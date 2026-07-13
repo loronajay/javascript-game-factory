@@ -45,7 +45,7 @@ function clearPhaseOne(state) {
   return state;
 }
 
-test("Void Ridden Castle is the 21st stop, a 13x13 4v4 rewarding Nemesis and the Summoner", () => {
+test("Void Ridden Castle is the penultimate stop, a 13x13 4v4 rewarding Nemesis and the Summoner", () => {
   const mission = getCampaignMission(VOID_CASTLE_MISSION_ID);
   const config = createCampaignMatchConfig(VOID_CASTLE_MISSION_ID, SQUAD);
 
@@ -56,7 +56,8 @@ test("Void Ridden Castle is the 21st stop, a 13x13 4v4 rewarding Nemesis and the
   assert.equal(mission.requiresPreviousMissionsComplete, true);
   assert.deepEqual([...mission.rewardUnits], ["nemesis", "summoner"]);
   assert.deepEqual([...config.squads[2]], ["summoner", "nemesis", "nemesis", "nemesis"]);
-  assert.equal(MAX_CAMPAIGN_MISSIONS, 21);
+  // The castle is stop 21 of 22 — The Final Battle now sits behind it at the void gate.
+  assert.equal(MAX_CAMPAIGN_MISSIONS, 22);
 
   // The mission blurb must not give away either surprise.
   assert.doesNotMatch(mission.description, /split|four Summoners|copy|copies|decoy|fake|two-part|ghost/i);

@@ -314,6 +314,20 @@ body.tutorial-spotlight-mp .dialogue-layer {
 /* Selected/active piece: warm the bone so the highlight reads on the figure. */
 .unit.active .fig-body { filter:brightness(1.08); }
 #message { position:absolute; left:50%; bottom:.875rem; z-index:7; max-width:min(72vw,620px); padding:.45rem .85rem; transform:translateX(-50%); border:1px solid rgba(100,140,170,.42); border-radius:14px; background:rgba(4,12,26,.92); color:var(--text); box-shadow:0 4px 16px rgba(0,0,0,.45); font-size:.78rem; line-height:1.34; text-align:center; }#message.error { color:#ffaca0; }
+/* Blackout: a full-screen fade the match holds on while the board is rebuilt underneath
+   (see ui/blackout.js). z-index 45 — over everything on the match screen (board 1, HUD 10,
+   turn flash 25, dice 30) but UNDER the dialogue layer at 50, so a script can keep talking
+   in the dark. pointer-events swallow clicks so nothing on the hidden board is reachable. */
+.blackout-layer { position:absolute; inset:0; z-index:45; display:grid; place-items:center; padding:2rem; background:#000; opacity:0; transition:opacity var(--blackout-fade,620ms) ease; pointer-events:auto; }
+.blackout-layer[hidden] { display:none; }
+.blackout-layer.is-active { opacity:1; }
+.blackout-caption { margin:0; max-width:36rem; color:var(--brass-hi,#f6dfb0); font:800 clamp(1rem,3.2vw,1.6rem) var(--font-display); letter-spacing:.26em; text-transform:uppercase; text-align:center; text-shadow:0 0 26px rgba(120,60,180,.5); opacity:0; transform:translateY(.4rem); animation:blackout-caption-in .9s ease .35s forwards; }
+@keyframes blackout-caption-in { to { opacity:.92; transform:translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .blackout-layer { transition-duration:1ms; }
+  .blackout-caption { animation-duration:1ms; animation-delay:0ms; }
+}
+
 /* Dialogue overlay: portrait + text box for tutorials and future campaign beats. */
 .dialogue-layer { position:absolute; inset:0; z-index:50; display:flex; align-items:flex-end; justify-content:center; padding:1rem 1.15rem 1.15rem; background:linear-gradient(180deg,transparent 38%,rgba(0,0,0,.34)); pointer-events:auto; }
 .dialogue-layer[hidden] { display:none; }

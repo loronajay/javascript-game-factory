@@ -1,4 +1,5 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
+import { DRAFT_BATTLE_REQUIRED_UNITS, isDraftBattleAvailable } from "./draftAvailability.js";
 import { STARTER_UNIT_TYPES, readUnlockProgress } from "./unlocks.js";
 
 export const PROGRESSION_ANNOUNCEMENTS_KEY = "tacticalArenaProgressionAnnouncementsV1";
@@ -71,6 +72,18 @@ export function buildSkinUnlockAnnouncement(skin) {
   };
 }
 
+export function buildDraftBattleUnlockAnnouncement() {
+  return {
+    id: "mode-unlock:draft-battles",
+    kind: "mode-unlock",
+    mode: "draft-battles",
+    eyebrow: "Achievement",
+    title: "Draft Battles Available",
+    body: `You own ${DRAFT_BATTLE_REQUIRED_UNITS} unique units, enough for the full snake draft. Draft 1v1 is now available in Online Versus.`,
+    primaryLabel: "Continue",
+  };
+}
+
 export function normalizeProgressionAnnouncement(value) {
   if (!value || typeof value !== "object") return null;
   if (value.kind === "unit-unlock") return buildUnitUnlockAnnouncement(value.unitType);
@@ -78,6 +91,7 @@ export function normalizeProgressionAnnouncement(value) {
     type: value.unitType ?? value.type,
     slug: value.skinSlug ?? value.slug,
   });
+  if (value.kind === "mode-unlock" && value.mode === "draft-battles") return buildDraftBattleUnlockAnnouncement();
   return null;
 }
 
@@ -138,10 +152,16 @@ export function enqueueSkinUnlockAnnouncements(storage = defaultStorage(), skins
   );
 }
 
+export function enqueueDraftBattleUnlockAnnouncement(storage = defaultStorage()) {
+  if (!isDraftBattleAvailable(storage)) return readProgressionAnnouncements(storage);
+  return enqueueProgressionAnnouncements(storage, [buildDraftBattleUnlockAnnouncement()]);
+}
+
 export function syncMissingUnitUnlockAnnouncements(storage = defaultStorage()) {
   const starterUnits = new Set(STARTER_UNIT_TYPES);
   const unlockedUnits = readUnlockProgress(storage).unlockedUnits.filter((type) => !starterUnits.has(type));
-  return enqueueUnitUnlockAnnouncements(storage, unlockedUnits);
+  enqueueUnitUnlockAnnouncements(storage, unlockedUnits);
+  return enqueueDraftBattleUnlockAnnouncement(storage);
 }
 
 export function consumeProgressionAnnouncements(storage = defaultStorage()) {

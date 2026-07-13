@@ -1,9 +1,9 @@
 import { COMMANDS } from "./commands.js";
 import { resolveNemesisAutoPulse, resolveVolcanicPyroclasmTick, useArt } from "./artResolvers.js";
 import { getArt, getBasicAttackResourceCost, getEffectiveStats, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, getWallKillResourceReward, getWeatherCritCreatesFire, initialAbilityUses, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
-import { areEnemies, cloneState, findUnit, isWallAt, livingUnits, unitAt } from "./state.js";
+import { areEnemies, cloneState, findUnit, getTileAffinity, isWallAt, livingUnits, unitAt } from "./state.js";
 import { getConeCells } from "../rules/arts.js";
-import { addDuelMark, duelistTracksMisses, getAttackRecoil, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCritPullEffect, getCritSplashDamage, getDuelistCritLifesteal, getLineAttackTargets, getMeleeDefendRetaliation, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack, resolveBaseStrike, rollToHit } from "../rules/combat.js";
+import { addDuelMark, duelistTracksMisses, getAttackRecoil, getAttackSplashDamage, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCritPullEffect, getCritSplashDamage, getDuelistCritLifesteal, getLineAttackTargets, getMeleeDefendRetaliation, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack, resolveBaseStrike, rollToHit } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMovePath, getLegalMoves, positionKey, validateTrampleMovePath } from "../rules/movement.js";
 import { applyStatus, isPetrified, isStunned } from "../rules/statuses.js";
 import { alliesInRadius, getStanceEffect } from "../rules/stances.js";
@@ -443,7 +443,9 @@ function attack(state, command) {
   const growthEvents = poisonRefund > 0 ? applyGrowth(next, actor, poisonRefund * poisonedByAttack) : [];
   // Dark Tread (Blacksword): heal for each enemy struck while it stood on a dark tile.
   const darkTreadEvents = applyDarkTreadLifesteal(next, actor, damagedForLifesteal);
-  const splashEvents = swing.critical ? applyCritSplashDamage(next, actor, nextTarget, getCritSplashDamage(actor)) : [];
+  const splashEvents = swing.critical ? applySplashDamage(next, actor, nextTarget, getCritSplashDamage(actor)) : [];
+  // Void Reach (attackSplash): splash on EVERY landed hit, crit or not.
+  const attackSplashEvents = applySplashDamage(next, actor, nextTarget, getAttackSplashDamage(actor), "ATTACK_SPLASH");
   const freeConeEvents = applyBasicAttackFreeCone(next, actor, nextTarget);
   const desperationEvents = consumeOneShotRage(actor);
   resolveVictory(next);
@@ -462,7 +464,7 @@ function attack(state, command) {
     ...(fireTiles.length ? { fireTiles } : {}),
     ...(Object.keys(pulled).length ? { pulled } : {}),
     ...damageFields
-  }, ...triggerEvents, ...healingEvents, ...retaliationEvents, ...growthEvents, ...darkTreadEvents, ...splashEvents, ...freeConeEvents, ...desperationEvents, ...rockHardEvents, ...magicReactionEvents, ...duelistEvents]);
+  }, ...triggerEvents, ...healingEvents, ...retaliationEvents, ...growthEvents, ...darkTreadEvents, ...splashEvents, ...attackSplashEvents, ...freeConeEvents, ...desperationEvents, ...rockHardEvents, ...magicReactionEvents, ...duelistEvents]);
 }
 
 function getBasicAttackCritMpRestore(unit) {
@@ -470,24 +472,35 @@ function getBasicAttackCritMpRestore(unit) {
   return effect?.type === "weatherCommander" ? Math.max(0, Number(effect.critMpRestore) || 0) : 0;
 }
 
-function applyCritSplashDamage(state, actor, originalTarget, splash) {
+// True-damage splash around the unit a basic attack just struck: everything hostile to the
+// attacker within `radius` of the original target (the target itself excluded — it already
+// took the strike) takes `amount`, plus `affinityBonus.amount` more if THAT unit stands on
+// an `affinityBonus.affinity` tile. Two callers: Little Brother's crit-only Splash Fire,
+// and the `attackSplash` passive, which rides every landed hit (mission 22's Blacksword —
+// standing next to whoever he swings at is what gets a party killed).
+function applySplashDamage(state, actor, originalTarget, splash, eventType = "SPLASH_FIRE") {
   const amount = Math.max(0, Number(splash?.amount) || 0);
   if (amount <= 0 || !originalTarget) return [];
   const radius = Math.max(0, Number(splash.radius) || 0);
+  const affinityBonus = splash.affinityBonus ?? null;
+  const bonusAmount = Math.max(0, Number(affinityBonus?.amount) || 0);
   const damageByTarget = {};
   const targetIds = [];
   for (const target of livingUnits(state)) {
     if (target.id === originalTarget.id || !areEnemies(actor, target)) continue;
     if (chebyshevDistance(originalTarget.position, target.position) > radius) continue;
-    const dealt = Math.min(target.hp, amount);
-    target.hp = Math.max(0, target.hp - amount);
+    const onAffinity = Boolean(affinityBonus) &&
+      getTileAffinity(state, target.position) === affinityBonus.affinity;
+    const damage = amount + (onAffinity ? bonusAmount : 0);
+    const dealt = Math.min(target.hp, damage);
+    target.hp = Math.max(0, target.hp - damage);
     if (dealt > 0) {
       targetIds.push(target.id);
       damageByTarget[target.id] = dealt;
     }
   }
   return targetIds.length ? [{
-    type: "SPLASH_FIRE",
+    type: eventType,
     actorId: actor.id,
     sourceTargetId: originalTarget.id,
     targetIds,

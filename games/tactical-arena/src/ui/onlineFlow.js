@@ -20,6 +20,7 @@ import { createOnlineClient, normalizeRoomCode } from "../online/onlineClient.js
 import { createOnlineSession } from "../online/onlineSession.js";
 import { ONLINE_RULESET_VERSION } from "../online/ruleset.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
+import { DRAFT_BATTLE_REQUIRED_UNITS } from "../progression/draftAvailability.js";
 import { UNIT_TYPE_KEYS, groupedUnitTypes, isUnitUnlocked } from "./squadModel.js";
 import { createPortrait } from "./portraits.js";
 import { openSkinPicker } from "./skinPicker.js";
@@ -151,7 +152,7 @@ export function createOnlineFlow({ onStartMatch }) {
   }
 
   function isDraftUnlockable() {
-    return unlockedUnitCount() >= DRAFT_PICK_ORDER.length;
+    return unlockedUnitCount() >= DRAFT_BATTLE_REQUIRED_UNITS;
   }
 
   function syncMatchTypeAvailability() {
@@ -161,14 +162,14 @@ export function createOnlineFlow({ onStartMatch }) {
       seg.disabled = locked;
       seg.classList.toggle("is-locked", locked);
       seg.title = locked
-        ? `Must own ${DRAFT_PICK_ORDER.length} unique units to draft (${unlockedUnitCount()} unlocked)`
+        ? `Must own ${DRAFT_BATTLE_REQUIRED_UNITS} unique units to draft (${unlockedUnitCount()} unlocked)`
         : "";
     }
     if (matchTypeHintEl) {
       const showHint = !draftReady && normalizeMatchType(selectedMatchType) === "draft1v1";
       matchTypeHintEl.hidden = !showHint;
       matchTypeHintEl.textContent = showHint
-        ? `Draft 1v1 needs ${DRAFT_PICK_ORDER.length} unique units — you have ${unlockedUnitCount()} unlocked.`
+        ? `Draft 1v1 needs ${DRAFT_BATTLE_REQUIRED_UNITS} unique units — you have ${unlockedUnitCount()} unlocked.`
         : "";
     }
   }

@@ -21,6 +21,7 @@ import {
   SHOWDOWN_MISSION_ID,
   NOT_MY_KING_MISSION_ID,
   VOID_CASTLE_MISSION_ID,
+  FINAL_BATTLE_MISSION_ID,
   VOID_CASTLE_SUMMONER_COUNT,
   WANDERING_PARTY_SKIN_PACK,
   HASBEEN_MYSTIC_SKIN_PACK,
@@ -45,6 +46,7 @@ import { getNicknamePref } from "../ui/nicknameModel.js";
 import { getCampaignMission } from "./campaignModel.js";
 import { defaultStorage } from "./campaignProgress.js";
 import { VOID_CASTLE_GHOST_FAKE_NAMES, VOID_CASTLE_GHOST_POOLS } from "./missions/void-ridden-castle/ghosts.js";
+import { prepareFinalBattle } from "./missions/the-final-battle/stages.js";
 
 export function campaignMissionHasAuthoredWeather(missionOrId) {
   const missionId = typeof missionOrId === "string" ? missionOrId : missionOrId?.id ?? null;
@@ -55,8 +57,16 @@ export function campaignMissionHasAuthoredWeather(missionOrId) {
   return Boolean(layout.weather || rules?.permanentWeather || rules?.weatherCycle);
 }
 
+// Types a given mission will not let the player field. Two sources, unioned: a mission whose
+// board runs its own weather locks Mother Nature out (her whole kit is the weather), and a
+// mission may declare its own `restrictedUnitTypes` — The Final Battle uses it to keep the
+// King out, since every party member there has to survive a solo duel and a non-combatant
+// commander has no way to fight one.
 export function campaignRestrictedUnitTypes(storage = defaultStorage(), missionOrId = null) {
-  return campaignMissionHasAuthoredWeather(missionOrId) ? ["mother-nature"] : [];
+  const mission = typeof missionOrId === "string" ? getCampaignMission(missionOrId) : missionOrId;
+  const restricted = new Set(mission?.restrictedUnitTypes ?? []);
+  if (campaignMissionHasAuthoredWeather(missionOrId)) restricted.add("mother-nature");
+  return [...restricted];
 }
 
 export function campaignRetiredUnitTypes(storage = defaultStorage(), missionOrId = null) {
@@ -153,7 +163,9 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
     },
     teamNames: {
       1: "Player Vanguard",
-      2: mission.id === WANDERING_PARTY_MISSION_ID
+      2: mission.id === FINAL_BATTLE_MISSION_ID
+        ? "The Void"
+        : mission.id === WANDERING_PARTY_MISSION_ID
         ? "The Wanderers"
         : mission.id === HASBEEN_HEROES_MISSION_ID
         ? "The Has-Beens"
@@ -857,6 +869,20 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
       unit.player === 2 && unit.type === "summoner" ? VOID_CASTLE_SUMMONER_SKIN : unit.skin ?? null
     ),
     prepareTrial: prepareVoidCastleTrial,
+  },
+  // The Final Battle (11×11 → 5×5 → 11×11): the party takes its usual corner block; the only
+  // thing the layout itself does is hand the board to prepareFinalBattle, which stands
+  // Blacksword in the middle of it and installs the five-stage rule block. Every board after
+  // this one is built by the stage machine, not from a table — see
+  // missions/the-final-battle/stages.js.
+  [FINAL_BATTLE_MISSION_ID]: {
+    positions: {},
+    fallback: (unit) => ({ ...unit.position }),
+    fullHp: true,
+    skinFor: (unit) => (
+      unit.player === 2 && unit.type === "blacksword" ? "void-dweller" : unit.skin ?? null
+    ),
+    prepareTrial: prepareFinalBattle,
   },
   [VOIDWOOD_MISSION_ID]: {
     positions: {},

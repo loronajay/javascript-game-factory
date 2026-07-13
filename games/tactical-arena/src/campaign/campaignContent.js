@@ -22,6 +22,8 @@ import {
   NOT_MY_KING_MISSION_ID,
   VOID_CASTLE_MISSION_ID,
   VOID_CASTLE_ENEMY_TYPES,
+  FINAL_BATTLE_MISSION_ID,
+  FINAL_BATTLE_BOARD_SIZE,
   WANDERING_PARTY_SKIN_PACK,
   HASBEEN_MYSTIC_SKIN_PACK,
   HASBEEN_HEROES_FAT_TYPES,
@@ -357,6 +359,31 @@ const AUTHORED_MISSIONS = Object.freeze({
   // voidCastleTrial rule in turnEngine.js + missions/void-ridden-castle/ghosts.js). The
   // description deliberately does NOT mention the split or the ghost-name tell — both are
   // meant to land as surprises.
+  // The Final Battle (11×11 → 5×5 → 11×11): the last stop on the trail, at the void gate
+  // itself. A FIVE-stage battle — a confrontation, four mirror duels, then the 4v1 — driven
+  // by missions/the-final-battle/stages.js. The description says none of that: the blackout
+  // and what walks out of it are the mission. It only warns about the one thing a player
+  // genuinely cannot recover from being surprised by (bring fighters — every one of them
+  // will have to fight alone), and the King is filtered out of the picker entirely
+  // (restrictedUnitTypes), since a non-combatant commander cannot be sent into a solo duel.
+  [FINAL_BATTLE_MISSION_ID]: {
+    id: FINAL_BATTLE_MISSION_ID,
+    title: "The Final Battle",
+    subtitle: "The gate is open, and it did not open from this side",
+    description: "Bring any four to the void gate. Blacksword is waiting in the middle of it, and he has no intention of being reasoned with. Choose four who can each hold their own — before this is over, every one of them will stand alone.",
+    unitType: "blacksword",
+    requiredStars: 0,
+    requiresPreviousMissionsComplete: true,
+    rewardUnits: Object.freeze(["blacksword"]),
+    playerSlots: 4,
+    enemySquad: Object.freeze(["blacksword"]),
+    enemySkins: Object.freeze(["void-dweller"]),
+    // The King never draws a weapon. Every party member here has to survive a duel with
+    // nobody to command, so he cannot be brought — the picker simply doesn't offer him.
+    restrictedUnitTypes: Object.freeze(["king"]),
+    size: FINAL_BATTLE_BOARD_SIZE,
+    fullHp: true,
+  },
   [VOID_CASTLE_MISSION_ID]: {
     id: VOID_CASTLE_MISSION_ID,
     title: "Void Ridden Castle",
@@ -403,44 +430,49 @@ export const CAMPAIGN_REGIONS = Object.freeze([
 // while the mission itself is still gated. `blurb` seeds the placeholder's flavor +
 // a hint at the challenge a real mission there might explore (a mission-idea backlog).
 const CAMPAIGN_TRAIL = [
-  { id: CLOD_MISSION_ID, cell: { col: 0, row: 4 }, point: { x: 9.5, y: 86.4 }, region: "ridge", locationName: "Stoneback Ridge" },
-  { id: NECROMANCER_MISSION_ID, cell: { col: 1, row: 4 }, point: { x: 19.0, y: 76.5 }, region: "barrow", locationName: "The Old Gate" },
-  { id: WITCH_DOCTOR_MISSION_ID, cell: { col: 2, row: 4 }, point: { x: 31.4, y: 86.2 }, region: "mire", locationName: "Mirefen Shallows",
+  { id: CLOD_MISSION_ID, cell: { col: 0, row: 4 }, point: { x: 9.39, y: 88.44 }, region: "ridge", locationName: "Stoneback Ridge" },
+  { id: NECROMANCER_MISSION_ID, cell: { col: 1, row: 4 }, point: { x: 19.04, y: 76.93 }, region: "barrow", locationName: "The Old Gate" },
+  { id: WITCH_DOCTOR_MISSION_ID, cell: { col: 2, row: 4 }, point: { x: 30.87, y: 87.43 }, region: "mire", locationName: "Mirefen Shallows",
     blurb: "Foul water swallows the causeway. Something chants in the reeds — a witch doctor's dance, they say, that turns your own curses against you." },
-  { id: FATHER_TIME_MISSION_ID, cell: { col: 3, row: 4 }, point: { x: 21.3, y: 48.4 }, region: "wood", locationName: "Timeless Woods",
+  { id: FATHER_TIME_MISSION_ID, cell: { col: 3, row: 4 }, point: { x: 21.45, y: 48.65 }, region: "wood", locationName: "Timeless Woods",
     blurb: "Ancient trees lean over a path where seconds fall like leaves. A clock-crowned keeper waits beside a patient archer." },
-  { id: VIRUS_MISSION_ID, cell: { col: 4, row: 4 }, point: { x: 11.4, y: 44.7 }, region: "mire", locationName: "The Viral Root",
+  { id: VIRUS_MISSION_ID, cell: { col: 4, row: 4 }, point: { x: 11.23, y: 45.11 }, region: "mire", locationName: "The Viral Root",
     blurb: "Where the swamp drains to the sea, the rot has roots. A poisonous squad waits in the black water." },
-  { id: PALADIN_MISSION_ID, cell: { col: 5, row: 4 }, point: { x: 29.1, y: 34.2 }, region: "coast", locationName: "Tidewatch Harbor",
+  { id: PALADIN_MISSION_ID, cell: { col: 5, row: 4 }, point: { x: 28.72, y: 34.39 }, region: "coast", locationName: "Tidewatch Harbor",
     blurb: "Salt wind and long sightlines. Whoever commands the piers commands the range." },
-  { id: MONK_MISSION_ID, cell: { col: 6, row: 4 }, point: { x: 21.3, y: 20.5 }, region: "coast", locationName: "Temple Steps",
+  { id: MONK_MISSION_ID, cell: { col: 6, row: 4 }, point: { x: 21.33, y: 20.08 }, region: "coast", locationName: "Temple Steps",
     blurb: "A silent temple waits above the tide. Four identical Monks guard the steps, but only one carries the true discipline." },
-  { id: BROTHERS_MISSION_ID, cell: { col: 3, row: 1 }, point: { x: 46.2, y: 31.1 }, region: "farm", locationName: "Meadowmill Farm" },
-  { id: GARGOYLE_MISSION_ID, cell: { col: 5, row: 3 }, point: { x: 51.9, y: 18.7 }, region: "ashfall", locationName: "Ashfall Flats",
+  { id: BROTHERS_MISSION_ID, cell: { col: 3, row: 1 }, point: { x: 46.07, y: 30.76 }, region: "farm", locationName: "Meadowmill Farm" },
+  { id: GARGOYLE_MISSION_ID, cell: { col: 5, row: 3 }, point: { x: 52.25, y: 18.22 }, region: "ashfall", locationName: "Ashfall Flats",
     blurb: "A low ruin mouth exhales heat from beneath the flats. Something stone-winged waits in the old dark." },
-  { id: SNIPER_MISSION_ID, cell: { col: 4, row: 3 }, point: { x: 63.3, y: 24.3 }, region: "plateau", locationName: "The High Cliffs",
+  { id: SNIPER_MISSION_ID, cell: { col: 4, row: 3 }, point: { x: 63.36, y: 24.68 }, region: "plateau", locationName: "The High Cliffs",
     blurb: "Flat cliffs and long sightlines. Whoever holds the plateau's height holds every lane across it." },
-  { id: WANDERING_PARTY_MISSION_ID, cell: { col: 3, row: 3 }, point: { x: 67.3, y: 37.0 }, region: "ashfall", locationName: "Cinderwood" },
-  { id: MINER_MISSION_ID, cell: { col: 2, row: 3 }, point: { x: 56.2, y: 47.3 }, region: "wood", locationName: "Whisperwood Eaves" },
-  { id: HASBEEN_HEROES_MISSION_ID, cell: { col: 1, row: 3 }, point: { x: 50.2, y: 58.2 }, region: "town", locationName: "Highmarket" },
-  { id: RONIN_MISSION_ID, cell: { col: 0, row: 3 }, point: { x: 55.7, y: 72.5 }, region: "wood", locationName: "Thornhollow Bridge",
+  { id: WANDERING_PARTY_MISSION_ID, cell: { col: 3, row: 3 }, point: { x: 66.98, y: 36.83 }, region: "ashfall", locationName: "Cinderwood" },
+  { id: MINER_MISSION_ID, cell: { col: 2, row: 3 }, point: { x: 56.29, y: 46.73 }, region: "wood", locationName: "Whisperwood Eaves" },
+  { id: HASBEEN_HEROES_MISSION_ID, cell: { col: 1, row: 3 }, point: { x: 50.09, y: 58.45 }, region: "town", locationName: "Highmarket" },
+  { id: RONIN_MISSION_ID, cell: { col: 0, row: 3 }, point: { x: 56.13, y: 72.44 }, region: "wood", locationName: "Thornhollow Bridge",
     blurb: "Bramble walls and blind corners. Line of sight is a luxury you'll have to earn." },
-  { id: WRONG_PLACE_MISSION_ID, cell: { col: 0, row: 2 }, point: { x: 68.5, y: 78.9 }, region: "town", locationName: "Frostcrown Foothills",
+  { id: WRONG_PLACE_MISSION_ID, cell: { col: 0, row: 2 }, point: { x: 68.55, y: 79.02 }, region: "town", locationName: "Frostcrown Foothills",
     blurb: "The climb begins. Cold slows the blood and the boots — every step of movement counts double." },
-  { id: OUT_OF_RETIREMENT_MISSION_ID, cell: { col: 1, row: 2 }, point: { x: 85.2, y: 87.1 }, region: "coast", locationName: "Sunbreak Temple",
+  { id: OUT_OF_RETIREMENT_MISSION_ID, cell: { col: 1, row: 2 }, point: { x: 85.73, y: 87.27 }, region: "coast", locationName: "Sunbreak Temple",
     blurb: "A deserted island beach curls around an ancient temple. Someone has been enjoying the quiet a little too much." },
-  { id: VOIDWOOD_MISSION_ID, cell: { col: 2, row: 2 }, point: { x: 74.9, y: 64.8 }, region: "wood", locationName: "Voidwood Forest",
+  { id: VOIDWOOD_MISSION_ID, cell: { col: 2, row: 2 }, point: { x: 74.91, y: 63.78 }, region: "wood", locationName: "Voidwood Forest",
     blurb: "Void-black trees crowd the old trail. Something ancient waits where the summit marker used to sit." },
-  { id: SPIRIT_WOODS_MISSION_ID, cell: { col: 6, row: 1 }, point: { x: 30.0, y: 56.9 }, region: "wood", locationName: "Spirit Grove",
+  { id: SPIRIT_WOODS_MISSION_ID, cell: { col: 6, row: 1 }, point: { x: 29.97, y: 56.93 }, region: "wood", locationName: "Spirit Grove",
     blurb: "A quiet forest node waits east of the Timeless Woods. The wind moves here even when the trees do not." },
-  { id: SHOWDOWN_MISSION_ID, cell: { col: 3, row: 2 }, point: { x: 80.0, y: 47.2 }, region: "waste", locationName: "The Shattered Waste", requiredStars: 0, requiresPreviousMissionsComplete: true,
+  { id: SHOWDOWN_MISSION_ID, cell: { col: 3, row: 2 }, point: { x: 79.86, y: 45.19 }, region: "waste", locationName: "The Shattered Waste", requiredStars: 0, requiresPreviousMissionsComplete: true,
     blurb: "Beyond the peaks, a broken country of fallen towers where time itself runs strange." },
-  { id: NOT_MY_KING_MISSION_ID, cell: { col: 5, row: 2 }, point: { x: 84.5, y: 30.9 }, region: "waste", locationName: "Ember Crown Rise", requiredStars: 0, requiresPreviousMissionsComplete: true,
+  { id: NOT_MY_KING_MISSION_ID, cell: { col: 5, row: 2 }, point: { x: 83.88, y: 30.8 }, region: "waste", locationName: "Ember Crown Rise", requiredStars: 0, requiresPreviousMissionsComplete: true,
     blurb: "A lower painted marker smolders above the shattered waste. The castle can wait; the crown has come to the road." },
   // The painted castle in the snowbound north-east. Its cell (6,0) finally gives the
   // declared-but-unused `frost` region a home, so Frostcrown Peaks reads on the map.
-  { id: VOID_CASTLE_MISSION_ID, cell: { col: 6, row: 0 }, point: { x: 86.6, y: 18.9 }, region: "frost", locationName: "Highspire Castle", requiredStars: 0, requiresPreviousMissionsComplete: true,
+  { id: VOID_CASTLE_MISSION_ID, cell: { col: 6, row: 0 }, point: { x: 86.95, y: 19.13 }, region: "frost", locationName: "Highspire Castle", requiredStars: 0, requiresPreviousMissionsComplete: true,
     blurb: "The kingdom's seat, high in the snow. The walls are still standing. That is the only thing about it that still feels right." },
+  // The last painted landmark on the map: the crystal cave in the far-east snowfield, held
+  // node-less since the map art was drawn "for the Blacksword finale." This claims it, and
+  // with it the trail is complete — every ring on the map is now a real stop.
+  { id: FINAL_BATTLE_MISSION_ID, cell: { col: 6, row: 2 }, point: { x: 90.54, y: 45.2 }, region: "frost", locationName: "The Void Gate", requiredStars: 0, requiresPreviousMissionsComplete: true,
+    blurb: "A wound of blue light in the rock. It is not a cave. Caves do not hum." },
 ];
 
 // Extra visual branches on top of the linear spine, so the map reads as a network

@@ -20,6 +20,7 @@ export const SPIRIT_WOODS_MISSION_ID = "spirit-of-the-woods";
 export const SHOWDOWN_MISSION_ID = "the-showdown";
 export const NOT_MY_KING_MISSION_ID = "not-my-king";
 export const VOID_CASTLE_MISSION_ID = "void-ridden-castle";
+export const FINAL_BATTLE_MISSION_ID = "the-final-battle";
 // Phase 1 of the castle: the Summoner hides behind a wall of three Nemesis bodies.
 export const VOID_CASTLE_ENEMY_TYPES = Object.freeze(["summoner", "nemesis", "nemesis", "nemesis"]);
 // Phase 2 spawns this many Summoners (one real, the rest decoys).
@@ -54,10 +55,45 @@ export const WITCH_DOCTOR_BOARD_SIZE = 9;
 // 3 (a 1+2+2 = 5 HP ceiling) keeps the heal-before-you-arrive telegraph (see
 // witchDoctorFireWarningScript) without letting it fully negate approach damage.
 export const WITCH_DOCTOR_HEAL_CAST_CAP = 3;
+// --- The Final Battle (mission 22) ----------------------------------------------------
+// A five-stage battle: an opening confrontation, then one mirror duel per party member on
+// a cramped 5×5, then the 4v1 against Blacksword himself on the full board. See
+// missions/the-final-battle/stages.js — the stage machine — and CLAUDE.md.
+//
+// The duels: your unit against a copy of itself. Both sides are flattened to the SAME low
+// HP so the mirror is exact and the duel is short — no unit's own stat block gives it an
+// edge over its reflection, which is the whole point of the fight.
+export const FINAL_BATTLE_DUEL_BOARD_SIZE = 5;
+export const FINAL_BATTLE_DUEL_HP = 10;
+export const FINAL_BATTLE_BOARD_SIZE = 11;
+// Blacksword the boss is NOT the Blacksword the player unlocks: he fields with a granted
+// stat block (100 HP / 13 STR, folded through the standard additive statModifiers seam) and
+// one instance-granted passive, Void Reach (see FINAL_BATTLE_VOID_REACH). His drafted twin
+// keeps the 30/10 unit definition untouched.
+export const FINAL_BATTLE_BOSS_HP = 100;
+export const FINAL_BATTLE_BOSS_STRENGTH = 13;
+export const FINAL_BATTLE_BOSS_ID = "p2-boss-blacksword";
+// Void Reach — the reason a clustered party dies here. Every landed basic attack of his
+// also deals 3 true damage to each of the target's allies within 1 tile, +1 more against
+// any of them standing on a dark tile. Granted per-instance via `unit.bonusPassives`
+// (rules/combat.js's passiveEffects), so it never touches the playable unit.
+export const FINAL_BATTLE_VOID_REACH = Object.freeze({
+  id: "void-reach",
+  name: "Void Reach",
+  kind: "passive",
+  effect: Object.freeze({
+    type: "attackSplash",
+    amount: 3,
+    radius: 1,
+    affinityBonus: Object.freeze({ affinity: "dark", amount: 1 }),
+  }),
+  description: "Blacksword's attacks tear the space around them: allies within 1 tile of his target take 3 true damage, +1 more while standing on a dark tile.",
+  implemented: true,
+});
 export const MIN_CAMPAIGN_SQUAD_SIZE = 1;
 export const MAX_CAMPAIGN_SQUAD_SIZE = 4;
-// The campaign map is capped for now so the journey stays surveyable at once;
-// authored missions fill placeholder stops one at a time up to this count. Some
-// painted landmarks intentionally stay node-less until a future unit needs them
-// (the far-east crystal/ice cave is reserved for the Blacksword finale).
-export const MAX_CAMPAIGN_MISSIONS = 21;
+// The campaign map is capped for now so the journey stays surveyable at once; authored
+// missions fill placeholder stops one at a time up to this count. The last painted landmark
+// held in reserve — the far-east crystal/ice cave — is now claimed by The Final Battle, so
+// every ring on the map art is a real stop and the trail is complete.
+export const MAX_CAMPAIGN_MISSIONS = 22;

@@ -12,8 +12,28 @@ import {
   BROTHERS_MISSION_ID,
   CAMPAIGN_MISSIONS,
   CAMPAIGN_REGIONS,
+  CLOD_MISSION_ID,
+  FATHER_TIME_MISSION_ID,
+  FINAL_BATTLE_MISSION_ID,
   GARGOYLE_MISSION_ID,
+  HASBEEN_HEROES_MISSION_ID,
   MAX_CAMPAIGN_MISSIONS,
+  MINER_MISSION_ID,
+  MONK_MISSION_ID,
+  NECROMANCER_MISSION_ID,
+  NOT_MY_KING_MISSION_ID,
+  OUT_OF_RETIREMENT_MISSION_ID,
+  PALADIN_MISSION_ID,
+  RONIN_MISSION_ID,
+  SHOWDOWN_MISSION_ID,
+  SNIPER_MISSION_ID,
+  SPIRIT_WOODS_MISSION_ID,
+  VIRUS_MISSION_ID,
+  VOIDWOOD_MISSION_ID,
+  VOID_CASTLE_MISSION_ID,
+  WANDERING_PARTY_MISSION_ID,
+  WITCH_DOCTOR_MISSION_ID,
+  WRONG_PLACE_MISSION_ID,
   getCampaignMap,
 } from "../src/campaign/campaign.js";
 
@@ -25,6 +45,31 @@ function storageAdapter() {
     removeItem: (key) => values.delete(key),
   };
 }
+
+const PAINTED_MAP_NODE_CENTERS = Object.freeze({
+  [CLOD_MISSION_ID]: Object.freeze({ x: 9.39, y: 88.44 }),
+  [NECROMANCER_MISSION_ID]: Object.freeze({ x: 19.04, y: 76.93 }),
+  [WITCH_DOCTOR_MISSION_ID]: Object.freeze({ x: 30.87, y: 87.43 }),
+  [FATHER_TIME_MISSION_ID]: Object.freeze({ x: 21.45, y: 48.65 }),
+  [VIRUS_MISSION_ID]: Object.freeze({ x: 11.23, y: 45.11 }),
+  [PALADIN_MISSION_ID]: Object.freeze({ x: 28.72, y: 34.39 }),
+  [MONK_MISSION_ID]: Object.freeze({ x: 21.33, y: 20.08 }),
+  [BROTHERS_MISSION_ID]: Object.freeze({ x: 46.07, y: 30.76 }),
+  [GARGOYLE_MISSION_ID]: Object.freeze({ x: 52.25, y: 18.22 }),
+  [SNIPER_MISSION_ID]: Object.freeze({ x: 63.36, y: 24.68 }),
+  [WANDERING_PARTY_MISSION_ID]: Object.freeze({ x: 66.98, y: 36.83 }),
+  [MINER_MISSION_ID]: Object.freeze({ x: 56.29, y: 46.73 }),
+  [HASBEEN_HEROES_MISSION_ID]: Object.freeze({ x: 50.09, y: 58.45 }),
+  [RONIN_MISSION_ID]: Object.freeze({ x: 56.13, y: 72.44 }),
+  [WRONG_PLACE_MISSION_ID]: Object.freeze({ x: 68.55, y: 79.02 }),
+  [OUT_OF_RETIREMENT_MISSION_ID]: Object.freeze({ x: 85.73, y: 87.27 }),
+  [VOIDWOOD_MISSION_ID]: Object.freeze({ x: 74.91, y: 63.78 }),
+  [SPIRIT_WOODS_MISSION_ID]: Object.freeze({ x: 29.97, y: 56.93 }),
+  [SHOWDOWN_MISSION_ID]: Object.freeze({ x: 79.86, y: 45.19 }),
+  [NOT_MY_KING_MISSION_ID]: Object.freeze({ x: 83.88, y: 30.8 }),
+  [VOID_CASTLE_MISSION_ID]: Object.freeze({ x: 86.95, y: 19.13 }),
+  [FINAL_BATTLE_MISSION_ID]: Object.freeze({ x: 90.54, y: 45.2 }),
+});
 
 test("cellToPercent keeps every grid cell inside the padded canvas", () => {
   const corners = [
@@ -80,6 +125,17 @@ test("computeCampaignGeometry prefers authored image points over grid cells", ()
   assert.deepEqual(geo.positions.a, { x: 12.35, y: 67.89 });
 });
 
+test("authored campaign points sit on the painted map node centers", () => {
+  assert.equal(Object.keys(PAINTED_MAP_NODE_CENTERS).length, CAMPAIGN_MISSIONS.length);
+  for (const mission of CAMPAIGN_MISSIONS) {
+    assert.deepEqual(
+      mission.point,
+      PAINTED_MAP_NODE_CENTERS[mission.id],
+      `${mission.id} should stay centered on its painted map node`,
+    );
+  }
+});
+
 test("computeCampaignGeometry ignores connections to unknown nodes", () => {
   const geo = computeCampaignGeometry([
     { id: "a", cell: { col: 0, row: 0 }, connections: ["ghost"] },
@@ -124,8 +180,8 @@ test("the authored campaign graph is capped, uniquely celled, and fully connecte
 });
 
 test("Mechs on the Farm claims the reserved farmland landmark; Ashfall Flats keeps the mining landmark", () => {
-  const farmlandPoint = { x: 46.2, y: 31.1 };
-  const miningPoint = { x: 51.9, y: 18.7 };
+  const farmlandPoint = { x: 46.07, y: 30.76 };
+  const miningPoint = { x: 52.25, y: 18.22 };
   const farmlandNode = CAMPAIGN_MISSIONS.find((mission) =>
     mission.point?.x === farmlandPoint.x && mission.point?.y === farmlandPoint.y
   );

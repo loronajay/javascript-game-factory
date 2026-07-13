@@ -21,6 +21,7 @@ import {
   SHOWDOWN_MISSION_ID,
   NOT_MY_KING_MISSION_ID,
   VOID_CASTLE_MISSION_ID,
+  FINAL_BATTLE_MISSION_ID,
   WANDERING_PARTY_SKIN_PACK,
   HASBEEN_MYSTIC_SKIN_PACK,
   HASBEEN_HEROES_FAT_TYPES,
@@ -54,6 +55,26 @@ function volunteerType(selectedSquad) {
 }
 
 export function campaignMapCutsceneScript(missionId, selectedSquad = null, { phase = "full" } = {}) {
+  // The Final Battle — the walk up to the gate. The Summoner and Nemesis come this far and
+  // no further, on purpose: their fight is on the other side, and the party has to be the
+  // ones who do this. It also quietly does the job of telling the player that the two of
+  // them are still around, so the ending doesn't have to introduce them from nowhere.
+  if (missionId === FINAL_BATTLE_MISSION_ID) {
+    return [
+      narration("The ice thins. Under it, the rock begins to glow — a blue that has never been in a sky."),
+      { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+        text: "This is as far as we come." },
+      { speaker: "swordsman", side: "left",
+        text: "You've been walking behind us for three hundred miles to stop at the door?" },
+      { speaker: "nemesis", side: "right", player: 2,
+        text: "If we step through that light, he stops being a thing that ran from the void and starts being a thing that RULES it. He would not fight you. He would simply be home." },
+      { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+        text: "He has to be beaten HERE. On your stone, under your sky, with your feet on the ground he is standing on. That was always going to be your half of this." },
+      { speaker: "mystic", side: "left",
+        text: "Then we'll take our half." },
+      narration("Ahead, in the hollow of the crystal, something that is not the light is waiting to be looked at."),
+    ];
+  }
   // Void Ridden Castle — the pre-mission brief. The party walks into the throne room they
   // fought all campaign to reach and it is subtly, unbearably wrong. The Summoner is
   // already there; the trap already closed behind them. The party's offer of an alliance
@@ -388,7 +409,56 @@ export function markCampaignMapCutsceneSeen(storage = defaultStorage(), missionI
 // forced back onto the map) and BEFORE the skin reward pick. Flag-gated by the same
 // seen-list pattern the overworld map cutscene uses, but tracked separately per mission
 // so the two cutscenes never burn each other's flag.
+// The ending. It has four jobs, in this order, and it fails if it does them out of order:
+// send the void beings home, let the party be people for a moment, pay off the journey
+// WITHOUT a victory speech, and only then talk to the player about what is next. The
+// player-facing beats are narration cards rather than a character selling features —
+// a Swordsman recommending online matchmaking is where this would have gone corny.
+function finalBattleEndingScript() {
+  return [
+    { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+      text: "It is closing. Slowly — but it is closing, and it will not open again from this side for a very long time." },
+    { speaker: "nemesis", side: "right", player: 2,
+      text: "He went through it bleeding. Everything he took from this world, he left on that rock." },
+    { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+      text: "Which makes now the only hour in a thousand years that he can be caught. So this is where we leave you." },
+    { speaker: "mystic", side: "left",
+      text: "You're going after him. Into the void. The two of you." },
+    { speaker: "nemesis", side: "right", player: 2,
+      text: "We were losing to him at full strength, apart. He is not at full strength. We are not apart." },
+    { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+      text: "Weakened, in our realm, with both of us waiting — yes. We can hold him there. That is not a boast. It is the first honest arithmetic I have done in a century." },
+    { speaker: "swordsman", side: "left",
+      text: "And afterward? When he's held?" },
+    { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+      text: "Afterward, Nemesis and I have an argument to get back to." },
+    { speaker: "nemesis", side: "right", player: 2,
+      text: "A long one." },
+    { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+      text: "Guardians. I have never said this to anything living. Thank you." },
+    narration("The two of them step into the blue light without looking back, and the gate folds shut behind them like a held breath finally let go."),
+    narration("The humming stops. It is very, very quiet in the crystal cave."),
+    { speaker: "mystic", side: "left",
+      text: "...Is that it? That's it. That's the whole thing." },
+    { speaker: "swordsman", side: "left",
+      text: "Don't say it like that. You'll jinx the walk home." },
+    { speaker: "mystic", side: "left",
+      text: "I'm not celebrating. I'm just standing here noticing that nothing is trying to kill us. Give me a minute with it. It's been a while." },
+    { speaker: "swordsman", side: "left",
+      text: "Take the minute. We earned the minute." },
+    narration("A ridge, a farm, a bridge, a market, a swamp, a castle. Every stone of it walked, and every one of them still standing at the end of it."),
+    narration("The war for the earth is over. What is left is the part nobody writes songs about: the road home, and whatever you decide to do with the peace."),
+    // The one place the game talks to the player as the player. Kept to narration cards, kept
+    // short, and kept until after the story has actually landed.
+    narration("Every fighter on this continent now answers to you — the whole roster is unlocked, and there is nothing left in the campaign to earn them with."),
+    narration("So take them somewhere that fights back. ONLINE VERSUS puts your four against a real opponent's four, and a mirror match out there is a very different animal than a mirror match in the dark."),
+    narration("And when you want them to look the part: a skin store is coming. Your roster has earned the right to be seen."),
+    narration("Thank you for playing Tactical Arena."),
+  ];
+}
+
 export function campaignPostMatchCutsceneScript(missionId) {
+  if (missionId === FINAL_BATTLE_MISSION_ID) return finalBattleEndingScript();
   // Void Ridden Castle — the alliance. The Summoner does not have a change of heart; he
   // has a change of arithmetic. Beating him cost him the one thing he was holding in
   // reserve for Blacksword, and the party is now the only asset he has left. This is also

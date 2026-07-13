@@ -11,7 +11,7 @@ import {
   readUnlockProgress,
   writeUnlockProgress
 } from "../progression/unlocks.js";
-import { enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
+import { enqueueDraftBattleUnlockAnnouncement, enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
 
 export const TUTORIAL_BASICS_ID = "basics";
 export const TUTORIAL_ARTS_MP_ID = "arts-mp";
@@ -569,6 +569,7 @@ export function completeTutorial(storage, tutorialId) {
   });
   if (!previouslyComplete && next.allTutorialsComplete) {
     enqueueUnitUnlockAnnouncements(storage, [TUTORIAL_JUGGERNAUT_REWARD_UNIT]);
+    enqueueDraftBattleUnlockAnnouncement(storage);
   }
   return next;
 }

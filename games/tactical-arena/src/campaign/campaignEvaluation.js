@@ -21,6 +21,7 @@ import {
   SHOWDOWN_MISSION_ID,
   NOT_MY_KING_MISSION_ID,
   VOID_CASTLE_MISSION_ID,
+  FINAL_BATTLE_MISSION_ID,
   WANDERING_PARTY_SKIN_PACK,
   HASBEEN_MYSTIC_SKIN_PACK,
   HASBEEN_HEROES_FAT_TYPES,
@@ -35,7 +36,7 @@ import {
 } from "./campaignConstants.js";
 import { getUnitType } from "../core/unitCatalog.js";
 import { STARTER_UNIT_TYPES, readUnlockProgress, writeUnlockProgress } from "../progression/unlocks.js";
-import { enqueueSkinUnlockAnnouncements, enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
+import { enqueueDraftBattleUnlockAnnouncement, enqueueSkinUnlockAnnouncements, enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
 import { getCampaignMission } from "./campaignModel.js";
 import { defaultStorage, readCampaignProgress, writeCampaignProgress } from "./campaignProgress.js";
 
@@ -222,6 +223,22 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       gargoylePyroclasmDamageTakenCount,
       fireDamageTakenCount,
       gargoyleEnteredRage,
+    };
+  } else if (missionId === FINAL_BATTLE_MISSION_ID) {
+    // The finale is graded on one thing: did you win it. Winning means surviving four mirror
+    // duels AND the last stand, so a per-objective breakdown here would only be re-scoring
+    // the same fight three times. All three stars ride the victory, and there is no bonus
+    // star — nothing is being held back from the player on the last mission of the game.
+    const blacksword = enemyUnits.find((unit) => unit.type === "blacksword") ?? null;
+    objectives = [
+      { id: "duels", label: "Hold on to all four of yourselves", earned: victory },
+      { id: "lastStand", label: "Defeat Blacksword", earned: victory },
+      { id: "complete", label: "Drive the void back through the gate", earned: victory },
+    ];
+    bonusObjectives = [];
+    extra = {
+      blackswordDefeated: Boolean(blacksword && blacksword.hp <= 0),
+      finalBattleBanished: Boolean(meta.finalBattleBanished),
     };
   } else if (missionId === WANDERING_PARTY_MISSION_ID) {
     // A friendly duel with no puzzle: winning is the whole objective. All three stars are
@@ -520,6 +537,7 @@ export function completeCampaignMission(storage = defaultStorage(), missionId, s
   });
   enqueueUnitUnlockAnnouncements(storage, newRewardUnits);
   enqueueSkinUnlockAnnouncements(storage, newRewardSkins);
+  enqueueDraftBattleUnlockAnnouncement(storage);
 
   return { ...evaluation, progress, newRewardUnits, newRewardSkins };
 }

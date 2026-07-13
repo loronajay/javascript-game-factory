@@ -1,6 +1,6 @@
 import { attack, attackTile, beginActivation, cancelMove, concede, defend, finishActivation, moveUnit, useArt } from "./core/commands.js";
 import { UNIT_TYPES, getArt, getAvailableArts, getCommandBuffStats, getEffectiveStats, getInitialMp, getSoulShuffleChoices, getUnitType, isRaging } from "./core/unitCatalog.js";
-import { areAllies, areEnemies, createBattleState, createUnit, findUnit, isWallAt, unitAt } from "./core/state.js";
+import { areAllies, areEnemies, createBattleState, createUnit, findUnit, getTileAffinity, isWallAt, unitAt } from "./core/state.js";
 import { canUseArt, getConeCells, getConeOriginForTarget, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getFootworkSteps, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getRevivePlacementTiles, getReviveTargets, getRushStepOptions, getRushSteps, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getVolleyShotAimOptions, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles } from "./rules/arts.js";
 import { getBasicAttackDamageType, isFireBasedDamage, isWallBetween } from "./rules/combat.js";
 import { canTrample, chebyshevDistance, getTrampleMoveOptions, positionKey } from "./rules/movement.js";
@@ -26,6 +26,14 @@ import { applyTheme, loadSavedThemeId } from "./ui/themes.js";
 import { shouldShowTurnAnnouncement, turnAnnouncementSub } from "./ui/turnAnnouncement.js";
 import { openChoiceModal } from "./ui/choiceModal.js";
 import { createDialogueSystem } from "./ui/dialogue.js";
+import { createBlackout } from "./ui/blackout.js";
+import {
+  FINAL_BATTLE_DUEL_COUNT,
+  FINAL_BATTLE_STAGE_LAST_STAND,
+  advanceFinalBattleStage,
+  finalBattleDuelistType,
+  getFinalBattleRules,
+} from "./campaign/missions/the-final-battle/stages.js";
 import { buildSummary, createMatchState, hpRemaining, readableError, teamColor } from "./match/matchBuilder.js";
 import {
   TEMPO_GAUGE_MAX,
@@ -56,6 +64,7 @@ import {
   SHOWDOWN_MISSION_ID,
   VOIDWOOD_MISSION_ID,
   VOID_CASTLE_MISSION_ID,
+  FINAL_BATTLE_MISSION_ID,
   VIRUS_MISSION_ID,
   WITCH_DOCTOR_HEAL_CAST_CAP,
   WITCH_DOCTOR_MISSION_ID,
@@ -68,6 +77,15 @@ import {
   voidCastleDefeatScript,
   voidCastleNemesisRageWarningScript,
   voidCastleSplitScript,
+  finalBattleBanishScript,
+  finalBattleDefeatScript,
+  finalBattleDuelScript,
+  finalBattleDuelWonScript,
+  finalBattleLastStandScript,
+  finalBattleRageWarningScript,
+  finalBattleReachWarningScript,
+  shouldShowFinalBattleRageWarning,
+  shouldShowFinalBattleReachWarning,
   campaignMapCutsceneScript,
   campaignOpeningScript,
   campaignPostMatchCutsceneScript,
@@ -182,6 +200,7 @@ const squadOverlays = document.querySelector("#squadOverlays");
 const message = document.querySelector("#message");
 const refModal = document.querySelector("#refModal");
 const dialogueLayer = document.querySelector("#dialogueLayer");
+const blackoutLayer = document.querySelector("#blackoutLayer");
 
 // --- View state ---
 let state = createBattleState();
@@ -358,6 +377,15 @@ function createCampaignMeta() {
     voidCastleDecoyKilled: false,
     voidCastleSplitShown: false,
     voidCastleDefeatDialogueShown: false,
+    // The Final Battle (mission 22)
+    // One "shown" latch per stage rather than a single flag: each duel is its own beat, and
+    // the stage a beat belongs to is the key that keeps them from replaying.
+    finalBattleStageShown: {},
+    finalBattleReachWarningShown: false,
+    finalBattleRageWarningShown: false,
+    finalBattleBanished: false,
+    finalBattleBanishDialogueShown: false,
+    finalBattleDefeatDialogueShown: false,
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -442,6 +470,9 @@ const dialogue = createDialogueSystem(dialogueLayer, {
   onClose: render,
   onLineAction: handleDialogueLineAction,
 });
+// The blackout sits under the dialogue layer, so a script can keep talking while the board
+// is torn down and rebuilt behind the dark (The Final Battle's stage changes).
+const blackout = createBlackout(blackoutLayer, { sleep: (ms) => sleep(ms) });
 const menu = createMenuFlow({ audio, onStartMatch: startMatch, onStartCampaignMission, onCampaignMissionSelected, onCampaignMapEntered, openCodex, onLeaveMatch });
 window.tacticalArenaDialogue = dialogue;
 
@@ -583,6 +614,10 @@ async function onCampaignMapEntered({ openCampaignRewardChoice } = {}) {
 
 async function handleDialogueLineAction(action) {
   if (matchConfig?.mode !== "campaign") return;
+  if (campaignMissionId === FINAL_BATTLE_MISSION_ID) {
+    await handleFinalBattleLineAction(action);
+    return;
+  }
   if (campaignMissionId === VOID_CASTLE_MISSION_ID) {
     await handleVoidCastleLineAction(action);
     return;
@@ -636,8 +671,91 @@ async function handleVoidCastleLineAction(action) {
   }
 }
 
+// --- The Final Battle: the blackouts -------------------------------------------------
+// The finale is the first mission that REPLACES the board mid-match (a different size and a
+// different roster every stage — see missions/the-final-battle/stages.js). A reveal can be
+// watched; a replacement cannot, so the swap happens behind a blackout the dialogue keeps
+// talking over.
+
+// The title card on the black. It is also the only place the player is told how many duels
+// there are, which is the difference between "this is a gauntlet" and "this is never ending."
+function finalBattleStageCaption(rules) {
+  if (!rules) return null;
+  if (rules.stage === FINAL_BATTLE_STAGE_LAST_STAND) return "The Last Stand";
+  const type = finalBattleDuelistType(state, rules.stage);
+  const name = type ? getUnitType(type).name : "Alone";
+  return `${name} · Duel ${rules.stage} of 4`;
+}
+
+// Tear the board down and build the next stage. `instant` skips the fades — used by the
+// safety path below, where the beat that was supposed to do this has been skipped and the
+// player is just waiting on a board that cannot be played.
+async function runFinalBattleStageChange({ instant = false } = {}) {
+  resolving = true;
+  try {
+    if (!instant && !blackout.isActive()) await blackout.enter();
+    state = advanceFinalBattleStage(state);
+    // The board changed SIZE. renderBoard derives its own metrics from state.size, but the
+    // effects layer holds its own copy for animation coordinates — a stale one would land
+    // every impact and float on the wrong tile for the rest of the match.
+    effects.setMetrics(createBoardMetrics(state.size));
+    render();
+    if (instant) {
+      blackout.clear();
+    } else {
+      blackout.setCaption(finalBattleStageCaption(getFinalBattleRules(state)));
+      await sleep(1150);
+      await blackout.exit();
+    }
+  } finally {
+    resolving = false;
+  }
+  render();
+  announceTurn(state.currentPlayer);
+}
+
+async function handleFinalBattleLineAction(action) {
+  // Fade to black and STAY there — the lines that follow are spoken in the dark.
+  if (action === "finalBattleBlackoutHold") {
+    resolving = true;
+    await blackout.enter();
+    resolving = false;
+    return;
+  }
+  if (action === "finalBattleBlackoutDuel" || action === "finalBattleBlackoutStand") {
+    await runFinalBattleStageChange();
+  }
+}
+
+// The safety net. Every stage change is driven by a dialogue beat, and a dialogue beat can be
+// skipped with Escape — which would strand the player on a board whose enemy is already dead
+// and whose match has been un-won (resolveVictory flagged `pendingStage`; the reducer hook
+// took the victory back). If a beat closes with the stage still pending, do the change anyway.
+async function ensureFinalBattleStageAdvanced() {
+  if (matchConfig?.mode !== "campaign" || campaignMissionId !== FINAL_BATTLE_MISSION_ID) return;
+  if (!getFinalBattleRules(state)?.pendingStage) return;
+  await runFinalBattleStageChange({ instant: true });
+}
+
 function finalizeCampaignOpeningState() {
   if (matchConfig?.mode !== "campaign") return;
+  // A skipped opening must still leave the board in a playable shape. For the finale that
+  // means the confrontation has to become the first duel — the stage-0 board has Blacksword
+  // standing in the middle of it at 100 HP and is not a fight anyone is meant to have.
+  if (campaignMissionId === FINAL_BATTLE_MISSION_ID) {
+    if (getFinalBattleRules(state)?.stage !== 0) {
+      blackout.clear();
+      resolving = false;
+      render();
+      return;
+    }
+    state = advanceFinalBattleStage(state);
+    effects.setMetrics(createBoardMetrics(state.size));
+    blackout.clear();
+    resolving = false;
+    render();
+    return;
+  }
   // A skipped opening must still leave the board in its post-intro shape, or the two held-
   // back Nemesis bodies stay invisible for the whole match.
   if (campaignMissionId === VOID_CASTLE_MISSION_ID) {
@@ -658,6 +776,8 @@ function startMatch(config) {
   window.clearTimeout(resultsTimer);
   window.clearTimeout(tutorialPresentationTimer);
   stopTempoLoop();
+  // A restart or a new match must never inherit a blackout left up by an abandoned one.
+  blackout.clear();
   matchEpoch += 1;
   const online = config.mode === "online";
   // Online builds from the relay's shared seed so every client draws identical dice;
@@ -826,6 +946,7 @@ function resumeActiveMusic() {
 // net.endMatch(), so we only null our handles here.
 function onLeaveMatch() {
   stopTempoLoop();
+  blackout.clear();
   if (net && state.phase === "playing") net.dispose();
   net = null;
   mySeat = null;
@@ -858,6 +979,21 @@ const CAMPAIGN_DEFEAT_BEATS = Object.freeze({
   [HASBEEN_HEROES_MISSION_ID]: { flag: "hasbeenDefeatDialogueShown", script: hasbeenHeroesDefeatScript },
   [BROTHERS_MISSION_ID]: { flag: "brothersDefeatDialogueShown", script: brothersDefeatScript },
   [VOID_CASTLE_MISSION_ID]: { flag: "voidCastleDefeatDialogueShown", script: voidCastleDefeatScript },
+  [FINAL_BATTLE_MISSION_ID]: { flag: "finalBattleDefeatDialogueShown", script: finalBattleDefeatScript },
+});
+
+// The mirror image: a beat that plays when the PLAYER loses, between the final blow and the
+// results screen. Only the finale has one, and only for one specific way of losing —
+// Blacksword's Banish, which spends his own life to take the whole party with him. It is the
+// one loss in the game that is a deliberate, earned play by the enemy rather than a grind,
+// and it deserves to be acknowledged instead of dumped straight onto a defeat screen.
+// `when` gates it so an ordinary defeat still goes quietly to results.
+const CAMPAIGN_LOSS_BEATS = Object.freeze({
+  [FINAL_BATTLE_MISSION_ID]: {
+    flag: "finalBattleBanishDialogueShown",
+    script: finalBattleBanishScript,
+    when: () => campaignMeta.finalBattleBanished,
+  },
 });
 
 function announceTurnChange(prevPlayer) {
@@ -897,10 +1033,12 @@ function announceTurnChange(prevPlayer) {
       window.clearTimeout(resultsTimer);
       resultsTimer = window.setTimeout(() => menu.showResults(summary), 1600);
     };
-    const defeatBeat = CAMPAIGN_DEFEAT_BEATS[campaignMissionId];
-    if (defeatBeat && state.winner === 1 && !campaignMeta[defeatBeat.flag]) {
-      campaignMeta[defeatBeat.flag] = true;
-      const script = defeatBeat.script(state);
+    const beat = state.winner === 1
+      ? CAMPAIGN_DEFEAT_BEATS[campaignMissionId]
+      : CAMPAIGN_LOSS_BEATS[campaignMissionId];
+    if (beat && !campaignMeta[beat.flag] && (beat.when ? beat.when() : true)) {
+      campaignMeta[beat.flag] = true;
+      const script = beat.script(state);
       if (script.length) {
         void dialogue.show(script).then(showResults);
       } else {
@@ -968,13 +1106,28 @@ function dispatch(command) {
   return true;
 }
 
-// Mission-scoped CPU ART denylist, threaded into chooseActivation's excludeArtIds.
-// Currently only Mission 3's Rain Dance heal-stall cap (see WITCH_DOCTOR_HEAL_CAST_CAP).
+// Mission-scoped CPU ART denylist, threaded into chooseActivation's excludeArtIds. Two
+// missions use it: Mission 3's Rain Dance heal-stall cap (see WITCH_DOCTOR_HEAL_CAST_CAP),
+// and the finale's Banish gate.
 function campaignCpuExcludedArtIds() {
   if (matchConfig?.mode !== "campaign") return null;
+  if (campaignMissionId === FINAL_BATTLE_MISSION_ID) return finalBattleExcludedArtIds();
   if (campaignMissionId !== WITCH_DOCTOR_MISSION_ID) return null;
   if (campaignMeta.witchDoctorHealCastCount < WITCH_DOCTOR_HEAL_CAST_CAP) return null;
   return ["rain-dance"];
+}
+
+// Banish kills every enemy on a dark tile and costs Blacksword every point of HP he has
+// left — he does not survive casting it. Spending his life to take out one or two of you is
+// a bad trade he would never make, and the engine's own gate (any enemy on a dark tile) is
+// far too eager. So he only reaches for it when it takes the WHOLE party with him. That
+// makes it a real threat with a real answer: the party is never wiped by it unless all four
+// were standing on the dark, which is a thing the player controls.
+function finalBattleExcludedArtIds() {
+  const party = state.units.filter((unit) => unit.player === 1 && unit.hp > 0);
+  const wipesParty = party.length > 0 &&
+    party.every((unit) => getTileAffinity(state, unit.position) === "dark");
+  return wipesParty ? null : ["banish-dark"];
 }
 
 function recordCampaignRejection(command, result) {
@@ -1171,6 +1324,23 @@ function recordCampaignProgressHooks(command, result, beforeState = null) {
     // screen — the same trick recordTutorialProgress uses for its scripted "victories".
     // The split beat that follows is what actually rebuilds the board.
     if (trial?.pendingSplit && state.phase === "complete") {
+      state.phase = "playing";
+      state.winner = null;
+      state.activation = null;
+    }
+  } else if (campaignMissionId === FINAL_BATTLE_MISSION_ID) {
+    // Banish: he spends every point of his own HP to erase every enemy standing on a dark
+    // tile. Recorded here (not inferred from the corpses) so the loss beat can tell the
+    // difference between "he wiped the party with the ultimate" and "he ground them down."
+    if (events.some((event) => event.type === "ART_RESOLVED" && event.artId === "banish-dark")) {
+      campaignMeta.finalBattleBanished = true;
+    }
+    // Every stage but the last registers as a genuine victory in the engine — a side with no
+    // living bodies would otherwise stall the turn loop. Take it back here, synchronously,
+    // before announceTurnChange can read state.phase and flash a results screen. The blackout
+    // beat that follows is what actually rebuilds the board (the same trick the castle's split
+    // and the tutorial's scripted "victories" use).
+    if (state.missionRules?.finalBattle?.pendingStage && state.phase === "complete") {
       state.phase = "playing";
       state.winner = null;
       state.activation = null;
@@ -1471,6 +1641,42 @@ function countPlayerMagicDamageDealt(events) {
 // Returns the next eligible condition-triggered dialogue beat for the active mission
 // (or null). Each beat marks its own once-only flag so the same warning never repeats.
 function nextCampaignDialogueBeat() {
+  if (campaignMissionId === FINAL_BATTLE_MISSION_ID) {
+    const rules = getFinalBattleRules(state);
+    if (!rules) return null;
+    const stage = rules.stage;
+    // A stage that has just been won outranks everything: this is the beat that reopens a
+    // match the engine has already called for the player. The last duel leads into the last
+    // stand instead of into another duel.
+    if (rules.pendingStage && !campaignMeta.finalBattleStageShown[`won-${stage}`]) {
+      return {
+        markShown: () => { campaignMeta.finalBattleStageShown[`won-${stage}`] = true; },
+        script: stage >= FINAL_BATTLE_DUEL_COUNT ? finalBattleLastStandScript : finalBattleDuelWonScript,
+      };
+    }
+    // The duel that was just built, introducing itself.
+    if (stage >= 1 && stage <= FINAL_BATTLE_DUEL_COUNT && !campaignMeta.finalBattleStageShown[`intro-${stage}`]) {
+      return {
+        markShown: () => { campaignMeta.finalBattleStageShown[`intro-${stage}`] = true; },
+        script: finalBattleDuelScript,
+      };
+    }
+    // RAGE first: Banish can end the run in one action, and it is the only warning that is
+    // still actionable at the moment it fires (get off the dark tiles).
+    if (shouldShowFinalBattleRageWarning(state, { warningShown: campaignMeta.finalBattleRageWarningShown })) {
+      return {
+        markShown: () => { campaignMeta.finalBattleRageWarningShown = true; },
+        script: finalBattleRageWarningScript,
+      };
+    }
+    if (shouldShowFinalBattleReachWarning(state, { warningShown: campaignMeta.finalBattleReachWarningShown })) {
+      return {
+        markShown: () => { campaignMeta.finalBattleReachWarningShown = true; },
+        script: finalBattleReachWarningScript,
+      };
+    }
+    return null;
+  }
   if (campaignMissionId === VOID_CASTLE_MISSION_ID) {
     // The split outranks everything: it is the beat that reopens a match the engine has
     // already called for the player.
@@ -1792,7 +1998,14 @@ function maybeShowCampaignDialogue() {
   beat.markShown();
   const script = beat.script(state);
   if (!script.length) return;
-  void dialogue.show(script).then(() => maybeStartCpuTurn());
+  // Beats can chain: a Final Battle stage change is a beat whose afterAction builds the NEXT
+  // stage, which immediately has a beat of its own (the duel introducing itself). Re-asking
+  // after each script closes is safe — every beat latches its own shown-flag, so this settles.
+  void dialogue.show(script).then(async () => {
+    await ensureFinalBattleStageAdvanced();
+    maybeShowCampaignDialogue();
+    maybeStartCpuTurn();
+  });
 }
 
 function recordTutorialProgress(command, result, previousPlayer) {
@@ -2302,17 +2515,19 @@ async function resolveCombat(command) {
     }
   }
 
-  // Splash Fire (Little Brother passive): a crit basic attack splashes true damage
-  // onto enemies near the original target. The reducer already applied the damage;
-  // without this the splash was silent — no float, no visible sign it happened.
-  const splashFireEvent = events.find((e) => e.type === "SPLASH_FIRE");
-  if (splashFireEvent) {
-    const splashTargetsBefore = (splashFireEvent.targetIds ?? []).map((id) => findUnit(before, id)).filter(Boolean);
+  // Basic-attack splash onto units standing near the one that was struck. Two sources, same
+  // presentation: SPLASH_FIRE (Little Brother's crit-only Splash Fire) and ATTACK_SPLASH
+  // (the `attackSplash` passive — Blacksword's Void Reach, on every landed hit). The reducer
+  // already applied the damage; without this the splash is silent, and a player who cannot
+  // see it happen cannot learn to stop standing next to each other.
+  const splashEvent = events.find((e) => e.type === "SPLASH_FIRE" || e.type === "ATTACK_SPLASH");
+  if (splashEvent) {
+    const splashTargetsBefore = (splashEvent.targetIds ?? []).map((id) => findUnit(before, id)).filter(Boolean);
     await Promise.all(splashTargetsBefore.map(async (target) => {
       const center = unitCenter(metrics, target);
       effects.impact(center, false, "true");
       await effects.hitRecoil(target.id, target.position, false);
-      const dmg = splashFireEvent.damageByTarget?.[target.id] ?? 0;
+      const dmg = splashEvent.damageByTarget?.[target.id] ?? 0;
       await effects.floatText(center, `-${dmg}`, "#ff7684");
       const after = findUnit(result.nextState, target.id);
       if (!after || after.hp <= 0) await effects.deathDissolve(target.id, target.position, teamColor(target.player));

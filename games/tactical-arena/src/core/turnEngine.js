@@ -445,6 +445,34 @@ export function resolveVictory(state) {
     }
     return;
   }
+  // The Final Battle is a five-stage battle (see missions/the-final-battle/stages.js). Every
+  // stage but the last ends the same way the castle's phase 1 does: the board is cleared, but
+  // the MATCH is not over. We can't simply decline to set a winner — a side with no living
+  // bodies stalls advanceTurnIfExhausted — so the stage completes normally and flags
+  // `pendingStage`; main.js reverts the win and drives the blackout into the next stage.
+  //
+  // The party is checked FIRST, and that is the whole edge case of the finale: Blacksword's
+  // Banish spends every point of his own HP to erase every enemy standing on a dark tile. If
+  // he catches all four, nobody is left standing at all — and the side that had to survive is
+  // the party. He does not win by outliving you. He wins by taking you with him.
+  const finalBattle = state.missionRules?.finalBattle;
+  if (finalBattle) {
+    const playerAlive = livingUnits(state, 1).some(sustainsVictory);
+    if (!playerAlive) {
+      state.winner = 2;
+      state.phase = "complete";
+      state.activation = null;
+      return;
+    }
+    if (livingUnits(state, 2).some(sustainsVictory)) return;
+    // `lastStage` rides the rules block rather than being imported, so core stays free of a
+    // dependency on the campaign layer (the castle's phase check does the same).
+    if (finalBattle.stage < finalBattle.lastStage) finalBattle.pendingStage = true;
+    state.winner = 1;
+    state.phase = "complete";
+    state.activation = null;
+    return;
+  }
   const monkTrial = state.missionRules?.monkTrial;
   if (monkTrial?.realMonkId) {
     const playerAlive = livingUnits(state, 1).some(sustainsVictory);

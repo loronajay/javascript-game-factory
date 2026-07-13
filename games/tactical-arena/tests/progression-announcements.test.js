@@ -10,7 +10,9 @@ import {
 } from "../src/campaign/campaign.js";
 import { writeUnlockProgress } from "../src/progression/unlocks.js";
 import {
+  buildDraftBattleUnlockAnnouncement,
   consumeProgressionAnnouncements,
+  enqueueDraftBattleUnlockAnnouncement,
   enqueueSkinUnlockAnnouncements,
   enqueueUnitUnlockAnnouncements,
   readProgressionAnnouncements,
@@ -90,6 +92,52 @@ test("existing non-starter unit unlocks are audited into pending announcements",
   assert.deepEqual(syncMissingUnitUnlockAnnouncements(storage), []);
 });
 
+test("draft battle achievement queues once when the account has eight known units", () => {
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, {
+    unlockedUnits: ["swordsman", "archer", "mystic", "magician", "clod", "necromancer", "witch-doctor"],
+  });
+
+  enqueueDraftBattleUnlockAnnouncement(storage);
+  assert.deepEqual(readProgressionAnnouncements(storage), []);
+
+  writeUnlockProgress(storage, {
+    unlockedUnits: ["swordsman", "archer", "mystic", "magician", "clod", "necromancer", "witch-doctor", "father-time", "missing-unit"],
+  });
+  const pending = enqueueDraftBattleUnlockAnnouncement(storage);
+
+  assert.deepEqual(pending.map((announcement) => announcement.id), ["mode-unlock:draft-battles"]);
+  assert.deepEqual(buildDraftBattleUnlockAnnouncement(), {
+    id: "mode-unlock:draft-battles",
+    kind: "mode-unlock",
+    mode: "draft-battles",
+    eyebrow: "Achievement",
+    title: "Draft Battles Available",
+    body: "You own 8 unique units, enough for the full snake draft. Draft 1v1 is now available in Online Versus.",
+    primaryLabel: "Continue",
+  });
+
+  consumeProgressionAnnouncements(storage);
+  assert.deepEqual(enqueueDraftBattleUnlockAnnouncement(storage), []);
+});
+
+test("existing eight-unit profiles are audited into the draft battle achievement", () => {
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, {
+    unlockedUnits: ["swordsman", "archer", "mystic", "magician", "clod", "necromancer", "witch-doctor", "father-time"],
+  });
+
+  const pending = syncMissingUnitUnlockAnnouncements(storage);
+
+  assert.deepEqual(pending.map((announcement) => announcement.id), [
+    "unit-unlock:clod",
+    "unit-unlock:necromancer",
+    "unit-unlock:witch-doctor",
+    "unit-unlock:father-time",
+    "mode-unlock:draft-battles",
+  ]);
+});
+
 test("completing the Clod mission queues a Clod unlock announcement", () => {
   const storage = storageAdapter();
   const won = wonClodMission();
@@ -102,4 +150,19 @@ test("completing the Clod mission queues a Clod unlock announcement", () => {
   consumeProgressionAnnouncements(storage);
   completeCampaignMission(storage, CLOD_MISSION_ID, won, { clodChargeHitCount: 1 });
   assert.deepEqual(readProgressionAnnouncements(storage), []);
+});
+
+test("mission rewards queue the draft battle achievement when they cross the unit threshold", () => {
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, {
+    unlockedUnits: ["swordsman", "archer", "mystic", "magician", "necromancer", "witch-doctor", "father-time"],
+  });
+  const won = wonClodMission();
+
+  completeCampaignMission(storage, CLOD_MISSION_ID, won, { clodChargeHitCount: 1 });
+
+  assert.deepEqual(readProgressionAnnouncements(storage).map((announcement) => announcement.id), [
+    "unit-unlock:clod",
+    "mode-unlock:draft-battles",
+  ]);
 });

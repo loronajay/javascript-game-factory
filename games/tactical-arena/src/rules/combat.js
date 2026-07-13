@@ -129,9 +129,21 @@ export function getCritPullEffect(unit) {
   return null;
 }
 
+// Every passive effect a unit carries. Beyond its TYPE's authored passives, a unit
+// instance may carry `bonusPassives` — passives granted to that one body rather than to
+// the unit type, so a campaign can field a boss with extra rules without rewriting the
+// playable unit (mission 22's Blacksword gets Void Reach this way; his drafted twin does
+// not). Scanned here so every passive reader in this module — crit riders, splash, fire
+// immunity, damage-type immunity — sees an instance grant with no further wiring.
 function passiveEffects(unit) {
   const definition = getUnitType(unit.type);
-  return [definition.passive, ...definition.arts, definition.ragePassive, definition.rageArt]
+  return [
+    definition.passive,
+    ...definition.arts,
+    definition.ragePassive,
+    definition.rageArt,
+    ...(unit.bonusPassives ?? [])
+  ]
     .map((source) => source?.effect)
     .filter(Boolean);
 }
@@ -155,6 +167,18 @@ export function getCritSplashDamage(unit) {
   for (const effect of passiveEffects(unit)) {
     if (effect?.type === "critSplashDamage") return effect;
     if (effect?.critSplashDamage) return effect.critSplashDamage;
+  }
+  return null;
+}
+
+// Splash that rides EVERY landed basic attack, not just a crit (Little Brother's Splash
+// Fire is the crit-only sibling above). Returns the authored effect — `{ amount, radius,
+// affinityBonus: { affinity, amount } }` — where affinityBonus adds damage per splashed
+// unit standing on a tile of that affinity. Applied by the reducer's attack().
+export function getAttackSplashDamage(unit) {
+  for (const effect of passiveEffects(unit)) {
+    if (effect?.type === "attackSplash") return effect;
+    if (effect?.attackSplash) return effect.attackSplash;
   }
   return null;
 }

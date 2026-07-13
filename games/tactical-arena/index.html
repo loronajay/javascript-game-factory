@@ -471,6 +471,10 @@
         </footer>
       </section>
 
+      <!-- Blackout. Sits directly BELOW the dialogue layer so a script can keep talking
+           on a black screen while the board is rebuilt underneath (The Final Battle). -->
+      <div id="blackoutLayer" class="blackout-layer" hidden></div>
+
       <!-- Story/tutorial dialogue overlay. Lives at the #app level (not inside the
            match screen) so map cutscenes render over the campaign screen too — the
            match screen is display:none when the overworld map is active. -->
