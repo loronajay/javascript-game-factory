@@ -10,6 +10,7 @@ import {
   FINAL_BATTLE_MISSION_ID,
   MAX_CAMPAIGN_MISSIONS,
   createCampaignMatchConfig,
+  campaignRestrictedUnitTypes,
   campaignSelectableUnitTypes,
   evaluateCampaignMission,
   getCampaignMission,
@@ -74,10 +75,12 @@ test("the battle music is the final battle theme", () => {
 });
 
 test("the King cannot be brought — every party member has to survive a solo duel", () => {
-  const selectable = campaignSelectableUnitTypes(undefined, undefined, FINAL_BATTLE_MISSION_ID);
-  assert.ok(!selectable.includes("king"));
-  // The restriction is mission-scoped, not global: he is still fieldable elsewhere.
-  assert.ok(campaignSelectableUnitTypes(undefined, undefined, "not-my-king").includes("king"));
+  // A non-combatant commander has no way to fight a 1v1, and a lone King does not sustain a
+  // victory — he would hand the duel away the moment it started.
+  assert.deepEqual(campaignRestrictedUnitTypes(undefined, FINAL_BATTLE_MISSION_ID), ["king"]);
+  assert.ok(!campaignSelectableUnitTypes(undefined, undefined, FINAL_BATTLE_MISSION_ID).includes("king"));
+  // Mission-scoped, not global: no other mission locks him out for this reason.
+  assert.ok(!campaignRestrictedUnitTypes(undefined, "the-showdown").includes("king"));
 });
 
 // --- Stage 0: the confrontation -------------------------------------------------------
@@ -219,36 +222,41 @@ test("felling Blacksword on the last stand actually ends the match", () => {
 test("Void Reach hits the target's neighbours for 3 true, +1 on a dark tile", () => {
   const state = playToLastStand(finalBattleState());
   const boss = state.units.find((unit) => unit.id === FINAL_BATTLE_BOSS_ID);
-  const [target, beside, far] = state.units.filter((unit) => unit.player === 1);
+  const [target, onDark, onLight, far] = state.units.filter((unit) => unit.player === 1);
 
-  // A light-tile neighbour (parity even), a dark-tile neighbour, and a bystander out of range.
+  // Tile affinity is board parity: an even x+y is light, an odd one is dark. Both neighbours
+  // are adjacent to the TARGET (that is what the reach measures from — not from Blacksword).
   boss.position = { x: 4, y: 4 };
   target.position = { x: 5, y: 4 };
-  beside.position = { x: 5, y: 5 }; // adjacent to the target, dark tile (5+5 = odd)
+  onDark.position = { x: 6, y: 5 };  // 6+5 = 11, dark
+  onLight.position = { x: 5, y: 5 }; // 5+5 = 10, light
   far.position = { x: 0, y: 0 };
-  const besideHpBefore = beside.hp;
+  const darkHpBefore = onDark.hp;
+  const lightHpBefore = onLight.hp;
   const farHpBefore = far.hp;
+  state.currentPlayer = 2;
 
   const result = applyCommand(state, {
     type: "BEGIN_ACTIVATION", player: 2, unitId: boss.id,
   });
   assert.equal(result.accepted, true);
-  // Force a landed, non-critical swing so the splash under test is Void Reach's and not a
-  // crit rider's.
+  // Force a landed, non-critical swing (a high roll hits; a high crit roll does not crit) so
+  // the splash under test is Void Reach's and not a crit rider's.
   const attack = applyCommand(result.nextState, {
-    type: "ATTACK", player: 2, actorId: boss.id, targetId: target.id, attackRoll: 0.01, critRoll: 0.99,
+    type: "ATTACK", player: 2, actorId: boss.id, targetId: target.id, attackRoll: 0.99, critRoll: 0.99,
   });
   assert.equal(attack.accepted, true);
 
   const splash = (attack.events ?? []).find((event) => event.type === "ATTACK_SPLASH");
   assert.ok(splash, "the splash fires on a landed basic attack, not only on a crit");
-  assert.equal(splash.damageByTarget[beside.id], 4); // 3 + 1 for standing on the dark
+  assert.equal(splash.damageByTarget[onLight.id], 3);
+  assert.equal(splash.damageByTarget[onDark.id], 4); // 3 + 1 for standing on the dark
   assert.ok(!splash.targetIds.includes(far.id));
 
-  const besideAfter = attack.nextState.units.find((unit) => unit.id === beside.id);
-  const farAfter = attack.nextState.units.find((unit) => unit.id === far.id);
-  assert.equal(besideAfter.hp, besideHpBefore - 4);
-  assert.equal(farAfter.hp, farHpBefore, "a unit outside the reach takes nothing");
+  const byId = (id) => attack.nextState.units.find((unit) => unit.id === id);
+  assert.equal(byId(onLight.id).hp, lightHpBefore - 3);
+  assert.equal(byId(onDark.id).hp, darkHpBefore - 4);
+  assert.equal(byId(far.id).hp, farHpBefore, "a unit outside the reach takes nothing");
 });
 
 // --- Banish: the edge case he wins ----------------------------------------------------

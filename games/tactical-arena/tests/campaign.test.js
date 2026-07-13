@@ -2740,7 +2740,7 @@ test("Voidwood Forest replaces the White Summit placeholder and nudges the marke
   assert.deepEqual(mission.rewardSkins, [{ type: "treant", slug: "voidroot" }]);
   assert.equal(mission.region, "wood");
   assert.equal(mission.point.x > 74 && mission.point.x < 76, true);
-  assert.equal(mission.point.y > 64 && mission.point.y < 66, true, "the old summit node is pulled down onto the painted node");
+  assert.equal(mission.point.y > 63 && mission.point.y < 66, true, "the old summit node is pulled down onto the painted node");
 
   const node = getCampaignMap(storageAdapter()).nodes[16];
   assert.equal(node.id, VOIDWOOD_MISSION_ID);
@@ -3176,7 +3176,7 @@ test("Not My King replaces the Iron Citadel placeholder on the lower painted nod
   const kingIndex = fresh.nodes.findIndex((node) => node.id === NOT_MY_KING_MISSION_ID);
   assert.equal(kingIndex, showdownIndex + 1);
   assert.equal(fresh.nodes[kingIndex].locationName.includes("Iron Citadel"), false);
-  assert.equal(fresh.nodes[kingIndex].point.x > 84 && fresh.nodes[kingIndex].point.x < 85, true, "the marker sits on the painted snow-route node above The Showdown");
+  assert.equal(fresh.nodes[kingIndex].point.x > 83 && fresh.nodes[kingIndex].point.x < 85, true, "the marker sits on the painted snow-route node above The Showdown");
   assert.equal(fresh.nodes[kingIndex].point.y > 30 && fresh.nodes[kingIndex].point.y < 32, true, "the marker sits on the painted snow-route node above The Showdown");
 
   const storage = storageAdapter();

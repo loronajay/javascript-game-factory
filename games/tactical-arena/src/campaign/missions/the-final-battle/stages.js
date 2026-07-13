@@ -120,13 +120,20 @@ export function prepareFinalBattle(match, units) {
   };
 }
 
-// A snapshot of everyone who is NOT on the board for the stage being built. Fallen mirrors
-// are simply dropped — a beaten copy does not come back, and a corpse from a 5×5 has no
-// coordinates that mean anything on the next board.
+// Everyone who is still in the mission: whoever is standing on the current board, UNIONED
+// with whoever was already benched. Only the board changes between stages — the roster
+// persists, so the bench has to be carried forward or a duel would quietly delete the three
+// party members who were not in it. Fallen mirrors are dropped: a beaten copy does not come
+// back, and a corpse from a 5×5 has no coordinates that mean anything on the next board.
 function benchUnits(state) {
-  return state.units
+  const onBoard = state.units
     .filter((unit) => unit.player === 1 || unit.id === FINAL_BATTLE_BOSS_ID)
     .map((unit) => ({ ...unit }));
+  const standing = new Set(onBoard.map((unit) => unit.id));
+  const alreadyBenched = (getFinalBattleRules(state)?.bench ?? [])
+    .filter((unit) => !standing.has(unit.id))
+    .map((unit) => ({ ...unit }));
+  return [...onBoard, ...alreadyBenched];
 }
 
 function restToFull(unit) {
@@ -208,8 +215,11 @@ function buildDuelStage(state, bench, stage) {
 // the world, and a party worn down to nothing by four duels would make the boss a wall
 // rather than a fight (the same reasoning behind the castle's Mystic shout).
 function buildLastStand(state, bench) {
-  const party = bench
-    .filter((unit) => unit.player === 1)
+  // Rebuilt in SQUAD-SLOT order, not bench order — the bench is whatever order the units came
+  // off the board in, and the party should form up the way the player arranged it.
+  const party = state.missionRules.finalBattle.duelTypes
+    .map((type) => bench.find((unit) => unit.player === 1 && unit.type === type))
+    .filter(Boolean)
     .map((unit, index) => ({
       ...restToFull(unit),
       position: { ...(PARTY_LAST_STAND_POSITIONS[index] ?? PARTY_LAST_STAND_POSITIONS[0]) },

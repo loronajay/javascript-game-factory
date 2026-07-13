@@ -162,9 +162,11 @@ export function shouldShowFinalBattleReachWarning(state, { warningShown = false 
   if (warningShown) return false;
   const rules = getFinalBattleRules(state);
   if (rules?.stage !== rules?.lastStage) return false;
+  // Fires once anyone is down to half of THEIR OWN health — by then the party has taken a
+  // couple of swings and the splash is the reason, so the warning lands as an explanation
+  // rather than as a prophecy.
   const party = (state?.units ?? []).filter((unit) => unit.player === 1 && unit.hp > 0);
-  const definition = getUnitType("blacksword");
-  return party.some((unit) => unit.hp < definition.stats.maxHp / 2);
+  return party.some((unit) => unit.hp <= getUnitType(unit.type).stats.maxHp / 2);
 }
 
 export function finalBattleReachWarningScript(state) {
