@@ -12,7 +12,7 @@ import { createEffectEnvironment } from "./effectEnvironment.js";
 
 export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, dieFace, metrics, audio }) {
   const sound = audio ?? { play() {} };
-  const { setMetrics, unitBase, unitElement, effectPoint } = createEffectEnvironment({ metrics, unitsLayer });
+  const { setMetrics, getMetrics, unitBase, unitElement, effectPoint } = createEffectEnvironment({ metrics, unitsLayer });
 
   // Camera punch: jolt the board SVG a few pixels and settle, scaled by how much
   // the blow hurt. Fired, not awaited, so the board shivers under the float text.
@@ -1182,7 +1182,7 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     }
 
     // A ring rippling outward from the dancer far enough to cross any board size.
-    const reach = boardMetrics.tileWidth * 9;
+    const reach = getMetrics().tileWidth * 9;
     const ring = svg("ellipse", { class: "fx-ring", cx: ground.x, cy: ground.y + 6, rx: 10, ry: 5, stroke: vfx.colors.core, filter: "url(#softGlow)" });
     effectsLayer.appendChild(ring);
     animations.push(waitForAnimation(ring.animate([

@@ -568,6 +568,40 @@ test("an ART callout is a fixed one-shot overlay instead of a unit child", () =>
   }
 });
 
+test("global ritual VFX use the configured board metrics without throwing", async () => {
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+  globalThis.window = { matchMedia: () => ({ matches: false }) };
+
+  try {
+    const metrics = { tileWidth: 58, tileHeight: 29, originX: 0, originY: 0 };
+    const effectsLayer = new TestSvgElement("g");
+    const effects = createEffects({
+      board: null,
+      unitsLayer: { querySelector: () => null },
+      effectsLayer,
+      diceOverlay: null,
+      dieFace: null,
+      metrics,
+      audio: { play() {} }
+    });
+
+    await effects.playAbilityVfx("higher-ground", {
+      actor: { id: "king", position: { x: 1, y: 1 } },
+      targets: [{ id: "ally", position: { x: 2, y: 1 } }]
+    });
+
+    const expandingRing = effectsLayer.children.find((child) => (
+      child.tagName === "ellipse" && child.animations?.[0]?.frames?.at(-1)?.rx === metrics.tileWidth * 9
+    ));
+    assert.ok(expandingRing, "the ritual ring should scale from the active board geometry");
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
+  }
+});
+
 test("the selected-unit HUD gains a rage glow state", () => {
   const state = createBattleState();
   const unit = state.units.find((candidate) => candidate.id === "p1-swordsman");

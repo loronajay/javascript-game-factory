@@ -8,6 +8,10 @@ export function createEffectEnvironment({ metrics, unitsLayer }) {
     boardMetrics = next;
   }
 
+  function getMetrics() {
+    return boardMetrics;
+  }
+
   function unitBase(position) {
     const point = gridToScreen(boardMetrics, position.x, position.y);
     return { x: point.x, y: point.y + boardMetrics.tileHeight * 0.45 };
@@ -22,5 +26,5 @@ export function createEffectEnvironment({ metrics, unitsLayer }) {
     return { x: base.x, y: base.y - lift };
   }
 
-  return { setMetrics, unitBase, unitElement, effectPoint };
+  return { setMetrics, getMetrics, unitBase, unitElement, effectPoint };
 }
