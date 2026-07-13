@@ -46,14 +46,16 @@ test("styles live behind purpose-specific entry points instead of the project ro
 
 test("release hotspots delegate cohesive responsibilities to smaller modules", () => {
   const boundaries = [
-    ["src/main.js", 4450, "./campaign/campaignObservations.js"],
-    ["src/core/artResolvers.js", 3000, "./artResolvers/riotCopResolvers.js"],
-    ["src/ui/effects.js", 1350, "./unitMotionEffects.js"],
+    ["src/main.js", 1325, ["./ai/cpuTurnController.js", "./online/onlineCommandController.js", "./match/matchLifecycleController.js", "./ui/battleEventPresenter.js", "./ui/rolledCombatPresenter.js", "./ui/instantArtPresenter.js", "./ui/battleInputController.js", "./ui/tutorialPresentationController.js", "./ui/tempoLoopController.js", "./campaign/campaignPresentationController.js", "./campaign/campaignRuntime.js"]],
+    ["src/core/artResolvers.js", 3000, ["./artResolvers/riotCopResolvers.js"]],
+    ["src/ui/effects.js", 1350, ["./unitMotionEffects.js"]],
   ];
 
-  for (const [path, maxLines, expectedImport] of boundaries) {
+  for (const [path, maxLines, expectedImports] of boundaries) {
     const source = readFileSync(rootFile(path), "utf8");
     assert.ok(source.split(/\r?\n/).length < maxLines, `${path} should stay below ${maxLines} lines`);
-    assert.match(source, new RegExp(expectedImport.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    for (const expectedImport of expectedImports) {
+      assert.match(source, new RegExp(expectedImport.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    }
   }
 });
