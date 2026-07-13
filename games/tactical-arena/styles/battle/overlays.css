@@ -1,0 +1,129 @@
+/* Blackout: a full-screen fade the match holds on while the board is rebuilt underneath
+   (see ui/blackout.js). z-index 45 — over everything on the match screen (board 1, HUD 10,
+   turn flash 25, dice 30) but UNDER the dialogue layer at 50, so a script can keep talking
+   in the dark. pointer-events swallow clicks so nothing on the hidden board is reachable. */
+.blackout-layer { position:absolute; inset:0; z-index:45; display:grid; place-items:center; padding:2rem; background:#000; opacity:0; transition:opacity var(--blackout-fade,620ms) ease; pointer-events:auto; }
+.blackout-layer[hidden] { display:none; }
+.blackout-layer.is-active { opacity:1; }
+.blackout-caption { margin:0; max-width:36rem; color:var(--brass-hi,#f6dfb0); font:800 clamp(1rem,3.2vw,1.6rem) var(--font-display); letter-spacing:.26em; text-transform:uppercase; text-align:center; text-shadow:0 0 26px rgba(120,60,180,.5); opacity:0; transform:translateY(.4rem); animation:blackout-caption-in .9s ease .35s forwards; }
+@keyframes blackout-caption-in { to { opacity:.92; transform:translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .blackout-layer { transition-duration:1ms; }
+  .blackout-caption { animation-duration:1ms; animation-delay:0ms; }
+}
+
+/* Dialogue overlay: portrait + text box for tutorials and future campaign beats. */
+.dialogue-layer { position:absolute; inset:0; z-index:50; display:flex; align-items:flex-end; justify-content:center; padding:1rem 1.15rem 1.15rem; background:linear-gradient(180deg,transparent 38%,rgba(0,0,0,.34)); pointer-events:auto; }
+.dialogue-layer[hidden] { display:none; }
+.dialogue-card { display:grid; grid-template-columns:auto minmax(0,1fr); gap:.9rem; align-items:end; width:min(48rem,100%); padding:.85rem .95rem; border:1px solid color-mix(in srgb,var(--team,var(--brass)) 58%,var(--brass-lo)); border-radius:12px; background:linear-gradient(180deg,rgba(20,32,46,.96),rgba(7,13,24,.97)); box-shadow:0 18px 44px rgba(0,0,0,.58), inset 0 1px 0 rgba(var(--sheen),.12); }
+.dialogue-card.is-right { grid-template-columns:minmax(0,1fr) auto; }
+.dialogue-card.is-right .unit-portrait { grid-column:2; }
+.dialogue-card.is-right .dialogue-body { grid-column:1; grid-row:1; }
+.unit-portrait.is-dialogue { width:7rem; height:8.75rem; border:1px solid color-mix(in srgb,var(--team,var(--brass)) 55%,var(--brass-lo)); border-radius:10px; box-shadow:inset 0 1px 0 rgba(var(--sheen),.12), inset 0 0 22px rgba(0,10,20,.55), 0 0 0 2px color-mix(in srgb,var(--team,transparent) 24%,transparent); }
+.unit-portrait.is-dialogue.is-glyph-fallback { font:900 2.2rem var(--font-display); }
+.dialogue-body { min-width:0; }
+.dialogue-speaker { display:inline-block; margin-bottom:.4rem; padding:.24rem .55rem; border:1px solid color-mix(in srgb,var(--team,var(--brass)) 60%,transparent); border-radius:999px; background:rgba(0,0,0,.28); color:var(--brass-hi); font:900 .78rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; }
+.dialogue-text { min-height:3.4rem; margin:0; color:var(--text); font-size:1rem; line-height:1.48; }
+.dialogue-foot { display:flex; align-items:center; justify-content:space-between; gap:.7rem; margin-top:.7rem; }
+.dialogue-count { color:var(--muted); font:800 .66rem var(--font-display); letter-spacing:.08em; }
+.dialogue-controls { display:flex; gap:.45rem; }
+.dialogue-btn { padding:.42rem .82rem; font-size:.66rem; }
+.dialogue-btn.ghost { color:var(--muted); border-color:var(--brass-lo); background:rgba(0,0,0,.14); }
+/* Sound toggle reads "Muted" and dims its frame when off. */
+#muteBtn::before { content:"\1F50A"; margin-right:.3rem; }#muteBtn.is-muted { color:var(--muted); border-color:var(--brass-lo); }#muteBtn.is-muted::before { content:"\1F507"; }
+/* Field Codex overlay — reference of every unit's stats and kit. */
+.ref-modal { position:fixed; inset:0; z-index:50; display:grid; place-items:center; padding:1.2rem; background:rgba(4,8,18,.82); backdrop-filter:blur(4px); }.ref-modal[hidden] { display:none; }.ref-card { display:flex; flex-direction:column; width:min(45rem,94vw); max-height:88vh; border:1px solid var(--brass); border-radius:16px; background:var(--parchment-fill); box-shadow:0 24px 60px rgba(0,0,0,.75), inset 0 0 0 1px rgba(0,0,0,.4); overflow:hidden; }.ref-head { display:flex; flex-direction:column; padding:.8rem 1.1rem 0; border-bottom:1px solid var(--parchment-edge); background:linear-gradient(180deg,var(--console-hi),var(--console-lo)); flex-shrink:0; }.ref-head-title { display:flex; align-items:center; justify-content:space-between; margin-bottom:.55rem; }.ref-head h2 { margin:0; color:var(--brass-hi); font:800 1.05rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; }.ref-close { padding:.3rem .55rem; font-size:.8rem; }.ref-tabs { display:flex; flex-wrap:wrap; gap:.2rem; }.ref-tab { padding:.38rem .72rem; border:0; border-radius:6px 6px 0 0; background:transparent; color:rgba(120,170,210,.6); font:700 .68rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; cursor:pointer; transition:background .1s,color .1s; }.ref-tab:hover:not(.is-active) { background:rgba(var(--sheen),.08); color:rgba(140,190,230,.9); }.ref-tab.is-active { background:var(--parchment-fill); color:var(--text); }.ref-panel { display:none; }.ref-panel.is-active { display:block; flex:1 1 auto; min-height:0; overflow-y:auto; padding:1rem 1.1rem; color:var(--text); }.ref-panel .ref-rules,.ref-panel .ref-tips { padding-left:1.2rem; margin:.1rem 0; }.ref-panel .ref-rules li,.ref-panel .ref-tips li { font-size:.84rem; line-height:1.52; margin-bottom:.48rem; }.ref-panel .ref-rules li strong,.ref-panel .ref-tips li strong { color:var(--brass-hi); }.ref-tips { list-style:none; padding-left:0 !important; }.ref-tips li::before { content:"▸ "; color:var(--brass); }
+.manual-card { height:min(640px,88vh); }
+#refBody { display:flex; flex:1; min-height:0; min-width:0; }
+
+/* Father Time choice pop-up (Age stat pick / Rewind fallen-ally pick) — reuses the
+   .ref-modal backdrop + .ref-card shell. */
+.choice-modal .choice-card { width:min(33rem,94vw); }
+.choice-head { padding:.9rem 1.1rem .7rem; border-bottom:1px solid var(--parchment-edge); background:linear-gradient(180deg,var(--console-hi),var(--console-lo)); }
+.choice-title { margin:0 0 .3rem; color:var(--brass-hi); font:800 1rem var(--font-display); letter-spacing:.06em; text-transform:uppercase; }
+.choice-sub { margin:0; color:var(--text); opacity:.8; font-size:.82rem; line-height:1.4; }
+.choice-list { display:flex; flex-direction:column; gap:.5rem; padding:1rem 1.1rem; overflow-y:auto; }
+.choice-group { display:grid; gap:.4rem; min-width:0; }
+.choice-group + .choice-group { padding-top:.2rem; border-top:1px solid rgba(188,214,236,.14); }
+.choice-group-title { margin:0; color:color-mix(in srgb,var(--team,var(--brass)) 62%,var(--muted)); font:800 .62rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
+/* Fixed track width (no 1fr) so a choice button is always the SAME standard width,
+   whether its group has one option or five — auto-fit would otherwise stretch a
+   lone option to fill the whole row. */
+.choice-group-options { display:grid; grid-template-columns:repeat(auto-fill,11.5rem); justify-content:flex-start; gap:.5rem; }
+.choice-option { display:flex; align-items:center; gap:.7rem; width:100%; padding:.6rem .7rem; border:1px solid var(--brass); border-radius:10px; background:linear-gradient(180deg,var(--btn-hi),var(--btn-lo)); color:var(--text); cursor:pointer; text-align:left; transition:transform .08s ease,border-color .1s,box-shadow .1s; overflow:hidden; }
+.choice-option:hover { transform:translateY(-1px); border-color:var(--team,var(--brass-hi)); box-shadow:0 6px 16px rgba(0,0,0,.4); }
+.choice-option.has-portrait .unit-portrait { width:2.875rem; height:2.875rem; flex:0 0 auto; border:1px solid var(--brass); border-radius:8px; overflow:hidden; }
+.choice-option-text { display:flex; flex-direction:column; min-width:0; flex:1 1 auto; }
+.choice-option-label { font:800 .84rem var(--font-display); letter-spacing:.02em; overflow-wrap:anywhere; }
+.choice-option-sub { font-size:.74rem; opacity:.75; }
+.choice-foot { display:flex; justify-content:flex-end; padding:.1rem 1.1rem 1rem; }
+.ref-unit { padding:.9rem 0; border-bottom:1px dashed rgba(70,100,130,.4); }.ref-unit:last-child { border-bottom:0; }.ref-unit h3 { display:flex; gap:.5rem; align-items:center; margin:0 0 .55rem; color:var(--text); font:800 1rem var(--font-display); letter-spacing:.04em; }.ref-glyph { font-size:1.2rem; }/* Stat grid — the shared stat display model (codex + roster picker). Labeled
+   cells with a meter under each value, normalized to the roster maximum for that
+   stat, so relative strengths read at a glance. */
+.stat-grid { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:.4rem; margin-bottom:.7rem; }
+.stat-box { display:grid; gap:.16rem; justify-items:center; padding:.4rem .2rem .38rem; border:1px solid rgba(255,255,255,.08); border-radius:8px; background:rgba(0,0,0,.28); }
+.stat-box-label { color:var(--muted); font:800 .54rem var(--font-display); letter-spacing:.1em; }
+.stat-box-value { font:800 .95rem var(--font-display); color:var(--text); line-height:1; }
+.stat-meter { display:block; width:82%; height:3px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.09); }
+.stat-meter i { display:block; height:100%; border-radius:999px; background:var(--brass); }
+.stat-box.stat-hp .stat-meter i { background:var(--hp-high); }
+.stat-box.stat-mp .stat-meter i { background:#6ea6e0; }
+@media (max-width:560px) { .stat-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }.ref-group { margin-top:.55rem; }.ref-group-title { margin-bottom:.3rem; color:var(--brass); font:800 .62rem var(--font-display); letter-spacing:.16em; text-transform:uppercase; }.ref-line { margin:.25rem 0; font-size:.82rem; line-height:1.4; }.ref-line b { color:var(--text); }.ref-tag { display:inline-block; margin-right:.4rem; padding:.05rem .4rem; border-radius:5px; font:800 .6rem var(--font-display); letter-spacing:.04em; vertical-align:.05em; }.ref-tag.passive { background:rgba(120,80,160,.22); color:#c0a8f0; }.ref-tag.art { background:rgba(70,110,170,.22); color:#7aa8e0; }.ref-tag.status { background:rgba(170,80,70,.22); color:#d08080; }.ref-note { margin-top:.7rem; padding:.55rem .7rem; border-left:3px solid var(--brass); background:rgba(20,50,80,.3); color:var(--muted); font-size:.78rem; font-style:italic; line-height:1.4; }
+/* Two-pane codex: unit-selection nav on the left, detail on the right. */
+.ref-panel[data-panel="codex"].is-active { padding:0; overflow:hidden; display:flex; }
+.codex-layout { display:flex; flex-direction:column; flex:1; min-height:0; }
+.codex-category-tabs { display:flex; gap:.25rem; flex-shrink:0; overflow-x:auto; padding:.45rem .55rem 0; border-bottom:1px solid rgba(70,100,130,.35); background:linear-gradient(180deg,rgba(var(--sheen),.04),transparent 72%); }
+.codex-category-tab { flex:0 0 auto; padding:.42rem .68rem .46rem; border:0; border-radius:7px 7px 0 0; background:transparent; box-shadow:none; color:var(--muted); font:800 .64rem var(--font-display); letter-spacing:.1em; text-transform:uppercase; }
+.codex-category-tab:hover:not(.is-active) { background:rgba(var(--sheen),.07); color:var(--text); transform:none; }
+.codex-category-tab.is-active { background:var(--parchment-fill); color:var(--brass-hi); box-shadow:inset 0 1px rgba(var(--sheen),.12), inset 0 0 0 1px rgba(255,255,255,.04); }
+.codex-category-status { margin-left:auto; }
+.codex-body { display:flex; flex:1; min-height:0; }
+.codex-body.is-status-view .codex-nav { display:none; }
+.codex-nav { width:8.875rem; flex-shrink:0; overflow-y:auto; border-right:1px solid rgba(70,100,130,.35); padding:.5rem .35rem; }
+.codex-detail { flex:1; min-height:0; min-width:0; overflow-y:auto; padding:1rem 1.1rem; }
+.codex-unit-detail { padding:.9rem 0; border-bottom:0; }
+.codex-nav-item { display:flex; align-items:center; gap:.38rem; width:100%; padding:.4rem .48rem; border:0; border-radius:6px; background:transparent; color:var(--muted); font:700 .7rem var(--font-display); letter-spacing:.04em; text-align:left; cursor:pointer; transition:background .1s,color .1s; white-space:nowrap; overflow:hidden; }
+.codex-nav-item:hover:not(.is-active) { background:rgba(var(--sheen),.07); color:var(--text); }
+.codex-nav-item.is-active { background:rgba(80,130,200,.18); color:var(--brass-hi); }
+.codex-nav-glyph { font-size:.95rem; flex-shrink:0; }
+.codex-nav-name { overflow:hidden; text-overflow:ellipsis; }
+@media (max-width:640px) { .codex-category-status { margin-left:0; }.codex-body { flex-direction:column; }.codex-nav { display:flex; gap:.28rem; width:100%; max-height:76px; overflow-x:auto; overflow-y:hidden; border-right:0; border-bottom:1px solid rgba(70,100,130,.35); padding:.4rem .45rem; }.codex-nav-item { width:auto; min-width:116px; }.codex-detail { padding:.85rem; }.codex-detail-hero { align-items:center; }.codex-detail-hero .unit-portrait.is-hero { width:96px; height:128px; } }
+/* Painted unit portraits (assets/units/*.png) — see ui/portraits.js. The <img> is
+   self-framed by inline height + transform (consistent scale, baseline-aligned, no
+   clipping); the frame just crops the dead canvas space and decorates. */
+.unit-portrait { position:relative; overflow:hidden; flex-shrink:0; margin:0; background:radial-gradient(ellipse 70% 55% at 50% 78%,rgba(120,170,210,.16),transparent 70%),linear-gradient(180deg,#16222f,#0a121b); }
+.unit-portrait-img { position:absolute; top:0; left:50%; width:auto; pointer-events:none; }
+.unit-portrait.is-glyph-fallback { display:flex; align-items:center; justify-content:center; color:var(--brass-hi); }
+/* Codex detail hero: portrait beside the unit name. */
+.codex-detail-hero { display:flex; align-items:flex-end; gap:1rem; margin-bottom:.7rem; }
+.codex-detail-hero h3 { margin:0 0 .45rem; }
+.codex-detail-hero .unit-portrait.is-hero { width:8.25rem; height:11rem; border:1px solid var(--parchment-edge); border-radius:12px; box-shadow:inset 0 1px 0 rgba(var(--sheen),.12), inset 0 0 24px rgba(0,10,20,.5); }
+.codex-detail-hero .is-glyph-fallback { font-size:3rem; }
+/* Codex nav thumbnail (replaces the per-unit glyph in the unit list). */
+.codex-nav-item .unit-portrait.is-thumb { width:1.875rem; height:2.125rem; border-radius:6px; }
+.codex-nav-item .is-glyph-fallback { font-size:1rem; }
+/* Targetable-enemy reticle: a red ring + chevron drawn on the figurine so valid
+   targets read clearly even though the bright tile sits beneath them. */
+.unit.targetable,.unit.spent.targetable { opacity:1; filter:none; }.unit .target-mark { pointer-events:none; }.unit .target-ring { stroke:#ff8a7e; stroke-width:2.4; stroke-dasharray:7 6; opacity:.95; transform-box:fill-box; transform-origin:center; animation:target-spin 2.4s linear infinite, target-pulse 1s ease-in-out infinite alternate; filter:drop-shadow(0 0 5px rgba(255,90,72,.7)); }.unit .target-chevron { fill:none; stroke:#ff8a7e; stroke-width:2.6; stroke-linecap:round; stroke-linejoin:round; animation:target-pulse 1s ease-in-out infinite alternate; }
+.status-stack { pointer-events:none; }.status-badge { transform-box:fill-box; transform-origin:center; filter:drop-shadow(0 0 6px var(--status-glow)); animation:status-float 1.8s ease-in-out infinite alternate; }.status-badge:nth-child(2) { animation-delay:.18s; }.status-badge:nth-child(3) { animation-delay:.36s; }.status-badge:nth-child(4) { animation-delay:.54s; }
+.status-disc { fill:rgba(8,12,22,.82); stroke:var(--status); stroke-width:1.4; }.status-icon { stroke-linejoin:round; stroke-linecap:round; }
+/* poison — a cluster of green bubbles */
+.status-icon .ic-bubble { fill:var(--status); stroke:rgba(8,30,8,.6); stroke-width:.7; }.status-icon .ic-shine { fill:rgba(255,255,255,.82); }
+/* silence — a "..." chat box */
+.status-icon .ic-bubble-box { fill:color-mix(in srgb,var(--status) 78%,#ffffff 22%); stroke:rgba(24,8,38,.7); stroke-width:.8; }.status-icon .ic-dot { fill:#2a1640; }
+/* stun — a yellow lightning bolt */
+.status-icon .ic-bolt { fill:var(--status); stroke:rgba(60,46,0,.85); stroke-width:.8; animation:status-blink 1.1s steps(2,jump-none) infinite alternate; }
+/* blind — sunglasses */
+.status-icon .ic-lens { fill:#14131a; stroke:var(--status); stroke-width:1.2; }.status-icon .ic-bridge,.status-icon .ic-temple { fill:none; stroke:var(--status); stroke-width:1.4; }
+/* slow — a boot with a down arrow */
+.status-icon .ic-boot { fill:var(--status); stroke:rgba(8,24,44,.7); stroke-width:.7; }.status-icon .ic-down { fill:none; stroke:#eaf4ff; stroke-width:1.4; }
+.status-icon .ic-rock { fill:var(--status); stroke:rgba(30,22,10,.75); stroke-width:.7; }.status-icon .ic-rock-facet { fill:none; stroke:rgba(20,15,8,.6); stroke-width:.9; }
+/* Persistent stance badge (Witch Doctor's "Dancing Man") — sits lower than the
+   transient status stack and holds steady instead of floating, so it reads as a
+   fixed emblem of "this is currently his passive" rather than a wearing-off buff. */
+.stance-badge { pointer-events:none; filter:drop-shadow(0 0 5px var(--stance-glow)); }
+.stance-disc { fill:rgba(8,12,22,.85); stroke:var(--stance); stroke-width:1.6; }
+.stance-glyph { font-size:11px; text-shadow:0 0 4px var(--stance-glow); }
+.intro-alert-badge { pointer-events:none; filter:drop-shadow(0 0 8px rgba(255,214,94,.7)); animation:status-float 1.1s ease-in-out infinite alternate; }
+.intro-alert-disc { fill:rgba(14,16,20,.9); stroke:#ffd65e; stroke-width:1.6; }
+.intro-alert-mark { fill:#ffd65e; font:900 19px var(--font-display); paint-order:stroke; stroke:rgba(0,0,0,.78); stroke-width:3px; stroke-linejoin:round; }

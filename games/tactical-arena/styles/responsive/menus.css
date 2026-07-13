@@ -1,0 +1,259 @@
+/* -----------------------------------------------------------------------
+   Compact menus (short viewport: phone landscape title/setup/results)
+   ----------------------------------------------------------------------- */
+@media (pointer: coarse) and (max-height: 540px) {
+  .menu-screen.is-active {
+    padding:
+      max(.55rem, env(safe-area-inset-top))
+      max(.55rem, env(safe-area-inset-right))
+      max(.55rem, env(safe-area-inset-bottom))
+      max(.55rem, env(safe-area-inset-left));
+  }
+
+  .menu-card {
+    width: min(380px, 100%);
+    padding: 1.05rem 1rem 1rem;
+  }
+
+  .title-card {
+    padding-top: 1.15rem;
+  }
+
+  .title-mark {
+    width: 2.55rem;
+    height: 2.55rem;
+    margin-bottom: .62rem;
+  }
+
+  .title-mark::before {
+    font-size: 1.28rem;
+  }
+
+  .title-name {
+    font-size: 1.62rem;
+    letter-spacing: .04em;
+  }
+
+  .title-sub {
+    margin: .24rem 0 .82rem;
+    font-size: .62rem;
+    letter-spacing: .16em;
+  }
+
+  .menu-buttons {
+    gap: .42rem;
+    margin-top: .85rem;
+  }
+
+  .menu-btn {
+    min-height: 40px;
+    padding: .5rem .78rem;
+    font-size: .82rem;
+  }
+
+  [data-screen="campaign"] .campaign-card {
+    width: min(980px, 98vw);
+    min-height: 0;
+  }
+
+  [data-screen="campaign"] .campaign-map {
+    min-height: 280px;
+  }
+}
+
+/* -----------------------------------------------------------------------
+   Roster pop-up on landscape phones (the squad picker)
+
+   The picker's fixed chrome — header, the 4-slot tray, and the footer — ate the
+   whole short landscape height, crushing the unit grid + detail pane into an
+   unusable ~90px sliver (you saw one row of units and a clipped stat card). This
+   compresses the chrome so the body gets the room, keeps the grid|detail split
+   side-by-side (wide enough), and scrolls the grid + detail internally.
+   ----------------------------------------------------------------------- */
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 540px) {
+  .roster-card {
+    width: min(980px, 98vw);
+    height: 94vh;
+    max-height: 94vh;
+  }
+
+  /* Draft formation picker: shrink the board + chrome so the Lock Formation
+     footer fits a short landscape phone. */
+  .draft-formation-card {
+    max-height: 94vh;
+  }
+
+  .draft-formation-board {
+    min-height: 14rem;
+    margin: .5rem;
+  }
+
+  .draft-formation-slot {
+    width: 5.7rem;
+    min-height: 5.4rem;
+    padding: .4rem .3rem;
+  }
+
+  .draft-formation-slot .unit-portrait.is-slot {
+    width: 2.5rem;
+    height: 3rem;
+  }
+
+  .draft-formation-name {
+    font-size: .62rem;
+  }
+
+  /* Header: drop the long instruction line, shrink the title + padding. */
+  .roster-head {
+    padding: .45rem .8rem;
+  }
+
+  .roster-head h2 {
+    font-size: .82rem;
+  }
+
+  .roster-sub {
+    display: none;
+  }
+
+  /* Tray: the four chosen slots collapse to compact glyph + name chips. */
+  .roster-tray {
+    gap: .3rem;
+    padding: .4rem .6rem;
+  }
+
+  .roster-slot {
+    padding: .26rem .2rem;
+  }
+
+  .roster-slot-tag {
+    display: none;
+  }
+
+  .roster-slot .unit-portrait.is-slot {
+    width: 28px;
+    height: 30px;
+  }
+
+  .roster-slot-name {
+    font-size: .54rem;
+  }
+
+  /* Body now owns the height. Grid scrolls on the left, detail on the right. */
+  .roster-grid {
+    width: 42%;
+    max-width: 300px;
+    gap: .35rem;
+    padding: .5rem;
+  }
+
+  .roster-class {
+    gap: .24rem;
+  }
+
+  .roster-class-title {
+    font-size: .5rem;
+    letter-spacing: .08em;
+  }
+
+  .roster-class-units {
+    grid-template-columns: repeat(auto-fill, minmax(4.4rem, 1fr));
+    gap: .35rem;
+  }
+
+  .roster-unit {
+    padding: .3rem .2rem .34rem;
+  }
+
+  .roster-unit .unit-portrait.is-card {
+    height: 52px;
+  }
+
+  .roster-unit-name {
+    font-size: .58rem;
+  }
+
+  .roster-detail-bar {
+    padding: .4rem .7rem;
+  }
+
+  .roster-detail-name {
+    font-size: .82rem;
+  }
+
+  .roster-assign {
+    min-width: 8.5rem;
+    padding: .4rem .6rem;
+    font-size: .66rem;
+  }
+
+  .roster-detail-scroll {
+    padding: .55rem .8rem;
+  }
+
+  /* Short landscape phone: shrink the portrait + tighten the split so the stat
+     card still fits beside it without crushing the unit grid above. */
+  .roster-detail-split {
+    gap: .7rem;
+  }
+
+  .roster-detail-split .unit-portrait.is-hero {
+    width: 96px;
+    height: 132px;
+  }
+
+  /* Footer: tighter so Place / Done never get pushed off a short screen. */
+  .roster-foot {
+    gap: .45rem;
+    padding: .45rem .7rem;
+  }
+
+  .roster-foot .menu-btn {
+    min-width: 5.5rem;
+    padding: .5rem .7rem;
+  }
+
+  .skin-picker-card {
+    width: min(760px, 98vw);
+    height: 94vh;
+    max-height: 94vh;
+  }
+
+  .skin-picker-body {
+    grid-template-columns: minmax(9rem, 12rem) minmax(0, 1fr);
+  }
+
+  .skin-picker-preview {
+    padding: .65rem;
+  }
+
+  .skin-picker-preview .unit-portrait.is-skin-preview {
+    width: 92px;
+    height: 122px;
+  }
+
+  .skin-picker-grid {
+    grid-template-columns: repeat(auto-fill, minmax(5.4rem, 1fr));
+    gap: .38rem;
+    padding: .55rem;
+  }
+
+  .skin-picker-choice {
+    padding: .32rem .22rem .34rem;
+  }
+
+  .skin-picker-choice .unit-portrait.is-skin-choice {
+    width: 50px;
+    height: 62px;
+  }
+
+  .skin-picker-foot {
+    gap: .45rem;
+    padding: .45rem .7rem;
+  }
+
+  .skin-picker-foot .menu-btn {
+    min-width: 5.5rem;
+    padding: .5rem .7rem;
+  }
+}

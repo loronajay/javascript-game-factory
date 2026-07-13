@@ -1,0 +1,114 @@
+/* -----------------------------------------------------------------------
+   Coarse-pointer touch sizing
+   ----------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  html,
+  body {
+    overscroll-behavior: none;
+  }
+
+  button {
+    min-height: 44px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #boardSvg,
+  .tile,
+  .unit {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .roster-modal {
+    padding:
+      max(.35rem, env(safe-area-inset-top))
+      max(.35rem, env(safe-area-inset-right))
+      max(.35rem, env(safe-area-inset-bottom))
+      max(.35rem, env(safe-area-inset-left));
+  }
+
+  .skin-picker-modal {
+    padding:
+      max(.35rem, env(safe-area-inset-top))
+      max(.35rem, env(safe-area-inset-right))
+      max(.35rem, env(safe-area-inset-bottom))
+      max(.35rem, env(safe-area-inset-left));
+  }
+
+  .roster-card {
+    width: min(980px, 100%);
+    height: calc(var(--app-height, 100vh) - .7rem);
+    max-height: calc(var(--app-height, 100vh) - .7rem);
+    border-radius: 10px;
+  }
+
+  .skin-picker-card {
+    height: calc(var(--app-height, 100vh) - .7rem);
+    max-height: calc(var(--app-height, 100vh) - .7rem);
+    border-radius: 10px;
+  }
+}
+
+/* Setup squad strips: phones need one readable squad at a time, with four
+   direct slot targets, not two cramped desktop cards side-by-side. */
+@media (pointer: coarse) and (max-width: 740px), (pointer: coarse) and (max-height: 540px) {
+  .squad-pickers {
+    grid-template-columns: 1fr;
+  }
+
+  .squad-picker {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "title actions"
+      "chips chips";
+    align-items: center;
+    gap: .42rem;
+    padding: .5rem;
+  }
+
+  .squad-picker-title {
+    grid-area: title;
+    min-width: 0;
+    font-size: .6rem;
+    letter-spacing: .08em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .squad-chip-row {
+    grid-area: chips;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .28rem;
+  }
+
+  .squad-chip {
+    min-height: 56px;
+    gap: .08rem;
+    padding: .3rem .16rem .26rem;
+  }
+
+  .squad-chip .unit-portrait.is-chip {
+    width: 28px;
+    height: 32px;
+  }
+
+  .squad-chip-name {
+    font-size: .52rem;
+    letter-spacing: 0;
+  }
+
+  .squad-actions {
+    grid-area: actions;
+    grid-template-columns: repeat(2, auto);
+    justify-content: end;
+  }
+
+  .squad-edit-btn {
+    width: auto;
+    min-height: 38px;
+    padding: .42rem .58rem;
+    font-size: .58rem;
+    letter-spacing: .05em;
+    white-space: nowrap;
+  }
+}

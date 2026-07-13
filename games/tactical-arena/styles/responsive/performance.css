@@ -1,0 +1,68 @@
+/* -----------------------------------------------------------------------
+   Mobile performance mode (coarse pointer)
+
+   A turn-based game has no render loop, so every continuous GPU cost is a CSS
+   animation or filter. On phones the worst offenders are the full-screen
+   animated backdrop layers that combine filter:blur() with mix-blend-mode
+   (aurora, rays, fog, clouds) and the glowing ember field — animated blur+blend
+   is the textbook cause of mobile jank. The battle layers only shed these under OS-level
+   prefers-reduced-motion, which almost no phone user enables, so do it for every
+   touch device here. We keep a static sky + stars + fortress silhouette so the
+   scene still reads; desktop keeps the full ambiance.
+   ----------------------------------------------------------------------- */
+@media (pointer: coarse) {
+  /* Drop the blur/blend/glow backdrop layers entirely (embers are also skipped
+     at the source in sceneBackdrop.js so they never get built). */
+  .bk-aurora,
+  .bk-rays,
+  .bk-fog,
+  .bk-clouds,
+  .bk-ember,
+  .bk-heat-haze,
+  .bk-storm-clouds {
+    display: none;
+  }
+
+  /* Keep the cheap static layers but stop their perpetual repaint. .bk-sky
+     animates filter:brightness on a full-viewport gradient — a full-screen
+     repaint every frame. */
+  .bk-sky,
+  .bk-stars,
+  .bk-window {
+    animation: none !important;
+  }
+
+  /* The fortress silhouette stays, but lose its blurred backlight glow. */
+  .bk-fortress::before {
+    display: none;
+  }
+
+  .bk-fortress-svg {
+    filter: none;
+  }
+
+  /* Hold the resting frame on the always-on board/unit/status animations. */
+  .unit.idle:not(.spent) .body-group,
+  .status-badge,
+  .tile.aura-zone .tile-face,
+  .tile.legal-move .tile-face,
+  .tile.legal-attack .tile-face,
+  .tile.legal-art .tile-face,
+  .tile.legal-heal .tile-face,
+  .tile.path .tile-face,
+  .tile.cone-hot .tile-face {
+    animation: none;
+  }
+
+  /* Per-unit blurred drop-shadow: an SVG blur filter re-rasterized on every
+     board rebuild. A flat shadow composites for free. */
+  .unit .shadow {
+    filter: none;
+  }
+
+  /* Stone-grain feTurbulence over the tile layer re-rasterizes on every board
+     rebuild — same class of cost as the blur layers above. Flat fills on touch. */
+  #boardLayer {
+    filter: none;
+  }
+}

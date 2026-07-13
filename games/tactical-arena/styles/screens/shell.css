@@ -1,0 +1,182 @@
+/* Screen system — title / main menu / hot-seat setup / results / settings.
+   Chrome-and-dark panels with steel borders, centered on the dark war table by
+   .menu-screen.is-active (style.css). */
+
+.menu-card { position:relative; width:min(27.5rem,100%); padding:1.9rem 1.7rem 1.7rem; border:1px solid var(--brass); border-radius:var(--radius-console); background:var(--parchment-fill); box-shadow:var(--parchment-shadow); color:var(--text); text-align:center; }
+.menu-card::after { content:""; position:absolute; inset:7px; pointer-events:none; border:1px solid rgba(80,120,150,.28); border-radius:calc(var(--radius-console) - 6px); }
+.title-card { padding-top:2.3rem; }
+.title-mark { position:relative; width:3.6rem; height:3.6rem; margin:0 auto 1.1rem; border-radius:50%; border:2px solid var(--brass-lo); background:radial-gradient(circle at 38% 30%,var(--brass-hi),var(--brass) 45%,var(--brass-lo) 90%); box-shadow:inset 0 2px 3px rgba(180,220,255,.5), inset 0 -4px 8px rgba(10,20,40,.6), 0 4px 14px rgba(0,0,0,.55); }
+.title-mark::before { content:"\2694"; position:absolute; inset:0; display:grid; place-items:center; color:#040e1a; font-size:1.7rem; text-shadow:0 1px 0 rgba(180,220,255,.3); }
+.title-name { margin:0; color:var(--text); font:900 2.2rem var(--font-display); letter-spacing:.06em; text-shadow:0 1px 0 rgba(var(--sheen),.2); }
+.title-sub { margin:.4rem 0 1.6rem; color:var(--muted); font:700 .76rem var(--font-display); letter-spacing:.26em; text-transform:uppercase; }
+.title-sub::after { content:""; display:block; width:62%; height:1px; margin:.9rem auto 0; background:linear-gradient(90deg,transparent,var(--brass) 20%,var(--brass) 80%,transparent); }
+.menu-heading { margin:0 0 .4rem; color:var(--text); font:800 1.55rem var(--font-display); letter-spacing:.05em; }
+.menu-note { margin:0 0 1.3rem; color:var(--muted); font-size:.92rem; font-style:italic; line-height:1.5; }
+.menu-buttons { display:grid; gap:.6rem; margin-top:1.5rem; }
+.menu-btn { width:100%; padding:.82rem 1rem; font-size:.98rem; font-weight:700; letter-spacing:.06em; }
+.menu-btn.ghost { border-color:rgba(80,120,150,.55); background:linear-gradient(180deg,rgba(var(--sheen),.06),rgba(var(--sheen),0) 46%),linear-gradient(180deg,var(--surface-hi),var(--surface-lo)); color:var(--muted); }
+.soon { margin-left:.5rem; padding:.12rem .44rem; border:1px solid rgba(var(--sheen),.28); border-radius:4px; background:rgba(0,0,0,.3); color:var(--brass-hi); font:700 .58rem var(--font-body); letter-spacing:.14em; text-transform:uppercase; vertical-align:middle; }
+
+/* Setup fields + segmented controls */
+.setup-field { display:grid; gap:.55rem; margin:1.25rem 0 .4rem; text-align:left; }
+.setup-field[hidden] { display:none; }
+.setup-label { color:var(--muted); font:700 .7rem var(--font-display); letter-spacing:.18em; text-transform:uppercase; }
+.segmented { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:.4rem; padding:.35rem; border:1px solid var(--parchment-edge); border-radius:var(--radius-tile); background:rgba(8,18,32,.4); box-shadow:inset 0 2px 5px rgba(0,10,20,.4); }
+.segmented .seg { padding:.6rem .5rem; border:1px solid transparent; border-radius:7px; background:transparent; box-shadow:none; color:var(--muted); font:700 .9rem var(--font-display); letter-spacing:.04em; text-shadow:none; }
+.segmented .seg:hover:not(:disabled):not(.is-selected) { filter:none; background:rgba(var(--sheen),.1); border-color:rgba(80,120,150,.3); transform:none; }
+.segmented .seg.is-selected { border-color:var(--brass); color:#040e1a; background:linear-gradient(180deg,var(--brass-hi),var(--brass) 60%,var(--brass-lo)); text-shadow:0 1px 0 rgba(200,235,255,.35); box-shadow:inset 0 1px 0 rgba(200,235,255,.4), 0 2px 6px rgba(0,0,0,.4); }
+.segmented .seg:disabled { cursor:not-allowed; opacity:.35; }
+.setup-hint { margin:0; color:var(--muted); opacity:.7; font:400 .72rem var(--font-body); line-height:1.35; }
+.setup-hint[hidden] { display:none; }
+
+/* Squad strip — per-player summary on the setup screen (chips + Edit button).
+   The actual choosing happens in the roster pop-up below. */
+.squad-pickers { display:grid; grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr)); gap:.6rem; }
+.squad-pickers[hidden] { display:none; }
+.squad-picker { display:grid; gap:.5rem; padding:.55rem .5rem; border:1px solid var(--parchment-edge); border-top:3px solid var(--team,var(--brass)); border-radius:var(--radius-tile); background:rgba(8,20,34,.3); box-shadow:inset 0 2px 5px rgba(0,10,20,.3); }
+.squad-picker-title { color:color-mix(in srgb,var(--team,var(--muted)) 65%,var(--muted)); font:700 .64rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
+.squad-chip-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.35rem; }
+.squad-chip { display:grid; gap:.12rem; justify-items:center; padding:.42rem .25rem; border:1px solid var(--parchment-edge); border-radius:7px; background:linear-gradient(180deg,rgba(30,50,70,.55),rgba(14,24,40,.45)); color:var(--text); cursor:pointer; }
+.squad-chip.row-back { background:linear-gradient(180deg,rgba(8,20,36,.5),rgba(6,16,28,.35)); }
+.squad-chip:hover { border-color:var(--brass); filter:brightness(1.1); transform:none; }
+.squad-picker.is-locked { border-color:rgba(120,200,140,.6); box-shadow:inset 0 0 0 1px rgba(120,200,140,.18); }
+.squad-picker.is-locked .squad-chip { cursor:default; opacity:.72; }
+.squad-picker.is-locked .squad-edit-btn { color:#9fe6b0; border-color:rgba(120,200,140,.55); cursor:default; }
+.squad-chip .unit-portrait.is-chip { width:2.125rem; height:2.5rem; border-radius:5px; }
+.squad-chip .is-glyph-fallback { font-size:1.1rem; }
+.squad-chip-name { max-width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font:700 .6rem var(--font-display); letter-spacing:.04em; }
+.squad-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.35rem; }
+.squad-edit-btn { width:100%; padding:.45rem .5rem; border:1px solid color-mix(in srgb,var(--team,var(--brass)) 45%,var(--parchment-edge)); border-radius:7px; background:linear-gradient(180deg,rgba(var(--sheen),.08),rgba(var(--sheen),0) 50%),rgba(12,22,36,.6); color:var(--text); font:700 .68rem var(--font-display); letter-spacing:.1em; text-transform:uppercase; cursor:pointer; }
+.squad-edit-btn:hover { border-color:var(--team,var(--brass)); filter:brightness(1.12); transform:none; }
+
+/* Roster pop-up — full-roster squad builder with a unit detail pane (reuses the
+   .ref-* / .codex-detail reference markup). */
+/* Fixed height so swapping the detail content never resizes / re-centres the
+   modal — the detail pane scrolls internally instead. */
+.roster-card { width:min(57.5rem,96vw); height:min(41.25rem,92vh); }
+.roster-head { padding-bottom:.7rem; }
+.roster-sub { margin:.2rem 0 0; color:var(--muted); font-size:.78rem; font-style:italic; line-height:1.4; }
+.roster-tray { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.4rem; padding:.7rem 1.1rem; border-bottom:1px solid var(--parchment-edge); background:rgba(8,18,30,.4); flex-shrink:0; }
+.roster-slot { display:grid; gap:.18rem; justify-items:center; padding:.4rem .3rem .35rem; border:1px solid var(--parchment-edge); border-radius:8px; background:linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.4)); color:var(--text); cursor:pointer; }
+.roster-slot.row-back { background:linear-gradient(180deg,rgba(8,20,36,.5),rgba(6,16,28,.35)); }
+.roster-slot:hover { border-color:var(--brass); filter:brightness(1.1); }
+.roster-slot.is-active { border-color:var(--team,var(--brass)); box-shadow:0 0 0 1px var(--team,var(--brass)), inset 0 1px 0 rgba(200,235,255,.25); background:linear-gradient(180deg,color-mix(in srgb,var(--team,var(--brass)) 18%,transparent),transparent 60%),linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.4)); }
+.roster-slot.is-active .roster-slot-tag { color:var(--brass-hi); }
+.roster-slot-tag { color:var(--muted); font:700 .52rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
+.roster-slot .unit-portrait.is-slot { width:2.5rem; height:2.875rem; border-radius:6px; }
+.roster-slot .is-glyph-fallback { font-size:1.2rem; }
+.roster-slot-name { font:700 .62rem var(--font-display); letter-spacing:.03em; }
+.roster-body { display:flex; flex:1; min-height:0; }
+.roster-grid { display:grid; grid-template-columns:1fr; align-content:start; gap:.7rem; width:46%; max-width:21.25rem; flex-shrink:0; overflow-y:auto; padding:.8rem; border-right:1px solid rgba(70,100,130,.35); }
+.roster-class { display:grid; gap:.32rem; min-width:0; }
+.roster-class-title { margin:0; color:color-mix(in srgb,var(--team,var(--brass)) 58%,var(--muted)); font:800 .58rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
+.roster-class-units { display:grid; grid-template-columns:repeat(auto-fill,minmax(5.6rem,1fr)); gap:.45rem; }
+.roster-unit { position:relative; display:grid; gap:.3rem; justify-items:center; padding:.45rem .3rem .5rem; border:1px solid var(--parchment-edge); border-radius:8px; background:linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.4)); color:var(--text); cursor:pointer; }
+.roster-unit:hover:not(.is-disabled) { border-color:var(--brass); filter:brightness(1.1); }
+.roster-unit.is-focused { border-color:var(--brass); box-shadow:inset 0 0 0 1px var(--brass), 0 0 10px rgba(203,159,85,.3); }
+/* Already-in-squad units stay greyed but remain clickable for inspection. */
+.roster-unit.is-disabled { opacity:.5; filter:grayscale(.5); }
+.roster-unit.is-disabled.is-focused { opacity:.85; }
+.roster-unit .unit-portrait.is-card { width:100%; height:4.75rem; border-radius:6px; }
+.roster-unit .is-glyph-fallback { font-size:1.6rem; }
+.roster-unit-name { font:700 .64rem var(--font-display); letter-spacing:.03em; }
+.roster-unit-flag { font:700 .5rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.roster-unit.is-locked .roster-unit-flag { color:#e6c15c; }
+/* Detail pane: a pinned action bar (unit name + the Place button) above an
+   internally-scrolling card, so Place is always visible where the player reads. */
+.roster-detail { flex:1; display:flex; flex-direction:column; overflow:hidden; padding:0; }
+.roster-detail .ref-unit { padding-top:0; border-bottom:0; }
+.roster-detail-bar { display:flex; flex-shrink:0; align-items:center; gap:.8rem; padding:.55rem .9rem; border-bottom:1px solid var(--parchment-edge); background:rgba(8,18,30,.4); }
+.roster-detail-name { flex:1; display:flex; gap:.5rem; align-items:center; min-width:0; margin:0; color:var(--text); font:800 1rem var(--font-display); letter-spacing:.04em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.roster-detail-bar .roster-assign { width:auto; flex-shrink:0; }
+.roster-detail-scroll { flex:1; min-height:0; overflow-y:auto; padding:.9rem 1rem; }
+/* Drafting detail card: large painted portrait on the LEFT, unit data on the RIGHT.
+   The portrait (ui/portraits.js) self-frames to a consistent scale; the team accent
+   rings the frame so the player still reads which side they're drafting for. */
+.roster-detail-split { display:flex; align-items:flex-start; gap:1.2rem; }
+.roster-detail-info { flex:1; min-width:0; }
+.roster-detail-split .unit-portrait.is-hero { width:10.75rem; height:15rem; flex-shrink:0; border:1px solid var(--parchment-edge); border-radius:12px; box-shadow:inset 0 1px 0 rgba(var(--sheen),.12), inset 0 0 24px rgba(0,10,20,.5), 0 0 0 2px color-mix(in srgb,var(--team,var(--p1)) 45%,transparent); }
+.roster-detail-split .is-glyph-fallback { font-size:3rem; }
+.skin-summary { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:.55rem; margin:0 0 .75rem; padding:.5rem; border:1px solid rgba(80,120,150,.35); border-radius:8px; background:rgba(8,18,30,.34); }
+.skin-summary .unit-portrait.is-skin-summary { width:3.25rem; height:3.9rem; border-radius:6px; }
+.skin-summary-copy { display:grid; gap:.08rem; min-width:0; }
+.skin-summary-title { color:color-mix(in srgb,var(--team,var(--brass)) 58%,var(--muted)); font:800 .54rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
+.skin-summary-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font:800 .72rem var(--font-display); letter-spacing:.03em; }
+.skin-summary-hint { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font:700 .52rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; }
+.skin-summary-btn { width:auto; min-height:2.35rem; padding:.45rem .62rem; border:1px solid color-mix(in srgb,var(--team,var(--brass)) 48%,var(--parchment-edge)); border-radius:7px; background:linear-gradient(180deg,rgba(var(--sheen),.08),rgba(var(--sheen),0) 50%),rgba(12,22,36,.6); color:var(--text); font:800 .58rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; cursor:pointer; }
+.skin-summary-btn:hover { border-color:var(--team,var(--brass)); filter:brightness(1.12); transform:none; }
+.skin-shelf { display:grid; gap:.4rem; margin:0 0 .75rem; padding:.55rem; border:1px solid rgba(80,120,150,.35); border-radius:8px; background:rgba(8,18,30,.34); }
+.skin-shelf-title { color:color-mix(in srgb,var(--team,var(--brass)) 58%,var(--muted)); font:800 .58rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
+.skin-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(5.7rem,1fr)); gap:.4rem; }
+.skin-option { display:grid; gap:.22rem; justify-items:center; min-width:0; padding:.38rem .3rem .42rem; border:1px solid var(--parchment-edge); border-radius:8px; background:linear-gradient(180deg,rgba(30,50,70,.48),rgba(14,24,40,.42)); color:var(--text); cursor:pointer; }
+.skin-option:hover:not(.is-locked),.skin-option.is-selected { border-color:var(--team,var(--brass)); filter:brightness(1.08); }
+.skin-option.is-selected { box-shadow:inset 0 0 0 1px var(--team,var(--brass)); }
+.skin-option.is-locked { opacity:.5; filter:grayscale(.6); cursor:not-allowed; }
+.skin-option .unit-portrait.is-skin { width:3.375rem; height:4rem; border-radius:6px; }
+.skin-option-name { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:700 .58rem var(--font-display); letter-spacing:.04em; }
+.skin-option-status { color:var(--muted); font:700 .48rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; }
+.roster-foot { display:flex; align-items:center; gap:.6rem; padding:.8rem 1.1rem; border-top:1px solid var(--parchment-edge); background:linear-gradient(0deg,var(--console-hi),var(--console-lo)); flex-shrink:0; }
+.roster-foot .menu-btn { width:auto; min-width:7rem; }
+/* Contextual Place button — the primary build action; strong brass call-to-action. */
+.roster-assign { min-width:11rem; padding:.5rem .8rem; border-color:var(--brass); color:var(--text); font:700 .78rem var(--font-display); letter-spacing:.05em; background:linear-gradient(180deg,rgba(203,159,85,.32),rgba(150,108,46,.22)); box-shadow:inset 0 1px 0 rgba(255,235,190,.25); }
+.roster-assign:hover:not(:disabled) { filter:brightness(1.12); border-color:var(--brass-hi); }
+.roster-assign:disabled { opacity:.45; cursor:not-allowed; filter:grayscale(.4); }
+@media (max-width:560px) {
+  .roster-body { flex-direction:column; }
+  .roster-grid { width:auto; max-width:none; border-right:0; border-bottom:1px solid rgba(70,100,130,.35); }
+  .skin-summary { grid-template-columns:auto minmax(0,1fr); }
+  .skin-summary-btn { grid-column:1 / -1; width:100%; }
+  .skin-picker-body { grid-template-columns:1fr; }
+  .skin-picker-preview { grid-template-columns:auto minmax(0,1fr); align-content:center; justify-items:start; text-align:left; border-right:0; border-bottom:1px solid rgba(70,100,130,.35); }
+  .skin-picker-preview .unit-portrait.is-skin-preview { width:5.5rem; height:7rem; }
+  .skin-picker-copy { justify-items:start; }
+  .skin-picker-grid { grid-template-columns:repeat(auto-fill,minmax(5.8rem,1fr)); padding:.65rem; }
+  .skin-picker-choice .unit-portrait.is-skin-choice { width:3.35rem; height:4.05rem; }
+}
+
+/* Results */
+.results-card { width:min(31.25rem,100%); }
+.results-winner { margin:.2rem 0 1.1rem; font:800 1.1rem var(--font-display); letter-spacing:.03em; color:var(--text); }
+.results-winner[style*="--team"] { color:color-mix(in srgb,var(--team) 80%,var(--text)); }
+.results-report { display:grid; gap:.6rem; margin-bottom:1rem; text-align:left; }
+.report-team { padding:.75rem .9rem; border:1px solid var(--parchment-edge); border-left:3px solid color-mix(in srgb,var(--team) 75%,var(--brass-lo)); border-radius:var(--radius-tile); background:rgba(16,28,44,.5); box-shadow:inset 0 1px 2px rgba(80,140,180,.06); }
+.report-team.is-winner { border-color:color-mix(in srgb,var(--team) 50%,var(--parchment-edge)); border-left-color:var(--team); background:linear-gradient(180deg,color-mix(in srgb,var(--team) 14%,transparent),transparent 60%),rgba(16,28,44,.6); }
+.report-team:not(.is-winner) { opacity:.82; }
+.report-head { display:flex; align-items:center; gap:.5rem; margin-bottom:.55rem; }
+.report-dot { width:.85rem; height:.85rem; border-radius:50% 50% 50% 50% / 42% 42% 58% 58%; background:var(--team); box-shadow:inset 0 1px 2px rgba(255,255,255,.3), 0 0 8px color-mix(in srgb,var(--team) 55%,transparent); }
+.report-name { font:800 .96rem var(--font-display); letter-spacing:.03em; color:var(--text); }
+.report-badge { padding:.1rem .46rem; border-radius:5px; background:linear-gradient(180deg,var(--brass-hi),var(--brass) 60%,var(--brass-lo)); color:#040e1a; font:800 .6rem var(--font-display); letter-spacing:.1em; text-transform:uppercase; box-shadow:inset 0 1px 0 rgba(200,235,255,.4); }
+.report-survivors { margin-left:auto; color:var(--muted); font-size:.78rem; font-weight:700; letter-spacing:.04em; }
+.report-hpbar { height:7px; margin-bottom:.6rem; overflow:hidden; border-radius:4px; background:rgba(8,20,36,.4); box-shadow:inset 0 1px 2px rgba(0,10,20,.4); }
+.report-hpfill { height:100%; border-radius:4px; background:linear-gradient(90deg,color-mix(in srgb,var(--team) 70%,#0c1a2a),var(--team)); }
+.report-tallies { display:flex; flex-wrap:wrap; gap:.45rem; }
+.report-tally { display:flex; flex-direction:column; flex:1 1 0; min-width:3.4rem; padding:.42rem .3rem; border:1px solid rgba(70,110,140,.25); border-radius:7px; background:rgba(16,30,46,.5); text-align:center; }
+.report-tally b { font:800 1.05rem var(--font-display); color:var(--text); }
+.report-tally i { margin-top:.1rem; color:var(--muted); font:700 .62rem var(--font-body); font-style:normal; letter-spacing:.07em; text-transform:uppercase; }
+.results-stats { display:grid; grid-template-columns:auto 1fr; gap:.5rem 1rem; margin:0; padding:1rem 1.1rem; border:1px solid var(--parchment-edge); border-radius:var(--radius-tile); background:rgba(8,20,36,.3); box-shadow:inset 0 2px 5px rgba(0,10,20,.25); text-align:left; }
+.results-stats dt { color:var(--muted); font:700 .72rem var(--font-display); letter-spacing:.09em; text-transform:uppercase; }
+.results-stats dd { margin:0; font-size:.9rem; font-weight:700; color:var(--text); text-align:right; }
+
+/* Victory confetti */
+.victory-burst { position:absolute; z-index:0; inset:0; overflow:hidden; pointer-events:none; }
+[data-screen="results"] .menu-card { position:relative; z-index:1; }
+.confetti { position:absolute; top:-8%; width:var(--size,8px); height:calc(var(--size,8px) * .5); border-radius:1px; opacity:0; animation:confetti-fall var(--dur,2.4s) linear var(--delay,0s) forwards; }
+@keyframes confetti-fall { 0% { transform:translate(0,0) rotate(0); opacity:0; } 12% { opacity:1; } 100% { transform:translate(var(--drift,0),110vh) rotate(var(--spin,360deg)); opacity:.9; } }
+
+/* Settings overlay (reuses .ref-modal / .ref-card shell from style.css) */
+.settings-card { width:min(26.25rem,94vw); }
+.settings-body { display:grid; gap:1.2rem; padding:1.2rem 1.2rem 1.4rem; }
+.set-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+.set-label { font:700 .85rem var(--font-display); letter-spacing:.04em; color:var(--text); }
+.settings-body input[type="range"] { flex:1; max-width:220px; accent-color:var(--brass); }
+.settings-body input[type="checkbox"] { width:1.25rem; height:1.25rem; accent-color:var(--brass); }
+.set-select { flex:1; max-width:220px; padding:.5rem .6rem; border:1px solid var(--parchment-edge); border-radius:7px; background:rgba(8,18,32,.55); color:var(--text); font:700 .82rem var(--font-display); letter-spacing:.04em; cursor:pointer; }
+.set-select:hover { border-color:var(--brass); }
+.set-action-row { align-items:flex-start; }
+.set-action-stack { display:grid; justify-items:end; gap:.35rem; min-width:0; }
+.set-action-stack .menu-btn { min-height:2.35rem; padding:.45rem .7rem; font-size:.62rem; }
+.set-action-stack .menu-btn.danger.is-confirming { border-color:#d46b5e; background:linear-gradient(180deg,rgba(160,54,42,.32),rgba(85,21,22,.58)); color:#ffe3df; box-shadow:0 0 0 2px rgba(212,107,94,.18); }
+.set-hint { max-width:14rem; color:var(--muted); font:700 .56rem var(--font-display); letter-spacing:.06em; line-height:1.35; text-align:right; }
+
+@media (prefers-reduced-motion:reduce) { .confetti { display:none; } }
+@media (max-width:480px) { .menu-card { padding:1.5rem 1.2rem; } .title-name { font-size:1.9rem; } }

@@ -168,6 +168,17 @@ import {
   witchDoctorRageWarningScript,
 } from "./campaign/campaign.js";
 import { isCampaignSkinRewardGranted } from "./progression/unlocks.js";
+import { createCampaignMeta } from "./campaign/campaignMeta.js";
+import {
+  countPlayerMagicDamageDealt,
+  eventDamageForTarget,
+  eventTargetIds,
+  playerFireHitTarget,
+  playerLandedEnemyStatus,
+  playerTriedBlindOnEnemyMonk,
+  playerTriedPoisonOnTarget,
+  playerTriedStatusOnTargets,
+} from "./campaign/campaignObservations.js";
 import {
   TUTORIAL_ARTS_PLAYER_MYSTIC_ID,
   TUTORIAL_BASICS_ID,
@@ -268,127 +279,6 @@ let tempoBusy = false;
 // Reset in startMatch; both missions read/write their own keys.
 let campaignMeta = createCampaignMeta();
 
-function createCampaignMeta() {
-  return {
-    // Clod (mission 1)
-    clodWarningShown: false,
-    clodChargeUsed: false,
-    clodChargeHitCount: 0,
-    chargeDefended: false,
-    // Necromancer (mission 2)
-    statusWarningShown: false,
-    summonWarningShown: false,
-    rageWarningShown: false,
-    cleanseUsed: false,
-    spreadHitCount: 0,
-    // Witch Doctor (mission 3)
-    fireWarningShown: false,
-    blockedShotWarningShown: false,
-    blockedShotQueued: false,
-    ghoulWarningShown: false,
-    witchDoctorRageWarningShown: false,
-    ghoulsDefeatedCount: 0,
-    fireDamageTakenCount: 0,
-    ghoulBiteTakenCount: 0,
-    blackDeathDanceUsed: false,
-    witchDoctorHealCastCount: 0,
-    // Father Time (mission 4)
-    fatherTimeRageWarningShown: false,
-    archerDefeatedBeforeFatherTime: false,
-    archerBlinded: false,
-    rewindUsed: false,
-    // Virus (mission 5)
-    virusPoisonWarningShown: false,
-    virusEnemyStatusTauntShown: false,
-    playerAfflictedEnemyStatus: false,
-    // Paladin (mission 6)
-    paladinLightseekerWarningShown: false,
-    paladinStatusTauntShown: false,
-    paladinRageWarningShown: false,
-    paladinLightseekerDamageTakenCount: 0,
-    paladinStatusAttempted: false,
-    paladinDefeatDialogueShown: false,
-    // Monk (mission 7)
-    monkFakeKilledBeforeReal: false,
-    monkBlindAttempted: false,
-    // Gargoyle (mission 8)
-    gargoyleRageWarningShown: false,
-    gargoyleEnteredRage: false,
-    gargoylePyroclasmDamageTakenCount: 0,
-    // Sniper (mission 9) — shares fireDamageTakenCount above
-    sniperFireWarningShown: false,
-    wallDestroyedCount: 0,
-    sniperBlinded: false,
-    // Miner (mission 11)
-    minerBlastingCapSplashWarningShown: false,
-    minerRageWarningShown: false,
-    minerBlastingCapSplashTakenCount: 0,
-    minerEnteredRage: false,
-    minerRageHarvested: false,
-    minerDefeatDialogueShown: false,
-    // Mechs on the Farm (mission 7.5)
-    flamethrowerBothHitCount: 0,
-    brothersEnteredRage: false,
-    brothersDefeatDialogueShown: false,
-    brothersRageWarned: { "big-brother": false, "little-brother": false },
-    // Has-Been Heroes (mission 12)
-    fartDisplacementDamageTakenCount: 0,
-    hasbeenDefeatDialogueShown: false,
-    // Per-fat-member one-time RAGE popup flags, keyed by unit type.
-    hasbeenFatRageWarned: Object.fromEntries(HASBEEN_HEROES_FAT_TYPES.map((type) => [type, false])),
-    // Ronin (mission 13)
-    roninBlindWarningShown: false,
-    roninRageWarningShown: false,
-    roninBlindApplied: false,
-    roninEnteredRage: false,
-    // Wrong Place, Wrong Time (mission 14)
-    wrongPlacePlayerStunned: false,
-    wrongPlaceNukedAllEnemies: false,
-    // Out of Retirement (mission 15) -- reuses Paladin Lightseeker/status counters.
-    angelRageWarningShown: false,
-    angelDefeatedBeforePaladin: false,
-    outOfRetirementDefeatDialogueShown: false,
-    // Voidwood Forest (mission 16) -- reuses Ghoul Bite counter above.
-    voidwoodDarkBombDamageTakenCount: 0,
-    playerMagicDamageDealtCount: 0,
-    voidwoodFallLinesShown: {},
-    voidwoodDefeatDialogueShown: false,
-    // Spirit of the Woods (mission 17) -- reuses Paladin Lightseeker counter above.
-    motherNatureGreatFloodUsed: false,
-    motherNatureGreatFloodDialogueShown: false,
-    spiritWoodsTreantPoisonAttempted: false,
-    spiritWoodsTreantPoisonTauntShown: false,
-    spiritWoodsPaladinStatusTauntShown: false,
-    spiritWoodsTreantFireHit: false,
-    spiritWoodsTreantFireTauntShown: false,
-    // The Showdown (mission 18)
-    showdownAnyUnitEnteredRage: false,
-    showdownFootworkHitAllEnemies: false,
-    showdownDefeatDialogueShown: false,
-    showdownFatRageWarned: Object.fromEntries(SHOWDOWN_FAT_TYPES.map((type) => [type, false])),
-    // Not My King (mission 19)
-    notMyKingEnemyEnteredRage: false,
-    notMyKingDefeatDialogueShown: false,
-    notMyKingEnemyRageWarned: Object.fromEntries(NOT_MY_KING_ENEMY_TYPES.map((type) => [type, false])),
-    // Void Ridden Castle (mission 21)
-    voidCastleNemesisEnteredRage: false,
-    voidCastleNemesisRageWarningShown: false,
-    // Latched while the real Summoner still lives — the decoys all drop the instant he
-    // does (resolveVictory collapses them), and that collapse must not fail the star.
-    voidCastleDecoyKilled: false,
-    voidCastleSplitShown: false,
-    voidCastleDefeatDialogueShown: false,
-    // The Final Battle (mission 22)
-    // One "shown" latch per stage rather than a single flag: each duel is its own beat, and
-    // the stage a beat belongs to is the key that keeps them from replaying.
-    finalBattleStageShown: {},
-    finalBattleReachWarningShown: false,
-    finalBattleRageWarningShown: false,
-    finalBattleBanished: false,
-    finalBattleBanishDialogueShown: false,
-    finalBattleDefeatDialogueShown: false,
-  };
-}
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
 const CPU_TURN_LEAD_MS = 480;        // pause before the CPU's first move
 const CPU_ACTIVATION_GAP_MS = 320;   // between one unit finishing and the next
@@ -1171,7 +1061,7 @@ function recordCampaignProgressHooks(command, result, beforeState = null) {
         campaignMeta.spreadHitCount += 1;
       }
     }
-    if (campaignMissionId === VIRUS_MISSION_ID && playerLandedEnemyStatus(events)) {
+    if (campaignMissionId === VIRUS_MISSION_ID && playerLandedEnemyStatus(state, events)) {
       campaignMeta.playerAfflictedEnemyStatus = true;
     }
   } else if (campaignMissionId === WITCH_DOCTOR_MISSION_ID) {
@@ -1231,7 +1121,7 @@ function recordCampaignProgressHooks(command, result, beforeState = null) {
     const immuneTargets = campaignMissionId === OUT_OF_RETIREMENT_MISSION_ID
       ? ["p2-0-angel", "p2-1-paladin"]
       : ["p2-0-paladin"];
-    if (playerTriedStatusOnPaladin(command, events, immuneTargets)) {
+    if (playerTriedStatusOnTargets(state, command, events, immuneTargets)) {
       campaignMeta.paladinStatusAttempted = true;
     }
     if (campaignMissionId === OUT_OF_RETIREMENT_MISSION_ID) {
@@ -1251,14 +1141,14 @@ function recordCampaignProgressHooks(command, result, beforeState = null) {
       if (event.type === "ART_RESOLVED" && event.actorId === "p2-0-mother-nature" && event.artId === "great-flood") {
         campaignMeta.motherNatureGreatFloodUsed = true;
       }
-      if (playerFireHitTarget(event, "p2-1-treant")) {
+      if (playerFireHitTarget(state, event, "p2-1-treant")) {
         campaignMeta.spiritWoodsTreantFireHit = true;
       }
     }
-    if (playerTriedPoisonOnTarget(command, events, "p2-1-treant")) {
+    if (playerTriedPoisonOnTarget(state, command, events, "p2-1-treant")) {
       campaignMeta.spiritWoodsTreantPoisonAttempted = true;
     }
-    if (playerTriedStatusOnPaladin(command, events, ["p2-3-paladin"])) {
+    if (playerTriedStatusOnTargets(state, command, events, ["p2-3-paladin"])) {
       campaignMeta.paladinStatusAttempted = true;
     }
   } else if (campaignMissionId === SHOWDOWN_MISSION_ID) {
@@ -1288,7 +1178,7 @@ function recordCampaignProgressHooks(command, result, beforeState = null) {
       campaignMeta.notMyKingEnemyEnteredRage = true;
     }
   } else if (campaignMissionId === VOIDWOOD_MISSION_ID) {
-    campaignMeta.playerMagicDamageDealtCount += countPlayerMagicDamageDealt(events);
+    campaignMeta.playerMagicDamageDealtCount += countPlayerMagicDamageDealt(state, events);
     for (const event of events) {
       if (event.type === "AUTO_STRIKE") {
         const source = findUnit(state, event.sourceId);
@@ -1352,7 +1242,7 @@ function recordCampaignProgressHooks(command, result, beforeState = null) {
     if (realMonk?.hp > 0 && state.units.some((unit) => unit.trialFakeMonk && unit.hp <= 0)) {
       campaignMeta.monkFakeKilledBeforeReal = true;
     }
-    if (playerTriedBlindOnMonk(command, events)) {
+    if (playerTriedBlindOnEnemyMonk(state, command, events)) {
       campaignMeta.monkBlindAttempted = true;
     }
   } else if (campaignMissionId === GARGOYLE_MISSION_ID) {
@@ -1483,160 +1373,6 @@ function recordCampaignProgressHooks(command, result, beforeState = null) {
     }
   }
   maybeShowCampaignDialogue();
-}
-
-function playerTriedStatusOnPaladin(command, events = [], targetIds = ["p2-0-paladin"]) {
-  if (command?.type !== "USE_ART" || command.player !== 1) return false;
-  const actor = findUnit(state, command.unitId);
-  const art = actor ? getArt(actor.type, command.artId) : null;
-  if (!artHasStatusEffect(art)) return false;
-  const targets = targetIds.filter((id) => findUnit(state, id));
-  if (!targets.length) return false;
-  if (targets.includes(command.targetId)) return true;
-  if (!command.targetId && (art.selfCast || art.globalStatus || art.targeting?.shape === "selfAura")) return true;
-  return events.some((event) =>
-    event.type === "ART_RESOLVED" &&
-    event.actorId === command.unitId &&
-    targets.some((targetId) =>
-      event.targetId === targetId ||
-      (event.targetIds ?? []).includes(targetId) ||
-      (event.statusTargets ?? []).includes(targetId) ||
-      (event.blinded ?? []).includes(targetId)
-    ));
-}
-
-function playerTriedPoisonOnTarget(command, events = [], targetId) {
-  if (command?.type !== "USE_ART" || command.player !== 1 || !targetId) return false;
-  const actor = findUnit(state, command.unitId);
-  const art = actor ? getArt(actor.type, command.artId) : null;
-  if (!artHasPoisonEffect(art)) return false;
-  if (command.targetId === targetId) return true;
-  return events.some((event) =>
-    event.type === "ART_RESOLVED" &&
-    event.actorId === command.unitId &&
-    (
-      event.targetId === targetId ||
-      (event.targetIds ?? []).includes(targetId) ||
-      (event.statusTargets ?? []).includes(targetId)
-    ));
-}
-
-function artHasStatusEffect(value) {
-  if (!value || typeof value !== "object") return false;
-  if (value.effect?.type === "status" || value.type === "status") return true;
-  if (typeof value.status === "string" && value.type !== "immunity") return true;
-  return Object.values(value).some((child) => {
-    if (Array.isArray(child)) return child.some(artHasStatusEffect);
-    return child && typeof child === "object" && artHasStatusEffect(child);
-  });
-}
-
-function artHasPoisonEffect(value) {
-  if (!value || typeof value !== "object") return false;
-  if (value.effect?.status === "poison" || value.globalStatus?.status === "poison") return true;
-  if (value.status === "poison" && value.type !== "immunity") return true;
-  return Object.values(value).some((child) => {
-    if (Array.isArray(child)) return child.some(artHasPoisonEffect);
-    return child && typeof child === "object" && artHasPoisonEffect(child);
-  });
-}
-
-function playerTriedBlindOnMonk(command, events = []) {
-  if (command?.type !== "USE_ART" || command.player !== 1) return false;
-  const actor = findUnit(state, command.unitId);
-  const art = actor ? getArt(actor.type, command.artId) : null;
-  if (!artHasBlindEffect(art)) return false;
-  if (command.targetId && findUnit(state, command.targetId)?.type === "monk") return true;
-  const monks = state.units.filter((unit) => unit.player === 2 && unit.type === "monk" && unit.hp > 0);
-  if (!monks.length) return false;
-  if (!command.targetId && (art.selfCast || art.globalStatus || art.targeting?.shape === "selfAura")) return true;
-  return events.some((event) =>
-    event.type === "ART_RESOLVED" &&
-    event.actorId === command.unitId &&
-    monks.some((monk) =>
-      event.targetId === monk.id ||
-      (event.targetIds ?? []).includes(monk.id) ||
-      (event.statusTargets ?? []).includes(monk.id) ||
-      (event.blinded ?? []).includes(monk.id)
-    ));
-}
-
-function artHasBlindEffect(value) {
-  if (!value || typeof value !== "object") return false;
-  if (value.effect?.status === "blind" || value.globalStatus?.status === "blind") return true;
-  if (value.status === "blind" && value.type !== "immunity") return true;
-  return Object.values(value).some((child) => {
-    if (Array.isArray(child)) return child.some(artHasBlindEffect);
-    return child && typeof child === "object" && artHasBlindEffect(child);
-  });
-}
-
-function playerLandedEnemyStatus(events) {
-  return events.some((event) => {
-    const actor = findUnit(state, event.actorId);
-    if (actor?.player !== 1) return false;
-    const targetIds = [
-      event.targetId,
-      ...(event.targetIds ?? []),
-      ...(event.statusTargets ?? []),
-      ...(event.blinded ?? []),
-    ].filter(Boolean);
-    if (!targetIds.some((id) => findUnit(state, id)?.player === 2)) return false;
-    return Boolean(
-      event.effect?.applied ||
-      event.appliedStatus ||
-      event.statusTargets?.length ||
-      event.blinded?.length
-    );
-  });
-}
-
-function numericDamage(value) {
-  if (typeof value === "number") return Math.max(0, value);
-  if (value && typeof value.damage === "number") return Math.max(0, value.damage);
-  return 0;
-}
-
-function eventTargetIds(event) {
-  return [...new Set([
-    event.targetId,
-    ...(event.targetIds ?? []),
-    ...Object.keys(event.damageByTarget ?? {}),
-  ].filter(Boolean))];
-}
-
-function eventDamageForTarget(event, targetId) {
-  if (typeof event.damageByTarget?.[targetId] === "number") return Math.max(0, event.damageByTarget[targetId]);
-  const targets = eventTargetIds(event);
-  if (event.targetId === targetId || targets.length <= 1) return numericDamage(event.damage);
-  return 0;
-}
-
-function playerFireHitTarget(event, targetId) {
-  if (event?.type !== "ART_RESOLVED" || !targetId) return false;
-  const actor = findUnit(state, event.actorId);
-  if (actor?.player !== 1) return false;
-  const art = getArt(actor.type, event.artId);
-  if (!isFireBasedDamage({ art })) return false;
-  return eventTargetIds(event).some((id) =>
-    id === targetId && eventDamageForTarget(event, id) > 0);
-}
-
-function countPlayerMagicDamageDealt(events) {
-  let count = 0;
-  for (const event of events) {
-    if (event.type !== "ATTACK_RESOLVED" && event.type !== "ART_RESOLVED") continue;
-    const actor = findUnit(state, event.actorId);
-    if (actor?.player !== 1) continue;
-    const damageType = event.type === "ART_RESOLVED"
-      ? getArt(actor.type, event.artId)?.damageType
-      : getBasicAttackDamageType(actor);
-    if (damageType !== "magic") continue;
-    for (const targetId of eventTargetIds(event)) {
-      if (findUnit(state, targetId)?.player === 2 && eventDamageForTarget(event, targetId) > 0) count += 1;
-    }
-  }
-  return count;
 }
 
 // Returns the next eligible condition-triggered dialogue beat for the active mission

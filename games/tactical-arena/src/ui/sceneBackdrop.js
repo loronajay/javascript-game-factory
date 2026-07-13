@@ -171,7 +171,7 @@ export function mountSceneBackdrop(container) {
   if (!container) return;
   // This is a turn-based game with no render loop, so the only continuous GPU
   // cost is CSS animation. On phones the animated blur/blend backdrop layers and
-  // the ember field are the dominant cause of jank — responsive.css strips the
+  // the ember field are the dominant cause of jank — styles/responsive.css strips the
   // heavy layers on a coarse pointer, and we skip the ember field at the source
   // so we never even create 28 perpetually-animating nodes there.
   const coarse =

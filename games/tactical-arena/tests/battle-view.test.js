@@ -17,7 +17,9 @@ import { UNIT_TYPES, getArt } from "../src/core/unitCatalog.js";
 import { buildCodex, buildCodexForTypes, mountCodex } from "../src/ui/codex.js";
 
 const GAME_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const STYLE_CSS = readFileSync(join(GAME_ROOT, "style.css"), "utf8");
+const STYLE_CSS = ["board", "overlays", "effects", "scene"]
+  .map((name) => readFileSync(join(GAME_ROOT, "styles", "battle", `${name}.css`), "utf8"))
+  .join("\n");
 
 class TestStyle {
   constructor() {

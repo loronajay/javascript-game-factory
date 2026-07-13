@@ -1,0 +1,381 @@
+/* -----------------------------------------------------------------------
+   Landscape phone: command console BESIDE the battlefield. A phone held
+   sideways is short, so stacking the HUD under the board crushes both. This
+   reflows to a top bar + (stage | hud) split so the board keeps its height.
+   ----------------------------------------------------------------------- */
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 540px) {
+  .match-screen.is-active {
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) clamp(168px, 27vw, 232px);
+    grid-template-areas:
+      "top top"
+      "stage hud";
+  }
+
+  .topbar {
+    grid-area: top;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: .45rem;
+    padding:
+      .38rem max(.55rem, env(safe-area-inset-right))
+      .34rem max(.55rem, env(safe-area-inset-left));
+  }
+
+  .brand {
+    display: none;
+  }
+
+  .turn-banner {
+    min-width: 0;
+    padding: .3rem .62rem;
+    text-align: left;
+  }
+
+  .turn-title {
+    font-size: .72rem;
+    letter-spacing: .02em;
+  }
+
+  .turn-title::before {
+    width: .48rem;
+    height: .48rem;
+  }
+
+  .turn-sub {
+    margin-top: .02rem;
+    font-size: .58rem;
+  }
+
+  .top-actions {
+    gap: .28rem;
+  }
+
+  .top-actions button {
+    min-height: 34px;
+    padding: .38rem .44rem;
+    font-size: .56rem;
+    letter-spacing: .02em;
+  }
+
+  #stageWrap {
+    grid-area: stage;
+  }
+
+  .hud {
+    grid-area: hud;
+    padding:
+      .42rem max(.42rem, env(safe-area-inset-right))
+      calc(.42rem + env(safe-area-inset-bottom))
+      .42rem;
+    border-top: 0;
+    border-left: 2px solid var(--brass);
+    box-shadow:
+      inset 1px 0 0 rgba(0, 0, 0, .5),
+      -8px 0 24px rgba(0, 0, 0, .34);
+  }
+
+  .panel.command-console {
+    height: 100%;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: .42rem;
+    align-items: start;
+    align-content: start;
+    min-height: 0;
+    padding: .42rem;
+  }
+
+  .unit-card {
+    height: 54px;
+    gap: .48rem;
+  }
+
+  .unit-portrait.is-hud {
+    width: 40px;
+    height: 54px;
+  }
+
+  .dialogue-layer {
+    padding: .45rem;
+  }
+
+  .dialogue-card {
+    gap: .55rem;
+    padding: .55rem;
+    border-radius: 10px;
+  }
+
+  .unit-portrait.is-dialogue {
+    width: 4rem;
+    height: 5.25rem;
+  }
+
+  .dialogue-speaker {
+    margin-bottom: .24rem;
+    font-size: .58rem;
+  }
+
+  .dialogue-text {
+    min-height: 2.45rem;
+    font-size: .72rem;
+    line-height: 1.32;
+  }
+
+  .dialogue-foot {
+    margin-top: .35rem;
+  }
+
+  .dialogue-btn {
+    min-height: 34px;
+    padding: .32rem .52rem;
+    font-size: .56rem;
+  }
+
+  .unit-name {
+    font-size: .72rem;
+    line-height: 1.05;
+  }
+
+  .unit-meta,
+  .unit-statline,
+  .unit-tags {
+    display: none;
+  }
+
+  .unit-info {
+    gap: .18rem;
+  }
+
+  .vitals {
+    gap: .16rem;
+  }
+
+  .vital-track {
+    height: 6px;
+  }
+
+  .vital-label {
+    font-size: .48rem;
+  }
+
+  .vital-num {
+    min-width: 2.2rem;
+    font-size: .56rem;
+  }
+
+  .actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    min-height: 0;
+    gap: .28rem;
+  }
+
+  .actions button {
+    height: auto;
+    min-height: 46px;
+    padding: .32rem .15rem .28rem;
+    font-size: .48rem;
+    letter-spacing: .01em;
+  }
+
+  .actions button::before {
+    font-size: 1rem;
+  }
+
+  .actions button .key,
+  .action-help {
+    display: none;
+  }
+
+  .squad-overlay {
+    display: none;
+  }
+}
+
+/* Narrow touch roster: keep the four squad slots and action button pinned, then
+   make the roster a horizontal rail so the unit detail gets the rest of the
+   screen. This also helps foldables/tablets that skip the phone rotate gate. */
+@media (pointer: coarse) and (max-width: 560px) {
+  .roster-head {
+    padding: .55rem .7rem .42rem;
+  }
+
+  .roster-head h2 {
+    font-size: .86rem;
+    letter-spacing: .05em;
+  }
+
+  .roster-sub {
+    display: none;
+  }
+
+  .roster-tray {
+    gap: .25rem;
+    padding: .38rem .45rem;
+  }
+
+  .roster-slot {
+    min-height: 58px;
+    gap: .08rem;
+    padding: .24rem .12rem .22rem;
+  }
+
+  .roster-slot-tag {
+    display: none;
+  }
+
+  .roster-slot .unit-portrait.is-slot {
+    width: 28px;
+    height: 31px;
+  }
+
+  .roster-slot-name {
+    max-width: 100%;
+    font-size: .5rem;
+    letter-spacing: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .roster-body {
+    flex-direction: column;
+  }
+
+  .roster-grid {
+    display: flex;
+    width: auto;
+    max-width: none;
+    height: 132px;
+    gap: .45rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: .45rem;
+    border-right: 0;
+    border-bottom: 1px solid rgba(70, 100, 130, .35);
+    scroll-snap-type: x proximity;
+  }
+
+  .roster-class {
+    flex: 0 0 auto;
+    gap: .24rem;
+  }
+
+  .roster-class-title {
+    font-size: .47rem;
+    letter-spacing: .08em;
+  }
+
+  .roster-class-units {
+    display: flex;
+    gap: .32rem;
+  }
+
+  .roster-unit {
+    width: 5rem;
+    min-height: 94px;
+    padding: .28rem .18rem .3rem;
+    scroll-snap-align: start;
+  }
+
+  .roster-unit .unit-portrait.is-card {
+    height: 50px;
+  }
+
+  .roster-unit-name {
+    font-size: .54rem;
+    letter-spacing: 0;
+  }
+
+  .roster-unit-flag {
+    font-size: .45rem;
+    letter-spacing: .04em;
+  }
+
+  .roster-detail-bar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: .36rem;
+    padding: .45rem .6rem;
+  }
+
+  .roster-detail-name {
+    font-size: .86rem;
+  }
+
+  .roster-detail-bar .roster-assign {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .roster-detail-scroll {
+    padding: .62rem .68rem;
+  }
+
+  .roster-detail-split {
+    flex-direction: column;
+    align-items: stretch;
+    gap: .6rem;
+  }
+
+  .roster-detail-split .unit-portrait.is-hero {
+    align-self: center;
+    width: min(138px, 44vw);
+    height: 172px;
+    border-radius: 8px;
+  }
+
+  .roster-foot {
+    gap: .45rem;
+    padding: .48rem .6rem calc(.48rem + env(safe-area-inset-bottom));
+  }
+
+  .roster-foot .menu-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: .55rem;
+  }
+
+  .skin-picker-card {
+    width: min(100%, 96vw);
+  }
+
+  .skin-picker-foot {
+    gap: .45rem;
+    padding: .48rem .6rem calc(.48rem + env(safe-area-inset-bottom));
+  }
+
+  .skin-picker-foot .menu-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: .55rem;
+  }
+}
+
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 380px) {
+  .match-screen.is-active {
+    grid-template-columns: minmax(0, 1fr) clamp(150px, 25vw, 196px);
+  }
+
+  .top-actions button {
+    padding-inline: .35rem;
+    font-size: .5rem;
+  }
+
+  .panel.command-console {
+    padding: .34rem;
+  }
+
+  .unit-card .unit-portrait.is-hud {
+    display: none;
+  }
+
+  .unit-card {
+    grid-template-columns: 1fr;
+    height: 44px;
+  }
+
+  .actions button {
+    min-height: 40px;
+  }
+}

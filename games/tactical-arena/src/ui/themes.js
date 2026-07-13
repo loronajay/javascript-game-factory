@@ -1,10 +1,10 @@
 // Theme registry — pure + tested (no DOM import), following the boardSprites/
 // portraits metadata-module pattern. A theme is a named map of CSS custom
-// properties layered over the :root defaults in style.css; the SVG gradient
+// properties layered over the :root defaults in styles/battle/board.css; the SVG gradient
 // stops in index.html read the same tokens through inline style var()s.
 //
 // "Moonlit" is the stylesheet itself: its token map is EMPTY so the defaults in
-// style.css stay the single source of truth (no value duplicated here that
+// styles/battle/board.css stays the single source of truth (no value duplicated here that
 // could drift). Every other palette must override the FULL token set
 // (THEME_TOKEN_KEYS) so switching between two themes can never leak a stray
 // color from the previous one; applyTheme also clears every key first, which

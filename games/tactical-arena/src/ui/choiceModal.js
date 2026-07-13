@@ -1,7 +1,7 @@
 // A tiny promise-based choice pop-up, reused for Father Time's two decisions: Age's
 // STR/DEF stat pick and Rewind's fallen-ally pick. It borrows the shared `.ref-modal`
 // overlay (same backdrop/close behavior as the roster picker) so it matches the war-
-// table styling and the mobile chrome rules already in responsive.css.
+// table styling and the mobile chrome rules already in styles/responsive.css.
 //
 // One entry point: openChoiceModal(...) => Promise<value|null>. Resolves with a choice's
 // `value`, or null if cancelled (Escape / backdrop / Cancel). Pure DOM; no game imports

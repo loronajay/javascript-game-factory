@@ -1,7 +1,7 @@
 // Theme registry guard — mirrors the boardSprites/portraits pattern: the theme
 // data model is pure, so we can enforce its contract headlessly. The rules:
 // every theme id is unique, the default theme leans on the stylesheet (empty
-// token map, so style.css stays the single source of truth), and every OTHER
+// token map, so styles/battle/board.css stays the single source of truth), and every OTHER
 // palette overrides the FULL token set so switching themes never leaks a stray
 // color from the previous palette.
 import test from "node:test";

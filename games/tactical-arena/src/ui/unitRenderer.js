@@ -15,7 +15,7 @@ import { colorOf } from "../core/state.js";
 // Light comes from the upper-LEFT, so highlights sit on the upper-left of each
 // form and `.fig-shade` overlays go on the lower-right.
 //
-// The look is achieved with shared CSS material classes (see style.css), NOT
+// The look is achieved with shared CSS material classes (see styles/battle/board.css), NOT
 // inline colors, so the same path geometry recolors per team:
 //   .fig-body     ivory/bone gradient + dark outline (the carved body)
 //   .fig-shade    translucent dark overlay (sculpts the shadowed right side)
@@ -511,7 +511,7 @@ export function createUnitFigure(metrics, unit, { isTarget = false, selectedId =
   }
 
   // Hit area = the unit's own tile diamond (in token space). The tall figurine
-  // visuals are pointer-events:none (see style.css), so the body that overhangs
+  // visuals are pointer-events:none (see styles/battle/board.css), so the body that overhangs
   // the tiles BEHIND it lets those clicks pass through to the board — only this
   // diamond, sitting over the unit's own square, selects the piece.
   const hw = metrics.tileWidth / 2;

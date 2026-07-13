@@ -1,0 +1,125 @@
+/* -----------------------------------------------------------------------
+   Mobile playability shell (ported from Mini-Tactics)
+
+   styles/battle/scene.css already carries the width-based reflow (@media max-width 820/480)
+   and the reduced-motion neutralization. This file adds the phone-specific
+   pass on top: the return-to-arcade link, the portrait rotate-gate, coarse-
+   pointer touch sizing, and the landscape layout that moves the command
+   console BESIDE the battlefield instead of crushing it vertically.
+   ----------------------------------------------------------------------- */
+
+/* Return to the arcade. Fixed to the safe-area top-left, above every screen. */
+.back-link {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  z-index: 60;
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: .82rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+  text-decoration: none;
+  text-transform: uppercase;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, .75);
+  transition: color .15s ease, filter .15s ease;
+}
+
+.back-link:hover,
+.back-link:focus-visible {
+  color: var(--brass-hi);
+  filter: brightness(1.1);
+}
+
+/* The fixed corner link collides with the in-match turn banner and sits on top
+   of any open pop-up (roster picker / Field Manual / Settings). Hide it in both
+   cases — the match topbar has its own Menu button, and a modal owns the screen.
+   On menu screens (title / main / setup) it stays put in the free corner. */
+body:has(.match-screen.is-active) .back-link,
+body:has(.ref-modal:not([hidden])) .back-link {
+  display: none;
+}
+
+/* -----------------------------------------------------------------------
+   Portrait rotate-gate
+   ----------------------------------------------------------------------- */
+.landscape-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none;
+  place-items: center;
+  padding:
+    max(1.2rem, env(safe-area-inset-top))
+    max(1.2rem, env(safe-area-inset-right))
+    max(1.2rem, env(safe-area-inset-bottom))
+    max(1.2rem, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 50% 20%, rgba(134, 196, 238, .16), transparent 45%),
+    linear-gradient(180deg, #0e1722, #060c14);
+}
+
+[data-landscape-gate="on"] .landscape-gate {
+  display: grid;
+}
+
+@media (pointer: coarse) and (orientation: portrait) and (max-width: 520px) {
+  .landscape-gate {
+    display: grid;
+  }
+}
+
+.landscape-gate-card {
+  width: min(22rem, 100%);
+  padding: 1.35rem 1.2rem;
+  border: 1px solid var(--brass);
+  border-radius: var(--radius-console);
+  background: var(--parchment-fill);
+  box-shadow: var(--parchment-shadow);
+  color: var(--text);
+  text-align: center;
+}
+
+.landscape-gate-phone {
+  position: relative;
+  width: 4.4rem;
+  height: 2.6rem;
+  margin: 0 auto .9rem;
+  border: 3px solid var(--brass);
+  border-radius: .55rem;
+  background:
+    linear-gradient(180deg, rgba(160, 210, 255, .22), rgba(90, 130, 165, .16)),
+    rgba(20, 32, 46, .6);
+  box-shadow:
+    inset 0 0 0 2px rgba(10, 20, 30, .4),
+    0 8px 20px rgba(0, 0, 0, .45);
+}
+
+.landscape-gate-phone::after {
+  content: "";
+  position: absolute;
+  right: .28rem;
+  top: 50%;
+  width: .24rem;
+  height: .24rem;
+  border-radius: 50%;
+  background: var(--brass-lo);
+  transform: translateY(-50%);
+}
+
+.landscape-gate-card h2 {
+  margin: 0 0 .4rem;
+  color: var(--brass-hi);
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.landscape-gate-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: .95rem;
+  font-style: italic;
+}

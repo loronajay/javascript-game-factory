@@ -1,0 +1,88 @@
+@keyframes legal-pulse { to { filter:brightness(1.28); } } @keyframes attack-pulse { to { filter:brightness(1.32) saturate(1.2); } } @keyframes shield-orbit { to { transform:rotate(360deg); } } @keyframes rim-spin { to { stroke-dashoffset:-28; } } @keyframes idle-bob { 50% { transform:translateY(-2px); } } @keyframes target-spin { to { transform:rotate(360deg); } } @keyframes target-pulse { to { opacity:.5; } } @keyframes status-spin { to { stroke-dashoffset:-18; } } @keyframes status-float { from { transform:translateY(0); } to { transform:translateY(-3px); } } @keyframes status-blink { to { opacity:.52; } } @keyframes aura-breathe { from { filter:brightness(.92); } to { filter:brightness(1.16); } }
+/* Flakes sway side to side as they fall (wind), fading in/out at the ends. */
+@keyframes weather-snow-fall {
+  0% { transform:translate(calc(var(--wx,6px) * -1),-8px) scale(.82); opacity:.05; }
+  14% { opacity:.72; }
+  50% { transform:translate(var(--wx,6px),calc(var(--wy,26px) * .5)) scale(1); }
+  78% { opacity:.72; }
+  100% { transform:translate(calc(var(--wx,6px) * -1),var(--wy,26px)) scale(.88); opacity:.05; }
+}
+@keyframes snow-gust {
+  0% { transform:translateX(calc(var(--sweep,600px) * -0.45)) scaleX(.7); opacity:0; }
+  32% { opacity:.5; }
+  68% { opacity:.4; }
+  100% { transform:translateX(var(--sweep,600px)) scaleX(1.25); opacity:0; }
+}
+@keyframes weather-rain-fall { 0% { transform:translateY(calc(var(--fall,42px) * -0.2)); opacity:0; } 12% { opacity:.85; } 78% { opacity:.85; } 100% { transform:translateY(var(--fall,42px)); opacity:0; } }
+@keyframes weather-splat { 0%,72% { transform:scale(.25); opacity:0; } 82% { opacity:.42; } 100% { transform:scale(1.55); opacity:0; } }
+/* Petals drift sideways and tumble as they fall. --sway returns to 0 at the end
+   so they sweep out and back, --fall carries them down a couple of tiles. */
+@keyframes petal-drift {
+  0% { transform:translate(0,0) rotate(0deg); opacity:0; }
+  12% { opacity:.6; }
+  50% { transform:translate(var(--sway,20px),calc(var(--fall,60px) * .5)) rotate(180deg); }
+  86% { opacity:.55; }
+  100% { transform:translate(0,var(--fall,60px)) rotate(360deg); opacity:0; }
+}
+/* Hot-air distortion: wobble side to side while rising and breathing opacity. */
+@keyframes heat-shimmer {
+  0% { transform:translate(-4px,5px) skewX(-5deg) scaleY(.97); opacity:.12; }
+  50% { transform:translate(4px,-7px) skewX(6deg) scaleY(1.05); opacity:.46; }
+  100% { transform:translate(-3px,4px) skewX(-4deg) scaleY(.97); opacity:.12; }
+}
+@keyframes heat-ember-rise {
+  0% { transform:translateY(0) scale(.6); opacity:0; }
+  16% { opacity:.9; }
+  70% { opacity:.65; }
+  100% { transform:translateY(-48px) scale(1.05); opacity:0; }
+}
+@keyframes storm-cell-pulse { from { transform:translateX(-2px) scaleX(.92); opacity:.28; } to { transform:translateX(4px) scaleX(1.12); opacity:.7; } }
+/* Brief double-flicker strike then dark for the rest of the cycle — staggered per
+   bolt by --delay so the board mostly sits calm with occasional strikes. */
+@keyframes storm-strike { 0%,100% { opacity:0; } 1.5% { opacity:1; } 3% { opacity:.15; } 5% { opacity:.9; } 8%,99% { opacity:0; } }
+@keyframes rage-pulse { from { transform:scale(.96); opacity:.76; } to { transform:scale(1.08); opacity:1; } }
+/* Combat forecast badges — the predicted damage shown over each legal target's head
+   while aiming. Number comes from the same resolver the reducer uses, so it can't lie. */
+.forecast-badge { pointer-events:none; transform-box:fill-box; animation:fc-pop .18s ease-out; }
+.forecast-badge .fc-bg { fill:rgba(4,12,24,.94); stroke:var(--brass); stroke-width:1; }
+.forecast-badge .fc-text { font:900 13px var(--font-display); letter-spacing:.02em; paint-order:stroke; stroke:rgba(0,0,0,.82); stroke-width:3px; stroke-linejoin:round; fill:var(--text); }
+.fc-attack .fc-bg { stroke:color-mix(in srgb, var(--p2) 62%, transparent); }
+.fc-attack .fc-text { fill:#ffd0d5; }
+.fc-miss .fc-bg { stroke:var(--brass-lo); }
+.fc-miss .fc-text { fill:var(--muted); font-style:italic; }
+.fc-lethal .fc-bg { fill:rgba(30,10,8,.96); stroke:var(--gold); stroke-width:1.6; }
+.fc-lethal .fc-text { fill:var(--gold); }
+.fc-lethal { animation:fc-pop .18s ease-out, fc-lethal-pulse .9s ease-in-out .18s infinite; }
+@keyframes fc-pop { from { opacity:0; transform:translateY(5px) scale(.7); } to { opacity:1; transform:translateY(0) scale(1); } } @keyframes fc-lethal-pulse { 50% { filter:drop-shadow(0 0 8px rgba(100,180,220,.75)); } }
+/* Combat impact effects (effectsLayer) + the roll-reveal overlay. Presentation
+   only — driven by resolved events in main.js, never by the rules. */
+.float-text { pointer-events:none; font:950 19px var(--font-display); letter-spacing:.02em; paint-order:stroke; stroke:rgba(0,0,0,.85); stroke-width:4.5px; stroke-linejoin:round; transform-box:fill-box; transform-origin:center; }
+.fx-art-callout { pointer-events:none; filter:drop-shadow(0 4px 5px rgba(0,0,0,.45)); }
+.fx-art-callout-box { fill:rgba(12,18,28,.94); stroke:var(--gold); stroke-width:1.4; vector-effect:non-scaling-stroke; }
+.fx-art-callout-tail { fill:rgba(12,18,28,.94); stroke:var(--gold); stroke-width:1.2; stroke-linejoin:round; vector-effect:non-scaling-stroke; }
+.fx-art-callout-label { fill:#fff3c6; stroke:rgba(0,0,0,.72); stroke-width:2.2; paint-order:stroke; font:900 12px var(--font-display); letter-spacing:.04em; text-transform:uppercase; }
+.fx-ring { fill:none; pointer-events:none; stroke-width:3; }
+.fx-flash,.fx-critflash,.fx-shard,.fx-status-burst,.fx-drain-particle,.fx-mote,.fx-afterimage,.fx-spark,.fx-snare-ring,.fx-rune,.fx-projectile,.fx-projectile-trail { pointer-events:none; }
+.fx-line,.fx-rune { fill:none; pointer-events:none; stroke-linecap:round; stroke-linejoin:round; }
+#diceOverlay { position:absolute; z-index:30; inset:0; display:grid; place-items:center; pointer-events:none; opacity:0; transition:opacity .14s ease; }
+#diceOverlay.show { opacity:1; }
+.die { display:flex; flex-direction:column; align-items:center; justify-content:center; width:6.5rem; height:6.5rem; padding:.4rem; border-radius:18px; background:linear-gradient(145deg,#c0d8ec,#88aac4); color:#040e1a; font:900 2.4rem var(--font-display); letter-spacing:.02em; text-align:center; box-shadow:0 18px 55px rgba(0,0,0,.65), 0 0 30px rgba(100,170,220,.3), inset 0 0 0 2px rgba(200,235,255,.75), inset 0 -8px 14px rgba(10,30,50,.35); }
+.die-glyph { font-size:2.4rem; line-height:1; }
+.die-label { font-size:.48rem; letter-spacing:.18em; opacity:.85; margin-top:4px; }
+.die.die-hit { background:linear-gradient(145deg,#d4b87a,#9a7030); color:#150800; box-shadow:0 18px 55px rgba(0,0,0,.65), 0 0 32px rgba(180,130,40,.45), inset 0 0 0 2px rgba(240,200,110,.8), inset 0 -8px 14px rgba(30,10,0,.4); }
+.die.die-crit { background:linear-gradient(145deg,#d8eeff,#80c0e8); color:#030c1a; box-shadow:0 18px 55px rgba(0,0,0,.65), 0 0 40px rgba(100,180,240,.7), inset 0 0 0 2px rgba(210,240,255,.9); }
+.die.die-miss { background:linear-gradient(145deg,#2a3a48,#1a2832); color:#6a8090; }
+#diceOverlay.rolling .die { animation:dice-roll .46s cubic-bezier(.2,.8,.2,1); }
+@keyframes dice-roll { 0% { filter:blur(5px); transform:rotate(0) scale(.4); } 45% { filter:blur(0); transform:rotate(240deg) scale(1.2); } 100% { transform:rotate(360deg) scale(1); } }
+@media (prefers-reduced-motion:reduce) { #diceOverlay { transition:none; } .die { animation:none!important; } }
+/* Turn-change / victory sweep — a brief faction-tinted card on every squad hand-off. */
+#turnFlash { position:absolute; z-index:25; inset:0; display:grid; place-items:center; pointer-events:none; opacity:0; transition:opacity .26s ease; }
+#turnFlash.show { opacity:1; }
+.turn-flash-card { position:relative; padding:.85rem 2.6rem; text-align:center; border:1px solid color-mix(in srgb,var(--team,var(--p1)) 50%,var(--brass)); border-radius:14px; background:linear-gradient(180deg,rgba(16,28,44,.97),rgba(6,14,24,.97)); box-shadow:inset 0 1px 0 rgba(var(--sheen),.1), inset 0 0 34px color-mix(in srgb,var(--team,var(--p1)) 24%,transparent), 0 20px 55px rgba(0,0,0,.65); backdrop-filter:blur(8px); transform:translateY(10px) scale(.95); transition:transform .32s cubic-bezier(.2,.85,.25,1); }
+#turnFlash.show .turn-flash-card { transform:translateY(0) scale(1); }
+.turn-flash-card::before { content:""; position:absolute; top:0; left:18%; right:18%; height:3px; border-radius:3px; background:var(--team,var(--p1)); box-shadow:0 0 16px color-mix(in srgb,var(--team,var(--p1)) 85%,transparent); }
+.turn-flash-title { font:900 1.6rem var(--font-display); letter-spacing:.06em; color:var(--text); }
+.turn-flash-sub { margin-top:.26rem; font:700 .72rem var(--font-display); text-transform:uppercase; letter-spacing:.2em; color:color-mix(in srgb,var(--team,var(--p1)) 65%,var(--brass-hi)); }
+@media (prefers-reduced-motion:reduce) { #turnFlash { transition:none; } .turn-flash-card { transition:none; transform:none; } }
+/* Stage vignette — seats the diamond in a pool of shadow instead of flat black. */
+#stageWrap::after { content:""; position:absolute; z-index:5; inset:0; pointer-events:none; background:radial-gradient(120% 92% at 50% 42%, transparent 52%, var(--vignette) 100%); }
