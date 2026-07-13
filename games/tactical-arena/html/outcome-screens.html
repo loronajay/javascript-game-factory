@@ -1,0 +1,29 @@
+      <!-- ============================ RESULTS ============================= -->
+      <section class="screen menu-screen" data-screen="results">
+        <div class="victory-burst" data-results="burst" aria-hidden="true"></div>
+        <div class="menu-card results-card">
+          <h2 class="menu-heading" data-results="title">Victory</h2>
+          <p class="results-winner" data-results="winner"></p>
+          <div class="results-report" data-results="report"></div>
+          <dl class="results-stats" data-results="stats"></dl>
+          <div class="menu-buttons">
+            <button data-action="rematch" class="primary menu-btn">Rematch</button>
+            <button data-nav="campaign" data-results="campaign-map" class="primary menu-btn" hidden>Campaign Map</button>
+            <button data-nav="mainMenu" class="menu-btn ghost">Main Menu</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================= TUTORIAL COMPLETE ======================= -->
+      <section class="screen menu-screen" data-screen="tutorialComplete">
+        <div class="menu-card results-card tutorial-complete-card">
+          <h2 class="menu-heading" data-tutorial-complete="title">Tutorial Complete</h2>
+          <p class="menu-note" data-tutorial-complete="reward">Tutorial progress saved.</p>
+          <div class="menu-buttons">
+            <button type="button" class="primary menu-btn" data-action="chooseTutorialReward" data-tutorial-complete="reward-choice" hidden>Choose Skin</button>
+            <button type="button" class="primary menu-btn" data-action="startTutorial" data-tutorial-complete="next" disabled>Next Tutorial</button>
+            <button data-nav="mainMenu" class="menu-btn ghost">Main Menu</button>
+          </div>
+        </div>
+      </section>
+

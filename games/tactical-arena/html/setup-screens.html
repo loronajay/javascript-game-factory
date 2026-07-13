@@ -1,0 +1,208 @@
+      <!-- ========================= TUTORIAL SELECT ======================== -->
+      <section class="screen menu-screen" data-screen="tutorialSelect">
+        <div class="menu-card tutorial-select-card">
+          <h2 class="menu-heading">Tutorials</h2>
+          <p class="menu-note">Pick a lesson. Completed tutorials can be replayed; locked lessons open as earlier tutorials are finished.</p>
+          <div class="tutorial-list" data-tutorial-list></div>
+          <div class="menu-buttons">
+            <button data-nav="mainMenu" class="menu-btn ghost">Back</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================= HOT SEAT SETUP ========================= -->
+      <section class="screen menu-screen" data-screen="hsSetup">
+        <div class="menu-card">
+          <h2 class="menu-heading">Hot Seat</h2>
+          <p class="menu-note">One screen. Pass the device at each squad turn.</p>
+
+          <div class="setup-field">
+            <span class="setup-label">Players</span>
+            <div class="segmented" data-field="playerCount">
+              <button type="button" class="seg is-selected" data-count="2">2</button>
+              <button type="button" class="seg" data-count="3" disabled>3</button>
+              <button type="button" class="seg" data-count="4">4</button>
+            </div>
+            <p class="setup-hint">Three-player matches are deferred; four players can play FFA or 2v2.</p>
+          </div>
+
+          <div class="setup-field" data-group="format" hidden>
+            <span class="setup-label">Format</span>
+            <div class="segmented" data-field="format">
+              <button type="button" class="seg is-selected" data-format="ffa">Free-for-all</button>
+              <button type="button" class="seg" data-format="teams">Teams 2v2</button>
+            </div>
+          </div>
+
+          <div class="setup-field">
+            <span class="setup-label">Board size</span>
+            <div class="segmented" data-field="boardSize">
+              <button type="button" class="seg is-selected" data-size="13">13 × 13</button>
+              <button type="button" class="seg" data-size="15">15 × 15</button>
+            </div>
+          </div>
+
+          <div class="setup-field" data-group="squads">
+            <span class="setup-label">Squads</span>
+            <p class="setup-hint">
+              Each squad deploys four pieces. Tap Edit Squad to choose units and read their stats, passives and ARTS.
+            </p>
+            <div class="squad-pickers" data-squad-pickers></div>
+          </div>
+
+          <div class="menu-buttons">
+            <button data-action="startHotSeat" class="primary menu-btn">Start Match</button>
+            <button data-nav="mainMenu" class="menu-btn ghost">Back</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================= SINGLE PLAYER ========================= -->
+      <section class="screen menu-screen" data-screen="spSetup">
+        <div class="menu-card">
+          <h2 class="menu-heading">Vs CPU</h2>
+          <p class="menu-note">Command Player 1 against the computer.</p>
+
+          <div class="setup-field">
+            <span class="setup-label">Difficulty</span>
+            <div class="segmented" data-field="difficulty">
+              <button type="button" class="seg" data-difficulty="easy">Easy</button>
+              <button type="button" class="seg is-selected" data-difficulty="normal">Normal</button>
+              <button type="button" class="seg" data-difficulty="hard">Hard</button>
+            </div>
+          </div>
+
+          <div class="setup-field">
+            <span class="setup-label">Board size</span>
+            <div class="segmented" data-field="boardSize">
+              <button type="button" class="seg is-selected" data-size="13">13 × 13</button>
+              <button type="button" class="seg" data-size="15">15 × 15</button>
+            </div>
+          </div>
+
+          <div class="setup-field" data-group="squads">
+            <span class="setup-label">Squads</span>
+            <p class="setup-hint">
+              Build your squad and the computer's. Each deploys four pieces. Tap Edit Squad to choose units and read their stats, passives and ARTS.
+            </p>
+            <div class="squad-pickers" data-sp-squad-pickers></div>
+          </div>
+
+          <div class="menu-buttons">
+            <button data-action="startSingle" class="primary menu-btn">Start Match</button>
+            <button data-nav="mainMenu" class="menu-btn ghost">Back</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================== TEMPO SINGLE PLAYER ====================== -->
+      <section class="screen menu-screen" data-screen="tempoSpSetup">
+        <div class="menu-card">
+          <h2 class="menu-heading">Tempo Battle Vs CPU</h2>
+          <p class="menu-note">Command Player 1 in real time as units become ready.</p>
+
+          <div class="setup-field">
+            <span class="setup-label">Difficulty</span>
+            <div class="segmented" data-field="difficulty">
+              <button type="button" class="seg" data-difficulty="easy">Easy</button>
+              <button type="button" class="seg is-selected" data-difficulty="normal">Normal</button>
+              <button type="button" class="seg" data-difficulty="hard">Hard</button>
+            </div>
+          </div>
+
+          <div class="setup-field">
+            <span class="setup-label">Board size</span>
+            <div class="segmented" data-field="boardSize">
+              <button type="button" class="seg is-selected" data-size="13">13 × 13</button>
+              <button type="button" class="seg" data-size="15">15 × 15</button>
+            </div>
+          </div>
+
+          <div class="setup-field" data-group="squads">
+            <span class="setup-label">Squads</span>
+            <p class="setup-hint">
+              Each unit has an AGILITY value in Tempo Battle. Faster units become ready more often.
+            </p>
+            <div class="squad-pickers" data-tempo-sp-squad-pickers></div>
+          </div>
+
+          <div class="menu-buttons">
+            <button data-action="startTempoSingle" class="primary menu-btn">Start Tempo Battle</button>
+            <button data-nav="tempoMenu" class="menu-btn ghost">Back</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================= ONLINE VERSUS ========================= -->
+      <section class="screen menu-screen" data-screen="onlineSetup">
+        <div class="menu-card">
+          <h2 class="menu-heading">Online Versus</h2>
+          <p class="menu-note" data-online="status">Connecting…</p>
+
+          <!-- Pairing: quick match or a private room code. -->
+          <div data-online-panel="idle" hidden>
+            <div class="setup-field">
+              <span class="setup-label">Match type</span>
+              <div class="segmented" data-field="onlineMatchType">
+                <button type="button" class="seg is-selected" data-match-type="duel">Classic 1v1</button>
+                <button type="button" class="seg" data-match-type="draft1v1">Draft 1v1</button>
+                <button type="button" class="seg" data-match-type="ffa4">4 Player FFA</button>
+                <button type="button" class="seg" data-match-type="teams4">2v2 Teams</button>
+              </div>
+              <p class="menu-note" data-online="matchTypeHint" hidden></p>
+            </div>
+            <div class="menu-buttons">
+              <button type="button" class="primary menu-btn" data-action="quickMatch">Quick Match</button>
+              <button type="button" class="menu-btn" data-action="createRoom">Create Private Room</button>
+            </div>
+            <div class="setup-field">
+              <span class="setup-label">Join with a code</span>
+              <div class="online-join">
+                <input type="text" class="online-code-input" data-online="codeInput" maxlength="5" placeholder="CODE" autocomplete="off" spellcheck="false" />
+                <button type="button" class="menu-btn" data-action="joinRoom">Join</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- In a room: framing + blind squad pick, waiting for the host to start. -->
+          <div data-online-panel="lobby" hidden>
+            <p class="online-roomcode" data-online="roomCode" hidden></p>
+            <ol class="lobby-roster" data-online="roster"></ol>
+
+            <div class="setup-field">
+              <span class="setup-label">Board size <span class="setup-hint" data-online="hostHint"></span></span>
+              <div class="segmented" data-field="boardSize">
+                <button type="button" class="seg is-selected" data-size="13">13 × 13</button>
+                <button type="button" class="seg" data-size="15">15 × 15</button>
+              </div>
+            </div>
+
+            <div class="setup-field">
+              <span class="setup-label">Your squad</span>
+              <p class="setup-hint">Blind pick — your opponent can't see your squad until the match begins.</p>
+              <div class="squad-pickers" data-online="squadHost"></div>
+              <button type="button" class="menu-btn" data-online="lockBtn">Lock Squad</button>
+            </div>
+
+            <div class="setup-field online-draft" data-online="draftField" hidden>
+              <span class="setup-label">Draft</span>
+              <p class="setup-hint" data-online="draftHint">Draft starts when both commanders are in the room.</p>
+              <div class="draft-track" data-online="draftTrack"></div>
+              <div class="draft-squads" data-online="draftSquads"></div>
+              <div class="draft-actions" data-online="draftActions"></div>
+              <div class="draft-roster" data-online="draftRoster"></div>
+            </div>
+
+            <div class="menu-buttons">
+              <button type="button" class="primary menu-btn" data-online="startBtn" hidden>Start Match</button>
+              <p class="setup-hint" data-online="lobbyHint"></p>
+              <button type="button" class="menu-btn ghost" data-action="leaveLobby">Leave Room</button>
+            </div>
+          </div>
+
+          <div class="menu-buttons">
+            <button data-nav="mainMenu" class="menu-btn ghost">Back</button>
+          </div>
+        </div>
+      </section>
+

@@ -1,0 +1,111 @@
+      <!-- ============================= MATCH ============================== -->
+      <section class="screen match-screen" data-screen="match">
+        <header class="topbar">
+          <div class="brand">Tactical Arena</div>
+          <div class="topbar-center">
+            <div id="turnBanner" class="turn-banner">
+              <div id="turnTitle" class="turn-title">Player 1 squad turn</div>
+              <div id="turnSub" class="turn-sub">Select an unspent piece</div>
+            </div>
+            <div id="weatherBadge" class="weather-badge" data-weather="none" title="No weather is currently active">
+              <span class="weather-icon" aria-hidden="true">☀</span>
+              <span class="weather-text">Weather: None</span>
+            </div>
+          </div>
+          <div class="top-actions">
+            <button id="muteBtn" type="button" aria-pressed="false" title="Toggle sound">Sound</button>
+            <button id="rulesBtn" type="button">Codex</button>
+            <button id="restartBtn" type="button">Restart</button>
+            <button data-nav="mainMenu" type="button">Menu</button>
+          </div>
+        </header>
+
+        <main id="stageWrap">
+          <!-- Atmospheric world backdrop (populated by sceneBackdrop.js): parallax
+               sky, distant fortress, drifting clouds/fog, light shafts, embers. -->
+          <div id="sceneBackdrop" aria-hidden="true"></div>
+          <svg id="boardSvg" viewBox="0 0 1200 760" aria-label="Tactical Arena board" role="grid">
+            <defs>
+              <!-- Colors come from the theme tokens (style.css :root, overridden by
+                   src/ui/themes.js): presentation attributes can't hold var(), so the
+                   stops carry inline style. -->
+              <radialGradient id="boardAura" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" style="stop-color:var(--board-aura, #70aed8); stop-opacity:var(--board-aura-op, .24)"/>
+                <stop offset="100%" style="stop-color:var(--board-aura, #70aed8); stop-opacity:0"/>
+              </radialGradient>
+              <!-- Stone grain — multiplies fractal noise over the tile faces so the
+                   board reads as cut stone instead of flat vector fills. Disabled on
+                   coarse pointers (responsive.css): feTurbulence re-rasterizes on
+                   every board rebuild. -->
+              <filter id="boardStone" x="-2%" y="-2%" width="104%" height="104%">
+                <feTurbulence type="fractalNoise" baseFrequency="0.7" numOctaves="3" seed="7" result="n"/>
+                <feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.45 0.45 0.45 0 0" result="na"/>
+                <feComposite in="na" in2="SourceAlpha" operator="in" result="grain"/>
+                <feBlend in="SourceGraphic" in2="grain" mode="multiply"/>
+              </filter>
+              <!-- Figurine materials (#ivory/#figSteel/#figGold) and #softGlow now live
+                   in the global <defs> at the top of <body> so picker figurines on other
+                   screens can resolve them too. -->
+              <!-- War-table dais materials: a moonlit stone top, darker side faces,
+                   and a soft diamond aura halo that pools under the board. -->
+              <linearGradient id="daisStone" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" style="stop-color:var(--dais-stone-1, #46566a)"/><stop offset="52%" style="stop-color:var(--dais-stone-2, #2b3746)"/><stop offset="100%" style="stop-color:var(--dais-stone-3, #19222e)"/>
+              </linearGradient>
+              <linearGradient id="daisSideL" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" style="stop-color:var(--dais-side-l-1, #1c2734)"/><stop offset="100%" style="stop-color:var(--dais-side-l-2, #0a121b)"/>
+              </linearGradient>
+              <linearGradient id="daisSideR" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" style="stop-color:var(--dais-side-r-1, #121b26)"/><stop offset="100%" style="stop-color:var(--dais-side-r-2, #060c14)"/>
+              </linearGradient>
+              <radialGradient id="daisAura" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" style="stop-color:var(--dais-aura-1, #86c4ee)" stop-opacity=".5"/>
+                <stop offset="55%" style="stop-color:var(--dais-aura-2, #5a93c8)" stop-opacity=".18"/>
+                <stop offset="100%" style="stop-color:var(--dais-aura-2, #5a93c8)" stop-opacity="0"/>
+              </radialGradient>
+              <filter id="daisAuraBlur" x="-60%" y="-60%" width="220%" height="220%">
+                <feGaussianBlur stdDeviation="26"/>
+              </filter>
+            </defs>
+            <ellipse id="boardGlow" cx="600" cy="440" rx="420" ry="210" fill="url(#boardAura)"/>
+            <g id="boardLayer"></g>
+            <g id="unitsLayer"></g>
+            <g id="forecastLayer"></g>
+            <g id="effectsLayer"></g>
+          </svg>
+          <div id="diceOverlay" aria-hidden="true"><div id="dieFace" class="die">⚔</div></div>
+          <!-- Turn-change announcement. A brief faction-tinted sweep fired on every
+               squad hand-off (and reused for the victory banner). Presentation only. -->
+          <div id="turnFlash" aria-hidden="true">
+            <div class="turn-flash-card">
+              <div class="turn-flash-title"></div>
+              <div class="turn-flash-sub"></div>
+            </div>
+          </div>
+          <div id="squadOverlays" class="squad-overlays"></div>
+          <div id="message" role="status" aria-live="polite">Select an unspent piece.</div>
+        </main>
+
+        <footer class="hud">
+          <section class="panel command-console">
+            <div id="unitCard" class="unit-card">
+              <figure class="unit-portrait is-hud is-glyph-fallback is-empty">?</figure>
+              <div class="unit-info">
+                <div class="unit-title-row"><span class="unit-name is-muted">No piece selected</span></div>
+                <div class="unit-meta">Choose an unspent unit on the board.</div>
+              </div>
+            </div>
+            <div id="actions" class="actions"></div>
+            <div id="actionHelp" class="action-help">Select an unspent piece.</div>
+          </section>
+        </footer>
+      </section>
+
+      <!-- Blackout. Sits directly BELOW the dialogue layer so a script can keep talking
+           on a black screen while the board is rebuilt underneath (The Final Battle). -->
+      <div id="blackoutLayer" class="blackout-layer" hidden></div>
+
+      <!-- Story/tutorial dialogue overlay. Lives at the #app level (not inside the
+           match screen) so map cutscenes render over the campaign screen too — the
+           match screen is display:none when the overworld map is active. -->
+      <div id="dialogueLayer" class="dialogue-layer" hidden></div>
+

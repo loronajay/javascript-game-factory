@@ -62,7 +62,9 @@ test("desktop and laptop viewports never show the mobile landscape gate", () => 
 });
 
 test("the document exposes the mobile playability shell", () => {
-  const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+  const html = ["index.html", "html/app-chrome.html", "html/field-manual.html"]
+    .map((path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8"))
+    .join("\n");
   const responsiveCss = ["shell", "touch", "battle", "menus", "performance"]
     .map((name) => readFileSync(new URL(`../styles/responsive/${name}.css`, import.meta.url), "utf8"))
     .join("\n");

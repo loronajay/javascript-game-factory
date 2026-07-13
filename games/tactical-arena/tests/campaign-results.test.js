@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 
 import { isCampaignMapPanTarget, syncResultsActions } from "../src/ui/menuFlow.js";
 
-const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const outcomeScreensHtml = readFileSync(new URL("../html/outcome-screens.html", import.meta.url), "utf8");
 
 function fakeButton(hidden = false) {
   return { hidden };
@@ -12,7 +12,7 @@ function fakeButton(hidden = false) {
 
 test("results markup includes a campaign-map action that starts hidden", () => {
   assert.match(
-    indexHtml,
+    outcomeScreensHtml,
     /<button[^>]+data-nav="campaign"[^>]+data-results="campaign-map"[^>]+hidden[^>]*>Campaign Map<\/button>/,
   );
 });

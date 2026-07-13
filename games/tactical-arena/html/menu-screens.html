@@ -1,0 +1,53 @@
+      <!-- ============================== TITLE ============================== -->
+      <section class="screen menu-screen is-active" data-screen="title">
+        <div class="menu-card title-card">
+          <div class="title-mark"></div>
+          <h1 class="title-name">Tactical Arena</h1>
+          <p class="title-sub">Isometric Squad Tactics</p>
+          <div class="menu-buttons">
+            <button data-nav="mainMenu" class="primary menu-btn">Continue</button>
+            <button data-action="rules" class="menu-btn">How to Play</button>
+            <button data-action="skins" class="menu-btn">Skins</button>
+            <button data-action="nicknames" class="menu-btn">Nicknames</button>
+            <button data-action="settings" class="menu-btn">Settings</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ MAIN MENU =========================== -->
+      <section class="screen menu-screen" data-screen="mainMenu">
+        <div class="menu-card hub-card">
+          <h2 class="menu-heading">Main Menu</h2>
+          <div class="menu-buttons menu-choice-list">
+            <button data-nav="campaign" class="primary menu-btn menu-choice"><span>Campaign</span></button>
+            <button data-nav="onlineSetup" class="menu-btn menu-choice"><span>Online Versus</span></button>
+            <button data-nav="spSetup" class="primary menu-btn menu-choice"><span>Vs CPU</span></button>
+            <button data-nav="tutorialSelect" class="primary menu-btn menu-choice"><span>Tutorials</span></button>
+            <button data-nav="hsSetup" class="menu-btn menu-choice"><span>Hot Seat</span></button>
+          </div>
+          <div class="menu-secondary-actions">
+            <button data-action="rules" class="menu-btn ghost">Codex</button>
+            <button data-action="skins" class="menu-btn ghost">Skins</button>
+            <button data-action="nicknames" class="menu-btn ghost">Nicknames</button>
+            <button data-action="settings" class="menu-btn ghost">Settings</button>
+            <button data-nav="title" class="menu-btn ghost">Back</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================== TEMPO BATTLE ========================== -->
+      <section class="screen menu-screen" data-screen="tempoMenu">
+        <div class="menu-card hub-card">
+          <h2 class="menu-heading">Tempo Battle</h2>
+          <p class="menu-note">Real-time readiness battles. Units act when their AGILITY-driven command gauge fills.</p>
+          <div class="menu-buttons menu-choice-list">
+            <button data-nav="tempoSpSetup" class="primary menu-btn menu-choice"><span>Vs CPU</span></button>
+            <button class="menu-btn menu-choice" disabled><span>Online Versus</span></button>
+            <button class="menu-btn menu-choice" disabled><span>Hot Seat</span></button>
+          </div>
+          <div class="menu-secondary-actions">
+            <button data-nav="mainMenu" class="menu-btn ghost">Back</button>
+          </div>
+        </div>
+      </section>
+

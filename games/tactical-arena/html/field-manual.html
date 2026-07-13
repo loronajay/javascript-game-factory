@@ -1,0 +1,80 @@
+    <!-- Field Manual — four-tab reference overlay reachable from the title,
+         main menu, and in-match topbar. Basics, Advanced, and Synergy Tips are static content;
+         the Codex tab is populated dynamically by rulesModal.js. When opened
+         from a live match, the Codex tab is filtered to units in that battle. -->
+    <div id="refModal" class="ref-modal" hidden>
+      <div class="ref-card manual-card">
+        <header class="ref-head">
+          <div class="ref-head-title">
+            <h2>Field Manual</h2>
+            <button id="refCloseBtn" class="ref-close" type="button" aria-label="Close">✕</button>
+          </div>
+          <nav class="ref-tabs" role="tablist">
+            <button class="ref-tab is-active" data-tab="basics" type="button">Basics</button>
+            <button class="ref-tab" data-tab="codex" type="button">Codex</button>
+            <button class="ref-tab" data-tab="advanced" type="button">Advanced</button>
+            <button class="ref-tab" data-tab="synergy" type="button">Synergy Tips</button>
+          </nav>
+        </header>
+
+        <!-- Basics: onboarding rules. -->
+        <div class="ref-panel is-active" data-panel="basics">
+          <ul class="ref-rules">
+            <li>Each player activates every living piece once per squad turn. <strong>Last squad standing wins.</strong></li>
+            <li>A piece may move then act, or act then move — but <strong>a move-alone activation is not allowed.</strong> Every activation must end with an attack, ART, or Defend.</li>
+            <li>An <strong>ART replaces the whole activation</strong> and cannot be used after moving or attacking. ARTS spend MP; MP never auto-recovers.</li>
+            <li>Physical damage = <strong>max(1, STR − DEF)</strong>. Magic ignores DEF. True damage bypasses both DEF and Defend.</li>
+            <li>Attack rolls: <strong>10% miss, 15% critical</strong> (×1.5 damage). Blind units always miss. Attacking ARTS roll twice — first to hit, then for their status or heal effect. A missed swing lands no effect.</li>
+            <li><strong>Defend</strong> halves all incoming physical and magic damage (rounded up) until the unit next activates.</li>
+            <li><strong>RAGE</strong> triggers automatically at 5 HP or lower. Read each unit's Codex entry for its specific bonus.</li>
+            <li>Volley Shot and Footwork deal <strong>true damage</strong> and never roll to hit.</li>
+            <li>Status effects come in five flavors — <strong>blind</strong> (miss attacks), <strong>silence</strong> (no ARTS), <strong>poison</strong> (damage each activation start, usually permanent until cleansed), <strong>slow</strong> (reduced Move), and <strong>stun</strong> (skip the turn entirely). Check each unit's Codex entry for immunities.</li>
+            <li>Some units place battlefield objects — destructible <strong>walls</strong> block movement and line of sight, and <strong>fire</strong> burns anyone standing on it each turn rollover.</li>
+            <li><strong>Summoned units</strong> (like the Necromancer's Ghoul) occupy a tile and can be killed, but never take their own turn and don't count toward victory — defeat is decided by living squad commanders only.</li>
+            <li>A few units are <strong>non-combatant commanders</strong> (like the King) — they never attack, must be given a command before any other unit on their side can act, and losing them alone doesn't end the match unless they're the last piece standing.</li>
+            <li>Some units carry an always-on <strong>aura</strong> that buffs allies or debuffs enemies near them — its reach is shown as a tinted zone on the board.</li>
+          </ul>
+        </div>
+
+        <!-- Codex: unit data — built from the catalog in rulesModal.js. -->
+        <div class="ref-panel" data-panel="codex">
+          <div id="refBody"></div>
+        </div>
+
+        <!-- Advanced: strategy tips. -->
+        <div class="ref-panel" data-panel="advanced">
+          <ul class="ref-tips">
+            <li><strong>Kill before spreading.</strong> A dead unit can't act — focus fire one target completely rather than chipping multiple enemies.</li>
+            <li><strong>Time your debuffs.</strong> Status durations vary by ability — check each ability's description. The current Blind and Silence abilities each last 1 turn, so cast them right before the enemy's activation for maximum disruption.</li>
+            <li><strong>Poison is permanent.</strong> Unlike Blind and Silence, Poison never fades. Stack it on high-HP targets who will take many activation-start ticks before they fall.</li>
+            <li><strong>Respect RAGE.</strong> Units at 5 HP or below become more dangerous. Finish low-HP targets rather than leaving them to activate with RAGE bonuses.</li>
+            <li><strong>Defend is timing-based.</strong> It halves all hits until the unit next acts. Use it when multiple enemies will attack before your next squad turn.</li>
+            <li><strong>Footwork is a traversal tool.</strong> It passes through enemies for 2 true damage each tile — use it to reach a backline target and chip the frontline in the same activation.</li>
+            <li><strong>MP is scarce.</strong> ARTS never recover MP. Save it for activations where it changes the outcome, not just any time you can afford the cost.</li>
+            <li><strong>Volley Shot punishes clusters.</strong> Aim the cone to hit multiple enemies. Close Shot bonuses still apply per target — the Archer can hit harder up close than expected.</li>
+            <li><strong>Read each unit's full kit in the Codex.</strong> The roster has grown well past the original four — many units bring auras, summons, stances, or battlefield objects (walls, fire) that change how a fight should be planned, not just what damage rolls do.</li>
+            <li><strong>Auras reward positioning, not just targeting.</strong> A unit with a buff/debuff aura is doing work just by standing still — pull your units out of an enemy's debuff zone, or hold formation inside your own buff zone.</li>
+            <li><strong>Commanders must be managed first.</strong> If your side has a non-combatant commander unit, its command is spent before anyone else can act each squad turn — plan that command around what your squad needs that turn.</li>
+            <li><strong>Destructible walls buy time, not kills.</strong> Use them to block a lane or protect a low-HP ally for a turn, but remember they can be knocked down.</li>
+          </ul>
+        </div>
+
+        <!-- Synergy Tips: grounded pairings and squad ideas without solved-team prescriptions. -->
+        <div class="ref-panel" data-panel="synergy">
+          <ul class="ref-tips">
+            <li><strong>Count the support turn.</strong> Age, Time Stretch, Anoint, dances, heals, and commands usually spend the caster's whole activation. They are strongest when they create an immediate reach break, deny an enemy turn, or make one ally's next several activations worth more than the support turn you spent.</li>
+            <li><strong>Try Father Time with Sniper or Angel as a super carry.</strong> Age can stack +STR or +DEF on the same ally and lasts until Father Time falls. Sniper converts that STR into long-range, wall-and-body-piercing shots; Angel converts it into DEF-ignoring magic basics while staying status-immune. Time Stretch is the tempo button when +1 MOVE creates the shot this turn.</li>
+            <li><strong>Try cover around the carry plan.</strong> Sniper's Build Cover blocks movement and line of sight for most pieces, but Sniper still shoots through it. That makes cover more than defense: it can buy the extra turns Father Time needs to Age the carry, then let the carry keep firing through the barricade.</li>
+            <li><strong>Try magic next to magic support.</strong> Nemesis makes allied magic hit +1 harder and trims MP costs while alive. Magician, Fat Wizard, Angel basics, Necromancer, Virus, and Gargoyle's Pyroclasm all care because magic ignores DEF; Defend, silence, and magic reduction are the things that answer it.</li>
+            <li><strong>Try status chains before the damage payoff.</strong> Virus spreads debuffs from an afflicted enemy to nearby enemy allies, Witch Doctor's Misfortune Stance doubles status chances for everyone, and Archer, Swordsman, Mystic, Necromancer, Sniper, Fat Wizard, and Virus all bring statuses. The setup turn is worth it when poison enables board-wide true damage or blind/silence denies key enemy activations.</li>
+            <li><strong>Try sustain around a real anchor.</strong> Mystic's Guardian gives the team +1 DEF, Paladin heals nearby allies when his physical hits land, and Fat Cleric or Fat Wizard can patch damage directly. Put those tools near a tank like Gargoyle, Clod, Juggernaut, or Fat Knight when you want the fight to take longer, but keep a damage plan so healing turns do not just stall.</li>
+            <li><strong>Try true damage when armor is the problem.</strong> Footwork, Volley Shot, Time Steal, Fart, Flight, Poison Tick, Self Destruct, Explosion, Thunderous Charge, and several light-tile effects ignore DEF and Defend. They are the pressure valves against high-DEF walls and permanent defending plans.</li>
+            <li><strong>Try Clod as a formation piece.</strong> Brick House gives adjacent allies +1 DEF and gives Clod +1 STR per sheltered ally, while Rock Hard blanks physical damage when he defends. The reward is real, but it asks you to keep pieces close enough to benefit without donating an easy area target.</li>
+            <li><strong>Try King when you want timing puzzles.</strong> Commands are global for the turn and scale with allied RAGE: Strike for damage, Hold for DEF and healing, Pursue for MOVE, Higher Ground for range. He must act first and bleeds when allies fall, so the fun is sequencing, not autopilot power.</li>
+            <li><strong>Try the fat family for the designed combo.</strong> Fat Knight, Fat Wizard, Fat Cleric, and Fat Bowman each unlock a small Brothers in Arms bonus when the other three are alive. You get four 30-HP bodies with healing, splash magic, ranged scaling, and frontline shove tools instead of one single trick.</li>
+            <li><strong>Try immunity as part of the plan.</strong> Paladin, Angel, Gargoyle, and King ignore every status, Mystic and Nemesis ignore silence, Father Time ignores stun and slow, and cleanses from Mystic or Fat Cleric can reset a bad turn. A synergy that folds to blind, poison, or silence needs one of those answers nearby.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+

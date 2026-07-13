@@ -406,7 +406,7 @@ test("tempo squad rows are selectable for ready units while no squad turn is act
 });
 
 test("main menu does not expose Tempo Battle while it is out of scope", () => {
-  const html = readFileSync(join(GAME_ROOT, "index.html"), "utf8");
+  const html = readFileSync(join(GAME_ROOT, "html/menu-screens.html"), "utf8");
   const mainMenu = html.match(/data-screen="mainMenu"[\s\S]*?<\/section>/)?.[0] ?? "";
 
   assert.doesNotMatch(mainMenu, /data-nav="tempoMenu"/);
@@ -414,7 +414,7 @@ test("main menu does not expose Tempo Battle while it is out of scope", () => {
 });
 
 test("tempo setup board-size labels use the same readable multiplication sign as other setup screens", () => {
-  const html = readFileSync(join(GAME_ROOT, "index.html"), "utf8");
+  const html = readFileSync(join(GAME_ROOT, "html/setup-screens.html"), "utf8");
   const tempoSetup = html.match(/data-screen="tempoSpSetup"[\s\S]*?data-action="startTempoSingle"/)?.[0] ?? "";
 
   assert.match(tempoSetup, /13 × 13/);

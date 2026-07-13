@@ -1,0 +1,27 @@
+  <body>
+    <!-- Global SVG paint servers. These figurine materials + soft-glow filter are
+         referenced by standalone SVGs (roster/squad picker figurines, combat FX)
+         that live OUTSIDE #boardSvg. #boardSvg sits in the match <section>, which
+         is display:none while other screens are active — and gradients inside a
+         display:none subtree don't resolve as paint servers, so picker figurines
+         rendered with empty ivory/steel/gold fills. Keeping them here (always
+         rendered, 0×0) makes url(#…) resolve from any screen. -->
+    <svg width="0" height="0" aria-hidden="true" style="position:absolute" focusable="false">
+      <defs>
+        <filter id="softGlow" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="5" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <!-- Carved-figurine materials: ivory/bone body, polished steel, brass/wood. -->
+        <linearGradient id="ivory" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f6f1e3"/><stop offset="46%" stop-color="#e3d9c2"/><stop offset="100%" stop-color="#b9ac8e"/>
+        </linearGradient>
+        <linearGradient id="figSteel" x1="0" y1="0" x2="0.3" y2="1">
+          <stop offset="0%" stop-color="#eef4fb"/><stop offset="45%" stop-color="#aebfd0"/><stop offset="100%" stop-color="#5d6c7c"/>
+        </linearGradient>
+        <linearGradient id="figGold" x1="0" y1="0" x2="0.2" y2="1">
+          <stop offset="0%" stop-color="#f4dfa0"/><stop offset="48%" stop-color="#cb9f55"/><stop offset="100%" stop-color="#876026"/>
+        </linearGradient>
+      </defs>
+    </svg>
+

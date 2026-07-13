@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 
 import { createCampaignMeta } from "../src/campaign/campaignMeta.js";
 
@@ -47,7 +47,28 @@ test("styles live behind purpose-specific entry points instead of the project ro
 test("release hotspots delegate cohesive responsibilities to smaller modules", () => {
   const boundaries = [
     ["src/main.js", 1325, ["./ai/cpuTurnController.js", "./online/onlineCommandController.js", "./match/matchLifecycleController.js", "./ui/battleEventPresenter.js", "./ui/rolledCombatPresenter.js", "./ui/instantArtPresenter.js", "./ui/battleInputController.js", "./ui/tutorialPresentationController.js", "./ui/tempoLoopController.js", "./campaign/campaignPresentationController.js", "./campaign/campaignRuntime.js"]],
-    ["src/core/artResolvers.js", 3000, ["./artResolvers/riotCopResolvers.js"]],
+    ["src/core/artResolvers.js", 350, [
+      "./artResolvers/riotCopResolvers.js",
+      "./artResolvers/fatWizardResolvers.js",
+      "./artResolvers/treantResolvers.js",
+      "./artResolvers/virusResolvers.js",
+      "./artResolvers/clodResolvers.js",
+      "./artResolvers/nemesisResolvers.js",
+      "./artResolvers/motherNatureResolvers.js",
+      "./artResolvers/roninResolvers.js",
+      "./artResolvers/bigBrotherResolvers.js",
+      "./artResolvers/witchDoctorResolvers.js",
+      "./artResolvers/fatherTimeResolvers.js",
+      "./artResolvers/juggernautResolvers.js",
+      "./artResolvers/monkResolvers.js",
+      "./artResolvers/targetedArtResolvers.js",
+      "./artResolvers/areaArtResolvers.js",
+      "./artResolvers/summonResolvers.js",
+      "./artResolvers/minerResolvers.js",
+      "./artResolvers/supportResolvers.js",
+      "./artResolvers/rangedArtResolvers.js",
+      "./artResolvers/gargoyleResolvers.js",
+    ]],
     ["src/ui/effects.js", 1350, ["./unitMotionEffects.js"]],
   ];
 
@@ -57,5 +78,14 @@ test("release hotspots delegate cohesive responsibilities to smaller modules", (
     for (const expectedImport of expectedImports) {
       assert.match(source, new RegExp(expectedImport.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     }
+  }
+});
+
+test("ART resolver modules remain focused instead of becoming new monoliths", () => {
+  const resolverDirectory = rootFile("src/core/artResolvers/");
+  for (const entry of readdirSync(resolverDirectory)) {
+    if (!entry.endsWith(".js")) continue;
+    const source = readFileSync(new URL(entry, resolverDirectory), "utf8");
+    assert.ok(source.split(/\r?\n/).length < 350, `${entry} should stay below 350 lines`);
   }
 });
