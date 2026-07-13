@@ -18,6 +18,7 @@ import {
   SPIRIT_WOODS_MISSION_ID,
   SHOWDOWN_MISSION_ID,
   NOT_MY_KING_MISSION_ID,
+  VOID_CASTLE_MISSION_ID,
 } from "./campaignConstants.js";
 import { clodMissionOpeningScript } from "./missions/clod-trial/dialogue.js";
 import { necromancerMissionOpeningScript } from "./missions/necromancer-rise/dialogue.js";
@@ -38,6 +39,7 @@ import { roninMissionOpeningScript } from "./missions/battle-for-the-bridge/dial
 import { wrongPlaceMissionOpeningScript } from "./missions/wrong-place-wrong-time/dialogue.js";
 import { spiritWoodsMissionOpeningScript } from "./missions/spirit-of-the-woods/dialogue.js";
 import { voidwoodMissionOpeningScript } from "./missions/voidwood-forest/dialogue.js";
+import { voidCastleMissionOpeningScript } from "./missions/void-ridden-castle/dialogue.js";
 
 export * from "./missions/sharedDialogue.js";
 export * from "./missions/clod-trial/dialogue.js";
@@ -59,9 +61,11 @@ export * from "./missions/battle-for-the-bridge/dialogue.js";
 export * from "./missions/wrong-place-wrong-time/dialogue.js";
 export * from "./missions/spirit-of-the-woods/dialogue.js";
 export * from "./missions/voidwood-forest/dialogue.js";
+export * from "./missions/void-ridden-castle/dialogue.js";
 
 // Dispatcher so the match code can ask for a mission opening through the public campaign API.
 export function campaignOpeningScript(missionId, state) {
+  if (missionId === VOID_CASTLE_MISSION_ID) return voidCastleMissionOpeningScript(state);
   if (missionId === NOT_MY_KING_MISSION_ID) return notMyKingMissionOpeningScript(state);
   if (missionId === SHOWDOWN_MISSION_ID) return showdownMissionOpeningScript(state);
   if (missionId === SPIRIT_WOODS_MISSION_ID) return spiritWoodsMissionOpeningScript(state);

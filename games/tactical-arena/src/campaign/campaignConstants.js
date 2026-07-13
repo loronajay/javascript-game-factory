@@ -19,6 +19,11 @@ export const VOIDWOOD_MISSION_ID = "voidwood-forest";
 export const SPIRIT_WOODS_MISSION_ID = "spirit-of-the-woods";
 export const SHOWDOWN_MISSION_ID = "the-showdown";
 export const NOT_MY_KING_MISSION_ID = "not-my-king";
+export const VOID_CASTLE_MISSION_ID = "void-ridden-castle";
+// Phase 1 of the castle: the Summoner hides behind a wall of three Nemesis bodies.
+export const VOID_CASTLE_ENEMY_TYPES = Object.freeze(["summoner", "nemesis", "nemesis", "nemesis"]);
+// Phase 2 spawns this many Summoners (one real, the rest decoys).
+export const VOID_CASTLE_SUMMONER_COUNT = 4;
 // The reward for The Wandering Party is a skin from this pack, not a unit unlock. The
 // pack id is shared with the campaign skin-reward ledger in progression/unlocks.js.
 export const WANDERING_PARTY_SKIN_PACK = "wandering";
@@ -53,5 +58,6 @@ export const MIN_CAMPAIGN_SQUAD_SIZE = 1;
 export const MAX_CAMPAIGN_SQUAD_SIZE = 4;
 // The campaign map is capped for now so the journey stays surveyable at once;
 // authored missions fill placeholder stops one at a time up to this count. Some
-// painted landmarks intentionally stay node-less until a future unit needs them.
-export const MAX_CAMPAIGN_MISSIONS = 20;
+// painted landmarks intentionally stay node-less until a future unit needs them
+// (the far-east crystal/ice cave is reserved for the Blacksword finale).
+export const MAX_CAMPAIGN_MISSIONS = 21;

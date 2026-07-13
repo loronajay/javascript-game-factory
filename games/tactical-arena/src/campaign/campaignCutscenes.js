@@ -20,6 +20,7 @@ import {
   SPIRIT_WOODS_MISSION_ID,
   SHOWDOWN_MISSION_ID,
   NOT_MY_KING_MISSION_ID,
+  VOID_CASTLE_MISSION_ID,
   WANDERING_PARTY_SKIN_PACK,
   HASBEEN_MYSTIC_SKIN_PACK,
   HASBEEN_HEROES_FAT_TYPES,
@@ -53,6 +54,50 @@ function volunteerType(selectedSquad) {
 }
 
 export function campaignMapCutsceneScript(missionId, selectedSquad = null, { phase = "full" } = {}) {
+  // Void Ridden Castle — the pre-mission brief. The party walks into the throne room they
+  // fought all campaign to reach and it is subtly, unbearably wrong. The Summoner is
+  // already there; the trap already closed behind them. The party's offer of an alliance
+  // against Blacksword is genuine, and it is refused — which is precisely why the offer
+  // gets accepted in the post-match scene instead, once the Summoner has been broken.
+  if (missionId === VOID_CASTLE_MISSION_ID) {
+    return [
+      { speaker: "king", side: "left",
+        text: "The doors are as I left them. The banners are as I left them." },
+      { speaker: "king", side: "left",
+        text: "And I have never once been cold in this room." },
+      narration("The throne room holds its shape, and nothing else. Sound arrives a half-beat late. The light falls without warming anything it lands on."),
+      { speaker: "mystic", side: "left",
+        text: "This is not a room. It is something wearing the memory of one." },
+      { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+        text: "It is a very good likeness. I studied it for a long while before I built it." },
+      { speaker: "swordsman", side: "left",
+        text: "He was here. He was here the entire climb." },
+      { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+        text: "You did not fight your way to me. You were walked here. Every road you took, I left open." },
+      { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+        text: "The strongest warriors this land has, gathered into one room of my choosing. Do you understand how rarely that happens? I did not want to hunt you one at a time." },
+      { speaker: "mystic", side: "left",
+        text: "Then hear us before you close it. We know about Blacksword." },
+      { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+        text: "..." },
+      { speaker: "swordsman", side: "left",
+        text: "We know he is stronger than you. We know he is stronger than both of you. And we know he is not finished." },
+      { speaker: "mystic", side: "left",
+        text: "You do not have to spend us. Spend him. Take the help." },
+      { speaker: "nemesis", side: "right", player: 2,
+        text: "Help. From mortals." },
+      { speaker: "nemesis", side: "right", player: 2,
+        text: "We will not be given your strength. We will take it. Every one of you goes into the void, and what you were becomes what we are — and that will be enough to end Blacksword without a single favor owed to your kind." },
+      { speaker: "king", side: "left",
+        text: "I would rather stand beside you than bury you. I have said so plainly, and I will say it once more." },
+      { speaker: "king", side: "left",
+        text: "But make no mistake about what happens if you refuse. We will put you both down and go to Blacksword ourselves." },
+      { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+        text: "A foolish endeavour. Both halves of it." },
+      { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+        text: "Come, then. Let us find out which of us was wrong." },
+    ];
+  }
   if (missionId === NOT_MY_KING_MISSION_ID) {
     return [
       { speaker: "treant", side: "left",
@@ -344,6 +389,44 @@ export function markCampaignMapCutsceneSeen(storage = defaultStorage(), missionI
 // seen-list pattern the overworld map cutscene uses, but tracked separately per mission
 // so the two cutscenes never burn each other's flag.
 export function campaignPostMatchCutsceneScript(missionId) {
+  // Void Ridden Castle — the alliance. The Summoner does not have a change of heart; he
+  // has a change of arithmetic. Beating him cost him the one thing he was holding in
+  // reserve for Blacksword, and the party is now the only asset he has left. This is also
+  // the scene that hands the campaign its final destination.
+  if (missionId === VOID_CASTLE_MISSION_ID) {
+    return [
+      { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+        text: "Do you have any idea what you have just done." },
+      { speaker: "swordsman", side: "left",
+        text: "Won." },
+      { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+        text: "You have spent me. Everything I had been saving, I spent on you — on a room full of people who were never the enemy." },
+      { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+        text: "I cannot meet Blacksword like this. Not now. Not as I am. And he is still coming." },
+      { speaker: "nemesis", side: "right", player: 2,
+        text: "Then we are finished. Both of us, and everything under us." },
+      { speaker: "mystic", side: "left",
+        text: "Or you stop counting yourself as one and start counting us." },
+      { speaker: "swordsman", side: "left",
+        text: "This is what we came here to offer. It is still on the table. It has been on the table the whole time." },
+      { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+        text: "..." },
+      { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+        text: "Then take it. I will fight beside you. I have nothing else left to be." },
+      { speaker: "king", side: "left",
+        text: "Where is he?" },
+      { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+        text: "South. A cave of crystal, deep in the ice. A spiritual site — the oldest one left standing." },
+      { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+        text: "That is why he chose it. Once he begins drinking it down with void magic, every hour we wait makes him harder to end." },
+      { speaker: "summoner", skin: "void-dweller", side: "right", player: 2,
+        text: "Understand me. This will not resemble anything you have fought. Not me. Not Nemesis. Not the crown. He is not a battle you win by being brave in." },
+      { speaker: "mystic", side: "left",
+        text: "Then we go now, and we go together, and we do not go brave. We go ready." },
+      { speaker: "swordsman", side: "left",
+        text: "South. To the ice." },
+    ];
+  }
   if (missionId === NOT_MY_KING_MISSION_ID) {
     return [
       { speaker: "fat-wizard", side: "left",

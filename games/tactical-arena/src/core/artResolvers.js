@@ -1679,6 +1679,10 @@ function resolveSummonGhost(state, command, art) {
     ghostArtId: art.id,
     forceRage: art.id === "beckon"
   });
+  // A summoner may carry a table of corrupted ART names to hand down to whatever it calls
+  // up (Void Ridden Castle's decoy Summoners — their ghosts misname their own ARTS, which
+  // is the tell that traces back to the decoy). The ghost only ever looks up ids it owns.
+  if (actor.ghostFakeArtNames) ghost.fakeArtNames = { ...actor.ghostFakeArtNames };
   next.units.push(ghost);
   next.activation = {
     unitId: ghost.id,

@@ -11,6 +11,7 @@
 // from the match state (cpuRng) so it never disturbs the authoritative dice stream and
 // a replay reproduces the same moves.
 
+import { finishActivation } from "../core/commands.js";
 import { areEnemies, findUnit, livingUnits } from "../core/state.js";
 import { getArt, getBasicAttackResourceCost, getEffectiveStats, getWallKillResourceReward, isCommander, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
 import { createRngState, nextRandom } from "../core/rng.js";
@@ -74,6 +75,24 @@ export function chooseActivation(
 
   const weights = WEIGHTS[difficulty] ?? WEIGHTS.normal;
 
+  // A Summoner's Summon/Beckon hands the open activation straight to the ghost it calls
+  // (resolveSummonGhost), and the reducer will reject a beginActivation for ANY other unit
+  // until that ghost has taken its turn. So an open activation is not something to plan
+  // around — it is the only thing this side may play. Resume it rather than trying to
+  // start a fresh one, or the CPU spins on rejected commands until its guard trips.
+  const open = state.activation?.unitId ? findUnit(state, state.activation.unitId) : null;
+  if (open && open.hp > 0 && open.player === cpuPlayer && !open.spent) {
+    // Defensive: a half-played activation can't be re-planned from scratch (the plan would
+    // move/attack twice and be rejected). Only a fresh one is safe to plan; otherwise just
+    // close it out so the turn can move on.
+    if (state.activation.moved || state.activation.primaryUsed) {
+      return [finishActivation(cpuPlayer, open.id)];
+    }
+    const resumed = bestPlanFor(state, [open], cpuPlayer, weights, difficulty, rng, excludeArtIds);
+    if (resumed) return toCommands(cpuPlayer, resumed.plan, { resume: true });
+    return [finishActivation(cpuPlayer, open.id)];
+  }
+
   // An actsFirst commander (King, Mother Nature) must act before any squadmate may act —
   // while one is still unspent it is the ONLY unit the reducer will let this player
   // activate, so restrict the search to it (offering another unit would only replay into
@@ -82,29 +101,34 @@ export function chooseActivation(
   const commanders = units.filter((u) => isCommander(u));
   const actable = commanders.length ? commanders : units;
 
-  // Optional per-call ART denylist. Used by scripted content (e.g. a campaign mission
-  // capping how many times a stalling unit may re-cast a self-heal) to remove a plan
-  // from consideration without touching the scoring model itself.
-  const excluded = excludeArtIds && excludeArtIds.length ? new Set(excludeArtIds) : null;
-
-  const scored = [];
-  for (const unit of actable) {
-    for (const plan of generatePlans(state, unit)) {
-      if (excluded && plan.primary.kind === "art" && excluded.has(plan.primary.artId)) continue;
-      scored.push({ plan, score: scorePlan(state, plan, unit, cpuPlayer, weights) });
-    }
-  }
+  const chosen = bestPlanFor(state, actable, cpuPlayer, weights, difficulty, rng, excludeArtIds);
 
   // Defensive: generatePlans always yields at least a defend fallback, so this is
   // unreachable — but never leave a unit stuck.
-  if (scored.length === 0) {
+  if (!chosen) {
     return toCommands(cpuPlayer, {
       unitId: units[0].id, bonus: null, moveTo: null, movePhase: null, primary: { kind: "defend" }
     });
   }
 
-  const chosen = difficulty === "easy" ? pickWeighted(scored, rng) : pickBest(scored, rng);
   return toCommands(cpuPlayer, chosen.plan);
+}
+
+// Scores every plan across `candidates` and picks one (best, or weighted on easy).
+// `excludeArtIds` is an optional per-call ART denylist used by scripted content (e.g. a
+// campaign mission capping how many times a stalling unit may re-cast a self-heal) to
+// remove a plan from consideration without touching the scoring model itself.
+function bestPlanFor(state, candidates, cpuPlayer, weights, difficulty, rng, excludeArtIds) {
+  const excluded = excludeArtIds && excludeArtIds.length ? new Set(excludeArtIds) : null;
+  const scored = [];
+  for (const unit of candidates) {
+    for (const plan of generatePlans(state, unit)) {
+      if (excluded && plan.primary.kind === "art" && excluded.has(plan.primary.artId)) continue;
+      scored.push({ plan, score: scorePlan(state, plan, unit, cpuPlayer, weights) });
+    }
+  }
+  if (scored.length === 0) return null;
+  return difficulty === "easy" ? pickWeighted(scored, rng) : pickBest(scored, rng);
 }
 
 // Score the board a plan produces, from the CPU's perspective. Higher is better. The
@@ -321,8 +345,20 @@ function missionPlanBias(state, unit, plan) {
   const carry = state.aiProfile?.fatherTimeCarry;
   const virusMisfortune = state.aiProfile?.virusMisfortune;
   const monkTrialArts = state.aiProfile?.monkTrialArts;
+  const voidCastleSummonArts = state.aiProfile?.voidCastleSummonArts;
   if (plan.primary.kind !== "art") return 0;
   const primary = plan.primary;
+  if (
+    voidCastleSummonArts &&
+    unit.type === "summoner" &&
+    (primary.artId === "summon" || primary.artId === "beckon")
+  ) {
+    // Void Ridden Castle is a read-the-ghost puzzle: a Summoner who never summons gives the
+    // player nothing to read. A nudge, not an override — summonCandidates has already thrown
+    // out every placement the ghost couldn't act from, so this only ever tips a summon that
+    // was going to accomplish something, and it still loses to a genuinely better play.
+    return 12;
+  }
   if (
     monkTrialArts &&
     unit.type === "monk" &&

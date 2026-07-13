@@ -12,7 +12,8 @@ import { createEffects } from "./ui/effects.js";
 import { clumsySplashTargets, healingPresentationTargets, orderedHitTargets, shouldUseRangedAttackAnimation, wallOreGainFloat } from "./ui/combatPresentation.js";
 import { TurnAnnouncer } from "./ui/turnFlash.js";
 import { createMenuFlow } from "./ui/menuFlow.js";
-import { DEFAULT_SQUAD } from "./ui/squadPicker.js";
+import { DEFAULT_FORMATION_ORDER, DEFAULT_SQUAD } from "./ui/squadPicker.js";
+import { applyFormationOrder } from "./ui/squadModel.js";
 import { AudioManager, musicKeyForMatchMode } from "./audio/sounds.js";
 import { isHealArtConfirmTile, renderBoard } from "./ui/boardRenderer.js";
 import { mountSceneBackdrop } from "./ui/sceneBackdrop.js";
@@ -54,11 +55,19 @@ import {
   SHOWDOWN_FAT_TYPES,
   SHOWDOWN_MISSION_ID,
   VOIDWOOD_MISSION_ID,
+  VOID_CASTLE_MISSION_ID,
   VIRUS_MISSION_ID,
   WITCH_DOCTOR_HEAL_CAST_CAP,
   WITCH_DOCTOR_MISSION_ID,
   WRONG_PLACE_MISSION_ID,
   applyMonkTrialIntroBeat,
+  applyVoidCastleIntroBeat,
+  applyVoidCastlePartyHeal,
+  applyVoidCastleSplit,
+  shouldShowVoidCastleNemesisRageWarning,
+  voidCastleDefeatScript,
+  voidCastleNemesisRageWarningScript,
+  voidCastleSplitScript,
   campaignMapCutsceneScript,
   campaignOpeningScript,
   campaignPostMatchCutsceneScript,
@@ -341,6 +350,14 @@ function createCampaignMeta() {
     notMyKingEnemyEnteredRage: false,
     notMyKingDefeatDialogueShown: false,
     notMyKingEnemyRageWarned: Object.fromEntries(NOT_MY_KING_ENEMY_TYPES.map((type) => [type, false])),
+    // Void Ridden Castle (mission 21)
+    voidCastleNemesisEnteredRage: false,
+    voidCastleNemesisRageWarningShown: false,
+    // Latched while the real Summoner still lives — the decoys all drop the instant he
+    // does (resolveVictory collapses them), and that collapse must not fail the star.
+    voidCastleDecoyKilled: false,
+    voidCastleSplitShown: false,
+    voidCastleDefeatDialogueShown: false,
   };
 }
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -565,7 +582,12 @@ async function onCampaignMapEntered({ openCampaignRewardChoice } = {}) {
 }
 
 async function handleDialogueLineAction(action) {
-  if (matchConfig?.mode !== "campaign" || campaignMissionId !== MONK_MISSION_ID) return;
+  if (matchConfig?.mode !== "campaign") return;
+  if (campaignMissionId === VOID_CASTLE_MISSION_ID) {
+    await handleVoidCastleLineAction(action);
+    return;
+  }
+  if (campaignMissionId !== MONK_MISSION_ID) return;
   if (action === "monkIntroRevealAndMove") {
     const realMonkId = state.missionRules?.monkTrial?.realMonkId;
     const from = realMonkId ? findUnit(state, realMonkId)?.position : null;
@@ -588,8 +610,44 @@ async function handleDialogueLineAction(action) {
   }
 }
 
+// The three board mutations Void Ridden Castle drives from dialogue: the Nemesis splitting
+// into three at the open, the Summoner coming apart into four when he refuses to die, and
+// the Mystic's shout that puts the party back on its feet for phase 2.
+async function handleVoidCastleLineAction(action) {
+  if (action === "voidCastleNemesisSplit") {
+    state = applyVoidCastleIntroBeat(state, action);
+    render();
+    effects.shake(5);
+    await sleep(260);
+    return;
+  }
+  if (action === "voidCastleSummonerSplit") {
+    state = applyVoidCastleSplit(state);
+    render();
+    effects.shake(9);
+    await sleep(420);
+    return;
+  }
+  if (action === "voidCastlePartyHeal") {
+    state = applyVoidCastlePartyHeal(state);
+    render();
+    effects.shake(4);
+    await sleep(320);
+  }
+}
+
 function finalizeCampaignOpeningState() {
-  if (matchConfig?.mode !== "campaign" || campaignMissionId !== MONK_MISSION_ID) return;
+  if (matchConfig?.mode !== "campaign") return;
+  // A skipped opening must still leave the board in its post-intro shape, or the two held-
+  // back Nemesis bodies stay invisible for the whole match.
+  if (campaignMissionId === VOID_CASTLE_MISSION_ID) {
+    if (state.missionRules?.voidCastleTrial?.introComplete) return;
+    state = applyVoidCastleIntroBeat(state, "voidCastleNemesisSplit");
+    resolving = false;
+    render();
+    return;
+  }
+  if (campaignMissionId !== MONK_MISSION_ID) return;
   if (state.missionRules?.monkTrial?.introComplete) return;
   state = applyMonkTrialIntroBeat(state, "monkIntroComplete");
   resolving = false;
@@ -679,7 +737,8 @@ function startMatch(config) {
 
 function resetBattle() {
   if (net) return; // a networked match can't be unilaterally restarted
-  startMatch(matchConfig ?? { size: 13, squads: { 1: [...DEFAULT_SQUAD], 2: [...DEFAULT_SQUAD] } });
+  const defaultSquad = applyFormationOrder(DEFAULT_SQUAD, DEFAULT_FORMATION_ORDER);
+  startMatch(matchConfig ?? { size: 13, squads: { 1: defaultSquad, 2: defaultSquad } });
 }
 
 function stopTempoLoop() {
@@ -786,6 +845,21 @@ function announceTurn(player, { hold = false } = {}) {
   });
 }
 
+// Missions that play a beat from the losing side between the final blow and the results
+// screen. Keyed by mission id; `flag` is the campaignMeta latch that keeps the beat from
+// replaying if victory resolves more than once in a match.
+const CAMPAIGN_DEFEAT_BEATS = Object.freeze({
+  [NOT_MY_KING_MISSION_ID]: { flag: "notMyKingDefeatDialogueShown", script: notMyKingDefeatScript },
+  [SHOWDOWN_MISSION_ID]: { flag: "showdownDefeatDialogueShown", script: showdownDefeatScript },
+  [VOIDWOOD_MISSION_ID]: { flag: "voidwoodDefeatDialogueShown", script: voidwoodDefeatScript },
+  [OUT_OF_RETIREMENT_MISSION_ID]: { flag: "outOfRetirementDefeatDialogueShown", script: outOfRetirementDefeatScript },
+  [PALADIN_MISSION_ID]: { flag: "paladinDefeatDialogueShown", script: paladinDefeatScript },
+  [MINER_MISSION_ID]: { flag: "minerDefeatDialogueShown", script: minerDefeatScript },
+  [HASBEEN_HEROES_MISSION_ID]: { flag: "hasbeenDefeatDialogueShown", script: hasbeenHeroesDefeatScript },
+  [BROTHERS_MISSION_ID]: { flag: "brothersDefeatDialogueShown", script: brothersDefeatScript },
+  [VOID_CASTLE_MISSION_ID]: { flag: "voidCastleDefeatDialogueShown", script: voidCastleDefeatScript },
+});
+
 function announceTurnChange(prevPlayer) {
   if (!shouldShowTurnAnnouncement({
     tempo: isTempoBattle(state),
@@ -823,97 +897,10 @@ function announceTurnChange(prevPlayer) {
       window.clearTimeout(resultsTimer);
       resultsTimer = window.setTimeout(() => menu.showResults(summary), 1600);
     };
-    if (
-      campaignMissionId === NOT_MY_KING_MISSION_ID &&
-      state.winner === 1 &&
-      !campaignMeta.notMyKingDefeatDialogueShown
-    ) {
-      campaignMeta.notMyKingDefeatDialogueShown = true;
-      const script = notMyKingDefeatScript(state);
-      if (script.length) {
-        void dialogue.show(script).then(showResults);
-      } else {
-        showResults();
-      }
-    } else if (
-      campaignMissionId === SHOWDOWN_MISSION_ID &&
-      state.winner === 1 &&
-      !campaignMeta.showdownDefeatDialogueShown
-    ) {
-      campaignMeta.showdownDefeatDialogueShown = true;
-      const script = showdownDefeatScript(state);
-      if (script.length) {
-        void dialogue.show(script).then(showResults);
-      } else {
-        showResults();
-      }
-    } else if (
-      campaignMissionId === VOIDWOOD_MISSION_ID &&
-      state.winner === 1 &&
-      !campaignMeta.voidwoodDefeatDialogueShown
-    ) {
-      campaignMeta.voidwoodDefeatDialogueShown = true;
-      const script = voidwoodDefeatScript(state);
-      if (script.length) {
-        void dialogue.show(script).then(showResults);
-      } else {
-        showResults();
-      }
-    } else if (
-      campaignMissionId === OUT_OF_RETIREMENT_MISSION_ID &&
-      state.winner === 1 &&
-      !campaignMeta.outOfRetirementDefeatDialogueShown
-    ) {
-      campaignMeta.outOfRetirementDefeatDialogueShown = true;
-      const script = outOfRetirementDefeatScript(state);
-      if (script.length) {
-        void dialogue.show(script).then(showResults);
-      } else {
-        showResults();
-      }
-    } else if (
-      campaignMissionId === PALADIN_MISSION_ID &&
-      state.winner === 1 &&
-      !campaignMeta.paladinDefeatDialogueShown
-    ) {
-      campaignMeta.paladinDefeatDialogueShown = true;
-      const script = paladinDefeatScript(state);
-      if (script.length) {
-        void dialogue.show(script).then(showResults);
-      } else {
-        showResults();
-      }
-    } else if (
-      campaignMissionId === MINER_MISSION_ID &&
-      state.winner === 1 &&
-      !campaignMeta.minerDefeatDialogueShown
-    ) {
-      campaignMeta.minerDefeatDialogueShown = true;
-      const script = minerDefeatScript(state);
-      if (script.length) {
-        void dialogue.show(script).then(showResults);
-      } else {
-        showResults();
-      }
-    } else if (
-      campaignMissionId === HASBEEN_HEROES_MISSION_ID &&
-      state.winner === 1 &&
-      !campaignMeta.hasbeenDefeatDialogueShown
-    ) {
-      campaignMeta.hasbeenDefeatDialogueShown = true;
-      const script = hasbeenHeroesDefeatScript(state);
-      if (script.length) {
-        void dialogue.show(script).then(showResults);
-      } else {
-        showResults();
-      }
-    } else if (
-      campaignMissionId === BROTHERS_MISSION_ID &&
-      state.winner === 1 &&
-      !campaignMeta.brothersDefeatDialogueShown
-    ) {
-      campaignMeta.brothersDefeatDialogueShown = true;
-      const script = brothersDefeatScript(state);
+    const defeatBeat = CAMPAIGN_DEFEAT_BEATS[campaignMissionId];
+    if (defeatBeat && state.winner === 1 && !campaignMeta[defeatBeat.flag]) {
+      campaignMeta[defeatBeat.flag] = true;
+      const script = defeatBeat.script(state);
       if (script.length) {
         void dialogue.show(script).then(showResults);
       } else {
@@ -1160,6 +1147,33 @@ function recordCampaignProgressHooks(command, result, beforeState = null) {
       const playerHits = eventTargetIds(event).filter((id) =>
         findUnit(state, id)?.player === 1 && eventDamageForTarget(event, id) > 0);
       campaignMeta.voidwoodDarkBombDamageTakenCount += playerHits.length;
+    }
+  } else if (campaignMissionId === VOID_CASTLE_MISSION_ID) {
+    const trial = state.missionRules?.voidCastleTrial;
+    if (state.units.some((unit) =>
+      unit.player === 2 && unit.type === "nemesis" && unit.hp > 0 && isRaging(unit))) {
+      campaignMeta.voidCastleNemesisEnteredRage = true;
+    }
+    // Only a decoy felled while the real Summoner is still standing counts against the
+    // player. Once he falls, resolveVictory drops every copy at once — that is the win,
+    // not a mistake.
+    const realSummoner = trial?.realSummonerId ? findUnit(state, trial.realSummonerId) : null;
+    if (
+      trial?.phase === 2 &&
+      realSummoner?.hp > 0 &&
+      state.units.some((unit) => unit.trialDecoySummoner && unit.hp <= 0)
+    ) {
+      campaignMeta.voidCastleDecoyKilled = true;
+    }
+    // The finishing blow of phase 1 registers as a genuine victory in the engine (an enemy
+    // team with no living bodies would otherwise stall the turn loop). Take it back here,
+    // synchronously, before announceTurnChange can read state.phase and flash a results
+    // screen — the same trick recordTutorialProgress uses for its scripted "victories".
+    // The split beat that follows is what actually rebuilds the board.
+    if (trial?.pendingSplit && state.phase === "complete") {
+      state.phase = "playing";
+      state.winner = null;
+      state.activation = null;
     }
   } else if (campaignMissionId === MONK_MISSION_ID) {
     const realMonkId = state.missionRules?.monkTrial?.realMonkId;
@@ -1457,6 +1471,22 @@ function countPlayerMagicDamageDealt(events) {
 // Returns the next eligible condition-triggered dialogue beat for the active mission
 // (or null). Each beat marks its own once-only flag so the same warning never repeats.
 function nextCampaignDialogueBeat() {
+  if (campaignMissionId === VOID_CASTLE_MISSION_ID) {
+    // The split outranks everything: it is the beat that reopens a match the engine has
+    // already called for the player.
+    if (state.missionRules?.voidCastleTrial?.pendingSplit && !campaignMeta.voidCastleSplitShown) {
+      return { markShown: () => { campaignMeta.voidCastleSplitShown = true; }, script: voidCastleSplitScript };
+    }
+    if (shouldShowVoidCastleNemesisRageWarning(state, {
+      warningShown: campaignMeta.voidCastleNemesisRageWarningShown,
+    })) {
+      return {
+        markShown: () => { campaignMeta.voidCastleNemesisRageWarningShown = true; },
+        script: voidCastleNemesisRageWarningScript,
+      };
+    }
+    return null;
+  }
   if (campaignMissionId === CLOD_MISSION_ID) {
     if (shouldShowClodRageWarning(state, { warningShown: campaignMeta.clodWarningShown, chargeUsed: campaignMeta.clodChargeUsed })) {
       return { markShown: () => { campaignMeta.clodWarningShown = true; }, script: clodRageWarningScript };

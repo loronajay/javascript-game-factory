@@ -20,6 +20,8 @@ import {
   SPIRIT_WOODS_MISSION_ID,
   SHOWDOWN_MISSION_ID,
   NOT_MY_KING_MISSION_ID,
+  VOID_CASTLE_MISSION_ID,
+  VOID_CASTLE_ENEMY_TYPES,
   WANDERING_PARTY_SKIN_PACK,
   HASBEEN_MYSTIC_SKIN_PACK,
   HASBEEN_HEROES_FAT_TYPES,
@@ -349,6 +351,27 @@ const AUTHORED_MISSIONS = Object.freeze({
     size: 13,
     fullHp: true,
   },
+  // Void Ridden Castle (13×13): the throne room turns out to be the Summoner's trap. A
+  // two-part battle — the first in the campaign. Beating the Summoner does not end it;
+  // he splits into four and the fight becomes a find-the-real-one puzzle (see the
+  // voidCastleTrial rule in turnEngine.js + missions/void-ridden-castle/ghosts.js). The
+  // description deliberately does NOT mention the split or the ghost-name tell — both are
+  // meant to land as surprises.
+  [VOID_CASTLE_MISSION_ID]: {
+    id: VOID_CASTLE_MISSION_ID,
+    title: "Void Ridden Castle",
+    subtitle: "The throne room is not the throne room anymore",
+    description: "Bring any four-unit squad into the castle. The Summoner has walled himself into the far corner behind Nemesis, and he chose this ground for a reason. Do not let Nemesis get desperate.",
+    unitType: "summoner",
+    requiredStars: 0,
+    requiresPreviousMissionsComplete: true,
+    rewardUnits: Object.freeze(["nemesis", "summoner"]),
+    rewardLabel: "Nemesis and the Summoner",
+    playerSlots: 4,
+    enemySquad: Object.freeze([...VOID_CASTLE_ENEMY_TYPES]),
+    size: 13,
+    fullHp: true,
+  },
 });
 
 // The overworld trail: index = traversal order, each entry pins a mission's grid
@@ -414,6 +437,10 @@ const CAMPAIGN_TRAIL = [
     blurb: "Beyond the peaks, a broken country of fallen towers where time itself runs strange." },
   { id: NOT_MY_KING_MISSION_ID, cell: { col: 5, row: 2 }, point: { x: 84.5, y: 30.9 }, region: "waste", locationName: "Ember Crown Rise", requiredStars: 0, requiresPreviousMissionsComplete: true,
     blurb: "A lower painted marker smolders above the shattered waste. The castle can wait; the crown has come to the road." },
+  // The painted castle in the snowbound north-east. Its cell (6,0) finally gives the
+  // declared-but-unused `frost` region a home, so Frostcrown Peaks reads on the map.
+  { id: VOID_CASTLE_MISSION_ID, cell: { col: 6, row: 0 }, point: { x: 86.6, y: 18.9 }, region: "frost", locationName: "Highspire Castle", requiredStars: 0, requiresPreviousMissionsComplete: true,
+    blurb: "The kingdom's seat, high in the snow. The walls are still standing. That is the only thing about it that still feels right." },
 ];
 
 // Extra visual branches on top of the linear spine, so the map reads as a network

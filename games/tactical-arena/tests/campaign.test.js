@@ -15,6 +15,7 @@ import {
   HASBEEN_HEROES_FAT_TYPES,
   HASBEEN_HEROES_MISSION_ID,
   HASBEEN_MYSTIC_SKIN_PACK,
+  MAX_CAMPAIGN_MISSIONS,
   MINER_MISSION_ID,
   NECROMANCER_MISSION_ID,
   NOT_MY_KING_ENEMY_TYPES,
@@ -162,7 +163,7 @@ test("fresh campaign map surveys the active campaign graph with Clod live and th
 
   assert.equal(map.totalStars, 0);
   // The full journey is always visible so the player gets an overview.
-  assert.equal(map.nodes.length, 20);
+  assert.equal(map.nodes.length, MAX_CAMPAIGN_MISSIONS);
   assert.equal(map.nodes[0].id, CLOD_MISSION_ID);
   assert.equal(map.nodes[0].status, "available");
   assert.equal(map.nodes[0].displayType, "clod");
@@ -1856,7 +1857,7 @@ test("The Wandering Party replaces the Cinderwood placeholder with an authored s
   assert.equal(mission.rewardSkinPack, WANDERING_PARTY_SKIN_PACK);
   // The node is still present on the map.
   const map = getCampaignMap(storageAdapter());
-  assert.equal(map.nodes.length, 20);
+  assert.equal(map.nodes.length, MAX_CAMPAIGN_MISSIONS);
   assert.ok(map.nodes.some((node) => node.id === WANDERING_PARTY_MISSION_ID));
 });
 
@@ -2101,7 +2102,7 @@ test("Has-Been Heroes replaces the Elderroot placeholder with a town skin-reward
 
   // The node reports the new town biome once revealed.
   const map = getCampaignMap(storageAdapter());
-  assert.equal(map.nodes.length, 20);
+  assert.equal(map.nodes.length, MAX_CAMPAIGN_MISSIONS);
   const node = map.nodes.find((n) => n.id === HASBEEN_HEROES_MISSION_ID);
   assert.ok(node);
   assert.equal(node.biome, "town");

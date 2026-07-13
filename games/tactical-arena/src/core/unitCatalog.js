@@ -163,9 +163,20 @@ export function getSoulShuffleChoices(unit, rngState) {
   const excluded = new Set();
   if (passive?.excludeSelf) excluded.add(unit.type);
   if (passive?.excludeLastGhost && unit.lastGhostType) excluded.add(unit.lastGhostType);
-  const candidates = Object.keys(UNIT_TYPES).filter((type) => {
+  // A unit may carry its own restricted Soul Shuffle pool (Void Ridden Castle gives each
+  // of its four Summoners a disjoint slice of the roster). Absent one, the whole roster
+  // minus summons/commanders is fair game, as normal.
+  const roster = Array.isArray(unit.ghostPool) && unit.ghostPool.length
+    ? unit.ghostPool.filter((type) => UNIT_TYPES[type])
+    : Object.keys(UNIT_TYPES);
+  // A COMMANDER can never be summoned. `actsFirst` means the owner must command that unit
+  // before any other unit of theirs may activate — a temporary ghost carrying it would
+  // seize the owner's whole activation order for the one turn it exists (and the King,
+  // being commandOnly, cannot fight at all). This gates the King and Mother Nature off
+  // every summon, and any future commander with them.
+  const candidates = roster.filter((type) => {
     const definition = UNIT_TYPES[type];
-    return !excluded.has(type) && !definition.summon && !definition.commandOnly;
+    return !excluded.has(type) && !definition.summon && !definition.commandOnly && !definition.actsFirst;
   });
   const shuffled = [...candidates];
   let nextRngState = rngState;

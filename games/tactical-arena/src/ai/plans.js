@@ -193,10 +193,12 @@ function generateArtPlans(state, unit, art, ai, plans) {
       const maxActive = art.summon?.maxActive ?? 1;
       const activeSummons = state.units.filter((u) => u.hp > 0 && u.summonerId === unit.id).length;
       if (activeSummons >= maxActive) break;
+      // getSoulShuffleChoices returns type KEYS (strings), not definitions — naming the
+      // type here is what lets the projection below value the ghost at all.
       const summonType = art.resolution === "summonGhost"
-        ? getSoulShuffleChoices(unit, state.rngState).choices[0]?.id
+        ? getSoulShuffleChoices(unit, state.rngState).choices[0]
         : null;
-      for (const tile of summonCandidates(state, unit, art)) {
+      for (const tile of summonCandidates(state, unit, art, summonType)) {
         plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetPosition: tile, summonType } }));
       }
       break;
@@ -503,7 +505,7 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
       break;
     }
     case "summon": {
-      const summonType = art.summon?.type ?? primary.summonType ?? getSoulShuffleChoices(actor, state.rngState).choices[0]?.id;
+      const summonType = art.summon?.type ?? primary.summonType ?? getSoulShuffleChoices(actor, state.rngState).choices[0];
       if (!summonType) break;
       board.push({
         id: `${actor.id}-proj-summon`, type: summonType, player: actor.player,
@@ -655,8 +657,14 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
 // Expand a plan into the begin → (bonus) → (move) → primary → (retreat) → finish
 // command sequence the reducer expects. An ART primary spends the activation itself,
 // so it gets NO trailing finishActivation; basic attack / defend do.
-export function toCommands(player, plan) {
-  const commands = [beginActivation(player, plan.unitId)];
+//
+// `resume` omits the leading beginActivation, for a unit whose activation is ALREADY
+// open — a summoned ghost, which inherits the activation from its Summoner (see
+// resolveSummonGhost). Re-beginning it would be worse than useless: beginActivation
+// rebuilds state.activation from scratch and drops `summonerId`, which is the only thing
+// telling spendAndAdvance to dissipate the ghost and spend the Summoner with it.
+export function toCommands(player, plan, { resume = false } = {}) {
+  const commands = resume ? [] : [beginActivation(player, plan.unitId)];
   if (plan.bonus) commands.push(useArt(player, plan.unitId, plan.bonus.artId));
   if (plan.movePhase === "before" && plan.moveTo) commands.push(moveUnit(player, plan.unitId, plan.moveTo.x, plan.moveTo.y));
 
@@ -836,10 +844,89 @@ function enemiesOnPath(state, actor, path) {
 }
 
 // Summon tiles, preferring those nearest an enemy (the Ghoul projects an aura), capped.
-function summonCandidates(state, unit, art) {
-  return tilesFromKeys(getSummonPlacementTiles(state, unit, art))
-    .sort((a, b) => nearestEnemyDistance(state, unit.player, a) - nearestEnemyDistance(state, unit.player, b))
-    .slice(0, PLACEMENT_KEEP);
+// Intents whose value is spent on a FRIENDLY unit. A ghost carrying one of these earns its
+// turn next to allies, not next to enemies.
+const ALLY_SUPPORT_INTENTS = new Set([
+  "healAlly", "healAllies", "buffAlly", "buffAllies", "cleanseAlly", "protectAlly", "hasten", "revive",
+]);
+
+// How far a summoned ghost can actually DO something from the tile it lands on, given it
+// gets exactly ONE turn before it dissipates. Moving and using an ART are mutually
+// exclusive in this engine — only a basic attack may follow a move — so a ghost's reach is
+// the better of:
+//   • move + basic attack range, or
+//   • its longest ART range, plus move ONLY if it carries moveAndUseArts (the Monk).
+// Adding move to every ART range (the naive version) badly overstates this: a Ronin would
+// look like it threatens 8 tiles when Challenge, standing still, only reaches 5.
+// (The landing tile is itself up to the summon's radius from the Summoner, so his own
+// effective threat is that radius + this.)
+function ghostReach(type) {
+  const definition = getUnitType(type);
+  const { moveRange, attackRange } = definition.stats;
+  // Mirrors canMoveAndUseArts' static scan: a standing passive/art may grant it outright.
+  const mobileArts = [definition.passive, ...definition.arts]
+    .filter(Boolean)
+    .some((source) => source.effect?.moveAndUseArts === true);
+
+  let reach = moveRange + attackRange;
+  for (const art of [...definition.arts, definition.rageArt].filter(Boolean)) {
+    if (art.kind === "passive") continue;
+    const targeting = art.targeting ?? {};
+    const range = Number.isFinite(targeting.range)
+      ? targeting.range
+      : Number.isFinite(targeting.radius)
+      ? targeting.radius
+      : attackRange;
+    reach = Math.max(reach, range + (mobileArts ? moveRange : 0));
+  }
+  return reach;
+}
+
+function ghostSupportsAllies(type) {
+  const definition = getUnitType(type);
+  return [...definition.arts, definition.rageArt].filter(Boolean).some((art) =>
+    art.kind !== "passive" && ALLY_SUPPORT_INTENTS.has(normalizeArtAi(art).intent));
+}
+
+function nearestDistance(units, tile) {
+  let best = Infinity;
+  for (const unit of units) best = Math.min(best, chebyshevDistance(tile, unit.position));
+  return best;
+}
+
+// Only offer placements the ghost can actually DO something from. Without this the CPU
+// summons at whichever legal tile happens to sit closest to the enemy, even when that is
+// still far out of the ghost's reach — burning the Summoner's activation to drop a body
+// that dissipates having done nothing. If no tile is worth it, we return none and the
+// Summoner spends his turn on something real instead.
+function summonCandidates(state, unit, art, summonType) {
+  const tiles = tilesFromKeys(getSummonPlacementTiles(state, unit, art));
+  if (!summonType) {
+    return tiles
+      .sort((a, b) => nearestEnemyDistance(state, unit.player, a) - nearestEnemyDistance(state, unit.player, b))
+      .slice(0, PLACEMENT_KEEP);
+  }
+
+  const reach = ghostReach(summonType);
+  const enemies = livingUnits(state).filter((other) => areEnemies(unit, other));
+  // A support ghost only earns its turn if there is someone in reach who actually NEEDS
+  // help. Without the "hurt" requirement this degenerates: a summoner's nearest allies are
+  // usually its own squadmates standing right beside it, so any ghost with any ally-facing
+  // ART would justify a summon from anywhere on the board, forever.
+  const hurtAllies = ghostSupportsAllies(summonType)
+    ? livingUnits(state, unit.player).filter((other) =>
+      other.id !== unit.id && other.hp < getUnitType(other.type).stats.maxHp)
+    : [];
+
+  const offensive = [];
+  const supportive = [];
+  for (const tile of tiles) {
+    if (nearestDistance(enemies, tile) <= reach) offensive.push(tile);
+    else if (hurtAllies.length && nearestDistance(hurtAllies, tile) <= reach) supportive.push(tile);
+  }
+  offensive.sort((a, b) => nearestDistance(enemies, a) - nearestDistance(enemies, b));
+  supportive.sort((a, b) => nearestDistance(hurtAllies, a) - nearestDistance(hurtAllies, b));
+  return [...offensive, ...supportive].slice(0, PLACEMENT_KEEP);
 }
 
 // Tile-placement candidates, filtered by the art's `placeNear` hint to the tiles

@@ -5,21 +5,69 @@ import { UNIT_TYPES } from "../src/core/unitCatalog.js";
 import {
   UNIT_TYPE_KEYS,
   DEFAULT_SQUAD,
+  DEFAULT_FORMATION_ORDER,
   STARTER_UNIT_TYPES,
   UNIT_CLASS_GROUPS,
+  applyFormationOrder,
   availableTypesForSlot,
   groupedUnitTypes,
   isUnitUnlocked,
+  normalizeFormationOrder,
   normalizeSquadLoadout
 } from "../src/ui/squadModel.js";
 // Importing through squadPicker.js also loads rosterPicker.js — this guards that
 // the picker modules don't touch the DOM at import time (Node has no `document`).
 import { availableTypesForSlot as availableViaPicker, normalizeSquad } from "../src/ui/squadPicker.js";
+import {
+  FORMATION_SLOT_LABELS,
+  formationPreviewSlots,
+  normalizeFormationPlayer
+} from "../src/ui/draftFormationPicker.js";
 
 test("default squad is four distinct draftable units", () => {
   assert.equal(DEFAULT_SQUAD.length, 4);
   assert.equal(new Set(DEFAULT_SQUAD).size, 4);
   for (const type of DEFAULT_SQUAD) assert.ok(UNIT_TYPE_KEYS.includes(type));
+});
+
+test("default formation keeps pick order separate from board placement", () => {
+  assert.deepEqual(DEFAULT_FORMATION_ORDER, [3, 1, 2, 0]);
+  assert.deepEqual(
+    applyFormationOrder(DEFAULT_SQUAD, DEFAULT_FORMATION_ORDER),
+    ["magician", "archer", "mystic", "swordsman"]
+  );
+});
+
+test("formation order falls back unless given a complete permutation", () => {
+  assert.deepEqual(normalizeFormationOrder([3, 1, 2, 0]), [3, 1, 2, 0]);
+  assert.deepEqual(normalizeFormationOrder([0, 0, 1, 2]), [0, 1, 2, 3]);
+  assert.deepEqual(normalizeFormationOrder(null, 4, [3, 1, 2, 0]), [3, 1, 2, 0]);
+});
+
+test("formation picker labels real board slots and mirrors player two", () => {
+  assert.deepEqual(FORMATION_SLOT_LABELS, ["1", "2", "3", "4"]);
+  assert.equal(normalizeFormationPlayer(2), 2);
+  assert.equal(normalizeFormationPlayer("2"), 2);
+  assert.equal(normalizeFormationPlayer(9), 1);
+
+  assert.deepEqual(
+    formationPreviewSlots(1).map((slot) => [slot.slot, slot.label, slot.position]),
+    [
+      [0, "4", { x: 1, y: 12 }],
+      [1, "2", { x: 0, y: 11 }],
+      [2, "3", { x: 0, y: 12 }],
+      [3, "1", { x: 1, y: 11 }]
+    ]
+  );
+  assert.deepEqual(
+    formationPreviewSlots(2).map((slot) => [slot.slot, slot.label, slot.position]),
+    [
+      [0, "4", { x: 11, y: 0 }],
+      [1, "2", { x: 12, y: 1 }],
+      [2, "3", { x: 12, y: 0 }],
+      [3, "1", { x: 11, y: 1 }]
+    ]
+  );
 });
 
 test("the Ghoul (summon) is never offered in the picker pool", () => {

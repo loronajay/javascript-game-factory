@@ -124,8 +124,8 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   // are allowed; draft/ranked will pass allowDuplicates:false later.
   function buildSquadPickers(host, p2Title) {
     host.replaceChildren();
-    const p1 = createSquadPicker({ title: "Player 1", initial: DEFAULT_SQUAD, accent: TEAM_COLOR[1], allowDuplicates: true });
-    const p2 = createSquadPicker({ title: p2Title, initial: DEFAULT_SQUAD, accent: TEAM_COLOR[2], allowDuplicates: true });
+    const p1 = createSquadPicker({ title: "Player 1", initial: DEFAULT_SQUAD, accent: TEAM_COLOR[1], allowDuplicates: true, player: 1 });
+    const p2 = createSquadPicker({ title: p2Title, initial: DEFAULT_SQUAD, accent: TEAM_COLOR[2], allowDuplicates: true, player: 2 });
     host.append(p1.el, p2.el);
     return { p1, p2 };
   }
@@ -145,6 +145,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
         initial: DEFAULT_SQUAD,
         accent: TEAM_COLOR[player],
         allowDuplicates: true,
+        player,
       }));
     }
     return hsPickers.get(player);

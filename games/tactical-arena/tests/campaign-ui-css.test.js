@@ -37,3 +37,13 @@ test("campaign locked nodes defer to the painted map instead of drawing token cl
   assert.match(lockedChildrenRule, /display\s*:\s*none/);
   assert.match(panelRule, /grid-template-rows\s*:\s*auto auto auto/);
 });
+
+test("formation editor buttons do not move on hover or drag", () => {
+  const modalHoverRule = ruleBody(".draft-formation-modal button:hover:not(:disabled)");
+  const slotRule = ruleBody(".draft-formation-slot");
+  const slotDraggingRule = ruleBody(".draft-formation-slot.is-dragging");
+
+  assert.match(modalHoverRule, /transform\s*:\s*none/);
+  assert.match(slotRule, /translate\(var\(--drag-x,\s*0px\),\s*var\(--drag-y,\s*0px\)\)\s*!important/);
+  assert.doesNotMatch(slotDraggingRule, /scale/);
+});

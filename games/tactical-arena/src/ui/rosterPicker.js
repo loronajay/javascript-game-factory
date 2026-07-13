@@ -51,7 +51,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
     head.innerHTML =
       `<div class="ref-head-title"><h2>${escapeHtml(title)}</h2>` +
       `<button class="ref-close" type="button" data-roster="close" aria-label="Close">✕</button></div>` +
-      `<p class="roster-sub">Pick a slot, click a unit to read its card, then press <b>Place</b> beside its name. Double-click a unit to place it instantly.</p>`;
+      `<p class="roster-sub">Pick a roster spot, click a unit to read its card, then press <b>Place</b> beside its name. Double-click a unit to place it instantly.</p>`;
     card.appendChild(head);
 
     // Squad tray (the four slots being filled)
@@ -88,10 +88,10 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
       tray.replaceChildren();
       for (const slot of SLOT_LAYOUT) {
         const def = UNIT_TYPES[squad[slot.index]];
-        const btn = el("button", `roster-slot row-${slot.row}${slot.index === activeSlot ? " is-active" : ""}`);
+        const btn = el("button", `roster-slot${slot.index === activeSlot ? " is-active" : ""}`);
         btn.type = "button";
         const tag = el("span", "roster-slot-tag");
-        tag.textContent = `${slot.index + 1} · ${slot.row === "front" ? "Front" : "Back"}`;
+        tag.textContent = `Pick ${slot.index + 1}`;
         const name = el("span", "roster-slot-name");
         name.textContent = def.name;
         btn.append(tag, createPortrait(squad[slot.index], { variant: "is-slot", eager: true, skin: skins[slot.index] }), name);
@@ -184,13 +184,11 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
     // disables itself when that unit can't go there (already in squad, draft rule).
     function paintAssign() {
       const available = new Set(availableTypesForSlot(squad, activeSlot, allowDuplicates));
-      const activeSlotDef = SLOT_LAYOUT.find((s) => s.index === activeSlot) ?? SLOT_LAYOUT[0];
-      const rowLabel = activeSlotDef.row === "front" ? "Front" : "Back";
       const canAssign = available.has(focusedType);
       assignBtn.disabled = !canAssign;
       assignBtn.textContent = canAssign
-        ? `▸ Place in Slot ${activeSlot + 1} · ${rowLabel}`
-        : isUnitUnlocked(focusedType) ? "Already in squad" : "🔒 Locked";
+        ? `Place in Pick ${activeSlot + 1}`
+        : isUnitUnlocked(focusedType) ? "Already in squad" : "Locked";
     }
 
     function paintAll() { paintTray(); paintGrid(); paintDetail(); }
@@ -228,7 +226,6 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
 
     function createSkinSummary(type) {
       const current = selectedSkinForType(type);
-      const slot = SLOT_LAYOUT.find((item) => item.index === activeSlot) ?? SLOT_LAYOUT[0];
       const summary = el("div", "skin-summary");
       summary.appendChild(createPortrait(type, { variant: "is-skin-summary", eager: true, skin: current }));
 
@@ -238,7 +235,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
       const name = el("div", "skin-summary-name");
       name.textContent = skinLabel(type, current);
       const hint = el("div", "skin-summary-hint");
-      hint.textContent = `${slot.row === "front" ? "Front" : "Back"} row cosmetic`;
+      hint.textContent = "Selected look";
       copy.append(title, name, hint);
 
       const btn = el("button", "skin-summary-btn");

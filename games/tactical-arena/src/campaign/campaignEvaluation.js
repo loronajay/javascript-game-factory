@@ -20,6 +20,7 @@ import {
   SPIRIT_WOODS_MISSION_ID,
   SHOWDOWN_MISSION_ID,
   NOT_MY_KING_MISSION_ID,
+  VOID_CASTLE_MISSION_ID,
   WANDERING_PARTY_SKIN_PACK,
   HASBEEN_MYSTIC_SKIN_PACK,
   HASBEEN_HEROES_FAT_TYPES,
@@ -154,6 +155,33 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
       paladinLightseekerDamageTakenCount,
       paladinStatusAttempted,
       draftedMelee,
+    };
+  } else if (missionId === VOID_CASTLE_MISSION_ID) {
+    // Three stars: win the two-part battle / never let a Nemesis reach RAGE in phase 1 /
+    // solve phase 2 cleanly, felling the real Summoner without cutting down a single decoy.
+    // The bonus is the starter four, the same "you brought who you started with" nod
+    // Has-Been Heroes uses.
+    const voidCastleNemesisEnteredRage = Boolean(meta.voidCastleNemesisEnteredRage);
+    const voidCastleDecoyKilled = Boolean(meta.voidCastleDecoyKilled);
+    const playerTypes = new Set(playerUnits.map((unit) => unit.type));
+    const broughtStarterSquad = STARTER_UNIT_TYPES.every((type) => playerTypes.has(type));
+    const realSummoner = enemyUnits.find((unit) => unit.trialRealSummoner) ??
+      enemyUnits.find((unit) => unit.id === state?.missionRules?.voidCastleTrial?.realSummonerId) ??
+      null;
+    objectives = [
+      complete,
+      { id: "noNemesisRage", label: "Never let a Nemesis reach RAGE", earned: victory && !voidCastleNemesisEnteredRage },
+      { id: "cleanSolve", label: "Fell the true Summoner without felling a copy", earned: victory && !voidCastleDecoyKilled },
+    ];
+    bonusObjectives = [
+      { id: "starterSquad", label: "Bonus: bring the original starter four", earned: victory && broughtStarterSquad },
+    ];
+    extra = {
+      voidCastleNemesisEnteredRage,
+      voidCastleDecoyKilled,
+      broughtStarterSquad,
+      realSummonerDefeated: Boolean(realSummoner && realSummoner.hp <= 0),
+      decoySummonersDefeated: enemyUnits.filter((unit) => unit.trialDecoySummoner && unit.hp <= 0).length,
     };
   } else if (missionId === MONK_MISSION_ID) {
     const monkBlindAttempted = Boolean(meta.monkBlindAttempted);

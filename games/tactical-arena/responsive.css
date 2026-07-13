@@ -184,7 +184,7 @@ body:has(.ref-modal:not([hidden])) .back-link {
   .squad-picker {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
-      "title edit"
+      "title actions"
       "chips chips";
     align-items: center;
     gap: .42rem;
@@ -223,8 +223,13 @@ body:has(.ref-modal:not([hidden])) .back-link {
     letter-spacing: 0;
   }
 
+  .squad-actions {
+    grid-area: actions;
+    grid-template-columns: repeat(2, auto);
+    justify-content: end;
+  }
+
   .squad-edit-btn {
-    grid-area: edit;
     width: auto;
     min-height: 38px;
     padding: .42rem .58rem;
@@ -695,18 +700,19 @@ body:has(.ref-modal:not([hidden])) .back-link {
     max-height: 94vh;
   }
 
-  /* Draft formation picker: shrink the four slots + chrome so both rows AND the
-     Lock Formation footer fit a short landscape phone (they were clipped off). */
+  /* Draft formation picker: shrink the board + chrome so the Lock Formation
+     footer fits a short landscape phone. */
   .draft-formation-card {
     max-height: 94vh;
   }
 
-  .draft-formation-grid {
-    gap: .4rem;
-    padding: .5rem;
+  .draft-formation-board {
+    min-height: 14rem;
+    margin: .5rem;
   }
 
   .draft-formation-slot {
+    width: 5.7rem;
     min-height: 5.4rem;
     padding: .4rem .3rem;
   }

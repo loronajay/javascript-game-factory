@@ -88,8 +88,8 @@ test("computeCampaignGeometry ignores connections to unknown nodes", () => {
 });
 
 test("the authored campaign graph is capped, uniquely celled, and fully connected", () => {
-  assert.ok(CAMPAIGN_MISSIONS.length <= MAX_CAMPAIGN_MISSIONS);
-  assert.equal(CAMPAIGN_MISSIONS.length, 20);
+  // The trail is fully authored up to the cap — no placeholder stops remain.
+  assert.equal(CAMPAIGN_MISSIONS.length, MAX_CAMPAIGN_MISSIONS);
 
   // No two missions share a grid cell (nodes never overlap on the map).
   const cellKeys = new Set(CAMPAIGN_MISSIONS.map((m) => `${m.cell.col},${m.cell.row}`));

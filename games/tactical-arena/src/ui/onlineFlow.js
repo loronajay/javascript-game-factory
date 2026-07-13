@@ -308,6 +308,7 @@ export function createOnlineFlow({ onStartMatch }) {
     if (blindPickField) blindPickField.hidden = draftMode;
     if (draftField) draftField.hidden = !draftMode;
     if (!draftMode) {
+      squadPicker.setPlayer(localLobbySeat() ?? 1);
       squadPicker.setLocked(localLocked);
       lockBtn.textContent = localLocked ? "Change Squad" : "Lock Squad";
       lockBtn.classList.toggle("primary", !localLocked);
@@ -535,6 +536,7 @@ export function createOnlineFlow({ onStartMatch }) {
       nicknames,
       order: localFormationOrder,
       accent: PLAYER_COLOR[seat] ?? PLAYER_COLOR[1],
+      player: seat,
     });
     formationPromptOpen = false;
     if (!result?.order) {

@@ -19,6 +19,7 @@ export const UNIT_CLASS_GROUPS = Object.freeze([
 export const UNIT_TYPE_KEYS = Object.keys(UNIT_TYPES).filter((key) => !UNIT_TYPES[key].summon);
 export const DEFAULT_SQUAD = ["swordsman", "archer", "mystic", "magician"];
 export const SQUAD_SIZE = DEFAULT_SQUAD.length;
+export const DEFAULT_FORMATION_ORDER = Object.freeze([3, 1, 2, 0]);
 
 // Campaign unlock gate. Player-facing squad pickers read the thin progression
 // record. CPU squads and
@@ -58,6 +59,22 @@ export function normalizeSquadLoadout(loadout, skins = null) {
     composition,
     skins: normalizeSkinLoadout(composition, skinInput)
   };
+}
+
+export function normalizeFormationOrder(order, length = SQUAD_SIZE, fallback = DEFAULT_FORMATION_ORDER) {
+  const identity = Array.from({ length }, (_, index) => index);
+  const fallbackOrder = Array.isArray(fallback) && fallback.length === length ? fallback : identity;
+  const candidate = Array.isArray(order) && order.length === length ? order : fallbackOrder;
+  const normalized = candidate.map((index) => Number(index));
+  if (normalized.some((index) => !Number.isInteger(index) || index < 0 || index >= length)) return identity;
+  if (new Set(normalized).size !== length) return identity;
+  return normalized;
+}
+
+export function applyFormationOrder(values, order = null, fallback = DEFAULT_FORMATION_ORDER) {
+  const list = Array.isArray(values) ? values : [];
+  const formationOrder = normalizeFormationOrder(order, list.length, fallback);
+  return formationOrder.map((index) => list[index]);
 }
 
 // Which roster types may fill `slotIndex` given the rest of the squad. With

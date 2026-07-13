@@ -408,6 +408,43 @@ export function resolveVictory(state) {
       return;
     }
   }
+  // Void Ridden Castle is a two-part battle. Phase 1 (Summoner + three Nemesis) does NOT
+  // end when the last enemy falls: the Summoner refuses the finish, splits into four, and
+  // the match continues as phase 2. We can't just decline to set a winner — an enemy team
+  // with no living bodies stalls advanceTurnIfExhausted — so phase 1 completes normally
+  // and flags `pendingSplit`. The UI layer (main.js) sees the flag, plays the split beat,
+  // and calls applyVoidCastleSplit to reopen the board. Nothing else in the engine has to
+  // know the match can come back from "complete".
+  const voidCastle = state.missionRules?.voidCastleTrial;
+  if (voidCastle) {
+    const playerAlive = livingUnits(state, 1).some(sustainsVictory);
+    if (!playerAlive) {
+      state.winner = 2;
+      state.phase = "complete";
+      state.activation = null;
+      return;
+    }
+    if (voidCastle.phase === 1) {
+      if (livingUnits(state, 2).some(sustainsVictory)) return;
+      voidCastle.pendingSplit = true;
+      state.winner = 1;
+      state.phase = "complete";
+      state.activation = null;
+      return;
+    }
+    // Phase 2: only the real Summoner sustains the fight. Felling him collapses every
+    // decoy with him — the same rule the Monk's temple trial uses.
+    const realSummoner = state.units.find((unit) => unit.id === voidCastle.realSummonerId);
+    if (realSummoner && realSummoner.hp <= 0) {
+      for (const unit of state.units) {
+        if (unit.trialDecoySummoner && unit.hp > 0) unit.hp = 0;
+      }
+      state.winner = 1;
+      state.phase = "complete";
+      state.activation = null;
+    }
+    return;
+  }
   const monkTrial = state.missionRules?.monkTrial;
   if (monkTrial?.realMonkId) {
     const playerAlive = livingUnits(state, 1).some(sustainsVictory);

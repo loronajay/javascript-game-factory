@@ -10,7 +10,11 @@ import { UNIT_TYPES } from "../core/unitCatalog.js";
 import {
   UNIT_TYPE_KEYS,
   DEFAULT_SQUAD,
+  DEFAULT_FORMATION_ORDER,
+  SQUAD_SIZE,
   SLOT_LAYOUT,
+  applyFormationOrder,
+  normalizeFormationOrder,
   normalizeSquad,
   normalizeSquadLoadout,
   availableTypesForSlot,
@@ -18,14 +22,17 @@ import {
   groupedUnitTypes
 } from "./squadModel.js";
 import { openRosterPicker } from "./rosterPicker.js";
+import { openDraftFormationPicker } from "./draftFormationPicker.js";
 import { createPortrait } from "./portraits.js";
 import { getNicknamePref } from "./nicknameModel.js";
 
-export { UNIT_TYPE_KEYS, DEFAULT_SQUAD, normalizeSquad, normalizeSquadLoadout, availableTypesForSlot, UNIT_CLASS_GROUPS, groupedUnitTypes };
+export { UNIT_TYPE_KEYS, DEFAULT_SQUAD, DEFAULT_FORMATION_ORDER, normalizeSquad, normalizeSquadLoadout, availableTypesForSlot, UNIT_CLASS_GROUPS, groupedUnitTypes };
 
-export function createSquadPicker({ title = "Squad", initial = null, accent = null, allowDuplicates = true } = {}) {
+export function createSquadPicker({ title = "Squad", initial = null, accent = null, allowDuplicates = true, player = 1 } = {}) {
   let loadout = normalizeSquadLoadout(initial);
+  let formationOrder = normalizeInitialFormation(initial);
   let locked = false;
+  let formationPlayer = player;
 
   const el = document.createElement("div");
   el.className = "squad-picker";
@@ -44,7 +51,16 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
   editBtn.type = "button";
   editBtn.className = "squad-edit-btn";
   editBtn.textContent = "Edit Squad";
-  el.appendChild(editBtn);
+
+  const formationBtn = document.createElement("button");
+  formationBtn.type = "button";
+  formationBtn.className = "squad-edit-btn squad-formation-btn";
+  formationBtn.textContent = "Formation";
+
+  const actions = document.createElement("div");
+  actions.className = "squad-actions";
+  actions.append(editBtn, formationBtn);
+  el.appendChild(actions);
 
   // Open the roster pop-up on the slot the player tapped (or slot 0 from Edit).
   async function edit(startSlot = 0) {
@@ -53,17 +69,36 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
     if (result) { loadout = normalizeSquadLoadout(result); paintChips(); }
   }
 
+  async function editFormation() {
+    if (locked) return;
+    const result = await openDraftFormationPicker({
+      title: `${title} Formation`,
+      composition: loadout.composition,
+      skins: loadout.skins,
+      nicknames: loadout.composition.map((type) => getNicknamePref(type)),
+      order: formationOrder,
+      accent,
+      player: formationPlayer
+    });
+    if (result?.order) {
+      formationOrder = normalizeFormationOrder(result.order, loadout.composition.length, formationOrder);
+      paintChips();
+    }
+  }
+
   function paintChips() {
     el.classList.toggle("is-locked", locked);
     editBtn.disabled = locked;
+    formationBtn.disabled = locked;
     editBtn.textContent = locked ? "Squad Locked" : "Edit Squad";
+    formationBtn.textContent = locked ? "Locked" : "Formation";
     chips.replaceChildren();
     for (const slot of SLOT_LAYOUT) {
       const type = loadout.composition[slot.index];
       const def = UNIT_TYPES[type];
       const chip = document.createElement("button");
       chip.type = "button";
-      chip.className = `squad-chip row-${slot.row}`;
+      chip.className = "squad-chip";
       chip.disabled = locked;
       chip.append(createPortrait(type, { variant: "is-chip", eager: true, skin: loadout.skins[slot.index] }));
       const name = document.createElement("span");
@@ -76,6 +111,7 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
   }
 
   editBtn.addEventListener("click", () => edit(0));
+  formationBtn.addEventListener("click", editFormation);
   paintChips();
 
   return {
@@ -85,13 +121,24 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
       paintChips();
     },
     isLocked: () => locked,
-    getSquad: () => [...loadout.composition],
-    getSkins: () => [...loadout.skins],
-    getNicknames: () => loadout.composition.map((type) => getNicknamePref(type)),
-    getLoadout: () => ({ composition: [...loadout.composition], skins: [...loadout.skins] }),
+    getSquad: () => applyFormationOrder(loadout.composition, formationOrder),
+    getSkins: () => applyFormationOrder(loadout.skins, formationOrder),
+    getNicknames: () => applyFormationOrder(loadout.composition.map((type) => getNicknamePref(type)), formationOrder),
+    getLoadout: () => ({ composition: [...loadout.composition], skins: [...loadout.skins], formation: [...formationOrder] }),
     setLoadout(nextLoadout) {
       loadout = normalizeSquadLoadout(nextLoadout);
+      formationOrder = normalizeInitialFormation(nextLoadout);
       paintChips();
+    },
+    setPlayer(nextPlayer) {
+      formationPlayer = nextPlayer;
     }
   };
+}
+
+function normalizeInitialFormation(loadout) {
+  const explicit = Array.isArray(loadout)
+    ? null
+    : (loadout?.formation ?? loadout?.formationOrder ?? loadout?.order);
+  return normalizeFormationOrder(explicit, SQUAD_SIZE, DEFAULT_FORMATION_ORDER);
 }

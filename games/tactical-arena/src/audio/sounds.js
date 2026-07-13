@@ -5,7 +5,7 @@
 
 import { HybridAudioEngine } from "./hybridAudioEngine.js";
 import { SOUND_CATALOG, SAMPLE_SOURCES } from "./soundCatalog.js";
-import { HASBEEN_HEROES_MISSION_ID, NOT_MY_KING_MISSION_ID } from "../campaign/campaign.js";
+import { HASBEEN_HEROES_MISSION_ID, NOT_MY_KING_MISSION_ID, VOID_CASTLE_MISSION_ID } from "../campaign/campaign.js";
 
 export const MUSIC_FILES = Object.freeze({
   menu: "menu.mp3",
@@ -13,13 +13,19 @@ export const MUSIC_FILES = Object.freeze({
   vsBattle: "vs-battle.mp3",
   fattyBattle: "fatty-battle.mp3",
   kingBattle: "king-battle.mp3",
+  summonerBattle: "summoner-battle.mp3",
 });
 const MUSIC_BASE = new URL("../../sounds/", import.meta.url);
 
+const CAMPAIGN_MUSIC_BY_MISSION = Object.freeze({
+  [NOT_MY_KING_MISSION_ID]: "kingBattle",
+  [HASBEEN_HEROES_MISSION_ID]: "fattyBattle",
+  [VOID_CASTLE_MISSION_ID]: "summonerBattle",
+});
+
 export function musicKeyForMatchMode(mode, campaignMissionId = null) {
   if (mode !== "campaign") return "vsBattle";
-  if (campaignMissionId === NOT_MY_KING_MISSION_ID) return "kingBattle";
-  return campaignMissionId === HASBEEN_HEROES_MISSION_ID ? "fattyBattle" : "missionBattle";
+  return CAMPAIGN_MUSIC_BY_MISSION[campaignMissionId] ?? "missionBattle";
 }
 
 export class AudioManager {

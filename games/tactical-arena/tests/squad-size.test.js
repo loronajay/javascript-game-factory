@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 
 import { createBattleState } from "../src/core/state.js";
 import { buildRoster } from "../src/match/matchBuilder.js";
-import { DEFAULT_SQUAD, normalizeSquad } from "../src/ui/squadPicker.js";
+import { DEFAULT_FORMATION_ORDER, DEFAULT_SQUAD, normalizeSquad } from "../src/ui/squadPicker.js";
+import { applyFormationOrder } from "../src/ui/squadModel.js";
 
 test("standard squads contain four units per team", () => {
   assert.equal(DEFAULT_SQUAD.length, 4);
@@ -35,6 +36,24 @@ test("custom rosters spawn four units for each player in opposite corner blocks"
       ["p2-1-swordsman", 2, "swordsman", 9, 1],
       ["p2-2-archer", 2, "archer", 9, 0],
       ["p2-3-mystic", 2, "mystic", 8, 1]
+    ]
+  );
+});
+
+test("player-facing default formation deploys the starter squad in board order", () => {
+  const arranged = applyFormationOrder(DEFAULT_SQUAD, DEFAULT_FORMATION_ORDER);
+
+  assert.deepEqual(
+    buildRoster({ 1: arranged, 2: arranged }, 13).map((unit) => [unit.id, unit.player, unit.type, unit.x, unit.y]),
+    [
+      ["p1-0-magician", 1, "magician", 1, 12],
+      ["p1-1-archer", 1, "archer", 0, 11],
+      ["p1-2-mystic", 1, "mystic", 0, 12],
+      ["p1-3-swordsman", 1, "swordsman", 1, 11],
+      ["p2-0-magician", 2, "magician", 11, 0],
+      ["p2-1-archer", 2, "archer", 12, 1],
+      ["p2-2-mystic", 2, "mystic", 12, 0],
+      ["p2-3-swordsman", 2, "swordsman", 11, 1]
     ]
   );
 });

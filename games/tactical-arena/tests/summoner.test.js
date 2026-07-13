@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { applyCommand } from "../src/core/reducer.js";
+import { chooseActivation } from "../src/ai/cpuController.js";
+import { generatePlans } from "../src/ai/plans.js";
 import { beginActivation, defend, finishActivation, moveUnit, useArt } from "../src/core/commands.js";
 import { createBattleState, findUnit } from "../src/core/state.js";
 import { getArt, getSoulShuffleChoices, isRaging, UNIT_TYPES } from "../src/core/unitCatalog.js";
@@ -203,4 +205,85 @@ test("Energy Retrieval redirects a ghost's self MP restore to Summoner", () => {
   const event = recharge.events.find((entry) => entry.type === "ART_RESOLVED");
   assert.equal(event.recipientId, "summoner");
   assert.equal(event.mpRestored, 5);
+});
+
+// --- CPU behaviour around summoning ---------------------------------------------------
+// A Summon hands the open activation to the ghost it calls (resolveSummonGhost), and the
+// reducer rejects a beginActivation for ANY other unit until that ghost has taken its turn.
+// These guard the two things that has to get right.
+
+test("the CPU resumes a summoned ghost's open activation instead of stalling on it", () => {
+  // A foe within reach, so the summon is worth making in the first place.
+  let state = createBattleState({
+    seed: 7,
+    size: 9,
+    units: [
+      { id: "summoner", player: 1, type: "summoner", x: 3, y: 3, hp: 23 },
+      { id: "foe", player: 2, type: "swordsman", x: 5, y: 5 }
+    ]
+  });
+
+  // Play the CPU's Summoner until a ghost is on the board.
+  let ghost = null;
+  for (let guard = 0; guard < 8 && !ghost; guard += 1) {
+    const commands = chooseActivation(state, { cpuPlayer: 1, difficulty: "hard" });
+    assert.ok(commands.length, "the CPU produced no commands");
+    for (const command of commands) {
+      const result = applyCommand(state, command);
+      assert.ok(result.accepted, `CPU command rejected: ${command.type} -> ${result.errorCode}`);
+      state = result.nextState;
+    }
+    ghost = state.units.find((unit) => unit.ghost && unit.hp > 0) ?? null;
+  }
+  assert.ok(ghost, "the CPU never summoned a ghost");
+
+  // The ghost now holds the activation, carrying the summonerId that dissipates it later.
+  assert.equal(state.activation?.unitId, ghost.id);
+  assert.equal(state.activation?.summonerId, "summoner");
+
+  // The CPU must now play THAT ghost — and must not try to re-open its activation, which
+  // would rebuild state.activation and drop summonerId.
+  const resume = chooseActivation(state, { cpuPlayer: 1, difficulty: "hard" });
+  assert.ok(resume.length, "the CPU stalled on the ghost's open activation");
+  assert.equal(resume.some((command) => command.type === "BEGIN_ACTIVATION"), false);
+  // ATTACK names its actor `actorId`; everything else uses `unitId`.
+  assert.ok(resume.every((command) => (command.unitId ?? command.actorId) === ghost.id));
+
+  for (const command of resume) {
+    const result = applyCommand(state, command);
+    assert.ok(result.accepted, `ghost turn rejected: ${command.type} -> ${result.errorCode}`);
+    state = result.nextState;
+  }
+  // The ghost took its one turn and dissipated, taking the Summoner's activation with it.
+  assert.equal(findUnit(state, ghost.id).hp, 0);
+  assert.equal(findUnit(state, "summoner").spent, true);
+});
+
+test("the CPU won't spend a turn summoning a ghost that cannot reach anything", () => {
+  // The foe is parked in the far corner. A ghost lands within 3 of the Summoner and gets
+  // exactly one turn, so nothing it could call can act — summoning here is a wasted turn.
+  const stranded = createBattleState({
+    seed: 3,
+    size: 13,
+    units: [
+      { id: "summoner", player: 1, type: "summoner", x: 0, y: 0, hp: 23 },
+      { id: "foe", player: 2, type: "swordsman", x: 12, y: 12 }
+    ]
+  });
+  const summoner = findUnit(stranded, "summoner");
+  const plans = generatePlans(stranded, summoner).filter((plan) => plan.primary.artId === "summon");
+  assert.equal(plans.length, 0, "the CPU offered a summon with nothing in the ghost's reach");
+
+  // Bring the foe inside reach and the summon becomes worth making again.
+  const engaged = createBattleState({
+    seed: 3,
+    size: 13,
+    units: [
+      { id: "summoner", player: 1, type: "summoner", x: 5, y: 5, hp: 23 },
+      { id: "foe", player: 2, type: "swordsman", x: 7, y: 7 }
+    ]
+  });
+  const engagedPlans = generatePlans(engaged, findUnit(engaged, "summoner"))
+    .filter((plan) => plan.primary.artId === "summon");
+  assert.ok(engagedPlans.length > 0, "the CPU refused a summon that would have reached the enemy");
 });
