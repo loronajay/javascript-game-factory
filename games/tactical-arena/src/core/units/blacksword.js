@@ -92,6 +92,19 @@ export const BLACKSWORD = Object.freeze({
       implemented: true,
       ai: Object.freeze({ intent: "buffAllies", tags: Object.freeze(["setup", "offense"]) })
     }),
+    Object.freeze({
+      id: "void-gravity",
+      name: "Void Gravity",
+      kind: "active",
+      mpCost: 0,
+      hpCost: 2,
+      selfCast: true,
+      targeting: Object.freeze({ shape: "self", radius: 3 }),
+      requiresNearbyEnemy: true,
+      description: "Spend 2 HP to shift every enemy within 3 tiles by 1 random orthogonal tile. Blocked and displacement-immune units stay put.",
+      implemented: true,
+      ai: Object.freeze({ intent: "displaceAoe", tags: Object.freeze(["control", "setup"]) })
+    }),
     // Dark Tick — global true damage to every blinded enemy (Virus's Poison Tick, keyed
     // off the blind status instead of poison).
     Object.freeze({

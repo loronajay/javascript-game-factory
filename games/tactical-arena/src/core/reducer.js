@@ -11,7 +11,7 @@ import { applyDarkTreadLifesteal, applyGrowth, applyMagicDamageReaction, applyRo
 import { commanderPending, validateOpenActivation, validateOwnedLivingUnit } from "./commandValidation.js";
 import { applyPostCommandReactions, consumeOneShotRage, syncOneShotRageArm } from "./reactions.js";
 import { accept, ERR, reject } from "./reducerResult.js";
-import { nextActivePlayer, resolveVictory, spendAndAdvance } from "./turnEngine.js";
+import { nextActivePlayer, resolveVictory, spendAndAdvance, syncFinalBattleDarkTileStatuses } from "./turnEngine.js";
 import { isTempoBattle, normalizeTempoStateAfterCommand, prepareTempoStateForCommand } from "./tempoBattle.js";
 
 function stationaryStrengthEffect(unit) {
@@ -31,6 +31,7 @@ export function applyCommand(state, command) {
       resolveNemesisAutoPulse,
       resolveVolcanicPyroclasmTick
     });
+    syncFinalBattleDarkTileStatuses(result.nextState, result.events);
     closeDeadActiveUnit(result.nextState);
     normalizeTempoStateAfterCommand(result.nextState);
   }

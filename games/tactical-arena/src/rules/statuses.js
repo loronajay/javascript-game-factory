@@ -56,7 +56,12 @@ export function applyStatus(unit, status) {
     return { applied: false, reason: "RESISTED", statuses: [...unit.statuses] };
   }
   const { ignoreResistance: _ignoreResistance, ...storedStatus } = status;
-  const existing = unit.statuses.filter((entry) => entry.type !== status.type);
+  // A source-tagged environmental status may coexist with the ordinary timed version.
+  // This lets the finale remove its tile-bound Blind without erasing a one-turn Blind
+  // that Blacksword inflicted normally.
+  const source = status.source ?? null;
+  const existing = unit.statuses.filter((entry) =>
+    entry.type !== status.type || (entry.source ?? null) !== source);
   return { applied: true, statuses: [...existing, { ...storedStatus }] };
 }
 

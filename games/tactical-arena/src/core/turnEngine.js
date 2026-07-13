@@ -1,15 +1,83 @@
 import { getUnitType, getWeatherAffinityRestore, getWeatherPassiveRestore, sustainsVictory, takesTurns } from "./unitCatalog.js";
-import { areAllies, areEnemies, findUnit, livingUnits, teamOfUnit, unitAt } from "./state.js";
+import { areAllies, areEnemies, findUnit, getTileAffinity, livingUnits, teamOfUnit, unitAt } from "./state.js";
 import { chebyshevDistance } from "../rules/movement.js";
 import { getFireVulnerability, isFireDamageImmune } from "../rules/combat.js";
 import { getGlobalTrueTick } from "../rules/stances.js";
-import { isInvulnerable, isPetrified, isStunned, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
+import { applyStatus, isInvulnerable, isPetrified, isStunned, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
 import { drawValue } from "./rng.js";
 import { finishTempoActivation, isTempoBattle } from "./tempoBattle.js";
 import { restoreHp, restoreMp } from "./combatEffects.js";
 
 const MAX_STUN_FAST_FORWARD_ROLLOVERS = 32;
 const FIRE_DAMAGE = 1;
+
+function activeFinalBattleLastStand(state) {
+  const rules = state?.missionRules?.finalBattle;
+  if (!rules || rules.stage !== rules.lastStage || state.phase !== "playing") return null;
+  const boss = findUnit(state, rules.bossId);
+  return boss?.hp > 0 ? { rules, boss } : null;
+}
+
+// These are position-bound copies, not timed casts. They are tagged so leaving a dark
+// tile removes only the void copy while any ordinary timed Blind/Silence survives.
+export function syncFinalBattleDarkTileStatuses(state, events = null) {
+  const active = activeFinalBattleLastStand(state);
+  const rules = state?.missionRules?.finalBattle;
+  const source = rules?.darkTileStatusSource ?? "final-battle-dark-tile";
+  const statusTypes = rules?.darkTileStatuses ?? ["blind", "silence"];
+  for (const unit of state?.units ?? []) {
+    const prior = unit.statuses ?? [];
+    const had = new Set(prior.filter((status) => status.source === source).map((status) => status.type));
+    unit.statuses = prior.filter((status) => status.source !== source);
+    const onHazard = Boolean(
+      active && unit.player === 1 && unit.hp > 0 && getTileAffinity(state, unit.position) === "dark"
+    );
+    if (onHazard) {
+      for (const type of statusTypes) {
+        // Preserve true immunities. A one-shot resistance is not consumed by the floor.
+        const result = applyStatus(unit, {
+          type,
+          duration: "permanent",
+          source,
+          ignoreResistance: true,
+        });
+        if (result.applied) unit.statuses = result.statuses;
+      }
+    }
+    const now = new Set(unit.statuses.filter((status) => status.source === source).map((status) => status.type));
+    const applied = [...now].filter((type) => !had.has(type));
+    const removed = [...had].filter((type) => !now.has(type));
+    if (events && (applied.length || removed.length)) {
+      events.push({
+        type: "VOID_TILE_AFFLICTION",
+        unitId: unit.id,
+        position: { ...unit.position },
+        applied,
+        removed,
+      });
+    }
+  }
+}
+
+function applyFinalBattleVoidPressure(state, previousPlayer, events) {
+  const active = activeFinalBattleLastStand(state);
+  if (!active || previousPlayer !== 2 || state.currentPlayer !== 1) return;
+  const amount = Math.max(0, Number(active.rules.voidPressureDamage) || 0);
+  if (amount <= 0) return;
+  for (const unit of livingUnits(state, 1)) {
+    if (isInvulnerable(unit)) continue;
+    const damage = Math.min(unit.hp, amount);
+    unit.hp = Math.max(0, unit.hp - amount);
+    if (damage > 0) {
+      events.push({
+        type: "VOID_PRESSURE",
+        unitId: unit.id,
+        position: { ...unit.position },
+        damage,
+      });
+    }
+  }
+}
 
 export function spendAndAdvance(state, unit) {
   if (isTempoBattle(state)) {
@@ -232,12 +300,14 @@ function advanceTurnIfExhausted(state) {
       releaseStunLoopGuard(state);
       break;
     }
+    const previousPlayer = state.currentPlayer;
     state.currentPlayer = nextActivePlayer(state, state.currentPlayer);
     state.turnNumber += 1;
     rollovers += 1;
     for (const member of livingUnits(state, state.currentPlayer)) if (takesTurns(member)) member.spent = false;
     appendPendingRolloverEvents(state, applySquadTurnChargeStatuses(state, state.currentPlayer));
     const fireEvents = [];
+    applyFinalBattleVoidPressure(state, previousPlayer, fireEvents);
     applyFireTick(state, fireEvents);
     applyBlackDeathTick(state, fireEvents);
     applyTimeStealTick(state, fireEvents);

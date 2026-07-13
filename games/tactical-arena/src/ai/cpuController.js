@@ -301,6 +301,14 @@ function planEffectValue(state, unit, plan) {
     }
     return { control, heal: 0 };
   }
+  if (ai.intent === "displaceAoe") {
+    const radius = art.targeting?.radius ?? 1;
+    const affected = livingUnits(state).filter((enemy) =>
+      areEnemies(unit, enemy) && chebyshevDistance(unit.position, enemy.position) <= radius);
+    // Displacement is useful setup on its own; in the finale every orthogonal shift also
+    // has a chance to flip the victim onto the punishing dark half of the checkerboard.
+    return { control: affected.length * 4, heal: 0 };
+  }
   return { control: 0, heal: 0 };
 }
 

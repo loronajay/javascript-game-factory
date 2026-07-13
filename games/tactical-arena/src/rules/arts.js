@@ -1,5 +1,5 @@
 import { areAllies, areEnemies, getTileObject, isWallAt, unitAt } from "../core/state.js";
-import { canMoveAndUseArts, getArt, getArtMpCost, getCommandRangeBonus, getEffectiveStats, getRageArtRangeBonus, getRageEffectValue, getUnitAuraRadius, getWeatherMovementArtRangeBonus, hasAbilityUsesRemaining, hasLivingStudiedTarget, isRaging, takesTurns } from "../core/unitCatalog.js";
+import { canMoveAndUseArts, getArt, getArtForUnit, getArtMpCost, getCommandRangeBonus, getEffectiveStats, getRageArtRangeBonus, getRageEffectValue, getUnitAuraRadius, getWeatherMovementArtRangeBonus, hasAbilityUsesRemaining, hasLivingStudiedTarget, isRaging, takesTurns } from "../core/unitCatalog.js";
 import { getTileAffinity } from "../core/state.js";
 import { ORTHOGONAL_DIRECTIONS, chebyshevDistance, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
 import { isStunned } from "./statuses.js";
@@ -513,6 +513,12 @@ export function hasConditionEnemy(state, actor, condition) {
       : getTileAffinity(state, unit.position) === condition.affinity));
 }
 
+export function hasNearbyEnemy(state, actor, radius) {
+  return (state.units ?? []).some((unit) =>
+    unit.hp > 0 && areEnemies(actor, unit) &&
+    chebyshevDistance(actor.position, unit.position) <= radius);
+}
+
 // True when it is still `actor`'s FIRST command of the turn (Riot Cop's Lockdown must be
 // used before he moves or any squadmate acts). The activation is fresh (no move/primary),
 // and no allied turn-taking unit has spent its activation yet this turn.
@@ -523,7 +529,7 @@ export function isFirstTurnCommand(state, actor) {
 }
 
 export function canUseArt(state, actor, artId) {
-  const art = getArt(actor.type, artId);
+  const art = getArtForUnit(actor, artId);
   const permanentWeather = state?.missionRules?.permanentWeather?.weather ?? null;
   const activation = state.activation;
   const usedBonusGroups = activation?.bonusActionGroups ?? [];
@@ -564,6 +570,7 @@ export function canUseArt(state, actor, artId) {
     // HP-cost ARTS (Blacksword) can never suicide him; an all-HP ultimate opts in via
     // selfKill instead. And a condition-gated burst is only usable with a matching enemy.
     !(art.hpCost && !art.selfKill && actor.hp <= art.hpCost) &&
+    (!art.requiresNearbyEnemy || hasNearbyEnemy(state, actor, art.targeting?.radius ?? 1)) &&
     (!art.requiresConditionEnemy || hasConditionEnemy(state, actor, art.condition)) &&
     !(art.effect?.type === "studyTarget" && hasLivingStudiedTarget(actor, state)) &&
     !(art.effect?.type === "relayPower" && (actor.hp <= (art.effect.hp ?? 0) || actor.mp < (art.effect.mp ?? 0)))

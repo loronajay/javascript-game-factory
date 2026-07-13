@@ -68,6 +68,7 @@ const BLADES_FAKE_NAMES = Object.freeze({
   // blacksword
   "dark-rush": "Night Charge",
   "dark-ether": "Black Vapor",
+  "void-gravity": "Abyssal Pull",
   "dark-tick": "Gloom Pulse",
   "banish-dark": "Oblivion",
   // fat-knight

@@ -25,12 +25,16 @@ import {
   FINAL_BATTLE_BOSS_HP,
   FINAL_BATTLE_BOSS_ID,
   FINAL_BATTLE_BOSS_STRENGTH,
+  FINAL_BATTLE_DARK_TILE_STATUS_SOURCE,
+  FINAL_BATTLE_DARK_TILE_STATUSES,
   FINAL_BATTLE_DUEL_BOARD_SIZE,
   FINAL_BATTLE_DUEL_HP,
   FINAL_BATTLE_VOID_REACH,
+  FINAL_BATTLE_VOID_PRESSURE_DAMAGE,
 } from "../../campaignConstants.js";
 import { createUnit } from "../../../core/state.js";
 import { getInitialMp, getUnitType } from "../../../core/unitCatalog.js";
+import { syncFinalBattleDarkTileStatuses } from "../../../core/turnEngine.js";
 
 export const FINAL_BATTLE_DUEL_COUNT = 4;
 export const FINAL_BATTLE_STAGE_CONFRONTATION = 0;
@@ -87,6 +91,13 @@ export function makeFinalBattleBoss(unit) {
       strength: FINAL_BATTLE_BOSS_STRENGTH - base.strength,
     },
     bonusPassives: [FINAL_BATTLE_VOID_REACH],
+    artOverrides: {
+      ...(unit.artOverrides ?? {}),
+      "void-gravity": {
+        hpCost: 5,
+        description: "Spend 5 HP to shift every enemy within 3 tiles by 1 random orthogonal tile. Blocked and displacement-immune units stay put.",
+      },
+    },
   };
 }
 
@@ -115,6 +126,10 @@ export function prepareFinalBattle(match, units) {
         duelTypes,
         bench: [],
         pendingStage: false,
+        bossId: FINAL_BATTLE_BOSS_ID,
+        voidPressureDamage: FINAL_BATTLE_VOID_PRESSURE_DAMAGE,
+        darkTileStatusSource: FINAL_BATTLE_DARK_TILE_STATUS_SOURCE,
+        darkTileStatuses: [...FINAL_BATTLE_DARK_TILE_STATUSES],
       },
     },
   };
@@ -235,7 +250,7 @@ function buildLastStand(state, bench) {
         defending: false,
       }
     : null;
-  return {
+  const lastStand = {
     ...clearBoard(state, FINAL_BATTLE_BOARD_SIZE),
     units: boss ? [...party, boss] : party,
     missionRules: {
@@ -248,6 +263,8 @@ function buildLastStand(state, bench) {
       },
     },
   };
+  syncFinalBattleDarkTileStatuses(lastStand);
+  return lastStand;
 }
 
 // The one entry point the dialogue layer drives: tear the board down and build the next

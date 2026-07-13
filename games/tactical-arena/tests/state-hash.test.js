@@ -60,6 +60,7 @@ for (const [label, mutate] of [
   ["unit mageChargeCount", (s) => (s.units[0].mageChargeCount = 2)],
   ["unit statuses", (s) => s.units[0].statuses.push({ type: "poison", duration: "permanent" })],
   ["unit statModifiers", (s) => (s.units[0].statModifiers = { str: 3 })],
+  ["unit artOverrides", (s) => (s.units[0].artOverrides = { "void-gravity": { hpCost: 5 } })],
   ["currentPlayer", (s) => (s.currentPlayer = 2)],
   ["turnNumber", (s) => (s.turnNumber += 1)],
   ["phase", (s) => (s.phase = "complete")],

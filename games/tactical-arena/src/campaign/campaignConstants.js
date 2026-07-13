@@ -73,6 +73,9 @@ export const FINAL_BATTLE_BOARD_SIZE = 11;
 export const FINAL_BATTLE_BOSS_HP = 100;
 export const FINAL_BATTLE_BOSS_STRENGTH = 13;
 export const FINAL_BATTLE_BOSS_ID = "p2-boss-blacksword";
+export const FINAL_BATTLE_VOID_PRESSURE_DAMAGE = 1;
+export const FINAL_BATTLE_DARK_TILE_STATUS_SOURCE = "final-battle-dark-tile";
+export const FINAL_BATTLE_DARK_TILE_STATUSES = Object.freeze(["blind", "silence"]);
 // Void Reach — the reason a clustered party dies here. Every landed basic attack of his
 // also deals 3 true damage to each of the target's allies within 1 tile, +1 more against
 // any of them standing on a dark tile. Granted per-instance via `unit.bonusPassives`

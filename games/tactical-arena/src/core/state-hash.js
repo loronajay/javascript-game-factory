@@ -80,6 +80,8 @@ function canonicalUnits(units) {
         // damage, so they are part of the authoritative hash (stored sorted, so it is stable).
         `[${(unit.duelMarks ?? []).join("+")}],` +
         `${stableStringify(unit.statModifiers ?? {})},` +
+        // Mission-only ART tuning changes costs/legality and therefore future commands.
+        `${stableStringify(unit.artOverrides ?? {})},` +
         // Source-linked modifiers (Father Time's Age) change future effective stats, so
         // they are part of the authoritative hash.
         `${stableStringify(unit.linkedStatMods ?? [])},` +

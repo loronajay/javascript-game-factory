@@ -8,6 +8,7 @@ import { getEffectiveStats, getUnitType, isRaging } from "../src/core/unitCatalo
 import { getCritChance } from "../src/rules/combat.js";
 import { canUseArt } from "../src/rules/arts.js";
 import { applyStatus } from "../src/rules/statuses.js";
+import { generatePlans, toCommands } from "../src/ai/plans.js";
 
 const NORMAL_HIT = { attackRoll: 0.5, critRoll: 0.99 };
 const MISS = { attackRoll: 0.01, critRoll: 0.99 };
@@ -146,6 +147,56 @@ test("Dark Ether: spends 2 HP and forces the next basic attack to crit (a miss s
   m = run(m, attack(1, "bs", "foe", MISS)).nextState;
   assert.equal(findUnit(m, "foe").hp, 25, "a miss deals nothing");
   assert.equal(findUnit(m, "bs").guaranteedCritCharged, false, "the charge is still spent on a miss");
+});
+
+test("Void Gravity is a canon Blacksword ART that spends 2 HP and randomly shifts every nearby enemy one legal orthogonal tile", () => {
+  const state = scenario({
+    blacksword: { x: 4, y: 4, hp: 20 },
+    units: [
+      { id: "near-a", player: 2, type: "swordsman", x: 4, y: 6 },
+      { id: "near-b", player: 2, type: "archer", x: 6, y: 4 },
+      { id: "far", player: 2, type: "mystic", x: 8, y: 8 },
+      { id: "ally", player: 1, type: "swordsman", x: 3, y: 4 },
+    ],
+  });
+  const before = Object.fromEntries(state.units.map((unit) => [unit.id, { ...unit.position }]));
+  let s = run(state, beginActivation(1, "bs")).nextState;
+  const result = run(s, useArt(1, "bs", "void-gravity"));
+  s = result.nextState;
+
+  for (const id of ["near-a", "near-b"]) {
+    const after = findUnit(s, id).position;
+    const prior = before[id];
+    assert.equal(Math.abs(after.x - prior.x) + Math.abs(after.y - prior.y), 1, `${id} moves orthogonally by one`);
+  }
+  assert.deepEqual(findUnit(s, "far").position, before.far, "an enemy outside range 3 is untouched");
+  assert.deepEqual(findUnit(s, "ally").position, before.ally, "allies are untouched");
+  assert.equal(findUnit(s, "bs").hp, 18, "Void Gravity costs 2 HP in standard battles");
+  const event = result.events.find((entry) => entry.type === "ART_RESOLVED" && entry.artId === "void-gravity");
+  assert.deepEqual(new Set(event.targetIds), new Set(["near-a", "near-b"]));
+  assert.equal(new Set(s.units.filter((unit) => unit.hp > 0).map((unit) => `${unit.position.x},${unit.position.y}`)).size, s.units.length,
+    "random shifts never overlap living units");
+});
+
+test("Void Gravity needs a nearby enemy, cannot be paid at 2 HP, and is planned by the CPU", () => {
+  const noTarget = run(scenario({ blacksword: { hp: 20 } }), beginActivation(1, "bs")).nextState;
+  assert.equal(canUseArt(noTarget, findUnit(noTarget, "bs"), "void-gravity"), false);
+
+  const low = run(scenario({
+    blacksword: { hp: 2 },
+    units: [{ id: "near", player: 2, type: "swordsman", x: 2, y: 1 }],
+  }), beginActivation(1, "bs")).nextState;
+  assert.equal(canUseArt(low, findUnit(low, "bs"), "void-gravity"), false);
+
+  const cpuState = scenario({
+    blacksword: { x: 4, y: 4, hp: 20 },
+    units: [{ id: "near", player: 2, type: "swordsman", x: 5, y: 4 }],
+  });
+  const plans = generatePlans(cpuState, findUnit(cpuState, "bs"));
+  const gravity = plans.find((plan) => plan.primary.artId === "void-gravity");
+  assert.ok(gravity, "the CPU considers Void Gravity when an enemy is close");
+  let replay = cpuState;
+  for (const command of toCommands(1, gravity)) replay = run(replay, command).nextState;
 });
 
 test("Dark Tick: 3 true damage to every blinded enemy, costs 1 HP, needs a blinded enemy", () => {

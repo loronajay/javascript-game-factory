@@ -19,6 +19,7 @@ import {
   campaignPostMatchCutsceneScript,
   finalBattleDefeatScript,
   finalBattleDuelScript,
+  finalBattleLastStandScript,
 } from "../src/campaign/campaign.js";
 import {
   FINAL_BATTLE_DUEL_COUNT,
@@ -29,9 +30,10 @@ import {
 import { createMatchState } from "../src/match/matchBuilder.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { resolveVictory } from "../src/core/turnEngine.js";
-import { getEffectiveStats, getUnitType } from "../src/core/unitCatalog.js";
+import { getAvailableArts, getEffectiveStats, getUnitType } from "../src/core/unitCatalog.js";
 import { getAttackSplashDamage } from "../src/rules/combat.js";
 import { musicKeyForMatchMode } from "../src/audio/sounds.js";
+import { beginActivation, defend, finishActivation, moveUnit, useArt } from "../src/core/commands.js";
 
 const SQUAD = ["swordsman", "archer", "mystic", "magician"];
 
@@ -112,6 +114,12 @@ test("the boss is a granted stat block, not a re-tuned unit — the drafted Blac
   const definition = getUnitType("blacksword");
   assert.equal(definition.stats.maxHp, 30);
   assert.equal(definition.stats.strength, 10);
+  assert.equal(definition.arts.find((art) => art.id === "void-gravity").hpCost, 2);
+  assert.equal(
+    getAvailableArts(boss).find((art) => art.id === "void-gravity").hpCost,
+    5,
+    "only the mission boss pays the original 5 HP cost",
+  );
 });
 
 test("Void Reach is granted to the one body, not to the unit type", () => {
@@ -125,6 +133,23 @@ test("Void Reach is granted to the one body, not to the unit type", () => {
 
   // A plain Blacksword — the one the player unlocks — carries no splash at all.
   assert.equal(getAttackSplashDamage({ type: "blacksword" }), null);
+});
+
+test("the Final Battle boss actually pays the mission-only 5 HP Void Gravity cost", () => {
+  const last = playToLastStand(finalBattleState());
+  const boss = last.units.find((unit) => unit.id === FINAL_BATTLE_BOSS_ID);
+  const target = last.units.find((unit) => unit.player === 1);
+  boss.hp = 20;
+  boss.spent = false;
+  target.position = { x: 9, y: 0 };
+  last.currentPlayer = 2;
+
+  let result = applyCommand(last, beginActivation(2, boss.id));
+  result = applyCommand(result.nextState, useArt(2, boss.id, "void-gravity"));
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.nextState.units.find((unit) => unit.id === boss.id).hp, 15);
+  assert.equal(result.events.find((event) => event.artId === "void-gravity").hpCost, 5);
 });
 
 // --- Stages 1-4: the mirror duels -----------------------------------------------------
@@ -215,6 +240,72 @@ test("felling Blacksword on the last stand actually ends the match", () => {
   assert.equal(last.winner, 1);
   // No further stage: this is the end of the road, not another blackout.
   assert.equal(getFinalBattleRules(last).pendingStage, false);
+});
+
+test("Void Pressure deals 1 true damage to every living player unit once after Blacksword's turn", () => {
+  const last = playToLastStand(finalBattleState());
+  const boss = last.units.find((unit) => unit.id === FINAL_BATTLE_BOSS_ID);
+  const hpBefore = Object.fromEntries(last.units.filter((unit) => unit.player === 1).map((unit) => [unit.id, unit.hp]));
+  last.currentPlayer = 2;
+  boss.spent = false;
+
+  let result = applyCommand(last, beginActivation(2, boss.id));
+  result = applyCommand(result.nextState, defend(2, boss.id));
+  result = applyCommand(result.nextState, finishActivation(2, boss.id));
+
+  assert.equal(result.accepted, true);
+  assert.equal(result.nextState.currentPlayer, 1);
+  const pressure = result.events.filter((event) => event.type === "VOID_PRESSURE");
+  assert.equal(pressure.length, 4);
+  for (const unit of result.nextState.units.filter((entry) => entry.player === 1)) {
+    assert.equal(unit.hp, hpBefore[unit.id] - 1);
+  }
+});
+
+test("Void Pressure and dark-tile statuses never leak into a mirror duel", () => {
+  const duel = advanceFinalBattleStage(finalBattleState());
+  const mirror = duel.units.find((unit) => unit.player === 2);
+  const champion = duel.units.find((unit) => unit.player === 1);
+  champion.position = { x: 1, y: 0 }; // dark
+  const hpBefore = champion.hp;
+  duel.currentPlayer = 2;
+  mirror.spent = false;
+
+  let result = applyCommand(duel, beginActivation(2, mirror.id));
+  result = applyCommand(result.nextState, defend(2, mirror.id));
+  result = applyCommand(result.nextState, finishActivation(2, mirror.id));
+
+  const after = result.nextState.units.find((unit) => unit.id === champion.id);
+  assert.equal(after.hp, hpBefore);
+  assert.ok(!result.events.some((event) => event.type === "VOID_PRESSURE"));
+  assert.ok(!after.statuses.some((status) => status.source === "final-battle-dark-tile"));
+});
+
+test("stage-5 dark tiles add source-tagged Blind and Silence immediately, then remove only those copies on exit", () => {
+  const last = playToLastStand(finalBattleState());
+  const unit = last.units.find((entry) => entry.player === 1 && entry.position.x === 0 && entry.position.y === 10);
+  unit.statuses = [{ type: "blind", duration: 2 }];
+  unit.position = { x: 1, y: 10 }; // dark
+
+  let result = applyCommand(last, beginActivation(1, unit.id));
+  let stained = result.nextState.units.find((entry) => entry.id === unit.id);
+  assert.ok(stained.statuses.some((status) => status.type === "blind" && status.duration === 2), "timed Blind remains distinct");
+  assert.ok(stained.statuses.some((status) => status.type === "blind" && status.source === "final-battle-dark-tile"));
+  assert.ok(stained.statuses.some((status) => status.type === "silence" && status.source === "final-battle-dark-tile"));
+
+  result = applyCommand(result.nextState, moveUnit(1, unit.id, 0, 10)); // light
+  stained = result.nextState.units.find((entry) => entry.id === unit.id);
+  assert.ok(stained.statuses.some((status) => status.type === "blind" && status.duration === 2), "ordinary Blind survives leaving");
+  assert.ok(!stained.statuses.some((status) => status.source === "final-battle-dark-tile"), "tile-sourced effects leave immediately");
+});
+
+test("innate status immunities still resist the stage-5 dark tiles", () => {
+  const last = playToLastStand(finalBattleState(["paladin", "archer", "mystic", "magician"]));
+  const paladin = last.units.find((unit) => unit.type === "paladin");
+  paladin.position = { x: 1, y: 10 }; // dark
+  const result = applyCommand(last, beginActivation(1, paladin.id));
+  const after = result.nextState.units.find((unit) => unit.id === paladin.id);
+  assert.ok(!after.statuses.some((status) => status.source === "final-battle-dark-tile"));
 });
 
 // --- Void Reach ------------------------------------------------------------------------
@@ -309,6 +400,16 @@ test("the duel beat is spoken by the duelist and its copy", () => {
 
   assert.ok(script.some((line) => line.speakerId === champion.id));
   assert.ok(script.some((line) => line.speakerId === mirror.id));
+});
+
+test("the last-stand dialogue explains Void Pressure, Void Gravity, and the dark-tile afflictions before play", () => {
+  const last = playToLastStand(finalBattleState());
+  const text = finalBattleLastStandScript(last).map((line) => line.text).join(" ");
+  assert.match(text, /pressure|every time|each time/i);
+  assert.match(text, /gravity|shift|move/i);
+  assert.match(text, /dark|black/i);
+  assert.match(text, /blind/i);
+  assert.match(text, /silenc/i);
 });
 
 test("the killing blow gets its beat, and the ending sends the void beings home", () => {

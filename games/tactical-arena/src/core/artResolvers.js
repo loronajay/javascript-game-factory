@@ -1,4 +1,4 @@
-import { canMoveAndUseArts, getAbilityUsesRemaining, getArt, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getInitialMp, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getSoulShuffleChoices, getUnitType, getWeatherCritCreatesFire, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
+import { canMoveAndUseArts, getAbilityUsesRemaining, getArt, getArtForUnit, getArtMpCost, getCommandHealBonus, getEffectiveStats, getGuaranteedStatuses, getInitialMp, getMagicDamageReward, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getSoulShuffleChoices, getUnitType, getWeatherCritCreatesFire, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, areAllies, cloneState, findUnit, getTileAffinity, isWallAt, livingTeamUnits, livingUnits, teamOfUnit, unitAt } from "./state.js";
 import { artIsBodyBlocked, artUsesPhysicalStrike, canUseArt, getArtTargetRange, getConeCells, getConeOriginForTarget, getDarkPulseRays, getFirePlacementTiles, getFlightTiles, getLegalFleeTiles, getLineTargets, getProtectLandingTiles, getPyroclasmTargets, getRevivePlacementTiles, getReviveTargets, getRushContactDamage, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastTargets, getTilePulseTargets, getVolleyShotCells, getVolleyShotOriginForTarget, getWallPlacementTiles, validateRushPath } from "../rules/arts.js";
 import { addDuelMark, duelistTracksMisses, finalizeMagicDamage, getAttackRecoil, getDisplacementRetaliation, getProximityBonus, ignoresCriticalDamage, isFireBasedDamage, isFireDamageImmune, isHealingDisabled, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resistsDisplacement, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike, resolvePhysicalStrike, rollToHit } from "../rules/combat.js";
@@ -25,6 +25,7 @@ import {
   resolveSelfDestruct,
 } from "./artResolvers/commandResolvers.js";
 import { spendAbilityUse } from "./artResolvers/abilityUses.js";
+import { resolveVoidGravity } from "./artResolvers/blackswordResolvers.js";
 
 export function resolveVolcanicPyroclasmTick(state, unit, freeCast, events, { trigger, force = false, resetCounter = false } = {}) {
   if (resetCounter) unit.volcanicCounter = 0;
@@ -92,6 +93,7 @@ const ART_RESOLVERS = new Map([
   // true-damage bursts (Dark Tick = blinded enemies, Banish = enemies on dark tiles).
   ["dark-rush", resolveDarkRush],
   ["dark-ether", resolveDarkEther],
+  ["void-gravity", resolveVoidGravity],
   ["dark-tick", resolvePoisonBurst],
   ["banish-dark", resolvePoisonBurst],
   ["fart", resolveFart],
@@ -209,7 +211,7 @@ export function useArt(state, command) {
   const result = validateOpenActivation(state, command.player, command.unitId);
   if (result.error) return reject(result.error);
   if (!canUseArt(state, result.unit, command.artId)) return reject(ERR.ART_NOT_AVAILABLE);
-  const art = getArt(result.unit.type, command.artId);
+  const art = getArtForUnit(result.unit, command.artId);
   const resolver = ART_RESOLVERS.get(art.id) ?? resolveTargetedArt;
   return resolver(state, command, art);
 }

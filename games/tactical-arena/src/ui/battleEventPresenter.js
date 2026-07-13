@@ -13,6 +13,7 @@ const VFX_MANAGED_ARTS = new Set([
   "realm-traversal", "quake", "thunderous-charge", "blizzard", "spring-shower", "heatwave",
   "landscaper", "thunderstorm", "great-flood", "patient-blade", "broken-oath", "challenge",
   "enrich", "source-shift", "petrify", "strike", "hold", "pursue", "higher-ground",
+  "void-gravity",
 ]);
 
 export function unitCenter(metrics, unit) {
@@ -87,10 +88,13 @@ export function createBattleEventPresenter({ audio, effects, getState, onIdle = 
     const ghostDissipations = events.filter((event) => event.type === "GHOST_DISSIPATED");
     const petrifyPulses = events.filter((event) => event.type === "PETRIFY_PULSE");
     const weatherRegens = events.filter((event) => event.type === "WEATHER_REGEN");
+    const voidPressure = events.filter((event) => event.type === "VOID_PRESSURE");
+    const voidAfflictions = events.filter((event) => event.type === "VOID_TILE_AFFLICTION");
     if (!burns.length && !steals.length && !mourns.length && !rallies.length && !restores.length &&
         !darkPulses.length && !erupts.length && !retaliations.length && !snacks.length && !bites.length &&
         !oreRageFills.length && !duelHeals.length && !recoils.length && !critMpRestores.length &&
-        !ghostDissipations.length && !petrifyPulses.length && !weatherRegens.length) return;
+        !ghostDissipations.length && !petrifyPulses.length && !weatherRegens.length &&
+        !voidPressure.length && !voidAfflictions.length) return;
 
     const metrics = createBoardMetrics(state.size);
     let killed = false;
@@ -162,6 +166,21 @@ export function createBattleEventPresenter({ audio, effects, getState, onIdle = 
       if (!unit) continue;
       if (regen.hpRestored > 0) effects.floatText(unitCenter(metrics, unit), `+${regen.hpRestored}`, "#8cf0a4");
       else if (regen.mpRestored > 0) effects.floatText(unitCenter(metrics, unit), `+${regen.mpRestored} MP`, "#8cc8ff");
+    }
+
+    if (voidPressure.length) audio.play("timeSteal");
+    for (const pressure of voidPressure) {
+      const center = unitCenter(metrics, { position: pressure.position });
+      effects.impact(center, false, "true");
+      effects.floatText(center, `-${pressure.damage}`, "#b996ff");
+      const unit = findUnit(state, pressure.unitId);
+      if (!unit || unit.hp <= 0) { effects.deathBurst(center, teamColor(unit?.player ?? 1)); killed = true; }
+    }
+    for (const affliction of voidAfflictions) {
+      if (!(affliction.applied ?? []).length) continue;
+      const unit = findUnit(state, affliction.unitId);
+      if (!unit) continue;
+      effects.floatText(unitCenter(metrics, unit), affliction.applied.map((type) => type.toUpperCase()).join(" + "), "#b996ff");
     }
 
     for (const pulse of petrifyPulses) {

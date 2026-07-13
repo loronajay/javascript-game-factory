@@ -25,7 +25,7 @@
 
 import { attack, attackTile, beginActivation, defend, finishActivation, moveUnit, useArt } from "../core/commands.js";
 import { areAllies, areEnemies, findUnit, getTileAffinity, livingUnits } from "../core/state.js";
-import { canMoveAndUseArts, getArt, getArtMpCost, getBasicAttackResourceCost, getEffectiveStats, getRageEffectValue, getSoulShuffleChoices, getUnitType, hasAbilityUsesRemaining, isCommandOnly, isRaging, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
+import { canMoveAndUseArts, getArtForUnit, getArtMpCost, getAvailableArts, getBasicAttackResourceCost, getEffectiveStats, getRageEffectValue, getSoulShuffleChoices, getUnitType, hasAbilityUsesRemaining, isCommandOnly, isRaging, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
 import { getProximityBonus, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import {
@@ -51,6 +51,7 @@ import {
   getTilePulseTargets,
   getWallPlacementTiles,
   hasConditionEnemy,
+  hasNearbyEnemy,
   validateRushPath
 } from "../rules/arts.js";
 import { isStunned } from "../rules/statuses.js";
@@ -67,7 +68,7 @@ export function generatePlans(state, unit) {
   // rejection and stall the CPU turn.
   if (isCommandOnly(unit)) {
     const plans = [];
-    for (const art of getUnitType(unit.type).arts) {
+    for (const art of getAvailableArts(unit)) {
       if (!artUsableForPlanning(state, unit, art)) continue;
       generateArtPlans(state, unit, art, normalizeArtAi(art), plans);
     }
@@ -114,7 +115,7 @@ export function generatePlans(state, unit) {
   }
 
   // 3. ART plans (cast from the origin — an ART cannot follow a move).
-  for (const art of [...getUnitType(unit.type).arts, getUnitType(unit.type).rageArt].filter(Boolean)) {
+  for (const art of getAvailableArts(unit)) {
     if (art.bonusActionGroup) continue;            // bonus actions are attached as a prefix below
     if (!artUsableForPlanning(state, unit, art)) continue;
     generateArtPlans(state, unit, art, normalizeArtAi(art), plans);
@@ -377,6 +378,13 @@ function generateArtPlans(state, unit, art, ai, plans) {
       }
       break;
     }
+    case "displaceAoe": {
+      const radius = art.targeting?.radius ?? 1;
+      if (enemiesWithin(state, unit, radius).length > 0) {
+        plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id } }));
+      }
+      break;
+    }
     case "poisonBurst": {
       // Poison Tick / Explosion / Dark Tick / Banish: detonate enemies matching the art's
       // condition (poison / blind status, or a tile affinity). Offer only when one exists —
@@ -423,7 +431,7 @@ export function projectPlan(state, plan) {
 
   // Bonus tile pulse fires first, from the origin (before any move).
   if (plan.bonus) {
-    const art = getArt(actor.type, plan.bonus.artId);
+    const art = getArtForUnit(actor, plan.bonus.artId);
     const amount = Math.max(0, Number(art.effect.amount) || 0);
     for (const target of getTilePulseTargets(state, actor, art)) {
       const entry = byId.get(target.id);
@@ -449,7 +457,7 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
     return;
   }
   // primary.kind === "art"
-  const art = getArt(actor.type, primary.artId);
+  const art = getArtForUnit(actor, primary.artId);
   const intent = normalizeArtAi(art).intent;
   switch (intent) {
     case "strike": {
@@ -612,6 +620,9 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
     }
     case "statusAoe":
       break; // Smog changes no HP now; the blind value is a controller score term.
+    case "displaceAoe":
+      if (art.hpCost) actor.hp = Math.max(0, actor.hp - art.hpCost);
+      break; // Random positions are scored as control value, not projected as certainty.
     case "poisonBurst": {
       // Poison Tick / Explosion / Dark Tick / Banish: TRUE damage (no DEF/Defend) to every
       // enemy matching the art's condition, plus a splash to enemies near one. selfKill
@@ -687,9 +698,9 @@ export function planMpCost(state, plan) {
   let cost = 0;
   // getArtMpCost honors a raging Juggernaut's freeArts (0-cost ARTS), so the CPU doesn't
   // over-count MP it won't actually spend.
-  if (plan.bonus) cost += getArtMpCost(unit, getArt(unit.type, plan.bonus.artId), state);
+  if (plan.bonus) cost += getArtMpCost(unit, getArtForUnit(unit, plan.bonus.artId), state);
   if (plan.primary.kind === "attackTile") cost += getBasicAttackResourceCost(unit, plan.primary.targetPosition);
-  if (plan.primary.kind === "art") cost += getArtMpCost(unit, getArt(unit.type, plan.primary.artId), state);
+  if (plan.primary.kind === "art") cost += getArtMpCost(unit, getArtForUnit(unit, plan.primary.artId), state);
   return cost;
 }
 
@@ -796,7 +807,7 @@ function advanceTile(state, unit, moveTiles) {
 function bestBonusAction(state, unit) {
   let best = null;
   let bestCount = 0;
-  for (const art of [...getUnitType(unit.type).arts, getUnitType(unit.type).rageArt].filter(Boolean)) {
+  for (const art of getAvailableArts(unit)) {
     if (!art.bonusActionGroup || normalizeArtAi(art).intent !== "tilePulse") continue;
     if (!artUsableForPlanning(state, unit, art)) continue;
     const count = getTilePulseTargets(state, unit, art).length;
@@ -956,7 +967,7 @@ function placementCandidates(state, unit, art, ai) {
 
 function artPrimaryKeepsActivationOpen(unit, primary) {
   if (primary?.kind !== "art") return false;
-  const art = getArt(unit.type, primary.artId);
+  const art = getArtForUnit(unit, primary.artId);
   return Boolean(!art?.bonusActionGroup && canMoveAndUseArts(unit));
 }
 
@@ -992,6 +1003,7 @@ function artUsableForPlanning(state, unit, art) {
     (!art.rageLocked || isRaging(unit)) &&
     !(art.weather && unit.lastWeather === art.weather) &&
     !(art.hpCost && !art.selfKill && unit.hp <= art.hpCost) &&
+    (!art.requiresNearbyEnemy || hasNearbyEnemy(state, unit, art.targeting?.radius ?? 1)) &&
     (!art.requiresConditionEnemy || hasConditionEnemy(state, unit, art.condition)) &&
     !(art.effect?.type === "studyTarget" && unit.studiedTargetId && state.units.some((target) => target.id === unit.studiedTargetId && target.hp > 0)) &&
     !(art.effect?.type === "relayPower" && (unit.hp <= (art.effect.hp ?? 0) || unit.mp < (art.effect.mp ?? 0)))

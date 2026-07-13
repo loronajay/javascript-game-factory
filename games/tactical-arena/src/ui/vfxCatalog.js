@@ -76,6 +76,14 @@ const ABILITY_VFX = Object.freeze({
     particleCount: 16,
     colors: Object.freeze({ core: "#b7e878", trail: "#6b8f35", impact: "#e4ff9a" })
   }),
+  "void-gravity": Object.freeze({
+    type: "magicBurst",
+    soundKey: "nuke",
+    radius: 3,
+    ringCount: 3,
+    particleCount: 24,
+    colors: Object.freeze({ core: "#d8c4ff", trail: "#68459b", impact: "#9b72dc" })
+  }),
   zap: Object.freeze({
     type: "projectileFan",
     soundKey: "spark",

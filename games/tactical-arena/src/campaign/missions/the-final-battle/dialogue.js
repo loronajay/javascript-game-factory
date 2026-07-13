@@ -151,6 +151,9 @@ export function finalBattleLastStandScript(state) {
     partyLine(state, "swordsman", "We're all here."),
     partyLine(state, "mystic", "All of us. Whole. Whatever he took, we took it back."),
     blackswordLine("Then there's more of you to lose."),
+    blackswordLine("Feel that pressure? The void takes a little from every one of you each time I finish my turn."),
+    blackswordLine("And gravity here answers to me. Come close, and I can shift every body around me with a thought."),
+    partyLine(state, "mystic", "The black stones are carrying it. Stand on one and the void will blind you and silence your arts — move back to the white and it lets go."),
   ]);
 }
 

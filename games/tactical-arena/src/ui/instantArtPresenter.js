@@ -484,6 +484,13 @@ export async function presentInstantArt({
     const center = unitCenter(metrics, actorBefore);
     effects.impact(center, false, "magic");
     await effects.floatText(center, "CRIT READY", "#c8a2ff");
+  } else if (resolved?.artId === "void-gravity" && actorBefore) {
+    await effects.playAbilityVfx("void-gravity", { actor: actorBefore, targets: targetsBefore });
+    effects.shake(8);
+    await Promise.all(Object.entries(resolved.pushed ?? {}).map(([id, shift]) => {
+      const target = findUnit(state, id);
+      return target ? effects.animateMovement(id, shift.from, shift.to) : Promise.resolve();
+    }));
   } else if (resolved?.artId === "quake" && actorBefore) {
     // A self-centred ground slam: earthen magic ripples out and shakes everyone caught.
     const metrics = createBoardMetrics(state.size);

@@ -240,7 +240,12 @@ export function cloneState(state) {
       // Riot Cop finite ability uses — deep-copy the keyed maps so a shallow spread
       // never shares them across clones.
       ...(unit.abilityUses ? { abilityUses: { ...unit.abilityUses } } : {}),
-      ...(unit.abilityRecharge ? { abilityRecharge: { ...unit.abilityRecharge } } : {})
+      ...(unit.abilityRecharge ? { abilityRecharge: { ...unit.abilityRecharge } } : {}),
+      ...(unit.artOverrides ? {
+        artOverrides: Object.fromEntries(
+          Object.entries(unit.artOverrides).map(([artId, override]) => [artId, { ...override }])
+        )
+      } : {})
     })),
     activation: state.activation ? {
       ...state.activation,

@@ -157,6 +157,14 @@ export function getArt(type, artId) {
     (definition.rageArt?.id === artId ? definition.rageArt : null);
 }
 
+// Mission bodies may tune one of their canonical ARTS without changing the unit type
+// players draft in normal battles. Overrides are data-only patches keyed by ART id.
+export function getArtForUnit(unit, artId) {
+  const art = unit ? getArt(unit.type, artId) : null;
+  const override = unit?.artOverrides?.[artId];
+  return art && override ? { ...art, ...override } : art;
+}
+
 export function getSoulShuffleChoices(unit, rngState) {
   const passive = getUnitType(unit.type).passive?.effect;
   const count = Math.max(1, Number(passive?.choices) || 5);
@@ -992,7 +1000,7 @@ export function getAvailableArts(unit) {
   const arts = isRaging(unit)
     ? [...definition.arts.filter((art) => !art.replacedByRageArt), definition.rageArt].filter(Boolean)
     : [...definition.arts];
-  return arts;
+  return arts.map((art) => getArtForUnit(unit, art.id));
 }
 
 // --- CPU AI metadata --------------------------------------------------------
@@ -1032,7 +1040,7 @@ export const AI_INTENTS = Object.freeze([
   // Virus's contagion casts:
   //   statusAoe    — Smog: a self-centred blind cloud (no damage, no roll).
   //   poisonBurst  — Poison Tick / Explosion: true damage to every poisoned enemy.
-  "statusAoe", "poisonBurst",
+  "statusAoe", "poisonBurst", "displaceAoe",
   // Clod's Thunderous Charge: a RANGE-picked tile that detonates a radius blast (damage +
   // a mass stun) — a targeted-tile AoE, distinct from the self-centred selfBlast.
   "targetedBlast"
