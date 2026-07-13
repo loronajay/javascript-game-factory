@@ -3,15 +3,6 @@
 // renderer-independent means the roster modal and a future draft/blind-pick
 // controller can both drive the same rules without importing each other's UI.
 import { UNIT_TYPES } from "../core/unitCatalog.js";
-import {
-  DEFAULT_DEPLOYMENT_POSITIONS,
-  DEPLOYMENT_TILES,
-  DEPLOYMENT_ZONE_SIZE,
-  deploymentSlotDescriptor,
-  deploymentTileLabel,
-  deploymentTileRank,
-  normalizeDeploymentPositions
-} from "../core/deployment.js";
 import { STARTER_UNIT_TYPES, isProgressUnitUnlocked } from "../progression/unlocks.js";
 import { normalizeSkinLoadout } from "./skinModel.js";
 
@@ -39,21 +30,13 @@ export function isUnitUnlocked(type, storage = globalThis.localStorage) {
   return isProgressUnitUnlocked(type, storage);
 }
 
-export {
-  DEFAULT_DEPLOYMENT_POSITIONS,
-  DEPLOYMENT_TILES,
-  DEPLOYMENT_ZONE_SIZE,
-  deploymentSlotDescriptor,
-  deploymentTileLabel,
-  deploymentTileRank,
-  normalizeDeploymentPositions
-};
-
-// Legacy name kept for callers that render the four slots. The row labels now come
-// from the actual deployment tiles instead of an assumed 2x2 front/back block.
-export const SLOT_LAYOUT = Object.freeze(
-  DEFAULT_DEPLOYMENT_POSITIONS.map((position, index) => deploymentSlotDescriptor(index, position))
-);
+// The four corner-spawn cells, labelled front/back to mirror the staging block.
+export const SLOT_LAYOUT = [
+  { index: 0, row: "front" },
+  { index: 1, row: "front" },
+  { index: 2, row: "back" },
+  { index: 3, row: "back" }
+];
 
 // Force any input into a valid SQUAD_SIZE squad of known unit types.
 export function normalizeSquad(squad) {
@@ -71,13 +54,9 @@ export function normalizeSquadLoadout(loadout, skins = null) {
     : (loadout?.composition ?? loadout?.squad ?? loadout?.units);
   const composition = normalizeSquad(compositionInput);
   const skinInput = skins ?? (Array.isArray(loadout) ? null : loadout?.skins);
-  const positionInput = Array.isArray(loadout)
-    ? null
-    : (loadout?.positions ?? loadout?.formation ?? loadout?.deployment);
   return {
     composition,
-    skins: normalizeSkinLoadout(composition, skinInput),
-    positions: normalizeDeploymentPositions(positionInput, composition.length)
+    skins: normalizeSkinLoadout(composition, skinInput)
   };
 }
 

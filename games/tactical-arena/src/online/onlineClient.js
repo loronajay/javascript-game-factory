@@ -18,7 +18,7 @@
 // room (lobby) message contract (all `value`s are JSON strings):
 //   owner -> all : config   { rulesetVersion, size, format, teamColors, teamNames }
 //   each  -> all : ready     { ready }                          lobby squad lock-in flag
-//   each  -> all : setup     { seat, composition, skins, nicknames, positions }  blind squad pick / completed draft squad
+//   each  -> all : setup     { seat, composition, skins, nicknames }  blind squad pick / completed draft squad
 //   each  -> all : draft_pick { pickIndex, seat, type, skin, nickname }   draft phase pick
 //   active-> all : command   { command }                        an ACCEPTED core command
 //   owner -> all : hash      { revision, hash }                  desync check
@@ -154,14 +154,7 @@ function parseSetupMessage(value) {
   const nicknames = Array.isArray(p.nicknames)
     ? p.nicknames.slice(0, 4).map((name) => (typeof name === "string" ? name : null))
     : null;
-  const positions = Array.isArray(p.positions)
-    ? p.positions.slice(0, 4).map((position) => (
-      position && typeof position === "object"
-        ? { x: Number(position.x), y: Number(position.y) }
-        : null
-    ))
-    : null;
-  return { seat: Math.floor(seat), composition, skins, nicknames, positions };
+  return { seat: Math.floor(seat), composition, skins, nicknames };
 }
 
 function parseDraftPickMessage(value) {
@@ -243,7 +236,7 @@ export function createOnlineClient() {
     onPlayerLeft: null, // ({ clientId, ownerId, playerCount })
     onRemoteConfig: null, // ({ rulesetVersion?, size?, format?, teamColors?, teamNames? })
     onRemoteReady: null, // ({ clientId, ready })
-    onRemoteSetup: null, // ({ seat, composition?, skins?, nicknames?, positions? })
+    onRemoteSetup: null, // ({ seat, composition?, skins?, nicknames? })
     onRemoteDraftPick: null, // ({ pickIndex, seat, type, skin? })
     onRemoteCommand: null, // ({ command })
     onRemoteHash: null, // ({ revision, hash })
@@ -458,8 +451,8 @@ export function createOnlineClient() {
   function sendConfig(config) {
     _lobbyMsg("config", JSON.stringify(config || {}));
   }
-  function sendSetup({ seat, composition = null, skins = null, nicknames = null, positions = null } = {}) {
-    _lobbyMsg("setup", JSON.stringify({ seat, composition, skins, nicknames, positions }));
+  function sendSetup({ seat, composition = null, skins = null, nicknames = null } = {}) {
+    _lobbyMsg("setup", JSON.stringify({ seat, composition, skins, nicknames }));
   }
   function sendDraftPick({ pickIndex, seat, type, skin = null, nickname = null } = {}) {
     _lobbyMsg("draft_pick", JSON.stringify({ pickIndex, seat, type, skin, nickname }));

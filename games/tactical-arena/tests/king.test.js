@@ -272,13 +272,3 @@ test("the King always spawns on the far corner cell", () => {
   const keys = new Set(units.map((u) => `${u.x},${u.y}`));
   assert.equal(keys.size, units.length);
 });
-
-test("the King keeps the home corner even when a custom formation omits it", () => {
-  const squads = { 1: ["swordsman", "king", "archer", "mystic"] };
-  const formations = { 1: [{ x: 3, y: 3 }, { x: 2, y: 2 }, { x: 1, y: 2 }, { x: 2, y: 1 }] };
-  const units = buildRoster(squads, 13, undefined, null, null, formations);
-  const king = units.find((u) => u.type === "king");
-  assert.deepEqual({ x: king.x, y: king.y }, { x: 0, y: 12 });
-  const keys = new Set(units.map((u) => `${u.x},${u.y}`));
-  assert.equal(keys.size, units.length);
-});

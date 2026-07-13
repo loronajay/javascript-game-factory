@@ -39,31 +39,6 @@ test("custom rosters spawn four units for each player in opposite corner blocks"
   );
 });
 
-test("custom roster formations can use the expanded deployment zone", () => {
-  const squads = {
-    1: ["swordsman", "archer", "mystic", "magician"],
-    2: ["mystic", "swordsman", "archer", "magician"]
-  };
-  const formations = {
-    1: [{ x: 3, y: 3 }, { x: 2, y: 1 }, { x: 0, y: 0 }, { x: 1, y: 2 }],
-    2: [{ x: 3, y: 3 }, { x: 2, y: 1 }, { x: 0, y: 0 }, { x: 1, y: 2 }]
-  };
-
-  assert.deepEqual(
-    buildRoster(squads, 10, undefined, null, null, formations).map((unit) => [unit.id, unit.x, unit.y]),
-    [
-      ["p1-0-swordsman", 3, 6],
-      ["p1-1-archer", 2, 8],
-      ["p1-2-mystic", 0, 9],
-      ["p1-3-magician", 1, 7],
-      ["p2-0-mystic", 6, 3],
-      ["p2-1-swordsman", 7, 1],
-      ["p2-2-archer", 9, 0],
-      ["p2-3-magician", 8, 2]
-    ]
-  );
-});
-
 test("the default battle state is a four-unit mirror match", () => {
   const state = createBattleState();
 

@@ -35,17 +35,16 @@
 .squad-pickers[hidden] { display:none; }
 .squad-picker { display:grid; gap:.5rem; padding:.55rem .5rem; border:1px solid var(--parchment-edge); border-top:3px solid var(--team,var(--brass)); border-radius:var(--radius-tile); background:rgba(8,20,34,.3); box-shadow:inset 0 2px 5px rgba(0,10,20,.3); }
 .squad-picker-title { color:color-mix(in srgb,var(--team,var(--muted)) 65%,var(--muted)); font:700 .64rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
-.squad-chip-row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); grid-template-rows:repeat(4,minmax(2.6rem,1fr)); gap:.18rem; padding:.28rem; border:1px solid rgba(80,120,150,.22); border-radius:8px; background:linear-gradient(45deg,rgba(120,160,190,.08) 25%,transparent 25% 50%,rgba(120,160,190,.08) 50% 75%,transparent 75%); background-size:2.4rem 2.4rem; }
-.squad-chip { display:grid; gap:.08rem; justify-items:center; align-content:center; min-width:0; min-height:2.65rem; padding:.24rem .12rem; border:1px solid var(--parchment-edge); border-radius:7px; background:linear-gradient(180deg,rgba(30,50,70,.55),rgba(14,24,40,.45)); color:var(--text); cursor:pointer; }
+.squad-chip-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.35rem; }
+.squad-chip { display:grid; gap:.12rem; justify-items:center; padding:.42rem .25rem; border:1px solid var(--parchment-edge); border-radius:7px; background:linear-gradient(180deg,rgba(30,50,70,.55),rgba(14,24,40,.45)); color:var(--text); cursor:pointer; }
 .squad-chip.row-back { background:linear-gradient(180deg,rgba(8,20,36,.5),rgba(6,16,28,.35)); }
-.squad-chip.row-middle { background:linear-gradient(180deg,rgba(18,38,56,.52),rgba(10,24,40,.42)); }
 .squad-chip:hover { border-color:var(--brass); filter:brightness(1.1); transform:none; }
 .squad-picker.is-locked { border-color:rgba(120,200,140,.6); box-shadow:inset 0 0 0 1px rgba(120,200,140,.18); }
 .squad-picker.is-locked .squad-chip { cursor:default; opacity:.72; }
 .squad-picker.is-locked .squad-edit-btn { color:#9fe6b0; border-color:rgba(120,200,140,.55); cursor:default; }
-.squad-chip .unit-portrait.is-chip { width:1.7rem; height:2rem; border-radius:5px; }
+.squad-chip .unit-portrait.is-chip { width:2.125rem; height:2.5rem; border-radius:5px; }
 .squad-chip .is-glyph-fallback { font-size:1.1rem; }
-.squad-chip-name { max-width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font:700 .52rem var(--font-display); letter-spacing:0; }
+.squad-chip-name { max-width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font:700 .6rem var(--font-display); letter-spacing:.04em; }
 .squad-edit-btn { width:100%; padding:.45rem .5rem; border:1px solid color-mix(in srgb,var(--team,var(--brass)) 45%,var(--parchment-edge)); border-radius:7px; background:linear-gradient(180deg,rgba(var(--sheen),.08),rgba(var(--sheen),0) 50%),rgba(12,22,36,.6); color:var(--text); font:700 .68rem var(--font-display); letter-spacing:.1em; text-transform:uppercase; cursor:pointer; }
 .squad-edit-btn:hover { border-color:var(--team,var(--brass)); filter:brightness(1.12); transform:none; }
 
@@ -56,26 +55,16 @@
 .roster-card { width:min(57.5rem,96vw); height:min(41.25rem,92vh); }
 .roster-head { padding-bottom:.7rem; }
 .roster-sub { margin:.2rem 0 0; color:var(--muted); font-size:.78rem; font-style:italic; line-height:1.4; }
-.roster-tray { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.35rem; padding:.55rem 1.1rem; border-bottom:1px solid var(--parchment-edge); background:rgba(8,18,30,.4); flex-shrink:0; }
-.roster-slot { display:grid; gap:.04rem; justify-items:center; align-content:center; min-width:0; min-height:0; padding:.16rem .1rem; border:1px solid var(--parchment-edge); border-radius:8px; background:linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.4)); color:var(--text); cursor:pointer; }
+.roster-tray { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.4rem; padding:.7rem 1.1rem; border-bottom:1px solid var(--parchment-edge); background:rgba(8,18,30,.4); flex-shrink:0; }
+.roster-slot { display:grid; gap:.18rem; justify-items:center; padding:.4rem .3rem .35rem; border:1px solid var(--parchment-edge); border-radius:8px; background:linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.4)); color:var(--text); cursor:pointer; }
 .roster-slot.row-back { background:linear-gradient(180deg,rgba(8,20,36,.5),rgba(6,16,28,.35)); }
-.roster-slot.row-middle { background:linear-gradient(180deg,rgba(18,38,56,.52),rgba(10,24,40,.42)); }
 .roster-slot:hover { border-color:var(--brass); filter:brightness(1.1); }
 .roster-slot.is-active { border-color:var(--team,var(--brass)); box-shadow:0 0 0 1px var(--team,var(--brass)), inset 0 1px 0 rgba(200,235,255,.25); background:linear-gradient(180deg,color-mix(in srgb,var(--team,var(--brass)) 18%,transparent),transparent 60%),linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.4)); }
 .roster-slot.is-active .roster-slot-tag { color:var(--brass-hi); }
-.roster-slot-tag { color:var(--muted); font:700 .42rem var(--font-display); letter-spacing:.06em; text-transform:uppercase; }
-.roster-slot .unit-portrait.is-slot { width:2rem; height:2.3rem; border-radius:5px; }
+.roster-slot-tag { color:var(--muted); font:700 .52rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
+.roster-slot .unit-portrait.is-slot { width:2.5rem; height:2.875rem; border-radius:6px; }
 .roster-slot .is-glyph-fallback { font-size:1.2rem; }
-.roster-slot-name { max-width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font:700 .56rem var(--font-display); letter-spacing:0; }
-.deployment-picker { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); grid-template-rows:repeat(4,2.35rem); gap:.18rem; padding:.5rem 1.1rem; border-bottom:1px solid var(--parchment-edge); background:rgba(3,10,18,.36); flex-shrink:0; }
-.deployment-tile { position:relative; display:grid; place-items:center; min-width:0; min-height:0; border:1px solid rgba(188,214,236,.13); border-radius:7px; background:rgba(10,22,36,.58); color:var(--text); cursor:pointer; }
-.deployment-tile.row-back { background:rgba(8,18,32,.58); }
-.deployment-tile.row-middle { background:rgba(16,34,52,.62); }
-.deployment-tile.row-front { background:linear-gradient(180deg,rgba(58,74,92,.68),rgba(18,36,52,.62)); }
-.deployment-tile:hover { border-color:var(--brass); filter:brightness(1.08); }
-.deployment-tile.is-active { border-color:var(--team,var(--brass)); box-shadow:0 0 0 1px var(--team,var(--brass)),0 0 12px color-mix(in srgb,var(--team,var(--brass)) 25%,transparent); }
-.deployment-tile .unit-portrait.is-chip { width:1.6rem; height:1.9rem; border-radius:5px; }
-.deployment-marker { position:absolute; left:.2rem; top:.12rem; z-index:1; color:var(--brass-hi); font:800 .48rem var(--font-display); }
+.roster-slot-name { font:700 .62rem var(--font-display); letter-spacing:.03em; }
 .roster-body { display:flex; flex:1; min-height:0; }
 .roster-grid { display:grid; grid-template-columns:1fr; align-content:start; gap:.7rem; width:46%; max-width:21.25rem; flex-shrink:0; overflow-y:auto; padding:.8rem; border-right:1px solid rgba(70,100,130,.35); }
 .roster-class { display:grid; gap:.32rem; min-width:0; }
@@ -477,10 +466,10 @@
 .draft-unit i { color:var(--brass-hi); font:800 .48rem var(--font-display); font-style:normal; letter-spacing:.1em; text-transform:uppercase; }
 .draft-actions { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:.7rem; }
 .draft-actions .menu-btn { width:auto; min-width:12rem; }
-.draft-formation-card { width:min(42rem,94vw); }
-.draft-formation-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.5rem; padding:.8rem 1rem .55rem; flex:0 0 auto; min-height:0; }
+.draft-formation-card { width:min(34rem,94vw); }
+.draft-formation-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.65rem; padding:1rem; flex:1 1 auto; min-height:0; overflow-y:auto; }
 .draft-formation-slot {
-  display:grid; gap:.2rem; justify-items:center; min-width:0; min-height:6.2rem; padding:.55rem .4rem;
+  display:grid; gap:.35rem; justify-items:center; min-height:8.5rem; padding:.75rem .55rem;
   border:1px solid rgba(188,214,236,.14); border-radius:10px;
   background:linear-gradient(180deg,color-mix(in srgb,var(--team,var(--brass)) 13%,transparent),transparent 62%),rgba(3,10,18,.55);
   color:var(--text); cursor:pointer;
@@ -490,7 +479,6 @@
 .draft-formation-slot .unit-portrait.is-slot { width:3.25rem; height:3.9rem; border-radius:7px; }
 .draft-formation-tag { color:var(--brass-hi); font:800 .58rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
 .draft-formation-name { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:800 .74rem var(--font-display); letter-spacing:.03em; }
-.draft-deployment-picker { grid-template-rows:repeat(4,2.75rem); padding:.55rem 1rem .8rem; }
 
 /* Menu polish pass: atmospheric shell, richer setup cards, and cleaner reference surfaces. */
 .menu-screen.is-active {

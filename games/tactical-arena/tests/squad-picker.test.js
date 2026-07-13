@@ -8,10 +8,6 @@ import {
   STARTER_UNIT_TYPES,
   UNIT_CLASS_GROUPS,
   availableTypesForSlot,
-  DEFAULT_DEPLOYMENT_POSITIONS,
-  DEPLOYMENT_ZONE_SIZE,
-  deploymentTileLabel,
-  normalizeDeploymentPositions,
   groupedUnitTypes,
   isUnitUnlocked,
   normalizeSquadLoadout
@@ -86,29 +82,13 @@ test("squadPicker re-exports the model without DOM access at import time", () =>
 test("squad loadouts preserve legacy composition arrays and normalize slot skins", () => {
   assert.deepEqual(normalizeSquadLoadout(["archer"]), {
     composition: ["archer", "archer", "mystic", "magician"],
-    skins: [null, null, null, null],
-    positions: [...DEFAULT_DEPLOYMENT_POSITIONS]
+    skins: [null, null, null, null]
   });
   assert.deepEqual(normalizeSquadLoadout({
     composition: ["swordsman", "archer", "mystic", "magician"],
     skins: ["summer-vibes", "missing", null, "summer-vibes"]
   }), {
     composition: ["swordsman", "archer", "mystic", "magician"],
-    skins: [null, null, null, null],
-    positions: [...DEFAULT_DEPLOYMENT_POSITIONS]
+    skins: [null, null, null, null]
   });
-});
-
-test("deployment positions normalize into a unique four-by-four setup zone", () => {
-  assert.equal(DEPLOYMENT_ZONE_SIZE, 4);
-  assert.deepEqual(
-    normalizeDeploymentPositions([{ x: 3, y: 3 }, { x: 3, y: 3 }, { x: -1, y: 2 }, { x: 0, y: 0 }]),
-    [{ x: 3, y: 3 }, { x: 0, y: 1 }, { x: 0, y: 0 }, { x: 1, y: 1 }]
-  );
-});
-
-test("deployment labels describe real battle distance instead of fixed slot rows", () => {
-  assert.equal(deploymentTileLabel({ x: 0, y: 0 }), "Back");
-  assert.equal(deploymentTileLabel({ x: 1, y: 1 }), "Middle");
-  assert.equal(deploymentTileLabel({ x: 3, y: 3 }), "Front");
 });

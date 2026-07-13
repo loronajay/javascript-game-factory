@@ -167,12 +167,10 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     const format = playerCount === 4 ? (selectedValue(hsSetup, "format", "format") || "ffa") : "ffa";
     const squads = {};
     const skins = {};
-    const formations = {};
     for (let player = 1; player <= playerCount; player += 1) {
       const picker = ensureHotSeatPicker(player);
       squads[player] = picker.getSquad();
       skins[player] = picker.getSkins();
-      formations[player] = picker.getPositions();
     }
     return {
       mode: "hotseat",
@@ -182,7 +180,6 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       teamColors: format === "teams" ? { 1: TEAM_COLOR[1], 2: TEAM_COLOR[2] } : null,
       squads,
       skins,
-      formations,
     };
   }
 
@@ -195,7 +192,6 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       size,
       squads: { 1: spPickers.p1.getSquad(), 2: spPickers.p2.getSquad() },
       skins: { 1: spPickers.p1.getSkins(), 2: spPickers.p2.getSkins() },
-      formations: { 1: spPickers.p1.getPositions(), 2: spPickers.p2.getPositions() },
       // Player 2 is CPU-controlled — only the human's own nickname preferences
       // should ride onto the board, never re-derived onto the CPU's squad.
       nicknames: { 1: spPickers.p1.getNicknames(), 2: spPickers.p2.getSquad().map(() => null) }
@@ -212,7 +208,6 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       size,
       squads: { 1: tempoSpPickers.p1.getSquad(), 2: tempoSpPickers.p2.getSquad() },
       skins: { 1: tempoSpPickers.p1.getSkins(), 2: tempoSpPickers.p2.getSkins() },
-      formations: { 1: tempoSpPickers.p1.getPositions(), 2: tempoSpPickers.p2.getPositions() },
       nicknames: { 1: tempoSpPickers.p1.getNicknames(), 2: tempoSpPickers.p2.getSquad().map(() => null) }
     };
   }
