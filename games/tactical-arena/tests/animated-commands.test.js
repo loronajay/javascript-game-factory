@@ -7,24 +7,35 @@ function createContext({ dispatchResult = true } = {}) {
   const resolving = [];
   const renders = [];
   const animations = [];
+  const order = [];
   const state = {
     units: [
       { id: "p2-swordsman", position: { x: 3, y: 4 } },
     ],
   };
+  const dispatchEvents = [{ type: "DARK_PULSE_AUTO", actorId: "nem" }];
 
   return {
     resolving,
     renders,
     animations,
+    order,
     context: {
       getState: () => state,
-      setResolving: (value) => resolving.push(value),
+      setResolving: (value) => { resolving.push(value); order.push(`resolving:${value}`); },
       findUnit: (s, unitId) => s.units.find((unit) => unit.id === unitId) ?? null,
-      dispatch: () => dispatchResult,
+      dispatch: (_command, options = {}) => {
+        order.push(options.deferRolloverFx ? "dispatch:deferred" : "dispatch");
+        return dispatchResult;
+      },
+      getDispatchEvents: () => dispatchEvents,
+      playRolloverFx: async (events) => {
+        order.push(`reactions:${events.map((event) => event.type).join(",")}`);
+      },
       render: () => renders.push("render"),
       effects: {
         animateMovement: async (unitId, from, to) => {
+          order.push("move-animation");
           animations.push({ unitId, from, to });
         },
       },
@@ -33,7 +44,7 @@ function createContext({ dispatchResult = true } = {}) {
 }
 
 test("remote animated movement releases the input lock after the animation", async () => {
-  const { context, resolving, renders, animations } = createContext();
+  const { context, resolving, renders, animations, order } = createContext();
 
   const accepted = await resolveAnimatedMove({
     type: "MOVE_UNIT",
@@ -49,6 +60,13 @@ test("remote animated movement releases the input lock after the animation", asy
     from: { x: 3, y: 4 },
     to: { x: 4, y: 4 },
   }]);
+  assert.deepEqual(order, [
+    "resolving:true",
+    "dispatch:deferred",
+    "move-animation",
+    "reactions:DARK_PULSE_AUTO",
+    "resolving:false"
+  ]);
 });
 
 test("CPU animated movement can keep the input lock for the squad turn loop", async () => {

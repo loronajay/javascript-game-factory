@@ -31,9 +31,17 @@ export function applyCommand(state, command) {
       resolveNemesisAutoPulse,
       resolveVolcanicPyroclasmTick
     });
+    closeDeadActiveUnit(result.nextState);
     normalizeTempoStateAfterCommand(result.nextState);
   }
   return result;
+}
+
+function closeDeadActiveUnit(state) {
+  if (state.phase !== "playing" || !state.activation?.unitId) return;
+  const unit = findUnit(state, state.activation.unitId);
+  if (!unit || unit.hp > 0) return;
+  spendAndAdvance(state, unit);
 }
 
 function dispatchCommand(state, command) {

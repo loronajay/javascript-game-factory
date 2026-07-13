@@ -403,6 +403,7 @@ export function applyMonkTrialIntroBeat(state, beat) {
 // The battle opens with ONE Nemesis on the board; a dialogue beat splits him into three,
 // which is purely presentational (all three exist from the start, two just introHidden).
 const VOID_CASTLE_SUMMONER_SKIN = "void-dweller";
+const VOID_CASTLE_NEMESIS_HP = 10;
 const VOID_CASTLE_SUMMONER_SPAWN = Object.freeze({ x: 12, y: 0 });
 const VOID_CASTLE_NEMESIS_SPAWNS = Object.freeze([
   Object.freeze({ x: 11, y: 1 }), // the one that greets you, and stays put when he splits
@@ -862,7 +863,9 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
       "p2-3-nemesis": { ...VOID_CASTLE_NEMESIS_SPAWNS[2] },
     },
     fallback: (unit) => ({ ...unit.position }),
-    fullHp: true,
+    hpFor: (unit, maxHp) => (
+      unit.player === 2 && unit.type === "nemesis" ? VOID_CASTLE_NEMESIS_HP : maxHp
+    ),
     // Only the Summoner has a void-dweller skin; Nemesis is already a void entity in its
     // base art, so it fields as itself.
     skinFor: (unit) => (

@@ -164,6 +164,30 @@ test("Dark Pulse auto-casts for free when Nemesis crosses missing-HP thresholds"
   assert.equal(findUnit(s, "nem").mp, 45, "automatic pulses are free");
 });
 
+test("a Dark Pulse reaction that kills the moving unit closes the dead activation", () => {
+  const state = scenario([
+    { id: "fk", type: "fat-knight", player: 1, x: 6, y: 8, hp: 5 },
+    { id: "ally", type: "swordsman", player: 1, x: 0, y: 0 },
+    { id: "nem", type: "nemesis", player: 2, x: 6, y: 7, hp: 21 }
+  ]);
+  let s = run(state, beginActivation(1, "fk")).nextState;
+  const moved = run(s, moveUnit(1, "fk", 6, 5, [
+    { x: 6, y: 7 },
+    { x: 6, y: 6 },
+    { x: 6, y: 5 }
+  ]));
+
+  assert.ok(moved.events.some((event) => event.type === "DARK_PULSE_AUTO"));
+  s = moved.nextState;
+  assert.equal(findUnit(s, "fk").hp, 0, "the threshold pulse killed the mover");
+  assert.equal(s.activation, null, "the dead mover no longer holds the activation open");
+  assert.equal(s.currentPlayer, 1, "the owning player can continue with another unit");
+
+  const nextUnit = applyCommand(s, beginActivation(1, "ally"));
+  assert.equal(nextUnit.accepted, true, nextUnit.errorCode);
+  assert.equal(nextUnit.nextState.activation.unitId, "ally");
+});
+
 test("Realm Traversal lets Nemesis move then cast Dark Pulse on the next turn and then unlocks", () => {
   const state = scenario([
     { id: "nem", type: "nemesis", player: 1, x: 0, y: 0 },

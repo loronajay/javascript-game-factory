@@ -213,6 +213,7 @@ let areaForecastMode = null;
 // The fallen ally chosen for Father Time's Rewind, awaiting a placement-tile click.
 let rewindTargetId = null;
 let resolving = false;
+let reactionPresentationCount = 0;
 
 // --- CPU (single-player) ---
 // `cpu` is null in hot-seat; in single-player it names the difficulty and which seats
@@ -438,8 +439,8 @@ function inputLocked() {
   // Tempo is real-time: animations never block input. The player can always reach their
   // ready units (rolled actions commit their state before animating, so nothing is lost).
   // The lone exception is an instant-ART cast (tempoBusy), which commits at animation end.
-  if (isTempoBattle(state)) return dialogue.isOpen() || state.phase !== "playing" || tempoBusy;
-  return resolving || dialogue.isOpen() || !currentPlayerIsLocal();
+  if (isTempoBattle(state)) return dialogue.isOpen() || state.phase !== "playing" || tempoBusy || reactionPresentationCount > 0;
+  return resolving || reactionPresentationCount > 0 || dialogue.isOpen() || !currentPlayerIsLocal();
 }
 
 // Broadcast a locally-originated accepted command to the opponent. Skipped while
@@ -1083,7 +1084,7 @@ function commandErrorMessage(result) {
   return result.message ?? readableError(result.errorCode);
 }
 
-function dispatch(command) {
+function dispatch(command, { deferRolloverFx = false } = {}) {
   const prevPlayer = state.currentPlayer;
   const beforeState = state;
   const { prepared, result } = resolveCommand(command);
@@ -1098,7 +1099,7 @@ function dispatch(command) {
   recordCampaignProgressHooks(prepared, result, beforeState);
   broadcastIfLocal(prepared);
   playEventSounds(result.events ?? []);
-  playRolloverFx(result.events ?? []);
+  if (!deferRolloverFx) void playRolloverFx(result.events ?? []);
   if (state.activation) selectedId = state.activation.unitId;
   else { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
   announceTurnChange(prevPlayer);
@@ -3341,6 +3342,7 @@ function maybeStartCpuTurn() {
     return;
   }
   if (cpuThinking || state.phase !== "playing" || !isCpu(state.currentPlayer)) return;
+  if (reactionPresentationCount > 0) return;
   maybeShowCampaignDialogue();
   if (dialogue.isOpen()) return;
   if (shouldDelayCpuForTutorialPresentation()) {
@@ -3371,7 +3373,7 @@ function shouldDelayCpuForTutorialPresentation() {
 // sets tempoCpuAbort so its loop stands down after the current animation. Because rolled
 // actions commit their state up front, the player's command can never be clobbered.
 function maybeStartTempoCpuTurn() {
-  if (!isTempoBattle(state) || cpuThinking || resolving || tempoBusy || state.activation || state.phase !== "playing") return;
+  if (!isTempoBattle(state) || cpuThinking || resolving || tempoBusy || reactionPresentationCount > 0 || state.activation || state.phase !== "playing") return;
   if (dialogue.isOpen() || tempoAnimating > 0) return;
   const player = [...(cpu?.players ?? [])].find((p) =>
     state.units.some((unit) => unit.player === p && isTempoUnitReady(state, unit))
@@ -3523,6 +3525,8 @@ async function resolveCpuMove(command, options) {
     setResolving: (value) => { resolving = value; },
     findUnit,
     dispatch,
+    getDispatchEvents: () => lastDispatchEvents,
+    playRolloverFx,
     render,
     effects,
   }, options);
@@ -3699,10 +3703,11 @@ function playEventSounds(events) {
 }
 
 // Fire-tile burns happen at the rollover (inside the reducer), so they surface as
-// FIRE_DAMAGE events on whatever action ended the turn. Voice + float them here —
-// fire-and-forget, since a board hazard shouldn't block input. `state` is already
-// the committed post-rollover state when this runs.
-function playRolloverFx(events) {
+// FIRE_DAMAGE events on whatever action ended the turn. Most floats are fire-and-forget,
+// but reaction animations that can kill the active unit (Dark Pulse) are tracked so input
+// and CPU turns do not resume while the board is still presenting the reaction.
+// `state` is already the committed post-rollover state when this runs.
+async function playRolloverFx(events) {
   const burns = events.filter((e) => e.type === "FIRE_DAMAGE");
   const steals = events.filter((e) => e.type === "TIME_STEAL");
   // Ghoul Bite (autoStrike): a Ghoul mauls one random adjacent enemy at the rollover.
@@ -3739,6 +3744,7 @@ function playRolloverFx(events) {
       !petrifyPulses.length && !weatherRegens.length) return;
   const metrics = createBoardMetrics(state.size);
   let killed = false;
+  const blockingAnimations = [];
 
   for (const ghost of ghostDissipations) {
     const unit = findUnit(state, ghost.unitId);
@@ -3765,7 +3771,7 @@ function playRolloverFx(events) {
     const actor = findUnit(state, pulse.actorId);
     if (!actor) continue;
     const targets = (pulse.targetIds ?? []).map((id) => findUnit(state, id)).filter(Boolean);
-    effects.playAbilityVfx("dark-pulse", { actor, targets, rays: pulse.pulseRays ?? [] }).then(() => {
+    blockingAnimations.push(effects.playAbilityVfx("dark-pulse", { actor, targets, rays: pulse.pulseRays ?? [] }).then(() => {
       for (const target of targets) {
         const center = unitCenter(metrics, target);
         const damage = pulse.damageByTarget?.[target.id] ?? 0;
@@ -3777,7 +3783,7 @@ function playRolloverFx(events) {
           effects.floatText(center, `+${healing}`, "#8cf0a4");
         }
       }
-    }).catch(() => {});
+    }));
   }
 
   // Stone Body recoil: a melee attacker / displacer takes true damage, floated over it.
@@ -3923,6 +3929,16 @@ function playRolloverFx(events) {
   }
 
   if (killed) audio.play("unitDefeated");
+
+  if (blockingAnimations.length) {
+    reactionPresentationCount += 1;
+    try {
+      await Promise.allSettled(blockingAnimations);
+    } finally {
+      reactionPresentationCount = Math.max(0, reactionPresentationCount - 1);
+      if (reactionPresentationCount === 0) maybeStartCpuTurn();
+    }
+  }
 }
 
 // --- Input ---
@@ -4038,8 +4054,9 @@ async function handleTile(position) {
     const path = [...footworkPath];
     const dest = path[path.length - 1];
     footworkPath = [];
-    if (dispatch(moveUnit(state.currentPlayer, unit.id, dest.x, dest.y, path))) {
-      const moved = lastDispatchEvents.find((e) => e.type === "UNIT_MOVED");
+    if (dispatch(moveUnit(state.currentPlayer, unit.id, dest.x, dest.y, path), { deferRolloverFx: true })) {
+      const moveEvents = [...lastDispatchEvents];
+      const moved = moveEvents.find((e) => e.type === "UNIT_MOVED");
       const completesActivation = state.activation?.primaryUsed;
       mode = null;
       setMessage(consumeTutorialPrompt(completesActivation ? "Moved. Activation complete." : "Moved. Now attack or defend to finish."));
@@ -4068,6 +4085,7 @@ async function handleTile(position) {
       } else {
         await effects.animateMovement(unit.id, from, dest);
       }
+      await playRolloverFx(moveEvents);
       resolving = false;
       if (completesActivation) maybeAutoFinish();
       render();
@@ -4077,13 +4095,15 @@ async function handleTile(position) {
     return;
   } else if (mode === "move") {
     const from = { ...unit.position };
-    if (dispatch(moveUnit(state.currentPlayer, unit.id, position.x, position.y))) {
+    if (dispatch(moveUnit(state.currentPlayer, unit.id, position.x, position.y), { deferRolloverFx: true })) {
+      const moveEvents = [...lastDispatchEvents];
       const completesActivation = state.activation?.primaryUsed;
       mode = null;
       setMessage(consumeTutorialPrompt(completesActivation ? "Moved. Activation complete." : "Moved. Now attack or defend to finish."));
       resolving = true;
       render();
       await effects.animateMovement(unit.id, from, position);
+      await playRolloverFx(moveEvents);
       resolving = false;
       if (completesActivation) maybeAutoFinish();
       render();

@@ -193,6 +193,31 @@ test("the CPU Miner may keep mining when a ranged enemy is only reachable throug
   replay(state, commands);
 });
 
+test("a charged CPU Nemesis does not re-cast locked Realm Traversal", () => {
+  const state = createBattleState({
+    size: 13,
+    seed: 21,
+    units: [
+      { id: "p1-sword", type: "swordsman", player: 1, x: 0, y: 1 },
+      { id: "p2-nem", type: "nemesis", player: 2, x: 12, y: 12, realmTraversalCharged: true, realmTraversalLocked: true },
+      { id: "p2-a", type: "swordsman", player: 2, x: 11, y: 12 },
+      { id: "p2-b", type: "swordsman", player: 2, x: 12, y: 11 },
+      { id: "p2-c", type: "swordsman", player: 2, x: 11, y: 11 }
+    ]
+  });
+  state.currentPlayer = 2;
+  findUnit(state, "p2-a").spent = true;
+  findUnit(state, "p2-b").spent = true;
+  findUnit(state, "p2-c").spent = true;
+
+  const commands = chooseActivation(state, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(state) });
+  assert.ok(!commands.some((c) => c.type === "USE_ART" && c.artId === "realm-traversal"),
+    "Realm Traversal is locked until the charged turn ends");
+  const after = replay(state, commands);
+  assert.equal(findUnit(after, "p2-nem").realmTraversalLocked, false);
+  assert.equal(after.currentPlayer, 1);
+});
+
 test("a full CPU squad turn is legal and terminates, handing the turn back", () => {
   let s = skirmish(2);
   let guard = 0;

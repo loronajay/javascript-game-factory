@@ -982,6 +982,7 @@ function artUsableForPlanning(state, unit, art) {
     !isStunned(unit) &&
     !unit.statuses?.some((status) => status.type === "silence") &&
     !(isRaging(unit) && art.replacedByRageArt) &&
+    !(art.id === "realm-traversal" && unit.realmTraversalLocked) &&
     unit.mp >= getArtMpCost(unit, art, state) &&
     // Riot Cop: a depleted finite-use art is off the table, and Lockdown is only plan- able
     // while no squadmate has acted yet this turn (it must be the first command).

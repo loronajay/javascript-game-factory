@@ -79,6 +79,7 @@ test("phase 1 walls the Summoner into the corner behind three Nemesis, two of th
   assert.equal(summoner.skin, "void-dweller");
   assert.equal(summoner.hp, getUnitType("summoner").stats.maxHp);
   assert.equal(nemesis.length, 3);
+  assert.deepEqual(nemesis.map((unit) => unit.hp), [10, 10, 10]);
 
   // Exactly one Nemesis greets the party; the other two appear when he "splits".
   assert.equal(nemesis.filter((unit) => unit.introHidden).length, 2);
