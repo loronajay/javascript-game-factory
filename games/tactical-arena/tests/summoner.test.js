@@ -4,13 +4,15 @@ import assert from "node:assert/strict";
 import { applyCommand } from "../src/core/reducer.js";
 import { chooseActivation } from "../src/ai/cpuController.js";
 import { generatePlans } from "../src/ai/plans.js";
-import { beginActivation, defend, finishActivation, moveUnit, useArt } from "../src/core/commands.js";
+import { attack, beginActivation, defend, finishActivation, moveUnit, useArt } from "../src/core/commands.js";
 import { createBattleState, findUnit } from "../src/core/state.js";
 import { getArt, getSoulShuffleChoices, isRaging, UNIT_TYPES } from "../src/core/unitCatalog.js";
 import { getLegalFleeTiles, getSummonPlacementTiles } from "../src/rules/arts.js";
 import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
 import { PORTRAITS } from "../src/ui/portraits.js";
 import { BOARD_SPRITES } from "../src/ui/boardSprites.js";
+
+const NORMAL_HIT = { attackRoll: 0.5, critRoll: 0.99 };
 
 function makeState(seed = 1, hp = 23) {
   return createBattleState({
@@ -184,6 +186,119 @@ test("Beckon's ghost arrives already RAGING, unlike a plain Summon's ghost", () 
   const summonEvent = cast.events.find((entry) => entry.type === "ART_RESOLVED");
   const summonedGhost = findUnit(cast.nextState, summonEvent.summonedUnitId);
   assert.ok(!isRaging(summonedGhost), "a plain Summon's ghost should spawn at full health");
+});
+
+test("a Beckoned Self Destruct kills the Summoner and still wins the final trade", () => {
+  const seed = seedWithChoice("juggernaut");
+  const state = createBattleState({
+    seed,
+    size: 9,
+    units: [
+      { id: "summoner", player: 1, type: "summoner", hp: 5, x: 1, y: 1 },
+      { id: "foe", player: 2, type: "swordsman", hp: 10, x: 3, y: 1 }
+    ]
+  });
+
+  const opened = begin(state, "summoner");
+  const beckoned = applyCommand(opened, useArt(1, "summoner", "beckon", {
+    targetPosition: { x: 2, y: 1 },
+    summonType: "juggernaut"
+  }));
+  assert.ok(beckoned.accepted, beckoned.errorCode);
+  const ghost = findUnit(beckoned.nextState, beckoned.events.find((entry) => entry.type === "ART_RESOLVED").summonedUnitId);
+
+  const blast = applyCommand(beckoned.nextState, useArt(1, ghost.id, "self-destruct"));
+  assert.ok(blast.accepted, blast.errorCode);
+  assert.equal(findUnit(blast.nextState, "foe").hp, 0, "the last enemy falls");
+  assert.equal(findUnit(blast.nextState, ghost.id).hp, 0, "the ghost pays the sacrifice");
+  assert.equal(findUnit(blast.nextState, "summoner").hp, 0, "the Summoner also pays for Beckon's sacrifice");
+  assert.equal(blast.nextState.phase, "complete");
+  assert.equal(blast.nextState.winner, 1);
+});
+
+test("a Beckoned Explosion kills the Summoner and still wins the final trade", () => {
+  const seed = seedWithChoice("virus");
+  const state = createBattleState({
+    seed,
+    size: 9,
+    units: [
+      { id: "summoner", player: 1, type: "summoner", hp: 5, x: 1, y: 1 },
+      { id: "foe", player: 2, type: "swordsman", hp: 10, x: 7, y: 7, statuses: [{ type: "poison", duration: "permanent" }] }
+    ]
+  });
+
+  const opened = begin(state, "summoner");
+  const beckoned = applyCommand(opened, useArt(1, "summoner", "beckon", {
+    targetPosition: { x: 2, y: 1 },
+    summonType: "virus"
+  }));
+  assert.ok(beckoned.accepted, beckoned.errorCode);
+  const ghost = findUnit(beckoned.nextState, beckoned.events.find((entry) => entry.type === "ART_RESOLVED").summonedUnitId);
+
+  const explosion = applyCommand(beckoned.nextState, useArt(1, ghost.id, "explosion"));
+  assert.ok(explosion.accepted, explosion.errorCode);
+  assert.equal(findUnit(explosion.nextState, "foe").hp, 0, "the last enemy falls");
+  assert.equal(findUnit(explosion.nextState, ghost.id).hp, 0, "the ghost pays the sacrifice");
+  assert.equal(findUnit(explosion.nextState, "summoner").hp, 0, "the Summoner also pays for Beckon's sacrifice");
+  assert.equal(explosion.nextState.phase, "complete");
+  assert.equal(explosion.nextState.winner, 1);
+});
+
+test("a Beckoned Banish kills the Summoner and still wins the final trade", () => {
+  const seed = seedWithChoice("blacksword");
+  const state = createBattleState({
+    seed,
+    size: 9,
+    tiles: [{ x: 7, y: 7, affinity: "dark" }],
+    units: [
+      { id: "summoner", player: 1, type: "summoner", hp: 5, x: 1, y: 1 },
+      { id: "foe", player: 2, type: "swordsman", hp: 25, x: 7, y: 7 }
+    ]
+  });
+
+  const opened = begin(state, "summoner");
+  const beckoned = applyCommand(opened, useArt(1, "summoner", "beckon", {
+    targetPosition: { x: 2, y: 1 },
+    summonType: "blacksword"
+  }));
+  assert.ok(beckoned.accepted, beckoned.errorCode);
+  const ghost = findUnit(beckoned.nextState, beckoned.events.find((entry) => entry.type === "ART_RESOLVED").summonedUnitId);
+
+  const banish = applyCommand(beckoned.nextState, useArt(1, ghost.id, "banish-dark"));
+  assert.ok(banish.accepted, banish.errorCode);
+  assert.equal(findUnit(banish.nextState, "foe").hp, 0, "the last enemy falls");
+  assert.equal(findUnit(banish.nextState, ghost.id).hp, 0, "the ghost pays the sacrifice");
+  assert.equal(findUnit(banish.nextState, "summoner").hp, 0, "the Summoner also pays for Beckon's sacrifice");
+  assert.equal(banish.nextState.phase, "complete");
+  assert.equal(banish.nextState.winner, 1);
+});
+
+test("a Beckoned Ronin recoil death kills the Summoner", () => {
+  const seed = seedWithChoice("ronin");
+  const state = createBattleState({
+    seed,
+    size: 9,
+    units: [
+      { id: "summoner", player: 1, type: "summoner", hp: 5, x: 1, y: 1 },
+      { id: "ally", player: 1, type: "swordsman", x: 0, y: 8 },
+      { id: "foe", player: 2, type: "swordsman", hp: 40, x: 3, y: 1 },
+      { id: "reserve", player: 2, type: "swordsman", x: 8, y: 8 }
+    ]
+  });
+
+  const opened = begin(state, "summoner");
+  const beckoned = applyCommand(opened, useArt(1, "summoner", "beckon", {
+    targetPosition: { x: 2, y: 1 },
+    summonType: "ronin"
+  }));
+  assert.ok(beckoned.accepted, beckoned.errorCode);
+  const ghost = findUnit(beckoned.nextState, beckoned.events.find((entry) => entry.type === "ART_RESOLVED").summonedUnitId);
+
+  const strike = applyCommand(beckoned.nextState, attack(1, ghost.id, "foe", NORMAL_HIT));
+  assert.ok(strike.accepted, strike.errorCode);
+  assert.equal(findUnit(strike.nextState, ghost.id).hp, 0, "Final Draw recoil kills the ghost");
+  assert.equal(findUnit(strike.nextState, "summoner").hp, 0, "the Summoner also pays for Beckon's recoil death");
+  assert.equal(strike.nextState.phase, "playing", "other surviving units keep the match going");
 });
 
 test("Energy Retrieval redirects a ghost's self MP restore to Summoner", () => {

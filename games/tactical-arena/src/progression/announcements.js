@@ -1,5 +1,5 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
-import { DRAFT_BATTLE_REQUIRED_UNITS, isDraftBattleAvailable } from "./draftAvailability.js";
+import { DRAFT_BATTLE_REQUIRED_UNITS, isDraftBattleAvailable, isDraftableProgressionUnit } from "./draftAvailability.js";
 import { STARTER_UNIT_TYPES, readUnlockProgress } from "./unlocks.js";
 
 export const PROGRESSION_ANNOUNCEMENTS_KEY = "tacticalArenaProgressionAnnouncementsV1";
@@ -35,7 +35,7 @@ function writeJsonArray(storage, key, values) {
 
 export function buildUnitUnlockAnnouncement(type) {
   const def = UNIT_TYPES[type];
-  if (!def) return null;
+  if (!def || !isDraftableProgressionUnit(type)) return null;
   const classLabel = def.classType ? `${def.classType} unit` : "unit";
   return {
     id: `unit-unlock:${type}`,

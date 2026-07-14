@@ -45,7 +45,7 @@ function wonClodMission() {
 test("unit unlock announcements queue once and mark themselves seen when consumed", () => {
   const storage = storageAdapter();
 
-  const pending = enqueueUnitUnlockAnnouncements(storage, ["clod", "clod", "missing-unit"]);
+  const pending = enqueueUnitUnlockAnnouncements(storage, ["clod", "clod", "ghoul", "missing-unit"]);
 
   assert.equal(pending.length, 1);
   assert.equal(pending[0].id, "unit-unlock:clod");
@@ -57,6 +57,24 @@ test("unit unlock announcements queue once and mark themselves seen when consume
   assert.deepEqual(readSeenProgressionAnnouncementIds(storage), ["unit-unlock:clod"]);
 
   assert.deepEqual(enqueueUnitUnlockAnnouncements(storage, ["clod"]), []);
+});
+
+test("summon-only unit unlocks are never announced or counted for draft unlocks", () => {
+  const storage = storageAdapter();
+
+  assert.deepEqual(enqueueUnitUnlockAnnouncements(storage, ["ghoul"]), []);
+
+  writeUnlockProgress(storage, {
+    unlockedUnits: ["swordsman", "archer", "mystic", "magician", "clod", "necromancer", "witch-doctor", "ghoul"],
+  });
+
+  const pending = syncMissingUnitUnlockAnnouncements(storage);
+
+  assert.deepEqual(pending.map((announcement) => announcement.id), [
+    "unit-unlock:clod",
+    "unit-unlock:necromancer",
+    "unit-unlock:witch-doctor",
+  ]);
 });
 
 test("skin unlock announcements queue with unit and skin identity", () => {

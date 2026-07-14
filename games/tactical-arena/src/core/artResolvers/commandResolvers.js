@@ -6,6 +6,7 @@ import { applyStatus } from "../../rules/statuses.js";
 import { restoreHp, restoreMp } from "../combatEffects.js";
 import { accept } from "../reducerResult.js";
 import { resolveVictory, spendAndAdvance } from "../turnEngine.js";
+import { applyBeckonedGhostSacrifice } from "../ghostSacrifice.js";
 
 // Recharge: vent the reactor. Restore MP up to full; if already at full MP, mend 1 HP
 // instead — the mend is a heal, so a board-wide healing lockout (a raging Juggernaut's
@@ -62,6 +63,7 @@ export function resolveSelfDestruct(state, command, art) {
   const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
   actor.hp = 0; // the core is spent — the Juggernaut is consumed
+  applyBeckonedGhostSacrifice(next, actor);
   resolveVictory(next, { actionTakerTeam: actor.player });
   if (next.phase === "playing") {
     spendAndAdvance(next, actor);
@@ -91,4 +93,3 @@ export function resolveKingCommand(state, command, art) {
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, command: art.command.id, mpCost: 0
   }]);
 }
-

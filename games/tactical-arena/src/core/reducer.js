@@ -8,6 +8,7 @@ import { chebyshevDistance, getLegalMovePath, getLegalMoves, positionKey, valida
 import { applyStatus, isPetrified, isStunned } from "../rules/statuses.js";
 import { alliesInRadius, getStanceEffect } from "../rules/stances.js";
 import { applyDarkTreadLifesteal, applyGrowth, applyMagicDamageReaction, applyRockHardDefense, resolvePhysicalDamageHealing, restoreHp, restoreMp } from "./combatEffects.js";
+import { applyBeckonedGhostSacrifice } from "./ghostSacrifice.js";
 import { commanderPending, validateOpenActivation, validateOwnedLivingUnit } from "./commandValidation.js";
 import { applyPostCommandReactions, consumeOneShotRage, syncOneShotRageArm } from "./reactions.js";
 import { accept, ERR, reject } from "./reducerResult.js";
@@ -436,6 +437,7 @@ function attack(state, command) {
   if (shouldApplyAttackRecoil(actor, next) && totalDamageDealt > 0) {
     const recoil = Math.min(actor.hp, totalDamageDealt);
     actor.hp = Math.max(0, actor.hp - totalDamageDealt);
+    if (actor.hp <= 0) applyBeckonedGhostSacrifice(next, actor);
     duelistEvents.push({ type: "ATTACK_RECOIL", unitId: actor.id, damage: recoil });
   }
   // A magic strike (Blessed Arrow) never feeds a physical-damage heal aura (Hand of Life).

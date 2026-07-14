@@ -6,6 +6,7 @@ import { applyStatus } from "../../rules/statuses.js";
 import { applyDarkTreadLifesteal } from "../combatEffects.js";
 import { accept } from "../reducerResult.js";
 import { resolveVictory, spendAndAdvance } from "../turnEngine.js";
+import { applyBeckonedGhostSacrifice } from "../ghostSacrifice.js";
 
 export function resolveSmog(state, command, art) {
   const next = cloneState(state);
@@ -75,6 +76,7 @@ export function resolvePoisonBurst(state, command, art) {
   // which consumes Blacksword anyway).
   const darkTreadEvents = art.selfKill ? [] : applyDarkTreadLifesteal(next, actor, damaged);
   if (art.selfKill) actor.hp = 0; // Explosion consumes Virus / Banish consumes Blacksword
+  if (art.selfKill) applyBeckonedGhostSacrifice(next, actor);
   if (art.selfKill) {
     resolveVictory(next, { actionTakerTeam: actor.player });
     if (next.phase === "playing") {

@@ -7,6 +7,7 @@ import { chebyshevDistance } from "../../rules/movement.js";
 import { applyStatus } from "../../rules/statuses.js";
 import { accept, ERR, reject } from "../reducerResult.js";
 import { resolveVictory, spendAndAdvance } from "../turnEngine.js";
+import { applyBeckonedGhostSacrifice } from "../ghostSacrifice.js";
 
 function validateTargetedEnemyCast(state, actor, target, art) {
   if (!target || target.hp <= 0 || !areEnemies(actor, target)) return ERR.INVALID_TARGET;
@@ -115,6 +116,7 @@ export function resolveShuriken(state, command, art) {
   if (shouldApplyAttackRecoil(actor, next) && damageDealt > 0) {
     const recoil = Math.min(actor.hp, damageDealt);
     actor.hp = Math.max(0, actor.hp - damageDealt);
+    if (actor.hp <= 0) applyBeckonedGhostSacrifice(next, actor);
     recoilEvents.push({ type: "ATTACK_RECOIL", unitId: actor.id, damage: recoil });
   }
 

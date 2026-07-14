@@ -9,6 +9,7 @@ import { applyDarkTreadLifesteal, applyGrowth, applyMagicDamageReaction, applyRo
 import { consumeOneShotRage } from "../reactions.js";
 import { accept, ERR, reject } from "../reducerResult.js";
 import { resolveVictory, spendAndAdvance } from "../turnEngine.js";
+import { applyBeckonedGhostSacrifice } from "../ghostSacrifice.js";
 import { pushDestinationAwayFrom } from "./displacement.js";
 import { completeArtUse } from "./artCompletion.js";
 
@@ -208,6 +209,7 @@ export function resolveTargetedArt(state, command, art) {
   if (shouldApplyAttackRecoil(actor, next) && damageDealt > 0) {
     const recoil = Math.min(actor.hp, damageDealt);
     actor.hp = Math.max(0, actor.hp - damageDealt);
+    if (actor.hp <= 0) applyBeckonedGhostSacrifice(next, actor);
     recoilEvents.push({ type: "ATTACK_RECOIL", unitId: actor.id, damage: recoil });
   }
 
