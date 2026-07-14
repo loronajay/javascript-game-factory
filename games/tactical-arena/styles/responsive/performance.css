@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------------------
-   Mobile performance mode (coarse pointer)
+   Balanced performance mode
 
    A turn-based game has no render loop, so every continuous GPU cost is a CSS
    animation or filter. On phones the worst offenders are the full-screen
@@ -8,8 +8,60 @@
    is the textbook cause of mobile jank. The battle layers only shed these under OS-level
    prefers-reduced-motion, which almost no phone user enables, so do it for every
    touch device here. We keep a static sky + stars + fortress silhouette so the
-   scene still reads; desktop keeps the full ambiance.
+   scene still reads. Balanced mode is the default on every device because the
+   same SVG repaint costs can make integrated-GPU laptops run hot. Players can
+   restore the ambient motion with the Battery saver toggle in Settings.
    ----------------------------------------------------------------------- */
+html[data-performance="balanced"] .bk-aurora,
+html[data-performance="balanced"] .bk-rays,
+html[data-performance="balanced"] .bk-fog,
+html[data-performance="balanced"] .bk-clouds,
+html[data-performance="balanced"] .bk-ember,
+html[data-performance="balanced"] .bk-snow,
+html[data-performance="balanced"] .bk-rain,
+html[data-performance="balanced"] .bk-heat-haze,
+html[data-performance="balanced"] .bk-heat-band,
+html[data-performance="balanced"] .bk-storm-clouds,
+html[data-performance="balanced"] .bk-lightning,
+html[data-performance="balanced"] .weather-flake,
+html[data-performance="balanced"] .weather-snow-gust,
+html[data-performance="balanced"] .weather-drop-cycle,
+html[data-performance="balanced"] .weather-splat,
+html[data-performance="balanced"] .weather-petal,
+html[data-performance="balanced"] .weather-heat-shimmer,
+html[data-performance="balanced"] .weather-heat-ember,
+html[data-performance="balanced"] .weather-storm-cell,
+html[data-performance="balanced"] .weather-bolt {
+  display: none;
+}
+
+html[data-performance="balanced"] .bk-sky,
+html[data-performance="balanced"] .bk-stars,
+html[data-performance="balanced"] .bk-window,
+html[data-performance="balanced"] .unit.idle:not(.spent) .body-group,
+html[data-performance="balanced"] .status-badge,
+html[data-performance="balanced"] .unit .target-ring,
+html[data-performance="balanced"] .unit .target-chevron,
+html[data-performance="balanced"] .tile.aura-zone .tile-face,
+html[data-performance="balanced"] .tile.legal-move .tile-face,
+html[data-performance="balanced"] .tile.legal-attack .tile-face,
+html[data-performance="balanced"] .tile.legal-art .tile-face,
+html[data-performance="balanced"] .tile.legal-heal .tile-face,
+html[data-performance="balanced"] .tile.path .tile-face,
+html[data-performance="balanced"] .tile.cone-hot .tile-face {
+  animation: none !important;
+}
+
+html[data-performance="balanced"] .bk-fortress::before {
+  display: none;
+}
+
+html[data-performance="balanced"] .bk-fortress-svg,
+html[data-performance="balanced"] .unit .shadow,
+html[data-performance="balanced"] #boardLayer {
+  filter: none;
+}
+
 @media (pointer: coarse) {
   /* Drop the blur/blend/glow backdrop layers entirely (embers are also skipped
      at the source in sceneBackdrop.js so they never get built). */

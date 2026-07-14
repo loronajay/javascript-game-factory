@@ -31,6 +31,7 @@ import { renderHeader, renderUnitCard, renderActions, renderSquads, renderWeathe
 import { RulesModal } from "./ui/rulesModal.js";
 import { applyMobileViewport, requestMobileFullscreen } from "./ui/mobileViewport.js";
 import { applyTheme, loadSavedThemeId } from "./ui/themes.js";
+import { applyPerformanceMode, loadPerformanceMode } from "./ui/performanceSettings.js";
 import { shouldShowTurnAnnouncement, turnAnnouncementSub } from "./ui/turnAnnouncement.js";
 import { openChoiceModal } from "./ui/choiceModal.js";
 import { createDialogueSystem } from "./ui/dialogue.js";
@@ -457,6 +458,10 @@ const matchLifecycle = createMatchLifecycleController({
   maybeStartCpuTurn,
 });
 window.tacticalArenaDialogue = dialogue;
+
+// Preserve the full presentation by default; battery saver remains an explicit,
+// persisted option for machines that benefit from shedding ambient effects.
+applyPerformanceMode(loadPerformanceMode());
 
 // Atmospheric battle-view backdrop (parallax sky, fortress, fog, embers). Built
 // once — it's independent of board size and presentation only.

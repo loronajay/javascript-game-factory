@@ -8,6 +8,11 @@ import { ScreenManager } from "./screenManager.js";
 import { createSquadPicker, DEFAULT_SQUAD } from "./squadPicker.js";
 import { createOnlineFlow } from "./onlineFlow.js";
 import { THEMES, applyTheme, loadSavedThemeId, saveThemeId } from "./themes.js";
+import {
+  applyPerformanceMode,
+  loadPerformanceMode,
+  savePerformanceMode,
+} from "./performanceSettings.js";
 import { openSkinGallery } from "./skinGallery.js";
 import { openNicknameGallery } from "./nicknameGallery.js";
 import { getNicknamePref } from "./nicknameModel.js";
@@ -744,6 +749,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   const sfxRange = $("#setSfxVolume", settingsModal);
   const musicRange = $("#setMusicVolume", settingsModal);
   const themeSelect = $("#setTheme", settingsModal);
+  const batterySaverToggle = $("#setBatterySaver", settingsModal);
   const resetProgressBtn = $("#setResetProgressBtn", settingsModal);
   const progressStatus = $("#setProgressStatus", settingsModal);
   let progressStatusTimer = null;
@@ -776,6 +782,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     sfxRange.value = String(Math.round((audio.volume ?? 0.85) * 100));
     musicRange.value = String(Math.round((audio.musicVolume ?? 0.32) * 100));
     themeSelect.value = loadSavedThemeId();
+    batterySaverToggle.checked = loadPerformanceMode() === "balanced";
     resetProgressConfirmation.disarm({ clearStatus: true });
     settingsModal.hidden = false;
   }
@@ -810,6 +817,11 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   soundToggle.addEventListener("change", () => {
     audio.setEnabled(soundToggle.checked);
     syncScreenMusic(audio, screens.active);
+  });
+  batterySaverToggle.addEventListener("change", () => {
+    const mode = batterySaverToggle.checked ? "balanced" : "full";
+    applyPerformanceMode(mode);
+    savePerformanceMode(mode);
   });
   sfxRange.addEventListener("input", () => audio.setVolume(Number(sfxRange.value) / 100));
   musicRange.addEventListener("input", () => audio.setMusicVolume(Number(musicRange.value) / 100));

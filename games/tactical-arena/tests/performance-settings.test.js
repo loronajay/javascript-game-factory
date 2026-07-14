@@ -1,0 +1,59 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+
+import {
+  PERFORMANCE_MODE_STORAGE_KEY,
+  applyPerformanceMode,
+  loadPerformanceMode,
+  savePerformanceMode,
+} from "../src/ui/performanceSettings.js";
+
+function memoryStorage(initial = {}) {
+  const values = new Map(Object.entries(initial));
+  return {
+    getItem(key) { return values.has(key) ? values.get(key) : null; },
+    setItem(key, value) { values.set(key, String(value)); },
+  };
+}
+
+test("full presentation is the default and is applied to the document root", () => {
+  const root = { dataset: {} };
+
+  assert.equal(loadPerformanceMode(memoryStorage()), "full");
+  assert.equal(applyPerformanceMode("unexpected", root), "full");
+  assert.equal(root.dataset.performance, "full");
+});
+
+test("balanced battery-saver mode can be persisted and restored", () => {
+  const storage = memoryStorage();
+
+  savePerformanceMode("balanced", storage);
+
+  assert.equal(storage.getItem(PERFORMANCE_MODE_STORAGE_KEY), "balanced");
+  assert.equal(loadPerformanceMode(storage), "balanced");
+});
+
+test("balanced mode neutralizes continuous action-selection and backdrop repaint costs", () => {
+  const css = readFileSync(new URL("../styles/responsive/performance.css", import.meta.url), "utf8");
+
+  assert.match(css, /data-performance=["']balanced["']/);
+  assert.match(css, /\.tile\.legal-move \.tile-face/);
+  assert.match(css, /\.tile\.legal-attack \.tile-face/);
+  assert.match(css, /#boardLayer/);
+  assert.match(css, /\.bk-aurora/);
+  assert.match(css, /\.bk-rain/);
+  assert.match(css, /\.weather-flake/);
+  assert.match(css, /animation\s*:\s*none\s*!important/);
+  assert.match(css, /filter\s*:\s*none/);
+});
+
+test("the default renderer preserves the original full-board stone texture", () => {
+  const boardCss = readFileSync(new URL("../styles/battle/board.css", import.meta.url), "utf8");
+  const matchHtml = readFileSync(new URL("../html/match-screen.html", import.meta.url), "utf8");
+
+  assert.doesNotMatch(matchHtml, /id="boardTextureLayer"/);
+  assert.match(boardCss, /#boardLayer\s*\{[^}]*filter\s*:\s*url\(#boardStone\)/s);
+  assert.doesNotMatch(boardCss, /#boardTextureLayer/);
+  assert.match(boardCss, /\.unit\.idle:not\(\.spent\) \.body-group\s*\{[^}]*animation\s*:\s*none/s);
+});
