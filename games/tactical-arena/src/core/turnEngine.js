@@ -1,5 +1,5 @@
 import { getUnitType, getWeatherAffinityRestore, getWeatherPassiveRestore, sustainsVictory, takesTurns } from "./unitCatalog.js";
-import { areAllies, areEnemies, findUnit, getTileAffinity, livingUnits, teamOfUnit, unitAt } from "./state.js";
+import { areAllies, areEnemies, findUnit, getTileAffinity, livingUnits, openAutomaticKingActivation, teamOfUnit, unitAt } from "./state.js";
 import { chebyshevDistance } from "../rules/movement.js";
 import { getFireVulnerability, isFireDamageImmune } from "../rules/combat.js";
 import { getGlobalTrueTick } from "../rules/stances.js";
@@ -329,6 +329,7 @@ function advanceTurnIfExhausted(state) {
     resolveVictory(state);
     appendPendingRolloverEvents(state, fireEvents);
     appendPendingRolloverEvents(state, autoSpendStunnedUnits(state, state.currentPlayer));
+    openAutomaticKingActivation(state);
   }
 }
 

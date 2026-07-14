@@ -25,7 +25,7 @@ export function resolveVolcanicPyroclasmTick(state, unit, freeCast, events, { tr
   return true;
 }
 
-// Shared Pyroclasm damage: 5 magic to every enemy on any of the 8 straight rays within
+// Shared Pyroclasm damage: magic damage to every enemy on any of the 8 straight rays within
 // range. Magic honors Defend halving, Dead Zone team reduction, Black Death immunity,
 // and Bruiser-Mode magic vulnerability — exactly like resolveNuke, so a manual cast and
 // the free Volcanic-Rage eruption resolve identically. Mutates `state`; returns the hit
@@ -81,7 +81,7 @@ export function resolveFlight(state, command, art) {
   }]);
 }
 
-// Pyroclasm (Gargoyle): a self-centred line burst — 5 magic to every enemy standing on
+// Pyroclasm (Gargoyle): a self-centred line burst — magic damage to every enemy standing on
 // any of the 8 straight rays within range (a wall/edge stops a ray; a body does NOT).
 // Shares the magic-damage math with the free Volcanic-Rage eruption (applyPyroclasmDamage).
 export function resolvePyroclasm(state, command, art) {

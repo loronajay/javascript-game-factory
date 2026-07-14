@@ -83,8 +83,8 @@ export const GARGOYLE = Object.freeze({
       selfCast: true,
       targeting: Object.freeze({ shape: "lineBurst", range: 3 }),
       damageType: "magic",
-      damage: Object.freeze({ type: "magic", amount: 5, affinity: "fire" }),
-      description: "Erupt lines of fire from all 8 directions: 5 magic damage to every enemy standing on a line within range. (Volcanic Rage: +2 range.)",
+      damage: Object.freeze({ type: "magic", amount: 4, affinity: "fire" }),
+      description: "Erupt lines of fire from all 8 directions: 4 magic damage to every enemy standing on a line within range. (Volcanic Rage: +2 range.)",
       implemented: true,
       ai: Object.freeze({ intent: "lineBurst", evHints: Object.freeze({ minTargets: 2 }), tags: Object.freeze(["aoe"]) })
     }),

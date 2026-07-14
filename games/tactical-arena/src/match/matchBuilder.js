@@ -1,4 +1,4 @@
-import { createBattleState } from "../core/state.js";
+import { createBattleState, openAutomaticKingActivation } from "../core/state.js";
 import { nextRandom } from "../core/rng.js";
 import { getUnitType, takesTurns } from "../core/unitCatalog.js";
 import { createRoster, FORMATS, playerColor } from "../core/roster.js";
@@ -115,11 +115,14 @@ export function createMatchState({
   });
   const flip = nextRandom(state.rngState);
   const turnOrder = state.turnOrder ?? players.map((slot) => slot.id);
-  return {
+  const started = {
     ...state,
     currentPlayer: turnOrder[Math.floor(flip.value * turnOrder.length)] ?? 1,
+    activation: null,
     rngState: flip.state,
   };
+  openAutomaticKingActivation(started);
+  return started;
 }
 
 export function buildSummary(state, { matchStartedAt, initialHpByPlayer }) {

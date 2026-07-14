@@ -111,7 +111,7 @@ test("One With The Flames: fire-based ARTS do not damage the Gargoyle", () => {
   s = run(s, useArt(1, "g1", "pyroclasm", {})).nextState;
 
   assert.equal(findUnit(s, "g2").hp, 30, "enemy Gargoyle ignores Pyroclasm's fire-based damage");
-  assert.equal(findUnit(s, "sw").hp, getUnitType("swordsman").stats.maxHp - 5, "non-immune enemies still burn");
+  assert.equal(findUnit(s, "sw").hp, getUnitType("swordsman").stats.maxHp - 4, "non-immune enemies still burn");
 });
 
 test("One With The Flames: a critical basic attack makes the target tile permanent fire", () => {
@@ -272,7 +272,7 @@ test("Heavy caps Flight range: a +5 Move buff still only extends the fly to 4", 
   assert.ok(!tiles.has(positionKey({ x: 5, y: 10 })), "distance 5 is still out of range");
 });
 
-test("Pyroclasm: 5 magic to every enemy on a ray within range; off-line enemies are spared", () => {
+test("Pyroclasm: 4 magic to every enemy on a ray within range; off-line enemies are spared", () => {
   const state = scenario([
     { id: "g", type: "gargoyle", player: 1, x: 6, y: 6 },
     { id: "vert", type: "swordsman", player: 2, x: 6, y: 8 },   // vertical ray, dist 2
@@ -284,9 +284,9 @@ test("Pyroclasm: 5 magic to every enemy on a ray within range; off-line enemies 
   s = run(s, useArt(1, "g", "pyroclasm", {})).nextState;
 
   const swMax = getUnitType("swordsman").stats.maxHp;
-  assert.equal(findUnit(s, "vert").hp, swMax - 5);
-  assert.equal(findUnit(s, "diag").hp, swMax - 5);
-  assert.equal(findUnit(s, "horiz").hp, swMax - 5);
+  assert.equal(findUnit(s, "vert").hp, swMax - 4);
+  assert.equal(findUnit(s, "diag").hp, swMax - 4);
+  assert.equal(findUnit(s, "horiz").hp, swMax - 4);
   assert.equal(findUnit(s, "off").hp, swMax, "an enemy off every ray is untouched");
 });
 
@@ -364,7 +364,7 @@ test("Volcanic Rage: entering rage from damage immediately erupts Pyroclasm", ()
   assert.equal(erupt.actorId, "g");
   assert.deepEqual(erupt.targetIds, ["arc"]);
   assert.equal(findUnit(s, "g").volcanicCounter, 1, "the immediate eruption starts the cadence");
-  assert.equal(findUnit(s, "arc").hp, getUnitType("archer").stats.maxHp - 5, "the attacker is caught on the ray");
+  assert.equal(findUnit(s, "arc").hp, getUnitType("archer").stats.maxHp - 4, "the attacker is caught on the ray");
 });
 
 test("A non-raging Gargoyle never erupts on begin", () => {

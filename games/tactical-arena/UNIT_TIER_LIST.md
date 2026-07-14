@@ -43,10 +43,10 @@ flexibility across the draft, not by ceiling in one perfect comp.
 - **Big Brother** — unique anti-heal/true-damage tech; near-dead into non-healing comps
 - **Swordsman** — reliable baseline utility bruiser, but outclassed by the rebuild melee
 - **Ronin** — high personal threat, but his anti-team passive fights a 4-unit squad
+- **Miner** — safe, uncontested early setup; a working range-5 ranger throttled by his own ammo economy
 
 ## D — hardest to justify / worst floor
 - **King** — a comeback engine with an S-ceiling, but a genuine liability floor (can't win alone)
-- **Miner** — begins the match unable to function; needs protected setup before he pays off
 - **Archer** — fragile and paradoxical; outclassed by every rebuild ranger
 
 ---

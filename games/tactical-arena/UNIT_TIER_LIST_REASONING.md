@@ -27,7 +27,12 @@ order:
    ore, HP-as-fuel, Snack Break, USES) is what lets a kit function past turn 10.
 6. **Conditionality tax.** Tile/weather/isolation/comp requirements, fragility, and slow
    starts all discount an otherwise strong kit — a high ceiling with a bad floor lands
-   lower than a smaller-but-reliable one.
+   lower than a smaller-but-reliable one. One caveat the board itself enforces: a "slow
+   start" is only a real tax if the enemy can *contest* it. Squads spawn in opposite
+   corners 10–12 tiles apart (13×13 or 15×15), and the fastest turn-one engage in the game
+   covers 6 tiles, so the first several turns are a shared neutral approach for both sides.
+   A unit that spends them setting up (mining, planting, charging) in its own corner is not
+   losing tempo it could have spent fighting — no one is in range to fight yet.
 
 Format assumed: 4-unit squads, 1v1 blind-pick/draft, RAGE at ≤5 HP. A unit that's only
 good inside one bespoke comp is judged on how often that comp is available, not on its
@@ -75,7 +80,7 @@ Ghouls too. That's a huge amount of always-on, no-piloting-required value.
 Stone Body makes him **immune to displacement** (and the ART that tries eats 2 true), Stone
 Ward makes him **immune to every status** (targeted statuses *reflect back onto the caster*),
 Heavy hard-caps his MOVE at 3, and while Defending a melee attacker takes thorns. He is
-unmovable, uncontrollable, and unpleasant to touch. Pyroclasm is real damage — 5 magic to
+unmovable, uncontrollable, and unpleasant to touch. Pyroclasm is real damage — 4 magic to
 every enemy on any of the 8 rays, burning *through* bodies so screening fails. And Volcanic
 Rage is the best rage in the roster: +2 DEF, **permanently Defending while still taking full
 turns** (so he halves everything *and* acts), Pyroclasm +2 range, a **free Pyroclasm the
@@ -263,8 +268,11 @@ Excellent *if she never moves*: Heavy Handed makes her shots hit **harder the fa
 target is (up to +2 at range 4), and Planted stacks +1 STR per turn she holds still, to +4 — so
 she can become an 11-STR range-4 gun that also pierces bodies and double-rolls poison.
 Desperation Shot (rage) is one enormous shot. But **confirming any move wipes the Planted stack
-to zero**, so she's punished for the repositioning a 1v1 usually demands; her value collapses
-the moment she's forced off her tile.
+to zero**, and her range is only 4 — so while a corner turret is a genuinely viable plan (the
+enemy has to close on her, and she out-scales them the longer they take), anything that
+out-ranges her (a Sniper, a caster) or a flanker that finally reaches her tile can force the
+reposition that resets her to nothing. She's strong for exactly as long as she's allowed to
+stand still.
 
 ### Summoner — the tempo gamble
 Converts his own mediocre activation into a **random roster unit that arrives at full HP and
@@ -297,6 +305,18 @@ isolated targets, +1 vs anyone who missed him, self-heal on crit), and Final Dra
 its own damage back onto him. He's a specialist flanker whose kit fights the format; strong in
 the exact isolated duel he's built for, hard to leverage otherwise.
 
+### Miner — the slow-scaling ammo ranger
+His resource is Ore, and he **starts with none** — at 0 ore his range collapses from 5 to **1**.
+That reads scarier than it plays: his opening turns are spent mining in a back corner 10+ tiles
+from any enemy, *in parallel with* their unavoidable approach, so it costs him nothing the board
+wasn't already going to — and a single Ore Harvest (2–5 ore) restores his full range immediately,
+so he's a working range-5 ranger from turn two. The real tax is ongoing, not up-front: every
+ranged shot **spends** the ore that is simultaneously his ammo, his crit chance (per 5 held), and
+his stat line (+1 STR/+1 DEF at max), so sustained fire keeps forcing him back to mining, and his
+best numbers are backloaded behind hoarding he can't do while shooting. A functional ranger with a
+genuine self-throttling economy and no team value — solid but unremarkable, which is C, not the
+"begins the match unable to function" liability an earlier read made him out to be.
+
 ---
 
 # D Tier
@@ -310,19 +330,14 @@ The most piloting-dependent unit in the game. He **cannot move, attack, or Defen
 one global command a turn (Strike/Hold/Pursue/Higher Ground), and each **scales +1 per allied
 unit currently in RAGE**, so a King behind three raging bruisers hands the team +5 STR. That's a
 real comeback engine. But the cost is brutal and structural: he takes **−10 HP every time an ally
-falls** (30 HP ≈ three dead allies and he's gone), he **must act first** (mis-sequence and you can
-soft-lock your turn), and he **does not sustain victory** — a team of only a King has already lost.
+falls** (30 HP ≈ three dead allies and he's gone), he brings **no body to the fight** — he can't
+move, attack, or Defend, so you are effectively fielding three real units in four slots — and he
+**does not sustain victory**: a team of only a King has already lost. (His command is a mandated
+first step each turn, but the engine auto-opens it and simply rejects any out-of-order squadmate
+command with a reminder — it's a rigid rhythm, not a way to brick your turn.)
 Draft him blind, without the dedicated rage-squad and the piloting to ride your units at low HP,
 and he's a four-slot liability. In expert hands inside King Rush he's a different, much better
 unit — but a tier list ranks the reliable case, and his is bad.
-
-### Miner — begins the match unable to do his job
-His resource is Ore, and he **starts with none** — at 0 ore his range collapses from 5 to **1**
-(a ranged unit with no ammunition), and every ranged shot costs ore. So his opening turns are
-spent mining while contributing nothing, and in a fast 1v1 he can be pressured or killed before
-he's online. The payoff is real once stocked (crit per ore, +STR/+DEF at max, a doubling rage),
-but "needs two protected setup turns before he functions" is a heavy tax, and a squad that denies
-him those turns denies the whole unit.
 
 ### Archer — the outclassed legacy ranger
 Paradoxical by design (range 5, but Close Shot pays her to fight at adjacency) on a fragile,
@@ -338,7 +353,7 @@ rebuild most clearly left behind, and there's almost always a better pick for th
 ## A note on the shape of this list
 
 This is a well-tuned roster — the gap from S to C is smaller than in most games, and several C/D
-units have genuinely high ceilings (King, Miner, Ronin, Summoner) that a skilled pilot inside the
+units have genuinely high ceilings (King, Ronin, Summoner) that a skilled pilot inside the
 right comp can absolutely realize. The tiers reflect **reliable, general-draft power**: how much a
 unit gives you when you can't guarantee the perfect supporting cast or flawless sequencing. Read
 alongside `TEAM_COMPS.md` — a C-tier tech piece like Big Brother or a build-around like Mother

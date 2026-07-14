@@ -307,16 +307,21 @@ the match **unable to do his job**. His resource is Ore, not MP, and he starts w
 At 0 ore his attack range collapses from 5 to **1** — a ranged unit with no ammunition is a
 melee unit. Every ranged basic attack costs 1 ore.
 
-So his opening turns are spent mining. Ore Harvest (free) gathers 2–5 ore and grants +1
-MOVE next turn; destroying a wall next to him grants 2 more. Once stocked, he converts:
-+1% crit per 5 ore held, and at **max ore** he gains +1 STR and +1 DEF outright. His ore
+So his first turn is spent mining — uncontested, since both squads spawn a corner apart and
+no enemy is anywhere near range. Ore Harvest (free) gathers 2–5 ore and grants +1 MOVE next
+turn; destroying a wall next to him grants 2 more. One harvest already lifts him off 0 and
+restores his full range 5, so the "unable to do his job" window is a single, safe turn. Once
+stocked, he converts: +1% crit per 5 ore held, and at **max ore** he gains +1 STR and +1 DEF
+outright. His ore
 total is simultaneously his ammo, his crit chance, and his stat line — a genuinely elegant
 piece of design where hoarding and spending are in direct tension.
 
 Adjacent basics deal +2 (his pickaxe), Headlamp blinds an adjacent enemy with no roll, Shaft
 Prop builds a wall, and Blasting Cap is a 3-true-damage blast that pushes and can stun. In
-rage he instantly fills to max ore and doubles the crit conversion. He is a slow-starting,
-snowballing engine — protect him for two turns and he pays it back.
+rage he instantly fills to max ore and doubles the crit conversion. He is a slow-scaling,
+snowballing engine — but the slow part is nearly free (he mines in his corner while the enemy
+is still crossing the board); the real, ongoing tension is that every shot spends the ore that
+is simultaneously his ammo, his crit chance, and his stat line.
 
 ---
 
@@ -655,7 +660,7 @@ simply walk around him — which is exactly why he has Flight: move (MOVE+1, dia
 allowed) and deal 2 true damage to everything within 1 tile of the landing. It's his answer
 to being ignored.
 
-Pyroclasm is the real gun: 5 magic damage to **every enemy standing on any of the 8 straight
+Pyroclasm is the real gun: 4 magic damage to **every enemy standing on any of the 8 straight
 rays** within range — and unlike other line abilities the rays burn *through* bodies, so
 screening doesn't work.
 

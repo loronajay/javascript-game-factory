@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { createBattleState, findUnit } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
-import { beginActivation, useArt, defend } from "../src/core/commands.js";
+import { beginActivation, useArt, defend, finishActivation } from "../src/core/commands.js";
 import {
   getEffectiveStats, getUnitType, getCommandHealBonus, getCommandRangeBonus,
   getCommandBuffStats, sustainsVictory, isCommandOnly
@@ -122,6 +122,24 @@ test("a King-less squad is never touched by the command fold", () => {
     ]
   });
   assert.deepEqual(getCommandBuffStats(findUnit(state, "p1-a"), state), {});
+});
+
+test("a drafted King starts his owner's turn already activated", () => {
+  const state = scenario();
+
+  assert.deepEqual(state.activation, {
+    unitId: "p1-king",
+    origin: { x: 0, y: 0 },
+    moved: false,
+    primaryUsed: false,
+    spellUsed: false,
+    bonusActionGroups: [],
+    realmTraversalActive: false
+  });
+
+  const commanded = run(state, useArt(1, "p1-king", "strike"));
+  assert.equal(findUnit(commanded.nextState, "p1-king").spent, true);
+  assert.equal(findUnit(commanded.nextState, "p1-king").command, "strike");
 });
 
 test("the King must command before any squadmate may act", () => {
@@ -259,6 +277,38 @@ test("the CPU commands its King first, then plays the rest of the squad — no s
   const second = chooseActivation(s, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(s) });
   assert.notEqual(findUnit(s, second[0].unitId).type, "king");
   for (const c of second) { const r = applyCommand(s, c); assert.ok(r.accepted, `${c.type} rejected (${r.errorCode})`); s = r.nextState; }
+});
+
+test("turn rollover into a King squad starts with the King already open and CPU resumes it", () => {
+  const state = createBattleState({
+    size: 13, seed: 5,
+    units: [
+      { id: "p1-sword", type: "swordsman", player: 1, x: 1, y: 12 },
+      { id: "p2-king", type: "king", player: 2, x: 12, y: 0 },
+      { id: "p2-sword", type: "swordsman", player: 2, x: 10, y: 2 }
+    ]
+  });
+
+  let r = run(state, beginActivation(1, "p1-sword"));
+  r = run(r.nextState, defend(1, "p1-sword"));
+  r = run(r.nextState, finishActivation(1, "p1-sword"));
+  const rolled = r.nextState;
+  assert.equal(rolled.currentPlayer, 2);
+  assert.equal(rolled.activation?.unitId, "p2-king");
+
+  const commands = chooseActivation(rolled, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(rolled) });
+  assert.ok(commands.length > 0);
+  assert.equal(commands.some((command) => command.type === "BEGIN_ACTIVATION"), false);
+  assert.equal(commands[0].type, "USE_ART");
+
+  let s = rolled;
+  for (const c of commands) {
+    const applied = applyCommand(s, c);
+    assert.ok(applied.accepted, `${c.type} rejected (${applied.errorCode})`);
+    s = applied.nextState;
+  }
+  assert.equal(findUnit(s, "p2-king").spent, true);
+  assert.equal(s.activation, null);
 });
 
 test("the King always spawns on the far corner cell", () => {

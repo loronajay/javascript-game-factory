@@ -170,7 +170,7 @@ export function createBattleState({
   const activeWeather = normalizeWeatherSpec(weather) ??
     normalizeWeatherSpec(roster.find((unit) => unit?.weather && (unit.hp ?? 1) > 0)?.weather);
 
-  return {
+  const state = {
     size,
     format,
     teamNames: normalizeTeamNames(teamNames),
@@ -196,6 +196,31 @@ export function createBattleState({
     rngState: createRngState(seed ?? (Date.now() & 0xffffffff)),
     restorePolarityShift: false
   };
+  openAutomaticKingActivation(state);
+  return state;
+}
+
+export function openAutomaticKingActivation(state) {
+  if (!state || state.phase !== "playing" || state.activation) return false;
+  const king = state.units?.find((unit) => {
+    if (unit.hp <= 0 || unit.player !== state.currentPlayer || unit.spent || unit.commandTurn === state.turnNumber) {
+      return false;
+    }
+    const definition = getUnitType(unit.type);
+    return unit.type === "king" && definition.actsFirst && definition.commandOnly;
+  });
+  if (!king) return false;
+  king.defending = false;
+  state.activation = {
+    unitId: king.id,
+    origin: { ...king.position },
+    moved: false,
+    primaryUsed: false,
+    spellUsed: false,
+    bonusActionGroups: [],
+    realmTraversalActive: false
+  };
+  return true;
 }
 
 const MAX_TEAM_NAME_LENGTH = 20;

@@ -1,7 +1,13 @@
-    <!-- Field Manual — four-tab reference overlay reachable from the title,
-         main menu, and in-match topbar. Basics, Advanced, and Synergy Tips are static content;
-         the Codex tab is populated dynamically by rulesModal.js. When opened
-         from a live match, the Codex tab is filtered to units in that battle. -->
+    <!-- Field Manual — five-tab reference overlay reachable from the title,
+         main menu, and in-match topbar. Basics, Systems, Advanced, and Synergy Tips
+         are static content; the Codex tab is populated dynamically by rulesModal.js.
+         When opened from a live match, the Codex tab is filtered to units in that
+         battle. Content scoping (keep each tab at one altitude):
+           Basics   — only the rules needed to take a legal, informed activation.
+           Systems  — general board/piece mechanics that reach across units.
+           Codex    — per-unit stats and kits (generated).
+           Advanced — tactics that build on the rules; no hard-coded balance numbers.
+           Synergy  — grounded pairings (covered by tests/field-manual.test.js). -->
     <div id="refModal" class="ref-modal" hidden>
       <div class="ref-card manual-card">
         <header class="ref-head">
@@ -11,28 +17,42 @@
           </div>
           <nav class="ref-tabs" role="tablist">
             <button class="ref-tab is-active" data-tab="basics" type="button">Basics</button>
+            <button class="ref-tab" data-tab="systems" type="button">Systems</button>
             <button class="ref-tab" data-tab="codex" type="button">Codex</button>
             <button class="ref-tab" data-tab="advanced" type="button">Advanced</button>
             <button class="ref-tab" data-tab="synergy" type="button">Synergy Tips</button>
           </nav>
         </header>
 
-        <!-- Basics: onboarding rules. -->
+        <!-- Basics: only what a player needs to take a legal, informed turn.
+             Board and piece mechanics beyond the turn itself live in Systems. -->
         <div class="ref-panel is-active" data-panel="basics">
           <ul class="ref-rules">
             <li>Each player activates every living piece once per squad turn. <strong>Last squad standing wins.</strong></li>
-            <li>A piece may move then act, or act then move — but <strong>a move-alone activation is not allowed.</strong> Every activation must end with an attack, ART, or Defend.</li>
-            <li>An <strong>ART replaces the whole activation</strong> and cannot be used after moving or attacking. ARTS spend MP; MP never auto-recovers.</li>
-            <li>Physical damage = <strong>max(1, STR − DEF)</strong>. Magic ignores DEF. True damage bypasses both DEF and Defend.</li>
-            <li>Attack rolls: <strong>7% miss, 15% critical</strong> (×1.5 damage). Blind units always miss. Attacking ARTS roll twice — first to hit, then for their status or heal effect. A missed swing lands no effect.</li>
-            <li><strong>Defend</strong> halves all incoming physical and magic damage (rounded up) until the unit next activates.</li>
+            <li>An activation is <strong>move then act</strong> or <strong>act then move</strong> — but <strong>a move-alone activation is not allowed.</strong> Every activation ends with an attack, ART, or Defend.</li>
+            <li>An <strong>ART replaces the whole activation</strong> and cannot follow a move or attack. ARTS spend MP (or an alternate resource); <strong>MP never auto-recovers.</strong></li>
+            <li>Physical damage = <strong>max(1, STR − DEF)</strong>. Magic ignores DEF. <strong>True damage</strong> bypasses both DEF and Defend.</li>
+            <li>Attacks roll <strong>7% miss, 15% critical</strong> (×1.5 damage). Attacking ARTS roll first to hit, then separately for their status or heal effect — <strong>a missed swing lands no effect.</strong></li>
+            <li><strong>Defend</strong> halves incoming physical and magic damage (rounded up) until the unit next activates.</li>
             <li><strong>RAGE</strong> triggers automatically at 5 HP or lower. Read each unit's Codex entry for its specific bonus.</li>
-            <li>Volley Shot and Footwork deal <strong>true damage</strong> and never roll to hit.</li>
-            <li>Status effects come in five flavors — <strong>blind</strong> (miss attacks), <strong>silence</strong> (no ARTS), <strong>poison</strong> (damage each activation start, usually permanent until cleansed), <strong>slow</strong> (reduced Move), and <strong>stun</strong> (skip the turn entirely). Check each unit's Codex entry for immunities.</li>
-            <li>Some units place battlefield objects — destructible <strong>walls</strong> block movement and line of sight, and <strong>fire</strong> burns anyone standing on it each turn rollover.</li>
-            <li><strong>Summoned units</strong> (like the Necromancer's Ghoul) occupy a tile and can be killed, but never take their own turn and don't count toward victory — defeat is decided by living squad commanders only.</li>
-            <li>A few units are <strong>non-combatant commanders</strong> (like the King) — they never attack, must be given a command before any other unit on their side can act, and losing them alone doesn't end the match unless they're the last piece standing.</li>
-            <li>Some units carry an always-on <strong>aura</strong> that buffs allies or debuffs enemies near them — its reach is shown as a tinted zone on the board.</li>
+          </ul>
+          <p class="ref-note">New here? These seven rules are enough to play a legal turn. The <strong>Systems</strong> tab explains statuses, summons, auras, and other board mechanics; the <strong>Codex</strong> lists every unit's exact kit.</p>
+        </div>
+
+        <!-- Systems: general board/piece mechanics that reach across many units.
+             Kept free of hard-coded durations/values — those live per-ability in the
+             Codex so this tab never goes stale when a unit is retuned. -->
+        <div class="ref-panel" data-panel="systems">
+          <ul class="ref-rules">
+            <li><strong>Status effects (debuffs).</strong> Five kinds — <strong>blind</strong> (next attack misses), <strong>silence</strong> (no ARTS), <strong>poison</strong> (damage at each activation start, usually permanent until cleansed), <strong>slow</strong> (reduced Move), and <strong>stun</strong> (auto-spent, can't be selected). Durations vary per ability — check the Codex — and some units are immune to specific statuses.</li>
+            <li><strong>Buffs.</strong> Many ARTS and passives grant temporary boosts instead — extra STR, DEF, Move, or range on an ally. Like debuffs, buffs run on a duration and then expire.</li>
+            <li><strong>True damage.</strong> A growing set of abilities deal damage that ignores both DEF and Defend. It's the answer to high-armor walls and permanent-defend plans — when a target hides behind armor, reach for a true-damage option.</li>
+            <li><strong>Auras.</strong> Some units carry an always-on zone that buffs nearby allies or debuffs nearby enemies. Its reach shows as a tinted area on the board, so positioning in or out of it matters as much as targeting.</li>
+            <li><strong>Battlefield objects.</strong> Certain units place objects on tiles: destructible <strong>walls</strong> block movement and line of sight until knocked down, and <strong>fire</strong> burns any unit standing on it at each turn rollover.</li>
+            <li><strong>Summoned units.</strong> Summons (like the Necromancer's Ghoul) occupy a tile and can be killed, but never take their own turn and don't count toward victory — defeat is decided by living squad commanders only.</li>
+            <li><strong>Non-combatant commanders.</strong> A few pieces (like the King) never attack and must be given a command before the rest of their squad can act. Losing one alone doesn't end the match unless it's the last piece standing.</li>
+            <li><strong>Weather.</strong> Some casters change the whole board's weather — blizzard, spring shower, heatwave, or thunderstorm — each shifting something (range, restoration, crits, or ART costs) for everyone until it changes.</li>
+            <li><strong>Board polarity.</strong> The board is a checkerboard of light and dark tiles. A handful of units gain effects from the tile they stand on, so where a piece sits can be part of its kit.</li>
           </ul>
         </div>
 
@@ -41,21 +61,21 @@
           <div id="refBody"></div>
         </div>
 
-        <!-- Advanced: strategy tips. -->
+        <!-- Advanced: tactics that build on the rules. No restated rules and no
+             hard-coded balance numbers — those belong in Basics and the Codex. -->
         <div class="ref-panel" data-panel="advanced">
           <ul class="ref-tips">
-            <li><strong>Kill before spreading.</strong> A dead unit can't act — focus fire one target completely rather than chipping multiple enemies.</li>
-            <li><strong>Time your debuffs.</strong> Status durations vary by ability — check each ability's description. The current Blind and Silence abilities each last 1 turn, so cast them right before the enemy's activation for maximum disruption.</li>
-            <li><strong>Poison is permanent.</strong> Unlike Blind and Silence, Poison never fades. Stack it on high-HP targets who will take many activation-start ticks before they fall.</li>
-            <li><strong>Respect RAGE.</strong> Units at 5 HP or below become more dangerous. Finish low-HP targets rather than leaving them to activate with RAGE bonuses.</li>
-            <li><strong>Defend is timing-based.</strong> It halves all hits until the unit next acts. Use it when multiple enemies will attack before your next squad turn.</li>
-            <li><strong>Footwork is a traversal tool.</strong> It passes through enemies for 2 true damage each tile — use it to reach a backline target and chip the frontline in the same activation.</li>
-            <li><strong>MP is scarce.</strong> ARTS never recover MP. Save it for activations where it changes the outcome, not just any time you can afford the cost.</li>
-            <li><strong>Volley Shot punishes clusters.</strong> Aim the cone to hit multiple enemies. Close Shot bonuses still apply per target — the Archer can hit harder up close than expected.</li>
-            <li><strong>Read each unit's full kit in the Codex.</strong> The roster has grown well past the original four — many units bring auras, summons, stances, or battlefield objects (walls, fire) that change how a fight should be planned, not just what damage rolls do.</li>
-            <li><strong>Auras reward positioning, not just targeting.</strong> A unit with a buff/debuff aura is doing work just by standing still — pull your units out of an enemy's debuff zone, or hold formation inside your own buff zone.</li>
-            <li><strong>Commanders must be managed first.</strong> If your side has a non-combatant commander unit, its command is spent before anyone else can act each squad turn — plan that command around what your squad needs that turn.</li>
-            <li><strong>Destructible walls buy time, not kills.</strong> Use them to block a lane or protect a low-HP ally for a turn, but remember they can be knocked down.</li>
+            <li><strong>Kill before spreading.</strong> A dead unit can't act — focus fire one target completely rather than chipping several enemies.</li>
+            <li><strong>Time your disables.</strong> Short-lived debuffs — blind, silence, slow, stun — do the most work when cast right before the enemy would act. Deny the activation you fear most, not the first one you can reach.</li>
+            <li><strong>Poison rewards patience.</strong> Because poison usually never fades, stack it on high-HP targets who will eat many activation-start ticks before they fall.</li>
+            <li><strong>Respect RAGE.</strong> Units at 5 HP or below become more dangerous. Finish low-HP targets rather than leaving them to activate with a RAGE bonus.</li>
+            <li><strong>Defend against the crowd.</strong> Defend halves every hit until the unit next acts — raise it when several enemies will swing before your next squad turn, not by reflex.</li>
+            <li><strong>Spend MP on swings, not fillers.</strong> ARTS never refund MP. Save it for the activation that changes the outcome, not any time you can afford the cost.</li>
+            <li><strong>True damage answers armor.</strong> When a high-DEF body or a permanent-defend plan stonewalls you, switch to an ability that ignores DEF and Defend outright.</li>
+            <li><strong>Auras reward standing still.</strong> A buff or debuff aura works just by existing — hold formation inside your own zone, and pull units out of the enemy's.</li>
+            <li><strong>Sequence your commander.</strong> If your side has a non-combatant commander, its command is spent first each turn — plan that command around what the squad needs, not by habit.</li>
+            <li><strong>Walls buy time, not kills.</strong> Use destructible cover to stall a lane or shield a low-HP ally for a turn, and expect it to come down.</li>
+            <li><strong>Read the whole board.</strong> Weather, tile polarity, summons, and auras change a fight's math. Check what's active before committing a plan — the roster brings far more than raw damage rolls, and each unit's full kit is in the Codex.</li>
           </ul>
         </div>
 

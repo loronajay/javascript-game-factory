@@ -103,6 +103,7 @@ export function createMatchLifecycleController({
     runtime.applyingRemote = false;
     restartControl.hidden = online;
     clearInteraction();
+    if (state.activation?.unitId) interaction.selectedId = state.activation.unitId;
     runtime.resolving = false;
     turnFlash.clear();
 
