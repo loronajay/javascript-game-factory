@@ -240,6 +240,24 @@ test("Explosion (RAGE) detonates poisoned enemies for 10, splashes 5, and consum
   assert.equal(findUnit(next, "p1-virus").hp, 0, "Virus is consumed");
 });
 
+test("Explosion awards the match to Virus when the sacrifice defeats the last enemy", () => {
+  const state = createBattleState({
+    size: 7,
+    units: [
+      { id: "p1-virus", player: 1, type: "virus", hp: 4, x: 0, y: 0 },
+      { id: "p2-poison", player: 2, type: "swordsman", hp: 10, x: 4, y: 4, statuses: [poison()] }
+    ]
+  });
+
+  const opened = begin(state, "p1-virus");
+  const result = applyCommand(opened, useArt(1, "p1-virus", "explosion"));
+  assert.ok(result.accepted, result.errorCode);
+  assert.equal(findUnit(result.nextState, "p2-poison").hp, 0, "the last enemy falls");
+  assert.equal(findUnit(result.nextState, "p1-virus").hp, 0, "Virus still pays the sacrifice");
+  assert.equal(result.nextState.phase, "complete");
+  assert.equal(result.nextState.winner, 1);
+});
+
 test("Explosion is unusable with no poisoned enemy, and unusable at full HP", () => {
   const raging = createBattleState({
     size: 7,

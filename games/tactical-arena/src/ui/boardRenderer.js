@@ -637,8 +637,11 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   if (actor && mode === "art:build-cover") legal = getWallPlacementTiles(state, actor, getArt(actor.type, "build-cover"));
   if (actor && mode === "art:shaft-prop") legal = getWallPlacementTiles(state, actor, getArt(actor.type, "shaft-prop"));
   if (actor && mode === "art:throw-cigar") legal = getFirePlacementTiles(state, actor, getArt(actor.type, "throw-cigar"));
-  // Rewind places a revived ally on an empty tile within range (same rule as a summon).
-  if (actor && mode === "art:rewind") legal = getRevivePlacementTiles(state, actor, getArt(actor.type, "rewind"));
+  // Revive arts place a fallen ally on an empty tile within range (same rule as a summon).
+  if (actor && mode?.startsWith("art:")) {
+    const reviveArt = getArt(actor.type, mode.slice("art:".length));
+    if (reviveArt?.targeting?.shape === "revive") legal = getRevivePlacementTiles(state, actor, reviveArt);
+  }
 
   if (actor && mode?.startsWith("art:")) {
     const protectArt = getArt(actor.type, mode.slice("art:".length));

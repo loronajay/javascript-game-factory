@@ -99,9 +99,10 @@ export const FAT_WIZARD = Object.freeze({
       zapDamageBonus: 3,
       zapCritStatus: Object.freeze({ status: "stun", durationTurns: 1 }),
       zapSplashOnHit: Object.freeze({ amount: 2, critAmount: 3 }),
-      surgeSplashOnHit: Object.freeze({ amount: 2 })
+      surgeSplashOnHit: Object.freeze({ amount: 2 }),
+      attackDamageType: "magic"
     }),
-    description: "RAGE: Zap! and Surge cost no MP. Zap! gains +3 damage, splashes on hit, and stuns instead of silencing on crit. Surge splashes healing on hit.",
+    description: "RAGE: basic attacks deal magic damage. Zap! and Surge cost no MP. Zap! gains +3 damage, splashes on hit, and stuns instead of silencing on crit. Surge splashes healing on hit.",
     implemented: true
   })
 });

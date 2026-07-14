@@ -15,6 +15,8 @@
 //   • `focusPrayer` resolution (Focus Prayer) — a friendly heal that ROLLS to-hit; on a hit
 //     it heals, on a miss the prayer backfires and inflicts a random negative status on the
 //     ally for 1 turn instead.
+//   • revive (Second Helping) — a RAGE ART using the shared Rewind-style fallen-ally
+//     placement flow, but restoring only half HP rounded up.
 //   • `teamCompositionStats` (Brothers in Arms) — the existing squad-synergy seam: +1 MOVE /
 //     +1 DEF while Fat Knight, Fat Wizard, AND Fat Bowman all share her team.
 //   • `rageRegen` (Emergency Snacks) — a per-turn RAGE regen fired in beginActivation: +1 HP
@@ -99,6 +101,19 @@ export const FAT_CLERIC = Object.freeze({
       implemented: true,
       ai: Object.freeze({ intent: "healAlly", tags: Object.freeze(["heal"]) })
     }),
+    Object.freeze({
+      id: "second-helping",
+      name: "Second Helping",
+      kind: "active",
+      mpCost: 15,
+      rageLocked: true,
+      resolution: "rewind",
+      targeting: Object.freeze({ shape: "revive", radius: 3 }),
+      revive: Object.freeze({ hpFraction: 0.5 }),
+      description: "RAGE: Bring a fallen ally back onto a tile within 3, restored to 50% HP rounded up with statuses cleared. Their MP is not restored.",
+      implemented: true,
+      ai: Object.freeze({ intent: "revive", tags: Object.freeze(["revive", "rageOnly"]) })
+    }),
     // Brothers in Arms: the fat squad fights better together. +1 MOVE / +1 DEF while the
     // whole family (Fat Knight, Fat Wizard, Fat Bowman) shares her team. A kind:"passive"
     // arts entry picked up by teamCompositionStats in getEffectiveStats.
@@ -124,8 +139,8 @@ export const FAT_CLERIC = Object.freeze({
     name: "Emergency Snacks",
     kind: "passive",
     mpCost: 0,
-    effect: Object.freeze({ type: "rageRegen", hp: 1, exitMp: 5, maxProcs: 3 }),
-    description: "At 5 HP or lower, restore 1 HP at the start of each of Fat Cleric's turns; if that heal lifts her back above 5 HP she also restores 5 MP. Happens at most 3 times per battle.",
+    effect: Object.freeze({ type: "rageRegen", hp: 1, exitMp: 5, maxProcs: 3, attackDamageType: "magic" }),
+    description: "At 5 HP or lower, basic attacks deal magic damage and Fat Cleric restores 1 HP at the start of each turn; if that heal lifts her back above 5 HP she also restores 5 MP. Happens at most 3 times per battle.",
     implemented: true
   })
 });

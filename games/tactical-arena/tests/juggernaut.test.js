@@ -304,6 +304,24 @@ test("Self Destruct bypasses Defend (true damage)", () => {
   assert.equal(findUnit(r.nextState, "p2-foe").hp, getUnitType("swordsman").stats.maxHp - 10); // full 10, Defend ignored
 });
 
+test("Self Destruct awards the match to Juggernaut when the sacrifice defeats the last enemy", () => {
+  const state = createBattleState({
+    size: 13,
+    seed: 12,
+    units: [
+      { id: "p1-jug", type: "juggernaut", player: 1, x: 5, y: 5, hp: 4 },
+      { id: "p2-foe", type: "swordsman", player: 2, x: 6, y: 5, hp: 10 }
+    ]
+  });
+
+  let r = run(state, beginActivation(1, "p1-jug"));
+  r = run(r.nextState, useArt(1, "p1-jug", "self-destruct"));
+  assert.equal(findUnit(r.nextState, "p2-foe").hp, 0, "the last enemy falls");
+  assert.equal(findUnit(r.nextState, "p1-jug").hp, 0, "Juggernaut still pays the sacrifice");
+  assert.equal(r.nextState.phase, "complete");
+  assert.equal(r.nextState.winner, 1);
+});
+
 test("getLineReachTiles washes the full reach of every ray, stopping AT the first unit", () => {
   // Foe 3 tiles down the +y ray; a far ally further along the same ray is behind it.
   const state = scenario({ foe: { x: 5, y: 8 }, ally: { x: 4, y: 4 }, far: { id: "p2-far", type: "swordsman", player: 2, x: 5, y: 11 } });

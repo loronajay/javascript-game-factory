@@ -2,9 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { applyCommand } from "../src/core/reducer.js";
-import { beginActivation, finishActivation, moveUnit, useArt } from "../src/core/commands.js";
+import { attack, beginActivation, finishActivation, moveUnit, useArt } from "../src/core/commands.js";
 import { createBattleState, findUnit } from "../src/core/state.js";
 import { getArt, UNIT_TYPES } from "../src/core/unitCatalog.js";
+import { getBasicAttackDamageType } from "../src/rules/combat.js";
 import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
 
 function begin(state, unitId, player = 1) {
@@ -113,6 +114,45 @@ test("raging Mystic can move before using an ART", () => {
   const finished = applyCommand(cast.nextState, finishActivation(1, "mystic"));
   assert.ok(finished.accepted, finished.errorCode);
   assert.equal(findUnit(finished.nextState, "mystic").spent, true);
+});
+
+test("Mystic restores 15 MP when entering rage", () => {
+  const state = createBattleState({
+    size: 7,
+    units: [
+      { id: "sword", player: 1, type: "swordsman", x: 0, y: 1 },
+      { id: "mystic", player: 2, type: "mystic", x: 0, y: 0, hp: 11, mp: 10 }
+    ]
+  });
+
+  const result = applyCommand(begin(state, "sword"), attack(1, "sword", "mystic", { attackRoll: 0.5, critRoll: 0.99 }));
+  assert.ok(result.accepted, result.errorCode);
+  assert.equal(findUnit(result.nextState, "mystic").hp, 5);
+  assert.equal(findUnit(result.nextState, "mystic").mp, 25);
+  assert.ok(result.events.some((event) =>
+    event.type === "RAGE_REGENERATE" &&
+    event.unitId === "mystic" &&
+    event.hpRestored === 0 &&
+    event.mpRestored === 15
+  ));
+});
+
+test("raging Mystic basic attacks deal magic damage", () => {
+  assert.equal(getBasicAttackDamageType({ type: "mystic", hp: 5 }), "magic");
+  assert.equal(getBasicAttackDamageType({ type: "mystic", hp: 6 }), "physical");
+
+  const state = createBattleState({
+    size: 7,
+    units: [
+      { id: "mystic", player: 1, type: "mystic", x: 0, y: 0, hp: 5 },
+      { id: "foe", player: 2, type: "swordsman", x: 0, y: 5 }
+    ]
+  });
+
+  const result = applyCommand(begin(state, "mystic"), attack(1, "mystic", "foe", { attackRoll: 0.5, critRoll: 0.99 }));
+  assert.ok(result.accepted, result.errorCode);
+  assert.equal(findUnit(result.nextState, "foe").hp, 20);
+  assert.equal(result.events[0].damage, 5);
 });
 
 test("raging Mystic can move after using an ART", () => {

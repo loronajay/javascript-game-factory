@@ -160,12 +160,12 @@ export async function presentInstantArt({
       const enemy = targetBefore.player !== actorBefore.player;
       await effects.floatText(unitCenter(createBoardMetrics(state.size), targetBefore), enemy ? "SLOW" : "HASTE", enemy ? "#70b7ff" : "#8cf0a4");
     }
-  } else if (resolved?.artId === "rewind") {
-    // The revived ally rises from the placement tile (summon-rise motif, warm palette).
+  } else if (resolved?.revivedUnitId) {
+    // The revived ally rises from the placement tile (summon-rise motif).
     const revived = findUnit(result.nextState, resolved.revivedUnitId);
     if (revived) {
-      await effects.playAbilityVfx("rewind", { actor: actorBefore ?? revived, targets: [revived] });
-      await effects.floatText(unitCenter(createBoardMetrics(state.size), revived), "REWIND", "#f7e9c0");
+      await effects.playAbilityVfx(resolved.artId, { actor: actorBefore ?? revived, targets: [revived] });
+      await effects.floatText(unitCenter(createBoardMetrics(state.size), revived), "REVIVE", "#f7e9c0");
     }
   } else if (resolved?.stance !== undefined && actorBefore) {
     // Witch Doctor dances: a global team/board ritual, never a single-target cast.

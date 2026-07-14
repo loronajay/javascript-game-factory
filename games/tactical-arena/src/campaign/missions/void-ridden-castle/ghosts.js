@@ -123,6 +123,7 @@ const BULWARK_FAKE_NAMES = Object.freeze({
   hope: "Comfort",
   cleanse: "Purge",
   "focus-prayer": "Fervent Prayer",
+  "second-helping": "Mercy Plate",
   // father-time
   age: "Wither Years",
   "time-stretch": "Slow Hand",

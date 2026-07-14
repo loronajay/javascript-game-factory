@@ -278,3 +278,18 @@ test("Banish: RAGE-only, destroys every enemy on a dark tile and consumes Blacks
   const noDark = run(scenario({ blacksword: { hp: 5 }, units: [{ id: "light", player: 2, type: "swordsman", x: 6, y: 6 }], tiles: [{ x: 6, y: 6, affinity: "light" }] }), beginActivation(1, "bs")).nextState;
   assert.equal(canUseArt(noDark, findUnit(noDark, "bs"), "banish-dark"), false, "no enemy on a dark tile → unusable");
 });
+
+test("Banish awards the match to Blacksword when the sacrifice defeats the last enemy", () => {
+  const state = scenario({
+    blacksword: { hp: 5 },
+    units: [{ id: "dark", player: 2, type: "swordsman", hp: 25, x: 5, y: 5 }],
+    tiles: [{ x: 5, y: 5, affinity: "dark" }]
+  });
+
+  let s = run(state, beginActivation(1, "bs")).nextState;
+  s = run(s, useArt(1, "bs", "banish-dark")).nextState;
+  assert.equal(findUnit(s, "dark").hp, 0, "the last enemy falls");
+  assert.equal(findUnit(s, "bs").hp, 0, "Blacksword still pays the sacrifice");
+  assert.equal(s.phase, "complete");
+  assert.equal(s.winner, 1);
+});

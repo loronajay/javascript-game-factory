@@ -55,7 +55,7 @@ export function createMatchLifecycleController({
     interaction.mode = null;
     interaction.footworkPath = [];
     interaction.volleyShotOrigin = null;
-    interaction.rewindTargetId = null;
+    interaction.reviveTargetId = null;
   }
 
   function start(config) {

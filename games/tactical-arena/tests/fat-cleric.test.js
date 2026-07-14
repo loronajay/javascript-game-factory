@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 
 import { createBattleState, findUnit } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
-import { beginActivation, defend, finishActivation, moveUnit, useArt } from "../src/core/commands.js";
+import { attack, beginActivation, defend, finishActivation, moveUnit, useArt } from "../src/core/commands.js";
 import { getEffectiveStats, getUnitType } from "../src/core/unitCatalog.js";
 import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
+import { getBasicAttackDamageType } from "../src/rules/combat.js";
 import { NEGATIVE_STATUS_TYPES } from "../src/rules/statuses.js";
-import { generatePlans, toCommands } from "../src/ai/plans.js";
+import { generatePlans, projectPlan, toCommands } from "../src/ai/plans.js";
 
 function run(state, command) {
   const result = applyCommand(state, command);
@@ -178,6 +179,34 @@ test("Focus Prayer: cannot target self", () => {
   assert.equal(applyCommand(s, useArt(1, "fc", "focus-prayer", { targetId: "fc", ...HIT })).accepted, false);
 });
 
+// --- Second Helping (RAGE) --------------------------------------------------
+
+test("Second Helping is rage-locked, then revives a fallen ally at half HP rounded up", () => {
+  const healthy = scenario([
+    { id: "fc", type: "fat-cleric", player: 1, x: 5, y: 5, hp: 10, mp: 15 },
+    { id: "ally", type: "swordsman", player: 1, x: 6, y: 5, hp: 0, mp: 3 }
+  ]);
+  let s = run(healthy, beginActivation(1, "fc")).nextState;
+  const denied = applyCommand(s, useArt(1, "fc", "second-helping", { targetId: "ally", targetPosition: { x: 4, y: 5 } }));
+  assert.equal(denied.accepted, false);
+  assert.equal(denied.errorCode, "ART_NOT_AVAILABLE");
+
+  const raging = scenario([
+    { id: "fc", type: "fat-cleric", player: 1, x: 5, y: 5, hp: 4, mp: 15 },
+    { id: "ally", type: "swordsman", player: 1, x: 6, y: 5, hp: 0, mp: 3, statuses: [{ type: "poison", duration: "permanent" }] },
+    { id: "enemy", type: "swordsman", player: 2, x: 12, y: 12 }
+  ]);
+  s = run(raging, beginActivation(1, "fc")).nextState;
+  const res = run(s, useArt(1, "fc", "second-helping", { targetId: "ally", targetPosition: { x: 4, y: 5 } }));
+  const revived = findUnit(res.nextState, "ally");
+  assert.equal(revived.hp, Math.ceil(getUnitType("swordsman").stats.maxHp / 2));
+  assert.equal(revived.mp, 3, "MP is not restored");
+  assert.deepEqual(revived.position, { x: 4, y: 5 });
+  assert.deepEqual(revived.statuses, []);
+  assert.equal(revived.spent, true);
+  assert.equal(findUnit(res.nextState, "fc").mp, 0, "15 MP spent");
+});
+
 // --- Brothers in Arms -------------------------------------------------------
 
 test("Brothers in Arms: dormant without the full fat family on her team", () => {
@@ -231,12 +260,30 @@ test("Emergency Snacks: does not trigger when she is not raging", () => {
   assert.equal(findUnit(res.nextState, "fc").emergencySnackCount, 0);
 });
 
+test("raging Fat Cleric basic attacks deal magic damage", () => {
+  assert.equal(getBasicAttackDamageType({ type: "fat-cleric", hp: 6 }), "physical");
+  assert.equal(getBasicAttackDamageType({ type: "fat-cleric", hp: 5 }), "magic");
+
+  const state = scenario([
+    { id: "fc", type: "fat-cleric", player: 1, x: 5, y: 5, hp: 4 },
+    { id: "target", type: "swordsman", player: 2, x: 5, y: 9 }
+  ]);
+  const s = run(state, beginActivation(1, "fc")).nextState;
+  const result = run(s, attack(1, "fc", "target", HIT));
+  const event = result.events.find((e) => e.type === "ATTACK_RESOLVED");
+
+  assert.equal(findUnit(s, "fc").hp, 5, "Emergency Snacks keeps her in RAGE after activation");
+  assert.equal(event.damage, 7);
+  assert.equal(findUnit(result.nextState, "target").hp, 18);
+});
+
 // --- assets / VFX / AI ------------------------------------------------------
 
 test("Fat Cleric's active ARTS all register a VFX recipe", () => {
   assert.equal(getAbilityVfx("hope").type, "healPulse");
   assert.equal(getAbilityVfx("cleanse").type, "projectileFan");
   assert.equal(getAbilityVfx("focus-prayer").type, "healPulse");
+  assert.equal(getAbilityVfx("second-helping").type, "summonRise");
 });
 
 test("CPU: Fat Cleric's support plans (Hope/Cleanse/Focus Prayer) replay cleanly", () => {
@@ -257,4 +304,37 @@ test("CPU: Fat Cleric's support plans (Hope/Cleanse/Focus Prayer) replay cleanly
       s = result.nextState;
     }
   }
+});
+
+test("CPU: raging Fat Cleric offers Second Helping revive plans that replay cleanly", () => {
+  const state = scenario([
+    { id: "fc", type: "fat-cleric", player: 1, x: 5, y: 5, hp: 4, mp: 15 },
+    { id: "fallen", type: "archer", player: 1, x: 6, y: 5, hp: 0 },
+    { id: "e", type: "swordsman", player: 2, x: 10, y: 10 }
+  ]);
+  const plans = generatePlans(state, findUnit(state, "fc"));
+  assert.ok(plans.some((p) => p.primary.artId === "second-helping" && p.primary.targetId === "fallen" && p.primary.targetPosition),
+    "expected a Second Helping plan targeting the fallen ally + a tile");
+  for (const plan of plans) {
+    let s = state;
+    for (const command of toCommands(1, plan)) {
+      const result = applyCommand(s, command);
+      assert.ok(result.accepted, `${plan.primary.artId ?? plan.primary.kind} -> ${command.type} rejected (${result.errorCode})`);
+      s = result.nextState;
+    }
+  }
+});
+
+test("CPU projection values Second Helping at half HP, rounded up", () => {
+  const state = scenario([
+    { id: "fc", type: "fat-cleric", player: 1, x: 5, y: 5, hp: 4, mp: 15 },
+    { id: "fallen", type: "swordsman", player: 1, x: 6, y: 5, hp: 0 },
+    { id: "e", type: "swordsman", player: 2, x: 10, y: 10 }
+  ]);
+  const plan = generatePlans(state, findUnit(state, "fc"))
+    .find((candidate) => candidate.primary.artId === "second-helping" && candidate.primary.targetId === "fallen");
+
+  assert.ok(plan, "expected a Second Helping plan");
+  const projected = projectPlan(state, plan).board.find((unit) => unit.id === "fallen");
+  assert.equal(projected.hp, Math.ceil(getUnitType("swordsman").stats.maxHp / 2));
 });

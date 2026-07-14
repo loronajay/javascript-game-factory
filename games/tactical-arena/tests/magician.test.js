@@ -7,7 +7,7 @@ import { createBattleState, findUnit } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { attack, beginActivation, finishActivation, useArt } from "../src/core/commands.js";
 import { getLegalFleeTiles } from "../src/rules/arts.js";
-import { resolveBaseStrike } from "../src/rules/combat.js";
+import { getBasicAttackDamageType, resolveBaseStrike } from "../src/rules/combat.js";
 
 const NORMAL_HIT = { attackRoll: 0.5, critRoll: 0.99 };
 const MISS = { attackRoll: 0.01 };
@@ -158,6 +158,15 @@ test("Magic Pipe restores 10 MP on the 3rd consecutive non-spell activation", ()
   const magAfter = r2.nextState.units.find((u) => u.id === "p1-mag");
   assert.equal(magAfter.mp, 20); // 10 + 10 regen
   assert.equal(magAfter.mageChargeCount, 0); // reset after trigger
+  assert.deepEqual(r2.events.find((event) => event.type === "PASSIVE_RESTORE"), {
+    type: "PASSIVE_RESTORE",
+    unitId: "p1-mag",
+    sourceId: "p1-mag",
+    passiveId: "magic-pipe",
+    passiveName: "Magic Pipe",
+    mpRestored: 10,
+    hpRestored: 0
+  });
 });
 
 test("Magic Pipe regen does not push MP above maxMp", () => {
@@ -452,9 +461,11 @@ test("Banish spends 8 MP", () => {
   assert.equal(magAfter.mp, 40 - 8);
 });
 
-// --- Magician basic attack (physical) ---
+// --- Magician basic attack ---
 
-test("Magician basic attack is physical damage (not magic)", () => {
+test("Magician basic attack is physical damage while healthy", () => {
+  assert.equal(getBasicAttackDamageType({ type: "magician", hp: 6 }), "physical");
+
   const state = makeState();
   const s1 = activate(state, "p1-mag");
   const result = applyCommand(s1, attack(1, "p1-mag", "p2-sword", NORMAL_HIT));
@@ -463,6 +474,19 @@ test("Magician basic attack is physical damage (not magic)", () => {
   assert.ok(event.hit);
   // physical = max(1, STR - DEF) = max(1, 6 - 5) = 1; damage spread flat on ATTACK_RESOLVED
   assert.equal(event.damage, 1);
+});
+
+test("raging Magician basic attacks deal magic damage", () => {
+  assert.equal(getBasicAttackDamageType({ type: "magician", hp: 5 }), "magic");
+
+  const state = makeState();
+  state.units.find((u) => u.id === "p1-mag").hp = 5;
+  const s1 = activate(state, "p1-mag");
+  const result = applyCommand(s1, attack(1, "p1-mag", "p2-sword", NORMAL_HIT));
+  assert.ok(result.accepted);
+  const event = result.events.find((e) => e.type === "ATTACK_RESOLVED");
+  assert.ok(event.hit);
+  assert.equal(event.damage, 6);
 });
 
 // --- VFX catalog ---

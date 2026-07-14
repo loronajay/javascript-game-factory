@@ -662,6 +662,18 @@ const ABILITY_VFX = Object.freeze({
     stream: Object.freeze({ shape: "orb", arcHeight: 34, durationMs: 420, size: 1.1, colors: Object.freeze({ core: "#f7e9c0", trail: "#c8a24a" }) }),
     colors: Object.freeze({ core: "#f7e9c0", trail: "#c8a24a", impact: "#fff7d8" })
   }),
+  // Second Helping (RAGE): a warm meal-prayer version of the revive rise, smaller than
+  // Rewind because the ally returns at half HP instead of fully restored.
+  "second-helping": Object.freeze({
+    type: "summonRise",
+    soundKey: "wish",
+    soilCount: 5,
+    miasmaCount: 5,
+    riseDurationMs: 520,
+    windup: Object.freeze({ style: "gather", durationMs: 390, particleCount: 9 }),
+    stream: Object.freeze({ shape: "orb", arcHeight: 32, durationMs: 400, size: 1.05, colors: Object.freeze({ core: "#ffe9b0", trail: "#e6b45a" }) }),
+    colors: Object.freeze({ core: "#ffe9b0", trail: "#e6b45a", impact: "#fffbe0" })
+  }),
   // The King's four commands (Strike / Hold / Pursue / Higher Ground). Each is a GLOBAL
   // team order — a decisive battlefield command radiating from the King's banner to every
   // squadmate — so they reuse the `ritual` motif (a color wash, a ring that ripples past

@@ -78,7 +78,8 @@ export const MAGICIAN = Object.freeze({
     name: "RAGE",
     kind: "passive",
     mpCost: 0,
-    description: "At 5 HP or lower, the Nuke ART becomes available.",
+    effect: Object.freeze({ attackDamageType: "magic" }),
+    description: "At 5 HP or lower, basic attacks deal magic damage and the Nuke ART becomes available.",
     implemented: true
   })
 });

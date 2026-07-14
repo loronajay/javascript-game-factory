@@ -76,9 +76,16 @@ export function resolveTimeStretch(state, command, art) {
   }]);
 }
 
-// Rewind (RAGE): return a fallen ally to the board on a chosen tile within range, fully
-// healed with statuses cleared. Its MP is NOT restored. The revived unit is placed
-// already `spent` so the revival doesn't hand its owner a bonus activation this round.
+function reviveHpForArt(revived, state, art) {
+  const maxHp = getEffectiveStats(revived, state).maxHp;
+  const fraction = Number.isFinite(art.revive?.hpFraction) ? art.revive.hpFraction : 1;
+  return Math.max(1, Math.min(maxHp, Math.ceil(maxHp * fraction)));
+}
+
+// Rewind-style revive (RAGE): return a fallen ally to the board on a chosen tile within
+// range, healed by the art's revive fraction with statuses cleared. Its MP is NOT
+// restored. The revived unit is placed already `spent` so the revival doesn't hand its
+// owner a bonus activation this round.
 export function resolveRewind(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const target = getReviveTargets(state, actorState).find((unit) => unit.id === command.targetId);
@@ -94,7 +101,7 @@ export function resolveRewind(state, command, art) {
   revived.position = { ...placement };
   revived.statuses = [];
   revived.defending = false;
-  revived.hp = getEffectiveStats(revived, next).maxHp;
+  revived.hp = reviveHpForArt(revived, next, art);
   revived.spent = true;
   const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
@@ -109,4 +116,3 @@ export function resolveRewind(state, command, art) {
 // to the tile one step from the Juggernaut along that ray. An enemy also takes 3 magic
 // damage; an ally is only repositioned. The tiles between are empty (it was the first
 // contact), so the pull destination is always clear.
-

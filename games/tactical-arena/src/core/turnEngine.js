@@ -123,7 +123,18 @@ export function spendAndAdvance(state, unit) {
     } else {
       unit.mageChargeCount = (unit.mageChargeCount ?? 0) + 1;
       if (unit.mageChargeCount >= passive.effect.interval) {
-        restoreMp(state, unit, unit, passive.effect.amount);
+        const restored = restoreMp(state, unit, unit, passive.effect.amount);
+        if (restored.mpRestored > 0 || restored.hpRestored > 0) {
+          appendPendingRolloverEvents(state, [{
+            type: "PASSIVE_RESTORE",
+            unitId: restored.targetId ?? unit.id,
+            sourceId: unit.id,
+            passiveId: passive.id,
+            passiveName: passive.name,
+            mpRestored: restored.mpRestored,
+            hpRestored: restored.hpRestored
+          }]);
+        }
         unit.mageChargeCount = 0;
       }
     }
@@ -464,7 +475,8 @@ function applyTimeStealTick(state, events) {
   }
 }
 
-export function resolveVictory(state) {
+export function resolveVictory(state, options = {}) {
+  const actionTakerTeam = Number.isInteger(options.actionTakerTeam) ? options.actionTakerTeam : null;
   const roninDuel = state.missionRules?.roninDuel;
   if (roninDuel) {
     const ronin = state.units.find((unit) => unit.id === roninDuel.roninId) ??
@@ -568,6 +580,10 @@ export function resolveVictory(state) {
   const livingTeams = new Set(livingUnits(state).filter(sustainsVictory).map(teamOfUnit));
   if (livingTeams.size === 1) {
     state.winner = [...livingTeams][0];
+    state.phase = "complete";
+    state.activation = null;
+  } else if (livingTeams.size === 0 && actionTakerTeam !== null) {
+    state.winner = actionTakerTeam;
     state.phase = "complete";
     state.activation = null;
   }

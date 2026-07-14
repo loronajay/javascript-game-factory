@@ -62,8 +62,11 @@ export function resolveSelfDestruct(state, command, art) {
   const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
   actor.hp = 0; // the core is spent — the Juggernaut is consumed
-  spendAndAdvance(next, actor);
-  resolveVictory(next);
+  resolveVictory(next, { actionTakerTeam: actor.player });
+  if (next.phase === "playing") {
+    spendAndAdvance(next, actor);
+    resolveVictory(next, { actionTakerTeam: actor.player });
+  }
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetIds, damageByTarget,
     selfDestruct: true, mpCost: cost
@@ -88,5 +91,4 @@ export function resolveKingCommand(state, command, art) {
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, command: art.command.id, mpCost: 0
   }]);
 }
-
 

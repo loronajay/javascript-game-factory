@@ -647,13 +647,15 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
       break;
     }
     case "revive": {
-      // Rewind returns the fallen ally to the board at full HP — the material term
-      // (unitThreatValue + hp) is exactly the value of the revival.
+      // Revive arts return the fallen ally to the board at their configured HP fraction.
+      // The material term (unitThreatValue + hp) is exactly the value of the revival.
       const dead = state.units.find((u) => u.id === primary.targetId);
       if (dead) {
+        const maxHp = getUnitType(dead.type).stats.maxHp;
+        const hpFraction = Number.isFinite(art.revive?.hpFraction) ? art.revive.hpFraction : 1;
         board.push({
           ...dead,
-          hp: getUnitType(dead.type).stats.maxHp,
+          hp: Math.max(1, Math.min(maxHp, Math.ceil(maxHp * hpFraction))),
           position: { ...primary.targetPosition },
           statuses: [], statModifiers: {}, linkedStatMods: []
         });

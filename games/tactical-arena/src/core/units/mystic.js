@@ -85,9 +85,11 @@ export const MYSTIC = Object.freeze({
       type: "statModifiers",
       stats: Object.freeze({ moveRange: 6 }),
       defending: true,
-      moveAndUseArts: true
+      moveAndUseArts: true,
+      attackDamageType: "magic",
+      rageEntryRestore: Object.freeze({ mp: 15 })
     }),
-    description: "At 5 HP or lower, gain +6 MOVE, may move and use ARTS in the same activation, and passively halve incoming physical and magic damage.",
+    description: "At 5 HP or lower, restore 15 MP, gain +6 MOVE, basic attacks deal magic damage, may move and use ARTS in the same activation, and passively halve incoming physical and magic damage.",
     implemented: true
   })
 });

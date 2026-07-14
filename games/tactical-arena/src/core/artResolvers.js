@@ -90,6 +90,7 @@ const ART_RESOLVERS = new Map([
   ["age", resolveAge],
   ["time-stretch", resolveTimeStretch],
   ["rewind", resolveRewind],
+  ["second-helping", resolveRewind],
   // Juggernaut: line grab/strike, a self MP vent, and a self-sacrifice blast.
   ["tether-grab", resolveTetherGrab],
   ["rocket-punch", resolveRocketPunch],

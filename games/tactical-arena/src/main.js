@@ -117,8 +117,8 @@ let volleyShotOrigin = null;
 let areaForecastCenter = null;
 let areaForecastMode = null;
 let accuracyForecastEnabled = loadAccuracyForecastEnabled();
-// The fallen ally chosen for Father Time's Rewind, awaiting a placement-tile click.
-let rewindTargetId = null;
+// The fallen ally chosen for a revive ART, awaiting a placement-tile click.
+let reviveTargetId = null;
 let resolving = false;
 
 // --- CPU (single-player) ---
@@ -247,8 +247,8 @@ const battleInteraction = {
   set footworkPath(value) { footworkPath = value; },
   get volleyShotOrigin() { return volleyShotOrigin; },
   set volleyShotOrigin(value) { volleyShotOrigin = value; },
-  get rewindTargetId() { return rewindTargetId; },
-  set rewindTargetId(value) { rewindTargetId = value; },
+  get reviveTargetId() { return reviveTargetId; },
+  set reviveTargetId(value) { reviveTargetId = value; },
   get resolving() { return resolving; },
   set resolving(value) { resolving = value; },
 };

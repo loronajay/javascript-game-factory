@@ -36,7 +36,7 @@ test("Angel is a holy Ranger with Blessed Arrow, Anoint, Elevate, and Heaven's W
   assert.ok(UNIT_TYPES.angel.arts.find((a) => a.id === "anoint"));
   assert.ok(UNIT_TYPES.angel.arts.find((a) => a.id === "elevate"));
   assert.deepEqual(UNIT_TYPES.angel.ragePassive.effect, {
-    type: "statModifiers", stats: { strength: 2, moveRange: 2 }
+    type: "statModifiers", stats: { strength: 3, moveRange: 2 }
   });
   assert.equal(UNIT_TYPES.angel.rageArt.id, "heavenseeker");
 });
@@ -194,7 +194,7 @@ test("Elevate heals only allies standing on a white (light) tile", () => {
   assert.equal(findUnit(result.nextState, "p1-ondark").hp, 20);  // untouched
 });
 
-test("Heaven's Wrath grants +2 STR and +2 MOVE while raging", () => {
+test("Heaven's Wrath grants +3 STR and +2 MOVE while raging", () => {
   const state = createBattleState({
     size: 7,
     units: [{ id: "p1-angel", player: 1, type: "angel", hp: 4, x: 0, y: 0 }]
@@ -202,7 +202,7 @@ test("Heaven's Wrath grants +2 STR and +2 MOVE while raging", () => {
   const angel = findUnit(state, "p1-angel");
   assert.ok(isRaging(angel));
   const stats = getEffectiveStats(angel, state);
-  assert.equal(stats.strength, 5); // 3 + 2
+  assert.equal(stats.strength, 6); // 3 + 3
   assert.equal(stats.moveRange, 4); // 2 + 2
 });
 

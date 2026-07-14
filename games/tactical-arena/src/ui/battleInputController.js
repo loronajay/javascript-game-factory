@@ -464,15 +464,18 @@ export function createBattleInputController({
         interaction.mode = null;
         setMessage("Cover: you swap in and brace. This unit's activation is complete.");
       }
-    } else if (interaction.mode === "art:rewind") {
-      const placement = getRevivePlacementTiles(runtime.state, unit, getAvailableArts(unit).find((a) => a.id === "rewind"));
-      if (!interaction.rewindTargetId) {
-        setMessage("Rewind: choose a fallen ally first.", true);
+    } else if (interaction.mode?.startsWith("art:") &&
+      getAvailableArts(unit).find((a) => a.id === interaction.mode.slice("art:".length))?.targeting?.shape === "revive") {
+      const artId = interaction.mode.slice("art:".length);
+      const art = getAvailableArts(unit).find((a) => a.id === artId);
+      const placement = getRevivePlacementTiles(runtime.state, unit, art);
+      if (!interaction.reviveTargetId) {
+        setMessage(`${art.name}: choose a fallen ally first.`, true);
       } else if (!placement.has(positionKey(position))) {
-        setMessage("Rewind: click a highlighted empty tile within 3.", true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "rewind", { targetId: interaction.rewindTargetId, targetPosition: position }))) {
+        setMessage(`${art.name}: click a highlighted empty tile within ${art.targeting?.radius ?? 3}.`, true);
+      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, artId, { targetId: interaction.reviveTargetId, targetPosition: position }))) {
         interaction.mode = null;
-        interaction.rewindTargetId = null;
+        interaction.reviveTargetId = null;
         setMessage("An ally returns to the field. This unit's activation is complete.");
       }
     } else if (interaction.mode?.startsWith("art:")) {
@@ -569,7 +572,7 @@ export function createBattleInputController({
       interaction.mode = deselect ? null : action;
       interaction.footworkPath = [];
       interaction.volleyShotOrigin = null;
-      interaction.rewindTargetId = null;
+      interaction.reviveTargetId = null;
       if (deselect) {
         setMessage("Choose an action below.");
       } else if (action === "move" && canTrample(unit)) {
@@ -581,35 +584,37 @@ export function createBattleInputController({
         const artId = action.slice(4);
         const art = getAvailableArts(unit).find((a) => a.id === artId);
         if (art?.targeting?.shape === "revive") {
-          // Rewind: pick which fallen ally to bring back FIRST (a pop-up), then place them
-          // on a highlighted tile. `interaction.mode` stays "art:rewind" so the board lights placement
-          // tiles behind the pop-up and after it closes.
+          // Revive arts pick which fallen ally to bring back first (a pop-up), then place
+          // them on a highlighted tile. `interaction.mode` stays on this art so the board
+          // lights placement tiles behind the pop-up and after it closes.
           const fallen = getReviveTargets(runtime.state, unit);
           if (!fallen.length) {
             interaction.mode = null;
-            setMessage("Rewind: no fallen allies to bring back.", true);
+            setMessage(`${art.name}: no fallen allies to bring back.`, true);
             render();
             return;
           }
           setMessage(`${art.name} (${art.mpCost} MP): choose a fallen ally to bring back.`);
           render();
+          const hpFraction = Number.isFinite(art.revive?.hpFraction) ? art.revive.hpFraction : 1;
+          const hpLabel = hpFraction >= 1 ? "full HP" : `${Math.ceil(hpFraction * 100)}% HP`;
           const chosen = await openChoiceModal({
-            title: "Rewind — bring back",
-            subtitle: "Return a fallen ally to the field, fully healed.",
+            title: `${art.name} - bring back`,
+            subtitle: `Return a fallen ally to the field at ${hpLabel}.`,
             accent: teamColor(unit.player),
-            choices: fallen.map((ally) => ({ value: ally.id, label: ally.nickname || getUnitType(ally.type).name, sub: "Fallen · returns at full HP", type: ally.type }))
+            choices: fallen.map((ally) => ({ value: ally.id, label: ally.nickname || getUnitType(ally.type).name, sub: `Fallen - returns at ${hpLabel}`, type: ally.type }))
           });
-          if (!chosen || interaction.mode !== "art:rewind") {
+          if (!chosen || interaction.mode !== action) {
             interaction.mode = null;
-            interaction.rewindTargetId = null;
-            setMessage("Rewind cancelled. Choose an action below.");
+            interaction.reviveTargetId = null;
+            setMessage(`${art.name} cancelled. Choose an action below.`);
             render();
             return;
           }
-          interaction.rewindTargetId = chosen;
+          interaction.reviveTargetId = chosen;
           {
             const revivedUnit = findUnit(runtime.state, chosen);
-            setMessage(`${art.name}: click a highlighted tile within 3 to place ${revivedUnit.nickname || getUnitType(revivedUnit.type).name}.`);
+            setMessage(`${art.name}: click a highlighted tile within ${art.targeting?.radius ?? 3} to place ${revivedUnit.nickname || getUnitType(revivedUnit.type).name}.`);
           }
           render();
           return;

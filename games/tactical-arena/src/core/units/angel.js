@@ -104,8 +104,8 @@ export const ANGEL = Object.freeze({
     name: "Heaven's Wrath",
     kind: "passive",
     mpCost: 0,
-    effect: Object.freeze({ type: "statModifiers", stats: Object.freeze({ strength: 2, moveRange: 2 }) }),
-    description: "At 5 HP or lower, gain +2 STR and +2 MOVE.",
+    effect: Object.freeze({ type: "statModifiers", stats: Object.freeze({ strength: 3, moveRange: 2 }) }),
+    description: "At 5 HP or lower, gain +3 STR and +2 MOVE.",
     implemented: true
   }),
   // Heavenseeker mirrors the Paladin's Darkseeker (a bonus-action, self-cast tile pulse

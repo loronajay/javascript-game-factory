@@ -7,7 +7,7 @@ const VFX_MANAGED_ARTS = new Set([
   "footwork", "dark-rush", "flee", "nuke", "dematerialize", "spark", "pray", "wish",
   "lightseeker", "darkseeker", "dark-bomb", "summon-ghoul", "summon", "beckon",
   "smoke-bomb", "build-cover", "shaft-prop", "throw-cigar", "age", "time-stretch",
-  "rewind", "tether-grab", "rocket-punch", "recharge", "self-destruct", "anoint",
+  "rewind", "second-helping", "tether-grab", "rocket-punch", "recharge", "self-destruct", "anoint",
   "purify", "elevate", "heavenseeker", "hope", "cleanse", "focus-prayer", "flight",
   "pyroclasm", "ore-harvest", "ore-abundance", "headlamp", "blasting-cap", "dark-pulse",
   "realm-traversal", "quake", "thunderous-charge", "blizzard", "spring-shower", "heatwave",
@@ -80,6 +80,8 @@ export function createBattleEventPresenter({ audio, effects, getState, onIdle = 
     const erupts = events.filter((event) => event.type === "PYROCLASM_ERUPT");
     const retaliations = events.filter((event) => event.type === "STONE_RETALIATION");
     const snacks = events.filter((event) => event.type === "SNACK_BREAK" || event.type === "EMERGENCY_SNACK");
+    const rageRegens = events.filter((event) =>
+      event.type === "RAGE_REGENERATE" && findUnit(state, event.unitId)?.type !== "miner");
     const oreRageFills = events.filter((event) =>
       event.type === "RAGE_REGENERATE" && (event.mpRestored ?? 0) > 0 && findUnit(state, event.unitId)?.type === "miner");
     const duelHeals = events.filter((event) => event.type === "DUELIST_HEAL");
@@ -88,12 +90,13 @@ export function createBattleEventPresenter({ audio, effects, getState, onIdle = 
     const ghostDissipations = events.filter((event) => event.type === "GHOST_DISSIPATED");
     const petrifyPulses = events.filter((event) => event.type === "PETRIFY_PULSE");
     const weatherRegens = events.filter((event) => event.type === "WEATHER_REGEN");
+    const passiveRestores = events.filter((event) => event.type === "PASSIVE_RESTORE");
     const voidPressure = events.filter((event) => event.type === "VOID_PRESSURE");
     const voidAfflictions = events.filter((event) => event.type === "VOID_TILE_AFFLICTION");
     if (!burns.length && !steals.length && !mourns.length && !rallies.length && !restores.length &&
         !darkPulses.length && !erupts.length && !retaliations.length && !snacks.length && !bites.length &&
-        !oreRageFills.length && !duelHeals.length && !recoils.length && !critMpRestores.length &&
-        !ghostDissipations.length && !petrifyPulses.length && !weatherRegens.length &&
+        !rageRegens.length && !oreRageFills.length && !duelHeals.length && !recoils.length && !critMpRestores.length &&
+        !ghostDissipations.length && !petrifyPulses.length && !weatherRegens.length && !passiveRestores.length &&
         !voidPressure.length && !voidAfflictions.length) return;
 
     const metrics = createBoardMetrics(state.size);
@@ -166,6 +169,22 @@ export function createBattleEventPresenter({ audio, effects, getState, onIdle = 
       if (!unit) continue;
       if (regen.hpRestored > 0) effects.floatText(unitCenter(metrics, unit), `+${regen.hpRestored}`, "#8cf0a4");
       else if (regen.mpRestored > 0) effects.floatText(unitCenter(metrics, unit), `+${regen.mpRestored} MP`, "#8cc8ff");
+    }
+    for (const restore of passiveRestores) {
+      const source = findUnit(state, restore.sourceId ?? restore.unitId);
+      const unit = findUnit(state, restore.unitId);
+      if (source && restore.passiveName) effects.artCallout(source, restore.passiveName);
+      if (!unit) continue;
+      const center = unitCenter(metrics, unit);
+      if (restore.mpRestored > 0) effects.floatText(center, `+${restore.mpRestored} MP`, "#7fd0ff");
+      else if (restore.hpRestored > 0) effects.floatText(center, `+${restore.hpRestored}`, "#8cf0a4");
+    }
+    for (const regen of rageRegens) {
+      const unit = findUnit(state, regen.unitId);
+      if (!unit) continue;
+      const center = unitCenter(metrics, unit);
+      if (regen.hpRestored > 0) effects.floatText(center, `+${regen.hpRestored}`, "#8cf0a4");
+      if (regen.mpRestored > 0) effects.floatText(center, `+${regen.mpRestored} MP`, "#8cc8ff");
     }
 
     if (voidPressure.length) audio.play("timeSteal");

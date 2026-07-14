@@ -3,8 +3,9 @@ import assert from "node:assert/strict";
 
 import { createBattleState, findUnit } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
-import { beginActivation, useArt } from "../src/core/commands.js";
+import { attack, beginActivation, useArt } from "../src/core/commands.js";
 import { getArt, getArtMpCost, getEffectiveStats, getUnitType, isRaging } from "../src/core/unitCatalog.js";
+import { getBasicAttackDamageType } from "../src/rules/combat.js";
 import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
 
 const MISS = { attackRoll: 0.01 };
@@ -112,6 +113,22 @@ test("Zap crit silences normally, but raging Lazy Cast makes Zap free, stronger,
   assert.deepEqual(findUnit(result.nextState, "target").statuses.map((status) => status.type), ["stun"]);
   assert.equal(findUnit(result.nextState, "near").hp, 22);
   assert.equal(findUnit(result.nextState, "fw").mp, 0);
+});
+
+test("raging Fat Wizard basic attacks deal magic damage", () => {
+  assert.equal(getBasicAttackDamageType({ type: "fat-wizard", hp: 6 }), "physical");
+  assert.equal(getBasicAttackDamageType({ type: "fat-wizard", hp: 5 }), "magic");
+
+  const state = scenario([
+    { id: "fw", type: "fat-wizard", player: 1, x: 5, y: 5, hp: 5 },
+    { id: "target", type: "swordsman", player: 2, x: 5, y: 8 }
+  ]);
+  const s = run(state, beginActivation(1, "fw")).nextState;
+  const result = run(s, attack(1, "fw", "target", HIT));
+  const event = result.events.find((e) => e.type === "ATTACK_RESOLVED");
+
+  assert.equal(event.damage, 7);
+  assert.equal(findUnit(result.nextState, "target").hp, 18);
 });
 
 test("Surge heals one ally and Clumsy restores nearby units on miss, crit, and raging hit", () => {

@@ -75,8 +75,16 @@ export function resolvePoisonBurst(state, command, art) {
   // which consumes Blacksword anyway).
   const darkTreadEvents = art.selfKill ? [] : applyDarkTreadLifesteal(next, actor, damaged);
   if (art.selfKill) actor.hp = 0; // Explosion consumes Virus / Banish consumes Blacksword
-  spendAndAdvance(next, actor);
-  resolveVictory(next);
+  if (art.selfKill) {
+    resolveVictory(next, { actionTakerTeam: actor.player });
+    if (next.phase === "playing") {
+      spendAndAdvance(next, actor);
+      resolveVictory(next, { actionTakerTeam: actor.player });
+    }
+  } else {
+    spendAndAdvance(next, actor);
+    resolveVictory(next);
+  }
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetIds, damageByTarget,
     ...(art.selfKill ? { selfDestruct: true } : {}),
@@ -89,4 +97,3 @@ export function resolvePoisonBurst(state, command, art) {
 // (base + number caught) magic damage — magic honors Defend halving / Dead Zone / immunity
 // like every self-centred blast. If the quake catches the ENTIRE enemy team, the MP is
 // refunded (mirrors the Nemesis Dark Pulse refund).
-

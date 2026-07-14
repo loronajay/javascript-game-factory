@@ -106,7 +106,12 @@ function rageCombat(unit) {
 // passive (Angel's Blessed Arrow) makes basic attack damage magic, so it ignores DEF.
 // Targeting/line-of-sight is separate: only explicit pierce passives shoot through bodies.
 export function getBasicAttackDamageType(unit) {
-  return getUnitType(unit.type).passive?.effect?.attackDamageType ?? "physical";
+  const definition = getUnitType(unit.type);
+  if (isRaging(unit)) {
+    const rageDamageType = definition.ragePassive?.effect?.attackDamageType ?? definition.rageArt?.effect?.attackDamageType;
+    if (rageDamageType) return rageDamageType;
+  }
+  return definition.passive?.effect?.attackDamageType ?? "physical";
 }
 
 export function requiresRayBasicAttack(unit) {

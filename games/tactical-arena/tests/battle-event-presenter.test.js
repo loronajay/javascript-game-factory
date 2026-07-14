@@ -29,6 +29,65 @@ test("art callouts prefer mission aliases and otherwise humanize unknown ids", (
   assert.equal(artCalloutLabel(null, "dark-rush"), "Dark Rush");
 });
 
+test("passive restore events show the passive callout and resource float", async () => {
+  const calls = [];
+  const state = {
+    size: 13,
+    units: [
+      { id: "mag", type: "magician", player: 1, hp: 10, mp: 20, position: { x: 2, y: 2 } },
+    ],
+  };
+  const presenter = createBattleEventPresenter({
+    audio: { play() {} },
+    effects: {
+      artCallout: (unit, label) => { calls.push(["callout", unit.id, label]); },
+      floatText: async (_position, text, color) => { calls.push(["float", text, color]); },
+    },
+    getState: () => state,
+  });
+
+  await presenter.playRolloverFx([{
+    type: "PASSIVE_RESTORE",
+    unitId: "mag",
+    sourceId: "mag",
+    passiveId: "magic-pipe",
+    passiveName: "Magic Pipe",
+    mpRestored: 10,
+    hpRestored: 0,
+  }]);
+
+  assert.deepEqual(calls, [
+    ["callout", "mag", "Magic Pipe"],
+    ["float", "+10 MP", "#7fd0ff"],
+  ]);
+});
+
+test("rage MP restore events show resource float text", async () => {
+  const floats = [];
+  const state = {
+    size: 13,
+    units: [
+      { id: "mystic", type: "mystic", player: 1, hp: 5, mp: 25, position: { x: 2, y: 2 } },
+    ],
+  };
+  const presenter = createBattleEventPresenter({
+    audio: { play() {} },
+    effects: {
+      floatText: async (_position, text, color) => { floats.push([text, color]); },
+    },
+    getState: () => state,
+  });
+
+  await presenter.playRolloverFx([{
+    type: "RAGE_REGENERATE",
+    unitId: "mystic",
+    hpRestored: 0,
+    mpRestored: 15,
+  }]);
+
+  assert.deepEqual(floats, [["+15 MP", "#8cc8ff"]]);
+});
+
 test("blocking reaction VFX owns and releases the presenter's busy state", async () => {
   let finishVfx;
   let idleCalls = 0;
