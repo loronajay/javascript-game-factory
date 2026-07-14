@@ -142,6 +142,24 @@ test("targeted spell arts still render their normal damage forecast", () => {
   });
 });
 
+test("targeted art forecast reads overridden art accuracy", () => {
+  withSvgDocument(() => {
+    const state = createBattleState({
+      units: [
+        { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
+        { id: "p2-sword", player: 2, type: "swordsman", x: 3, y: 0 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "p1-archer");
+    actor.artOverrides = { "poison-arrow": { accuracy: 0.5 } };
+    const forecastLayer = new TestSvgElement("g");
+
+    renderForecast({ forecastLayer, state, mode: "art:poison-arrow", actor, resolving: false });
+
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["50%"]);
+  });
+});
+
 test("blind targeted spell arts still render damage instead of miss", () => {
   withSvgDocument(() => {
     const state = createBattleState({

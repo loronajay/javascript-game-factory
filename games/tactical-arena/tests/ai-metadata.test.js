@@ -15,6 +15,35 @@ import {
 // CPU_AI_METADATA_SCHEMA.md.
 
 const ENTRIES = Object.entries(UNIT_TYPES);
+const ROLLED_ART_IDS = new Set([
+  "moonstrike",
+  "mage-killer",
+  "life-sap",
+  "poison-arrow",
+  "leg-shot",
+  "spark",
+  "banish",
+  "wither",
+  "force-tug",
+  "cannon-fire",
+  "front-kick",
+  "cough",
+  "stone-throw",
+  "zap",
+  "surge",
+  "focus-prayer",
+  "curve-shot",
+  "dragonsbane",
+  "blasting-cap",
+  "tether-grab",
+  "rocket-punch",
+  "flashing-steel",
+  "shuriken",
+  "stun-gun",
+  "smoke-bomb-riot",
+  "shield-bash",
+  "soul-sap"
+]);
 
 // Active arts only: passives (immunities, auras, mp-regen, rage stat blocks) are
 // not activatable, so they carry no AI intent.
@@ -53,6 +82,25 @@ test("every active art declares an explicit, valid ai.intent", () => {
       );
     }
   }
+});
+
+test("every rolled art declares a valid accuracy knob", () => {
+  const seen = new Set();
+  for (const [type, definition] of ENTRIES) {
+    for (const art of activeArts(definition)) {
+      if (!ROLLED_ART_IDS.has(art.id)) continue;
+      seen.add(art.id);
+      assert.ok(
+        Number.isFinite(art.accuracy) && art.accuracy >= 0 && art.accuracy <= 1,
+        `${type}.${art.id} must declare accuracy between 0 and 1`
+      );
+    }
+  }
+  assert.deepEqual(
+    [...ROLLED_ART_IDS].filter((id) => !seen.has(id)),
+    [],
+    "rolled art metadata list contains ids that were not found"
+  );
 });
 
 test("placeObject arts declare zoneValue + placeNear (the only authored EV hints)", () => {

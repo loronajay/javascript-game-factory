@@ -28,7 +28,7 @@ export function resolveTetherGrab(state, command, art) {
   // pure repositioning — allies are never rolled against, so it always lands.
   let swing = null;
   if (grabsEnemy) {
-    swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+    swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, { accuracy: art.accuracy });
     next.rngState = swing.rngState;
     if (swing.missed) {
       spendAndAdvance(next, actor);
@@ -105,7 +105,7 @@ export function resolveRocketPunch(state, command, art) {
   const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
 
-  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, { accuracy: art.accuracy });
   next.rngState = swing.rngState;
   if (swing.missed) {
     spendAndAdvance(next, actor);
@@ -143,4 +143,3 @@ export function resolveRocketPunch(state, command, art) {
     hit: true, critical: swing.critical, stunned: Boolean(effect?.applied && !effect.reflected), mpCost: cost
   }, ...rockHardEvents]);
 }
-

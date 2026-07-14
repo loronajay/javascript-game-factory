@@ -551,7 +551,7 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
       // the pull is applied as the modal (landed) outcome.
       const target = byId.get(primary.targetId);
       if (target) {
-        target.hp = Math.max(0, target.hp - expectedLineStrikeDamage(state, actor, target, { amount: art.damage.amount, type: "magic" }));
+        target.hp = Math.max(0, target.hp - expectedLineStrikeDamage(state, actor, target, { amount: art.damage.amount, type: "magic", art }));
         const dir = { x: Math.sign(target.position.x - actor.position.x), y: Math.sign(target.position.y - actor.position.y) };
         target.position = { x: actor.position.x + dir.x, y: actor.position.y + dir.y };
       }
@@ -559,7 +559,7 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
     }
     case "lineStrike": {
       const target = byId.get(primary.targetId);
-      if (target) target.hp = Math.max(0, target.hp - expectedLineStrikeDamage(state, actor, target, { amount: art.damage.amount, type: "physical" }));
+      if (target) target.hp = Math.max(0, target.hp - expectedLineStrikeDamage(state, actor, target, { amount: art.damage.amount, type: "physical", art }));
       break; // the stun rider is a controller score term
     }
     case "recharge": {

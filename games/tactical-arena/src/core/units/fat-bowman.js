@@ -38,6 +38,7 @@ export const FAT_BOWMAN = Object.freeze({
       name: "Curve Shot",
       kind: "active",
       mpCost: 3,
+      accuracy: 0.93,
       targeting: Object.freeze({ shape: "single" }),
       effect: Object.freeze({ type: "piercingStrike", pierceUnits: true }),
       description: "Shoot a normal physical attack that can pass through units.",
@@ -49,6 +50,7 @@ export const FAT_BOWMAN = Object.freeze({
       name: "Dragonsbane",
       kind: "active",
       mpCost: 5,
+      accuracy: 0.93,
       targeting: Object.freeze({ shape: "single" }),
       effect: Object.freeze({
         type: "status",

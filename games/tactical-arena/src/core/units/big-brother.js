@@ -32,6 +32,7 @@ export const BIG_BROTHER = Object.freeze({
       name: "Force Tug",
       kind: "active",
       mpCost: 5,
+      accuracy: 0.93,
       resolution: "forceTug",
       targeting: Object.freeze({ range: 3 }),
       damageType: "true",

@@ -61,6 +61,7 @@ export const VIRUS = Object.freeze({
       name: "Cough",
       kind: "active",
       mpCost: 5,
+      accuracy: 0.93,
       damageType: "magic",
       targeting: Object.freeze({ range: 5 }),
       damage: Object.freeze({ type: "magic", amount: 5 }),

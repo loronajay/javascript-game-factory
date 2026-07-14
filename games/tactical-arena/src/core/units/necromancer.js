@@ -41,6 +41,7 @@ export const NECROMANCER = Object.freeze({
       name: "Wither",
       kind: "active",
       mpCost: 4,
+      accuracy: 0.93,
       damageType: "magic",
       effect: Object.freeze({
         type: "status",

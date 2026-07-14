@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { getCritChance, getMissChance, getProximityBonus, isBlinded, resolvePhysicalStrike } from "../src/rules/combat.js";
+import { getArtAccuracy, getCritChance, getMissChance, getProximityBonus, isBlinded, resolvePhysicalStrike } from "../src/rules/combat.js";
 import { createBattleState } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { attack, beginActivation, useArt } from "../src/core/commands.js";
@@ -148,6 +148,44 @@ test("a missed ART deals no damage, lands no status, but still spends MP and the
   assert.deepEqual(target.statuses, []);
   assert.equal(actor.mp, 18); // 22 - 4 MP, spent even on a miss
   assert.equal(actor.spent, true);
+});
+
+test("rolled ARTS use per-art accuracy while basic attacks keep the universal miss chance", () => {
+  assert.equal(getArtAccuracy({}), 0.93);
+  assert.equal(getMissChance({ type: "swordsman", hp: 25, statuses: [] }, { accuracy: 0.5 }), 0.5);
+  assert.equal(getMissChance({ type: "swordsman", hp: 25, statuses: [] }), 0.07);
+
+  const makeState = () => {
+    const state = createBattleState({
+      units: [
+        { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
+        { id: "p2-swordsman", player: 2, type: "swordsman", x: 1, y: 0 }
+      ]
+    });
+    state.units.find((u) => u.id === "p1-archer").artOverrides = {
+      "poison-arrow": { accuracy: 0.5 }
+    };
+    return state;
+  };
+
+  let selected = applyCommand(makeState(), beginActivation(1, "p1-archer"));
+  let result = applyCommand(selected.nextState, useArt(1, "p1-archer", "poison-arrow", {
+    targetId: "p2-swordsman", attackRoll: 0.49, effectRoll: 0
+  }));
+  assert.equal(result.events[0].missed, true);
+
+  selected = applyCommand(makeState(), beginActivation(1, "p1-archer"));
+  result = applyCommand(selected.nextState, useArt(1, "p1-archer", "poison-arrow", {
+    targetId: "p2-swordsman", attackRoll: 0.5, critRoll: 0.99, effectRoll: 0.99
+  }));
+  assert.equal(result.events[0].missed, undefined);
+  assert.equal(result.events[0].hit, true);
+
+  selected = applyCommand(makeState(), beginActivation(1, "p1-archer"));
+  result = applyCommand(selected.nextState, attack(1, "p1-archer", "p2-swordsman", {
+    attackRoll: 0.49, critRoll: 0.99
+  }));
+  assert.equal(result.events[0].missed, false);
 });
 
 test("blind makes physical attack ARTS miss", () => {

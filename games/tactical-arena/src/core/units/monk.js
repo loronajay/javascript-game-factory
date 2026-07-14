@@ -26,6 +26,7 @@ export const MONK = Object.freeze({
       name: "Front Kick",
       kind: "active",
       mpCost: 4,
+      accuracy: 0.93,
       resolution: "frontKick",
       targeting: Object.freeze({ range: 1 }),
       damage: Object.freeze({ type: "physical", amount: 10, scaleStat: "strength", baseStat: 9 }),

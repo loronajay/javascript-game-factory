@@ -86,6 +86,13 @@ export const COMBAT = Object.freeze({
   CRIT_CHANCE: 0.15   // base crit on a landed attack
 });
 
+export const DEFAULT_ART_ACCURACY = 0.93;
+
+export function getArtAccuracy(art) {
+  if (!Number.isFinite(art?.accuracy)) return DEFAULT_ART_ACCURACY;
+  return Math.max(0, Math.min(1, art.accuracy));
+}
+
 // A raging unit may carry combat overrides in its catalog data (the Archer's RAGE
 // never-miss + 50% crit). Non-raging units, and units whose RAGE has no combat
 // block (the Swordsman's Quick), get null and fall back to the base chances.
@@ -286,11 +293,13 @@ function getTileBasicAttackCombat(attacker, { target = null, state = null, basic
 // Probability that this attacker's swing misses *right now*. Never-miss (raging
 // Archer, or Angel's both-on-white Blessed Arrow shot) overrides everything; otherwise
 // Blind can force a miss unless the caller is resolving a caster roll that intentionally
-// ignores attacker accuracy.
-export function getMissChance(attacker, { ignoreBlind = false, target = null, state = null, basicAttack = false } = {}) {
+// ignores attacker accuracy. Rolled ARTS pass an authored hit `accuracy`; basic attacks
+// omit it and stay on the universal miss chance.
+export function getMissChance(attacker, { ignoreBlind = false, target = null, state = null, basicAttack = false, accuracy = null } = {}) {
   const tileCombat = getTileBasicAttackCombat(attacker, { target, state, basicAttack });
   if (rageCombat(attacker)?.neverMiss || (tileCombat?.attackerOnAffinity && tileCombat.cfg.bothNeverMiss)) return 0;
   if (!ignoreBlind && isBlinded(attacker)) return 1;
+  if (Number.isFinite(accuracy)) return 1 - Math.max(0, Math.min(1, accuracy));
   const tileAccuracy = Math.max(0, Number(tileCombat?.cfg.targetMissReduction) || 0);
   return Math.max(0, Math.min(1, COMBAT.MISS_CHANCE - tileAccuracy));
 }
@@ -316,10 +325,11 @@ export function getCritChance(attacker, { target = null, state = null, basicAtta
 // the hit value first; only a landed swing draws for crit (so a miss costs one
 // draw, a hit costs two — deterministic from state, so replay-safe). `overrides`
 // lets a command pin either draw for tests / recorded replay without consuming the
-// seed. `ignoreBlind` is for mage casts that still have a normal Clumsy-style roll.
-export function rollToHit(rngState, attacker, overrides = {}, { ignoreBlind = false, target = null, state = null, basicAttack = false } = {}) {
+// seed. `ignoreBlind` is for mage casts that still have a normal Clumsy-style roll;
+// `accuracy` is a per-ART hit chance and is omitted for basic attacks.
+export function rollToHit(rngState, attacker, overrides = {}, { ignoreBlind = false, target = null, state = null, basicAttack = false, accuracy = null } = {}) {
   const hit = drawValue(rngState, overrides.attackRoll);
-  const missed = hit.value < getMissChance(attacker, { ignoreBlind, target, state, basicAttack });
+  const missed = hit.value < getMissChance(attacker, { ignoreBlind, target, state, basicAttack, accuracy });
   if (missed) return { rngState: hit.rngState, missed: true, critical: false, hitRoll: hit.value, critRoll: null };
   const crit = drawValue(hit.rngState, overrides.critRoll);
   return { rngState: crit.rngState, missed: false, critical: crit.value < getCritChance(attacker, { target, state, basicAttack }), hitRoll: hit.value, critRoll: crit.value };

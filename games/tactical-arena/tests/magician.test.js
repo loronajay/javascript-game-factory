@@ -276,7 +276,7 @@ test("Spark spends 4 MP", () => {
   assert.equal(magAfter.mp, 40 - 4);
 });
 
-test("Spark ignores blind (still rolls to-hit off the base miss chance)", () => {
+test("Spark ignores blind (still rolls to-hit off art accuracy)", () => {
   const state = makeState();
   state.units.find((u) => u.id === "p1-mag").statuses = [{ type: "blind", duration: 1 }];
   const s1 = activate(state, "p1-mag");

@@ -168,11 +168,12 @@ export function resolveTargetedArt(state, command, art) {
   const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
 
-  // Every targeted attack ART rolls to-hit like a basic attack (the ART's own status/
-  // heal check is a SECOND, separate roll below). Magic casts ignore Blind specifically —
-  // Silence, not Blind, is the mage counter — but can still whiff on a bad roll.
+  // Every targeted attack ART rolls to-hit from its authored accuracy (the ART's own
+  // status/heal check is a SECOND, separate roll below). Magic casts ignore Blind
+  // specifically — Silence, not Blind, is the mage counter — but can still whiff on a
+  // bad roll.
   const ignoreBlind = !artUsesPhysicalStrike(art);
-  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, { ignoreBlind });
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, { ignoreBlind, accuracy: art.accuracy });
   next.rngState = swing.rngState;
   if (swing.missed) {
     // Wanderer (Ronin): a foe that whiffs an attack ART on Ronin is marked for +1 next turn.

@@ -91,7 +91,7 @@ export function resolveFatWizardZap(state, command, art) {
   const leechEvents = [];
   const clumsy = clumsyEffect(actor);
 
-  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, { ignoreBlind: true });
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, { ignoreBlind: true, accuracy: art.accuracy });
   next.rngState = swing.rngState;
   if (swing.missed) {
     applyMagicSplash(next, actor, target, {
@@ -192,7 +192,7 @@ export function resolveFatWizardSurge(state, command, art) {
   const splashHealingByTarget = {};
   const healTargetIds = [];
   const splashTargetIds = [];
-  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, { ignoreBlind: true });
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, { ignoreBlind: true, accuracy: art.accuracy });
   next.rngState = swing.rngState;
 
   const clumsy = clumsyEffect(actor);

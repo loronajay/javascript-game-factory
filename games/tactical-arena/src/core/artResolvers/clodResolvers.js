@@ -67,7 +67,7 @@ export function resolveStoneThrow(state, command, art) {
   const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
 
-  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, { accuracy: art.accuracy });
   next.rngState = swing.rngState;
   if (swing.missed) {
     spendAndAdvance(next, actor);
@@ -160,4 +160,3 @@ export function resolveThunderousCharge(state, command, art) {
     targetIds, damageByTarget, stunnedIds, mpCost: cost
   }, ...rockHardEvents]);
 }
-

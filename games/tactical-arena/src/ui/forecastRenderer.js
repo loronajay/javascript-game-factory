@@ -1,10 +1,10 @@
 import { svgElement } from "./svgHelpers.js";
 import { createBoardMetrics, gridToScreen } from "./isometric.js";
-import { getArt, getEffectiveStats, isDefending } from "../core/unitCatalog.js";
+import { getArtForUnit, getEffectiveStats, isDefending } from "../core/unitCatalog.js";
 import { areEnemies } from "../core/state.js";
 import { chebyshevDistance, positionKey } from "../rules/movement.js";
 import { artIsBodyBlocked, artUsesPhysicalStrike, getArtTargetRange, getConeCells, getPyroclasmTargets, getSelfBlastRadius, getTargetedBlastTargets } from "../rules/arts.js";
-import { finalizeMagicDamage, getBasicAttackDamageType, getMissChance, getProximityBonus, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike } from "../rules/combat.js";
+import { finalizeMagicDamage, getArtAccuracy, getBasicAttackDamageType, getMissChance, getProximityBonus, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 
 function drawForecastBadge(forecastLayer, metrics, target, label, cls, yOffset = 0) {
@@ -149,7 +149,7 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving, a
   if (!actor || state.phase !== "playing" || resolving) return;
   const isAttack = mode === "attack";
   const artId = mode?.startsWith("art:") ? mode.slice(4) : null;
-  const art = artId ? getArt(actor.type, artId) : null;
+  const art = artId ? getArtForUnit(actor, artId) : null;
   const isStrikeArt = Boolean(artId) && isForecastableStrikeArt(art);
   const isAreaArt = Boolean(artId) && isForecastableAreaArt(art);
   if (!isAttack && !isStrikeArt && !isAreaArt) return;
@@ -179,7 +179,13 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving, a
     // Sniper's pierce is the only shot that still reaches and shows a number.
     if (isWallBetween(state, actor.position, target.position, actor)) continue;
     const ignoreBlind = isStrikeArt && !artUsesPhysicalStrike(art);
-    const missChance = getMissChance(actor, { ignoreBlind, target, state, basicAttack: isAttack });
+    const missChance = getMissChance(actor, {
+      ignoreBlind,
+      target,
+      state,
+      basicAttack: isAttack,
+      accuracy: isStrikeArt ? getArtAccuracy(art) : null
+    });
     const accuracy = accuracyLabel(missChance);
     const guaranteedMiss = missChance >= 1;
     if (guaranteedMiss) {

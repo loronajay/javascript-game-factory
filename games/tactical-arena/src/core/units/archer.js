@@ -44,6 +44,7 @@ export const ARCHER = Object.freeze({
       name: "Poison Arrow",
       kind: "active",
       mpCost: 4,
+      accuracy: 0.93,
       effect: Object.freeze({ type: "status", status: "poison", chance: 0.6, duration: "permanent", turnStartDamage: 1 }),
       description: "Attack, then apply permanent poison on a 60% effect check.",
       implemented: true,
@@ -54,6 +55,7 @@ export const ARCHER = Object.freeze({
       name: "Leg Shot",
       kind: "active",
       mpCost: 4,
+      accuracy: 0.93,
       effect: Object.freeze({
         type: "status",
         status: "slow",

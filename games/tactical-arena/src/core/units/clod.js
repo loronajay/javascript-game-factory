@@ -71,6 +71,7 @@ export const CLOD = Object.freeze({
       name: "Stone Throw",
       kind: "active",
       mpCost: 3,
+      accuracy: 0.93,
       resolution: "stoneThrow",
       targeting: Object.freeze({ range: 4 }),
       // Fixed power 8 that scales with STR above Clod's base 9 (Brick House can lift it),

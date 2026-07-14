@@ -67,6 +67,14 @@ test("expectedStrike: magic damageType ignores DEF", () => {
   close(ev.expDamage, HIT_BASELINE * (0.85 * 6 + 0.15 * 9));
 });
 
+test("expectedStrike: art accuracy tunes hit-weighted damage", () => {
+  const attacker = makeUnit({ type: "swordsman", player: 1, hp: 25 });
+  const target = makeUnit({ type: "swordsman", player: 2, hp: 25, position: { x: 1, y: 0 } });
+  const ev = expectedStrike(null, attacker, target, { accuracy: 0.5 });
+
+  close(ev.expDamage, 0.5 * (0.85 * 5 + 0.15 * 8));
+});
+
 test("expectedStrike: status rider is survival × chance × statusValue", () => {
   const attacker = makeUnit({ type: "swordsman", player: 1, hp: 25 });
   const target = makeUnit({ type: "swordsman", player: 2, hp: 25, position: { x: 1, y: 0 } });

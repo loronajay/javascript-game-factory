@@ -74,6 +74,7 @@ export const MINER = Object.freeze({
       name: "Blasting Cap",
       kind: "active",
       mpCost: 2,
+      accuracy: 0.93,
       resolution: "blastingCap",
       targeting: Object.freeze({ range: 3 }),
       damage: Object.freeze({ type: "true", amount: 3 }),
