@@ -175,6 +175,10 @@
 .set-action-row { align-items:flex-start; }
 .set-action-stack { display:grid; justify-items:end; gap:.35rem; min-width:0; }
 .set-action-stack .menu-btn { min-height:2.35rem; padding:.45rem .7rem; font-size:.62rem; }
+.set-cheat-stack { width:min(100%,220px); }
+.set-cheat-controls { display:flex; width:100%; gap:.4rem; }
+.set-code-input { min-width:0; flex:1; padding:.5rem .6rem; border:1px solid var(--parchment-edge); border-radius:7px; background:rgba(8,18,32,.55); color:var(--text); font:700 .82rem var(--font-display); letter-spacing:.08em; }
+.set-code-input:focus { outline:2px solid color-mix(in srgb,var(--brass) 55%,transparent); border-color:var(--brass); }
 .set-action-stack .menu-btn.danger.is-confirming { border-color:#d46b5e; background:linear-gradient(180deg,rgba(160,54,42,.32),rgba(85,21,22,.58)); color:#ffe3df; box-shadow:0 0 0 2px rgba(212,107,94,.18); }
 .set-hint { max-width:14rem; color:var(--muted); font:700 .56rem var(--font-display); letter-spacing:.06em; line-height:1.35; text-align:right; }
 

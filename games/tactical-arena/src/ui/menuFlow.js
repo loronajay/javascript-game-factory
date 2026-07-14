@@ -32,6 +32,7 @@ import {
   resetProgressionAnnouncements,
   syncMissingUnitUnlockAnnouncements
 } from "../progression/announcements.js";
+import { applyCheatCode } from "../progression/cheatCodes.js";
 import { showPendingProgressionAnnouncements } from "./progressionAnnouncements.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { createPortrait } from "./portraits.js";
@@ -752,6 +753,9 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   const batterySaverToggle = $("#setBatterySaver", settingsModal);
   const resetProgressBtn = $("#setResetProgressBtn", settingsModal);
   const progressStatus = $("#setProgressStatus", settingsModal);
+  const cheatCodeForm = $("#setCheatCodeForm", settingsModal);
+  const cheatCodeInput = $("#setCheatCode", settingsModal);
+  const cheatCodeStatus = $("#setCheatCodeStatus", settingsModal);
   let progressStatusTimer = null;
   const resetProgressConfirmation = createResetProgressConfirmation({
     button: resetProgressBtn,
@@ -784,11 +788,30 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     themeSelect.value = loadSavedThemeId();
     batterySaverToggle.checked = loadPerformanceMode() === "balanced";
     resetProgressConfirmation.disarm({ clearStatus: true });
+    cheatCodeInput.value = "";
+    cheatCodeStatus.textContent = "";
     settingsModal.hidden = false;
   }
   function closeSettings() {
     resetProgressConfirmation.disarm({ clearStatus: true });
+    cheatCodeInput.value = "";
+    cheatCodeStatus.textContent = "";
     settingsModal.hidden = true;
+  }
+
+  function submitCheatCode(event) {
+    event.preventDefault();
+    const result = applyCheatCode(globalThis.localStorage, cheatCodeInput.value);
+    cheatCodeInput.value = "";
+    if (!result.accepted) {
+      cheatCodeStatus.textContent = "Code not recognized.";
+      return;
+    }
+    resetProgressionAnnouncements(globalThis.localStorage);
+    cheatCodeStatus.textContent = "Everything unlocked: missions, units, tutorials, and skins.";
+    if (screens.active === "tutorialSelect") renderTutorialSelect();
+    if (screens.active === "hsSetup") syncHotSeatSetup();
+    if (screens.active === "campaign") renderCampaign();
   }
 
   function resetLocalProgress() {
@@ -826,6 +849,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   sfxRange.addEventListener("input", () => audio.setVolume(Number(sfxRange.value) / 100));
   musicRange.addEventListener("input", () => audio.setMusicVolume(Number(musicRange.value) / 100));
   $("#setCloseBtn", settingsModal).addEventListener("click", closeSettings);
+  cheatCodeForm?.addEventListener("submit", submitCheatCode);
   resetProgressBtn?.addEventListener("click", resetProgressConfirmation.requestReset);
   settingsModal.addEventListener("click", (event) => { if (event.target === settingsModal) closeSettings(); });
 

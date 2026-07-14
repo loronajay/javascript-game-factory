@@ -28,6 +28,16 @@
             <span class="set-label">Music volume</span>
             <input id="setMusicVolume" type="range" min="0" max="100" value="32">
           </label>
+          <form id="setCheatCodeForm" class="set-row set-action-row">
+            <label class="set-label" for="setCheatCode">Cheat code</label>
+            <div class="set-action-stack set-cheat-stack">
+              <div class="set-cheat-controls">
+                <input id="setCheatCode" class="set-code-input" type="password" autocomplete="off" spellcheck="false">
+                <button id="setCheatCodeBtn" class="menu-btn" type="submit">Confirm</button>
+              </div>
+              <span id="setCheatCodeStatus" class="set-hint" aria-live="polite"></span>
+            </div>
+          </form>
           <div class="set-row set-action-row">
             <span class="set-label">Progress</span>
             <div class="set-action-stack">
