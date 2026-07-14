@@ -956,7 +956,8 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     if (blast) {
       shake(vfx.shake ?? 10);
 
-      const reach = boardMetrics.tileWidth * 0.55 * (vfx.blastTiles ?? 2) + boardMetrics.tileWidth * 0.5;
+      const { tileWidth } = getMetrics();
+      const reach = tileWidth * 0.55 * (vfx.blastTiles ?? 2) + tileWidth * 0.5;
       const wave = svg("ellipse", {
         class: "fx-ring",
         cx: ground.x,
@@ -998,7 +999,7 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     // …and a scorch afterglow that outlives the burst on the ground. Fire-and-forget
     // so the lingering fade never slows the resolver's pacing.
     if (vfx.afterglow) {
-      const reach = boardMetrics.tileWidth * 0.5 * (vfx.blastTiles ?? 1.5);
+      const reach = getMetrics().tileWidth * 0.5 * (vfx.blastTiles ?? 1.5);
       const scorch = svg("ellipse", { class: "fx-flash", cx: ground.x, cy: ground.y + 6, rx: reach, ry: reach * 0.5, fill: vfx.colors.trail, filter: "url(#softGlow)" });
       effectsLayer.appendChild(scorch);
       scorch.animate([

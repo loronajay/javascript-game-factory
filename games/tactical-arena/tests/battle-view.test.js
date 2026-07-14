@@ -602,6 +602,43 @@ test("global ritual VFX use the configured board metrics without throwing", asyn
   }
 });
 
+test("blast VFX use the current board metrics without throwing", async () => {
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+  globalThis.window = { matchMedia: () => ({ matches: false }) };
+
+  try {
+    const initialMetrics = { tileWidth: 58, tileHeight: 29, originX: 0, originY: 0 };
+    const resizedMetrics = { tileWidth: 72, tileHeight: 36, originX: 0, originY: 0 };
+    const effectsLayer = new TestSvgElement("g");
+    const effects = createEffects({
+      board: null,
+      unitsLayer: { querySelector: () => null },
+      effectsLayer,
+      diceOverlay: null,
+      dieFace: null,
+      metrics: initialMetrics,
+      audio: { play() {} }
+    });
+    effects.setMetrics(resizedMetrics);
+
+    await effects.playAbilityVfx("nuke", {
+      actor: { id: "magician", position: { x: 1, y: 1 } },
+      targets: []
+    });
+
+    const expectedReach = resizedMetrics.tileWidth * 0.55 * 3 + resizedMetrics.tileWidth * 0.5;
+    const shockwave = effectsLayer.children.find((child) => (
+      child.tagName === "ellipse" && child.animations?.[0]?.frames?.[1]?.rx === expectedReach
+    ));
+    assert.ok(shockwave, "the blast shockwave should scale from the latest board geometry");
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
+  }
+});
+
 test("the selected-unit HUD gains a rage glow state", () => {
   const state = createBattleState();
   const unit = state.units.find((candidate) => candidate.id === "p1-swordsman");
