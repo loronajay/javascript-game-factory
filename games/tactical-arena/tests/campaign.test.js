@@ -1330,6 +1330,13 @@ test("Temple Trial CPU opens with clue-giving Monk ARTS after the split", () => 
     command.type === "USE_ART" &&
     ["front-kick", "protect"].includes(command.artId)
   ), "the Temple Trial monk AI should reveal real/fake art callouts instead of only basic attacking");
+
+  let after = split;
+  for (const command of commands) {
+    const result = applyCommand(after, command);
+    assert.ok(result.accepted, `${command.type} rejected (${result.errorCode})`);
+    after = result.nextState;
+  }
 });
 
 test("Temple Trial dialogue drives visual intro beats without narrating the split as text", () => {
@@ -3215,6 +3222,47 @@ test("Not My King is a 13x13 chosen 4v4 under permanent heatwave with void enemi
   for (const unit of match.units) {
     assert.equal(unit.hp, getUnitType(unit.type).stats.maxHp, `${unit.id} starts at full HP`);
   }
+});
+
+test("Not My King CPU can complete Gargoyle Flight without locking its turn", () => {
+  const base = notMyKingMatchState();
+  const state = {
+    ...base,
+    currentPlayer: 2,
+    activation: null,
+    units: base.units.map((unit) => {
+      if (unit.id === "p2-2-gargoyle") {
+        return { ...unit, position: { x: 7, y: 7 }, spent: false };
+      }
+      if (unit.player === 2) {
+        return {
+          ...unit,
+          spent: true,
+          ...(unit.type === "king" ? { commandTurn: base.turnNumber } : {}),
+        };
+      }
+      if (unit.id === "p1-0-swordsman") {
+        return { ...unit, position: { x: 3, y: 3 }, hp: Math.max(1, unit.hp) };
+      }
+      return { ...unit, hp: 0, spent: true };
+    }),
+  };
+
+  const commands = chooseActivation(state, {
+    difficulty: "normal",
+    cpuPlayer: 2,
+    rng: cpuRng(state),
+  });
+  assert.ok(commands.some((command) => command.type === "USE_ART" && command.artId === "flight"));
+
+  let after = state;
+  for (const command of commands) {
+    const result = applyCommand(after, command);
+    assert.ok(result.accepted, `${command.type} rejected (${result.errorCode})`);
+    after = result.nextState;
+  }
+  assert.equal(after.currentPlayer, 1, "Flight must spend the final CPU activation and hand over the turn");
+  assert.equal(after.activation, null);
 });
 
 test("Not My King grading rewards winning, avoiding enemy RAGE, and survival", () => {

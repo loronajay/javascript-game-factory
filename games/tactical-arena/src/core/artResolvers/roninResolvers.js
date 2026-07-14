@@ -8,6 +8,15 @@ import { applyStatus } from "../../rules/statuses.js";
 import { accept, ERR, reject } from "../reducerResult.js";
 import { resolveVictory, spendAndAdvance } from "../turnEngine.js";
 
+function validateTargetedEnemyCast(state, actor, target, art) {
+  if (!target || target.hp <= 0 || !areEnemies(actor, target)) return ERR.INVALID_TARGET;
+  if (chebyshevDistance(actor.position, target.position) > getArtTargetRange(state, actor, art)) {
+    return ERR.TARGET_OUT_OF_RANGE;
+  }
+  if (isWallBetween(state, actor.position, target.position, actor)) return ERR.TARGET_OBSTRUCTED;
+  return null;
+}
+
 export function resolveSelfBuff(state, command, art) {
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
@@ -117,4 +126,3 @@ export function resolveShuriken(state, command, art) {
     targetIds: [target.id], damageByTarget: { [target.id]: damageDealt }, mpCost: cost
   }, ...recoilEvents]);
 }
-

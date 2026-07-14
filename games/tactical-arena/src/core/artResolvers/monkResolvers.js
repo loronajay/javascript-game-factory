@@ -6,8 +6,9 @@ import { resolveDamage } from "../../rules/damage.js";
 import { chebyshevDistance } from "../../rules/movement.js";
 import { getGlobalHealBonus } from "../../rules/stances.js";
 import { applyRockHardDefense, resolvePhysicalDamageHealing, restoreHp } from "../combatEffects.js";
+import { completeArtUse } from "./artCompletion.js";
 import { accept, ERR, reject } from "../reducerResult.js";
-import { resolveVictory, spendAndAdvance } from "../turnEngine.js";
+import { resolveVictory } from "../turnEngine.js";
 
 function knockbackDestination(state, target, direction, distance) {
   let destination = { ...target.position };
@@ -41,7 +42,7 @@ export function resolveFrontKick(state, command, art) {
   const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
   next.rngState = swing.rngState;
   if (swing.missed) {
-    spendAndAdvance(next, actor);
+    completeArtUse(next, actor, art);
     resolveVictory(next);
     return accept(next, [{
       type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
@@ -92,7 +93,7 @@ export function resolveFrontKick(state, command, art) {
   }
 
   const healingEvents = resolvePhysicalDamageHealing(next, actor, damageDealt);
-  spendAndAdvance(next, actor);
+  completeArtUse(next, actor, art);
   resolveVictory(next);
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
@@ -133,7 +134,7 @@ export function resolveProtect(state, command, art) {
     mpRestored = restored.mpRestored;
   }
 
-  spendAndAdvance(next, actor);
+  completeArtUse(next, actor, art);
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id,
     from, to: { ...destination }, defended: [actor.id, target.id],
@@ -142,4 +143,3 @@ export function resolveProtect(state, command, art) {
     mpCost: cost
   }]);
 }
-

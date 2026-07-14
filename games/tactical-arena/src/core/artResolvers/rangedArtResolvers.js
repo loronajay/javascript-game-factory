@@ -1,10 +1,10 @@
 import { getArtMpCost } from "../unitCatalog.js";
 import { areEnemies, cloneState, findUnit, livingUnits, unitAt } from "../state.js";
-import { getConeCells, getConeOriginForTarget, getFirePlacementTiles, getVolleyShotOriginForTarget } from "../../rules/arts.js";
-import { getProximityBonus, isFireBasedDamage, isFireDamageImmune, resolveFixedPhysicalStrike, rollToHit } from "../../rules/combat.js";
+import { getArtTargetRange, getConeCells, getConeOriginForTarget, getFirePlacementTiles, getVolleyShotOriginForTarget } from "../../rules/arts.js";
+import { getProximityBonus, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isWallBetween, resolveFixedPhysicalStrike, rollToHit } from "../../rules/combat.js";
 import { chebyshevDistance, positionKey } from "../../rules/movement.js";
 import { applyStatus } from "../../rules/statuses.js";
-import { applyRockHardDefense } from "../combatEffects.js";
+import { applyRockHardDefense, resolvePhysicalDamageHealing } from "../combatEffects.js";
 import { accept, ERR, reject } from "../reducerResult.js";
 import { resolveVictory, spendAndAdvance } from "../turnEngine.js";
 

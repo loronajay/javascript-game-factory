@@ -3,7 +3,7 @@ import { areEnemies, cloneState, findUnit, livingUnits } from "../state.js";
 import { getFlightTiles, getPyroclasmTargets } from "../../rules/arts.js";
 import { finalizeMagicDamage } from "../../rules/combat.js";
 import { resolveDamage } from "../../rules/damage.js";
-import { chebyshevDistance } from "../../rules/movement.js";
+import { chebyshevDistance, positionKey } from "../../rules/movement.js";
 import { applyMagicDamageReaction } from "../combatEffects.js";
 import { accept, ERR, reject } from "../reducerResult.js";
 import { resolveVictory, spendAndAdvance } from "../turnEngine.js";
@@ -102,4 +102,3 @@ export function resolvePyroclasm(state, command, art) {
 // blinded with no roll. A board-wide AoE status, so it applies directly (immunity
 // respected) and is NOT reflected the way a single-target cast is (mirrors the Witch
 // Doctor's global blind). Shares the nukeAura radius plumbing for its preview + reach.
-
