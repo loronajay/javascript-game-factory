@@ -1,8 +1,8 @@
-import { getEffectiveStats, getSourceDamageBonus, getTeamMagicDamageBonus, getUnitType, getWeatherAffinityMagicBonus, getWeatherCritDamageBonus, isDefending, isRaging, passiveStackKey, projectsHealingLockout } from "../core/unitCatalog.js";
+import { getEffectiveStats, getSourceDamageBonus, getTeamMagicDamageBonus, getUnitType, getWeatherAffinityMagicBonus, getWeatherCritDamageBonus, isDefending, isRaging, passiveStackKey, projectsHealingLockout, sustainsVictory } from "../core/unitCatalog.js";
 import { drawValue } from "../core/rng.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "./damage.js";
 import { traceGridLine } from "./movement.js";
-import { areAllies, areEnemies, getTileAffinity, isWallAt, unitAt } from "../core/state.js";
+import { areAllies, areEnemies, getTileAffinity, isWallAt, livingUnits, unitAt } from "../core/state.js";
 import { getStanceCritBonus, isDamageTypeImmuneByStance } from "./stances.js";
 import { damageTypeImmunities, isInvulnerable } from "./statuses.js";
 
@@ -82,7 +82,7 @@ export function isWallBetween(state, from, to, attacker = null) {
 // engine rolls a probability in [0,1) (not literally a d6), so these compose with
 // the percentage status checks ARTS already use (70% blind, 60% poison, …).
 export const COMBAT = Object.freeze({
-  MISS_CHANCE: 0.10,  // base whiff on any attack
+  MISS_CHANCE: 0.07,  // base whiff on any attack
   CRIT_CHANCE: 0.15   // base crit on a landed attack
 });
 
@@ -270,26 +270,46 @@ function getResourceCritBonus(attacker) {
   return bonus;
 }
 
+function getTileBasicAttackCombat(attacker, { target = null, state = null, basicAttack = false } = {}) {
+  if (!basicAttack || !state || !target) return null;
+  for (const effect of passiveEffects(attacker)) {
+    const cfg = effect?.tileBasicAttack;
+    if (!cfg?.affinity) continue;
+    const targetOnAffinity = getTileAffinity(state, target.position) === cfg.affinity;
+    if (!targetOnAffinity) continue;
+    const attackerOnAffinity = getTileAffinity(state, attacker.position) === cfg.affinity;
+    return { cfg, targetOnAffinity, attackerOnAffinity };
+  }
+  return null;
+}
+
 // Probability that this attacker's swing misses *right now*. Never-miss (raging
-// Archer) overrides everything; otherwise Blind can force a miss unless the caller
-// is resolving a caster roll that intentionally ignores attacker accuracy.
-export function getMissChance(attacker, { ignoreBlind = false } = {}) {
-  if (rageCombat(attacker)?.neverMiss) return 0;
+// Archer, or Angel's both-on-white Blessed Arrow shot) overrides everything; otherwise
+// Blind can force a miss unless the caller is resolving a caster roll that intentionally
+// ignores attacker accuracy.
+export function getMissChance(attacker, { ignoreBlind = false, target = null, state = null, basicAttack = false } = {}) {
+  const tileCombat = getTileBasicAttackCombat(attacker, { target, state, basicAttack });
+  if (rageCombat(attacker)?.neverMiss || (tileCombat?.attackerOnAffinity && tileCombat.cfg.bothNeverMiss)) return 0;
   if (!ignoreBlind && isBlinded(attacker)) return 1;
-  return COMBAT.MISS_CHANCE;
+  const tileAccuracy = Math.max(0, Number(tileCombat?.cfg.targetMissReduction) || 0);
+  return Math.max(0, Math.min(1, COMBAT.MISS_CHANCE - tileAccuracy));
 }
 
 // Probability that a landed swing crits. The raging Archer's kit raises this to
 // 50%; everyone else uses the base chance. A missing-HP passive (Angel's Inner
 // Strength) adds on top, clamped so the final chance never exceeds 1.
-export function getCritChance(attacker) {
+export function getCritChance(attacker, { target = null, state = null, basicAttack = false } = {}) {
   // Dark Ether (Blacksword): a one-shot charge that forces the next landed swing to crit.
   // The to-hit roll is untouched (he can still miss); the reducer consumes the flag.
   if (attacker.guaranteedCritCharged) return 1;
   const crit = rageCombat(attacker)?.criticalChance;
   const rageBonus = Number(rageCombat(attacker)?.criticalBonus) || 0;
   const base = Number.isFinite(crit) ? crit : COMBAT.CRIT_CHANCE;
-  return Math.min(1, base + rageBonus + getMissingHpCritBonus(attacker) + getResourceCritBonus(attacker));
+  const tileCombat = getTileBasicAttackCombat(attacker, { target, state, basicAttack });
+  const tileCritBonus = tileCombat?.attackerOnAffinity
+    ? Math.max(0, Number(tileCombat.cfg.bothCritBonus) || 0)
+    : 0;
+  return Math.min(1, base + rageBonus + getMissingHpCritBonus(attacker) + getResourceCritBonus(attacker) + tileCritBonus);
 }
 
 // Resolve a single swing's to-hit and crit against the authoritative seed. Draws
@@ -297,12 +317,12 @@ export function getCritChance(attacker) {
 // draw, a hit costs two — deterministic from state, so replay-safe). `overrides`
 // lets a command pin either draw for tests / recorded replay without consuming the
 // seed. `ignoreBlind` is for mage casts that still have a normal Clumsy-style roll.
-export function rollToHit(rngState, attacker, overrides = {}, { ignoreBlind = false } = {}) {
+export function rollToHit(rngState, attacker, overrides = {}, { ignoreBlind = false, target = null, state = null, basicAttack = false } = {}) {
   const hit = drawValue(rngState, overrides.attackRoll);
-  const missed = hit.value < getMissChance(attacker, { ignoreBlind });
+  const missed = hit.value < getMissChance(attacker, { ignoreBlind, target, state, basicAttack });
   if (missed) return { rngState: hit.rngState, missed: true, critical: false, hitRoll: hit.value, critRoll: null };
   const crit = drawValue(hit.rngState, overrides.critRoll);
-  return { rngState: crit.rngState, missed: false, critical: crit.value < getCritChance(attacker), hitRoll: hit.value, critRoll: crit.value };
+  return { rngState: crit.rngState, missed: false, critical: crit.value < getCritChance(attacker, { target, state, basicAttack }), hitRoll: hit.value, critRoll: crit.value };
 }
 
 // Data-driven proximity passive (Archer's Close Shot): bonus damage that rises the
@@ -408,6 +428,13 @@ export function getAttackRecoil(unit) {
   if (!isRaging(unit)) return false;
   const definition = getUnitType(unit.type);
   return Boolean(definition.ragePassive?.effect?.attackRecoil || definition.rageArt?.effect?.attackRecoil);
+}
+
+// Final Draw does not punish the strike that has already ended the opposing team's fight.
+export function shouldApplyAttackRecoil(unit, state) {
+  if (!getAttackRecoil(unit)) return false;
+  if (!state) return true;
+  return livingUnits(state).some((target) => areEnemies(unit, target) && sustainsVictory(target));
 }
 
 // A hard floor a passive places under a landed physical hit (the Sniper's Rifle

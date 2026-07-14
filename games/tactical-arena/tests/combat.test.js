@@ -83,7 +83,7 @@ test("isBlinded reflects a guaranteed-miss attacker", () => {
 
 test("miss and crit chances honor blind and the raging Archer's kit", () => {
   const swordsman = { type: "swordsman", hp: 25, statuses: [] };
-  assert.equal(getMissChance(swordsman), 0.10);
+  assert.equal(getMissChance(swordsman), 0.07);
   assert.equal(getCritChance(swordsman), 0.15);
 
   // Blind = guaranteed miss.
@@ -106,7 +106,7 @@ test("a pinned low to-hit roll makes the reducer's attack miss; a pinned crit ro
     ]
   });
 
-  // attackRoll 0.01 < 10% miss → whiff, target untouched, primary still spent.
+  // attackRoll 0.01 < 7% miss -> whiff, target untouched, primary still spent.
   let s = makeState();
   s = applyCommand(s, beginActivation(1, "p1-swordsman")).nextState;
   const missed = applyCommand(s, attack(1, "p1-swordsman", "p2-swordsman", { attackRoll: 0.01 }));

@@ -44,9 +44,15 @@ export const ANGEL = Object.freeze({
       attackDamageType: "magic",
       // A critical basic attack also lands this status on the target (immunity is still
       // respected centrally, so a Paladin/immune target simply resists the blind).
-      critStatus: Object.freeze({ status: "blind", duration: 1 })
+      critStatus: Object.freeze({ status: "blind", duration: 1 }),
+      tileBasicAttack: Object.freeze({
+        affinity: "light",
+        targetMissReduction: 0.05,
+        bothNeverMiss: true,
+        bothCritBonus: 0.05
+      })
     }),
-    description: "Angel's basic attacks deal magic damage. On a critical basic attack, the target is also blinded for 1 turn.",
+    description: "Angel's basic attacks deal magic damage. They are more accurate against enemies on white tiles, never miss and gain +5% crit when Angel is also on a white tile. On a critical basic attack, the target is also blinded for 1 turn.",
     implemented: true
   }),
   arts: Object.freeze([

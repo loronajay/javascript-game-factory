@@ -46,6 +46,8 @@
 .forecast-badge { pointer-events:none; transform-box:fill-box; animation:fc-pop .18s ease-out; }
 .forecast-badge .fc-bg { fill:rgba(4,12,24,.94); stroke:var(--brass); stroke-width:1; }
 .forecast-badge .fc-text { font:900 13px var(--font-display); letter-spacing:.02em; paint-order:stroke; stroke:rgba(0,0,0,.82); stroke-width:3px; stroke-linejoin:round; fill:var(--text); }
+.fc-accuracy .fc-bg { fill:rgba(6,16,28,.92); stroke:color-mix(in srgb,var(--brass) 72%,var(--p1)); stroke-width:1; }
+.fc-accuracy .fc-text { fill:#c7f3ff; font-size:12px; }
 .fc-attack .fc-bg { stroke:color-mix(in srgb, var(--p2) 62%, transparent); }
 .fc-attack .fc-text { fill:#ffd0d5; }
 .fc-miss .fc-bg { stroke:var(--brass-lo); }

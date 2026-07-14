@@ -5,7 +5,7 @@ import { applyCommand } from "../src/core/reducer.js";
 import { attack, beginActivation, useArt } from "../src/core/commands.js";
 import { createBattleState, findUnit, getTileAffinity } from "../src/core/state.js";
 import { getAvailableArts, getEffectiveStats, isRaging, UNIT_TYPES } from "../src/core/unitCatalog.js";
-import { getBasicAttackDamageType, getCritChance, getCritOnHitStatus } from "../src/rules/combat.js";
+import { getBasicAttackDamageType, getCritChance, getCritOnHitStatus, getMissChance } from "../src/rules/combat.js";
 import { applyStatus } from "../src/rules/statuses.js";
 
 // Pin the rolls so damage/status outcomes are deterministic (combat is stochastic).
@@ -27,6 +27,12 @@ test("Angel is a holy Ranger with Blessed Arrow, Anoint, Elevate, and Heaven's W
   assert.equal(UNIT_TYPES.angel.passive.effect.type, "blessedAttack");
   assert.equal(UNIT_TYPES.angel.passive.effect.attackDamageType, "magic");
   assert.deepEqual(UNIT_TYPES.angel.passive.effect.critStatus, { status: "blind", duration: 1 });
+  assert.deepEqual(UNIT_TYPES.angel.passive.effect.tileBasicAttack, {
+    affinity: "light",
+    targetMissReduction: 0.05,
+    bothNeverMiss: true,
+    bothCritBonus: 0.05
+  });
   assert.ok(UNIT_TYPES.angel.arts.find((a) => a.id === "anoint"));
   assert.ok(UNIT_TYPES.angel.arts.find((a) => a.id === "elevate"));
   assert.deepEqual(UNIT_TYPES.angel.ragePassive.effect, {
@@ -88,6 +94,53 @@ test("Inner Strength adds crit chance per 3 HP missing", () => {
   // Base 15%; at 24 - 9 = 15 HP (9 missing → floor(9/3)=3 bands) it is 15% + 3×1.5% = 19.5%.
   assert.ok(Math.abs(getCritChance({ type: "angel", hp: 24, statuses: [] }) - 0.15) < 1e-9);
   assert.ok(Math.abs(getCritChance({ type: "angel", hp: 15, statuses: [] }) - 0.195) < 1e-9);
+});
+
+test("Blessed Arrow is more accurate against enemies standing on white tiles", () => {
+  const state = createBattleState({
+    size: 7,
+    units: [
+      { id: "p1-angel", player: 1, type: "angel", x: 1, y: 0 }, // dark
+      { id: "p2-sword", player: 2, type: "swordsman", hp: 25, x: 2, y: 0 } // light
+    ]
+  });
+  const angel = findUnit(state, "p1-angel");
+  const target = findUnit(state, "p2-sword");
+  assert.equal(getTileAffinity(state, angel.position), "dark");
+  assert.equal(getTileAffinity(state, target.position), "light");
+  assert.ok(Math.abs(getMissChance(angel, { target, state, basicAttack: true }) - 0.02) < 1e-9);
+  assert.equal(getCritChance(angel, { target, state, basicAttack: true }), 0.15);
+
+  const opened = begin(state, "p1-angel");
+  const result = applyCommand(opened, attack(1, "p1-angel", "p2-sword", { attackRoll: 0.075, critRoll: 0.99 }));
+  assert.ok(result.accepted, result.errorCode);
+  assert.equal(result.events[0].hit, true);
+  assert.equal(result.events[0].missed, false);
+  assert.equal(findUnit(result.nextState, "p2-sword").hp, 22);
+});
+
+test("Blessed Arrow never misses and gains crit chance when Angel and target both stand on white tiles", () => {
+  const state = createBattleState({
+    size: 7,
+    units: [
+      { id: "p1-angel", player: 1, type: "angel", x: 0, y: 0 }, // light
+      { id: "p2-sword", player: 2, type: "swordsman", hp: 25, x: 2, y: 0 } // light
+    ]
+  });
+  const angel = findUnit(state, "p1-angel");
+  const target = findUnit(state, "p2-sword");
+  assert.equal(getTileAffinity(state, angel.position), "light");
+  assert.equal(getTileAffinity(state, target.position), "light");
+  assert.equal(getMissChance(angel, { target, state, basicAttack: true }), 0);
+  assert.equal(getCritChance(angel, { target, state, basicAttack: true }), 0.20);
+
+  const opened = begin(state, "p1-angel");
+  const result = applyCommand(opened, attack(1, "p1-angel", "p2-sword", { attackRoll: 0, critRoll: 0.19 }));
+  assert.ok(result.accepted, result.errorCode);
+  assert.equal(result.events[0].hit, true);
+  assert.equal(result.events[0].critical, true);
+  assert.equal(findUnit(result.nextState, "p2-sword").hp, 20);
+  assert.ok(findUnit(result.nextState, "p2-sword").statuses.some((status) => status.type === "blind"));
 });
 
 test("Holy Being makes Angel immune to every status", () => {

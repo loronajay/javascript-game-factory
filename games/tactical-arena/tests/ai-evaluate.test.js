@@ -14,12 +14,14 @@ import {
 } from "../src/ai/evaluate.js";
 
 // Pure EV math — no state mutation, no RNG. Expectations are hand-computed from the
-// real resolvers (base miss 10%, crit 15%, crit ×1.5 rounded up, physical = STR−DEF
+// real resolvers (base miss 7%, crit 15%, crit x1.5 rounded up, physical = STR-DEF
 // floored at 1, magic ignores DEF). Pass state=null for two-unit cases so no team /
 // enemy auras fold in and the numbers stay legible.
 
 const close = (actual, expected, eps = 1e-9) =>
   assert.ok(Math.abs(actual - expected) <= eps, `expected ${actual} ≈ ${expected}`);
+
+const HIT_BASELINE = 0.93;
 
 const makeUnit = (over) => ({
   id: over.id ?? `${over.type}-${over.player}`,
@@ -41,8 +43,8 @@ test("expectedStrike: basic physical hit blends normal + crit by probability", (
   // normal = max(1, 10−5) = 5; crit = ceil(5×1.5) = 8.
   assert.equal(ev.normalDamage, 5);
   assert.equal(ev.critDamage, 8);
-  // 0.9 × (0.85×5 + 0.15×8) = 4.905
-  close(ev.expDamage, 4.905);
+  // pHit x (85% normal + 15% crit)
+  close(ev.expDamage, HIT_BASELINE * (0.85 * 5 + 0.15 * 8));
   assert.equal(ev.pKill, 0);
   assert.equal(ev.riderValue, 0);
 });
@@ -51,8 +53,8 @@ test("expectedStrike: pKill is the hit-weighted kill probability when lethal", (
   const attacker = makeUnit({ type: "swordsman", player: 1, hp: 25 });
   const target = makeUnit({ type: "swordsman", player: 2, hp: 4, position: { x: 1, y: 0 } });
   const ev = expectedStrike(null, attacker, target);
-  // Both a normal (5) and a crit (8) kill a 4-HP target → pKill = pHit = 0.9.
-  close(ev.pKill, 0.9);
+  // Both a normal (5) and a crit (8) kill a 4-HP target, so pKill = pHit.
+  close(ev.pKill, HIT_BASELINE);
 });
 
 test("expectedStrike: magic damageType ignores DEF", () => {
@@ -62,7 +64,7 @@ test("expectedStrike: magic damageType ignores DEF", () => {
   // magic = STR 6 (DEF ignored); crit = ceil(6×1.5) = 9.
   assert.equal(ev.normalDamage, 6);
   assert.equal(ev.critDamage, 9);
-  close(ev.expDamage, 0.9 * (0.85 * 6 + 0.15 * 9)); // 5.805
+  close(ev.expDamage, HIT_BASELINE * (0.85 * 6 + 0.15 * 9));
 });
 
 test("expectedStrike: status rider is survival × chance × statusValue", () => {
@@ -70,14 +72,13 @@ test("expectedStrike: status rider is survival × chance × statusValue", () => 
   const target = makeUnit({ type: "swordsman", player: 2, hp: 25, position: { x: 1, y: 0 } });
   const art = { effect: { type: "status", status: "blind", chance: 0.7, durationTurns: 1 } };
   const ev = expectedStrike(null, attacker, target, art);
-  // pSurvive = 0.9 (neither hit kills a 25-HP target); blind value = offense 5.4 × 1.
-  // rider = 0.9 × 0.7 × 5.4 = 3.402
-  close(ev.riderValue, 0.9 * 0.7 * 5.4);
+  // pSurvive = pHit (neither hit kills a 25-HP target); blind value = offense for 1 turn.
+  close(ev.riderValue, HIT_BASELINE * 0.7 * (6 * HIT_BASELINE));
 });
 
 test("offenseEstimate: bruiser off STR−DEF, caster off raw STR", () => {
-  close(offenseEstimate(makeUnit({ type: "swordsman", hp: 25 })), Math.max(1, 10 - 4) * 0.9); // 5.4
-  close(offenseEstimate(makeUnit({ type: "magician", hp: 23 })), 6 * 0.9); // caster uses raw STR 6
+  close(offenseEstimate(makeUnit({ type: "swordsman", hp: 25 })), Math.max(1, 10 - 4) * HIT_BASELINE);
+  close(offenseEstimate(makeUnit({ type: "magician", hp: 23 })), 6 * HIT_BASELINE); // caster uses raw STR 6
 });
 
 test("statusValue: immunity zeroes it", () => {
@@ -89,13 +90,13 @@ test("statusValue: immunity zeroes it", () => {
 
 test("statusValue: silence scaled up for casters, capped at threatValue", () => {
   const magician = makeUnit({ type: "magician", player: 2, hp: 23 });
-  // offense 5.4 × duration 1 × caster mult 1.5 = 8.1 (< threatValue 13, so uncapped)
-  close(statusValue(magician, { status: "silence", durationTurns: 1 }), 5.4 * 1.5);
+  // offense x duration 1 x caster mult 1.5 (< threatValue 13, so uncapped)
+  close(statusValue(magician, { status: "silence", durationTurns: 1 }), 6 * HIT_BASELINE * 1.5);
 });
 
 test("statusValue: stun is valued as full action denial over its duration", () => {
   const swordsman = makeUnit({ type: "swordsman", player: 2, hp: 25 });
-  close(statusValue(swordsman, { status: "stun", durationTurns: 1 }), 5.4);
+  close(statusValue(swordsman, { status: "stun", durationTurns: 1 }), 6 * HIT_BASELINE);
   assert.equal(statusValue(swordsman, { status: "stun", durationTurns: 3 }), 10);
 });
 
@@ -133,9 +134,9 @@ test("incomingThreat: only in-reach enemies count, defending lowers it", () => {
   const far = makeUnit({ type: "swordsman", player: 2, hp: 25, position: { x: 11, y: 0 } });
 
   const near = { units: [victim, adjacent] };
-  close(incomingThreat(near, victim, victim.position, false), 4.905);
+  close(incomingThreat(near, victim, victim.position, false), HIT_BASELINE * (0.85 * 5 + 0.15 * 8));
   assert.ok(
-    incomingThreat(near, victim, victim.position, true) < 4.905,
+    incomingThreat(near, victim, victim.position, true) < HIT_BASELINE * (0.85 * 5 + 0.15 * 8),
     "bracing should reduce projected incoming damage"
   );
 

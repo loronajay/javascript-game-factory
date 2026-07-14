@@ -95,7 +95,7 @@ export function roninRageWarningScript(state) {
     },
     {
       speakerId: speaker.id,
-      text: "RAGE. He hits harder now, but every strike recoils on him. Do not let a suicide blow take us both.",
+      text: "RAGE. He hits harder now, but every strike recoils on him until the duel is decided. Finish cleanly.",
     },
   ];
 }

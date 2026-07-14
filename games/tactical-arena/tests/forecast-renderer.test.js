@@ -43,6 +43,30 @@ function textContentOf(element) {
   return [element.textContent, ...element.children.flatMap(textContentOf)].join("");
 }
 
+function badgeTextsByClass(forecastLayer, cls) {
+  return forecastLayer.children
+    .filter((child) => child.getAttribute("class")?.split(/\s+/).includes(cls))
+    .map(textContentOf);
+}
+
+test("forecast rendering clears stale badges when disabled", () => {
+  withSvgDocument(() => {
+    const state = createBattleState({
+      units: [
+        { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
+        { id: "p2-sword", player: 2, type: "swordsman", x: 3, y: 0 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "p1-archer");
+    const forecastLayer = new TestSvgElement("g");
+    forecastLayer.append(new TestSvgElement("g"));
+
+    renderForecast({ forecastLayer, state, mode: "attack", actor, resolving: false, enabled: false });
+
+    assert.equal(forecastLayer.children.length, 0);
+  });
+});
+
 test("self-centered blast arts render damage forecast badges for enemies in the blast", () => {
   withSvgDocument(() => {
     const state = createBattleState({
@@ -57,8 +81,8 @@ test("self-centered blast arts render damage forecast badges for enemies in the 
 
     renderForecast({ forecastLayer, state, mode: "art:nuke", actor, resolving: false });
 
-    assert.equal(forecastLayer.children.length, 1);
-    assert.equal(textContentOf(forecastLayer), "-12");
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["100%"]);
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-attack"), ["-12"]);
   });
 });
 
@@ -76,8 +100,8 @@ test("targeted blast arts render damage forecasts around the hovered tile", () =
 
     renderForecast({ forecastLayer, state, mode: "art:thunderous-charge", actor, resolving: false, areaCenter: { x: 5, y: 5 } });
 
-    assert.equal(forecastLayer.children.length, 1);
-    assert.equal(textContentOf(forecastLayer), "-5");
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["100%"]);
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-attack"), ["-5"]);
   });
 });
 
@@ -95,8 +119,8 @@ test("cone arts render damage forecasts around the hovered cone", () => {
 
     renderForecast({ forecastLayer, state, mode: "art:volley-shot", actor, resolving: false, areaCenter: { x: 5, y: 6 } });
 
-    assert.equal(forecastLayer.children.length, 1);
-    assert.equal(textContentOf(forecastLayer), "-4");
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["100%"]);
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-attack"), ["-4"]);
   });
 });
 
@@ -113,8 +137,8 @@ test("targeted spell arts still render their normal damage forecast", () => {
 
     renderForecast({ forecastLayer, state, mode: "art:spark", actor, resolving: false });
 
-    assert.equal(forecastLayer.children.length, 1);
-    assert.equal(textContentOf(forecastLayer), "-6");
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["93%"]);
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-attack"), ["-6"]);
   });
 });
 
@@ -131,8 +155,8 @@ test("blind targeted spell arts still render damage instead of miss", () => {
 
     renderForecast({ forecastLayer, state, mode: "art:spark", actor, resolving: false });
 
-    assert.equal(forecastLayer.children.length, 1);
-    assert.equal(textContentOf(forecastLayer), "-6");
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["93%"]);
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-attack"), ["-6"]);
   });
 });
 
@@ -183,8 +207,8 @@ test("Angel basic attack forecast uses magic damage instead of physical chip", (
 
     renderForecast({ forecastLayer, state, mode: "attack", actor, resolving: false });
 
-    assert.equal(forecastLayer.children.length, 1);
-    assert.equal(textContentOf(forecastLayer), "-3");
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["93%"]);
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-attack"), ["-3"]);
   });
 });
 
@@ -202,8 +226,8 @@ test("Angel basic attack forecast does not show through an intervening body", ()
 
     renderForecast({ forecastLayer, state, mode: "attack", actor, resolving: false });
 
-    assert.equal(forecastLayer.children.length, 1);
-    assert.equal(textContentOf(forecastLayer), "-3");
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["93%"]);
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-attack"), ["-3"]);
   });
 });
 
@@ -264,7 +288,43 @@ test("Curve Shot forecast shows through an intervening unit", () => {
 
     renderForecast({ forecastLayer, state, mode: "art:curve-shot", actor, resolving: false });
 
-    assert.equal(forecastLayer.children.length, 1);
-    assert.equal(textContentOf(forecastLayer), "-3");
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["93%"]);
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-attack"), ["-3"]);
+  });
+});
+
+test("raging Archer attack forecasts 100 percent accuracy above damage", () => {
+  withSvgDocument(() => {
+    const state = createBattleState({
+      units: [
+        { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0, hp: 5 },
+        { id: "p2-sword", player: 2, type: "swordsman", x: 5, y: 0 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "p1-archer");
+    const forecastLayer = new TestSvgElement("g");
+
+    renderForecast({ forecastLayer, state, mode: "attack", actor, resolving: false });
+
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["100%"]);
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-attack"), ["-4"]);
+  });
+});
+
+test("blinded physical attack art forecasts zero percent accuracy above miss", () => {
+  withSvgDocument(() => {
+    const state = createBattleState({
+      units: [
+        { id: "p1-sword", player: 1, type: "swordsman", x: 0, y: 0, statuses: [{ type: "blind", duration: 1 }] },
+        { id: "p2-sword", player: 2, type: "swordsman", x: 1, y: 0 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "p1-sword");
+    const forecastLayer = new TestSvgElement("g");
+
+    renderForecast({ forecastLayer, state, mode: "art:moonstrike", actor, resolving: false });
+
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["0%"]);
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-miss"), ["miss"]);
   });
 });

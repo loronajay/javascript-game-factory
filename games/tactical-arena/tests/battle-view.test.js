@@ -278,6 +278,18 @@ test("the action bar hides commands when the active turn is not locally controll
   assert.equal(actionHelp.textContent, "Enemy turn - commands hidden.");
 });
 
+test("the accuracy forecast toggle is integrated into the command console", () => {
+  const html = readFileSync(join(GAME_ROOT, "html/match-screen.html"), "utf8");
+  const commandConsole = html.match(/<section class="panel command-console">[\s\S]*?<\/section>/)?.[0] ?? "";
+  const boardCss = readFileSync(join(GAME_ROOT, "styles/battle/board.css"), "utf8");
+
+  assert.match(commandConsole, /id="accuracyForecastToggle"/);
+  assert.match(commandConsole, /class="forecast-toggle"/);
+  assert.match(commandConsole, /id="actionHelp"/);
+  assert.match(boardCss, /\.battle-assist\s*\{/);
+  assert.match(boardCss, /\.forecast-toggle\s*\{/);
+});
+
 test("the action bar enables Cancel Move only after an uncommitted move", () => {
   const started = applyCommand(createBattleState(), beginActivation(1, "p1-swordsman"));
   assert.equal(started.accepted, true);

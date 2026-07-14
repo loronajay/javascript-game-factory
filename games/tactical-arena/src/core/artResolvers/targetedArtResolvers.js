@@ -1,7 +1,7 @@
 import { getArtMpCost, getCommandHealBonus, getGuaranteedStatuses, getPoisonMpRefund, getWeatherCritCreatesFire } from "../unitCatalog.js";
 import { areEnemies, cloneState, findUnit, getTileAffinity, isWallAt, livingUnits, unitAt } from "../state.js";
 import { artIsBodyBlocked, artUsesPhysicalStrike, getArtTargetRange, getRushContactDamage, validateRushPath } from "../../rules/arts.js";
-import { addDuelMark, duelistTracksMisses, getAttackRecoil, isHealingDisabled, isShotBlocked, isWallBetween, resolveBaseStrike, resolveFixedMagicStrike, rollToHit } from "../../rules/combat.js";
+import { addDuelMark, duelistTracksMisses, isHealingDisabled, isShotBlocked, isWallBetween, resolveBaseStrike, resolveFixedMagicStrike, rollToHit, shouldApplyAttackRecoil } from "../../rules/combat.js";
 import { drawValue } from "../rng.js";
 import { chebyshevDistance, isOnBoard, positionKey } from "../../rules/movement.js";
 import { getGlobalHealBonus, getGlobalStatusChanceMultiplier } from "../../rules/stances.js";
@@ -10,6 +10,7 @@ import { consumeOneShotRage } from "../reactions.js";
 import { accept, ERR, reject } from "../reducerResult.js";
 import { resolveVictory, spendAndAdvance } from "../turnEngine.js";
 import { pushDestinationAwayFrom } from "./displacement.js";
+import { completeArtUse } from "./artCompletion.js";
 
 export function resolveRushPath(state, command, art) {
   const actorState = findUnit(state, command.unitId);
@@ -177,7 +178,7 @@ export function resolveTargetedArt(state, command, art) {
     // Wanderer (Ronin): a foe that whiffs an attack ART on Ronin is marked for +1 next turn.
     if (duelistTracksMisses(target)) addDuelMark(target, actor.id);
     const desperationEvents = consumeOneShotRage(actor);
-    spendAndAdvance(next, actor);
+    completeArtUse(next, actor, art);
     return accept(next, [{ type: "ART_RESOLVED", artId: art.id, actorId: actor.id, targetId: target.id, mpCost: cost, hit: false, missed: true, roll: swing.hitRoll }, ...desperationEvents]);
   }
 
@@ -201,9 +202,9 @@ export function resolveTargetedArt(state, command, art) {
     next.tileObjects[positionKey(position)] = { kind: weatherCritFire.kind ?? "fire", permanent: Boolean(weatherCritFire.permanent) };
     fireTiles.push(position);
   }
-  // Final Draw (Ronin RAGE): an attack ART recoils its damage back onto the raging attacker.
+  // Final Draw (Ronin RAGE): attack ART recoil only applies while enemies remain.
   const recoilEvents = [];
-  if (getAttackRecoil(actor) && damageDealt > 0) {
+  if (shouldApplyAttackRecoil(actor, next) && damageDealt > 0) {
     const recoil = Math.min(actor.hp, damageDealt);
     actor.hp = Math.max(0, actor.hp - damageDealt);
     recoilEvents.push({ type: "ATTACK_RECOIL", unitId: actor.id, damage: recoil });
@@ -257,7 +258,7 @@ export function resolveTargetedArt(state, command, art) {
   // was already negated by resolveBaseStrike).
   const rockHardEvents = applyRockHardDefense(next, target, damage.type === "physical");
   const desperationEvents = consumeOneShotRage(actor);
-  spendAndAdvance(next, actor);
+  completeArtUse(next, actor, art);
   resolveVictory(next);
   return accept(next, [{
     type: "ART_RESOLVED",

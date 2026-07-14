@@ -187,6 +187,36 @@
     display: none;
   }
 
+  .battle-assist {
+    min-width: 0;
+    gap: .28rem;
+  }
+
+  .forecast-toggle {
+    grid-template-columns: minmax(0, 1fr) 2rem;
+    min-height: 36px;
+    padding: .24rem .3rem .24rem .42rem;
+  }
+
+  .forecast-toggle-copy {
+    font-size: .48rem;
+    letter-spacing: .02em;
+  }
+
+  .forecast-toggle-switch {
+    width: 2rem;
+    height: 1rem;
+  }
+
+  .forecast-toggle-switch::after {
+    width: .68rem;
+    height: .68rem;
+  }
+
+  .forecast-toggle input:checked + .forecast-toggle-switch::after {
+    left: 1.1rem;
+  }
+
   .squad-overlay {
     display: none;
   }
@@ -377,5 +407,15 @@
 
   .actions button {
     min-height: 40px;
+  }
+
+  .forecast-toggle {
+    grid-template-columns: 1fr;
+    place-items: center;
+    padding: .24rem;
+  }
+
+  .forecast-toggle-copy {
+    display: none;
   }
 }

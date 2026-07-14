@@ -17,7 +17,7 @@
 
 import { areEnemies, livingUnits } from "../core/state.js";
 import { getEffectiveStats, getUnitType, isCommandOnly, isDefending, isRaging, normalizeUnitAi, takesTurns } from "../core/unitCatalog.js";
-import { getCritChance, getMissChance, getSelfMagicVulnerability, getTeamDamageReduction, isFireBasedDamage, isFireDamageImmune, resolveBaseStrike, resolveFixedPhysicalStrike } from "../rules/combat.js";
+import { getBasicAttackDamageType, getCritChance, getMissChance, getSelfMagicVulnerability, getTeamDamageReduction, isFireBasedDamage, isFireDamageImmune, resolveBaseStrike, resolveFixedPhysicalStrike } from "../rules/combat.js";
 import { CRIT_MULTIPLIER } from "../rules/damage.js";
 import { chebyshevDistance } from "../rules/movement.js";
 import { statusImmunities } from "../rules/statuses.js";
@@ -29,7 +29,7 @@ const HARMFUL_STATUSES = new Set(["poison", "blind", "slow", "silence", "stun"])
 // Tuning priors. All values are in the same currency as HP / expected damage, so
 // the difficulty weights in cpuController compose cleanly (decision 3: one currency).
 const DEF_BASELINE = 4;      // notional enemy DEF, for estimating a unit's offense
-const HIT_BASELINE = 0.9;    // 1 − base miss; a unit's swing usually lands
+const HIT_BASELINE = 0.93;   // 1 - base miss; a unit's swing usually lands
 const POISON_HORIZON = 3;    // turns of DoT the CPU plans for (decision 1)
 const SLOW_FACTOR = 0.25;    // a slowed turn denies only a slice of value
 
@@ -308,7 +308,8 @@ function misfortuneStatusSynergyValue(state, caster, allies, enemies) {
 // a missed swing deals nothing and lands no rider, and the status rider only fires
 // if the target survives the hit.
 export function expectedStrike(state, attacker, target, art = null) {
-  const damageType = art?.damageType ?? "physical";
+  const basicAttack = !art;
+  const damageType = art?.damageType ?? (basicAttack ? getBasicAttackDamageType(attacker) : "physical");
   const damageAffinity = art?.damageAffinity ?? art?.damage?.affinity ?? null;
   const fixedPhysical = art?.damage?.type === "physical" && art.damage.fixed && Number.isFinite(art.damage.amount);
   const normal = fixedPhysical
@@ -321,9 +322,9 @@ export function expectedStrike(state, attacker, target, art = null) {
   // Magic-damage ARTS ignore Blind (Silence, not Blind, is the mage counter — see
   // artResolvers.js's resolveTargetedArt), so the EV math must match or the CPU would
   // undervalue casting while blinded.
-  const pMiss = getMissChance(attacker, { ignoreBlind: damageType === "magic" });
+  const pMiss = getMissChance(attacker, { ignoreBlind: Boolean(art && damageType === "magic"), target, state, basicAttack });
   const pHit = 1 - pMiss;
-  const pCrit = getCritChance(attacker);
+  const pCrit = getCritChance(attacker, { target, state, basicAttack });
 
   const expDamage = pHit * ((1 - pCrit) * normal + pCrit * crit);
   const normalKills = normal >= target.hp;

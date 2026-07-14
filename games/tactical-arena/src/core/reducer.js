@@ -3,7 +3,7 @@ import { resolveNemesisAutoPulse, resolveVolcanicPyroclasmTick, useArt } from ".
 import { getArt, getBasicAttackResourceCost, getEffectiveStats, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, getWallKillResourceReward, getWeatherCritCreatesFire, initialAbilityUses, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, getTileAffinity, isWallAt, livingUnits, unitAt } from "./state.js";
 import { getConeCells } from "../rules/arts.js";
-import { addDuelMark, duelistTracksMisses, getAttackRecoil, getAttackSplashDamage, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCritPullEffect, getCritSplashDamage, getDuelistCritLifesteal, getLineAttackTargets, getMeleeDefendRetaliation, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack, resolveBaseStrike, rollToHit } from "../rules/combat.js";
+import { addDuelMark, duelistTracksMisses, getAttackSplashDamage, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCritPullEffect, getCritSplashDamage, getDuelistCritLifesteal, getLineAttackTargets, getMeleeDefendRetaliation, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack, resolveBaseStrike, rollToHit, shouldApplyAttackRecoil } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMovePath, getLegalMoves, positionKey, validateTrampleMovePath } from "../rules/movement.js";
 import { applyStatus, isPetrified, isStunned } from "../rules/statuses.js";
 import { alliesInRadius, getStanceEffect } from "../rules/stances.js";
@@ -329,7 +329,11 @@ function attack(state, command) {
 
   // To-hit roll first (miss/crit). Blind and the raging Archer's never-miss are
   // folded into the chance, so a guaranteed miss reads through the same path.
-  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll });
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, {
+    target: nextTarget,
+    state: next,
+    basicAttack: true
+  });
   next.rngState = swing.rngState;
   // Dark Ether (Blacksword): a one-shot guaranteed-crit charge is spent by the attack it
   // buffed, hit OR miss ("still roll for misses").
@@ -429,7 +433,7 @@ function attack(state, command) {
       duelistEvents.push({ type: "CRIT_MP_RESTORE", unitId: restored.targetId ?? actor.id, sourceId: actor.id, mpGained: restored.mpRestored, hpRestored: restored.hpRestored });
     }
   }
-  if (getAttackRecoil(actor) && totalDamageDealt > 0) {
+  if (shouldApplyAttackRecoil(actor, next) && totalDamageDealt > 0) {
     const recoil = Math.min(actor.hp, totalDamageDealt);
     actor.hp = Math.max(0, actor.hp - totalDamageDealt);
     duelistEvents.push({ type: "ATTACK_RECOIL", unitId: actor.id, damage: recoil });

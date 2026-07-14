@@ -1,7 +1,3 @@
-// Presentation-only combat effects, ported from Mini-Tactics' EffectsRenderer:
-// the unit-element motion (movement slide, attack lunge / arrow projectile, hit
-// recoil, death dissolve) AND the fire-and-forget atmosphere (roll reveal, impact
-// flash/ring, floating damage text, crit screen-flash, screen shake, shard burst).
 // Nothing here touches authoritative state — every animation is fire-and-forget and
 // goes silent (no transform left behind) under prefers-reduced-motion.
 
@@ -13,9 +9,18 @@ import { createEffectEnvironment } from "./effectEnvironment.js";
 export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, dieFace, metrics, audio }) {
   const sound = audio ?? { play() {} };
   const { setMetrics, getMetrics, unitBase, unitElement, effectPoint } = createEffectEnvironment({ metrics, unitsLayer });
+  let generation = 0;
 
-  // Camera punch: jolt the board SVG a few pixels and settle, scaled by how much
-  // the blow hurt. Fired, not awaited, so the board shivers under the float text.
+  function clearActive() {
+    generation += 1;
+    for (const root of [board, unitsLayer, effectsLayer, diceOverlay]) {
+      for (const animation of root?.getAnimations?.({ subtree: true }) ?? []) animation.cancel();
+    }
+    effectsLayer?.replaceChildren();
+    diceOverlay?.classList.remove("show", "rolling");
+    if (dieFace) { dieFace.className = "die"; dieFace.replaceChildren(); }
+  }
+
   function shake(magnitude = 6) {
     if (!board || reducedMotion()) return;
     const throwTo = (m) => {
@@ -41,7 +46,6 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
       .finished.catch(() => {}).then(() => flash.remove());
   }
 
-  // Impact pop + expanding ring + debris at the point of contact, styled by damage
   // type ("physical" | "magic" | "fire" | "true" — see IMPACT_VFX in vfxCatalog).
   function impact(point, critical, kind = "physical") {
     if (reducedMotion()) return;
@@ -56,8 +60,6 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     ring.animate([{ r: 8, opacity: 1, strokeWidth: 5 }, { r: 44, opacity: 0, strokeWidth: 1 }], { duration: 420, easing: "ease-out" })
       .finished.catch(() => {}).then(() => ring.remove());
 
-    // Debris sells the material: chips tumble outward, motes drift out and up,
-    // embers climb with a flicker. Origin-centered geometry + absolute translate
     // (scale/rotate on SVG are user-space-origin-relative — see castWindup).
     const count = style.sparkCount + (critical ? 3 : 0);
     for (let i = 0; i < count; i += 1) {
@@ -70,7 +72,6 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
       effectsLayer.appendChild(debris);
       let frames;
       if (style.motion === "embers") {
-        // Rising sparks with a sideways wander and a mid-flight flicker.
         const driftX = Math.cos(angle) * reach * 0.5;
         frames = [
           { transform: `translate(${center.x}px, ${center.y}px) scale(1)`, opacity: 1 },
@@ -79,14 +80,12 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
           { transform: `translate(${center.x + driftX * 1.3}px, ${center.y - reach * 1.7}px) scale(.4)`, opacity: 0 }
         ];
       } else if (style.motion === "motes") {
-        // Arcane points floating outward then lifting away.
         frames = [
           { transform: `translate(${center.x}px, ${center.y}px) scale(.5)`, opacity: 0.95 },
           { transform: `translate(${center.x + Math.cos(angle) * reach}px, ${center.y + Math.sin(angle) * reach * 0.5 - 4}px) scale(1)`, opacity: 0.8, offset: 0.5 },
           { transform: `translate(${center.x + Math.cos(angle) * reach * 1.2}px, ${center.y + Math.sin(angle) * reach * 0.5 - 16}px) scale(.35)`, opacity: 0 }
         ];
       } else {
-        // Kinetic chips tumbling out on a shallow ballistic hop.
         frames = [
           { transform: `translate(${center.x}px, ${center.y}px) rotate(0deg) scale(1)`, opacity: 1 },
           { transform: `translate(${center.x + Math.cos(angle) * reach}px, ${center.y + Math.sin(angle) * reach * 0.55 - 8}px) rotate(${140 + i * 40}deg) scale(.8)`, opacity: 0.9, offset: 0.55 },
@@ -99,7 +98,6 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
   }
 
   // ---------------------------------------------------------------------------
-  // Projectile flight primitive. A REAL object (arrow, orb, tracer, lobbed toss)
   // flies a quadratic arc from `from` to `to`, rotating to its heading, with a
   // faint trail behind it. The promise resolves at arrival so the caller can land
   // the impact in sync. Shape builders draw pointing +x; the flight rotates them.
@@ -1323,6 +1321,7 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
   // Pass a custom `label` for a second effect roll (e.g. "BLINDED", "RESISTED").
   async function rollReveal(outcome, label = null) {
     if (!diceOverlay || !dieFace) return;
+    const token = generation;
     sound.play("diceRoll");
     diceOverlay.classList.add("show", "rolling");
     dieFace.className = "die";
@@ -1331,6 +1330,7 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
       for (let i = 0; i < 7; i += 1) {
         dieFace.textContent = faces[Math.floor(Math.random() * faces.length)];
         await sleep(46);
+        if (token !== generation) return;
       }
     }
     const glyph = outcome.missed ? "✘" : outcome.critical ? "✦" : "⚔";
@@ -1339,9 +1339,10 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     dieFace.classList.add(outcome.missed ? "die-miss" : outcome.critical ? "die-crit" : "die-hit");
     diceOverlay.classList.remove("rolling");
     await sleep(reducedMotion() ? 140 : 380);
+    if (token !== generation) return;
     diceOverlay.classList.remove("show");
     await sleep(120);
   }
 
-  return { setMetrics, shake, critFlash, impact, statusBurst, floatText, artCallout, deathBurst, animateMovement, animateAttack, hitRecoil, knockUp, deathDissolve, rollReveal, playAbilityVfx, footworkCharge };
+  return { setMetrics, clearActive, shake, critFlash, impact, statusBurst, floatText, artCallout, deathBurst, animateMovement, animateAttack, hitRecoil, knockUp, deathDissolve, rollReveal, playAbilityVfx, footworkCharge };
 }

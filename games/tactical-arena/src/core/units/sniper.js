@@ -78,9 +78,10 @@ export const SNIPER = Object.freeze({
     effect: Object.freeze({
       type: "statModifiers",
       stats: Object.freeze({ strength: 1, attackRange: 1, moveRange: 2 }),
+      moveAndUseArts: true,
       lineAttack: Object.freeze({ damageType: "physical" })
     }),
-    description: "At 5 HP or lower, gain +1 STR, +1 range, +2 MOVE, and basic attacks damage every enemy in the chosen straight ray.",
+    description: "At 5 HP or lower, gain +1 STR, +1 range, +2 MOVE, may move and use ARTS in the same activation, and basic attacks damage every enemy in the chosen straight ray.",
     implemented: true
   })
 });

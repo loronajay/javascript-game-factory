@@ -63,6 +63,7 @@ export function createMatchLifecycleController({
     tutorialPresentation.reset();
     tempoLoop.stop();
     blackout.clear();
+    effects.clearActive?.();
     runtime.matchEpoch += 1;
     const online = config.mode === "online";
 

@@ -2380,7 +2380,7 @@ test("Battle for the Bridge dialogue covers opening banter, blind, rage, and pos
   };
   assert.equal(shouldShowRoninRageWarning(raging, { warningShown: false }), true);
   assert.equal(shouldShowRoninRageWarning(raging, { warningShown: true }), false);
-  assert.match(roninRageWarningScript(raging).map((line) => line.text).join(" "), /Final Draw|RAGE|recoil|suicide/i);
+  assert.match(roninRageWarningScript(raging).map((line) => line.text).join(" "), /Final Draw|RAGE|recoil|duel/i);
 
   const defeat = roninDefeatScript({ ...state, winner: 1 });
   assert.match(defeat.map((line) => line.text).join(" "), /king|sorcerer|void|wrongs|just|services/i);
@@ -2416,7 +2416,7 @@ test("Battle for the Bridge grading rewards the duel, no blind, no Ronin rage, a
   assert.equal(evaluateCampaignMission(RONIN_MISSION_ID, lost, {}).stars, 0);
 });
 
-test("Battle for the Bridge awards a Final Draw double-KO to the Ronin", () => {
+test("Battle for the Bridge still awards an actual double-KO to the Ronin", () => {
   const state = roninMatchState(["swordsman"]);
   const doubleKo = {
     ...state,

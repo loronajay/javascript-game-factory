@@ -2,10 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { attackerPierces, isShotBlocked, resolvePhysicalStrike } from "../src/rules/combat.js";
-import { getEffectiveStats } from "../src/core/unitCatalog.js";
+import { canMoveAndUseArts, getEffectiveStats } from "../src/core/unitCatalog.js";
 import { createBattleState } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
-import { attack, beginActivation, useArt } from "../src/core/commands.js";
+import { attack, beginActivation, moveUnit, useArt } from "../src/core/commands.js";
 
 // Pin a clean normal hit so reducer damage is deterministic.
 const NORMAL_HIT = { attackRoll: 0.5, critRoll: 0.99 };
@@ -31,15 +31,19 @@ test("Rifle Powered guarantees at least 2 damage against heavy defense", () => {
 });
 
 test("Sniper RAGE grants +1 STR, +1 range, and +2 MOVE at <=5 HP", () => {
-  const calm = getEffectiveStats({ type: "sniper", hp: 23, statModifiers: {}, statuses: [] });
+  const calmUnit = { type: "sniper", hp: 23, statModifiers: {}, statuses: [] };
+  const calm = getEffectiveStats(calmUnit);
   assert.equal(calm.strength, 8);
   assert.equal(calm.attackRange, 6);
   assert.equal(calm.moveRange, 2);
+  assert.equal(canMoveAndUseArts(calmUnit), false);
 
-  const raging = getEffectiveStats({ type: "sniper", hp: 5, statModifiers: {}, statuses: [] });
+  const ragingUnit = { type: "sniper", hp: 5, statModifiers: {}, statuses: [] };
+  const raging = getEffectiveStats(ragingUnit);
   assert.equal(raging.strength, 9);
   assert.equal(raging.attackRange, 7);
   assert.equal(raging.moveRange, 4);
+  assert.equal(canMoveAndUseArts(ragingUnit), true);
 });
 
 test("attackerPierces is true only for the Sniper", () => {
@@ -72,6 +76,30 @@ test("Smoke Bomb's 70% check can fail (no blind on a high roll), still spending 
   assert.equal(result.accepted, true);
   assert.deepEqual(result.nextState.units.find((u) => u.id === "foe").statuses, []);
   assert.equal(result.nextState.units.find((u) => u.id === "sniper").mp, 15);
+});
+
+test("a raging Sniper can move before using an ART", () => {
+  const healthy = applyCommand(sniperVsFoe(4, 0), beginActivation(1, "sniper")).nextState;
+  const healthyMoved = applyCommand(healthy, moveUnit(1, "sniper", 1, 0));
+  assert.ok(healthyMoved.accepted, healthyMoved.errorCode);
+  assert.equal(applyCommand(healthyMoved.nextState, useArt(1, "sniper", "smoke-bomb", { targetId: "foe", effectRoll: 0.1 })).accepted, false);
+
+  const ragingState = createBattleState({
+    units: [
+      { id: "sniper", player: 1, type: "sniper", hp: 5, x: 0, y: 0 },
+      { id: "foe", player: 2, type: "swordsman", x: 4, y: 0 }
+    ]
+  });
+  const raging = applyCommand(ragingState, beginActivation(1, "sniper")).nextState;
+  const rageMoved = applyCommand(raging, moveUnit(1, "sniper", 1, 0));
+  assert.ok(rageMoved.accepted, rageMoved.errorCode);
+
+  const cast = applyCommand(rageMoved.nextState, useArt(1, "sniper", "smoke-bomb", { targetId: "foe", effectRoll: 0.1 }));
+  assert.ok(cast.accepted, cast.errorCode);
+  assert.equal(cast.nextState.activation.moved, true);
+  assert.equal(cast.nextState.activation.primaryUsed, true);
+  assert.equal(cast.nextState.units.find((u) => u.id === "sniper").spent, false);
+  assert.equal(cast.nextState.units.find((u) => u.id === "foe").statuses.some((status) => status.type === "blind"), true);
 });
 
 test("Build Cover places a 1-HP wall on an empty tile within range", () => {

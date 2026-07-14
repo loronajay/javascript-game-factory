@@ -20,6 +20,7 @@ import {
   createTutorialPresentationController,
   hasTutorialPresentation,
 } from "./ui/tutorialPresentationController.js";
+import { createResolutionGuard } from "./ui/resolutionGuard.js";
 import { shouldUseRangedAttackAnimation, wallOreGainFloat } from "./ui/combatPresentation.js";
 import { TurnAnnouncer } from "./ui/turnFlash.js";
 import { createMenuFlow } from "./ui/menuFlow.js";
@@ -32,6 +33,7 @@ import { RulesModal } from "./ui/rulesModal.js";
 import { applyMobileViewport, requestMobileFullscreen } from "./ui/mobileViewport.js";
 import { applyTheme, loadSavedThemeId } from "./ui/themes.js";
 import { applyPerformanceMode, loadPerformanceMode } from "./ui/performanceSettings.js";
+import { loadAccuracyForecastEnabled, saveAccuracyForecastEnabled } from "./ui/forecastSettings.js";
 import { shouldShowTurnAnnouncement, turnAnnouncementSub } from "./ui/turnAnnouncement.js";
 import { openChoiceModal } from "./ui/choiceModal.js";
 import { createDialogueSystem } from "./ui/dialogue.js";
@@ -98,6 +100,7 @@ const turnTitle = document.querySelector("#turnTitle");
 const turnSub = document.querySelector("#turnSub");
 const turnBanner = document.querySelector("#turnBanner");
 const weatherBadge = document.querySelector("#weatherBadge");
+const accuracyForecastToggle = document.querySelector("#accuracyForecastToggle");
 const actionHelp = document.querySelector("#actionHelp");
 const squadOverlays = document.querySelector("#squadOverlays");
 const message = document.querySelector("#message");
@@ -113,6 +116,7 @@ let footworkPath = [];
 let volleyShotOrigin = null;
 let areaForecastCenter = null;
 let areaForecastMode = null;
+let accuracyForecastEnabled = loadAccuracyForecastEnabled();
 // The fallen ally chosen for Father Time's Rewind, awaiting a placement-tile click.
 let rewindTargetId = null;
 let resolving = false;
@@ -499,6 +503,9 @@ function renderCommandHud() {
   const unit = selectedUnit();
   const controlsEnabled = currentPlayerIsLocal() && !dialogue.isOpen();
   renderUnitCard(unit, state, unitCard);
+  if (accuracyForecastToggle) {
+    accuracyForecastToggle.checked = accuracyForecastEnabled;
+  }
   renderActions(unit, state, mode, { actions, actionHelp }, {
     resolving,
     controlsEnabled,
@@ -535,10 +542,10 @@ function renderBoardAndRail() {
     onAreaHover: (center) => {
       areaForecastCenter = center;
       areaForecastMode = center ? mode : null;
-      renderForecast({ forecastLayer, state, mode, actor: selectedUnit(), resolving, areaCenter: center });
+      renderForecast({ forecastLayer, state, mode, actor: selectedUnit(), resolving, areaCenter: center, enabled: accuracyForecastEnabled });
     }
   });
-  renderForecast({ forecastLayer, state, mode, actor: unit, resolving, areaCenter: currentAreaCenter });
+  renderForecast({ forecastLayer, state, mode, actor: unit, resolving, areaCenter: currentAreaCenter, enabled: accuracyForecastEnabled });
 }
 
 // A living, ready, human-controlled unit the local player may command right now (readiness
@@ -1006,6 +1013,7 @@ function endResolve(prepared, result, prevPlayer) {
 // the roll, commits the resolved state, then plays impact FX. Non-rolled actions use
 // synchronous dispatch; instant ARTs use resolveInstantArt (commit-at-end).
 async function resolveCombat(command) {
+  const guard = createResolutionGuard(matchEpoch, () => matchEpoch, { effects, revealRoll, playAttackImpactSound });
   const prevPlayer = state.currentPlayer;
   const { prepared, result } = resolveCommand(command);
   if (!result.accepted) { setMessage(commandErrorMessage(result), true); return false; }
@@ -1019,18 +1027,20 @@ async function resolveCombat(command) {
     result,
     events,
     ...presentation,
-    effects,
-    revealRoll,
-    playAttackImpactSound,
+    effects: guard.effects,
+    revealRoll: guard.revealRoll,
+    playAttackImpactSound: guard.playAttackImpactSound,
     artDefinition,
   });
 
+  if (!guard.current()) return false;
   return endResolve(prepared, result, prevPlayer);
 }
 // A wall is attacked like a unit (it can't dodge, so there's no roll), but it gets
 // the SAME attacker lunge/projectile animation as a normal strike instead of just
 // popping. Impact lands on the wall; a destroyed wall bursts into stone shards.
 async function resolveWallAttack(command) {
+  const guard = createResolutionGuard(matchEpoch, () => matchEpoch, { effects, audio });
   const prevPlayer = state.currentPlayer;
   const { prepared, result } = resolveCommand(command);
   if (!result.accepted) { setMessage(commandErrorMessage(result), true); return false; }
@@ -1042,25 +1052,29 @@ async function resolveWallAttack(command) {
   if (event && attackerBefore) {
     const ranged = shouldUseRangedAttackAnimation(attackerBefore, { id: `wall:${positionKey(event.position)}`, position: event.position });
     const center = unitCenter(metrics, { position: event.position });
-    await effects.animateAttack(attackerBefore, { id: `wall:${positionKey(event.position)}`, position: event.position }, ranged);
-    audio.play(ranged ? "arrowHit" : "attackHit");
-    effects.impact(center, false);
-    effects.shake(5);
+    await guard.effects.animateAttack(attackerBefore, { id: `wall:${positionKey(event.position)}`, position: event.position }, ranged);
+    if (!guard.current()) return false;
+    guard.audio.play(ranged ? "arrowHit" : "attackHit");
+    guard.effects.impact(center, false);
+    guard.effects.shake(5);
     if (event.destroyed) {
-      audio.play("wallBreak");
-      effects.deathBurst(center, "#9a9384");
+      guard.audio.play("wallBreak");
+      guard.effects.deathBurst(center, "#9a9384");
       const oreFloat = wallOreGainFloat(event);
-      if (oreFloat) await effects.floatText(unitCenter(metrics, attackerBefore), oreFloat.text, oreFloat.color);
+      if (oreFloat) await guard.effects.floatText(unitCenter(metrics, attackerBefore), oreFloat.text, oreFloat.color);
+      if (!guard.current()) return false;
       setMessage("Wall destroyed.");
     } else {
       setMessage(`Wall struck — ${event.hpAfter} HP left.`);
     }
   }
 
+  if (!guard.current()) return false;
   return endResolve(prepared, result, prevPlayer);
 }
 
 async function resolveInstantArt(command) {
+  const guard = createResolutionGuard(matchEpoch, () => matchEpoch, { effects, audio, render, revealRoll });
   const prevPlayer = state.currentPlayer;
   const { prepared, result } = resolveCommand(command);
   if (!result.accepted) { setMessage(commandErrorMessage(result), true); return false; }
@@ -1084,13 +1098,14 @@ async function resolveInstantArt(command) {
     resolved,
     actorBefore,
     targetsBefore,
-    effects,
-    audio,
-    revealRoll,
+    effects: guard.effects,
+    audio: guard.audio,
+    revealRoll: guard.revealRoll,
     artDefinition,
-    render,
+    render: guard.render,
   });
 
+  if (!guard.current()) return false;
 
   const beforeState = state;
   state = result.nextState;
@@ -1229,6 +1244,11 @@ function releaseTempoSlot(exceptId) {
 
 document.querySelector("#restartBtn").addEventListener("click", resetBattle);
 document.querySelector("#rulesBtn").addEventListener("click", openCodex);
+
+accuracyForecastToggle?.addEventListener("change", () => {
+  accuracyForecastEnabled = saveAccuracyForecastEnabled(accuracyForecastToggle.checked);
+  render();
+});
 
 const muteBtn = document.querySelector("#muteBtn");
 muteBtn.addEventListener("click", () => {

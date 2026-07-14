@@ -201,6 +201,7 @@ export function createCpuTurnController({
   }
 
   async function resolveCpuMove(command, options) {
+    const epoch = runtime.matchEpoch;
     return resolveAnimatedMove(command, {
       getState: () => runtime.state,
       setResolving: (value) => { runtime.resolving = value; },
@@ -210,6 +211,7 @@ export function createCpuTurnController({
       playRolloverFx,
       render,
       effects,
+      isCurrent: () => epoch === runtime.matchEpoch,
     }, options);
   }
 

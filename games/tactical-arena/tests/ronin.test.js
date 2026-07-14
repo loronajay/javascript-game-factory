@@ -244,14 +244,15 @@ test("Final Draw: an attack recoils its full damage back onto Ronin", () => {
   assert.equal(findUnit(res.nextState, "ronin").hp, 5 - dealt);
 });
 
-test("Final Draw: a lethal recoil kills Ronin and does not soft-lock the turn", () => {
+test("Final Draw: a lethal recoil still kills Ronin while another enemy remains", () => {
   // Low-DEF foe → a big strike → recoil exceeds Ronin's 5 HP. The activation must close so
   // the player can keep playing with their other unit.
   const state = scenario([
     { id: "ronin", type: "ronin", player: 1, x: 5, y: 5, hp: 5 },
     { id: "ally", type: "swordsman", player: 1, x: 5, y: 8 },
     { id: "foe", type: "swordsman", player: 2, x: 6, y: 5, defense: 0, hp: 40 },
-    { id: "foeAlly", type: "swordsman", player: 2, x: 6, y: 6 }
+    { id: "foeAlly", type: "swordsman", player: 2, x: 6, y: 6 },
+    { id: "reserve", type: "swordsman", player: 2, x: 12, y: 12 }
   ]);
   let s = run(state, beginActivation(1, "ronin")).nextState;
   s = run(s, attack(1, "ronin", "foe", NORMAL_HIT)).nextState;
@@ -260,6 +261,46 @@ test("Final Draw: a lethal recoil kills Ronin and does not soft-lock the turn", 
   assert.equal(s.activation, null, "the dangling activation is closed");
   assert.equal(s.currentPlayer, 1, "player 1 still has an unspent ally");
   assert.equal(run(s, beginActivation(1, "ally")).accepted, true, "the turn is not soft-locked");
+});
+
+test("Final Draw: Ronin survives recoil when his attack defeats the last enemy unit", () => {
+  const state = scenario([
+    { id: "ronin", type: "ronin", player: 1, x: 5, y: 5, hp: 5 },
+    { id: "foe", type: "swordsman", player: 2, x: 6, y: 5, hp: 10 }
+  ]);
+  let s = run(state, beginActivation(1, "ronin")).nextState;
+  const res = run(s, attack(1, "ronin", "foe", NORMAL_HIT));
+  assert.equal(findUnit(res.nextState, "foe").hp, 0, "the last enemy falls");
+  assert.equal(findUnit(res.nextState, "ronin").hp, 5, "match-ending recoil is skipped");
+  assert.equal(res.events.some((e) => e.type === "ATTACK_RECOIL"), false);
+  assert.equal(res.nextState.phase, "complete");
+  assert.equal(res.nextState.winner, 1);
+});
+
+test("Final Draw: attack arts skip recoil when they defeat the last enemy unit", () => {
+  const state = scenario([
+    { id: "ronin", type: "ronin", player: 1, x: 5, y: 5, hp: 5 },
+    { id: "foe", type: "swordsman", player: 2, x: 6, y: 5, hp: 10 }
+  ]);
+  let s = run(state, beginActivation(1, "ronin")).nextState;
+  const res = run(s, useArt(1, "ronin", "flashing-steel", { targetId: "foe", ...EFFECT_HIT }));
+  assert.equal(findUnit(res.nextState, "foe").hp, 0, "the last enemy falls");
+  assert.equal(findUnit(res.nextState, "ronin").hp, 5, "match-ending art recoil is skipped");
+  assert.equal(res.events.some((e) => e.type === "ATTACK_RECOIL"), false);
+  assert.equal(res.nextState.winner, 1);
+});
+
+test("Final Draw: Shuriken skips recoil when it defeats the last enemy unit", () => {
+  const state = scenario([
+    { id: "ronin", type: "ronin", player: 1, x: 5, y: 5, hp: 3 },
+    { id: "foe", type: "swordsman", player: 2, x: 7, y: 5, hp: 3 }
+  ]);
+  let s = run(state, beginActivation(1, "ronin")).nextState;
+  const res = run(s, useArt(1, "ronin", "shuriken", { targetId: "foe", ...NORMAL_HIT }));
+  assert.equal(findUnit(res.nextState, "foe").hp, 0, "the last enemy falls");
+  assert.equal(findUnit(res.nextState, "ronin").hp, 3, "match-ending shuriken recoil is skipped");
+  assert.equal(res.events.some((e) => e.type === "ATTACK_RECOIL"), false);
+  assert.equal(res.nextState.winner, 1);
 });
 
 // --- lockstep / presentation guards ------------------------------------------

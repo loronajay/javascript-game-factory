@@ -7,15 +7,25 @@ import { artIsBodyBlocked, artUsesPhysicalStrike, getArtTargetRange, getConeCell
 import { finalizeMagicDamage, getBasicAttackDamageType, getMissChance, getProximityBonus, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 
-function drawForecastBadge(forecastLayer, metrics, target, label, cls) {
+function drawForecastBadge(forecastLayer, metrics, target, label, cls, yOffset = 0) {
   const point = gridToScreen(metrics, target.position.x, target.position.y);
-  const y = point.y + metrics.tileHeight * 0.45 - 52;
+  const y = point.y + metrics.tileHeight * 0.45 - 52 + yOffset;
   const group = svgElement("g", { class: `forecast-badge ${cls}`, transform: `translate(${point.x} ${y})` });
   const halfWidth = 15 + (label.length - 1) * 4.5;
   const text = svgElement("text", { class: "fc-text", x: 0, y: 5, "text-anchor": "middle" });
   text.textContent = label;
   group.append(svgElement("rect", { class: "fc-bg", x: -halfWidth, y: -11, width: halfWidth * 2, height: 22, rx: 11 }), text);
   forecastLayer.append(group);
+}
+
+function accuracyLabel(missChance) {
+  const hitChance = 1 - Math.max(0, Math.min(1, missChance));
+  return `${Math.round(hitChance * 100)}%`;
+}
+
+function drawForecastStack(forecastLayer, metrics, target, accuracy, label, cls) {
+  drawForecastBadge(forecastLayer, metrics, target, accuracy, "fc-accuracy", -24);
+  drawForecastBadge(forecastLayer, metrics, target, label, cls);
 }
 
 // Shapes whose real resolver does NOT run a plain single-target strike through
@@ -129,12 +139,13 @@ function areaForecastEntries(state, actor, art, areaCenter) {
   return [];
 }
 
-// While in attack or single-target ART mode, every enemy in range wears a badge
-// showing the predicted normal-hit damage (skull when lethal, "miss" when an attack
-// or physical strike ART is blinded).
+// While in attack or single-target ART mode, every enemy in range wears stacked badges
+// showing hit accuracy above predicted normal-hit damage (skull when lethal, "miss"
+// when an attack or physical strike ART is blinded).
 // Uses the same strike resolver the reducer uses, so damage-type changes stay honest.
-export function renderForecast({ forecastLayer, state, mode, actor, resolving, areaCenter = null }) {
+export function renderForecast({ forecastLayer, state, mode, actor, resolving, areaCenter = null, enabled = true }) {
   forecastLayer.replaceChildren();
+  if (!enabled) return;
   if (!actor || state.phase !== "playing" || resolving) return;
   const isAttack = mode === "attack";
   const artId = mode?.startsWith("art:") ? mode.slice(4) : null;
@@ -146,13 +157,12 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving, a
   const metrics = createBoardMetrics(state.size);
   if (isAreaArt && !isStrikeArt && !isAttack) {
     for (const { target, damage } of areaForecastEntries(state, actor, art, areaCenter)) {
-      drawForecastBadge(forecastLayer, metrics, target, damageLabel(damage, target), damageClass(damage, target));
+      drawForecastStack(forecastLayer, metrics, target, "100%", damageLabel(damage, target), damageClass(damage, target));
     }
     return;
   }
 
   const reach = isStrikeArt ? getArtTargetRange(state, actor, art) : getEffectiveStats(actor, state).attackRange;
-  const guaranteedMiss = (isAttack || (isStrikeArt && artUsesPhysicalStrike(art))) && getMissChance(actor) >= 1;
   // The damage type of what's being aimed: a basic attack reads the unit's passive
   // (Angel's Blessed Arrow is magic); an ART carries its own damageType.
   const damageType = isAttack ? getBasicAttackDamageType(actor) : (art?.damageType ?? null);
@@ -168,8 +178,12 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving, a
     // A wall hides the forecast for any ranged ability (physical or magic) — the
     // Sniper's pierce is the only shot that still reaches and shows a number.
     if (isWallBetween(state, actor.position, target.position, actor)) continue;
+    const ignoreBlind = isStrikeArt && !artUsesPhysicalStrike(art);
+    const missChance = getMissChance(actor, { ignoreBlind, target, state, basicAttack: isAttack });
+    const accuracy = accuracyLabel(missChance);
+    const guaranteedMiss = missChance >= 1;
     if (guaranteedMiss) {
-      drawForecastBadge(forecastLayer, metrics, target, "miss", "fc-miss");
+      drawForecastStack(forecastLayer, metrics, target, accuracy, "miss", "fc-miss");
       continue;
     }
     // A fixed-amount magic art (Virus's Cough) forecasts its authored amount, not a
@@ -190,7 +204,7 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving, a
           : fixedPhysical
             ? resolveFixedPhysicalStrike(actor, target, art.damage.amount, { state })
             : resolveBaseStrike(actor, target, { proximity: true, state, damageType, damageAffinity: art?.damageAffinity ?? art?.damage?.affinity ?? null });
-    drawForecastBadge(forecastLayer, metrics, target, damageLabel(strike.damage, target), damageClass(strike.damage, target));
+    drawForecastStack(forecastLayer, metrics, target, accuracy, damageLabel(strike.damage, target), damageClass(strike.damage, target));
   }
 }
 

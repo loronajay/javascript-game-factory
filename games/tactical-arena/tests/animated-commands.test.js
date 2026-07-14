@@ -95,3 +95,33 @@ test("a rejected animated movement releases the input lock", async () => {
   assert.equal(renders.length, 0);
   assert.equal(animations.length, 0);
 });
+
+test("a canceled animated movement does not finish stale rollover or render work", async () => {
+  let current = true;
+  let finishAnimation;
+  const { context, resolving, renders, order } = createContext();
+  context.isCurrent = () => current;
+  context.effects.animateMovement = async () => {
+    order.push("move-animation");
+    await new Promise((resolve) => { finishAnimation = resolve; });
+  };
+
+  const resolvingMove = resolveAnimatedMove({
+    type: "MOVE_UNIT",
+    unitId: "p2-swordsman",
+    position: { x: 4, y: 4 },
+  }, context);
+
+  await Promise.resolve();
+  current = false;
+  finishAnimation();
+
+  assert.equal(await resolvingMove, false);
+  assert.deepEqual(resolving, [true]);
+  assert.equal(renders.length, 1);
+  assert.deepEqual(order, [
+    "resolving:true",
+    "dispatch:deferred",
+    "move-animation",
+  ]);
+});

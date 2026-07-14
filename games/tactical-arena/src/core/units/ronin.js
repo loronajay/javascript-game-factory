@@ -3,8 +3,8 @@
 // is near (his or the target's), punishes enemies that whiffed on him, and heals him on a
 // critical strike. His ARTS are all self-serving duel tools — a patient guard, a stronger
 // blinding cut, a reckless offense trade, a mutual grudge mark, and a thrown finisher.
-// RAGE (Final Draw) turns him into a glass cannon: +12 STR but every attack recoils onto
-// him.
+// RAGE (Final Draw) turns him into a glass cannon: +12 STR but every non-finishing attack
+// recoils onto him.
 //
 // New reusable engine seams introduced here (all data-first, read centrally):
 //   • `duelist` passive (rules/combat.js getDuelistDamageBonus / getDuelistCritLifesteal /
@@ -14,7 +14,7 @@
 //   • `challenged` status + getChallengeDamageBonus — a mutual "+N vs a specific foe"
 //     mark, folded into the physical strike so the forecast stays honest.
 //   • `attackRecoil` RAGE flag (reducer attack / artResolvers) — self-damage equal to the
-//     damage an attack deals.
+//     damage an attack deals while the enemy team can still fight.
 //   • `selfBuff` resolution (artResolvers resolveSelfBuff) — defend and/or apply a timed
 //     self status; and `challenge`/`shuriken` resolutions.
 export const RONIN = Object.freeze({
@@ -138,7 +138,7 @@ export const RONIN = Object.freeze({
       attackRecoil: true
     }),
     description:
-      "At 5 HP or lower: +12 STR and +1 MOVE, but Ronin takes damage equal to the damage he deals with an attack.",
+      "At 5 HP or lower: +12 STR and +1 MOVE, but Ronin takes damage equal to the damage he deals with an attack unless it defeats the last enemy unit.",
     implemented: true
   })
 });

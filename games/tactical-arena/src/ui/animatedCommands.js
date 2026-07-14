@@ -7,6 +7,7 @@ export async function resolveAnimatedMove(command, {
   playRolloverFx,
   render,
   effects,
+  isCurrent = () => true,
 } = {}, { keepResolving = false } = {}) {
   const state = getState?.();
   const unit = state ? findUnit?.(state, command.unitId) : null;
@@ -21,7 +22,9 @@ export async function resolveAnimatedMove(command, {
 
   render?.();
   if (from) await effects?.animateMovement?.(command.unitId, from, command.position);
+  if (!isCurrent()) return false;
   await playRolloverFx?.(events);
+  if (!isCurrent()) return false;
   setResolving?.(keepResolving);
   render?.();
   return true;

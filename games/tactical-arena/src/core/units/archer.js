@@ -80,9 +80,13 @@ export const ARCHER = Object.freeze({
     name: "RAGE Passive",
     kind: "passive",
     mpCost: 0,
-    effect: Object.freeze({ type: "statModifiers", stats: Object.freeze({ strength: 1, attackRange: 1 }) }),
+    effect: Object.freeze({
+      type: "statModifiers",
+      stats: Object.freeze({ strength: 1, attackRange: 1 }),
+      moveAndUseArts: true
+    }),
     combat: Object.freeze({ neverMiss: true, criticalChance: 0.5 }),
-    description: "At 5 HP or lower, gain +1 STR and +1 range, never miss, and gain a 50% critical chance.",
+    description: "At 5 HP or lower, gain +1 STR and +1 range, may move and use ARTS in the same activation, never miss, and gain a 50% critical chance.",
     implemented: true
   })
 });
