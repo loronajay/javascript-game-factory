@@ -156,11 +156,16 @@ test("the document exposes the mobile playability shell", () => {
     /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.roster-detail \.stat-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\)[\s\S]*?\.roster-detail \.skin-summary\s*\{[\s\S]*?display:\s*none/,
     "short landscape roster detail should spend vertical space on unit stats and kit text, not skin chrome",
   );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.roster-grid-head\s*\{\s*grid-column:\s*1 \/ -1;\s*display:\s*none;/,
+    "short landscape roster grid should not show the Choose Pick toolbar over the unit grid",
+  );
   const rosterPickerJs = readFileSync(new URL("../src/ui/rosterPicker.js", import.meta.url), "utf8");
   assert.match(
     rosterPickerJs,
-    /dataset\.roster\s*=\s*"place"/,
-    "short landscape roster picker needs an explicit Place action from the units view",
+    /detailsOpen\s*=\s*shouldUseSinglePaneRoster\(\)/,
+    "short landscape roster taps should open unit details instead of repainting a grid toolbar",
   );
   assert.match(
     rosterPickerJs,
@@ -169,8 +174,8 @@ test("the document exposes the mobile playability shell", () => {
   );
   assert.match(
     rosterPickerJs,
-    /dataset\.roster\s*=\s*"details"/,
-    "short landscape roster picker needs an explicit Details action from the units view",
+    /function shouldUseSinglePaneRoster\(\)[\s\S]*?matchMedia\("\(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)"\)/,
+    "single-pane roster behavior should be limited to the short landscape mobile layout",
   );
   assert.match(
     rosterPickerJs,

@@ -413,20 +413,8 @@
   }
 
   .roster-grid-head {
-    position: sticky;
-    top: 0;
-    z-index: 5;
     grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto auto;
-    align-items: center;
-    gap: .45rem;
-    margin: -.55rem -.55rem 0;
-    min-height: 38px;
-    padding: .28rem .46rem;
-    border-bottom: 1px solid rgba(70, 100, 130, .35);
-    background: linear-gradient(180deg, #122236, #091725);
-    box-shadow: 0 6px 14px rgba(0, 0, 0, .24);
+    display: none;
   }
 
   .roster-grid-title {

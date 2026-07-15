@@ -157,7 +157,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
           // Disabled (already-in-squad) units stay inspectable; only assign is blocked.
           unitBtn.addEventListener("click", () => {
             focusedType = type;
-            detailsOpen = false;
+            detailsOpen = shouldUseSinglePaneRoster();
             paintAll();
           });
           unitBtn.addEventListener("dblclick", () => { if (!disabled) assign(type); });
@@ -346,5 +346,13 @@ function isSkinPickerOpen() {
   return Boolean(
     typeof document.querySelector === "function" &&
     document.querySelector(".skin-picker-modal:not([hidden])")
+  );
+}
+
+function shouldUseSinglePaneRoster() {
+  return Boolean(
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(pointer: coarse) and (orientation: landscape) and (max-height: 540px)").matches
   );
 }
