@@ -103,7 +103,7 @@ export const TREANT = Object.freeze({
       name: "Soul Sap",
       kind: "active",
       mpCost: 2,
-      accuracy: 0.93,
+      accuracy: 0.96,
       targeting: Object.freeze({ range: 1 }),
       effect: Object.freeze({ type: "heal", chance: 0.7, amount: "halfDamageDealtRounded", restore: "mp" }),
       description: "Attack an adjacent enemy with a 70% chance to drain half the damage dealt back as MP.",

@@ -174,7 +174,7 @@ export function resolveTargetedArt(state, command, art) {
   // specifically — Silence, not Blind, is the mage counter — but can still whiff on a
   // bad roll.
   const ignoreBlind = !artUsesPhysicalStrike(art);
-  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, { ignoreBlind, accuracy: art.accuracy });
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, { ignoreBlind, target, state: next, accuracy: art.accuracy });
   next.rngState = swing.rngState;
   if (swing.missed) {
     // Wanderer (Ronin): a foe that whiffs an attack ART on Ronin is marked for +1 next turn.

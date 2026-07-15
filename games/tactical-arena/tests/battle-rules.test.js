@@ -16,7 +16,7 @@ import {
   useArt
 } from "../src/core/commands.js";
 
-// Combat now rolls to-hit (7% miss) and crit (15%). These pins force a clean
+// Combat now rolls to-hit (96% range-1 base accuracy) and crit (15%). These pins force a clean
 // normal hit so the rules below stay deterministic; live play draws from the seed.
 const NORMAL_HIT = { attackRoll: 0.5, critRoll: 0.99 };
 

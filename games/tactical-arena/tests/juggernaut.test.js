@@ -17,7 +17,7 @@ function run(state, command) {
 
 // Tether Grab (on an enemy) and Rocket Punch now roll to-hit like every attacking ART, so
 // any test asserting a damage outcome pins the swing. NORMAL_HIT lands a non-crit hit;
-// MISS forces a whiff (attackRoll below the 7% miss chance).
+// MISS forces a whiff (attackRoll below the range-1 miss chance).
 const NORMAL_HIT = { attackRoll: 0.5, critRoll: 0.99 };
 const MISS = { attackRoll: 0.02 };
 

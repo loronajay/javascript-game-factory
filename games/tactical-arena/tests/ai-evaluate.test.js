@@ -14,14 +14,14 @@ import {
 } from "../src/ai/evaluate.js";
 
 // Pure EV math — no state mutation, no RNG. Expectations are hand-computed from the
-// real resolvers (base miss 7%, crit 15%, crit x1.5 rounded up, physical = STR-DEF
+// real resolvers (96% range-1 base accuracy, crit 15%, crit x1.5 rounded up, physical = STR-DEF
 // floored at 1, magic ignores DEF). Pass state=null for two-unit cases so no team /
 // enemy auras fold in and the numbers stay legible.
 
 const close = (actual, expected, eps = 1e-9) =>
   assert.ok(Math.abs(actual - expected) <= eps, `expected ${actual} ≈ ${expected}`);
 
-const HIT_BASELINE = 0.93;
+const HIT_BASELINE = 0.96;
 
 const makeUnit = (over) => ({
   id: over.id ?? `${over.type}-${over.player}`,
@@ -64,7 +64,7 @@ test("expectedStrike: magic damageType ignores DEF", () => {
   // magic = STR 6 (DEF ignored); crit = ceil(6×1.5) = 9.
   assert.equal(ev.normalDamage, 6);
   assert.equal(ev.critDamage, 9);
-  close(ev.expDamage, HIT_BASELINE * (0.85 * 6 + 0.15 * 9));
+  close(ev.expDamage, 0.94 * (0.85 * 6 + 0.15 * 9));
 });
 
 test("expectedStrike: art accuracy tunes hit-weighted damage", () => {

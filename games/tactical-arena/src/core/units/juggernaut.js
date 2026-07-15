@@ -53,7 +53,7 @@ export const JUGGERNAUT = Object.freeze({
       name: "Tether Grab",
       kind: "active",
       mpCost: 5,
-      accuracy: 0.93,
+      accuracy: 0.96,
       resolution: "tetherGrab",
       targeting: Object.freeze({ shape: "lineAny", range: 4 }),
       damageType: "magic",
@@ -69,7 +69,7 @@ export const JUGGERNAUT = Object.freeze({
       name: "Rocket Punch",
       kind: "active",
       mpCost: 5,
-      accuracy: 0.93,
+      accuracy: 0.96,
       resolution: "rocketPunch",
       targeting: Object.freeze({ shape: "lineEnemy", range: 5 }),
       // A fixed-power physical strike (Defense + Defend still reduce it): rolls to-hit

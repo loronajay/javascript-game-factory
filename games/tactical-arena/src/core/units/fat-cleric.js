@@ -81,7 +81,7 @@ export const FAT_CLERIC = Object.freeze({
       name: "Focus Prayer",
       kind: "active",
       mpCost: 5,
-      accuracy: 0.93,
+      accuracy: 0.96,
       resolution: "focusPrayer",
       targeting: Object.freeze({ shape: "ally", range: 3, excludeSelf: true }),
       heal: Object.freeze({ amount: 5 }),

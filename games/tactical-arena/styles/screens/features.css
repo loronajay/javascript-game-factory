@@ -96,6 +96,7 @@
 .shop-buy-btn .shop-price { width:100%; }
 .shop-buy-btn .valor-icon { width:.82rem; height:.82rem; }
 .shop-unit .shop-buy-btn { width:100%; }
+.shop-unit-purchase-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.4rem; width:100%; }
 .shop-skin-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.4rem; width:100%; margin-top:.45rem; }
 .shop-skin .shop-buy-btn { width:100%; min-width:0; }
 .shop-body.is-detail-view { align-content:stretch; }
@@ -145,6 +146,7 @@
 .progression-announcement-body { display:grid; grid-template-columns:auto 1fr; gap:1rem; align-items:center; padding:1rem 1.15rem; }
 .progression-announcement-body .unit-portrait.is-unlock-hero { width:7rem; height:8.75rem; border:1px solid var(--parchment-edge); border-radius:8px; box-shadow:inset 0 1px 0 rgba(var(--sheen),.12), inset 0 0 26px rgba(0,10,20,.5), 0 0 0 2px rgba(230,192,101,.16); }
 .progression-announcement-copy p { margin:0; color:var(--text); font-size:.9rem; line-height:1.5; }
+.progression-announcement-copy .valor-icon { display:inline-block; vertical-align:-0.14em; margin:0 .12em; }
 .progression-announcement-foot { display:flex; justify-content:flex-end; padding:0 1.15rem 1.1rem; }
 @media (max-width:480px) {
   .progression-announcement-body { grid-template-columns:1fr; justify-items:center; text-align:center; }

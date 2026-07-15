@@ -187,12 +187,16 @@ test("shop unit cards open a detail card and return to unit browsing", () => {
   openShop(storageAdapter());
 
   const overlay = document.body.children[0];
-  const unitCard = walk(overlay, (node) => hasClass(node, "shop-unit"))[0];
+  const unitCard = walk(overlay, (node) => hasClass(node, "shop-unit") && visibleText(node).includes("Clod"))[0];
   assert.ok(unitCard, "shop should render unit cards");
 
   const buttons = walk(unitCard, (node) => node.tagName === "BUTTON");
   assert.equal(buttons[0].textContent, "Details", "details should sit above the purchase button");
-  assert.ok(hasClass(buttons[1], "shop-buy-btn"), "purchase button should stay below details");
+  const usdBuy = buttons.find((node) => hasClass(node, "is-premium") && /^\$\d+\.\d{2}$/.test(node.textContent));
+  const valorBuy = buttons.find((node) => hasClass(node, "is-valor") && /Valor$/.test(node.getAttribute("aria-label") ?? ""));
+  assert.ok(usdBuy, "unit card should show the pending USD price button");
+  assert.equal(usdBuy.getAttribute("aria-disabled"), "true");
+  assert.ok(valorBuy, "unit card should keep the working Valor purchase button");
 
   buttons[0].click();
 
@@ -210,6 +214,40 @@ test("shop unit cards open a detail card and return to unit browsing", () => {
 
   assert.equal(walk(overlay, (node) => hasClass(node, "shop-unit-detail")).length, 0);
   assert.ok(walk(overlay, (node) => hasClass(node, "shop-unit")).length > 0, "back should restore unit browsing");
+});
+
+test("shop unit Valor purchase flips both USD and Valor unit buttons to owned", () => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, { valorBalance: 999 });
+
+  openShop(storage);
+
+  const overlay = document.body.children[0];
+  const clodCard = walk(overlay, (node) => hasClass(node, "shop-unit") && visibleText(node).includes("Clod"))[0];
+  assert.ok(clodCard, "shop should render an unowned Clod card");
+
+  const buyButtons = walk(clodCard, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-buy-btn"));
+  const usdBuy = buyButtons.find((node) => hasClass(node, "is-premium"));
+  const valorBuy = buyButtons.find((node) => hasClass(node, "is-valor"));
+  assert.equal(usdBuy.textContent, "$1.99");
+  assert.equal(usdBuy.getAttribute("aria-label"), "Buy Clod with $1.99 soon");
+  assert.equal(valorBuy.getAttribute("aria-label"), "Unlock Clod for 650 Valor");
+
+  usdBuy.click();
+  assert.equal(readUnlockProgress(storage).valorBalance, 999, "pending USD button should not spend Valor");
+
+  valorBuy.click();
+
+  const progress = readUnlockProgress(storage);
+  assert.equal(progress.valorBalance, 349);
+  assert.ok(progress.unlockedUnits.includes("clod"));
+  const ownedClodCard = walk(overlay, (node) => hasClass(node, "shop-unit") && hasClass(node, "is-owned") && visibleText(node).includes("Clod"))[0];
+  assert.ok(ownedClodCard, "Valor purchase should flip the unit card to owned");
+  const ownedButtons = walk(ownedClodCard, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-buy-btn"));
+  assert.equal(ownedButtons.length, 2);
+  assert.ok(ownedButtons.every((node) => node.textContent === "Owned"));
+  assert.ok(ownedButtons.every((node) => node.disabled));
 });
 
 test("clicking a shop skin portrait opens a viewer that closes back to the shop", () => {

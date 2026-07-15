@@ -15,7 +15,7 @@ import {
 } from "./performanceSettings.js";
 import { openSkinGallery } from "./skinGallery.js";
 import { openShop } from "./shop.js";
-import { formatValor } from "../progression/marketplace.js";
+import { formatValor, formatValorAmount } from "../progression/marketplace.js";
 import { openNicknameGallery } from "./nicknameGallery.js";
 import { getNicknamePref } from "./nicknameModel.js";
 import { openSkinPicker } from "./skinPicker.js";
@@ -473,7 +473,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       `<dt>Best</dt><dd>${node?.stars ? `${node.stars} / 3 ★` : "No clear"}</dd>` +
       `<dt>Squad</dt><dd>${campaignSquadSize(node)} units</dd>` +
       `<dt>Reward</dt><dd>${escapeHtml((node?.rewardUnits ?? []).map(unitLabel).join(", ") || node?.rewardLabel || "TBD")}</dd>` +
-      `<dt>Valor</dt><dd>${escapeHtml(formatValor(campaignValorRewardForNode(node)))}</dd>` +
+      `<dt>Valor</dt><dd><span class="valor-badge valor-inline" aria-label="${escapeHtml(formatValor(campaignValorRewardForNode(node)))}"><span class="valor-icon" aria-hidden="true"></span><span class="valor-amount">${escapeHtml(formatValorAmount(campaignValorRewardForNode(node)))}</span></span></dd>` +
       `</dl>`;
     campaignStartBtn.textContent = node?.status === "completed" ? "Replay Mission" : node?.comingSoon ? "Coming Soon" : "Start Mission";
     campaignStartBtn.dataset.missionId = node?.id ?? "";

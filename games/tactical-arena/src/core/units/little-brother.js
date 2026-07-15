@@ -32,7 +32,7 @@ export const LITTLE_BROTHER = Object.freeze({
       name: "Cannon Fire",
       kind: "active",
       mpCost: 5,
-      accuracy: 0.93,
+      accuracy: 0.96,
       targeting: Object.freeze({ shape: "single", range: 5 }),
       damage: Object.freeze({ type: "physical", amount: 10, fixed: true }),
       onCrit: Object.freeze({

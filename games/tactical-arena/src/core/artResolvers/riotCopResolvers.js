@@ -41,7 +41,7 @@ export function resolveStunGun(state, command, art) {
   const target = findUnit(next, command.targetId);
   spendAbilityUse(actor, art);
 
-  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, { accuracy: art.accuracy });
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, { target, state: next, accuracy: art.accuracy });
   next.rngState = swing.rngState;
   if (swing.missed) {
     if (duelistTracksMisses(target)) addDuelMark(target, actor.id);
@@ -97,7 +97,7 @@ export function resolveSmokeBomb(state, command, art) {
   const actor = findUnit(next, command.unitId);
   spendAbilityUse(actor, art);
 
-  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll }, { accuracy: art.accuracy });
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll }, { targetPosition: center, state: next, accuracy: art.accuracy });
   next.rngState = swing.rngState;
   const radius = art.targeting?.radius ?? 1;
   const statusTargets = [];
@@ -130,7 +130,7 @@ export function resolveShieldBash(state, command, art) {
   const actor = findUnit(next, command.unitId);
   const target = findUnit(next, command.targetId);
 
-  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, { accuracy: art.accuracy });
+  const swing = rollToHit(next.rngState, actor, { attackRoll: command.attackRoll, critRoll: command.critRoll }, { target, state: next, accuracy: art.accuracy });
   next.rngState = swing.rngState;
   if (swing.missed) {
     if (duelistTracksMisses(target)) addDuelMark(target, actor.id);

@@ -29,7 +29,7 @@ const HARMFUL_STATUSES = new Set(["poison", "blind", "slow", "silence", "stun"])
 // Tuning priors. All values are in the same currency as HP / expected damage, so
 // the difficulty weights in cpuController compose cleanly (decision 3: one currency).
 const DEF_BASELINE = 4;      // notional enemy DEF, for estimating a unit's offense
-const HIT_BASELINE = 0.93;   // basic attacks and neutral rolled arts usually land
+const HIT_BASELINE = 0.96;   // range-1 base hit chance for basics and neutral rolled arts
 const POISON_HORIZON = 3;    // turns of DoT the CPU plans for (decision 1)
 const SLOW_FACTOR = 0.25;    // a slowed turn denies only a slice of value
 
@@ -386,8 +386,8 @@ export function expectedFixedHit(state, target, { amount, type, affinity = null 
 // reducer folds it. Tether Grab's magic ignores DEF and does NOT halve under Defend (the
 // reducer skips resolveDamage there); Rocket Punch's physical takes DEF then Defend.
 export function expectedLineStrikeDamage(state, attacker, target, { amount, type, art = null }) {
-  const pHit = 1 - getMissChance(attacker, { accuracy: art ? getArtAccuracy(art) : null });
-  const pCrit = getCritChance(attacker);
+  const pHit = 1 - getMissChance(attacker, { target, state, accuracy: art ? getArtAccuracy(art) : null });
+  const pCrit = getCritChance(attacker, { target, state });
   const fold = (critical) => {
     if (type === "magic") {
       const base = critical ? Math.ceil(amount * CRIT_MULTIPLIER) : amount;

@@ -1,7 +1,7 @@
 import { getEffectiveStats, getSourceDamageBonus, getTeamMagicDamageBonus, getUnitType, getWeatherAffinityMagicBonus, getWeatherCritDamageBonus, isDefending, isRaging, passiveStackKey, projectsHealingLockout, sustainsVictory } from "../core/unitCatalog.js";
 import { drawValue } from "../core/rng.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "./damage.js";
-import { traceGridLine } from "./movement.js";
+import { chebyshevDistance, traceGridLine } from "./movement.js";
 import { areAllies, areEnemies, getTileAffinity, isWallAt, livingUnits, unitAt } from "../core/state.js";
 import { getStanceCritBonus, isDamageTypeImmuneByStance } from "./stances.js";
 import { damageTypeImmunities, isInvulnerable } from "./statuses.js";
@@ -82,15 +82,29 @@ export function isWallBetween(state, from, to, attacker = null) {
 // engine rolls a probability in [0,1) (not literally a d6), so these compose with
 // the percentage status checks ARTS already use (70% blind, 60% poison, …).
 export const COMBAT = Object.freeze({
-  MISS_CHANCE: 0.07,  // base whiff on any attack
+  BASE_ACCURACY: 0.96, // hit chance at range 1 before range falloff
+  RANGE_ACCURACY_FALLOFF: 0.01, // -1% hit chance per tile after range 1
   CRIT_CHANCE: 0.15   // base crit on a landed attack
 });
 
-export const DEFAULT_ART_ACCURACY = 0.93;
+export const DEFAULT_ART_ACCURACY = COMBAT.BASE_ACCURACY;
+
+function clampProbability(value) {
+  return Math.max(0, Math.min(1, value));
+}
 
 export function getArtAccuracy(art) {
   if (!Number.isFinite(art?.accuracy)) return DEFAULT_ART_ACCURACY;
-  return Math.max(0, Math.min(1, art.accuracy));
+  return clampProbability(art.accuracy);
+}
+
+export function getRangeAdjustedAccuracy(attacker, { target = null, targetPosition = null, accuracy = null } = {}) {
+  const baseAccuracy = Number.isFinite(accuracy) ? clampProbability(accuracy) : COMBAT.BASE_ACCURACY;
+  const to = target?.position ?? targetPosition;
+  if (!attacker?.position || !to) return baseAccuracy;
+  const distance = Math.max(1, chebyshevDistance(attacker.position, to));
+  const adjusted = baseAccuracy - COMBAT.RANGE_ACCURACY_FALLOFF * (distance - 1);
+  return clampProbability(Math.round(adjusted * 10000) / 10000);
 }
 
 // A raging unit may carry combat overrides in its catalog data (the Archer's RAGE
@@ -298,15 +312,16 @@ function getTileBasicAttackCombat(attacker, { target = null, state = null, basic
 // Probability that this attacker's swing misses *right now*. Never-miss (raging
 // Archer, or Angel's both-on-white Blessed Arrow shot) overrides everything; otherwise
 // Blind can force a miss unless the caller is resolving a caster roll that intentionally
-// ignores attacker accuracy. Rolled ARTS pass an authored hit `accuracy`; basic attacks
-// omit it and stay on the universal miss chance.
-export function getMissChance(attacker, { ignoreBlind = false, target = null, state = null, basicAttack = false, accuracy = null } = {}) {
+// ignores attacker accuracy. Rolled ARTS pass an authored range-1 base `accuracy`;
+// basic attacks omit it and use the shared 96% range-1 base. Both lose 1% per tile
+// after the first.
+export function getMissChance(attacker, { ignoreBlind = false, target = null, targetPosition = null, state = null, basicAttack = false, accuracy = null } = {}) {
   const tileCombat = getTileBasicAttackCombat(attacker, { target, state, basicAttack });
   if (rageCombat(attacker)?.neverMiss || (tileCombat?.attackerOnAffinity && tileCombat.cfg.bothNeverMiss)) return 0;
   if (!ignoreBlind && isBlinded(attacker)) return 1;
-  if (Number.isFinite(accuracy)) return 1 - Math.max(0, Math.min(1, accuracy));
   const tileAccuracy = Math.max(0, Number(tileCombat?.cfg.targetMissReduction) || 0);
-  return Math.max(0, Math.min(1, COMBAT.MISS_CHANCE - tileAccuracy));
+  const missChance = 1 - getRangeAdjustedAccuracy(attacker, { target, targetPosition, accuracy });
+  return clampProbability(Math.round((missChance - tileAccuracy) * 10000) / 10000);
 }
 
 // Probability that a landed swing crits. The raging Archer's kit raises this to
@@ -331,10 +346,10 @@ export function getCritChance(attacker, { target = null, state = null, basicAtta
 // draw, a hit costs two — deterministic from state, so replay-safe). `overrides`
 // lets a command pin either draw for tests / recorded replay without consuming the
 // seed. `ignoreBlind` is for mage casts that still have a normal Clumsy-style roll;
-// `accuracy` is a per-ART hit chance and is omitted for basic attacks.
-export function rollToHit(rngState, attacker, overrides = {}, { ignoreBlind = false, target = null, state = null, basicAttack = false, accuracy = null } = {}) {
+// `accuracy` is a per-ART range-1 base hit chance and is omitted for basic attacks.
+export function rollToHit(rngState, attacker, overrides = {}, { ignoreBlind = false, target = null, targetPosition = null, state = null, basicAttack = false, accuracy = null } = {}) {
   const hit = drawValue(rngState, overrides.attackRoll);
-  const missed = hit.value < getMissChance(attacker, { ignoreBlind, target, state, basicAttack, accuracy });
+  const missed = hit.value < getMissChance(attacker, { ignoreBlind, target, targetPosition, state, basicAttack, accuracy });
   if (missed) return { rngState: hit.rngState, missed: true, critical: false, hitRoll: hit.value, critRoll: null };
   const crit = drawValue(hit.rngState, overrides.critRoll);
   return { rngState: crit.rngState, missed: false, critical: crit.value < getCritChance(attacker, { target, state, basicAttack }), hitRoll: hit.value, critRoll: crit.value };

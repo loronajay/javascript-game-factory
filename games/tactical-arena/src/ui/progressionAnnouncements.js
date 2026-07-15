@@ -44,7 +44,7 @@ export function openProgressionAnnouncement(announcement) {
       }));
     }
     const copy = el("div", "progression-announcement-copy");
-    copy.appendChild(el("p", "", announcement.body || "A new reward is available."));
+    copy.appendChild(buildAnnouncementBody(announcement));
     body.appendChild(copy);
     card.appendChild(body);
 
@@ -74,6 +74,27 @@ export function openProgressionAnnouncement(announcement) {
     overlay.hidden = false;
     button.focus();
   });
+}
+
+function buildAnnouncementBody(announcement) {
+  const text = announcement.body || "A new reward is available.";
+  const p = el("p", "");
+  if (announcement.kind !== "valor-gain") {
+    p.textContent = text;
+    return p;
+  }
+  // Swap the resource word for the Valor coin icon in the achievement copy.
+  const parts = text.split(/\bValor\b/gi);
+  parts.forEach((part, index) => {
+    if (part) p.appendChild(document.createTextNode(part));
+    if (index < parts.length - 1) {
+      const icon = el("span", "valor-icon");
+      icon.setAttribute("role", "img");
+      icon.setAttribute("aria-label", "Valor");
+      p.appendChild(icon);
+    }
+  });
+  return p;
 }
 
 function el(tag, className, text) {

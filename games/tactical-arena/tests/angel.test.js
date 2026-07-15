@@ -108,7 +108,7 @@ test("Blessed Arrow is more accurate against enemies standing on white tiles", (
   const target = findUnit(state, "p2-sword");
   assert.equal(getTileAffinity(state, angel.position), "dark");
   assert.equal(getTileAffinity(state, target.position), "light");
-  assert.ok(Math.abs(getMissChance(angel, { target, state, basicAttack: true }) - 0.02) < 1e-9);
+  assert.equal(getMissChance(angel, { target, state, basicAttack: true }), 0);
   assert.equal(getCritChance(angel, { target, state, basicAttack: true }), 0.15);
 
   const opened = begin(state, "p1-angel");

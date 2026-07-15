@@ -18,6 +18,13 @@ an existing boundary instead of adding behavior to `src/main.js` or a catch-all 
   `campaignRuntime.js` exposes the split progress-recording and dialogue-selection runtimes;
   `campaignPresentationController.js` owns map cutscenes, dialogue-driven board changes, and
   Final Battle blackout/stage presentation.
+- `src/progression/` owns persisted meta-progression outside deterministic battle state.
+  `unlocks.js` is the single read/write/normalize authority for the progress payload
+  (unlocked units/skins, campaign reward picks, Valor balance); `valorRewards.js` grants
+  Valor from campaign/online/tutorial results; `marketplace.js` owns Shop catalog, pricing,
+  and purchase transactions; `announcements.js`, `draftAvailability.js`, and `cheatCodes.js`
+  handle the unlock announcement feed, draft-mode gating, and cheats. Route all progress
+  mutations through `unlocks.js`; keep economy math out of `src/ui/`.
 - `src/ui/` renders and presents state. UI modules may read rules but must not duplicate them.
   `effects.js` composes effect primitives; live token motion is isolated in
   `unitMotionEffects.js`, while DOM/timing and board geometry live in `effectDom.js` and

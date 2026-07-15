@@ -56,8 +56,8 @@ do."
 - *True* bypasses DEF **and** Defend. It is the game's universal solvent, and it's
   deliberately handed out in small amounts (1–3) or on rage ultimates.
 
-**Rolls.** Basic attacks: 7% miss, 15% crit. Attacking ARTs declare their own accuracy
-(usually 93%) and roll the same crit. Crits are ×1.5 before Defend. A surprising number of
+**Rolls.** Basic attacks: 96% accuracy at range 1, then -1% per range tile; 15% crit.
+Attacking ARTs declare their own range-1 base accuracy (usually 96%) and roll the same crit. Crits are ×1.5 before Defend. A surprising number of
 kits are built entirely on top of the crit roll (Angel, Blacksword, Little Brother, Big
 Brother, Miner, Treant), which makes crit-chance modifiers quietly one of the strongest
 stats in the game.

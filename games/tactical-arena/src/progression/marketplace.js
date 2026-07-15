@@ -21,6 +21,13 @@ const UNIT_VALOR_COST_BY_STAR = Object.freeze({
   4: 1150,
 });
 
+const UNIT_PREMIUM_PRICE_CENTS_BY_STAR = Object.freeze({
+  1: 99,
+  2: 199,
+  3: 299,
+  4: 399,
+});
+
 const UNIT_VALOR_STAR_BY_TYPE = Object.freeze({
   juggernaut: 1,
   "big-brother": 1,
@@ -56,11 +63,27 @@ const UNIT_VALOR_STAR_BY_TYPE = Object.freeze({
 const SKIN_VALOR_PER_USD = 850;
 const SKIN_VALOR_CURVE_EXPONENT = 0.88;
 
-export function unitValorCost(typeOrDef) {
+function unitStar(typeOrDef) {
   const type = typeof typeOrDef === "string" ? typeOrDef : typeOrDef?.id ?? typeOrDef?.type;
   const def = UNIT_TYPES[type];
   if (!def || def.summon) return null;
-  return UNIT_VALOR_COST_BY_STAR[UNIT_VALOR_STAR_BY_TYPE[type]] ?? null;
+  return UNIT_VALOR_STAR_BY_TYPE[type] ?? null;
+}
+
+export function unitValorCost(typeOrDef) {
+  return UNIT_VALOR_COST_BY_STAR[unitStar(typeOrDef)] ?? null;
+}
+
+export function unitPremiumPrice(typeOrDef) {
+  const cents = UNIT_PREMIUM_PRICE_CENTS_BY_STAR[unitStar(typeOrDef)] ?? null;
+  if (!cents) return null;
+  const type = typeof typeOrDef === "string" ? typeOrDef : typeOrDef?.id ?? typeOrDef?.type;
+  return Object.freeze({
+    kind: "premium",
+    sku: `ta.unit.${type}`,
+    currency: "USD",
+    cents,
+  });
 }
 
 export function formatValor(amount) {
@@ -91,6 +114,7 @@ export function getUnitOffer(type, storage = globalThis.localStorage) {
   const def = UNIT_TYPES[type];
   if (!def || def.summon) return null;
   const cost = unitValorCost(type);
+  const premiumPrice = unitPremiumPrice(type);
   const owned = isProgressUnitUnlocked(type, storage);
   return Object.freeze({
     id: `unit:${type}`,
@@ -98,8 +122,11 @@ export function getUnitOffer(type, storage = globalThis.localStorage) {
     type,
     name: def.name,
     classType: def.classType,
+    sku: premiumPrice?.sku ?? `ta.unit.${type}`,
+    entitlementId: `unit:${type}`,
     owned,
     purchasable: !owned && Number.isFinite(cost),
+    premiumPrice,
     price: Object.freeze({
       kind: "valor",
       resourceId: VALOR_RESOURCE.id,

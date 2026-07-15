@@ -137,7 +137,7 @@ test("targeted spell arts still render their normal damage forecast", () => {
 
     renderForecast({ forecastLayer, state, mode: "art:spark", actor, resolving: false });
 
-    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["93%"]);
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["94%"]);
     assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-attack"), ["-6"]);
   });
 });
@@ -156,7 +156,7 @@ test("targeted art forecast reads overridden art accuracy", () => {
 
     renderForecast({ forecastLayer, state, mode: "art:poison-arrow", actor, resolving: false });
 
-    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["50%"]);
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["48%"]);
   });
 });
 
@@ -173,7 +173,7 @@ test("blind targeted spell arts still render damage instead of miss", () => {
 
     renderForecast({ forecastLayer, state, mode: "art:spark", actor, resolving: false });
 
-    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["93%"]);
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["94%"]);
     assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-attack"), ["-6"]);
   });
 });
@@ -225,7 +225,7 @@ test("Angel basic attack forecast uses magic damage instead of physical chip", (
 
     renderForecast({ forecastLayer, state, mode: "attack", actor, resolving: false });
 
-    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["93%"]);
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["94%"]);
     assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-attack"), ["-3"]);
   });
 });
@@ -244,7 +244,7 @@ test("Angel basic attack forecast does not show through an intervening body", ()
 
     renderForecast({ forecastLayer, state, mode: "attack", actor, resolving: false });
 
-    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["93%"]);
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["96%"]);
     assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-attack"), ["-3"]);
   });
 });
@@ -306,7 +306,7 @@ test("Curve Shot forecast shows through an intervening unit", () => {
 
     renderForecast({ forecastLayer, state, mode: "art:curve-shot", actor, resolving: false });
 
-    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["93%"]);
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["94%"]);
     assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-attack"), ["-3"]);
   });
 });

@@ -84,9 +84,9 @@ Use lowercase kebab-case ids for ARTS and passives. Runtime unit instances store
 not put per-match mutable state on the catalog object.
 
 Rolled active ARTS that use the to-hit/success roll declare `accuracy` as their
-hit chance from `0` to `1`. Current balance uses `accuracy: 0.93`, matching the
-old 7% ART miss behavior. Basic attacks do not read art accuracy; they keep the
-universal combat miss chance in `src/rules/combat.js`.
+range-1 base hit chance from `0` to `1`. Current balance uses `accuracy: 0.96`.
+Both rolled ARTS and basic attacks lose 1% hit chance per range tile after the
+first, using the shared combat accuracy helper in `src/rules/combat.js`.
 
 Draftable units must set `classType` to one of `melee`, `ranger`, `support`,
 `mage`, or `tank`. `src/ui/squadModel.js` reads this field to group the squad
@@ -290,8 +290,8 @@ activation, immunity, refresh/replace behavior, and death/victory interactions.
 
 Basic attacks and targeted attack ARTS use `resolvePhysicalStrike` in
 `src/rules/combat.js`, which is also used by the forecast renderer. Rolled ARTS
-that can miss pass their authored `accuracy` through `rollToHit`; basic attacks
-omit it and stay on the universal miss chance. If a new ability previews damage,
+that can miss pass their authored range-1 base `accuracy` through `rollToHit`;
+basic attacks omit it and use the shared 96% range-1 base. If a new ability previews damage,
 reuse the same resolver path the reducer uses.
 
 ## Animations and VFX

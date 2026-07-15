@@ -110,7 +110,7 @@ export function openShop(storage = globalThis.localStorage) {
           statusText = "";
           render();
         });
-        actions.append(details, createUnitBuyButton(offer));
+        actions.append(details, createUnitBuyActions(offer));
         card.append(copy, actions);
         grid.appendChild(card);
       }
@@ -150,7 +150,7 @@ export function openShop(storage = globalThis.localStorage) {
     detail.appendChild(rules);
 
     const actions = el("div", "shop-unit-detail-actions");
-    actions.appendChild(createUnitBuyButton(offer));
+    actions.appendChild(createUnitBuyActions(offer));
     detail.appendChild(actions);
 
     body.appendChild(detail);
@@ -213,26 +213,37 @@ export function openShop(storage = globalThis.localStorage) {
     overlay.replaceChildren();
   }
 
-  function createUnitBuyButton(offer) {
-    const buy = el("button", `shop-buy-btn${offer.owned ? " is-owned" : ""}`, offer.owned ? "Owned" : null);
-    buy.type = "button";
-    buy.disabled = offer.owned;
-    if (!offer.owned) {
-      buy.setAttribute("aria-label", `Unlock ${offer.name} for ${formatValor(offer.price.amount)}`);
-      buy.appendChild(createValorBadge(offer.price.amount, "shop-price"));
+  function createUnitBuyActions(offer) {
+    const actions = el("div", `shop-unit-purchase-actions${offer.owned ? " is-owned" : ""}`);
+    if (offer.owned) {
+      actions.append(createOwnedBuyButton("premium"), createOwnedBuyButton("valor"));
+      return actions;
     }
-    buy.addEventListener("click", () => {
+
+    const premiumBuy = el("button", "shop-buy-btn is-premium", formatPremiumPrice(offer.premiumPrice));
+    premiumBuy.type = "button";
+    premiumBuy.dataset.sku = offer.sku;
+    premiumBuy.setAttribute("aria-disabled", "true");
+    premiumBuy.setAttribute("aria-label", `Buy ${offer.name} with ${formatPremiumPrice(offer.premiumPrice)} soon`);
+
+    const valorBuy = el("button", "shop-buy-btn is-valor");
+    valorBuy.type = "button";
+    valorBuy.setAttribute("aria-label", `Unlock ${offer.name} for ${formatValor(offer.price.amount)}`);
+    valorBuy.appendChild(createValorBadge(offer.price.amount, "shop-price"));
+    valorBuy.addEventListener("click", () => {
       const result = purchaseUnitWithValor(storage, offer.type);
       statusText = unitPurchaseStatus(result);
       render();
     });
-    return buy;
+
+    actions.append(premiumBuy, valorBuy);
+    return actions;
   }
 
   function createSkinBuyActions(offer) {
     const actions = el("div", `shop-skin-actions${offer.owned ? " is-owned" : ""}`);
     if (offer.owned) {
-      actions.append(createOwnedSkinButton("premium"), createOwnedSkinButton("valor"));
+      actions.append(createOwnedBuyButton("premium"), createOwnedBuyButton("valor"));
       return actions;
     }
 
@@ -265,7 +276,7 @@ export function openShop(storage = globalThis.localStorage) {
     return actions;
   }
 
-  function createOwnedSkinButton(channel) {
+  function createOwnedBuyButton(channel) {
     const owned = el("button", `shop-buy-btn is-owned is-${channel}`, "Owned");
     owned.type = "button";
     owned.disabled = true;

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { getArtAccuracy, getCritChance, getMissChance, getProximityBonus, isBlinded, resolvePhysicalStrike } from "../src/rules/combat.js";
+import { getArtAccuracy, getCritChance, getMissChance, getProximityBonus, getRangeAdjustedAccuracy, isBlinded, resolvePhysicalStrike } from "../src/rules/combat.js";
 import { createBattleState } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { attack, beginActivation, useArt } from "../src/core/commands.js";
@@ -83,7 +83,7 @@ test("isBlinded reflects a guaranteed-miss attacker", () => {
 
 test("miss and crit chances honor blind and the raging Archer's kit", () => {
   const swordsman = { type: "swordsman", hp: 25, statuses: [] };
-  assert.equal(getMissChance(swordsman), 0.07);
+  assert.equal(getMissChance(swordsman), 0.04);
   assert.equal(getCritChance(swordsman), 0.15);
 
   // Blind = guaranteed miss.
@@ -98,6 +98,19 @@ test("miss and crit chances honor blind and the raging Archer's kit", () => {
   assert.equal(getCritChance({ type: "swordsman", hp: 5, statuses: [] }), 0.15);
 });
 
+test("base accuracy falls off by one percent per range tile after the first", () => {
+  const attacker = { type: "archer", hp: 24, statuses: [], position: { x: 0, y: 0 } };
+  const rangeOne = { type: "swordsman", hp: 25, position: { x: 1, y: 0 } };
+  const rangeFive = { type: "swordsman", hp: 25, position: { x: 5, y: 0 } };
+  const diagonalRangeFive = { type: "swordsman", hp: 25, position: { x: 5, y: 5 } };
+
+  assert.equal(getRangeAdjustedAccuracy(attacker, { target: rangeOne }), 0.96);
+  assert.equal(getRangeAdjustedAccuracy(attacker, { target: rangeFive }), 0.92);
+  assert.equal(getRangeAdjustedAccuracy(attacker, { target: diagonalRangeFive }), 0.92);
+  assert.equal(getMissChance(attacker, { target: rangeFive }), 0.08);
+  assert.equal(getRangeAdjustedAccuracy(attacker, { target: rangeFive, accuracy: 0.5 }), 0.46);
+});
+
 test("a pinned low to-hit roll makes the reducer's attack miss; a pinned crit roll scales damage", () => {
   const makeState = () => createBattleState({
     units: [
@@ -106,7 +119,7 @@ test("a pinned low to-hit roll makes the reducer's attack miss; a pinned crit ro
     ]
   });
 
-  // attackRoll 0.01 < 7% miss -> whiff, target untouched, primary still spent.
+  // attackRoll 0.01 < range-1 miss chance -> whiff, target untouched, primary still spent.
   let s = makeState();
   s = applyCommand(s, beginActivation(1, "p1-swordsman")).nextState;
   const missed = applyCommand(s, attack(1, "p1-swordsman", "p2-swordsman", { attackRoll: 0.01 }));
@@ -150,10 +163,10 @@ test("a missed ART deals no damage, lands no status, but still spends MP and the
   assert.equal(actor.spent, true);
 });
 
-test("rolled ARTS use per-art accuracy while basic attacks keep the universal miss chance", () => {
-  assert.equal(getArtAccuracy({}), 0.93);
+test("rolled ARTS use per-art base accuracy while basic attacks use the shared base accuracy", () => {
+  assert.equal(getArtAccuracy({}), 0.96);
   assert.equal(getMissChance({ type: "swordsman", hp: 25, statuses: [] }, { accuracy: 0.5 }), 0.5);
-  assert.equal(getMissChance({ type: "swordsman", hp: 25, statuses: [] }), 0.07);
+  assert.equal(getMissChance({ type: "swordsman", hp: 25, statuses: [] }), 0.04);
 
   const makeState = () => {
     const state = createBattleState({
@@ -184,6 +197,24 @@ test("rolled ARTS use per-art accuracy while basic attacks keep the universal mi
   selected = applyCommand(makeState(), beginActivation(1, "p1-archer"));
   result = applyCommand(selected.nextState, attack(1, "p1-archer", "p2-swordsman", {
     attackRoll: 0.49, critRoll: 0.99
+  }));
+  assert.equal(result.events[0].missed, false);
+
+  const rangedState = createBattleState({
+    units: [
+      { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 5, y: 0 }
+    ]
+  });
+  selected = applyCommand(rangedState, beginActivation(1, "p1-archer"));
+  result = applyCommand(selected.nextState, attack(1, "p1-archer", "p2-swordsman", {
+    attackRoll: 0.079, critRoll: 0.99
+  }));
+  assert.equal(result.events[0].missed, true);
+
+  selected = applyCommand(rangedState, beginActivation(1, "p1-archer"));
+  result = applyCommand(selected.nextState, attack(1, "p1-archer", "p2-swordsman", {
+    attackRoll: 0.08, critRoll: 0.99
   }));
   assert.equal(result.events[0].missed, false);
 });

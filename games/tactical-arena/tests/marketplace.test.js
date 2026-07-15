@@ -12,6 +12,7 @@ import {
   purchaseSkinWithValor,
   purchaseUnitWithValor,
   skinValorCost,
+  unitPremiumPrice,
   unitValorCost,
 } from "../src/progression/marketplace.js";
 
@@ -51,7 +52,7 @@ test("skin shop offers group by class and then by unit type", () => {
   assert.ok(swordsman.offers.every((offer) => offer.type === "swordsman"));
 });
 
-test("unit offers use Valor while skin offers use premium prices", () => {
+test("unit offers use Valor for active purchases and expose premium USD display prices", () => {
   const storage = storageAdapter();
   const unit = getUnitOffer("clod", storage);
   const skin = getSkinOffer("swordsman", "medieval", storage);
@@ -60,12 +61,25 @@ test("unit offers use Valor while skin offers use premium prices", () => {
   assert.equal(unit.price.resourceId, "valor");
   assert.equal(unit.owned, false);
   assert.equal(formatValor(unit.price.amount), `${unit.price.amount} Valor`);
+  assert.equal(unit.premiumPrice.kind, "premium");
+  assert.equal(unit.premiumPrice.currency, "USD");
+  assert.equal(unit.premiumPrice.cents, 199);
+  assert.equal(formatPremiumPrice(unit.premiumPrice), "$1.99");
+  assert.match(unit.sku, /^ta\.unit\.clod$/);
 
   assert.equal(skin.price.kind, "premium");
   assert.equal(skin.price.currency, "USD");
   assert.ok(skin.price.cents > 0);
   assert.match(skin.sku, /^ta\.skin\.swordsman\.medieval$/);
   assert.equal(formatPremiumPrice(skin.price), "$2.99");
+});
+
+test("unit premium prices follow the invisible star buckets", () => {
+  assert.equal(unitPremiumPrice("monk").cents, 99);
+  assert.equal(unitPremiumPrice("clod").cents, 199);
+  assert.equal(unitPremiumPrice("fat-knight").cents, 299);
+  assert.equal(unitPremiumPrice("blacksword").cents, 399);
+  assert.equal(unitPremiumPrice("ghoul"), null);
 });
 
 test("skin Valor prices are derived from the USD premium price with a fairer high-price curve", () => {
