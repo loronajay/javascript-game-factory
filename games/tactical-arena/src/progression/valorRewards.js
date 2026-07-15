@@ -1,7 +1,7 @@
 import { readUnlockProgress, writeUnlockProgress } from "./unlocks.js";
 
-export const ONLINE_MATCH_WIN_VALOR_REWARD = 90;
-export const ONLINE_MATCH_LOSS_VALOR_REWARD = 35;
+export const ONLINE_MATCH_WIN_VALOR_REWARD = 35;
+export const ONLINE_MATCH_LOSS_VALOR_REWARD = 10;
 export const MIN_ONLINE_REWARD_REVISION = 12;
 
 function normalizedValorAmount(amount) {

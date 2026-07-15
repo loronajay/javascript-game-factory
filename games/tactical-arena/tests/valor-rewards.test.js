@@ -14,6 +14,7 @@ import {
   ONLINE_MATCH_WIN_VALOR_REWARD,
   grantOnlineMatchValor,
 } from "../src/progression/valorRewards.js";
+import { skinValorCost, unitValorCost } from "../src/progression/marketplace.js";
 import { readUnlockProgress } from "../src/progression/unlocks.js";
 
 function storageAdapter() {
@@ -41,6 +42,19 @@ function wonClodMission() {
 test("every authored campaign mission carries a scoped Valor reward", () => {
   assert.ok(CAMPAIGN_MISSIONS.length >= 20);
   assert.ok(CAMPAIGN_MISSIONS.every((mission) => Number.isInteger(mission.valorReward) && mission.valorReward > 0));
+});
+
+test("campaign Valor total is scoped against live shop prices", () => {
+  const campaignTotal = CAMPAIGN_MISSIONS.reduce((total, mission) => total + mission.valorReward, 0);
+  const firstActTotal = CAMPAIGN_MISSIONS.slice(0, 7).reduce((total, mission) => total + mission.valorReward, 0);
+  const cheapestUnitCost = unitValorCost("juggernaut");
+  const premiumUnitCost = unitValorCost("blacksword");
+  const commonSkinCost = skinValorCost({ kind: "premium", currency: "USD", cents: 199 });
+
+  assert.equal(campaignTotal, 3875);
+  assert.ok(firstActTotal >= cheapestUnitCost, "early campaign should fund a low-tier shop pick");
+  assert.ok(campaignTotal >= commonSkinCost * 2 + cheapestUnitCost);
+  assert.ok(campaignTotal < premiumUnitCost * 4);
 });
 
 test("campaign Valor is granted once per victorious mission clear", () => {
@@ -82,7 +96,11 @@ test("online match Valor requires a fully played battle and pays winners more th
 
   assert.equal(winner.valorGranted, ONLINE_MATCH_WIN_VALOR_REWARD);
   assert.equal(loser.valorGranted, ONLINE_MATCH_LOSS_VALOR_REWARD);
+  assert.equal(ONLINE_MATCH_WIN_VALOR_REWARD, 35);
+  assert.equal(ONLINE_MATCH_LOSS_VALOR_REWARD, 10);
   assert.ok(ONLINE_MATCH_WIN_VALOR_REWARD > ONLINE_MATCH_LOSS_VALOR_REWARD);
+  assert.ok(ONLINE_MATCH_WIN_VALOR_REWARD * 10 < unitValorCost("juggernaut"));
+  assert.ok(ONLINE_MATCH_WIN_VALOR_REWARD * 40 < skinValorCost({ kind: "premium", currency: "USD", cents: 199 }));
   assert.equal(readUnlockProgress(winnerStorage).valorBalance, ONLINE_MATCH_WIN_VALOR_REWARD);
   assert.equal(readUnlockProgress(loserStorage).valorBalance, ONLINE_MATCH_LOSS_VALOR_REWARD);
   assert.equal(abandoned.valorGranted, 0);
