@@ -69,7 +69,7 @@ test("release hotspots delegate cohesive responsibilities to smaller modules", (
       "./artResolvers/rangedArtResolvers.js",
       "./artResolvers/gargoyleResolvers.js",
     ]],
-    ["src/ui/effects.js", 1350, ["./unitMotionEffects.js"]],
+    ["src/ui/effects.js", 1160, ["./effectProjectiles.js", "./effectWindups.js", "./unitMotionEffects.js"]],
   ];
 
   for (const [path, maxLines, expectedImports] of boundaries) {

@@ -1,7 +1,9 @@
 // Nothing here touches authoritative state — every animation is fire-and-forget and
 // goes silent (no transform left behind) under prefers-reduced-motion.
 
-import { getAbilityVfx, getAttackProjectile, getImpactVfx, getStatusVfx } from "./vfxCatalog.js";
+import { getAbilityVfx, getImpactVfx, getStatusVfx } from "./vfxCatalog.js";
+import { createEffectProjectiles } from "./effectProjectiles.js";
+import { createEffectWindups } from "./effectWindups.js";
 import { createUnitMotionEffects } from "./unitMotionEffects.js";
 import { reducedMotion, sleep, svg, waitForAnimation } from "./effectDom.js";
 import { createEffectEnvironment } from "./effectEnvironment.js";
@@ -97,252 +99,17 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // flies a quadratic arc from `from` to `to`, rotating to its heading, with a
-  // faint trail behind it. The promise resolves at arrival so the caller can land
-  // the impact in sync. Shape builders draw pointing +x; the flight rotates them.
-  // ---------------------------------------------------------------------------
-
-  const PROJECTILE_BUILDERS = {
-    arrow(colors, size) {
-      const group = svg("g", { class: "fx-projectile" });
-      group.appendChild(svg("line", { x1: -9 * size, y1: 0, x2: 7 * size, y2: 0, stroke: colors.trail, "stroke-width": 2.2 * size, "stroke-linecap": "round" }));
-      group.appendChild(svg("polygon", { points: `${7 * size},${-3.2 * size} ${12.5 * size},0 ${7 * size},${3.2 * size}`, fill: colors.core }));
-      group.appendChild(svg("line", { x1: -9 * size, y1: 0, x2: -5.5 * size, y2: -2.6 * size, stroke: colors.core, "stroke-width": 1.6 * size, "stroke-linecap": "round" }));
-      group.appendChild(svg("line", { x1: -9 * size, y1: 0, x2: -5.5 * size, y2: 2.6 * size, stroke: colors.core, "stroke-width": 1.6 * size, "stroke-linecap": "round" }));
-      return group;
-    },
-    orb(colors, size) {
-      const group = svg("g", { class: "fx-projectile", filter: "url(#softGlow)" });
-      const halo = svg("circle", { cx: 0, cy: 0, r: 7 * size, fill: colors.trail });
-      halo.style.opacity = "0.4";
-      group.appendChild(halo);
-      const tail = svg("ellipse", { cx: -7 * size, cy: 0, rx: 7 * size, ry: 2.6 * size, fill: colors.trail });
-      tail.style.opacity = "0.55";
-      group.appendChild(tail);
-      group.appendChild(svg("circle", { cx: 0, cy: 0, r: 4 * size, fill: colors.core }));
-      const spark = svg("circle", { cx: 0, cy: 0, r: 1.8 * size, fill: "#ffffff" });
-      spark.style.opacity = "0.9";
-      group.appendChild(spark);
-      return group;
-    },
-    tracer(colors, size) {
-      const group = svg("g", { class: "fx-projectile", filter: "url(#softGlow)" });
-      const wake = svg("line", { x1: -22 * size, y1: 0, x2: -6 * size, y2: 0, stroke: colors.trail, "stroke-width": 1.6 * size, "stroke-linecap": "round" });
-      wake.style.opacity = "0.5";
-      group.appendChild(wake);
-      group.appendChild(svg("line", { x1: -8 * size, y1: 0, x2: 9 * size, y2: 0, stroke: colors.core, "stroke-width": 2.6 * size, "stroke-linecap": "round" }));
-      group.appendChild(svg("circle", { cx: 9 * size, cy: 0, r: 2.1 * size, fill: "#ffffff" }));
-      return group;
-    },
-    lob(colors, size) {
-      const group = svg("g", { class: "fx-projectile" });
-      group.appendChild(svg("rect", { x: -5 * size, y: -1.9 * size, width: 10 * size, height: 3.8 * size, rx: 1.8 * size, fill: colors.core, stroke: colors.trail, "stroke-width": 1 }));
-      const ember = svg("circle", { cx: 5.5 * size, cy: 0, r: 2 * size, fill: "#ff8a4c", filter: "url(#softGlow)" });
-      group.appendChild(ember);
-      return group;
-    },
-    rock(colors, size) {
-      const group = svg("g", { class: "fx-projectile" });
-      group.appendChild(svg("polygon", {
-        points: [
-          `${-7 * size},${-2.5 * size}`,
-          `${-3.5 * size},${-6.2 * size}`,
-          `${2.5 * size},${-5.4 * size}`,
-          `${7.2 * size},${-1.4 * size}`,
-          `${5.6 * size},${4.1 * size}`,
-          `${-1.2 * size},${6.2 * size}`,
-          `${-6.4 * size},${3.1 * size}`
-        ].join(" "),
-        fill: colors.core,
-        stroke: colors.trail,
-        "stroke-width": 1.4 * size,
-        "stroke-linejoin": "round"
-      }));
-      const ridge = svg("path", {
-        d: `M ${-3.8 * size} ${-2.2 * size} L ${0.5 * size} ${-3.9 * size} L ${4.1 * size} ${-0.7 * size}`,
-        fill: "none",
-        stroke: "#d2c4a8",
-        "stroke-width": 1.1 * size,
-        "stroke-linecap": "round",
-        "stroke-linejoin": "round"
-      });
-      ridge.style.opacity = "0.45";
-      group.appendChild(ridge);
-      const chip = svg("circle", { cx: -1.8 * size, cy: 2.1 * size, r: 1.1 * size, fill: colors.trail });
-      chip.style.opacity = "0.5";
-      group.appendChild(chip);
-      return group;
-    }
-  };
-
-  // Flies one projectile and resolves when it lands. `opacity`/`trail` let a rain
-  // of many (volley) keep its faint non-hit shots without a wall of glow streaks.
-  async function flyProjectile(from, to, spec = {}, { delay = 0, opacity = 1, trail = true } = {}) {
-    if (reducedMotion()) return;
-    const colors = spec.colors ?? { core: "#f7e27d", trail: "#8a6d3a" };
-    const size = spec.size ?? 1;
-    const control = { x: (from.x + to.x) / 2, y: Math.min(from.y, to.y) - (spec.arcHeight ?? 50) };
-    const duration = spec.durationMs ?? 430;
-
-    if (trail) {
-      const wake = svg("path", {
-        d: `M ${from.x} ${from.y} Q ${control.x} ${control.y} ${to.x} ${to.y}`,
-        class: "fx-line fx-projectile-trail",
-        stroke: colors.trail,
-        "stroke-width": 2,
-        filter: "url(#softGlow)"
-      });
-      effectsLayer.appendChild(wake);
-      wake.animate([
-        { opacity: 0 },
-        { opacity: 0.3 * opacity, offset: 0.4 },
-        { opacity: 0 }
-      ], { duration: duration + 220, delay, easing: "ease-out", fill: "backwards" })
-        .finished.catch(() => {}).then(() => wake.remove());
-    }
-
-    const builder = PROJECTILE_BUILDERS[spec.shape] ?? PROJECTILE_BUILDERS.orb;
-    const projectile = builder(colors, size);
-    projectile.style.opacity = String(opacity);
-    effectsLayer.appendChild(projectile);
-
-    // Sampled quadratic-bezier keyframes: position from the curve, rotation from its
-    // tangent (a lob also tumbles end-over-end on top of its heading).
-    const steps = 22;
-    const tumble = spec.shape === "lob" || spec.shape === "rock" ? 540 : 0;
-    const frames = [];
-    for (let i = 0; i <= steps; i += 1) {
-      const t = i / steps;
-      const inv = 1 - t;
-      const x = inv * inv * from.x + 2 * inv * t * control.x + t * t * to.x;
-      const y = inv * inv * from.y + 2 * inv * t * control.y + t * t * to.y;
-      const dx = 2 * inv * (control.x - from.x) + 2 * t * (to.x - control.x);
-      const dy = 2 * inv * (control.y - from.y) + 2 * t * (to.y - control.y);
-      const deg = (Math.atan2(dy, dx) * 180) / Math.PI + tumble * t;
-      frames.push({ transform: `translate(${x}px, ${y}px) rotate(${deg}deg)`, offset: t });
-    }
-    frames[0].opacity = 0;
-    if (frames[1]) frames[1].opacity = opacity;
-    await waitForAnimation(projectile.animate(frames, { duration, delay, easing: "linear", fill: "backwards" }));
-    projectile.remove();
-  }
-
-  // ---------------------------------------------------------------------------
-  // Caster anticipation. Two styles, both awaited so cause precedes effect:
-  //  - castWindup ("gather"): ability-colored motes converge into a swelling core
-  //    over the caster while a ground ring draws in and the token rises — plus the
-  //    shared castCharge audio riser. The ability's own sound then fires at release.
-  //  - tossWindup ("toss"): the token leans back away from the throw line, holds a
-  //    beat, and snaps forward — the anticipation for lobbed objects.
-  // ---------------------------------------------------------------------------
-
-  async function castWindup(actor, vfx) {
-    if (reducedMotion() || !actor) return;
-    const windup = vfx.windup ?? {};
-    const colors = vfx.colors ?? { core: "#f7e27d", trail: "#8a6d3a" };
-    const duration = windup.durationMs ?? 420;
-    const count = windup.particleCount ?? 9;
-    const focus = effectPoint(actor.position, windup.lift ?? 26);
-    const ground = unitBase(actor.position);
-    sound.play("castCharge");
-    const animations = [];
-
-    // Motes drawn in from a loose halo, vanishing into the core as they arrive.
-    // Geometry is origin-centered with the position carried in translate() —
-    // scale() on SVG is user-space-origin-relative, so a cx/cy-placed mote with a
-    // scale keyframe renders displaced toward the SVG origin (caught on-screen).
-    for (let i = 0; i < count; i += 1) {
-      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
-      const dist = 30 + (i % 3) * 12;
-      const startX = focus.x + Math.cos(angle) * dist;
-      const startY = focus.y + Math.sin(angle) * dist * 0.6;
-      const midX = startX + (focus.x - startX) * 0.55;
-      const midY = startY + (focus.y - startY) * 0.55;
-      const mote = svg("circle", {
-        class: "fx-mote",
-        cx: 0,
-        cy: 0,
-        r: 1.8 + (i % 2),
-        fill: i % 2 ? colors.trail : colors.core,
-        filter: "url(#softGlow)"
-      });
-      effectsLayer.appendChild(mote);
-      const animation = mote.animate([
-        { transform: `translate(${startX}px, ${startY}px) scale(.6)`, opacity: 0 },
-        { transform: `translate(${midX}px, ${midY}px) scale(1)`, opacity: 0.95, offset: 0.55 },
-        { transform: `translate(${focus.x}px, ${focus.y}px) scale(.35)`, opacity: 0 }
-      ], { duration: duration - 40, delay: i * 16, easing: "cubic-bezier(.4,0,.6,1)", fill: "backwards" });
-      animations.push(waitForAnimation(animation).then(() => mote.remove()));
-    }
-
-    // Swelling core that pops on release.
-    const core = svg("circle", { class: "fx-flash", cx: focus.x, cy: focus.y, r: 2, fill: colors.core, filter: "url(#softGlow)" });
-    effectsLayer.appendChild(core);
-    animations.push(waitForAnimation(core.animate([
-      { r: 2, opacity: 0 },
-      { r: 6.5, opacity: 0.95, offset: 0.82 },
-      { r: 13, opacity: 0 }
-    ], { duration, easing: "ease-in" })).then(() => core.remove()));
-
-    // Ground ring contracting inward — the visual opposite of an impact ring.
-    const ring = svg("ellipse", {
-      class: "fx-ring",
-      cx: ground.x,
-      cy: ground.y + 6,
-      rx: 26,
-      ry: 12,
-      stroke: colors.trail,
-      filter: "url(#softGlow)"
-    });
-    effectsLayer.appendChild(ring);
-    animations.push(waitForAnimation(ring.animate([
-      { rx: 26, ry: 12, opacity: 0, strokeWidth: 1 },
-      { rx: 16, ry: 7.5, opacity: 0.7, strokeWidth: 2.5, offset: 0.55 },
-      { rx: 7, ry: 3.2, opacity: 0, strokeWidth: 4 }
-    ], { duration, easing: "ease-in" })).then(() => ring.remove()));
-
-    // The caster rises slightly with the gather and settles on release.
-    const token = unitElement(actor.id);
-    if (token) {
-      animations.push(waitForAnimation(token.animate([
-        { transform: `translate(${ground.x}px, ${ground.y}px) scale(1)` },
-        { transform: `translate(${ground.x}px, ${ground.y - 5}px) scale(1.05)`, offset: 0.75 },
-        { transform: `translate(${ground.x}px, ${ground.y}px) scale(1)` }
-      ], { duration: duration + 60, easing: "ease-in-out" })));
-    }
-
-    await Promise.all(animations);
-  }
-
-  async function tossWindup(actor, targetPosition) {
-    if (reducedMotion() || !actor) return;
-    const element = unitElement(actor.id);
-    if (!element) return;
-    const base = unitBase(actor.position);
-    const toward = targetPosition ? unitBase(targetPosition) : { x: base.x + 1, y: base.y };
-    const dx = toward.x - base.x;
-    const dy = toward.y - base.y;
-    const length = Math.hypot(dx, dy) || 1;
-    const backX = (-dx / length) * 7;
-    const backY = (-dy / length) * 4;
-    // Absolute board coords (a WAAPI transform replaces the SVG attribute): lean back
-    // off the throw line, hold the beat, snap through, settle exactly onto the base.
-    await element.animate([
-      { transform: `translate(${base.x}px, ${base.y}px)` },
-      { transform: `translate(${base.x + backX}px, ${base.y + backY - 3}px) rotate(-4deg)`, offset: 0.4 },
-      { transform: `translate(${base.x + backX}px, ${base.y + backY - 3}px) rotate(-4deg)`, offset: 0.62 },
-      { transform: `translate(${base.x - backX * 0.6}px, ${base.y - backY * 0.4}px) scale(1.06)`, offset: 0.85 },
-      { transform: `translate(${base.x}px, ${base.y}px) scale(1)` }
-    ], { duration: 320, easing: "cubic-bezier(.3,.7,.3,1)" }).finished.catch(() => {});
-  }
-
-  // Dispatch a recipe's windup block to its style.
-  async function playWindup(actor, vfx, targetPosition = null) {
-    if (!vfx?.windup) return;
-    if (vfx.windup.style === "toss") await tossWindup(actor, targetPosition);
-    else await castWindup(actor, vfx);
-  }
+  const { flyProjectile } = createEffectProjectiles({ effectsLayer, reducedMotion, svg, waitForAnimation });
+  const { playWindup } = createEffectWindups({
+    effectsLayer,
+    reducedMotion,
+    svg,
+    waitForAnimation,
+    unitBase,
+    unitElement,
+    effectPoint,
+    sound
+  });
 
   function statusBurst(unit, status) {
     if (reducedMotion()) return;
