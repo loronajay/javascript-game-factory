@@ -4,10 +4,12 @@ import { createPortrait } from "./portraits.js";
 import { getUnitSkins } from "./skinModel.js";
 
 let host = null;
+let hostDocument = null;
 
 function ensureHost() {
-  if (host) return host;
+  if (host && hostDocument === document) return host;
   host = document.createElement("div");
+  hostDocument = document;
   host.className = "ref-modal skin-gallery-modal";
   host.hidden = true;
   document.body.appendChild(host);
@@ -41,10 +43,20 @@ export function openSkinGallery() {
     for (const group of groupedUnitTypes(Object.keys(UNIT_TYPES))) {
       const section = el("section", "skin-gallery-section");
       section.appendChild(el("h3", "skin-gallery-title", group.label));
-      const grid = el("div", "skin-gallery-grid");
       for (const type of group.types) {
         const def = UNIT_TYPES[type];
-        for (const skin of getUnitSkins(type)) {
+        const skins = getUnitSkins(type);
+        if (!skins.length) continue;
+        const unitSection = el("section", "skin-gallery-unit-section");
+        unitSection.dataset.type = type;
+        const unitHead = el("header", "skin-gallery-unit-head");
+        unitHead.append(
+          createPortrait(type, { variant: "is-skin-unit", eager: true }),
+          el("h4", "skin-gallery-unit-title", def.name),
+          el("span", "skin-gallery-unit-count", `${skins.length} skins`),
+        );
+        const grid = el("div", "skin-gallery-grid");
+        for (const skin of skins) {
           const item = el("button", `skin-gallery-item${skin.unlocked ? "" : " is-locked"}`);
           item.type = "button";
           item.dataset.type = type;
@@ -62,8 +74,9 @@ export function openSkinGallery() {
           });
           grid.appendChild(item);
         }
+        unitSection.append(unitHead, grid);
+        section.appendChild(unitSection);
       }
-      section.appendChild(grid);
       body.appendChild(section);
     }
     body.scrollTop = savedScrollTop;

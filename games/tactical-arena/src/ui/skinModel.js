@@ -9,6 +9,40 @@ export const SKIN_STATUS = Object.freeze({
   LOCKED: "locked"
 });
 
+export const SKIN_RARITIES = Object.freeze({
+  COMMON: "common",
+  RARE: "rare",
+  EPIC: "epic",
+  LEGENDARY: "legendary"
+});
+
+const SKIN_PRICE_BY_RARITY = Object.freeze({
+  [SKIN_RARITIES.COMMON]: 199,
+  [SKIN_RARITIES.RARE]: 299,
+  [SKIN_RARITIES.EPIC]: 499,
+  [SKIN_RARITIES.LEGENDARY]: 799,
+});
+
+const LEGENDARY_SKINS = new Set([
+  "ascended",
+  "gaia-elemental",
+  "galactic-guardian",
+  "judicator",
+  "lunar-goddess",
+  "star-princess",
+  "sun-goddess",
+  "voidroot",
+]);
+
+const EPIC_SKIN_KEYWORDS = [
+  "arcane",
+  "blood-moon",
+  "dragon",
+  "hell",
+  "infernal",
+  "void",
+];
+
 function skinName(slug) {
   return String(slug || "")
     .split("-")
@@ -21,6 +55,20 @@ function collectionDescription(slug) {
   return slug === SUMMER_VIBES_SKIN_SLUG
     ? "Launch collection beach-day looks for the original roster."
     : "";
+}
+
+function skuPart(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function skinRarity(slug) {
+  if (LEGENDARY_SKINS.has(slug)) return SKIN_RARITIES.LEGENDARY;
+  if (EPIC_SKIN_KEYWORDS.some((keyword) => slug.includes(keyword))) return SKIN_RARITIES.EPIC;
+  return slug === SUMMER_VIBES_SKIN_SLUG ? SKIN_RARITIES.COMMON : SKIN_RARITIES.RARE;
 }
 
 function sortSkinEntries(left, right) {
@@ -44,10 +92,25 @@ export const SKIN_COLLECTIONS = Object.freeze(collectionSlugs.map((slug) => Obje
 function skin(entry, { status = SKIN_STATUS.UNLOCKED } = {}) {
   const collection = SKIN_COLLECTIONS.find((item) => item.slug === entry.slug);
   const src = `assets/units/skins/${entry.type}/${entry.file}`;
+  const rarity = skinRarity(entry.slug);
+  const id = `skin:${entry.type}:${entry.slug}`;
+  const sku = `ta.skin.${skuPart(entry.type)}.${skuPart(entry.slug)}`;
   return Object.freeze({
+    id,
+    unitType: entry.type,
     slug: entry.slug,
     name: collection?.name ?? skinName(entry.slug),
     collection: entry.slug,
+    collectionName: collection?.name ?? skinName(entry.slug),
+    rarity,
+    sku,
+    entitlementId: id,
+    price: Object.freeze({
+      kind: "premium",
+      sku,
+      currency: "USD",
+      cents: SKIN_PRICE_BY_RARITY[rarity],
+    }),
     status,
     unlocked: status === SKIN_STATUS.UNLOCKED,
     portraitSrc: src,

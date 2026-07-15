@@ -4,10 +4,13 @@ import assert from "node:assert/strict";
 import {
   LEGACY_TUTORIAL_PROGRESS_KEY,
   OUT_OF_RETIREMENT_SKIN_REWARDS,
+  STARTING_VALOR_BALANCE,
   TUTORIAL_JUGGERNAUT_REWARD_UNIT,
   TUTORIAL_PROGRESS_KEY,
   TUTORIAL_REWARD_SKIN_CHOICES,
+  VALOR_RESOURCE,
   WANDERING_SKIN_PACK_ID,
+  grantPremiumSkinPurchase,
   getCampaignSkinReward,
   getCampaignSkinRewardChoices,
   isCampaignSkinRewardGranted,
@@ -45,6 +48,15 @@ test("tutorial reward choices match the first skin-choice pool", () => {
     { type: "mystic", slug: "enlightened" },
     { type: "magician", slug: "summer-vibes" },
   ]);
+});
+
+test("fresh profiles start with Valor for unit purchases", () => {
+  const progress = readUnlockProgress(storageAdapter());
+
+  assert.equal(VALOR_RESOURCE.id, "valor");
+  assert.equal(VALOR_RESOURCE.name, "Valor");
+  assert.equal(progress.valorBalance, STARTING_VALOR_BALANCE);
+  assert.deepEqual(progress.purchasedSkins, []);
 });
 
 test("completing all tutorial entries unlocks Juggernaut but waits for a skin choice", () => {
@@ -159,6 +171,21 @@ test("direct campaign skin grants are folded into unlocked skins", () => {
   assert.equal(normalizeSkinSlug("angel", "summer-vibes", storage), "summer-vibes");
 });
 
+test("premium skin purchases are stored separately and folded into unlocked skins", () => {
+  const storage = storageAdapter();
+
+  const result = grantPremiumSkinPurchase(storage, { type: "swordsman", slug: "medieval" });
+
+  assert.equal(result.accepted, true);
+  assert.deepEqual(result.progress.purchasedSkins, [{ type: "swordsman", slug: "medieval" }]);
+  assert.equal(isProgressSkinUnlocked("swordsman", "medieval", storage), true);
+  assert.equal(normalizeSkinSlug("swordsman", "medieval", storage), "medieval");
+
+  const duplicate = grantPremiumSkinPurchase(storage, { type: "swordsman", slug: "medieval" });
+  assert.equal(duplicate.accepted, false);
+  assert.equal(duplicate.errorCode, "PREMIUM_SKIN_ALREADY_OWNED");
+});
+
 test("resetting progress clears stored tutorial unlocks and returns to a fresh profile", () => {
   const storage = storageAdapter();
   for (const tutorialId of [TUTORIAL_BASICS_ID, TUTORIAL_ARTS_MP_ID, TUTORIAL_DAMAGE_TYPES_ID, TUTORIAL_RAGE_ID]) {
@@ -171,8 +198,10 @@ test("resetting progress clears stored tutorial unlocks and returns to a fresh p
 
   assert.deepEqual(reset.completedTutorials, []);
   assert.equal(reset.allTutorialsComplete, false);
+  assert.equal(reset.valorBalance, STARTING_VALOR_BALANCE);
   assert.deepEqual(reset.unlockedUnits, ["swordsman", "archer", "mystic", "magician"]);
   assert.deepEqual(reset.unlockedSkins, []);
+  assert.deepEqual(reset.purchasedSkins, []);
   assert.equal(readUnlockProgress(storage).allTutorialsComplete, false);
   assert.equal(isUnitUnlocked("juggernaut", storage), false);
   assert.equal(isProgressSkinUnlocked("magician", "summer-vibes", storage), false);

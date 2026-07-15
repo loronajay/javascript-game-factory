@@ -2,6 +2,12 @@ export const TUTORIAL_PROGRESS_KEY = "tacticalArenaTutorialProgressV2";
 export const LEGACY_TUTORIAL_PROGRESS_KEY = "tacticalArenaTutorialProgress";
 export const TUTORIAL_JUGGERNAUT_REWARD_UNIT = "juggernaut";
 export const STARTER_UNIT_TYPES = Object.freeze(["swordsman", "archer", "mystic", "magician"]);
+export const VALOR_RESOURCE = Object.freeze({
+  id: "valor",
+  name: "Valor",
+  shortName: "Valor",
+});
+export const STARTING_VALOR_BALANCE = 900;
 
 export const TUTORIAL_REWARD_SKIN_CHOICES = Object.freeze([
   Object.freeze({ type: "juggernaut", slug: "bio-mech" }),
@@ -62,6 +68,10 @@ function dedupeSkins(values) {
   return out;
 }
 
+function normalizeValorBalance(value) {
+  return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : STARTING_VALOR_BALANCE;
+}
+
 // One granted skin per campaign pack, validated against that pack's choices. Stored as a
 // { [packId]: {type, slug} } map so re-opening a pack can be rejected by presence alone.
 function normalizeCampaignRewardSkins(value) {
@@ -84,9 +94,11 @@ function progressFallback() {
     selectedRewardSkin: null,
     rewardGranted: false,
     allTutorialsComplete: false,
+    valorBalance: STARTING_VALOR_BALANCE,
     unlockedUnits: [...STARTER_UNIT_TYPES],
     campaignRewardSkins: {},
     campaignGrantedSkins: [],
+    purchasedSkins: [],
     unlockedSkins: [],
   };
 }
@@ -98,23 +110,28 @@ export function normalizeUnlockProgress(value = {}) {
   const rewardGranted = Boolean(value.rewardGranted && selectedRewardSkin);
   const unlockedUnits = new Set([...STARTER_UNIT_TYPES, ...uniqueStrings(value.unlockedUnits)]);
   if (allTutorialsComplete) unlockedUnits.add(TUTORIAL_JUGGERNAUT_REWARD_UNIT);
+  const valorBalance = normalizeValorBalance(value.valorBalance);
   const campaignRewardSkins = normalizeCampaignRewardSkins(value.campaignRewardSkins);
   const campaignGrantedSkins = dedupeSkins(value.campaignGrantedSkins);
+  const purchasedSkins = dedupeSkins(value.purchasedSkins);
   // unlockedSkins is fully derived from the granted rewards (tutorial + campaign packs),
   // so it stays consistent no matter what an older/partial payload carried.
   const unlockedSkins = [];
   if (rewardGranted && selectedRewardSkin) unlockedSkins.push(selectedRewardSkin);
   for (const skin of Object.values(campaignRewardSkins)) unlockedSkins.push(skin);
   unlockedSkins.push(...campaignGrantedSkins);
+  unlockedSkins.push(...purchasedSkins);
   return {
     completedTutorials,
     rewardChoices: [...TUTORIAL_REWARD_SKIN_CHOICES],
     selectedRewardSkin: rewardGranted ? selectedRewardSkin : null,
     rewardGranted,
     allTutorialsComplete,
+    valorBalance,
     unlockedUnits: [...unlockedUnits],
     campaignRewardSkins,
     campaignGrantedSkins,
+    purchasedSkins,
     unlockedSkins: dedupeSkins(unlockedSkins),
   };
 }
@@ -210,6 +227,24 @@ export function selectCampaignRewardSkin(storage = defaultStorage(), packId, cho
   const next = writeUnlockProgress(storage, {
     ...progress,
     campaignRewardSkins: { ...progress.campaignRewardSkins, [packId]: { type: selected.type, slug: selected.slug } },
+  });
+  return { accepted: true, progress: next };
+}
+
+export function grantPremiumSkinPurchase(storage = defaultStorage(), choice) {
+  const progress = readUnlockProgress(storage);
+  const selected = choice && typeof choice.type === "string" && typeof choice.slug === "string"
+    ? { type: choice.type, slug: choice.slug }
+    : null;
+  if (!selected) {
+    return { accepted: false, errorCode: "INVALID_PREMIUM_SKIN", progress };
+  }
+  if (progress.purchasedSkins.some((skin) => skin.type === selected.type && skin.slug === selected.slug)) {
+    return { accepted: false, errorCode: "PREMIUM_SKIN_ALREADY_OWNED", progress };
+  }
+  const next = writeUnlockProgress(storage, {
+    ...progress,
+    purchasedSkins: [...progress.purchasedSkins, selected],
   });
   return { accepted: true, progress: next };
 }

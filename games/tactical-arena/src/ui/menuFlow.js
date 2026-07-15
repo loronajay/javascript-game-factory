@@ -14,6 +14,7 @@ import {
   savePerformanceMode,
 } from "./performanceSettings.js";
 import { openSkinGallery } from "./skinGallery.js";
+import { openShop } from "./shop.js";
 import { openNicknameGallery } from "./nicknameGallery.js";
 import { getNicknamePref } from "./nicknameModel.js";
 import { openSkinPicker } from "./skinPicker.js";
@@ -872,6 +873,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     if (!actionBtn || actionBtn.disabled) return;
     switch (actionBtn.dataset.action) {
       case "rules": openCodex(); break;
+      case "shop": openShop(globalThis.localStorage); break;
       case "skins": openSkinGallery(); break;
       case "nicknames": openNicknameGallery(); break;
       case "chooseTutorialReward": openTutorialRewardChoice({ title: "Juggernaut Unlocked" }); break;

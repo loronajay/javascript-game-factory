@@ -80,6 +80,18 @@ test("newly dropped skin files become selectable by inferred slug", () => {
   assert.equal(getSkin("nemesis", "infernal")?.portraitSrc, "assets/units/skins/nemesis/infernal-nemesis.png");
 });
 
+test("skin entries carry marketplace-ready premium metadata", () => {
+  const skin = getSkin("swordsman", "medieval");
+
+  assert.equal(skin.id, "skin:swordsman:medieval");
+  assert.equal(skin.unitType, "swordsman");
+  assert.equal(skin.sku, "ta.skin.swordsman.medieval");
+  assert.equal(skin.price.kind, "premium");
+  assert.equal(skin.price.currency, "USD");
+  assert.equal(skin.price.cents, 299);
+  assert.ok(["common", "rare", "epic", "legendary"].includes(skin.rarity));
+});
+
 test("unknown or locked skin slugs normalize to classic (every skin is currently locked)", () => {
   assert.equal(normalizeSkinSlug("swordsman", "summer-vibes"), null);
   assert.equal(normalizeSkinSlug("swordsman", "not-real"), null);

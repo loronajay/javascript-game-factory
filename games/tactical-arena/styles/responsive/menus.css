@@ -72,6 +72,7 @@
    ----------------------------------------------------------------------- */
 @media (pointer: coarse) and (orientation: landscape) and (max-height: 540px) {
   .skin-gallery-modal,
+  .shop-modal,
   #settingsModal {
     padding:
       max(.35rem, env(safe-area-inset-top))
@@ -130,6 +131,77 @@
     max-height: calc(var(--app-height, 100vh) - .7rem);
     border-radius: 10px;
     width: min(58rem, 100%);
+  }
+
+  .shop-card {
+    width: min(58rem, 100%);
+    height: calc(var(--app-height, 100vh) - .7rem);
+    max-height: calc(var(--app-height, 100vh) - .7rem);
+    border-radius: 10px;
+  }
+
+  .shop-head {
+    min-height: 0;
+  }
+
+  .shop-title-row {
+    min-height: 34px;
+    margin-bottom: .28rem;
+  }
+
+  .shop-title-stack {
+    grid-auto-flow: column;
+    align-items: center;
+    gap: .5rem;
+  }
+
+  .shop-title-stack h2 {
+    font-size: .82rem;
+  }
+
+  .shop-body {
+    gap: .5rem;
+    padding: .55rem;
+  }
+
+  .shop-unit-grid {
+    grid-template-columns: repeat(auto-fill, minmax(9.8rem, 1fr));
+  }
+
+  .shop-skin-grid {
+    grid-template-columns: repeat(auto-fill, minmax(7.4rem, 1fr));
+    gap: .42rem;
+  }
+
+  .shop-unit {
+    grid-template-columns: 3.35rem minmax(0, 1fr);
+    gap: .4rem;
+    padding: .4rem;
+  }
+
+  .shop-unit .unit-portrait.is-shop-unit {
+    width: 3.25rem;
+    height: 3.95rem;
+  }
+
+  .shop-skin .unit-portrait.is-shop-skin {
+    width: 4.4rem;
+    height: 5.25rem;
+  }
+
+  .shop-item-title {
+    font-size: .64rem;
+  }
+
+  .shop-buy-btn {
+    min-height: 32px;
+    padding: .34rem .48rem;
+    font-size: .52rem;
+  }
+
+  .shop-foot {
+    min-height: 42px;
+    padding: .34rem .58rem calc(.34rem + env(safe-area-inset-bottom));
   }
 
   .skin-gallery-body {

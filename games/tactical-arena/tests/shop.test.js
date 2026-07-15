@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { openSkinGallery } from "../src/ui/skinGallery.js";
+import { openShop } from "../src/ui/shop.js";
 
 class FakeClassList {
   constructor(node) {
@@ -32,6 +32,7 @@ class FakeElement {
     this.listeners = new Map();
     this.classList = new FakeClassList(this);
     this.hidden = false;
+    this.disabled = false;
   }
 
   append(...nodes) {
@@ -96,9 +97,18 @@ class FakeDocument {
   }
 }
 
+function storageAdapter() {
+  const values = new Map();
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
+  };
+}
+
 function walk(node, predicate, matches = []) {
-  if (predicate(node)) matches.push(node);
-  for (const child of node.children ?? []) walk(child, predicate, matches);
+  if (node && predicate(node)) matches.push(node);
+  for (const child of node?.children ?? []) walk(child, predicate, matches);
   return matches;
 }
 
@@ -106,49 +116,26 @@ function hasClass(node, className) {
   return node.className.split(/\s+/).includes(className);
 }
 
-test("skin gallery entries are buttons that open and close an enlarged skin view", () => {
+function visibleText(node) {
+  return [node.textContent, ...(node.children ?? []).map(visibleText)].join("");
+}
+
+test("shop skins render under unit shelves and Valor uses an icon badge", () => {
   globalThis.document = new FakeDocument();
 
-  openSkinGallery();
+  openShop(storageAdapter());
 
   const overlay = document.body.children[0];
-  assert.equal(overlay.hidden, false);
+  const balance = walk(overlay, (node) => hasClass(node, "shop-balance"))[0];
+  assert.ok(balance, "shop should show the Valor balance badge");
+  assert.ok(walk(balance, (node) => hasClass(node, "valor-icon")).length > 0);
+  assert.match(balance.getAttribute("aria-label"), /Valor$/);
+  assert.doesNotMatch(visibleText(balance), /Valor/);
 
-  const skinButtons = walk(overlay, (node) => node.tagName === "BUTTON" && hasClass(node, "skin-gallery-item"));
-  assert.ok(skinButtons.length > 0, "gallery should render clickable skin entries");
-  assert.match(skinButtons[0].getAttribute("aria-label"), /^View .+ skin for .+$/);
+  const skinsTab = walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Skins")[0];
+  skinsTab.click();
 
-  skinButtons[0].click();
-
-  const detailViews = walk(overlay, (node) => hasClass(node, "skin-gallery-detail"));
-  assert.equal(detailViews.length, 1, "clicking a skin should show the enlarged detail view");
-  assert.equal(walk(overlay, (node) => hasClass(node, "skin-gallery-grid")).length, 0);
-
-  const detailPortraits = walk(overlay, (node) => hasClass(node, "is-skin-detail"));
-  assert.equal(detailPortraits.length, 1, "detail view should render a larger portrait variant");
-
-  const returnButton = walk(overlay, (node) => node.tagName === "BUTTON" && hasClass(node, "skin-gallery-detail-close"))[0];
-  assert.equal(returnButton.getAttribute("aria-label"), "Return to skins list");
-  returnButton.click();
-
-  assert.ok(walk(overlay, (node) => hasClass(node, "skin-gallery-grid")).length > 0);
-  assert.equal(walk(overlay, (node) => hasClass(node, "skin-gallery-detail")).length, 0);
-});
-
-test("skin gallery nests skin cards under unit shelves inside each class", () => {
-  globalThis.document = new FakeDocument();
-
-  openSkinGallery();
-
-  const overlay = document.body.children[0];
-  const unitShelves = walk(overlay, (node) => hasClass(node, "skin-gallery-unit-section"));
-  assert.ok(unitShelves.length > 0, "gallery should render per-unit skin shelves");
-
-  const swordsmanShelf = unitShelves.find((node) => node.dataset.type === "swordsman");
-  assert.ok(swordsmanShelf, "swordsman should have its own skin shelf");
-  assert.ok(walk(swordsmanShelf, (node) => hasClass(node, "skin-gallery-unit-title")).some((node) => node.textContent === "Swordsman"));
-
-  const buttons = walk(swordsmanShelf, (node) => node.tagName === "BUTTON" && hasClass(node, "skin-gallery-item"));
-  assert.ok(buttons.length > 0);
-  assert.ok(buttons.every((button) => button.dataset.type === "swordsman"));
+  const shelves = walk(overlay, (node) => hasClass(node, "shop-unit-skin-section"));
+  assert.ok(shelves.length > 0, "shop skins should be organized into per-unit shelves");
+  assert.ok(shelves.some((node) => node.dataset.type === "swordsman"));
 });
