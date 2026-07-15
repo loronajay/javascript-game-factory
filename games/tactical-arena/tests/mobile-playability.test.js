@@ -128,6 +128,36 @@ test("the document exposes the mobile playability shell", () => {
   );
   assert.match(
     responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.roster-body\s*\{[\s\S]*?flex-direction:\s*column[\s\S]*?\.roster-grid\s*\{[\s\S]*?display:\s*flex[\s\S]*?height:\s*clamp\(88px,\s*24vh,\s*116px\)/,
+    "short landscape roster pickers should use a compact horizontal unit rail so the detail pane stays readable",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.roster-detail-split\s*\{[\s\S]*?display:\s*grid[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)[\s\S]*?\.roster-detail-split \.unit-portrait\.is-hero\s*\{[\s\S]*?display:\s*none/,
+    "short landscape roster detail should prioritize unit stats over the large portrait",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.campaign-map\s*\{[\s\S]*?min-height:\s*0/,
+    "campaign mobile landscape must not keep a desktop-height map minimum that clips the mission panel",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.settings-card\s*\{[\s\S]*?height:\s*calc\(var\(--app-height,\s*100vh\) - \.7rem\)[\s\S]*?\.settings-body\s*\{(?=[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\))[\s\S]*?overflow-y:\s*auto/,
+    "settings should compact into two columns and scroll internally on mobile landscape",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.skin-gallery-card\s*\{[\s\S]*?height:\s*calc\(var\(--app-height,\s*100vh\) - \.7rem\)[\s\S]*?\.skin-gallery-detail \.unit-portrait\.is-skin-detail\s*\{[\s\S]*?height:\s*clamp\(8rem,\s*48vh,\s*13rem\)/,
+    "skin view should use the live viewport and smaller detail art in short landscape",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.draft-formation-board\s*\{[\s\S]*?min-height:\s*0[\s\S]*?height:\s*clamp\(11rem,\s*54vh,\s*15rem\)[\s\S]*?\.draft-formation-card \.roster-foot\s*\{[\s\S]*?padding:\s*\.45rem \.7rem/,
+    "formation editor should bound the board height and keep footer buttons reachable",
+  );
+  assert.match(
+    responsiveCss,
     /@media \(pointer: coarse\)[\s\S]*?\.roster-card\s*\{[\s\S]*?var\(--app-height,\s*100vh\)/,
     "touch roster modals should size to the live viewport height instead of overflowing mobile browser chrome",
   );

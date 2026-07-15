@@ -57,7 +57,7 @@
   }
 
   [data-screen="campaign"] .campaign-map {
-    min-height: 280px;
+    min-height: 0;
   }
 }
 
@@ -71,20 +71,212 @@
    side-by-side (wide enough), and scrolls the grid + detail internally.
    ----------------------------------------------------------------------- */
 @media (pointer: coarse) and (orientation: landscape) and (max-height: 540px) {
+  .skin-gallery-modal,
+  #settingsModal {
+    padding:
+      max(.35rem, env(safe-area-inset-top))
+      max(.35rem, env(safe-area-inset-right))
+      max(.35rem, env(safe-area-inset-bottom))
+      max(.35rem, env(safe-area-inset-left));
+  }
+
+  .settings-card {
+    height: calc(var(--app-height, 100vh) - .7rem);
+    max-height: calc(var(--app-height, 100vh) - .7rem);
+    border-radius: 10px;
+    width: min(46rem, 100%);
+  }
+
+  .settings-body {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    gap: .55rem .85rem;
+    min-height: 0;
+    overflow-y: auto;
+    padding: .75rem .85rem calc(.75rem + env(safe-area-inset-bottom));
+  }
+
+  .set-row {
+    min-width: 0;
+    gap: .55rem;
+  }
+
+  .set-label {
+    font-size: .68rem;
+  }
+
+  .settings-body input[type="range"],
+  .settings-body input[type="checkbox"],
+  .set-select,
+  .set-cheat-stack {
+    max-width: none;
+  }
+
+  .set-action-stack {
+    justify-items: stretch;
+  }
+
+  .set-action-stack .menu-btn {
+    width: 100%;
+  }
+
+  .set-hint {
+    max-width: none;
+    text-align: left;
+  }
+
+  .skin-gallery-card {
+    height: calc(var(--app-height, 100vh) - .7rem);
+    max-height: calc(var(--app-height, 100vh) - .7rem);
+    border-radius: 10px;
+    width: min(58rem, 100%);
+  }
+
+  .skin-gallery-body {
+    gap: .55rem;
+    padding: .6rem;
+  }
+
+  .skin-gallery-grid {
+    grid-template-columns: repeat(auto-fill, minmax(8.4rem, 1fr));
+    gap: .4rem;
+  }
+
+  .skin-gallery-item {
+    grid-template-columns: 2.75rem minmax(0, 1fr);
+    gap: .45rem;
+    padding: .38rem;
+  }
+
+  .skin-gallery-item .unit-portrait.is-skin-card {
+    width: 2.75rem;
+    height: 3.35rem;
+  }
+
+  .skin-gallery-detail {
+    min-height: 0;
+    gap: .45rem;
+    padding: .75rem 2.8rem .75rem .75rem;
+  }
+
+  .skin-gallery-detail .unit-portrait.is-skin-detail {
+    width: clamp(7rem, 22vw, 10rem);
+    height: clamp(8rem, 48vh, 13rem);
+  }
+
+  .skin-gallery-detail-title {
+    font-size: .95rem;
+  }
+
+  [data-screen="campaign"] .campaign-card {
+    width: min(980px, 98vw);
+    height: calc(var(--app-height, 100vh) - 1.1rem);
+    max-height: calc(var(--app-height, 100vh) - 1.1rem);
+    padding: .65rem;
+  }
+
+  [data-screen="campaign"] .campaign-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .55rem;
+    margin-bottom: .55rem;
+  }
+
+  [data-screen="campaign"] .menu-heading {
+    margin-bottom: .12rem;
+    font-size: 1rem;
+  }
+
+  [data-screen="campaign"] .menu-note {
+    display: none;
+  }
+
+  [data-screen="campaign"] .campaign-star-bank {
+    min-height: 1.8rem;
+    padding: .3rem .55rem;
+    font-size: .62rem;
+  }
+
+  [data-screen="campaign"] .campaign-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(15rem, 19rem);
+    gap: .6rem;
+  }
+
+  [data-screen="campaign"] .campaign-map {
+    min-height: 0;
+  }
+
+  [data-screen="campaign"] .campaign-panel {
+    gap: .5rem;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  [data-screen="campaign"] .campaign-detail {
+    padding: .65rem;
+  }
+
+  [data-screen="campaign"] .campaign-detail h3 {
+    font-size: .86rem;
+  }
+
+  [data-screen="campaign"] .campaign-detail p,
+  [data-screen="campaign"] .campaign-rewards {
+    font-size: .7rem;
+    line-height: 1.3;
+  }
+
+  [data-screen="campaign"] .campaign-squad {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .38rem;
+  }
+
+  [data-screen="campaign"] .campaign-squad-slot {
+    padding: .34rem;
+  }
+
+  [data-screen="campaign"] .campaign-squad-slot .unit-portrait.is-chip {
+    width: 2rem;
+    height: 2.35rem;
+  }
+
+  [data-screen="campaign"] .campaign-squad-slot-main {
+    gap: .35rem;
+  }
+
+  [data-screen="campaign"] .campaign-squad-slot-main b,
+  [data-screen="campaign"] .campaign-squad-skin-btn {
+    font-size: .5rem;
+    letter-spacing: .05em;
+  }
+
+  [data-screen="campaign"] .campaign-panel > .menu-buttons {
+    gap: .38rem;
+  }
+
+  [data-screen="campaign"] .campaign-panel > .menu-buttons .menu-btn {
+    min-height: 2.15rem;
+    padding: .45rem .55rem;
+    font-size: .62rem;
+  }
+
   .roster-card {
     width: min(980px, 98vw);
-    height: 94vh;
-    max-height: 94vh;
+    height: calc(var(--app-height, 100vh) - .7rem);
+    max-height: calc(var(--app-height, 100vh) - .7rem);
   }
 
   /* Draft formation picker: shrink the board + chrome so the Lock Formation
      footer fits a short landscape phone. */
   .draft-formation-card {
-    max-height: 94vh;
+    height: calc(var(--app-height, 100vh) - .7rem);
+    max-height: calc(var(--app-height, 100vh) - .7rem);
   }
 
   .draft-formation-board {
-    min-height: 14rem;
+    min-height: 0;
+    height: clamp(11rem, 54vh, 15rem);
     margin: .5rem;
   }
 
@@ -139,15 +331,29 @@
     font-size: .54rem;
   }
 
-  /* Body now owns the height. Grid scrolls on the left, detail on the right. */
+  /* Body now owns the height. The roster becomes a compact rail so unit data is
+     the main readable surface on short landscape phones. */
+  .roster-body {
+    flex-direction: column;
+    min-height: 0;
+  }
+
   .roster-grid {
-    width: 42%;
-    max-width: 300px;
+    display: flex;
+    width: auto;
+    max-width: none;
+    height: clamp(88px, 24vh, 116px);
     gap: .35rem;
+    overflow-x: auto;
+    overflow-y: hidden;
     padding: .5rem;
+    border-right: 0;
+    border-bottom: 1px solid rgba(70, 100, 130, .35);
+    scroll-snap-type: x proximity;
   }
 
   .roster-class {
+    flex: 0 0 auto;
     gap: .24rem;
   }
 
@@ -157,16 +363,19 @@
   }
 
   .roster-class-units {
-    grid-template-columns: repeat(auto-fill, minmax(4.4rem, 1fr));
+    display: flex;
     gap: .35rem;
   }
 
   .roster-unit {
+    width: 4.6rem;
+    min-height: 78px;
     padding: .3rem .2rem .34rem;
+    scroll-snap-align: start;
   }
 
   .roster-unit .unit-portrait.is-card {
-    height: 52px;
+    height: 40px;
   }
 
   .roster-unit-name {
@@ -188,18 +397,56 @@
   }
 
   .roster-detail-scroll {
-    padding: .55rem .8rem;
+    padding: .45rem .65rem;
   }
 
-  /* Short landscape phone: shrink the portrait + tighten the split so the stat
-     card still fits beside it without crushing the unit grid above. */
   .roster-detail-split {
-    gap: .7rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: .45rem;
   }
 
   .roster-detail-split .unit-portrait.is-hero {
-    width: 96px;
-    height: 132px;
+    display: none;
+  }
+
+  .roster-detail .stat-grid {
+    gap: .28rem;
+    margin-bottom: .45rem;
+  }
+
+  .roster-detail .stat-box {
+    padding: .26rem .12rem .24rem;
+  }
+
+  .roster-detail .stat-box-label,
+  .roster-detail .ref-group-title {
+    font-size: .48rem;
+    letter-spacing: .08em;
+  }
+
+  .roster-detail .stat-box-value {
+    font-size: .78rem;
+  }
+
+  .roster-detail .ref-line {
+    margin: .18rem 0;
+    font-size: .7rem;
+    line-height: 1.28;
+  }
+
+  .roster-detail .ref-tag {
+    font-size: .5rem;
+  }
+
+  .roster-detail .skin-summary {
+    margin-bottom: .45rem;
+    padding: .35rem;
+  }
+
+  .roster-detail .skin-summary .unit-portrait.is-skin-summary {
+    width: 2.35rem;
+    height: 2.85rem;
   }
 
   /* Footer: tighter so Place / Done never get pushed off a short screen. */
@@ -253,6 +500,16 @@
   }
 
   .skin-picker-foot .menu-btn {
+    min-width: 5.5rem;
+    padding: .5rem .7rem;
+  }
+
+  .draft-formation-card .roster-foot {
+    gap: .45rem;
+    padding: .45rem .7rem;
+  }
+
+  .draft-formation-card .roster-foot .menu-btn {
     min-width: 5.5rem;
     padding: .5rem .7rem;
   }
