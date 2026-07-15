@@ -76,7 +76,7 @@ class FakeElement {
 
   click() {
     for (const handler of this.listeners.get("click") ?? []) {
-      handler({ target: this });
+      handler({ target: this, stopPropagation() {} });
     }
   }
 }
@@ -169,7 +169,32 @@ test("shop skin cards offer USD checkout and Valor purchase buttons", () => {
 
   valorBuy.click();
 
-  const progress = readUnlockProgress(storage);
+  let progress = readUnlockProgress(storage);
+  assert.equal(progress.valorBalance, 3000, "opening confirmation should not spend Valor");
+  assert.equal(progress.purchasedSkins.some((skin) => skin.slug === "summer-vibes"), false);
+
+  let confirm = walk(overlay, (node) => hasClass(node, "shop-purchase-confirm"))[0];
+  assert.ok(confirm, "Valor click should open a purchase confirmation popup");
+  assert.equal(confirm.getAttribute("role"), "dialog");
+  assert.match(visibleText(confirm), /Confirm Unlock/);
+  assert.match(visibleText(confirm), /Summer Vibes/);
+
+  const cancel = walk(confirm, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-confirm-cancel"))[0];
+  const purchase = walk(confirm, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-confirm-purchase"))[0];
+  assert.equal(cancel.textContent, "Cancel");
+  assert.equal(purchase.getAttribute("aria-label"), "Purchase Summer Vibes for 1,550 Valor");
+  assert.ok(walk(purchase, (node) => hasClass(node, "valor-icon")).length > 0);
+  assert.doesNotMatch(visibleText(purchase), /Valor/);
+
+  cancel.click();
+  assert.equal(walk(overlay, (node) => hasClass(node, "shop-purchase-confirm")).length, 0);
+  assert.equal(readUnlockProgress(storage).valorBalance, 3000, "cancel should leave Valor untouched");
+
+  valorBuy.click();
+  confirm = walk(overlay, (node) => hasClass(node, "shop-purchase-confirm"))[0];
+  walk(confirm, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-confirm-purchase"))[0].click();
+
+  progress = readUnlockProgress(storage);
   assert.equal(progress.valorBalance, 1450);
   assert.ok(progress.purchasedSkins.some((skin) => skin.slug === "summer-vibes"));
   assert.ok(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent.includes("Summer Vibes unlocked"));
@@ -239,7 +264,20 @@ test("shop unit Valor purchase flips both USD and Valor unit buttons to owned", 
 
   valorBuy.click();
 
-  const progress = readUnlockProgress(storage);
+  let progress = readUnlockProgress(storage);
+  assert.equal(progress.valorBalance, 999, "opening confirmation should not spend Valor");
+  assert.equal(progress.unlockedUnits.includes("clod"), false);
+
+  const confirm = walk(overlay, (node) => hasClass(node, "shop-purchase-confirm"))[0];
+  assert.ok(confirm, "Valor click should open a purchase confirmation popup");
+  assert.match(visibleText(confirm), /Clod/);
+  const purchase = walk(confirm, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-confirm-purchase"))[0];
+  assert.equal(purchase.getAttribute("aria-label"), "Purchase Clod for 650 Valor");
+  assert.ok(walk(purchase, (node) => hasClass(node, "valor-icon")).length > 0);
+  assert.doesNotMatch(visibleText(purchase), /Valor/);
+  purchase.click();
+
+  progress = readUnlockProgress(storage);
   assert.equal(progress.valorBalance, 349);
   assert.ok(progress.unlockedUnits.includes("clod"));
   const ownedClodCard = walk(overlay, (node) => hasClass(node, "shop-unit") && hasClass(node, "is-owned") && visibleText(node).includes("Clod"))[0];

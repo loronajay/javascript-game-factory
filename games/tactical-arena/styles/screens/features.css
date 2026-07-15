@@ -121,6 +121,22 @@
 .shop-empty-sub { color:var(--muted); font:700 .72rem var(--font-display); letter-spacing:.04em; }
 .shop-foot { justify-content:space-between; }
 .shop-status { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font:800 .62rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; }
+.shop-confirm-layer { position:fixed; inset:0; z-index:2; display:grid; place-items:center; padding:1rem; background:rgba(1,5,10,.58); }
+.shop-purchase-confirm { display:grid; gap:.85rem; width:min(25rem,92vw); padding:1rem; border:1px solid color-mix(in srgb,var(--brass) 78%,#ffffff 8%); border-radius:8px; background:linear-gradient(135deg,rgba(var(--sheen),.09),transparent 45%),linear-gradient(180deg,rgba(24,38,54,.98),rgba(7,13,22,.98)); box-shadow:0 26px 72px rgba(0,0,0,.78), inset 0 1px 0 rgba(var(--sheen),.13), inset 0 0 0 1px rgba(0,0,0,.52); }
+.shop-confirm-head { display:grid; gap:.18rem; text-align:center; }
+.shop-confirm-kicker { color:var(--brass-hi); font:900 .58rem var(--font-display); letter-spacing:.14em; text-transform:uppercase; }
+.shop-confirm-title { margin:0; color:var(--text); font:900 1.08rem var(--font-display); letter-spacing:.06em; text-transform:uppercase; }
+.shop-confirm-item { display:grid; grid-template-columns:4rem minmax(0,1fr); align-items:center; gap:.7rem; min-width:0; padding:.65rem; border:1px solid rgba(188,214,236,.13); border-radius:8px; background:rgba(4,11,19,.34); }
+.shop-confirm-item .unit-portrait.is-shop-confirm { width:4rem; height:4.9rem; border:1px solid rgba(188,214,236,.18); border-radius:7px; box-shadow:inset 0 1px 0 rgba(var(--sheen),.08); }
+.shop-confirm-copy { display:grid; gap:.16rem; min-width:0; }
+.shop-confirm-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font:900 .86rem var(--font-display); letter-spacing:.04em; text-transform:uppercase; }
+.shop-confirm-sub { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font:800 .58rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; }
+.shop-confirm-cost { display:flex; align-items:center; justify-content:space-between; gap:.8rem; min-width:0; padding:.55rem .65rem; border:1px solid rgba(203,159,85,.32); border-radius:7px; background:rgba(0,0,0,.24); color:var(--muted); font:900 .6rem var(--font-display); letter-spacing:.1em; text-transform:uppercase; }
+.shop-confirm-actions { display:grid; grid-template-columns:minmax(0,.75fr) minmax(0,1.25fr); gap:.55rem; }
+.shop-confirm-actions .menu-btn { min-width:0; }
+.shop-confirm-purchase { display:inline-flex; align-items:center; justify-content:center; gap:.38rem; }
+.shop-confirm-purchase .shop-confirm-price { color:inherit; }
+.shop-confirm-price .valor-icon { width:.86rem; height:.86rem; }
 
 .nickname-gallery-card { width:min(52rem,96vw); height:min(42rem,90vh); }
 .nickname-gallery-sub { margin:.3rem 0 0; color:var(--muted); font:600 .68rem var(--font-display); letter-spacing:.02em; }

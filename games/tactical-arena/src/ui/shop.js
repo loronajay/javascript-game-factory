@@ -32,9 +32,12 @@ export function openShop(storage = globalThis.localStorage) {
   let statusText = "";
   let detailUnitType = null;
   let unitScrollTop = 0;
+  let pendingValorPurchase = null;
 
   function render() {
     const catalog = getShopCatalog(storage);
+    const pendingOffer = pendingValorPurchase ? currentPendingOffer(catalog) : null;
+    if (pendingValorPurchase && (!pendingOffer || pendingOffer.owned)) pendingValorPurchase = null;
     const detailOffer = activeTab === "units" && detailUnitType
       ? catalog.units.find((offer) => offer.type === detailUnitType)
       : null;
@@ -62,6 +65,7 @@ export function openShop(storage = globalThis.localStorage) {
       tabBtn.addEventListener("click", () => {
         activeTab = tab.id;
         detailUnitType = null;
+        pendingValorPurchase = null;
         statusText = "";
         render();
       });
@@ -85,6 +89,8 @@ export function openShop(storage = globalThis.localStorage) {
     done.addEventListener("click", close);
     foot.append(status, done);
     card.appendChild(foot);
+
+    if (pendingOffer && !pendingOffer.owned) overlay.appendChild(createPurchaseConfirm(pendingValorPurchase.kind, pendingOffer));
   }
 
   function renderUnits(body, offers) {
@@ -129,6 +135,7 @@ export function openShop(storage = globalThis.localStorage) {
     back.setAttribute("aria-label", "Back to unit shop");
     back.addEventListener("click", () => {
       detailUnitType = null;
+      pendingValorPurchase = null;
       render();
     });
     top.appendChild(back);
@@ -207,10 +214,91 @@ export function openShop(storage = globalThis.localStorage) {
   }
 
   function close() {
+    pendingValorPurchase = null;
     overlay.hidden = true;
     overlay.removeEventListener("click", onOverlay);
     document.removeEventListener("keydown", onKey, true);
     overlay.replaceChildren();
+  }
+
+  function openValorPurchase(kind, offer) {
+    pendingValorPurchase = kind === "skin"
+      ? { kind, type: offer.type, slug: offer.slug }
+      : { kind, type: offer.type };
+    render();
+  }
+
+  function dismissValorPurchase() {
+    pendingValorPurchase = null;
+    render();
+  }
+
+  function currentPendingOffer(catalog) {
+    if (!pendingValorPurchase) return null;
+    if (pendingValorPurchase.kind === "unit") {
+      return catalog.units.find((offer) => offer.type === pendingValorPurchase.type) ?? null;
+    }
+    return catalog.skins.find((offer) =>
+      offer.type === pendingValorPurchase.type && offer.slug === pendingValorPurchase.slug) ?? null;
+  }
+
+  function confirmValorPurchase(kind, offer) {
+    const result = kind === "skin"
+      ? purchaseSkinWithValor(storage, offer.type, offer.slug)
+      : purchaseUnitWithValor(storage, offer.type);
+    pendingValorPurchase = null;
+    statusText = kind === "skin" ? skinValorPurchaseStatus(result) : unitPurchaseStatus(result);
+    render();
+  }
+
+  function createPurchaseConfirm(kind, offer) {
+    const amount = kind === "skin" ? offer.valorPrice?.amount : offer.price?.amount;
+    const layer = el("div", "shop-confirm-layer");
+    layer.addEventListener("click", (event) => {
+      if (event.target === layer) dismissValorPurchase();
+    });
+
+    const dialog = el("section", "shop-purchase-confirm");
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "shop-purchase-confirm-title");
+    dialog.addEventListener("click", (event) => event.stopPropagation?.());
+
+    const head = el("header", "shop-confirm-head");
+    const title = el("h3", "shop-confirm-title", "Confirm Unlock");
+    title.id = "shop-purchase-confirm-title";
+    head.append(el("span", "shop-confirm-kicker", "Valor Purchase"), title);
+
+    const item = el("div", "shop-confirm-item");
+    item.appendChild(createPortrait(offer.type, {
+      variant: "is-shop-confirm",
+      eager: true,
+      skin: kind === "skin" ? offer.slug : null,
+    }));
+    const copy = el("div", "shop-confirm-copy");
+    copy.append(
+      el("b", "shop-confirm-name", offer.name),
+      el("span", "shop-confirm-sub", kind === "skin" ? `Skin for ${offer.unitName}` : "Unit unlock"),
+    );
+    item.appendChild(copy);
+
+    const cost = el("div", "shop-confirm-cost");
+    cost.append(el("span", "", "Cost"), createValorBadge(amount, "shop-confirm-price"));
+
+    const foot = el("footer", "shop-confirm-actions");
+    const cancel = el("button", "menu-btn ghost shop-confirm-cancel", "Cancel");
+    cancel.type = "button";
+    cancel.addEventListener("click", dismissValorPurchase);
+    const purchase = el("button", "menu-btn shop-confirm-purchase");
+    purchase.type = "button";
+    purchase.setAttribute("aria-label", `Purchase ${offer.name} for ${formatValor(amount)}`);
+    purchase.append(el("span", "", "Purchase for"), createValorBadge(amount, "shop-confirm-price"));
+    purchase.addEventListener("click", () => confirmValorPurchase(kind, offer));
+    foot.append(cancel, purchase);
+
+    dialog.append(head, item, cost, foot);
+    layer.appendChild(dialog);
+    return layer;
   }
 
   function createUnitBuyActions(offer) {
@@ -230,10 +318,9 @@ export function openShop(storage = globalThis.localStorage) {
     valorBuy.type = "button";
     valorBuy.setAttribute("aria-label", `Unlock ${offer.name} for ${formatValor(offer.price.amount)}`);
     valorBuy.appendChild(createValorBadge(offer.price.amount, "shop-price"));
-    valorBuy.addEventListener("click", () => {
-      const result = purchaseUnitWithValor(storage, offer.type);
-      statusText = unitPurchaseStatus(result);
-      render();
+    valorBuy.addEventListener("click", (event) => {
+      event.stopPropagation?.();
+      openValorPurchase("unit", offer);
     });
 
     actions.append(premiumBuy, valorBuy);
@@ -267,9 +354,7 @@ export function openShop(storage = globalThis.localStorage) {
     valorBuy.appendChild(createValorBadge(offer.valorPrice?.amount, "shop-price"));
     valorBuy.addEventListener("click", (event) => {
       event.stopPropagation?.();
-      const result = purchaseSkinWithValor(storage, offer.type, offer.slug);
-      statusText = skinValorPurchaseStatus(result);
-      render();
+      openValorPurchase("skin", offer);
     });
 
     actions.append(premiumBuy, valorBuy);
@@ -288,7 +373,13 @@ export function openShop(storage = globalThis.localStorage) {
   }
 
   function onKey(event) {
-    if (event.key === "Escape") close();
+    if (event.key !== "Escape") return;
+    if (pendingValorPurchase) {
+      event.preventDefault?.();
+      dismissValorPurchase();
+      return;
+    }
+    close();
   }
 
   overlay.addEventListener("click", onOverlay);
