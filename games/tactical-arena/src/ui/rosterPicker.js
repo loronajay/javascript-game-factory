@@ -37,6 +37,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
   const skinDrafts = squad.map((type, index) => ({ type, slug: skins[index] ?? null }));
   let activeSlot = clampSlot(startSlot);
   let focusedType = squad[activeSlot];
+  let browseOpen = false;
 
   return new Promise((resolve) => {
     overlay.replaceChildren();
@@ -98,6 +99,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
         btn.addEventListener("click", () => {
           activeSlot = slot.index;
           focusedType = squad[slot.index];
+          browseOpen = false;
           primeSlotDraft(activeSlot);
           paintAll();
         });
@@ -108,6 +110,15 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
     function paintGrid() {
       const available = new Set(availableTypesForSlot(squad, activeSlot, allowDuplicates));
       grid.replaceChildren();
+      const gridHead = el("div", "roster-grid-head");
+      const gridTitle = el("div", "roster-grid-title");
+      gridTitle.textContent = `Choose Pick ${activeSlot + 1}`;
+      const detailsBtn = el("button", "menu-btn ghost roster-details-btn");
+      detailsBtn.type = "button";
+      detailsBtn.dataset.roster = "details";
+      detailsBtn.textContent = "Details";
+      gridHead.append(gridTitle, detailsBtn);
+      grid.appendChild(gridHead);
       for (const group of groupedUnitTypes()) {
         const section = el("section", "roster-class");
         section.dataset.classType = group.id;
@@ -137,19 +148,16 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
           // Click inspects — the detail card stays locked to this unit (no hover
           // fragility, scroll it freely). Double-click is the power-user fast-slot.
           // Disabled (already-in-squad) units stay inspectable; only assign is blocked.
-          unitBtn.addEventListener("click", () => { focusedType = type; paintDetail(); flagFocus(); });
+          unitBtn.addEventListener("click", () => {
+            focusedType = type;
+            browseOpen = false;
+            paintAll();
+          });
           unitBtn.addEventListener("dblclick", () => { if (!disabled) assign(type); });
           units.appendChild(unitBtn);
         }
         section.append(heading, units);
         grid.appendChild(section);
-      }
-    }
-
-    // Cheap focus restyle without a full grid rebuild (pointerenter path).
-    function flagFocus() {
-      for (const node of grid.querySelectorAll(".roster-unit")) {
-        node.classList.toggle("is-focused", node.dataset.type === focusedType);
       }
     }
 
@@ -162,7 +170,11 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
       const name = document.createElement("h3");
       name.className = "roster-detail-name";
       name.innerHTML = `<span class="ref-glyph">${def.glyph}</span>${escapeHtml(def.name)}`;
-      bar.append(name, assignBtn);
+      const browseBtn = el("button", "menu-btn ghost roster-browse-btn");
+      browseBtn.type = "button";
+      browseBtn.dataset.roster = "browse";
+      browseBtn.textContent = "Browse Units";
+      bar.append(name, browseBtn, assignBtn);
 
       // Scrolling card: large painted portrait LEFT, stat grid + passives + ARTS
       // RIGHT — players read the figure they're drafting alongside its data. The
@@ -191,7 +203,16 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
         : isUnitUnlocked(focusedType) ? "Already in squad" : "Locked";
     }
 
-    function paintAll() { paintTray(); paintGrid(); paintDetail(); }
+    function paintAll() {
+      paintTray();
+      paintGrid();
+      paintDetail();
+      syncBrowseState();
+    }
+
+    function syncBrowseState() {
+      body.classList.toggle("is-browsing", browseOpen);
+    }
 
     // Place `type` in the active slot, then advance to the next slot so a player
     // can tap straight down the roster.
@@ -203,6 +224,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
       skinDrafts[slotIndex] = { type, slug: skin };
       focusedType = type;
       activeSlot = (activeSlot + 1) % squad.length;
+      browseOpen = false;
       paintAll();
     }
 
@@ -277,6 +299,13 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
       const action = event.target.closest("[data-roster]")?.dataset.roster;
       if (action === "done") finish();
       else if (action === "cancel" || action === "close") cancel();
+      else if (action === "browse") {
+        browseOpen = true;
+        syncBrowseState();
+      } else if (action === "details") {
+        browseOpen = false;
+        syncBrowseState();
+      }
     });
     overlay.addEventListener("click", onOverlay);
     document.addEventListener("keydown", onKey, true);

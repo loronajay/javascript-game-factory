@@ -128,8 +128,8 @@ test("the document exposes the mobile playability shell", () => {
   );
   assert.match(
     responsiveCss,
-    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.roster-body\s*\{[\s\S]*?flex-direction:\s*row[\s\S]*?\.roster-grid\s*\{[\s\S]*?display:\s*grid[\s\S]*?width:\s*clamp\(10\.5rem,\s*30vw,\s*14rem\)[\s\S]*?overflow-y:\s*auto/,
-    "short landscape roster pickers should keep the roster beside the detail pane so unit data keeps readable height",
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.roster-body\s*\{[\s\S]*?position:\s*relative[\s\S]*?flex-direction:\s*column[\s\S]*?overflow:\s*hidden[\s\S]*?\.roster-grid\s*\{[\s\S]*?position:\s*absolute[\s\S]*?display:\s*none[\s\S]*?\.roster-body\.is-browsing \.roster-grid\s*\{[\s\S]*?display:\s*grid/,
+    "short landscape roster pickers should default to full-height unit details and open the roster only as a browse layer",
   );
   assert.match(
     responsiveCss,
@@ -140,6 +140,22 @@ test("the document exposes the mobile playability shell", () => {
     responsiveCss,
     /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.roster-detail \.stat-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\)[\s\S]*?\.roster-detail \.skin-summary\s*\{[\s\S]*?display:\s*none/,
     "short landscape roster detail should spend vertical space on unit stats and kit text, not skin chrome",
+  );
+  const rosterPickerJs = readFileSync(new URL("../src/ui/rosterPicker.js", import.meta.url), "utf8");
+  assert.match(
+    rosterPickerJs,
+    /dataset\.roster\s*=\s*"browse"/,
+    "short landscape roster picker needs an explicit browse control",
+  );
+  assert.match(
+    rosterPickerJs,
+    /dataset\.roster\s*=\s*"details"/,
+    "short landscape roster picker needs an explicit return-to-details control",
+  );
+  assert.match(
+    rosterPickerJs,
+    /classList\.toggle\("is-browsing",\s*browseOpen\)/,
+    "short landscape roster picker needs explicit browse/detail state so selected unit data remains the primary view",
   );
   assert.match(
     responsiveCss,

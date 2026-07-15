@@ -331,27 +331,71 @@
     font-size: .54rem;
   }
 
-  /* Body now owns the height. On landscape phones the screen is wide but short,
-     so keeping roster and detail side-by-side gives the unit data real vertical
-     room instead of burying it below a horizontal unit rail. */
+  /* Detail-first picker: the selected unit card owns the short viewport. The
+     roster only appears as an intentional browse layer, so unit data is never
+     squeezed into a thin horizontal strip below a unit rail. */
   .roster-body {
-    flex-direction: row;
+    position: relative;
+    flex-direction: column;
     min-height: 0;
+    overflow: hidden;
   }
 
   .roster-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    width: clamp(10.5rem, 30vw, 14rem);
-    max-width: clamp(10.5rem, 30vw, 14rem);
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: none;
+    width: auto;
+    max-width: none;
     height: auto;
-    gap: .4rem;
+    align-content: start;
+    gap: .42rem;
     overflow-x: hidden;
     overflow-y: auto;
-    padding: .5rem;
-    border-right: 1px solid rgba(70, 100, 130, .35);
-    border-bottom: 0;
+    padding: .55rem;
+    border: 0;
+    background: linear-gradient(180deg, rgba(13, 24, 38, .98), rgba(7, 14, 24, .98));
+    box-shadow: inset 0 1px 0 rgba(var(--sheen), .08);
     scroll-snap-type: y proximity;
+  }
+
+  .roster-body.is-browsing .roster-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .roster-grid-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    margin: -.55rem -.55rem 0;
+    padding: .38rem .55rem;
+    border-bottom: 1px solid rgba(70, 100, 130, .35);
+    background: linear-gradient(180deg, rgba(16, 30, 46, .99), rgba(9, 18, 30, .99));
+  }
+
+  .roster-grid-title {
+    min-width: 0;
+    color: color-mix(in srgb, var(--team, var(--brass)) 58%, var(--muted));
+    font: 800 .58rem var(--font-display);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+  }
+
+  .roster-details-btn,
+  .roster-browse-btn {
+    display: block;
+    min-width: 6.8rem;
+    min-height: 36px;
+    padding: .34rem .52rem;
+    font-size: .58rem;
+    letter-spacing: .05em;
   }
 
   .roster-class {
@@ -367,18 +411,18 @@
   .roster-class-units {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: .35rem;
+    gap: .32rem;
   }
 
   .roster-unit {
     width: auto;
-    min-height: 66px;
+    min-height: 68px;
     padding: .3rem .2rem .34rem;
     scroll-snap-align: start;
   }
 
   .roster-unit .unit-portrait.is-card {
-    height: 32px;
+    height: 34px;
   }
 
   .roster-unit-name {
@@ -386,6 +430,10 @@
   }
 
   .roster-detail-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: .42rem;
+    align-items: center;
     padding: .34rem .62rem;
   }
 
