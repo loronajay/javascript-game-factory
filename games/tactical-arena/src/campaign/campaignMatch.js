@@ -36,7 +36,7 @@ import {
   MAX_CAMPAIGN_MISSIONS,
 } from "./campaignConstants.js";
 import { getInitialMp, getUnitType } from "../core/unitCatalog.js";
-import { createUnit, findUnit, openAutomaticKingActivation } from "../core/state.js";
+import { createUnit, findUnit, openAutomaticFirstActivation } from "../core/state.js";
 import { nextRandom } from "../core/rng.js";
 import { ORTHOGONAL_DIRECTIONS, positionKey } from "../rules/movement.js";
 import { normalizeWeatherSpec } from "../core/weather.js";
@@ -955,6 +955,6 @@ export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
       : {}),
     units: [...trial.units, ...(layout.extraUnits?.(match) ?? [])],
   };
-  openAutomaticKingActivation(prepared);
+  openAutomaticFirstActivation(prepared);
   return prepared;
 }

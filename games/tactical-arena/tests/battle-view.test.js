@@ -434,6 +434,24 @@ test("tempo setup board-size labels use the same readable multiplication sign as
   assert.doesNotMatch(tempoSetup, /Ã/);
 });
 
+test("local match setup exposes compact board sizes from fifteen down to seven", () => {
+  const html = readFileSync(join(GAME_ROOT, "html/setup-screens.html"), "utf8");
+  const expectedSizes = [15, 14, 13, 12, 11, 10, 9, 8, 7];
+
+  for (const [screen, startAction] of [
+    ["hsSetup", "startHotSeat"],
+    ["spSetup", "startSingle"],
+    ["tempoSpSetup", "startTempoSingle"],
+  ]) {
+    const setup = html.match(new RegExp(`data-screen="${screen}"[\\s\\S]*?data-action="${startAction}"`))?.[0] ?? "";
+    const boardControl = setup.match(/<div class="segmented board-size-grid" data-field="boardSize">[\s\S]*?<\/div>/)?.[0] ?? "";
+    const sizes = [...boardControl.matchAll(/data-size="(\d+)"/g)].map((match) => Number(match[1]));
+
+    assert.deepEqual(sizes, expectedSizes, `${screen} should offer every board size from 15 to 7`);
+    assert.match(boardControl, /class="seg is-selected" data-size="13">13 × 13<\/button>/);
+  }
+});
+
 test("raging board units carry a rage state class and aura element", () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };

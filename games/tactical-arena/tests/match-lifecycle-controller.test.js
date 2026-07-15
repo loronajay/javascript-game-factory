@@ -46,3 +46,42 @@ test("starting a match clears in-flight effects before rendering the fresh battl
   assert.ok(calls.indexOf("effects-clear") > calls.indexOf("blackout-clear"));
   assert.ok(calls.indexOf("effects-clear") < calls.indexOf("render"));
 });
+
+test("local match starts preserve every setup board size from fifteen down to seven", () => {
+  const squad = ["swordsman", "archer", "mystic", "magician"];
+
+  for (const mode of ["hotseat", "single"]) {
+    for (const size of [15, 14, 13, 12, 11, 10, 9, 8, 7]) {
+      let metricsSize = null;
+      const runtime = { matchEpoch: 0 };
+      const controller = createMatchLifecycleController({
+        runtime,
+        interaction: {},
+        tutorialPresentation: { reset() {} },
+        tempoLoop: { stop() {}, start() {} },
+        blackout: { clear() {} },
+        effects: { clearActive() {}, setMetrics(metrics) { metricsSize = metrics.tileWidth; } },
+        restartControl: {},
+        turnFlash: { clear() {} },
+        menu: { show() {} },
+        audio: {},
+        dialogue: {},
+      });
+
+      controller.start({ mode, size, squads: { 1: squad, 2: squad } });
+
+      assert.equal(runtime.state.size, size);
+      assert.ok(metricsSize > 0, `${mode} ${size}x${size} should configure board metrics`);
+      assert.equal(runtime.state.units.length, 8);
+      assert.ok(
+        runtime.state.units.every((unit) => (
+          unit.position.x >= 0 &&
+          unit.position.y >= 0 &&
+          unit.position.x < size &&
+          unit.position.y < size
+        )),
+        `${mode} ${size}x${size} should spawn every unit inside the board`,
+      );
+    }
+  }
+});

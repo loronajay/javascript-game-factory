@@ -2,6 +2,7 @@ import { getInitialMp, getUnitType, initialAbilityUses } from "./unitCatalog.js"
 import { createRngState } from "./rng.js";
 import { createRoster, FORMATS, playerColor } from "./roster.js";
 import { normalizeWeatherSpec } from "./weather.js";
+import { applyStatus } from "../rules/statuses.js";
 
 export function createUnit(spec) {
   const definition = getUnitType(spec.type);
@@ -196,32 +197,65 @@ export function createBattleState({
     rngState: createRngState(seed ?? (Date.now() & 0xffffffff)),
     restorePolarityShift: false
   };
-  openAutomaticKingActivation(state);
+  openAutomaticFirstActivation(state);
   return state;
 }
 
-export function openAutomaticKingActivation(state) {
+function applyActivationStartCharges(unit) {
+  if (unit.rainCharged) {
+    const hasted = applyStatus(unit, { type: "empowered", duration: 1, statModifiers: { moveRange: unit.rainCharged } });
+    if (hasted.applied) unit.statuses = hasted.statuses;
+    unit.rainCharged = 0;
+  }
+  if (unit.weatherMoveCharged) {
+    const hasted = applyStatus(unit, { type: "empowered", duration: 1, statModifiers: { moveRange: unit.weatherMoveCharged } });
+    if (hasted.applied) unit.statuses = hasted.statuses;
+    unit.weatherMoveCharged = 0;
+  }
+  if (unit.etherCharged) {
+    const empowered = applyStatus(unit, { type: "empowered", duration: 1, statModifiers: { ...unit.etherCharged } });
+    if (empowered.applied) unit.statuses = empowered.statuses;
+    unit.etherCharged = null;
+  }
+}
+
+const FIRST_ACTOR_PRIORITY = Object.freeze({
+  king: 0,
+  "mother-nature": 1
+});
+
+function firstActorPriority(unit) {
+  return FIRST_ACTOR_PRIORITY[unit?.type] ?? Infinity;
+}
+
+export function openAutomaticFirstActivation(state) {
   if (!state || state.phase !== "playing" || state.activation) return false;
-  const king = state.units?.find((unit) => {
+  let firstActor = null;
+  for (const unit of state.units ?? []) {
     if (unit.hp <= 0 || unit.player !== state.currentPlayer || unit.spent || unit.commandTurn === state.turnNumber) {
-      return false;
+      continue;
     }
     const definition = getUnitType(unit.type);
-    return unit.type === "king" && definition.actsFirst && definition.commandOnly;
-  });
-  if (!king) return false;
-  king.defending = false;
+    if (!definition.actsFirst || !Number.isFinite(firstActorPriority(unit))) continue;
+    if (!firstActor || firstActorPriority(unit) < firstActorPriority(firstActor)) firstActor = unit;
+  }
+  if (!firstActor) return false;
+  firstActor.defending = false;
+  applyActivationStartCharges(firstActor);
   state.activation = {
-    unitId: king.id,
-    origin: { ...king.position },
+    unitId: firstActor.id,
+    origin: { ...firstActor.position },
     moved: false,
     primaryUsed: false,
     spellUsed: false,
     bonusActionGroups: [],
-    realmTraversalActive: false
+    realmTraversalActive: Boolean(firstActor.realmTraversalCharged)
   };
+  if (firstActor.realmTraversalCharged) firstActor.realmTraversalCharged = false;
   return true;
 }
+
+export const openAutomaticKingActivation = openAutomaticFirstActivation;
 
 const MAX_TEAM_NAME_LENGTH = 20;
 function normalizeTeamNames(names) {

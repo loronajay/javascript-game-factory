@@ -1,7 +1,7 @@
 import { COMMANDS } from "./commands.js";
 import { resolveNemesisAutoPulse, resolveVolcanicPyroclasmTick, useArt } from "./artResolvers.js";
 import { getArt, getBasicAttackResourceCost, getEffectiveStats, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, getWallKillResourceReward, getWeatherCritCreatesFire, initialAbilityUses, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
-import { areEnemies, cloneState, findUnit, getTileAffinity, isWallAt, livingUnits, openAutomaticKingActivation, unitAt } from "./state.js";
+import { areEnemies, cloneState, findUnit, getTileAffinity, isWallAt, livingUnits, openAutomaticFirstActivation, unitAt } from "./state.js";
 import { getConeCells } from "../rules/arts.js";
 import { addDuelMark, duelistTracksMisses, getAttackSplashDamage, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCritPullEffect, getCritSplashDamage, getDuelistCritLifesteal, getLineAttackTargets, getMeleeDefendRetaliation, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack, resolveBaseStrike, rollToHit, shouldApplyAttackRecoil } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMovePath, getLegalMoves, positionKey, validateTrampleMovePath } from "../rules/movement.js";
@@ -696,7 +696,7 @@ function concede(state, command) {
     next.currentPlayer = nextActivePlayer(next, command.player);
     next.turnNumber += 1;
     for (const member of livingUnits(next, next.currentPlayer)) if (takesTurns(member)) member.spent = false;
-    openAutomaticKingActivation(next);
+    openAutomaticFirstActivation(next);
   }
   return accept(next, events);
 }

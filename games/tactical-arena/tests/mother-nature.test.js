@@ -8,6 +8,7 @@ import { getActiveWeather, getArt, getArtMpCost, getEffectiveStats, getUnitType 
 import { getLegalFleeTiles, getRushSteps } from "../src/rules/arts.js";
 import { resolvePhysicalStrike } from "../src/rules/combat.js";
 import { positionKey } from "../src/rules/movement.js";
+import { chooseActivation, cpuRng } from "../src/ai/cpuController.js";
 
 const NORMAL_HIT = { attackRoll: 0.5, critRoll: 0.99 };
 const CRIT = { attackRoll: 0.5, critRoll: 0.0 };
@@ -53,6 +54,82 @@ test("Mother Nature is registered as an acts-first support with weather arts", (
   assert.equal(def.rageArt.id, "great-flood");
 });
 
+test("drafted Mother Nature starts her owner's turn already activated with charged weather movement", () => {
+  const state = createBattleState({
+    size: 13,
+    seed: 7,
+    units: [
+      { id: "mn", type: "mother-nature", player: 1, x: 1, y: 1, weatherMoveCharged: 1 },
+      { id: "foe", type: "swordsman", player: 2, x: 7, y: 7 }
+    ]
+  });
+
+  assert.deepEqual(state.activation, {
+    unitId: "mn",
+    origin: { x: 1, y: 1 },
+    moved: false,
+    primaryUsed: false,
+    spellUsed: false,
+    bonusActionGroups: [],
+    realmTraversalActive: false
+  });
+  assert.equal(findUnit(state, "mn").weatherMoveCharged, 0);
+  assert.equal(getEffectiveStats(findUnit(state, "mn"), state).moveRange, 4);
+
+  const next = run(state, useArt(1, "mn", "spring-shower"));
+  assert.equal(findUnit(next, "mn").spent, true);
+  assert.equal(findUnit(next, "mn").lastWeather, "spring");
+});
+
+test("King opens before Mother Nature, then Mother Nature opens before the rest of the squad", () => {
+  const state = createBattleState({
+    size: 13,
+    seed: 7,
+    units: [
+      { id: "mn", type: "mother-nature", player: 1, x: 1, y: 12 },
+      { id: "king", type: "king", player: 1, x: 0, y: 12 },
+      { id: "ally", type: "swordsman", player: 1, x: 2, y: 12 },
+      { id: "foe", type: "swordsman", player: 2, x: 7, y: 7 }
+    ]
+  });
+
+  assert.equal(state.activation?.unitId, "king");
+  let next = run(state, useArt(1, "king", "strike"));
+  assert.equal(next.activation?.unitId, "mn");
+
+  next = run(next, useArt(1, "mn", "heatwave"));
+  const allyBegins = applyCommand(next, beginActivation(1, "ally"));
+  assert.equal(allyBegins.accepted, true);
+});
+
+test("CPU resumes King first, then Mother Nature, for a double first-actor squad", () => {
+  let state = createBattleState({
+    size: 13,
+    seed: 9,
+    units: [
+      { id: "mn", type: "mother-nature", player: 1, x: 1, y: 12 },
+      { id: "king", type: "king", player: 1, x: 0, y: 12 },
+      { id: "ally", type: "swordsman", player: 1, x: 2, y: 12 },
+      { id: "foe", type: "swordsman", player: 2, x: 7, y: 7 }
+    ]
+  });
+
+  assert.equal(state.activation?.unitId, "king");
+  const kingCommands = chooseActivation(state, { difficulty: "normal", cpuPlayer: 1, rng: cpuRng(state) });
+  assert.ok(kingCommands.length > 0);
+  assert.equal(kingCommands.some((command) => command.type === "BEGIN_ACTIVATION"), false);
+  for (const command of kingCommands) state = run(state, command);
+
+  assert.equal(state.activation?.unitId, "mn");
+  const natureCommands = chooseActivation(state, { difficulty: "normal", cpuPlayer: 1, rng: cpuRng(state) });
+  assert.ok(natureCommands.length > 0);
+  assert.equal(natureCommands.some((command) => command.type === "BEGIN_ACTIVATION"), false);
+  for (const command of natureCommands) state = run(state, command);
+
+  assert.equal(findUnit(state, "king").spent, true);
+  assert.equal(findUnit(state, "mn").spent, true);
+});
+
 test("Mother Nature must act first, and any completed action releases her squad", () => {
   const state = scenario();
   const blocked = applyCommand(state, beginActivation(1, "ally"));
@@ -64,6 +141,32 @@ test("Mother Nature must act first, and any completed action releases her squad"
   next = run(next, finishActivation(1, "mn"));
   next = run(next, beginActivation(1, "ally"));
   assert.equal(findUnit(next, "mn").commandTurn, next.turnNumber);
+});
+
+test("turn rollover into a Mother Nature squad starts with her already open and CPU resumes it", () => {
+  const state = createBattleState({
+    size: 13,
+    seed: 5,
+    units: [
+      { id: "p1-sword", type: "swordsman", player: 1, x: 1, y: 12 },
+      { id: "p2-nature", type: "mother-nature", player: 2, x: 12, y: 0 },
+      { id: "p2-sword", type: "swordsman", player: 2, x: 10, y: 2 }
+    ]
+  });
+
+  let next = run(state, beginActivation(1, "p1-sword"));
+  next = run(next, defend(1, "p1-sword"));
+  next = run(next, finishActivation(1, "p1-sword"));
+
+  assert.equal(next.currentPlayer, 2);
+  assert.equal(next.activation?.unitId, "p2-nature");
+
+  const commands = chooseActivation(next, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(next) });
+  assert.ok(commands.length > 0);
+  assert.equal(commands.some((command) => command.type === "BEGIN_ACTIVATION"), false);
+
+  for (const command of commands) next = run(next, command);
+  assert.equal(findUnit(next, "p2-nature").spent, true);
 });
 
 test("weather activations cannot repeat the same weather twice in a row", () => {

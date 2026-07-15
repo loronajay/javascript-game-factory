@@ -1,4 +1,4 @@
-import { createBattleState, openAutomaticKingActivation } from "../core/state.js";
+import { createBattleState, openAutomaticFirstActivation } from "../core/state.js";
 import { nextRandom } from "../core/rng.js";
 import { getUnitType, takesTurns } from "../core/unitCatalog.js";
 import { createRoster, FORMATS, playerColor } from "../core/roster.js";
@@ -121,7 +121,7 @@ export function createMatchState({
     activation: null,
     rngState: flip.state,
   };
-  openAutomaticKingActivation(started);
+  openAutomaticFirstActivation(started);
   return started;
 }
 
