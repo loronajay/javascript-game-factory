@@ -331,9 +331,13 @@
     font-size: .54rem;
   }
 
-  /* Detail-first picker: the selected unit card owns the short viewport. The
-     roster only appears as an intentional browse layer, so unit data is never
-     squeezed into a thin horizontal strip below a unit rail. */
+  .roster-card:has(.roster-body.is-viewing-detail) .roster-tray {
+    display: none;
+  }
+
+  /* Two-screen picker: roster and selected-unit details are separate full-body
+     views. They never share the short landscape height, so details cannot be
+     crushed into a horizontal strip under a roster rail. */
   .roster-body {
     position: relative;
     flex-direction: column;
@@ -341,14 +345,20 @@
     overflow: hidden;
   }
 
-  .roster-grid {
+  .roster-grid,
+  .roster-detail {
     position: absolute;
     inset: 0;
-    z-index: 4;
-    display: none;
     width: auto;
     max-width: none;
+    min-height: 0;
     height: auto;
+    border: 0;
+  }
+
+  .roster-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     align-content: start;
     gap: .42rem;
     overflow-x: hidden;
@@ -360,9 +370,19 @@
     scroll-snap-type: y proximity;
   }
 
-  .roster-body.is-browsing .roster-grid {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+  .roster-detail {
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .roster-body.is-viewing-detail .roster-grid {
+    display: none;
+  }
+
+  .roster-body.is-viewing-detail .roster-detail {
+    display: flex;
   }
 
   .roster-grid-head {
@@ -370,10 +390,10 @@
     top: 0;
     z-index: 2;
     grid-column: 1 / -1;
-    display: flex;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
     align-items: center;
-    justify-content: space-between;
-    gap: .5rem;
+    gap: .45rem;
     margin: -.55rem -.55rem 0;
     padding: .38rem .55rem;
     border-bottom: 1px solid rgba(70, 100, 130, .35);
@@ -388,7 +408,18 @@
     text-transform: uppercase;
   }
 
+  .roster-grid-selected {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text);
+    font: 800 .74rem var(--font-display);
+    letter-spacing: .03em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .roster-details-btn,
+  .roster-grid-place-btn,
   .roster-browse-btn {
     display: block;
     min-width: 6.8rem;

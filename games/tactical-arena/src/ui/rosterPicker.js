@@ -37,7 +37,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
   const skinDrafts = squad.map((type, index) => ({ type, slug: skins[index] ?? null }));
   let activeSlot = clampSlot(startSlot);
   let focusedType = squad[activeSlot];
-  let browseOpen = false;
+  let detailsOpen = false;
 
   return new Promise((resolve) => {
     overlay.replaceChildren();
@@ -52,7 +52,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
     head.innerHTML =
       `<div class="ref-head-title"><h2>${escapeHtml(title)}</h2>` +
       `<button class="ref-close" type="button" data-roster="close" aria-label="Close">✕</button></div>` +
-      `<p class="roster-sub">Pick a roster spot, click a unit to read its card, then press <b>Place</b> beside its name. Double-click a unit to place it instantly.</p>`;
+      `<p class="roster-sub">Pick a roster spot, choose a unit, then place it or open its details. Double-click a unit to place it instantly.</p>`;
     card.appendChild(head);
 
     // Squad tray (the four slots being filled)
@@ -99,7 +99,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
         btn.addEventListener("click", () => {
           activeSlot = slot.index;
           focusedType = squad[slot.index];
-          browseOpen = false;
+          detailsOpen = false;
           primeSlotDraft(activeSlot);
           paintAll();
         });
@@ -113,11 +113,18 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
       const gridHead = el("div", "roster-grid-head");
       const gridTitle = el("div", "roster-grid-title");
       gridTitle.textContent = `Choose Pick ${activeSlot + 1}`;
+      const gridSelected = el("div", "roster-grid-selected");
+      gridSelected.textContent = UNIT_TYPES[focusedType]?.name ?? "Select a unit";
+      const gridPlaceBtn = el("button", "menu-btn roster-grid-place-btn");
+      gridPlaceBtn.type = "button";
+      gridPlaceBtn.dataset.roster = "place";
+      gridPlaceBtn.textContent = "Place";
+      gridPlaceBtn.disabled = !canAssignFocused();
       const detailsBtn = el("button", "menu-btn ghost roster-details-btn");
       detailsBtn.type = "button";
       detailsBtn.dataset.roster = "details";
       detailsBtn.textContent = "Details";
-      gridHead.append(gridTitle, detailsBtn);
+      gridHead.append(gridTitle, gridSelected, gridPlaceBtn, detailsBtn);
       grid.appendChild(gridHead);
       for (const group of groupedUnitTypes()) {
         const section = el("section", "roster-class");
@@ -150,7 +157,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
           // Disabled (already-in-squad) units stay inspectable; only assign is blocked.
           unitBtn.addEventListener("click", () => {
             focusedType = type;
-            browseOpen = false;
+            detailsOpen = false;
             paintAll();
           });
           unitBtn.addEventListener("dblclick", () => { if (!disabled) assign(type); });
@@ -173,7 +180,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
       const browseBtn = el("button", "menu-btn ghost roster-browse-btn");
       browseBtn.type = "button";
       browseBtn.dataset.roster = "browse";
-      browseBtn.textContent = "Browse Units";
+      browseBtn.textContent = "Back";
       bar.append(name, browseBtn, assignBtn);
 
       // Scrolling card: large painted portrait LEFT, stat grid + passives + ARTS
@@ -195,23 +202,26 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
     // The contextual Place button reflects the focused unit + the active slot, and
     // disables itself when that unit can't go there (already in squad, draft rule).
     function paintAssign() {
-      const available = new Set(availableTypesForSlot(squad, activeSlot, allowDuplicates));
-      const canAssign = available.has(focusedType);
+      const canAssign = canAssignFocused();
       assignBtn.disabled = !canAssign;
       assignBtn.textContent = canAssign
-        ? `Place in Pick ${activeSlot + 1}`
+        ? "Select"
         : isUnitUnlocked(focusedType) ? "Already in squad" : "Locked";
+    }
+
+    function canAssignFocused() {
+      return availableTypesForSlot(squad, activeSlot, allowDuplicates).includes(focusedType);
     }
 
     function paintAll() {
       paintTray();
       paintGrid();
       paintDetail();
-      syncBrowseState();
+      syncViewState();
     }
 
-    function syncBrowseState() {
-      body.classList.toggle("is-browsing", browseOpen);
+    function syncViewState() {
+      body.classList.toggle("is-viewing-detail", detailsOpen);
     }
 
     // Place `type` in the active slot, then advance to the next slot so a player
@@ -224,7 +234,7 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
       skinDrafts[slotIndex] = { type, slug: skin };
       focusedType = type;
       activeSlot = (activeSlot + 1) % squad.length;
-      browseOpen = false;
+      detailsOpen = false;
       paintAll();
     }
 
@@ -299,12 +309,15 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
       const action = event.target.closest("[data-roster]")?.dataset.roster;
       if (action === "done") finish();
       else if (action === "cancel" || action === "close") cancel();
+      else if (action === "place") {
+        if (canAssignFocused()) assign(focusedType);
+      }
       else if (action === "browse") {
-        browseOpen = true;
-        syncBrowseState();
+        detailsOpen = false;
+        syncViewState();
       } else if (action === "details") {
-        browseOpen = false;
-        syncBrowseState();
+        detailsOpen = true;
+        syncViewState();
       }
     });
     overlay.addEventListener("click", onOverlay);

@@ -118,6 +118,21 @@ test("the document exposes the mobile playability shell", () => {
   );
   assert.match(
     responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.panel\.command-console\s*\{[\s\S]*?grid-template-rows:\s*auto minmax\(0,\s*1fr\) auto[\s\S]*?\.actions\s*\{[\s\S]*?overflow-y:\s*auto/,
+    "short landscape command panels should scroll long command lists instead of clipping lower rows",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.battle-assist\s*\{[\s\S]*?align-self:\s*end/,
+    "short landscape assist controls should stay in their own row below the commands",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?#message\s*\{[\s\S]*?pointer-events:\s*none[\s\S]*?top:\s*\.45rem/,
+    "mobile ART instruction callouts must not block board targeting taps",
+  );
+  assert.match(
+    responsiveCss,
     /@media \(pointer: coarse\) and \(max-width: 740px\),\s*\(pointer: coarse\) and \(max-height: 540px\)[\s\S]*?\.squad-pickers\s*\{[\s\S]*?grid-template-columns:\s*1fr/,
     "mobile setup should stack squad pickers instead of squeezing two squads into cramped columns",
   );
@@ -128,8 +143,8 @@ test("the document exposes the mobile playability shell", () => {
   );
   assert.match(
     responsiveCss,
-    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.roster-body\s*\{[\s\S]*?position:\s*relative[\s\S]*?flex-direction:\s*column[\s\S]*?overflow:\s*hidden[\s\S]*?\.roster-grid\s*\{[\s\S]*?position:\s*absolute[\s\S]*?display:\s*none[\s\S]*?\.roster-body\.is-browsing \.roster-grid\s*\{[\s\S]*?display:\s*grid/,
-    "short landscape roster pickers should default to full-height unit details and open the roster only as a browse layer",
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.roster-grid,\s*\.roster-detail\s*\{[\s\S]*?position:\s*absolute[\s\S]*?inset:\s*0[\s\S]*?\.roster-grid\s*\{[\s\S]*?display:\s*grid[\s\S]*?\.roster-detail\s*\{[\s\S]*?display:\s*none[\s\S]*?\.roster-body\.is-viewing-detail \.roster-grid\s*\{[\s\S]*?display:\s*none[\s\S]*?\.roster-body\.is-viewing-detail \.roster-detail\s*\{[\s\S]*?display:\s*flex/,
+    "short landscape roster pickers should use mutually exclusive full-body roster and detail screens",
   );
   assert.match(
     responsiveCss,
@@ -144,17 +159,22 @@ test("the document exposes the mobile playability shell", () => {
   const rosterPickerJs = readFileSync(new URL("../src/ui/rosterPicker.js", import.meta.url), "utf8");
   assert.match(
     rosterPickerJs,
+    /dataset\.roster\s*=\s*"place"/,
+    "short landscape roster picker needs an explicit Place action from the units view",
+  );
+  assert.match(
+    rosterPickerJs,
     /dataset\.roster\s*=\s*"browse"/,
-    "short landscape roster picker needs an explicit browse control",
+    "short landscape details popup needs an explicit Back action",
   );
   assert.match(
     rosterPickerJs,
     /dataset\.roster\s*=\s*"details"/,
-    "short landscape roster picker needs an explicit return-to-details control",
+    "short landscape roster picker needs an explicit Details action from the units view",
   );
   assert.match(
     rosterPickerJs,
-    /classList\.toggle\("is-browsing",\s*browseOpen\)/,
+    /classList\.toggle\("is-viewing-detail",\s*detailsOpen\)/,
     "short landscape roster picker needs explicit browse/detail state so selected unit data remains the primary view",
   );
   assert.match(
