@@ -118,13 +118,13 @@ test("the document exposes the mobile playability shell", () => {
   );
   assert.match(
     responsiveCss,
-    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.panel\.command-console\s*\{[\s\S]*?grid-template-rows:\s*auto minmax\(0,\s*1fr\) auto[\s\S]*?\.actions\s*\{[\s\S]*?overflow-y:\s*auto/,
-    "short landscape command panels should scroll long command lists instead of clipping lower rows",
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.panel\.command-console\s*\{[\s\S]*?overflow-y:\s*auto[\s\S]*?\.actions\s*\{[\s\S]*?overflow-y:\s*auto[\s\S]*?-webkit-overflow-scrolling:\s*touch/,
+    "short landscape command panels and long command lists should scroll instead of clipping lower rows",
   );
   assert.match(
     responsiveCss,
-    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.battle-assist\s*\{[\s\S]*?align-self:\s*end/,
-    "short landscape assist controls should stay in their own row below the commands",
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.topbar-forecast\s*\{[\s\S]*?\.forecast-toggle-copy\s*\{[\s\S]*?display:\s*none/,
+    "short landscape forecast controls should move to a compact topbar switch instead of sitting in the command panel",
   );
   assert.match(
     responsiveCss,

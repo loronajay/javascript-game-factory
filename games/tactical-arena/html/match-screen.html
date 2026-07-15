@@ -13,6 +13,11 @@
             </div>
           </div>
           <div class="top-actions">
+            <label class="forecast-toggle topbar-forecast" for="accuracyForecastToggle" title="Toggle accuracy forecast">
+              <span class="forecast-toggle-copy">Forecast</span>
+              <input id="accuracyForecastToggle" type="checkbox" checked>
+              <span class="forecast-toggle-switch" aria-hidden="true"></span>
+            </label>
             <button id="muteBtn" type="button" aria-pressed="false" title="Toggle sound">Sound</button>
             <button id="rulesBtn" type="button">Codex</button>
             <button id="restartBtn" type="button">Restart</button>
@@ -96,11 +101,6 @@
             </div>
             <div id="actions" class="actions"></div>
             <div class="battle-assist">
-              <label class="forecast-toggle" for="accuracyForecastToggle">
-                <span class="forecast-toggle-copy">Accuracy forecast</span>
-                <input id="accuracyForecastToggle" type="checkbox" checked>
-                <span class="forecast-toggle-switch" aria-hidden="true"></span>
-              </label>
               <div id="actionHelp" class="action-help">Select an unspent piece.</div>
             </div>
           </section>

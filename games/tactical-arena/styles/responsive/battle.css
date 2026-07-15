@@ -3,7 +3,8 @@
    sideways is short, so stacking the HUD under the board crushes both. This
    reflows to a top bar + (stage | hud) split so the board keeps its height.
    ----------------------------------------------------------------------- */
-@media (pointer: coarse) and (orientation: landscape) and (max-height: 540px) {
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 540px),
+  (orientation: landscape) and (max-height: 540px) and (max-width: 940px) {
   .match-screen.is-active {
     grid-template-rows: auto minmax(0, 1fr);
     grid-template-columns: minmax(0, 1fr) clamp(168px, 27vw, 232px);
@@ -84,6 +85,10 @@
     align-items: start;
     align-content: start;
     min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    -webkit-overflow-scrolling: touch;
     padding: .42rem;
   }
 
@@ -169,8 +174,10 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-content: start;
     min-height: 0;
+    max-height: 100%;
     overflow-y: auto;
     overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     padding-right: .12rem;
     scrollbar-gutter: stable;
     gap: .28rem;
@@ -199,10 +206,14 @@
     gap: .28rem;
   }
 
-  .forecast-toggle {
-    grid-template-columns: minmax(0, 1fr) 2rem;
-    min-height: 36px;
+  .topbar-forecast {
+    grid-template-columns: 2rem;
+    min-height: 34px;
     padding: .24rem .3rem .24rem .42rem;
+  }
+
+  .topbar-forecast .forecast-toggle-copy {
+    display: none;
   }
 
   .forecast-toggle-copy {
@@ -405,7 +416,8 @@
   }
 }
 
-@media (pointer: coarse) and (orientation: landscape) and (max-height: 380px) {
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 380px),
+  (orientation: landscape) and (max-height: 380px) and (max-width: 940px) {
   .match-screen.is-active {
     grid-template-columns: minmax(0, 1fr) clamp(150px, 25vw, 196px);
   }
@@ -438,7 +450,7 @@
     font-size: .56rem;
   }
 
-  .forecast-toggle {
+  .topbar-forecast {
     grid-template-columns: 1fr;
     place-items: center;
     padding: .24rem;
