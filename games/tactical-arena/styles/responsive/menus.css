@@ -331,30 +331,32 @@
     font-size: .54rem;
   }
 
-  /* Body now owns the height. The roster becomes a compact rail so unit data is
-     the main readable surface on short landscape phones. */
+  /* Body now owns the height. On landscape phones the screen is wide but short,
+     so keeping roster and detail side-by-side gives the unit data real vertical
+     room instead of burying it below a horizontal unit rail. */
   .roster-body {
-    flex-direction: column;
+    flex-direction: row;
     min-height: 0;
   }
 
   .roster-grid {
-    display: flex;
-    width: auto;
-    max-width: none;
-    height: clamp(88px, 24vh, 116px);
-    gap: .35rem;
-    overflow-x: auto;
-    overflow-y: hidden;
+    display: grid;
+    grid-template-columns: 1fr;
+    width: clamp(10.5rem, 30vw, 14rem);
+    max-width: clamp(10.5rem, 30vw, 14rem);
+    height: auto;
+    gap: .4rem;
+    overflow-x: hidden;
+    overflow-y: auto;
     padding: .5rem;
-    border-right: 0;
-    border-bottom: 1px solid rgba(70, 100, 130, .35);
-    scroll-snap-type: x proximity;
+    border-right: 1px solid rgba(70, 100, 130, .35);
+    border-bottom: 0;
+    scroll-snap-type: y proximity;
   }
 
   .roster-class {
-    flex: 0 0 auto;
     gap: .24rem;
+    min-width: 0;
   }
 
   .roster-class-title {
@@ -363,19 +365,20 @@
   }
 
   .roster-class-units {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: .35rem;
   }
 
   .roster-unit {
-    width: 4.6rem;
-    min-height: 78px;
+    width: auto;
+    min-height: 66px;
     padding: .3rem .2rem .34rem;
     scroll-snap-align: start;
   }
 
   .roster-unit .unit-portrait.is-card {
-    height: 40px;
+    height: 32px;
   }
 
   .roster-unit-name {
@@ -383,7 +386,7 @@
   }
 
   .roster-detail-bar {
-    padding: .4rem .7rem;
+    padding: .34rem .62rem;
   }
 
   .roster-detail-name {
@@ -392,12 +395,13 @@
 
   .roster-assign {
     min-width: 8.5rem;
-    padding: .4rem .6rem;
+    min-height: 38px;
+    padding: .34rem .56rem;
     font-size: .66rem;
   }
 
   .roster-detail-scroll {
-    padding: .45rem .65rem;
+    padding: .42rem .6rem;
   }
 
   .roster-detail-split {
@@ -411,8 +415,9 @@
   }
 
   .roster-detail .stat-grid {
-    gap: .28rem;
-    margin-bottom: .45rem;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: .24rem;
+    margin-bottom: .38rem;
   }
 
   .roster-detail .stat-box {
@@ -440,13 +445,7 @@
   }
 
   .roster-detail .skin-summary {
-    margin-bottom: .45rem;
-    padding: .35rem;
-  }
-
-  .roster-detail .skin-summary .unit-portrait.is-skin-summary {
-    width: 2.35rem;
-    height: 2.85rem;
+    display: none;
   }
 
   /* Footer: tighter so Place / Done never get pushed off a short screen. */

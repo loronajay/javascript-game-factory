@@ -128,13 +128,18 @@ test("the document exposes the mobile playability shell", () => {
   );
   assert.match(
     responsiveCss,
-    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.roster-body\s*\{[\s\S]*?flex-direction:\s*column[\s\S]*?\.roster-grid\s*\{[\s\S]*?display:\s*flex[\s\S]*?height:\s*clamp\(88px,\s*24vh,\s*116px\)/,
-    "short landscape roster pickers should use a compact horizontal unit rail so the detail pane stays readable",
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.roster-body\s*\{[\s\S]*?flex-direction:\s*row[\s\S]*?\.roster-grid\s*\{[\s\S]*?display:\s*grid[\s\S]*?width:\s*clamp\(10\.5rem,\s*30vw,\s*14rem\)[\s\S]*?overflow-y:\s*auto/,
+    "short landscape roster pickers should keep the roster beside the detail pane so unit data keeps readable height",
   );
   assert.match(
     responsiveCss,
     /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.roster-detail-split\s*\{[\s\S]*?display:\s*grid[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)[\s\S]*?\.roster-detail-split \.unit-portrait\.is-hero\s*\{[\s\S]*?display:\s*none/,
     "short landscape roster detail should prioritize unit stats over the large portrait",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.roster-detail \.stat-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\)[\s\S]*?\.roster-detail \.skin-summary\s*\{[\s\S]*?display:\s*none/,
+    "short landscape roster detail should spend vertical space on unit stats and kit text, not skin chrome",
   );
   assert.match(
     responsiveCss,
