@@ -18,10 +18,9 @@ export const TUTORIAL_REWARD_SKIN_CHOICES = Object.freeze([
   Object.freeze({ type: "magician", slug: "summer-vibes" }),
 ]);
 
-// Campaign skin-reward packs. A mission (currently only The Wandering Party) can grant
-// ONE skin from a pack on its first clear; the choice is final and the pack can never be
-// re-opened, so a player can't grind the mission for the rest of the pack. The chosen
-// skin is folded into unlockedSkins the same way the tutorial reward skin is.
+// Campaign skin-reward packs. Most packs grant one final choice forever. The
+// Wandering Party grants one choice per campaign-progress run, so a progress reset
+// lets players replay the campaign for another unowned wandering skin.
 export const WANDERING_SKIN_PACK_ID = "wandering";
 // Has-Been Heroes (campaign mission 12) grants the Mystic one of two curated looks
 // after a friendly duel in town. Same one-final-pick rule as every campaign pack.
@@ -46,6 +45,7 @@ export const CAMPAIGN_SKIN_PACKS = Object.freeze({
     Object.freeze({ type: "mystic", slug: "lunar-goddess" }),
   ]),
 });
+const RESET_REPLAYABLE_CAMPAIGN_SKIN_PACK_IDS = Object.freeze(new Set([WANDERING_SKIN_PACK_ID]));
 
 function defaultStorage() {
   return globalThis.localStorage;
@@ -71,6 +71,14 @@ function dedupeSkins(values) {
     out.push(Object.freeze({ type: skin.type, slug: skin.slug }));
   }
   return out;
+}
+
+function sameSkin(left, right) {
+  return Boolean(left && right && left.type === right.type && left.slug === right.slug);
+}
+
+function progressOwnsSkin(progress, skin) {
+  return progress.unlockedSkins.some((owned) => sameSkin(owned, skin));
 }
 
 function normalizeValorBalance(value) {
@@ -182,13 +190,33 @@ export function writeUnlockProgress(storage, progress) {
 }
 
 export function resetUnlockProgress(storage = defaultStorage()) {
+  const current = readUnlockProgress(storage);
+  const campaignRewardSkins = { ...current.campaignRewardSkins };
+  const campaignGrantedSkins = [...current.campaignGrantedSkins];
+  for (const packId of RESET_REPLAYABLE_CAMPAIGN_SKIN_PACK_IDS) {
+    const chosen = campaignRewardSkins[packId];
+    if (!chosen) continue;
+    campaignGrantedSkins.push(chosen);
+    delete campaignRewardSkins[packId];
+  }
+  const preservedOwnedSkins = {
+    selectedRewardSkin: current.selectedRewardSkin,
+    rewardGranted: current.rewardGranted,
+    campaignRewardSkins,
+    campaignGrantedSkins,
+    purchasedSkins: current.purchasedSkins,
+  };
+  const resetProgress = normalizeUnlockProgress({
+    ...progressFallback(),
+    ...preservedOwnedSkins,
+  });
   try {
-    storage?.removeItem?.(TUTORIAL_PROGRESS_KEY);
+    storage?.setItem?.(TUTORIAL_PROGRESS_KEY, JSON.stringify(resetProgress));
     storage?.removeItem?.(LEGACY_TUTORIAL_PROGRESS_KEY);
   } catch {
     // Best-effort profile reset.
   }
-  return progressFallback();
+  return resetProgress;
 }
 
 export function isProgressUnitUnlocked(type, storage = defaultStorage()) {
@@ -233,8 +261,26 @@ export function getCampaignSkinReward(storage = defaultStorage(), packId) {
   return readUnlockProgress(storage).campaignRewardSkins[packId] ?? null;
 }
 
+export function getAvailableCampaignSkinRewardChoices(storage = defaultStorage(), packId) {
+  const choices = CAMPAIGN_SKIN_PACKS[packId];
+  if (!choices) return null;
+  const progress = readUnlockProgress(storage);
+  if (progress.campaignRewardSkins[packId]) return [];
+  if (RESET_REPLAYABLE_CAMPAIGN_SKIN_PACK_IDS.has(packId)) {
+    return choices.filter((choice) => !progressOwnsSkin(progress, choice));
+  }
+  return [...choices];
+}
+
 export function isCampaignSkinRewardGranted(storage = defaultStorage(), packId) {
-  return Boolean(getCampaignSkinReward(storage, packId));
+  const choices = CAMPAIGN_SKIN_PACKS[packId];
+  if (!choices) return false;
+  const progress = readUnlockProgress(storage);
+  if (progress.campaignRewardSkins[packId]) return true;
+  if (RESET_REPLAYABLE_CAMPAIGN_SKIN_PACK_IDS.has(packId)) {
+    return getAvailableCampaignSkinRewardChoices(storage, packId).length === 0;
+  }
+  return false;
 }
 
 export function getCampaignUnitReward(storage = defaultStorage(), packId) {
@@ -248,9 +294,8 @@ export function isCampaignUnitRewardGranted(storage = defaultStorage(), packId) 
   return choices.some((type) => progress.unlockedUnits.includes(type));
 }
 
-// Grant ONE skin from a campaign pack. Rejected if the pack is unknown, already granted
-// (the choice is final — no grinding for the rest of the pack), or the choice is not one
-// of the pack's skins.
+// Grant one skin from a campaign pack. Wandering can be earned again only after
+// progress reset clears its run marker; all packs reject a second pick in the same run.
 export function selectCampaignRewardSkin(storage = defaultStorage(), packId, choice) {
   const progress = readUnlockProgress(storage);
   const choices = CAMPAIGN_SKIN_PACKS[packId];
@@ -263,6 +308,9 @@ export function selectCampaignRewardSkin(storage = defaultStorage(), packId, cho
   const selected = choices.find((skin) => skin.type === choice?.type && skin.slug === choice?.slug) ?? null;
   if (!selected) {
     return { accepted: false, errorCode: "INVALID_CAMPAIGN_REWARD", progress };
+  }
+  if (RESET_REPLAYABLE_CAMPAIGN_SKIN_PACK_IDS.has(packId) && progressOwnsSkin(progress, selected)) {
+    return { accepted: false, errorCode: "CAMPAIGN_REWARD_ALREADY_OWNED", progress };
   }
   const next = writeUnlockProgress(storage, {
     ...progress,

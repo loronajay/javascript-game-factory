@@ -47,7 +47,8 @@ test("reset progress requires a second confirming press", () => {
   assert.equal(button.textContent, "Confirm Reset");
   assert.equal(button.classList.contains("is-confirming"), true);
   assert.equal(button.attributes.get("aria-pressed"), "true");
-  assert.match(status.textContent, /erase tutorials, campaign stars, units, and skins/);
+  assert.match(status.textContent, /erase tutorials, campaign stars, and units/);
+  assert.match(status.textContent, /Skins stay owned/);
   assert.equal(timers[0].ms, 6000);
 
   assert.equal(confirmation.requestReset(), true);

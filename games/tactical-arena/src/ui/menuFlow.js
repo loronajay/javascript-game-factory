@@ -25,7 +25,7 @@ import { openRewardSkinPicker } from "./rewardSkinPicker.js";
 import {
   HASBEEN_MYSTIC_SKIN_PACK_ID,
   getCampaignUnitRewardChoices,
-  getCampaignSkinRewardChoices,
+  getAvailableCampaignSkinRewardChoices,
   isCampaignUnitRewardGranted,
   isCampaignSkinRewardGranted,
   resetUnlockProgress,
@@ -69,7 +69,7 @@ function emptyCampaignSquad(size = MAX_CAMPAIGN_SQUAD_SIZE) {
 }
 const RESET_PROGRESS_IDLE_LABEL = "Reset Progress";
 const RESET_PROGRESS_CONFIRM_LABEL = "Confirm Reset";
-const RESET_PROGRESS_WARNING = "Press Confirm Reset again to erase tutorials, campaign stars, units, and skins.";
+const RESET_PROGRESS_WARNING = "Press Confirm Reset again to erase tutorials, campaign stars, and units. Skins stay owned.";
 const RESET_PROGRESS_CONFIRM_MS = 6000;
 
 export function campaignUnitChoiceGroups(unlockedTypes = [], squad = [], slot = 0) {
@@ -749,8 +749,8 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   }
 
   async function openCampaignSkinRewardChoice(packId) {
-    const choices = getCampaignSkinRewardChoices(packId);
-    if (!choices || isCampaignSkinRewardGranted(globalThis.localStorage, packId)) return null;
+    const choices = getAvailableCampaignSkinRewardChoices(globalThis.localStorage, packId);
+    if (!choices?.length || isCampaignSkinRewardGranted(globalThis.localStorage, packId)) return null;
     const copy = CAMPAIGN_REWARD_COPY[packId] ?? DEFAULT_CAMPAIGN_REWARD_COPY;
     const choice = await openRewardSkinPicker({
       title: copy.title,
@@ -885,7 +885,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     if (screens.active === "hsSetup") syncHotSeatSetup();
     if (screens.active === "campaign") renderCampaign();
     if (progressStatus) {
-      progressStatus.textContent = "Progress reset. Tutorials, campaign stars, units, and skins are fresh.";
+      progressStatus.textContent = "Progress reset. Tutorials, campaign stars, and units are fresh. Owned skins were preserved.";
       window.clearTimeout(progressStatusTimer);
       progressStatusTimer = window.setTimeout(() => { progressStatus.textContent = ""; }, 3600);
     }

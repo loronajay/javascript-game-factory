@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   BROTHERS_UNIT_PACK_ID,
+  HASBEEN_MYSTIC_SKIN_PACK_ID,
   LEGACY_TUTORIAL_PROGRESS_KEY,
   OUT_OF_RETIREMENT_SKIN_REWARDS,
   STARTING_VALOR_BALANCE,
@@ -15,6 +16,7 @@ import {
   grantPremiumSkinPurchase,
   getCampaignUnitReward,
   getCampaignUnitRewardChoices,
+  getAvailableCampaignSkinRewardChoices,
   getCampaignSkinReward,
   getCampaignSkinRewardChoices,
   isCampaignUnitRewardGranted,
@@ -140,7 +142,7 @@ test("wandering skin pack offers the four wandering skins", () => {
   assert.equal(getCampaignSkinRewardChoices("no-such-pack"), null);
 });
 
-test("selecting a campaign reward unlocks exactly that skin and is a final one-time grant", () => {
+test("wandering campaign reward grants one pick per campaign progress run", () => {
   const storage = storageAdapter();
   assert.equal(isCampaignSkinRewardGranted(storage, WANDERING_SKIN_PACK_ID), false);
 
@@ -148,17 +150,41 @@ test("selecting a campaign reward unlocks exactly that skin and is a final one-t
   assert.equal(first.accepted, true);
   assert.equal(isCampaignSkinRewardGranted(storage, WANDERING_SKIN_PACK_ID), true);
   assert.deepEqual(getCampaignSkinReward(storage, WANDERING_SKIN_PACK_ID), { type: "archer", slug: "wandering" });
-  // Only the chosen skin unlocks — the rest of the pack stays locked (no grinding).
   assert.equal(isProgressSkinUnlocked("archer", "wandering", storage), true);
   assert.equal(isProgressSkinUnlocked("swordsman", "wandering", storage), false);
   assert.equal(getSkin("archer", "wandering", storage)?.unlocked, true);
   assert.equal(normalizeSkinSlug("archer", "wandering", storage), "wandering");
+  assert.deepEqual(getAvailableCampaignSkinRewardChoices(storage, WANDERING_SKIN_PACK_ID), []);
 
-  // A second pick is rejected — the choice is final, even for a different skin.
   const second = selectCampaignRewardSkin(storage, WANDERING_SKIN_PACK_ID, { type: "swordsman", slug: "wandering" });
   assert.equal(second.accepted, false);
   assert.equal(second.errorCode, "CAMPAIGN_REWARD_ALREADY_GRANTED");
   assert.equal(isProgressSkinUnlocked("swordsman", "wandering", storage), false);
+});
+
+test("non-repeatable campaign skin rewards stay final after one pick", () => {
+  const storage = storageAdapter();
+
+  const first = selectCampaignRewardSkin(storage, HASBEEN_MYSTIC_SKIN_PACK_ID, { type: "mystic", slug: "sun-goddess" });
+  assert.equal(first.accepted, true);
+  assert.equal(isCampaignSkinRewardGranted(storage, HASBEEN_MYSTIC_SKIN_PACK_ID), true);
+
+  const second = selectCampaignRewardSkin(storage, HASBEEN_MYSTIC_SKIN_PACK_ID, { type: "mystic", slug: "lunar-goddess" });
+  assert.equal(second.accepted, false);
+  assert.equal(second.errorCode, "CAMPAIGN_REWARD_ALREADY_GRANTED");
+  assert.equal(isProgressSkinUnlocked("mystic", "lunar-goddess", storage), false);
+  assert.deepEqual(getAvailableCampaignSkinRewardChoices(storage, HASBEEN_MYSTIC_SKIN_PACK_ID), []);
+});
+
+test("wandering reward is complete when every wandering skin is already owned", () => {
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, {
+    purchasedSkins: getCampaignSkinRewardChoices(WANDERING_SKIN_PACK_ID),
+  });
+
+  assert.equal(getCampaignSkinReward(storage, WANDERING_SKIN_PACK_ID), null);
+  assert.equal(isCampaignSkinRewardGranted(storage, WANDERING_SKIN_PACK_ID), true);
+  assert.deepEqual(getAvailableCampaignSkinRewardChoices(storage, WANDERING_SKIN_PACK_ID), []);
 });
 
 test("campaign reward rejects unknown packs and off-pack choices", () => {
@@ -195,16 +221,32 @@ test("campaign unit reward rejects unknown packs and off-pack choices", () => {
   assert.equal(isCampaignUnitRewardGranted(storage, BROTHERS_UNIT_PACK_ID), false);
 });
 
-test("campaign reward skin survives a read/write round trip and reset clears it", () => {
+test("owned skins and one-time skin picks survive a progress reset", () => {
   const storage = storageAdapter();
   selectCampaignRewardSkin(storage, WANDERING_SKIN_PACK_ID, { type: "mystic", slug: "wandering" });
+  selectCampaignRewardSkin(storage, HASBEEN_MYSTIC_SKIN_PACK_ID, { type: "mystic", slug: "sun-goddess" });
+  grantPremiumSkinPurchase(storage, { type: "swordsman", slug: "medieval" });
   const reread = readUnlockProgress(storage);
   assert.deepEqual(reread.campaignRewardSkins[WANDERING_SKIN_PACK_ID], { type: "mystic", slug: "wandering" });
   assert.ok(reread.unlockedSkins.some((skin) => skin.type === "mystic" && skin.slug === "wandering"));
 
   resetUnlockProgress(storage);
+  assert.equal(isProgressSkinUnlocked("mystic", "wandering", storage), true);
+  assert.equal(isProgressSkinUnlocked("mystic", "sun-goddess", storage), true);
+  assert.equal(isProgressSkinUnlocked("swordsman", "medieval", storage), true);
   assert.equal(isCampaignSkinRewardGranted(storage, WANDERING_SKIN_PACK_ID), false);
-  assert.equal(isProgressSkinUnlocked("mystic", "wandering", storage), false);
+  assert.equal(isCampaignSkinRewardGranted(storage, HASBEEN_MYSTIC_SKIN_PACK_ID), true);
+  assert.deepEqual(getAvailableCampaignSkinRewardChoices(storage, WANDERING_SKIN_PACK_ID), [
+    { type: "swordsman", slug: "wandering" },
+    { type: "archer", slug: "wandering" },
+    { type: "magician", slug: "wandering" },
+  ]);
+  assert.deepEqual(getAvailableCampaignSkinRewardChoices(storage, HASBEEN_MYSTIC_SKIN_PACK_ID), []);
+
+  const nextWanderingPick = selectCampaignRewardSkin(storage, WANDERING_SKIN_PACK_ID, { type: "swordsman", slug: "wandering" });
+  assert.equal(nextWanderingPick.accepted, true);
+  assert.equal(isCampaignSkinRewardGranted(storage, WANDERING_SKIN_PACK_ID), true);
+  assert.equal(isProgressSkinUnlocked("swordsman", "wandering", storage), true);
 });
 
 test("direct campaign skin grants are folded into unlocked skins", () => {
@@ -237,25 +279,30 @@ test("premium skin purchases are stored separately and folded into unlocked skin
   assert.equal(duplicate.errorCode, "PREMIUM_SKIN_ALREADY_OWNED");
 });
 
-test("resetting progress clears stored tutorial unlocks and returns to a fresh profile", () => {
+test("resetting progress clears stored progression while preserving owned skins", () => {
   const storage = storageAdapter();
   for (const tutorialId of [TUTORIAL_BASICS_ID, TUTORIAL_ARTS_MP_ID, TUTORIAL_DAMAGE_TYPES_ID, TUTORIAL_RAGE_ID]) {
     completeTutorial(storage, tutorialId);
   }
   selectTutorialRewardSkin(storage, { type: "magician", slug: "summer-vibes" });
+  selectCampaignRewardSkin(storage, HASBEEN_MYSTIC_SKIN_PACK_ID, { type: "mystic", slug: "lunar-goddess" });
+  grantPremiumSkinPurchase(storage, { type: "swordsman", slug: "medieval" });
   storage.setItem(LEGACY_TUTORIAL_PROGRESS_KEY, JSON.stringify({ completedTutorials: [TUTORIAL_BASICS_ID] }));
 
   const reset = resetUnlockProgress(storage);
 
   assert.deepEqual(reset.completedTutorials, []);
   assert.equal(reset.allTutorialsComplete, false);
+  assert.equal(reset.rewardGranted, true);
+  assert.deepEqual(reset.selectedRewardSkin, { type: "magician", slug: "summer-vibes" });
   assert.equal(reset.valorBalance, STARTING_VALOR_BALANCE);
   assert.deepEqual(reset.unlockedUnits, ["swordsman", "archer", "mystic", "magician"]);
-  assert.deepEqual(reset.unlockedSkins, []);
-  assert.deepEqual(reset.purchasedSkins, []);
+  assert.deepEqual(reset.purchasedSkins, [{ type: "swordsman", slug: "medieval" }]);
+  assert.equal(isProgressSkinUnlocked("magician", "summer-vibes", storage), true);
+  assert.equal(isProgressSkinUnlocked("mystic", "lunar-goddess", storage), true);
+  assert.equal(isProgressSkinUnlocked("swordsman", "medieval", storage), true);
   assert.equal(readUnlockProgress(storage).allTutorialsComplete, false);
   assert.equal(isUnitUnlocked("juggernaut", storage), false);
-  assert.equal(isProgressSkinUnlocked("magician", "summer-vibes", storage), false);
-  assert.equal(storage.getItem(TUTORIAL_PROGRESS_KEY), null);
+  assert.notEqual(storage.getItem(TUTORIAL_PROGRESS_KEY), null);
   assert.equal(storage.getItem(LEGACY_TUTORIAL_PROGRESS_KEY), null);
 });
