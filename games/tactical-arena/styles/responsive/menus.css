@@ -265,6 +265,7 @@
     width: min(980px, 98vw);
     height: calc(var(--app-height, 100vh) - .7rem);
     max-height: calc(var(--app-height, 100vh) - .7rem);
+    min-height: 0;
   }
 
   /* Draft formation picker: shrink the board + chrome so the Lock Formation
@@ -297,11 +298,29 @@
 
   /* Header: drop the long instruction line, shrink the title + padding. */
   .roster-head {
-    padding: .45rem .8rem;
+    min-height: 0;
+    padding: .28rem .56rem;
+  }
+
+  .roster-head .ref-head-title {
+    min-height: 34px;
+    margin-bottom: 0;
   }
 
   .roster-head h2 {
-    font-size: .82rem;
+    font-size: .78rem;
+    line-height: 1;
+  }
+
+  .roster-head .ref-close {
+    display: grid;
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    min-height: 34px;
+    place-items: center;
+    padding: 0;
+    font-size: .72rem;
   }
 
   .roster-sub {
@@ -310,12 +329,14 @@
 
   /* Tray: the four chosen slots collapse to compact glyph + name chips. */
   .roster-tray {
-    gap: .3rem;
-    padding: .4rem .6rem;
+    gap: .26rem;
+    padding: .28rem .5rem;
   }
 
   .roster-slot {
-    padding: .26rem .2rem;
+    min-height: 46px;
+    gap: .08rem;
+    padding: .18rem .16rem;
   }
 
   .roster-slot-tag {
@@ -323,12 +344,17 @@
   }
 
   .roster-slot .unit-portrait.is-slot {
-    width: 28px;
-    height: 30px;
+    width: 24px;
+    height: 27px;
   }
 
   .roster-slot-name {
-    font-size: .54rem;
+    max-width: 100%;
+    overflow: hidden;
+    font-size: .5rem;
+    letter-spacing: 0;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .roster-card:has(.roster-body.is-viewing-detail) .roster-tray {
@@ -340,6 +366,7 @@
      crushed into a horizontal strip under a roster rail. */
   .roster-body {
     position: relative;
+    flex: 1 1 0;
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
@@ -388,16 +415,18 @@
   .roster-grid-head {
     position: sticky;
     top: 0;
-    z-index: 2;
+    z-index: 5;
     grid-column: 1 / -1;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto auto;
     align-items: center;
     gap: .45rem;
     margin: -.55rem -.55rem 0;
-    padding: .38rem .55rem;
+    min-height: 38px;
+    padding: .28rem .46rem;
     border-bottom: 1px solid rgba(70, 100, 130, .35);
-    background: linear-gradient(180deg, rgba(16, 30, 46, .99), rgba(9, 18, 30, .99));
+    background: linear-gradient(180deg, #122236, #091725);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, .24);
   }
 
   .roster-grid-title {
@@ -423,8 +452,8 @@
   .roster-browse-btn {
     display: block;
     min-width: 6.8rem;
-    min-height: 36px;
-    padding: .34rem .52rem;
+    min-height: 32px;
+    padding: .28rem .46rem;
     font-size: .58rem;
     letter-spacing: .05em;
   }
@@ -465,7 +494,8 @@
     grid-template-columns: minmax(0, 1fr) auto auto;
     gap: .42rem;
     align-items: center;
-    padding: .34rem .62rem;
+    min-height: 40px;
+    padding: .28rem .52rem;
   }
 
   .roster-detail-name {
@@ -474,8 +504,8 @@
 
   .roster-assign {
     min-width: 8.5rem;
-    min-height: 38px;
-    padding: .34rem .56rem;
+    min-height: 34px;
+    padding: .28rem .5rem;
     font-size: .66rem;
   }
 
@@ -530,12 +560,14 @@
   /* Footer: tighter so Place / Done never get pushed off a short screen. */
   .roster-foot {
     gap: .45rem;
-    padding: .45rem .7rem;
+    min-height: 48px;
+    padding: .32rem .58rem calc(.32rem + env(safe-area-inset-bottom));
   }
 
   .roster-foot .menu-btn {
     min-width: 5.5rem;
-    padding: .5rem .7rem;
+    min-height: 36px;
+    padding: .36rem .62rem;
   }
 
   .skin-picker-card {

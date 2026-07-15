@@ -203,6 +203,21 @@ test("the document exposes the mobile playability shell", () => {
     "touch roster modals should size to the live viewport height instead of overflowing mobile browser chrome",
   );
   assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.roster-head \.ref-head-title\s*\{[\s\S]*?margin-bottom:\s*0[\s\S]*?\.roster-head \.ref-close\s*\{[\s\S]*?min-height:\s*34px/,
+    "short landscape roster headers should compact the inherited desktop title row and close button",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.roster-body\s*\{[\s\S]*?flex:\s*1 1 0[\s\S]*?min-height:\s*0/,
+    "short landscape roster bodies should take the remaining modal height instead of being squeezed by chrome",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.roster-foot\s*\{[\s\S]*?min-height:\s*48px[\s\S]*?\.roster-foot \.menu-btn\s*\{[\s\S]*?min-height:\s*36px/,
+    "short landscape roster footers should keep actions reachable without consuming the picker body",
+  );
+  assert.match(
     menusCss,
     /\.roster-body\s*\{[^}]*min-height:\s*0/,
     "the roster modal body must be allowed to shrink so its internal panes can scroll",
