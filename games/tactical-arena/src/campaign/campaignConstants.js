@@ -31,6 +31,7 @@ export const WANDERING_PARTY_SKIN_PACK = "wandering";
 // Has-Been Heroes rewards a Mystic skin the same way (see CAMPAIGN_SKIN_PACKS /
 // HASBEEN_MYSTIC_SKIN_PACK_ID in progression/unlocks.js — keep the string in sync).
 export const HASBEEN_MYSTIC_SKIN_PACK = "hasbeen-mystic";
+export const BROTHERS_UNIT_PACK = "brothers";
 // The four members of the touring fat squad, in the order they field on the board
 // ("p2-<index>-<type>" ids follow this order). Their overworld/rage/defeat banter and
 // the "bring the whole starter squad" bonus all read off this list.

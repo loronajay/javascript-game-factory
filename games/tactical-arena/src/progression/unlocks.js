@@ -25,10 +25,14 @@ export const WANDERING_SKIN_PACK_ID = "wandering";
 // Has-Been Heroes (campaign mission 12) grants the Mystic one of two curated looks
 // after a friendly duel in town. Same one-final-pick rule as every campaign pack.
 export const HASBEEN_MYSTIC_SKIN_PACK_ID = "hasbeen-mystic";
+export const BROTHERS_UNIT_PACK_ID = "brothers";
 export const OUT_OF_RETIREMENT_SKIN_REWARDS = Object.freeze([
   Object.freeze({ type: "angel", slug: "summer-vibes" }),
   Object.freeze({ type: "paladin", slug: "summer-vibes" }),
 ]);
+export const CAMPAIGN_UNIT_PACKS = Object.freeze({
+  [BROTHERS_UNIT_PACK_ID]: Object.freeze(["big-brother", "little-brother"]),
+});
 export const CAMPAIGN_SKIN_PACKS = Object.freeze({
   [WANDERING_SKIN_PACK_ID]: Object.freeze([
     Object.freeze({ type: "swordsman", slug: "wandering" }),
@@ -87,6 +91,16 @@ function normalizeCampaignRewardSkins(value) {
   return out;
 }
 
+function normalizeCampaignRewardUnits(value) {
+  const out = {};
+  if (!value || typeof value !== "object") return out;
+  for (const [packId, choices] of Object.entries(CAMPAIGN_UNIT_PACKS)) {
+    const chosen = value[packId];
+    if (typeof chosen === "string" && choices.includes(chosen)) out[packId] = chosen;
+  }
+  return out;
+}
+
 function progressFallback() {
   return {
     completedTutorials: [],
@@ -96,6 +110,7 @@ function progressFallback() {
     allTutorialsComplete: false,
     valorBalance: STARTING_VALOR_BALANCE,
     unlockedUnits: [...STARTER_UNIT_TYPES],
+    campaignRewardUnits: {},
     campaignRewardSkins: {},
     campaignGrantedSkins: [],
     purchasedSkins: [],
@@ -111,6 +126,8 @@ export function normalizeUnlockProgress(value = {}) {
   const unlockedUnits = new Set([...STARTER_UNIT_TYPES, ...uniqueStrings(value.unlockedUnits)]);
   if (allTutorialsComplete) unlockedUnits.add(TUTORIAL_JUGGERNAUT_REWARD_UNIT);
   const valorBalance = normalizeValorBalance(value.valorBalance);
+  const campaignRewardUnits = normalizeCampaignRewardUnits(value.campaignRewardUnits);
+  for (const type of Object.values(campaignRewardUnits)) unlockedUnits.add(type);
   const campaignRewardSkins = normalizeCampaignRewardSkins(value.campaignRewardSkins);
   const campaignGrantedSkins = dedupeSkins(value.campaignGrantedSkins);
   const purchasedSkins = dedupeSkins(value.purchasedSkins);
@@ -129,6 +146,7 @@ export function normalizeUnlockProgress(value = {}) {
     allTutorialsComplete,
     valorBalance,
     unlockedUnits: [...unlockedUnits],
+    campaignRewardUnits,
     campaignRewardSkins,
     campaignGrantedSkins,
     purchasedSkins,
@@ -200,12 +218,27 @@ export function getCampaignSkinRewardChoices(packId) {
   return CAMPAIGN_SKIN_PACKS[packId] ?? null;
 }
 
+export function getCampaignUnitRewardChoices(packId) {
+  return CAMPAIGN_UNIT_PACKS[packId] ?? null;
+}
+
 export function getCampaignSkinReward(storage = defaultStorage(), packId) {
   return readUnlockProgress(storage).campaignRewardSkins[packId] ?? null;
 }
 
 export function isCampaignSkinRewardGranted(storage = defaultStorage(), packId) {
   return Boolean(getCampaignSkinReward(storage, packId));
+}
+
+export function getCampaignUnitReward(storage = defaultStorage(), packId) {
+  return readUnlockProgress(storage).campaignRewardUnits[packId] ?? null;
+}
+
+export function isCampaignUnitRewardGranted(storage = defaultStorage(), packId) {
+  const progress = readUnlockProgress(storage);
+  if (progress.campaignRewardUnits[packId]) return true;
+  const choices = CAMPAIGN_UNIT_PACKS[packId] ?? [];
+  return choices.some((type) => progress.unlockedUnits.includes(type));
 }
 
 // Grant ONE skin from a campaign pack. Rejected if the pack is unknown, already granted
@@ -227,6 +260,26 @@ export function selectCampaignRewardSkin(storage = defaultStorage(), packId, cho
   const next = writeUnlockProgress(storage, {
     ...progress,
     campaignRewardSkins: { ...progress.campaignRewardSkins, [packId]: { type: selected.type, slug: selected.slug } },
+  });
+  return { accepted: true, progress: next };
+}
+
+export function selectCampaignRewardUnit(storage = defaultStorage(), packId, choice) {
+  const progress = readUnlockProgress(storage);
+  const choices = CAMPAIGN_UNIT_PACKS[packId];
+  if (!choices) {
+    return { accepted: false, errorCode: "INVALID_UNIT_PACK", progress };
+  }
+  if (isCampaignUnitRewardGranted(storage, packId)) {
+    return { accepted: false, errorCode: "CAMPAIGN_REWARD_ALREADY_GRANTED", progress };
+  }
+  const selected = typeof choice === "string" && choices.includes(choice) ? choice : null;
+  if (!selected) {
+    return { accepted: false, errorCode: "INVALID_CAMPAIGN_REWARD", progress };
+  }
+  const next = writeUnlockProgress(storage, {
+    ...progress,
+    campaignRewardUnits: { ...progress.campaignRewardUnits, [packId]: selected },
   });
   return { accepted: true, progress: next };
 }

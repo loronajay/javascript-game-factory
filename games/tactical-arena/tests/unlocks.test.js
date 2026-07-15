@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  BROTHERS_UNIT_PACK_ID,
   LEGACY_TUTORIAL_PROGRESS_KEY,
   OUT_OF_RETIREMENT_SKIN_REWARDS,
   STARTING_VALOR_BALANCE,
@@ -11,13 +12,17 @@ import {
   VALOR_RESOURCE,
   WANDERING_SKIN_PACK_ID,
   grantPremiumSkinPurchase,
+  getCampaignUnitReward,
+  getCampaignUnitRewardChoices,
   getCampaignSkinReward,
   getCampaignSkinRewardChoices,
+  isCampaignUnitRewardGranted,
   isCampaignSkinRewardGranted,
   isProgressSkinUnlocked,
   readUnlockProgress,
   resetUnlockProgress,
   selectCampaignRewardSkin,
+  selectCampaignRewardUnit,
   selectTutorialRewardSkin,
   writeUnlockProgress
 } from "../src/progression/unlocks.js";
@@ -142,6 +147,33 @@ test("campaign reward rejects unknown packs and off-pack choices", () => {
   assert.equal(selectCampaignRewardSkin(storage, "bogus", { type: "archer", slug: "wandering" }).errorCode, "INVALID_SKIN_PACK");
   assert.equal(selectCampaignRewardSkin(storage, WANDERING_SKIN_PACK_ID, { type: "paladin", slug: "count" }).errorCode, "INVALID_CAMPAIGN_REWARD");
   assert.equal(isCampaignSkinRewardGranted(storage, WANDERING_SKIN_PACK_ID), false);
+});
+
+test("selecting a campaign unit reward unlocks exactly that unit and is final", () => {
+  const storage = storageAdapter();
+  assert.deepEqual(getCampaignUnitRewardChoices(BROTHERS_UNIT_PACK_ID), ["big-brother", "little-brother"]);
+  assert.equal(getCampaignUnitRewardChoices("no-such-pack"), null);
+  assert.equal(isCampaignUnitRewardGranted(storage, BROTHERS_UNIT_PACK_ID), false);
+
+  const first = selectCampaignRewardUnit(storage, BROTHERS_UNIT_PACK_ID, "little-brother");
+
+  assert.equal(first.accepted, true);
+  assert.equal(isCampaignUnitRewardGranted(storage, BROTHERS_UNIT_PACK_ID), true);
+  assert.equal(getCampaignUnitReward(storage, BROTHERS_UNIT_PACK_ID), "little-brother");
+  assert.equal(first.progress.unlockedUnits.includes("little-brother"), true);
+  assert.equal(first.progress.unlockedUnits.includes("big-brother"), false);
+
+  const second = selectCampaignRewardUnit(storage, BROTHERS_UNIT_PACK_ID, "big-brother");
+  assert.equal(second.accepted, false);
+  assert.equal(second.errorCode, "CAMPAIGN_REWARD_ALREADY_GRANTED");
+  assert.equal(readUnlockProgress(storage).unlockedUnits.includes("big-brother"), false);
+});
+
+test("campaign unit reward rejects unknown packs and off-pack choices", () => {
+  const storage = storageAdapter();
+  assert.equal(selectCampaignRewardUnit(storage, "bogus", "big-brother").errorCode, "INVALID_UNIT_PACK");
+  assert.equal(selectCampaignRewardUnit(storage, BROTHERS_UNIT_PACK_ID, "clod").errorCode, "INVALID_CAMPAIGN_REWARD");
+  assert.equal(isCampaignUnitRewardGranted(storage, BROTHERS_UNIT_PACK_ID), false);
 });
 
 test("campaign reward skin survives a read/write round trip and reset clears it", () => {

@@ -24,6 +24,8 @@ export function openRewardSkinPicker({
   subtitle = "",
   accent = null,
   cancelLabel = "Cancel",
+  selectLabel = "Select This Skin",
+  itemKind = "skin",
   choices = [],
 } = {}) {
   const overlay = ensureHost();
@@ -74,7 +76,7 @@ export function openRewardSkinPicker({
       copy.appendChild(el("span", "skin-picker-kicker", viewing?.sub ?? ""));
       copy.appendChild(el("h3", "skin-picker-title", viewing?.label ?? ""));
       copy.appendChild(el("span", "skin-picker-status", "Previewing"));
-      const selectBtn = el("button", "menu-btn skin-picker-select-btn", "Select This Skin");
+      const selectBtn = el("button", "menu-btn skin-picker-select-btn", selectLabel);
       selectBtn.type = "button";
       selectBtn.disabled = !viewing;
       selectBtn.addEventListener("click", () => close(viewing?.value ?? null));
@@ -88,7 +90,7 @@ export function openRewardSkinPicker({
         if (viewingThisChoice) classes.push("is-viewing");
         const btn = el("button", classes.join(" "));
         btn.type = "button";
-        btn.setAttribute("aria-label", `View ${choice.label} skin`);
+        btn.setAttribute("aria-label", `View ${choice.label} ${itemKind}`);
         btn.appendChild(createPortrait(choice.type, { variant: "is-skin-choice", eager: true, skin: choice.slug ?? null }));
         const name = el("span", "skin-picker-choice-name", choice.label);
         const status = el("span", "skin-picker-choice-status", choice.sub ?? "");

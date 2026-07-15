@@ -12,6 +12,7 @@ import {
   applyVoidCastleIntroBeat,
   applyVoidCastlePartyHeal,
   applyVoidCastleSplit,
+  completeCampaignMission,
   createCampaignMatchConfig,
   evaluateCampaignMission,
   getCampaignMission,
@@ -25,8 +26,18 @@ import {
   VOID_CASTLE_GHOST_FAKE_NAMES,
   VOID_CASTLE_GHOST_POOLS,
 } from "../src/campaign/missions/void-ridden-castle/ghosts.js";
+import { isUnitUnlocked } from "../src/ui/squadModel.js";
 
 const SQUAD = ["swordsman", "archer", "mystic", "magician"];
+
+function storageAdapter() {
+  const values = new Map();
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
+  };
+}
 
 function castleState(squad = SQUAD) {
   return prepareCampaignMatchState(
@@ -45,7 +56,7 @@ function clearPhaseOne(state) {
   return state;
 }
 
-test("Void Ridden Castle is the penultimate stop, a 13x13 4v4 rewarding Nemesis and the Summoner", () => {
+test("Void Ridden Castle is the penultimate stop, a 13x13 4v4 rewarding Nemesis", () => {
   const mission = getCampaignMission(VOID_CASTLE_MISSION_ID);
   const config = createCampaignMatchConfig(VOID_CASTLE_MISSION_ID, SQUAD);
 
@@ -54,13 +65,27 @@ test("Void Ridden Castle is the penultimate stop, a 13x13 4v4 rewarding Nemesis 
   assert.equal(mission.playerSlots, 4);
   assert.equal(mission.size, 13);
   assert.equal(mission.requiresPreviousMissionsComplete, true);
-  assert.deepEqual([...mission.rewardUnits], ["nemesis", "summoner"]);
+  assert.deepEqual([...mission.rewardUnits], ["nemesis"]);
+  assert.equal(mission.rewardLabel, "Nemesis");
   assert.deepEqual([...config.squads[2]], ["summoner", "nemesis", "nemesis", "nemesis"]);
   // The castle is stop 21 of 22 — The Final Battle now sits behind it at the void gate.
   assert.equal(MAX_CAMPAIGN_MISSIONS, 22);
 
   // The mission blurb must not give away either surprise.
   assert.doesNotMatch(mission.description, /split|four Summoners|copy|copies|decoy|fake|two-part|ghost/i);
+});
+
+test("completing Void Ridden Castle unlocks Nemesis but not the Summoner", () => {
+  const storage = storageAdapter();
+  const won = applyVoidCastleSplit(clearPhaseOne(castleState()));
+  findUnit(won, won.missionRules.voidCastleTrial.realSummonerId).hp = 0;
+  resolveVictory(won);
+
+  const completed = completeCampaignMission(storage, VOID_CASTLE_MISSION_ID, won, {});
+
+  assert.deepEqual(completed.newRewardUnits, ["nemesis"]);
+  assert.equal(isUnitUnlocked("nemesis", storage), true);
+  assert.equal(isUnitUnlocked("summoner", storage), false);
 });
 
 test("the battle music is the Summoner's theme", () => {

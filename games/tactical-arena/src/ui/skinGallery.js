@@ -1,22 +1,27 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { groupedUnitTypes } from "./squadModel.js";
 import { createPortrait } from "./portraits.js";
-import { getUnitSkins } from "./skinModel.js";
+import { getSkin, getUnitSkins } from "./skinModel.js";
 
 let host = null;
 let hostDocument = null;
 
 function ensureHost() {
-  if (host && hostDocument === document) return host;
-  host = document.createElement("div");
-  hostDocument = document;
-  host.className = "ref-modal skin-gallery-modal";
-  host.hidden = true;
+  if (!host || hostDocument !== document) {
+    host = document.createElement("div");
+    hostDocument = document;
+    host.className = "ref-modal skin-gallery-modal";
+    host.hidden = true;
+  }
   document.body.appendChild(host);
   return host;
 }
 
-export function openSkinGallery() {
+export function openSkinViewer({ type, slug, storage = globalThis.localStorage } = {}) {
+  return openSkinGallery({ initial: { type, slug }, storage, viewerOnly: true });
+}
+
+export function openSkinGallery({ initial = null, storage = globalThis.localStorage, viewerOnly = false } = {}) {
   const overlay = ensureHost();
   overlay.replaceChildren();
 
@@ -25,7 +30,7 @@ export function openSkinGallery() {
 
   const head = el("header", "ref-head");
   const titleRow = el("div", "ref-head-title");
-  titleRow.appendChild(el("h2", "", "Skins"));
+  titleRow.appendChild(el("h2", "", viewerOnly ? "Skin Viewer" : "Skins"));
   const closeBtn = el("button", "ref-close", "X");
   closeBtn.type = "button";
   closeBtn.setAttribute("aria-label", "Close");
@@ -35,7 +40,6 @@ export function openSkinGallery() {
 
   const body = el("div", "skin-gallery-body");
   let savedScrollTop = 0;
-  renderList();
   card.appendChild(body);
 
   function renderList() {
@@ -45,7 +49,7 @@ export function openSkinGallery() {
       section.appendChild(el("h3", "skin-gallery-title", group.label));
       for (const type of group.types) {
         const def = UNIT_TYPES[type];
-        const skins = getUnitSkins(type);
+        const skins = getUnitSkins(type, storage);
         if (!skins.length) continue;
         const unitSection = el("section", "skin-gallery-unit-section");
         unitSection.dataset.type = type;
@@ -85,11 +89,13 @@ export function openSkinGallery() {
   function renderDetail(type, skin) {
     const def = UNIT_TYPES[type];
     const detail = el("section", "skin-gallery-detail");
-    const closeDetail = el("button", "skin-gallery-detail-close", "X");
-    closeDetail.type = "button";
-    closeDetail.setAttribute("aria-label", "Return to skins list");
-    closeDetail.addEventListener("click", renderList);
-    detail.appendChild(closeDetail);
+    if (!viewerOnly) {
+      const closeDetail = el("button", "skin-gallery-detail-close", "X");
+      closeDetail.type = "button";
+      closeDetail.setAttribute("aria-label", "Return to skins list");
+      closeDetail.addEventListener("click", renderList);
+      detail.appendChild(closeDetail);
+    }
 
     detail.appendChild(createPortrait(type, {
       variant: "is-skin-detail",
@@ -104,6 +110,16 @@ export function openSkinGallery() {
     copy.appendChild(el("span", "skin-gallery-detail-status", skin.unlocked ? "Unlocked" : "Locked"));
     detail.appendChild(copy);
 
+    body.replaceChildren(detail);
+  }
+
+  function renderUnavailableDetail() {
+    const detail = el("section", "skin-gallery-detail");
+    const copy = el("div", "skin-gallery-detail-copy");
+    copy.appendChild(el("span", "skin-gallery-detail-kicker", "Preview"));
+    copy.appendChild(el("h3", "skin-gallery-detail-title", "Skin unavailable"));
+    copy.appendChild(el("span", "skin-gallery-detail-status", "Not found"));
+    detail.appendChild(copy);
     body.replaceChildren(detail);
   }
 
@@ -123,6 +139,14 @@ export function openSkinGallery() {
   overlay.addEventListener("click", onOverlay);
   document.addEventListener("keydown", onKey, true);
   overlay.hidden = false;
+  const initialSkin = getSkin(initial?.type, initial?.slug, storage);
+  if (viewerOnly) {
+    if (initialSkin) renderDetail(initial.type, initialSkin);
+    else renderUnavailableDetail();
+    return;
+  }
+  renderList();
+  if (initialSkin) renderDetail(initial.type, initialSkin);
 }
 
 function el(tag, className = "", text = null) {

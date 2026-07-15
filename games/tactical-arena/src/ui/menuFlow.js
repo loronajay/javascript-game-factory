@@ -23,13 +23,18 @@ import { openChoiceModal } from "./choiceModal.js";
 import { openRewardSkinPicker } from "./rewardSkinPicker.js";
 import {
   HASBEEN_MYSTIC_SKIN_PACK_ID,
+  getCampaignUnitRewardChoices,
   getCampaignSkinRewardChoices,
+  isCampaignUnitRewardGranted,
   isCampaignSkinRewardGranted,
   resetUnlockProgress,
+  selectCampaignRewardUnit,
   selectCampaignRewardSkin,
   selectTutorialRewardSkin,
 } from "../progression/unlocks.js";
 import {
+  enqueueDraftBattleUnlockAnnouncement,
+  enqueueUnitUnlockAnnouncements,
   resetProgressionAnnouncements,
   syncMissingUnitUnlockAnnouncements
 } from "../progression/announcements.js";
@@ -723,6 +728,14 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   // after the post-match cutscene resolves. Returns the chosen reward (or null if declined /
   // already granted) so the host can play a closing beat only on a real pick.
   async function openCampaignRewardChoice(packId) {
+    if (packId && typeof packId === "object") {
+      if (packId.unitPackId) return openCampaignUnitRewardChoice(packId.unitPackId);
+      return openCampaignSkinRewardChoice(packId.skinPackId ?? packId.packId);
+    }
+    return openCampaignSkinRewardChoice(packId);
+  }
+
+  async function openCampaignSkinRewardChoice(packId) {
     const choices = getCampaignSkinRewardChoices(packId);
     if (!choices || isCampaignSkinRewardGranted(globalThis.localStorage, packId)) return null;
     const copy = CAMPAIGN_REWARD_COPY[packId] ?? DEFAULT_CAMPAIGN_REWARD_COPY;
@@ -741,6 +754,33 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     });
     if (!choice) return null;
     selectCampaignRewardSkin(globalThis.localStorage, packId, choice);
+    if (screens.active === "campaign") renderCampaign();
+    return choice;
+  }
+
+  async function openCampaignUnitRewardChoice(packId) {
+    const choices = getCampaignUnitRewardChoices(packId);
+    if (!choices || isCampaignUnitRewardGranted(globalThis.localStorage, packId)) return null;
+    const choice = await openRewardSkinPicker({
+      title: "A Brother Joins",
+      subtitle: "The brothers are done fighting each other. Choose one mech to recruit; this choice is final.",
+      accent: TEAM_COLOR[1],
+      cancelLabel: "Decide Later",
+      selectLabel: "Recruit This Unit",
+      itemKind: "unit",
+      choices: choices.map((type) => ({
+        value: type,
+        label: unitLabel(type),
+        sub: `${UNIT_TYPES[type]?.classType ?? "unit"} unit`,
+        type,
+        slug: null,
+      })),
+    });
+    if (!choice) return null;
+    const result = selectCampaignRewardUnit(globalThis.localStorage, packId, choice);
+    if (!result.accepted) return null;
+    enqueueUnitUnlockAnnouncements(globalThis.localStorage, [choice]);
+    enqueueDraftBattleUnlockAnnouncement(globalThis.localStorage);
     if (screens.active === "campaign") renderCampaign();
     return choice;
   }

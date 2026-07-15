@@ -70,7 +70,7 @@ import {
   shouldShowCampaignPostMatchCutscene,
   voidwoodDefeatScript,
 } from "./campaign/campaign.js";
-import { isCampaignSkinRewardGranted } from "./progression/unlocks.js";
+import { isCampaignSkinRewardGranted, isCampaignUnitRewardGranted } from "./progression/unlocks.js";
 import { createCampaignMeta } from "./campaign/campaignMeta.js";
 import {
   nextCampaignDialogueBeat as selectCampaignDialogueBeat,
@@ -666,17 +666,26 @@ function announceTurnChange(prevPlayer) {
     const summary = buildSummary(state, { matchStartedAt, initialHpByPlayer });
     if (matchConfig?.mode === "campaign" && campaignMissionId) {
       summary.campaign = completeCampaignMission(globalThis.localStorage, campaignMissionId, state, { ...campaignMeta });
-      // Skin-reward missions (The Wandering Party, Has-Been Heroes) run their reward pick on
-      // the map AFTER results. Only queue it on a win whose reward hasn't already been
+      // Choice-reward missions run their reward pick on the map AFTER results.
+      // Only queue it on a win whose reward hasn't already been
       // granted, and force the results screen to route back through the map so the
       // post-match cutscene + reward pick can't be skipped.
-      const rewardPack = getCampaignMission(campaignMissionId)?.rewardSkinPack ?? null;
+      const mission = getCampaignMission(campaignMissionId);
+      const rewardPack = mission?.rewardSkinPack ?? null;
+      const rewardUnitPack = mission?.rewardUnitChoicePack ?? null;
       if (
         rewardPack &&
         state.winner === 1 &&
         !isCampaignSkinRewardGranted(globalThis.localStorage, rewardPack)
       ) {
         pendingCampaignReward = { missionId: campaignMissionId, packId: rewardPack };
+        summary.campaign.forceMapReturn = true;
+      } else if (
+        rewardUnitPack &&
+        state.winner === 1 &&
+        !isCampaignUnitRewardGranted(globalThis.localStorage, rewardUnitPack)
+      ) {
+        pendingCampaignReward = { missionId: campaignMissionId, unitPackId: rewardUnitPack };
         summary.campaign.forceMapReturn = true;
       } else if (
         state.winner === 1 &&

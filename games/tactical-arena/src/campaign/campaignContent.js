@@ -24,6 +24,7 @@ import {
   VOID_CASTLE_ENEMY_TYPES,
   FINAL_BATTLE_MISSION_ID,
   FINAL_BATTLE_BOARD_SIZE,
+  BROTHERS_UNIT_PACK,
   WANDERING_PARTY_SKIN_PACK,
   HASBEEN_MYSTIC_SKIN_PACK,
   HASBEEN_HEROES_FAT_TYPES,
@@ -144,7 +145,7 @@ const AUTHORED_MISSIONS = Object.freeze({
   // Mechs on the Farm (9×9): a standard full-HP 2v2 on the default corner blocks against
   // the feuding mech brothers, Big Brother and Little Brother. No board puzzle — the fight
   // IS the lesson (keep your two units apart so one Little Brother Flamethrower cone can't
-  // scorch both; race the brothers' RAGE). A win unlocks BOTH brothers as playable units.
+  // scorch both; race the brothers' RAGE). A win lets the player recruit ONE brother.
   // Owns an arguing-brothers opening, per-brother RAGE lines, and a make-up beat before the
   // results screen (brothersDefeatScript). Sits on the reserved farmland landmark that the
   // gargoyle mission's map test deliberately left node-less "for a future unit."
@@ -155,8 +156,9 @@ const AUTHORED_MISSIONS = Object.freeze({
     description: "A pair of mech brothers are wrecking the old homestead over a squabble. Bring any two units into a standard duel. Keep them apart so a single Flamethrower cone can't scorch both, and finish the brothers before they hit RAGE.",
     unitType: "big-brother",
     requiredStars: 13,
-    rewardUnits: Object.freeze(["big-brother", "little-brother"]),
-    rewardLabel: "Big Brother and Little Brother",
+    rewardUnits: Object.freeze([]),
+    rewardLabel: "Big Brother or Little Brother",
+    rewardUnitChoicePack: BROTHERS_UNIT_PACK,
     playerSlots: 2,
     enemySquad: Object.freeze(["big-brother", "little-brother"]),
     size: 9,
@@ -392,8 +394,8 @@ const AUTHORED_MISSIONS = Object.freeze({
     unitType: "summoner",
     requiredStars: 0,
     requiresPreviousMissionsComplete: true,
-    rewardUnits: Object.freeze(["nemesis", "summoner"]),
-    rewardLabel: "Nemesis and the Summoner",
+    rewardUnits: Object.freeze(["nemesis"]),
+    rewardLabel: "Nemesis",
     playerSlots: 4,
     enemySquad: Object.freeze([...VOID_CASTLE_ENEMY_TYPES]),
     size: 13,

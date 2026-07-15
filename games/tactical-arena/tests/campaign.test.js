@@ -9,6 +9,7 @@ import { resolveVictory } from "../src/core/turnEngine.js";
 import { isUnitUnlocked } from "../src/ui/squadModel.js";
 import {
   BROTHERS_MISSION_ID,
+  BROTHERS_UNIT_PACK,
   CLOD_MISSION_ID,
   FATHER_TIME_MISSION_ID,
   GARGOYLE_MISSION_ID,
@@ -3357,12 +3358,14 @@ function brothersWonState(base, { survive = true } = {}) {
   };
 }
 
-test("Mechs on the Farm is a full-HP 9x9 2v2 vs Big and Little Brother, rewarding both", () => {
+test("Mechs on the Farm is a full-HP 9x9 2v2 vs Big and Little Brother, rewarding a choice", () => {
   const mission = getCampaignMission(BROTHERS_MISSION_ID);
   assert.ok(mission);
   assert.equal(mission.comingSoon ?? false, false);
   assert.equal(mission.requiredStars, 13);
-  assert.deepEqual(mission.rewardUnits, ["big-brother", "little-brother"]);
+  assert.deepEqual(mission.rewardUnits, []);
+  assert.equal(mission.rewardLabel, "Big Brother or Little Brother");
+  assert.equal(mission.rewardUnitChoicePack, BROTHERS_UNIT_PACK);
   assert.equal(mission.playerSlots, 2);
 
   const config = createCampaignMatchConfig(BROTHERS_MISSION_ID, ["swordsman", "archer"]);
@@ -3381,6 +3384,23 @@ test("Mechs on the Farm is a full-HP 9x9 2v2 vs Big and Little Brother, rewardin
   }
   assert.ok(findUnit(match, "p2-0-big-brother"));
   assert.ok(findUnit(match, "p2-1-little-brother"));
+});
+
+test("completing Mechs on the Farm saves stars but defers the brother unlock to the reward choice", () => {
+  const storage = storageAdapter();
+  const completed = completeCampaignMission(storage, BROTHERS_MISSION_ID, brothersWonState(brothersMatchState()), {
+    flamethrowerBothHitCount: 0,
+    brothersEnteredRage: false,
+  });
+
+  assert.equal(completed.victory, true);
+  assert.equal(completed.stars, 3);
+  assert.equal(completed.rewardUnitChoicePack, BROTHERS_UNIT_PACK);
+  assert.deepEqual(completed.rewardUnits, []);
+  assert.deepEqual(completed.newRewardUnits, []);
+  assert.equal(isUnitUnlocked("big-brother", storage), false);
+  assert.equal(isUnitUnlocked("little-brother", storage), false);
+  assert.equal(readCampaignProgressStars(storage, BROTHERS_MISSION_ID), 3);
 });
 
 test("Mechs on the Farm grading: win, no double-flame, kill before rage, plus the survival bonus", () => {

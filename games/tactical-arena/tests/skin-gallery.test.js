@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { openSkinGallery } from "../src/ui/skinGallery.js";
+import { openSkinGallery, openSkinViewer } from "../src/ui/skinGallery.js";
 
 class FakeClassList {
   constructor(node) {
@@ -39,6 +39,9 @@ class FakeElement {
   }
 
   appendChild(node) {
+    if (node.parentElement) {
+      node.parentElement.children = node.parentElement.children.filter((child) => child !== node);
+    }
     node.parentElement = this;
     this.children.push(node);
     return node;
@@ -133,6 +136,49 @@ test("skin gallery entries are buttons that open and close an enlarged skin view
 
   assert.ok(walk(overlay, (node) => hasClass(node, "skin-gallery-grid")).length > 0);
   assert.equal(walk(overlay, (node) => hasClass(node, "skin-gallery-detail")).length, 0);
+});
+
+test("skin gallery can open directly to a requested skin detail", () => {
+  globalThis.document = new FakeDocument();
+
+  openSkinGallery({ initial: { type: "swordsman", slug: "medieval" } });
+
+  const overlay = document.body.children[0];
+  const detailViews = walk(overlay, (node) => hasClass(node, "skin-gallery-detail"));
+  assert.equal(detailViews.length, 1, "initial skin should render the enlarged detail view");
+  assert.equal(walk(overlay, (node) => hasClass(node, "skin-gallery-grid")).length, 0);
+
+  const titles = walk(overlay, (node) => hasClass(node, "skin-gallery-detail-title"));
+  assert.ok(titles.some((node) => node.textContent === "Medieval"));
+  const portraits = walk(overlay, (node) => hasClass(node, "is-skin-detail"));
+  assert.equal(portraits.length, 1);
+  assert.equal(portraits[0].dataset.type, "swordsman");
+  assert.equal(portraits[0].dataset.skin, "medieval");
+});
+
+test("skin viewer opens only the requested skin detail without gallery navigation", () => {
+  globalThis.document = new FakeDocument();
+
+  openSkinViewer({ type: "swordsman", slug: "medieval" });
+
+  const overlay = document.body.children[0];
+  assert.equal(walk(overlay, (node) => hasClass(node, "skin-gallery-detail")).length, 1);
+  assert.equal(walk(overlay, (node) => hasClass(node, "skin-gallery-grid")).length, 0);
+  assert.equal(walk(overlay, (node) => hasClass(node, "skin-gallery-detail-close")).length, 0);
+  assert.ok(walk(overlay, (node) => node.tagName === "H2").some((node) => node.textContent === "Skin Viewer"));
+  assert.ok(walk(overlay, (node) => hasClass(node, "skin-gallery-detail-title")).some((node) => node.textContent === "Medieval"));
+});
+
+test("skin viewer never falls back to the full skin grid", () => {
+  globalThis.document = new FakeDocument();
+
+  openSkinViewer({ type: "swordsman", slug: "not-real" });
+
+  const overlay = document.body.children[0];
+  assert.equal(walk(overlay, (node) => hasClass(node, "skin-gallery-grid")).length, 0);
+  assert.equal(walk(overlay, (node) => hasClass(node, "skin-gallery-unit-section")).length, 0);
+  assert.equal(walk(overlay, (node) => hasClass(node, "skin-gallery-detail")).length, 1);
+  assert.ok(walk(overlay, (node) => hasClass(node, "skin-gallery-detail-title")).some((node) => node.textContent === "Skin unavailable"));
 });
 
 test("skin gallery nests skin cards under unit shelves inside each class", () => {

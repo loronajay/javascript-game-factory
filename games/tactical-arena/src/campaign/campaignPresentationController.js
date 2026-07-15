@@ -68,7 +68,11 @@ export function createCampaignPresentationController({
       if (script.length) await dialogue.show(script);
       markCampaignPostMatchCutsceneSeen(storage, pending.missionId);
     }
-    const picked = pending.packId ? await openCampaignRewardChoice?.(pending.packId) : null;
+    const picked = pending.packId
+      ? await openCampaignRewardChoice?.({ skinPackId: pending.packId })
+      : pending.unitPackId
+        ? await openCampaignRewardChoice?.({ unitPackId: pending.unitPackId })
+        : null;
     if (picked) {
       const closer = campaignRewardPickedScript(pending.missionId);
       if (closer.length) await dialogue.show(closer);
