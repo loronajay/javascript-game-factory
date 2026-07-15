@@ -4,6 +4,7 @@ import {
   formatValorAmount,
   groupSkinOffersByClassAndType,
   getShopCatalog,
+  purchaseSkinWithValor,
   purchaseUnitWithValor,
 } from "../progression/marketplace.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
@@ -189,20 +190,7 @@ export function openShop(storage = globalThis.localStorage) {
             el("b", "shop-item-title", offer.name),
             el("span", "shop-item-meta", rarityLabel(offer.rarity)),
           );
-          const buy = el("button", `shop-buy-btn${offer.owned ? " is-owned" : ""}`, offer.owned ? "Owned" : formatPremiumPrice(offer.price));
-          buy.type = "button";
-          buy.disabled = offer.owned;
-          buy.dataset.sku = offer.sku;
-          buy.addEventListener("click", (event) => {
-            event.stopPropagation?.();
-            statusText = `${formatPremiumPrice(offer.price)} ${offer.name} checkout ready: ${offer.sku}`;
-            overlay.dispatchEvent(new CustomEvent("tacticalarena:premium-purchase-request", {
-              bubbles: true,
-              detail: { offer },
-            }));
-            render();
-          });
-          card.append(copy, buy);
+          card.append(copy, createSkinBuyActions(offer));
           grid.appendChild(card);
         }
         unitSection.append(unitHead, grid);
@@ -241,6 +229,49 @@ export function openShop(storage = globalThis.localStorage) {
     return buy;
   }
 
+  function createSkinBuyActions(offer) {
+    const actions = el("div", `shop-skin-actions${offer.owned ? " is-owned" : ""}`);
+    if (offer.owned) {
+      actions.append(createOwnedSkinButton("premium"), createOwnedSkinButton("valor"));
+      return actions;
+    }
+
+    const premiumBuy = el("button", "shop-buy-btn is-premium", formatPremiumPrice(offer.price));
+    premiumBuy.type = "button";
+    premiumBuy.dataset.sku = offer.sku;
+    premiumBuy.setAttribute("aria-label", `Buy ${offer.name} with ${formatPremiumPrice(offer.price)}`);
+    premiumBuy.addEventListener("click", (event) => {
+      event.stopPropagation?.();
+      statusText = `${formatPremiumPrice(offer.price)} ${offer.name} checkout ready: ${offer.sku}`;
+      overlay.dispatchEvent(new CustomEvent("tacticalarena:premium-purchase-request", {
+        bubbles: true,
+        detail: { offer },
+      }));
+      render();
+    });
+
+    const valorBuy = el("button", "shop-buy-btn is-valor");
+    valorBuy.type = "button";
+    valorBuy.setAttribute("aria-label", `Unlock ${offer.name} for ${formatValor(offer.valorPrice?.amount)}`);
+    valorBuy.appendChild(createValorBadge(offer.valorPrice?.amount, "shop-price"));
+    valorBuy.addEventListener("click", (event) => {
+      event.stopPropagation?.();
+      const result = purchaseSkinWithValor(storage, offer.type, offer.slug);
+      statusText = skinValorPurchaseStatus(result);
+      render();
+    });
+
+    actions.append(premiumBuy, valorBuy);
+    return actions;
+  }
+
+  function createOwnedSkinButton(channel) {
+    const owned = el("button", `shop-buy-btn is-owned is-${channel}`, "Owned");
+    owned.type = "button";
+    owned.disabled = true;
+    return owned;
+  }
+
   function onOverlay(event) {
     if (event.target === overlay) close();
   }
@@ -260,6 +291,13 @@ function unitPurchaseStatus(result) {
   if (result.errorCode === "INSUFFICIENT_VALOR") return "Not enough currency.";
   if (result.errorCode === "UNIT_ALREADY_OWNED") return "Already owned.";
   return "That unit is not for sale.";
+}
+
+function skinValorPurchaseStatus(result) {
+  if (result.accepted) return `${result.offer.name} unlocked.`;
+  if (result.errorCode === "INSUFFICIENT_VALOR") return "Not enough Valor.";
+  if (result.errorCode === "SKIN_ALREADY_OWNED") return "Already owned.";
+  return "That skin is not for sale.";
 }
 
 function classLabel(value) {

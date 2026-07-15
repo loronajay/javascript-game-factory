@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { readUnlockProgress, writeUnlockProgress } from "../src/progression/unlocks.js";
 import { openShop } from "../src/ui/shop.js";
 import { openSkinGallery } from "../src/ui/skinGallery.js";
 
@@ -142,6 +143,42 @@ test("shop skins render under unit shelves and Valor uses an icon badge", () => 
   const shelves = walk(overlay, (node) => hasClass(node, "shop-unit-skin-section"));
   assert.ok(shelves.length > 0, "shop skins should be organized into per-unit shelves");
   assert.ok(shelves.some((node) => node.dataset.type === "swordsman"));
+});
+
+test("shop skin cards offer USD checkout and Valor purchase buttons", () => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, { valorBalance: 3000 });
+
+  openShop(storage);
+
+  const overlay = document.body.children[0];
+  const skinsTab = walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Skins")[0];
+  skinsTab.click();
+
+  const skinCard = walk(overlay, (node) => hasClass(node, "shop-skin") && visibleText(node).includes("Summer Vibes"))[0];
+  assert.ok(skinCard, "shop should render an unowned purchasable skin");
+
+  const buyButtons = walk(skinCard, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-buy-btn"));
+  const usdBuy = buyButtons.find((node) => /^\$\d+\.\d{2}$/.test(node.textContent));
+  const valorBuy = buyButtons.find((node) => /Valor$/.test(node.getAttribute("aria-label") ?? ""));
+  assert.ok(usdBuy, "skin card should keep the premium USD checkout button");
+  assert.ok(valorBuy, "skin card should add a Valor purchase button");
+  assert.equal(valorBuy.getAttribute("aria-label"), "Unlock Summer Vibes for 1,550 Valor");
+  assert.ok(walk(valorBuy, (node) => hasClass(node, "valor-icon")).length > 0);
+
+  valorBuy.click();
+
+  const progress = readUnlockProgress(storage);
+  assert.equal(progress.valorBalance, 1450);
+  assert.ok(progress.purchasedSkins.some((skin) => skin.slug === "summer-vibes"));
+  assert.ok(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent.includes("Summer Vibes unlocked"));
+  const ownedSkinCard = walk(overlay, (node) => hasClass(node, "shop-skin") && hasClass(node, "is-owned"))[0];
+  assert.ok(ownedSkinCard, "Valor purchase should flip the skin card to owned");
+  const ownedButtons = walk(ownedSkinCard, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-buy-btn"));
+  assert.equal(ownedButtons.length, 2, "both purchase paths should remain visible as owned");
+  assert.ok(ownedButtons.every((node) => node.textContent === "Owned"));
+  assert.ok(ownedButtons.every((node) => node.disabled));
 });
 
 test("shop unit cards open a detail card and return to unit browsing", () => {

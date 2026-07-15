@@ -9,7 +9,9 @@ import {
   groupSkinOffersByClassAndType,
   getSkinOffer,
   getUnitOffer,
+  purchaseSkinWithValor,
   purchaseUnitWithValor,
+  skinValorCost,
   unitValorCost,
 } from "../src/progression/marketplace.js";
 
@@ -66,6 +68,29 @@ test("unit offers use Valor while skin offers use premium prices", () => {
   assert.equal(formatPremiumPrice(skin.price), "$2.99");
 });
 
+test("skin Valor prices are derived from the USD premium price with a fairer high-price curve", () => {
+  const storage = storageAdapter();
+  const common = getSkinOffer("magician", "summer-vibes", storage);
+
+  assert.equal(skinValorCost({ kind: "premium", currency: "USD", cents: 99 }), 850);
+  assert.equal(skinValorCost({ kind: "premium", currency: "USD", cents: 199 }), 1550);
+  assert.equal(skinValorCost({ kind: "premium", currency: "USD", cents: 799 }), 5300);
+  assert.ok(
+    skinValorCost({ kind: "premium", currency: "USD", cents: 199 }) < skinValorCost({ kind: "premium", currency: "USD", cents: 99 }) * 2,
+    "the curve should not simply double the Valor cost when the USD price roughly doubles"
+  );
+  assert.ok(
+    skinValorCost({ kind: "premium", currency: "USD", cents: 799 }) / 7.99 < skinValorCost({ kind: "premium", currency: "USD", cents: 99 }) / 0.99,
+    "higher USD prices should have a lower Valor-per-dollar rate"
+  );
+  assert.equal(common.price.cents, 199);
+  assert.deepEqual(common.valorPrice, {
+    kind: "valor",
+    resourceId: "valor",
+    amount: 1550,
+  });
+});
+
 test("unit Valor costs follow the invisible star buckets", () => {
   const expectedCosts = {
     juggernaut: 450,
@@ -114,6 +139,35 @@ test("purchasing a unit spends Valor and unlocks the unit", () => {
   assert.equal(offer.owned, true);
   assert.ok(progress.unlockedUnits.includes("clod"));
   assert.equal(progress.valorBalance, 999 - result.offer.price.amount);
+});
+
+test("purchasing a skin with Valor spends Valor and unlocks the skin", () => {
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, { valorBalance: 3000 });
+
+  const result = purchaseSkinWithValor(storage, "magician", "summer-vibes");
+  const offer = getSkinOffer("magician", "summer-vibes", storage);
+  const progress = readUnlockProgress(storage);
+
+  assert.equal(result.accepted, true);
+  assert.equal(offer.owned, true);
+  assert.ok(progress.purchasedSkins.some((skin) => skin.type === "magician" && skin.slug === "summer-vibes"));
+  assert.equal(progress.valorBalance, 3000 - result.offer.valorPrice.amount);
+});
+
+test("skin Valor purchases reject owned, invalid, and unaffordable offers", () => {
+  const storage = storageAdapter();
+
+  assert.equal(purchaseSkinWithValor(storage, "dragon", "summer-vibes").errorCode, "SKIN_NOT_FOR_SALE");
+
+  writeUnlockProgress(storage, { valorBalance: 0 });
+  assert.equal(purchaseSkinWithValor(storage, "magician", "summer-vibes").errorCode, "INSUFFICIENT_VALOR");
+
+  writeUnlockProgress(storage, {
+    valorBalance: 9999,
+    purchasedSkins: [{ type: "magician", slug: "summer-vibes" }],
+  });
+  assert.equal(purchaseSkinWithValor(storage, "magician", "summer-vibes").errorCode, "SKIN_ALREADY_OWNED");
 });
 
 test("unit purchases reject owned, invalid, and unaffordable offers", () => {

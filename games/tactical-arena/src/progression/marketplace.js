@@ -53,6 +53,9 @@ const UNIT_VALOR_STAR_BY_TYPE = Object.freeze({
   summoner: 4,
 });
 
+const SKIN_VALOR_PER_USD = 850;
+const SKIN_VALOR_CURVE_EXPONENT = 0.88;
+
 export function unitValorCost(typeOrDef) {
   const type = typeof typeOrDef === "string" ? typeOrDef : typeOrDef?.id ?? typeOrDef?.type;
   const def = UNIT_TYPES[type];
@@ -74,6 +77,14 @@ export function formatPremiumPrice(price) {
     style: "currency",
     currency: price.currency ?? "USD",
   }).format((Number(price.cents) || 0) / 100);
+}
+
+export function skinValorCost(price) {
+  if (!price || price.kind !== "premium") return null;
+  const cents = Math.max(0, Math.floor(Number(price.cents) || 0));
+  if (!cents) return null;
+  const dollars = cents / 100;
+  return roundValorAmount(SKIN_VALOR_PER_USD * (dollars ** SKIN_VALOR_CURVE_EXPONENT));
 }
 
 export function getUnitOffer(type, storage = globalThis.localStorage) {
@@ -106,6 +117,7 @@ export function getSkinOffer(type, slug, storage = globalThis.localStorage) {
   const skin = getUnitSkins(type, storage).find((entry) => entry.slug === slug) ?? null;
   const def = UNIT_TYPES[type];
   if (!skin || !def) return null;
+  const valorAmount = skinValorCost(skin.price);
   return Object.freeze({
     id: skin.id,
     kind: "skin",
@@ -119,6 +131,11 @@ export function getSkinOffer(type, slug, storage = globalThis.localStorage) {
     entitlementId: skin.entitlementId,
     owned: skin.unlocked,
     price: skin.price,
+    valorPrice: valorAmount == null ? null : Object.freeze({
+      kind: "valor",
+      resourceId: VALOR_RESOURCE.id,
+      amount: valorAmount,
+    }),
   });
 }
 
@@ -174,4 +191,25 @@ export function purchaseUnitWithValor(storage = globalThis.localStorage, type) {
     unlockedUnits: [...progress.unlockedUnits, type],
   });
   return { accepted: true, progress: next, offer: getUnitOffer(type, storage) };
+}
+
+export function purchaseSkinWithValor(storage = globalThis.localStorage, type, slug) {
+  const offer = getSkinOffer(type, slug, storage);
+  const progress = readUnlockProgress(storage);
+  if (!offer || !offer.valorPrice) return { accepted: false, errorCode: "SKIN_NOT_FOR_SALE", progress, offer: null };
+  if (offer.owned) return { accepted: false, errorCode: "SKIN_ALREADY_OWNED", progress, offer };
+  if (progress.valorBalance < offer.valorPrice.amount) {
+    return { accepted: false, errorCode: "INSUFFICIENT_VALOR", progress, offer };
+  }
+  const selected = { type: offer.type, slug: offer.slug };
+  const next = writeUnlockProgress(storage, {
+    ...progress,
+    valorBalance: progress.valorBalance - offer.valorPrice.amount,
+    purchasedSkins: [...progress.purchasedSkins, selected],
+  });
+  return { accepted: true, progress: next, offer: getSkinOffer(type, slug, storage) };
+}
+
+function roundValorAmount(amount) {
+  return Math.max(0, Math.round((Number(amount) || 0) / 50) * 50);
 }

@@ -96,7 +96,8 @@
 .shop-buy-btn .shop-price { width:100%; }
 .shop-buy-btn .valor-icon { width:.82rem; height:.82rem; }
 .shop-unit .shop-buy-btn { width:100%; }
-.shop-skin .shop-buy-btn { width:100%; margin-top:.45rem; }
+.shop-skin-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.4rem; width:100%; margin-top:.45rem; }
+.shop-skin .shop-buy-btn { width:100%; min-width:0; }
 .shop-body.is-detail-view { align-content:stretch; }
 .shop-unit-detail { display:grid; grid-template-rows:auto auto minmax(0,1fr) auto; gap:.75rem; min-height:0; max-width:54rem; width:100%; justify-self:center; }
 .shop-unit-detail-top { display:flex; justify-content:flex-start; min-width:0; }
