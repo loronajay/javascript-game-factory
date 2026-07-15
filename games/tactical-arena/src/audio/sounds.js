@@ -90,7 +90,7 @@ export class AudioManager {
     if (!track) {
       track = new Audio(new URL(file, MUSIC_BASE).href);
       track.loop = true;
-      track.preload = "auto";
+      track.preload = "metadata";
       this._musicTracks.set(key, track);
     }
 

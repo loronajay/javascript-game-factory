@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "skins": "node scripts/generate-skin-manifest.mjs",
-    "test": "node scripts/generate-skin-manifest.mjs && node --test tests/*.test.js"
+    "release:audit": "node --preserve-symlinks --preserve-symlinks-main scripts/release-audit.mjs",
+    "release:audit:strict": "node --preserve-symlinks --preserve-symlinks-main scripts/release-audit.mjs --strict",
+    "skins": "node --preserve-symlinks --preserve-symlinks-main scripts/generate-skin-manifest.mjs",
+    "test": "node --preserve-symlinks --preserve-symlinks-main scripts/generate-skin-manifest.mjs && node --preserve-symlinks --preserve-symlinks-main --test tests/*.test.js"
   }
 }

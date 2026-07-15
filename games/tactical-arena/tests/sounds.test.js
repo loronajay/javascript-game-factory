@@ -74,6 +74,7 @@ test("starting the same music track is idempotent while switching tracks stops t
     audio.startMusic("menu");
     const menuTrack = created[0];
     menuTrack.currentTime = 12;
+    assert.equal(menuTrack.preload, "metadata");
 
     audio.startMusic("menu");
     assert.equal(menuTrack.playCount, 1);
