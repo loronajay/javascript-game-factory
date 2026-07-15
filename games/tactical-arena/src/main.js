@@ -71,6 +71,7 @@ import {
   voidwoodDefeatScript,
 } from "./campaign/campaign.js";
 import { isCampaignSkinRewardGranted, isCampaignUnitRewardGranted } from "./progression/unlocks.js";
+import { claimOnlineMatchValorReward, recordOnlineValorEvents } from "./progression/valorRewards.js";
 import { createCampaignMeta } from "./campaign/campaignMeta.js";
 import {
   nextCampaignDialogueBeat as selectCampaignDialogueBeat,
@@ -565,37 +566,14 @@ function setMessage(text, isError = false) {
 
 // --- Match lifecycle ---
 
-async function onCampaignMissionSelected(missionId, selectedSquad = null, options = {}) {
-  return campaignPresentation.onCampaignMissionSelected(missionId, selectedSquad, options);
-}
-
-function onStartCampaignMission(config) {
-  campaignPresentation.onStartCampaignMission(config);
-}
-
-async function onCampaignMapEntered(options = {}) {
-  return campaignPresentation.onCampaignMapEntered(options);
-}
-
-async function handleDialogueLineAction(action) {
-  return campaignPresentation.handleDialogueLineAction(action);
-}
-
-async function ensureFinalBattleStageAdvanced() {
-  return campaignPresentation.ensureFinalBattleStageAdvanced();
-}
-
-function finalizeCampaignOpeningState() {
-  campaignPresentation.finalizeCampaignOpeningState();
-}
-
-function startMatch(config) {
-  matchLifecycle.start(config);
-}
-
-function resetBattle() {
-  matchLifecycle.reset();
-}
+async function onCampaignMissionSelected(missionId, selectedSquad = null, options = {}) { return campaignPresentation.onCampaignMissionSelected(missionId, selectedSquad, options); }
+function onStartCampaignMission(config) { campaignPresentation.onStartCampaignMission(config); }
+async function onCampaignMapEntered(options = {}) { return campaignPresentation.onCampaignMapEntered(options); }
+async function handleDialogueLineAction(action) { return campaignPresentation.handleDialogueLineAction(action); }
+async function ensureFinalBattleStageAdvanced() { return campaignPresentation.ensureFinalBattleStageAdvanced(); }
+function finalizeCampaignOpeningState() { campaignPresentation.finalizeCampaignOpeningState(); }
+function startMatch(config) { matchLifecycle.start(config); }
+function resetBattle() { matchLifecycle.reset(); }
 
 function resumeActiveMusic() {
   if (muted || !audioUnlocked) return;
@@ -664,6 +642,7 @@ function announceTurnChange(prevPlayer) {
     net?.endMatch(); // clean finish: let the session keep the socket alive briefly for the peer
     announceTurn(state.winner);
     const summary = buildSummary(state, { matchStartedAt, initialHpByPlayer });
+    claimOnlineMatchValorReward(globalThis.localStorage, summary, { matchConfig, match: state, mySeat });
     if (matchConfig?.mode === "campaign" && campaignMissionId) {
       summary.campaign = completeCampaignMission(globalThis.localStorage, campaignMissionId, state, { ...campaignMeta });
       // Choice-reward missions run their reward pick on the map AFTER results.
@@ -759,6 +738,7 @@ function dispatch(command, { deferRolloverFx = false } = {}) {
     return false;
   }
   lastDispatchEvents = result.events ?? [];
+  recordOnlineValorEvents(matchConfig, lastDispatchEvents);
   state = result.nextState;
   recordTutorialProgress(prepared, result, prevPlayer);
   recordCampaignProgressHooks(prepared, result, beforeState);

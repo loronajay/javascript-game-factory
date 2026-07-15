@@ -36,6 +36,7 @@ import {
 } from "./campaignConstants.js";
 import { getUnitType } from "../core/unitCatalog.js";
 import { STARTER_UNIT_TYPES, readUnlockProgress, writeUnlockProgress } from "../progression/unlocks.js";
+import { grantCampaignMissionValor } from "../progression/valorRewards.js";
 import { enqueueDraftBattleUnlockAnnouncement, enqueueSkinUnlockAnnouncements, enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
 import { getCampaignMission } from "./campaignModel.js";
 import { defaultStorage, readCampaignProgress, writeCampaignProgress } from "./campaignProgress.js";
@@ -506,8 +507,10 @@ export function evaluateCampaignMission(missionId, state, meta = {}) {
 export function completeCampaignMission(storage = defaultStorage(), missionId, state, meta = {}) {
   const evaluation = evaluateCampaignMission(missionId, state, meta);
   const current = readCampaignProgress(storage);
+  const mission = getCampaignMission(missionId);
+  const valorReward = Math.max(0, Math.floor(Number(mission?.valorReward) || 0));
   if (!evaluation.victory) {
-    return { ...evaluation, progress: current, newRewardUnits: [], newRewardSkins: [] };
+    return { ...evaluation, progress: current, newRewardUnits: [], newRewardSkins: [], valorReward, valorGranted: 0 };
   }
 
   const completedMissions = new Set(current.completedMissions);
@@ -522,7 +525,8 @@ export function completeCampaignMission(storage = defaultStorage(), missionId, s
     },
   });
 
-  const unlockProgress = readUnlockProgress(storage);
+  const valorGrant = grantCampaignMissionValor(storage, missionId, valorReward);
+  const unlockProgress = valorGrant.progress;
   const existing = new Set(unlockProgress.unlockedUnits);
   const newRewardUnits = evaluation.rewardUnits.filter((type) => !existing.has(type));
   const existingSkins = new Set((unlockProgress.unlockedSkins ?? []).map((skin) => `${skin.type}:${skin.slug}`));
@@ -540,5 +544,5 @@ export function completeCampaignMission(storage = defaultStorage(), missionId, s
   enqueueSkinUnlockAnnouncements(storage, newRewardSkins);
   enqueueDraftBattleUnlockAnnouncement(storage);
 
-  return { ...evaluation, progress, newRewardUnits, newRewardSkins };
+  return { ...evaluation, progress, newRewardUnits, newRewardSkins, valorReward, valorGranted: valorGrant.valorGranted };
 }

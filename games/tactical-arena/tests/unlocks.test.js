@@ -6,6 +6,7 @@ import {
   LEGACY_TUTORIAL_PROGRESS_KEY,
   OUT_OF_RETIREMENT_SKIN_REWARDS,
   STARTING_VALOR_BALANCE,
+  TUTORIAL_VALOR_REWARD,
   TUTORIAL_JUGGERNAUT_REWARD_UNIT,
   TUTORIAL_PROGRESS_KEY,
   TUTORIAL_REWARD_SKIN_CHOICES,
@@ -55,12 +56,13 @@ test("tutorial reward choices match the first skin-choice pool", () => {
   ]);
 });
 
-test("fresh profiles start with Valor for unit purchases", () => {
+test("fresh profiles start with no Valor for unit purchases", () => {
   const progress = readUnlockProgress(storageAdapter());
 
   assert.equal(VALOR_RESOURCE.id, "valor");
   assert.equal(VALOR_RESOURCE.name, "Valor");
-  assert.equal(progress.valorBalance, STARTING_VALOR_BALANCE);
+  assert.equal(STARTING_VALOR_BALANCE, 0);
+  assert.equal(progress.valorBalance, 0);
   assert.deepEqual(progress.purchasedSkins, []);
 });
 
@@ -74,13 +76,30 @@ test("completing all tutorial entries unlocks Juggernaut but waits for a skin ch
   assert.equal(progress.allTutorialsComplete, true);
   assert.equal(progress.rewardGranted, false);
   assert.equal(progress.selectedRewardSkin, null);
+  assert.equal(progress.valorBalance, TUTORIAL_VALOR_REWARD);
+  assert.equal(progress.tutorialValorGranted, true);
   assert.ok(progress.unlockedUnits.includes(TUTORIAL_JUGGERNAUT_REWARD_UNIT));
   assert.equal(isUnitUnlocked("juggernaut", storage), true);
   assert.ok(availableTypesForSlot(["swordsman", "archer", "mystic", "magician"], 0, true, storage).includes("juggernaut"));
 
   progress = readUnlockProgress(storage);
   assert.equal(progress.allTutorialsComplete, true);
+  assert.equal(progress.valorBalance, TUTORIAL_VALOR_REWARD);
   assert.ok(progress.unlockedUnits.includes("juggernaut"));
+});
+
+test("tutorial Valor is granted only once after all tutorials are complete", () => {
+  const storage = storageAdapter();
+
+  for (const tutorialId of [TUTORIAL_BASICS_ID, TUTORIAL_ARTS_MP_ID, TUTORIAL_DAMAGE_TYPES_ID, TUTORIAL_RAGE_ID]) {
+    completeTutorial(storage, tutorialId);
+  }
+  completeTutorial(storage, TUTORIAL_RAGE_ID);
+  completeTutorial(storage, TUTORIAL_BASICS_ID);
+
+  const progress = readUnlockProgress(storage);
+  assert.equal(progress.valorBalance, TUTORIAL_VALOR_REWARD);
+  assert.equal(progress.tutorialValorGranted, true);
 });
 
 test("selecting the tutorial reward unlocks exactly that skin", () => {

@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { isCampaignMapPanTarget, syncResultsActions } from "../src/ui/menuFlow.js";
+import { campaignValorRewardForNode, isCampaignMapPanTarget, syncResultsActions } from "../src/ui/menuFlow.js";
+import { CLOD_MISSION_ID } from "../src/campaign/campaign.js";
 
 const outcomeScreensHtml = readFileSync(new URL("../html/outcome-screens.html", import.meta.url), "utf8");
 
@@ -49,4 +50,10 @@ test("campaign map panning does not capture mission node clicks", () => {
   assert.equal(isCampaignMapPanTarget(host, host), true);
   assert.equal(isCampaignMapPanTarget(mapBackgroundTarget, host), true);
   assert.equal(isCampaignMapPanTarget(missionNodeTarget, host), false);
+});
+
+test("campaign detail Valor falls back to canonical mission rewards", () => {
+  assert.equal(campaignValorRewardForNode({ id: CLOD_MISSION_ID }), 80);
+  assert.equal(campaignValorRewardForNode({ id: CLOD_MISSION_ID, valorReward: 0 }), 80);
+  assert.equal(campaignValorRewardForNode({ id: CLOD_MISSION_ID, valorReward: 12 }), 12);
 });

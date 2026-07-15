@@ -1,6 +1,6 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { DRAFT_BATTLE_REQUIRED_UNITS, isDraftBattleAvailable, isDraftableProgressionUnit } from "./draftAvailability.js";
-import { STARTER_UNIT_TYPES, readUnlockProgress } from "./unlocks.js";
+import { STARTER_UNIT_TYPES, VALOR_RESOURCE, readUnlockProgress } from "./unlocks.js";
 
 export const PROGRESSION_ANNOUNCEMENTS_KEY = "tacticalArenaProgressionAnnouncementsV1";
 export const PROGRESSION_ANNOUNCEMENTS_SEEN_KEY = "tacticalArenaProgressionAnnouncementsSeenV1";
@@ -84,6 +84,23 @@ export function buildDraftBattleUnlockAnnouncement() {
   };
 }
 
+export function buildValorGainAnnouncement({ id, amount, title, body, eyebrow = "Achievement" } = {}) {
+  const rawId = typeof id === "string" && id.trim() ? id.trim() : null;
+  const normalizedId = rawId?.startsWith("valor-gain:") ? rawId.slice("valor-gain:".length) : rawId;
+  const normalizedAmount = Math.max(0, Math.floor(Number(amount) || 0));
+  if (!normalizedId || normalizedAmount <= 0) return null;
+  const amountLabel = `${normalizedAmount.toLocaleString("en-US")} ${VALOR_RESOURCE.name}`;
+  return {
+    id: `valor-gain:${normalizedId}`,
+    kind: "valor-gain",
+    amount: normalizedAmount,
+    eyebrow,
+    title: title || `${amountLabel} Earned`,
+    body: body || `${amountLabel} has been added to your account.`,
+    primaryLabel: "Continue",
+  };
+}
+
 export function normalizeProgressionAnnouncement(value) {
   if (!value || typeof value !== "object") return null;
   if (value.kind === "unit-unlock") return buildUnitUnlockAnnouncement(value.unitType);
@@ -92,6 +109,7 @@ export function normalizeProgressionAnnouncement(value) {
     slug: value.skinSlug ?? value.slug,
   });
   if (value.kind === "mode-unlock" && value.mode === "draft-battles") return buildDraftBattleUnlockAnnouncement();
+  if (value.kind === "valor-gain") return buildValorGainAnnouncement(value);
   return null;
 }
 
@@ -150,6 +168,10 @@ export function enqueueSkinUnlockAnnouncements(storage = defaultStorage(), skins
       return announcement ? { kind: "skin-unlock", unitType: skin.type, skinSlug: skin.slug } : null;
     }).filter(Boolean),
   );
+}
+
+export function enqueueValorGainAnnouncement(storage = defaultStorage(), value = {}) {
+  return enqueueProgressionAnnouncements(storage, [{ ...value, kind: "valor-gain" }]);
 }
 
 export function enqueueDraftBattleUnlockAnnouncement(storage = defaultStorage()) {

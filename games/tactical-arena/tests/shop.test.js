@@ -161,7 +161,8 @@ test("shop unit cards open a detail card and return to unit browsing", () => {
 
   const detail = walk(overlay, (node) => hasClass(node, "shop-unit-detail"))[0];
   assert.ok(detail, "details button should open a unit detail card inside the shop");
-  assert.match(visibleText(detail), /Tips/i);
+  assert.doesNotMatch(visibleText(detail), /Tips/i, "shop unit details should not be crowded by a tips panel");
+  assert.equal(walk(detail, (node) => hasClass(node, "shop-unit-tips")).length, 0);
   const rules = walk(detail, (node) => hasClass(node, "shop-unit-detail-rules"))[0];
   assert.match(rules.innerHTML, /stat-grid/);
   assert.match(rules.innerHTML, /ref-group/);

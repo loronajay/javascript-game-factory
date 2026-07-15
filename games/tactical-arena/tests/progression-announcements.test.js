@@ -10,11 +10,13 @@ import {
 } from "../src/campaign/campaign.js";
 import { writeUnlockProgress } from "../src/progression/unlocks.js";
 import {
+  buildValorGainAnnouncement,
   buildDraftBattleUnlockAnnouncement,
   consumeProgressionAnnouncements,
   enqueueDraftBattleUnlockAnnouncement,
   enqueueSkinUnlockAnnouncements,
   enqueueUnitUnlockAnnouncements,
+  enqueueValorGainAnnouncement,
   readProgressionAnnouncements,
   readSeenProgressionAnnouncementIds,
   syncMissingUnitUnlockAnnouncements,
@@ -137,6 +139,36 @@ test("draft battle achievement queues once when the account has eight known unit
 
   consumeProgressionAnnouncements(storage);
   assert.deepEqual(enqueueDraftBattleUnlockAnnouncement(storage), []);
+});
+
+test("tutorial Valor gain queues an achievement-style announcement once", () => {
+  const storage = storageAdapter();
+
+  const pending = enqueueValorGainAnnouncement(storage, {
+    id: "tutorials-complete",
+    amount: 500,
+    title: "Tutorial Valor Earned",
+    body: "Completing every tutorial awarded 500 Valor.",
+  });
+
+  assert.deepEqual(pending.map((announcement) => announcement.id), ["valor-gain:tutorials-complete"]);
+  assert.deepEqual(buildValorGainAnnouncement({
+    id: "tutorials-complete",
+    amount: 500,
+    title: "Tutorial Valor Earned",
+    body: "Completing every tutorial awarded 500 Valor.",
+  }), {
+    id: "valor-gain:tutorials-complete",
+    kind: "valor-gain",
+    amount: 500,
+    eyebrow: "Achievement",
+    title: "Tutorial Valor Earned",
+    body: "Completing every tutorial awarded 500 Valor.",
+    primaryLabel: "Continue",
+  });
+
+  consumeProgressionAnnouncements(storage);
+  assert.deepEqual(enqueueValorGainAnnouncement(storage, { id: "tutorials-complete", amount: 500 }), []);
 });
 
 test("existing eight-unit profiles are audited into the draft battle achievement", () => {

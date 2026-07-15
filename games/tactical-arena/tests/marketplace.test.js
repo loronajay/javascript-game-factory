@@ -10,6 +10,7 @@ import {
   getSkinOffer,
   getUnitOffer,
   purchaseUnitWithValor,
+  unitValorCost,
 } from "../src/progression/marketplace.js";
 
 function storageAdapter() {
@@ -63,6 +64,42 @@ test("unit offers use Valor while skin offers use premium prices", () => {
   assert.ok(skin.price.cents > 0);
   assert.match(skin.sku, /^ta\.skin\.swordsman\.medieval$/);
   assert.equal(formatPremiumPrice(skin.price), "$2.99");
+});
+
+test("unit Valor costs follow the invisible star buckets", () => {
+  const expectedCosts = {
+    juggernaut: 450,
+    "big-brother": 450,
+    "witch-doctor": 450,
+    monk: 450,
+    paladin: 650,
+    sniper: 650,
+    miner: 650,
+    necromancer: 650,
+    virus: 650,
+    clod: 650,
+    gargoyle: 650,
+    "father-time": 650,
+    "fat-knight": 850,
+    ronin: 850,
+    angel: 850,
+    "fat-bowman": 850,
+    "little-brother": 850,
+    king: 850,
+    "fat-cleric": 850,
+    "fat-wizard": 850,
+    treant: 850,
+    "riot-cop": 850,
+    blacksword: 1150,
+    "mother-nature": 1150,
+    nemesis: 1150,
+    summoner: 1150,
+  };
+
+  for (const [type, cost] of Object.entries(expectedCosts)) {
+    assert.equal(unitValorCost(type), cost, `${type} should cost ${cost} Valor`);
+    assert.equal(getUnitOffer(type).price.amount, cost, `${type} offer should cost ${cost} Valor`);
+  }
 });
 
 test("purchasing a unit spends Valor and unlocks the unit", () => {

@@ -1,0 +1,76 @@
+import { readUnlockProgress, writeUnlockProgress } from "./unlocks.js";
+
+export const ONLINE_MATCH_WIN_VALOR_REWARD = 90;
+export const ONLINE_MATCH_LOSS_VALOR_REWARD = 35;
+export const MIN_ONLINE_REWARD_REVISION = 12;
+
+function normalizedValorAmount(amount) {
+  return Math.max(0, Math.floor(Number(amount) || 0));
+}
+
+export function grantValor(storage = globalThis.localStorage, amount) {
+  const valorGranted = normalizedValorAmount(amount);
+  const progress = readUnlockProgress(storage);
+  if (valorGranted <= 0) return { accepted: false, valorGranted: 0, progress };
+  const next = writeUnlockProgress(storage, {
+    ...progress,
+    valorBalance: progress.valorBalance + valorGranted,
+  });
+  return { accepted: true, valorGranted, progress: next };
+}
+
+export function grantCampaignMissionValor(storage = globalThis.localStorage, missionId, amount) {
+  const valorReward = normalizedValorAmount(amount);
+  const progress = readUnlockProgress(storage);
+  if (!missionId || valorReward <= 0 || progress.campaignValorRewards.includes(missionId)) {
+    return { accepted: false, valorGranted: 0, progress };
+  }
+  const next = writeUnlockProgress(storage, {
+    ...progress,
+    valorBalance: progress.valorBalance + valorReward,
+    campaignValorRewards: [...progress.campaignValorRewards, missionId],
+  });
+  return { accepted: true, valorGranted: valorReward, progress: next };
+}
+
+export function onlineMatchValorEligibility({ match, mySeat, hadConcede = false } = {}) {
+  if (!match || match.phase !== "complete") return { eligible: false, reason: "MATCH_NOT_COMPLETE" };
+  if (hadConcede) return { eligible: false, reason: "MATCH_CONCEDED" };
+  if (!Number.isInteger(mySeat) || mySeat < 1) return { eligible: false, reason: "INVALID_SEAT" };
+  if (!Number.isInteger(match.winner) || match.winner < 1) return { eligible: false, reason: "NO_WINNER" };
+  if ((Number(match.revision) || 0) < MIN_ONLINE_REWARD_REVISION) {
+    return { eligible: false, reason: "MATCH_TOO_SHORT" };
+  }
+  return { eligible: true, reason: "ELIGIBLE" };
+}
+
+export function grantOnlineMatchValor(storage = globalThis.localStorage, { match, mySeat, hadConcede = false } = {}) {
+  const eligibility = onlineMatchValorEligibility({ match, mySeat, hadConcede });
+  const progress = readUnlockProgress(storage);
+  if (!eligibility.eligible) {
+    return { accepted: false, valorGranted: 0, progress, reason: eligibility.reason };
+  }
+  const valorGranted = match.winner === mySeat ? ONLINE_MATCH_WIN_VALOR_REWARD : ONLINE_MATCH_LOSS_VALOR_REWARD;
+  const next = writeUnlockProgress(storage, {
+    ...progress,
+    valorBalance: progress.valorBalance + valorGranted,
+  });
+  return { accepted: true, valorGranted, progress: next, reason: eligibility.reason };
+}
+
+export function recordOnlineValorEvents(matchConfig, events = []) {
+  if (matchConfig?.mode !== "online") return;
+  if (events.some((event) => event.type === "PLAYER_CONCEDED")) matchConfig.onlineMatchHadConcede = true;
+}
+
+export function claimOnlineMatchValorReward(storage, summary, { matchConfig, match, mySeat } = {}) {
+  if (matchConfig?.mode !== "online" || matchConfig.onlineValorRewardClaimed) return null;
+  const result = grantOnlineMatchValor(storage, {
+    match,
+    mySeat,
+    hadConcede: Boolean(matchConfig.onlineMatchHadConcede),
+  });
+  matchConfig.onlineValorRewardClaimed = true;
+  if (summary) summary.onlineValor = result;
+  return result;
+}

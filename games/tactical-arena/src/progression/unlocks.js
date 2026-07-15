@@ -7,7 +7,8 @@ export const VALOR_RESOURCE = Object.freeze({
   name: "Valor",
   shortName: "Valor",
 });
-export const STARTING_VALOR_BALANCE = 900;
+export const STARTING_VALOR_BALANCE = 0;
+export const TUTORIAL_VALOR_REWARD = 500;
 
 export const TUTORIAL_REWARD_SKIN_CHOICES = Object.freeze([
   Object.freeze({ type: "juggernaut", slug: "bio-mech" }),
@@ -109,6 +110,8 @@ function progressFallback() {
     rewardGranted: false,
     allTutorialsComplete: false,
     valorBalance: STARTING_VALOR_BALANCE,
+    tutorialValorGranted: false,
+    campaignValorRewards: [],
     unlockedUnits: [...STARTER_UNIT_TYPES],
     campaignRewardUnits: {},
     campaignRewardSkins: {},
@@ -126,6 +129,8 @@ export function normalizeUnlockProgress(value = {}) {
   const unlockedUnits = new Set([...STARTER_UNIT_TYPES, ...uniqueStrings(value.unlockedUnits)]);
   if (allTutorialsComplete) unlockedUnits.add(TUTORIAL_JUGGERNAUT_REWARD_UNIT);
   const valorBalance = normalizeValorBalance(value.valorBalance);
+  const tutorialValorGranted = Boolean(value.tutorialValorGranted);
+  const campaignValorRewards = uniqueStrings(value.campaignValorRewards);
   const campaignRewardUnits = normalizeCampaignRewardUnits(value.campaignRewardUnits);
   for (const type of Object.values(campaignRewardUnits)) unlockedUnits.add(type);
   const campaignRewardSkins = normalizeCampaignRewardSkins(value.campaignRewardSkins);
@@ -145,6 +150,8 @@ export function normalizeUnlockProgress(value = {}) {
     rewardGranted,
     allTutorialsComplete,
     valorBalance,
+    tutorialValorGranted,
+    campaignValorRewards,
     unlockedUnits: [...unlockedUnits],
     campaignRewardUnits,
     campaignRewardSkins,

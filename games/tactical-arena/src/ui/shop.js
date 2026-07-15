@@ -148,8 +148,6 @@ export function openShop(storage = globalThis.localStorage) {
     rules.innerHTML = unitDetailHtml(def);
     detail.appendChild(rules);
 
-    detail.appendChild(createUnitTips(def));
-
     const actions = el("div", "shop-unit-detail-actions");
     actions.appendChild(createUnitBuyButton(offer));
     detail.appendChild(actions);
@@ -280,48 +278,6 @@ function createUnitOwnershipLine(offer) {
   const line = el("span", "shop-unit-detail-state");
   line.append(el("span", "", "Unlock for"), createValorBadge(offer.price.amount, "shop-price"));
   return line;
-}
-
-function createUnitTips(def) {
-  const tips = el("section", "shop-unit-tips");
-  tips.appendChild(el("h4", "shop-unit-tips-title", "Tips"));
-  const list = el("ul", "shop-unit-tips-list");
-  for (const tip of unitTips(def)) {
-    const item = el("li", "", tip);
-    list.appendChild(item);
-  }
-  tips.appendChild(list);
-  return tips;
-}
-
-function unitTips(def) {
-  const stats = def.stats ?? {};
-  const role = def.ai?.role ?? def.classType ?? "unit";
-  const tips = [];
-
-  if (role === "support" || role === "caster") {
-    tips.push("Keep them screened until their ARTS can swing a turn.");
-  } else if (role === "ranged" || stats.attackRange >= 4) {
-    tips.push("Use range and sight lines to pressure targets before they can answer.");
-  } else if (role === "controller") {
-    tips.push("Save MP for control turns that deny an enemy's best activation.");
-  } else if (role === "bruiser" || def.classType === "melee") {
-    tips.push("Send them toward contested tiles where their basic attack stays relevant.");
-  } else {
-    tips.push("Look for flanks and timing windows instead of trading straight ahead.");
-  }
-
-  const activeArts = (def.arts ?? []).filter((art) => art.kind === "active");
-  if (activeArts.length > 0 && stats.maxMp > 0) {
-    tips.push(`${def.name} has ${activeArts.length} active ART${activeArts.length === 1 ? "" : "S"}; spend MP when the position is worth more than a basic attack.`);
-  }
-
-  const rage = def.rageArt ?? def.ragePassive;
-  if (rage) {
-    tips.push(`At 5 HP or lower, RAGE turns on ${rage.name}, so a wounded ${def.name} can still change the fight.`);
-  }
-
-  return tips;
 }
 
 function createValorBadge(amount, className = "") {

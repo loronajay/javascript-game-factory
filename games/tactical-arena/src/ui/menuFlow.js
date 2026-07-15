@@ -15,6 +15,7 @@ import {
 } from "./performanceSettings.js";
 import { openSkinGallery } from "./skinGallery.js";
 import { openShop } from "./shop.js";
+import { formatValor } from "../progression/marketplace.js";
 import { openNicknameGallery } from "./nicknameGallery.js";
 import { getNicknamePref } from "./nicknameModel.js";
 import { openSkinPicker } from "./skinPicker.js";
@@ -53,6 +54,7 @@ import {
   campaignSelectableUnitTypes,
   createCampaignMatchConfig,
   getCampaignMap,
+  getCampaignMission,
   resetCampaignProgress
 } from "../campaign/campaign.js";
 import { createTutorialMatchConfig, getNextTutorialId, getTutorialList, readProgress } from "../tutorials/basics.js";
@@ -81,6 +83,13 @@ export function campaignUnitChoiceGroups(unlockedTypes = [], squad = [], slot = 
       type,
     })),
   }));
+}
+
+export function campaignValorRewardForNode(node) {
+  const nodeReward = Math.floor(Number(node?.valorReward) || 0);
+  if (nodeReward > 0) return nodeReward;
+  const missionReward = Math.floor(Number(getCampaignMission(node?.id)?.valorReward) || 0);
+  return Math.max(0, missionReward);
 }
 
 export function syncScreenMusic(audio, screenName) {
@@ -464,6 +473,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       `<dt>Best</dt><dd>${node?.stars ? `${node.stars} / 3 ★` : "No clear"}</dd>` +
       `<dt>Squad</dt><dd>${campaignSquadSize(node)} units</dd>` +
       `<dt>Reward</dt><dd>${escapeHtml((node?.rewardUnits ?? []).map(unitLabel).join(", ") || node?.rewardLabel || "TBD")}</dd>` +
+      `<dt>Valor</dt><dd>${escapeHtml(formatValor(campaignValorRewardForNode(node)))}</dd>` +
       `</dl>`;
     campaignStartBtn.textContent = node?.status === "completed" ? "Replay Mission" : node?.comingSoon ? "Coming Soon" : "Start Mission";
     campaignStartBtn.dataset.missionId = node?.id ?? "";
@@ -604,6 +614,9 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
         addStat(stats, "Bonus", campaign.bonusObjectives.filter((objective) => objective.earned).map((objective) => objective.label.replace(/^Bonus:\s*/i, "")).join(", "));
       }
       addStat(stats, "Reward", campaign.newRewardUnits?.length ? campaign.newRewardUnits.map(unitLabel).join(", ") : campaign.victory ? "Already unlocked" : "Win to unlock");
+      addStat(stats, "Valor", campaign.valorGranted > 0 ? `+${formatValor(campaign.valorGranted)}` : campaign.victory ? "Already claimed" : `Win to earn ${formatValor(campaign.valorReward ?? 0)}`);
+    } else if (online && summary.onlineValor) {
+      addStat(stats, "Valor", summary.onlineValor.valorGranted > 0 ? `+${formatValor(summary.onlineValor.valorGranted)}` : "No reward");
     }
     addStat(stats, "Board", `${summary.size} × ${summary.size}`);
     addStat(stats, "Squad turns", String(summary.turns));
@@ -660,8 +673,8 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       summary.rewardGranted && summary.selectedRewardSkin
         ? `Reward selected: ${skinRewardLabel(summary.selectedRewardSkin)}.`
         : rewardPending
-          ? "Juggernaut unlocked. Choose one starter reward skin to add to your collection."
-          : "Tutorial progress saved. Complete every tutorial to unlock Juggernaut and choose one reward skin.";
+          ? "Juggernaut unlocked. 500 Valor earned. Choose one starter reward skin to add to your collection."
+          : "Tutorial progress saved. Complete every tutorial to unlock Juggernaut, earn 500 Valor, and choose one reward skin.";
     const nextBtn = $("[data-tutorial-complete='next']", tutorialComplete);
     const nextTutorialId = getNextTutorialId(globalThis.localStorage, summary.tutorialId ?? null);
     if (nextBtn) {

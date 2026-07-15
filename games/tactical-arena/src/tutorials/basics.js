@@ -7,11 +7,12 @@ import {
   TUTORIAL_JUGGERNAUT_REWARD_UNIT,
   TUTORIAL_PROGRESS_KEY,
   TUTORIAL_REWARD_SKIN_CHOICES,
+  TUTORIAL_VALOR_REWARD,
   normalizeUnlockProgress,
   readUnlockProgress,
   writeUnlockProgress
 } from "../progression/unlocks.js";
-import { enqueueDraftBattleUnlockAnnouncement, enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
+import { enqueueDraftBattleUnlockAnnouncement, enqueueUnitUnlockAnnouncements, enqueueValorGainAnnouncement } from "../progression/announcements.js";
 
 export const TUTORIAL_BASICS_ID = "basics";
 export const TUTORIAL_ARTS_MP_ID = "arts-mp";
@@ -562,14 +563,25 @@ export function completeTutorial(storage, tutorialId) {
 
   const completedTutorials = TUTORIAL_IDS.filter((id) => completed.has(id));
   const allTutorialsComplete = TUTORIAL_IDS.every((id) => completed.has(id));
+  const shouldGrantTutorialValor = allTutorialsComplete && !current.tutorialValorGranted;
   const next = writeUnlockProgress(storage, {
     ...current,
     completedTutorials,
     allTutorialsComplete,
+    valorBalance: current.valorBalance + (shouldGrantTutorialValor ? TUTORIAL_VALOR_REWARD : 0),
+    tutorialValorGranted: current.tutorialValorGranted || shouldGrantTutorialValor,
   });
   if (!previouslyComplete && next.allTutorialsComplete) {
     enqueueUnitUnlockAnnouncements(storage, [TUTORIAL_JUGGERNAUT_REWARD_UNIT]);
     enqueueDraftBattleUnlockAnnouncement(storage);
+  }
+  if (shouldGrantTutorialValor) {
+    enqueueValorGainAnnouncement(storage, {
+      id: "tutorials-complete",
+      amount: TUTORIAL_VALOR_REWARD,
+      title: "Tutorial Valor Earned",
+      body: `Completing every tutorial awarded ${TUTORIAL_VALOR_REWARD.toLocaleString("en-US")} Valor.`,
+    });
   }
   return next;
 }

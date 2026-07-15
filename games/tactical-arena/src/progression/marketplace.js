@@ -14,35 +14,50 @@ export const SHOP_TABS = Object.freeze([
   Object.freeze({ id: "boosts", label: "Boosts" }),
 ]);
 
-const UNIT_PRICE_BY_CLASS = Object.freeze({
-  melee: 450,
-  ranger: 450,
-  support: 550,
-  mage: 600,
-  tank: 700,
+const UNIT_VALOR_COST_BY_STAR = Object.freeze({
+  1: 450,
+  2: 650,
+  3: 850,
+  4: 1150,
 });
 
-const UNIT_PRICE_OVERRIDES = Object.freeze({
-  angel: 800,
-  "big-brother": 750,
-  blacksword: 750,
-  clod: 500,
-  gargoyle: 800,
-  juggernaut: 800,
-  king: 900,
-  "little-brother": 700,
-  "mother-nature": 900,
-  nemesis: 850,
-  ronin: 700,
-  summoner: 850,
-  treant: 800,
+const UNIT_VALOR_STAR_BY_TYPE = Object.freeze({
+  juggernaut: 1,
+  "big-brother": 1,
+  "witch-doctor": 1,
+  monk: 1,
+
+  paladin: 2,
+  sniper: 2,
+  miner: 2,
+  necromancer: 2,
+  virus: 2,
+  clod: 2,
+  gargoyle: 2,
+  "father-time": 2,
+
+  "fat-knight": 3,
+  ronin: 3,
+  angel: 3,
+  "fat-bowman": 3,
+  "little-brother": 3,
+  king: 3,
+  "fat-cleric": 3,
+  "fat-wizard": 3,
+  treant: 3,
+  "riot-cop": 3,
+
+  blacksword: 4,
+  "mother-nature": 4,
+  nemesis: 4,
+  summoner: 4,
 });
 
 export function unitValorCost(typeOrDef) {
   const type = typeof typeOrDef === "string" ? typeOrDef : typeOrDef?.id ?? typeOrDef?.type;
   const def = UNIT_TYPES[type];
   if (!def || def.summon) return null;
-  return UNIT_PRICE_OVERRIDES[type] ?? UNIT_PRICE_BY_CLASS[def.classType] ?? 650;
+  return UNIT_VALOR_COST_BY_STAR[UNIT_VALOR_STAR_BY_TYPE[type]] ?? null;
 }
 
 export function formatValor(amount) {

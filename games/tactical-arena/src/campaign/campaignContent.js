@@ -41,6 +41,31 @@ import { DEFAULT_SQUAD } from "../ui/squadModel.js";
 import { OUT_OF_RETIREMENT_SKIN_REWARDS } from "../progression/unlocks.js";
 import { computeCampaignGeometry, computeRegionBoxes } from "./campaignMap.js";
 
+export const CAMPAIGN_VALOR_REWARDS = Object.freeze({
+  [CLOD_MISSION_ID]: 80,
+  [NECROMANCER_MISSION_ID]: 90,
+  [WITCH_DOCTOR_MISSION_ID]: 100,
+  [FATHER_TIME_MISSION_ID]: 115,
+  [VIRUS_MISSION_ID]: 130,
+  [PALADIN_MISSION_ID]: 145,
+  [MONK_MISSION_ID]: 160,
+  [BROTHERS_MISSION_ID]: 175,
+  [GARGOYLE_MISSION_ID]: 190,
+  [SNIPER_MISSION_ID]: 205,
+  [WANDERING_PARTY_MISSION_ID]: 220,
+  [MINER_MISSION_ID]: 235,
+  [HASBEEN_HEROES_MISSION_ID]: 250,
+  [RONIN_MISSION_ID]: 265,
+  [WRONG_PLACE_MISSION_ID]: 280,
+  [OUT_OF_RETIREMENT_MISSION_ID]: 300,
+  [VOIDWOOD_MISSION_ID]: 320,
+  [SPIRIT_WOODS_MISSION_ID]: 340,
+  [SHOWDOWN_MISSION_ID]: 365,
+  [NOT_MY_KING_MISSION_ID]: 390,
+  [VOID_CASTLE_MISSION_ID]: 420,
+  [FINAL_BATTLE_MISSION_ID]: 500,
+});
+
 // Fully-authored, playable missions. Everything OTHER than the map graph lives here
 // (squads, flavor copy, rewards); the mission's cell + trail wiring comes from
 // CAMPAIGN_TRAIL below so this object never carries hand-placed map coordinates.
@@ -515,6 +540,7 @@ function buildCampaignMissions() {
       connections: [],
       region: stop.region,
       locationName: stop.locationName,
+      valorReward: CAMPAIGN_VALOR_REWARDS[stop.id] ?? 75,
       requiresPreviousMissionsComplete: Boolean(stop.requiresPreviousMissionsComplete ?? base.requiresPreviousMissionsComplete),
     });
   });
