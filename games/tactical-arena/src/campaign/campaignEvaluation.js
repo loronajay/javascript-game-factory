@@ -509,8 +509,17 @@ export function completeCampaignMission(storage = defaultStorage(), missionId, s
   const current = readCampaignProgress(storage);
   const mission = getCampaignMission(missionId);
   const valorReward = Math.max(0, Math.floor(Number(mission?.valorReward) || 0));
+  const valorWasClaimed = readUnlockProgress(storage).campaignValorRewards.includes(missionId);
   if (!evaluation.victory) {
-    return { ...evaluation, progress: current, newRewardUnits: [], newRewardSkins: [], valorReward, valorGranted: 0 };
+    return {
+      ...evaluation,
+      progress: current,
+      newRewardUnits: [],
+      newRewardSkins: [],
+      valorReward,
+      valorGranted: 0,
+      valorClaimed: valorWasClaimed,
+    };
   }
 
   const completedMissions = new Set(current.completedMissions);
@@ -544,5 +553,13 @@ export function completeCampaignMission(storage = defaultStorage(), missionId, s
   enqueueSkinUnlockAnnouncements(storage, newRewardSkins);
   enqueueDraftBattleUnlockAnnouncement(storage);
 
-  return { ...evaluation, progress, newRewardUnits, newRewardSkins, valorReward, valorGranted: valorGrant.valorGranted };
+  return {
+    ...evaluation,
+    progress,
+    newRewardUnits,
+    newRewardSkins,
+    valorReward,
+    valorGranted: valorGrant.valorGranted,
+    valorClaimed: valorGrant.progress.campaignValorRewards.includes(missionId),
+  };
 }

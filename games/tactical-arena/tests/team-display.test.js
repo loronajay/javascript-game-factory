@@ -28,6 +28,12 @@ test("team setup labels name the paired players explicitly", () => {
   assert.equal(playerSeatListLabel([1, 3]), "Player 1 + Player 3");
   assert.equal(playerSeatListLabel([2, 4]), "Player 2 + Player 4");
   assert.equal(teamPairingSummary(4, "teams"), "Teams: Player 1 + Player 3 vs Player 2 + Player 4.");
+  assert.equal(teamPairingSummary(3, "teams"), "");
+  assert.deepEqual(teamGroupsForSetup(3, "teams"), [
+    { team: 1, seats: [1] },
+    { team: 2, seats: [2] },
+    { team: 3, seats: [3] },
+  ]);
 });
 
 test("hot-seat setup refreshes when either player count or format changes", () => {

@@ -93,6 +93,13 @@ export function campaignValorRewardForNode(node) {
   return Math.max(0, missionReward);
 }
 
+export function campaignResultsValorLabel(campaign) {
+  const valorGranted = Math.floor(Number(campaign?.valorGranted) || 0);
+  if (valorGranted > 0) return `+${formatValor(valorGranted)}`;
+  if (campaign?.valorClaimed || campaign?.victory) return "Already claimed";
+  return `Win to earn ${formatValor(campaign?.valorReward ?? 0)}`;
+}
+
 export function campaignPendingRewardActionForNode(node, storage = globalThis.localStorage) {
   if (!node || node.status !== "completed") return null;
   if (node.rewardSkinPack) {
@@ -681,7 +688,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
         addStat(stats, "Bonus", campaign.bonusObjectives.filter((objective) => objective.earned).map((objective) => objective.label.replace(/^Bonus:\s*/i, "")).join(", "));
       }
       addStat(stats, "Reward", campaign.newRewardUnits?.length ? campaign.newRewardUnits.map(unitLabel).join(", ") : campaign.victory ? "Already unlocked" : "Win to unlock");
-      addStat(stats, "Valor", campaign.valorGranted > 0 ? `+${formatValor(campaign.valorGranted)}` : campaign.victory ? "Already claimed" : `Win to earn ${formatValor(campaign.valorReward ?? 0)}`);
+      addStat(stats, "Valor", campaignResultsValorLabel(campaign));
     } else if (online && summary.onlineValor) {
       addStat(stats, "Valor", summary.onlineValor.valorGranted > 0 ? `+${formatValor(summary.onlineValor.valorGranted)}` : "No reward");
     }

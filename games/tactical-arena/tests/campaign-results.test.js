@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 import {
   campaignPendingRewardActionForNode,
+  campaignResultsValorLabel,
   campaignValorRewardForNode,
   isCampaignMapPanTarget,
   syncResultsActions,
@@ -78,6 +79,13 @@ test("campaign detail Valor falls back to canonical mission rewards", () => {
   assert.equal(campaignValorRewardForNode({ id: CLOD_MISSION_ID }), clodReward);
   assert.equal(campaignValorRewardForNode({ id: CLOD_MISSION_ID, valorReward: 0 }), clodReward);
   assert.equal(campaignValorRewardForNode({ id: CLOD_MISSION_ID, valorReward: 12 }), 12);
+});
+
+test("campaign results do not promise already-claimed Valor on losses", () => {
+  assert.equal(campaignResultsValorLabel({ victory: false, valorReward: 75, valorGranted: 0 }), "Win to earn 75 Valor");
+  assert.equal(campaignResultsValorLabel({ victory: false, valorReward: 75, valorGranted: 0, valorClaimed: true }), "Already claimed");
+  assert.equal(campaignResultsValorLabel({ victory: true, valorReward: 75, valorGranted: 0, valorClaimed: true }), "Already claimed");
+  assert.equal(campaignResultsValorLabel({ victory: true, valorReward: 75, valorGranted: 75 }), "+75 Valor");
 });
 
 test("completed campaign skin rewards stay claimable until the player chooses one", () => {

@@ -167,14 +167,18 @@ export function createBattleState({
   teamColors = null,
   teamNames = null
 } = {}) {
-  const playerRoster = players ?? createRoster({ playerCount, format, teamColors });
+  const rosterPlayerCount = players?.length ?? Number(playerCount);
+  const normalizedFormat = format === FORMATS.TEAMS && rosterPlayerCount === 4
+    ? FORMATS.TEAMS
+    : FORMATS.FFA;
+  const playerRoster = players ?? createRoster({ playerCount, format: normalizedFormat, teamColors });
   const roster = units ?? defaultRoster(size, playerRoster);
   const activeWeather = normalizeWeatherSpec(weather) ??
     normalizeWeatherSpec(roster.find((unit) => unit?.weather && (unit.hp ?? 1) > 0)?.weather);
 
   const state = {
     size,
-    format,
+    format: normalizedFormat,
     teamNames: normalizeTeamNames(teamNames),
     players: playerRoster,
     turnOrder: playerRoster.map((slot) => slot.id),

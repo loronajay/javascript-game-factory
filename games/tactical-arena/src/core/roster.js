@@ -7,11 +7,11 @@ const PLAYER_COLORS = Object.freeze({
 
 export const FORMATS = Object.freeze({ FFA: "ffa", TEAMS: "teams" });
 
-const FOUR_PLAYER_CORNER_BY_SEAT = Object.freeze({ 1: 0, 2: 2, 3: 1, 4: 3 });
+const MULTIPLAYER_CORNER_BY_SEAT = Object.freeze({ 1: 0, 2: 2, 3: 1, 4: 3 });
 
 export function createRoster({ playerCount = 2, format = FORMATS.FFA, teamColors = null } = {}) {
   const count = clampPlayerCount(playerCount);
-  const teams = format === FORMATS.TEAMS;
+  const teams = format === FORMATS.TEAMS && count === 4;
   const seenInTeam = new Map();
   const roster = [];
 
@@ -33,7 +33,7 @@ export function createRoster({ playerCount = 2, format = FORMATS.FFA, teamColors
 }
 
 function cornerForSeat(seat, playerCount, teams) {
-  if (teams || playerCount === 4) return FOUR_PLAYER_CORNER_BY_SEAT[seat] ?? (seat - 1);
+  if (teams || playerCount >= 3) return MULTIPLAYER_CORNER_BY_SEAT[seat] ?? (seat - 1);
   return seat - 1;
 }
 

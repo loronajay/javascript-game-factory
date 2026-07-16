@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 
 import { beginActivation, concede, defend, finishActivation } from "../src/core/commands.js";
 import { applyCommand } from "../src/core/reducer.js";
-import { areAllies, areEnemies } from "../src/core/state.js";
+import { createRoster } from "../src/core/roster.js";
+import { areAllies, areEnemies, createBattleState } from "../src/core/state.js";
 import { hashState } from "../src/core/state-hash.js";
 import { createMatchState, teamOf } from "../src/match/matchBuilder.js";
 import { DEFAULT_SQUAD } from "../src/ui/squadPicker.js";
@@ -28,6 +29,44 @@ test("four-player 2v2 assigns odd seats against even seats", () => {
   assert.equal(teamOf(state, 4), 2);
   assert.equal(areAllies(firstLivingUnit(state, 1), firstLivingUnit(state, 3)), true);
   assert.equal(areEnemies(firstLivingUnit(state, 1), firstLivingUnit(state, 2)), true);
+});
+
+test("explicit four-player team rosters keep their team format", () => {
+  const state = createBattleState({
+    players: createRoster({ playerCount: 4, format: "teams" }),
+    format: "teams",
+  });
+
+  assert.equal(state.format, "teams");
+  assert.equal(state.players[2].team, 1);
+});
+
+test("three-player hot-seat matches are free-for-all even if teams is requested", () => {
+  const state = createMatchState({ size: 13, playerCount: 3, format: "teams" });
+
+  assert.deepEqual(state.turnOrder, [1, 2, 3]);
+  assert.equal(state.format, "ffa");
+  assert.deepEqual(state.players.map((slot) => [slot.id, slot.team]), [
+    [1, 1],
+    [2, 2],
+    [3, 3],
+  ]);
+  assert.equal(areEnemies(firstLivingUnit(state, 1), firstLivingUnit(state, 3)), true);
+});
+
+test("three-player hot-seat uses three distinct four-corner spawn blocks", () => {
+  const state = createMatchState({ size: 13, playerCount: 3, format: "ffa" });
+  const firstPositions = Object.fromEntries(
+    [1, 2, 3].map((player) => [player, firstLivingUnit(state, player).position])
+  );
+
+  assert.equal(state.units.length, 12);
+  assert.deepEqual(firstPositions, {
+    1: { x: 1, y: 12 },
+    2: { x: 1, y: 0 },
+    3: { x: 11, y: 0 },
+  });
+  assert.equal(new Set(state.units.map((unit) => `${unit.position.x},${unit.position.y}`)).size, state.units.length);
 });
 
 test("four-player matches spawn four squads without overlapping tiles", () => {

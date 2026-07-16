@@ -123,6 +123,27 @@ test("formation picker previews four-player FFA with the same seat corners as te
   );
 });
 
+test("formation picker previews three-player FFA on the first three four-player corners", () => {
+  assert.deepEqual(
+    formationPreviewSlots(2, 13, "ffa", 3).map((slot) => [slot.slot, slot.label, slot.position]),
+    [
+      [0, "4", { x: 1, y: 0 }],
+      [1, "2", { x: 0, y: 1 }],
+      [2, "3", { x: 0, y: 0 }],
+      [3, "1", { x: 1, y: 1 }]
+    ]
+  );
+  assert.deepEqual(
+    formationPreviewSlots(3, 13, "ffa", 3).map((slot) => [slot.slot, slot.label, slot.position]),
+    [
+      [0, "4", { x: 11, y: 0 }],
+      [1, "2", { x: 12, y: 1 }],
+      [2, "3", { x: 12, y: 0 }],
+      [3, "1", { x: 11, y: 1 }]
+    ]
+  );
+});
+
 test("the Ghoul (summon) is never offered in the picker pool", () => {
   assert.ok(!UNIT_TYPE_KEYS.includes("ghoul"));
 });

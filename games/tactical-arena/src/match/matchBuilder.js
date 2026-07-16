@@ -103,14 +103,17 @@ export function createMatchState({
   skins = null,
   nicknames = null
 } = {}) {
-  const players = createRoster({ playerCount, format, teamColors });
+  const normalizedFormat = format === FORMATS.TEAMS && Number(playerCount) === 4
+    ? FORMATS.TEAMS
+    : FORMATS.FFA;
+  const players = createRoster({ playerCount, format: normalizedFormat, teamColors });
   const state = createBattleState({
     size,
     seed,
     players,
     playerCount,
-    format,
-    teamColors,
+    format: normalizedFormat,
+    teamColors: normalizedFormat === FORMATS.TEAMS ? teamColors : null,
     teamNames,
     units: squads ? buildRoster(squads, size, players, skins, nicknames) : undefined,
   });

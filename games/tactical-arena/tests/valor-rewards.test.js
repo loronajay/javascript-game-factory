@@ -61,13 +61,19 @@ test("campaign Valor is granted once per victorious mission clear", () => {
   const storage = storageAdapter();
   const won = wonClodMission();
   const mission = CAMPAIGN_MISSIONS.find((candidate) => candidate.id === CLOD_MISSION_ID);
+  const lostAfterReward = { ...won, winner: 2 };
 
   const first = completeCampaignMission(storage, CLOD_MISSION_ID, won, { clodChargeHitCount: 1 });
   const replay = completeCampaignMission(storage, CLOD_MISSION_ID, won, { clodChargeHitCount: 1 });
+  const loss = completeCampaignMission(storage, CLOD_MISSION_ID, lostAfterReward, { clodChargeHitCount: 1 });
 
   assert.equal(first.valorReward, mission.valorReward);
   assert.equal(first.valorGranted, mission.valorReward);
+  assert.equal(first.valorClaimed, true);
   assert.equal(replay.valorGranted, 0);
+  assert.equal(replay.valorClaimed, true);
+  assert.equal(loss.valorGranted, 0);
+  assert.equal(loss.valorClaimed, true);
   assert.equal(readUnlockProgress(storage).valorBalance, mission.valorReward);
   assert.deepEqual(readUnlockProgress(storage).campaignValorRewards, [CLOD_MISSION_ID]);
 });

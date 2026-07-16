@@ -467,10 +467,10 @@ export function createUnitFigure(metrics, unit, { isTarget = false, selectedId =
   // SVG figurine, scaled by FIGURE_SCALE so a tall figurine doesn't swamp its tile.
   const figure = createBoardSpriteFigure(unit.type, svgElement, null, { skin: unit.skin });
   if (figure) {
-    // Red team (player 2) faces the enemy: mirror the painted sprite horizontally.
+    // Upper/right-side seats face left: mirror the painted sprite horizontally.
     // The <image> is centred on x=0 in the sprite-figure group, so scale(-1 1)
     // flips it about the coin centre without shifting its footing.
-    if (unit.player === 2) figure.setAttribute("transform", "scale(-1 1)");
+    if (unit.player === 2 || unit.player === 3) figure.setAttribute("transform", "scale(-1 1)");
     body.append(figure);
   } else {
     const figurine = createUnitFigurine(unit.type);

@@ -525,6 +525,17 @@ test("local match setup exposes compact board sizes from fifteen down to seven",
   }
 });
 
+test("hot-seat setup enables three-player free-for-all and reserves teams for four players", () => {
+  const html = readFileSync(join(GAME_ROOT, "html/setup-screens.html"), "utf8");
+  const setup = html.match(/data-screen="hsSetup"[\s\S]*?data-action="startHotSeat"/)?.[0] ?? "";
+  const playerControl = setup.match(/<div class="segmented" data-field="playerCount">[\s\S]*?<\/div>/)?.[0] ?? "";
+
+  assert.match(playerControl, /data-count="3">3<\/button>/);
+  assert.doesNotMatch(playerControl, /data-count="3" disabled/);
+  assert.match(setup, /Three-player matches are free-for-all/);
+  assert.match(setup, /four players can play FFA or 2v2/);
+});
+
 test("raging board units carry a rage state class and aura element", () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
@@ -589,9 +600,11 @@ test("board sprite facing follows player ownership instead of board position", (
 
     const p1Token = createUnitFigure(metrics, makeUnit("p1-crossed", 1, { x: 9, y: 9 }), { state, onUnitClick: () => {} });
     const p2Token = createUnitFigure(metrics, makeUnit("p2-left", 2, { x: 1, y: 1 }), { state, onUnitClick: () => {} });
+    const p3Token = createUnitFigure(metrics, makeUnit("p3-left", 3, { x: 11, y: 0 }), { state, onUnitClick: () => {} });
 
     assert.equal(p1Token.findByClass("sprite-figure").getAttribute("transform"), null);
     assert.equal(p2Token.findByClass("sprite-figure").getAttribute("transform"), "scale(-1 1)");
+    assert.equal(p3Token.findByClass("sprite-figure").getAttribute("transform"), "scale(-1 1)");
   } finally {
     globalThis.document = previousDocument;
   }

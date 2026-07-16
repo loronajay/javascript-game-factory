@@ -21,7 +21,7 @@ export const FORMATION_PREVIEW_SIZE = 13;
 export const FORMATION_SLOT_LABELS = Object.freeze(["1", "2", "3", "4"]);
 const FORMATION_LABEL_BY_ENGINE_SLOT = Object.freeze(["4", "2", "3", "1"]);
 const TWO_PLAYER_FFA_CORNER_BY_PLAYER = Object.freeze({ 1: 0, 2: 1, 3: 2, 4: 3 });
-const FOUR_PLAYER_CORNER_BY_PLAYER = Object.freeze({ 1: 0, 2: 2, 3: 1, 4: 3 });
+const MULTIPLAYER_CORNER_BY_PLAYER = Object.freeze({ 1: 0, 2: 2, 3: 1, 4: 3 });
 const FORMATION_CROP_BY_CORNER = Object.freeze({
   0: Object.freeze({ minX: 0, maxX: 3, minY: 9, maxY: 12 }),
   1: Object.freeze({ minX: 9, maxX: 12, minY: 0, maxY: 3 }),
@@ -261,8 +261,8 @@ function normalizeFormationPlayerCount(playerCount) {
 
 function formationCornerIndex(player = 1, format = "ffa", playerCount = 2) {
   const normalized = normalizeFormationPlayer(player);
-  const corners = normalizeFormationFormat(format) === "teams" || normalizeFormationPlayerCount(playerCount) === 4
-    ? FOUR_PLAYER_CORNER_BY_PLAYER
+  const corners = normalizeFormationFormat(format) === "teams" || normalizeFormationPlayerCount(playerCount) >= 3
+    ? MULTIPLAYER_CORNER_BY_PLAYER
     : TWO_PLAYER_FFA_CORNER_BY_PLAYER;
   return corners[normalized] ?? 0;
 }
