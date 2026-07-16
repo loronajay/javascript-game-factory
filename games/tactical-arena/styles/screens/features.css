@@ -132,6 +132,7 @@
 .shop-confirm-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font:900 .86rem var(--font-display); letter-spacing:.04em; text-transform:uppercase; }
 .shop-confirm-sub { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font:800 .58rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; }
 .shop-confirm-cost { display:flex; align-items:center; justify-content:space-between; gap:.8rem; min-width:0; padding:.55rem .65rem; border:1px solid rgba(203,159,85,.32); border-radius:7px; background:rgba(0,0,0,.24); color:var(--muted); font:900 .6rem var(--font-display); letter-spacing:.1em; text-transform:uppercase; }
+.shop-confirm-warning { margin:0; padding:.55rem .65rem; border:1px solid rgba(255,172,160,.42); border-radius:7px; background:rgba(100,28,24,.26); color:#ffccc5; font:800 .64rem var(--font-display); letter-spacing:.05em; line-height:1.35; text-align:center; text-transform:uppercase; }
 .shop-confirm-actions { display:grid; grid-template-columns:minmax(0,.75fr) minmax(0,1.25fr); gap:.55rem; }
 .shop-confirm-actions .menu-btn { min-width:0; }
 .shop-confirm-purchase { display:inline-flex; align-items:center; justify-content:center; gap:.38rem; }

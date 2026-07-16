@@ -33,11 +33,15 @@ export function openShop(storage = globalThis.localStorage) {
   let detailUnitType = null;
   let unitScrollTop = 0;
   let pendingValorPurchase = null;
+  let pendingValorError = "";
 
   function render() {
     const catalog = getShopCatalog(storage);
     const pendingOffer = pendingValorPurchase ? currentPendingOffer(catalog) : null;
-    if (pendingValorPurchase && (!pendingOffer || pendingOffer.owned)) pendingValorPurchase = null;
+    if (pendingValorPurchase && (!pendingOffer || pendingOffer.owned)) {
+      pendingValorPurchase = null;
+      pendingValorError = "";
+    }
     const detailOffer = activeTab === "units" && detailUnitType
       ? catalog.units.find((offer) => offer.type === detailUnitType)
       : null;
@@ -66,6 +70,7 @@ export function openShop(storage = globalThis.localStorage) {
         activeTab = tab.id;
         detailUnitType = null;
         pendingValorPurchase = null;
+        pendingValorError = "";
         statusText = "";
         render();
       });
@@ -90,7 +95,9 @@ export function openShop(storage = globalThis.localStorage) {
     foot.append(status, done);
     card.appendChild(foot);
 
-    if (pendingOffer && !pendingOffer.owned) overlay.appendChild(createPurchaseConfirm(pendingValorPurchase.kind, pendingOffer));
+    if (pendingOffer && !pendingOffer.owned) {
+      overlay.appendChild(createPurchaseConfirm(pendingValorPurchase.kind, pendingOffer, catalog.resource.balance));
+    }
   }
 
   function renderUnits(body, offers) {
@@ -136,6 +143,7 @@ export function openShop(storage = globalThis.localStorage) {
     back.addEventListener("click", () => {
       detailUnitType = null;
       pendingValorPurchase = null;
+      pendingValorError = "";
       render();
     });
     top.appendChild(back);
@@ -225,11 +233,13 @@ export function openShop(storage = globalThis.localStorage) {
     pendingValorPurchase = kind === "skin"
       ? { kind, type: offer.type, slug: offer.slug }
       : { kind, type: offer.type };
+    pendingValorError = "";
     render();
   }
 
   function dismissValorPurchase() {
     pendingValorPurchase = null;
+    pendingValorError = "";
     render();
   }
 
@@ -246,13 +256,22 @@ export function openShop(storage = globalThis.localStorage) {
     const result = kind === "skin"
       ? purchaseSkinWithValor(storage, offer.type, offer.slug)
       : purchaseUnitWithValor(storage, offer.type);
+    if (!result.accepted && result.errorCode === "INSUFFICIENT_VALOR") {
+      pendingValorError = result.errorCode;
+      statusText = "";
+      render();
+      return;
+    }
     pendingValorPurchase = null;
+    pendingValorError = "";
     statusText = kind === "skin" ? skinValorPurchaseStatus(result) : unitPurchaseStatus(result);
     render();
   }
 
-  function createPurchaseConfirm(kind, offer) {
+  function createPurchaseConfirm(kind, offer, balance) {
     const amount = kind === "skin" ? offer.valorPrice?.amount : offer.price?.amount;
+    const shortOnValor = Number.isFinite(amount) && balance < amount;
+    const shouldShowValorWarning = pendingValorError === "INSUFFICIENT_VALOR" || shortOnValor;
     const layer = el("div", "shop-confirm-layer");
     layer.addEventListener("click", (event) => {
       if (event.target === layer) dismissValorPurchase();
@@ -285,6 +304,10 @@ export function openShop(storage = globalThis.localStorage) {
     const cost = el("div", "shop-confirm-cost");
     cost.append(el("span", "", "Cost"), createValorBadge(amount, "shop-confirm-price"));
 
+    const warning = shouldShowValorWarning
+      ? createValorWarning(balance, amount)
+      : null;
+
     const foot = el("footer", "shop-confirm-actions");
     const cancel = el("button", "menu-btn ghost shop-confirm-cancel", "Cancel");
     cancel.type = "button";
@@ -293,10 +316,17 @@ export function openShop(storage = globalThis.localStorage) {
     purchase.type = "button";
     purchase.setAttribute("aria-label", `Purchase ${offer.name} for ${formatValor(amount)}`);
     purchase.append(el("span", "", "Purchase for"), createValorBadge(amount, "shop-confirm-price"));
-    purchase.addEventListener("click", () => confirmValorPurchase(kind, offer));
+    if (shortOnValor) {
+      purchase.disabled = true;
+      purchase.setAttribute("aria-disabled", "true");
+    } else {
+      purchase.addEventListener("click", () => confirmValorPurchase(kind, offer));
+    }
     foot.append(cancel, purchase);
 
-    dialog.append(head, item, cost, foot);
+    dialog.append(head, item, cost);
+    if (warning) dialog.appendChild(warning);
+    dialog.appendChild(foot);
     layer.appendChild(dialog);
     return layer;
   }
@@ -428,6 +458,16 @@ function createValorBadge(amount, className = "") {
   const value = el("span", "valor-amount", formatValorAmount(amount));
   badge.append(icon, value);
   return badge;
+}
+
+function createValorWarning(balance, amount) {
+  const message = el(
+    "p",
+    "shop-confirm-warning",
+    `Not enough Valor. You have ${formatValorAmount(balance)} and need ${formatValorAmount(amount)}.`,
+  );
+  message.setAttribute("role", "alert");
+  return message;
 }
 
 function el(tag, className = "", text = null) {

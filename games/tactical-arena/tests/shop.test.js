@@ -288,6 +288,33 @@ test("shop unit Valor purchase flips both USD and Valor unit buttons to owned", 
   assert.ok(ownedButtons.every((node) => node.disabled));
 });
 
+test("shop Valor confirmation explains when the player cannot afford the unlock", () => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, { valorBalance: 100 });
+
+  openShop(storage);
+
+  const overlay = document.body.children[0];
+  const clodCard = walk(overlay, (node) => hasClass(node, "shop-unit") && visibleText(node).includes("Clod"))[0];
+  const valorBuy = walk(clodCard, (node) => node.tagName === "BUTTON" && hasClass(node, "is-valor"))[0];
+  valorBuy.click();
+
+  const confirm = walk(overlay, (node) => hasClass(node, "shop-purchase-confirm"))[0];
+  assert.ok(confirm, "unaffordable Valor purchases should stay in the confirmation popup");
+  assert.match(visibleText(confirm), /Not enough Valor/i);
+  assert.match(visibleText(confirm), /You have 100/i);
+  assert.match(visibleText(confirm), /need 650/i);
+
+  const purchase = walk(confirm, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-confirm-purchase"))[0];
+  purchase.click();
+
+  assert.equal(walk(overlay, (node) => hasClass(node, "shop-purchase-confirm")).length, 1);
+  assert.equal(readUnlockProgress(storage).valorBalance, 100);
+  assert.equal(readUnlockProgress(storage).unlockedUnits.includes("clod"), false);
+  assert.equal(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent, "");
+});
+
 test("clicking a shop skin portrait opens a viewer that closes back to the shop", () => {
   globalThis.document = new FakeDocument();
 
