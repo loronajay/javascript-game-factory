@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   FINAL_BATTLE_BOSS_HP,
   FINAL_BATTLE_BOSS_ID,
+  FINAL_BATTLE_BOSS_RAGE_THRESHOLD,
   FINAL_BATTLE_BOSS_STRENGTH,
   FINAL_BATTLE_DUEL_BOARD_SIZE,
   FINAL_BATTLE_DUEL_HP,
@@ -30,8 +31,9 @@ import {
 import { createMatchState } from "../src/match/matchBuilder.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { resolveVictory } from "../src/core/turnEngine.js";
-import { getAvailableArts, getEffectiveStats, getUnitType } from "../src/core/unitCatalog.js";
+import { getAvailableArts, getEffectiveStats, getUnitType, isRaging } from "../src/core/unitCatalog.js";
 import { getAttackSplashDamage } from "../src/rules/combat.js";
+import { canUseArt } from "../src/rules/arts.js";
 import { musicKeyForMatchMode } from "../src/audio/sounds.js";
 import { beginActivation, defend, finishActivation, moveUnit, useArt } from "../src/core/commands.js";
 
@@ -150,6 +152,33 @@ test("the Final Battle boss actually pays the mission-only 5 HP Void Gravity cos
   assert.equal(result.accepted, true);
   assert.equal(result.nextState.units.find((unit) => unit.id === boss.id).hp, 15);
   assert.equal(result.events.find((event) => event.artId === "void-gravity").hpCost, 5);
+});
+
+test("the Final Battle boss has a mission-only 15 HP rage threshold", () => {
+  const state = finalBattleState();
+  const boss = state.units.find((unit) => unit.id === FINAL_BATTLE_BOSS_ID);
+  const ordinary = { type: "blacksword", hp: FINAL_BATTLE_BOSS_RAGE_THRESHOLD };
+
+  assert.equal(boss.rageThreshold, FINAL_BATTLE_BOSS_RAGE_THRESHOLD);
+  assert.equal(isRaging({ ...boss, hp: FINAL_BATTLE_BOSS_RAGE_THRESHOLD + 1 }), false);
+  assert.equal(isRaging({ ...boss, hp: FINAL_BATTLE_BOSS_RAGE_THRESHOLD }), true);
+  assert.equal(isRaging(ordinary), false, "the unlockable Blacksword keeps the normal threshold");
+  assert.equal(getAvailableArts({ ...boss, hp: FINAL_BATTLE_BOSS_RAGE_THRESHOLD }).some((art) => art.id === "banish-dark"), true);
+});
+
+test("the Final Battle boss can use Banish at 15 HP, but ordinary Blacksword cannot", () => {
+  const state = playToLastStand(finalBattleState());
+  const boss = state.units.find((unit) => unit.id === FINAL_BATTLE_BOSS_ID);
+  const target = state.units.find((unit) => unit.player === 1);
+  boss.hp = FINAL_BATTLE_BOSS_RAGE_THRESHOLD;
+  boss.spent = false;
+  boss.position = { x: 1, y: 0 };
+  target.position = { x: 2, y: 1 }; // dark tile
+  state.currentPlayer = 2;
+  state.activation = { player: 2, unitId: boss.id, moved: false, primaryUsed: false, bonusActionGroups: [] };
+
+  assert.equal(canUseArt(state, boss, "banish-dark"), true);
+  assert.equal(canUseArt(state, { ...boss, rageThreshold: undefined }, "banish-dark"), false);
 });
 
 // --- Stages 1-4: the mirror duels -----------------------------------------------------

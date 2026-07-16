@@ -706,8 +706,8 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
     fullHp: true,
     prepareTrial: prepareMonkTrial,
   },
-  // Gargoyle's Inferno (9x9): a clean corner duel with a mission rule that adds one
-  // temporary fire tile at every turn rollover while the Gargoyle lives.
+  // Gargoyle's Inferno (9x9): a clean corner duel under normal weather with a mission
+  // rule that adds one temporary fire tile at every turn rollover while the Gargoyle lives.
   [GARGOYLE_MISSION_ID]: {
     positions: {
       "p2-0-gargoyle": { x: 8, y: 0 },
@@ -717,7 +717,6 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
         ? { x: 0, y: 8 }
         : { x: 8, y: 0 },
     fullHp: true,
-    weather: "heatwave",
     missionRules: () => ({ randomFire: { sourceId: "p2-0-gargoyle", turnsLeft: 3 } }),
   },
   // The High Ground of the Sniper (13×13): a full-HP 2v2 on the STANDARD corner

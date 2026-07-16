@@ -119,6 +119,17 @@
   letter-spacing: .05em;
 }
 
+.menu-shop-action {
+  margin-top: .85rem;
+}
+
+.menu-shop-action .menu-shop-btn {
+  min-height: 3.35rem;
+  padding: .9rem 1rem;
+  font: 900 1rem var(--font-display);
+  letter-spacing: .06em;
+}
+
 .menu-secondary-actions {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

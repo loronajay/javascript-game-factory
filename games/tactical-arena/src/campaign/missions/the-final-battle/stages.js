@@ -24,6 +24,7 @@ import {
   FINAL_BATTLE_BOARD_SIZE,
   FINAL_BATTLE_BOSS_HP,
   FINAL_BATTLE_BOSS_ID,
+  FINAL_BATTLE_BOSS_RAGE_THRESHOLD,
   FINAL_BATTLE_BOSS_STRENGTH,
   FINAL_BATTLE_DARK_TILE_STATUS_SOURCE,
   FINAL_BATTLE_DARK_TILE_STATUSES,
@@ -85,6 +86,7 @@ export function makeFinalBattleBoss(unit) {
     id: FINAL_BATTLE_BOSS_ID,
     hp: FINAL_BATTLE_BOSS_HP,
     mp: 0,
+    rageThreshold: FINAL_BATTLE_BOSS_RAGE_THRESHOLD,
     statModifiers: {
       ...(unit.statModifiers ?? {}),
       maxHp: FINAL_BATTLE_BOSS_HP - base.maxHp,

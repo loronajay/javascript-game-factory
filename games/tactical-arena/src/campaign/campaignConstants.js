@@ -73,6 +73,7 @@ export const FINAL_BATTLE_BOARD_SIZE = 11;
 // keeps the 30/10 unit definition untouched.
 export const FINAL_BATTLE_BOSS_HP = 100;
 export const FINAL_BATTLE_BOSS_STRENGTH = 13;
+export const FINAL_BATTLE_BOSS_RAGE_THRESHOLD = 15;
 export const FINAL_BATTLE_BOSS_ID = "p2-boss-blacksword";
 export const FINAL_BATTLE_VOID_PRESSURE_DAMAGE = 1;
 export const FINAL_BATTLE_DARK_TILE_STATUS_SOURCE = "final-battle-dark-tile";

@@ -1484,7 +1484,7 @@ test("Gargoyle's Inferno replaces the eighth Ashfall Flats placeholder once enou
   assert.equal(node.biome, "volcanic");
 });
 
-test("Gargoyle's Inferno builds a full-HP 9x9 chosen-unit duel with random inferno fires armed", () => {
+test("Gargoyle's Inferno builds a full-HP 9x9 chosen-unit duel under normal weather with random inferno fires armed", () => {
   const config = createCampaignMatchConfig(GARGOYLE_MISSION_ID, ["mystic"]);
   const match = gargoyleMatchState(["mystic"]);
 
@@ -1499,8 +1499,8 @@ test("Gargoyle's Inferno builds a full-HP 9x9 chosen-unit duel with random infer
   assert.deepEqual(findUnit(match, "p2-0-gargoyle").position, { x: 8, y: 0 });
   assert.equal(findUnit(match, "p1-0-mystic").hp, 23);
   assert.equal(findUnit(match, "p2-0-gargoyle").hp, 30);
-  assert.deepEqual(match.weather, { id: "heatwave", sourceId: null });
-  assert.equal(getActiveWeather(match).id, "heatwave");
+  assert.equal(match.weather, null);
+  assert.equal(getActiveWeather(match), null);
   assert.deepEqual(match.missionRules?.randomFire, {
     sourceId: "p2-0-gargoyle",
     turnsLeft: 3,
@@ -3002,7 +3002,7 @@ test("campaign squad selection gates Mother Nature from weather-related missions
   const choices = ["mother-nature", "swordsman"];
   assert.deepEqual(campaignSelectableUnitTypes(choices, storage, SPIRIT_WOODS_MISSION_ID), choices);
   assert.deepEqual(campaignSelectableUnitTypes(choices, storage, VIRUS_MISSION_ID), choices);
-  assert.deepEqual(campaignSelectableUnitTypes(choices, storage, GARGOYLE_MISSION_ID), ["swordsman"]);
+  assert.deepEqual(campaignSelectableUnitTypes(choices, storage, GARGOYLE_MISSION_ID), choices);
   assert.deepEqual(campaignSelectableUnitTypes(choices, storage, OUT_OF_RETIREMENT_MISSION_ID), ["swordsman"]);
   assert.deepEqual(campaignSelectableUnitTypes(choices, storage, RONIN_MISSION_ID), ["swordsman"]);
   assert.deepEqual(campaignSelectableUnitTypes(choices, storage, SHOWDOWN_MISSION_ID), ["swordsman"]);

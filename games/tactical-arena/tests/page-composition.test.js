@@ -27,6 +27,17 @@ test("index is a small shell that delegates page regions to HTML fragments", () 
   assert.doesNotMatch(html, /src="\.\/src\/main\.js"/);
 });
 
+test("main menu gives Shop its own prominent action outside secondary controls", () => {
+  const html = readFileSync(rootFile("html/menu-screens.html"), "utf8");
+  const mainMenu = html.match(/<section class="screen menu-screen" data-screen="mainMenu">([\s\S]*?)<\/section>/)?.[1];
+
+  assert.ok(mainMenu, "main menu fragment should exist");
+  assert.match(mainMenu, /<div class="menu-shop-action">[\s\S]*data-action="shop"[\s\S]*<\/div>/);
+
+  const secondaryActions = mainMenu.match(/<div class="menu-secondary-actions">([\s\S]*?)<\/div>/)?.[1] ?? "";
+  assert.doesNotMatch(secondaryActions, /data-action="shop"/);
+});
+
 test("page composition loads in parallel and mounts fragments in document order", async () => {
   const events = [];
   const slots = ["first.html", "second.html"].map((source) => ({

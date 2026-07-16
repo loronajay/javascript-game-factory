@@ -198,7 +198,8 @@ export function getSoulShuffleChoices(unit, rngState) {
 }
 
 export function isRaging(unit) {
-  return unit.hp > 0 && unit.hp <= 5;
+  const threshold = Number.isFinite(unit.rageThreshold) ? unit.rageThreshold : 5;
+  return unit.hp > 0 && unit.hp <= threshold;
 }
 
 function passiveSources(definition) {
