@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { attack, beginActivation, useArt } from "../src/core/commands.js";
 import { applyCommand } from "../src/core/reducer.js";
-import { createBattleState, findUnit } from "../src/core/state.js";
+import { createBattleState, findUnit, getTileObject } from "../src/core/state.js";
 import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
 import { getArt, getEffectiveStats, getUnitType } from "../src/core/unitCatalog.js";
 import { getCritChance } from "../src/rules/combat.js";
@@ -114,8 +114,28 @@ test("Rechargeable Battery restores MP whenever Little Brother takes magic damag
   s = result.nextState;
 
   assert.equal(findUnit(s, "lb").hp, 22);
-  assert.equal(findUnit(s, "lb").mp, 4);
-  assert.ok(result.events.some((event) => event.type === "BATTERY_MP" && event.unitId === "lb" && event.mpGained === 3));
+  assert.equal(findUnit(s, "lb").mp, 6);
+  assert.ok(result.events.some((event) => event.type === "BATTERY_MP" && event.unitId === "lb" && event.mpGained === 5));
+});
+
+test("Flamethrower leaves permanent fire under enemies it damages", () => {
+  const state = scenario([
+    { id: "target", player: 2, type: "swordsman", x: 3, y: 1 },
+    { id: "behind", player: 2, type: "archer", x: 4, y: 1 },
+    { id: "ally", player: 1, type: "archer", x: 4, y: 2 },
+    { id: "gargoyle", player: 2, type: "gargoyle", x: 5, y: 1 }
+  ]);
+
+  let s = run(state, beginActivation(1, "lb")).nextState;
+  const result = run(s, useArt(1, "lb", "flamethrower", { targetPosition: { x: 3, y: 1 } }));
+  s = result.nextState;
+
+  assert.deepEqual(getTileObject(s, { x: 3, y: 1 }), { kind: "fire", permanent: true });
+  assert.deepEqual(getTileObject(s, { x: 4, y: 1 }), { kind: "fire", permanent: true });
+  assert.equal(getTileObject(s, { x: 4, y: 2 }), null, "allies in the cone are not hit");
+  assert.equal(getTileObject(s, { x: 5, y: 1 }), null, "fire-immune enemies are not hit");
+  assert.ok(result.events[0].createdFire.some((position) => position.x === 3 && position.y === 1));
+  assert.ok(result.events[0].createdFire.some((position) => position.x === 4 && position.y === 1));
 });
 
 test("Flamespitter gives rage stats and free orthogonal Flamethrower on basic attack", () => {
@@ -139,6 +159,10 @@ test("Flamespitter gives rage stats and free orthogonal Flamethrower on basic at
   assert.equal(findUnit(s, "behind").hp, 21);
   assert.equal(findUnit(s, "wide").hp, 21);
   assert.equal(findUnit(s, "diagonal").hp, 24);
+  assert.deepEqual(getTileObject(s, { x: 3, y: 1 }), { kind: "fire", permanent: true });
+  assert.deepEqual(getTileObject(s, { x: 4, y: 1 }), { kind: "fire", permanent: true });
+  assert.deepEqual(getTileObject(s, { x: 4, y: 2 }), { kind: "fire", permanent: true });
+  assert.equal(getTileObject(s, { x: 2, y: 2 }), null);
   assert.ok(result.events.some((event) => event.type === "FLAMESPITTER" && event.targetIds.includes("behind")));
 });
 
@@ -165,7 +189,7 @@ test("Flamethrower does not damage a fire-immune enemy (Gargoyle's One With The 
   s = result.nextState;
 
   assert.equal(findUnit(s, "gargoyle").hp, getUnitType("gargoyle").stats.maxHp, "Gargoyle ignores Flamethrower's fire damage");
-  assert.equal(findUnit(s, "swordsman").hp, getUnitType("swordsman").stats.maxHp - 3, "non-immune enemies in the cone still burn");
+  assert.equal(findUnit(s, "swordsman").hp, getUnitType("swordsman").stats.maxHp - 4, "non-immune enemies in the cone still burn, then take the fire tile tick");
   assert.ok(!result.events[0].targetIds.includes("gargoyle"));
 });
 

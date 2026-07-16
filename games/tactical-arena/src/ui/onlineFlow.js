@@ -26,6 +26,7 @@ import { createPortrait } from "./portraits.js";
 import { openSkinPicker } from "./skinPicker.js";
 import { openDraftFormationPicker } from "./draftFormationPicker.js";
 import { DRAFT_PICK_ORDER, applyDraftPick, arrangeDraftLoadout, canDraftType, createDraftState, currentDraftSeat, draftedTypes, isDraftComplete } from "./draftModel.js";
+import { playerSeatListLabel, teamForSeat, teamGroupsForSetup } from "./teamDisplay.js";
 
 const RULESET_VERSION = ONLINE_RULESET_VERSION;
 const BOARD_SIZES = [13, 15];
@@ -261,7 +262,9 @@ export function createOnlineFlow({ onStartMatch }) {
     rosterEl.replaceChildren();
     const teams = activeMatchType() === "teams4";
     const draftMode = isDraftMatch();
-    for (const p of lobby?.players ?? []) {
+    rosterEl.classList.toggle("is-team-roster", teams);
+    const players = lobby?.players ?? [];
+    const renderPlayer = (p) => {
       const li = document.createElement("li");
       li.className = "lobby-roster-item";
       const tags = [];
@@ -284,7 +287,7 @@ export function createOnlineFlow({ onStartMatch }) {
         );
       }
       if (teams) {
-        const team = p.seat % 2 === 1 ? 1 : 2;
+        const team = teamForSeat(p.seat, "teams");
         li.style.setProperty("--team", TEAM_COLOR[team] ?? PLAYER_COLOR[1]);
         tags.push(`<span class="lobby-tag team">Team ${team}</span>`);
       } else {
@@ -295,6 +298,21 @@ export function createOnlineFlow({ onStartMatch }) {
         `<span class="lobby-name">${escapeHtml(p.name)}</span>` +
         `<span class="lobby-tags">${tags.join("")}</span>`;
       rosterEl.appendChild(li);
+    };
+    if (teams) {
+      for (const group of teamGroupsForSetup(4, "teams")) {
+        const header = document.createElement("li");
+        header.className = "lobby-team-heading";
+        header.style.setProperty("--team", TEAM_COLOR[group.team] ?? PLAYER_COLOR[1]);
+        header.innerHTML = `<span>Team ${group.team}</span><small>${playerSeatListLabel(group.seats)}</small>`;
+        rosterEl.appendChild(header);
+        for (const seat of group.seats) {
+          const player = players.find((candidate) => candidate.seat === seat);
+          if (player) renderPlayer(player);
+        }
+      }
+    } else {
+      for (const p of players) renderPlayer(p);
     }
   }
 
@@ -309,7 +327,12 @@ export function createOnlineFlow({ onStartMatch }) {
     if (blindPickField) blindPickField.hidden = draftMode;
     if (draftField) draftField.hidden = !draftMode;
     if (!draftMode) {
-      squadPicker.setPlayer(localLobbySeat() ?? 1);
+      const localSeat = localLobbySeat() ?? 1;
+      const teams = activeMatchType() === "teams4";
+      const localTeam = teamForSeat(localSeat, teams ? "teams" : "ffa");
+      squadPicker.setPlayer(localSeat);
+      squadPicker.setTitle(teams ? `Your squad - Team ${localTeam}` : "Your squad");
+      squadPicker.setAccent(teams ? (TEAM_COLOR[localTeam] ?? PLAYER_COLOR[localSeat]) : (PLAYER_COLOR[localSeat] ?? PLAYER_COLOR[1]));
       squadPicker.setLocked(localLocked);
       lockBtn.textContent = localLocked ? "Change Squad" : "Lock Squad";
       lockBtn.classList.toggle("primary", !localLocked);

@@ -35,6 +35,11 @@
    The actual choosing happens in the roster pop-up below. */
 .squad-pickers { display:grid; grid-template-columns:repeat(auto-fit,minmax(8.5rem,1fr)); gap:.6rem; }
 .squad-pickers[hidden] { display:none; }
+.squad-team-group { display:grid; gap:.55rem; min-width:0; padding:.55rem; border:1px solid color-mix(in srgb,var(--team,var(--brass)) 44%,var(--parchment-edge)); border-radius:8px; background:linear-gradient(180deg,color-mix(in srgb,var(--team,transparent) 14%,transparent),rgba(8,20,34,.22)); box-shadow:inset 0 1px 0 rgba(var(--sheen),.07); }
+.squad-team-title { display:flex; align-items:center; justify-content:space-between; gap:.7rem; min-width:0; padding-bottom:.42rem; border-bottom:1px solid color-mix(in srgb,var(--team,var(--brass)) 34%,var(--parchment-edge)); color:color-mix(in srgb,var(--team,var(--brass)) 72%,var(--brass-hi)); font:800 .66rem var(--font-display); letter-spacing:.14em; text-transform:uppercase; }
+.squad-team-title span,.squad-team-title small { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.squad-team-title small { color:var(--muted); font:800 .56rem var(--font-display); letter-spacing:.08em; }
+.squad-team-pickers { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.55rem; }
 .squad-picker { display:grid; gap:.5rem; padding:.55rem .5rem; border:1px solid var(--parchment-edge); border-top:3px solid var(--team,var(--brass)); border-radius:var(--radius-tile); background:rgba(8,20,34,.3); box-shadow:inset 0 2px 5px rgba(0,10,20,.3); }
 .squad-picker-title { color:color-mix(in srgb,var(--team,var(--muted)) 65%,var(--muted)); font:700 .64rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
 .squad-chip-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.35rem; }

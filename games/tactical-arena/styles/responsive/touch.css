@@ -55,6 +55,10 @@
     grid-template-columns: 1fr;
   }
 
+  .squad-team-pickers {
+    grid-template-columns: 1fr;
+  }
+
   .squad-picker {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:

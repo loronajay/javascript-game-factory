@@ -33,14 +33,16 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
   let formationOrder = normalizeInitialFormation(initial);
   let locked = false;
   let formationPlayer = player;
+  let pickerTitle = title;
+  let pickerAccent = accent;
 
   const el = document.createElement("div");
   el.className = "squad-picker";
-  if (accent) el.style.setProperty("--team", accent);
+  if (pickerAccent) el.style.setProperty("--team", pickerAccent);
 
   const heading = document.createElement("div");
   heading.className = "squad-picker-title";
-  heading.textContent = title;
+  heading.textContent = pickerTitle;
   el.appendChild(heading);
 
   const chips = document.createElement("div");
@@ -65,19 +67,19 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
   // Open the roster pop-up on the slot the player tapped (or slot 0 from Edit).
   async function edit(startSlot = 0) {
     if (locked) return;
-    const result = await openRosterPicker({ title, accent, initial: loadout, allowDuplicates, startSlot });
+    const result = await openRosterPicker({ title: pickerTitle, accent: pickerAccent, initial: loadout, allowDuplicates, startSlot });
     if (result) { loadout = normalizeSquadLoadout(result); paintChips(); }
   }
 
   async function editFormation() {
     if (locked) return;
     const result = await openDraftFormationPicker({
-      title: `${title} Formation`,
+      title: `${pickerTitle} Formation`,
       composition: loadout.composition,
       skins: loadout.skins,
       nicknames: loadout.composition.map((type) => getNicknamePref(type)),
       order: formationOrder,
-      accent,
+      accent: pickerAccent,
       player: formationPlayer
     });
     if (result?.order) {
@@ -132,6 +134,15 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
     },
     setPlayer(nextPlayer) {
       formationPlayer = nextPlayer;
+    },
+    setTitle(nextTitle) {
+      pickerTitle = String(nextTitle || "Squad");
+      heading.textContent = pickerTitle;
+    },
+    setAccent(nextAccent) {
+      pickerAccent = nextAccent;
+      if (pickerAccent) el.style.setProperty("--team", pickerAccent);
+      else el.style.removeProperty("--team");
     }
   };
 }

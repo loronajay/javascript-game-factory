@@ -548,6 +548,7 @@ function applyBasicAttackFreeCone(state, actor, originalTarget) {
   const fireBased = isFireBasedDamage({ art });
   const targetIds = [];
   const damageByTarget = {};
+  const createdFire = [];
   for (const target of livingUnits(state)) {
     if (!areEnemies(actor, target) || !cellKeys.has(positionKey(target.position))) continue;
     if (fireBased && isFireDamageImmune(target)) continue;
@@ -556,6 +557,14 @@ function applyBasicAttackFreeCone(state, actor, originalTarget) {
     if (dealt > 0) {
       targetIds.push(target.id);
       damageByTarget[target.id] = dealt;
+      if (art.hitTileObject?.kind === "fire") {
+        const fire = art.hitTileObject;
+        const firePosition = { ...target.position };
+        state.tileObjects[positionKey(firePosition)] = fire.permanent
+          ? { kind: "fire", permanent: true }
+          : { kind: "fire", turnsLeft: Number.isFinite(fire.turnsLeft) ? fire.turnsLeft : 3 };
+        createdFire.push(firePosition);
+      }
     }
   }
   return [{
@@ -565,6 +574,7 @@ function applyBasicAttackFreeCone(state, actor, originalTarget) {
     targetPosition: origin,
     targetIds,
     damageByTarget,
+    ...(createdFire.length ? { createdFire } : {}),
     mpCost: 0
   }];
 }

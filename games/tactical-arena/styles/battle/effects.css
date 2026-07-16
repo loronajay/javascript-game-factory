@@ -66,6 +66,7 @@
 .fx-ring { fill:none; pointer-events:none; stroke-width:3; }
 .fx-flash,.fx-critflash,.fx-shard,.fx-status-burst,.fx-drain-particle,.fx-mote,.fx-afterimage,.fx-spark,.fx-snare-ring,.fx-rune,.fx-projectile,.fx-projectile-trail { pointer-events:none; }
 .fx-line,.fx-rune { fill:none; pointer-events:none; stroke-linecap:round; stroke-linejoin:round; }
+.fx-stage-blackout { position:absolute; inset:0; z-index:20; pointer-events:none; background:var(--fx-stage-blackout-color,#020106); opacity:0; }
 #diceOverlay { position:absolute; z-index:30; inset:0; display:grid; place-items:center; pointer-events:none; opacity:0; transition:opacity .14s ease; }
 #diceOverlay.show { opacity:1; }
 .die { display:flex; flex-direction:column; align-items:center; justify-content:center; width:6.5rem; height:6.5rem; padding:.4rem; border-radius:18px; background:linear-gradient(145deg,#c0d8ec,#88aac4); color:#040e1a; font:900 2.4rem var(--font-display); letter-spacing:.02em; text-align:center; box-shadow:0 18px 55px rgba(0,0,0,.65), 0 0 30px rgba(100,170,220,.3), inset 0 0 0 2px rgba(200,235,255,.75), inset 0 -8px 14px rgba(10,30,50,.35); }

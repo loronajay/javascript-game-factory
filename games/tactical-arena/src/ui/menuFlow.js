@@ -22,6 +22,7 @@ import { openSkinPicker } from "./skinPicker.js";
 import { getSkinPref, normalizeSkinSlug } from "./skinModel.js";
 import { openChoiceModal } from "./choiceModal.js";
 import { openRewardSkinPicker } from "./rewardSkinPicker.js";
+import { playerSeatListLabel, teamGroupsForSetup } from "./teamDisplay.js";
 import {
   HASBEEN_MYSTIC_SKIN_PACK_ID,
   getCampaignUnitRewardChoices,
@@ -191,11 +192,24 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
 
   function syncHotSeatSetup() {
     const count = Number(selectedValue(hsSetup, "playerCount", "count")) || 2;
+    const format = count === 4 ? (selectedValue(hsSetup, "format", "format") || "ffa") : "ffa";
     const formatGroup = $("[data-group='format']", hsSetup);
     if (formatGroup) formatGroup.hidden = count !== 4;
     hsSquadHost.replaceChildren();
-    for (let player = 1; player <= count; player += 1) {
-      hsSquadHost.append(ensureHotSeatPicker(player).el);
+    for (const group of teamGroupsForSetup(count, format)) {
+      if (format === "teams") {
+        const teamGroup = document.createElement("section");
+        teamGroup.className = "squad-team-group";
+        teamGroup.style.setProperty("--team", TEAM_COLOR[group.team]);
+        teamGroup.innerHTML = `<div class="squad-team-title"><span>Team ${group.team}</span><small>${playerSeatListLabel(group.seats)}</small></div>`;
+        const row = document.createElement("div");
+        row.className = "squad-team-pickers";
+        for (const player of group.seats) row.append(ensureHotSeatPicker(player).el);
+        teamGroup.append(row);
+        hsSquadHost.append(teamGroup);
+      } else {
+        for (const player of group.seats) hsSquadHost.append(ensureHotSeatPicker(player).el);
+      }
     }
   }
   syncHotSeatSetup();

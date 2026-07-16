@@ -100,6 +100,16 @@
 .online-roomcode[hidden] { display:none; }
 
 .lobby-roster { list-style:none; margin:0 0 .4rem; padding:0; display:grid; gap:.45rem; }
+.lobby-team-heading {
+  display:flex; align-items:center; justify-content:space-between; gap:.75rem;
+  min-width:0; margin:.15rem 0 -.1rem; padding:.38rem .62rem;
+  border:1px solid color-mix(in srgb,var(--team,#5288c6) 44%,var(--parchment-edge));
+  border-radius:7px; background:color-mix(in srgb,var(--team,#5288c6) 12%,rgba(8,18,32,.34));
+  color:color-mix(in srgb,var(--team,#5288c6) 70%,var(--brass-hi));
+  font:800 .62rem var(--font-display); letter-spacing:.12em; text-transform:uppercase;
+}
+.lobby-team-heading span,.lobby-team-heading small { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lobby-team-heading small { color:var(--muted); font:800 .52rem var(--font-display); letter-spacing:.08em; }
 .lobby-roster-item {
   --team:#5288c6;
   display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:.7rem;

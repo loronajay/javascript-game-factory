@@ -178,6 +178,8 @@ body.tutorial-spotlight-mp .dialogue-layer {
 .panel.squad-overlay { position:absolute; width:clamp(14.875rem,23vw,20rem); padding:.6rem .6rem .55rem; pointer-events:auto; background:linear-gradient(180deg,color-mix(in srgb,var(--team,transparent) 16%,transparent),transparent 40%),var(--console-fill); }
 .squad-overlay.slot-1 { bottom:.75rem; left:.75rem; }
 .squad-overlay.slot-2 { bottom:.75rem; right:.75rem; }
+.squad-overlay.slot-3 { top:.75rem; left:.75rem; }
+.squad-overlay.slot-4 { top:.75rem; right:.75rem; }
 .squad-overlay.is-active { border-color:color-mix(in srgb,var(--team) 60%,transparent); box-shadow:var(--console-shadow),0 0 18px color-mix(in srgb,var(--team) 25%,transparent); }
 .panel-title { display:flex; gap:.45rem; align-items:center; margin-bottom:.5rem; padding-bottom:.4rem; border-bottom:1px solid var(--console-edge-soft); color:var(--brass-hi); font:700 .66rem var(--font-display); letter-spacing:.18em; text-transform:uppercase; }
 .panel-title::before { content:""; width:3px; height:.8rem; border-radius:2px; background:var(--team,var(--gold)); }

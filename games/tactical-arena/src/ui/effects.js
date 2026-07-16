@@ -11,6 +11,8 @@ import { createEffectEnvironment } from "./effectEnvironment.js";
 export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, dieFace, metrics, audio }) {
   const sound = audio ?? { play() {} };
   const { setMetrics, getMetrics, unitBase, unitElement, effectPoint } = createEffectEnvironment({ metrics, unitsLayer });
+  const stageHost = board?.parentElement ?? null;
+  const htmlEffects = new Set();
   let generation = 0;
 
   function clearActive() {
@@ -18,6 +20,8 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     for (const root of [board, unitsLayer, effectsLayer, diceOverlay]) {
       for (const animation of root?.getAnimations?.({ subtree: true }) ?? []) animation.cancel();
     }
+    for (const element of htmlEffects) element.remove();
+    htmlEffects.clear();
     effectsLayer?.replaceChildren();
     diceOverlay?.classList.remove("show", "rolling");
     if (dieFace) { dieFace.className = "die"; dieFace.replaceChildren(); }
@@ -46,6 +50,29 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     effectsLayer.appendChild(flash);
     flash.animate([{ opacity: 0.5 }, { opacity: 0 }], { duration: 220, easing: "ease-out" })
       .finished.catch(() => {}).then(() => flash.remove());
+  }
+
+  function stageDarken(vfx, duration) {
+    const createElement = globalThis.document?.createElement?.bind(globalThis.document);
+    if (!stageHost || !createElement) return null;
+    const darkness = createElement("div");
+    darkness.className = "fx-stage-blackout";
+    darkness.style.setProperty("--fx-stage-blackout-color", vfx.screenDarken.color ?? "#020106");
+    stageHost.appendChild(darkness);
+    htmlEffects.add(darkness);
+
+    const opacity = vfx.screenDarken.opacity ?? 0.7;
+    const animation = darkness.animate([
+      { opacity: 0 },
+      { opacity, offset: 0.18 },
+      { opacity: opacity * 0.86, offset: 0.68 },
+      { opacity: 0 }
+    ], { duration: duration + 260, easing: "ease-in-out" });
+
+    return waitForAnimation(animation).then(() => {
+      htmlEffects.delete(darkness);
+      darkness.remove();
+    });
   }
 
   // type ("physical" | "magic" | "fire" | "true" — see IMPACT_VFX in vfxCatalog).
@@ -706,24 +733,29 @@ export function createEffects({ board, unitsLayer, effectsLayer, diceOverlay, di
     const particleCount = vfx.particleCount ?? 20;
     const animations = [];
 
-    if (vfx.screenDarken && board) {
-      const box = board.viewBox.baseVal;
-      const darkness = svg("rect", {
-        class: "fx-critflash",
-        x: box.x,
-        y: box.y,
-        width: box.width,
-        height: box.height,
-        fill: vfx.screenDarken.color ?? "#020106"
-      });
-      effectsLayer.appendChild(darkness);
-      const opacity = vfx.screenDarken.opacity ?? 0.7;
-      animations.push(waitForAnimation(darkness.animate([
-        { opacity: 0 },
-        { opacity, offset: 0.18 },
-        { opacity: opacity * 0.86, offset: 0.68 },
-        { opacity: 0 }
-      ], { duration: duration + 260, easing: "ease-in-out" })).then(() => darkness.remove()));
+    if (vfx.screenDarken) {
+      const stageAnimation = stageDarken(vfx, duration);
+      if (stageAnimation) {
+        animations.push(stageAnimation);
+      } else if (board) {
+        const box = board.viewBox.baseVal;
+        const darkness = svg("rect", {
+          class: "fx-critflash",
+          x: box.x,
+          y: box.y,
+          width: box.width,
+          height: box.height,
+          fill: vfx.screenDarken.color ?? "#020106"
+        });
+        effectsLayer.appendChild(darkness);
+        const opacity = vfx.screenDarken.opacity ?? 0.7;
+        animations.push(waitForAnimation(darkness.animate([
+          { opacity: 0 },
+          { opacity, offset: 0.18 },
+          { opacity: opacity * 0.86, offset: 0.68 },
+          { opacity: 0 }
+        ], { duration: duration + 260, easing: "ease-in-out" })).then(() => darkness.remove()));
+      }
     }
 
     // Signature extras (recipe-flagged, Nuke carries all three): a whole-board

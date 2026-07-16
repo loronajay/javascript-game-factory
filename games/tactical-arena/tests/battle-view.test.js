@@ -90,6 +90,16 @@ class TestElement {
     this.listeners.set(type, handler);
   }
 
+  animate(frames, options) {
+    this.animations ??= [];
+    this.animations.push({ frames, options });
+    return { finished: Promise.resolve() };
+  }
+
+  remove() {
+    this.removed = true;
+  }
+
   querySelector(selector) {
     if (!selector.startsWith(".")) return null;
     const className = selector.slice(1);
@@ -388,6 +398,30 @@ test("the squad HUD renders each player as four stacked unit rows", () => {
       assert.ok(list.children.every((row) => row.className.includes("squad-unit")));
       assert.ok(list.children.every((row) => !row.className.includes("squad-chip")));
     }
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("four-player team HUD gives every player panel its own slot and team label", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: (tagName) => new TestElement(tagName) };
+
+  try {
+    const overlay = new TestElement("div");
+    renderSquads(createBattleState({ playerCount: 4, format: "teams" }), overlay, () => {});
+
+    assert.equal(overlay.children.length, 4);
+    assert.deepEqual(
+      overlay.children.map((panel) => panel.classNames().find((name) => name.startsWith("slot-"))),
+      ["slot-1", "slot-2", "slot-3", "slot-4"],
+    );
+    assert.match(overlay.children[0].innerHTML, /Player 1 - Team 1/);
+    assert.match(overlay.children[1].innerHTML, /Player 2 - Team 2/);
+    assert.match(overlay.children[2].innerHTML, /Player 3 - Team 1/);
+    assert.match(overlay.children[3].innerHTML, /Player 4 - Team 2/);
+    assert.match(STYLE_CSS, /\.squad-overlay\.slot-3\s*\{\s*top:\.75rem;\s*left:\.75rem;/);
+    assert.match(STYLE_CSS, /\.squad-overlay\.slot-4\s*\{\s*top:\.75rem;\s*right:\.75rem;/);
   } finally {
     globalThis.document = previousDocument;
   }
@@ -692,6 +726,53 @@ test("blast VFX use the current board metrics without throwing", async () => {
       child.tagName === "ellipse" && child.animations?.[0]?.frames?.[1]?.rx === expectedReach
     ));
     assert.ok(shockwave, "the blast shockwave should scale from the latest board geometry");
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
+  }
+});
+
+test("screen-darken ability VFX black out the stage instead of only the board SVG", async () => {
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  globalThis.document = {
+    createElement: (tagName) => new TestElement(tagName),
+    createElementNS: (_ns, tagName) => new TestSvgElement(tagName)
+  };
+  globalThis.window = { matchMedia: () => ({ matches: false }) };
+
+  try {
+    const metrics = { tileWidth: 58, tileHeight: 29, originX: 0, originY: 0 };
+    const stage = new TestElement("main");
+    const board = new TestSvgElement("svg");
+    board.parentElement = stage;
+    board.viewBox = { baseVal: { x: 0, y: 0, width: 1200, height: 760 } };
+    const effectsLayer = new TestSvgElement("g");
+    const effects = createEffects({
+      board,
+      unitsLayer: { querySelector: () => null },
+      effectsLayer,
+      diceOverlay: null,
+      dieFace: null,
+      metrics,
+      audio: { play() {} }
+    });
+
+    await effects.playAbilityVfx("banish-dark", {
+      actor: { id: "black", position: { x: 1, y: 1 } },
+      targets: []
+    });
+
+    const blackout = stage.children.find((child) => child.className === "fx-stage-blackout");
+    assert.ok(blackout, "Banish should darken the whole stageWrap HTML layer");
+    assert.equal(blackout.style.props.get("--fx-stage-blackout-color"), "#020106");
+    assert.equal(blackout.animations[0].frames[1].opacity, 0.78);
+    assert.equal(blackout.removed, true);
+    assert.equal(
+      effectsLayer.children.some((child) => child.tagName === "rect" && child.getAttribute("fill") === "#020106"),
+      false,
+      "the blackout should not be constrained to the board SVG viewBox"
+    );
   } finally {
     globalThis.document = previousDocument;
     globalThis.window = previousWindow;

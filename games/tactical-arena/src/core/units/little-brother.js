@@ -49,8 +49,8 @@ export const LITTLE_BROTHER = Object.freeze({
       name: "Rechargeable Battery",
       kind: "passive",
       mpCost: null,
-      effect: Object.freeze({ type: "magicDamageMpRestore", amount: 3 }),
-      description: "Restore 3 MP whenever Little Brother takes magic damage.",
+      effect: Object.freeze({ type: "magicDamageMpRestore", amount: 5 }),
+      description: "Restore 5 MP whenever Little Brother takes magic damage.",
       implemented: true
     }),
     Object.freeze({
@@ -74,7 +74,8 @@ export const LITTLE_BROTHER = Object.freeze({
       targeting: Object.freeze({ shape: "cone", range: 3 }),
       rageRangeBonus: 2,
       damage: Object.freeze({ type: "true", amount: 3, affinity: "fire" }),
-      description: "Deal 3 true damage to enemies in a range-3 cone. While raging, the cone gains +2 range.",
+      hitTileObject: Object.freeze({ kind: "fire", permanent: true }),
+      description: "Deal 3 true damage to enemies in a range-3 cone, leaving permanent fire under enemies hit. While raging, the cone gains +2 range.",
       implemented: true,
       ai: Object.freeze({ intent: "coneAoe", evHints: Object.freeze({ minTargets: 2 }) })
     })

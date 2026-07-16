@@ -313,7 +313,7 @@ export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnable
     const panel = document.createElement("section");
     panel.className = `panel squad-panel squad-overlay slot-${player}${player === state.currentPlayer && state.phase === "playing" ? " is-active" : ""}`;
     panel.style.setProperty("--team", colorOf(state, player));
-    const teamTag = state.format === "teams" ? ` · ${teamLabel(state, teamOf(state, player))}` : "";
+    const teamTag = state.format === "teams" ? ` - ${teamLabel(state, teamOf(state, player))}` : "";
     panel.innerHTML = `<div class="panel-title">Player ${player}${teamTag}</div><div class="squad-list"></div>`;
     const list = panel.querySelector(".squad-list");
 

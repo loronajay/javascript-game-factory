@@ -117,6 +117,7 @@ export function resolveConeArt(state, command, art) {
   const actor = findUnit(next, command.unitId);
   const targetIds = [];
   const damageByTarget = {};
+  const createdFire = [];
   const fireBased = isFireBasedDamage({ art });
   for (const position of cells) {
     const target = unitAt(next, position);
@@ -126,6 +127,14 @@ export function resolveConeArt(state, command, art) {
     target.hp = Math.max(0, target.hp - damage);
     targetIds.push(target.id);
     damageByTarget[target.id] = damage;
+    if (damage > 0 && art.hitTileObject?.kind === "fire") {
+      const fire = art.hitTileObject;
+      const firePosition = { ...target.position };
+      next.tileObjects[positionKey(firePosition)] = fire.permanent
+        ? { kind: "fire", permanent: true }
+        : { kind: "fire", turnsLeft: Number.isFinite(fire.turnsLeft) ? fire.turnsLeft : 3 };
+      createdFire.push(firePosition);
+    }
   }
   const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
@@ -138,6 +147,7 @@ export function resolveConeArt(state, command, art) {
     targetPosition: { ...origin },
     targetIds,
     damageByTarget,
+    ...(createdFire.length ? { createdFire } : {}),
     mpCost: cost
   }]);
 }
