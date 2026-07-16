@@ -148,7 +148,8 @@ import {
 } from "../src/campaign/campaign.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { beginActivation, defend, finishActivation } from "../src/core/commands.js";
-import { isProgressSkinUnlocked, readUnlockProgress } from "../src/progression/unlocks.js";
+import { isProgressSkinUnlocked, readUnlockProgress, TUTORIAL_PROGRESS_KEY } from "../src/progression/unlocks.js";
+import { SKIN_PREF_STORAGE_KEY } from "../src/ui/skinModel.js";
 
 function storageAdapter() {
   const values = new Map();
@@ -183,6 +184,24 @@ test("fresh campaign map surveys the active campaign graph with Clod live and th
   assert.match(clodEdge.d, /^M /, "trail carries an SVG path");
   // Trails into locked ground stay locked; the opener touches only itself so far.
   assert.ok(map.edges.every((edge) => edge.status === "open" || edge.status === "locked"));
+});
+
+test("campaign match config defaults player skins from saved per-unit preferences", () => {
+  const storage = storageAdapter();
+  storage.setItem(TUTORIAL_PROGRESS_KEY, JSON.stringify({
+    purchasedSkins: [{ type: "archer", slug: "desert-warrior" }],
+  }));
+  storage.setItem(SKIN_PREF_STORAGE_KEY, JSON.stringify({ archer: "desert-warrior" }));
+  globalThis.localStorage = storage;
+  try {
+    const withPreference = createCampaignMatchConfig(CLOD_MISSION_ID, ["swordsman", "archer"]);
+    assert.equal(withPreference.skins[1][withPreference.squads[1].indexOf("archer")], "desert-warrior");
+
+    const explicitClassic = createCampaignMatchConfig(CLOD_MISSION_ID, ["swordsman", "archer"], { archer: null });
+    assert.equal(explicitClassic.skins[1][explicitClassic.squads[1].indexOf("archer")], null);
+  } finally {
+    delete globalThis.localStorage;
+  }
 });
 
 test("Clod mission config creates a two-unit player squad against Clod and Juggernaut at half HP", () => {

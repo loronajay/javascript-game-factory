@@ -43,6 +43,7 @@ import { normalizeWeatherSpec } from "../core/weather.js";
 import { DEFAULT_SQUAD, UNIT_TYPE_KEYS } from "../ui/squadModel.js";
 import { isProgressUnitUnlocked } from "../progression/unlocks.js";
 import { getNicknamePref } from "../ui/nicknameModel.js";
+import { getSkinPref } from "../ui/skinModel.js";
 import { getCampaignMission } from "./campaignModel.js";
 import { defaultStorage } from "./campaignProgress.js";
 import { VOID_CASTLE_GHOST_FAKE_NAMES, VOID_CASTLE_GHOST_POOLS } from "./missions/void-ridden-castle/ghosts.js";
@@ -150,7 +151,11 @@ export function createCampaignMatchConfig(missionId = CLOD_MISSION_ID, selectedS
     // Skins are chosen by the player keyed by unit TYPE (see menuFlow.js), matched
     // back onto the normalized squad's slot order here for buildRoster.
     skins: {
-      1: playerSquad.map((type) => selectedSkins?.[type] ?? null),
+      1: playerSquad.map((type) => (
+        selectedSkins && Object.hasOwn(selectedSkins, type)
+          ? selectedSkins[type] ?? null
+          : getSkinPref(type)
+      )),
       2: mission.enemySkins ? [...mission.enemySkins] : mission.enemySquad.map(() => null),
     },
     // The enemy squad is scripted, not a real local player — it must never inherit

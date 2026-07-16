@@ -3,6 +3,7 @@ import { isProgressSkinUnlocked } from "../progression/unlocks.js";
 import { SKIN_MANIFEST } from "./skinManifest.generated.js";
 
 export const BASE_SKIN_SLUG = null;
+export const SKIN_PREF_STORAGE_KEY = "tactical-arena.skinPrefs";
 export const SUMMER_VIBES_SKIN_SLUG = "summer-vibes";
 export const SKIN_STATUS = Object.freeze({
   UNLOCKED: "unlocked",
@@ -167,11 +168,49 @@ export function skinAssetPath(typeOrDef, slug, kind = "portrait", storage = glob
 }
 
 export function normalizeSkinLoadout(composition, skins, storage = globalThis.localStorage) {
-  const raw = Array.isArray(skins) ? skins : [];
-  return composition.map((type, index) => normalizeSkinSlug(type, raw[index], storage));
+  const raw = Array.isArray(skins) ? skins : null;
+  return composition.map((type, index) => {
+    if (raw && index in raw) return normalizeSkinSlug(type, raw[index], storage);
+    return getSkinPref(type, storage);
+  });
 }
 
 export function skinLabel(typeOrDef, slug, storage = globalThis.localStorage) {
   const entry = getSkin(typeOrDef, slug, storage);
   return entry?.name ?? "Classic";
+}
+
+export function loadSkinPrefs(storage = globalThis.localStorage) {
+  try {
+    const raw = storage?.getItem(SKIN_PREF_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    const prefs = {};
+    for (const [type, slug] of Object.entries(parsed)) {
+      const clean = normalizeSkinSlug(type, slug, storage);
+      if (clean) prefs[type] = clean;
+    }
+    return prefs;
+  } catch {
+    return {};
+  }
+}
+
+export function saveSkinPref(type, slug, storage = globalThis.localStorage) {
+  if (!type) return;
+  try {
+    const prefs = loadSkinPrefs(storage);
+    const clean = normalizeSkinSlug(type, slug, storage);
+    if (clean) prefs[type] = clean;
+    else delete prefs[type];
+    storage?.setItem(SKIN_PREF_STORAGE_KEY, JSON.stringify(prefs));
+  } catch {
+    // Storage unavailable means the cosmetic default simply will not persist.
+  }
+}
+
+export function getSkinPref(type, storage = globalThis.localStorage) {
+  if (!type) return BASE_SKIN_SLUG;
+  return loadSkinPrefs(storage)[type] ?? BASE_SKIN_SLUG;
 }

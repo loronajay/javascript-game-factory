@@ -19,7 +19,7 @@ import { formatValor, formatValorAmount } from "../progression/marketplace.js";
 import { openNicknameGallery } from "./nicknameGallery.js";
 import { getNicknamePref } from "./nicknameModel.js";
 import { openSkinPicker } from "./skinPicker.js";
-import { normalizeSkinSlug } from "./skinModel.js";
+import { getSkinPref, normalizeSkinSlug } from "./skinModel.js";
 import { openChoiceModal } from "./choiceModal.js";
 import { openRewardSkinPicker } from "./rewardSkinPicker.js";
 import {
@@ -543,7 +543,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       const copy = document.createElement("span");
       if (type) {
         const def = UNIT_TYPES[type];
-        const skin = normalizeSkinSlug(type, campaignSquadSkins[type]);
+        const skin = campaignSkinForType(type);
         button.append(createPortrait(type, { variant: "is-chip", eager: true, skin }));
         copy.innerHTML = locked
           ? `<b>Slot ${index + 1}</b><i>${escapeHtml(def.name)} · Required</i>`
@@ -573,10 +573,16 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
 
   async function chooseCampaignSkin(type) {
     if (!type) return;
-    const result = await openSkinPicker({ type, initial: campaignSquadSkins[type] ?? null, accent: TEAM_COLOR[1] });
+    const result = await openSkinPicker({ type, initial: campaignSkinForType(type), accent: TEAM_COLOR[1] });
     if (!result) return;
     campaignSquadSkins = { ...campaignSquadSkins, [type]: result.skin };
     renderCampaignSquad();
+  }
+
+  function campaignSkinForType(type) {
+    if (!type) return null;
+    if (Object.hasOwn(campaignSquadSkins, type)) return normalizeSkinSlug(type, campaignSquadSkins[type]);
+    return getSkinPref(type);
   }
 
   async function chooseCampaignUnit(slot) {

@@ -145,10 +145,15 @@
 .nickname-gallery-section { display:grid; gap:.45rem; }
 .nickname-gallery-title { margin:0; color:color-mix(in srgb,var(--brass) 70%,var(--muted)); font:800 .66rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
 .nickname-gallery-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(15rem,1fr)); gap:.55rem; }
-.nickname-gallery-row { display:grid; grid-template-columns:2.75rem minmax(0,1fr); gap:.6rem; align-items:center; min-width:0; padding:.5rem; border:1px solid var(--parchment-edge); border-radius:8px; background:linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.42)); }
+.nickname-gallery-row { display:grid; grid-template-columns:2.75rem minmax(0,1fr); gap:.6rem; align-items:start; min-width:0; padding:.5rem; border:1px solid var(--parchment-edge); border-radius:8px; background:linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.42)); }
+.nickname-gallery-portrait { display:grid; place-items:center; align-self:center; }
 .nickname-gallery-row .unit-portrait.is-chip { width:2.75rem; height:3.4rem; border-radius:7px; }
 .nickname-gallery-copy { display:grid; grid-template-columns:minmax(0,1fr); gap:.3rem; min-width:0; }
 .nickname-gallery-unit { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font:800 .68rem var(--font-display); letter-spacing:.03em; }
+.nickname-gallery-skinbar { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:.35rem; min-width:0; }
+.nickname-gallery-skinname { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font:800 .5rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; }
+.nickname-gallery-skinbtn { flex-shrink:0; min-height:1.45rem; padding:.2rem .46rem; border:1px solid color-mix(in srgb,var(--brass) 42%,var(--parchment-edge)); border-radius:6px; background:rgba(8,18,32,.68); color:var(--text); font:800 .5rem var(--font-display); letter-spacing:.07em; text-transform:uppercase; cursor:pointer; }
+.nickname-gallery-skinbtn:hover { border-color:var(--brass); color:var(--brass-hi); }
 .nickname-gallery-field { display:flex; gap:.35rem; align-items:center; min-width:0; }
 .nickname-gallery-input { flex:1; min-width:0; padding:.35rem .5rem; border:1px solid var(--parchment-edge); border-radius:6px; background:rgba(8,18,32,.55); color:var(--text); font:600 .68rem var(--font-display); }
 .nickname-gallery-input:focus-visible { outline:2px solid var(--brass-hi); outline-offset:1px; }

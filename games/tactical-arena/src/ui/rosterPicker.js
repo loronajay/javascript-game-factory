@@ -13,7 +13,7 @@ import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { unitDetailHtml } from "./codex.js";
 import { createPortrait } from "./portraits.js";
 import { SLOT_LAYOUT, normalizeSquadLoadout, availableTypesForSlot, groupedUnitTypes, isUnitUnlocked } from "./squadModel.js";
-import { normalizeSkinSlug, skinLabel } from "./skinModel.js";
+import { getSkinPref, normalizeSkinSlug, skinLabel } from "./skinModel.js";
 import { openSkinPicker } from "./skinPicker.js";
 
 let host = null; // lazily-created singleton overlay, reused across opens
@@ -240,7 +240,8 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
 
     function selectedSkinForType(type) {
       const draft = skinDrafts[activeSlot];
-      return normalizeSkinSlug(type, draft?.type === type ? draft.slug : null);
+      if (draft?.type === type) return normalizeSkinSlug(type, draft.slug);
+      return getSkinPref(type);
     }
 
     function setSkinForFocusedType(skin) {

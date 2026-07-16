@@ -7,6 +7,8 @@ import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { groupedUnitTypes } from "./squadModel.js";
 import { createPortrait } from "./portraits.js";
 import { getNicknamePref, saveNicknamePref, NICKNAME_MAX_LENGTH } from "./nicknameModel.js";
+import { getSkinPref, saveSkinPref, skinLabel } from "./skinModel.js";
+import { openSkinPicker } from "./skinPicker.js";
 
 let host = null;
 
@@ -58,10 +60,25 @@ export function openNicknameGallery() {
 
   function renderRow(type, def) {
     const row = el("div", "nickname-gallery-row");
-    row.appendChild(createPortrait(type, { variant: "is-chip", eager: true }));
+    const portraitSlot = el("div", "nickname-gallery-portrait");
+    row.appendChild(portraitSlot);
 
     const copy = el("div", "nickname-gallery-copy");
     copy.appendChild(el("b", "nickname-gallery-unit", def.name));
+
+    const skinBar = el("div", "nickname-gallery-skinbar");
+    const skinName = el("span", "nickname-gallery-skinname");
+    const skinBtn = el("button", "nickname-gallery-skinbtn", "Equip Skin");
+    skinBtn.type = "button";
+    skinBtn.setAttribute("aria-label", `Equip ${def.name} skin`);
+    skinBtn.addEventListener("click", async () => {
+      const result = await openSkinPicker({ type, initial: getSkinPref(type) });
+      if (!result) return;
+      saveSkinPref(type, result.skin);
+      refreshSkin();
+    });
+    skinBar.append(skinName, skinBtn);
+    copy.appendChild(skinBar);
 
     const field = el("div", "nickname-gallery-field");
     const input = document.createElement("input");
@@ -88,7 +105,14 @@ export function openNicknameGallery() {
     field.append(input, clearBtn);
     copy.appendChild(field);
     row.appendChild(copy);
+    refreshSkin();
     return row;
+
+    function refreshSkin() {
+      const skin = getSkinPref(type);
+      portraitSlot.replaceChildren(createPortrait(type, { variant: "is-chip", eager: true, skin }));
+      skinName.textContent = skinLabel(type, skin);
+    }
   }
 
   function close() {

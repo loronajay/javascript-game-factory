@@ -6,21 +6,47 @@ import { fileURLToPath } from "node:url";
 
 import { UNIT_TYPES } from "../src/core/unitCatalog.js";
 import { createMatchState } from "../src/match/matchBuilder.js";
+import { TUTORIAL_PROGRESS_KEY } from "../src/progression/unlocks.js";
 import { getBoardSprite } from "../src/ui/boardSprites.js";
 import { getPortrait } from "../src/ui/portraits.js";
 import { SKIN_MANIFEST } from "../src/ui/skinManifest.generated.js";
 import {
   SKIN_COLLECTIONS,
   SKINS_BY_UNIT,
+  SKIN_PREF_STORAGE_KEY,
   SUMMER_VIBES_SKIN_SLUG,
+  getSkinPref,
   getSkin,
   getUnitSkins,
+  loadSkinPrefs,
   normalizeSkinLoadout,
   normalizeSkinSlug,
+  saveSkinPref,
   skinAssetPath
 } from "../src/ui/skinModel.js";
 
 const GAME_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+class FakeLocalStorage {
+  constructor(initial = {}) {
+    this.values = new Map(Object.entries(initial));
+  }
+  getItem(key) {
+    return this.values.has(key) ? this.values.get(key) : null;
+  }
+  setItem(key, value) {
+    this.values.set(key, String(value));
+  }
+}
+
+function storageWithUnlockedSkin(type, slug, extra = {}) {
+  return new FakeLocalStorage({
+    [TUTORIAL_PROGRESS_KEY]: JSON.stringify({
+      purchasedSkins: [{ type, slug }],
+    }),
+    ...extra,
+  });
+}
 
 function expectedSkinEntriesFromDisk() {
   const skinRoot = join(GAME_ROOT, "assets", "units", "skins");
@@ -105,6 +131,26 @@ test("skin loadouts normalize against the unit in the same squad slot", () => {
     normalizeSkinLoadout(composition, ["summer-vibes", "missing", null, "summer-vibes"]),
     [null, null, null, null]
   );
+});
+
+test("skin preferences persist per unit type and only keep unlocked skins", () => {
+  const storage = storageWithUnlockedSkin("archer", "desert-warrior");
+  saveSkinPref("archer", "desert-warrior", storage);
+  saveSkinPref("swordsman", "summer-vibes", storage);
+
+  assert.equal(getSkinPref("archer", storage), "desert-warrior");
+  assert.equal(getSkinPref("swordsman", storage), null);
+  assert.deepEqual(loadSkinPrefs(storage), { archer: "desert-warrior" });
+});
+
+test("skin preferences fill default loadouts without overriding explicit classic", () => {
+  const storage = storageWithUnlockedSkin("archer", "desert-warrior", {
+    [SKIN_PREF_STORAGE_KEY]: JSON.stringify({ archer: "desert-warrior" }),
+  });
+  const composition = ["swordsman", "archer", "mystic", "magician"];
+
+  assert.deepEqual(normalizeSkinLoadout(composition, null, storage), [null, "desert-warrior", null, null]);
+  assert.deepEqual(normalizeSkinLoadout(composition, [null, null, null, null], storage), [null, null, null, null]);
 });
 
 test("skin registry does not invent entries for unknown units", () => {
