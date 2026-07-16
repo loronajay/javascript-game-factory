@@ -79,7 +79,7 @@ export function finalBattleMissionOpeningScript(state) {
     blackswordLine("Stop there. Let me look at you."),
     blackswordLine("Four of you. Walking into a wound in the world like it's a doorway you own. So you're what this place grew to keep me out. Its guardians."),
     partyLine(state, "swordsman", "We're what's left standing. That's a different thing."),
-    slotLine(state, 0, "You don't belong on this side of the gate. Go back through it. Go back to the void, and we'll let you leave whole."),
+    slotLine(state, 0, "You don't belong on this side of the gate. Go back through it. Go back to the void."),
     blackswordLine("Or?"),
     partyLine(state, "mystic", "Or we put you back through it."),
     blackswordLine("You'd have to be real to do that.", { afterAction: "finalBattleBlackoutHold" }),
@@ -114,7 +114,7 @@ export function finalBattleDuelScript(state) {
       duelistLine(state, "That's... that's me. That is ME."),
       mirrorLine(state, "No. I'm the one who came back."),
       blackswordLine("One of you gets to keep being real. Settle it."),
-      duelistLine(state, "Fine. Then I'll be the one who's still here at the end of it."),
+      duelistLine(state, "I've got to play this smart. How do i beat ME?"),
     ]);
   }
   return script([
@@ -147,11 +147,11 @@ export function finalBattleLastStandScript(state) {
     blackswordLine("The gate kept the weaker halves. That only means the pieces I wanted are standing in one place."),
     blackswordLine("I have wasted enough ceremony on shadows.", { afterAction: "finalBattleBlackoutHold" }),
     narration("The dark comes down one last time. It does not feel like his doing. It feels like something is being decided."),
-    blackswordLine("No more halves. No more copies. If this world insists on hiding behind you, I will remove its guard myself.", { afterAction: "finalBattleBlackoutStand" }),
+    blackswordLine("If this world insists on hiding behind you, I will remove its guard myself.", { afterAction: "finalBattleBlackoutStand" }),
     partyLine(state, "swordsman", "We're all here."),
     partyLine(state, "mystic", "All of us. Whole. Whatever he took, we took it back."),
     blackswordLine("Then there's more of you to lose."),
-    blackswordLine("Feel that pressure? The void takes a little from every one of you each time I finish my turn."),
+    blackswordLine("Feel the pressure of the void. It eats away at your health every turn cycle."),
     blackswordLine("And gravity here answers to me. Come close, and I can shift every body around me with a thought."),
     partyLine(state, "mystic", "The black stones are carrying it. Stand on one and the void will blind you and silence your arts — move back to the white and it lets go."),
   ]);
@@ -187,7 +187,7 @@ export function shouldShowFinalBattleRageWarning(state, { warningShown = false }
   const rules = getFinalBattleRules(state);
   if (rules?.stage !== rules?.lastStage) return false;
   const boss = (state?.units ?? []).find((unit) => unit.player === 2 && unit.hp > 0);
-  return Boolean(boss && boss.hp <= 12);
+  return Boolean(boss && boss.hp <= 15);
 }
 
 export function finalBattleRageWarningScript(state) {
@@ -217,7 +217,7 @@ export function finalBattleDefeatScript(state) {
     blackswordLine("...what."),
     blackswordLine("What ARE you?"),
     partyLine(state, "swordsman", "The ones still standing."),
-    blackswordLine("No. No, I'm not doing this. I am not dying on a rock at the edge of nowhere to four people who walked through my dark and came back whole."),
+    blackswordLine("No, I will not end this way. I will never be erased. You have escaped the Dark this time, but I will always inhabit the void, and the void is now always within each of you."),
     blackswordLine("I must leave this wretched place. Its guardians are too powerful. Too — tactical. I can't afford to lose any more strength than you've already taken."),
     narration("He does not retreat so much as fall upward. The blue light of the gate takes him, and the humming stops."),
   ]);
