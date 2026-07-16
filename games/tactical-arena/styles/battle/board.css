@@ -209,6 +209,21 @@ body.tutorial-spotlight-mp .dialogue-layer {
 .squad-unit .stat-cell { justify-content:center; gap:.18rem; min-width:0; padding:.04rem .18rem; border-radius:4px; }
 .squad-unit .stat-cell i { font-size:.43rem; letter-spacing:.04em; }
 .squad-unit .stat-cell b { font-size:.58rem; }
+.panel.squad-overlay.is-compact { width:clamp(10.75rem,15vw,13.25rem); padding:.45rem; }
+.squad-overlay.is-compact .panel-title { margin-bottom:.35rem; padding-bottom:.3rem; font-size:.56rem; letter-spacing:.1em; }
+.squad-list.is-compact-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.32rem; }
+.squad-overlay.is-compact .squad-unit { grid-template-columns:1.875rem minmax(0,1fr); gap:.28rem; min-height:3.05rem; padding:.28rem .3rem; border-left-width:2px; border-radius:6px; }
+.squad-overlay.is-compact .squad-unit.selectable:hover { transform:translateY(-1px); }
+.squad-overlay.is-compact .squad-unit .unit-portrait.is-squad { width:1.875rem; height:2.5rem; border-radius:5px; }
+.squad-chip-body { display:grid; grid-template-rows:auto auto; gap:.16rem; min-width:0; align-content:center; }
+.squad-chip-head { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.2rem; align-items:center; min-width:0; }
+.squad-chip-state { max-width:2.5rem; overflow:hidden; padding:.04rem .18rem; border:1px solid color-mix(in srgb,var(--team,var(--brass)) 44%,transparent); border-radius:4px; color:var(--brass-hi); font:800 .42rem var(--font-display); text-transform:uppercase; text-overflow:ellipsis; white-space:nowrap; }
+.squad-overlay.is-compact .squad-unit-name { font-size:.55rem; letter-spacing:0; }
+.squad-overlay.is-compact .vitals { gap:.12rem; }
+.squad-overlay.is-compact .vital { grid-template-columns:.82rem minmax(0,1fr); gap:.18rem; }
+.squad-overlay.is-compact .vital-label { font-size:.38rem; letter-spacing:.05em; }
+.squad-overlay.is-compact .vital-track { height:5px; }
+.squad-overlay.is-compact .vital-num { display:none; }
 .tile { cursor:pointer; }.tile-face { stroke:var(--tile-stroke); stroke-width:1; vector-effect:non-scaling-stroke; transition:fill .12s ease; }.tile-light .tile-face { fill:var(--tile-light); }.tile-dark .tile-face { fill:var(--tile-dark); }.tile:hover .tile-face { fill:var(--tile-hover); }.tile-side-a { fill:var(--tile-side-a); }.tile-side-b { fill:var(--tile-side-b); }
 /* Cut-stone variation: nudge every 3rd/7th/11th tile a shade off the base so the
    floor doesn't read as a flat vector checkerboard. :where() keeps specificity at

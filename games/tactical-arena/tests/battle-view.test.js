@@ -62,9 +62,10 @@ class TestElement {
   set innerHTML(value) {
     this._innerHTML = value;
     this.children = [];
-    if (value.includes('class="squad-list"')) {
+    const squadListClass = value.match(/class="([^"]*\bsquad-list\b[^"]*)"/)?.[1];
+    if (squadListClass) {
       const list = new TestElement("div");
-      list.className = "squad-list";
+      list.className = squadListClass;
       this.children.push(list);
     }
   }
@@ -403,7 +404,7 @@ test("the squad HUD renders each player as four stacked unit rows", () => {
   }
 });
 
-test("four-player team HUD gives every player panel its own slot and team label", () => {
+test("four-player team HUD uses compact chips in every player slot", () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElement: (tagName) => new TestElement(tagName) };
 
@@ -420,8 +421,15 @@ test("four-player team HUD gives every player panel its own slot and team label"
     assert.match(overlay.children[1].innerHTML, /Player 2 - Team 2/);
     assert.match(overlay.children[2].innerHTML, /Player 3 - Team 1/);
     assert.match(overlay.children[3].innerHTML, /Player 4 - Team 2/);
+    assert.ok(overlay.children.every((panel) => panel.className.includes("is-compact")));
+    assert.ok(overlay.children.every((panel) => panel.querySelector(".squad-list").className.includes("is-compact-grid")));
+    assert.equal(overlay.children[0].querySelector(".squad-list").children.length, 4);
+    assert.ok(overlay.children[0].querySelector(".squad-list").children.every((row) => row.className.includes("squad-chip")));
+    assert.doesNotMatch(overlay.children[0].innerHTML, /unit-statline/);
     assert.match(STYLE_CSS, /\.squad-overlay\.slot-3\s*\{\s*top:\.75rem;\s*left:\.75rem;/);
     assert.match(STYLE_CSS, /\.squad-overlay\.slot-4\s*\{\s*top:\.75rem;\s*right:\.75rem;/);
+    assert.match(STYLE_CSS, /\.panel\.squad-overlay\.is-compact\s*\{/);
+    assert.match(STYLE_CSS, /\.squad-list\.is-compact-grid\s*\{/);
   } finally {
     globalThis.document = previousDocument;
   }

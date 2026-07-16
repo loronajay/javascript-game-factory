@@ -48,6 +48,8 @@ test("formation picker labels real board slots and mirrors player two", () => {
   assert.deepEqual(FORMATION_SLOT_LABELS, ["1", "2", "3", "4"]);
   assert.equal(normalizeFormationPlayer(2), 2);
   assert.equal(normalizeFormationPlayer("2"), 2);
+  assert.equal(normalizeFormationPlayer(3), 3);
+  assert.equal(normalizeFormationPlayer(4), 4);
   assert.equal(normalizeFormationPlayer(9), 1);
 
   assert.deepEqual(
@@ -66,6 +68,36 @@ test("formation picker labels real board slots and mirrors player two", () => {
       [1, "2", { x: 12, y: 1 }],
       [2, "3", { x: 12, y: 0 }],
       [3, "1", { x: 11, y: 1 }]
+    ]
+  );
+});
+
+test("formation picker previews all four hot-seat team spawn corners", () => {
+  assert.deepEqual(
+    formationPreviewSlots(2, 13, "teams").map((slot) => [slot.slot, slot.label, slot.position]),
+    [
+      [0, "4", { x: 1, y: 0 }],
+      [1, "2", { x: 0, y: 1 }],
+      [2, "3", { x: 0, y: 0 }],
+      [3, "1", { x: 1, y: 1 }]
+    ]
+  );
+  assert.deepEqual(
+    formationPreviewSlots(3, 13, "teams").map((slot) => [slot.slot, slot.label, slot.position]),
+    [
+      [0, "4", { x: 11, y: 0 }],
+      [1, "2", { x: 12, y: 1 }],
+      [2, "3", { x: 12, y: 0 }],
+      [3, "1", { x: 11, y: 1 }]
+    ]
+  );
+  assert.deepEqual(
+    formationPreviewSlots(4, 13, "teams").map((slot) => [slot.slot, slot.label, slot.position]),
+    [
+      [0, "4", { x: 11, y: 12 }],
+      [1, "2", { x: 12, y: 11 }],
+      [2, "3", { x: 12, y: 12 }],
+      [3, "1", { x: 11, y: 11 }]
     ]
   );
 });

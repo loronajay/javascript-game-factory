@@ -20,14 +20,19 @@ function ensureHost() {
 export const FORMATION_PREVIEW_SIZE = 13;
 export const FORMATION_SLOT_LABELS = Object.freeze(["1", "2", "3", "4"]);
 const FORMATION_LABEL_BY_ENGINE_SLOT = Object.freeze(["4", "2", "3", "1"]);
-const FORMATION_CROP = Object.freeze({
-  1: Object.freeze({ minX: 0, maxX: 3, minY: 9, maxY: 12 }),
-  2: Object.freeze({ minX: 9, maxX: 12, minY: 0, maxY: 3 })
+const FFA_CORNER_BY_PLAYER = Object.freeze({ 1: 0, 2: 1, 3: 2, 4: 3 });
+const TEAMS_CORNER_BY_PLAYER = Object.freeze({ 1: 0, 2: 2, 3: 1, 4: 3 });
+const FORMATION_CROP_BY_CORNER = Object.freeze({
+  0: Object.freeze({ minX: 0, maxX: 3, minY: 9, maxY: 12 }),
+  1: Object.freeze({ minX: 9, maxX: 12, minY: 0, maxY: 3 }),
+  2: Object.freeze({ minX: 0, maxX: 3, minY: 0, maxY: 3 }),
+  3: Object.freeze({ minX: 9, maxX: 12, minY: 9, maxY: 12 })
 });
 
-export function openDraftFormationPicker({ title = "Arrange Formation", composition = [], skins = [], nicknames = [], order = null, accent = null, player = 1 } = {}) {
+export function openDraftFormationPicker({ title = "Arrange Formation", composition = [], skins = [], nicknames = [], order = null, accent = null, player = 1, format = "ffa" } = {}) {
   const overlay = ensureHost();
   const previewPlayer = normalizeFormationPlayer(player);
+  const previewFormat = normalizeFormationFormat(format);
   let formationOrder = Array.isArray(order) && order.length === composition.length
     ? [...order]
     : defaultFormationOrder(composition.length);
@@ -71,6 +76,7 @@ export function openDraftFormationPicker({ title = "Arrange Formation", composit
       grid.dataset.player = String(previewPlayer);
       const preview = createFormationPreview({
         player: previewPlayer,
+        format: previewFormat,
         composition,
         skins,
         nicknames,
@@ -238,13 +244,29 @@ function nameFor(type, nickname, def) {
 }
 
 export function normalizeFormationPlayer(player) {
-  return Number(player) === 2 ? 2 : 1;
+  const normalized = Math.floor(Number(player));
+  return normalized >= 1 && normalized <= 4 ? normalized : 1;
 }
 
-export function formationPreviewSlots(player = 1, size = FORMATION_PREVIEW_SIZE) {
+function normalizeFormationFormat(format) {
+  return format === "teams" ? "teams" : "ffa";
+}
+
+function formationCornerIndex(player = 1, format = "ffa") {
   const normalized = normalizeFormationPlayer(player);
+  const corners = normalizeFormationFormat(format) === "teams" ? TEAMS_CORNER_BY_PLAYER : FFA_CORNER_BY_PLAYER;
+  return corners[normalized] ?? 0;
+}
+
+export function formationPreviewSlots(player = 1, size = FORMATION_PREVIEW_SIZE, format = "ffa") {
+  const cornerIndex = formationCornerIndex(player, format);
   const max = size - 1;
-  const corner = normalized === 2 ? { cx: max, cy: 0 } : { cx: 0, cy: max };
+  const corner = [
+    { cx: 0, cy: max },
+    { cx: max, cy: 0 },
+    { cx: 0, cy: 0 },
+    { cx: max, cy: max }
+  ][cornerIndex] ?? { cx: 0, cy: max };
   const inwardX = corner.cx === 0 ? 1 : -1;
   const inwardY = corner.cy === 0 ? 1 : -1;
   return [
@@ -269,10 +291,10 @@ function defaultFormationOrder(length) {
     : Array.from({ length }, (_, index) => index);
 }
 
-function createFormationPreview({ player, composition, skins, nicknames, formationOrder, selectedSlot, accent, onSlotClick }) {
+function createFormationPreview({ player, format, composition, skins, nicknames, formationOrder, selectedSlot, accent, onSlotClick }) {
   const metrics = createBoardMetrics(FORMATION_PREVIEW_SIZE);
-  const slots = formationPreviewSlots(player);
-  const tiles = formationPreviewTiles(player);
+  const slots = formationPreviewSlots(player, FORMATION_PREVIEW_SIZE, format);
+  const tiles = formationPreviewTiles(player, format);
   const viewBox = formationPreviewViewBox(metrics, tiles, slots);
   const units = slots.map(({ slot, position }) => {
     const pickIndex = formationOrder[slot];
@@ -332,8 +354,8 @@ function createFormationPreview({ player, composition, skins, nicknames, formati
   };
 }
 
-function formationPreviewTiles(player) {
-  const crop = FORMATION_CROP[normalizeFormationPlayer(player)] ?? FORMATION_CROP[1];
+function formationPreviewTiles(player, format) {
+  const crop = FORMATION_CROP_BY_CORNER[formationCornerIndex(player, format)] ?? FORMATION_CROP_BY_CORNER[0];
   const tiles = [];
   for (let y = crop.minY; y <= crop.maxY; y += 1) {
     for (let x = crop.minX; x <= crop.maxX; x += 1) tiles.push({ x, y });

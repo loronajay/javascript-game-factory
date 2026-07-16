@@ -192,6 +192,29 @@ function tempoGaugeHtml(state, unit) {
   </div>`;
 }
 
+function compactSquadStateLabel(unit, { dead, active, tempoReady }) {
+  if (dead) return "Fallen";
+  if (active) return "Active";
+  if (isRaging(unit)) return "RAGE";
+  if (tempoReady) return "Ready";
+  if (isDefending(unit)) return "Guard";
+  if (unit.spent) return "Done";
+  return "";
+}
+
+function compactSquadTitle(unit, definition, stats, resource, { stateLabel }) {
+  return [
+    `${displayName(unit, definition)} - Player ${unit.player}`,
+    stateLabel,
+    `HP ${Math.max(0, unit.hp)}/${stats.maxHp}`,
+    `${resource.shortLabel} ${unit.mp}/${stats.maxMp}`,
+    `STR ${stats.strength}`,
+    `DEF ${stats.defense}`,
+    `MOV ${stats.moveRange}`,
+    `RNG ${stats.attackRange}`
+  ].filter(Boolean).join(" | ");
+}
+
 export function renderUnitCard(unit, state, unitCard) {
   if (!unit) {
     toggleClass(unitCard, "is-raging", false);
@@ -309,12 +332,14 @@ export function renderActions(
 
 export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnabled = true, tempoCanSelect = null } = {}) {
   squadOverlays.replaceChildren();
-  for (const player of state.turnOrder ?? [1, 2]) {
+  const players = state.turnOrder ?? [1, 2];
+  const compactHud = players.length === 4;
+  for (const player of players) {
     const panel = document.createElement("section");
-    panel.className = `panel squad-panel squad-overlay slot-${player}${player === state.currentPlayer && state.phase === "playing" ? " is-active" : ""}`;
+    panel.className = `panel squad-panel squad-overlay slot-${player}${compactHud ? " is-compact" : ""}${player === state.currentPlayer && state.phase === "playing" ? " is-active" : ""}`;
     panel.style.setProperty("--team", colorOf(state, player));
     const teamTag = state.format === "teams" ? ` - ${teamLabel(state, teamOf(state, player))}` : "";
-    panel.innerHTML = `<div class="panel-title">Player ${player}${teamTag}</div><div class="squad-list"></div>`;
+    panel.innerHTML = `<div class="panel-title">Player ${player}${teamTag}</div><div class="squad-list${compactHud ? " is-compact-grid" : ""}"></div>`;
     const list = panel.querySelector(".squad-list");
 
     for (const unit of state.units.filter((u) => u.player === player && !u.introHidden && !u.ghost)) {
@@ -334,23 +359,39 @@ export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnable
           ? (tempoCanSelect ? tempoCanSelect(unit) : canBeginTempoActivation(state, unit))
           : unit.player === state.currentPlayer && !unit.spent
       );
-      row.className = `squad-unit${dead ? " is-dead" : unit.spent ? " spent" : ""}${isDefending(unit) ? " defending" : ""}${isRaging(unit) ? " is-raging" : ""}${active ? " is-current" : ""}${selectable ? " selectable" : ""}`;
+      row.className = `squad-unit${compactHud ? " squad-chip" : ""}${dead ? " is-dead" : unit.spent ? " spent" : ""}${isDefending(unit) ? " defending" : ""}${isRaging(unit) ? " is-raging" : ""}${active ? " is-current" : ""}${selectable ? " selectable" : ""}`;
       const tags = dead
         ? `<span class="unit-tag spent">Fallen</span>`
         : unitTagsHtml(unit, definition, { includePassive: false, includeSpent: true, spentLabel: "Done" });
-      row.innerHTML = `${portraitHtml(unit.type, "is-squad", unit.skin)}
-        <div class="squad-unit-body">
-          <div class="squad-unit-head">
-            <span class="squad-unit-name">${escapeHtml(displayName(unit, definition))}</span>
-            <span class="unit-tags">${tags}</span>
-          </div>
-          <div class="vitals">
-            ${vitalHtml("hp", "HP", Math.max(0, unit.hp), stats.maxHp, { low: !dead && unit.hp <= stats.maxHp * 0.3 })}
-            ${vitalHtml("mp", resource.shortLabel, unit.mp, stats.maxMp)}
-            ${tempoGaugeHtml(state, unit)}
-          </div>
-          ${statLineHtml(definition, stats)}
-        </div>`;
+      if (compactHud) {
+        const stateLabel = compactSquadStateLabel(unit, { dead, active, tempoReady });
+        row.title = compactSquadTitle(unit, definition, stats, resource, { stateLabel });
+        row.innerHTML = `${portraitHtml(unit.type, "is-squad", unit.skin)}
+          <div class="squad-chip-body">
+            <div class="squad-chip-head">
+              <span class="squad-unit-name">${escapeHtml(displayName(unit, definition))}</span>
+              ${stateLabel ? `<span class="squad-chip-state">${escapeHtml(stateLabel)}</span>` : ""}
+            </div>
+            <div class="vitals">
+              ${vitalHtml("hp", "HP", Math.max(0, unit.hp), stats.maxHp, { low: !dead && unit.hp <= stats.maxHp * 0.3 })}
+              ${vitalHtml("mp", resource.shortLabel, unit.mp, stats.maxMp)}
+            </div>
+          </div>`;
+      } else {
+        row.innerHTML = `${portraitHtml(unit.type, "is-squad", unit.skin)}
+          <div class="squad-unit-body">
+            <div class="squad-unit-head">
+              <span class="squad-unit-name">${escapeHtml(displayName(unit, definition))}</span>
+              <span class="unit-tags">${tags}</span>
+            </div>
+            <div class="vitals">
+              ${vitalHtml("hp", "HP", Math.max(0, unit.hp), stats.maxHp, { low: !dead && unit.hp <= stats.maxHp * 0.3 })}
+              ${vitalHtml("mp", resource.shortLabel, unit.mp, stats.maxMp)}
+              ${tempoGaugeHtml(state, unit)}
+            </div>
+            ${statLineHtml(definition, stats)}
+          </div>`;
+      }
       if (selectable) row.addEventListener("click", () => onBeginUnit(unit));
       list.append(row);
     }

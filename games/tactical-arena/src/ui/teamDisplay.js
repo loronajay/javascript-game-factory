@@ -17,9 +17,22 @@ export function teamGroupsForSetup(playerCount = 2, format = "ffa") {
   ];
 }
 
+export function teamPairingSummary(playerCount = 2, format = "ffa") {
+  const groups = teamGroupsForSetup(playerCount, format);
+  if (format !== "teams" || groups.length !== 2) return "";
+  return `Teams: ${playerSeatListLabel(groups[0].seats)} vs ${playerSeatListLabel(groups[1].seats)}.`;
+}
+
 export function playerSeatListLabel(seats = []) {
   const labels = seats.map((seat) => `Player ${seat}`);
   if (labels.length <= 1) return labels[0] ?? "";
   if (labels.length === 2) return labels.join(" + ");
   return `${labels.slice(0, -1).join(", ")} + ${labels.at(-1)}`;
+}
+
+export function shouldSyncHotSeatSetupForSegment(seg) {
+  return Boolean(
+    seg?.closest?.('[data-screen="hsSetup"]') &&
+    (seg.closest('[data-field="playerCount"]') || seg.closest('[data-field="format"]'))
+  );
 }

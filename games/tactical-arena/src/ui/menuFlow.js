@@ -22,7 +22,7 @@ import { openSkinPicker } from "./skinPicker.js";
 import { getSkinPref, normalizeSkinSlug } from "./skinModel.js";
 import { openChoiceModal } from "./choiceModal.js";
 import { openRewardSkinPicker } from "./rewardSkinPicker.js";
-import { playerSeatListLabel, teamGroupsForSetup } from "./teamDisplay.js";
+import { playerSeatListLabel, shouldSyncHotSeatSetupForSegment, teamGroupsForSetup, teamPairingSummary } from "./teamDisplay.js";
 import {
   HASBEEN_MYSTIC_SKIN_PACK_ID,
   getCampaignUnitRewardChoices,
@@ -195,6 +195,13 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     const format = count === 4 ? (selectedValue(hsSetup, "format", "format") || "ffa") : "ffa";
     const formatGroup = $("[data-group='format']", hsSetup);
     if (formatGroup) formatGroup.hidden = count !== 4;
+    const squadHint = $("[data-group='squads'] .setup-hint", hsSetup);
+    if (squadHint) {
+      const teamSummary = teamPairingSummary(count, format);
+      squadHint.textContent = teamSummary
+        ? `${teamSummary} Each squad deploys four pieces. Tap Edit Squad to choose units and read their stats, passives and ARTS.`
+        : "Each squad deploys four pieces. Tap Edit Squad to choose units and read their stats, passives and ARTS.";
+    }
     hsSquadHost.replaceChildren();
     for (const group of teamGroupsForSetup(count, format)) {
       if (format === "teams") {
@@ -204,11 +211,19 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
         teamGroup.innerHTML = `<div class="squad-team-title"><span>Team ${group.team}</span><small>${playerSeatListLabel(group.seats)}</small></div>`;
         const row = document.createElement("div");
         row.className = "squad-team-pickers";
-        for (const player of group.seats) row.append(ensureHotSeatPicker(player).el);
+        for (const player of group.seats) {
+          const picker = ensureHotSeatPicker(player);
+          picker.setFormat(format);
+          row.append(picker.el);
+        }
         teamGroup.append(row);
         hsSquadHost.append(teamGroup);
       } else {
-        for (const player of group.seats) hsSquadHost.append(ensureHotSeatPicker(player).el);
+        for (const player of group.seats) {
+          const picker = ensureHotSeatPicker(player);
+          picker.setFormat(format);
+          hsSquadHost.append(picker.el);
+        }
       }
     }
   }
@@ -966,7 +981,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     const seg = event.target.closest(".seg");
     if (seg && !seg.disabled) {
       for (const sibling of seg.parentElement.querySelectorAll(".seg")) sibling.classList.toggle("is-selected", sibling === seg);
-      if (seg.closest('[data-screen="hsSetup"]') && seg.closest('[data-field="playerCount"]')) syncHotSeatSetup();
+      if (shouldSyncHotSeatSetupForSegment(seg)) syncHotSeatSetup();
       return;
     }
 

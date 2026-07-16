@@ -331,6 +331,7 @@ export function createOnlineFlow({ onStartMatch }) {
       const teams = activeMatchType() === "teams4";
       const localTeam = teamForSeat(localSeat, teams ? "teams" : "ffa");
       squadPicker.setPlayer(localSeat);
+      squadPicker.setFormat(teams ? "teams" : "ffa");
       squadPicker.setTitle(teams ? `Your squad - Team ${localTeam}` : "Your squad");
       squadPicker.setAccent(teams ? (TEAM_COLOR[localTeam] ?? PLAYER_COLOR[localSeat]) : (PLAYER_COLOR[localSeat] ?? PLAYER_COLOR[1]));
       squadPicker.setLocked(localLocked);
@@ -559,8 +560,11 @@ export function createOnlineFlow({ onStartMatch }) {
       skins,
       nicknames,
       order: localFormationOrder,
-      accent: PLAYER_COLOR[seat] ?? PLAYER_COLOR[1],
+      accent: matchTypeConfig().format === "teams"
+        ? (TEAM_COLOR[teamForSeat(seat, "teams")] ?? PLAYER_COLOR[seat])
+        : (PLAYER_COLOR[seat] ?? PLAYER_COLOR[1]),
       player: seat,
+      format: matchTypeConfig().format,
     });
     formationPromptOpen = false;
     if (!result?.order) {

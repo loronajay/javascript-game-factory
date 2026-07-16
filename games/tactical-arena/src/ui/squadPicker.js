@@ -28,11 +28,12 @@ import { getNicknamePref } from "./nicknameModel.js";
 
 export { UNIT_TYPE_KEYS, DEFAULT_SQUAD, DEFAULT_FORMATION_ORDER, normalizeSquad, normalizeSquadLoadout, availableTypesForSlot, UNIT_CLASS_GROUPS, groupedUnitTypes };
 
-export function createSquadPicker({ title = "Squad", initial = null, accent = null, allowDuplicates = true, player = 1 } = {}) {
+export function createSquadPicker({ title = "Squad", initial = null, accent = null, allowDuplicates = true, player = 1, format = "ffa" } = {}) {
   let loadout = normalizeSquadLoadout(initial);
   let formationOrder = normalizeInitialFormation(initial);
   let locked = false;
   let formationPlayer = player;
+  let formationFormat = format;
   let pickerTitle = title;
   let pickerAccent = accent;
 
@@ -80,7 +81,8 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
       nicknames: loadout.composition.map((type) => getNicknamePref(type)),
       order: formationOrder,
       accent: pickerAccent,
-      player: formationPlayer
+      player: formationPlayer,
+      format: formationFormat
     });
     if (result?.order) {
       formationOrder = normalizeFormationOrder(result.order, loadout.composition.length, formationOrder);
@@ -134,6 +136,9 @@ export function createSquadPicker({ title = "Squad", initial = null, accent = nu
     },
     setPlayer(nextPlayer) {
       formationPlayer = nextPlayer;
+    },
+    setFormat(nextFormat) {
+      formationFormat = nextFormat === "teams" ? "teams" : "ffa";
     },
     setTitle(nextTitle) {
       pickerTitle = String(nextTitle || "Squad");
