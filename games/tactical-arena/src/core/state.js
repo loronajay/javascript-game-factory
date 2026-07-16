@@ -61,6 +61,7 @@ export function createUnit(spec) {
     realmTraversalLocked: spec.realmTraversalLocked ?? false,
     studiedTargetId: spec.studiedTargetId ?? null,
     lastGhostType: spec.lastGhostType ?? null,
+    soulShuffleChoices: Array.isArray(spec.soulShuffleChoices) ? [...spec.soulShuffleChoices] : null,
     ghost: spec.ghost ?? false,
     ghostArtId: spec.ghostArtId ?? null,
     summonerId: spec.summonerId ?? null,
@@ -224,7 +225,7 @@ const FIRST_ACTOR_PRIORITY = Object.freeze({
   "mother-nature": 1
 });
 
-function firstActorPriority(unit) {
+export function firstActorPriority(unit) {
   return FIRST_ACTOR_PRIORITY[unit?.type] ?? Infinity;
 }
 
@@ -287,6 +288,7 @@ export function cloneState(state) {
       linkedStatMods: (unit.linkedStatMods ?? []).map((mod) => ({ ...mod, stats: { ...mod.stats } })),
       studiedTargetId: unit.studiedTargetId ?? null,
       lastGhostType: unit.lastGhostType ?? null,
+      soulShuffleChoices: Array.isArray(unit.soulShuffleChoices) ? [...unit.soulShuffleChoices] : null,
       ghost: Boolean(unit.ghost),
       ghostArtId: unit.ghostArtId ?? null,
       summonerId: unit.summonerId ?? null,

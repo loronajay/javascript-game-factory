@@ -447,6 +447,7 @@ export function isTargetedMode(mode, actor) {
     art.effect?.type !== "healAllies" &&
     art.resolution !== "flee" &&
     art.resolution !== "summon" &&
+    art.resolution !== "summonGhost" &&
     art.targeting?.shape !== "nukeAura" &&
     art.targeting?.shape !== "tilePlacement" &&
     // Father Time's ally-or-enemy casts (Age, Time Stretch) and Rewind's revive

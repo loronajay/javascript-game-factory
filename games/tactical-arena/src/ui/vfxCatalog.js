@@ -84,6 +84,21 @@ const ABILITY_VFX = Object.freeze({
     particleCount: 24,
     colors: Object.freeze({ core: "#d8c4ff", trail: "#68459b", impact: "#9b72dc" })
   }),
+  "banish-dark": Object.freeze({
+    type: "magicBurst",
+    soundKey: "banish",
+    blast: true,
+    blastTiles: 5,
+    shake: 15,
+    particleCount: 32,
+    radius: 72,
+    durationMs: 920,
+    windup: Object.freeze({ style: "gather", durationMs: 560, particleCount: 14 }),
+    screenDarken: Object.freeze({ opacity: 0.78 }),
+    boardFlash: true,
+    afterglow: true,
+    colors: Object.freeze({ core: "#0b0615", trail: "#2f164d", impact: "#d6b4ff" })
+  }),
   zap: Object.freeze({
     type: "projectileFan",
     soundKey: "spark",

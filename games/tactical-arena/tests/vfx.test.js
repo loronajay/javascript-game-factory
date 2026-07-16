@@ -58,6 +58,17 @@ test("every implemented active ART declares a distinct VFX recipe", () => {
   assert.ok(getAbilityVfx("pray").radius > getAbilityVfx("wish").radius);
 });
 
+test("Blacksword Banish declares an ultimate-scale dark screen burst", () => {
+  const banish = getAbilityVfx("banish-dark");
+  assert.equal(banish.type, "magicBurst");
+  assert.equal(banish.soundKey, "banish");
+  assert.equal(banish.blast, true);
+  assert.equal(banish.boardFlash, true);
+  assert.equal(banish.afterglow, true);
+  assert.ok(banish.screenDarken.opacity >= 0.7);
+  assert.ok(banish.windup.durationMs >= 500);
+});
+
 test("ranged basic attacks fire a per-unit-type projectile with a safe fallback", () => {
   assert.equal(getAttackProjectile("archer").shape, "arrow");
   assert.equal(getAttackProjectile("sniper").shape, "tracer");

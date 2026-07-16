@@ -20,7 +20,7 @@
 export const RONIN = Object.freeze({
   id: "ronin",
   name: "Ronin",
-  glyph: "🗡",
+  glyph: "\u{1F977}",
   classType: "melee",
   ai: Object.freeze({ threatValue: 13, role: "skirmisher", protect: false }),
   tempo: Object.freeze({ agility: 7 }),

@@ -1,14 +1,21 @@
-import { findUnit } from "./state.js";
+import { findUnit, firstActorPriority } from "./state.js";
 import { getUnitType } from "./unitCatalog.js";
 import { ERR } from "./reducerResult.js";
 
-// True while this player owns a living, not-yet-commanded acts-first King. He is
-// forced to issue his command before any of his squadmates may begin.
+export function pendingFirstActor(state, player) {
+  let pending = null;
+  for (const unit of state.units ?? []) {
+    if (unit.hp <= 0 || unit.player !== player || unit.commandTurn === state.turnNumber) continue;
+    if (!getUnitType(unit.type).actsFirst) continue;
+    if (!pending || firstActorPriority(unit) < firstActorPriority(pending)) pending = unit;
+  }
+  return pending;
+}
+
+// True while this player owns a living, not-yet-acted acts-first unit. That unit
+// must complete its activation before any of its squadmates may begin.
 export function commanderPending(state, player) {
-  return state.units.some((unit) =>
-    unit.hp > 0 && unit.player === player &&
-    getUnitType(unit.type).actsFirst &&
-    unit.commandTurn !== state.turnNumber);
+  return Boolean(pendingFirstActor(state, player));
 }
 
 export function validateOwnedLivingUnit(state, player, unitId) {

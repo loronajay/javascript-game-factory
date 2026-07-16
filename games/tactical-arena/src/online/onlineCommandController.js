@@ -6,7 +6,9 @@ import { getUnitType } from "../core/unitCatalog.js";
 const REMOTE_ACTIVATION_STEP_MS = 260;
 
 export function isRolledArtResult(events = []) {
-  return events.some((event) => event.type === "ART_RESOLVED" && "hit" in event);
+  return events.some((event) => event.type === "ART_RESOLVED" && "hit" in event && (
+    Boolean(event.targetId) || (event.targetIds?.length ?? 0) > 0
+  ));
 }
 
 export function createOnlineCommandController({

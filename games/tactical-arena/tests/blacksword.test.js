@@ -37,6 +37,7 @@ function scenario({ units = [], tiles = [], blacksword = {}, size = 9 } = {}) {
 test("Blacksword is a melee unit with 0 MP and Blind immunity", () => {
   const def = getUnitType("blacksword");
   assert.equal(def.name, "Blacksword");
+  assert.equal(def.glyph, "\u{1F5E1}");
   assert.equal(def.classType, "melee");
   assert.deepEqual(def.stats, { moveRange: 3, attackRange: 1, strength: 10, defense: 6, maxHp: 30, maxMp: 0 });
 

@@ -387,6 +387,7 @@ export async function presentInstantArt({
     // BLIND, on a fizzle the tile puffs harmlessly.
     const metrics = createBoardMetrics(state.size);
     const clouded = (resolved.statusTargets ?? []).map((id) => findUnit(state, id)).filter(Boolean);
+    await revealRoll({ missed: Boolean(resolved.missed), critical: false }, null, actorBefore);
     await effects.playAbilityVfx("smoke-bomb-riot", { actor: actorBefore, targets: clouded, targetPosition: resolved.center });
     if (resolved.missed) {
       await effects.floatText(unitCenter(metrics, { position: resolved.center }), "FIZZLE", "#b9b19a");
@@ -470,7 +471,7 @@ export async function presentInstantArt({
   } else if (resolved?.artId === "banish-dark" && actorBefore) {
     // The RAGE ultimate: every enemy on a dark tile is destroyed, then Blacksword falls.
     const metrics = createBoardMetrics(state.size);
-    effects.shake(12);
+    await effects.playAbilityVfx("banish-dark", { actor: actorBefore, targets: targetsBefore });
     await Promise.all(targetsBefore.map(async (target) => {
       const center = unitCenter(metrics, target);
       effects.impact(center, true, "true");

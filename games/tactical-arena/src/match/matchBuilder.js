@@ -1,6 +1,7 @@
 import { createBattleState, openAutomaticFirstActivation } from "../core/state.js";
 import { nextRandom } from "../core/rng.js";
 import { getUnitType, takesTurns } from "../core/unitCatalog.js";
+import { pendingFirstActor } from "../core/commandValidation.js";
 import { createRoster, FORMATS, playerColor } from "../core/roster.js";
 import { normalizeSkinLoadout } from "../ui/skinModel.js";
 import { getNicknamePref } from "../ui/nicknameModel.js";
@@ -169,7 +170,18 @@ export function buildSummary(state, { matchStartedAt, initialHpByPlayer }) {
   };
 }
 
-export function readableError(errorCode) {
+function firstActorGateMessage(state, player) {
+  const actor = state ? pendingFirstActor(state, player ?? state.currentPlayer) : null;
+  const definition = actor ? getUnitType(actor.type) : null;
+  if (definition?.commandOnly) {
+    return "Your King must issue his command before the rest of the squad may act.";
+  }
+  const name = actor ? (actor.nickname || definition.name) : "First actor";
+  return `${name} must act before the rest of the squad may act.`;
+}
+
+export function readableError(errorCode, state = null, player = state?.currentPlayer) {
+  if (errorCode === "KING_MUST_ACT_FIRST") return firstActorGateMessage(state, player);
   return ({
     ART_NOT_AVAILABLE: "ARTS must be chosen before moving or attacking, with enough MP.",
     INVALID_ART_PATH: "Footwork must use its full unique orthogonal path and finish on empty ground.",
@@ -180,7 +192,6 @@ export function readableError(errorCode) {
     PRIMARY_ALREADY_USED: "This unit has already taken its primary action.",
     FINISH_REQUIRES_ACTION: "Attack or defend before finishing this activation.",
     SUMMON_LIMIT: "This Necromancer already has two Ghouls on the field.",
-    KING_MUST_ACT_FIRST: "Your King must issue his command before the rest of the squad may act.",
     COMMANDER_CANNOT_ACT: "The King only commands — he never moves, attacks, or defends."
   })[errorCode] ?? "That action is not legal right now.";
 }

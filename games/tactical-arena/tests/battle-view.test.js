@@ -741,6 +741,44 @@ test("the board only treats attack and enemy-target ARTS as targeted modes", () 
   assert.equal(isTargetedMode("art:pray", actor), false);
   assert.equal(isTargetedMode("art:wish", actor), false);
   assert.equal(isTargetedMode("art:volley-shot", { type: "archer" }), false);
+  assert.equal(isTargetedMode("art:summon", { type: "summoner" }), false);
+  assert.equal(isTargetedMode("art:beckon", { type: "summoner" }), false);
+});
+
+test("Summoner placement ARTS do not paint attack-range spillover", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const state = createBattleState({
+      size: 9,
+      units: [
+        { id: "summoner", player: 1, type: "summoner", x: 1, y: 1, hp: 5 },
+        { id: "foe", player: 2, type: "swordsman", x: 8, y: 8 }
+      ]
+    });
+    const board = new TestSvgElement("svg");
+    const boardLayer = new TestSvgElement("g");
+    const unitsLayer = new TestSvgElement("g");
+
+    renderBoard({
+      board,
+      boardLayer,
+      unitsLayer,
+      state,
+      mode: "art:beckon",
+      selectedId: "summoner",
+      footworkPath: [],
+      onTileClick: () => {}
+    });
+
+    assert.ok(findSvgByAttribute(boardLayer, "data-key", "4,1").classList.contains("legal-art"));
+    const outsidePrintedRange = findSvgByAttribute(boardLayer, "data-key", "5,1");
+    assert.equal(outsidePrintedRange.classList.contains("legal-art"), false);
+    assert.equal(outsidePrintedRange.classList.contains("art-range"), false);
+  } finally {
+    globalThis.document = previousDocument;
+  }
 });
 
 test("self-aura heal ARTS can be confirmed from any highlighted heal tile", () => {

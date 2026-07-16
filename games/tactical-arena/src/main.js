@@ -724,8 +724,8 @@ function resolveCommand(command) {
   return { prepared, result: applyCommand(state, prepared) };
 }
 
-function commandErrorMessage(result) {
-  return result.message ?? readableError(result.errorCode);
+function commandErrorMessage(result, command, commandState = state) {
+  return result.message ?? readableError(result.errorCode, commandState, command?.player ?? commandState?.currentPlayer);
 }
 
 function dispatch(command, { deferRolloverFx = false } = {}) {
@@ -734,7 +734,7 @@ function dispatch(command, { deferRolloverFx = false } = {}) {
   const { prepared, result } = resolveCommand(command);
   if (!result.accepted) {
     recordCampaignRejection(prepared, result);
-    setMessage(commandErrorMessage(result), true);
+    setMessage(commandErrorMessage(result, prepared, beforeState), true);
     return false;
   }
   lastDispatchEvents = result.events ?? [];

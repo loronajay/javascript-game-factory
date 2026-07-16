@@ -23,6 +23,8 @@ function run(state, command) {
 test("Nemesis is registered with mage stats and authored abilities", () => {
   const def = getUnitType("nemesis");
   assert.equal(def.name, "Nemesis");
+  assert.equal(def.glyph, "\u{1F300}");
+  assert.notEqual(def.glyph, "N", "Nemesis should use an authored UI glyph, not a letter fallback");
   assert.equal(def.classType, "mage");
   assert.deepEqual(def.stats, {
     moveRange: 3,

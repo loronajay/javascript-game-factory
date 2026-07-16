@@ -28,6 +28,7 @@ import {
   advanceFinalBattleStage,
   getFinalBattleRules,
 } from "../src/campaign/missions/the-final-battle/stages.js";
+import { finalBattleDuelWonScript } from "../src/campaign/missions/the-final-battle/dialogue.js";
 import { createMatchState } from "../src/match/matchBuilder.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { resolveVictory } from "../src/core/turnEngine.js";
@@ -431,6 +432,20 @@ test("the duel beat is spoken by the duelist and its copy", () => {
   assert.ok(script.some((line) => line.speakerId === mirror.id));
 });
 
+test("Blacksword's between-duel lines stay confident as the copies fall", () => {
+  let state = advanceFinalBattleStage(finalBattleState());
+  const lines = [];
+  for (let stage = 1; stage <= 3; stage += 1) {
+    lines.push(...finalBattleDuelWonScript(state).map((line) => line.text));
+    state = advanceFinalBattleStage(state);
+  }
+  const text = lines.join(" ");
+
+  assert.doesNotMatch(text, /huh|usually doesn't happen|not the number i expected|stop that/i);
+  assert.match(text, /worth taking/i);
+  assert.match(text, /still breaks/i);
+});
+
 test("the last-stand dialogue explains Void Pressure, Void Gravity, and the dark-tile afflictions before play", () => {
   const last = playToLastStand(finalBattleState());
   const text = finalBattleLastStandScript(last).map((line) => line.text).join(" ");
@@ -441,14 +456,27 @@ test("the last-stand dialogue explains Void Pressure, Void Gravity, and the dark
   assert.match(text, /silenc/i);
 });
 
+test("Blacksword stays composed while the party survives the mirror duels", () => {
+  const last = playToLastStand(finalBattleState());
+  const text = finalBattleLastStandScript(last).map((line) => line.text).join(" ");
+
+  assert.doesNotMatch(text, /four for four|nobody does that|i don't have time/i);
+  assert.match(text, /weaker halves/i);
+  assert.match(text, /standing in one place/i);
+});
+
 test("the killing blow gets its beat, and the ending sends the void beings home", () => {
   const last = playToLastStand(finalBattleState());
   const defeat = finalBattleDefeatScript(last);
   const ending = campaignPostMatchCutsceneScript(FINAL_BATTLE_MISSION_ID);
   const endingText = ending.map((line) => line.text).join(" ");
+  const defeatText = defeat.map((line) => line.text).join(" ");
 
-  assert.match(defeat.map((line) => line.text).join(" "), /What ARE you\?/);
-  assert.match(defeat.map((line) => line.text).join(" "), /wretched place/i);
+  assert.match(defeatText, /What ARE you\?/);
+  assert.match(defeatText, /still standing/i);
+  assert.match(defeatText, /wretched place/i);
+  assert.match(defeatText, /Too — tactical/i);
+  assert.doesNotMatch(defeatText, /tired/i);
 
   // The Summoner and Nemesis follow him through the gate.
   assert.ok(ending.some((line) => line.speaker === "summoner"));

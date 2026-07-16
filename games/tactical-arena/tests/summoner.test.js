@@ -69,10 +69,50 @@ test("Soul Shuffle offers five non-Summoner units and excludes the last ghost ty
   assert.ok(!next.choices.includes(summoner.lastGhostType));
 });
 
+test("Soul Shuffle refreshes at the start of each fresh Summoner activation", () => {
+  let state = makeState(4);
+  state = begin(state, "summoner");
+  const first = [...findUnit(state, "summoner").soulShuffleChoices];
+  assert.equal(first.length, 5);
+
+  let result = applyCommand(state, defend(1, "summoner"));
+  assert.ok(result.accepted, result.errorCode);
+  result = applyCommand(result.nextState, finishActivation(1, "summoner"));
+  assert.ok(result.accepted, result.errorCode);
+  state = result.nextState;
+
+  state = begin(state, "foe", 2);
+  result = applyCommand(state, defend(2, "foe"));
+  assert.ok(result.accepted, result.errorCode);
+  result = applyCommand(result.nextState, finishActivation(2, "foe"));
+  assert.ok(result.accepted, result.errorCode);
+  state = result.nextState;
+
+  state = begin(state, "summoner");
+  const second = [...findUnit(state, "summoner").soulShuffleChoices];
+  assert.equal(second.length, 5);
+  assert.notDeepEqual(second, first);
+});
+
+test("Summon and Beckon resolve from the activation's Soul Shuffle list", () => {
+  const opened = begin(makeState(7, 5), "summoner");
+  const summoner = findUnit(opened, "summoner");
+  const activationChoices = [...summoner.soulShuffleChoices];
+  const nextPreview = getSoulShuffleChoices(summoner, opened.rngState).choices;
+  assert.notDeepEqual(activationChoices, nextPreview, "test seed should expose a re-roll");
+
+  const result = applyCommand(opened, useArt(1, "summoner", "beckon", {
+    targetPosition: { x: 2, y: 1 },
+    summonType: activationChoices[0]
+  }));
+  assert.ok(result.accepted, result.errorCode);
+  assert.deepEqual(result.events.find((entry) => entry.type === "ART_RESOLVED").choices, activationChoices);
+});
+
 test("Summon opens an immediate ghost activation, then the ghost dissipates and spends Summoner", () => {
   const state = makeState(4);
   const opened = begin(state, "summoner");
-  const choice = getSoulShuffleChoices(findUnit(opened, "summoner"), opened.rngState).choices[0];
+  const choice = findUnit(opened, "summoner").soulShuffleChoices[0];
 
   const cast = applyCommand(opened, useArt(1, "summoner", "summon", {
     targetPosition: { x: 2, y: 1 },
@@ -127,7 +167,7 @@ test("Summoner cannot move before Summon unless Disturbed Spirit is active", () 
   assert.ok(isRaging(findUnit(raging, "summoner")));
   const rageMoved = applyCommand(raging, moveUnit(1, "summoner", 2, 1));
   assert.ok(rageMoved.accepted, rageMoved.errorCode);
-  const choice = getSoulShuffleChoices(findUnit(rageMoved.nextState, "summoner"), rageMoved.nextState.rngState).choices[0];
+  const choice = findUnit(rageMoved.nextState, "summoner").soulShuffleChoices[0];
   const cast = applyCommand(rageMoved.nextState, useArt(1, "summoner", "summon", {
     targetPosition: { x: 3, y: 1 },
     summonType: choice
@@ -154,7 +194,7 @@ test("Beckon is rage-locked and costs 20 MP while using Soul Shuffle", () => {
   assert.equal(applyCommand(healthy, useArt(1, "summoner", "beckon", { targetPosition: { x: 2, y: 1 } })).accepted, false);
 
   const raging = begin(makeState(2, 5), "summoner");
-  const choice = getSoulShuffleChoices(findUnit(raging, "summoner"), raging.rngState).choices[0];
+  const choice = findUnit(raging, "summoner").soulShuffleChoices[0];
   const result = applyCommand(raging, useArt(1, "summoner", "beckon", {
     targetPosition: { x: 2, y: 1 },
     summonType: choice
@@ -166,7 +206,7 @@ test("Beckon is rage-locked and costs 20 MP while using Soul Shuffle", () => {
 
 test("Beckon's ghost arrives already RAGING, unlike a plain Summon's ghost", () => {
   const raging = begin(makeState(2, 5), "summoner");
-  const choice = getSoulShuffleChoices(findUnit(raging, "summoner"), raging.rngState).choices[0];
+  const choice = findUnit(raging, "summoner").soulShuffleChoices[0];
   const beckoned = applyCommand(raging, useArt(1, "summoner", "beckon", {
     targetPosition: { x: 2, y: 1 },
     summonType: choice
@@ -177,7 +217,7 @@ test("Beckon's ghost arrives already RAGING, unlike a plain Summon's ghost", () 
   assert.ok(isRaging(beckonedGhost), "Beckon's ghost should spawn already raging");
 
   const summoned = begin(makeState(3), "summoner");
-  const summonChoice = getSoulShuffleChoices(findUnit(summoned, "summoner"), summoned.rngState).choices[0];
+  const summonChoice = findUnit(summoned, "summoner").soulShuffleChoices[0];
   const cast = applyCommand(summoned, useArt(1, "summoner", "summon", {
     targetPosition: { x: 2, y: 1 },
     summonType: summonChoice

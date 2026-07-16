@@ -6,9 +6,11 @@ import {
   isRolledArtResult,
 } from "../src/online/onlineCommandController.js";
 
-test("online ART routing recognizes only resolved ART events carrying a hit result", () => {
-  assert.equal(isRolledArtResult([{ type: "ART_RESOLVED", hit: true }]), true);
+test("online ART routing recognizes rolled ART events with unit targets", () => {
+  assert.equal(isRolledArtResult([{ type: "ART_RESOLVED", hit: true, targetId: "foe" }]), true);
+  assert.equal(isRolledArtResult([{ type: "ART_RESOLVED", hit: true, targetIds: ["foe"] }]), true);
   assert.equal(isRolledArtResult([{ type: "ART_RESOLVED" }]), false);
+  assert.equal(isRolledArtResult([{ type: "ART_RESOLVED", artId: "smoke-bomb-riot", hit: true, center: { x: 8, y: 5 }, statusTargets: ["foe"] }]), false);
   assert.equal(isRolledArtResult([{ type: "ATTACK_RESOLVED", hit: true }]), false);
 });
 

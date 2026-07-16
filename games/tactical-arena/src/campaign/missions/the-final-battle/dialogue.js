@@ -125,9 +125,9 @@ export function finalBattleDuelScript(state) {
 
 // Between duels: Blacksword is not impressed, exactly. He is starting to pay attention.
 const DUEL_WON_LINES = Object.freeze([
-  "Huh. The copy folded. That usually doesn't happen.",
-  "Two. Two of you held on to yourselves. That is... not the number I expected.",
-  "Three. Stop that.",
+  "The copy fell. Good. The half worth taking is still breathing.",
+  "Two have held. The void is sorting cleaner vessels than I was promised.",
+  "Three. Keep proving the point. A sharper blade still breaks when I close my hand.",
 ]);
 
 export function finalBattleDuelWonScript(state) {
@@ -143,11 +143,11 @@ export function finalBattleDuelWonScript(state) {
 
 export function finalBattleLastStandScript(state) {
   return script([
-    blackswordLine("Four."),
-    blackswordLine("Four for four. Nobody does that. The gate has been eating people for longer than your language has existed and it has never once given all four of them back."),
-    blackswordLine("...I don't have TIME for this.", { afterAction: "finalBattleBlackoutHold" }),
+    blackswordLine("All four returned."),
+    blackswordLine("The gate kept the weaker halves. That only means the pieces I wanted are standing in one place."),
+    blackswordLine("I have wasted enough ceremony on shadows.", { afterAction: "finalBattleBlackoutHold" }),
     narration("The dark comes down one last time. It does not feel like his doing. It feels like something is being decided."),
-    blackswordLine("No more halves. No more copies. If this world wants to keep you, it can watch me take you off it myself.", { afterAction: "finalBattleBlackoutStand" }),
+    blackswordLine("No more halves. No more copies. If this world insists on hiding behind you, I will remove its guard myself.", { afterAction: "finalBattleBlackoutStand" }),
     partyLine(state, "swordsman", "We're all here."),
     partyLine(state, "mystic", "All of us. Whole. Whatever he took, we took it back."),
     blackswordLine("Then there's more of you to lose."),
@@ -216,8 +216,8 @@ export function finalBattleDefeatScript(state) {
   return script([
     blackswordLine("...what."),
     blackswordLine("What ARE you?"),
-    partyLine(state, "swordsman", "Tired. Mostly tired."),
-    blackswordLine("No. No, I'm not doing this. I am not dying on a rock at the edge of nowhere to four people who walked here."),
+    partyLine(state, "swordsman", "The ones still standing."),
+    blackswordLine("No. No, I'm not doing this. I am not dying on a rock at the edge of nowhere to four people who walked through my dark and came back whole."),
     blackswordLine("I must leave this wretched place. Its guardians are too powerful. Too — tactical. I can't afford to lose any more strength than you've already taken."),
     narration("He does not retreat so much as fall upward. The blue light of the gate takes him, and the humming stops."),
   ]);

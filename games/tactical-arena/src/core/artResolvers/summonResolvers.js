@@ -89,16 +89,22 @@ export function resolveSummonGhost(state, command, art) {
     return reject(ERR.INVALID_TARGET);
   }
 
-  const preview = getSoulShuffleChoices(actorState, state.rngState);
+  const storedChoices = Array.isArray(actorState.soulShuffleChoices) && actorState.soulShuffleChoices.length
+    ? [...actorState.soulShuffleChoices]
+    : null;
+  const preview = storedChoices
+    ? { choices: storedChoices, rngState: state.rngState }
+    : getSoulShuffleChoices(actorState, state.rngState);
   const chosenType = command.summonType ?? preview.choices[0];
   if (!preview.choices.includes(chosenType)) return reject(ERR.INVALID_TARGET);
 
   const next = cloneState(state);
-  next.rngState = preview.rngState;
+  if (!storedChoices) next.rngState = preview.rngState;
   const actor = findUnit(next, command.unitId);
   const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
   actor.lastGhostType = chosenType;
+  actor.soulShuffleChoices = null;
   actor.defending = false;
 
   const seq = next.units.filter((unit) => unit.summonerId === actor.id && unit.ghost).length;
@@ -137,4 +143,3 @@ export function resolveSummonGhost(state, command, art) {
     ghostTurn: true
   }]);
 }
-

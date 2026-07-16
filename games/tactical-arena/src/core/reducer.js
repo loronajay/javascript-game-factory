@@ -1,6 +1,6 @@
 import { COMMANDS } from "./commands.js";
 import { resolveNemesisAutoPulse, resolveVolcanicPyroclasmTick, useArt } from "./artResolvers.js";
-import { getArt, getBasicAttackResourceCost, getEffectiveStats, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getUnitType, getWallKillResourceReward, getWeatherCritCreatesFire, initialAbilityUses, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
+import { getArt, getBasicAttackResourceCost, getEffectiveStats, getPoisonMpRefund, getRageAttackStatus, getRageEffectValue, getSoulShuffleChoices, getUnitType, getWallKillResourceReward, getWeatherCritCreatesFire, initialAbilityUses, isCommandOnly, isDefending, isRaging, takesTurns } from "./unitCatalog.js";
 import { areEnemies, cloneState, findUnit, getTileAffinity, isWallAt, livingUnits, openAutomaticFirstActivation, unitAt } from "./state.js";
 import { getConeCells } from "../rules/arts.js";
 import { addDuelMark, duelistTracksMisses, getAttackSplashDamage, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCritPullEffect, getCritSplashDamage, getDuelistCritLifesteal, getLineAttackTargets, getMeleeDefendRetaliation, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack, resolveBaseStrike, rollToHit, shouldApplyAttackRecoil } from "../rules/combat.js";
@@ -75,8 +75,8 @@ function beginActivation(state, command) {
   if (state.activation?.summonerId && state.activation.unitId !== result.unit.id) return reject(ERR.ACTIVATION_ALREADY_OPEN);
   if (state.activation && state.activation.unitId !== result.unit.id &&
       (state.activation.moved || state.activation.primaryUsed)) return reject(ERR.ACTIVATION_ALREADY_OPEN);
-  // The King commands first: no other unit of this owner may open an activation while a
-  // living King still owes his command this turn.
+  // First-actor supports go first: no other unit of this owner may open an activation
+  // while a living first-actor still owes its turn.
   if (!getUnitType(result.unit.type).actsFirst && commanderPending(state, command.player)) {
     return reject(ERR.KING_MUST_ACT_FIRST);
   }
@@ -106,6 +106,7 @@ function beginActivation(state, command) {
     // toward their restore. Fired at the START of each fresh turn (deterministic, no
     // roll), so online lockstep clients all agree.
     applyAbilityRecharge(unit);
+    refreshSoulShuffle(next, unit);
   }
   // Rain Stance's on-attack charge (set last turn) becomes a live +MOVE buff for this
   // whole activation — applied here, not at attack time, so it lands on the NEXT turn
@@ -150,6 +151,13 @@ function beginActivation(state, command) {
   // start of each fresh turn (deterministic, no roll — so online lockstep clients agree).
   if (fresh) applyRageRegen(next, unit, events);
   return accept(next, events);
+}
+
+function refreshSoulShuffle(state, unit) {
+  if (getUnitType(unit.type).passive?.effect?.type !== "soulShuffle") return;
+  const preview = getSoulShuffleChoices(unit, state.rngState);
+  state.rngState = preview.rngState;
+  unit.soulShuffleChoices = [...preview.choices];
 }
 
 // Emergency Snacks (a `rageRegen` ragePassive): while raging, nibble `hp` HP back at the

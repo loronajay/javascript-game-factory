@@ -258,7 +258,9 @@ export function createBattleInputController({
       if (!placement.has(positionKey(position))) {
         setMessage(`${art.name}: choose a highlighted empty tile.`, true);
       } else if (art.resolution === "summonGhost") {
-        const shuffled = getSoulShuffleChoices(unit, runtime.state.rngState).choices;
+        const shuffled = Array.isArray(unit.soulShuffleChoices) && unit.soulShuffleChoices.length
+          ? [...unit.soulShuffleChoices]
+          : getSoulShuffleChoices(unit, runtime.state.rngState).choices;
         setMessage(`${art.name}: choose a spirit to call.`);
         render();
         const summonType = await openChoiceModal({

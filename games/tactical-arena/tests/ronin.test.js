@@ -34,6 +34,8 @@ function scenario(units, { seed = 17, currentPlayer = 1 } = {}) {
 test("Ronin is registered with its authored stat block", () => {
   const def = getUnitType("ronin");
   assert.equal(def.name, "Ronin");
+  assert.equal(def.glyph, "\u{1F977}");
+  assert.notEqual(def.glyph, getUnitType("blacksword").glyph, "Ronin and Blacksword need distinct UI glyphs");
   assert.equal(def.classType, "melee");
   assert.deepEqual(def.stats, { moveRange: 3, attackRange: 1, strength: 10, defense: 5, maxHp: 28, maxMp: 20 });
 });
