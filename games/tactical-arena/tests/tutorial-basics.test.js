@@ -13,6 +13,8 @@ import {
   TUTORIAL_ARTS_PLAYER_ARCHER_ID,
   TUTORIAL_ARTS_PLAYER_MYSTIC_ID,
   TUTORIAL_BASICS_ID,
+  CPU_ARCHER_ID,
+  PLAYER_ARCHER_ID,
   TUTORIAL_DAMAGE_TYPES_ID,
   TUTORIAL_DAMAGE_TYPES_PLAYER_MAGICIAN_ID,
   TUTORIAL_DAMAGE_TYPES_PLAYER_SWORDSMAN_ID,
@@ -53,52 +55,55 @@ function makeMatch() {
   return prepareTutorialMatchState(createMatchState(createTutorialMatchConfig()), TUTORIAL_BASICS_ID);
 }
 
-test("basics tutorial config starts player one with the four base units on the normal board", () => {
+test("basics tutorial config starts player one in an Archer duel on the normal board", () => {
   const config = createTutorialMatchConfig();
   const match = makeMatch();
 
   assert.equal(config.size, 13);
   assert.equal(match.size, 13);
   assert.equal(match.currentPlayer, 1);
+  assert.deepEqual(config.squads[1], ["archer"]);
+  assert.deepEqual(config.squads[2], ["archer"]);
   assert.deepEqual(
     match.units.filter((unit) => unit.player === 1).map((unit) => unit.type),
-    ["swordsman", "archer", "mystic", "magician"],
+    ["archer"],
   );
   assert.deepEqual(
     match.units.filter((unit) => unit.player === 2).map((unit) => unit.type),
-    ["swordsman", "archer", "mystic", "magician"],
+    ["archer"],
   );
-  assert.deepEqual(match.units.find((unit) => unit.id === "p1-0-swordsman").position, { x: 1, y: 12 });
-  assert.deepEqual(match.units.find((unit) => unit.id === "p1-1-archer").position, { x: 0, y: 11 });
-  assert.deepEqual(match.units.find((unit) => unit.id === "p2-1-archer").position, { x: 12, y: 1 });
+  assert.deepEqual(match.units.find((unit) => unit.id === PLAYER_ARCHER_ID).position, { x: 1, y: 12 });
+  assert.deepEqual(match.units.find((unit) => unit.id === CPU_ARCHER_ID).position, { x: 11, y: 0 });
+  assert.equal(match.units.find((unit) => unit.id === "p1-0-swordsman"), undefined);
+  assert.equal(match.units.find((unit) => unit.id === "p1-2-mystic"), undefined);
 });
 
-test("basics tutorial gates the opening turn by action order, not exact tiles", () => {
+test("basics tutorial gates the Archer opening by action order, not exact tiles", () => {
   const tutorial = createBasicsTutorial();
   let match = makeMatch();
 
-  assert.equal(validateTutorialCommand(tutorial, beginActivation(1, "p1-0-swordsman"), match).accepted, true);
+  assert.equal(validateTutorialCommand(tutorial, beginActivation(1, PLAYER_ARCHER_ID), match).accepted, true);
 
-  assert.equal(validateTutorialCommand(tutorial, moveUnit(1, "p1-0-swordsman", 3, 12), match).accepted, true);
-  assert.equal(validateTutorialCommand(tutorial, moveUnit(1, "p1-0-swordsman", 1, 10), match).accepted, true);
+  assert.equal(validateTutorialCommand(tutorial, moveUnit(1, PLAYER_ARCHER_ID, 3, 12), match).accepted, true);
+  assert.equal(validateTutorialCommand(tutorial, moveUnit(1, PLAYER_ARCHER_ID, 1, 10), match).accepted, true);
 
-  let blocked = validateTutorialCommand(tutorial, attack(1, "p1-1-archer", "p2-1-archer"), match);
+  let blocked = validateTutorialCommand(tutorial, attack(1, PLAYER_ARCHER_ID, CPU_ARCHER_ID), match);
   assert.equal(blocked.accepted, false);
   assert.match(blocked.message, /move.*defend/i);
 
-  blocked = validateTutorialCommand(tutorial, useArt(1, "p1-1-archer", "volley-shot", { targetPosition: { x: 4, y: 8 } }), match);
+  blocked = validateTutorialCommand(tutorial, useArt(1, PLAYER_ARCHER_ID, "volley-shot", { targetPosition: { x: 4, y: 8 } }), match);
   assert.equal(blocked.accepted, false);
   assert.match(blocked.message, /move.*defend/i);
 
-  ({ match } = applyTutorial(tutorial, match, beginActivation(1, "p1-0-swordsman")));
+  ({ match } = applyTutorial(tutorial, match, beginActivation(1, PLAYER_ARCHER_ID)));
 
-  blocked = validateTutorialCommand(tutorial, defend(1, "p1-0-swordsman"), match);
+  blocked = validateTutorialCommand(tutorial, defend(1, PLAYER_ARCHER_ID), match);
   assert.equal(blocked.accepted, false);
   assert.match(blocked.message, /move first/i);
 
-  assert.equal(validateTutorialCommand(tutorial, moveUnit(1, "p1-0-swordsman", 3, 12), match).accepted, true);
-  ({ match } = applyTutorial(tutorial, match, moveUnit(1, "p1-0-swordsman", 3, 12)));
-  assert.equal(validateTutorialCommand(tutorial, defend(1, "p1-0-swordsman"), match).accepted, true);
+  assert.equal(validateTutorialCommand(tutorial, moveUnit(1, PLAYER_ARCHER_ID, 3, 12), match).accepted, true);
+  ({ match } = applyTutorial(tutorial, match, moveUnit(1, PLAYER_ARCHER_ID, 3, 12)));
+  assert.equal(validateTutorialCommand(tutorial, defend(1, PLAYER_ARCHER_ID), match).accepted, true);
 });
 
 test("basics tutorial gates Archer action order while leaving kite movement free", () => {
@@ -106,32 +111,31 @@ test("basics tutorial gates Archer action order while leaving kite movement free
   let match = {
     ...makeMatch(),
     units: makeMatch().units.map((unit) => {
-      if (unit.id === "p1-1-archer") return { ...unit, position: { x: 3, y: 4 } };
-      if (unit.id === "p2-1-archer") return { ...unit, position: { x: 6, y: 4 } };
+      if (unit.id === PLAYER_ARCHER_ID) return { ...unit, position: { x: 3, y: 4 } };
+      if (unit.id === CPU_ARCHER_ID) return { ...unit, position: { x: 6, y: 4 } };
       return unit;
     }),
   };
 
   tutorial.stage = "await_first_attack";
   assert.equal(validateTutorialCommand(tutorial, beginActivation(1, "p1-0-swordsman"), match).accepted, false);
-  assert.equal(validateTutorialCommand(tutorial, moveUnit(1, "p1-1-archer", 2, 4), match).accepted, false);
-  assert.equal(validateTutorialCommand(tutorial, beginActivation(1, "p1-1-archer"), match).accepted, true);
+  assert.equal(validateTutorialCommand(tutorial, moveUnit(1, PLAYER_ARCHER_ID, 2, 4), match).accepted, false);
+  assert.equal(validateTutorialCommand(tutorial, beginActivation(1, PLAYER_ARCHER_ID), match).accepted, true);
 
-  ({ match } = applyTutorial(tutorial, match, beginActivation(1, "p1-1-archer")));
-  const shot = applyTutorial(tutorial, match, attack(1, "p1-1-archer", "p2-1-archer"));
+  ({ match } = applyTutorial(tutorial, match, beginActivation(1, PLAYER_ARCHER_ID)));
+  const shot = applyTutorial(tutorial, match, attack(1, PLAYER_ARCHER_ID, CPU_ARCHER_ID));
   match = shot.match;
   assert.equal(tutorial.stage, "await_cpu_counterattack");
-  assert.equal(validateTutorialCommand(tutorial, moveUnit(1, "p1-2-mystic", 2, 6), match).accepted, false);
-  assert.equal(validateTutorialCommand(tutorial, defend(1, "p1-2-mystic"), match).accepted, true);
+  assert.equal(match.units.find((unit) => unit.id === "p1-2-mystic"), undefined);
 
   tutorial.stage = "await_kite_attack";
-  assert.equal(validateTutorialCommand(tutorial, moveUnit(1, "p1-1-archer", 2, 4), match).accepted, false);
-  assert.equal(validateTutorialCommand(tutorial, attack(1, "p1-1-archer", "p2-1-archer"), match).accepted, true);
+  assert.equal(validateTutorialCommand(tutorial, moveUnit(1, PLAYER_ARCHER_ID, 2, 4), match).accepted, false);
+  assert.equal(validateTutorialCommand(tutorial, attack(1, PLAYER_ARCHER_ID, CPU_ARCHER_ID), match).accepted, true);
 
   tutorial.stage = "await_kite_move";
-  assert.equal(validateTutorialCommand(tutorial, finishActivation(1, "p1-1-archer"), match).accepted, false);
-  assert.equal(validateTutorialCommand(tutorial, moveUnit(1, "p1-1-archer", 2, 4), match).accepted, true);
-  assert.equal(validateTutorialCommand(tutorial, moveUnit(1, "p1-1-archer", 1, 4), match).accepted, true);
+  assert.equal(validateTutorialCommand(tutorial, finishActivation(1, PLAYER_ARCHER_ID), match).accepted, false);
+  assert.equal(validateTutorialCommand(tutorial, moveUnit(1, PLAYER_ARCHER_ID, 2, 4), match).accepted, true);
+  assert.equal(validateTutorialCommand(tutorial, moveUnit(1, PLAYER_ARCHER_ID, 1, 4), match).accepted, true);
 });
 
 test("basics tutorial tracks defense practice and detects the first archer range lesson", () => {
@@ -151,9 +155,9 @@ test("basics tutorial tracks defense practice and detects the first archer range
     ...match,
     currentPlayer: 1,
     units: match.units.map((unit) =>
-      unit.id === "p1-1-archer"
+      unit.id === PLAYER_ARCHER_ID
         ? { ...unit, spent: false, position: { x: 4, y: 6 } }
-        : unit.id === "p2-1-archer"
+        : unit.id === CPU_ARCHER_ID
           ? { ...unit, position: { x: 8, y: 6 } }
           : unit,
     ),
@@ -168,7 +172,7 @@ test("basics tutorial tracks defense practice and detects the first archer range
 
   assert.equal(tutorial.stage, "await_first_attack");
   assert.match(update.prompt, /Archer has a target in range/);
-  assert.equal(update.dialogue?.[0]?.speakerId, "p1-1-archer");
+  assert.equal(update.dialogue?.[0]?.speakerId, PLAYER_ARCHER_ID);
 });
 
 test("basics tutorial forces hit, miss, kiting, and final critical strike", () => {
@@ -176,15 +180,15 @@ test("basics tutorial forces hit, miss, kiting, and final critical strike", () =
   let match = {
     ...makeMatch(),
     units: makeMatch().units.map((unit) => {
-      if (unit.id === "p1-1-archer") return { ...unit, position: { x: 3, y: 4 } };
-      if (unit.id === "p2-1-archer") return { ...unit, position: { x: 6, y: 4 } };
-      return { ...unit, spent: unit.player === 1 && unit.id !== "p1-1-archer" };
+      if (unit.id === PLAYER_ARCHER_ID) return { ...unit, position: { x: 3, y: 4 } };
+      if (unit.id === CPU_ARCHER_ID) return { ...unit, position: { x: 6, y: 4 } };
+      return unit;
     }),
   };
 
   tutorial.stage = "await_first_attack";
-  ({ match } = applyTutorial(tutorial, match, beginActivation(1, "p1-1-archer")));
-  let applied = applyTutorial(tutorial, match, attack(1, "p1-1-archer", "p2-1-archer"));
+  ({ match } = applyTutorial(tutorial, match, beginActivation(1, PLAYER_ARCHER_ID)));
+  let applied = applyTutorial(tutorial, match, attack(1, PLAYER_ARCHER_ID, CPU_ARCHER_ID));
   let attackEvent = applied.events.find((event) => event.type === "ATTACK_RESOLVED");
   assert.equal(attackEvent.hit, true);
   assert.equal(attackEvent.critical, false);
@@ -195,10 +199,10 @@ test("basics tutorial forces hit, miss, kiting, and final critical strike", () =
     ...match,
     currentPlayer: 2,
     activation: null,
-    units: match.units.map((unit) => ({ ...unit, spent: unit.player === 2 ? unit.id !== "p2-1-archer" : unit.spent })),
+    units: match.units.map((unit) => ({ ...unit, spent: unit.player === 2 ? unit.id !== CPU_ARCHER_ID : unit.spent })),
   };
-  ({ match } = applyTutorial(tutorial, match, beginActivation(2, "p2-1-archer")));
-  applied = applyTutorial(tutorial, match, attack(2, "p2-1-archer", "p1-1-archer"));
+  ({ match } = applyTutorial(tutorial, match, beginActivation(2, CPU_ARCHER_ID)));
+  applied = applyTutorial(tutorial, match, attack(2, CPU_ARCHER_ID, PLAYER_ARCHER_ID));
   attackEvent = applied.events.find((event) => event.type === "ATTACK_RESOLVED");
   assert.equal(attackEvent.hit, false);
   assert.equal(tutorial.stage, "await_kite_attack");
@@ -208,26 +212,26 @@ test("basics tutorial forces hit, miss, kiting, and final critical strike", () =
     ...match,
     currentPlayer: 1,
     activation: null,
-    units: match.units.map((unit) => unit.id === "p1-1-archer" ? { ...unit, spent: false } : unit),
+    units: match.units.map((unit) => unit.id === PLAYER_ARCHER_ID ? { ...unit, spent: false } : unit),
   };
-  ({ match } = applyTutorial(tutorial, match, beginActivation(1, "p1-1-archer")));
-  applied = applyTutorial(tutorial, match, attack(1, "p1-1-archer", "p2-1-archer"));
+  ({ match } = applyTutorial(tutorial, match, beginActivation(1, PLAYER_ARCHER_ID)));
+  applied = applyTutorial(tutorial, match, attack(1, PLAYER_ARCHER_ID, CPU_ARCHER_ID));
   attackEvent = applied.events.find((event) => event.type === "ATTACK_RESOLVED");
   assert.equal(attackEvent.hit, true);
   assert.equal(attackEvent.critical, false);
   assert.equal(tutorial.stage, "await_kite_move");
   match = applied.match;
 
-  ({ match } = applyTutorial(tutorial, match, moveUnit(1, "p1-1-archer", 1, 4)));
+  ({ match } = applyTutorial(tutorial, match, moveUnit(1, PLAYER_ARCHER_ID, 1, 4)));
   assert.equal(tutorial.stage, "await_final_crit");
 
   match = {
     ...match,
     activation: null,
-    units: match.units.map((unit) => unit.id === "p1-1-archer" ? { ...unit, spent: false } : unit),
+    units: match.units.map((unit) => unit.id === PLAYER_ARCHER_ID ? { ...unit, spent: false } : unit),
   };
-  ({ match } = applyTutorial(tutorial, match, beginActivation(1, "p1-1-archer")));
-  applied = applyTutorial(tutorial, match, attack(1, "p1-1-archer", "p2-1-archer"));
+  ({ match } = applyTutorial(tutorial, match, beginActivation(1, PLAYER_ARCHER_ID)));
+  applied = applyTutorial(tutorial, match, attack(1, PLAYER_ARCHER_ID, CPU_ARCHER_ID));
   attackEvent = applied.events.find((event) => event.type === "ATTACK_RESOLVED");
   assert.equal(attackEvent.hit, true);
   assert.equal(attackEvent.critical, true);
@@ -239,9 +243,9 @@ test("tutorial blocks moving the archer before attacking in the kiting lesson", 
   tutorial.stage = "await_kite_attack";
   const match = makeMatch();
 
-  const select = validateTutorialCommand(tutorial, beginActivation(1, "p1-1-archer"), match);
-  const blocked = validateTutorialCommand(tutorial, moveUnit(1, "p1-1-archer", 1, 8), match);
-  const allowed = validateTutorialCommand(tutorial, attack(1, "p1-1-archer", "p2-1-archer"), match);
+  const select = validateTutorialCommand(tutorial, beginActivation(1, PLAYER_ARCHER_ID), match);
+  const blocked = validateTutorialCommand(tutorial, moveUnit(1, PLAYER_ARCHER_ID, 1, 8), match);
+  const allowed = validateTutorialCommand(tutorial, attack(1, PLAYER_ARCHER_ID, CPU_ARCHER_ID), match);
 
   assert.equal(select.accepted, true);
   assert.equal(blocked.accepted, false);
@@ -256,9 +260,8 @@ test("tutorial CPU archer counterattacks the player Archer to progress", () => {
     ...makeMatch(),
     currentPlayer: 2,
     units: makeMatch().units.map((unit) => {
-      if (unit.id === "p2-1-archer") return { ...unit, spent: false, position: { x: 8, y: 6 } };
-      if (unit.id === "p1-1-archer") return { ...unit, position: { x: 2, y: 6 } };
-      if (unit.id === "p1-2-mystic") return { ...unit, position: { x: 8, y: 2 } };
+      if (unit.id === CPU_ARCHER_ID) return { ...unit, spent: false, position: { x: 8, y: 6 } };
+      if (unit.id === PLAYER_ARCHER_ID) return { ...unit, position: { x: 2, y: 6 } };
       return { ...unit, spent: unit.player === 2 };
     }),
   };
@@ -271,7 +274,7 @@ test("tutorial CPU archer counterattacks the player Archer to progress", () => {
     "ATTACK",
     "FINISH_ACTIVATION",
   ]);
-  assert.equal(commands[2].targetId, "p1-1-archer");
+  assert.equal(commands[2].targetId, PLAYER_ARCHER_ID);
 
   let update = null;
   let attackEvent = null;
@@ -289,15 +292,15 @@ test("tutorial CPU archer counterattacks the player Archer to progress", () => {
     match = result.nextState;
   }
 
-  assert.equal(attackEvent?.actorId, "p2-1-archer");
-  assert.equal(attackEvent?.targetId, "p1-1-archer");
+  assert.equal(attackEvent?.actorId, CPU_ARCHER_ID);
+  assert.equal(attackEvent?.targetId, PLAYER_ARCHER_ID);
   assert.equal(attackEvent?.hit, false);
   assert.equal(tutorial.stage, "await_kite_attack");
   assert.match(update.prompt, /attack first, then move/i);
   assert.match(update.prompt, /kiting/i);
 });
 
-test("basics tutorial enemy turn preserves a clean Archer kite target", () => {
+test("basics tutorial enemy turn uses only the enemy Archer for the duel", () => {
   const tutorial = createBasicsTutorial();
   tutorial.stage = "await_cpu_counterattack";
   let match = {
@@ -305,13 +308,12 @@ test("basics tutorial enemy turn preserves a clean Archer kite target", () => {
     currentPlayer: 2,
     activation: null,
     units: makeMatch().units.map((unit) => {
-      if (unit.id === "p1-1-archer") return { ...unit, spent: true, position: { x: 2, y: 4 } };
-      if (unit.id === "p2-1-archer") return { ...unit, spent: false, position: { x: 7, y: 4 } };
+      if (unit.id === PLAYER_ARCHER_ID) return { ...unit, spent: true, position: { x: 2, y: 4 } };
+      if (unit.id === CPU_ARCHER_ID) return { ...unit, spent: false, position: { x: 7, y: 4 } };
       if (unit.player === 2) return { ...unit, spent: false };
       return { ...unit, spent: true };
     }),
   };
-  const enemyStart = new Map(match.units.filter((unit) => unit.player === 2).map((unit) => [unit.id, { ...unit.position }]));
   const commandLog = [];
   let counterattack = null;
 
@@ -337,20 +339,17 @@ test("basics tutorial enemy turn preserves a clean Archer kite target", () => {
 
   assert.equal(match.currentPlayer, 1);
   assert.equal(tutorial.stage, "await_kite_attack");
-  assert.equal(counterattack?.actorId, "p2-1-archer");
-  assert.equal(counterattack?.targetId, "p1-1-archer");
+  assert.equal(counterattack?.actorId, CPU_ARCHER_ID);
+  assert.equal(counterattack?.targetId, PLAYER_ARCHER_ID);
+  assert.equal(match.units.filter((candidate) => candidate.player === 2).length, 1);
   assert.deepEqual(
-    commandLog.filter((command) => command.type === "MOVE_UNIT"),
-    [],
-    "remaining enemies should not move into the scripted Archer lane",
+    [...new Set(commandLog.filter((command) => command.unitId || command.actorId).map((command) => command.unitId ?? command.actorId))],
+    [CPU_ARCHER_ID],
   );
-  for (const unit of match.units.filter((candidate) => candidate.player === 2 && candidate.id !== "p2-1-archer")) {
-    assert.deepEqual(unit.position, enemyStart.get(unit.id));
-  }
 
-  ({ match } = applyTutorial(tutorial, match, beginActivation(1, "p1-1-archer")));
-  const kiteShot = applyTutorial(tutorial, match, attack(1, "p1-1-archer", "p2-1-archer"));
-  assert.equal(kiteShot.events.find((event) => event.type === "ATTACK_RESOLVED")?.targetId, "p2-1-archer");
+  ({ match } = applyTutorial(tutorial, match, beginActivation(1, PLAYER_ARCHER_ID)));
+  const kiteShot = applyTutorial(tutorial, match, attack(1, PLAYER_ARCHER_ID, CPU_ARCHER_ID));
+  assert.equal(kiteShot.events.find((event) => event.type === "ATTACK_RESOLVED")?.targetId, CPU_ARCHER_ID);
   assert.equal(tutorial.stage, "await_kite_move");
 });
 
@@ -361,9 +360,8 @@ test("tutorial CPU archer moves before the scripted counterattack when no target
     ...makeMatch(),
     currentPlayer: 2,
     units: makeMatch().units.map((unit) => {
-      if (unit.id === "p2-1-archer") return { ...unit, spent: false, position: { x: 8, y: 4 } };
-      if (unit.id === "p1-1-archer") return { ...unit, position: { x: 2, y: 4 } };
-      if (unit.id === "p1-2-mystic") return { ...unit, position: { x: 0, y: 2 } };
+      if (unit.id === CPU_ARCHER_ID) return { ...unit, spent: false, position: { x: 8, y: 4 } };
+      if (unit.id === PLAYER_ARCHER_ID) return { ...unit, position: { x: 2, y: 4 } };
       return { ...unit, spent: unit.player === 2 };
     }),
   };
@@ -387,7 +385,7 @@ test("tutorial CPU archer moves before the scripted counterattack when no target
     match = result.nextState;
   }
 
-  assert.equal(attackEvent?.actorId, "p2-1-archer");
+  assert.equal(attackEvent?.actorId, CPU_ARCHER_ID);
   assert.equal(attackEvent?.hit, false);
 });
 
@@ -783,7 +781,7 @@ test("basics tutorial copy teaches kiting without claiming the player is live-ba
   tutorial.stage = "await_final_crit";
 
   const update = recordTutorialCommand(tutorial, {
-    events: [{ type: "ATTACK_RESOLVED", actorId: "p1-1-archer", targetId: "p2-1-archer", hit: true, critical: true }],
+    events: [{ type: "ATTACK_RESOLVED", actorId: PLAYER_ARCHER_ID, targetId: CPU_ARCHER_ID, hit: true, critical: true }],
   });
 
   assert.match(update.prompt, /kiting/i);

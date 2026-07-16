@@ -62,11 +62,11 @@ export const TUTORIAL_CATALOG = Object.freeze([
 export const TUTORIAL_IDS = Object.freeze(TUTORIAL_CATALOG.map((tutorial) => tutorial.id));
 export { TUTORIAL_PROGRESS_KEY, TUTORIAL_REWARD_SKIN_CHOICES };
 
-export const TUTORIAL_SQUAD = Object.freeze(["swordsman", "archer", "mystic", "magician"]);
-export const PLAYER_ARCHER_ID = "p1-1-archer";
-export const CPU_ARCHER_ID = "p2-1-archer";
+export const TUTORIAL_SQUAD = Object.freeze(["archer"]);
+export const PLAYER_ARCHER_ID = "p1-0-archer";
+export const CPU_ARCHER_ID = "p2-0-archer";
 
-const BASICS_PLAYER_IDS = Object.freeze(["p1-0-swordsman", PLAYER_ARCHER_ID, "p1-2-mystic", "p1-3-magician"]);
+const BASICS_PLAYER_IDS = Object.freeze([PLAYER_ARCHER_ID]);
 
 const NORMAL_HIT = Object.freeze({ attackRoll: 0.5, critRoll: 0.99 });
 const FORCED_MISS = Object.freeze({ attackRoll: 0.01 });
@@ -170,7 +170,7 @@ export function createRageTutorial() {
 }
 
 export function openingPrompt() {
-  return "Tutorial 1: The Basics. Activate each unit, move with a tile click/tap or key 1, then Defend with the button or key 3.";
+  return "Tutorial 1: The Basics. Activate your Archer, move with a tile click/tap or key 1, then Defend with the button or key 3.";
 }
 
 export function openingDialogue() {
@@ -180,8 +180,8 @@ export function openingDialogue() {
       text: "Each squad turn, every living unit gets one activation. A clean starter turn is Move, then Defend.",
     },
     {
-      speaker: "swordsman",
-      text: "Select each base unit once: Swordsman, Archer, Mystic, and Magician. Choose useful ground, then use key 3 to defend.",
+      speakerId: PLAYER_ARCHER_ID,
+      text: "Select me, choose useful ground, then use key 3 to defend. The enemy Archer will do the same.",
     },
   ];
 }
@@ -435,7 +435,7 @@ export function recordTutorialCommand(tutorial, { command, events = [], match, p
 
   if (previousPlayer === 1 && match?.currentPlayer === 2 && tutorial.stage === "practice_defense") {
     return setStage(tutorial, "cpu_approach", {
-      prompt: "Good. The CPU will now advance with normal movement only, then brace. Watch the enemy formation close the gap.",
+      prompt: "Good. The CPU will now advance with normal movement only, then brace. Watch the enemy Archer close the gap.",
     });
   }
 
@@ -467,7 +467,7 @@ export function recordTutorialCommand(tutorial, { command, events = [], match, p
 
     if (tutorial.stage === "cpu_approach") {
       return setStage(tutorial, "approach", {
-        prompt: "Now approach with your squad while keeping your ranged units positioned. Take your full turn.",
+        prompt: "Now approach with your Archer while keeping her line of fire in mind. Take your full turn.",
       });
     }
   }
@@ -628,7 +628,7 @@ function recordAttack(tutorial, attackEvent) {
   if (attackEvent.actorId === PLAYER_ARCHER_ID) {
     if (tutorial.stage === "await_first_attack") {
       return setStage(tutorial, "await_cpu_counterattack", {
-        prompt: "Hit confirmed. Attacks roll to hit: very low rolls miss, normal rolls land, and strong rolls can crit. Finish the Archer, then Defend with anyone still ready so the enemy Archer can answer.",
+        prompt: "Hit confirmed. Attacks roll to hit: very low rolls miss, normal rolls land, and strong rolls can crit. Finish the Archer so the enemy Archer can answer.",
         dialogue: [{
           name: "Instructor",
           text: "That shot hit. Every attack rolls: some miss, most hit, and critical strikes hit harder.",
@@ -705,7 +705,7 @@ function validateBasicsCommand(tutorial, command, match) {
       // On the shot turn the Archer has already attacked, so only FINISH is legal
       // (DEFEND/MOVE get rejected by the reducer as PRIMARY_ALREADY_USED and the
       // player finishes). But if the enemy Archer was too far to answer in one turn
-      // and the squad turn returns with a FRESH Archer, she must be spendable too —
+      // and the turn returns with a FRESH Archer, she must be spendable too —
       // otherwise the turn can never pass back so the enemy Archer can close in and
       // fire. Allow bracing/repositioning (never a second attack — the enemy answers
       // first) so the counter-shot lesson can't soft-lock.
@@ -718,18 +718,7 @@ function validateBasicsCommand(tutorial, command, match) {
       ) {
         return tutorialAllowed();
       }
-      return tutorialBlocked("Finish the Archer's activation after the shot, then brace your squad so the enemy Archer can answer.");
-    }
-    if (isBasicsPlayer) {
-      if (
-        command.type === COMMANDS.BEGIN_ACTIVATION ||
-        command.type === COMMANDS.DEFEND ||
-        command.type === COMMANDS.FINISH_ACTIVATION ||
-        command.type === COMMANDS.CANCEL_MOVE
-      ) {
-        return tutorialAllowed();
-      }
-      return tutorialBlocked("Brace the remaining units in place so the enemy Archer can answer.");
+      return tutorialBlocked("Finish the Archer's activation after the shot so the enemy Archer can answer.");
     }
   }
 
@@ -764,17 +753,6 @@ function validateBasicsCommand(tutorial, command, match) {
         return tutorialAllowed();
       }
       return tutorialBlocked("Bring the Archer back online and attack to see a critical strike.");
-    }
-    if (isBasicsPlayer) {
-      if (
-        command.type === COMMANDS.BEGIN_ACTIVATION ||
-        command.type === COMMANDS.DEFEND ||
-        command.type === COMMANDS.FINISH_ACTIVATION ||
-        command.type === COMMANDS.CANCEL_MOVE
-      ) {
-        return tutorialAllowed();
-      }
-      return tutorialBlocked("Keep the rest of the squad braced; the next lesson is the Archer's critical strike.");
     }
   }
 
