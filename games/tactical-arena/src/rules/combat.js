@@ -220,7 +220,7 @@ export function isDamageTypeImmune(unit, damageType) {
   return damageTypeImmunities(unit).has(damageType);
 }
 
-export function finalizeMagicDamage({ attacker, target, state = null, rawDamage, damageAffinity = null, art = null }) {
+export function finalizeMagicDamage({ attacker, target, state = null, rawDamage, damageAffinity = null, art = null, critical = false }) {
   // Petrify (Treant): an invulnerable statue takes no damage of any kind.
   if (isInvulnerable(target)) return 0;
   const fireBased = isFireBasedDamage({ damageAffinity, art });
@@ -234,7 +234,7 @@ export function finalizeMagicDamage({ attacker, target, state = null, rawDamage,
   // Enchanted Roots (Treant): +1 damage taken from fire-based abilities.
   const fireVulnerability = fireBased ? getFireVulnerability(target) : 0;
   return reduced > 0
-    ? reduced + getTeamMagicDamageBonus(attacker, state) + getSourceDamageBonus(attacker, target, state, "magic") + getSelfMagicVulnerability(target) + getTileVulnerability(target, state) + getWeatherMagicDamageBonus(attacker) + getWeatherAffinityMagicBonus(attacker, state) + fireVulnerability
+    ? reduced + getTeamMagicDamageBonus(attacker, state) + getSourceDamageBonus(attacker, target, state, "magic") + getSelfMagicVulnerability(target) + getCriticalMagicVulnerability(target, critical) + getTileVulnerability(target, state) + getWeatherMagicDamageBonus(attacker) + getWeatherAffinityMagicBonus(attacker, state) + fireVulnerability
     : reduced;
 }
 
@@ -554,6 +554,17 @@ export function getSelfMagicVulnerability(target) {
   return vulnerability;
 }
 
+// Flat extra damage a target takes from critical magic hits only (Riot Cop's shield is
+// great against ordinary shots, but crit magic cracks through harder).
+export function getCriticalMagicVulnerability(target, critical = false) {
+  if (!critical) return 0;
+  let vulnerability = 0;
+  for (const passiveEffect of passiveEffects(target)) {
+    vulnerability += Math.max(0, Number(passiveEffect.critMagicVulnerability) || 0);
+  }
+  return vulnerability;
+}
+
 // True when any living unit is projecting a board-wide healing lockout (a raging
 // Juggernaut's Null Zone). Read at every heal site so a healer can't top anyone up while
 // it holds. Presentation-free — a pure query over match state.
@@ -598,7 +609,7 @@ export function resolveBaseStrike(attacker, target, { proximity = false, critica
   const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
   const effectiveCritical = critical && !ignoresCriticalDamage(target) && !ignoresOwnCriticalDamage(attacker);
   const result = resolveDamage({ attacker: actorStats, defender: targetStats, type: "magic", critical: effectiveCritical });
-  const damage = finalizeMagicDamage({ attacker, target, state, rawDamage: result.damage + (effectiveCritical ? getWeatherCritDamageBonus(state) : 0), damageAffinity });
+  const damage = finalizeMagicDamage({ attacker, target, state, rawDamage: result.damage + (effectiveCritical ? getWeatherCritDamageBonus(state) : 0), damageAffinity, critical: effectiveCritical });
   return { ...result, critical, proximityBonus: 0, damage };
 }
 
@@ -613,7 +624,7 @@ export function resolveFixedMagicStrike(attacker, target, amount, { critical = f
   const base = effectiveCritical ? Math.ceil(Math.max(0, amount) * CRIT_MULTIPLIER) + getWeatherCritDamageBonus(state) : Math.max(0, amount);
   const targetStats = { ...getEffectiveStats(target, state), defending: isDefending(target) };
   const result = resolveDamage({ attacker: { strength: base }, defender: targetStats, type: "magic" });
-  const damage = finalizeMagicDamage({ attacker, target, state, rawDamage: result.damage, art });
+  const damage = finalizeMagicDamage({ attacker, target, state, rawDamage: result.damage, art, critical: effectiveCritical });
   return { ...result, critical: effectiveCritical, proximityBonus: 0, damage };
 }
 
@@ -683,7 +694,10 @@ export function resolvePhysicalStrike(attacker, target, { proximity = false, cri
   // on-board forecast (which also resolves through this path) reads the mitigated number.
   if (basicAttack) {
     const distance = Math.max(Math.abs(attacker.position.x - target.position.x), Math.abs(attacker.position.y - target.position.y));
-    if (distance > 1) damage = Math.max(0, damage - getRangedBasicAttackReduction(target));
+    if (distance > 1) {
+      const reduction = getRangedBasicAttackReduction(target);
+      if (reduction > 0 && damage > 0) damage = Math.max(1, damage - reduction);
+    }
   }
   // Rock Hard (Clod): a defending target negates physical damage entirely — applied
   // absolutely last so no bonus/floor can leak through, and honestly (the forecast

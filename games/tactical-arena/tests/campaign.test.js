@@ -2884,6 +2884,7 @@ test("Spirit of the Woods is mission 17 and keeps The Showdown locked until all 
   assert.equal(mission.locationName, "Spirit Grove");
   assert.equal(mission.region, "wood");
   assert.equal(mission.requiredStars, 32);
+  assert.equal(mission.requiresPreviousMissionsComplete, true);
   assert.equal(mission.playerSlots, 4);
   assert.deepEqual(mission.rewardUnits, ["mother-nature"]);
 
@@ -2897,10 +2898,23 @@ test("Spirit of the Woods is mission 17 and keeps The Showdown locked until all 
 
   const storage = storageAdapter();
   const priorWithoutSpirit = fresh.nodes.slice(0, spiritIndex).map((node) => node.id);
+  const priorMissingOne = priorWithoutSpirit.slice(1);
+  writeCampaignProgress(storage, {
+    completedMissions: priorMissingOne,
+    missionStars: Object.fromEntries(priorMissingOne.map((id) => [id, 3])),
+  });
+  const gatedSpirit = getCampaignMap(storage).nodes[spiritIndex];
+  assert.equal(gatedSpirit.status, "locked");
+  assert.equal(gatedSpirit.displayType, null);
+
   writeCampaignProgress(storage, {
     completedMissions: priorWithoutSpirit,
     missionStars: Object.fromEntries(priorWithoutSpirit.map((id) => [id, 3])),
   });
+  const unlockedSpirit = getCampaignMap(storage).nodes[spiritIndex];
+  assert.equal(unlockedSpirit.status, "available");
+  assert.equal(unlockedSpirit.displayType, "mother-nature");
+
   const stillLocked = getCampaignMap(storage).nodes[wasteIndex];
   assert.equal(stillLocked.locationName, "The Shattered Waste");
   assert.equal(stillLocked.status, "locked");

@@ -58,7 +58,7 @@ export function resolveTetherGrab(state, command, art) {
     // fold (magic ignores DEF; Tether Grab does not halve under Defend).
     const critical = swing.critical && !ignoresCriticalDamage(target);
     const baseAmount = critical ? Math.ceil(art.damage.amount * CRIT_MULTIPLIER) : art.damage.amount;
-    const rawDamage = finalizeMagicDamage({ attacker: actor, target, state: next, rawDamage: baseAmount, art });
+    const rawDamage = finalizeMagicDamage({ attacker: actor, target, state: next, rawDamage: baseAmount, art, critical });
     if (rawDamage > 0) {
       const dealt = Math.min(target.hp, rawDamage);
       target.hp = Math.max(0, target.hp - rawDamage);

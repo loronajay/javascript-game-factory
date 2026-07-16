@@ -343,6 +343,7 @@ const AUTHORED_MISSIONS = Object.freeze({
     description: "Bring any four-unit squad into an 11x11 duel against Mother Nature, Treant, Clod, and a Gaia-protected Paladin. The old starter squad has a special stake in this fight.",
     unitType: "mother-nature",
     requiredStars: 32,
+    requiresPreviousMissionsComplete: true,
     rewardUnits: Object.freeze(["mother-nature"]),
     playerSlots: 4,
     enemySquad: Object.freeze(["mother-nature", "treant", "clod", "paladin"]),

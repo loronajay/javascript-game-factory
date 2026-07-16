@@ -61,12 +61,12 @@ export const FATHER_TIME = Object.freeze({
       kind: "active",
       mpCost: 5,
       resolution: "age",
-      targeting: Object.freeze({ shape: "allyOrEnemy" }),
+      targeting: Object.freeze({ shape: "allyOrEnemy", range: 4 }),
       // Amount granted to an ally / drained from an enemy on the chosen stat. The sign
       // is decided by target team in resolveAge; the stat (strength|defense) rides on
       // the command from the stat-picker UI (defaults to strength).
       effect: Object.freeze({ type: "linkedStatMod", amount: 1 }),
-      description: "Grant an ally +1 STR or +1 DEF, or drain an enemy's STR or DEF by 1 — lasting until Father Time is defeated.",
+      description: "Grant an ally within 4 +1 STR or +1 DEF, or drain STR or DEF from an enemy within 4 by 1 — lasting until Father Time is defeated.",
       implemented: true,
       ai: Object.freeze({ intent: "statBuff", tags: Object.freeze(["buff", "control"]) })
     }),

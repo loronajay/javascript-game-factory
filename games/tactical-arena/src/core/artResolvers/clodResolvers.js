@@ -14,7 +14,6 @@ export function resolveQuake(state, command, art) {
   const actor = findUnit(next, command.unitId);
   const radius = getSelfBlastRadius(next, actor, art);
   const enemies = livingUnits(next).filter((u) => areEnemies(actor, u) && chebyshevDistance(actor.position, u.position) <= radius);
-  const totalEnemies = livingUnits(next).filter((u) => areEnemies(actor, u)).length;
   const amount = (art.damage?.amount ?? 3) + enemies.length;
 
   const damageByTarget = {};
@@ -32,7 +31,7 @@ export function resolveQuake(state, command, art) {
     damageByTarget[target.id] = dealt;
   }
 
-  const refunded = enemies.length > 0 && enemies.length === totalEnemies;
+  const refunded = enemies.length >= (art.refundTargets ?? 3);
   const cost = getArtMpCost(actor, art, next);
   if (!refunded) actor.mp -= cost;
   next.activation.spellUsed = true;

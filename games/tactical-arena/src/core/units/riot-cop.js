@@ -132,9 +132,10 @@ export const RIOT_COP = Object.freeze({
       effect: Object.freeze({
         type: "riotShield",
         rangedBasicReduction: 1,
-        magicNullifyWhileDefending: true
+        magicNullifyWhileDefending: true,
+        critMagicVulnerability: 1
       }),
-      description: "Allies within 1 tile of Riot Cop's shield wall gain +1 DEF. Riot Cop himself takes 1 less damage from ranged basic attacks, and completely nullifies magic damage aimed at him while defending.",
+      description: "Allies within 1 tile of Riot Cop's shield wall gain +1 DEF. Riot Cop himself takes 1 less damage from ranged basic attacks, takes 1 extra damage from critical magic hits, and completely nullifies magic damage aimed at him while defending.",
       implemented: true
     })
   ]),

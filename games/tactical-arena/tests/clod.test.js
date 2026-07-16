@@ -107,7 +107,7 @@ test("Rock Hard: magic damage still lands on a defending Clod (only physical is 
 
 // --- Quake ------------------------------------------------------------------
 
-test("Quake: every enemy within 3 takes (3 + number hit) magic, and a full-team hit refunds MP", () => {
+test("Quake: every enemy within 3 takes (3 + number hit) magic, but 2 hits do not refund MP", () => {
   const state = scenario([
     { id: "clod", type: "clod", player: 1, x: 6, y: 6, mp: 20 },
     { id: "e1", type: "swordsman", player: 2, x: 6, y: 8 }, // dist 2
@@ -119,11 +119,27 @@ test("Quake: every enemy within 3 takes (3 + number hit) magic, and a full-team 
   // 2 enemies caught → 3 + 2 = 5 magic each (magic ignores DEF).
   assert.equal(findUnit(res.nextState, "e1").hp, swMax - 5);
   assert.equal(findUnit(res.nextState, "e2").hp, swMax - 5);
-  assert.equal(findUnit(res.nextState, "clod").mp, 20, "hitting the whole enemy team refunds the MP");
-  assert.ok(res.events.find((e) => e.type === "ART_RESOLVED").refunded);
+  assert.equal(findUnit(res.nextState, "clod").mp, 15, "2 targets hit still spends 5 MP");
+  assert.equal(res.events.find((e) => e.type === "ART_RESOLVED").refunded, false);
 });
 
-test("Quake: MP is NOT refunded when an enemy is outside the radius", () => {
+test("Quake: MP is refunded when it hits 3 or more targets", () => {
+  const state = scenario([
+    { id: "clod", type: "clod", player: 1, x: 6, y: 6, mp: 20 },
+    { id: "e1", type: "swordsman", player: 2, x: 6, y: 8 }, // dist 2
+    { id: "e2", type: "swordsman", player: 2, x: 8, y: 6 }, // dist 2
+    { id: "e3", type: "swordsman", player: 2, x: 4, y: 6 }  // dist 2
+  ]);
+  let s = run(state, beginActivation(1, "clod")).nextState;
+  const res = run(s, useArt(1, "clod", "quake", {}));
+  const ev = res.events.find((e) => e.type === "ART_RESOLVED");
+
+  assert.equal(findUnit(res.nextState, "clod").mp, 20, "3 targets hit refunds the MP");
+  assert.equal(ev.refunded, true);
+  assert.deepEqual(ev.targetIds.sort(), ["e1", "e2", "e3"]);
+});
+
+test("Quake: MP is NOT refunded when fewer than 3 enemies are inside the radius", () => {
   const state = scenario([
     { id: "clod", type: "clod", player: 1, x: 6, y: 6, mp: 20 },
     { id: "e1", type: "swordsman", player: 2, x: 6, y: 8 },   // dist 2 (caught)

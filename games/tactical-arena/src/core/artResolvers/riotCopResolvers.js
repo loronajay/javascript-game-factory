@@ -59,6 +59,7 @@ export function resolveStunGun(state, command, art) {
   target.hp = Math.max(0, target.hp - amount);
 
   let appliedStatus = null;
+  let effect = null;
   if (target.hp > 0) {
     const adjacent = chebyshevDistance(actor.position, target.position) <= 1;
     const anyRange = getRageEffectValue(actor, "stunAtAnyRange", false);
@@ -68,7 +69,8 @@ export function resolveStunGun(state, command, art) {
       : { status: "slow", chance: art.effect.chance, durationTurns: art.effect.durationTurns, statModifiers: { moveRange: -1 } };
     const roll = drawValue(next.rngState, command.effectRoll);
     next.rngState = roll.rngState;
-    const effect = applyRolledStatus(target, spec, roll.value, actor, getGlobalStatusChanceMultiplier(next));
+    effect = applyRolledStatus(target, spec, roll.value, actor, getGlobalStatusChanceMultiplier(next));
+    effect = { ...effect, status: statusType, roll: roll.value };
     if (effect.applied && !effect.reflected) appliedStatus = statusType;
   }
 
@@ -80,6 +82,7 @@ export function resolveStunGun(state, command, art) {
     hit: true, critical: swing.critical, roll: swing.hitRoll,
     damage: { type: "true", damage: damageDealt }, targetIds: [target.id], damageByTarget: { [target.id]: damageDealt },
     ...(appliedStatus ? { appliedStatus } : {}),
+    ...(effect ? { effect } : {}),
     usesLeft: getAbilityUsesRemaining(actor, art)
   }, ...desperationEvents]);
 }
@@ -111,7 +114,7 @@ export function resolveSmokeBomb(state, command, art) {
   resolveVictory(next);
   return accept(next, [{
     type: "ART_RESOLVED", artId: art.id, actorId: actor.id, center: { ...center },
-    missed: swing.missed, statusTargets, mpCost: 0, usesLeft: getAbilityUsesRemaining(actor, art)
+    hit: !swing.missed, missed: swing.missed, roll: swing.hitRoll, statusTargets, mpCost: 0, usesLeft: getAbilityUsesRemaining(actor, art)
   }]);
 }
 

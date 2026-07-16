@@ -60,9 +60,10 @@ export const CLOD = Object.freeze({
       targeting: Object.freeze({ shape: "nukeAura", radius: 3 }),
       damageType: "magic",
       // Base 3, +1 per enemy the quake catches (computed in resolveQuake). If it catches
-      // the WHOLE enemy team, the MP is refunded.
+      // at least 3 enemies, the MP is refunded.
       damage: Object.freeze({ type: "magic", amount: 3 }),
-      description: "Slam the ground: every enemy within 3 tiles takes (3 + number of enemies hit) magic damage. If it hits the entire enemy team, the MP is refunded.",
+      refundTargets: 3,
+      description: "Slam the ground: every enemy within 3 tiles takes (3 + number of enemies hit) magic damage. If it hits 3 or more enemies, the MP is refunded.",
       implemented: true,
       ai: Object.freeze({ intent: "selfBlast", evHints: Object.freeze({ minTargets: 1 }), tags: Object.freeze(["aoe"]) })
     }),

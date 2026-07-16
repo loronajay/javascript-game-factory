@@ -117,7 +117,8 @@ async function presentArtRider({ rolled, attackerBefore, targetBefore, metrics, 
   if (!rolled.artId) return;
   const art = artDefinition(attackerBefore, rolled.artId);
   if (art?.effect?.type === "status" && rolled.effect?.attempted) {
-    const statusName = (art.effect.status ?? "status").toUpperCase();
+    const status = rolled.effect.status ?? art.effect.status ?? "status";
+    const statusName = status.toUpperCase();
     await revealRoll(
       { missed: !rolled.effect.applied, critical: false },
       rolled.effect.applied ? statusName : "RESISTED",
@@ -127,7 +128,7 @@ async function presentArtRider({ rolled, attackerBefore, targetBefore, metrics, 
       await effects.playAbilityVfx(rolled.artId, {
         actor: attackerBefore,
         target: targetBefore,
-        effect: { ...rolled.effect, status: art.effect.status },
+        effect: { ...rolled.effect, status },
       });
     }
   }

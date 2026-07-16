@@ -1,6 +1,6 @@
 import { getArtMpCost, getEffectiveStats } from "../unitCatalog.js";
 import { areEnemies, cloneState, findUnit } from "../state.js";
-import { getRevivePlacementTiles, getReviveTargets } from "../../rules/arts.js";
+import { getArtTargetRange, getRevivePlacementTiles, getReviveTargets } from "../../rules/arts.js";
 import { isWallBetween } from "../../rules/combat.js";
 import { chebyshevDistance, positionKey } from "../../rules/movement.js";
 import { applyStatus, reflectsStatus } from "../../rules/statuses.js";
@@ -11,7 +11,7 @@ export function resolveAge(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const targetState = findUnit(state, command.targetId);
   if (!targetState || targetState.hp <= 0) return reject(ERR.INVALID_TARGET);
-  if (chebyshevDistance(actorState.position, targetState.position) > getEffectiveStats(actorState, state).attackRange) {
+  if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }
   // A wall blocks the cast like any other ranged ability.

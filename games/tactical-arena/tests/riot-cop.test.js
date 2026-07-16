@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { createBattleState, findUnit } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
-import { beginActivation, defend, finishActivation, useArt } from "../src/core/commands.js";
+import { attack, beginActivation, defend, finishActivation, useArt } from "../src/core/commands.js";
 import { getAbilityUsesRemaining, getAuraSources, getEffectiveStats, getUnitType, hasAbilityUsesRemaining } from "../src/core/unitCatalog.js";
 import { canUseArt } from "../src/rules/arts.js";
 import { resolvePhysicalStrike } from "../src/rules/combat.js";
@@ -73,7 +73,8 @@ test("Riot Shield: a ranged basic attack deals 1 less to Riot Cop", () => {
   const riot = findUnit(state, "riot");
   const withShield = resolvePhysicalStrike(archer, riot, { state, basicAttack: true }).damage;
   const withoutShield = resolvePhysicalStrike(archer, riot, { state, basicAttack: false }).damage;
-  assert.equal(withShield, Math.max(0, withoutShield - 1), "ranged basic takes 1 less");
+  assert.equal(withShield, 1, "ranged basic mitigation keeps a landed hit at minimum 1");
+  assert.equal(withShield, Math.max(1, withoutShield - 1), "ranged basic takes 1 less without dropping below 1");
 });
 
 test("Riot Shield: an ADJACENT basic attack is NOT reduced (only ranged)", () => {
@@ -111,6 +112,23 @@ test("Riot Shield: a defending Riot Cop nullifies magic damage; a non-defender t
   assert.ok(findUnit(hit.nextState, "riot").hp < 30, "an un-braced Riot Cop still eats the magic");
 });
 
+test("Riot Shield: Riot Cop takes +1 damage from critical magic hits", () => {
+  const units = [
+    { id: "riot", type: "riot-cop", player: 1, x: 5, y: 5 },
+    { id: "angel", type: "angel", player: 2, x: 5, y: 8 }
+  ];
+
+  let normal = { ...scenario(units), currentPlayer: 2 };
+  normal = run(normal, beginActivation(2, "angel")).nextState;
+  const normalHit = run(normal, attack(2, "angel", "riot", { attackRoll: 0.5, critRoll: 0.99 }));
+  assert.equal(findUnit(normalHit.nextState, "riot").hp, 27, "normal magic basic deals Angel's 3 STR");
+
+  let crit = { ...scenario(units), currentPlayer: 2 };
+  crit = run(crit, beginActivation(2, "angel")).nextState;
+  const critHit = run(crit, attack(2, "angel", "riot", { attackRoll: 0.5, critRoll: 0.0 }));
+  assert.equal(findUnit(critHit.nextState, "riot").hp, 24, "crit magic is 5 plus Riot Cop's +1 crit-magic vulnerability");
+});
+
 test("Heavy Boots: Riot Cop is immune to slow", () => {
   const state = { ...scenario([
     { id: "riot", type: "riot-cop", player: 1, x: 5, y: 5 },
@@ -138,8 +156,26 @@ test("Stun Gun: 3 true damage + STUN at range 1, and one use is spent", () => {
   // A 1-turn stun on an adjacent enemy is consumed the instant its turn auto-spends, so
   // assert the reducer recorded it (the enemy loses its next activation).
   assert.ok(res.events.some((e) => e.type === "ART_RESOLVED" && e.appliedStatus === "stun"), "an adjacent target is stunned");
+  assert.ok(res.events.some((e) => e.type === "ART_RESOLVED" && e.effect?.attempted && e.effect?.applied && e.effect?.status === "stun"), "stun status uses its own roll");
   const stunGun = getUnitType("riot-cop").arts.find((art) => art.id === "stun-gun");
   assert.equal(getAbilityUsesRemaining(findUnit(res.nextState, "riot"), stunGun), 4, "one use spent");
+});
+
+test("Stun Gun: adjacent pre-rage stun still rolls for status separately from damage", () => {
+  const state = scenario([
+    { id: "riot", type: "riot-cop", player: 1, x: 5, y: 5 },
+    { id: "foe", type: "swordsman", player: 2, x: 5, y: 6 }
+  ]);
+  let s = run(state, beginActivation(1, "riot")).nextState;
+  const res = run(s, useArt(1, "riot", "stun-gun", { targetId: "foe", ...HIT_NO_STATUS }));
+  const foe = findUnit(res.nextState, "foe");
+  assert.equal(foe.hp, getUnitType("swordsman").stats.maxHp - 3, "damage still lands");
+  assert.ok(!isStunned(foe), "failed status roll does not stun");
+  const event = res.events.find((e) => e.type === "ART_RESOLVED" && e.artId === "stun-gun");
+  assert.equal(event.effect?.attempted, true);
+  assert.equal(event.effect?.applied, false);
+  assert.equal(event.effect?.status, "stun");
+  assert.equal(event.effect?.reason, "ROLL_FAILED");
 });
 
 test("Stun Gun: a ranged target is SLOWED, not stunned", () => {
@@ -175,12 +211,34 @@ test("Smoke Bomb: blinds enemies in the blast radius, deals no damage, spends a 
   ]);
   let s = run(state, beginActivation(1, "riot")).nextState;
   const res = run(s, useArt(1, "riot", "smoke-bomb-riot", { targetPosition: { x: 8, y: 5 }, attackRoll: 0.5 }));
+  const event = res.events.find((e) => e.type === "ART_RESOLVED" && e.artId === "smoke-bomb-riot");
+  assert.equal(event.hit, true, "the throw records a landed roll");
+  assert.equal(event.roll, 0.5);
   const blinded = (id) => (findUnit(res.nextState, id).statuses ?? []).some((st) => st.type === "blind");
   assert.ok(blinded("a") && blinded("b"), "enemies in the cloud are blinded");
   assert.ok(!blinded("c"), "a distant enemy is untouched");
   assert.equal(findUnit(res.nextState, "a").hp, getUnitType("swordsman").stats.maxHp, "no damage dealt");
   const smoke = getUnitType("riot-cop").arts.find((art) => art.id === "smoke-bomb-riot");
   assert.equal(getAbilityUsesRemaining(findUnit(res.nextState, "riot"), smoke), 2, "one use spent");
+});
+
+test("Smoke Bomb: a failed throw roll blinds nobody but still spends a use", () => {
+  const state = scenario([
+    { id: "riot", type: "riot-cop", player: 1, x: 5, y: 5 },
+    { id: "a", type: "swordsman", player: 2, x: 7, y: 5 },
+    { id: "b", type: "archer", player: 2, x: 9, y: 5 }
+  ]);
+  let s = run(state, beginActivation(1, "riot")).nextState;
+  const res = run(s, useArt(1, "riot", "smoke-bomb-riot", { targetPosition: { x: 8, y: 5 }, attackRoll: 0.0 }));
+  const event = res.events.find((e) => e.type === "ART_RESOLVED" && e.artId === "smoke-bomb-riot");
+  assert.equal(event.hit, false);
+  assert.equal(event.missed, true);
+  assert.equal(event.roll, 0.0);
+  assert.deepEqual(event.statusTargets, []);
+  assert.ok(!(findUnit(res.nextState, "a").statuses ?? []).some((st) => st.type === "blind"));
+  assert.ok(!(findUnit(res.nextState, "b").statuses ?? []).some((st) => st.type === "blind"));
+  const smoke = getUnitType("riot-cop").arts.find((art) => art.id === "smoke-bomb-riot");
+  assert.equal(getAbilityUsesRemaining(findUnit(res.nextState, "riot"), smoke), 2, "missed throws still spend a smoke bomb");
 });
 
 // --- Shield Bash -------------------------------------------------------------

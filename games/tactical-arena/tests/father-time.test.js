@@ -6,6 +6,7 @@ import { applyCommand } from "../src/core/reducer.js";
 import { beginActivation, useArt, defend, finishActivation, attack } from "../src/core/commands.js";
 import { getEffectiveStats, getUnitType, isRaging } from "../src/core/unitCatalog.js";
 import { statusImmunities } from "../src/rules/statuses.js";
+import { ERR } from "../src/core/reducerResult.js";
 
 // Deterministic combat rolls where a test asserts a damage outcome.
 const NORMAL_HIT = { attackRoll: 0.5, critRoll: 0.99 };
@@ -86,6 +87,19 @@ test("Age grants an ally +1 STR until Father Time is defeated", () => {
   s = r.nextState;
   findUnit(s, "p1-ft").hp = 0;
   assert.equal(getEffectiveStats(findUnit(s, "p1-ally"), s).strength, baseStr);
+});
+
+test("Age targets within 4 tiles, not Father Time's full attack range", () => {
+  const edge = scenario({ ally: { x: 9, y: 5 } }); // distance 4
+  let r = run(edge, beginActivation(1, "p1-ft"));
+  r = run(r.nextState, useArt(1, "p1-ft", "age", { targetId: "p1-ally", stat: "strength" }));
+  assert.equal(findUnit(r.nextState, "p1-ft").mp, getUnitType("father-time").stats.maxMp - 5);
+
+  const tooFar = scenario({ ally: { x: 10, y: 5 } }); // distance 5
+  let r2 = run(tooFar, beginActivation(1, "p1-ft"));
+  const denied = applyCommand(r2.nextState, useArt(1, "p1-ft", "age", { targetId: "p1-ally", stat: "strength" }));
+  assert.ok(!denied.accepted);
+  assert.equal(denied.errorCode, ERR.TARGET_OUT_OF_RANGE);
 });
 
 test("Age drains an enemy's DEF (defaulting to STR when no stat is given)", () => {

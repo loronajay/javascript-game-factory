@@ -115,7 +115,7 @@ const ART_RESOLVERS = new Map([
   ["smog", resolveSmog],
   ["poison-tick", resolvePoisonBurst],
   ["explosion", resolvePoisonBurst],
-  // Clod: a self-centred quake (variable magic + MP refund on a full-team hit), a STR-
+  // Clod: a self-centred quake (variable magic + MP refund on 3+ hits), a STR-
   // scaling boulder throw with a guaranteed slow/crit-stun, and the RAGE targeted blast.
   ["quake", resolveQuake],
   ["stone-throw", resolveStoneThrow],
