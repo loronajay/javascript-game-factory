@@ -244,15 +244,14 @@ function applySquadTurnChargeStatuses(state, player) {
   return events;
 }
 
-// Enchanted Roots (Treant): a weather-attuned unit restores HP/MP each turn rollover while
-// the matching weather holds (Rain → +1 HP). Data-first off the weatherAffinity passive, so
-// a no-op for every unit without it.
+// Enchanted Roots (Treant): a weather-attuned unit restores HP/MP each full turn cycle
+// while the matching weather holds. Data-first off the weatherAffinity passive, so a
+// no-op for every unit without it.
 function applyWeatherAffinityRegen(state, events) {
   for (const unit of livingUnits(state)) {
     if (isInvulnerable(unit)) continue;
     const affinity = getWeatherAffinityRestore(unit, state);
-    const passive = getWeatherPassiveRestore(unit, state);
-    const restore = { hp: affinity.hp + passive.hp, mp: affinity.mp + passive.mp };
+    const restore = { hp: affinity.hp, mp: affinity.mp };
     if (restore.hp <= 0 && restore.mp <= 0) continue;
     const hp = restoreHp(state, unit, unit, restore.hp);
     const mp = restoreMp(state, unit, unit, restore.mp);
@@ -262,6 +261,29 @@ function applyWeatherAffinityRegen(state, events) {
       events.push({ type: "WEATHER_REGEN", unitId: unit.id, hpRestored, mpRestored });
     }
   }
+}
+
+function applyWeatherPassiveCycleRegen(state, events) {
+  for (const unit of livingUnits(state)) {
+    if (isInvulnerable(unit)) continue;
+    const restore = getWeatherPassiveRestore(unit, state);
+    if (restore.hp <= 0 && restore.mp <= 0) continue;
+    const hp = restoreHp(state, unit, unit, restore.hp);
+    const mp = restoreMp(state, unit, unit, restore.mp);
+    const hpRestored = hp.hpRestored + mp.hpRestored;
+    const mpRestored = hp.mpRestored + mp.mpRestored;
+    if (hpRestored > 0 || mpRestored > 0) {
+      events.push({ type: "WEATHER_REGEN", unitId: unit.id, hpRestored, mpRestored });
+    }
+  }
+}
+
+function didTurnCycleWrap(state, previousPlayer) {
+  const order = state.turnOrder?.length ? state.turnOrder : [1, 2];
+  const previousIndex = order.indexOf(previousPlayer);
+  const currentIndex = order.indexOf(state.currentPlayer);
+  if (previousIndex < 0 || currentIndex < 0) return false;
+  return currentIndex <= previousIndex;
 }
 
 function releaseStunLoopGuard(state) {
@@ -315,6 +337,7 @@ function advanceTurnIfExhausted(state) {
     const previousPlayer = state.currentPlayer;
     state.currentPlayer = nextActivePlayer(state, state.currentPlayer);
     state.turnNumber += 1;
+    const turnCycleWrapped = didTurnCycleWrap(state, previousPlayer);
     rollovers += 1;
     for (const member of livingUnits(state, state.currentPlayer)) if (takesTurns(member)) member.spent = false;
     appendPendingRolloverEvents(state, applySquadTurnChargeStatuses(state, state.currentPlayer));
@@ -326,7 +349,10 @@ function advanceTurnIfExhausted(state) {
     applyAutoStrikeTick(state, fireEvents);
     applyRandomFireTick(state, fireEvents);
     applyWeatherCycleTick(state, fireEvents);
-    applyWeatherAffinityRegen(state, fireEvents);
+    if (turnCycleWrapped) {
+      applyWeatherAffinityRegen(state, fireEvents);
+      applyWeatherPassiveCycleRegen(state, fireEvents);
+    }
     resolveVictory(state);
     appendPendingRolloverEvents(state, fireEvents);
     appendPendingRolloverEvents(state, autoSpendStunnedUnits(state, state.currentPlayer));

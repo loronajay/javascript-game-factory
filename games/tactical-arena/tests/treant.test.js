@@ -68,14 +68,17 @@ test("Enchanted Roots: no weather leaves the base stat block", () => {
   assert.equal(stats.defense, 6);
 });
 
-test("Enchanted Roots: Rain restores HP per turn rollover (stacking Spring's global restore bonus)", () => {
+test("Enchanted Roots: Rain restores HP per turn cycle (stacking Spring's global restore bonus)", () => {
   const state = scenario([
     { id: "t", type: "treant", player: 1, x: 6, y: 6, hp: 20 },
     { id: "foe", type: "swordsman", player: 2, x: 1, y: 1 }
   ], { weather: "spring" });
-  // Treant passes its turn; the rollover fires the regen. Spring ("Spring Shower") also
-  // carries a global restoreBonus of +1, so the 1 HP regen lands as 2.
-  const after = passDefend(state, 1, "t");
+  // The simple P1 -> P2 rollover does not fire the regen. Once P2 passes and the turn
+  // cycle wraps back to P1, Spring's global restoreBonus turns the 1 HP regen into 2.
+  const afterTreant = passDefend(state, 1, "t");
+  assert.equal(findUnit(afterTreant, "t").hp, 20);
+
+  const after = passDefend(afterTreant, 2, "foe");
   assert.equal(findUnit(after, "t").hp, 22);
 });
 

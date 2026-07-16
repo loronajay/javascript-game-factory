@@ -75,7 +75,15 @@ test("One With The Flames: Heatwave restores 1 HP and 1 MP each turn cycle", () 
 
   let s = run(state, beginActivation(1, "p1")).nextState;
   s = run(s, defend(1, "p1")).nextState;
-  const res = run(s, finishActivation(1, "p1"));
+  let res = run(s, finishActivation(1, "p1"));
+
+  assert.equal(findUnit(res.nextState, "g").hp, 20, "no restore on the simple P1 to P2 rollover");
+  assert.equal(findUnit(res.nextState, "g").mp, 10, "no MP restore on the simple P1 to P2 rollover");
+  assert.ok(!res.events.some((e) => e.type === "WEATHER_REGEN" && e.unitId === "g"));
+
+  s = run(res.nextState, beginActivation(2, "g")).nextState;
+  s = run(s, defend(2, "g")).nextState;
+  res = run(s, finishActivation(2, "g"));
 
   assert.equal(findUnit(res.nextState, "g").hp, 21);
   assert.equal(findUnit(res.nextState, "g").mp, 11);

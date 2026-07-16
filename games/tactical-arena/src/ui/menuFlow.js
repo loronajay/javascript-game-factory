@@ -92,6 +92,23 @@ export function campaignValorRewardForNode(node) {
   return Math.max(0, missionReward);
 }
 
+export function campaignPendingRewardActionForNode(node, storage = globalThis.localStorage) {
+  if (!node || node.status !== "completed") return null;
+  if (node.rewardSkinPack) {
+    const choices = getAvailableCampaignSkinRewardChoices(storage, node.rewardSkinPack);
+    if (choices?.length && !isCampaignSkinRewardGranted(storage, node.rewardSkinPack)) {
+      return { kind: "skin", packId: node.rewardSkinPack, label: "Choose Reward" };
+    }
+  }
+  if (node.rewardUnitChoicePack && !isCampaignUnitRewardGranted(storage, node.rewardUnitChoicePack)) {
+    const choices = getCampaignUnitRewardChoices(node.rewardUnitChoicePack);
+    if (choices?.length) {
+      return { kind: "unit", packId: node.rewardUnitChoicePack, label: "Choose Recruit" };
+    }
+  }
+  return null;
+}
+
 export function syncScreenMusic(audio, screenName) {
   if (!screenName) return;
   if (screenName === "match") audio.stopMusic();
@@ -462,6 +479,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
 
   function renderCampaignDetail(node) {
     const playable = node && (node.status === "available" || node.status === "completed") && !node.comingSoon;
+    const rewardAction = campaignPendingRewardActionForNode(node, globalThis.localStorage);
     campaignDetail.innerHTML =
       `<div class="campaign-detail-copy">` +
       `<div class="campaign-kicker">${escapeHtml(node?.subtitle ?? "Campaign")}</div>` +
@@ -475,6 +493,16 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       `<dt>Reward</dt><dd>${escapeHtml((node?.rewardUnits ?? []).map(unitLabel).join(", ") || node?.rewardLabel || "TBD")}</dd>` +
       `<dt>Valor</dt><dd><span class="valor-badge valor-inline" aria-label="${escapeHtml(formatValor(campaignValorRewardForNode(node)))}"><span class="valor-icon" aria-hidden="true"></span><span class="valor-amount">${escapeHtml(formatValorAmount(campaignValorRewardForNode(node)))}</span></span></dd>` +
       `</dl>`;
+    if (rewardAction) {
+      const claimBtn = document.createElement("button");
+      claimBtn.type = "button";
+      claimBtn.className = "primary menu-btn campaign-reward-claim";
+      claimBtn.dataset.action = "chooseCampaignReward";
+      claimBtn.dataset.rewardKind = rewardAction.kind;
+      claimBtn.dataset.packId = rewardAction.packId;
+      claimBtn.textContent = rewardAction.label;
+      campaignDetail.append(claimBtn);
+    }
     campaignStartBtn.textContent = node?.status === "completed" ? "Replay Mission" : node?.comingSoon ? "Coming Soon" : "Start Mission";
     campaignStartBtn.dataset.missionId = node?.id ?? "";
     updateCampaignStartAvailability();
@@ -976,6 +1004,15 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       }
       case "chooseCampaignSkin": {
         void chooseCampaignSkin(actionBtn.dataset.type);
+        break;
+      }
+      case "chooseCampaignReward": {
+        const packId = actionBtn.dataset.packId;
+        if (actionBtn.dataset.rewardKind === "unit") {
+          void openCampaignUnitRewardChoice(packId);
+        } else {
+          void openCampaignSkinRewardChoice(packId);
+        }
         break;
       }
       case "startCampaignMission": {

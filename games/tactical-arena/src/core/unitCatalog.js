@@ -509,7 +509,7 @@ export function getWeatherAffinityMagicBonus(attacker, state) {
   return Math.max(0, Number(weatherAffinityBlock(attacker, state)?.magicDamage) || 0);
 }
 
-// Enchanted Roots (Rain): the HP/MP a weather-attuned unit restores each turn rollover.
+// Enchanted Roots (Rain): the HP/MP a weather-attuned unit restores each full turn cycle.
 // Ticked by turnEngine.js. { hp, mp } (zeros when the weather has no regen).
 export function getWeatherAffinityRestore(unit, state) {
   const restore = weatherAffinityBlock(unit, state)?.restorePerTurn ?? {};
@@ -517,7 +517,8 @@ export function getWeatherAffinityRestore(unit, state) {
 }
 
 // Passive weather restore: any passive source can declare `weatherRestore` keyed by
-// active weather id. Used by Gargoyle's One With The Flames during Heatwave.
+// active weather id. Ticked once per full turn cycle by turnEngine.js. Used by
+// Gargoyle's One With The Flames during Heatwave.
 export function getWeatherPassiveRestore(unit, state) {
   const weatherId = getActiveWeather(state)?.id ?? null;
   if (!weatherId) return { hp: 0, mp: 0 };

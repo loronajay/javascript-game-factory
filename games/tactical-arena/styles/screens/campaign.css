@@ -54,6 +54,7 @@
 .campaign-rewards dd { margin:0; color:var(--text); font-weight:800; text-align:right; }
 .campaign-rewards dd .valor-badge.valor-inline { display:inline-flex; font:inherit; color:var(--brass-hi); }
 .campaign-rewards dd .valor-badge.valor-inline .valor-icon { width:.85rem; height:.85rem; }
+.campaign-reward-claim { width:100%; min-height:2.45rem; margin-top:.85rem; padding:.6rem .8rem; font-size:.72rem; }
 /* Fixed track width (no 1fr) so every slot button is the SAME width no matter the
    squad size or how many slots fit per row — auto-fill just adds/drops columns,
    it never stretches an existing one to fill leftover space. */
