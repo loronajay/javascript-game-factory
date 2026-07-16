@@ -34,6 +34,7 @@ import {
   TUTORIAL_BASICS_ID,
   TUTORIAL_DAMAGE_TYPES_ID,
   TUTORIAL_RAGE_ID,
+  TUTORIAL_STATUS_EFFECTS_ID,
   completeTutorial,
 } from "../src/tutorials/basics.js";
 import { availableTypesForSlot, isUnitUnlocked } from "../src/ui/squadModel.js";
@@ -47,6 +48,14 @@ function storageAdapter() {
     removeItem: (key) => values.delete(key),
   };
 }
+
+const ALL_TUTORIAL_IDS = Object.freeze([
+  TUTORIAL_BASICS_ID,
+  TUTORIAL_ARTS_MP_ID,
+  TUTORIAL_DAMAGE_TYPES_ID,
+  TUTORIAL_RAGE_ID,
+  TUTORIAL_STATUS_EFFECTS_ID,
+]);
 
 test("tutorial reward choices match the first skin-choice pool", () => {
   assert.deepEqual(TUTORIAL_REWARD_SKIN_CHOICES, [
@@ -70,10 +79,10 @@ test("fresh profiles start with no Valor for unit purchases", () => {
 
 test("completing all tutorial entries unlocks Juggernaut but waits for a skin choice", () => {
   const storage = storageAdapter();
-  for (const tutorialId of [TUTORIAL_BASICS_ID, TUTORIAL_ARTS_MP_ID, TUTORIAL_DAMAGE_TYPES_ID]) {
+  for (const tutorialId of ALL_TUTORIAL_IDS.slice(0, -1)) {
     completeTutorial(storage, tutorialId);
   }
-  let progress = completeTutorial(storage, TUTORIAL_RAGE_ID);
+  let progress = completeTutorial(storage, TUTORIAL_STATUS_EFFECTS_ID);
 
   assert.equal(progress.allTutorialsComplete, true);
   assert.equal(progress.rewardGranted, false);
@@ -93,10 +102,10 @@ test("completing all tutorial entries unlocks Juggernaut but waits for a skin ch
 test("tutorial Valor is granted only once after all tutorials are complete", () => {
   const storage = storageAdapter();
 
-  for (const tutorialId of [TUTORIAL_BASICS_ID, TUTORIAL_ARTS_MP_ID, TUTORIAL_DAMAGE_TYPES_ID, TUTORIAL_RAGE_ID]) {
+  for (const tutorialId of ALL_TUTORIAL_IDS) {
     completeTutorial(storage, tutorialId);
   }
-  completeTutorial(storage, TUTORIAL_RAGE_ID);
+  completeTutorial(storage, TUTORIAL_STATUS_EFFECTS_ID);
   completeTutorial(storage, TUTORIAL_BASICS_ID);
 
   const progress = readUnlockProgress(storage);
@@ -106,7 +115,7 @@ test("tutorial Valor is granted only once after all tutorials are complete", () 
 
 test("selecting the tutorial reward unlocks exactly that skin", () => {
   const storage = storageAdapter();
-  for (const tutorialId of [TUTORIAL_BASICS_ID, TUTORIAL_ARTS_MP_ID, TUTORIAL_DAMAGE_TYPES_ID, TUTORIAL_RAGE_ID]) {
+  for (const tutorialId of ALL_TUTORIAL_IDS) {
     completeTutorial(storage, tutorialId);
   }
 
@@ -281,7 +290,7 @@ test("premium skin purchases are stored separately and folded into unlocked skin
 
 test("resetting progress clears stored progression while preserving owned skins", () => {
   const storage = storageAdapter();
-  for (const tutorialId of [TUTORIAL_BASICS_ID, TUTORIAL_ARTS_MP_ID, TUTORIAL_DAMAGE_TYPES_ID, TUTORIAL_RAGE_ID]) {
+  for (const tutorialId of ALL_TUTORIAL_IDS) {
     completeTutorial(storage, tutorialId);
   }
   selectTutorialRewardSkin(storage, { type: "magician", slug: "summer-vibes" });

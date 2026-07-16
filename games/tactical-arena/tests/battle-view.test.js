@@ -428,8 +428,10 @@ test("four-player team HUD uses compact chips in every player slot", () => {
     assert.doesNotMatch(overlay.children[0].innerHTML, /unit-statline/);
     assert.match(STYLE_CSS, /\.squad-overlay\.slot-3\s*\{\s*top:\.75rem;\s*left:\.75rem;/);
     assert.match(STYLE_CSS, /\.squad-overlay\.slot-4\s*\{\s*top:\.75rem;\s*right:\.75rem;/);
-    assert.match(STYLE_CSS, /\.panel\.squad-overlay\.is-compact\s*\{/);
+    assert.match(STYLE_CSS, /\.panel\.squad-overlay\.is-compact\s*\{[^}]*width:clamp\(12\.25rem,18vw,15\.5rem\)/);
     assert.match(STYLE_CSS, /\.squad-list\.is-compact-grid\s*\{/);
+    assert.match(STYLE_CSS, /\.squad-chip-body\s*\{[^}]*width:100%/);
+    assert.match(STYLE_CSS, /\.squad-overlay\.is-compact \.vital\s*\{[^}]*minmax\(2\.2rem,1fr\)/);
   } finally {
     globalThis.document = previousDocument;
   }

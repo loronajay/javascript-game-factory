@@ -9,6 +9,10 @@ import {
   teamPairingSummary
 } from "../src/ui/teamDisplay.js";
 
+import { readFileSync } from "node:fs";
+
+const SHELL_CSS = readFileSync(new URL("../styles/screens/shell.css", import.meta.url), "utf8");
+
 test("2v2 setup groups odd and even player seats into readable teams", () => {
   assert.deepEqual(teamGroupsForSetup(4, "teams"), [
     { team: 1, seats: [1, 3] },
@@ -40,4 +44,14 @@ test("hot-seat setup refreshes when either player count or format changes", () =
   assert.equal(shouldSyncHotSeatSetupForSegment(playerCountSegment), true);
   assert.equal(shouldSyncHotSeatSetupForSegment(formatSegment), true);
   assert.equal(shouldSyncHotSeatSetupForSegment(boardSizeSegment), false);
+});
+
+test("squad setup action buttons keep formation text inside narrow team pickers", () => {
+  const rules = [...SHELL_CSS.matchAll(/\.squad-edit-btn\s*\{([^}]*)\}/g)].map((match) => match[1]);
+  const rule = rules.find((body) => body.includes("white-space")) ?? "";
+
+  assert.match(rule, /min-width\s*:\s*0/);
+  assert.match(rule, /white-space\s*:\s*normal/);
+  assert.match(rule, /overflow-wrap\s*:\s*anywhere/);
+  assert.match(rule, /text-align\s*:\s*center/);
 });

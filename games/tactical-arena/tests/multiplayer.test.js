@@ -38,6 +38,22 @@ test("four-player matches spawn four squads without overlapping tiles", () => {
   assert.equal(tiles.size, state.units.length);
 });
 
+test("four-player FFA uses the same physical seat corners as 2v2 teams", () => {
+  const ffa = createMatchState({ size: 13, playerCount: 4, format: "ffa" });
+  const teams = createMatchState({ size: 13, playerCount: 4, format: "teams" });
+  const firstPositions = (state) => Object.fromEntries(
+    [1, 2, 3, 4].map((player) => [player, firstLivingUnit(state, player).position])
+  );
+
+  assert.deepEqual(firstPositions(ffa), firstPositions(teams));
+  assert.deepEqual(firstPositions(ffa), {
+    1: { x: 1, y: 12 },
+    2: { x: 1, y: 0 },
+    3: { x: 11, y: 0 },
+    4: { x: 11, y: 12 },
+  });
+});
+
 test("2v2 turn order skips a fully eliminated seat but keeps that seat's ally alive", () => {
   let state = createMatchState({ size: 13, playerCount: 4, format: "teams" });
   state.currentPlayer = 1;

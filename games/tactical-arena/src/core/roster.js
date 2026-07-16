@@ -7,7 +7,7 @@ const PLAYER_COLORS = Object.freeze({
 
 export const FORMATS = Object.freeze({ FFA: "ffa", TEAMS: "teams" });
 
-const TEAM_CORNER_BY_SEAT = Object.freeze({ 1: 0, 2: 2, 3: 1, 4: 3 });
+const FOUR_PLAYER_CORNER_BY_SEAT = Object.freeze({ 1: 0, 2: 2, 3: 1, 4: 3 });
 
 export function createRoster({ playerCount = 2, format = FORMATS.FFA, teamColors = null } = {}) {
   const count = clampPlayerCount(playerCount);
@@ -22,7 +22,7 @@ export function createRoster({ playerCount = 2, format = FORMATS.FFA, teamColors
     roster.push({
       id: seat,
       team,
-      corner: teams ? TEAM_CORNER_BY_SEAT[seat] : seat - 1,
+      corner: cornerForSeat(seat, count, teams),
       color: teams && teamColors?.[team]
         ? shade(teamColors[team], indexInTeam === 0 ? 1 : 0.66)
         : PLAYER_COLORS[seat],
@@ -30,6 +30,11 @@ export function createRoster({ playerCount = 2, format = FORMATS.FFA, teamColors
   }
 
   return roster;
+}
+
+function cornerForSeat(seat, playerCount, teams) {
+  if (teams || playerCount === 4) return FOUR_PLAYER_CORNER_BY_SEAT[seat] ?? (seat - 1);
+  return seat - 1;
 }
 
 export function playerColor(player) {

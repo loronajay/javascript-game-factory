@@ -1,4 +1,4 @@
-import { COMMANDS, attack, beginActivation, defend, finishActivation, moveUnit } from "../core/commands.js";
+import { COMMANDS, attack, beginActivation, defend, finishActivation, moveUnit, useArt } from "../core/commands.js";
 import { areEnemies, findUnit, livingUnits } from "../core/state.js";
 import { getEffectiveStats, getInitialMp, getUnitType, takesTurns } from "../core/unitCatalog.js";
 import { getLegalMoves, positionKey } from "../rules/movement.js";
@@ -18,6 +18,7 @@ export const TUTORIAL_BASICS_ID = "basics";
 export const TUTORIAL_ARTS_MP_ID = "arts-mp";
 export const TUTORIAL_DAMAGE_TYPES_ID = "damage-types";
 export const TUTORIAL_RAGE_ID = "rage-status";
+export const TUTORIAL_STATUS_EFFECTS_ID = "status-effects";
 export const TUTORIAL_ARTS_PLAYER_ARCHER_ID = "p1-0-archer";
 export const TUTORIAL_ARTS_PLAYER_MYSTIC_ID = "p1-1-mystic";
 export const TUTORIAL_ARTS_CPU_ARCHER_ID = "p2-3-archer";
@@ -29,6 +30,15 @@ export const TUTORIAL_RAGE_PLAYER_ARCHER_ID = "p1-1-archer";
 export const TUTORIAL_RAGE_CPU_GHOUL_IDS = Object.freeze(["p2-0-ghoul", "p2-1-ghoul", "p2-2-ghoul"]);
 export const TUTORIAL_RAGE_CPU_SWORDSMAN_ID = "p2-3-swordsman";
 export const TUTORIAL_RAGE_CPU_MAGICIAN_ID = "p2-4-magician";
+export const TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID = "p1-0-swordsman";
+export const TUTORIAL_STATUS_PLAYER_MAGICIAN_ID = "p1-1-magician";
+export const TUTORIAL_STATUS_PLAYER_ARCHER_ID = "p1-2-archer";
+export const TUTORIAL_STATUS_PLAYER_VIRUS_ID = "p1-3-virus";
+export const TUTORIAL_STATUS_PLAYER_MYSTIC_ID = "p1-status-mystic";
+export const TUTORIAL_STATUS_CPU_SWORDSMAN_ID = "p2-0-swordsman";
+export const TUTORIAL_STATUS_CPU_MAGICIAN_ID = "p2-1-magician";
+export const TUTORIAL_STATUS_CPU_MYSTIC_ID = "p2-2-mystic";
+export const TUTORIAL_STATUS_CPU_FAT_BOWMAN_ID = "p2-3-fat-bowman";
 export const TUTORIAL_CATALOG = Object.freeze([
   Object.freeze({
     id: TUTORIAL_BASICS_ID,
@@ -56,6 +66,13 @@ export const TUTORIAL_CATALOG = Object.freeze([
     title: "Tutorial 4",
     subtitle: "RAGE Status",
     description: "See the RAGE threshold unlock unique ARTS and passives, then use them to break out of a deadly trap.",
+    available: true,
+  }),
+  Object.freeze({
+    id: TUTORIAL_STATUS_EFFECTS_ID,
+    title: "Tutorial 5",
+    subtitle: "Status Effects and Immunities",
+    description: "Blind, silence, poison spread, cleanse answers, and status immunities.",
     available: true,
   }),
 ]);
@@ -96,22 +113,35 @@ const RAGE_ARCHER_HP = 4;
 const RAGE_CPU_MAGICIAN_POSITION = Object.freeze({ x: 11, y: 6 });
 const RAGE_ARCHER_START = Object.freeze({ x: 5, y: 6 });
 const RAGE_ARCHER_RETREAT = Object.freeze({ x: 3, y: 6 });
+const STATUS_BLIND_PLAYER_SWORDSMAN_POSITION = Object.freeze({ x: 2, y: 3 });
+const STATUS_BLIND_CPU_SWORDSMAN_POSITION = Object.freeze({ x: 3, y: 3 });
+const STATUS_SILENCE_PLAYER_MAGICIAN_POSITION = Object.freeze({ x: 0, y: 3 });
+const STATUS_SILENCE_PLAYER_SWORDSMAN_POSITION = Object.freeze({ x: 3, y: 2 });
+const STATUS_SILENCE_PLAYER_MYSTIC_POSITION = Object.freeze({ x: 3, y: 4 });
+const STATUS_SILENCE_CPU_MAGICIAN_POSITION = Object.freeze({ x: 4, y: 3 });
+const STATUS_POISON_PLAYER_ARCHER_POSITION = Object.freeze({ x: 1, y: 3 });
+const STATUS_POISON_PLAYER_VIRUS_POSITION = Object.freeze({ x: 0, y: 5 });
+const STATUS_POISON_CPU_FAT_BOWMAN_POSITION = Object.freeze({ x: 4, y: 3 });
+const STATUS_POISON_CPU_MYSTIC_POSITION = Object.freeze({ x: 5, y: 4 });
 
 export function createTutorialMatchConfig(tutorialId = TUTORIAL_BASICS_ID) {
   const artsMp = tutorialId === TUTORIAL_ARTS_MP_ID;
   const damageTypes = tutorialId === TUTORIAL_DAMAGE_TYPES_ID;
   const rage = tutorialId === TUTORIAL_RAGE_ID;
+  const statusEffects = tutorialId === TUTORIAL_STATUS_EFFECTS_ID;
   return {
     mode: "tutorial",
-    tutorialId: artsMp ? TUTORIAL_ARTS_MP_ID : damageTypes ? TUTORIAL_DAMAGE_TYPES_ID : rage ? TUTORIAL_RAGE_ID : TUTORIAL_BASICS_ID,
-    size: 13,
-    seed: artsMp ? 23 : damageTypes ? 31 : rage ? 41 : 7,
+    tutorialId: artsMp ? TUTORIAL_ARTS_MP_ID : damageTypes ? TUTORIAL_DAMAGE_TYPES_ID : rage ? TUTORIAL_RAGE_ID : statusEffects ? TUTORIAL_STATUS_EFFECTS_ID : TUTORIAL_BASICS_ID,
+    size: statusEffects ? 7 : 13,
+    seed: artsMp ? 23 : damageTypes ? 31 : rage ? 41 : statusEffects ? 53 : 7,
     squads: artsMp
       ? { 1: ["archer", "mystic"], 2: ["ghoul", "ghoul", "ghoul", "archer"] }
       : damageTypes
         ? { 1: ["swordsman", "magician"], 2: ["clod"] }
       : rage
         ? { 1: ["magician", "archer"], 2: ["ghoul", "ghoul", "ghoul", "swordsman"] }
+      : statusEffects
+        ? { 1: ["swordsman", "magician", "archer", "virus"], 2: ["swordsman", "magician", "mystic", "fat-bowman"] }
       : { 1: [...TUTORIAL_SQUAD], 2: [...TUTORIAL_SQUAD] },
     skins: artsMp
       ? { 1: [null, null], 2: [null, null, null, null] }
@@ -119,6 +149,8 @@ export function createTutorialMatchConfig(tutorialId = TUTORIAL_BASICS_ID) {
         ? { 1: [null, null], 2: [null] }
       : rage
         ? { 1: [null, null], 2: [null, null, null, null] }
+      : statusEffects
+        ? { 1: [null, null, null, null], 2: [null, null, null, null] }
       : { 1: [null, null, null, null], 2: [null, null, null, null] },
   };
 }
@@ -126,6 +158,7 @@ export function createTutorialMatchConfig(tutorialId = TUTORIAL_BASICS_ID) {
 export function createTutorial(tutorialId = TUTORIAL_BASICS_ID) {
   if (tutorialId === TUTORIAL_DAMAGE_TYPES_ID) return createDamageTypesTutorial();
   if (tutorialId === TUTORIAL_RAGE_ID) return createRageTutorial();
+  if (tutorialId === TUTORIAL_STATUS_EFFECTS_ID) return createStatusEffectsTutorial();
   return tutorialId === TUTORIAL_ARTS_MP_ID ? createArtsMpTutorial() : createBasicsTutorial();
 }
 
@@ -166,6 +199,16 @@ export function createRageTutorial() {
     completed: false,
     prompt: rageOpeningPrompt(),
     dialogue: rageOpeningDialogue(),
+  };
+}
+
+export function createStatusEffectsTutorial() {
+  return {
+    id: TUTORIAL_STATUS_EFFECTS_ID,
+    stage: "await_moonstrike",
+    completed: false,
+    prompt: statusEffectsOpeningPrompt(),
+    dialogue: statusEffectsOpeningDialogue(),
   };
 }
 
@@ -253,7 +296,53 @@ export function rageOpeningDialogue() {
   ];
 }
 
+export function statusEffectsOpeningPrompt() {
+  return "Tutorial 5: Status Effects and Immunities. Activate your 1 HP Swordsman and use Moonstrike on the enemy Swordsman.";
+}
+
+export function statusEffectsOpeningDialogue() {
+  return [
+    {
+      name: "Instructor",
+      text: "Status effects are debuffs that change what a unit can safely do: blind makes attacks miss, silence locks ARTS, poison chips HP, slow cuts MOVE, and stun skips a unit.",
+    },
+    {
+      name: "Instructor",
+      text: "Immunities stop specific statuses before they land. Archer's Emblem blocks poison, Mystic is immune to silence, and fully protected units like Paladin ignore the whole status package.",
+    },
+    {
+      speakerId: TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID,
+      text: "One hit point against a fresh Swordsman is ugly. If Moonstrike blinds him, his answer cannot connect.",
+    },
+  ];
+}
+
 export function prepareTutorialMatchState(match, tutorialId = TUTORIAL_BASICS_ID) {
+  if (tutorialId === TUTORIAL_STATUS_EFFECTS_ID) {
+    const positions = {
+      [TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID]: STATUS_BLIND_PLAYER_SWORDSMAN_POSITION,
+      [TUTORIAL_STATUS_CPU_SWORDSMAN_ID]: STATUS_BLIND_CPU_SWORDSMAN_POSITION,
+    };
+    return {
+      ...match,
+      currentPlayer: 1,
+      activation: null,
+      units: match.units.map((unit) => {
+        const definition = getUnitType(unit.type);
+        const active = unit.id === TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID || unit.id === TUTORIAL_STATUS_CPU_SWORDSMAN_ID;
+        return {
+          ...unit,
+          position: { ...(positions[unit.id] ?? unit.position) },
+          hp: unit.id === TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID ? 1 : active ? definition.stats.maxHp : 0,
+          mp: getInitialMp(definition),
+          spent: !active,
+          defending: false,
+          statuses: [],
+        };
+      }),
+    };
+  }
+
   if (tutorialId === TUTORIAL_RAGE_ID) {
     const positions = {
       [TUTORIAL_RAGE_PLAYER_MAGICIAN_ID]: RAGE_TRAP_CENTER,
@@ -337,6 +426,49 @@ export function prepareTutorialMatchState(match, tutorialId = TUTORIAL_BASICS_ID
 export function prepareTutorialCommand(tutorial, command) {
   if (!tutorial || tutorial.completed) return command;
 
+  if (tutorial.id === TUTORIAL_STATUS_EFFECTS_ID) {
+    if (
+      command?.type === COMMANDS.USE_ART &&
+      command.unitId === TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID &&
+      command.artId === "moonstrike" &&
+      tutorial.stage === "await_moonstrike"
+    ) {
+      return { ...command, ...FORCED_CRIT, effectRoll: 0.01 };
+    }
+    if (
+      command?.type === COMMANDS.ATTACK &&
+      command.actorId === TUTORIAL_STATUS_CPU_SWORDSMAN_ID &&
+      tutorial.stage === "await_blinded_enemy_attack"
+    ) {
+      return { ...command, ...NORMAL_HIT };
+    }
+    if (
+      command?.type === COMMANDS.USE_ART &&
+      command.unitId === TUTORIAL_STATUS_PLAYER_MAGICIAN_ID &&
+      command.artId === "banish" &&
+      tutorial.stage === "await_banish"
+    ) {
+      return { ...command, ...NORMAL_HIT, effectRoll: 0.01 };
+    }
+    if (
+      command?.type === COMMANDS.USE_ART &&
+      command.unitId === TUTORIAL_STATUS_PLAYER_ARCHER_ID &&
+      command.artId === "poison-arrow" &&
+      tutorial.stage === "await_poison_arrow"
+    ) {
+      return { ...command, ...NORMAL_HIT, effectRoll: 0.01 };
+    }
+    if (
+      command?.type === COMMANDS.USE_ART &&
+      command.unitId === TUTORIAL_STATUS_CPU_FAT_BOWMAN_ID &&
+      command.artId === "dragonsbane" &&
+      tutorial.stage === "await_enemy_poison_immunity"
+    ) {
+      return { ...command, ...NORMAL_HIT, effectRoll: 0.01, effectRoll2: 0.01 };
+    }
+    return command;
+  }
+
   if (tutorial.id === TUTORIAL_DAMAGE_TYPES_ID) {
     if (
       command?.type === COMMANDS.ATTACK &&
@@ -395,6 +527,8 @@ export function prepareTutorialCommand(tutorial, command) {
 export function validateTutorialCommand(tutorial, command, match) {
   if (!tutorial || tutorial.completed || !command) return tutorialAllowed();
 
+  if (tutorial.id === TUTORIAL_STATUS_EFFECTS_ID) return validateStatusEffectsCommand(tutorial, command, match);
+
   if (tutorial.id === TUTORIAL_DAMAGE_TYPES_ID) return validateDamageTypesCommand(tutorial, command, match);
 
   if (tutorial.id === TUTORIAL_ARTS_MP_ID) return validateArtsMpCommand(tutorial, command, match);
@@ -406,6 +540,9 @@ export function validateTutorialCommand(tutorial, command, match) {
 
 export function recordTutorialCommand(tutorial, { command, events = [], match, previousPlayer = match?.currentPlayer } = {}) {
   if (!tutorial || tutorial.completed) return noUpdate();
+  if (tutorial.id === TUTORIAL_STATUS_EFFECTS_ID) {
+    return recordStatusEffectsCommand(tutorial, { command, events, match, previousPlayer });
+  }
   if (tutorial.id === TUTORIAL_DAMAGE_TYPES_ID) {
     return recordDamageTypesCommand(tutorial, { command, events, match, previousPlayer });
   }
@@ -493,6 +630,38 @@ export function chooseTutorialCpuActivation(match, tutorial) {
       defend(player, magician.id),
       finishActivation(player, magician.id),
     ];
+  }
+
+  if (tutorial?.id === TUTORIAL_STATUS_EFFECTS_ID) {
+    if (tutorial.stage === "await_blinded_enemy_attack") {
+      const swordsman = findUnit(match, TUTORIAL_STATUS_CPU_SWORDSMAN_ID);
+      const target = findUnit(match, TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID);
+      if (!canAct(match, swordsman) || !target || target.hp <= 0) return [];
+      return [
+        beginActivation(player, swordsman.id),
+        attack(player, swordsman.id, target.id),
+        finishActivation(player, swordsman.id),
+      ];
+    }
+    if (tutorial.stage === "await_enemy_cleanse") {
+      const mystic = findUnit(match, TUTORIAL_STATUS_CPU_MYSTIC_ID);
+      const target = findUnit(match, TUTORIAL_STATUS_CPU_FAT_BOWMAN_ID);
+      if (!canAct(match, mystic) || !target || target.hp <= 0) return [];
+      return [
+        beginActivation(player, mystic.id),
+        useArt(player, mystic.id, "purify", { targetId: target.id }),
+      ];
+    }
+    if (tutorial.stage === "await_enemy_poison_immunity") {
+      const bowman = findUnit(match, TUTORIAL_STATUS_CPU_FAT_BOWMAN_ID);
+      const target = findUnit(match, TUTORIAL_STATUS_PLAYER_ARCHER_ID);
+      if (!canAct(match, bowman) || !target || target.hp <= 0) return [];
+      return [
+        beginActivation(player, bowman.id),
+        useArt(player, bowman.id, "dragonsbane", { targetId: target.id }),
+      ];
+    }
+    return [];
   }
 
   if (tutorial?.id === TUTORIAL_DAMAGE_TYPES_ID && tutorial.stage === "await_clod_defend") {
@@ -868,6 +1037,63 @@ function validateArtsMpCommand(tutorial, command) {
   return tutorialAllowed();
 }
 
+function validateStatusEffectsCommand(tutorial, command) {
+  if (command.type === COMMANDS.CONCEDE || command.player !== 1) return tutorialAllowed();
+  const unitId = activeCommandUnitId(command);
+  const isSwordsman = unitId === TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID;
+  const isMagician = unitId === TUTORIAL_STATUS_PLAYER_MAGICIAN_ID;
+  const isArcher = unitId === TUTORIAL_STATUS_PLAYER_ARCHER_ID;
+
+  if (tutorial.stage === "await_moonstrike") {
+    if (command.type === COMMANDS.BEGIN_ACTIVATION && isSwordsman) return tutorialAllowed();
+    if (
+      command.type === COMMANDS.USE_ART &&
+      command.unitId === TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID &&
+      command.artId === "moonstrike" &&
+      command.targetId === TUTORIAL_STATUS_CPU_SWORDSMAN_ID
+    ) {
+      return tutorialAllowed();
+    }
+    return tutorialBlocked("Activate your Swordsman and use Moonstrike on the enemy Swordsman to blind him.");
+  }
+
+  if (tutorial.stage === "await_banish") {
+    if (command.type === COMMANDS.BEGIN_ACTIVATION && isMagician) return tutorialAllowed();
+    if (
+      command.type === COMMANDS.USE_ART &&
+      command.unitId === TUTORIAL_STATUS_PLAYER_MAGICIAN_ID &&
+      command.artId === "banish" &&
+      command.targetId === TUTORIAL_STATUS_CPU_MAGICIAN_ID
+    ) {
+      return tutorialAllowed();
+    }
+    return tutorialBlocked("Use the Magician's Banish on the enemy Magician so Nuke is off the table.");
+  }
+
+  if (tutorial.stage === "await_poison_arrow") {
+    if (command.type === COMMANDS.BEGIN_ACTIVATION && isArcher) return tutorialAllowed();
+    if (
+      command.type === COMMANDS.USE_ART &&
+      command.unitId === TUTORIAL_STATUS_PLAYER_ARCHER_ID &&
+      command.artId === "poison-arrow" &&
+      command.targetId === TUTORIAL_STATUS_CPU_FAT_BOWMAN_ID
+    ) {
+      return tutorialAllowed();
+    }
+    return tutorialBlocked("Activate the Archer and use Poison Arrow on the Fat Bowman so Virus can spread the poison.");
+  }
+
+  if (
+    tutorial.stage === "await_blinded_enemy_attack" ||
+    tutorial.stage === "await_enemy_cleanse" ||
+    tutorial.stage === "await_enemy_poison_immunity"
+  ) {
+    return tutorialBlocked("Watch the scripted enemy response resolve.");
+  }
+
+  return tutorialAllowed();
+}
+
 function validateRageCommand(tutorial, command) {
   const unitId = activeCommandUnitId(command);
   const isMagician = unitId === TUTORIAL_RAGE_PLAYER_MAGICIAN_ID;
@@ -901,6 +1127,194 @@ function validateRageCommand(tutorial, command) {
   }
 
   return tutorialAllowed();
+}
+
+function statusSilenceFormationAction() {
+  return {
+    type: "formationSwap",
+    hideUnitIds: [TUTORIAL_STATUS_CPU_SWORDSMAN_ID],
+    revealUnits: [
+      { unitId: TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID, position: STATUS_SILENCE_PLAYER_SWORDSMAN_POSITION, hp: 10, spent: true },
+      { unitId: TUTORIAL_STATUS_PLAYER_MAGICIAN_ID, position: STATUS_SILENCE_PLAYER_MAGICIAN_POSITION, hp: 23 },
+      { unitId: TUTORIAL_STATUS_CPU_MAGICIAN_ID, position: STATUS_SILENCE_CPU_MAGICIAN_POSITION, hp: 11 },
+    ],
+    spawnUnits: [
+      { id: TUTORIAL_STATUS_PLAYER_MYSTIC_ID, type: "mystic", player: 1, position: STATUS_SILENCE_PLAYER_MYSTIC_POSITION, hp: 10, spent: true },
+    ],
+    currentPlayer: 1,
+    dialogue: [
+      {
+        name: "Instructor",
+        text: "New formation. Your Swordsman and Mystic could try to finish that Magician, but their damage would likely push him into RAGE instead of ending him.",
+      },
+      {
+        name: "Instructor",
+        text: "A raging Magician threatens Nuke. Silence prevents ARTS, so activate your Magician and use Banish before your team commits to the brawl.",
+      },
+    ],
+    prompt: "Activate your Magician and use Banish on the enemy Magician.",
+  };
+}
+
+function statusPoisonFormationAction() {
+  return {
+    type: "formationSwap",
+    hideUnitIds: [
+      TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID,
+      TUTORIAL_STATUS_PLAYER_MAGICIAN_ID,
+      TUTORIAL_STATUS_PLAYER_MYSTIC_ID,
+      TUTORIAL_STATUS_CPU_MAGICIAN_ID,
+    ],
+    revealUnits: [
+      { unitId: TUTORIAL_STATUS_PLAYER_ARCHER_ID, position: STATUS_POISON_PLAYER_ARCHER_POSITION, hp: 24 },
+      { unitId: TUTORIAL_STATUS_PLAYER_VIRUS_ID, position: STATUS_POISON_PLAYER_VIRUS_POSITION, hp: 25, spent: true },
+      { unitId: TUTORIAL_STATUS_CPU_MYSTIC_ID, position: STATUS_POISON_CPU_MYSTIC_POSITION, hp: 23 },
+      { unitId: TUTORIAL_STATUS_CPU_FAT_BOWMAN_ID, position: STATUS_POISON_CPU_FAT_BOWMAN_POSITION, hp: 30 },
+    ],
+    currentPlayer: 1,
+    dialogue: [
+      {
+        name: "Instructor",
+        text: "Poison is permanent until cleansed and deals damage at the start of the poisoned unit's activation.",
+      },
+      {
+        speakerId: TUTORIAL_STATUS_PLAYER_VIRUS_ID,
+        text: "And when an enemy catches a debuff near their allies, Spread copies it. I only need to stand here looking infectious.",
+      },
+      {
+        name: "Instructor",
+        text: "Virus is already spent. Activate the Archer and use Poison Arrow on the Fat Bowman; the nearby Mystic should catch the same poison.",
+      },
+    ],
+    prompt: "Activate your Archer and use Poison Arrow on the Fat Bowman.",
+  };
+}
+
+function recordStatusEffectsCommand(tutorial, { events = [] } = {}) {
+  const artEvent = events.find((event) => event.type === "ART_RESOLVED");
+  if (
+    artEvent?.actorId === TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID &&
+    artEvent.artId === "moonstrike" &&
+    tutorial.stage === "await_moonstrike"
+  ) {
+    return setStage(tutorial, "await_blinded_enemy_attack", {
+      prompt: "Moonstrike blinded the enemy. Every attack he tries this activation will miss; watch him swing into nothing.",
+      dialogue: [
+        {
+          name: "Instructor",
+          text: "Blind does not stop movement or ARTS by itself, but it makes attacks miss. Timing it right can save a fragile unit from a lethal counter.",
+        },
+      ],
+    });
+  }
+
+  const attackEvent = events.find((event) => event.type === "ATTACK_RESOLVED");
+  if (
+    attackEvent?.actorId === TUTORIAL_STATUS_CPU_SWORDSMAN_ID &&
+    attackEvent.hit === false &&
+    tutorial.stage === "await_blinded_enemy_attack"
+  ) {
+    return setStage(tutorial, "await_banish", {
+      prompt: "Blind bought the turn. Next, use silence to shut down a dangerous ART.",
+      dialogue: [
+        {
+          speakerId: TUTORIAL_STATUS_CPU_SWORDSMAN_ID,
+          text: "I had the swing. I just did not have the sight.",
+        },
+        {
+          name: "Instructor",
+          text: "That is blind in miniature: the threat still activates, but the attack cannot connect.",
+        },
+      ],
+      afterDialogueAction: statusSilenceFormationAction(),
+    });
+  }
+
+  if (
+    artEvent?.actorId === TUTORIAL_STATUS_PLAYER_MAGICIAN_ID &&
+    artEvent.artId === "banish" &&
+    tutorial.stage === "await_banish"
+  ) {
+    return setStage(tutorial, "await_poison_arrow", {
+      prompt: "Banish silenced the Magician. Next: poison, spread, cleanse, and immunity.",
+      dialogue: [
+        {
+          name: "Instructor",
+          text: "Silence leaves basic attacks alone, but it disables ARTS. Against a caster near RAGE, that can be the difference between a cleanup and a disaster.",
+        },
+      ],
+      afterDialogueAction: statusPoisonFormationAction(),
+    });
+  }
+
+  if (
+    artEvent?.actorId === TUTORIAL_STATUS_PLAYER_ARCHER_ID &&
+    artEvent.artId === "poison-arrow" &&
+    tutorial.stage === "await_poison_arrow"
+  ) {
+    return setStage(tutorial, "await_enemy_cleanse", {
+      prompt: "Poison landed and Virus spread it. The enemy Mystic will cleanse the Fat Bowman before the counterattack.",
+      dialogue: [
+        {
+          speakerId: TUTORIAL_STATUS_CPU_FAT_BOWMAN_ID,
+          text: "That little poison trick is cute. Mystic, get this off me.",
+        },
+        {
+          name: "Instructor",
+          text: "Cleanses remove statuses after they land. They are one of the cleanest answers to poison chains, blind locks, and silence setups.",
+        },
+      ],
+    });
+  }
+
+  if (
+    artEvent?.actorId === TUTORIAL_STATUS_CPU_MYSTIC_ID &&
+    artEvent.artId === "purify" &&
+    tutorial.stage === "await_enemy_cleanse"
+  ) {
+    return setStage(tutorial, "await_enemy_poison_immunity", {
+      prompt: "Purify removed the Fat Bowman's poison. Now watch her try to poison your Archer back.",
+      dialogue: [
+        {
+          name: "Instructor",
+          text: "The Fat Bowman is clean, but the Mystic still carries poison. Cleanses target what they actually reach; they are powerful, not automatic.",
+        },
+        {
+          speakerId: TUTORIAL_STATUS_CPU_FAT_BOWMAN_ID,
+          text: "My turn. Let us see how your Archer likes poison.",
+        },
+      ],
+    });
+  }
+
+  if (
+    artEvent?.actorId === TUTORIAL_STATUS_CPU_FAT_BOWMAN_ID &&
+    artEvent.artId === "dragonsbane" &&
+    artEvent.effect?.applied === false &&
+    artEvent.effect?.reason === "IMMUNE" &&
+    tutorial.stage === "await_enemy_poison_immunity"
+  ) {
+    return setStage(tutorial, "complete", {
+      prompt: "Tutorial complete. Statuses win turns, cleanses reset them, and immunities stop specific debuffs before they land.",
+      completed: true,
+      dialogue: [
+        {
+          speakerId: TUTORIAL_STATUS_PLAYER_ARCHER_ID,
+          text: "Arrow hurt. Poison did not. Emblem handled that part.",
+        },
+        {
+          name: "Instructor",
+          text: "That is immunity: the status never sticks. Archer blocks poison, Mystic and Nemesis block silence, Father Time blocks stun and slow, and Paladin is fully immune to poison, slow, blind, silence, and stun.",
+        },
+        {
+          name: "Instructor",
+          text: "Slow reduces MOVE, and stun auto-spends the unit so it cannot be selected. Scout immunities before building a status plan around either one.",
+        },
+      ],
+    });
+  }
+
+  return noUpdate();
 }
 
 function recordRageCommand(tutorial, { command, events = [], match, previousPlayer = match?.currentPlayer } = {}) {

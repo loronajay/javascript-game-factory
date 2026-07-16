@@ -24,6 +24,15 @@ import {
   TUTORIAL_RAGE_PLAYER_ARCHER_ID,
   TUTORIAL_RAGE_CPU_SWORDSMAN_ID,
   TUTORIAL_RAGE_CPU_MAGICIAN_ID,
+  TUTORIAL_STATUS_EFFECTS_ID,
+  TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID,
+  TUTORIAL_STATUS_PLAYER_MAGICIAN_ID,
+  TUTORIAL_STATUS_PLAYER_ARCHER_ID,
+  TUTORIAL_STATUS_PLAYER_VIRUS_ID,
+  TUTORIAL_STATUS_CPU_SWORDSMAN_ID,
+  TUTORIAL_STATUS_CPU_MAGICIAN_ID,
+  TUTORIAL_STATUS_CPU_MYSTIC_ID,
+  TUTORIAL_STATUS_CPU_FAT_BOWMAN_ID,
   chooseTutorialCpuActivation,
   completeTutorial,
   createBasicsTutorial,
@@ -53,6 +62,41 @@ function applyTutorial(tutorial, match, command) {
 
 function makeMatch() {
   return prepareTutorialMatchState(createMatchState(createTutorialMatchConfig()), TUTORIAL_BASICS_ID);
+}
+
+function applyFormationSwapForTest(match, action) {
+  const hidden = new Set(action.hideUnitIds ?? []);
+  const revealById = new Map((action.revealUnits ?? []).map((unit) => [unit.unitId, unit]));
+  const existingIds = new Set(match.units.map((unit) => unit.id));
+  return {
+    ...match,
+    currentPlayer: Number.isInteger(action.currentPlayer) ? action.currentPlayer : match.currentPlayer,
+    activation: null,
+    units: [
+      ...match.units.map((unit) => {
+        if (hidden.has(unit.id)) return { ...unit, hp: 0, spent: true, defending: false };
+        const reveal = revealById.get(unit.id);
+        if (!reveal) return unit;
+        return {
+          ...unit,
+          position: { ...(reveal.position ?? unit.position) },
+          hp: Number.isFinite(reveal.hp) ? reveal.hp : unit.hp,
+          mp: Number.isFinite(reveal.mp) ? reveal.mp : unit.mp,
+          spent: Boolean(reveal.spent),
+          defending: false,
+          statuses: [],
+        };
+      }),
+      ...(action.spawnUnits ?? [])
+        .filter((unit) => !existingIds.has(unit.id))
+        .map((unit) => ({
+          ...createUnit({ id: unit.id, type: unit.type, player: unit.player, x: unit.position.x, y: unit.position.y, skin: unit.skin }),
+          ...(Number.isFinite(unit.hp) ? { hp: unit.hp } : {}),
+          ...(Number.isFinite(unit.mp) ? { mp: unit.mp } : {}),
+          spent: Boolean(unit.spent),
+        })),
+    ],
+  };
 }
 
 test("basics tutorial config starts player one in an Archer duel on the normal board", () => {
@@ -425,6 +469,9 @@ test("next tutorial lookup routes tutorial 1 completion into the playable arts/m
   assert.equal(getNextTutorialId(adapter, TUTORIAL_DAMAGE_TYPES_ID), TUTORIAL_RAGE_ID);
 
   completeTutorial(adapter, TUTORIAL_RAGE_ID);
+  assert.equal(getNextTutorialId(adapter, TUTORIAL_RAGE_ID), TUTORIAL_STATUS_EFFECTS_ID);
+
+  completeTutorial(adapter, TUTORIAL_STATUS_EFFECTS_ID);
   assert.equal(getNextTutorialId(adapter, TUTORIAL_RAGE_ID), null);
 });
 
@@ -746,6 +793,163 @@ test("rage tutorial idles the enemy Magician outside its scripted stage", () => 
   };
 
   assert.deepEqual(chooseTutorialCpuActivation(match, tutorial), []);
+});
+
+test("status-effects tutorial config starts a 7x7 Swordsman blind lesson", () => {
+  const config = createTutorialMatchConfig(TUTORIAL_STATUS_EFFECTS_ID);
+  const match = prepareTutorialMatchState(createMatchState(config), TUTORIAL_STATUS_EFFECTS_ID);
+  const tutorials = getTutorialList();
+  const statusEffects = tutorials.find((tutorial) => tutorial.id === TUTORIAL_STATUS_EFFECTS_ID);
+
+  assert.equal(config.tutorialId, TUTORIAL_STATUS_EFFECTS_ID);
+  assert.equal(config.size, 7);
+  assert.deepEqual(config.squads[1], ["swordsman", "magician", "archer", "virus"]);
+  assert.deepEqual(config.squads[2], ["swordsman", "magician", "mystic", "fat-bowman"]);
+  assert.equal(statusEffects.available, true);
+  assert.equal(statusEffects.title, "Tutorial 5");
+  assert.equal(statusEffects.subtitle, "Status Effects and Immunities");
+
+  const swordsman = match.units.find((unit) => unit.id === TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID);
+  const enemy = match.units.find((unit) => unit.id === TUTORIAL_STATUS_CPU_SWORDSMAN_ID);
+  assert.deepEqual(swordsman.position, { x: 2, y: 3 });
+  assert.deepEqual(enemy.position, { x: 3, y: 3 });
+  assert.equal(swordsman.hp, 1);
+  assert.equal(enemy.hp, 25);
+  assert.equal(match.units.find((unit) => unit.id === TUTORIAL_STATUS_PLAYER_MAGICIAN_ID).hp, 0);
+  assert.equal(match.units.find((unit) => unit.id === TUTORIAL_STATUS_CPU_FAT_BOWMAN_ID).hp, 0);
+  assert.equal(match.currentPlayer, 1);
+});
+
+test("status-effects tutorial walks blind, silence, poison spread, cleanse, and immunity", () => {
+  const tutorial = createTutorial(TUTORIAL_STATUS_EFFECTS_ID);
+  let match = prepareTutorialMatchState(createMatchState(createTutorialMatchConfig(TUTORIAL_STATUS_EFFECTS_ID)), TUTORIAL_STATUS_EFFECTS_ID);
+
+  assert.equal(tutorial.stage, "await_moonstrike");
+  assert.match(tutorial.dialogue.map((line) => line.text).join(" "), /status effects/i);
+  assert.match(tutorial.dialogue.map((line) => line.text).join(" "), /immun/i);
+  assert.equal(validateTutorialCommand(tutorial, attack(1, TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID, TUTORIAL_STATUS_CPU_SWORDSMAN_ID), match).accepted, false);
+
+  ({ match } = applyTutorial(tutorial, match, beginActivation(1, TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID)));
+  let applied = applyTutorial(tutorial, match, useArt(1, TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID, "moonstrike", { targetId: TUTORIAL_STATUS_CPU_SWORDSMAN_ID }));
+  let artEvent = applied.events.find((event) => event.type === "ART_RESOLVED");
+  assert.equal(artEvent.artId, "moonstrike");
+  assert.equal(artEvent.critical, true);
+  assert.equal(artEvent.effect.applied, true);
+  assert.ok(applied.match.units.find((unit) => unit.id === TUTORIAL_STATUS_CPU_SWORDSMAN_ID).statuses.some((status) => status.type === "blind"));
+  assert.equal(tutorial.stage, "await_blinded_enemy_attack");
+  match = applied.match;
+
+  let blindedAttack = null;
+  let blindUpdate = null;
+  for (const command of chooseTutorialCpuActivation(match, tutorial)) {
+    applied = applyTutorial(tutorial, match, command);
+    match = applied.match;
+    blindedAttack = applied.events.find((event) => event.type === "ATTACK_RESOLVED") ?? blindedAttack;
+    if (applied.update.afterDialogueAction) blindUpdate = applied.update;
+  }
+  assert.equal(blindedAttack?.actorId, TUTORIAL_STATUS_CPU_SWORDSMAN_ID);
+  assert.equal(blindedAttack?.hit, false);
+  assert.equal(tutorial.stage, "await_banish");
+  assert.equal(blindUpdate.afterDialogueAction.type, "formationSwap");
+  assert.ok(blindUpdate.afterDialogueAction.revealUnits.some((unit) => unit.unitId === TUTORIAL_STATUS_PLAYER_MAGICIAN_ID));
+
+  match = applyFormationSwapForTest(match, blindUpdate.afterDialogueAction);
+  assert.equal(match.currentPlayer, 1);
+  assert.equal(match.units.find((unit) => unit.id === TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID).spent, true);
+  assert.equal(match.units.find((unit) => unit.id === TUTORIAL_STATUS_CPU_MAGICIAN_ID).hp, 11);
+
+  let blocked = validateTutorialCommand(tutorial, beginActivation(1, TUTORIAL_STATUS_PLAYER_SWORDSMAN_ID), match);
+  assert.equal(blocked.accepted, false);
+  assert.match(blocked.message, /Magician.*Banish/i);
+
+  ({ match } = applyTutorial(tutorial, match, beginActivation(1, TUTORIAL_STATUS_PLAYER_MAGICIAN_ID)));
+  applied = applyTutorial(tutorial, match, useArt(1, TUTORIAL_STATUS_PLAYER_MAGICIAN_ID, "banish", { targetId: TUTORIAL_STATUS_CPU_MAGICIAN_ID }));
+  artEvent = applied.events.find((event) => event.type === "ART_RESOLVED");
+  assert.equal(artEvent.artId, "banish");
+  assert.equal(artEvent.effect.applied, true);
+  assert.equal(applied.match.units.find((unit) => unit.id === TUTORIAL_STATUS_CPU_MAGICIAN_ID).hp, 5);
+  assert.ok(applied.match.units.find((unit) => unit.id === TUTORIAL_STATUS_CPU_MAGICIAN_ID).statuses.some((status) => status.type === "silence"));
+  assert.equal(tutorial.stage, "await_poison_arrow");
+  assert.equal(applied.update.afterDialogueAction.type, "formationSwap");
+
+  match = applyFormationSwapForTest(applied.match, applied.update.afterDialogueAction);
+  assert.equal(match.currentPlayer, 1);
+  assert.equal(match.units.find((unit) => unit.id === TUTORIAL_STATUS_PLAYER_VIRUS_ID).spent, true);
+  assert.deepEqual(match.units.find((unit) => unit.id === TUTORIAL_STATUS_PLAYER_ARCHER_ID).position, { x: 1, y: 3 });
+  assert.deepEqual(match.units.find((unit) => unit.id === TUTORIAL_STATUS_CPU_FAT_BOWMAN_ID).position, { x: 4, y: 3 });
+
+  blocked = validateTutorialCommand(tutorial, beginActivation(1, TUTORIAL_STATUS_PLAYER_VIRUS_ID), match);
+  assert.equal(blocked.accepted, false);
+  assert.match(blocked.message, /Archer.*Poison/i);
+
+  ({ match } = applyTutorial(tutorial, match, beginActivation(1, TUTORIAL_STATUS_PLAYER_ARCHER_ID)));
+  applied = applyTutorial(tutorial, match, useArt(1, TUTORIAL_STATUS_PLAYER_ARCHER_ID, "poison-arrow", { targetId: TUTORIAL_STATUS_CPU_FAT_BOWMAN_ID }));
+  artEvent = applied.events.find((event) => event.type === "ART_RESOLVED");
+  const spreadEvent = applied.events.find((event) => event.type === "STATUS_SPREAD");
+  assert.equal(artEvent.artId, "poison-arrow");
+  assert.equal(artEvent.effect.applied, true);
+  assert.equal(spreadEvent.status, "poison");
+  assert.deepEqual(spreadEvent.spreadTo, [TUTORIAL_STATUS_CPU_MYSTIC_ID]);
+  assert.ok(applied.match.units.find((unit) => unit.id === TUTORIAL_STATUS_CPU_FAT_BOWMAN_ID).statuses.some((status) => status.type === "poison"));
+  assert.ok(applied.match.units.find((unit) => unit.id === TUTORIAL_STATUS_CPU_MYSTIC_ID).statuses.some((status) => status.type === "poison"));
+  assert.equal(tutorial.stage, "await_enemy_cleanse");
+  match = applied.match;
+
+  let cleanseEvent = null;
+  for (const command of chooseTutorialCpuActivation(match, tutorial)) {
+    applied = applyTutorial(tutorial, match, command);
+    match = applied.match;
+    cleanseEvent = applied.events.find((event) => event.type === "ART_RESOLVED" && event.artId === "purify") ?? cleanseEvent;
+  }
+  assert.deepEqual(cleanseEvent?.cleansed, [TUTORIAL_STATUS_CPU_FAT_BOWMAN_ID]);
+  assert.equal(tutorial.stage, "await_enemy_poison_immunity");
+  assert.ok(!match.units.find((unit) => unit.id === TUTORIAL_STATUS_CPU_FAT_BOWMAN_ID).statuses.some((status) => status.type === "poison"));
+  assert.ok(match.units.find((unit) => unit.id === TUTORIAL_STATUS_CPU_MYSTIC_ID).statuses.some((status) => status.type === "poison"));
+
+  let immunityEvent = null;
+  let finalUpdate = null;
+  for (const command of chooseTutorialCpuActivation(match, tutorial)) {
+    applied = applyTutorial(tutorial, match, command);
+    match = applied.match;
+    immunityEvent = applied.events.find((event) => event.type === "ART_RESOLVED" && event.artId === "dragonsbane") ?? immunityEvent;
+    if (applied.update.completed) finalUpdate = applied.update;
+  }
+  assert.equal(immunityEvent?.effect.applied, false);
+  assert.equal(immunityEvent?.effect.reason, "IMMUNE");
+  assert.ok(!match.units.find((unit) => unit.id === TUTORIAL_STATUS_PLAYER_ARCHER_ID).statuses.some((status) => status.type === "poison"));
+  assert.equal(tutorial.completed, true);
+  assert.match(finalUpdate.prompt, /Tutorial complete/i);
+  assert.match(finalUpdate.dialogue.map((line) => line.text).join(" "), /Slow/i);
+  assert.match(finalUpdate.dialogue.map((line) => line.text).join(" "), /Stun/i);
+});
+
+test("tutorial completion reward is held until tutorial five is completed", () => {
+  const storage = new Map();
+  const adapter = {
+    getItem: (key) => storage.get(key) ?? null,
+    setItem: (key, value) => storage.set(key, value),
+  };
+
+  completeTutorial(adapter, TUTORIAL_BASICS_ID);
+  completeTutorial(adapter, TUTORIAL_ARTS_MP_ID);
+  completeTutorial(adapter, TUTORIAL_DAMAGE_TYPES_ID);
+  const progressAfterFour = completeTutorial(adapter, TUTORIAL_RAGE_ID);
+
+  assert.deepEqual(progressAfterFour.completedTutorials, [
+    TUTORIAL_BASICS_ID,
+    TUTORIAL_ARTS_MP_ID,
+    TUTORIAL_DAMAGE_TYPES_ID,
+    TUTORIAL_RAGE_ID,
+  ]);
+  assert.equal(progressAfterFour.allTutorialsComplete, false);
+  assert.equal(progressAfterFour.tutorialValorGranted, false);
+  assert.equal(progressAfterFour.valorBalance, 0);
+
+  const progressAfterFive = completeTutorial(adapter, TUTORIAL_STATUS_EFFECTS_ID);
+  assert.equal(progressAfterFive.allTutorialsComplete, true);
+  assert.equal(progressAfterFive.tutorialValorGranted, true);
+  assert.equal(progressAfterFive.valorBalance, 500);
+  assert.ok(progressAfterFive.unlockedUnits.includes("juggernaut"));
 });
 
 test("a completed tutorial idles the CPU instead of sneaking in a final move/defend", () => {

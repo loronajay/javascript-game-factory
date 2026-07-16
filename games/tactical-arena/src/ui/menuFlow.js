@@ -213,6 +213,8 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
         row.className = "squad-team-pickers";
         for (const player of group.seats) {
           const picker = ensureHotSeatPicker(player);
+          picker.setPlayer(player);
+          picker.setPlayerCount(count);
           picker.setFormat(format);
           row.append(picker.el);
         }
@@ -221,6 +223,8 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       } else {
         for (const player of group.seats) {
           const picker = ensureHotSeatPicker(player);
+          picker.setPlayer(player);
+          picker.setPlayerCount(count);
           picker.setFormat(format);
           hsSquadHost.append(picker.el);
         }

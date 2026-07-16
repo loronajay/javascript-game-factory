@@ -863,7 +863,7 @@ function applyTutorialPresentationAction(action) {
   }
   if (action.type === "formationSwap") {
     for (const unitId of action.hideUnitIds ?? []) hideTutorialUnit(unitId);
-    for (const spawn of action.revealUnits ?? []) revealTutorialUnit(spawn.unitId, spawn.position, spawn.hp, spawn.mp);
+    for (const spawn of action.revealUnits ?? []) revealTutorialUnit(spawn.unitId, spawn.position, spawn.hp, spawn.mp, spawn.spent);
     for (const spawn of action.spawnUnits ?? []) spawnTutorialUnit(spawn);
     if (Number.isInteger(action.currentPlayer)) state.currentPlayer = action.currentPlayer;
     state.activation = null;
@@ -876,11 +876,12 @@ function applyTutorialPresentationAction(action) {
 // tutorial's second enemy Magician "arriving" for its new formation) rather than
 // revealing one already present in the squad — buildRoster caps a squad at the
 // four corner-block cells, so a fresh unit can't just ride in the initial squads.
-function spawnTutorialUnit({ id, type, player, position, hp = null, mp = null, skin = null }) {
+function spawnTutorialUnit({ id, type, player, position, hp = null, mp = null, skin = null, spent = false }) {
   if (findUnit(state, id)) return;
   const unit = createUnit({ id, type, player, x: position.x, y: position.y, skin });
   if (Number.isFinite(hp)) unit.hp = hp;
   if (Number.isFinite(mp)) unit.mp = mp;
+  unit.spent = Boolean(spent);
   state.units.push(unit);
 }
 
@@ -909,14 +910,14 @@ function tutorialCompleteTitle(tutorialId) {
   return entry ? `${entry.title} Complete` : "Tutorial Complete";
 }
 
-function revealTutorialUnit(unitId, position = null, hp = null, mp = null) {
+function revealTutorialUnit(unitId, position = null, hp = null, mp = null, spent = false) {
   const unit = findUnit(state, unitId);
   if (!unit) return;
   const definition = getUnitType(unit.type);
   if (position) unit.position = { ...position };
   unit.hp = Number.isFinite(hp) ? hp : definition.stats.maxHp;
   unit.mp = Number.isFinite(mp) ? mp : getInitialMp(definition);
-  unit.spent = false;
+  unit.spent = Boolean(spent);
   unit.defending = false;
   if (unitId === TUTORIAL_ARTS_PLAYER_MYSTIC_ID) {
     setMessage("The Mystic joins the field. Activate her and use Pray to heal the Archer.");

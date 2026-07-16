@@ -20,8 +20,8 @@ function ensureHost() {
 export const FORMATION_PREVIEW_SIZE = 13;
 export const FORMATION_SLOT_LABELS = Object.freeze(["1", "2", "3", "4"]);
 const FORMATION_LABEL_BY_ENGINE_SLOT = Object.freeze(["4", "2", "3", "1"]);
-const FFA_CORNER_BY_PLAYER = Object.freeze({ 1: 0, 2: 1, 3: 2, 4: 3 });
-const TEAMS_CORNER_BY_PLAYER = Object.freeze({ 1: 0, 2: 2, 3: 1, 4: 3 });
+const TWO_PLAYER_FFA_CORNER_BY_PLAYER = Object.freeze({ 1: 0, 2: 1, 3: 2, 4: 3 });
+const FOUR_PLAYER_CORNER_BY_PLAYER = Object.freeze({ 1: 0, 2: 2, 3: 1, 4: 3 });
 const FORMATION_CROP_BY_CORNER = Object.freeze({
   0: Object.freeze({ minX: 0, maxX: 3, minY: 9, maxY: 12 }),
   1: Object.freeze({ minX: 9, maxX: 12, minY: 0, maxY: 3 }),
@@ -29,10 +29,11 @@ const FORMATION_CROP_BY_CORNER = Object.freeze({
   3: Object.freeze({ minX: 9, maxX: 12, minY: 9, maxY: 12 })
 });
 
-export function openDraftFormationPicker({ title = "Arrange Formation", composition = [], skins = [], nicknames = [], order = null, accent = null, player = 1, format = "ffa" } = {}) {
+export function openDraftFormationPicker({ title = "Arrange Formation", composition = [], skins = [], nicknames = [], order = null, accent = null, player = 1, format = "ffa", playerCount = 2 } = {}) {
   const overlay = ensureHost();
   const previewPlayer = normalizeFormationPlayer(player);
   const previewFormat = normalizeFormationFormat(format);
+  const previewPlayerCount = normalizeFormationPlayerCount(playerCount);
   let formationOrder = Array.isArray(order) && order.length === composition.length
     ? [...order]
     : defaultFormationOrder(composition.length);
@@ -77,6 +78,7 @@ export function openDraftFormationPicker({ title = "Arrange Formation", composit
       const preview = createFormationPreview({
         player: previewPlayer,
         format: previewFormat,
+        playerCount: previewPlayerCount,
         composition,
         skins,
         nicknames,
@@ -252,14 +254,21 @@ function normalizeFormationFormat(format) {
   return format === "teams" ? "teams" : "ffa";
 }
 
-function formationCornerIndex(player = 1, format = "ffa") {
+function normalizeFormationPlayerCount(playerCount) {
+  const normalized = Math.floor(Number(playerCount));
+  return normalized >= 2 && normalized <= 4 ? normalized : 2;
+}
+
+function formationCornerIndex(player = 1, format = "ffa", playerCount = 2) {
   const normalized = normalizeFormationPlayer(player);
-  const corners = normalizeFormationFormat(format) === "teams" ? TEAMS_CORNER_BY_PLAYER : FFA_CORNER_BY_PLAYER;
+  const corners = normalizeFormationFormat(format) === "teams" || normalizeFormationPlayerCount(playerCount) === 4
+    ? FOUR_PLAYER_CORNER_BY_PLAYER
+    : TWO_PLAYER_FFA_CORNER_BY_PLAYER;
   return corners[normalized] ?? 0;
 }
 
-export function formationPreviewSlots(player = 1, size = FORMATION_PREVIEW_SIZE, format = "ffa") {
-  const cornerIndex = formationCornerIndex(player, format);
+export function formationPreviewSlots(player = 1, size = FORMATION_PREVIEW_SIZE, format = "ffa", playerCount = 2) {
+  const cornerIndex = formationCornerIndex(player, format, playerCount);
   const max = size - 1;
   const corner = [
     { cx: 0, cy: max },
@@ -291,10 +300,10 @@ function defaultFormationOrder(length) {
     : Array.from({ length }, (_, index) => index);
 }
 
-function createFormationPreview({ player, format, composition, skins, nicknames, formationOrder, selectedSlot, accent, onSlotClick }) {
+function createFormationPreview({ player, format, playerCount, composition, skins, nicknames, formationOrder, selectedSlot, accent, onSlotClick }) {
   const metrics = createBoardMetrics(FORMATION_PREVIEW_SIZE);
-  const slots = formationPreviewSlots(player, FORMATION_PREVIEW_SIZE, format);
-  const tiles = formationPreviewTiles(player, format);
+  const slots = formationPreviewSlots(player, FORMATION_PREVIEW_SIZE, format, playerCount);
+  const tiles = formationPreviewTiles(player, format, playerCount);
   const viewBox = formationPreviewViewBox(metrics, tiles, slots);
   const units = slots.map(({ slot, position }) => {
     const pickIndex = formationOrder[slot];
@@ -354,8 +363,8 @@ function createFormationPreview({ player, format, composition, skins, nicknames,
   };
 }
 
-function formationPreviewTiles(player, format) {
-  const crop = FORMATION_CROP_BY_CORNER[formationCornerIndex(player, format)] ?? FORMATION_CROP_BY_CORNER[0];
+function formationPreviewTiles(player, format, playerCount) {
+  const crop = FORMATION_CROP_BY_CORNER[formationCornerIndex(player, format, playerCount)] ?? FORMATION_CROP_BY_CORNER[0];
   const tiles = [];
   for (let y = crop.minY; y <= crop.maxY; y += 1) {
     for (let x = crop.minX; x <= crop.maxX; x += 1) tiles.push({ x, y });
