@@ -1,4 +1,4 @@
-import { getAbilityUseMax, getAbilityUsesRemaining, getActiveWeather, getAvailableArts, getEffectiveStats, getRageEffectValue, getResourceMeta, getUnitType, isCommandOnly, isDefending, isRaging } from "../core/unitCatalog.js";
+import { getAbilityUseMax, getAbilityUsesRemaining, getActiveWeather, getArtMpCost, getAvailableArts, getEffectiveStats, getRageEffectValue, getResourceMeta, getUnitType, isCommandOnly, isDefending, isRaging } from "../core/unitCatalog.js";
 import { canUseArt } from "../rules/arts.js";
 import { isStunned } from "../rules/statuses.js";
 import { getPortrait, portraitFrameStyle } from "./portraits.js";
@@ -31,7 +31,7 @@ function displayName(unit, definition) {
 // The cost an ART shows on its tile/tooltip. Most spend MP; an HP-cost ART (Blacksword's
 // Dark Rush/Ether/Tick) reads "N HP", and an all-HP ultimate (Banish) carries its own
 // `costLabel`. Returned split so the button can style the unit suffix.
-function artCostParts(art, unitOrDefinition = null) {
+function artCostParts(art, unitOrDefinition = null, state = null) {
   if (art.costLabel) {
     const [main, ...rest] = String(art.costLabel).split(" ");
     return { main, unit: rest.join(" ") };
@@ -47,10 +47,11 @@ function artCostParts(art, unitOrDefinition = null) {
   }
   if (art.hpCost) return { main: String(art.hpCost), unit: "HP" };
   const resource = unitOrDefinition ? getResourceMeta(unitOrDefinition.type ?? unitOrDefinition) : getResourceMeta(null);
-  return { main: String(art.mpCost), unit: resource.shortLabel };
+  const mpCost = unitOrDefinition?.type && state ? getArtMpCost(unitOrDefinition, art, state) : art.mpCost;
+  return { main: String(mpCost), unit: resource.shortLabel };
 }
 
-function artTip(art, unitOrDefinition = null) {
+function artTip(art, unitOrDefinition = null, state = null) {
   const useMax = getAbilityUseMax(art);
   if (useMax !== null) {
     const remaining = unitOrDefinition && unitOrDefinition.abilityUses
@@ -58,7 +59,7 @@ function artTip(art, unitOrDefinition = null) {
       : useMax;
     return `${art.name} · ${remaining}/${useMax} uses left — ${art.description}`;
   }
-  const cost = artCostParts(art, unitOrDefinition);
+  const cost = artCostParts(art, unitOrDefinition, state);
   return `${art.name} · ${cost.main}${cost.unit ? ` ${cost.unit}` : ""} — ${art.description}`;
 }
 
@@ -258,7 +259,7 @@ export function renderActions(
   if (isCommandOnly(unit)) {
     actions.innerHTML = getAvailableArts(unit)
       .filter((art) => art.kind === "active" && art.implemented)
-      .map((art) => `<button class="art-tile command-tile ${mode === `art:${art.id}` ? "is-active" : ""}" data-action="art:${art.id}" title="${escapeAttr(artTip(art, unit))}" ${canUseArt(state, unit, art.id) ? "" : "disabled"}>${art.name}</button>`)
+      .map((art) => `<button class="art-tile command-tile ${mode === `art:${art.id}` ? "is-active" : ""}" data-action="art:${art.id}" title="${escapeAttr(artTip(art, unit, state))}" ${canUseArt(state, unit, art.id) ? "" : "disabled"}>${art.name}</button>`)
       .join("");
     actionHelp.textContent = "Issue a command — it rallies your whole squad for this turn.";
     actions.querySelectorAll("button").forEach((button) => {
@@ -272,13 +273,13 @@ export function renderActions(
   const stats = getEffectiveStats(unit, state);
   const footwork = getUnitType(unit.type).arts.find((art) => art.id === "footwork");
   const footworkBtn = footwork
-    ? `<button class="${mode === "footwork" ? "is-active" : ""}" data-action="footwork" title="${escapeAttr(artTip(footwork, unit))}" ${canUseArt(state, unit, footwork.id) ? "" : "disabled"}>Footwork<kbd class="key">A</kbd></button>`
+    ? `<button class="${mode === "footwork" ? "is-active" : ""}" data-action="footwork" title="${escapeAttr(artTip(footwork, unit, state))}" ${canUseArt(state, unit, footwork.id) ? "" : "disabled"}>Footwork<kbd class="key">A</kbd></button>`
     : "";
   const artBtns = getAvailableArts(unit)
     .filter((art) => art.kind === "active" && art.id !== "footwork" && art.implemented)
     .map((art) => {
-      const cost = artCostParts(art, unit);
-      return `<button class="art-tile ${mode === `art:${art.id}` ? "is-active" : ""}" data-action="art:${art.id}" title="${escapeAttr(artTip(art, unit))}" ${canUseArt(state, unit, art.id) ? "" : "disabled"}>${art.name}<kbd class="key">${cost.main}<span class="kbd-unit">${cost.unit}</span></kbd></button>`;
+      const cost = artCostParts(art, unit, state);
+      return `<button class="art-tile ${mode === `art:${art.id}` ? "is-active" : ""}" data-action="art:${art.id}" title="${escapeAttr(artTip(art, unit, state))}" ${canUseArt(state, unit, art.id) ? "" : "disabled"}>${art.name}<kbd class="key">${cost.main}<span class="kbd-unit">${cost.unit}</span></kbd></button>`;
     })
     .join("");
 

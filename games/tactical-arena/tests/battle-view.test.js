@@ -319,6 +319,31 @@ test("the action bar enables Cancel Move only after an uncommitted move", () => 
   assert.doesNotMatch(actions.innerHTML, /data-action="cancel-move"[^>]*disabled/);
 });
 
+test("the action bar displays effective ART MP costs after team discounts", () => {
+  const state = createBattleState({
+    units: [
+      { id: "nem", type: "nemesis", player: 1, x: 0, y: 0 },
+      { id: "mage", type: "magician", player: 1, x: 1, y: 0 },
+      { id: "foe", type: "swordsman", player: 2, x: 4, y: 0 }
+    ]
+  });
+  const started = applyCommand(state, beginActivation(1, "mage"));
+  assert.equal(started.accepted, true);
+  const mage = started.nextState.units.find((candidate) => candidate.id === "mage");
+  const actions = { innerHTML: "", querySelectorAll: () => [] };
+  const actionHelp = { textContent: "" };
+
+  renderActions(mage, started.nextState, null, { actions, actionHelp }, {
+    resolving: false,
+    controlsEnabled: true,
+    onActionClick: () => {}
+  });
+
+  assert.match(actions.innerHTML, /Spark<kbd class="key">3<span class="kbd-unit">MP<\/span><\/kbd>/);
+  assert.match(actions.innerHTML, /title="Spark [^"]*3 MP/);
+  assert.doesNotMatch(actions.innerHTML, /Spark<kbd class="key">4<span class="kbd-unit">MP<\/span><\/kbd>/);
+});
+
 test("the action bar disables Cancel Move after raging Fat Knight Trample movement", () => {
   const state = createBattleState({
     size: 13,
