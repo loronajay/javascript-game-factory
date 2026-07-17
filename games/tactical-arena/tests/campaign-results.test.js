@@ -7,8 +7,8 @@ import {
   campaignResultsValorLabel,
   campaignValorRewardForNode,
   isCampaignMapPanTarget,
-  syncResultsActions,
-} from "../src/ui/menuFlow.js";
+} from "../src/ui/campaignMenuModel.js";
+import { syncResultsActions } from "../src/ui/resultsScreen.js";
 import { CAMPAIGN_MISSIONS, CLOD_MISSION_ID } from "../src/campaign/campaign.js";
 import {
   BROTHERS_UNIT_PACK_ID,

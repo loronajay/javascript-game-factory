@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { campaignUnitChoiceGroups } from "../src/ui/menuFlow.js";
+import { campaignUnitChoiceGroups } from "../src/ui/campaignMenuModel.js";
 
 test("campaign squad choices are grouped by class and exclude units picked in other slots", () => {
   const groups = campaignUnitChoiceGroups(

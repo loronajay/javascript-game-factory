@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createResetProgressConfirmation } from "../src/ui/menuFlow.js";
+import { createResetProgressConfirmation } from "../src/ui/settingsScreen.js";
 
 function fakeButton() {
   const classes = new Set();

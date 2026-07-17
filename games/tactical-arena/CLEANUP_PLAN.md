@@ -40,9 +40,12 @@ never loosened, only retargeted/tightened.
       (as overridable built-ins so the existing test seams keep working);
       `src/dev/sandbox.js` (696 → 454 lines) now consumes the shared resolution controller —
       its resolve loop can no longer drift from production, enforced by architecture test.
-- [ ] **Phase 3 — Split menuFlow.js**: keep `createMenuFlow` router + public API (tests import it);
-      delegate to flat `src/ui/` modules: `campaignMapScreen.js`, `resultsScreen.js`,
-      `tutorialMenuScreens.js`, `settingsScreen.js`, `matchSetupScreens.js`.
+- [x] **Phase 3 — Split menuFlow.js** (1246 → 164 lines): `createMenuFlow` is now a pure
+      router; screens live in `campaignMapScreen.js`, `resultsScreen.js`,
+      `tutorialMenuScreens.js`, `settingsScreen.js`, `matchSetupScreens.js`, with pure
+      view-model helpers in `campaignMenuModel.js` and the menu seat palette
+      (`MENU_TEAM_COLORS`) in `teamDisplay.js`; tests updated to import from the new homes;
+      per-module caps added to the architecture test.
 - [ ] **Phase 4 — Split boardRenderer.js**: weather/atmosphere/figures (`:47–438`) →
       `src/ui/boardAtmosphere.js`; boardRenderer keeps the targeting/highlight contract only.
 - [ ] **Phase 5 — Split campaignMatch.js**: `CAMPAIGN_LAYOUTS` → `src/campaign/campaignLayouts.js`;

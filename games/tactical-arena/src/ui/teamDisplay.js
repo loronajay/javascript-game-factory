@@ -1,3 +1,7 @@
+// The menu-side seat palette (setup pickers, campaign accents, results confetti).
+// In-match team colors still come from matchBuilder's teamColor(player, state).
+export const MENU_TEAM_COLORS = Object.freeze({ 1: "#5288c6", 2: "#c4463f", 3: "#d8a33f", 4: "#48a86f" });
+
 export function teamForSeat(seat, format = "ffa") {
   const normalizedSeat = Number(seat) || 1;
   return format === "teams" ? (normalizedSeat % 2 === 1 ? 1 : 2) : normalizedSeat;
