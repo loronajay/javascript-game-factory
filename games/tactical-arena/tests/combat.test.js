@@ -21,6 +21,18 @@ test("resolvePhysicalStrike folds STR, DEF, and Defend halving (rounded up)", ()
   assert.equal(resolvePhysicalStrike(attacker, target).damage, 3); // ceil(5 / 2)
 });
 
+test("campaign damage consumable boosts only the configured player side", () => {
+  const state = {
+    missionRules: { campaignDamageBoost: { player: 1, amount: 2 } },
+    units: [],
+  };
+  const player = { type: "swordsman", player: 1, hp: 25, position: { x: 0, y: 0 } };
+  const enemy = { type: "swordsman", player: 2, hp: 25, position: { x: 1, y: 0 } };
+
+  assert.equal(resolvePhysicalStrike(player, enemy, { state }).damage, 7);
+  assert.equal(resolvePhysicalStrike(enemy, player, { state }).damage, 5);
+});
+
 test("proximity passive adds bonus when a physical strike opts into ART scaling", () => {
   const archer = { type: "archer", hp: 24, position: { x: 0, y: 0 } };
   const adjacent = { type: "swordsman", hp: 25, defending: false, position: { x: 1, y: 0 } };

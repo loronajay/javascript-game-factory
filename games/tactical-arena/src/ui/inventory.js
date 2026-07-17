@@ -38,7 +38,7 @@ export function openInventory(storage = globalThis.localStorage) {
     const titleStack = el("div", "shop-title-stack");
     titleStack.append(
       el("h2", "", "Inventory"),
-      el("p", "inventory-sub", "Activate skin grants and boosts here. Timed boosts begin on their first Valor or campaign trigger."),
+      el("p", "inventory-sub", "Activate skin grants and boosts here. Timed boosts stay dormant until activated, then begin on their next Valor or campaign trigger."),
     );
     const closeBtn = el("button", "ref-close", "X");
     closeBtn.type = "button";
@@ -210,8 +210,8 @@ export function openInventory(storage = globalThis.localStorage) {
 }
 
 function activationPreview(item) {
-  if (item.activationTrigger === "valor-gained") return "Timer starts with first Valor gained.";
-  if (item.activationTrigger === "campaign-mission-started") return "Timer starts with first campaign mission.";
+  if (item.activationTrigger === "valor-gained") return "After activation, the timer starts with your next Valor gain.";
+  if (item.activationTrigger === "campaign-mission-started") return "After activation, the timer starts with your next campaign mission.";
   return "Reward resolution coming soon.";
 }
 

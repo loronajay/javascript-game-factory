@@ -20,6 +20,10 @@ function addHours(iso, hours) {
   return new Date(ms).toISOString();
 }
 
+function timestamp(value = null) {
+  return new Date(nowIso(value)).getTime();
+}
+
 function normalizeQuantities(value) {
   const out = {};
   if (!value || typeof value !== "object") return out;
@@ -168,4 +172,43 @@ export function startPendingConsumables(storage = defaultStorage(), trigger, opt
   });
   const next = writeInventory(storage, { ...inventory, activeConsumables });
   return { inventory: next, started: Object.freeze(started) };
+}
+
+export function getActiveConsumableEffects(storage = defaultStorage(), effectKind, options = {}) {
+  const at = timestamp(options.now);
+  const inventory = readInventory(storage);
+  return Object.freeze(inventory.activeConsumables
+    .filter((activation) => activation.status === "active" || activation.status === "resolved")
+    .filter((activation) => !activation.expiresAt || timestamp(activation.expiresAt) > at)
+    .map((activation) => {
+      const offer = getConsumableOffer(activation.itemId);
+      return offer ? Object.freeze({ activation, offer, effect: offer.effect }) : null;
+    })
+    .filter((entry) => entry && (!effectKind || entry.effect?.kind === effectKind)));
+}
+
+export function getActiveValorBoostPercent(storage = defaultStorage(), options = {}) {
+  return getActiveConsumableEffects(storage, "valor-boost", options)
+    .reduce((sum, entry) => sum + Math.max(0, Number(entry.effect.percentBonus) || 0), 0);
+}
+
+export function getActiveCampaignDamageBoost(storage = defaultStorage(), options = {}) {
+  return getActiveConsumableEffects(storage, "campaign-damage-boost", options)
+    .reduce((sum, entry) => sum + Math.max(0, Number(entry.effect.damageBonus) || 0), 0);
+}
+
+export function startValorBoostsForGain(storage = defaultStorage(), options = {}) {
+  const started = startPendingConsumables(storage, "valor-gained", options);
+  return {
+    ...started,
+    percentBonus: getActiveValorBoostPercent(storage, options),
+  };
+}
+
+export function startCampaignDamageBoosts(storage = defaultStorage(), options = {}) {
+  const started = startPendingConsumables(storage, "campaign-mission-started", options);
+  return {
+    ...started,
+    damageBonus: getActiveCampaignDamageBoost(storage, options),
+  };
 }

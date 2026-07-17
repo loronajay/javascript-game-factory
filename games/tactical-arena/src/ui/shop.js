@@ -322,7 +322,7 @@ export function openShop(storage = globalThis.localStorage) {
     body.appendChild(el(
       "p",
       "shop-consumable-note",
-      "Consumables are stored in Inventory. Activate skin grants and boosts from the Inventory tab; timed boosts begin on their first Valor or campaign trigger.",
+      "Consumables are stored in Inventory. Boosts do nothing until activated from the Inventory tab; after activation, timed boosts begin on their next Valor or campaign trigger.",
     ));
     const groups = new Map();
     for (const offer of offers) {

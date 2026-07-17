@@ -42,6 +42,7 @@ import { ORTHOGONAL_DIRECTIONS, positionKey } from "../rules/movement.js";
 import { normalizeWeatherSpec } from "../core/weather.js";
 import { DEFAULT_SQUAD, UNIT_TYPE_KEYS } from "../ui/squadModel.js";
 import { isProgressUnitUnlocked } from "../progression/unlocks.js";
+import { startCampaignDamageBoosts } from "../progression/inventory.js";
 import { getNicknamePref } from "../ui/nicknameModel.js";
 import { getSkinPref } from "../ui/skinModel.js";
 import { getCampaignMission } from "./campaignModel.js";
@@ -910,9 +911,10 @@ const CAMPAIGN_LAYOUTS = Object.freeze({
   },
 });
 
-export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
+export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID, options = {}) {
   const layout = CAMPAIGN_LAYOUTS[missionId];
   if (!layout) return match;
+  const campaignBoost = startCampaignDamageBoosts(options.storage ?? defaultStorage(), { now: options.now });
   const tileObjects = {
     ...(match.tileObjects ?? {}),
     ...(layout.tileObjects?.() ?? {}),
@@ -954,8 +956,16 @@ export function prepareCampaignMatchState(match, missionId = CLOD_MISSION_ID) {
     tileObjects,
     weather: normalizeWeatherSpec(layout.weather ?? match.weather),
     rngState: trial.rngState,
-    ...(trial.missionRules || layout.missionRules
-      ? { missionRules: { ...(layout.missionRules?.(match) ?? {}), ...(trial.missionRules ?? {}) } }
+    ...(trial.missionRules || layout.missionRules || campaignBoost.damageBonus > 0
+      ? {
+          missionRules: {
+            ...(layout.missionRules?.(match) ?? {}),
+            ...(trial.missionRules ?? {}),
+            ...(campaignBoost.damageBonus > 0
+              ? { campaignDamageBoost: { player: 1, amount: campaignBoost.damageBonus } }
+              : {}),
+          },
+        }
       : {}),
     units: [...trial.units, ...(layout.extraUnits?.(match) ?? [])],
   };

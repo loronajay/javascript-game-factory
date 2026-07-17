@@ -149,6 +149,7 @@ import {
 import { applyCommand } from "../src/core/reducer.js";
 import { beginActivation, defend, finishActivation } from "../src/core/commands.js";
 import { isProgressSkinUnlocked, readUnlockProgress, TUTORIAL_PROGRESS_KEY } from "../src/progression/unlocks.js";
+import { activateConsumable, grantConsumable, readInventory } from "../src/progression/inventory.js";
 import { SKIN_PREF_STORAGE_KEY } from "../src/ui/skinModel.js";
 
 function storageAdapter() {
@@ -218,6 +219,32 @@ test("Clod mission config creates a two-unit player squad against Clod and Jugge
   assert.equal(findUnit(match, "p2-0-clod").hp, 15);
   assert.equal(findUnit(match, "p2-1-juggernaut").hp, 15);
   assert.deepEqual(findUnit(match, "p2-0-clod").position, { x: 7, y: 5 });
+});
+
+test("campaign damage boosts start only after inventory activation", () => {
+  const unarmedStorage = storageAdapter();
+  grantConsumable(unarmedStorage, "campaign-damage-boost", 1);
+
+  const unarmedMatch = prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(CLOD_MISSION_ID, ["mystic", "magician"])),
+    CLOD_MISSION_ID,
+    { storage: unarmedStorage, now: "2026-07-17T12:00:00.000Z" },
+  );
+  assert.equal(unarmedMatch.missionRules?.campaignDamageBoost, undefined);
+  assert.equal(readInventory(unarmedStorage).consumables["campaign-damage-boost"], 1);
+  assert.equal(readInventory(unarmedStorage).activeConsumables.length, 0);
+
+  const armedStorage = storageAdapter();
+  grantConsumable(armedStorage, "campaign-damage-boost", 1);
+  activateConsumable(armedStorage, "campaign-damage-boost", { now: "2026-07-17T11:00:00.000Z" });
+
+  const armedMatch = prepareCampaignMatchState(
+    createMatchState(createCampaignMatchConfig(CLOD_MISSION_ID, ["mystic", "magician"])),
+    CLOD_MISSION_ID,
+    { storage: armedStorage, now: "2026-07-17T12:00:00.000Z" },
+  );
+  assert.deepEqual(armedMatch.missionRules?.campaignDamageBoost, { player: 1, amount: 2 });
+  assert.equal(readInventory(armedStorage).activeConsumables[0].status, "active");
 });
 
 test("Clod mission opens with team banter, then Swordsman warns the player to spread out", () => {

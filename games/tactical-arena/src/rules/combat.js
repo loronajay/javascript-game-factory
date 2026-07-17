@@ -1,4 +1,4 @@
-import { getEffectiveStats, getSourceDamageBonus, getTeamMagicDamageBonus, getUnitType, getWeatherAffinityMagicBonus, getWeatherCritDamageBonus, isDefending, isRaging, passiveStackKey, projectsHealingLockout, sustainsVictory } from "../core/unitCatalog.js";
+import { getCampaignDamageBoost, getEffectiveStats, getSourceDamageBonus, getTeamMagicDamageBonus, getUnitType, getWeatherAffinityMagicBonus, getWeatherCritDamageBonus, isDefending, isRaging, passiveStackKey, projectsHealingLockout, sustainsVictory } from "../core/unitCatalog.js";
 import { drawValue } from "../core/rng.js";
 import { CRIT_MULTIPLIER, resolveDamage } from "./damage.js";
 import { chebyshevDistance, traceGridLine } from "./movement.js";
@@ -234,7 +234,7 @@ export function finalizeMagicDamage({ attacker, target, state = null, rawDamage,
   // Enchanted Roots (Treant): +1 damage taken from fire-based abilities.
   const fireVulnerability = fireBased ? getFireVulnerability(target) : 0;
   return reduced > 0
-    ? reduced + getTeamMagicDamageBonus(attacker, state) + getSourceDamageBonus(attacker, target, state, "magic") + getSelfMagicVulnerability(target) + getCriticalMagicVulnerability(target, critical) + getTileVulnerability(target, state) + getWeatherMagicDamageBonus(attacker) + getWeatherAffinityMagicBonus(attacker, state) + fireVulnerability
+    ? reduced + getTeamMagicDamageBonus(attacker, state) + getSourceDamageBonus(attacker, target, state, "magic") + getCampaignDamageBoost(attacker, state) + getSelfMagicVulnerability(target) + getCriticalMagicVulnerability(target, critical) + getTileVulnerability(target, state) + getWeatherMagicDamageBonus(attacker) + getWeatherAffinityMagicBonus(attacker, state) + fireVulnerability
     : reduced;
 }
 
@@ -594,7 +594,9 @@ export function resolveBaseStrike(attacker, target, { proximity = false, critica
   }
   if (damageType === "true") {
     // Petrify (Treant): true damage still can't touch an invulnerable statue.
-    const damage = isInvulnerable(target) ? 0 : Math.max(0, getEffectiveStats(attacker, state).strength);
+    const damage = isInvulnerable(target)
+      ? 0
+      : Math.max(0, getEffectiveStats(attacker, state).strength + getCampaignDamageBoost(attacker, state));
     return {
       type: "true",
       base: damage,
@@ -637,6 +639,7 @@ export function resolveFixedPhysicalStrike(attacker, target, amount, { critical 
     critical: effectiveCritical
   });
   let damage = (negatesPhysicalWhileDefending(target) || isInvulnerable(target)) ? 0 : result.damage;
+  if (damage > 0) damage += getCampaignDamageBoost(attacker, state);
   if (effectiveCritical && damage > 0) damage += getWeatherCritDamageBonus(state);
   return { ...result, critical: effectiveCritical, proximityBonus: 0, damage };
 }
@@ -680,7 +683,8 @@ export function resolvePhysicalStrike(attacker, target, { proximity = false, cri
   // Both fold in here so the forecast reads the same number the reducer delivers.
   const duelistBonus = getDuelistDamageBonus(attacker, target, state);
   const challengeBonus = getChallengeDamageBonus(attacker, target);
-  let damage = result.damage + proximityBonus + rangeDamageBonus + adjacentDamageBonus + tileStrikeBonus + tileAffinityBonus + tileVulnerability + stanceCritBonus + weatherCritBonus + duelistBonus + challengeBonus;
+  const campaignDamageBoost = getCampaignDamageBoost(attacker, state);
+  let damage = result.damage + proximityBonus + rangeDamageBonus + adjacentDamageBonus + tileStrikeBonus + tileAffinityBonus + tileVulnerability + stanceCritBonus + weatherCritBonus + duelistBonus + challengeBonus + campaignDamageBoost;
   if (damage >= 1 || result.damage >= 1) {
     const passiveMinimum = getUnitType(attacker.type).passive?.effect?.minimumDamage;
     if (Number.isFinite(passiveMinimum)) damage = Math.max(passiveMinimum, damage);

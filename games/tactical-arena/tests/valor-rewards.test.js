@@ -13,7 +13,9 @@ import {
   ONLINE_MATCH_LOSS_VALOR_REWARD,
   ONLINE_MATCH_WIN_VALOR_REWARD,
   grantOnlineMatchValor,
+  grantValor,
 } from "../src/progression/valorRewards.js";
+import { activateConsumable, grantConsumable, readInventory } from "../src/progression/inventory.js";
 import { skinValorCost, unitValorCost } from "../src/progression/marketplace.js";
 import { readUnlockProgress } from "../src/progression/unlocks.js";
 
@@ -114,4 +116,26 @@ test("online match Valor requires a fully played battle and pays winners more th
   assert.equal(tooShort.valorGranted, 0);
   assert.equal(readUnlockProgress(abandonedStorage).valorBalance, 0);
   assert.equal(readUnlockProgress(concededStorage).valorBalance, 0);
+});
+
+test("Valor boosts apply only after the player activates them from inventory", () => {
+  const ownedStorage = storageAdapter();
+  grantConsumable(ownedStorage, "valor-boost-1", 1);
+
+  const unarmed = grantValor(ownedStorage, 100, { now: "2026-07-17T12:00:00.000Z" });
+  assert.equal(unarmed.valorGranted, 100);
+  assert.equal(unarmed.valorBoostBonus, 0);
+  assert.equal(readUnlockProgress(ownedStorage).valorBalance, 100);
+  assert.equal(readInventory(ownedStorage).consumables["valor-boost-1"], 1);
+  assert.equal(readInventory(ownedStorage).activeConsumables.length, 0);
+
+  const armedStorage = storageAdapter();
+  grantConsumable(armedStorage, "valor-boost-1", 1);
+  activateConsumable(armedStorage, "valor-boost-1", { now: "2026-07-17T11:00:00.000Z" });
+
+  const boosted = grantValor(armedStorage, 100, { now: "2026-07-17T12:00:00.000Z" });
+  assert.equal(boosted.valorGranted, 120);
+  assert.equal(boosted.valorBoostBonus, 20);
+  assert.equal(readUnlockProgress(armedStorage).valorBalance, 120);
+  assert.equal(readInventory(armedStorage).activeConsumables[0].status, "active");
 });

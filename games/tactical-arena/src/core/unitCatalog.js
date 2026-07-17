@@ -405,6 +405,14 @@ export function getSourceDamageBonus(attacker, target, state, damageType) {
   return bonus;
 }
 
+export function getCampaignDamageBoost(attacker, state) {
+  const boost = state?.missionRules?.campaignDamageBoost;
+  if (!attacker || !boost) return 0;
+  if (Number.isFinite(boost.player) && attacker.player !== boost.player) return 0;
+  if (Number.isFinite(boost.team) && attacker.team !== boost.team) return 0;
+  return Math.max(0, Number(boost.amount) || 0);
+}
+
 export function getMagicDamageReward(attacker, target) {
   if (!attacker || !target || attacker.studiedTargetId !== target.id) return null;
   for (const source of allPassiveSources(getUnitType(attacker.type))) {
