@@ -20,9 +20,13 @@ export const PALADIN = Object.freeze({
       type: "physicalDamageHealAura",
       radius: 2,
       fraction: 0.5,
-      rounding: "floor"
+      rounding: "floor",
+      tileAffinityStats: Object.freeze({
+        affinity: "light",
+        stats: Object.freeze({ defense: 1 })
+      })
     }),
-    description: "When the Paladin deals physical damage, allies within 2 tiles heal for half the damage dealt, rounded down.",
+    description: "When the Paladin deals physical damage, allies within 2 tiles heal for half the damage dealt, rounded down. The Paladin gains +1 DEF while standing on a white tile.",
     implemented: true
   }),
   arts: Object.freeze([

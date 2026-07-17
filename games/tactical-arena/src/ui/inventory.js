@@ -2,6 +2,7 @@ import {
   activateConsumable,
   getInventoryCatalog,
 } from "../progression/inventory.js";
+import { createConsumableIcon } from "./consumableIcons.js";
 
 let host = null;
 let hostDocument = null;
@@ -35,7 +36,10 @@ export function openInventory(storage = globalThis.localStorage) {
     const head = el("header", "ref-head inventory-head");
     const titleRow = el("div", "ref-head-title shop-title-row");
     const titleStack = el("div", "shop-title-stack");
-    titleStack.append(el("h2", "", "Inventory"), el("p", "inventory-sub", "Owned consumables activate here."));
+    titleStack.append(
+      el("h2", "", "Inventory"),
+      el("p", "inventory-sub", "Activate skin grants and boosts here. Timed boosts begin on their first Valor or campaign trigger."),
+    );
     const closeBtn = el("button", "ref-close", "X");
     closeBtn.type = "button";
     closeBtn.setAttribute("aria-label", "Close");
@@ -77,7 +81,7 @@ export function openInventory(storage = globalThis.localStorage) {
     const grid = el("div", "inventory-grid");
     for (const item of catalog.ownedItems) {
       const card = el("article", "shop-item inventory-item");
-      card.appendChild(createInventoryIcon(item));
+      card.appendChild(createConsumableIcon(item, { className: "inventory-consumable-icon" }));
       const copy = el("div", "shop-item-copy");
       copy.append(
         el("b", "shop-item-title", item.name),
@@ -136,7 +140,7 @@ export function openInventory(storage = globalThis.localStorage) {
     head.append(el("span", "shop-confirm-kicker", "Inventory"), title);
 
     const itemRow = el("div", "shop-confirm-item inventory-confirm-item");
-    itemRow.appendChild(createInventoryIcon(item));
+    itemRow.appendChild(createConsumableIcon(item, { className: "inventory-consumable-icon" }));
     const copy = el("div", "shop-confirm-copy");
     copy.append(
       el("b", "shop-confirm-name", item.name),
@@ -203,15 +207,6 @@ export function openInventory(storage = globalThis.localStorage) {
   document.addEventListener("keydown", onKey, true);
   overlay.hidden = false;
   render();
-}
-
-function createInventoryIcon(item) {
-  const icon = el("div", "shop-consumable-icon inventory-consumable-icon");
-  icon.setAttribute("aria-hidden", "true");
-  if (item.effect?.kind === "campaign-damage-boost") icon.textContent = "+2";
-  else if (item.effect?.kind === "random-unowned-skin") icon.textContent = "?";
-  else icon.textContent = `${item.effect?.percentBonus ?? ""}%`;
-  return icon;
 }
 
 function activationPreview(item) {

@@ -163,10 +163,30 @@ test("shop consumables tab sells paid consumables with checkout coming soon feed
   assert.equal(walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Boosts").length, 0);
   consumablesTab.click();
 
+  const guidance = walk(overlay, (node) => hasClass(node, "shop-consumable-note"))[0];
+  assert.ok(guidance, "consumables tab should explain where purchased boosts and skin grants activate");
+  assert.match(guidance.textContent, /Inventory tab/i);
+
   const boostCard = walk(overlay, (node) => hasClass(node, "shop-consumable") && visibleText(node).includes("Valor Boost I"))[0];
   assert.ok(boostCard, "consumables tab should render Valor boosts for purchase");
   assert.match(visibleText(boostCard), /\+20% earned Valor from all sources\./);
-  assert.match(visibleText(boostCard), /24h from first Valor gained/);
+  assert.doesNotMatch(visibleText(boostCard), /24h from first Valor gained/);
+  assert.doesNotMatch(visibleText(boostCard), /Opens from Inventory/i);
+
+  const valorIcon = walk(boostCard, (node) => hasClass(node, "shop-consumable-icon"))[0];
+  assert.ok(hasClass(valorIcon, "is-valor-boost"), "Valor boosts should use a specific icon treatment");
+  assert.match(visibleText(valorIcon), /\+20%/);
+  assert.ok(walk(valorIcon, (node) => hasClass(node, "valor-icon")).length > 0);
+
+  const skinCard = walk(overlay, (node) => hasClass(node, "shop-consumable") && visibleText(node).includes("Random Rare Skin"))[0];
+  const mysteryIcon = walk(skinCard, (node) => hasClass(node, "shop-consumable-icon"))[0];
+  assert.ok(hasClass(mysteryIcon, "is-random-skin"), "random skin grants should use a deliberate mystery icon");
+  assert.match(visibleText(mysteryIcon), /\?/);
+
+  const damageCard = walk(overlay, (node) => hasClass(node, "shop-consumable") && visibleText(node).includes("Campaign Boost"))[0];
+  const damageIcon = walk(damageCard, (node) => hasClass(node, "shop-consumable-icon"))[0];
+  assert.ok(hasClass(damageIcon, "is-damage-boost"), "campaign damage should use a dedicated damage icon");
+  assert.match(visibleText(damageIcon), /\+2DMG/);
 
   const buy = walk(boostCard, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-buy-btn"))[0];
   assert.equal(buy.textContent, "$1.99");
@@ -184,9 +204,15 @@ test("inventory activation requires confirmation before consuming an owned consu
   openInventory(storage);
 
   const overlay = document.body.children[0];
+  const inventoryGuidance = walk(overlay, (node) => hasClass(node, "inventory-sub"))[0];
+  assert.match(inventoryGuidance.textContent, /skin grants and boosts/i);
+
   const itemCard = walk(overlay, (node) => hasClass(node, "inventory-item") && visibleText(node).includes("Valor Boost I"))[0];
   assert.ok(itemCard, "inventory should render owned consumables");
   assert.match(visibleText(itemCard), /Owned x1/);
+  const itemIcon = walk(itemCard, (node) => hasClass(node, "inventory-consumable-icon"))[0];
+  assert.ok(hasClass(itemIcon, "is-valor-boost"));
+  assert.ok(walk(itemIcon, (node) => hasClass(node, "valor-icon")).length > 0);
 
   const activate = walk(itemCard, (node) => node.tagName === "BUTTON" && hasClass(node, "inventory-activate-btn"))[0];
   activate.click();

@@ -132,14 +132,18 @@
 
 .menu-secondary-actions {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(6.6rem, 1fr));
   gap: .5rem;
   margin-top: 1rem;
 }
 
 .menu-secondary-actions .menu-btn {
-  padding: .62rem .5rem;
-  font-size: .72rem;
+  min-height: 2.65rem;
+  padding: .58rem .5rem;
+  font-size: .68rem;
+  line-height: 1.08;
+  overflow-wrap: normal;
+  white-space: normal;
 }
 
 [data-screen="hsSetup"] .menu-card,

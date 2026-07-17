@@ -35,7 +35,11 @@ test("Paladin owns Hand of Life, Chosen, Lightseeker, Heaven's Realm, and Darkse
   });
   assert.equal(UNIT_TYPES.paladin.passive.name, "Hand of Life");
   assert.deepEqual(UNIT_TYPES.paladin.passive.effect, {
-    type: "physicalDamageHealAura", radius: 2, fraction: 0.5, rounding: "floor"
+    type: "physicalDamageHealAura",
+    radius: 2,
+    fraction: 0.5,
+    rounding: "floor",
+    tileAffinityStats: { affinity: "light", stats: { defense: 1 } }
   });
   assert.equal(UNIT_TYPES.paladin.arts.find((art) => art.id === "chosen").kind, "passive");
   assert.deepEqual(UNIT_TYPES.paladin.arts.find((art) => art.id === "chosen").effect, {
@@ -60,6 +64,25 @@ test("Chosen prevents all current status effects", () => {
   for (const type of ["poison", "slow", "blind", "silence", "stun"]) {
     assert.equal(applyStatus(paladin, { type, duration: 1 }).applied, false);
   }
+});
+
+test("Hand of Life gives Paladin +1 DEF while standing on a white tile", () => {
+  const state = createBattleState({
+    tiles: [
+      { x: 0, y: 0, affinity: "light" },
+      { x: 1, y: 0, affinity: "dark" }
+    ],
+    units: [
+      { id: "p1-paladin", player: 1, type: "paladin", x: 0, y: 0 },
+      { id: "p1-paladin-dark", player: 1, type: "paladin", x: 1, y: 0 }
+    ]
+  });
+
+  const paladinOnWhite = state.units.find((unit) => unit.id === "p1-paladin");
+  const paladinOnDark = state.units.find((unit) => unit.id === "p1-paladin-dark");
+
+  assert.equal(getEffectiveStats(paladinOnWhite, state).defense, 6);
+  assert.equal(getEffectiveStats(paladinOnDark, state).defense, 5);
 });
 
 test("Hand of Life heals nearby allies for half physical damage dealt, rounded down", () => {

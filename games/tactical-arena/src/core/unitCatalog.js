@@ -32,7 +32,7 @@ import { SUMMONER } from "./units/summoner.js";
 import { RIOT_COP } from "./units/riot-cop.js";
 import { TREANT } from "./units/treant.js";
 import { drawValue } from "./rng.js";
-import { areAllies, areEnemies } from "./state.js";
+import { areAllies, areEnemies, getTileAffinity } from "./state.js";
 import { WEATHER_TYPES, normalizeWeatherSpec } from "./weather.js";
 
 export const UNIT_TYPES = Object.freeze({
@@ -560,6 +560,23 @@ function positionalDefenseStats(unit, state) {
   return totals;
 }
 
+function tileAffinityStats(unit, state) {
+  if (!state || !unit?.position) return {};
+  const definition = getUnitType(unit.type);
+  const affinity = getTileAffinity(state, unit.position);
+  const totals = {};
+  for (const source of allPassiveSources(definition)) {
+    if (source.kind && source.kind !== "passive") continue;
+    if ((source === definition.ragePassive || source === definition.rageArt) && !isRaging(unit)) continue;
+    const bonus = source.effect?.tileAffinityStats;
+    if (bonus?.affinity !== affinity) continue;
+    for (const [name, value] of Object.entries(bonus.stats ?? {})) {
+      if (Number.isFinite(value)) totals[name] = (totals[name] ?? 0) + value;
+    }
+  }
+  return totals;
+}
+
 // The Chebyshev radius an enemy-debuff aura currently reaches from `source`. An
 // aura extends one tile further while its OWNER rages: a Ghoul has no rage of its
 // own, so it borrows its summoner's rage state — a raging Necromancer widens both
@@ -773,6 +790,9 @@ export function getEffectiveStats(unit, state = null) {
     if (name in stats && Number.isFinite(value)) stats[name] += value;
   }
   for (const [name, value] of Object.entries(positionalDefenseStats(unit, state))) {
+    if (name in stats && Number.isFinite(value)) stats[name] += value;
+  }
+  for (const [name, value] of Object.entries(tileAffinityStats(unit, state))) {
     if (name in stats && Number.isFinite(value)) stats[name] += value;
   }
   for (const [name, value] of Object.entries(linkedStatModTotals(unit, state))) {

@@ -11,6 +11,7 @@ import {
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { groupedUnitTypes } from "./squadModel.js";
 import { unitDetailHtml } from "./codex.js";
+import { createConsumableIcon } from "./consumableIcons.js";
 import { createPortrait } from "./portraits.js";
 import { openSkinViewer } from "./skinGallery.js";
 
@@ -318,6 +319,11 @@ export function openShop(storage = globalThis.localStorage) {
   }
 
   function renderConsumables(body, offers) {
+    body.appendChild(el(
+      "p",
+      "shop-consumable-note",
+      "Consumables are stored in Inventory. Activate skin grants and boosts from the Inventory tab; timed boosts begin on their first Valor or campaign trigger.",
+    ));
     const groups = new Map();
     for (const offer of offers) {
       const list = groups.get(offer.family) ?? [];
@@ -334,7 +340,6 @@ export function openShop(storage = globalThis.localStorage) {
         const copy = el("div", "shop-item-copy");
         copy.append(
           el("b", "shop-item-title", offer.name),
-          el("span", "shop-item-sub", consumableDurationLabel(offer)),
           el("span", "shop-item-meta", offer.description),
         );
         card.append(copy, createConsumableBuyActions(offer));
@@ -689,24 +694,6 @@ function createPackPreview(offer, className = "") {
     }));
   }
   return preview;
-}
-
-function createConsumableIcon(offer) {
-  const icon = el("div", "shop-consumable-icon");
-  icon.setAttribute("aria-hidden", "true");
-  const symbol = offer.effect?.kind === "random-unowned-skin"
-    ? "?"
-    : offer.effect?.kind === "campaign-damage-boost"
-      ? "+2"
-      : `${offer.effect?.percentBonus ?? ""}%`;
-  icon.textContent = symbol;
-  return icon;
-}
-
-function consumableDurationLabel(offer) {
-  if (offer.activationTrigger === "valor-gained") return "24h from first Valor gained";
-  if (offer.activationTrigger === "campaign-mission-started") return "24h from first mission";
-  return "Opens from Inventory";
 }
 
 function createValorBadge(amount, className = "") {
