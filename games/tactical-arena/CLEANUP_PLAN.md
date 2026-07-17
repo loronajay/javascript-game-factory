@@ -49,9 +49,13 @@ never loosened, only retargeted/tightened.
 - [x] **Phase 4 — Split boardRenderer.js** (918 → 516 lines): weather overlay, wall/fire
       figures, and the stone dais → `src/ui/boardAtmosphere.js` (413 lines);
       boardRenderer keeps the targeting/highlight contract only; caps added.
-- [ ] **Phase 5 — Split campaignMatch.js**: `CAMPAIGN_LAYOUTS` → `src/campaign/campaignLayouts.js`;
-      per-mission trial scripting → existing `src/campaign/missions/<slug>/` folders;
-      keep config rules + `prepareCampaignMatchState` assembler.
+- [x] **Phase 5 — Split campaignMatch.js** (975 → 289 lines): `CAMPAIGN_LAYOUTS` + spawn
+      constants → `src/campaign/campaignLayouts.js`; Monk trial →
+      `missions/monk-temple-trial/trial.js`; Void Castle split/heal/intro →
+      `missions/void-ridden-castle/trial.js`; swamp lattice/fire/ghoul factory →
+      `missions/witch-doctor-swamp/layout.js`; campaignMatch keeps config rules +
+      `prepareCampaignMatchState` and re-exports the moved surface through the barrel;
+      the 45-line teamNames ternary became a lookup table; dead imports dropped.
 - [ ] **Phase 6 — Split tutorials/basics.js**: `tutorialContent.js`, `tutorialMatchSetup.js`,
       `tutorialValidation.js`, `tutorialCpu.js`, `tutorialProgress.js`; `basics.js` stays as a
       barrel so import paths survive (campaignRuntime precedent).
