@@ -1,228 +1,63 @@
-// Unit definitions live in src/core/units/<name>.js — one file per unit type.
-// Add new units by importing and registering them here.
-import { SWORDSMAN } from "./units/swordsman.js";
-import { ARCHER } from "./units/archer.js";
-import { MYSTIC } from "./units/mystic.js";
-import { MAGICIAN } from "./units/magician.js";
-import { PALADIN } from "./units/paladin.js";
-import { NECROMANCER } from "./units/necromancer.js";
-import { GHOUL } from "./units/ghoul.js";
-import { SNIPER } from "./units/sniper.js";
-import { WITCH_DOCTOR } from "./units/witch-doctor.js";
-import { FATHER_TIME } from "./units/father-time.js";
-import { JUGGERNAUT } from "./units/juggernaut.js";
-import { KING } from "./units/king.js";
-import { ANGEL } from "./units/angel.js";
-import { MONK } from "./units/monk.js";
-import { GARGOYLE } from "./units/gargoyle.js";
-import { NEMESIS } from "./units/nemesis.js";
-import { VIRUS } from "./units/virus.js";
-import { CLOD } from "./units/clod.js";
-import { FAT_KNIGHT } from "./units/fat-knight.js";
-import { FAT_WIZARD } from "./units/fat-wizard.js";
-import { FAT_CLERIC } from "./units/fat-cleric.js";
-import { FAT_BOWMAN } from "./units/fat-bowman.js";
-import { MINER } from "./units/miner.js";
-import { BIG_BROTHER } from "./units/big-brother.js";
-import { LITTLE_BROTHER } from "./units/little-brother.js";
-import { BLACKSWORD } from "./units/blacksword.js";
-import { RONIN } from "./units/ronin.js";
-import { MOTHER_NATURE } from "./units/mother-nature.js";
-import { SUMMONER } from "./units/summoner.js";
-import { RIOT_COP } from "./units/riot-cop.js";
-import { TREANT } from "./units/treant.js";
-import { drawValue } from "./rng.js";
+// The live-stat authority: getEffectiveStats folds base stats, statuses, auras,
+// team composition, tile/positional affinities, weather, and King commands into
+// a unit's current numbers, alongside the cost/rage/status accessors the rules
+// read. The unit registry, weather reads, King commands, and CPU-AI metadata
+// live in sibling modules and are re-exported here, so every existing
+// `from "./unitCatalog.js"` import keeps working.
+
 import { areAllies, areEnemies, getTileAffinity } from "./state.js";
-import { WEATHER_TYPES, normalizeWeatherSpec } from "./weather.js";
 
-export const UNIT_TYPES = Object.freeze({
-  swordsman: SWORDSMAN,
-  archer: ARCHER,
-  mystic: MYSTIC,
-  magician: MAGICIAN,
-  paladin: PALADIN,
-  necromancer: NECROMANCER,
-  ghoul: GHOUL,
-  sniper: SNIPER,
-  "witch-doctor": WITCH_DOCTOR,
-  "father-time": FATHER_TIME,
-  juggernaut: JUGGERNAUT,
-  king: KING,
-  angel: ANGEL,
-  monk: MONK,
-  gargoyle: GARGOYLE,
-  nemesis: NEMESIS,
-  virus: VIRUS,
-  clod: CLOD,
-  "fat-knight": FAT_KNIGHT,
-  "fat-wizard": FAT_WIZARD,
-  "fat-cleric": FAT_CLERIC,
-  "fat-bowman": FAT_BOWMAN,
-  miner: MINER,
-  "big-brother": BIG_BROTHER,
-  "little-brother": LITTLE_BROTHER,
-  blacksword: BLACKSWORD,
-  ronin: RONIN,
-  "mother-nature": MOTHER_NATURE,
-  summoner: SUMMONER,
-  "riot-cop": RIOT_COP,
-  treant: TREANT
-});
+import {
+  UNIT_TYPES,
+  chebyshev,
+  takesTurns,
+  isCommander,
+  isCommandOnly,
+  sustainsVictory,
+  getUnitType,
+  getResourceMeta,
+  getInitialMp,
+  getAbilityUseMax,
+  initialAbilityUses,
+  getAbilityUsesRemaining,
+  hasAbilityUsesRemaining,
+  getArt,
+  getArtForUnit,
+  getSoulShuffleChoices,
+  isRaging,
+  passiveSources,
+  rageStatSources,
+  allPassiveSources,
+  passiveStackKey,
+} from "./unitRegistry.js";
+import {
+  getActiveWeather,
+  getWeatherRestoreBonus,
+  getWeatherMovementArtRangeBonus,
+  getWeatherCritDamageBonus,
+  getWeatherCritCreatesFire,
+  getWeatherArtMpCostReduction,
+  weatherAffinityStats,
+  getWeatherAffinityMagicBonus,
+  getWeatherAffinityRestore,
+  getWeatherPassiveRestore,
+} from "./unitWeather.js";
+import { getCommandBuffStats, getCommandHealBonus, getCommandRangeBonus } from "./kingCommands.js";
 
-// Local Chebyshev so this module stays free of a rules/movement.js import
-// (movement.js imports getEffectiveStats from here — importing it back would be
-// a cycle). Aura folding below needs grid distance.
-function chebyshev(a, b) {
-  return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
-}
-
-// Summoned pieces (Ghouls) are real units but never activate: they are skipped
-// by the turn loop, the victory check, the squad picker, and summary counts.
-export function takesTurns(unit) {
-  return !getUnitType(unit.type).summon;
-}
-
-// A commander (the King) must act first each turn and can ONLY issue command ARTS —
-// he never moves, attacks, or defends.
-export function isCommander(unit) {
-  return Boolean(getUnitType(unit.type).actsFirst);
-}
-export function isCommandOnly(unit) {
-  return Boolean(getUnitType(unit.type).commandOnly);
-}
-
-// Whether a living unit keeps its team in the match. A turn-less summon (Ghoul) and a
-// non-combatant commander (King) can't win on their own, so neither sustains victory —
-// a player left with only these has lost. Default true for every ordinary unit.
-export function sustainsVictory(unit) {
-  return takesTurns(unit) && !unit.ghost && !getUnitType(unit.type).commandOnly;
-}
-
-export function getUnitType(type) {
-  const definition = UNIT_TYPES[type];
-  if (!definition) throw new Error(`Unknown unit type: ${type}`);
-  return definition;
-}
-
-export function getResourceMeta(typeOrDefinition) {
-  const definition = typeof typeOrDefinition === "string" ? getUnitType(typeOrDefinition) : typeOrDefinition;
-  return definition?.resource ?? Object.freeze({ id: "mp", label: "MP", shortLabel: "MP", startsAt: definition?.stats?.maxMp ?? 0 });
-}
-
-export function getInitialMp(typeOrDefinition) {
-  const definition = typeof typeOrDefinition === "string" ? getUnitType(typeOrDefinition) : typeOrDefinition;
-  const resource = getResourceMeta(definition);
-  return Number.isFinite(resource.startsAt) ? resource.startsAt : definition.stats.maxMp;
-}
-
-// --- Finite ability uses (Riot Cop) -----------------------------------------
-// Some arts are gated by a finite pool of USES rather than MP (Riot Cop's Stun Gun /
-// Smoke Bomb). Each such art declares a numeric `uses` (its max); the live per-art
-// remaining counter lives on `unit.abilityUses`, and `unit.abilityRecharge` tracks how
-// many of the unit's own turns a depleted pool has waited (see the reducer's
-// beginActivation recharge). Arts without `uses` are infinite (Shield Bash / Cover).
-export function getAbilityUseMax(art) {
-  return Number.isFinite(art?.uses) ? art.uses : null;
-}
-
-// A fresh { artId: max } map for every finite-use art a definition owns (the rageArt
-// included). Seeds createUnit and the rage-entry refresh.
-export function initialAbilityUses(typeOrDefinition) {
-  const definition = typeof typeOrDefinition === "string" ? getUnitType(typeOrDefinition) : typeOrDefinition;
-  const uses = {};
-  for (const art of [...(definition.arts ?? []), definition.rageArt].filter(Boolean)) {
-    if (Number.isFinite(art.uses)) uses[art.id] = art.uses;
-  }
-  return uses;
-}
-
-// Remaining uses of a finite-use art on `unit` (its max when the unit has no counter
-// yet); null for an infinite-use / MP-costed art.
-export function getAbilityUsesRemaining(unit, art) {
-  if (!Number.isFinite(art?.uses)) return null;
-  const stored = unit?.abilityUses?.[art.id];
-  return Number.isFinite(stored) ? stored : art.uses;
-}
-
-// True when a finite-use art still has a use left (always true for an infinite-use art).
-// The single gate read by canUseArt + the CPU planner so both agree.
-export function hasAbilityUsesRemaining(unit, art) {
-  const remaining = getAbilityUsesRemaining(unit, art);
-  return remaining === null || remaining > 0;
-}
-
-export function getArt(type, artId) {
-  const definition = getUnitType(type);
-  return definition.arts.find((art) => art.id === artId) ??
-    (definition.rageArt?.id === artId ? definition.rageArt : null);
-}
-
-// Mission bodies may tune one of their canonical ARTS without changing the unit type
-// players draft in normal battles. Overrides are data-only patches keyed by ART id.
-export function getArtForUnit(unit, artId) {
-  const art = unit ? getArt(unit.type, artId) : null;
-  const override = unit?.artOverrides?.[artId];
-  return art && override ? { ...art, ...override } : art;
-}
-
-export function getSoulShuffleChoices(unit, rngState) {
-  const passive = getUnitType(unit.type).passive?.effect;
-  const count = Math.max(1, Number(passive?.choices) || 5);
-  const excluded = new Set();
-  if (passive?.excludeSelf) excluded.add(unit.type);
-  if (passive?.excludeLastGhost && unit.lastGhostType) excluded.add(unit.lastGhostType);
-  // A unit may carry its own restricted Soul Shuffle pool (Void Ridden Castle gives each
-  // of its four Summoners a disjoint slice of the roster). Absent one, the whole roster
-  // minus summons/commanders is fair game, as normal.
-  const roster = Array.isArray(unit.ghostPool) && unit.ghostPool.length
-    ? unit.ghostPool.filter((type) => UNIT_TYPES[type])
-    : Object.keys(UNIT_TYPES);
-  // A COMMANDER can never be summoned. `actsFirst` means the owner must command that unit
-  // before any other unit of theirs may activate — a temporary ghost carrying it would
-  // seize the owner's whole activation order for the one turn it exists (and the King,
-  // being commandOnly, cannot fight at all). This gates the King and Mother Nature off
-  // every summon, and any future commander with them.
-  const candidates = roster.filter((type) => {
-    const definition = UNIT_TYPES[type];
-    return !excluded.has(type) && !definition.summon && !definition.commandOnly && !definition.actsFirst;
-  });
-  const shuffled = [...candidates];
-  let nextRngState = rngState;
-  for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const draw = drawValue(nextRngState);
-    nextRngState = draw.rngState;
-    const swap = Math.floor(draw.value * (index + 1));
-    [shuffled[index], shuffled[swap]] = [shuffled[swap], shuffled[index]];
-  }
-  return { choices: shuffled.slice(0, count), rngState: nextRngState };
-}
-
-export function isRaging(unit) {
-  const threshold = Number.isFinite(unit.rageThreshold) ? unit.rageThreshold : 5;
-  return unit.hp > 0 && unit.hp <= threshold;
-}
-
-function passiveSources(definition) {
-  return [definition.passive, ...definition.arts, definition.ragePassive, definition.rageArt].filter(Boolean);
-}
-
-function rageStatSources(definition) {
-  return [definition.ragePassive, definition.rageArt].filter(Boolean);
-}
-
-function allPassiveSources(definition) {
-  return [definition.passive, ...definition.arts, definition.ragePassive, definition.rageArt].filter(Boolean);
-}
-
-function stableValueKey(value) {
-  if (!value || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(stableValueKey).join(",")}]`;
-  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableValueKey(value[key])}`).join(",")}}`;
-}
-
-export function passiveStackKey(passive, effect = passive?.effect) {
-  return passive?.stackKey ?? effect?.stackKey ?? `${effect?.type ?? "passive"}:${stableValueKey(effect)}`;
-}
+// Public surface re-exports (see module headers above).
+export {
+  UNIT_TYPES, takesTurns, isCommander, isCommandOnly, sustainsVictory, getUnitType,
+  getResourceMeta, getInitialMp, getAbilityUseMax, initialAbilityUses,
+  getAbilityUsesRemaining, hasAbilityUsesRemaining, getArt, getArtForUnit,
+  getSoulShuffleChoices, isRaging, passiveStackKey,
+} from "./unitRegistry.js";
+export {
+  getActiveWeather, getWeatherRestoreBonus, getWeatherMovementArtRangeBonus,
+  getWeatherCritDamageBonus, getWeatherCritCreatesFire, getWeatherAffinityMagicBonus,
+  getWeatherAffinityRestore, getWeatherPassiveRestore,
+} from "./unitWeather.js";
+export { getCommandBuffStats, getCommandHealBonus, getCommandRangeBonus } from "./kingCommands.js";
+export * from "./unitAiMetadata.js";
 
 function teamAuraStats(unit, state) {
   const totals = {};
@@ -444,111 +279,6 @@ function getTeamMpCostReduction(unit, state) {
   return { reduction, minCost };
 }
 
-export function getActiveWeather(state) {
-  const boardWeather = normalizeWeatherSpec(state?.weather);
-  if (boardWeather) {
-    return {
-      ...WEATHER_TYPES[boardWeather.id],
-      sourceId: boardWeather.sourceId
-    };
-  }
-
-  for (const unit of state?.units ?? []) {
-    if (unit.hp <= 0) continue;
-    const weatherId = unit.weather ?? null;
-    const weather = weatherId ? WEATHER_TYPES[weatherId] ?? getUnitType(unit.type).weathers?.[weatherId] : null;
-    if (weather) return { id: weatherId, sourceId: unit.id, ...weather };
-  }
-  return null;
-}
-
-function activeWeatherPersistent(state) {
-  return getActiveWeather(state)?.persistent ?? null;
-}
-
-export function getWeatherRestoreBonus(state) {
-  return Math.max(0, Number(activeWeatherPersistent(state)?.restoreBonus) || 0);
-}
-
-export function getWeatherMovementArtRangeBonus(state, art = null) {
-  if (!art) return 0;
-  const shape = art.targeting?.shape;
-  const intent = art.ai?.intent;
-  const movementArt = shape === "rushPath" || shape === "flightMove" || shape === "flee" || art.id === "flee" ||
-    intent === "rush" || intent === "reposition" || intent === "flightStrike";
-  return movementArt ? Math.max(0, Number(activeWeatherPersistent(state)?.movementArtRangeBonus) || 0) : 0;
-}
-
-export function getWeatherCritDamageBonus(state) {
-  return Math.max(0, Number(activeWeatherPersistent(state)?.critDamageBonus) || 0);
-}
-
-export function getWeatherCritCreatesFire(state) {
-  return activeWeatherPersistent(state)?.critCreatesFire ?? null;
-}
-
-function getWeatherArtMpCostReduction(state) {
-  const persistent = activeWeatherPersistent(state);
-  return {
-    reduction: Math.max(0, Number(persistent?.artMpCostReduction) || 0),
-    minCost: Math.max(0, Number(persistent?.minArtMpCost) || 0)
-  };
-}
-
-// --- Treant (Enchanted Roots + Deep Roots) ----------------------------------
-// The active weather's per-weather block for a unit that carries a weatherAffinity
-// passive (the Treant's Enchanted Roots), or null. Read off the board-wide weather so
-// a mission weather cycle or a Mother Nature cast both drive it.
-function weatherAffinityBlock(unit, state) {
-  const effect = getUnitType(unit.type).passive?.effect;
-  if (effect?.type !== "weatherAffinity") return null;
-  const weather = getActiveWeather(state);
-  return weather ? effect.weathers?.[weather.id] ?? null : null;
-}
-
-// Enchanted Roots: the current weather's flat stat bonus (Snow +1 DEF, Fire +2 STR/−1
-// DEF). Folded into getEffectiveStats. {} when there is no weather or no matching block.
-function weatherAffinityStats(unit, state) {
-  return weatherAffinityBlock(unit, state)?.stats ?? {};
-}
-
-// Enchanted Roots (Thunderstorm): +1 magic damage the Treant DEALS while a storm holds.
-// Read attacker-side by finalizeMagicDamage (rules/combat.js).
-export function getWeatherAffinityMagicBonus(attacker, state) {
-  return Math.max(0, Number(weatherAffinityBlock(attacker, state)?.magicDamage) || 0);
-}
-
-// Enchanted Roots (Rain): the HP/MP a weather-attuned unit restores each full turn cycle.
-// Ticked by turnEngine.js. { hp, mp } (zeros when the weather has no regen).
-export function getWeatherAffinityRestore(unit, state) {
-  const restore = weatherAffinityBlock(unit, state)?.restorePerTurn ?? {};
-  return { hp: Math.max(0, Number(restore.hp) || 0), mp: Math.max(0, Number(restore.mp) || 0) };
-}
-
-// Passive weather restore: any passive source can declare `weatherRestore` keyed by
-// active weather id. Ticked once per full turn cycle by turnEngine.js. Used by
-// Gargoyle's One With The Flames during Heatwave.
-export function getWeatherPassiveRestore(unit, state) {
-  const weatherId = getActiveWeather(state)?.id ?? null;
-  if (!weatherId) return { hp: 0, mp: 0 };
-  const definition = getUnitType(unit.type);
-  let hp = 0;
-  let mp = 0;
-  for (const source of allPassiveSources(definition)) {
-    if (source.kind && source.kind !== "passive") continue;
-    if ((source === definition.ragePassive || source === definition.rageArt) && !isRaging(unit)) continue;
-    const restore = source.effect?.weatherRestore?.[weatherId] ?? null;
-    if (!restore) continue;
-    hp += Math.max(0, Number(restore.hp) || 0);
-    mp += Math.max(0, Number(restore.mp) || 0);
-  }
-  return { hp, mp };
-}
-
-// Deep Roots (positionalDefense): +DEF while every living enemy sits inside the unit's
-// BASE attack range, +DEF while every OTHER living ally does (a "keep the squad close"
-// reward, so a lone unit with no team earns nothing from the ally half). Uses base
-// attackRange to stay non-recursive inside getEffectiveStats. {} when no set qualifies.
 function positionalDefenseStats(unit, state) {
   const effect = getUnitType(unit.type).arts?.find((art) => art.effect?.type === "positionalDefense")?.effect ??
     (getUnitType(unit.type).passive?.effect?.type === "positionalDefense" ? getUnitType(unit.type).passive.effect : null);
@@ -700,74 +430,7 @@ function linkedStatModTotals(unit, state) {
 // to re-issue one every turn — see the beginActivation gate). Kept inline here beside
 // the aura/stance folds (not a separate module) so getEffectiveStats needs no extra
 // import — the same pattern stances use.
-function activeCommandData(king) {
-  if (!king.command) return null;
-  return getArt(king.type, king.command)?.command ?? null;
-}
-function activeCommanderKings(unit, state) {
-  if (!state?.units) return [];
-  return state.units.filter((king) =>
-    king.hp > 0 &&
-    getUnitType(king.type).actsFirst &&
-    king.command &&
-    king.commandTurn === state.turnNumber &&
-    areAllies(king, unit));
-}
-function ragingAllyCount(state, ref) {
-  if (!state?.units) return 0;
-  return state.units.filter((u) => u.hp > 0 && areAllies(u, ref) && isRaging(u)).length;
-}
 
-// The live stat buff an active allied King grants `unit` this turn ({} if none). The
-// King never buffs himself (a Pursue +MOVE must not make the immobile King mobile), so
-// commandOnly units are excluded. Every buffed value gains +1 per allied unit in RAGE;
-// Strike's base is lifted when the King's previous command matches `prevOverride`.
-export function getCommandBuffStats(unit, state) {
-  if (isCommandOnly(unit)) return {};
-  const totals = {};
-  for (const king of activeCommanderKings(unit, state)) {
-    const cmd = activeCommandData(king);
-    if (!cmd?.stats) continue;
-    const base = (cmd.prevOverride && king.previousCommand && cmd.prevOverride[king.previousCommand]) || cmd.stats;
-    const rage = ragingAllyCount(state, king);
-    for (const [name, value] of Object.entries(base)) {
-      if (!Number.isFinite(value)) continue;
-      const scaled = value + rage;
-      // Two Kings on one team don't stack — take the strongest per stat.
-      totals[name] = name in totals ? Math.max(totals[name], scaled) : scaled;
-    }
-  }
-  return totals;
-}
-
-// Hold's "+1 to all healing this turn" (+1 per raging ally). Team-scoped, so it takes
-// the healed unit's actor/team context. 0 when no allied King holds Hold this turn.
-export function getCommandHealBonus(state, actor) {
-  let bonus = 0;
-  for (const king of activeCommanderKings(actor, state)) {
-    const cmd = activeCommandData(king);
-    if (!Number.isFinite(cmd?.healBonus) || cmd.healBonus <= 0) continue;
-    bonus = Math.max(bonus, cmd.healBonus + ragingAllyCount(state, king));
-  }
-  return bonus;
-}
-
-// Higher Ground's "+1 range, area ARTS included" (+1 per raging ally). The attack/
-// targeted-ART range rides on the attackRange stat buff (getCommandBuffStats); this is
-// the extra reach folded into the AOE/placement/line geometry in rules/arts.js.
-export function getCommandRangeBonus(state, actor) {
-  let bonus = 0;
-  for (const king of activeCommanderKings(actor, state)) {
-    const cmd = activeCommandData(king);
-    if (!Number.isFinite(cmd?.rangeBonus) || cmd.rangeBonus <= 0) continue;
-    bonus = Math.max(bonus, cmd.rangeBonus + ragingAllyCount(state, king));
-  }
-  return bonus;
-}
-
-// Runtime modifiers are deliberately numeric and additive. Status effects,
-// map auras, and future ARTS can feed this same seam without teaching every
-// ability about one another. Per-unit passives apply after external modifiers.
 export function getEffectiveStats(unit, state = null) {
   const stats = { ...getUnitType(unit.type).stats };
   for (const [name, value] of Object.entries(unit.statModifiers ?? {})) {
@@ -1039,69 +702,3 @@ export function getAvailableArts(unit) {
 // through the normalizers below so they never see a missing block — decision 4,
 // option C: normalize for runtime safety AND tests/ai-metadata.test.js enforces
 // that the data is authored explicitly. Full schema: CPU_AI_METADATA_SCHEMA.md.
-export const AI_INTENTS = Object.freeze([
-  "strike", "statusCast", "coneAoe", "selfBlast", "healAllies",
-  "tilePulse", "reposition", "rush", "summon", "placeObject", "defend",
-  // Self/team support casts with no enemy target (Witch Doctor's Fire/Spirit/
-  // Misfortune/Black Death dances): buff allies, cleanse, or shift stance.
-  "buffAllies",
-  // Father Time's ally-OR-enemy single-target utility + revive:
-  //   statBuff — Age: persistent +stat on an ally / -stat on an enemy.
-  //   hasten   — Time Stretch: +MOVE on an ally / Slow on an enemy.
-  //   revive   — Rewind: return a fallen ally to the board.
-  "statBuff", "hasten", "revive",
-  // Juggernaut's line abilities + self MP vent:
-  //   grab       — Tether Grab: pull the first ally/enemy on a straight ray.
-  //   lineStrike — Rocket Punch: strike the first enemy on a straight ray (+ stun).
-  //   recharge   — Recharge: restore this unit's own MP (or 1 HP at full MP).
-  "grab", "lineStrike", "recharge",
-  // The King's global one-turn team buffs (Strike/Hold/Pursue/Higher Ground):
-  "commandBuff",
-  // Angel's single-ally targeted buff (Anoint: +1 range on a friendly unit):
-  "buffAlly", "healAlly",
-  // Mystic's single-ally targeted cleanse (Purify: remove all statuses):
-  "cleanseAlly",
-  // Monk's guarded ally reposition + defend handoff:
-  "protectAlly",
-  // Gargoyle's abilities:
-  //   flightStrike — Flight: reposition (Move + 1) then a small TRUE blast on landing.
-  //   lineBurst    — Pyroclasm: hit every enemy on any of the 8 straight rays in range.
-  "flightStrike", "lineBurst",
-  // Virus's contagion casts:
-  //   statusAoe    — Smog: a self-centred blind cloud (no damage, no roll).
-  //   poisonBurst  — Poison Tick / Explosion: true damage to every poisoned enemy.
-  "statusAoe", "poisonBurst", "displaceAoe",
-  // Clod's Thunderous Charge: a RANGE-picked tile that detonates a radius blast (damage +
-  // a mass stun) — a targeted-tile AoE, distinct from the self-centred selfBlast.
-  "targetedBlast"
-]);
-export const AI_ROLES = Object.freeze([
-  "bruiser", "skirmisher", "ranged", "caster", "support", "controller", "summon"
-]);
-
-const DEFAULT_UNIT_AI = Object.freeze({ threatValue: 10, role: "skirmisher", protect: false });
-
-// Normalized unit-level AI metadata, with safe fallbacks for any unannotated unit.
-// `protect` defaults true for support/caster roles when omitted.
-export function normalizeUnitAi(definitionOrType) {
-  const definition = typeof definitionOrType === "string" ? getUnitType(definitionOrType) : definitionOrType;
-  const ai = definition?.ai ?? {};
-  return {
-    threatValue: Number.isFinite(ai.threatValue) ? ai.threatValue : DEFAULT_UNIT_AI.threatValue,
-    role: AI_ROLES.includes(ai.role) ? ai.role : DEFAULT_UNIT_AI.role,
-    protect: typeof ai.protect === "boolean" ? ai.protect : (ai.role === "support" || ai.role === "caster")
-  };
-}
-
-// Normalized art-level AI metadata. An active art missing `ai` degrades to a plain
-// `strike` so the planner can still offer it; tags/evHints/priority get empty/neutral
-// defaults.
-export function normalizeArtAi(art) {
-  const ai = art?.ai ?? {};
-  return {
-    intent: AI_INTENTS.includes(ai.intent) ? ai.intent : "strike",
-    tags: Array.isArray(ai.tags) ? ai.tags : [],
-    evHints: ai.evHints ?? {},
-    priority: Number.isFinite(ai.priority) ? ai.priority : 1
-  };
-}

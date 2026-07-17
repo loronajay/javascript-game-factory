@@ -57,6 +57,10 @@ test("release hotspots delegate cohesive responsibilities to smaller modules", (
     ["src/ui/boardRenderer.js", 560, ["./boardAtmosphere.js"]],
     ["src/ui/boardAtmosphere.js", 450, []],
     ["src/campaign/campaignMatch.js", 320, ["./campaignLayouts.js", "./missions/monk-temple-trial/trial.js", "./missions/void-ridden-castle/trial.js"]],
+    ["src/core/reducer.js", 340, ["./basicAttack.js", "./activationPassives.js"]],
+    ["src/core/basicAttack.js", 430, []],
+    ["src/core/turnEngine.js", 520, ["./turnHazards.js"]],
+    ["src/core/unitCatalog.js", 760, ["./unitRegistry.js", "./unitWeather.js", "./kingCommands.js", "./unitAiMetadata.js"]],
     // basics.js stays a pure barrel over the split tutorial subsystem.
     ["src/tutorials/basics.js", 15, ["./tutorialContent.js", "./tutorialMatchSetup.js", "./tutorialValidation.js", "./tutorialCpu.js", "./tutorialProgress.js"]],
     ["src/tutorials/tutorialValidation.js", 1000, ["./tutorialContent.js", "./tutorialRuntimeHelpers.js"]],
