@@ -12,7 +12,7 @@ export const SHOP_TABS = Object.freeze([
   Object.freeze({ id: "units", label: "Units" }),
   Object.freeze({ id: "skin-packs", label: "Skin Packs" }),
   Object.freeze({ id: "skins", label: "Skins" }),
-  Object.freeze({ id: "boosts", label: "Boosts" }),
+  Object.freeze({ id: "consumables", label: "Consumables" }),
 ]);
 
 const UNIT_VALOR_COST_BY_STAR = Object.freeze({
@@ -78,6 +78,117 @@ const SKIN_PACK_PRICES = Object.freeze({
   infernal: Object.freeze({ cents: 499, valor: 3750 }),
   medieval: Object.freeze({ cents: 299, valor: 2500 }),
 });
+
+const CONSUMABLE_OFFERS = Object.freeze([
+  Object.freeze({
+    id: "valor-boost-1",
+    kind: "consumable",
+    sku: "ta.consumable.valor-boost-1",
+    name: "Valor Boost I",
+    family: "Valor Boost",
+    description: "+20% earned Valor from all sources.",
+    durationHours: 24,
+    activationTrigger: "valor-gained",
+    price: Object.freeze({ kind: "premium", currency: "USD", cents: 199 }),
+    effect: Object.freeze({ kind: "valor-boost", percentBonus: 20 }),
+  }),
+  Object.freeze({
+    id: "valor-boost-2",
+    kind: "consumable",
+    sku: "ta.consumable.valor-boost-2",
+    name: "Valor Boost II",
+    family: "Valor Boost",
+    description: "+40% earned Valor from all sources.",
+    durationHours: 24,
+    activationTrigger: "valor-gained",
+    price: Object.freeze({ kind: "premium", currency: "USD", cents: 299 }),
+    effect: Object.freeze({ kind: "valor-boost", percentBonus: 40 }),
+  }),
+  Object.freeze({
+    id: "valor-boost-3",
+    kind: "consumable",
+    sku: "ta.consumable.valor-boost-3",
+    name: "Valor Boost III",
+    family: "Valor Boost",
+    description: "+65% earned Valor from all sources.",
+    durationHours: 24,
+    activationTrigger: "valor-gained",
+    price: Object.freeze({ kind: "premium", currency: "USD", cents: 399 }),
+    effect: Object.freeze({ kind: "valor-boost", percentBonus: 65 }),
+  }),
+  Object.freeze({
+    id: "valor-boost-x",
+    kind: "consumable",
+    sku: "ta.consumable.valor-boost-x",
+    name: "Valor Boost X",
+    family: "Valor Boost",
+    description: "+100% earned Valor from all sources.",
+    durationHours: 24,
+    activationTrigger: "valor-gained",
+    price: Object.freeze({ kind: "premium", currency: "USD", cents: 599 }),
+    effect: Object.freeze({ kind: "valor-boost", percentBonus: 100 }),
+  }),
+  Object.freeze({
+    id: "random-rare-skin",
+    kind: "consumable",
+    sku: "ta.consumable.random-rare-skin",
+    name: "Random Rare Skin",
+    family: "Skin Grant",
+    description: "Random unowned rare skin.",
+    durationHours: null,
+    activationTrigger: "immediate",
+    price: Object.freeze({ kind: "premium", currency: "USD", cents: 99 }),
+    effect: Object.freeze({ kind: "random-unowned-skin", rarity: "rare", count: 1 }),
+  }),
+  Object.freeze({
+    id: "random-epic-skin",
+    kind: "consumable",
+    sku: "ta.consumable.random-epic-skin",
+    name: "Random Epic Skin",
+    family: "Skin Grant",
+    description: "Random unowned epic skin.",
+    durationHours: null,
+    activationTrigger: "immediate",
+    price: Object.freeze({ kind: "premium", currency: "USD", cents: 199 }),
+    effect: Object.freeze({ kind: "random-unowned-skin", rarity: "epic", count: 1 }),
+  }),
+  Object.freeze({
+    id: "random-legendary-skin",
+    kind: "consumable",
+    sku: "ta.consumable.random-legendary-skin",
+    name: "Random Legendary Skin",
+    family: "Skin Grant",
+    description: "Random unowned legendary skin.",
+    durationHours: null,
+    activationTrigger: "immediate",
+    price: Object.freeze({ kind: "premium", currency: "USD", cents: 299 }),
+    effect: Object.freeze({ kind: "random-unowned-skin", rarity: "legendary", count: 1 }),
+  }),
+  Object.freeze({
+    id: "five-random-epic-skins",
+    kind: "consumable",
+    sku: "ta.consumable.five-random-epic-skins",
+    name: "5 Random Epic Skins",
+    family: "Skin Grant",
+    description: "Five random unowned epic skins.",
+    durationHours: null,
+    activationTrigger: "immediate",
+    price: Object.freeze({ kind: "premium", currency: "USD", cents: 999 }),
+    effect: Object.freeze({ kind: "random-unowned-skin", rarity: "epic", count: 5 }),
+  }),
+  Object.freeze({
+    id: "campaign-damage-boost",
+    kind: "consumable",
+    sku: "ta.consumable.campaign-damage-boost",
+    name: "Campaign Boost",
+    family: "Campaign Boost",
+    description: "All units deal +2 damage in campaign.",
+    durationHours: 24,
+    activationTrigger: "campaign-mission-started",
+    price: Object.freeze({ kind: "premium", currency: "USD", cents: 99 }),
+    effect: Object.freeze({ kind: "campaign-damage-boost", damageBonus: 2 }),
+  }),
+]);
 
 function unitStar(typeOrDef) {
   const type = typeof typeOrDef === "string" ? typeOrDef : typeOrDef?.id ?? typeOrDef?.type;
@@ -223,6 +334,14 @@ export function getSkinPackOffer(packId, storage = globalThis.localStorage) {
   return getSkinPackOffers(storage).find((offer) => offer.packId === packId) ?? null;
 }
 
+export function getConsumableOffers() {
+  return CONSUMABLE_OFFERS;
+}
+
+export function getConsumableOffer(id) {
+  return CONSUMABLE_OFFERS.find((offer) => offer.id === id) ?? null;
+}
+
 function skinPackOffer(packId, offers) {
   const basePrice = SKIN_PACK_PRICES[packId];
   if (!basePrice || !offers.length) return null;
@@ -305,7 +424,7 @@ export function getShopCatalog(storage = globalThis.localStorage) {
     units: getUnitOffers(storage),
     skinPacks: getSkinPackOffers(storage),
     skins: getSkinOffers(storage),
-    boosts: Object.freeze([]),
+    consumables: getConsumableOffers(),
   });
 }
 

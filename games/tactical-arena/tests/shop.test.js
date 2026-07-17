@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { readUnlockProgress, writeUnlockProgress } from "../src/progression/unlocks.js";
+import { grantConsumable, readInventory } from "../src/progression/inventory.js";
+import { openInventory } from "../src/ui/inventory.js";
 import { openShop } from "../src/ui/shop.js";
 import { openSkinGallery } from "../src/ui/skinGallery.js";
 
@@ -74,6 +76,11 @@ class FakeElement {
     this.listeners.set(type, (this.listeners.get(type) ?? []).filter((item) => item !== handler));
   }
 
+  dispatchEvent(event) {
+    for (const handler of this.listeners.get(event.type) ?? []) handler(event);
+    return true;
+  }
+
   click() {
     for (const handler of this.listeners.get("click") ?? []) {
       handler({ target: this, stopPropagation() {} });
@@ -143,6 +150,65 @@ test("shop skins render under unit shelves and Valor uses an icon badge", () => 
   const shelves = walk(overlay, (node) => hasClass(node, "shop-unit-skin-section"));
   assert.ok(shelves.length > 0, "shop skins should be organized into per-unit shelves");
   assert.ok(shelves.some((node) => node.dataset.type === "swordsman"));
+});
+
+test("shop consumables tab sells paid consumables with checkout coming soon feedback", () => {
+  globalThis.document = new FakeDocument();
+
+  openShop(storageAdapter());
+
+  const overlay = document.body.children[0];
+  const consumablesTab = walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Consumables")[0];
+  assert.ok(consumablesTab, "shop should expose the renamed Consumables tab");
+  assert.equal(walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Boosts").length, 0);
+  consumablesTab.click();
+
+  const boostCard = walk(overlay, (node) => hasClass(node, "shop-consumable") && visibleText(node).includes("Valor Boost I"))[0];
+  assert.ok(boostCard, "consumables tab should render Valor boosts for purchase");
+  assert.match(visibleText(boostCard), /\+20% earned Valor from all sources\./);
+  assert.match(visibleText(boostCard), /24h from first Valor gained/);
+
+  const buy = walk(boostCard, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-buy-btn"))[0];
+  assert.equal(buy.textContent, "$1.99");
+  assert.equal(buy.getAttribute("aria-label"), "Buy Valor Boost I with $1.99 soon");
+  buy.click();
+
+  assert.match(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent, /checkout coming soon/i);
+});
+
+test("inventory activation requires confirmation before consuming an owned consumable", () => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  grantConsumable(storage, "valor-boost-1", 1);
+
+  openInventory(storage);
+
+  const overlay = document.body.children[0];
+  const itemCard = walk(overlay, (node) => hasClass(node, "inventory-item") && visibleText(node).includes("Valor Boost I"))[0];
+  assert.ok(itemCard, "inventory should render owned consumables");
+  assert.match(visibleText(itemCard), /Owned x1/);
+
+  const activate = walk(itemCard, (node) => node.tagName === "BUTTON" && hasClass(node, "inventory-activate-btn"))[0];
+  activate.click();
+
+  assert.equal(readInventory(storage).consumables["valor-boost-1"], 1, "opening confirmation should not consume item");
+  let confirm = walk(overlay, (node) => hasClass(node, "inventory-activation-confirm"))[0];
+  assert.ok(confirm, "activation should open a confirmation dialog");
+  assert.match(visibleText(confirm), /Confirm Activation/);
+  assert.match(visibleText(confirm), /consume one item/i);
+
+  walk(confirm, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-confirm-cancel"))[0].click();
+  assert.equal(readInventory(storage).consumables["valor-boost-1"], 1, "cancel should leave inventory untouched");
+
+  walk(overlay, (node) => node.tagName === "BUTTON" && hasClass(node, "inventory-activate-btn"))[0].click();
+  confirm = walk(overlay, (node) => hasClass(node, "inventory-activation-confirm"))[0];
+  walk(confirm, (node) => node.tagName === "BUTTON" && hasClass(node, "inventory-confirm-activate"))[0].click();
+
+  const inventory = readInventory(storage);
+  assert.equal(inventory.consumables["valor-boost-1"], undefined);
+  assert.equal(inventory.activeConsumables.length, 1);
+  assert.equal(inventory.activeConsumables[0].status, "pending");
+  assert.match(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent, /timer starts/i);
 });
 
 test("shop skin cards offer USD checkout and Valor purchase buttons", () => {

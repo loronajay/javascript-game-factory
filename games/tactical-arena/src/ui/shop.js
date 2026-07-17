@@ -91,7 +91,8 @@ export function openShop(storage = globalThis.localStorage) {
     else if (activeTab === "units") renderUnits(body, catalog.units);
     else if (activeTab === "skin-packs") renderSkinPacks(body, catalog.skinPacks);
     else if (activeTab === "skins") renderSkins(body, catalog.skins);
-    else renderBoosts(body);
+    else if (activeTab === "consumables") renderConsumables(body, catalog.consumables);
+    else renderEmpty(body);
     card.appendChild(body);
     if (activeTab === "units" && !detailOffer && unitScrollTop > 0) body.scrollTop = unitScrollTop;
 
@@ -316,9 +317,37 @@ export function openShop(storage = globalThis.localStorage) {
     }
   }
 
-  function renderBoosts(body) {
+  function renderConsumables(body, offers) {
+    const groups = new Map();
+    for (const offer of offers) {
+      const list = groups.get(offer.family) ?? [];
+      list.push(offer);
+      groups.set(offer.family, list);
+    }
+    for (const [family, list] of groups.entries()) {
+      const section = el("section", "shop-section");
+      section.appendChild(el("h3", "shop-section-title", family));
+      const grid = el("div", "shop-grid shop-consumable-grid");
+      for (const offer of list) {
+        const card = el("article", "shop-item shop-consumable");
+        card.appendChild(createConsumableIcon(offer));
+        const copy = el("div", "shop-item-copy");
+        copy.append(
+          el("b", "shop-item-title", offer.name),
+          el("span", "shop-item-sub", consumableDurationLabel(offer)),
+          el("span", "shop-item-meta", offer.description),
+        );
+        card.append(copy, createConsumableBuyActions(offer));
+        grid.appendChild(card);
+      }
+      section.appendChild(grid);
+      body.appendChild(section);
+    }
+  }
+
+  function renderEmpty(body) {
     const empty = el("div", "shop-empty");
-    empty.append(el("b", "shop-empty-title", "No Boosts Yet"), el("span", "shop-empty-sub", "This shelf is ready when boosts arrive."));
+    empty.append(el("b", "shop-empty-title", "Nothing Here Yet"), el("span", "shop-empty-sub", "This shelf is ready for future offers."));
     body.appendChild(empty);
   }
 
@@ -542,6 +571,25 @@ export function openShop(storage = globalThis.localStorage) {
     return actions;
   }
 
+  function createConsumableBuyActions(offer) {
+    const actions = el("div", "shop-consumable-actions");
+    const premiumBuy = el("button", "shop-buy-btn is-premium", formatPremiumPrice(offer.price));
+    premiumBuy.type = "button";
+    premiumBuy.dataset.sku = offer.sku;
+    premiumBuy.setAttribute("aria-label", `Buy ${offer.name} with ${formatPremiumPrice(offer.price)} soon`);
+    premiumBuy.addEventListener("click", (event) => {
+      event.stopPropagation?.();
+      statusText = "Consumable checkout coming soon.";
+      overlay.dispatchEvent(new CustomEvent("tacticalarena:premium-purchase-request", {
+        bubbles: true,
+        detail: { offer },
+      }));
+      render();
+    });
+    actions.appendChild(premiumBuy);
+    return actions;
+  }
+
   function createOwnedBuyButton() {
     const owned = el("button", "shop-buy-btn is-owned", "Owned");
     owned.type = "button";
@@ -641,6 +689,24 @@ function createPackPreview(offer, className = "") {
     }));
   }
   return preview;
+}
+
+function createConsumableIcon(offer) {
+  const icon = el("div", "shop-consumable-icon");
+  icon.setAttribute("aria-hidden", "true");
+  const symbol = offer.effect?.kind === "random-unowned-skin"
+    ? "?"
+    : offer.effect?.kind === "campaign-damage-boost"
+      ? "+2"
+      : `${offer.effect?.percentBonus ?? ""}%`;
+  icon.textContent = symbol;
+  return icon;
+}
+
+function consumableDurationLabel(offer) {
+  if (offer.activationTrigger === "valor-gained") return "24h from first Valor gained";
+  if (offer.activationTrigger === "campaign-mission-started") return "24h from first mission";
+  return "Opens from Inventory";
 }
 
 function createValorBadge(amount, className = "") {

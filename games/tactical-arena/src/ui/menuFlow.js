@@ -15,6 +15,7 @@ import {
 } from "./performanceSettings.js";
 import { openSkinGallery } from "./skinGallery.js";
 import { openShop } from "./shop.js";
+import { openInventory } from "./inventory.js";
 import { formatValor, formatValorAmount } from "../progression/marketplace.js";
 import { openNicknameGallery } from "./nicknameGallery.js";
 import { getNicknamePref } from "./nicknameModel.js";
@@ -1001,6 +1002,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     switch (actionBtn.dataset.action) {
       case "rules": openCodex(); break;
       case "shop": openShop(globalThis.localStorage); break;
+      case "inventory": openInventory(globalThis.localStorage); break;
       case "skins": openSkinGallery(); break;
       case "nicknames": openNicknameGallery(); break;
       case "chooseTutorialReward": openTutorialRewardChoice({ title: "Juggernaut Unlocked" }); break;

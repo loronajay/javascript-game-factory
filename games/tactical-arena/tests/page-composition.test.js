@@ -36,6 +36,7 @@ test("main menu gives Shop its own prominent action outside secondary controls",
 
   const secondaryActions = mainMenu.match(/<div class="menu-secondary-actions">([\s\S]*?)<\/div>/)?.[1] ?? "";
   assert.doesNotMatch(secondaryActions, /data-action="shop"/);
+  assert.match(secondaryActions, /data-action="inventory"/);
 });
 
 test("page composition loads in parallel and mounts fragments in document order", async () => {

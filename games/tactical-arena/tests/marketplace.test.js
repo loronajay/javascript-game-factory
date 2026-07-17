@@ -5,6 +5,8 @@ import { STARTING_VALOR_BALANCE, readUnlockProgress, writeUnlockProgress } from 
 import {
   formatPremiumPrice,
   formatValor,
+  getConsumableOffer,
+  getConsumableOffers,
   getSkinPackOffer,
   getSkinPackOffers,
   getShopCatalog,
@@ -28,7 +30,7 @@ function storageAdapter() {
   };
 }
 
-test("shop catalog exposes units, premium skins, skin packs, and an empty boosts tab", () => {
+test("shop catalog exposes units, premium skins, skin packs, and paid consumables", () => {
   const storage = storageAdapter();
   const catalog = getShopCatalog(storage);
 
@@ -36,9 +38,34 @@ test("shop catalog exposes units, premium skins, skin packs, and an empty boosts
   assert.ok(catalog.skins.length > 0);
   assert.ok(catalog.skinPacks.length > 0);
   assert.ok(catalog.tabs.some((tab) => tab.id === "skin-packs" && tab.label === "Skin Packs"));
-  assert.deepEqual(catalog.boosts, []);
+  assert.ok(catalog.tabs.some((tab) => tab.id === "consumables" && tab.label === "Consumables"));
+  assert.equal(catalog.tabs.some((tab) => tab.id === "boosts"), false);
+  assert.equal(catalog.consumables.length, 9);
   assert.equal(catalog.resource.balance, STARTING_VALOR_BALANCE);
   assert.equal(catalog.resource.name, "Valor");
+});
+
+test("consumable offers cover valor boosts, random skin grants, and campaign boost prices", () => {
+  const offers = getConsumableOffers();
+  const valorBoost = getConsumableOffer("valor-boost-3");
+  const campaignBoost = getConsumableOffer("campaign-damage-boost");
+  const fiveEpics = getConsumableOffer("five-random-epic-skins");
+
+  assert.equal(offers.length, 9);
+  assert.equal(valorBoost.name, "Valor Boost III");
+  assert.equal(valorBoost.price.cents, 399);
+  assert.equal(valorBoost.effect.percentBonus, 65);
+  assert.equal(valorBoost.durationHours, 24);
+  assert.equal(valorBoost.activationTrigger, "valor-gained");
+  assert.equal(formatPremiumPrice(valorBoost.price), "$3.99");
+
+  assert.equal(fiveEpics.price.cents, 999);
+  assert.equal(fiveEpics.effect.rarity, "epic");
+  assert.equal(fiveEpics.effect.count, 5);
+
+  assert.equal(campaignBoost.price.cents, 99);
+  assert.equal(campaignBoost.effect.damageBonus, 2);
+  assert.equal(campaignBoost.activationTrigger, "campaign-mission-started");
 });
 
 test("skin pack offers use authored pack metadata and exclude separate Halloween exclusives", () => {
