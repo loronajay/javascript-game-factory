@@ -27,10 +27,11 @@ never loosened, only retargeted/tightened.
 
 ## Phases
 
-- [ ] **Phase 0 — Prep**: working branch off current state; record green `npm test` baseline.
-- [ ] **Phase 1 — Shared helper dedup**: new `src/ui/domHelpers.js` (`el`, `escapeHtml`); replace
-      the ~12 `el()` and 5 `escapeHtml` local copies; replace tutorials' `chebyshev` with
-      `chebyshevDistance` from `src/rules/movement.js`.
+- [x] **Phase 0 — Prep**: working branch off current state; record green `npm test` baseline.
+- [x] **Phase 1 — Shared helper dedup**: new `src/ui/domHelpers.js` (`el`, `escapeHtml`); replaced
+      the 12 `el()` and 5 `escapeHtml` local copies; replaced tutorials' `chebyshev` with
+      `chebyshevDistance` from `src/rules/movement.js`; also extracted `diceRollReveal.js`
+      from `effects.js`, clearing the pre-existing architecture-test cap failure.
 - [ ] **Phase 2 — main.js back to composition root**:
       resolve loop (`main.js:708–1116`) → `src/ui/commandResolutionController.js`;
       turn/results + Valor/reward orchestration (`:590–699`) → `src/ui/matchOutcomeController.js`;

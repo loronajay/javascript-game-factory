@@ -1,7 +1,7 @@
 import { COMMANDS, attack, beginActivation, defend, finishActivation, moveUnit, useArt } from "../core/commands.js";
 import { areEnemies, findUnit, livingUnits } from "../core/state.js";
 import { getEffectiveStats, getInitialMp, getUnitType, takesTurns } from "../core/unitCatalog.js";
-import { getLegalMoves, positionKey } from "../rules/movement.js";
+import { chebyshevDistance as chebyshev, getLegalMoves, positionKey } from "../rules/movement.js";
 import { isShotBlocked, isWallBetween } from "../rules/combat.js";
 import {
   TUTORIAL_JUGGERNAUT_REWARD_UNIT,
@@ -1735,8 +1735,4 @@ function samePosition(a, b) {
 
 function footworkPathHitsClod(path) {
   return Array.isArray(path) && path.some((step) => samePosition(step, DAMAGE_TYPES_FOOTWORK_PATH[0]));
-}
-
-function chebyshev(a, b) {
-  return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
 }

@@ -1,6 +1,7 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { createPortrait } from "./portraits.js";
 import { getUnitSkins, normalizeSkinSlug, skinLabel } from "./skinModel.js";
+import { el } from "./domHelpers.js";
 
 let host = null;
 
@@ -160,11 +161,4 @@ function choicesFor(type) {
     { slug: null, name: "Classic", unlocked: true },
     ...getUnitSkins(type)
   ];
-}
-
-function el(tag, className = "", text = null) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = text;
-  return node;
 }

@@ -1,3 +1,5 @@
+import { el } from "./domHelpers.js";
+
 export function createConsumableIcon(offer, { className = "" } = {}) {
   const kind = offer?.effect?.kind;
   const icon = el("div", `shop-consumable-icon ${iconClass(kind, offer)}${className ? ` ${className}` : ""}`);
@@ -42,11 +44,4 @@ function safeClass(value) {
     .replace(/[^a-z0-9]+/gi, "-")
     .replace(/^-+|-+$/g, "")
     .toLowerCase();
-}
-
-function el(tag, className = "", text = null) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = text;
-  return node;
 }

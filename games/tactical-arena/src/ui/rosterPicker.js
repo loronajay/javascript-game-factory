@@ -15,6 +15,7 @@ import { createPortrait } from "./portraits.js";
 import { SLOT_LAYOUT, normalizeSquadLoadout, availableTypesForSlot, groupedUnitTypes, isUnitUnlocked } from "./squadModel.js";
 import { getSkinPref, normalizeSkinSlug, skinLabel } from "./skinModel.js";
 import { openSkinPicker } from "./skinPicker.js";
+import { el, escapeHtml } from "./domHelpers.js";
 
 let host = null; // lazily-created singleton overlay, reused across opens
 
@@ -331,16 +332,6 @@ export function openRosterPicker({ title = "Squad", accent = null, initial = nul
 function clampSlot(index) {
   const n = Number(index) || 0;
   return Math.min(Math.max(0, n), SLOT_LAYOUT.length - 1);
-}
-
-function el(tag, className) {
-  const node = document.createElement(tag);
-  node.className = className;
-  return node;
-}
-
-function escapeHtml(text) {
-  return String(text).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 }
 
 function isSkinPickerOpen() {

@@ -5,6 +5,7 @@
 // currently supports (hot-seat 1v1/4-player); the other menu options are present but
 // flagged "Soon" until their units/CPU/online land.
 import { ScreenManager } from "./screenManager.js";
+import { escapeHtml } from "./domHelpers.js";
 import { createSquadPicker, DEFAULT_SQUAD } from "./squadPicker.js";
 import { createOnlineFlow } from "./onlineFlow.js";
 import { THEMES, applyTheme, loadSavedThemeId, saveThemeId } from "./themes.js";
@@ -1218,10 +1219,6 @@ function skinRewardLabel(reward) {
 function formatDuration(ms) {
   const total = Math.max(0, Math.round(ms / 1000));
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
-}
-
-function escapeHtml(text) {
-  return String(text).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 }
 
 // Celebratory confetti shower tinted to the winner; each chip removes itself and

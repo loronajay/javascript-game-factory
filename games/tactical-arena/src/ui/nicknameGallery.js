@@ -8,6 +8,7 @@ import { groupedUnitTypes } from "./squadModel.js";
 import { createPortrait } from "./portraits.js";
 import { getNicknamePref, saveNicknamePref, NICKNAME_MAX_LENGTH } from "./nicknameModel.js";
 import { getSkinPref, saveSkinPref, skinLabel } from "./skinModel.js";
+import { el } from "./domHelpers.js";
 import { openSkinPicker } from "./skinPicker.js";
 
 let host = null;
@@ -131,11 +132,4 @@ export function openNicknameGallery() {
   overlay.addEventListener("click", onOverlay);
   document.addEventListener("keydown", onKey, true);
   overlay.hidden = false;
-}
-
-function el(tag, className = "", text = null) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = text;
-  return node;
 }

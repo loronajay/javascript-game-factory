@@ -5,6 +5,7 @@
 // {type, slug}, since a reward list can span several roster units. Reuses the same
 // .skin-picker-* CSS (verified generic, no per-type styling) so it matches the equip picker.
 import { createPortrait } from "./portraits.js";
+import { el } from "./domHelpers.js";
 
 let host = null;
 
@@ -133,11 +134,4 @@ export function openRewardSkinPicker({
     paint();
     overlay.hidden = false;
   });
-}
-
-function el(tag, className = "", text = null) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = text;
-  return node;
 }

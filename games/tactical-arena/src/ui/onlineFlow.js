@@ -27,6 +27,7 @@ import { openSkinPicker } from "./skinPicker.js";
 import { openDraftFormationPicker } from "./draftFormationPicker.js";
 import { DRAFT_PICK_ORDER, applyDraftPick, arrangeDraftLoadout, canDraftType, createDraftState, currentDraftSeat, draftedTypes, isDraftComplete } from "./draftModel.js";
 import { playerSeatListLabel, teamForSeat, teamGroupsForSetup } from "./teamDisplay.js";
+import { escapeHtml } from "./domHelpers.js";
 
 const RULESET_VERSION = ONLINE_RULESET_VERSION;
 const BOARD_SIZES = [13, 15];
@@ -838,8 +839,4 @@ export function createOnlineFlow({ onStartMatch }) {
   }
 
   return { el, onEnter, onExit };
-}
-
-function escapeHtml(text) {
-  return String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
