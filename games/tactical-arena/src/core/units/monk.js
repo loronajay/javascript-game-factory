@@ -31,7 +31,7 @@ export const MONK = Object.freeze({
       targeting: Object.freeze({ range: 1 }),
       damage: Object.freeze({ type: "physical", amount: 10, scaleStat: "strength", baseStat: 9 }),
       knockback: Object.freeze({ distance: 3, criticalOnly: true }),
-      description: "Kick an enemy within 1 for 10 physical damage, scaling with STR. On critical hit, knock the target back up to 3 straight-line spaces.",
+      description: "Kick an enemy within 1 for 10 physical damage, scaling with STR. On critical hit, knock the target back up to 3 straight-line spaces. If the route is cut short by the board edge, the target is stunned for 1 turn; if it is cut short by one of the target's allies, that ally is stunned for 1 turn.",
       implemented: true,
       ai: Object.freeze({ intent: "strike", tags: Object.freeze(["control"]) })
     }),

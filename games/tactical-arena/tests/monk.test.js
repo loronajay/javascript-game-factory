@@ -103,6 +103,39 @@ test("Front Kick knocks the target back 3 on crit and stops before blockers", ()
   assert.deepEqual(findUnit(r.nextState, "p2-foe").position, { x: 8, y: 5 });
 });
 
+test("Front Kick stuns a target ally that blocks the knockback route", () => {
+  const state = scenario({
+    units: [
+      { id: "p1-monk", type: "monk", player: 1, x: 5, y: 5 },
+      { id: "p1-ally", type: "swordsman", player: 1, x: 0, y: 0 },
+      { id: "p2-foe", type: "swordsman", player: 2, x: 6, y: 5 },
+      { id: "p2-ally", type: "archer", player: 2, x: 8, y: 5 }
+    ]
+  });
+  let r = run(state, beginActivation(1, "p1-monk"));
+  r = run(r.nextState, useArt(1, "p1-monk", "front-kick", { targetId: "p2-foe", ...CRIT }));
+
+  assert.deepEqual(findUnit(r.nextState, "p2-foe").position, { x: 7, y: 5 });
+  assert.equal(findUnit(r.nextState, "p2-ally").statuses.some((status) => status.type === "stun" && status.duration === 1), true);
+  assert.equal(findUnit(r.nextState, "p2-foe").statuses.some((status) => status.type === "stun"), false);
+});
+
+test("Front Kick stuns the target when the board edge stops knockback early", () => {
+  const state = scenario({
+    units: [
+      { id: "p1-monk", type: "monk", player: 1, x: 10, y: 5 },
+      { id: "p1-ally", type: "swordsman", player: 1, x: 0, y: 0 },
+      { id: "p2-foe", type: "swordsman", player: 2, x: 11, y: 5 },
+      { id: "p2-far", type: "archer", player: 2, x: 0, y: 12 }
+    ]
+  });
+  let r = run(state, beginActivation(1, "p1-monk"));
+  r = run(r.nextState, useArt(1, "p1-monk", "front-kick", { targetId: "p2-foe", ...CRIT }));
+
+  assert.deepEqual(findUnit(r.nextState, "p2-foe").position, { x: 12, y: 5 });
+  assert.equal(findUnit(r.nextState, "p2-foe").statuses.some((status) => status.type === "stun" && status.duration === 1), true);
+});
+
 test("Front Kick misses cleanly and does not knock back without a crit outside RAGE", () => {
   const missState = scenario();
   const missHp = findUnit(missState, "p2-foe").hp;

@@ -3,22 +3,25 @@ import { areEnemies, areAllies, cloneState, findUnit, isWallAt, unitAt } from ".
 import { getArtTargetRange, getProtectLandingTiles } from "../../rules/arts.js";
 import { getDisplacementRetaliation, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resistsDisplacement, rollToHit } from "../../rules/combat.js";
 import { resolveDamage } from "../../rules/damage.js";
-import { chebyshevDistance } from "../../rules/movement.js";
+import { chebyshevDistance, isOnBoard } from "../../rules/movement.js";
 import { getGlobalHealBonus } from "../../rules/stances.js";
+import { applyStatus } from "../../rules/statuses.js";
 import { applyRockHardDefense, resolvePhysicalDamageHealing, restoreHp } from "../combatEffects.js";
 import { completeArtUse } from "./artCompletion.js";
 import { accept, ERR, reject } from "../reducerResult.js";
 import { resolveVictory } from "../turnEngine.js";
 
-function knockbackDestination(state, target, direction, distance) {
+function traceKnockback(state, target, direction, distance) {
   let destination = { ...target.position };
   for (let step = 1; step <= distance; step += 1) {
     const next = { x: target.position.x + direction.x * step, y: target.position.y + direction.y * step };
-    if (next.x < 0 || next.y < 0 || next.x >= state.size || next.y >= state.size) break;
-    if (isWallAt(state, next) || unitAt(state, next)) break;
+    if (!isOnBoard(state, next)) return { destination, blocked: true, blockedBy: "edge", blocker: null };
+    if (isWallAt(state, next)) return { destination, blocked: true, blockedBy: "wall", blocker: null };
+    const blocker = unitAt(state, next);
+    if (blocker) return { destination, blocked: true, blockedBy: "unit", blocker };
     destination = next;
   }
-  return destination;
+  return { destination, blocked: false, blockedBy: null, blocker: null };
 }
 
 export function resolveFrontKick(state, command, art) {
@@ -78,6 +81,7 @@ export function resolveFrontKick(state, command, art) {
   const stoneEvents = [];
   const from = { ...target.position };
   let to = { ...target.position };
+  const stunnedByImpact = [];
   if (shouldKnockback && (direction.x !== 0 || direction.y !== 0)) {
     if (immobile) {
       const retaliation = getDisplacementRetaliation(target);
@@ -87,8 +91,19 @@ export function resolveFrontKick(state, command, art) {
         if (dealt > 0) stoneEvents.push({ type: "STONE_RETALIATION", offenderId: actor.id, sourceId: target.id, damage: dealt });
       }
     } else {
-      to = knockbackDestination(next, target, direction, art.knockback?.distance ?? 3);
+      const knockback = traceKnockback(next, target, direction, art.knockback?.distance ?? 3);
+      to = knockback.destination;
       target.position = { ...to };
+      const stunTarget = knockback.blockedBy === "edge"
+        ? target
+        : (knockback.blocker && areAllies(target, knockback.blocker) ? knockback.blocker : null);
+      if (stunTarget) {
+        const applied = applyStatus(stunTarget, { type: "stun", duration: 1 });
+        if (applied.applied) {
+          stunTarget.statuses = applied.statuses;
+          stunnedByImpact.push(stunTarget.id);
+        }
+      }
     }
   }
 
@@ -100,7 +115,7 @@ export function resolveFrontKick(state, command, art) {
     targetIds: [target.id], damageByTarget: { [target.id]: damage },
     hit: true, critical: swing.critical, damage: { ...result, damage },
     knockedBack: shouldKnockback && (from.x !== to.x || from.y !== to.y),
-    from, to, mpCost: cost
+    from, to, ...(stunnedByImpact.length ? { stunnedByImpact } : {}), mpCost: cost
   }, ...healingEvents, ...stoneEvents, ...rockHardEvents]);
 }
 
