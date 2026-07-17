@@ -50,8 +50,12 @@ test("release hotspots delegate cohesive responsibilities to smaller modules", (
     ["src/ui/commandResolutionController.js", 400, ["./rolledCombatPresenter.js", "./instantArtPresenter.js", "./resolutionGuard.js"]],
     ["src/ui/matchOutcomeController.js", 220, []],
     ["src/campaign/campaignMatchHooks.js", 150, []],
-    // The sandbox must consume the SAME resolve loop as the shipping match, never a fork of it.
-    ["src/dev/sandbox.js", 520, ["../ui/commandResolutionController.js"]],
+    // The sandbox must consume the SAME resolve loop as the shipping match, never a fork
+    // of it. src/dev/ is currently untracked (the repo-root .gitignore's `dev/` pattern
+    // catches it), so this boundary only applies when the folder is present locally.
+    ...(existsSync(rootFile("src/dev/sandbox.js"))
+      ? [["src/dev/sandbox.js", 520, ["../ui/commandResolutionController.js"]]]
+      : []),
     ["src/core/artResolvers.js", 350, [
       "./artResolvers/riotCopResolvers.js",
       "./artResolvers/fatWizardResolvers.js",
