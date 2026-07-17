@@ -3,6 +3,9 @@
 A canonical read of what each unit is *for*: the role it plays, the plan it wants to
 execute, and how its kit interacts with the turn structure. This is a design-reading
 document, not a rules reference — the code and tests are authoritative for numbers.
+This pass is scoped against the live unit definitions in `src/core/units/`, including
+passives stored in ART lists, rage-only basic attack damage types, resource economies,
+and threshold reactions.
 
 Roster: 30 draftable units plus the summon-only Ghoul. Descriptions assume the classic
 turn mode (Tempo Battle re-times the same kits against readiness gauges).
@@ -374,6 +377,11 @@ Banish adds a 75% silence to the magic damage (shutting off an enemy caster's AR
 entirely). Flee is a 5-MP escape to any empty tile within MOVE+2 — his only defense with 23
 HP and DEF 3.
 
+His basic attack matters in two different forms. While healthy, it is still an ordinary
+physical ranged attack, so DEF can reduce that STR 6 shot to almost nothing. In RAGE, his
+basic attacks become **magic damage**, so even the refill turns become armor-piercing
+pressure instead of weak chip.
+
 Nuke (rage) is the payoff: 12 magic damage to **every enemy within 3 tiles**, centered on
 him. A dying Magician who has been allowed to walk into the middle of a clustered squad is
 a board wipe.
@@ -462,9 +470,11 @@ He also heals: Surge restores 4 HP to an ally (5 on a crit, and Clumsy splashes 
 on a miss). Relay Power is a 0-MP-cost transfer, not a free one — lose 2 HP and 2 MP to give
 an ally 2 HP and 2 MP.
 
-Lazy Cast (rage) is a monster: Zap and Surge become **free**, Zap gains +3 damage, splashes
-on every hit, and **stuns instead of silencing** on a crit. A raging Fat Wizard with no MP
-cost casting a splashing, stunning 8-damage nuke every turn is a win condition.
+Lazy Cast (rage) is a monster: his basic attacks become **magic damage**, Zap and Surge
+become **free**, Zap gains +3 damage, splashes on every hit, and **stuns instead of
+silencing** on a crit. Surge also splashes healing on normal rage hits, not only on the
+miss/crit Clumsy cases. A raging Fat Wizard with no MP cost casting a splashing, stunning
+8-damage nuke every turn is a win condition.
 
 ### Summoner — Tempo Engine (action-economy caster)
 
@@ -709,8 +719,9 @@ screening doesn't work.
 
 Volcanic Rage is the best rage in the roster to reach: +2 DEF, **permanently Defending while
 still taking full turns**, Pyroclasm gains +2 range, a **free Pyroclasm the moment he
-enters rage**, and another free one every 3rd turn thereafter. One With The Flames makes him
-immune to fire and turns his crits into permanent fire tiles.
+enters rage**, and another free one every 3rd turn thereafter before he acts. One With The
+Flames makes him immune to fire, turns his crits into permanent fire tiles, and restores 1
+HP and 1 MP each Heatwave turn cycle.
 
 ### Clod — Anchor Tank / Phalanx Pivot
 
@@ -729,9 +740,10 @@ half of the game, and the enemy melee squad *refuels him* by attacking. The only
 is magic — which is precisely why he's paired with a Mystic or a Necromancer in practice.
 
 Quake deals `3 + (number of enemies hit)` magic damage in a 3-tile radius and **refunds its
-own MP if it catches 3 or more enemies**. Stone Throw hurls a boulder for 8 physical with a
-guaranteed slow (or a stun on a crit). Thunderous Charge (rage) is a targeted 2-radius
-blast for 10 physical and a mass stun.
+own MP if it catches 3 or more enemies**. Stone Throw hurls a boulder within 4 for 8
+physical, scales above his base STR, and applies a guaranteed slow on hit (or a stun on a
+crit). Thunderous Charge (rage) targets a tile within 4 that an enemy is not occupying,
+then detonates a 2-radius blast for 10 physical and a mass stun.
 
 ### Riot Cop — Crowd-Control Tank / Peel Bodyguard
 
@@ -778,7 +790,9 @@ him cannot be healed**; Big Brother himself can still receive healing. That turn
 into a no-heal zone you can walk onto an enemy healer.
 Polarity Shift is the strangest button in the game: globally swap HP restores and MP
 restores, so every heal on the board becomes mana and vice versa — a hard counter to a
-healing composition, and a real hazard for your own.
+healing composition, and a real hazard for your own. Recharge is the exception clause: it
+restores his own 5 MP through Polarity Shift, or if already full, restores 1 HP and gives
+him +1 MOVE on his next turn.
 
 Pissing Contest gives him +1 STR while any Little Brother lives **on either team** (and
 Little Brother gets +1 range in return) — a piece of pure flavor that rewards drafting the

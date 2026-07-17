@@ -6,54 +6,56 @@ boards, with RAGE at <=5 HP. It weights reliable draft value first: always-on
 auras, mitigation, damage type coverage, action economy, and how much a unit
 still does when the perfect comp is not available.
 
-For the full placement notes, see `UNIT_TIER_LIST_REASONING.md`.
+For the full placement notes, see `UNIT_TIER_LIST_REASONING.md`. That file is
+scoped as a kit audit: every draftable unit section names the live passive, ARTS,
+and rage entries that drove the placement.
 
 ---
 
 ## S - format-defining first picks
 
-- **Mystic** - the best universal support: +1 team DEF, cheap board-wide healing, cleanse, silence, and an absurdly safe rage
-- **Necromancer** - Dead Zone is premium magic mitigation, while Deathly Aura and Ghouls add pressure, screens, and DEF shred
-- **Gargoyle** - the safest tank-carry: status reflection, displacement immunity, ray AoE, thorns, and the roster's best defensive rage
-- **Nemesis** - the strongest offensive aura: +1 team magic damage and -1 ART cost turns caster shells into engines
-- **Paladin** - promoted: status immunity, lifelink offense, white-tile DEF, and bonus-action true chip now make him an elite blind pick
+- **Mystic** - best universal support: Guardian DEF, Wish/Pray healing, Purify cleanse, Silence control, and a rage that restores MP while passively Defending
+- **Necromancer** - Dead Zone is premium magic mitigation; Deathly Aura, Dark Bomb, Wither, Grave Wrath, and Ghouls add pressure, screens, and DEF shred
+- **Gargoyle** - safest tank-carry: status reflection, displacement immunity, fire immunity, Pyroclasm rays, Flight true splash, and Volcanic Rage
+- **Nemesis** - strongest offensive aura: +1 team magic damage and -1 ART cost, backed by Dark Pulse auto-casts, Realm Traversal, Nullify, and rage restore
+- **Paladin** - status-proof lifelink bruiser with white-tile DEF, Lightseeker/Darkseeker no-action true chip, and Heaven's Realm damage scaling
 
 ## A - high-impact, broadly playable
 
-- **Clod** - top physical wall; Rock Hard blanks physical damage and the easier Quake refund makes his offense less theoretical
-- **Treant** - Grove Ward gives team magic reduction on a 30-HP body, with Enrich, Deep Roots, and Petrify making him a real sustain anchor
-- **Monk** - permanent move-and-ART plus radius movement; the Front Kick impact-stun buff makes his skirmish control much scarier
-- **Father Time** - true-damage attrition that funds itself, range-4 permanent Age swings, haste/slow utility, and full-HP revive
-- **Magician** - cleanest armor solvent; range-5 magic, silence, self-refuel, escape, and Nuke keep tanks honest
-- **Fat Wizard** - durable caster/healer with splash insurance, Study sustain, Relay utility, and a rage mode that can take over
-- **Virus** - S-ceiling status engine; Spread, Smog, Poison Tick, and Explosion punish drafts without immunity or cleanse
-- **Juggernaut** - healing lockout is one of the hardest counters in the game; Self Destruct and Bruiser Mode give him a brutal clock
-- **Mother Nature** - 100-MP weather commander; Thunderstorm/Spring Shower can define a match, but the global effects demand piloting
-- **Little Brother** - promoted: +5 MP battery, permanent-fire Flamethrower, true cone pressure, and crit splash give him real artillery value
+- **Clod** - top physical wall; Brick House, Rock Hard MP refunds, Quake refund pressure, Stone Throw control, and Thunderous Charge punish physical teams
+- **Treant** - Grove Ward magic reduction on a 30-HP body, with Enrich, Source Shift, Ether, Deep Roots, Verdant Bond, and Petrify sustain loops
+- **Monk** - Shadow Step move-and-ART plus radius movement; Front Kick stun conversion, Protect bodyguarding, and Nirvana make him premium control
+- **Father Time** - Time Steal true attrition funds range-4 permanent Age swings, Time Stretch tempo, immunities, and full-HP Rewind
+- **Magician** - cleanest armor solvent; Spark/Banish magic, Magic Pipe refuel, Flee escape, and rage Nuke keep DEF stacks honest
+- **Fat Wizard** - durable caster/healer with Clumsy splash insurance, Study sustain, Surge/Relay utility, Brothers in Arms upside, and Lazy Cast takeover turns
+- **Virus** - S-ceiling status engine; Spread, Cough, Smog, Growth, Poison Tick, Infectious Affinity, and Explosion punish teams without immunity or cleanse
+- **Juggernaut** - Null Zone healing lockout is one of the hardest counters in the game; Bruiser Mode, Recharge, Tether Grab, Rocket Punch, and Self Destruct give him a brutal clock
+- **Mother Nature** - 100-MP first-acting weather commander; Blizzard, Spring Shower, Heatwave, Thunderstorm, Landscaper, and Great Flood can define a match but are global
+- **Little Brother** - +5 MP battery, Cannon Fire, permanent-fire Flamethrower, Splash Fire crits, Big Brother range synergy, and Flamespitter free cones
 
 ## B - strong role-players and build-arounds
 
-- **Fat Cleric** - durable main healer with cleanse, self-sustain, and a rage revive; excellent, just less warping than Mystic
-- **Angel** - anti-armor magic support with full status immunity, Anoint range plays, and a powerful white-tile rage pulse
-- **Witch Doctor** - stance rules-editor; Spirit and Misfortune are elite in the right shell but can help the enemy too
-- **Sniper** - longest reliable threat range, wall/body-piercing shots, cover, blind, and fire; great anti-turtle specialist
-- **Blacksword** - dark-tile duelist with guaranteed crit setup, blind spread, Dark Tick payoff, and a dangerous sacrifice ultimate
-- **Fat Knight** - sturdy bruiser with anti-crit tech, true shove damage, Stumble/Trample lines, and Fat Squad synergy
-- **Riot Cop** - still a premium peeler with USES economy, Cover, smoke, ranged true control, and a DEF aura; critical magic now gets through
-- **Summoner** - high-action-economy ceiling from full-turn ghosts, but the body is fragile and the draw is intentionally variable
-- **Fat Bowman** - dangerous planted turret with scaling range damage, poison rolls, and Fat Squad range; repositioning is the tax
+- **Fat Cleric** - durable main healer with Snack Break, Hope, Cleanse, Focus Prayer, Second Helping, Brothers in Arms, and Emergency Snacks
+- **Angel** - anti-armor magic support with Blessed Arrow tile rules, Anoint range plays, Elevate/Heavenseeker light-tile pulses, crit scaling, and full status immunity
+- **Witch Doctor** - stance rules-editor; Rain/Fire/Spirit/Misfortune/Black Death dances are elite in the right shell but can help the enemy too
+- **Sniper** - longest reliable threat range, Rifle Powered wall/body piercing, Build Cover, Smoke Bomb, Throw Cigar, and rage line attacks
+- **Blacksword** - dark-tile duelist with HP-fueled Dark Rush/Ether/Gravity/Tick, Darkspread blind loops, Banisher stats, and sacrifice Banish
+- **Fat Knight** - sturdy bruiser with anti-crit Battle Trauma, Stumble/Fart true damage, Thick Boi status resist, Brothers in Arms, and Trample lines
+- **Riot Cop** - premium peeler with finite USES economy, Stun Gun, Smoke Bomb, Shield Bash, Cover, Heavy Boots, Riot Shield, and Lockdown; critical magic now gets through
+- **Summoner** - high-action-economy ceiling from Soul Shuffle, Summon, Dematerialize, Disturbed Spirit, and raging Beckon ghosts, but the body is fragile and draws vary
+- **Fat Bowman** - planted turret with Heavy Handed range scaling, Curve Shot, Dragonsbane poison rolls, Planted STR, Fat Squad range, and Desperation Shot burst
 
 ## C - conditional, narrow, or high-floor-risk
 
-- **Swordsman** - Footwork's 3 true damage helps, and his kit is useful, but he is still the fair baseline in a powered-up roster
-- **Miner** - functional range-5 ranger after one harvest; ore is also ammo, crit scaling, and stats, so sustained fire throttles him
-- **Big Brother** - excellent anti-heal/control tech with true basics and Polarity Shift, but low pressure into teams that do not care about healing
-- **Ronin** - scary isolated duelist with true poke and Final Draw, yet his best passive value fights normal 4-unit positioning
-- **King** - enormous human-piloted ceiling, but the non-combatant body and ally-death HP loss make his blind-draft floor brutal
+- **Swordsman** - Last Stand, Footwork, Moonstrike, Mage Killer, Life Sap, and Quick are useful, but he remains the fair baseline in a powered-up roster
+- **Miner** - functional range-5 ranger after Ore Harvest; ore is also ammo, crit scaling, stats, walls, and Blasting Cap fuel, so sustained fire throttles him
+- **Big Brother** - excellent anti-heal/control tech with Super Magnet true basics, Force Tug/Push, Polarity Shift, Magnetic Field, and Rogue Mech, but low pressure into non-healers
+- **Ronin** - scary isolated duelist with Wanderer damage, Patient Blade, Flashing Steel, Broken Oath, Challenge, Shuriken, and Final Draw recoil risk
+- **King** - huge command ceiling from Strike!, Hold!, Pursue!, and Higher Ground!, but Dictator / Spectator and the non-combatant body make his blind-draft floor brutal
 
 ## D - hardest to justify
 
-- **Archer** - permanent poison and slow are useful, but the legacy range kit is outpaced by Sniper, Angel, Little Brother, Fat Bowman, and status engines that do the same jobs harder
+- **Archer** - Close Shot, Volley Shot, Poison Arrow, Leg Shot, Emblem, and the RAGE Passive are playable, but the legacy range/status kit is easiest to upgrade
 
 ---
 

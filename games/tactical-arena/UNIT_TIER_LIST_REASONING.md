@@ -1,372 +1,485 @@
 # Tactical Arena - Unit Tier List: Reasoning
 
 This is the reasoning behind `UNIT_TIER_LIST.md`, rewritten for the 2026-07-17
-balance state. It is based on the live unit definitions in `src/core/units/*.js`,
-the shared stat and aura folds in `src/core/unitCatalog.js`, and the damage rules
-in `src/rules/combat.js` / `src/rules/damage.js`.
+balance state from the live unit definitions in `src/core/units/*.js`, the stat
+folds in `src/core/unitCatalog.js`, and the combat rules in `src/rules/combat.js`
+and `src/rules/damage.js`.
+
+Scope: 30 draftable units, standard 4-unit custom squads, 1v1 hot-seat/online
+play, 13x13 or 15x15 boards, and the normal RAGE threshold of 5 HP or lower.
+`Ghoul` is not ranked because it is summon-only.
+
+## Audit rules for this pass
+
+1. **Every kit piece counts.** Each placement accounts for the unit's passive,
+   all ARTS, and rage entries, not just the headline combo.
+2. **Damage type matters.** DEF checks physical damage only. Magic ignores DEF,
+   and true damage ignores DEF and Defend, so magic reduction, status immunity,
+   healing denial, and true-damage access are draft-warping.
+3. **Action economy beats raw numbers.** Move-and-ART, no-action pulses, free
+   casts, full-turn ghosts, and automatic triggers frequently matter more than a
+   bigger single hit.
+4. **Resource engines decide long games.** MP does not passively regenerate for
+   most units, so refunds, charges, ore, weather, stances, and HP-as-fuel change
+   how real a kit is after the first exchange.
+5. **Conditional value is taxed.** Tile color, weather, exact partners, isolation,
+   global rules that help both teams, and rage-only payoffs lower blind-pick value.
 
 ## What changed in this pass
 
-The old list had the right skeleton but was behind the current meta. Paladin is
-now a true S-tier blind pick because white-tile footing also gives DEF, on top of
-status immunity, lifelink, and bonus-action seeker chip. Clod rises because Quake
-refunds on 3+ targets rather than the entire enemy team. Monk rises because Front
-Kick crit knockback now converts blocked paths into stuns. Little Brother rises
-because Rechargeable Battery restores 5 MP and Flamethrower leaves permanent fire.
-Father Time is easier to trust with Age explicitly at range 4. Riot Cop remains
-strong, but the magic-shield nerf matters: non-critical magic is still blanked
-while Defending, critical magic now leaks +1 through.
+The biggest correction is scope. Earlier notes leaned too hard on role labels and
+did not name enough of the actual kit text, which made several placements look
+less grounded than they should have. This pass audits the full kit for every
+draftable unit.
 
-## Ranking levers
-
-1. **Always-on team value.** Auras like Guardian, Dead Zone, Grove Ward, Realm of
-   Magic, and Deathly Aura compound across every turn and usually cannot be
-   outplayed by simple positioning.
-2. **Mitigation against the right damage type.** DEF handles physical only.
-   Magic ignores DEF, and true damage ignores DEF and Defend. Team magic
-   reduction is therefore one of the rare answers to caster piles.
-3. **Action economy.** Bonus actions, move-and-ART, free pulses, and extra bodies
-   are better than bigger numbers because they break the normal activation limit.
-4. **Rage path and payoff.** A rage ultimate is only worth full credit if the unit
-   can safely reach <=5 HP and still act afterward.
-5. **Resource economy.** MP does not passively regenerate. Self-refund, discounts,
-   finite USES, ore, HP-as-fuel, and weather or stance support decide long games.
-6. **Conditionality.** Tile color, weather, isolation, exact squadmates, and
-   global rules that also help the enemy all tax an otherwise powerful kit.
+Placement changes still follow the current balance state: Paladin remains S
+because Hand of Life, Chosen, white-tile DEF, Lightseeker, Heaven's Realm, and
+Darkseeker form a complete blind-pick package. Monk and Little Brother are higher
+than older reads because Front Kick has real stun conversion and Flamethrower now
+leaves permanent fire while Rechargeable Battery restores 5 MP. Riot Cop stays
+strong but not elite because Riot Shield no longer makes critical magic harmless.
 
 ---
 
 # S Tier
 
-These are the units I would expect to shape drafts by their presence. They either
-bring unconditional team value or are so hard to answer cleanly that the enemy has
-to draft with them in mind.
+These units define drafts by being excellent without needing a narrow setup, or by
+forcing the opponent to draft specific answers.
 
 ### Mystic - best universal support
 
-Guardian is still the cleanest defensive aura in the roster: +1 DEF to every ally
-while Mystic lives. That single point matters because physical damage is based on
-STR minus DEF, so it shrinks every normal swing and stacks naturally with Defend,
-healers, and tanks. Her active kit covers the rest of the support checklist:
-Wish for cheap board-wide healing, Pray for local burst healing, Purify for full
-status cleanup, and Silence for caster control.
+Mystic is S because her floor is immediate team value. Guardian gives every ally
++1 DEF while she lives, and Anointed means silence cannot turn off her support
+job. Pray is local burst healing, Wish is cheap global healing, Purify removes
+all statuses from an ally within 5, and Silence gives her a direct caster-control
+button at range 5.
 
-The rage mode is also wild: +15 MP on entry, huge movement, move-and-ART, magic
-basics, and passive Defend while still acting. She is fragile before rage, but her
-value does not depend on a particular partner. That is S-tier reliability.
+Her RAGE Passive is one of the safest in the roster: it restores 15 MP on entry,
+adds +6 MOVE, makes basics magic, allows move-and-ART, and passively Defends
+while she still acts. The weakness is 23 HP and DEF 3 before rage, but the kit
+covers DEF, healing, cleanse, status pressure, and late-game safety without asking
+for a specific comp.
 
 ### Necromancer - mitigation, DEF shred, and free screens
 
-Dead Zone is the reason Necromancer stays S. Magic bypasses DEF, so a team-wide
--1 magic damage reduction is one of the game's rare answers to the strongest
-damage type. He also projects Deathly Aura, stripping enemy DEF in radius 3, and
-can raise two Ghouls that carry the same aura while blocking space.
+Necromancer earns S through stacked passive value. Deathly Aura applies -1 DEF to
+enemies within 3, and Dead Zone gives allies -1 incoming magic damage, one of the
+rarest answers to the damage type that ignores DEF. Wither adds range-5 magic plus
+slow, Dark Bomb punishes anything inside the aura, and Summon Ghoul creates up to
+two 10-HP blockers that also carry Deathly Aura.
 
-That combination means he helps defensive shells and physical teams at the same
-time. Wither and Dark Bomb give him real caster pressure, while Grave Wrath turns
-the aura into a wider STR/DEF/MOVE debuff field. He is fragile, but the kit pays
-you immediately before he ever reaches rage.
+Grave Wrath makes the package even nastier at low HP: +1 MOVE, aura radius 4, and
+an added -1 STR/-1 MOVE on top of the DEF shred, including through Ghouls. He is
+fragile, but the draft value arrives before he ever reaches rage: mitigation for
+caster matchups, aura pressure for physical teams, and board control through
+summons.
 
 ### Gargoyle - safest tank-carry
 
-Gargoyle answers too many common plans at once. It cannot be displaced, reflects
-targeted statuses, is immune to every status, punishes melee while Defending, and
-can still pressure clustered lines with Pyroclasm. Heavy caps Move, but Flight
-partly offsets that by giving diagonal repositioning and landing true damage.
+Gargoyle's Stone Body answers too many plans at once: melee attackers take true
+retaliation while it Defends, displacement fails and returns 2 true damage, and
+targeted statuses reflect back to the offender. Stone Ward adds full status
+immunity, Heavy caps Move at 3, and One With The Flames gives fire immunity,
+Heatwave sustain, and permanent fire on basic crits.
 
-Volcanic Rage is the best defensive rage in the game: +2 DEF, always Defending
-while still acting, longer Pyroclasm, and free eruptions. A unit that is difficult
-to move, difficult to control, difficult to burst, and still has AoE is a draft
-anchor.
+Flight offsets the Move cap with diagonal repositioning and landing true damage,
+while Pyroclasm gives eight-line magic AoE. Volcanic Rage is the best defensive
+rage profile here: +2 DEF, always Defending while acting, +2 Pyroclasm range, a
+free Pyroclasm on rage entry, and another every third turn. Gargoyle is hard to
+move, hard to debuff, hard to burst, and still threatens clustered boards.
 
 ### Nemesis - offensive aura engine
 
-Realm of Magic gives every ally +1 magic damage and reduces ART costs by 1, to a
-minimum of 1. Because magic ignores DEF, that is both a damage buff and a resource
-engine for the game's strongest offensive archetype. It gets even better on AoE
-and repeated casts.
+Realm of Magic is a format-level aura: allied magic damage gains +1, and allied
+ART costs are reduced by 1 to a minimum of 1. Because magic ignores DEF and many
+strong ARTS are repeatable, Nemesis turns caster squads into resource engines
+instead of one-burst shells.
 
-Nemesis himself is not just an aura holder: Dark Pulse hits eight rays, heals
-allies, can refund itself, and auto-casts at HP thresholds. He is DEF 2, so the
-draft must protect him, but the reward is format-level.
+The rest of the kit is not filler. Dark Pulse fires along all eight rays, damages
+enemies, heals allies, refunds if it hits four targets, and auto-casts for free as
+Nemesis crosses 20, 15, 10, and 5 HP. Realm Traversal charges a move-plus-Dark
+Pulse turn, Nullify gives silence immunity, and Regenerate restores 5 HP and 15
+MP on rage entry. DEF 2 is the tax, but the payoff is strong enough to draft
+around.
 
-### Paladin - promoted all-purpose anchor
+### Paladin - all-purpose anchor
 
-Paladin now crosses the S line. Hand of Life already turned his physical damage
-into nearby ally healing, and Chosen already made him immune to poison, slow,
-blind, silence, and stun. The current white-tile DEF bonus makes Lightseeker
-positioning defensive as well as offensive, so his preferred tiles now support
-both survivability and bonus-action true chip.
+Paladin belongs in S because his kit is now complete instead of merely sturdy.
+Hand of Life converts physical damage into nearby ally healing and also gives
++1 DEF on white tiles. Chosen grants immunity to poison, slow, blind, silence, and
+stun, so common control plans do not meaningfully tax him.
 
-He still has physical-damage matchups where Clod or Defend can shrink his healing,
-but the full package is too reliable to keep in A: durable bruiser, control-proof
-anchor, sustain engine, tile chipper, and strong rage seeker payoff.
+Lightseeker is no-action true chip against enemies on light tiles within 5, while
+Heaven's Realm adds +2 STR, +1 range, and +2 extra damage when both Paladin and the
+target stand on light tiles. Darkseeker gives no-action global true damage against
+enemies on dark tiles while raging. Physical mitigation can still shrink his
+healing, but a status-proof sustain bruiser with tile-based true chip is elite.
 
 ---
 
 # A Tier
 
-These units are very strong and often first-pickable, but each has a clearer
-counter, setup burden, or comp dependency than the S tier.
+These units are frequently first-pickable, but they have clearer counters,
+positioning demands, or matchup dependencies than S-tier anchors.
 
 ### Clod - physical damage veto
 
-Rock Hard is binary but enormous: while Defending, Clod negates physical damage
-entirely and gains MP when struck. Brick House gives adjacent allies +1 DEF and
-rewards a compact formation with extra STR for Clod. The July Quake change matters
-because refunding on 3+ targets makes his magic AoE a realistic pressure option
-rather than a miracle condition.
+Clod is the best anti-physical wall. Brick House gives adjacent allies +1 DEF and
+gives Clod +1 STR for each sheltered ally, so compact squads get both protection
+and counterpunch. Rock Hard is the core reason to draft him: while Defending, he
+negates all physical damage and restores 3 MP whenever a physical attack hits.
 
-He is A rather than S because his signature defense is far less relevant into
-magic and true damage. Still, any physical squad must solve him or lose the front.
+His offense is more real now. Quake deals magic damage in radius 3, scales with
+the number of enemies hit, and refunds if it hits at least 3 enemies. Stone Throw
+adds range-4 physical damage with slow, or stun on crit. Thunderous Charge is the
+rage payoff: a range-4 charge into radius-2 physical damage and stun. Clod is A
+because magic and true damage bypass the main gimmick, but physical squads have
+to solve him.
 
 ### Treant - magic ward sustain tank
 
-Treant has been underrated by lists that focus only on weather. Grove Ward is the
-same kind of team magic reduction that makes Dead Zone important, but attached to
-a 30-HP, DEF-6 body. Enrich restores ally MP, Source Shift gives weird resource
-play, Deep Roots rewards compact anchoring, and Petrify can make a clustered fight
-stall while healing allies and draining enemies.
+Treant is not just a weather toy. Grove Ward gives the whole team -1 incoming
+magic damage while Treant lives, attached to a 30-HP, DEF-6 body. Enchanted Roots
+adds weather bonuses, poison immunity, and fire vulnerability: HP regen in
+Spring Shower, +1 DEF in Blizzard, +1 magic damage in Thunderstorm, and +2 STR/-1
+DEF in Heatwave.
 
-Weather raises his ceiling, especially Spring Shower and Thunderstorm, but he no
-longer needs a weather comp to justify the slot. A team magic ward on a real tank
-is simply valuable.
+His active economy is broad. Enrich turns 2 MP into 3 ally MP, or 3 HP if that
+ally is full. Source Shift swaps HP and MP at an HP/MP cost, Soul Sap can drain
+half damage as MP, Ether converts MP recovery into +2 STR next turn, Deep Roots
+can add up to +2 DEF based on ally/enemy positioning, and Verdant Bond copies
+nearby ally stat buffs while crits slow. Petrify makes him invulnerable for 2
+turns, trading actions for area HP/MP restore and enemy HP/MP drain. The fire
+vulnerability and setup needs keep him below S, but the magic ward is premium.
 
 ### Monk - action-economy skirmisher
 
-Shadow Step is a structural advantage: Monk moves by radius and may move and use
-an ART in the same activation from turn one. Protect is a strong bodyguard action
-because it moves him to the ally and sets both units to Defend, even if the ally
-already acted.
+Monk's Shadow Step is a structural advantage: radius movement instead of normal
+orthogonal pathing, plus move-and-ART from turn one. Front Kick is now serious
+control: it hits for STR-scaling physical damage and, on crit, knocks back up to
+3 spaces; if the board edge cuts the path short the target is stunned, and if an
+ally blocks it that ally is stunned.
 
-The Front Kick buff raises his threat. A critical knockback that hits the board
-edge stuns the target; if an allied body blocks the path, that ally is stunned.
-He is still range-1 and not a pure damage carry, but his mobility plus control is
-now premium.
+Protect lets Monk jump to an ally within 3, Defend, and put that ally into Defend
+even if the ally already acted. Heightened Sense grants blind immunity and +1 STR
+per 5 missing HP. Nirvana adds +2 MOVE, +1 ART range, guaranteed Front Kick
+knockback, and 2 HP healing on Protect. He is range-1 and not a pure damage
+carry, but the movement rules and bodyguard action make him a top skirmisher.
 
 ### Father Time - permanent stat swings and revive
 
-Time Steal deals true damage in radius 2 and refunds MP, so melee teams fund his
-control by standing near him. Age at range 4 is now much easier to apply safely,
-and permanent +1/-1 STR or DEF changes combat math for as long as Father Time
-lives. Time Stretch gives short-term movement control.
+Father Time is valuable because Time Steal creates passive radius-2 true damage
+and refunds 1 MP per damage dealt. Father of Time gives stun and slow immunity,
+so common peel tools do not easily stop his control role. Age is the centerpiece:
+within range 4, it gives an ally permanent +1 STR or +1 DEF, or drains an enemy's
+STR or DEF by 1 until Father Time dies.
 
-Rewind is one of the biggest possible rage plays: a full-HP revive with statuses
-cleared. The short aura radius and rage-locked revive keep him out of S, but his
-floor is much better than a normal revive bot.
+Time Stretch gives temporary +1 MOVE to an ally or -1 MOVE to an enemy. Rewind is
+rage-locked but enormous: a fallen ally returns within 3 at full HP with statuses
+cleared, though MP is not restored. His RAGE entry only unlocks Rewind, so the
+ceiling depends on reaching low HP with a corpse available, but permanent stat
+swings plus true attrition make him a strong A.
 
 ### Magician - armor solvent
 
-Spark and Banish are simple but strategically essential: range-5 magic that
-ignores DEF. He is the clean answer to Clod, Gargoyle, and other armor stacks.
-Magic Pipe gives him a way to recover MP, Flee keeps him alive, and Banish adds
-silence to the damage.
+Magician's job is simple and essential: Spark is range-5 magic damage, and magic
+ignores DEF. That makes him one of the cleanest answers to Clod, Gargoyle, Riot
+Cop, and other armor-first boards. Banish adds magic damage with a 75% silence
+check, while Flee teleports him to an empty tile within Move+2 to preserve the
+fragile DEF-3 body.
 
-Nuke is rage-locked and he is fragile, so he needs a screen. Even so, no roster
-read is complete without respecting how hard he punishes DEF-first drafts.
+Magic Pipe restores 10 MP after every 3 completed activations without Spark or
+Banish, so he can recover if the game slows down. RAGE makes his basics magic and
+unlocks Nuke, a 12-magic radius-3 detonation. The frailty and rage dependence for
+Nuke keep him out of S, but every real tier list has to price his anti-armor role
+highly.
 
 ### Fat Wizard - durable caster with sustain
 
-Fat Wizard brings a caster kit on a 30-HP body. Zap provides magic pressure,
-Clumsy means missed or critical Zap still splashes, Surge gives healing, Relay
-Power moves HP/MP to an ally, and Study turns a marked target into sustain.
+Fat Wizard brings a caster role on a 30-HP body. Clumsy means Zap! misses still
+splash 2 magic around the target, crits splash 3, and Surge has splash-heal
+insurance. Zap! is range-4 magic with silence on crit. Study marks one enemy,
+adding +1 damage and causing his magic damage to that target to restore 2 HP and
+2 MP. Surge heals an ally, and Relay Power converts 2 HP and 2 MP from Fat Wizard
+into 2 HP and 2 MP for an ally within 5.
 
-Lazy Cast is the payoff: free Zap and Surge, stronger Zap, hit splash, and stun
-on criticals. He lacks a team aura, but he is one of the safest self-contained
-casters.
+Brothers in Arms adds +1 STR and +1 magic damage if Fat Knight, Fat Cleric, and
+Fat Bowman are all on his team. Lazy Cast is the rage payoff: basics become
+magic, Zap! and Surge are free, Zap! gains +3 damage, Zap! splashes on hit, and
+crit control changes from silence to stun. He lacks a broad team aura, but the
+self-contained sustain and rage mode are strong.
 
 ### Virus - status win condition
 
-Spread makes any debuff on an enemy jump to nearby allies. Smog is no-roll blind
-in a radius, Cough supplies poison, Poison Tick converts poison into board-wide
-true damage, and Explosion can finish poisoned teams through DEF and Defend.
+Virus can take over games that lack immunity or cleanse. Spread propagates poison,
+blind, silence, slow, and stun to nearby allies when an enemy is afflicted, with
+basic crits adding poison. Cough is range-5 magic plus poison chance, Smog is
+no-roll radius-2 blind, Poison Tick deals 2 true damage to every poisoned enemy,
+Gaseous Entity grants poison/blind immunity, and Growth refunds 2 MP whenever
+Virus poisons an enemy.
 
-The reason Virus is A instead of S is matchup polarity. Status immunity and
-cleanse are common enough to matter: Paladin, Angel, Gargoyle, King, Mystic, and
-Fat Cleric all blunt the plan. Into teams without those answers, Virus can feel
-like the best unit in the game.
+Infectious Affinity extends Spread by 1, guarantees poison inflicted by Virus, and
+makes every landed basic poison. Explosion is the rage finisher: 10 true damage to
+poisoned enemies and 5 true splash near poisoned enemies, at the cost of Virus.
+Status immunity and cleanse are common enough to keep him A rather than S, but
+into unprepared drafts he plays like a top unit.
 
 ### Juggernaut - anti-heal clock
 
-Null Zone disables all healing on the board while Juggernaut is raging, gives
-free ARTs, and makes him harder to kite. That single passive can flip the sustain
-matchup. Self Destruct is a guaranteed 10 true AoE finisher if the trade wins the
-game, and Bruiser Mode turns empty MP into better combat stats.
+Juggernaut is a brutal timing unit. Bruiser Mode makes 0 MP a power state: +2 STR
+and +1 MOVE, with +1 incoming magic damage as the cost. Recharge restores 5 MP, or
+1 HP if already full, so he can choose between loaded ARTS and empty-MP stats.
+Tether Grab pulls the first unit in a line within 4 and deals 3 magic to enemies;
+Rocket Punch is a range-5 line shot for 10 physical damage with stun chance.
 
-His weakness is the path: base Move 2 melee, small MP pool, and best effects at
-low HP. He is terrifying when piloted into the right window, less reliable when
-forced to chase.
+Null Zone is why he ranks this high: at rage, +2 STR, +2 MOVE, free ARTS, and all
+healing on the board disabled. Self Destruct then threatens 10 true damage to
+every enemy within 4 while killing Juggernaut. He is slow before the window and
+magic-vulnerable in Bruiser Mode, but no-healing rage changes matchups by itself.
 
 ### Mother Nature - weather commander
 
-Mother Nature is a rules-editor with 100 MP and range 6. Thunderstorm stacks with
-caster plans by lowering ART costs and boosting magic. Spring Shower multiplies
-healing and MP restoration. Blizzard slows everyone up front and buffs movement
-ART range. Heatwave turns crits and fire into a board rule. Landscaper adds no-roll
-push/wall control.
+Mother Nature is a first-acting rules editor. Mood Swing / Weather Commander
+makes her act first, persists the last weather globally, gives +1 MOVE next turn
+after setting new weather, and restores 10 MP on a basic crit. Blizzard slows
+every unit for a turn and then globally increases movement ART range.
+Spring Shower heals every unit and then boosts all HP/MP restoration by 1. Heatwave
+temporarily grants +1 STR and then makes crits stronger while creating permanent
+fire under victims. Thunderstorm temporarily gives +1 magic damage and then
+reduces ART costs by 1 globally.
 
-She remains A, not S, because weather is global and she must act first. The best
-Mother Nature player drafts to abuse the weather more than the opponent can.
+Landscaper is the non-weather control button: no-roll push plus wall, or 10
+physical damage if blocked. Her RAGE unlocks Great Flood, which deals 7 magic to
+every unit, shuffles surviving positions, and heals Mother Nature for 5. She is A
+because the effects are global and must be drafted around, but the player who
+breaks parity better gets enormous value.
 
 ### Little Brother - upgraded artillery
 
-Little Brother's current kit is much scarier than the old list gave him credit
-for. Rechargeable Battery now restores 5 MP from magic damage, enough to fund his
-big casts quickly. Flamethrower deals true cone damage and leaves permanent fire
-under enemies hit, while Cannon Fire gives range-5 physical pressure with stun
-and splash on crit.
+Little Brother is much more than a basic ranged unit now. Splash Fire turns basic
+crits into 2 true splash around the target. Cannon Fire is a range-5, 10-power
+physical shot that stuns on crit and triggers Splash Fire. Rechargeable Battery
+restores 5 MP whenever he takes magic damage, which can quickly reload his
+10-MP pool. Pissing Contest adds +1 range while any Big Brother is in play.
 
-He is still crit-incentivized and better with Big Brother on board, but permanent
-fire plus true cone pressure is a real plan, not just a gimmick.
+Flamethrower is the main upgrade: 3 true damage in a range-3 cone, leaving
+permanent fire under enemies hit. Flamespitter adds +2 STR and crit chance, gives
+Flamethrower +2 range, and fires it for free after orthogonal basic attacks. He
+still likes crit support and can be resource-gated, but permanent fire plus true
+cone pressure is a real artillery plan.
 
 ---
 
 # B Tier
 
-These are good units that fill real jobs. They are often excellent in the right
-shell, but less automatic than A-tier picks.
+These units are good and draftable, often excellent in the right shell, but less
+automatic than A-tier picks.
 
 ### Fat Cleric - durable main healer
 
-Fat Cleric is hard to remove: 30 HP, DEF 5, Snack Break sustain, Hope, Cleanse,
-Focus Prayer, and a rage revive. She is one of the best units for a grind plan.
-The main reason she is B is comparison pressure: Mystic's Guardian and Purify are
-more universal, while Necromancer/Treant mitigation changes the incoming damage
-equation before healing is needed.
+Fat Cleric is a reliable grind piece. Snack Break restores 1 HP and 1 MP when she
+Defends without moving. Hope is a cheap radius-3 random heal for her and allies,
+Cleanse removes negative statuses from an ally within 5, and Focus Prayer can
+restore 5 HP within 3, with the miss risk of backfiring into a random status.
+
+Second Helping is a rage revive for a fallen ally at 50% HP, statuses cleared, no
+MP restored. Brothers in Arms adds +1 MOVE and +1 DEF beside Fat Knight, Fat
+Wizard, and Fat Bowman. Emergency Snacks makes basics magic while raging and can
+heal 1 HP at turn start up to 3 times, with 5 MP restored if it exits rage. She is
+good, but Mystic's Guardian/Purify and the Necromancer/Treant mitigation auras
+are more draft-warping than raw healing.
 
 ### Angel - status-immune magic support
 
-Angel's low STR is deceptive because Blessed Arrow deals magic damage. He attacks
-armor well, ignores status comps entirely, can Anoint allies for range spikes, and
-has a strong white-tile rage pulse that heals allies and damages enemies without
-spending the action.
+Angel's Blessed Arrow makes basics magic, adds light-tile accuracy/crit rules, and
+blinds on basic crits. Holy Being grants full status immunity, and Inner Strength
+adds crit chance as HP drops. That gives Angel a clean role into armor and status
+teams even with only STR 3.
 
-He is a specialist support, not a main carry. In the right draft he plays above B,
-especially beside Sniper, Paladin, Mystic, or Nemesis.
+Anoint gives an ally +1 range for a turn, which is excellent with Sniper,
+Paladin, Mystic, and other ranged threats. Elevate heals allies standing on light
+tiles anywhere. Heaven's Wrath adds +3 STR and +2 MOVE at rage, and Heavenseeker
+is a no-action global light-tile pulse that heals allies for 2 and deals 2 true
+damage to enemies. Angel can play above B in tile/range shells, but as a blind
+pick he is more specialist support than centerpiece.
 
 ### Witch Doctor - stance rules-editor
 
-Witch Doctor can change the match with one dance. Spirit Stance is a real MP
-battery. Misfortune doubles status odds. Rain amplifies healing. Fire boosts STR.
-Black Death creates a dangerous rage board state.
+Witch Doctor's Dancing Man means the last dance sets his ongoing stance, and the
+stances are powerful but dangerous because several rewrite rules for everyone.
+Rain Dance heals allies globally and enters Rain Stance, making all HP healing +1
+globally and giving Witch Doctor +2 MOVE next turn after attacking. Fire Dance
+gives allies +1 STR for a turn and enters Fire Stance, where Witch Doctor gains
+STR and better crits. Spirit Dance restores 1 MP to every ally and enters Spirit
+Stance, letting attacks restore 3 MP to nearby allies.
 
-The tax is that several stances are global or timing-sensitive, and his standalone
-body is merely fine. He belongs in comps that deliberately abuse the stance.
+Misfortune Dance cleanses every unit, ally and foe, then doubles status chances
+for everyone. Coal Walker gives fire immunity. RAGE unlocks Black Death Dance,
+which gives temporary stats, blinds every unit, and enters Black Death Stance:
+magic immunity for Witch Doctor and 1 true damage to every unit each turn. He is
+powerful, but the global and timing-sensitive nature of the stances makes him a
+planned-shell unit rather than a universal pick.
 
 ### Sniper - anti-turtle specialist
 
-Rifle Powered makes Sniper unique: range 6, shots pierce units and walls, and
-damage never falls below 2. Build Cover is better for him than anyone else because
-he can shoot through it. Smoke Bomb and Throw Cigar add control and chip.
+Sniper's Rifle Powered gives range 6, unit/wall piercing, and a minimum of 2
+damage. That is an unusually clean answer to cover, screens, and low-HP backline
+pieces. Build Cover is better for Sniper than anyone else because his shots pierce
+walls. Smoke Bomb gives range blind control, and Throw Cigar creates a fire tile
+that ticks true damage for 3 turns.
 
-His small MP pool and low team synergy keep him in B, but against screens, walls,
-and slow turtles he is exactly the answer.
+His RAGE Passive adds +1 STR, +1 range, +2 MOVE, move-and-ART, and a straight-ray
+basic attack that damages every enemy in the chosen line. He is B because his MP
+pool is small and the team utility is narrow, but against slow screens and
+fortified boards he is the exact specialist you want.
 
 ### Blacksword - dark-tile duelist
 
-Blacksword has a self-contained combo: Dark Ether guarantees a critical attempt,
-Darkspread blinds the target on crit, then Dark Tick punishes every blinded enemy
-on the board for true damage. Dark Tread rewards dark-tile fights with damage and
-lifesteal, while Banish threatens every enemy on dark tiles at the cost of his life.
+Blacksword has one of the most coherent self-fueled kits. Dark Tread gives blind
+immunity, dark-tile lifesteal, +1/+2 damage into enemies on dark tiles, and +1
+damage taken while standing on light tiles. Dark Rush spends HP to charge through
+tiles for true damage, hitting harder on dark tiles. Dark Ether spends HP to make
+the next basic a guaranteed crit attempt, and Darkspread blinds on any landed
+crit.
 
-The kit is strong but tile-conditional and HP-fueled. He can absolutely carry a
-planned dark/status shell, but blind drafting him asks for more work.
+Void Gravity spends HP to randomly shift nearby enemies, and Dark Tick spends HP
+to deal 3 true damage to every blinded enemy. Banisher adds +2 STR and +1 MOVE at
+rage, while Banish spends all remaining HP to destroy every enemy on dark tiles,
+killing Blacksword. The ceiling is scary, but dark-tile dependence and HP fuel
+make him less stable as a blind pick.
 
 ### Fat Knight - sturdy anti-crit bruiser
 
-Fat Knight is a dependable body. Battle Trauma cancels bonus crit damage and turns
-magic hits into temporary STR, Fart now deals 3 true damage when pushes are blocked,
-Stumble gives true-damage pathing, and Trample is a useful rage line payoff.
+Fat Knight is a dependable frontline body with useful brawler tech. Battle Trauma
+makes magic deal +1 to him, but cancels bonus critical damage and gives +1 STR
+for a turn after taking magic. Stumble lets him path through enemies for 3 true
+damage, while Fart pushes nearby enemies and deals 3 true damage instead when the
+push is blocked.
 
-He is especially good in Fat Squad, but outside it he competes with Clod,
-Gargoyle, Paladin, and Juggernaut for frontline slots.
+Thick Boi resists one incoming status per battle. Brothers in Arms gives +1 STR
+and +1 MOVE with Fat Wizard, Fat Cleric, and Fat Bowman. Trample adds +2 DEF and
++1 MOVE at rage, lets him move through enemies, and adds true damage to crossed
+enemies; Stumble also gains +3 range and Trample damage. He is solid, but the
+frontline slot is crowded by Clod, Gargoyle, Paladin, Monk, and Juggernaut.
 
-### Riot Cop - peeler with a real nerf
+### Riot Cop - peeler with charge economy
 
-Riot Cop still offers a lot: DEF 7, adjacent +1 DEF aura, slow immunity, Cover,
-Stun Gun true damage, Smoke Bomb AoE blind, Shield Bash displacement, and finite
-USES instead of MP. He is a great protection piece.
+Riot Cop brings a lot of protection and control. Utility Belt runs Stun Gun and
+Smoke Bomb on finite charges that refill after a dry turn, and rage refills them
+immediately. The same passive also grants the adjacent +1 DEF aura. Stun Gun is
+range-3 true damage plus slow, stunning adjacent targets or any target while
+raging. Smoke Bomb blinds enemies around an empty tile. Shield Bash is an
+unlimited physical shove with true chip if blocked, and Cover swaps with an ally,
+Defends, and can grant next-turn STR when covering a wounded ally.
 
-The reason he does not rise higher is the current Riot Shield behavior. Defending
-still blanks non-critical magic, but critical magic now gets +1 through, so he is
-not an absolute caster stop. His own damage is also more control than clock.
+Heavy Boots gives slow immunity. Riot Shield reduces ranged basic damage, nullifies
+magic aimed at Riot Cop while Defending, but takes +1 from critical magic hits.
+Lockdown adds +1 STR/MOVE, upgrades Stun Gun, refreshes charges, and the rage ART
+slows nearby units to 1 MOVE while dropping DEF by 2, allies included. He is a
+premium peeler, but the damage clock is modest and critical magic still leaks.
 
 ### Summoner - variable action economy
 
-Summon is one of the highest-ceiling actions in the game: a full-health ghost
-arrives, takes a complete turn, and disappears. Beckon can call a raging ghost,
-which makes the ceiling spectacular. The five-choice Soul Shuffle gives agency
-without making the result deterministic.
+Summoner has the highest variance in the roster. Soul Shuffle offers five shuffled
+non-Summoner, non-commander choices, excludes the last ghost, and redirects ghost
+self-restoration to Summoner. Summon then calls one of those ghosts to an empty
+tile within 3; it arrives at full health, takes a complete turn, then disappears.
 
-That variance is the point and the weakness. The Summoner's own body is fragile
-and low-pressure, and focused burst can end the whole engine.
+Dematerialize gives Summoner a teleport escape. Disturbed Spirit allows move-and-
+ART while raging, and Beckon is the ceiling: a 20-MP rage summon that brings the
+chosen ghost in already raging. The action economy is absurd when the roll and
+position line up, but the Summoner's own 23-HP body is fragile and the output is
+intentionally not deterministic.
 
 ### Fat Bowman - planted turret
 
-Fat Bowman scales hard when allowed to stand still. Heavy Handed rewards long
-range, Planted stacks STR up to +4, Curve Shot pierces units, Dragonsbane has two
-poison rolls, and Desperation Shot creates one huge rage attack.
+Fat Bowman is strong when allowed to hold ground. Heavy Handed creates a range
+damage curve: weak adjacent, normal at 2, stronger at 3+, scaling with range
+buffs. Curve Shot pierces units, Dragonsbane attacks at range then rolls twice for
+permanent poison with crits guaranteeing it, and Planted stacks +1 STR per turn
+without moving up to +4.
 
-The counterplay is direct: force her to move or outrange her. She is strong in
-Siege Line and Fat Squad, less forgiving elsewhere.
+Brothers in Arms gives +1 range with Fat Knight, Fat Wizard, and Fat Cleric.
+Desperation Shot is a one-shot rage spike: +4 STR and +1 range on the next basic,
+Curve Shot, or Dragonsbane, followed by a skipped turn. She can dominate lanes,
+but forced movement, cover-piercing counters, and the skipped-turn rage tax keep
+her in B.
 
 ---
 
 # C Tier
 
-These units have real tools, but their reliable blind-draft value is narrow or
-their floor is unusually punishing.
+These units have real tools, but their blind-draft value is narrower or their
+floor is unusually punishing.
 
 ### Swordsman - fair baseline
 
-Swordsman is not bad. Footwork now deals 3 true damage through enemies, Moonstrike
-and Mage Killer bring useful control, Life Sap sustains, and Quick makes him a
-dangerous low-HP bruiser.
+Swordsman is the honest benchmark. Last Stand gives +3 STR below 3 HP, Footwork
+walks current MOVE + 3 through enemies for 3 true damage, Moonstrike can blind,
+Mage Killer can silence, and Life Sap can heal for half damage dealt. Quick adds
++3 MOVE and +1 STR at rage.
 
-The issue is roster context. Many newer melee units bring auras, immunity, bodyguard
-utility, magic/true pressure, or stronger rage payoffs. Swordsman remains the honest
-benchmark, which puts him below the powered-up specialists.
+None of that is bad. The problem is comparative value: newer melee pieces bring
+team auras, full immunities, bodyguarding, magic/true damage pressure, or stronger
+rage conversions. Swordsman is playable and flexible, but he rarely forces the
+opponent's draft.
 
 ### Miner - self-throttled ranger
 
-Miner can become a functional range-5 ranger after one Ore Harvest, and Blasting
-Cap gives true damage plus displacement. Headlamp is no-roll blind, and max ore
-adds stats and crit chance.
+Miner has a full alternate economy. Ore Harvester / Pickaxe starts him at 0 ore:
+range drops to 1 with no ore, ranged basics spend 1 ore, adjacent basics deal +2,
+max ore gives +1 STR/+1 DEF, wall kills can grant ore, and crit chance scales with
+ore. Ore Harvest gathers 2-5 ore and grants next-turn MOVE, so one harvest turns
+him into a real range-5 threat.
 
-The problem is that ore is everything at once: ammo, crit scaling, stat scaling,
-wall tools, and setup. Shooting spends the same resource he wants to hoard, so his
-long-game output repeatedly pauses for mining.
+Headlamp is no-roll adjacent blind, Shaft Prop spends ore to build a wall,
+Blasting Cap spends ore for true damage, push, blocked true damage, wall removal,
+and stun on crit. Diamond Harvester fills ore on rage and improves crit scaling,
+while Ore Abundance refills to max. The issue is that ore is ammo, setup, crit
+scaling, stats, and utility all at once, so sustained pressure repeatedly pauses
+for mining.
 
 ### Big Brother - narrow anti-heal tech
 
-Big Brother is a real counter-pick. Super Magnet makes basic attacks true damage,
-Magnetic Field blocks healing near him, Polarity Shift flips HP/MP restoration,
-and displacement can ruin formations.
+Big Brother is a counter-pick more than a blind staple. Super Magnet makes basics
+true damage along straight rays, removes critical damage, and makes basic crits
+pull the target adjacent and stun. Force Tug adds range-3 true damage with slow or
+crit stun. Force Push displaces all adjacent units and deals true damage when
+blocked. Magnetic Field prevents healing within 1, except on Big Brother himself.
 
-Into sustain walls, that can be the best tool on the board. Into teams that do
-not rely on healing, his STR 2 clock and short-range control are much less
-threatening.
+Polarity Shift globally swaps HP and MP restoration, while Recharge restores 5 MP
+or 1 HP/+1 next-turn MOVE and ignores Polarity Shift. Pissing Contest grants +1
+STR while any Little Brother is in play. Rogue Mech adds +3 STR/+1 MOVE and free
+ARTS at rage. Into healing teams he can be excellent; into teams that do not care
+about healing, STR 2 and short-range control are easier to ignore.
 
 ### Ronin - awkward isolated duelist
 
-Ronin can hit very hard when isolated, especially with Challenge, Broken Oath,
-Shuriken true poke, and Final Draw's +12 STR rage. He also has crit healing and
-good base melee stats.
+Ronin can win the duel he asks for. Wanderer gives +2 damage when no ally is
+within 3, +1 against isolated enemies, +1 against enemies that missed him last
+turn, and crit lifesteal. Patient Blade Defends and grants next-turn MOVE.
+Flashing Steel is a high-chance blind attack, Broken Oath trades -2 DEF for +1
+MOVE/+1 STR, Challenge creates a mutual +2 damage duel next turn, and Shuriken is
+range-3 true poke.
 
-The awkward part is that his passive wants him away from allies in a 4-unit squad
-game where auras, bodyguards, and healers reward clustering. He is powerful in the
-duel he asks for and uneven everywhere else.
+Final Draw is terrifying: +12 STR and +1 MOVE while raging, with recoil equal to
+attack damage unless it defeats the last enemy. The problem is team structure.
+Most 4-unit squads want clustering for auras, heals, Defend chains, and bodyguards,
+while Ronin wants isolation and accepts recoil risk.
 
 ### King - ceiling/floor split
 
-King commands can be enormous in human hands. Strike, Hold, Pursue, and Higher
-Ground all scale with allied units in RAGE, so a near-dead bruiser squad can become
-terrifying. Rally healing when allies fall also creates comeback moments.
+King has a high human-piloted ceiling but the worst structural floor. Dictator / Spectator
+damages the King for 10 when an allied unit falls, heals other allies
+for 5 when that happens, and restores 10 HP to King when an ally is revived.
+Royal Detachment makes him immune to blind, silence, slow, stun, and poison.
 
-The cost is structural. King cannot move, attack, or Defend; he loses 10 HP when
-an ally falls; and he cannot sustain victory alone. Drafting him blind means
-playing three fighters plus a command engine, and that floor is too low for a
-higher tier despite the ceiling.
+His commands can be enormous: Strike! gives allies STR, Hold! gives DEF and
+healing bonus, Pursue! gives MOVE, and Higher Ground! gives range to attacks and
+ARTS. Each scales by +1 per allied unit in RAGE, and Strike! gets a bonus if it
+follows Pursue!. The tax is that King cannot move, attack, Defend, or sustain
+victory alone, and he must act first. Drafting him means playing three fighters
+plus a command engine, so his blind-draft floor stays C.
 
 ---
 
@@ -374,22 +487,27 @@ higher tier despite the ceiling.
 
 ### Archer - outpaced legacy ranger
 
-Archer has useful pieces: permanent poison, 3-turn slow, poison immunity, range-5
-Volley true damage, and a strong rage accuracy/crit package. The problem is that
-nearly every later ranger or status unit took one of those jobs and sharpened it.
+Archer still has real utility. Close Shot gives bonus damage at short distance,
+Volley Shot is a range-5 cone for 2 true damage per enemy, Poison Arrow applies
+permanent poison on a 60% check, Leg Shot applies a 3-turn -1 MOVE slow, and
+Emblem grants poison immunity. Her RAGE Passive adds +1 STR, +1 range,
+move-and-ART, perfect accuracy, and 50% crit chance.
 
-Sniper out-ranges and pierces cover. Angel deals magic and ignores status. Little
-Brother brings true cone damage and permanent fire. Fat Bowman outscales if
-planted. Virus and Witch Doctor turn status into a whole win condition. Archer is
-playable, but she is the easiest draft slot to upgrade.
+The problem is not that Archer does nothing. It is that several other units cover
+her jobs with more pressure or better defenses: Sniper pierces units and walls
+from longer range, Angel attacks armor with magic and full status immunity, Little
+Brother brings true cone damage and permanent fire, Fat Bowman scales harder when
+planted, and Virus turns poison/status into an actual win condition. Archer is
+playable, but she is the easiest ranged/status slot to upgrade.
 
 ---
 
 ## Final read
 
-The current roster is healthier than a simple S-to-D ladder implies. Most C and D
-units have real comps where they matter, and several B units can play like A when
-the draft lines up. The main meta change is that defensive value is no longer just
-"stack DEF": the best teams combine DEF, Defend, healing, and especially magic
-reduction. That is why Necromancer, Treant, Clod, and Gargoyle all grade higher in
-this refactor, and why Paladin's new defensive tile payoff pushes him into S.
+The roster is closer than a simple S-to-D ladder suggests. Most C and D units have
+matchups where they matter, and many B units become A-level in the right shell.
+The main strategic truth is that defense is not just DEF stacking anymore: the
+best squads combine DEF, Defend, healing, status immunity, magic reduction, and
+true-damage access. That is why Mystic, Necromancer, Gargoyle, Nemesis, Paladin,
+Clod, Treant, and Monk sit so high, and why narrow kits get taxed even when their
+best turn is explosive.
