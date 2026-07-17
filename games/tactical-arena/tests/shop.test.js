@@ -164,7 +164,7 @@ test("shop skin cards offer USD checkout and Valor purchase buttons", () => {
   const valorBuy = buyButtons.find((node) => /Valor$/.test(node.getAttribute("aria-label") ?? ""));
   assert.ok(usdBuy, "skin card should keep the premium USD checkout button");
   assert.ok(valorBuy, "skin card should add a Valor purchase button");
-  assert.equal(valorBuy.getAttribute("aria-label"), "Unlock Summer Vibes for 1,550 Valor");
+  assert.equal(valorBuy.getAttribute("aria-label"), "Unlock Summer Vibes for 850 Valor");
   assert.ok(walk(valorBuy, (node) => hasClass(node, "valor-icon")).length > 0);
 
   valorBuy.click();
@@ -182,7 +182,7 @@ test("shop skin cards offer USD checkout and Valor purchase buttons", () => {
   const cancel = walk(confirm, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-confirm-cancel"))[0];
   const purchase = walk(confirm, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-confirm-purchase"))[0];
   assert.equal(cancel.textContent, "Cancel");
-  assert.equal(purchase.getAttribute("aria-label"), "Purchase Summer Vibes for 1,550 Valor");
+  assert.equal(purchase.getAttribute("aria-label"), "Purchase Summer Vibes for 850 Valor");
   assert.ok(walk(purchase, (node) => hasClass(node, "valor-icon")).length > 0);
   assert.doesNotMatch(visibleText(purchase), /Valor/);
 
@@ -195,7 +195,7 @@ test("shop skin cards offer USD checkout and Valor purchase buttons", () => {
   walk(confirm, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-confirm-purchase"))[0].click();
 
   progress = readUnlockProgress(storage);
-  assert.equal(progress.valorBalance, 1450);
+  assert.equal(progress.valorBalance, 2150);
   assert.ok(progress.purchasedSkins.some((skin) => skin.slug === "summer-vibes"));
   assert.ok(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent.includes("Summer Vibes unlocked"));
   const ownedSkinCard = walk(overlay, (node) => hasClass(node, "shop-skin") && hasClass(node, "is-owned"))[0];
@@ -204,6 +204,28 @@ test("shop skin cards offer USD checkout and Valor purchase buttons", () => {
   assert.equal(ownedButtons.length, 2, "both purchase paths should remain visible as owned");
   assert.ok(ownedButtons.every((node) => node.textContent === "Owned"));
   assert.ok(ownedButtons.every((node) => node.disabled));
+});
+
+test("shop and confirmation show the cancer research proceeds note for Fuck Cancer skins", () => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, { valorBalance: 5000 });
+
+  openShop(storage);
+
+  const overlay = document.body.children[0];
+  const skinsTab = walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Skins")[0];
+  skinsTab.click();
+
+  const skinCard = walk(overlay, (node) => hasClass(node, "shop-skin") && visibleText(node).includes("Fuck Cancer"))[0];
+  assert.ok(skinCard, "shop should render the Fuck Cancer skin");
+  assert.match(visibleText(skinCard), /All proceeds for this skin will be donated for cancer research\./);
+
+  const valorBuy = walk(skinCard, (node) => node.tagName === "BUTTON" && hasClass(node, "is-valor"))[0];
+  valorBuy.click();
+
+  const confirm = walk(overlay, (node) => hasClass(node, "shop-purchase-confirm"))[0];
+  assert.match(visibleText(confirm), /All proceeds for this skin will be donated for cancer research\./);
 });
 
 test("shop unit cards open a detail card and return to unit browsing", () => {

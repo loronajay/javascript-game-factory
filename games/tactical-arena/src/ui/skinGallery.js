@@ -108,6 +108,7 @@ export function openSkinGallery({ initial = null, storage = globalThis.localStor
     copy.appendChild(el("span", "skin-gallery-detail-kicker", def.name));
     copy.appendChild(el("h3", "skin-gallery-detail-title", skin.name));
     copy.appendChild(el("span", "skin-gallery-detail-status", skin.unlocked ? "Unlocked" : "Locked"));
+    if (skin.donationNote) copy.appendChild(el("span", "skin-gallery-detail-note", skin.donationNote));
     detail.appendChild(copy);
 
     body.replaceChildren(detail);

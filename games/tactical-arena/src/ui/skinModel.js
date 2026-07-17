@@ -14,35 +14,19 @@ export const SKIN_RARITIES = Object.freeze({
   COMMON: "common",
   RARE: "rare",
   EPIC: "epic",
-  LEGENDARY: "legendary"
+  LEGENDARY: "legendary",
+  LEGENDARY_PLUS: "legendary+"
 });
 
 const SKIN_PRICE_BY_RARITY = Object.freeze({
-  [SKIN_RARITIES.COMMON]: 199,
-  [SKIN_RARITIES.RARE]: 299,
-  [SKIN_RARITIES.EPIC]: 499,
-  [SKIN_RARITIES.LEGENDARY]: 799,
+  [SKIN_RARITIES.COMMON]: 99,
+  [SKIN_RARITIES.RARE]: 199,
+  [SKIN_RARITIES.EPIC]: 299,
+  [SKIN_RARITIES.LEGENDARY]: 399,
+  [SKIN_RARITIES.LEGENDARY_PLUS]: 499,
 });
 
-const LEGENDARY_SKINS = new Set([
-  "ascended",
-  "gaia-elemental",
-  "galactic-guardian",
-  "judicator",
-  "lunar-goddess",
-  "star-princess",
-  "sun-goddess",
-  "voidroot",
-]);
-
-const EPIC_SKIN_KEYWORDS = [
-  "arcane",
-  "blood-moon",
-  "dragon",
-  "hell",
-  "infernal",
-  "void",
-];
+export const CANCER_RESEARCH_DONATION_NOTE = "All proceeds for this skin will be donated for cancer research.";
 
 function skinName(slug) {
   return String(slug || "")
@@ -66,10 +50,274 @@ function skuPart(value) {
     .replace(/^-+|-+$/g, "");
 }
 
-function skinRarity(slug) {
-  if (LEGENDARY_SKINS.has(slug)) return SKIN_RARITIES.LEGENDARY;
-  if (EPIC_SKIN_KEYWORDS.some((keyword) => slug.includes(keyword))) return SKIN_RARITIES.EPIC;
-  return slug === SUMMER_VIBES_SKIN_SLUG ? SKIN_RARITIES.COMMON : SKIN_RARITIES.RARE;
+function skinKey(type, slug) {
+  return `${type}:${slug}`;
+}
+
+function pack(id, name) {
+  return { packId: id, packName: name };
+}
+
+function meta(rarity, extra = {}) {
+  return Object.freeze({ rarity, ...extra });
+}
+
+const PACK = Object.freeze({
+  ARCANE: pack("arcane", "Arcane Pack"),
+  BLOOD_MOON: pack("blood-moon", "Blood Moon Pack"),
+  DESERT_WARRIORS: pack("desert-warriors", "Desert Warriors Pack"),
+  GEISHA: pack("geisha", "Geisha Pack"),
+  GRIM_REAPER: pack("grim-reaper", "Grim Reaper Pack"),
+  HALLOWEEN: pack("halloween", "Halloween Pack"),
+  INFERNAL: pack("infernal", "Infernal Pack"),
+  MEDIEVAL: pack("medieval", "Medieval Pack"),
+  RIOT_COP: pack("riot-cop", "Riot Cop Pack"),
+  SOUTHERN_KINGDOM: pack("southern-kingdom", "Southern Kingdom Pack"),
+  SUMMER_VIBES: pack("summer-vibes", "Summer Vibes Pack"),
+  VOID_DWELLER: pack("void-dweller", "Void Dweller Pack"),
+});
+
+const AUTHORED_SKIN_METADATA = Object.freeze({
+  [skinKey("swordsman", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("swordsman", "wandering")]: meta(SKIN_RARITIES.COMMON),
+  [skinKey("swordsman", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("swordsman", "enchanted")]: meta(SKIN_RARITIES.RARE, { availabilityNote: "Halloween exclusive" }),
+  [skinKey("swordsman", "pumpkin-knight")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("swordsman", "medieval")]: meta(SKIN_RARITIES.RARE, PACK.MEDIEVAL),
+  [skinKey("swordsman", "grim-reaper")]: meta(SKIN_RARITIES.EPIC, PACK.GRIM_REAPER),
+  [skinKey("swordsman", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
+
+  [skinKey("paladin", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("paladin", "count")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("paladin", "gaia's-protector")]: meta(SKIN_RARITIES.RARE),
+  [skinKey("paladin", "reef-guardian")]: meta(SKIN_RARITIES.RARE),
+  [skinKey("paladin", "southern-kingdom")]: meta(SKIN_RARITIES.EPIC, PACK.SOUTHERN_KINGDOM),
+  [skinKey("paladin", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
+  [skinKey("paladin", "crusader")]: meta(SKIN_RARITIES.LEGENDARY),
+  [skinKey("paladin", "galactic-guardian")]: meta(SKIN_RARITIES.LEGENDARY),
+
+  [skinKey("monk", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("monk", "desert-temple")]: meta(SKIN_RARITIES.RARE, PACK.DESERT_WARRIORS),
+  [skinKey("monk", "mummy")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("monk", "jade-dragon")]: meta(SKIN_RARITIES.RARE),
+  [skinKey("monk", "blue-lightning")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("monk", "artist")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("monk", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
+  [skinKey("monk", "void-dweller")]: meta(SKIN_RARITIES.LEGENDARY, PACK.VOID_DWELLER),
+
+  [skinKey("fat-knight", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("fat-knight", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("fat-knight", "franken-fatigue")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+
+  [skinKey("blacksword", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("blacksword", "judicator")]: meta(SKIN_RARITIES.RARE),
+  [skinKey("blacksword", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
+  [skinKey("blacksword", "blood-knight")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("blacksword", "southern-kingdom")]: meta(SKIN_RARITIES.LEGENDARY, PACK.SOUTHERN_KINGDOM),
+  [skinKey("blacksword", "void-dweller")]: meta(SKIN_RARITIES.LEGENDARY, PACK.VOID_DWELLER),
+  [skinKey("blacksword", "apprentice")]: meta(SKIN_RARITIES.LEGENDARY_PLUS),
+
+  [skinKey("ronin", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("ronin", "armored")]: meta(SKIN_RARITIES.COMMON),
+  [skinKey("ronin", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("ronin", "eastern-vampire")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("ronin", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
+  [skinKey("ronin", "void-dweller")]: meta(SKIN_RARITIES.LEGENDARY, PACK.VOID_DWELLER),
+
+  [skinKey("archer", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("archer", "wandering")]: meta(SKIN_RARITIES.COMMON),
+  [skinKey("archer", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("archer", "desert-warrior")]: meta(SKIN_RARITIES.RARE, PACK.DESERT_WARRIORS),
+  [skinKey("archer", "masquerade")]: meta(SKIN_RARITIES.RARE),
+  [skinKey("archer", "kitty-kat")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("archer", "nature-guardian")]: meta(SKIN_RARITIES.RARE),
+  [skinKey("archer", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
+  [skinKey("archer", "black-widow")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("archer", "vampire")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("archer", "vampire-slayer")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("archer", "floral")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("archer", "blood-rose")]: meta(SKIN_RARITIES.LEGENDARY),
+  [skinKey("archer", "geisha")]: meta(SKIN_RARITIES.LEGENDARY, PACK.GEISHA),
+  [skinKey("archer", "scarlet-rose")]: meta(SKIN_RARITIES.LEGENDARY),
+  [skinKey("archer", "velvet")]: meta(SKIN_RARITIES.LEGENDARY_PLUS),
+
+  [skinKey("sniper", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("sniper", "swamp-combat")]: meta(SKIN_RARITIES.COMMON),
+  [skinKey("sniper", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("sniper", "spooky-ops")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("sniper", "medieval")]: meta(SKIN_RARITIES.RARE, PACK.MEDIEVAL),
+  [skinKey("sniper", "desert-ops")]: meta(SKIN_RARITIES.RARE, PACK.DESERT_WARRIORS),
+  [skinKey("sniper", "grim-reaper")]: meta(SKIN_RARITIES.EPIC, PACK.GRIM_REAPER),
+  [skinKey("sniper", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
+
+  [skinKey("angel", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("angel", "devilish")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("angel", "fallen")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("angel", "raging-storm")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("angel", "southern-kingdom")]: meta(SKIN_RARITIES.EPIC, PACK.SOUTHERN_KINGDOM),
+  [skinKey("angel", "dragonslayer")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("angel", "sol")]: meta(SKIN_RARITIES.LEGENDARY),
+  [skinKey("angel", "void-dweller")]: meta(SKIN_RARITIES.LEGENDARY, PACK.VOID_DWELLER),
+
+  [skinKey("fat-bowman", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("fat-bowman", "kitty-kat")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("fat-bowman", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("fat-bowman", "enchanted")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("fat-bowman", "geisha")]: meta(SKIN_RARITIES.LEGENDARY, PACK.GEISHA),
+  [skinKey("fat-bowman", "violet")]: meta(SKIN_RARITIES.LEGENDARY),
+  [skinKey("fat-bowman", "scarlet-rose")]: meta(SKIN_RARITIES.LEGENDARY_PLUS),
+
+  [skinKey("miner", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("miner", "gold-rush")]: meta(SKIN_RARITIES.COMMON),
+  [skinKey("miner", "jade prospector")]: meta(SKIN_RARITIES.RARE),
+  [skinKey("miner", "shipwreck-scavenger")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("miner", "steampunk-engineer")]: meta(SKIN_RARITIES.RARE),
+  [skinKey("miner", "firefighter")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("miner", "ruin-digger")]: meta(SKIN_RARITIES.EPIC),
+
+  [skinKey("little-brother", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("little-brother", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("little-brother", "arctic-ops")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("little-brother", "crusader-mech")]: meta(SKIN_RARITIES.LEGENDARY),
+  [skinKey("little-brother", "galaxy-defender")]: meta(SKIN_RARITIES.LEGENDARY),
+
+  [skinKey("mystic", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("mystic", "wandering")]: meta(SKIN_RARITIES.COMMON),
+  [skinKey("mystic", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("mystic", "candy-witch")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("mystic", "lunar-goddess")]: meta(SKIN_RARITIES.RARE),
+  [skinKey("mystic", "sun-goddess")]: meta(SKIN_RARITIES.RARE),
+  [skinKey("mystic", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
+  [skinKey("mystic", "enlightened")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("mystic", "floral")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("mystic", "star-princess")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("mystic", "moon-guardian")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("mystic", "nirvana")]: meta(SKIN_RARITIES.LEGENDARY),
+  [skinKey("mystic", "ruby")]: meta(SKIN_RARITIES.LEGENDARY),
+  [skinKey("mystic", "geisha")]: meta(SKIN_RARITIES.LEGENDARY, PACK.GEISHA),
+  [skinKey("mystic", "discord-kitten")]: meta(SKIN_RARITIES.LEGENDARY_PLUS),
+  [skinKey("mystic", "heartbreaker")]: meta(SKIN_RARITIES.LEGENDARY_PLUS),
+
+  [skinKey("witch-doctor", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("witch-doctor", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("witch-doctor", "black-mage")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("witch-doctor", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
+  [skinKey("witch-doctor", "void-dweller")]: meta(SKIN_RARITIES.LEGENDARY, PACK.VOID_DWELLER),
+
+  [skinKey("father-time", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("father-time", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("father-time", "steampunk-wizard")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("father-time", "void-dweller")]: meta(SKIN_RARITIES.LEGENDARY, PACK.VOID_DWELLER),
+
+  [skinKey("king", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("king", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("king", "pumpkin")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("king", "void-dweller")]: meta(SKIN_RARITIES.LEGENDARY, PACK.VOID_DWELLER),
+
+  [skinKey("fat-cleric", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("fat-cleric", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("fat-cleric", "sweet-bliss-angel")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("fat-cleric", "sun-goddess")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("fat-cleric", "nirvana")]: meta(SKIN_RARITIES.LEGENDARY),
+  [skinKey("fat-cleric", "mystic-cosplay")]: meta(SKIN_RARITIES.LEGENDARY_PLUS),
+
+  [skinKey("mother-nature", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("mother-nature", "desert-oasis")]: meta(SKIN_RARITIES.RARE, PACK.DESERT_WARRIORS),
+  [skinKey("mother-nature", "autumn-witch")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("mother-nature", "autumn-spirit")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("mother-nature", "gaia-elemental")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("mother-nature", "everfrost")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("mother-nature", "black-widow")]: meta(SKIN_RARITIES.LEGENDARY),
+  [skinKey("mother-nature", "blood-rose")]: meta(SKIN_RARITIES.LEGENDARY),
+  [skinKey("mother-nature", "geisha")]: meta(SKIN_RARITIES.LEGENDARY, PACK.GEISHA),
+  [skinKey("mother-nature", "bronze-witch")]: meta(SKIN_RARITIES.LEGENDARY_PLUS, { availabilityNote: "Halloween exclusive" }),
+  [skinKey("mother-nature", "discord-kitten")]: meta(SKIN_RARITIES.LEGENDARY_PLUS),
+  [skinKey("mother-nature", "discord-kitten-(alt.)")]: meta(SKIN_RARITIES.LEGENDARY_PLUS),
+
+  [skinKey("magician", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("magician", "wandering")]: meta(SKIN_RARITIES.COMMON),
+  [skinKey("magician", "ghostly")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("magician", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("magician", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
+
+  [skinKey("necromancer", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("necromancer", "trick-or-treat")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("necromancer", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("necromancer", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
+  [skinKey("necromancer", "void-dweller")]: meta(SKIN_RARITIES.LEGENDARY, PACK.VOID_DWELLER),
+
+  [skinKey("nemesis", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("nemesis", "spooky")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("nemesis", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("nemesis", "infernal")]: meta(SKIN_RARITIES.EPIC, PACK.INFERNAL),
+
+  [skinKey("virus", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("virus", "jack-o-lantern")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("virus", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+
+  [skinKey("fat-wizard", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("fat-wizard", "black-mage")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("fat-wizard", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("fat-wizard", "fire-mage")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("fat-wizard", "ice-mage")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("fat-wizard", "lightning-mage")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("fat-wizard", "poison-mage")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("fat-wizard", "void-magic")]: meta(SKIN_RARITIES.LEGENDARY),
+
+  [skinKey("summoner", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
+  [skinKey("summoner", "frostbitten")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("summoner", "ascended")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("summoner", "hellfire")]: meta(SKIN_RARITIES.LEGENDARY),
+  [skinKey("summoner", "void-dweller")]: meta(SKIN_RARITIES.LEGENDARY),
+
+  [skinKey("juggernaut", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("juggernaut", "bio-mech")]: meta(SKIN_RARITIES.COMMON),
+  [skinKey("juggernaut", "pumpkin-mech")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("juggernaut", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("juggernaut", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
+  [skinKey("juggernaut", "holy-mech")]: meta(SKIN_RARITIES.LEGENDARY),
+  [skinKey("juggernaut", "fuck-cancer")]: meta(SKIN_RARITIES.LEGENDARY, { donationNote: CANCER_RESEARCH_DONATION_NOTE }),
+
+  [skinKey("gargoyle", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("gargoyle", "dragon")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("gargoyle", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("gargoyle", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
+  [skinKey("gargoyle", "runic-flame")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("gargoyle", "southern-kingdom")]: meta(SKIN_RARITIES.EPIC, PACK.SOUTHERN_KINGDOM),
+  [skinKey("gargoyle", "holy-guardian")]: meta(SKIN_RARITIES.LEGENDARY),
+  [skinKey("gargoyle", "void-dweller")]: meta(SKIN_RARITIES.LEGENDARY, PACK.VOID_DWELLER),
+
+  [skinKey("clod", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("clod", "scarecrow")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("clod", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("clod", "infernal")]: meta(SKIN_RARITIES.EPIC, PACK.INFERNAL),
+
+  [skinKey("big-brother", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("big-brother", "junkyard-king")]: meta(SKIN_RARITIES.RARE),
+  [skinKey("big-brother", "fire-rescue")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("big-brother", "hell-mech")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("big-brother", "ruin-scavenger")]: meta(SKIN_RARITIES.EPIC),
+
+  [skinKey("riot-cop", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("riot-cop", "transylvanian-guard")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
+  [skinKey("riot-cop", "firefighter")]: meta(SKIN_RARITIES.EPIC, PACK.RIOT_COP),
+  [skinKey("riot-cop", "street-patrol")]: meta(SKIN_RARITIES.EPIC, PACK.RIOT_COP),
+  [skinKey("riot-cop", "swat-team")]: meta(SKIN_RARITIES.EPIC, PACK.RIOT_COP),
+  [skinKey("riot-cop", "snow-patrol")]: meta(SKIN_RARITIES.EPIC, PACK.RIOT_COP),
+  [skinKey("riot-cop", "neon-squad")]: meta(SKIN_RARITIES.LEGENDARY),
+
+  [skinKey("treant", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
+  [skinKey("treant", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
+  [skinKey("treant", "sapling")]: meta(SKIN_RARITIES.RARE),
+  [skinKey("treant", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
+  [skinKey("treant", "rotting")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("treant", "voidroot")]: meta(SKIN_RARITIES.LEGENDARY, PACK.VOID_DWELLER),
+});
+
+function skinMetadata(entry) {
+  return AUTHORED_SKIN_METADATA[skinKey(entry.type, entry.slug)] ?? meta(
+    entry.slug === SUMMER_VIBES_SKIN_SLUG ? SKIN_RARITIES.COMMON : SKIN_RARITIES.RARE
+  );
 }
 
 function sortSkinEntries(left, right) {
@@ -93,7 +341,8 @@ export const SKIN_COLLECTIONS = Object.freeze(collectionSlugs.map((slug) => Obje
 function skin(entry, { status = SKIN_STATUS.UNLOCKED } = {}) {
   const collection = SKIN_COLLECTIONS.find((item) => item.slug === entry.slug);
   const src = `assets/units/skins/${entry.type}/${entry.file}`;
-  const rarity = skinRarity(entry.slug);
+  const metadata = skinMetadata(entry);
+  const rarity = metadata.rarity;
   const id = `skin:${entry.type}:${entry.slug}`;
   const sku = `ta.skin.${skuPart(entry.type)}.${skuPart(entry.slug)}`;
   return Object.freeze({
@@ -101,9 +350,13 @@ function skin(entry, { status = SKIN_STATUS.UNLOCKED } = {}) {
     unitType: entry.type,
     slug: entry.slug,
     name: collection?.name ?? skinName(entry.slug),
-    collection: entry.slug,
-    collectionName: collection?.name ?? skinName(entry.slug),
+    collection: metadata.packId ?? entry.slug,
+    collectionName: metadata.packName ?? collection?.name ?? skinName(entry.slug),
     rarity,
+    packId: metadata.packId ?? null,
+    packName: metadata.packName ?? null,
+    availabilityNote: metadata.availabilityNote ?? null,
+    donationNote: metadata.donationNote ?? null,
     sku,
     entitlementId: id,
     price: Object.freeze({

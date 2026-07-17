@@ -71,7 +71,7 @@ test("unit offers use Valor for active purchases and expose premium USD display 
   assert.equal(skin.price.currency, "USD");
   assert.ok(skin.price.cents > 0);
   assert.match(skin.sku, /^ta\.skin\.swordsman\.medieval$/);
-  assert.equal(formatPremiumPrice(skin.price), "$2.99");
+  assert.equal(formatPremiumPrice(skin.price), "$1.99");
 });
 
 test("unit premium prices follow the invisible star buckets", () => {
@@ -88,21 +88,48 @@ test("skin Valor prices are derived from the USD premium price with a fairer hig
 
   assert.equal(skinValorCost({ kind: "premium", currency: "USD", cents: 99 }), 850);
   assert.equal(skinValorCost({ kind: "premium", currency: "USD", cents: 199 }), 1550);
-  assert.equal(skinValorCost({ kind: "premium", currency: "USD", cents: 799 }), 5300);
+  assert.equal(skinValorCost({ kind: "premium", currency: "USD", cents: 499 }), 3500);
   assert.ok(
     skinValorCost({ kind: "premium", currency: "USD", cents: 199 }) < skinValorCost({ kind: "premium", currency: "USD", cents: 99 }) * 2,
     "the curve should not simply double the Valor cost when the USD price roughly doubles"
   );
   assert.ok(
-    skinValorCost({ kind: "premium", currency: "USD", cents: 799 }) / 7.99 < skinValorCost({ kind: "premium", currency: "USD", cents: 99 }) / 0.99,
+    skinValorCost({ kind: "premium", currency: "USD", cents: 499 }) / 4.99 < skinValorCost({ kind: "premium", currency: "USD", cents: 99 }) / 0.99,
     "higher USD prices should have a lower Valor-per-dollar rate"
   );
-  assert.equal(common.price.cents, 199);
+  assert.equal(common.price.cents, 99);
   assert.deepEqual(common.valorPrice, {
     kind: "valor",
     resourceId: "valor",
-    amount: 1550,
+    amount: 850,
   });
+});
+
+test("skin offers expose the authored rarity price buckets and donation notes", () => {
+  const storage = storageAdapter();
+  const cases = [
+    ["swordsman", "summer-vibes", "common", 99],
+    ["swordsman", "medieval", "rare", 199],
+    ["swordsman", "blood-moon", "epic", 299],
+    ["paladin", "crusader", "legendary", 399],
+    ["blacksword", "apprentice", "legendary+", 499],
+  ];
+
+  for (const [type, slug, rarity, cents] of cases) {
+    const offer = getSkinOffer(type, slug, storage);
+    assert.equal(offer.rarity, rarity, `${type}:${slug} rarity`);
+    assert.equal(offer.price.cents, cents, `${type}:${slug} price`);
+  }
+
+  const charity = getSkinOffer("juggernaut", "fuck-cancer", storage);
+  assert.equal(charity.rarity, "legendary");
+  assert.equal(charity.price.cents, 399);
+  assert.equal(charity.donationNote, "All proceeds for this skin will be donated for cancer research.");
+
+  const arcane = getSkinOffer("swordsman", "arcane", storage);
+  assert.equal(arcane.packName, "Arcane Pack");
+  const exclusive = getSkinOffer("swordsman", "enchanted", storage);
+  assert.equal(exclusive.availabilityNote, "Halloween exclusive");
 });
 
 test("unit Valor costs follow the invisible star buckets", () => {

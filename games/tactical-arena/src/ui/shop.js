@@ -186,7 +186,7 @@ export function openShop(storage = globalThis.localStorage) {
         );
         const grid = el("div", "shop-grid shop-skin-grid");
         for (const offer of unit.offers) {
-          const card = el("article", `shop-item shop-skin is-${offer.rarity}${offer.owned ? " is-owned" : ""}`);
+          const card = el("article", `shop-item shop-skin is-${rarityClass(offer.rarity)}${offer.owned ? " is-owned" : ""}`);
           card.setAttribute("aria-label", `View ${offer.name} skin for ${unit.name}`);
           card.addEventListener("click", () => {
             openSkinViewer({ type: offer.type, slug: offer.slug, storage });
@@ -205,6 +205,7 @@ export function openShop(storage = globalThis.localStorage) {
             el("b", "shop-item-title", offer.name),
             el("span", "shop-item-meta", rarityLabel(offer.rarity)),
           );
+          if (offer.donationNote) copy.appendChild(el("span", "shop-item-note", offer.donationNote));
           card.append(copy, createSkinBuyActions(offer));
           grid.appendChild(card);
         }
@@ -299,6 +300,9 @@ export function openShop(storage = globalThis.localStorage) {
       el("b", "shop-confirm-name", offer.name),
       el("span", "shop-confirm-sub", kind === "skin" ? `Skin for ${offer.unitName}` : "Unit unlock"),
     );
+    if (kind === "skin" && offer.donationNote) {
+      copy.appendChild(el("span", "shop-confirm-note", offer.donationNote));
+    }
     item.appendChild(copy);
 
     const cost = el("div", "shop-confirm-cost");
@@ -441,6 +445,10 @@ function classLabel(value) {
 
 function rarityLabel(value) {
   return classLabel(value);
+}
+
+function rarityClass(value) {
+  return String(value || "common").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase();
 }
 
 function createUnitOwnershipLine(offer) {

@@ -108,14 +108,28 @@ test("newly dropped skin files become selectable by inferred slug", () => {
 
 test("skin entries carry marketplace-ready premium metadata", () => {
   const skin = getSkin("swordsman", "medieval");
+  const common = getSkin("swordsman", "summer-vibes");
+  const epic = getSkin("swordsman", "blood-moon");
+  const legendary = getSkin("paladin", "crusader");
+  const legendaryPlus = getSkin("blacksword", "apprentice");
+  const charity = getSkin("juggernaut", "fuck-cancer");
 
   assert.equal(skin.id, "skin:swordsman:medieval");
   assert.equal(skin.unitType, "swordsman");
   assert.equal(skin.sku, "ta.skin.swordsman.medieval");
   assert.equal(skin.price.kind, "premium");
   assert.equal(skin.price.currency, "USD");
-  assert.equal(skin.price.cents, 299);
-  assert.ok(["common", "rare", "epic", "legendary"].includes(skin.rarity));
+  assert.equal(skin.rarity, "rare");
+  assert.equal(skin.price.cents, 199);
+  assert.equal(common.rarity, "common");
+  assert.equal(common.price.cents, 99);
+  assert.equal(epic.rarity, "epic");
+  assert.equal(epic.price.cents, 299);
+  assert.equal(legendary.rarity, "legendary");
+  assert.equal(legendary.price.cents, 399);
+  assert.equal(legendaryPlus.rarity, "legendary+");
+  assert.equal(legendaryPlus.price.cents, 499);
+  assert.equal(charity.donationNote, "All proceeds for this skin will be donated for cancer research.");
 });
 
 test("unknown or locked skin slugs normalize to classic (every skin is currently locked)", () => {

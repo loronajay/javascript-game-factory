@@ -169,6 +169,18 @@ test("skin viewer opens only the requested skin detail without gallery navigatio
   assert.ok(walk(overlay, (node) => hasClass(node, "skin-gallery-detail-title")).some((node) => node.textContent === "Medieval"));
 });
 
+test("skin viewer shows the cancer research proceeds note for Fuck Cancer skins", () => {
+  globalThis.document = new FakeDocument();
+
+  openSkinViewer({ type: "juggernaut", slug: "fuck-cancer" });
+
+  const overlay = document.body.children[0];
+  assert.ok(walk(overlay, (node) => hasClass(node, "skin-gallery-detail-title")).some((node) => node.textContent === "Fuck Cancer"));
+  assert.ok(walk(overlay, (node) => hasClass(node, "skin-gallery-detail-note")).some((node) =>
+    node.textContent === "All proceeds for this skin will be donated for cancer research."
+  ));
+});
+
 test("skin viewer never falls back to the full skin grid", () => {
   globalThis.document = new FakeDocument();
 
