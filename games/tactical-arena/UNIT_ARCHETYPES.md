@@ -1,13 +1,8 @@
 # Tactical Arena — Unit Archetypes
 
-An audited read of what each unit is *for*: the role it plays, the plan it wants to
+A canonical read of what each unit is *for*: the role it plays, the plan it wants to
 execute, and how its kit interacts with the turn structure. This is a design-reading
 document, not a rules reference — the code and tests are authoritative for numbers.
-
-Audit basis: this pass checked every entry against `src/core/units/*`,
-`src/core/unitRegistry.js`, `src/core/unitCatalog.js`, `src/rules/arts.js`,
-`src/rules/combat.js`, `src/rules/statuses.js`, the reducer lifecycle, and the
-unit-family ART resolvers under `src/core/artResolvers/`.
 
 Roster: 30 draftable units plus the summon-only Ghoul. Descriptions assume the classic
 turn mode (Tempo Battle re-times the same kits against readiness gauges).
@@ -130,7 +125,7 @@ nearly dead. A Swordsman at 4 HP with 6 MOVE and 11 STR is a real threat, not a 
 
 A Swordsman body whose damage is also his team's healing. Hand of Life converts every
 point of physical damage he deals into healing (half, floored) for **other allies within 2
-tiles**, and it now gives the Paladin **+1 DEF while he stands on a white tile**. That
+tiles**, and gives the Paladin **+1 DEF while he stands on a white tile**. That
 single passive rewrites how you position an entire squad: the Paladin is not a lone
 frontliner, he's a mobile healing station whose fuel is aggression. You want your wounded
 units *hugging him* while he swings, preferably while he is braced on his color.
@@ -143,9 +138,9 @@ deals 1 true damage to every enemy within 5 standing on a light tile *without sp
 action*. While the MP lasts, he can move, attack, heal his team, and also chip half the
 enemy board in one activation.
 
-Heaven's Realm (rage) is the stat break the old read was missing: **+2 STR and +1 range**,
-plus **+2 physical strike damage** when both Paladin and target stand on light tiles. That
-turns his rage into a real dueling mode, not just a Darkseeker unlock. Darkseeker itself
+Heaven's Realm (rage) gives him **+2 STR and +1 range**, plus **+2 physical strike damage**
+when both Paladin and target stand on light tiles. That turns his rage into a real dueling
+mode, not just a Darkseeker unlock. Darkseeker itself
 adds the other half: 4 MP for 2 true damage, board-wide, on dark tiles (the two seeker
 pulses share a bonus-action group, so it's one pulse per activation, not both). Recurring
 off-action damage on a unit that already wants to be swinging is the strongest kind of
@@ -165,7 +160,7 @@ That turns both his ARTs from expensive commitments into ordinary plays. Front K
 10-power STR-scaling strike that knocks the target back 3 tiles on a crit, with a built-in
 stun payoff: if the board edge stops that shove, the target is stunned; if one of the
 target's allies stops it, that ally is stunned instead. He can walk into those angles first,
-so Front Kick is now both displacement and impact-stun control. Protect is the bodyguard
+so Front Kick functions as both displacement and impact-stun control. Protect is the bodyguard
 button: he steps to the near side of an ally within 3 and *both* of them Defend, even if
 that ally already acted. That's a
 genuinely rare thing in this game — a reaction, purchased on your own turn.
@@ -536,7 +531,7 @@ backfires and inflicts a random negative status on that same ally. A heal that c
 your own Swordsman is a real gamble, and the weighted table makes stun the rare disaster.
 
 Second Helping (rage) is a **revive** — bring a fallen ally back at 50% HP, with statuses
-cleared but MP unchanged. And Emergency Snacks means rage isn't a death sentence for her:
+cleared but without restoring MP. And Emergency Snacks means rage isn't a death sentence for her:
 her basic attacks become magic, she gains
 +1 HP at the start of each raging turn, and if that nibble lifts her back over the threshold
 she gulps 5 MP too (up to 3 times a battle). She's the healer designed to survive her own
@@ -627,7 +622,7 @@ global commands (all free):
 - **Pursue!** — allies +1 MOVE
 - **Higher Ground!** — allies +1 range, on attacks *and* ARTs, area ARTs included
 
-Every one of those scales by **+1 per allied unit currently in RAGE**. That's the design: as
+Every one of those scales by **+1 per allied unit in RAGE**. That's the design: as
 your squad gets shredded down toward 5 HP, the King's commands get proportionally stronger.
 A King commanding three raging units is handing out +5 STR to the whole team. He's a
 comeback engine. The command buffs do not affect the King himself, so Pursue never makes the
@@ -645,7 +640,7 @@ your other units die, which is a genuinely uncomfortable and interesting bargain
 
 Like the King, she **must act first** every turn. Unlike the King, she fights. Mood Swing /
 Weather Commander is the engine rule: her last weather persists globally until she changes
-it, a new weather charges +1 MOVE for her next turn, and a basic-attack crit restores 10
+it, each weather activation charges +1 MOVE for her next turn, and a basic-attack crit restores 10
 MP. Crucially, **weather affects both teams**. She isn't a buff-bot, she's a rules-editor,
 and you draft her by building a squad that abuses the weather she'll be running.
 
@@ -687,7 +682,8 @@ on his terms* — a 2-MOVE melee unit needs help closing, and he brings the enem
 
 Null Zone (rage) is one of the nastiest passives in the game: +2 STR, +2 MOVE, his **ARTS
 cost no MP**, and **all healing on the board is disabled** — for everyone, everywhere. He
-can no longer be pulled out of rage, but neither can anyone else be saved. He turns the
+stays in rage because healing cannot pull him above the threshold, and nobody else can be
+saved either. He turns the
 endgame into a race with the healers switched off.
 
 Self Destruct (rage) is the exit: 10 true damage to every enemy within 4 tiles, killing him.
