@@ -56,9 +56,12 @@ never loosened, only retargeted/tightened.
       `missions/witch-doctor-swamp/layout.js`; campaignMatch keeps config rules +
       `prepareCampaignMatchState` and re-exports the moved surface through the barrel;
       the 45-line teamNames ternary became a lookup table; dead imports dropped.
-- [ ] **Phase 6 — Split tutorials/basics.js**: `tutorialContent.js`, `tutorialMatchSetup.js`,
-      `tutorialValidation.js`, `tutorialCpu.js`, `tutorialProgress.js`; `basics.js` stays as a
-      barrel so import paths survive (campaignRuntime precedent).
+- [x] **Phase 6 — Split tutorials/basics.js** (1738 → 9-line barrel): `tutorialContent.js`
+      (definitions/constants/scripts), `tutorialMatchSetup.js`, `tutorialValidation.js`
+      (the 5-tutorial state machine), `tutorialCpu.js` (scripted CPU),
+      `tutorialProgress.js` (persistence), `tutorialRuntimeHelpers.js` (shared
+      setStage/predicates/pathing); `basics.js` is a pure barrel enforced by the
+      architecture test, so all import paths survive.
 - [ ] **Phase 7 — Within-file refactors**: `handleTile`/`handleActionClick` → per-mode handler maps;
       `instantArtPresenter` → presenter registry Map (mirrors `ART_RESOLVERS`);
       reducer → `src/core/basicAttack.js` + `src/core/activationPassives.js`;
