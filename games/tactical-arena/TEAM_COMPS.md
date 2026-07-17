@@ -128,7 +128,8 @@ Relay Power, all of it).
   while also running a −1-team-magic Grove Ward. His Petrify (rage) becomes an invulnerable
   2-turn heal-pulse for the whole cluster.
 - **Fat Cleric + Paladin** are two more heal engines; every one of their numbers is +1 from
-  the weather. Paladin's Hand of Life turns his aggression into team healing, now amplified.
+  the weather. Paladin's Hand of Life turns his aggression into team healing, now amplified,
+  and white tiles give him +1 DEF while he anchors the cluster.
 
 **Pilot line:** set Spring Shower and keep it up; the enemy healing +1 too rarely matters
 because you brought three healers and they didn't. Hug the Paladin with your wounded units.
@@ -170,9 +171,10 @@ Built on the two cleanest **bonus actions** in the game — pulses that fire *wi
 spending the unit's activation*, so you get them on top of a normal move-and-attack every
 single turn.
 
-- **Paladin / Lightseeker** chips 1 true to every enemy on a **light** tile within 5;
-  **Angel / Heavenseeker** (rage) does 2 true to enemies on **white** tiles board-wide and
-  heals your units on them. Half the board is always working for you, for free.
+- **Paladin / Lightseeker** chips 1 true to every enemy on a **light** tile within 5, and
+  the same color now gives Paladin +1 DEF while he stands on it. **Angel / Heavenseeker**
+  (rage) does 2 true to enemies on **white** tiles board-wide and heals your units on them.
+  Half the board is always working for you, for free.
 - **Angel** is a magic-damage support that ignores DEF and gets better as he's hurt; his
   **Anoint** hands the **Sniper +1 range**, pushing an already-6-range pierce gun to 7.
 - **Mystic** anchors it: unconditional **+1 team DEF**, board-wide Wish healing, and Purify.
@@ -249,8 +251,9 @@ any triple-healer). It attacks the *rules of healing*, not the HP bars.
 - **Juggernaut**'s Null Zone (rage) **disables all healing on the board** and gives him free
   ARTs; **Tether Grab** hauls an enemy healer out of their back line and into your fists.
 - **Pissing Contest** rewards the brother pair (Big Brother +1 STR, Little Brother +1 range
-  while both live). **Little Brother** adds crit splash artillery; **Mystic** is your own
-  +1-DEF anchor and cleanse.
+  while both live). **Little Brother** adds crit splash artillery, permanent-fire
+  Flamethrower pressure, and a +5 MP battery trigger when magic hits him; **Mystic** is your
+  own +1-DEF anchor and cleanse.
 
 **Pilot line:** identify the enemy healer and make healing illegal around it — walk Big
 Brother onto it, Tether it out, or flip Polarity right as they try to top up. Against a

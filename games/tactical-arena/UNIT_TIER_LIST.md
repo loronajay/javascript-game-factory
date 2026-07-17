@@ -16,9 +16,9 @@ flexibility across the draft, not by ceiling in one perfect comp.
 - **Gargoyle** — immovable, fully status-immune, pierce-AoE, and the best rage in the roster
 
 ## A — strong and flexible
-- **Paladin** — lifelink aura + full status immunity + free bonus-action chip on a STR-10 body
+- **Paladin** — lifelink aura + white-tile DEF + full status immunity + free bonus-action chip
 - **Clod** — highest DEF; negates *all* physical while defending; phalanx anchor
-- **Monk** — permanent move-and-ART, ignore-body movement, and an on-turn bodyguard reaction
+- **Monk** — permanent move-and-ART, ignore-body movement, impact-stun kick, and bodyguard reaction
 - **Juggernaut** — board-wide heal lockout in rage (un-rageable), efficient true-AoE finisher
 - **Magician** — the clean armor solvent; self-refueling; Nuke rage wipes clusters
 - **Fat Wizard** — durable self-sufficient caster/healer; Lazy Cast rage is a win condition
@@ -31,8 +31,8 @@ flexibility across the draft, not by ceiling in one perfect comp.
 - **Mother Nature** — weather rules-editor, 100 MP, roll-free control (A-ceiling in a built squad)
 - **Fat Cleric** — the most durable healer; cleanse + revive; survives her own rage
 - **Sniper** — longest range, pierces walls *and* bodies; the anti-turtle pick
-- **Riot Cop** — sturdy peeler; nullifies magic while defending; cooldown-style economy
-- **Little Brother** — crit-splash artillery; casters refuel him
+- **Riot Cop** — sturdy peeler; blanks non-critical magic while defending; cooldown-style economy
+- **Little Brother** — crit-splash/fire artillery; casters refuel him hard
 - **Fat Knight** — anti-crit brick; Trample rage line-damage
 - **Treant** — −1 team magic taken + positional DEF + invulnerable heal-pulse rage
 - **Blacksword** — dark-tile duelist with a real self-chain combo and a board-wipe ultimate

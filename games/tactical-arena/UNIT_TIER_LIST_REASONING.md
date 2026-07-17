@@ -97,20 +97,22 @@ or a role that's a notch below format-defining.
 ### Paladin — the cleanest value bruiser
 Hand of Life turns **every point of physical damage he deals into healing for allies within
 2 tiles** — a lifesteal aura on a STR-10 body, which rewrites how you position a whole squad.
-Chosen makes him **immune to poison, slow, blind, silence, and stun** — a hard anchor against
-any control comp. And Lightseeker is a **bonus action** (1 true to every enemy on a light tile
-within 5, *without spending his turn*), upgraded by Darkseeker in rage. Free recurring chip
-on a unit that already wants to be swinging is the best kind of value here. He's just below S
-because his damage and healing are both *physical* (they fall off into armor — into a DEF-8
-Clod his hit and therefore his heal are near zero) and his chip is tile-gated to half the
-board. Elite, but conditional where the S units are not.
+It also gives him **+1 DEF while standing on a white tile**, so his preferred Lightseeker
+footing is now defensive as well as offensive. Chosen makes him **immune to poison, slow,
+blind, silence, and stun** — a hard anchor against any control comp. And Lightseeker is a
+**bonus action** (1 true to every enemy on a light tile within 5, *without spending his
+turn*), upgraded by Darkseeker in rage. Free recurring chip on a unit that already wants to
+be swinging is the best kind of value here. He's just below S because his damage and healing
+are both *physical* (they fall off into armor — into a DEF-8 Clod his hit and therefore his
+heal are near zero) and his chip/extra DEF are tile-gated to half the board. Elite, but
+conditional where the S units are not.
 
 ### Clod — the physical wall
 Highest DEF in the game (8), and Rock Hard means that **while Defending he negates physical
 damage entirely** — not halves, zero — and refunds 3 MP per hit, so an enemy melee squad
 literally *refuels* him by attacking. Brick House turns him into a phalanx pivot (+1 DEF to
 huddled allies, +1 STR to him per sheltered ally). Quake (scaling magic AoE, self-refunding on
-a full-team hit), Stone Throw (control), and Thunderous Charge (rage true-blast + mass stun)
+a 3+ target hit), Stone Throw (control), and Thunderous Charge (rage true-blast + mass stun)
 give him a real offense too. A tier rather than S only because Rock Hard is *binary* — it's
 inert against magic, and a magic pile ignores everything that makes him special.
 
@@ -118,9 +120,10 @@ inert against magic, and a magic pile ignores everything that makes him special.
 Shadow Step is one of the best passives in the game: he moves on a **radius** (diagonals, and
 bodies/walls don't block him because only the destination is checked) **and may move and use
 an ART in the same activation, always** — the thing every other unit needs rage for, from turn
-one. That turns Front Kick (STR-scaling strike, knockback on crit) and Protect (an *on-your-turn
-reaction* — step to an ally and both Defend, even if they acted) from commitments into ordinary
-plays. Blind-immune, +1 STR per 5 missing HP, and a scaling rage. Held out of S only by melee
+one. That turns Front Kick (STR-scaling strike, crit knockback that can stun on impact with the
+board edge or the target's own ally) and Protect (an *on-your-turn reaction* — step to an ally
+and both Defend, even if they acted) from commitments into ordinary plays. Blind-immune, +1 STR
+per 5 missing HP, and a scaling rage. Held out of S only by melee
 range 1 / base 2 MOVE and a lower damage ceiling than the casters — but as a bodyguard/skirmisher
 he's premier.
 
@@ -129,7 +132,7 @@ Null Zone (rage) is one of the nastiest passives in the roster: +2 STR/+2 MOVE, 
 no MP**, and **all healing on the board is disabled for everyone** — which also means he can't
 be pulled out of rage, and neither can any healer save anyone. That single mode hard-counters
 the entire sustain half of the game. Self Destruct is a guaranteed 10-true r4 finisher whose
-only cost is the unit itself, and Bruiser Mode (STR 10 / MOVE 3 at 0 MP) means empty is his
+only cost is the unit itself, and Bruiser Mode (STR 10 / MOVE 4 at 0 MP) means empty is his
 combat form. A rather than S because he's a 2-MOVE melee whose best mode requires being at
 ≤5 HP, and non-raging he's a clunky 5-MP tank that needs Tether Grab just to start a fight.
 
@@ -165,7 +168,7 @@ best unit in the game; when they do, he's a mid caster.
 Time Steal deals **1 true damage every turn to every enemy within 2 tiles** — unavoidable,
 undefendable, DEF-ignoring — and refunds him 1 MP per point dealt, so standing near him is a
 slow death that *funds his spells*. Against a melee squad that must close on him, that's free
-damage forever. Age rewrites stat lines permanently (−1 to an enemy, or +1 to an ally, until
+damage forever. Age rewrites stat lines permanently within range 4 (−1 to an enemy, or +1 to an ally, until
 he dies), and Rewind (rage) is a **full-HP revive with statuses cleared** — the single biggest
 swing any unit can make. Stun/slow immune. A rather than S because his aura is short-range and
 his headline play (Rewind) is expensive and rage-locked.
@@ -179,7 +182,7 @@ condition. First picks in the right draft, not in a blind one.
 
 ### Angel — anti-armor support with an anti-meta anchor
 STR 3 is misleading: his basic is **magic that ignores DEF** and scales with *every* STR
-source (King's Strike, Fire Dance, Nemesis's +1, his own +2 rage), so he out-damages physical
+source (King's Strike, Fire Dance, Nemesis's +1, his own +3 rage), so he out-damages physical
 rangers into armor. Holy Being makes him **immune to every status** — a hard anti-Contagion
 anchor — and Heavenseeker (rage) is a **bonus action** doing board-wide white-tile chip *and*
 heal without spending his turn. Anoint hands an ally +1 range (huge on a Sniper). Held at B by
@@ -220,16 +223,17 @@ turtle/screen comp.
 ### Riot Cop — the sturdy peeler
 No MP — his gear runs on **finite USES** (the only cooldown-style economy), so he's always able
 to do *something*. Riot Shield hard-counters two damage categories: −1 from ranged basics and
-**full magic nullification while Defending**. With DEF 7, Heavy Boots (slow immunity), and a +1
-DEF ally aura, he's among the hardest units to remove. Cover is the cleanest bodyguard action in
-the game (swap places with an ally and Defend). Lockdown rage clamps everyone nearby to 1 MOVE /
-−2 DEF. Solid, sturdy utility across the board.
+**full non-critical magic nullification while Defending** (critical magic still gets +1 through).
+With DEF 7, Heavy Boots (slow immunity), and a +1 DEF ally aura, he's among the hardest units to
+remove. Cover is the cleanest bodyguard action in the game (swap places with an ally and Defend).
+Lockdown rage clamps everyone nearby to 1 MOVE / −2 DEF. Solid, sturdy utility across the board.
 
 ### Little Brother — crit-splash artillery
 Cannon Fire (fixed 10 physical, stun + splash on crit) and Splash Fire (crit basics deal 2 true
 in a radius) make him a crit-fishing area gun; Rechargeable Battery means enemy casters refuel
-him (+3 MP per magic hit). Flamespitter rage fires Flamethrower *free* after orthogonal basics —
-an attack + a cone in one turn. B because his payoff is crit-dependent and he's noticeably better
+him (+5 MP per magic hit). Flamethrower also leaves permanent fire under enemies hit, so his cone
+creates lasting terrain pressure instead of only a damage burst. Flamespitter rage fires
+Flamethrower *free* after orthogonal basics — an attack + a cone in one turn. B because his payoff is crit-dependent and he's noticeably better
 paired with Big Brother (Pissing Contest).
 
 ### Fat Knight — the anti-crit brick

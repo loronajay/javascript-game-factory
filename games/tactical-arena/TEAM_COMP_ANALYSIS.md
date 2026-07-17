@@ -2,17 +2,27 @@
 
 A grounded read of the current roster for balancing. Every claim here is traced to
 the actual unit data (`src/core/units/*.js`) and the resolvers
-(`rules/combat.js`, `rules/damage.js`, `core/unitCatalog.js`) as of 2026-07-07.
+(`rules/combat.js`, `rules/damage.js`, `core/unitCatalog.js`) as of 2026-07-17.
 Squads are **4 units**, duplicates allowed in casual/hot-seat, board 13×13 or 15×15,
 RAGE auto-triggers at **≤5 HP**.
 
 ## Balance changelog
 
+- **2026-07-17 — post-doc unit tuning pass:** **Paladin** now gains +1 DEF while standing
+  on white tiles, making Lightseeker footing defensive as well as offensive. **Monk's
+  Front Kick** now converts blocked crit knockback into stuns (edge stuns the target; an
+  allied body blocking the shove stuns that ally). **Little Brother** got a stronger
+  Rechargeable Battery (`+3 → +5` MP from magic damage) and Flamethrower now leaves
+  permanent fire under enemies it hits. **Clod's Quake** refunds on 3+ targets instead of
+  requiring the whole enemy team. **Father Time's Age** is now explicitly range 4.
+  **Riot Cop** still blanks non-critical magic while defending, but critical magic now gets
+  +1 damage through.
 - **2026-07-07 — first true-damage nudge (anti-wall):** **Footwork** (Swordsman)
   `2 → 3` true and **Fart** (Fat Knight) `2 → 3` true. Motivated by the sim finding that
   the dedicated true-damage comp couldn't out-pace stacked healers. More true-damage
   sources are planned; the Nemesis passive→aura change is still under consideration.
-  **The simulation tables below predate this buff** — they need a re-run to reflect it.
+  **The simulation tables below predate this buff and the later July 17 tuning** — they
+  need a re-run to reflect it.
 - **King left as-is (by design):** an earlier note floated reducing the King's −10-HP-per-
   ally-fallen. That was reverted — **it is intentional**: the King is a non-combatant whose
   HP *is* a readout of squad cohesion (30 HP ≈ 3 allies × 10). His fragility is the cost of
@@ -53,26 +63,35 @@ these auras is entirely in the *first* copy.
 | Unit | HP | MP | MOV | RNG | STR | DEF | Class | Role |
 |---|---:|---:|---:|---:|---:|---:|---|---|
 | Swordsman | 25 | 20 | 3 | 1 | 10 | 5 | melee | bruiser |
-| Paladin | 26 | 24 | 3 | 1 | 10 | 5 | melee | bruiser + heal-aura |
-| Monk | 26 | 25 | 2 | 1 | 9 | 6 | melee | skirmisher |
 | Archer | 24 | 22 | 2 | 5 | 8 | 4 | ranger | ranged |
-| Sniper | 23 | 18 | 2 | 6 | 8 | 3 | ranger | ranged/pierce |
-| Angel | 24 | 37 | 2 | 5 | 3 | 3 | ranger | support |
 | Mystic | 23 | 38 | 2 | 5 | 5 | 3 | support | healer/DEF aura |
+| Magician | 23 | 40 | 2 | 5 | 6 | 3 | mage | nuker |
+| Paladin | 26 | 24 | 3 | 1 | 10 | 5 | melee | bruiser + heal-aura (DEF 6 on white) |
+| Necromancer | 23 | 36 | 3 | 5 | 6 | 3 | mage | debuff/summon |
+| Sniper | 23 | 18 | 2 | 6 | 8 | 3 | ranger | ranged/pierce |
 | Witch Doctor | 24 | 30 | 2 | 4 | 8 | 3 | support | stance-caster |
 | Father Time | 25 | 30 | 2 | 5 | 7 | 3 | support | controller/revive |
-| Magician | 23 | 40 | 2 | 5 | 6 | 3 | mage | nuker |
-| Necromancer | 23 | 36 | 3 | 5 | 6 | 3 | mage | debuff/summon |
+| Juggernaut | 30 | 5 | 2 | 1 | 8 | 7 | tank | bruiser (STR10/MOV4 @0MP) |
+| King | 30 | 0 | 0 | 0 | 0 | 0 | support | non-combatant commander |
+| Angel | 24 | 37 | 2 | 5 | 3 | 3 | ranger | support |
+| Monk | 26 | 25 | 2 | 1 | 9 | 6 | melee | skirmisher |
+| Gargoyle | 30 | 20 | 2 | 1 | 9 | 7 | tank | thorns/immunity |
 | Nemesis | 25 | 45 | 3 | 5 | 7 | 2 | mage | **magic amplifier** |
 | Virus | 25 | 36 | 3 | 5 | 6 | 3 | mage | contagion |
-| Juggernaut | 30 | 5 | 2 | 1 | 8 | 7 | tank | bruiser (STR10/MOV3 @0MP) |
-| Gargoyle | 30 | 20 | 2 | 1 | 10 | 7 | tank | thorns/immunity |
 | Clod | 30 | 20 | 2 | 1 | 9 | 8 | tank | phys-negate |
-| King | 30 | 0 | 0 | 0 | 0 | 0 | support | non-combatant commander |
 | Fat Knight | 30 | 20 | 2 | 1 | 10 | 6 | melee | bruiser |
 | Fat Wizard | 30 | 35 | 2 | 3 | 7 | 4 | mage | splash caster |
 | Fat Cleric | 30 | 35 | 2 | 4 | 7 | 5 | support | healer |
-| Fat Bowman | 30 | 25 | 2 | 4 | 8 | 5 | ranger | ranged |
+| Fat Bowman | 30 | 25 | 2 | 4 | 7 | 5 | ranger | ranged |
+| Miner | 25 | 25 | 2 | 5 | 8 | 4 | ranger | ore economy |
+| Big Brother | 30 | 5 | 2 | 3 | 2 | 8 | tank | anti-heal/control |
+| Little Brother | 25 | 10 | 2 | 4 | 8 | 6 | ranger | splash/fire artillery |
+| Blacksword | 30 | 0 | 3 | 1 | 10 | 6 | melee | dark-tile duelist |
+| Ronin | 28 | 20 | 3 | 1 | 10 | 5 | melee | isolation duelist |
+| Mother Nature | 25 | 100 | 3 | 6 | 7 | 3 | support | weather commander |
+| Summoner | 23 | 100 | 2 | 5 | 6 | 4 | support | ghost tempo |
+| Riot Cop | 30 | 0 | 3 | 1 | 8 | 7 | tank | peel/control |
+| Treant | 30 | 30 | 2 | 2 | 7 | 6 | tank | sustain/magic ward |
 
 ---
 
@@ -123,7 +142,8 @@ lockout** (only a raging *enemy* Juggernaut can shut healing off).
 - **Mystic / Guardian**: unconditional **+1 DEF to the whole team** while alive, plus
   Pray (3 AoE r3), Wish (1 global), Purify (cleanse), Silence.
 - **Paladin / Hand of Life**: every physical hit he lands heals allies within 2 for
-  **half the damage** — a lifesteal aura attached to a STR-10 body.
+  **half the damage** — a lifesteal aura attached to a STR-10 body, with +1 DEF while he
+  stands on a white tile.
 - **Fat Cleric**: **Hope** (1–4 AoE r3, 3 MP), Focus Prayer (5 single), Cleanse,
   Snack Break (+1 HP/+1 MP on a no-move defend), Emergency Snacks rage regen.
 - **Gargoyle** (DEF 7 → **8** under Guardian, 30 HP): Stone Body thorns, total
@@ -208,7 +228,8 @@ in Nemesis-led magic.
 
 A clean midline benchmark. Rage unlocks Magician's Nuke, Mystic goes +6 MOVE +
 damage-halving, Swordsman +3 MOVE/+1 STR (+3 STR under 3 HP via Last Stand), Paladin
-+2 STR/+1 range with light-tile bonus. Mystic's Guardian + Pray sustains. Nothing
++2 STR/+1 range with light-tile bonus and +1 DEF on white tiles. Mystic's Guardian + Pray
+sustains. Nothing
 degenerate — this is what "fair and strong" should feel like; measure the Tier-S comps
 against it.
 
@@ -225,11 +246,11 @@ against it.
 - **Clod / Rock Hard** — the *passive* is binary: while defending it negates **all**
   physical damage (+3 MP per hit), so Clod is a hard wall against physical teams and the
   passive is simply inert against magic. The unit itself is not dead weight vs magic
-  (Quake AoE, Stone Throw control, Brick House +1-DEF aura / +1 STR per sheltered ally,
-  Thunderous Charge) — but the all-or-nothing physical negation is a swingy design lever
-  worth watching.
+  (Quake AoE with refund on 3+ targets, Stone Throw control, Brick House +1-DEF aura /
+  +1 STR per sheltered ally, Thunderous Charge) — but the all-or-nothing physical negation
+  is a swingy design lever worth watching.
 - **Juggernaut / Self Destruct** — 10 true AoE r4, guaranteed, only "cost" is the unit
-  itself; a very efficient trade/finisher. Bruiser Mode (STR 10/MOVE 3 at 0 MP) means
+  itself; a very efficient trade/finisher. Bruiser Mode (STR 10/MOVE 4 at 0 MP) means
   it *wants* to be empty.
 - **Witch Doctor / Misfortune** — a global ×2 status multiplier on one cheap dance is
   the strongest status enabler; watch it with any status comp.
@@ -237,20 +258,30 @@ against it.
   Its basic attack deals **magic that scales with effective STR and ignores DEF**, so the
   low base STR (3) is misleading: it *out-damages physical rangers against armor* (3 into
   a DEF-8 Clod, where a STR-8 Swordsman does 1) and it grows with **every** STR source —
-  King's Strike, Fire Dance, its own +2 rage, and Nemesis's team +1 magic all stack onto
+  King's Strike, Fire Dance, its own +3 rage, and Nemesis's team +1 magic all stack onto
   it. Pair that with **full status immunity** (Holy Being — a hard anti-Contagion anchor,
   see the counterplay list), Inner Strength ramping crit-and-blind as it drops, and ally
   utility (Anoint +range, Elevate / Heavenseeker white-tile heal+damage). Judge it as
   anti-armor support, not by raw STR — it wasn't tested in the sim and shouldn't be
   flagged for a buff on the "STR 3 = trivial" reasoning.
+- **Monk** — Front Kick now has real impact control: a crit knockback that hits the board
+  edge stuns the target, and a shove blocked by one of the target's allies stuns that ally.
+  That makes his permanent move-and-ART more threatening because he can choose the angle
+  before kicking.
+- **Little Brother** — Rechargeable Battery now restores **5 MP per magic hit**, enough to
+  pay for Cannon Fire or Flamethrower immediately. Flamethrower also leaves permanent fire,
+  so his cone is now terrain pressure as well as true damage.
+- **Riot Cop** — still a premium peeler, but Riot Shield is no longer absolute against
+  critical magic while defending: non-critical magic is blanked, critical magic gets +1
+  through. The ranged-basic reduction also no longer floors damage at 0.
 - **Sniper** — excellent poke (range 6, pierces walls *and* bodies, min-2 floor) but a
   small MP pool (18) and no team synergy; a solo carry rather than a comp piece.
 
 ## Counterplay axes (so nerfs target the right thing)
 
 - **True damage** ignores DEF *and* Defend (Volley, Footwork/Stumble, Time Steal, Fart,
-  Flight, Poison Tick, Juggernaut/Virus rage blasts, Clod's Thunderous Charge) — the
-  theoretical answer to a wall. **But the sim showed the theory doesn't carry:** the
+  Flight, Flamethrower, Poison Tick, Juggernaut/Virus rage blasts, Clod's Thunderous
+  Charge) — the theoretical answer to a wall. **But the sim showed the theory doesn't carry:** the
   dedicated true-damage comp (`truedmg`) lost to Wall **96%**, because the *throughput* of
   the CPU-usable true sources is far below what three stacked healers repair each turn. The
   practical wall-breaker turned out to be **out-tanking + magic reduction** (Fortress),
@@ -266,9 +297,10 @@ against it.
 
 ## Simulation results (empirical backing)
 
-> ⚠ **These tables predate the 2026-07-07 Footwork/Fart buff** (see the changelog up top).
-> The comps that use those arts — `classic`, `baseline`, `king`, `truedmg`, `fatsquad` —
-> should now perform somewhat better than shown; re-run `node scripts/comp-sim.mjs --seeds 12`
+> ⚠ **These tables predate the 2026-07-07 Footwork/Fart buff and the 2026-07-17 post-doc
+> tuning pass** (see the changelog up top). The comps that use those arts — `classic`,
+> `baseline`, `king`, `truedmg`, `fatsquad`, and Little Brother / Paladin shells — should
+> now perform somewhat differently than shown; re-run `node scripts/comp-sim.mjs --seeds 12`
 > to refresh before drawing new conclusions.
 
 The comps below were run head-to-head through the **real reducer + real CPU** — no

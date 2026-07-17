@@ -123,9 +123,10 @@ nearly dead. A Swordsman at 4 HP with 6 MOVE and 11 STR is a real threat, not a 
 
 A Swordsman body whose damage is also his team's healing. Hand of Life converts every
 point of physical damage he deals into healing (half, floored) for **every ally within 2
-tiles**. That single passive rewrites how you position an entire squad: the Paladin is not
-a lone frontliner, he's a mobile healing station whose fuel is aggression. You want your
-wounded units *hugging him* while he swings.
+tiles**, and it now gives the Paladin **+1 DEF while he stands on a white tile**. That
+single passive rewrites how you position an entire squad: the Paladin is not a lone
+frontliner, he's a mobile healing station whose fuel is aggression. You want your wounded
+units *hugging him* while he swings, preferably while he is braced on his color.
 
 Chosen makes him immune to poison, slow, blind, silence, and stun — he simply cannot be
 controlled, which makes him the natural answer to a status-lock composition.
@@ -149,9 +150,11 @@ may **move and use an ART in the same activation, always**. Every other unit tha
 has to be at 5 HP first. The Monk has it from turn one.
 
 That turns both his ARTs from expensive commitments into ordinary plays. Front Kick is a
-10-power STR-scaling strike that knocks the target back 3 tiles on a crit — and he can
-walk into position first. Protect is the bodyguard button: he steps to the near side of an
-ally within 3 and *both* of them Defend, even if that ally already acted. That's a
+10-power STR-scaling strike that knocks the target back 3 tiles on a crit — and if the
+board edge stops that shove, the target is stunned; if one of the target's allies stops it,
+that ally is stunned instead. He can walk into those angles first. Protect is the bodyguard
+button: he steps to the near side of an ally within 3 and *both* of them Defend, even if
+that ally already acted. That's a
 genuinely rare thing in this game — a reaction, purchased on your own turn.
 
 Heightened Sense (blind immunity, +1 STR per 5 missing HP) and Nirvana (rage: +2 MOVE, +1
@@ -286,12 +289,13 @@ and then she **skips her next turn entirely**. One enormous shot for a full acti
 
 A short-budget, high-impact gun. Only 10 MP total, so realistically two ARTs a match — but
 both are big. Cannon Fire is a fixed 10-power physical shot at range 5 that stuns on a crit
-and triggers his splash; Flamethrower is a 3-true-damage cone.
+and triggers his splash; Flamethrower is a 3-true-damage cone that leaves permanent fire
+under every enemy it hits.
 
 Splash Fire is the passive that defines him: a **critical basic attack** deals 2 true damage
 to everything within 1 tile of the target. He's a crit-fishing area unit — the ideal target
 is an enemy standing in a clump, and every basic attack is a 15% lottery ticket for a
-mini-AoE. Rechargeable Battery (+3 MP whenever he takes magic damage) means enemy casters
+mini-AoE. Rechargeable Battery (+5 MP whenever he takes magic damage) means enemy casters
 actively refill him.
 
 Flamespitter (rage) is his blowout: +2 STR, +5% crit, and **Flamethrower fires for free
@@ -558,10 +562,10 @@ MP for every point dealt. Standing next to Father Time is a slow death that pays
 spells. He is an attrition zone with legs, and against a melee squad that has to close on
 him, he's free damage forever.
 
-Age is a permanent commitment: +1 STR or DEF to an ally, or **−1 to an enemy**, lasting
-until Father Time himself is defeated. Stack a few of those and you've quietly rewritten
-the stat lines of the whole fight — which makes him a high-priority kill, and makes killing
-him *undo* his work, which is a satisfying loop.
+Age is a permanent commitment: +1 STR or DEF to an ally within 4, or **−1 to an enemy**
+within 4, lasting until Father Time himself is defeated. Stack a few of those and you've
+quietly rewritten the stat lines of the whole fight — which makes him a high-priority kill,
+and makes killing him *undo* his work, which is a satisfying loop.
 
 Time Stretch hastes an ally or slows an enemy. Father of Time makes him immune to stun and
 slow.
@@ -686,8 +690,8 @@ half of the game, and the enemy melee squad *refuels him* by attacking. The only
 is magic — which is precisely why he's paired with a Mystic or a Necromancer in practice.
 
 Quake deals `3 + (number of enemies hit)` magic damage in a 3-tile radius and **refunds its
-own MP if it catches the whole enemy team**. Stone Throw hurls a boulder for 8 physical with
-a guaranteed slow (or a stun on a crit). Thunderous Charge (rage) is a targeted 2-radius
+own MP if it catches 3 or more enemies**. Stone Throw hurls a boulder for 8 physical with a
+guaranteed slow (or a stun on a crit). Thunderous Charge (rage) is a targeted 2-radius
 blast for 10 physical and a mass stun.
 
 ### Riot Cop — Crowd-Control Tank / Peel Bodyguard
@@ -700,9 +704,10 @@ one full turn, then refills completely. So he's not rationing across a whole mat
 everyone else; he's managing a rhythm, and he's always able to do *something*.
 
 Riot Shield is a hard counter to two entire damage categories: he takes 1 less from every
-ranged basic attack, and while **Defending he nullifies all magic damage aimed at him
-completely**. Combined with Heavy Boots (slow immunity) and DEF 7, he's the hardest unit in
-the game to remove with focused fire. Utility Belt gives adjacent allies +1 DEF.
+ranged basic attack, and while **Defending he nullifies all non-critical magic damage aimed
+at him completely**; critical magic still sneaks 1 extra damage through. Combined with Heavy
+Boots (slow immunity) and DEF 7, he's one of the hardest units in the game to remove with
+focused fire. Utility Belt gives adjacent allies +1 DEF.
 
 His job is peeling. Stun Gun does 3 true and slows (or **stuns** if the target is adjacent).
 Shield Bash does 8 physical and shoves the target back a tile. Cover **swaps places with an
