@@ -20,7 +20,7 @@ import { createOnlineClient, normalizeRoomCode } from "../online/onlineClient.js
 import { createOnlineSession } from "../online/onlineSession.js";
 import { ONLINE_RULESET_VERSION } from "../online/ruleset.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
-import { DRAFT_BATTLE_REQUIRED_UNITS } from "../progression/draftAvailability.js";
+import { DRAFT_BATTLE_REQUIRED_UNITS, isDraftBattleAvailable, unlockedDraftUnitCount } from "../progression/draftAvailability.js";
 import { UNIT_TYPE_KEYS, groupedUnitTypes, isUnitUnlocked } from "./squadModel.js";
 import { createPortrait } from "./portraits.js";
 import { openSkinPicker } from "./skinPicker.js";
@@ -149,11 +149,11 @@ export function createOnlineFlow({ onStartMatch }) {
   // per pick, no duplicate types. With the campaign lock on, there just aren't
   // enough unlocked units yet, so the mode stays greyed out until enough are.
   function unlockedUnitCount() {
-    return UNIT_TYPE_KEYS.filter(isUnitUnlocked).length;
+    return unlockedDraftUnitCount(globalThis.localStorage);
   }
 
   function isDraftUnlockable() {
-    return unlockedUnitCount() >= DRAFT_BATTLE_REQUIRED_UNITS;
+    return isDraftBattleAvailable(globalThis.localStorage);
   }
 
   function syncMatchTypeAvailability() {
