@@ -5,6 +5,7 @@ import { createUnitFigure } from "./unitRenderer.js";
 import { createBoardMetrics, gridToScreen, pointsToString } from "./isometric.js";
 import { svgElement } from "./svgHelpers.js";
 import { DEFAULT_FORMATION_ORDER } from "./squadModel.js";
+import { el, escapeHtml } from "./domHelpers.js";
 
 let host = null;
 
@@ -229,16 +230,6 @@ export function openDraftFormationPicker({ title = "Arrange Formation", composit
     paint();
     overlay.hidden = false;
   });
-}
-
-function el(tag, className) {
-  const node = document.createElement(tag);
-  node.className = className;
-  return node;
-}
-
-function escapeHtml(text) {
-  return String(text).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 }
 
 function nameFor(type, nickname, def) {

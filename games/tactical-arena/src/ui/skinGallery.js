@@ -2,6 +2,7 @@ import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { groupedUnitTypes } from "./squadModel.js";
 import { createPortrait } from "./portraits.js";
 import { getSkin, getUnitSkins } from "./skinModel.js";
+import { el } from "./domHelpers.js";
 
 let host = null;
 let hostDocument = null;
@@ -148,11 +149,4 @@ export function openSkinGallery({ initial = null, storage = globalThis.localStor
   }
   renderList();
   if (initialSkin) renderDetail(initial.type, initialSkin);
-}
-
-function el(tag, className = "", text = null) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = text;
-  return node;
 }

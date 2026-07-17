@@ -1,27 +1,17 @@
-import { attack, beginActivation, cancelMove, defend, finishActivation } from "./core/commands.js";
-import { UNIT_TYPES, getArt, getInitialMp, getUnitType } from "./core/unitCatalog.js";
-import { createBattleState, createUnit, findUnit, getTileAffinity } from "./core/state.js";
-import { positionKey } from "./rules/movement.js";
+import { beginActivation, cancelMove, finishActivation } from "./core/commands.js";
+import { UNIT_TYPES, getUnitType } from "./core/unitCatalog.js";
+import { createBattleState, findUnit } from "./core/state.js";
 import { isStunned } from "./rules/statuses.js";
-import { applyCommand } from "./core/reducer.js";
 import { createCpuTurnController } from "./ai/cpuTurnController.js";
 import { createOnlineCommandController } from "./online/onlineCommandController.js";
 import { createBoardMetrics } from "./ui/isometric.js";
 import { createEffects } from "./ui/effects.js";
-import { createBattleEventPresenter, unitCenter } from "./ui/battleEventPresenter.js";
-import { presentInstantArt } from "./ui/instantArtPresenter.js";
+import { createBattleEventPresenter } from "./ui/battleEventPresenter.js";
 import { createBattleInputController } from "./ui/battleInputController.js";
+import { createCommandResolutionController } from "./ui/commandResolutionController.js";
+import { createMatchOutcomeController } from "./ui/matchOutcomeController.js";
 import { createTempoLoopController } from "./ui/tempoLoopController.js";
-import {
-  prepareRolledCombatPresentation,
-  presentRolledCombat,
-} from "./ui/rolledCombatPresenter.js";
-import {
-  createTutorialPresentationController,
-  hasTutorialPresentation,
-} from "./ui/tutorialPresentationController.js";
-import { createResolutionGuard } from "./ui/resolutionGuard.js";
-import { shouldUseRangedAttackAnimation, wallOreGainFloat } from "./ui/combatPresentation.js";
+import { createTutorialPresentationController } from "./ui/tutorialPresentationController.js";
 import { TurnAnnouncer } from "./ui/turnFlash.js";
 import { createMenuFlow } from "./ui/menuFlow.js";
 import { AudioManager, musicKeyForMatchMode } from "./audio/sounds.js";
@@ -34,58 +24,14 @@ import { applyMobileViewport, requestMobileFullscreen } from "./ui/mobileViewpor
 import { applyTheme, loadSavedThemeId } from "./ui/themes.js";
 import { applyPerformanceMode, loadPerformanceMode } from "./ui/performanceSettings.js";
 import { loadAccuracyForecastEnabled, saveAccuracyForecastEnabled } from "./ui/forecastSettings.js";
-import { shouldShowTurnAnnouncement, turnAnnouncementSub } from "./ui/turnAnnouncement.js";
 import { openChoiceModal } from "./ui/choiceModal.js";
 import { createDialogueSystem } from "./ui/dialogue.js";
 import { createBlackout } from "./ui/blackout.js";
+import { createCampaignMatchHooks } from "./campaign/campaignMatchHooks.js";
 import { createCampaignPresentationController } from "./campaign/campaignPresentationController.js";
-import { buildSummary, readableError, teamColor } from "./match/matchBuilder.js";
 import { createMatchLifecycleController } from "./match/matchLifecycleController.js";
 import { isTempoBattle, isTempoUnitReady } from "./core/tempoBattle.js";
-import {
-  BROTHERS_MISSION_ID,
-  HASBEEN_HEROES_MISSION_ID,
-  MINER_MISSION_ID,
-  NOT_MY_KING_MISSION_ID,
-  OUT_OF_RETIREMENT_MISSION_ID,
-  PALADIN_MISSION_ID,
-  SHOWDOWN_MISSION_ID,
-  VOIDWOOD_MISSION_ID,
-  VOID_CASTLE_MISSION_ID,
-  FINAL_BATTLE_MISSION_ID,
-  WITCH_DOCTOR_HEAL_CAST_CAP,
-  WITCH_DOCTOR_MISSION_ID,
-  voidCastleDefeatScript,
-  finalBattleBanishScript,
-  finalBattleDefeatScript,
-  brothersDefeatScript,
-  completeCampaignMission,
-  getCampaignMission,
-  hasbeenHeroesDefeatScript,
-  minerDefeatScript,
-  notMyKingDefeatScript,
-  outOfRetirementDefeatScript,
-  paladinDefeatScript,
-  showdownDefeatScript,
-  shouldShowCampaignPostMatchCutscene,
-  voidwoodDefeatScript,
-} from "./campaign/campaign.js";
-import { isCampaignSkinRewardGranted, isCampaignUnitRewardGranted } from "./progression/unlocks.js";
-import { claimOnlineMatchValorReward, recordOnlineValorEvents } from "./progression/valorRewards.js";
 import { createCampaignMeta } from "./campaign/campaignMeta.js";
-import {
-  nextCampaignDialogueBeat as selectCampaignDialogueBeat,
-  recordCampaignProgress,
-} from "./campaign/campaignRuntime.js";
-import {
-  TUTORIAL_ARTS_PLAYER_MYSTIC_ID,
-  TUTORIAL_BASICS_ID,
-  TUTORIAL_CATALOG,
-  completeTutorial,
-  prepareTutorialCommand,
-  recordTutorialCommand,
-  validateTutorialCommand,
-} from "./tutorials/basics.js";
 
 // --- DOM refs ---
 const board = document.querySelector("#boardSvg");
@@ -238,7 +184,7 @@ const eventPresenter = createBattleEventPresenter({
   getState: () => state,
   onIdle: () => maybeStartCpuTurn(),
 });
-const { playArtCallout, playAttackImpactSound, playEventSounds, playRolloverFx } = eventPresenter;
+const { playRolloverFx } = eventPresenter;
 const battleInteraction = {
   get selectedId() { return selectedId; },
   set selectedId(value) { selectedId = value; },
@@ -256,7 +202,7 @@ const battleInteraction = {
 const battleInput = createBattleInputController({
   runtime: {
     get state() { return state; },
-    get lastDispatchEvents() { return lastDispatchEvents; },
+    get lastDispatchEvents() { return resolution.lastDispatchEvents; },
   },
   interaction: battleInteraction,
   selectedUnit,
@@ -319,14 +265,77 @@ const tutorialPresentation = createTutorialPresentationController({
   },
   interaction: battleInteraction,
   dialogue,
+  menu,
+  storage: globalThis.localStorage,
   clock: window,
   body: document.body,
   isCpu,
   setMessage,
   render,
   maybeStartCpuTurn,
-  applyAction: applyTutorialPresentationAction,
-  onFinish: finishTutorialPresentation,
+});
+const campaignHooks = createCampaignMatchHooks({
+  runtime: {
+    get state() { return state; },
+    get matchConfig() { return matchConfig; },
+    get campaignMissionId() { return campaignMissionId; },
+    get campaignMeta() { return campaignMeta; },
+  },
+  dialogue,
+  ensureFinalBattleStageAdvanced,
+  maybeStartCpuTurn,
+});
+const matchOutcome = createMatchOutcomeController({
+  runtime: {
+    get state() { return state; },
+    get matchConfig() { return matchConfig; },
+    get campaignMissionId() { return campaignMissionId; },
+    get campaignMeta() { return campaignMeta; },
+    get matchStartedAt() { return matchStartedAt; },
+    get initialHpByPlayer() { return initialHpByPlayer; },
+    get mySeat() { return mySeat; },
+    get net() { return net; },
+    get resultsTimer() { return resultsTimer; },
+    set resultsTimer(value) { resultsTimer = value; },
+    set pendingCampaignReward(value) { pendingCampaignReward = value; },
+  },
+  turnFlash,
+  menu,
+  dialogue,
+  setMessage,
+  isCpu,
+  storage: globalThis.localStorage,
+  clock: window,
+});
+const resolution = createCommandResolutionController({
+  runtime: {
+    get state() { return state; },
+    set state(value) { state = value; },
+    get tutorial() { return tutorial; },
+    get matchConfig() { return matchConfig; },
+    get matchEpoch() { return matchEpoch; },
+    get resolving() { return resolving; },
+    set resolving(value) { resolving = value; },
+    get tempoAnimating() { return tempoAnimating; },
+    set tempoAnimating(value) { tempoAnimating = value; },
+    set tempoBusy(value) { tempoBusy = value; },
+  },
+  interaction: battleInteraction,
+  effects,
+  audio,
+  eventPresenter,
+  setMessage,
+  render,
+  selectedUnit,
+  announceTurnChange,
+  maybeStartCpuTurn,
+  broadcastIfLocal,
+  recordCampaignRejection: (command, result) => campaignHooks.recordCampaignRejection(command, result),
+  recordCampaignProgressHooks: (command, result, beforeState) => campaignHooks.recordCampaignProgressHooks(command, result, beforeState),
+  recordTutorialProgress: (command, result, previousPlayer) => tutorialPresentation.record(command, result, previousPlayer),
+  queueTutorialPresentation,
+  flushTutorialPresentation,
+  consumeTutorialPrompt,
 });
 const cpuTurnController = createCpuTurnController({
   runtime: {
@@ -334,7 +343,7 @@ const cpuTurnController = createCpuTurnController({
     get cpu() { return cpu; },
     get tutorial() { return tutorial; },
     get matchEpoch() { return matchEpoch; },
-    get lastDispatchEvents() { return lastDispatchEvents; },
+    get lastDispatchEvents() { return resolution.lastDispatchEvents; },
     get cpuThinking() { return cpuThinking; },
     set cpuThinking(value) { cpuThinking = value; },
     get resolving() { return resolving; },
@@ -587,258 +596,24 @@ function onLeaveMatch() {
   matchLifecycle.leave();
 }
 
-function announceTurn(player, { hold = false } = {}) {
-  if (state.phase === "complete") {
-    const summary = buildSummary(state, { matchStartedAt, initialHpByPlayer });
-    turnFlash.announce({ title: `${summary.winnerLabel ?? `Player ${state.winner}`} wins`, sub: "Victory", color: summary.winnerColor ?? teamColor(state.winner, state), hold: true });
-    return;
-  }
-  turnFlash.announce({
-    title: `Player ${player} squad turn`,
-    sub: turnAnnouncementSub({ matchMode: matchConfig?.mode, player, mySeat, isCpu: isCpu(player) }),
-    color: teamColor(player, state),
-    hold
-  });
-}
-
-// Missions that play a beat from the losing side between the final blow and the results
-// screen. Keyed by mission id; `flag` is the campaignMeta latch that keeps the beat from
-// replaying if victory resolves more than once in a match.
-const CAMPAIGN_DEFEAT_BEATS = Object.freeze({
-  [NOT_MY_KING_MISSION_ID]: { flag: "notMyKingDefeatDialogueShown", script: notMyKingDefeatScript },
-  [SHOWDOWN_MISSION_ID]: { flag: "showdownDefeatDialogueShown", script: showdownDefeatScript },
-  [VOIDWOOD_MISSION_ID]: { flag: "voidwoodDefeatDialogueShown", script: voidwoodDefeatScript },
-  [OUT_OF_RETIREMENT_MISSION_ID]: { flag: "outOfRetirementDefeatDialogueShown", script: outOfRetirementDefeatScript },
-  [PALADIN_MISSION_ID]: { flag: "paladinDefeatDialogueShown", script: paladinDefeatScript },
-  [MINER_MISSION_ID]: { flag: "minerDefeatDialogueShown", script: minerDefeatScript },
-  [HASBEEN_HEROES_MISSION_ID]: { flag: "hasbeenDefeatDialogueShown", script: hasbeenHeroesDefeatScript },
-  [BROTHERS_MISSION_ID]: { flag: "brothersDefeatDialogueShown", script: brothersDefeatScript },
-  [VOID_CASTLE_MISSION_ID]: { flag: "voidCastleDefeatDialogueShown", script: voidCastleDefeatScript },
-  [FINAL_BATTLE_MISSION_ID]: { flag: "finalBattleDefeatDialogueShown", script: finalBattleDefeatScript },
-});
-
-// The mirror image: a beat that plays when the PLAYER loses, between the final blow and the
-// results screen. Only the finale has one, and only for one specific way of losing —
-// Blacksword's Banish, which spends his own life to take the whole party with him. It is the
-// one loss in the game that is a deliberate, earned play by the enemy rather than a grind,
-// and it deserves to be acknowledged instead of dumped straight onto a defeat screen.
-// `when` gates it so an ordinary defeat still goes quietly to results.
-const CAMPAIGN_LOSS_BEATS = Object.freeze({
-  [FINAL_BATTLE_MISSION_ID]: {
-    flag: "finalBattleBanishDialogueShown",
-    script: finalBattleBanishScript,
-    when: () => campaignMeta.finalBattleBanished,
-  },
-});
-
-function announceTurnChange(prevPlayer) {
-  if (!shouldShowTurnAnnouncement({
-    tempo: isTempoBattle(state),
-    phase: state.phase,
-    currentPlayer: state.currentPlayer,
-    prevPlayer
-  })) return;
-  if (state.phase === "complete") {
-    net?.endMatch(); // clean finish: let the session keep the socket alive briefly for the peer
-    announceTurn(state.winner);
-    const summary = buildSummary(state, { matchStartedAt, initialHpByPlayer });
-    claimOnlineMatchValorReward(globalThis.localStorage, summary, { matchConfig, match: state, mySeat });
-    if (matchConfig?.mode === "campaign" && campaignMissionId) {
-      summary.campaign = completeCampaignMission(globalThis.localStorage, campaignMissionId, state, { ...campaignMeta });
-      // Choice-reward missions run their reward pick on the map AFTER results.
-      // Only queue it on a win whose reward hasn't already been
-      // granted, and force the results screen to route back through the map so the
-      // post-match cutscene + reward pick can't be skipped.
-      const mission = getCampaignMission(campaignMissionId);
-      const rewardPack = mission?.rewardSkinPack ?? null;
-      const rewardUnitPack = mission?.rewardUnitChoicePack ?? null;
-      if (
-        rewardPack &&
-        state.winner === 1 &&
-        !isCampaignSkinRewardGranted(globalThis.localStorage, rewardPack)
-      ) {
-        pendingCampaignReward = { missionId: campaignMissionId, packId: rewardPack };
-        summary.campaign.forceMapReturn = true;
-      } else if (
-        rewardUnitPack &&
-        state.winner === 1 &&
-        !isCampaignUnitRewardGranted(globalThis.localStorage, rewardUnitPack)
-      ) {
-        pendingCampaignReward = { missionId: campaignMissionId, unitPackId: rewardUnitPack };
-        summary.campaign.forceMapReturn = true;
-      } else if (
-        state.winner === 1 &&
-        shouldShowCampaignPostMatchCutscene(globalThis.localStorage, campaignMissionId)
-      ) {
-        pendingCampaignReward = { missionId: campaignMissionId, packId: null };
-        summary.campaign.forceMapReturn = true;
-      }
-    }
-    const showResults = () => {
-      window.clearTimeout(resultsTimer);
-      resultsTimer = window.setTimeout(() => menu.showResults(summary), 1600);
-    };
-    const beat = state.winner === 1
-      ? CAMPAIGN_DEFEAT_BEATS[campaignMissionId]
-      : CAMPAIGN_LOSS_BEATS[campaignMissionId];
-    if (beat && !campaignMeta[beat.flag] && (beat.when ? beat.when() : true)) {
-      campaignMeta[beat.flag] = true;
-      const script = beat.script(state);
-      if (script.length) {
-        void dialogue.show(script).then(showResults);
-      } else {
-        showResults();
-      }
-    } else {
-      showResults();
-    }
-  } else if (state.currentPlayer !== prevPlayer) {
-    announceTurn(state.currentPlayer);
-    if (net && state.currentPlayer !== mySeat) setMessage(`Player ${state.currentPlayer}'s turn — please wait.`);
-  }
-}
+// Turn/results announcement + end-of-match orchestration live in matchOutcomeController;
+// per-command campaign glue lives in campaignMatchHooks. These hoisted delegates keep
+// construction order flexible (controllers reference each other only at call time).
+function announceTurn(player, options = {}) { matchOutcome.announceTurn(player, options); }
+function announceTurnChange(prevPlayer) { matchOutcome.announceTurnChange(prevPlayer); }
+function campaignCpuExcludedArtIds() { return campaignHooks.campaignCpuExcludedArtIds(); }
+function maybeShowCampaignDialogue() { campaignHooks.maybeShowCampaignDialogue(); }
 
 // --- Command dispatch ---
+// The shared resolve loop lives in commandResolutionController (also consumed by the
+// dev sandbox); these delegates are what the input/CPU/online controllers receive.
 
-// Set by every successful dispatch() so a caller that needs the resolved events
-// (e.g. a trampling MOVE_UNIT's harmed/damageByTarget/path) can read them without
-// dispatch() itself growing animation concerns.
-let lastDispatchEvents = [];
-
-function resolveCommand(command) {
-  const validation = tutorial ? validateTutorialCommand(tutorial, command, state) : { accepted: true };
-  if (!validation.accepted) {
-    if (tutorial && hasTutorialPresentation(validation)) {
-      queueTutorialPresentation(validation);
-    }
-    return {
-      prepared: command,
-      result: {
-        accepted: false,
-        errorCode: "TUTORIAL_BLOCKED",
-        message: validation.message,
-      },
-    };
-  }
-  const prepared = tutorial ? prepareTutorialCommand(tutorial, command) : command;
-  return { prepared, result: applyCommand(state, prepared) };
-}
-
-function commandErrorMessage(result, command, commandState = state) {
-  return result.message ?? readableError(result.errorCode, commandState, command?.player ?? commandState?.currentPlayer);
-}
-
-function dispatch(command, { deferRolloverFx = false } = {}) {
-  const prevPlayer = state.currentPlayer;
-  const beforeState = state;
-  const { prepared, result } = resolveCommand(command);
-  if (!result.accepted) {
-    recordCampaignRejection(prepared, result);
-    setMessage(commandErrorMessage(result, prepared, beforeState), true);
-    return false;
-  }
-  lastDispatchEvents = result.events ?? [];
-  recordOnlineValorEvents(matchConfig, lastDispatchEvents);
-  state = result.nextState;
-  recordTutorialProgress(prepared, result, prevPlayer);
-  recordCampaignProgressHooks(prepared, result, beforeState);
-  broadcastIfLocal(prepared);
-  playEventSounds(result.events ?? []);
-  if (!deferRolloverFx) void playRolloverFx(result.events ?? []);
-  if (state.activation) selectedId = state.activation.unitId;
-  else { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
-  announceTurnChange(prevPlayer);
-  maybeStartCpuTurn();
-  return true;
-}
-
-// Mission-scoped CPU ART denylist, threaded into chooseActivation's excludeArtIds. Two
-// missions use it: Mission 3's Rain Dance heal-stall cap (see WITCH_DOCTOR_HEAL_CAST_CAP),
-// and the finale's Banish gate.
-function campaignCpuExcludedArtIds() {
-  if (matchConfig?.mode !== "campaign") return null;
-  if (campaignMissionId === FINAL_BATTLE_MISSION_ID) return finalBattleExcludedArtIds();
-  if (campaignMissionId !== WITCH_DOCTOR_MISSION_ID) return null;
-  if (campaignMeta.witchDoctorHealCastCount < WITCH_DOCTOR_HEAL_CAST_CAP) return null;
-  return ["rain-dance"];
-}
-
-// Banish kills every enemy on a dark tile and costs Blacksword every point of HP he has
-// left — he does not survive casting it. Spending his life to take out one or two of you is
-// a bad trade he would never make, and the engine's own gate (any enemy on a dark tile) is
-// far too eager. So he only reaches for it when it takes the WHOLE party with him. That
-// makes it a real threat with a real answer: the party is never wiped by it unless all four
-// were standing on the dark, which is a thing the player controls.
-function finalBattleExcludedArtIds() {
-  const party = state.units.filter((unit) => unit.player === 1 && unit.hp > 0);
-  const wipesParty = party.length > 0 &&
-    party.every((unit) => getTileAffinity(state, unit.position) === "dark");
-  return wipesParty ? null : ["banish-dark"];
-}
-
-function recordCampaignRejection(command, result) {
-  if (matchConfig?.mode !== "campaign") return;
-  if (campaignMissionId !== WITCH_DOCTOR_MISSION_ID) return;
-  if (result?.errorCode !== "TARGET_OBSTRUCTED") return;
-  if (command?.player !== 1) return;
-  campaignMeta.blockedShotQueued = true;
-  maybeShowCampaignDialogue();
-}
-
-function recordCampaignProgressHooks(command, result, beforeState = null) {
-  recordCampaignProgress({
-    matchMode: matchConfig?.mode,
-    campaignMissionId,
-    campaignMeta,
-    state,
-    command,
-    result,
-    beforeState,
-  });
-  maybeShowCampaignDialogue();
-}
-
-function nextCampaignDialogueBeat() {
-  return selectCampaignDialogueBeat({ campaignMissionId, campaignMeta, state });
-}
-
-
-function maybeShowCampaignDialogue() {
-  if (matchConfig?.mode !== "campaign" || dialogue.isOpen() || state.phase !== "playing") return;
-  const beat = nextCampaignDialogueBeat();
-  if (!beat) return;
-  beat.markShown();
-  const script = beat.script(state);
-  if (!script.length) return;
-  // Beats can chain: a Final Battle stage change is a beat whose afterAction builds the NEXT
-  // stage, which immediately has a beat of its own (the duel introducing itself). Re-asking
-  // after each script closes is safe — every beat latches its own shown-flag, so this settles.
-  void dialogue.show(script).then(async () => {
-    await ensureFinalBattleStageAdvanced();
-    maybeShowCampaignDialogue();
-    maybeStartCpuTurn();
-  });
-}
-
-function recordTutorialProgress(command, result, previousPlayer) {
-  if (!tutorial) return;
-  const update = recordTutorialCommand(tutorial, {
-    command,
-    events: result.events ?? [],
-    match: state,
-    previousPlayer,
-  });
-  // Some scripted moments (the RAGE tutorial's Nuke wiping every real enemy
-  // commander) trigger a genuine victory the tutorial isn't ready to end on yet.
-  // This must revert synchronously, before the caller's announceTurnChange() reads
-  // state.phase, or a results screen flashes in ahead of the follow-up dialogue.
-  if (update.revertVictory && state.phase === "complete") {
-    state.phase = "playing";
-    state.winner = null;
-    state.activation = null;
-  }
-  queueTutorialPresentation(update);
-}
+function dispatch(command, options) { return resolution.dispatch(command, options); }
+function resolveCombat(command) { return resolution.resolveCombat(command); }
+function resolveWallAttack(command) { return resolution.resolveWallAttack(command); }
+function resolveInstantArt(command) { return resolution.resolveInstantArt(command); }
+function maybeAutoFinish() { resolution.maybeAutoFinish(); }
+function finishNow() { resolution.finishNow(); }
 
 function queueTutorialPresentation(update = {}) {
   tutorialPresentation.queue(update);
@@ -850,269 +625,6 @@ function consumeTutorialPrompt(fallback) {
 
 function flushTutorialPresentation() {
   tutorialPresentation.flush();
-}
-
-function applyTutorialPresentationAction(action) {
-  if (!action) return;
-  if (action.type === "revealUnit") {
-    revealTutorialUnit(action.unitId, action.position);
-    if (Number.isInteger(action.currentPlayer)) state.currentPlayer = action.currentPlayer;
-    state.activation = null;
-    render();
-    return;
-  }
-  if (action.type === "formationSwap") {
-    for (const unitId of action.hideUnitIds ?? []) hideTutorialUnit(unitId);
-    for (const spawn of action.revealUnits ?? []) revealTutorialUnit(spawn.unitId, spawn.position, spawn.hp, spawn.mp, spawn.spent);
-    for (const spawn of action.spawnUnits ?? []) spawnTutorialUnit(spawn);
-    if (Number.isInteger(action.currentPlayer)) state.currentPlayer = action.currentPlayer;
-    state.activation = null;
-    render();
-    if (action.dialogue || action.prompt) queueTutorialPresentation({ dialogue: action.dialogue, prompt: action.prompt });
-  }
-}
-
-// Introduces a brand-new unit mid-match for a scripted formation swap (the RAGE
-// tutorial's second enemy Magician "arriving" for its new formation) rather than
-// revealing one already present in the squad — buildRoster caps a squad at the
-// four corner-block cells, so a fresh unit can't just ride in the initial squads.
-function spawnTutorialUnit({ id, type, player, position, hp = null, mp = null, skin = null, spent = false }) {
-  if (findUnit(state, id)) return;
-  const unit = createUnit({ id, type, player, x: position.x, y: position.y, skin });
-  if (Number.isFinite(hp)) unit.hp = hp;
-  if (Number.isFinite(mp)) unit.mp = mp;
-  unit.spent = Boolean(spent);
-  state.units.push(unit);
-}
-
-function finishTutorialPresentation() {
-  resolving = true;
-  selectedId = null;
-  mode = null;
-  footworkPath = [];
-  volleyShotOrigin = null;
-  render();
-
-  const progress = completeTutorial(globalThis.localStorage, tutorial.id ?? TUTORIAL_BASICS_ID);
-  setMessage(consumeTutorialPrompt("Tutorial complete."));
-  menu.showTutorialComplete({
-    title: tutorialCompleteTitle(tutorial.id),
-    tutorialId: tutorial.id,
-    rewardChoices: progress.rewardChoices,
-    selectedRewardSkin: progress.selectedRewardSkin,
-    rewardGranted: progress.rewardGranted,
-    allTutorialsComplete: progress.allTutorialsComplete,
-  });
-}
-
-function tutorialCompleteTitle(tutorialId) {
-  const entry = TUTORIAL_CATALOG.find((candidate) => candidate.id === tutorialId);
-  return entry ? `${entry.title} Complete` : "Tutorial Complete";
-}
-
-function revealTutorialUnit(unitId, position = null, hp = null, mp = null, spent = false) {
-  const unit = findUnit(state, unitId);
-  if (!unit) return;
-  const definition = getUnitType(unit.type);
-  if (position) unit.position = { ...position };
-  unit.hp = Number.isFinite(hp) ? hp : definition.stats.maxHp;
-  unit.mp = Number.isFinite(mp) ? mp : getInitialMp(definition);
-  unit.spent = Boolean(spent);
-  unit.defending = false;
-  if (unitId === TUTORIAL_ARTS_PLAYER_MYSTIC_ID) {
-    setMessage("The Mystic joins the field. Activate her and use Pray to heal the Archer.");
-  }
-}
-
-// Kills a unit outside combat for a scripted formation swap (e.g. the RAGE tutorial's
-// trapped Magician "disappearing" once Nuke resolves). Mirrors revealTutorialUnit in
-// reverse; hp<=0 already excludes it from rendering and turn order everywhere else.
-function hideTutorialUnit(unitId) {
-  const unit = findUnit(state, unitId);
-  if (!unit) return;
-  unit.hp = 0;
-  unit.spent = true;
-  unit.defending = false;
-}
-
-async function revealRoll(outcome, label = null, originUnit = null) {
-  if (isTempoBattle(state)) {
-    const unit = originUnit ?? selectedUnit();
-    if (unit) {
-      const text = label ?? (outcome.missed ? "MISS" : outcome.critical ? "CRIT" : "HIT");
-      const color = outcome.missed ? "#cbb78b" : outcome.critical ? "#ffd26a" : "#f3dc86";
-      await effects.floatText(unitCenter(createBoardMetrics(state.size), unit), text, color);
-      return;
-    }
-  }
-  await effects.rollReveal(outcome, label);
-}
-
-// Rolled actions (attack / wall) commit their resolved state and then animate. In CLASSIC
-// play the commit lands at the END (endResolve) and input stays locked across the animation
-// via `resolving`. In TEMPO it lands HERE, up front — so the player can command another ready
-// unit mid-animation without the end-of-animation commit clobbering it; `tempoAnimating` only
-// tells the real-time loop not to rebuild the board under the animation. Either way the
-// pre-commit board is drawn first so a dying target is still present to animate. NOTE: capture
-// every pre-command snapshot the animation needs BEFORE calling this — `state` becomes the
-// post-command board the instant it returns in tempo.
-function beginResolve(result, artCalloutEvent = null) {
-  mode = null; footworkPath = []; volleyShotOrigin = null;
-  if (artCalloutEvent) playArtCallout(artCalloutEvent);
-  if (isTempoBattle(state)) {
-    render();                 // pre-command board (targeting cleared, nothing committed yet)
-    state = result.nextState; // commit up front, before animating
-    tempoAnimating += 1;
-  } else {
-    resolving = true;
-    render();
-  }
-}
-
-// Retire a rolled action once its animation finishes. Classic commits here; tempo already
-// committed in beginResolve and only reconciles the board + selection.
-function endResolve(prepared, result, prevPlayer) {
-  const events = result.events ?? [];
-  const tempo = isTempoBattle(state);
-  const beforeState = tempo ? null : state;
-  if (tempo) tempoAnimating = Math.max(0, tempoAnimating - 1);
-  else state = result.nextState;
-  recordTutorialProgress(prepared, result, prevPlayer);
-  recordCampaignProgressHooks(prepared, result, beforeState);
-  broadcastIfLocal(prepared);
-  playEventSounds(events);
-  playRolloverFx(events);
-  if (tempo) {
-    // Only drop the selection if the piece we were commanding is spent/gone — never clobber a
-    // unit the player switched to mid-animation.
-    const sel = selectedUnit();
-    if (!sel || sel.spent || sel.hp <= 0) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
-    if (tempoAnimating === 0) render();
-  } else {
-    if (!state.activation) { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
-    render();
-    resolving = false;
-  }
-  announceTurnChange(prevPlayer);
-  maybeStartCpuTurn();
-  flushTutorialPresentation();
-  return true;
-}
-
-// Async resolution for rolled actions (basic ATTACK and targeted ARTS). Reveals
-// the roll, commits the resolved state, then plays impact FX. Non-rolled actions use
-// synchronous dispatch; instant ARTs use resolveInstantArt (commit-at-end).
-async function resolveCombat(command) {
-  const guard = createResolutionGuard(matchEpoch, () => matchEpoch, { effects, revealRoll, playAttackImpactSound });
-  const prevPlayer = state.currentPlayer;
-  const { prepared, result } = resolveCommand(command);
-  if (!result.accepted) { setMessage(commandErrorMessage(result), true); return false; }
-  const events = result.events ?? [];
-  const before = state;
-  const presentation = prepareRolledCombatPresentation(before, events);
-
-  beginResolve(result, events.find((event) => event.type === "ART_RESOLVED" && event.artId));
-  await presentRolledCombat({
-    before,
-    result,
-    events,
-    ...presentation,
-    effects: guard.effects,
-    revealRoll: guard.revealRoll,
-    playAttackImpactSound: guard.playAttackImpactSound,
-    artDefinition,
-  });
-
-  if (!guard.current()) return false;
-  return endResolve(prepared, result, prevPlayer);
-}
-// A wall is attacked like a unit (it can't dodge, so there's no roll), but it gets
-// the SAME attacker lunge/projectile animation as a normal strike instead of just
-// popping. Impact lands on the wall; a destroyed wall bursts into stone shards.
-async function resolveWallAttack(command) {
-  const guard = createResolutionGuard(matchEpoch, () => matchEpoch, { effects, audio });
-  const prevPlayer = state.currentPlayer;
-  const { prepared, result } = resolveCommand(command);
-  if (!result.accepted) { setMessage(commandErrorMessage(result), true); return false; }
-  const event = (result.events ?? []).find((e) => e.type === "WALL_ATTACKED");
-
-  const metrics = createBoardMetrics(state.size);
-  const attackerBefore = findUnit(state, command.actorId); // captured before beginResolve commits
-  beginResolve(result);
-  if (event && attackerBefore) {
-    const ranged = shouldUseRangedAttackAnimation(attackerBefore, { id: `wall:${positionKey(event.position)}`, position: event.position });
-    const center = unitCenter(metrics, { position: event.position });
-    await guard.effects.animateAttack(attackerBefore, { id: `wall:${positionKey(event.position)}`, position: event.position }, ranged);
-    if (!guard.current()) return false;
-    guard.audio.play(ranged ? "arrowHit" : "attackHit");
-    guard.effects.impact(center, false);
-    guard.effects.shake(5);
-    if (event.destroyed) {
-      guard.audio.play("wallBreak");
-      guard.effects.deathBurst(center, "#9a9384");
-      const oreFloat = wallOreGainFloat(event);
-      if (oreFloat) await guard.effects.floatText(unitCenter(metrics, attackerBefore), oreFloat.text, oreFloat.color);
-      if (!guard.current()) return false;
-      setMessage("Wall destroyed.");
-    } else {
-      setMessage(`Wall struck — ${event.hpAfter} HP left.`);
-    }
-  }
-
-  if (!guard.current()) return false;
-  return endResolve(prepared, result, prevPlayer);
-}
-
-async function resolveInstantArt(command) {
-  const guard = createResolutionGuard(matchEpoch, () => matchEpoch, { effects, audio, render, revealRoll });
-  const prevPlayer = state.currentPlayer;
-  const { prepared, result } = resolveCommand(command);
-  if (!result.accepted) { setMessage(commandErrorMessage(result), true); return false; }
-  const events = result.events ?? [];
-  const resolved = events.find((e) => e.type === "ART_RESOLVED");
-  const actorBefore = resolved ? findUnit(state, resolved.actorId) : null;
-  const targetIds = resolved?.targetIds ?? resolved?.harmed ?? (resolved?.targetId ? [resolved.targetId] : []);
-  const targetsBefore = targetIds.map((id) => findUnit(state, id)).filter(Boolean);
-
-  resolving = true;
-  // Instant ARTs commit at the END of their animation, so in tempo we briefly hold input to
-  // keep a concurrent command from clobbering the pending commit. Cleared in the tail below.
-  if (isTempoBattle(state)) tempoBusy = true;
-  mode = null; footworkPath = []; volleyShotOrigin = null;
-  playArtCallout(resolved);
-  render();
-
-  await presentInstantArt({
-    state,
-    result,
-    resolved,
-    actorBefore,
-    targetsBefore,
-    effects: guard.effects,
-    audio: guard.audio,
-    revealRoll: guard.revealRoll,
-    artDefinition,
-    render: guard.render,
-  });
-
-  if (!guard.current()) return false;
-
-  const beforeState = state;
-  state = result.nextState;
-  recordTutorialProgress(prepared, result, prevPlayer);
-  recordCampaignProgressHooks(prepared, result, beforeState);
-  broadcastIfLocal(prepared);
-  playEventSounds(events);
-  playRolloverFx(events);
-  if (state.activation) selectedId = state.activation.unitId;
-  else { selectedId = null; mode = null; footworkPath = []; volleyShotOrigin = null; }
-  render();
-  announceTurnChange(prevPlayer);
-  resolving = false;
-  tempoBusy = false;
-  maybeStartCpuTurn();
-  flushTutorialPresentation();
-  return true;
 }
 
 // --- CPU driver ---
@@ -1131,29 +643,6 @@ async function applyCpuCommand(command) {
 
 async function resolveCpuMove(command, options) {
   return cpuTurnController.resolveCpuMove(command, options);
-}
-// --- Activation completion ---
-
-function maybeAutoFinish() {
-  const activation = state.activation;
-  if (activation && activation.moved && activation.primaryUsed) {
-    dispatch(finishActivation(state.currentPlayer, activation.unitId));
-    setMessage(consumeTutorialPrompt("Activation complete. The next commander takes the field."));
-  }
-}
-
-function finishNow() {
-  const activation = state.activation;
-  if (activation && activation.primaryUsed) {
-    dispatch(finishActivation(state.currentPlayer, activation.unitId));
-    setMessage(consumeTutorialPrompt("Activation complete. The next commander takes the field."));
-  }
-}
-
-// --- Command presentation helpers ---
-
-function artDefinition(unit, artId) {
-  return getArt(unit.type, artId);
 }
 
 // --- Input ---

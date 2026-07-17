@@ -46,7 +46,38 @@ test("styles live behind purpose-specific entry points instead of the project ro
 
 test("release hotspots delegate cohesive responsibilities to smaller modules", () => {
   const boundaries = [
-    ["src/main.js", 1325, ["./ai/cpuTurnController.js", "./online/onlineCommandController.js", "./match/matchLifecycleController.js", "./ui/battleEventPresenter.js", "./ui/rolledCombatPresenter.js", "./ui/instantArtPresenter.js", "./ui/battleInputController.js", "./ui/tutorialPresentationController.js", "./ui/tempoLoopController.js", "./campaign/campaignPresentationController.js", "./campaign/campaignRuntime.js"]],
+    ["src/main.js", 850, ["./ai/cpuTurnController.js", "./online/onlineCommandController.js", "./match/matchLifecycleController.js", "./ui/battleEventPresenter.js", "./ui/commandResolutionController.js", "./ui/matchOutcomeController.js", "./ui/battleInputController.js", "./ui/tutorialPresentationController.js", "./ui/tempoLoopController.js", "./campaign/campaignPresentationController.js", "./campaign/campaignMatchHooks.js"]],
+    ["src/ui/commandResolutionController.js", 400, ["./rolledCombatPresenter.js", "./instantArtPresenter.js", "./resolutionGuard.js"]],
+    ["src/ui/menuFlow.js", 220, ["./matchSetupScreens.js", "./campaignMapScreen.js", "./resultsScreen.js", "./tutorialMenuScreens.js", "./settingsScreen.js"]],
+    ["src/ui/campaignMapScreen.js", 580, ["./campaignMenuModel.js"]],
+    ["src/ui/resultsScreen.js", 200, []],
+    ["src/ui/tutorialMenuScreens.js", 170, []],
+    ["src/ui/settingsScreen.js", 250, []],
+    ["src/ui/matchSetupScreens.js", 220, []],
+    ["src/ui/boardRenderer.js", 560, ["./boardAtmosphere.js"]],
+    ["src/ui/boardAtmosphere.js", 450, []],
+    ["src/campaign/campaignMatch.js", 320, ["./campaignLayouts.js", "./missions/monk-temple-trial/trial.js", "./missions/void-ridden-castle/trial.js"]],
+    ["src/core/reducer.js", 340, ["./basicAttack.js", "./activationPassives.js"]],
+    ["src/core/basicAttack.js", 430, []],
+    ["src/core/turnEngine.js", 520, ["./turnHazards.js"]],
+    ["src/core/unitCatalog.js", 760, ["./unitRegistry.js", "./unitWeather.js", "./kingCommands.js", "./unitAiMetadata.js"]],
+    // basics.js stays a pure barrel over the split tutorial subsystem.
+    ["src/tutorials/basics.js", 15, ["./tutorialContent.js", "./tutorialMatchSetup.js", "./tutorialValidation.js", "./tutorialCpu.js", "./tutorialProgress.js"]],
+    ["src/tutorials/tutorialValidation.js", 1000, ["./tutorialContent.js", "./tutorialRuntimeHelpers.js"]],
+    ["src/tutorials/tutorialContent.js", 340, []],
+    ["src/tutorials/tutorialMatchSetup.js", 280, []],
+    ["src/tutorials/tutorialCpu.js", 180, []],
+    ["src/tutorials/tutorialProgress.js", 120, []],
+    ["src/tutorials/tutorialRuntimeHelpers.js", 170, []],
+    ["src/campaign/campaignLayouts.js", 430, ["./missions/witch-doctor-swamp/layout.js", "./missions/the-final-battle/stages.js"]],
+    ["src/ui/matchOutcomeController.js", 220, []],
+    ["src/campaign/campaignMatchHooks.js", 150, []],
+    // The sandbox must consume the SAME resolve loop as the shipping match, never a fork
+    // of it. src/dev/ is currently untracked (the repo-root .gitignore's `dev/` pattern
+    // catches it), so this boundary only applies when the folder is present locally.
+    ...(existsSync(rootFile("src/dev/sandbox.js"))
+      ? [["src/dev/sandbox.js", 520, ["../ui/commandResolutionController.js"]]]
+      : []),
     ["src/core/artResolvers.js", 350, [
       "./artResolvers/riotCopResolvers.js",
       "./artResolvers/fatWizardResolvers.js",
@@ -69,7 +100,7 @@ test("release hotspots delegate cohesive responsibilities to smaller modules", (
       "./artResolvers/rangedArtResolvers.js",
       "./artResolvers/gargoyleResolvers.js",
     ]],
-    ["src/ui/effects.js", 1160, ["./effectProjectiles.js", "./effectWindups.js", "./unitMotionEffects.js"]],
+    ["src/ui/effects.js", 1150, ["./effectProjectiles.js", "./effectWindups.js", "./unitMotionEffects.js", "./diceRollReveal.js"]],
   ];
 
   for (const [path, maxLines, expectedImports] of boundaries) {

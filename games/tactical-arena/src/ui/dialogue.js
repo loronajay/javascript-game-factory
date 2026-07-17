@@ -2,6 +2,7 @@ import { UNIT_TYPES, getUnitType } from "../core/unitCatalog.js";
 import { colorOf } from "../core/state.js";
 import { createPortrait, getPortrait } from "./portraits.js";
 import { getNicknamePref } from "./nicknameModel.js";
+import { el } from "./domHelpers.js";
 
 const VALID_SIDES = new Set(["left", "right"]);
 
@@ -211,11 +212,4 @@ export function createDialogueSystem(host, { getState = () => null, onOpen = () 
   }
 
   return Object.freeze({ show, hide, next, isOpen });
-}
-
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = text;
-  return node;
 }

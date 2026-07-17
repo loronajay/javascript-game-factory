@@ -1,5 +1,6 @@
 import { consumeProgressionAnnouncements } from "../progression/announcements.js";
 import { createPortrait } from "./portraits.js";
+import { el } from "./domHelpers.js";
 
 let host = null;
 
@@ -95,11 +96,4 @@ function buildAnnouncementBody(announcement) {
     }
   });
   return p;
-}
-
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = text;
-  return node;
 }

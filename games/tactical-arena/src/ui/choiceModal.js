@@ -7,6 +7,7 @@
 // `value`, or null if cancelled (Escape / backdrop / Cancel). Pure DOM; no game imports
 // beyond the portrait helper so a choice can show a unit thumb (the ally picker).
 import { createPortrait } from "./portraits.js";
+import { el } from "./domHelpers.js";
 
 let host = null; // lazily-created singleton overlay, reused across opens
 function ensureHost() {
@@ -93,11 +94,4 @@ export function openChoiceModal({ title = "", subtitle = "", accent = null, choi
     document.addEventListener("keydown", onKey);
     overlay.hidden = false;
   });
-}
-
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = text;
-  return node;
 }

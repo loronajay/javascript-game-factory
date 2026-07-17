@@ -3,6 +3,7 @@ import {
   getInventoryCatalog,
 } from "../progression/inventory.js";
 import { createConsumableIcon } from "./consumableIcons.js";
+import { el } from "./domHelpers.js";
 
 let host = null;
 let hostDocument = null;
@@ -235,11 +236,4 @@ function triggerLabel(trigger) {
   if (trigger === "valor-gained") return "Valor is gained";
   if (trigger === "campaign-mission-started") return "a campaign mission starts";
   return "used";
-}
-
-function el(tag, className = "", text = null) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = text;
-  return node;
 }

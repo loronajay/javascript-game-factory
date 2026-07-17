@@ -27,39 +27,66 @@ never loosened, only retargeted/tightened.
 
 ## Phases
 
-- [ ] **Phase 0 — Prep**: working branch off current state; record green `npm test` baseline.
-- [ ] **Phase 1 — Shared helper dedup**: new `src/ui/domHelpers.js` (`el`, `escapeHtml`); replace
-      the ~12 `el()` and 5 `escapeHtml` local copies; replace tutorials' `chebyshev` with
-      `chebyshevDistance` from `src/rules/movement.js`.
-- [ ] **Phase 2 — main.js back to composition root**:
-      resolve loop (`main.js:708–1116`) → `src/ui/commandResolutionController.js`;
-      turn/results + Valor/reward orchestration (`:590–699`) → `src/ui/matchOutcomeController.js`;
-      tutorial state mutation (`:855–936`) → existing `src/ui/tutorialPresentationController.js`;
-      point `src/dev/sandbox.js` at the shared resolution controller (resolves `sandbox.js:10` TODO);
-      architecture test: new import list, `main.js` cap ~700.
-- [ ] **Phase 3 — Split menuFlow.js**: keep `createMenuFlow` router + public API (tests import it);
-      delegate to flat `src/ui/` modules: `campaignMapScreen.js`, `resultsScreen.js`,
-      `tutorialMenuScreens.js`, `settingsScreen.js`, `matchSetupScreens.js`.
-- [ ] **Phase 4 — Split boardRenderer.js**: weather/atmosphere/figures (`:47–438`) →
-      `src/ui/boardAtmosphere.js`; boardRenderer keeps the targeting/highlight contract only.
-- [ ] **Phase 5 — Split campaignMatch.js**: `CAMPAIGN_LAYOUTS` → `src/campaign/campaignLayouts.js`;
-      per-mission trial scripting → existing `src/campaign/missions/<slug>/` folders;
-      keep config rules + `prepareCampaignMatchState` assembler.
-- [ ] **Phase 6 — Split tutorials/basics.js**: `tutorialContent.js`, `tutorialMatchSetup.js`,
-      `tutorialValidation.js`, `tutorialCpu.js`, `tutorialProgress.js`; `basics.js` stays as a
-      barrel so import paths survive (campaignRuntime precedent).
-- [ ] **Phase 7 — Within-file refactors**: `handleTile`/`handleActionClick` → per-mode handler maps;
-      `instantArtPresenter` → presenter registry Map (mirrors `ART_RESOLVERS`);
-      reducer → `src/core/basicAttack.js` + `src/core/activationPassives.js`;
-      turnEngine hazard ticks → `src/core/turnHazards.js`;
-      unitCatalog → extract weather folding, `kingCommands.js`, `unitAiMetadata.js`
-      (`getEffectiveStats` stays in `unitCatalog.js`).
-- [ ] **Phase 8 — CPU fixes (approved behavior change)**: AoE projection through
-      `rules/combat.js` resolvers (respect DEF/Defend/team reduction); remove
-      `rng = Math.random` default in `cpuController.js`.
-- [ ] **Phase 9 — Docs + guardrails**: rewrite `ARCHITECTURE.md` for the new tree (document
-      `missions/` subtree, `progression/inventory.js`, new modules; drop resolved hotspots);
-      final architecture-test tightening; update CLAUDE.md pointers that moved.
+- [x] **Phase 0 — Prep**: working branch off current state; record green `npm test` baseline.
+- [x] **Phase 1 — Shared helper dedup**: new `src/ui/domHelpers.js` (`el`, `escapeHtml`); replaced
+      the 12 `el()` and 5 `escapeHtml` local copies; replaced tutorials' `chebyshev` with
+      `chebyshevDistance` from `src/rules/movement.js`; also extracted `diceRollReveal.js`
+      from `effects.js`, clearing the pre-existing architecture-test cap failure.
+- [x] **Phase 2 — main.js back to composition root** (1308 → 797 lines):
+      resolve loop → `src/ui/commandResolutionController.js`;
+      turn/results + Valor/reward orchestration → `src/ui/matchOutcomeController.js`;
+      per-command campaign glue → `src/campaign/campaignMatchHooks.js`;
+      tutorial state mutation + command recording → `src/ui/tutorialPresentationController.js`
+      (as overridable built-ins so the existing test seams keep working);
+      `src/dev/sandbox.js` (696 → 454 lines) now consumes the shared resolution controller —
+      its resolve loop can no longer drift from production, enforced by architecture test.
+- [x] **Phase 3 — Split menuFlow.js** (1246 → 164 lines): `createMenuFlow` is now a pure
+      router; screens live in `campaignMapScreen.js`, `resultsScreen.js`,
+      `tutorialMenuScreens.js`, `settingsScreen.js`, `matchSetupScreens.js`, with pure
+      view-model helpers in `campaignMenuModel.js` and the menu seat palette
+      (`MENU_TEAM_COLORS`) in `teamDisplay.js`; tests updated to import from the new homes;
+      per-module caps added to the architecture test.
+- [x] **Phase 4 — Split boardRenderer.js** (918 → 516 lines): weather overlay, wall/fire
+      figures, and the stone dais → `src/ui/boardAtmosphere.js` (413 lines);
+      boardRenderer keeps the targeting/highlight contract only; caps added.
+- [x] **Phase 5 — Split campaignMatch.js** (975 → 289 lines): `CAMPAIGN_LAYOUTS` + spawn
+      constants → `src/campaign/campaignLayouts.js`; Monk trial →
+      `missions/monk-temple-trial/trial.js`; Void Castle split/heal/intro →
+      `missions/void-ridden-castle/trial.js`; swamp lattice/fire/ghoul factory →
+      `missions/witch-doctor-swamp/layout.js`; campaignMatch keeps config rules +
+      `prepareCampaignMatchState` and re-exports the moved surface through the barrel;
+      the 45-line teamNames ternary became a lookup table; dead imports dropped.
+- [x] **Phase 6 — Split tutorials/basics.js** (1738 → 9-line barrel): `tutorialContent.js`
+      (definitions/constants/scripts), `tutorialMatchSetup.js`, `tutorialValidation.js`
+      (the 5-tutorial state machine), `tutorialCpu.js` (scripted CPU),
+      `tutorialProgress.js` (persistence), `tutorialRuntimeHelpers.js` (shared
+      setStage/predicates/pathing); `basics.js` is a pure barrel enforced by the
+      architecture test, so all import paths survive.
+- [x] **Phase 7 (core half) — Within-file extractions**:
+      reducer (721 → 308) → `src/core/basicAttack.js` + `src/core/activationPassives.js`;
+      turnEngine (618 → 482) hazard ticks → `src/core/turnHazards.js`;
+      unitCatalog (1107 → 704) → `unitRegistry.js` + `unitWeather.js` + `kingCommands.js` +
+      `unitAiMetadata.js`, re-exported through the catalog (`getEffectiveStats` stays).
+- [ ] **Phase 7 (deferred) — UI ladder conversions**: `battleInputController.js`'s
+      `handleTile`/`handleActionClick` → per-mode handler dispatch, and
+      `instantArtPresenter.js` → per-art presenter registry (mirroring `ART_RESOLVERS`).
+      Deliberately deferred: both files are cohesive and fully working; the conversions are
+      readability-only rewrites of ~1,100 lines of input/animation code whose visual
+      branches have thin automated coverage — a bad pre-release risk trade. Listed as the
+      top remaining hotspots in `ARCHITECTURE.md` with the target shape; best done in a
+      dedicated session with hand-playtesting of each targeting mode.
+- [x] **Phase 8 — CPU fixes (approved behavior change)**: investigation showed the engine
+      itself resolves cone/tile-pulse AoE as FIXED damage (no DEF/Defend) — so the audit's
+      DEF concern didn't apply; the real projection divergence was the missing fire-immunity
+      skip, now mirrored from `resolveConeArt` (CPU no longer overvalues fire cones vs
+      fire-immune units). `chooseActivation`'s `rng` now defaults to the state-seeded
+      `cpuRng` instead of `Math.random`, so omitting it can never desync a replay.
+- [x] **Phase 9 — Docs + guardrails**: `ARCHITECTURE.md` rewritten for the post-cleanup
+      tree (all new modules, the `missions/` subtree, `progression/inventory.js`, the
+      untracked-`src/dev/` note; resolved hotspots dropped, remaining ones listed);
+      CLAUDE.md pointers updated; architecture test now enforces ~30 module boundaries;
+      `npm run release:audit` runs clean of structural findings (its remaining warnings
+      are pre-existing asset-size items).
 
 ## Verification per phase
 

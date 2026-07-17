@@ -5,6 +5,7 @@ import { getPortrait, portraitFrameStyle } from "./portraits.js";
 import { colorOf } from "../core/state.js";
 import { teamLabel, teamOf } from "../match/matchBuilder.js";
 import { TEMPO_GAUGE_MAX, canBeginTempoActivation, getTempoReadiness, getUnitAgility, isTempoBattle, isTempoUnitReady } from "../core/tempoBattle.js";
+import { escapeHtml } from "./domHelpers.js";
 
 // Icon per weather id, shown in the match HUD's weather badge (renderWeatherBadge).
 // "none" is the badge's own resting state, not a WEATHER_TYPES entry.
@@ -18,10 +19,6 @@ const WEATHER_ICONS = {
 
 function escapeAttr(text) {
   return String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-function escapeHtml(text) {
-  return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function displayName(unit, definition) {

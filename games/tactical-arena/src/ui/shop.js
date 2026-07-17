@@ -10,6 +10,7 @@ import {
 } from "../progression/marketplace.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { groupedUnitTypes } from "./squadModel.js";
+import { el } from "./domHelpers.js";
 import { unitDetailHtml } from "./codex.js";
 import { createConsumableIcon } from "./consumableIcons.js";
 import { createPortrait } from "./portraits.js";
@@ -714,11 +715,4 @@ function createValorWarning(balance, amount) {
   );
   message.setAttribute("role", "alert");
   return message;
-}
-
-function el(tag, className = "", text = null) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = text;
-  return node;
 }
