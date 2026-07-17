@@ -10,6 +10,7 @@ import {
 
 export const SHOP_TABS = Object.freeze([
   Object.freeze({ id: "units", label: "Units" }),
+  Object.freeze({ id: "skin-packs", label: "Skin Packs" }),
   Object.freeze({ id: "skins", label: "Skins" }),
   Object.freeze({ id: "boosts", label: "Boosts" }),
 ]);
@@ -62,6 +63,21 @@ const UNIT_VALOR_STAR_BY_TYPE = Object.freeze({
 
 const SKIN_VALOR_PER_USD = 850;
 const SKIN_VALOR_CURVE_EXPONENT = 0.88;
+
+const SKIN_PACK_PRICES = Object.freeze({
+  "summer-vibes": Object.freeze({ cents: 1499, valor: 12500 }),
+  halloween: Object.freeze({ cents: 2499, valor: 19500 }),
+  arcane: Object.freeze({ cents: 1999, valor: 16000 }),
+  "blood-moon": Object.freeze({ cents: 2499, valor: 19000 }),
+  "void-dweller": Object.freeze({ cents: 2499, valor: 19500 }),
+  "desert-warriors": Object.freeze({ cents: 599, valor: 4750 }),
+  geisha: Object.freeze({ cents: 1199, valor: 8750 }),
+  "riot-cop": Object.freeze({ cents: 899, valor: 6750 }),
+  "southern-kingdom": Object.freeze({ cents: 999, valor: 7250 }),
+  "grim-reaper": Object.freeze({ cents: 499, valor: 3750 }),
+  infernal: Object.freeze({ cents: 499, valor: 3750 }),
+  medieval: Object.freeze({ cents: 299, valor: 2500 }),
+});
 
 function unitStar(typeOrDef) {
   const type = typeof typeOrDef === "string" ? typeOrDef : typeOrDef?.id ?? typeOrDef?.type;
@@ -175,6 +191,91 @@ export function getSkinOffers(storage = globalThis.localStorage) {
     getUnitSkins(type, storage).map((skin) => getSkinOffer(type, skin.slug, storage)).filter(Boolean)));
 }
 
+function rarityCounts(offers) {
+  const counts = {};
+  for (const offer of offers) counts[offer.rarity] = (counts[offer.rarity] ?? 0) + 1;
+  return Object.freeze(counts);
+}
+
+function prorateAmount(baseAmount, totalAmount, unownedAmount, { roundTo = 1 } = {}) {
+  if (!Number.isFinite(baseAmount) || !Number.isFinite(totalAmount) || !Number.isFinite(unownedAmount)) return null;
+  if (totalAmount <= 0 || unownedAmount <= 0) return 0;
+  const raw = baseAmount * (unownedAmount / totalAmount);
+  return Math.max(roundTo, Math.round(raw / roundTo) * roundTo);
+}
+
+export function getSkinPackOffers(storage = globalThis.localStorage) {
+  const offersByPack = new Map();
+  for (const offer of getSkinOffers(storage)) {
+    if (!offer.packId) continue;
+    const list = offersByPack.get(offer.packId) ?? [];
+    list.push(offer);
+    offersByPack.set(offer.packId, list);
+  }
+
+  return Object.freeze([...offersByPack.entries()]
+    .map(([packId, offers]) => skinPackOffer(packId, offers))
+    .filter(Boolean)
+    .sort((left, right) => left.name.localeCompare(right.name) || left.packId.localeCompare(right.packId)));
+}
+
+export function getSkinPackOffer(packId, storage = globalThis.localStorage) {
+  return getSkinPackOffers(storage).find((offer) => offer.packId === packId) ?? null;
+}
+
+function skinPackOffer(packId, offers) {
+  const basePrice = SKIN_PACK_PRICES[packId];
+  if (!basePrice || !offers.length) return null;
+  const sortedOffers = [...offers].sort((left, right) =>
+    left.type.localeCompare(right.type) || left.name.localeCompare(right.name) || left.slug.localeCompare(right.slug));
+  const unownedSkins = sortedOffers.filter((offer) => !offer.owned);
+  const individualPriceCents = sortedOffers.reduce((sum, offer) => sum + (offer.price?.cents ?? 0), 0);
+  const unownedPriceCents = unownedSkins.reduce((sum, offer) => sum + (offer.price?.cents ?? 0), 0);
+  const individualValorAmount = sortedOffers.reduce((sum, offer) => sum + (offer.valorPrice?.amount ?? 0), 0);
+  const unownedValorAmount = unownedSkins.reduce((sum, offer) => sum + (offer.valorPrice?.amount ?? 0), 0);
+  const cents = prorateAmount(basePrice.cents, individualPriceCents, unownedPriceCents);
+  const valor = prorateAmount(basePrice.valor, individualValorAmount, unownedValorAmount, { roundTo: 50 });
+  const first = sortedOffers[0];
+  const sku = `ta.skinpack.${packId}`;
+  return Object.freeze({
+    id: `skin-pack:${packId}`,
+    kind: "skin-pack",
+    packId,
+    name: first.packName,
+    collectionName: first.packName,
+    sku,
+    entitlementId: `skin-pack:${packId}`,
+    skinCount: sortedOffers.length,
+    ownedSkinCount: sortedOffers.length - unownedSkins.length,
+    unownedSkinCount: unownedSkins.length,
+    owned: unownedSkins.length === 0,
+    rarityCounts: rarityCounts(sortedOffers),
+    skins: Object.freeze(sortedOffers),
+    unownedSkins: Object.freeze(unownedSkins),
+    individualPrice: Object.freeze({
+      kind: "premium",
+      currency: "USD",
+      cents: individualPriceCents,
+    }),
+    individualValorPrice: Object.freeze({
+      kind: "valor",
+      resourceId: VALOR_RESOURCE.id,
+      amount: individualValorAmount,
+    }),
+    price: Object.freeze({
+      kind: "premium",
+      sku,
+      currency: "USD",
+      cents,
+    }),
+    valorPrice: Object.freeze({
+      kind: "valor",
+      resourceId: VALOR_RESOURCE.id,
+      amount: valor,
+    }),
+  });
+}
+
 export function groupSkinOffersByClassAndType(offers = []) {
   const offersByType = new Map();
   for (const offer of Array.isArray(offers) ? offers : []) {
@@ -202,6 +303,7 @@ export function getShopCatalog(storage = globalThis.localStorage) {
       balance: progress.valorBalance,
     }),
     units: getUnitOffers(storage),
+    skinPacks: getSkinPackOffers(storage),
     skins: getSkinOffers(storage),
     boosts: Object.freeze([]),
   });
@@ -239,6 +341,28 @@ export function purchaseSkinWithValor(storage = globalThis.localStorage, type, s
     purchasedSkins: [...progress.purchasedSkins, selected],
   });
   return { accepted: true, progress: next, offer: getSkinOffer(type, slug, storage) };
+}
+
+export function purchaseSkinPackWithValor(storage = globalThis.localStorage, packId) {
+  const offer = getSkinPackOffer(packId, storage);
+  const progress = readUnlockProgress(storage);
+  if (!offer || !offer.valorPrice) return { accepted: false, errorCode: "SKIN_PACK_NOT_FOR_SALE", progress, offer: null };
+  if (offer.owned || offer.unownedSkinCount <= 0) {
+    return { accepted: false, errorCode: "SKIN_PACK_ALREADY_OWNED", progress, offer };
+  }
+  if (progress.valorBalance < offer.valorPrice.amount) {
+    return { accepted: false, errorCode: "INSUFFICIENT_VALOR", progress, offer };
+  }
+  const purchasedSkins = [
+    ...progress.purchasedSkins,
+    ...offer.unownedSkins.map((skin) => ({ type: skin.type, slug: skin.slug })),
+  ];
+  const next = writeUnlockProgress(storage, {
+    ...progress,
+    valorBalance: progress.valorBalance - offer.valorPrice.amount,
+    purchasedSkins,
+  });
+  return { accepted: true, progress: next, offer: getSkinPackOffer(packId, storage) };
 }
 
 function roundValorAmount(amount) {

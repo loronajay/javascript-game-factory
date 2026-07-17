@@ -4,6 +4,7 @@ import {
   formatValorAmount,
   groupSkinOffersByClassAndType,
   getShopCatalog,
+  purchaseSkinPackWithValor,
   purchaseSkinWithValor,
   purchaseUnitWithValor,
 } from "../progression/marketplace.js";
@@ -31,6 +32,7 @@ export function openShop(storage = globalThis.localStorage) {
   let activeTab = "units";
   let statusText = "";
   let detailUnitType = null;
+  let detailPackId = null;
   let unitScrollTop = 0;
   let pendingValorPurchase = null;
   let pendingValorError = "";
@@ -44,6 +46,9 @@ export function openShop(storage = globalThis.localStorage) {
     }
     const detailOffer = activeTab === "units" && detailUnitType
       ? catalog.units.find((offer) => offer.type === detailUnitType)
+      : null;
+    const detailPackOffer = activeTab === "skin-packs" && detailPackId
+      ? catalog.skinPacks.find((offer) => offer.packId === detailPackId)
       : null;
     overlay.replaceChildren();
 
@@ -69,6 +74,7 @@ export function openShop(storage = globalThis.localStorage) {
       tabBtn.addEventListener("click", () => {
         activeTab = tab.id;
         detailUnitType = null;
+        detailPackId = null;
         pendingValorPurchase = null;
         pendingValorError = "";
         statusText = "";
@@ -79,9 +85,11 @@ export function openShop(storage = globalThis.localStorage) {
     head.appendChild(tabs);
     card.appendChild(head);
 
-    const body = el("div", `shop-body${detailOffer ? " is-detail-view" : ""}`);
+    const body = el("div", `shop-body${detailOffer || detailPackOffer ? " is-detail-view" : ""}`);
     if (detailOffer) renderUnitDetail(body, detailOffer);
+    else if (detailPackOffer) renderSkinPackDetail(body, detailPackOffer);
     else if (activeTab === "units") renderUnits(body, catalog.units);
+    else if (activeTab === "skin-packs") renderSkinPacks(body, catalog.skinPacks);
     else if (activeTab === "skins") renderSkins(body, catalog.skins);
     else renderBoosts(body);
     card.appendChild(body);
@@ -171,6 +179,98 @@ export function openShop(storage = globalThis.localStorage) {
     body.appendChild(detail);
   }
 
+  function renderSkinPacks(body, offers) {
+    const section = el("section", "shop-section");
+    section.appendChild(el("h3", "shop-section-title", "Skin Packs"));
+    const grid = el("div", "shop-grid shop-pack-grid");
+    for (const offer of offers) {
+      const card = el("article", `shop-item shop-skin-pack${offer.owned ? " is-owned" : ""}`);
+      card.setAttribute("aria-label", `View ${offer.name} contents`);
+      card.addEventListener("click", () => {
+        detailPackId = offer.packId;
+        pendingValorPurchase = null;
+        pendingValorError = "";
+        statusText = "";
+        render();
+      });
+      card.appendChild(createPackPreview(offer, "shop-pack-preview"));
+      const copy = el("div", "shop-item-copy");
+      copy.append(
+        el("b", "shop-item-title", offer.name),
+        el("span", "shop-item-sub", `${offer.skinCount} skins`),
+        el("span", "shop-item-meta", packOwnershipLabel(offer)),
+      );
+      const actions = el("div", "shop-pack-actions");
+      const details = el("button", "shop-detail-btn", "Details");
+      details.type = "button";
+      details.setAttribute("aria-label", `View ${offer.name} contents`);
+      details.addEventListener("click", (event) => {
+        event.stopPropagation?.();
+        detailPackId = offer.packId;
+        pendingValorPurchase = null;
+        pendingValorError = "";
+        statusText = "";
+        render();
+      });
+      actions.append(details, createPackBuyActions(offer));
+      card.append(copy, actions);
+      grid.appendChild(card);
+    }
+    section.appendChild(grid);
+    body.appendChild(section);
+  }
+
+  function renderSkinPackDetail(body, offer) {
+    const detail = el("article", "shop-pack-detail");
+
+    const top = el("div", "shop-unit-detail-top");
+    const back = el("button", "shop-detail-back", "Back");
+    back.type = "button";
+    back.setAttribute("aria-label", "Back to skin packs");
+    back.addEventListener("click", () => {
+      detailPackId = null;
+      pendingValorPurchase = null;
+      pendingValorError = "";
+      render();
+    });
+    top.appendChild(back);
+    detail.appendChild(top);
+
+    const hero = el("header", "shop-pack-detail-hero");
+    hero.appendChild(createPackPreview(offer, "shop-pack-detail-preview"));
+    const heroCopy = el("div", "shop-unit-detail-hero-copy");
+    heroCopy.append(
+      el("span", "shop-unit-detail-kicker", `${offer.skinCount} skins`),
+      el("h3", "shop-unit-detail-title", offer.name),
+      createPackOwnershipLine(offer),
+    );
+    hero.appendChild(heroCopy);
+    detail.appendChild(hero);
+
+    const contents = el("div", "shop-pack-contents");
+    for (const skin of offer.skins) {
+      const item = el("button", `shop-pack-skin${skin.owned ? " is-owned" : ""}`);
+      item.type = "button";
+      item.setAttribute("aria-label", `View ${skin.name} skin for ${skin.unitName}`);
+      item.append(
+        createPortrait(skin.type, { variant: "is-shop-pack-skin", eager: true, skin: skin.slug }),
+        el("span", "shop-pack-skin-name", skin.name),
+        el("span", "shop-pack-skin-unit", skin.unitName),
+      );
+      item.addEventListener("click", () => {
+        openSkinViewer({ type: skin.type, slug: skin.slug, storage });
+      });
+      contents.appendChild(item);
+    }
+    detail.appendChild(contents);
+
+    const actions = el("div", "shop-pack-detail-actions");
+    actions.appendChild(createPackBuyActions(offer));
+    detail.appendChild(actions);
+
+    body.appendChild(detail);
+  }
+
   function renderSkins(body, offers) {
     for (const group of groupSkinOffersByClassAndType(offers)) {
       const section = el("section", "shop-section shop-skin-class-section");
@@ -233,7 +333,9 @@ export function openShop(storage = globalThis.localStorage) {
   function openValorPurchase(kind, offer) {
     pendingValorPurchase = kind === "skin"
       ? { kind, type: offer.type, slug: offer.slug }
-      : { kind, type: offer.type };
+      : kind === "skin-pack"
+        ? { kind, packId: offer.packId }
+        : { kind, type: offer.type };
     pendingValorError = "";
     render();
   }
@@ -249,6 +351,9 @@ export function openShop(storage = globalThis.localStorage) {
     if (pendingValorPurchase.kind === "unit") {
       return catalog.units.find((offer) => offer.type === pendingValorPurchase.type) ?? null;
     }
+    if (pendingValorPurchase.kind === "skin-pack") {
+      return catalog.skinPacks.find((offer) => offer.packId === pendingValorPurchase.packId) ?? null;
+    }
     return catalog.skins.find((offer) =>
       offer.type === pendingValorPurchase.type && offer.slug === pendingValorPurchase.slug) ?? null;
   }
@@ -256,7 +361,9 @@ export function openShop(storage = globalThis.localStorage) {
   function confirmValorPurchase(kind, offer) {
     const result = kind === "skin"
       ? purchaseSkinWithValor(storage, offer.type, offer.slug)
-      : purchaseUnitWithValor(storage, offer.type);
+      : kind === "skin-pack"
+        ? purchaseSkinPackWithValor(storage, offer.packId)
+        : purchaseUnitWithValor(storage, offer.type);
     if (!result.accepted && result.errorCode === "INSUFFICIENT_VALOR") {
       pendingValorError = result.errorCode;
       statusText = "";
@@ -265,12 +372,16 @@ export function openShop(storage = globalThis.localStorage) {
     }
     pendingValorPurchase = null;
     pendingValorError = "";
-    statusText = kind === "skin" ? skinValorPurchaseStatus(result) : unitPurchaseStatus(result);
+    statusText = kind === "skin-pack"
+      ? skinPackValorPurchaseStatus(result)
+      : kind === "skin"
+        ? skinValorPurchaseStatus(result)
+        : unitPurchaseStatus(result);
     render();
   }
 
   function createPurchaseConfirm(kind, offer, balance) {
-    const amount = kind === "skin" ? offer.valorPrice?.amount : offer.price?.amount;
+    const amount = kind === "unit" ? offer.price?.amount : offer.valorPrice?.amount;
     const shortOnValor = Number.isFinite(amount) && balance < amount;
     const shouldShowValorWarning = pendingValorError === "INSUFFICIENT_VALOR" || shortOnValor;
     const layer = el("div", "shop-confirm-layer");
@@ -290,15 +401,17 @@ export function openShop(storage = globalThis.localStorage) {
     head.append(el("span", "shop-confirm-kicker", "Valor Purchase"), title);
 
     const item = el("div", "shop-confirm-item");
-    item.appendChild(createPortrait(offer.type, {
-      variant: "is-shop-confirm",
-      eager: true,
-      skin: kind === "skin" ? offer.slug : null,
-    }));
+    item.appendChild(kind === "skin-pack"
+      ? createPackPreview(offer, "is-shop-confirm")
+      : createPortrait(offer.type, {
+        variant: "is-shop-confirm",
+        eager: true,
+        skin: kind === "skin" ? offer.slug : null,
+      }));
     const copy = el("div", "shop-confirm-copy");
     copy.append(
       el("b", "shop-confirm-name", offer.name),
-      el("span", "shop-confirm-sub", kind === "skin" ? `Skin for ${offer.unitName}` : "Unit unlock"),
+      el("span", "shop-confirm-sub", confirmSubtitle(kind, offer)),
     );
     if (kind === "skin" && offer.donationNote) {
       copy.appendChild(el("span", "shop-confirm-note", offer.donationNote));
@@ -338,7 +451,7 @@ export function openShop(storage = globalThis.localStorage) {
   function createUnitBuyActions(offer) {
     const actions = el("div", `shop-unit-purchase-actions${offer.owned ? " is-owned" : ""}`);
     if (offer.owned) {
-      actions.append(createOwnedBuyButton("premium"), createOwnedBuyButton("valor"));
+      actions.appendChild(createOwnedBuyButton());
       return actions;
     }
 
@@ -364,7 +477,7 @@ export function openShop(storage = globalThis.localStorage) {
   function createSkinBuyActions(offer) {
     const actions = el("div", `shop-skin-actions${offer.owned ? " is-owned" : ""}`);
     if (offer.owned) {
-      actions.append(createOwnedBuyButton("premium"), createOwnedBuyButton("valor"));
+      actions.appendChild(createOwnedBuyButton());
       return actions;
     }
 
@@ -395,8 +508,42 @@ export function openShop(storage = globalThis.localStorage) {
     return actions;
   }
 
-  function createOwnedBuyButton(channel) {
-    const owned = el("button", `shop-buy-btn is-owned is-${channel}`, "Owned");
+  function createPackBuyActions(offer) {
+    const actions = el("div", `shop-pack-purchase-actions${offer.owned ? " is-owned" : ""}`);
+    if (offer.owned) {
+      actions.appendChild(createOwnedBuyButton());
+      return actions;
+    }
+
+    const premiumBuy = el("button", "shop-buy-btn is-premium", formatPremiumPrice(offer.price));
+    premiumBuy.type = "button";
+    premiumBuy.dataset.sku = offer.sku;
+    premiumBuy.setAttribute("aria-label", `Buy ${offer.name} with ${formatPremiumPrice(offer.price)}`);
+    premiumBuy.addEventListener("click", (event) => {
+      event.stopPropagation?.();
+      statusText = `${formatPremiumPrice(offer.price)} ${offer.name} checkout ready: ${offer.sku}`;
+      overlay.dispatchEvent(new CustomEvent("tacticalarena:premium-purchase-request", {
+        bubbles: true,
+        detail: { offer },
+      }));
+      render();
+    });
+
+    const valorBuy = el("button", "shop-buy-btn is-valor");
+    valorBuy.type = "button";
+    valorBuy.setAttribute("aria-label", `Unlock ${offer.name} for ${formatValor(offer.valorPrice?.amount)}`);
+    valorBuy.appendChild(createValorBadge(offer.valorPrice?.amount, "shop-price"));
+    valorBuy.addEventListener("click", (event) => {
+      event.stopPropagation?.();
+      openValorPurchase("skin-pack", offer);
+    });
+
+    actions.append(premiumBuy, valorBuy);
+    return actions;
+  }
+
+  function createOwnedBuyButton() {
+    const owned = el("button", "shop-buy-btn is-owned", "Owned");
     owned.type = "button";
     owned.disabled = true;
     return owned;
@@ -436,6 +583,13 @@ function skinValorPurchaseStatus(result) {
   return "That skin is not for sale.";
 }
 
+function skinPackValorPurchaseStatus(result) {
+  if (result.accepted) return `${result.offer.name} unlocked.`;
+  if (result.errorCode === "INSUFFICIENT_VALOR") return "Not enough Valor.";
+  if (result.errorCode === "SKIN_PACK_ALREADY_OWNED") return "Already owned.";
+  return "That skin pack is not for sale.";
+}
+
 function classLabel(value) {
   return String(value || "unit")
     .split("-")
@@ -451,11 +605,42 @@ function rarityClass(value) {
   return String(value || "common").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "").toLowerCase();
 }
 
+function packOwnershipLabel(offer) {
+  if (offer.owned) return "Owned";
+  if (offer.ownedSkinCount > 0) return `${offer.ownedSkinCount}/${offer.skinCount} owned`;
+  return "Bundle";
+}
+
+function confirmSubtitle(kind, offer) {
+  if (kind === "skin") return `Skin for ${offer.unitName}`;
+  if (kind === "skin-pack") return `${offer.unownedSkinCount} skins`;
+  return "Unit unlock";
+}
+
 function createUnitOwnershipLine(offer) {
   if (offer.owned) return el("span", "shop-unit-detail-state is-owned", "Owned");
   const line = el("span", "shop-unit-detail-state");
   line.append(el("span", "", "Unlock for"), createValorBadge(offer.price.amount, "shop-price"));
   return line;
+}
+
+function createPackOwnershipLine(offer) {
+  if (offer.owned) return el("span", "shop-unit-detail-state is-owned", "Owned");
+  const line = el("span", "shop-unit-detail-state");
+  line.append(el("span", "", packOwnershipLabel(offer)), createValorBadge(offer.valorPrice.amount, "shop-price"));
+  return line;
+}
+
+function createPackPreview(offer, className = "") {
+  const preview = el("div", `shop-pack-preview${className ? ` ${className}` : ""}`);
+  for (const skin of offer.skins.slice(0, 4)) {
+    preview.appendChild(createPortrait(skin.type, {
+      variant: "is-shop-pack-preview",
+      eager: true,
+      skin: skin.slug,
+    }));
+  }
+  return preview;
 }
 
 function createValorBadge(amount, className = "") {

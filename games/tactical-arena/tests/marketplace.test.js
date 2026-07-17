@@ -5,10 +5,13 @@ import { STARTING_VALOR_BALANCE, readUnlockProgress, writeUnlockProgress } from 
 import {
   formatPremiumPrice,
   formatValor,
+  getSkinPackOffer,
+  getSkinPackOffers,
   getShopCatalog,
   groupSkinOffersByClassAndType,
   getSkinOffer,
   getUnitOffer,
+  purchaseSkinPackWithValor,
   purchaseSkinWithValor,
   purchaseUnitWithValor,
   skinValorCost,
@@ -25,15 +28,59 @@ function storageAdapter() {
   };
 }
 
-test("shop catalog exposes units, premium skins, and an empty boosts tab", () => {
+test("shop catalog exposes units, premium skins, skin packs, and an empty boosts tab", () => {
   const storage = storageAdapter();
   const catalog = getShopCatalog(storage);
 
   assert.ok(catalog.units.length > 0);
   assert.ok(catalog.skins.length > 0);
+  assert.ok(catalog.skinPacks.length > 0);
+  assert.ok(catalog.tabs.some((tab) => tab.id === "skin-packs" && tab.label === "Skin Packs"));
   assert.deepEqual(catalog.boosts, []);
   assert.equal(catalog.resource.balance, STARTING_VALOR_BALANCE);
   assert.equal(catalog.resource.name, "Valor");
+});
+
+test("skin pack offers use authored pack metadata and exclude separate Halloween exclusives", () => {
+  const storage = storageAdapter();
+  const packs = getSkinPackOffers(storage);
+  const halloween = packs.find((pack) => pack.packId === "halloween");
+
+  assert.ok(halloween, "Halloween Pack should be offered");
+  assert.equal(halloween.name, "Halloween Pack");
+  assert.equal(halloween.skinCount, 25);
+  assert.equal(halloween.ownedSkinCount, 0);
+  assert.equal(halloween.unownedSkinCount, 25);
+  assert.equal(halloween.price.cents, 2499);
+  assert.equal(halloween.valorPrice.amount, 19500);
+  assert.ok(halloween.skins.some((skin) => skin.type === "swordsman" && skin.slug === "pumpkin-knight"));
+  assert.equal(
+    halloween.skins.some((skin) => skin.type === "swordsman" && skin.slug === "enchanted"),
+    false,
+    "Halloween-exclusive singles should stay outside the Halloween Pack"
+  );
+  assert.equal(
+    halloween.skins.some((skin) => skin.type === "mother-nature" && skin.slug === "bronze-witch"),
+    false,
+    "separate exclusive singles should not be pulled into the pack by theme"
+  );
+});
+
+test("skin pack offers prorate prices for already owned pack contents", () => {
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, {
+    purchasedSkins: [{ type: "swordsman", slug: "pumpkin-knight" }],
+  });
+
+  const full = getSkinPackOffer("halloween", storageAdapter());
+  const partial = getSkinPackOffer("halloween", storage);
+
+  assert.equal(partial.skinCount, full.skinCount);
+  assert.equal(partial.ownedSkinCount, 1);
+  assert.equal(partial.unownedSkinCount, full.skinCount - 1);
+  assert.ok(partial.price.cents < full.price.cents);
+  assert.ok(partial.valorPrice.amount < full.valorPrice.amount);
+  assert.ok(partial.skins.find((skin) => skin.slug === "pumpkin-knight").owned);
 });
 
 test("skin shop offers group by class and then by unit type", () => {
@@ -194,6 +241,44 @@ test("purchasing a skin with Valor spends Valor and unlocks the skin", () => {
   assert.equal(offer.owned, true);
   assert.ok(progress.purchasedSkins.some((skin) => skin.type === "magician" && skin.slug === "summer-vibes"));
   assert.equal(progress.valorBalance, 3000 - result.offer.valorPrice.amount);
+});
+
+test("purchasing a skin pack with Valor spends the prorated pack price and unlocks unowned pack skins", () => {
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, {
+    valorBalance: 30000,
+    purchasedSkins: [{ type: "swordsman", slug: "pumpkin-knight" }],
+  });
+
+  const offer = getSkinPackOffer("halloween", storage);
+  const result = purchaseSkinPackWithValor(storage, "halloween");
+  const progress = readUnlockProgress(storage);
+
+  assert.equal(result.accepted, true);
+  assert.equal(progress.valorBalance, 30000 - offer.valorPrice.amount);
+  assert.ok(progress.purchasedSkins.some((skin) => skin.type === "swordsman" && skin.slug === "pumpkin-knight"));
+  assert.ok(progress.purchasedSkins.some((skin) => skin.type === "juggernaut" && skin.slug === "pumpkin-mech"));
+  assert.equal(
+    progress.purchasedSkins.some((skin) => skin.type === "swordsman" && skin.slug === "enchanted"),
+    false,
+    "pack purchase should not grant separate Halloween-exclusive skins"
+  );
+  assert.equal(getSkinPackOffer("halloween", storage).owned, true);
+});
+
+test("skin pack purchases reject owned, invalid, and unaffordable offers", () => {
+  const storage = storageAdapter();
+
+  assert.equal(purchaseSkinPackWithValor(storage, "bogus").errorCode, "SKIN_PACK_NOT_FOR_SALE");
+
+  writeUnlockProgress(storage, { valorBalance: 0 });
+  assert.equal(purchaseSkinPackWithValor(storage, "halloween").errorCode, "INSUFFICIENT_VALOR");
+
+  writeUnlockProgress(storage, {
+    valorBalance: 99999,
+    purchasedSkins: getSkinPackOffer("medieval", storageAdapter()).skins.map((skin) => ({ type: skin.type, slug: skin.slug })),
+  });
+  assert.equal(purchaseSkinPackWithValor(storage, "medieval").errorCode, "SKIN_PACK_ALREADY_OWNED");
 });
 
 test("skin Valor purchases reject owned, invalid, and unaffordable offers", () => {

@@ -201,9 +201,58 @@ test("shop skin cards offer USD checkout and Valor purchase buttons", () => {
   const ownedSkinCard = walk(overlay, (node) => hasClass(node, "shop-skin") && hasClass(node, "is-owned"))[0];
   assert.ok(ownedSkinCard, "Valor purchase should flip the skin card to owned");
   const ownedButtons = walk(ownedSkinCard, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-buy-btn"));
-  assert.equal(ownedButtons.length, 2, "both purchase paths should remain visible as owned");
-  assert.ok(ownedButtons.every((node) => node.textContent === "Owned"));
-  assert.ok(ownedButtons.every((node) => node.disabled));
+  assert.equal(ownedButtons.length, 1, "owned skin cards should collapse purchase paths into one button");
+  assert.equal(ownedButtons[0].textContent, "Owned");
+  assert.ok(ownedButtons[0].disabled);
+});
+
+test("shop skin packs render clickable contents and use Valor confirmation", () => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, { valorBalance: 30000 });
+
+  openShop(storage);
+
+  const overlay = document.body.children[0];
+  const packsTab = walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Skin Packs")[0];
+  assert.ok(packsTab, "shop should expose a Skin Packs tab");
+  packsTab.click();
+
+  const halloweenCard = walk(overlay, (node) => hasClass(node, "shop-skin-pack") && visibleText(node).includes("Halloween Pack"))[0];
+  assert.ok(halloweenCard, "shop should render the Halloween Pack");
+  assert.match(visibleText(halloweenCard), /25 skins/);
+  assert.doesNotMatch(visibleText(halloweenCard), /Enchanted/);
+
+  const details = walk(halloweenCard, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-detail-btn"))[0];
+  details.click();
+
+  const detail = walk(overlay, (node) => hasClass(node, "shop-pack-detail"))[0];
+  assert.ok(detail, "pack details should open inside the shop");
+  assert.match(visibleText(detail), /Pumpkin Knight/);
+  assert.doesNotMatch(visibleText(detail), /Enchanted/);
+
+  const valorBuy = walk(detail, (node) => node.tagName === "BUTTON" && hasClass(node, "is-valor"))[0];
+  valorBuy.click();
+
+  let progress = readUnlockProgress(storage);
+  assert.equal(progress.valorBalance, 30000, "opening confirmation should not spend Valor");
+
+  const confirm = walk(overlay, (node) => hasClass(node, "shop-purchase-confirm"))[0];
+  assert.ok(confirm, "pack Valor click should open a confirmation popup");
+  assert.match(visibleText(confirm), /Halloween Pack/);
+  assert.match(visibleText(confirm), /25 skins/);
+  const purchase = walk(confirm, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-confirm-purchase"))[0];
+  assert.equal(purchase.getAttribute("aria-label"), "Purchase Halloween Pack for 19,500 Valor");
+  purchase.click();
+
+  progress = readUnlockProgress(storage);
+  assert.equal(progress.valorBalance, 10500);
+  assert.ok(progress.purchasedSkins.some((skin) => skin.type === "swordsman" && skin.slug === "pumpkin-knight"));
+  assert.equal(
+    progress.purchasedSkins.some((skin) => skin.type === "swordsman" && skin.slug === "enchanted"),
+    false,
+    "pack purchase should not grant Halloween-exclusive singles"
+  );
 });
 
 test("shop and confirmation show the cancer research proceeds note for Fuck Cancer skins", () => {
@@ -263,7 +312,7 @@ test("shop unit cards open a detail card and return to unit browsing", () => {
   assert.ok(walk(overlay, (node) => hasClass(node, "shop-unit")).length > 0, "back should restore unit browsing");
 });
 
-test("shop unit Valor purchase flips both USD and Valor unit buttons to owned", () => {
+test("shop unit Valor purchase flips the unit card to one owned button", () => {
   globalThis.document = new FakeDocument();
   const storage = storageAdapter();
   writeUnlockProgress(storage, { valorBalance: 999 });
@@ -305,9 +354,9 @@ test("shop unit Valor purchase flips both USD and Valor unit buttons to owned", 
   const ownedClodCard = walk(overlay, (node) => hasClass(node, "shop-unit") && hasClass(node, "is-owned") && visibleText(node).includes("Clod"))[0];
   assert.ok(ownedClodCard, "Valor purchase should flip the unit card to owned");
   const ownedButtons = walk(ownedClodCard, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-buy-btn"));
-  assert.equal(ownedButtons.length, 2);
-  assert.ok(ownedButtons.every((node) => node.textContent === "Owned"));
-  assert.ok(ownedButtons.every((node) => node.disabled));
+  assert.equal(ownedButtons.length, 1);
+  assert.equal(ownedButtons[0].textContent, "Owned");
+  assert.ok(ownedButtons[0].disabled);
 });
 
 test("shop Valor confirmation explains when the player cannot afford the unlock", () => {

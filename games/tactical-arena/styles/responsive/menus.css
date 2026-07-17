@@ -168,6 +168,10 @@
     grid-template-columns: repeat(auto-fill, minmax(9.8rem, 1fr));
   }
 
+  .shop-pack-grid {
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  }
+
   .shop-skin-grid {
     grid-template-columns: repeat(auto-fill, minmax(7.4rem, 1fr));
     gap: .42rem;
@@ -182,6 +186,21 @@
   .shop-unit .unit-portrait.is-shop-unit {
     width: 3.25rem;
     height: 3.95rem;
+  }
+
+  .shop-skin-pack {
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+    gap: .45rem;
+    padding: .45rem;
+  }
+
+  .shop-pack-preview {
+    grid-template-columns: repeat(2, 2rem);
+  }
+
+  .shop-pack-preview .unit-portrait.is-shop-pack-preview {
+    width: 2rem;
+    height: 2.45rem;
   }
 
   .shop-skin .unit-portrait.is-shop-skin {
