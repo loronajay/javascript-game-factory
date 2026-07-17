@@ -62,12 +62,19 @@ never loosened, only retargeted/tightened.
       `tutorialProgress.js` (persistence), `tutorialRuntimeHelpers.js` (shared
       setStage/predicates/pathing); `basics.js` is a pure barrel enforced by the
       architecture test, so all import paths survive.
-- [ ] **Phase 7 — Within-file refactors**: `handleTile`/`handleActionClick` → per-mode handler maps;
-      `instantArtPresenter` → presenter registry Map (mirrors `ART_RESOLVERS`);
-      reducer → `src/core/basicAttack.js` + `src/core/activationPassives.js`;
-      turnEngine hazard ticks → `src/core/turnHazards.js`;
-      unitCatalog → extract weather folding, `kingCommands.js`, `unitAiMetadata.js`
-      (`getEffectiveStats` stays in `unitCatalog.js`).
+- [x] **Phase 7 (core half) — Within-file extractions**:
+      reducer (721 → 308) → `src/core/basicAttack.js` + `src/core/activationPassives.js`;
+      turnEngine (618 → 482) hazard ticks → `src/core/turnHazards.js`;
+      unitCatalog (1107 → 704) → `unitRegistry.js` + `unitWeather.js` + `kingCommands.js` +
+      `unitAiMetadata.js`, re-exported through the catalog (`getEffectiveStats` stays).
+- [ ] **Phase 7 (deferred) — UI ladder conversions**: `battleInputController.js`'s
+      `handleTile`/`handleActionClick` → per-mode handler dispatch, and
+      `instantArtPresenter.js` → per-art presenter registry (mirroring `ART_RESOLVERS`).
+      Deliberately deferred: both files are cohesive and fully working; the conversions are
+      readability-only rewrites of ~1,100 lines of input/animation code whose visual
+      branches have thin automated coverage — a bad pre-release risk trade. Listed as the
+      top remaining hotspots in `ARCHITECTURE.md` with the target shape; best done in a
+      dedicated session with hand-playtesting of each targeting mode.
 - [x] **Phase 8 — CPU fixes (approved behavior change)**: investigation showed the engine
       itself resolves cone/tile-pulse AoE as FIXED damage (no DEF/Defend) — so the audit's
       DEF concern didn't apply; the real projection divergence was the missing fire-immunity
