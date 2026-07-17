@@ -46,7 +46,12 @@ test("styles live behind purpose-specific entry points instead of the project ro
 
 test("release hotspots delegate cohesive responsibilities to smaller modules", () => {
   const boundaries = [
-    ["src/main.js", 1325, ["./ai/cpuTurnController.js", "./online/onlineCommandController.js", "./match/matchLifecycleController.js", "./ui/battleEventPresenter.js", "./ui/rolledCombatPresenter.js", "./ui/instantArtPresenter.js", "./ui/battleInputController.js", "./ui/tutorialPresentationController.js", "./ui/tempoLoopController.js", "./campaign/campaignPresentationController.js", "./campaign/campaignRuntime.js"]],
+    ["src/main.js", 850, ["./ai/cpuTurnController.js", "./online/onlineCommandController.js", "./match/matchLifecycleController.js", "./ui/battleEventPresenter.js", "./ui/commandResolutionController.js", "./ui/matchOutcomeController.js", "./ui/battleInputController.js", "./ui/tutorialPresentationController.js", "./ui/tempoLoopController.js", "./campaign/campaignPresentationController.js", "./campaign/campaignMatchHooks.js"]],
+    ["src/ui/commandResolutionController.js", 400, ["./rolledCombatPresenter.js", "./instantArtPresenter.js", "./resolutionGuard.js"]],
+    ["src/ui/matchOutcomeController.js", 220, []],
+    ["src/campaign/campaignMatchHooks.js", 150, []],
+    // The sandbox must consume the SAME resolve loop as the shipping match, never a fork of it.
+    ["src/dev/sandbox.js", 520, ["../ui/commandResolutionController.js"]],
     ["src/core/artResolvers.js", 350, [
       "./artResolvers/riotCopResolvers.js",
       "./artResolvers/fatWizardResolvers.js",

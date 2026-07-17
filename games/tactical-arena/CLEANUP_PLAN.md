@@ -32,12 +32,14 @@ never loosened, only retargeted/tightened.
       the 12 `el()` and 5 `escapeHtml` local copies; replaced tutorials' `chebyshev` with
       `chebyshevDistance` from `src/rules/movement.js`; also extracted `diceRollReveal.js`
       from `effects.js`, clearing the pre-existing architecture-test cap failure.
-- [ ] **Phase 2 — main.js back to composition root**:
-      resolve loop (`main.js:708–1116`) → `src/ui/commandResolutionController.js`;
-      turn/results + Valor/reward orchestration (`:590–699`) → `src/ui/matchOutcomeController.js`;
-      tutorial state mutation (`:855–936`) → existing `src/ui/tutorialPresentationController.js`;
-      point `src/dev/sandbox.js` at the shared resolution controller (resolves `sandbox.js:10` TODO);
-      architecture test: new import list, `main.js` cap ~700.
+- [x] **Phase 2 — main.js back to composition root** (1308 → 797 lines):
+      resolve loop → `src/ui/commandResolutionController.js`;
+      turn/results + Valor/reward orchestration → `src/ui/matchOutcomeController.js`;
+      per-command campaign glue → `src/campaign/campaignMatchHooks.js`;
+      tutorial state mutation + command recording → `src/ui/tutorialPresentationController.js`
+      (as overridable built-ins so the existing test seams keep working);
+      `src/dev/sandbox.js` (696 → 454 lines) now consumes the shared resolution controller —
+      its resolve loop can no longer drift from production, enforced by architecture test.
 - [ ] **Phase 3 — Split menuFlow.js**: keep `createMenuFlow` router + public API (tests import it);
       delegate to flat `src/ui/` modules: `campaignMapScreen.js`, `resultsScreen.js`,
       `tutorialMenuScreens.js`, `settingsScreen.js`, `matchSetupScreens.js`.
