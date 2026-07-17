@@ -54,6 +54,8 @@ test("release hotspots delegate cohesive responsibilities to smaller modules", (
     ["src/ui/tutorialMenuScreens.js", 170, []],
     ["src/ui/settingsScreen.js", 250, []],
     ["src/ui/matchSetupScreens.js", 220, []],
+    ["src/ui/boardRenderer.js", 560, ["./boardAtmosphere.js"]],
+    ["src/ui/boardAtmosphere.js", 450, []],
     ["src/ui/matchOutcomeController.js", 220, []],
     ["src/campaign/campaignMatchHooks.js", 150, []],
     // The sandbox must consume the SAME resolve loop as the shipping match, never a fork

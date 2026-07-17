@@ -46,8 +46,9 @@ never loosened, only retargeted/tightened.
       view-model helpers in `campaignMenuModel.js` and the menu seat palette
       (`MENU_TEAM_COLORS`) in `teamDisplay.js`; tests updated to import from the new homes;
       per-module caps added to the architecture test.
-- [ ] **Phase 4 — Split boardRenderer.js**: weather/atmosphere/figures (`:47–438`) →
-      `src/ui/boardAtmosphere.js`; boardRenderer keeps the targeting/highlight contract only.
+- [x] **Phase 4 — Split boardRenderer.js** (918 → 516 lines): weather overlay, wall/fire
+      figures, and the stone dais → `src/ui/boardAtmosphere.js` (413 lines);
+      boardRenderer keeps the targeting/highlight contract only; caps added.
 - [ ] **Phase 5 — Split campaignMatch.js**: `CAMPAIGN_LAYOUTS` → `src/campaign/campaignLayouts.js`;
       per-mission trial scripting → existing `src/campaign/missions/<slug>/` folders;
       keep config rules + `prepareCampaignMatchState` assembler.
