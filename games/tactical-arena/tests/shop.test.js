@@ -350,7 +350,7 @@ test("shop skin packs render clickable contents and use Valor confirmation", () 
 test("shop and confirmation show the cancer research proceeds note for Fuck Cancer skins", () => {
   globalThis.document = new FakeDocument();
   const storage = storageAdapter();
-  writeUnlockProgress(storage, { valorBalance: 5000 });
+  writeUnlockProgress(storage, { valorBalance: 99999 });
 
   openShop(storage);
 
@@ -367,6 +367,27 @@ test("shop and confirmation show the cancer research proceeds note for Fuck Canc
 
   const confirm = walk(overlay, (node) => hasClass(node, "shop-purchase-confirm"))[0];
   assert.match(visibleText(confirm), /All proceeds for this skin will be donated for cancer research\./);
+
+  walk(confirm, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-confirm-cancel"))[0].click();
+
+  const packsTab = walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Skin Packs")[0];
+  packsTab.click();
+
+  const packCard = walk(overlay, (node) => hasClass(node, "shop-skin-pack") && visibleText(node).includes("Fuck Cancer Charity Pack"))[0];
+  assert.ok(packCard, "shop should render the Fuck Cancer Charity Pack");
+  assert.match(visibleText(packCard), /All proceeds for this pack will be donated for cancer research\./);
+
+  const details = walk(packCard, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-detail-btn"))[0];
+  details.click();
+
+  const detail = walk(overlay, (node) => hasClass(node, "shop-pack-detail"))[0];
+  assert.match(visibleText(detail), /All proceeds for this pack will be donated for cancer research\./);
+
+  const packValorBuy = walk(detail, (node) => node.tagName === "BUTTON" && hasClass(node, "is-valor"))[0];
+  packValorBuy.click();
+
+  const packConfirm = walk(overlay, (node) => hasClass(node, "shop-purchase-confirm"))[0];
+  assert.match(visibleText(packConfirm), /All proceeds for this pack will be donated for cancer research\./);
 });
 
 test("shop unit cards open a detail card and return to unit browsing", () => {

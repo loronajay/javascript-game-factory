@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { STARTING_VALOR_BALANCE, readUnlockProgress, writeUnlockProgress } from "../src/progression/unlocks.js";
+import { UNIT_TYPES } from "../src/core/unitCatalog.js";
 import {
   formatPremiumPrice,
   formatValor,
@@ -91,6 +92,25 @@ test("skin pack offers use authored pack metadata and exclude separate Halloween
     false,
     "separate exclusive singles should not be pulled into the pack by theme"
   );
+});
+
+test("Fuck Cancer charity pack offers every unit skin with charity labeling", () => {
+  const storage = storageAdapter();
+  const charity = getSkinPackOffer("fuck-cancer", storage);
+
+  assert.ok(charity, "Fuck Cancer Charity Pack should be offered");
+  assert.equal(charity.name, "Fuck Cancer Charity Pack");
+  assert.equal(charity.skinCount, Object.keys(UNIT_TYPES).length);
+  assert.equal(charity.ownedSkinCount, 0);
+  assert.equal(charity.unownedSkinCount, Object.keys(UNIT_TYPES).length);
+  assert.equal(charity.rarityCounts.legendary, Object.keys(UNIT_TYPES).length);
+  assert.equal(charity.price.cents, 4999);
+  assert.equal(charity.valorPrice.amount, 42500);
+  assert.equal(charity.donationNote, "All proceeds for this pack will be donated for cancer research.");
+  assert.ok(charity.skins.every((skin) => skin.slug === "fuck-cancer"));
+  assert.ok(charity.skins.every((skin) => skin.rarity === "legendary"));
+  assert.ok(charity.skins.every((skin) => skin.donationNote === "All proceeds for this skin will be donated for cancer research."));
+  assert.ok(charity.skins.some((skin) => skin.type === "ghoul"), "the full-unit charity set should include Ghoul");
 });
 
 test("skin pack offers prorate prices for already owned pack contents", () => {

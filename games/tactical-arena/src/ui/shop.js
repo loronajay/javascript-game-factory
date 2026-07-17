@@ -203,6 +203,7 @@ export function openShop(storage = globalThis.localStorage) {
         el("span", "shop-item-sub", `${offer.skinCount} skins`),
         el("span", "shop-item-meta", packOwnershipLabel(offer)),
       );
+      if (offer.donationNote) copy.appendChild(el("span", "shop-item-note", offer.donationNote));
       const actions = el("div", "shop-pack-actions");
       const details = el("button", "shop-detail-btn", "Details");
       details.type = "button";
@@ -247,6 +248,7 @@ export function openShop(storage = globalThis.localStorage) {
       el("h3", "shop-unit-detail-title", offer.name),
       createPackOwnershipLine(offer),
     );
+    if (offer.donationNote) heroCopy.appendChild(el("span", "shop-item-note", offer.donationNote));
     hero.appendChild(heroCopy);
     detail.appendChild(hero);
 
@@ -449,6 +451,9 @@ export function openShop(storage = globalThis.localStorage) {
       el("span", "shop-confirm-sub", confirmSubtitle(kind, offer)),
     );
     if (kind === "skin" && offer.donationNote) {
+      copy.appendChild(el("span", "shop-confirm-note", offer.donationNote));
+    }
+    if (kind === "skin-pack" && offer.donationNote) {
       copy.appendChild(el("span", "shop-confirm-note", offer.donationNote));
     }
     item.appendChild(copy);

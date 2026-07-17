@@ -23,6 +23,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "swordsman",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-swordsman.png"
+  },
+  {
+    type: "swordsman",
     slug: "grim-reaper",
     file: "grim-reaper-swordsman.png"
   },
@@ -75,6 +80,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "archer",
     slug: "floral",
     file: "floral-archer.png"
+  },
+  {
+    type: "archer",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-archer.png"
   },
   {
     type: "archer",
@@ -158,6 +168,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "mystic",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-mystic.png"
+  },
+  {
+    type: "mystic",
     slug: "geisha",
     file: "geisha-mystic.png"
   },
@@ -218,6 +233,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "magician",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-magician.png"
+  },
+  {
+    type: "magician",
     slug: "ghostly",
     file: "ghostly-magician.png"
   },
@@ -245,6 +265,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "paladin",
     slug: "crusader",
     file: "crusader-paladin.png"
+  },
+  {
+    type: "paladin",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-paladin.png"
   },
   {
     type: "paladin",
@@ -283,6 +308,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "necromancer",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-necromancer.png"
+  },
+  {
+    type: "necromancer",
     slug: "trick-or-treat",
     file: "trick-or-treat-necromancer.png"
   },
@@ -305,6 +335,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "ghoul",
     slug: "blood-moon",
     file: "blood-moon-ghoul.png"
+  },
+  {
+    type: "ghoul",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-ghoul.png"
   },
   {
     type: "ghoul",
@@ -335,6 +370,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "sniper",
     slug: "desert-ops",
     file: "desert-ops-sniper.png"
+  },
+  {
+    type: "sniper",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-sniper.png"
   },
   {
     type: "sniper",
@@ -378,6 +418,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "witch-doctor",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-witch-doctor.png"
+  },
+  {
+    type: "witch-doctor",
     slug: "void-dweller",
     file: "void-dweller-witch-doctor.png"
   },
@@ -390,6 +435,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "father-time",
     slug: "arcane",
     file: "arcane-father-time.png"
+  },
+  {
+    type: "father-time",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-father-time.png"
   },
   {
     type: "father-time",
@@ -448,6 +498,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "king",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-king.png"
+  },
+  {
+    type: "king",
     slug: "pumpkin",
     file: "pumpkin-king.png"
   },
@@ -475,6 +530,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "angel",
     slug: "fallen",
     file: "fallen-angel.png"
+  },
+  {
+    type: "angel",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-angel.png"
   },
   {
     type: "angel",
@@ -523,6 +583,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "monk",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-monk.png"
+  },
+  {
+    type: "monk",
     slug: "jade-dragon",
     file: "jade-dragon-monk.png"
   },
@@ -558,6 +623,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "gargoyle",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-gargoyle.png"
+  },
+  {
+    type: "gargoyle",
     slug: "holy-guardian",
     file: "holy-guardian-gargoyle.png"
   },
@@ -588,6 +658,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "nemesis",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-nemesis.png"
+  },
+  {
+    type: "nemesis",
     slug: "infernal",
     file: "infernal-nemesis.png"
   },
@@ -608,6 +683,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "virus",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-virus.png"
+  },
+  {
+    type: "virus",
     slug: "jack-o-lantern",
     file: "jack-o-lantern-virus.png"
   },
@@ -620,6 +700,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "clod",
     slug: "arcane",
     file: "arcane-clod.png"
+  },
+  {
+    type: "clod",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-clod.png"
   },
   {
     type: "clod",
@@ -647,6 +732,11 @@ export const SKIN_MANIFEST = Object.freeze([
     file: "franken-fatigue-fat-knight.png"
   },
   {
+    type: "fat-knight",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-fat-knight.png"
+  },
+  {
     type: "fat-wizard",
     slug: "summer-vibes",
     file: "summer-vibes-fat-wizard.png"
@@ -665,6 +755,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "fat-wizard",
     slug: "fire-mage",
     file: "fire-mage-fat-wizard.png"
+  },
+  {
+    type: "fat-wizard",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-fat-wizard.png"
   },
   {
     type: "fat-wizard",
@@ -695,6 +790,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "fat-cleric",
     slug: "arcane",
     file: "arcane-fat-cleric.png"
+  },
+  {
+    type: "fat-cleric",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-fat-cleric.png"
   },
   {
     type: "fat-cleric",
@@ -733,6 +833,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "fat-bowman",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-fat-bowman.png"
+  },
+  {
+    type: "fat-bowman",
     slug: "geisha",
     file: "geisha-fat-bowman.png"
   },
@@ -760,6 +865,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "miner",
     slug: "firefighter",
     file: "firefighter-miner.png"
+  },
+  {
+    type: "miner",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-miner.png"
   },
   {
     type: "miner",
@@ -798,6 +908,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "big-brother",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-big-brother.png"
+  },
+  {
+    type: "big-brother",
     slug: "hell-mech",
     file: "hell-mech-big-brother.png"
   },
@@ -833,6 +948,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "little-brother",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-little-brother.png"
+  },
+  {
+    type: "little-brother",
     slug: "galaxy-defender",
     file: "galaxy-defender-little-brother.png"
   },
@@ -855,6 +975,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "blacksword",
     slug: "blood-moon",
     file: "blood-moon-blacksword.png"
+  },
+  {
+    type: "blacksword",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-blacksword.png"
   },
   {
     type: "blacksword",
@@ -895,6 +1020,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "ronin",
     slug: "eastern-vampire",
     file: "eastern-vampire-ronin.png"
+  },
+  {
+    type: "ronin",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-ronin.png"
   },
   {
     type: "ronin",
@@ -953,6 +1083,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "mother-nature",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-mother-nature.png"
+  },
+  {
+    type: "mother-nature",
     slug: "gaia-elemental",
     file: "gaia-elemental-mother-nature.png"
   },
@@ -978,6 +1113,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "summoner",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-summoner.png"
+  },
+  {
+    type: "summoner",
     slug: "hellfire",
     file: "hellfire-summoner.png"
   },
@@ -995,6 +1135,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "riot-cop",
     slug: "firefighter",
     file: "firefighter-riot-cop.png"
+  },
+  {
+    type: "riot-cop",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-riot-cop.png"
   },
   {
     type: "riot-cop",
@@ -1035,6 +1180,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "treant",
     slug: "blood-moon",
     file: "blood-moon-treant.png"
+  },
+  {
+    type: "treant",
+    slug: "fuck-cancer",
+    file: "fuck-cancer-treant.png"
   },
   {
     type: "treant",

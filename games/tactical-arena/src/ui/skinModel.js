@@ -75,7 +75,17 @@ const PACK = Object.freeze({
   SOUTHERN_KINGDOM: pack("southern-kingdom", "Southern Kingdom Pack"),
   SUMMER_VIBES: pack("summer-vibes", "Summer Vibes Pack"),
   VOID_DWELLER: pack("void-dweller", "Void Dweller Pack"),
+  FUCK_CANCER: pack("fuck-cancer", "Fuck Cancer Charity Pack"),
 });
+
+const FUCK_CANCER_SKIN_METADATA = meta(SKIN_RARITIES.LEGENDARY, {
+  ...PACK.FUCK_CANCER,
+  donationNote: CANCER_RESEARCH_DONATION_NOTE,
+});
+
+const FUCK_CANCER_SKIN_METADATA_ENTRIES = Object.freeze(Object.fromEntries(
+  Object.keys(UNIT_TYPES).map((type) => [skinKey(type, "fuck-cancer"), FUCK_CANCER_SKIN_METADATA])
+));
 
 const AUTHORED_SKIN_METADATA = Object.freeze({
   [skinKey("swordsman", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
@@ -276,7 +286,6 @@ const AUTHORED_SKIN_METADATA = Object.freeze({
   [skinKey("juggernaut", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
   [skinKey("juggernaut", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
   [skinKey("juggernaut", "holy-mech")]: meta(SKIN_RARITIES.LEGENDARY),
-  [skinKey("juggernaut", "fuck-cancer")]: meta(SKIN_RARITIES.LEGENDARY, { donationNote: CANCER_RESEARCH_DONATION_NOTE }),
 
   [skinKey("gargoyle", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
   [skinKey("gargoyle", "dragon")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
@@ -312,6 +321,8 @@ const AUTHORED_SKIN_METADATA = Object.freeze({
   [skinKey("treant", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
   [skinKey("treant", "rotting")]: meta(SKIN_RARITIES.EPIC),
   [skinKey("treant", "voidroot")]: meta(SKIN_RARITIES.LEGENDARY, PACK.VOID_DWELLER),
+
+  ...FUCK_CANCER_SKIN_METADATA_ENTRIES,
 });
 
 function skinMetadata(entry) {

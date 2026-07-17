@@ -77,6 +77,7 @@ const SKIN_PACK_PRICES = Object.freeze({
   "grim-reaper": Object.freeze({ cents: 499, valor: 3750 }),
   infernal: Object.freeze({ cents: 499, valor: 3750 }),
   medieval: Object.freeze({ cents: 299, valor: 2500 }),
+  "fuck-cancer": Object.freeze({ cents: 4999, valor: 42500 }),
 });
 
 const CONSUMABLE_OFFERS = Object.freeze([
@@ -298,8 +299,11 @@ export function getSkinOffer(type, slug, storage = globalThis.localStorage) {
 }
 
 export function getSkinOffers(storage = globalThis.localStorage) {
-  return Object.freeze(UNIT_TYPE_KEYS.flatMap((type) =>
-    getUnitSkins(type, storage).map((skin) => getSkinOffer(type, skin.slug, storage)).filter(Boolean)));
+  return Object.freeze(Object.keys(UNIT_TYPES).flatMap((type) => {
+    const sellableSkins = getUnitSkins(type, storage).filter((skin) =>
+      !UNIT_TYPES[type]?.summon || skin.packId);
+    return sellableSkins.map((skin) => getSkinOffer(type, skin.slug, storage)).filter(Boolean);
+  }));
 }
 
 function rarityCounts(offers) {
@@ -354,6 +358,7 @@ function skinPackOffer(packId, offers) {
   const unownedValorAmount = unownedSkins.reduce((sum, offer) => sum + (offer.valorPrice?.amount ?? 0), 0);
   const cents = prorateAmount(basePrice.cents, individualPriceCents, unownedPriceCents);
   const valor = prorateAmount(basePrice.valor, individualValorAmount, unownedValorAmount, { roundTo: 50 });
+  const donationNote = skinPackDonationNote(sortedOffers);
   const first = sortedOffers[0];
   const sku = `ta.skinpack.${packId}`;
   return Object.freeze({
@@ -369,6 +374,7 @@ function skinPackOffer(packId, offers) {
     unownedSkinCount: unownedSkins.length,
     owned: unownedSkins.length === 0,
     rarityCounts: rarityCounts(sortedOffers),
+    donationNote,
     skins: Object.freeze(sortedOffers),
     unownedSkins: Object.freeze(unownedSkins),
     individualPrice: Object.freeze({
@@ -393,6 +399,14 @@ function skinPackOffer(packId, offers) {
       amount: valor,
     }),
   });
+}
+
+function skinPackDonationNote(offers) {
+  const notes = offers.map((offer) => offer.donationNote).filter(Boolean);
+  if (notes.length !== offers.length) return null;
+  const unique = [...new Set(notes)];
+  if (unique.length !== 1) return null;
+  return unique[0].replace("for this skin", "for this pack");
 }
 
 export function groupSkinOffersByClassAndType(offers = []) {

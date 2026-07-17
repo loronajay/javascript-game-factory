@@ -132,6 +132,20 @@ test("skin entries carry marketplace-ready premium metadata", () => {
   assert.equal(charity.donationNote, "All proceeds for this skin will be donated for cancer research.");
 });
 
+test("every Fuck Cancer skin is legendary charity-pack metadata", () => {
+  const entries = SKIN_MANIFEST.filter((entry) => entry.slug === "fuck-cancer");
+
+  assert.equal(entries.length, Object.keys(UNIT_TYPES).length);
+  for (const entry of entries) {
+    const skin = getSkin(entry.type, entry.slug);
+    assert.equal(skin.rarity, "legendary", `${entry.type} Fuck Cancer rarity`);
+    assert.equal(skin.price.cents, 399, `${entry.type} Fuck Cancer price`);
+    assert.equal(skin.packId, "fuck-cancer");
+    assert.equal(skin.packName, "Fuck Cancer Charity Pack");
+    assert.equal(skin.donationNote, "All proceeds for this skin will be donated for cancer research.");
+  }
+});
+
 test("unknown or locked skin slugs normalize to classic (every skin is currently locked)", () => {
   assert.equal(normalizeSkinSlug("swordsman", "summer-vibes"), null);
   assert.equal(normalizeSkinSlug("swordsman", "not-real"), null);
