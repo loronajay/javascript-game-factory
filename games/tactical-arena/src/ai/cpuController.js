@@ -68,8 +68,11 @@ const WALL_ORE_VALUE = 4;
 
 export function chooseActivation(
   state,
-  { difficulty = "normal", cpuPlayer = state.currentPlayer, rng = Math.random, excludeArtIds = null } = {}
+  { difficulty = "normal", cpuPlayer = state.currentPlayer, rng = null, excludeArtIds = null } = {}
 ) {
+  // Tie-breaking must stay reproducible: a caller that omits `rng` gets the
+  // state-seeded PRNG, never Math.random (which would desync replays/lockstep).
+  rng = rng ?? cpuRng(state);
   const units = livingUnits(state, cpuPlayer).filter((u) => !u.spent && takesTurns(u) && !isStunned(u));
   if (units.length === 0) return [];
 

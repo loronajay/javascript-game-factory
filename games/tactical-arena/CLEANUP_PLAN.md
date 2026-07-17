@@ -68,9 +68,12 @@ never loosened, only retargeted/tightened.
       turnEngine hazard ticks → `src/core/turnHazards.js`;
       unitCatalog → extract weather folding, `kingCommands.js`, `unitAiMetadata.js`
       (`getEffectiveStats` stays in `unitCatalog.js`).
-- [ ] **Phase 8 — CPU fixes (approved behavior change)**: AoE projection through
-      `rules/combat.js` resolvers (respect DEF/Defend/team reduction); remove
-      `rng = Math.random` default in `cpuController.js`.
+- [x] **Phase 8 — CPU fixes (approved behavior change)**: investigation showed the engine
+      itself resolves cone/tile-pulse AoE as FIXED damage (no DEF/Defend) — so the audit's
+      DEF concern didn't apply; the real projection divergence was the missing fire-immunity
+      skip, now mirrored from `resolveConeArt` (CPU no longer overvalues fire cones vs
+      fire-immune units). `chooseActivation`'s `rng` now defaults to the state-seeded
+      `cpuRng` instead of `Math.random`, so omitting it can never desync a replay.
 - [ ] **Phase 9 — Docs + guardrails**: rewrite `ARCHITECTURE.md` for the new tree (document
       `missions/` subtree, `progression/inventory.js`, new modules; drop resolved hotspots);
       final architecture-test tightening; update CLAUDE.md pointers that moved.

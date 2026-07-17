@@ -26,7 +26,7 @@
 import { attack, attackTile, beginActivation, defend, finishActivation, moveUnit, useArt } from "../core/commands.js";
 import { areAllies, areEnemies, findUnit, getTileAffinity, livingUnits } from "../core/state.js";
 import { canMoveAndUseArts, getArtForUnit, getArtMpCost, getAvailableArts, getBasicAttackResourceCost, getEffectiveStats, getRageEffectValue, getSoulShuffleChoices, getUnitType, hasAbilityUsesRemaining, isCommandOnly, isRaging, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
-import { getProximityBonus, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack } from "../rules/combat.js";
+import { getProximityBonus, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import {
   getArtTargetRange,
@@ -470,8 +470,13 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
     case "coneAoe": {
       const cells = getConeCells(state, actor, primary.targetPosition, art) ?? [];
       const cellKeys = new Set(cells.map(positionKey));
+      // Mirrors resolveConeArt: cone damage is fixed (no DEF/Defend), but a
+      // fire-based cone deals nothing to a fire-immune target — without this
+      // skip the CPU overvalues fire cones against units like the Gargoyle.
+      const fireBased = isFireBasedDamage({ art });
       for (const target of board) {
         if (!areEnemies(actor, target) || !cellKeys.has(positionKey(target.position))) continue;
+        if (fireBased && isFireDamageImmune(target)) continue;
         const amount = art.damage.amount + (art.id === "volley-shot" ? getProximityBonus(actor, target) : 0);
         target.hp = Math.max(0, target.hp - amount);
       }
