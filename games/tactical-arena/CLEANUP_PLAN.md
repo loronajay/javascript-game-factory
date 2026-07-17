@@ -74,9 +74,12 @@ never loosened, only retargeted/tightened.
       skip, now mirrored from `resolveConeArt` (CPU no longer overvalues fire cones vs
       fire-immune units). `chooseActivation`'s `rng` now defaults to the state-seeded
       `cpuRng` instead of `Math.random`, so omitting it can never desync a replay.
-- [ ] **Phase 9 — Docs + guardrails**: rewrite `ARCHITECTURE.md` for the new tree (document
-      `missions/` subtree, `progression/inventory.js`, new modules; drop resolved hotspots);
-      final architecture-test tightening; update CLAUDE.md pointers that moved.
+- [x] **Phase 9 — Docs + guardrails**: `ARCHITECTURE.md` rewritten for the post-cleanup
+      tree (all new modules, the `missions/` subtree, `progression/inventory.js`, the
+      untracked-`src/dev/` note; resolved hotspots dropped, remaining ones listed);
+      CLAUDE.md pointers updated; architecture test now enforces ~30 module boundaries;
+      `npm run release:audit` runs clean of structural findings (its remaining warnings
+      are pre-existing asset-size items).
 
 ## Verification per phase
 
