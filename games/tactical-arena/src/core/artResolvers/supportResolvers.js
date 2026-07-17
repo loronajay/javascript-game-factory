@@ -4,7 +4,7 @@ import { getArtTargetRange, getTilePulseTargets } from "../../rules/arts.js";
 import { isHealingDisabled, isWallBetween, rollToHit } from "../../rules/combat.js";
 import { drawValue } from "../rng.js";
 import { chebyshevDistance } from "../../rules/movement.js";
-import { applyStatus, isNegativeStatus, NEGATIVE_STATUS_TYPES } from "../../rules/statuses.js";
+import { applyStatus, isNegativeStatus, isTargetable, NEGATIVE_STATUS_TYPES } from "../../rules/statuses.js";
 import { getGlobalHealBonus, getGlobalStatusChanceMultiplier } from "../../rules/stances.js";
 import { applyRolledStatus, restoreHp } from "../combatEffects.js";
 import { accept, ERR, reject } from "../reducerResult.js";
@@ -262,7 +262,7 @@ export function resolveFocusPrayer(state, command, art) {
 export function resolveStatusCast(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const targetState = findUnit(state, command.targetId);
-  if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (!isTargetable(targetState) || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
   if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }

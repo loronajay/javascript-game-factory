@@ -6,6 +6,7 @@ import { areEnemies, getTileAffinity, unitAt } from "../core/state.js";
 import { canTrample, chebyshevDistance, getLegalMoves, getTrampleMoveOptions, isOnBoard, positionKey } from "../rules/movement.js";
 import { isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack } from "../rules/combat.js";
 import { artIsBodyBlocked, getArtTargetRange, getConeAimOptions, getConeCells, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getPyroclasmReachTiles, getPyroclasmTargets, getRevivePlacementTiles, getRushStepOptions, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastFootprint, getWallPlacementTiles } from "../rules/arts.js";
+import { isTargetable } from "../rules/statuses.js";
 import { setSceneWeather } from "./sceneBackdrop.js";
 import { createBoardDais, createFireFigure, createWallFigure, createWeatherOverlay, getActiveBoardWeather } from "./boardAtmosphere.js";
 
@@ -124,7 +125,7 @@ function wireTargetedBlastHover(actor, art, tileByKey, unitsLayer, state, aimKey
     const enter = () => {
       for (const k of footprint) tileByKey.get(k)?.classList.add("cone-hot");
       for (const occupant of state.units) {
-        if (occupant.hp > 0 && areEnemies(actor, occupant) && footprint.includes(positionKey(occupant.position))) {
+        if (isTargetable(occupant) && areEnemies(actor, occupant) && footprint.includes(positionKey(occupant.position))) {
           unitsLayer.querySelector(`[data-key="${positionKey(occupant.position)}"]`)?.classList.add("volley-hit");
         }
       }
@@ -176,7 +177,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
       }
     }
     for (const target of state.units) {
-      if (target.hp > 0 && areEnemies(actor, target) && chebyshevDistance(actor.position, target.position) <= reach &&
+      if (isTargetable(target) && areEnemies(actor, target) && chebyshevDistance(actor.position, target.position) <= reach &&
           !(rayOnly && !isStraightRayTarget(actor.position, target.position)) &&
           !(blockable && isShotBlocked(state, actor.position, target.position, actor)) &&
           !isWallBetween(state, actor.position, target.position, actor)) {
@@ -276,7 +277,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
         }
       }
       for (const u of state.units) {
-        if (u.hp > 0 && u.player !== actor.player && chebyshevDistance(actor.position, u.position) <= radius)
+        if (isTargetable(u) && u.player !== actor.player && chebyshevDistance(actor.position, u.position) <= radius)
           legal.add(positionKey(u.position));
       }
     }
@@ -330,7 +331,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
         }
       }
       for (const u of state.units) {
-        if (u.hp <= 0 || u.id === actor.id) continue;
+        if (!isTargetable(u) || u.id === actor.id) continue;
         if (chebyshevDistance(actor.position, u.position) > reach) continue;
         if (isWallBetween(state, actor.position, u.position, actor)) continue;
         legal.add(positionKey(u.position));

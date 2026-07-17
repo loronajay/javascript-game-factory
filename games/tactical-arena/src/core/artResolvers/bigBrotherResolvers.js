@@ -5,6 +5,7 @@ import { isWallBetween, resolveBaseStrike, rollToHit } from "../../rules/combat.
 import { drawValue } from "../rng.js";
 import { chebyshevDistance, isOnBoard, positionKey } from "../../rules/movement.js";
 import { getGlobalStatusChanceMultiplier } from "../../rules/stances.js";
+import { isTargetable } from "../../rules/statuses.js";
 import { applyRolledStatus } from "../combatEffects.js";
 import { accept, ERR, reject } from "../reducerResult.js";
 import { resolveVictory, spendAndAdvance } from "../turnEngine.js";
@@ -13,7 +14,7 @@ import { pushDestinationAwayFrom } from "./displacement.js";
 export function resolveForceTug(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const targetState = findUnit(state, command.targetId);
-  if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (!isTargetable(targetState) || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
   if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }

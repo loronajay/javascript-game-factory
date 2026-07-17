@@ -5,6 +5,7 @@ import { addDuelMark, duelistTracksMisses, isHealingDisabled, isShotBlocked, isW
 import { drawValue } from "../rng.js";
 import { chebyshevDistance, isOnBoard, positionKey } from "../../rules/movement.js";
 import { getGlobalHealBonus, getGlobalStatusChanceMultiplier } from "../../rules/stances.js";
+import { isTargetable } from "../../rules/statuses.js";
 import { applyDarkTreadLifesteal, applyGrowth, applyMagicDamageReaction, applyRockHardDefense, applyRolledStatus, resolvePhysicalDamageHealing, restoreHp, restoreMp } from "../combatEffects.js";
 import { consumeOneShotRage } from "../reactions.js";
 import { accept, ERR, reject } from "../reducerResult.js";
@@ -148,7 +149,7 @@ export function resolveFart(state, command, art) {
 export function resolveTargetedArt(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const targetState = findUnit(state, command.targetId);
-  if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (!isTargetable(targetState) || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
   if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }

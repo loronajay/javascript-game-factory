@@ -3,7 +3,7 @@ import { areEnemies, cloneState, findUnit, livingUnits, unitAt } from "../state.
 import { getArtTargetRange, getConeCells, getConeOriginForTarget, getFirePlacementTiles, getVolleyShotOriginForTarget } from "../../rules/arts.js";
 import { getProximityBonus, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isWallBetween, resolveFixedPhysicalStrike, rollToHit } from "../../rules/combat.js";
 import { chebyshevDistance, positionKey } from "../../rules/movement.js";
-import { applyStatus } from "../../rules/statuses.js";
+import { applyStatus, isTargetable } from "../../rules/statuses.js";
 import { applyRockHardDefense, resolvePhysicalDamageHealing } from "../combatEffects.js";
 import { accept, ERR, reject } from "../reducerResult.js";
 import { resolveVictory, spendAndAdvance } from "../turnEngine.js";
@@ -46,7 +46,7 @@ function applyTrueSplashDamage(state, actor, center, { amount = 0, radius = 1 } 
 export function resolveCannonFire(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const targetState = findUnit(state, command.targetId);
-  if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (!isTargetable(targetState) || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
   if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }

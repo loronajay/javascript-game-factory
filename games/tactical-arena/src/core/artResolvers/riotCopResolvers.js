@@ -12,7 +12,7 @@ import {
 } from "../../rules/combat.js";
 import { drawValue } from "../rng.js";
 import { chebyshevDistance, isOnBoard, positionKey } from "../../rules/movement.js";
-import { applyStatus } from "../../rules/statuses.js";
+import { applyStatus, isTargetable } from "../../rules/statuses.js";
 import { getGlobalStatusChanceMultiplier } from "../../rules/stances.js";
 import { applyRockHardDefense, applyRolledStatus, resolvePhysicalDamageHealing } from "../combatEffects.js";
 import { consumeOneShotRage } from "../reactions.js";
@@ -28,7 +28,7 @@ import { spendAbilityUse } from "./abilityUses.js";
 export function resolveStunGun(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const targetState = findUnit(state, command.targetId);
-  if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (!isTargetable(targetState) || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
   if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }
@@ -124,7 +124,7 @@ export function resolveSmokeBomb(state, command, art) {
 export function resolveShieldBash(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const targetState = findUnit(state, command.targetId);
-  if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (!isTargetable(targetState) || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
   if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }

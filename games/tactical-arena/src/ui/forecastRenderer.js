@@ -4,7 +4,7 @@ import { getArtForUnit, getEffectiveStats, isDefending } from "../core/unitCatal
 import { areEnemies } from "../core/state.js";
 import { chebyshevDistance, positionKey } from "../rules/movement.js";
 import { artIsBodyBlocked, artUsesPhysicalStrike, getArtTargetRange, getConeCells, getPyroclasmTargets, getSelfBlastRadius, getTargetedBlastTargets } from "../rules/arts.js";
-import { finalizeMagicDamage, getArtAccuracy, getBasicAttackDamageType, getMissChance, getProximityBonus, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike } from "../rules/combat.js";
+import { finalizeMagicDamage, getArtAccuracy, getBasicAttackDamageType, getMissChance, getProximityBonus, isShotBlocked, isStraightRayTarget, isWallBetween, negatesPhysicalWhileDefending, requiresRayBasicAttack, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 
 function drawForecastBadge(forecastLayer, metrics, target, label, cls, yOffset = 0) {
@@ -170,10 +170,12 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving, a
   // (Sniper). Physical ARTS can opt out with pierceUnits (Curve Shot), and magic strike
   // ARTS still reach through bodies.
   const blockable = isAttack || (isStrikeArt && artIsBodyBlocked(art));
+  const rayOnly = isAttack && requiresRayBasicAttack(actor);
 
   for (const target of state.units) {
     if (target.hp <= 0 || !areEnemies(actor, target)) continue;
     if (chebyshevDistance(actor.position, target.position) > reach) continue;
+    if (rayOnly && !isStraightRayTarget(actor.position, target.position)) continue;
     if (blockable && isShotBlocked(state, actor.position, target.position, actor)) continue;
     // A wall hides the forecast for any ranged ability (physical or magic) — the
     // Sniper's pierce is the only shot that still reaches and shows a number.

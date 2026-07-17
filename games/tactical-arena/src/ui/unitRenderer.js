@@ -2,6 +2,7 @@ import { svgElement } from "./svgHelpers.js";
 import { gridToScreen } from "./isometric.js";
 import { getEffectiveStats, isDefending, isRaging } from "../core/unitCatalog.js";
 import { positionKey } from "../rules/movement.js";
+import { isPetrified } from "../rules/statuses.js";
 import { getStanceVfx, getUnitStatusVfx } from "./vfxCatalog.js";
 import { createBoardSpriteFigure } from "./boardSprites.js";
 import { colorOf } from "../core/state.js";
@@ -439,6 +440,7 @@ export function createUnitFigure(metrics, unit, { isTarget = false, selectedId =
   if (unit.ghost) classes.push("ghost");
   if (isDefending(unit)) classes.push("defending");
   if (isRaging(unit)) classes.push("is-raging");
+  if (isPetrified(unit)) classes.push("petrified");
   if (unit.id === selectedId) classes.push("active");
   if (isTarget) classes.push("targetable");
 

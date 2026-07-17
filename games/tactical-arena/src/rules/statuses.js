@@ -78,6 +78,10 @@ export function isPetrified(unit) {
   return (unit?.statuses ?? []).some((status) => status.type === "petrified");
 }
 
+export function isTargetable(unit) {
+  return Boolean(unit && unit.hp > 0 && !isPetrified(unit));
+}
+
 // True when a unit currently takes no damage from any source (Petrify). Read centrally by
 // the strike resolvers (rules/combat.js) and the rollover ticks (turnEngine.js).
 export function isInvulnerable(unit) {

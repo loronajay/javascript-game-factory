@@ -71,6 +71,18 @@ export function createBattleInputController({
   finishNow = () => {},
   resumeActiveMusic = () => {},
 }) {
+  async function resolveInstantArtAndMaybeAutoFinish(command) {
+    const resolved = await resolveInstantArt(command);
+    if (resolved) maybeAutoFinish();
+    return resolved;
+  }
+
+  async function resolveArtCombatAndMaybeAutoFinish(command) {
+    const resolved = await resolveCombat(command);
+    if (resolved) maybeAutoFinish();
+    return resolved;
+  }
+
   async function handleTile(position) {
     // Tempo: clicking one of my ready units always commands it instantly — even mid-animation,
     // even while another of mine is selected (it switches). beginTempoUnit frees the slot and
@@ -188,7 +200,7 @@ export function createBattleInputController({
         interaction.footworkPath.push(position);
         const steps = getFootworkSteps(unit, runtime.state);
         if (interaction.footworkPath.length === steps) {
-          if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "footwork", [...interaction.footworkPath])))
+          if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "footwork", [...interaction.footworkPath])))
             setMessage("Footwork complete. This unit's activation is complete.");
         } else {
           setMessage(`Footwork: choose step ${interaction.footworkPath.length + 1} of ${steps}.`);
@@ -203,7 +215,7 @@ export function createBattleInputController({
         interaction.footworkPath.push(position);
         const steps = getRushSteps(unit, art, runtime.state);
         if (interaction.footworkPath.length === steps) {
-          if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, artId, [...interaction.footworkPath])))
+          if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, artId, [...interaction.footworkPath])))
             setMessage(`${art.name} complete. This unit's activation is complete.`);
         } else {
           setMessage(`${art.name}: choose step ${interaction.footworkPath.length + 1} of ${steps}.`);
@@ -218,7 +230,7 @@ export function createBattleInputController({
       const fleeLegal = getLegalFleeTiles(runtime.state, unit, art);
       if (!fleeLegal.has(positionKey(position))) {
         setMessage(`${art.name}: choose a highlighted empty tile to teleport to.`, true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, artId, { targetPosition: position }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, artId, { targetPosition: position }))) {
         interaction.mode = null;
         setMessage(`${art.name} complete. This unit's activation is complete.`);
       }
@@ -226,7 +238,7 @@ export function createBattleInputController({
       const flightLegal = getFlightTiles(runtime.state, unit, getArt(unit.type, "flight"));
       if (!flightLegal.has(positionKey(position))) {
         setMessage("Flight: choose a highlighted empty tile to fly onto.", true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "flight", { targetPosition: position }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "flight", { targetPosition: position }))) {
         interaction.mode = null;
         setMessage("Flight complete. This unit's activation is complete.");
       }
@@ -234,7 +246,7 @@ export function createBattleInputController({
       const origin = getVolleyShotOriginForTarget(runtime.state, unit, position);
       if (!origin) {
         setMessage("Click a tile inside a highlighted Volley Shot cone.", true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "volley-shot", { targetPosition: origin }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "volley-shot", { targetPosition: origin }))) {
         setMessage("Volley Shot resolved. This unit's activation is complete.");
       }
     } else if (interaction.mode?.startsWith("art:") && getAvailableArts(unit).find((a) => a.id === interaction.mode.slice("art:".length))?.targeting?.shape === "cone") {
@@ -245,7 +257,7 @@ export function createBattleInputController({
       const origin = getConeOriginForTarget(runtime.state, unit, position, art);
       if (!origin) {
         setMessage(`Click a tile inside a highlighted ${art.name} cone.`, true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, artId, { targetPosition: origin }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, artId, { targetPosition: origin }))) {
         setMessage(`${art.name} resolved. This unit's activation is complete.`);
       }
     } else if (interaction.mode?.startsWith("art:") && (() => {
@@ -280,13 +292,13 @@ export function createBattleInputController({
           render();
           return;
         }
-        if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, artId, { targetPosition: position, summonType }))) {
+        if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, artId, { targetPosition: position, summonType }))) {
           interaction.mode = null;
           setMessage(artId === "beckon"
             ? `${getUnitType(summonType).name} beckoned as a raging ghost. Take its turn.`
             : `${getUnitType(summonType).name} called as a ghost. Take its turn.`);
         }
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, artId, { targetPosition: position }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, artId, { targetPosition: position }))) {
         interaction.mode = null;
         setMessage(`${art.name} complete. This unit's activation is complete.`);
       }
@@ -294,7 +306,7 @@ export function createBattleInputController({
       const placement = getWallPlacementTiles(runtime.state, unit, getUnitType(unit.type).arts.find((a) => a.id === "build-cover"));
       if (!placement.has(positionKey(position))) {
         setMessage("Build Cover: choose a highlighted empty tile to raise the wall.", true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "build-cover", { targetPosition: position }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "build-cover", { targetPosition: position }))) {
         interaction.mode = null;
         setMessage("Cover raised. This unit's activation is complete.");
       }
@@ -302,7 +314,7 @@ export function createBattleInputController({
       const placement = getWallPlacementTiles(runtime.state, unit, getUnitType(unit.type).arts.find((a) => a.id === "shaft-prop"));
       if (!placement.has(positionKey(position))) {
         setMessage("Shaft Prop: choose a highlighted empty tile to raise the wall.", true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "shaft-prop", { targetPosition: position }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "shaft-prop", { targetPosition: position }))) {
         interaction.mode = null;
         setMessage("Shaft prop raised. This unit's activation is complete.");
       }
@@ -310,7 +322,7 @@ export function createBattleInputController({
       const placement = getFirePlacementTiles(runtime.state, unit, getUnitType(unit.type).arts.find((a) => a.id === "throw-cigar"));
       if (!placement.has(positionKey(position))) {
         setMessage("Throw Cigar: choose a highlighted tile to set alight.", true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "throw-cigar", { targetPosition: position }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "throw-cigar", { targetPosition: position }))) {
         interaction.mode = null;
         setMessage("Fire started. This unit's activation is complete.");
       }
@@ -332,7 +344,7 @@ export function createBattleInputController({
             { value: "defense", label: "Defense", sub: ally ? "+1 DEF" : "−1 DEF" }
           ]
         });
-        if (stat && interaction.mode === "art:age" && await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "age", { targetId: target.id, stat }))) {
+        if (stat && interaction.mode === "art:age" && await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "age", { targetId: target.id, stat }))) {
           interaction.mode = null;
           setMessage("Age resolved. This unit's activation is complete.");
         }
@@ -345,7 +357,7 @@ export function createBattleInputController({
         !(enemy && isWallBetween(runtime.state, unit.position, target.position, unit));
       if (!inReach) {
         setMessage("Time Stretch: click a highlighted ally or enemy in range.", true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "time-stretch", { targetId: target.id }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "time-stretch", { targetId: target.id }))) {
         interaction.mode = null;
         setMessage("Time Stretch resolved. This unit's activation is complete.");
       }
@@ -359,7 +371,7 @@ export function createBattleInputController({
         chebyshevDistance(unit.position, target.position) <= reach;
       if (!inReach) {
         setMessage("Anoint: click a highlighted ally in range (not yourself).", true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "anoint", { targetId: target.id }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "anoint", { targetId: target.id }))) {
         interaction.mode = null;
         setMessage("Anoint resolved. This unit's activation is complete.");
       }
@@ -372,7 +384,7 @@ export function createBattleInputController({
         chebyshevDistance(unit.position, target.position) <= reach;
       if (!inReach) {
         setMessage("Purify: click a highlighted ally in range (not yourself).", true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "purify", { targetId: target.id }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "purify", { targetId: target.id }))) {
         interaction.mode = null;
         setMessage("Purify resolved. This unit's activation is complete.");
       }
@@ -385,7 +397,7 @@ export function createBattleInputController({
         chebyshevDistance(unit.position, target.position) <= reach;
       if (!inReach) {
         setMessage("Cleanse: click a highlighted ally in range (not yourself).", true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "cleanse", { targetId: target.id }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "cleanse", { targetId: target.id }))) {
         interaction.mode = null;
         setMessage("Cleanse resolved. This unit's activation is complete.");
       }
@@ -398,7 +410,7 @@ export function createBattleInputController({
         chebyshevDistance(unit.position, target.position) <= reach;
       if (!inReach) {
         setMessage("Focus Prayer: click a highlighted ally in range (not yourself).", true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "focus-prayer", { targetId: target.id }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "focus-prayer", { targetId: target.id }))) {
         interaction.mode = null;
         setMessage("Focus Prayer resolved. This unit's activation is complete.");
       }
@@ -408,7 +420,7 @@ export function createBattleInputController({
       const targets = getLineTargets(runtime.state, unit, getArt(unit.type, "tether-grab").targeting.range, { includeAllies: true });
       if (!target || !targets.some((entry) => entry.unit.id === target.id)) {
         setMessage("Tether Grab: click a highlighted ally or enemy on a straight line.", true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "tether-grab", { targetId: target.id }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "tether-grab", { targetId: target.id }))) {
         interaction.mode = null;
         setMessage("Tether Grab resolved. This unit's activation is complete.");
       }
@@ -418,7 +430,7 @@ export function createBattleInputController({
       const targets = getLineTargets(runtime.state, unit, getArt(unit.type, "rocket-punch").targeting.range, { includeAllies: false });
       if (!target || !targets.some((entry) => entry.unit.id === target.id)) {
         setMessage("Rocket Punch: click a highlighted enemy on a straight line.", true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "rocket-punch", { targetId: target.id }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "rocket-punch", { targetId: target.id }))) {
         interaction.mode = null;
         setMessage("Rocket Punch resolved. This unit's activation is complete.");
       }
@@ -427,7 +439,7 @@ export function createBattleInputController({
       const art = getAvailableArts(unit).find((a) => a.id === "thunderous-charge");
       if (!art || !getTargetedBlastAimTiles(runtime.state, unit, art).has(positionKey(position))) {
         setMessage("Thunderous Charge: click a highlighted tile (not one an enemy stands on).", true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "thunderous-charge", { targetPosition: position }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "thunderous-charge", { targetPosition: position }))) {
         interaction.mode = null;
         setMessage("Thunderous Charge resolved. This unit's activation is complete.");
       }
@@ -436,7 +448,7 @@ export function createBattleInputController({
       const art = getAvailableArts(unit).find((a) => a.id === "smoke-bomb-riot");
       if (!art || !getTargetedBlastAimTiles(runtime.state, unit, art).has(positionKey(position))) {
         setMessage("Smoke Bomb: click a highlighted empty tile within range.", true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "smoke-bomb-riot", { targetPosition: position }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "smoke-bomb-riot", { targetPosition: position }))) {
         interaction.mode = null;
         setMessage("Smoke Bomb thrown. This unit's activation is complete.");
       }
@@ -449,7 +461,7 @@ export function createBattleInputController({
         chebyshevDistance(unit.position, target.position) <= reach;
       if (!inReach) {
         setMessage("Enrich: click a highlighted ally in range (not yourself).", true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "enrich", { targetId: target.id }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "enrich", { targetId: target.id }))) {
         interaction.mode = null;
         setMessage("Enrich resolved. This unit's activation is complete.");
       }
@@ -462,7 +474,7 @@ export function createBattleInputController({
         chebyshevDistance(unit.position, target.position) <= reach;
       if (!inReach) {
         setMessage("Cover: click a highlighted adjacent ally to swap with (not yourself).", true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, "cover", { targetId: target.id }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "cover", { targetId: target.id }))) {
         interaction.mode = null;
         setMessage("Cover: you swap in and brace. This unit's activation is complete.");
       }
@@ -475,7 +487,7 @@ export function createBattleInputController({
         setMessage(`${art.name}: choose a fallen ally first.`, true);
       } else if (!placement.has(positionKey(position))) {
         setMessage(`${art.name}: click a highlighted empty tile within ${art.targeting?.radius ?? 3}.`, true);
-      } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, artId, { targetId: interaction.reviveTargetId, targetPosition: position }))) {
+      } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, artId, { targetId: interaction.reviveTargetId, targetPosition: position }))) {
         interaction.mode = null;
         interaction.reviveTargetId = null;
         setMessage("An ally returns to the field. This unit's activation is complete.");
@@ -488,20 +500,20 @@ export function createBattleInputController({
         const radius = getSelfBlastRadius(runtime.state, unit, art);
         if (chebyshevDistance(unit.position, position) > radius) {
           setMessage(`${art.name}: click inside the highlighted blast zone to detonate.`, true);
-        } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, artId))) {
+        } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, artId))) {
           interaction.mode = null;
           setMessage(`${art.name} resolved. This unit's activation is complete.`);
         }
       } else if (art?.targeting?.shape === "lineBurst") {
         // Self-centred line burst (Pyroclasm): any click confirms the eruption.
-        if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, artId))) {
+        if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, artId))) {
           interaction.mode = null;
           setMessage(`${art.name} resolved. This unit's activation is complete.`);
         }
       } else if (art?.effect?.type === "healAllies") {
         if (!isHealArtConfirmTile(runtime.state, unit, art, position)) {
           setMessage(`${art.name}: click a highlighted heal tile to confirm.`, true);
-        } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, artId))) {
+        } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, artId))) {
           interaction.mode = null;
           setMessage(`${art.name} resolved. This unit's activation is complete.`);
         }
@@ -514,7 +526,7 @@ export function createBattleInputController({
           getProtectLandingTiles(runtime.state, unit, candidate, art).has(key));
         if (!target) {
           setMessage(`${art.name}: click a highlighted landing tile beside an ally.`, true);
-        } else if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, artId, { targetId: target.id }))) {
+        } else if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, artId, { targetId: target.id }))) {
           interaction.mode = null;
           setMessage(`${art.name} resolved. This unit's activation is complete.`);
         }
@@ -522,12 +534,12 @@ export function createBattleInputController({
         const target = unitAt(runtime.state, position);
         let resolved = false;
         if (art?.id === "blasting-cap" && isWallAt(runtime.state, position)) {
-          resolved = await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, artId, { targetPosition: position }));
+          resolved = await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, artId, { targetPosition: position }));
         } else if (target) {
           const command = useArt(runtime.state.currentPlayer, unit.id, artId, { targetId: target.id });
           const peek = applyCommand(runtime.state, command);
           const rolled = (peek.events ?? []).some((event) => event.type === "ART_RESOLVED" && "hit" in event);
-          resolved = rolled ? await resolveCombat(command) : await resolveInstantArt(command);
+          resolved = rolled ? await resolveArtCombatAndMaybeAutoFinish(command) : await resolveInstantArtAndMaybeAutoFinish(command);
         }
         if (resolved) {
           const artName = art?.name ?? artId;
@@ -555,7 +567,7 @@ export function createBattleInputController({
     if (action === "defend") {
       if (dispatch(defend(runtime.state.currentPlayer, unit.id))) {
         setMessage(consumeTutorialPrompt("Defending: incoming physical and magic damage is halved."));
-        finishNow();
+        maybeAutoFinish();
       }
       interaction.mode = null;
     } else if (action === "cancel-move") {
@@ -636,7 +648,7 @@ export function createBattleInputController({
             render();
             return;
           }
-          if (await resolveInstantArt(useArt(runtime.state.currentPlayer, unit.id, artId))) {
+          if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, artId))) {
             setMessage(art.bonusActionGroup
               ? `${art.name} resolved. Take the rest of this unit's turn.`
               : `${art.name} resolved. This unit's activation is complete.`);

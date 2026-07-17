@@ -249,6 +249,25 @@ test("Angel basic attack forecast does not show through an intervening body", ()
   });
 });
 
+test("Big Brother basic attack forecast only appears on straight-ray targets", () => {
+  withSvgDocument(() => {
+    const state = createBattleState({
+      units: [
+        { id: "big", player: 1, type: "big-brother", x: 4, y: 4 },
+        { id: "legal-diag", player: 2, type: "swordsman", x: 6, y: 6 },
+        { id: "off-ray", player: 2, type: "swordsman", x: 6, y: 5 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "big");
+    const forecastLayer = new TestSvgElement("g");
+
+    renderForecast({ forecastLayer, state, mode: "attack", actor, resolving: false });
+
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-accuracy"), ["95%"]);
+    assert.deepEqual(badgeTextsByClass(forecastLayer, "fc-attack"), ["-2"]);
+  });
+});
+
 test("Rocket Punch (fixed-power line strike) does not render a badge derived from live STR", () => {
   // Regression: Rocket Punch is a FIXED 10-power physical strike (resolveRocketPunch),
   // not a STR-scaled attack. Before this fix, its "lineEnemy" shape slipped through

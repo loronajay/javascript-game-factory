@@ -134,10 +134,15 @@ controlled, which makes him the natural answer to a status-lock composition.
 Mechanically his most important line is Lightseeker: a **bonus-action** tile pulse that
 deals 1 true damage to every enemy within 5 standing on a light tile *without spending his
 action*. He moves, attacks, heals his team, and also chips half the enemy board — every
-turn. Darkseeker (rage) upgrades that to 2 true damage, board-wide, on dark tiles (the two
-share a bonus-action group, so it's one seeker pulse per turn, not both). Free recurring
-damage on a unit that already wants to be swinging is the strongest kind of value in this
-engine, and the Paladin is the cleanest example of it.
+turn.
+
+Heaven's Realm (rage) is the stat break the old read was missing: **+2 STR and +1 range**,
+plus **+2 physical strike damage** when both Paladin and target stand on light tiles. That
+turns his rage into a real dueling mode, not just a Darkseeker unlock. Darkseeker itself
+adds the other half: 2 true damage, board-wide, on dark tiles (the two seeker pulses share
+a bonus-action group, so it's one pulse per turn, not both). Free recurring damage on a
+unit that already wants to be swinging is the strongest kind of value in this engine, and
+the Paladin is the cleanest example of it.
 
 ### Monk — Skirmisher / Bodyguard (the action-economy unit)
 
@@ -150,17 +155,19 @@ may **move and use an ART in the same activation, always**. Every other unit tha
 has to be at 5 HP first. The Monk has it from turn one.
 
 That turns both his ARTs from expensive commitments into ordinary plays. Front Kick is a
-10-power STR-scaling strike that knocks the target back 3 tiles on a crit — and if the
-board edge stops that shove, the target is stunned; if one of the target's allies stops it,
-that ally is stunned instead. He can walk into those angles first. Protect is the bodyguard
+10-power STR-scaling strike that knocks the target back 3 tiles on a crit, with a built-in
+stun payoff: if the board edge stops that shove, the target is stunned; if one of the
+target's allies stops it, that ally is stunned instead. He can walk into those angles first,
+so Front Kick is now both displacement and impact-stun control. Protect is the bodyguard
 button: he steps to the near side of an ally within 3 and *both* of them Defend, even if
 that ally already acted. That's a
 genuinely rare thing in this game — a reaction, purchased on your own turn.
 
 Heightened Sense (blind immunity, +1 STR per 5 missing HP) and Nirvana (rage: +2 MOVE, +1
 ART range, Front Kick *always* knocks back, Protect heals 2) make him scale into the late
-game. He's the unit you draft when you want to protect a squishy caster and still get
-value every turn.
+game. Because Nirvana removes the crit requirement from the shove, those edge/body-block
+stuns become something he can deliberately threaten every kick. He's the unit you draft
+when you want to protect a squishy caster and still get value every turn.
 
 ### Fat Knight — Anti-Crit Frontline Bruiser
 
@@ -199,9 +206,10 @@ guarantees his next basic attack crits; Dark Tick (1 HP) then deals 3 true damag
 *every blinded enemy on the board*. Ether → crit → blind → Tick is a real combo, and with
 Virus on the team the blind spreads first.
 
+Banisher (rage) gives him +2 STR and +1 MOVE before the all-in button ever gets pressed.
 Banish is one of the most dramatic ultimates in the game: at rage, spend **all remaining
-HP** to instantly kill every enemy standing on a dark tile. He dies doing it. Half the
-board is dark. Play around that.
+HP** to instantly kill every enemy standing on a dark tile. He dies doing it. Half the board
+is dark. Play around that.
 
 ### Ronin — Lone-Wolf Duelist (isolation scaler)
 
@@ -262,8 +270,9 @@ approach in half, or wall off an ally. Throw Cigar sets a tile on fire for 3 rol
 dealing 1 true damage to whoever stands there. Smoke Bomb blinds. He shapes where the fight
 can happen, and then shoots into it from six tiles away with an 18-MP budget that runs out.
 
-Rage gives him +2 MOVE, move-and-ART, and a line attack — his basic shot damages every
-enemy on the chosen ray.
+Rage gives him +1 STR, +1 range, +2 MOVE, move-and-ART, and a line attack — his basic shot
+damages every enemy on the chosen ray. It turns the anti-turtle specialist into a temporary
+lane sweeper.
 
 ### Fat Bowman — Stationary Turret
 
@@ -322,10 +331,10 @@ piece of design where hoarding and spending are in direct tension.
 
 Adjacent basics deal +2 (his pickaxe), Headlamp blinds an adjacent enemy with no roll, Shaft
 Prop builds a wall, and Blasting Cap is a 3-true-damage blast that pushes and can stun. In
-rage he instantly fills to max ore and doubles the crit conversion. He is a slow-scaling,
-snowballing engine — but the slow part is nearly free (he mines in his corner while the enemy
-is still crossing the board); the real, ongoing tension is that every shot spends the ore that
-is simultaneously his ammo, his crit chance, and his stat line.
+rage he gains +1 MOVE and +1 STR, instantly fills to max ore, and doubles the crit conversion.
+He is a slow-scaling, snowballing engine — but the slow part is nearly free (he mines in his
+corner while the enemy is still crossing the board); the real, ongoing tension is that every
+shot spends the ore that is simultaneously his ammo, his crit chance, and his stat line.
 
 ---
 
@@ -500,9 +509,10 @@ backfires and inflicts a random negative status on that same ally. A heal that c
 your own Swordsman is a real gamble, and the weighted table makes stun the rare disaster.
 
 Second Helping (rage) is a **revive** — bring a fallen ally back at 50% HP. And Emergency
-Snacks means rage isn't a death sentence for her: +1 HP at the start of each raging turn,
-and if that nibble lifts her back over the threshold she gulps 5 MP too (up to 3 times a
-battle). She's the healer designed to survive her own rage.
+Snacks means rage isn't a death sentence for her: her basic attacks become magic, she gains
++1 HP at the start of each raging turn, and if that nibble lifts her back over the threshold
+she gulps 5 MP too (up to 3 times a battle). She's the healer designed to survive her own
+rage.
 
 ### Angel — White-Tile Support Ranger
 
@@ -522,10 +532,11 @@ His support is where the value is: Anoint grants an ally **+1 attack range for a
 handed to an Archer or a Sniper, that's a free extra tile of threat. Elevate heals 1 HP to
 every ally standing on a white tile, anywhere.
 
-Heavenseeker (rage) is the payoff and it's a **bonus action** — it does not spend his turn.
-Every raging turn, board-wide: allies on white tiles heal 2, enemies on white tiles take 2
-true damage. Free, recurring, half-the-board damage *and* healing, while he still moves and
-shoots.
+Heaven's Wrath (rage) gives him +3 STR and +2 MOVE, so his "support" shots suddenly become
+meaningful magic damage. Heavenseeker is the payoff ART and it's a **bonus action** — it
+does not spend his turn. Every raging turn, board-wide: allies on white tiles heal 2,
+enemies on white tiles take 2 true damage. Free, recurring, half-the-board damage *and*
+healing, while he still moves and shoots.
 
 ### Witch Doctor — Stance-Dancer (global field caster)
 
@@ -632,7 +643,7 @@ It's a reset button for a losing board.
 `HP 30 · MP 5 · STR 8 · DEF 7 · MOVE 2 · RNG 1`
 
 Only 5 MP, which is the whole design: his mana bar is a **toggle**, not a budget. Bruiser
-Mode means that while he sits at **0 MP** he's stronger — +2 STR and +1 MOVE — but takes +1
+Mode means that while he sits at **0 MP** he's stronger — +2 STR and +2 MOVE — but takes +1
 magic damage. So "empty" is his combat form, and Recharge (free, +5 MP) deliberately turns
 that form *off* in exchange for one ART's worth of fuel. Venting the reactor makes him
 weaker but able to cast; running dry makes him a monster who can't.
@@ -715,8 +726,9 @@ adjacent ally** and Defends — pulling a dying caster out of melee and standing
 place, which is the cleanest bodyguard action in the roster. Smoke Bomb blinds a whole
 1-tile radius.
 
-Lockdown (rage) refills every charge, makes Stun Gun stun at *any* range, and the ART clamps
-**every unit within 3 tiles — allies included** — to 1 MOVE and −2 DEF for a turn.
+Lockdown (rage) gives him +1 STR and +1 MOVE, refills every charge, makes Stun Gun stun at
+*any* range, and the ART clamps **every unit within 3 tiles — allies included** — to 1 MOVE
+and −2 DEF for a turn.
 
 ### Big Brother — Control Tank (displacement / anti-heal)
 

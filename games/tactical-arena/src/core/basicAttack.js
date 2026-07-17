@@ -31,7 +31,7 @@ import {
 import { getConeCells } from "../rules/arts.js";
 import { addDuelMark, duelistTracksMisses, getAttackSplashDamage, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCritPullEffect, getCritSplashDamage, getDuelistCritLifesteal, getLineAttackTargets, getMeleeDefendRetaliation, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack, resolveBaseStrike, rollToHit, shouldApplyAttackRecoil } from "../rules/combat.js";
 import { chebyshevDistance, positionKey } from "../rules/movement.js";
-import { applyStatus } from "../rules/statuses.js";
+import { applyStatus, isTargetable } from "../rules/statuses.js";
 import { alliesInRadius, getStanceEffect } from "../rules/stances.js";
 import { applyDarkTreadLifesteal, applyGrowth, applyMagicDamageReaction, applyRockHardDefense, resolvePhysicalDamageHealing, restoreHp, restoreMp } from "./combatEffects.js";
 import { applyBeckonedGhostSacrifice } from "./ghostSacrifice.js";
@@ -49,7 +49,7 @@ export function attack(state, command) {
   // A wall is attacked by tile (no unit there); it resolves through its own path.
   if (command.targetPosition) return attackWall(state, command, result.unit);
   const target = findUnit(state, command.targetId);
-  if (!target || target.hp <= 0 || !areEnemies(result.unit, target)) return reject(ERR.INVALID_TARGET);
+  if (!isTargetable(target) || !areEnemies(result.unit, target)) return reject(ERR.INVALID_TARGET);
   if (chebyshevDistance(result.unit.position, target.position) > getEffectiveStats(result.unit, state).attackRange) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }

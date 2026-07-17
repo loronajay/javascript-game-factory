@@ -12,9 +12,10 @@
 import { finishActivation } from "../core/commands.js";
 import { applyCommand } from "../core/reducer.js";
 import { findUnit } from "../core/state.js";
-import { getArt } from "../core/unitCatalog.js";
+import { getArt, getAvailableArts } from "../core/unitCatalog.js";
 import { isTempoBattle } from "../core/tempoBattle.js";
-import { positionKey } from "../rules/movement.js";
+import { getLegalMoves, positionKey } from "../rules/movement.js";
+import { canUseArt } from "../rules/arts.js";
 import { readableError } from "../match/matchBuilder.js";
 import { recordOnlineValorEvents } from "../progression/valorRewards.js";
 import { prepareTutorialCommand, validateTutorialCommand } from "../tutorials/basics.js";
@@ -25,6 +26,24 @@ import { presentInstantArt } from "./instantArtPresenter.js";
 import { unitCenter } from "./battleEventPresenter.js";
 import { hasTutorialPresentation } from "./tutorialPresentationController.js";
 import { shouldUseRangedAttackAnimation, wallOreGainFloat } from "./combatPresentation.js";
+
+function hasNonFinishActivationCommand(state, unit) {
+  const activation = state?.activation;
+  if (!activation || !unit || activation.unitId !== unit.id || unit.hp <= 0) return false;
+  if (!activation.moved && getLegalMoves(state, unit).size > 0) return true;
+  return getAvailableArts(unit).some((art) =>
+    art.kind === "active" &&
+    art.implemented &&
+    canUseArt(state, unit, art.id)
+  );
+}
+
+export function shouldAutoFinishActivation(state) {
+  const activation = state?.activation;
+  if (!activation?.primaryUsed) return false;
+  const unit = findUnit(state, activation.unitId);
+  return Boolean(unit && !hasNonFinishActivationCommand(state, unit));
+}
 
 export function createCommandResolutionController({
   runtime,
@@ -295,7 +314,7 @@ export function createCommandResolutionController({
 
   function maybeAutoFinish() {
     const activation = runtime.state.activation;
-    if (activation && activation.moved && activation.primaryUsed) {
+    if (activation && shouldAutoFinishActivation(runtime.state)) {
       dispatch(finishActivation(runtime.state.currentPlayer, activation.unitId));
       setMessage(consumeTutorialPrompt("Activation complete. The next commander takes the field."));
     }

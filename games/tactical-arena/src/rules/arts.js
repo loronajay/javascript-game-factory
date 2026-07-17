@@ -2,7 +2,7 @@ import { areAllies, areEnemies, getTileObject, isWallAt, unitAt } from "../core/
 import { canMoveAndUseArts, getArt, getArtForUnit, getArtMpCost, getCommandRangeBonus, getEffectiveStats, getRageArtRangeBonus, getRageEffectValue, getUnitAuraRadius, getWeatherMovementArtRangeBonus, hasAbilityUsesRemaining, hasLivingStudiedTarget, isRaging, takesTurns } from "../core/unitCatalog.js";
 import { getTileAffinity } from "../core/state.js";
 import { ORTHOGONAL_DIRECTIONS, chebyshevDistance, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
-import { isStunned } from "./statuses.js";
+import { isStunned, isTargetable } from "./statuses.js";
 
 export const FOOTWORK_DAMAGE = 3;
 export const FLEE_RANGE_BONUS = 2;
@@ -282,8 +282,10 @@ export function getLineTargets(state, actor, range, { includeAllies = false } = 
       if (isWallAt(state, pos)) break; // a wall stops the ray for everyone
       const occupant = unitAt(state, pos);
       if (occupant) {
-        if (includeAllies || areEnemies(actor, occupant)) targets.push({ unit: occupant, dir, distance: d });
-        break; // first contact ends the ray regardless of team
+        if (isTargetable(occupant) && (includeAllies || areEnemies(actor, occupant))) {
+          targets.push({ unit: occupant, dir, distance: d });
+        }
+        break; // first body still stops first-contact rays, even when it is untargetable
       }
     }
   }
@@ -313,7 +315,7 @@ export function getLineReachTiles(state, actor, range) {
 
 export function getDarkPulseTargets(state, actor) {
   return getDarkPulseRays(state, actor)
-    .filter((ray) => ray.stopKind === "unit" && ray.unit)
+    .filter((ray) => ray.stopKind === "unit" && ray.unit && isTargetable(ray.unit))
     .map((ray) => ({ unit: ray.unit, dir: ray.dir, distance: ray.distance }));
 }
 
@@ -380,7 +382,7 @@ export function getPyroclasmTargets(state, actor, art) {
       if (!isOnBoard(state, pos)) break;
       if (isWallAt(state, pos)) break; // a wall stops the ray for everyone
       const occupant = unitAt(state, pos);
-      if (occupant && areEnemies(actor, occupant) && !seen.has(occupant.id)) {
+      if (occupant && isTargetable(occupant) && areEnemies(actor, occupant) && !seen.has(occupant.id)) {
         seen.add(occupant.id);
         targets.push(occupant);
       }
@@ -411,6 +413,7 @@ export function getTilePulseTargets(state, actor, art) {
   const range = effect.range + getCommandRangeBonus(state, actor);
   return state.units.filter((target) =>
     target.hp > 0 &&
+    isTargetable(target) &&
     areEnemies(actor, target) &&
     getTileAffinity(state, target.position) === effect.affinity &&
     (effect.global || Math.max(
@@ -457,6 +460,7 @@ export function getTargetedBlastFootprint(state, center, radius) {
 export function getTargetedBlastTargets(state, actor, center, radius) {
   return state.units.filter((unit) =>
     unit.hp > 0 && areEnemies(actor, unit) &&
+    isTargetable(unit) &&
     Math.max(Math.abs(unit.position.x - center.x), Math.abs(unit.position.y - center.y)) <= radius);
 }
 

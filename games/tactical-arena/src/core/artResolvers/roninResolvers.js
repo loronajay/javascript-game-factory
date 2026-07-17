@@ -4,13 +4,13 @@ import { getArtTargetRange } from "../../rules/arts.js";
 import { addDuelMark, duelistTracksMisses, ignoresCriticalDamage, isWallBetween, rollToHit, shouldApplyAttackRecoil } from "../../rules/combat.js";
 import { CRIT_MULTIPLIER } from "../../rules/damage.js";
 import { chebyshevDistance } from "../../rules/movement.js";
-import { applyStatus } from "../../rules/statuses.js";
+import { applyStatus, isTargetable } from "../../rules/statuses.js";
 import { accept, ERR, reject } from "../reducerResult.js";
 import { resolveVictory, spendAndAdvance } from "../turnEngine.js";
 import { applyBeckonedGhostSacrifice } from "../ghostSacrifice.js";
 
 function validateTargetedEnemyCast(state, actor, target, art) {
-  if (!target || target.hp <= 0 || !areEnemies(actor, target)) return ERR.INVALID_TARGET;
+  if (!isTargetable(target) || !areEnemies(actor, target)) return ERR.INVALID_TARGET;
   if (chebyshevDistance(actor.position, target.position) > getArtTargetRange(state, actor, art)) {
     return ERR.TARGET_OUT_OF_RANGE;
   }
@@ -82,7 +82,7 @@ export function resolveChallenge(state, command, art) {
 export function resolveShuriken(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const targetState = findUnit(state, command.targetId);
-  if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (!isTargetable(targetState) || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
   if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }

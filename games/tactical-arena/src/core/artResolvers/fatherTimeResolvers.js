@@ -3,7 +3,7 @@ import { areEnemies, cloneState, findUnit } from "../state.js";
 import { getArtTargetRange, getRevivePlacementTiles, getReviveTargets } from "../../rules/arts.js";
 import { isWallBetween } from "../../rules/combat.js";
 import { chebyshevDistance, positionKey } from "../../rules/movement.js";
-import { applyStatus, reflectsStatus } from "../../rules/statuses.js";
+import { applyStatus, isTargetable, reflectsStatus } from "../../rules/statuses.js";
 import { accept, ERR, reject } from "../reducerResult.js";
 import { resolveVictory, spendAndAdvance } from "../turnEngine.js";
 
@@ -11,6 +11,7 @@ export function resolveAge(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const targetState = findUnit(state, command.targetId);
   if (!targetState || targetState.hp <= 0) return reject(ERR.INVALID_TARGET);
+  if (areEnemies(actorState, targetState) && !isTargetable(targetState)) return reject(ERR.INVALID_TARGET);
   if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }
@@ -42,6 +43,7 @@ export function resolveTimeStretch(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const targetState = findUnit(state, command.targetId);
   if (!targetState || targetState.hp <= 0) return reject(ERR.INVALID_TARGET);
+  if (areEnemies(actorState, targetState) && !isTargetable(targetState)) return reject(ERR.INVALID_TARGET);
   if (chebyshevDistance(actorState.position, targetState.position) > getEffectiveStats(actorState, state).attackRange) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }

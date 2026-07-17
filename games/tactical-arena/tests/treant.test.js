@@ -298,6 +298,50 @@ test("Petrify: a petrified Treant cannot open an activation", () => {
   assert.equal(rejected.errorCode, "UNIT_SPENT");
 });
 
+test("Petrify: a petrified Treant cannot be targeted by attacks or enemy ARTS", () => {
+  const state = scenario([
+    { id: "sword", type: "swordsman", player: 1, x: 6, y: 5 },
+    { id: "mage", type: "magician", player: 1, x: 5, y: 5, mp: 20 },
+    { id: "t", type: "treant", player: 2, x: 6, y: 6, hp: 5, statuses: [{ type: "petrified", duration: "permanent" }], petrified: 2 }
+  ]);
+
+  let s = run(state, beginActivation(1, "sword")).nextState;
+  const attackResult = applyCommand(s, { type: "ATTACK", player: 1, actorId: "sword", targetId: "t", ...HIT });
+  assert.equal(attackResult.accepted, false);
+  assert.equal(attackResult.errorCode, "INVALID_TARGET");
+
+  s.activation = null;
+  s.units.find((unit) => unit.id === "sword").spent = true;
+  s = run(s, beginActivation(1, "mage")).nextState;
+  const artResult = applyCommand(s, useArt(1, "mage", "spark", { targetId: "t", ...HIT }));
+  assert.equal(artResult.accepted, false);
+  assert.equal(artResult.errorCode, "INVALID_TARGET");
+});
+
+test("Petrify: CPU plans do not target a petrified Treant", () => {
+  const state = scenario([
+    { id: "sword", type: "swordsman", player: 1, x: 6, y: 5 },
+    { id: "t", type: "treant", player: 2, x: 6, y: 6, hp: 5, statuses: [{ type: "petrified", duration: "permanent" }], petrified: 2 }
+  ]);
+
+  const plans = generatePlans(state, findUnit(state, "sword"));
+  assert.ok(plans.length > 0, "defend fallback should remain available");
+  assert.equal(plans.some((plan) => plan.primary?.targetId === "t"), false);
+});
+
+test("Petrify: the statue still body-blocks physical shots", () => {
+  const state = scenario([
+    { id: "archer", type: "archer", player: 1, x: 4, y: 6 },
+    { id: "t", type: "treant", player: 2, x: 5, y: 6, hp: 5, statuses: [{ type: "petrified", duration: "permanent" }], petrified: 2 },
+    { id: "foe", type: "swordsman", player: 2, x: 6, y: 6, hp: 25 }
+  ]);
+
+  const s = run(state, beginActivation(1, "archer")).nextState;
+  const result = applyCommand(s, { type: "ATTACK", player: 1, actorId: "archer", targetId: "foe", ...HIT });
+  assert.equal(result.accepted, false);
+  assert.equal(result.errorCode, "TARGET_OBSTRUCTED");
+});
+
 test("Petrify: each of the Treant's turns the statue restores itself and its aura drains enemies", () => {
   const state = scenario([
     { id: "t", type: "treant", player: 1, x: 6, y: 6, hp: 5, mp: 10 },

@@ -563,6 +563,34 @@ test("raging board units carry a rage state class and aura element", () => {
   }
 });
 
+test("petrified board units render with a whole-piece stone state", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const metrics = { tileWidth: 58, tileHeight: 29, originX: 0, originY: 0 };
+    const unit = {
+      id: "p2-treant",
+      player: 2,
+      type: "treant",
+      hp: 5,
+      mp: 12,
+      position: { x: 0, y: 0 },
+      statuses: [{ type: "petrified", duration: "permanent" }],
+      statModifiers: {}
+    };
+
+    const token = createUnitFigure(metrics, unit, { onUnitClick: () => {} });
+
+    assert.match(token.getAttribute("class"), /\bpetrified\b/);
+    assert.ok(token.findByClass("status-petrified"), "petrified units still keep their rock status badge");
+    assert.match(STYLE_CSS, /\.unit\.petrified\s+\.(?:body-group|sprite-img)\b/);
+    assert.match(STYLE_CSS, /\.unit-tag\.status-petrified\b/);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("painted board sprites render without a team-color tint wash", () => {
   const spriteRules = STYLE_CSS
     .split("}")

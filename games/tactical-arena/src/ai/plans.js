@@ -54,7 +54,7 @@ import {
   hasNearbyEnemy,
   validateRushPath
 } from "../rules/arts.js";
-import { isStunned } from "../rules/statuses.js";
+import { isStunned, isTargetable } from "../rules/statuses.js";
 import { buffAlliesValue, expectedFixedHit, expectedLineStrikeDamage, expectedStrike, nearestEnemyDistance } from "./evaluate.js";
 
 const FOOTWORK_PATH_BUDGET = 3000; // DFS node cap so footwork search stays bounded
@@ -248,7 +248,7 @@ function generateArtPlans(state, unit, art, ai, plans) {
       for (const target of livingUnits(state)) {
         if (target.id === unit.id) continue;
         if (chebyshevDistance(unit.position, target.position) > range) continue;
-        if (areEnemies(unit, target) && isWallBetween(state, unit.position, target.position, unit)) continue;
+        if (areEnemies(unit, target) && (!isTargetable(target) || isWallBetween(state, unit.position, target.position, unit))) continue;
         plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetId: target.id } }));
       }
       break;
@@ -350,7 +350,7 @@ function generateArtPlans(state, unit, art, ai, plans) {
       // Gargoyle repositions purposefully instead of blinking to empty air.
       const radius = art.blastRadius ?? 1;
       const tiles = tilesFromKeys(getFlightTiles(state, unit, art))
-        .filter((tile) => livingUnits(state).some((u) => areEnemies(unit, u) && chebyshevDistance(tile, u.position) <= radius))
+        .filter((tile) => livingUnits(state).some((u) => isTargetable(u) && areEnemies(unit, u) && chebyshevDistance(tile, u.position) <= radius))
         .sort((a, b) => nearestEnemyDistance(state, unit.player, a) - nearestEnemyDistance(state, unit.player, b))
         .slice(0, PLACEMENT_KEEP);
       for (const tile of tiles) {
@@ -391,7 +391,7 @@ function generateArtPlans(state, unit, art, ai, plans) {
       // this also keeps every plan legal for the condition-gated bursts, so it replays
       // cleanly through the reducer.
       const condition = art.condition ?? { status: "poison" };
-      const any = livingUnits(state).some((u) => areEnemies(unit, u) &&
+      const any = livingUnits(state).some((u) => isTargetable(u) && areEnemies(unit, u) &&
         (condition.status
           ? (u.statuses ?? []).some((s) => s.type === condition.status)
           : getTileAffinity(state, u.position) === condition.affinity));
@@ -752,6 +752,7 @@ function attackableWallsFrom(state, unit, pos) {
 function rangedTargetsFrom(state, actor, pos, physical, art = null) {
   const range = art ? getArtTargetRange(state, actor, art) : getEffectiveStats(actor, state).attackRange;
   return livingUnits(state).filter((target) =>
+    isTargetable(target) &&
     areEnemies(actor, target) &&
     chebyshevDistance(pos, target.position) <= range &&
     !isWallBetween(state, pos, target.position, actor) &&
@@ -772,11 +773,11 @@ function bestTarget(state, unit, targets) {
 
 function coneHitsEnemy(state, actor, cells) {
   const keys = new Set(cells.map(positionKey));
-  return livingUnits(state).some((u) => areEnemies(actor, u) && keys.has(positionKey(u.position)));
+  return livingUnits(state).some((u) => isTargetable(u) && areEnemies(actor, u) && keys.has(positionKey(u.position)));
 }
 
 function enemiesWithin(state, actor, radius) {
-  return livingUnits(state).filter((u) => areEnemies(actor, u) && chebyshevDistance(actor.position, u.position) <= radius);
+  return livingUnits(state).filter((u) => isTargetable(u) && areEnemies(actor, u) && chebyshevDistance(actor.position, u.position) <= radius);
 }
 
 function woundedAlliesInReach(state, actor, art) {

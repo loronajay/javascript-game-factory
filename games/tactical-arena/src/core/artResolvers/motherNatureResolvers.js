@@ -5,7 +5,7 @@ import { finalizeMagicDamage, isWallBetween, resistsDisplacement, resolveFixedPh
 import { resolveDamage } from "../../rules/damage.js";
 import { drawValue } from "../rng.js";
 import { chebyshevDistance, isOnBoard, positionKey } from "../../rules/movement.js";
-import { applyStatus } from "../../rules/statuses.js";
+import { applyStatus, isTargetable } from "../../rules/statuses.js";
 import { getGlobalHealBonus } from "../../rules/stances.js";
 import { applyMagicDamageReaction, applyRockHardDefense, restoreHp } from "../combatEffects.js";
 import { accept, ERR, reject } from "../reducerResult.js";
@@ -101,7 +101,7 @@ function landscaperPushDestination(actor, target) {
 export function resolveLandscaper(state, command, art) {
   const actorState = findUnit(state, command.unitId);
   const targetState = findUnit(state, command.targetId);
-  if (!targetState || targetState.hp <= 0 || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
+  if (!isTargetable(targetState) || !areEnemies(actorState, targetState)) return reject(ERR.INVALID_TARGET);
   if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }

@@ -9,7 +9,7 @@ import { areAllies, areEnemies, cloneState, findUnit, livingUnits } from "../sta
 import { getArtTargetRange } from "../../rules/arts.js";
 import { isWallBetween, resolveFixedMagicStrike, rollToHit } from "../../rules/combat.js";
 import { chebyshevDistance } from "../../rules/movement.js";
-import { applyStatus } from "../../rules/statuses.js";
+import { applyStatus, isTargetable } from "../../rules/statuses.js";
 import { getGlobalHealBonus } from "../../rules/stances.js";
 import { applyMagicDamageReaction, restoreHp, restoreMp } from "../combatEffects.js";
 import { accept, ERR, reject } from "../reducerResult.js";
@@ -22,7 +22,7 @@ function clumsyEffect(actor) {
 }
 
 function validateTargetedEnemyCast(state, actor, target, art) {
-  if (!target || target.hp <= 0 || !areEnemies(actor, target)) return ERR.INVALID_TARGET;
+  if (!isTargetable(target) || !areEnemies(actor, target)) return ERR.INVALID_TARGET;
   if (chebyshevDistance(actor.position, target.position) > getArtTargetRange(state, actor, art)) return ERR.TARGET_OUT_OF_RANGE;
   if (isWallBetween(state, actor.position, target.position, actor)) return ERR.TARGET_OBSTRUCTED;
   return null;

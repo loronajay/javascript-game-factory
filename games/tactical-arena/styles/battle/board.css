@@ -112,6 +112,7 @@ button:hover:not(:disabled) { border-color: var(--brass-hi); filter: brightness(
 .unit-tag.status-blind { color:#e8d9a8; border-color:rgba(200,170,90,.5); background:rgba(170,140,60,.12); }
 .unit-tag.status-slow { color:#a8d4f0; border-color:rgba(100,160,220,.5); background:rgba(70,130,200,.12); }
 .unit-tag.status-stun { color:#ffe45e; border-color:rgba(230,200,70,.55); background:rgba(180,145,30,.14); }
+.unit-tag.status-petrified { color:#d7c8ad; border-color:rgba(185,168,138,.58); background:rgba(94,82,64,.2); }
 /* Persistent stance tags (Witch Doctor's "Dancing Man") — unlike a status, these
    don't expire on their own, so each stance gets its own steady color rather than
    the pulsing/temporary styling used for statuses. */
@@ -317,6 +318,13 @@ body.tutorial-spotlight-mp .dialogue-layer {
 .unit.ghost .rim { stroke:#cbb8ff; stroke-dasharray:5 5; animation:rim-spin 2.2s linear infinite; }
 .unit.ghost .sprite-img { opacity:.68; filter:drop-shadow(0 0 10px rgba(188,150,255,.85)) drop-shadow(0 2px 1px rgba(0,0,0,.35)); }
 .unit.ghost .hp-front { fill:#cbb8ff; }
+.unit.petrified { opacity:.9; filter:grayscale(.88) saturate(.28) brightness(.62) contrast(1.18) drop-shadow(0 0 9px rgba(185,168,138,.42)); }
+.unit.petrified .body-group { animation:none; }
+.unit.petrified .base-top { fill:#24272a; stroke:rgba(215,200,173,.34); }
+.unit.petrified .base-inlay { fill:#17191c; }
+.unit.petrified .rim { stroke:#8f836e; stroke-dasharray:4 6; }
+.unit.petrified .sprite-img { opacity:.72; filter:grayscale(1) sepia(.18) saturate(.35) brightness(.56) contrast(1.28) drop-shadow(0 2px 1px rgba(0,0,0,.55)); }
+.unit.petrified .hp-front { fill:#9b907c; }
 .unit .fig-body { fill:url(#ivory); stroke:#281e12; stroke-width:1.1; vector-effect:non-scaling-stroke; }
 .unit .fig-shade { fill:rgba(38,27,14,.30); stroke:none; }
 .unit .fig-light { fill:rgba(255,250,236,.55); stroke:none; }
