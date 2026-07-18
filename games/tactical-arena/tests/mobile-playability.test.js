@@ -204,8 +204,13 @@ test("the document exposes the mobile playability shell", () => {
   );
   assert.match(
     responsiveCss,
-    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.shop-pack-detail\s*\{[\s\S]*?grid-template-areas:\s*"top contents"\s*"hero contents"\s*"actions contents"[\s\S]*?\.shop-pack-contents\s*\{[\s\S]*?grid-area:\s*contents[\s\S]*?min-height:\s*0/,
-    "skin pack details should give pack contents the full short-landscape height instead of a tiny middle row",
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.shop-pack-detail\s*\{[\s\S]*?grid-template-areas:\s*"top top"\s*"hero actions"\s*"contents contents"[\s\S]*?\.shop-pack-detail-preview\s*\{[\s\S]*?display:\s*none[\s\S]*?\.shop-pack-contents\s*\{[\s\S]*?grid-area:\s*contents[\s\S]*?min-height:\s*0/,
+    "skin pack details should use a compact header, hide redundant preview art, and keep contents scrollable on short landscape",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.shop-unit-detail\s*\{[\s\S]*?grid-template-areas:\s*"top top"\s*"hero actions"\s*"rules rules"[\s\S]*?\.shop-unit-detail-hero \.unit-portrait\.is-shop-detail\s*\{[\s\S]*?display:\s*none[\s\S]*?\.shop-unit-detail-rules\s*\{[\s\S]*?grid-area:\s*rules[\s\S]*?overflow-y:\s*auto/,
+    "shop unit details should use a compact header, hide the large portrait, and keep rules scrollable on short landscape",
   );
   assert.match(
     responsiveCss,

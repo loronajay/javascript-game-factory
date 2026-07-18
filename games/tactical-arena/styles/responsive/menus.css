@@ -264,13 +264,68 @@
     font-size: .52rem;
   }
 
-  .shop-pack-detail {
-    grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) auto;
+  .shop-unit-detail {
+    grid-template-columns: minmax(0, 1fr) minmax(12rem, 17rem);
+    grid-template-rows: auto auto minmax(0, 1fr);
     grid-template-areas:
-      "top contents"
-      "hero contents"
-      "actions contents";
+      "top top"
+      "hero actions"
+      "rules rules";
+    align-items: stretch;
+  }
+
+  .shop-unit-detail .shop-unit-detail-top {
+    grid-area: top;
+  }
+
+  .shop-unit-detail-hero {
+    grid-area: hero;
+    grid-template-columns: 1fr;
+    align-content: center;
+    padding: .45rem;
+  }
+
+  .shop-unit-detail-hero .unit-portrait.is-shop-detail {
+    display: none;
+  }
+
+  .shop-unit-detail-hero .shop-unit-detail-hero-copy {
+    gap: .24rem;
+  }
+
+  .shop-unit-detail-title {
+    font-size: .95rem;
+    line-height: 1.05;
+  }
+
+  .shop-unit-detail-actions {
+    grid-area: actions;
+    align-self: stretch;
+    display: grid;
+    align-content: center;
+    padding: .45rem;
+    border: 1px solid rgba(188,214,236,.13);
+    border-radius: 8px;
+    background: linear-gradient(180deg,rgba(24,42,60,.46),rgba(5,12,20,.38));
+  }
+
+  .shop-unit-detail-actions .shop-unit-purchase-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .shop-unit-detail-rules {
+    grid-area: rules;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .shop-pack-detail {
+    grid-template-columns: minmax(0, 1fr) minmax(12rem, 17rem);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-areas:
+      "top top"
+      "hero actions"
+      "contents contents";
     align-items: stretch;
   }
 
@@ -281,23 +336,32 @@
   .shop-pack-detail-hero {
     grid-area: hero;
     grid-template-columns: 1fr;
-    align-content: start;
+    align-content: center;
     gap: .42rem;
     padding: .45rem;
   }
 
+  .shop-pack-detail-preview {
+    display: none;
+  }
+
+  .shop-pack-detail-hero .shop-unit-detail-hero-copy {
+    gap: .24rem;
+  }
+
   .shop-pack-detail-actions {
     grid-area: actions;
-    align-self: end;
+    align-self: stretch;
+    display: grid;
+    align-content: center;
+    padding: .45rem;
+    border: 1px solid rgba(188,214,236,.13);
+    border-radius: 8px;
+    background: linear-gradient(180deg,rgba(24,42,60,.46),rgba(5,12,20,.38));
   }
 
-  .shop-pack-detail-preview {
-    grid-template-columns: repeat(2, 2rem);
-  }
-
-  .shop-pack-detail-preview .unit-portrait.is-shop-pack-preview {
-    width: 2rem;
-    height: 2.45rem;
+  .shop-pack-detail-actions .shop-pack-purchase-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .shop-pack-contents {
