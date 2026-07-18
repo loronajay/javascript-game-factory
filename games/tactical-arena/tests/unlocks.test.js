@@ -288,6 +288,28 @@ test("premium skin purchases are stored separately and folded into unlocked skin
   assert.equal(duplicate.errorCode, "PREMIUM_SKIN_ALREADY_OWNED");
 });
 
+test("premium necromancer skin purchases unlock matching ghoul companion skins", () => {
+  const storage = storageAdapter();
+
+  const result = grantPremiumSkinPurchase(storage, { type: "necromancer", slug: "void-dweller" });
+
+  assert.equal(result.accepted, true);
+  assert.deepEqual(result.progress.purchasedSkins, [{ type: "necromancer", slug: "void-dweller" }]);
+  assert.equal(isProgressSkinUnlocked("necromancer", "void-dweller", storage), true);
+  assert.equal(isProgressSkinUnlocked("ghoul", "void-dweller", storage), true);
+  assert.equal(normalizeSkinSlug("ghoul", "void-dweller", storage), "void-dweller");
+});
+
+test("premium skin purchase grants reject standalone ghoul skins", () => {
+  const storage = storageAdapter();
+
+  const result = grantPremiumSkinPurchase(storage, { type: "ghoul", slug: "blood-moon" });
+
+  assert.equal(result.accepted, false);
+  assert.equal(result.errorCode, "INVALID_PREMIUM_SKIN");
+  assert.equal(isProgressSkinUnlocked("ghoul", "blood-moon", storage), false);
+});
+
 test("resetting progress clears stored progression while preserving owned skins", () => {
   const storage = storageAdapter();
   for (const tutorialId of ALL_TUTORIAL_IDS) {

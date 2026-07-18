@@ -46,6 +46,14 @@ export const CAMPAIGN_SKIN_PACKS = Object.freeze({
   ]),
 });
 const RESET_REPLAYABLE_CAMPAIGN_SKIN_PACK_IDS = Object.freeze(new Set([WANDERING_SKIN_PACK_ID]));
+const NECROMANCER_COMPANION_SKIN_SLUGS = Object.freeze(new Set([
+  "arcane",
+  "blood-moon",
+  "fuck-cancer",
+  "summer-vibes",
+  "trick-or-treat",
+  "void-dweller",
+]));
 
 function defaultStorage() {
   return globalThis.localStorage;
@@ -71,6 +79,19 @@ function dedupeSkins(values) {
     out.push(Object.freeze({ type: skin.type, slug: skin.slug }));
   }
   return out;
+}
+
+function companionSkinsFor(skin) {
+  if (skin?.type !== "necromancer" || !NECROMANCER_COMPANION_SKIN_SLUGS.has(skin.slug)) return [];
+  return [Object.freeze({ type: "ghoul", slug: skin.slug })];
+}
+
+function withCompanionSkinUnlocks(values) {
+  const out = [];
+  for (const skin of Array.isArray(values) ? values : []) {
+    out.push(skin, ...companionSkinsFor(skin));
+  }
+  return dedupeSkins(out);
 }
 
 function sameSkin(left, right) {
@@ -150,7 +171,7 @@ export function normalizeUnlockProgress(value = {}) {
   if (rewardGranted && selectedRewardSkin) unlockedSkins.push(selectedRewardSkin);
   for (const skin of Object.values(campaignRewardSkins)) unlockedSkins.push(skin);
   unlockedSkins.push(...campaignGrantedSkins);
-  unlockedSkins.push(...purchasedSkins);
+  unlockedSkins.push(...withCompanionSkinUnlocks(purchasedSkins));
   return {
     completedTutorials,
     rewardChoices: [...TUTORIAL_REWARD_SKIN_CHOICES],
@@ -344,7 +365,7 @@ export function grantPremiumSkinPurchase(storage = defaultStorage(), choice) {
   const selected = choice && typeof choice.type === "string" && typeof choice.slug === "string"
     ? { type: choice.type, slug: choice.slug }
     : null;
-  if (!selected) {
+  if (!selected || selected.type === "ghoul") {
     return { accepted: false, errorCode: "INVALID_PREMIUM_SKIN", progress };
   }
   if (progress.purchasedSkins.some((skin) => skin.type === selected.type && skin.slug === selected.slug)) {

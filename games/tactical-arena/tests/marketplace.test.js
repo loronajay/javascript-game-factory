@@ -101,18 +101,20 @@ test("expanded fat squad skin packs expose updated counts, rarities, and prices"
   const southernKingdom = getSkinPackOffer("southern-kingdom", storage);
   const bloodMoonTypes = SKIN_MANIFEST
     .filter((skin) => skin.slug === "blood-moon")
+    .filter((skin) => skin.type !== "ghoul")
     .map((skin) => skin.type)
     .sort();
 
   assert.ok(bloodMoon, "Blood Moon Pack should be offered");
-  assert.equal(bloodMoon.skinCount, 31);
-  assert.equal(bloodMoon.unownedSkinCount, 31);
-  assert.equal(bloodMoon.rarityCounts.epic, 31);
-  assert.equal(bloodMoon.individualPrice.cents, 9269);
-  assert.equal(bloodMoon.individualValorPrice.amount, 69750);
+  assert.equal(bloodMoon.skinCount, 30);
+  assert.equal(bloodMoon.unownedSkinCount, 30);
+  assert.equal(bloodMoon.rarityCounts.epic, 30);
+  assert.equal(bloodMoon.individualPrice.cents, 8970);
+  assert.equal(bloodMoon.individualValorPrice.amount, 67500);
   assert.equal(bloodMoon.price.cents, 4999);
   assert.equal(bloodMoon.valorPrice.amount, 40000);
   assert.deepEqual(bloodMoon.skins.map((skin) => skin.type).sort(), bloodMoonTypes);
+  assert.equal(bloodMoon.skins.some((skin) => skin.type === "ghoul"), false);
   for (const type of bloodMoonTypes) {
     assert.ok(bloodMoon.skins.some((skin) => skin.type === type && skin.slug === "blood-moon"), `${type} Blood Moon skin should be in the pack`);
   }
@@ -136,20 +138,31 @@ test("expanded fat squad skin packs expose updated counts, rarities, and prices"
 test("Fuck Cancer charity pack offers every unit skin with charity labeling", () => {
   const storage = storageAdapter();
   const charity = getSkinPackOffer("fuck-cancer", storage);
+  const nonSummonUnitCount = Object.values(UNIT_TYPES).filter((unit) => !unit.summon).length;
 
   assert.ok(charity, "Fuck Cancer Charity Pack should be offered");
   assert.equal(charity.name, "Fuck Cancer Charity Pack");
-  assert.equal(charity.skinCount, Object.keys(UNIT_TYPES).length);
+  assert.equal(charity.skinCount, nonSummonUnitCount);
   assert.equal(charity.ownedSkinCount, 0);
-  assert.equal(charity.unownedSkinCount, Object.keys(UNIT_TYPES).length);
-  assert.equal(charity.rarityCounts.legendary, Object.keys(UNIT_TYPES).length);
+  assert.equal(charity.unownedSkinCount, nonSummonUnitCount);
+  assert.equal(charity.rarityCounts.legendary, nonSummonUnitCount);
   assert.equal(charity.price.cents, 4999);
   assert.equal(charity.valorPrice.amount, 42500);
   assert.equal(charity.donationNote, "All proceeds for this pack will be donated for cancer research.");
   assert.ok(charity.skins.every((skin) => skin.slug === "fuck-cancer"));
   assert.ok(charity.skins.every((skin) => skin.rarity === "legendary"));
   assert.ok(charity.skins.every((skin) => skin.donationNote === "All proceeds for this skin will be donated for cancer research."));
-  assert.ok(charity.skins.some((skin) => skin.type === "ghoul"), "the full-unit charity set should include Ghoul");
+  assert.equal(charity.skins.some((skin) => skin.type === "ghoul"), false, "Ghoul should be bundled with Necromancer instead of sold in the charity pack");
+});
+
+test("ghoul skins are not sold directly or included in paid skin packs", () => {
+  const storage = storageAdapter();
+  const catalog = getShopCatalog(storage);
+
+  assert.equal(getSkinOffer("ghoul", "blood-moon", storage), null);
+  assert.equal(catalog.skins.some((skin) => skin.type === "ghoul"), false);
+  assert.equal(catalog.skinPacks.some((pack) => pack.skins.some((skin) => skin.type === "ghoul")), false);
+  assert.equal(purchaseSkinWithValor(storage, "ghoul", "blood-moon").errorCode, "SKIN_NOT_FOR_SALE");
 });
 
 test("skin pack offers prorate prices for already owned pack contents", () => {
@@ -329,6 +342,21 @@ test("purchasing a skin with Valor spends Valor and unlocks the skin", () => {
   assert.equal(progress.valorBalance, 3000 - result.offer.valorPrice.amount);
 });
 
+test("purchasing a necromancer skin with Valor unlocks its ghoul companion skin", () => {
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, { valorBalance: 3000 });
+
+  const result = purchaseSkinWithValor(storage, "necromancer", "arcane");
+  const progress = readUnlockProgress(storage);
+
+  assert.equal(result.accepted, true);
+  assert.ok(progress.purchasedSkins.some((skin) => skin.type === "necromancer" && skin.slug === "arcane"));
+  assert.equal(progress.purchasedSkins.some((skin) => skin.type === "ghoul" && skin.slug === "arcane"), false);
+  assert.ok(progress.unlockedSkins.some((skin) => skin.type === "ghoul" && skin.slug === "arcane"));
+  assert.equal(getSkinOffer("necromancer", "arcane", storage).owned, true);
+  assert.equal(getSkinOffer("ghoul", "arcane", storage), null);
+});
+
 test("purchasing a skin pack with Valor spends the prorated pack price and unlocks unowned pack skins", () => {
   const storage = storageAdapter();
   writeUnlockProgress(storage, {
@@ -344,6 +372,9 @@ test("purchasing a skin pack with Valor spends the prorated pack price and unloc
   assert.equal(progress.valorBalance, 30000 - offer.valorPrice.amount);
   assert.ok(progress.purchasedSkins.some((skin) => skin.type === "swordsman" && skin.slug === "pumpkin-knight"));
   assert.ok(progress.purchasedSkins.some((skin) => skin.type === "juggernaut" && skin.slug === "pumpkin-mech"));
+  assert.ok(progress.purchasedSkins.some((skin) => skin.type === "necromancer" && skin.slug === "trick-or-treat"));
+  assert.ok(progress.unlockedSkins.some((skin) => skin.type === "ghoul" && skin.slug === "trick-or-treat"));
+  assert.equal(progress.purchasedSkins.some((skin) => skin.type === "ghoul"), false);
   assert.equal(
     progress.purchasedSkins.some((skin) => skin.type === "swordsman" && skin.slug === "enchanted"),
     false,

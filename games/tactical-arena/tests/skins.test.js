@@ -140,9 +140,15 @@ test("every Fuck Cancer skin is legendary charity-pack metadata", () => {
     const skin = getSkin(entry.type, entry.slug);
     assert.equal(skin.rarity, "legendary", `${entry.type} Fuck Cancer rarity`);
     assert.equal(skin.price.cents, 399, `${entry.type} Fuck Cancer price`);
-    assert.equal(skin.packId, "fuck-cancer");
-    assert.equal(skin.packName, "Fuck Cancer Charity Pack");
-    assert.equal(skin.donationNote, "All proceeds for this skin will be donated for cancer research.");
+    if (entry.type === "ghoul") {
+      assert.equal(skin.packId, null);
+      assert.equal(skin.packName, null);
+      assert.equal(skin.donationNote, null);
+    } else {
+      assert.equal(skin.packId, "fuck-cancer");
+      assert.equal(skin.packName, "Fuck Cancer Charity Pack");
+      assert.equal(skin.donationNote, "All proceeds for this skin will be donated for cancer research.");
+    }
   }
 });
 

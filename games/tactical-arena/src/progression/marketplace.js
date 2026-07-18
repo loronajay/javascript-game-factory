@@ -271,7 +271,7 @@ export function getUnitOffers(storage = globalThis.localStorage) {
 export function getSkinOffer(type, slug, storage = globalThis.localStorage) {
   const skin = getUnitSkins(type, storage).find((entry) => entry.slug === slug) ?? null;
   const def = UNIT_TYPES[type];
-  if (!skin || !def) return null;
+  if (!skin || !def || def.summon) return null;
   const valorAmount = skinValorCost(skin.price);
   return Object.freeze({
     id: skin.id,
@@ -301,7 +301,7 @@ export function getSkinOffer(type, slug, storage = globalThis.localStorage) {
 export function getSkinOffers(storage = globalThis.localStorage) {
   return Object.freeze(Object.keys(UNIT_TYPES).flatMap((type) => {
     const sellableSkins = getUnitSkins(type, storage).filter((skin) =>
-      !UNIT_TYPES[type]?.summon || skin.packId);
+      !UNIT_TYPES[type]?.summon);
     return sellableSkins.map((skin) => getSkinOffer(type, skin.slug, storage)).filter(Boolean);
   }));
 }

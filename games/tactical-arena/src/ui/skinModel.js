@@ -84,7 +84,9 @@ const FUCK_CANCER_SKIN_METADATA = meta(SKIN_RARITIES.LEGENDARY, {
 });
 
 const FUCK_CANCER_SKIN_METADATA_ENTRIES = Object.freeze(Object.fromEntries(
-  Object.keys(UNIT_TYPES).map((type) => [skinKey(type, "fuck-cancer"), FUCK_CANCER_SKIN_METADATA])
+  Object.values(UNIT_TYPES)
+    .filter((unit) => !unit.summon)
+    .map((unit) => [skinKey(unit.id, "fuck-cancer"), FUCK_CANCER_SKIN_METADATA])
 ));
 
 const AUTHORED_SKIN_METADATA = Object.freeze({
@@ -230,7 +232,12 @@ const AUTHORED_SKIN_METADATA = Object.freeze({
   [skinKey("witch-doctor", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
   [skinKey("witch-doctor", "void-dweller")]: meta(SKIN_RARITIES.LEGENDARY, PACK.VOID_DWELLER),
 
-  [skinKey("ghoul", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
+  [skinKey("ghoul", "summer-vibes")]: meta(SKIN_RARITIES.COMMON),
+  [skinKey("ghoul", "arcane")]: meta(SKIN_RARITIES.RARE),
+  [skinKey("ghoul", "trick-or-treat")]: meta(SKIN_RARITIES.RARE),
+  [skinKey("ghoul", "blood-moon")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("ghoul", "fuck-cancer")]: meta(SKIN_RARITIES.LEGENDARY),
+  [skinKey("ghoul", "void-dweller")]: meta(SKIN_RARITIES.LEGENDARY),
 
   [skinKey("father-time", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
   [skinKey("father-time", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),

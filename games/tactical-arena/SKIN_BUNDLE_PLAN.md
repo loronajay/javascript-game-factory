@@ -6,8 +6,9 @@ individual skins. The game can keep everything unlocked for testing, but future
 ownership should follow these categories.
 
 Current catalog baseline from this plan: 108 sellable/displayed skins, plus 3
-planned Arcane skins. Ghoul skins exist in the asset manifest, but are only
-listed in storefront packs when an authored pack explicitly includes them.
+planned Arcane skins. Ghoul skins exist in the asset manifest, but are companion
+unlocks only: buying a Necromancer skin grants the matching Ghoul skin when that
+Ghoul asset exists. Ghoul skins are not standalone shop items or pack contents.
 
 ## Main Packs
 
@@ -116,7 +117,10 @@ Missing Arcane skins to create:
 
 ### Blood Moon
 
-Pack size: 31 skins.
+Pack size: 30 skins.
+
+The Ghoul Blood Moon skin is granted with Necromancer Blood Moon, not sold in
+this pack.
 
 | Unit | Skin |
 | --- | --- |
@@ -132,7 +136,6 @@ Pack size: 31 skins.
 | Fat Bowman | Blood Moon |
 | Mystic | Blood Moon |
 | Witch Doctor | Blood Moon |
-| Ghoul | Blood Moon |
 | Father Time | Blood Moon |
 | King | Blood Moon |
 | Fat Cleric | Blood Moon |
