@@ -157,8 +157,8 @@ test("new fat squad collection skins use authored rarity and pack metadata", () 
     assert.equal(bloodMoon.packName, "Blood Moon Pack", `${type} Blood Moon pack name`);
 
     const southernKingdom = getSkin(type, "southern-kingdom");
-    assert.equal(southernKingdom.rarity, "legendary", `${type} Southern Kingdom rarity`);
-    assert.equal(southernKingdom.price.cents, 399, `${type} Southern Kingdom price`);
+    assert.equal(southernKingdom.rarity, "epic", `${type} Southern Kingdom rarity`);
+    assert.equal(southernKingdom.price.cents, 299, `${type} Southern Kingdom price`);
     assert.equal(southernKingdom.packId, "southern-kingdom", `${type} Southern Kingdom pack id`);
     assert.equal(southernKingdom.packName, "Southern Kingdom Pack", `${type} Southern Kingdom pack name`);
 
@@ -179,14 +179,14 @@ test("new fat squad collection skins use authored rarity and pack metadata", () 
   }
 });
 
-test("all Southern Kingdom skins are legendary pack skins", () => {
+test("all Southern Kingdom skins are epic pack skins", () => {
   const entries = SKIN_MANIFEST.filter((entry) => entry.slug === "southern-kingdom");
 
   assert.equal(entries.length, 8);
   for (const entry of entries) {
     const skin = getSkin(entry.type, entry.slug);
-    assert.equal(skin.rarity, "legendary", `${entry.type} Southern Kingdom rarity`);
-    assert.equal(skin.price.cents, 399, `${entry.type} Southern Kingdom price`);
+    assert.equal(skin.rarity, "epic", `${entry.type} Southern Kingdom rarity`);
+    assert.equal(skin.price.cents, 299, `${entry.type} Southern Kingdom price`);
     assert.equal(skin.packId, "southern-kingdom", `${entry.type} Southern Kingdom pack id`);
     assert.equal(skin.packName, "Southern Kingdom Pack", `${entry.type} Southern Kingdom pack name`);
   }

@@ -6,9 +6,8 @@ individual skins. The game can keep everything unlocked for testing, but future
 ownership should follow these categories.
 
 Current catalog baseline from this plan: 108 sellable/displayed skins, plus 3
-planned Arcane skins. Ghoul skins exist in the asset manifest, but are not listed
-in these storefront packs because Ghoul is a summoned unit rather than a normal
-roster pick.
+planned Arcane skins. Ghoul skins exist in the asset manifest, but are only
+listed in storefront packs when an authored pack explicitly includes them.
 
 ## Main Packs
 
@@ -117,19 +116,41 @@ Missing Arcane skins to create:
 
 ### Blood Moon
 
-Pack size: 9 skins.
+Pack size: 31 skins.
 
 | Unit | Skin |
 | --- | --- |
+| Angel | Blood Moon |
 | Swordsman | Blood Moon |
 | Paladin | Blood Moon |
 | Monk | Blood Moon |
+| Fat Knight | Blood Moon |
+| Blacksword | Blood Moon |
+| Ronin | Blood Moon |
 | Archer | Blood Moon |
 | Sniper | Blood Moon |
+| Fat Bowman | Blood Moon |
 | Mystic | Blood Moon |
 | Witch Doctor | Blood Moon |
+| Ghoul | Blood Moon |
+| Father Time | Blood Moon |
+| King | Blood Moon |
+| Fat Cleric | Blood Moon |
+| Mother Nature | Blood Moon |
 | Magician | Blood Moon |
 | Necromancer | Blood Moon |
+| Nemesis | Blood Moon |
+| Virus | Blood Moon |
+| Fat Wizard | Blood Moon |
+| Summoner | Blood Moon |
+| Juggernaut | Blood Moon |
+| Gargoyle | Blood Moon |
+| Clod | Blood Moon |
+| Big Brother | Blood Moon |
+| Riot Cop | Blood Moon |
+| Treant | Blood Moon |
+| Miner | Blood Moon |
+| Little Brother | Blood Moon |
 
 ## Other Packs
 

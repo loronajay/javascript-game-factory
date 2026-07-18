@@ -21,6 +21,7 @@ import {
   unitPremiumPrice,
   unitValorCost,
 } from "../src/progression/marketplace.js";
+import { SKIN_MANIFEST } from "../src/ui/skinManifest.generated.js";
 
 function storageAdapter() {
   const values = new Map();
@@ -98,27 +99,32 @@ test("expanded fat squad skin packs expose updated counts, rarities, and prices"
   const storage = storageAdapter();
   const bloodMoon = getSkinPackOffer("blood-moon", storage);
   const southernKingdom = getSkinPackOffer("southern-kingdom", storage);
+  const bloodMoonTypes = SKIN_MANIFEST
+    .filter((skin) => skin.slug === "blood-moon")
+    .map((skin) => skin.type)
+    .sort();
 
   assert.ok(bloodMoon, "Blood Moon Pack should be offered");
-  assert.equal(bloodMoon.skinCount, 19);
-  assert.equal(bloodMoon.unownedSkinCount, 19);
-  assert.equal(bloodMoon.rarityCounts.epic, 19);
-  assert.equal(bloodMoon.individualPrice.cents, 5681);
-  assert.equal(bloodMoon.individualValorPrice.amount, 42750);
-  assert.equal(bloodMoon.price.cents, 2999);
-  assert.equal(bloodMoon.valorPrice.amount, 24000);
-  for (const type of ["fat-knight", "fat-wizard", "fat-cleric", "fat-bowman"]) {
+  assert.equal(bloodMoon.skinCount, 31);
+  assert.equal(bloodMoon.unownedSkinCount, 31);
+  assert.equal(bloodMoon.rarityCounts.epic, 31);
+  assert.equal(bloodMoon.individualPrice.cents, 9269);
+  assert.equal(bloodMoon.individualValorPrice.amount, 69750);
+  assert.equal(bloodMoon.price.cents, 4999);
+  assert.equal(bloodMoon.valorPrice.amount, 40000);
+  assert.deepEqual(bloodMoon.skins.map((skin) => skin.type).sort(), bloodMoonTypes);
+  for (const type of bloodMoonTypes) {
     assert.ok(bloodMoon.skins.some((skin) => skin.type === type && skin.slug === "blood-moon"), `${type} Blood Moon skin should be in the pack`);
   }
 
   assert.ok(southernKingdom, "Southern Kingdom Pack should be offered");
   assert.equal(southernKingdom.skinCount, 8);
   assert.equal(southernKingdom.unownedSkinCount, 8);
-  assert.equal(southernKingdom.rarityCounts.legendary, 8);
-  assert.equal(southernKingdom.individualPrice.cents, 3192);
-  assert.equal(southernKingdom.individualValorPrice.amount, 22800);
-  assert.equal(southernKingdom.price.cents, 2399);
-  assert.equal(southernKingdom.valorPrice.amount, 17250);
+  assert.equal(southernKingdom.rarityCounts.epic, 8);
+  assert.equal(southernKingdom.individualPrice.cents, 2392);
+  assert.equal(southernKingdom.individualValorPrice.amount, 18000);
+  assert.equal(southernKingdom.price.cents, 1799);
+  assert.equal(southernKingdom.valorPrice.amount, 13500);
   for (const type of ["fat-knight", "fat-wizard", "fat-cleric", "fat-bowman"]) {
     assert.ok(
       southernKingdom.skins.some((skin) => skin.type === type && skin.slug === "southern-kingdom"),

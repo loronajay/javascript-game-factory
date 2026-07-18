@@ -438,6 +438,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "father-time",
+    slug: "blood-moon",
+    file: "blood-moon-father-time.png"
+  },
+  {
+    type: "father-time",
     slug: "fuck-cancer",
     file: "fuck-cancer-father-time.png"
   },
@@ -498,6 +503,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "king",
+    slug: "blood-moon",
+    file: "blood-moon-king.png"
+  },
+  {
+    type: "king",
     slug: "fuck-cancer",
     file: "fuck-cancer-king.png"
   },
@@ -515,6 +525,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "angel",
     slug: "summer-vibes",
     file: "summer-vibes-angel.png"
+  },
+  {
+    type: "angel",
+    slug: "blood-moon",
+    file: "blood-moon-angel.png"
   },
   {
     type: "angel",
@@ -658,6 +673,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "nemesis",
+    slug: "blood-moon",
+    file: "blood-moon-nemesis.png"
+  },
+  {
+    type: "nemesis",
     slug: "fuck-cancer",
     file: "fuck-cancer-nemesis.png"
   },
@@ -683,6 +703,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "virus",
+    slug: "blood-moon",
+    file: "blood-moon-virus.png"
+  },
+  {
+    type: "virus",
     slug: "fuck-cancer",
     file: "fuck-cancer-virus.png"
   },
@@ -700,6 +725,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "clod",
     slug: "arcane",
     file: "arcane-clod.png"
+  },
+  {
+    type: "clod",
+    slug: "blood-moon",
+    file: "blood-moon-clod.png"
   },
   {
     type: "clod",
@@ -963,6 +993,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "miner",
+    slug: "blood-moon",
+    file: "blood-moon-miner.png"
+  },
+  {
+    type: "miner",
     slug: "firefighter",
     file: "firefighter-miner.png"
   },
@@ -1003,6 +1038,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "big-brother",
+    slug: "blood-moon",
+    file: "blood-moon-big-brother.png"
+  },
+  {
+    type: "big-brother",
     slug: "fire-rescue",
     file: "fire-rescue-big-brother.png"
   },
@@ -1040,6 +1080,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "little-brother",
     slug: "arctic-ops",
     file: "arctic-ops-little-brother.png"
+  },
+  {
+    type: "little-brother",
+    slug: "blood-moon",
+    file: "blood-moon-little-brother.png"
   },
   {
     type: "little-brother",
@@ -1153,6 +1198,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "mother-nature",
+    slug: "blood-moon",
+    file: "blood-moon-mother-nature.png"
+  },
+  {
+    type: "mother-nature",
     slug: "blood-rose",
     file: "blood-rose-mother-nature.png"
   },
@@ -1230,6 +1280,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "riot-cop",
     slug: "summer-vibes",
     file: "summer-vibes-riot-cop.png"
+  },
+  {
+    type: "riot-cop",
+    slug: "blood-moon",
+    file: "blood-moon-riot-cop.png"
   },
   {
     type: "riot-cop",
