@@ -201,9 +201,17 @@ test("shop consumables tab sells paid consumables with checkout coming soon feed
 test("shop purchase buttons require a signed-in factory account", () => {
   globalThis.document = new FakeDocument();
   const storage = storageAdapter();
+  const locationRef = {
+    href: "https://arcade.example/games/tactical-arena/index.html?mode=shop#skins",
+    assigned: "",
+    assign(url) {
+      this.assigned = url;
+      this.href = url;
+    },
+  };
   writeUnlockProgress(storage, { valorBalance: 99999 });
 
-  openShop(storage, { account: { authenticated: false } });
+  openShop(storage, { account: { authenticated: false }, locationRef });
 
   const overlay = document.body.children[0];
   assert.match(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent, /sign in to buy/i);
@@ -212,8 +220,13 @@ test("shop purchase buttons require a signed-in factory account", () => {
   const clodButtons = walk(clodCard, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-buy-btn"));
   assert.equal(clodButtons.length, 1);
   assert.equal(clodButtons[0].textContent, "Sign In");
-  assert.equal(clodButtons[0].disabled, true);
+  assert.equal(clodButtons[0].disabled, false);
   assert.equal(clodButtons[0].getAttribute("aria-label"), "Sign in to buy Clod");
+  clodButtons[0].click();
+  assert.equal(
+    locationRef.assigned,
+    "https://arcade.example/sign-in/index.html?next=https%3A%2F%2Farcade.example%2Fgames%2Ftactical-arena%2Findex.html%3Fmode%3Dshop%23skins",
+  );
 
   const skinsTab = walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Skins")[0];
   skinsTab.click();

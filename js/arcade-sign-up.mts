@@ -1,6 +1,6 @@
 import { createAuthApiClient } from "./platform/api/auth-api.mjs";
 import { bindFactoryProfileToSession, loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
-import { buildAppUrl } from "./arcade-paths.mjs";
+import { resolveAppRedirectTarget } from "./arcade-paths.mjs";
 
 const ERROR_MESSAGES: Record<string, string> = {
   email_taken: "That email is already registered. Sign in instead?",
@@ -30,11 +30,29 @@ function applySessionToProfile(playerId: any, profileName: any): void {
   bindFactoryProfileToSession(playerId, undefined, { profileName });
 }
 
+function getRedirectTarget(): string {
+  const params = new URLSearchParams(window.location.search);
+  return resolveAppRedirectTarget(params.get("next"), {
+    currentHref: window.location.href,
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("signUpForm") as HTMLFormElement | null;
   const flashEl = document.getElementById("authFlash");
   const submitBtn = document.getElementById("signUpSubmit") as HTMLButtonElement | null;
+  const signInLink = document.querySelector<HTMLAnchorElement>(".auth-card__switch[href*='sign-in']");
   const auth = createAuthApiClient();
+
+  if (signInLink) {
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next");
+    if (next) {
+      const signInUrl = new URL(signInLink.getAttribute("href") || "../sign-in/index.html", window.location.href);
+      signInUrl.searchParams.set("next", next);
+      signInLink.href = signInUrl.toString();
+    }
+  }
 
   if (!form) return;
 
@@ -72,6 +90,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     applySessionToProfile(result.playerId, result.profileName);
-    window.location.href = buildAppUrl("me/index.html");
+    window.location.href = getRedirectTarget();
   });
 });

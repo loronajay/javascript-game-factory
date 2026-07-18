@@ -35,7 +35,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("signInForm");
     const flashEl = document.getElementById("authFlash");
     const submitBtn = document.getElementById("signInSubmit");
+    const signUpLink = document.querySelector(".auth-card__switch[href*='sign-up']");
     const auth = createAuthApiClient();
+    if (signUpLink) {
+        const params = new URLSearchParams(window.location.search);
+        const next = params.get("next");
+        if (next) {
+            const signUpUrl = new URL(signUpLink.getAttribute("href") || "../sign-up/index.html", window.location.href);
+            signUpUrl.searchParams.set("next", next);
+            signUpLink.href = signUpUrl.toString();
+        }
+    }
     if (!form)
         return;
     form.addEventListener("submit", async (e) => {

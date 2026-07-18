@@ -8,7 +8,12 @@ import {
   purchaseSkinWithValor,
   purchaseUnitWithValor,
 } from "../progression/marketplace.js";
-import { SHOP_LOGIN_REQUIRED_ERROR, isFactoryAccountLoggedIn, readStoredFactoryAccountSession } from "../platform/factoryAccount.js";
+import {
+  SHOP_LOGIN_REQUIRED_ERROR,
+  isFactoryAccountLoggedIn,
+  readStoredFactoryAccountSession,
+  redirectToFactoryAccountSignIn,
+} from "../platform/factoryAccount.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { groupedUnitTypes } from "./squadModel.js";
 import { el } from "./domHelpers.js";
@@ -637,9 +642,11 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
   function createLoginRequiredButton(name) {
     const login = el("button", "shop-buy-btn is-login-required", "Sign In");
     login.type = "button";
-    login.disabled = true;
-    login.setAttribute("aria-disabled", "true");
     login.setAttribute("aria-label", `Sign in to buy ${name}`);
+    login.addEventListener("click", (event) => {
+      event.stopPropagation?.();
+      redirectToFactoryAccountSignIn({ locationRef: options.locationRef });
+    });
     return login;
   }
 
