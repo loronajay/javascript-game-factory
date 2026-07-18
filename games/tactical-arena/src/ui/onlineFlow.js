@@ -1,17 +1,17 @@
-// Online Versus lobby (1v1 — a 2-player lobby). Owns the relay client for the whole
-// lobby phase: connects on entry, runs quick-match / private-room pairing, and once
-// the lobby owner starts AND both players' squads have been exchanged, builds the
-// onlineSession and hands off to the match (onStartMatch). The match then owns the
-// live socket — so onExit only tears the client down when we leave WITHOUT starting.
+// Online Versus lobby. Owns the relay client for the whole lobby phase: connects on
+// entry, runs quick-match / private-room pairing for 1v1 or 4-player formats, and
+// once the lobby owner starts AND every seat's squad/draft has been exchanged, builds
+// the onlineSession and hands off to the match (onStartMatch). The match then owns
+// the live socket — so onExit only tears the client down when we leave WITHOUT starting.
 //
 // Authority model (see onlineClient.js / onlineSession.js): deterministic lockstep
 // over the generic v2 lobby. `lobby_started` hands every client an identical ordered
 // `members` array + a shared `seed`; seat = index in members + 1. The lobby OWNER
 // owns the match framing (board size), broadcast in-band via a `config` lobby_message
-// so every client builds it identically. Squads are a BLIND pick: each player builds
-// its own (the same roster pop-up as hot-seat) and broadcasts a `setup` message on
-// start; the match builds only once every seat's squad is in. A future draft-pick
-// mode (back-and-forth with bans) will replace the blind exchange, not this transport.
+// so every client builds it identically. Classic/FFA/team matches use BLIND pick:
+// each player builds its own squad (the same roster pop-up as hot-seat) and broadcasts
+// a `setup` message on start. Draft 1v1 uses the same transport with `draft_pick`
+// messages, then shares each completed draft squad through `setup`.
 import { createSquadPicker, DEFAULT_SQUAD } from "./squadPicker.js";
 import { getNicknamePref } from "./nicknameModel.js";
 import { loadFactoryProfile } from "../../../../js/platform/identity/factory-profile.mjs";

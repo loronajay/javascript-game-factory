@@ -129,7 +129,7 @@ function createBuckets() {
 function classifyFile(path) {
   if (path.startsWith("sounds/") && path.endsWith(".mp3")) return "music";
   if (path.startsWith("assets/theme-bgs/")) return "themeBackgrounds";
-  if (path === "assets/campaign-map.png") return "campaign";
+  if (path === "assets/campaign-map.webp") return "campaign";
   if (path.startsWith("assets/units/")) return "unitArt";
   if (path.startsWith("assets/") || path.startsWith("sounds/")) return "otherAssets";
   if (path.startsWith("html/")) return "markup";
@@ -145,7 +145,7 @@ function buildWarnings(files, budgets, assetBytes) {
       path: "assets+sounds",
       bytes: assetBytes,
       budget: budgets.totalAssetBytes,
-      suggestion: "Trim package size before release; prioritize music transcodes, theme backgrounds, and high-cardinality skin PNGs.",
+      suggestion: "Trim package size before release; prioritize music transcodes, theme backgrounds, and high-cardinality skin images.",
     });
   }
 
@@ -167,7 +167,7 @@ function warningForFile(file, budgets) {
       suggestion: "Export a shorter loop or lower-bitrate package track; keep masters outside the shipped game.",
     };
   }
-  if (file.path === "assets/campaign-map.png" && file.bytes > budgets.campaignMapBytes) {
+  if (file.path === "assets/campaign-map.webp" && file.bytes > budgets.campaignMapBytes) {
     return {
       kind: "campaign-map",
       ...file,
@@ -175,7 +175,7 @@ function warningForFile(file, budgets) {
       suggestion: "Create a compressed runtime copy or resize to the maximum displayed map resolution.",
     };
   }
-  if (file.path.startsWith("assets/theme-bgs/") && extension === ".png" && file.bytes > budgets.themeBackgroundBytes) {
+  if (file.path.startsWith("assets/theme-bgs/") && (extension === ".png" || extension === ".webp") && file.bytes > budgets.themeBackgroundBytes) {
     return {
       kind: "theme-background",
       ...file,
@@ -183,15 +183,15 @@ function warningForFile(file, budgets) {
       suggestion: "Compress or convert menu backgrounds to a package-friendly format while preserving the original source art separately.",
     };
   }
-  if (file.path.startsWith("assets/units/skins/") && extension === ".png" && file.bytes > budgets.unitSkinBytes) {
+  if (file.path.startsWith("assets/units/skins/") && (extension === ".png" || extension === ".webp") && file.bytes > budgets.unitSkinBytes) {
     return {
       kind: "unit-skin",
       ...file,
       budget: budgets.unitSkinBytes,
-      suggestion: "Batch-compress skin PNGs; these dominate total package weight because there are many of them.",
+      suggestion: "Batch-compress skin images; these dominate total package weight because there are many of them.",
     };
   }
-  if (/^assets\/units\/[^/]+\.png$/.test(file.path) && file.bytes > budgets.unitPortraitBytes) {
+  if (/^assets\/units\/[^/]+\.(png|webp)$/.test(file.path) && file.bytes > budgets.unitPortraitBytes) {
     return {
       kind: "unit-portrait",
       ...file,

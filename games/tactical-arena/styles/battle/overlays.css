@@ -88,7 +88,7 @@
 .codex-nav-glyph { font-size:.95rem; flex-shrink:0; }
 .codex-nav-name { overflow:hidden; text-overflow:ellipsis; }
 @media (max-width:640px) { .codex-category-status { margin-left:0; }.codex-body { flex-direction:column; }.codex-nav { display:flex; gap:.28rem; width:100%; max-height:76px; overflow-x:auto; overflow-y:hidden; border-right:0; border-bottom:1px solid rgba(70,100,130,.35); padding:.4rem .45rem; }.codex-nav-item { width:auto; min-width:116px; }.codex-detail { padding:.85rem; }.codex-detail-hero { align-items:center; }.codex-detail-hero .unit-portrait.is-hero { width:96px; height:128px; } }
-/* Painted unit portraits (assets/units/*.png) — see ui/portraits.js. The <img> is
+/* Painted unit portraits (assets/units/*.webp) — see ui/portraits.js. The <img> is
    self-framed by inline height + transform (consistent scale, baseline-aligned, no
    clipping); the frame just crops the dead canvas space and decorates. */
 .unit-portrait { position:relative; overflow:hidden; flex-shrink:0; margin:0; background:radial-gradient(ellipse 70% 55% at 50% 78%,rgba(120,170,210,.16),transparent 70%),linear-gradient(180deg,#16222f,#0a121b); }

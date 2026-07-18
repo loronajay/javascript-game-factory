@@ -93,8 +93,8 @@ test("every non-default theme points at a matching menu background asset path", 
     if (theme.id === DEFAULT_THEME_ID) continue;
     assert.equal(
       theme.tokens["--menu-bg-image"],
-      `url(../../assets/theme-bgs/${theme.id}.png)`,
-      `${theme.id} must resolve from styles/screens/polish.css to assets/theme-bgs/${theme.id}.png`
+      `url(../../assets/theme-bgs/${theme.id}.webp)`,
+      `${theme.id} must resolve from styles/screens/polish.css to assets/theme-bgs/${theme.id}.webp`
     );
   }
 });
@@ -114,7 +114,7 @@ test("applyTheme sets the palette's tokens and tags the root", () => {
   assert.equal(root.dataset.theme, warm.id);
   assert.equal(root.props.size, Object.keys(warm.tokens).length);
   assert.equal(root.props.get("--tile-light"), warm.tokens["--tile-light"]);
-  assert.equal(root.props.get("--menu-bg-image"), `url(../../assets/theme-bgs/${warm.id}.png)`);
+  assert.equal(root.props.get("--menu-bg-image"), `url(../../assets/theme-bgs/${warm.id}.webp)`);
 });
 
 test("applyTheme back to default clears every override", () => {

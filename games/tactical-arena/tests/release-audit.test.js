@@ -23,7 +23,7 @@ test("release audit flags known oversized release assets", async () => {
   const warningText = audit.warnings.map((warning) => warning.path).join("\n");
 
   assert.match(warningText, /sounds\/summoner-battle\.mp3/);
-  assert.match(warningText, /assets\/campaign-map\.png/);
+  assert.match(warningText, /assets\/campaign-map\.webp/);
 });
 
 test("formatBytes uses readable binary units", () => {

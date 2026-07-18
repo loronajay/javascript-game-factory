@@ -52,18 +52,41 @@ function expectedSkinEntriesFromDisk() {
   const skinRoot = join(GAME_ROOT, "assets", "units", "skins");
   return Object.keys(UNIT_TYPES).flatMap((type) => {
     const unitDir = join(skinRoot, type);
-    return readdirSync(unitDir)
-      .filter((file) => file.toLowerCase().endsWith(".png"))
+    const entriesByKey = new Map();
+    for (const entry of readdirSync(unitDir)
+      .filter((file) => /\.(png|webp)$/i.test(file))
       .map((file) => {
-        const basename = file.replace(/\.png$/i, "");
+        const basename = file.replace(/\.(png|webp)$/i, "");
         const suffix = `-${type}`;
         const slug = basename.endsWith(suffix) ? basename.slice(0, -suffix.length) : basename;
         return { type, slug, file };
-      });
+      })) {
+      const key = `${type}:${entry.slug}`;
+      const existing = entriesByKey.get(key);
+      if (!existing || skinAssetSort(entry, existing) < 0) entriesByKey.set(key, entry);
+    }
+    return [...entriesByKey.values()];
   }).sort((left, right) =>
     left.type.localeCompare(right.type) ||
     left.slug.localeCompare(right.slug) ||
-    left.file.localeCompare(right.file));
+    skinAssetSort(left, right));
+}
+
+function skinAssetSort(left, right) {
+  const extensionPriority = { ".webp": 0, ".png": 1 };
+  const leftExtension = left.file.slice(left.file.lastIndexOf(".")).toLowerCase();
+  const rightExtension = right.file.slice(right.file.lastIndexOf(".")).toLowerCase();
+  return (extensionPriority[leftExtension] ?? 99) - (extensionPriority[rightExtension] ?? 99) ||
+    left.file.localeCompare(right.file);
+}
+
+function expectedSkinAssetPath(type, slug) {
+  const basename = `${slug}-${type}`;
+  for (const extension of ["webp", "png"]) {
+    const path = `assets/units/skins/${type}/${basename}.${extension}`;
+    if (existsSync(join(GAME_ROOT, path))) return path;
+  }
+  return `assets/units/skins/${type}/${basename}.webp`;
 }
 
 test("summer-vibes is the first authored skin collection slug", () => {
@@ -85,12 +108,12 @@ test("every registered unit's skins are locked by default with real assets on di
     // bespoke themed set instead (e.g. Blacksword) simply has no summer-vibes entry.
     if (skins.some((entry) => entry.slug === SUMMER_VIBES_SKIN_SLUG)) {
       assert.equal(skins[0].slug, SUMMER_VIBES_SKIN_SLUG, `${type} should lead with summer-vibes`);
-      assert.equal(skinAssetPath(type, SUMMER_VIBES_SKIN_SLUG), `assets/units/skins/${type}/summer-vibes-${type}.png`);
+      assert.equal(skinAssetPath(type, SUMMER_VIBES_SKIN_SLUG), expectedSkinAssetPath(type, SUMMER_VIBES_SKIN_SLUG));
     }
   }
 });
 
-test("generated skin manifest matches every png dropped in unit skin folders", () => {
+test("generated skin manifest matches every image dropped in unit skin folders", () => {
   assert.deepEqual(
     [...SKIN_MANIFEST].sort((left, right) =>
       left.type.localeCompare(right.type) ||
@@ -101,9 +124,9 @@ test("generated skin manifest matches every png dropped in unit skin folders", (
 });
 
 test("newly dropped skin files become selectable by inferred slug", () => {
-  assert.equal(getSkin("swordsman", "medieval")?.portraitSrc, "assets/units/skins/swordsman/medieval-swordsman.png");
-  assert.equal(getSkin("sniper", "medieval")?.portraitSrc, "assets/units/skins/sniper/medieval-sniper.png");
-  assert.equal(getSkin("nemesis", "infernal")?.portraitSrc, "assets/units/skins/nemesis/infernal-nemesis.png");
+  assert.equal(getSkin("swordsman", "medieval")?.portraitSrc, expectedSkinAssetPath("swordsman", "medieval"));
+  assert.equal(getSkin("sniper", "medieval")?.portraitSrc, expectedSkinAssetPath("sniper", "medieval"));
+  assert.equal(getSkin("nemesis", "infernal")?.portraitSrc, expectedSkinAssetPath("nemesis", "infernal"));
 });
 
 test("skin entries carry marketplace-ready premium metadata", () => {
@@ -239,15 +262,15 @@ test("skin registry does not invent entries for unknown units", () => {
 });
 
 test("portrait and board sprite metadata swap to a skin asset by slug", () => {
-  assert.equal(getPortrait("swordsman", "summer-vibes").src, "assets/units/skins/swordsman/summer-vibes-swordsman.png");
-  assert.equal(getBoardSprite("swordsman", "summer-vibes").src, "assets/units/skins/swordsman/summer-vibes-swordsman.png");
-  assert.equal(getPortrait("swordsman", "missing").src, "assets/units/swordsman.png");
+  assert.equal(getPortrait("swordsman", "summer-vibes").src, expectedSkinAssetPath("swordsman", "summer-vibes"));
+  assert.equal(getBoardSprite("swordsman", "summer-vibes").src, expectedSkinAssetPath("swordsman", "summer-vibes"));
+  assert.equal(getPortrait("swordsman", "missing").src, "assets/units/swordsman.webp");
 });
 
 test("skinned board sprites inherit base framing metadata", () => {
   const base = getBoardSprite("ghoul");
   const summer = getBoardSprite("ghoul", "summer-vibes");
-  assert.equal(summer.src, "assets/units/skins/ghoul/summer-vibes-ghoul.png");
+  assert.equal(summer.src, expectedSkinAssetPath("ghoul", "summer-vibes"));
   assert.equal(summer.scale, base.scale);
   assert.deepEqual(summer.box, base.box);
 });

@@ -1,11 +1,11 @@
-// onlineClient.js — WebSocket relay layer for Tactical Arena online (1v1 today).
+// onlineClient.js — WebSocket relay layer for Tactical Arena online.
 //
 // This is the ONLY file in the game that touches `new WebSocket`. It rides the
 // GENERIC factory-network-server v2 LOBBY (create_lobby / find_lobby / join_lobby
 // / start_lobby / leave_lobby / lobby_message), with zero server-side match logic
-// — the "host-nothing relay" pattern. A 1v1 is simply a 2-player lobby; the cap is
-// raised to 4 the day FFA/teams ships (the relay is seat-count-agnostic). Ported
-// near-verbatim from Mini-Tactics — only GAME_ID and the lobby limits differ.
+// — the "host-nothing relay" pattern. Classic and draft 1v1 use 2-player lobbies;
+// 4 Player FFA and 2v2 Teams use 4-player lobbies. The relay is seat-count-agnostic:
+// all game rules still live in this client.
 //
 // Authority model (see onlineSession.js): deterministic lockstep. Every client
 // builds the match from the relay-provided shared `seed` + the ordered `members`

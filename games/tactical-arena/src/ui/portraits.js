@@ -1,4 +1,4 @@
-// Unit portraits — painted full-body character art (assets/units/<type>.png), used
+// Unit portraits — painted full-body character art (assets/units/<type>.webp), used
 // by the Codex + roster picker as reference/hero imagery. NOT the on-board token:
 // the board piece stays the team-tinted carved SVG figurine (unitRenderer.js). This
 // is a pure presentation layer, so it lives in ui/ and keeps core/ free of asset
@@ -13,7 +13,7 @@
 // space, normalize every figure to the SAME on-screen height, and floor-align the
 // feet — so figures read at a consistent scale with nothing clipped.
 //
-// `box` values are seeded from a real alpha-bbox measurement of each PNG (see the
+// `box` values are seeded from a real alpha-bbox measurement of each source image (see the
 // scratchpad measure script that produced them); re-measure if the art is replaced.
 
 import { UNIT_TYPES } from "../core/unitCatalog.js";
@@ -64,7 +64,7 @@ export const PORTRAITS = Object.freeze({
   // katana held to one side — the body centre sits near 0.43).
   ronin:       portrait("ronin",       { x: 0.163, y: 0.013, w: 0.530, h: 0.987 }),
   "mother-nature": portrait("mother-nature", { x: 0.080, y: 0.030, w: 0.780, h: 0.920 }),
-  // Riot Cop base art is the user-provided default Riot Cop PNG (not a skin variant).
+  // Riot Cop base art is the user-provided default Riot Cop image (not a skin variant).
   // The box below is an approximate standing-humanoid crop — re-measure the alpha bbox
   // off the 600×600 source if the on-board seating/centering needs tightening.
   "riot-cop": portrait("riot-cop", { x: 0.10, y: 0.03, w: 0.80, h: 0.92 }),
@@ -76,7 +76,7 @@ export const PORTRAITS = Object.freeze({
   ghoul:       portrait("ghoul",       { x: 0.162, y: 0.190, w: 0.705, h: 0.665 }, { scale: 0.82 })
 });
 
-function portrait(type, box, { scale = 1, src = `assets/units/${type}.png` } = {}) {
+function portrait(type, box, { scale = 1, src = `assets/units/${type}.webp` } = {}) {
   return Object.freeze({ src, box: Object.freeze(box), scale });
 }
 

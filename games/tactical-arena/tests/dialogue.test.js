@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { normalizeDialogueLine, normalizeDialogueScript } from "../src/ui/dialogue.js";
+
+const GAME_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const state = {
   units: [
@@ -42,6 +47,15 @@ function withSavedNickname(type, nickname, run) {
   }
 }
 
+function expectedSkinAssetPath(type, slug) {
+  const basename = `${slug}-${type}`;
+  for (const extension of ["webp", "png"]) {
+    const path = `assets/units/skins/${type}/${basename}.${extension}`;
+    if (existsSync(join(GAME_ROOT, path))) return path;
+  }
+  return `assets/units/skins/${type}/${basename}.webp`;
+}
+
 test("a unit type speaker resolves to its catalog name and the live unit's portrait/skin", () => {
   const line = normalizeDialogueLine({ speaker: "swordsman", text: "Keep your shield up." }, state);
 
@@ -49,7 +63,7 @@ test("a unit type speaker resolves to its catalog name and the live unit's portr
   assert.equal(line.type, "swordsman");
   assert.equal(line.text, "Keep your shield up.");
   assert.equal(line.side, "left");
-  assert.equal(line.portrait?.src, "assets/units/skins/swordsman/medieval-swordsman.png");
+  assert.equal(line.portrait?.src, expectedSkinAssetPath("swordsman", "medieval"));
 });
 
 test("a speaker unit id resolves live player side and selected skin", () => {

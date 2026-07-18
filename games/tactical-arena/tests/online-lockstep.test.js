@@ -11,8 +11,7 @@ import { createMatchState } from "../src/match/matchBuilder.js";
 // src/online/onlineSession.js). The real game never sends rendered state — each
 // client applies its own accepted command and broadcasts the COMMAND; every peer
 // replays it through the same seeded reducer. This harness proves that contract
-// holds end-to-end for the 1v1 (a 2-player lobby) format without a browser or the
-// live relay:
+// holds end-to-end for the 1v1 lockstep format without a browser or the live relay:
 //
 //   * Two INDEPENDENT match states (one per seat) built from one shared seed.
 //   * Accepted commands cross a relay with jittered async latency, exercising the

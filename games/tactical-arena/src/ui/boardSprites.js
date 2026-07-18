@@ -1,5 +1,5 @@
 // On-board unit sprites — the painted board pieces that stand on the team coin
-// (assets/units/<type>.png by default, or a skin asset when equipped). This REPLACES the carved SVG
+// (assets/units/<type>.webp by default, or a skin asset when equipped). This REPLACES the carved SVG
 // figurine as the on-board token (unitRenderer.js falls back to the figurine only
 // for a type with no sprite registered). Pure presentation, so it lives in ui/ and
 // keeps core/ free of asset framing data.
@@ -105,7 +105,7 @@ export const BOARD_SPRITES = Object.freeze({
   ghoul:       sprite("ghoul", { scale: 0.82 })
 });
 
-function sprite(type, { scale = 1, src = `assets/units/${type}.png`, w = 600, h = 600, box = PORTRAITS[type]?.box } = {}) {
+function sprite(type, { scale = 1, src = `assets/units/${type}.webp`, w = 600, h = 600, box = PORTRAITS[type]?.box } = {}) {
   return Object.freeze({ src, w, h, scale, box });
 }
 

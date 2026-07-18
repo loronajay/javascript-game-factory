@@ -24,7 +24,7 @@ test("campaign map uses the painted image and hides scrollbars for drag panning"
   assert.match(mapRule, /cursor\s*:\s*grab/);
   assert.match(mapRule, /scrollbar-width\s*:\s*none/);
   assert.match(mapRule, /overflow\s*:\s*hidden/);
-  assert.match(canvasRule, /campaign-map\.png/);
+  assert.match(canvasRule, /campaign-map\.webp/);
 });
 
 test("empty campaign squad slots show the full choose-unit prompt", () => {
