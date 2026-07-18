@@ -26,7 +26,7 @@ export function syncScreenMusic(audio, screenName) {
   else audio.startMusic("menu");
 }
 
-export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, onCampaignMissionSelected, onCampaignMapEntered, openCodex, onLeaveMatch }) {
+export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, onCampaignMissionSelected, onCampaignMapEntered, openCodex, onLeaveMatch, syncGameProgress = () => {} }) {
   const screens = new ScreenManager();
   const $ = (sel, root = document) => root.querySelector(sel);
   const screenEl = (name) => $(`[data-screen="${name}"]`);
@@ -88,6 +88,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     onCampaignMissionSelected,
     onCampaignMapEntered,
     startCampaignMission: (config) => { void startCampaignMatchTracked(config); },
+    syncGameProgress,
   });
   screens.register("campaign", { el: campaignMap.el, onEnter: campaignMap.onEnter });
 

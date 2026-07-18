@@ -1,5 +1,6 @@
 import { readUnlockProgress, writeUnlockProgress } from "./unlocks.js";
 import { startValorBoostsForGain } from "./inventory.js";
+import { buildCampaignValorClaim, enqueueGameProgressClaim } from "../platform/gameProgressClient.js";
 
 export const ONLINE_MATCH_WIN_VALOR_REWARD = 35;
 export const ONLINE_MATCH_LOSS_VALOR_REWARD = 10;
@@ -48,6 +49,11 @@ export function grantCampaignMissionValor(storage = globalThis.localStorage, mis
     valorBalance: progress.valorBalance + grant.valorGranted,
     campaignValorRewards: [...progress.campaignValorRewards, missionId],
   });
+  enqueueGameProgressClaim(storage, buildCampaignValorClaim({
+    missionId,
+    amount: grant.valorGranted,
+    stars: options.stars,
+  }));
   return { accepted: true, valorReward: valorBaseReward, ...grant, progress: next };
 }
 

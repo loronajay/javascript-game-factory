@@ -12,6 +12,12 @@ import {
   writeUnlockProgress
 } from "../progression/unlocks.js";
 import { enqueueDraftBattleUnlockAnnouncement, enqueueUnitUnlockAnnouncements, enqueueValorGainAnnouncement } from "../progression/announcements.js";
+import {
+  buildTutorialCompleteClaim,
+  buildTutorialUnitRewardClaim,
+  buildTutorialValorClaim,
+  enqueueGameProgressClaim,
+} from "../platform/gameProgressClient.js";
 
 import { TUTORIAL_CATALOG, TUTORIAL_IDS } from "./tutorialContent.js";
 
@@ -19,6 +25,7 @@ export function completeTutorial(storage, tutorialId) {
   const current = readProgress(storage);
   const previouslyComplete = current.allTutorialsComplete;
   const completed = new Set(current.completedTutorials);
+  const shouldClaimTutorialComplete = TUTORIAL_IDS.includes(tutorialId) && !completed.has(tutorialId);
   if (TUTORIAL_IDS.includes(tutorialId)) completed.add(tutorialId);
 
   const completedTutorials = TUTORIAL_IDS.filter((id) => completed.has(id));
@@ -31,11 +38,21 @@ export function completeTutorial(storage, tutorialId) {
     valorBalance: current.valorBalance + (shouldGrantTutorialValor ? TUTORIAL_VALOR_REWARD : 0),
     tutorialValorGranted: current.tutorialValorGranted || shouldGrantTutorialValor,
   });
+  if (shouldClaimTutorialComplete) {
+    enqueueGameProgressClaim(storage, buildTutorialCompleteClaim({ tutorialId }));
+  }
   if (!previouslyComplete && next.allTutorialsComplete) {
     enqueueUnitUnlockAnnouncements(storage, [TUTORIAL_JUGGERNAUT_REWARD_UNIT]);
     enqueueDraftBattleUnlockAnnouncement(storage);
   }
   if (shouldGrantTutorialValor) {
+    enqueueGameProgressClaim(storage, buildTutorialValorClaim({
+      amount: TUTORIAL_VALOR_REWARD,
+      completedTutorials,
+    }));
+    enqueueGameProgressClaim(storage, buildTutorialUnitRewardClaim({
+      type: TUTORIAL_JUGGERNAUT_REWARD_UNIT,
+    }));
     enqueueValorGainAnnouncement(storage, {
       id: "tutorials-complete",
       amount: TUTORIAL_VALOR_REWARD,

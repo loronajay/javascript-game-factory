@@ -32,6 +32,7 @@ import { createCampaignPresentationController } from "./campaign/campaignPresent
 import { createMatchLifecycleController } from "./match/matchLifecycleController.js";
 import { isTempoBattle, isTempoUnitReady } from "./core/tempoBattle.js";
 import { createCampaignMeta } from "./campaign/campaignMeta.js";
+import { flushPendingGameProgressClaims } from "./platform/gameProgressClient.js";
 
 // --- DOM refs ---
 const board = document.querySelector("#boardSvg");
@@ -108,6 +109,10 @@ let tempoBusy = false;
 let campaignMeta = createCampaignMeta();
 
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+function syncGameProgress() {
+  return flushPendingGameProgressClaims({ storage: globalThis.localStorage });
+}
 
 function isCpu(player) {
   return Boolean(cpu && cpu.players.has(player));
@@ -255,7 +260,7 @@ const campaignPresentation = createCampaignPresentationController({
   startMatch,
   storage: globalThis.localStorage,
 });
-const menu = createMenuFlow({ audio, onStartMatch: startMatch, onStartCampaignMission, onCampaignMissionSelected, onCampaignMapEntered, openCodex, onLeaveMatch });
+const menu = createMenuFlow({ audio, onStartMatch: startMatch, onStartCampaignMission, onCampaignMissionSelected, onCampaignMapEntered, openCodex, onLeaveMatch, syncGameProgress });
 const tutorialPresentation = createTutorialPresentationController({
   runtime: {
     get tutorial() { return tutorial; },
@@ -306,6 +311,7 @@ const matchOutcome = createMatchOutcomeController({
   isCpu,
   storage: globalThis.localStorage,
   clock: window,
+  syncGameProgress,
 });
 const resolution = createCommandResolutionController({
   runtime: {
@@ -795,3 +801,4 @@ document.addEventListener("keydown", (event) => {
 
 // --- Boot ---
 menu.show("title");
+void syncGameProgress();

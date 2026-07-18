@@ -73,6 +73,7 @@ export function createCampaignMapScreen({
   onCampaignMissionSelected = null,
   onCampaignMapEntered = null,
   startCampaignMission = () => {},
+  syncGameProgress = () => {},
 } = {}) {
   const $ = (sel, root = document) => root.querySelector(sel);
   const campaignScreen = $('[data-screen="campaign"]');
@@ -416,13 +417,13 @@ export function createCampaignMapScreen({
   // already granted) so the host can play a closing beat only on a real pick.
   async function openCampaignRewardChoice(packId) {
     if (packId && typeof packId === "object") {
-      if (packId.unitPackId) return openCampaignUnitRewardChoice(packId.unitPackId);
-      return openCampaignSkinRewardChoice(packId.skinPackId ?? packId.packId);
+      if (packId.unitPackId) return openCampaignUnitRewardChoice(packId.unitPackId, { missionId: packId.missionId });
+      return openCampaignSkinRewardChoice(packId.skinPackId ?? packId.packId, { missionId: packId.missionId });
     }
     return openCampaignSkinRewardChoice(packId);
   }
 
-  async function openCampaignSkinRewardChoice(packId) {
+  async function openCampaignSkinRewardChoice(packId, options = {}) {
     const choices = getAvailableCampaignSkinRewardChoices(globalThis.localStorage, packId);
     if (!choices?.length || isCampaignSkinRewardGranted(globalThis.localStorage, packId)) return null;
     const copy = CAMPAIGN_REWARD_COPY[packId] ?? DEFAULT_CAMPAIGN_REWARD_COPY;
@@ -440,12 +441,13 @@ export function createCampaignMapScreen({
       })),
     });
     if (!choice) return null;
-    selectCampaignRewardSkin(globalThis.localStorage, packId, choice);
+    selectCampaignRewardSkin(globalThis.localStorage, packId, choice, { missionId: options.missionId });
+    void syncGameProgress();
     if (isActive()) renderCampaign();
     return choice;
   }
 
-  async function openCampaignUnitRewardChoice(packId) {
+  async function openCampaignUnitRewardChoice(packId, options = {}) {
     const choices = getCampaignUnitRewardChoices(packId);
     if (!choices || isCampaignUnitRewardGranted(globalThis.localStorage, packId)) return null;
     const choice = await openRewardSkinPicker({
@@ -464,8 +466,9 @@ export function createCampaignMapScreen({
       })),
     });
     if (!choice) return null;
-    const result = selectCampaignRewardUnit(globalThis.localStorage, packId, choice);
+    const result = selectCampaignRewardUnit(globalThis.localStorage, packId, choice, { missionId: options.missionId });
     if (!result.accepted) return null;
+    void syncGameProgress();
     enqueueUnitUnlockAnnouncements(globalThis.localStorage, [choice]);
     enqueueDraftBattleUnlockAnnouncement(globalThis.localStorage);
     if (isActive()) renderCampaign();

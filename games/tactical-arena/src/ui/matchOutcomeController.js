@@ -65,6 +65,7 @@ export function createMatchOutcomeController({
   isCpu,
   storage = globalThis.localStorage,
   clock = globalThis,
+  syncGameProgress = () => {},
 } = {}) {
   // The mirror image: a beat that plays when the PLAYER loses, between the final blow and the
   // results screen. Only the finale has one, and only for one specific way of losing —
@@ -111,6 +112,7 @@ export function createMatchOutcomeController({
       const campaignMissionId = runtime.campaignMissionId;
       if (runtime.matchConfig?.mode === "campaign" && campaignMissionId) {
         summary.campaign = completeCampaignMission(storage, campaignMissionId, state, { ...runtime.campaignMeta });
+        void syncGameProgress();
         // Choice-reward missions run their reward pick on the map AFTER results.
         // Only queue it on a win whose reward hasn't already been
         // granted, and force the results screen to route back through the map so the

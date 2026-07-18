@@ -3,6 +3,10 @@ const VALID_CLAIM_KINDS = new Set([
     "campaign-valor",
     "campaign-skin-choice",
     "campaign-unit-choice",
+    "tutorial-complete",
+    "tutorial-valor",
+    "tutorial-unit-reward",
+    "tutorial-skin-choice",
 ]);
 function cleanText(value, maxLength = 200) {
     return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -144,7 +148,7 @@ export async function recordGameProgressClaim(pool, params = {}) {
     const claimId = cleanText(params.claimId, 200);
     const kind = cleanText(params.kind, 80);
     const payload = normalizePayload(params.payload);
-    const sourceId = cleanText(params.sourceId || payload.missionId || payload.packId || "", 200);
+    const sourceId = cleanText(params.sourceId || payload.missionId || payload.packId || payload.tutorialId || "", 200);
     if (!pool || !playerId || !gameSlug || !claimId || !VALID_CLAIM_KINDS.has(kind))
         return null;
     const client = await pool.connect();
@@ -185,6 +189,24 @@ export async function recordGameProgressClaim(pool, params = {}) {
                 await grantEntitlement(client, playerId, gameSlug, entitlement, "campaign", sourceId || missionId);
             if (missionId)
                 await markCampaignProgress(client, playerId, gameSlug, missionId, { stars: payload.stars, rewardClaimedAt: new Date().toISOString() });
+        }
+        else if (!alreadyProcessed && kind === "tutorial-valor") {
+            const amount = clampInt(payload.amount, { min: 0, max: 100000 });
+            if (amount > 0) {
+                await client.query(`update game_progress_profiles
+           set valor_balance = valor_balance + $3, updated_at = now()
+           where player_id = $1 and game_slug = $2`, [playerId, gameSlug, amount]);
+            }
+        }
+        else if (!alreadyProcessed && kind === "tutorial-skin-choice") {
+            const entitlement = buildSkinEntitlement(payload);
+            if (entitlement)
+                await grantEntitlement(client, playerId, gameSlug, entitlement, "tutorial", sourceId);
+        }
+        else if (!alreadyProcessed && kind === "tutorial-unit-reward") {
+            const entitlement = buildUnitEntitlement(payload);
+            if (entitlement)
+                await grantEntitlement(client, playerId, gameSlug, entitlement, "tutorial", sourceId);
         }
         await client.query("commit");
         return {

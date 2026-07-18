@@ -1,3 +1,10 @@
+import {
+  buildCampaignSkinChoiceClaim,
+  buildCampaignUnitChoiceClaim,
+  buildTutorialSkinChoiceClaim,
+  enqueueGameProgressClaim,
+} from "../platform/gameProgressClient.js";
+
 export const TUTORIAL_PROGRESS_KEY = "tacticalArenaTutorialProgressV2";
 export const LEGACY_TUTORIAL_PROGRESS_KEY = "tacticalArenaTutorialProgress";
 export const TUTORIAL_JUGGERNAUT_REWARD_UNIT = "juggernaut";
@@ -267,6 +274,7 @@ export function selectTutorialRewardSkin(storage = defaultStorage(), choice) {
     rewardGranted: true,
     unlockedSkins: [...progress.unlockedSkins, selectedRewardSkin],
   });
+  enqueueGameProgressClaim(storage, buildTutorialSkinChoiceClaim({ choice: selectedRewardSkin }));
   return { accepted: true, progress: next };
 }
 
@@ -317,7 +325,7 @@ export function isCampaignUnitRewardGranted(storage = defaultStorage(), packId) 
 
 // Grant one skin from a campaign pack. Wandering can be earned again only after
 // progress reset clears its run marker; all packs reject a second pick in the same run.
-export function selectCampaignRewardSkin(storage = defaultStorage(), packId, choice) {
+export function selectCampaignRewardSkin(storage = defaultStorage(), packId, choice, options = {}) {
   const progress = readUnlockProgress(storage);
   const choices = CAMPAIGN_SKIN_PACKS[packId];
   if (!choices) {
@@ -337,10 +345,16 @@ export function selectCampaignRewardSkin(storage = defaultStorage(), packId, cho
     ...progress,
     campaignRewardSkins: { ...progress.campaignRewardSkins, [packId]: { type: selected.type, slug: selected.slug } },
   });
+  enqueueGameProgressClaim(storage, buildCampaignSkinChoiceClaim({
+    packId,
+    choice: selected,
+    missionId: options.missionId,
+    stars: options.stars,
+  }));
   return { accepted: true, progress: next };
 }
 
-export function selectCampaignRewardUnit(storage = defaultStorage(), packId, choice) {
+export function selectCampaignRewardUnit(storage = defaultStorage(), packId, choice, options = {}) {
   const progress = readUnlockProgress(storage);
   const choices = CAMPAIGN_UNIT_PACKS[packId];
   if (!choices) {
@@ -357,6 +371,12 @@ export function selectCampaignRewardUnit(storage = defaultStorage(), packId, cho
     ...progress,
     campaignRewardUnits: { ...progress.campaignRewardUnits, [packId]: selected },
   });
+  enqueueGameProgressClaim(storage, buildCampaignUnitChoiceClaim({
+    packId,
+    choice: selected,
+    missionId: options.missionId,
+    stars: options.stars,
+  }));
   return { accepted: true, progress: next };
 }
 

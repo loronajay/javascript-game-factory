@@ -38,6 +38,11 @@ import { getUnitType } from "../core/unitCatalog.js";
 import { STARTER_UNIT_TYPES, readUnlockProgress, writeUnlockProgress } from "../progression/unlocks.js";
 import { grantCampaignMissionValor } from "../progression/valorRewards.js";
 import { enqueueDraftBattleUnlockAnnouncement, enqueueSkinUnlockAnnouncements, enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
+import {
+  buildCampaignSkinRewardClaim,
+  buildCampaignUnitRewardClaim,
+  enqueueGameProgressClaim,
+} from "../platform/gameProgressClient.js";
 import { getCampaignMission } from "./campaignModel.js";
 import { defaultStorage, readCampaignProgress, writeCampaignProgress } from "./campaignProgress.js";
 
@@ -534,7 +539,7 @@ export function completeCampaignMission(storage = defaultStorage(), missionId, s
     },
   });
 
-  const valorGrant = grantCampaignMissionValor(storage, missionId, valorReward);
+  const valorGrant = grantCampaignMissionValor(storage, missionId, valorReward, { stars: evaluation.stars });
   const unlockProgress = valorGrant.progress;
   const existing = new Set(unlockProgress.unlockedUnits);
   const newRewardUnits = evaluation.rewardUnits.filter((type) => !existing.has(type));
@@ -549,6 +554,20 @@ export function completeCampaignMission(storage = defaultStorage(), missionId, s
       ...rewardSkins,
     ],
   });
+  for (const type of newRewardUnits) {
+    enqueueGameProgressClaim(storage, buildCampaignUnitRewardClaim({
+      missionId,
+      type,
+      stars: evaluation.stars,
+    }));
+  }
+  for (const skin of newRewardSkins) {
+    enqueueGameProgressClaim(storage, buildCampaignSkinRewardClaim({
+      missionId,
+      skin,
+      stars: evaluation.stars,
+    }));
+  }
   enqueueUnitUnlockAnnouncements(storage, newRewardUnits);
   enqueueSkinUnlockAnnouncements(storage, newRewardSkins);
   enqueueDraftBattleUnlockAnnouncement(storage);
