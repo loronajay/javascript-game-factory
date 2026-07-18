@@ -146,6 +146,52 @@ test("every Fuck Cancer skin is legendary charity-pack metadata", () => {
   }
 });
 
+test("new fat squad collection skins use authored rarity and pack metadata", () => {
+  const fatSquad = ["fat-knight", "fat-wizard", "fat-cleric", "fat-bowman"];
+
+  for (const type of fatSquad) {
+    const bloodMoon = getSkin(type, "blood-moon");
+    assert.equal(bloodMoon.rarity, "epic", `${type} Blood Moon rarity`);
+    assert.equal(bloodMoon.price.cents, 299, `${type} Blood Moon price`);
+    assert.equal(bloodMoon.packId, "blood-moon", `${type} Blood Moon pack id`);
+    assert.equal(bloodMoon.packName, "Blood Moon Pack", `${type} Blood Moon pack name`);
+
+    const southernKingdom = getSkin(type, "southern-kingdom");
+    assert.equal(southernKingdom.rarity, "legendary", `${type} Southern Kingdom rarity`);
+    assert.equal(southernKingdom.price.cents, 399, `${type} Southern Kingdom price`);
+    assert.equal(southernKingdom.packId, "southern-kingdom", `${type} Southern Kingdom pack id`);
+    assert.equal(southernKingdom.packName, "Southern Kingdom Pack", `${type} Southern Kingdom pack name`);
+
+    const gothicWarrior = getSkin(type, "gothic-warrior");
+    assert.equal(gothicWarrior.rarity, "epic", `${type} Gothic Warrior rarity`);
+    assert.equal(gothicWarrior.price.cents, 299, `${type} Gothic Warrior price`);
+    assert.equal(gothicWarrior.packId, null, `${type} Gothic Warrior should stay a single skin`);
+
+    const tattered = getSkin(type, "tattered");
+    assert.equal(tattered.rarity, "common", `${type} Tattered rarity`);
+    assert.equal(tattered.price.cents, 99, `${type} Tattered price`);
+    assert.equal(tattered.packId, null, `${type} Tattered should stay a single skin`);
+
+    const wandering = getSkin(type, "wandering");
+    assert.equal(wandering.rarity, "common", `${type} Wandering rarity`);
+    assert.equal(wandering.price.cents, 99, `${type} Wandering price`);
+    assert.equal(wandering.packId, null, `${type} Wandering should stay outside paid skin packs`);
+  }
+});
+
+test("all Southern Kingdom skins are legendary pack skins", () => {
+  const entries = SKIN_MANIFEST.filter((entry) => entry.slug === "southern-kingdom");
+
+  assert.equal(entries.length, 8);
+  for (const entry of entries) {
+    const skin = getSkin(entry.type, entry.slug);
+    assert.equal(skin.rarity, "legendary", `${entry.type} Southern Kingdom rarity`);
+    assert.equal(skin.price.cents, 399, `${entry.type} Southern Kingdom price`);
+    assert.equal(skin.packId, "southern-kingdom", `${entry.type} Southern Kingdom pack id`);
+    assert.equal(skin.packName, "Southern Kingdom Pack", `${entry.type} Southern Kingdom pack name`);
+  }
+});
+
 test("unknown or locked skin slugs normalize to classic (every skin is currently locked)", () => {
   assert.equal(normalizeSkinSlug("swordsman", "summer-vibes"), null);
   assert.equal(normalizeSkinSlug("swordsman", "not-real"), null);

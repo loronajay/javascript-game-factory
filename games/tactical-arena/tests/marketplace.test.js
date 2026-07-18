@@ -94,6 +94,39 @@ test("skin pack offers use authored pack metadata and exclude separate Halloween
   );
 });
 
+test("expanded fat squad skin packs expose updated counts, rarities, and prices", () => {
+  const storage = storageAdapter();
+  const bloodMoon = getSkinPackOffer("blood-moon", storage);
+  const southernKingdom = getSkinPackOffer("southern-kingdom", storage);
+
+  assert.ok(bloodMoon, "Blood Moon Pack should be offered");
+  assert.equal(bloodMoon.skinCount, 19);
+  assert.equal(bloodMoon.unownedSkinCount, 19);
+  assert.equal(bloodMoon.rarityCounts.epic, 19);
+  assert.equal(bloodMoon.individualPrice.cents, 5681);
+  assert.equal(bloodMoon.individualValorPrice.amount, 42750);
+  assert.equal(bloodMoon.price.cents, 2999);
+  assert.equal(bloodMoon.valorPrice.amount, 24000);
+  for (const type of ["fat-knight", "fat-wizard", "fat-cleric", "fat-bowman"]) {
+    assert.ok(bloodMoon.skins.some((skin) => skin.type === type && skin.slug === "blood-moon"), `${type} Blood Moon skin should be in the pack`);
+  }
+
+  assert.ok(southernKingdom, "Southern Kingdom Pack should be offered");
+  assert.equal(southernKingdom.skinCount, 8);
+  assert.equal(southernKingdom.unownedSkinCount, 8);
+  assert.equal(southernKingdom.rarityCounts.legendary, 8);
+  assert.equal(southernKingdom.individualPrice.cents, 3192);
+  assert.equal(southernKingdom.individualValorPrice.amount, 22800);
+  assert.equal(southernKingdom.price.cents, 2399);
+  assert.equal(southernKingdom.valorPrice.amount, 17250);
+  for (const type of ["fat-knight", "fat-wizard", "fat-cleric", "fat-bowman"]) {
+    assert.ok(
+      southernKingdom.skins.some((skin) => skin.type === type && skin.slug === "southern-kingdom"),
+      `${type} Southern Kingdom skin should be in the pack`
+    );
+  }
+});
+
 test("Fuck Cancer charity pack offers every unit skin with charity labeling", () => {
   const storage = storageAdapter();
   const charity = getSkinPackOffer("fuck-cancer", storage);

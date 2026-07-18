@@ -728,6 +728,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "fat-knight",
+    slug: "blood-moon",
+    file: "blood-moon-fat-knight.png"
+  },
+  {
+    type: "fat-knight",
     slug: "franken-fatigue",
     file: "franken-fatigue-fat-knight.png"
   },
@@ -735,6 +740,26 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "fat-knight",
     slug: "fuck-cancer",
     file: "fuck-cancer-fat-knight.png"
+  },
+  {
+    type: "fat-knight",
+    slug: "gothic-warrior",
+    file: "gothic-warrior-fat-knight.png"
+  },
+  {
+    type: "fat-knight",
+    slug: "southern-kingdom",
+    file: "southern-kingdom-fat-knight.png"
+  },
+  {
+    type: "fat-knight",
+    slug: "tattered",
+    file: "tattered-fat-knight.png"
+  },
+  {
+    type: "fat-knight",
+    slug: "wandering",
+    file: "wandering-fat-knight.png"
   },
   {
     type: "fat-wizard",
@@ -753,6 +778,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "fat-wizard",
+    slug: "blood-moon",
+    file: "blood-moon-fat-wizard.png"
+  },
+  {
+    type: "fat-wizard",
     slug: "fire-mage",
     file: "fire-mage-fat-wizard.png"
   },
@@ -760,6 +790,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "fat-wizard",
     slug: "fuck-cancer",
     file: "fuck-cancer-fat-wizard.png"
+  },
+  {
+    type: "fat-wizard",
+    slug: "gothic-warrior",
+    file: "gothic-warrior-fat-wizard.png"
   },
   {
     type: "fat-wizard",
@@ -778,8 +813,23 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "fat-wizard",
+    slug: "southern-kingdom",
+    file: "southern-kingdom-fat-wizard.png"
+  },
+  {
+    type: "fat-wizard",
+    slug: "tattered",
+    file: "tattered-fat-wizard.png"
+  },
+  {
+    type: "fat-wizard",
     slug: "void-magic",
     file: "void-magic-fat-wizard.png"
+  },
+  {
+    type: "fat-wizard",
+    slug: "wandering",
+    file: "wandering-fat-wizard.png"
   },
   {
     type: "fat-cleric",
@@ -793,8 +843,18 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "fat-cleric",
+    slug: "blood-moon",
+    file: "blood-moon-fat-cleric.png"
+  },
+  {
+    type: "fat-cleric",
     slug: "fuck-cancer",
     file: "fuck-cancer-fat-cleric.png"
+  },
+  {
+    type: "fat-cleric",
+    slug: "gothic-warrior",
+    file: "gothic-warrior-fat-cleric.png"
   },
   {
     type: "fat-cleric",
@@ -808,6 +868,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "fat-cleric",
+    slug: "southern-kingdom",
+    file: "southern-kingdom-fat-cleric.png"
+  },
+  {
+    type: "fat-cleric",
     slug: "sun-goddess",
     file: "sun-goddess-fat-cleric.png"
   },
@@ -815,6 +880,16 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "fat-cleric",
     slug: "sweet-bliss-angel",
     file: "sweet-bliss-angel-fat-cleric.png"
+  },
+  {
+    type: "fat-cleric",
+    slug: "tattered",
+    file: "tattered-fat-cleric.png"
+  },
+  {
+    type: "fat-cleric",
+    slug: "wandering",
+    file: "wandering-fat-cleric.png"
   },
   {
     type: "fat-bowman",
@@ -825,6 +900,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "fat-bowman",
     slug: "arcane",
     file: "arcane-fat-bowman.png"
+  },
+  {
+    type: "fat-bowman",
+    slug: "blood-moon",
+    file: "blood-moon-fat-bowman.png"
   },
   {
     type: "fat-bowman",
@@ -843,6 +923,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "fat-bowman",
+    slug: "gothic-warrior",
+    file: "gothic-warrior-fat-bowman.png"
+  },
+  {
+    type: "fat-bowman",
     slug: "kitty-kat",
     file: "kitty-kat-fat-bowman.png"
   },
@@ -853,8 +938,23 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "fat-bowman",
+    slug: "southern-kingdom",
+    file: "southern-kingdom-fat-bowman.png"
+  },
+  {
+    type: "fat-bowman",
+    slug: "tattered",
+    file: "tattered-fat-bowman.png"
+  },
+  {
+    type: "fat-bowman",
     slug: "violet",
     file: "violet-fat-bowman.png"
+  },
+  {
+    type: "fat-bowman",
+    slug: "wandering",
+    file: "wandering-fat-bowman.png"
   },
   {
     type: "miner",
