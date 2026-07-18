@@ -267,6 +267,11 @@ test("the document exposes the mobile playability shell", () => {
     /@media \(pointer: coarse\)[\s\S]*?button\s*\{[\s\S]*?min-height: 44px/,
     "touch targets need a comfortable minimum button height on coarse pointers",
   );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\)[\s\S]*?\.squad-overlays\s*\{[\s\S]*?display:\s*none/,
+    "touch and tablet boards should not have corner squad rails covering playable board tiles",
+  );
 
   // Unit touch target = the unit's own tile diamond (see unitRenderer.js), so a
   // tall figurine that overhangs tiles behind it never steals their taps.

@@ -18,6 +18,10 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  .squad-overlays {
+    display: none;
+  }
+
   .roster-modal {
     padding:
       max(.35rem, env(safe-area-inset-top))
