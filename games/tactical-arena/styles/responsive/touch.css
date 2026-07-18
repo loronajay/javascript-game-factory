@@ -26,7 +26,8 @@
       max(.35rem, env(safe-area-inset-left));
   }
 
-  .skin-picker-modal {
+  .skin-picker-modal,
+  .shop-modal {
     padding:
       max(.35rem, env(safe-area-inset-top))
       max(.35rem, env(safe-area-inset-right))
@@ -42,6 +43,12 @@
   }
 
   .skin-picker-card {
+    height: calc(var(--app-height, 100vh) - .7rem);
+    max-height: calc(var(--app-height, 100vh) - .7rem);
+    border-radius: 10px;
+  }
+
+  .shop-card {
     height: calc(var(--app-height, 100vh) - .7rem);
     max-height: calc(var(--app-height, 100vh) - .7rem);
     border-radius: 10px;

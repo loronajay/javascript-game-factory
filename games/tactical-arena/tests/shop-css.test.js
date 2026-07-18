@@ -19,3 +19,16 @@ test("skin pack detail tiles keep fixed rows instead of stretching with the view
   assert.match(tileRule, /height\s*:\s*6\.85rem/);
   assert.match(tileRule, /grid-template-rows\s*:\s*3\.9rem auto auto/);
 });
+
+test("shop purchase controls keep Valor prices readable on cramped mobile layouts", () => {
+  const buyRule = ruleBody(".shop-buy-btn");
+  const priceRule = ruleBody(".shop-buy-btn .shop-price");
+  const amountRule = ruleBody(".shop-buy-btn .valor-amount");
+
+  assert.match(buyRule, /line-height\s*:\s*1\.05/);
+  assert.match(buyRule, /overflow-wrap\s*:\s*anywhere/);
+  assert.match(priceRule, /white-space\s*:\s*normal/);
+  assert.match(priceRule, /overflow\s*:\s*visible/);
+  assert.match(amountRule, /overflow\s*:\s*visible/);
+  assert.match(amountRule, /text-overflow\s*:\s*clip/);
+});

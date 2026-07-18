@@ -199,6 +199,26 @@ test("the document exposes the mobile playability shell", () => {
   );
   assert.match(
     responsiveCss,
+    /@media \(pointer: coarse\)[\s\S]*?\.shop-card\s*\{[\s\S]*?height:\s*calc\(var\(--app-height,\s*100vh\) - \.7rem\)/,
+    "touch shop modals should use the live viewport height instead of overflowing mobile browser chrome",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.shop-pack-detail\s*\{[\s\S]*?grid-template-areas:\s*"top contents"\s*"hero contents"\s*"actions contents"[\s\S]*?\.shop-pack-contents\s*\{[\s\S]*?grid-area:\s*contents[\s\S]*?min-height:\s*0/,
+    "skin pack details should give pack contents the full short-landscape height instead of a tiny middle row",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.shop-unit-purchase-actions,\s*\.shop-pack-purchase-actions,\s*\.shop-skin-actions\s*\{[\s\S]*?grid-template-columns:\s*1fr/,
+    "short landscape shop buy actions should stack so Valor amounts do not truncate",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.skin-picker-preview\s*\{[\s\S]*?grid-template-columns:\s*4\.6rem minmax\(0,\s*1fr\)[\s\S]*?\.skin-picker-select-btn\s*\{[\s\S]*?width:\s*100%/,
+    "reward skin picker preview should become a compact strip with a visible select button in short landscape",
+  );
+  assert.match(
+    responsiveCss,
     /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.draft-formation-board\s*\{[\s\S]*?min-height:\s*0[\s\S]*?height:\s*clamp\(11rem,\s*54vh,\s*15rem\)[\s\S]*?\.draft-formation-card \.roster-foot\s*\{[\s\S]*?padding:\s*\.45rem \.7rem/,
     "formation editor should bound the board height and keep footer buttons reachable",
   );
