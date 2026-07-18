@@ -23,6 +23,11 @@
 .skin-picker-foot .menu-btn { width:auto; min-width:7rem; }
 .skin-gallery-modal { z-index:56; }
 .skin-gallery-card { width:min(60rem,96vw); height:min(45rem,90vh); }
+.skin-gallery-tools { display:flex; justify-content:flex-end; min-width:0; margin-top:.55rem; }
+.skin-gallery-toggle { display:inline-flex; align-items:center; gap:.48rem; min-width:0; padding:.36rem .58rem; border:1px solid rgba(188,214,236,.18); border-radius:7px; background:rgba(8,18,32,.58); color:var(--text); cursor:pointer; user-select:none; }
+.skin-gallery-toggle:hover { border-color:var(--brass); filter:brightness(1.08); }
+.skin-gallery-toggle-input { flex:0 0 auto; width:1rem; height:1rem; margin:0; accent-color:var(--brass); cursor:pointer; }
+.skin-gallery-toggle-text { color:var(--text); font:900 .58rem var(--font-display); letter-spacing:.09em; text-transform:uppercase; white-space:nowrap; }
 .skin-gallery-body { flex:1; min-height:0; overflow-y:auto; display:grid; align-content:start; gap:1rem; padding:1rem; }
 .skin-gallery-section { display:grid; gap:.7rem; }
 .skin-gallery-title { margin:0; color:color-mix(in srgb,var(--brass) 70%,var(--muted)); font:800 .66rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
@@ -50,6 +55,9 @@
 .skin-gallery-detail-title { margin:0; color:var(--brass-hi); font:900 1.25rem var(--font-display); letter-spacing:.04em; }
 .skin-gallery-detail-status { color:var(--muted); font:800 .56rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
 .skin-gallery-detail-note { max-width:28rem; color:#f0d68f; font:800 .68rem var(--font-display); letter-spacing:.04em; line-height:1.35; }
+.skin-gallery-empty { display:grid; place-items:center; gap:.35rem; min-height:18rem; padding:1rem; border:1px dashed rgba(203,159,85,.35); border-radius:8px; background:rgba(8,18,30,.28); text-align:center; }
+.skin-gallery-empty-title { color:var(--text); font:900 1rem var(--font-display); letter-spacing:.05em; text-transform:uppercase; }
+.skin-gallery-empty-sub { color:var(--muted); font:700 .72rem var(--font-display); letter-spacing:.04em; }
 
 /* Marketplace */
 .shop-card { width:min(64rem,96vw); height:min(45rem,90vh); }

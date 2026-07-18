@@ -37,6 +37,23 @@ export function openSkinGallery({ initial = null, storage = globalThis.localStor
   closeBtn.setAttribute("aria-label", "Close");
   titleRow.appendChild(closeBtn);
   head.appendChild(titleRow);
+  let showUnowned = true;
+  if (!viewerOnly) {
+    const tools = el("div", "skin-gallery-tools");
+    const toggle = el("label", "skin-gallery-toggle");
+    const toggleInput = el("input", "skin-gallery-toggle-input");
+    toggleInput.type = "checkbox";
+    toggleInput.checked = showUnowned;
+    toggleInput.setAttribute("aria-label", "Show Unowned");
+    toggle.append(toggleInput, el("span", "skin-gallery-toggle-text", "Show Unowned"));
+    tools.appendChild(toggle);
+    head.appendChild(tools);
+    toggleInput.addEventListener("change", () => {
+      showUnowned = Boolean(toggleInput.checked);
+      savedScrollTop = 0;
+      renderList();
+    });
+  }
   card.appendChild(head);
 
   const body = el("div", "skin-gallery-body");
@@ -45,12 +62,14 @@ export function openSkinGallery({ initial = null, storage = globalThis.localStor
 
   function renderList() {
     body.replaceChildren();
+    let renderedSkinCount = 0;
     for (const group of groupedUnitTypes(Object.keys(UNIT_TYPES))) {
       const section = el("section", "skin-gallery-section");
       section.appendChild(el("h3", "skin-gallery-title", group.label));
+      let renderedUnitCount = 0;
       for (const type of group.types) {
         const def = UNIT_TYPES[type];
-        const skins = getUnitSkins(type, storage);
+        const skins = getUnitSkins(type, storage).filter((skin) => showUnowned || skin.unlocked);
         if (!skins.length) continue;
         const unitSection = el("section", "skin-gallery-unit-section");
         unitSection.dataset.type = type;
@@ -81,8 +100,18 @@ export function openSkinGallery({ initial = null, storage = globalThis.localStor
         }
         unitSection.append(unitHead, grid);
         section.appendChild(unitSection);
+        renderedUnitCount += 1;
+        renderedSkinCount += skins.length;
       }
-      body.appendChild(section);
+      if (renderedUnitCount > 0) body.appendChild(section);
+    }
+    if (renderedSkinCount === 0) {
+      const empty = el("section", "skin-gallery-empty");
+      empty.append(
+        el("b", "skin-gallery-empty-title", "No Owned Skins"),
+        el("span", "skin-gallery-empty-sub", "Owned skins will appear here.")
+      );
+      body.appendChild(empty);
     }
     body.scrollTop = savedScrollTop;
   }

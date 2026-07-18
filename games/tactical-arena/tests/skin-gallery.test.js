@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { writeUnlockProgress } from "../src/progression/unlocks.js";
 import { openSkinGallery, openSkinViewer } from "../src/ui/skinGallery.js";
 
 class FakeClassList {
@@ -109,6 +110,21 @@ function hasClass(node, className) {
   return node.className.split(/\s+/).includes(className);
 }
 
+function storageAdapter() {
+  const values = new Map();
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: (key) => values.delete(key),
+  };
+}
+
+function trigger(node, type) {
+  for (const handler of node.listeners.get(type) ?? []) {
+    handler({ target: node });
+  }
+}
+
 test("skin gallery entries are buttons that open and close an enlarged skin view", () => {
   globalThis.document = new FakeDocument();
 
@@ -209,4 +225,34 @@ test("skin gallery nests skin cards under unit shelves inside each class", () =>
   const buttons = walk(swordsmanShelf, (node) => node.tagName === "BUTTON" && hasClass(node, "skin-gallery-item"));
   assert.ok(buttons.length > 0);
   assert.ok(buttons.every((button) => button.dataset.type === "swordsman"));
+});
+
+test("skin gallery can hide unowned skins with the Show Unowned toggle", () => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, {
+    purchasedSkins: [{ type: "swordsman", slug: "medieval" }],
+  });
+
+  openSkinGallery({ storage });
+
+  const overlay = document.body.children[0];
+  const toggle = walk(overlay, (node) => node.tagName === "INPUT" && hasClass(node, "skin-gallery-toggle-input"))[0];
+  assert.ok(toggle, "gallery should render a Show Unowned checkbox");
+  assert.equal(toggle.checked, true);
+  assert.ok(walk(overlay, (node) => node.textContent === "Show Unowned").length > 0);
+  assert.ok(walk(overlay, (node) => hasClass(node, "skin-gallery-item") && hasClass(node, "is-locked")).length > 0);
+
+  toggle.checked = false;
+  trigger(toggle, "change");
+
+  const filteredItems = walk(overlay, (node) => hasClass(node, "skin-gallery-item"));
+  assert.ok(filteredItems.length > 0, "owned skins should remain visible");
+  assert.equal(filteredItems.some((node) => hasClass(node, "is-locked")), false);
+  assert.ok(filteredItems.some((node) => node.dataset.type === "swordsman" && node.dataset.skin === "medieval"));
+
+  toggle.checked = true;
+  trigger(toggle, "change");
+
+  assert.ok(walk(overlay, (node) => hasClass(node, "skin-gallery-item") && hasClass(node, "is-locked")).length > 0);
 });
