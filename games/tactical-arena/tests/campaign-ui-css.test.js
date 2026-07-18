@@ -27,6 +27,15 @@ test("campaign map uses the painted image and hides scrollbars for drag panning"
   assert.match(canvasRule, /campaign-map\.png/);
 });
 
+test("empty campaign squad slots show the full choose-unit prompt", () => {
+  const squadRule = ruleBody(".campaign-squad");
+  const emptyPromptRule = ruleBody(".campaign-squad-slot.is-empty .campaign-squad-slot-main i");
+
+  assert.match(squadRule, /minmax\(min\(100%,10\.5rem\),1fr\)/);
+  assert.match(emptyPromptRule, /text-overflow\s*:\s*clip/);
+  assert.match(emptyPromptRule, /white-space\s*:\s*normal/);
+});
+
 test("campaign locked nodes defer to the painted map instead of drawing token clutter", () => {
   const lockedRule = ruleBody(".campaign-node.is-locked");
   const lockedChildrenRule = ruleBody(".campaign-node.is-locked > *");

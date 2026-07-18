@@ -55,10 +55,9 @@
 .campaign-rewards dd .valor-badge.valor-inline { display:inline-flex; font:inherit; color:var(--brass-hi); }
 .campaign-rewards dd .valor-badge.valor-inline .valor-icon { width:.85rem; height:.85rem; }
 .campaign-reward-claim { width:100%; min-height:2.45rem; margin-top:.85rem; padding:.6rem .8rem; font-size:.72rem; }
-/* Fixed track width (no 1fr) so every slot button is the SAME width no matter the
-   squad size or how many slots fit per row — auto-fill just adds/drops columns,
-   it never stretches an existing one to fill leftover space. */
-.campaign-squad { display:grid; grid-template-columns:repeat(auto-fill,8.5rem); justify-content:flex-start; gap:.55rem; }
+/* Give squad slots enough breathing room for their prompts while still dropping
+   columns cleanly inside the narrow campaign panel. */
+.campaign-squad { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,10.5rem),1fr)); justify-content:flex-start; gap:.55rem; }
 .campaign-squad-slot { display:flex; flex-direction:column; gap:.32rem; min-width:0; padding:.5rem; border:1px solid rgba(188,214,236,.25); border-radius:7px; color:var(--text); background:rgba(4,11,19,.38); }
 .campaign-squad-slot:hover { border-color:var(--brass); filter:brightness(1.1); }
 .campaign-squad-slot-main { display:flex; align-items:center; gap:.52rem; min-width:0; padding:0; border:0; background:none; color:inherit; cursor:pointer; text-align:left; font:inherit; }
@@ -69,6 +68,7 @@
 .campaign-squad-slot-main i { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text); font-style:normal; font-weight:800; }
 .campaign-squad-slot.is-empty { border-style:dashed; border-color:rgba(188,214,236,.4); background:rgba(4,11,19,.2); }
 .campaign-squad-slot.is-empty i { color:var(--muted); font-weight:600; }
+.campaign-squad-slot.is-empty .campaign-squad-slot-main i { overflow:visible; text-overflow:clip; white-space:normal; line-height:1.12; }
 .campaign-squad-slot.is-locked { opacity:.85; }
 .campaign-squad-slot.is-locked:hover { border-color:rgba(188,214,236,.25); filter:none; }
 .campaign-squad-slot.is-locked i { color:var(--brass); }
