@@ -22,8 +22,9 @@ test("release audit flags known oversized release assets", async () => {
   const audit = await buildReleaseAudit({ root: GAME_ROOT, topCount: 5 });
   const warningText = audit.warnings.map((warning) => warning.path).join("\n");
 
-  assert.match(warningText, /sounds\/summoner-battle\.mp3/);
   assert.match(warningText, /assets\/campaign-map\.webp/);
+  assert.match(warningText, /assets\/theme-bgs\/verdant\.webp/);
+  assert.doesNotMatch(warningText, /sounds\/summoner-battle\.mp3/);
 });
 
 test("formatBytes uses readable binary units", () => {

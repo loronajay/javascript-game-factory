@@ -9,7 +9,9 @@ import {
   STARTING_VALOR_BALANCE,
   TUTORIAL_VALOR_REWARD,
   TUTORIAL_JUGGERNAUT_REWARD_UNIT,
+  TUTORIAL_PROGRESS_BACKUP_KEY,
   TUTORIAL_PROGRESS_KEY,
+  TUTORIAL_PROGRESS_SEAL_KEY,
   TUTORIAL_REWARD_SKIN_CHOICES,
   VALOR_RESOURCE,
   WANDERING_SKIN_PACK_ID,
@@ -75,6 +77,27 @@ test("fresh profiles start with no Valor for unit purchases", () => {
   assert.equal(STARTING_VALOR_BALANCE, 0);
   assert.equal(progress.valorBalance, 0);
   assert.deepEqual(progress.purchasedSkins, []);
+});
+
+test("forged local unlock payloads roll back to the sealed progress copy", () => {
+  const storage = storageAdapter();
+  grantPremiumSkinPurchase(storage, { type: "swordsman", slug: "medieval" });
+  assert.notEqual(storage.getItem(TUTORIAL_PROGRESS_SEAL_KEY), null);
+  assert.notEqual(storage.getItem(TUTORIAL_PROGRESS_BACKUP_KEY), null);
+
+  storage.setItem(TUTORIAL_PROGRESS_KEY, JSON.stringify({
+    valorBalance: 999999,
+    unlockedUnits: ["summoner"],
+    purchasedSkins: [{ type: "magician", slug: "summer-vibes" }],
+  }));
+
+  const progress = readUnlockProgress(storage);
+
+  assert.equal(progress.valorBalance, STARTING_VALOR_BALANCE);
+  assert.equal(progress.unlockedUnits.includes("summoner"), false);
+  assert.deepEqual(progress.purchasedSkins, [{ type: "swordsman", slug: "medieval" }]);
+  assert.equal(isProgressSkinUnlocked("swordsman", "medieval", storage), true);
+  assert.equal(isProgressSkinUnlocked("magician", "summer-vibes", storage), false);
 });
 
 test("completing all tutorial entries unlocks Juggernaut but waits for a skin choice", () => {

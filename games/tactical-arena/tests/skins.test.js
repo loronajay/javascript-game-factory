@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { UNIT_TYPES } from "../src/core/unitCatalog.js";
 import { createMatchState } from "../src/match/matchBuilder.js";
-import { TUTORIAL_PROGRESS_KEY } from "../src/progression/unlocks.js";
+import { writeUnlockProgress } from "../src/progression/unlocks.js";
 import { getBoardSprite } from "../src/ui/boardSprites.js";
 import { getPortrait } from "../src/ui/portraits.js";
 import { SKIN_MANIFEST } from "../src/ui/skinManifest.generated.js";
@@ -40,12 +40,9 @@ class FakeLocalStorage {
 }
 
 function storageWithUnlockedSkin(type, slug, extra = {}) {
-  return new FakeLocalStorage({
-    [TUTORIAL_PROGRESS_KEY]: JSON.stringify({
-      purchasedSkins: [{ type, slug }],
-    }),
-    ...extra,
-  });
+  const storage = new FakeLocalStorage(extra);
+  writeUnlockProgress(storage, { purchasedSkins: [{ type, slug }] });
+  return storage;
 }
 
 function expectedSkinEntriesFromDisk() {

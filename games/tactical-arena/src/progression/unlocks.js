@@ -6,6 +6,8 @@ import {
 } from "../platform/gameProgressClient.js";
 
 export const TUTORIAL_PROGRESS_KEY = "tacticalArenaTutorialProgressV2";
+export const TUTORIAL_PROGRESS_SEAL_KEY = "tacticalArenaTutorialProgressSealV1";
+export const TUTORIAL_PROGRESS_BACKUP_KEY = "tacticalArenaTutorialProgressBackupV1";
 export const LEGACY_TUTORIAL_PROGRESS_KEY = "tacticalArenaTutorialProgress";
 export const TUTORIAL_JUGGERNAUT_REWARD_UNIT = "juggernaut";
 export const STARTER_UNIT_TYPES = Object.freeze(["swordsman", "archer", "mystic", "magician"]);
@@ -61,6 +63,8 @@ const NECROMANCER_COMPANION_SKIN_SLUGS = Object.freeze(new Set([
   "trick-or-treat",
   "void-dweller",
 ]));
+const PROGRESS_SEAL_VERSION = 1;
+const PROGRESS_SEAL_SECRET = "tactical-arena-progress-v1";
 
 function defaultStorage() {
   return globalThis.localStorage;
@@ -157,6 +161,70 @@ function progressFallback() {
   };
 }
 
+function sealHash(value) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36).padStart(7, "0");
+}
+
+function serializedProgress(progress) {
+  return JSON.stringify(normalizeUnlockProgress(progress));
+}
+
+function progressSeal(serialized) {
+  return `v${PROGRESS_SEAL_VERSION}:${serialized.length}:${sealHash(`${PROGRESS_SEAL_SECRET}|${serialized}`)}`;
+}
+
+function backupEnvelope(serialized) {
+  return JSON.stringify({
+    version: PROGRESS_SEAL_VERSION,
+    progress: JSON.parse(serialized),
+    seal: progressSeal(serialized),
+  });
+}
+
+function parseProgress(raw) {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function readStorageText(storage, key) {
+  try {
+    return storage?.getItem?.(key) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSealedProgress(storage, progress) {
+  const serialized = serializedProgress(progress);
+  try {
+    storage?.setItem?.(TUTORIAL_PROGRESS_KEY, serialized);
+    storage?.setItem?.(TUTORIAL_PROGRESS_SEAL_KEY, progressSeal(serialized));
+    storage?.setItem?.(TUTORIAL_PROGRESS_BACKUP_KEY, backupEnvelope(serialized));
+  } catch {
+    // Storage failures should not block menu or tutorial flow.
+  }
+  return JSON.parse(serialized);
+}
+
+function readSealedBackupProgress(storage) {
+  const envelope = parseProgress(readStorageText(storage, TUTORIAL_PROGRESS_BACKUP_KEY));
+  if (!envelope || envelope.version !== PROGRESS_SEAL_VERSION || !envelope.progress || typeof envelope.seal !== "string") {
+    return null;
+  }
+  const serialized = serializedProgress(envelope.progress);
+  return envelope.seal === progressSeal(serialized) ? JSON.parse(serialized) : null;
+}
+
 export function normalizeUnlockProgress(value = {}) {
   const completedTutorials = uniqueStrings(value.completedTutorials);
   const allTutorialsComplete = Boolean(value.allTutorialsComplete);
@@ -198,23 +266,27 @@ export function normalizeUnlockProgress(value = {}) {
 }
 
 export function readUnlockProgress(storage = defaultStorage()) {
-  try {
-    const raw = storage?.getItem?.(TUTORIAL_PROGRESS_KEY);
-    if (!raw) return progressFallback();
-    return normalizeUnlockProgress(JSON.parse(raw));
-  } catch {
-    return progressFallback();
-  }
+  const fallback = () => readSealedBackupProgress(storage) ?? progressFallback();
+  const raw = readStorageText(storage, TUTORIAL_PROGRESS_KEY);
+  if (!raw) return fallback();
+  const parsed = parseProgress(raw);
+  if (!parsed) return fallback();
+
+  const serialized = serializedProgress(parsed);
+  const expectedSeal = progressSeal(serialized);
+  const storedSeal = readStorageText(storage, TUTORIAL_PROGRESS_SEAL_KEY);
+
+  if (storedSeal === expectedSeal) return JSON.parse(serialized);
+
+  const backup = readSealedBackupProgress(storage);
+  if (backup) return writeSealedProgress(storage, backup);
+
+  if (!storedSeal) return writeSealedProgress(storage, parsed);
+  return progressFallback();
 }
 
 export function writeUnlockProgress(storage, progress) {
-  const normalized = normalizeUnlockProgress(progress);
-  try {
-    storage?.setItem?.(TUTORIAL_PROGRESS_KEY, JSON.stringify(normalized));
-  } catch {
-    // Storage failures should not block menu or tutorial flow.
-  }
-  return normalized;
+  return writeSealedProgress(storage, progress);
 }
 
 export function resetUnlockProgress(storage = defaultStorage()) {
@@ -234,12 +306,11 @@ export function resetUnlockProgress(storage = defaultStorage()) {
     campaignGrantedSkins,
     purchasedSkins: current.purchasedSkins,
   };
-  const resetProgress = normalizeUnlockProgress({
+  const resetProgress = writeUnlockProgress(storage, {
     ...progressFallback(),
     ...preservedOwnedSkins,
   });
   try {
-    storage?.setItem?.(TUTORIAL_PROGRESS_KEY, JSON.stringify(resetProgress));
     storage?.removeItem?.(LEGACY_TUTORIAL_PROGRESS_KEY);
   } catch {
     // Best-effort profile reset.

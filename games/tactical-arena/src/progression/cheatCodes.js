@@ -15,9 +15,23 @@ function normalizedCode(value) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
-export function applyCheatCode(storage = globalThis.localStorage, code = "") {
+export function isCheatCodeEnabled({ location = globalThis.location } = {}) {
+  if (!location?.href) return false;
+  try {
+    const url = new URL(location.href);
+    if (url.searchParams.get("taCheats") === "1") return true;
+    return url.protocol === "file:" || url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
+export function applyCheatCode(storage = globalThis.localStorage, code = "", options = {}) {
   if (normalizedCode(code) !== UNLOCK_EVERYTHING_CHEAT_CODE) {
     return { accepted: false, errorCode: "INVALID_CHEAT_CODE" };
+  }
+  if (!(options.enabled ?? isCheatCodeEnabled(options))) {
+    return { accepted: false, errorCode: "CHEATS_DISABLED" };
   }
 
   const allSkins = SKIN_MANIFEST.map(({ type, slug }) => ({ type, slug }));

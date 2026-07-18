@@ -23,7 +23,7 @@ function memoryStorage(initial = {}) {
 test("poop cheat code unlocks all tutorials, missions, units, and skins", () => {
   const storage = memoryStorage();
 
-  const result = applyCheatCode(storage, "  PoOp  ");
+  const result = applyCheatCode(storage, "  PoOp  ", { enabled: true });
 
   assert.equal(result.accepted, true);
 
@@ -41,6 +41,17 @@ test("poop cheat code unlocks all tutorials, missions, units, and skins", () => 
   for (const mission of CAMPAIGN_MISSIONS) assert.equal(campaign.missionStars[mission.id], 3);
 });
 
+test("cheat code is disabled unless a dev or test caller opts in", () => {
+  const storage = memoryStorage();
+
+  const result = applyCheatCode(storage, "poop");
+
+  assert.equal(result.accepted, false);
+  assert.equal(result.errorCode, "CHEATS_DISABLED");
+  assert.deepEqual(readUnlockProgress(storage).unlockedSkins, []);
+  assert.deepEqual(readCampaignProgress(storage).completedMissions, []);
+});
+
 test("an invalid cheat code does not change stored progress", () => {
   const storage = memoryStorage({ unrelated: "keep-me" });
   const before = storage.snapshot();
@@ -52,9 +63,10 @@ test("an invalid cheat code does not change stored progress", () => {
   assert.deepEqual(storage.snapshot(), before);
 });
 
-test("settings exposes an accessible cheat code input and confirm button", () => {
+test("settings keeps the cheat code form unavailable in the settings menu", () => {
   const html = fs.readFileSync(new URL("../html/settings-modal.html", import.meta.url), "utf8");
 
+  assert.match(html, /id="setCheatCodeForm"[^>]*hidden/);
   assert.match(html, /id="setCheatCode"[^>]*type="password"/);
   assert.match(html, /id="setCheatCodeBtn"[^>]*>Confirm<\/button>/);
   assert.match(html, /id="setCheatCodeStatus"[^>]*aria-live="polite"/);

@@ -1,5 +1,5 @@
-// The Settings overlay: audio/theme/battery toggles, the cheat-code form, and the
-// two-press reset-progress confirmation. Extracted from menuFlow.js; the menu
+// The Settings overlay: audio/theme/battery toggles, a hidden cheat-code test
+// hook, and the two-press reset-progress confirmation. Extracted from menuFlow.js; the menu
 // router injects the cross-screen refresh + reset side effects.
 
 import { THEMES, applyTheme, loadSavedThemeId, saveThemeId } from "./themes.js";
