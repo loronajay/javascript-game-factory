@@ -1,6 +1,7 @@
 import { svgElement } from "./svgHelpers.js";
 import { createUnitFigure } from "./unitRenderer.js";
 import { createBoardMetrics, createBoardViewBox, gridToScreen, pointsToString } from "./isometric.js";
+import { updateBoardTouchAssist } from "./boardTouchAssist.js";
 import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.js";
 import { areEnemies, getTileAffinity, unitAt } from "../core/state.js";
 import { canTrample, chebyshevDistance, getLegalMoves, getTrampleMoveOptions, isOnBoard, positionKey } from "../rules/movement.js";
@@ -411,6 +412,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   const path = new Set(footworkPath.map(positionKey));
   const metrics = createBoardMetrics(state.size);
   const view = createBoardViewBox(metrics, state.size);
+  updateBoardTouchAssist(board, { size: state.size, metrics, legalKeys: legal, onTileClick });
   const activeWeather = getActiveBoardWeather(state);
   board.setAttribute("viewBox", `${view.x} ${view.y} ${view.width} ${view.height}`);
   boardLayer.replaceChildren();
