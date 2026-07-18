@@ -182,7 +182,7 @@ test("new fat squad collection skins use authored rarity and pack metadata", () 
 test("all Southern Kingdom skins are epic pack skins", () => {
   const entries = SKIN_MANIFEST.filter((entry) => entry.slug === "southern-kingdom");
 
-  assert.equal(entries.length, 8);
+  assert.equal(entries.length, 12);
   for (const entry of entries) {
     const skin = getSkin(entry.type, entry.slug);
     assert.equal(skin.rarity, "epic", `${entry.type} Southern Kingdom rarity`);

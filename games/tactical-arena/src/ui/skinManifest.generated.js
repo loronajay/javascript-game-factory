@@ -43,6 +43,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "swordsman",
+    slug: "southern-kingdom",
+    file: "southern-kingdom-swordsman.png"
+  },
+  {
+    type: "swordsman",
     slug: "wandering",
     file: "wandering-swordsman.png"
   },
@@ -110,6 +115,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "archer",
     slug: "scarlet-rose",
     file: "scarlet-rose-archer.png"
+  },
+  {
+    type: "archer",
+    slug: "southern-kingdom",
+    file: "southern-kingdom-archer.png"
   },
   {
     type: "archer",
@@ -203,6 +213,11 @@ export const SKIN_MANIFEST = Object.freeze([
   },
   {
     type: "mystic",
+    slug: "southern-kingdom",
+    file: "southern-kingdom-mystic.png"
+  },
+  {
+    type: "mystic",
     slug: "star-princess",
     file: "star-princess-mystic.png"
   },
@@ -240,6 +255,11 @@ export const SKIN_MANIFEST = Object.freeze([
     type: "magician",
     slug: "ghostly",
     file: "ghostly-magician.png"
+  },
+  {
+    type: "magician",
+    slug: "southern-kingdom",
+    file: "southern-kingdom-magician.png"
   },
   {
     type: "magician",

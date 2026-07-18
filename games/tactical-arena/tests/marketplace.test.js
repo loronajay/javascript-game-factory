@@ -118,14 +118,14 @@ test("expanded fat squad skin packs expose updated counts, rarities, and prices"
   }
 
   assert.ok(southernKingdom, "Southern Kingdom Pack should be offered");
-  assert.equal(southernKingdom.skinCount, 8);
-  assert.equal(southernKingdom.unownedSkinCount, 8);
-  assert.equal(southernKingdom.rarityCounts.epic, 8);
-  assert.equal(southernKingdom.individualPrice.cents, 2392);
-  assert.equal(southernKingdom.individualValorPrice.amount, 18000);
-  assert.equal(southernKingdom.price.cents, 1799);
-  assert.equal(southernKingdom.valorPrice.amount, 13500);
-  for (const type of ["fat-knight", "fat-wizard", "fat-cleric", "fat-bowman"]) {
+  assert.equal(southernKingdom.skinCount, 12);
+  assert.equal(southernKingdom.unownedSkinCount, 12);
+  assert.equal(southernKingdom.rarityCounts.epic, 12);
+  assert.equal(southernKingdom.individualPrice.cents, 3588);
+  assert.equal(southernKingdom.individualValorPrice.amount, 27000);
+  assert.equal(southernKingdom.price.cents, 2699);
+  assert.equal(southernKingdom.valorPrice.amount, 20250);
+  for (const type of ["swordsman", "archer", "mystic", "magician", "fat-knight", "fat-wizard", "fat-cleric", "fat-bowman"]) {
     assert.ok(
       southernKingdom.skins.some((skin) => skin.type === type && skin.slug === "southern-kingdom"),
       `${type} Southern Kingdom skin should be in the pack`

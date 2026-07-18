@@ -28,7 +28,7 @@ the Halloween Pack stay separate single purchases.
 | Desert Warriors | 4 rare skins | $7.96 | $5.99 | 6,200 | 4,750 |
 | Geisha | 4 legendary skins | $15.96 | $11.99 | 11,400 | 8,750 |
 | Riot Cop | 4 epic skins | $11.96 | $8.99 | 9,000 | 6,750 |
-| Southern Kingdom | 8 epic skins | $23.92 | $17.99 | 18,000 | 13,500 |
+| Southern Kingdom | 12 epic skins | $35.88 | $26.99 | 27,000 | 20,250 |
 | Grim Reaper | 2 epic skins | $5.98 | $4.99 | 4,500 | 3,750 |
 | Infernal | 2 epic skins | $5.98 | $4.99 | 4,500 | 3,750 |
 | Medieval | 2 rare skins | $3.98 | $2.99 | 3,100 | 2,500 |

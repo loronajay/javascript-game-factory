@@ -12,6 +12,9 @@ import { el } from "./domHelpers.js";
 import { openSkinPicker } from "./skinPicker.js";
 
 let host = null;
+const INHERITED_SKIN_SOURCE_BY_TYPE = Object.freeze({
+  ghoul: "necromancer"
+});
 
 function ensureHost() {
   if (host) return host;
@@ -60,6 +63,8 @@ export function openNicknameGallery() {
   }
 
   function renderRow(type, def) {
+    const skinSourceType = INHERITED_SKIN_SOURCE_BY_TYPE[type] ?? type;
+    const hasOwnSkinChoice = skinSourceType === type;
     const row = el("div", "nickname-gallery-row");
     const portraitSlot = el("div", "nickname-gallery-portrait");
     row.appendChild(portraitSlot);
@@ -69,16 +74,19 @@ export function openNicknameGallery() {
 
     const skinBar = el("div", "nickname-gallery-skinbar");
     const skinName = el("span", "nickname-gallery-skinname");
-    const skinBtn = el("button", "nickname-gallery-skinbtn", "Equip Skin");
-    skinBtn.type = "button";
-    skinBtn.setAttribute("aria-label", `Equip ${def.name} skin`);
-    skinBtn.addEventListener("click", async () => {
-      const result = await openSkinPicker({ type, initial: getSkinPref(type) });
-      if (!result) return;
-      saveSkinPref(type, result.skin);
-      refreshSkin();
-    });
-    skinBar.append(skinName, skinBtn);
+    skinBar.appendChild(skinName);
+    if (hasOwnSkinChoice) {
+      const skinBtn = el("button", "nickname-gallery-skinbtn", "Equip Skin");
+      skinBtn.type = "button";
+      skinBtn.setAttribute("aria-label", `Equip ${def.name} skin`);
+      skinBtn.addEventListener("click", async () => {
+        const result = await openSkinPicker({ type, initial: getSkinPref(type) });
+        if (!result) return;
+        saveSkinPref(type, result.skin);
+        renderList();
+      });
+      skinBar.appendChild(skinBtn);
+    }
     copy.appendChild(skinBar);
 
     const field = el("div", "nickname-gallery-field");
@@ -110,9 +118,9 @@ export function openNicknameGallery() {
     return row;
 
     function refreshSkin() {
-      const skin = getSkinPref(type);
+      const skin = getSkinPref(skinSourceType);
       portraitSlot.replaceChildren(createPortrait(type, { variant: "is-chip", eager: true, skin }));
-      skinName.textContent = skinLabel(type, skin);
+      skinName.textContent = skinLabel(skinSourceType, skin);
     }
   }
 

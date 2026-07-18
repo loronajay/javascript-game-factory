@@ -95,6 +95,7 @@ const AUTHORED_SKIN_METADATA = Object.freeze({
   [skinKey("swordsman", "pumpkin-knight")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
   [skinKey("swordsman", "medieval")]: meta(SKIN_RARITIES.RARE, PACK.MEDIEVAL),
   [skinKey("swordsman", "grim-reaper")]: meta(SKIN_RARITIES.EPIC, PACK.GRIM_REAPER),
+  [skinKey("swordsman", "southern-kingdom")]: meta(SKIN_RARITIES.EPIC, PACK.SOUTHERN_KINGDOM),
   [skinKey("swordsman", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
 
   [skinKey("paladin", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
@@ -151,6 +152,7 @@ const AUTHORED_SKIN_METADATA = Object.freeze({
   [skinKey("archer", "vampire")]: meta(SKIN_RARITIES.EPIC),
   [skinKey("archer", "vampire-slayer")]: meta(SKIN_RARITIES.EPIC),
   [skinKey("archer", "floral")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("archer", "southern-kingdom")]: meta(SKIN_RARITIES.EPIC, PACK.SOUTHERN_KINGDOM),
   [skinKey("archer", "blood-rose")]: meta(SKIN_RARITIES.LEGENDARY),
   [skinKey("archer", "geisha")]: meta(SKIN_RARITIES.LEGENDARY, PACK.GEISHA),
   [skinKey("archer", "scarlet-rose")]: meta(SKIN_RARITIES.LEGENDARY),
@@ -215,6 +217,7 @@ const AUTHORED_SKIN_METADATA = Object.freeze({
   [skinKey("mystic", "floral")]: meta(SKIN_RARITIES.EPIC),
   [skinKey("mystic", "star-princess")]: meta(SKIN_RARITIES.EPIC),
   [skinKey("mystic", "moon-guardian")]: meta(SKIN_RARITIES.EPIC),
+  [skinKey("mystic", "southern-kingdom")]: meta(SKIN_RARITIES.EPIC, PACK.SOUTHERN_KINGDOM),
   [skinKey("mystic", "nirvana")]: meta(SKIN_RARITIES.LEGENDARY),
   [skinKey("mystic", "ruby")]: meta(SKIN_RARITIES.LEGENDARY),
   [skinKey("mystic", "geisha")]: meta(SKIN_RARITIES.LEGENDARY, PACK.GEISHA),
@@ -272,6 +275,7 @@ const AUTHORED_SKIN_METADATA = Object.freeze({
   [skinKey("magician", "ghostly")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),
   [skinKey("magician", "arcane")]: meta(SKIN_RARITIES.RARE, PACK.ARCANE),
   [skinKey("magician", "blood-moon")]: meta(SKIN_RARITIES.EPIC, PACK.BLOOD_MOON),
+  [skinKey("magician", "southern-kingdom")]: meta(SKIN_RARITIES.EPIC, PACK.SOUTHERN_KINGDOM),
 
   [skinKey("necromancer", "summer-vibes")]: meta(SKIN_RARITIES.COMMON, PACK.SUMMER_VIBES),
   [skinKey("necromancer", "trick-or-treat")]: meta(SKIN_RARITIES.RARE, PACK.HALLOWEEN),

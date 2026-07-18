@@ -73,7 +73,7 @@ const SKIN_PACK_PRICES = Object.freeze({
   "desert-warriors": Object.freeze({ cents: 599, valor: 4750 }),
   geisha: Object.freeze({ cents: 1199, valor: 8750 }),
   "riot-cop": Object.freeze({ cents: 899, valor: 6750 }),
-  "southern-kingdom": Object.freeze({ cents: 1799, valor: 13500 }),
+  "southern-kingdom": Object.freeze({ cents: 2699, valor: 20250 }),
   "grim-reaper": Object.freeze({ cents: 499, valor: 3750 }),
   infernal: Object.freeze({ cents: 499, valor: 3750 }),
   medieval: Object.freeze({ cents: 299, valor: 2500 }),

@@ -152,6 +152,25 @@ Pack size: 31 skins.
 | Miner | Blood Moon |
 | Little Brother | Blood Moon |
 
+### Southern Kingdom
+
+Pack size: 12 skins.
+
+| Unit | Skin |
+| --- | --- |
+| Swordsman | Southern Kingdom |
+| Archer | Southern Kingdom |
+| Mystic | Southern Kingdom |
+| Magician | Southern Kingdom |
+| Paladin | Southern Kingdom |
+| Angel | Southern Kingdom |
+| Gargoyle | Southern Kingdom |
+| Fat Knight | Southern Kingdom |
+| Fat Wizard | Southern Kingdom |
+| Fat Cleric | Southern Kingdom |
+| Fat Bowman | Southern Kingdom |
+| Blacksword | Southern Kingdom |
+
 ## Other Packs
 
 ### Grim Reaper Skins
