@@ -501,7 +501,9 @@
   }
 
   [data-screen="campaign"] .campaign-squad-slot {
+    min-height: 5.8rem;
     padding: .34rem;
+    overflow: hidden;
   }
 
   [data-screen="campaign"] .campaign-squad-slot .unit-portrait.is-chip {
@@ -511,12 +513,30 @@
 
   [data-screen="campaign"] .campaign-squad-slot-main {
     gap: .35rem;
+    min-height: 2.45rem;
+    overflow: hidden;
   }
 
   [data-screen="campaign"] .campaign-squad-slot-main b,
   [data-screen="campaign"] .campaign-squad-skin-btn {
     font-size: .5rem;
     letter-spacing: .05em;
+  }
+
+  [data-screen="campaign"] .campaign-squad-slot-main b,
+  [data-screen="campaign"] .campaign-squad-slot-main i {
+    line-height: 1.05;
+  }
+
+  [data-screen="campaign"] .campaign-squad-skin-btn {
+    align-self: stretch;
+    width: 100%;
+    min-height: 1.75rem;
+    padding: .24rem .38rem;
+    overflow: hidden;
+    line-height: 1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   [data-screen="campaign"] .campaign-panel > .menu-buttons {
@@ -875,18 +895,40 @@
   }
 
   .skin-picker-grid {
-    grid-template-columns: repeat(auto-fill, minmax(5.4rem, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(5.8rem, 1fr));
     gap: .38rem;
     padding: .55rem;
   }
 
   .skin-picker-choice {
-    padding: .32rem .22rem .34rem;
+    grid-template-rows: 3.75rem 1rem .72rem;
+    align-content: start;
+    gap: .18rem;
+    min-height: 6.45rem;
+    overflow: hidden;
+    padding: .28rem .24rem .3rem;
   }
 
   .skin-picker-choice .unit-portrait.is-skin-choice {
-    width: 50px;
-    height: 62px;
+    align-self: start;
+    width: 46px;
+    height: 58px;
+  }
+
+  .skin-picker-choice-name,
+  .skin-picker-choice-status {
+    display: block;
+    min-width: 0;
+    line-height: 1;
+  }
+
+  .skin-picker-choice-name {
+    font-size: .52rem;
+  }
+
+  .skin-picker-choice-status {
+    font-size: .44rem;
+    letter-spacing: .06em;
   }
 
   .skin-picker-foot {

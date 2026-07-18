@@ -224,6 +224,16 @@ test("the document exposes the mobile playability shell", () => {
   );
   assert.match(
     responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.skin-picker-choice\s*\{[\s\S]*?grid-template-rows:\s*3\.75rem 1rem \.72rem[\s\S]*?min-height:\s*6\.45rem[\s\S]*?\.skin-picker-choice-name,\s*\.skin-picker-choice-status\s*\{[\s\S]*?line-height:\s*1/,
+    "short landscape skin choices should reserve separate rows for portrait, name, and Locked/Unlocked text",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\[data-screen="campaign"\] \.campaign-squad-skin-btn\s*\{[\s\S]*?align-self:\s*stretch[\s\S]*?min-height:\s*1\.75rem[\s\S]*?line-height:\s*1/,
+    "campaign squad skin buttons should stay inside the compact slot card on short landscape",
+  );
+  assert.match(
+    responsiveCss,
     /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.draft-formation-board\s*\{[\s\S]*?min-height:\s*0[\s\S]*?height:\s*clamp\(11rem,\s*54vh,\s*15rem\)[\s\S]*?\.draft-formation-card \.roster-foot\s*\{[\s\S]*?padding:\s*\.45rem \.7rem/,
     "formation editor should bound the board height and keep footer buttons reachable",
   );
