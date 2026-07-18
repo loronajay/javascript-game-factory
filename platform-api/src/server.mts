@@ -8,6 +8,7 @@ import { listActivityItems, saveActivityItem } from "./db/activity.mjs";
 import { readConfig } from "./config.mjs";
 import { loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
 import { applyMigrations } from "./db/migrations.mjs";
+import { getGameProgress, recordGameProgressClaim } from "./db/game-progress.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import {
@@ -179,6 +180,8 @@ async function bootstrap(): Promise<void> {
     markConversationRead: (convId: any, playerId: any) => markConversationRead(pool, convId, playerId),
     getGameRating: (gameSlug: any, playerId: any) => getGameRating(pool, playerId, gameSlug),
     recordMatchRating: (gameSlug: any, params: any) => recordMatchRating(pool, { ...params, gameSlug }),
+    getGameProgress: (playerId: any, gameSlug: any) => getGameProgress(pool, playerId, gameSlug),
+    recordGameProgressClaim: (params: any) => recordGameProgressClaim(pool, params),
     savePlayerPhoto: (params: any) => savePlayerPhoto(pool, params),
     listPlayerPhotos: (playerId: any, opts: any) => listPlayerPhotos(pool, playerId, opts),
     getPlayerPhoto: (photoId: any, opts: any) => getPlayerPhoto(pool, photoId, opts),

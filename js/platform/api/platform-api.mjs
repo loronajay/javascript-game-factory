@@ -420,5 +420,13 @@ export function createPlatformApiClient(options = {}) {
             const pid = encodePathSegment(playerId);
             return gs && pid ? get(`/ratings/${gs}/${pid}`, "rating") : Promise.resolve(null);
         },
+        fetchGameProgress(gameSlug) {
+            const encoded = encodePathSegment(gameSlug);
+            return encoded ? get(`/game-progress/${encoded}`, "progress") : Promise.resolve(null);
+        },
+        recordGameProgressClaim(gameSlug, claim = {}) {
+            const encoded = encodePathSegment(gameSlug);
+            return encoded ? post(`/game-progress/${encoded}/claims`, claim) : Promise.resolve(null);
+        },
     };
 }

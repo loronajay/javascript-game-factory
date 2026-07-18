@@ -7,6 +7,7 @@ import {
   readUnlockProgress,
   writeUnlockProgress,
 } from "./unlocks.js";
+import { SHOP_LOGIN_REQUIRED_ERROR, isFactoryAccountLoggedIn } from "../platform/factoryAccount.js";
 
 export const SHOP_TABS = Object.freeze([
   Object.freeze({ id: "units", label: "Units" }),
@@ -442,12 +443,15 @@ export function getShopCatalog(storage = globalThis.localStorage) {
   });
 }
 
-export function purchaseUnitWithValor(storage = globalThis.localStorage, type) {
+export function purchaseUnitWithValor(storage = globalThis.localStorage, type, options = {}) {
   const offer = getUnitOffer(type, storage);
   const progress = readUnlockProgress(storage);
   if (!offer) return { accepted: false, errorCode: "UNIT_NOT_FOR_SALE", progress, offer: null };
   if (offer.owned) return { accepted: false, errorCode: "UNIT_ALREADY_OWNED", progress, offer };
   if (!offer.purchasable) return { accepted: false, errorCode: "UNIT_NOT_FOR_SALE", progress, offer };
+  if (!isFactoryAccountLoggedIn(options.account)) {
+    return { accepted: false, errorCode: SHOP_LOGIN_REQUIRED_ERROR, progress, offer };
+  }
   if (progress.valorBalance < offer.price.amount) {
     return { accepted: false, errorCode: "INSUFFICIENT_VALOR", progress, offer };
   }
@@ -459,11 +463,14 @@ export function purchaseUnitWithValor(storage = globalThis.localStorage, type) {
   return { accepted: true, progress: next, offer: getUnitOffer(type, storage) };
 }
 
-export function purchaseSkinWithValor(storage = globalThis.localStorage, type, slug) {
+export function purchaseSkinWithValor(storage = globalThis.localStorage, type, slug, options = {}) {
   const offer = getSkinOffer(type, slug, storage);
   const progress = readUnlockProgress(storage);
   if (!offer || !offer.valorPrice) return { accepted: false, errorCode: "SKIN_NOT_FOR_SALE", progress, offer: null };
   if (offer.owned) return { accepted: false, errorCode: "SKIN_ALREADY_OWNED", progress, offer };
+  if (!isFactoryAccountLoggedIn(options.account)) {
+    return { accepted: false, errorCode: SHOP_LOGIN_REQUIRED_ERROR, progress, offer };
+  }
   if (progress.valorBalance < offer.valorPrice.amount) {
     return { accepted: false, errorCode: "INSUFFICIENT_VALOR", progress, offer };
   }
@@ -476,12 +483,15 @@ export function purchaseSkinWithValor(storage = globalThis.localStorage, type, s
   return { accepted: true, progress: next, offer: getSkinOffer(type, slug, storage) };
 }
 
-export function purchaseSkinPackWithValor(storage = globalThis.localStorage, packId) {
+export function purchaseSkinPackWithValor(storage = globalThis.localStorage, packId, options = {}) {
   const offer = getSkinPackOffer(packId, storage);
   const progress = readUnlockProgress(storage);
   if (!offer || !offer.valorPrice) return { accepted: false, errorCode: "SKIN_PACK_NOT_FOR_SALE", progress, offer: null };
   if (offer.owned || offer.unownedSkinCount <= 0) {
     return { accepted: false, errorCode: "SKIN_PACK_ALREADY_OWNED", progress, offer };
+  }
+  if (!isFactoryAccountLoggedIn(options.account)) {
+    return { accepted: false, errorCode: SHOP_LOGIN_REQUIRED_ERROR, progress, offer };
   }
   if (progress.valorBalance < offer.valorPrice.amount) {
     return { accepted: false, errorCode: "INSUFFICIENT_VALOR", progress, offer };

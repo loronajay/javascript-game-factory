@@ -32,6 +32,8 @@ function storageAdapter() {
   };
 }
 
+const SIGNED_IN_ACCOUNT = Object.freeze({ authenticated: true, playerId: "factory-player-1" });
+
 test("shop catalog exposes units, premium skins, skin packs, and paid consumables", () => {
   const storage = storageAdapter();
   const catalog = getShopCatalog(storage);
@@ -318,7 +320,7 @@ test("purchasing a unit spends Valor and unlocks the unit", () => {
   const storage = storageAdapter();
   writeUnlockProgress(storage, { valorBalance: 999 });
 
-  const result = purchaseUnitWithValor(storage, "clod");
+  const result = purchaseUnitWithValor(storage, "clod", { account: SIGNED_IN_ACCOUNT });
   const offer = getUnitOffer("clod", storage);
   const progress = readUnlockProgress(storage);
 
@@ -332,7 +334,7 @@ test("purchasing a skin with Valor spends Valor and unlocks the skin", () => {
   const storage = storageAdapter();
   writeUnlockProgress(storage, { valorBalance: 3000 });
 
-  const result = purchaseSkinWithValor(storage, "magician", "summer-vibes");
+  const result = purchaseSkinWithValor(storage, "magician", "summer-vibes", { account: SIGNED_IN_ACCOUNT });
   const offer = getSkinOffer("magician", "summer-vibes", storage);
   const progress = readUnlockProgress(storage);
 
@@ -346,7 +348,7 @@ test("purchasing a necromancer skin with Valor unlocks its ghoul companion skin"
   const storage = storageAdapter();
   writeUnlockProgress(storage, { valorBalance: 3000 });
 
-  const result = purchaseSkinWithValor(storage, "necromancer", "arcane");
+  const result = purchaseSkinWithValor(storage, "necromancer", "arcane", { account: SIGNED_IN_ACCOUNT });
   const progress = readUnlockProgress(storage);
 
   assert.equal(result.accepted, true);
@@ -365,7 +367,7 @@ test("purchasing a skin pack with Valor spends the prorated pack price and unloc
   });
 
   const offer = getSkinPackOffer("halloween", storage);
-  const result = purchaseSkinPackWithValor(storage, "halloween");
+  const result = purchaseSkinPackWithValor(storage, "halloween", { account: SIGNED_IN_ACCOUNT });
   const progress = readUnlockProgress(storage);
 
   assert.equal(result.accepted, true);
@@ -389,13 +391,13 @@ test("skin pack purchases reject owned, invalid, and unaffordable offers", () =>
   assert.equal(purchaseSkinPackWithValor(storage, "bogus").errorCode, "SKIN_PACK_NOT_FOR_SALE");
 
   writeUnlockProgress(storage, { valorBalance: 0 });
-  assert.equal(purchaseSkinPackWithValor(storage, "halloween").errorCode, "INSUFFICIENT_VALOR");
+  assert.equal(purchaseSkinPackWithValor(storage, "halloween", { account: SIGNED_IN_ACCOUNT }).errorCode, "INSUFFICIENT_VALOR");
 
   writeUnlockProgress(storage, {
     valorBalance: 99999,
     purchasedSkins: getSkinPackOffer("medieval", storageAdapter()).skins.map((skin) => ({ type: skin.type, slug: skin.slug })),
   });
-  assert.equal(purchaseSkinPackWithValor(storage, "medieval").errorCode, "SKIN_PACK_ALREADY_OWNED");
+  assert.equal(purchaseSkinPackWithValor(storage, "medieval", { account: SIGNED_IN_ACCOUNT }).errorCode, "SKIN_PACK_ALREADY_OWNED");
 });
 
 test("skin Valor purchases reject owned, invalid, and unaffordable offers", () => {
@@ -404,13 +406,13 @@ test("skin Valor purchases reject owned, invalid, and unaffordable offers", () =
   assert.equal(purchaseSkinWithValor(storage, "dragon", "summer-vibes").errorCode, "SKIN_NOT_FOR_SALE");
 
   writeUnlockProgress(storage, { valorBalance: 0 });
-  assert.equal(purchaseSkinWithValor(storage, "magician", "summer-vibes").errorCode, "INSUFFICIENT_VALOR");
+  assert.equal(purchaseSkinWithValor(storage, "magician", "summer-vibes", { account: SIGNED_IN_ACCOUNT }).errorCode, "INSUFFICIENT_VALOR");
 
   writeUnlockProgress(storage, {
     valorBalance: 9999,
     purchasedSkins: [{ type: "magician", slug: "summer-vibes" }],
   });
-  assert.equal(purchaseSkinWithValor(storage, "magician", "summer-vibes").errorCode, "SKIN_ALREADY_OWNED");
+  assert.equal(purchaseSkinWithValor(storage, "magician", "summer-vibes", { account: SIGNED_IN_ACCOUNT }).errorCode, "SKIN_ALREADY_OWNED");
 });
 
 test("unit purchases reject owned, invalid, and unaffordable offers", () => {
@@ -420,5 +422,22 @@ test("unit purchases reject owned, invalid, and unaffordable offers", () => {
   assert.equal(purchaseUnitWithValor(storage, "ghoul").errorCode, "UNIT_NOT_FOR_SALE");
 
   writeUnlockProgress(storage, { valorBalance: 0 });
-  assert.equal(purchaseUnitWithValor(storage, "clod").errorCode, "INSUFFICIENT_VALOR");
+  assert.equal(purchaseUnitWithValor(storage, "clod", { account: SIGNED_IN_ACCOUNT }).errorCode, "INSUFFICIENT_VALOR");
+});
+
+test("shop purchases require a signed-in JavaScript Game Factory account", () => {
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, { valorBalance: 99999 });
+
+  const unit = purchaseUnitWithValor(storage, "clod");
+  const skin = purchaseSkinWithValor(storage, "magician", "summer-vibes");
+  const pack = purchaseSkinPackWithValor(storage, "halloween");
+  const progress = readUnlockProgress(storage);
+
+  assert.equal(unit.errorCode, "ACCOUNT_LOGIN_REQUIRED");
+  assert.equal(skin.errorCode, "ACCOUNT_LOGIN_REQUIRED");
+  assert.equal(pack.errorCode, "ACCOUNT_LOGIN_REQUIRED");
+  assert.equal(progress.valorBalance, 99999);
+  assert.equal(progress.unlockedUnits.includes("clod"), false);
+  assert.equal(progress.purchasedSkins.length, 0);
 });

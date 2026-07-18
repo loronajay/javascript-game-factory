@@ -6,6 +6,7 @@ import { listActivityItems, saveActivityItem } from "./db/activity.mjs";
 import { readConfig } from "./config.mjs";
 import { loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
 import { applyMigrations } from "./db/migrations.mjs";
+import { getGameProgress, recordGameProgressClaim } from "./db/game-progress.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import { createFriendshipBetweenPlayers, loadPlayerRelationships, recordDirectInteractionBetweenPlayers, recordSharedEventBetweenPlayers, recordSharedSessionBetweenPlayers, removeFriendBetweenPlayers, savePlayerRelationships, } from "./db/relationships.mjs";
@@ -118,6 +119,8 @@ async function bootstrap() {
         markConversationRead: (convId, playerId) => markConversationRead(pool, convId, playerId),
         getGameRating: (gameSlug, playerId) => getGameRating(pool, playerId, gameSlug),
         recordMatchRating: (gameSlug, params) => recordMatchRating(pool, { ...params, gameSlug }),
+        getGameProgress: (playerId, gameSlug) => getGameProgress(pool, playerId, gameSlug),
+        recordGameProgressClaim: (params) => recordGameProgressClaim(pool, params),
         savePlayerPhoto: (params) => savePlayerPhoto(pool, params),
         listPlayerPhotos: (playerId, opts) => listPlayerPhotos(pool, playerId, opts),
         getPlayerPhoto: (photoId, opts) => getPlayerPhoto(pool, photoId, opts),

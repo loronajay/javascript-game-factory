@@ -430,6 +430,14 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
       const pid = encodePathSegment(playerId);
       return gs && pid ? get(`/ratings/${gs}/${pid}`, "rating") : Promise.resolve(null);
     },
+    fetchGameProgress(gameSlug: string) {
+      const encoded = encodePathSegment(gameSlug);
+      return encoded ? get(`/game-progress/${encoded}`, "progress") : Promise.resolve(null);
+    },
+    recordGameProgressClaim(gameSlug: string, claim: unknown = {}) {
+      const encoded = encodePathSegment(gameSlug);
+      return encoded ? post(`/game-progress/${encoded}/claims`, claim) : Promise.resolve(null);
+    },
   };
 }
 

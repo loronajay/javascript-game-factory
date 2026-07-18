@@ -18,6 +18,7 @@ export const MIGRATION_FILES = Object.freeze([
     "016-background-style.sql",
     "017-profile-layout.sql",
     "018-game-ratings.sql",
+    "019-game-progression.sql",
 ]);
 export function migrationFileUrl(name) {
     return new URL(`./migrations/${name}`, import.meta.url);

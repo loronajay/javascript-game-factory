@@ -5,6 +5,7 @@ import { handleMessageRoute } from "./routes/message-routes.mjs";
 import { handleNotificationRoute } from "./routes/notification-routes.mjs";
 import { handleLayoutRoute } from "./routes/layout-routes.mjs";
 import { handleRatingRoute } from "./routes/rating-routes.mjs";
+import { handleGameProgressRoute } from "./routes/game-progress-routes.mjs";
 import { handlePlayerRoute } from "./routes/player-routes.mjs";
 import { handleThoughtRoute } from "./routes/thought-routes.mjs";
 import { handlePhotoRoute } from "./routes/photo-routes.mjs";
@@ -178,6 +179,12 @@ export function createApp(options = {}) {
     const recordMatchRating = typeof options?.recordMatchRating === "function"
         ? options.recordMatchRating
         : async () => null;
+    const getGameProgress = typeof options?.getGameProgress === "function"
+        ? options.getGameProgress
+        : async () => null;
+    const recordGameProgressClaim = typeof options?.recordGameProgressClaim === "function"
+        ? options.recordGameProgressClaim
+        : async () => null;
     const savePlayerPhoto = typeof options?.savePlayerPhoto === "function"
         ? options.savePlayerPhoto
         : async () => null;
@@ -287,6 +294,10 @@ export function createApp(options = {}) {
     const ratingServices = {
         getGameRating,
         recordMatchRating,
+    };
+    const gameProgressServices = {
+        getGameProgress,
+        recordGameProgressClaim,
     };
     const notificationServices = {
         listNotifications,
@@ -452,6 +463,18 @@ export function createApp(options = {}) {
                 requestOrigin,
                 timestamp,
                 services: ratingServices,
+            })) {
+                return;
+            }
+            if (await handleGameProgressRoute({
+                req,
+                res,
+                method,
+                pathname,
+                authClaims,
+                requestOrigin,
+                timestamp,
+                services: gameProgressServices,
             })) {
                 return;
             }

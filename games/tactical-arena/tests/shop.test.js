@@ -132,6 +132,8 @@ function visibleText(node) {
   return [node.textContent, ...(node.children ?? []).map(visibleText)].join("");
 }
 
+const SIGNED_IN_ACCOUNT = Object.freeze({ authenticated: true, playerId: "factory-player-1" });
+
 test("shop skins render under unit shelves and Valor uses an icon badge", () => {
   globalThis.document = new FakeDocument();
 
@@ -155,7 +157,7 @@ test("shop skins render under unit shelves and Valor uses an icon badge", () => 
 test("shop consumables tab sells paid consumables with checkout coming soon feedback", () => {
   globalThis.document = new FakeDocument();
 
-  openShop(storageAdapter());
+  openShop(storageAdapter(), { account: SIGNED_IN_ACCOUNT });
 
   const overlay = document.body.children[0];
   const consumablesTab = walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Consumables")[0];
@@ -194,6 +196,32 @@ test("shop consumables tab sells paid consumables with checkout coming soon feed
   buy.click();
 
   assert.match(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent, /checkout coming soon/i);
+});
+
+test("shop purchase buttons require a signed-in factory account", () => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, { valorBalance: 99999 });
+
+  openShop(storage, { account: { authenticated: false } });
+
+  const overlay = document.body.children[0];
+  assert.match(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent, /sign in to buy/i);
+
+  const clodCard = walk(overlay, (node) => hasClass(node, "shop-unit") && visibleText(node).includes("Clod"))[0];
+  const clodButtons = walk(clodCard, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-buy-btn"));
+  assert.equal(clodButtons.length, 1);
+  assert.equal(clodButtons[0].textContent, "Sign In");
+  assert.equal(clodButtons[0].disabled, true);
+  assert.equal(clodButtons[0].getAttribute("aria-label"), "Sign in to buy Clod");
+
+  const skinsTab = walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Skins")[0];
+  skinsTab.click();
+  const skinCard = walk(overlay, (node) => hasClass(node, "shop-skin") && visibleText(node).includes("Summer Vibes"))[0];
+  const skinButton = walk(skinCard, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-buy-btn"))[0];
+  assert.equal(skinButton.textContent, "Sign In");
+  skinButton.click();
+  assert.equal(readUnlockProgress(storage).purchasedSkins.length, 0);
 });
 
 test("inventory activation requires confirmation before consuming an owned consumable", () => {
@@ -242,7 +270,7 @@ test("shop skin cards offer USD checkout and Valor purchase buttons", () => {
   const storage = storageAdapter();
   writeUnlockProgress(storage, { valorBalance: 3000 });
 
-  openShop(storage);
+  openShop(storage, { account: SIGNED_IN_ACCOUNT });
 
   const overlay = document.body.children[0];
   const skinsTab = walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Skins")[0];
@@ -303,7 +331,7 @@ test("shop skin packs render clickable contents and use Valor confirmation", () 
   const storage = storageAdapter();
   writeUnlockProgress(storage, { valorBalance: 30000 });
 
-  openShop(storage);
+  openShop(storage, { account: SIGNED_IN_ACCOUNT });
 
   const overlay = document.body.children[0];
   const packsTab = walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Skin Packs")[0];
@@ -352,7 +380,7 @@ test("shop and confirmation show the cancer research proceeds note for Fuck Canc
   const storage = storageAdapter();
   writeUnlockProgress(storage, { valorBalance: 99999 });
 
-  openShop(storage);
+  openShop(storage, { account: SIGNED_IN_ACCOUNT });
 
   const overlay = document.body.children[0];
   const skinsTab = walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Skins")[0];
@@ -393,7 +421,7 @@ test("shop and confirmation show the cancer research proceeds note for Fuck Canc
 test("shop unit cards open a detail card and return to unit browsing", () => {
   globalThis.document = new FakeDocument();
 
-  openShop(storageAdapter());
+  openShop(storageAdapter(), { account: SIGNED_IN_ACCOUNT });
 
   const overlay = document.body.children[0];
   const unitCard = walk(overlay, (node) => hasClass(node, "shop-unit") && visibleText(node).includes("Clod"))[0];
@@ -430,7 +458,7 @@ test("shop unit Valor purchase flips the unit card to one owned button", () => {
   const storage = storageAdapter();
   writeUnlockProgress(storage, { valorBalance: 999 });
 
-  openShop(storage);
+  openShop(storage, { account: SIGNED_IN_ACCOUNT });
 
   const overlay = document.body.children[0];
   const clodCard = walk(overlay, (node) => hasClass(node, "shop-unit") && visibleText(node).includes("Clod"))[0];
@@ -477,7 +505,7 @@ test("shop Valor confirmation explains when the player cannot afford the unlock"
   const storage = storageAdapter();
   writeUnlockProgress(storage, { valorBalance: 100 });
 
-  openShop(storage);
+  openShop(storage, { account: SIGNED_IN_ACCOUNT });
 
   const overlay = document.body.children[0];
   const clodCard = walk(overlay, (node) => hasClass(node, "shop-unit") && visibleText(node).includes("Clod"))[0];

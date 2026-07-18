@@ -8,6 +8,7 @@ import {
   purchaseSkinWithValor,
   purchaseUnitWithValor,
 } from "../progression/marketplace.js";
+import { SHOP_LOGIN_REQUIRED_ERROR, isFactoryAccountLoggedIn, readStoredFactoryAccountSession } from "../platform/factoryAccount.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { groupedUnitTypes } from "./squadModel.js";
 import { el } from "./domHelpers.js";
@@ -29,10 +30,12 @@ function ensureHost() {
   return host;
 }
 
-export function openShop(storage = globalThis.localStorage) {
+export function openShop(storage = globalThis.localStorage, options = {}) {
   const overlay = ensureHost();
+  const account = options.account ?? readStoredFactoryAccountSession();
+  const accountLoggedIn = isFactoryAccountLoggedIn(account);
   let activeTab = "units";
-  let statusText = "";
+  let statusText = accountLoggedIn ? "" : "Sign in to buy shop items.";
   let detailUnitType = null;
   let detailPackId = null;
   let unitScrollTop = 0;
@@ -368,6 +371,13 @@ export function openShop(storage = globalThis.localStorage) {
   }
 
   function openValorPurchase(kind, offer) {
+    if (!accountLoggedIn) {
+      statusText = "Sign in to buy shop items.";
+      pendingValorPurchase = null;
+      pendingValorError = "";
+      render();
+      return;
+    }
     pendingValorPurchase = kind === "skin"
       ? { kind, type: offer.type, slug: offer.slug }
       : kind === "skin-pack"
@@ -397,10 +407,10 @@ export function openShop(storage = globalThis.localStorage) {
 
   function confirmValorPurchase(kind, offer) {
     const result = kind === "skin"
-      ? purchaseSkinWithValor(storage, offer.type, offer.slug)
+      ? purchaseSkinWithValor(storage, offer.type, offer.slug, { account })
       : kind === "skin-pack"
-        ? purchaseSkinPackWithValor(storage, offer.packId)
-        : purchaseUnitWithValor(storage, offer.type);
+        ? purchaseSkinPackWithValor(storage, offer.packId, { account })
+        : purchaseUnitWithValor(storage, offer.type, { account });
     if (!result.accepted && result.errorCode === "INSUFFICIENT_VALOR") {
       pendingValorError = result.errorCode;
       statusText = "";
@@ -494,6 +504,10 @@ export function openShop(storage = globalThis.localStorage) {
       actions.appendChild(createOwnedBuyButton());
       return actions;
     }
+    if (!accountLoggedIn) {
+      actions.appendChild(createLoginRequiredButton(offer.name));
+      return actions;
+    }
 
     const premiumBuy = el("button", "shop-buy-btn is-premium", formatPremiumPrice(offer.premiumPrice));
     premiumBuy.type = "button";
@@ -518,6 +532,10 @@ export function openShop(storage = globalThis.localStorage) {
     const actions = el("div", `shop-skin-actions${offer.owned ? " is-owned" : ""}`);
     if (offer.owned) {
       actions.appendChild(createOwnedBuyButton());
+      return actions;
+    }
+    if (!accountLoggedIn) {
+      actions.appendChild(createLoginRequiredButton(offer.name));
       return actions;
     }
 
@@ -554,6 +572,10 @@ export function openShop(storage = globalThis.localStorage) {
       actions.appendChild(createOwnedBuyButton());
       return actions;
     }
+    if (!accountLoggedIn) {
+      actions.appendChild(createLoginRequiredButton(offer.name));
+      return actions;
+    }
 
     const premiumBuy = el("button", "shop-buy-btn is-premium", formatPremiumPrice(offer.price));
     premiumBuy.type = "button";
@@ -584,6 +606,10 @@ export function openShop(storage = globalThis.localStorage) {
 
   function createConsumableBuyActions(offer) {
     const actions = el("div", "shop-consumable-actions");
+    if (!accountLoggedIn) {
+      actions.appendChild(createLoginRequiredButton(offer.name));
+      return actions;
+    }
     const premiumBuy = el("button", "shop-buy-btn is-premium", formatPremiumPrice(offer.price));
     premiumBuy.type = "button";
     premiumBuy.dataset.sku = offer.sku;
@@ -608,6 +634,15 @@ export function openShop(storage = globalThis.localStorage) {
     return owned;
   }
 
+  function createLoginRequiredButton(name) {
+    const login = el("button", "shop-buy-btn is-login-required", "Sign In");
+    login.type = "button";
+    login.disabled = true;
+    login.setAttribute("aria-disabled", "true");
+    login.setAttribute("aria-label", `Sign in to buy ${name}`);
+    return login;
+  }
+
   function onOverlay(event) {
     if (event.target === overlay) close();
   }
@@ -630,6 +665,7 @@ export function openShop(storage = globalThis.localStorage) {
 
 function unitPurchaseStatus(result) {
   if (result.accepted) return `${result.offer.name} unlocked.`;
+  if (result.errorCode === SHOP_LOGIN_REQUIRED_ERROR) return "Sign in to buy shop items.";
   if (result.errorCode === "INSUFFICIENT_VALOR") return "Not enough currency.";
   if (result.errorCode === "UNIT_ALREADY_OWNED") return "Already owned.";
   return "That unit is not for sale.";
@@ -637,6 +673,7 @@ function unitPurchaseStatus(result) {
 
 function skinValorPurchaseStatus(result) {
   if (result.accepted) return `${result.offer.name} unlocked.`;
+  if (result.errorCode === SHOP_LOGIN_REQUIRED_ERROR) return "Sign in to buy shop items.";
   if (result.errorCode === "INSUFFICIENT_VALOR") return "Not enough Valor.";
   if (result.errorCode === "SKIN_ALREADY_OWNED") return "Already owned.";
   return "That skin is not for sale.";
@@ -644,6 +681,7 @@ function skinValorPurchaseStatus(result) {
 
 function skinPackValorPurchaseStatus(result) {
   if (result.accepted) return `${result.offer.name} unlocked.`;
+  if (result.errorCode === SHOP_LOGIN_REQUIRED_ERROR) return "Sign in to buy shop items.";
   if (result.errorCode === "INSUFFICIENT_VALOR") return "Not enough Valor.";
   if (result.errorCode === "SKIN_PACK_ALREADY_OWNED") return "Already owned.";
   return "That skin pack is not for sale.";
