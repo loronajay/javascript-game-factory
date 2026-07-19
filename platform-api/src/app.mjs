@@ -212,6 +212,12 @@ export function createApp(options = {}) {
     const loginAccount = typeof options?.loginAccount === "function"
         ? options.loginAccount
         : async () => ({ error: "not_configured" });
+    const verifyAccountSession = typeof options?.verifyAccountSession === "function"
+        ? options.verifyAccountSession
+        : null;
+    const logoutAccount = typeof options?.logoutAccount === "function"
+        ? options.logoutAccount
+        : async () => ({ ok: true });
     const requestPasswordReset = typeof options?.requestPasswordReset === "function"
         ? options.requestPasswordReset
         : async () => ({ ok: true });
@@ -233,6 +239,7 @@ export function createApp(options = {}) {
     const authServices = {
         registerAccount,
         loginAccount,
+        logoutAccount,
         requestPasswordReset,
         resetPassword,
         deleteAccount,
@@ -311,7 +318,12 @@ export function createApp(options = {}) {
             const requestUrl = new URL(req?.url || "/", "http://localhost");
             const pathname = requestUrl.pathname;
             const rawToken = extractTokenFromRequest(req);
-            const authClaims = rawToken && jwtSecret ? verifyToken(rawToken, jwtSecret) : null;
+            const verifiedAuthClaims = rawToken && jwtSecret ? verifyToken(rawToken, jwtSecret) : null;
+            const authClaims = verifiedAuthClaims?.playerId && verifyAccountSession
+                ? (await verifyAccountSession(verifiedAuthClaims.playerId, verifiedAuthClaims.sessionId)
+                    ? verifiedAuthClaims
+                    : null)
+                : verifiedAuthClaims;
             const playerGestureMatch = pathname.match(/^\/players\/([^/]+)\/gesture$/);
             const friendRequestActionMatch = pathname.match(/^\/friend-requests\/([^/]+)\/(accept|reject)$/);
             const challengeActionMatch = pathname.match(/^\/challenges\/([^/]+)\/(accept|decline)$/);

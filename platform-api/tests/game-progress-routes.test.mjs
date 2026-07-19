@@ -60,6 +60,23 @@ test("GET /game-progress/:gameSlug requires an authenticated platform account", 
   assert.equal(response.json.error, "unauthorized");
 });
 
+test("GET /game-progress/:gameSlug rejects stale account sessions", async () => {
+  const token = signToken({ playerId: "player-1", email: "player@test.com", sessionId: "older-session" }, TEST_SECRET);
+  const app = createApp({
+    jwtSecret: TEST_SECRET,
+    verifyAccountSession: async () => false,
+    getGameProgress: async () => {
+      throw new Error("stale sessions must not reach progress loading");
+    },
+    now: () => "2026-07-17T00:00:00.000Z",
+  });
+
+  const response = await invoke(app, "GET", "/game-progress/tactical-arena", { token });
+
+  assert.equal(response.statusCode, 401);
+  assert.equal(response.json.error, "unauthorized");
+});
+
 test("GET /game-progress/:gameSlug returns account progression for the signed-in player", async () => {
   const token = signToken({ playerId: "player-1", email: "player@test.com" }, TEST_SECRET);
   const seen = [];

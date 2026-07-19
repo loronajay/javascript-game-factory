@@ -11,7 +11,7 @@ import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, sav
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import { createFriendshipBetweenPlayers, loadPlayerRelationships, recordDirectInteractionBetweenPlayers, recordSharedEventBetweenPlayers, recordSharedSessionBetweenPlayers, removeFriendBetweenPlayers, savePlayerRelationships, } from "./db/relationships.mjs";
 import { commentOnThought, deleteThought, listThoughtComments, listThoughts, reactToThought, saveThought, shareThought, } from "./db/thoughts.mjs";
-import { deleteAccountService, loginAccountService, registerAccountService, requestPasswordResetService, resetPasswordService, } from "./services/auth.mjs";
+import { deleteAccountService, loginAccountService, logoutAccountService, registerAccountService, requestPasswordResetService, resetPasswordService, verifyAccountSessionService, } from "./services/auth.mjs";
 import { createEmailSender } from "./email.mjs";
 import { createNotification, listNotifications, markAllNotificationsRead, } from "./db/notifications.mjs";
 import { createFriendRequest, getFriendRequest, acceptFriendRequest, rejectFriendRequest, } from "./db/friend-requests.mjs";
@@ -71,6 +71,8 @@ async function bootstrap() {
         searchPlayers: (q) => searchPlayers(pool, q),
         registerAccount: (params) => registerAccountService(pool, params),
         loginAccount: (params) => loginAccountService(pool, params),
+        verifyAccountSession: (playerId, sessionId) => verifyAccountSessionService(pool, playerId, sessionId),
+        logoutAccount: (playerId, sessionId) => logoutAccountService(pool, playerId, sessionId),
         requestPasswordReset: ({ email }) => requestPasswordResetService(pool, emailSender, { email, appBaseUrl: config.appBaseUrl }),
         resetPassword: (params) => resetPasswordService(pool, params),
         deleteAccount: (playerId) => deleteAccountService(pool, playerId),

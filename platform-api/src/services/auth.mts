@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
 import {
+  clearAccountSession,
   consumePasswordResetToken,
   createAccount,
   createPasswordResetToken,
@@ -8,10 +9,16 @@ import {
   findAccountByEmail,
   findAccountByPlayerId,
   findPasswordResetToken,
+  isAccountSessionCurrent,
+  rotateAccountSession,
   updateAccountPassword,
   verifyAccountPassword,
 } from "../db/auth.mjs";
 import { savePlayerProfile } from "../db/profiles.mjs";
+
+function makeSessionId(): string {
+  return randomUUID();
+}
 
 export async function registerAccountService(pool: any, { email, password, profileName, claimPlayerId }: any): Promise<any> {
   const existing = await findAccountByEmail(pool, email);
@@ -33,10 +40,11 @@ export async function registerAccountService(pool: any, { email, password, profi
 
   await savePlayerProfile(pool, playerId, { profileName: resolvedProfileName });
 
-  const account = await createAccount(pool, { email, password, playerId });
+  const sessionId = makeSessionId();
+  const account = await createAccount(pool, { email, password, playerId, sessionId });
   if (!account) return { error: "account_creation_failed" };
 
-  return { ok: true, playerId, email: account.email, profileName: resolvedProfileName };
+  return { ok: true, playerId, email: account.email, profileName: resolvedProfileName, sessionId };
 }
 
 export async function loginAccountService(pool: any, { email, password }: any): Promise<any> {
@@ -46,7 +54,20 @@ export async function loginAccountService(pool: any, { email, password }: any): 
   const valid = await verifyAccountPassword(account, password);
   if (!valid) return { error: "invalid_credentials" };
 
-  return { ok: true, playerId: account.player_id, email: account.email };
+  const sessionId = makeSessionId();
+  const session = await rotateAccountSession(pool, account.player_id, sessionId);
+  if (!session) return { error: "session_update_failed" };
+
+  return { ok: true, playerId: account.player_id, email: account.email, sessionId };
+}
+
+export async function verifyAccountSessionService(pool: any, playerId: any, sessionId: any): Promise<boolean> {
+  return isAccountSessionCurrent(pool, playerId, sessionId);
+}
+
+export async function logoutAccountService(pool: any, playerId: any, sessionId: any): Promise<any> {
+  await clearAccountSession(pool, playerId, sessionId);
+  return { ok: true };
 }
 
 export async function requestPasswordResetService(pool: any, emailSender: any, { email, appBaseUrl }: any): Promise<any> {

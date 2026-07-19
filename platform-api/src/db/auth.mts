@@ -10,18 +10,23 @@ function sanitizePlayerId(value: unknown): string {
   return typeof value === "string" ? value.trim().slice(0, 80) : "";
 }
 
-export async function createAccount(db: any, { email, password, playerId }: any): Promise<any> {
+function sanitizeSessionId(value: unknown): string {
+  return typeof value === "string" ? value.trim().slice(0, 120) : "";
+}
+
+export async function createAccount(db: any, { email, password, playerId, sessionId }: any): Promise<any> {
   const normalizedEmail = sanitizeEmail(email);
   const normalizedPlayerId = sanitizePlayerId(playerId);
+  const normalizedSessionId = sanitizeSessionId(sessionId);
   if (!normalizedEmail || !password || !normalizedPlayerId) return null;
 
   const passwordHash = await bcrypt.hash(String(password), BCRYPT_ROUNDS);
 
   const result = await db.query(`
-    insert into accounts (player_id, email, password_hash)
-    values ($1, $2, $3)
-    returning id, player_id, email, created_at
-  `, [normalizedPlayerId, normalizedEmail, passwordHash]);
+    insert into accounts (player_id, email, password_hash, current_session_id)
+    values ($1, $2, $3, $4)
+    returning id, player_id, email, current_session_id, created_at
+  `, [normalizedPlayerId, normalizedEmail, passwordHash, normalizedSessionId]);
 
   return result?.rows?.[0] || null;
 }
@@ -38,6 +43,51 @@ export async function findAccountByEmail(db: any, email: any): Promise<any> {
   `, [normalizedEmail]);
 
   return result?.rows?.[0] || null;
+}
+
+export async function rotateAccountSession(db: any, playerId: any, sessionId: any): Promise<any> {
+  const normalizedPlayerId = sanitizePlayerId(playerId);
+  const normalizedSessionId = sanitizeSessionId(sessionId);
+  if (!normalizedPlayerId || !normalizedSessionId) return null;
+
+  const result = await db.query(`
+    update accounts
+    set current_session_id = $2, updated_at = now()
+    where player_id = $1
+    returning player_id, email, current_session_id
+  `, [normalizedPlayerId, normalizedSessionId]);
+
+  return result?.rows?.[0] || null;
+}
+
+export async function isAccountSessionCurrent(db: any, playerId: any, sessionId: any): Promise<boolean> {
+  const normalizedPlayerId = sanitizePlayerId(playerId);
+  const normalizedSessionId = sanitizeSessionId(sessionId);
+  if (!normalizedPlayerId || !normalizedSessionId) return false;
+
+  const result = await db.query(`
+    select 1
+    from accounts
+    where player_id = $1 and current_session_id = $2
+    limit 1
+  `, [normalizedPlayerId, normalizedSessionId]);
+
+  return (result?.rows?.length ?? 0) > 0;
+}
+
+export async function clearAccountSession(db: any, playerId: any, sessionId: any): Promise<boolean> {
+  const normalizedPlayerId = sanitizePlayerId(playerId);
+  const normalizedSessionId = sanitizeSessionId(sessionId);
+  if (!normalizedPlayerId || !normalizedSessionId) return false;
+
+  const result = await db.query(`
+    update accounts
+    set current_session_id = '', updated_at = now()
+    where player_id = $1 and current_session_id = $2
+    returning player_id
+  `, [normalizedPlayerId, normalizedSessionId]);
+
+  return (result?.rows?.length ?? 0) > 0;
 }
 
 export async function findAccountByPlayerId(db: any, playerId: any): Promise<any> {

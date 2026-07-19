@@ -30,6 +30,7 @@ export async function handleAuthRoute(context: any): Promise<boolean> {
   const {
     registerAccount,
     loginAccount,
+    logoutAccount,
     requestPasswordReset,
     resetPassword,
     deleteAccount,
@@ -69,7 +70,7 @@ export async function handleAuthRoute(context: any): Promise<boolean> {
       return true;
     }
 
-    const token = signToken({ playerId: result.playerId, email: result.email }, jwtSecret);
+    const token = signToken({ playerId: result.playerId, email: result.email, sessionId: result.sessionId }, jwtSecret);
     res.setHeader("set-cookie", buildSetCookieHeader(token, isProduction));
     writeJson(res, 201, { token, playerId: result.playerId, profileName: result.profileName, email: result.email }, requestOrigin);
     return true;
@@ -101,13 +102,16 @@ export async function handleAuthRoute(context: any): Promise<boolean> {
       return true;
     }
 
-    const token = signToken({ playerId: result.playerId, email: result.email }, jwtSecret);
+    const token = signToken({ playerId: result.playerId, email: result.email, sessionId: result.sessionId }, jwtSecret);
     res.setHeader("set-cookie", buildSetCookieHeader(token, isProduction));
     writeJson(res, 200, { token, playerId: result.playerId, email: result.email }, requestOrigin);
     return true;
   }
 
   if (method === "POST" && pathname === "/auth/logout") {
+    if (authClaims?.playerId && authClaims?.sessionId && typeof logoutAccount === "function") {
+      await logoutAccount(authClaims.playerId, authClaims.sessionId);
+    }
     res.setHeader("set-cookie", buildClearCookieHeader(isProduction));
     writeJson(res, 200, { ok: true }, requestOrigin);
     return true;
@@ -119,7 +123,7 @@ export async function handleAuthRoute(context: any): Promise<boolean> {
       return true;
     }
     const freshToken = jwtSecret
-      ? signToken({ playerId: authClaims.playerId, email: authClaims.email }, jwtSecret)
+      ? signToken({ playerId: authClaims.playerId, email: authClaims.email, sessionId: authClaims.sessionId }, jwtSecret)
       : null;
     writeJson(res, 200, {
       ok: true,

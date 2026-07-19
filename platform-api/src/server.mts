@@ -32,9 +32,11 @@ import {
 import {
   deleteAccountService,
   loginAccountService,
+  logoutAccountService,
   registerAccountService,
   requestPasswordResetService,
   resetPasswordService,
+  verifyAccountSessionService,
 } from "./services/auth.mjs";
 import { createEmailSender } from "./email.mjs";
 import {
@@ -132,6 +134,8 @@ async function bootstrap(): Promise<void> {
     searchPlayers: (q: any) => searchPlayers(pool, q),
     registerAccount: (params: any) => registerAccountService(pool, params),
     loginAccount: (params: any) => loginAccountService(pool, params),
+    verifyAccountSession: (playerId: any, sessionId: any) => verifyAccountSessionService(pool, playerId, sessionId),
+    logoutAccount: (playerId: any, sessionId: any) => logoutAccountService(pool, playerId, sessionId),
     requestPasswordReset: ({ email }: any) => requestPasswordResetService(pool, emailSender, { email, appBaseUrl: config.appBaseUrl }),
     resetPassword: (params: any) => resetPasswordService(pool, params),
     deleteAccount: (playerId: any) => deleteAccountService(pool, playerId),

@@ -14,7 +14,7 @@ function isValidEmail(value) {
 // even as the main app router is split into smaller route families.
 export async function handleAuthRoute(context) {
     const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services, } = context;
-    const { registerAccount, loginAccount, requestPasswordReset, resetPassword, deleteAccount, jwtSecret, isProduction, } = services;
+    const { registerAccount, loginAccount, logoutAccount, requestPasswordReset, resetPassword, deleteAccount, jwtSecret, isProduction, } = services;
     if (method === "POST" && pathname === "/auth/register") {
         const body = await readJsonBody(req);
         if (!body.ok) {
@@ -40,7 +40,7 @@ export async function handleAuthRoute(context) {
             writeJson(res, statusCode, { status: "error", error: result?.error || "register_failed", timestamp }, requestOrigin);
             return true;
         }
-        const token = signToken({ playerId: result.playerId, email: result.email }, jwtSecret);
+        const token = signToken({ playerId: result.playerId, email: result.email, sessionId: result.sessionId }, jwtSecret);
         res.setHeader("set-cookie", buildSetCookieHeader(token, isProduction));
         writeJson(res, 201, { token, playerId: result.playerId, profileName: result.profileName, email: result.email }, requestOrigin);
         return true;
@@ -65,12 +65,15 @@ export async function handleAuthRoute(context) {
             writeJson(res, 401, { status: "error", error: "invalid_credentials", timestamp }, requestOrigin);
             return true;
         }
-        const token = signToken({ playerId: result.playerId, email: result.email }, jwtSecret);
+        const token = signToken({ playerId: result.playerId, email: result.email, sessionId: result.sessionId }, jwtSecret);
         res.setHeader("set-cookie", buildSetCookieHeader(token, isProduction));
         writeJson(res, 200, { token, playerId: result.playerId, email: result.email }, requestOrigin);
         return true;
     }
     if (method === "POST" && pathname === "/auth/logout") {
+        if (authClaims?.playerId && authClaims?.sessionId && typeof logoutAccount === "function") {
+            await logoutAccount(authClaims.playerId, authClaims.sessionId);
+        }
         res.setHeader("set-cookie", buildClearCookieHeader(isProduction));
         writeJson(res, 200, { ok: true }, requestOrigin);
         return true;
@@ -81,7 +84,7 @@ export async function handleAuthRoute(context) {
             return true;
         }
         const freshToken = jwtSecret
-            ? signToken({ playerId: authClaims.playerId, email: authClaims.email }, jwtSecret)
+            ? signToken({ playerId: authClaims.playerId, email: authClaims.email, sessionId: authClaims.sessionId }, jwtSecret)
             : null;
         writeJson(res, 200, {
             ok: true,

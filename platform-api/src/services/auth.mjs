@@ -1,6 +1,9 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { consumePasswordResetToken, createAccount, createPasswordResetToken, deletePlayerAccount, findAccountByEmail, findAccountByPlayerId, findPasswordResetToken, updateAccountPassword, verifyAccountPassword, } from "../db/auth.mjs";
+import { clearAccountSession, consumePasswordResetToken, createAccount, createPasswordResetToken, deletePlayerAccount, findAccountByEmail, findAccountByPlayerId, findPasswordResetToken, isAccountSessionCurrent, rotateAccountSession, updateAccountPassword, verifyAccountPassword, } from "../db/auth.mjs";
 import { savePlayerProfile } from "../db/profiles.mjs";
+function makeSessionId() {
+    return randomUUID();
+}
 export async function registerAccountService(pool, { email, password, profileName, claimPlayerId }) {
     const existing = await findAccountByEmail(pool, email);
     if (existing)
@@ -19,10 +22,11 @@ export async function registerAccountService(pool, { email, password, profileNam
         ? profileName.trim()
         : "";
     await savePlayerProfile(pool, playerId, { profileName: resolvedProfileName });
-    const account = await createAccount(pool, { email, password, playerId });
+    const sessionId = makeSessionId();
+    const account = await createAccount(pool, { email, password, playerId, sessionId });
     if (!account)
         return { error: "account_creation_failed" };
-    return { ok: true, playerId, email: account.email, profileName: resolvedProfileName };
+    return { ok: true, playerId, email: account.email, profileName: resolvedProfileName, sessionId };
 }
 export async function loginAccountService(pool, { email, password }) {
     const account = await findAccountByEmail(pool, email);
@@ -31,7 +35,18 @@ export async function loginAccountService(pool, { email, password }) {
     const valid = await verifyAccountPassword(account, password);
     if (!valid)
         return { error: "invalid_credentials" };
-    return { ok: true, playerId: account.player_id, email: account.email };
+    const sessionId = makeSessionId();
+    const session = await rotateAccountSession(pool, account.player_id, sessionId);
+    if (!session)
+        return { error: "session_update_failed" };
+    return { ok: true, playerId: account.player_id, email: account.email, sessionId };
+}
+export async function verifyAccountSessionService(pool, playerId, sessionId) {
+    return isAccountSessionCurrent(pool, playerId, sessionId);
+}
+export async function logoutAccountService(pool, playerId, sessionId) {
+    await clearAccountSession(pool, playerId, sessionId);
+    return { ok: true };
 }
 export async function requestPasswordResetService(pool, emailSender, { email, appBaseUrl }) {
     // Always return ok to avoid revealing whether an email is registered
