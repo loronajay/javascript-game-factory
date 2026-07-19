@@ -7,8 +7,10 @@ import {
   applyPerformanceMode,
   loadPerformanceMode,
   savePerformanceMode,
+  shouldUseLowCostBoardPresentation,
   shouldUseReducedMotionPresentation,
 } from "../src/ui/performanceSettings.js";
+import { reducedMotion } from "../src/ui/effectDom.js";
 
 function memoryStorage(initial = {}) {
   const values = new Map(Object.entries(initial));
@@ -35,17 +37,37 @@ test("balanced battery-saver mode can be persisted and restored", () => {
   assert.equal(loadPerformanceMode(storage), "balanced");
 });
 
-test("reduced presentation applies to battery-saver, OS reduced-motion, and touch play", () => {
+test("combat reduced-motion only follows the OS accessibility setting", () => {
+  const media = (matchesFor) => ({
+    matchMedia: (query) => ({ matches: matchesFor.includes(query) }),
+  });
+
+  assert.equal(shouldUseReducedMotionPresentation({ windowRef: media(["(prefers-reduced-motion: reduce)"]) }), true);
+  assert.equal(shouldUseReducedMotionPresentation({ windowRef: media(["(pointer: coarse)"]) }), false);
+
+  const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
+  globalThis.document = { documentElement: { dataset: { performance: "balanced" } } };
+  globalThis.window = media(["(pointer: coarse)"]);
+  try {
+    assert.equal(reducedMotion(), false, "phone/battery-saver play must keep rolls, combat motion, and float text");
+  } finally {
+    globalThis.document = previousDocument;
+    globalThis.window = previousWindow;
+  }
+});
+
+test("low-cost board presentation applies to battery-saver, OS reduced-motion, and touch play", () => {
   const fullRoot = { dataset: { performance: "full" } };
   const balancedRoot = { dataset: { performance: "balanced" } };
   const media = (matchesFor) => ({
     matchMedia: (query) => ({ matches: matchesFor.includes(query) }),
   });
 
-  assert.equal(shouldUseReducedMotionPresentation({ root: balancedRoot, windowRef: media([]) }), true);
-  assert.equal(shouldUseReducedMotionPresentation({ root: fullRoot, windowRef: media(["(prefers-reduced-motion: reduce)"]) }), true);
-  assert.equal(shouldUseReducedMotionPresentation({ root: fullRoot, windowRef: media(["(pointer: coarse)"]) }), true);
-  assert.equal(shouldUseReducedMotionPresentation({ root: fullRoot, windowRef: media([]) }), false);
+  assert.equal(shouldUseLowCostBoardPresentation({ root: balancedRoot, windowRef: media([]) }), true);
+  assert.equal(shouldUseLowCostBoardPresentation({ root: fullRoot, windowRef: media(["(prefers-reduced-motion: reduce)"]) }), true);
+  assert.equal(shouldUseLowCostBoardPresentation({ root: fullRoot, windowRef: media(["(pointer: coarse)"]) }), true);
+  assert.equal(shouldUseLowCostBoardPresentation({ root: fullRoot, windowRef: media([]) }), false);
 });
 
 test("balanced mode neutralizes continuous action-selection and backdrop repaint costs", () => {

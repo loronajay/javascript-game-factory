@@ -8,7 +8,7 @@ import { svgElement } from "./svgHelpers.js";
 import { getBoardDiamond, pointsToString } from "./isometric.js";
 import { getActiveWeather } from "../core/unitCatalog.js";
 import { WEATHER_LABELS } from "../core/weather.js";
-import { shouldUseReducedMotionPresentation } from "./performanceSettings.js";
+import { shouldUseLowCostBoardPresentation } from "./performanceSettings.js";
 export function getActiveBoardWeather(state) {
   return getActiveWeather(state)?.id ?? null;
 }
@@ -322,7 +322,7 @@ export function createWeatherOverlay(metrics, size, weather) {
 
 // Throw Cigar fire: a cluster of flame tongues licking up off the tile face, with a
 // glowing ember base. Pure presentation; the hazard lives in state.tileObjects.
-export function createFireFigure(metrics, point, { simplified = shouldUseReducedMotionPresentation() } = {}) {
+export function createFireFigure(metrics, point, { simplified = shouldUseLowCostBoardPresentation() } = {}) {
   const hh = metrics.tileHeight / 2;
   const c = { x: point.x, y: point.y + hh };
   const w = metrics.tileWidth * 0.30;

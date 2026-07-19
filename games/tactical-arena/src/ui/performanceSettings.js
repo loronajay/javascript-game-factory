@@ -13,13 +13,17 @@ function mediaMatches(windowRef, query) {
   }
 }
 
-export function shouldUseReducedMotionPresentation({
+export function shouldUseReducedMotionPresentation({ windowRef = globalThis.window } = {}) {
+  return mediaMatches(windowRef, "(prefers-reduced-motion: reduce)");
+}
+
+export function shouldUseLowCostBoardPresentation({
   root = globalThis.document?.documentElement,
   windowRef = globalThis.window,
 } = {}) {
   return (
     normalizePerformanceMode(root?.dataset?.performance) === "balanced" ||
-    mediaMatches(windowRef, "(prefers-reduced-motion: reduce)") ||
+    shouldUseReducedMotionPresentation({ windowRef }) ||
     mediaMatches(windowRef, "(pointer: coarse)")
   );
 }
