@@ -34,7 +34,17 @@ export function hpRemaining(state, player) {
 
 // Map squad compositions onto the four-cell corner spawn blocks. The first two
 // slots preserve the original 2v2 staging, and the extra pair fills the block.
-export function buildRoster(squads, size, players = createRoster({ playerCount: Object.keys(squads ?? {}).length || 2 }), skins = null, nicknames = null) {
+export function buildRoster(
+  squads,
+  size,
+  players = createRoster({ playerCount: Object.keys(squads ?? {}).length || 2 }),
+  skins = null,
+  nicknames = null,
+  options = {},
+) {
+  const trustedSkinSeats = options.trustedSkinSeats == null
+    ? null
+    : new Set(Array.isArray(options.trustedSkinSeats) ? options.trustedSkinSeats.map(Number) : []);
   const slotsForCorner = (corner) => {
     const max = size - 1;
     const coords = [
@@ -57,7 +67,9 @@ export function buildRoster(squads, size, players = createRoster({ playerCount: 
   for (const slot of players) {
     const positions = slotsForCorner(slot.corner);
     const squad = (squads[slot.id] ?? []).slice(0, positions.length);
-    const skinLoadout = normalizeSkinLoadout(squad, skins?.[slot.id]);
+    const skinLoadout = trustedSkinSeats && !trustedSkinSeats.has(slot.id)
+      ? squad.map(() => null)
+      : normalizeSkinLoadout(squad, skins?.[slot.id]);
     // Nicknames are the device owner's personal labels for THEIR OWN units, so the
     // local-preference default (see nicknameModel.js) only rides onto player 1 — the
     // local human in every mode that omits an explicit map (hot-seat, single, campaign,
@@ -101,7 +113,8 @@ export function createMatchState({
   teamColors = null,
   teamNames = null,
   skins = null,
-  nicknames = null
+  nicknames = null,
+  trustedSkinSeats = null
 } = {}) {
   const normalizedFormat = format === FORMATS.TEAMS && Number(playerCount) === 4
     ? FORMATS.TEAMS
@@ -115,7 +128,7 @@ export function createMatchState({
     format: normalizedFormat,
     teamColors: normalizedFormat === FORMATS.TEAMS ? teamColors : null,
     teamNames,
-    units: squads ? buildRoster(squads, size, players, skins, nicknames) : undefined,
+    units: squads ? buildRoster(squads, size, players, skins, nicknames, { trustedSkinSeats }) : undefined,
   });
   const flip = nextRandom(state.rngState);
   const turnOrder = state.turnOrder ?? players.map((slot) => slot.id);

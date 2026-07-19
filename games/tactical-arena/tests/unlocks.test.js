@@ -24,6 +24,7 @@ import {
   isCampaignUnitRewardGranted,
   isCampaignSkinRewardGranted,
   isProgressSkinUnlocked,
+  mergeServerEntitlementsIntoUnlockProgress,
   readUnlockProgress,
   resetUnlockProgress,
   selectCampaignRewardSkin,
@@ -309,6 +310,51 @@ test("premium skin purchases are stored separately and folded into unlocked skin
   const duplicate = grantPremiumSkinPurchase(storage, { type: "swordsman", slug: "medieval" });
   assert.equal(duplicate.accepted, false);
   assert.equal(duplicate.errorCode, "PREMIUM_SKIN_ALREADY_OWNED");
+});
+
+test("server skin entitlements are folded into unlocked skins and equip gating", () => {
+  const storage = storageAdapter();
+
+  const progress = mergeServerEntitlementsIntoUnlockProgress(storage, {
+    entitlements: [
+      { entitlementId: "skin:swordsman:medieval", kind: "skin" },
+      { entitlementId: "skin:necromancer:void-dweller", kind: "skin" },
+      { entitlementId: "unit:juggernaut", kind: "unit" },
+      { entitlementId: "skin:swordsman:medieval", kind: "skin" },
+      { entitlementId: "skin:swordsman", kind: "skin" },
+      { entitlementId: "coins:999999", kind: "currency" },
+    ],
+  });
+
+  assert.deepEqual(progress.serverEntitlementSkins, [
+    { type: "swordsman", slug: "medieval" },
+    { type: "necromancer", slug: "void-dweller" },
+  ]);
+  assert.deepEqual(progress.serverEntitlementUnits, ["juggernaut"]);
+  assert.equal(isProgressSkinUnlocked("swordsman", "medieval", storage), true);
+  assert.equal(isProgressSkinUnlocked("necromancer", "void-dweller", storage), true);
+  assert.equal(isProgressSkinUnlocked("ghoul", "void-dweller", storage), true);
+  assert.equal(isProgressSkinUnlocked("magician", "summer-vibes", storage), false);
+  assert.equal(normalizeSkinSlug("swordsman", "medieval", storage), "medieval");
+  assert.equal(normalizeSkinSlug("magician", "summer-vibes", storage), null);
+  assert.equal(isUnitUnlocked("juggernaut", storage), true);
+});
+
+test("server skin entitlements survive a local progress reset", () => {
+  const storage = storageAdapter();
+  mergeServerEntitlementsIntoUnlockProgress(storage, {
+    entitlements: [
+      { entitlementId: "skin:swordsman:medieval", kind: "skin" },
+      { entitlementId: "unit:juggernaut", kind: "unit" },
+    ],
+  });
+
+  const reset = resetUnlockProgress(storage);
+
+  assert.deepEqual(reset.serverEntitlementSkins, [{ type: "swordsman", slug: "medieval" }]);
+  assert.deepEqual(reset.serverEntitlementUnits, ["juggernaut"]);
+  assert.equal(isProgressSkinUnlocked("swordsman", "medieval", storage), true);
+  assert.equal(isUnitUnlocked("juggernaut", storage), true);
 });
 
 test("premium necromancer skin purchases unlock matching ghoul companion skins", () => {

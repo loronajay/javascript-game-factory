@@ -117,6 +117,38 @@ function normalizeValorBalance(value) {
   return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : STARTING_VALOR_BALANCE;
 }
 
+function skinFromEntitlementId(value) {
+  const parts = typeof value === "string" ? value.trim().split(":") : [];
+  if (parts.length !== 3 || parts[0] !== "skin" || !parts[1] || !parts[2]) return null;
+  return Object.freeze({ type: parts[1], slug: parts[2] });
+}
+
+function unitFromEntitlementId(value) {
+  const parts = typeof value === "string" ? value.trim().split(":") : [];
+  if (parts.length !== 2 || parts[0] !== "unit" || !parts[1]) return null;
+  return parts[1];
+}
+
+function entitlementsFromServerSnapshot(snapshot) {
+  const skins = [];
+  const units = [];
+  const entitlements = Array.isArray(snapshot?.entitlements) ? snapshot.entitlements : [];
+  for (const entitlement of entitlements) {
+    const entitlementId = typeof entitlement?.entitlementId === "string" ? entitlement.entitlementId : "";
+    const skin = skinFromEntitlementId(entitlementId);
+    if (skin) {
+      skins.push(skin);
+      continue;
+    }
+    const unit = unitFromEntitlementId(entitlementId);
+    if (unit) units.push(unit);
+  }
+  return Object.freeze({
+    skins: dedupeSkins(skins),
+    units: uniqueStrings(units),
+  });
+}
+
 // One granted skin per campaign pack, validated against that pack's choices. Stored as a
 // { [packId]: {type, slug} } map so re-opening a pack can be rejected by presence alone.
 function normalizeCampaignRewardSkins(value) {
@@ -157,6 +189,8 @@ function progressFallback() {
     campaignRewardSkins: {},
     campaignGrantedSkins: [],
     purchasedSkins: [],
+    serverEntitlementUnits: [],
+    serverEntitlementSkins: [],
     unlockedSkins: [],
   };
 }
@@ -240,6 +274,9 @@ export function normalizeUnlockProgress(value = {}) {
   const campaignRewardSkins = normalizeCampaignRewardSkins(value.campaignRewardSkins);
   const campaignGrantedSkins = dedupeSkins(value.campaignGrantedSkins);
   const purchasedSkins = dedupeSkins(value.purchasedSkins);
+  const serverEntitlementUnits = uniqueStrings(value.serverEntitlementUnits);
+  for (const type of serverEntitlementUnits) unlockedUnits.add(type);
+  const serverEntitlementSkins = dedupeSkins(value.serverEntitlementSkins);
   // unlockedSkins is fully derived from the granted rewards (tutorial + campaign packs),
   // so it stays consistent no matter what an older/partial payload carried.
   const unlockedSkins = [];
@@ -247,6 +284,7 @@ export function normalizeUnlockProgress(value = {}) {
   for (const skin of Object.values(campaignRewardSkins)) unlockedSkins.push(skin);
   unlockedSkins.push(...campaignGrantedSkins);
   unlockedSkins.push(...withCompanionSkinUnlocks(purchasedSkins));
+  unlockedSkins.push(...withCompanionSkinUnlocks(serverEntitlementSkins));
   return {
     completedTutorials,
     rewardChoices: [...TUTORIAL_REWARD_SKIN_CHOICES],
@@ -261,6 +299,8 @@ export function normalizeUnlockProgress(value = {}) {
     campaignRewardSkins,
     campaignGrantedSkins,
     purchasedSkins,
+    serverEntitlementUnits,
+    serverEntitlementSkins,
     unlockedSkins: dedupeSkins(unlockedSkins),
   };
 }
@@ -305,6 +345,8 @@ export function resetUnlockProgress(storage = defaultStorage()) {
     campaignRewardSkins,
     campaignGrantedSkins,
     purchasedSkins: current.purchasedSkins,
+    serverEntitlementUnits: current.serverEntitlementUnits,
+    serverEntitlementSkins: current.serverEntitlementSkins,
   };
   const resetProgress = writeUnlockProgress(storage, {
     ...progressFallback(),
@@ -325,6 +367,17 @@ export function isProgressUnitUnlocked(type, storage = defaultStorage()) {
 export function isProgressSkinUnlocked(type, slug, storage = defaultStorage()) {
   if (!slug) return true;
   return readUnlockProgress(storage).unlockedSkins.some((skin) => skin.type === type && skin.slug === slug);
+}
+
+export function mergeServerEntitlementsIntoUnlockProgress(storage = defaultStorage(), snapshot = {}) {
+  const progress = readUnlockProgress(storage);
+  const entitlements = entitlementsFromServerSnapshot(snapshot);
+  if (!entitlements.skins.length && !entitlements.units.length) return progress;
+  return writeUnlockProgress(storage, {
+    ...progress,
+    serverEntitlementUnits: [...progress.serverEntitlementUnits, ...entitlements.units],
+    serverEntitlementSkins: [...progress.serverEntitlementSkins, ...entitlements.skins],
+  });
 }
 
 export function selectTutorialRewardSkin(storage = defaultStorage(), choice) {

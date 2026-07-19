@@ -48,7 +48,12 @@ html[data-performance="balanced"] .tile.legal-attack .tile-face,
 html[data-performance="balanced"] .tile.legal-art .tile-face,
 html[data-performance="balanced"] .tile.legal-heal .tile-face,
 html[data-performance="balanced"] .tile.path .tile-face,
-html[data-performance="balanced"] .tile.cone-hot .tile-face {
+html[data-performance="balanced"] .tile.cone-hot .tile-face,
+html[data-performance="balanced"] .tile-fire-flame,
+html[data-performance="balanced"] .unit.active .rim,
+html[data-performance="balanced"] .unit.is-raging .rage-aura,
+html[data-performance="balanced"] .unit.ghost .rim,
+html[data-performance="balanced"] .status-icon .ic-bolt {
   animation: none !important;
 }
 
@@ -57,9 +62,19 @@ html[data-performance="balanced"] .bk-fortress::before {
 }
 
 html[data-performance="balanced"] .bk-fortress-svg,
+html[data-performance="balanced"] .dais-top,
+html[data-performance="balanced"] .tile-fire,
 html[data-performance="balanced"] .unit .shadow,
+html[data-performance="balanced"] .unit.active,
+html[data-performance="balanced"] .unit.is-raging .sprite-img,
+html[data-performance="balanced"] .unit.ghost,
+html[data-performance="balanced"] .unit.ghost .sprite-img,
 html[data-performance="balanced"] #boardLayer {
   filter: none;
+}
+
+html[data-performance="balanced"] .dais-aura {
+  display: none;
 }
 
 @media (pointer: coarse) {
@@ -89,8 +104,18 @@ html[data-performance="balanced"] #boardLayer {
     display: none;
   }
 
-  .bk-fortress-svg {
+  .bk-fortress-svg,
+  .dais-top,
+  .tile-fire,
+  .unit.active,
+  .unit.is-raging .sprite-img,
+  .unit.ghost,
+  .unit.ghost .sprite-img {
     filter: none;
+  }
+
+  .dais-aura {
+    display: none;
   }
 
   /* Hold the resting frame on the always-on board/unit/status animations. */
@@ -102,7 +127,12 @@ html[data-performance="balanced"] #boardLayer {
   .tile.legal-art .tile-face,
   .tile.legal-heal .tile-face,
   .tile.path .tile-face,
-  .tile.cone-hot .tile-face {
+  .tile.cone-hot .tile-face,
+  .tile-fire-flame,
+  .unit.active .rim,
+  .unit.is-raging .rage-aura,
+  .unit.ghost .rim,
+  .status-icon .ic-bolt {
     animation: none;
   }
 

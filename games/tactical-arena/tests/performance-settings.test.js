@@ -7,6 +7,7 @@ import {
   applyPerformanceMode,
   loadPerformanceMode,
   savePerformanceMode,
+  shouldUseReducedMotionPresentation,
 } from "../src/ui/performanceSettings.js";
 
 function memoryStorage(initial = {}) {
@@ -34,12 +35,27 @@ test("balanced battery-saver mode can be persisted and restored", () => {
   assert.equal(loadPerformanceMode(storage), "balanced");
 });
 
+test("reduced presentation applies to battery-saver, OS reduced-motion, and touch play", () => {
+  const fullRoot = { dataset: { performance: "full" } };
+  const balancedRoot = { dataset: { performance: "balanced" } };
+  const media = (matchesFor) => ({
+    matchMedia: (query) => ({ matches: matchesFor.includes(query) }),
+  });
+
+  assert.equal(shouldUseReducedMotionPresentation({ root: balancedRoot, windowRef: media([]) }), true);
+  assert.equal(shouldUseReducedMotionPresentation({ root: fullRoot, windowRef: media(["(prefers-reduced-motion: reduce)"]) }), true);
+  assert.equal(shouldUseReducedMotionPresentation({ root: fullRoot, windowRef: media(["(pointer: coarse)"]) }), true);
+  assert.equal(shouldUseReducedMotionPresentation({ root: fullRoot, windowRef: media([]) }), false);
+});
+
 test("balanced mode neutralizes continuous action-selection and backdrop repaint costs", () => {
   const css = readFileSync(new URL("../styles/responsive/performance.css", import.meta.url), "utf8");
 
   assert.match(css, /data-performance=["']balanced["']/);
   assert.match(css, /\.tile\.legal-move \.tile-face/);
   assert.match(css, /\.tile\.legal-attack \.tile-face/);
+  assert.match(css, /\.tile-fire-flame/);
+  assert.match(css, /\.dais-aura/);
   assert.match(css, /#boardLayer/);
   assert.match(css, /\.bk-aurora/);
   assert.match(css, /\.bk-rain/);

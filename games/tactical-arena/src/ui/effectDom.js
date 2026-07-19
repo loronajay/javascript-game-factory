@@ -1,3 +1,5 @@
+import { shouldUseReducedMotionPresentation } from "./performanceSettings.js";
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 export function svg(name, attributes = {}) {
@@ -7,7 +9,7 @@ export function svg(name, attributes = {}) {
 }
 
 export function reducedMotion() {
-  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+  return shouldUseReducedMotionPresentation();
 }
 
 export function sleep(ms) {

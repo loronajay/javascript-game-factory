@@ -11,7 +11,7 @@ import { TEMPO_GAUGE_MAX, enableTempoBattle } from "../src/core/tempoBattle.js";
 import { canCancelMoveInActivation, canMoveInActivation } from "../src/ui/hud.js";
 import { renderActions, renderSquads, renderUnitCard } from "../src/ui/hud.js";
 import { isHealArtConfirmTile, isTargetedMode, renderBoard } from "../src/ui/boardRenderer.js";
-import { getActiveBoardWeather } from "../src/ui/boardAtmosphere.js";
+import { createFireFigure, getActiveBoardWeather } from "../src/ui/boardAtmosphere.js";
 import { createUnitFigure, UNIT_VISUAL_LIFT } from "../src/ui/unitRenderer.js";
 import { createEffects } from "../src/ui/effects.js";
 import { UNIT_TYPES, getArt } from "../src/core/unitCatalog.js";
@@ -744,6 +744,23 @@ test("global ritual VFX use the configured board metrics without throwing", asyn
   } finally {
     globalThis.document = previousDocument;
     globalThis.window = previousWindow;
+  }
+});
+
+test("reduced board presentation draws cheaper fire tiles", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const metrics = { tileWidth: 58, tileHeight: 29 };
+    const point = { x: 100, y: 100 };
+    const fullFire = createFireFigure(metrics, point, { simplified: false });
+    const cheapFire = createFireFigure(metrics, point, { simplified: true });
+
+    assert.equal(fullFire.children.length, 4, "full fire keeps the ember base and three flame tongues");
+    assert.equal(cheapFire.children.length, 2, "reduced fire keeps a readable base and one static flame");
+  } finally {
+    globalThis.document = previousDocument;
   }
 });
 

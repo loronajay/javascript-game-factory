@@ -32,7 +32,8 @@ import { createCampaignPresentationController } from "./campaign/campaignPresent
 import { createMatchLifecycleController } from "./match/matchLifecycleController.js";
 import { isTempoBattle, isTempoUnitReady } from "./core/tempoBattle.js";
 import { createCampaignMeta } from "./campaign/campaignMeta.js";
-import { flushPendingGameProgressClaims } from "./platform/gameProgressClient.js";
+import { fetchGameProgressSnapshot, flushPendingGameProgressClaims } from "./platform/gameProgressClient.js";
+import { mergeServerEntitlementsIntoUnlockProgress } from "./progression/unlocks.js";
 
 // --- DOM refs ---
 const board = document.querySelector("#boardSvg");
@@ -110,8 +111,15 @@ let campaignMeta = createCampaignMeta();
 
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
-function syncGameProgress() {
-  return flushPendingGameProgressClaims({ storage: globalThis.localStorage });
+async function syncGameProgress() {
+  const storage = globalThis.localStorage;
+  const flushResult = await flushPendingGameProgressClaims({ storage });
+  let snapshot = flushResult.progress;
+  if (!snapshot && flushResult.ok) {
+    snapshot = await fetchGameProgressSnapshot();
+  }
+  if (snapshot) mergeServerEntitlementsIntoUnlockProgress(storage, snapshot);
+  return flushResult;
 }
 
 function isCpu(player) {

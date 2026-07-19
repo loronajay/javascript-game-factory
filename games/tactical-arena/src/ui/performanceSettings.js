@@ -5,6 +5,25 @@ export function normalizePerformanceMode(mode) {
   return mode === "balanced" ? "balanced" : DEFAULT_PERFORMANCE_MODE;
 }
 
+function mediaMatches(windowRef, query) {
+  try {
+    return Boolean(windowRef?.matchMedia?.(query)?.matches);
+  } catch {
+    return false;
+  }
+}
+
+export function shouldUseReducedMotionPresentation({
+  root = globalThis.document?.documentElement,
+  windowRef = globalThis.window,
+} = {}) {
+  return (
+    normalizePerformanceMode(root?.dataset?.performance) === "balanced" ||
+    mediaMatches(windowRef, "(prefers-reduced-motion: reduce)") ||
+    mediaMatches(windowRef, "(pointer: coarse)")
+  );
+}
+
 export function applyPerformanceMode(mode, root = globalThis.document?.documentElement) {
   const normalized = normalizePerformanceMode(mode);
   if (root?.dataset) root.dataset.performance = normalized;

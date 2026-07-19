@@ -77,6 +77,7 @@ export function createMatchLifecycleController({
       format: config.format,
       teamColors: config.teamColors,
       teamNames: config.teamNames,
+      trustedSkinSeats: config.trustedSkinSeats,
     });
     if (config.mode === "tutorial") {
       state = prepareTutorialMatchState(state, config.tutorialId ?? TUTORIAL_BASICS_ID);

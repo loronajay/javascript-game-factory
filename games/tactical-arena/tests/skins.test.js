@@ -287,3 +287,32 @@ test("match state normalizes every skin selection to classic while skins are loc
     [["swordsman", null], ["archer", null], ["mystic", null], ["magician", null]]
   );
 });
+
+test("match state accepts only trusted-seat skins granted by account entitlements", () => {
+  const previousStorage = globalThis.localStorage;
+  const storage = new FakeLocalStorage();
+  writeUnlockProgress(storage, {
+    serverEntitlementSkins: [{ type: "swordsman", slug: "medieval" }],
+  });
+  globalThis.localStorage = storage;
+
+  try {
+    const state = createMatchState({
+      seed: 1,
+      squads: { 1: ["swordsman", "archer", "mystic", "magician"], 2: ["swordsman", "archer", "mystic", "magician"] },
+      skins: { 1: ["medieval", "summer-vibes", null, null], 2: ["medieval", null, null, null] },
+      trustedSkinSeats: [1],
+    });
+
+    assert.deepEqual(
+      state.units.filter((unit) => unit.player === 1).map((unit) => [unit.type, unit.skin]),
+      [["swordsman", "medieval"], ["archer", null], ["mystic", null], ["magician", null]]
+    );
+    assert.deepEqual(
+      state.units.filter((unit) => unit.player === 2).map((unit) => [unit.type, unit.skin]),
+      [["swordsman", null], ["archer", null], ["mystic", null], ["magician", null]]
+    );
+  } finally {
+    globalThis.localStorage = previousStorage;
+  }
+});

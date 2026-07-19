@@ -8,6 +8,7 @@ import { svgElement } from "./svgHelpers.js";
 import { getBoardDiamond, pointsToString } from "./isometric.js";
 import { getActiveWeather } from "../core/unitCatalog.js";
 import { WEATHER_LABELS } from "../core/weather.js";
+import { shouldUseReducedMotionPresentation } from "./performanceSettings.js";
 export function getActiveBoardWeather(state) {
   return getActiveWeather(state)?.id ?? null;
 }
@@ -321,7 +322,7 @@ export function createWeatherOverlay(metrics, size, weather) {
 
 // Throw Cigar fire: a cluster of flame tongues licking up off the tile face, with a
 // glowing ember base. Pure presentation; the hazard lives in state.tileObjects.
-export function createFireFigure(metrics, point) {
+export function createFireFigure(metrics, point, { simplified = shouldUseReducedMotionPresentation() } = {}) {
   const hh = metrics.tileHeight / 2;
   const c = { x: point.x, y: point.y + hh };
   const w = metrics.tileWidth * 0.30;
@@ -335,6 +336,18 @@ export function createFireFigure(metrics, point) {
     });
   };
   const g = svgElement("g", { class: "tile-fire" });
+  if (simplified) {
+    const bx = c.x;
+    const by = c.y + hh * 0.35;
+    g.append(
+      svgElement("ellipse", { class: "tile-fire-base", cx: c.x, cy: c.y + hh * 0.5, rx: w, ry: hh * 0.32 }),
+      svgElement("path", {
+        class: "tile-fire-flame tile-fire-flame--hi",
+        d: `M ${bx} ${by} C ${bx - w * 0.6} ${by - h * 0.48}, ${bx - w * 0.18} ${by - h * 0.86}, ${bx} ${by - h * 0.86} C ${bx + w * 0.18} ${by - h * 0.86}, ${bx + w * 0.6} ${by - h * 0.48}, ${bx} ${by} Z`
+      })
+    );
+    return g;
+  }
   g.append(
     svgElement("ellipse", { class: "tile-fire-base", cx: c.x, cy: c.y + hh * 0.5, rx: w * 1.2, ry: hh * 0.4 }),
     flame(-w * 0.7, 0.7, "tile-fire-flame tile-fire-flame--lo"),

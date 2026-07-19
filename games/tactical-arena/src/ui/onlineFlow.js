@@ -747,6 +747,7 @@ export function createOnlineFlow({ onStartMatch }) {
       nicknames,
       playerCount: count,
       format,
+      trustedSkinSeats: [mySeat],
       teamColors: format === "teams" ? { ...cfg.teamColors } : null,
       teamNames: format === "teams" ? { ...cfg.teamNames } : null,
     });
