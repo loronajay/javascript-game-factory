@@ -52,6 +52,26 @@ function storageAdapter() {
   };
 }
 
+function legacyProgressSeal(serialized) {
+  const sealed = `tactical-arena-progress-v1|${serialized}`;
+  let hash = 2166136261;
+  for (let index = 0; index < sealed.length; index += 1) {
+    hash ^= sealed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  const digest = (hash >>> 0).toString(36).padStart(7, "0");
+  return `v1:${serialized.length}:${digest}`;
+}
+
+function sealedBackupEnvelope(progress) {
+  const serialized = JSON.stringify(progress);
+  return JSON.stringify({
+    version: 1,
+    progress,
+    seal: legacyProgressSeal(serialized),
+  });
+}
+
 const ALL_TUTORIAL_IDS = Object.freeze([
   TUTORIAL_BASICS_ID,
   TUTORIAL_ARTS_MP_ID,
@@ -99,6 +119,52 @@ test("forged local unlock payloads roll back to the sealed progress copy", () =>
   assert.deepEqual(progress.purchasedSkins, [{ type: "swordsman", slug: "medieval" }]);
   assert.equal(isProgressSkinUnlocked("swordsman", "medieval", storage), true);
   assert.equal(isProgressSkinUnlocked("magician", "summer-vibes", storage), false);
+});
+
+test("older sealed unlock payloads migrate instead of resetting progress", () => {
+  const storage = storageAdapter();
+  const legacyProgress = {
+    valorBalance: 320,
+    unlockedUnits: ["clod", "necromancer"],
+    purchasedSkins: [{ type: "swordsman", slug: "medieval" }],
+  };
+  const raw = JSON.stringify(legacyProgress);
+  storage.setItem(TUTORIAL_PROGRESS_KEY, raw);
+  storage.setItem(TUTORIAL_PROGRESS_SEAL_KEY, legacyProgressSeal(raw));
+
+  const progress = readUnlockProgress(storage);
+
+  assert.equal(progress.valorBalance, 320);
+  assert.equal(progress.unlockedUnits.includes("clod"), true);
+  assert.equal(progress.unlockedUnits.includes("necromancer"), true);
+  assert.deepEqual(progress.purchasedSkins, [{ type: "swordsman", slug: "medieval" }]);
+  assert.equal(isProgressSkinUnlocked("swordsman", "medieval", storage), true);
+  assert.notEqual(storage.getItem(TUTORIAL_PROGRESS_KEY), raw);
+  assert.notEqual(storage.getItem(TUTORIAL_PROGRESS_SEAL_KEY), legacyProgressSeal(raw));
+  assert.notEqual(storage.getItem(TUTORIAL_PROGRESS_BACKUP_KEY), null);
+});
+
+test("older sealed backup payloads recover when the primary progress is invalid", () => {
+  const storage = storageAdapter();
+  const backupProgress = {
+    valorBalance: 180,
+    unlockedUnits: ["witch-doctor"],
+    purchasedSkins: [{ type: "archer", slug: "desert-warrior" }],
+  };
+  storage.setItem(TUTORIAL_PROGRESS_KEY, JSON.stringify({
+    valorBalance: 999999,
+    unlockedUnits: ["summoner"],
+  }));
+  storage.setItem(TUTORIAL_PROGRESS_SEAL_KEY, "v1:0:not-a-valid-seal");
+  storage.setItem(TUTORIAL_PROGRESS_BACKUP_KEY, sealedBackupEnvelope(backupProgress));
+
+  const progress = readUnlockProgress(storage);
+
+  assert.equal(progress.valorBalance, 180);
+  assert.equal(progress.unlockedUnits.includes("witch-doctor"), true);
+  assert.equal(progress.unlockedUnits.includes("summoner"), false);
+  assert.deepEqual(progress.purchasedSkins, [{ type: "archer", slug: "desert-warrior" }]);
+  assert.equal(isProgressSkinUnlocked("archer", "desert-warrior", storage), true);
 });
 
 test("completing all tutorial entries unlocks Juggernaut but waits for a skin choice", () => {

@@ -139,8 +139,8 @@ export function markProgressionAnnouncementsSeen(storage = defaultStorage(), ann
   return next;
 }
 
-export function enqueueProgressionAnnouncements(storage = defaultStorage(), announcements = []) {
-  const seenIds = new Set(readSeenProgressionAnnouncementIds(storage));
+export function enqueueProgressionAnnouncements(storage = defaultStorage(), announcements = [], options = {}) {
+  const seenIds = options.ignoreSeen ? new Set() : new Set(readSeenProgressionAnnouncementIds(storage));
   const pending = readProgressionAnnouncements(storage);
   const byId = new Map(pending.map((announcement) => [announcement.id, announcement]));
   for (const value of announcements) {
@@ -153,25 +153,27 @@ export function enqueueProgressionAnnouncements(storage = defaultStorage(), anno
   return next;
 }
 
-export function enqueueUnitUnlockAnnouncements(storage = defaultStorage(), unitTypes = []) {
+export function enqueueUnitUnlockAnnouncements(storage = defaultStorage(), unitTypes = [], options = {}) {
   return enqueueProgressionAnnouncements(
     storage,
     uniqueStrings(unitTypes).map((type) => buildUnitUnlockAnnouncement(type)),
+    options,
   );
 }
 
-export function enqueueSkinUnlockAnnouncements(storage = defaultStorage(), skins = []) {
+export function enqueueSkinUnlockAnnouncements(storage = defaultStorage(), skins = [], options = {}) {
   return enqueueProgressionAnnouncements(
     storage,
     (Array.isArray(skins) ? skins : []).map((skin) => {
       const announcement = buildSkinUnlockAnnouncement(skin);
       return announcement ? { kind: "skin-unlock", unitType: skin.type, skinSlug: skin.slug } : null;
     }).filter(Boolean),
+    options,
   );
 }
 
-export function enqueueValorGainAnnouncement(storage = defaultStorage(), value = {}) {
-  return enqueueProgressionAnnouncements(storage, [{ ...value, kind: "valor-gain" }]);
+export function enqueueValorGainAnnouncement(storage = defaultStorage(), value = {}, options = {}) {
+  return enqueueProgressionAnnouncements(storage, [{ ...value, kind: "valor-gain" }], options);
 }
 
 export function enqueueDraftBattleUnlockAnnouncement(storage = defaultStorage()) {

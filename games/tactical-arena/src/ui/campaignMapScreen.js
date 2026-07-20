@@ -469,7 +469,7 @@ export function createCampaignMapScreen({
     const result = selectCampaignRewardUnit(globalThis.localStorage, packId, choice, { missionId: options.missionId });
     if (!result.accepted) return null;
     void syncGameProgress();
-    enqueueUnitUnlockAnnouncements(globalThis.localStorage, [choice]);
+    enqueueUnitUnlockAnnouncements(globalThis.localStorage, [choice], { ignoreSeen: true });
     enqueueDraftBattleUnlockAnnouncement(globalThis.localStorage);
     if (isActive()) renderCampaign();
     return choice;

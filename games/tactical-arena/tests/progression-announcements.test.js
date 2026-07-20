@@ -61,6 +61,17 @@ test("unit unlock announcements queue once and mark themselves seen when consume
   assert.deepEqual(enqueueUnitUnlockAnnouncements(storage, ["clod"]), []);
 });
 
+test("explicit reward grants can announce even when a stale seen entry exists", () => {
+  const storage = storageAdapter();
+
+  enqueueUnitUnlockAnnouncements(storage, ["clod"]);
+  consumeProgressionAnnouncements(storage);
+
+  const pending = enqueueUnitUnlockAnnouncements(storage, ["clod"], { ignoreSeen: true });
+
+  assert.deepEqual(pending.map((announcement) => announcement.id), ["unit-unlock:clod"]);
+});
+
 test("summon-only unit unlocks are never announced or counted for draft unlocks", () => {
   const storage = storageAdapter();
 
@@ -97,6 +108,21 @@ test("skin unlock announcements queue with unit and skin identity", () => {
 
   consumeProgressionAnnouncements(storage);
   assert.deepEqual(enqueueSkinUnlockAnnouncements(storage, [{ type: "angel", slug: "summer-vibes" }]), []);
+});
+
+test("explicit skin grants can announce even when a stale seen entry exists", () => {
+  const storage = storageAdapter();
+
+  enqueueSkinUnlockAnnouncements(storage, [{ type: "angel", slug: "summer-vibes" }]);
+  consumeProgressionAnnouncements(storage);
+
+  const pending = enqueueSkinUnlockAnnouncements(
+    storage,
+    [{ type: "angel", slug: "summer-vibes" }],
+    { ignoreSeen: true },
+  );
+
+  assert.deepEqual(pending.map((announcement) => announcement.id), ["skin-unlock:angel:summer-vibes"]);
 });
 
 test("existing non-starter unit unlocks are audited into pending announcements", () => {

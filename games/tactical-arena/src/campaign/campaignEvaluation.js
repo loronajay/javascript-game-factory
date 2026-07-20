@@ -568,8 +568,8 @@ export function completeCampaignMission(storage = defaultStorage(), missionId, s
       stars: evaluation.stars,
     }));
   }
-  enqueueUnitUnlockAnnouncements(storage, newRewardUnits);
-  enqueueSkinUnlockAnnouncements(storage, newRewardSkins);
+  enqueueUnitUnlockAnnouncements(storage, newRewardUnits, { ignoreSeen: true });
+  enqueueSkinUnlockAnnouncements(storage, newRewardSkins, { ignoreSeen: true });
   enqueueDraftBattleUnlockAnnouncement(storage);
 
   return {

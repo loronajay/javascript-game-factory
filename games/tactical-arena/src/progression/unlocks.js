@@ -255,8 +255,8 @@ function readSealedBackupProgress(storage) {
   if (!envelope || envelope.version !== PROGRESS_SEAL_VERSION || !envelope.progress || typeof envelope.seal !== "string") {
     return null;
   }
-  const serialized = serializedProgress(envelope.progress);
-  return envelope.seal === progressSeal(serialized) ? JSON.parse(serialized) : null;
+  const serialized = JSON.stringify(envelope.progress);
+  return envelope.seal === progressSeal(serialized) ? normalizeUnlockProgress(envelope.progress) : null;
 }
 
 export function normalizeUnlockProgress(value = {}) {
@@ -317,6 +317,7 @@ export function readUnlockProgress(storage = defaultStorage()) {
   const storedSeal = readStorageText(storage, TUTORIAL_PROGRESS_SEAL_KEY);
 
   if (storedSeal === expectedSeal) return JSON.parse(serialized);
+  if (storedSeal === progressSeal(raw)) return writeSealedProgress(storage, parsed);
 
   const backup = readSealedBackupProgress(storage);
   if (backup) return writeSealedProgress(storage, backup);

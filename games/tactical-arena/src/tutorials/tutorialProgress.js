@@ -42,7 +42,7 @@ export function completeTutorial(storage, tutorialId) {
     enqueueGameProgressClaim(storage, buildTutorialCompleteClaim({ tutorialId }));
   }
   if (!previouslyComplete && next.allTutorialsComplete) {
-    enqueueUnitUnlockAnnouncements(storage, [TUTORIAL_JUGGERNAUT_REWARD_UNIT]);
+    enqueueUnitUnlockAnnouncements(storage, [TUTORIAL_JUGGERNAUT_REWARD_UNIT], { ignoreSeen: true });
     enqueueDraftBattleUnlockAnnouncement(storage);
   }
   if (shouldGrantTutorialValor) {
@@ -58,7 +58,7 @@ export function completeTutorial(storage, tutorialId) {
       amount: TUTORIAL_VALOR_REWARD,
       title: "Tutorial Valor Earned",
       body: `Completing every tutorial awarded ${TUTORIAL_VALOR_REWARD.toLocaleString("en-US")} Valor.`,
-    });
+    }, { ignoreSeen: true });
   }
   return next;
 }
