@@ -7,6 +7,7 @@ const VALID_CLAIM_KINDS = new Set([
     "tutorial-valor",
     "tutorial-unit-reward",
     "tutorial-skin-choice",
+    "premium-skin-purchase",
 ]);
 function cleanText(value, maxLength = 200) {
     return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -60,6 +61,16 @@ function buildSkinEntitlement(payload) {
         entitlementId: cleanText(payload.entitlementId, 180) || `skin:${type}:${slug}`,
         kind: "skin",
     };
+}
+function buildSkinPurchaseEntitlements(payload) {
+    const rawEntitlementIds = [
+        payload.entitlementId,
+        ...(Array.isArray(payload.entitlementIds) ? payload.entitlementIds : []),
+    ];
+    const entitlementIds = [...new Set(rawEntitlementIds.map((value) => cleanText(value, 180)).filter(Boolean))];
+    return entitlementIds
+        .filter((entitlementId) => entitlementId.startsWith("skin:"))
+        .map((entitlementId) => ({ entitlementId, kind: "skin" }));
 }
 function buildUnitEntitlement(payload) {
     const type = cleanText(payload.type, 80);
@@ -148,7 +159,7 @@ export async function recordGameProgressClaim(pool, params = {}) {
     const claimId = cleanText(params.claimId, 200);
     const kind = cleanText(params.kind, 80);
     const payload = normalizePayload(params.payload);
-    const sourceId = cleanText(params.sourceId || payload.missionId || payload.packId || payload.tutorialId || "", 200);
+    const sourceId = cleanText(params.sourceId || payload.sessionId || payload.missionId || payload.packId || payload.tutorialId || "", 200);
     if (!pool || !playerId || !gameSlug || !claimId || !VALID_CLAIM_KINDS.has(kind))
         return null;
     const client = await pool.connect();
@@ -207,6 +218,12 @@ export async function recordGameProgressClaim(pool, params = {}) {
             const entitlement = buildUnitEntitlement(payload);
             if (entitlement)
                 await grantEntitlement(client, playerId, gameSlug, entitlement, "tutorial", sourceId);
+        }
+        else if (!alreadyProcessed && kind === "premium-skin-purchase") {
+            const entitlements = buildSkinPurchaseEntitlements(payload);
+            for (const entitlement of entitlements) {
+                await grantEntitlement(client, playerId, gameSlug, entitlement, "stripe", sourceId || claimId);
+            }
         }
         await client.query("commit");
         return {

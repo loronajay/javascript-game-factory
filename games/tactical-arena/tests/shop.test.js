@@ -339,6 +339,56 @@ test("shop skin cards offer USD checkout and Valor purchase buttons", () => {
   assert.ok(ownedButtons[0].disabled);
 });
 
+test("shop skin USD purchase opens Stripe checkout through the configured endpoint", async () => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  const fetchCalls = [];
+  const locationRef = {
+    href: "https://factory.example/games/tactical-arena/index.html",
+    assigned: "",
+    assign(url) {
+      this.assigned = url;
+      this.href = url;
+    },
+  };
+
+  openShop(storage, {
+    account: { ...SIGNED_IN_ACCOUNT, token: "token-1" },
+    checkoutEndpoint: "/api/test-checkout",
+    locationRef,
+    fetchImpl: async (url, init) => {
+      fetchCalls.push({ url, init });
+      return {
+        ok: true,
+        async json() {
+          return { url: "https://checkout.stripe.com/c/test-session" };
+        },
+      };
+    },
+  });
+
+  const overlay = document.body.children[0];
+  walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Skins")[0].click();
+
+  const skinCard = walk(overlay, (node) => hasClass(node, "shop-skin") && visibleText(node).includes("Summer Vibes"))[0];
+  const usdBuy = walk(skinCard, (node) => node.tagName === "BUTTON" && hasClass(node, "is-premium"))[0];
+  usdBuy.click();
+
+  assert.match(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent, /Opening secure checkout/i);
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(locationRef.assigned, "https://checkout.stripe.com/c/test-session");
+  assert.equal(fetchCalls.length, 1);
+  assert.equal(fetchCalls[0].url, "https://factory.example/api/test-checkout");
+  assert.equal(fetchCalls[0].init.headers.Authorization, "Bearer token-1");
+  const body = JSON.parse(fetchCalls[0].init.body);
+  assert.equal(body.offer.kind, "skin");
+  assert.match(body.offer.sku, /^ta\.skin\./);
+  assert.equal("price" in body.offer, false);
+  assert.equal(body.successUrl, "https://factory.example/games/tactical-arena/index.html?checkout=success&session_id=%7BCHECKOUT_SESSION_ID%7D");
+});
+
 test("shop skin packs render clickable contents and use Valor confirmation", () => {
   globalThis.document = new FakeDocument();
   const storage = storageAdapter();

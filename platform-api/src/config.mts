@@ -14,6 +14,9 @@ export interface ApiConfig {
   cloudinaryApiKey: string;
   cloudinaryApiSecret: string;
   hasCloudinary: boolean;
+  stripeApiKey: string;
+  stripeWebhookSecret: string;
+  hasStripe: boolean;
 }
 
 function parsePort(value: unknown): number {
@@ -32,6 +35,14 @@ export function readConfig(options: { env?: Record<string, string | undefined> }
   const cloudinaryCloudName = typeof env.CLOUDINARY_CLOUD_NAME === "string" ? env.CLOUDINARY_CLOUD_NAME.trim() : "";
   const cloudinaryApiKey = typeof env.CLOUDINARY_API_KEY === "string" ? env.CLOUDINARY_API_KEY.trim() : "";
   const cloudinaryApiSecret = typeof env.CLOUDINARY_API_SECRET === "string" ? env.CLOUDINARY_API_SECRET.trim() : "";
+  const stripeApiKey = typeof env.STRIPE_RESTRICTED_KEY === "string" && env.STRIPE_RESTRICTED_KEY.trim()
+    ? env.STRIPE_RESTRICTED_KEY.trim()
+    : typeof env.STRIPE_SECRET_KEY === "string" && env.STRIPE_SECRET_KEY.trim()
+      ? env.STRIPE_SECRET_KEY.trim()
+      : typeof env.STRIPE_API_KEY === "string"
+        ? env.STRIPE_API_KEY.trim()
+        : "";
+  const stripeWebhookSecret = typeof env.STRIPE_WEBHOOK_SECRET === "string" ? env.STRIPE_WEBHOOK_SECRET.trim() : "";
 
   return {
     port: parsePort(env.PORT),
@@ -47,5 +58,8 @@ export function readConfig(options: { env?: Record<string, string | undefined> }
     cloudinaryApiKey,
     cloudinaryApiSecret,
     hasCloudinary: Boolean(cloudinaryCloudName && cloudinaryApiKey && cloudinaryApiSecret),
+    stripeApiKey,
+    stripeWebhookSecret,
+    hasStripe: Boolean(stripeApiKey && stripeWebhookSecret),
   };
 }

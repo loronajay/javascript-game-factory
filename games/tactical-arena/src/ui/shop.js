@@ -14,6 +14,11 @@ import {
   readStoredFactoryAccountSession,
   redirectToFactoryAccountSignIn,
 } from "../platform/factoryAccount.js";
+import {
+  PREMIUM_CHECKOUT_EVENT,
+  premiumCheckoutErrorMessage,
+  startPremiumCheckout,
+} from "../platform/premiumCheckoutClient.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { groupedUnitTypes } from "./squadModel.js";
 import { el } from "./domHelpers.js";
@@ -46,6 +51,7 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
   let unitScrollTop = 0;
   let pendingValorPurchase = null;
   let pendingValorError = "";
+  let premiumCheckoutInFlight = false;
 
   function render() {
     const catalog = getShopCatalog(storage);
@@ -432,6 +438,40 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
     render();
   }
 
+  async function beginPremiumCheckout(offer) {
+    if (!accountLoggedIn) {
+      statusText = "Sign in to buy shop items.";
+      pendingValorPurchase = null;
+      pendingValorError = "";
+      render();
+      return;
+    }
+    if (premiumCheckoutInFlight) return;
+    pendingValorPurchase = null;
+    pendingValorError = "";
+    premiumCheckoutInFlight = true;
+    statusText = `Opening secure checkout for ${offer.name}.`;
+    overlay.dispatchEvent(new CustomEvent(PREMIUM_CHECKOUT_EVENT, {
+      bubbles: true,
+      detail: { offer },
+    }));
+    render();
+
+    try {
+      await startPremiumCheckout({
+        offer,
+        account,
+        checkoutEndpoint: options.checkoutEndpoint,
+        fetchImpl: options.fetchImpl,
+        locationRef: options.locationRef,
+      });
+    } catch (error) {
+      premiumCheckoutInFlight = false;
+      statusText = premiumCheckoutErrorMessage(error);
+      render();
+    }
+  }
+
   function createPurchaseConfirm(kind, offer, balance) {
     const amount = kind === "unit" ? offer.price?.amount : offer.valorPrice?.amount;
     const shortOnValor = Number.isFinite(amount) && balance < amount;
@@ -550,12 +590,7 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
     premiumBuy.setAttribute("aria-label", `Buy ${offer.name} with ${formatPremiumPrice(offer.price)}`);
     premiumBuy.addEventListener("click", (event) => {
       event.stopPropagation?.();
-      statusText = `${formatPremiumPrice(offer.price)} ${offer.name} checkout ready: ${offer.sku}`;
-      overlay.dispatchEvent(new CustomEvent("tacticalarena:premium-purchase-request", {
-        bubbles: true,
-        detail: { offer },
-      }));
-      render();
+      void beginPremiumCheckout(offer);
     });
 
     const valorBuy = el("button", "shop-buy-btn is-valor");
@@ -588,12 +623,7 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
     premiumBuy.setAttribute("aria-label", `Buy ${offer.name} with ${formatPremiumPrice(offer.price)}`);
     premiumBuy.addEventListener("click", (event) => {
       event.stopPropagation?.();
-      statusText = `${formatPremiumPrice(offer.price)} ${offer.name} checkout ready: ${offer.sku}`;
-      overlay.dispatchEvent(new CustomEvent("tacticalarena:premium-purchase-request", {
-        bubbles: true,
-        detail: { offer },
-      }));
-      render();
+      void beginPremiumCheckout(offer);
     });
 
     const valorBuy = el("button", "shop-buy-btn is-valor");
@@ -622,7 +652,7 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
     premiumBuy.addEventListener("click", (event) => {
       event.stopPropagation?.();
       statusText = "Consumable checkout coming soon.";
-      overlay.dispatchEvent(new CustomEvent("tacticalarena:premium-purchase-request", {
+      overlay.dispatchEvent(new CustomEvent(PREMIUM_CHECKOUT_EVENT, {
         bubbles: true,
         detail: { offer },
       }));

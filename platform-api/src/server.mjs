@@ -13,6 +13,7 @@ import { cancelRanked, enqueueRanked, getPublicRankedCard, getRankedLeaderboard,
 import { createFriendshipBetweenPlayers, loadPlayerRelationships, recordDirectInteractionBetweenPlayers, recordSharedEventBetweenPlayers, recordSharedSessionBetweenPlayers, removeFriendBetweenPlayers, savePlayerRelationships, } from "./db/relationships.mjs";
 import { commentOnThought, deleteThought, listThoughtComments, listThoughts, reactToThought, saveThought, shareThought, } from "./db/thoughts.mjs";
 import { deleteAccountService, loginAccountService, logoutAccountService, registerAccountService, requestPasswordResetService, resetPasswordService, verifyAccountSessionService, } from "./services/auth.mjs";
+import { createTacticalArenaCheckoutSession, fulfillStripeWebhook, } from "./services/payments.mjs";
 import { createEmailSender } from "./email.mjs";
 import { createNotification, listNotifications, markAllNotificationsRead, } from "./db/notifications.mjs";
 import { createFriendRequest, getFriendRequest, acceptFriendRequest, rejectFriendRequest, } from "./db/friend-requests.mjs";
@@ -135,6 +136,18 @@ async function bootstrap() {
         getRankedLeaderboard: (gameSlug, params) => getRankedLeaderboard(pool, { ...params, gameSlug }),
         getGameProgress: (playerId, gameSlug) => getGameProgress(pool, playerId, gameSlug),
         recordGameProgressClaim: (params) => recordGameProgressClaim(pool, params),
+        createPremiumCheckoutSession: (params) => createTacticalArenaCheckoutSession({
+            ...params,
+            stripeApiKey: config.stripeApiKey,
+            appBaseUrl: config.appBaseUrl,
+            getGameProgress: (playerId, gameSlug) => getGameProgress(pool, playerId, gameSlug),
+        }),
+        fulfillStripeWebhook: (params) => fulfillStripeWebhook({
+            ...params,
+            stripeWebhookSecret: config.stripeWebhookSecret,
+            getGameProgress: (playerId, gameSlug) => getGameProgress(pool, playerId, gameSlug),
+            recordGameProgressClaim: (claim) => recordGameProgressClaim(pool, claim),
+        }),
         savePlayerPhoto: (params) => savePlayerPhoto(pool, params),
         listPlayerPhotos: (playerId, opts) => listPlayerPhotos(pool, playerId, opts),
         getPlayerPhoto: (photoId, opts) => getPlayerPhoto(pool, photoId, opts),

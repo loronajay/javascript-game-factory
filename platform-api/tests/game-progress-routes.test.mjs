@@ -179,6 +179,44 @@ test("POST /game-progress/:gameSlug/claims accepts tutorial reward claims", asyn
   }]);
 });
 
+test("POST /game-progress/:gameSlug/claims accepts premium purchase claims", async () => {
+  const token = signToken({ playerId: "player-1", email: "player@test.com" }, TEST_SECRET);
+  const seen = [];
+  const app = createApp({
+    jwtSecret: TEST_SECRET,
+    recordGameProgressClaim: async (params) => {
+      seen.push(params);
+      return {
+        ok: true,
+        alreadyProcessed: false,
+        progress: { playerId: params.playerId, gameSlug: params.gameSlug, entitlements: [] },
+      };
+    },
+    now: () => "2026-07-17T00:00:00.000Z",
+  });
+
+  const response = await invoke(app, "POST", "/game-progress/tactical-arena/claims", {
+    token,
+    body: {
+      claimId: "stripe-checkout:cs_test_paid",
+      kind: "premium-skin-purchase",
+      sourceId: "cs_test_paid",
+      payload: { entitlementIds: ["skin:swordsman:medieval"], sessionId: "cs_test_paid" },
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json.alreadyProcessed, false);
+  assert.deepEqual(seen, [{
+    playerId: "player-1",
+    gameSlug: "tactical-arena",
+    claimId: "stripe-checkout:cs_test_paid",
+    kind: "premium-skin-purchase",
+    sourceId: "cs_test_paid",
+    payload: { entitlementIds: ["skin:swordsman:medieval"], sessionId: "cs_test_paid" },
+  }]);
+});
+
 test("POST /game-progress/:gameSlug/claims rejects unsupported claim kinds", async () => {
   const token = signToken({ playerId: "player-1", email: "player@test.com" }, TEST_SECRET);
   const app = createApp({

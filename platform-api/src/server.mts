@@ -51,6 +51,10 @@ import {
   resetPasswordService,
   verifyAccountSessionService,
 } from "./services/auth.mjs";
+import {
+  createTacticalArenaCheckoutSession,
+  fulfillStripeWebhook,
+} from "./services/payments.mjs";
 import { createEmailSender } from "./email.mjs";
 import {
   createNotification,
@@ -210,6 +214,18 @@ async function bootstrap(): Promise<void> {
     getRankedLeaderboard: (gameSlug: any, params: any) => getRankedLeaderboard(pool, { ...params, gameSlug }),
     getGameProgress: (playerId: any, gameSlug: any) => getGameProgress(pool, playerId, gameSlug),
     recordGameProgressClaim: (params: any) => recordGameProgressClaim(pool, params),
+    createPremiumCheckoutSession: (params: any) => createTacticalArenaCheckoutSession({
+      ...params,
+      stripeApiKey: config.stripeApiKey,
+      appBaseUrl: config.appBaseUrl,
+      getGameProgress: (playerId: any, gameSlug: any) => getGameProgress(pool, playerId, gameSlug),
+    }),
+    fulfillStripeWebhook: (params: any) => fulfillStripeWebhook({
+      ...params,
+      stripeWebhookSecret: config.stripeWebhookSecret,
+      getGameProgress: (playerId: any, gameSlug: any) => getGameProgress(pool, playerId, gameSlug),
+      recordGameProgressClaim: (claim: any) => recordGameProgressClaim(pool, claim),
+    }),
     savePlayerPhoto: (params: any) => savePlayerPhoto(pool, params),
     listPlayerPhotos: (playerId: any, opts: any) => listPlayerPhotos(pool, playerId, opts),
     getPlayerPhoto: (photoId: any, opts: any) => getPlayerPhoto(pool, photoId, opts),
