@@ -4,7 +4,9 @@ export const CHECKOUT_API_UNAVAILABLE_ERROR = "CHECKOUT_API_UNAVAILABLE";
 export const CHECKOUT_RESPONSE_INVALID_ERROR = "CHECKOUT_RESPONSE_INVALID";
 export const CHECKOUT_OFFER_INVALID_ERROR = "CHECKOUT_OFFER_INVALID";
 export const DEFAULT_PREMIUM_CHECKOUT_ENDPOINT = "/api/tactical-arena/checkout-sessions";
+export const DEFAULT_PREMIUM_CHECKOUT_FULFILLMENT_ENDPOINT = "/api/tactical-arena/checkout-sessions/fulfill";
 export const PLATFORM_PREMIUM_CHECKOUT_PATH = "/payments/tactical-arena/checkout-sessions";
+export const PLATFORM_PREMIUM_CHECKOUT_FULFILLMENT_PATH = "/payments/tactical-arena/checkout-sessions/fulfill";
 export const PREMIUM_CHECKOUT_EVENT = "tacticalarena:premium-purchase-request";
 export const TACTICAL_ARENA_GAME_SLUG = "tactical-arena";
 
@@ -47,6 +49,13 @@ function defaultCheckoutEndpoint() {
     : DEFAULT_PREMIUM_CHECKOUT_ENDPOINT;
 }
 
+function defaultCheckoutFulfillmentEndpoint() {
+  const platformApiBaseUrl = configuredPlatformApiBaseUrl();
+  return platformApiBaseUrl
+    ? `${platformApiBaseUrl}${PLATFORM_PREMIUM_CHECKOUT_FULFILLMENT_PATH}`
+    : DEFAULT_PREMIUM_CHECKOUT_FULFILLMENT_ENDPOINT;
+}
+
 function defaultReturnUrl(locationRef = defaultLocationRef(), checkoutState = "success") {
   const href = cleanText(locationRef?.href) || "http://localhost/games/tactical-arena/index.html";
   const url = new URL(href);
@@ -61,6 +70,24 @@ export function checkoutEndpointUrl({
 } = {}) {
   const selected = cleanText(endpoint) || configuredEndpoint() || defaultCheckoutEndpoint();
   return new URL(selected, cleanText(currentHref) || "http://localhost/games/tactical-arena/index.html").toString();
+}
+
+export function checkoutFulfillmentEndpointUrl({
+  endpoint = "",
+  currentHref = defaultLocationRef()?.href || "",
+} = {}) {
+  const selected = cleanText(endpoint) || defaultCheckoutFulfillmentEndpoint();
+  return new URL(selected, cleanText(currentHref) || "http://localhost/games/tactical-arena/index.html").toString();
+}
+
+export function checkoutSessionIdFromReturnUrl(locationRef = defaultLocationRef()) {
+  try {
+    const url = new URL(cleanText(locationRef?.href) || "http://localhost/games/tactical-arena/index.html");
+    if (url.searchParams.get("checkout") !== "success") return "";
+    return cleanText(url.searchParams.get("session_id"), 200);
+  } catch {
+    return "";
+  }
 }
 
 function offerIdentity(offer = {}) {
@@ -192,6 +219,33 @@ export async function startPremiumCheckout({
     locationRef.href = checkoutUrl;
   }
   return { url: checkoutUrl, response: data };
+}
+
+export async function fulfillReturnedPremiumCheckout({
+  account = {},
+  checkoutFulfillmentEndpoint = "",
+  fetchImpl = defaultFetchImpl(),
+  locationRef = defaultLocationRef(),
+  sessionId = checkoutSessionIdFromReturnUrl(locationRef),
+} = {}) {
+  const cleanSessionId = cleanText(sessionId, 200);
+  if (!cleanSessionId) return null;
+  const session = normalizeFactoryAccountSession(account);
+  if (!session.token) return null;
+  const endpoint = checkoutFulfillmentEndpointUrl({
+    endpoint: checkoutFulfillmentEndpoint,
+    currentHref: locationRef?.href,
+  });
+  const response = await fetchImpl(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.token}`,
+    },
+    body: JSON.stringify({ sessionId: cleanSessionId }),
+  });
+  const data = await readJson(response);
+  return response?.ok ? data : null;
 }
 
 export function premiumCheckoutErrorMessage(error) {

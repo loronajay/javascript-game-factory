@@ -33,6 +33,8 @@ import { createMatchLifecycleController } from "./match/matchLifecycleController
 import { isTempoBattle, isTempoUnitReady } from "./core/tempoBattle.js";
 import { createCampaignMeta } from "./campaign/campaignMeta.js";
 import { fetchGameProgressSnapshot, flushPendingGameProgressClaims } from "./platform/gameProgressClient.js";
+import { fulfillReturnedPremiumCheckout } from "./platform/premiumCheckoutClient.js";
+import { readStoredFactoryAccountSession } from "./platform/factoryAccount.js";
 import { mergeServerEntitlementsIntoUnlockProgress } from "./progression/unlocks.js";
 
 // --- DOM refs ---
@@ -113,8 +115,10 @@ const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
 async function syncGameProgress() {
   const storage = globalThis.localStorage;
+  const account = readStoredFactoryAccountSession(storage);
+  const checkoutResult = await fulfillReturnedPremiumCheckout({ storage, account });
   const flushResult = await flushPendingGameProgressClaims({ storage });
-  let snapshot = flushResult.progress;
+  let snapshot = checkoutResult?.progress || flushResult.progress;
   if (!snapshot && flushResult.ok) {
     snapshot = await fetchGameProgressSnapshot();
   }

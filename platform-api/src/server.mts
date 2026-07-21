@@ -53,6 +53,7 @@ import {
 } from "./services/auth.mjs";
 import {
   createTacticalArenaCheckoutSession,
+  fulfillPremiumCheckoutSessionFromReturn,
   fulfillStripeWebhook,
 } from "./services/payments.mjs";
 import { createEmailSender } from "./email.mjs";
@@ -219,6 +220,12 @@ async function bootstrap(): Promise<void> {
       stripeApiKey: config.stripeApiKey,
       appBaseUrl: config.appBaseUrl,
       getGameProgress: (playerId: any, gameSlug: any) => getGameProgress(pool, playerId, gameSlug),
+    }),
+    fulfillPremiumCheckoutSession: (params: any) => fulfillPremiumCheckoutSessionFromReturn({
+      ...params,
+      stripeApiKey: config.stripeApiKey,
+      getGameProgress: (playerId: any, gameSlug: any) => getGameProgress(pool, playerId, gameSlug),
+      recordGameProgressClaim: (claim: any) => recordGameProgressClaim(pool, claim),
     }),
     fulfillStripeWebhook: (params: any) => fulfillStripeWebhook({
       ...params,

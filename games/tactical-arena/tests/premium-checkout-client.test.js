@@ -5,6 +5,8 @@ import {
   CHECKOUT_API_UNAVAILABLE_ERROR,
   buildPremiumCheckoutPayload,
   checkoutEndpointUrl,
+  checkoutSessionIdFromReturnUrl,
+  fulfillReturnedPremiumCheckout,
   startPremiumCheckout,
 } from "../src/platform/premiumCheckoutClient.js";
 
@@ -183,4 +185,44 @@ test("startPremiumCheckout reports unavailable checkout API failures", async () 
     }),
     (error) => error?.code === CHECKOUT_API_UNAVAILABLE_ERROR,
   );
+});
+
+test("checkoutSessionIdFromReturnUrl reads Stripe return session ids", () => {
+  assert.equal(
+    checkoutSessionIdFromReturnUrl({
+      href: "https://factory.example/games/tactical-arena/index.html?checkout=success&session_id=cs_test_paid",
+    }),
+    "cs_test_paid",
+  );
+  assert.equal(
+    checkoutSessionIdFromReturnUrl({
+      href: "https://factory.example/games/tactical-arena/index.html?checkout=cancel",
+    }),
+    "",
+  );
+});
+
+test("fulfillReturnedPremiumCheckout posts the returned Stripe session id", async () => {
+  const calls = [];
+  const result = await fulfillReturnedPremiumCheckout({
+    account: ACCOUNT,
+    checkoutFulfillmentEndpoint: "/api/test-fulfill",
+    locationRef: {
+      href: "https://factory.example/games/tactical-arena/index.html?checkout=success&session_id=cs_test_paid",
+    },
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return {
+        ok: true,
+        async json() {
+          return { ok: true, progress: { entitlements: [{ entitlementId: "skin:swordsman:summer-vibes" }] } };
+        },
+      };
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(calls[0].url, "https://factory.example/api/test-fulfill");
+  assert.equal(calls[0].init.headers.Authorization, "Bearer token-1");
+  assert.deepEqual(JSON.parse(calls[0].init.body), { sessionId: "cs_test_paid" });
 });

@@ -226,6 +226,9 @@ export function createApp(options = {}) {
     const fulfillStripeWebhook = typeof options?.fulfillStripeWebhook === "function"
         ? options.fulfillStripeWebhook
         : null;
+    const fulfillPremiumCheckoutSession = typeof options?.fulfillPremiumCheckoutSession === "function"
+        ? options.fulfillPremiumCheckoutSession
+        : null;
     const savePlayerPhoto = typeof options?.savePlayerPhoto === "function"
         ? options.savePlayerPhoto
         : async () => null;
@@ -362,6 +365,7 @@ export function createApp(options = {}) {
     };
     const paymentServices = {
         createPremiumCheckoutSession,
+        fulfillPremiumCheckoutSession,
         fulfillStripeWebhook,
     };
     const notificationServices = {

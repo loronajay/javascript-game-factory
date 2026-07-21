@@ -441,6 +441,13 @@ function stripeCheckoutError(json: any): any {
   };
 }
 
+function stripeFetchHeaders(stripeApiKey: string): Record<string, string> {
+  return {
+    authorization: `Bearer ${stripeApiKey}`,
+    "Stripe-Version": STRIPE_API_VERSION,
+  };
+}
+
 function appendMetadata(form: URLSearchParams, metadata: Record<string, string>): void {
   for (const [key, value] of Object.entries(metadata)) {
     if (!value) continue;
@@ -627,9 +634,8 @@ export async function createTacticalArenaCheckoutSession(params: any = {}): Prom
   const response = await fetchImpl(STRIPE_CHECKOUT_SESSIONS_URL, {
     method: "POST",
     headers: {
-      authorization: `Bearer ${stripeApiKey}`,
+      ...stripeFetchHeaders(stripeApiKey),
       "content-type": "application/x-www-form-urlencoded",
-      "Stripe-Version": STRIPE_API_VERSION,
     },
     body: form,
   });
@@ -640,6 +646,26 @@ export async function createTacticalArenaCheckoutSession(params: any = {}): Prom
   }
   const url = cleanUrl(json?.url);
   return url ? { ok: true, url, sessionId: cleanText(json?.id, 200) } : stripeError(502, "stripe_checkout_failed");
+}
+
+async function retrieveStripeCheckoutSession(params: any = {}): Promise<any> {
+  const stripeApiKey = cleanText(params.stripeApiKey, 500);
+  const sessionId = cleanText(params.sessionId, 200);
+  if (!stripeApiKey) return stripeError(503, "checkout_not_configured");
+  if (!sessionId.startsWith("cs_")) return stripeError(400, "invalid_checkout_session");
+  const fetchImpl = typeof params.fetchImpl === "function" ? params.fetchImpl : globalThis.fetch;
+  if (typeof fetchImpl !== "function") return stripeError(503, "fetch_not_configured");
+
+  const response = await fetchImpl(`${STRIPE_CHECKOUT_SESSIONS_URL}/${encodeURIComponent(sessionId)}`, {
+    method: "GET",
+    headers: stripeFetchHeaders(stripeApiKey),
+  });
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    logStripeCheckoutError(json);
+    return stripeCheckoutError(json);
+  }
+  return { ok: true, session: json };
 }
 
 async function readRawBody(req: any): Promise<Buffer> {
@@ -725,6 +751,32 @@ export async function fulfillTacticalArenaCheckoutSession(params: any = {}): Pro
       amountTotal: moneyCents(session.amount_total),
       currency: cleanText(session.currency, 10).toLowerCase(),
     },
+  });
+}
+
+export async function fulfillPremiumCheckoutSessionFromReturn(params: any = {}): Promise<any> {
+  const playerId = cleanText(params.playerId, 120);
+  const body = params.body && typeof params.body === "object" ? params.body : {};
+  const sessionId = cleanText(body.sessionId, 200);
+  if (!playerId || !sessionId) return stripeError(400, "invalid_checkout_session");
+
+  const retrieved = await retrieveStripeCheckoutSession({
+    stripeApiKey: params.stripeApiKey,
+    sessionId,
+    fetchImpl: params.fetchImpl,
+  });
+  if (!retrieved.ok) return retrieved;
+
+  const session = retrieved.session;
+  const metadata = session?.metadata && typeof session.metadata === "object" ? session.metadata : {};
+  const sessionPlayerId = cleanText(metadata.playerId || session?.client_reference_id, 120);
+  if (sessionPlayerId !== playerId) return stripeError(403, "player_mismatch");
+  if (session?.payment_status && session.payment_status !== "paid") return stripeError(409, "checkout_not_paid");
+
+  return fulfillTacticalArenaCheckoutSession({
+    session,
+    getGameProgress: params.getGameProgress,
+    recordGameProgressClaim: params.recordGameProgressClaim,
   });
 }
 
