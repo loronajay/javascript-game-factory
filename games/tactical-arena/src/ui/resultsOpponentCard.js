@@ -11,6 +11,7 @@ import { TACTICAL_ARENA_GAME_SLUG } from "../platform/gameProgressClient.js";
 import { loadFactoryProfile } from "../../../../js/platform/identity/factory-profile.mjs";
 import { createOnlineIdentityPayload } from "../../../../js/platform/identity/match-identity.mjs";
 import { factoryMessagesUrl, factoryPlayerUrl } from "../platform/factoryLinks.js";
+import { createRankedTierEmblem, normalizeRankedTierId } from "./rankedEmblems.js";
 
 // Fill `host` with the opponent card for a resolved online ranked match, or hide it.
 // `ranked` is the last match's ranked handoff ({ opponentPlayerId, ... }) or null.
@@ -44,8 +45,11 @@ function fillOpponentCard(body, card, apiClient) {
   const head = el("div", "results-opponent-head");
   head.appendChild(el("span", "results-opponent-name", card.title || "Ranked Rival"));
   if (Number.isFinite(Number(card.rating))) {
-    const tierId = card.tier?.id || "bronze";
-    head.appendChild(el("span", `results-opponent-tier ranked-tier-${tierId}`, `${card.tier?.label || "Bronze"} · ${card.rating}`));
+    const tierId = normalizeRankedTierId(card.tier);
+    const standing = el("span", "results-opponent-standing");
+    standing.appendChild(createRankedTierEmblem(card.tier, { className: "is-opponent" }));
+    standing.appendChild(el("span", `results-opponent-tier ranked-tier-${tierId}`, `${card.tier?.label || "Bronze"} · ${card.rating}`));
+    head.appendChild(standing);
   }
   body.appendChild(head);
 

@@ -13,6 +13,7 @@ import { TACTICAL_ARENA_GAME_SLUG } from "../platform/gameProgressClient.js";
 import { loadFactoryProfile } from "../../../../js/platform/identity/factory-profile.mjs";
 import { createOnlineIdentityPayload } from "../../../../js/platform/identity/match-identity.mjs";
 import { createPortrait, hasPortrait } from "./portraits.js";
+import { createRankedTierEmblem, normalizeRankedTierId } from "./rankedEmblems.js";
 
 const LEADERBOARD_LIMIT = 50;
 
@@ -130,10 +131,13 @@ function renderLeaderboard(body, entries) {
     name.appendChild(el("span", "ranked-leaderboard-record", record));
     row.appendChild(name);
 
-    const tierId = entry.tier?.id || "bronze";
+    const tierId = normalizeRankedTierId(entry.tier);
     const standing = el("div", "ranked-leaderboard-standing");
-    standing.appendChild(el("span", `ranked-leaderboard-tier ranked-tier-${tierId}`, entry.tier?.label || "Bronze"));
-    standing.appendChild(el("span", "ranked-leaderboard-rating", String(entry.rating ?? 1200)));
+    standing.appendChild(createRankedTierEmblem(entry.tier, { className: "is-leaderboard" }));
+    const standingCopy = el("span", "ranked-leaderboard-standing-copy");
+    standingCopy.appendChild(el("span", `ranked-leaderboard-tier ranked-tier-${tierId}`, entry.tier?.label || "Bronze"));
+    standingCopy.appendChild(el("span", "ranked-leaderboard-rating", String(entry.rating ?? 1200)));
+    standing.appendChild(standingCopy);
     row.appendChild(standing);
 
     list.appendChild(row);

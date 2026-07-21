@@ -171,7 +171,8 @@
 .results-opponent-loading { margin:0; color:var(--muted); font:600 .68rem var(--font-display); }
 .results-opponent-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; flex-wrap:wrap; }
 .results-opponent-name { color:var(--text); font:800 .95rem var(--font-display); letter-spacing:.02em; overflow:hidden; text-overflow:ellipsis; }
-.results-opponent-tier { padding:.2rem .6rem; border-radius:999px; border:1px solid color-mix(in srgb,var(--brass) 40%,var(--parchment-edge)); color:var(--brass-hi); font:800 .62rem var(--font-display); letter-spacing:.06em; white-space:nowrap; }
+.results-opponent-standing { display:flex; align-items:center; gap:.28rem; padding:.12rem .45rem .12rem .16rem; border:1px solid color-mix(in srgb,var(--brass) 34%,var(--parchment-edge)); border-radius:999px; background:rgba(8,18,32,.46); white-space:nowrap; }
+.results-opponent-tier { color:var(--brass-hi); font:800 .62rem var(--font-display); letter-spacing:.06em; white-space:nowrap; }
 .results-opponent-record { margin:.35rem 0 .7rem; color:color-mix(in srgb,var(--text) 80%,var(--muted)); font:700 .7rem var(--font-display); letter-spacing:.03em; }
 .results-opponent-actions { display:flex; flex-wrap:wrap; gap:.45rem; }
 .results-opponent-btn { flex:1 1 auto; min-width:6.5rem; padding:.45rem .7rem; font-size:.7rem; text-align:center; text-decoration:none; }

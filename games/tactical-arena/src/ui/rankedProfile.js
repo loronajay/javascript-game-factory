@@ -24,6 +24,7 @@ import { getUnitSkins } from "./skinModel.js";
 import { createPortrait, hasPortrait } from "./portraits.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { openRankedLeaderboard } from "./rankedLeaderboard.js";
+import { createRankedTierEmblem, normalizeRankedTierId } from "./rankedEmblems.js";
 
 // Matches the server-side RANKED_TITLE_MAX_LENGTH in platform-api/src/db/ranked.mts.
 const RANKED_TITLE_MAX_LENGTH = 60;
@@ -187,7 +188,7 @@ function renderSignedIn(body, { pilot, standing, apiClient }) {
   saveRankedName(state.title || "");
 
   renderIdentityEditor(body, { pilot, state, apiClient });
-  renderStanding(body, standing);
+  renderStanding(body, standing, { title: state.title || pilot || "Commander" });
   if (standing?.playerId) {
     renderMetaSections(body, { apiClient, playerId: standing.playerId });
   }
@@ -477,20 +478,27 @@ function ownedSkinsFor(type) {
   }
 }
 
-function renderStanding(body, standing) {
+function renderStanding(body, standing, { title = "" } = {}) {
   const section = el("section", "ranked-profile-standing");
   if (!standing) {
     section.appendChild(el("p", "ranked-profile-standing-error", "No rating yet. Play a ranked match to get started."));
     body.appendChild(section);
     return;
   }
-  const tierId = standing.tier?.id || "bronze";
-  const tierBadge = el("div", `ranked-profile-tier ranked-tier-${tierId}`, standing.tier?.label || "Bronze");
-  const ratingBlock = el("div", "ranked-profile-rating-block");
-  ratingBlock.appendChild(el("span", "ranked-profile-rating-num", String(standing.rating ?? 1200)));
-  ratingBlock.appendChild(el("span", "ranked-profile-rating-label", "RATING"));
+  const tierId = normalizeRankedTierId(standing.tier);
+  const tierLabel = standing.tier?.label || "Bronze";
+  const rating = String(standing.rating ?? 1200);
+  const nameplate = el("div", `ranked-profile-nameplate ranked-tier-${tierId}`);
+  nameplate.appendChild(createRankedTierEmblem(standing.tier, { className: "is-profile" }));
+  const plateCopy = el("div", "ranked-profile-nameplate-copy");
+  plateCopy.appendChild(el("span", "ranked-profile-nameplate-name", title || "Commander"));
+  const meta = el("span", "ranked-profile-nameplate-meta");
+  meta.appendChild(el("b", `ranked-profile-tier ranked-tier-${tierId}`, tierLabel));
+  meta.appendChild(el("span", "ranked-profile-rating-inline", `${rating} rating`));
+  plateCopy.appendChild(meta);
+  nameplate.appendChild(plateCopy);
   const record = el("p", "ranked-profile-record", formatRecord(standing));
-  section.append(tierBadge, ratingBlock, record);
+  section.append(nameplate, record);
 
   if (standing.activeMatch) {
     section.appendChild(el("p", "ranked-profile-activematch", "You have a ranked match in progress."));
