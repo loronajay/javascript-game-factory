@@ -582,6 +582,7 @@ export async function createTacticalArenaCheckoutSession(params = {}) {
     const cancelUrl = cleanUrl(body.cancelUrl) || fallbackCheckoutUrl(params.appBaseUrl, "cancel");
     const form = new URLSearchParams();
     form.set("mode", "payment");
+    form.set("managed_payments[enabled]", "false");
     form.set("success_url", successUrl);
     form.set("cancel_url", cancelUrl);
     form.set("client_reference_id", playerId);
