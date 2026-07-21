@@ -4,7 +4,7 @@
   "description": "A browser-based isometric tactics game on a fantasy war-table — the successor to Mini-Tactics. Draft four-unit squads from a 30-unit roster with ARTS abilities, passives, statuses, summons, weather, terrain, skins, and progression. Play the 22-mission campaign, local hot-seat 2-4 player matches, single-player vs CPU, Tempo Battle vs CPU, or online Quick Match/private rooms with Classic 1v1, Draft 1v1, 4 Player FFA, and 2v2 Teams.",
   "players": "1-4",
   "status": "Release candidate — campaign, tutorials, local/CPU play, Online Versus, Tempo Battle, Valor progression, skins, and shop",
-  "order": 12,
+  "order": 7,
   "featured": false,
   "theme": "ember",
   "accentColor": "#c8943a"

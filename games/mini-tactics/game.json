@@ -4,7 +4,7 @@
   "description": "A turn-based isometric squad-tactics duel on a fantasy war-table. Command a warrior, tank, ranger, and medic across a diamond battlefield: move, line up attacks, and brace for the dice. Play local hot-seat for 2–4 players (free-for-all or 2v2 teams), single-player vs CPU on three difficulties, or online 1v1.",
   "players": "1-4",
   "status": "Playable — local 2–4P hot-seat (FFA + teams), vs CPU, and online 1v1",
-  "order": 11,
+  "order": 4,
   "featured": false,
   "theme": "ember",
   "accentColor": "#c8943a"
