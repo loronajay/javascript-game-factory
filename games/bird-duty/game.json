@@ -4,7 +4,7 @@
   "description": "A native Javascript Game Factory port of Bird Duty from the TurboWarp original.",
   "players": "1-2",
   "status": "Porting",
-  "order": 6,
+  "order": 7,
   "featured": false,
   "theme": "sky",
   "accentColor": "#8fd7ff"
