@@ -109,6 +109,17 @@ export function createMatchOutcomeController({
       announceTurn(state.winner);
       const summary = buildSummary(state, { matchStartedAt: runtime.matchStartedAt, initialHpByPlayer: runtime.initialHpByPlayer });
       claimOnlineMatchValorReward(storage, summary, { matchConfig: runtime.matchConfig, match: state, mySeat: runtime.mySeat });
+      // Ranked result attestation — the online flow supplies a bound report() that
+      // POSTs win/loss to the platform. The backend dedups, so a double-fire from a
+      // re-resolved victory is harmless; the local guard just avoids the extra call.
+      if (runtime.matchConfig?.ranked?.report && !runtime.rankedReported) {
+        runtime.rankedReported = true;
+        try {
+          runtime.matchConfig.ranked.report(state.winner === runtime.mySeat ? "win" : "loss");
+        } catch {
+          // fire-and-forget: never let reporting interrupt the results flow
+        }
+      }
       const campaignMissionId = runtime.campaignMissionId;
       if (runtime.matchConfig?.mode === "campaign" && campaignMissionId) {
         summary.campaign = completeCampaignMission(storage, campaignMissionId, state, { ...runtime.campaignMeta });

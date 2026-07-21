@@ -10,6 +10,7 @@ import { openShop } from "./shop.js";
 import { openInventory } from "./inventory.js";
 import { openSkinGallery } from "./skinGallery.js";
 import { openNicknameGallery } from "./nicknameGallery.js";
+import { openRankedProfile } from "./rankedProfile.js";
 import { showPendingProgressionAnnouncements } from "./progressionAnnouncements.js";
 import { syncMissingUnitUnlockAnnouncements } from "../progression/announcements.js";
 import { shouldSyncHotSeatSetupForSegment } from "./teamDisplay.js";
@@ -142,6 +143,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       case "inventory": openInventory(globalThis.localStorage); break;
       case "skins": openSkinGallery(); break;
       case "nicknames": openNicknameGallery(); break;
+      case "rankedProfile": openRankedProfile(); break;
       case "chooseTutorialReward": tutorialScreens.openTutorialRewardChoice({ title: "Juggernaut Unlocked" }); break;
       case "settings": settings.openSettings(); break;
       case "startTutorial": {

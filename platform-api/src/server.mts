@@ -12,6 +12,14 @@ import { getGameProgress, recordGameProgressClaim } from "./db/game-progress.mjs
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import {
+  cancelRanked,
+  enqueueRanked,
+  getRankedStanding,
+  pollRanked,
+  reportRankedResult,
+  setRankedLobbyCode,
+} from "./db/ranked.mjs";
+import {
   createFriendshipBetweenPlayers,
   loadPlayerRelationships,
   recordDirectInteractionBetweenPlayers,
@@ -184,6 +192,12 @@ async function bootstrap(): Promise<void> {
     markConversationRead: (convId: any, playerId: any) => markConversationRead(pool, convId, playerId),
     getGameRating: (gameSlug: any, playerId: any) => getGameRating(pool, playerId, gameSlug),
     recordMatchRating: (gameSlug: any, params: any) => recordMatchRating(pool, { ...params, gameSlug }),
+    enqueueRanked: (gameSlug: any, params: any) => enqueueRanked(pool, { ...params, gameSlug }),
+    pollRanked: (gameSlug: any, params: any) => pollRanked(pool, { ...params, gameSlug }),
+    cancelRanked: (gameSlug: any, params: any) => cancelRanked(pool, { ...params, gameSlug }),
+    reportRankedResult: (gameSlug: any, params: any) => reportRankedResult(pool, { ...params, gameSlug }),
+    getRankedStanding: (gameSlug: any, params: any) => getRankedStanding(pool, { ...params, gameSlug }),
+    setRankedLobby: (gameSlug: any, params: any) => setRankedLobbyCode(pool, { ...params, gameSlug }),
     getGameProgress: (playerId: any, gameSlug: any) => getGameProgress(pool, playerId, gameSlug),
     recordGameProgressClaim: (params: any) => recordGameProgressClaim(pool, params),
     savePlayerPhoto: (params: any) => savePlayerPhoto(pool, params),

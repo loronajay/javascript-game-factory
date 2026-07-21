@@ -7,6 +7,8 @@ import { escapeHtml } from "./domHelpers.js";
 import { MENU_TEAM_COLORS } from "./teamDisplay.js";
 import { formatValor } from "../progression/marketplace.js";
 import { campaignResultsValorLabel, unitLabel } from "./campaignMenuModel.js";
+import { createPlatformApiClient } from "../../../../js/platform/api/platform-api.mjs";
+import { TACTICAL_ARENA_GAME_SLUG } from "../platform/gameProgressClient.js";
 
 const CONFETTI_COUNT = 44;
 
@@ -62,6 +64,9 @@ export function createResultsScreen({
     } else if (online && summary.onlineValor) {
       addStat(stats, "Valor", summary.onlineValor.valorGranted > 0 ? `+${formatValor(summary.onlineValor.valorGranted)}` : "No reward");
     }
+    if (online && lastConfig?.ranked) {
+      void renderRankedResult(lastConfig.ranked, stats);
+    }
     addStat(stats, "Board", `${summary.size} × ${summary.size}`);
     addStat(stats, "Squad turns", String(summary.turns));
     addStat(stats, "Duration", formatDuration(summary.durationMs));
@@ -110,6 +115,47 @@ function addStat(listEl, label, value) {
   const dd = document.createElement("dd");
   dd.textContent = value;
   listEl.append(dt, dd);
+  return dd;
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Ranked stat block: shows the player's rank tier and the rating change for this
+// match. ELO only applies once BOTH players report (or the forfeit grace elapses),
+// so a winner's new rating can lag a moment — we re-check a few times, then show
+// whatever standing we have. Failures degrade to a plain "Ranked match" label.
+async function renderRankedResult(ranked, stats) {
+  const before = Number(ranked?.ratingBefore);
+  const tierDd = addStat(stats, "Ranked", "…");
+  const ratingDd = addStat(stats, "Rating", Number.isFinite(before) ? String(before) : "…");
+  try {
+    const apiClient = createPlatformApiClient();
+    if (!apiClient?.isConfigured || typeof apiClient.fetchRankedStanding !== "function") {
+      tierDd.textContent = "Ranked match";
+      return;
+    }
+    let standing = await apiClient.fetchRankedStanding(TACTICAL_ARENA_GAME_SLUG);
+    for (let i = 0; i < 3 && standing && Number.isFinite(before) && Number(standing.rating) === before; i += 1) {
+      await delay(1500);
+      standing = await apiClient.fetchRankedStanding(TACTICAL_ARENA_GAME_SLUG);
+    }
+    if (!standing) {
+      tierDd.textContent = "Ranked match";
+      return;
+    }
+    tierDd.textContent = standing.tier?.label ?? "Ranked";
+    const after = Number(standing.rating);
+    if (Number.isFinite(before) && Number.isFinite(after) && after !== before) {
+      const delta = after - before;
+      ratingDd.textContent = `${before} → ${after} (${delta > 0 ? "+" : ""}${delta})`;
+    } else if (Number.isFinite(after)) {
+      ratingDd.textContent = Number.isFinite(before) && after === before ? `${after} · updating…` : String(after);
+    }
+  } catch {
+    tierDd.textContent = "Ranked match";
+  }
 }
 
 function formatDuration(ms) {

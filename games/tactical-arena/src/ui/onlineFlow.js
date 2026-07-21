@@ -25,9 +25,12 @@ import { UNIT_TYPE_KEYS, groupedUnitTypes, isUnitUnlocked } from "./squadModel.j
 import { createPortrait } from "./portraits.js";
 import { openSkinPicker } from "./skinPicker.js";
 import { openDraftFormationPicker } from "./draftFormationPicker.js";
-import { DRAFT_PICK_ORDER, applyDraftPick, arrangeDraftLoadout, canDraftType, createDraftState, currentDraftSeat, draftedTypes, isDraftComplete } from "./draftModel.js";
+import { DRAFT_PICK_ORDER, applyBan, applyDraftPick, arrangeDraftLoadout, bannedTypes, canBanType, canDraftType, createDraftState, currentBanSeat, currentDraftSeat, draftPhase, draftedTypes, isBanPhaseComplete, isDraftComplete } from "./draftModel.js";
 import { playerSeatListLabel, teamForSeat, teamGroupsForSetup } from "./teamDisplay.js";
 import { escapeHtml } from "./domHelpers.js";
+import { createRankedFlow } from "../online/rankedFlow.js";
+import { loadRankedName } from "./rankedNameModel.js";
+import { isFactoryAccountLoggedIn, readStoredFactoryAccountSession } from "../platform/factoryAccount.js";
 
 const RULESET_VERSION = ONLINE_RULESET_VERSION;
 const BOARD_SIZES = [13, 15];
@@ -65,6 +68,9 @@ export function createOnlineFlow({ onStartMatch }) {
   const sizeSegs = [...el.querySelectorAll('[data-field="boardSize"] .seg')];
   const matchTypeSegs = [...el.querySelectorAll('[data-field="onlineMatchType"] .seg')];
   const matchTypeHintEl = $('[data-online="matchTypeHint"]');
+  const rankedBtn = $('[data-online="rankedBtn"]');
+  const rankedHint = $('[data-online="rankedHint"]');
+  const casualGroup = $('[data-online-group="casual"]');
 
   let client = null;
   let handedOff = false;
@@ -79,6 +85,13 @@ export function createOnlineFlow({ onStartMatch }) {
   let draftMembersKey = "";
   let localFormationOrder = null;
   let formationPromptOpen = false;
+
+  // Ranked (server-brokered matchmaking + ban phase). rankedMode is true for the
+  // whole ranked session; rankedInfo holds the platform match once paired.
+  let rankedFlow = null;
+  let rankedMode = false;
+  let rankedInfo = null;
+  let rankedBanFirstSeat = null;
 
   // Owner-authored framing, mirrored to every client via `config`.
   const config = {
@@ -209,7 +222,17 @@ export function createOnlineFlow({ onStartMatch }) {
       return;
     }
     if (key !== draftMembersKey) {
-      draft = createDraftState({ seats: [1, 2] });
+      // Ranked adds a ban phase. Both clients agree on the ban-first SEAT from their
+      // own bansFirst flag (exactly one is true) mapped to their lobby seat, so the
+      // deterministic draft state matches on both sides.
+      if (rankedMode && rankedInfo) {
+        const mySeat = localLobbySeat() ?? 1;
+        const otherSeat = mySeat === 1 ? 2 : 1;
+        rankedBanFirstSeat = rankedInfo.bansFirst ? mySeat : otherSeat;
+        draft = createDraftState({ seats: [1, 2], banFirstSeat: rankedBanFirstSeat });
+      } else {
+        draft = createDraftState({ seats: [1, 2] });
+      }
       draftMembersKey = key;
       localFormationOrder = null;
       formationPromptOpen = false;
@@ -240,12 +263,72 @@ export function createOnlineFlow({ onStartMatch }) {
     // Pull the canonical Javascript Game Factory profile so the lobby shows the
     // player's real pilot name (not a generic tag) whenever a profile is registered.
     // createOnlineIdentityPayload returns { playerId, displayName }; a guest with no
-    // profile name falls through to onlineClient's "Commander" default.
+    // profile name falls through to onlineClient's "Commander" default. In ranked, an
+    // optional Tactical-Arena-only ranked name overrides the pilot name.
     try {
-      return createOnlineIdentityPayload(loadFactoryProfile());
+      return createOnlineIdentityPayload(loadFactoryProfile(), rankedMode ? loadRankedName() : "");
     } catch {
       return { playerId: "", displayName: "" };
     }
+  }
+
+  // ── Ranked matchmaking + rendezvous ─────────────────────────────────────────
+  function rankedLobbyOptions() {
+    return { minPlayers: 2, maxPlayers: 2, settings: { matchType: "draft1v1", ranked: true } };
+  }
+
+  function setRankedSearchingUI(searching) {
+    if (rankedBtn) {
+      rankedBtn.textContent = searching ? "✕ Cancel Search" : "⚔ Ranked Match";
+      rankedBtn.classList.toggle("is-searching", !!searching);
+    }
+    if (casualGroup) casualGroup.style.display = searching ? "none" : "";
+    for (const seg of matchTypeSegs) seg.disabled = searching || seg.disabled;
+  }
+
+  function startRanked() {
+    if (rankedMode) return;
+    if (!isFactoryAccountLoggedIn(readStoredFactoryAccountSession())) {
+      setStatus("Sign in to your account to play ranked.");
+      if (rankedHint) rankedHint.textContent = "You need a signed-in Javascript Game Factory account for ranked.";
+      return;
+    }
+    if (!isDraftUnlockable()) {
+      setStatus(`Ranked uses Draft — unlock ${DRAFT_BATTLE_REQUIRED_UNITS} unique units first (${unlockedUnitCount()} unlocked).`);
+      return;
+    }
+    rankedMode = true;
+    rankedInfo = null;
+    selectMatchType("draft1v1");
+    config.size = 13;
+    selectSeg(13);
+    setRankedSearchingUI(true);
+    setStatus("Joining the ranked queue…");
+    client?.setIdentity(identity()); // re-stamp identity so the ranked name is used
+    rankedFlow = createRankedFlow({
+      callbacks: {
+        onStatus: (text) => setStatus(text),
+        onMatched: (match) => { rankedInfo = match; },
+        onLobbyReady: ({ role, code }) => {
+          if (role === "create") client?.createLobby(rankedLobbyOptions());
+          else if (code) client?.joinLobby(code);
+        },
+        onError: (text) => { setStatus(text); endRankedSearch(); },
+      },
+    });
+    void rankedFlow.queue();
+  }
+
+  // Tears down an in-progress ranked SEARCH (before a match hands off). Safe to call
+  // when not searching. Does not touch a ranked match already in progress.
+  function endRankedSearch() {
+    const flow = rankedFlow;
+    rankedFlow = null;
+    rankedMode = false;
+    rankedInfo = null;
+    rankedBanFirstSeat = null;
+    setRankedSearchingUI(false);
+    void flow?.cancel();
   }
 
   function pushConfig() {
@@ -365,8 +448,13 @@ export function createOnlineFlow({ onStartMatch }) {
       if (!full) {
         lobbyHintEl.textContent = `Waiting for ${type.maxPlayers - count} more player${type.maxPlayers - count === 1 ? "" : "s"} for ${type.label}.`;
       } else if (draftMode && !draftDone) {
-        const seat = currentDraftSeat(draft);
-        lobbyHintEl.textContent = seat === localLobbySeat() ? "Your draft pick is up." : `Waiting for ${draftPlayerLabel(seat)} to draft.`;
+        if (rankedMode && draft && !isBanPhaseComplete(draft)) {
+          const banSeat = currentBanSeat(draft);
+          lobbyHintEl.textContent = banSeat === localLobbySeat() ? "Your ban is up." : `Waiting for ${draftPlayerLabel(banSeat)} to ban.`;
+        } else {
+          const seat = currentDraftSeat(draft);
+          lobbyHintEl.textContent = seat === localLobbySeat() ? "Your draft pick is up." : `Waiting for ${draftPlayerLabel(seat)} to draft.`;
+        }
       } else if (draftMode && !draftReady) {
         lobbyHintEl.textContent = localLocked
           ? `Waiting for ${missingLocks} formation lock-in${missingLocks === 1 ? "" : "s"}.`
@@ -403,6 +491,11 @@ export function createOnlineFlow({ onStartMatch }) {
       draftSquads.replaceChildren();
       draftActions.replaceChildren();
       draftRoster.replaceChildren();
+      return;
+    }
+
+    if (draftPhase(draft) === "ban") {
+      renderBanPhase();
       return;
     }
 
@@ -545,6 +638,97 @@ export function createOnlineFlow({ onStartMatch }) {
     syncUI();
   }
 
+  function renderBanPhase() {
+    const localSeat = localLobbySeat();
+    const banSeat = currentBanSeat(draft);
+    const banned = bannedTypes(draft);
+
+    draftHint.textContent = banSeat === localSeat
+      ? "Ban phase — ban one enemy unit from the match."
+      : `${draftPlayerLabel(banSeat)} is banning. One ban each.`;
+
+    draftTrack.replaceChildren();
+    for (let i = 0; i < draft.banOrder.length; i += 1) {
+      const seat = draft.banOrder[i];
+      const dot = document.createElement("span");
+      dot.className = `draft-step${i < draft.banIndex ? " is-done" : ""}${i === draft.banIndex ? " is-current" : ""}`;
+      dot.style.setProperty("--team", PLAYER_COLOR[seat] ?? PLAYER_COLOR[1]);
+      dot.textContent = "⊘";
+      draftTrack.appendChild(dot);
+    }
+
+    draftSquads.replaceChildren();
+    if (banned.size) {
+      const strip = document.createElement("section");
+      strip.className = "draft-side";
+      const list = document.createElement("div");
+      list.className = "draft-picks";
+      for (const type of banned) {
+        const slot = document.createElement("div");
+        slot.className = "draft-pick is-filled is-banned";
+        slot.append(createPortrait(type, { variant: "is-chip", eager: true }));
+        const name = document.createElement("span");
+        name.textContent = UNIT_TYPES[type]?.name || type;
+        slot.append(name);
+        list.appendChild(slot);
+      }
+      strip.append(Object.assign(document.createElement("h3"), { textContent: "Banned" }), list);
+      draftSquads.appendChild(strip);
+    }
+
+    draftActions.replaceChildren();
+    draftRoster.replaceChildren();
+    for (const group of groupedUnitTypes(UNIT_TYPE_KEYS)) {
+      const section = document.createElement("section");
+      section.className = "draft-class";
+      const heading = document.createElement("h3");
+      heading.textContent = group.label;
+      const units = document.createElement("div");
+      units.className = "draft-class-units";
+      for (const type of group.types) {
+        // Bans cover the whole roster, including units you don't own — no lock state.
+        const isBanned = banned.has(type);
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `draft-unit${isBanned ? " is-taken is-banned" : ""}`;
+        btn.disabled = banSeat !== localSeat || !canBanType(draft, localSeat, type);
+        btn.dataset.type = type;
+        btn.append(createPortrait(type, { variant: "is-card", eager: true }));
+        const name = document.createElement("span");
+        name.textContent = UNIT_TYPES[type]?.name ?? type;
+        btn.append(name);
+        if (isBanned) {
+          const flag = document.createElement("i");
+          flag.textContent = "Banned";
+          btn.append(flag);
+        }
+        btn.addEventListener("click", () => submitBan(type));
+        units.appendChild(btn);
+      }
+      section.append(heading, units);
+      draftRoster.appendChild(section);
+    }
+  }
+
+  function submitBan(type) {
+    const localSeat = localLobbySeat();
+    if (!draft || currentBanSeat(draft) !== localSeat) {
+      setStatus("Wait for your ban.");
+      return;
+    }
+    const banIndex = draft.banIndex;
+    const result = applyBan(draft, { seat: localSeat, type });
+    if (!result.accepted) {
+      setStatus("You can't ban that unit.");
+      renderDraft();
+      return;
+    }
+    draft = result.nextState;
+    client?.sendBanPick({ banIndex, seat: localSeat, type });
+    setStatus(isBanPhaseComplete(draft) ? "Bans locked. Draft begins." : "Ban locked.");
+    syncUI();
+  }
+
   async function openLocalFormation() {
     const seat = localLobbySeat();
     if (!draft || !isDraftComplete(draft) || !seat || formationPromptOpen) return;
@@ -604,7 +788,15 @@ export function createOnlineFlow({ onStartMatch }) {
       setPanel("lobby");
       setStatus(isOwner ? "Your room — invite an opponent, then start." : "Joined the room.");
       roomCodeEl.hidden = false;
-      roomCodeEl.textContent = `Room code: ${lobby.roomCode}`;
+      roomCodeEl.textContent = rankedMode ? "Ranked match" : `Room code: ${lobby.roomCode}`;
+      // Ranked rendezvous: the seat-1 creator publishes its relay code to the platform
+      // so the brokered opponent can poll for it and join this exact lobby.
+      if (rankedMode && isOwner && rankedFlow && lobby.roomCode) {
+        setRankedSearchingUI(false);
+        void rankedFlow.publishLobbyCode(lobby.roomCode);
+      } else if (rankedMode) {
+        setRankedSearchingUI(false);
+      }
       syncUI();
       if (isOwner) pushConfig(); // seed every (future) joiner with the framing
     };
@@ -689,12 +881,22 @@ export function createOnlineFlow({ onStartMatch }) {
       syncUI();
     };
 
+    cb.onRemoteBanPick = ({ banIndex, seat, type }) => {
+      if (!rankedMode || !draft || banIndex !== draft.banIndex) return;
+      const result = applyBan(draft, { seat, type });
+      if (!result.accepted) return;
+      draft = result.nextState;
+      setStatus(isBanPhaseComplete(draft) ? "Bans complete. Draft begins." : `${draftPlayerLabel(seat)} banned a unit.`);
+      syncUI();
+    };
+
     cb.onError = (_code, message) => {
       setStatus(message || "Connection problem. Try again.");
     };
 
     cb.onClosed = () => {
       if (handedOff) return;
+      endRankedSearch();
       setPanel("idle");
       setStatus("Disconnected. Try again.");
       resetLobbyState();
@@ -736,6 +938,11 @@ export function createOnlineFlow({ onStartMatch }) {
     }
 
     const format = matchTypeConfig().format;
+    // Ranked: bind a report() the match-outcome controller fires at victory. The
+    // controller sends win/loss to the platform; the backend attests and applies ELO.
+    const rankedHandoff = rankedInfo && rankedFlow
+      ? { matchId: rankedInfo.matchId, ratingBefore: rankedInfo.myRatingBefore, report: (outcome) => rankedFlow?.reportResult(outcome) }
+      : null;
     onStartMatch({
       mode: "online",
       net: session,
@@ -750,6 +957,7 @@ export function createOnlineFlow({ onStartMatch }) {
       trustedSkinSeats: [mySeat],
       teamColors: format === "teams" ? { ...cfg.teamColors } : null,
       teamNames: format === "teams" ? { ...cfg.teamNames } : null,
+      ranked: rankedHandoff,
     });
   }
 
@@ -778,10 +986,14 @@ export function createOnlineFlow({ onStartMatch }) {
   // ── one-time control wiring (the section persists across enter/exit) ─────────
   for (const seg of matchTypeSegs) {
     seg.addEventListener("click", () => {
-      if (lobby) return;
+      if (lobby || rankedMode) return;
       selectMatchType(seg.dataset.matchType);
     });
   }
+  rankedBtn?.addEventListener("click", () => {
+    if (rankedMode && !rankedInfo) endRankedSearch(); // cancel an in-progress search
+    else if (!rankedMode) startRanked();
+  });
   syncMatchTypeAvailability();
   $('[data-action="quickMatch"]').addEventListener("click", () => client?.findLobby(lobbyOptions()));
   $('[data-action="createRoom"]').addEventListener("click", () => client?.createLobby(lobbyOptions()));
@@ -803,13 +1015,14 @@ export function createOnlineFlow({ onStartMatch }) {
   });
   $('[data-action="leaveLobby"]').addEventListener("click", () => {
     client?.leaveLobby();
+    endRankedSearch();
     resetLobbyState();
     setPanel("idle");
     setStatus(`Connected to ${describeRelay(client?.getWebSocketUrl())}. Choose how to play.`);
   });
   for (const seg of sizeSegs) {
     seg.addEventListener("click", () => {
-      if (!isOwner || seg.disabled) return;
+      if (!isOwner || seg.disabled || rankedMode) return;
       const chosen = Number(seg.dataset.size);
       if (!BOARD_SIZES.includes(chosen)) return;
       config.size = chosen;
@@ -822,6 +1035,11 @@ export function createOnlineFlow({ onStartMatch }) {
   function onEnter() {
     handedOff = false;
     myClientId = null;
+    rankedMode = false;
+    rankedInfo = null;
+    rankedFlow = null;
+    rankedBanFirstSeat = null;
+    setRankedSearchingUI(false);
     selectMatchType("duel");
     resetLobbyState();
     setPanel("none");
@@ -833,9 +1051,13 @@ export function createOnlineFlow({ onStartMatch }) {
   }
 
   function onExit() {
-    // Leaving without starting a match: drop the connection. After a successful
-    // handoff the match owns the socket, so leave it alone.
-    if (client && !handedOff) client.disconnect();
+    // Leaving without starting a match: drop the connection and abandon any ranked
+    // search. After a successful handoff the match owns the socket AND the ranked
+    // reporter, so leave both alone.
+    if (!handedOff) {
+      endRankedSearch();
+      if (client) client.disconnect();
+    }
     client = null;
   }
 

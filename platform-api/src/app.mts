@@ -8,6 +8,7 @@ import { handleMessageRoute } from "./routes/message-routes.mjs";
 import { handleNotificationRoute } from "./routes/notification-routes.mjs";
 import { handleLayoutRoute } from "./routes/layout-routes.mjs";
 import { handleRatingRoute } from "./routes/rating-routes.mjs";
+import { handleRankedRoute } from "./routes/ranked-routes.mjs";
 import { handleGameProgressRoute } from "./routes/game-progress-routes.mjs";
 import { handlePlayerRoute } from "./routes/player-routes.mjs";
 import { handleThoughtRoute } from "./routes/thought-routes.mjs";
@@ -187,6 +188,24 @@ export function createApp(options: any = {}) {
   const recordMatchRating = typeof options?.recordMatchRating === "function"
     ? options.recordMatchRating
     : async () => null;
+  const enqueueRanked = typeof options?.enqueueRanked === "function"
+    ? options.enqueueRanked
+    : async () => null;
+  const pollRanked = typeof options?.pollRanked === "function"
+    ? options.pollRanked
+    : async () => null;
+  const cancelRanked = typeof options?.cancelRanked === "function"
+    ? options.cancelRanked
+    : async () => null;
+  const reportRankedResult = typeof options?.reportRankedResult === "function"
+    ? options.reportRankedResult
+    : async () => null;
+  const getRankedStanding = typeof options?.getRankedStanding === "function"
+    ? options.getRankedStanding
+    : async () => null;
+  const setRankedLobby = typeof options?.setRankedLobby === "function"
+    ? options.setRankedLobby
+    : async () => null;
   const getGameProgress = typeof options?.getGameProgress === "function"
     ? options.getGameProgress
     : async () => null;
@@ -309,6 +328,14 @@ export function createApp(options: any = {}) {
   const ratingServices = {
     getGameRating,
     recordMatchRating,
+  };
+  const rankedServices = {
+    enqueueRanked,
+    pollRanked,
+    cancelRanked,
+    reportRankedResult,
+    getRankedStanding,
+    setRankedLobby,
   };
   const gameProgressServices = {
     getGameProgress,
@@ -503,6 +530,19 @@ export function createApp(options: any = {}) {
       requestOrigin,
       timestamp,
       services: ratingServices,
+    })) {
+      return;
+    }
+
+    if (await handleRankedRoute({
+      req,
+      res,
+      method,
+      pathname,
+      authClaims,
+      requestOrigin,
+      timestamp,
+      services: rankedServices,
     })) {
       return;
     }

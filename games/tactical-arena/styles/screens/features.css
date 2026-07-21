@@ -225,6 +225,39 @@
 .nickname-gallery-clear { flex-shrink:0; padding:.3rem .55rem; border:1px solid var(--parchment-edge); border-radius:6px; background:rgba(8,18,32,.68); color:var(--muted); font:700 .58rem var(--font-display); letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
 .nickname-gallery-clear:hover { border-color:var(--brass); color:var(--brass-hi); }
 
+/* Ranked profile */
+.ranked-profile-card { width:min(30rem,94vw); max-height:90vh; }
+.ranked-profile-sub { margin:.3rem 0 0; color:var(--muted); font:600 .68rem var(--font-display); letter-spacing:.02em; }
+.ranked-profile-body { flex:1; min-height:0; overflow-y:auto; display:grid; align-content:start; gap:1rem; padding:1.1rem; }
+.ranked-profile-label { color:color-mix(in srgb,var(--brass) 70%,var(--muted)); font:800 .58rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
+.ranked-profile-identity { display:grid; gap:.75rem; padding:.85rem; border:1px solid var(--parchment-edge); border-radius:10px; background:linear-gradient(180deg,rgba(30,50,70,.5),rgba(14,24,40,.42)); }
+.ranked-profile-pilot { display:flex; align-items:baseline; justify-content:space-between; gap:.5rem; }
+.ranked-profile-pilot-name { color:var(--text); font:800 .95rem var(--font-display); letter-spacing:.02em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ranked-profile-namefield { display:grid; gap:.4rem; }
+.ranked-profile-fieldrow { display:flex; gap:.4rem; align-items:center; min-width:0; }
+.ranked-profile-input { flex:1; min-width:0; padding:.4rem .55rem; border:1px solid var(--parchment-edge); border-radius:6px; background:rgba(8,18,32,.55); color:var(--text); font:700 .8rem var(--font-display); }
+.ranked-profile-input:focus-visible { outline:2px solid var(--brass-hi); outline-offset:1px; }
+.ranked-profile-clear { flex-shrink:0; padding:.35rem .6rem; border:1px solid var(--parchment-edge); border-radius:6px; background:rgba(8,18,32,.68); color:var(--muted); font:700 .58rem var(--font-display); letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
+.ranked-profile-clear:hover { border-color:var(--brass); color:var(--brass-hi); }
+.ranked-profile-nameprev { margin:0; color:var(--muted); font:600 .6rem var(--font-display); letter-spacing:.03em; }
+.ranked-profile-standing { display:grid; justify-items:center; gap:.55rem; padding:1.1rem .85rem; border:1px solid var(--parchment-edge); border-radius:10px; background:radial-gradient(circle at 50% 0%,rgba(40,64,92,.55),rgba(10,18,32,.5)); text-align:center; }
+.ranked-profile-tier { padding:.3rem .9rem; border-radius:999px; border:1px solid color-mix(in srgb,var(--brass) 50%,var(--parchment-edge)); color:var(--brass-hi); font:900 .74rem var(--font-display); letter-spacing:.14em; text-transform:uppercase; }
+.ranked-profile-rating-block { display:grid; justify-items:center; gap:.1rem; }
+.ranked-profile-rating-num { color:var(--text); font:900 2.6rem var(--font-display); line-height:1; letter-spacing:.02em; }
+.ranked-profile-rating-label { color:var(--muted); font:800 .58rem var(--font-display); letter-spacing:.24em; }
+.ranked-profile-record { margin:0; color:color-mix(in srgb,var(--text) 82%,var(--muted)); font:700 .72rem var(--font-display); letter-spacing:.04em; }
+.ranked-profile-activematch { margin:.2rem 0 0; color:var(--brass-hi); font:700 .62rem var(--font-display); letter-spacing:.04em; }
+.ranked-profile-standing-loading, .ranked-profile-standing-error, .ranked-profile-signin { margin:0; color:var(--muted); font:600 .68rem var(--font-display); letter-spacing:.02em; text-align:center; }
+.ranked-profile-signin-link { display:inline-block; margin-top:.7rem; text-decoration:none; }
+/* Tier badge accents */
+.ranked-tier-bronze { color:#c9853f; border-color:color-mix(in srgb,#c9853f 55%,var(--parchment-edge)); }
+.ranked-tier-silver { color:#c7d0d8; border-color:color-mix(in srgb,#c7d0d8 55%,var(--parchment-edge)); }
+.ranked-tier-gold { color:#e8c24a; border-color:color-mix(in srgb,#e8c24a 55%,var(--parchment-edge)); }
+.ranked-tier-platinum { color:#5fd0c4; border-color:color-mix(in srgb,#5fd0c4 55%,var(--parchment-edge)); }
+.ranked-tier-diamond { color:#6fb7ff; border-color:color-mix(in srgb,#6fb7ff 55%,var(--parchment-edge)); }
+.ranked-tier-master { color:#b98cff; border-color:color-mix(in srgb,#b98cff 55%,var(--parchment-edge)); }
+.ranked-tier-grandmaster { color:#ff7d7d; border-color:color-mix(in srgb,#ff7d7d 60%,var(--parchment-edge)); }
+
 /* Progression reward announcements */
 .progression-announcement-card { width:min(30rem,94vw); }
 .progression-announcement-head { padding:1rem 1.15rem .75rem; border-bottom:1px solid var(--parchment-edge); background:linear-gradient(180deg,var(--console-hi),var(--console-lo)); text-align:center; }

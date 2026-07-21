@@ -172,6 +172,15 @@ function parseDraftPickMessage(value) {
   };
 }
 
+function parseBanPickMessage(value) {
+  const p = parseJson(value);
+  if (!p || typeof p !== "object") return null;
+  const banIndex = Number(p.banIndex);
+  const seat = Number(p.seat);
+  if (!Number.isFinite(banIndex) || !Number.isFinite(seat) || typeof p.type !== "string") return null;
+  return { banIndex: Math.floor(banIndex), seat: Math.floor(seat), type: p.type };
+}
+
 // A command is a plain serializable object { type, player, ...payload }. The core
 // reducer is the real validator — here we only confirm the wire shape.
 function parseCommandMessage(value) {
@@ -238,6 +247,7 @@ export function createOnlineClient() {
     onRemoteReady: null, // ({ clientId, ready })
     onRemoteSetup: null, // ({ seat, composition?, skins?, nicknames? })
     onRemoteDraftPick: null, // ({ pickIndex, seat, type, skin? })
+    onRemoteBanPick: null, // ({ banIndex, seat, type })
     onRemoteCommand: null, // ({ command })
     onRemoteHash: null, // ({ revision, hash })
     onRemoteProfile: null, // ({ playerId, displayName, seat })
@@ -278,6 +288,11 @@ export function createOnlineClient() {
       case "draft_pick": {
         const m = parseDraftPickMessage(value);
         if (m) cb.onRemoteDraftPick?.(m);
+        return;
+      }
+      case "ban_pick": {
+        const m = parseBanPickMessage(value);
+        if (m) cb.onRemoteBanPick?.(m);
         return;
       }
       case "command": {
@@ -457,6 +472,9 @@ export function createOnlineClient() {
   function sendDraftPick({ pickIndex, seat, type, skin = null, nickname = null } = {}) {
     _lobbyMsg("draft_pick", JSON.stringify({ pickIndex, seat, type, skin, nickname }));
   }
+  function sendBanPick({ banIndex, seat, type } = {}) {
+    _lobbyMsg("ban_pick", JSON.stringify({ banIndex, seat, type }));
+  }
   function sendReady(ready) {
     _lobbyMsg("ready", JSON.stringify({ ready: !!ready }));
   }
@@ -519,6 +537,7 @@ export function createOnlineClient() {
     sendReady,
     sendSetup,
     sendDraftPick,
+    sendBanPick,
     sendCommand,
     sendHash,
     sendProfile,

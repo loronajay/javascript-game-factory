@@ -438,6 +438,30 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
       const encoded = encodePathSegment(gameSlug);
       return encoded ? post(`/game-progress/${encoded}/claims`, claim) : Promise.resolve(null);
     },
+    enqueueRankedMatch(gameSlug: string) {
+      const gs = encodePathSegment(gameSlug);
+      return gs ? post(`/ranked/${gs}/queue`, {}) : Promise.resolve(null);
+    },
+    pollRankedMatch(gameSlug: string) {
+      const gs = encodePathSegment(gameSlug);
+      return gs ? get(`/ranked/${gs}/queue`) : Promise.resolve(null);
+    },
+    cancelRankedMatch(gameSlug: string) {
+      const gs = encodePathSegment(gameSlug);
+      return gs ? del(`/ranked/${gs}/queue`) : Promise.resolve(null);
+    },
+    reportRankedResult(gameSlug: string, { matchId, outcome }: any = {}) {
+      const gs = encodePathSegment(gameSlug);
+      return gs ? post(`/ranked/${gs}/report`, { matchId, outcome }) : Promise.resolve(null);
+    },
+    setRankedLobby(gameSlug: string, { matchId, lobbyCode }: any = {}) {
+      const gs = encodePathSegment(gameSlug);
+      return gs ? post(`/ranked/${gs}/lobby`, { matchId, lobbyCode }) : Promise.resolve(null);
+    },
+    fetchRankedStanding(gameSlug: string) {
+      const gs = encodePathSegment(gameSlug);
+      return gs ? get(`/ranked/${gs}/standing`, "standing") : Promise.resolve(null);
+    },
   };
 }
 

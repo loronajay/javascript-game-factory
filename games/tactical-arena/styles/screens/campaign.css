@@ -169,6 +169,15 @@
 .draft-unit.is-taken { opacity:.48; filter:grayscale(.55); }
 .draft-unit.is-locked { opacity:.48; filter:grayscale(.55); }
 .draft-unit.is-locked i { color:#e6c15c; }
+.draft-unit.is-banned { border-color:color-mix(in srgb,#c4463f 60%,var(--parchment-edge)); }
+.draft-unit.is-banned i { color:#e8746c; }
+.draft-pick.is-banned { border-color:color-mix(in srgb,#c4463f 55%,var(--parchment-edge)); filter:grayscale(.4); }
+
+/* Ranked entry on the online idle panel */
+.online-ranked-entry { display:grid; gap:.35rem; margin-bottom:.6rem; }
+.menu-ranked-btn { background:linear-gradient(180deg,color-mix(in srgb,var(--brass) 30%,var(--console-hi)),var(--console-lo)); border-color:color-mix(in srgb,var(--brass) 50%,var(--parchment-edge)); color:var(--brass-hi); font-weight:800; letter-spacing:.06em; }
+.menu-ranked-btn:hover { border-color:var(--brass); filter:brightness(1.08); }
+.menu-ranked-btn.is-searching { background:linear-gradient(180deg,color-mix(in srgb,#c4463f 30%,var(--console-hi)),var(--console-lo)); border-color:color-mix(in srgb,#c4463f 55%,var(--parchment-edge)); color:#f0b7b2; }
 .draft-unit .unit-portrait.is-card { width:100%; height:4.25rem; border-radius:6px; }
 .draft-unit span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:700 .58rem var(--font-display); letter-spacing:.02em; }
 .draft-unit i { color:var(--brass-hi); font:800 .48rem var(--font-display); font-style:normal; letter-spacing:.1em; text-transform:uppercase; }

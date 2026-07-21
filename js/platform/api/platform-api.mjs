@@ -428,5 +428,29 @@ export function createPlatformApiClient(options = {}) {
             const encoded = encodePathSegment(gameSlug);
             return encoded ? post(`/game-progress/${encoded}/claims`, claim) : Promise.resolve(null);
         },
+        enqueueRankedMatch(gameSlug) {
+            const gs = encodePathSegment(gameSlug);
+            return gs ? post(`/ranked/${gs}/queue`, {}) : Promise.resolve(null);
+        },
+        pollRankedMatch(gameSlug) {
+            const gs = encodePathSegment(gameSlug);
+            return gs ? get(`/ranked/${gs}/queue`) : Promise.resolve(null);
+        },
+        cancelRankedMatch(gameSlug) {
+            const gs = encodePathSegment(gameSlug);
+            return gs ? del(`/ranked/${gs}/queue`) : Promise.resolve(null);
+        },
+        reportRankedResult(gameSlug, { matchId, outcome } = {}) {
+            const gs = encodePathSegment(gameSlug);
+            return gs ? post(`/ranked/${gs}/report`, { matchId, outcome }) : Promise.resolve(null);
+        },
+        setRankedLobby(gameSlug, { matchId, lobbyCode } = {}) {
+            const gs = encodePathSegment(gameSlug);
+            return gs ? post(`/ranked/${gs}/lobby`, { matchId, lobbyCode }) : Promise.resolve(null);
+        },
+        fetchRankedStanding(gameSlug) {
+            const gs = encodePathSegment(gameSlug);
+            return gs ? get(`/ranked/${gs}/standing`, "standing") : Promise.resolve(null);
+        },
     };
 }
