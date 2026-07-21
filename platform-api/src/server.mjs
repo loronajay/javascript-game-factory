@@ -9,7 +9,7 @@ import { applyMigrations } from "./db/migrations.mjs";
 import { getGameProgress, recordGameProgressClaim } from "./db/game-progress.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
-import { cancelRanked, enqueueRanked, getPublicRankedCard, getRankedMatches, getRankedStanding, getRankedUnitStats, pollRanked, reportRankedResult, saveRankedProfile, setRankedLobbyCode, } from "./db/ranked.mjs";
+import { cancelRanked, enqueueRanked, getPublicRankedCard, getRankedLeaderboard, getRankedMatches, getRankedStanding, getRankedUnitStats, pollRanked, reportRankedResult, saveRankedProfile, setRankedLobbyCode, } from "./db/ranked.mjs";
 import { createFriendshipBetweenPlayers, loadPlayerRelationships, recordDirectInteractionBetweenPlayers, recordSharedEventBetweenPlayers, recordSharedSessionBetweenPlayers, removeFriendBetweenPlayers, savePlayerRelationships, } from "./db/relationships.mjs";
 import { commentOnThought, deleteThought, listThoughtComments, listThoughts, reactToThought, saveThought, shareThought, } from "./db/thoughts.mjs";
 import { deleteAccountService, loginAccountService, logoutAccountService, registerAccountService, requestPasswordResetService, resetPasswordService, verifyAccountSessionService, } from "./services/auth.mjs";
@@ -132,6 +132,7 @@ async function bootstrap() {
         getRankedCard: (gameSlug, params) => getPublicRankedCard(pool, { ...params, gameSlug }),
         getRankedUnitStats: (gameSlug, params) => getRankedUnitStats(pool, { ...params, gameSlug }),
         getRankedMatches: (gameSlug, params) => getRankedMatches(pool, { ...params, gameSlug }),
+        getRankedLeaderboard: (gameSlug, params) => getRankedLeaderboard(pool, { ...params, gameSlug }),
         getGameProgress: (playerId, gameSlug) => getGameProgress(pool, playerId, gameSlug),
         recordGameProgressClaim: (params) => recordGameProgressClaim(pool, params),
         savePlayerPhoto: (params) => savePlayerPhoto(pool, params),

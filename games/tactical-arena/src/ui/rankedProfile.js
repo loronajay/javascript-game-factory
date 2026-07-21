@@ -23,6 +23,7 @@ import { readUnlockProgress } from "../progression/unlocks.js";
 import { getUnitSkins } from "./skinModel.js";
 import { createPortrait, hasPortrait } from "./portraits.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
+import { openRankedLeaderboard } from "./rankedLeaderboard.js";
 
 // Matches the server-side RANKED_TITLE_MAX_LENGTH in platform-api/src/db/ranked.mts.
 const RANKED_TITLE_MAX_LENGTH = 60;
@@ -75,6 +76,11 @@ export function openRankedProfile() {
   titleRow.appendChild(closeBtn);
   head.appendChild(titleRow);
   head.appendChild(el("p", "ranked-profile-sub", "Your Tactical Arena ranked standing, title, and avatar."));
+
+  const leaderboardBtn = el("button", "ranked-profile-leaderboard-btn menu-btn ghost", "View Leaderboard");
+  leaderboardBtn.type = "button";
+  leaderboardBtn.addEventListener("click", () => openRankedLeaderboard());
+  head.appendChild(leaderboardBtn);
   card.appendChild(head);
 
   const body = el("div", "ranked-profile-body");

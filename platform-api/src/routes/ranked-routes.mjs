@@ -11,9 +11,10 @@ const VALID_OUTCOMES = new Set(["win", "loss", "draw"]);
 //   GET    /ranked/:gameSlug/card/:playerId    public ranked card for another player
 //   GET    /ranked/:gameSlug/units/:playerId   public per-unit ranked stats
 //   GET    /ranked/:gameSlug/matches/:playerId  public recent resolved match history
+//   GET    /ranked/:gameSlug/leaderboard[?limit=]  public top-N ranked ladder
 export async function handleRankedRoute(context) {
     const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services } = context;
-    const { enqueueRanked, pollRanked, cancelRanked, reportRankedResult, getRankedStanding, setRankedLobby, saveRankedProfile, getRankedCard, getRankedUnitStats, getRankedMatches } = services;
+    const { enqueueRanked, pollRanked, cancelRanked, reportRankedResult, getRankedStanding, setRankedLobby, saveRankedProfile, getRankedCard, getRankedUnitStats, getRankedMatches, getRankedLeaderboard } = services;
     const queueMatch = pathname.match(/^\/ranked\/([^/]+)\/queue$/);
     const reportMatch = pathname.match(/^\/ranked\/([^/]+)\/report$/);
     const standingMatch = pathname.match(/^\/ranked\/([^/]+)\/standing$/);
@@ -22,9 +23,10 @@ export async function handleRankedRoute(context) {
     const cardMatch = pathname.match(/^\/ranked\/([^/]+)\/card\/([^/]+)$/);
     const unitsMatch = pathname.match(/^\/ranked\/([^/]+)\/units\/([^/]+)$/);
     const matchesMatch = pathname.match(/^\/ranked\/([^/]+)\/matches\/([^/]+)$/);
-    if (!queueMatch && !reportMatch && !standingMatch && !lobbyMatch && !profileMatch && !cardMatch && !unitsMatch && !matchesMatch)
+    const leaderboardMatch = pathname.match(/^\/ranked\/([^/]+)\/leaderboard$/);
+    if (!queueMatch && !reportMatch && !standingMatch && !lobbyMatch && !profileMatch && !cardMatch && !unitsMatch && !matchesMatch && !leaderboardMatch)
         return false;
-    const gameSlug = decodeURIComponent((queueMatch || reportMatch || standingMatch || lobbyMatch || profileMatch || cardMatch || unitsMatch || matchesMatch)[1]);
+    const gameSlug = decodeURIComponent((queueMatch || reportMatch || standingMatch || lobbyMatch || profileMatch || cardMatch || unitsMatch || matchesMatch || leaderboardMatch)[1]);
     if (!isValidRankedSlug(gameSlug)) {
         writeJson(res, 400, { status: "error", error: "invalid_game_slug", timestamp }, requestOrigin);
         return true;
@@ -184,6 +186,16 @@ export async function handleRankedRoute(context) {
             return true;
         }
         writeJson(res, 200, { matches: result }, requestOrigin);
+        return true;
+    }
+    if (leaderboardMatch && method === "GET") {
+        const limitParam = new URL(req.url || "/", "http://localhost").searchParams.get("limit");
+        const result = await getRankedLeaderboard(gameSlug, { limit: limitParam });
+        if (!result) {
+            writeJson(res, 500, { status: "error", error: "leaderboard_unavailable", timestamp }, requestOrigin);
+            return true;
+        }
+        writeJson(res, 200, { leaderboard: result }, requestOrigin);
         return true;
     }
     return false;

@@ -236,12 +236,22 @@ No new backend beyond what Phases 1–2 add; friends/DMs are platform-owned.
 
 ## Phase 4 — Longevity (legit ladder)
 
-- **Leaderboard**: `GET /ranked/:slug/leaderboard` (top N by rating) + a screen.
-- **Seasons**: soft rating reset, placement matches, optional decay. Needs a season
-  key on ratings/matches and a reset job.
-- **Reconnect/resume** for a dropped ranked match (today a drop is conceded).
+**Status: Leaderboard shipped (code-complete + tests green). Seasons + reconnect/resume
+remain (deferred — see notes).**
 
-These are independent and can be scheduled after 1–3 land.
+- **Leaderboard** ✅: `getRankedLeaderboard` (top N by rating, `game_ratings` left-joined
+  with `ranked_profiles` for cosmetic identity, tie-break on `wins - losses`) →
+  `GET /ranked/:slug/leaderboard?limit=` (auth-gated public read, limit capped 1–100,
+  default 25). Client `fetchRankedLeaderboard`. Game UI: `src/ui/rankedLeaderboard.js`
+  modal (rank · avatar · title · tier+rating · W/L/D, own row highlighted), opened from a
+  "View Leaderboard" button in the ranked-profile modal.
+- **Seasons (remaining)**: soft rating reset, placement matches, optional decay. Deferred
+  because it needs a season-model design decision that touches the SHARED `game_ratings`
+  table (a `season` key would affect sumorai-ranked too) plus a reset job/cron — a
+  cross-cutting change worth its own pass, not a drop-in like the leaderboard.
+- **Reconnect/resume (remaining)**: resuming a dropped ranked match (today a drop is
+  conceded by the surviving owner). Invasive online-session work; like the Phase 3
+  nameplate it can only be trusted after a live two-client playtest.
 
 ---
 

@@ -481,6 +481,12 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
       const pid = encodePathSegment(playerId);
       return gs && pid ? get(`/ranked/${gs}/matches/${pid}`, "matches") : Promise.resolve(null);
     },
+    fetchRankedLeaderboard(gameSlug: string, limit?: number) {
+      const gs = encodePathSegment(gameSlug);
+      if (!gs) return Promise.resolve(null);
+      const query = Number.isFinite(Number(limit)) ? `?limit=${encodeURIComponent(String(limit))}` : "";
+      return get(`/ranked/${gs}/leaderboard${query}`, "leaderboard");
+    },
   };
 }
 

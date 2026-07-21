@@ -643,3 +643,40 @@ export async function getRankedMatches(pool, { playerId, gameSlug, limit }) {
         return null;
     }
 }
+// Top-N ranked ladder for a game, by rating, with each entry's cosmetic identity
+// folded in. Public read. Only players with a rating row for this slug appear.
+export async function getRankedLeaderboard(pool, { gameSlug, limit }) {
+    if (!pool || !gameSlug)
+        return null;
+    const cap = Math.max(1, Math.min(Number(limit) || 25, 100));
+    try {
+        const res = await pool.query(`select r.player_id, r.rating, r.wins, r.losses, r.draws,
+              p.title, p.avatar_unit, p.avatar_skin
+         from game_ratings r
+         left join ranked_profiles p
+           on p.player_id = r.player_id and p.game_slug = r.game_slug
+        where r.game_slug = $1
+        order by r.rating desc, (r.wins - r.losses) desc, r.player_id asc
+        limit $2`, [gameSlug, cap]);
+        const entries = (res.rows || []).map((row, i) => {
+            const tier = rankTier(row.rating);
+            return {
+                rank: i + 1,
+                playerId: row.player_id,
+                rating: row.rating,
+                tier: { id: tier.id, label: tier.label },
+                wins: row.wins,
+                losses: row.losses,
+                draws: row.draws,
+                title: row.title || null,
+                avatarUnit: row.avatar_unit || null,
+                avatarSkin: row.avatar_skin || null,
+            };
+        });
+        return { gameSlug, entries };
+    }
+    catch (err) {
+        process.stderr.write(`[ranked] getRankedLeaderboard error: ${err?.message || err}\n`);
+        return null;
+    }
+}

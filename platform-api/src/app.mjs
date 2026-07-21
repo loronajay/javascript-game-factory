@@ -210,6 +210,9 @@ export function createApp(options = {}) {
     const getRankedMatches = typeof options?.getRankedMatches === "function"
         ? options.getRankedMatches
         : async () => null;
+    const getRankedLeaderboard = typeof options?.getRankedLeaderboard === "function"
+        ? options.getRankedLeaderboard
+        : async () => null;
     const getGameProgress = typeof options?.getGameProgress === "function"
         ? options.getGameProgress
         : async () => null;
@@ -344,6 +347,7 @@ export function createApp(options = {}) {
         getRankedCard,
         getRankedUnitStats,
         getRankedMatches,
+        getRankedLeaderboard,
     };
     const gameProgressServices = {
         getGameProgress,
