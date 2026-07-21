@@ -23,6 +23,7 @@ export const MIGRATION_FILES = Object.freeze([
   "020-account-current-session.sql",
   "021-ranked-matches.sql",
   "022-ranked-identity.sql",
+  "023-ranked-unit-stats.sql",
 ]);
 
 export function migrationFileUrl(name: string): URL {

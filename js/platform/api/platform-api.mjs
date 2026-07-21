@@ -440,9 +440,9 @@ export function createPlatformApiClient(options = {}) {
             const gs = encodePathSegment(gameSlug);
             return gs ? del(`/ranked/${gs}/queue`) : Promise.resolve(null);
         },
-        reportRankedResult(gameSlug, { matchId, outcome } = {}) {
+        reportRankedResult(gameSlug, { matchId, outcome, squad, unitResults } = {}) {
             const gs = encodePathSegment(gameSlug);
-            return gs ? post(`/ranked/${gs}/report`, { matchId, outcome }) : Promise.resolve(null);
+            return gs ? post(`/ranked/${gs}/report`, { matchId, outcome, squad, unitResults }) : Promise.resolve(null);
         },
         setRankedLobby(gameSlug, { matchId, lobbyCode } = {}) {
             const gs = encodePathSegment(gameSlug);
@@ -460,6 +460,16 @@ export function createPlatformApiClient(options = {}) {
             const gs = encodePathSegment(gameSlug);
             const pid = encodePathSegment(playerId);
             return gs && pid ? get(`/ranked/${gs}/card/${pid}`, "card") : Promise.resolve(null);
+        },
+        fetchRankedUnitStats(gameSlug, playerId) {
+            const gs = encodePathSegment(gameSlug);
+            const pid = encodePathSegment(playerId);
+            return gs && pid ? get(`/ranked/${gs}/units/${pid}`, "unitStats") : Promise.resolve(null);
+        },
+        fetchRankedMatches(gameSlug, playerId) {
+            const gs = encodePathSegment(gameSlug);
+            const pid = encodePathSegment(playerId);
+            return gs && pid ? get(`/ranked/${gs}/matches/${pid}`, "matches") : Promise.resolve(null);
         },
     };
 }

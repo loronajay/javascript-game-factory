@@ -186,6 +186,26 @@ export function buildSummary(state, { matchStartedAt, initialHpByPlayer }) {
   };
 }
 
+// Ranked per-unit report: the shared final board both lockstep clients derive
+// identically from authoritative state, sent to the platform so per-unit stats are
+// credited only when both sides' reports agree (see ranked-unit-stats.mjs). Summoned
+// pieces (Ghouls) are excluded, matching every other ranked/summary stat. seat =
+// unit.player (ranked is 1v1, so seat is 1 or 2). Order is irrelevant — the server
+// canonicalizes by id before comparing.
+export function buildRankedUnitReport(state) {
+  const units = (state.units ?? [])
+    .filter((u) => takesTurns(u))
+    .map((u) => ({ id: u.id, seat: u.player, type: u.type, alive: u.hp > 0 }));
+  return { units };
+}
+
+// The unit types a seat brought (alive or dead at match end), for match history.
+export function squadForSeat(state, seat) {
+  return (state.units ?? [])
+    .filter((u) => u.player === seat && takesTurns(u))
+    .map((u) => u.type);
+}
+
 function firstActorGateMessage(state, player) {
   const actor = state ? pendingFirstActor(state, player ?? state.currentPlayer) : null;
   const definition = actor ? getUnitType(actor.type) : null;

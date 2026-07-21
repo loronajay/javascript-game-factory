@@ -259,6 +259,25 @@
 .ranked-profile-skinchip { padding:.28rem .55rem; border:1px solid var(--parchment-edge); border-radius:999px; background:rgba(8,18,32,.6); color:var(--muted); font:700 .58rem var(--font-display); letter-spacing:.06em; cursor:pointer; }
 .ranked-profile-skinchip:hover { border-color:var(--brass); color:var(--brass-hi); }
 .ranked-profile-skinchip.is-selected { border-color:var(--brass-hi); color:var(--brass-hi); background:rgba(230,192,101,.14); }
+/* Unit record + match history */
+.ranked-profile-units, .ranked-profile-matches { display:grid; gap:.55rem; padding:.85rem; border:1px solid var(--parchment-edge); border-radius:10px; background:linear-gradient(180deg,rgba(30,50,70,.4),rgba(14,24,40,.36)); }
+.ranked-profile-section-title { margin:0; color:color-mix(in srgb,var(--brass) 70%,var(--muted)); font:800 .6rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
+.ranked-profile-meta-loading, .ranked-profile-meta-empty { margin:0; color:var(--muted); font:600 .66rem var(--font-display); letter-spacing:.02em; }
+.ranked-profile-unitgrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(8.5rem,1fr)); gap:.4rem; }
+.ranked-profile-unitcell { display:flex; align-items:center; gap:.5rem; padding:.35rem .45rem; border:1px solid var(--parchment-edge); border-radius:8px; background:rgba(8,18,32,.5); }
+.ranked-profile-unitcell .unit-portrait.is-thumb { width:2rem; height:2.4rem; flex-shrink:0; border-radius:6px; overflow:hidden; background:rgba(8,18,32,.55); }
+.ranked-profile-unitinfo { display:grid; gap:.1rem; min-width:0; }
+.ranked-profile-unitname { color:var(--text); font:800 .72rem var(--font-display); letter-spacing:.02em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ranked-profile-unitstat { color:var(--muted); font:600 .58rem var(--font-display); letter-spacing:.02em; }
+.ranked-profile-matchlist { list-style:none; margin:0; padding:0; display:grid; gap:.35rem; }
+.ranked-profile-matchrow { display:grid; grid-template-columns:auto auto 1fr auto; align-items:center; gap:.5rem; padding:.35rem .5rem; border:1px solid var(--parchment-edge); border-radius:8px; background:rgba(8,18,32,.5); }
+.ranked-profile-matchoutcome { width:1.3rem; height:1.3rem; display:grid; place-items:center; border-radius:5px; font:900 .68rem var(--font-display); }
+.ranked-profile-matchrow.is-win .ranked-profile-matchoutcome { background:rgba(110,201,138,.2); color:#8fe0a6; }
+.ranked-profile-matchrow.is-loss .ranked-profile-matchoutcome { background:rgba(255,138,127,.18); color:#ff9a8f; }
+.ranked-profile-matchrow.is-draw .ranked-profile-matchoutcome { background:rgba(200,208,216,.16); color:#c7d0d8; }
+.ranked-profile-matchdelta { font:800 .66rem var(--font-display); color:var(--text); min-width:2.2rem; }
+.ranked-profile-matchsquads { color:var(--muted); font:600 .58rem var(--font-display); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ranked-profile-matchdate { color:var(--muted); font:700 .56rem var(--font-display); letter-spacing:.04em; }
 .ranked-profile-standing { display:grid; justify-items:center; gap:.55rem; padding:1.1rem .85rem; border:1px solid var(--parchment-edge); border-radius:10px; background:radial-gradient(circle at 50% 0%,rgba(40,64,92,.55),rgba(10,18,32,.5)); text-align:center; }
 .ranked-profile-tier { padding:.3rem .9rem; border-radius:999px; border:1px solid color-mix(in srgb,var(--brass) 50%,var(--parchment-edge)); color:var(--brass-hi); font:900 .74rem var(--font-display); letter-spacing:.14em; text-transform:uppercase; }
 .ranked-profile-rating-block { display:grid; justify-items:center; gap:.1rem; }

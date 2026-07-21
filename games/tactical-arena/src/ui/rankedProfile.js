@@ -165,6 +165,100 @@ function renderSignedIn(body, { pilot, standing, apiClient }) {
 
   renderIdentityEditor(body, { pilot, state, apiClient });
   renderStanding(body, standing);
+  if (standing?.playerId) {
+    renderMetaSections(body, { apiClient, playerId: standing.playerId });
+  }
+}
+
+// Per-unit ranked record + recent match history, fetched for the signed-in player and
+// filled in once loaded. Both are public reads keyed on the player's id.
+function renderMetaSections(body, { apiClient, playerId }) {
+  const units = el("section", "ranked-profile-units");
+  units.appendChild(el("h3", "ranked-profile-section-title", "Unit Record"));
+  const unitsBody = el("div", "ranked-profile-units-body");
+  unitsBody.appendChild(el("p", "ranked-profile-meta-loading", "Loading unit stats…"));
+  units.appendChild(unitsBody);
+  body.appendChild(units);
+
+  const matches = el("section", "ranked-profile-matches");
+  matches.appendChild(el("h3", "ranked-profile-section-title", "Recent Matches"));
+  const matchesBody = el("div", "ranked-profile-matches-body");
+  matchesBody.appendChild(el("p", "ranked-profile-meta-loading", "Loading match history…"));
+  matches.appendChild(matchesBody);
+  body.appendChild(matches);
+
+  if (typeof apiClient.fetchRankedUnitStats === "function") {
+    apiClient.fetchRankedUnitStats(TACTICAL_ARENA_GAME_SLUG, playerId)
+      .then((stats) => renderUnitStats(unitsBody, stats?.units || []))
+      .catch(() => renderUnitStats(unitsBody, []));
+  } else {
+    renderUnitStats(unitsBody, []);
+  }
+
+  if (typeof apiClient.fetchRankedMatches === "function") {
+    apiClient.fetchRankedMatches(TACTICAL_ARENA_GAME_SLUG, playerId)
+      .then((res) => renderMatchHistory(matchesBody, res?.matches || []))
+      .catch(() => renderMatchHistory(matchesBody, []));
+  } else {
+    renderMatchHistory(matchesBody, []);
+  }
+}
+
+function renderUnitStats(container, units) {
+  container.replaceChildren();
+  if (!units.length) {
+    container.appendChild(el("p", "ranked-profile-meta-empty", "No ranked unit records yet."));
+    return;
+  }
+  const grid = el("div", "ranked-profile-unitgrid");
+  for (const u of units) {
+    const cell = el("div", "ranked-profile-unitcell");
+    if (hasPortrait(u.unitType)) {
+      cell.appendChild(createPortrait(u.unitType, { variant: "is-thumb" }));
+    }
+    const info = el("div", "ranked-profile-unitinfo");
+    info.appendChild(el("span", "ranked-profile-unitname", unitLabel(u.unitType)));
+    const winPct = u.games > 0 ? Math.round((u.wins / u.games) * 100) : 0;
+    info.appendChild(el("span", "ranked-profile-unitstat", `${u.games}G · ${winPct}% W · ${u.survivals} survived`));
+    cell.appendChild(info);
+    grid.appendChild(cell);
+  }
+  container.appendChild(grid);
+}
+
+function renderMatchHistory(container, matches) {
+  container.replaceChildren();
+  if (!matches.length) {
+    container.appendChild(el("p", "ranked-profile-meta-empty", "No ranked matches yet."));
+    return;
+  }
+  const list = el("ul", "ranked-profile-matchlist");
+  for (const m of matches) {
+    const item = el("li", `ranked-profile-matchrow is-${m.outcome}`);
+    const outcomeLabel = m.outcome === "win" ? "W" : m.outcome === "loss" ? "L" : "D";
+    item.appendChild(el("span", "ranked-profile-matchoutcome", outcomeLabel));
+    const delta = Number(m.ratingDelta) || 0;
+    const deltaText = delta > 0 ? `+${delta}` : String(delta);
+    item.appendChild(el("span", "ranked-profile-matchdelta", deltaText));
+    const squads = el("span", "ranked-profile-matchsquads", formatSquadLine(m.mySquad, m.opponentSquad));
+    item.appendChild(squads);
+    item.appendChild(el("span", "ranked-profile-matchdate", formatMatchDate(m.resolvedAt)));
+    list.appendChild(item);
+  }
+  container.appendChild(list);
+}
+
+function formatSquadLine(mySquad, opponentSquad) {
+  const mine = (mySquad || []).map(unitLabel).join(", ") || "—";
+  const theirs = (opponentSquad || []).map(unitLabel).join(", ") || "—";
+  return `${mine} vs ${theirs}`;
+}
+
+function formatMatchDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 // One-time seed: if the player has no server title yet but set a local ranked name

@@ -125,6 +125,33 @@ hides private fields, standing includes profile.
 
 ## Phase 2 — Per-unit stats + match history (both-sides-agree)
 
+**Status: shipped (code-complete + tests green). Remaining: live two-client browser
+verification that both clients derive an identical board (agreement credits, disagreement
+flags) end-to-end.**
+
+As-built notes:
+- Migration `023-ranked-unit-stats.sql` (registered) adds `ranked_unit_stats` +
+  `squad_a/squad_b/unit_report_a/unit_report_b` jsonb columns on `ranked_matches`.
+- Pure agreement/aggregation logic lives in `db/ranked-unit-stats.mjs`
+  (`normalizeUnitResults`, `unitReportsAgree`, `unitStatDeltas`, `normalizeSquad`) so
+  it is fully headless-testable. The report is canonicalized (sorted by unit id) so
+  agreement is order-independent, and both clients produce the identical board.
+- Crediting is a side effect of the existing resolve path only: on resolve, if both
+  `unit_report_*` are present AND agree → aggregate for both players (seat 1 = player_a);
+  if present but disagree → credit nothing and flag `unit_report_conflict`; ELO is
+  unchanged either way. A legacy client that omits the report still resolves normally.
+- The `unitResults` contract (v1) is `{ units: [{ id, seat, type, alive, kills? }] }`
+  derived on the client from authoritative final state via `buildRankedUnitReport` in
+  `matchBuilder.js` (summoned Ghouls excluded). Per-unit `kills` defaults to 0 — the
+  table + pipeline carry it, but killer attribution is deferred (open question below).
+- New public reads: `GET /ranked/:slug/units/:playerId` and
+  `GET /ranked/:slug/matches/:playerId`; clients `fetchRankedUnitStats` /
+  `fetchRankedMatches`. Match rows are shaped to the caller's perspective (my outcome /
+  rating delta / my vs opponent squad). The ranked-profile card now renders a unit-record
+  grid + recent-match list.
+- The report is sent from `matchOutcomeController` at victory alongside the existing
+  win/loss attestation; it is NOT part of the online state hash (determinism preserved).
+
 Goal: real, trustworthy per-unit records and a recent-match list.
 
 **Migration `023-ranked-unit-stats.sql`**

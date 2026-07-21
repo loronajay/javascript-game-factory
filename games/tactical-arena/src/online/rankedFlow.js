@@ -150,10 +150,10 @@ export function createRankedFlow({
     state = "idle";
   }
 
-  async function reportResult(outcome) {
+  async function reportResult(outcome, { squad, unitResults } = {}) {
     if (!match) return null;
     try {
-      return await apiClient.reportRankedResult(gameSlug, { matchId: match.matchId, outcome });
+      return await apiClient.reportRankedResult(gameSlug, { matchId: match.matchId, outcome, squad, unitResults });
     } catch {
       return null;
     }

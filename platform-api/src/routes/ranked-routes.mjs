@@ -8,19 +8,23 @@ const VALID_OUTCOMES = new Set(["win", "loss", "draw"]);
 //   POST   /ranked/:gameSlug/report    attest a match result { matchId, outcome }
 //   GET    /ranked/:gameSlug/standing  rating + tier + record + my cosmetic profile + live match
 //   PUT    /ranked/:gameSlug/profile   save my ranked title/avatar (auth = me)
-//   GET    /ranked/:gameSlug/card/:playerId  public ranked card for another player
+//   GET    /ranked/:gameSlug/card/:playerId    public ranked card for another player
+//   GET    /ranked/:gameSlug/units/:playerId   public per-unit ranked stats
+//   GET    /ranked/:gameSlug/matches/:playerId  public recent resolved match history
 export async function handleRankedRoute(context) {
     const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services } = context;
-    const { enqueueRanked, pollRanked, cancelRanked, reportRankedResult, getRankedStanding, setRankedLobby, saveRankedProfile, getRankedCard } = services;
+    const { enqueueRanked, pollRanked, cancelRanked, reportRankedResult, getRankedStanding, setRankedLobby, saveRankedProfile, getRankedCard, getRankedUnitStats, getRankedMatches } = services;
     const queueMatch = pathname.match(/^\/ranked\/([^/]+)\/queue$/);
     const reportMatch = pathname.match(/^\/ranked\/([^/]+)\/report$/);
     const standingMatch = pathname.match(/^\/ranked\/([^/]+)\/standing$/);
     const lobbyMatch = pathname.match(/^\/ranked\/([^/]+)\/lobby$/);
     const profileMatch = pathname.match(/^\/ranked\/([^/]+)\/profile$/);
     const cardMatch = pathname.match(/^\/ranked\/([^/]+)\/card\/([^/]+)$/);
-    if (!queueMatch && !reportMatch && !standingMatch && !lobbyMatch && !profileMatch && !cardMatch)
+    const unitsMatch = pathname.match(/^\/ranked\/([^/]+)\/units\/([^/]+)$/);
+    const matchesMatch = pathname.match(/^\/ranked\/([^/]+)\/matches\/([^/]+)$/);
+    if (!queueMatch && !reportMatch && !standingMatch && !lobbyMatch && !profileMatch && !cardMatch && !unitsMatch && !matchesMatch)
         return false;
-    const gameSlug = decodeURIComponent((queueMatch || reportMatch || standingMatch || lobbyMatch || profileMatch || cardMatch)[1]);
+    const gameSlug = decodeURIComponent((queueMatch || reportMatch || standingMatch || lobbyMatch || profileMatch || cardMatch || unitsMatch || matchesMatch)[1]);
     if (!isValidRankedSlug(gameSlug)) {
         writeJson(res, 400, { status: "error", error: "invalid_game_slug", timestamp }, requestOrigin);
         return true;
@@ -72,10 +76,15 @@ export async function handleRankedRoute(context) {
             writeJson(res, 400, { status: "error", error: "invalid_outcome", timestamp }, requestOrigin);
             return true;
         }
+        // Optional per-unit reporting (Phase 2). squad/unitResults are sanitized in the db
+        // layer; a legacy client that omits them still reports outcome as before.
+        const { squad, unitResults } = body.value || {};
         const result = await reportRankedResult(gameSlug, {
             matchId: matchId.trim().slice(0, 200),
             reporterPlayerId: playerId,
             outcome,
+            squad: Array.isArray(squad) ? squad : undefined,
+            unitResults: unitResults && typeof unitResults === "object" ? unitResults : undefined,
         });
         if (!result) {
             writeJson(res, 500, { status: "error", error: "report_failed", timestamp }, requestOrigin);
@@ -155,6 +164,26 @@ export async function handleRankedRoute(context) {
             return true;
         }
         writeJson(res, 200, { card: result }, requestOrigin);
+        return true;
+    }
+    if (unitsMatch && method === "GET") {
+        const targetPlayerId = decodeURIComponent(unitsMatch[2]);
+        const result = await getRankedUnitStats(gameSlug, { playerId: targetPlayerId });
+        if (!result) {
+            writeJson(res, 500, { status: "error", error: "unit_stats_unavailable", timestamp }, requestOrigin);
+            return true;
+        }
+        writeJson(res, 200, { unitStats: result }, requestOrigin);
+        return true;
+    }
+    if (matchesMatch && method === "GET") {
+        const targetPlayerId = decodeURIComponent(matchesMatch[2]);
+        const result = await getRankedMatches(gameSlug, { playerId: targetPlayerId });
+        if (!result) {
+            writeJson(res, 500, { status: "error", error: "matches_unavailable", timestamp }, requestOrigin);
+            return true;
+        }
+        writeJson(res, 200, { matches: result }, requestOrigin);
         return true;
     }
     return false;

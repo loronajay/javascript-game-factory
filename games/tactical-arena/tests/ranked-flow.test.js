@@ -140,5 +140,18 @@ test("publishLobbyCode and reportResult call the platform with the match id", as
   await flow.reportResult("win");
 
   assert.deepEqual(api.calls.setLobby, [{ matchId: "m1", lobbyCode: "ABCDE" }]);
-  assert.deepEqual(api.calls.report, [{ matchId: "m1", outcome: "win" }]);
+  assert.deepEqual(api.calls.report, [{ matchId: "m1", outcome: "win", squad: undefined, unitResults: undefined }]);
+});
+
+test("reportResult forwards the squad + unit report when supplied", async () => {
+  const api = fakeApi({ enqueue: { status: "matched", match: { matchId: "m1", seat: 1, lobbyCode: null } } });
+  const sched = manualScheduler();
+  const rec = recorder();
+  const flow = createRankedFlow({ apiClient: api, ...sched, callbacks: rec.callbacks });
+
+  await flow.queue();
+  const unitResults = { units: [{ id: "p1-0-swordsman", seat: 1, type: "swordsman", alive: true }] };
+  await flow.reportResult("loss", { squad: ["swordsman"], unitResults });
+
+  assert.deepEqual(api.calls.report, [{ matchId: "m1", outcome: "loss", squad: ["swordsman"], unitResults }]);
 });

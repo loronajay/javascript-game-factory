@@ -36,7 +36,7 @@ import {
 } from "../campaign/campaign.js";
 import { isCampaignSkinRewardGranted, isCampaignUnitRewardGranted } from "../progression/unlocks.js";
 import { claimOnlineMatchValorReward } from "../progression/valorRewards.js";
-import { buildSummary, teamColor } from "../match/matchBuilder.js";
+import { buildRankedUnitReport, buildSummary, squadForSeat, teamColor } from "../match/matchBuilder.js";
 import { isTempoBattle } from "../core/tempoBattle.js";
 import { shouldShowTurnAnnouncement, turnAnnouncementSub } from "./turnAnnouncement.js";
 
@@ -110,12 +110,17 @@ export function createMatchOutcomeController({
       const summary = buildSummary(state, { matchStartedAt: runtime.matchStartedAt, initialHpByPlayer: runtime.initialHpByPlayer });
       claimOnlineMatchValorReward(storage, summary, { matchConfig: runtime.matchConfig, match: state, mySeat: runtime.mySeat });
       // Ranked result attestation — the online flow supplies a bound report() that
-      // POSTs win/loss to the platform. The backend dedups, so a double-fire from a
-      // re-resolved victory is harmless; the local guard just avoids the extra call.
+      // POSTs win/loss to the platform, plus the shared final board + my squad so the
+      // backend can credit per-unit stats when both sides' reports agree. The backend
+      // dedups, so a double-fire from a re-resolved victory is harmless; the local
+      // guard just avoids the extra call.
       if (runtime.matchConfig?.ranked?.report && !runtime.rankedReported) {
         runtime.rankedReported = true;
         try {
-          runtime.matchConfig.ranked.report(state.winner === runtime.mySeat ? "win" : "loss");
+          runtime.matchConfig.ranked.report(
+            state.winner === runtime.mySeat ? "win" : "loss",
+            { squad: squadForSeat(state, runtime.mySeat), unitResults: buildRankedUnitReport(state) },
+          );
         } catch {
           // fire-and-forget: never let reporting interrupt the results flow
         }

@@ -983,7 +983,7 @@ export function createOnlineFlow({ onStartMatch }) {
     // Ranked: bind a report() the match-outcome controller fires at victory. The
     // controller sends win/loss to the platform; the backend attests and applies ELO.
     const rankedHandoff = rankedInfo && rankedFlow
-      ? { matchId: rankedInfo.matchId, ratingBefore: rankedInfo.myRatingBefore, report: (outcome) => rankedFlow?.reportResult(outcome) }
+      ? { matchId: rankedInfo.matchId, ratingBefore: rankedInfo.myRatingBefore, report: (outcome, detail) => rankedFlow?.reportResult(outcome, detail) }
       : null;
     onStartMatch({
       mode: "online",

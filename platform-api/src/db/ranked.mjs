@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { DEFAULT_RATING, RANKED_BOARD, SAME_OPPONENT_WINDOW_HOURS, banFirstIndex, computeRankedRatings, decideForfeitFinalize, decideReport, outcomeScoreA, provisionalK, rankTier, ratingWindow, sameOpponentGainFactor, } from "./ranked-elo.mjs";
+import { normalizeSquad, normalizeUnitResults, unitReportsAgree, unitStatDeltas, } from "./ranked-unit-stats.mjs";
 // Same slug shape as the rest of the game-scoped routes.
 export function isValidRankedSlug(slug) {
     return typeof slug === "string" && /^[a-z0-9-]{1,60}$/.test(slug);
@@ -236,6 +237,12 @@ async function applyResolution(client, { row, gameSlug, outcomeA, report, extraF
         flags = appendFlag(flags, "same_opponent_damped");
     if (extraFlags)
         flags = appendFlag(flags, extraFlags);
+    // Per-unit stats are a side effect of resolution: credit only when BOTH final-board
+    // reports are present and agree; on conflict, credit nothing and flag the row.
+    const bothReported = row.unit_report_a != null && row.unit_report_b != null;
+    const unitsAgree = bothReported && unitReportsAgree(row.unit_report_a, row.unit_report_b);
+    if (bothReported && !unitsAgree)
+        flags = appendFlag(flags, "unit_report_conflict");
     await client.query(`update ranked_matches
         set status='resolved', outcome_a=$1, rating_a_after=$2, rating_b_after=$3,
             report_a=$4, report_b=$5, flags=$6, resolved_at=now()
@@ -249,6 +256,15 @@ async function applyResolution(client, { row, gameSlug, outcomeA, report, extraF
         row.match_id,
         gameSlug,
     ]);
+    if (unitsAgree) {
+        await creditUnitStats(client, {
+            gameSlug,
+            playerAId: row.player_a,
+            playerBId: row.player_b,
+            canonical: row.unit_report_a,
+            outcomeA,
+        });
+    }
     return {
         ok: true,
         status: "resolved",
@@ -256,6 +272,37 @@ async function applyResolution(client, { row, gameSlug, outcomeA, report, extraF
         ratingA: { playerId: row.player_a, before: a.rating, after: newRatingA },
         ratingB: { playerId: row.player_b, before: b.rating, after: newRatingB },
     };
+}
+// Aggregate an agreed final board into ranked_unit_stats for both players. seat 1 maps
+// to player_a, seat 2 to player_b. Runs inside the resolving transaction.
+async function creditUnitStats(client, { gameSlug, playerAId, playerBId, canonical, outcomeA }) {
+    const deltas = unitStatDeltas(canonical, { outcomeA });
+    const upsert = `
+    insert into ranked_unit_stats (player_id, game_slug, unit_type, games, wins, kills, survivals)
+    values ($1,$2,$3,$4,$5,$6,$7)
+    on conflict (player_id, game_slug, unit_type) do update
+      set games = ranked_unit_stats.games + excluded.games,
+          wins = ranked_unit_stats.wins + excluded.wins,
+          kills = ranked_unit_stats.kills + excluded.kills,
+          survivals = ranked_unit_stats.survivals + excluded.survivals`;
+    for (const d of deltas) {
+        const playerId = d.seat === 1 ? playerAId : playerBId;
+        await client.query(upsert, [playerId, gameSlug, d.unitType, d.games, d.wins, d.kills, d.survivals]);
+    }
+}
+// Store the reporting side's squad + final-board report before the resolution decision,
+// so the agreement check has both when the second attestation resolves the match. Also
+// mutates the in-memory row so a same-call resolve sees the just-stored report.
+async function storeReporterUnitReport(client, { row, gameSlug, reporterSide, squad, unitResults }) {
+    const cleanSquad = normalizeSquad(squad);
+    const cleanUnits = normalizeUnitResults(unitResults);
+    if (!cleanSquad && !cleanUnits)
+        return; // legacy client: nothing to persist
+    const squadCol = reporterSide === "a" ? "squad_a" : "squad_b";
+    const reportCol = reporterSide === "a" ? "unit_report_a" : "unit_report_b";
+    await client.query(`update ranked_matches set ${squadCol}=$1, ${reportCol}=$2 where match_id=$3 and game_slug=$4`, [cleanSquad ? JSON.stringify(cleanSquad) : null, cleanUnits ? JSON.stringify(cleanUnits) : null, row.match_id, gameSlug]);
+    row[squadCol] = cleanSquad;
+    row[reportCol] = cleanUnits;
 }
 // Resolve any pending_forfeit matches whose grace window has lapsed. Lazy (called
 // on poll/report) so no cron is required.
@@ -276,7 +323,7 @@ export async function finalizeForfeits(client, gameSlug) {
 }
 // Record a member's attestation of the match result and resolve when the trust
 // rules allow. This is the endpoint that replaces sumorai's blind self-report.
-export async function reportRankedResult(pool, { matchId, gameSlug, reporterPlayerId, outcome, minMatchSeconds, now }) {
+export async function reportRankedResult(pool, { matchId, gameSlug, reporterPlayerId, outcome, squad, unitResults, minMatchSeconds, now }) {
     if (!pool || !matchId || !gameSlug || !reporterPlayerId)
         return null;
     const client = await pool.connect();
@@ -297,6 +344,9 @@ export async function reportRankedResult(pool, { matchId, gameSlug, reporterPlay
             await client.query("commit");
             return { ok: true, alreadyResolved: true, status: row.status, match: serializeMatchForPlayer(row, reporterPlayerId) };
         }
+        // Persist this side's squad + final board first, so a resolve triggered by this same
+        // call (dual attestation) can verify agreement against both reports.
+        await storeReporterUnitReport(client, { row, gameSlug, reporterSide, squad, unitResults });
         const createdMs = new Date(row.created_at).getTime();
         const nowMs = now ? new Date(now).getTime() : Date.now();
         const matchAgeSeconds = (nowMs - createdMs) / 1000;
@@ -526,6 +576,70 @@ export async function getRankedStanding(pool, { playerId, gameSlug }) {
     }
     catch (err) {
         process.stderr.write(`[ranked] getRankedStanding error: ${err?.message || err}\n`);
+        return null;
+    }
+}
+// Per-unit ranked record for a player (games/wins/kills/survivals), highest-use first.
+// Public read — no private fields involved.
+export async function getRankedUnitStats(pool, { playerId, gameSlug }) {
+    if (!pool || !playerId || !gameSlug)
+        return null;
+    try {
+        const res = await pool.query(`select unit_type, games, wins, kills, survivals from ranked_unit_stats
+        where player_id=$1 and game_slug=$2
+        order by games desc, wins desc, unit_type asc`, [playerId, gameSlug]);
+        return {
+            playerId,
+            gameSlug,
+            units: (res.rows || []).map((r) => ({
+                unitType: r.unit_type,
+                games: r.games,
+                wins: r.wins,
+                kills: r.kills,
+                survivals: r.survivals,
+            })),
+        };
+    }
+    catch (err) {
+        process.stderr.write(`[ranked] getRankedUnitStats error: ${err?.message || err}\n`);
+        return null;
+    }
+}
+// Recent resolved ranked matches for a player, shaped to that player's perspective
+// (my outcome, my rating delta, my/opponent squads). Public read.
+export async function getRankedMatches(pool, { playerId, gameSlug, limit }) {
+    if (!pool || !playerId || !gameSlug)
+        return null;
+    const cap = Math.max(1, Math.min(Number(limit) || 10, 25));
+    try {
+        const res = await pool.query(`select match_id, player_a, player_b, outcome_a, rating_a_before, rating_b_before,
+              rating_a_after, rating_b_after, squad_a, squad_b, resolved_at
+         from ranked_matches
+        where game_slug=$1 and status='resolved' and (player_a=$2 or player_b=$2)
+        order by resolved_at desc limit $3`, [gameSlug, playerId, cap]);
+        const matches = (res.rows || []).map((r) => {
+            const isA = r.player_a === playerId;
+            const outcome = r.outcome_a === "draw"
+                ? "draw"
+                : (isA ? r.outcome_a : r.outcome_a === "win" ? "loss" : "win");
+            const before = isA ? r.rating_a_before : r.rating_b_before;
+            const after = isA ? r.rating_a_after : r.rating_b_after;
+            return {
+                matchId: r.match_id,
+                opponentPlayerId: isA ? r.player_b : r.player_a,
+                outcome,
+                ratingBefore: before,
+                ratingAfter: after,
+                ratingDelta: (after ?? before) - before,
+                mySquad: isA ? r.squad_a : r.squad_b,
+                opponentSquad: isA ? r.squad_b : r.squad_a,
+                resolvedAt: r.resolved_at,
+            };
+        });
+        return { playerId, gameSlug, matches };
+    }
+    catch (err) {
+        process.stderr.write(`[ranked] getRankedMatches error: ${err?.message || err}\n`);
         return null;
     }
 }
