@@ -110,15 +110,19 @@ function populate(body) {
   const pilot = pilotName();
 
   const account = readStoredFactoryAccountSession();
-  const signedIn = isFactoryAccountLoggedIn(account);
   const apiClient = createPlatformApiClient();
-  const canServe = signedIn
-    && apiClient?.isConfigured
+
+  // A signed-out player gets the sign-in prompt; a signed-in player whose platform
+  // client isn't reachable gets a clear "unavailable" — never a misleading "sign in".
+  if (!isFactoryAccountLoggedIn(account)) {
+    renderSignedOut(body, pilot);
+    return;
+  }
+  const serviceReady = apiClient?.isConfigured
     && typeof apiClient.fetchRankedStanding === "function"
     && typeof apiClient.saveRankedProfile === "function";
-
-  if (!canServe) {
-    renderSignedOut(body, pilot);
+  if (!serviceReady) {
+    renderServiceUnavailable(body, pilot);
     return;
   }
 
@@ -154,6 +158,19 @@ function renderSignedOut(body, pilot) {
   link.textContent = "Sign In";
   try { link.href = createFactoryAccountSignInUrl(); } catch { link.href = "#"; }
   standing.append(notice, link);
+  body.appendChild(standing);
+}
+
+function renderServiceUnavailable(body, pilot) {
+  const section = el("section", "ranked-profile-identity");
+  const pilotRow = el("div", "ranked-profile-pilot");
+  pilotRow.appendChild(el("span", "ranked-profile-label", "Pilot"));
+  pilotRow.appendChild(el("b", "ranked-profile-pilot-name", pilot || "Guest"));
+  section.appendChild(pilotRow);
+  body.appendChild(section);
+
+  const standing = el("section", "ranked-profile-standing");
+  standing.appendChild(el("p", "ranked-profile-standing-error", "Ranked service is unavailable right now. Try again in a moment."));
   body.appendChild(standing);
 }
 

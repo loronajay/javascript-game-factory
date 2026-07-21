@@ -26,6 +26,10 @@
     <template data-fragment-src="./html/field-manual.html"></template>
     <template data-fragment-src="./html/settings-modal.html"></template>
 
+    <!-- Sets window.__JGF_PLATFORM_API_URL__ so the platform API client is configured.
+         Must load before bootstrap.js (which creates API clients). Without it every
+         platform call — ranked, activity, progression sync — silently no-ops. -->
+    <script type="module" src="../../js/platform-config.mjs"></script>
     <script type="module" src="./src/bootstrap.js"></script>
   </body>
 </html>

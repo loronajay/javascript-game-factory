@@ -79,17 +79,18 @@ export function openRankedLeaderboard() {
 function populate(body) {
   const account = readStoredFactoryAccountSession();
   const apiClient = createPlatformApiClient();
-  const canServe = isFactoryAccountLoggedIn(account)
-    && apiClient?.isConfigured
-    && typeof apiClient.fetchRankedLeaderboard === "function";
 
-  if (!canServe) {
+  if (!isFactoryAccountLoggedIn(account)) {
     const notice = el("p", "ranked-profile-signin", "Sign in to your Javascript Game Factory account to view the ranked ladder.");
     const link = document.createElement("a");
     link.className = "ranked-profile-signin-link menu-btn";
     link.textContent = "Sign In";
     try { link.href = createFactoryAccountSignInUrl(); } catch { link.href = "#"; }
     body.append(notice, link);
+    return;
+  }
+  if (!apiClient?.isConfigured || typeof apiClient.fetchRankedLeaderboard !== "function") {
+    body.appendChild(el("p", "ranked-profile-standing-error", "Ranked service is unavailable right now. Try again in a moment."));
     return;
   }
 
