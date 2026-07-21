@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 import { UNIT_TYPES } from "../src/core/unitCatalog.js";
 import {
   DRAFT_BATTLE_REQUIRED_UNITS,
+  RANKED_BATTLE_REQUIRED_UNITS,
   isDraftBattleAvailable,
+  isRankedBattleAvailable,
   unlockedDraftUnitCount,
 } from "../src/progression/draftAvailability.js";
 import { writeUnlockProgress } from "../src/progression/unlocks.js";
@@ -38,4 +40,23 @@ test("draft availability ignores summon-only units when checking the threshold",
 
   assert.equal(unlockedDraftUnitCount(storage), DRAFT_BATTLE_REQUIRED_UNITS - 1);
   assert.equal(isDraftBattleAvailable(storage), false);
+});
+
+test("ranked requires a bigger pool than plain draft to survive the ban phase", () => {
+  assert.ok(RANKED_BATTLE_REQUIRED_UNITS > DRAFT_BATTLE_REQUIRED_UNITS);
+
+  // Exactly enough for draft, but short of the ranked (draft + bans) threshold.
+  const draftOnly = storageAdapter();
+  writeUnlockProgress(draftOnly, {
+    unlockedUnits: DRAFTABLE_TYPES.slice(0, DRAFT_BATTLE_REQUIRED_UNITS),
+  });
+  assert.equal(isDraftBattleAvailable(draftOnly), true);
+  assert.equal(isRankedBattleAvailable(draftOnly), false);
+
+  // Meeting the ranked threshold unlocks both.
+  const rankedReady = storageAdapter();
+  writeUnlockProgress(rankedReady, {
+    unlockedUnits: DRAFTABLE_TYPES.slice(0, RANKED_BATTLE_REQUIRED_UNITS),
+  });
+  assert.equal(isRankedBattleAvailable(rankedReady), true);
 });

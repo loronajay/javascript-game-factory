@@ -4,6 +4,33 @@ import {
   buildTutorialSkinChoiceClaim,
   enqueueGameProgressClaim,
 } from "../platform/gameProgressClient.js";
+import {
+  BROTHERS_MISSION_ID,
+  CAMPAIGN_PROGRESS_KEY,
+  CLOD_MISSION_ID,
+  FATHER_TIME_MISSION_ID,
+  FINAL_BATTLE_MISSION_ID,
+  GARGOYLE_MISSION_ID,
+  HASBEEN_HEROES_MISSION_ID,
+  MINER_MISSION_ID,
+  MONK_MISSION_ID,
+  NECROMANCER_MISSION_ID,
+  NOT_MY_KING_MISSION_ID,
+  OUT_OF_RETIREMENT_MISSION_ID,
+  PALADIN_MISSION_ID,
+  RONIN_MISSION_ID,
+  SHOWDOWN_FAT_TYPES,
+  SHOWDOWN_MISSION_ID,
+  SNIPER_MISSION_ID,
+  SPIRIT_WOODS_MISSION_ID,
+  VIRUS_MISSION_ID,
+  VOIDWOOD_MISSION_ID,
+  VOIDWOOD_SKIN_REWARDS,
+  VOID_CASTLE_MISSION_ID,
+  WANDERING_PARTY_MISSION_ID,
+  WITCH_DOCTOR_MISSION_ID,
+  WRONG_PLACE_MISSION_ID,
+} from "../campaign/campaignConstants.js";
 
 export const TUTORIAL_PROGRESS_KEY = "tacticalArenaTutorialProgressV2";
 export const TUTORIAL_PROGRESS_SEAL_KEY = "tacticalArenaTutorialProgressSealV1";
@@ -65,6 +92,38 @@ const NECROMANCER_COMPANION_SKIN_SLUGS = Object.freeze(new Set([
 ]));
 const PROGRESS_SEAL_VERSION = 1;
 const PROGRESS_SEAL_SECRET = "tactical-arena-progress-v1";
+const CAMPAIGN_REWARD_RECOVERY = Object.freeze({
+  [CLOD_MISSION_ID]: Object.freeze({ valorReward: 55, rewardUnits: Object.freeze(["clod"]) }),
+  [NECROMANCER_MISSION_ID]: Object.freeze({ valorReward: 60, rewardUnits: Object.freeze(["necromancer"]) }),
+  [WITCH_DOCTOR_MISSION_ID]: Object.freeze({ valorReward: 65, rewardUnits: Object.freeze(["witch-doctor"]) }),
+  [FATHER_TIME_MISSION_ID]: Object.freeze({ valorReward: 70, rewardUnits: Object.freeze(["father-time"]) }),
+  [VIRUS_MISSION_ID]: Object.freeze({ valorReward: 75, rewardUnits: Object.freeze(["virus"]) }),
+  [PALADIN_MISSION_ID]: Object.freeze({ valorReward: 80, rewardUnits: Object.freeze(["paladin"]) }),
+  [MONK_MISSION_ID]: Object.freeze({ valorReward: 90, rewardUnits: Object.freeze(["monk"]) }),
+  [BROTHERS_MISSION_ID]: Object.freeze({ valorReward: 105 }),
+  [GARGOYLE_MISSION_ID]: Object.freeze({ valorReward: 120, rewardUnits: Object.freeze(["gargoyle"]) }),
+  [SNIPER_MISSION_ID]: Object.freeze({ valorReward: 135, rewardUnits: Object.freeze(["sniper"]) }),
+  [WANDERING_PARTY_MISSION_ID]: Object.freeze({ valorReward: 150 }),
+  [MINER_MISSION_ID]: Object.freeze({ valorReward: 165, rewardUnits: Object.freeze(["miner"]) }),
+  [HASBEEN_HEROES_MISSION_ID]: Object.freeze({ valorReward: 180 }),
+  [RONIN_MISSION_ID]: Object.freeze({ valorReward: 195, rewardUnits: Object.freeze(["ronin"]) }),
+  [WRONG_PLACE_MISSION_ID]: Object.freeze({ valorReward: 210, rewardUnits: Object.freeze(["riot-cop"]) }),
+  [OUT_OF_RETIREMENT_MISSION_ID]: Object.freeze({
+    valorReward: 230,
+    rewardUnits: Object.freeze(["angel"]),
+    rewardSkins: OUT_OF_RETIREMENT_SKIN_REWARDS,
+  }),
+  [VOIDWOOD_MISSION_ID]: Object.freeze({
+    valorReward: 250,
+    rewardUnits: Object.freeze(["treant"]),
+    rewardSkins: VOIDWOOD_SKIN_REWARDS,
+  }),
+  [SPIRIT_WOODS_MISSION_ID]: Object.freeze({ valorReward: 270, rewardUnits: Object.freeze(["mother-nature"]) }),
+  [SHOWDOWN_MISSION_ID]: Object.freeze({ valorReward: 295, rewardUnits: SHOWDOWN_FAT_TYPES }),
+  [NOT_MY_KING_MISSION_ID]: Object.freeze({ valorReward: 320, rewardUnits: Object.freeze(["king"]) }),
+  [VOID_CASTLE_MISSION_ID]: Object.freeze({ valorReward: 350, rewardUnits: Object.freeze(["nemesis"]) }),
+  [FINAL_BATTLE_MISSION_ID]: Object.freeze({ valorReward: 405, rewardUnits: Object.freeze(["blacksword"]) }),
+});
 
 function defaultStorage() {
   return globalThis.localStorage;
@@ -238,6 +297,11 @@ function readStorageText(storage, key) {
   }
 }
 
+function completedCampaignMissionIds(storage) {
+  const value = parseProgress(readStorageText(storage, CAMPAIGN_PROGRESS_KEY));
+  return uniqueStrings(value?.completedMissions);
+}
+
 function writeSealedProgress(storage, progress) {
   const serialized = serializedProgress(progress);
   try {
@@ -305,24 +369,73 @@ export function normalizeUnlockProgress(value = {}) {
   };
 }
 
+function repairUnlockProgressFromCampaignProgress(storage, progress) {
+  const completed = completedCampaignMissionIds(storage);
+  if (!completed.length) return progress;
+
+  const unlockedUnits = new Set(progress.unlockedUnits);
+  const campaignValorRewards = new Set(progress.campaignValorRewards);
+  const campaignGrantedSkins = [...progress.campaignGrantedSkins];
+  const campaignGrantedSkinKeys = new Set(campaignGrantedSkins.map((skin) => `${skin.type}:${skin.slug}`));
+  let valorBalance = progress.valorBalance;
+  let changed = false;
+
+  for (const missionId of completed) {
+    const recovery = CAMPAIGN_REWARD_RECOVERY[missionId];
+    if (!recovery) continue;
+    for (const type of recovery.rewardUnits ?? []) {
+      if (unlockedUnits.has(type)) continue;
+      unlockedUnits.add(type);
+      changed = true;
+    }
+    for (const skin of recovery.rewardSkins ?? []) {
+      const key = `${skin.type}:${skin.slug}`;
+      if (campaignGrantedSkinKeys.has(key)) continue;
+      campaignGrantedSkinKeys.add(key);
+      campaignGrantedSkins.push(skin);
+      changed = true;
+    }
+    if (recovery.valorReward > 0 && !campaignValorRewards.has(missionId)) {
+      campaignValorRewards.add(missionId);
+      valorBalance += recovery.valorReward;
+      changed = true;
+    }
+  }
+
+  return changed
+    ? normalizeUnlockProgress({
+      ...progress,
+      valorBalance,
+      campaignValorRewards: [...campaignValorRewards],
+      unlockedUnits: [...unlockedUnits],
+      campaignGrantedSkins,
+    })
+    : progress;
+}
+
+function finalizeReadUnlockProgress(storage, progress) {
+  const repaired = repairUnlockProgressFromCampaignProgress(storage, progress);
+  return repaired === progress ? progress : writeSealedProgress(storage, repaired);
+}
+
 export function readUnlockProgress(storage = defaultStorage()) {
   const fallback = () => readSealedBackupProgress(storage) ?? progressFallback();
   const raw = readStorageText(storage, TUTORIAL_PROGRESS_KEY);
-  if (!raw) return fallback();
+  if (!raw) return finalizeReadUnlockProgress(storage, fallback());
   const parsed = parseProgress(raw);
-  if (!parsed) return fallback();
+  if (!parsed) return finalizeReadUnlockProgress(storage, fallback());
 
   const serialized = serializedProgress(parsed);
   const expectedSeal = progressSeal(serialized);
   const storedSeal = readStorageText(storage, TUTORIAL_PROGRESS_SEAL_KEY);
 
-  if (storedSeal === expectedSeal) return JSON.parse(serialized);
-  if (storedSeal === progressSeal(raw)) return writeSealedProgress(storage, parsed);
+  if (storedSeal === expectedSeal) return finalizeReadUnlockProgress(storage, JSON.parse(serialized));
+  if (storedSeal === progressSeal(raw)) return finalizeReadUnlockProgress(storage, writeSealedProgress(storage, parsed));
 
   const backup = readSealedBackupProgress(storage);
-  if (backup) return writeSealedProgress(storage, backup);
+  if (backup) return finalizeReadUnlockProgress(storage, writeSealedProgress(storage, backup));
 
-  if (!storedSeal) return writeSealedProgress(storage, parsed);
+  if (!storedSeal) return finalizeReadUnlockProgress(storage, writeSealedProgress(storage, parsed));
   return progressFallback();
 }
 
@@ -373,9 +486,12 @@ export function isProgressSkinUnlocked(type, slug, storage = defaultStorage()) {
 export function mergeServerEntitlementsIntoUnlockProgress(storage = defaultStorage(), snapshot = {}) {
   const progress = readUnlockProgress(storage);
   const entitlements = entitlementsFromServerSnapshot(snapshot);
-  if (!entitlements.skins.length && !entitlements.units.length) return progress;
+  const serverValorBalance = normalizeValorBalance(snapshot?.valorBalance);
+  const valorBalance = Math.max(progress.valorBalance, serverValorBalance);
+  if (!entitlements.skins.length && !entitlements.units.length && valorBalance === progress.valorBalance) return progress;
   return writeUnlockProgress(storage, {
     ...progress,
+    valorBalance,
     serverEntitlementUnits: [...progress.serverEntitlementUnits, ...entitlements.units],
     serverEntitlementSkins: [...progress.serverEntitlementSkins, ...entitlements.skins],
   });

@@ -530,15 +530,6 @@ export function completeCampaignMission(storage = defaultStorage(), missionId, s
   const completedMissions = new Set(current.completedMissions);
   completedMissions.add(missionId);
   const previousStars = current.missionStars[missionId] ?? 0;
-  const progress = writeCampaignProgress(storage, {
-    ...current,
-    completedMissions: [...completedMissions],
-    missionStars: {
-      ...current.missionStars,
-      [missionId]: Math.max(previousStars, evaluation.stars),
-    },
-  });
-
   const valorGrant = grantCampaignMissionValor(storage, missionId, valorReward, { stars: evaluation.stars });
   const unlockProgress = valorGrant.progress;
   const existing = new Set(unlockProgress.unlockedUnits);
@@ -553,6 +544,14 @@ export function completeCampaignMission(storage = defaultStorage(), missionId, s
       ...(unlockProgress.campaignGrantedSkins ?? []),
       ...rewardSkins,
     ],
+  });
+  const progress = writeCampaignProgress(storage, {
+    ...current,
+    completedMissions: [...completedMissions],
+    missionStars: {
+      ...current.missionStars,
+      [missionId]: Math.max(previousStars, evaluation.stars),
+    },
   });
   for (const type of newRewardUnits) {
     enqueueGameProgressClaim(storage, buildCampaignUnitRewardClaim({

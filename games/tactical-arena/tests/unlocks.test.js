@@ -33,6 +33,15 @@ import {
   writeUnlockProgress
 } from "../src/progression/unlocks.js";
 import {
+  CLOD_MISSION_ID,
+  FINAL_BATTLE_MISSION_ID,
+  OUT_OF_RETIREMENT_MISSION_ID,
+  SHOWDOWN_MISSION_ID,
+  VOIDWOOD_MISSION_ID,
+  WANDERING_PARTY_MISSION_ID,
+  writeCampaignProgress,
+} from "../src/campaign/campaign.js";
+import {
   TUTORIAL_ARTS_MP_ID,
   TUTORIAL_BASICS_ID,
   TUTORIAL_DAMAGE_TYPES_ID,
@@ -165,6 +174,53 @@ test("older sealed backup payloads recover when the primary progress is invalid"
   assert.equal(progress.unlockedUnits.includes("summoner"), false);
   assert.deepEqual(progress.purchasedSkins, [{ type: "archer", slug: "desert-warrior" }]);
   assert.equal(isProgressSkinUnlocked("archer", "desert-warrior", storage), true);
+});
+
+test("completed campaign progress repairs a wiped-but-sealed unlock profile", () => {
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, {});
+  writeCampaignProgress(storage, {
+    completedMissions: [
+      CLOD_MISSION_ID,
+      WANDERING_PARTY_MISSION_ID,
+      OUT_OF_RETIREMENT_MISSION_ID,
+      VOIDWOOD_MISSION_ID,
+      SHOWDOWN_MISSION_ID,
+      FINAL_BATTLE_MISSION_ID,
+    ],
+    missionStars: {
+      [CLOD_MISSION_ID]: 3,
+      [WANDERING_PARTY_MISSION_ID]: 3,
+      [OUT_OF_RETIREMENT_MISSION_ID]: 3,
+      [VOIDWOOD_MISSION_ID]: 3,
+      [SHOWDOWN_MISSION_ID]: 3,
+      [FINAL_BATTLE_MISSION_ID]: 3,
+    },
+  });
+
+  const progress = readUnlockProgress(storage);
+
+  for (const type of ["clod", "angel", "treant", "fat-knight", "fat-wizard", "fat-cleric", "fat-bowman", "blacksword"]) {
+    assert.equal(progress.unlockedUnits.includes(type), true, `${type} should be repaired from campaign completion`);
+  }
+  assert.equal(isProgressSkinUnlocked("angel", "summer-vibes", storage), true);
+  assert.equal(isProgressSkinUnlocked("paladin", "summer-vibes", storage), true);
+  assert.equal(isProgressSkinUnlocked("treant", "voidroot", storage), true);
+  assert.deepEqual(progress.campaignGrantedSkins, [
+    { type: "angel", slug: "summer-vibes" },
+    { type: "paladin", slug: "summer-vibes" },
+    { type: "treant", slug: "voidroot" },
+  ]);
+  assert.deepEqual(progress.campaignValorRewards, [
+    CLOD_MISSION_ID,
+    WANDERING_PARTY_MISSION_ID,
+    OUT_OF_RETIREMENT_MISSION_ID,
+    VOIDWOOD_MISSION_ID,
+    SHOWDOWN_MISSION_ID,
+    FINAL_BATTLE_MISSION_ID,
+  ]);
+  assert.equal(progress.valorBalance, 55 + 150 + 230 + 250 + 295 + 405);
+  assert.equal(readUnlockProgress(storage).unlockedUnits.includes("blacksword"), true, "repair should be resealed");
 });
 
 test("completing all tutorial entries unlocks Juggernaut but waits for a skin choice", () => {
@@ -382,6 +438,7 @@ test("server skin entitlements are folded into unlocked skins and equip gating",
   const storage = storageAdapter();
 
   const progress = mergeServerEntitlementsIntoUnlockProgress(storage, {
+    valorBalance: 875,
     entitlements: [
       { entitlementId: "skin:swordsman:medieval", kind: "skin" },
       { entitlementId: "skin:necromancer:void-dweller", kind: "skin" },
@@ -397,6 +454,7 @@ test("server skin entitlements are folded into unlocked skins and equip gating",
     { type: "necromancer", slug: "void-dweller" },
   ]);
   assert.deepEqual(progress.serverEntitlementUnits, ["juggernaut"]);
+  assert.equal(progress.valorBalance, 875);
   assert.equal(isProgressSkinUnlocked("swordsman", "medieval", storage), true);
   assert.equal(isProgressSkinUnlocked("necromancer", "void-dweller", storage), true);
   assert.equal(isProgressSkinUnlocked("ghoul", "void-dweller", storage), true);

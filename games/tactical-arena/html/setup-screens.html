@@ -162,30 +162,52 @@
 
           <!-- Pairing: quick match or a private room code. -->
           <div data-online-panel="idle" hidden>
+            <!-- Casual vs Ranked is a MODE, not an action: it decides which pairing
+                 flow the panel below shows. Ranked is a fixed competitive format, so
+                 it hides the format/board/room controls that only apply to casual. -->
             <div class="setup-field">
-              <span class="setup-label">Match type</span>
-              <div class="segmented" data-field="onlineMatchType">
-                <button type="button" class="seg is-selected" data-match-type="duel">Classic 1v1</button>
-                <button type="button" class="seg" data-match-type="draft1v1">Draft 1v1</button>
-                <button type="button" class="seg" data-match-type="ffa4">4 Player FFA</button>
-                <button type="button" class="seg" data-match-type="teams4">2v2 Teams</button>
+              <span class="setup-label">Mode</span>
+              <div class="segmented" data-field="onlineMode">
+                <button type="button" class="seg is-selected" data-online-mode="casual">Casual</button>
+                <button type="button" class="seg" data-online-mode="ranked">Ranked</button>
               </div>
-              <p class="menu-note" data-online="matchTypeHint" hidden></p>
             </div>
-            <div class="online-ranked-entry">
-              <button type="button" class="menu-btn menu-ranked-btn" data-online="rankedBtn">⚔ Ranked Match</button>
-              <p class="setup-hint" data-online="rankedHint">Ranked is always Draft on a 13×13 board, with a ban phase. Sign in to play.</p>
-            </div>
-            <div class="menu-buttons" data-online-group="casual">
-              <button type="button" class="primary menu-btn" data-action="quickMatch">Quick Match</button>
-              <button type="button" class="menu-btn" data-action="createRoom">Create Private Room</button>
-            </div>
-            <div class="setup-field">
-              <span class="setup-label">Join with a code</span>
-              <div class="online-join">
-                <input type="text" class="online-code-input" data-online="codeInput" maxlength="5" placeholder="CODE" autocomplete="off" spellcheck="false" />
-                <button type="button" class="menu-btn" data-action="joinRoom">Join</button>
+
+            <!-- CASUAL: choose a format, then pair by quick match, private room, or code. -->
+            <div data-online-mode-panel="casual">
+              <div class="setup-field">
+                <span class="setup-label">Match type</span>
+                <div class="segmented" data-field="onlineMatchType">
+                  <button type="button" class="seg is-selected" data-match-type="duel">Classic 1v1</button>
+                  <button type="button" class="seg" data-match-type="draft1v1">Draft 1v1</button>
+                  <button type="button" class="seg" data-match-type="ffa4">4 Player FFA</button>
+                  <button type="button" class="seg" data-match-type="teams4">2v2 Teams</button>
+                </div>
+                <p class="menu-note" data-online="matchTypeHint" hidden></p>
               </div>
+              <div class="menu-buttons">
+                <button type="button" class="primary menu-btn" data-action="quickMatch">Quick Match</button>
+                <button type="button" class="menu-btn" data-action="createRoom">Create Private Room</button>
+              </div>
+              <div class="setup-field">
+                <span class="setup-label">Join with a code</span>
+                <div class="online-join">
+                  <input type="text" class="online-code-input" data-online="codeInput" maxlength="5" placeholder="CODE" autocomplete="off" spellcheck="false" />
+                  <button type="button" class="menu-btn" data-action="joinRoom">Join</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- RANKED: one fixed competitive format, matchmaking only (no rooms/codes). -->
+            <div data-online-mode-panel="ranked" hidden>
+              <div class="ranked-format-card">
+                <span class="setup-label">Ranked · Draft 1v1</span>
+                <p class="setup-hint">13 × 13 board with a ban phase, against ranked opponents. Your rating is on the line.</p>
+              </div>
+              <div class="menu-buttons">
+                <button type="button" class="menu-btn menu-ranked-btn" data-online="rankedBtn">⚔ Find Ranked Match</button>
+              </div>
+              <p class="setup-hint" data-online="rankedHint"></p>
             </div>
           </div>
 

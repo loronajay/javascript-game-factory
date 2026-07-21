@@ -20,7 +20,7 @@ import { createOnlineClient, normalizeRoomCode } from "../online/onlineClient.js
 import { createOnlineSession } from "../online/onlineSession.js";
 import { ONLINE_RULESET_VERSION } from "../online/ruleset.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
-import { DRAFT_BATTLE_REQUIRED_UNITS, isDraftBattleAvailable, unlockedDraftUnitCount } from "../progression/draftAvailability.js";
+import { DRAFT_BATTLE_REQUIRED_UNITS, RANKED_BATTLE_REQUIRED_UNITS, isDraftBattleAvailable, isRankedBattleAvailable, unlockedDraftUnitCount } from "../progression/draftAvailability.js";
 import { UNIT_TYPE_KEYS, groupedUnitTypes, isUnitUnlocked } from "./squadModel.js";
 import { createPortrait } from "./portraits.js";
 import { openSkinPicker } from "./skinPicker.js";
@@ -70,7 +70,9 @@ export function createOnlineFlow({ onStartMatch }) {
   const matchTypeHintEl = $('[data-online="matchTypeHint"]');
   const rankedBtn = $('[data-online="rankedBtn"]');
   const rankedHint = $('[data-online="rankedHint"]');
-  const casualGroup = $('[data-online-group="casual"]');
+  const modeSegs = [...el.querySelectorAll('[data-field="onlineMode"] .seg')];
+  const casualModePanel = $('[data-online-mode-panel="casual"]');
+  const rankedModePanel = $('[data-online-mode-panel="ranked"]');
 
   let client = null;
   let handedOff = false;
@@ -86,8 +88,10 @@ export function createOnlineFlow({ onStartMatch }) {
   let localFormationOrder = null;
   let formationPromptOpen = false;
 
-  // Ranked (server-brokered matchmaking + ban phase). rankedMode is true for the
-  // whole ranked session; rankedInfo holds the platform match once paired.
+  // Ranked (server-brokered matchmaking + ban phase). onlineMode is the idle-panel
+  // toggle (which pairing flow is shown); rankedMode is true only once a ranked search
+  // is actually in flight; rankedInfo holds the platform match once paired.
+  let onlineMode = "casual"; // "casual" | "ranked"
   let rankedFlow = null;
   let rankedMode = false;
   let rankedInfo = null;
@@ -168,6 +172,13 @@ export function createOnlineFlow({ onStartMatch }) {
 
   function isDraftUnlockable() {
     return isDraftBattleAvailable(globalThis.localStorage);
+  }
+
+  // Ranked needs a bigger owned pool than plain draft: the ban phase can knock a champ
+  // out from under you before you ever pick, so the gate is stricter (see
+  // RANKED_BATTLE_REQUIRED_UNITS).
+  function isRankedUnlockable() {
+    return isRankedBattleAvailable(globalThis.localStorage);
   }
 
   function syncMatchTypeAvailability() {
@@ -277,13 +288,40 @@ export function createOnlineFlow({ onStartMatch }) {
     return { minPlayers: 2, maxPlayers: 2, settings: { matchType: "draft1v1", ranked: true } };
   }
 
+  // Switches the idle panel between the casual pairing flow and the ranked
+  // matchmaking flow. Leaving ranked abandons any in-flight search.
+  function setOnlineMode(mode) {
+    const next = mode === "ranked" ? "ranked" : "casual";
+    onlineMode = next;
+    for (const seg of modeSegs) seg.classList.toggle("is-selected", seg.dataset.onlineMode === next);
+    if (casualModePanel) casualModePanel.hidden = next !== "casual";
+    if (rankedModePanel) rankedModePanel.hidden = next !== "ranked";
+    if (next === "casual") endRankedSearch();
+    else syncRankedAvailability();
+  }
+
+  // Reflects the champ-pool gate on the ranked panel before the player commits: the ban
+  // phase can strip a champ, so ranked needs a bigger owned pool than plain draft. When
+  // the pool is too small the Find button is disabled and the hint says how many more.
+  function syncRankedAvailability() {
+    if (!rankedBtn || rankedMode) return; // don't fight the live Cancel state
+    const enough = isRankedUnlockable();
+    rankedBtn.disabled = !enough;
+    if (rankedHint) {
+      rankedHint.textContent = enough
+        ? ""
+        : `Ranked drafts with bans — unlock ${RANKED_BATTLE_REQUIRED_UNITS} unique units first (${unlockedUnitCount()} unlocked).`;
+    }
+  }
+
   function setRankedSearchingUI(searching) {
     if (rankedBtn) {
-      rankedBtn.textContent = searching ? "✕ Cancel Search" : "⚔ Ranked Match";
+      rankedBtn.textContent = searching ? "✕ Cancel Search" : "⚔ Find Ranked Match";
       rankedBtn.classList.toggle("is-searching", !!searching);
+      rankedBtn.disabled = false; // Cancel (or a re-evaluated Find) must stay clickable
     }
-    if (casualGroup) casualGroup.style.display = searching ? "none" : "";
-    for (const seg of matchTypeSegs) seg.disabled = searching || seg.disabled;
+    // Lock the Casual/Ranked toggle while a search is live — Cancel or Back to leave.
+    for (const seg of modeSegs) seg.disabled = !!searching;
   }
 
   function startRanked() {
@@ -293,15 +331,18 @@ export function createOnlineFlow({ onStartMatch }) {
       if (rankedHint) rankedHint.textContent = "You need a signed-in Javascript Game Factory account for ranked.";
       return;
     }
-    if (!isDraftUnlockable()) {
-      setStatus(`Ranked uses Draft — unlock ${DRAFT_BATTLE_REQUIRED_UNITS} unique units first (${unlockedUnitCount()} unlocked).`);
+    if (!isRankedUnlockable()) {
+      setStatus("Unlock more units to play ranked Draft.");
+      if (rankedHint) rankedHint.textContent = `Ranked drafts with bans — unlock ${RANKED_BATTLE_REQUIRED_UNITS} unique units first (${unlockedUnitCount()} unlocked).`;
       return;
     }
     rankedMode = true;
     rankedInfo = null;
-    selectMatchType("draft1v1");
+    // Ranked framing is fixed: Draft 1v1 on a 13×13 board. The lobby settings drive
+    // the match type once paired, so we only pin the owner's board-size framing here
+    // rather than mutating the (hidden) casual controls.
     config.size = 13;
-    selectSeg(13);
+    if (rankedHint) rankedHint.textContent = "";
     setRankedSearchingUI(true);
     setStatus("Joining the ranked queue…");
     client?.setIdentity(identity()); // re-stamp identity so the ranked name is used
@@ -328,6 +369,7 @@ export function createOnlineFlow({ onStartMatch }) {
     rankedInfo = null;
     rankedBanFirstSeat = null;
     setRankedSearchingUI(false);
+    if (onlineMode === "ranked") syncRankedAvailability(); // back on the ranked idle panel
     void flow?.cancel();
   }
 
@@ -990,6 +1032,12 @@ export function createOnlineFlow({ onStartMatch }) {
       selectMatchType(seg.dataset.matchType);
     });
   }
+  for (const seg of modeSegs) {
+    seg.addEventListener("click", () => {
+      if (lobby || seg.disabled) return; // locked while in a lobby or mid-search
+      setOnlineMode(seg.dataset.onlineMode);
+    });
+  }
   rankedBtn?.addEventListener("click", () => {
     if (rankedMode && !rankedInfo) endRankedSearch(); // cancel an in-progress search
     else if (!rankedMode) startRanked();
@@ -1035,12 +1083,10 @@ export function createOnlineFlow({ onStartMatch }) {
   function onEnter() {
     handedOff = false;
     myClientId = null;
-    rankedMode = false;
     rankedInfo = null;
-    rankedFlow = null;
     rankedBanFirstSeat = null;
-    setRankedSearchingUI(false);
     selectMatchType("duel");
+    setOnlineMode("casual"); // resets ranked search + shows the casual pairing flow
     resetLobbyState();
     setPanel("none");
     setStatus("Connecting to the network…");
