@@ -126,6 +126,10 @@ export function applyPanelScaling(doc, layout, panelToDom, layoutSelector) {
     const layoutEl = doc.querySelector(layoutSelector);
     if (!layoutEl)
         return;
+    // Untouched-default profiles render as a natural content-height flow (see apply-layout.mjs);
+    // the fixed-height zoom-shell scaling only applies to customized composition layouts.
+    if (layoutEl.classList.contains("layout--flow"))
+        return;
     const gap = getCssToken("--profile-layout-gap", 14);
     const rowH = getCssToken("--profile-layout-row-height", 80);
     // Column width derived from the live grid element's actual rendered width.

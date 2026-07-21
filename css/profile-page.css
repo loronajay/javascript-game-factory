@@ -1191,6 +1191,92 @@
   width: min(94vw, 1380px);
 }
 
+/* ---------- DEFAULT FLOW MODE (untouched profiles) ----------
+   When a profile has never been customized, panels render at natural content
+   height in three independent columns instead of the rigid fixed-row grid. */
+.me-layout.layout--flow,
+.player-layout.layout--flow {
+  display: flex;
+  align-items: flex-start;
+  grid-template-columns: none;
+  grid-auto-rows: auto;
+}
+
+.layout-flow-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--profile-layout-gap);
+}
+
+/* Panels have no padding of their own (the zoom shell normally supplies it), so
+   flow mode restores comfortable internal padding and stacking. */
+.layout--flow .me-panel,
+.layout--flow .player-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  overflow: visible;
+}
+
+.layout--flow .me-hero-card,
+.layout--flow .player-hero-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  grid-template-columns: none;
+  grid-template-rows: none;
+  grid-auto-rows: auto;
+  overflow: visible;
+  container-type: normal;
+}
+
+/* Children flow naturally rather than being absolutely positioned by percent. */
+.layout--flow [data-profile-child-id] {
+  position: static;
+  width: auto;
+  height: auto;
+  min-height: 0;
+}
+
+.layout--flow .player-hero-card__child,
+.layout--flow .me-hero-card__child {
+  width: 100%;
+}
+
+/* A panel hidden by JS (e.g. an empty music player) must stay hidden in flow. */
+.layout--flow .me-panel[hidden],
+.layout--flow .player-panel[hidden] {
+  display: none;
+}
+
+/* The featured-cabinet card normally sizes off the zoom-shell's container height
+   (100cqh); flow mode has no size container, so pin it to a natural square. */
+.layout--flow .me-featured-cabinet,
+.layout--flow .player-featured-cabinet {
+  height: auto;
+}
+
+.layout--flow .me-featured-cabinet__card,
+.layout--flow .player-featured-cabinet__card {
+  width: min(100%, 288px);
+  height: auto;
+  aspect-ratio: 1 / 1;
+}
+
+@media (max-width: 980px) {
+  .me-layout.layout--flow,
+  .player-layout.layout--flow {
+    flex-direction: column;
+  }
+
+  .layout-flow-col {
+    width: 100%;
+  }
+}
+
 /* Hidden panels */
 .layout-panel--hidden {
   display: none !important;

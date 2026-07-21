@@ -151,6 +151,12 @@
   padding: 14px 18px;
 }
 
+.gallery-grid > .me-panel__empty,
+.gallery-grid > .player-panel__empty {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
 .gallery-item {
   position: relative;
   display: flex;

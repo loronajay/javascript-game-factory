@@ -1,5 +1,6 @@
 import { escapeHtml } from "../profile-social/social-view-shared.mjs";
 import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs";
+import { getDefaultLayout, getPlayerDefaultLayout } from "../profile-layout/default-layout.mjs";
 
 export const ME_PANEL_TO_DOM: Record<string, string> = {
   hero: "meHeroCard",
@@ -61,6 +62,17 @@ export function applyProfileLayout(doc: Document, layout: any, {
 
   const layoutEl = doc.querySelector<HTMLElement>(layoutSelector);
   if (!layoutEl) return;
+
+  // Untouched-default profiles render as a natural content-height 3-column flow
+  // instead of the rigid fixed-row composition grid. The moment a player customizes
+  // anything (moves/resizes/recolors a panel, or adds a freeform element) the layout
+  // stops matching the default and the composition engine below takes over.
+  if (isDefaultFlowLayout(layout, layoutSelector)) {
+    applyDefaultFlowLayout(doc, layoutEl, layout, panelToDom, required);
+    return;
+  }
+  layoutEl.classList.remove("layout--flow");
+
   layoutEl.querySelectorAll("[data-profile-composition-overlay]").forEach((el) => el.remove());
   const renderElements = getCompositionElementsForRender(layout.desktop.elements, { galleryPhotos });
   const compositionCategories = getCompositionCategories(renderElements);
@@ -90,6 +102,114 @@ export function applyProfileLayout(doc: Document, layout: any, {
   }
 
   renderCompositionOverlays(doc, layoutEl, renderElements, layout.desktop.panels, { galleryPhotos });
+}
+
+const FLOW_COLUMN_CLASS = "layout-flow-col";
+
+// True when the layout is the pristine, never-customized default for its page variant.
+// Any moved/resized/recolored panel, customized child, or freeform element makes this
+// false so the composition engine renders instead.
+export function isDefaultFlowLayout(layout: any, layoutSelector: string): boolean {
+  if (!layout?.desktop?.panels) return false;
+  if (Array.isArray(layout.desktop.elements) && layout.desktop.elements.length > 0) return false;
+
+  const def = layoutSelector === ".player-layout" ? getPlayerDefaultLayout() : getDefaultLayout();
+  const defPanels: any[] = def.desktop.panels;
+  const panels: any[] = layout.desktop.panels;
+  if (panels.length !== defPanels.length) return false;
+
+  const defById = new Map<string, any>(defPanels.map((p) => [p.id, p]));
+  for (const p of panels) {
+    const d = defById.get(p.id);
+    if (!d) return false;
+    if (p.enabled === false) return false;
+    if (!numbersEqual(p.x, d.x) || !numbersEqual(p.y, d.y) || !numbersEqual(p.w, d.w) || !numbersEqual(p.h, d.h)) return false;
+    if (p.style && typeof p.style === "object" && Object.keys(p.style).length > 0) return false;
+    if (!panelChildrenMatchDefault(p.children, d.children)) return false;
+  }
+  return true;
+}
+
+function panelChildrenMatchDefault(childrenA: any, childrenB: any): boolean {
+  const a: any[] = Array.isArray(childrenA) ? childrenA : [];
+  const b: any[] = Array.isArray(childrenB) ? childrenB : [];
+  if (a.length !== b.length) return false;
+  const bById = new Map<string, any>(b.map((c) => [c.id, c]));
+  for (const c of a) {
+    const d = bById.get(c.id);
+    if (!d) return false;
+    if ((c.enabled !== false) !== (d.enabled !== false)) return false;
+    if (!numbersEqual(c.x, d.x) || !numbersEqual(c.y, d.y) || !numbersEqual(c.w, d.w) || !numbersEqual(c.h, d.h)) return false;
+    if (c.style && typeof c.style === "object" && Object.keys(c.style).length > 0) return false;
+  }
+  return true;
+}
+
+// Renders panels at natural content height in three independent columns (left/middle/right),
+// bypassing the fixed-row grid and zoom-shell scaling used for customized layouts.
+function applyDefaultFlowLayout(
+  doc: Document,
+  layoutEl: HTMLElement,
+  layout: any,
+  panelToDom: Record<string, string>,
+  required: Set<string>,
+): void {
+  layoutEl.querySelectorAll("[data-profile-composition-overlay]").forEach((el) => el.remove());
+  layoutEl.classList.add("layout--flow");
+
+  // Re-applies (thought posts, friend actions, etc.) rebuild the columns; drop the old
+  // wrappers so they don't accumulate. Panels are re-fetched by id and re-parented below.
+  const staleColumns = [...layoutEl.querySelectorAll<HTMLElement>(":scope > ." + FLOW_COLUMN_CLASS)];
+
+  const columns: HTMLElement[] = [0, 1, 2].map(() => {
+    const col = doc.createElement("div");
+    col.className = FLOW_COLUMN_CLASS;
+    return col;
+  });
+
+  const panels = [...layout.desktop.panels].sort(comparePanelsByFreeformPosition);
+  for (const panel of panels) {
+    const domId = panelToDom[panel.id];
+    if (!domId) continue;
+    const el = doc.getElementById(domId);
+    if (!el) continue;
+
+    resetPanelForFlow(el);
+    el.classList.toggle("layout-panel--hidden", panel.enabled === false && !required.has(panel.id));
+    applyPanelVisualStyle(el, panel.style);
+    columns[columnIndexForX(panel.x)].appendChild(el);
+  }
+
+  columns.forEach((col) => layoutEl.appendChild(col));
+  staleColumns.forEach((col) => col.remove());
+}
+
+function columnIndexForX(x: number): number {
+  return x < 4 ? 0 : x < 8 ? 1 : 2;
+}
+
+// Strips any inline grid/zoom-shell geometry a prior composition pass may have applied so the
+// panel and its children fall back to natural document flow.
+function resetPanelForFlow(el: HTMLElement): void {
+  const shell = el.querySelector<HTMLElement>(":scope > .panel-zoom-shell");
+  if (shell) {
+    while (shell.firstChild) el.insertBefore(shell.firstChild, shell);
+    shell.remove();
+  }
+  el.style.gridColumn = "";
+  el.style.gridRow = "";
+  el.style.zoom = "";
+  el.style.width = "";
+  el.style.height = "";
+  el.style.overflow = "";
+  el.querySelectorAll<HTMLElement>("[data-profile-child-id]").forEach((childEl) => {
+    childEl.style.left = "";
+    childEl.style.top = "";
+    childEl.style.width = "";
+    childEl.style.height = "";
+    childEl.style.gridColumn = "";
+    childEl.style.gridRow = "";
+  });
 }
 
 function getRenderablePanels(panels: any[], layoutSelector: string): any[] {
