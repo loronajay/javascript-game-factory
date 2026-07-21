@@ -31,6 +31,7 @@ import { escapeHtml } from "./domHelpers.js";
 import { createRankedFlow } from "../online/rankedFlow.js";
 import { loadRankedName } from "./rankedNameModel.js";
 import { isFactoryAccountLoggedIn, readStoredFactoryAccountSession } from "../platform/factoryAccount.js";
+import { publishTacticalArenaMatchActivity } from "../../../../js/platform/activity/activity.mjs";
 
 const RULESET_VERSION = ONLINE_RULESET_VERSION;
 const BOARD_SIZES = [13, 15];
@@ -983,7 +984,23 @@ export function createOnlineFlow({ onStartMatch }) {
     // Ranked: bind a report() the match-outcome controller fires at victory. The
     // controller sends win/loss to the platform; the backend attests and applies ELO.
     const rankedHandoff = rankedInfo && rankedFlow
-      ? { matchId: rankedInfo.matchId, ratingBefore: rankedInfo.myRatingBefore, report: (outcome, detail) => rankedFlow?.reportResult(outcome, detail) }
+      ? {
+          matchId: rankedInfo.matchId,
+          ratingBefore: rankedInfo.myRatingBefore,
+          opponentPlayerId: rankedInfo.opponentPlayerId,
+          report: (outcome, detail) => rankedFlow?.reportResult(outcome, detail),
+          // Publish the ranked result to the platform activity feed for discovery.
+          // Fire-and-forget; identity + opponent are resolved here where they live.
+          publishActivity: (outcome, detail) => publishTacticalArenaMatchActivity({
+            myProfile: createOnlineIdentityPayload(loadFactoryProfile()),
+            opponentProfile: { playerId: rankedInfo.opponentPlayerId },
+            result: outcome,
+            ranked: true,
+            ratingBefore: rankedInfo.myRatingBefore,
+            mySquad: detail?.squad,
+            sessionId: `tactical-arena:${rankedInfo.matchId}`,
+          }).catch(() => {}),
+        }
       : null;
     onStartMatch({
       mode: "online",

@@ -165,6 +165,18 @@
 .results-stats dt { color:var(--muted); font:700 .72rem var(--font-display); letter-spacing:.09em; text-transform:uppercase; }
 .results-stats dd { margin:0; font-size:.9rem; font-weight:700; color:var(--text); text-align:right; }
 
+/* Post-match opponent card (online ranked) */
+.results-opponent { margin-top:1rem; padding:.9rem 1rem; border:1px solid var(--parchment-edge); border-radius:var(--radius-tile); background:radial-gradient(circle at 50% 0%,rgba(40,64,92,.4),rgba(8,18,32,.4)); text-align:left; }
+.results-opponent-title { margin:0 0 .55rem; color:color-mix(in srgb,var(--brass) 70%,var(--muted)); font:800 .6rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
+.results-opponent-loading { margin:0; color:var(--muted); font:600 .68rem var(--font-display); }
+.results-opponent-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; flex-wrap:wrap; }
+.results-opponent-name { color:var(--text); font:800 .95rem var(--font-display); letter-spacing:.02em; overflow:hidden; text-overflow:ellipsis; }
+.results-opponent-tier { padding:.2rem .6rem; border-radius:999px; border:1px solid color-mix(in srgb,var(--brass) 40%,var(--parchment-edge)); color:var(--brass-hi); font:800 .62rem var(--font-display); letter-spacing:.06em; white-space:nowrap; }
+.results-opponent-record { margin:.35rem 0 .7rem; color:color-mix(in srgb,var(--text) 80%,var(--muted)); font:700 .7rem var(--font-display); letter-spacing:.03em; }
+.results-opponent-actions { display:flex; flex-wrap:wrap; gap:.45rem; }
+.results-opponent-btn { flex:1 1 auto; min-width:6.5rem; padding:.45rem .7rem; font-size:.7rem; text-align:center; text-decoration:none; }
+.results-opponent-btn:disabled { opacity:.55; cursor:default; }
+
 /* Victory confetti */
 .victory-burst { position:absolute; z-index:0; inset:0; overflow:hidden; pointer-events:none; }
 [data-screen="results"] .menu-card { position:relative; z-index:1; }

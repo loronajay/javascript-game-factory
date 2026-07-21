@@ -3,7 +3,7 @@ import { createPlatformApiClient } from "../api/platform-api.mjs";
 import { recordSharedSessionBetweenPlayers } from "../relationships/relationships.mjs";
 import { buildDerivedSessionId, normalizeActivityItem, normalizeIdentity, sanitizeSingleLine, } from "./activity-normalize.mjs";
 import { loadActivityFeed, upsertActivityFeedItem, writeActivityFeed, } from "./activity-store.mjs";
-import { buildBattleshitsMatchActivity, buildCreatureBattlerMatchActivity, buildLoversLostRunActivity, buildSumoraiMatchActivity, } from "./activity-builders.mjs";
+import { buildBattleshitsMatchActivity, buildCreatureBattlerMatchActivity, buildLoversLostRunActivity, buildSumoraiMatchActivity, buildTacticalArenaMatchActivity, } from "./activity-builders.mjs";
 function queueSharedSessionRelationshipUpdate(leftPlayerId, rightPlayerId, options = {}) {
     void recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, options);
 }
@@ -62,6 +62,23 @@ function maybeRecordSharedSessionFromActivity(activity, storage, options = {}) {
             occurredAt: item.createdAt,
         };
         queueSharedSessionRelationshipUpdate(myProfile.playerId, opponentProfile.playerId, sessionOptions);
+        return;
+    }
+    if (item.gameSlug === "tactical-arena") {
+        const myProfile = normalizeIdentity(item.metadata?.myProfile);
+        const opponentProfile = normalizeIdentity(item.metadata?.opponentProfile);
+        if (!myProfile.playerId || !opponentProfile.playerId)
+            return;
+        const sessionOptions = {
+            storage,
+            apiClient: options?.apiClient,
+            sessionId: sanitizeSingleLine(item.metadata?.sessionId, 120) || buildDerivedSessionId(item),
+            gameSlug: item.gameSlug,
+            startedTogether: true,
+            reachedResults: true,
+            occurredAt: item.createdAt,
+        };
+        queueSharedSessionRelationshipUpdate(myProfile.playerId, opponentProfile.playerId, sessionOptions);
     }
 }
 export function publishActivityItem(item, storage = getDefaultPlatformStorage(), options = {}) {
@@ -87,6 +104,11 @@ export function publishBattleshitsMatchActivity(match, options = {}) {
 export function publishSumoraiMatchActivity(match, options = {}) {
     const storage = options.storage || getDefaultPlatformStorage();
     const item = buildSumoraiMatchActivity(match, options);
+    return publishActivityItemWithApi(item, storage, options);
+}
+export function publishTacticalArenaMatchActivity(match, options = {}) {
+    const storage = options.storage || getDefaultPlatformStorage();
+    const item = buildTacticalArenaMatchActivity(match, options);
     return publishActivityItemWithApi(item, storage, options);
 }
 export async function syncActivityFeedFromApi(storage = getDefaultPlatformStorage(), apiClient = createPlatformApiClient()) {

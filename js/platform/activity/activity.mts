@@ -14,6 +14,7 @@ export {
   buildCreatureBattlerMatchActivity,
   buildLoversLostRunActivity,
   buildSumoraiMatchActivity,
+  buildTacticalArenaMatchActivity,
 } from "./activity-builders.mjs";
 
 export {
@@ -23,6 +24,7 @@ export {
   publishCreatureBattlerMatchActivity,
   publishLoversLostRunActivity,
   publishSumoraiMatchActivity,
+  publishTacticalArenaMatchActivity,
   syncActivityFeedFromApi,
 } from "./activity-api.mjs";
 export type { ActivityPublishOptions } from "./activity-api.mjs";

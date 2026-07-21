@@ -21,6 +21,7 @@ import {
   buildCreatureBattlerMatchActivity,
   buildLoversLostRunActivity,
   buildSumoraiMatchActivity,
+  buildTacticalArenaMatchActivity,
 } from "./activity-builders.mjs";
 
 type MaybeStorage = StorageLike | null;
@@ -96,6 +97,24 @@ function maybeRecordSharedSessionFromActivity(activity: unknown, storage: MaybeS
       occurredAt: item.createdAt,
     };
     queueSharedSessionRelationshipUpdate(myProfile.playerId, opponentProfile.playerId, sessionOptions);
+    return;
+  }
+
+  if (item.gameSlug === "tactical-arena") {
+    const myProfile = normalizeIdentity(item.metadata?.myProfile);
+    const opponentProfile = normalizeIdentity(item.metadata?.opponentProfile);
+    if (!myProfile.playerId || !opponentProfile.playerId) return;
+
+    const sessionOptions = {
+      storage,
+      apiClient: options?.apiClient,
+      sessionId: sanitizeSingleLine(item.metadata?.sessionId, 120) || buildDerivedSessionId(item),
+      gameSlug: item.gameSlug,
+      startedTogether: true,
+      reachedResults: true,
+      occurredAt: item.createdAt,
+    };
+    queueSharedSessionRelationshipUpdate(myProfile.playerId, opponentProfile.playerId, sessionOptions);
   }
 }
 
@@ -126,6 +145,12 @@ export function publishBattleshitsMatchActivity(match: unknown, options: Activit
 export function publishSumoraiMatchActivity(match: unknown, options: ActivityPublishOptions = {}): Promise<ActivityItem | null> {
   const storage = options.storage || getDefaultPlatformStorage();
   const item = buildSumoraiMatchActivity(match, options);
+  return publishActivityItemWithApi(item, storage, options);
+}
+
+export function publishTacticalArenaMatchActivity(match: unknown, options: ActivityPublishOptions = {}): Promise<ActivityItem | null> {
+  const storage = options.storage || getDefaultPlatformStorage();
+  const item = buildTacticalArenaMatchActivity(match, options);
   return publishActivityItemWithApi(item, storage, options);
 }
 

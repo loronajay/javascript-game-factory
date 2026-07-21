@@ -195,6 +195,29 @@ shape; determinism (unit report derived from authoritative state, never hashed).
 
 ## Phase 3 — Social wiring (reuse the platform)
 
+**Status: post-match opponent card + activity-feed publish shipped (code-complete +
+tests green). Remaining sub-item: the in-match nameplate (in-band avatar+title
+exchange) — deferred as invasive + needing a live two-tab playtest to verify.**
+
+As-built notes:
+- **Post-match opponent card** (`src/ui/resultsOpponentCard.js`, extracted so
+  `resultsScreen.js` stays under its architecture budget): a resolved online ranked
+  duel now shows the opponent's ranked card via `fetchRankedCard` (title + tier +
+  rating + record) with **View Profile** (`../../player/index.html?id=`), **Add Friend**
+  (`createFriendshipBetweenPlayers`), and **Message** (`../../messages/index.html?player=`).
+  Deep-links are built by `src/platform/factoryLinks.js` (pure, unit-tested). Actions
+  disable gracefully for signed-out/offline players. (Rematch/re-queue was left to the
+  existing menu flow rather than added to the card.)
+- **Activity feed**: `buildTacticalArenaMatchActivity` + `publishTacticalArenaMatchActivity`
+  added to the shared `js/platform/activity` layer (+ a `tactical-arena` shared-session
+  branch, mirroring sumorai/battleshits). Published fire-and-forget from
+  `matchOutcomeController` via a bound `publishActivity` on the ranked handoff (identity +
+  opponent resolved in `onlineFlow`). Ranked handoff now also carries `opponentPlayerId`.
+- **In-match nameplate (remaining)**: showing the opponent's ranked avatar + title in
+  the battle HUD via an in-band exchange at match start (same channel as nicknames,
+  kept out of the authoritative hash). Deferred: it touches online setup sync + HUD
+  rendering and can only be trusted after a live two-client playtest.
+
 Goal: ranked becomes social at the moments that matter, using existing platform APIs.
 
 - **Post-match results screen** (`src/ui/resultsScreen.js` /

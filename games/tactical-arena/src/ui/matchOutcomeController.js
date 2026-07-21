@@ -116,13 +116,17 @@ export function createMatchOutcomeController({
       // guard just avoids the extra call.
       if (runtime.matchConfig?.ranked?.report && !runtime.rankedReported) {
         runtime.rankedReported = true;
+        const rankedOutcome = state.winner === runtime.mySeat ? "win" : "loss";
+        const rankedDetail = { squad: squadForSeat(state, runtime.mySeat), unitResults: buildRankedUnitReport(state) };
         try {
-          runtime.matchConfig.ranked.report(
-            state.winner === runtime.mySeat ? "win" : "loss",
-            { squad: squadForSeat(state, runtime.mySeat), unitResults: buildRankedUnitReport(state) },
-          );
+          runtime.matchConfig.ranked.report(rankedOutcome, rankedDetail);
         } catch {
           // fire-and-forget: never let reporting interrupt the results flow
+        }
+        try {
+          runtime.matchConfig.ranked.publishActivity?.(rankedOutcome, rankedDetail);
+        } catch {
+          // discovery is best-effort — never let it interrupt the results flow
         }
       }
       const campaignMissionId = runtime.campaignMissionId;

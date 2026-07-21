@@ -9,6 +9,7 @@ import { formatValor } from "../progression/marketplace.js";
 import { campaignResultsValorLabel, unitLabel } from "./campaignMenuModel.js";
 import { createPlatformApiClient } from "../../../../js/platform/api/platform-api.mjs";
 import { TACTICAL_ARENA_GAME_SLUG } from "../platform/gameProgressClient.js";
+import { renderOpponentCard } from "./resultsOpponentCard.js";
 
 const CONFETTI_COUNT = 44;
 
@@ -31,6 +32,7 @@ export function createResultsScreen({
   const rematchBtn = $("[data-action='rematch']", results);
   const campaignMapBtn = $("[data-results='campaign-map']", results);
   const resultsMainMenuBtn = $("[data-nav='mainMenu']", results);
+  const opponentEl = $("[data-results='opponent']", results);
 
   function showResults(summary) {
     const lastConfig = getLastConfig();
@@ -66,6 +68,9 @@ export function createResultsScreen({
     }
     if (online && lastConfig?.ranked) {
       void renderRankedResult(lastConfig.ranked, stats);
+    }
+    if (opponentEl) {
+      renderOpponentCard(opponentEl, online ? lastConfig?.ranked : null);
     }
     addStat(stats, "Board", `${summary.size} × ${summary.size}`);
     addStat(stats, "Squad turns", String(summary.turns));

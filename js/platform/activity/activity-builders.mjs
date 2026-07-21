@@ -117,6 +117,48 @@ export function buildCreatureBattlerMatchActivity(match, options = {}) {
         },
     });
 }
+export function buildTacticalArenaMatchActivity(match, options = {}) {
+    const source = isPlainObject(match) ? match : {};
+    const myProfile = normalizeIdentity(source.myProfile);
+    const opponentProfile = normalizeIdentity(source.opponentProfile);
+    const actorDisplayName = myProfile.displayName || actorNameFromOptions(options);
+    const result = sanitizeSingleLine(source.result, 24).toLowerCase() || "loss";
+    const opponentName = opponentProfile.displayName || "an opponent";
+    const ranked = Boolean(source.ranked);
+    const mode = ranked ? "Ranked" : "Online";
+    let text;
+    if (result === "win") {
+        text = `${actorDisplayName} won a ${mode} Tactical Arena duel against ${opponentName}.`;
+    }
+    else if (result === "draw") {
+        text = `${actorDisplayName} drew a ${mode} Tactical Arena duel with ${opponentName}.`;
+    }
+    else {
+        text = `${actorDisplayName} lost a ${mode} Tactical Arena duel to ${opponentName}.`;
+    }
+    const ratingBefore = Number.isFinite(Number(source.ratingBefore)) ? Math.round(Number(source.ratingBefore)) : null;
+    const ratingAfter = Number.isFinite(Number(source.ratingAfter)) ? Math.round(Number(source.ratingAfter)) : null;
+    return normalizeActivityItem({
+        type: "game-result",
+        actorPlayerId: myProfile.playerId || sanitizeSingleLine(options?.actorPlayerId, 80),
+        actorDisplayName,
+        gameSlug: "tactical-arena",
+        summary: text,
+        visibility: options?.visibility || "friends",
+        createdAt: source.createdAt || options?.createdAt,
+        metadata: {
+            matchResult: result,
+            ranked,
+            ratingBefore,
+            ratingAfter,
+            opponentDisplayName: opponentProfile.displayName,
+            mySquad: Array.isArray(source.mySquad) ? source.mySquad : [],
+            sessionId: sanitizeSingleLine(source.sessionId, 120) || sanitizeSingleLine(options?.sessionId, 120),
+            myProfile,
+            opponentProfile,
+        },
+    });
+}
 export function buildBattleshitsMatchActivity(match, options = {}) {
     const source = isPlainObject(match) ? match : {};
     const myProfile = normalizeIdentity(source.myProfile);
