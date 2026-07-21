@@ -29,6 +29,8 @@ export async function handlePaymentRoute(context) {
             writeJson(res, result?.statusCode || 400, {
                 status: "error",
                 error: result?.error || "checkout_failed",
+                message: result?.message || undefined,
+                param: result?.param || undefined,
                 timestamp,
             }, requestOrigin);
             return true;

@@ -400,6 +400,30 @@ function moneyCents(value) {
 function stripeError(statusCode, error) {
     return { ok: false, statusCode, error };
 }
+function stripeErrorMessage(value) {
+    return cleanText(value, 1000);
+}
+function logStripeCheckoutError(json) {
+    const error = json?.error && typeof json.error === "object" ? json.error : {};
+    const code = stripeErrorMessage(error.code) || "stripe_checkout_failed";
+    const message = stripeErrorMessage(error.message);
+    const param = stripeErrorMessage(error.param);
+    const requestLogUrl = stripeErrorMessage(error.request_log_url);
+    process.stderr.write(`[stripe-checkout] ${code}${param ? ` param=${param}` : ""}${message ? ` message=${message}` : ""}${requestLogUrl ? ` log=${requestLogUrl}` : ""}\n`);
+}
+function stripeCheckoutError(json) {
+    const error = json?.error && typeof json.error === "object" ? json.error : {};
+    const code = stripeErrorMessage(error.code) || "stripe_checkout_failed";
+    const message = stripeErrorMessage(error.message);
+    const param = stripeErrorMessage(error.param);
+    return {
+        ok: false,
+        statusCode: 502,
+        error: code,
+        message,
+        param,
+    };
+}
 function appendMetadata(form, metadata) {
     for (const [key, value] of Object.entries(metadata)) {
         if (!value)
@@ -553,7 +577,8 @@ export async function createTacticalArenaCheckoutSession(params = {}) {
     if (typeof fetchImpl !== "function")
         return stripeError(503, "fetch_not_configured");
     const premiumOffer = resolved.offer;
-    const successUrl = cleanUrl(body.successUrl) || fallbackCheckoutUrl(params.appBaseUrl, "success");
+    const successUrl = (cleanUrl(body.successUrl) || fallbackCheckoutUrl(params.appBaseUrl, "success"))
+        .replace("%7BCHECKOUT_SESSION_ID%7D", "{CHECKOUT_SESSION_ID}");
     const cancelUrl = cleanUrl(body.cancelUrl) || fallbackCheckoutUrl(params.appBaseUrl, "cancel");
     const form = new URLSearchParams();
     form.set("mode", "payment");
@@ -577,13 +602,15 @@ export async function createTacticalArenaCheckoutSession(params = {}) {
         headers: {
             authorization: `Bearer ${stripeApiKey}`,
             "content-type": "application/x-www-form-urlencoded",
-            "stripe-version": STRIPE_API_VERSION,
+            "Stripe-Version": STRIPE_API_VERSION,
         },
         body: form,
     });
     const json = await response.json().catch(() => ({}));
-    if (!response.ok)
-        return stripeError(502, json?.error?.code || "stripe_checkout_failed");
+    if (!response.ok) {
+        logStripeCheckoutError(json);
+        return stripeCheckoutError(json);
+    }
     const url = cleanUrl(json?.url);
     return url ? { ok: true, url, sessionId: cleanText(json?.id, 200) } : stripeError(502, "stripe_checkout_failed");
 }
