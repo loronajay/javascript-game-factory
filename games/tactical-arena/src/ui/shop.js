@@ -557,8 +557,11 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
     const premiumBuy = el("button", "shop-buy-btn is-premium", formatPremiumPrice(offer.premiumPrice));
     premiumBuy.type = "button";
     premiumBuy.dataset.sku = offer.sku;
-    premiumBuy.setAttribute("aria-disabled", "true");
-    premiumBuy.setAttribute("aria-label", `Buy ${offer.name} with ${formatPremiumPrice(offer.premiumPrice)} soon`);
+    premiumBuy.setAttribute("aria-label", `Buy ${offer.name} with ${formatPremiumPrice(offer.premiumPrice)}`);
+    premiumBuy.addEventListener("click", (event) => {
+      event.stopPropagation();
+      void beginPremiumCheckout(offer);
+    });
 
     const valorBuy = el("button", "shop-buy-btn is-valor");
     valorBuy.type = "button";

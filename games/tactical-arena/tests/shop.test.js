@@ -389,6 +389,52 @@ test("shop skin USD purchase opens Stripe checkout through the configured endpoi
   assert.equal(body.successUrl, "https://factory.example/games/tactical-arena/index.html?checkout=success&session_id=%7BCHECKOUT_SESSION_ID%7D");
 });
 
+test("shop unit USD purchase opens Stripe checkout without spending Valor", async () => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, { valorBalance: 999 });
+  const fetchCalls = [];
+  const locationRef = {
+    href: "https://factory.example/games/tactical-arena/index.html",
+    assigned: "",
+    assign(url) {
+      this.assigned = url;
+      this.href = url;
+    },
+  };
+
+  openShop(storage, {
+    account: { ...SIGNED_IN_ACCOUNT, token: "token-1" },
+    checkoutEndpoint: "/api/test-checkout",
+    locationRef,
+    fetchImpl: async (url, init) => {
+      fetchCalls.push({ url, init });
+      return {
+        ok: true,
+        async json() {
+          return { url: "https://checkout.stripe.com/c/test-unit-session" };
+        },
+      };
+    },
+  });
+
+  const overlay = document.body.children[0];
+  const clodCard = walk(overlay, (node) => hasClass(node, "shop-unit") && visibleText(node).includes("Clod"))[0];
+  const usdBuy = walk(clodCard, (node) => node.tagName === "BUTTON" && hasClass(node, "is-premium"))[0];
+  usdBuy.click();
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(locationRef.assigned, "https://checkout.stripe.com/c/test-unit-session");
+  assert.equal(readUnlockProgress(storage).valorBalance, 999);
+  assert.equal(fetchCalls.length, 1);
+  const body = JSON.parse(fetchCalls[0].init.body);
+  assert.equal(body.offer.kind, "unit");
+  assert.equal(body.offer.sku, "ta.unit.clod");
+  assert.equal(body.offer.type, "clod");
+  assert.equal("premiumPrice" in body.offer, false);
+});
+
 test("shop skin packs render clickable contents and use Valor confirmation", () => {
   globalThis.document = new FakeDocument();
   const storage = storageAdapter();
@@ -494,8 +540,8 @@ test("shop unit cards open a detail card and return to unit browsing", () => {
   assert.equal(buttons[0].textContent, "Details", "details should sit above the purchase button");
   const usdBuy = buttons.find((node) => hasClass(node, "is-premium") && /^\$\d+\.\d{2}$/.test(node.textContent));
   const valorBuy = buttons.find((node) => hasClass(node, "is-valor") && /Valor$/.test(node.getAttribute("aria-label") ?? ""));
-  assert.ok(usdBuy, "unit card should show the pending USD price button");
-  assert.equal(usdBuy.getAttribute("aria-disabled"), "true");
+  assert.ok(usdBuy, "unit card should show the USD checkout button");
+  assert.equal(usdBuy.getAttribute("aria-disabled"), null);
   assert.ok(valorBuy, "unit card should keep the working Valor purchase button");
 
   buttons[0].click();
@@ -531,11 +577,8 @@ test("shop unit Valor purchase flips the unit card to one owned button", () => {
   const usdBuy = buyButtons.find((node) => hasClass(node, "is-premium"));
   const valorBuy = buyButtons.find((node) => hasClass(node, "is-valor"));
   assert.equal(usdBuy.textContent, "$1.99");
-  assert.equal(usdBuy.getAttribute("aria-label"), "Buy Clod with $1.99 soon");
+  assert.equal(usdBuy.getAttribute("aria-label"), "Buy Clod with $1.99");
   assert.equal(valorBuy.getAttribute("aria-label"), "Unlock Clod for 650 Valor");
-
-  usdBuy.click();
-  assert.equal(readUnlockProgress(storage).valorBalance, 999, "pending USD button should not spend Valor");
 
   valorBuy.click();
 

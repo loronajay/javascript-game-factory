@@ -8,6 +8,7 @@ const VALID_CLAIM_KINDS = new Set([
   "tutorial-unit-reward",
   "tutorial-skin-choice",
   "premium-skin-purchase",
+  "premium-unit-purchase",
 ]);
 
 function cleanText(value: any, maxLength = 200): string {
@@ -78,6 +79,17 @@ function buildSkinPurchaseEntitlements(payload: Record<string, any>): any[] {
   return entitlementIds
     .filter((entitlementId) => entitlementId.startsWith("skin:"))
     .map((entitlementId) => ({ entitlementId, kind: "skin" }));
+}
+
+function buildUnitPurchaseEntitlements(payload: Record<string, any>): any[] {
+  const rawEntitlementIds = [
+    payload.entitlementId,
+    ...(Array.isArray(payload.entitlementIds) ? payload.entitlementIds : []),
+  ];
+  const entitlementIds = [...new Set(rawEntitlementIds.map((value) => cleanText(value, 180)).filter(Boolean))];
+  return entitlementIds
+    .filter((entitlementId) => entitlementId.startsWith("unit:"))
+    .map((entitlementId) => ({ entitlementId, kind: "unit" }));
 }
 
 function buildUnitEntitlement(payload: Record<string, any>): any {
@@ -253,6 +265,11 @@ export async function recordGameProgressClaim(pool: any, params: any = {}): Prom
       if (entitlement) await grantEntitlement(client, playerId, gameSlug, entitlement, "tutorial", sourceId);
     } else if (!alreadyProcessed && kind === "premium-skin-purchase") {
       const entitlements = buildSkinPurchaseEntitlements(payload);
+      for (const entitlement of entitlements) {
+        await grantEntitlement(client, playerId, gameSlug, entitlement, "stripe", sourceId || claimId);
+      }
+    } else if (!alreadyProcessed && kind === "premium-unit-purchase") {
+      const entitlements = buildUnitPurchaseEntitlements(payload);
       for (const entitlement of entitlements) {
         await grantEntitlement(client, playerId, gameSlug, entitlement, "stripe", sourceId || claimId);
       }

@@ -62,6 +62,28 @@ test("premium checkout payload sends stable offer identity without trusting brow
   });
 });
 
+test("premium checkout payload supports unit offers without trusting browser price", () => {
+  const payload = buildPremiumCheckoutPayload({
+    id: "unit:sniper",
+    kind: "unit",
+    type: "sniper",
+    sku: "ta.unit.sniper",
+    entitlementId: "unit:sniper",
+    premiumPrice: { kind: "premium", currency: "USD", cents: 1 },
+  }, {
+    account: { authenticated: true, playerId: "player-1", token: "token-1" },
+  });
+
+  assert.deepEqual(payload.offer, {
+    id: "unit:sniper",
+    kind: "unit",
+    sku: "ta.unit.sniper",
+    entitlementId: "unit:sniper",
+    type: "sniper",
+  });
+  assert.equal(payload.offer.premiumPrice, undefined);
+});
+
 test("premium checkout payload summarizes pack contents for server-side validation", () => {
   const payload = buildPremiumCheckoutPayload(PACK_OFFER, { account: ACCOUNT });
 
