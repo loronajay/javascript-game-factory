@@ -56,6 +56,25 @@ build plan and the durable design decisions behind it.
 
 ## Phase 1 — Server-backed ranked identity (retire the local name)
 
+**Status: shipped (code-complete + tests green). Remaining: live signed-in browser
+QA of the title/avatar save round-trip against a running API.**
+
+As-built notes (where the build refined the plan below):
+- **Migration registry gap fixed.** `021-ranked-matches.sql` existed on disk but was
+  never registered in `MIGRATION_FILES` (the whole ranked backend had only ever been
+  applied to Railway by hand). Registered both `021` and the new `022` so a fresh
+  migrate creates the ranked tables; both use `create table if not exists`, so
+  re-running against the live DB is a no-op.
+- **In-match name kept working via a write-through cache.** The old local ranked name
+  also fed `onlineFlow.js`'s synchronous in-match name override. Rather than regress
+  that to the pilot name before the Phase 3 nameplate lands, the server title is now
+  authoritative and `rankedNameModel.js` is demoted to a synchronous local *cache*:
+  saving a title mirrors it down via `saveRankedName`, and `onlineFlow.js` reads that
+  cache unchanged. The proper in-band avatar+title nameplate exchange is still Phase 3.
+- Avatar ownership is client-gated (v1): the picker only lists owned units (via
+  `unlocks.js`) that have portrait art, plus each unit's owned skins. The server
+  sanitizes ids but does not verify ownership.
+
 Goal: name/title + avatar are stored server-side and readable by others. This alone
 kills the local-hybrid mess and unblocks the "view profile after a match" card.
 

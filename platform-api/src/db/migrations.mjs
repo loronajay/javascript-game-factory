@@ -20,6 +20,8 @@ export const MIGRATION_FILES = Object.freeze([
     "018-game-ratings.sql",
     "019-game-progression.sql",
     "020-account-current-session.sql",
+    "021-ranked-matches.sql",
+    "022-ranked-identity.sql",
 ]);
 export function migrationFileUrl(name) {
     return new URL(`./migrations/${name}`, import.meta.url);

@@ -8,19 +8,23 @@ const VALID_OUTCOMES = new Set(["win", "loss", "draw"]);
 //   GET    /ranked/:gameSlug/queue     poll for a brokered match
 //   DELETE /ranked/:gameSlug/queue     leave the queue
 //   POST   /ranked/:gameSlug/report    attest a match result { matchId, outcome }
-//   GET    /ranked/:gameSlug/standing  rating + tier + record + live match
+//   GET    /ranked/:gameSlug/standing  rating + tier + record + my cosmetic profile + live match
+//   PUT    /ranked/:gameSlug/profile   save my ranked title/avatar (auth = me)
+//   GET    /ranked/:gameSlug/card/:playerId  public ranked card for another player
 export async function handleRankedRoute(context: any): Promise<boolean> {
   const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services } = context;
-  const { enqueueRanked, pollRanked, cancelRanked, reportRankedResult, getRankedStanding, setRankedLobby } = services;
+  const { enqueueRanked, pollRanked, cancelRanked, reportRankedResult, getRankedStanding, setRankedLobby, saveRankedProfile, getRankedCard } = services;
 
   const queueMatch = pathname.match(/^\/ranked\/([^/]+)\/queue$/);
   const reportMatch = pathname.match(/^\/ranked\/([^/]+)\/report$/);
   const standingMatch = pathname.match(/^\/ranked\/([^/]+)\/standing$/);
   const lobbyMatch = pathname.match(/^\/ranked\/([^/]+)\/lobby$/);
+  const profileMatch = pathname.match(/^\/ranked\/([^/]+)\/profile$/);
+  const cardMatch = pathname.match(/^\/ranked\/([^/]+)\/card\/([^/]+)$/);
 
-  if (!queueMatch && !reportMatch && !standingMatch && !lobbyMatch) return false;
+  if (!queueMatch && !reportMatch && !standingMatch && !lobbyMatch && !profileMatch && !cardMatch) return false;
 
-  const gameSlug = decodeURIComponent((queueMatch || reportMatch || standingMatch || lobbyMatch)[1]);
+  const gameSlug = decodeURIComponent((queueMatch || reportMatch || standingMatch || lobbyMatch || profileMatch || cardMatch)[1]);
   if (!isValidRankedSlug(gameSlug)) {
     writeJson(res, 400, { status: "error", error: "invalid_game_slug", timestamp }, requestOrigin);
     return true;
@@ -134,6 +138,35 @@ export async function handleRankedRoute(context: any): Promise<boolean> {
       return true;
     }
     writeJson(res, 200, { standing: result }, requestOrigin);
+    return true;
+  }
+
+  if (profileMatch && method === "PUT") {
+    const body = await readJsonBody(req);
+    if (!body.ok) {
+      writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+      return true;
+    }
+    // Undefined keys keep the stored value; explicit null/blank clears. Avatar ids
+    // are opaque strings (ownership is client-gated in v1); the db layer sanitizes.
+    const { title, avatarUnit, avatarSkin } = body.value || {};
+    const result = await saveRankedProfile(gameSlug, { playerId, title, avatarUnit, avatarSkin });
+    if (!result) {
+      writeJson(res, 500, { status: "error", error: "profile_save_failed", timestamp }, requestOrigin);
+      return true;
+    }
+    writeJson(res, 200, { profile: result }, requestOrigin);
+    return true;
+  }
+
+  if (cardMatch && method === "GET") {
+    const targetPlayerId = decodeURIComponent(cardMatch[2]);
+    const result = await getRankedCard(gameSlug, { playerId: targetPlayerId });
+    if (!result) {
+      writeJson(res, 500, { status: "error", error: "card_unavailable", timestamp }, requestOrigin);
+      return true;
+    }
+    writeJson(res, 200, { card: result }, requestOrigin);
     return true;
   }
 

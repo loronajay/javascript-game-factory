@@ -14,9 +14,11 @@ import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import {
   cancelRanked,
   enqueueRanked,
+  getPublicRankedCard,
   getRankedStanding,
   pollRanked,
   reportRankedResult,
+  saveRankedProfile,
   setRankedLobbyCode,
 } from "./db/ranked.mjs";
 import {
@@ -198,6 +200,8 @@ async function bootstrap(): Promise<void> {
     reportRankedResult: (gameSlug: any, params: any) => reportRankedResult(pool, { ...params, gameSlug }),
     getRankedStanding: (gameSlug: any, params: any) => getRankedStanding(pool, { ...params, gameSlug }),
     setRankedLobby: (gameSlug: any, params: any) => setRankedLobbyCode(pool, { ...params, gameSlug }),
+    saveRankedProfile: (gameSlug: any, params: any) => saveRankedProfile(pool, { ...params, gameSlug }),
+    getRankedCard: (gameSlug: any, params: any) => getPublicRankedCard(pool, { ...params, gameSlug }),
     getGameProgress: (playerId: any, gameSlug: any) => getGameProgress(pool, playerId, gameSlug),
     recordGameProgressClaim: (params: any) => recordGameProgressClaim(pool, params),
     savePlayerPhoto: (params: any) => savePlayerPhoto(pool, params),

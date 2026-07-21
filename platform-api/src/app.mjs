@@ -198,6 +198,12 @@ export function createApp(options = {}) {
     const setRankedLobby = typeof options?.setRankedLobby === "function"
         ? options.setRankedLobby
         : async () => null;
+    const saveRankedProfile = typeof options?.saveRankedProfile === "function"
+        ? options.saveRankedProfile
+        : async () => null;
+    const getRankedCard = typeof options?.getRankedCard === "function"
+        ? options.getRankedCard
+        : async () => null;
     const getGameProgress = typeof options?.getGameProgress === "function"
         ? options.getGameProgress
         : async () => null;
@@ -328,6 +334,8 @@ export function createApp(options = {}) {
         reportRankedResult,
         getRankedStanding,
         setRankedLobby,
+        saveRankedProfile,
+        getRankedCard,
     };
     const gameProgressServices = {
         getGameProgress,

@@ -491,16 +491,121 @@ export async function setRankedLobbyCode(pool: any, { matchId, gameSlug, reporte
   }
 }
 
-// Read a player's ranked standing (rating + tier + record) and any live match.
+// --- Ranked identity (cosmetic profile) --------------------------------------
+// Title/avatar are cosmetic and derived; they never enter the online state hash or
+// authoritative battle state. The server owns them so opponents can read a card.
+
+export const RANKED_TITLE_MAX_LENGTH = 60;
+const AVATAR_ID_MAX_LENGTH = 60;
+
+function sanitizeTitle(value: any): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim().replace(/\s+/g, " ").slice(0, RANKED_TITLE_MAX_LENGTH);
+  return trimmed.length ? trimmed : null;
+}
+
+// Avatar unit/skin ids are opaque strings — ownership is client-gated (v1). The
+// server only rejects absurd lengths and empties so a bad payload can't poison the row.
+function sanitizeAvatarId(value: any): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed.length || trimmed.length > AVATAR_ID_MAX_LENGTH) return null;
+  return trimmed;
+}
+
+// Shared rating+tier+record read used by both the me-standing and the public card.
+async function loadRatingRecord(pool: any, gameSlug: any, playerId: any): Promise<any> {
+  const res = await pool.query(
+    `select rating, wins, losses, draws, last_match_at from game_ratings where player_id=$1 and game_slug=$2`,
+    [playerId, gameSlug],
+  );
+  const r = res.rows[0] || { rating: DEFAULT_RATING, wins: 0, losses: 0, draws: 0, last_match_at: null };
+  const tier = rankTier(r.rating);
+  return {
+    rating: r.rating,
+    tier: { id: tier.id, label: tier.label },
+    wins: r.wins,
+    losses: r.losses,
+    draws: r.draws,
+    lastMatchAt: r.last_match_at,
+  };
+}
+
+export async function getRankedProfile(pool: any, { playerId, gameSlug }: any): Promise<any> {
+  if (!pool || !playerId || !gameSlug) return null;
+  try {
+    const res = await pool.query(
+      `select title, avatar_unit, avatar_skin, updated_at from ranked_profiles where player_id=$1 and game_slug=$2`,
+      [playerId, gameSlug],
+    );
+    const row = res.rows[0] || null;
+    return {
+      title: row?.title || null,
+      avatarUnit: row?.avatar_unit || null,
+      avatarSkin: row?.avatar_skin || null,
+      updatedAt: row?.updated_at || null,
+    };
+  } catch (err: any) {
+    process.stderr.write(`[ranked] getRankedProfile error: ${err?.message || err}\n`);
+    return null;
+  }
+}
+
+// Upsert my ranked identity. Patch semantics: an undefined field keeps the stored
+// value; an explicit null (or blank string) clears it. A null avatar unit also
+// clears the skin (a skin is meaningless without its unit).
+export async function saveRankedProfile(pool: any, { playerId, gameSlug, title, avatarUnit, avatarSkin }: any): Promise<any> {
+  if (!pool || !playerId || !gameSlug) return null;
+  try {
+    const existing = await getRankedProfile(pool, { playerId, gameSlug });
+    const nextTitle = title === undefined ? (existing?.title ?? null) : sanitizeTitle(title);
+    let nextUnit = avatarUnit === undefined ? (existing?.avatarUnit ?? null) : sanitizeAvatarId(avatarUnit);
+    let nextSkin = avatarSkin === undefined ? (existing?.avatarSkin ?? null) : sanitizeAvatarId(avatarSkin);
+    if (!nextUnit) nextSkin = null;
+
+    await pool.query(
+      `insert into ranked_profiles (player_id, game_slug, title, avatar_unit, avatar_skin, updated_at)
+       values ($1,$2,$3,$4,$5, now())
+       on conflict (player_id, game_slug) do update
+         set title=excluded.title, avatar_unit=excluded.avatar_unit,
+             avatar_skin=excluded.avatar_skin, updated_at=now()`,
+      [playerId, gameSlug, nextTitle, nextUnit, nextSkin],
+    );
+    return { title: nextTitle, avatarUnit: nextUnit, avatarSkin: nextSkin };
+  } catch (err: any) {
+    process.stderr.write(`[ranked] saveRankedProfile error: ${err?.message || err}\n`);
+    return null;
+  }
+}
+
+// Public read: another player's ranked card (rating/tier/record + cosmetic identity).
+// Deliberately omits activeMatch/token and anything else private.
+export async function getPublicRankedCard(pool: any, { playerId, gameSlug }: any): Promise<any> {
+  if (!pool || !playerId || !gameSlug) return null;
+  try {
+    const record = await loadRatingRecord(pool, gameSlug, playerId);
+    const profile = await getRankedProfile(pool, { playerId, gameSlug });
+    return {
+      playerId,
+      gameSlug,
+      ...record,
+      title: profile?.title || null,
+      avatarUnit: profile?.avatarUnit || null,
+      avatarSkin: profile?.avatarSkin || null,
+    };
+  } catch (err: any) {
+    process.stderr.write(`[ranked] getPublicRankedCard error: ${err?.message || err}\n`);
+    return null;
+  }
+}
+
+// Read a player's ranked standing (rating + tier + record + cosmetic profile) and
+// any live match. This is the me-view: it may include the private active-match token.
 export async function getRankedStanding(pool: any, { playerId, gameSlug }: any): Promise<any> {
   if (!pool || !playerId || !gameSlug) return null;
   try {
-    const ratingRes = await pool.query(
-      `select rating, wins, losses, draws, last_match_at from game_ratings where player_id=$1 and game_slug=$2`,
-      [playerId, gameSlug],
-    );
-    const r = ratingRes.rows[0] || { rating: DEFAULT_RATING, wins: 0, losses: 0, draws: 0, last_match_at: null };
-    const tier = rankTier(r.rating);
+    const record = await loadRatingRecord(pool, gameSlug, playerId);
+    const profile = await getRankedProfile(pool, { playerId, gameSlug });
     const activeRes = await pool.query(
       `select * from ranked_matches
         where game_slug=$1 and (player_a=$2 or player_b=$2) and status in ('active','pending_forfeit')
@@ -510,12 +615,10 @@ export async function getRankedStanding(pool: any, { playerId, gameSlug }: any):
     return {
       playerId,
       gameSlug,
-      rating: r.rating,
-      tier: { id: tier.id, label: tier.label },
-      wins: r.wins,
-      losses: r.losses,
-      draws: r.draws,
-      lastMatchAt: r.last_match_at,
+      ...record,
+      title: profile?.title || null,
+      avatarUnit: profile?.avatarUnit || null,
+      avatarSkin: profile?.avatarSkin || null,
       activeMatch: activeRes.rows[0] ? serializeMatchForPlayer(activeRes.rows[0], playerId) : null,
     };
   } catch (err: any) {

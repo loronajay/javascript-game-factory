@@ -462,6 +462,15 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
       const gs = encodePathSegment(gameSlug);
       return gs ? get(`/ranked/${gs}/standing`, "standing") : Promise.resolve(null);
     },
+    saveRankedProfile(gameSlug: string, patch: any = {}) {
+      const gs = encodePathSegment(gameSlug);
+      return gs ? put(`/ranked/${gs}/profile`, patch, "profile") : Promise.resolve(null);
+    },
+    fetchRankedCard(gameSlug: string, playerId: string) {
+      const gs = encodePathSegment(gameSlug);
+      const pid = encodePathSegment(playerId);
+      return gs && pid ? get(`/ranked/${gs}/card/${pid}`, "card") : Promise.resolve(null);
+    },
   };
 }
 
