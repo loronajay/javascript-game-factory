@@ -7,6 +7,7 @@ import { teamLabel, teamOf } from "../match/matchBuilder.js";
 import { TEMPO_GAUGE_MAX, canBeginTempoActivation, getTempoReadiness, getUnitAgility, isTempoBattle, isTempoUnitReady } from "../core/tempoBattle.js";
 import { escapeHtml } from "./domHelpers.js";
 import { getRankedTierEmblemSrc, normalizeRankedTierId } from "./rankedEmblems.js";
+import { hasRankedAvatar, rankedAvatarHtml as rankedAvatarIconHtml } from "./rankedAvatars.js";
 
 // Icon per weather id, shown in the match HUD's weather badge (renderWeatherBadge).
 // "none" is the badge's own resting state, not a WEATHER_TYPES entry.
@@ -137,6 +138,7 @@ function rankedProfileForSeat(net, seat) {
 
 function rankedAvatarHtml(profile) {
   const ranked = profile?.rankedProfile;
+  if (hasRankedAvatar(ranked?.avatarUnit)) return rankedAvatarIconHtml(ranked.avatarUnit, "is-ranked-avatar");
   if (ranked?.avatarUnit) return portraitHtml(ranked.avatarUnit, "is-ranked-avatar", ranked.avatarSkin);
   return `<figure class="ranked-match-avatar-fallback" aria-hidden="true">${escapeHtml((profile?.displayName || "?").slice(0, 1).toUpperCase())}</figure>`;
 }

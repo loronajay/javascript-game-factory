@@ -86,7 +86,7 @@ button:hover:not(:disabled) { border-color: var(--brass-hi); filter: brightness(
 .ranked-match-plate.slot-2 { justify-self:end; direction:rtl; }
 .ranked-match-plate.slot-2 .ranked-match-copy,.ranked-match-plate.slot-2 .ranked-match-standing { direction:ltr; text-align:right; justify-items:end; }
 .ranked-match-plate.is-me { border-color:color-mix(in srgb,var(--team,var(--brass)) 70%,var(--brass-hi)); }
-.ranked-match-plate .unit-portrait.is-ranked-avatar,.ranked-match-avatar-fallback { grid-row:1 / span 2; width:2.8rem; height:3.65rem; border:1px solid color-mix(in srgb,var(--team,var(--brass)) 52%,var(--brass-lo)); border-radius:7px; background:radial-gradient(ellipse 70% 55% at 50% 78%,rgba(120,170,210,.16),transparent 70%),linear-gradient(180deg,#16222f,#0a121b); overflow:hidden; box-shadow:inset 0 1px rgba(var(--sheen),.1); }
+.ranked-match-plate .unit-portrait.is-ranked-avatar,.ranked-match-plate .ranked-avatar-icon.is-ranked-avatar,.ranked-match-avatar-fallback { grid-row:1 / span 2; width:2.8rem; height:3.65rem; border:1px solid color-mix(in srgb,var(--team,var(--brass)) 52%,var(--brass-lo)); border-radius:7px; background:radial-gradient(ellipse 70% 55% at 50% 78%,rgba(120,170,210,.16),transparent 70%),linear-gradient(180deg,#16222f,#0a121b); overflow:hidden; box-shadow:inset 0 1px rgba(var(--sheen),.1); }
 .ranked-match-avatar-fallback { display:grid; place-items:center; color:var(--brass-hi); font:900 1rem var(--font-display); }
 .ranked-match-copy { display:grid; gap:.05rem; min-width:0; }
 .ranked-match-kicker { color:color-mix(in srgb,var(--team,var(--brass)) 70%,var(--muted)); font:900 .48rem var(--font-display); letter-spacing:.14em; text-transform:uppercase; }

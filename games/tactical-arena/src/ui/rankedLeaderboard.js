@@ -15,6 +15,7 @@ import { createOnlineIdentityPayload } from "../../../../js/platform/identity/ma
 import { syncRankedPilotProfile } from "../online/rankedPilotProfile.js";
 import { createPortrait, hasPortrait } from "./portraits.js";
 import { createRankedTierEmblem, normalizeRankedTierId } from "./rankedEmblems.js";
+import { createRankedAvatarIcon, hasRankedAvatar } from "./rankedAvatars.js";
 
 const LEADERBOARD_LIMIT = 100;
 const TOP_LEADERBOARD_COUNT = 10;
@@ -279,7 +280,9 @@ function renderLeaderboardRows(body, entries, totalEntries, state) {
     row.appendChild(el("span", "ranked-leaderboard-rank", `#${entry.rank}`));
 
     const avatar = el("div", "ranked-leaderboard-avatar");
-    if (entry.avatarUnit && hasPortrait(entry.avatarUnit)) {
+    if (hasRankedAvatar(entry.avatarUnit)) {
+      avatar.appendChild(createRankedAvatarIcon(entry.avatarUnit, { className: "is-thumb" }));
+    } else if (entry.avatarUnit && hasPortrait(entry.avatarUnit)) {
       avatar.appendChild(createPortrait(entry.avatarUnit, { variant: "is-thumb", skin: entry.avatarSkin }));
     }
     row.appendChild(avatar);

@@ -10,6 +10,7 @@ class TestElement {
     this.className = "";
     this.textContent = "";
     this.dataset = {};
+    this.attributes = {};
     this.style = {};
     this.classList = {
       add: (...names) => {
@@ -18,6 +19,10 @@ class TestElement {
         this.className = [...next].join(" ");
       },
     };
+  }
+
+  setAttribute(name, value) {
+    this.attributes[name] = String(value);
   }
 
   append(...children) {
@@ -97,6 +102,23 @@ test("ranked profile standing nameplate updates tagline and avatar in-place", ()
   assert.equal(avatar.children.length, 1);
   assert.equal(avatar.children[0].className, "ranked-profile-avatar-initial");
   assert.equal(avatar.children[0].textContent, "L");
+});
+
+test("ranked profile standing nameplate renders sprite avatar ids", () => {
+  const { section, avatar } = createNameplateSection();
+
+  syncRankedStandingNameplate(section, {
+    pilot: "Leonardo",
+    tagline: "Tempo thief",
+    avatarUnit: "avatar-001",
+    avatarSkin: null,
+  });
+
+  assert.equal(avatar.children.length, 1);
+  assert.equal(avatar.children[0].tagName, "span");
+  assert.equal(avatar.children[0].className, "ranked-avatar-icon is-profile-avatar");
+  assert.equal(avatar.children[0].dataset.avatar, "avatar-001");
+  assert.equal(avatar.children[0].children[0].className, "ranked-avatar-icon-sprite");
 });
 
 test("ranked profile active-match notice only treats live matches as in progress", () => {
