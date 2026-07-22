@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { renderLeaderboard } from "../src/ui/rankedLeaderboard.js";
+import { filterLeaderboardEntries, renderLeaderboard } from "../src/ui/rankedLeaderboard.js";
 
 class TestElement {
   constructor(tagName) {
@@ -21,6 +21,8 @@ class TestElement {
     this.children.push(node);
     return node;
   }
+
+  addEventListener() {}
 
   replaceChildren(...nodes) {
     this.children = [];
@@ -75,4 +77,45 @@ test("ranked leaderboard rows show player name and tagline separately", () => {
   } finally {
     globalThis.document = previousDocument;
   }
+});
+
+test("ranked leaderboard top tab shows only the first ten entries", () => {
+  const entries = Array.from({ length: 12 }, (_, index) => ({
+    rank: index + 1,
+    playerId: `pilot-${index + 1}`,
+    displayName: `Pilot ${index + 1}`,
+    tier: { id: index < 6 ? "gold" : "silver", label: index < 6 ? "Gold" : "Silver" },
+  }));
+
+  const visible = filterLeaderboardEntries(entries, { tab: "top" });
+
+  assert.equal(visible.length, 10);
+  assert.deepEqual(visible.map((entry) => entry.rank), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+});
+
+test("ranked leaderboard tier tabs filter by normalized tier id", () => {
+  const entries = [
+    { rank: 1, displayName: "Mara", tier: { id: "gold", label: "Gold" } },
+    { rank: 2, displayName: "Vale", tier: { id: "grand-master", label: "Grandmaster" } },
+    { rank: 3, displayName: "Iris", tier: { id: "silver", label: "Silver" } },
+  ];
+
+  const visible = filterLeaderboardEntries(entries, { tab: "grandmaster" });
+
+  assert.deepEqual(visible.map((entry) => entry.displayName), ["Vale"]);
+});
+
+test("ranked leaderboard search finds loaded players outside the top ten", () => {
+  const entries = Array.from({ length: 15 }, (_, index) => ({
+    rank: index + 1,
+    playerId: `pilot-${index + 1}`,
+    displayName: index === 12 ? "Needle Commander" : `Pilot ${index + 1}`,
+    title: index === 12 ? "Hidden in the ladder" : "",
+    tier: { id: "bronze", label: "Bronze" },
+  }));
+
+  const visible = filterLeaderboardEntries(entries, { tab: "top", search: "needle" });
+
+  assert.equal(visible.length, 1);
+  assert.equal(visible[0].rank, 13);
 });
