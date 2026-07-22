@@ -2,6 +2,9 @@
 // to keep that screen a thin composer. Ranked matches are the first-class add-friend
 // entry point, so a resolved online ranked duel surfaces the opponent's ranked
 // standing plus View Profile / Add Friend / Message deep-links.
+//
+// Card/record shaping lives in resultsOpponentCardModel.js; this file owns only the DOM
+// rendering and the friend-action wiring.
 
 import { el } from "./domHelpers.js";
 import { createPlatformApiClient } from "../../../../js/platform/api/platform-api.mjs";
@@ -10,6 +13,7 @@ import { loadFactoryProfile } from "../../../../js/platform/identity/factory-pro
 import { createOnlineIdentityPayload } from "../../../../js/platform/identity/match-identity.mjs";
 import { factoryMessagesUrl, factoryPlayerUrl } from "../platform/factoryLinks.js";
 import { createRankedTierEmblem, normalizeRankedTierId } from "./rankedEmblems.js";
+import { cardName, mergeFetchedCard, opponentCardFromMatch } from "./resultsOpponentCardModel.js";
 
 // Fill `host` with the opponent card for a resolved online ranked match, or hide it.
 // `context` carries the match-local identity exchange so offline/stale platform reads
@@ -78,62 +82,6 @@ function fillOpponentCard(body, card, apiClient) {
   body.appendChild(actions);
 }
 
-function opponentCardFromMatch(ranked, { net = null, mySeat = null, outcome = null } = {}) {
-  const profile = net?.profileForSeat?.(Number(mySeat) === 1 ? 2 : 1) || {};
-  const rp = profile.rankedProfile || {};
-  const base = recordOf(rp);
-  const preMatchRecord = profile.rankedProfile ? base : null;
-  return {
-    outcome,
-    preMatchRecord,
-    card: bumpIfStale({
-      playerId: ranked?.opponentPlayerId,
-      displayName: profile.displayName,
-      title: rp.title || rp.tagline || null,
-      avatarUnit: rp.avatarUnit || null,
-      avatarSkin: rp.avatarSkin || null,
-      tier: rp.tier || null,
-      rating: rp.rating,
-      ...base,
-    }, preMatchRecord, outcome),
-  };
-}
-
-function mergeFetchedCard(card, matchCard) {
-  const merged = { ...matchCard.card, ...(card || {}) };
-  merged.displayName = preferredName(card, matchCard.card.displayName);
-  return bumpIfStale(merged, matchCard.preMatchRecord, matchCard.outcome);
-}
-
-function clean(value) { return typeof value === "string" ? value.trim() : ""; }
-
-function preferredName(card, fallback = "") {
-  const name = clean(card?.displayName) || clean(card?.profileName) || clean(card?.pilotName);
-  return name && !/^(commander|ranked rival)$/i.test(name) ? name : fallback;
-}
-
-function cardName(card) {
-  return clean(card.displayName) || clean(card.profileName) || clean(card.pilotName) || clean(card.name) || clean(card.title) || "Ranked Rival";
-}
-
-function recordOf(card) {
-  return { wins: Number(card?.wins) || 0, losses: Number(card?.losses) || 0, draws: Number(card?.draws) || 0 };
-}
-
-function bumpIfStale(card, preMatchRecord, outcome) {
-  const record = recordOf(card);
-  const stale = preMatchRecord
-    && record.wins === preMatchRecord.wins
-    && record.losses === preMatchRecord.losses
-    && record.draws === preMatchRecord.draws;
-  if (!outcome || !stale) return card;
-  const next = { ...card };
-  if (outcome === "win") next.losses += 1;
-  else if (outcome === "loss") next.wins += 1;
-  else if (outcome === "draw") next.draws += 1;
-  return next;
-}
-
 function wireAddFriend(button, apiClient, opponentId) {
   const profile = myFactoryProfile();
   const myId = myPlayerId(profile);
@@ -166,13 +114,13 @@ function myPlayerId(profile = myFactoryProfile()) {
 }
 
 function isAlreadyFriend(profile, opponentId) {
-  const id = clean(opponentId);
+  const id = typeof opponentId === "string" ? opponentId.trim() : "";
   if (!id || !profile) return false;
   const friendIds = [
     ...(Array.isArray(profile.friends) ? profile.friends : []),
     ...(Array.isArray(profile.friendsPreview) ? profile.friendsPreview.map(friendPreviewPlayerId) : []),
   ];
-  return friendIds.some((friendId) => clean(friendId) === id);
+  return friendIds.some((friendId) => (typeof friendId === "string" ? friendId.trim() : "") === id);
 }
 
 function friendPreviewPlayerId(friend) {

@@ -80,7 +80,23 @@ update it deliberately when a boundary genuinely changes; never loosen it for co
     `resultsScreen.js`, `tutorialMenuScreens.js`, `settingsScreen.js`, and
     `matchSetupScreens.js`, with pure campaign view-model helpers in
     `campaignMenuModel.js` and the menu seat palette in `teamDisplay.js`
-    (`MENU_TEAM_COLORS`). `onlineFlow.js` owns the online lobby end-to-end.
+    (`MENU_TEAM_COLORS`).
+  - `onlineFlow.js` is the online lobby controller: transport wiring, the lobby state
+    machine, and the match handoff. Its rendering and pure logic are extracted —
+    `onlineLobbyView.js` builds the roster + draft/ban board (from an injected context),
+    `onlineFlowColors.js` holds the seat/team palette, `onlineMatchTypes.js` the
+    match-type catalog + lookups, `onlineProfiles.js` the lobby profile/identity shaping,
+    and `onlineLobbyStatus.js` the Start-button/status-hint derivation. Each extracted
+    piece has its own `node:test` because `onlineFlow.js` itself constructs a real
+    WebSocket client and cannot load headless. The ranked matchmaking state machine still
+    lives inline (see Remaining hotspots).
+  - Shop, ranked-profile, and results surfaces are split from their controllers. `shop.js`
+    is the modal controller over `shop/shopTabs.js` (per-tab renderers), `shop/shopCheckout.js`
+    (Valor-confirm + embedded Stripe layers), and `shop/shopWidgets.js` (pure widgets +
+    status/format helpers). `rankedProfile.js` is the profile overlay over
+    `rankedProfileIdentity.js` (tagline/avatar editor + owned-avatar options) and
+    `rankedProfileNameplate.js` (standing nameplate fill). `resultsOpponentCard.js` renders
+    the post-match opponent card; its record/view-model math is `resultsOpponentCardModel.js`.
   - `boardRenderer.js` owns the targeting/highlight render contract (see below);
     scene decoration (weather overlay, wall/fire figures, the dais) lives in
     `boardAtmosphere.js`. `unitRenderer.js` + `boardSprites.js` draw tokens.
@@ -143,6 +159,14 @@ shipping menu screens. Asset URLs are relative to the stylesheet that declares t
 
 ## Remaining hotspots
 
+- `src/ui/onlineFlow.js` — the remaining bulk is coupled lobby glue: the `wireLobby`
+  client-callback handlers, the `tryStart` match handoff, and the ranked matchmaking
+  state machine (`startRanked` / `endRankedSearch` / `syncRankedAvailability` /
+  `setOnlineMode` / `hydrateRankedIdentityProfile` plus their `rankedMode` / `rankedInfo`
+  / `rankedBanFirstSeat` / `rankedIdentityProfile` state). Extracting a ranked-search
+  controller is the next planned split, but that state is threaded through
+  `syncDraftMembership`, `wireLobby`, `tryStart`, and `onEnter`, so it wants a live
+  two-tab playtest alongside the extraction — do not cut it blind.
 - `src/ui/battleInputController.js` — `handleTile` / `handleActionClick` are long
   per-mode ladders; the comment-delimited mode blocks are the extraction seams if they
   grow further.
