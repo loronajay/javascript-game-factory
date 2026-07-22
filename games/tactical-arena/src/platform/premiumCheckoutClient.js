@@ -8,6 +8,7 @@ export const DEFAULT_PREMIUM_CHECKOUT_FULFILLMENT_ENDPOINT = "/api/tactical-aren
 export const PLATFORM_PREMIUM_CHECKOUT_PATH = "/payments/tactical-arena/checkout-sessions";
 export const PLATFORM_PREMIUM_CHECKOUT_FULFILLMENT_PATH = "/payments/tactical-arena/checkout-sessions/fulfill";
 export const PREMIUM_CHECKOUT_EVENT = "tacticalarena:premium-purchase-request";
+export const PENDING_PREMIUM_CHECKOUT_SESSION_KEY = "tactical-arena.pendingPremiumCheckoutSessionId";
 export const TACTICAL_ARENA_GAME_SLUG = "tactical-arena";
 
 function cleanText(value, maxLength = 500) {
@@ -26,6 +27,10 @@ function defaultLocationRef() {
 
 function defaultFetchImpl() {
   return globalThis.fetch;
+}
+
+function defaultStorageRef() {
+  return globalThis.localStorage || globalThis.sessionStorage;
 }
 
 function configuredEndpoint() {
@@ -80,11 +85,41 @@ export function checkoutFulfillmentEndpointUrl({
   return new URL(selected, cleanText(currentHref) || "http://localhost/games/tactical-arena/index.html").toString();
 }
 
-export function checkoutSessionIdFromReturnUrl(locationRef = defaultLocationRef()) {
+function readCheckoutSessionId(data) {
+  return cleanText(data?.sessionId || data?.checkoutSessionId || data?.id, 200);
+}
+
+function readPendingCheckoutSessionId(storage = defaultStorageRef()) {
+  try {
+    return cleanText(storage?.getItem?.(PENDING_PREMIUM_CHECKOUT_SESSION_KEY), 200);
+  } catch {
+    return "";
+  }
+}
+
+function writePendingCheckoutSessionId(storage = defaultStorageRef(), sessionId = "") {
+  const cleanSessionId = cleanText(sessionId, 200);
+  if (!cleanSessionId) return;
+  try {
+    storage?.setItem?.(PENDING_PREMIUM_CHECKOUT_SESSION_KEY, cleanSessionId);
+  } catch {
+    // Best effort only: the return URL still carries the session id.
+  }
+}
+
+function clearPendingCheckoutSessionId(storage = defaultStorageRef()) {
+  try {
+    storage?.removeItem?.(PENDING_PREMIUM_CHECKOUT_SESSION_KEY);
+  } catch {
+    // Best effort only.
+  }
+}
+
+export function checkoutSessionIdFromReturnUrl(locationRef = defaultLocationRef(), storage = defaultStorageRef()) {
   try {
     const url = new URL(cleanText(locationRef?.href) || "http://localhost/games/tactical-arena/index.html");
     if (url.searchParams.get("checkout") !== "success") return "";
-    return cleanText(url.searchParams.get("session_id"), 200);
+    return cleanText(url.searchParams.get("session_id"), 200) || readPendingCheckoutSessionId(storage);
   } catch {
     return "";
   }
@@ -167,6 +202,7 @@ export async function startPremiumCheckout({
   checkoutEndpoint = "",
   fetchImpl = defaultFetchImpl(),
   locationRef = defaultLocationRef(),
+  storage = defaultStorageRef(),
   successUrl = "",
   cancelUrl = "",
   gameSlug = TACTICAL_ARENA_GAME_SLUG,
@@ -213,6 +249,7 @@ export async function startPremiumCheckout({
   if (!checkoutUrl) {
     throw checkoutError(CHECKOUT_RESPONSE_INVALID_ERROR, "Stripe checkout did not return a redirect URL.");
   }
+  writePendingCheckoutSessionId(storage, readCheckoutSessionId(data));
   if (typeof locationRef?.assign === "function") {
     locationRef.assign(checkoutUrl);
   } else if (locationRef) {
@@ -226,7 +263,8 @@ export async function fulfillReturnedPremiumCheckout({
   checkoutFulfillmentEndpoint = "",
   fetchImpl = defaultFetchImpl(),
   locationRef = defaultLocationRef(),
-  sessionId = checkoutSessionIdFromReturnUrl(locationRef),
+  storage = defaultStorageRef(),
+  sessionId = checkoutSessionIdFromReturnUrl(locationRef, storage),
 } = {}) {
   const cleanSessionId = cleanText(sessionId, 200);
   if (!cleanSessionId) return null;
@@ -245,6 +283,7 @@ export async function fulfillReturnedPremiumCheckout({
     body: JSON.stringify({ sessionId: cleanSessionId }),
   });
   const data = await readJson(response);
+  if (response?.ok) clearPendingCheckoutSessionId(storage);
   return response?.ok ? data : null;
 }
 

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   CHECKOUT_API_UNAVAILABLE_ERROR,
+  PENDING_PREMIUM_CHECKOUT_SESSION_KEY,
   buildPremiumCheckoutPayload,
   checkoutEndpointUrl,
   checkoutSessionIdFromReturnUrl,
@@ -40,6 +41,21 @@ const PACK_OFFER = Object.freeze({
     Object.freeze({ type: "necromancer", slug: "trick-or-treat", entitlementId: "skin:necromancer:trick-or-treat" }),
   ]),
 });
+
+function createMemoryStorage(initial = {}) {
+  const entries = new Map(Object.entries(initial));
+  return {
+    getItem(key) {
+      return entries.has(key) ? entries.get(key) : null;
+    },
+    setItem(key, value) {
+      entries.set(key, String(value));
+    },
+    removeItem(key) {
+      entries.delete(key);
+    },
+  };
+}
 
 test("premium checkout payload sends stable offer identity without trusting browser price", () => {
   const payload = buildPremiumCheckoutPayload(SKIN_OFFER, {
@@ -135,6 +151,7 @@ test("checkout endpoint prefers the configured Factory platform API", () => {
 
 test("startPremiumCheckout posts to the checkout API and redirects to Stripe", async () => {
   const calls = [];
+  const storage = createMemoryStorage();
   const locationRef = {
     href: "https://factory.example/games/tactical-arena/index.html",
     assigned: "",
@@ -147,6 +164,7 @@ test("startPremiumCheckout posts to the checkout API and redirects to Stripe", a
   const result = await startPremiumCheckout({
     offer: SKIN_OFFER,
     account: ACCOUNT,
+    storage,
     locationRef,
     checkoutEndpoint: "/api/test-checkout",
     fetchImpl: async (url, init) => {
@@ -154,7 +172,7 @@ test("startPremiumCheckout posts to the checkout API and redirects to Stripe", a
       return {
         ok: true,
         async json() {
-          return { url: "https://checkout.stripe.com/c/session-1" };
+          return { url: "https://checkout.stripe.com/c/session-1", sessionId: "cs_test_session_1" };
         },
       };
     },
@@ -167,6 +185,7 @@ test("startPremiumCheckout posts to the checkout API and redirects to Stripe", a
   assert.equal(calls[0].init.method, "POST");
   assert.equal(calls[0].init.headers.Authorization, "Bearer token-1");
   assert.equal(JSON.parse(calls[0].init.body).offer.sku, "ta.skin.swordsman.medieval");
+  assert.equal(storage.getItem(PENDING_PREMIUM_CHECKOUT_SESSION_KEY), "cs_test_session_1");
 });
 
 test("startPremiumCheckout reports unavailable checkout API failures", async () => {
@@ -202,10 +221,27 @@ test("checkoutSessionIdFromReturnUrl reads Stripe return session ids", () => {
   );
 });
 
+test("checkoutSessionIdFromReturnUrl falls back to the pending checkout session id", () => {
+  const storage = createMemoryStorage({
+    [PENDING_PREMIUM_CHECKOUT_SESSION_KEY]: "cs_test_pending",
+  });
+
+  assert.equal(
+    checkoutSessionIdFromReturnUrl({
+      href: "https://factory.example/games/tactical-arena/index.html?checkout=success",
+    }, storage),
+    "cs_test_pending",
+  );
+});
+
 test("fulfillReturnedPremiumCheckout posts the returned Stripe session id", async () => {
   const calls = [];
+  const storage = createMemoryStorage({
+    [PENDING_PREMIUM_CHECKOUT_SESSION_KEY]: "cs_test_paid",
+  });
   const result = await fulfillReturnedPremiumCheckout({
     account: ACCOUNT,
+    storage,
     checkoutFulfillmentEndpoint: "/api/test-fulfill",
     locationRef: {
       href: "https://factory.example/games/tactical-arena/index.html?checkout=success&session_id=cs_test_paid",
@@ -225,4 +261,5 @@ test("fulfillReturnedPremiumCheckout posts the returned Stripe session id", asyn
   assert.equal(calls[0].url, "https://factory.example/api/test-fulfill");
   assert.equal(calls[0].init.headers.Authorization, "Bearer token-1");
   assert.deepEqual(JSON.parse(calls[0].init.body), { sessionId: "cs_test_paid" });
+  assert.equal(storage.getItem(PENDING_PREMIUM_CHECKOUT_SESSION_KEY), null);
 });
