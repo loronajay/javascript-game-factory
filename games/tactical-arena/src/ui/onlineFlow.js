@@ -29,8 +29,10 @@ import { DRAFT_PICK_ORDER, applyBan, applyDraftPick, arrangeDraftLoadout, banned
 import { playerSeatListLabel, teamForSeat, teamGroupsForSetup } from "./teamDisplay.js";
 import { escapeHtml } from "./domHelpers.js";
 import { createRankedFlow } from "../online/rankedFlow.js";
+import { getRankedAccountGate } from "../online/rankedAccountGate.js";
+import { syncRankedPilotProfile } from "../online/rankedPilotProfile.js";
 import { loadRankedName } from "./rankedNameModel.js";
-import { isFactoryAccountLoggedIn, readStoredFactoryAccountSession } from "../platform/factoryAccount.js";
+import { readStoredFactoryAccountSession } from "../platform/factoryAccount.js";
 import { TACTICAL_ARENA_GAME_SLUG } from "../platform/gameProgressClient.js";
 import { createPlatformApiClient } from "../../../../js/platform/api/platform-api.mjs";
 import { publishTacticalArenaMatchActivity } from "../../../../js/platform/activity/activity.mjs";
@@ -57,6 +59,7 @@ export function createOnlineFlow({ onStartMatch }) {
   const roomCodeEl = $('[data-online="roomCode"]');
   const rosterEl = $('[data-online="roster"]');
   const hostHintEl = $('[data-online="hostHint"]');
+  const boardSizeField = $('[data-online="boardSizeField"]');
   const lobbyHintEl = $('[data-online="lobbyHint"]');
   const startBtn = $('[data-online="startBtn"]');
   const lockBtn = $('[data-online="lockBtn"]');
@@ -122,6 +125,8 @@ export function createOnlineFlow({ onStartMatch }) {
   const compositionsBySeat = {};
   const skinsBySeat = {};
   const nicknamesBySeat = {};
+  const profilesByClientId = new Map();
+  const profilesBySeat = new Map();
 
   // ── view helpers ───────────────────────────────────────────────────────────
   function setPanel(name) {
@@ -165,6 +170,10 @@ export function createOnlineFlow({ onStartMatch }) {
 
   function isDraftMatch(matchType = activeMatchType()) {
     return !!matchTypeConfig(matchType).draft;
+  }
+
+  function isRankedLobby() {
+    return rankedMode || lobby?.settings?.ranked === true;
   }
 
   // Draft needs DRAFT_PICK_ORDER.length (8) unique units across both seats — one
@@ -274,6 +283,28 @@ export function createOnlineFlow({ onStartMatch }) {
     return isDraftComplete(draft) && players.length > 0 && players.every((p) => readyByClientId.get(p.id) === true);
   }
 
+  function rememberRemoteProfile(profile) {
+    if (!profile || typeof profile !== "object") return;
+    const copy = { ...profile, rankedProfile: profile.rankedProfile ? { ...profile.rankedProfile } : null };
+    if (copy.clientId) profilesByClientId.set(copy.clientId, copy);
+    const seat = Number(copy.seat);
+    if (Number.isFinite(seat) && seat > 0) profilesBySeat.set(Math.floor(seat), copy);
+  }
+
+  function profilesForSession() {
+    if (!Array.isArray(membersAtStart)) return [];
+    const profiles = [];
+    membersAtStart.forEach((clientId, index) => {
+      const seat = index + 1;
+      if (seat === mySeat) return;
+      const profile = profilesByClientId.get(clientId) || profilesBySeat.get(seat);
+      if (profile) {
+        profiles.push({ ...profile, seat, rankedProfile: profile.rankedProfile ? { ...profile.rankedProfile } : null });
+      }
+    });
+    return profiles;
+  }
+
   function identity() {
     // Pull the canonical Javascript Game Factory profile so the lobby and ranked
     // nameplate can show the pilot name separately from the Tactical Arena tagline.
@@ -311,6 +342,7 @@ export function createOnlineFlow({ onStartMatch }) {
     rankedIdentityProfile = null;
     let apiClient = null;
     try { apiClient = createPlatformApiClient(); } catch { apiClient = null; }
+    await syncRankedPilotProfile({ apiClient, loadProfile: loadFactoryProfile });
     if (!apiClient?.isConfigured || typeof apiClient.fetchRankedStanding !== "function") {
       const fallback = loadRankedName();
       rankedIdentityProfile = fallback ? { title: fallback, tagline: fallback } : null;
@@ -346,12 +378,15 @@ export function createOnlineFlow({ onStartMatch }) {
   // the pool is too small the Find button is disabled and the hint says how many more.
   function syncRankedAvailability() {
     if (!rankedBtn || rankedMode) return; // don't fight the live Cancel state
+    const accountGate = getRankedAccountGate(readStoredFactoryAccountSession());
     const enough = isRankedUnlockable();
-    rankedBtn.disabled = !enough;
+    rankedBtn.disabled = !accountGate.eligible || !enough;
     if (rankedHint) {
-      rankedHint.textContent = enough
-        ? ""
-        : `Ranked drafts with bans — unlock ${RANKED_BATTLE_REQUIRED_UNITS} unique units first (${unlockedUnitCount()} unlocked).`;
+      rankedHint.textContent = !accountGate.eligible
+        ? "You need a signed-in Javascript Game Factory account for ranked."
+        : enough
+          ? ""
+          : `Ranked drafts with bans — unlock ${RANKED_BATTLE_REQUIRED_UNITS} unique units first (${unlockedUnitCount()} unlocked).`;
     }
   }
 
@@ -367,8 +402,10 @@ export function createOnlineFlow({ onStartMatch }) {
 
   async function startRanked() {
     if (rankedMode) return;
-    if (!isFactoryAccountLoggedIn(readStoredFactoryAccountSession())) {
-      setStatus("Sign in to your account to play ranked.");
+    const account = readStoredFactoryAccountSession();
+    const accountGate = getRankedAccountGate(account);
+    if (!accountGate.eligible) {
+      setStatus(accountGate.message);
       if (rankedHint) rankedHint.textContent = "You need a signed-in Javascript Game Factory account for ranked.";
       return;
     }
@@ -391,6 +428,7 @@ export function createOnlineFlow({ onStartMatch }) {
     setStatus("Joining the ranked queue…");
     client?.setIdentity(identity()); // re-stamp identity so ranked metadata is used
     rankedFlow = createRankedFlow({
+      account,
       callbacks: {
         onStatus: (text) => setStatus(text),
         onMatched: (match) => { rankedInfo = match; },
@@ -491,9 +529,12 @@ export function createOnlineFlow({ onStartMatch }) {
     syncDraftMembership();
     const cfg = activeConfig() ?? config;
     cfg.format = matchTypeConfig().format;
+    const rankedLobby = isRankedLobby();
+    if (rankedLobby) cfg.size = 13;
     selectSeg(cfg.size);
-    for (const seg of sizeSegs) seg.disabled = !isOwner;
-    hostHintEl.textContent = isOwner ? "(you set it)" : "(set by host)";
+    for (const seg of sizeSegs) seg.disabled = rankedLobby || !isOwner;
+    if (boardSizeField) boardSizeField.hidden = rankedLobby;
+    hostHintEl.textContent = rankedLobby ? "(ranked fixed)" : isOwner ? "(you set it)" : "(set by host)";
     const draftMode = isDraftMatch();
     if (blindPickField) blindPickField.hidden = draftMode;
     if (draftField) draftField.hidden = !draftMode;
@@ -916,6 +957,10 @@ export function createOnlineFlow({ onStartMatch }) {
       syncUI();
     };
 
+    cb.onRemoteProfile = (profile) => {
+      rememberRemoteProfile(profile);
+    };
+
     cb.onLobbyStarted = ({ seed: matchSeed, members, myClientId: id }) => {
       myClientId = id ?? myClientId;
       membersAtStart = Array.isArray(members) ? members.slice() : [];
@@ -1013,6 +1058,7 @@ export function createOnlineFlow({ onStartMatch }) {
       seed,
       size: cfg.size,
       localProfile: identity(),
+      initialProfiles: profilesForSession(),
     });
     handedOff = true; // onExit must NOT disconnect — the match owns the client now
 
@@ -1084,6 +1130,8 @@ export function createOnlineFlow({ onStartMatch }) {
     for (const key of Object.keys(compositionsBySeat)) delete compositionsBySeat[key];
     for (const key of Object.keys(skinsBySeat)) delete skinsBySeat[key];
     for (const key of Object.keys(nicknamesBySeat)) delete nicknamesBySeat[key];
+    profilesByClientId.clear();
+    profilesBySeat.clear();
     roomCodeEl.hidden = true;
   }
 
@@ -1132,7 +1180,7 @@ export function createOnlineFlow({ onStartMatch }) {
   });
   for (const seg of sizeSegs) {
     seg.addEventListener("click", () => {
-      if (!isOwner || seg.disabled || rankedMode) return;
+      if (!isOwner || seg.disabled || isRankedLobby()) return;
       const chosen = Number(seg.dataset.size);
       if (!BOARD_SIZES.includes(chosen)) return;
       config.size = chosen;

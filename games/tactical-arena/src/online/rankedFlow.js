@@ -11,6 +11,8 @@
 //   onError(text)
 import { createPlatformApiClient } from "../../../../js/platform/api/platform-api.mjs";
 import { TACTICAL_ARENA_GAME_SLUG } from "../platform/gameProgressClient.js";
+import { readStoredFactoryAccountSession } from "../platform/factoryAccount.js";
+import { getRankedAccountGate } from "./rankedAccountGate.js";
 
 export function createRankedFlow({
   apiClient = createPlatformApiClient(),
@@ -18,6 +20,8 @@ export function createRankedFlow({
   pollIntervalMs = 2000,
   setTimeoutFn = (fn, ms) => setTimeout(fn, ms),
   clearTimeoutFn = (id) => clearTimeout(id),
+  account = undefined,
+  getAccountSession = readStoredFactoryAccountSession,
   callbacks = {},
 } = {}) {
   let state = "idle"; // idle | queuing | awaiting_lobby | ready | cancelled
@@ -44,6 +48,11 @@ export function createRankedFlow({
   }
   function isPolling() {
     return state === "queuing" || state === "awaiting_lobby";
+  }
+  function currentAccount() {
+    return account !== undefined
+      ? account
+      : (typeof getAccountSession === "function" ? getAccountSession() : {});
   }
 
   function handlePoll(res) {
@@ -107,6 +116,12 @@ export function createRankedFlow({
 
   async function queue() {
     if (state === "queuing" || state === "awaiting_lobby" || state === "ready") return;
+    const gate = getRankedAccountGate(currentAccount());
+    if (!gate.eligible) {
+      cb.onError(gate.message);
+      state = "idle";
+      return;
+    }
     state = "queuing";
     matchedEmitted = false;
     match = null;

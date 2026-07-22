@@ -274,6 +274,7 @@ export function createOnlineClient() {
   let _identity = sanitizeIdentity(null);
   let _roomCode = null;
   let _inLobby = false;
+  let _members = [];
   let _latencyMs = null;
   let _pingTimer = null;
 
@@ -306,6 +307,15 @@ export function createOnlineClient() {
       messageType,
       value: typeof value === "string" ? value : JSON.stringify(value),
     });
+  }
+
+  function _rememberMembers(data) {
+    if (Array.isArray(data?.members)) _members = data.members.slice();
+  }
+
+  function _localSeat() {
+    const index = _members.indexOf(_clientId);
+    return index >= 0 ? index + 1 : null;
   }
 
   function _handleLobbyMessage(messageType, value, senderId = null) {
@@ -347,7 +357,7 @@ export function createOnlineClient() {
       }
       case "profile": {
         const m = parseProfileMessage(value);
-        if (m) cb.onRemoteProfile?.(m);
+        if (m) cb.onRemoteProfile?.({ ...m, clientId: senderId || "" });
         return;
       }
       case "ping": {
@@ -374,10 +384,12 @@ export function createOnlineClient() {
       case "lobby_joined":
         _roomCode = data.roomCode;
         _inLobby = true;
+        _rememberMembers(data);
         _broadcastProfile();
         cb.onLobbyJoined?.(normalizeLobby(data), { created: !!data.created });
         return;
       case "lobby_updated":
+        _rememberMembers(data);
         cb.onLobbyUpdated?.(normalizeLobby(data));
         return;
       case "lobby_player_joined":
@@ -386,6 +398,7 @@ export function createOnlineClient() {
         return;
       case "lobby_started":
         _inLobby = true;
+        _rememberMembers(data);
         cb.onLobbyStarted?.({
           seed: data.seed,
           ownerId: data.ownerId || null,
@@ -405,6 +418,7 @@ export function createOnlineClient() {
       case "lobby_closed":
         _inLobby = false;
         _roomCode = null;
+        _members = [];
         return;
       case "message":
         if (data.scope !== "lobby") return;
@@ -430,6 +444,7 @@ export function createOnlineClient() {
       _clientId = null;
       _roomCode = null;
       _inLobby = false;
+      _members = [];
       if (wasInLobby) cb.onClosed?.();
     });
     ws.addEventListener("error", () => {
@@ -495,11 +510,12 @@ export function createOnlineClient() {
     _send({ type: "leave_lobby" });
     _inLobby = false;
     _roomCode = null;
+    _members = [];
   }
 
   function _broadcastProfile() {
     if (!_inLobby || !_identity?.displayName) return;
-    _lobbyMsg("profile", JSON.stringify(_identity));
+    _lobbyMsg("profile", JSON.stringify({ ..._identity, seat: _localSeat() }));
   }
 
   // ── Outbound gameplay messages ──
@@ -555,6 +571,7 @@ export function createOnlineClient() {
     stopPinging();
     _inLobby = false;
     _roomCode = null;
+    _members = [];
     ws?.close();
     ws = null;
   }
@@ -563,6 +580,7 @@ export function createOnlineClient() {
     stopPinging();
     _roomCode = null;
     _inLobby = false;
+    _members = [];
   }
 
   return {

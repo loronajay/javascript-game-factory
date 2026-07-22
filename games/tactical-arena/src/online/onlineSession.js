@@ -25,7 +25,7 @@ import { hashState } from "../core/state-hash.js";
 // finish animating the final command before our close would look like a drop.
 const CLEAN_CLOSE_GRACE_MS = 2500;
 
-export function createOnlineSession({ client, mySeat, isOwner, members, seed, size, localProfile = null }) {
+export function createOnlineSession({ client, mySeat, isOwner, members, seed, size, localProfile = null, initialProfiles = [] }) {
   let _controller = null;
   let latencyMs = null;
   let _ended = false;
@@ -78,6 +78,9 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
   }
 
   rememberProfile({ ...(localProfile || {}), seat: mySeat });
+  for (const profile of Array.isArray(initialProfiles) ? initialProfiles : []) {
+    rememberProfile(profile);
+  }
 
   function _checkHash(revision) {
     const mine = _myHashByRevision.get(revision);

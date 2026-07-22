@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import { createRankedFlow } from "../src/online/rankedFlow.js";
 
+const SIGNED_IN_ACCOUNT = Object.freeze({ authenticated: true, playerId: "pilot-1", token: "token-1" });
+
 // A manual scheduler: the controller's next poll is stashed here so the test can
 // pump it deterministically instead of waiting on real timers.
 function manualScheduler() {
@@ -45,11 +47,30 @@ function recorder() {
   };
 }
 
+test("queue refuses ranked without a signed-in platform account token", async () => {
+  const api = fakeApi({ enqueue: { status: "waiting" } });
+  const sched = manualScheduler();
+  const rec = recorder();
+  const flow = createRankedFlow({
+    apiClient: api,
+    account: { authenticated: true, playerId: "local-guest" },
+    ...sched,
+    callbacks: rec.callbacks,
+  });
+
+  await flow.queue();
+
+  assert.equal(api.calls.enqueue, 0);
+  assert.equal(flow.state, "idle");
+  assert.deepEqual(rec.events.error, ["Sign in to your Javascript Game Factory account to play ranked."]);
+  assert.equal(sched.hasPending, false);
+});
+
 test("seat 1 gets an immediate match and is told to CREATE the relay lobby", async () => {
   const api = fakeApi({ enqueue: { status: "matched", match: { matchId: "m1", seat: 1, bansFirst: true, lobbyCode: null } } });
   const sched = manualScheduler();
   const rec = recorder();
-  const flow = createRankedFlow({ apiClient: api, gameSlug: "tactical-arena", ...sched, callbacks: rec.callbacks });
+  const flow = createRankedFlow({ apiClient: api, account: SIGNED_IN_ACCOUNT, gameSlug: "tactical-arena", ...sched, callbacks: rec.callbacks });
 
   await flow.queue();
 
@@ -63,7 +84,7 @@ test("seat 2 with a lobby code already present is told to JOIN immediately", asy
   const api = fakeApi({ enqueue: { status: "matched", match: { matchId: "m1", seat: 2, lobbyCode: "ABCDE" } } });
   const sched = manualScheduler();
   const rec = recorder();
-  const flow = createRankedFlow({ apiClient: api, ...sched, callbacks: rec.callbacks });
+  const flow = createRankedFlow({ apiClient: api, account: SIGNED_IN_ACCOUNT, ...sched, callbacks: rec.callbacks });
 
   await flow.queue();
 
@@ -81,7 +102,7 @@ test("seat 2 without a code waits, then JOINs once the code is published", async
   });
   const sched = manualScheduler();
   const rec = recorder();
-  const flow = createRankedFlow({ apiClient: api, ...sched, callbacks: rec.callbacks });
+  const flow = createRankedFlow({ apiClient: api, account: SIGNED_IN_ACCOUNT, ...sched, callbacks: rec.callbacks });
 
   await flow.queue();
   assert.equal(flow.state, "awaiting_lobby");
@@ -105,7 +126,7 @@ test("waiting in queue polls until a match is found", async () => {
   });
   const sched = manualScheduler();
   const rec = recorder();
-  const flow = createRankedFlow({ apiClient: api, ...sched, callbacks: rec.callbacks });
+  const flow = createRankedFlow({ apiClient: api, account: SIGNED_IN_ACCOUNT, ...sched, callbacks: rec.callbacks });
 
   await flow.queue();
   assert.equal(flow.state, "queuing");
@@ -120,7 +141,7 @@ test("cancel leaves the queue and stops polling", async () => {
   const api = fakeApi({ enqueue: { status: "waiting" } });
   const sched = manualScheduler();
   const rec = recorder();
-  const flow = createRankedFlow({ apiClient: api, ...sched, callbacks: rec.callbacks });
+  const flow = createRankedFlow({ apiClient: api, account: SIGNED_IN_ACCOUNT, ...sched, callbacks: rec.callbacks });
 
   await flow.queue();
   assert.equal(sched.hasPending, true);
@@ -133,7 +154,7 @@ test("publishLobbyCode and reportResult call the platform with the match id", as
   const api = fakeApi({ enqueue: { status: "matched", match: { matchId: "m1", seat: 1, lobbyCode: null } } });
   const sched = manualScheduler();
   const rec = recorder();
-  const flow = createRankedFlow({ apiClient: api, ...sched, callbacks: rec.callbacks });
+  const flow = createRankedFlow({ apiClient: api, account: SIGNED_IN_ACCOUNT, ...sched, callbacks: rec.callbacks });
 
   await flow.queue();
   await flow.publishLobbyCode("ABCDE");
@@ -147,7 +168,7 @@ test("reportResult forwards the squad + unit report when supplied", async () => 
   const api = fakeApi({ enqueue: { status: "matched", match: { matchId: "m1", seat: 1, lobbyCode: null } } });
   const sched = manualScheduler();
   const rec = recorder();
-  const flow = createRankedFlow({ apiClient: api, ...sched, callbacks: rec.callbacks });
+  const flow = createRankedFlow({ apiClient: api, account: SIGNED_IN_ACCOUNT, ...sched, callbacks: rec.callbacks });
 
   await flow.queue();
   const unitResults = { units: [{ id: "p1-0-swordsman", seat: 1, type: "swordsman", alive: true }] };

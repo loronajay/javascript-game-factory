@@ -36,6 +36,7 @@ function cleanText(value) {
 
 function leaderboardPlayerName(entry, isMe) {
   return cleanText(entry.displayName)
+    || cleanText(entry.pilotName)
     || cleanText(entry.playerName)
     || cleanText(entry.profileName)
     || (isMe ? "You" : "Commander");
@@ -58,6 +59,7 @@ function entryMatchesSearch(entry, search) {
     entry.rating,
     entry.playerId,
     entry.displayName,
+    entry.pilotName,
     entry.playerName,
     entry.profileName,
     entry.tagline,

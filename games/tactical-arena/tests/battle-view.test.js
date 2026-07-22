@@ -429,6 +429,10 @@ test("four-player team HUD uses compact chips in every player slot", () => {
     assert.doesNotMatch(overlay.children[0].innerHTML, /unit-statline/);
     assert.match(STYLE_CSS, /\.squad-overlay\.slot-3\s*\{\s*top:\.75rem;\s*left:\.75rem;/);
     assert.match(STYLE_CSS, /\.squad-overlay\.slot-4\s*\{\s*top:\.75rem;\s*right:\.75rem;/);
+    assert.match(STYLE_CSS, /\.ranked-match-nameplates:not\(\[hidden\]\)\s*~\s*\.squad-overlays \.squad-overlay\s*\{[^}]*max-height:calc\(100% - 6\.65rem\)[^}]*overflow:hidden/);
+    assert.match(STYLE_CSS, /\.ranked-match-nameplates:not\(\[hidden\]\)\s*~\s*\.squad-overlays \.squad-overlay \.squad-list\s*\{[^}]*max-height:calc\(100% - 1\.6rem\)[^}]*overflow:auto/);
+    assert.match(STYLE_CSS, /\.ranked-match-nameplates:not\(\[hidden\]\)\s*~\s*\.squad-overlays \.squad-overlay\.slot-3/);
+    assert.match(STYLE_CSS, /\.ranked-match-nameplates:not\(\[hidden\]\)\s*~\s*\.squad-overlays \.squad-overlay\.slot-4\s*\{\s*top:5\.9rem;/);
     assert.match(STYLE_CSS, /\.panel\.squad-overlay\.is-compact\s*\{[^}]*width:clamp\(12\.25rem,18vw,15\.5rem\)/);
     assert.match(STYLE_CSS, /\.squad-list\.is-compact-grid\s*\{/);
     assert.match(STYLE_CSS, /\.squad-chip-body\s*\{[^}]*width:100%/);
@@ -491,6 +495,11 @@ test("ranked matches render pilot nameplates with avatar, rank, tagline, and rec
     assert.match(host.children[1].innerHTML, /Rival Pilot/);
     assert.match(host.children[1].innerHTML, /Never skips bans/);
     assert.match(host.children[1].innerHTML, /data-skin="summer-vibes"/);
+    assert.match(STYLE_CSS, /\.ranked-match-nameplates\s*\{[^}]*display:grid[^}]*grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/);
+    assert.match(STYLE_CSS, /\.ranked-match-plate\s*\{[^}]*grid-template-columns:2\.8rem minmax\(0,1fr\) 2\.55rem/);
+    assert.match(STYLE_CSS, /\.ranked-match-plate\.slot-1\s*\{\s*justify-self:start;/);
+    assert.match(STYLE_CSS, /\.ranked-match-plate\.slot-2\s*\{\s*justify-self:end;/);
+    assert.match(STYLE_CSS, /\.ranked-match-emblem\s*\{[^}]*grid-column:3/);
 
     renderRankedMatchNameplates(host, { state: createBattleState(), net, mySeat: 1, ranked: null });
     assert.equal(host.hidden, true);
@@ -586,6 +595,17 @@ test("local match setup exposes compact board sizes from fifteen down to seven",
     assert.deepEqual(sizes, expectedSizes, `${screen} should offer every board size from 15 to 7`);
     assert.match(boardControl, /class="seg is-selected" data-size="13">13 × 13<\/button>/);
   }
+});
+
+test("ranked online setup keeps board size fixed out of player controls", () => {
+  const html = readFileSync(join(GAME_ROOT, "html/setup-screens.html"), "utf8");
+  const rankedPanel = html.match(/data-online-mode-panel="ranked"[\s\S]*?<div data-online-panel="lobby"/)?.[0] ?? "";
+  const lobbyPanel = html.match(/data-online-panel="lobby"[\s\S]*?<div class="menu-buttons">[\s\S]*?data-action="leaveLobby"/)?.[0] ?? "";
+
+  assert.match(rankedPanel, /13 . 13 board with a ban phase/);
+  assert.doesNotMatch(rankedPanel, /data-field="boardSize"/);
+  assert.match(lobbyPanel, /data-online="boardSizeField"/);
+  assert.match(lobbyPanel, /data-field="boardSize"/);
 });
 
 test("hot-seat setup enables three-player free-for-all and reserves teams for four players", () => {

@@ -210,6 +210,64 @@ test("online lobby search carries sanitized ranked profile metadata", () => {
   }
 });
 
+test("online client broadcasts ranked profile messages with its lobby seat", () => {
+  const previous = globalThis.WebSocket;
+  const sent = [];
+  let messageHandler = null;
+  try {
+    globalThis.WebSocket = class FakeWebSocket {
+      static OPEN = 1;
+      readyState = FakeWebSocket.OPEN;
+      addEventListener(type, handler) {
+        if (type === "message") messageHandler = handler;
+      }
+      send(payload) {
+        sent.push(JSON.parse(payload));
+      }
+    };
+    const client = createOnlineClient();
+    client.connect();
+    client.setIdentity({
+      playerId: "player-1",
+      displayName: "Factory Pilot",
+      rankedProfile: { title: "Gold line", tier: { id: "gold", label: "Gold" }, rating: 1422 },
+    });
+    messageHandler({ data: JSON.stringify({ event: "connected", clientId: "c_owner" }) });
+    messageHandler({
+      data: JSON.stringify({
+        event: "lobby_joined",
+        roomCode: "ABCDE",
+        ownerId: "c_owner",
+        members: ["c_guest", "c_owner"],
+        players: [
+          { id: "c_guest", name: "Guest" },
+          { id: "c_owner", name: "Factory Pilot" },
+        ],
+      }),
+    });
+
+    assert.equal(sent[0].messageType, "profile");
+    assert.deepEqual(JSON.parse(sent[0].value), {
+      playerId: "player-1",
+      displayName: "Factory Pilot",
+      seat: 2,
+      rankedProfile: {
+        title: "Gold line",
+        tagline: "Gold line",
+        avatarUnit: null,
+        avatarSkin: null,
+        tier: { id: "gold", label: "Gold" },
+        rating: 1422,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+      },
+    });
+  } finally {
+    globalThis.WebSocket = previous;
+  }
+});
+
 test("online client parses remote squad lock-in readiness by sender", () => {
   const previous = globalThis.WebSocket;
   let messageHandler = null;
@@ -321,6 +379,7 @@ test("online client parses remote ranked profile messages", () => {
     });
 
     assert.deepEqual(profiles, [{
+      clientId: "c_guest",
       playerId: "opponent-1",
       displayName: "Rival Pilot",
       seat: 2,
