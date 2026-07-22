@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { syncRankedStandingNameplate } from "../src/ui/rankedProfile.js";
+import { isRankedMatchInProgress, syncRankedStandingNameplate } from "../src/ui/rankedProfile.js";
 
 class TestElement {
   constructor(tagName) {
@@ -97,4 +97,15 @@ test("ranked profile standing nameplate updates tagline and avatar in-place", ()
   assert.equal(avatar.children.length, 1);
   assert.equal(avatar.children[0].className, "ranked-profile-avatar-initial");
   assert.equal(avatar.children[0].textContent, "L");
+});
+
+test("ranked profile active-match notice only treats live matches as in progress", () => {
+  assert.equal(isRankedMatchInProgress({ status: "active", matchId: "m1" }), true);
+
+  assert.equal(isRankedMatchInProgress(null), false);
+  assert.equal(isRankedMatchInProgress(true), false);
+  assert.equal(isRankedMatchInProgress("active"), false);
+  assert.equal(isRankedMatchInProgress({ status: "pending_forfeit", matchId: "m1" }), false);
+  assert.equal(isRankedMatchInProgress({ status: "resolved", matchId: "m1" }), false);
+  assert.equal(isRankedMatchInProgress({ status: "active", outcome: "win", matchId: "m1" }), false);
 });

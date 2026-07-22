@@ -61,6 +61,13 @@ function formatRecord(standing) {
   return `${w}W / ${l}L / ${d}D${rate}`;
 }
 
+export function isRankedMatchInProgress(activeMatch) {
+  if (!activeMatch || typeof activeMatch !== "object") return false;
+  if (activeMatch.status !== "active") return false;
+  if (activeMatch.outcome) return false;
+  return Boolean(activeMatch.matchId);
+}
+
 export function openRankedProfile() {
   const overlay = ensureHost();
   overlay.replaceChildren();
@@ -538,7 +545,7 @@ function renderStanding(body, standing, { pilot = "", tagline = "", avatarUnit =
   const record = el("p", "ranked-profile-record", formatRecord(standing));
   section.append(nameplate, record);
 
-  if (standing.activeMatch) {
+  if (isRankedMatchInProgress(standing.activeMatch)) {
     section.appendChild(el("p", "ranked-profile-activematch", "You have a ranked match in progress."));
   }
   syncRankedStandingNameplate(section, { pilot, tagline, avatarUnit, avatarSkin });
