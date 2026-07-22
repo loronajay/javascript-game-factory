@@ -18,7 +18,7 @@ import { AudioManager, musicKeyForMatchMode } from "./audio/sounds.js";
 import { renderBoard } from "./ui/boardRenderer.js";
 import { mountSceneBackdrop } from "./ui/sceneBackdrop.js";
 import { renderForecast } from "./ui/forecastRenderer.js";
-import { renderHeader, renderUnitCard, renderActions, renderSquads, renderWeatherBadge } from "./ui/hud.js";
+import { renderHeader, renderUnitCard, renderActions, renderSquads, renderWeatherBadge, renderRankedMatchNameplates } from "./ui/hud.js";
 import { RulesModal } from "./ui/rulesModal.js";
 import { applyMobileViewport, requestMobileFullscreen } from "./ui/mobileViewport.js";
 import { applyTheme, loadSavedThemeId } from "./ui/themes.js";
@@ -51,6 +51,7 @@ const turnTitle = document.querySelector("#turnTitle");
 const turnSub = document.querySelector("#turnSub");
 const turnBanner = document.querySelector("#turnBanner");
 const weatherBadge = document.querySelector("#weatherBadge");
+const rankedNameplates = document.querySelector("#rankedNameplates");
 const accuracyForecastToggle = document.querySelector("#accuracyForecastToggle");
 const actionHelp = document.querySelector("#actionHelp");
 const squadOverlays = document.querySelector("#squadOverlays");
@@ -548,6 +549,7 @@ function renderBoardAndRail() {
   const unit = selectedUnit();
   renderHeader(state, { turnTitle, turnSub, turnBanner });
   renderWeatherBadge(state, weatherBadge);
+  renderRankedMatchNameplates(rankedNameplates, { state, net, mySeat, ranked: matchConfig?.ranked });
   // In tempo the rail is the player's selection surface at all times — a ready unit of
   // theirs stays clickable even while the CPU is acting, so a click can preempt it.
   const railEnabled = isTempoBattle(state)

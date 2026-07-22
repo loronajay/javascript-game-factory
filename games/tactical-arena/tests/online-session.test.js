@@ -105,3 +105,40 @@ test("owner publishes the revision-0 hash when the match controller binds", () =
 
   assert.deepEqual(client.sentHashes, [{ revision: 0, hash: hashState(match) }]);
 });
+
+test("session exposes local and remote ranked profiles by seat", () => {
+  const client = createFakeClient();
+  const session = createOnlineSession({
+    client,
+    mySeat: 1,
+    isOwner: true,
+    members: ["c_owner", "c_guest"],
+    seed: 123,
+    size: 13,
+    localProfile: {
+      playerId: "me",
+      displayName: "Local Pilot",
+      rankedProfile: { title: "Holds the bridge", tagline: "Holds the bridge", rating: 1410 },
+    },
+  });
+
+  client.cb.onRemoteProfile({
+    playerId: "them",
+    displayName: "Remote Pilot",
+    seat: 2,
+    rankedProfile: { title: "Draft menace", tagline: "Draft menace", avatarUnit: "archer" },
+  });
+
+  assert.equal(session.nameForSeat(1), "Local Pilot");
+  assert.equal(session.nameForSeat(2), "Remote Pilot");
+  assert.deepEqual(session.profileForSeat(1), {
+    playerId: "me",
+    displayName: "Local Pilot",
+    rankedProfile: { title: "Holds the bridge", tagline: "Holds the bridge", rating: 1410 },
+  });
+  assert.deepEqual(session.profileForSeat(2), {
+    playerId: "them",
+    displayName: "Remote Pilot",
+    rankedProfile: { title: "Draft menace", tagline: "Draft menace", avatarUnit: "archer" },
+  });
+});

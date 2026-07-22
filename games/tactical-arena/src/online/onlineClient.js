@@ -86,15 +86,52 @@ export function normalizeRoomCode(code) {
 
 // ─── Message parsers (validation seam — never trust the wire) ─────────────────
 
+function sanitizeText(value, maxLength) {
+  return typeof value === "string" ? value.trim().replace(/\s+/g, " ").slice(0, maxLength) : "";
+}
+
+function sanitizeNonNegativeInt(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.floor(number)) : 0;
+}
+
+function sanitizeRankedProfile(profile) {
+  if (!profile || typeof profile !== "object") return null;
+  const title = sanitizeText(profile.title || profile.tagline, 60);
+  const avatarUnit = sanitizeText(profile.avatarUnit, 80);
+  const avatarSkin = sanitizeText(profile.avatarSkin, 120);
+  const tierId = sanitizeText(profile.tier?.id || profile.tierId, 40);
+  const tierLabel = sanitizeText(profile.tier?.label || profile.tierLabel, 40);
+  const rating = Number(profile.rating);
+  const rankedProfile = {
+    title,
+    tagline: title,
+    avatarUnit: avatarUnit || null,
+    avatarSkin: avatarSkin || null,
+    tier: {
+      id: tierId || "bronze",
+      label: tierLabel || "Bronze",
+    },
+    wins: sanitizeNonNegativeInt(profile.wins),
+    losses: sanitizeNonNegativeInt(profile.losses),
+    draws: sanitizeNonNegativeInt(profile.draws),
+  };
+  if (Number.isFinite(rating)) rankedProfile.rating = Math.round(rating);
+  return rankedProfile;
+}
+
 function sanitizeIdentity(identity) {
   const displayName =
     typeof identity?.displayName === "string" && identity.displayName.trim()
       ? identity.displayName.trim().slice(0, 18)
       : "Commander";
-  return {
+  const out = {
     playerId: typeof identity?.playerId === "string" ? identity.playerId : "",
     displayName,
   };
+  const rankedProfile = sanitizeRankedProfile(identity?.rankedProfile);
+  if (rankedProfile) out.rankedProfile = rankedProfile;
+  return out;
 }
 
 function parseJson(value) {
@@ -108,11 +145,14 @@ function parseJson(value) {
 function parseProfileMessage(value) {
   const p = parseJson(value);
   if (!p || typeof p.displayName !== "string") return null;
-  return {
+  const out = {
     playerId: typeof p.playerId === "string" ? p.playerId : "",
     displayName: p.displayName,
     seat: Number.isFinite(Number(p.seat)) ? Math.floor(Number(p.seat)) : null,
   };
+  const rankedProfile = sanitizeRankedProfile(p.rankedProfile);
+  if (rankedProfile) out.rankedProfile = rankedProfile;
+  return out;
 }
 
 // Owner-authored match framing. Every field is optional/clamped at build time (the

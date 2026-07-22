@@ -79,6 +79,24 @@ button:hover:not(:disabled) { border-color: var(--brass-hi); filter: brightness(
 .weather-badge[data-weather="heatwave"] { --weather-tint: #ff9457; }
 .weather-badge[data-weather="thunderstorm"] { --weather-tint: #b79bff; }
 #stageWrap { position: relative; min-height: 0; overflow: hidden; touch-action: none; } #boardSvg { position: relative; z-index: 1; display: block; width: 100%; height: 100%; user-select: none; touch-action: none; }
+.ranked-match-nameplates { position:absolute; inset:.75rem .75rem auto; z-index:8; pointer-events:none; }
+.ranked-match-nameplates[hidden] { display:none; }
+.ranked-match-plate { position:absolute; top:0; display:grid; grid-template-columns:2.8rem minmax(0,1fr) 2.25rem; grid-template-rows:auto auto; align-items:center; gap:.18rem .55rem; width:min(18.25rem,42vw); min-height:4.4rem; padding:.46rem .56rem; border:1px solid color-mix(in srgb,var(--team,var(--brass)) 50%,var(--console-edge-soft)); border-radius:8px; background:linear-gradient(180deg,rgba(18,30,46,.86),rgba(5,12,23,.82)); box-shadow:inset 0 1px rgba(var(--sheen),.14),0 12px 28px rgba(0,0,0,.42); overflow:hidden; }
+.ranked-match-plate.slot-1 { left:0; }
+.ranked-match-plate.slot-2 { right:0; direction:rtl; }
+.ranked-match-plate.slot-2 .ranked-match-copy,.ranked-match-plate.slot-2 .ranked-match-standing { direction:ltr; text-align:right; justify-items:end; }
+.ranked-match-plate.is-me { border-color:color-mix(in srgb,var(--team,var(--brass)) 70%,var(--brass-hi)); }
+.ranked-match-plate .unit-portrait.is-ranked-avatar,.ranked-match-avatar-fallback { grid-row:1 / span 2; width:2.8rem; height:3.65rem; border:1px solid color-mix(in srgb,var(--team,var(--brass)) 52%,var(--brass-lo)); border-radius:7px; background:radial-gradient(ellipse 70% 55% at 50% 78%,rgba(120,170,210,.16),transparent 70%),linear-gradient(180deg,#16222f,#0a121b); overflow:hidden; box-shadow:inset 0 1px rgba(var(--sheen),.1); }
+.ranked-match-avatar-fallback { display:grid; place-items:center; color:var(--brass-hi); font:900 1rem var(--font-display); }
+.ranked-match-copy { display:grid; gap:.05rem; min-width:0; }
+.ranked-match-kicker { color:color-mix(in srgb,var(--team,var(--brass)) 70%,var(--muted)); font:900 .48rem var(--font-display); letter-spacing:.14em; text-transform:uppercase; }
+.ranked-match-name { max-width:100%; overflow:hidden; color:var(--text); font:900 .82rem var(--font-display); letter-spacing:.02em; text-overflow:ellipsis; white-space:nowrap; }
+.ranked-match-tagline { max-width:100%; overflow:hidden; color:var(--brass-hi); font:800 .58rem var(--font-display); letter-spacing:.02em; text-overflow:ellipsis; white-space:nowrap; }
+.ranked-match-record { color:var(--muted); font:700 .52rem var(--font-display); letter-spacing:.04em; }
+.ranked-match-emblem { grid-row:1; width:2.2rem; height:2.2rem; object-fit:contain; filter:drop-shadow(0 5px 7px rgba(0,0,0,.42)); }
+.ranked-match-standing { grid-column:3; grid-row:2; display:grid; justify-items:start; gap:.02rem; min-width:0; }
+.ranked-match-tier { max-width:4.2rem; overflow:hidden; font:900 .46rem var(--font-display); letter-spacing:.08em; text-overflow:ellipsis; text-transform:uppercase; white-space:nowrap; }
+.ranked-match-rating { color:var(--text); font:900 .72rem var(--font-display); letter-spacing:.02em; line-height:1; }
 .hud { z-index: 10; padding: .55rem max(.8rem, env(safe-area-inset-right)) calc(.55rem + env(safe-area-inset-bottom)) max(.8rem, env(safe-area-inset-left)); border-top: 2px solid var(--brass); background: linear-gradient(0deg, rgba(var(--sheen),.04), transparent 30%), linear-gradient(0deg, var(--surface-hi), var(--surface-lo)); box-shadow: inset 0 1px rgba(0,0,0,.6), 0 -8px 24px rgba(0,0,0,.5); }.panel { position: relative; min-width: 0; padding: .8rem; border: 1px solid var(--console-edge); border-radius: var(--radius-console); background: var(--console-fill); box-shadow: var(--console-shadow); }.panel::before,.panel::after { content:""; position:absolute; width:14px; height:14px; opacity:.55; pointer-events:none; }.panel::before { top:7px; left:7px; border-top:2px solid var(--console-edge); border-left:2px solid var(--console-edge); border-radius:6px 0 0; }.panel::after { right:7px; bottom:7px; border-right:2px solid var(--console-edge); border-bottom:2px solid var(--console-edge); border-radius:0 0 6px; }
 /* min-height reserves the worst-case (2-row ARTS menu) height so selecting a
    unit never grows the HUD and shrinks the battlefield. The board no longer

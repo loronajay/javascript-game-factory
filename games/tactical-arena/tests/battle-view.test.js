@@ -9,7 +9,7 @@ import { applyCommand } from "../src/core/reducer.js";
 import { beginActivation, moveUnit } from "../src/core/commands.js";
 import { TEMPO_GAUGE_MAX, enableTempoBattle } from "../src/core/tempoBattle.js";
 import { canCancelMoveInActivation, canMoveInActivation } from "../src/ui/hud.js";
-import { renderActions, renderSquads, renderUnitCard } from "../src/ui/hud.js";
+import { renderActions, renderSquads, renderUnitCard, renderRankedMatchNameplates } from "../src/ui/hud.js";
 import { isHealArtConfirmTile, isTargetedMode, renderBoard } from "../src/ui/boardRenderer.js";
 import { createFireFigure, getActiveBoardWeather } from "../src/ui/boardAtmosphere.js";
 import { createUnitFigure, UNIT_VISUAL_LIFT } from "../src/ui/unitRenderer.js";
@@ -433,6 +433,68 @@ test("four-player team HUD uses compact chips in every player slot", () => {
     assert.match(STYLE_CSS, /\.squad-list\.is-compact-grid\s*\{/);
     assert.match(STYLE_CSS, /\.squad-chip-body\s*\{[^}]*width:100%/);
     assert.match(STYLE_CSS, /\.squad-overlay\.is-compact \.vital\s*\{[^}]*minmax\(2\.2rem,1fr\)/);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("ranked matches render pilot nameplates with avatar, rank, tagline, and record", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: (tagName) => new TestElement(tagName) };
+
+  try {
+    const host = new TestElement("div");
+    const net = {
+      profileForSeat(seat) {
+        return seat === 1
+          ? {
+              displayName: "Local Pilot",
+              rankedProfile: {
+                title: "Holds the bridge",
+                tagline: "Holds the bridge",
+                avatarUnit: "swordsman",
+                tier: { id: "gold", label: "Gold" },
+                rating: 1442,
+                wins: 9,
+                losses: 4,
+                draws: 1,
+              },
+            }
+          : {
+              displayName: "Rival Pilot",
+              rankedProfile: {
+                title: "Never skips bans",
+                tagline: "Never skips bans",
+                avatarUnit: "archer",
+                avatarSkin: "summer-vibes",
+                tier: { id: "silver", label: "Silver" },
+                rating: 1301,
+                wins: 6,
+                losses: 5,
+                draws: 0,
+              },
+            };
+      },
+    };
+
+    renderRankedMatchNameplates(host, { state: createBattleState(), net, mySeat: 1, ranked: { matchId: "ranked-1" } });
+
+    assert.equal(host.hidden, false);
+    assert.equal(host.children.length, 2);
+    assert.match(host.children[0].className, /\bis-me\b/);
+    assert.match(host.children[0].innerHTML, /Local Pilot/);
+    assert.match(host.children[0].innerHTML, /Holds the bridge/);
+    assert.match(host.children[0].innerHTML, /assets\/units\/swordsman\.webp/);
+    assert.match(host.children[0].innerHTML, /Gold/);
+    assert.match(host.children[0].innerHTML, /1442/);
+    assert.match(host.children[0].innerHTML, /9W \/ 4L \/ 1D/);
+    assert.match(host.children[1].innerHTML, /Rival Pilot/);
+    assert.match(host.children[1].innerHTML, /Never skips bans/);
+    assert.match(host.children[1].innerHTML, /data-skin="summer-vibes"/);
+
+    renderRankedMatchNameplates(host, { state: createBattleState(), net, mySeat: 1, ranked: null });
+    assert.equal(host.hidden, true);
+    assert.equal(host.children.length, 0);
   } finally {
     globalThis.document = previousDocument;
   }

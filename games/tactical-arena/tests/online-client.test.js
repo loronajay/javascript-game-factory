@@ -163,6 +163,53 @@ test("online lobby search includes match type settings for separate queues", () 
   }
 });
 
+test("online lobby search carries sanitized ranked profile metadata", () => {
+  const previous = globalThis.WebSocket;
+  const sent = [];
+  try {
+    globalThis.WebSocket = class FakeWebSocket {
+      static OPEN = 1;
+      readyState = FakeWebSocket.OPEN;
+      addEventListener() {}
+      send(payload) {
+        sent.push(JSON.parse(payload));
+      }
+    };
+    const client = createOnlineClient();
+    client.connect();
+    client.setIdentity({
+      playerId: "player-1",
+      displayName: "Factory Pilot",
+      rankedProfile: {
+        title: "  Corner camper   but legal  ",
+        avatarUnit: "necromancer",
+        avatarSkin: "blood-moon",
+        tier: { id: "gold", label: "Gold" },
+        rating: 1337.4,
+        wins: 12,
+        losses: 3,
+        draws: 1,
+      },
+    });
+    client.findLobby({ minPlayers: 2, maxPlayers: 2, settings: { ranked: true } });
+
+    assert.equal(sent[0].identity.displayName, "Factory Pilot");
+    assert.deepEqual(sent[0].identity.rankedProfile, {
+      title: "Corner camper but legal",
+      tagline: "Corner camper but legal",
+      avatarUnit: "necromancer",
+      avatarSkin: "blood-moon",
+      tier: { id: "gold", label: "Gold" },
+      rating: 1337,
+      wins: 12,
+      losses: 3,
+      draws: 1,
+    });
+  } finally {
+    globalThis.WebSocket = previous;
+  }
+});
+
 test("online client parses remote squad lock-in readiness by sender", () => {
   const previous = globalThis.WebSocket;
   let messageHandler = null;
@@ -232,6 +279,63 @@ test("online client parses remote draft picks", () => {
       })
     });
     assert.deepEqual(picks, [{ pickIndex: 1, seat: 2, type: "archer", skin: "summer-vibes", nickname: "Ryan" }]);
+  } finally {
+    globalThis.WebSocket = previous;
+  }
+});
+
+test("online client parses remote ranked profile messages", () => {
+  const previous = globalThis.WebSocket;
+  let messageHandler = null;
+  try {
+    globalThis.WebSocket = class FakeWebSocket {
+      static OPEN = 1;
+      readyState = FakeWebSocket.OPEN;
+      addEventListener(type, handler) {
+        if (type === "message") messageHandler = handler;
+      }
+      send() {}
+    };
+    const client = createOnlineClient();
+    const profiles = [];
+    client.cb.onRemoteProfile = (payload) => profiles.push(payload);
+    client.connect();
+    messageHandler({
+      data: JSON.stringify({
+        event: "message",
+        scope: "lobby",
+        senderId: "c_guest",
+        messageType: "profile",
+        value: JSON.stringify({
+          playerId: "opponent-1",
+          displayName: "Rival Pilot",
+          seat: 2,
+          rankedProfile: {
+            tagline: "Never skips ban phase",
+            avatarUnit: "archer",
+            tier: { id: "silver", label: "Silver" },
+            rating: 1249,
+          },
+        })
+      })
+    });
+
+    assert.deepEqual(profiles, [{
+      playerId: "opponent-1",
+      displayName: "Rival Pilot",
+      seat: 2,
+      rankedProfile: {
+        title: "Never skips ban phase",
+        tagline: "Never skips ban phase",
+        avatarUnit: "archer",
+        avatarSkin: null,
+        tier: { id: "silver", label: "Silver" },
+        rating: 1249,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+      },
+    }]);
   } finally {
     globalThis.WebSocket = previous;
   }

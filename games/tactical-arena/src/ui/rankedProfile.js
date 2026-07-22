@@ -76,7 +76,7 @@ export function openRankedProfile() {
   closeBtn.setAttribute("aria-label", "Close");
   titleRow.appendChild(closeBtn);
   head.appendChild(titleRow);
-  head.appendChild(el("p", "ranked-profile-sub", "Your Tactical Arena ranked standing, title, and avatar."));
+  head.appendChild(el("p", "ranked-profile-sub", "Your Tactical Arena ranked standing, tagline, and avatar."));
 
   const leaderboardBtn = el("button", "ranked-profile-leaderboard-btn menu-btn ghost", "View Leaderboard");
   leaderboardBtn.type = "button";
@@ -153,7 +153,7 @@ function renderSignedOut(body, pilot) {
   body.appendChild(section);
 
   const standing = el("section", "ranked-profile-standing");
-  const notice = el("p", "ranked-profile-signin", "Sign in to your Javascript Game Factory account to set your ranked title and avatar and track your rating.");
+  const notice = el("p", "ranked-profile-signin", "Sign in to your Javascript Game Factory account to set your ranked tagline and avatar and track your rating.");
   const link = document.createElement("a");
   link.className = "ranked-profile-signin-link menu-btn";
   link.textContent = "Sign In";
@@ -188,7 +188,12 @@ function renderSignedIn(body, { pilot, standing, apiClient }) {
   saveRankedName(state.title || "");
 
   renderIdentityEditor(body, { pilot, state, apiClient });
-  renderStanding(body, standing, { title: state.title || pilot || "Commander" });
+  renderStanding(body, standing, {
+    pilot,
+    tagline: state.title,
+    avatarUnit: state.avatarUnit,
+    avatarSkin: state.avatarSkin,
+  });
   if (standing?.playerId) {
     renderMetaSections(body, { apiClient, playerId: standing.playerId });
   }
@@ -326,22 +331,22 @@ function renderIdentityEditor(body, { pilot, state, apiClient }) {
       })
       .catch(flashError);
 
-  // --- Title field ---
+  // --- Tagline field ---
   const titleField = el("div", "ranked-profile-namefield");
-  titleField.appendChild(el("label", "ranked-profile-label", "Ranked title"));
+  titleField.appendChild(el("label", "ranked-profile-label", "Ranked tagline"));
 
   const input = document.createElement("input");
   input.type = "text";
   input.className = "ranked-profile-input";
   input.maxLength = RANKED_TITLE_MAX_LENGTH;
-  input.placeholder = pilot || "Commander";
+  input.placeholder = "Say something sharp";
   input.value = state.title;
-  input.setAttribute("aria-label", "Ranked title");
+  input.setAttribute("aria-label", "Ranked tagline");
 
   const preview = el("p", "ranked-profile-nameprev");
   const refreshPreview = () => {
-    const shown = input.value.trim() || pilot || "Commander";
-    preview.textContent = `Opponents see: ${shown}`;
+    const shown = input.value.trim() || "No tagline set";
+    preview.textContent = `Nameplate tagline: ${shown}`;
   };
   const commitTitle = () => {
     const next = input.value.trim().replace(/\s+/g, " ").slice(0, RANKED_TITLE_MAX_LENGTH);
@@ -478,7 +483,7 @@ function ownedSkinsFor(type) {
   }
 }
 
-function renderStanding(body, standing, { title = "" } = {}) {
+function renderStanding(body, standing, { pilot = "", tagline = "", avatarUnit = null, avatarSkin = null } = {}) {
   const section = el("section", "ranked-profile-standing");
   if (!standing) {
     section.appendChild(el("p", "ranked-profile-standing-error", "No rating yet. Play a ranked match to get started."));
@@ -489,14 +494,22 @@ function renderStanding(body, standing, { title = "" } = {}) {
   const tierLabel = standing.tier?.label || "Bronze";
   const rating = String(standing.rating ?? 1200);
   const nameplate = el("div", `ranked-profile-nameplate ranked-tier-${tierId}`);
-  nameplate.appendChild(createRankedTierEmblem(standing.tier, { className: "is-profile" }));
+  const avatar = el("div", "ranked-profile-nameplate-avatar");
+  if (avatarUnit && hasPortrait(avatarUnit)) {
+    avatar.appendChild(createPortrait(avatarUnit, { variant: "is-profile-avatar", skin: avatarSkin, eager: true }));
+  } else {
+    avatar.appendChild(el("span", "ranked-profile-avatar-initial", (pilot || "C").slice(0, 1).toUpperCase()));
+  }
+  nameplate.appendChild(avatar);
   const plateCopy = el("div", "ranked-profile-nameplate-copy");
-  plateCopy.appendChild(el("span", "ranked-profile-nameplate-name", title || "Commander"));
+  plateCopy.appendChild(el("span", "ranked-profile-nameplate-name", pilot || "Commander"));
+  plateCopy.appendChild(el("span", "ranked-profile-nameplate-tagline", tagline || "No tagline set"));
   const meta = el("span", "ranked-profile-nameplate-meta");
   meta.appendChild(el("b", `ranked-profile-tier ranked-tier-${tierId}`, tierLabel));
   meta.appendChild(el("span", "ranked-profile-rating-inline", `${rating} rating`));
   plateCopy.appendChild(meta);
   nameplate.appendChild(plateCopy);
+  nameplate.appendChild(createRankedTierEmblem(standing.tier, { className: "is-profile" }));
   const record = el("p", "ranked-profile-record", formatRecord(standing));
   section.append(nameplate, record);
 

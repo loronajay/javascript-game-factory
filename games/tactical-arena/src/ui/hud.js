@@ -6,6 +6,7 @@ import { colorOf } from "../core/state.js";
 import { teamLabel, teamOf } from "../match/matchBuilder.js";
 import { TEMPO_GAUGE_MAX, canBeginTempoActivation, getTempoReadiness, getUnitAgility, isTempoBattle, isTempoUnitReady } from "../core/tempoBattle.js";
 import { escapeHtml } from "./domHelpers.js";
+import { getRankedTierEmblemSrc, normalizeRankedTierId } from "./rankedEmblems.js";
 
 // Icon per weather id, shown in the match HUD's weather badge (renderWeatherBadge).
 // "none" is the badge's own resting state, not a WEATHER_TYPES entry.
@@ -118,6 +119,65 @@ export function renderWeatherBadge(state, weatherBadge) {
   const text = weatherBadge.querySelector(".weather-text");
   if (icon) icon.textContent = WEATHER_ICONS[id] ?? WEATHER_ICONS.none;
   if (text) text.textContent = `Weather: ${label}`;
+}
+
+function rankedRecordText(profile) {
+  const wins = Number(profile?.wins) || 0;
+  const losses = Number(profile?.losses) || 0;
+  const draws = Number(profile?.draws) || 0;
+  return `${wins}W / ${losses}L / ${draws}D`;
+}
+
+function rankedProfileForSeat(net, seat) {
+  const profile = net?.profileForSeat?.(seat);
+  if (profile) return profile;
+  const displayName = net?.nameForSeat?.(seat);
+  return displayName ? { displayName, rankedProfile: null } : null;
+}
+
+function rankedAvatarHtml(profile) {
+  const ranked = profile?.rankedProfile;
+  if (ranked?.avatarUnit) return portraitHtml(ranked.avatarUnit, "is-ranked-avatar", ranked.avatarSkin);
+  return `<figure class="ranked-match-avatar-fallback" aria-hidden="true">${escapeHtml((profile?.displayName || "?").slice(0, 1).toUpperCase())}</figure>`;
+}
+
+export function renderRankedMatchNameplates(host, { state, net, mySeat, ranked } = {}) {
+  if (!host) return;
+  if (!ranked || !net || state?.phase === "complete") {
+    host.hidden = true;
+    host.replaceChildren?.();
+    return;
+  }
+
+  const seats = (state?.turnOrder ?? [1, 2]).filter((seat) => seat === 1 || seat === 2);
+  host.replaceChildren();
+  host.hidden = false;
+
+  for (const seat of seats) {
+    const profile = rankedProfileForSeat(net, seat) || { displayName: `Player ${seat}`, rankedProfile: null };
+    const rankedProfile = profile.rankedProfile || {};
+    const tierId = normalizeRankedTierId(rankedProfile.tier);
+    const tierLabel = rankedProfile.tier?.label || "Bronze";
+    const rating = Number.isFinite(Number(rankedProfile.rating)) ? String(Math.round(Number(rankedProfile.rating))) : "1200";
+    const tagline = rankedProfile.tagline || rankedProfile.title || "";
+    const plate = document.createElement("article");
+    plate.className = `ranked-match-plate slot-${seat} ranked-tier-${tierId}${seat === mySeat ? " is-me" : ""}`;
+    plate.style.setProperty("--team", colorOf(state, seat));
+    plate.innerHTML = `
+      ${rankedAvatarHtml(profile)}
+      <div class="ranked-match-copy">
+        <span class="ranked-match-kicker">${seat === mySeat ? "You" : "Opponent"}</span>
+        <strong class="ranked-match-name">${escapeHtml(profile.displayName || `Player ${seat}`)}</strong>
+        ${tagline ? `<span class="ranked-match-tagline">${escapeHtml(tagline)}</span>` : ""}
+        <span class="ranked-match-record">${escapeHtml(rankedRecordText(rankedProfile))}</span>
+      </div>
+      <img class="ranked-match-emblem" src="${escapeHtml(getRankedTierEmblemSrc(tierId))}" alt="" aria-hidden="true">
+      <div class="ranked-match-standing">
+        <span class="ranked-match-tier ranked-tier-${tierId}">${escapeHtml(tierLabel)}</span>
+        <span class="ranked-match-rating">${escapeHtml(rating)}</span>
+      </div>`;
+    host.appendChild(plate);
+  }
 }
 
 // HUD portrait as an HTML string (renderUnitCard builds the card via innerHTML).

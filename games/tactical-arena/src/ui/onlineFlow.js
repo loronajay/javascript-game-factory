@@ -31,6 +31,8 @@ import { escapeHtml } from "./domHelpers.js";
 import { createRankedFlow } from "../online/rankedFlow.js";
 import { loadRankedName } from "./rankedNameModel.js";
 import { isFactoryAccountLoggedIn, readStoredFactoryAccountSession } from "../platform/factoryAccount.js";
+import { TACTICAL_ARENA_GAME_SLUG } from "../platform/gameProgressClient.js";
+import { createPlatformApiClient } from "../../../../js/platform/api/platform-api.mjs";
 import { publishTacticalArenaMatchActivity } from "../../../../js/platform/activity/activity.mjs";
 
 const RULESET_VERSION = ONLINE_RULESET_VERSION;
@@ -97,6 +99,7 @@ export function createOnlineFlow({ onStartMatch }) {
   let rankedMode = false;
   let rankedInfo = null;
   let rankedBanFirstSeat = null;
+  let rankedIdentityProfile = null;
 
   // Owner-authored framing, mirrored to every client via `config`.
   const config = {
@@ -272,15 +275,52 @@ export function createOnlineFlow({ onStartMatch }) {
   }
 
   function identity() {
-    // Pull the canonical Javascript Game Factory profile so the lobby shows the
-    // player's real pilot name (not a generic tag) whenever a profile is registered.
-    // createOnlineIdentityPayload returns { playerId, displayName }; a guest with no
-    // profile name falls through to onlineClient's "Commander" default. In ranked, an
-    // optional Tactical-Arena-only ranked name overrides the pilot name.
+    // Pull the canonical Javascript Game Factory profile so the lobby and ranked
+    // nameplate can show the pilot name separately from the Tactical Arena tagline.
     try {
-      return createOnlineIdentityPayload(loadFactoryProfile(), rankedMode ? loadRankedName() : "");
+      const payload = createOnlineIdentityPayload(loadFactoryProfile());
+      if (!rankedMode) return payload;
+      const fallbackTagline = loadRankedName();
+      return {
+        ...payload,
+        rankedProfile: rankedIdentityProfile || (fallbackTagline ? { title: fallbackTagline, tagline: fallbackTagline } : null),
+      };
     } catch {
       return { playerId: "", displayName: "" };
+    }
+  }
+
+  function rankedProfileFromStanding(standing) {
+    if (!standing || typeof standing !== "object") return null;
+    const title = typeof standing.title === "string" ? standing.title.trim() : "";
+    const rating = Number(standing.rating);
+    return {
+      title,
+      tagline: title,
+      avatarUnit: typeof standing.avatarUnit === "string" ? standing.avatarUnit : null,
+      avatarSkin: typeof standing.avatarSkin === "string" ? standing.avatarSkin : null,
+      tier: standing.tier && typeof standing.tier === "object" ? { ...standing.tier } : null,
+      rating: Number.isFinite(rating) ? Math.round(rating) : undefined,
+      wins: Number(standing.wins) || 0,
+      losses: Number(standing.losses) || 0,
+      draws: Number(standing.draws) || 0,
+    };
+  }
+
+  async function hydrateRankedIdentityProfile() {
+    rankedIdentityProfile = null;
+    let apiClient = null;
+    try { apiClient = createPlatformApiClient(); } catch { apiClient = null; }
+    if (!apiClient?.isConfigured || typeof apiClient.fetchRankedStanding !== "function") {
+      const fallback = loadRankedName();
+      rankedIdentityProfile = fallback ? { title: fallback, tagline: fallback } : null;
+      return;
+    }
+    try {
+      rankedIdentityProfile = rankedProfileFromStanding(await apiClient.fetchRankedStanding(TACTICAL_ARENA_GAME_SLUG));
+    } catch {
+      const fallback = loadRankedName();
+      rankedIdentityProfile = fallback ? { title: fallback, tagline: fallback } : null;
     }
   }
 
@@ -325,7 +365,7 @@ export function createOnlineFlow({ onStartMatch }) {
     for (const seg of modeSegs) seg.disabled = !!searching;
   }
 
-  function startRanked() {
+  async function startRanked() {
     if (rankedMode) return;
     if (!isFactoryAccountLoggedIn(readStoredFactoryAccountSession())) {
       setStatus("Sign in to your account to play ranked.");
@@ -345,8 +385,11 @@ export function createOnlineFlow({ onStartMatch }) {
     config.size = 13;
     if (rankedHint) rankedHint.textContent = "";
     setRankedSearchingUI(true);
+    setStatus("Loading ranked profile...");
+    await hydrateRankedIdentityProfile();
+    if (!rankedMode) return;
     setStatus("Joining the ranked queue…");
-    client?.setIdentity(identity()); // re-stamp identity so the ranked name is used
+    client?.setIdentity(identity()); // re-stamp identity so ranked metadata is used
     rankedFlow = createRankedFlow({
       callbacks: {
         onStatus: (text) => setStatus(text),
@@ -369,6 +412,7 @@ export function createOnlineFlow({ onStartMatch }) {
     rankedMode = false;
     rankedInfo = null;
     rankedBanFirstSeat = null;
+    rankedIdentityProfile = null;
     setRankedSearchingUI(false);
     if (onlineMode === "ranked") syncRankedAvailability(); // back on the ranked idle panel
     void flow?.cancel();
@@ -968,6 +1012,7 @@ export function createOnlineFlow({ onStartMatch }) {
       members: membersAtStart,
       seed,
       size: cfg.size,
+      localProfile: identity(),
     });
     handedOff = true; // onExit must NOT disconnect — the match owns the client now
 
@@ -1057,7 +1102,7 @@ export function createOnlineFlow({ onStartMatch }) {
   }
   rankedBtn?.addEventListener("click", () => {
     if (rankedMode && !rankedInfo) endRankedSearch(); // cancel an in-progress search
-    else if (!rankedMode) startRanked();
+    else if (!rankedMode) void startRanked();
   });
   syncMatchTypeAvailability();
   $('[data-action="quickMatch"]').addEventListener("click", () => client?.findLobby(lobbyOptions()));

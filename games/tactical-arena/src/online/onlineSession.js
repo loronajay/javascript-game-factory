@@ -25,7 +25,7 @@ import { hashState } from "../core/state-hash.js";
 // finish animating the final command before our close would look like a drop.
 const CLEAN_CLOSE_GRACE_MS = 2500;
 
-export function createOnlineSession({ client, mySeat, isOwner, members, seed, size }) {
+export function createOnlineSession({ client, mySeat, isOwner, members, seed, size, localProfile = null }) {
   let _controller = null;
   let latencyMs = null;
   let _ended = false;
@@ -38,6 +38,8 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
 
   // Per-seat display names from the `profile` exchange (for HUD strings).
   const nameBySeat = new Map();
+  // Presentation-only rich identity for ranked nameplates. Never enters state hash.
+  const profileBySeat = new Map();
   // Seats we have already conceded on disconnect, so a re-fired left event (or a
   // second owner) never double-concedes.
   const handledDrops = new Set();
@@ -60,6 +62,22 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
     const idx = membersAtStart.indexOf(clientId);
     return idx >= 0 ? idx + 1 : null;
   }
+
+  function rememberProfile(profile) {
+    const seat = Number(profile?.seat);
+    if (!Number.isFinite(seat) || seat < 1) return;
+    const displayName = typeof profile.displayName === "string" ? profile.displayName.trim() : "";
+    if (displayName) nameBySeat.set(seat, displayName);
+    profileBySeat.set(seat, {
+      playerId: typeof profile.playerId === "string" ? profile.playerId : "",
+      displayName: displayName || nameBySeat.get(seat) || `Player ${seat}`,
+      rankedProfile: profile.rankedProfile && typeof profile.rankedProfile === "object"
+        ? { ...profile.rankedProfile }
+        : null,
+    });
+  }
+
+  rememberProfile({ ...(localProfile || {}), seat: mySeat });
 
   function _checkHash(revision) {
     const mine = _myHashByRevision.get(revision);
@@ -117,10 +135,8 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
     if (!_owner) _checkHash(revision);
   };
 
-  client.cb.onRemoteProfile = ({ displayName, seat }) => {
-    if (typeof displayName === "string" && displayName.trim() && seat) {
-      nameBySeat.set(seat, displayName.trim());
-    }
+  client.cb.onRemoteProfile = (profile) => {
+    rememberProfile(profile);
   };
 
   client.cb.onLatency = (ms) => {
@@ -205,6 +221,10 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
     size,
     nameForSeat(seat) {
       return nameBySeat.get(seat) || null;
+    },
+    profileForSeat(seat) {
+      const profile = profileBySeat.get(seat);
+      return profile ? { ...profile, rankedProfile: profile.rankedProfile ? { ...profile.rankedProfile } : null } : null;
     },
     get latencyMs() {
       return latencyMs;
