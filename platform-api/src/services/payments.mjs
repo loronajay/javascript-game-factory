@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 const STRIPE_API_VERSION = "2026-06-24.dahlia";
 const STRIPE_CHECKOUT_SESSIONS_URL = "https://api.stripe.com/v1/checkout/sessions";
 const TACTICAL_ARENA_GAME_SLUG = "tactical-arena";
+const TACTICAL_ARENA_PRODUCT_TAX_CODE = "txcd_10201000";
 const SKIN_PACK_PRICES = Object.freeze({
     "summer-vibes": 1499,
     halloween: 2499,
@@ -588,14 +589,14 @@ export async function createTacticalArenaCheckoutSession(params = {}) {
     const premiumOffer = resolved.offer;
     const form = new URLSearchParams();
     form.set("mode", "payment");
-    form.set("ui_mode", "embedded");
+    form.set("ui_mode", "embedded_page");
     form.set("redirect_on_completion", "never");
-    form.set("managed_payments[enabled]", "false");
     form.set("client_reference_id", playerId);
     form.set("line_items[0][quantity]", "1");
     form.set("line_items[0][price_data][currency]", premiumOffer.currency);
     form.set("line_items[0][price_data][unit_amount]", String(premiumOffer.amountCents));
     form.set("line_items[0][price_data][product_data][name]", premiumOffer.name);
+    form.set("line_items[0][price_data][product_data][tax_code]", TACTICAL_ARENA_PRODUCT_TAX_CODE);
     form.set("line_items[0][price_data][product_data][metadata][sku]", premiumOffer.sku);
     form.set("line_items[0][price_data][product_data][metadata][gameSlug]", gameSlug);
     appendMetadata(form, {
