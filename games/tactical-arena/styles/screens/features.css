@@ -192,14 +192,14 @@
 .shop-confirm-purchase .shop-confirm-price { color:inherit; }
 .shop-confirm-price .valor-icon { width:.86rem; height:.86rem; }
 .shop-checkout-layer { position:fixed; inset:0; z-index:3; display:grid; place-items:center; padding:1rem; background:radial-gradient(circle at 50% 18%,rgba(203,159,85,.16),transparent 28rem),rgba(1,5,10,.72); backdrop-filter:blur(5px); }
-.shop-checkout-dialog { display:grid; grid-template-rows:auto minmax(22rem,1fr); width:min(35rem,94vw); height:min(42rem,88vh); min-height:30rem; border:1px solid color-mix(in srgb,var(--brass) 84%,#ffffff 8%); border-radius:8px; background:linear-gradient(135deg,rgba(var(--sheen),.1),transparent 42%),linear-gradient(180deg,rgba(24,38,54,.98),rgba(7,13,22,.99)); box-shadow:0 28px 80px rgba(0,0,0,.82), inset 0 1px 0 rgba(var(--sheen),.14), inset 0 0 0 1px rgba(0,0,0,.58); overflow:hidden; }
+.shop-checkout-dialog { display:grid; grid-template-rows:auto minmax(0,1fr); width:min(35rem,94vw); height:min(42rem,88vh); min-height:30rem; border:1px solid color-mix(in srgb,var(--brass) 84%,#ffffff 8%); border-radius:8px; background:linear-gradient(135deg,rgba(var(--sheen),.1),transparent 42%),linear-gradient(180deg,rgba(24,38,54,.98),rgba(7,13,22,.99)); box-shadow:0 28px 80px rgba(0,0,0,.82), inset 0 1px 0 rgba(var(--sheen),.14), inset 0 0 0 1px rgba(0,0,0,.58); overflow:hidden; }
 .shop-checkout-head { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:.8rem; padding:.85rem 1rem; border-bottom:1px solid rgba(203,159,85,.34); background:linear-gradient(180deg,rgba(34,52,72,.76),rgba(8,16,28,.82)); }
 .shop-checkout-copy { display:grid; gap:.18rem; min-width:0; }
 .shop-checkout-title { margin:0; color:var(--brass-hi); font:900 .92rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
 .shop-checkout-sub { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font:800 .58rem var(--font-display); letter-spacing:.09em; text-transform:uppercase; }
 .shop-checkout-close { min-width:2.25rem; min-height:2.25rem; border-radius:7px; }
-.shop-checkout-mount { min-width:0; min-height:0; padding:.55rem; background:linear-gradient(180deg,rgba(188,214,236,.07),rgba(0,0,0,.12)); }
-.shop-checkout-mount iframe { border-radius:6px; }
+.shop-checkout-mount { min-width:0; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding:.55rem; background:linear-gradient(180deg,rgba(188,214,236,.07),rgba(0,0,0,.12)); }
+.shop-checkout-mount iframe { display:block; width:100%; min-height:44rem; border-radius:6px; }
 
 /* Inventory */
 .inventory-card { width:min(52rem,96vw); height:min(38rem,90vh); }
