@@ -267,6 +267,7 @@ function defend(state, command) {
       events.push({ type: "SNACK_BREAK", unitId: recipientId, sourceId: unit.id, hpRestored, mpRestored });
     }
   }
+  spendAndAdvance(next, unit);
   return accept(next, events);
 }
 
@@ -306,4 +307,4 @@ function concede(state, command) {
   }
   return accept(next, events);
 }
-
+

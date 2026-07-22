@@ -362,14 +362,13 @@ test("A Ghoul never takes a turn: it stays spent across the round and cannot act
   // P2 takes and finishes its activation → turn returns to P1.
   const s2 = activate(r1.nextState, "p2-sword");
   const r2 = applyCommand(s2, defend(2, "p2-sword"));
-  const r3 = applyCommand(r2.nextState, finishActivation(2, "p2-sword"));
-  assert.ok(r3.accepted);
-  assert.equal(r3.nextState.currentPlayer, 1);
+  assert.ok(r2.accepted);
+  assert.equal(r2.nextState.currentPlayer, 1);
 
-  const ghoul = r3.nextState.units.find((u) => u.type === "ghoul");
+  const ghoul = r2.nextState.units.find((u) => u.type === "ghoul");
   assert.equal(ghoul.spent, true, "ghoul should not be refreshed at turn start");
-  assert.equal(findId(r3.nextState, "p1-necro").spent, false, "commander should refresh");
-  assert.ok(!applyCommand(r3.nextState, beginActivation(1, ghoul.id)).accepted, "ghoul must not activate");
+  assert.equal(findId(r2.nextState, "p1-necro").spent, false, "commander should refresh");
+  assert.ok(!applyCommand(r2.nextState, beginActivation(1, ghoul.id)).accepted, "ghoul must not activate");
 });
 
 test("Ghoul carries a Ghoul Bite passive: autoStrike, 1 true damage, range 1", () => {
@@ -399,14 +398,12 @@ test("Ghoul Bite mauls one random adjacent enemy for 1 true damage at the turn r
   const s1 = activate(state, "p1-necro");
   const r = applyCommand(s1, defend(1, "p1-necro"));
   assert.ok(r.accepted);
-  const r2 = applyCommand(r.nextState, finishActivation(1, "p1-necro"));
-  assert.ok(r2.accepted);
-  assert.equal(r2.nextState.currentPlayer, 2);
+  assert.equal(r.nextState.currentPlayer, 2);
 
-  assert.equal(findId(r2.nextState, "p2-near").hp, getUnitType("swordsman").stats.maxHp - 1);
-  assert.equal(findId(r2.nextState, "p2-far").hp, getUnitType("archer").stats.maxHp);
+  assert.equal(findId(r.nextState, "p2-near").hp, getUnitType("swordsman").stats.maxHp - 1);
+  assert.equal(findId(r.nextState, "p2-far").hp, getUnitType("archer").stats.maxHp);
 
-  const bites = r2.events.filter((e) => e.type === "AUTO_STRIKE");
+  const bites = r.events.filter((e) => e.type === "AUTO_STRIKE");
   assert.equal(bites.length, 1);
   assert.equal(bites[0].sourceId, "p1-ghoul");
   assert.equal(bites[0].targetId, "p2-near");

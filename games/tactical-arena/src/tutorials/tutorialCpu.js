@@ -55,7 +55,6 @@ export function chooseTutorialCpuActivation(match, tutorial) {
     return [
       beginActivation(player, magician.id),
       defend(player, magician.id),
-      finishActivation(player, magician.id),
     ];
   }
 
@@ -97,7 +96,6 @@ export function chooseTutorialCpuActivation(match, tutorial) {
     return [
       beginActivation(player, clod.id),
       defend(player, clod.id),
-      finishActivation(player, clod.id),
     ];
   }
 
@@ -131,9 +129,12 @@ export function chooseTutorialCpuActivation(match, tutorial) {
         target = findCounterattackTarget(actingMatch, actingArcher);
       }
     }
-    if (target) commands.push(attack(player, archer.id, target.id));
-    else commands.push(defend(player, archer.id));
-    commands.push(finishActivation(player, archer.id));
+    if (target) {
+      commands.push(attack(player, archer.id, target.id));
+      commands.push(finishActivation(player, archer.id));
+    } else {
+      commands.push(defend(player, archer.id));
+    }
     return commands;
   }
 
@@ -147,7 +148,7 @@ export function chooseTutorialCpuActivation(match, tutorial) {
   const commands = [beginActivation(player, unit.id)];
   const step = approachMove(match, unit);
   if (step) commands.push(moveUnit(player, unit.id, step.x, step.y));
-  commands.push(defend(player, unit.id), finishActivation(player, unit.id));
+  commands.push(defend(player, unit.id));
   return commands;
 }
 

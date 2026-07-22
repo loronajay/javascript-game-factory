@@ -72,7 +72,6 @@ test("Rock Hard: a defending Clod negates a physical attack and restores 3 MP", 
   ]);
   let s = run(state, beginActivation(1, "clod")).nextState;
   s = run(s, defend(1, "clod")).nextState;
-  s = run(s, finishActivation(1, "clod")).nextState;
   s = run(s, beginActivation(2, "sw")).nextState;
   const res = run(s, attack(2, "sw", "clod", NORMAL_HIT));
 
@@ -99,7 +98,6 @@ test("Rock Hard: magic damage still lands on a defending Clod (only physical is 
   ]);
   let s = run(state, beginActivation(1, "clod")).nextState;
   s = run(s, defend(1, "clod")).nextState;
-  s = run(s, finishActivation(1, "clod")).nextState;
   s = run(s, beginActivation(2, "mage")).nextState;
   const res = run(s, useArt(2, "mage", "spark", { targetId: "clod", ...NORMAL_HIT }));
   assert.ok(findUnit(res.nextState, "clod").hp < 30, "Spark (magic) still bites a braced Clod");

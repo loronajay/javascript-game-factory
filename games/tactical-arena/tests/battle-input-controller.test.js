@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { createBattleInputController } from "../src/ui/battleInputController.js";
 import { shouldAutoFinishActivation } from "../src/ui/commandResolutionController.js";
-import { beginActivation } from "../src/core/commands.js";
+import { attack, beginActivation } from "../src/core/commands.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { createBattleState } from "../src/core/state.js";
 
@@ -63,9 +63,19 @@ test("targeted ART resolution asks the shared auto-finish path to close dead-end
   assert.equal(autoFinishes, 1);
 });
 
-test("auto-finish predicate waits for remaining movement but closes a blocked primary action", () => {
-  const mobile = applyCommand(createBattleState(), beginActivation(1, "p1-swordsman")).nextState;
+test("auto-finish predicate waits for remaining movement but Defend closes immediately", () => {
+  const mobileInitial = createBattleState({
+    units: [
+      { id: "p1-swordsman", player: 1, type: "swordsman", x: 0, y: 0 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 1, y: 0 }
+    ]
+  });
+  const mobile = applyCommand(mobileInitial, beginActivation(1, "p1-swordsman")).nextState;
+  const mobileAttacked = applyCommand(mobile, attack(1, "p1-swordsman", "p2-swordsman")).nextState;
+  assert.equal(shouldAutoFinishActivation(mobileAttacked), false);
+
   const mobileDefended = applyCommand(mobile, { type: "DEFEND", player: 1, unitId: "p1-swordsman" }).nextState;
+  assert.equal(mobileDefended.activation, null);
   assert.equal(shouldAutoFinishActivation(mobileDefended), false);
 
   const blockedInitial = createBattleState({
@@ -74,12 +84,12 @@ test("auto-finish predicate waits for remaining movement but closes a blocked pr
       { id: "p1-swordsman", player: 1, type: "swordsman", x: 0, y: 0 },
       { id: "p1-block-a", player: 1, type: "swordsman", x: 1, y: 0 },
       { id: "p1-block-b", player: 1, type: "swordsman", x: 0, y: 1 },
-      { id: "p2-swordsman", player: 2, type: "swordsman", x: 2, y: 2 }
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 1, y: 1 }
     ]
   });
   const blocked = applyCommand(blockedInitial, beginActivation(1, "p1-swordsman")).nextState;
-  const blockedDefended = applyCommand(blocked, { type: "DEFEND", player: 1, unitId: "p1-swordsman" }).nextState;
-  assert.equal(shouldAutoFinishActivation(blockedDefended), true);
+  const blockedAttacked = applyCommand(blocked, attack(1, "p1-swordsman", "p2-swordsman")).nextState;
+  assert.equal(shouldAutoFinishActivation(blockedAttacked), true);
 });
 
 test("an empty tile click with no active mode deselects through the interaction adapter", async () => {

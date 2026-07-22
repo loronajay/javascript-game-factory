@@ -201,7 +201,6 @@ test("Realm Traversal lets Nemesis move then cast Dark Pulse on the next turn an
 
   s = run(s, beginActivation(2, "foe")).nextState;
   s = run(s, defend(2, "foe")).nextState;
-  s = run(s, finishActivation(2, "foe")).nextState;
 
   s = run(s, beginActivation(1, "nem")).nextState;
   s = run(s, moveUnit(1, "nem", 1, 0)).nextState;

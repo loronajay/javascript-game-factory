@@ -142,7 +142,7 @@ function wireTargetedBlastHover(actor, art, tileByKey, unitsLayer, state, aimKey
   }
 }
 
-export function renderBoard({ board, boardLayer, unitsLayer, state, mode, selectedId, footworkPath, onTileClick, onAreaHover = null }) {
+export function renderBoard({ board, boardLayer, unitsLayer, state, mode, selectedId, footworkPath, onTileClick, onAreaHover = null, onUnitHover = null }) {
   let legal = new Set();
   let range = new Set();
   const actor = selectedId ? state.units.find((u) => u.id === selectedId) : null;
@@ -494,7 +494,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
           // Pyroclasm reticles every enemy caught on its rays.
           (isPyroclasm && u.player !== actor.player)
         );
-        return createUnitFigure(metrics, u, { isTarget, selectedId, onUnitClick: onTileClick, state });
+        return createUnitFigure(metrics, u, { isTarget, selectedId, onUnitClick: onTileClick, onUnitHover, state });
       }
     });
   }

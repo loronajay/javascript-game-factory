@@ -88,7 +88,6 @@ export function holdNextTutorialCpuUnit(match, player) {
   return [
     beginActivation(player, unit.id),
     defend(player, unit.id),
-    finishActivation(player, unit.id),
   ];
 }
 

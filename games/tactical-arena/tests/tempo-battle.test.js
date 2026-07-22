@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { createBattleState } from "../src/core/state.js";
 import { UNIT_TYPES, getEffectiveStats } from "../src/core/unitCatalog.js";
-import { beginActivation, defend, finishActivation } from "../src/core/commands.js";
+import { beginActivation, defend } from "../src/core/commands.js";
 import { applyCommand } from "../src/core/reducer.js";
 import {
   TEMPO_GAUGE_MAX,
@@ -154,8 +154,6 @@ test("tempo ready units can activate and finishing resets only their readiness",
   result = applyCommand(result.nextState, defend(1, "p1-archer"));
   assert.equal(result.accepted, true);
 
-  result = applyCommand(result.nextState, finishActivation(1, "p1-archer"));
-  assert.equal(result.accepted, true);
   assert.equal(result.nextState.currentPlayer, null);
   assert.equal(result.nextState.activation, null);
   assert.equal(getTempoReadiness(result.nextState, "p1-archer"), 0);

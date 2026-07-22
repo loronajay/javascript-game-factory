@@ -30,7 +30,6 @@ function scenario(units, extra = {}) {
 function passDefend(state, player, id) {
   let s = run(state, beginActivation(player, id)).nextState;
   s = run(s, defend(player, id)).nextState;
-  s = run(s, finishActivation(player, id)).nextState;
   return s;
 }
 
@@ -97,7 +96,6 @@ test("Riot Shield: a defending Riot Cop nullifies magic damage; a non-defender t
   // Riot Cop braces, then the Magician sparks him.
   let s = run(state, beginActivation(1, "riot")).nextState;
   s = run(s, defend(1, "riot")).nextState;
-  s = run(s, finishActivation(1, "riot")).nextState;
   s = run(s, beginActivation(2, "mage")).nextState;
   const defended = run(s, useArt(2, "mage", "spark", { targetId: "riot", ...HIT }));
   assert.equal(findUnit(defended.nextState, "riot").hp, 30, "magic is fully nullified while defending");
@@ -319,7 +317,6 @@ test("Lockdown: must be raging and the turn's FIRST command", () => {
   // But if a squadmate has already acted this turn, it is locked out.
   let acted = run(raging, beginActivation(1, "ally")).nextState;
   acted = run(acted, defend(1, "ally")).nextState;
-  acted = run(acted, finishActivation(1, "ally")).nextState;
   acted = run(acted, beginActivation(1, "riot")).nextState;
   assert.ok(!canUseArt(acted, findUnit(acted, "riot"), "lockdown"), "locked once an ally has acted");
 });
@@ -361,7 +358,6 @@ test("Ability uses restore after a full turn empty (not the turn they run dry)",
   assert.equal(getAbilityUsesRemaining(findUnit(s, "riot"), stunGun), 0, "still empty the turn after");
   assert.ok(!hasAbilityUsesRemaining(findUnit(s, "riot"), stunGun), "canUseArt gate blocks it");
   s = run(s, defend(1, "riot")).nextState;
-  s = run(s, finishActivation(1, "riot")).nextState;
   s = passDefend(s, 2, "foe");
 
   // Turn C: restored to full.

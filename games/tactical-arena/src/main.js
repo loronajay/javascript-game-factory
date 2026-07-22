@@ -70,6 +70,7 @@ let footworkPath = [];
 let volleyShotOrigin = null;
 let areaForecastCenter = null;
 let areaForecastMode = null;
+let hoveredForecastTargetId = null;
 let accuracyForecastEnabled = loadAccuracyForecastEnabled();
 // The fallen ally chosen for a revive ART, awaiting a placement-tile click.
 let reviveTargetId = null;
@@ -581,10 +582,41 @@ function renderBoardAndRail() {
     onAreaHover: (center) => {
       areaForecastCenter = center;
       areaForecastMode = center ? mode : null;
-      renderForecast({ forecastLayer, state, mode, actor: selectedUnit(), resolving, areaCenter: center, enabled: accuracyForecastEnabled });
+      renderForecast({
+        forecastLayer,
+        state,
+        mode,
+        actor: selectedUnit(),
+        resolving,
+        areaCenter: center,
+        enabled: accuracyForecastEnabled,
+        hoveredTargetId: hoveredForecastTargetId
+      });
+    },
+    onUnitHover: (unit) => {
+      hoveredForecastTargetId = unit?.id ?? null;
+      renderForecast({
+        forecastLayer,
+        state,
+        mode,
+        actor: selectedUnit(),
+        resolving,
+        areaCenter: currentAreaCenter,
+        enabled: accuracyForecastEnabled,
+        hoveredTargetId: hoveredForecastTargetId
+      });
     }
   });
-  renderForecast({ forecastLayer, state, mode, actor: unit, resolving, areaCenter: currentAreaCenter, enabled: accuracyForecastEnabled });
+  renderForecast({
+    forecastLayer,
+    state,
+    mode,
+    actor: unit,
+    resolving,
+    areaCenter: currentAreaCenter,
+    enabled: accuracyForecastEnabled,
+    hoveredTargetId: hoveredForecastTargetId
+  });
 }
 
 // A living, ready, human-controlled unit the local player may command right now (readiness

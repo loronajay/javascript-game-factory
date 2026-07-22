@@ -432,7 +432,7 @@ function createIntroAlertBadge(unit) {
   return badge;
 }
 
-export function createUnitFigure(metrics, unit, { isTarget = false, selectedId = null, onUnitClick, state = null }) {
+export function createUnitFigure(metrics, unit, { isTarget = false, selectedId = null, onUnitClick, onUnitHover = null, state = null }) {
   const point = gridToScreen(metrics, unit.position.x, unit.position.y);
   const stats = getEffectiveStats(unit, state);
   const classes = ["unit", `player-${unit.player}`, "idle"];
@@ -526,5 +526,9 @@ export function createUnitFigure(metrics, unit, { isTarget = false, selectedId =
   visual.append(svgElement("ellipse", { class: "shadow", cx: 0, cy: 18, rx: 24, ry: 8 }), body);
   token.append(visual, hit);
   token.addEventListener("click", (event) => { event.stopPropagation(); onUnitClick(unit.position); });
+  if (onUnitHover) {
+    token.addEventListener("mouseenter", () => onUnitHover(unit));
+    token.addEventListener("mouseleave", () => onUnitHover(null));
+  }
   return token;
 }

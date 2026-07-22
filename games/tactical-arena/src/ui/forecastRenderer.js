@@ -10,7 +10,11 @@ import { resolveDamage } from "../rules/damage.js";
 function drawForecastBadge(forecastLayer, metrics, target, label, cls, yOffset = 0) {
   const point = gridToScreen(metrics, target.position.x, target.position.y);
   const y = point.y + metrics.tileHeight * 0.45 - 52 + yOffset;
-  const group = svgElement("g", { class: `forecast-badge ${cls}`, transform: `translate(${point.x} ${y})` });
+  const group = svgElement("g", {
+    class: `forecast-badge ${cls}`,
+    "data-target-id": target.id,
+    transform: `translate(${point.x} ${y})`
+  });
   const halfWidth = 15 + (label.length - 1) * 4.5;
   const text = svgElement("text", { class: "fc-text", x: 0, y: 5, "text-anchor": "middle" });
   text.textContent = label;
@@ -26,6 +30,17 @@ function accuracyLabel(missChance) {
 function drawForecastStack(forecastLayer, metrics, target, accuracy, label, cls) {
   drawForecastBadge(forecastLayer, metrics, target, accuracy, "fc-accuracy", -24);
   drawForecastBadge(forecastLayer, metrics, target, label, cls);
+}
+
+function drawForecastEntries(forecastLayer, metrics, entries, hoveredTargetId = null) {
+  const regular = [];
+  const hovered = [];
+  for (const entry of entries) {
+    (entry.target.id === hoveredTargetId ? hovered : regular).push(entry);
+  }
+  for (const { target, accuracy, label, cls } of [...regular, ...hovered]) {
+    drawForecastStack(forecastLayer, metrics, target, accuracy, label, cls);
+  }
 }
 
 // Shapes whose real resolver does NOT run a plain single-target strike through
@@ -143,7 +158,7 @@ function areaForecastEntries(state, actor, art, areaCenter) {
 // showing hit accuracy above predicted normal-hit damage (skull when lethal, "miss"
 // when an attack or physical strike ART is blinded).
 // Uses the same strike resolver the reducer uses, so damage-type changes stay honest.
-export function renderForecast({ forecastLayer, state, mode, actor, resolving, areaCenter = null, enabled = true }) {
+export function renderForecast({ forecastLayer, state, mode, actor, resolving, areaCenter = null, enabled = true, hoveredTargetId = null }) {
   forecastLayer.replaceChildren();
   if (!enabled) return;
   if (!actor || state.phase !== "playing" || resolving) return;
@@ -156,9 +171,13 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving, a
 
   const metrics = createBoardMetrics(state.size);
   if (isAreaArt && !isStrikeArt && !isAttack) {
-    for (const { target, damage } of areaForecastEntries(state, actor, art, areaCenter)) {
-      drawForecastStack(forecastLayer, metrics, target, "100%", damageLabel(damage, target), damageClass(damage, target));
-    }
+    const entries = areaForecastEntries(state, actor, art, areaCenter).map(({ target, damage }) => ({
+      target,
+      accuracy: "100%",
+      label: damageLabel(damage, target),
+      cls: damageClass(damage, target)
+    }));
+    drawForecastEntries(forecastLayer, metrics, entries, hoveredTargetId);
     return;
   }
 
@@ -172,6 +191,7 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving, a
   const blockable = isAttack || (isStrikeArt && artIsBodyBlocked(art));
   const rayOnly = isAttack && requiresRayBasicAttack(actor);
 
+  const entries = [];
   for (const target of state.units) {
     if (target.hp <= 0 || !areEnemies(actor, target)) continue;
     if (chebyshevDistance(actor.position, target.position) > reach) continue;
@@ -191,7 +211,7 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving, a
     const accuracy = accuracyLabel(missChance);
     const guaranteedMiss = missChance >= 1;
     if (guaranteedMiss) {
-      drawForecastStack(forecastLayer, metrics, target, accuracy, "miss", "fc-miss");
+      entries.push({ target, accuracy, label: "miss", cls: "fc-miss" });
       continue;
     }
     // A fixed-amount magic art (Virus's Cough) forecasts its authored amount, not a
@@ -212,8 +232,9 @@ export function renderForecast({ forecastLayer, state, mode, actor, resolving, a
           : fixedPhysical
             ? resolveFixedPhysicalStrike(actor, target, art.damage.amount, { state })
             : resolveBaseStrike(actor, target, { proximity: true, state, damageType, damageAffinity: art?.damageAffinity ?? art?.damage?.affinity ?? null });
-    drawForecastStack(forecastLayer, metrics, target, accuracy, damageLabel(strike.damage, target), damageClass(strike.damage, target));
+    entries.push({ target, accuracy, label: damageLabel(strike.damage, target), cls: damageClass(strike.damage, target) });
   }
+  drawForecastEntries(forecastLayer, metrics, entries, hoveredTargetId);
 }
 
 function scaledPowerForecast(actor, target, art, state) {

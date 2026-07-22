@@ -59,8 +59,7 @@ test("One With The Flames: fire tiles do not damage the Gargoyle", () => {
   );
 
   let s = run(state, beginActivation(1, "p1")).nextState;
-  s = run(s, defend(1, "p1")).nextState;
-  const res = run(s, finishActivation(1, "p1"));
+  const res = run(s, defend(1, "p1"));
 
   assert.equal(findUnit(res.nextState, "g").hp, 30, "Gargoyle ignores fire tile damage");
   assert.ok(!res.events.some((e) => e.type === "FIRE_DAMAGE" && e.unitId === "g"), "no burn event is surfaced");
@@ -74,16 +73,14 @@ test("One With The Flames: Heatwave restores 1 HP and 1 MP each turn cycle", () 
   ], { weather: "heatwave" });
 
   let s = run(state, beginActivation(1, "p1")).nextState;
-  s = run(s, defend(1, "p1")).nextState;
-  let res = run(s, finishActivation(1, "p1"));
+  let res = run(s, defend(1, "p1"));
 
   assert.equal(findUnit(res.nextState, "g").hp, 20, "no restore on the simple P1 to P2 rollover");
   assert.equal(findUnit(res.nextState, "g").mp, 10, "no MP restore on the simple P1 to P2 rollover");
   assert.ok(!res.events.some((e) => e.type === "WEATHER_REGEN" && e.unitId === "g"));
 
   s = run(res.nextState, beginActivation(2, "g")).nextState;
-  s = run(s, defend(2, "g")).nextState;
-  res = run(s, finishActivation(2, "g"));
+  res = run(s, defend(2, "g"));
 
   assert.equal(findUnit(res.nextState, "g").hp, 21);
   assert.equal(findUnit(res.nextState, "g").mp, 11);
@@ -101,8 +98,7 @@ test("One With The Flames: no passive restore outside Heatwave", () => {
   ], { weather: "spring" });
 
   let s = run(state, beginActivation(1, "p1")).nextState;
-  s = run(s, defend(1, "p1")).nextState;
-  const after = run(s, finishActivation(1, "p1")).nextState;
+  const after = run(s, defend(1, "p1")).nextState;
 
   assert.equal(findUnit(after, "g").hp, 20);
   assert.equal(findUnit(after, "g").mp, 10);
@@ -172,7 +168,6 @@ test("Stone Body: a melee attacker takes 1 true damage when the Gargoyle is defe
   // Gargoyle braces, then the adjacent swordsman strikes it.
   let s = run(state, beginActivation(1, "g")).nextState;
   s = run(s, defend(1, "g")).nextState;
-  s = run(s, finishActivation(1, "g")).nextState;
   s = run(s, beginActivation(2, "sw")).nextState;
   const res = run(s, attack(2, "sw", "g", NORMAL_HIT));
   s = res.nextState;
@@ -335,12 +330,10 @@ test("Volcanic Rage: erupts on the first raging activation, then every 3rd ragin
   }
   function foeTurn(s) {
     let n = run(s, beginActivation(2, "foe")).nextState;
-    n = run(n, defend(2, "foe")).nextState;
-    return run(n, finishActivation(2, "foe")).nextState;
+    return run(n, defend(2, "foe")).nextState;
   }
   function finishGarg(s) {
-    let n = run(s, defend(1, "g")).nextState;
-    return run(n, finishActivation(1, "g")).nextState;
+    return run(s, defend(1, "g")).nextState;
   }
 
   let s = state;

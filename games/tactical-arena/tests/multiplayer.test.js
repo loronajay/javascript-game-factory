@@ -104,7 +104,6 @@ test("2v2 turn order skips a fully eliminated seat but keeps that seat's ally al
   }
   state = must(state, beginActivation(1, unit.id));
   state = must(state, defend(1, unit.id));
-  state = must(state, finishActivation(1, unit.id));
 
   assert.equal(state.phase, "playing");
   assert.equal(state.currentPlayer, 3);

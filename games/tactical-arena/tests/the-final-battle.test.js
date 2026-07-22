@@ -281,7 +281,6 @@ test("Void Pressure deals 1 true damage to every living player unit once after B
 
   let result = applyCommand(last, beginActivation(2, boss.id));
   result = applyCommand(result.nextState, defend(2, boss.id));
-  result = applyCommand(result.nextState, finishActivation(2, boss.id));
 
   assert.equal(result.accepted, true);
   assert.equal(result.nextState.currentPlayer, 1);
@@ -303,7 +302,6 @@ test("Void Pressure and dark-tile statuses never leak into a mirror duel", () =>
 
   let result = applyCommand(duel, beginActivation(2, mirror.id));
   result = applyCommand(result.nextState, defend(2, mirror.id));
-  result = applyCommand(result.nextState, finishActivation(2, mirror.id));
 
   const after = result.nextState.units.find((unit) => unit.id === champion.id);
   assert.equal(after.hp, hpBefore);

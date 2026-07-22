@@ -1143,6 +1143,49 @@ test("Volley Shot previews its cone when hovering any tile inside that cone", ()
   }
 });
 
+test("unit tokens report hover changes for forecast paint priority", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const state = createBattleState({
+      size: 8,
+      units: [
+        { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
+        { id: "p2-target", player: 2, type: "swordsman", x: 3, y: 0 }
+      ]
+    });
+    const board = new TestSvgElement("svg");
+    const boardLayer = new TestSvgElement("g");
+    const unitsLayer = new TestSvgElement("g");
+    const hovered = [];
+
+    renderBoard({
+      board,
+      boardLayer,
+      unitsLayer,
+      state,
+      mode: "attack",
+      selectedId: "p1-archer",
+      footworkPath: [],
+      onTileClick: () => {},
+      onUnitHover: (unit) => hovered.push(unit?.id ?? null)
+    });
+
+    const target = findSvgByAttribute(unitsLayer, "data-id", "p2-target");
+    assert.ok(target, "target unit should be addressable");
+    assert.equal(target.listeners.has("mouseenter"), true);
+    assert.equal(target.listeners.has("mouseleave"), true);
+
+    target.listeners.get("mouseenter")();
+    target.listeners.get("mouseleave")();
+
+    assert.deepEqual(hovered, ["p2-target", null]);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("Curve Shot highlights an enemy behind an intervening unit as a legal target", () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };

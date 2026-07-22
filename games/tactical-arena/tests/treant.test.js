@@ -30,7 +30,6 @@ function scenario(units, extra = {}) {
 function passDefend(state, player, id) {
   let s = run(state, beginActivation(player, id)).nextState;
   s = run(s, defend(player, id)).nextState;
-  s = run(s, finishActivation(player, id)).nextState;
   return s;
 }
 
@@ -354,8 +353,7 @@ test("Petrify: each of the Treant's turns the statue restores itself and its aur
   s = passDefend(s, 1, "ally");
   // P2 passes; the rollover into P1's NEXT turn fires the petrify pulse + countdown.
   s = run(s, beginActivation(2, "foe")).nextState;
-  s = run(s, defend(2, "foe")).nextState;
-  const pulseResult = run(s, finishActivation(2, "foe"));
+  const pulseResult = run(s, defend(2, "foe"));
   const s2 = pulseResult.nextState;
 
   const pulse = pulseResult.events.find((e) => e.type === "PETRIFY_PULSE");

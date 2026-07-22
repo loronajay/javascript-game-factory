@@ -142,6 +142,32 @@ test("targeted spell arts still render their normal damage forecast", () => {
   });
 });
 
+test("hovered target forecast stack paints after overlapping target stacks", () => {
+  withSvgDocument(() => {
+    const state = createBattleState({
+      units: [
+        { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
+        { id: "p2-back", player: 2, type: "swordsman", x: 3, y: 0 },
+        { id: "p2-front", player: 2, type: "swordsman", x: 4, y: 0 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "p1-archer");
+    const forecastLayer = new TestSvgElement("g");
+
+    renderForecast({
+      forecastLayer,
+      state,
+      mode: "attack",
+      actor,
+      resolving: false,
+      hoveredTargetId: "p2-back"
+    });
+
+    assert.equal(forecastLayer.children.at(-2).getAttribute("data-target-id"), "p2-back");
+    assert.equal(forecastLayer.children.at(-1).getAttribute("data-target-id"), "p2-back");
+  });
+});
+
 test("targeted art forecast reads overridden art accuracy", () => {
   withSvgDocument(() => {
     const state = createBattleState({

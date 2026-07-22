@@ -189,7 +189,6 @@ test("basics tutorial tracks defense practice and detects the first archer range
   for (const unit of match.units.filter((candidate) => candidate.player === 1)) {
     ({ match } = applyTutorial(tutorial, match, beginActivation(1, unit.id)));
     ({ match } = applyTutorial(tutorial, match, defend(1, unit.id)));
-    ({ match } = applyTutorial(tutorial, match, finishActivation(1, unit.id)));
   }
 
   assert.equal(match.currentPlayer, 2);
@@ -515,7 +514,6 @@ test("arts/mp tutorial gates range check, move and defend, volley, then pray", (
   assert.equal(tutorial.stage, "await_defend");
   ({ match } = applyTutorial(tutorial, match, defend(1, TUTORIAL_ARTS_PLAYER_ARCHER_ID)));
   assert.equal(tutorial.stage, "await_enemy_counterattack");
-  ({ match } = applyTutorial(tutorial, match, finishActivation(1, TUTORIAL_ARTS_PLAYER_ARCHER_ID)));
 
   for (const command of chooseTutorialCpuActivation(match, tutorial)) {
     ({ match } = applyTutorial(tutorial, match, command));
@@ -771,7 +769,7 @@ test("rage tutorial walks Nuke through the trap, the formation swap, the Archer'
   assert.equal(match.currentPlayer, 2);
 
   const idleCommands = chooseTutorialCpuActivation(match, tutorial);
-  assert.deepEqual(idleCommands.map((command) => command.type), ["BEGIN_ACTIVATION", "DEFEND", "FINISH_ACTIVATION"]);
+  assert.deepEqual(idleCommands.map((command) => command.type), ["BEGIN_ACTIVATION", "DEFEND"]);
   assert.equal(idleCommands[0].unitId, TUTORIAL_RAGE_CPU_MAGICIAN_ID);
 
   let finalUpdate = null;

@@ -1597,8 +1597,7 @@ test("Gargoyle's Inferno lights one random open space on fire at each turn rollo
   };
 
   state = applyCommand(state, beginActivation(1, "p1-0-swordsman")).nextState;
-  state = applyCommand(state, defend(1, "p1-0-swordsman")).nextState;
-  const finished = applyCommand(state, finishActivation(1, "p1-0-swordsman"));
+  const finished = applyCommand(state, defend(1, "p1-0-swordsman"));
   const event = finished.events.find((e) => e.type === "RANDOM_FIRE_LIT");
   const fireEntries = Object.entries(finished.nextState.tileObjects ?? {})
     .filter(([, obj]) => obj.kind === "fire");
@@ -2346,12 +2345,10 @@ test("Battle for the Bridge mission weather changes every two turn cycles", () =
   // A turn cycle is one full round in which both players act; the ronin duel swaps
   // weather every two cycles, so a single cycle must NOT change it.
   const finishP1 = (s) => {
-    s = applyCommand(applyCommand(s, beginActivation(1, "p1-0-swordsman")).nextState, defend(1, "p1-0-swordsman")).nextState;
-    return applyCommand(s, finishActivation(1, "p1-0-swordsman"));
+    return applyCommand(applyCommand(s, beginActivation(1, "p1-0-swordsman")).nextState, defend(1, "p1-0-swordsman"));
   };
   const finishP2 = (s) => {
-    s = applyCommand(applyCommand(s, beginActivation(2, "p2-0-ronin")).nextState, defend(2, "p2-0-ronin")).nextState;
-    return applyCommand(s, finishActivation(2, "p2-0-ronin"));
+    return applyCommand(applyCommand(s, beginActivation(2, "p2-0-ronin")).nextState, defend(2, "p2-0-ronin"));
   };
 
   // Cycle 1 (turns 1-2) holds the opening weather.

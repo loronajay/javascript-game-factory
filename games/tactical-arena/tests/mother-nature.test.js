@@ -138,7 +138,6 @@ test("Mother Nature must act first, and any completed action releases her squad"
 
   let next = run(state, beginActivation(1, "mn"));
   next = run(next, defend(1, "mn"));
-  next = run(next, finishActivation(1, "mn"));
   next = run(next, beginActivation(1, "ally"));
   assert.equal(findUnit(next, "mn").commandTurn, next.turnNumber);
 });
@@ -156,7 +155,6 @@ test("turn rollover into a Mother Nature squad starts with her already open and 
 
   let next = run(state, beginActivation(1, "p1-sword"));
   next = run(next, defend(1, "p1-sword"));
-  next = run(next, finishActivation(1, "p1-sword"));
 
   assert.equal(next.currentPlayer, 2);
   assert.equal(next.activation?.unitId, "p2-nature");
@@ -182,7 +180,6 @@ test("weather activations cannot repeat the same weather twice in a row", () => 
   // Move the match back to Mother Nature's next squad turn.
   next = run(next, beginActivation(2, "foe"));
   next = run(next, defend(2, "foe"));
-  next = run(next, finishActivation(2, "foe"));
   next = run(next, beginActivation(1, "mn"));
 
   const repeat = applyCommand(next, useArt(1, "mn", "blizzard"));
@@ -282,7 +279,6 @@ test("Spring Shower heals all units and then boosts later HP and MP restoration 
   });
   let recharge = run(rechargeState, beginActivation(1, "mn"));
   recharge = run(recharge, defend(1, "mn"));
-  recharge = run(recharge, finishActivation(1, "mn"));
   recharge = run(recharge, beginActivation(1, "cleric"));
   recharge = run(recharge, defend(1, "cleric"));
   assert.equal(findUnit(recharge, "cleric").mp, 12, "Snack Break's 1 MP restore is boosted to 2");
@@ -340,7 +336,6 @@ test("Thunderstorm boosts temporary magic damage and discounts later arts global
 
   next = run(next, beginActivation(1, "ally"));
   next = run(next, defend(1, "ally"));
-  next = run(next, finishActivation(1, "ally"));
   next = run(next, beginActivation(1, "mage"));
   next = run(next, useArt(1, "mage", "spark", { targetId: "foe", ...NORMAL_HIT }));
   assert.equal(getUnitType("swordsman").stats.maxHp - findUnit(next, "foe").hp, baseDamage + 1);

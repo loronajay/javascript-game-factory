@@ -291,7 +291,6 @@ test("turn rollover into a King squad starts with the King already open and CPU 
 
   let r = run(state, beginActivation(1, "p1-sword"));
   r = run(r.nextState, defend(1, "p1-sword"));
-  r = run(r.nextState, finishActivation(1, "p1-sword"));
   const rolled = r.nextState;
   assert.equal(rolled.currentPlayer, 2);
   assert.equal(rolled.activation?.unitId, "p2-king");

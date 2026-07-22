@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { applyCommand } from "../src/core/reducer.js";
 import { chooseActivation } from "../src/ai/cpuController.js";
 import { generatePlans } from "../src/ai/plans.js";
-import { attack, beginActivation, defend, finishActivation, moveUnit, useArt } from "../src/core/commands.js";
+import { attack, beginActivation, defend, moveUnit, useArt } from "../src/core/commands.js";
 import { createBattleState, findUnit } from "../src/core/state.js";
 import { getArt, getSoulShuffleChoices, isRaging, UNIT_TYPES } from "../src/core/unitCatalog.js";
 import { getLegalFleeTiles, getSummonPlacementTiles } from "../src/rules/arts.js";
@@ -77,14 +77,10 @@ test("Soul Shuffle refreshes at the start of each fresh Summoner activation", ()
 
   let result = applyCommand(state, defend(1, "summoner"));
   assert.ok(result.accepted, result.errorCode);
-  result = applyCommand(result.nextState, finishActivation(1, "summoner"));
-  assert.ok(result.accepted, result.errorCode);
   state = result.nextState;
 
   state = begin(state, "foe", 2);
   result = applyCommand(state, defend(2, "foe"));
-  assert.ok(result.accepted, result.errorCode);
-  result = applyCommand(result.nextState, finishActivation(2, "foe"));
   assert.ok(result.accepted, result.errorCode);
   state = result.nextState;
 
@@ -134,12 +130,10 @@ test("Summon opens an immediate ghost activation, then the ghost dissipates and 
 
   const braced = applyCommand(cast.nextState, defend(1, ghost.id));
   assert.ok(braced.accepted, braced.errorCode);
-  const finished = applyCommand(braced.nextState, finishActivation(1, ghost.id));
-  assert.ok(finished.accepted, finished.errorCode);
-  assert.equal(findUnit(finished.nextState, ghost.id).hp, 0);
-  assert.equal(findUnit(finished.nextState, "summoner").spent, true);
-  assert.equal(finished.nextState.activation, null);
-  assert.ok(finished.events.some((entry) => entry.type === "GHOST_DISSIPATED" && entry.unitId === ghost.id));
+  assert.equal(findUnit(braced.nextState, ghost.id).hp, 0);
+  assert.equal(findUnit(braced.nextState, "summoner").spent, true);
+  assert.equal(braced.nextState.activation, null);
+  assert.ok(braced.events.some((entry) => entry.type === "GHOST_DISSIPATED" && entry.unitId === ghost.id));
 });
 
 test("Summon rejects invalid Soul Shuffle picks and placement still uses range 3", () => {

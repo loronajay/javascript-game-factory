@@ -56,7 +56,6 @@ test("Time Steal drains enemies within 2 tiles at the rollover and refunds MP", 
   });
   let r = run(state, beginActivation(1, "p1-ft"));
   r = run(r.nextState, defend(1, "p1-ft"));
-  r = run(r.nextState, finishActivation(1, "p1-ft"));
   const next = r.nextState;
 
   assert.equal(findUnit(next, "p2-near").hp, 24); // 25 - 1 true

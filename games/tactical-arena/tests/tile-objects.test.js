@@ -13,8 +13,7 @@ import { attack, attackTile, beginActivation, defend, finishActivation, useArt }
 // firing the board-hazard tick. Returns the post-rollover state.
 function rolloverAfterP1(state, unitId = "p1") {
   let s = applyCommand(state, beginActivation(1, unitId)).nextState;
-  s = applyCommand(s, defend(1, unitId)).nextState;
-  return applyCommand(s, finishActivation(1, unitId)).nextState;
+  return applyCommand(s, defend(1, unitId)).nextState;
 }
 
 const NORMAL_HIT = { attackRoll: 0.5, critRoll: 0.99 };
@@ -216,8 +215,7 @@ test("a fire burn surfaces a FIRE_DAMAGE event for the view to animate", () => {
     tileObjects: [{ x: 5, y: 5, kind: "fire", turnsLeft: 3 }]
   });
   let s = applyCommand(state, beginActivation(1, "p1")).nextState;
-  s = applyCommand(s, defend(1, "p1")).nextState;
-  const finished = applyCommand(s, finishActivation(1, "p1"));
+  const finished = applyCommand(s, defend(1, "p1"));
   const burn = finished.events.find((e) => e.type === "FIRE_DAMAGE");
   assert.ok(burn, "rollover should surface a FIRE_DAMAGE event");
   assert.equal(burn.unitId, "p2");

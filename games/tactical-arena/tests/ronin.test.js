@@ -104,7 +104,6 @@ test("Wanderer: duel marks clear once Ronin has had his turn", () => {
   findUnit(state, "ronin").duelMarks = ["foe"];
   let s = run(state, beginActivation(1, "ronin")).nextState;
   s = run(s, defend(1, "ronin")).nextState;
-  s = run(s, finishActivation(1, "ronin")).nextState;
   assert.deepEqual(findUnit(s, "ronin").duelMarks, [], "marks reset after his activation ends");
 });
 

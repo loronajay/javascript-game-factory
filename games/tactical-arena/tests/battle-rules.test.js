@@ -253,13 +253,14 @@ test("physical damage never falls below one before defend is applied", () => {
   }).damage, 1);
 });
 
-test("defend is a primary action and clears when that unit begins its next activation", () => {
+test("defend spends the activation immediately and clears when that unit begins its next activation", () => {
   const initial = createBattleState();
   const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
   const defended = applyCommand(selected.nextState, defend(1, "p1-swordsman"));
 
   assert.equal(defended.nextState.units[0].defending, true);
-  assert.equal(defended.nextState.activation.primaryUsed, true);
+  assert.equal(defended.nextState.units[0].spent, true);
+  assert.equal(defended.nextState.activation, null);
 
   const reset = applyCommand(
     { ...defended.nextState, activation: null, units: defended.nextState.units.map((unit) => ({
@@ -271,7 +272,7 @@ test("defend is a primary action and clears when that unit begins its next activ
   assert.equal(reset.nextState.units[0].defending, false);
 });
 
-test("a unit stays active after moving and can immediately defend", () => {
+test("a unit can move and then defend to spend its activation", () => {
   const initial = createBattleState();
   const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
   const moved = applyCommand(selected.nextState, moveUnit(1, "p1-swordsman", 2, 12));
@@ -282,8 +283,8 @@ test("a unit stays active after moving and can immediately defend", () => {
 
   const defended = applyCommand(moved.nextState, defend(1, "p1-swordsman"));
   assert.equal(defended.accepted, true);
-  assert.equal(defended.nextState.activation.unitId, "p1-swordsman");
-  assert.equal(defended.nextState.activation.primaryUsed, true);
+  assert.equal(defended.nextState.activation, null);
+  assert.equal(defended.nextState.units.find((unit) => unit.id === "p1-swordsman").spent, true);
   assert.equal(defended.nextState.units.find((unit) => unit.id === "p1-swordsman").defending, true);
 });
 
@@ -378,8 +379,7 @@ test("cancel move cannot restore a spent unit", () => {
   const initial = createBattleState();
   const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
   const defended = applyCommand(selected.nextState, defend(1, "p1-swordsman"));
-  const finished = applyCommand(defended.nextState, finishActivation(1, "p1-swordsman"));
-  const cancelled = applyCommand(finished.nextState, cancelMove(1, "p1-swordsman"));
+  const cancelled = applyCommand(defended.nextState, cancelMove(1, "p1-swordsman"));
 
   assert.equal(cancelled.accepted, false);
   assert.equal(cancelled.errorCode, "NO_ACTIVATION");
@@ -574,7 +574,6 @@ test("poison damages the newly charged squad at turn rollover, honoring configur
   });
   let result = applyCommand(initial, beginActivation(1, "p1-poisoned"));
   result = applyCommand(result.nextState, defend(1, "p1-poisoned"));
-  result = applyCommand(result.nextState, finishActivation(1, "p1-poisoned"));
 
   assert.equal(result.accepted, true);
   assert.equal(result.nextState.currentPlayer, 2);
@@ -583,7 +582,6 @@ test("poison damages the newly charged squad at turn rollover, honoring configur
 
   result = applyCommand(result.nextState, beginActivation(2, "p2-swordsman"));
   result = applyCommand(result.nextState, defend(2, "p2-swordsman"));
-  result = applyCommand(result.nextState, finishActivation(2, "p2-swordsman"));
 
   assert.equal(result.accepted, true);
   assert.equal(result.nextState.units.find((unit) => unit.id === "p1-poisoned").hp, 2);
@@ -612,8 +610,7 @@ test("Moonstrike applies a one-turn status that expires after the afflicted unit
 
   const enemySelected = applyCommand(moonstrike.nextState, beginActivation(2, "p2-swordsman"));
   const enemyDefended = applyCommand(enemySelected.nextState, defend(2, "p2-swordsman"));
-  const finished = applyCommand(enemyDefended.nextState, finishActivation(2, "p2-swordsman"));
-  assert.deepEqual(finished.nextState.units.find((unit) => unit.id === "p2-swordsman").statuses, []);
+  assert.deepEqual(enemyDefended.nextState.units.find((unit) => unit.id === "p2-swordsman").statuses, []);
 });
 
 test("stunned units are auto-spent when their squad turn begins", () => {
@@ -625,8 +622,7 @@ test("stunned units are auto-spent when their squad turn begins", () => {
     ]
   });
   const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
-  const defended = applyCommand(selected.nextState, defend(1, "p1-swordsman"));
-  const finished = applyCommand(defended.nextState, finishActivation(1, "p1-swordsman"));
+  const finished = applyCommand(selected.nextState, defend(1, "p1-swordsman"));
 
   assert.equal(finished.accepted, true);
   assert.equal(finished.nextState.currentPlayer, 2);
@@ -644,8 +640,7 @@ test("a squad with only stunned units is skipped immediately", () => {
     ]
   });
   const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
-  const defended = applyCommand(selected.nextState, defend(1, "p1-swordsman"));
-  const finished = applyCommand(defended.nextState, finishActivation(1, "p1-swordsman"));
+  const finished = applyCommand(selected.nextState, defend(1, "p1-swordsman"));
 
   assert.equal(finished.accepted, true);
   assert.equal(finished.nextState.currentPlayer, 1);

@@ -108,7 +108,6 @@ test("Ore Harvest gathers weighted ore, caps at 25, and grants +1 move next turn
 
   s = run(s, beginActivation(2, "foe")).nextState;
   s = run(s, defend(2, "foe")).nextState;
-  s = run(s, finishActivation(2, "foe")).nextState;
   s = run(s, beginActivation(1, "miner")).nextState;
   assert.equal(getEffectiveStats(findUnit(s, "miner"), s).moveRange, 3);
 });

@@ -311,8 +311,7 @@ test("Black Death Stance burns every unit (incl. the Witch Doctor) 1 true dmg pe
   // The Witch Doctor is player 1's only commander, so finishing its turn rolls over
   // to player 2 — firing the Black Death tick once.
   let s = activate(state, "wd");
-  s = applyCommand(s, defend(1, "wd")).nextState;
-  const r = applyCommand(s, finishActivation(1, "wd"));
+  const r = applyCommand(s, defend(1, "wd"));
   assert.ok(r.accepted);
   assert.ok(r.events.some((e) => e.type === "BLACK_DEATH_DAMAGE"), "tick surfaced an event");
   assert.equal(findId(r.nextState, "wd").hp, 23, "the source Witch Doctor is not spared");
@@ -456,8 +455,7 @@ test("Coal Walker: fire tiles do not damage the Witch Doctor", () => {
   });
 
   let s = activate(state, "p1");
-  s = applyCommand(s, defend(1, "p1")).nextState;
-  const res = applyCommand(s, finishActivation(1, "p1"));
+  const res = applyCommand(s, defend(1, "p1"));
 
   assert.equal(findId(res.nextState, "wd").hp, 24, "Witch Doctor ignores fire tile damage");
   assert.ok(!res.events.some((e) => e.type === "FIRE_DAMAGE" && e.unitId === "wd"), "no burn event is surfaced");

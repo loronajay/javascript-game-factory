@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { applyCommand } from "../src/core/reducer.js";
-import { attack, beginActivation, moveUnit, useArt } from "../src/core/commands.js";
+import { attack, beginActivation, defend, moveUnit, useArt } from "../src/core/commands.js";
 import { createBattleState, getTileAffinity } from "../src/core/state.js";
 import { getAvailableArts, getEffectiveStats, UNIT_TYPES, isRaging } from "../src/core/unitCatalog.js";
 import { applyStatus } from "../src/rules/statuses.js";
@@ -141,6 +141,30 @@ test("Lightseeker damages light-tile enemies within five and still leaves a full
   assert.equal(attacked.accepted, true);
   const moved = applyCommand(attacked.nextState, moveUnit(1, "p1-paladin", 0, 1));
   assert.equal(moved.accepted, true);
+});
+
+test("Paladin can use a seeker bonus action before Defend, but Defend still spends the turn", () => {
+  const initial = createBattleState({
+    size: 8,
+    tiles: [{ x: 3, y: 0, affinity: "light" }],
+    units: [
+      { id: "p1-paladin", player: 1, type: "paladin", x: 0, y: 0 },
+      { id: "p2-light-near", player: 2, type: "swordsman", x: 3, y: 0 }
+    ]
+  });
+
+  const selected = applyCommand(initial, beginActivation(1, "p1-paladin"));
+  const lightseeker = applyCommand(selected.nextState, useArt(1, "p1-paladin", "lightseeker"));
+  const defended = applyCommand(lightseeker.nextState, defend(1, "p1-paladin"));
+
+  assert.equal(lightseeker.accepted, true);
+  assert.equal(lightseeker.nextState.activation.unitId, "p1-paladin");
+  assert.equal(lightseeker.nextState.activation.primaryUsed, false);
+  assert.deepEqual(lightseeker.nextState.activation.bonusActionGroups, ["seeker"]);
+  assert.equal(defended.accepted, true);
+  assert.equal(defended.nextState.activation, null);
+  assert.equal(defended.nextState.units.find((unit) => unit.id === "p1-paladin").spent, true);
+  assert.equal(defended.nextState.units.find((unit) => unit.id === "p1-paladin").defending, true);
 });
 
 test("Lightseeker and Darkseeker share a one-cast seeker lockout", () => {

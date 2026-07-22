@@ -673,8 +673,8 @@ function applyPrimaryProjection(state, board, byId, actor, primary) {
 }
 
 // Expand a plan into the begin → (bonus) → (move) → primary → (retreat) → finish
-// command sequence the reducer expects. An ART primary spends the activation itself,
-// so it gets NO trailing finishActivation; basic attack / defend do.
+// command sequence the reducer expects. ART and Defend primaries spend the activation
+// themselves, so they get no trailing finishActivation.
 //
 // `resume` omits the leading beginActivation, for a unit whose activation is ALREADY
 // open — a summoned ghost, which inherits the activation from its Summoner (see
@@ -693,8 +693,9 @@ export function toCommands(player, plan, { resume = false } = {}) {
   else if (p.kind === "defend") commands.push(defend(player, plan.unitId));
   else commands.push(artCommand(player, plan.unitId, p));
 
-  if (plan.movePhase === "after" && plan.moveTo) commands.push(moveUnit(player, plan.unitId, plan.moveTo.x, plan.moveTo.y));
-  if (!artPrimary || plan.primaryKeepsActivationOpen) commands.push(finishActivation(player, plan.unitId));
+  const defendPrimary = p.kind === "defend";
+  if (!defendPrimary && plan.movePhase === "after" && plan.moveTo) commands.push(moveUnit(player, plan.unitId, plan.moveTo.x, plan.moveTo.y));
+  if (!defendPrimary && (!artPrimary || plan.primaryKeepsActivationOpen)) commands.push(finishActivation(player, plan.unitId));
   return commands;
 }
 
