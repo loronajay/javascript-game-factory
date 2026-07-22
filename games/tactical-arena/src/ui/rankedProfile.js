@@ -187,8 +187,19 @@ function renderSignedIn(body, { pilot, standing, apiClient }) {
   // Keep the synchronous in-match cache aligned with the authoritative title.
   saveRankedName(state.title || "");
 
-  renderIdentityEditor(body, { pilot, state, apiClient });
-  renderStanding(body, standing, {
+  let standingSection = null;
+  const refreshStandingNameplate = () => {
+    if (!standingSection) return;
+    syncRankedStandingNameplate(standingSection, {
+      pilot,
+      tagline: state.title,
+      avatarUnit: state.avatarUnit,
+      avatarSkin: state.avatarSkin,
+    });
+  };
+
+  renderIdentityEditor(body, { pilot, state, apiClient, onProfileSaved: refreshStandingNameplate });
+  standingSection = renderStanding(body, standing, {
     pilot,
     tagline: state.title,
     avatarUnit: state.avatarUnit,
@@ -301,7 +312,7 @@ function maybeMigrateLegacyName(state, apiClient) {
   apiClient.saveRankedProfile(TACTICAL_ARENA_GAME_SLUG, { title: state.title }).catch(() => {});
 }
 
-function renderIdentityEditor(body, { pilot, state, apiClient }) {
+function renderIdentityEditor(body, { pilot, state, apiClient, onProfileSaved = null }) {
   const section = el("section", "ranked-profile-identity");
 
   const pilotRow = el("div", "ranked-profile-pilot");
@@ -327,6 +338,7 @@ function renderIdentityEditor(body, { pilot, state, apiClient }) {
         state.avatarUnit = profile.avatarUnit || null;
         state.avatarSkin = profile.avatarSkin || null;
         saveRankedName(state.title || "");
+        onProfileSaved?.(state);
         flashSaved();
       })
       .catch(flashError);
@@ -483,27 +495,40 @@ function ownedSkinsFor(type) {
   }
 }
 
+function renderNameplateAvatar(avatar, { pilot = "", avatarUnit = null, avatarSkin = null } = {}) {
+  avatar.replaceChildren();
+  if (avatarUnit && hasPortrait(avatarUnit)) {
+    avatar.appendChild(createPortrait(avatarUnit, { variant: "is-profile-avatar", skin: avatarSkin, eager: true }));
+  } else {
+    avatar.appendChild(el("span", "ranked-profile-avatar-initial", (pilot || "C").slice(0, 1).toUpperCase()));
+  }
+}
+
+export function syncRankedStandingNameplate(section, { pilot = "", tagline = "", avatarUnit = null, avatarSkin = null } = {}) {
+  const name = section?.querySelector?.(".ranked-profile-nameplate-name");
+  if (name) name.textContent = pilot || "Commander";
+  const taglineNode = section?.querySelector?.(".ranked-profile-nameplate-tagline");
+  if (taglineNode) taglineNode.textContent = tagline || "No tagline set";
+  const avatar = section?.querySelector?.(".ranked-profile-nameplate-avatar");
+  if (avatar) renderNameplateAvatar(avatar, { pilot, avatarUnit, avatarSkin });
+}
+
 function renderStanding(body, standing, { pilot = "", tagline = "", avatarUnit = null, avatarSkin = null } = {}) {
   const section = el("section", "ranked-profile-standing");
   if (!standing) {
     section.appendChild(el("p", "ranked-profile-standing-error", "No rating yet. Play a ranked match to get started."));
     body.appendChild(section);
-    return;
+    return section;
   }
   const tierId = normalizeRankedTierId(standing.tier);
   const tierLabel = standing.tier?.label || "Bronze";
   const rating = String(standing.rating ?? 1200);
   const nameplate = el("div", `ranked-profile-nameplate ranked-tier-${tierId}`);
   const avatar = el("div", "ranked-profile-nameplate-avatar");
-  if (avatarUnit && hasPortrait(avatarUnit)) {
-    avatar.appendChild(createPortrait(avatarUnit, { variant: "is-profile-avatar", skin: avatarSkin, eager: true }));
-  } else {
-    avatar.appendChild(el("span", "ranked-profile-avatar-initial", (pilot || "C").slice(0, 1).toUpperCase()));
-  }
   nameplate.appendChild(avatar);
   const plateCopy = el("div", "ranked-profile-nameplate-copy");
-  plateCopy.appendChild(el("span", "ranked-profile-nameplate-name", pilot || "Commander"));
-  plateCopy.appendChild(el("span", "ranked-profile-nameplate-tagline", tagline || "No tagline set"));
+  plateCopy.appendChild(el("span", "ranked-profile-nameplate-name", ""));
+  plateCopy.appendChild(el("span", "ranked-profile-nameplate-tagline", ""));
   const meta = el("span", "ranked-profile-nameplate-meta");
   meta.appendChild(el("b", `ranked-profile-tier ranked-tier-${tierId}`, tierLabel));
   meta.appendChild(el("span", "ranked-profile-rating-inline", `${rating} rating`));
@@ -516,5 +541,7 @@ function renderStanding(body, standing, { pilot = "", tagline = "", avatarUnit =
   if (standing.activeMatch) {
     section.appendChild(el("p", "ranked-profile-activematch", "You have a ranked match in progress."));
   }
+  syncRankedStandingNameplate(section, { pilot, tagline, avatarUnit, avatarSkin });
   body.appendChild(section);
+  return section;
 }

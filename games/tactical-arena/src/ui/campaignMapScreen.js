@@ -24,7 +24,7 @@ import {
   selectCampaignRewardSkin,
 } from "../progression/unlocks.js";
 import {
-  enqueueDraftBattleUnlockAnnouncement,
+  enqueueBattleModeUnlockAnnouncements,
   enqueueUnitUnlockAnnouncements,
 } from "../progression/announcements.js";
 import {
@@ -470,7 +470,7 @@ export function createCampaignMapScreen({
     if (!result.accepted) return null;
     void syncGameProgress();
     enqueueUnitUnlockAnnouncements(globalThis.localStorage, [choice], { ignoreSeen: true });
-    enqueueDraftBattleUnlockAnnouncement(globalThis.localStorage);
+    enqueueBattleModeUnlockAnnouncements(globalThis.localStorage);
     if (isActive()) renderCampaign();
     return choice;
   }

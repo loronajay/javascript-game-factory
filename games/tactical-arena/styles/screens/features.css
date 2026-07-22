@@ -282,9 +282,10 @@
 .ranked-leaderboard-rank { color:var(--brass-hi); font:900 .85rem var(--font-display); letter-spacing:.02em; text-align:center; }
 .ranked-leaderboard-avatar { width:2.4rem; height:2.9rem; }
 .ranked-leaderboard-avatar .unit-portrait.is-thumb { width:100%; height:100%; border:1px solid var(--parchment-edge); border-radius:6px; overflow:hidden; background:rgba(8,18,32,.55); }
-.ranked-leaderboard-name { display:grid; gap:.1rem; min-width:0; }
-.ranked-leaderboard-title { color:var(--text); font:800 .8rem var(--font-display); letter-spacing:.02em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.ranked-leaderboard-record { color:var(--muted); font:600 .58rem var(--font-display); letter-spacing:.02em; }
+.ranked-leaderboard-name { display:grid; gap:.08rem; min-width:0; }
+.ranked-leaderboard-player { color:var(--text); font:800 .8rem var(--font-display); letter-spacing:.02em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ranked-leaderboard-title { color:var(--muted); font:700 .62rem var(--font-display); letter-spacing:.02em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ranked-leaderboard-record { color:var(--muted); font:600 .56rem var(--font-display); letter-spacing:.02em; }
 .ranked-leaderboard-standing { display:flex; align-items:center; justify-content:flex-end; gap:.35rem; min-width:5.8rem; }
 .ranked-leaderboard-standing-copy { display:grid; justify-items:end; gap:.08rem; min-width:0; }
 .ranked-leaderboard-tier { font:800 .56rem var(--font-display); letter-spacing:.06em; text-transform:uppercase; }

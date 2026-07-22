@@ -1,6 +1,6 @@
 // Ranked Leaderboard — the top-N ranked ladder for Tactical Arena (Phase 4 of
 // RANKED_FEATURE_PLAN.md). A read-only modal over the public leaderboard endpoint;
-// each row shows rank, avatar, ranked title, tier + rating, and W/L/D. The signed-in
+// each row shows rank, avatar, player name, ranked tagline, tier + rating, and W/L/D. The signed-in
 // player's own row is highlighted. Structurally mirrors rankedProfile.js.
 import { el } from "./domHelpers.js";
 import { createPlatformApiClient } from "../../../../js/platform/api/platform-api.mjs";
@@ -18,6 +18,21 @@ import { createRankedTierEmblem, normalizeRankedTierId } from "./rankedEmblems.j
 const LEADERBOARD_LIMIT = 50;
 
 let host = null;
+
+function cleanText(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function leaderboardPlayerName(entry, isMe) {
+  return cleanText(entry.displayName)
+    || cleanText(entry.playerName)
+    || cleanText(entry.profileName)
+    || (isMe ? "You" : "Commander");
+}
+
+function leaderboardTagline(entry) {
+  return cleanText(entry.tagline) || cleanText(entry.title);
+}
 
 function ensureHost() {
   if (host) return host;
@@ -104,7 +119,7 @@ function populate(body) {
     });
 }
 
-function renderLeaderboard(body, entries) {
+export function renderLeaderboard(body, entries) {
   body.replaceChildren();
   if (!entries.length) {
     body.appendChild(el("p", "ranked-profile-meta-empty", "No ranked players yet. Play a ranked match to claim the top spot."));
@@ -126,7 +141,9 @@ function renderLeaderboard(body, entries) {
     row.appendChild(avatar);
 
     const name = el("div", "ranked-leaderboard-name");
-    name.appendChild(el("span", "ranked-leaderboard-title", entry.title || (isMe ? "You" : "Commander")));
+    name.appendChild(el("span", "ranked-leaderboard-player", leaderboardPlayerName(entry, isMe)));
+    const tagline = leaderboardTagline(entry);
+    if (tagline) name.appendChild(el("span", "ranked-leaderboard-title", tagline));
     const record = `${entry.wins || 0}W / ${entry.losses || 0}L / ${entry.draws || 0}D`;
     name.appendChild(el("span", "ranked-leaderboard-record", record));
     row.appendChild(name);

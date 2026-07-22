@@ -11,7 +11,7 @@ import {
   readUnlockProgress,
   writeUnlockProgress
 } from "../progression/unlocks.js";
-import { enqueueDraftBattleUnlockAnnouncement, enqueueUnitUnlockAnnouncements, enqueueValorGainAnnouncement } from "../progression/announcements.js";
+import { enqueueBattleModeUnlockAnnouncements, enqueueUnitUnlockAnnouncements, enqueueValorGainAnnouncement } from "../progression/announcements.js";
 import {
   buildTutorialCompleteClaim,
   buildTutorialUnitRewardClaim,
@@ -43,7 +43,7 @@ export function completeTutorial(storage, tutorialId) {
   }
   if (!previouslyComplete && next.allTutorialsComplete) {
     enqueueUnitUnlockAnnouncements(storage, [TUTORIAL_JUGGERNAUT_REWARD_UNIT], { ignoreSeen: true });
-    enqueueDraftBattleUnlockAnnouncement(storage);
+    enqueueBattleModeUnlockAnnouncements(storage);
   }
   if (shouldGrantTutorialValor) {
     enqueueGameProgressClaim(storage, buildTutorialValorClaim({

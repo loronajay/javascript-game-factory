@@ -37,7 +37,7 @@ import {
 import { getUnitType } from "../core/unitCatalog.js";
 import { STARTER_UNIT_TYPES, readUnlockProgress, writeUnlockProgress } from "../progression/unlocks.js";
 import { grantCampaignMissionValor } from "../progression/valorRewards.js";
-import { enqueueDraftBattleUnlockAnnouncement, enqueueSkinUnlockAnnouncements, enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
+import { enqueueBattleModeUnlockAnnouncements, enqueueSkinUnlockAnnouncements, enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
 import {
   buildCampaignSkinRewardClaim,
   buildCampaignUnitRewardClaim,
@@ -569,7 +569,7 @@ export function completeCampaignMission(storage = defaultStorage(), missionId, s
   }
   enqueueUnitUnlockAnnouncements(storage, newRewardUnits, { ignoreSeen: true });
   enqueueSkinUnlockAnnouncements(storage, newRewardSkins, { ignoreSeen: true });
-  enqueueDraftBattleUnlockAnnouncement(storage);
+  enqueueBattleModeUnlockAnnouncements(storage);
 
   return {
     ...evaluation,

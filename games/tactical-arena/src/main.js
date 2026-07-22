@@ -35,7 +35,9 @@ import { createCampaignMeta } from "./campaign/campaignMeta.js";
 import { fetchGameProgressSnapshot, flushPendingGameProgressClaims } from "./platform/gameProgressClient.js";
 import { fulfillReturnedPremiumCheckout } from "./platform/premiumCheckoutClient.js";
 import { readStoredFactoryAccountSession } from "./platform/factoryAccount.js";
-import { mergeServerEntitlementsIntoUnlockProgress } from "./progression/unlocks.js";
+import { mergeServerEntitlementsIntoUnlockProgress, readUnlockProgress } from "./progression/unlocks.js";
+import { enqueuePurchasedUnlockAnnouncements } from "./progression/announcements.js";
+import { showPendingProgressionAnnouncements } from "./ui/progressionAnnouncements.js";
 
 // --- DOM refs ---
 const board = document.querySelector("#boardSvg");
@@ -123,8 +125,12 @@ async function syncGameProgress() {
   if (!snapshot && flushResult.ok) {
     snapshot = await fetchGameProgressSnapshot();
   }
-  if (snapshot) mergeServerEntitlementsIntoUnlockProgress(storage, snapshot);
-  return flushResult;
+  if (snapshot) {
+    const beforeProgress = readUnlockProgress(storage);
+    const afterProgress = mergeServerEntitlementsIntoUnlockProgress(storage, snapshot);
+    enqueuePurchasedUnlockAnnouncements(storage, beforeProgress, afterProgress);
+  }
+  return { ...flushResult, checkoutResult };
 }
 
 function isCpu(player) {
@@ -815,4 +821,6 @@ document.addEventListener("keydown", (event) => {
 
 // --- Boot ---
 menu.show("title");
-void syncGameProgress();
+void syncGameProgress().then((result) => {
+  if (result?.checkoutResult?.progress) void showPendingProgressionAnnouncements(globalThis.localStorage);
+});

@@ -10,17 +10,22 @@ import {
 } from "../src/campaign/campaign.js";
 import { writeUnlockProgress } from "../src/progression/unlocks.js";
 import {
+  buildRankedBattleUnlockAnnouncement,
   buildValorGainAnnouncement,
   buildDraftBattleUnlockAnnouncement,
   consumeProgressionAnnouncements,
   enqueueDraftBattleUnlockAnnouncement,
+  enqueuePurchasedUnlockAnnouncements,
+  enqueueRankedBattleUnlockAnnouncement,
   enqueueSkinUnlockAnnouncements,
   enqueueUnitUnlockAnnouncements,
   enqueueValorGainAnnouncement,
+  markProgressionAnnouncementsSeen,
   readProgressionAnnouncements,
   readSeenProgressionAnnouncementIds,
   syncMissingUnitUnlockAnnouncements,
 } from "../src/progression/announcements.js";
+import { readUnlockProgress } from "../src/progression/unlocks.js";
 
 function storageAdapter() {
   const values = new Map();
@@ -167,6 +172,91 @@ test("draft battle achievement queues once when the account has eight known unit
   assert.deepEqual(enqueueDraftBattleUnlockAnnouncement(storage), []);
 });
 
+test("ranked battle achievement queues once when the account has ten known units", () => {
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, {
+    unlockedUnits: [
+      "swordsman",
+      "archer",
+      "mystic",
+      "magician",
+      "clod",
+      "necromancer",
+      "witch-doctor",
+      "father-time",
+      "virus",
+    ],
+  });
+
+  enqueueRankedBattleUnlockAnnouncement(storage);
+  assert.deepEqual(readProgressionAnnouncements(storage), []);
+
+  writeUnlockProgress(storage, {
+    unlockedUnits: [
+      "swordsman",
+      "archer",
+      "mystic",
+      "magician",
+      "clod",
+      "necromancer",
+      "witch-doctor",
+      "father-time",
+      "virus",
+      "paladin",
+    ],
+  });
+  const pending = enqueueRankedBattleUnlockAnnouncement(storage);
+
+  assert.deepEqual(pending.map((announcement) => announcement.id), ["mode-unlock:ranked-battles"]);
+  assert.deepEqual(buildRankedBattleUnlockAnnouncement(), {
+    id: "mode-unlock:ranked-battles",
+    kind: "mode-unlock",
+    mode: "ranked-battles",
+    eyebrow: "Achievement",
+    title: "Ranked Matches Available",
+    body: "You own 10 unique units, enough for ranked drafts with bans. Ranked Match is now available in Online Versus.",
+    primaryLabel: "Continue",
+  });
+
+  consumeProgressionAnnouncements(storage);
+  assert.deepEqual(enqueueRankedBattleUnlockAnnouncement(storage), []);
+});
+
+test("shop purchase announcements include purchased unlocks and ranked threshold", () => {
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, {
+    unlockedUnits: [
+      "swordsman",
+      "archer",
+      "mystic",
+      "magician",
+      "clod",
+      "necromancer",
+      "witch-doctor",
+      "father-time",
+      "virus",
+    ],
+    purchasedSkins: [],
+  });
+  markProgressionAnnouncementsSeen(storage, [buildDraftBattleUnlockAnnouncement()]);
+  const before = readUnlockProgress(storage);
+
+  writeUnlockProgress(storage, {
+    ...before,
+    unlockedUnits: [...before.unlockedUnits, "paladin"],
+    purchasedSkins: [{ type: "swordsman", slug: "summer-vibes" }],
+  });
+  const after = readUnlockProgress(storage);
+
+  enqueuePurchasedUnlockAnnouncements(storage, before, after);
+
+  assert.deepEqual(readProgressionAnnouncements(storage).map((announcement) => announcement.id), [
+    "unit-unlock:paladin",
+    "skin-unlock:swordsman:summer-vibes",
+    "mode-unlock:ranked-battles",
+  ]);
+});
+
 test("tutorial Valor gain queues an achievement-style announcement once", () => {
   const storage = storageAdapter();
 
@@ -211,6 +301,37 @@ test("existing eight-unit profiles are audited into the draft battle achievement
     "unit-unlock:witch-doctor",
     "unit-unlock:father-time",
     "mode-unlock:draft-battles",
+  ]);
+});
+
+test("existing ten-unit profiles are audited into the ranked battle achievement", () => {
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, {
+    unlockedUnits: [
+      "swordsman",
+      "archer",
+      "mystic",
+      "magician",
+      "clod",
+      "necromancer",
+      "witch-doctor",
+      "father-time",
+      "virus",
+      "paladin",
+    ],
+  });
+
+  const pending = syncMissingUnitUnlockAnnouncements(storage);
+
+  assert.deepEqual(pending.map((announcement) => announcement.id), [
+    "unit-unlock:clod",
+    "unit-unlock:necromancer",
+    "unit-unlock:witch-doctor",
+    "unit-unlock:father-time",
+    "unit-unlock:virus",
+    "unit-unlock:paladin",
+    "mode-unlock:draft-battles",
+    "mode-unlock:ranked-battles",
   ]);
 });
 

@@ -3,10 +3,12 @@ import { createPortrait } from "./portraits.js";
 import { el } from "./domHelpers.js";
 
 let host = null;
+let hostDocument = null;
 
 function ensureHost() {
-  if (host) return host;
+  if (host && hostDocument === document) return host;
   host = document.createElement("div");
+  hostDocument = document;
   host.className = "ref-modal progression-announcement-modal";
   host.hidden = true;
   document.body.appendChild(host);
@@ -73,7 +75,7 @@ export function openProgressionAnnouncement(announcement) {
     overlay.addEventListener("click", onOverlay);
     document.addEventListener("keydown", onKey);
     overlay.hidden = false;
-    button.focus();
+    button.focus?.();
   });
 }
 

@@ -82,6 +82,8 @@ class FakeElement {
     this.parentElement = null;
   }
 
+  focus() {}
+
   dispatchEvent(event) {
     for (const handler of this.listeners.get(event.type) ?? []) handler(event);
     return true;
@@ -336,6 +338,10 @@ test("shop skin cards offer USD checkout and Valor purchase buttons", () => {
   progress = readUnlockProgress(storage);
   assert.equal(progress.valorBalance, 2150);
   assert.ok(progress.purchasedSkins.some((skin) => skin.slug === "summer-vibes"));
+  const skinAnnouncement = document.body.children.find((node) => hasClass(node, "progression-announcement-modal"));
+  assert.ok(skinAnnouncement, "skin purchases should open an achievement popup");
+  assert.equal(skinAnnouncement.hidden, false);
+  assert.match(visibleText(skinAnnouncement), /Summer Vibes .* Unlocked/);
   assert.ok(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent.includes("Summer Vibes unlocked"));
   const ownedSkinCard = walk(overlay, (node) => hasClass(node, "shop-skin") && hasClass(node, "is-owned"))[0];
   assert.ok(ownedSkinCard, "Valor purchase should flip the skin card to owned");
@@ -433,6 +439,10 @@ test("shop skin USD purchase embeds Stripe checkout through the configured endpo
   assert.equal(fetchCalls[1].url, "https://factory.example/api/tactical-arena/checkout-sessions/fulfill");
   assert.equal(walk(overlay, (node) => hasClass(node, "shop-checkout-dialog")).length, 0);
   assert.equal(isProgressSkinUnlocked("swordsman", "summer-vibes", storage), true);
+  const announcement = document.body.children.find((node) => hasClass(node, "progression-announcement-modal"));
+  assert.ok(announcement, "checkout fulfillment should open an unlock popup");
+  assert.equal(announcement.hidden, false);
+  assert.match(visibleText(announcement), /Summer Vibes Swordsman Unlocked/);
   assert.match(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent, /Summer Vibes unlocked/);
 });
 
@@ -508,6 +518,10 @@ test("shop unit USD purchase embeds Stripe checkout without spending Valor", asy
   assert.equal(fetchCalls.length, 2);
   assert.equal(readUnlockProgress(storage).valorBalance, 999);
   assert.ok(readUnlockProgress(storage).unlockedUnits.includes("clod"));
+  const announcement = document.body.children.find((node) => hasClass(node, "progression-announcement-modal"));
+  assert.ok(announcement, "checkout fulfillment should open a unit unlock popup");
+  assert.equal(announcement.hidden, false);
+  assert.match(visibleText(announcement), /Clod Unlocked/);
 });
 
 test("shop skin packs render clickable contents and use Valor confirmation", () => {
@@ -673,6 +687,10 @@ test("shop unit Valor purchase flips the unit card to one owned button", () => {
   progress = readUnlockProgress(storage);
   assert.equal(progress.valorBalance, 349);
   assert.ok(progress.unlockedUnits.includes("clod"));
+  const announcement = document.body.children.find((node) => hasClass(node, "progression-announcement-modal"));
+  assert.ok(announcement, "unit purchases should open an achievement popup");
+  assert.equal(announcement.hidden, false);
+  assert.match(visibleText(announcement), /Clod Unlocked/);
   const ownedClodCard = walk(overlay, (node) => hasClass(node, "shop-unit") && hasClass(node, "is-owned") && visibleText(node).includes("Clod"))[0];
   assert.ok(ownedClodCard, "Valor purchase should flip the unit card to owned");
   const ownedButtons = walk(ownedClodCard, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-buy-btn"));

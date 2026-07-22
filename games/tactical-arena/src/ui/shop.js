@@ -19,7 +19,8 @@ import {
   premiumCheckoutErrorMessage,
   startPremiumCheckout,
 } from "../platform/premiumCheckoutClient.js";
-import { mergeServerEntitlementsIntoUnlockProgress } from "../progression/unlocks.js";
+import { mergeServerEntitlementsIntoUnlockProgress, readUnlockProgress } from "../progression/unlocks.js";
+import { enqueuePurchasedUnlockAnnouncements } from "../progression/announcements.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { groupedUnitTypes } from "./squadModel.js";
 import { el } from "./domHelpers.js";
@@ -27,6 +28,7 @@ import { unitDetailHtml } from "./codex.js";
 import { createConsumableIcon } from "./consumableIcons.js";
 import { createPortrait } from "./portraits.js";
 import { openSkinViewer } from "./skinGallery.js";
+import { showPendingProgressionAnnouncements } from "./progressionAnnouncements.js";
 
 let host = null;
 let hostDocument = null;
@@ -420,7 +422,13 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
       offer.type === pendingValorPurchase.type && offer.slug === pendingValorPurchase.slug) ?? null;
   }
 
+  function announcePurchaseProgress(beforeProgress, afterProgress) {
+    enqueuePurchasedUnlockAnnouncements(storage, beforeProgress, afterProgress);
+    void showPendingProgressionAnnouncements(storage);
+  }
+
   function confirmValorPurchase(kind, offer) {
+    const beforeProgress = readUnlockProgress(storage);
     const result = kind === "skin"
       ? purchaseSkinWithValor(storage, offer.type, offer.slug, { account })
       : kind === "skin-pack"
@@ -440,6 +448,7 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
         ? skinValorPurchaseStatus(result)
         : unitPurchaseStatus(result);
     render();
+    if (result.accepted) announcePurchaseProgress(beforeProgress, result.progress);
   }
 
   async function beginPremiumCheckout(offer) {
@@ -477,11 +486,15 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
         stripeFactory: options.stripeFactory,
         stripeJsUrl: options.stripeJsUrl,
         onComplete: async (fulfillment) => {
-          if (fulfillment?.progress) mergeServerEntitlementsIntoUnlockProgress(storage, fulfillment.progress);
+          const beforeProgress = readUnlockProgress(storage);
+          const nextProgress = fulfillment?.progress
+            ? mergeServerEntitlementsIntoUnlockProgress(storage, fulfillment.progress)
+            : beforeProgress;
           premiumCheckoutInFlight = false;
           statusText = `${offer.name} unlocked.`;
           closePremiumCheckoutLayer();
           render();
+          if (fulfillment?.progress) announcePurchaseProgress(beforeProgress, nextProgress);
         },
       });
       premiumCheckoutInstance = checkoutResult.checkout || null;

@@ -1,5 +1,11 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
-import { DRAFT_BATTLE_REQUIRED_UNITS, isDraftBattleAvailable, isDraftableProgressionUnit } from "./draftAvailability.js";
+import {
+  DRAFT_BATTLE_REQUIRED_UNITS,
+  RANKED_BATTLE_REQUIRED_UNITS,
+  isDraftBattleAvailable,
+  isDraftableProgressionUnit,
+  isRankedBattleAvailable,
+} from "./draftAvailability.js";
 import { STARTER_UNIT_TYPES, VALOR_RESOURCE, readUnlockProgress } from "./unlocks.js";
 
 export const PROGRESSION_ANNOUNCEMENTS_KEY = "tacticalArenaProgressionAnnouncementsV1";
@@ -11,6 +17,24 @@ function defaultStorage() {
 
 function uniqueStrings(values) {
   return [...new Set((Array.isArray(values) ? values : []).filter((value) => typeof value === "string" && value))];
+}
+
+function skinKey(skin) {
+  return skin && typeof skin.type === "string" && typeof skin.slug === "string"
+    ? `${skin.type}:${skin.slug}`
+    : "";
+}
+
+function uniqueSkins(values) {
+  const out = [];
+  const seen = new Set();
+  for (const skin of Array.isArray(values) ? values : []) {
+    const key = skinKey(skin);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ type: skin.type, slug: skin.slug });
+  }
+  return out;
 }
 
 function readJsonArray(storage, key) {
@@ -84,6 +108,18 @@ export function buildDraftBattleUnlockAnnouncement() {
   };
 }
 
+export function buildRankedBattleUnlockAnnouncement() {
+  return {
+    id: "mode-unlock:ranked-battles",
+    kind: "mode-unlock",
+    mode: "ranked-battles",
+    eyebrow: "Achievement",
+    title: "Ranked Matches Available",
+    body: `You own ${RANKED_BATTLE_REQUIRED_UNITS} unique units, enough for ranked drafts with bans. Ranked Match is now available in Online Versus.`,
+    primaryLabel: "Continue",
+  };
+}
+
 export function buildValorGainAnnouncement({ id, amount, title, body, eyebrow = "Achievement" } = {}) {
   const rawId = typeof id === "string" && id.trim() ? id.trim() : null;
   const normalizedId = rawId?.startsWith("valor-gain:") ? rawId.slice("valor-gain:".length) : rawId;
@@ -109,6 +145,7 @@ export function normalizeProgressionAnnouncement(value) {
     slug: value.skinSlug ?? value.slug,
   });
   if (value.kind === "mode-unlock" && value.mode === "draft-battles") return buildDraftBattleUnlockAnnouncement();
+  if (value.kind === "mode-unlock" && value.mode === "ranked-battles") return buildRankedBattleUnlockAnnouncement();
   if (value.kind === "valor-gain") return buildValorGainAnnouncement(value);
   return null;
 }
@@ -181,11 +218,41 @@ export function enqueueDraftBattleUnlockAnnouncement(storage = defaultStorage())
   return enqueueProgressionAnnouncements(storage, [buildDraftBattleUnlockAnnouncement()]);
 }
 
+export function enqueueRankedBattleUnlockAnnouncement(storage = defaultStorage()) {
+  if (!isRankedBattleAvailable(storage)) return readProgressionAnnouncements(storage);
+  return enqueueProgressionAnnouncements(storage, [buildRankedBattleUnlockAnnouncement()]);
+}
+
+export function enqueueBattleModeUnlockAnnouncements(storage = defaultStorage()) {
+  enqueueDraftBattleUnlockAnnouncement(storage);
+  return enqueueRankedBattleUnlockAnnouncement(storage);
+}
+
+export function enqueuePurchasedUnlockAnnouncements(storage = defaultStorage(), beforeProgress = {}, afterProgress = {}, options = {}) {
+  const ignoreSeen = options.ignoreSeen ?? true;
+  const beforeUnits = new Set(uniqueStrings(beforeProgress?.unlockedUnits));
+  const newlyUnlockedUnits = uniqueStrings(afterProgress?.unlockedUnits)
+    .filter((type) => !beforeUnits.has(type));
+
+  const beforePurchasedSkins = new Set(uniqueSkins([
+    ...(beforeProgress?.purchasedSkins ?? []),
+    ...(beforeProgress?.serverEntitlementSkins ?? []),
+  ]).map(skinKey));
+  const newlyPurchasedSkins = uniqueSkins([
+    ...(afterProgress?.purchasedSkins ?? []),
+    ...(afterProgress?.serverEntitlementSkins ?? []),
+  ]).filter((skin) => !beforePurchasedSkins.has(skinKey(skin)));
+
+  enqueueUnitUnlockAnnouncements(storage, newlyUnlockedUnits, { ignoreSeen });
+  enqueueSkinUnlockAnnouncements(storage, newlyPurchasedSkins, { ignoreSeen });
+  return enqueueBattleModeUnlockAnnouncements(storage);
+}
+
 export function syncMissingUnitUnlockAnnouncements(storage = defaultStorage()) {
   const starterUnits = new Set(STARTER_UNIT_TYPES);
   const unlockedUnits = readUnlockProgress(storage).unlockedUnits.filter((type) => !starterUnits.has(type));
   enqueueUnitUnlockAnnouncements(storage, unlockedUnits);
-  return enqueueDraftBattleUnlockAnnouncement(storage);
+  return enqueueBattleModeUnlockAnnouncements(storage);
 }
 
 export function consumeProgressionAnnouncements(storage = defaultStorage()) {

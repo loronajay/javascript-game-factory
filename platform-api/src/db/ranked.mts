@@ -764,8 +764,11 @@ export async function getRankedLeaderboard(pool: any, { gameSlug, limit }: any):
   try {
     const res = await pool.query(
       `select r.player_id, r.rating, r.wins, r.losses, r.draws,
+              pp.profile_name,
               p.title, p.avatar_unit, p.avatar_skin
          from game_ratings r
+         left join player_profiles pp
+           on pp.player_id = r.player_id
          left join ranked_profiles p
            on p.player_id = r.player_id and p.game_slug = r.game_slug
         where r.game_slug = $1
@@ -783,6 +786,7 @@ export async function getRankedLeaderboard(pool: any, { gameSlug, limit }: any):
         wins: row.wins,
         losses: row.losses,
         draws: row.draws,
+        displayName: row.profile_name || null,
         title: row.title || null,
         avatarUnit: row.avatar_unit || null,
         avatarSkin: row.avatar_skin || null,
