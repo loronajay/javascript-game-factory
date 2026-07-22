@@ -58,10 +58,14 @@ test("ranked avatar sprite styles use prepared sheets without per-sheet nudges",
   assert.equal(first.nudgeY, secondSheet.nudgeY);
 });
 
-test("ranked avatar css keeps sprite cells square inside portrait-shaped frames", () => {
+test("ranked avatar css sizes square sprite cells for both square and portrait ranked frames", () => {
   const css = readFileSync(join(GAME_ROOT, "styles/screens/features.css"), "utf8");
   assert.match(
     css,
-    /\.ranked-avatar-icon-sprite\s*\{[^}]*width:108%[^}]*aspect-ratio:1\/1[^}]*transform:translate\(calc\(-50% \+ var\(--avatar-nudge-x,0\)\),calc\(-50% \+ var\(--avatar-nudge-y,0\)\)\)/s,
+    /\.ranked-avatar-icon-sprite\s*\{[^}]*width:var\(--avatar-sprite-width,108%\)[^}]*height:var\(--avatar-sprite-height,auto\)[^}]*aspect-ratio:1\/1[^}]*transform:translate\(calc\(-50% \+ var\(--avatar-nudge-x,0\)\),calc\(-50% \+ var\(--avatar-nudge-y,0\)\)\)/s,
+  );
+  assert.match(
+    css,
+    /\.ranked-avatar-icon:is\(\.is-profile-avatar,\.is-ranked-avatar,\.is-thumb\)\s*\{[^}]*--avatar-sprite-width:auto[^}]*--avatar-sprite-height:96%/s,
   );
 });
