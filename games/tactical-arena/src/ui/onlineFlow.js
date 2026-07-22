@@ -34,6 +34,7 @@ import { syncRankedPilotProfile } from "../online/rankedPilotProfile.js";
 import { loadRankedName } from "./rankedNameModel.js";
 import { readStoredFactoryAccountSession } from "../platform/factoryAccount.js";
 import { TACTICAL_ARENA_GAME_SLUG } from "../platform/gameProgressClient.js";
+import { syncRankedAccountFeatureControls } from "./rankedFeatureGate.js";
 import { createPlatformApiClient } from "../../../../js/platform/api/platform-api.mjs";
 import { publishTacticalArenaMatchActivity } from "../../../../js/platform/activity/activity.mjs";
 
@@ -364,7 +365,8 @@ export function createOnlineFlow({ onStartMatch }) {
   // Switches the idle panel between the casual pairing flow and the ranked
   // matchmaking flow. Leaving ranked abandons any in-flight search.
   function setOnlineMode(mode) {
-    const next = mode === "ranked" ? "ranked" : "casual";
+    const accountState = syncRankedAccountFeatureControls(el);
+    const next = mode === "ranked" && accountState.enabled ? "ranked" : "casual";
     onlineMode = next;
     for (const seg of modeSegs) seg.classList.toggle("is-selected", seg.dataset.onlineMode === next);
     if (casualModePanel) casualModePanel.hidden = next !== "casual";
@@ -378,6 +380,7 @@ export function createOnlineFlow({ onStartMatch }) {
   // the pool is too small the Find button is disabled and the hint says how many more.
   function syncRankedAvailability() {
     if (!rankedBtn || rankedMode) return; // don't fight the live Cancel state
+    syncRankedAccountFeatureControls(el);
     const accountGate = getRankedAccountGate(readStoredFactoryAccountSession());
     const enough = isRankedUnlockable();
     rankedBtn.disabled = !accountGate.eligible || !enough;
@@ -398,6 +401,7 @@ export function createOnlineFlow({ onStartMatch }) {
     }
     // Lock the Casual/Ranked toggle while a search is live — Cancel or Back to leave.
     for (const seg of modeSegs) seg.disabled = !!searching;
+    if (!searching) syncRankedAccountFeatureControls(el);
   }
 
   async function startRanked() {
@@ -1202,6 +1206,7 @@ export function createOnlineFlow({ onStartMatch }) {
     myClientId = null;
     rankedInfo = null;
     rankedBanFirstSeat = null;
+    syncRankedAccountFeatureControls(el);
     selectMatchType("duel");
     setOnlineMode("casual"); // resets ranked search + shows the casual pairing flow
     resetLobbyState();

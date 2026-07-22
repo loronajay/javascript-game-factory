@@ -20,6 +20,7 @@ import { createResultsScreen } from "./resultsScreen.js";
 import { createTutorialMenuScreens } from "./tutorialMenuScreens.js";
 import { createSettingsScreen } from "./settingsScreen.js";
 import { createTutorialMatchConfig } from "../tutorials/basics.js";
+import { syncRankedAccountFeatureControls } from "./rankedFeatureGate.js";
 
 export function syncScreenMusic(audio, screenName) {
   if (!screenName) return;
@@ -40,7 +41,10 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   }
   screens.register("mainMenu", {
     el: screenEl("mainMenu"),
-    onEnter: () => showQueuedProgressionAnnouncements({ audit: true }),
+    onEnter: () => {
+      syncRankedAccountFeatureControls(screenEl("mainMenu"));
+      showQueuedProgressionAnnouncements({ audit: true });
+    },
   });
   // The match screen disposes a live online session when left mid-game.
   screens.register("match", { el: screenEl("match"), onExit: () => onLeaveMatch?.() });
