@@ -3,12 +3,14 @@ import { normalizeFactoryAccountSession } from "./factoryAccount.js";
 export const CHECKOUT_API_UNAVAILABLE_ERROR = "CHECKOUT_API_UNAVAILABLE";
 export const CHECKOUT_RESPONSE_INVALID_ERROR = "CHECKOUT_RESPONSE_INVALID";
 export const CHECKOUT_OFFER_INVALID_ERROR = "CHECKOUT_OFFER_INVALID";
+export const CHECKOUT_EMBED_UNAVAILABLE_ERROR = "CHECKOUT_EMBED_UNAVAILABLE";
 export const DEFAULT_PREMIUM_CHECKOUT_ENDPOINT = "/api/tactical-arena/checkout-sessions";
 export const DEFAULT_PREMIUM_CHECKOUT_FULFILLMENT_ENDPOINT = "/api/tactical-arena/checkout-sessions/fulfill";
 export const PLATFORM_PREMIUM_CHECKOUT_PATH = "/payments/tactical-arena/checkout-sessions";
 export const PLATFORM_PREMIUM_CHECKOUT_FULFILLMENT_PATH = "/payments/tactical-arena/checkout-sessions/fulfill";
 export const PREMIUM_CHECKOUT_EVENT = "tacticalarena:premium-purchase-request";
 export const PENDING_PREMIUM_CHECKOUT_SESSION_KEY = "tactical-arena.pendingPremiumCheckoutSessionId";
+export const STRIPE_JS_URL = "https://js.stripe.com/clover/stripe.js";
 export const TACTICAL_ARENA_GAME_SLUG = "tactical-arena";
 
 function cleanText(value, maxLength = 500) {
@@ -31,6 +33,10 @@ function defaultFetchImpl() {
 
 function defaultStorageRef() {
   return globalThis.localStorage || globalThis.sessionStorage;
+}
+
+function defaultDocumentRef() {
+  return globalThis.document;
 }
 
 function configuredEndpoint() {
@@ -187,6 +193,14 @@ function readCheckoutUrl(data) {
   return cleanText(data?.url || data?.checkoutUrl || data?.checkoutSessionUrl, 2000);
 }
 
+function readClientSecret(data) {
+  return cleanText(data?.clientSecret || data?.client_secret, 500);
+}
+
+function readPublishableKey(data) {
+  return cleanText(data?.publishableKey || data?.stripePublishableKey, 500);
+}
+
 async function readJson(response) {
   if (!response || typeof response.json !== "function") return null;
   try {
@@ -196,6 +210,43 @@ async function readJson(response) {
   }
 }
 
+function defaultStripeFactory() {
+  return typeof globalThis.Stripe === "function" ? globalThis.Stripe : null;
+}
+
+function loadStripeFactory({
+  documentRef = defaultDocumentRef(),
+  stripeFactory = defaultStripeFactory(),
+  stripeJsUrl = STRIPE_JS_URL,
+} = {}) {
+  if (typeof stripeFactory === "function") return Promise.resolve(stripeFactory);
+  if (!documentRef?.createElement) return Promise.resolve(null);
+
+  return new Promise((resolve) => {
+    const existing = typeof documentRef.querySelector === "function"
+      ? documentRef.querySelector(`script[src="${stripeJsUrl}"]`)
+      : null;
+    if (existing) {
+      existing.addEventListener?.("load", () => resolve(defaultStripeFactory()), { once: true });
+      existing.addEventListener?.("error", () => resolve(null), { once: true });
+      if (defaultStripeFactory()) resolve(defaultStripeFactory());
+      return;
+    }
+
+    const script = documentRef.createElement("script");
+    script.src = stripeJsUrl;
+    script.async = true;
+    script.addEventListener("load", () => resolve(defaultStripeFactory()), { once: true });
+    script.addEventListener("error", () => resolve(null), { once: true });
+    const target = documentRef.head || documentRef.body || documentRef.documentElement;
+    if (!target?.appendChild) {
+      resolve(null);
+      return;
+    }
+    target.appendChild(script);
+  });
+}
+
 export async function startPremiumCheckout({
   offer,
   account = {},
@@ -203,6 +254,11 @@ export async function startPremiumCheckout({
   fetchImpl = defaultFetchImpl(),
   locationRef = defaultLocationRef(),
   storage = defaultStorageRef(),
+  documentRef = defaultDocumentRef(),
+  checkoutContainer = null,
+  stripeFactory = defaultStripeFactory(),
+  stripeJsUrl = STRIPE_JS_URL,
+  onComplete = null,
   successUrl = "",
   cancelUrl = "",
   gameSlug = TACTICAL_ARENA_GAME_SLUG,
@@ -245,11 +301,55 @@ export async function startPremiumCheckout({
     throw checkoutError(code, data?.message || "Stripe checkout is not configured yet.");
   }
 
+  const sessionId = readCheckoutSessionId(data);
+  writePendingCheckoutSessionId(storage, sessionId);
+  const clientSecret = readClientSecret(data);
+  const publishableKey = readPublishableKey(data);
+  if (checkoutContainer || clientSecret || publishableKey) {
+    if (!checkoutContainer || !clientSecret || !publishableKey) {
+      throw checkoutError(CHECKOUT_EMBED_UNAVAILABLE_ERROR, "Stripe embedded checkout is not configured yet.");
+    }
+    const stripeCtor = await loadStripeFactory({ documentRef, stripeFactory, stripeJsUrl });
+    if (typeof stripeCtor !== "function") {
+      throw checkoutError(CHECKOUT_EMBED_UNAVAILABLE_ERROR, "Stripe embedded checkout is not available right now.");
+    }
+    const stripe = stripeCtor(publishableKey);
+    if (!stripe || typeof stripe.initEmbeddedCheckout !== "function") {
+      throw checkoutError(CHECKOUT_EMBED_UNAVAILABLE_ERROR, "Stripe embedded checkout is not available right now.");
+    }
+    let embeddedCheckout = null;
+    embeddedCheckout = await stripe.initEmbeddedCheckout({
+      clientSecret,
+      onComplete: async () => {
+        const fulfillment = await fulfillReturnedPremiumCheckout({
+          account: session,
+          checkoutFulfillmentEndpoint: "",
+          fetchImpl,
+          locationRef,
+          storage,
+          sessionId,
+        });
+        if (typeof onComplete === "function") await onComplete(fulfillment);
+      },
+    });
+    if (!embeddedCheckout || typeof embeddedCheckout.mount !== "function") {
+      throw checkoutError(CHECKOUT_EMBED_UNAVAILABLE_ERROR, "Stripe embedded checkout is not available right now.");
+    }
+    embeddedCheckout.mount(checkoutContainer);
+    return {
+      embedded: true,
+      checkout: embeddedCheckout,
+      sessionId,
+      clientSecret,
+      publishableKey,
+      response: data,
+    };
+  }
+
   const checkoutUrl = readCheckoutUrl(data);
   if (!checkoutUrl) {
     throw checkoutError(CHECKOUT_RESPONSE_INVALID_ERROR, "Stripe checkout did not return a redirect URL.");
   }
-  writePendingCheckoutSessionId(storage, readCheckoutSessionId(data));
   if (typeof locationRef?.assign === "function") {
     locationRef.assign(checkoutUrl);
   } else if (locationRef) {
@@ -290,5 +390,6 @@ export async function fulfillReturnedPremiumCheckout({
 export function premiumCheckoutErrorMessage(error) {
   if (error?.code === CHECKOUT_OFFER_INVALID_ERROR) return "That shop item cannot be sent to checkout.";
   if (error?.code === CHECKOUT_RESPONSE_INVALID_ERROR) return "Stripe checkout did not return a redirect URL.";
+  if (error?.code === CHECKOUT_EMBED_UNAVAILABLE_ERROR) return "Stripe embedded checkout is not configured yet.";
   return "Stripe checkout is not configured yet.";
 }

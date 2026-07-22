@@ -19,6 +19,7 @@ import {
   premiumCheckoutErrorMessage,
   startPremiumCheckout,
 } from "../platform/premiumCheckoutClient.js";
+import { mergeServerEntitlementsIntoUnlockProgress } from "../progression/unlocks.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { groupedUnitTypes } from "./squadModel.js";
 import { el } from "./domHelpers.js";
@@ -52,6 +53,8 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
   let pendingValorPurchase = null;
   let pendingValorError = "";
   let premiumCheckoutInFlight = false;
+  let premiumCheckoutLayer = null;
+  let premiumCheckoutInstance = null;
 
   function render() {
     const catalog = getShopCatalog(storage);
@@ -374,6 +377,7 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
   }
 
   function close() {
+    closePremiumCheckoutLayer();
     pendingValorPurchase = null;
     overlay.hidden = true;
     overlay.removeEventListener("click", onOverlay);
@@ -450,26 +454,97 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
     pendingValorPurchase = null;
     pendingValorError = "";
     premiumCheckoutInFlight = true;
-    statusText = `Opening secure checkout for ${offer.name}.`;
+    statusText = `Opening checkout for ${offer.name}.`;
     overlay.dispatchEvent(new CustomEvent(PREMIUM_CHECKOUT_EVENT, {
       bubbles: true,
       detail: { offer },
     }));
     render();
+    const checkoutUi = createPremiumCheckoutLayer(offer);
+    premiumCheckoutLayer = checkoutUi.layer;
+    overlay.appendChild(checkoutUi.layer);
 
     try {
-      await startPremiumCheckout({
+      const checkoutResult = await startPremiumCheckout({
         offer,
         account,
         checkoutEndpoint: options.checkoutEndpoint,
         fetchImpl: options.fetchImpl,
         locationRef: options.locationRef,
+        storage,
+        documentRef: options.documentRef,
+        checkoutContainer: checkoutUi.mount,
+        stripeFactory: options.stripeFactory,
+        stripeJsUrl: options.stripeJsUrl,
+        onComplete: async (fulfillment) => {
+          if (fulfillment?.progress) mergeServerEntitlementsIntoUnlockProgress(storage, fulfillment.progress);
+          premiumCheckoutInFlight = false;
+          statusText = `${offer.name} unlocked.`;
+          closePremiumCheckoutLayer();
+          render();
+        },
       });
+      premiumCheckoutInstance = checkoutResult.checkout || null;
     } catch (error) {
       premiumCheckoutInFlight = false;
+      closePremiumCheckoutLayer();
       statusText = premiumCheckoutErrorMessage(error);
       render();
     }
+  }
+
+  function closePremiumCheckoutLayer() {
+    if (premiumCheckoutInstance && typeof premiumCheckoutInstance.destroy === "function") {
+      try {
+        premiumCheckoutInstance.destroy();
+      } catch {
+        // Stripe cleanup is best-effort when the player closes the shop mid-checkout.
+      }
+    }
+    premiumCheckoutInstance = null;
+    if (premiumCheckoutLayer?.parentElement) {
+      detachNode(premiumCheckoutLayer);
+    }
+    premiumCheckoutLayer = null;
+  }
+
+  function createPremiumCheckoutLayer(offer) {
+    const layer = el("div", "shop-checkout-layer");
+    layer.addEventListener("click", (event) => {
+      if (event.target === layer) {
+        premiumCheckoutInFlight = false;
+        statusText = "Checkout closed.";
+        closePremiumCheckoutLayer();
+        render();
+      }
+    });
+
+    const dialog = el("section", "shop-checkout-dialog");
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    dialog.setAttribute("aria-labelledby", "shop-checkout-title");
+    dialog.addEventListener("click", (event) => event.stopPropagation?.());
+
+    const head = el("header", "shop-checkout-head");
+    const copy = el("div", "shop-checkout-copy");
+    const title = el("h3", "shop-checkout-title", "Secure Checkout");
+    title.id = "shop-checkout-title";
+    copy.append(title, el("span", "shop-checkout-sub", offer.name));
+    const closeBtn = el("button", "ref-close shop-checkout-close", "X");
+    closeBtn.type = "button";
+    closeBtn.setAttribute("aria-label", "Close checkout");
+    closeBtn.addEventListener("click", () => {
+      premiumCheckoutInFlight = false;
+      statusText = "Checkout closed.";
+      closePremiumCheckoutLayer();
+      render();
+    });
+    head.append(copy, closeBtn);
+
+    const mount = el("div", "shop-checkout-mount");
+    dialog.append(head, mount);
+    layer.appendChild(dialog);
+    return { layer, mount };
   }
 
   function createPurchaseConfirm(kind, offer, balance) {
@@ -689,6 +764,14 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
 
   function onKey(event) {
     if (event.key !== "Escape") return;
+    if (premiumCheckoutLayer) {
+      event.preventDefault?.();
+      premiumCheckoutInFlight = false;
+      statusText = "Checkout closed.";
+      closePremiumCheckoutLayer();
+      render();
+      return;
+    }
     if (pendingValorPurchase) {
       event.preventDefault?.();
       dismissValorPurchase();
@@ -798,4 +881,20 @@ function createValorWarning(balance, amount) {
   );
   message.setAttribute("role", "alert");
   return message;
+}
+
+function detachNode(node) {
+  if (!node) return;
+  if (typeof node.remove === "function") {
+    node.remove();
+    return;
+  }
+  if (node.parentElement && typeof node.parentElement.removeChild === "function") {
+    node.parentElement.removeChild(node);
+    return;
+  }
+  if (node.parentElement?.children) {
+    node.parentElement.children = node.parentElement.children.filter((child) => child !== node);
+    node.parentElement = null;
+  }
 }

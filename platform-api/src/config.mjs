@@ -21,6 +21,7 @@ export function readConfig(options = {}) {
             : typeof env.STRIPE_API_KEY === "string"
                 ? env.STRIPE_API_KEY.trim()
                 : "";
+    const stripePublishableKey = typeof env.STRIPE_PUBLISHABLE_KEY === "string" ? env.STRIPE_PUBLISHABLE_KEY.trim() : "";
     const stripeWebhookSecret = typeof env.STRIPE_WEBHOOK_SECRET === "string" ? env.STRIPE_WEBHOOK_SECRET.trim() : "";
     return {
         port: parsePort(env.PORT),
@@ -37,6 +38,7 @@ export function readConfig(options = {}) {
         cloudinaryApiSecret,
         hasCloudinary: Boolean(cloudinaryCloudName && cloudinaryApiKey && cloudinaryApiSecret),
         stripeApiKey,
+        stripePublishableKey,
         stripeWebhookSecret,
         hasStripe: Boolean(stripeApiKey && stripeWebhookSecret),
     };

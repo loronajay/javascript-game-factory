@@ -37,7 +37,12 @@ export async function handlePaymentRoute(context: any): Promise<boolean> {
       }, requestOrigin);
       return true;
     }
-    writeJson(res, 200, { url: result.url, sessionId: result.sessionId || "" }, requestOrigin);
+    writeJson(res, 200, {
+      url: result.url || "",
+      sessionId: result.sessionId || "",
+      clientSecret: result.clientSecret || "",
+      publishableKey: result.publishableKey || "",
+    }, requestOrigin);
     return true;
   }
 

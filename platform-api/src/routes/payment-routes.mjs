@@ -35,7 +35,12 @@ export async function handlePaymentRoute(context) {
             }, requestOrigin);
             return true;
         }
-        writeJson(res, 200, { url: result.url, sessionId: result.sessionId || "" }, requestOrigin);
+        writeJson(res, 200, {
+            url: result.url || "",
+            sessionId: result.sessionId || "",
+            clientSecret: result.clientSecret || "",
+            publishableKey: result.publishableKey || "",
+        }, requestOrigin);
         return true;
     }
     if (method === "POST" && pathname === "/payments/tactical-arena/checkout-sessions/fulfill") {

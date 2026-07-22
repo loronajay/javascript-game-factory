@@ -188,6 +188,72 @@ test("startPremiumCheckout posts to the checkout API and redirects to Stripe", a
   assert.equal(storage.getItem(PENDING_PREMIUM_CHECKOUT_SESSION_KEY), "cs_test_session_1");
 });
 
+test("startPremiumCheckout mounts embedded Stripe Checkout and fulfills on completion", async () => {
+  const calls = [];
+  let stripeKey = "";
+  let embeddedOptions = null;
+  let mountedContainer = null;
+  const checkoutContainer = {};
+  const storage = createMemoryStorage();
+
+  const result = await startPremiumCheckout({
+    offer: SKIN_OFFER,
+    account: ACCOUNT,
+    storage,
+    checkoutContainer,
+    locationRef: { href: "https://factory.example/games/tactical-arena/index.html" },
+    checkoutEndpoint: "/api/test-checkout",
+    stripeFactory: (publishableKey) => {
+      stripeKey = publishableKey;
+      return {
+        async initEmbeddedCheckout(options) {
+          embeddedOptions = options;
+          return {
+            mount(container) {
+              mountedContainer = container;
+            },
+            destroy() {},
+          };
+        },
+      };
+    },
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      if (url.endsWith("/fulfill")) {
+        return {
+          ok: true,
+          async json() {
+            return { ok: true, progress: { entitlements: [{ entitlementId: "skin:swordsman:summer-vibes" }] } };
+          },
+        };
+      }
+      return {
+        ok: true,
+        async json() {
+          return {
+            sessionId: "cs_test_embedded",
+            clientSecret: "cs_test_embedded_secret_abc",
+            publishableKey: "pk_test_checkout",
+          };
+        },
+      };
+    },
+  });
+
+  assert.equal(result.embedded, true);
+  assert.equal(stripeKey, "pk_test_checkout");
+  assert.equal(embeddedOptions.clientSecret, "cs_test_embedded_secret_abc");
+  assert.equal(mountedContainer, checkoutContainer);
+  assert.equal(storage.getItem(PENDING_PREMIUM_CHECKOUT_SESSION_KEY), "cs_test_embedded");
+
+  await embeddedOptions.onComplete();
+
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].url, "https://factory.example/api/tactical-arena/checkout-sessions/fulfill");
+  assert.deepEqual(JSON.parse(calls[1].init.body), { sessionId: "cs_test_embedded" });
+  assert.equal(storage.getItem(PENDING_PREMIUM_CHECKOUT_SESSION_KEY), null);
+});
+
 test("startPremiumCheckout reports unavailable checkout API failures", async () => {
   await assert.rejects(
     () => startPremiumCheckout({

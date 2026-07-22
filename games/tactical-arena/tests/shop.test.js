@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { readUnlockProgress, writeUnlockProgress } from "../src/progression/unlocks.js";
+import { isProgressSkinUnlocked, readUnlockProgress, writeUnlockProgress } from "../src/progression/unlocks.js";
 import { grantConsumable, readInventory } from "../src/progression/inventory.js";
 import { openInventory } from "../src/ui/inventory.js";
 import { openShop } from "../src/ui/shop.js";
@@ -74,6 +74,12 @@ class FakeElement {
 
   removeEventListener(type, handler) {
     this.listeners.set(type, (this.listeners.get(type) ?? []).filter((item) => item !== handler));
+  }
+
+  remove() {
+    if (!this.parentElement) return;
+    this.parentElement.children = this.parentElement.children.filter((child) => child !== this);
+    this.parentElement = null;
   }
 
   dispatchEvent(event) {
@@ -339,10 +345,13 @@ test("shop skin cards offer USD checkout and Valor purchase buttons", () => {
   assert.ok(ownedButtons[0].disabled);
 });
 
-test("shop skin USD purchase opens Stripe checkout through the configured endpoint", async () => {
+test("shop skin USD purchase embeds Stripe checkout through the configured endpoint", async () => {
   globalThis.document = new FakeDocument();
   const storage = storageAdapter();
   const fetchCalls = [];
+  let stripeKey = "";
+  let embeddedOptions = null;
+  let mountedContainer = null;
   const locationRef = {
     href: "https://factory.example/games/tactical-arena/index.html",
     assigned: "",
@@ -356,12 +365,38 @@ test("shop skin USD purchase opens Stripe checkout through the configured endpoi
     account: { ...SIGNED_IN_ACCOUNT, token: "token-1" },
     checkoutEndpoint: "/api/test-checkout",
     locationRef,
+    stripeFactory: (publishableKey) => {
+      stripeKey = publishableKey;
+      return {
+        async initEmbeddedCheckout(options) {
+          embeddedOptions = options;
+          return {
+            mount(container) {
+              mountedContainer = container;
+            },
+            destroy() {},
+          };
+        },
+      };
+    },
     fetchImpl: async (url, init) => {
       fetchCalls.push({ url, init });
+      if (url.endsWith("/fulfill")) {
+        return {
+          ok: true,
+          async json() {
+            return { ok: true, progress: { entitlements: [{ entitlementId: "skin:swordsman:summer-vibes" }] } };
+          },
+        };
+      }
       return {
         ok: true,
         async json() {
-          return { url: "https://checkout.stripe.com/c/test-session" };
+          return {
+            sessionId: "cs_test_shop_skin",
+            clientSecret: "cs_test_shop_skin_secret_abc",
+            publishableKey: "pk_test_checkout",
+          };
         },
       };
     },
@@ -374,11 +409,16 @@ test("shop skin USD purchase opens Stripe checkout through the configured endpoi
   const usdBuy = walk(skinCard, (node) => node.tagName === "BUTTON" && hasClass(node, "is-premium"))[0];
   usdBuy.click();
 
-  assert.match(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent, /Opening secure checkout/i);
+  assert.match(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent, /Opening checkout/i);
 
   await new Promise((resolve) => setTimeout(resolve, 0));
 
-  assert.equal(locationRef.assigned, "https://checkout.stripe.com/c/test-session");
+  assert.equal(locationRef.assigned, "");
+  assert.equal(stripeKey, "pk_test_checkout");
+  assert.equal(embeddedOptions.clientSecret, "cs_test_shop_skin_secret_abc");
+  assert.ok(mountedContainer);
+  assert.ok(hasClass(mountedContainer, "shop-checkout-mount"));
+  assert.equal(walk(overlay, (node) => hasClass(node, "shop-checkout-dialog")).length, 1);
   assert.equal(fetchCalls.length, 1);
   assert.equal(fetchCalls[0].url, "https://factory.example/api/test-checkout");
   assert.equal(fetchCalls[0].init.headers.Authorization, "Bearer token-1");
@@ -387,13 +427,21 @@ test("shop skin USD purchase opens Stripe checkout through the configured endpoi
   assert.match(body.offer.sku, /^ta\.skin\./);
   assert.equal("price" in body.offer, false);
   assert.equal(body.successUrl, "https://factory.example/games/tactical-arena/index.html?checkout=success&session_id=%7BCHECKOUT_SESSION_ID%7D");
+
+  await embeddedOptions.onComplete();
+  assert.equal(fetchCalls.length, 2);
+  assert.equal(fetchCalls[1].url, "https://factory.example/api/tactical-arena/checkout-sessions/fulfill");
+  assert.equal(walk(overlay, (node) => hasClass(node, "shop-checkout-dialog")).length, 0);
+  assert.equal(isProgressSkinUnlocked("swordsman", "summer-vibes", storage), true);
+  assert.match(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent, /Summer Vibes unlocked/);
 });
 
-test("shop unit USD purchase opens Stripe checkout without spending Valor", async () => {
+test("shop unit USD purchase embeds Stripe checkout without spending Valor", async () => {
   globalThis.document = new FakeDocument();
   const storage = storageAdapter();
   writeUnlockProgress(storage, { valorBalance: 999 });
   const fetchCalls = [];
+  let embeddedOptions = null;
   const locationRef = {
     href: "https://factory.example/games/tactical-arena/index.html",
     assigned: "",
@@ -407,12 +455,33 @@ test("shop unit USD purchase opens Stripe checkout without spending Valor", asyn
     account: { ...SIGNED_IN_ACCOUNT, token: "token-1" },
     checkoutEndpoint: "/api/test-checkout",
     locationRef,
+    stripeFactory: () => ({
+      async initEmbeddedCheckout(options) {
+        embeddedOptions = options;
+        return {
+          mount() {},
+          destroy() {},
+        };
+      },
+    }),
     fetchImpl: async (url, init) => {
       fetchCalls.push({ url, init });
+      if (url.endsWith("/fulfill")) {
+        return {
+          ok: true,
+          async json() {
+            return { ok: true, progress: { entitlements: [{ entitlementId: "unit:clod" }] } };
+          },
+        };
+      }
       return {
         ok: true,
         async json() {
-          return { url: "https://checkout.stripe.com/c/test-unit-session" };
+          return {
+            sessionId: "cs_test_shop_unit",
+            clientSecret: "cs_test_shop_unit_secret_abc",
+            publishableKey: "pk_test_checkout",
+          };
         },
       };
     },
@@ -425,7 +494,8 @@ test("shop unit USD purchase opens Stripe checkout without spending Valor", asyn
 
   await new Promise((resolve) => setTimeout(resolve, 0));
 
-  assert.equal(locationRef.assigned, "https://checkout.stripe.com/c/test-unit-session");
+  assert.equal(locationRef.assigned, "");
+  assert.equal(embeddedOptions.clientSecret, "cs_test_shop_unit_secret_abc");
   assert.equal(readUnlockProgress(storage).valorBalance, 999);
   assert.equal(fetchCalls.length, 1);
   const body = JSON.parse(fetchCalls[0].init.body);
@@ -433,6 +503,11 @@ test("shop unit USD purchase opens Stripe checkout without spending Valor", asyn
   assert.equal(body.offer.sku, "ta.unit.clod");
   assert.equal(body.offer.type, "clod");
   assert.equal("premiumPrice" in body.offer, false);
+
+  await embeddedOptions.onComplete();
+  assert.equal(fetchCalls.length, 2);
+  assert.equal(readUnlockProgress(storage).valorBalance, 999);
+  assert.ok(readUnlockProgress(storage).unlockedUnits.includes("clod"));
 });
 
 test("shop skin packs render clickable contents and use Valor confirmation", () => {

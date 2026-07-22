@@ -15,6 +15,7 @@ export interface ApiConfig {
   cloudinaryApiSecret: string;
   hasCloudinary: boolean;
   stripeApiKey: string;
+  stripePublishableKey: string;
   stripeWebhookSecret: string;
   hasStripe: boolean;
 }
@@ -42,6 +43,7 @@ export function readConfig(options: { env?: Record<string, string | undefined> }
       : typeof env.STRIPE_API_KEY === "string"
         ? env.STRIPE_API_KEY.trim()
         : "";
+  const stripePublishableKey = typeof env.STRIPE_PUBLISHABLE_KEY === "string" ? env.STRIPE_PUBLISHABLE_KEY.trim() : "";
   const stripeWebhookSecret = typeof env.STRIPE_WEBHOOK_SECRET === "string" ? env.STRIPE_WEBHOOK_SECRET.trim() : "";
 
   return {
@@ -59,6 +61,7 @@ export function readConfig(options: { env?: Record<string, string | undefined> }
     cloudinaryApiSecret,
     hasCloudinary: Boolean(cloudinaryCloudName && cloudinaryApiKey && cloudinaryApiSecret),
     stripeApiKey,
+    stripePublishableKey,
     stripeWebhookSecret,
     hasStripe: Boolean(stripeApiKey && stripeWebhookSecret),
   };

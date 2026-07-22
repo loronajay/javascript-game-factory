@@ -592,6 +592,8 @@ export async function resolveTacticalArenaPremiumOffer(offerInput: any, progress
 export async function createTacticalArenaCheckoutSession(params: any = {}): Promise<any> {
   const stripeApiKey = cleanText(params.stripeApiKey, 500);
   if (!stripeApiKey) return stripeError(503, "checkout_not_configured");
+  const stripePublishableKey = cleanText(params.stripePublishableKey, 500);
+  if (!stripePublishableKey) return stripeError(503, "stripe_publishable_key_not_configured");
 
   const playerId = cleanText(params.playerId, 120);
   const body = params.body && typeof params.body === "object" ? params.body : {};
@@ -609,14 +611,11 @@ export async function createTacticalArenaCheckoutSession(params: any = {}): Prom
   if (typeof fetchImpl !== "function") return stripeError(503, "fetch_not_configured");
 
   const premiumOffer = resolved.offer;
-  const successUrl = (cleanUrl(body.successUrl) || fallbackCheckoutUrl(params.appBaseUrl, "success"))
-    .replace("%7BCHECKOUT_SESSION_ID%7D", "{CHECKOUT_SESSION_ID}");
-  const cancelUrl = cleanUrl(body.cancelUrl) || fallbackCheckoutUrl(params.appBaseUrl, "cancel");
   const form = new URLSearchParams();
   form.set("mode", "payment");
+  form.set("ui_mode", "embedded");
+  form.set("redirect_on_completion", "never");
   form.set("managed_payments[enabled]", "false");
-  form.set("success_url", successUrl);
-  form.set("cancel_url", cancelUrl);
   form.set("client_reference_id", playerId);
   form.set("line_items[0][quantity]", "1");
   form.set("line_items[0][price_data][currency]", premiumOffer.currency);
@@ -645,7 +644,11 @@ export async function createTacticalArenaCheckoutSession(params: any = {}): Prom
     return stripeCheckoutError(json);
   }
   const url = cleanUrl(json?.url);
-  return url ? { ok: true, url, sessionId: cleanText(json?.id, 200) } : stripeError(502, "stripe_checkout_failed");
+  const clientSecret = cleanText(json?.client_secret, 500);
+  const sessionId = cleanText(json?.id, 200);
+  return clientSecret && sessionId
+    ? { ok: true, url, clientSecret, sessionId, publishableKey: stripePublishableKey }
+    : stripeError(502, "stripe_checkout_failed");
 }
 
 async function retrieveStripeCheckoutSession(params: any = {}): Promise<any> {

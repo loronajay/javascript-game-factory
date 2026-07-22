@@ -139,6 +139,7 @@ async function bootstrap() {
         createPremiumCheckoutSession: (params) => createTacticalArenaCheckoutSession({
             ...params,
             stripeApiKey: config.stripeApiKey,
+            stripePublishableKey: config.stripePublishableKey,
             appBaseUrl: config.appBaseUrl,
             getGameProgress: (playerId, gameSlug) => getGameProgress(pool, playerId, gameSlug),
         }),
