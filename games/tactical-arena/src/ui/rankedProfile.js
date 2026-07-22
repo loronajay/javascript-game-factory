@@ -21,6 +21,8 @@ import { createOnlineIdentityPayload } from "../../../../js/platform/identity/ma
 import { loadRankedName, saveRankedName } from "./rankedNameModel.js";
 import { createPortrait, hasPortrait } from "./portraits.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
+import { readUnlockProgress } from "../progression/unlocks.js";
+import { getUnitSkins } from "./skinModel.js";
 import { openRankedLeaderboard } from "./rankedLeaderboard.js";
 import { createRankedTierEmblem, normalizeRankedTierId } from "./rankedEmblems.js";
 import { RANKED_AVATARS, createRankedAvatarIcon, getRankedAvatar, hasRankedAvatar } from "./rankedAvatars.js";
@@ -49,6 +51,50 @@ function pilotName() {
 
 function unitLabel(type) {
   return UNIT_TYPES[type]?.name ?? type;
+}
+
+function legacyAvatarKey(avatarUnit, avatarSkin = null) {
+  return `legacy:${avatarUnit || ""}:${avatarSkin || ""}`;
+}
+
+export function buildLegacyRankedAvatarOptions(storage = globalThis.localStorage) {
+  const progress = readUnlockProgress(storage);
+  const unlockedUnits = new Set(progress.unlockedUnits);
+  const options = [];
+  const seen = new Set();
+
+  for (const type of Object.keys(UNIT_TYPES)) {
+    if (!hasPortrait(type)) continue;
+    if (unlockedUnits.has(type)) {
+      const key = legacyAvatarKey(type);
+      seen.add(key);
+      options.push(Object.freeze({
+        kind: "legacy",
+        id: key,
+        avatarUnit: type,
+        avatarSkin: null,
+        label: unitLabel(type),
+        sub: "Owned unit",
+      }));
+    }
+
+    for (const skin of getUnitSkins(type, storage)) {
+      if (!skin.unlocked) continue;
+      const key = legacyAvatarKey(type, skin.slug);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      options.push(Object.freeze({
+        kind: "legacy",
+        id: key,
+        avatarUnit: type,
+        avatarSkin: skin.slug,
+        label: `${unitLabel(type)}: ${skin.name}`,
+        sub: "Owned skin",
+      }));
+    }
+  }
+
+  return Object.freeze(options);
 }
 
 function formatRecord(standing) {
@@ -396,11 +442,11 @@ function renderIdentityEditor(body, { pilot, state, apiClient, onProfileSaved = 
   body.appendChild(section);
 }
 
-// Avatar picker: choose from authored sprite icons. Legacy unit portraits stay visible
-// until the player chooses one of the new icons.
+// Avatar picker: choose from authored sprite icons plus owned unit/skin portraits.
 function renderAvatarField(state, save) {
   const field = el("div", "ranked-profile-avatarfield");
   field.appendChild(el("label", "ranked-profile-label", "Ranked avatar"));
+  const legacyOptions = buildLegacyRankedAvatarOptions();
 
   const preview = el("div", "ranked-profile-avatar-preview");
   const dropdown = el("div", "ranked-profile-avatar-dropdown");
@@ -429,7 +475,9 @@ function renderAvatarField(state, save) {
       preview.appendChild(el("span", "ranked-profile-avatar-name", getRankedAvatar(state.avatarUnit).label));
     } else if (state.avatarUnit && hasPortrait(state.avatarUnit)) {
       preview.appendChild(createPortrait(state.avatarUnit, { variant: "is-thumb", skin: state.avatarSkin, eager: true }));
-      preview.appendChild(el("span", "ranked-profile-avatar-name", `${unitLabel(state.avatarUnit)} legacy portrait`));
+      const selected = legacyOptions.find((option) =>
+        option.avatarUnit === state.avatarUnit && (option.avatarSkin || null) === (state.avatarSkin || null));
+      preview.appendChild(el("span", "ranked-profile-avatar-name", selected?.label ?? `${unitLabel(state.avatarUnit)} portrait`));
     } else {
       preview.appendChild(el("span", "ranked-profile-avatar-none", "No avatar set"));
     }
@@ -444,15 +492,16 @@ function renderAvatarField(state, save) {
     menu.hidden = !isOpening;
     toggle.setAttribute("aria-expanded", String(isOpening));
   };
-  const selectAvatar = (avatarUnit) => {
+  const selectAvatar = ({ avatarUnit = null, avatarSkin = null } = {}) => {
     const nextAvatarUnit = avatarUnit || null;
-    if (nextAvatarUnit === (state.avatarUnit || null) && !state.avatarSkin) {
+    const nextAvatarSkin = avatarSkin || null;
+    if (nextAvatarUnit === (state.avatarUnit || null) && nextAvatarSkin === (state.avatarSkin || null)) {
       closeMenu();
       return;
     }
     state.avatarUnit = nextAvatarUnit;
-    state.avatarSkin = null;
-    save({ avatarUnit: state.avatarUnit, avatarSkin: null });
+    state.avatarSkin = nextAvatarSkin;
+    save({ avatarUnit: state.avatarUnit, avatarSkin: state.avatarSkin });
     syncAvatarDropdown();
     closeMenu();
   };
@@ -464,22 +513,27 @@ function renderAvatarField(state, save) {
       selectedSub.textContent = "Icon avatar";
     } else if (state.avatarUnit && hasPortrait(state.avatarUnit)) {
       selectedIcon.appendChild(createPortrait(state.avatarUnit, { variant: "is-thumb", skin: state.avatarSkin, eager: true }));
-      selectedLabel.textContent = unitLabel(state.avatarUnit);
-      selectedSub.textContent = "Legacy portrait";
+      const selected = legacyOptions.find((option) =>
+        option.avatarUnit === state.avatarUnit && (option.avatarSkin || null) === (state.avatarSkin || null));
+      selectedLabel.textContent = selected?.label ?? unitLabel(state.avatarUnit);
+      selectedSub.textContent = selected?.sub ?? "Legacy portrait";
     } else {
       selectedIcon.appendChild(el("span", "ranked-profile-avatar-initial", "C"));
       selectedLabel.textContent = "No avatar";
       selectedSub.textContent = "Use initial";
     }
   };
-  const renderDropdownOption = ({ id, label, sub, icon }) => {
-    const selected = (state.avatarUnit || null) === (id || null);
+  const renderDropdownOption = ({ id = null, avatarUnit = null, avatarSkin = null, label, sub, icon }) => {
+    const nextAvatarUnit = avatarUnit ?? id ?? null;
+    const nextAvatarSkin = avatarSkin ?? null;
+    const selected = (state.avatarUnit || null) === (nextAvatarUnit || null)
+      && (state.avatarSkin || null) === (nextAvatarSkin || null);
     const option = el("button", `ranked-profile-avatar-option${selected ? " is-selected" : ""}`);
     option.type = "button";
     option.setAttribute("role", "option");
     option.setAttribute("aria-selected", String(selected));
     option.append(icon, el("span", "ranked-profile-avatar-option-text", label), el("span", "ranked-profile-avatar-option-sub", sub));
-    option.addEventListener("click", () => selectAvatar(id));
+    option.addEventListener("click", () => selectAvatar({ avatarUnit: nextAvatarUnit, avatarSkin: nextAvatarSkin }));
     menu.appendChild(option);
   };
   const renderMenu = () => {
@@ -490,11 +544,25 @@ function renderAvatarField(state, save) {
       sub: "Use initial",
       icon: el("span", "ranked-profile-avatar-option-none", "C"),
     });
-    if (state.avatarUnit && !hasRankedAvatar(state.avatarUnit) && hasPortrait(state.avatarUnit)) {
+    let currentLegacyOptionRendered = false;
+    for (const legacy of legacyOptions) {
+      if (legacy.avatarUnit === state.avatarUnit && (legacy.avatarSkin || null) === (state.avatarSkin || null)) {
+        currentLegacyOptionRendered = true;
+      }
       renderDropdownOption({
-        id: state.avatarUnit,
+        avatarUnit: legacy.avatarUnit,
+        avatarSkin: legacy.avatarSkin,
+        label: legacy.label,
+        sub: legacy.sub,
+        icon: createPortrait(legacy.avatarUnit, { variant: "is-thumb", skin: legacy.avatarSkin, eager: true }),
+      });
+    }
+    if (!currentLegacyOptionRendered && state.avatarUnit && !hasRankedAvatar(state.avatarUnit) && hasPortrait(state.avatarUnit)) {
+      renderDropdownOption({
+        avatarUnit: state.avatarUnit,
+        avatarSkin: state.avatarSkin,
         label: unitLabel(state.avatarUnit),
-        sub: "Legacy portrait",
+        sub: state.avatarSkin ? "Current skin" : "Legacy portrait",
         icon: createPortrait(state.avatarUnit, { variant: "is-thumb", skin: state.avatarSkin, eager: true }),
       });
     }

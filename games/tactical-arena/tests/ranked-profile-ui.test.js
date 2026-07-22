@@ -1,7 +1,30 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { isRankedMatchInProgress, syncRankedStandingNameplate } from "../src/ui/rankedProfile.js";
+import {
+  buildLegacyRankedAvatarOptions,
+  isRankedMatchInProgress,
+  syncRankedStandingNameplate,
+} from "../src/ui/rankedProfile.js";
+import { writeUnlockProgress } from "../src/progression/unlocks.js";
+
+class FakeLocalStorage {
+  constructor() {
+    this.values = new Map();
+  }
+
+  getItem(key) {
+    return this.values.has(key) ? this.values.get(key) : null;
+  }
+
+  setItem(key, value) {
+    this.values.set(key, String(value));
+  }
+
+  removeItem(key) {
+    this.values.delete(key);
+  }
+}
 
 class TestElement {
   constructor(tagName) {
@@ -119,6 +142,25 @@ test("ranked profile standing nameplate renders sprite avatar ids", () => {
   assert.equal(avatar.children[0].className, "ranked-avatar-icon is-profile-avatar");
   assert.equal(avatar.children[0].dataset.avatar, "avatar-001");
   assert.equal(avatar.children[0].children[0].className, "ranked-avatar-icon-sprite");
+});
+
+test("ranked profile legacy avatar options include unlocked units and owned skins", () => {
+  const storage = new FakeLocalStorage();
+  writeUnlockProgress(storage, {
+    unlockedUnits: ["clod"],
+    purchasedSkins: [{ type: "paladin", slug: "crusader" }],
+  });
+
+  const options = buildLegacyRankedAvatarOptions(storage);
+
+  assert.ok(options.some((option) =>
+    option.avatarUnit === "swordsman" && option.avatarSkin === null && option.label === "Swordsman"));
+  assert.ok(options.some((option) =>
+    option.avatarUnit === "clod" && option.avatarSkin === null && option.label === "Clod"));
+  assert.ok(options.some((option) =>
+    option.avatarUnit === "paladin" && option.avatarSkin === "crusader" && option.label === "Paladin: Crusader"));
+  assert.equal(options.some((option) =>
+    option.avatarUnit === "paladin" && option.avatarSkin === null), false);
 });
 
 test("ranked profile active-match notice only treats live matches as in progress", () => {
