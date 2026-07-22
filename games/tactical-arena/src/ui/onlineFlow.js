@@ -1006,7 +1006,14 @@ export function createOnlineFlow({ onStartMatch }) {
 
     cb.onRemoteDraftPick = ({ pickIndex, seat, type, skin, nickname }) => {
       if (!isDraftMatch() || !draft || pickIndex !== draft.pickIndex) return;
-      const result = applyDraftPick(draft, { seat, type, skin, nickname });
+      const result = applyDraftPick(draft, {
+        seat,
+        type,
+        skin,
+        nickname,
+        isUnlocked: () => true,
+        trustSkin: true,
+      });
       if (!result.accepted) return;
       draft = result.nextState;
       setStatus(isDraftComplete(draft) ? "Draft complete. Arrange your formation." : `${draftPlayerLabel(seat)} locked a pick.`);
@@ -1104,7 +1111,7 @@ export function createOnlineFlow({ onStartMatch }) {
       nicknames,
       playerCount: count,
       format,
-      trustedSkinSeats: [mySeat],
+      trustedSkinSeats: Array.from({ length: count }, (_, index) => index + 1),
       teamColors: format === "teams" ? { ...cfg.teamColors } : null,
       teamNames: format === "teams" ? { ...cfg.teamNames } : null,
       ranked: rankedHandoff,

@@ -130,6 +130,23 @@ test("draft stores normalized skin selections alongside each seat's picks", () =
   assert.deepEqual(draft.skins[2], [null]);
 });
 
+test("draft can trust authored skin selections received from a remote player", () => {
+  let draft = createDraftState();
+
+  const result = applyDraftPick(draft, {
+    seat: 1,
+    type: "monk",
+    skin: "summer-vibes",
+    isUnlocked: () => true,
+    trustSkin: true,
+  });
+  assert.equal(result.accepted, true);
+  draft = result.nextState;
+
+  assert.deepEqual(draft.picks[1], ["monk"]);
+  assert.deepEqual(draft.skins[1], ["summer-vibes"]);
+});
+
 test("draft stores an explicit nickname alongside each seat's picks", () => {
   let draft = createDraftState();
 

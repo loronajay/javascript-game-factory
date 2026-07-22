@@ -67,9 +67,12 @@ export function buildRoster(
   for (const slot of players) {
     const positions = slotsForCorner(slot.corner);
     const squad = (squads[slot.id] ?? []).slice(0, positions.length);
-    const skinLoadout = trustedSkinSeats && !trustedSkinSeats.has(slot.id)
-      ? squad.map(() => null)
-      : normalizeSkinLoadout(squad, skins?.[slot.id]);
+    const skinLoadout = normalizeSkinLoadout(
+      squad,
+      skins?.[slot.id],
+      globalThis.localStorage,
+      { trustAuthored: trustedSkinSeats?.has(slot.id) === true },
+    );
     // Nicknames are the device owner's personal labels for THEIR OWN units, so the
     // local-preference default (see nicknameModel.js) only rides onto player 1 — the
     // local human in every mode that omits an explicit map (hot-seat, single, campaign,

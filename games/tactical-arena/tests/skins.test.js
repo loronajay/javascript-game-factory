@@ -19,6 +19,7 @@ import {
   getSkin,
   getUnitSkins,
   loadSkinPrefs,
+  normalizeAuthoredSkinSlug,
   normalizeSkinLoadout,
   normalizeSkinSlug,
   saveSkinPref,
@@ -225,6 +226,12 @@ test("unknown or locked skin slugs normalize to classic (every skin is currently
   assert.equal(getSkin("swordsman", null), null);
 });
 
+test("authored skin slugs can normalize without requiring local ownership", () => {
+  assert.equal(normalizeAuthoredSkinSlug("monk", "summer-vibes"), "summer-vibes");
+  assert.equal(normalizeAuthoredSkinSlug("monk", "not-real"), null);
+  assert.equal(normalizeAuthoredSkinSlug("dragon", "summer-vibes"), null);
+});
+
 test("skin loadouts normalize against the unit in the same squad slot", () => {
   const composition = ["swordsman", "archer", "mystic", "magician"];
   assert.deepEqual(
@@ -288,7 +295,7 @@ test("match state normalizes every skin selection to classic while skins are loc
   );
 });
 
-test("match state accepts only trusted-seat skins granted by account entitlements", () => {
+test("match state accepts authored skins for trusted online seats without local entitlements", () => {
   const previousStorage = globalThis.localStorage;
   const storage = new FakeLocalStorage();
   writeUnlockProgress(storage, {
@@ -299,18 +306,18 @@ test("match state accepts only trusted-seat skins granted by account entitlement
   try {
     const state = createMatchState({
       seed: 1,
-      squads: { 1: ["swordsman", "archer", "mystic", "magician"], 2: ["swordsman", "archer", "mystic", "magician"] },
-      skins: { 1: ["medieval", "summer-vibes", null, null], 2: ["medieval", null, null, null] },
-      trustedSkinSeats: [1],
+      squads: { 1: ["swordsman", "archer", "mystic", "magician"], 2: ["monk", "archer", "mystic", "magician"] },
+      skins: { 1: ["medieval", "summer-vibes", null, null], 2: ["summer-vibes", null, null, null] },
+      trustedSkinSeats: [1, 2],
     });
 
     assert.deepEqual(
       state.units.filter((unit) => unit.player === 1).map((unit) => [unit.type, unit.skin]),
-      [["swordsman", "medieval"], ["archer", null], ["mystic", null], ["magician", null]]
+      [["swordsman", "medieval"], ["archer", "summer-vibes"], ["mystic", null], ["magician", null]]
     );
     assert.deepEqual(
       state.units.filter((unit) => unit.player === 2).map((unit) => [unit.type, unit.skin]),
-      [["swordsman", null], ["archer", null], ["mystic", null], ["magician", null]]
+      [["monk", "summer-vibes"], ["archer", null], ["mystic", null], ["magician", null]]
     );
   } finally {
     globalThis.localStorage = previousStorage;

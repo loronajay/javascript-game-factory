@@ -1,5 +1,5 @@
 import { UNIT_TYPE_KEYS, isUnitUnlocked } from "./squadModel.js";
-import { normalizeSkinSlug } from "./skinModel.js";
+import { normalizeAuthoredSkinSlug, normalizeSkinSlug } from "./skinModel.js";
 import { sanitizeNickname, getNicknamePref } from "./nicknameModel.js";
 
 export const DRAFT_SEATS = Object.freeze([1, 2]);
@@ -124,7 +124,7 @@ function cloneDraft(draft) {
   };
 }
 
-export function applyDraftPick(draft, { seat, type, skin = null, nickname = null, isUnlocked = isUnitUnlocked } = {}) {
+export function applyDraftPick(draft, { seat, type, skin = null, nickname = null, isUnlocked = isUnitUnlocked, trustSkin = false } = {}) {
   const numericSeat = Number(seat);
   if (!canDraftType(draft, numericSeat, type, { isUnlocked })) {
     return { accepted: false, errorCode: "INVALID_DRAFT_PICK", nextState: draft };
@@ -132,7 +132,8 @@ export function applyDraftPick(draft, { seat, type, skin = null, nickname = null
   const next = cloneDraft(draft);
   next.pickIndex = draft.pickIndex + 1;
   next.picks[numericSeat] = [...(next.picks[numericSeat] ?? []), type];
-  next.skins[numericSeat] = [...(next.skins[numericSeat] ?? []), normalizeSkinSlug(type, skin)];
+  const normalizedSkin = trustSkin ? normalizeAuthoredSkinSlug(type, skin) : normalizeSkinSlug(type, skin);
+  next.skins[numericSeat] = [...(next.skins[numericSeat] ?? []), normalizedSkin];
   next.nicknames[numericSeat] = [...(next.nicknames[numericSeat] ?? []), sanitizeNickname(nickname) ?? getNicknamePref(type)];
   return { accepted: true, nextState: next };
 }

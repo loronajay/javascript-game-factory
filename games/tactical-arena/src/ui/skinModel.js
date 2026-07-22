@@ -469,16 +469,28 @@ export function normalizeSkinSlug(typeOrDef, slug, storage = globalThis.localSto
   return entry?.unlocked ? entry.slug : BASE_SKIN_SLUG;
 }
 
+export function normalizeAuthoredSkinSlug(typeOrDef, slug) {
+  const type = typeof typeOrDef === "string" ? typeOrDef : typeOrDef?.id ?? typeOrDef?.type;
+  const clean = typeof slug === "string" ? slug.trim() : slug;
+  if (!type || !clean) return BASE_SKIN_SLUG;
+  const entry = (SKINS_BY_UNIT[type] ?? []).find((skinEntry) => skinEntry.slug === clean);
+  return entry?.slug ?? BASE_SKIN_SLUG;
+}
+
 export function skinAssetPath(typeOrDef, slug, kind = "portrait", storage = globalThis.localStorage) {
   const entry = getSkin(typeOrDef, slug, storage);
   if (!entry) return null;
   return kind === "board" ? entry.boardSrc : entry.portraitSrc;
 }
 
-export function normalizeSkinLoadout(composition, skins, storage = globalThis.localStorage) {
+export function normalizeSkinLoadout(composition, skins, storage = globalThis.localStorage, { trustAuthored = false } = {}) {
   const raw = Array.isArray(skins) ? skins : null;
   return composition.map((type, index) => {
-    if (raw && index in raw) return normalizeSkinSlug(type, raw[index], storage);
+    if (raw && index in raw) {
+      return trustAuthored
+        ? normalizeAuthoredSkinSlug(type, raw[index])
+        : normalizeSkinSlug(type, raw[index], storage);
+    }
     return getSkinPref(type, storage);
   });
 }
