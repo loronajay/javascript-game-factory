@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -46,14 +46,22 @@ test("ranked avatar lookup rejects legacy unit ids and unknown ids", () => {
   assert.equal(getRankedAvatar("dragon"), null);
 });
 
-test("ranked avatar sprite styles use sheet-specific alignment nudges", () => {
+test("ranked avatar sprite styles use prepared sheets without per-sheet nudges", () => {
   const first = rankedAvatarSpriteStyle(getRankedAvatar("avatar-001"));
   const secondSheet = rankedAvatarSpriteStyle(getRankedAvatar("avatar-065"));
 
   assert.equal(first.backgroundImage, "url(\"assets/avatars/avatar-sheet-1.webp\")");
   assert.equal(first.backgroundSize, "800% 800%");
   assert.equal(first.backgroundPosition, "0% 0%");
-  assert.notEqual(first.nudgeX, secondSheet.nudgeX);
-  assert.notEqual(secondSheet.nudgeX, "0%");
+  assert.equal(first.nudgeX, "0%");
+  assert.equal(secondSheet.nudgeX, "0%");
   assert.equal(first.nudgeY, secondSheet.nudgeY);
+});
+
+test("ranked avatar css keeps sprite cells square inside portrait-shaped frames", () => {
+  const css = readFileSync(join(GAME_ROOT, "styles/screens/features.css"), "utf8");
+  assert.match(
+    css,
+    /\.ranked-avatar-icon-sprite\s*\{[^}]*width:108%[^}]*aspect-ratio:1\/1[^}]*transform:translate\(calc\(-50% \+ var\(--avatar-nudge-x,0\)\),calc\(-50% \+ var\(--avatar-nudge-y,0\)\)\)/s,
+  );
 });

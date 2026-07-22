@@ -253,8 +253,8 @@
 .ranked-profile-savestate[data-state="ok"] { color:color-mix(in srgb,var(--brass-hi) 80%,#6ec98a); }
 .ranked-profile-savestate[data-state="err"] { color:#ff9a8f; }
 /* Avatar picker */
-.ranked-avatar-icon { position:relative; display:block; overflow:hidden; background:rgba(8,18,32,.55); }
-.ranked-avatar-icon-sprite { position:absolute; inset:0; background-repeat:no-repeat; transform:translate(var(--avatar-nudge-x,0),var(--avatar-nudge-y,0)); }
+.ranked-avatar-icon { position:relative; display:grid; place-items:center; overflow:hidden; background:rgba(8,18,32,.55); }
+.ranked-avatar-icon-sprite { position:absolute; left:50%; top:50%; width:108%; aspect-ratio:1/1; background-repeat:no-repeat; transform:translate(calc(-50% + var(--avatar-nudge-x,0)),calc(-50% + var(--avatar-nudge-y,0))); }
 .ranked-profile-avatarfield { display:grid; gap:.5rem; }
 .ranked-profile-avatar-preview { display:flex; align-items:center; gap:.6rem; }
 .ranked-profile-avatar-preview .unit-portrait.is-thumb,.ranked-profile-avatar-preview .ranked-avatar-icon.is-preview { width:2.6rem; height:2.6rem; flex-shrink:0; border:1px solid var(--parchment-edge); border-radius:8px; background:rgba(8,18,32,.55); overflow:hidden; }

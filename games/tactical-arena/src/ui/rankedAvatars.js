@@ -2,8 +2,8 @@ const AVATAR_GRID_SIZE = 8;
 const AVATAR_COUNT_PER_SHEET = AVATAR_GRID_SIZE * AVATAR_GRID_SIZE;
 
 const AVATAR_SHEETS = Object.freeze([
-  sheet("sheet-1", "assets/avatars/avatar-sheet-1.webp", { nudgeX: "0.12%", nudgeY: "-1.9%" }),
-  sheet("sheet-2", "assets/avatars/avatar-sheet-2.webp", { nudgeX: "0.79%", nudgeY: "-1.9%" }),
+  sheet("sheet-1", "assets/avatars/avatar-sheet-1.webp"),
+  sheet("sheet-2", "assets/avatars/avatar-sheet-2.webp"),
 ]);
 
 function sheet(id, src, { nudgeX = "0%", nudgeY = "0%" } = {}) {
