@@ -47,6 +47,80 @@ test("starting a match clears in-flight effects before rendering the fresh battl
   assert.ok(calls.indexOf("effects-clear") < calls.indexOf("render"));
 });
 
+test("online matches replace the topbar menu button with concede", () => {
+  const squad = ["swordsman"];
+  const controls = {
+    restart: {},
+    concede: { hidden: true },
+    menu: { hidden: false },
+  };
+  const controller = createMatchLifecycleController({
+    runtime: { matchEpoch: 0 },
+    interaction: {},
+    tutorialPresentation: { reset() {} },
+    tempoLoop: { stop() {}, start() {} },
+    blackout: { clear() {} },
+    effects: { clearActive() {}, setMetrics() {} },
+    restartControl: controls.restart,
+    concedeControl: controls.concede,
+    menuControl: controls.menu,
+    turnFlash: { clear() {} },
+    menu: { show() {} },
+    audio: {},
+    dialogue: {},
+  });
+
+  controller.start({
+    mode: "online",
+    size: 13,
+    squads: { 1: squad, 2: squad },
+    mySeat: 1,
+    net: { bind() {}, dispose() {} },
+  });
+  assert.equal(controls.restart.hidden, true);
+  assert.equal(controls.concede.hidden, false);
+  assert.equal(controls.concede.disabled, false);
+  assert.equal(controls.menu.hidden, true);
+
+  controller.leave();
+  assert.equal(controls.concede.hidden, true);
+  assert.equal(controls.concede.disabled, true);
+  assert.equal(controls.menu.hidden, false);
+});
+
+test("ranked online matches also use concede instead of the match menu", () => {
+  const squad = ["swordsman"];
+  const controls = { restart: {}, concede: { hidden: true }, menu: { hidden: false } };
+  const controller = createMatchLifecycleController({
+    runtime: { matchEpoch: 0 },
+    interaction: {},
+    tutorialPresentation: { reset() {} },
+    tempoLoop: { stop() {}, start() {} },
+    blackout: { clear() {} },
+    effects: { clearActive() {}, setMetrics() {} },
+    restartControl: controls.restart,
+    concedeControl: controls.concede,
+    menuControl: controls.menu,
+    turnFlash: { clear() {} },
+    menu: { show() {} },
+    audio: {},
+    dialogue: {},
+  });
+
+  controller.start({
+    mode: "online",
+    ranked: { matchId: "ranked-1" },
+    size: 13,
+    squads: { 1: squad, 2: squad },
+    mySeat: 2,
+    net: { bind() {} },
+  });
+
+  assert.equal(controls.concede.hidden, false);
+  assert.equal(controls.concede.disabled, false);
+  assert.equal(controls.menu.hidden, true);
+});
+
 test("local match starts preserve every setup board size from fifteen down to seven", () => {
   const squad = ["swordsman", "archer", "mystic", "magician"];
 

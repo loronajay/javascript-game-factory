@@ -51,7 +51,7 @@ test("release hotspots delegate cohesive responsibilities to smaller modules", (
     ["src/ui/menuFlow.js", 220, ["./matchSetupScreens.js", "./campaignMapScreen.js", "./resultsScreen.js", "./tutorialMenuScreens.js", "./settingsScreen.js"]],
     ["src/ui/campaignMapScreen.js", 580, ["./campaignMenuModel.js"]],
     ["src/ui/resultsScreen.js", 200, ["./resultsOpponentCard.js"]],
-    ["src/ui/resultsOpponentCard.js", 120, []],
+    ["src/ui/resultsOpponentCard.js", 160, []],
     ["src/ui/tutorialMenuScreens.js", 170, []],
     ["src/ui/settingsScreen.js", 250, []],
     ["src/ui/matchSetupScreens.js", 220, []],

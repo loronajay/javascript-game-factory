@@ -1,9 +1,7 @@
 // Post-match opponent ranked card + discovery actions, extracted from resultsScreen.js
 // to keep that screen a thin composer. Ranked matches are the first-class add-friend
-// entry point (see the platform discovery vision), so a resolved online ranked duel
-// surfaces the opponent's ranked standing plus View Profile / Add Friend / Message
-// deep-links. All platform I/O is best-effort: a signed-out or offline player still sees
-// the card, just with the actions disabled.
+// entry point, so a resolved online ranked duel surfaces the opponent's ranked
+// standing plus View Profile / Add Friend / Message deep-links.
 
 import { el } from "./domHelpers.js";
 import { createPlatformApiClient } from "../../../../js/platform/api/platform-api.mjs";
@@ -14,41 +12,42 @@ import { factoryMessagesUrl, factoryPlayerUrl } from "../platform/factoryLinks.j
 import { createRankedTierEmblem, normalizeRankedTierId } from "./rankedEmblems.js";
 
 // Fill `host` with the opponent card for a resolved online ranked match, or hide it.
-// `ranked` is the last match's ranked handoff ({ opponentPlayerId, ... }) or null.
-export function renderOpponentCard(host, ranked) {
+// `context` carries the match-local identity exchange so offline/stale platform reads
+// still render the opponent's pilot name and the just-finished result.
+export function renderOpponentCard(host, ranked, context = {}) {
   if (!host) return;
   host.replaceChildren();
   const opponentId = ranked?.opponentPlayerId;
   if (!opponentId) { host.hidden = true; return; }
   host.hidden = false;
+  const matchCard = opponentCardFromMatch(ranked, context);
 
   host.appendChild(el("h3", "results-opponent-title", "Your Opponent"));
   const body = el("div", "results-opponent-body");
-  body.appendChild(el("p", "results-opponent-loading", "Loading opponent…"));
+  body.appendChild(el("p", "results-opponent-loading", "Loading opponent..."));
   host.appendChild(body);
 
   let apiClient = null;
   try { apiClient = createPlatformApiClient(); } catch { apiClient = null; }
   if (!apiClient?.isConfigured || typeof apiClient.fetchRankedCard !== "function") {
-    fillOpponentCard(body, { playerId: opponentId }, apiClient);
+    fillOpponentCard(body, matchCard.card, apiClient);
     return;
   }
   apiClient.fetchRankedCard(TACTICAL_ARENA_GAME_SLUG, opponentId)
-    .then((card) => fillOpponentCard(body, card || { playerId: opponentId }, apiClient))
-    .catch(() => fillOpponentCard(body, { playerId: opponentId }, apiClient));
+    .then((card) => fillOpponentCard(body, mergeFetchedCard(card, matchCard), apiClient))
+    .catch(() => fillOpponentCard(body, matchCard.card, apiClient));
 }
 
 function fillOpponentCard(body, card, apiClient) {
   body.replaceChildren();
   const opponentId = card.playerId;
-
   const head = el("div", "results-opponent-head");
-  head.appendChild(el("span", "results-opponent-name", card.title || "Ranked Rival"));
+  head.appendChild(el("span", "results-opponent-name", cardName(card)));
   if (Number.isFinite(Number(card.rating))) {
     const tierId = normalizeRankedTierId(card.tier);
     const standing = el("span", "results-opponent-standing");
     standing.appendChild(createRankedTierEmblem(card.tier, { className: "is-opponent" }));
-    standing.appendChild(el("span", `results-opponent-tier ranked-tier-${tierId}`, `${card.tier?.label || "Bronze"} · ${card.rating}`));
+    standing.appendChild(el("span", `results-opponent-tier ranked-tier-${tierId}`, `${card.tier?.label || "Bronze"} - ${card.rating}`));
     head.appendChild(standing);
   }
   body.appendChild(head);
@@ -59,31 +58,91 @@ function fillOpponentCard(body, card, apiClient) {
   body.appendChild(el("p", "results-opponent-record", record));
 
   const actions = el("div", "results-opponent-actions");
-
   const profileUrl = factoryPlayerUrl(opponentId);
   if (profileUrl) {
     const view = el("a", "results-opponent-btn menu-btn", "View Profile");
     view.href = profileUrl;
     actions.appendChild(view);
   }
-
   const addFriend = el("button", "results-opponent-btn menu-btn", "Add Friend");
   addFriend.type = "button";
   wireAddFriend(addFriend, apiClient, opponentId);
   actions.appendChild(addFriend);
 
-  const messageUrl = factoryMessagesUrl(opponentId, { name: card.title || "" });
+  const messageUrl = factoryMessagesUrl(opponentId, { name: cardName(card) });
   if (messageUrl) {
     const message = el("a", "results-opponent-btn menu-btn ghost", "Message");
     message.href = messageUrl;
     actions.appendChild(message);
   }
-
   body.appendChild(actions);
 }
 
+function opponentCardFromMatch(ranked, { net = null, mySeat = null, outcome = null } = {}) {
+  const profile = net?.profileForSeat?.(Number(mySeat) === 1 ? 2 : 1) || {};
+  const rp = profile.rankedProfile || {};
+  const base = recordOf(rp);
+  const preMatchRecord = profile.rankedProfile ? base : null;
+  return {
+    outcome,
+    preMatchRecord,
+    card: bumpIfStale({
+      playerId: ranked?.opponentPlayerId,
+      displayName: profile.displayName,
+      title: rp.title || rp.tagline || null,
+      avatarUnit: rp.avatarUnit || null,
+      avatarSkin: rp.avatarSkin || null,
+      tier: rp.tier || null,
+      rating: rp.rating,
+      ...base,
+    }, preMatchRecord, outcome),
+  };
+}
+
+function mergeFetchedCard(card, matchCard) {
+  const merged = { ...matchCard.card, ...(card || {}) };
+  merged.displayName = preferredName(card, matchCard.card.displayName);
+  return bumpIfStale(merged, matchCard.preMatchRecord, matchCard.outcome);
+}
+
+function clean(value) { return typeof value === "string" ? value.trim() : ""; }
+
+function preferredName(card, fallback = "") {
+  const name = clean(card?.displayName) || clean(card?.profileName) || clean(card?.pilotName);
+  return name && !/^(commander|ranked rival)$/i.test(name) ? name : fallback;
+}
+
+function cardName(card) {
+  return clean(card.displayName) || clean(card.profileName) || clean(card.pilotName) || clean(card.name) || clean(card.title) || "Ranked Rival";
+}
+
+function recordOf(card) {
+  return { wins: Number(card?.wins) || 0, losses: Number(card?.losses) || 0, draws: Number(card?.draws) || 0 };
+}
+
+function bumpIfStale(card, preMatchRecord, outcome) {
+  const record = recordOf(card);
+  const stale = preMatchRecord
+    && record.wins === preMatchRecord.wins
+    && record.losses === preMatchRecord.losses
+    && record.draws === preMatchRecord.draws;
+  if (!outcome || !stale) return card;
+  const next = { ...card };
+  if (outcome === "win") next.losses += 1;
+  else if (outcome === "loss") next.wins += 1;
+  else if (outcome === "draw") next.draws += 1;
+  return next;
+}
+
 function wireAddFriend(button, apiClient, opponentId) {
-  const myId = myPlayerId();
+  const profile = myFactoryProfile();
+  const myId = myPlayerId(profile);
+  if (isAlreadyFriend(profile, opponentId)) {
+    button.disabled = true;
+    button.textContent = "Friend Added";
+    button.title = "Already friends.";
+    return;
+  }
   if (!apiClient?.isConfigured || typeof apiClient.createFriendshipBetweenPlayers !== "function" || !myId) {
     button.disabled = true;
     button.title = "Sign in to add friends.";
@@ -91,17 +150,32 @@ function wireAddFriend(button, apiClient, opponentId) {
   }
   button.addEventListener("click", () => {
     button.disabled = true;
-    button.textContent = "Adding…";
+    button.textContent = "Adding...";
     apiClient.createFriendshipBetweenPlayers(myId, opponentId)
       .then((friendship) => { button.textContent = friendship ? "Friend Added" : "Request Sent"; })
       .catch(() => { button.textContent = "Try Again"; button.disabled = false; });
   });
 }
 
-function myPlayerId() {
-  try {
-    return createOnlineIdentityPayload(loadFactoryProfile()).playerId || "";
-  } catch {
-    return "";
-  }
+function myFactoryProfile() {
+  try { return loadFactoryProfile(); } catch { return null; }
+}
+
+function myPlayerId(profile = myFactoryProfile()) {
+  try { return createOnlineIdentityPayload(profile).playerId || ""; } catch { return ""; }
+}
+
+function isAlreadyFriend(profile, opponentId) {
+  const id = clean(opponentId);
+  if (!id || !profile) return false;
+  const friendIds = [
+    ...(Array.isArray(profile.friends) ? profile.friends : []),
+    ...(Array.isArray(profile.friendsPreview) ? profile.friendsPreview.map(friendPreviewPlayerId) : []),
+  ];
+  return friendIds.some((friendId) => clean(friendId) === id);
+}
+
+function friendPreviewPlayerId(friend) {
+  if (typeof friend === "string") return friend;
+  return friend?.playerId || friend?.id || "";
 }

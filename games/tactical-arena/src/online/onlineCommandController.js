@@ -82,6 +82,20 @@ export function createOnlineCommandController({
     }, 2200);
   }
 
+  function concedeLocalMatch() {
+    if (!runtime.net || !Number.isInteger(runtime.mySeat)) return false;
+    if (runtime.state?.phase !== "playing") return false;
+    if (runtime.resolving || runtime.applyingRemote) {
+      setMessage("Concede after the current command resolves.", true);
+      return true;
+    }
+    const accepted = dispatch(concede(runtime.mySeat));
+    if (!accepted) return false;
+    render();
+    setMessage("You conceded the match.");
+    return true;
+  }
+
   const sessionController = {
     getMatchState: () => runtime.state,
     applyRemoteCommand,
@@ -98,5 +112,5 @@ export function createOnlineCommandController({
     },
   };
 
-  return { applyRemoteCommand, endOnlineMatch, sessionController };
+  return { applyRemoteCommand, concedeLocalMatch, endOnlineMatch, sessionController };
 }

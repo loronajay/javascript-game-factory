@@ -12,6 +12,7 @@ import {
 import { TACTICAL_ARENA_GAME_SLUG } from "../platform/gameProgressClient.js";
 import { loadFactoryProfile } from "../../../../js/platform/identity/factory-profile.mjs";
 import { createOnlineIdentityPayload } from "../../../../js/platform/identity/match-identity.mjs";
+import { syncRankedPilotProfile } from "../online/rankedPilotProfile.js";
 import { createPortrait, hasPortrait } from "./portraits.js";
 import { createRankedTierEmblem, normalizeRankedTierId } from "./rankedEmblems.js";
 
@@ -34,11 +35,18 @@ function cleanText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function isGenericCommanderName(value) {
+  return cleanText(value).toLowerCase() === "commander";
+}
+
 function leaderboardPlayerName(entry, isMe) {
-  return cleanText(entry.displayName)
-    || cleanText(entry.pilotName)
-    || cleanText(entry.playerName)
+  const displayName = cleanText(entry.displayName);
+  const pilotName = cleanText(entry.pilotName)
     || cleanText(entry.profileName)
+    || cleanText(entry.playerName);
+  return (!isGenericCommanderName(displayName) ? displayName : "")
+    || pilotName
+    || displayName
     || (isMe ? "You" : "Commander");
 }
 
@@ -171,7 +179,9 @@ function populate(body) {
 
   body.appendChild(el("p", "ranked-profile-meta-loading", "Loading ladder…"));
 
-  apiClient.fetchRankedLeaderboard(TACTICAL_ARENA_GAME_SLUG, LEADERBOARD_LIMIT)
+  Promise.resolve(syncRankedPilotProfile({ apiClient, loadProfile: loadFactoryProfile }))
+    .catch(() => null)
+    .then(() => apiClient.fetchRankedLeaderboard(TACTICAL_ARENA_GAME_SLUG, LEADERBOARD_LIMIT))
     .then((leaderboard) => renderLeaderboard(body, leaderboard?.entries || []))
     .catch(() => {
       body.replaceChildren(el("p", "ranked-profile-standing-error", "Could not load the leaderboard."));

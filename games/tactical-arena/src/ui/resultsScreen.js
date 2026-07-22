@@ -70,7 +70,14 @@ export function createResultsScreen({
       void renderRankedResult(lastConfig.ranked, stats);
     }
     if (opponentEl) {
-      renderOpponentCard(opponentEl, online ? lastConfig?.ranked : null);
+      const rankedOutcome = online && lastConfig?.ranked
+        ? summary.winner === lastConfig.mySeat ? "win" : "loss"
+        : null;
+      renderOpponentCard(opponentEl, online ? lastConfig?.ranked : null, {
+        net: lastConfig?.net,
+        mySeat: lastConfig?.mySeat,
+        outcome: rankedOutcome,
+      });
     }
     addStat(stats, "Board", `${summary.size} × ${summary.size}`);
     addStat(stats, "Squad turns", String(summary.turns));

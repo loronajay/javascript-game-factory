@@ -106,6 +106,33 @@ test("ranked leaderboard prefers pilot names over commander taglines", () => {
   }
 });
 
+test("ranked leaderboard treats Commander display names as fallback copy", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: (tagName) => new TestElement(tagName) };
+
+  try {
+    const body = new TestElement("div");
+
+    renderLeaderboard(body, [
+      {
+        rank: 1,
+        playerId: "pilot-1",
+        displayName: "Commander",
+        profileName: "Mara Pilot",
+        title: "Commander",
+        tier: { id: "gold", label: "Gold" },
+      },
+    ]);
+
+    const row = walk(body, (node) => hasClass(node, "ranked-leaderboard-row"))[0];
+    assert.ok(row);
+    assert.equal(walk(row, (node) => hasClass(node, "ranked-leaderboard-player"))[0]?.textContent, "Mara Pilot");
+    assert.equal(walk(row, (node) => hasClass(node, "ranked-leaderboard-title"))[0]?.textContent, "Commander");
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("ranked leaderboard top tab shows only the first ten entries", () => {
   const entries = Array.from({ length: 12 }, (_, index) => ({
     rank: index + 1,

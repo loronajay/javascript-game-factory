@@ -34,6 +34,8 @@ export function createMatchLifecycleController({
   blackout,
   effects,
   restartControl,
+  concedeControl,
+  menuControl,
   turnFlash,
   menu,
   audio,
@@ -103,6 +105,11 @@ export function createMatchLifecycleController({
     runtime.mySeat = online ? config.mySeat : null;
     runtime.applyingRemote = false;
     restartControl.hidden = online;
+    if (concedeControl) {
+      concedeControl.hidden = !online;
+      concedeControl.disabled = !online;
+    }
+    if (menuControl) menuControl.hidden = online;
     clearInteraction();
     if (state.activation?.unitId) interaction.selectedId = state.activation.unitId;
     runtime.resolving = false;
@@ -140,6 +147,11 @@ export function createMatchLifecycleController({
 
   function reset() {
     if (runtime.net) return;
+    if (concedeControl) {
+      concedeControl.hidden = true;
+      concedeControl.disabled = true;
+    }
+    if (menuControl) menuControl.hidden = false;
     const defaultSquad = applyFormationOrder(DEFAULT_SQUAD, DEFAULT_FORMATION_ORDER);
     start(runtime.matchConfig ?? { size: 13, squads: { 1: defaultSquad, 2: defaultSquad } });
   }
@@ -150,6 +162,11 @@ export function createMatchLifecycleController({
     if (runtime.net && runtime.state.phase === "playing") runtime.net.dispose();
     runtime.net = null;
     runtime.mySeat = null;
+    if (concedeControl) {
+      concedeControl.hidden = true;
+      concedeControl.disabled = true;
+    }
+    if (menuControl) menuControl.hidden = false;
   }
 
   return { leave, reset, start };

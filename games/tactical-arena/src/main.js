@@ -481,6 +481,8 @@ const matchLifecycle = createMatchLifecycleController({
   blackout,
   effects,
   restartControl: document.querySelector("#restartBtn"),
+  concedeControl: document.querySelector("#concedeBtn"),
+  menuControl: document.querySelector("#matchMenuBtn"),
   turnFlash,
   menu,
   audio,
@@ -748,6 +750,14 @@ function releaseTempoSlot(exceptId) {
 // --- Input wiring ---
 
 document.querySelector("#restartBtn").addEventListener("click", resetBattle);
+document.querySelector("#concedeBtn")?.addEventListener("click", () => {
+  const handled = onlineCommandController.concedeLocalMatch();
+  if (handled && state.phase === "complete") {
+    document.querySelector("#concedeBtn").disabled = true;
+  } else if (!handled) {
+    setMessage("Concede is only available during an online match.", true);
+  }
+});
 document.querySelector("#rulesBtn").addEventListener("click", openCodex);
 
 accuracyForecastToggle?.addEventListener("change", () => {
