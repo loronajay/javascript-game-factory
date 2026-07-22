@@ -104,10 +104,15 @@ def measure_webp_lossless(path: Path, method: int = 6) -> tuple[int, int]:
             temp_path.unlink()
 
 
-def convert_to_webp_lossless(path: Path, dry_run: bool = False, method: int = 6) -> tuple[int, int, str, Path]:
+def convert_to_webp_lossless(
+    path: Path,
+    dry_run: bool = False,
+    method: int = 6,
+    overwrite: bool = False,
+) -> tuple[int, int, str, Path]:
     original_size = path.stat().st_size
     target_path = path.with_suffix(".webp")
-    if target_path.exists():
+    if target_path.exists() and not overwrite:
         return original_size, original_size, "target-exists", target_path
 
     temp_handle = tempfile.NamedTemporaryFile(
@@ -128,12 +133,15 @@ def convert_to_webp_lossless(path: Path, dry_run: bool = False, method: int = 6)
         if after_size != before_size or not pixels_match(before_pixels, after_pixels, ignore_transparent_rgb=True):
             return original_size, original_size, "pixel-mismatch", target_path
         new_size = temp_path.stat().st_size
-        if new_size >= original_size:
+        if target_path.exists() and temp_path.read_bytes() == target_path.read_bytes():
+            return original_size, new_size, "target-current", target_path
+        if not overwrite and new_size >= original_size:
             return original_size, original_size, "kept", target_path
         if not dry_run:
             os.replace(temp_path, target_path)
             temp_path = None
-            path.unlink()
+            if not overwrite:
+                path.unlink()
         return original_size, new_size, "converted", target_path
     finally:
         if temp_path and temp_path.exists():
@@ -159,6 +167,7 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--webp-report", action="store_true")
     parser.add_argument("--webp-lossless-replace", action="store_true")
+    parser.add_argument("--webp-lossless-overwrite", action="store_true")
     parser.add_argument("--webp-method", type=int, default=6, choices=range(0, 7), metavar="0-6")
     parser.add_argument("--top", type=int, default=20)
     args = parser.parse_args()
@@ -194,7 +203,12 @@ def main() -> None:
         converted: list[tuple[int, Path, int, int, Path]] = []
         skipped: dict[str, int] = {}
         for path in files:
-            before, after, status, target_path = convert_to_webp_lossless(path, dry_run=args.dry_run, method=args.webp_method)
+            before, after, status, target_path = convert_to_webp_lossless(
+                path,
+                dry_run=args.dry_run,
+                method=args.webp_method,
+                overwrite=args.webp_lossless_overwrite,
+            )
             total_before += before
             total_after += after
             if status == "converted":
