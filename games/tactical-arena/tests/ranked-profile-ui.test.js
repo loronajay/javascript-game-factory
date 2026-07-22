@@ -164,7 +164,8 @@ test("ranked profile legacy avatar options include unlocked units and owned skin
 });
 
 test("ranked profile active-match notice only treats live matches as in progress", () => {
-  assert.equal(isRankedMatchInProgress({ status: "active", matchId: "m1" }), true);
+  assert.equal(isRankedMatchInProgress({ status: "playing", matchId: "m1" }), true);
+  assert.equal(isRankedMatchInProgress({ status: "active", matchId: "m1" }), false);
 
   assert.equal(isRankedMatchInProgress(null), false);
   assert.equal(isRankedMatchInProgress(true), false);

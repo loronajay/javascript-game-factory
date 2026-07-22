@@ -104,6 +104,7 @@ export function createOnlineFlow({ onStartMatch }) {
   let rankedInfo = null;
   let rankedBanFirstSeat = null;
   let rankedIdentityProfile = null;
+  let rankedPagehideHandler = null;
 
   // Owner-authored framing, mirrored to every client via `config`.
   const config = {
@@ -175,6 +176,20 @@ export function createOnlineFlow({ onStartMatch }) {
 
   function isRankedLobby() {
     return rankedMode || lobby?.settings?.ranked === true;
+  }
+
+  function clearRankedPagehideHandler() {
+    if (!rankedPagehideHandler) return;
+    globalThis.removeEventListener?.("pagehide", rankedPagehideHandler);
+    rankedPagehideHandler = null;
+  }
+
+  function installRankedPagehideHandler() {
+    clearRankedPagehideHandler();
+    rankedPagehideHandler = () => {
+      if (!handedOff && rankedFlow) void rankedFlow.cancel({ keepalive: true });
+    };
+    globalThis.addEventListener?.("pagehide", rankedPagehideHandler);
   }
 
   // Draft needs DRAFT_PICK_ORDER.length (8) unique units across both seats — one
@@ -1073,6 +1088,8 @@ export function createOnlineFlow({ onStartMatch }) {
     });
     handedOff = true; // onExit must NOT disconnect — the match owns the client now
 
+    if (rankedInfo && rankedFlow) void rankedFlow.markMatchStarted();
+
     const squads = {};
     const skins = {};
     const nicknames = {};
@@ -1091,6 +1108,7 @@ export function createOnlineFlow({ onStartMatch }) {
           ratingBefore: rankedInfo.myRatingBefore,
           opponentPlayerId: rankedInfo.opponentPlayerId,
           report: (outcome, detail) => rankedFlow?.reportResult(outcome, detail),
+          reportAbandon: (options) => rankedFlow?.reportAbandon(options),
           // Publish the ranked result to the platform activity feed for discovery.
           // Fire-and-forget; identity + opponent are resolved here where they live.
           publishActivity: (outcome, detail) => publishTacticalArenaMatchActivity({
@@ -1202,6 +1220,7 @@ export function createOnlineFlow({ onStartMatch }) {
 
   // ── screen lifecycle (ScreenManager onEnter/onExit) ──────────────────────────
   function onEnter() {
+    installRankedPagehideHandler();
     handedOff = false;
     myClientId = null;
     rankedInfo = null;
@@ -1226,6 +1245,7 @@ export function createOnlineFlow({ onStartMatch }) {
       endRankedSearch();
       if (client) client.disconnect();
     }
+    clearRankedPagehideHandler();
     client = null;
   }
 

@@ -9,13 +9,12 @@ import {
   savePerformanceMode,
 } from "./performanceSettings.js";
 import { applyCheatCode } from "../progression/cheatCodes.js";
-import { resetUnlockProgress } from "../progression/unlocks.js";
 import { resetProgressionAnnouncements } from "../progression/announcements.js";
 import { resetCampaignProgress } from "../campaign/campaign.js";
 
 const RESET_PROGRESS_IDLE_LABEL = "Reset Progress";
 const RESET_PROGRESS_CONFIRM_LABEL = "Confirm Reset";
-const RESET_PROGRESS_WARNING = "Press Confirm Reset again to erase tutorials, campaign stars, and units. Skins stay owned.";
+const RESET_PROGRESS_WARNING = "Press Confirm Reset again to erase mission progress only. Unit unlocks, Valor, tutorials, and owned skins stay saved.";
 const RESET_PROGRESS_CONFIRM_MS = 6000;
 
 // Two-press confirmation state machine for the destructive reset. Pure (no DOM
@@ -76,6 +75,17 @@ export function createResetProgressConfirmation({
 
   render();
   return { requestReset, disarm, get armed() { return armed; } };
+}
+
+export function resetLocalMissionProgress({
+  storage = globalThis.localStorage,
+  onProgressReset = () => {},
+  refreshUnlockedScreens = () => {},
+} = {}) {
+  const campaignProgress = resetCampaignProgress(storage);
+  onProgressReset();
+  refreshUnlockedScreens();
+  return { campaignProgress };
 }
 
 export function createSettingsScreen({
@@ -153,13 +163,13 @@ export function createSettingsScreen({
   }
 
   function resetLocalProgress() {
-    resetUnlockProgress(globalThis.localStorage);
-    resetCampaignProgress(globalThis.localStorage);
-    resetProgressionAnnouncements(globalThis.localStorage);
-    onProgressReset();
-    refreshUnlockedScreens();
+    resetLocalMissionProgress({
+      storage: globalThis.localStorage,
+      onProgressReset,
+      refreshUnlockedScreens,
+    });
     if (progressStatus) {
-      progressStatus.textContent = "Progress reset. Tutorials, campaign stars, and units are fresh. Owned skins were preserved.";
+      progressStatus.textContent = "Mission progress reset. Unit unlocks, Valor, tutorials, and owned skins were preserved.";
       window.clearTimeout(progressStatusTimer);
       progressStatusTimer = window.setTimeout(() => { progressStatus.textContent = ""; }, 3600);
     }

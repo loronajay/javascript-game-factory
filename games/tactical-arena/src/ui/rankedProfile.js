@@ -108,7 +108,7 @@ function formatRecord(standing) {
 
 export function isRankedMatchInProgress(activeMatch) {
   if (!activeMatch || typeof activeMatch !== "object") return false;
-  if (activeMatch.status !== "active") return false;
+  if (activeMatch.status !== "playing") return false;
   if (activeMatch.outcome) return false;
   return Boolean(activeMatch.matchId);
 }

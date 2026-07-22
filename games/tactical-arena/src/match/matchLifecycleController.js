@@ -52,6 +52,8 @@ export function createMatchLifecycleController({
   maybeShowCampaignDialogue = () => {},
   maybeStartCpuTurn = () => {},
 } = {}) {
+  let rankedPagehideHandler = null;
+
   function clearInteraction() {
     interaction.selectedId = null;
     interaction.mode = null;
@@ -60,7 +62,32 @@ export function createMatchLifecycleController({
     interaction.reviveTargetId = null;
   }
 
+  function clearRankedPagehideHandler() {
+    if (!rankedPagehideHandler) return;
+    globalThis.removeEventListener?.("pagehide", rankedPagehideHandler);
+    rankedPagehideHandler = null;
+  }
+
+  function reportLiveRankedAbandon(reason, { keepalive = true } = {}) {
+    if (runtime.state?.phase !== "playing") return;
+    const ranked = runtime.matchConfig?.ranked;
+    if (typeof ranked?.reportAbandon !== "function") return;
+    try {
+      ranked.reportAbandon({ reason, keepalive });
+    } catch {
+      // Best effort: cleanup must never interrupt leaving the match.
+    }
+  }
+
+  function installRankedPagehideHandler() {
+    clearRankedPagehideHandler();
+    if (typeof runtime.matchConfig?.ranked?.reportAbandon !== "function") return;
+    rankedPagehideHandler = () => reportLiveRankedAbandon("pagehide", { keepalive: true });
+    globalThis.addEventListener?.("pagehide", rankedPagehideHandler);
+  }
+
   function start(config) {
+    clearRankedPagehideHandler();
     clock.clearTimeout(runtime.resultsTimer);
     tutorialPresentation.reset();
     tempoLoop.stop();
@@ -89,6 +116,7 @@ export function createMatchLifecycleController({
     runtime.state = state;
     effects.setMetrics(createBoardMetrics(config.size));
     runtime.matchConfig = config;
+    installRankedPagehideHandler();
     runtime.matchStartedAt = now();
     runtime.initialHpByPlayer = {};
     for (const player of state.turnOrder ?? [1, 2]) {
@@ -159,7 +187,11 @@ export function createMatchLifecycleController({
   function leave() {
     tempoLoop.stop();
     blackout.clear();
-    if (runtime.net && runtime.state.phase === "playing") runtime.net.dispose();
+    if (runtime.net && runtime.state.phase === "playing") {
+      reportLiveRankedAbandon("leave", { keepalive: false });
+      runtime.net.dispose();
+    }
+    clearRankedPagehideHandler();
     runtime.net = null;
     runtime.mySeat = null;
     if (concedeControl) {

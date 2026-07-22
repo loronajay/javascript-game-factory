@@ -190,6 +190,9 @@ export function createApp(options = {}) {
     const cancelRanked = typeof options?.cancelRanked === "function"
         ? options.cancelRanked
         : async () => null;
+    const startRankedMatch = typeof options?.startRankedMatch === "function"
+        ? options.startRankedMatch
+        : async () => null;
     const reportRankedResult = typeof options?.reportRankedResult === "function"
         ? options.reportRankedResult
         : async () => null;
@@ -350,6 +353,7 @@ export function createApp(options = {}) {
         enqueueRanked,
         pollRanked,
         cancelRanked,
+        startRankedMatch,
         reportRankedResult,
         getRankedStanding,
         setRankedLobby,

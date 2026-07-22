@@ -69,6 +69,13 @@ export function createOnlineCommandController({
 
   function endOnlineMatch(title, sub) {
     if (!runtime.net) return;
+    if (runtime.state?.phase === "playing" && typeof runtime.matchConfig?.ranked?.reportAbandon === "function") {
+      try {
+        runtime.matchConfig.ranked.reportAbandon({ reason: "disconnect", keepalive: true });
+      } catch {
+        // Best effort: never block the disconnect UI.
+      }
+    }
     runtime.net.dispose();
     runtime.net = null;
     runtime.mySeat = null;

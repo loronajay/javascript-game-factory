@@ -1,7 +1,28 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createResetProgressConfirmation } from "../src/ui/settingsScreen.js";
+import {
+  createResetProgressConfirmation,
+  resetLocalMissionProgress,
+} from "../src/ui/settingsScreen.js";
+import {
+  readUnlockProgress,
+  writeUnlockProgress,
+} from "../src/progression/unlocks.js";
+import {
+  CLOD_MISSION_ID,
+  readCampaignProgress,
+  writeCampaignProgress,
+} from "../src/campaign/campaign.js";
+
+function storageAdapter() {
+  const values = new Map();
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
+  };
+}
 
 function fakeButton() {
   const classes = new Set();
@@ -47,8 +68,9 @@ test("reset progress requires a second confirming press", () => {
   assert.equal(button.textContent, "Confirm Reset");
   assert.equal(button.classList.contains("is-confirming"), true);
   assert.equal(button.attributes.get("aria-pressed"), "true");
-  assert.match(status.textContent, /erase tutorials, campaign stars, and units/);
-  assert.match(status.textContent, /Skins stay owned/);
+  assert.match(status.textContent, /erase mission progress/);
+  assert.match(status.textContent, /Unit unlocks, Valor, tutorials, and owned skins stay saved/);
+  assert.doesNotMatch(status.textContent, /erase .*units/i);
   assert.equal(timers[0].ms, 6000);
 
   assert.equal(confirmation.requestReset(), true);
@@ -82,4 +104,48 @@ test("reset progress confirmation can expire without resetting", () => {
   assert.equal(button.textContent, "Reset Progress");
   assert.equal(button.classList.contains("is-confirming"), false);
   assert.equal(button.attributes.get("aria-pressed"), "false");
+});
+
+test("settings reset clears mission progress without touching unlock progress", () => {
+  const storage = storageAdapter();
+  writeUnlockProgress(storage, {
+    completedTutorials: ["basics"],
+    allTutorialsComplete: true,
+    tutorialValorGranted: true,
+    valorBalance: 900,
+    campaignValorRewards: [CLOD_MISSION_ID],
+    unlockedUnits: ["clod", "juggernaut"],
+    purchasedSkins: [{ type: "swordsman", slug: "medieval" }],
+  });
+  writeCampaignProgress(storage, {
+    completedMissions: [CLOD_MISSION_ID],
+    missionStars: { [CLOD_MISSION_ID]: 3 },
+    seenMapCutscenes: [CLOD_MISSION_ID],
+    seenPostMatchCutscenes: [CLOD_MISSION_ID],
+  });
+  let onProgressResetCount = 0;
+  let refreshCount = 0;
+
+  const reset = resetLocalMissionProgress({
+    storage,
+    onProgressReset: () => { onProgressResetCount += 1; },
+    refreshUnlockedScreens: () => { refreshCount += 1; },
+  });
+
+  assert.deepEqual(reset.campaignProgress, {
+    completedMissions: [],
+    missionStars: {},
+    seenMapCutscenes: [],
+    seenPostMatchCutscenes: [],
+  });
+  assert.deepEqual(readCampaignProgress(storage), reset.campaignProgress);
+  const unlockProgress = readUnlockProgress(storage);
+  assert.equal(unlockProgress.allTutorialsComplete, true);
+  assert.equal(unlockProgress.valorBalance, 900);
+  assert.deepEqual(unlockProgress.campaignValorRewards, [CLOD_MISSION_ID]);
+  assert.equal(unlockProgress.unlockedUnits.includes("clod"), true);
+  assert.equal(unlockProgress.unlockedUnits.includes("juggernaut"), true);
+  assert.deepEqual(unlockProgress.purchasedSkins, [{ type: "swordsman", slug: "medieval" }]);
+  assert.equal(onProgressResetCount, 1);
+  assert.equal(refreshCount, 1);
 });

@@ -401,6 +401,7 @@ const cpuTurnController = createCpuTurnController({
 const onlineCommandController = createOnlineCommandController({
   runtime: {
     get state() { return state; },
+    get matchConfig() { return matchConfig; },
     get net() { return net; },
     set net(value) { net = value; },
     get mySeat() { return mySeat; },

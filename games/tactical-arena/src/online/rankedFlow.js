@@ -24,7 +24,7 @@ export function createRankedFlow({
   getAccountSession = readStoredFactoryAccountSession,
   callbacks = {},
 } = {}) {
-  let state = "idle"; // idle | queuing | awaiting_lobby | ready | cancelled
+  let state = "idle"; // idle | queuing | awaiting_lobby | ready | in_match | cancelled
   let timer = null;
   let match = null;
   let matchedEmitted = false;
@@ -115,7 +115,7 @@ export function createRankedFlow({
   }
 
   async function queue() {
-    if (state === "queuing" || state === "awaiting_lobby" || state === "ready") return;
+    if (state === "queuing" || state === "awaiting_lobby" || state === "ready" || state === "in_match") return;
     const gate = getRankedAccountGate(currentAccount());
     if (!gate.eligible) {
       cb.onError(gate.message);
@@ -151,34 +151,54 @@ export function createRankedFlow({
     }
   }
 
-  async function cancel() {
+  async function cancel({ keepalive = false } = {}) {
     const wasPolling = isPolling();
+    const hadMatch = Boolean(match);
     state = "cancelled";
     stopTimer();
-    if (wasPolling) {
+    if (wasPolling || hadMatch) {
       try {
-        await apiClient.cancelRankedMatch(gameSlug);
+        await apiClient.cancelRankedMatch(gameSlug, { keepalive });
       } catch {
         // best effort
       }
     }
+    match = null;
+    matchedEmitted = false;
     state = "idle";
   }
 
-  async function reportResult(outcome, { squad, unitResults } = {}) {
+  async function markMatchStarted() {
     if (!match) return null;
+    state = "in_match";
     try {
-      return await apiClient.reportRankedResult(gameSlug, { matchId: match.matchId, outcome, squad, unitResults });
+      return await apiClient.startRankedMatch?.(gameSlug, { matchId: match.matchId });
     } catch {
       return null;
     }
   }
 
+  async function reportResult(outcome, { squad, unitResults, keepalive = false } = {}) {
+    if (!match) return null;
+    try {
+      return await apiClient.reportRankedResult(gameSlug, { matchId: match.matchId, outcome, squad, unitResults }, { keepalive });
+    } catch {
+      return null;
+    }
+  }
+
+  function reportAbandon({ keepalive = true } = {}) {
+    if (!match || state !== "in_match") return null;
+    return reportResult("loss", { keepalive });
+  }
+
   return {
     queue,
     cancel,
+    markMatchStarted,
     publishLobbyCode,
     reportResult,
+    reportAbandon,
     getMatch: () => match,
     get state() {
       return state;

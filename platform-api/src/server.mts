@@ -23,6 +23,7 @@ import {
   reportRankedResult,
   saveRankedProfile,
   setRankedLobbyCode,
+  startRankedMatch,
 } from "./db/ranked.mjs";
 import {
   createFriendshipBetweenPlayers,
@@ -205,6 +206,7 @@ async function bootstrap(): Promise<void> {
     enqueueRanked: (gameSlug: any, params: any) => enqueueRanked(pool, { ...params, gameSlug }),
     pollRanked: (gameSlug: any, params: any) => pollRanked(pool, { ...params, gameSlug }),
     cancelRanked: (gameSlug: any, params: any) => cancelRanked(pool, { ...params, gameSlug }),
+    startRankedMatch: (gameSlug: any, params: any) => startRankedMatch(pool, { ...params, gameSlug }),
     reportRankedResult: (gameSlug: any, params: any) => reportRankedResult(pool, { ...params, gameSlug }),
     getRankedStanding: (gameSlug: any, params: any) => getRankedStanding(pool, { ...params, gameSlug }),
     setRankedLobby: (gameSlug: any, params: any) => setRankedLobbyCode(pool, { ...params, gameSlug }),

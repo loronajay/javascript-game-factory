@@ -92,3 +92,32 @@ test("local online concede waits while a command is resolving", () => {
   assert.equal(controller.concedeLocalMatch(), true);
   assert.deepEqual(calls, [{ message: "Concede after the current command resolves.", isError: true }]);
 });
+
+test("live ranked disconnect reports an abandon loss before disposing", () => {
+  const calls = [];
+  const controller = createOnlineCommandController({
+    runtime: {
+      state: createBattleState(),
+      matchConfig: { ranked: { reportAbandon: () => calls.push("abandon") } },
+      net: { dispose: () => calls.push("dispose") },
+      mySeat: 1,
+    },
+    interaction: {},
+    turnFlash: { announce: () => calls.push("announce") },
+    setMessage: (message) => calls.push(message),
+    menu: { show: (screen) => calls.push(`show:${screen}`) },
+    clock: {
+      clearTimeout() {},
+      setTimeout(fn) {
+        calls.push("timer");
+        fn();
+        return 1;
+      },
+    },
+  });
+
+  controller.sessionController.endOnDisconnect("Lost connection to the match.");
+
+  assert.ok(calls.indexOf("abandon") >= 0, "ranked abandon should be reported");
+  assert.ok(calls.indexOf("abandon") < calls.indexOf("dispose"), "report before socket disposal");
+});

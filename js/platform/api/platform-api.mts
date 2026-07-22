@@ -68,13 +68,15 @@ async function requestJson(fetchImpl: FetchImpl, baseUrl: string, path: string, 
   }
 }
 
-function buildJsonRequestOptions(method: string, value: unknown): RequestInit {
+function buildJsonRequestOptions(method: string, value: unknown, options: RequestInit = {}): RequestInit {
   return {
     method,
     credentials: "include",
+    ...options,
     headers: {
       "content-type": "application/json; charset=utf-8",
       ...buildAuthHeaders(),
+      ...(options.headers || {}),
     },
     body: JSON.stringify(value ?? {}),
   };
@@ -126,20 +128,21 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
     return payload && responseKey ? (payload[responseKey] ?? null) : payload;
   }
 
-  async function post(path: string, value: unknown, responseKey?: string): Promise<any> {
+  async function post(path: string, value: unknown, responseKey?: string, options: RequestInit = {}): Promise<any> {
     const payload = await requestJson(
       fetchImpl,
       baseUrl,
       path,
-      buildJsonRequestOptions("POST", value),
+      buildJsonRequestOptions("POST", value, options),
     );
     return payload && responseKey ? (payload[responseKey] ?? null) : payload;
   }
 
-  async function del(path: string, responseKey?: string): Promise<any> {
+  async function del(path: string, responseKey?: string, options: RequestInit = {}): Promise<any> {
     const payload = await requestJson(fetchImpl, baseUrl, path, {
       method: "DELETE",
       credentials: "include",
+      ...options,
       headers: buildAuthHeaders(),
     });
     return payload && responseKey ? (payload[responseKey] ?? null) : payload;
@@ -446,13 +449,17 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
       const gs = encodePathSegment(gameSlug);
       return gs ? get(`/ranked/${gs}/queue`) : Promise.resolve(null);
     },
-    cancelRankedMatch(gameSlug: string) {
+    cancelRankedMatch(gameSlug: string, options: RequestInit = {}) {
       const gs = encodePathSegment(gameSlug);
-      return gs ? del(`/ranked/${gs}/queue`) : Promise.resolve(null);
+      return gs ? del(`/ranked/${gs}/queue`, undefined, options) : Promise.resolve(null);
     },
-    reportRankedResult(gameSlug: string, { matchId, outcome, squad, unitResults }: any = {}) {
+    startRankedMatch(gameSlug: string, { matchId }: any = {}) {
       const gs = encodePathSegment(gameSlug);
-      return gs ? post(`/ranked/${gs}/report`, { matchId, outcome, squad, unitResults }) : Promise.resolve(null);
+      return gs ? post(`/ranked/${gs}/start`, { matchId }) : Promise.resolve(null);
+    },
+    reportRankedResult(gameSlug: string, { matchId, outcome, squad, unitResults }: any = {}, options: RequestInit = {}) {
+      const gs = encodePathSegment(gameSlug);
+      return gs ? post(`/ranked/${gs}/report`, { matchId, outcome, squad, unitResults }, undefined, options) : Promise.resolve(null);
     },
     setRankedLobby(gameSlug: string, { matchId, lobbyCode }: any = {}) {
       const gs = encodePathSegment(gameSlug);

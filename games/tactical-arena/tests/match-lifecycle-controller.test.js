@@ -121,6 +121,41 @@ test("ranked online matches also use concede instead of the match menu", () => {
   assert.equal(controls.menu.hidden, true);
 });
 
+test("leaving a live ranked match reports an abandon loss before disposing the socket", () => {
+  const calls = [];
+  const squad = ["swordsman"];
+  const runtime = { matchEpoch: 0 };
+  const controller = createMatchLifecycleController({
+    runtime,
+    interaction: {},
+    tutorialPresentation: { reset() {} },
+    tempoLoop: { stop() { calls.push("tempo-stop"); }, start() {} },
+    blackout: { clear() {} },
+    effects: { clearActive() {}, setMetrics() {} },
+    restartControl: {},
+    concedeControl: { hidden: true },
+    menuControl: { hidden: false },
+    turnFlash: { clear() {} },
+    menu: { show() {} },
+    audio: {},
+    dialogue: {},
+  });
+
+  controller.start({
+    mode: "online",
+    ranked: { matchId: "ranked-1", reportAbandon: () => calls.push("abandon") },
+    size: 13,
+    squads: { 1: squad, 2: squad },
+    mySeat: 1,
+    net: { bind() {}, dispose() { calls.push("dispose"); } },
+  });
+
+  controller.leave();
+
+  assert.ok(calls.indexOf("abandon") >= 0, "ranked abandon should be reported");
+  assert.ok(calls.indexOf("abandon") < calls.indexOf("dispose"), "report before socket disposal");
+});
+
 test("local match starts preserve every setup board size from fifteen down to seven", () => {
   const squad = ["swordsman", "archer", "mystic", "magician"];
 

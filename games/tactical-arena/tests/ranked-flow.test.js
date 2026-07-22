@@ -150,6 +150,22 @@ test("cancel leaves the queue and stops polling", async () => {
   assert.equal(flow.state, "idle");
 });
 
+test("cancel also clears a brokered match before the relay handoff starts", async () => {
+  const api = fakeApi({ enqueue: { status: "matched", match: { matchId: "m1", seat: 1, lobbyCode: null } } });
+  const sched = manualScheduler();
+  const rec = recorder();
+  const flow = createRankedFlow({ apiClient: api, account: SIGNED_IN_ACCOUNT, ...sched, callbacks: rec.callbacks });
+
+  await flow.queue();
+  assert.equal(flow.state, "ready");
+
+  await flow.cancel();
+
+  assert.equal(api.calls.cancel, 1);
+  assert.equal(flow.state, "idle");
+  assert.equal(flow.getMatch(), null);
+});
+
 test("publishLobbyCode and reportResult call the platform with the match id", async () => {
   const api = fakeApi({ enqueue: { status: "matched", match: { matchId: "m1", seat: 1, lobbyCode: null } } });
   const sched = manualScheduler();

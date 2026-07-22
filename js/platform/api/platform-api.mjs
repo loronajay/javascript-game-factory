@@ -50,13 +50,15 @@ async function requestJson(fetchImpl, baseUrl, path, options = {}) {
         return null;
     }
 }
-function buildJsonRequestOptions(method, value) {
+function buildJsonRequestOptions(method, value, options = {}) {
     return {
         method,
         credentials: "include",
+        ...options,
         headers: {
             "content-type": "application/json; charset=utf-8",
             ...buildAuthHeaders(),
+            ...(options.headers || {}),
         },
         body: JSON.stringify(value ?? {}),
     };
@@ -93,14 +95,15 @@ export function createPlatformApiClient(options = {}) {
         const payload = await requestJson(fetchImpl, baseUrl, path, buildJsonRequestOptions("PUT", value));
         return payload && responseKey ? (payload[responseKey] ?? null) : payload;
     }
-    async function post(path, value, responseKey) {
-        const payload = await requestJson(fetchImpl, baseUrl, path, buildJsonRequestOptions("POST", value));
+    async function post(path, value, responseKey, options = {}) {
+        const payload = await requestJson(fetchImpl, baseUrl, path, buildJsonRequestOptions("POST", value, options));
         return payload && responseKey ? (payload[responseKey] ?? null) : payload;
     }
-    async function del(path, responseKey) {
+    async function del(path, responseKey, options = {}) {
         const payload = await requestJson(fetchImpl, baseUrl, path, {
             method: "DELETE",
             credentials: "include",
+            ...options,
             headers: buildAuthHeaders(),
         });
         return payload && responseKey ? (payload[responseKey] ?? null) : payload;
@@ -436,13 +439,17 @@ export function createPlatformApiClient(options = {}) {
             const gs = encodePathSegment(gameSlug);
             return gs ? get(`/ranked/${gs}/queue`) : Promise.resolve(null);
         },
-        cancelRankedMatch(gameSlug) {
+        cancelRankedMatch(gameSlug, options = {}) {
             const gs = encodePathSegment(gameSlug);
-            return gs ? del(`/ranked/${gs}/queue`) : Promise.resolve(null);
+            return gs ? del(`/ranked/${gs}/queue`, undefined, options) : Promise.resolve(null);
         },
-        reportRankedResult(gameSlug, { matchId, outcome, squad, unitResults } = {}) {
+        startRankedMatch(gameSlug, { matchId } = {}) {
             const gs = encodePathSegment(gameSlug);
-            return gs ? post(`/ranked/${gs}/report`, { matchId, outcome, squad, unitResults }) : Promise.resolve(null);
+            return gs ? post(`/ranked/${gs}/start`, { matchId }) : Promise.resolve(null);
+        },
+        reportRankedResult(gameSlug, { matchId, outcome, squad, unitResults } = {}, options = {}) {
+            const gs = encodePathSegment(gameSlug);
+            return gs ? post(`/ranked/${gs}/report`, { matchId, outcome, squad, unitResults }, undefined, options) : Promise.resolve(null);
         },
         setRankedLobby(gameSlug, { matchId, lobbyCode } = {}) {
             const gs = encodePathSegment(gameSlug);

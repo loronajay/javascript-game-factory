@@ -1,6 +1,10 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { DEFAULT_RATING, RANKED_BOARD, SAME_OPPONENT_WINDOW_HOURS, banFirstIndex, computeRankedRatings, decideForfeitFinalize, decideReport, outcomeScoreA, provisionalK, rankTier, ratingWindow, sameOpponentGainFactor, } from "./ranked-elo.mjs";
 import { normalizeSquad, normalizeUnitResults, unitReportsAgree, unitStatDeltas, } from "./ranked-unit-stats.mjs";
+export const RANKED_ACTIVE_MATCH_TTL_HOURS = 6;
+function isOpenRankedMatchStatus(status) {
+    return status === "active" || status === "playing";
+}
 // Same slug shape as the rest of the game-scoped routes.
 export function isValidRankedSlug(slug) {
     return typeof slug === "string" && /^[a-z0-9-]{1,60}$/.test(slug);
@@ -42,6 +46,36 @@ function resolvedOutcomeForPlayer(row, playerId) {
         return "draw";
     const aWon = row.outcome_a === "win";
     return (isA ? aWon : !aWon) ? "win" : "loss";
+}
+function staleActiveCutoff(now = new Date()) {
+    return new Date(new Date(now).getTime() - RANKED_ACTIVE_MATCH_TTL_HOURS * 60 * 60 * 1000);
+}
+export function isStaleActiveRankedMatch(row, now = new Date()) {
+    if (!row || !isOpenRankedMatchStatus(row.status) || !row.created_at)
+        return false;
+    const createdMs = new Date(row.created_at).getTime();
+    const nowMs = new Date(now).getTime();
+    if (Number.isNaN(createdMs) || Number.isNaN(nowMs))
+        return false;
+    return nowMs - createdMs > RANKED_ACTIVE_MATCH_TTL_HOURS * 60 * 60 * 1000;
+}
+export async function expireStaleActiveRankedMatches(client, gameSlug, now = new Date()) {
+    if (!client || !gameSlug)
+        return 0;
+    const stale = await client.query(`select * from ranked_matches
+       where game_slug = $1 and status in ('active','playing') and created_at < $2
+       for update skip locked`, [gameSlug, staleActiveCutoff(now)]);
+    let expired = 0;
+    for (const row of stale.rows || []) {
+        if (!isStaleActiveRankedMatch(row, now))
+            continue;
+        await client.query(`update ranked_matches set status='voided', flags=$1, resolved_at=now()
+          where match_id=$2 and game_slug=$3`, [appendFlag(row.flags, "stale_active_expired"), row.match_id, gameSlug]);
+        await client.query(`update ranked_queue set status='cancelled', match_id=null
+          where game_slug=$1 and match_id=$2`, [gameSlug, row.match_id]);
+        expired += 1;
+    }
+    return expired;
 }
 async function loadRating(client, gameSlug, playerId) {
     const res = await client.query(`select rating, wins, losses, draws from game_ratings where player_id = $1 and game_slug = $2`, [playerId, gameSlug]);
@@ -107,10 +141,12 @@ export async function enqueueRanked(pool, { playerId, gameSlug }) {
     try {
         await client.query("begin");
         const { rating } = await loadRating(client, gameSlug, playerId);
+        await expireStaleActiveRankedMatches(client, gameSlug);
+        await finalizeForfeits(client, gameSlug);
         // If the player already holds an unresolved match, hand it back instead of queueing.
         const active = await client.query(`select * from ranked_matches
         where game_slug = $1 and (player_a = $2 or player_b = $2)
-          and status in ('active','pending_forfeit')
+          and status in ('active','playing','pending_forfeit')
         order by created_at desc limit 1`, [gameSlug, playerId]);
         if (active.rows[0]) {
             await client.query("commit");
@@ -146,10 +182,11 @@ export async function pollRanked(pool, { playerId, gameSlug }) {
     const client = await pool.connect();
     try {
         await client.query("begin");
+        await expireStaleActiveRankedMatches(client, gameSlug);
         await finalizeForfeits(client, gameSlug);
         const active = await client.query(`select * from ranked_matches
         where game_slug = $1 and (player_a = $2 or player_b = $2)
-          and status in ('active','pending_forfeit')
+          and status in ('active','playing','pending_forfeit')
         order by created_at desc limit 1`, [gameSlug, playerId]);
         if (active.rows[0]) {
             await client.query("commit");
@@ -183,14 +220,81 @@ export async function pollRanked(pool, { playerId, gameSlug }) {
 export async function cancelRanked(pool, { playerId, gameSlug }) {
     if (!pool || !playerId || !gameSlug)
         return null;
+    const client = await pool.connect();
     try {
-        await pool.query(`update ranked_queue set status='cancelled', match_id=null
+        await client.query("begin");
+        await expireStaleActiveRankedMatches(client, gameSlug);
+        await finalizeForfeits(client, gameSlug);
+        const active = await client.query(`select * from ranked_matches
+        where game_slug=$1 and (player_a=$2 or player_b=$2) and status='active'
+        order by created_at desc limit 1
+        for update`, [gameSlug, playerId]);
+        const row = active.rows[0];
+        if (row) {
+            const flags = appendFlag(row.flags, "cancelled_before_start");
+            await client.query(`update ranked_matches set status='voided', flags=$1, resolved_at=now()
+          where match_id=$2 and game_slug=$3`, [flags, row.match_id, gameSlug]);
+            await client.query(`update ranked_queue set status='cancelled', match_id=null
+          where game_slug=$1 and match_id=$2`, [gameSlug, row.match_id]);
+            await client.query("commit");
+            return {
+                ok: true,
+                cancelledMatch: true,
+                match: serializeMatchForPlayer({ ...row, status: "voided", flags }, playerId),
+            };
+        }
+        await client.query(`update ranked_queue set status='cancelled', match_id=null
         where player_id=$1 and game_slug=$2 and status='waiting'`, [playerId, gameSlug]);
+        await client.query("commit");
         return { ok: true };
     }
     catch (err) {
+        await client.query("rollback").catch(() => { });
         process.stderr.write(`[ranked] cancelRanked error: ${err?.message || err}\n`);
         return null;
+    }
+    finally {
+        client.release();
+    }
+}
+export async function startRankedMatch(pool, { matchId, gameSlug, playerId }) {
+    if (!pool || !matchId || !gameSlug || !playerId)
+        return null;
+    const client = await pool.connect();
+    try {
+        await client.query("begin");
+        await expireStaleActiveRankedMatches(client, gameSlug);
+        await finalizeForfeits(client, gameSlug);
+        const found = await client.query(`select * from ranked_matches where match_id=$1 and game_slug=$2 for update`, [matchId, gameSlug]);
+        const row = found.rows[0];
+        if (!row) {
+            await client.query("rollback");
+            return { error: "match_not_found" };
+        }
+        if (row.player_a !== playerId && row.player_b !== playerId) {
+            await client.query("rollback");
+            return { error: "not_a_member" };
+        }
+        if (["resolved", "voided", "disputed"].includes(row.status)) {
+            await client.query("commit");
+            return { ok: true, alreadyResolved: true, status: row.status, match: serializeMatchForPlayer(row, playerId) };
+        }
+        if (row.status === "active") {
+            await client.query(`update ranked_matches set status='playing' where match_id=$1 and game_slug=$2`, [matchId, gameSlug]);
+            await client.query(`update ranked_queue set status='cancelled', match_id=null
+          where game_slug=$1 and match_id=$2`, [gameSlug, matchId]);
+            row.status = "playing";
+        }
+        await client.query("commit");
+        return { ok: true, status: row.status, match: serializeMatchForPlayer(row, playerId) };
+    }
+    catch (err) {
+        await client.query("rollback").catch(() => { });
+        process.stderr.write(`[ranked] startRankedMatch error: ${err?.message || err}\n`);
+        return null;
+    }
+    finally {
+        client.release();
     }
 }
 async function countPriorMeetings(client, gameSlug, playerA, playerB) {
@@ -561,8 +665,9 @@ export async function getRankedStanding(pool, { playerId, gameSlug }) {
     try {
         const record = await loadRatingRecord(pool, gameSlug, playerId);
         const profile = await getRankedProfile(pool, { playerId, gameSlug });
+        await expireStaleActiveRankedMatches(pool, gameSlug);
         const activeRes = await pool.query(`select * from ranked_matches
-        where game_slug=$1 and (player_a=$2 or player_b=$2) and status in ('active','pending_forfeit')
+        where game_slug=$1 and (player_a=$2 or player_b=$2) and status in ('active','playing','pending_forfeit')
         order by created_at desc limit 1`, [gameSlug, playerId]);
         return {
             playerId,
