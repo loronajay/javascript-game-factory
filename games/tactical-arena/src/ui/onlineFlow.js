@@ -35,6 +35,7 @@ import { TACTICAL_ARENA_GAME_SLUG } from "../platform/gameProgressClient.js";
 import { syncRankedAccountFeatureControls } from "./rankedFeatureGate.js";
 import { createPlatformApiClient } from "../../../../js/platform/api/platform-api.mjs";
 import { publishTacticalArenaMatchActivity } from "../../../../js/platform/activity/activity.mjs";
+import { getRankedPlacementProgress, placementProgressText } from "./rankedPlacements.js";
 import { normalizeMatchType, matchTypeConfigFor, isDraftMatchType } from "./onlineMatchTypes.js";
 import { cloneRemoteProfile, rankedProfileFromStanding, resolveRankedIdentity, shapeSessionProfiles } from "./onlineProfiles.js";
 import { deriveLobbyStartView } from "./onlineLobbyStatus.js";
@@ -350,13 +351,16 @@ export function createOnlineFlow({ onStartMatch }) {
     if (!apiClient?.isConfigured || typeof apiClient.fetchRankedStanding !== "function") {
       const fallback = loadRankedName();
       rankedIdentityProfile = fallback ? { title: fallback, tagline: fallback } : null;
-      return;
+      return null;
     }
     try {
-      rankedIdentityProfile = rankedProfileFromStanding(await apiClient.fetchRankedStanding(TACTICAL_ARENA_GAME_SLUG));
+      const standing = await apiClient.fetchRankedStanding(TACTICAL_ARENA_GAME_SLUG);
+      rankedIdentityProfile = rankedProfileFromStanding(standing);
+      return standing;
     } catch {
       const fallback = loadRankedName();
       rankedIdentityProfile = fallback ? { title: fallback, tagline: fallback } : null;
+      return null;
     }
   }
 
@@ -430,8 +434,11 @@ export function createOnlineFlow({ onStartMatch }) {
     if (rankedHint) rankedHint.textContent = "";
     setRankedSearchingUI(true);
     setStatus("Loading ranked profile...");
-    await hydrateRankedIdentityProfile();
+    const standing = await hydrateRankedIdentityProfile();
     if (!rankedMode) return;
+    if (rankedHint && standing) {
+      rankedHint.textContent = placementProgressText(getRankedPlacementProgress(standing), standing);
+    }
     setStatus("Joining the ranked queue…");
     client?.setIdentity(identity()); // re-stamp identity so ranked metadata is used
     rankedFlow = createRankedFlow({

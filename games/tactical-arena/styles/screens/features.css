@@ -339,6 +339,8 @@
 .ranked-profile-nameplate-meta { display:flex; flex-wrap:wrap; align-items:center; gap:.35rem .55rem; }
 .ranked-profile-tier { color:var(--brass-hi); font:900 .66rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
 .ranked-profile-rating-inline { color:var(--muted); font:800 .62rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; }
+.ranked-profile-placement { margin:0; padding:.42rem .65rem; border:1px solid color-mix(in srgb,var(--brass) 38%,var(--parchment-edge)); border-radius:7px; background:rgba(230,192,101,.1); color:var(--brass-hi); font:900 .62rem var(--font-display); letter-spacing:.06em; text-transform:uppercase; }
+.ranked-profile-placement.is-complete { color:color-mix(in srgb,var(--text) 86%,var(--brass-hi)); background:rgba(110,201,138,.11); border-color:color-mix(in srgb,#6ec98a 36%,var(--parchment-edge)); }
 .ranked-profile-record { margin:0; color:color-mix(in srgb,var(--text) 82%,var(--muted)); font:700 .72rem var(--font-display); letter-spacing:.04em; }
 .ranked-profile-activematch { margin:.2rem 0 0; color:var(--brass-hi); font:700 .62rem var(--font-display); letter-spacing:.04em; }
 .ranked-profile-standing-loading, .ranked-profile-standing-error, .ranked-profile-signin { margin:0; color:var(--muted); font:600 .68rem var(--font-display); letter-spacing:.02em; text-align:center; }

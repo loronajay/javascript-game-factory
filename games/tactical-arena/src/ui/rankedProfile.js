@@ -28,6 +28,7 @@ import { openRankedLeaderboard } from "./rankedLeaderboard.js";
 import { createRankedTierEmblem, normalizeRankedTierId } from "./rankedEmblems.js";
 import { maybeMigrateLegacyName, renderIdentityEditor, unitLabel } from "./rankedProfileIdentity.js";
 import { syncRankedStandingNameplate } from "./rankedProfileNameplate.js";
+import { getRankedPlacementProgress, placementProgressText } from "./rankedPlacements.js";
 
 export { buildLegacyRankedAvatarOptions } from "./rankedProfileIdentity.js";
 export { syncRankedStandingNameplate } from "./rankedProfileNameplate.js";
@@ -315,7 +316,8 @@ function renderStanding(body, standing, { pilot = "", tagline = "", avatarUnit =
     return section;
   }
   const tierId = normalizeRankedTierId(standing.tier);
-  const tierLabel = standing.tier?.label || "Bronze";
+  const placement = getRankedPlacementProgress(standing);
+  const tierLabel = placement.complete ? (standing.tier?.label || "Bronze") : "Placement";
   const rating = String(standing.rating ?? 1200);
   const nameplate = el("div", `ranked-profile-nameplate ranked-tier-${tierId}`);
   const avatar = el("div", "ranked-profile-nameplate-avatar");
@@ -325,12 +327,13 @@ function renderStanding(body, standing, { pilot = "", tagline = "", avatarUnit =
   plateCopy.appendChild(el("span", "ranked-profile-nameplate-tagline", ""));
   const meta = el("span", "ranked-profile-nameplate-meta");
   meta.appendChild(el("b", `ranked-profile-tier ranked-tier-${tierId}`, tierLabel));
-  meta.appendChild(el("span", "ranked-profile-rating-inline", `${rating} rating`));
+  meta.appendChild(el("span", "ranked-profile-rating-inline", placement.complete ? `${rating} rating` : `${rating} provisional rating`));
   plateCopy.appendChild(meta);
   nameplate.appendChild(plateCopy);
   nameplate.appendChild(createRankedTierEmblem(standing.tier, { className: "is-profile" }));
   const record = el("p", "ranked-profile-record", formatRecord(standing));
-  section.append(nameplate, record);
+  const placementNode = el("p", `ranked-profile-placement${placement.complete ? " is-complete" : " is-active"}`, placementProgressText(placement, standing));
+  section.append(nameplate, placementNode, record);
 
   if (isRankedMatchInProgress(standing.activeMatch)) {
     section.appendChild(el("p", "ranked-profile-activematch", "You have a ranked match in progress."));

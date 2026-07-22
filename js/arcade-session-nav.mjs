@@ -1,6 +1,7 @@
 import { createAuthApiClient } from "./platform/api/auth-api.mjs";
 import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { clearPlatformStorage, getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
+import { clearAuthToken, getStoredAuthToken } from "./platform/api/auth-token.mjs";
 import { initNotificationBell } from "./arcade-notifications.mjs";
 const auth = createAuthApiClient();
 const SIGNED_OUT_QUERY_KEY = "signedOut";
@@ -94,6 +95,17 @@ export async function initSessionNav(containerEl, { signInPath = "sign-in/index.
         catch {
             // Best-effort cleanup only.
         }
+    }
+    // A stored auth token with no valid session means the session was invalidated
+    // server-side (an expiry or a site update), not an explicit sign-out. Purge the
+    // stale token and cached factory identity so no page keeps presenting the
+    // signed-out player's pilot name as if they were still signed in. A network/config
+    // failure is inconclusive, so leave the cached identity alone in that case.
+    const authenticated = !!(session?.ok && session?.playerId);
+    const sessionCheckInconclusive = session?.error === "network_error" || session?.error === "not_configured";
+    if (!authenticated && !skipSessionCheck && !sessionCheckInconclusive && getStoredAuthToken()) {
+        clearAuthToken();
+        clearPlatformStorage(getDefaultPlatformStorage());
     }
     if (session?.ok && session?.playerId) {
         const profile = loadFactoryProfile();

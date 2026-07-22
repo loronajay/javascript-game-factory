@@ -5,7 +5,6 @@ import {
   paginateArcadeGames,
 } from "./arcade-catalog.mjs";
 import { initArcadeProfilePanel } from "./arcade-profile.mjs";
-import { createAuthApiClient } from "./platform/api/auth-api.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "./arcade-session-nav.mjs";
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -386,7 +385,7 @@ window.ArcadeInput?.onAction((action) => {
 });
 
 const catalog = await loadArcadeCatalog();
-initArcadeProfilePanel();
+const profilePanel = initArcadeProfilePanel();
 buildPages(catalog);
 renderPrimaryAppNav(document.getElementById("gridPrimaryNav"), {
   basePath: "",
@@ -394,22 +393,27 @@ renderPrimaryAppNav(document.getElementById("gridPrimaryNav"), {
   linkClass: "grid-stage__portal",
   sessionNavId: "gridAuthNav",
 });
-void initSessionNav(document.getElementById("gridAuthNav"), {
+
+// initSessionNav also purges a stale token + cached identity when the session was
+// invalidated server-side, so consume its resolved session directly rather than
+// making a second /auth/me call against a possibly-cleared token.
+const session = await initSessionNav(document.getElementById("gridAuthNav"), {
   signInPath: "sign-in/index.html",
   signUpPath: "sign-up/index.html",
   homeOnLogout: "index.html",
 });
 
-// registered users manage their full profile at /me — hide the guest name chip
-try {
-  const session = await createAuthApiClient().getSession();
-  if (session?.ok && session?.playerId) {
-    const chip = document.getElementById("playerProfileButton");
-    const panel = document.getElementById("playerProfilePanel");
-    if (chip) chip.hidden = true;
-    if (panel) panel.hidden = true;
-  }
-} catch { /* network down, keep chip visible */ }
+if (session?.ok && session?.playerId) {
+  // registered users manage their full profile at /me — hide the guest name chip
+  const chip = document.getElementById("playerProfileButton");
+  const panel = document.getElementById("playerProfilePanel");
+  if (chip) chip.hidden = true;
+  if (panel) panel.hidden = true;
+} else {
+  // signed out: re-render the chip so a just-purged stale identity reverts to the
+  // default guest name instead of lingering as the signed-out player's pilot name
+  profilePanel?.render();
+}
 
 if (pages.length > 0) {
   showPage(0, 0);
