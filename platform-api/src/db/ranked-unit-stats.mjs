@@ -12,10 +12,14 @@
 export const UNIT_REPORT_MAX_UNITS = 16;
 const UNIT_TYPE_MAX_LENGTH = 40;
 const UNIT_ID_MAX_LENGTH = 64;
+const MAX_REPORTED_TURNS = 999;
 export const SQUAD_MAX_UNITS = 8;
 // Canonicalize a reported final board into a stable, comparable shape, or null if the
 // payload is malformed. Sorting by id makes agreement order-independent and gives both
 // sides an identical canonical form to compare.
+//
+// `turns` is an optional attested match length that rides along with the board; a client
+// that omits it still produces a valid report (see unitReportsAgree).
 export function normalizeUnitResults(raw) {
     if (!raw || typeof raw !== "object")
         return null;
@@ -32,13 +36,20 @@ export function normalizeUnitResults(raw) {
         if (!id || !type || !(seat === 1 || seat === 2))
             return null;
         const alive = Boolean(u.alive);
-        const kills = Number.isInteger(u.kills) && u.kills >= 0 ? Math.min(u.kills, 99) : 0;
+        // null (not 0) when the client did not report kills at all, so unitReportsAgree can
+        // tell "no claim" apart from "claimed zero" — see the rollout note there.
+        const kills = Number.isInteger(u.kills) && u.kills >= 0 ? Math.min(u.kills, 99) : null;
         units.push({ id, seat, type, alive, kills });
     }
     units.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-    return { units };
+    const turns = Number.isInteger(raw.turns) && raw.turns >= 0 ? Math.min(raw.turns, MAX_REPORTED_TURNS) : null;
+    return { units, turns };
 }
 // True only when both reports are well-formed and describe the identical final board.
+// `turns` and `kills` are compared only when BOTH sides sent them, so a client that
+// predates either field still reaches agreement against one that sends it — a mismatched
+// pair would otherwise silently lose per-unit stat crediting during a rollout, including
+// the survival stats that already worked.
 export function unitReportsAgree(a, b) {
     const na = normalizeUnitResults(a);
     const nb = normalizeUnitResults(b);
@@ -46,12 +57,16 @@ export function unitReportsAgree(a, b) {
         return false;
     if (na.units.length !== nb.units.length)
         return false;
+    if (na.turns !== null && nb.turns !== null && na.turns !== nb.turns)
+        return false;
     for (let i = 0; i < na.units.length; i += 1) {
         const x = na.units[i];
         const y = nb.units[i];
-        if (x.id !== y.id || x.seat !== y.seat || x.type !== y.type || x.alive !== y.alive || x.kills !== y.kills) {
+        if (x.id !== y.id || x.seat !== y.seat || x.type !== y.type || x.alive !== y.alive) {
             return false;
         }
+        if (x.kills !== null && y.kills !== null && x.kills !== y.kills)
+            return false;
     }
     return true;
 }

@@ -139,7 +139,8 @@ export function resolveAnoint(state, command, art) {
   const result = applyStatus(target, {
     type: art.effect.status,
     duration: art.effect.durationTurns,
-    ...(art.effect.statModifiers ? { statModifiers: { ...art.effect.statModifiers } } : {})
+    ...(art.effect.statModifiers ? { statModifiers: { ...art.effect.statModifiers } } : {}),
+    appliedBy: actor.id
   });
   if (result.applied) target.statuses = result.statuses;
 
@@ -250,7 +251,7 @@ export function resolveFocusPrayer(state, command, art) {
     const roll = drawValue(next.rngState, command.effectRoll);
     next.rngState = roll.rngState;
     const status = pickMisfireStatus(art.misfire?.pool, roll.value);
-    const result = applyStatus(target, { type: status, duration: art.misfire?.durationTurns ?? 1 });
+    const result = applyStatus(target, { type: status, duration: art.misfire?.durationTurns ?? 1, appliedBy: actor.id });
     if (result.applied) target.statuses = result.statuses;
     event.effect = { attempted: true, applied: result.applied, status, ...(result.reason ? { reason: result.reason } : {}) };
   }

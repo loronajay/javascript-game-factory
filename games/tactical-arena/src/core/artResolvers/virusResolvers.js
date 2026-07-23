@@ -7,6 +7,7 @@ import { applyDarkTreadLifesteal } from "../combatEffects.js";
 import { accept } from "../reducerResult.js";
 import { resolveVictory, spendAndAdvance } from "../turnEngine.js";
 import { applyBeckonedGhostSacrifice } from "../ghostSacrifice.js";
+import { markSelfInflicted } from "../killAttribution.js";
 
 export function resolveSmog(state, command, art) {
   const next = cloneState(state);
@@ -18,7 +19,7 @@ export function resolveSmog(state, command, art) {
   for (const target of livingUnits(next)) {
     if (!areEnemies(actor, target)) continue;
     if (chebyshevDistance(actor.position, target.position) > radius) continue;
-    const applied = applyStatus(target, { type: art.effect.status, duration: art.effect.durationTurns });
+    const applied = applyStatus(target, { type: art.effect.status, duration: art.effect.durationTurns, appliedBy: actor.id });
     if (applied.applied) { target.statuses = applied.statuses; statusTargets.push(target.id); }
   }
   spendAndAdvance(next, actor);
@@ -39,7 +40,7 @@ export function resolvePoisonBurst(state, command, art) {
   const hpCost = art.hpCost ?? 0;
   // Dark Tick (Blacksword) pays HP; Virus's Poison Tick / Explosion (and Banish's all-HP
   // cost, which rides on selfKill below) keep paying MP.
-  if (hpCost > 0) actor.hp = Math.max(0, actor.hp - hpCost);
+  if (hpCost > 0) { actor.hp = Math.max(0, actor.hp - hpCost); markSelfInflicted(actor); }
   else actor.mp -= cost;
 
   const amount = Math.max(0, Number(art.damage?.amount) || 0);
@@ -75,7 +76,7 @@ export function resolvePoisonBurst(state, command, art) {
   // Dark Tread lifesteal on Dark Tick's dark-tile hits (skipped for a self-killing Banish,
   // which consumes Blacksword anyway).
   const darkTreadEvents = art.selfKill ? [] : applyDarkTreadLifesteal(next, actor, damaged);
-  if (art.selfKill) actor.hp = 0; // Explosion consumes Virus / Banish consumes Blacksword
+  if (art.selfKill) { actor.hp = 0; markSelfInflicted(actor); } // Explosion consumes Virus / Banish consumes Blacksword
   if (art.selfKill) applyBeckonedGhostSacrifice(next, actor);
   if (art.selfKill) {
     resolveVictory(next, { actionTakerTeam: actor.player });

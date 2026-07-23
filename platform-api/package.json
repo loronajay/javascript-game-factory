@@ -9,6 +9,7 @@
     "start": "node ./src/server.mjs",
     "test": "node --test ./tests/*.test.mjs",
     "build": "tsc -p tsconfig.json && node ./scripts/sync-emitted-mjs.mjs",
+    "verify:build": "tsc -p tsconfig.json && node ./scripts/sync-emitted-mjs.mjs --check",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

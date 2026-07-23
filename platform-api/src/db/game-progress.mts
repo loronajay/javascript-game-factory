@@ -343,7 +343,7 @@ export async function spendValorForEntitlement(pool: any, params: any = {}): Pro
        where player_id = $1 and game_slug = $2 and entitlement_id = any($3::text[])`,
       [playerId, gameSlug, requestedIds],
     );
-    const ownedIds = new Set(ownedRes.rows.map((row: any) => row.entitlement_id));
+    const ownedIds = new Set<string>(ownedRes.rows.map((row: any) => row.entitlement_id));
 
     const priced = priceValorOffer(resolved, ownedIds);
     if (priced.alreadyOwned) {
@@ -423,7 +423,7 @@ export async function backfillLocalOwnership(pool: any, params: any = {}): Promi
   if (!pool || !playerId || !gameSlug) return { ok: false, statusCode: 400, error: "invalid_request" };
 
   const rawIds = Array.isArray(params.entitlementIds) ? params.entitlementIds : [];
-  const entitlementIds = [...new Set(
+  const entitlementIds = [...new Set<string>(
     rawIds.map((value: any) => cleanText(value, 160)).filter((id: string) => VALID_ENTITLEMENT_ID.test(id)),
   )].slice(0, MAX_BACKFILL_ENTITLEMENTS);
   const valorBalance = clampInt(params.valorBalance, { min: 0, max: 100_000_000 });
@@ -528,7 +528,7 @@ export async function revokeGameEntitlements(pool: any, params: any = {}): Promi
   const sessionId = cleanText(params.sessionId, 200);
   const revocationId = cleanText(params.revocationId, 200);
   const reason = cleanText(params.reason, 80) || "revoked";
-  const entitlementIds = [...new Set(
+  const entitlementIds = [...new Set<string>(
     (Array.isArray(params.entitlementIds) ? params.entitlementIds : [])
       .map((value: any) => cleanText(value, 180))
       .filter(Boolean),
@@ -582,7 +582,7 @@ export async function regrantStripeEntitlements(pool: any, params: any = {}): Pr
   const gameSlug = normalizeGameSlug(params.gameSlug);
   const sessionId = cleanText(params.sessionId, 200);
   const regrantId = cleanText(params.regrantId, 200);
-  const entitlementIds = [...new Set(
+  const entitlementIds = [...new Set<string>(
     (Array.isArray(params.entitlementIds) ? params.entitlementIds : [])
       .map((value: any) => cleanText(value, 180))
       .filter(Boolean),

@@ -13,11 +13,12 @@ const VALID_OUTCOMES = new Set(["win", "loss", "draw"]);
 //   PUT    /ranked/:gameSlug/profile   save my ranked title/avatar (auth = me)
 //   GET    /ranked/:gameSlug/card/:playerId    public ranked card for another player
 //   GET    /ranked/:gameSlug/units/:playerId   public per-unit ranked stats
-//   GET    /ranked/:gameSlug/matches/:playerId  public recent resolved match history
+//   GET    /ranked/:gameSlug/matches/:playerId[?limit=]  public recent match history
+//   GET    /ranked/:gameSlug/match/:matchId[?perspective=]  public single-match detail
 //   GET    /ranked/:gameSlug/leaderboard[?limit=]  public top-N ranked ladder
 export async function handleRankedRoute(context: any): Promise<boolean> {
   const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services } = context;
-  const { enqueueRanked, pollRanked, cancelRanked, startRankedMatch, reportRankedResult, getRankedStanding, setRankedLobby, saveRankedProfile, getRankedCard, getRankedUnitStats, getRankedMatches, getRankedLeaderboard } = services;
+  const { enqueueRanked, pollRanked, cancelRanked, startRankedMatch, reportRankedResult, getRankedStanding, setRankedLobby, saveRankedProfile, getRankedCard, getRankedUnitStats, getRankedMatches, getRankedMatchDetail, getRankedLeaderboard } = services;
 
   const queueMatch = pathname.match(/^\/ranked\/([^/]+)\/queue$/);
   const startMatch = pathname.match(/^\/ranked\/([^/]+)\/start$/);
@@ -28,11 +29,12 @@ export async function handleRankedRoute(context: any): Promise<boolean> {
   const cardMatch = pathname.match(/^\/ranked\/([^/]+)\/card\/([^/]+)$/);
   const unitsMatch = pathname.match(/^\/ranked\/([^/]+)\/units\/([^/]+)$/);
   const matchesMatch = pathname.match(/^\/ranked\/([^/]+)\/matches\/([^/]+)$/);
+  const matchDetailMatch = pathname.match(/^\/ranked\/([^/]+)\/match\/([^/]+)$/);
   const leaderboardMatch = pathname.match(/^\/ranked\/([^/]+)\/leaderboard$/);
 
-  if (!queueMatch && !startMatch && !reportMatch && !standingMatch && !lobbyMatch && !profileMatch && !cardMatch && !unitsMatch && !matchesMatch && !leaderboardMatch) return false;
+  if (!queueMatch && !startMatch && !reportMatch && !standingMatch && !lobbyMatch && !profileMatch && !cardMatch && !unitsMatch && !matchesMatch && !matchDetailMatch && !leaderboardMatch) return false;
 
-  const gameSlug = decodeURIComponent((queueMatch || startMatch || reportMatch || standingMatch || lobbyMatch || profileMatch || cardMatch || unitsMatch || matchesMatch || leaderboardMatch)[1]);
+  const gameSlug = decodeURIComponent((queueMatch || startMatch || reportMatch || standingMatch || lobbyMatch || profileMatch || cardMatch || unitsMatch || matchesMatch || matchDetailMatch || leaderboardMatch)[1]);
   if (!isValidRankedSlug(gameSlug)) {
     writeJson(res, 400, { status: "error", error: "invalid_game_slug", timestamp }, requestOrigin);
     return true;
@@ -224,12 +226,36 @@ export async function handleRankedRoute(context: any): Promise<boolean> {
 
   if (matchesMatch && method === "GET") {
     const targetPlayerId = decodeURIComponent(matchesMatch[2]);
-    const result = await getRankedMatches(gameSlug, { playerId: targetPlayerId });
+    const limitParam = new URL(req.url || "/", "http://localhost").searchParams.get("limit");
+    const result = await getRankedMatches(gameSlug, { playerId: targetPlayerId, limit: limitParam });
     if (!result) {
       writeJson(res, 500, { status: "error", error: "matches_unavailable", timestamp }, requestOrigin);
       return true;
     }
     writeJson(res, 200, { matches: result }, requestOrigin);
+    return true;
+  }
+
+  // One finished match in full. `perspective` picks whose side the detail is shaped
+  // from (defaults to the caller) so a history list opened for another player keeps
+  // that player's outcome/delta instead of flipping to the reader's.
+  if (matchDetailMatch && method === "GET") {
+    const targetMatchId = decodeURIComponent(matchDetailMatch[2]);
+    const perspective = new URL(req.url || "/", "http://localhost").searchParams.get("perspective");
+    const result = await getRankedMatchDetail(gameSlug, {
+      matchId: targetMatchId.slice(0, 200),
+      viewerPlayerId: perspective ? perspective.slice(0, 120) : playerId,
+    });
+    if (!result) {
+      writeJson(res, 500, { status: "error", error: "match_unavailable", timestamp }, requestOrigin);
+      return true;
+    }
+    if (result.error) {
+      const code = result.error === "match_not_found" ? 404 : result.error === "not_a_member" ? 403 : 400;
+      writeJson(res, code, { status: "error", error: result.error, timestamp }, requestOrigin);
+      return true;
+    }
+    writeJson(res, 200, { match: result.match }, requestOrigin);
     return true;
   }
 

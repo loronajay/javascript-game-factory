@@ -278,6 +278,8 @@ function applySpreadReactions(prevState, next, events) {
     for (const ally of next.units) {
       if (ally.hp <= 0 || ally.id === unit.id || !areAllies(ally, unit)) continue;
       if (chebyshevDistance(unit.position, ally.position) > radius) continue;
+      // The copy keeps the original `appliedBy`, so a spread poison still credits the
+      // unit that first inflicted it rather than the Virus that propagated it.
       const applied = applyStatus(ally, { ...status });
       if (applied.applied) { ally.statuses = applied.statuses; spreadTo.push(ally.id); }
     }

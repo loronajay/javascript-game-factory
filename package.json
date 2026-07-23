@@ -8,7 +8,10 @@
     "typecheck": "npm run typecheck:browser && npm run typecheck:api",
     "typecheck:browser": "tsc -p tsconfig.browser.json --noEmit",
     "build:browser": "tsc -p tsconfig.browser.json && node scripts/sync-emitted-mjs.mjs",
-    "typecheck:api": "tsc -p platform-api/tsconfig.json --noEmit"
+    "typecheck:api": "tsc -p platform-api/tsconfig.json --noEmit",
+    "verify:build": "npm run verify:build:browser && npm run verify:build:api",
+    "verify:build:browser": "tsc -p tsconfig.browser.json && node scripts/sync-emitted-mjs.mjs --check",
+    "verify:build:api": "npm --prefix platform-api run verify:build"
   },
   "devDependencies": {
     "puppeteer-core": "^25.3.0",

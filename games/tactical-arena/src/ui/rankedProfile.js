@@ -29,6 +29,7 @@ import { createRankedTierEmblem, normalizeRankedTierId } from "./rankedEmblems.j
 import { maybeMigrateLegacyName, renderIdentityEditor, unitLabel } from "./rankedProfileIdentity.js";
 import { syncRankedStandingNameplate } from "./rankedProfileNameplate.js";
 import { getRankedPlacementProgress, placementProgressText } from "./rankedPlacements.js";
+import { RANKED_MATCH_HISTORY_LIMIT, renderMatchHistory } from "./rankedMatchHistory.js";
 
 export { buildLegacyRankedAvatarOptions } from "./rankedProfileIdentity.js";
 export { syncRankedStandingNameplate } from "./rankedProfileNameplate.js";
@@ -229,6 +230,7 @@ function renderMetaSections(body, { apiClient, playerId }) {
 
   const matches = el("section", "ranked-profile-matches");
   matches.appendChild(el("h3", "ranked-profile-section-title", "Recent Matches"));
+  matches.appendChild(el("p", "ranked-profile-section-hint", "Select a match for the full report."));
   const matchesBody = el("div", "ranked-profile-matches-body");
   matchesBody.appendChild(el("p", "ranked-profile-meta-loading", "Loading match history…"));
   matches.appendChild(matchesBody);
@@ -242,12 +244,13 @@ function renderMetaSections(body, { apiClient, playerId }) {
     renderUnitStats(unitsBody, []);
   }
 
+  const history = (matches) => renderMatchHistory(matchesBody, matches, { perspective: playerId, apiClient });
   if (typeof apiClient.fetchRankedMatches === "function") {
-    apiClient.fetchRankedMatches(TACTICAL_ARENA_GAME_SLUG, playerId)
-      .then((res) => renderMatchHistory(matchesBody, res?.matches || []))
-      .catch(() => renderMatchHistory(matchesBody, []));
+    apiClient.fetchRankedMatches(TACTICAL_ARENA_GAME_SLUG, playerId, RANKED_MATCH_HISTORY_LIMIT)
+      .then((res) => history(res?.matches || []))
+      .catch(() => history([]));
   } else {
-    renderMatchHistory(matchesBody, []);
+    history([]);
   }
 }
 
@@ -271,41 +274,6 @@ function renderUnitStats(container, units) {
     grid.appendChild(cell);
   }
   container.appendChild(grid);
-}
-
-function renderMatchHistory(container, matches) {
-  container.replaceChildren();
-  if (!matches.length) {
-    container.appendChild(el("p", "ranked-profile-meta-empty", "No ranked matches yet."));
-    return;
-  }
-  const list = el("ul", "ranked-profile-matchlist");
-  for (const m of matches) {
-    const item = el("li", `ranked-profile-matchrow is-${m.outcome}`);
-    const outcomeLabel = m.outcome === "win" ? "W" : m.outcome === "loss" ? "L" : "D";
-    item.appendChild(el("span", "ranked-profile-matchoutcome", outcomeLabel));
-    const delta = Number(m.ratingDelta) || 0;
-    const deltaText = delta > 0 ? `+${delta}` : String(delta);
-    item.appendChild(el("span", "ranked-profile-matchdelta", deltaText));
-    const squads = el("span", "ranked-profile-matchsquads", formatSquadLine(m.mySquad, m.opponentSquad));
-    item.appendChild(squads);
-    item.appendChild(el("span", "ranked-profile-matchdate", formatMatchDate(m.resolvedAt)));
-    list.appendChild(item);
-  }
-  container.appendChild(list);
-}
-
-function formatSquadLine(mySquad, opponentSquad) {
-  const mine = (mySquad || []).map(unitLabel).join(", ") || "—";
-  const theirs = (opponentSquad || []).map(unitLabel).join(", ") || "—";
-  return `${mine} vs ${theirs}`;
-}
-
-function formatMatchDate(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function renderStanding(body, standing, { pilot = "", tagline = "", avatarUnit = null, avatarSkin = null } = {}) {

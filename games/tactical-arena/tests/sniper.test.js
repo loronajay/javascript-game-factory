@@ -134,7 +134,7 @@ test("Throw Cigar sets a tile alight — even one an enemy stands on", () => {
   const begun = applyCommand(state, beginActivation(1, "sniper"));
   const result = applyCommand(begun.nextState, useArt(1, "sniper", "throw-cigar", { targetPosition: { x: 3, y: 0 } }));
   assert.equal(result.accepted, true);
-  assert.deepEqual(result.nextState.tileObjects["3,0"], { kind: "fire", turnsLeft: 3 });
+  assert.deepEqual(result.nextState.tileObjects["3,0"], { kind: "fire", turnsLeft: 3, ownerId: "sniper" });
   assert.equal(result.nextState.units.find((u) => u.id === "sniper").mp, 15);
 });
 

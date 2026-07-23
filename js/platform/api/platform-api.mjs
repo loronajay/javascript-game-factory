@@ -489,10 +489,24 @@ export function createPlatformApiClient(options = {}) {
             const pid = encodePathSegment(playerId);
             return gs && pid ? get(`/ranked/${gs}/units/${pid}`, "unitStats") : Promise.resolve(null);
         },
-        fetchRankedMatches(gameSlug, playerId) {
+        fetchRankedMatches(gameSlug, playerId, limit) {
             const gs = encodePathSegment(gameSlug);
             const pid = encodePathSegment(playerId);
-            return gs && pid ? get(`/ranked/${gs}/matches/${pid}`, "matches") : Promise.resolve(null);
+            if (!gs || !pid)
+                return Promise.resolve(null);
+            const query = Number.isFinite(Number(limit)) ? `?limit=${encodeURIComponent(String(limit))}` : "";
+            return get(`/ranked/${gs}/matches/${pid}${query}`, "matches");
+        },
+        // One finished match in full. `perspective` shapes the detail from that player's
+        // side; omit it to use the signed-in caller's.
+        fetchRankedMatchDetail(gameSlug, matchId, { perspective } = {}) {
+            const gs = encodePathSegment(gameSlug);
+            const mid = encodePathSegment(matchId);
+            if (!gs || !mid)
+                return Promise.resolve(null);
+            const who = encodePathSegment(perspective);
+            const query = who ? `?perspective=${who}` : "";
+            return get(`/ranked/${gs}/match/${mid}${query}`, "match");
         },
         fetchRankedLeaderboard(gameSlug, limit) {
             const gs = encodePathSegment(gameSlug);

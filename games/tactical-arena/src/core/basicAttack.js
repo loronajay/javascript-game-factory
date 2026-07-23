@@ -35,6 +35,7 @@ import { applyStatus, isTargetable } from "../rules/statuses.js";
 import { alliesInRadius, getStanceEffect } from "../rules/stances.js";
 import { applyDarkTreadLifesteal, applyGrowth, applyMagicDamageReaction, applyRockHardDefense, resolvePhysicalDamageHealing, restoreHp, restoreMp } from "./combatEffects.js";
 import { applyBeckonedGhostSacrifice } from "./ghostSacrifice.js";
+import { CAUSE, creditDeaths, snapshotAlive } from "./killAttribution.js";
 import { validateOpenActivation } from "./commandValidation.js";
 import { consumeOneShotRage } from "./reactions.js";
 import { accept, ERR, reject } from "./reducerResult.js";
@@ -134,7 +135,8 @@ export function attack(state, command) {
       const applied = applyStatus(targetUnit, {
         type: onHit.status,
         duration: onHit.duration,
-        ...(onHit.statModifiers ? { statModifiers: { ...onHit.statModifiers } } : {})
+        ...(onHit.statModifiers ? { statModifiers: { ...onHit.statModifiers } } : {}),
+        appliedBy: actor.id
       });
       if (applied.applied) {
         targetUnit.statuses = applied.statuses;
@@ -145,7 +147,7 @@ export function attack(state, command) {
     if (swing.critical && (critFire || weatherCritFire)) {
       const position = { ...targetUnit.position };
       const fire = critFire ?? weatherCritFire;
-      next.tileObjects[positionKey(position)] = { kind: fire.kind ?? "fire", permanent: Boolean(fire.permanent) };
+      next.tileObjects[positionKey(position)] = { kind: fire.kind ?? "fire", permanent: Boolean(fire.permanent), ownerId: actor.id };
       fireTiles.push(position);
     }
     const critPull = swing.critical ? getCritPullEffect(actor) : null;
@@ -195,9 +197,15 @@ export function attack(state, command) {
   }
   if (shouldApplyAttackRecoil(actor, next) && totalDamageDealt > 0) {
     const recoil = Math.min(actor.hp, totalDamageDealt);
+    // Recoil and the ghost sacrifice it can trigger are both self-inflicted: the
+    // attacker burns itself down, and a Beckoned ghost's death spends its summoner.
+    // Neither is anyone's kill, so this narrow scope claims them before the broad
+    // per-command scope could credit the enemy that was being attacked.
+    const aliveBefore = snapshotAlive(next);
     actor.hp = Math.max(0, actor.hp - totalDamageDealt);
     if (actor.hp <= 0) applyBeckonedGhostSacrifice(next, actor);
     duelistEvents.push({ type: "ATTACK_RECOIL", unitId: actor.id, damage: recoil });
+    creditDeaths(next, aliveBefore, duelistEvents, { cause: CAUSE.SELF });
   }
   // A magic strike (Blessed Arrow) never feeds a physical-damage heal aura (Hand of Life).
   const healingEvents = basicDamageType === "physical" ? resolvePhysicalDamageHealing(next, actor, totalDamageDealt) : [];
@@ -210,8 +218,12 @@ export function attack(state, command) {
   if (thorns > 0 && nextTarget.hp > 0 && isDefending(nextTarget) &&
       chebyshevDistance(actor.position, nextTarget.position) === 1) {
     const dealt = Math.min(actor.hp, thorns);
+    // Thorns kill in the DEFENDER's name, not the attacker's — without this scope the
+    // broad per-command sweep would see the attacker die and credit nobody.
+    const aliveBefore = snapshotAlive(next);
     actor.hp = Math.max(0, actor.hp - thorns);
     if (dealt > 0) retaliationEvents.push({ type: "STONE_RETALIATION", offenderId: actor.id, sourceId: nextTarget.id, damage: dealt });
+    creditDeaths(next, aliveBefore, retaliationEvents, { killerId: nextTarget.id, cause: CAUSE.UNIT });
   }
   // Growth (Virus): restore MP for each enemy this attack poisoned.
   const growthEvents = poisonRefund > 0 ? applyGrowth(next, actor, poisonRefund * poisonedByAttack) : [];
@@ -312,8 +324,8 @@ function applyBasicAttackFreeCone(state, actor, originalTarget) {
         const fire = art.hitTileObject;
         const firePosition = { ...target.position };
         state.tileObjects[positionKey(firePosition)] = fire.permanent
-          ? { kind: "fire", permanent: true }
-          : { kind: "fire", turnsLeft: Number.isFinite(fire.turnsLeft) ? fire.turnsLeft : 3 };
+          ? { kind: "fire", permanent: true, ownerId: actor.id }
+          : { kind: "fire", turnsLeft: Number.isFinite(fire.turnsLeft) ? fire.turnsLeft : 3, ownerId: actor.id };
         createdFire.push(firePosition);
       }
     }

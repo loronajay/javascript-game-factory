@@ -15,6 +15,7 @@ import { applyStatus, isInvulnerable, isPetrified, isStunned, resolveTurnStartSt
 import { finishTempoActivation, isTempoBattle } from "./tempoBattle.js";
 import { restoreHp, restoreMp } from "./combatEffects.js";
 import { applyAutoStrikeTick, applyBlackDeathTick, applyFireTick, applyRandomFireTick, applyTimeStealTick, applyWeatherCycleTick } from "./turnHazards.js";
+import { CAUSE, creditDeaths, snapshotAlive } from "./killAttribution.js";
 
 const MAX_STUN_FAST_FORWARD_ROLLOVERS = 32;
 
@@ -71,6 +72,7 @@ function applyFinalBattleVoidPressure(state, previousPlayer, events) {
   if (!active || previousPlayer !== 2 || state.currentPlayer !== 1) return;
   const amount = Math.max(0, Number(active.rules.voidPressureDamage) || 0);
   if (amount <= 0) return;
+  const aliveBefore = snapshotAlive(state);
   for (const unit of livingUnits(state, 1)) {
     if (isInvulnerable(unit)) continue;
     const damage = Math.min(unit.hp, amount);
@@ -84,6 +86,8 @@ function applyFinalBattleVoidPressure(state, previousPlayer, events) {
       });
     }
   }
+  // The collapsing arena is a mission hazard, not the boss's kill.
+  creditDeaths(state, aliveBefore, events, { cause: CAUSE.ENVIRONMENT });
 }
 
 export function spendAndAdvance(state, unit) {
@@ -242,10 +246,28 @@ function applyPetrifyTurn(state, unit, events) {
 
 function applySquadTurnChargeStatuses(state, player) {
   const events = [];
+  const aliveBefore = snapshotAlive(state);
+  // Track the applier of the most recent damaging tick per unit — that is the tick
+  // that killed anyone who ends this pass at 0 HP.
+  const lastApplierByUnit = new Map();
   for (const member of livingUnits(state, player)) {
     // Petrify (Treant): an invulnerable statue shrugs off poison/DOT ticks too.
     if (isInvulnerable(member)) continue;
-    events.push(...resolveTurnStartStatuses(member));
+    const ticks = resolveTurnStartStatuses(member);
+    for (const tick of ticks) lastApplierByUnit.set(tick.unitId, tick.appliedBy ?? null);
+    events.push(...ticks);
+  }
+  // Credit per victim so two units poisoned by different enemies attribute correctly.
+  // An untagged poison (pre-existing save, authored mission status) has no applier and
+  // falls through as environmental rather than crediting the wrong unit.
+  for (const [unitId, appliedBy] of lastApplierByUnit) {
+    // Scope the sweep to this one victim: creditDeaths skips any unit missing from the
+    // snapshot, so a one-entry map attributes exactly this death and no other.
+    const scoped = new Map([[unitId, aliveBefore.get(unitId) ?? false]]);
+    creditDeaths(state, scoped, events, {
+      killerId: appliedBy,
+      cause: appliedBy ? CAUSE.STATUS : CAUSE.ENVIRONMENT,
+    });
   }
   if (events.length) resolveVictory(state);
   return events;

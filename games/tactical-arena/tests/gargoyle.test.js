@@ -127,7 +127,7 @@ test("One With The Flames: a critical basic attack makes the target tile permane
   let s = run(state, beginActivation(1, "g")).nextState;
   s = run(s, attack(1, "g", "sw", CRIT)).nextState;
 
-  assert.deepEqual(s.tileObjects["5,6"], { kind: "fire", permanent: true });
+  assert.deepEqual(s.tileObjects["5,6"], { kind: "fire", permanent: true, ownerId: "g" });
 });
 
 test("One With The Flames: crit-created fire persists after burning", () => {
@@ -142,7 +142,7 @@ test("One With The Flames: crit-created fire persists after burning", () => {
   s = run(s, finishActivation(1, "g")).nextState;
 
   assert.equal(findUnit(s, "sw").hp, hpAfterCrit - 1, "the new fire burns at rollover");
-  assert.deepEqual(s.tileObjects["5,6"], { kind: "fire", permanent: true }, "permanent fire does not count down");
+  assert.deepEqual(s.tileObjects["5,6"], { kind: "fire", permanent: true, ownerId: "g" }, "permanent fire does not count down");
 });
 
 test("Stone Body: a status targeted at the Gargoyle is reflected onto the offender", () => {

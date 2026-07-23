@@ -229,7 +229,7 @@ test("authored board weather works without Mother Nature on the roster", () => {
   next = run(next, attack(1, "hero", "foe", CRIT));
 
   assert.equal(findUnit(next, "foe").hp, 20 - baseDamage - 1);
-  assert.deepEqual(next.tileObjects["2,1"], { kind: "fire", permanent: true });
+  assert.deepEqual(next.tileObjects["2,1"], { kind: "fire", permanent: true, ownerId: "hero" });
 });
 
 test("Mother Nature replaces mission-authored weather with her latest cast", () => {
@@ -311,7 +311,7 @@ test("Heatwave grants +1 STR immediately, adds crit damage, and crits ignite per
   const opened = run(heated, beginActivation(1, "mn"));
   const crit = run(opened, attack(1, "mn", "foe", CRIT));
   assert.equal(findUnit(crit, "foe").hp, 20 - baseDamage - 1, "Heatwave adds +1 to the crit's normal damage");
-  assert.deepEqual(crit.tileObjects["2,1"], { kind: "fire", permanent: true });
+  assert.deepEqual(crit.tileObjects["2,1"], { kind: "fire", permanent: true, ownerId: "mn" });
   assert.equal(findUnit(crit, "mn").mp, 100);
 });
 

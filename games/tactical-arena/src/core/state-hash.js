@@ -39,6 +39,14 @@ function canonicalStatuses(statuses = []) {
 // are cosmetic-only and excluded from the authoritative hash on purpose. Do
 // not "fix" this omission; nickname sync for online play rides the dedicated
 // setup/draft_pick peer messages instead (see onlineClient.js/onlineFlow.js).
+//
+// unit.kills, unit.killedBy, and unit.deathCause are excluded for the same reason:
+// they are a statistical record of what already happened and never feed a legality
+// check, a damage number, or an RNG draw. Both clients still derive identical values
+// from the identical command stream, and the ranked backend only credits per-unit
+// stats when both end-of-match reports agree. See killAttribution.js.
+// (Fire tiles DO carry an `ownerId` that is hashed, because tileObjects is hashed
+// wholesale — that is why ONLINE_RULESET_VERSION was bumped to 3.)
 function canonicalUnits(units) {
   return [...units]
     .sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0))

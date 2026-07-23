@@ -197,7 +197,7 @@ test("raging Mystic can move before casting Silence", () => {
   const cast = applyCommand(moved.nextState, useArt(1, "mystic", "silence", { targetId: "foe", effectRoll: 0.1 }));
   assert.ok(cast.accepted, cast.errorCode);
   assert.equal(findUnit(cast.nextState, "mystic").spent, false);
-  assert.deepEqual(findUnit(cast.nextState, "foe").statuses, [{ type: "silence", duration: 1 }]);
+  assert.deepEqual(findUnit(cast.nextState, "foe").statuses, [{ type: "silence", duration: 1, appliedBy: "mystic" }]);
   assert.equal(cast.nextState.activation.primaryUsed, true);
 });
 

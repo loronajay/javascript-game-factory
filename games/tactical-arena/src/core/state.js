@@ -24,6 +24,12 @@ export function createUnit(spec) {
     linkedStatMods: (spec.linkedStatMods ?? []).map((mod) => ({ ...mod, stats: { ...mod.stats } })),
     defending: false,
     spent: false,
+    // Kill attribution (see killAttribution.js). `kills` is a pure tally and
+    // `killedBy`/`deathCause` record how this unit fell; all three are statistical
+    // and deliberately excluded from the authoritative state hash.
+    kills: spec.kills ?? 0,
+    killedBy: spec.killedBy ?? null,
+    deathCause: spec.deathCause ?? null,
     mageChargeCount: 0,
     // Witch Doctor "Dancing Man" stance (a key into the unit's `stances` data, or
     // null). Persists across turns; set by each dance ART. `rainCharged` is the
@@ -103,9 +109,12 @@ function normalizeTileObjects(objects = []) {
     if (obj.kind === "wall") {
       map[tileKey(obj)] = { kind: "wall", hp: Number.isFinite(obj.hp) ? obj.hp : 1 };
     } else if (obj.kind === "fire") {
+      // ownerId is preserved when present (authored mission/scenario fires have none),
+      // so kill credit survives a state round-trip. See killAttribution.js.
+      const owner = obj.ownerId ?? null;
       map[tileKey(obj)] = obj.permanent
-        ? { kind: "fire", permanent: true }
-        : { kind: "fire", turnsLeft: Number.isFinite(obj.turnsLeft) ? obj.turnsLeft : 3 };
+        ? { kind: "fire", permanent: true, ownerId: owner }
+        : { kind: "fire", turnsLeft: Number.isFinite(obj.turnsLeft) ? obj.turnsLeft : 3, ownerId: owner };
     }
   }
   return map;

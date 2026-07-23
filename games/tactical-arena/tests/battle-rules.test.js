@@ -504,7 +504,7 @@ test("Poison Arrow resolves a normal attack, spends the Archer, and applies perm
   const target = result.nextState.units.find((unit) => unit.id === "p2-swordsman");
   const actor = result.nextState.units.find((unit) => unit.id === "p1-archer");
   assert.equal(target.hp, 19);
-  assert.deepEqual(target.statuses, [{ type: "poison", duration: "permanent", turnStartDamage: 1 }]);
+  assert.deepEqual(target.statuses, [{ type: "poison", duration: "permanent", turnStartDamage: 1, appliedBy: "p1-archer" }]);
   assert.equal(actor.mp, 18);
   assert.equal(actor.spent, true);
   assert.equal(result.events[0].effect.applied, true);
@@ -589,7 +589,9 @@ test("poison damages the newly charged squad at turn rollover, honoring configur
     type: "STATUS_DAMAGE",
     unitId: "p1-poisoned",
     status: "poison",
-    damage: 3
+    damage: 3,
+    // An authored/pre-existing poison has no applier, so it credits nobody.
+    appliedBy: null
   });
 });
 
@@ -605,7 +607,7 @@ test("Moonstrike applies a one-turn status that expires after the afflicted unit
     targetId: "p2-swordsman", effectRoll: 0, ...NORMAL_HIT
   }));
   assert.deepEqual(moonstrike.nextState.units.find((unit) => unit.id === "p2-swordsman").statuses, [
-    { type: "blind", duration: 1 }
+    { type: "blind", duration: 1, appliedBy: "p1-swordsman" }
   ]);
 
   const enemySelected = applyCommand(moonstrike.nextState, beginActivation(2, "p2-swordsman"));
@@ -707,7 +709,7 @@ test("Leg Shot applies a three-turn Slow that reduces the target's MOVE by one",
   }));
   const target = result.nextState.units.find((unit) => unit.id === "p2-swordsman");
 
-  assert.deepEqual(target.statuses, [{ type: "slow", duration: 3, statModifiers: { moveRange: -1 } }]);
+  assert.deepEqual(target.statuses, [{ type: "slow", duration: 3, statModifiers: { moveRange: -1 }, appliedBy: "p1-archer" }]);
   assert.equal(getEffectiveStats(target).moveRange, 2);
 });
 
@@ -923,7 +925,7 @@ test("Mystic Silence is a status cast that deals no damage and respects immunity
 
   assert.equal(result.accepted, true);
   assert.equal(target.hp, 25);
-  assert.deepEqual(target.statuses, [{ type: "silence", duration: 1 }]);
+  assert.deepEqual(target.statuses, [{ type: "silence", duration: 1, appliedBy: "p1-mystic" }]);
   assert.equal(result.nextState.units.find((unit) => unit.id === "p1-mystic").mp, 35);
   assert.deepEqual(result.events[0].effect, { attempted: true, applied: true, status: "silence" });
 

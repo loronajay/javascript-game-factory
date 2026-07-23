@@ -130,8 +130,8 @@ test("Flamethrower leaves permanent fire under enemies it damages", () => {
   const result = run(s, useArt(1, "lb", "flamethrower", { targetPosition: { x: 3, y: 1 } }));
   s = result.nextState;
 
-  assert.deepEqual(getTileObject(s, { x: 3, y: 1 }), { kind: "fire", permanent: true });
-  assert.deepEqual(getTileObject(s, { x: 4, y: 1 }), { kind: "fire", permanent: true });
+  assert.deepEqual(getTileObject(s, { x: 3, y: 1 }), { kind: "fire", permanent: true, ownerId: "lb" });
+  assert.deepEqual(getTileObject(s, { x: 4, y: 1 }), { kind: "fire", permanent: true, ownerId: "lb" });
   assert.equal(getTileObject(s, { x: 4, y: 2 }), null, "allies in the cone are not hit");
   assert.equal(getTileObject(s, { x: 5, y: 1 }), null, "fire-immune enemies are not hit");
   assert.ok(result.events[0].createdFire.some((position) => position.x === 3 && position.y === 1));
@@ -159,9 +159,9 @@ test("Flamespitter gives rage stats and free orthogonal Flamethrower on basic at
   assert.equal(findUnit(s, "behind").hp, 21);
   assert.equal(findUnit(s, "wide").hp, 21);
   assert.equal(findUnit(s, "diagonal").hp, 24);
-  assert.deepEqual(getTileObject(s, { x: 3, y: 1 }), { kind: "fire", permanent: true });
-  assert.deepEqual(getTileObject(s, { x: 4, y: 1 }), { kind: "fire", permanent: true });
-  assert.deepEqual(getTileObject(s, { x: 4, y: 2 }), { kind: "fire", permanent: true });
+  assert.deepEqual(getTileObject(s, { x: 3, y: 1 }), { kind: "fire", permanent: true, ownerId: "lb" });
+  assert.deepEqual(getTileObject(s, { x: 4, y: 1 }), { kind: "fire", permanent: true, ownerId: "lb" });
+  assert.deepEqual(getTileObject(s, { x: 4, y: 2 }), { kind: "fire", permanent: true, ownerId: "lb" });
   assert.equal(getTileObject(s, { x: 2, y: 2 }), null);
   assert.ok(result.events.some((event) => event.type === "FLAMESPITTER" && event.targetIds.includes("behind")));
 });

@@ -279,7 +279,6 @@ export async function recordGameProgressClaim(pool, params = {}) {
         client.release();
     }
 }
-
 // Atomically spend Valor on an entitlement. The charge is computed server-side from the
 // catalog (services/valor-catalog) — the client never supplies a price. The profile row is
 // locked FOR UPDATE so concurrent spends cannot double-charge, and the balance check plus
@@ -287,9 +286,11 @@ export async function recordGameProgressClaim(pool, params = {}) {
 export async function spendValorForEntitlement(pool, params = {}) {
     const playerId = cleanText(params.playerId, 120);
     const gameSlug = normalizeGameSlug(params.gameSlug);
-    if (!pool || !playerId || !gameSlug) return { ok: false, statusCode: 400, error: "invalid_request" };
+    if (!pool || !playerId || !gameSlug)
+        return { ok: false, statusCode: 400, error: "invalid_request" };
     const resolved = getValorOffer(params.offer);
-    if (!resolved.ok) return resolved;
+    if (!resolved.ok)
+        return resolved;
     const client = await pool.connect();
     try {
         await client.query("begin");
@@ -367,7 +368,8 @@ const OWNERSHIP_BACKFILL_CLAIM_ID = "migration:local-ownership-v1";
 export async function backfillLocalOwnership(pool, params = {}) {
     const playerId = cleanText(params.playerId, 120);
     const gameSlug = normalizeGameSlug(params.gameSlug);
-    if (!pool || !playerId || !gameSlug) return { ok: false, statusCode: 400, error: "invalid_request" };
+    if (!pool || !playerId || !gameSlug)
+        return { ok: false, statusCode: 400, error: "invalid_request" };
     const rawIds = Array.isArray(params.entitlementIds) ? params.entitlementIds : [];
     const entitlementIds = [...new Set(rawIds.map((value) => cleanText(value, 160)).filter((id) => VALID_ENTITLEMENT_ID.test(id)))].slice(0, MAX_BACKFILL_ENTITLEMENTS);
     const valorBalance = clampInt(params.valorBalance, { min: 0, max: 100_000_000 });
@@ -409,7 +411,8 @@ export async function backfillLocalOwnership(pool, params = {}) {
 export async function findStripeGrant(pool, params = {}) {
     const paymentIntentId = cleanText(params.paymentIntentId, 200);
     const sessionId = cleanText(params.sessionId, 200);
-    if (!pool || (!paymentIntentId && !sessionId)) return null;
+    if (!pool || (!paymentIntentId && !sessionId))
+        return null;
     const conditions = [];
     const values = [];
     if (paymentIntentId) {
@@ -428,11 +431,12 @@ export async function findStripeGrant(pool, params = {}) {
        order by created_at asc
        limit 1`, values);
         const row = res.rows[0];
-        if (!row) return null;
+        if (!row)
+            return null;
         const payload = row.payload && typeof row.payload === "object" ? row.payload : {};
         const entitlementIds = [...new Set((Array.isArray(payload.entitlementIds) ? payload.entitlementIds : [])
-            .map((value) => cleanText(value, 180))
-            .filter(Boolean))];
+                .map((value) => cleanText(value, 180))
+                .filter(Boolean))];
         return {
             playerId: cleanText(row.player_id, 120),
             gameSlug: normalizeGameSlug(row.game_slug),
@@ -460,12 +464,13 @@ export async function revokeGameEntitlements(pool, params = {}) {
     const revocationId = cleanText(params.revocationId, 200);
     const reason = cleanText(params.reason, 80) || "revoked";
     const entitlementIds = [...new Set((Array.isArray(params.entitlementIds) ? params.entitlementIds : [])
-        .map((value) => cleanText(value, 180))
-        .filter(Boolean))];
+            .map((value) => cleanText(value, 180))
+            .filter(Boolean))];
     if (!pool || !playerId || !gameSlug || !revocationId) {
         return { ok: false, statusCode: 400, error: "invalid_request" };
     }
-    if (!entitlementIds.length) return { ok: true, alreadyProcessed: false, revoked: [] };
+    if (!entitlementIds.length)
+        return { ok: true, alreadyProcessed: false, revoked: [] };
     const client = await pool.connect();
     try {
         await client.query("begin");
@@ -506,12 +511,13 @@ export async function regrantStripeEntitlements(pool, params = {}) {
     const sessionId = cleanText(params.sessionId, 200);
     const regrantId = cleanText(params.regrantId, 200);
     const entitlementIds = [...new Set((Array.isArray(params.entitlementIds) ? params.entitlementIds : [])
-        .map((value) => cleanText(value, 180))
-        .filter(Boolean))];
+            .map((value) => cleanText(value, 180))
+            .filter(Boolean))];
     if (!pool || !playerId || !gameSlug || !regrantId) {
         return { ok: false, statusCode: 400, error: "invalid_request" };
     }
-    if (!entitlementIds.length) return { ok: true, alreadyProcessed: false, regranted: [] };
+    if (!entitlementIds.length)
+        return { ok: true, alreadyProcessed: false, regranted: [] };
     const client = await pool.connect();
     try {
         await client.query("begin");

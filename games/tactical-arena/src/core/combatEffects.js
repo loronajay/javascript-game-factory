@@ -9,7 +9,11 @@ import { applyStatus, reflectsStatus, resolveStatusEffect } from "../rules/statu
 // reflecting unit is issued to the offender instead of the target.
 export function applyRolledStatus(target, effect, rollValue, offender, chanceMultiplier = 1) {
   const recipient = (offender && offender.id !== target.id && reflectsStatus(target)) ? offender : target;
-  const result = resolveStatusEffect(recipient, effect, rollValue, chanceMultiplier);
+  // Kill credit for a damaging status follows the reflection: normally the offender
+  // applied it, but a Stone Body bounce means the TARGET is the one poisoning the
+  // offender, so credit for that death belongs to the reflector.
+  const appliedBy = recipient.id === target.id ? (offender?.id ?? null) : target.id;
+  const result = resolveStatusEffect(recipient, effect, rollValue, chanceMultiplier, appliedBy);
   if (result.statuses) { recipient.statuses = result.statuses; }
   delete result.statuses;
   if (recipient.id !== target.id) result.reflected = true;

@@ -4,6 +4,7 @@ import { chebyshevDistance, isOnBoard, ORTHOGONAL_DIRECTIONS } from "../../rules
 import { drawValue } from "../rng.js";
 import { accept } from "../reducerResult.js";
 import { spendAndAdvance } from "../turnEngine.js";
+import { markSelfInflicted } from "../killAttribution.js";
 
 // Tear the nearby board sideways. Each enemy gets its own deterministic RNG draw among
 // currently legal orthogonal destinations. Resolving against the updated board after each
@@ -43,6 +44,7 @@ export function resolveVoidGravity(state, command, art) {
 
   const hpCost = Math.max(0, Number(art.hpCost) || 0);
   actor.hp = Math.max(0, actor.hp - hpCost);
+  markSelfInflicted(actor); // an HP cost that kills you is nobody else's kill
   spendAndAdvance(next, actor);
   return accept(next, [{
     type: "ART_RESOLVED",

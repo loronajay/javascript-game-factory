@@ -223,6 +223,9 @@ export function createApp(options: any = {}) {
   const getRankedMatches = typeof options?.getRankedMatches === "function"
     ? options.getRankedMatches
     : async () => null;
+  const getRankedMatchDetail = typeof options?.getRankedMatchDetail === "function"
+    ? options.getRankedMatchDetail
+    : async () => null;
   const getRankedLeaderboard = typeof options?.getRankedLeaderboard === "function"
     ? options.getRankedLeaderboard
     : async () => null;
@@ -379,6 +382,7 @@ export function createApp(options: any = {}) {
     getRankedCard,
     getRankedUnitStats,
     getRankedMatches,
+    getRankedMatchDetail,
     getRankedLeaderboard,
   };
   const gameProgressServices = {

@@ -215,6 +215,9 @@ export function createApp(options = {}) {
     const getRankedMatches = typeof options?.getRankedMatches === "function"
         ? options.getRankedMatches
         : async () => null;
+    const getRankedMatchDetail = typeof options?.getRankedMatchDetail === "function"
+        ? options.getRankedMatchDetail
+        : async () => null;
     const getRankedLeaderboard = typeof options?.getRankedLeaderboard === "function"
         ? options.getRankedLeaderboard
         : async () => null;
@@ -371,6 +374,7 @@ export function createApp(options = {}) {
         getRankedCard,
         getRankedUnitStats,
         getRankedMatches,
+        getRankedMatchDetail,
         getRankedLeaderboard,
     };
     const gameProgressServices = {
@@ -466,7 +470,8 @@ export function createApp(options = {}) {
                 const rule = rateLimitRules.find((entry) => entry.match(pathname));
                 if (rule) {
                     rateLimitSweepCounter = (rateLimitSweepCounter + 1) % 500;
-                    if (rateLimitSweepCounter === 0) rateLimiter.sweep();
+                    if (rateLimitSweepCounter === 0)
+                        rateLimiter.sweep();
                     const result = rateLimiter.check(`${rule.bucket}:${clientIp(req)}`, rule);
                     if (!result.allowed) {
                         res.setHeader("retry-after", String(Math.ceil(result.retryAfterMs / 1000)));
@@ -680,7 +685,6 @@ export function createApp(options = {}) {
                 writeJson(res, 200, { item }, requestOrigin);
                 return;
             }
-
             // Friend request routes (auth required)
             if (method === "POST" && pathname === "/friend-requests") {
                 if (!authClaims?.playerId) {

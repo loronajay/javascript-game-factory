@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { beginActivation } from "../src/core/commands.js";
+import { attack, beginActivation } from "../src/core/commands.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { createBattleState } from "../src/core/state.js";
 import { buildRankedUnitReport, readableError, squadForSeat } from "../src/match/matchBuilder.js";
@@ -59,9 +59,28 @@ test("buildRankedUnitReport captures every real unit's seat + alive state, exclu
   assert.deepEqual(ids, ["p1-0-swordsman", "p1-1-mystic", "p2-0-archer"], "summoned ghoul excluded");
 
   const byId = Object.fromEntries(report.units.map((u) => [u.id, u]));
-  assert.deepEqual(byId["p1-0-swordsman"], { id: "p1-0-swordsman", seat: 1, type: "swordsman", alive: true });
+  assert.deepEqual(byId["p1-0-swordsman"], { id: "p1-0-swordsman", seat: 1, type: "swordsman", alive: true, kills: 0 });
   assert.equal(byId["p1-1-mystic"].alive, false, "hp 0 reads as dead");
   assert.equal(byId["p2-0-archer"].seat, 2);
+});
+
+test("buildRankedUnitReport attests the kill tally the reducer actually recorded", () => {
+  const state = createBattleState({
+    units: [
+      { id: "hero", type: "swordsman", player: 1, x: 1, y: 1 },
+      { id: "ally", type: "swordsman", player: 1, x: 1, y: 3 },
+      { id: "foe", type: "swordsman", player: 2, hp: 1, x: 2, y: 1 },
+      { id: "spare", type: "swordsman", player: 2, x: 7, y: 7 }
+    ]
+  });
+  const begun = applyCommand(state, beginActivation(1, "hero"));
+  const killed = applyCommand(begun.nextState, attack(1, "hero", "foe", { attackRoll: 0.5, critRoll: 0.99 }));
+  assert.equal(killed.accepted, true, killed.errorCode);
+
+  const byId = Object.fromEntries(buildRankedUnitReport(killed.nextState).units.map((u) => [u.id, u]));
+  assert.equal(byId.hero.kills, 1, "the tally rides the same attestation as alive/dead");
+  assert.equal(byId.foe.alive, false);
+  assert.equal(byId.spare.kills, 0);
 });
 
 test("squadForSeat lists a seat's real unit types (alive or dead), excluding summons", () => {

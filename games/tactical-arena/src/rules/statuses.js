@@ -99,7 +99,7 @@ export function isStunned(unit) {
 // `chanceMultiplier` scales the effect's base success chance before the roll (the
 // Witch Doctor's Misfortune Stance passes 2 for his team). Clamped to [0,1] so a
 // doubled 70% becomes a capped 100%, never an out-of-range chance.
-export function resolveStatusEffect(unit, effect, effectRoll, chanceMultiplier = 1) {
+export function resolveStatusEffect(unit, effect, effectRoll, chanceMultiplier = 1, appliedBy = null) {
   if (!Number.isFinite(effectRoll) || effectRoll < 0 || effectRoll >= 1) {
     return { attempted: false, applied: false, reason: "INVALID_ROLL" };
   }
@@ -110,12 +110,20 @@ export function resolveStatusEffect(unit, effect, effectRoll, chanceMultiplier =
     type: effect.status,
     duration: effect.duration ?? effect.durationTurns,
     ...(effect.statModifiers ? { statModifiers: { ...effect.statModifiers } } : {}),
-    ...(Number.isFinite(effect.turnStartDamage) ? { turnStartDamage: effect.turnStartDamage } : {})
+    ...(Number.isFinite(effect.turnStartDamage) ? { turnStartDamage: effect.turnStartDamage } : {}),
+    // Who inflicted this. Only meaningful for damaging statuses (poison), where it
+    // carries kill credit to whoever applied it. See killAttribution.js.
+    ...(appliedBy ? { appliedBy } : {})
   };
   const result = applyStatus(unit, status);
   return { attempted: true, applied: result.applied, ...(result.reason ? { reason: result.reason } : {}), statuses: result.statuses };
 }
 
+// Pure: ticks damaging statuses and reports what happened. This module is a rules
+// layer and must not reach into core, so it does NOT credit kills itself — it tags
+// each STATUS_DAMAGE with the applier and lets the caller (turnEngine) attribute the
+// death. Ticks apply in order, so the LAST event for a unit that ends at 0 HP is the
+// one that killed it.
 export function resolveTurnStartStatuses(unit) {
   const events = [];
   for (const status of unit.statuses) {
@@ -124,7 +132,13 @@ export function resolveTurnStartStatuses(unit) {
     if (damage === 0 || unit.hp <= 0) continue;
     const appliedDamage = Math.min(unit.hp, damage);
     unit.hp -= appliedDamage;
-    events.push({ type: "STATUS_DAMAGE", unitId: unit.id, status: status.type, damage: appliedDamage });
+    events.push({
+      type: "STATUS_DAMAGE",
+      unitId: unit.id,
+      status: status.type,
+      damage: appliedDamage,
+      appliedBy: status.appliedBy ?? null,
+    });
   }
   return events;
 }

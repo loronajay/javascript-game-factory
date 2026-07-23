@@ -27,7 +27,8 @@ export function createRateLimiter() {
     // Drop expired entries so the map does not grow without bound. Cheap to call periodically.
     function sweep(now = Date.now()) {
         for (const [key, entry] of hits) {
-            if (now >= entry.resetAt) hits.delete(key);
+            if (now >= entry.resetAt)
+                hits.delete(key);
         }
     }
     return { check, sweep };

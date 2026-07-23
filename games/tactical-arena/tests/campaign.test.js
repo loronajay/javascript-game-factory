@@ -1605,7 +1605,7 @@ test("Gargoyle's Inferno lights one random open space on fire at each turn rollo
   assert.ok(event, "turn rollover should surface the lit fire tile");
   assert.deepEqual(event.sourceId, "p2-0-gargoyle");
   assert.equal(fireEntries.length, 1);
-  assert.deepEqual(fireEntries[0][1], { kind: "fire", turnsLeft: 3 });
+  assert.deepEqual(fireEntries[0][1], { kind: "fire", turnsLeft: 3, ownerId: "p2-0-gargoyle" });
   assert.deepEqual(fireEntries[0][0], `${event.position.x},${event.position.y}`);
   assert.notDeepEqual(event.position, findUnit(finished.nextState, "p1-0-swordsman").position);
   assert.notDeepEqual(event.position, findUnit(finished.nextState, "p2-0-gargoyle").position);

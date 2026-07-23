@@ -13,6 +13,7 @@ import { resolveVictory, spendAndAdvance } from "../turnEngine.js";
 import { applyBeckonedGhostSacrifice } from "../ghostSacrifice.js";
 import { pushDestinationAwayFrom } from "./displacement.js";
 import { completeArtUse } from "./artCompletion.js";
+import { markSelfInflicted } from "../killAttribution.js";
 
 export function resolveRushPath(state, command, art) {
   const actorState = findUnit(state, command.unitId);
@@ -77,6 +78,7 @@ export function resolveDarkRush(state, command, art) {
   actor.position = { ...command.path.at(-1) };
   const darkTreadEvents = applyDarkTreadLifesteal(next, actor, damaged);
   actor.hp = Math.max(0, actor.hp - hpCost);
+  markSelfInflicted(actor); // an HP cost that kills you is nobody else's kill
   spendAndAdvance(next, actor);
   resolveVictory(next);
   return accept(next, [{
@@ -98,6 +100,7 @@ export function resolveDarkEther(state, command, art) {
   const actor = findUnit(next, command.unitId);
   const hpCost = art.hpCost ?? 0;
   actor.hp = Math.max(0, actor.hp - hpCost);
+  markSelfInflicted(actor); // an HP cost that kills you is nobody else's kill
   actor.guaranteedCritCharged = true;
   spendAndAdvance(next, actor);
   return accept(next, [{

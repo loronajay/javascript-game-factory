@@ -11,8 +11,10 @@ function configuredAllowedOrigins() {
     return new Set([...DEFAULT_ALLOWED_ORIGINS, ...extra]);
 }
 function isAllowedOrigin(origin) {
-    if (!origin) return false;
-    if (configuredAllowedOrigins().has(origin)) return true;
+    if (!origin)
+        return false;
+    if (configuredAllowedOrigins().has(origin))
+        return true;
     try {
         const { hostname } = new URL(origin);
         return hostname === "localhost" || hostname === "127.0.0.1";

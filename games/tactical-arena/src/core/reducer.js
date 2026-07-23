@@ -29,6 +29,7 @@ import { nextActivePlayer, resolveVictory, spendAndAdvance, syncFinalBattleDarkT
 import { isTempoBattle, normalizeTempoStateAfterCommand, prepareTempoStateForCommand } from "./tempoBattle.js";
 import { attack } from "./basicAttack.js";
 import { applyAbilityRecharge, applyRageRegen, refreshSoulShuffle } from "./activationPassives.js";
+import { CAUSE, creditDeaths, snapshotAlive } from "./killAttribution.js";
 
 function stationaryStrengthEffect(unit) {
   return getUnitType(unit.type).arts.find((art) => art.effect?.type === "stationaryStrength")?.effect ?? null;
@@ -36,6 +37,11 @@ function stationaryStrengthEffect(unit) {
 
 export function applyCommand(state, command) {
   const commandState = isTempoBattle(state) ? prepareTempoStateForCommand(state, command) : state;
+  // Opens the BROAD kill-credit scope for this command. Narrow scopes inside the
+  // resolvers (fire ticks, poison ticks, self-sacrifice) claim their deaths first;
+  // this backstop attributes whatever is left to the acting unit, which is correct for
+  // the ordinary case of "their attack/ART/splash killed it". See killAttribution.js.
+  const aliveBefore = snapshotAlive(commandState);
   const result = dispatchCommand(commandState, command);
   // A single reconciliation seam runs after EVERY accepted command, diffing the input
   // state against the result to catch every unit that fell or was revived — regardless
@@ -48,6 +54,14 @@ export function applyCommand(state, command) {
       resolveVolcanicPyroclasmTick
     });
     syncFinalBattleDarkTileStatuses(result.nextState, result.events);
+    // Closed AFTER the reaction seam so chain deaths are attributed too: if the actor
+    // kills an enemy and that enemy's King then mourns itself to death, the actor caused
+    // both. Same-team and self kills are filtered by creditDeaths, so friendly fire and
+    // a player's own grieving King never pad anyone's record.
+    creditDeaths(result.nextState, aliveBefore, result.events, {
+      killerId: command.unitId ?? commandState.activation?.unitId ?? null,
+      cause: command.type === COMMANDS.CONCEDE ? CAUSE.CONCEDE : CAUSE.UNIT,
+    });
     closeDeadActiveUnit(result.nextState);
     normalizeTempoStateAfterCommand(result.nextState);
   }
@@ -290,11 +304,11 @@ function concede(state, command) {
   if (!Number.isInteger(command.player) || command.player < 1) return reject(ERR.INVALID_COMMAND);
   const next = cloneState(state);
   const events = [];
+  // Resigning wipes the squad. The UNIT_DEFEATED events are emitted by the shared
+  // attribution pass in applyCommand (cause: "concede", crediting nobody) rather than
+  // here, so a death is announced exactly once no matter how it happened.
   for (const unit of next.units) {
-    if (unit.player === command.player && unit.hp > 0) {
-      unit.hp = 0;
-      events.push({ type: "UNIT_DEFEATED", unitId: unit.id });
-    }
+    if (unit.player === command.player && unit.hp > 0) unit.hp = 0;
   }
   events.push({ type: "PLAYER_CONCEDED", player: command.player });
   next.activation = null;

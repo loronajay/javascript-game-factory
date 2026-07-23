@@ -124,7 +124,7 @@ export function resolveFatWizardZap(state, command, art) {
   if (swing.critical && target.hp > 0) {
     const rageStatus = getRageEffectValue(actor, "zapCritStatus", null);
     const spec = rageStatus ?? { status: art.effect?.status, durationTurns: art.effect?.durationTurns ?? 1 };
-    const applied = applyStatus(target, { type: spec.status, duration: spec.durationTurns });
+    const applied = applyStatus(target, { type: spec.status, duration: spec.durationTurns, appliedBy: actor.id });
     if (applied.applied) target.statuses = applied.statuses;
     effect = { status: spec.status, applied: applied.applied, ...(applied.reason ? { reason: applied.reason } : {}) };
   }

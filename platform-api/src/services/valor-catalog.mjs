@@ -72,14 +72,17 @@ function roundValorAmount(amount) {
 }
 // marketplace prorateAmount (roundTo 50): base * (part / total), floored at one step.
 function prorateValor(baseAmount, totalAmount, partAmount) {
-    if (![baseAmount, totalAmount, partAmount].every((value) => Number.isFinite(value))) return 0;
-    if (totalAmount <= 0 || partAmount <= 0) return 0;
+    if (![baseAmount, totalAmount, partAmount].every((value) => Number.isFinite(value)))
+        return 0;
+    if (totalAmount <= 0 || partAmount <= 0)
+        return 0;
     const raw = baseAmount * (partAmount / totalAmount);
     return Math.max(50, Math.round(raw / 50) * 50);
 }
 export function skinValorCost(amountCents) {
     const cents = Math.max(0, Math.floor(Number(amountCents) || 0));
-    if (!cents) return 0;
+    if (!cents)
+        return 0;
     const dollars = cents / 100;
     return roundValorAmount(SKIN_VALOR_PER_USD * (dollars ** SKIN_VALOR_CURVE_EXPONENT));
 }
@@ -106,9 +109,11 @@ export function getValorOffer(offerInput) {
     if (kind === "unit") {
         const type = cleanText(offer.type, 80);
         const unit = findUnit(type);
-        if (!unit) return { ok: false, statusCode: 400, error: "offer_not_found" };
+        if (!unit)
+            return { ok: false, statusCode: 400, error: "offer_not_found" };
         const cost = unitValorCost(type);
-        if (!cost) return { ok: false, statusCode: 400, error: "offer_not_purchasable" };
+        if (!cost)
+            return { ok: false, statusCode: 400, error: "offer_not_purchasable" };
         return {
             ok: true,
             kind: "unit",
@@ -120,9 +125,11 @@ export function getValorOffer(offerInput) {
         const type = cleanText(offer.type, 80);
         const slug = cleanText(offer.slug, 120);
         const skin = findSkin(type, slug);
-        if (!skin) return { ok: false, statusCode: 400, error: "offer_not_found" };
+        if (!skin)
+            return { ok: false, statusCode: 400, error: "offer_not_found" };
         const cost = skinValorCost(skin.amountCents);
-        if (!cost) return { ok: false, statusCode: 400, error: "offer_not_purchasable" };
+        if (!cost)
+            return { ok: false, statusCode: 400, error: "offer_not_purchasable" };
         return {
             ok: true,
             kind: "skin",
@@ -134,7 +141,8 @@ export function getValorOffer(offerInput) {
         const packId = cleanText(offer.packId, 120);
         const skins = packSkins(packId);
         const packBaseValor = roundValorAmount(SKIN_PACK_VALOR[packId]);
-        if (!skins.length || !packBaseValor) return { ok: false, statusCode: 400, error: "offer_not_found" };
+        if (!skins.length || !packBaseValor)
+            return { ok: false, statusCode: 400, error: "offer_not_found" };
         return {
             ok: true,
             kind: "skin-pack",

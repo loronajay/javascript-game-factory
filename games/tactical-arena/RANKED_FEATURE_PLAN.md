@@ -146,11 +146,18 @@ As-built notes:
   table + pipeline carry it, but killer attribution is deferred (open question below).
 - New public reads: `GET /ranked/:slug/units/:playerId` and
   `GET /ranked/:slug/matches/:playerId`; clients `fetchRankedUnitStats` /
-  `fetchRankedMatches`. Match rows are shaped to the caller's perspective (my outcome /
-  rating delta / my vs opponent squad). The ranked-profile card now renders a unit-record
-  grid + recent-match list.
+  `fetchRankedMatches`. The ranked-profile card renders a unit-record grid + recent-match
+  list.
 - The report is sent from `matchOutcomeController` at victory alongside the existing
   win/loss attestation; it is NOT part of the online state hash (determinism preserved).
+
+**Superseded by the match-history contract.** Match rows are no longer an ad-hoc
+`{ outcome, ratingDelta, mySquad, opponentSquad }` shape. Both the list and the new
+`GET /ranked/:slug/match/:matchId` detail read the canonical, source-agnostic contract in
+`platform-api/src/db/match-history.mts`, adapted from ranked rows by
+`ranked-history.mts`. The unit report also gained an attested `turns`. Rationale, trust
+model, endpoint semantics, and how to add the general all-modes history tab later are in
+**`MATCH_HISTORY.md`** — read that before touching match history.
 
 Goal: real, trustworthy per-unit records and a recent-match list.
 

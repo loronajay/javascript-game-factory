@@ -195,11 +195,20 @@ export function buildSummary(state, { matchStartedAt, initialHpByPlayer }) {
 // pieces (Ghouls) are excluded, matching every other ranked/summary stat. seat =
 // unit.player (ranked is 1v1, so seat is 1 or 2). Order is irrelevant — the server
 // canonicalizes by id before comparing.
+//
+// `turns` rides along on the same attestation so match history can show a match length
+// that neither client could inflate alone: it comes from deterministic state, and the
+// server only trusts it when both reports carry the same number.
+// `kills` rides the same attestation as `alive`: it is derived deterministically from
+// the identical command stream (see core/killAttribution.js), so both clients report the
+// same tally and the server credits it only when they agree. A client that inflated its
+// own kills would simply disagree with its opponent and have the whole report dropped.
 export function buildRankedUnitReport(state) {
   const units = (state.units ?? [])
     .filter((u) => takesTurns(u))
-    .map((u) => ({ id: u.id, seat: u.player, type: u.type, alive: u.hp > 0 }));
-  return { units };
+    .map((u) => ({ id: u.id, seat: u.player, type: u.type, alive: u.hp > 0, kills: u.kills ?? 0 }));
+  const turns = Number.isInteger(state.turnNumber) && state.turnNumber >= 0 ? state.turnNumber : null;
+  return { units, turns };
 }
 
 // The unit types a seat brought (alive or dead at match end), for match history.

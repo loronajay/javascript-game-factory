@@ -10,6 +10,7 @@ import { getFireVulnerability, isFireDamageImmune } from "../rules/combat.js";
 import { getGlobalTrueTick } from "../rules/stances.js";
 import { isInvulnerable } from "../rules/statuses.js";
 import { drawValue } from "./rng.js";
+import { CAUSE, creditDeaths, snapshotAlive } from "./killAttribution.js";
 
 import { restoreMp } from "./combatEffects.js";
 const FIRE_DAMAGE = 1;
@@ -26,8 +27,16 @@ export function applyFireTick(state, events) {
       // Enchanted Roots (Treant): +fireVulnerability extra damage from a fire-tile tick.
       const amount = FIRE_DAMAGE + getFireVulnerability(occupant);
       const dealt = Math.min(occupant.hp, amount);
+      // Each tile burns in its own credit scope so a death here is attributed to the
+      // unit that lit THIS tile, not to whoever happens to be acting. Authored mission
+      // fire has no owner and falls through as environmental.
+      const aliveBefore = snapshotAlive(state);
       occupant.hp = Math.max(0, occupant.hp - amount);
       if (dealt > 0) events.push({ type: "FIRE_DAMAGE", unitId: occupant.id, position: { x, y }, damage: dealt });
+      creditDeaths(state, aliveBefore, events, {
+        killerId: obj.ownerId ?? null,
+        cause: obj.ownerId ? CAUSE.FIRE : CAUSE.ENVIRONMENT,
+      });
     }
     if (obj.permanent) continue;
     obj.turnsLeft -= 1;
@@ -54,7 +63,13 @@ export function applyRandomFireTick(state, events) {
   state.rngState = draw.rngState;
   const position = candidates[Math.min(candidates.length - 1, Math.floor(draw.value * candidates.length))];
   const key = `${position.x},${position.y}`;
-  state.tileObjects[key] = { kind: "fire", turnsLeft: Math.max(1, Math.floor(Number(rule.turnsLeft) || 3)) };
+  // Mission random fire is credited to the mission's declared source when it has one
+  // (a boss lighting the arena), and is otherwise environmental.
+  state.tileObjects[key] = {
+    kind: "fire",
+    turnsLeft: Math.max(1, Math.floor(Number(rule.turnsLeft) || 3)),
+    ownerId: source?.id ?? null,
+  };
   events.push({
     type: "RANDOM_FIRE_LIT",
     sourceId: source?.id ?? null,
@@ -87,11 +102,14 @@ export function applyWeatherCycleTick(state, events) {
 export function applyBlackDeathTick(state, events) {
   const amount = getGlobalTrueTick(state);
   if (amount <= 0) return;
+  // Black Death is a board-wide clock that hits friend and foe alike — nobody's kill.
+  const aliveBefore = snapshotAlive(state);
   for (const unit of livingUnits(state)) {
     const dealt = Math.min(unit.hp, amount);
     unit.hp = Math.max(0, unit.hp - amount);
     if (dealt > 0) events.push({ type: "BLACK_DEATH_DAMAGE", unitId: unit.id, damage: dealt });
   }
+  creditDeaths(state, aliveBefore, events, { cause: CAUSE.ENVIRONMENT });
 }
 
 // Ghoul Bite (and any future unit sharing the `autoStrike` passive effect): at every
@@ -120,6 +138,7 @@ export function applyAutoStrikeTick(state, events) {
       const amount = Math.max(0, Number(effect.damage) || 0);
       const dealt = Math.min(target.hp, amount);
       if (dealt <= 0) continue;
+      const aliveBefore = snapshotAlive(state);
       target.hp = Math.max(0, target.hp - dealt);
       events.push({
         type: "AUTO_STRIKE",
@@ -128,6 +147,7 @@ export function applyAutoStrikeTick(state, events) {
         position: { ...target.position },
         damage: dealt
       });
+      creditDeaths(state, aliveBefore, events, { killerId: source.id, cause: CAUSE.UNIT });
     }
   }
 }
@@ -144,9 +164,11 @@ export function applyTimeStealTick(state, events) {
       if (chebyshevDistance(source.position, target.position) > radius) continue;
       const dealt = Math.min(target.hp, amount);
       if (dealt <= 0) continue;
+      const aliveBefore = snapshotAlive(state);
       target.hp = Math.max(0, target.hp - amount);
       totalDealt += dealt;
       events.push({ type: "TIME_STEAL", sourceId: source.id, targetId: target.id, position: { ...target.position }, damage: dealt });
+      creditDeaths(state, aliveBefore, events, { killerId: source.id, cause: CAUSE.UNIT });
     }
     if (totalDealt > 0 && effect.refundMpPerDamage) {
       const restored = restoreMp(state, source, source, totalDealt * effect.refundMpPerDamage);

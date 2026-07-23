@@ -16,7 +16,9 @@ export function resolveThrowCigar(state, command, art) {
   }
   const next = cloneState(state);
   const actor = findUnit(next, command.unitId);
-  next.tileObjects[positionKey(placement)] = { kind: "fire", turnsLeft: art.fire?.turns ?? 3 };
+  // ownerId carries kill credit forward: a unit that later burns to death on this tile
+  // is attributed to whoever lit it (see killAttribution.js).
+  next.tileObjects[positionKey(placement)] = { kind: "fire", turnsLeft: art.fire?.turns ?? 3, ownerId: actor.id };
   const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
   spendAndAdvance(next, actor);
@@ -77,7 +79,7 @@ export function resolveCannonFire(state, command, art) {
 
   let stunned = false;
   if (swing.critical && target.hp > 0 && art.onCrit?.status) {
-    const result = applyStatus(target, { type: art.onCrit.status, duration: art.onCrit.durationTurns ?? 1 });
+    const result = applyStatus(target, { type: art.onCrit.status, duration: art.onCrit.durationTurns ?? 1, appliedBy: actor.id });
     if (result.applied) {
       target.statuses = result.statuses;
       stunned = true;
@@ -131,8 +133,8 @@ export function resolveConeArt(state, command, art) {
       const fire = art.hitTileObject;
       const firePosition = { ...target.position };
       next.tileObjects[positionKey(firePosition)] = fire.permanent
-        ? { kind: "fire", permanent: true }
-        : { kind: "fire", turnsLeft: Number.isFinite(fire.turnsLeft) ? fire.turnsLeft : 3 };
+        ? { kind: "fire", permanent: true, ownerId: actor.id }
+        : { kind: "fire", turnsLeft: Number.isFinite(fire.turnsLeft) ? fire.turnsLeft : 3, ownerId: actor.id };
       createdFire.push(firePosition);
     }
   }

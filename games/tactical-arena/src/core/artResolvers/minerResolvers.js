@@ -147,7 +147,7 @@ export function resolveBlastingCap(state, command, art) {
 
   let stunned = false;
   if (swing.critical && target.hp > 0 && art.onCrit?.status) {
-    const result = applyStatus(target, { type: art.onCrit.status, duration: art.onCrit.durationTurns ?? 1 });
+    const result = applyStatus(target, { type: art.onCrit.status, duration: art.onCrit.durationTurns ?? 1, appliedBy: actor.id });
     if (result.applied) {
       target.statuses = result.statuses;
       stunned = true;

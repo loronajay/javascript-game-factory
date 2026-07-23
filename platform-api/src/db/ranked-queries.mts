@@ -1,4 +1,4 @@
-// Ranked read views — public cards, me-standing, per-unit stats, match history, and the
+// Ranked read views — public cards, me-standing, per-unit stats, and the
 // leaderboard. Split out of ranked.mts. These are read-mostly (getRankedStanding also
 // lazily expires stale active matches), fold in the cosmetic profile, and never leak
 // private fields except the me-standing's own active-match token.
@@ -103,45 +103,8 @@ export async function getRankedUnitStats(pool: any, { playerId, gameSlug }: any)
   }
 }
 
-// Recent resolved ranked matches for a player, shaped to that player's perspective
-// (my outcome, my rating delta, my/opponent squads). Public read.
-export async function getRankedMatches(pool: any, { playerId, gameSlug, limit }: any): Promise<any> {
-  if (!pool || !playerId || !gameSlug) return null;
-  const cap = Math.max(1, Math.min(Number(limit) || 10, 25));
-  try {
-    const res = await pool.query(
-      `select match_id, player_a, player_b, outcome_a, rating_a_before, rating_b_before,
-              rating_a_after, rating_b_after, squad_a, squad_b, resolved_at
-         from ranked_matches
-        where game_slug=$1 and status='resolved' and (player_a=$2 or player_b=$2)
-        order by resolved_at desc limit $3`,
-      [gameSlug, playerId, cap],
-    );
-    const matches = (res.rows || []).map((r: any) => {
-      const isA = r.player_a === playerId;
-      const outcome = r.outcome_a === "draw"
-        ? "draw"
-        : (isA ? r.outcome_a : r.outcome_a === "win" ? "loss" : "win");
-      const before = isA ? r.rating_a_before : r.rating_b_before;
-      const after = isA ? r.rating_a_after : r.rating_b_after;
-      return {
-        matchId: r.match_id,
-        opponentPlayerId: isA ? r.player_b : r.player_a,
-        outcome,
-        ratingBefore: before,
-        ratingAfter: after,
-        ratingDelta: (after ?? before) - before,
-        mySquad: isA ? r.squad_a : r.squad_b,
-        opponentSquad: isA ? r.squad_b : r.squad_a,
-        resolvedAt: r.resolved_at,
-      };
-    });
-    return { playerId, gameSlug, matches };
-  } catch (err: any) {
-    process.stderr.write(`[ranked] getRankedMatches error: ${err?.message || err}\n`);
-    return null;
-  }
-}
+// Match history (list + single-match detail) lives in ranked-history.mts, which adapts
+// ranked rows onto the shared match-history contract.
 
 // Top-N ranked ladder for a game, by rating, with each entry's cosmetic identity
 // folded in. Public read. Only players with a rating row for this slug appear.
