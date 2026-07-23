@@ -483,11 +483,64 @@ export function isProgressSkinUnlocked(type, slug, storage = defaultStorage()) {
   return readUnlockProgress(storage).unlockedSkins.some((skin) => skin.type === type && skin.slug === slug);
 }
 
-export function mergeServerEntitlementsIntoUnlockProgress(storage = defaultStorage(), snapshot = {}) {
+export function mergeServerEntitlementsIntoUnlockProgress(storage = defaultStorage(), snapshot = {}, options = {}) {
+  // `authoritative` = full server authority (signed-in + a successful sync): the server owned
+  // set REPLACES local ownership and all other local ownership sources are filtered down to
+  // items the server actually has, so injected local ownership is dropped and self-heals on
+  // every online boot. `authoritativeValor` = Valor balance authority only (used after a
+  // single server spend, where ownership stays additive). `authoritative` implies both.
+  const authoritative = Boolean(options.authoritative);
+  const authoritativeValor = authoritative || Boolean(options.authoritativeValor);
   const progress = readUnlockProgress(storage);
   const entitlements = entitlementsFromServerSnapshot(snapshot);
   const serverValorBalance = normalizeValorBalance(snapshot?.valorBalance);
-  const valorBalance = Math.max(progress.valorBalance, serverValorBalance);
+  // When the server is known to be current its Valor balance is authoritative — this is what
+  // overwrites a tampered local balance. Otherwise keep the higher of the two so an offline /
+  // not-yet-synced legitimately-earned balance is never downgraded.
+  const valorBalance = authoritativeValor
+    ? serverValorBalance
+    : Math.max(progress.valorBalance, serverValorBalance);
+
+  if (authoritative) {
+    // Ownership is the server's, period. Replace the server-entitlement fields with the
+    // server's exact set, drop the pure-ownership fields (their items live in the server set
+    // now), and filter the flow-bearing reward-pick fields down to picks the server actually
+    // has — so a legit synced pick survives (and still gates re-picking) while an injected
+    // pick is removed. normalizeUnlockProgress (run on write) re-derives the owned set from
+    // these, yielding exactly server + starters.
+    const serverUnitSet = new Set(entitlements.units);
+    const serverSkinSet = new Set(entitlements.skins.map((skin) => `${skin.type}:${skin.slug}`));
+    const keepSkin = (skin) => Boolean(skin) && serverSkinSet.has(`${skin.type}:${skin.slug}`);
+    const filteredRewardSkins = {};
+    for (const [packId, skin] of Object.entries(progress.campaignRewardSkins || {})) {
+      if (keepSkin(skin)) filteredRewardSkins[packId] = skin;
+    }
+    const filteredRewardUnits = {};
+    for (const [packId, type] of Object.entries(progress.campaignRewardUnits || {})) {
+      if (serverUnitSet.has(type)) filteredRewardUnits[packId] = type;
+    }
+    const rewardSkinKept = keepSkin(progress.selectedRewardSkin);
+    // The "all tutorials complete" flag also grants the Juggernaut in normalize, so gate it on
+    // the server actually having it — legit completers do (via backfill / tutorial claim); an
+    // injected flag on an account that never earned it does not.
+    const tutorialsCompleteKept = Boolean(progress.allTutorialsComplete)
+      && serverUnitSet.has(TUTORIAL_JUGGERNAUT_REWARD_UNIT);
+    return writeUnlockProgress(storage, {
+      ...progress,
+      valorBalance,
+      serverEntitlementUnits: [...entitlements.units],
+      serverEntitlementSkins: [...entitlements.skins],
+      unlockedUnits: [],
+      purchasedSkins: [],
+      campaignGrantedSkins: [],
+      campaignRewardSkins: filteredRewardSkins,
+      campaignRewardUnits: filteredRewardUnits,
+      selectedRewardSkin: rewardSkinKept ? progress.selectedRewardSkin : null,
+      rewardGranted: Boolean(progress.rewardGranted) && rewardSkinKept,
+      allTutorialsComplete: tutorialsCompleteKept,
+    });
+  }
+
   if (!entitlements.skins.length && !entitlements.units.length && valorBalance === progress.valorBalance) return progress;
   return writeUnlockProgress(storage, {
     ...progress,

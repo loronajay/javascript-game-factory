@@ -530,3 +530,31 @@ test("resetting progress clears stored progression while preserving owned skins"
   assert.notEqual(storage.getItem(TUTORIAL_PROGRESS_KEY), null);
   assert.equal(storage.getItem(LEGACY_TUTORIAL_PROGRESS_KEY), null);
 });
+
+test("authoritative merge drops injected local ownership and mirrors the server owned set", () => {
+  const storage = storageAdapter();
+  // A tampered local profile: inflated Valor, an injected premium skin, an injected unit.
+  writeUnlockProgress(storage, {
+    valorBalance: 999999,
+    purchasedSkins: [{ type: "mystic", slug: "blood-moon" }],
+    unlockedUnits: ["nemesis"],
+  });
+  assert.equal(isProgressSkinUnlocked("mystic", "blood-moon", storage), true, "sanity: injection works before authority");
+
+  const snapshot = {
+    valorBalance: 500,
+    entitlements: [
+      { entitlementId: "unit:sniper", kind: "unit" },
+      { entitlementId: "skin:swordsman:medieval", kind: "skin" },
+    ],
+  };
+  mergeServerEntitlementsIntoUnlockProgress(storage, snapshot, { authoritative: true });
+
+  const progress = readUnlockProgress(storage);
+  assert.equal(progress.valorBalance, 500, "Valor is the server's, not the injected balance");
+  assert.equal(progress.unlockedUnits.includes("sniper"), true, "server-owned unit is present");
+  assert.equal(isProgressSkinUnlocked("swordsman", "medieval", storage), true, "server-owned skin is present");
+  assert.equal(progress.unlockedUnits.includes("nemesis"), false, "injected unit is dropped");
+  assert.equal(isProgressSkinUnlocked("mystic", "blood-moon", storage), false, "injected premium skin is dropped");
+  assert.equal(progress.unlockedUnits.includes("swordsman"), true, "starters stay free");
+});

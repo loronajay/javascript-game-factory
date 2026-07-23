@@ -9,15 +9,13 @@ import {
   formatPremiumPrice,
   formatValor,
   getShopCatalog,
-  purchaseSkinPackWithValor,
-  purchaseSkinWithValor,
-  purchaseUnitWithValor,
 } from "../progression/marketplace.js";
 import {
   isFactoryAccountLoggedIn,
   readStoredFactoryAccountSession,
   redirectToFactoryAccountSignIn,
 } from "../platform/factoryAccount.js";
+import { runValorPurchase } from "./shop/shopValorPurchase.js";
 import {
   PREMIUM_CHECKOUT_EVENT,
   premiumCheckoutErrorMessage,
@@ -31,9 +29,6 @@ import { showPendingProgressionAnnouncements } from "./progressionAnnouncements.
 import {
   createValorBadge,
   detachNode,
-  skinPackValorPurchaseStatus,
-  skinValorPurchaseStatus,
-  unitPurchaseStatus,
 } from "./shop/shopWidgets.js";
 import {
   renderConsumables,
@@ -63,6 +58,8 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
   const overlay = ensureHost();
   const account = options.account ?? readStoredFactoryAccountSession();
   const accountLoggedIn = isFactoryAccountLoggedIn(account);
+  // Injected in tests; otherwise runValorPurchase builds the default platform client.
+  const apiClient = options.apiClient;
   let activeTab = "units";
   let statusText = accountLoggedIn ? "" : "Sign in to buy shop items.";
   let detailUnitType = null;
@@ -235,28 +232,36 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
     void showPendingProgressionAnnouncements(storage);
   }
 
-  function confirmValorPurchase(kind, offer) {
-    const beforeProgress = readUnlockProgress(storage);
-    const result = kind === "skin"
-      ? purchaseSkinWithValor(storage, offer.type, offer.slug, { account })
-      : kind === "skin-pack"
-        ? purchaseSkinPackWithValor(storage, offer.packId, { account })
-        : purchaseUnitWithValor(storage, offer.type, { account });
-    if (!result.accepted && result.errorCode === "INSUFFICIENT_VALOR") {
-      pendingValorError = result.errorCode;
+  async function confirmValorPurchase(kind, offer) {
+    if (!accountLoggedIn) {
+      statusText = "Sign in to buy shop items.";
+      pendingValorPurchase = null;
+      pendingValorError = "";
+      render();
+      return;
+    }
+    statusText = `Purchasing ${offer.name}…`;
+    render();
+    const result = await runValorPurchase({ kind, offer, storage, account, apiClient });
+    if (result.outcome === "insufficient") {
+      pendingValorError = "INSUFFICIENT_VALOR";
       statusText = "";
+      render();
+      return;
+    }
+    if (result.outcome === "failed") {
+      pendingValorError = "";
+      statusText = result.errorCode === "ACCOUNT_LOGIN_REQUIRED"
+        ? "Sign in to buy shop items."
+        : "Couldn't complete that purchase. Please try again.";
       render();
       return;
     }
     pendingValorPurchase = null;
     pendingValorError = "";
-    statusText = kind === "skin-pack"
-      ? skinPackValorPurchaseStatus(result)
-      : kind === "skin"
-        ? skinValorPurchaseStatus(result)
-        : unitPurchaseStatus(result);
+    statusText = result.status;
     render();
-    if (result.accepted) announcePurchaseProgress(beforeProgress, result.progress);
+    announcePurchaseProgress(result.beforeProgress, result.afterProgress);
   }
 
   async function beginPremiumCheckout(offer) {

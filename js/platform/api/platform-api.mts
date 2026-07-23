@@ -441,6 +441,22 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
       const encoded = encodePathSegment(gameSlug);
       return encoded ? post(`/game-progress/${encoded}/claims`, claim) : Promise.resolve(null);
     },
+    // Server-authoritative Valor spend: the server prices the offer and deducts+grants
+    // atomically. The client only names the offer; it must never send a price.
+    spendGameValor(gameSlug: string, offer: unknown) {
+      const encoded = encodePathSegment(gameSlug);
+      return encoded ? post(`/game-progress/${encoded}/spend`, { offer }) : Promise.resolve(null);
+    },
+    // Reset campaign mission progress only (Valor / unlocks / skins preserved server-side).
+    resetGameCampaign(gameSlug: string) {
+      const encoded = encodePathSegment(gameSlug);
+      return encoded ? post(`/game-progress/${encoded}/reset`, {}) : Promise.resolve(null);
+    },
+    // One-time migration of existing local ownership to the server (server-idempotent).
+    backfillGameOwnership(gameSlug: string, payload: unknown) {
+      const encoded = encodePathSegment(gameSlug);
+      return encoded ? post(`/game-progress/${encoded}/backfill`, payload) : Promise.resolve(null);
+    },
     enqueueRankedMatch(gameSlug: string) {
       const gs = encodePathSegment(gameSlug);
       return gs ? post(`/ranked/${gs}/queue`, {}) : Promise.resolve(null);

@@ -8,7 +8,7 @@ import { listActivityItems, saveActivityItem } from "./db/activity.mjs";
 import { readConfig } from "./config.mjs";
 import { loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
 import { applyMigrations } from "./db/migrations.mjs";
-import { getGameProgress, recordGameProgressClaim } from "./db/game-progress.mjs";
+import { backfillLocalOwnership, getGameProgress, recordGameProgressClaim, resetCampaignProgress, spendValorForEntitlement } from "./db/game-progress.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import {
@@ -217,6 +217,9 @@ async function bootstrap(): Promise<void> {
     getRankedLeaderboard: (gameSlug: any, params: any) => getRankedLeaderboard(pool, { ...params, gameSlug }),
     getGameProgress: (playerId: any, gameSlug: any) => getGameProgress(pool, playerId, gameSlug),
     recordGameProgressClaim: (params: any) => recordGameProgressClaim(pool, params),
+    spendValor: (params: any) => spendValorForEntitlement(pool, params),
+    resetCampaign: (params: any) => resetCampaignProgress(pool, params.playerId, params.gameSlug),
+    backfillOwnership: (params: any) => backfillLocalOwnership(pool, params),
     createPremiumCheckoutSession: (params: any) => createTacticalArenaCheckoutSession({
       ...params,
       stripeApiKey: config.stripeApiKey,

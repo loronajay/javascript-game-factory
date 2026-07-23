@@ -231,6 +231,15 @@ export function createApp(options: any = {}) {
   const recordGameProgressClaim = typeof options?.recordGameProgressClaim === "function"
     ? options.recordGameProgressClaim
     : async () => null;
+  const spendValor = typeof options?.spendValor === "function"
+    ? options.spendValor
+    : null;
+  const resetCampaign = typeof options?.resetCampaign === "function"
+    ? options.resetCampaign
+    : null;
+  const backfillOwnership = typeof options?.backfillOwnership === "function"
+    ? options.backfillOwnership
+    : null;
   const createPremiumCheckoutSession = typeof options?.createPremiumCheckoutSession === "function"
     ? options.createPremiumCheckoutSession
     : null;
@@ -374,6 +383,9 @@ export function createApp(options: any = {}) {
   const gameProgressServices = {
     getGameProgress,
     recordGameProgressClaim,
+    spendValor,
+    resetCampaign,
+    backfillOwnership,
   };
   const paymentServices = {
     createPremiumCheckoutSession,

@@ -6,7 +6,7 @@ import { listActivityItems, saveActivityItem } from "./db/activity.mjs";
 import { readConfig } from "./config.mjs";
 import { loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
 import { applyMigrations } from "./db/migrations.mjs";
-import { getGameProgress, recordGameProgressClaim } from "./db/game-progress.mjs";
+import { backfillLocalOwnership, getGameProgress, recordGameProgressClaim, resetCampaignProgress, spendValorForEntitlement } from "./db/game-progress.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import { cancelRanked, enqueueRanked, getPublicRankedCard, getRankedLeaderboard, getRankedMatches, getRankedStanding, getRankedUnitStats, pollRanked, reportRankedResult, saveRankedProfile, setRankedLobbyCode, startRankedMatch, } from "./db/ranked.mjs";
@@ -137,6 +137,9 @@ async function bootstrap() {
         getRankedLeaderboard: (gameSlug, params) => getRankedLeaderboard(pool, { ...params, gameSlug }),
         getGameProgress: (playerId, gameSlug) => getGameProgress(pool, playerId, gameSlug),
         recordGameProgressClaim: (params) => recordGameProgressClaim(pool, params),
+        spendValor: (params) => spendValorForEntitlement(pool, params),
+        resetCampaign: (params) => resetCampaignProgress(pool, params.playerId, params.gameSlug),
+        backfillOwnership: (params) => backfillLocalOwnership(pool, params),
         createPremiumCheckoutSession: (params) => createTacticalArenaCheckoutSession({
             ...params,
             stripeApiKey: config.stripeApiKey,

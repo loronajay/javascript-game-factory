@@ -1,3 +1,4 @@
+import { getValorOffer, priceValorOffer } from "../services/valor-catalog.mjs";
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
 const VALID_CLAIM_KINDS = new Set([
     "campaign-valor",
@@ -273,6 +274,129 @@ export async function recordGameProgressClaim(pool, params = {}) {
         await client.query("rollback").catch(() => { });
         process.stderr.write(`[game-progress] recordGameProgressClaim error: ${err?.message || err}\n`);
         return null;
+    }
+    finally {
+        client.release();
+    }
+}
+
+// Atomically spend Valor on an entitlement. The charge is computed server-side from the
+// catalog (services/valor-catalog) — the client never supplies a price. The profile row is
+// locked FOR UPDATE so concurrent spends cannot double-charge, and the balance check plus
+// the `valor_balance >= 0` column constraint make an overspend impossible.
+export async function spendValorForEntitlement(pool, params = {}) {
+    const playerId = cleanText(params.playerId, 120);
+    const gameSlug = normalizeGameSlug(params.gameSlug);
+    if (!pool || !playerId || !gameSlug) return { ok: false, statusCode: 400, error: "invalid_request" };
+    const resolved = getValorOffer(params.offer);
+    if (!resolved.ok) return resolved;
+    const client = await pool.connect();
+    try {
+        await client.query("begin");
+        await ensureGameProgressProfile(client, playerId, gameSlug);
+        const profileRes = await client.query(`select valor_balance from game_progress_profiles
+       where player_id = $1 and game_slug = $2 for update`, [playerId, gameSlug]);
+        const valorBalance = Number(profileRes.rows[0]?.valor_balance) || 0;
+        const requestedIds = resolved.entitlements.map((entry) => entry.entitlementId);
+        const ownedRes = await client.query(`select entitlement_id from game_entitlements
+       where player_id = $1 and game_slug = $2 and entitlement_id = any($3::text[])`, [playerId, gameSlug, requestedIds]);
+        const ownedIds = new Set(ownedRes.rows.map((row) => row.entitlement_id));
+        const priced = priceValorOffer(resolved, ownedIds);
+        if (priced.alreadyOwned) {
+            await client.query("rollback");
+            return { ok: false, statusCode: 409, error: "offer_already_owned" };
+        }
+        if (valorBalance < priced.valorCost) {
+            await client.query("rollback");
+            return { ok: false, statusCode: 402, error: "insufficient_valor" };
+        }
+        const deductRes = await client.query(`update game_progress_profiles
+       set valor_balance = valor_balance - $3, updated_at = now()
+       where player_id = $1 and game_slug = $2 and valor_balance >= $3
+       returning valor_balance`, [playerId, gameSlug, priced.valorCost]);
+        if (!deductRes.rows.length) {
+            await client.query("rollback");
+            return { ok: false, statusCode: 402, error: "insufficient_valor" };
+        }
+        for (const grant of priced.grants) {
+            await grantEntitlement(client, playerId, gameSlug, grant, "valor", `valor:${grant.entitlementId}`);
+        }
+        await client.query("commit");
+        return {
+            ok: true,
+            valorSpent: priced.valorCost,
+            entitlementIds: priced.grants.map((grant) => grant.entitlementId),
+            progress: await getGameProgress(pool, playerId, gameSlug),
+        };
+    }
+    catch (err) {
+        await client.query("rollback").catch(() => { });
+        process.stderr.write(`[game-progress] spendValorForEntitlement error: ${err?.message || err}\n`);
+        return { ok: false, statusCode: 500, error: "spend_failed" };
+    }
+    finally {
+        client.release();
+    }
+}
+// Reset campaign mission progress ONLY. Per the in-game Reset Progress contract, Valor,
+// unit/skin entitlements, and tutorial progress are intentionally preserved — this only
+// clears game_campaign_progress rows so the player can replay missions.
+export async function resetCampaignProgress(pool, playerId, gameSlug) {
+    const normalizedPlayerId = cleanText(playerId, 120);
+    const normalizedGameSlug = normalizeGameSlug(gameSlug);
+    if (!pool || !normalizedPlayerId || !normalizedGameSlug) {
+        return { ok: false, statusCode: 400, error: "invalid_request" };
+    }
+    try {
+        await pool.query(`delete from game_campaign_progress where player_id = $1 and game_slug = $2`, [normalizedPlayerId, normalizedGameSlug]);
+        return { ok: true, progress: await getGameProgress(pool, normalizedPlayerId, normalizedGameSlug) };
+    }
+    catch (err) {
+        process.stderr.write(`[game-progress] resetCampaignProgress error: ${err?.message || err}\n`);
+        return { ok: false, statusCode: 500, error: "reset_failed" };
+    }
+}
+// One-time, per-account migration of a signed-in player's existing LOCAL ownership to the
+// server, so switching to server-authoritative ownership never loses what a player already
+// had. Gated by a single claim row (`migration:local-ownership-v1`) so it runs exactly once
+// per account — after that, injected local entitlements can never be re-grandfathered.
+// Entitlement ids are format-validated (real-shaped ids only) and capped.
+const VALID_ENTITLEMENT_ID = /^(unit:[a-z0-9-]{1,60}|skin:[a-z0-9-]{1,60}:[a-z0-9-]{1,80})$/;
+const MAX_BACKFILL_ENTITLEMENTS = 2000;
+const OWNERSHIP_BACKFILL_CLAIM_ID = "migration:local-ownership-v1";
+export async function backfillLocalOwnership(pool, params = {}) {
+    const playerId = cleanText(params.playerId, 120);
+    const gameSlug = normalizeGameSlug(params.gameSlug);
+    if (!pool || !playerId || !gameSlug) return { ok: false, statusCode: 400, error: "invalid_request" };
+    const rawIds = Array.isArray(params.entitlementIds) ? params.entitlementIds : [];
+    const entitlementIds = [...new Set(rawIds.map((value) => cleanText(value, 160)).filter((id) => VALID_ENTITLEMENT_ID.test(id)))].slice(0, MAX_BACKFILL_ENTITLEMENTS);
+    const valorBalance = clampInt(params.valorBalance, { min: 0, max: 100_000_000 });
+    const client = await pool.connect();
+    try {
+        await client.query("begin");
+        await ensureGameProgressProfile(client, playerId, gameSlug);
+        const claim = await client.query(`insert into game_progress_claims (player_id, game_slug, claim_id, kind, source_id, payload)
+       values ($1, $2, $3, 'migration', '', '{}'::jsonb)
+       on conflict (player_id, game_slug, claim_id) do nothing`, [playerId, gameSlug, OWNERSHIP_BACKFILL_CLAIM_ID]);
+        const alreadyMigrated = claim.rowCount === 0;
+        if (!alreadyMigrated) {
+            for (const entitlementId of entitlementIds) {
+                const kind = entitlementId.startsWith("unit:") ? "unit" : "skin";
+                await grantEntitlement(client, playerId, gameSlug, { entitlementId, kind }, "migration", OWNERSHIP_BACKFILL_CLAIM_ID);
+            }
+            if (valorBalance > 0) {
+                await client.query(`update game_progress_profiles
+           set valor_balance = greatest(valor_balance, $3), updated_at = now()
+           where player_id = $1 and game_slug = $2`, [playerId, gameSlug, valorBalance]);
+            }
+        }
+        await client.query("commit");
+        return { ok: true, alreadyMigrated, progress: await getGameProgress(pool, playerId, gameSlug) };
+    }
+    catch (err) {
+        await client.query("rollback").catch(() => { });
+        process.stderr.write(`[game-progress] backfillLocalOwnership error: ${err?.message || err}\n`);
+        return { ok: false, statusCode: 500, error: "backfill_failed" };
     }
     finally {
         client.release();

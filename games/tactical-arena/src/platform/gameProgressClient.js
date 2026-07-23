@@ -252,6 +252,86 @@ export async function fetchGameProgressSnapshot({
   return apiClient.fetchGameProgress(gameSlug);
 }
 
+// Server-authoritative Valor spend. The server prices the offer from its own catalog and
+// performs the deduct+grant atomically; the client only names the offer. On success the
+// server returns the fresh progress snapshot, which the caller applies as truth.
+export async function spendValorOnServer({
+  offer,
+  account = readStoredFactoryAccountSession(),
+  apiClient = createPlatformApiClient(),
+  gameSlug = TACTICAL_ARENA_GAME_SLUG,
+} = {}) {
+  if (!isFactoryAccountLoggedIn(account)) return { ok: false, errorCode: "ACCOUNT_LOGIN_REQUIRED" };
+  if (!apiClient?.isConfigured || typeof apiClient.spendGameValor !== "function") {
+    return { ok: false, errorCode: "PROGRESS_API_UNAVAILABLE" };
+  }
+  let result = null;
+  try {
+    result = await apiClient.spendGameValor(gameSlug, offer);
+  } catch {
+    result = null;
+  }
+  if (!result?.ok) return { ok: false, errorCode: "SPEND_FAILED" };
+  return {
+    ok: true,
+    valorSpent: cleanInt(result.valorSpent),
+    entitlementIds: Array.isArray(result.entitlementIds) ? result.entitlementIds : [],
+    progress: result.progress ?? null,
+  };
+}
+
+// Server-authoritative campaign reset. Clears the account's campaign mission rows only;
+// Valor, unit/skin entitlements, and tutorial progress are preserved server-side.
+export async function resetCampaignOnServer({
+  account = readStoredFactoryAccountSession(),
+  apiClient = createPlatformApiClient(),
+  gameSlug = TACTICAL_ARENA_GAME_SLUG,
+} = {}) {
+  if (!isFactoryAccountLoggedIn(account)) return { ok: false, errorCode: "ACCOUNT_LOGIN_REQUIRED" };
+  if (!apiClient?.isConfigured || typeof apiClient.resetGameCampaign !== "function") {
+    return { ok: false, errorCode: "PROGRESS_API_UNAVAILABLE" };
+  }
+  let result = null;
+  try {
+    result = await apiClient.resetGameCampaign(gameSlug);
+  } catch {
+    result = null;
+  }
+  if (!result?.ok) return { ok: false, errorCode: "RESET_FAILED" };
+  return { ok: true, progress: result.progress ?? null };
+}
+
+// One-time migration of the player's existing LOCAL ownership up to the server, so switching
+// to server-authoritative ownership loses nothing. The server records these once per account
+// (idempotent) and validates id format; this only ships the current owned unit/skin set.
+export async function backfillLocalOwnershipToServer({
+  ownedUnits = [],
+  ownedSkins = [],
+  valorBalance = 0,
+  account = readStoredFactoryAccountSession(),
+  apiClient = createPlatformApiClient(),
+  gameSlug = TACTICAL_ARENA_GAME_SLUG,
+} = {}) {
+  if (!isFactoryAccountLoggedIn(account)) return { ok: false, errorCode: "ACCOUNT_LOGIN_REQUIRED" };
+  if (!apiClient?.isConfigured || typeof apiClient.backfillGameOwnership !== "function") {
+    return { ok: false, errorCode: "PROGRESS_API_UNAVAILABLE" };
+  }
+  const entitlementIds = [
+    ...(Array.isArray(ownedUnits) ? ownedUnits : [])
+      .map((type) => `unit:${cleanText(type, 80)}`),
+    ...(Array.isArray(ownedSkins) ? ownedSkins : [])
+      .map((skin) => `skin:${cleanText(skin?.type, 80)}:${cleanText(skin?.slug, 120)}`),
+  ];
+  let result = null;
+  try {
+    result = await apiClient.backfillGameOwnership(gameSlug, { entitlementIds, valorBalance: cleanInt(valorBalance) });
+  } catch {
+    result = null;
+  }
+  if (!result?.ok) return { ok: false, errorCode: "BACKFILL_FAILED" };
+  return { ok: true, alreadyMigrated: Boolean(result.alreadyMigrated), progress: result.progress ?? null };
+}
+
 export async function flushPendingGameProgressClaims({
   storage = defaultStorage(),
   account = readStoredFactoryAccountSession(storage),

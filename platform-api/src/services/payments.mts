@@ -345,7 +345,7 @@ function unitSku(type: string): string {
   return `ta.unit.${skuPart(type)}`;
 }
 
-const SKIN_CATALOG = Object.freeze(RAW_SKIN_CATALOG
+export const SKIN_CATALOG = Object.freeze(RAW_SKIN_CATALOG
   .trim()
   .split(/\n+/)
   .map((line) => {
@@ -363,7 +363,7 @@ const SKIN_CATALOG = Object.freeze(RAW_SKIN_CATALOG
     });
   }));
 
-const UNIT_CATALOG = Object.freeze(RAW_UNIT_CATALOG
+export const UNIT_CATALOG = Object.freeze(RAW_UNIT_CATALOG
   .trim()
   .split(/\n+/)
   .map((line) => {

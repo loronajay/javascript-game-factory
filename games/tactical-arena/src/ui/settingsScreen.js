@@ -11,6 +11,7 @@ import {
 import { applyCheatCode } from "../progression/cheatCodes.js";
 import { resetProgressionAnnouncements } from "../progression/announcements.js";
 import { resetCampaignProgress } from "../campaign/campaign.js";
+import { resetCampaignOnServer } from "../platform/gameProgressClient.js";
 
 const RESET_PROGRESS_IDLE_LABEL = "Reset Progress";
 const RESET_PROGRESS_CONFIRM_LABEL = "Confirm Reset";
@@ -168,6 +169,10 @@ export function createSettingsScreen({
       onProgressReset,
       refreshUnlockedScreens,
     });
+    // Best-effort: clear the account's campaign mission rows server-side too so the
+    // server state matches the local reset. Valor / unlocks / skins are preserved by
+    // the endpoint. No-op for guests or when the platform client is unavailable.
+    void resetCampaignOnServer();
     if (progressStatus) {
       progressStatus.textContent = "Mission progress reset. Unit unlocks, Valor, tutorials, and owned skins were preserved.";
       window.clearTimeout(progressStatusTimer);

@@ -253,3 +253,70 @@ test("POST /game-progress/:gameSlug/claims rejects unsupported claim kinds", asy
   assert.equal(response.statusCode, 400);
   assert.equal(response.json.error, "invalid_claim_kind");
 });
+
+test("POST /game-progress/:gameSlug/spend requires authentication", async () => {
+  const app = createApp({ jwtSecret: TEST_SECRET, spendValor: async () => ({ ok: true }) });
+  const response = await invoke(app, "POST", "/game-progress/tactical-arena/spend", {
+    body: { offer: { kind: "unit", type: "sniper" } },
+  });
+  assert.equal(response.statusCode, 401);
+});
+
+test("POST /game-progress/:gameSlug/spend passes the authenticated player + offer to the service", async () => {
+  const token = signToken({ playerId: "player-1", email: "p@test.com" }, TEST_SECRET);
+  let seen = null;
+  const app = createApp({
+    jwtSecret: TEST_SECRET,
+    spendValor: async (params) => {
+      seen = params;
+      return { ok: true, valorSpent: 650, entitlementIds: ["unit:sniper"], progress: { valorBalance: 350 } };
+    },
+  });
+  const response = await invoke(app, "POST", "/game-progress/tactical-arena/spend", {
+    token,
+    body: { offer: { kind: "unit", type: "sniper" } },
+  });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json.valorSpent, 650);
+  assert.deepEqual(response.json.entitlementIds, ["unit:sniper"]);
+  assert.equal(seen.playerId, "player-1");
+  assert.equal(seen.gameSlug, "tactical-arena");
+  assert.deepEqual(seen.offer, { kind: "unit", type: "sniper" });
+});
+
+test("POST /game-progress/:gameSlug/spend surfaces the service error + status (insufficient valor)", async () => {
+  const token = signToken({ playerId: "player-1", email: "p@test.com" }, TEST_SECRET);
+  const app = createApp({
+    jwtSecret: TEST_SECRET,
+    spendValor: async () => ({ ok: false, statusCode: 402, error: "insufficient_valor" }),
+  });
+  const response = await invoke(app, "POST", "/game-progress/tactical-arena/spend", {
+    token,
+    body: { offer: { kind: "unit", type: "blacksword" } },
+  });
+  assert.equal(response.statusCode, 402);
+  assert.equal(response.json.error, "insufficient_valor");
+});
+
+test("POST /game-progress/:gameSlug/reset resets campaign progress for the authenticated player", async () => {
+  const token = signToken({ playerId: "player-1", email: "p@test.com" }, TEST_SECRET);
+  let seen = null;
+  const app = createApp({
+    jwtSecret: TEST_SECRET,
+    resetCampaign: async (params) => {
+      seen = params;
+      return { ok: true, progress: { campaignProgress: [] } };
+    },
+  });
+  const response = await invoke(app, "POST", "/game-progress/tactical-arena/reset", { token });
+  assert.equal(response.statusCode, 200);
+  assert.equal(seen.playerId, "player-1");
+  assert.equal(seen.gameSlug, "tactical-arena");
+  assert.deepEqual(response.json.progress.campaignProgress, []);
+});
+
+test("POST /game-progress/:gameSlug/reset requires authentication", async () => {
+  const app = createApp({ jwtSecret: TEST_SECRET, resetCampaign: async () => ({ ok: true }) });
+  const response = await invoke(app, "POST", "/game-progress/tactical-arena/reset", {});
+  assert.equal(response.statusCode, 401);
+});

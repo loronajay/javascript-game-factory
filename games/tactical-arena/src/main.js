@@ -32,11 +32,7 @@ import { createCampaignPresentationController } from "./campaign/campaignPresent
 import { createMatchLifecycleController } from "./match/matchLifecycleController.js";
 import { isTempoBattle, isTempoUnitReady } from "./core/tempoBattle.js";
 import { createCampaignMeta } from "./campaign/campaignMeta.js";
-import { fetchGameProgressSnapshot, flushPendingGameProgressClaims } from "./platform/gameProgressClient.js";
-import { fulfillReturnedPremiumCheckout } from "./platform/premiumCheckoutClient.js";
-import { readStoredFactoryAccountSession } from "./platform/factoryAccount.js";
-import { mergeServerEntitlementsIntoUnlockProgress, readUnlockProgress } from "./progression/unlocks.js";
-import { enqueuePurchasedUnlockAnnouncements } from "./progression/announcements.js";
+import { syncGameProgress } from "./platform/bootProgressSync.js";
 import { showPendingProgressionAnnouncements } from "./ui/progressionAnnouncements.js";
 
 // --- DOM refs ---
@@ -116,23 +112,6 @@ let tempoBusy = false;
 let campaignMeta = createCampaignMeta();
 
 const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
-
-async function syncGameProgress() {
-  const storage = globalThis.localStorage;
-  const account = readStoredFactoryAccountSession(storage);
-  const checkoutResult = await fulfillReturnedPremiumCheckout({ storage, account });
-  const flushResult = await flushPendingGameProgressClaims({ storage });
-  let snapshot = checkoutResult?.progress || flushResult.progress;
-  if (!snapshot && flushResult.ok) {
-    snapshot = await fetchGameProgressSnapshot();
-  }
-  if (snapshot) {
-    const beforeProgress = readUnlockProgress(storage);
-    const afterProgress = mergeServerEntitlementsIntoUnlockProgress(storage, snapshot);
-    enqueuePurchasedUnlockAnnouncements(storage, beforeProgress, afterProgress);
-  }
-  return { ...flushResult, checkoutResult };
-}
 
 function isCpu(player) {
   return Boolean(cpu && cpu.players.has(player));

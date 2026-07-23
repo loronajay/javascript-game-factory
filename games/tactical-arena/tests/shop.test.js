@@ -142,6 +142,40 @@ function visibleText(node) {
 
 const SIGNED_IN_ACCOUNT = Object.freeze({ authenticated: true, playerId: "factory-player-1" });
 
+// Stub platform client mimicking the server-authoritative Valor spend: it grants the
+// requested entitlement(s) and returns the post-spend Valor balance, which the shop applies
+// as truth. For skin packs, pass the granted entitlement ids explicitly.
+function serverSpendClient({ valorAfter = 0, packEntitlementIds = null } = {}) {
+  return {
+    isConfigured: true,
+    async spendGameValor(_gameSlug, offer) {
+      const entitlementIds = offer.kind === "unit"
+        ? [`unit:${offer.type}`]
+        : offer.kind === "skin"
+          ? [`skin:${offer.type}:${offer.slug}`]
+          : (packEntitlementIds || []);
+      return {
+        ok: true,
+        valorSpent: 0,
+        entitlementIds,
+        progress: {
+          valorBalance: valorAfter,
+          entitlements: entitlementIds.map((id) => ({
+            entitlementId: id,
+            kind: id.startsWith("unit:") ? "unit" : "skin",
+          })),
+        },
+      };
+    },
+  };
+}
+
+async function flushAsyncPurchase() {
+  for (let i = 0; i < 6; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+}
+
 test("shop skins render under unit shelves and Valor uses an icon badge", () => {
   globalThis.document = new FakeDocument();
 
@@ -286,12 +320,12 @@ test("inventory activation requires confirmation before consuming an owned consu
   assert.match(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent, /timer starts/i);
 });
 
-test("shop skin cards offer USD checkout and Valor purchase buttons", () => {
+test("shop skin cards offer USD checkout and Valor purchase buttons", async () => {
   globalThis.document = new FakeDocument();
   const storage = storageAdapter();
   writeUnlockProgress(storage, { valorBalance: 3000 });
 
-  openShop(storage, { account: SIGNED_IN_ACCOUNT });
+  openShop(storage, { account: SIGNED_IN_ACCOUNT, apiClient: serverSpendClient({ valorAfter: 2150 }) });
 
   const overlay = document.body.children[0];
   const skinsTab = walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Skins")[0];
@@ -334,10 +368,11 @@ test("shop skin cards offer USD checkout and Valor purchase buttons", () => {
   valorBuy.click();
   confirm = walk(overlay, (node) => hasClass(node, "shop-purchase-confirm"))[0];
   walk(confirm, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-confirm-purchase"))[0].click();
+  await flushAsyncPurchase();
 
   progress = readUnlockProgress(storage);
   assert.equal(progress.valorBalance, 2150);
-  assert.ok(progress.purchasedSkins.some((skin) => skin.slug === "summer-vibes"));
+  assert.ok(progress.unlockedSkins.some((skin) => skin.slug === "summer-vibes"));
   const skinAnnouncement = document.body.children.find((node) => hasClass(node, "progression-announcement-modal"));
   assert.ok(skinAnnouncement, "skin purchases should open an achievement popup");
   assert.equal(skinAnnouncement.hidden, false);
@@ -524,12 +559,15 @@ test("shop unit USD purchase embeds Stripe checkout without spending Valor", asy
   assert.match(visibleText(announcement), /Clod Unlocked/);
 });
 
-test("shop skin packs render clickable contents and use Valor confirmation", () => {
+test("shop skin packs render clickable contents and use Valor confirmation", async () => {
   globalThis.document = new FakeDocument();
   const storage = storageAdapter();
   writeUnlockProgress(storage, { valorBalance: 30000 });
 
-  openShop(storage, { account: SIGNED_IN_ACCOUNT });
+  openShop(storage, {
+    account: SIGNED_IN_ACCOUNT,
+    apiClient: serverSpendClient({ valorAfter: 10500, packEntitlementIds: ["skin:swordsman:pumpkin-knight"] }),
+  });
 
   const overlay = document.body.children[0];
   const packsTab = walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Skin Packs")[0];
@@ -562,12 +600,13 @@ test("shop skin packs render clickable contents and use Valor confirmation", () 
   const purchase = walk(confirm, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-confirm-purchase"))[0];
   assert.equal(purchase.getAttribute("aria-label"), "Purchase Halloween Pack for 19,500 Valor");
   purchase.click();
+  await flushAsyncPurchase();
 
   progress = readUnlockProgress(storage);
   assert.equal(progress.valorBalance, 10500);
-  assert.ok(progress.purchasedSkins.some((skin) => skin.type === "swordsman" && skin.slug === "pumpkin-knight"));
+  assert.ok(progress.unlockedSkins.some((skin) => skin.type === "swordsman" && skin.slug === "pumpkin-knight"));
   assert.equal(
-    progress.purchasedSkins.some((skin) => skin.type === "swordsman" && skin.slug === "enchanted"),
+    progress.unlockedSkins.some((skin) => skin.type === "swordsman" && skin.slug === "enchanted"),
     false,
     "pack purchase should not grant Halloween-exclusive singles"
   );
@@ -651,12 +690,12 @@ test("shop unit cards open a detail card and return to unit browsing", () => {
   assert.ok(walk(overlay, (node) => hasClass(node, "shop-unit")).length > 0, "back should restore unit browsing");
 });
 
-test("shop unit Valor purchase flips the unit card to one owned button", () => {
+test("shop unit Valor purchase flips the unit card to one owned button", async () => {
   globalThis.document = new FakeDocument();
   const storage = storageAdapter();
   writeUnlockProgress(storage, { valorBalance: 999 });
 
-  openShop(storage, { account: SIGNED_IN_ACCOUNT });
+  openShop(storage, { account: SIGNED_IN_ACCOUNT, apiClient: serverSpendClient({ valorAfter: 349 }) });
 
   const overlay = document.body.children[0];
   const clodCard = walk(overlay, (node) => hasClass(node, "shop-unit") && visibleText(node).includes("Clod"))[0];
@@ -683,6 +722,7 @@ test("shop unit Valor purchase flips the unit card to one owned button", () => {
   assert.ok(walk(purchase, (node) => hasClass(node, "valor-icon")).length > 0);
   assert.doesNotMatch(visibleText(purchase), /Valor/);
   purchase.click();
+  await flushAsyncPurchase();
 
   progress = readUnlockProgress(storage);
   assert.equal(progress.valorBalance, 349);
