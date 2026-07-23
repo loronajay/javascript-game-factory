@@ -1,5 +1,6 @@
 import { extractTokenFromRequest, verifyToken, } from "./auth-helpers.mjs";
 import { readJsonBody, readMultipartFile, applyCorsHeaders, writeJson } from "./http-utils.mjs";
+import { clientIp, createRateLimiter } from "./rate-limit.mjs";
 import { handleAuthRoute } from "./routes/auth-routes.mjs";
 import { handleMessageRoute } from "./routes/message-routes.mjs";
 import { handleNotificationRoute } from "./routes/notification-routes.mjs";
@@ -388,6 +389,27 @@ export function createApp(options = {}) {
         listNotifications,
         markAllNotificationsRead,
     };
+    // Coarse per-IP abuse guards. Auth endpoints resist credential brute-force + reset/email
+    // spam; checkout-session creation resists Stripe-session spam (which costs real money). The
+    // Stripe webhook is intentionally NOT limited (Stripe retries and is signature-verified).
+    const rateLimiter = createRateLimiter();
+    const MINUTE_MS = 60 * 1000;
+    const rateLimitRules = [
+        {
+            match: (p) => p === "/auth/login" || p === "/auth/register"
+                || p === "/auth/forgot-password" || p === "/auth/reset-password",
+            bucket: "auth",
+            limit: 15,
+            windowMs: 15 * MINUTE_MS,
+        },
+        {
+            match: (p) => p === "/payments/tactical-arena/checkout-sessions",
+            bucket: "checkout",
+            limit: 30,
+            windowMs: 60 * MINUTE_MS,
+        },
+    ];
+    let rateLimitSweepCounter = 0;
     return async function app(req, res) {
         const requestOrigin = req?.headers?.origin || "";
         const timestamp = buildTimestamp(now);
@@ -438,6 +460,20 @@ export function createApp(options = {}) {
                     timestamp,
                 }, requestOrigin);
                 return;
+            }
+            // Coarse rate limiting on sensitive POST endpoints (health/ready/OPTIONS above are exempt).
+            if (method === "POST") {
+                const rule = rateLimitRules.find((entry) => entry.match(pathname));
+                if (rule) {
+                    rateLimitSweepCounter = (rateLimitSweepCounter + 1) % 500;
+                    if (rateLimitSweepCounter === 0) rateLimiter.sweep();
+                    const result = rateLimiter.check(`${rule.bucket}:${clientIp(req)}`, rule);
+                    if (!result.allowed) {
+                        res.setHeader("retry-after", String(Math.ceil(result.retryAfterMs / 1000)));
+                        writeJson(res, 429, { status: "error", error: "rate_limited", timestamp }, requestOrigin);
+                        return;
+                    }
+                }
             }
             // Upload routes
             if (method === "POST" && (pathname === "/upload/avatar" || pathname === "/upload/photo" || pathname === "/upload/background" || pathname === "/upload/music")) {

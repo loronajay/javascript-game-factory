@@ -45,11 +45,14 @@ export async function syncGameProgress() {
     snapshot = await fetchGameProgressSnapshot();
   }
   if (snapshot) {
-    // Full server authority only when signed in AND the pending-claim flush succeeded (so the
-    // server snapshot already reflects every earned reward): the server owned set becomes the
-    // truth and injected local ownership is filtered out. Otherwise (offline / failed flush)
-    // stay additive so unsynced legitimately-earned progress is never dropped.
-    const authoritative = flushResult.ok && isFactoryAccountLoggedIn(account);
+    // Full server authority (the reconcile that filters local ownership down to the server's
+    // set) is only safe once we KNOW the server has this player's complete owned set — i.e.
+    // signed in, the pending-claim flush succeeded, AND the one-time ownership backfill has
+    // confirmed (flag present). If the backfill hasn't succeeded yet, stay additive so we
+    // never drop local ownership the server hasn't received — otherwise a transient backfill
+    // failure would permanently delete a legit player's items.
+    const backfillConfirmed = Boolean(storage.getItem(OWNERSHIP_BACKFILL_FLAG));
+    const authoritative = flushResult.ok && isFactoryAccountLoggedIn(account) && backfillConfirmed;
     const authoritativeValor = authoritative || Boolean(checkoutResult?.progress);
     const beforeProgress = readUnlockProgress(storage);
     const afterProgress = mergeServerEntitlementsIntoUnlockProgress(storage, snapshot, { authoritative, authoritativeValor });
