@@ -149,6 +149,20 @@ test("Quake: MP is NOT refunded when fewer than 3 enemies are inside the radius"
   assert.equal(findUnit(res.nextState, "away").hp, getUnitType("swordsman").stats.maxHp, "the distant enemy is untouched");
 });
 
+test("Quake: an enemy on the farthest edge (3 tiles) takes 1 less", () => {
+  const state = scenario([
+    { id: "clod", type: "clod", player: 1, x: 6, y: 6, mp: 20 },
+    { id: "near", type: "swordsman", player: 2, x: 6, y: 8 }, // dist 2 (inner)
+    { id: "edge", type: "swordsman", player: 2, x: 6, y: 9 }  // dist 3 (outer rim)
+  ]);
+  let s = run(state, beginActivation(1, "clod")).nextState;
+  const res = run(s, useArt(1, "clod", "quake", {}));
+  const swMax = getUnitType("swordsman").stats.maxHp;
+  // 2 enemies caught → base 3 + 2 = 5 magic; the edge target is softened by 1 → 4.
+  assert.equal(findUnit(res.nextState, "near").hp, swMax - 5, "inner target takes full quake");
+  assert.equal(findUnit(res.nextState, "edge").hp, swMax - 4, "the rim target takes 1 less");
+});
+
 // --- Stone Throw ------------------------------------------------------------
 
 test("Stone Throw: 8 physical (STR-scaled) and a guaranteed slow on a landed hit", () => {

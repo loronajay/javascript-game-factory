@@ -1,6 +1,6 @@
 import { getArtMpCost, getEffectiveStats, isDefending } from "../unitCatalog.js";
 import { areEnemies, cloneState, findUnit, livingUnits } from "../state.js";
-import { getArtTargetRange, getSelfBlastRadius, getTargetedBlastAimTiles, getTargetedBlastTargets } from "../../rules/arts.js";
+import { applyBlastEdgeFalloff, getArtTargetRange, getSelfBlastRadius, getTargetedBlastAimTiles, getTargetedBlastTargets } from "../../rules/arts.js";
 import { finalizeMagicDamage, ignoresCriticalDamage, isShotBlocked, isWallBetween, negatesPhysicalWhileDefending, rollToHit } from "../../rules/combat.js";
 import { resolveDamage } from "../../rules/damage.js";
 import { chebyshevDistance, positionKey } from "../../rules/movement.js";
@@ -20,8 +20,10 @@ export function resolveQuake(state, command, art) {
   const targetIds = [];
   const reactionEvents = [];
   for (const target of enemies) {
+    const distance = chebyshevDistance(actor.position, target.position);
+    const targetAmount = applyBlastEdgeFalloff(amount, art, distance, radius);
     const targetStats = { ...getEffectiveStats(target, next), defending: isDefending(target) };
-    const result = resolveDamage({ attacker: { strength: amount }, defender: targetStats, type: "magic" });
+    const result = resolveDamage({ attacker: { strength: targetAmount }, defender: targetStats, type: "magic" });
     const damage = finalizeMagicDamage({ attacker: actor, target, state: next, rawDamage: result.damage, art });
     const dealt = Math.min(target.hp, damage);
     target.hp = Math.max(0, target.hp - damage);

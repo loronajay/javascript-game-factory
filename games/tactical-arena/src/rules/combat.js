@@ -155,6 +155,17 @@ export function getCritPullEffect(unit) {
   return null;
 }
 
+// MP a unit's landed basic attack restores to ITSELF when it and its target both stand on
+// a given tile affinity (Witch Doctor's Hex Strike: +3 MP on dark ground). Data-driven off
+// passive effects — mirrors the darkTileLifesteal vocabulary Blacksword uses. Returns
+// { affinity, amount } or null.
+export function getBasicAttackAffinityMpRestore(unit) {
+  for (const effect of passiveEffects(unit)) {
+    if (effect.darkTileMpRestore) return effect.darkTileMpRestore;
+  }
+  return null;
+}
+
 // Every passive effect a unit carries. Beyond its TYPE's authored passives, a unit
 // instance may carry `bonusPassives` — passives granted to that one body rather than to
 // the unit type, so a campaign can field a boss with extra rules without rewriting the

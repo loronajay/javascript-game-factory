@@ -3,7 +3,7 @@ import { createBoardMetrics, gridToScreen } from "./isometric.js";
 import { getArtForUnit, getEffectiveStats, isDefending } from "../core/unitCatalog.js";
 import { areEnemies } from "../core/state.js";
 import { chebyshevDistance, positionKey } from "../rules/movement.js";
-import { artIsBodyBlocked, artUsesPhysicalStrike, getArtTargetRange, getConeCells, getPyroclasmTargets, getSelfBlastRadius, getTargetedBlastTargets } from "../rules/arts.js";
+import { applyBlastEdgeFalloff, artIsBodyBlocked, artUsesPhysicalStrike, getArtTargetRange, getConeCells, getPyroclasmTargets, getSelfBlastRadius, getTargetedBlastTargets } from "../rules/arts.js";
 import { finalizeMagicDamage, getArtAccuracy, getBasicAttackDamageType, getMissChance, getProximityBonus, isShotBlocked, isStraightRayTarget, isWallBetween, negatesPhysicalWhileDefending, requiresRayBasicAttack, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 
@@ -122,7 +122,10 @@ function areaForecastEntries(state, actor, art, areaCenter) {
       ? (art.damage?.amount ?? 3) + targets.length
       : Math.max(0, Number(art.damage?.amount) || 0);
     const type = art.damage?.type ?? art.damageType ?? "magic";
-    return targets.map((target) => ({ target, damage: areaDamage(actor, target, art, state, amount, type) }));
+    return targets.map((target) => {
+      const perTarget = applyBlastEdgeFalloff(amount, art, chebyshevDistance(actor.position, target.position), radius);
+      return { target, damage: areaDamage(actor, target, art, state, perTarget, type) };
+    });
   }
   if (shape === "targetedBlast") {
     if (!areaCenter) return [];

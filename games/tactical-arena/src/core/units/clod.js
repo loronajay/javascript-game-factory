@@ -63,7 +63,10 @@ export const CLOD = Object.freeze({
       // at least 3 enemies, the MP is refunded.
       damage: Object.freeze({ type: "magic", amount: 3 }),
       refundTargets: 3,
-      description: "Slam the ground: every enemy within 3 tiles takes (3 + number of enemies hit) magic damage. If it hits 3 or more enemies, the MP is refunded.",
+      // The shock loses bite at the very rim: an enemy on the outermost ring (3 tiles away)
+      // takes 1 less. Applied per-target by applyBlastEdgeFalloff in resolve + forecast.
+      edgeFalloff: 1,
+      description: "Slam the ground: every enemy within 3 tiles takes (3 + number of enemies hit) magic damage — 1 less at the farthest edge. If it hits 3 or more enemies, the MP is refunded.",
       implemented: true,
       ai: Object.freeze({ intent: "selfBlast", evHints: Object.freeze({ minTargets: 1 }), tags: Object.freeze(["aoe"]) })
     }),

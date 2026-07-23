@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { createBattleState, findUnit } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { attack, beginActivation, defend, finishActivation, moveUnit, useArt } from "../src/core/commands.js";
-import { getEffectiveStats, getUnitType } from "../src/core/unitCatalog.js";
+import { getEffectiveStats, getUnitType, isDefending } from "../src/core/unitCatalog.js";
 import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
 import { getBasicAttackDamageType } from "../src/rules/combat.js";
 import { NEGATIVE_STATUS_TYPES } from "../src/rules/statuses.js";
@@ -258,6 +258,25 @@ test("Emergency Snacks: does not trigger when she is not raging", () => {
   const res = run(state, beginActivation(1, "fc"));
   assert.equal(findUnit(res.nextState, "fc").hp, 20, "healthy Cleric does not self-heal");
   assert.equal(findUnit(res.nextState, "fc").emergencySnackCount, 0);
+});
+
+test("Emergency Snacks: a raging Fat Cleric is always defending, halving incoming damage", () => {
+  assert.equal(isDefending({ type: "fat-cleric", hp: 6 }), false, "not defending above the rage threshold");
+  assert.equal(isDefending({ type: "fat-cleric", hp: 5 }), true, "always defending at 5 HP or lower");
+
+  const state = scenario([
+    { id: "atk", type: "swordsman", player: 1, x: 5, y: 6 },
+    { id: "fc", type: "fat-cleric", player: 2, x: 5, y: 5, hp: 5 }
+  ]);
+  // The attacker's physical damage against her DEF, halved (rounded up) because she is
+  // braced by rage even though she never spent a Defend action.
+  const atkStr = getEffectiveStats(findUnit(state, "atk"), state).strength;
+  const fcDef = getEffectiveStats(findUnit(state, "fc"), state).defense;
+  const expected = Math.ceil(Math.max(1, atkStr - fcDef) / 2);
+  const s = run(state, beginActivation(1, "atk")).nextState;
+  const res = run(s, attack(1, "atk", "fc", HIT));
+  const ev = res.events.find((e) => e.type === "ATTACK_RESOLVED");
+  assert.equal(ev.damage, expected, "damage is halved by the always-on rage Defend");
 });
 
 test("raging Fat Cleric basic attacks deal magic damage", () => {

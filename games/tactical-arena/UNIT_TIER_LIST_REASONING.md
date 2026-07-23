@@ -314,7 +314,9 @@ STR and better crits. Spirit Dance restores 1 MP to every ally and enters Spirit
 Stance, letting attacks restore 3 MP to nearby allies.
 
 Misfortune Dance cleanses every unit, ally and foe, then doubles status chances
-for everyone. Coal Walker gives fire immunity. RAGE unlocks Black Death Dance,
+for everyone. Coal Walker gives fire immunity. Hex Strike makes his basic attacks
+silence on a crit and, on dark ground with his target, gain +20% crit chance and
+refund him 3 MP — rewarding him for fighting on dark tiles. RAGE unlocks Black Death Dance,
 which gives temporary stats, blinds every unit, and enters Black Death Stance:
 magic immunity for Witch Doctor and 1 true damage to every unit each turn. He is
 powerful, but the global and timing-sensitive nature of the stances makes him a

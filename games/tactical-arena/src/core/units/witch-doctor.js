@@ -171,6 +171,25 @@ export const WITCH_DOCTOR = Object.freeze({
       effect: Object.freeze({ type: "fireImmunity", fireDamageImmune: true }),
       description: "The Witch Doctor takes no damage from fire-based ARTS or fire tiles.",
       implemented: true
+    }),
+    // Hex Strike: the signature basic-attack rider, all parts data-driven off passive
+    // effects. `critStatus` is read by getCritOnHitStatus (same seam as Angel's Blessed
+    // Arrow blind); `tileBasicAttack.bothCritBonus` is read by getCritChance (the same seam
+    // as Angel's white-tile crit) — a bigger crit chance against a target on a dark tile
+    // when he is on one too; `darkTileMpRestore` is read by getBasicAttackAffinityMpRestore
+    // and pays out in basicAttack.js when he AND his target both stand on dark ground.
+    Object.freeze({
+      id: "hex-strike",
+      name: "Hex Strike",
+      kind: "passive",
+      mpCost: null,
+      effect: Object.freeze({
+        critStatus: Object.freeze({ status: "silence", duration: 1 }),
+        tileBasicAttack: Object.freeze({ affinity: "dark", bothCritBonus: 0.2 }),
+        darkTileMpRestore: Object.freeze({ affinity: "dark", amount: 3 })
+      }),
+      description: "The Witch Doctor's basic attacks silence on a critical hit, gain +20% crit chance against a target on a dark tile while he is on one too, and restore 3 MP to him when he and his target both stand on a dark tile.",
+      implemented: true
     })
   ]),
   ragePassive: Object.freeze({

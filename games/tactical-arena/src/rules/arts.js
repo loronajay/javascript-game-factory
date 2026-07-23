@@ -464,6 +464,15 @@ export function getTargetedBlastTargets(state, actor, center, radius) {
     Math.max(Math.abs(unit.position.x - center.x), Math.abs(unit.position.y - center.y)) <= radius);
 }
 
+// Self-blast (nukeAura) edge softening: a slam that loses bite at its outer rim. When the
+// art declares `edgeFalloff`, any target on the outermost ring (Chebyshev distance === the
+// blast radius) takes that much less, floored at 1. Central so resolveQuake and the forecast
+// agree on the number.
+export function applyBlastEdgeFalloff(amount, art, distance, radius) {
+  const falloff = Math.max(0, Number(art?.edgeFalloff) || 0);
+  return falloff > 0 && distance >= radius ? Math.max(1, amount - falloff) : amount;
+}
+
 export function getSelfBlastRadius(state, actor, art) {
   // Higher Ground widens a self-centred blast (Nuke/Dark Bomb/Self Destruct) — an area ART.
   const bonus = getCommandRangeBonus(state, actor);

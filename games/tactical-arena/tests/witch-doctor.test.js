@@ -5,7 +5,7 @@ import { UNIT_TYPES, getArt, getEffectiveStats } from "../src/core/unitCatalog.j
 import { createBattleState } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { attack, beginActivation, defend, finishActivation, useArt } from "../src/core/commands.js";
-import { isFireDamageImmune, resolvePhysicalStrike } from "../src/rules/combat.js";
+import { getCritChance, isFireDamageImmune, resolvePhysicalStrike } from "../src/rules/combat.js";
 import { buffAlliesValue } from "../src/ai/evaluate.js";
 import { chooseActivation } from "../src/ai/cpuController.js";
 import { getAbilityVfx, getStanceVfx } from "../src/ui/vfxCatalog.js";
@@ -348,6 +348,88 @@ test("Black Death Dance is rage-locked and its self-buff survives to the next tu
   assert.equal(getEffectiveStats(wd, r.nextState).strength, 8 + 2, "+2 STR is live");
   assert.equal(wd.statuses.some((st) => st.type === "blind"), false, "the Witch Doctor is not left blind by his own dance");
   assert.ok(findId(r.nextState, "foe").statuses.some((st) => st.type === "blind"), "enemies are blinded");
+});
+
+// --- Hex Strike (basic-attack rider) ---
+// Default tile affinity is (x+y) even → light, odd → dark. (1,0) and (2,1) are dark;
+// (2,0) is light.
+
+test("Hex Strike: a critical basic attack silences the target for 1 turn", () => {
+  const state = createBattleState({
+    units: [
+      { id: "wd", player: 1, type: "witch-doctor", x: 1, y: 0 },
+      { id: "foe", player: 2, type: "swordsman", x: 2, y: 1 }
+    ]
+  });
+  const s = activate(state, "wd");
+  const r = applyCommand(s, attack(1, "wd", "foe", CRIT));
+  assert.ok(r.accepted, `attack rejected: ${r.errorCode}`);
+  const foe = findId(r.nextState, "foe");
+  assert.ok(foe.hp > 0, "the foe survives the crit to carry the status");
+  assert.ok(foe.statuses.some((st) => st.type === "silence"), "a crit silences");
+});
+
+test("Hex Strike: a non-crit basic attack does NOT silence", () => {
+  const state = createBattleState({
+    units: [
+      { id: "wd", player: 1, type: "witch-doctor", x: 1, y: 0 },
+      { id: "foe", player: 2, type: "swordsman", x: 2, y: 1 }
+    ]
+  });
+  const r = applyCommand(activate(state, "wd"), attack(1, "wd", "foe", NORMAL_HIT));
+  assert.ok(r.accepted);
+  assert.equal(findId(r.nextState, "foe").statuses.some((st) => st.type === "silence"), false, "no silence without a crit");
+});
+
+test("Hex Strike: restores 3 MP when the Witch Doctor and his target are both on dark", () => {
+  const state = createBattleState({
+    units: [
+      { id: "wd", player: 1, type: "witch-doctor", x: 1, y: 0, mp: 10 }, // dark
+      { id: "foe", player: 2, type: "swordsman", x: 2, y: 1 }            // dark
+    ]
+  });
+  const r = applyCommand(activate(state, "wd"), attack(1, "wd", "foe", NORMAL_HIT));
+  assert.ok(r.accepted);
+  assert.equal(findId(r.nextState, "wd").mp, 13, "+3 MP on dark ground");
+  assert.ok(r.events.some((e) => e.type === "AFFINITY_MP_RESTORE" && e.unitId === "wd"), "an MP-restore event surfaces");
+});
+
+test("Hex Strike: no MP when the target stands on a light tile", () => {
+  const state = createBattleState({
+    units: [
+      { id: "wd", player: 1, type: "witch-doctor", x: 1, y: 0, mp: 10 }, // dark
+      { id: "foe", player: 2, type: "swordsman", x: 2, y: 0 }            // light
+    ]
+  });
+  const r = applyCommand(activate(state, "wd"), attack(1, "wd", "foe", NORMAL_HIT));
+  assert.ok(r.accepted);
+  assert.equal(findId(r.nextState, "wd").mp, 10, "no MP restore unless both stand on dark");
+  assert.equal(r.events.some((e) => e.type === "AFFINITY_MP_RESTORE"), false);
+});
+
+test("Hex Strike: +20% crit chance vs a dark-tile target only while he is on dark too", () => {
+  const state = createBattleState({
+    units: [
+      { id: "wd", player: 1, type: "witch-doctor", x: 1, y: 0 },        // dark
+      { id: "onDark", player: 2, type: "swordsman", x: 2, y: 1 },       // dark
+      { id: "onLight", player: 2, type: "swordsman", x: 2, y: 0 }       // light
+    ]
+  });
+  const wd = findId(state, "wd");
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+  const critVs = (target) => getCritChance(wd, { target: findId(state, target), state, basicAttack: true });
+  assert.ok(near(critVs("onDark"), 0.35), "0.15 base + 0.20 when both stand on dark");
+  assert.ok(near(critVs("onLight"), 0.15), "no bonus when the target is on light");
+
+  const onLight = createBattleState({
+    units: [
+      { id: "wd", player: 1, type: "witch-doctor", x: 2, y: 0 },  // light
+      { id: "foe", player: 2, type: "swordsman", x: 2, y: 1 }     // dark
+    ]
+  });
+  const wdLight = findId(onLight, "wd");
+  assert.ok(near(getCritChance(wdLight, { target: findId(onLight, "foe"), state: onLight, basicAttack: true }), 0.15),
+    "no bonus when the Witch Doctor himself is off dark");
 });
 
 // --- CPU: the dances are in the brain's repertoire (buffAllies plan family) ---

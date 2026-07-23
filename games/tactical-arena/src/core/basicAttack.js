@@ -29,7 +29,7 @@ import {
   unitAt,
 } from "./state.js";
 import { getConeCells } from "../rules/arts.js";
-import { addDuelMark, duelistTracksMisses, getAttackSplashDamage, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCritPullEffect, getCritSplashDamage, getDuelistCritLifesteal, getLineAttackTargets, getMeleeDefendRetaliation, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack, resolveBaseStrike, rollToHit, shouldApplyAttackRecoil } from "../rules/combat.js";
+import { addDuelMark, duelistTracksMisses, getAttackSplashDamage, getBasicAttackAffinityMpRestore, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCritPullEffect, getCritSplashDamage, getDuelistCritLifesteal, getLineAttackTargets, getMeleeDefendRetaliation, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack, resolveBaseStrike, rollToHit, shouldApplyAttackRecoil } from "../rules/combat.js";
 import { chebyshevDistance, positionKey } from "../rules/movement.js";
 import { applyStatus, isTargetable } from "../rules/statuses.js";
 import { alliesInRadius, getStanceEffect } from "../rules/stances.js";
@@ -180,6 +180,17 @@ export function attack(state, command) {
     const restored = restoreMp(next, actor, actor, critMpRestore);
     if (restored.mpRestored > 0 || restored.hpRestored > 0) {
       duelistEvents.push({ type: "CRIT_MP_RESTORE", unitId: restored.targetId ?? actor.id, sourceId: actor.id, mpGained: restored.mpRestored, hpRestored: restored.hpRestored });
+    }
+  }
+  // Hex Strike (Witch Doctor): a landed basic attack restores MP to him when he and his
+  // target both stand on a dark tile. Data-driven off passive data, not hard-coded here.
+  const affinityMpRestore = getBasicAttackAffinityMpRestore(actor);
+  if (affinityMpRestore && Number(affinityMpRestore.amount) > 0 &&
+      getTileAffinity(next, actor.position) === affinityMpRestore.affinity &&
+      getTileAffinity(next, nextTarget.position) === affinityMpRestore.affinity) {
+    const restored = restoreMp(next, actor, actor, affinityMpRestore.amount);
+    if (restored.mpRestored > 0 || restored.hpRestored > 0) {
+      duelistEvents.push({ type: "AFFINITY_MP_RESTORE", unitId: restored.targetId ?? actor.id, sourceId: actor.id, mpGained: restored.mpRestored, hpRestored: restored.hpRestored });
     }
   }
   if (shouldApplyAttackRecoil(actor, next) && totalDamageDealt > 0) {

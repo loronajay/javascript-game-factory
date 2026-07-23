@@ -139,8 +139,11 @@ export const FAT_CLERIC = Object.freeze({
     name: "Emergency Snacks",
     kind: "passive",
     mpCost: 0,
-    effect: Object.freeze({ type: "rageRegen", hp: 1, exitMp: 5, maxProcs: 3, attackDamageType: "magic" }),
-    description: "At 5 HP or lower, basic attacks deal magic damage and Fat Cleric restores 1 HP at the start of each turn; if that heal lifts her back above 5 HP she also restores 5 MP. Happens at most 3 times per battle.",
+    // `defending: true` is read centrally by isDefending (same seam as the Gargoyle's
+    // Volcanic Rage): while raging she is always braced, so incoming physical/magic damage
+    // is halved even on turns she does not spend the Defend action.
+    effect: Object.freeze({ type: "rageRegen", hp: 1, exitMp: 5, maxProcs: 3, attackDamageType: "magic", defending: true }),
+    description: "At 5 HP or lower, Fat Cleric is always defending (incoming damage halved), her basic attacks deal magic damage, and she restores 1 HP at the start of each turn; if that heal lifts her back above 5 HP she also restores 5 MP. The regen happens at most 3 times per battle.",
     implemented: true
   })
 });
