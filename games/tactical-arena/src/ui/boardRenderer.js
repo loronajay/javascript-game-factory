@@ -321,7 +321,7 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
     const utilArt = getArt(actor.type, mode.slice("art:".length));
     if (utilArt?.targeting?.shape === "allyOrEnemy") {
       isAllyOrEnemyArt = true;
-      const reach = getEffectiveStats(actor, state).attackRange;
+      const reach = getArtTargetRange(state, actor, utilArt);
       for (let x = actor.position.x - reach; x <= actor.position.x + reach; x += 1) {
         for (let y = actor.position.y - reach; y <= actor.position.y + reach; y += 1) {
           const cell = { x, y };

@@ -186,6 +186,12 @@ export function createCpuTurnController({
         return accepted;
       }
       case "USE_ART": {
+        // Tile-targeted blasts (Thunderous Charge, Smoke Bomb) roll to-hit like a unit-
+        // targeted ART, but their ART_RESOLVED event has no targetId — presentRolledCombat
+        // needs a unit target and would silently no-op (no roll reveal, no VFX, no float
+        // text). battleInputController.js hard-routes these to the instant-art path for the
+        // same reason; mirror that here instead of trusting the generic "hit in event" peek.
+        if (command.targetPosition && command.targetId == null) return resolveInstantArt(command);
         const peek = applyCommand(runtime.state, command);
         const rolled = (peek.events ?? []).some((event) => event.type === "ART_RESOLVED" && "hit" in event);
         return rolled ? resolveCombat(command) : resolveInstantArt(command);
