@@ -1,3 +1,4 @@
+import { defend, finishActivation } from "../core/commands.js";
 import { applyCommand } from "../core/reducer.js";
 import { findUnit } from "../core/state.js";
 import { getUnitType } from "../core/unitCatalog.js";
@@ -37,6 +38,29 @@ export function createCpuTurnController({
   playRolloverFx = () => {},
   consumeTutorialPrompt = (fallback) => fallback,
 } = {}) {
+  // A rejected command leaves the board exactly as it was, so the next pass re-plans the
+  // same state and deterministically re-picks the same illegal plan. Without a way out the
+  // classic turn spins until CPU_MAX_ACTIVATIONS trips (~20s of visible lockup), and a
+  // tempo activation has no counter at all — it just re-enters itself. So whenever a
+  // command is rejected mid-activation, force the stuck unit to spend its turn: brace, then
+  // close the activation. FINISH_ACTIVATION on its own is not enough — the reducer rejects
+  // it with FINISH_REQUIRES_ACTION until the activation has used its primary action.
+  //
+  // This is a backstop for a planner/reducer disagreement (an ART planned at a reach its
+  // resolver won't accept, say), not a substitute for fixing one. It costs the CPU a single
+  // braced activation and lets the turn move on. If recovery is itself refused — a
+  // commandOnly King cannot Defend, and a rejected BEGIN_ACTIVATION leaves nothing open to
+  // close — the caller's existing guard stays the final backstop.
+  function recoverStalledActivation(unitId) {
+    const open = runtime.state.activation;
+    if (!open || open.unitId !== unitId) return false;
+    const player = runtime.state.currentPlayer;
+    if (!open.primaryUsed && !dispatch(defend(player, unitId))) return false;
+    const closed = dispatch(finishActivation(player, unitId));
+    if (closed) render();
+    return closed;
+  }
+
   function clearInteraction() {
     interaction.selectedId = null;
     interaction.mode = null;
@@ -93,7 +117,12 @@ export function createCpuTurnController({
       if (epoch !== runtime.matchEpoch || runtime.state.phase !== "playing" || runtime.tempoCpuAbort) break;
       const applied = await applyCpuCommand(command);
       if (epoch !== runtime.matchEpoch || runtime.tempoCpuAbort) break;
-      if (!applied || runtime.state.phase !== "playing") break;
+      if (!applied || runtime.state.phase !== "playing") {
+        // Without this the `finally` hook re-enters maybeStartTempoCpuTurn on an unchanged
+        // board and the same rejected plan is chosen forever.
+        if (!applied && runtime.state.phase === "playing") recoverStalledActivation(command.unitId);
+        break;
+      }
     }
     runtime.tempoCpuActing = false;
     runtime.resolving = false;
@@ -132,7 +161,10 @@ export function createCpuTurnController({
         if (epoch !== runtime.matchEpoch) return;
         const applied = await applyCpuCommand(command);
         runtime.resolving = true;
-        if (!applied || runtime.state.phase !== "playing") break;
+        if (!applied || runtime.state.phase !== "playing") {
+          if (!applied && runtime.state.phase === "playing") recoverStalledActivation(command.unitId);
+          break;
+        }
       }
 
       if (epoch !== runtime.matchEpoch || runtime.state.phase !== "playing") break;

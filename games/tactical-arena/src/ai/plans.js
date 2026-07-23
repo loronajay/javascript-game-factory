@@ -233,8 +233,11 @@ function generateArtPlans(state, unit, art, ai, plans) {
     case "statBuff": {
       // Age: an ally-OR-enemy persistent ±1 STR/DEF. Offer both stat choices per legal
       // target (both replay legally: ally→buff, enemy→drain) and let the scorer pick.
-      // A wall blocks the cast for either team, matching resolveAge.
-      const range = getEffectiveStats(unit, state).attackRange;
+      // A wall blocks the cast for either team, matching resolveAge. Age declares its own
+      // targeting.range (shorter than Father Time's attackRange), so the reach must come
+      // from getArtTargetRange like the resolver's — planning off attackRange offers a
+      // target the resolver rejects, and the rejection stalls the CPU turn loop.
+      const range = getArtTargetRange(state, unit, art);
       for (const target of livingUnits(state)) {
         if (target.id === unit.id) continue;
         if (chebyshevDistance(unit.position, target.position) > range) continue;

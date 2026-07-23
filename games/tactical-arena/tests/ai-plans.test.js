@@ -182,6 +182,25 @@ test("Father Time offers statBuff / hasten / revive plans that all replay cleanl
   for (const plan of plans) assertPlanReplays(state, 1, plan);
 });
 
+// Age declares its own targeting.range (4), which is SHORTER than Father Time's
+// attackRange (5). Planning off attackRange offered a target the resolver rejects with
+// TARGET_OUT_OF_RANGE, and the rejection stalled the CPU turn loop.
+test("Age plans respect the ART's own range, not Father Time's attack range", () => {
+  const state = createBattleState({
+    size: 13, seed: 5,
+    units: [
+      { id: "p1-ft", type: "father-time", player: 1, x: 5, y: 5 },
+      { id: "p2-near", type: "swordsman", player: 2, x: 9, y: 5 }, // distance 4 — in Age range
+      { id: "p2-far", type: "mystic", player: 2, x: 10, y: 5 }     // distance 5 — attack range only
+    ]
+  });
+  const plans = generatePlans(state, findUnit(state, "p1-ft"));
+  const agePlans = plans.filter((p) => p.primary.artId === "age");
+  assert.ok(agePlans.some((p) => p.primary.targetId === "p2-near"), "expected an Age plan at distance 4");
+  assert.ok(!agePlans.some((p) => p.primary.targetId === "p2-far"), "Age must not be planned at distance 5");
+  for (const plan of plans) assertPlanReplays(state, 1, plan);
+});
+
 test("Mother Nature weather plans skip her last weather and replay cleanly", () => {
   const state = createBattleState({
     size: 11, seed: 8,
