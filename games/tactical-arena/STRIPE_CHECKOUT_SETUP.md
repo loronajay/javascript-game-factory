@@ -76,15 +76,33 @@ Create a Stripe webhook endpoint on your server and listen for:
 ```text
 checkout.session.completed
 checkout.session.async_payment_succeeded
+charge.dispute.created
+charge.dispute.closed
+charge.refunded
 ```
 
-On those events:
+On the fulfillment events (`checkout.session.*`):
 
 1. Verify the Stripe webhook signature with `STRIPE_WEBHOOK_SECRET`.
 2. Retrieve the Checkout Session and confirm `payment_status` is paid or otherwise fulfillable.
 3. Use an idempotency table keyed by the Checkout Session id so duplicate webhook deliveries do not double-grant.
 4. Grant the entitlement ids to the Factory progress/account backend.
-5. Mark the Checkout Session fulfilled.
+5. Mark the Checkout Session fulfilled. The grant record also stores the session's `payment_intent`
+   so a later refund or dispute can be traced back to what was granted.
+
+## Refunds and chargebacks (revocation)
+
+The same webhook revokes entitlements when money is returned:
+
+- `charge.dispute.created` (chargeback) → revoke the granted item(s) immediately.
+- `charge.dispute.closed` → `status: won` re-grants; any other close status keeps it revoked.
+- `charge.refunded` → revoke on a **full** refund only; partial refunds are logged and ignored.
+
+Revocation is idempotent, scoped to the exact purchase, and self-heals on the player's next
+online boot (server-authoritative ownership). Full model + invariants: `SECURITY.md`.
+
+**You must enable the three new event types** on the webhook endpoint in the Stripe Dashboard —
+they aren't retroactive to an endpoint that only subscribed to `checkout.session.*`.
 
 When the player returns to the game, `src/main.js` already calls `syncGameProgress()`, and `mergeServerEntitlementsIntoUnlockProgress()` folds server skin entitlements into owned skins.
 

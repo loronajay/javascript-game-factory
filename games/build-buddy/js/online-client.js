@@ -127,12 +127,17 @@ export function createOnlineClient(input = {}) {
   }
 
   function getSnapshot() {
+    // Shallow copies only. emit() always rebuilds the containers it changes
+    // (profiles/onlineGameplay/readyByPlayerId are spread into fresh objects on
+    // every patch) and subscribers treat the snapshot as read-only, so a
+    // structuredClone on every relay message was pure CPU/GC churn at ~100+
+    // messages/sec — enough to make the client itself feel like it was lagging.
     return {
       ...snapshot,
       lobby: snapshot.lobby ? { ...snapshot.lobby, members: [...snapshot.lobby.members] } : null,
-      profiles: structuredClone(snapshot.profiles),
+      profiles: { ...snapshot.profiles },
       readyByPlayerId: { ...snapshot.readyByPlayerId },
-      onlineGameplay: structuredClone(snapshot.onlineGameplay),
+      onlineGameplay: { ...snapshot.onlineGameplay },
       error: snapshot.error ? { ...snapshot.error } : null,
     };
   }

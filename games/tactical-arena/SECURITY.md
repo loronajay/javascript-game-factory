@@ -23,6 +23,34 @@ fulfillment idempotent by checkout session id. The public game-progress `/claims
 **rejects** `premium-*` claim kinds (`403 claim_kind_forbidden`); premium entitlements can only
 be granted by the server's Stripe fulfillment path. See `STRIPE_CHECKOUT_SETUP.md`.
 
+### Refunds and chargebacks revoke entitlements
+A refund or chargeback pulls the granted item back. The webhook (`fulfillStripeWebhook` in
+`platform-api/src/services/payments.mts`) handles:
+- `charge.dispute.created` (chargeback opened) → **revoke immediately**. Digital-goods policy:
+  the funds are already withheld and most disputes are lost. If the dispute is later resolved
+  in our favor, `charge.dispute.closed` with `status: won` **re-grants** the item; any other
+  close status keeps it revoked (idempotent).
+- `charge.refunded` → revoke, but **only on a full refund** (`refunded === true` or
+  `amount_refunded >= amount`). Partial refunds are logged and ignored.
+
+**The linkage:** refund/dispute events carry a `payment_intent`/`charge`, never the checkout
+session metadata (playerId, sku, entitlements). So the grant claim now persists
+`paymentIntentId` in its payload, and `findStripeGrant` traces a payment back to what was
+granted. For purchases fulfilled before that key existed, the webhook falls back to a Stripe
+`GET /checkout/sessions?payment_intent=…` lookup.
+
+**Scoping (don't loosen this):** `revokeGameEntitlements` deletes only `game_entitlements` rows
+that are still `source='stripe'` AND carry this exact purchase's `source_id` (the checkout
+session id). An item the player also owns through a different path (campaign, tutorial, Valor)
+is never yanked. Revocation and re-grant are each idempotent via an audit claim
+(`stripe-revocation:<id>` / `stripe-regrant:<id>`), so duplicate webhook deliveries are safe.
+Because ownership is server-authoritative and self-heals on boot, deleting the server row is
+enough — the item disappears on the player's next online boot with no client change.
+
+Enable these events on the Stripe webhook endpoint (Dashboard → Developers → Webhooks):
+`charge.dispute.created`, `charge.dispute.closed`, `charge.refunded`. See
+`STRIPE_CHECKOUT_SETUP.md`.
+
 ### Valor is server-authoritative
 - **Earn** is recorded via the pending-claim queue (`gameProgressClient.js`) — campaign/tutorial
   grants sync up as claims. (Campaign-mission *completion* itself is still client-asserted; see
@@ -72,6 +100,10 @@ them permanently.
    charged price).
 5. Guests / offline keep the additive (non-authoritative) merge — never force authority without
    a live, flushed, backfilled sign-in.
+6. Revocation deletes only `source='stripe'` rows matching the refunded/disputed purchase's
+   `source_id`; it never touches entitlements owned through another path. Revoke/re-grant stay
+   idempotent via their audit claim rows. The grant claim must keep persisting `paymentIntentId`
+   — it is the only join key from a refund/dispute back to what was granted.
 
 ## Known limits (accepted / future)
 
@@ -86,6 +118,13 @@ them permanently.
   unaffected.
 - **Campaign completion** is still client-asserted (single-player). A future pass could
   server-validate mission outcomes via deterministic replay of the headless core.
+- **Rare multi-source revocation edge**: an entitlement's `source` is set by whichever grant
+  landed *first* and is never overwritten. So if a Stripe purchase granted an item first and the
+  player *later* also earned that same item another way, a chargeback still revokes the (single)
+  row. Conversely, if the other source landed first, a chargeback won't revoke it. Premium skins
+  aren't campaign/Valor grantable in practice, so this is a corner case, not a live path.
+- **Partial refunds** are not auto-handled — they're logged and left for manual review. Repeat
+  chargeback offenders are logged (audit claim rows) but not yet blocked from future purchases.
 
 ## Platform-level hardening (backend)
 

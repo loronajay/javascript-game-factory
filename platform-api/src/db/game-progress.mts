@@ -463,3 +463,159 @@ export async function backfillLocalOwnership(pool: any, params: any = {}): Promi
     client.release();
   }
 }
+
+// Find the premium (Stripe) grant claim behind a payment, so a later refund/dispute event
+// — which only carries a payment_intent / charge, never the checkout session metadata — can
+// be traced back to what was granted. Matches on the payment_intent stored in the grant
+// payload, or on the checkout-session id (`stripe-checkout:<sessionId>`) as a fallback.
+export async function findStripeGrant(pool: any, params: any = {}): Promise<any> {
+  const paymentIntentId = cleanText(params.paymentIntentId, 200);
+  const sessionId = cleanText(params.sessionId, 200);
+  if (!pool || (!paymentIntentId && !sessionId)) return null;
+
+  const conditions: string[] = [];
+  const values: any[] = [];
+  if (paymentIntentId) {
+    values.push(paymentIntentId);
+    conditions.push(`payload->>'paymentIntentId' = $${values.length}`);
+  }
+  if (sessionId) {
+    values.push(`stripe-checkout:${sessionId}`);
+    conditions.push(`claim_id = $${values.length}`);
+  }
+
+  try {
+    const res = await pool.query(
+      `select player_id, game_slug, claim_id, payload
+       from game_progress_claims
+       where kind in ('premium-skin-purchase', 'premium-unit-purchase')
+         and (${conditions.join(" or ")})
+       order by created_at asc
+       limit 1`,
+      values,
+    );
+    const row = res.rows[0];
+    if (!row) return null;
+    const payload = row.payload && typeof row.payload === "object" ? row.payload : {};
+    const entitlementIds = [...new Set(
+      (Array.isArray(payload.entitlementIds) ? payload.entitlementIds : [])
+        .map((value: any) => cleanText(value, 180))
+        .filter(Boolean),
+    )];
+    return {
+      playerId: cleanText(row.player_id, 120),
+      gameSlug: normalizeGameSlug(row.game_slug),
+      sessionId: cleanText(payload.sessionId, 200) || cleanText(row.claim_id, 200).replace(/^stripe-checkout:/, ""),
+      paymentIntentId: cleanText(payload.paymentIntentId, 200),
+      entitlementIds,
+    };
+  } catch (err) {
+    process.stderr.write(`[game-progress] findStripeGrant error: ${(err as any)?.message || err}\n`);
+    return null;
+  }
+}
+
+// Revoke premium entitlements after a refund or chargeback. Idempotent via an audit claim
+// (`stripe-revocation:<disputeOrChargeId>`) so duplicate webhook deliveries are safe. The
+// delete is scoped to rows that are still `source='stripe'` AND carry this exact purchase's
+// `source_id` (the checkout session id), so an entitlement the player also owns through a
+// different path is never yanked out from under them. Because ownership is server-authoritative
+// and self-heals on boot, deleting the server row is enough — the item disappears on the
+// player's next online boot with no client change.
+export async function revokeGameEntitlements(pool: any, params: any = {}): Promise<any> {
+  const playerId = cleanText(params.playerId, 120);
+  const gameSlug = normalizeGameSlug(params.gameSlug);
+  const sessionId = cleanText(params.sessionId, 200);
+  const revocationId = cleanText(params.revocationId, 200);
+  const reason = cleanText(params.reason, 80) || "revoked";
+  const entitlementIds = [...new Set(
+    (Array.isArray(params.entitlementIds) ? params.entitlementIds : [])
+      .map((value: any) => cleanText(value, 180))
+      .filter(Boolean),
+  )];
+  if (!pool || !playerId || !gameSlug || !revocationId) {
+    return { ok: false, statusCode: 400, error: "invalid_request" };
+  }
+  if (!entitlementIds.length) return { ok: true, alreadyProcessed: false, revoked: [] };
+
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await ensureGameProgressProfile(client, playerId, gameSlug);
+    const claim = await client.query(
+      `insert into game_progress_claims (player_id, game_slug, claim_id, kind, source_id, payload)
+       values ($1, $2, $3, 'premium-revocation', $4, $5::jsonb)
+       on conflict (player_id, game_slug, claim_id) do nothing`,
+      [playerId, gameSlug, `stripe-revocation:${revocationId}`, sessionId, JSON.stringify({ reason, sessionId, entitlementIds })],
+    );
+    const alreadyProcessed = claim.rowCount === 0;
+    let revoked: string[] = [];
+    if (!alreadyProcessed) {
+      const del = await client.query(
+        `delete from game_entitlements
+         where player_id = $1 and game_slug = $2
+           and source = 'stripe'
+           and entitlement_id = any($3::text[])
+           ${sessionId ? "and source_id = $4" : ""}
+         returning entitlement_id`,
+        sessionId ? [playerId, gameSlug, entitlementIds, sessionId] : [playerId, gameSlug, entitlementIds],
+      );
+      revoked = del.rows.map((row: any) => row.entitlement_id);
+      process.stderr.write(`[game-progress] revoked ${revoked.length} entitlement(s) (player=${playerId} reason=${reason} revocation=${revocationId})\n`);
+    }
+    await client.query("commit");
+    return { ok: true, alreadyProcessed, revoked, progress: await getGameProgress(pool, playerId, gameSlug) };
+  } catch (err) {
+    await client.query("rollback").catch(() => {});
+    process.stderr.write(`[game-progress] revokeGameEntitlements error: ${(err as any)?.message || err}\n`);
+    return { ok: false, statusCode: 500, error: "revoke_failed" };
+  } finally {
+    client.release();
+  }
+}
+
+// Re-grant premium entitlements when a dispute is resolved in the merchant's favor (won).
+// Idempotent via an audit claim (`stripe-regrant:<disputeId>`). Rows are restored as
+// `source='stripe'` with this purchase's session id, mirroring the original grant.
+export async function regrantStripeEntitlements(pool: any, params: any = {}): Promise<any> {
+  const playerId = cleanText(params.playerId, 120);
+  const gameSlug = normalizeGameSlug(params.gameSlug);
+  const sessionId = cleanText(params.sessionId, 200);
+  const regrantId = cleanText(params.regrantId, 200);
+  const entitlementIds = [...new Set(
+    (Array.isArray(params.entitlementIds) ? params.entitlementIds : [])
+      .map((value: any) => cleanText(value, 180))
+      .filter(Boolean),
+  )];
+  if (!pool || !playerId || !gameSlug || !regrantId) {
+    return { ok: false, statusCode: 400, error: "invalid_request" };
+  }
+  if (!entitlementIds.length) return { ok: true, alreadyProcessed: false, regranted: [] };
+
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await ensureGameProgressProfile(client, playerId, gameSlug);
+    const claim = await client.query(
+      `insert into game_progress_claims (player_id, game_slug, claim_id, kind, source_id, payload)
+       values ($1, $2, $3, 'premium-regrant', $4, $5::jsonb)
+       on conflict (player_id, game_slug, claim_id) do nothing`,
+      [playerId, gameSlug, `stripe-regrant:${regrantId}`, sessionId, JSON.stringify({ sessionId, entitlementIds })],
+    );
+    const alreadyProcessed = claim.rowCount === 0;
+    if (!alreadyProcessed) {
+      for (const entitlementId of entitlementIds) {
+        const kind = entitlementId.startsWith("unit:") ? "unit" : "skin";
+        await grantEntitlement(client, playerId, gameSlug, { entitlementId, kind }, "stripe", sessionId || `stripe-regrant:${regrantId}`);
+      }
+    }
+    await client.query("commit");
+    return { ok: true, alreadyProcessed, regranted: alreadyProcessed ? [] : entitlementIds, progress: await getGameProgress(pool, playerId, gameSlug) };
+  } catch (err) {
+    await client.query("rollback").catch(() => {});
+    process.stderr.write(`[game-progress] regrantStripeEntitlements error: ${(err as any)?.message || err}\n`);
+    return { ok: false, statusCode: 500, error: "regrant_failed" };
+  } finally {
+    client.release();
+  }
+}

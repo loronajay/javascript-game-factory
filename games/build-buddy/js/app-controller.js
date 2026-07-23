@@ -30,7 +30,6 @@ import {
   createBuilderCommandMessage,
   createBuilderCursorMessage,
   createRunnerInputMessage,
-  createRunnerStateMessage,
   createStageCompleteRequestMessage,
   createStageStartMessage,
   receiveStageStartMessage,
@@ -83,8 +82,11 @@ export class AppController {
     this.onlineSnapshotTick = 0;
     this.sentOnlineMessageCount = 0;
     this.appliedServerCommandSeq = 0;
-    this.processedOnlineMessages = new Set();
-    this.lastAppliedRunnerStateTick = -1;
+    // Dedup by last-applied key per message kind. The client snapshot only ever
+    // retains the most recent message of each type, so a single key per kind is
+    // all we need — and it stays O(1) instead of the old unbounded Set that grew
+    // for the whole run and re-hashed a full JSON string on every relay message.
+    this.lastOnlineKeys = Object.create(null);
     this.lastAppliedBuilderCursorTick = -1;
 
     this.onlineClient.subscribe?.((snapshot) => {
@@ -190,23 +192,15 @@ export class AppController {
         jump: input?.jumpHeld(),
         reposition: input?.consumeReposition?.(),
       }));
-      // Send runner position every 3 ticks so the builder has an authoritative sync point
-      if (this.onlineTick % 3 === 0 && this.game?.runner) {
-        const r = this.game.runner;
-        this.onlineClient.sendOnlineGameplayMessage?.(createRunnerStateMessage({
-          tick: this.onlineTick,
-          x: r.x,
-          y: r.y,
-          vx: r.vx,
-          vy: r.vy,
-          dead: r.dead,
-        }));
-      }
+      // Note: no separate runner_state echo. The host's state_sync already carries
+      // authoritative runner position to every non-host, so a second position
+      // stream here was pure redundant relay traffic.
       input?.endFrame?.();
     }
     if (role === 'builder') {
-      // Send cursor position every tick so the runner sees the ghost preview
-      if (this.game) {
+      // Cursor is a cosmetic ghost preview, so throttle it to ~15Hz instead of
+      // flooding one message per tick (60Hz) through the relay.
+      if (this.game && this.onlineTick % 4 === 0) {
         const input = this.game.input;
         const world = this.game.camera.screenToWorld(input.mouse.x, input.mouse.y);
         const gridX = Math.round(world.x / 40) * 40;
@@ -300,8 +294,8 @@ export class AppController {
   applyOnce(kind, payload, apply) {
     if (!payload) return;
     const key = this.onlineMessageKey(kind, payload);
-    if (this.processedOnlineMessages.has(key)) return;
-    this.processedOnlineMessages.add(key);
+    if (this.lastOnlineKeys[kind] === key) return;
+    this.lastOnlineKeys[kind] = key;
     apply(payload);
   }
 
@@ -362,16 +356,6 @@ export class AppController {
       if (stage.stageId && this.game?.currentStageId?.() !== stage.stageId) this.game?.loadStage(stage.stageId);
       this.applyServerCommands(message.value?.commands);
     });
-    // Runner state snapshots: builder applies the runner's actual position to correct its local simulation
-    const runnerState = gameplay.lastRunnerState;
-    if (runnerState && this.localOnlineRole() === 'builder') {
-      const tick = runnerState.value?.tick ?? 0;
-      if (tick > this.lastAppliedRunnerStateTick) {
-        this.lastAppliedRunnerStateTick = tick;
-        this.game?.applyStateSnapshot({ runner: runnerState.value });
-      }
-    }
-
     // Builder cursor: runner receives the ghost preview position so both players share intent
     const builderCursor = gameplay.lastBuilderCursor;
     if (builderCursor && this.localOnlineRole() === 'runner') {

@@ -8,7 +8,7 @@ import { listActivityItems, saveActivityItem } from "./db/activity.mjs";
 import { readConfig } from "./config.mjs";
 import { loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
 import { applyMigrations } from "./db/migrations.mjs";
-import { backfillLocalOwnership, getGameProgress, recordGameProgressClaim, resetCampaignProgress, spendValorForEntitlement } from "./db/game-progress.mjs";
+import { backfillLocalOwnership, findStripeGrant, getGameProgress, recordGameProgressClaim, regrantStripeEntitlements, resetCampaignProgress, revokeGameEntitlements, spendValorForEntitlement } from "./db/game-progress.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import {
@@ -236,8 +236,12 @@ async function bootstrap(): Promise<void> {
     fulfillStripeWebhook: (params: any) => fulfillStripeWebhook({
       ...params,
       stripeWebhookSecret: config.stripeWebhookSecret,
+      stripeApiKey: config.stripeApiKey,
       getGameProgress: (playerId: any, gameSlug: any) => getGameProgress(pool, playerId, gameSlug),
       recordGameProgressClaim: (claim: any) => recordGameProgressClaim(pool, { ...claim, allowPremiumKinds: true }),
+      findStripeGrant: (lookup: any) => findStripeGrant(pool, lookup),
+      revokeGameEntitlements: (revocation: any) => revokeGameEntitlements(pool, revocation),
+      regrantStripeEntitlements: (regrant: any) => regrantStripeEntitlements(pool, regrant),
     }),
     savePlayerPhoto: (params: any) => savePlayerPhoto(pool, params),
     listPlayerPhotos: (playerId: any, opts: any) => listPlayerPhotos(pool, playerId, opts),

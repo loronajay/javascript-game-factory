@@ -725,6 +725,9 @@ export async function fulfillTacticalArenaCheckoutSession(params = {}) {
             entitlementIds,
             amountTotal: moneyCents(session.amount_total),
             currency: cleanText(session.currency, 10).toLowerCase(),
+            // The join key for later refund/dispute events, which carry a payment_intent but not
+            // the checkout session metadata. Stored so revocation can trace back to this grant.
+            paymentIntentId: cleanText(session.payment_intent, 200),
         },
     });
 }
@@ -754,6 +757,84 @@ export async function fulfillPremiumCheckoutSessionFromReturn(params = {}) {
         recordGameProgressClaim: params.recordGameProgressClaim,
     });
 }
+// Recover a checkout-session id from a payment_intent via the Stripe API. Only used as a
+// fallback for purchases granted before the payment_intent join key was persisted; returns
+// "" on any error so revocation degrades to manual handling rather than throwing.
+async function recoverSessionIdByPaymentIntent(params = {}) {
+    const stripeApiKey = cleanText(params.stripeApiKey, 500);
+    const paymentIntentId = cleanText(params.paymentIntentId, 200);
+    if (!stripeApiKey || !paymentIntentId.startsWith("pi_"))
+        return "";
+    const fetchImpl = typeof params.fetchImpl === "function" ? params.fetchImpl : globalThis.fetch;
+    if (typeof fetchImpl !== "function")
+        return "";
+    try {
+        const url = new URL(STRIPE_CHECKOUT_SESSIONS_URL);
+        url.searchParams.set("payment_intent", paymentIntentId);
+        url.searchParams.set("limit", "1");
+        const response = await fetchImpl(url.href, { method: "GET", headers: stripeFetchHeaders(stripeApiKey) });
+        const json = await response.json().catch(() => ({}));
+        if (!response.ok)
+            return "";
+        const session = Array.isArray(json?.data) ? json.data[0] : null;
+        return cleanText(session?.id, 200);
+    }
+    catch {
+        return "";
+    }
+}
+// Resolve the grant behind a refund/dispute event object (a charge or a dispute). Both carry
+// a payment_intent; disputes also carry a charge. Falls back to a Stripe session lookup for
+// pre-linkage grants. Returns null when no matching grant exists.
+async function resolveStripeGrantForEvent(params = {}) {
+    const object = params.eventObject && typeof params.eventObject === "object" ? params.eventObject : {};
+    const paymentIntentId = cleanText(object.payment_intent, 200);
+    const findStripeGrant = typeof params.findStripeGrant === "function" ? params.findStripeGrant : null;
+    if (!findStripeGrant)
+        return null;
+    let grant = paymentIntentId ? await findStripeGrant({ paymentIntentId }) : null;
+    if (!grant && paymentIntentId) {
+        const sessionId = await recoverSessionIdByPaymentIntent({
+            paymentIntentId,
+            stripeApiKey: params.stripeApiKey,
+            fetchImpl: params.fetchImpl,
+        });
+        if (sessionId)
+            grant = await findStripeGrant({ sessionId });
+    }
+    return grant && grant.entitlementIds?.length ? grant : null;
+}
+async function revokeForStripeEvent(params = {}) {
+    const revokeGameEntitlements = typeof params.revokeGameEntitlements === "function" ? params.revokeGameEntitlements : null;
+    if (!revokeGameEntitlements)
+        return stripeError(503, "revocation_not_configured");
+    const grant = await resolveStripeGrantForEvent(params);
+    if (!grant)
+        return { ok: true, ignored: true, reason: "grant_not_found" };
+    return revokeGameEntitlements({
+        playerId: grant.playerId,
+        gameSlug: grant.gameSlug,
+        sessionId: grant.sessionId,
+        entitlementIds: grant.entitlementIds,
+        revocationId: params.revocationId,
+        reason: params.reason,
+    });
+}
+async function regrantForStripeEvent(params = {}) {
+    const regrantStripeEntitlements = typeof params.regrantStripeEntitlements === "function" ? params.regrantStripeEntitlements : null;
+    if (!regrantStripeEntitlements)
+        return stripeError(503, "revocation_not_configured");
+    const grant = await resolveStripeGrantForEvent(params);
+    if (!grant)
+        return { ok: true, ignored: true, reason: "grant_not_found" };
+    return regrantStripeEntitlements({
+        playerId: grant.playerId,
+        gameSlug: grant.gameSlug,
+        sessionId: grant.sessionId,
+        entitlementIds: grant.entitlementIds,
+        regrantId: params.regrantId,
+    });
+}
 export async function fulfillStripeWebhook(params = {}) {
     const stripeWebhookSecret = cleanText(params.stripeWebhookSecret, 500);
     if (!stripeWebhookSecret)
@@ -774,16 +855,38 @@ export async function fulfillStripeWebhook(params = {}) {
     catch {
         return stripeError(400, "invalid_json");
     }
-    if (event?.type !== "checkout.session.completed" && event?.type !== "checkout.session.async_payment_succeeded") {
-        return { ok: true, ignored: true };
+    const type = cleanText(event?.type, 80);
+    const object = event?.data?.object || {};
+    // Fulfillment: grant entitlements on a paid checkout session.
+    if (type === "checkout.session.completed" || type === "checkout.session.async_payment_succeeded") {
+        if (object.payment_status && object.payment_status !== "paid") {
+            return { ok: true, ignored: true };
+        }
+        return fulfillTacticalArenaCheckoutSession({
+            session: object,
+            getGameProgress: params.getGameProgress,
+            recordGameProgressClaim: params.recordGameProgressClaim,
+        });
     }
-    const session = event?.data?.object || {};
-    if (session.payment_status && session.payment_status !== "paid") {
-        return { ok: true, ignored: true };
+    // Chargeback opened: revoke immediately (policy: revoke on dispute created).
+    if (type === "charge.dispute.created") {
+        return revokeForStripeEvent({ ...params, eventObject: object, revocationId: cleanText(object.id, 200), reason: "chargeback" });
     }
-    return fulfillTacticalArenaCheckoutSession({
-        session,
-        getGameProgress: params.getGameProgress,
-        recordGameProgressClaim: params.recordGameProgressClaim,
-    });
+    // Dispute resolved: re-grant if we won, otherwise ensure it stays revoked (idempotent).
+    if (type === "charge.dispute.closed") {
+        const status = cleanText(object.status, 40);
+        return status === "won"
+            ? regrantForStripeEvent({ ...params, eventObject: object, regrantId: cleanText(object.id, 200) })
+            : revokeForStripeEvent({ ...params, eventObject: object, revocationId: cleanText(object.id, 200), reason: "chargeback_lost" });
+    }
+    // Refund: revoke only on a full refund. Partial refunds are logged/ignored for now.
+    if (type === "charge.refunded") {
+        const amount = moneyCents(object.amount);
+        const refundedAmount = moneyCents(object.amount_refunded);
+        const fullyRefunded = object.refunded === true || (amount > 0 && refundedAmount >= amount);
+        if (!fullyRefunded)
+            return { ok: true, ignored: true, reason: "partial_refund" };
+        return revokeForStripeEvent({ ...params, eventObject: object, revocationId: cleanText(object.id, 200), reason: "refund" });
+    }
+    return { ok: true, ignored: true };
 }
