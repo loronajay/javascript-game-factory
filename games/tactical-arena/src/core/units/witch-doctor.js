@@ -5,6 +5,11 @@
 // Witch Doctor dances. `unit.stance` carries the current stance (persists across
 // turns like statModifiers); it starts null (no stance) until the first dance.
 //
+// "Rhythm": every dance is a BONUS ACTION (`bonusActionGroup: "dance"`, the Paladin's
+// seeker pattern) — it fires its effect and enters its stance WITHOUT spending the
+// Witch Doctor's activation, so he can still move and attack on the same turn. He can
+// dance at most once per turn (the shared "dance" group is consumed on cast).
+//
 // The per-stance effects live in the `stances` block below and are folded by the
 // shared rule seams — NOT hard-coded per unit (see UNIT_AUTHORING_GUIDE.md):
 //   • getEffectiveStats folds `stances[stance].stats` (Fire Stance's +1 STR).
@@ -34,7 +39,7 @@ export const WITCH_DOCTOR = Object.freeze({
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 4,
-    strength: 8,
+    strength: 7,
     defense: 3,
     maxHp: 24,
     maxMp: 30
@@ -61,7 +66,7 @@ export const WITCH_DOCTOR = Object.freeze({
     }),
     fire: Object.freeze({
       name: "Fire Stance",
-      // Base STR 8 → 9 while in Fire Stance (folded by getEffectiveStats).
+      // Base STR 7 → 8 while in Fire Stance (folded by getEffectiveStats).
       stats: Object.freeze({ strength: 1 }),
       // The Witch Doctor's crits deal +1 damage in Fire Stance.
       critBonus: 1
@@ -93,10 +98,14 @@ export const WITCH_DOCTOR = Object.freeze({
       kind: "active",
       mpCost: 2,
       resolution: "witchDance",
+      // selfCast so the bonus-action dance resolves the instant it is pressed (no ally to
+      // click) — the heal is global, so a target would be redundant.
+      selfCast: true,
+      bonusActionGroup: "dance",
       stance: "rain",
       // Reuses the healAllies effect shape so the CPU planner/projection understand it.
       effect: Object.freeze({ type: "healAllies", amount: 1, global: true }),
-      description: "Heal every ally for 1 HP, then enter Rain Stance: all HP healing is +1 globally, and attacking grants the Witch Doctor +2 MOVE next turn.",
+      description: "Heal every ally for 1 HP, then enter Rain Stance: all HP healing is +1 globally, and attacking grants the Witch Doctor +2 MOVE next turn. Does not spend the Witch Doctor's action.",
       implemented: true,
       ai: Object.freeze({ intent: "healAllies", tags: Object.freeze(["stance"]) })
     }),
@@ -110,10 +119,11 @@ export const WITCH_DOCTOR = Object.freeze({
       // team buff is usable even with no enemy in range (Rain Dance stays a healAllies
       // cast, which already has a working "click an ally" affordance).
       selfCast: true,
+      bonusActionGroup: "dance",
       stance: "fire",
       // A timed positive buff applied to every ally on cast.
       teamBuff: Object.freeze({ statModifiers: Object.freeze({ strength: 1 }), durationTurns: 1 }),
-      description: "Grant every ally +1 STR for 1 turn, then enter Fire Stance: the Witch Doctor's STR becomes 9 and his crits deal +1 damage.",
+      description: "Grant every ally +1 STR for 1 turn, then enter Fire Stance: the Witch Doctor's STR becomes 8 and his crits deal +1 damage. Does not spend the Witch Doctor's action.",
       implemented: true,
       ai: Object.freeze({ intent: "buffAllies", tags: Object.freeze(["stance", "buff"]) })
     }),
@@ -124,9 +134,10 @@ export const WITCH_DOCTOR = Object.freeze({
       mpCost: 0,
       resolution: "witchDance",
       selfCast: true,
+      bonusActionGroup: "dance",
       stance: "spirit",
       teamMp: Object.freeze({ amount: 1 }),
-      description: "Restore 1 MP to every ally, then enter Spirit Stance: attacking restores 3 MP to allies within 2 tiles.",
+      description: "Restore 1 MP to every ally, then enter Spirit Stance: attacking restores 3 MP to allies within 2 tiles. Does not spend the Witch Doctor's action.",
       implemented: true,
       ai: Object.freeze({ intent: "buffAllies", tags: Object.freeze(["stance", "buff"]) })
     }),
@@ -137,9 +148,10 @@ export const WITCH_DOCTOR = Object.freeze({
       mpCost: 5,
       resolution: "witchDance",
       selfCast: true,
+      bonusActionGroup: "dance",
       stance: "misfortune",
       cleanse: Object.freeze({ scope: "all" }),
-      description: "Remove every status effect from all units (allies and foes), then enter Misfortune Stance: status effects are twice as likely to land for everyone.",
+      description: "Remove every status effect from all units (allies and foes), then enter Misfortune Stance: status effects are twice as likely to land for everyone. Does not spend the Witch Doctor's action.",
       implemented: true,
       ai: Object.freeze({ intent: "buffAllies", tags: Object.freeze(["stance", "cleanse"]) })
     }),
@@ -153,10 +165,11 @@ export const WITCH_DOCTOR = Object.freeze({
       rageLocked: true,
       resolution: "witchDance",
       selfCast: true,
+      bonusActionGroup: "dance",
       stance: "blackDeath",
       selfBuff: Object.freeze({ statModifiers: Object.freeze({ strength: 2, defense: 1, moveRange: 1 }), durationTurns: 1 }),
       globalStatus: Object.freeze({ status: "blind", durationTurns: 1 }),
-      description: "RAGE: Gain +2 STR / +1 DEF / +1 MOVE for 1 turn and blind every unit for 1 turn, then enter Black Death Stance: you are immune to magic, and every unit takes 1 true damage each turn.",
+      description: "RAGE: Gain +2 STR / +1 DEF / +1 MOVE for this turn and blind every unit for 1 turn, then enter Black Death Stance: you are immune to magic, and every unit takes 1 true damage each turn. Does not spend the Witch Doctor's action, so the buff empowers his own move and attack.",
       implemented: true,
       ai: Object.freeze({ intent: "buffAllies", tags: Object.freeze(["stance", "rageOnly"]) })
     }),

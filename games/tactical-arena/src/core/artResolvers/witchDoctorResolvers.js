@@ -76,14 +76,15 @@ export function resolveWitchDance(state, command, art) {
   }
 
   if (art.selfBuff) {
-    // +1 duration so the buff SURVIVES this activation's own end-of-turn tick (the
-    // dance spends the Witch Doctor's turn) and is live on his NEXT turn — otherwise
-    // "+2 STR / +1 DEF / +1 MOVE for 1 turn" would be ticked to nothing before it
-    // could ever be used. Ally buffs (teamBuff) need no bonus: the caster's tick
-    // doesn't touch an ally's statuses, so they already get one buffed activation.
+    // A dance is a BONUS ACTION (it does not spend the activation), so the self-buff is
+    // live for the Witch Doctor's own follow-up move/attack this same turn and is ticked
+    // off at the end of the full activation — exactly "for this turn". A legacy
+    // turn-spending dance (no bonusActionGroup) still needs +1 duration so the buff
+    // survives its own end-of-turn tick to reach his NEXT turn. Ally buffs (teamBuff) need
+    // no bonus: the caster's tick doesn't touch an ally's statuses.
     const result = applyStatus(actor, {
       type: "empowered",
-      duration: (art.selfBuff.durationTurns ?? 1) + 1,
+      duration: (art.selfBuff.durationTurns ?? 1) + (art.bonusActionGroup ? 0 : 1),
       statModifiers: { ...(art.selfBuff.statModifiers ?? {}) }
     });
     if (result.applied) {
@@ -96,6 +97,12 @@ export function resolveWitchDance(state, command, art) {
   if (art.globalStatus) {
     const statusTargets = [];
     for (const target of livingUnits(next)) {
+      // The caster is exempt from his own global status: Black Death Dance blinds the whole
+      // board, but the Witch Doctor must stay clear-eyed so the self-buff it grants can
+      // actually power his own same-turn attack. (Previously the dance spent his turn, so
+      // the 1-turn blind ticked off him before he acted; as a bonus action that no longer
+      // happens, so the exemption is made explicit here.)
+      if (target.id === actor.id) continue;
       const result = applyStatus(target, {
         type: art.globalStatus.status,
         duration: art.globalStatus.durationTurns
@@ -118,7 +125,18 @@ export function resolveWitchDance(state, command, art) {
   ).map((unit) => unit.id);
 
   actor.stance = art.stance ?? null;
-  spendAndAdvance(next, actor);
+  // A dance is a bonus action (Paladin's seeker pattern): it enters its stance and fires
+  // its effect but does NOT spend the activation, so the Witch Doctor can still move and
+  // attack this turn. The shared "dance" group is marked used so he can only dance once.
+  if (art.bonusActionGroup) {
+    next.activation.bonusActionGroups = [
+      ...(next.activation.bonusActionGroups ?? []),
+      art.bonusActionGroup
+    ];
+    event.bonusActionGroup = art.bonusActionGroup;
+  } else {
+    spendAndAdvance(next, actor);
+  }
   resolveVictory(next);
   return accept(next, [event]);
 }

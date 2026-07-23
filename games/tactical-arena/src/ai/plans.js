@@ -127,13 +127,17 @@ export function generatePlans(state, unit) {
   const advance = advanceTile(state, unit, moveTiles);
   if (advance) plans.push(makePlan(unit, { moveTo: advance, movePhase: "before", primary: { kind: "defend" } }));
 
-  // 5. Bonus tile-pulse prefix (Paladin's Light/Darkseeker). It is free of the
-  //    activation but costs MP and only helps when it hits an enemy, so we offer a
-  //    WITH-bonus variant of every plan and let the scorer weigh the MP against the
-  //    damage (rather than forcing it on).
-  const bonus = bestBonusAction(state, unit);
-  if (bonus) {
-    for (const plan of [...plans]) plans.push({ ...plan, bonus });
+  // 5. Bonus-action prefixes (Paladin's Light/Darkseeker tile pulses, the Witch Doctor's
+  //    dances). A bonus does NOT spend the activation but costs MP, so we offer a variant
+  //    of every base plan WITH each usable bonus and let the scorer weigh the MP/tempo
+  //    against the payoff (rather than forcing one on). Snapshot the base plans first so a
+  //    bonus never stacks on a plan that already carries one — a unit dances/pulses once.
+  const bonuses = usableBonusActions(state, unit);
+  if (bonuses.length) {
+    const baseline = [...plans];
+    for (const bonus of bonuses) {
+      for (const plan of baseline) plans.push({ ...plan, bonus });
+    }
   }
 
   return plans;
@@ -429,13 +433,25 @@ export function projectPlan(state, plan) {
   const byId = new Map(board.map((u) => [u.id, u]));
   const actor = byId.get(plan.unitId);
 
-  // Bonus tile pulse fires first, from the origin (before any move).
+  // The bonus action fires first, from the origin (before any move). Only its HP effect
+  // is modeled here — a tile pulse's damage (Paladin) or a heal-dance's healing (Rain
+  // Dance); a buff/cleanse/blind dance changes no HP, so its worth is added as a `control`
+  // score term by the controller (planEffectValue), exactly like a status cast.
   if (plan.bonus) {
     const art = getArtForUnit(actor, plan.bonus.artId);
-    const amount = Math.max(0, Number(art.effect.amount) || 0);
-    for (const target of getTilePulseTargets(state, actor, art)) {
-      const entry = byId.get(target.id);
-      if (entry) entry.hp = Math.max(0, entry.hp - amount);
+    if (normalizeArtAi(art).intent === "tilePulse") {
+      const amount = Math.max(0, Number(art.effect.amount) || 0);
+      for (const target of getTilePulseTargets(state, actor, art)) {
+        const entry = byId.get(target.id);
+        if (entry) entry.hp = Math.max(0, entry.hp - amount);
+      }
+    } else if (art.effect?.type === "healAllies") {
+      const amount = getTeamHealAmount(art);
+      for (const target of board) {
+        if (target.player !== actor.player) continue;
+        if (!art.effect.global && chebyshevDistance(actor.position, target.position) > (art.effect.radius ?? 0)) continue;
+        target.hp = Math.min(getEffectiveStats(target, state).maxHp, target.hp + amount);
+      }
     }
   }
 
@@ -811,18 +827,26 @@ function advanceTile(state, unit, moveTiles) {
   return best;
 }
 
-// Best usable bonus tile pulse for this unit (most enemies hit), or null. Used as a
-// free prefix. Honors silence / MP / rage via artUsableForPlanning.
-function bestBonusAction(state, unit) {
-  let best = null;
-  let bestCount = 0;
+// Every bonus-action ART worth prefixing onto a plan for this unit, as { artId }. A bonus
+// rides in front of a real primary without spending the activation. Honors silence / MP /
+// rage via artUsableForPlanning, and only offers an ART that would actually accomplish
+// something: a tile pulse that hits an enemy (Paladin), a heal with a wounded ally in
+// reach (Rain Dance), or a buff/cleanse/blind dance whose buffAlliesValue is positive
+// (Fire/Spirit/Misfortune/Black Death Dance). The scorer still weighs each variant's MP.
+function usableBonusActions(state, unit) {
+  const bonuses = [];
   for (const art of getAvailableArts(unit)) {
-    if (!art.bonusActionGroup || normalizeArtAi(art).intent !== "tilePulse") continue;
-    if (!artUsableForPlanning(state, unit, art)) continue;
-    const count = getTilePulseTargets(state, unit, art).length;
-    if (count > bestCount) { bestCount = count; best = { artId: art.id }; }
+    if (!art.bonusActionGroup || !artUsableForPlanning(state, unit, art)) continue;
+    const intent = normalizeArtAi(art).intent;
+    if (intent === "tilePulse") {
+      if (getTilePulseTargets(state, unit, art).length > 0) bonuses.push({ artId: art.id });
+    } else if (intent === "healAllies") {
+      if (woundedAlliesInReach(state, unit, art).length > 0) bonuses.push({ artId: art.id });
+    } else if (intent === "buffAllies") {
+      if (buffAlliesValue(state, unit, art) > 0) bonuses.push({ artId: art.id });
+    }
   }
-  return best;
+  return bonuses;
 }
 
 // Bounded DFS for footwork: enumerate up to a node budget of full-length legal paths,

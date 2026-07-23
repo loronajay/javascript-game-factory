@@ -126,7 +126,12 @@ function bestPlanFor(state, candidates, cpuPlayer, weights, difficulty, rng, exc
   const scored = [];
   for (const unit of candidates) {
     for (const plan of generatePlans(state, unit)) {
-      if (excluded && plan.primary.kind === "art" && excluded.has(plan.primary.artId)) continue;
+      // The denylist covers an ART used either as the primary OR as a bonus-action prefix
+      // (a Witch Doctor dance rides in `plan.bonus`), so Mission 3's Rain-Dance heal-stall
+      // cap still bites now that the dance is a bonus action rather than a full turn.
+      if (excluded &&
+        ((plan.primary.kind === "art" && excluded.has(plan.primary.artId)) ||
+          (plan.bonus && excluded.has(plan.bonus.artId)))) continue;
       scored.push({ plan, score: scorePlan(state, plan, unit, cpuPlayer, weights) });
     }
   }
@@ -214,8 +219,29 @@ function scorePlan(state, plan, unit, cpuPlayer, weights) {
 }
 
 // Status-effect / heal-rider value (in damage-equivalent units) that the HP diff can't
-// see: a status applied by a strike ART, a pure status cast, or a self-heal rider.
+// see: a status applied by a strike ART, a pure status cast, or a self-heal rider — from
+// BOTH the primary ART and any bonus-action prefix (a Witch Doctor dance rides in front of
+// a basic attack, so its buff/cleanse/blind value must be counted even when the primary is
+// not an ART).
 function planEffectValue(state, unit, plan) {
+  const primary = primaryEffectValue(state, unit, plan);
+  const bonus = bonusEffectValue(state, unit, plan);
+  return { control: primary.control + bonus.control, heal: primary.heal + bonus.heal };
+}
+
+// A bonus-action dance's non-HP worth (Fire/Spirit/Misfortune/Black Death). A tile pulse's
+// damage and Rain Dance's heal are already in the projected HP diff, so they add nothing
+// here — only the buff/cleanse/blind dances need a `control` term.
+function bonusEffectValue(state, unit, plan) {
+  if (!plan.bonus) return { control: 0, heal: 0 };
+  const art = getArt(unit.type, plan.bonus.artId);
+  if (normalizeArtAi(art).intent === "buffAllies") {
+    return { control: buffAlliesValue(state, unit, art), heal: 0 };
+  }
+  return { control: 0, heal: 0 };
+}
+
+function primaryEffectValue(state, unit, plan) {
   if (plan.primary.kind !== "art") return { control: 0, heal: 0 };
   const art = getArt(unit.type, plan.primary.artId);
   const ai = normalizeArtAi(art);

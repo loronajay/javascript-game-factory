@@ -573,7 +573,7 @@ while he still moves and shoots, is why the resource gate matters.
 
 ### Witch Doctor — Stance-Dancer (global field caster)
 
-`HP 24 · MP 30 · STR 8 · DEF 3 · MOVE 2 · RNG 4`
+`HP 24 · MP 30 · STR 7 · DEF 3 · MOVE 2 · RNG 4`
 
 His passive is *whichever dance he did last* — Dancing Man means he has no fixed identity,
 he has a mode switch, and every dance both fires a one-shot effect and changes what he

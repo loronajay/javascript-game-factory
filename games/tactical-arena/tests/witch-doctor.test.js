@@ -38,7 +38,7 @@ test("Witch Doctor is registered with the scoped stat block", () => {
   assert.equal(wd.stats.maxMp, 30);
   assert.equal(wd.stats.moveRange, 2);
   assert.equal(wd.stats.attackRange, 4);
-  assert.equal(wd.stats.strength, 8);
+  assert.equal(wd.stats.strength, 7);
   assert.equal(wd.stats.defense, 3);
 });
 
@@ -58,7 +58,7 @@ test("Witch Doctor has Dancing Man + five dances (Black Death rage-locked)", () 
 
 // --- Dancing Man: stance is set by the last dance and persists ---
 
-test("each dance sets the Witch Doctor's stance, spends MP, and ends the activation", () => {
+test("each dance sets the Witch Doctor's stance, spends MP, and is a BONUS action (activation stays open)", () => {
   const cases = [
     ["rain-dance", "rain", 2],
     ["fire-dance", "fire", 3],
@@ -79,8 +79,43 @@ test("each dance sets the Witch Doctor's stance, spends MP, and ends the activat
     const wd = findId(r.nextState, "wd");
     assert.equal(wd.stance, stance, `${artId} should enter ${stance}`);
     assert.equal(wd.mp, 30 - cost, `${artId} MP`);
-    assert.equal(wd.spent, true, `${artId} spends the activation`);
+    // A dance follows the Paladin's seeker pattern: it does NOT spend the activation, so
+    // the Witch Doctor can still move and attack this turn. The shared "dance" bonus group
+    // is consumed so he cannot dance again.
+    assert.equal(wd.spent, false, `${artId} does not spend the activation`);
+    assert.equal(r.nextState.activation.unitId, "wd", `${artId} keeps ${"wd"}'s activation open`);
+    assert.equal(r.nextState.activation.primaryUsed, false, `${artId} leaves the primary action available`);
+    assert.deepEqual(r.nextState.activation.bonusActionGroups, ["dance"], `${artId} marks the dance group used`);
   }
+});
+
+test("a dance is a bonus action: the Witch Doctor still attacks afterward, but cannot dance twice", () => {
+  const state = createBattleState({
+    units: [
+      { id: "wd", player: 1, type: "witch-doctor", x: 0, y: 0 },
+      { id: "ally", player: 1, type: "swordsman", x: 1, y: 0 },
+      { id: "foe", player: 2, type: "swordsman", x: 1, y: 1 }
+    ]
+  });
+  let s = activate(state, "wd");
+  const danced = applyCommand(s, useArt(1, "wd", "fire-dance"));
+  assert.ok(danced.accepted, `fire-dance rejected: ${danced.errorCode}`);
+  s = danced.nextState;
+
+  // A second dance is blocked — the "dance" bonus group is already spent this turn.
+  const twice = applyCommand(s, useArt(1, "wd", "spirit-dance"));
+  assert.equal(twice.accepted, false, "cannot dance a second time in one activation");
+
+  // But a normal basic attack still lands after the dance (the primary action was never
+  // consumed). A lone attack leaves the option to still move, so it sets primaryUsed
+  // without fully spending the activation; a finishActivation then ends the turn.
+  const struck = applyCommand(s, attack(1, "wd", "foe", NORMAL_HIT));
+  assert.ok(struck.accepted, `attack after dancing rejected: ${struck.errorCode}`);
+  assert.equal(struck.nextState.activation.primaryUsed, true, "the follow-up attack uses the primary action");
+  assert.ok(findId(struck.nextState, "foe").hp < 25, "the foe took the follow-up hit");
+  const ended = applyCommand(struck.nextState, finishActivation(1, "wd"));
+  assert.ok(ended.accepted, `finishActivation rejected: ${ended.errorCode}`);
+  assert.equal(findId(ended.nextState, "wd").spent, true, "finishing ends the danced-and-struck turn");
 });
 
 // --- Rain Dance / Rain Stance ---
@@ -142,14 +177,14 @@ test("Rain Stance: attacking charges +2 MOVE, consumed as a buff next activation
 
 // --- Fire Stance ---
 
-test("Fire Stance raises the Witch Doctor's STR to 9", () => {
+test("Fire Stance raises the Witch Doctor's STR to 8", () => {
   const state = createBattleState({
     units: [
       { id: "wd", player: 1, type: "witch-doctor", x: 0, y: 0, stance: "fire" },
       { id: "foe", player: 2, type: "swordsman", x: 9, y: 9 }
     ]
   });
-  assert.equal(getEffectiveStats(findId(state, "wd"), state).strength, 9);
+  assert.equal(getEffectiveStats(findId(state, "wd"), state).strength, 8);
 });
 
 test("Fire Stance adds +1 damage to a crit (and only to a crit)", () => {
@@ -160,7 +195,7 @@ test("Fire Stance adds +1 damage to a crit (and only to a crit)", () => {
     ]
   });
   // Isolate the crit bonus: compare Fire Stance vs a neutral WD boosted to the same
-  // STR 9, so only the stance's critBonus differs.
+  // STR 8, so only the stance's critBonus differs.
   const fire = build("fire", {});
   const boosted = build(null, { strength: 1 });
   const crit = (state) => resolvePhysicalStrike(findId(state, "wd"), findId(state, "foe"), { critical: true, state }).damage;
@@ -318,7 +353,7 @@ test("Black Death Stance burns every unit (incl. the Witch Doctor) 1 true dmg pe
   assert.equal(findId(r.nextState, "foe").hp, foeMax - 1, "the foe burns too");
 });
 
-test("Black Death Dance is rage-locked and its self-buff survives to the next turn", () => {
+test("Black Death Dance is rage-locked and its self-buff empowers his own same-turn action", () => {
   // Above 5 HP the rage art is unavailable.
   const healthy = createBattleState({
     units: [
@@ -330,8 +365,8 @@ test("Black Death Dance is rage-locked and its self-buff survives to the next tu
   const locked = applyCommand(activate(healthy, "wd"), useArt(1, "wd", "black-death-dance"));
   assert.equal(locked.accepted, false, "cannot dance Black Death above 5 HP");
 
-  // At 5 HP or lower it fires. The +2 STR / +1 DEF / +1 MOVE self-buff must NOT be
-  // ticked to nothing by the dance's own end-of-turn — it is live afterward. The ally
+  // At 5 HP or lower it fires as a BONUS action: the +2 STR / +1 DEF / +1 MOVE self-buff
+  // is live for the Witch Doctor's own follow-up move/attack this same turn. The ally
   // keeps player 1 on the clock, so no rollover tick muddies the assertions.
   const raging = createBattleState({
     units: [
@@ -344,10 +379,17 @@ test("Black Death Dance is rage-locked and its self-buff survives to the next tu
   assert.ok(r.accepted, `black-death-dance rejected: ${r.errorCode}`);
   const wd = findId(r.nextState, "wd");
   assert.equal(wd.stance, "blackDeath");
-  assert.ok(wd.statuses.some((st) => st.type === "empowered"), "self-buff still present after the cast tick");
-  assert.equal(getEffectiveStats(wd, r.nextState).strength, 8 + 2, "+2 STR is live");
+  assert.equal(wd.spent, false, "the rage dance is a bonus action too — the turn is not spent");
+  assert.ok(wd.statuses.some((st) => st.type === "empowered"), "self-buff is live for the same-turn action");
+  assert.equal(getEffectiveStats(wd, r.nextState).strength, 7 + 2, "+2 STR is live");
   assert.equal(wd.statuses.some((st) => st.type === "blind"), false, "the Witch Doctor is not left blind by his own dance");
   assert.ok(findId(r.nextState, "foe").statuses.some((st) => st.type === "blind"), "enemies are blinded");
+
+  // The buff is consumed at the end of THIS activation (it does not linger to next turn).
+  const ended = applyCommand(r.nextState, defend(1, "wd"));
+  assert.ok(ended.accepted, `defend after dancing rejected: ${ended.errorCode}`);
+  assert.equal(findId(ended.nextState, "wd").statuses.some((st) => st.type === "empowered"), false,
+    "the self-buff is spent once the activation it powered ends");
 });
 
 // --- Hex Strike (basic-attack rider) ---

@@ -21,6 +21,7 @@ import { createTutorialMenuScreens } from "./tutorialMenuScreens.js";
 import { createSettingsScreen } from "./settingsScreen.js";
 import { createTutorialMatchConfig } from "../tutorials/basics.js";
 import { syncRankedAccountFeatureControls } from "./rankedFeatureGate.js";
+import { syncOnlineAccountFeatureControls } from "../../../../js/platform/ui/online-account-feature-gate.mjs";
 
 export function syncScreenMusic(audio, screenName) {
   if (!screenName) return;
@@ -42,6 +43,9 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   screens.register("mainMenu", {
     el: screenEl("mainMenu"),
     onEnter: () => {
+      // Online Versus (casual) and Ranked both require a real signed-in factory
+      // account. They carry different copy, so each syncs its own control set.
+      syncOnlineAccountFeatureControls(screenEl("mainMenu"));
       syncRankedAccountFeatureControls(screenEl("mainMenu"));
       showQueuedProgressionAnnouncements({ audit: true });
     },
