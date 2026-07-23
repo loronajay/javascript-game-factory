@@ -179,18 +179,14 @@ test("POST /game-progress/:gameSlug/claims accepts tutorial reward claims", asyn
   }]);
 });
 
-test("POST /game-progress/:gameSlug/claims accepts premium purchase claims", async () => {
+test("POST /game-progress/:gameSlug/claims REJECTS premium skin purchase claims (Stripe-only)", async () => {
   const token = signToken({ playerId: "player-1", email: "player@test.com" }, TEST_SECRET);
   const seen = [];
   const app = createApp({
     jwtSecret: TEST_SECRET,
     recordGameProgressClaim: async (params) => {
       seen.push(params);
-      return {
-        ok: true,
-        alreadyProcessed: false,
-        progress: { playerId: params.playerId, gameSlug: params.gameSlug, entitlements: [] },
-      };
+      return { ok: true, alreadyProcessed: false, progress: {} };
     },
     now: () => "2026-07-17T00:00:00.000Z",
   });
@@ -198,37 +194,27 @@ test("POST /game-progress/:gameSlug/claims accepts premium purchase claims", asy
   const response = await invoke(app, "POST", "/game-progress/tactical-arena/claims", {
     token,
     body: {
-      claimId: "stripe-checkout:cs_test_paid",
+      claimId: "forged-claim",
       kind: "premium-skin-purchase",
-      sourceId: "cs_test_paid",
-      payload: { entitlementIds: ["skin:swordsman:medieval"], sessionId: "cs_test_paid" },
+      sourceId: "forged",
+      payload: { entitlementIds: ["skin:swordsman:medieval"] },
     },
   });
 
-  assert.equal(response.statusCode, 200);
-  assert.equal(response.json.alreadyProcessed, false);
-  assert.deepEqual(seen, [{
-    playerId: "player-1",
-    gameSlug: "tactical-arena",
-    claimId: "stripe-checkout:cs_test_paid",
-    kind: "premium-skin-purchase",
-    sourceId: "cs_test_paid",
-    payload: { entitlementIds: ["skin:swordsman:medieval"], sessionId: "cs_test_paid" },
-  }]);
+  // A client must not be able to grant itself a paid entitlement for free.
+  assert.equal(response.statusCode, 403);
+  assert.equal(response.json.error, "claim_kind_forbidden");
+  assert.deepEqual(seen, []);
 });
 
-test("POST /game-progress/:gameSlug/claims accepts premium unit purchase claims", async () => {
+test("POST /game-progress/:gameSlug/claims REJECTS premium unit purchase claims (Stripe-only)", async () => {
   const token = signToken({ playerId: "player-1", email: "player@test.com" }, TEST_SECRET);
   const seen = [];
   const app = createApp({
     jwtSecret: TEST_SECRET,
     recordGameProgressClaim: async (params) => {
       seen.push(params);
-      return {
-        ok: true,
-        alreadyProcessed: false,
-        progress: { playerId: params.playerId, gameSlug: params.gameSlug, entitlements: [] },
-      };
+      return { ok: true, alreadyProcessed: false, progress: {} };
     },
     now: () => "2026-07-17T00:00:00.000Z",
   });
@@ -236,17 +222,16 @@ test("POST /game-progress/:gameSlug/claims accepts premium unit purchase claims"
   const response = await invoke(app, "POST", "/game-progress/tactical-arena/claims", {
     token,
     body: {
-      claimId: "stripe-checkout:cs_test_unit",
+      claimId: "forged-unit-claim",
       kind: "premium-unit-purchase",
-      sourceId: "cs_test_unit",
-      payload: { entitlementIds: ["unit:sniper"], sessionId: "cs_test_unit" },
+      sourceId: "forged",
+      payload: { entitlementIds: ["unit:sniper"] },
     },
   });
 
-  assert.equal(response.statusCode, 200);
-  assert.equal(response.json.alreadyProcessed, false);
-  assert.equal(seen[0].kind, "premium-unit-purchase");
-  assert.deepEqual(seen[0].payload.entitlementIds, ["unit:sniper"]);
+  assert.equal(response.statusCode, 403);
+  assert.equal(response.json.error, "claim_kind_forbidden");
+  assert.deepEqual(seen, []);
 });
 
 test("POST /game-progress/:gameSlug/claims rejects unsupported claim kinds", async () => {

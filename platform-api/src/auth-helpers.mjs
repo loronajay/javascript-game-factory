@@ -6,7 +6,9 @@ export function signToken(payload, secret) {
 }
 export function verifyToken(token, secret) {
     try {
-        return jwt.verify(token, secret);
+        // Pin the algorithm so a token can never be verified under an unexpected
+        // scheme (e.g. an attacker-supplied header claiming a different alg).
+        return jwt.verify(token, secret, { algorithms: ["HS256"] });
     }
     catch {
         return null;

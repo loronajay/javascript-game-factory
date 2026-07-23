@@ -612,6 +612,10 @@ export function createApp(options = {}) {
                 return;
             }
             if (method === "POST" && pathname === "/activity") {
+                if (!authClaims?.playerId) {
+                    writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+                    return;
+                }
                 const body = await readJsonBody(req);
                 if (!body.ok) {
                     writeJson(res, 400, {
@@ -622,10 +626,13 @@ export function createApp(options = {}) {
                     }, requestOrigin);
                     return;
                 }
-                const item = await saveActivityItem(body.value);
+                const submitted = body.value && typeof body.value === "object" ? body.value : {};
+                // Force the server-verified actor so a client can't post activity as someone else.
+                const item = await saveActivityItem({ ...submitted, actorPlayerId: authClaims.playerId });
                 writeJson(res, 200, { item }, requestOrigin);
                 return;
             }
+
             // Friend request routes (auth required)
             if (method === "POST" && pathname === "/friend-requests") {
                 if (!authClaims?.playerId) {

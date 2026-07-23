@@ -1,12 +1,42 @@
 import busboy from "busboy";
 
+// Credentialed CORS is only granted to allow-listed origins. Reflecting an
+// arbitrary Origin together with access-control-allow-credentials would let any
+// website make authenticated cross-origin requests as a logged-in user and read
+// the responses. The live frontend origin plus any localhost dev origin are
+// allowed by default; extra origins can be added via ALLOWED_ORIGINS (comma list).
+const DEFAULT_ALLOWED_ORIGINS = ["https://loronajay.github.io"];
+
+function configuredAllowedOrigins(): Set<string> {
+  const raw = typeof process.env.ALLOWED_ORIGINS === "string" ? process.env.ALLOWED_ORIGINS : "";
+  const extra = raw.split(",").map((value) => value.trim()).filter(Boolean);
+  return new Set([...DEFAULT_ALLOWED_ORIGINS, ...extra]);
+}
+
+function isAllowedOrigin(origin: string): boolean {
+  if (!origin) return false;
+  if (configuredAllowedOrigins().has(origin)) return true;
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
 export function applyCorsHeaders(res: any, requestOrigin: any): void {
-  if (requestOrigin) {
-    res.setHeader("access-control-allow-origin", requestOrigin);
+  const origin = typeof requestOrigin === "string" ? requestOrigin : "";
+  if (origin && isAllowedOrigin(origin)) {
+    res.setHeader("access-control-allow-origin", origin);
     res.setHeader("access-control-allow-credentials", "true");
     res.setHeader("vary", "Origin");
-  } else {
+  } else if (!origin) {
+    // Non-browser / same-origin callers (no Origin header): wildcard, never with credentials.
     res.setHeader("access-control-allow-origin", "*");
+  } else {
+    // A browser origin that is not allow-listed: do not echo it and do not grant
+    // credentials, so the browser blocks any cross-origin credentialed read.
+    res.setHeader("vary", "Origin");
   }
   res.setHeader("access-control-allow-methods", "GET,POST,PUT,DELETE,OPTIONS");
   res.setHeader("access-control-allow-headers", "content-type, authorization");

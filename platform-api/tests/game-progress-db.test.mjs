@@ -138,3 +138,31 @@ test("recordGameProgressClaim applies tutorial Valor and entitlement claims idem
   assert.equal(duplicateValor.alreadyProcessed, true);
   assert.equal(duplicateValor.progress.valorBalance, 500);
 });
+
+test("recordGameProgressClaim refuses premium kinds unless the trusted Stripe path sets allowPremiumKinds", async () => {
+  const pool = createGameProgressPool();
+  const common = { playerId: "player-1", gameSlug: "tactical-arena" };
+
+  // Untrusted caller (public route) — must be refused, nothing granted.
+  const forged = await recordGameProgressClaim(pool, {
+    ...common,
+    claimId: "forged:cs_fake",
+    kind: "premium-skin-purchase",
+    sourceId: "cs_fake",
+    payload: { entitlementIds: ["skin:swordsman:medieval"] },
+  });
+  assert.equal(forged, null);
+  assert.equal(pool.state.entitlements.has("skin:swordsman:medieval"), false);
+
+  // Trusted Stripe fulfillment path — allowed to grant the paid entitlement.
+  const paid = await recordGameProgressClaim(pool, {
+    ...common,
+    claimId: "stripe-checkout:cs_real",
+    kind: "premium-skin-purchase",
+    sourceId: "cs_real",
+    allowPremiumKinds: true,
+    payload: { entitlementIds: ["skin:swordsman:medieval"] },
+  });
+  assert.equal(paid.ok, true);
+  assert.equal(pool.state.entitlements.has("skin:swordsman:medieval"), true);
+});

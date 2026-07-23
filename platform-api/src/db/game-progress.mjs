@@ -10,6 +10,14 @@ const VALID_CLAIM_KINDS = new Set([
     "premium-skin-purchase",
     "premium-unit-purchase",
 ]);
+// Premium (real-money) entitlements must never be grantable through the public
+// claims route. They may only be recorded by the server-side Stripe fulfillment
+// path, which calls recordGameProgressClaim with allowPremiumKinds: true after a
+// verified payment. Every other caller is untrusted and is refused below.
+const PREMIUM_CLAIM_KINDS = new Set([
+    "premium-skin-purchase",
+    "premium-unit-purchase",
+]);
 function cleanText(value, maxLength = 200) {
     return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
@@ -124,6 +132,12 @@ export function isValidGameProgressSlug(value) {
 export function isValidGameClaimKind(value) {
     return VALID_CLAIM_KINDS.has(cleanText(value, 80));
 }
+// A claim kind that untrusted (public-route) callers are allowed to submit.
+// Premium purchase kinds are excluded — those are Stripe-fulfillment only.
+export function isPubliclyClaimableKind(value) {
+    const kind = cleanText(value, 80);
+    return VALID_CLAIM_KINDS.has(kind) && !PREMIUM_CLAIM_KINDS.has(kind);
+}
 export async function getGameProgress(pool, playerId, gameSlug) {
     const normalizedPlayerId = cleanText(playerId, 120);
     const normalizedGameSlug = normalizeGameSlug(gameSlug);
@@ -173,6 +187,12 @@ export async function recordGameProgressClaim(pool, params = {}) {
     const sourceId = cleanText(params.sourceId || payload.sessionId || payload.missionId || payload.packId || payload.tutorialId || "", 200);
     if (!pool || !playerId || !gameSlug || !claimId || !VALID_CLAIM_KINDS.has(kind))
         return null;
+    // Defense in depth: even if a premium kind reaches this layer, only the trusted
+    // Stripe fulfillment path (allowPremiumKinds: true) may grant a paid entitlement.
+    if (PREMIUM_CLAIM_KINDS.has(kind) && params.allowPremiumKinds !== true) {
+        process.stderr.write(`[game-progress] refused premium claim kind '${kind}' from untrusted caller (player=${playerId})\n`);
+        return null;
+    }
     const client = await pool.connect();
     try {
         await client.query("begin");
