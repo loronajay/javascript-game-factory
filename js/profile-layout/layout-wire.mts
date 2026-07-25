@@ -28,8 +28,8 @@ import {
 import {
   renderElementInspectorHtml,
   renderPanelInspectorHtml,
-  renderPanelListHtml,
 } from "./layout-inspector-view.mjs";
+import { renderPanelListHtml } from "./layout-panel-list.mjs";
 import { applyCompositionElementScaling, renderLayoutGrid } from "./layout-renderer.mjs";
 import { initLayoutEditor, getGridMetrics } from "./layout-editor.mjs";
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
@@ -75,17 +75,24 @@ if (typeof doc?.getElementById === "function") {
     let previewModels: any = {};
     let childDrag: any = null;
     let elementDrag: any = null;
+    let panelQuery = "";
+    // Explicit rail group open/closed decisions; anything absent falls back to the
+    // derived default (see buildPanelListGroups).
+    let panelGroupOverrides: Record<string, boolean> = {};
 
     const canvas = doc.getElementById("meLayoutCanvas") as HTMLElement;
     const canvasWrap = doc.getElementById("meLayoutCanvasWrap") as HTMLElement;
+    const canvasStage = doc.getElementById("meLayoutCanvasStage") as HTMLElement;
     const inspector = doc.getElementById("meLayoutInspector") as HTMLElement;
     const panelListEl = doc.getElementById("meLayoutPanelList");
+    const panelSearchEl = doc.getElementById("meLayoutPanelSearch") as HTMLInputElement | null;
     const addTitleBtn = doc.getElementById("meLayoutAddTitleBtn");
     const dirtyFlag = doc.getElementById("meLayoutDirtyFlag");
     const saveBtn = doc.getElementById("meLayoutSaveBtn") as HTMLButtonElement;
     const resetBtn = doc.getElementById("meLayoutResetBtn");
     const gridToggleBtn = doc.getElementById("meLayoutGridToggle");
     const zoomFitBtn = doc.getElementById("meLayoutZoomFitBtn");
+    const zoomLevelEl = doc.getElementById("meLayoutZoomLevel");
     const zoomOutBtn = doc.getElementById("meLayoutZoomOutBtn");
     const zoomInBtn  = doc.getElementById("meLayoutZoomInBtn");
     const statusEl = doc.getElementById("meLayoutStatus");
@@ -120,6 +127,9 @@ if (typeof doc?.getElementById === "function") {
       // renderer preserves extra classes, but re-assert overlay to be safe
       canvas?.classList.toggle("profile-layout-grid--overlay", gridOverlayOn);
       requestAnimationFrame(applyLivePreviewScaling);
+      // The canvas height changes whenever panels move or resize; the zoom stage
+      // has to be resized to match or the viewport scrolls the wrong distance.
+      requestAnimationFrame(() => applyZoom(zoom));
       renderPanelList();
       renderInspector();
     }
@@ -130,7 +140,21 @@ if (typeof doc?.getElementById === "function") {
         childEditPanelId = null;
         selectedChildId = null;
       }
+      // A canvas click must not leave its rail row buried in a collapsed group,
+      // so selecting drops any manual collapse on the owning group.
+      const groupKey = panelGroupKeyFor(selectedPanelId);
+      if (groupKey && panelGroupOverrides[groupKey] === false) {
+        const { [groupKey]: _dropped, ...rest } = panelGroupOverrides;
+        panelGroupOverrides = rest;
+      }
       refreshAll();
+      revealSelectedPanelRow();
+    }
+
+    function panelGroupKeyFor(id: any): string | null {
+      if (!id) return null;
+      if (currentLayout.desktop.panels.some((panel: any) => panel.id === id)) return "panels";
+      return getCompositionElementDef(id)?.category ?? null;
     }
 
     function selectChild(id: any): void {
@@ -142,20 +166,20 @@ if (typeof doc?.getElementById === "function") {
 
     function applyZoom(z: number): void {
       zoom = clampZoom(z);
-      if (canvas) {
+      if (canvas && canvasStage) {
+        // Measure the canvas unscaled — offsetWidth/Height already ignore the
+        // transform, so the stage can be sized to the scaled footprint.
         const frame = buildZoomFrame({
           zoom,
           canvasWidth: canvas.offsetWidth,
           canvasHeight: canvas.offsetHeight,
-          wrapWidth: canvasWrap.clientWidth || window.innerWidth,
         });
         canvas.style.transform = frame.transform;
         canvas.style.transformOrigin = frame.transformOrigin;
-        canvas.style.marginLeft = frame.marginLeft;
-        canvasWrap.style.height = frame.wrapHeight;
-        canvasWrap.style.overflowX = frame.overflowX;
+        canvasStage.style.width = frame.stageWidth;
+        canvasStage.style.height = frame.stageHeight;
       }
-      if (zoomFitBtn) zoomFitBtn.textContent = zoom < 1 ? `Zoom: ${Math.round(zoom * 100)}%` : "Fit";
+      if (zoomLevelEl) zoomLevelEl.textContent = `${Math.round(zoom * 100)}%`;
     }
 
     // Sets the editor canvas to match the live profile grid width so column proportions
@@ -166,24 +190,40 @@ if (typeof doc?.getElementById === "function") {
       canvas.style.width = `${liveW}px`;
     }
 
+    /** Usable viewport inside the canvas wrap, minus its padding gutter. */
+    function getCanvasViewportSize(): { width: number; height: number } {
+      const styles = window.getComputedStyle(canvasWrap);
+      const padX = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+      const padY = parseFloat(styles.paddingTop) + parseFloat(styles.paddingBottom);
+      return {
+        width: Math.max(0, canvasWrap.clientWidth - padX),
+        height: Math.max(0, canvasWrap.clientHeight - padY),
+      };
+    }
+
     function fitToScreen(): void {
       if (!canvas || !canvasWrap) return;
       const { rowHeight, gap } = getGridMetrics(canvas);
+      const viewport = getCanvasViewportSize();
       applyZoom(computeFitZoom({
         rowHeight,
         gap,
         rowCount: getLayoutMaxRow(currentLayout),
         canvasWidth: canvas.offsetWidth,
-        wrapWidth: canvasWrap.clientWidth,
-        wrapHeight: canvasWrap.clientHeight,
+        wrapWidth: viewport.width,
+        wrapHeight: viewport.height,
         windowWidth: window.innerWidth,
         windowHeight: window.innerHeight,
       }));
     }
 
+    function stepZoom(delta: number): void {
+      applyZoom(Math.round((zoom + delta) * 20) / 20);
+    }
+
     zoomFitBtn?.addEventListener("click", fitToScreen);
-    zoomOutBtn?.addEventListener("click", () => applyZoom(zoom - 0.1));
-    zoomInBtn?.addEventListener("click",  () => applyZoom(zoom + 0.1));
+    zoomOutBtn?.addEventListener("click", () => stepZoom(-0.1));
+    zoomInBtn?.addEventListener("click",  () => stepZoom(0.1));
     window.addEventListener("resize", () => {
       syncCanvasWidth();
       fitToScreen();
@@ -585,6 +625,7 @@ if (typeof doc?.getElementById === "function") {
 
     function renderPanelList(): void {
       if (!panelListEl) return;
+      const scrollTop = panelListEl.scrollTop;
       panelListEl.innerHTML = renderPanelListHtml({
         panels: currentLayout.desktop.panels,
         elements: currentLayout.desktop.elements || [],
@@ -592,12 +633,50 @@ if (typeof doc?.getElementById === "function") {
         panelRegistry: PROFILE_PANEL_REGISTRY,
         getElementDef: getCompositionElementDef,
         isCustomTitleElementId,
+        query: panelQuery,
+        groupOverrides: panelGroupOverrides,
       });
+      panelListEl.scrollTop = scrollTop;
 
       panelListEl.querySelectorAll<HTMLElement>("[data-panel-select]").forEach((btn) => {
         btn.addEventListener("click", () => selectPanel(btn.dataset.panelSelect));
       });
+      // Toggling visibility straight from the rail avoids the select → hunt for
+      // the inspector checkbox → scroll back round-trip.
+      panelListEl.querySelectorAll<HTMLElement>("[data-panel-visibility]").forEach((btn) => {
+        btn.addEventListener("click", () => setItemEnabled(btn.dataset.panelVisibility, btn.getAttribute("aria-pressed") !== "true"));
+      });
+      panelListEl.querySelectorAll<HTMLElement>("[data-panel-group-toggle]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const key = btn.dataset.panelGroupToggle;
+          if (!key) return;
+          panelGroupOverrides = { ...panelGroupOverrides, [key]: btn.getAttribute("aria-expanded") !== "true" };
+          renderPanelList();
+        });
+      });
     }
+
+    /** Brings the rail row for the current selection into view after canvas clicks. */
+    function revealSelectedPanelRow(): void {
+      if (!panelListEl || !selectedPanelId) return;
+      const row = panelListEl.querySelector<HTMLElement>(`[data-panel-select="${CSS.escape(selectedPanelId)}"]`);
+      row?.scrollIntoView({ block: "nearest" });
+    }
+
+    /** Single entry point for show/hide so panels and elements behave the same. */
+    function setItemEnabled(id: any, enabled: boolean): void {
+      if (!id) return;
+      if (currentLayout.desktop.panels.some((panel: any) => panel.id === id)) {
+        togglePanel(id, enabled);
+        return;
+      }
+      toggleElement(id, enabled);
+    }
+
+    panelSearchEl?.addEventListener("input", () => {
+      panelQuery = panelSearchEl.value;
+      renderPanelList();
+    });
 
     // --- inspector ---
 
@@ -605,7 +684,7 @@ if (typeof doc?.getElementById === "function") {
       if (!inspector) return;
 
       if (!selectedPanelId) {
-        inspector.innerHTML = `<p class="me-layout-inspector__empty">Click a panel to inspect it.</p>`;
+        inspector.innerHTML = `<p class="me-layout-inspector__empty">Select a panel on the canvas or in the list to edit it.</p>`;
         return;
       }
 
@@ -657,7 +736,7 @@ if (typeof doc?.getElementById === "function") {
       const element = currentLayout.desktop.elements?.find((item: any) => item.id === id);
       const def = getCompositionElementDef(id);
       if (!element || !def) {
-        inspector.innerHTML = `<p class="me-layout-inspector__empty">Click a panel or element to inspect it.</p>`;
+        inspector.innerHTML = `<p class="me-layout-inspector__empty">Select a panel on the canvas or in the list to edit it.</p>`;
         return;
       }
 
@@ -753,10 +832,7 @@ if (typeof doc?.getElementById === "function") {
     gridToggleBtn?.addEventListener("click", () => {
       gridOverlayOn = !gridOverlayOn;
       canvas?.classList.toggle("profile-layout-grid--overlay", gridOverlayOn);
-      if (gridToggleBtn) {
-        gridToggleBtn.textContent = `Grid: ${gridOverlayOn ? "ON" : "OFF"}`;
-        gridToggleBtn.setAttribute("aria-pressed", String(gridOverlayOn));
-      }
+      gridToggleBtn.setAttribute("aria-pressed", String(gridOverlayOn));
     });
 
     addTitleBtn?.addEventListener("click", addCustomTitleBubble);
@@ -764,7 +840,7 @@ if (typeof doc?.getElementById === "function") {
     // --- click canvas background to deselect ---
 
     canvasWrap?.addEventListener("click", (e) => {
-      if (e.target === canvasWrap || e.target === canvas) {
+      if (e.target === canvasWrap || e.target === canvasStage || e.target === canvas) {
         if (selectedPanelId !== null) {
           selectedPanelId = null;
           refreshAll();

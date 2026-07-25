@@ -21,72 +21,21 @@ function escapeHtml(str) {
 function formatNumber(value) {
     return Math.round(value * 10) / 10;
 }
-export function renderPanelListHtml({ panels = [], elements = [], selectedPanelId = null, panelRegistry, getElementDef, isCustomTitleElementId, }) {
-    const panelHtml = panels.map((panel) => {
-        const def = panelRegistry?.[panel.id];
-        if (!def)
-            return "";
-        const isSelected = panel.id === selectedPanelId;
-        const isEnabled = panel.enabled !== false;
-        return `
-      <button
-        class="me-layout-panel-item${isSelected ? " me-layout-panel-item--selected" : ""}${!isEnabled ? " me-layout-panel-item--hidden" : ""}"
-        type="button"
-        data-panel-select="${escapeHtml(panel.id)}"
-        aria-pressed="${isSelected ? "true" : "false"}"
-      >
-        <span class="me-layout-panel-item__dot${def.required ? " me-layout-panel-item__dot--required" : ""}"></span>
-        <span class="me-layout-panel-item__label">${escapeHtml(def.label)}</span>
-        ${isEnabled ? "" : `<span class="me-layout-panel-item__badge">hidden</span>`}
-        ${def.required ? `<span class="me-layout-panel-item__badge me-layout-panel-item__badge--required">required</span>` : ""}
-      </button>
-    `;
-    }).join("");
-    const elementHtml = elements.map((element) => {
-        const def = getElementDef?.(element.id);
-        if (!def)
-            return "";
-        const isSelected = element.id === selectedPanelId;
-        const isEnabled = element.enabled !== false;
-        const label = isCustomTitleElementId?.(element.id)
-            ? (element.text || def.label)
-            : def.label;
-        return `
-      <button
-        class="me-layout-panel-item${isSelected ? " me-layout-panel-item--selected" : ""}${!isEnabled ? " me-layout-panel-item--hidden" : ""}"
-        type="button"
-        data-panel-select="${escapeHtml(element.id)}"
-        aria-pressed="${isSelected ? "true" : "false"}"
-      >
-        <span class="me-layout-panel-item__dot"></span>
-        <span class="me-layout-panel-item__label">${escapeHtml(label)}</span>
-        <span class="me-layout-panel-item__badge">${escapeHtml(def.category)}</span>
-        ${isEnabled ? "" : `<span class="me-layout-panel-item__badge">hidden</span>`}
-      </button>
-    `;
-    }).join("");
-    return `${panelHtml}${elementHtml}`;
-}
 export function renderPanelInspectorHtml({ panel, def, childEditPanelId = null, selectedChildId = null, }) {
     const enableToggle = !def.required
-        ? `<label class="me-layout-inspector__toggle-label">
-        <input
-          class="me-layout-inspector__visible-toggle"
-          type="checkbox"
-          data-toggle-panel="${escapeHtml(panel.id)}"
-          ${panel.enabled !== false ? "checked" : ""}
-        >
-        Visible
-      </label>`
-        : `<p class="me-layout-inspector__locked">Required - always visible</p>`;
+        ? renderVisibilityToggle(`data-toggle-panel="${escapeHtml(panel.id)}"`, panel.enabled !== false)
+        : `<p class="me-layout-inspector__locked">Required — always visible</p>`;
     return `
     <div class="me-layout-inspector__panel">
-      <p class="me-layout-inspector__panel-label">${escapeHtml(def.label)}</p>
+      <header class="me-layout-inspector__head">
+        <p class="me-layout-inspector__panel-label">${escapeHtml(def.label)}</p>
+        <span class="me-layout-inspector__kind">Panel</span>
+      </header>
       <dl class="me-layout-inspector__meta">
         <dt>Position</dt><dd>col ${panel.x + 1}, row ${panel.y + 1}</dd>
-        <dt>Size</dt><dd>${panel.w} x ${panel.h}</dd>
-        <dt>Min</dt><dd>${def.minW} x ${def.minH}</dd>
-        <dt>Max</dt><dd>${def.maxW} x ${def.maxH}</dd>
+        <dt>Size</dt><dd>${panel.w} × ${panel.h}</dd>
+        <dt>Min</dt><dd>${def.minW} × ${def.minH}</dd>
+        <dt>Max</dt><dd>${def.maxW} × ${def.maxH}</dd>
       </dl>
       ${enableToggle}
       ${!def.draggable ? `<p class="me-layout-inspector__locked">Position locked</p>` : ""}
@@ -96,27 +45,37 @@ export function renderPanelInspectorHtml({ panel, def, childEditPanelId = null, 
     </div>
   `;
 }
+/** Shared visibility switch so panels and elements read identically in the rail. */
+function renderVisibilityToggle(dataAttr, checked) {
+    return `
+    <label class="me-layout-inspector__toggle-label">
+      <input
+        class="me-layout-inspector__visible-toggle"
+        type="checkbox"
+        ${dataAttr}
+        ${checked ? "checked" : ""}
+      >
+      <span class="me-layout-inspector__toggle-track" aria-hidden="true"></span>
+      <span class="me-layout-inspector__toggle-copy">Visible on my profile</span>
+    </label>
+  `;
+}
 export function renderElementInspectorHtml({ element, def, isCustomTitleElementId, }) {
     return `
     <div class="me-layout-inspector__panel">
-      <p class="me-layout-inspector__panel-label">${escapeHtml(def.label)}</p>
+      <header class="me-layout-inspector__head">
+        <p class="me-layout-inspector__panel-label">${escapeHtml(def.label)}</p>
+        <span class="me-layout-inspector__kind">Element</span>
+      </header>
       <dl class="me-layout-inspector__meta">
         <dt>Category</dt><dd>${escapeHtml(def.category)}</dd>
         <dt>Type</dt><dd>${escapeHtml(def.type)}</dd>
         <dt>Position</dt><dd>col ${formatNumber(element.x + 1)}, row ${formatNumber(element.y + 1)}</dd>
-        <dt>Size</dt><dd>${formatNumber(element.w)} x ${formatNumber(element.h)}</dd>
+        <dt>Size</dt><dd>${formatNumber(element.w)} × ${formatNumber(element.h)}</dd>
       </dl>
-      <label class="me-layout-inspector__toggle-label">
-        <input
-          class="me-layout-inspector__visible-toggle"
-          type="checkbox"
-          data-toggle-element="${escapeHtml(element.id)}"
-          ${element.enabled !== false ? "checked" : ""}
-        >
-        Visible
-      </label>
+      ${renderVisibilityToggle(`data-toggle-element="${escapeHtml(element.id)}"`, element.enabled !== false)}
       ${def.type === "title" ? `
-        <label class="me-layout-style-control">
+        <label class="me-layout-style-control me-layout-style-control--stacked">
           <span>Title Text</span>
           <input class="me-layout-style-control__text" type="text" value="${escapeHtml(element.text || def.defaultText || "")}" data-element-text="${escapeHtml(element.id)}">
         </label>
@@ -272,11 +231,15 @@ function renderStyleControls(item, def = null) {
         <p class="me-layout-style-editor__title">${type === "panel" ? "Panel Style" : "Element Style"}</p>
         <button class="me-layout-style-editor__reset" type="button" data-reset-panel-style="${escapeHtml(item.id)}">Reset</button>
       </div>
-      ${colorControls.join("")}
-      ${renderRangeControl("Transparency", "opacity", style.opacity, 0.15, 1, 0.01, `${Math.round(style.opacity * 100)}%`)}
-      ${renderRangeControl("Saturation", "saturation", style.saturation, 0, 2, 0.01, `${Math.round(style.saturation * 100)}%`)}
-      ${renderRangeControl("Brightness", "brightness", style.brightness, 0.35, 1.8, 0.01, `${Math.round(style.brightness * 100)}%`)}
-      ${showGradientAngle ? renderRangeControl("Gradient Angle", "gradientAngle", style.gradientAngle, 0, 360, 1, `${Math.round(style.gradientAngle)}deg`) : ""}
+      <div class="me-layout-style-editor__group">
+        ${colorControls.join("")}
+      </div>
+      <div class="me-layout-style-editor__group">
+        ${renderRangeControl("Transparency", "opacity", style.opacity, 0.15, 1, 0.01, `${Math.round(style.opacity * 100)}%`)}
+        ${renderRangeControl("Saturation", "saturation", style.saturation, 0, 2, 0.01, `${Math.round(style.saturation * 100)}%`)}
+        ${renderRangeControl("Brightness", "brightness", style.brightness, 0.35, 1.8, 0.01, `${Math.round(style.brightness * 100)}%`)}
+        ${showGradientAngle ? renderRangeControl("Gradient Angle", "gradientAngle", style.gradientAngle, 0, 360, 1, `${Math.round(style.gradientAngle)}deg`) : ""}
+      </div>
     </div>
   `;
 }
@@ -290,10 +253,12 @@ function renderColorControl(label, key, value) {
 }
 function renderRangeControl(label, key, value, min, max, step, readout) {
     return `
-    <label class="me-layout-style-control">
-      <span>${escapeHtml(label)}</span>
+    <label class="me-layout-style-control me-layout-style-control--range">
+      <span class="me-layout-style-control__head">
+        <span>${escapeHtml(label)}</span>
+        <output>${escapeHtml(readout)}</output>
+      </span>
       <input type="range" min="${min}" max="${max}" step="${step}" value="${escapeHtml(value)}" data-panel-style="${escapeHtml(key)}">
-      <output>${escapeHtml(readout)}</output>
     </label>
   `;
 }

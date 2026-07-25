@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="../../css/profile-music.css">
   <link rel="stylesheet" href="../../css/me.css?v=20260519-global-text-color-1">
   <link rel="stylesheet" href="../../css/thoughts.css?v=20260519-composer-about-color-1">
-  <link rel="stylesheet" href="../../css/profile-layout.css?v=20260524-gallery-photo-fix-2">
+  <link rel="stylesheet" href="../../css/profile-layout.css?v=20260725-editor-ux-1">
   <link rel="stylesheet" href="../../css/notifications.css">
   <link rel="stylesheet" href="../../css/page-stage.css">
 </head>
@@ -29,45 +29,78 @@
       <div id="meLayoutPrimaryNav" class="me-layout-stage__nav page-stage__nav"></div>
 
       <div class="me-layout-topbar">
-        <a href="../" class="me-layout-topbar__back">← Back to Profile</a>
-        <h1 class="pixel-text me-layout-topbar__title">CUSTOMIZE LAYOUT</h1>
-        <a href="../edit/" class="me-layout-topbar__action">Edit Content</a>
-        <span id="meLayoutDirtyFlag" class="me-layout-topbar__dirty" hidden>Unsaved changes</span>
-        <span id="meLayoutStatus" class="me-layout-topbar__status"></span>
-        <button id="meLayoutGridToggle" class="me-layout-topbar__btn" type="button" aria-pressed="true">Grid: ON</button>
-        <button id="meLayoutZoomFitBtn" class="me-layout-topbar__btn" type="button">Fit</button>
-        <button id="meLayoutZoomOutBtn" class="me-layout-topbar__btn" type="button" aria-label="Zoom out">−</button>
-        <button id="meLayoutZoomInBtn"  class="me-layout-topbar__btn" type="button" aria-label="Zoom in">+</button>
-        <button id="meLayoutResetBtn" class="me-layout-topbar__btn" type="button">Reset</button>
-        <button id="meLayoutSaveBtn" class="me-layout-topbar__btn me-layout-topbar__btn--primary" type="button">Save Layout</button>
+        <div class="me-layout-topbar__lead">
+          <a href="../" class="me-layout-topbar__back" title="Back to your profile">
+            <span aria-hidden="true">←</span> Profile
+          </a>
+          <h1 class="pixel-text me-layout-topbar__title">Customize Layout</h1>
+          <span id="meLayoutDirtyFlag" class="me-layout-topbar__dirty" hidden>Unsaved changes</span>
+        </div>
+
+        <div class="me-layout-topbar__center">
+          <div class="me-layout-toolgroup" role="group" aria-label="Canvas view">
+            <button id="meLayoutGridToggle" class="me-layout-toolbtn" type="button" aria-pressed="true" title="Toggle the alignment grid">
+              <span class="me-layout-toolbtn__icon" aria-hidden="true">
+                <svg viewBox="0 0 16 16"><path d="M1 1h14v14H1V1Zm1.5 1.5v3.7h3.7V2.5H2.5Zm5.2 0v3.7h3.7V2.5H7.7Zm5.2 0v3.7h1.6V2.5h-1.6ZM2.5 7.7v3.7h3.7V7.7H2.5Zm5.2 0v3.7h3.7V7.7H7.7Zm5.2 0v3.7h1.6V7.7h-1.6ZM2.5 12.9v1.6h3.7v-1.6H2.5Zm5.2 0v1.6h3.7v-1.6H7.7Zm5.2 0v1.6h1.6v-1.6h-1.6Z"/></svg>
+              </span>
+              <span class="me-layout-toolbtn__text">Grid</span>
+            </button>
+          </div>
+
+          <div class="me-layout-toolgroup me-layout-toolgroup--zoom" role="group" aria-label="Zoom">
+            <button id="meLayoutZoomOutBtn" class="me-layout-toolbtn me-layout-toolbtn--icon" type="button" aria-label="Zoom out" title="Zoom out">−</button>
+            <button id="meLayoutZoomFitBtn" class="me-layout-toolbtn me-layout-toolbtn--zoom" type="button" title="Zoom to fit">
+              <span id="meLayoutZoomLevel">100%</span>
+            </button>
+            <button id="meLayoutZoomInBtn" class="me-layout-toolbtn me-layout-toolbtn--icon" type="button" aria-label="Zoom in" title="Zoom in">+</button>
+          </div>
+        </div>
+
+        <div class="me-layout-topbar__actions">
+          <span id="meLayoutStatus" class="me-layout-topbar__status" role="status"></span>
+          <a href="../edit/" class="me-layout-toolbtn me-layout-toolbtn--link">Edit Content</a>
+          <button id="meLayoutResetBtn" class="me-layout-toolbtn" type="button" title="Restore the default layout">Reset</button>
+          <button id="meLayoutSaveBtn" class="me-layout-toolbtn me-layout-toolbtn--primary" type="button">Save Layout</button>
+        </div>
       </div>
 
       <div class="me-layout-workspace">
-        <aside class="me-layout-sidebar">
-          <section class="me-layout-sidebar__section">
-            <h2 class="me-layout-sidebar__heading">Panels</h2>
-            <button id="meLayoutAddTitleBtn" class="me-layout-sidebar__action" type="button">Add Title Bubble</button>
-            <div id="meLayoutPanelList" class="me-layout-panel-list"></div>
-          </section>
-          <section class="me-layout-sidebar__section">
-            <h2 class="me-layout-sidebar__heading">Selected</h2>
-            <div id="meLayoutInspector" class="me-layout-inspector">
-              <p class="me-layout-inspector__empty">Click a panel to inspect it.</p>
-            </div>
-          </section>
+        <aside class="me-layout-rail me-layout-rail--left" aria-label="Panels and elements">
+          <div class="me-layout-rail__head">
+            <h2 class="me-layout-rail__heading">Panels &amp; Elements</h2>
+            <button id="meLayoutAddTitleBtn" class="me-layout-rail__add" type="button" title="Add a custom title bubble">
+              <span aria-hidden="true">+</span> Title
+            </button>
+          </div>
+          <div class="me-layout-rail__search">
+            <svg class="me-layout-rail__search-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M10.4 9.3a5 5 0 1 0-1.1 1.1l3.4 3.4 1.1-1.1-3.4-3.4ZM6.5 10a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z"/></svg>
+            <input id="meLayoutPanelSearch" class="me-layout-rail__search-input" type="search" placeholder="Search panels…" autocomplete="off" aria-label="Search panels and elements">
+          </div>
+          <div id="meLayoutPanelList" class="me-layout-panel-list"></div>
         </aside>
 
         <div class="me-layout-canvas-wrap" id="meLayoutCanvasWrap">
-          <div id="meLayoutCanvas" class="profile-layout-grid profile-layout-grid--edit profile-layout-grid--overlay">
-            <p class="me-layout-loading">Loading layout…</p>
+          <div class="me-layout-canvas-stage" id="meLayoutCanvasStage">
+            <div id="meLayoutCanvas" class="profile-layout-grid profile-layout-grid--edit profile-layout-grid--overlay">
+              <p class="me-layout-loading">Loading layout…</p>
+            </div>
           </div>
         </div>
+
+        <aside class="me-layout-rail me-layout-rail--right" aria-label="Selected panel settings">
+          <div class="me-layout-rail__head">
+            <h2 class="me-layout-rail__heading">Inspector</h2>
+          </div>
+          <div id="meLayoutInspector" class="me-layout-inspector">
+            <p class="me-layout-inspector__empty">Select a panel on the canvas or in the list to edit it.</p>
+          </div>
+        </aside>
       </div>
     </div>
   </main>
 
   <script type="module" src="../../js/pixel-text.mjs"></script>
   <script type="module" src="../../js/platform-config.mjs"></script>
-  <script type="module" src="../../js/profile-layout/layout-wire.mjs?v=20260524-gallery-photo-fix-2"></script>
+  <script type="module" src="../../js/profile-layout/layout-wire.mjs?v=20260725-editor-ux-1"></script>
 </body>
 </html>

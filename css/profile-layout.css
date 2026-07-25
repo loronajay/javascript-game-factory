@@ -2,330 +2,735 @@
    PROFILE LAYOUT — grid system + /me/layout editor chrome
    ========================================================= */
 
-/* --- Page Shell --- */
+/* ---------------------------------------------------------
+   EDITOR SHELL
+   /me/layout is an app frame, not a document: the page itself
+   never scrolls, and the three workspace columns each own
+   their own scroll region.
+   --------------------------------------------------------- */
 
 .me-layout-shell {
+  --edit-surface: rgba(255, 255, 255, 0.032);
+  --edit-surface-hi: rgba(255, 255, 255, 0.06);
+  --edit-line: rgba(255, 255, 255, 0.085);
+  --edit-line-soft: rgba(255, 255, 255, 0.05);
+  --edit-text: var(--color-fg, #f0e6d3);
+  --edit-muted: rgba(240, 230, 211, 0.5);
+  --edit-faint: rgba(240, 230, 211, 0.3);
+  --edit-accent: var(--color-accent, #7ec8e3);
+  --edit-accent-soft: rgba(126, 200, 227, 0.14);
+  --edit-rail-w: 268px;
+  --edit-inspector-w: 322px;
+  --edit-radius: 12px;
+
   background: var(--color-bg, #0a0a14);
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* Full-bleed: the shared 1120px document column would waste half the screen
+   on a tool whose whole job is showing a wide canvas next to two rails. */
+.me-layout-shell .arcade-shell {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .me-layout-stage {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  padding: 0 1rem 3rem;
+  flex: 1;
+  min-height: 0;
+  padding: 0 clamp(10px, 1.4vw, 22px) clamp(10px, 1.4vw, 18px);
 }
 
 .me-layout-stage__nav {
-  padding: 0.75rem 0;
+  padding: 0.5rem 0 0.35rem;
+  flex-shrink: 0;
 }
 
 /* --- Top Bar --- */
 
 .me-layout-topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0 0.7rem;
+  border-bottom: 1px solid var(--edit-line-soft);
+  margin-bottom: 0.7rem;
+  flex-shrink: 0;
+}
+
+.me-layout-topbar__lead {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.75rem 0 1.25rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.me-layout-topbar__center {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-self: center;
+}
+
+.me-layout-topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  justify-content: flex-end;
+  min-width: 0;
 }
 
 .me-layout-topbar__back {
-  color: var(--color-accent, #7ec8e3);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--edit-muted);
   text-decoration: none;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   letter-spacing: 0.04em;
-  opacity: 0.85;
+  padding: 0.32rem 0.55rem;
+  border-radius: 6px;
   white-space: nowrap;
+  transition: color 0.15s, background 0.15s;
 }
 
 .me-layout-topbar__back:hover {
-  opacity: 1;
-  text-decoration: underline;
+  color: var(--edit-text);
+  background: var(--edit-surface-hi);
 }
 
 .me-layout-topbar__title {
-  font-size: 1.1rem;
+  font-size: 0.92rem;
+  letter-spacing: 0.06em;
   margin: 0;
-  flex: 1;
-}
-
-.me-layout-topbar__action {
-  color: var(--color-accent, #7ec8e3);
-  text-decoration: none;
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
-  border: 1px solid rgba(126, 200, 227, 0.3);
-  border-radius: 4px;
-  padding: 0.3rem 0.7rem;
   white-space: nowrap;
-  transition: background 0.15s;
-}
-
-.me-layout-topbar__action:hover {
-  background: rgba(126, 200, 227, 0.08);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .me-layout-topbar__dirty {
-  font-size: 0.78rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--color-warn, #f0c040);
-  letter-spacing: 0.05em;
-  opacity: 0.9;
+  border: 1px solid rgba(240, 192, 64, 0.32);
+  background: rgba(240, 192, 64, 0.1);
+  border-radius: 999px;
+  padding: 0.16rem 0.5rem;
   white-space: nowrap;
 }
 
 .me-layout-topbar__status {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.72rem;
+  color: var(--edit-faint);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   min-width: 0;
+  margin-right: 0.15rem;
 }
 
-.me-layout-topbar__btn {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
-  color: var(--color-fg, #f0e6d3);
+/* --- Toolbar buttons --- */
+
+.me-layout-toolgroup {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--edit-line);
+  border-radius: 8px;
+  background: var(--edit-surface);
+}
+
+.me-layout-toolbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  background: var(--edit-surface);
+  border: 1px solid var(--edit-line);
+  border-radius: 7px;
+  color: var(--edit-text);
   cursor: pointer;
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
-  padding: 0.3rem 0.8rem;
-  transition: background 0.15s;
+  font: inherit;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  padding: 0.36rem 0.72rem;
+  text-decoration: none;
   white-space: nowrap;
+  transition: background 0.14s, border-color 0.14s, color 0.14s;
 }
 
-.me-layout-topbar__btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+.me-layout-toolbtn:hover {
+  background: var(--edit-surface-hi);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
-.me-layout-topbar__btn[aria-pressed="true"] {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.22);
+/* Inside a toolgroup the group owns the frame, so members go borderless. */
+.me-layout-toolgroup .me-layout-toolbtn {
+  border-color: transparent;
+  background: transparent;
 }
 
-.me-layout-topbar__btn--primary {
-  background: rgba(126, 200, 227, 0.15);
-  border-color: rgba(126, 200, 227, 0.4);
-  color: var(--color-accent, #7ec8e3);
+.me-layout-toolgroup .me-layout-toolbtn:hover {
+  background: var(--edit-surface-hi);
 }
 
-.me-layout-topbar__btn--primary:hover {
-  background: rgba(126, 200, 227, 0.25);
+.me-layout-toolbtn__icon {
+  display: inline-flex;
+  width: 13px;
+  height: 13px;
 }
 
-.me-layout-topbar__btn:disabled {
-  opacity: 0.5;
+.me-layout-toolbtn__icon svg {
+  width: 100%;
+  height: 100%;
+  fill: currentColor;
+}
+
+.me-layout-toolbtn--icon {
+  width: 28px;
+  padding: 0.36rem 0;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.me-layout-toolbtn--zoom {
+  min-width: 58px;
+  font-variant-numeric: tabular-nums;
+  color: var(--edit-muted);
+}
+
+.me-layout-toolbtn--zoom:hover {
+  color: var(--edit-text);
+}
+
+.me-layout-toolbtn[aria-pressed="true"] {
+  background: var(--edit-accent-soft);
+  border-color: rgba(126, 200, 227, 0.3);
+  color: var(--edit-accent);
+}
+
+.me-layout-toolgroup .me-layout-toolbtn[aria-pressed="true"] {
+  border-color: transparent;
+}
+
+.me-layout-toolbtn--link {
+  color: var(--edit-muted);
+}
+
+.me-layout-toolbtn--link:hover {
+  color: var(--edit-text);
+}
+
+.me-layout-toolbtn--primary {
+  background: rgba(126, 200, 227, 0.16);
+  border-color: rgba(126, 200, 227, 0.42);
+  color: var(--edit-accent);
+  font-weight: 600;
+}
+
+.me-layout-toolbtn--primary:hover {
+  background: rgba(126, 200, 227, 0.26);
+  border-color: rgba(126, 200, 227, 0.6);
+}
+
+.me-layout-toolbtn:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
-/* --- Workspace (sidebar + canvas) --- */
+/* --- Workspace: rail | canvas | inspector --- */
 
 .me-layout-workspace {
-  display: flex;
-  gap: 1.25rem;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: var(--edit-rail-w) minmax(0, 1fr) var(--edit-inspector-w);
+  gap: 10px;
   flex: 1;
+  min-height: 0;
 }
 
-.me-layout-sidebar {
-  width: 220px;
-  flex-shrink: 0;
+.me-layout-rail {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
-  position: sticky;
-  top: 1rem;
-  max-height: calc(100vh - 6rem);
-  overflow-y: auto;
+  min-height: 0;
+  background: var(--edit-surface);
+  border: 1px solid var(--edit-line);
+  border-radius: var(--edit-radius);
+  overflow: hidden;
 }
 
-.me-layout-sidebar__section {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 8px;
-  padding: 0.85rem 0.9rem;
+.me-layout-rail__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.7rem;
+  border-bottom: 1px solid var(--edit-line-soft);
+  flex-shrink: 0;
 }
 
-.me-layout-sidebar__heading {
-  margin: 0 0 0.6rem;
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
+.me-layout-rail__heading {
+  margin: 0;
+  font-size: 0.66rem;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--edit-faint);
+  white-space: nowrap;
 }
 
-.me-layout-sidebar__action {
-  width: 100%;
-  margin: 0 0 0.65rem;
-  padding: 0.55rem 0.65rem;
+.me-layout-rail__add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
   border: 1px solid rgba(126, 200, 227, 0.28);
   border-radius: 6px;
   background: rgba(126, 200, 227, 0.08);
-  color: #fff8ff;
+  color: var(--edit-accent);
+  cursor: pointer;
   font: inherit;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  padding: 0.24rem 0.5rem;
+  white-space: nowrap;
+  transition: background 0.14s, border-color 0.14s;
+}
+
+.me-layout-rail__add:hover {
+  background: rgba(126, 200, 227, 0.18);
+  border-color: rgba(126, 200, 227, 0.5);
+}
+
+/* --- Rail search --- */
+
+.me-layout-rail__search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0.6rem 0.4rem;
+  flex-shrink: 0;
+}
+
+.me-layout-rail__search-icon {
+  position: absolute;
+  left: 1.15rem;
+  width: 12px;
+  height: 12px;
+  fill: var(--edit-faint);
+  pointer-events: none;
+}
+
+.me-layout-rail__search-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--edit-line);
+  border-radius: 7px;
+  background: rgba(7, 6, 18, 0.6);
+  color: var(--edit-text);
+  font: inherit;
+  font-size: 0.76rem;
+  padding: 0.36rem 0.5rem 0.36rem 1.85rem;
+  transition: border-color 0.14s;
+}
+
+.me-layout-rail__search-input::placeholder {
+  color: var(--edit-faint);
+}
+
+.me-layout-rail__search-input:focus {
+  outline: none;
+  border-color: rgba(126, 200, 227, 0.5);
+}
+
+.me-layout-rail__search-input::-webkit-search-cancel-button {
+  filter: invert(1) opacity(0.4);
   cursor: pointer;
 }
 
-.me-layout-sidebar__action:hover {
-  border-color: rgba(126, 200, 227, 0.52);
-  background: rgba(126, 200, 227, 0.14);
-}
-
-/* --- Panel List --- */
+/* --- Panel list --- */
 
 .me-layout-panel-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 0.45rem 0.6rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+.me-layout-panel-list::-webkit-scrollbar {
+  width: 9px;
+}
+
+.me-layout-panel-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+.me-layout-panel-list__empty {
+  margin: 1rem 0.4rem;
+  font-size: 0.76rem;
+  color: var(--edit-faint);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+/* --- Groups --- */
+
+.me-layout-group + .me-layout-group {
+  margin-top: 2px;
+}
+
+/* Sticky so the section a row belongs to stays named while the rail scrolls.
+   The fade matches the rail surface (page bg + --edit-surface) so rows scroll
+   out under it cleanly. */
+.me-layout-group__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  color: var(--edit-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.66rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  padding: 0.42rem 0.35rem;
+  text-align: left;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: linear-gradient(to bottom, #11111a 78%, rgba(17, 17, 26, 0));
+}
+
+.me-layout-group__toggle:hover {
+  color: var(--edit-text);
+}
+
+.me-layout-group__chevron {
+  flex-shrink: 0;
+  width: 0;
+  height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 3.5px solid transparent;
+  border-bottom: 3.5px solid transparent;
+  transform: rotate(90deg);
+  transition: transform 0.14s ease;
+  opacity: 0.75;
+}
+
+.me-layout-group--collapsed .me-layout-group__chevron {
+  transform: rotate(0deg);
+}
+
+.me-layout-group__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.me-layout-group__count {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  color: var(--edit-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.me-layout-group__rows {
   display: flex;
   flex-direction: column;
+  gap: 1px;
+  padding-bottom: 0.3rem;
+}
+
+.me-layout-group--collapsed .me-layout-group__rows {
+  display: none;
+}
+
+/* --- Panel rows --- */
+
+.me-layout-panel-row {
+  display: flex;
+  align-items: stretch;
   gap: 2px;
+  border-radius: 6px;
+}
+
+.me-layout-panel-row:hover {
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .me-layout-panel-item {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   background: none;
   border: 1px solid transparent;
-  border-radius: 5px;
-  color: var(--color-fg, #f0e6d3);
+  border-radius: 6px;
+  color: var(--edit-text);
   cursor: pointer;
-  font-size: 0.8rem;
-  letter-spacing: 0.02em;
-  padding: 0.35rem 0.5rem;
+  font: inherit;
+  font-size: 0.775rem;
+  letter-spacing: 0.01em;
+  padding: 0.36rem 0.45rem;
   text-align: left;
-  transition: background 0.12s, border-color 0.12s;
-}
-
-.me-layout-panel-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
 }
 
 .me-layout-panel-item--selected {
-  background: rgba(126, 200, 227, 0.1);
-  border-color: rgba(126, 200, 227, 0.3);
-  color: var(--color-accent, #7ec8e3);
+  background: var(--edit-accent-soft);
+  border-color: rgba(126, 200, 227, 0.4);
+  color: var(--edit-accent);
 }
 
 .me-layout-panel-item--hidden {
-  opacity: 0.45;
+  color: var(--edit-faint);
 }
 
 .me-layout-panel-item__dot {
   flex-shrink: 0;
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: rgba(126, 200, 227, 0.5);
+  background: currentColor;
+  opacity: 0.55;
 }
 
-.me-layout-panel-item__dot--required {
-  background: rgba(255, 121, 183, 0.6);
+.me-layout-panel-item--hidden .me-layout-panel-item__dot {
+  background: none;
+  box-shadow: inset 0 0 0 1px currentColor;
 }
 
+/* Long element names wrap to a second line instead of truncating to "He…". */
 .me-layout-panel-item__label {
   flex: 1;
   min-width: 0;
-  white-space: nowrap;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
-.me-layout-panel-item__badge {
+.me-layout-panel-item__vis {
   flex-shrink: 0;
-  font-size: 0.62rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 3px;
-  padding: 1px 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--edit-faint);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.12s, background 0.12s;
 }
 
-.me-layout-panel-item__badge--required {
-  color: rgba(255, 121, 183, 0.6);
-  border-color: rgba(255, 121, 183, 0.2);
+.me-layout-panel-item__vis svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.me-layout-panel-item__vis:hover {
+  color: var(--edit-text);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.me-layout-panel-item__vis[aria-pressed="true"] {
+  color: rgba(240, 230, 211, 0.68);
+}
+
+.me-layout-panel-item__vis--locked {
+  color: rgba(255, 121, 183, 0.5);
+  cursor: default;
+}
+
+.me-layout-panel-item__vis--locked:hover {
+  background: none;
+  color: rgba(255, 121, 183, 0.5);
 }
 
 /* --- Inspector --- */
 
 .me-layout-inspector {
-  min-height: 48px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.75rem 0.8rem 1.2rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+
+.me-layout-inspector::-webkit-scrollbar {
+  width: 9px;
+}
+
+.me-layout-inspector::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
 }
 
 .me-layout-inspector__empty {
   font-size: 0.78rem;
-  color: rgba(255, 255, 255, 0.28);
-  margin: 0;
-  font-style: italic;
+  color: var(--edit-faint);
+  margin: 0.4rem 0 0;
+  line-height: 1.55;
 }
 
 .me-layout-inspector__panel {
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
+  gap: 0.7rem;
+}
+
+.me-layout-inspector__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
 .me-layout-inspector__panel-label {
-  font-size: 0.88rem;
+  font-size: 0.95rem;
   font-weight: 600;
-  color: var(--color-fg, #f0e6d3);
+  color: var(--edit-text);
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.me-layout-inspector__kind {
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--edit-faint);
+  border: 1px solid var(--edit-line);
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
 }
 
 .me-layout-inspector__meta {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.1rem 0.6rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.22rem 0.7rem;
   font-size: 0.73rem;
   margin: 0;
+  padding: 0.5rem 0.55rem;
+  border: 1px solid var(--edit-line-soft);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
 }
 
 .me-layout-inspector__meta dt {
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--edit-faint);
   font-weight: normal;
 }
 
 .me-layout-inspector__meta dd {
-  color: rgba(255, 255, 255, 0.65);
+  color: rgba(255, 255, 255, 0.72);
   margin: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .me-layout-inspector__locked {
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.28);
+  font-size: 0.72rem;
+  color: var(--edit-faint);
   margin: 0;
   font-style: italic;
 }
 
+/* Visibility switch */
+
 .me-layout-inspector__toggle-label {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.8rem;
-  color: var(--color-fg, #f0e6d3);
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--edit-text);
   cursor: pointer;
+  user-select: none;
 }
 
-.me-layout-style-editor {
-  display: grid;
-  gap: 0.65rem;
-  margin-top: 0.2rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+.me-layout-inspector__visible-toggle {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
 }
+
+.me-layout-inspector__toggle-track {
+  flex-shrink: 0;
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid var(--edit-line);
+  background: rgba(0, 0, 0, 0.35);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.me-layout-inspector__toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--edit-faint);
+  transition: transform 0.15s, background 0.15s;
+}
+
+.me-layout-inspector__visible-toggle:checked + .me-layout-inspector__toggle-track {
+  background: rgba(126, 200, 227, 0.28);
+  border-color: rgba(126, 200, 227, 0.5);
+}
+
+.me-layout-inspector__visible-toggle:checked + .me-layout-inspector__toggle-track::after {
+  transform: translateX(14px);
+  background: var(--edit-accent);
+}
+
+.me-layout-inspector__visible-toggle:focus-visible + .me-layout-inspector__toggle-track {
+  outline: 2px solid rgba(126, 200, 227, 0.6);
+  outline-offset: 2px;
+}
+
+/* --- Child (panel contents) editor --- */
 
 .me-layout-child-editor {
   display: grid;
-  gap: 0.5rem;
-  margin-top: 0.2rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid rgba(153, 255, 255, 0.1);
+  gap: 0.35rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--edit-line-soft);
 }
 
 .me-layout-child-editor__row {
@@ -333,9 +738,9 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.3rem 0.35rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 5px;
+  padding: 0.32rem 0.4rem;
+  border: 1px solid var(--edit-line-soft);
+  border-radius: 6px;
 }
 
 .me-layout-child-editor__row--selected {
@@ -347,126 +752,261 @@
   min-width: 0;
   border: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(255, 255, 255, 0.78);
   cursor: pointer;
   font: inherit;
-  font-size: 0.72rem;
+  font-size: 0.74rem;
   padding: 0;
   text-align: left;
 }
 
 .me-layout-child-editor__meta {
-  color: rgba(255, 255, 255, 0.38);
-  font-size: 0.64rem;
+  color: var(--edit-faint);
+  font-size: 0.65rem;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .me-layout-child-editor__hint {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.42);
-  font-size: 0.68rem;
-  line-height: 1.45;
+  margin: 0.1rem 0 0;
+  color: var(--edit-muted);
+  font-size: 0.7rem;
+  line-height: 1.5;
 }
 
-.me-layout-style-editor__header,
-.me-layout-style-control {
+/* --- Style editor --- */
+
+.me-layout-style-editor {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.6rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--edit-line-soft);
 }
 
 .me-layout-style-editor__header {
+  display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
+  gap: 0.5rem;
 }
 
 .me-layout-style-editor__title {
   margin: 0;
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 0.74rem;
-  letter-spacing: 0.1em;
+  color: var(--edit-muted);
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
+.me-layout-style-editor__group {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.55rem 0.55rem 0.6rem;
+  border: 1px solid var(--edit-line-soft);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
 .me-layout-style-editor__reset {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.62);
+  border: 1px solid var(--edit-line);
+  border-radius: 5px;
+  background: var(--edit-surface);
+  color: var(--edit-muted);
   cursor: pointer;
   font: inherit;
   font-size: 0.68rem;
-  padding: 0.2rem 0.45rem;
+  padding: 0.22rem 0.5rem;
+  transition: background 0.14s, color 0.14s;
+}
+
+.me-layout-style-editor__reset:hover {
+  background: var(--edit-surface-hi);
+  color: var(--edit-text);
 }
 
 .me-layout-style-editor__reset--danger {
   width: 100%;
-  margin-top: 0.75rem;
-  padding: 0.55rem 0.65rem;
-  border-color: rgba(255, 80, 80, 0.24);
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border-color: rgba(255, 80, 80, 0.26);
   background: rgba(255, 80, 80, 0.07);
   color: rgba(255, 170, 170, 0.9);
 }
 
+.me-layout-style-editor__reset--danger:hover {
+  background: rgba(255, 80, 80, 0.16);
+  color: rgba(255, 200, 200, 1);
+}
+
 .me-layout-style-control {
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
+  display: grid;
+  gap: 0.3rem;
+  color: var(--edit-muted);
+  font-size: 0.73rem;
+  letter-spacing: 0.02em;
 }
 
 .me-layout-style-control--color {
-  grid-template-columns: minmax(0, 1fr) 42px;
+  grid-template-columns: minmax(0, 1fr) 40px;
   align-items: center;
+  gap: 0.5rem;
+}
+
+.me-layout-style-control--range .me-layout-style-control__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
 .me-layout-style-control input[type="color"] {
-  width: 42px;
-  height: 28px;
+  width: 40px;
+  height: 24px;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 5px;
   background: transparent;
   cursor: pointer;
 }
 
 .me-layout-style-control input[type="range"] {
   width: 100%;
-  accent-color: var(--color-accent, #7ec8e3);
+  height: 16px;
+  accent-color: var(--edit-accent);
+  cursor: pointer;
 }
 
 .me-layout-style-control__text {
   width: 100%;
-  min-height: 34px;
+  min-height: 32px;
   box-sizing: border-box;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 5px;
+  border: 1px solid var(--edit-line);
+  border-radius: 6px;
   background: rgba(7, 6, 18, 0.74);
-  color: rgba(255, 255, 255, 0.82);
+  color: rgba(255, 255, 255, 0.86);
   font: inherit;
-  padding: 0 0.55rem;
+  font-size: 0.78rem;
+  padding: 0 0.5rem;
+}
+
+.me-layout-style-control__text:focus {
+  outline: none;
+  border-color: rgba(126, 200, 227, 0.5);
 }
 
 .me-layout-style-control output {
-  justify-self: end;
-  color: rgba(255, 255, 255, 0.42);
+  color: var(--edit-faint);
   font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
 }
 
-/* --- Canvas wrap --- */
+/* --- Canvas viewport --- */
 
 .me-layout-canvas-wrap {
-  flex: 1;
   min-width: 0;
-  overflow-x: auto;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--edit-line);
+  border-radius: var(--edit-radius);
+  padding: 18px;
+  /* A faint dot field reads as "workspace" and makes the profile canvas itself
+     legible as an object sitting on top of it. */
+  background:
+    radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 22px 22px,
+    #08070f;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.55);
+  display: grid;
+  justify-content: safe center;
+  align-content: safe center;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
   /* clicking the wrap background triggers deselect */
   cursor: default;
 }
 
+.me-layout-canvas-wrap::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+.me-layout-canvas-wrap::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+/* Sized to the *scaled* canvas so zooming out shrinks the scroll area
+   instead of leaving a tall empty gutter under the layout. */
+.me-layout-canvas-stage {
+  position: relative;
+}
+
+.me-layout-canvas-stage > .profile-layout-grid {
+  transform-origin: top left;
+}
+
 .me-layout-loading {
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--edit-faint);
   font-size: 0.85rem;
   padding: 2rem;
   text-align: center;
 }
+
+/* --- Narrower screens --- */
+
+@media (max-width: 1320px) {
+  .me-layout-shell {
+    --edit-rail-w: 232px;
+    --edit-inspector-w: 288px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .me-layout-shell {
+    height: auto;
+    overflow: auto;
+  }
+
+  .me-layout-shell .arcade-shell {
+    height: auto;
+  }
+
+  .me-layout-topbar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+  }
+
+  .me-layout-topbar__center,
+  .me-layout-topbar__actions {
+    justify-self: stretch;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .me-layout-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .me-layout-rail {
+    max-height: 320px;
+  }
+
+  /* Stacked rails are wide and short, so rows flow into columns instead of
+     stretching one name across the whole screen. */
+  .me-layout-group__rows {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 2px 8px;
+  }
+
+  .me-layout-canvas-wrap {
+    min-height: 60vh;
+  }
+}
+
 
 /* --- Profile Layout Grid --- */
 
@@ -1340,26 +1880,9 @@
 /* --- Mobile stacked --- */
 
 @media (max-width: 899px) {
-  .me-layout-workspace {
-    flex-direction: column;
-  }
-
-  .me-layout-sidebar {
-    width: 100%;
-    position: static;
-    max-height: none;
-    overflow-y: visible;
-    flex-direction: row;
-    flex-wrap: wrap;
-  }
-
-  .me-layout-sidebar__section {
-    flex: 1;
-    min-width: 200px;
-  }
-
   .me-layout-canvas-wrap {
     width: 100%;
+    padding: 10px;
   }
 
   .profile-layout-grid {
@@ -1381,6 +1904,6 @@
 
 @media (max-width: 600px) {
   .me-layout-stage {
-    padding: 0 0.75rem 2rem;
+    padding: 0 0.6rem 1.5rem;
   }
 }

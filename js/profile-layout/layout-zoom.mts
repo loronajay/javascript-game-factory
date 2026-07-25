@@ -1,4 +1,17 @@
-export function clampZoom(value: number, min = 0.25, max = 1): number {
+/**
+ * Layout editor zoom math.
+ *
+ * The editor canvas is rendered at the live profile width so column proportions
+ * match /me exactly, then CSS-scaled to fit the viewport. A scaled element still
+ * occupies its unscaled layout box, so the canvas sits inside a "stage" element
+ * whose explicit size is the scaled size — that stage is what the canvas viewport
+ * actually scrolls and centers.
+ */
+
+export const MIN_ZOOM = 0.25;
+export const MAX_ZOOM = 2;
+
+export function clampZoom(value: number, min = MIN_ZOOM, max = MAX_ZOOM): number {
   return Math.max(min, Math.min(max, value));
 }
 
@@ -22,6 +35,7 @@ export interface ComputeFitZoomOptions {
   windowHeight?: number;
 }
 
+/** Fit never magnifies — 100% is "actual size", and that stays the fit ceiling. */
 export function computeFitZoom({
   rowHeight = 0,
   gap = 0,
@@ -44,40 +58,24 @@ export interface BuildZoomFrameOptions {
   zoom?: number;
   canvasWidth?: number;
   canvasHeight?: number;
-  wrapWidth?: number;
 }
 
 export interface ZoomFrame {
   transform: string;
   transformOrigin: string;
-  marginLeft: string;
-  overflowX: string;
-  wrapHeight: string;
+  stageWidth: string;
+  stageHeight: string;
 }
 
 export function buildZoomFrame({
   zoom = 1,
   canvasWidth = 0,
   canvasHeight = 0,
-  wrapWidth = 0,
 }: BuildZoomFrameOptions = {}): ZoomFrame {
-  if (zoom < 1) {
-    const scaledWidth = canvasWidth * zoom;
-    const translateX = Math.max(0, (wrapWidth - scaledWidth) / 2);
-    return {
-      transform: `translateX(${translateX}px) scale(${zoom})`,
-      transformOrigin: "top left",
-      marginLeft: "0",
-      overflowX: scaledWidth <= wrapWidth ? "hidden" : "auto",
-      wrapHeight: canvasHeight ? `${Math.ceil(canvasHeight * zoom)}px` : "",
-    };
-  }
-
   return {
-    transform: "",
-    transformOrigin: "",
-    marginLeft: "",
-    overflowX: "auto",
-    wrapHeight: "",
+    transform: zoom === 1 ? "" : `scale(${zoom})`,
+    transformOrigin: "top left",
+    stageWidth: canvasWidth ? `${Math.ceil(canvasWidth * zoom)}px` : "",
+    stageHeight: canvasHeight ? `${Math.ceil(canvasHeight * zoom)}px` : "",
   };
 }
