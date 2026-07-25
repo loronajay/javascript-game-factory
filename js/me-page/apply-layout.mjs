@@ -57,6 +57,12 @@ export function applyProfileLayout(doc, layout, { panelToDom = ME_PANEL_TO_DOM, 
     layoutEl.querySelectorAll("[data-profile-composition-overlay]").forEach((el) => el.remove());
     const renderElements = getCompositionElementsForRender(layout.desktop.elements, { galleryPhotos });
     const compositionCategories = getCompositionCategories(renderElements);
+    // Composition overlays are positioned as percentages of this container, so its height
+    // has to be the same on /me and /player. Left to the CSS grid's implicit rows it is not:
+    // the public page has no topFriends panel, so its grid ends five rows short and every
+    // overlay gets compressed upward. Pin the track count from the saved layout instead.
+    layoutEl.style.gridTemplateRows =
+        `repeat(${getLayoutRowCount(layout.desktop.panels, compositionCategories, required)}, var(--profile-layout-row-height))`;
     const panels = getRenderablePanels(layout.desktop.panels, layoutSelector).sort(comparePanelsByFreeformPosition);
     for (const panel of panels) {
         if (!panelToDom[panel.id])
@@ -79,6 +85,21 @@ export function applyProfileLayout(doc, layout, { panelToDom = ME_PANEL_TO_DOM, 
         layoutEl.appendChild(el);
     }
     renderCompositionOverlays(doc, layoutEl, renderElements, layout.desktop.panels, { galleryPhotos });
+}
+// Number of grid rows the layout occupies, counted from the saved layout rather than from
+// whichever panels the current page happens to own a DOM node for. Mirrors the placement
+// rules in applyProfileLayout: disabled panels and panels replaced by composition overlays
+// (except required ones, which still get grid geometry) create no tracks.
+export function getLayoutRowCount(panels, compositionCategories, required) {
+    let rows = 1;
+    for (const panel of panels) {
+        if (!panel || panel.enabled === false)
+            continue;
+        if (compositionCategories.has(panel.id) && !required.has(panel.id))
+            continue;
+        rows = Math.max(rows, (panel.y || 0) + (panel.h || 1));
+    }
+    return rows;
 }
 const FLOW_COLUMN_CLASS = "layout-flow-col";
 // True when the layout is the pristine, never-customized default for its page variant.
@@ -134,6 +155,7 @@ function panelChildrenMatchDefault(childrenA, childrenB) {
 function applyDefaultFlowLayout(doc, layoutEl, layout, panelToDom, required) {
     layoutEl.querySelectorAll("[data-profile-composition-overlay]").forEach((el) => el.remove());
     layoutEl.classList.add("layout--flow");
+    layoutEl.style.gridTemplateRows = "";
     // Re-applies (thought posts, friend actions, etc.) rebuild the columns; drop the old
     // wrappers so they don't accumulate. Panels are re-fetched by id and re-parented below.
     const staleColumns = [...layoutEl.querySelectorAll(":scope > ." + FLOW_COLUMN_CLASS)];
