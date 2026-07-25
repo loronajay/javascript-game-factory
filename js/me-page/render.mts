@@ -32,6 +32,7 @@ export function renderMePage(doc: Document = globalThis.document, profile: any =
     thoughtFeed,
     metricsRecord,
     relationshipsRecord,
+    ladderPlacements: Array.isArray(options?.ladderPlacements) ? options.ladderPlacements : [],
     thoughtComposerFlash: options?.thoughtComposerFlash || "",
     friendCodeFlash: options?.friendCodeFlash || "",
   });

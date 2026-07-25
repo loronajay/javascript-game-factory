@@ -45,6 +45,7 @@ export function renderPlayerPage(doc = globalThis.document, options = {}) {
         isOwnerView,
         metricsRecord,
         relationshipsRecord,
+        ladderPlacements: Array.isArray(options?.ladderPlacements) ? options.ladderPlacements : [],
         viewerPlayerId: localProfile.playerId,
         viewerRelationshipsRecord,
         thoughtComposerFlash: options?.thoughtComposerFlash || "",

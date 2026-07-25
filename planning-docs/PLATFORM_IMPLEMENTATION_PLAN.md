@@ -121,7 +121,8 @@ Not implemented yet:
 
 - Latest manual verification is complete for the profile CSS ownership pass. The 2026-05-18 layout-editor pass still needs a post-deploy browser pass across `/me`, `/me/layout`, and `/player`.
 - Upload flows are manually verified as working, including avatar/background/media uploads and multiple-photo gallery usage.
-- Ladder placements, badges, and favorite-cabinet empty-state polish still need a cleaner pass even though the surrounding profile surfaces are live.
+- Badges and favorite-cabinet empty-state polish still need a cleaner pass even though the surrounding profile surfaces are live.
+- Ladder placements are live on `/me` and `/player`, driven by the registry in `platform-api/src/services/ladder-catalog.mts`. Not yet verified in a browser against real `game_ratings` rows — needs a post-deploy pass once a ranked match has been played.
 
 ## Still To Implement
 
@@ -129,7 +130,7 @@ Not implemented yet:
 
 - Durable memories on `/me` and `/player`
 - A real badge pass instead of placeholder badge presentation
-- Better ladder-placement surfacing from existing activity/results data
+- A public ladder board page (`GET /ladders/:slug` exists; no platform UI reads it yet)
 - API-driven bulletins and events so seasonal content can rotate without a deploy
 - Production email/domain sender verification beyond the temporary sender setup
 

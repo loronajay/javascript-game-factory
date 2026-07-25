@@ -81,6 +81,7 @@ export interface BuildPlayerPageViewModelOptions {
   avatarUrlResolver?: (assetId: string) => unknown;
   metricsRecord?: any;
   relationshipsRecord?: any;
+  ladderPlacements?: any[];
   viewerPlayerId?: unknown;
   viewerRelationshipsRecord?: any;
   relationshipFlash?: string;
@@ -201,7 +202,8 @@ export function buildPlayerPageViewModel(profile: any, options: BuildPlayerPageV
     emptyValue: "No favorite cabinet is pinned on this player file yet.",
   });
   const rankingItems = buildRankingItems(publicView, favoriteTitleResolver, {
-    emptyValue: "No shared ranking snapshots are attached to this player file yet.",
+    ladderPlacements: options?.ladderPlacements,
+    emptyValue: "This player has not placed on a ladder yet.",
   });
   const friendItems = buildFriendItems(publicView, relationshipsRecord);
   const heroName = publicView.profileName || "UNNAMED PILOT";

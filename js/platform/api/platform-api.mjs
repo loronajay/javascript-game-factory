@@ -468,6 +468,26 @@ export function createPlatformApiClient(options = {}) {
             const encoded = encodePathSegment(gameSlug);
             return encoded ? post(`/game-progress/${encoded}/backfill`, payload) : Promise.resolve(null);
         },
+        // Platform ladders — public cross-game standings. Which games have a ladder is
+        // server-registry data (services/ladder-catalog), so a new cabinet appears here
+        // with no client change.
+        fetchLadders() {
+            return get("/ladders", "ladders");
+        },
+        fetchLadder(gameSlug, { limit } = {}) {
+            const gs = encodePathSegment(gameSlug);
+            if (!gs)
+                return Promise.resolve(null);
+            const query = limit ? `?limit=${encodeURIComponent(String(limit))}` : "";
+            return get(`/ladders/${gs}${query}`, "ladder");
+        },
+        fetchPlayerLadderPlacements(playerId, { limit } = {}) {
+            const pid = encodePathSegment(playerId);
+            if (!pid)
+                return Promise.resolve(null);
+            const query = limit ? `?limit=${encodeURIComponent(String(limit))}` : "";
+            return get(`/players/${pid}/ladders${query}`, "placements");
+        },
         enqueueRankedMatch(gameSlug) {
             const gs = encodePathSegment(gameSlug);
             return gs ? post(`/ranked/${gs}/queue`, {}) : Promise.resolve(null);

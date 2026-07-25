@@ -9,6 +9,7 @@ import { applyMigrations } from "./db/migrations.mjs";
 import { backfillLocalOwnership, findStripeGrant, getGameProgress, recordGameProgressClaim, regrantStripeEntitlements, resetCampaignProgress, revokeGameEntitlements, spendValorForEntitlement } from "./db/game-progress.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
+import { getLadderStandings, getPlayerLadderPlacements } from "./db/ladders.mjs";
 import { cancelRanked, enqueueRanked, getPublicRankedCard, getRankedLeaderboard, getRankedMatchDetail, getRankedMatches, getRankedStanding, getRankedUnitStats, pollRanked, reportRankedResult, saveRankedProfile, setRankedLobbyCode, startRankedMatch, } from "./db/ranked.mjs";
 import { createFriendshipBetweenPlayers, loadPlayerRelationships, recordDirectInteractionBetweenPlayers, recordSharedEventBetweenPlayers, recordSharedSessionBetweenPlayers, removeFriendBetweenPlayers, savePlayerRelationships, } from "./db/relationships.mjs";
 import { commentOnThought, deleteThought, deleteThoughtComment, listThoughtComments, listThoughts, reactToThought, saveThought, shareThought, } from "./db/thoughts.mjs";
@@ -138,6 +139,8 @@ async function bootstrap() {
         getRankedMatches: (gameSlug, params) => getRankedMatches(pool, { ...params, gameSlug }),
         getRankedMatchDetail: (gameSlug, params) => getRankedMatchDetail(pool, { ...params, gameSlug }),
         getRankedLeaderboard: (gameSlug, params) => getRankedLeaderboard(pool, { ...params, gameSlug }),
+        getLadderStandings: (gameSlug, params) => getLadderStandings(pool, { ...params, gameSlug }),
+        getPlayerLadderPlacements: (playerId, params) => getPlayerLadderPlacements(pool, { ...params, playerId }),
         getGameProgress: (playerId, gameSlug) => getGameProgress(pool, playerId, gameSlug),
         recordGameProgressClaim: (params) => recordGameProgressClaim(pool, params),
         spendValor: (params) => spendValorForEntitlement(pool, params),

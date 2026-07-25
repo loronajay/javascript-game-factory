@@ -11,6 +11,7 @@ import { applyMigrations } from "./db/migrations.mjs";
 import { backfillLocalOwnership, findStripeGrant, getGameProgress, recordGameProgressClaim, regrantStripeEntitlements, resetCampaignProgress, revokeGameEntitlements, spendValorForEntitlement } from "./db/game-progress.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
+import { getLadderStandings, getPlayerLadderPlacements } from "./db/ladders.mjs";
 import {
   cancelRanked,
   enqueueRanked,
@@ -224,6 +225,8 @@ async function bootstrap(): Promise<void> {
     getRankedMatches: (gameSlug: any, params: any) => getRankedMatches(pool, { ...params, gameSlug }),
     getRankedMatchDetail: (gameSlug: any, params: any) => getRankedMatchDetail(pool, { ...params, gameSlug }),
     getRankedLeaderboard: (gameSlug: any, params: any) => getRankedLeaderboard(pool, { ...params, gameSlug }),
+    getLadderStandings: (gameSlug: any, params: any) => getLadderStandings(pool, { ...params, gameSlug }),
+    getPlayerLadderPlacements: (playerId: any, params: any) => getPlayerLadderPlacements(pool, { ...params, playerId }),
     getGameProgress: (playerId: any, gameSlug: any) => getGameProgress(pool, playerId, gameSlug),
     recordGameProgressClaim: (params: any) => recordGameProgressClaim(pool, params),
     spendValor: (params: any) => spendValorForEntitlement(pool, params),

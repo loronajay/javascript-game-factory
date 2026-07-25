@@ -24,6 +24,7 @@ export function renderMePage(doc = globalThis.document, profile = loadFactoryPro
         thoughtFeed,
         metricsRecord,
         relationshipsRecord,
+        ladderPlacements: Array.isArray(options?.ladderPlacements) ? options.ladderPlacements : [],
         thoughtComposerFlash: options?.thoughtComposerFlash || "",
         friendCodeFlash: options?.friendCodeFlash || "",
     });

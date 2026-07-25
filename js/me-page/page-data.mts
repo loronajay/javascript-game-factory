@@ -102,10 +102,17 @@ export function createMePageDataController(options: MePageDataControllerOptions 
         }
       }
 
+      // Live read, never cached: a ladder placement moves whenever anyone else on that
+      // ladder finishes a match. Failure is non-fatal — the panel shows its empty state.
+      const ladderPlacements = currentProfile.playerId && typeof apiClient?.fetchPlayerLadderPlacements === "function"
+        ? await apiClient.fetchPlayerLadderPlacements(currentProfile.playerId).catch(() => null)
+        : null;
+
       return {
         profile: enrichedProfile,
         metricsRecord: hydrated.metricsRecord,
         relationshipsRecord: hydrated.relationshipsRecord,
+        ladderPlacements: Array.isArray(ladderPlacements) ? ladderPlacements : [],
         thoughtFeed,
         galleryPhotos,
       };

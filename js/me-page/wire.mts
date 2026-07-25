@@ -92,6 +92,7 @@ export function wireMePage(
       friendCodeFlash,
       metricsRecord: renderState.metricsRecord,
       relationshipsRecord: renderState.relationshipsRecord,
+      ladderPlacements: renderState.ladderPlacements,
       openReactionThoughtId: socialViewState.openReactionThoughtId,
       sharePanelState: socialViewState.sharePanelState,
       commentPanelState: socialViewState.commentPanelState,

@@ -99,13 +99,37 @@ export function buildFavoriteGameItems(publicView: any, favoriteTitleResolver: (
   }];
 }
 
+// Rank line under a ladder's rating: "Rank #3 of 42 · 12W-4L", trimming whatever the
+// source did not supply. Placements from the live ladder API carry the record and field
+// size; ones read off a stored profile may only have the rank.
+function buildRankingMeta(placement: any): string {
+  const parts: string[] = [];
+  const total = Math.floor(Number(placement.totalPlayers) || 0);
+  parts.push(total > 0 ? `Rank #${placement.rank} of ${total}` : `Rank #${placement.rank}`);
+
+  const wins = Math.floor(Number(placement.wins) || 0);
+  const losses = Math.floor(Number(placement.losses) || 0);
+  const draws = Math.floor(Number(placement.draws) || 0);
+  if (wins || losses || draws) {
+    parts.push(draws > 0 ? `${wins}W-${losses}L-${draws}D` : `${wins}W-${losses}L`);
+  }
+  return parts.join(" · ");
+}
+
+// Live placements (options.ladderPlacements, fetched from the platform ladder API) win
+// over anything stored on the profile record — a standing goes stale the moment someone
+// else plays a match, so the profile copy is only a fallback.
 export function buildRankingItems(publicView: any, favoriteTitleResolver: (slug: any) => string, options: any = {}): any[] {
-  const placements = Array.isArray(publicView.ladderPlacements) ? publicView.ladderPlacements : [];
+  const livePlacements = Array.isArray(options.ladderPlacements) ? options.ladderPlacements : [];
+  const storedPlacements = Array.isArray(publicView.ladderPlacements) ? publicView.ladderPlacements : [];
+  const placements = livePlacements.length > 0 ? livePlacements : storedPlacements;
   if (placements.length > 0) {
     return placements.map((placement: any) => ({
-      title: favoriteTitleResolver(placement.gameSlug),
+      // The ladder registry names itself (a rating slug like `sumorai-ranked` has no
+      // catalog title); fall back to the caller's slug resolver when it does not.
+      title: placement.title || favoriteTitleResolver(placement.gameSlug),
       value: placement.ratingLabel || `Rank #${placement.rank}`,
-      meta: `Rank #${placement.rank}`,
+      meta: buildRankingMeta(placement),
       isPlaceholder: false,
     }));
   }

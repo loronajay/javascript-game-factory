@@ -10,6 +10,7 @@ import { handleNotificationRoute } from "./routes/notification-routes.mjs";
 import { handleLayoutRoute } from "./routes/layout-routes.mjs";
 import { handleRatingRoute } from "./routes/rating-routes.mjs";
 import { handleRankedRoute } from "./routes/ranked-routes.mjs";
+import { handleLadderRoute } from "./routes/ladder-routes.mjs";
 import { handleGameProgressRoute } from "./routes/game-progress-routes.mjs";
 import { handlePaymentRoute } from "./routes/payment-routes.mjs";
 import { handlePlayerRoute } from "./routes/player-routes.mjs";
@@ -235,6 +236,12 @@ export function createApp(options: any = {}) {
   const getRankedLeaderboard = typeof options?.getRankedLeaderboard === "function"
     ? options.getRankedLeaderboard
     : async () => null;
+  const getLadderStandings = typeof options?.getLadderStandings === "function"
+    ? options.getLadderStandings
+    : async () => null;
+  const getPlayerLadderPlacements = typeof options?.getPlayerLadderPlacements === "function"
+    ? options.getPlayerLadderPlacements
+    : async () => null;
   const getGameProgress = typeof options?.getGameProgress === "function"
     ? options.getGameProgress
     : async () => null;
@@ -397,6 +404,10 @@ export function createApp(options: any = {}) {
     getRankedMatches,
     getRankedMatchDetail,
     getRankedLeaderboard,
+  };
+  const ladderServices = {
+    getLadderStandings,
+    getPlayerLadderPlacements,
   };
   const gameProgressServices = {
     getGameProgress,
@@ -676,6 +687,20 @@ export function createApp(options: any = {}) {
       requestOrigin,
       timestamp,
       services: paymentServices,
+    })) {
+      return;
+    }
+
+    // Before the player family: /players/:id/ladders must not be swallowed by a
+    // broader /players route.
+    if (await handleLadderRoute({
+      req,
+      res,
+      method,
+      pathname,
+      requestOrigin,
+      timestamp,
+      services: ladderServices,
     })) {
       return;
     }

@@ -92,6 +92,12 @@ export async function loadPlayerPageData(options = {}) {
         }
     }
     const enrichedProfile = await enrichProfileFriendPreviewsFromApi(profile, relationshipsRecord, apiClient);
+    // Ladder standings are read live rather than cached: a placement changes whenever
+    // any other player on that ladder finishes a match, so a stored copy is stale by
+    // definition. Failure is non-fatal — the rankings panel falls back to its empty state.
+    const ladderPlacements = targetPlayerId && typeof apiClient?.fetchPlayerLadderPlacements === "function"
+        ? await apiClient.fetchPlayerLadderPlacements(targetPlayerId).catch(() => null)
+        : null;
     return {
         requestedPlayerId,
         isOwnerView,
@@ -99,6 +105,7 @@ export async function loadPlayerPageData(options = {}) {
         profile: enrichedProfile,
         metricsRecord,
         relationshipsRecord,
+        ladderPlacements: Array.isArray(ladderPlacements) ? ladderPlacements : [],
         storage,
     };
 }

@@ -83,6 +83,7 @@ export interface BuildMePageViewModelOptions {
   favoriteTitleResolver?: (slug: string) => string;
   metricsRecord?: any;
   relationshipsRecord?: any;
+  ladderPlacements?: any[];
   thoughtComposerFlash?: string;
   friendCodeFlash?: string;
   avatarUrlResolver?: (assetId: string) => unknown;
@@ -116,7 +117,8 @@ export function buildMePageViewModel(profile: any, options: BuildMePageViewModel
     emptyValue: "No favorite cabinet pinned yet. Pick one from Edit Profile.",
   });
   const rankingItems = buildRankingItems(publicView, favoriteTitleResolver, {
-    emptyValue: "Rank snapshots will appear here once shared standings come online.",
+    ladderPlacements: options?.ladderPlacements,
+    emptyValue: "No ladder standings yet. Play a ranked match to claim a placement.",
   });
   const friendItems = buildFriendItems(publicView, relationshipsRecord);
   const friendNavigatorItems = buildFriendNavigatorItems(publicView, relationshipsRecord);
