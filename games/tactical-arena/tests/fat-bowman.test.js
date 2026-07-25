@@ -5,6 +5,7 @@ import { attack, beginActivation, cancelMove, defend, moveUnit, useArt } from ".
 import { applyCommand } from "../src/core/reducer.js";
 import { createBattleState, findUnit } from "../src/core/state.js";
 import { getEffectiveStats, getUnitType } from "../src/core/unitCatalog.js";
+import { getMissChance } from "../src/rules/combat.js";
 import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
 
 const HIT = { attackRoll: 0.5, critRoll: 0.99 };
@@ -181,6 +182,44 @@ test("Desperation Shot empowers one shot, then Fat Bowman skips her next turn un
   s = run(s, beginActivation(1, "fb")).nextState;
   assert.equal(findUnit(s, "fb").desperationShotSpent, false, "leaving and re-entering rage restores the shot");
   assert.equal(getEffectiveStats(findUnit(s, "fb"), s).attackRange, 5);
+});
+
+test("Desperation Shot cannot miss while armed, but BLIND still overrides it", () => {
+  const armed = { type: "fat-bowman", hp: 5, position: { x: 0, y: 0 }, statModifiers: {}, statuses: [] };
+  assert.equal(getMissChance(armed, { basicAttack: true }), 0, "the armed super shot never misses");
+
+  const blinded = { ...armed, statuses: [{ type: "blind", remainingTurns: 1 }] };
+  assert.equal(getMissChance(blinded, { basicAttack: true }), 1, "BLIND outranks the never-miss");
+
+  const spent = { ...armed, desperationShotSpent: true };
+  assert.ok(getMissChance(spent, { basicAttack: true }) > 0, "accuracy returns to normal once the shot is spent");
+
+  const healthy = { ...armed, hp: 30 };
+  assert.ok(getMissChance(healthy, { basicAttack: true }) > 0, "out of RAGE she rolls to hit normally");
+});
+
+test("the armed Desperation Shot lands on a roll that would normally miss", () => {
+  // At range 4 the base 96% loses 1% per tile after the first, so a 0.02 roll is a miss.
+  const state = scenario([
+    { id: "fb", type: "fat-bowman", player: 1, x: 0, y: 0, hp: 5 },
+    { id: "target", type: "swordsman", player: 2, x: 4, y: 0 }
+  ]);
+  const MISS_ROLL = { attackRoll: 0.02, critRoll: 0.99 };
+
+  let s = run(state, beginActivation(1, "fb")).nextState;
+  const empowered = run(s, attack(1, "fb", "target", MISS_ROLL));
+  assert.ok(empowered.events.some((event) => event.type === "ATTACK_RESOLVED" && event.hit),
+    "the armed shot connects through a would-be miss roll");
+
+  const blindState = scenario([
+    { id: "fb", type: "fat-bowman", player: 1, x: 0, y: 0, hp: 5, statuses: [{ type: "blind", duration: 2 }] },
+    { id: "target", type: "swordsman", player: 2, x: 4, y: 0 }
+  ]);
+  s = run(blindState, beginActivation(1, "fb")).nextState;
+  const blinded = run(s, attack(1, "fb", "target", { attackRoll: 0.99, critRoll: 0.99 }));
+  assert.ok(blinded.events.some((event) => event.type === "ATTACK_RESOLVED" && event.missed),
+    "a blinded Fat Bowman still whiffs her super shot");
+  assert.equal(findUnit(blinded.nextState, "fb").desperationShotSpent, true, "the whiffed shot is still consumed");
 });
 
 test("Fat Bowman's active ARTS register VFX recipes", () => {

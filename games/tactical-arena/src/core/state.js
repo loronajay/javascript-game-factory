@@ -242,6 +242,33 @@ export function firstActorPriority(unit) {
   return FIRST_ACTOR_PRIORITY[unit?.type] ?? Infinity;
 }
 
+// The blank activation record. Both entry points (the reducer's BEGIN_ACTIVATION and the
+// automatic first-actor open below) build it here so the tracked fields never drift apart.
+// Consumes the unit's banked realm-traversal charge, which the record itself carries.
+export function createActivationRecord(unit) {
+  const record = {
+    unitId: unit.id,
+    origin: { ...unit.position },
+    moved: false,
+    primaryUsed: false,
+    spellUsed: false,
+    bonusActionGroups: [],
+    realmTraversalActive: Boolean(unit.realmTraversalCharged)
+  };
+  if (unit.realmTraversalCharged) unit.realmTraversalCharged = false;
+  return record;
+}
+
+// Has the open activation done anything yet? A spent BONUS ACTION (the Witch Doctor's
+// dance, the Paladin's seeker) counts even though it leaves `moved`/`primaryUsed` false —
+// the unit has acted, so its activation may no longer be handed to another unit.
+export function activationHasActed(activation) {
+  return Boolean(
+    activation &&
+    (activation.moved || activation.primaryUsed || (activation.bonusActionGroups ?? []).length > 0)
+  );
+}
+
 export function openAutomaticFirstActivation(state) {
   if (!state || state.phase !== "playing" || state.activation) return false;
   let firstActor = null;
@@ -256,16 +283,7 @@ export function openAutomaticFirstActivation(state) {
   if (!firstActor) return false;
   firstActor.defending = false;
   applyActivationStartCharges(firstActor);
-  state.activation = {
-    unitId: firstActor.id,
-    origin: { ...firstActor.position },
-    moved: false,
-    primaryUsed: false,
-    spellUsed: false,
-    bonusActionGroups: [],
-    realmTraversalActive: Boolean(firstActor.realmTraversalCharged)
-  };
-  if (firstActor.realmTraversalCharged) firstActor.realmTraversalCharged = false;
+  state.activation = createActivationRecord(firstActor);
   return true;
 }
 

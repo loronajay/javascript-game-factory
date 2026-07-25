@@ -84,11 +84,11 @@ export const ARCHER = Object.freeze({
     mpCost: 0,
     effect: Object.freeze({
       type: "statModifiers",
-      stats: Object.freeze({ strength: 1, attackRange: 1 }),
+      stats: Object.freeze({ strength: 1, attackRange: 1, moveRange: 1 }),
       moveAndUseArts: true
     }),
     combat: Object.freeze({ neverMiss: true, criticalChance: 0.5 }),
-    description: "At 5 HP or lower, gain +1 STR and +1 range, may move and use ARTS in the same activation, never miss, and gain a 50% critical chance.",
+    description: "At 5 HP or lower, gain +1 STR, +1 range, and +1 MOVE, may move and use ARTS in the same activation, never miss (unless blinded), and gain a 50% critical chance.",
     implemented: true
   })
 });

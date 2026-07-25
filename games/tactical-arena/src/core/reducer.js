@@ -8,8 +8,10 @@ import {
   takesTurns,
 } from "./unitCatalog.js";
 import {
+  activationHasActed,
   areEnemies,
   cloneState,
+  createActivationRecord,
   findUnit,
   livingUnits,
   openAutomaticFirstActivation,
@@ -102,8 +104,13 @@ function beginActivation(state, command) {
   // of its turns (turnEngine.js) until it wakes.
   if (!takesTurns(result.unit) || result.unit.spent || isStunned(result.unit) || isPetrified(result.unit)) return reject(ERR.UNIT_SPENT);
   if (state.activation?.summonerId && state.activation.unitId !== result.unit.id) return reject(ERR.ACTIVATION_ALREADY_OPEN);
+  // Switching to a different unit is only allowed while the open activation has done
+  // nothing at all. A spent BONUS ACTION (the Witch Doctor's dance, the Paladin's
+  // seeker) counts: it leaves `moved`/`primaryUsed` false, but the unit has acted, and
+  // letting another unit take over would discard the open activation — handing the
+  // dancer a whole second turn, second dance included, when it was re-selected.
   if (state.activation && state.activation.unitId !== result.unit.id &&
-      (state.activation.moved || state.activation.primaryUsed)) return reject(ERR.ACTIVATION_ALREADY_OPEN);
+      activationHasActed(state.activation)) return reject(ERR.ACTIVATION_ALREADY_OPEN);
   // First-actor supports go first: no other unit of this owner may open an activation
   // while a living first-actor still owes its turn.
   if (!getUnitType(result.unit.type).actsFirst && commanderPending(state, command.player)) {
@@ -157,16 +164,11 @@ function beginActivation(state, command) {
     if (empowered.applied) unit.statuses = empowered.statuses;
     unit.etherCharged = null;
   }
-  next.activation = {
-    unitId: unit.id,
-    origin: { ...unit.position },
-    moved: false,
-    primaryUsed: false,
-    spellUsed: false,
-    bonusActionGroups: [],
-    realmTraversalActive: Boolean(unit.realmTraversalCharged)
-  };
-  if (unit.realmTraversalCharged) unit.realmTraversalCharged = false;
+  // Only a genuinely fresh activation gets a blank record. Re-selecting the unit whose
+  // activation is already open keeps the cloned one: rebuilding it would clear `moved`,
+  // `primaryUsed`, and `bonusActionGroups`, handing out a free extra move, primary
+  // action, or bonus action (the Witch Doctor's second dance).
+  if (fresh) next.activation = createActivationRecord(unit);
   // Volcanic Rage (Gargoyle): the first raging activation and every Nth one after erupt
   // a free Pyroclasm BEFORE the turn opens. It spends no MP and no action — the Gargoyle
   // still takes its full turn.

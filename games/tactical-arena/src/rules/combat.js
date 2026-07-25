@@ -320,16 +320,28 @@ function getTileBasicAttackCombat(attacker, { target = null, state = null, basic
   return null;
 }
 
-// Probability that this attacker's swing misses *right now*. Never-miss (raging
-// Archer, or Angel's both-on-white Blessed Arrow shot) overrides everything; otherwise
-// Blind can force a miss unless the caller is resolving a caster roll that intentionally
-// ignores attacker accuracy. Rolled ARTS pass an authored range-1 base `accuracy`;
-// basic attacks omit it and use the shared 96% range-1 base. Both lose 1% per tile
-// after the first.
+// Desperation Shot (Fat Bowman): an armed one-shot rage buff may also declare
+// `neverMiss`, so the single super-shot it powers cannot whiff. It reads the same
+// armed/spent flag the stat fold uses, so accuracy returns to normal once the shot is
+// spent. Blind still outranks it — getMissChance checks blind first.
+function armedOneShotNeverMiss(unit) {
+  if (!isRaging(unit) || unit.desperationShotSpent) return false;
+  const definition = getUnitType(unit.type);
+  return [definition.ragePassive, definition.rageArt]
+    .some((source) => source?.effect?.type === "oneShotStatModifiers" && source.effect.neverMiss === true);
+}
+
+// Probability that this attacker's swing misses *right now*. Blind outranks everything:
+// a blinded attacker always misses, even with a never-miss source (raging Archer, or
+// Angel's both-on-white Blessed Arrow shot), unless the caller is resolving a caster roll
+// that intentionally ignores attacker accuracy. Otherwise never-miss zeroes the chance.
+// Rolled ARTS pass an authored range-1 base `accuracy`; basic attacks omit it and use the
+// shared 96% range-1 base. Both lose 1% per tile after the first.
 export function getMissChance(attacker, { ignoreBlind = false, target = null, targetPosition = null, state = null, basicAttack = false, accuracy = null } = {}) {
-  const tileCombat = getTileBasicAttackCombat(attacker, { target, state, basicAttack });
-  if (rageCombat(attacker)?.neverMiss || (tileCombat?.attackerOnAffinity && tileCombat.cfg.bothNeverMiss)) return 0;
   if (!ignoreBlind && isBlinded(attacker)) return 1;
+  const tileCombat = getTileBasicAttackCombat(attacker, { target, state, basicAttack });
+  if (rageCombat(attacker)?.neverMiss || armedOneShotNeverMiss(attacker) ||
+      (tileCombat?.attackerOnAffinity && tileCombat.cfg.bothNeverMiss)) return 0;
   const tileAccuracy = Math.max(0, Number(tileCombat?.cfg.targetMissReduction) || 0);
   const missChance = 1 - getRangeAdjustedAccuracy(attacker, { target, targetPosition, accuracy });
   return clampProbability(Math.round((missChance - tileAccuracy) * 10000) / 10000);

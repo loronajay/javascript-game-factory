@@ -238,6 +238,7 @@ export function readableError(errorCode, state = null, player = state?.currentPl
     TARGET_OUT_OF_RANGE: "That target is beyond attack range.",
     TARGET_OBSTRUCTED: "Another unit is blocking the line of fire.",
     PRIMARY_ALREADY_USED: "This unit has already taken its primary action.",
+    ACTIVATION_ALREADY_OPEN: "Finish the unit that has already acted before activating another.",
     FINISH_REQUIRES_ACTION: "Attack or defend before finishing this activation.",
     SUMMON_LIMIT: "This Necromancer already has two Ghouls on the field.",
     COMMANDER_CANNOT_ACT: "The King only commands — he never moves, attacks, or defends."

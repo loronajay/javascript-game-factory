@@ -118,6 +118,46 @@ test("a dance is a bonus action: the Witch Doctor still attacks afterward, but c
   assert.equal(findId(ended.nextState, "wd").spent, true, "finishing ends the danced-and-struck turn");
 });
 
+// A bonus action is still an action taken this activation. Before this was enforced,
+// dancing first left `moved`/`primaryUsed` false, so activating a different unit was
+// allowed — that silently discarded the Witch Doctor's open activation (including the
+// spent "dance" group), and re-selecting him opened a brand-new one: a whole second
+// turn plus a second dance.
+test("dancing locks the activation to the Witch Doctor — no other unit can take over", () => {
+  const state = createBattleState({
+    units: [
+      { id: "wd", player: 1, type: "witch-doctor", x: 0, y: 0 },
+      { id: "ally", player: 1, type: "swordsman", x: 1, y: 0 },
+      { id: "foe", player: 2, type: "swordsman", x: 4, y: 4 }
+    ]
+  });
+  let s = activate(state, "wd");
+  const danced = applyCommand(s, useArt(1, "wd", "spirit-dance"));
+  assert.ok(danced.accepted, `spirit-dance rejected: ${danced.errorCode}`);
+  s = danced.nextState;
+  assert.equal(findId(s, "wd").spent, false, "the dance does not spend him");
+
+  const stolen = applyCommand(s, beginActivation(1, "ally"));
+  assert.equal(stolen.accepted, false, "another unit cannot open an activation after the dance");
+  assert.equal(stolen.errorCode, "ACTIVATION_ALREADY_OPEN");
+
+  // Re-selecting the Witch Doctor himself is still fine, and must NOT refresh the
+  // consumed dance group.
+  const reopened = applyCommand(s, beginActivation(1, "wd"));
+  assert.ok(reopened.accepted, `re-selecting the Witch Doctor rejected: ${reopened.errorCode}`);
+  assert.deepEqual(reopened.nextState.activation.bonusActionGroups, ["dance"]);
+  const twice = applyCommand(reopened.nextState, useArt(1, "wd", "rain-dance"));
+  assert.equal(twice.accepted, false, "re-selecting him must not hand back a second dance");
+
+  // Once he finishes his turn normally, the ally activates as usual.
+  const struck = applyCommand(s, attack(1, "wd", "foe", NORMAL_HIT));
+  assert.ok(struck.accepted, `attack after dancing rejected: ${struck.errorCode}`);
+  const ended = applyCommand(struck.nextState, finishActivation(1, "wd"));
+  assert.ok(ended.accepted, `finishActivation rejected: ${ended.errorCode}`);
+  const allyTurn = applyCommand(ended.nextState, beginActivation(1, "ally"));
+  assert.ok(allyTurn.accepted, `ally activation rejected: ${allyTurn.errorCode}`);
+});
+
 // --- Rain Dance / Rain Stance ---
 
 test("Rain Dance heals every ally for 1 and enters Rain Stance", () => {

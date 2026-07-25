@@ -5,6 +5,7 @@ import { beginActivation, moveUnit, useArt } from "../src/core/commands.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { createBattleState, findUnit } from "../src/core/state.js";
 import { canMoveAndUseArts, getEffectiveStats } from "../src/core/unitCatalog.js";
+import { getMissChance } from "../src/rules/combat.js";
 
 const NORMAL_HIT = { attackRoll: 0.5, critRoll: 0.99 };
 
@@ -18,18 +19,29 @@ function archerVsFoe(hp = 24) {
   });
 }
 
-test("Archer RAGE grants +1 STR, +1 range, and move-and-ART at <=5 HP", () => {
+test("Archer RAGE grants +1 STR, +1 range, +1 MOVE, and move-and-ART at <=5 HP", () => {
   const calmUnit = { type: "archer", hp: 24, statModifiers: {}, statuses: [] };
   const calm = getEffectiveStats(calmUnit);
   assert.equal(calm.strength, 8);
   assert.equal(calm.attackRange, 5);
+  assert.equal(calm.moveRange, 2);
   assert.equal(canMoveAndUseArts(calmUnit), false);
 
   const ragingUnit = { type: "archer", hp: 5, statModifiers: {}, statuses: [] };
   const raging = getEffectiveStats(ragingUnit);
   assert.equal(raging.strength, 9);
   assert.equal(raging.attackRange, 6);
+  assert.equal(raging.moveRange, 3);
   assert.equal(canMoveAndUseArts(ragingUnit), true);
+});
+
+test("Blind overrides the raging Archer's never-miss", () => {
+  const raging = { type: "archer", hp: 5, position: { x: 0, y: 0 }, statModifiers: {}, statuses: [] };
+  assert.equal(getMissChance(raging, { basicAttack: true }), 0);
+
+  const blinded = { ...raging, statuses: [{ type: "blind", remainingTurns: 1 }] };
+  assert.equal(getMissChance(blinded, { basicAttack: true }), 1);
+  assert.equal(getMissChance(blinded, { basicAttack: true, ignoreBlind: true }), 0);
 });
 
 test("a raging Archer can move before using an ART", () => {

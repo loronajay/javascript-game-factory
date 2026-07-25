@@ -649,6 +649,10 @@ export function createBattleInputController({
             return;
           }
           if (await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, artId))) {
+            // Leave the ART's targeting mode — every other resolve path does. A bonus
+            // action (a dance) keeps the activation open, so the board must fall back to
+            // the plain selected-unit view instead of staying lit for the spent ART.
+            interaction.mode = null;
             setMessage(art.bonusActionGroup
               ? `${art.name} resolved. Take the rest of this unit's turn.`
               : `${art.name} resolved. This unit's activation is complete.`);

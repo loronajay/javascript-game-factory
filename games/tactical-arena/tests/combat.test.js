@@ -101,10 +101,11 @@ test("miss and crit chances honor blind and the raging Archer's kit", () => {
   // Blind = guaranteed miss.
   assert.equal(getMissChance({ type: "swordsman", hp: 25, statuses: [{ type: "blind", duration: 1 }] }), 1);
 
-  // Raging Archer: never misses (even while blinded) and crits at 50%.
-  const ragingArcher = { type: "archer", hp: 5, statuses: [{ type: "blind", duration: 1 }] };
+  // Raging Archer: never misses and crits at 50% — but blind still outranks never-miss.
+  const ragingArcher = { type: "archer", hp: 5, statuses: [] };
   assert.equal(getMissChance(ragingArcher), 0);
   assert.equal(getCritChance(ragingArcher), 0.50);
+  assert.equal(getMissChance({ ...ragingArcher, statuses: [{ type: "blind", duration: 1 }] }), 1);
 
   // The Swordsman's RAGE has no combat block, so it keeps base chances.
   assert.equal(getCritChance({ type: "swordsman", hp: 5, statuses: [] }), 0.15);

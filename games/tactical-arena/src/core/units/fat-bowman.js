@@ -4,7 +4,8 @@
 //   * Curve Shot is a normal physical strike with unit-piercing line of sight.
 //   * Dragonsbane is a normal strike with two poison rolls, crit-guaranteed.
 //   * Planted stores its STR counter on the unit and is folded by getEffectiveStats.
-//   * Desperation Shot is a RAGE one-shot stat buff consumed by basic/ART attacks.
+//   * Desperation Shot is a RAGE one-shot stat buff (with never-miss) consumed by
+//     basic/ART attacks; BLIND still outranks its never-miss.
 export const FAT_BOWMAN = Object.freeze({
   id: "fat-bowman",
   name: "Fat Bowman",
@@ -96,9 +97,10 @@ export const FAT_BOWMAN = Object.freeze({
     effect: Object.freeze({
       type: "oneShotStatModifiers",
       stats: Object.freeze({ strength: 4, attackRange: 1 }),
+      neverMiss: true,
       skipNextActivation: true
     }),
-    description: "At 5 HP or lower, Fat Bowman's next basic attack, Curve Shot, or Dragonsbane gains +4 STR and +1 RANGE. After using it, she skips her next turn. Leaving and re-entering RAGE restores the shot.",
+    description: "At 5 HP or lower, Fat Bowman's next basic attack, Curve Shot, or Dragonsbane gains +4 STR and +1 RANGE and cannot miss (BLIND still blocks it). After using it, she skips her next turn. Leaving and re-entering RAGE restores the shot.",
     implemented: true
   })
 });

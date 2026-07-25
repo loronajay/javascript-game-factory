@@ -166,8 +166,13 @@ RAGE is automatic at `hp <= 5` via `isRaging(unit)`. A unit's `rageArt` is shown
 as an available passive while raging and may include:
 
 - `effect: { type: "statModifiers", stats: { ... } }`
-- `combat: { neverMiss: true, criticalChance: 0.5 }`
+- `combat: { neverMiss: true, criticalChance: 0.5 }` — applies for the whole RAGE
+- `effect: { type: "oneShotStatModifiers", stats: { ... }, neverMiss: true }` — a single
+  armed super-shot; `neverMiss` here lasts only until the shot is spent
 - future passive fields if the engine supports them
+
+Either never-miss form is still outranked by BLIND: `getMissChance` returns a
+guaranteed miss for a blinded attacker before it looks at any never-miss source.
 
 RAGE should not be implemented as an active button. If a legacy RAGE says
 "always defending" or "aura gets stronger," add a passive engine seam and test
