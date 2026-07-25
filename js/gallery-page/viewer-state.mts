@@ -8,6 +8,8 @@ export interface GalleryPhoto {
 }
 
 export interface ViewerComment {
+  id?: string;
+  authorPlayerId?: string;
   authorDisplayName?: string;
   text?: string;
   createdAt?: string;
@@ -21,19 +23,25 @@ export interface PhotoSocialState {
 }
 
 export interface SetPhotosOptions {
+  // `isOwner` gates the surface's own "Remove Photo" control; `isPhotoOwner` states whether
+  // the viewer owns the photo, which is what comment moderation keys off. They are set
+  // together on the gallery page, but the profile-embedded viewer only has the latter.
   isOwner?: boolean;
+  isPhotoOwner?: boolean;
   galleryLinkHref?: string;
   viewerPlayerId?: string;
   viewerAuthorDisplayName?: string;
   onDelete?: ((photoId: string) => void) | null;
   onReact?: ((photoId: string, reactionId: string) => void) | null;
   onComment?: ((photoId: string, text: string) => void) | null;
+  onDeleteComment?: ((photoId: string, commentId: string) => void) | null;
 }
 
 export interface PhotoViewerViewState {
   photos: GalleryPhoto[];
   currentIndex: number;
   isOwner: boolean;
+  isPhotoOwner: boolean;
   galleryLinkHref: string;
   viewerPlayerId: string;
   viewerAuthorDisplayName: string;
@@ -44,6 +52,7 @@ export function createPhotoViewerState() {
   let photos: GalleryPhoto[] = [];
   let currentIndex = -1;
   let isOwner = false;
+  let isPhotoOwner = false;
   let galleryLinkHref = "";
   let viewerPlayerId = "";
   let viewerAuthorDisplayName = "";
@@ -61,6 +70,7 @@ export function createPhotoViewerState() {
     setPhotos(newPhotos: GalleryPhoto[], options: SetPhotosOptions = {}) {
       photos = Array.isArray(newPhotos) ? newPhotos : [];
       isOwner = !!options.isOwner;
+      isPhotoOwner = options.isPhotoOwner === undefined ? !!options.isOwner : !!options.isPhotoOwner;
       galleryLinkHref = options.galleryLinkHref || "";
       viewerPlayerId = options.viewerPlayerId || "";
       viewerAuthorDisplayName = options.viewerAuthorDisplayName || "";
@@ -128,6 +138,7 @@ export function createPhotoViewerState() {
         photos,
         currentIndex,
         isOwner,
+        isPhotoOwner,
         galleryLinkHref,
         viewerPlayerId,
         viewerAuthorDisplayName,

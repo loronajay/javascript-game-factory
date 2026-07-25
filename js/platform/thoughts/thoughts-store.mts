@@ -235,6 +235,57 @@ export function commentOnThoughtPost(
   };
 }
 
+// Local mirror of the server moderation rule: a comment can be removed by its author or by
+// the author of the post it sits under. Returns null when the viewer may not remove it, so
+// callers can leave the panel untouched instead of faking a success.
+export function deleteThoughtCommentPost(
+  thoughtId: unknown,
+  commentId: unknown,
+  viewerPlayerId: unknown,
+  storage: MaybeStorage = getDefaultPlatformStorage(),
+) {
+  const normalizedThoughtId = sanitizeThoughtShareId(thoughtId);
+  const normalizedCommentId = sanitizeSingleLine(commentId, 80);
+  const normalizedViewerPlayerId = sanitizeSingleLine(viewerPlayerId, 80);
+  if (!normalizedThoughtId || !normalizedCommentId || !normalizedViewerPlayerId) return null;
+
+  // Read through the visible thread (stored, or the seeded defaults when nothing is stored
+  // yet) so a removal also sticks for seed comments the viewer is allowed to moderate.
+  const visibleComments = loadThoughtComments(normalizedThoughtId, storage);
+  const target = visibleComments.find((entry) => entry.id === normalizedCommentId);
+  if (!target) return null;
+
+  const mergedFeed = mergeThoughtSources(parseNormalizedStoredFeed(storage), DEFAULT_THOUGHTS as unknown[]);
+  const sourceThought = mergedFeed.find((entry) => entry.id === normalizedThoughtId);
+  const isCommentAuthor = target.authorPlayerId === normalizedViewerPlayerId;
+  const isThoughtAuthor = !!sourceThought && sourceThought.authorPlayerId === normalizedViewerPlayerId;
+  if (!isCommentAuthor && !isThoughtAuthor) return null;
+
+  const remainingComments = visibleComments.filter((entry) => entry.id !== normalizedCommentId);
+  const otherThreads = parseNormalizedStoredComments(storage)
+    .filter((entry) => entry.thoughtId !== normalizedThoughtId);
+  writeThoughtComments(storage, [...otherThreads, ...remainingComments]);
+
+  if (!sourceThought) {
+    return { thought: null, commentId: normalizedCommentId, comments: remainingComments };
+  }
+
+  const updatedThought = normalizeThoughtPost({
+    ...sourceThought,
+    commentCount: remainingComments.length,
+  });
+  writeThoughtFeed(
+    storage,
+    mergedFeed.map((entry) => (entry.id === normalizedThoughtId ? updatedThought : entry)),
+  );
+
+  return {
+    thought: updatedThought,
+    commentId: normalizedCommentId,
+    comments: remainingComments,
+  };
+}
+
 export function shareThoughtPost(
   thoughtId: unknown,
   viewerActor: unknown,

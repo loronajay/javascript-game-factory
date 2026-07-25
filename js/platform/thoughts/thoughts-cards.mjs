@@ -24,6 +24,7 @@ export function buildThoughtCardItems(thoughtFeed = [], options = {}) {
                 reactionPickerItems: buildThoughtReactionPickerItems(normalized.reactionTotals, normalized.viewerReaction),
                 shareTargetId: normalized.repostOfId || normalized.id,
                 commentTargetId: normalized.repostOfId || normalized.id,
+                commentTargetAuthorPlayerId: (quotedThought?.authorPlayerId || normalized.authorPlayerId) || "",
                 imageUrl: normalized.imageUrl || "",
                 posterPlayerId: normalized.authorPlayerId || "",
                 quotedThought: quotedThought

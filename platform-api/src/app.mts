@@ -123,10 +123,16 @@ export function createApp(options: any = {}) {
     : async () => null;
   const deleteThought = typeof options?.deleteThought === "function"
     ? options.deleteThought
-    : async () => false;
+    : async () => ({ ok: false, reason: "not_found" });
+  const deleteThoughtComment = typeof options?.deleteThoughtComment === "function"
+    ? options.deleteThoughtComment
+    : async () => ({ ok: false, reason: "not_found" });
   const createNotification = typeof options?.createNotification === "function"
     ? options.createNotification
     : async () => null;
+  const deleteNotificationsByPayloadRef = typeof options?.deleteNotificationsByPayloadRef === "function"
+    ? options.deleteNotificationsByPayloadRef
+    : async () => 0;
   const listNotifications = typeof options?.listNotifications === "function"
     ? options.listNotifications
     : async () => ({ notifications: [], unreadCount: 0 });
@@ -274,6 +280,9 @@ export function createApp(options: any = {}) {
   const listPhotoComments = typeof options?.listPhotoComments === "function"
     ? options.listPhotoComments
     : async () => [];
+  const deletePhotoComment = typeof options?.deletePhotoComment === "function"
+    ? options.deletePhotoComment
+    : async () => ({ ok: false, reason: "not_found" });
   const registerAccount = typeof options?.registerAccount === "function"
     ? options.registerAccount
     : async () => ({ error: "not_configured" });
@@ -333,7 +342,9 @@ export function createApp(options: any = {}) {
     commentOnThought,
     reactToThought,
     deleteThought,
+    deleteThoughtComment,
     createNotification,
+    deleteNotificationsByPayloadRef,
   };
   const photoServices = {
     savePlayerPhoto,
@@ -343,9 +354,11 @@ export function createApp(options: any = {}) {
     reactToPhoto,
     commentOnPhoto,
     listPhotoComments,
+    deletePhotoComment,
     loadPlayerProfile,
     saveThought,
     createNotification,
+    deleteNotificationsByPayloadRef,
   };
   const playerServices = {
     searchPlayers,
@@ -580,6 +593,7 @@ export function createApp(options: any = {}) {
       method,
       pathname,
       requestUrl,
+      authClaims,
       requestOrigin,
       timestamp,
       services: thoughtServices,

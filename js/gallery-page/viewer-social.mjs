@@ -42,16 +42,24 @@ export function buildReactionChipsHtml(state = {}) {
       type="button" data-reaction-id="${id}" title="${id}"
     >${PHOTO_REACTION_GLYPHS[id]} <span>${totals[id] || 0}</span></button>`).join("");
 }
-export function buildCommentListHtml(comments) {
+export function buildCommentListHtml(comments, { viewerPlayerId = "", isPhotoOwner = false } = {}) {
     if (!comments) {
         return `<p class="photo-viewer__comments-loading">Loading comments...</p>`;
     }
     if (comments.length === 0) {
         return `<p class="photo-viewer__comments-empty">No comments yet.</p>`;
     }
-    return comments.map((comment) => `<div class="photo-viewer__comment">
+    return comments.map((comment) => {
+        const canDelete = !!comment.id
+            && !!viewerPlayerId
+            && (isPhotoOwner || comment.authorPlayerId === viewerPlayerId);
+        return `<div class="photo-viewer__comment">
       <span class="photo-viewer__comment-author">${escapeViewerHtml(comment.authorDisplayName)}</span>
       <span class="photo-viewer__comment-text">${escapeViewerHtml(comment.text)}</span>
       <span class="photo-viewer__comment-time">${formatViewerDate(comment.createdAt)}</span>
-    </div>`).join("");
+      ${canDelete
+            ? `<button class="photo-viewer__comment-delete" type="button" data-delete-comment-id="${escapeViewerHtml(comment.id)}" aria-label="Delete comment">&times;</button>`
+            : ""}
+    </div>`;
+    }).join("");
 }

@@ -1,4 +1,4 @@
-import { commentOnThoughtPostWithApi, loadThoughtComments, loadThoughtFeed, reactToThoughtPostWithApi, shareThoughtPostWithApi, syncThoughtCommentsFromApi, } from "../platform/thoughts/thoughts.mjs";
+import { commentOnThoughtPostWithApi, deleteThoughtCommentWithApi, loadThoughtComments, loadThoughtFeed, reactToThoughtPostWithApi, shareThoughtPostWithApi, syncThoughtCommentsFromApi, } from "../platform/thoughts/thoughts.mjs";
 function emptySharePanelState() {
     return { cardId: "", thoughtId: "", mode: "", caption: "" };
 }
@@ -13,7 +13,7 @@ function closestField(event, selector) {
     const target = event.target;
     return target?.closest(selector) ?? null;
 }
-export function createThoughtsPageActions({ storage, apiClient, loadCurrentProfile, rerender, loadThoughtFeedImpl = loadThoughtFeed, loadThoughtCommentsImpl = loadThoughtComments, syncThoughtCommentsFromApiImpl = syncThoughtCommentsFromApi, shareThoughtPostWithApiImpl = shareThoughtPostWithApi, reactToThoughtPostWithApiImpl = reactToThoughtPostWithApi, commentOnThoughtPostWithApiImpl = commentOnThoughtPostWithApi, } = {}) {
+export function createThoughtsPageActions({ storage, apiClient, loadCurrentProfile, rerender, loadThoughtFeedImpl = loadThoughtFeed, loadThoughtCommentsImpl = loadThoughtComments, syncThoughtCommentsFromApiImpl = syncThoughtCommentsFromApi, shareThoughtPostWithApiImpl = shareThoughtPostWithApi, reactToThoughtPostWithApiImpl = reactToThoughtPostWithApi, commentOnThoughtPostWithApiImpl = commentOnThoughtPostWithApi, deleteThoughtCommentWithApiImpl = deleteThoughtCommentWithApi, } = {}) {
     let currentProfile = loadCurrentProfile?.();
     let openReactionThoughtId = "";
     let sharePanelState = emptySharePanelState();
@@ -39,6 +39,7 @@ export function createThoughtsPageActions({ storage, apiClient, loadCurrentProfi
             thoughtId,
             text: "",
             comments: loadThoughtCommentsImpl(thoughtId, storage),
+            viewerPlayerId: currentProfile?.playerId || "",
         };
         openReactionThoughtId = "";
         sharePanelState = emptySharePanelState();
@@ -55,11 +56,32 @@ export function createThoughtsPageActions({ storage, apiClient, loadCurrentProfi
     }
     async function handleClick(event) {
         refreshCurrentProfile();
+        // Checked first so a comment removal never falls through to another card control.
+        const deleteCommentButton = closestEl(event, "[data-delete-comment-id]");
+        if (deleteCommentButton) {
+            const commentId = deleteCommentButton.dataset.deleteCommentId || "";
+            const thoughtId = deleteCommentButton.dataset.deleteCommentThoughtId
+                || commentPanelState.thoughtId
+                || "";
+            if (!commentId || !thoughtId || !currentProfile?.playerId)
+                return true;
+            const removed = await deleteThoughtCommentWithApiImpl(thoughtId, commentId, currentProfile.playerId, storage, { apiClient });
+            if (removed === false)
+                return true;
+            commentPanelState = {
+                ...commentPanelState,
+                comments: loadThoughtCommentsImpl(thoughtId, storage),
+            };
+            await rerenderWithFeed();
+            return true;
+        }
+        // Reading a thread is public; only replying and moderating require an account, so this
+        // branch deliberately does not check for a signed-in profile.
         const commentButton = closestEl(event, "[data-comment-thought-id]");
         if (commentButton) {
             const thoughtId = commentButton.dataset.commentThoughtId || "";
             const cardId = commentButton.dataset.commentCardId || "";
-            if (!thoughtId || !currentProfile?.playerId)
+            if (!thoughtId)
                 return true;
             if (commentPanelState.cardId === cardId) {
                 commentPanelState = emptyCommentPanelState();

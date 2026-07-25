@@ -1,7 +1,7 @@
 import { PROFILE_UPDATED_EVENT } from "../arcade-profile.mjs";
 import { loadFactoryProfile } from "../platform/identity/factory-profile.mjs";
 import { syncThoughtPostCountWithApi } from "../platform/metrics/metrics.mjs";
-import { buildPlayerThoughtFeed, commentOnThoughtPostWithApi, deleteThoughtPostWithApi, loadThoughtFeed, loadThoughtComments, reactToThoughtPostWithApi, shareThoughtPostWithApi, syncThoughtCommentsFromApi, } from "../platform/thoughts/thoughts.mjs";
+import { buildPlayerThoughtFeed, commentOnThoughtPostWithApi, deleteThoughtCommentWithApi, deleteThoughtPostWithApi, loadThoughtFeed, loadThoughtComments, reactToThoughtPostWithApi, shareThoughtPostWithApi, syncThoughtCommentsFromApi, } from "../platform/thoughts/thoughts.mjs";
 import { initProfileMusicPlayer } from "../profile-editor/music-player.mjs";
 import { createPlayerHeroActions } from "./hero-actions.mjs";
 import { createPlayerMediaActions } from "./media-actions.mjs";
@@ -82,8 +82,11 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
         applyCurrentLayout();
     };
     const socialActions = createProfileSocialActions({
+        // Social writes are account-holders-only. This page is public to read, and every
+        // visitor has a local factory profile, so the actor must come from the signed-in
+        // session — otherwise a guest would fire writes the server now rejects.
         loadCurrentProfile() {
-            return loadFactoryProfile(storage);
+            return authSessionPlayerId ? loadFactoryProfile(storage) : null;
         },
         loadThoughtComments(thoughtId) {
             return loadThoughtComments(thoughtId, storage);
@@ -96,6 +99,9 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
                 playerId: currentProfile.playerId,
                 profileName: currentProfile.profileName || "UNNAMED PILOT",
             }, text, storage, { apiClient });
+        },
+        async deleteThoughtComment(thoughtId, commentId, currentProfile) {
+            return deleteThoughtCommentWithApi(thoughtId, commentId, currentProfile.playerId, storage, { apiClient });
         },
         async shareThought(thoughtId, currentProfile, caption = "") {
             return shareThoughtPostWithApi(thoughtId, {

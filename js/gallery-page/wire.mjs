@@ -49,6 +49,7 @@ async function initGalleryPage(doc = globalThis.document) {
             onDelete: handleViewerDelete,
             onReact: handleViewerReact,
             onComment: handleViewerComment,
+            onDeleteComment: handleViewerDeleteComment,
             viewerPlayerId: pageState.authSessionPlayerId,
             viewerAuthorDisplayName: pageState.authSessionDisplayName,
         });
@@ -108,6 +109,15 @@ async function initGalleryPage(doc = globalThis.document) {
             viewerReaction: "",
             comments: Array.isArray(comments) ? comments : [],
         });
+    }
+    async function handleViewerDeleteComment(photoId, commentId) {
+        if (!pageState.authSessionPlayerId || !commentId)
+            return;
+        // The server decides whether this viewer may remove the comment; repaint only on success.
+        const removed = await apiClient.deletePhotoComment(photoId, commentId).catch(() => null);
+        if (!removed)
+            return;
+        await loadViewerSocialState(photoId);
     }
     rerender();
     syncViewer();

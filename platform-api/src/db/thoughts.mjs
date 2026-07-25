@@ -143,15 +143,111 @@ export async function saveThought(db, thought = {}) {
   `, buildThoughtParams(normalized));
     return mapRowToThought(result?.rows?.[0] || null);
 }
-export async function deleteThought(db, thoughtId) {
+// Only the post's author may delete it. The ownership check is part of the delete statement
+// itself rather than a read-then-delete, so two concurrent requests cannot race past it.
+export async function deleteThought(db, thoughtId, requesterPlayerId) {
     const normalizedThoughtId = sanitizeThoughtId(thoughtId);
-    if (!normalizedThoughtId)
-        return false;
-    await db.query(`
+    const normalizedRequesterId = sanitizeViewerPlayerId(requesterPlayerId);
+    if (!normalizedThoughtId || !normalizedRequesterId) {
+        return { ok: false, reason: "invalid" };
+    }
+    const deleteResult = await db.query(`
     delete from thought_posts
+    where id = $1 and author_player_id = $2
+    returning id
+  `, [normalizedThoughtId, normalizedRequesterId]);
+    if ((deleteResult?.rows?.length || 0) > 0) {
+        return { ok: true, id: normalizedThoughtId };
+    }
+    // Nothing was deleted: either the post is gone or it belongs to someone else. Separate the
+    // two so the route can answer 404 vs 403 instead of a blanket failure.
+    const existingResult = await db.query(`
+    select id
+    from thought_posts
     where id = $1
   `, [normalizedThoughtId]);
-    return true;
+    return (existingResult?.rows?.length || 0) > 0
+        ? { ok: false, reason: "forbidden" }
+        : { ok: false, reason: "not_found" };
+}
+// Self-moderation: a comment can be removed by whoever wrote it or by the author of the
+// post it sits under. Authorization is decided here against stored rows, never from the
+// caller's claim about who owns what.
+export async function deleteThoughtComment(db, thoughtId, commentId, requesterPlayerId) {
+    const normalizedThoughtId = sanitizeThoughtId(thoughtId);
+    const normalizedCommentId = sanitizeThoughtId(commentId);
+    const normalizedRequesterId = sanitizeViewerPlayerId(requesterPlayerId);
+    if (!normalizedThoughtId || !normalizedCommentId || !normalizedRequesterId) {
+        return { ok: false, reason: "invalid" };
+    }
+    await db.query("begin");
+    try {
+        const commentResult = await db.query(`
+      select id, thought_id, author_player_id
+      from thought_post_comments
+      where id = $1 and thought_id = $2
+    `, [normalizedCommentId, normalizedThoughtId]);
+        const commentRow = commentResult?.rows?.[0];
+        if (!commentRow) {
+            await db.query("rollback");
+            return { ok: false, reason: "not_found" };
+        }
+        const thoughtResult = await db.query(`
+      select
+        id,
+        author_player_id,
+        author_display_name,
+        subject,
+        text,
+        visibility,
+        comment_count,
+        share_count,
+        reaction_totals,
+        repost_of_id,
+        image_url,
+        created_at,
+        edited_at
+      from thought_posts
+      where id = $1
+    `, [normalizedThoughtId]);
+        const thoughtRow = thoughtResult?.rows?.[0];
+        if (!thoughtRow) {
+            await db.query("rollback");
+            return { ok: false, reason: "not_found" };
+        }
+        const isCommentAuthor = sanitizeViewerPlayerId(commentRow.author_player_id) === normalizedRequesterId;
+        const isThoughtAuthor = sanitizeViewerPlayerId(thoughtRow.author_player_id) === normalizedRequesterId;
+        if (!isCommentAuthor && !isThoughtAuthor) {
+            await db.query("rollback");
+            return { ok: false, reason: "forbidden" };
+        }
+        await db.query(`
+      delete from thought_post_comments
+      where id = $1 and thought_id = $2
+    `, [normalizedCommentId, normalizedThoughtId]);
+        const commentCountResult = await db.query(`
+      select count(*)::int as comment_count
+      from thought_post_comments
+      where thought_id = $1
+    `, [normalizedThoughtId]);
+        const commentCount = Math.max(0, Number(commentCountResult?.rows?.[0]?.comment_count) || 0);
+        await db.query(`
+      update thought_posts
+      set comment_count = $2
+      where id = $1
+    `, [normalizedThoughtId, commentCount]);
+        await db.query("commit");
+        return {
+            ok: true,
+            commentId: normalizedCommentId,
+            commentCount,
+            thought: mapRowToThought({ ...thoughtRow, comment_count: commentCount }),
+        };
+    }
+    catch (error) {
+        await db.query("rollback");
+        throw error;
+    }
 }
 export async function reactToThought(db, thoughtId, viewerPlayerId, reactionId) {
     const normalizedThoughtId = sanitizeThoughtId(thoughtId);

@@ -59,10 +59,21 @@ export function createPageGalleryViewerActions({ apiClient, fullViewer, createSe
             comments: Array.isArray(comments) ? comments : [],
         });
     }
+    async function handleDeleteComment(photoId, commentId) {
+        const session = await loadSessionOnce();
+        if (!session.playerId || !commentId)
+            return;
+        // The server owns the permission decision; only repaint once it confirms removal.
+        const removed = await apiClient.deletePhotoComment(photoId, commentId).catch(() => null);
+        if (!removed)
+            return;
+        await loadSocialState(removed.photo?.playerId || "", photoId);
+    }
     return {
         loadSessionOnce,
         loadSocialState,
         handleReact,
         handleComment,
+        handleDeleteComment,
     };
 }

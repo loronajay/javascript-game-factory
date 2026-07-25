@@ -66,6 +66,30 @@ export async function listNotifications(db, recipientPlayerId, options = {}) {
         unreadCount: Number(countResult?.rows?.[0]?.unread_count) || 0,
     };
 }
+// Notifications embed a snapshot of what they announce, so when the underlying comment,
+// post, or photo is removed the notification is left pointing at something that no longer
+// exists. Callers that delete social content clear the matching notifications through here.
+// The key is allowlisted because it is interpolated into a jsonb path lookup.
+const NOTIFICATION_PAYLOAD_REF_KEYS = new Set(["commentId", "thoughtId", "photoId"]);
+export async function deleteNotificationsByPayloadRef(db, payloadKey, payloadValue) {
+    if (!db)
+        return 0;
+    const key = typeof payloadKey === "string" ? payloadKey : "";
+    const value = typeof payloadValue === "string" ? payloadValue.trim() : "";
+    if (!NOTIFICATION_PAYLOAD_REF_KEYS.has(key) || !value)
+        return 0;
+    try {
+        const result = await db.query(`
+      delete from notifications
+      where payload->>$1 = $2
+    `, [key, value]);
+        return Number(result?.rowCount) || 0;
+    }
+    catch {
+        // A stale notification is a cosmetic problem; never fail the content deletion over it.
+        return 0;
+    }
+}
 export async function markAllNotificationsRead(db, recipientPlayerId) {
     if (!db || !recipientPlayerId)
         return;

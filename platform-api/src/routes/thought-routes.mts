@@ -51,6 +51,7 @@ export async function handleThoughtRoute(context: any): Promise<boolean> {
     method,
     pathname,
     requestUrl,
+    authClaims,
     requestOrigin,
     timestamp,
     services,
@@ -63,13 +64,16 @@ export async function handleThoughtRoute(context: any): Promise<boolean> {
     commentOnThought,
     reactToThought,
     deleteThought,
+    deleteThoughtComment,
     createNotification,
+    deleteNotificationsByPayloadRef,
   } = services;
 
   const thoughtDeleteMatch = pathname.match(/^\/thoughts\/([^/]+)$/);
   const thoughtReactionMatch = pathname.match(/^\/thoughts\/([^/]+)\/reactions$/);
   const thoughtShareMatch = pathname.match(/^\/thoughts\/([^/]+)\/shares$/);
   const thoughtCommentMatch = pathname.match(/^\/thoughts\/([^/]+)\/comments$/);
+  const thoughtCommentDeleteMatch = pathname.match(/^\/thoughts\/([^/]+)\/comments\/([^/]+)$/);
 
   if (method === "GET" && pathname === "/thoughts") {
     const thoughts = await listThoughts({
@@ -79,7 +83,14 @@ export async function handleThoughtRoute(context: any): Promise<boolean> {
     return true;
   }
 
+  // Posting is account-holders-only, and the author is always the verified session — a
+  // body-supplied authorPlayerId would let any caller post as anyone.
   if (method === "POST" && pathname === "/thoughts") {
+    if (!authClaims?.playerId) {
+      writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+      return true;
+    }
+
     const body = await readJsonBody(req);
     if (!body.ok) {
       writeJson(res, 400, {
@@ -91,7 +102,10 @@ export async function handleThoughtRoute(context: any): Promise<boolean> {
       return true;
     }
 
-    const thought = await saveThought(body.value);
+    const thought = await saveThought({
+      ...body.value,
+      authorPlayerId: authClaims.playerId,
+    });
     writeJson(res, 200, { thought }, requestOrigin);
     return true;
   }
@@ -103,6 +117,11 @@ export async function handleThoughtRoute(context: any): Promise<boolean> {
   }
 
   if (method === "POST" && thoughtCommentMatch) {
+    if (!authClaims?.playerId) {
+      writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+      return true;
+    }
+
     const body = await readJsonBody(req);
     if (!body.ok) {
       writeJson(res, 400, {
@@ -114,7 +133,7 @@ export async function handleThoughtRoute(context: any): Promise<boolean> {
       return true;
     }
 
-    const actorPlayerId = String(body.value?.viewerPlayerId || "");
+    const actorPlayerId = String(authClaims.playerId);
     const actorDisplayName = String(body.value?.viewerAuthorDisplayName || "");
     const commentRecord = await commentOnThought(
       decodeURIComponent(thoughtCommentMatch[1]),
@@ -133,7 +152,44 @@ export async function handleThoughtRoute(context: any): Promise<boolean> {
     return true;
   }
 
+  // Comment removal is the one thought mutation that must be identity-checked, so it reads
+  // the verified session rather than a body-supplied player id.
+  if (method === "DELETE" && thoughtCommentDeleteMatch) {
+    if (!authClaims?.playerId) {
+      writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+      return true;
+    }
+
+    const result = await deleteThoughtComment(
+      decodeURIComponent(thoughtCommentDeleteMatch[1]),
+      decodeURIComponent(thoughtCommentDeleteMatch[2]),
+      authClaims.playerId,
+    );
+
+    if (!result?.ok) {
+      const reason = result?.reason || "delete_failed";
+      const statusCode = reason === "forbidden" ? 403 : (reason === "not_found" ? 404 : 400);
+      writeJson(res, statusCode, { status: "error", error: reason, timestamp }, requestOrigin);
+      return true;
+    }
+
+    // The comment is gone, so the notification announcing it has nothing left to point at.
+    await deleteNotificationsByPayloadRef("commentId", result.commentId);
+
+    writeJson(res, 200, {
+      deleted: true,
+      commentId: result.commentId,
+      thought: result.thought,
+    }, requestOrigin);
+    return true;
+  }
+
   if (method === "POST" && thoughtShareMatch) {
+    if (!authClaims?.playerId) {
+      writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+      return true;
+    }
+
     const body = await readJsonBody(req);
     if (!body.ok) {
       writeJson(res, 400, {
@@ -145,7 +201,7 @@ export async function handleThoughtRoute(context: any): Promise<boolean> {
       return true;
     }
 
-    const actorPlayerId = String(body.value?.viewerPlayerId || "");
+    const actorPlayerId = String(authClaims.playerId);
     const actorDisplayName = String(body.value?.viewerAuthorDisplayName || "");
     const share = await shareThought(
       decodeURIComponent(thoughtShareMatch[1]),
@@ -165,6 +221,11 @@ export async function handleThoughtRoute(context: any): Promise<boolean> {
   }
 
   if (method === "POST" && thoughtReactionMatch) {
+    if (!authClaims?.playerId) {
+      writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+      return true;
+    }
+
     const body = await readJsonBody(req);
     if (!body.ok) {
       writeJson(res, 400, {
@@ -176,7 +237,7 @@ export async function handleThoughtRoute(context: any): Promise<boolean> {
       return true;
     }
 
-    const actorPlayerId = String(body.value?.viewerPlayerId || "");
+    const actorPlayerId = String(authClaims.playerId);
     const actorDisplayName = String(body.value?.actorDisplayName || "");
     const thought = await reactToThought(
       decodeURIComponent(thoughtReactionMatch[1]),
@@ -194,11 +255,28 @@ export async function handleThoughtRoute(context: any): Promise<boolean> {
     return true;
   }
 
+  // A post may only be deleted by its author, established from the verified session.
   if (method === "DELETE" && thoughtDeleteMatch) {
+    if (!authClaims?.playerId) {
+      writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+      return true;
+    }
+
     const thoughtId = decodeURIComponent(thoughtDeleteMatch[1]);
-    const deleted = await deleteThought(thoughtId);
+    const result = await deleteThought(thoughtId, authClaims.playerId);
+
+    if (!result?.ok) {
+      const reason = result?.reason || "delete_failed";
+      const statusCode = reason === "forbidden" ? 403 : (reason === "not_found" ? 404 : 400);
+      writeJson(res, statusCode, { status: "error", error: reason, timestamp }, requestOrigin);
+      return true;
+    }
+
+    // Comment, share, and reaction notifications all reference the post that is now gone.
+    await deleteNotificationsByPayloadRef("thoughtId", thoughtId);
+
     writeJson(res, 200, {
-      deleted,
+      deleted: true,
       id: thoughtId,
     }, requestOrigin);
     return true;

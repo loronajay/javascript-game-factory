@@ -261,6 +261,72 @@ export async function commentOnPhoto(db, photoId, viewerPlayerId, authorDisplayN
         throw error;
     }
 }
+// Self-moderation: a photo comment can be removed by whoever wrote it or by the owner of
+// the photo. Authorization is decided here against stored rows, never from the caller's
+// claim about who owns what.
+export async function deletePhotoComment(db, photoId, commentId, requesterPlayerId) {
+    const safePhotoId = sanitizePhotoId(photoId);
+    const safeCommentId = sanitizePhotoId(commentId);
+    const safeRequesterId = sanitizeViewerPlayerId(requesterPlayerId);
+    if (!safePhotoId || !safeCommentId || !safeRequesterId) {
+        return { ok: false, reason: "invalid" };
+    }
+    await db.query("begin");
+    try {
+        const commentResult = await db.query(`
+      select id, photo_id, author_player_id
+      from photo_comments
+      where id = $1 and photo_id = $2
+    `, [safeCommentId, safePhotoId]);
+        const commentRow = commentResult?.rows?.[0];
+        if (!commentRow) {
+            await db.query("rollback");
+            return { ok: false, reason: "not_found" };
+        }
+        const photoResult = await db.query(`
+      select ${PHOTO_COLUMNS}
+      from player_photos
+      where id = $1
+    `, [safePhotoId]);
+        const photoRow = photoResult?.rows?.[0];
+        if (!photoRow) {
+            await db.query("rollback");
+            return { ok: false, reason: "not_found" };
+        }
+        const isCommentAuthor = sanitizeViewerPlayerId(commentRow.author_player_id) === safeRequesterId;
+        const isPhotoOwner = sanitizeViewerPlayerId(photoRow.player_id) === safeRequesterId;
+        if (!isCommentAuthor && !isPhotoOwner) {
+            await db.query("rollback");
+            return { ok: false, reason: "forbidden" };
+        }
+        await db.query(`
+      delete from photo_comments
+      where id = $1 and photo_id = $2
+    `, [safeCommentId, safePhotoId]);
+        const countResult = await db.query(`
+      select count(*)::int as comment_count
+      from photo_comments
+      where photo_id = $1
+    `, [safePhotoId]);
+        const commentCount = Math.max(0, Number(countResult?.rows?.[0]?.comment_count) || 0);
+        await db.query(`
+      update player_photos
+      set comment_count = $2
+      where id = $1
+    `, [safePhotoId, commentCount]);
+        await db.query("commit");
+        return {
+            ok: true,
+            commentId: safeCommentId,
+            commentCount,
+            photo: mapRowToPhoto({ ...photoRow, comment_count: commentCount }),
+        };
+    }
+    catch (error) {
+        await db.query("rollback");
+        throw error;
+    }
+}
 export async function listPhotoComments(db, photoId, { limit = 100 } = {}) {
     if (!db || !photoId)
         return [];

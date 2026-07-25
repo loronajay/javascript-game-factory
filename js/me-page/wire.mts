@@ -6,6 +6,7 @@ import {
 import {
   buildPlayerThoughtFeed,
   commentOnThoughtPostWithApi,
+  deleteThoughtCommentWithApi,
   deleteThoughtPostWithApi,
   loadThoughtFeed,
   loadThoughtComments,
@@ -134,6 +135,9 @@ export function wireMePage(
         playerId: currentProfile.playerId,
         profileName: currentProfile.profileName || "UNNAMED PILOT",
       }, text, storage, { apiClient });
+    },
+    async deleteThoughtComment(thoughtId, commentId, currentProfile) {
+      return deleteThoughtCommentWithApi(thoughtId, commentId, currentProfile.playerId, storage, { apiClient });
     },
     async shareThought(thoughtId, currentProfile, caption = "") {
       return shareThoughtPostWithApi(thoughtId, {

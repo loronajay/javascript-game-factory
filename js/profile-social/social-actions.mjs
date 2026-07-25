@@ -2,12 +2,12 @@ function createInitialSharePanelState() {
     return { cardId: "", thoughtId: "", mode: "", caption: "" };
 }
 function createInitialCommentPanelState() {
-    return { cardId: "", thoughtId: "", text: "", comments: [] };
+    return { cardId: "", thoughtId: "", text: "", comments: [], viewerPlayerId: "" };
 }
 function normalizeComments(comments) {
     return Array.isArray(comments) ? comments : [];
 }
-export function createProfileSocialActions({ loadCurrentProfile, loadThoughtComments, syncThoughtComments, commentOnThought, shareThought, reactToThought, deleteThought, rerenderView, rerenderPanels, afterDelete, } = {}) {
+export function createProfileSocialActions({ loadCurrentProfile, loadThoughtComments, syncThoughtComments, commentOnThought, deleteThoughtComment, shareThought, reactToThought, deleteThought, rerenderView, rerenderPanels, afterDelete, } = {}) {
     let openReactionThoughtId = "";
     let sharePanelState = createInitialSharePanelState();
     let commentPanelState = createInitialCommentPanelState();
@@ -39,6 +39,7 @@ export function createProfileSocialActions({ loadCurrentProfile, loadThoughtComm
                 thoughtId,
                 text: "",
                 comments: normalizeComments(loadThoughtComments?.(thoughtId)),
+                viewerPlayerId: loadCurrentProfile?.()?.playerId || "",
             };
             openReactionThoughtId = "";
             resetSharePanel();
@@ -108,12 +109,36 @@ export function createProfileSocialActions({ loadCurrentProfile, loadThoughtComm
             if (!target?.closest) {
                 return false;
             }
+            // Checked before the post-level delete button so a comment removal never falls
+            // through to deleting the whole thought.
+            const deleteCommentButton = target.closest("[data-delete-comment-id]");
+            if (deleteCommentButton) {
+                const commentId = deleteCommentButton.dataset.deleteCommentId || "";
+                const thoughtId = deleteCommentButton.dataset.deleteCommentThoughtId
+                    || commentPanelState.thoughtId
+                    || "";
+                const currentProfile = loadCurrentProfile?.();
+                if (!commentId || !thoughtId || !currentProfile?.playerId) {
+                    return true;
+                }
+                const removed = await deleteThoughtComment?.(thoughtId, commentId, currentProfile);
+                if (removed === false) {
+                    return true;
+                }
+                commentPanelState = {
+                    ...commentPanelState,
+                    comments: normalizeComments(loadThoughtComments?.(thoughtId)),
+                };
+                await renderView();
+                return true;
+            }
+            // Reading a thread is public; only replying and moderating require an account, so
+            // this branch deliberately does not check for a signed-in profile.
             const commentButton = target.closest("[data-comment-thought-id]");
             if (commentButton) {
                 const thoughtId = commentButton.dataset.commentThoughtId || "";
                 const cardId = commentButton.dataset.commentCardId || "";
-                const currentProfile = loadCurrentProfile?.();
-                if (!thoughtId || !currentProfile?.playerId) {
+                if (!thoughtId) {
                     return true;
                 }
                 if (commentPanelState.cardId === cardId) {

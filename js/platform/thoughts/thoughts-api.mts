@@ -21,6 +21,7 @@ import {
   loadThoughtFeed,
   loadThoughtComments,
   deleteThoughtPost,
+  deleteThoughtCommentPost,
   publishThoughtPost,
   commentOnThoughtPost,
   shareThoughtPost,
@@ -141,6 +142,47 @@ export async function deleteThoughtPostWithApi(
   // Auth: API first, then update local cache
   await apiClient.deleteThought(id as string).catch(() => null);
   deleteThoughtPost(id, storage);
+  return true;
+}
+
+export async function deleteThoughtCommentWithApi(
+  thoughtId: unknown,
+  commentId: unknown,
+  viewerPlayerId: unknown,
+  storage: MaybeStorage = getDefaultPlatformStorage(),
+  options: ThoughtApiOptions = {},
+): Promise<boolean> {
+  const apiClient = options?.apiClient || createPlatformApiClient(options);
+  const isAuth = typeof apiClient?.deleteThoughtComment === "function";
+
+  if (!isAuth) {
+    // Guest: local only
+    return !!deleteThoughtCommentPost(thoughtId, commentId, viewerPlayerId, storage);
+  }
+
+  const normalizedThoughtId = sanitizeThoughtShareId(thoughtId);
+  const normalizedCommentId = sanitizeSingleLine(commentId, 80);
+  if (!normalizedThoughtId || !normalizedCommentId) return false;
+
+  // Auth: the server owns the permission decision; only mirror into the local cache when
+  // it actually removed the comment.
+  const deleted = await apiClient
+    .deleteThoughtComment(normalizedThoughtId, normalizedCommentId)
+    .catch(() => null);
+  if (!deleted) return false;
+
+  const remainingComments = parseNormalizedStoredComments(storage)
+    .filter((entry) => entry.id !== normalizedCommentId);
+  writeThoughtComments(storage, remainingComments);
+
+  const storedFeed = parseNormalizedStoredFeed(storage);
+  const matchingThought = storedFeed.find((entry) => entry.id === normalizedThoughtId);
+  if (matchingThought) {
+    const remainingCount = remainingComments
+      .filter((entry) => entry.thoughtId === normalizedThoughtId).length;
+    cacheThoughtPosts(storage, [normalizeThoughtPost({ ...matchingThought, commentCount: remainingCount })]);
+  }
+
   return true;
 }
 

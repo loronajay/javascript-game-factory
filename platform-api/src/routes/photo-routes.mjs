@@ -50,11 +50,12 @@ function buildPhotoNotificationPayload(type, { actorPlayerId, actorDisplayName, 
 // rules, so they stay together as one extracted route family.
 export async function handlePhotoRoute(context) {
     const { req, res, method, pathname, requestUrl, authClaims, requestOrigin, timestamp, services, } = context;
-    const { savePlayerPhoto, listPlayerPhotos, getPlayerPhoto, deletePlayerPhoto, reactToPhoto, commentOnPhoto, listPhotoComments, loadPlayerProfile, saveThought, createNotification, } = services;
+    const { savePlayerPhoto, listPlayerPhotos, getPlayerPhoto, deletePlayerPhoto, reactToPhoto, commentOnPhoto, listPhotoComments, deletePhotoComment, loadPlayerProfile, saveThought, createNotification, deleteNotificationsByPayloadRef, } = services;
     const playerPhotosMatch = pathname.match(/^\/players\/([^/]+)\/photos$/);
     const playerPhotoMatch = pathname.match(/^\/players\/([^/]+)\/photos\/([^/]+)$/);
     const photoReactionsMatch = pathname.match(/^\/photos\/([^/]+)\/reactions$/);
     const photoCommentsMatch = pathname.match(/^\/photos\/([^/]+)\/comments$/);
+    const photoCommentDeleteMatch = pathname.match(/^\/photos\/([^/]+)\/comments\/([^/]+)$/);
     if (method === "GET" && playerPhotosMatch) {
         const targetPlayerId = decodeURIComponent(playerPhotosMatch[1]);
         const visibilityParam = requestUrl.searchParams.get("visibility") || null;
@@ -137,6 +138,10 @@ export async function handlePhotoRoute(context) {
             return true;
         }
         const deleted = await deletePlayerPhoto(photoId, targetPlayerId);
+        if (deleted) {
+            // Comment and reaction notifications all reference the photo that is now gone.
+            await deleteNotificationsByPayloadRef("photoId", photoId);
+        }
         writeJson(res, 200, { ok: deleted }, requestOrigin);
         return true;
     }
@@ -157,7 +162,8 @@ export async function handlePhotoRoute(context) {
             writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
             return true;
         }
-        const actorPlayerId = String(body.value?.viewerPlayerId || "");
+        // Actor is the verified session; the body only supplies the comment content.
+        const actorPlayerId = String(authClaims.playerId);
         const actorDisplayName = String(body.value?.viewerAuthorDisplayName || "");
         const commentRecord = await commentOnPhoto(photoId, actorPlayerId, actorDisplayName, body.value?.text);
         if (!commentRecord) {
@@ -174,6 +180,29 @@ export async function handlePhotoRoute(context) {
         }
         return true;
     }
+    // Photo owners and comment authors can both remove a comment; the verified session is the
+    // only identity trusted here.
+    if (method === "DELETE" && photoCommentDeleteMatch) {
+        if (!authClaims?.playerId) {
+            writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+            return true;
+        }
+        const result = await deletePhotoComment(decodeURIComponent(photoCommentDeleteMatch[1]), decodeURIComponent(photoCommentDeleteMatch[2]), authClaims.playerId);
+        if (!result?.ok) {
+            const reason = result?.reason || "delete_failed";
+            const statusCode = reason === "forbidden" ? 403 : (reason === "not_found" ? 404 : 400);
+            writeJson(res, statusCode, { status: "error", error: reason, timestamp }, requestOrigin);
+            return true;
+        }
+        // The comment is gone, so the notification announcing it has nothing left to point at.
+        await deleteNotificationsByPayloadRef("commentId", result.commentId);
+        writeJson(res, 200, {
+            deleted: true,
+            commentId: result.commentId,
+            photo: result.photo,
+        }, requestOrigin);
+        return true;
+    }
     if (method === "POST" && photoReactionsMatch) {
         if (!authClaims?.playerId) {
             writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
@@ -185,7 +214,8 @@ export async function handlePhotoRoute(context) {
             writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
             return true;
         }
-        const actorPlayerId = String(body.value?.viewerPlayerId || "");
+        // Actor is the verified session; the body only supplies which reaction was chosen.
+        const actorPlayerId = String(authClaims.playerId);
         const actorDisplayName = String(body.value?.actorDisplayName || "");
         const photo = await reactToPhoto(photoId, actorPlayerId, body.value?.reactionId);
         if (!photo) {

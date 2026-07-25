@@ -1,5 +1,6 @@
 import { createPlatformApiClient } from "../platform/api/platform-api.mjs";
-import { loadFactoryProfile } from "../platform/identity/factory-profile.mjs";
+import { createAuthApiClient } from "../platform/api/auth-api.mjs";
+import { bindFactoryProfileToSession, loadFactoryProfile } from "../platform/identity/factory-profile.mjs";
 import { getDefaultPlatformStorage } from "../platform/storage/storage.mjs";
 import { createThoughtsPageActions } from "./actions.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "../arcade-session-nav.mjs";
@@ -24,14 +25,28 @@ if (doc?.getElementById) {
     linkClass: "thoughts-stage__portal",
     sessionNavId: "thoughtsAuthNav",
   });
+  const storage = getDefaultPlatformStorage();
+  const apiClient = createPlatformApiClient();
+
+  // The feed is public to read, but commenting/sharing/reacting is account-holders-only,
+  // so the page resolves the session up front and treats guests as read-only.
+  let authSession: any = null;
+  try {
+    authSession = await createAuthApiClient().getSession();
+  } catch { /* no session */ }
+
+  if (authSession?.playerId) {
+    bindFactoryProfileToSession(authSession.playerId, storage);
+  }
+
   void initSessionNav(doc.getElementById("thoughtsAuthNav"), {
     signInPath: "../sign-in/index.html",
     signUpPath: "../sign-up/index.html",
     homeOnLogout: "../index.html",
+    preloadedSession: authSession,
   });
 
-  const storage = getDefaultPlatformStorage();
-  const apiClient = createPlatformApiClient();
+  const signedInPlayerId = authSession?.playerId || "";
 
   const rerender = async (thoughtFeedOverride: unknown[] | null = null) => {
     const currentProfile = loadFactoryProfile(storage);
@@ -46,7 +61,7 @@ if (doc?.getElementById) {
     storage,
     apiClient,
     loadCurrentProfile() {
-      return loadFactoryProfile(storage);
+      return signedInPlayerId ? loadFactoryProfile(storage) : null;
     },
     rerender,
   });

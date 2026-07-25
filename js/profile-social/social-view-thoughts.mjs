@@ -35,6 +35,11 @@ export function renderCommentSheet({ item, commentPanelState = {}, pageKey = "me
     }
     const comments = Array.isArray(commentPanelState.comments) ? commentPanelState.comments : [];
     const reference = buildShareReference(item);
+    const viewerPlayerId = commentPanelState.viewerPlayerId || "";
+    // Mirrors the server rule: the comment's author or the post's author may remove it. The
+    // server re-checks, so this only decides whether the control is worth showing.
+    const postAuthorPlayerId = item.commentTargetAuthorPlayerId || item.posterPlayerId || "";
+    const canModerateThread = !!viewerPlayerId && viewerPlayerId === postAuthorPlayerId;
     return `
     <div class="thought-card__comment-sheet">
       <div class="thought-card__comment-header">
@@ -44,17 +49,32 @@ export function renderCommentSheet({ item, commentPanelState = {}, pageKey = "me
       ${renderQuotedThought(reference, "share-sheet")}
       <div class="thought-card__comment-thread">
         ${comments.length > 0
-        ? comments.map((comment) => `
+        ? comments.map((comment) => {
+            const canDeleteComment = !!comment.id
+                && (canModerateThread || (!!viewerPlayerId && comment.authorPlayerId === viewerPlayerId));
+            return `
             <article class="thought-card__comment">
               <div class="thought-card__comment-meta">
                 <span class="thought-card__comment-author">${escapeHtml(comment.authorDisplayName || "Arcade Pilot")}</span>
                 <span class="thought-card__comment-date">${escapeHtml(formatCommentDate(comment.createdAt))}</span>
+                ${canDeleteComment
+                ? `<button
+                      class="thought-card__comment-delete"
+                      type="button"
+                      data-delete-comment-id="${escapeHtml(comment.id)}"
+                      data-delete-comment-thought-id="${escapeHtml(item.commentTargetId || item.id)}"
+                      aria-label="Delete comment"
+                    >Delete</button>`
+                : ""}
               </div>
               <p class="thought-card__comment-body">${escapeHtml(comment.text || "")}</p>
             </article>
-          `).join("")
+          `;
+        }).join("")
         : `<p class="thought-card__comment-empty">No comments yet. Start the thread.</p>`}
       </div>
+      ${viewerPlayerId
+        ? `
       <form class="thought-card__comment-form" data-comment-form="${escapeHtml(item.commentTargetId || item.id)}" data-comment-card-id="${escapeHtml(item.id)}">
         <label class="thought-card__share-label" for="${pageKey}-comment-body-${escapeHtml(item.id)}">Write a comment</label>
         <textarea
@@ -69,7 +89,9 @@ export function renderCommentSheet({ item, commentPanelState = {}, pageKey = "me
           <button class="thought-card__share-button thought-card__share-button--primary" type="submit">Post Comment</button>
           <button class="thought-card__share-button" type="button" data-close-comment-sheet="${escapeHtml(item.id)}">Cancel</button>
         </div>
-      </form>
+      </form>`
+        : `
+      <p class="thought-card__comment-signin">Sign in to join the conversation.</p>`}
     </div>
   `;
 }

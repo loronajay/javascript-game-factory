@@ -1,5 +1,6 @@
 import {
   commentOnThoughtPostWithApi,
+  deleteThoughtCommentWithApi,
   loadThoughtComments,
   loadThoughtFeed,
   reactToThoughtPostWithApi,
@@ -23,6 +24,8 @@ export interface CommentPanelState {
   thoughtId: string;
   text: string;
   comments: NormalizedThoughtComment[];
+  // Who is reading the thread; drives which comments show a moderation control.
+  viewerPlayerId?: string;
 }
 
 export interface ThoughtsPageViewState {
@@ -42,6 +45,7 @@ export interface ThoughtsPageActionsOptions {
   shareThoughtPostWithApiImpl?: typeof shareThoughtPostWithApi;
   reactToThoughtPostWithApiImpl?: typeof reactToThoughtPostWithApi;
   commentOnThoughtPostWithApiImpl?: typeof commentOnThoughtPostWithApi;
+  deleteThoughtCommentWithApiImpl?: typeof deleteThoughtCommentWithApi;
 }
 
 function emptySharePanelState(): SharePanelState {
@@ -73,6 +77,7 @@ export function createThoughtsPageActions({
   shareThoughtPostWithApiImpl = shareThoughtPostWithApi,
   reactToThoughtPostWithApiImpl = reactToThoughtPostWithApi,
   commentOnThoughtPostWithApiImpl = commentOnThoughtPostWithApi,
+  deleteThoughtCommentWithApiImpl = deleteThoughtCommentWithApi,
 }: ThoughtsPageActionsOptions = {}) {
   let currentProfile = loadCurrentProfile?.();
   let openReactionThoughtId = "";
@@ -103,6 +108,7 @@ export function createThoughtsPageActions({
       thoughtId,
       text: "",
       comments: loadThoughtCommentsImpl(thoughtId, storage),
+      viewerPlayerId: currentProfile?.playerId || "",
     };
     openReactionThoughtId = "";
     sharePanelState = emptySharePanelState();
@@ -123,11 +129,39 @@ export function createThoughtsPageActions({
   async function handleClick(event: Event): Promise<boolean> {
     refreshCurrentProfile();
 
+    // Checked first so a comment removal never falls through to another card control.
+    const deleteCommentButton = closestEl(event, "[data-delete-comment-id]");
+    if (deleteCommentButton) {
+      const commentId = deleteCommentButton.dataset.deleteCommentId || "";
+      const thoughtId = deleteCommentButton.dataset.deleteCommentThoughtId
+        || commentPanelState.thoughtId
+        || "";
+      if (!commentId || !thoughtId || !currentProfile?.playerId) return true;
+
+      const removed = await deleteThoughtCommentWithApiImpl(
+        thoughtId,
+        commentId,
+        currentProfile.playerId,
+        storage,
+        { apiClient },
+      );
+      if (removed === false) return true;
+
+      commentPanelState = {
+        ...commentPanelState,
+        comments: loadThoughtCommentsImpl(thoughtId, storage),
+      };
+      await rerenderWithFeed();
+      return true;
+    }
+
+    // Reading a thread is public; only replying and moderating require an account, so this
+    // branch deliberately does not check for a signed-in profile.
     const commentButton = closestEl(event, "[data-comment-thought-id]");
     if (commentButton) {
       const thoughtId = commentButton.dataset.commentThoughtId || "";
       const cardId = commentButton.dataset.commentCardId || "";
-      if (!thoughtId || !currentProfile?.playerId) return true;
+      if (!thoughtId) return true;
 
       if (commentPanelState.cardId === cardId) {
         commentPanelState = emptyCommentPanelState();

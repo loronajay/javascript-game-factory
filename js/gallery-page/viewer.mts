@@ -43,6 +43,7 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
   let onDeleteFn: ((photoId: string) => void) | null = null;
   let onReactFn: ((photoId: string, reactionId: string) => void) | null = null;
   let onCommentFn: ((photoId: string, text: string) => void) | null = null;
+  let onDeleteCommentFn: ((photoId: string, commentId: string) => void) | null = null;
   const viewerState = createPhotoViewerState();
 
   const overlay = doc.createElement("div");
@@ -129,7 +130,7 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
     if (!photo) return;
 
     const state = viewerState.getCurrentSocialState();
-    const { viewerPlayerId } = viewerState.getViewState();
+    const { viewerPlayerId, isPhotoOwner } = viewerState.getViewState();
 
     if (reactionChipsEl) {
       reactionChipsEl.innerHTML = buildReactionChipsHtml(state);
@@ -137,7 +138,10 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
 
     if (commentListEl) {
       const comments = state?.comments;
-      commentListEl.innerHTML = buildCommentListHtml(comments);
+      commentListEl.innerHTML = buildCommentListHtml(comments, {
+        viewerPlayerId,
+        isPhotoOwner,
+      });
       if (Array.isArray(comments) && comments.length > 0) {
         commentListEl.scrollTop = commentListEl.scrollHeight;
       }
@@ -234,6 +238,13 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
       if (photoId && onDeleteFn) onDeleteFn(photoId);
       return;
     }
+    const deleteCommentBtn = target?.closest<HTMLElement>(".photo-viewer__comment-delete");
+    if (deleteCommentBtn) {
+      const commentId = deleteCommentBtn.dataset.deleteCommentId;
+      const photo = viewerState.getCurrentPhoto();
+      if (commentId && photo?.id && onDeleteCommentFn) onDeleteCommentFn(photo.id, commentId);
+      return;
+    }
     if (target?.closest(".photo-viewer__react-btn")) {
       setReactionPickerOpen(viewerState.toggleReactionPicker());
       return;
@@ -295,6 +306,7 @@ export function createPhotoViewer({ doc = globalThis.document, lightweight = fal
       onDeleteFn = opts.onDelete || null;
       onReactFn = opts.onReact || null;
       onCommentFn = opts.onComment || null;
+      onDeleteCommentFn = opts.onDeleteComment || null;
       if (api.isOpen() && viewerState.getCurrentPhoto()) paint();
     },
     setSocialState(photoId: string, state: PhotoSocialState) {

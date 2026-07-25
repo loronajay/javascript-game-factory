@@ -4,6 +4,7 @@ import { syncThoughtPostCountWithApi } from "../platform/metrics/metrics.mjs";
 import {
   buildPlayerThoughtFeed,
   commentOnThoughtPostWithApi,
+  deleteThoughtCommentWithApi,
   deleteThoughtPostWithApi,
   loadThoughtFeed,
   loadThoughtComments,
@@ -113,8 +114,11 @@ export function wirePlayerPage(
   };
 
   const socialActions = createProfileSocialActions({
+    // Social writes are account-holders-only. This page is public to read, and every
+    // visitor has a local factory profile, so the actor must come from the signed-in
+    // session — otherwise a guest would fire writes the server now rejects.
     loadCurrentProfile() {
-      return loadFactoryProfile(storage);
+      return authSessionPlayerId ? loadFactoryProfile(storage) : null;
     },
     loadThoughtComments(thoughtId) {
       return loadThoughtComments(thoughtId, storage);
@@ -127,6 +131,9 @@ export function wirePlayerPage(
         playerId: currentProfile.playerId,
         profileName: currentProfile.profileName || "UNNAMED PILOT",
       }, text, storage, { apiClient });
+    },
+    async deleteThoughtComment(thoughtId, commentId, currentProfile) {
+      return deleteThoughtCommentWithApi(thoughtId, commentId, currentProfile.playerId, storage, { apiClient });
     },
     async shareThought(thoughtId, currentProfile, caption = "") {
       return shareThoughtPostWithApi(thoughtId, {

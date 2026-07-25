@@ -212,6 +212,15 @@ export function createPlatformApiClient(options = {}) {
             const encoded = encodePathSegment(thoughtId);
             return encoded ? del(`/thoughts/${encoded}`, "deleted") : Promise.resolve(null);
         },
+        // Server decides whether the caller may remove the comment (comment author or post
+        // author); a rejection surfaces as a null payload here.
+        deleteThoughtComment(thoughtId, commentId) {
+            const encodedThoughtId = encodePathSegment(thoughtId);
+            const encodedCommentId = encodePathSegment(commentId);
+            return encodedThoughtId && encodedCommentId
+                ? del(`/thoughts/${encodedThoughtId}/comments/${encodedCommentId}`, "deleted")
+                : Promise.resolve(null);
+        },
         async uploadAvatar(file) {
             if (!fetchImpl || !baseUrl || !file)
                 return null;
@@ -402,6 +411,18 @@ export function createPlatformApiClient(options = {}) {
                 return null;
             const payload = await post(`/photos/${encoded}/comments`, { viewerPlayerId, viewerAuthorDisplayName, text });
             return payload?.commentRecord || null;
+        },
+        // Server decides whether the caller may remove the comment (comment author or photo
+        // owner); a rejection surfaces as a null payload here.
+        async deletePhotoComment(photoId, commentId) {
+            if (!fetchImpl || !baseUrl)
+                return null;
+            const encodedPhotoId = encodePathSegment(photoId);
+            const encodedCommentId = encodePathSegment(commentId);
+            if (!encodedPhotoId || !encodedCommentId)
+                return null;
+            const payload = await del(`/photos/${encodedPhotoId}/comments/${encodedCommentId}`);
+            return payload?.deleted ? payload : null;
         },
         fetchMyLayout() {
             return get("/profile/layout", "layout");

@@ -52,7 +52,17 @@ export function buildReactionChipsHtml(state: PhotoSocialState | null | undefine
   ).join("");
 }
 
-export function buildCommentListHtml(comments: ViewerComment[] | null | undefined): string {
+export interface CommentListViewerContext {
+  // Reader of the thread and whether they own the photo; together these decide which
+  // comments get a moderation control. The server re-checks on delete.
+  viewerPlayerId?: string;
+  isPhotoOwner?: boolean;
+}
+
+export function buildCommentListHtml(
+  comments: ViewerComment[] | null | undefined,
+  { viewerPlayerId = "", isPhotoOwner = false }: CommentListViewerContext = {},
+): string {
   if (!comments) {
     return `<p class="photo-viewer__comments-loading">Loading comments...</p>`;
   }
@@ -61,11 +71,17 @@ export function buildCommentListHtml(comments: ViewerComment[] | null | undefine
     return `<p class="photo-viewer__comments-empty">No comments yet.</p>`;
   }
 
-  return comments.map((comment) =>
-    `<div class="photo-viewer__comment">
+  return comments.map((comment) => {
+    const canDelete = !!comment.id
+      && !!viewerPlayerId
+      && (isPhotoOwner || comment.authorPlayerId === viewerPlayerId);
+    return `<div class="photo-viewer__comment">
       <span class="photo-viewer__comment-author">${escapeViewerHtml(comment.authorDisplayName)}</span>
       <span class="photo-viewer__comment-text">${escapeViewerHtml(comment.text)}</span>
       <span class="photo-viewer__comment-time">${formatViewerDate(comment.createdAt)}</span>
-    </div>`
-  ).join("");
+      ${canDelete
+        ? `<button class="photo-viewer__comment-delete" type="button" data-delete-comment-id="${escapeViewerHtml(comment.id)}" aria-label="Delete comment">&times;</button>`
+        : ""}
+    </div>`;
+  }).join("");
 }

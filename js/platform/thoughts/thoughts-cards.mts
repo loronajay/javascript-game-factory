@@ -41,6 +41,9 @@ export interface ThoughtCardItem {
   isPlaceholder: boolean;
   shareTargetId?: string;
   commentTargetId?: string;
+  // Author of the post the comment thread actually belongs to. For a repost that is the
+  // original author, not whoever shared it — moderation follows the thread, not the card.
+  commentTargetAuthorPlayerId?: string;
   imageUrl?: string;
   posterPlayerId?: string;
   quotedThought?: ThoughtCardQuoted | null;
@@ -86,6 +89,7 @@ export function buildThoughtCardItems(thoughtFeed: unknown = [], options: Though
         reactionPickerItems: buildThoughtReactionPickerItems(normalized.reactionTotals, normalized.viewerReaction),
         shareTargetId: normalized.repostOfId || normalized.id,
         commentTargetId: normalized.repostOfId || normalized.id,
+        commentTargetAuthorPlayerId: (quotedThought?.authorPlayerId || normalized.authorPlayerId) || "",
         imageUrl: normalized.imageUrl || "",
         posterPlayerId: normalized.authorPlayerId || "",
         quotedThought: quotedThought

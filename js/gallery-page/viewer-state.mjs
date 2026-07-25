@@ -2,6 +2,7 @@ export function createPhotoViewerState() {
     let photos = [];
     let currentIndex = -1;
     let isOwner = false;
+    let isPhotoOwner = false;
     let galleryLinkHref = "";
     let viewerPlayerId = "";
     let viewerAuthorDisplayName = "";
@@ -17,6 +18,7 @@ export function createPhotoViewerState() {
         setPhotos(newPhotos, options = {}) {
             photos = Array.isArray(newPhotos) ? newPhotos : [];
             isOwner = !!options.isOwner;
+            isPhotoOwner = options.isPhotoOwner === undefined ? !!options.isOwner : !!options.isPhotoOwner;
             galleryLinkHref = options.galleryLinkHref || "";
             viewerPlayerId = options.viewerPlayerId || "";
             viewerAuthorDisplayName = options.viewerAuthorDisplayName || "";
@@ -77,6 +79,7 @@ export function createPhotoViewerState() {
                 photos,
                 currentIndex,
                 isOwner,
+                isPhotoOwner,
                 galleryLinkHref,
                 viewerPlayerId,
                 viewerAuthorDisplayName,

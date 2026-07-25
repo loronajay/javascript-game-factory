@@ -2,7 +2,7 @@ import { getDefaultPlatformStorage } from "../storage/storage.mjs";
 import { createPlatformApiClient } from "../api/platform-api.mjs";
 import { recordDirectInteractionBetweenPlayers } from "../relationships/relationships.mjs";
 import { sanitizeSingleLine, sanitizeTextBlock, sanitizeThoughtReactionId, sanitizeThoughtShareId, normalizeThoughtShareActor, normalizeThoughtPost, normalizeThoughtComment, } from "./thoughts-normalize.mjs";
-import { parseNormalizedStoredFeed, parseNormalizedStoredComments, writeThoughtFeed, writeThoughtComments, loadThoughtFeed, loadThoughtComments, deleteThoughtPost, publishThoughtPost, commentOnThoughtPost, shareThoughtPost, reactToThoughtPost, } from "./thoughts-store.mjs";
+import { parseNormalizedStoredFeed, parseNormalizedStoredComments, writeThoughtFeed, writeThoughtComments, loadThoughtFeed, loadThoughtComments, deleteThoughtPost, deleteThoughtCommentPost, publishThoughtPost, commentOnThoughtPost, shareThoughtPost, reactToThoughtPost, } from "./thoughts-store.mjs";
 function cacheThoughtPosts(storage, additions = [], options = {}) {
     const removeIds = new Set((Array.isArray(options?.removeIds) ? options.removeIds : [])
         .map((v) => sanitizeSingleLine(v, 80))
@@ -81,6 +81,36 @@ export async function deleteThoughtPostWithApi(id, storage = getDefaultPlatformS
     // Auth: API first, then update local cache
     await apiClient.deleteThought(id).catch(() => null);
     deleteThoughtPost(id, storage);
+    return true;
+}
+export async function deleteThoughtCommentWithApi(thoughtId, commentId, viewerPlayerId, storage = getDefaultPlatformStorage(), options = {}) {
+    const apiClient = options?.apiClient || createPlatformApiClient(options);
+    const isAuth = typeof apiClient?.deleteThoughtComment === "function";
+    if (!isAuth) {
+        // Guest: local only
+        return !!deleteThoughtCommentPost(thoughtId, commentId, viewerPlayerId, storage);
+    }
+    const normalizedThoughtId = sanitizeThoughtShareId(thoughtId);
+    const normalizedCommentId = sanitizeSingleLine(commentId, 80);
+    if (!normalizedThoughtId || !normalizedCommentId)
+        return false;
+    // Auth: the server owns the permission decision; only mirror into the local cache when
+    // it actually removed the comment.
+    const deleted = await apiClient
+        .deleteThoughtComment(normalizedThoughtId, normalizedCommentId)
+        .catch(() => null);
+    if (!deleted)
+        return false;
+    const remainingComments = parseNormalizedStoredComments(storage)
+        .filter((entry) => entry.id !== normalizedCommentId);
+    writeThoughtComments(storage, remainingComments);
+    const storedFeed = parseNormalizedStoredFeed(storage);
+    const matchingThought = storedFeed.find((entry) => entry.id === normalizedThoughtId);
+    if (matchingThought) {
+        const remainingCount = remainingComments
+            .filter((entry) => entry.thoughtId === normalizedThoughtId).length;
+        cacheThoughtPosts(storage, [normalizeThoughtPost({ ...matchingThought, commentCount: remainingCount })]);
+    }
     return true;
 }
 export async function commentOnThoughtPostWithApi(thoughtId, viewerActor, text, storage = getDefaultPlatformStorage(), options = {}) {

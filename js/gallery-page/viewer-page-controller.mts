@@ -56,8 +56,12 @@ export async function openGalleryItemInViewer({
     const session = await viewerActions.loadSessionOnce();
     fullViewer.setPhotos([photo], {
       galleryLinkHref,
+      // Photo removal is not offered from this embedded viewer, but the owner still needs
+      // comment moderation, so only the identity flag is set here.
+      isPhotoOwner: !!ownerId && ownerId === session.playerId,
       onReact: viewerActions.handleReact,
       onComment: viewerActions.handleComment,
+      onDeleteComment: viewerActions.handleDeleteComment,
       viewerPlayerId: session.playerId,
       viewerAuthorDisplayName: session.displayName,
     });

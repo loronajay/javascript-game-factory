@@ -38,6 +38,7 @@ import {
 import {
   commentOnThought,
   deleteThought,
+  deleteThoughtComment,
   listThoughtComments,
   listThoughts,
   reactToThought,
@@ -61,6 +62,7 @@ import {
 import { createEmailSender } from "./email.mjs";
 import {
   createNotification,
+  deleteNotificationsByPayloadRef,
   listNotifications,
   markAllNotificationsRead,
 } from "./db/notifications.mjs";
@@ -93,6 +95,7 @@ import {
   reactToPhoto,
   commentOnPhoto,
   listPhotoComments,
+  deletePhotoComment,
 } from "./db/photos.mjs";
 
 const { Pool } = pg;
@@ -183,8 +186,12 @@ async function bootstrap(): Promise<void> {
     shareThought: (thoughtId: any, viewerPlayerId: any, viewerAuthorDisplayName: any, options: any) => shareThought(pool, thoughtId, viewerPlayerId, viewerAuthorDisplayName, options),
     commentOnThought: (thoughtId: any, viewerPlayerId: any, viewerAuthorDisplayName: any, text: any) => commentOnThought(pool, thoughtId, viewerPlayerId, viewerAuthorDisplayName, text),
     reactToThought: (thoughtId: any, viewerPlayerId: any, reactionId: any) => reactToThought(pool, thoughtId, viewerPlayerId, reactionId),
-    deleteThought: (thoughtId: any) => deleteThought(pool, thoughtId),
+    deleteThought: (thoughtId: any, requesterPlayerId: any) => deleteThought(pool, thoughtId, requesterPlayerId),
+    deleteThoughtComment: (thoughtId: any, commentId: any, requesterPlayerId: any) =>
+      deleteThoughtComment(pool, thoughtId, commentId, requesterPlayerId),
     createNotification: (params: any) => createNotification(pool, params),
+    deleteNotificationsByPayloadRef: (payloadKey: any, payloadValue: any) =>
+      deleteNotificationsByPayloadRef(pool, payloadKey, payloadValue),
     listNotifications: (recipientPlayerId: any) => listNotifications(pool, recipientPlayerId),
     markAllNotificationsRead: (recipientPlayerId: any) => markAllNotificationsRead(pool, recipientPlayerId),
     createFriendRequest: (params: any) => createFriendRequest(pool, params),
@@ -252,6 +259,8 @@ async function bootstrap(): Promise<void> {
     reactToPhoto: (photoId: any, viewerPlayerId: any, reactionId: any) => reactToPhoto(pool, photoId, viewerPlayerId, reactionId),
     commentOnPhoto: (photoId: any, viewerPlayerId: any, displayName: any, text: any) => commentOnPhoto(pool, photoId, viewerPlayerId, displayName, text),
     listPhotoComments: (photoId: any) => listPhotoComments(pool, photoId),
+    deletePhotoComment: (photoId: any, commentId: any, requesterPlayerId: any) =>
+      deletePhotoComment(pool, photoId, commentId, requesterPlayerId),
   });
   const server = createServer(app);
 

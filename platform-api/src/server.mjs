@@ -11,15 +11,15 @@ import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, sav
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import { cancelRanked, enqueueRanked, getPublicRankedCard, getRankedLeaderboard, getRankedMatchDetail, getRankedMatches, getRankedStanding, getRankedUnitStats, pollRanked, reportRankedResult, saveRankedProfile, setRankedLobbyCode, startRankedMatch, } from "./db/ranked.mjs";
 import { createFriendshipBetweenPlayers, loadPlayerRelationships, recordDirectInteractionBetweenPlayers, recordSharedEventBetweenPlayers, recordSharedSessionBetweenPlayers, removeFriendBetweenPlayers, savePlayerRelationships, } from "./db/relationships.mjs";
-import { commentOnThought, deleteThought, listThoughtComments, listThoughts, reactToThought, saveThought, shareThought, } from "./db/thoughts.mjs";
+import { commentOnThought, deleteThought, deleteThoughtComment, listThoughtComments, listThoughts, reactToThought, saveThought, shareThought, } from "./db/thoughts.mjs";
 import { deleteAccountService, loginAccountService, logoutAccountService, registerAccountService, requestPasswordResetService, resetPasswordService, verifyAccountSessionService, } from "./services/auth.mjs";
 import { createTacticalArenaCheckoutSession, fulfillPremiumCheckoutSessionFromReturn, fulfillStripeWebhook, } from "./services/payments.mjs";
 import { createEmailSender } from "./email.mjs";
-import { createNotification, listNotifications, markAllNotificationsRead, } from "./db/notifications.mjs";
+import { createNotification, deleteNotificationsByPayloadRef, listNotifications, markAllNotificationsRead, } from "./db/notifications.mjs";
 import { createFriendRequest, getFriendRequest, acceptFriendRequest, rejectFriendRequest, } from "./db/friend-requests.mjs";
 import { createChallenge, getChallenge, acceptChallenge, declineChallenge, } from "./db/challenges.mjs";
 import { findOrCreateConversation, findConversationBetween, listConversations, getConversation, listMessages, createMessage, markConversationRead, } from "./db/messages.mjs";
-import { savePlayerPhoto, listPlayerPhotos, getPlayerPhoto, deletePlayerPhoto, reactToPhoto, commentOnPhoto, listPhotoComments, } from "./db/photos.mjs";
+import { savePlayerPhoto, listPlayerPhotos, getPlayerPhoto, deletePlayerPhoto, reactToPhoto, commentOnPhoto, listPhotoComments, deletePhotoComment, } from "./db/photos.mjs";
 const { Pool } = pg;
 function createDatabaseCheck(pool) {
     if (!pool) {
@@ -102,8 +102,10 @@ async function bootstrap() {
         shareThought: (thoughtId, viewerPlayerId, viewerAuthorDisplayName, options) => shareThought(pool, thoughtId, viewerPlayerId, viewerAuthorDisplayName, options),
         commentOnThought: (thoughtId, viewerPlayerId, viewerAuthorDisplayName, text) => commentOnThought(pool, thoughtId, viewerPlayerId, viewerAuthorDisplayName, text),
         reactToThought: (thoughtId, viewerPlayerId, reactionId) => reactToThought(pool, thoughtId, viewerPlayerId, reactionId),
-        deleteThought: (thoughtId) => deleteThought(pool, thoughtId),
+        deleteThought: (thoughtId, requesterPlayerId) => deleteThought(pool, thoughtId, requesterPlayerId),
+        deleteThoughtComment: (thoughtId, commentId, requesterPlayerId) => deleteThoughtComment(pool, thoughtId, commentId, requesterPlayerId),
         createNotification: (params) => createNotification(pool, params),
+        deleteNotificationsByPayloadRef: (payloadKey, payloadValue) => deleteNotificationsByPayloadRef(pool, payloadKey, payloadValue),
         listNotifications: (recipientPlayerId) => listNotifications(pool, recipientPlayerId),
         markAllNotificationsRead: (recipientPlayerId) => markAllNotificationsRead(pool, recipientPlayerId),
         createFriendRequest: (params) => createFriendRequest(pool, params),
@@ -171,6 +173,7 @@ async function bootstrap() {
         reactToPhoto: (photoId, viewerPlayerId, reactionId) => reactToPhoto(pool, photoId, viewerPlayerId, reactionId),
         commentOnPhoto: (photoId, viewerPlayerId, displayName, text) => commentOnPhoto(pool, photoId, viewerPlayerId, displayName, text),
         listPhotoComments: (photoId) => listPhotoComments(pool, photoId),
+        deletePhotoComment: (photoId, commentId, requesterPlayerId) => deletePhotoComment(pool, photoId, commentId, requesterPlayerId),
     });
     const server = createServer(app);
     async function shutdown(signal) {

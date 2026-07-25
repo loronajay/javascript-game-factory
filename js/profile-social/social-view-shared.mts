@@ -1,4 +1,6 @@
 export interface CommentLike {
+  id?: string;
+  authorPlayerId?: string;
   authorDisplayName?: string;
   createdAt?: string;
   text?: string;
@@ -17,6 +19,8 @@ export interface CommentPanelState {
   thoughtId: string;
   text: string;
   comments: CommentLike[];
+  // Who is reading the thread; drives which comments show a moderation control.
+  viewerPlayerId?: string;
 }
 
 export interface SocialViewState {

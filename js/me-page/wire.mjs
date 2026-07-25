@@ -1,7 +1,7 @@
 import { PROFILE_UPDATED_EVENT } from "../arcade-profile.mjs";
 import { loadFactoryProfile } from "../platform/identity/factory-profile.mjs";
 import { syncThoughtPostCountWithApi, } from "../platform/metrics/metrics.mjs";
-import { buildPlayerThoughtFeed, commentOnThoughtPostWithApi, deleteThoughtPostWithApi, loadThoughtFeed, loadThoughtComments, publishThoughtPostWithApi, reactToThoughtPostWithApi, shareThoughtPostWithApi, syncThoughtCommentsFromApi, syncThoughtFeedFromApi, } from "../platform/thoughts/thoughts.mjs";
+import { buildPlayerThoughtFeed, commentOnThoughtPostWithApi, deleteThoughtCommentWithApi, deleteThoughtPostWithApi, loadThoughtFeed, loadThoughtComments, publishThoughtPostWithApi, reactToThoughtPostWithApi, shareThoughtPostWithApi, syncThoughtCommentsFromApi, syncThoughtFeedFromApi, } from "../platform/thoughts/thoughts.mjs";
 import { createMediaComposerState } from "../profile-social/media-composer-state.mjs";
 import { createProfileSocialActions } from "../profile-social/social-actions.mjs";
 import { initPageGalleryViewer } from "../gallery-page/viewer.mjs";
@@ -100,6 +100,9 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
                 playerId: currentProfile.playerId,
                 profileName: currentProfile.profileName || "UNNAMED PILOT",
             }, text, storage, { apiClient });
+        },
+        async deleteThoughtComment(thoughtId, commentId, currentProfile) {
+            return deleteThoughtCommentWithApi(thoughtId, commentId, currentProfile.playerId, storage, { apiClient });
         },
         async shareThought(thoughtId, currentProfile, caption = "") {
             return shareThoughtPostWithApi(thoughtId, {
