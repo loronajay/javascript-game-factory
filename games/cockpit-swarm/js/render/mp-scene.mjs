@@ -22,6 +22,43 @@ const OUTGOING_DEPTH_SPAN = OPPONENT_VISUAL_Z - SPAWN_Z;       // ≈ 5.70
 // vertical screen span from horizon to reticle (used for incoming y-approach math)
 const DHEIGHT = RETICLE_Y - HORIZON_Y;                         // ≈ 87
 
+// Incoming fly-past: a shot climbs from the horizon and reaches the reticle at
+// the hit plane, then keeps rushing toward and past the cockpit — growing and
+// sliding off the bottom edge — until it despawns just behind the player. This
+// gives incoming fire the same "coming right at me" depth as campaign enemy
+// bullets instead of vanishing at the reticle. Constants below must stay in
+// sync with the hit/pass planes in mp-controller.mjs.
+const INCOMING_START_Z     = OPPONENT_VISUAL_Z; // 6.85 — where an incoming shot is born
+const INCOMING_HIT_Z       = Z_NEAR + 0.5;      // 1.50 — reaches the reticle / hit is decided
+const INCOMING_PASS_CUTOFF = 0.2;               // matches Z_PASS_NEAR in mp-controller
+const INCOMING_PASS_Y_END  = H + 180;           // drives the shot off the bottom edge
+
+// Projected screen position of an incoming shot at a given view depth.
+// Returns { x, y, s, app (0→1 approach), passFrac (0→1 once past the reticle) }.
+function _incomingPos(viewZ, bulletX, localPlayerX) {
+  const raw    = project(bulletX, 0, viewZ, localPlayerX);
+  const rawApp = (INCOMING_START_Z - viewZ) / (INCOMING_START_Z - INCOMING_HIT_Z);
+
+  // Approach phase: rise from the horizon and converge on the reticle.
+  if (rawApp <= 1) {
+    const a = clamp(rawApp, 0, 1);
+    return { x: raw.x, y: HORIZON_Y + a * a * DHEIGHT, s: raw.s, app: a, passFrac: 0 };
+  }
+
+  // Pass phase: beyond the reticle — accelerate off the bottom as it blows by.
+  // (Off-lane shots naturally diverge sideways via the raw perspective x.)
+  const passFrac = clamp(
+    (INCOMING_HIT_Z - viewZ) / (INCOMING_HIT_Z - INCOMING_PASS_CUTOFF), 0, 1
+  );
+  return {
+    x: raw.x,
+    y: lerp(RETICLE_Y, INCOMING_PASS_Y_END, passFrac * passFrac),
+    s: raw.s,
+    app: 1,
+    passFrac,
+  };
+}
+
 // ─── Shared button helper ─────────────────────────────────────────────────────
 
 function _drawBtn(ctx, btn, active, t) {
@@ -342,69 +379,76 @@ export function buildMpBulletView({ bullet, side, localPlayerX }) {
   const visible = viewZ >= 0.14;
   const isIncoming = (side === "p1" && bullet.owner === "p2") ||
                      (side === "p2" && bullet.owner === "p1");
-  const startZ = OPPONENT_VISUAL_Z;
-  const hitZ   = Z_NEAR + 0.5;
-  const approach = isIncoming ? clamp((startZ - viewZ) / (startZ - hitZ), 0, 1) : 0;
+  const isLob = bullet.kind === "lob";
+
+  // ── Incoming bullets: rush in to the reticle, then blow past the cockpit ──────
+  if (isIncoming) {
+    const tailDz    = isLob ? 0.55 : 0.30;
+    const tailViewZ = Math.min(viewZ + tailDz, Z_FAR); // tail trails farther back
+
+    const head = _incomingPos(viewZ,     bullet.x, localPlayerX);
+    const tail = _incomingPos(tailViewZ, bullet.x, localPlayerX);
+
+    const approach = head.app;
+    const onLane   = Math.abs(bullet.x - localPlayerX) <= MP_TUNING.hitWindowX;
+
+    // Stay bright while rushing in; fade only over the final stretch behind you.
+    const passFade = 1 - clamp((head.passFrac - 0.6) / 0.4, 0, 1);
+    const rs = Math.min(head.s, 5.0); // clamp the perspective blow-up as z → 0
+
+    return {
+      visible,
+      x:     head.x,
+      y:     head.y,
+      s:     head.s,
+      viewZ,
+      tailX: tail.x,
+      tailY: tail.y,
+      kind:  bullet.kind,
+      isIncoming: true,
+      approach,
+      onLane,
+      overshootFade: passFade,
+      radius: Math.max(1.5, (isLob ? 11 : 5.5) * rs * lerp(0.90, 1.72, approach)),
+      outgoingGlowBoost: 0,
+      threatAlpha: onLane ? clamp((approach - 0.42) / 0.58, 0, 1) * 0.68 * passFade : 0,
+      palette: getProjectilePalette(bullet.kind, true),
+    };
+  }
 
   // ── Outgoing bullets: interpolate worldY from gun muzzle (reticle height at SPAWN_Z)
   //    to opponent worldY — gives correct 3-D arc from reticle into the distance.
-  const outgoingDepthFrac = !isIncoming
-    ? clamp((viewZ - SPAWN_Z) / OUTGOING_DEPTH_SPAN, 0, 1)
-    : 0;
-  const bulletWorldY = !isIncoming
-    ? lerp(GUN_MUZZLE_WORLD_Y, OPPONENT_VISUAL_Y, outgoingDepthFrac)
-    : 0;
+  const outgoingDepthFrac = clamp((viewZ - SPAWN_Z) / OUTGOING_DEPTH_SPAN, 0, 1);
+  const bulletWorldY = lerp(GUN_MUZZLE_WORLD_Y, OPPONENT_VISUAL_Y, outgoingDepthFrac);
   const raw = project(bullet.x, bulletWorldY, viewZ, localPlayerX);
 
-  const tailDz = bullet.kind === "lob" ? 0.55 : 0.30;
-  const tailViewZ = isIncoming
-    ? Math.min(viewZ + tailDz, Z_FAR)
-    : Math.max(viewZ - tailDz, Z_NEAR);
-
-  const tailDepthFrac = !isIncoming
-    ? clamp((tailViewZ - SPAWN_Z) / OUTGOING_DEPTH_SPAN, 0, 1)
-    : 0;
-  const tailWorldY = !isIncoming
-    ? lerp(GUN_MUZZLE_WORLD_Y, OPPONENT_VISUAL_Y, tailDepthFrac)
-    : 0;
+  const tailDz    = isLob ? 0.55 : 0.30;
+  const tailViewZ = Math.max(viewZ - tailDz, Z_NEAR);
+  const tailDepthFrac = clamp((tailViewZ - SPAWN_Z) / OUTGOING_DEPTH_SPAN, 0, 1);
+  const tailWorldY = lerp(GUN_MUZZLE_WORLD_Y, OPPONENT_VISUAL_Y, tailDepthFrac);
   const tailRaw = project(bullet.x, tailWorldY, tailViewZ, localPlayerX);
 
-  // ── Incoming bullets: use Z_NEAR as the visual convergence target (not hitZ) so
-  //    bullets reach RETICLE_Y exactly at Z_NEAR, then overshoot past the player.
-  const rawVisualApp     = isIncoming ? (startZ - viewZ)     / Math.max(0.001, startZ - hitZ) : 0;
-  const tailRawVisualApp = isIncoming ? (startZ - tailViewZ) / Math.max(0.001, startZ - hitZ) : 0;
-
-  // Allow overshoot past 1.0 — bullet rushes through the reticle, then fades fast.
-  const overshoot     = Math.max(0, rawVisualApp - 1.0);
-  const overshootFade = overshoot > 0 ? Math.max(0, 1 - overshoot * 3.5) : 1.0;
-
-  const yApp     = isIncoming ? Math.min(rawVisualApp,     1.40) : 0;
-  const tailYApp = isIncoming ? Math.min(tailRawVisualApp, 1.40) : 0;
-
-  const isLob = bullet.kind === "lob";
-  const onLane = isIncoming && Math.abs(bullet.x - localPlayerX) <= MP_TUNING.hitWindowX;
-
-  const outgoingFarFrac   = !isIncoming ? clamp((viewZ - 3.5) / (OPPONENT_VISUAL_Z - 3.5), 0, 1) : 0;
-  const minRadius         = !isIncoming ? lerp(1.5, 4.0, outgoingFarFrac) : 1.5;
+  const outgoingFarFrac   = clamp((viewZ - 3.5) / (OPPONENT_VISUAL_Z - 3.5), 0, 1);
+  const minRadius         = lerp(1.5, 4.0, outgoingFarFrac);
   const outgoingGlowBoost = outgoingFarFrac;
 
   return {
     visible,
     x:     raw.x,
-    y:     isIncoming ? HORIZON_Y + yApp     * yApp     * DHEIGHT : raw.y,
+    y:     raw.y,
     s:     raw.s,
     viewZ,
     tailX: tailRaw.x,
-    tailY: isIncoming ? HORIZON_Y + tailYApp * tailYApp * DHEIGHT : tailRaw.y,
+    tailY: tailRaw.y,
     kind:  bullet.kind,
-    isIncoming,
-    approach,
-    onLane,
-    overshootFade,
-    radius: Math.max(minRadius, (isLob ? 11 : 5.5) * raw.s * lerp(0.90, 1.72, approach)),
+    isIncoming: false,
+    approach: 0,
+    onLane: false,
+    overshootFade: 1,
+    radius: Math.max(minRadius, (isLob ? 11 : 5.5) * raw.s * 0.90),
     outgoingGlowBoost,
-    threatAlpha: onLane ? clamp((approach - 0.42) / 0.58, 0, 1) * 0.68 : 0,
-    palette: getProjectilePalette(bullet.kind, isIncoming),
+    threatAlpha: 0,
+    palette: getProjectilePalette(bullet.kind, false),
   };
 }
 
@@ -536,7 +580,7 @@ function _renderBulletView(ctx, view) {
   const color = palette.color;
 
   // Outgoing bullets at far depth: boost alpha and glow so they stay readable.
-  // Incoming bullets fade quickly once they overshoot past the reticle (overshootFade → 0).
+  // Incoming bullets stay bright rushing in, then fade over the final fly-past (overshootFade → 0).
   const baseAlpha = isIncoming
     ? clamp(0.22 + approach * 0.50, 0.22, 0.78) * overshootFade
     : clamp(0.32 + outgoingGlowBoost * 0.42, 0.32, 0.74);

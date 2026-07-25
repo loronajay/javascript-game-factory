@@ -32,6 +32,14 @@ const MP_COUNTDOWN_LEAD_MS = 4000;
 const Z_NEAR = 1.0;
 const Z_FAR  = 7.0;
 
+// A shot's hit is decided once as it crosses the target plane (Z_NEAR+0.5 for
+// incoming, Z_FAR-0.5 for outgoing). On a MISS the bullet is NOT removed — it
+// keeps travelling and rushes past the player/opponent, only despawning once it
+// is fully behind them. This is what makes incoming fire read as truly 3-D
+// (matching the campaign enemy-bullet feel) instead of vanishing at the reticle.
+const Z_PASS_NEAR = 0.2;                          // incoming bullet fully behind the cockpit
+const Z_PASS_FAR  = Z_NEAR + Z_FAR - Z_PASS_NEAR; // 7.8 — outgoing fully behind the opponent
+
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
 function getClient() {
@@ -245,28 +253,36 @@ function _checkHits(game, input, client) {
   for (const b of mp.mpBullets) {
     let keep = true;
 
-    if (b.owner === "p1" && b.z >= Z_FAR - 0.5) {
-      keep = false;
-      if (Math.abs(b.x - p2x) <= MP_TUNING.hitWindowX) {
-        const inSD = mp.suddenDeath && b.kind === "lob";
-        const dmg  = inSD ? 9999 : (b.kind === "lob" ? MP_TUNING.lobDmg : MP_TUNING.laserDmg);
-        mp.p2hp = Math.max(0, mp.p2hp - dmg);
-        mp.opponentHitFlash = 240;
-        if (mp.p2hp <= 0) _endRound(game, input, "p1", client);
+    if (b.owner === "p1") {
+      // Outgoing toward the opponent — decide the hit once at the opponent plane.
+      if (!b.resolved && b.z >= Z_FAR - 0.5) {
+        b.resolved = true;
+        if (Math.abs(b.x - p2x) <= MP_TUNING.hitWindowX) {
+          const inSD = mp.suddenDeath && b.kind === "lob";
+          const dmg  = inSD ? 9999 : (b.kind === "lob" ? MP_TUNING.lobDmg : MP_TUNING.laserDmg);
+          mp.p2hp = Math.max(0, mp.p2hp - dmg);
+          mp.opponentHitFlash = 240;
+          keep = false; // a connecting shot stops on impact
+          if (mp.p2hp <= 0) _endRound(game, input, "p1", client);
+        }
       }
-    } else if (b.owner === "p2" && b.z <= Z_NEAR + 0.5) {
-      keep = false;
-      if (Math.abs(b.x - p1x) <= MP_TUNING.hitWindowX) {
-        const inSD = mp.suddenDeath && b.kind === "lob";
-        const dmg  = inSD ? 9999 : (b.kind === "lob" ? MP_TUNING.lobDmg : MP_TUNING.laserDmg);
-        mp.p1hp = Math.max(0, mp.p1hp - dmg);
-        game.shake = 6;
-        game.player.hurtFlash = 220;
-        sfxPlayerHurt();
-        if (mp.p1hp <= 0) _endRound(game, input, "p2", client);
+      if (b.z >= Z_PASS_FAR) keep = false; // sailed clear past the opponent
+    } else {
+      // Incoming toward the local player — decide the hit once at the player plane.
+      if (!b.resolved && b.z <= Z_NEAR + 0.5) {
+        b.resolved = true;
+        if (Math.abs(b.x - p1x) <= MP_TUNING.hitWindowX) {
+          const inSD = mp.suddenDeath && b.kind === "lob";
+          const dmg  = inSD ? 9999 : (b.kind === "lob" ? MP_TUNING.lobDmg : MP_TUNING.laserDmg);
+          mp.p1hp = Math.max(0, mp.p1hp - dmg);
+          game.shake = 6;
+          game.player.hurtFlash = 220;
+          sfxPlayerHurt();
+          keep = false; // a connecting shot stops on impact
+          if (mp.p1hp <= 0) _endRound(game, input, "p2", client);
+        }
       }
-    } else if (b.z > Z_FAR || b.z < Z_NEAR) {
-      keep = false; // missed
+      if (b.z <= Z_PASS_NEAR) keep = false; // whooshed clear past the cockpit
     }
 
     if (keep) surviving.push(b);
