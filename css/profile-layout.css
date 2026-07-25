@@ -1907,3 +1907,68 @@
     padding: 0 0.6rem 1.5rem;
   }
 }
+
+/* ---------- MOBILE: EDITOR UNAVAILABLE NOTICE ----------
+   The editor canvas mirrors the live desktop page width and is drag-driven, so it
+   has no mobile model. layout-wire.mjs replaces the whole workspace with this
+   notice on coarse-pointer phones. */
+
+.me-layout-blocked {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(100%, 560px);
+  margin: 10vh auto 0;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--accent);
+  border-radius: var(--profile-radius-lg, 22px);
+  background: var(--panel-strong);
+  box-shadow: 0 24px 60px var(--shadow);
+  text-align: center;
+}
+
+.me-layout-blocked__title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.15rem;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.me-layout-blocked__copy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.me-layout-blocked__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.me-layout-blocked__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--profile-radius-sm, 12px);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.me-layout-blocked__action--primary {
+  border-color: rgba(255, 184, 77, 0.55);
+  background: rgba(255, 184, 77, 0.14);
+}

@@ -1,5 +1,5 @@
 import { PROFILE_PANEL_REGISTRY, KNOWN_PANEL_IDS } from "./registry.mjs";
-import { getDefaultLayout, LAYOUT_COLUMNS, LAYOUT_VERSION } from "./default-layout.mjs";
+import { FRIENDS_PANEL_LAYOUT_REVISION, getDefaultLayout, LAYOUT_COLUMNS, LAYOUT_VERSION } from "./default-layout.mjs";
 import { getDefaultPanelChildren, PROFILE_PANEL_CHILD_REGISTRY } from "./child-layout.mjs";
 import {
   COMPOSITION_GRID_COLUMNS,
@@ -63,6 +63,7 @@ export interface LayoutElement {
 
 export interface ProfileLayout {
   version: number;
+  friendsPanelRevision: number;
   desktop: {
     columns: number;
     elements: LayoutElement[];
@@ -89,6 +90,7 @@ export function normalizeLayout(raw: unknown): ProfileLayout {
 
   const defaultLayout = getDefaultLayout();
   const defaultPanelMap = new Map<string, any>(defaultLayout.desktop.panels.map((p: any) => [p.id, p]));
+  const friendsResetPending = toInt(rawLayout.friendsPanelRevision, 1) !== FRIENDS_PANEL_LAYOUT_REVISION;
 
   for (const p of rawPanels) {
     if (!p || typeof p !== "object") continue;
@@ -101,6 +103,21 @@ export function normalizeLayout(raw: unknown): ProfileLayout {
     const enabled = p.enabled !== false;
 
     if (!enabled && def.required) continue; // required panels are always enabled
+
+    // One-time friends reset: geometry and children go back to the current defaults,
+    // but a panel the owner switched off stays off.
+    if (id === "friends" && friendsResetPending) {
+      const dp = defaultPanelMap.get(id);
+      if (dp) {
+        normalized.push({
+          ...dp,
+          enabled,
+          style: normalizePanelStyle(dp.style),
+          children: normalizePanelChildren(id, dp.children),
+        });
+        continue;
+      }
+    }
 
     // Fully locked panels (not draggable AND not resizable) always use default geometry.
     if (!def.draggable && !def.resizable) {
@@ -153,8 +170,11 @@ export function normalizeLayout(raw: unknown): ProfileLayout {
     }
   }
 
+  if (friendsResetPending) dropResetFriendsPanelBelowCollisions(normalized);
+
   return {
     version: LAYOUT_VERSION,
+    friendsPanelRevision: FRIENDS_PANEL_LAYOUT_REVISION,
     desktop: {
       columns,
       elements: migrateCompositionElementStylesFromPanelChildren(
@@ -164,6 +184,29 @@ export function normalizeLayout(raw: unknown): ProfileLayout {
       panels: normalized,
     },
   };
+}
+
+// The reset drops the friends panel back into its default slot, which a customized layout
+// may already have filled. Rather than shove other panels around, slide friends down to the
+// first row where it clears everything else.
+function dropResetFriendsPanelBelowCollisions(panels: LayoutPanel[]): void {
+  const friends = panels.find((panel) => panel.id === "friends");
+  if (!friends || friends.enabled === false) return;
+
+  const others = panels.filter((panel) => panel !== friends && panel.enabled !== false);
+  const overlapsAt = (y: number) => others.filter((panel) => (
+    friends.x < panel.x + panel.w &&
+    friends.x + friends.w > panel.x &&
+    y < panel.y + panel.h &&
+    y + friends.h > panel.y
+  ));
+
+  // Each pass clears the lowest blocker, so it terminates in at most one pass per panel.
+  for (let guard = 0; guard <= others.length; guard += 1) {
+    const blockers = overlapsAt(friends.y);
+    if (blockers.length === 0) return;
+    friends.y = Math.max(...blockers.map((panel) => panel.y + panel.h));
+  }
 }
 
 export function normalizeCompositionElements(rawElements: unknown): LayoutElement[] {

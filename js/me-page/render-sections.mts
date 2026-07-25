@@ -153,7 +153,7 @@ export function renderFriendNavigatorPanel(container: HTMLElement | null, title:
         autocomplete="off"
       >
     </label>
-    <div id="meFriendsDropdown" class="me-friends-navigator__dropdown" data-profile-child-id="list"${hideDropdown}>
+    <div id="meFriendsDropdown" class="me-friends-navigator__dropdown" data-profile-child-id="list" data-profile-child-scroll="true"${hideDropdown}>
       ${hasItems ? `
         <p id="meFriendsSearchEmpty" class="me-friends-navigator__empty" hidden>No friends match your search.</p>
         <div id="meFriendsList" class="me-friends-navigator__list">

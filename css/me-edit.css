@@ -157,3 +157,11 @@
     padding: 1rem;
   }
 }
+
+/* Hide the layout-editor entry point on phones — the editor is desktop-only
+   (see the notice in css/profile-layout.css), so never navigate them into it. */
+@media (pointer: coarse) and (max-width: 960px) {
+  .me-edit-topbar__action[href$="layout/"] {
+    display: none;
+  }
+}

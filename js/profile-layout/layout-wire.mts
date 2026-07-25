@@ -35,10 +35,43 @@ import { initLayoutEditor, getGridMetrics } from "./layout-editor.mjs";
 import { PROFILE_PANEL_REGISTRY } from "./registry.mjs";
 import { buildMePageViewModel } from "../me-page/view-model.mjs";
 import { applyPanelScaling } from "../me-page/apply-scale.mjs";
+import { isMobileProfileViewport } from "./mobile-profile.mjs";
+
+// Replaces the editor workspace with a "desktop only" notice. Kept deliberately
+// simple: no session lookup, no layout fetch, nothing that can fail offline.
+function renderMobileEditorNotice(document: Document): void {
+  const stage = document.querySelector<HTMLElement>(".me-layout-stage");
+  if (!stage) return;
+  stage.innerHTML = `
+    <div class="me-layout-blocked">
+      <h1 class="me-layout-blocked__title">Layout editor needs a bigger screen</h1>
+      <p class="me-layout-blocked__copy">
+        Customizing your profile layout uses a drag-and-drop canvas that mirrors the
+        full-size desktop page, so it isn't available on phones yet.
+      </p>
+      <p class="me-layout-blocked__copy">
+        Your saved layout is untouched — open this page on a desktop or tablet to edit it.
+        On phones your profile always shows the standard mobile layout.
+      </p>
+      <div class="me-layout-blocked__actions">
+        <a class="me-layout-blocked__action me-layout-blocked__action--primary" href="../">Back to Profile</a>
+        <a class="me-layout-blocked__action" href="../edit/">Edit Profile Content</a>
+      </div>
+    </div>
+  `;
+}
 
 const doc = globalThis.document;
 
-if (typeof doc?.getElementById === "function") {
+// The editor is a three-rail drag-and-drop workspace (panel list / canvas / inspector)
+// with no mobile design, and its canvas is pinned to the live desktop page width so it
+// stays WYSIWYG. Rather than ship something unusable, phones get an explanatory notice
+// and keep their profile intact. Gate runs before the auth check so mobile visitors are
+// not bounced through sign-in only to hit a wall.
+const blockedOnMobile = typeof doc?.getElementById === "function" && isMobileProfileViewport();
+if (blockedOnMobile) renderMobileEditorNotice(doc);
+
+if (typeof doc?.getElementById === "function" && !blockedOnMobile) {
   renderPrimaryAppNav(doc.getElementById("meLayoutPrimaryNav"), {
     basePath: "../../",
     currentPage: "me",

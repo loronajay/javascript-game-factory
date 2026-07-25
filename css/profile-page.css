@@ -637,8 +637,7 @@
 }
 
 [data-profile-child-id="toggle"].me-friends-navigator__toggle > .profile-child-zoom-shell,
-[data-profile-child-id="search"].me-friends-navigator__search > .profile-child-zoom-shell,
-[data-profile-child-id="list"].me-friends-navigator__dropdown > .profile-child-zoom-shell {
+[data-profile-child-id="search"].me-friends-navigator__search > .profile-child-zoom-shell {
   display: grid;
   align-content: start;
   justify-items: stretch;
@@ -656,13 +655,18 @@
   padding: 8px 10px;
 }
 
+/* The friend list scrolls instead of shrink-to-fit scaling, so its rows stay
+   legible no matter how short the child box is (see apply-scale.mjs). */
 [data-profile-child-id="list"].me-friends-navigator__dropdown {
   overflow: hidden auto;
+  align-content: start;
+  gap: 8px;
 }
 
-[data-profile-child-id="list"].me-friends-navigator__dropdown > .profile-child-zoom-shell {
-  gap: 8px;
-  padding: 8px 10px;
+/* The inner list must size to its rows so the child box above can scroll it. */
+[data-profile-child-id="list"].me-friends-navigator__dropdown > .me-friends-navigator__list {
+  overflow: visible;
+  height: max-content;
 }
 
 [data-profile-child-id="composer"].thought-composer,
@@ -1250,6 +1254,42 @@
 .layout--flow .me-panel[hidden],
 .layout--flow .player-panel[hidden] {
   display: none;
+}
+
+/* ---------- FIXED MOBILE STACK ----------
+   Phones ignore the saved composition layout entirely (see apply-layout.mjs) and
+   render one full-width column. This is a plain class rather than a media query
+   because the JS branch that builds the single column and the CSS that styles it
+   must agree — a media query could style a stack the JS never built. */
+.me-layout.layout--mobile-stack,
+.player-layout.layout--mobile-stack {
+  flex-direction: column;
+  width: min(100%, 620px);
+  margin-inline: auto;
+}
+
+.layout--mobile-stack .layout-flow-col {
+  width: 100%;
+  flex: 0 0 auto;
+}
+
+/* Panels sized off the desktop grid can leave fixed heights behind; on mobile
+   every panel is content-height. */
+.layout--mobile-stack .me-panel,
+.layout--mobile-stack .player-panel,
+.layout--mobile-stack .me-hero-card,
+.layout--mobile-stack .player-hero-card {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  padding: 16px;
+}
+
+/* Scrollable children (thoughts feed) would otherwise inherit a percentage height
+   from the composition pass and collapse to nothing. */
+.layout--mobile-stack [data-profile-child-scroll] {
+  max-height: 60vh;
+  overflow-y: auto;
 }
 
 /* The featured-cabinet card normally sizes off the zoom-shell's container height

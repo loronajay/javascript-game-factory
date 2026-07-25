@@ -1,6 +1,12 @@
 import { getDefaultPanelChildren } from "./child-layout.mjs";
 export const LAYOUT_COLUMNS = 12;
 export const LAYOUT_VERSION = 1;
+// One-time reset marker for the friends panel. Saved layouts below this revision get
+// their friends panel (geometry + children) snapped back to the current defaults on the
+// next normalize, because the older defaults were sized for a friend list that scaled
+// itself down to illegible rows instead of scrolling. Bump this only for another
+// deliberate, everyone-gets-it reset of that panel.
+export const FRIENDS_PANEL_LAYOUT_REVISION = 2;
 const DEFAULT_HERO_CHILDREN = [
     { id: "portrait", enabled: true, x: 25, y: 5, w: 50, h: 36 },
     { id: "metrics", enabled: true, x: 20, y: 46, w: 60, h: 48 },
@@ -25,6 +31,7 @@ const DEFAULT_FRIENDS_CHILDREN = getDefaultPanelChildren("friends");
 // so accounts without a customized layout keep the classic readable panel sizing.
 export const DEFAULT_PROFILE_LAYOUT = {
     version: LAYOUT_VERSION,
+    friendsPanelRevision: FRIENDS_PANEL_LAYOUT_REVISION,
     desktop: {
         columns: LAYOUT_COLUMNS,
         elements: [],
@@ -34,7 +41,7 @@ export const DEFAULT_PROFILE_LAYOUT = {
             { id: "identity", enabled: true, x: 0, y: 5, w: 4, h: 3, children: DEFAULT_IDENTITY_CHILDREN },
             { id: "rankings", enabled: true, x: 0, y: 8, w: 4, h: 3, children: DEFAULT_RANKINGS_CHILDREN },
             { id: "topFriends", enabled: true, x: 0, y: 11, w: 4, h: 3, children: DEFAULT_TOP_FRIENDS_CHILDREN },
-            { id: "friends", enabled: true, x: 0, y: 14, w: 4, h: 3, children: DEFAULT_FRIENDS_CHILDREN },
+            { id: "friends", enabled: true, x: 0, y: 14, w: 4, h: 5, children: DEFAULT_FRIENDS_CHILDREN },
             // Middle column
             { id: "music", enabled: true, x: 4, y: 0, w: 4, h: 3, children: DEFAULT_MUSIC_CHILDREN },
             { id: "favoriteGame", enabled: true, x: 4, y: 3, w: 4, h: 4, children: DEFAULT_FAVORITE_GAME_CHILDREN },
@@ -54,6 +61,7 @@ export function getDefaultLayout() {
 // to fill those gaps compactly.
 export const PLAYER_DEFAULT_PROFILE_LAYOUT = {
     version: LAYOUT_VERSION,
+    friendsPanelRevision: FRIENDS_PANEL_LAYOUT_REVISION,
     desktop: {
         columns: LAYOUT_COLUMNS,
         elements: [],
@@ -62,7 +70,7 @@ export const PLAYER_DEFAULT_PROFILE_LAYOUT = {
             { id: "hero", enabled: true, x: 0, y: 0, w: 4, h: 5, children: DEFAULT_HERO_CHILDREN },
             { id: "identity", enabled: true, x: 0, y: 5, w: 4, h: 3, children: DEFAULT_IDENTITY_CHILDREN },
             { id: "rankings", enabled: true, x: 0, y: 8, w: 4, h: 3, children: DEFAULT_RANKINGS_CHILDREN },
-            { id: "friends", enabled: true, x: 0, y: 11, w: 4, h: 3, children: DEFAULT_FRIENDS_CHILDREN },
+            { id: "friends", enabled: true, x: 0, y: 11, w: 4, h: 5, children: DEFAULT_FRIENDS_CHILDREN },
             // Middle column (no friendCode on player page)
             { id: "music", enabled: true, x: 4, y: 0, w: 4, h: 3, children: DEFAULT_MUSIC_CHILDREN },
             { id: "favoriteGame", enabled: true, x: 4, y: 3, w: 4, h: 4, children: DEFAULT_FAVORITE_GAME_CHILDREN },

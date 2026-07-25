@@ -10,6 +10,7 @@ import { createMediaComposerState } from "../profile-social/media-composer-state
 import { createProfileSocialActions } from "../profile-social/social-actions.mjs";
 import { initPageGalleryViewer } from "../gallery-page/viewer.mjs";
 import { applyPlayerLayout } from "../me-page/apply-layout.mjs";
+import { watchMobileProfileViewport } from "../profile-layout/mobile-profile.mjs";
 import { applyPlayerScaling } from "../me-page/apply-scale.mjs";
 export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClient, profilePanel, authSession, savedLayout = null }) {
     let currentLayout = savedLayout;
@@ -60,6 +61,9 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
             }
         });
     };
+    // See the matching note in me-page/wire.mts: the mobile-stack decision lives in JS,
+    // so a rotation has to re-apply the layout rather than relying on CSS alone.
+    watchMobileProfileViewport(() => applyCurrentLayout());
     const rerender = async (thoughtComposerFlash = "", disableProfileViewTracking = true) => {
         const pageData = await loadPageData({ storage, apiClient, authSessionPlayerId });
         currentPageData = pageData;
@@ -164,8 +168,15 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
         loadGallery,
         rerender,
     });
+    // The music player replaces #playerMusicPanel's innerHTML, discarding the zoom shell and
+    // child geometry a prior layout pass installed — so re-apply the layout after mounting it.
+    const mountMusicPlayer = (playlist) => {
+        musicPlayer?.destroy?.();
+        musicPlayer = initProfileMusicPlayer("playerMusicPanel", playlist || [], { doc });
+        applyCurrentLayout();
+    };
     void rerender("", false).then(() => {
-        musicPlayer = initProfileMusicPlayer("playerMusicPanel", currentPageData?.profile?.profileMusicPlaylist || [], { doc });
+        mountMusicPlayer(currentPageData?.profile?.profileMusicPlaylist);
         const targetId = currentPageData?.profile?.playerId || "";
         if (targetId)
             void loadGallery(targetId).then(() => rerender("", true));
@@ -174,8 +185,7 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
         void rerender();
         const updatedPlaylist = event?.detail?.profile?.profileMusicPlaylist;
         if (updatedPlaylist !== undefined) {
-            musicPlayer?.destroy?.();
-            musicPlayer = initProfileMusicPlayer("playerMusicPanel", updatedPlaylist, { doc });
+            mountMusicPlayer(updatedPlaylist);
         }
     });
     doc.addEventListener("submit", async (event) => {

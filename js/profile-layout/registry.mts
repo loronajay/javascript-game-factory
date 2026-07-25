@@ -57,7 +57,9 @@ export const PROFILE_PANEL_REGISTRY: Record<string, PanelDef> = {
   friends: {
     label: "Friends",
     minW: 2, minH: 2, maxW: 12, maxH: 12,
-    defaultW: 4, defaultH: 3,
+    // Taller than the other rail panels so the scrolling friend list shows
+    // close to two full rows before the viewer has to scroll it.
+    defaultW: 4, defaultH: 5,
     required: false,
     draggable: true,
     resizable: true,

@@ -26,6 +26,7 @@ import {
 } from "./media-actions.mjs";
 import { initProfileMusicPlayer } from "../profile-editor/music-player.mjs";
 import { applyMeLayout } from "./apply-layout.mjs";
+import { watchMobileProfileViewport } from "../profile-layout/mobile-profile.mjs";
 import { applyMeScaling } from "./apply-scale.mjs";
 import type { PlatformApiClient } from "../platform/api/platform-api.mjs";
 import type { StorageLike } from "../platform/storage/storage.mjs";
@@ -45,6 +46,7 @@ export function wireMePage(
   let currentLayout = savedLayout;
   initPageGalleryViewer({ doc, apiClient });
   let musicPlayer: any = null;
+  let lastGalleryPhotos: any[] = [];
   const friendNavigator = createFriendNavigatorController();
   const pageData = createMePageDataController({ storage, apiClient });
   const mediaComposer = createMediaComposerState({
@@ -52,6 +54,32 @@ export function wireMePage(
     thoughtPhotoNameId: "meThoughtPhotoName",
     thoughtPhotoInputId: "meThoughtPhotoInput",
   });
+
+  // Panel geometry + zoom-shell scaling. Anything that replaces a panel's markup after a
+  // render (the music player owns #meMusicPanel's innerHTML) has to re-run this, or the
+  // fresh markup keeps none of the saved child layout and falls back to raw document flow.
+  const applyCurrentLayout = (galleryPhotos: any[] | null = null) => {
+    if (!currentLayout) return;
+    if (Array.isArray(galleryPhotos)) lastGalleryPhotos = galleryPhotos;
+    applyMeLayout(doc, currentLayout, { galleryPhotos: lastGalleryPhotos });
+    requestAnimationFrame(() => applyMeScaling(doc, currentLayout));
+    doc.querySelectorAll<HTMLImageElement>(".me-layout img").forEach((img) => {
+      if (!img.complete) {
+        img.addEventListener("load", () => applyMeScaling(doc, currentLayout), { once: true });
+      }
+    });
+  };
+
+  // Rotating a phone crosses the mobile boundary, which switches the layout between
+  // the fixed mobile stack and the saved composition layout. That choice is made in
+  // JS, so CSS alone can't follow a rotation — re-apply on the change.
+  watchMobileProfileViewport(() => applyCurrentLayout());
+
+  const mountMusicPlayer = (playlist: any) => {
+    musicPlayer?.destroy?.();
+    musicPlayer = initProfileMusicPlayer("meMusicPanel", playlist || [], { doc });
+    applyCurrentLayout();
+  };
 
   const rerender = async (thoughtComposerFlash = "", shouldHydrate = false, friendCodeFlash = "") => {
     const renderState = await pageData.loadRenderState({ shouldHydrate });
@@ -87,15 +115,7 @@ export function wireMePage(
           }))
         : [],
     };
-    if (currentLayout) {
-      applyMeLayout(doc, currentLayout, { galleryPhotos: renderState.galleryPhotos });
-      requestAnimationFrame(() => applyMeScaling(doc, currentLayout));
-      doc.querySelectorAll<HTMLImageElement>(".me-layout img").forEach((img) => {
-        if (!img.complete) {
-          img.addEventListener("load", () => applyMeScaling(doc, currentLayout), { once: true });
-        }
-      });
-    }
+    applyCurrentLayout(renderState.galleryPhotos);
     friendNavigator.applyFilter(doc);
   };
 
@@ -141,7 +161,7 @@ export function wireMePage(
 
   void pageData.loadGallery().then(() => rerender("", true)).then(() => {
     const profile = loadFactoryProfile(storage);
-    musicPlayer = initProfileMusicPlayer("meMusicPanel", profile?.profileMusicPlaylist || [], { doc });
+    mountMusicPlayer(profile?.profileMusicPlaylist);
   });
 
   doc.addEventListener(PROFILE_UPDATED_EVENT, (event) => {
@@ -149,8 +169,7 @@ export function wireMePage(
     void rerender();
     const updatedPlaylist = (event as CustomEvent)?.detail?.profile?.profileMusicPlaylist;
     if (updatedPlaylist !== undefined) {
-      musicPlayer?.destroy?.();
-      musicPlayer = initProfileMusicPlayer("meMusicPanel", updatedPlaylist, { doc });
+      mountMusicPlayer(updatedPlaylist);
     }
   });
 

@@ -1,0 +1,196 @@
+/* ---------- MOBILE LANDSCAPE ----------
+
+   Every other breakpoint in this repo is width-only, which is precisely why phones
+   held sideways broke. A landscape phone is roughly 844x390: it clears every
+   `max-width: 640/720/820` query and is served the full desktop layout inside
+   390px of height. Three things follow from that, all fixed here:
+
+     1. session-nav.css's `min-width: 800px` desktop rail applies, and its
+        `flex-wrap: nowrap` pushes the nav off the right edge on every page.
+     2. Pixel-text mastheads are SVGs scaled to container WIDTH, so a single
+        title can consume the entire viewport height.
+     3. Stage chrome designed around `100vh` has no room left for content.
+
+   Detection is `pointer: coarse` rather than viewport size alone so that a short
+   or narrow DESKTOP window keeps the full desktop experience untouched.
+
+   LOAD ORDER: this file must come last in <head>. Several rules here intentionally
+   override same-specificity desktop rules and rely on source order to win.
+
+   Portrait phones are handled by the existing `max-width` queries in the
+   per-concern stylesheets and are deliberately left alone. */
+
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 560px) {
+
+  /* ---------- SHARED NAV ----------
+     Undo the desktop top rail. Same specificity as the `min-width: 800px` block
+     in session-nav.css, so this file's load order is what makes it win. */
+
+  .app-shell-nav {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .app-shell-nav__tabs {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: 100%;
+    flex-wrap: wrap;
+    white-space: normal;
+    gap: 4px;
+    padding: 5px 7px;
+  }
+
+  .app-shell-nav__tabs .app-shell-nav__link,
+  .app-shell-nav__utility-link {
+    min-height: 30px;
+    padding: 4px 8px;
+    font-size: 0.58rem;
+    letter-spacing: 0.05em;
+  }
+
+  .app-shell-nav__session-slot {
+    flex: 0 0 auto;
+    width: auto;
+    max-width: 100%;
+    margin-left: auto;
+    flex-wrap: wrap;
+    white-space: normal;
+    gap: 6px;
+    padding: 5px 7px;
+  }
+
+  .session-nav {
+    flex-wrap: wrap;
+    white-space: normal;
+    gap: 6px;
+  }
+
+  /* ---------- PIXEL-TEXT MASTHEADS ----------
+     The SVG carries a viewBox, so pinning height lets width follow the aspect
+     ratio instead of stretching to the full 844px container. */
+
+  .pixel-text__svg {
+    height: clamp(24px, 9vh, 40px);
+    width: auto;
+    max-width: 100%;
+    /* Mastheads centre the title by giving the heading a fixed width and letting the
+       full-width SVG fill it. Once width is auto the SVG no longer fills that box, so
+       it has to centre itself or it sits left of its own subtitle. */
+    margin-inline: auto;
+  }
+
+  /* ---------- SHARED STAGE CHROME ---------- */
+
+  .arcade-shell {
+    padding-top: 10px;
+    padding-bottom: 20px;
+  }
+
+  .page-stage__masthead {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .page-stage__header {
+    padding-top: 8px;
+  }
+
+  .hero,
+  .mode-card {
+    padding: 14px;
+  }
+
+  .hero-sub,
+  .page-stage__masthead p {
+    font-size: 0.72rem;
+    line-height: 1.4;
+  }
+
+  /* ---------- HOME ----------
+     `.hero-actions` is absolutely positioned at `bottom: 12%` over a 100vh stage.
+     With six CTAs at `min-height: 84px` that stack is taller than a landscape
+     viewport, so it renders on top of the masthead title. Put it back in flow and
+     let the page scroll. */
+
+  .home-page {
+    overflow: auto;
+  }
+
+  .home-page .arcade-shell,
+  .home-page .home-hero,
+  .home-stage {
+    min-height: 0;
+  }
+
+  .home-stage {
+    padding: 10px 14px 20px;
+  }
+
+  .home-stage__masthead {
+    gap: 12px;
+    padding-top: 4px;
+  }
+
+  .home-stage__header {
+    padding-top: 8px;
+  }
+
+  .home-page .hero-actions {
+    position: static;
+    transform: none;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+    margin-top: 14px;
+    padding: 0;
+  }
+
+  .hero-cta {
+    min-height: 46px;
+    min-width: 0;
+    width: 100%;
+    padding: 0 12px;
+    font-size: 0.82rem;
+  }
+
+  /* The decorative scene is sized off the tall desktop stage; scale it back so it
+     stays behind the content instead of dominating the viewport. */
+  .home-stage__sun {
+    max-height: 40vh;
+  }
+
+  .home-stage__skyline {
+    max-height: 22vh;
+  }
+
+  /* ---------- AUTH (sign-in / sign-up / reset) ---------- */
+
+  .auth-stage {
+    padding-top: 10px;
+    padding-bottom: 20px;
+  }
+
+  .auth-card {
+    width: min(100%, 520px);
+    margin-inline: auto;
+    padding: 16px;
+  }
+
+  /* ---------- PROFILE SURFACES ----------
+     /me and /player render a JS-built single-column stack on phones (see
+     js/profile-layout/mobile-profile.mts). These rules only tighten the chrome
+     around it — the layout switch itself is not a media query. */
+
+  .profile-hero,
+  .me-hero,
+  .player-hero {
+    min-height: 0;
+  }
+
+  .layout--mobile-stack {
+    gap: 10px;
+  }
+}

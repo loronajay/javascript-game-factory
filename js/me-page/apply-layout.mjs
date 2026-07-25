@@ -1,6 +1,7 @@
 import { escapeHtml } from "../profile-social/social-view-shared.mjs";
 import { PROFILE_COMPOSITION_ELEMENT_REGISTRY } from "../profile-layout/composition-layout.mjs";
 import { getDefaultLayout, getPlayerDefaultLayout } from "../profile-layout/default-layout.mjs";
+import { isMobileProfileViewport } from "../profile-layout/mobile-profile.mjs";
 export const ME_PANEL_TO_DOM = {
     hero: "meHeroCard",
     identity: "meIdentityPanel",
@@ -39,12 +40,30 @@ const ME_REQUIRED = new Set(["hero"]);
 const PLAYER_REQUIRED = new Set(["hero"]);
 const PLAYER_IDENTITY_MIN_ROWS = 5;
 // Applies saved panel layout onto the 12-column CSS grid.
-export function applyProfileLayout(doc, layout, { panelToDom = ME_PANEL_TO_DOM, required = ME_REQUIRED, layoutSelector = ".me-layout", galleryPhotos = [], } = {}) {
+export function applyProfileLayout(doc, layout, { panelToDom = ME_PANEL_TO_DOM, required = ME_REQUIRED, layoutSelector = ".me-layout", galleryPhotos = [], isMobile, } = {}) {
     if (!layout?.desktop?.panels)
         return;
     const layoutEl = doc.querySelector(layoutSelector);
     if (!layoutEl)
         return;
+    // Phones get a fixed single-column stack regardless of what the player saved.
+    // The composition engine positions overlays and hero children by percentage of
+    // a 12x17 desktop grid, which has no sane reading on a 390px-tall landscape
+    // phone, so mobile ignores saved geometry entirely and renders panel content in
+    // document order. Custom panel colours still apply — only positions are dropped.
+    if (isMobile ?? isMobileProfileViewport()) {
+        applyMobileStackLayout(doc, layoutEl, layout, panelToDom, required);
+        return;
+    }
+    layoutEl.classList.remove("layout--mobile-stack");
+    // Flow and mobile-stack renders wrap panels in column divs. The composition path
+    // below re-parents panels straight onto the grid, so those wrappers would be left
+    // behind as empty grid items and consume tracks. Collected now but removed only
+    // after the panels have been re-parented — dropping them first would detach the
+    // panels from the document and getElementById would stop finding them. Reachable
+    // when a live viewport crosses the mobile boundary (rotating a tablet, resizing a
+    // touch laptop), which the layout watchers now re-render on.
+    const staleFlowColumns = [...layoutEl.querySelectorAll(":scope > ." + FLOW_COLUMN_CLASS)];
     // Untouched-default profiles render as a natural content-height 3-column flow
     // instead of the rigid fixed-row composition grid. The moment a player customizes
     // anything (moves/resizes/recolors a panel, or adds a freeform element) the layout
@@ -85,6 +104,7 @@ export function applyProfileLayout(doc, layout, { panelToDom = ME_PANEL_TO_DOM, 
         layoutEl.appendChild(el);
     }
     renderCompositionOverlays(doc, layoutEl, renderElements, layout.desktop.panels, { galleryPhotos });
+    staleFlowColumns.forEach((col) => col.remove());
 }
 // Number of grid rows the layout occupies, counted from the saved layout rather than from
 // whichever panels the current page happens to own a DOM node for. Mirrors the placement
@@ -183,6 +203,55 @@ function applyDefaultFlowLayout(doc, layoutEl, layout, panelToDom, required) {
 function columnIndexForX(x) {
     return x < 4 ? 0 : x < 8 ? 1 : 2;
 }
+// Fixed mobile layout: every enabled panel in one full-width column, ordered the
+// way the desktop layout reads (top-to-bottom, then left-to-right).
+//
+// Reuses flow mode's CSS (`layout--flow`), which is what neutralizes the absolute
+// percentage positioning on panel children; `layout--mobile-stack` collapses the
+// flow columns to one. Composition overlays are deliberately not rendered — the
+// real panels carry the same content and survive a narrow viewport, whereas
+// percentage-positioned overlays do not.
+function applyMobileStackLayout(doc, layoutEl, layout, panelToDom, required) {
+    layoutEl.querySelectorAll("[data-profile-composition-overlay]").forEach((el) => el.remove());
+    layoutEl.classList.add("layout--flow", "layout--mobile-stack");
+    layoutEl.style.gridTemplateRows = "";
+    const staleColumns = [...layoutEl.querySelectorAll(":scope > ." + FLOW_COLUMN_CLASS)];
+    const column = doc.createElement("div");
+    column.className = FLOW_COLUMN_CLASS;
+    const panels = [...layout.desktop.panels].sort(comparePanelsByFreeformPosition);
+    for (const panel of panels) {
+        const domId = panelToDom[panel.id];
+        if (!domId)
+            continue;
+        const el = doc.getElementById(domId);
+        if (!el)
+            continue;
+        resetPanelForFlow(el);
+        // A panel the player turned off stays off, but a panel the composition engine
+        // would have replaced with overlays must come back — the overlay is gone here.
+        el.classList.toggle("layout-panel--hidden", panel.enabled === false && !required.has(panel.id));
+        resetHeroCompositionForFlow(el);
+        applyPanelVisualStyle(el, panel.style);
+        column.appendChild(el);
+    }
+    layoutEl.appendChild(column);
+    staleColumns.forEach((col) => col.remove());
+}
+// Strips the inline percentage geometry a prior composition pass wrote onto hero
+// children. `resetPanelForFlow` clears `[data-profile-child-id]` nodes; hero
+// composition also marks nodes with `data-profile-composition-id` and can hide
+// them, both of which have to be undone or the hero renders empty on mobile.
+function resetHeroCompositionForFlow(el) {
+    el.classList.remove("profile-composition-hero", "profile-composition-surface--hidden");
+    el.querySelectorAll("[data-profile-composition-id]").forEach((childEl) => {
+        childEl.classList.remove("profile-composition-child--hidden");
+        childEl.hidden = false;
+        childEl.style.left = "";
+        childEl.style.top = "";
+        childEl.style.width = "";
+        childEl.style.height = "";
+    });
+}
 // Strips any inline grid/zoom-shell geometry a prior composition pass may have applied so the
 // panel and its children fall back to natural document flow.
 function resetPanelForFlow(el) {
@@ -252,7 +321,10 @@ function findPanelLayoutChild(panelEl, childId) {
     const all = [...panelEl.querySelectorAll(`[data-profile-child-id="${childId}"]`)];
     if (all.length === 0)
         return null;
-    return all.find((childEl) => childEl.parentElement === panelEl) || null;
+    // Top-level children only — but after a scaling pass they hang off the zoom shell
+    // rather than the panel itself, and both count as top level.
+    const shell = panelEl.querySelector(":scope > .panel-zoom-shell");
+    return all.find((childEl) => childEl.parentElement === panelEl || (shell && childEl.parentElement === shell)) || null;
 }
 function applyHeroCompositionLayout(doc, heroEl, elements) {
     if (!heroEl?.classList?.contains("me-hero-card") && !heroEl?.classList?.contains("player-hero-card"))

@@ -297,14 +297,27 @@ function moveSelection(delta) {
         showPage(currentPage - 1, previousCards.length - 1);
     }
 }
+// The pager sits below the fold on phones, so a page turn from down there would drop the
+// viewer into the middle of the new page. Send them back to the first cabinet instead.
+function scrollGridToTop() {
+    const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto"
+        : "smooth";
+    window.scrollTo({ top: 0, behavior });
+    // Shells that scroll the body element itself rather than the viewport.
+    document.scrollingElement?.scrollTo?.({ top: 0, behavior });
+    document.body?.scrollTo?.({ top: 0, behavior });
+}
 prevPageButton.addEventListener("click", () => {
     if (currentPage > 0) {
         showPage(currentPage - 1, 0);
+        scrollGridToTop();
     }
 });
 nextPageButton.addEventListener("click", () => {
     if (currentPage < pages.length - 1) {
         showPage(currentPage + 1, 0);
+        scrollGridToTop();
     }
 });
 window.ArcadeInput?.onAction((action) => {
