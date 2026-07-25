@@ -328,25 +328,38 @@ function applyCommanderReactions(prevState, next, events) {
     }
   }
 
-  if (!healingOff) {
-    const teamsWithKing = new Map();
-    for (const king of reactingKings) {
-      const rally = getUnitType(king.type).passive?.effect?.allyRallyHeal ?? 0;
-      const team = teamOfUnit(king);
-      teamsWithKing.set(team, Math.max(teamsWithKing.get(team) ?? 0, rally));
-    }
-    for (const [team, rally] of teamsWithKing) {
-      const falls = fell.filter((u) => teamOfUnit(u) === team).length;
-      if (!falls || rally <= 0) continue;
-      const rallied = [];
-      for (const ally of next.units) {
-        if (ally.hp <= 0 || teamOfUnit(ally) !== team || !isAlly(ally)) continue;
-        const before = ally.hp;
-        restoreHp(next, ally, ally, rally * falls);
-        if (ally.hp > before) rallied.push(ally.id);
+  // The squad rally: every surviving ally on a King's team heals and takes a PERMANENT
+  // STR bump per fallen teammate. The heal obeys the healing lockout; the STR gain is a
+  // stat modifier, not healing, so it lands either way.
+  const teamsWithKing = new Map();
+  for (const king of reactingKings) {
+    const effect = getUnitType(king.type).passive?.effect;
+    const team = teamOfUnit(king);
+    const prev = teamsWithKing.get(team) ?? { heal: 0, strength: 0 };
+    teamsWithKing.set(team, {
+      heal: Math.max(prev.heal, effect?.allyRallyHeal ?? 0),
+      strength: Math.max(prev.strength, effect?.allyRallyStrength ?? 0)
+    });
+  }
+  for (const [team, rally] of teamsWithKing) {
+    const falls = fell.filter((u) => teamOfUnit(u) === team).length;
+    if (!falls) continue;
+    const healing = healingOff ? 0 : Math.max(0, rally.heal) * falls;
+    const strength = Math.max(0, rally.strength) * falls;
+    if (healing <= 0 && strength <= 0) continue;
+    const rallied = [];
+    for (const ally of next.units) {
+      if (ally.hp <= 0 || teamOfUnit(ally) !== team || !isAlly(ally)) continue;
+      const before = ally.hp;
+      if (healing > 0) restoreHp(next, ally, ally, healing);
+      if (strength > 0) {
+        const mods = { ...(ally.statModifiers ?? {}) };
+        mods.strength = (Number(mods.strength) || 0) + strength;
+        ally.statModifiers = mods;
       }
-      if (rallied.length) events.push({ type: "SQUAD_RALLY", team, healing: rally * falls, rallied });
+      if (ally.hp > before || strength > 0) rallied.push(ally.id);
     }
+    if (rallied.length) events.push({ type: "SQUAD_RALLY", team, healing, strength, rallied });
   }
 
   resolveVictory(next);

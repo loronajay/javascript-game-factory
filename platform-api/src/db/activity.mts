@@ -23,6 +23,14 @@ function mapRowToActivityItem(row: any = {}): any {
   });
 }
 
+function buildActivityPayload(item: any): string {
+  return JSON.stringify({
+    type: item.type,
+    actorDisplayName: item.actorDisplayName || "",
+    metadata: item.metadata || {},
+  });
+}
+
 function buildActivityParams(item: any): any[] {
   return [
     item.id,
@@ -32,11 +40,22 @@ function buildActivityParams(item: any): any[] {
     item.visibility,
     item.summary,
     item.createdAt,
-    JSON.stringify({
-      type: item.type,
-      actorDisplayName: item.actorDisplayName || "",
-      metadata: item.metadata || {},
-    }),
+    buildActivityPayload(item),
+  ];
+}
+
+// The legacy fallback omits `actor_display_name`, so it must renumber its
+// placeholders: Postgres rejects a parse where a bound parameter is never
+// referenced ("could not determine data type of parameter $3").
+function buildLegacyActivityParams(item: any): any[] {
+  return [
+    item.id,
+    item.actorPlayerId,
+    item.gameSlug,
+    item.visibility,
+    item.summary,
+    item.createdAt,
+    buildActivityPayload(item),
   ];
 }
 
@@ -139,7 +158,7 @@ export async function saveActivityItem(db: any, item: any = {}): Promise<any> {
         created_at,
         payload
       ) values (
-        $1, $2, $4, $5, $6, $7, $8::jsonb
+        $1, $2, $3, $4, $5, $6, $7::jsonb
       )
       on conflict (id) do update set
         actor_player_id = excluded.actor_player_id,
@@ -156,7 +175,7 @@ export async function saveActivityItem(db: any, item: any = {}): Promise<any> {
         summary,
         created_at,
         payload
-    `, buildActivityParams(normalized));
+    `, buildLegacyActivityParams(normalized));
   }
 
   return mapRowToActivityItem(result?.rows?.[0] || null);

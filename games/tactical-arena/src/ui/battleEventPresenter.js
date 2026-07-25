@@ -268,7 +268,10 @@ export function createBattleEventPresenter({ audio, effects, getState, onIdle = 
     for (const rally of rallies) {
       for (const id of rally.rallied ?? []) {
         const unit = findUnit(state, id);
-        if (unit) effects.floatText(unitCenter(metrics, unit), `+${rally.healing}`, "#8cf0a4");
+        if (!unit) continue;
+        const center = unitCenter(metrics, unit);
+        if (rally.healing > 0) effects.floatText(center, `+${rally.healing}`, "#8cf0a4");
+        if (rally.strength > 0) effects.floatText(center, `+${rally.strength} STR`, "#ffd27a");
       }
     }
     for (const restore of restores) {

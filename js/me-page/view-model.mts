@@ -113,7 +113,7 @@ export function buildMePageViewModel(profile: any, options: BuildMePageViewModel
     ? normalizeProfileRelationshipsRecord(options.relationshipsRecord)
     : normalizeProfileRelationshipsRecord({ playerId: publicView.playerId });
   const favoriteGameItems = buildFavoriteGameItems(publicView, favoriteTitleResolver, {
-    emptyValue: "Pin a go-to cabinet once favorites are wired into the shared player profile.",
+    emptyValue: "No favorite cabinet pinned yet. Pick one from Edit Profile.",
   });
   const rankingItems = buildRankingItems(publicView, favoriteTitleResolver, {
     emptyValue: "Rank snapshots will appear here once shared standings come online.",
@@ -124,11 +124,11 @@ export function buildMePageViewModel(profile: any, options: BuildMePageViewModel
   const heroName = publicView.profileName || "UNNAMED PILOT";
   const heroRealName = publicView.realName || "";
   const heroTagline = publicView.tagline || "No tagline set yet.";
-  const heroBio = publicView.bio || "This shared player page will grow into your public home base across the arcade as more platform features come online.";
+  const heroBio = publicView.bio || "No about-me written yet. Add one from Edit Profile.";
   const sessionPresence = resolveOwnerPresence(publicView.presence);
   const friendCodeValue = publicView.friendCode || "";
 
-  const identityLinkItems = buildIdentityLinkItems(publicView.links, "Profile links are not wired in yet.");
+  const identityLinkItems = buildIdentityLinkItems(publicView.links, "No links added yet. Add them from Edit Profile.");
   const badgeItems = buildBadgeItems(publicView.badgeIds);
 
   return {

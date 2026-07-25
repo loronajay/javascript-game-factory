@@ -13,8 +13,9 @@
 //                    a lone Ghoul today (see rules in unitCatalog.sustainsVictory).
 //   • the `commander` passive — reactive HP swings driven centrally by the reducer's
 //                    applyCommanderReactions: −damagePerAllyFallen to the King and a
-//                    +allyRallyHeal to the rest of the squad whenever an ally falls, and
-//                    +healPerAllyRevived to the King when a fallen ally is brought back.
+//                    +allyRallyHeal / permanent +allyRallyStrength to the rest of the
+//                    squad whenever an ally falls, and +healPerAllyRevived to the King
+//                    when a fallen ally is brought back.
 //   • the `command` block on each command ART — a data-driven, DYNAMIC one-turn team
 //                    buff folded live by getEffectiveStats (getCommandBuffStats) plus the
 //                    heal/range bonuses (getCommandHealBonus / getCommandRangeBonus). The
@@ -55,10 +56,14 @@ export const KING = Object.freeze({
       damagePerAllyFallen: 10,
       // …restores this much HP for every fallen ally that is revived…
       healPerAllyRevived: 10,
-      // …and every ally fall rallies the rest of the squad (the King excluded) by this.
-      allyRallyHeal: 5
+      // …and every ally fall rallies the rest of the squad (the King excluded): each
+      // survivor heals this much…
+      allyRallyHeal: 5,
+      // …and permanently gains this much STR (a persistent statModifiers bump, so it
+      // outlives the turn and stacks with each further loss).
+      allyRallyStrength: 2
     }),
-    description: "The King takes 10 damage whenever an allied unit falls (and the rest of the squad rallies for 5), and restores 10 HP when a fallen ally is revived.",
+    description: "When an allied unit falls, the King loses 10 HP and every surviving ally heals 5 HP and permanently gains +2 STR. When a fallen ally is revived, the King restores 10 HP.",
     implemented: true
   }),
   arts: Object.freeze([

@@ -11,7 +11,11 @@ import { openInventory } from "./inventory.js";
 import { openSkinGallery } from "./skinGallery.js";
 import { openNicknameGallery } from "./nicknameGallery.js";
 import { openRankedProfile } from "./rankedProfile.js";
-import { showPendingProgressionAnnouncements } from "./progressionAnnouncements.js";
+import {
+  requestProgressionAnnouncements,
+  setProgressionAnnouncementsAllowed,
+} from "./progressionAnnouncements.js";
+import { progressionAnnouncementScreenPolicy } from "./progressionAnnouncementPolicy.js";
 import { syncMissingUnitUnlockAnnouncements } from "../progression/announcements.js";
 import { shouldSyncHotSeatSetupForSegment } from "./teamDisplay.js";
 import { createMatchSetupScreens } from "./matchSetupScreens.js";
@@ -29,13 +33,13 @@ export function syncScreenMusic(audio, screenName) {
   else audio.startMusic("menu");
 }
 
+
 export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, onCampaignMissionSelected, onCampaignMapEntered, openCodex, onLeaveMatch, syncGameProgress = () => {} }) {
   const screens = new ScreenManager();
   const $ = (sel, root = document) => root.querySelector(sel);
   const screenEl = (name) => $(`[data-screen="${name}"]`);
 
   let lastConfig = null;
-  let progressionAnnouncementRunning = false;
 
   for (const name of ["title", "hsSetup", "spSetup", "tempoMenu", "tempoSpSetup", "results", "tutorialComplete"]) {
     screens.register(name, { el: screenEl(name) });
@@ -75,18 +79,19 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   }
 
   function showScreen(name, params) {
+    // Close the popup gate BEFORE the screen swaps so an in-flight drain request can't
+    // slip a modal onto the board, then reopen it on arrival if this screen presents.
+    const policy = progressionAnnouncementScreenPolicy(name);
+    if (!policy.present) setProgressionAnnouncementsAllowed(false, globalThis.localStorage);
     screens.show(name, params);
     syncScreenMusic(audio, name);
+    // Reopening the gate sweeps the queue itself, on the arriving screen's delay.
+    if (policy.present) setProgressionAnnouncementsAllowed(true, globalThis.localStorage, { delay: policy.delay });
   }
 
   function showQueuedProgressionAnnouncements({ audit = false, delay = 0 } = {}) {
-    if (progressionAnnouncementRunning) return;
     if (audit) syncMissingUnitUnlockAnnouncements(globalThis.localStorage);
-    progressionAnnouncementRunning = true;
-    window.setTimeout(() => {
-      showPendingProgressionAnnouncements(globalThis.localStorage)
-        .finally(() => { progressionAnnouncementRunning = false; });
-    }, delay);
+    requestProgressionAnnouncements({ delay, storage: globalThis.localStorage });
   }
 
   // ── Screen modules ────────────────────────────────────────────────────────
@@ -104,7 +109,6 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   const resultsScreen = createResultsScreen({
     showScreen,
     getLastConfig: () => lastConfig,
-    announceProgression: showQueuedProgressionAnnouncements,
   });
 
   const tutorialScreens = createTutorialMenuScreens({

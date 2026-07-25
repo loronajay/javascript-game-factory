@@ -384,6 +384,53 @@
   line-height: 1.7;
 }
 
+/* Signals saved on this device that have not reached the platform API yet. */
+.activity-card--pending {
+  border: 1px dashed rgba(255, 221, 157, 0.38);
+}
+
+.activity-card__pending {
+  margin-right: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 221, 157, 0.14);
+  color: #ffdd9d;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.activity-hero-card__notice {
+  margin: 12px 0 0;
+  color: #ffdd9d;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* Matches the card panel fill so the skyline behind the stage cannot wash out
+   the message. */
+.activity-empty {
+  margin: 0;
+  padding: 28px 24px;
+  overflow: hidden;
+  border-radius: var(--profile-radius-md);
+  border: 2px dashed rgba(168, 248, 255, 0.28);
+  background:
+    linear-gradient(135deg, rgba(168, 248, 255, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(10, 26, 58, 0.96), rgba(5, 12, 26, 0.96));
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.28),
+    0 0 24px rgba(123, 246, 255, 0.08);
+  color: rgba(244, 253, 255, 0.82);
+  line-height: 1.7;
+  text-align: center;
+}
+
+.activity-empty--offline {
+  border-color: rgba(255, 221, 157, 0.38);
+  color: #ffdd9d;
+}
+
 @media (max-width: 640px) {
   .activity-stage {
     padding: 16px 12px 30px;

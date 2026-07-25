@@ -79,7 +79,13 @@ export function creditDeaths(state, aliveBefore, events, { killerId = null, caus
     // A pre-tagged self-inflicted death overrides this scope's cause (see
     // markSelfInflicted) so an HP cost or a sacrifice is never blamed on the enemy the
     // actor happened to be fighting.
-    const effectiveCause = unit.pendingDeathCause ?? cause;
+    //
+    // A scope whose killer IS the victim is self-inflicted too, and reaches here without
+    // a tag: a Fat Wizard standing next to its own Zap target and dying to its own Clumsy
+    // splash, or any caster caught in its own blast. Recorded as SELF so it reads like
+    // recoil instead of an unexplained `unit` death with no killer.
+    const selfInflicted = killerId != null && killerId === unit.id && CREDITING_CAUSES.has(cause);
+    const effectiveCause = unit.pendingDeathCause ?? (selfInflicted ? CAUSE.SELF : cause);
     delete unit.pendingDeathCause;
 
     // A killer that is itself already dead still gets credit — trading kills is normal.

@@ -69,6 +69,11 @@ test("release hotspots delegate cohesive responsibilities to smaller modules", (
     ["src/ui/onlineMatchTypes.js", 40, []],
     ["src/ui/onlineProfiles.js", 80, []],
     ["src/ui/onlineLobbyStatus.js", 80, ["./draftModel.js"]],
+    // The announcement presenter owns the modal; scheduling and screen policy stay split
+    // out so both are testable without a DOM.
+    ["src/ui/progressionAnnouncements.js", 170, ["./progressionAnnouncementRunner.js"]],
+    ["src/ui/progressionAnnouncementRunner.js", 100, []],
+    ["src/ui/progressionAnnouncementPolicy.js", 30, []],
     ["src/ui/tutorialMenuScreens.js", 170, []],
     ["src/ui/settingsScreen.js", 250, []],
     ["src/ui/matchSetupScreens.js", 220, []],

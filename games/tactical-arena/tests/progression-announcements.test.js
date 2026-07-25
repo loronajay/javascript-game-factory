@@ -23,8 +23,13 @@ import {
   markProgressionAnnouncementsSeen,
   readProgressionAnnouncements,
   readSeenProgressionAnnouncementIds,
+  shiftProgressionAnnouncement,
   syncMissingUnitUnlockAnnouncements,
 } from "../src/progression/announcements.js";
+import {
+  ANNOUNCEMENT_SCREENS,
+  progressionAnnouncementScreenPolicy,
+} from "../src/ui/progressionAnnouncementPolicy.js";
 import { readUnlockProgress } from "../src/progression/unlocks.js";
 
 function storageAdapter() {
@@ -347,6 +352,42 @@ test("completing the Clod mission queues a Clod unlock announcement", () => {
   consumeProgressionAnnouncements(storage);
   completeCampaignMission(storage, CLOD_MISSION_ID, won, { clodChargeHitCount: 1 });
   assert.deepEqual(readProgressionAnnouncements(storage), []);
+});
+
+test("draining one at a time keeps the rest queued when a batch is interrupted", () => {
+  const storage = storageAdapter();
+  enqueueUnitUnlockAnnouncements(storage, ["clod", "necromancer", "witch-doctor"]);
+
+  const first = shiftProgressionAnnouncement(storage);
+
+  // Only the shown one is marked seen — quitting here must not swallow the other two.
+  assert.equal(first.id, "unit-unlock:clod");
+  assert.deepEqual(readSeenProgressionAnnouncementIds(storage), ["unit-unlock:clod"]);
+  assert.deepEqual(readProgressionAnnouncements(storage).map((a) => a.id), [
+    "unit-unlock:necromancer",
+    "unit-unlock:witch-doctor",
+  ]);
+
+  assert.equal(shiftProgressionAnnouncement(storage).id, "unit-unlock:necromancer");
+  assert.equal(shiftProgressionAnnouncement(storage).id, "unit-unlock:witch-doctor");
+  assert.equal(shiftProgressionAnnouncement(storage), null);
+  assert.deepEqual(readProgressionAnnouncements(storage), []);
+});
+
+test("popups present on reward screens and are held everywhere else", () => {
+  // The campaign map is the one that regressed: reward picks queued an unlock there but
+  // nothing drained it, so the popup surfaced on a later visit to the main menu.
+  for (const screen of ["mainMenu", "results", "campaign", "tutorialComplete"]) {
+    assert.equal(progressionAnnouncementScreenPolicy(screen).present, true, screen);
+  }
+  // A popup must never land on the board, the lobby, or the boot/setup screens.
+  for (const screen of ["match", "onlineSetup", "title", "hsSetup", "spSetup", "tempoMenu", "tutorialSelect"]) {
+    assert.equal(progressionAnnouncementScreenPolicy(screen).present, false, screen);
+    assert.equal(ANNOUNCEMENT_SCREENS.has(screen), false, screen);
+  }
+  // Results waits out the confetti; everything else drains immediately.
+  assert.equal(progressionAnnouncementScreenPolicy("results").delay, 550);
+  assert.equal(progressionAnnouncementScreenPolicy("campaign").delay, 0);
 });
 
 test("mission rewards queue the draft battle achievement when they cross the unit threshold", () => {

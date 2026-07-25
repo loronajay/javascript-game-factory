@@ -639,9 +639,11 @@ comeback engine. The command buffs do not affect the King himself, so Pursue nev
 immobile commander mobile.
 
 The cost is real and it's brutal. Dictator / Spectator takes **10 damage off the King every
-time an ally falls** (though the rest of the squad rallies for 5) — with 30 HP, losing three
-units kills him outright. And he does not sustain victory: a team of nothing but a King has
-already lost. He's a fifth unit's worth of buff attached to a body you must protect while
+time an ally falls** — with 30 HP, losing three units kills him outright. And he does not
+sustain victory: a team of nothing but a King has already lost. What he buys with that HP is
+a survivors' rally: every ally still standing heals 5 **and permanently gains +2 STR** per
+teammate lost, stacking with each further death, so a King squad that is losing bodies hits
+harder for the rest of the match. He's a fifth unit's worth of buff attached to a body you must protect while
 your other units die, which is a genuinely uncomfortable and interesting bargain.
 
 ### Mother Nature — Weather Commander (global board-state support)

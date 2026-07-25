@@ -1,4 +1,4 @@
-import { loadActivityFeed, syncActivityFeedFromApi } from "./platform/activity/activity.mjs";
+import { loadActivityFeed, syncActivityFeed } from "./platform/activity/activity.mjs";
 import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
 import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "./arcade-session-nav.mjs";
@@ -37,13 +37,34 @@ function formatVisibilityLabel(value) {
 function formatCountLabel(count) {
     return `${count} SIGNAL${count === 1 ? "" : "S"}`;
 }
-export function buildActivityPageViewModel(activityFeed = loadActivityFeed()) {
+const EMPTY_FEED_MESSAGE = "No signals yet. Finish a run on any cabinet and it lands here.";
+const OFFLINE_FEED_MESSAGE = "Can't reach the arcade right now. Showing what's saved on this device.";
+function buildEmptyStateMessage(status, isOffline) {
+    return isOffline || status === "offline" ? OFFLINE_FEED_MESSAGE : EMPTY_FEED_MESSAGE;
+}
+function buildPendingNotice(pendingCount) {
+    if (pendingCount < 1)
+        return "";
+    return pendingCount === 1
+        ? "1 signal is saved on this device and will upload once you're signed in and back online."
+        : `${pendingCount} signals are saved on this device and will upload once you're signed in and back online.`;
+}
+export function buildActivityPageViewModel(activityFeed = loadActivityFeed(), options = {}) {
     const items = Array.isArray(activityFeed) ? activityFeed : [];
+    const status = String(options?.status || "synced");
+    const isOffline = status === "offline";
+    const pendingCount = Number.isFinite(options?.pendingCount)
+        ? Number(options.pendingCount)
+        : items.filter((item) => item?.pendingSync).length;
     return {
         heroTitle: "ARCADE ACTIVITY",
         heroKicker: "FLOOR AFTERGLOW",
         heroSummary: "Platform-owned activity keeps game results and shared floor signals in one feed without letting individual cabinets invent their own long-term social history.",
-        heroCountLabel: formatCountLabel(items.length),
+        heroCountLabel: isOffline ? "OFFLINE" : formatCountLabel(items.length),
+        isOffline,
+        pendingCount,
+        pendingNotice: buildPendingNotice(pendingCount),
+        emptyMessage: items.length ? "" : buildEmptyStateMessage(status, isOffline),
         items: items.map((item) => ({
             id: item.id,
             title: item.actorDisplayName || "ARCADE SIGNAL",
@@ -51,18 +72,27 @@ export function buildActivityPageViewModel(activityFeed = loadActivityFeed()) {
             gameLabel: titleFromSlug(item.gameSlug) || "Arcade Floor",
             visibilityLabel: formatVisibilityLabel(item.visibility),
             publishedLabel: formatActivityDate(item.createdAt),
+            isPending: item.pendingSync === true,
         })),
     };
 }
 export async function loadActivityPageData(options = {}) {
     const storage = options.storage || getDefaultPlatformStorage();
     const apiClient = options.apiClient || createPlatformApiClient(options);
-    const activityFeed = Array.isArray(options?.activityFeed)
-        ? options.activityFeed
-        : await syncActivityFeedFromApi(storage, apiClient);
+    if (Array.isArray(options?.activityFeed)) {
+        return {
+            storage,
+            activityFeed: options.activityFeed,
+            status: "synced",
+            pendingCount: options.activityFeed.filter((item) => item?.pendingSync).length,
+        };
+    }
+    const { items, status, pendingCount } = await syncActivityFeed(storage, apiClient);
     return {
         storage,
-        activityFeed,
+        activityFeed: items,
+        status,
+        pendingCount,
     };
 }
 function renderHeroCard(container, model) {
@@ -79,14 +109,25 @@ function renderHeroCard(container, model) {
         <span class="activity-meta-block__label">Feed Status</span>
         <span class="activity-meta-block__value">${escapeHtml(model.heroCountLabel)}</span>
       </div>
+      ${model.pendingNotice
+        ? `<p class="activity-hero-card__notice">${escapeHtml(model.pendingNotice)}</p>`
+        : ""}
     </div>
+  `;
+}
+function renderEmptyState(message, isOffline) {
+    return `
+    <p class="activity-empty${isOffline ? " activity-empty--offline" : ""}" role="status">
+      ${escapeHtml(message)}
+    </p>
   `;
 }
 function renderActivityCard(item) {
     return `
-    <article class="activity-card">
+    <article class="activity-card${item.isPending ? " activity-card--pending" : ""}">
       <div class="activity-card__topline">
         <span class="activity-card__visibility">${escapeHtml(item.visibilityLabel)}</span>
+        ${item.isPending ? '<span class="activity-card__pending">Not uploaded yet</span>' : ""}
         <span class="activity-card__date">${escapeHtml(item.publishedLabel)}</span>
       </div>
       <h2 class="activity-card__title">${escapeHtml(item.title)}</h2>
@@ -95,14 +136,16 @@ function renderActivityCard(item) {
     </article>
   `;
 }
-export function renderActivityPage(doc = globalThis.document, activityFeed = loadActivityFeed()) {
+export function renderActivityPage(doc = globalThis.document, activityFeed = loadActivityFeed(), options = {}) {
     if (!doc?.getElementById)
         return null;
-    const model = buildActivityPageViewModel(activityFeed);
+    const model = buildActivityPageViewModel(activityFeed, options);
     renderHeroCard(doc.getElementById("activityHeroCard"), model);
     const feed = doc.getElementById("activityFeed");
     if (feed) {
-        feed.innerHTML = model.items.map(renderActivityCard).join("");
+        feed.innerHTML = model.items.length
+            ? model.items.map(renderActivityCard).join("")
+            : renderEmptyState(model.emptyMessage, model.isOffline);
     }
     return model;
 }
@@ -120,7 +163,7 @@ if (typeof doc?.getElementById === "function") {
         homeOnLogout: "../index.html",
     });
     renderActivityPage(doc);
-    void loadActivityPageData().then(({ activityFeed }) => {
-        renderActivityPage(doc, activityFeed);
+    void loadActivityPageData().then(({ activityFeed, status, pendingCount }) => {
+        renderActivityPage(doc, activityFeed, { status, pendingCount });
     });
 }

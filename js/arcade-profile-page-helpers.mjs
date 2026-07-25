@@ -45,7 +45,7 @@ export function buildPresenceToneClass(presence) {
     const normalized = String(presence || "").trim().toLowerCase();
     return normalized || "offline";
 }
-export function buildIdentityLinkItems(links = [], emptyValue = "Profile links are not wired in yet.") {
+export function buildIdentityLinkItems(links = [], emptyValue = "No links added yet.") {
     if (Array.isArray(links) && links.length > 0) {
         return links.map((link) => ({
             label: link.label,

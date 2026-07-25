@@ -212,6 +212,51 @@ test("a Beckoned ghost's sacrifice kills its Summoner without crediting the enem
   assert.ok(deathOf(strike.events, "summoner"), "the sacrifice is still announced");
 });
 
+const CRIT_HIT = { attackRoll: 0.1, critRoll: 0.01 };
+
+test("a Fat Wizard's Clumsy crit splash killing its own ally records the death but scores nothing", () => {
+  // Clumsy splashes every unit around the Zap target, friend or foe. The wizard stands
+  // adjacent to the enemy it zaps, so the blast catches its own squadmate behind it.
+  const state = createBattleState({
+    units: [
+      { id: "wizard", player: 1, type: "fat-wizard", x: 0, y: 0 },
+      { id: "buddy", player: 1, type: "swordsman", hp: 1, x: 1, y: 1 },
+      { id: "foe", player: 2, type: "swordsman", x: 1, y: 0 },
+      { id: "reserve", player: 2, type: "swordsman", x: 8, y: 8 }
+    ]
+  });
+  const begun = applyCommand(state, beginActivation(1, "wizard"));
+  const zap = applyCommand(begun.nextState, useArt(1, "wizard", "zap", { targetId: "foe", ...CRIT_HIT }));
+  assert.equal(zap.accepted, true, zap.errorCode);
+
+  const buddy = findUnit(zap.nextState, "buddy");
+  assert.equal(buddy.hp, 0, "the friendly splash actually landed");
+  assert.equal(buddy.killedBy, "wizard", "the UI can still explain who did it");
+  assert.equal(buddy.deathCause, CAUSE.UNIT);
+  assert.ok(deathOf(zap.events, "buddy"), "a teamkill is still announced");
+  assert.equal(findUnit(zap.nextState, "wizard").kills ?? 0, 0, "friendly fire pads nobody's record");
+});
+
+test("a Fat Wizard caught in its own Clumsy splash dies self-inflicted, not to the unit it zapped", () => {
+  const state = createBattleState({
+    units: [
+      { id: "wizard", player: 1, type: "fat-wizard", hp: 1, x: 0, y: 0 },
+      { id: "ally", player: 1, type: "swordsman", x: 0, y: 8 },
+      { id: "foe", player: 2, type: "swordsman", x: 1, y: 0 },
+      { id: "reserve", player: 2, type: "swordsman", x: 8, y: 8 }
+    ]
+  });
+  const begun = applyCommand(state, beginActivation(1, "wizard"));
+  const zap = applyCommand(begun.nextState, useArt(1, "wizard", "zap", { targetId: "foe", ...CRIT_HIT }));
+  assert.equal(zap.accepted, true, zap.errorCode);
+
+  const wizard = findUnit(zap.nextState, "wizard");
+  assert.equal(wizard.hp, 0, "its own splash reached its own tile");
+  assert.equal(wizard.killedBy, null, "the target it zapped did not kill it");
+  assert.equal(wizard.deathCause, CAUSE.SELF);
+  assert.equal(findUnit(zap.nextState, "foe").kills ?? 0, 0);
+});
+
 test("conceding wipes the squad without crediting the opponent", () => {
   const state = createBattleState({
     units: [

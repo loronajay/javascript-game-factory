@@ -255,6 +255,18 @@ export function syncMissingUnitUnlockAnnouncements(storage = defaultStorage()) {
   return enqueueBattleModeUnlockAnnouncements(storage);
 }
 
+// Pop exactly one queued announcement and mark only that one seen. The presenter
+// drains one at a time so closing the tab (or navigating) part-way through a batch
+// leaves the rest queued instead of silently marking the whole batch seen.
+export function shiftProgressionAnnouncement(storage = defaultStorage()) {
+  const pending = readProgressionAnnouncements(storage);
+  if (!pending.length) return null;
+  const [next, ...rest] = pending;
+  writeJsonArray(storage, PROGRESSION_ANNOUNCEMENTS_KEY, rest);
+  markProgressionAnnouncementsSeen(storage, [next]);
+  return next;
+}
+
 export function consumeProgressionAnnouncements(storage = defaultStorage()) {
   const pending = readProgressionAnnouncements(storage);
   writeJsonArray(storage, PROGRESSION_ANNOUNCEMENTS_KEY, []);

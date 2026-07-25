@@ -27,6 +27,7 @@ import {
   enqueueBattleModeUnlockAnnouncements,
   enqueueUnitUnlockAnnouncements,
 } from "../progression/announcements.js";
+import { requestProgressionAnnouncements } from "./progressionAnnouncements.js";
 import {
   CLOD_MISSION_ID,
   MAX_CAMPAIGN_SQUAD_SIZE,
@@ -444,6 +445,7 @@ export function createCampaignMapScreen({
     selectCampaignRewardSkin(globalThis.localStorage, packId, choice, { missionId: options.missionId });
     void syncGameProgress();
     if (isActive()) renderCampaign();
+    requestProgressionAnnouncements({ storage: globalThis.localStorage });
     return choice;
   }
 
@@ -472,6 +474,9 @@ export function createCampaignMapScreen({
     enqueueUnitUnlockAnnouncements(globalThis.localStorage, [choice], { ignoreSeen: true });
     enqueueBattleModeUnlockAnnouncements(globalThis.localStorage);
     if (isActive()) renderCampaign();
+    // The player never leaves the campaign screen after picking, so drain here — otherwise
+    // this unlock would sit queued until they next wandered back to the main menu.
+    requestProgressionAnnouncements({ storage: globalThis.localStorage });
     return choice;
   }
 

@@ -110,11 +110,11 @@ export function buildPlayerPageViewModel(profile: any, options: BuildPlayerPageV
     return {
       state: "missing",
       pageTitle: "UNKNOWN PILOT",
-      pageSubtitle: "Signal not present on this local cabinet.",
+      pageSubtitle: "Signal not found on the arcade network.",
       heroName: "UNKNOWN PILOT",
       heroRealName: "",
-      heroTagline: "Signal not present on this local cabinet.",
-      heroBio: "This public player file is not available in the local arcade cache yet. Open the Me page to inspect the current local profile or load this player from a future shared source.",
+      heroTagline: "Signal not found on the arcade network.",
+      heroBio: "This player file could not be loaded. The profile may not exist, or the link may be wrong.",
       heroChipLabel: "PLAYER PROFILE",
       pageViewCount: "0",
       avatarSrc: DEFAULT_PROFILE_PICTURE_SRC,
@@ -133,7 +133,7 @@ export function buildPlayerPageViewModel(profile: any, options: BuildPlayerPageV
       }, 0, options?.metricsRecord, options?.relationshipsRecord),
       identityLinkItems: [{
         label: "Link Ports",
-        value: "No public links are cached for this player yet.",
+        value: "No public links to show.",
         kind: "placeholder",
         isPlaceholder: true,
       }],
@@ -141,12 +141,12 @@ export function buildPlayerPageViewModel(profile: any, options: BuildPlayerPageV
         favoriteGameSlug: "",
         featuredGames: [],
       }, titleFromSlug, {
-        emptyValue: "A favorite game link will appear here once profile favorites are wired in.",
+        emptyValue: "No favorite cabinet to show.",
       }),
       rankingItems: buildRankingItems({
         ladderPlacements: [],
       }, titleFromSlug, {
-        emptyValue: "Rank snapshots are not cached for this player yet.",
+        emptyValue: "No rank snapshots to show.",
       }),
       friendItems: buildFriendItems({
         playerId: requestedPlayerId,
@@ -173,7 +173,7 @@ export function buildPlayerPageViewModel(profile: any, options: BuildPlayerPageV
         playerId: requestedPlayerId,
       },
       messageAction: { enabled: false, playerId: requestedPlayerId, profileName: "" },
-      aboutText: "This player has not filled out an about block in the local arcade cache yet.",
+      aboutText: "No profile details to show.",
       badgeItems: [{
         label: "Badge case still empty",
         isPlaceholder: true,

@@ -25,7 +25,7 @@ import { mergeServerEntitlementsIntoUnlockProgress, readUnlockProgress } from ".
 import { enqueuePurchasedUnlockAnnouncements } from "../progression/announcements.js";
 import { el } from "./domHelpers.js";
 import { openSkinViewer } from "./skinGallery.js";
-import { showPendingProgressionAnnouncements } from "./progressionAnnouncements.js";
+import { requestProgressionAnnouncements } from "./progressionAnnouncements.js";
 import {
   createValorBadge,
   detachNode,
@@ -229,7 +229,7 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
 
   function announcePurchaseProgress(beforeProgress, afterProgress) {
     enqueuePurchasedUnlockAnnouncements(storage, beforeProgress, afterProgress);
-    void showPendingProgressionAnnouncements(storage);
+    requestProgressionAnnouncements({ storage });
   }
 
   async function confirmValorPurchase(kind, offer) {

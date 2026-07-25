@@ -81,6 +81,15 @@ update it deliberately when a boundary genuinely changes; never loosen it for co
     `matchSetupScreens.js`, with pure campaign view-model helpers in
     `campaignMenuModel.js` and the menu seat palette in `teamDisplay.js`
     (`MENU_TEAM_COLORS`).
+  - Unlock/achievement popups have exactly one presenter. Many subsystems ENQUEUE
+    announcements (`campaignEvaluation.js`, campaign reward picks, `tutorialProgress.js`,
+    the shop, `bootProgressSync.js`), but only `progressionAnnouncements.js` may present
+    them. It owns the modal; `progressionAnnouncementRunner.js` owns the scheduling rules
+    (coalesce concurrent requests, hold-don't-drop when the current screen can't show a
+    popup, drain one at a time) with its I/O injected so it tests headlessly; and
+    `progressionAnnouncementPolicy.js` names the screens allowed to present. `menuFlow.js`
+    is the only caller of `setProgressionAnnouncementsAllowed`, driven by the screen it is
+    routing to. Never open an announcement modal directly from a feature module.
   - `onlineFlow.js` is the online lobby controller: transport wiring, the lobby state
     machine, and the match handoff. Its rendering and pure logic are extracted —
     `onlineLobbyView.js` builds the roster + draft/ban board (from an injected context),

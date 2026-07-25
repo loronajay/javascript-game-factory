@@ -1,8 +1,8 @@
 import { getDefaultPlatformStorage } from "../storage/storage.mjs";
 import { createPlatformApiClient } from "../api/platform-api.mjs";
 import { recordSharedSessionBetweenPlayers } from "../relationships/relationships.mjs";
-import { buildDerivedSessionId, normalizeActivityItem, normalizeIdentity, sanitizeSingleLine, } from "./activity-normalize.mjs";
-import { loadActivityFeed, upsertActivityFeedItem, writeActivityFeed, } from "./activity-store.mjs";
+import { buildDerivedSessionId, normalizeActivityItem, normalizeIdentity, sanitizeSingleLine, toActivityApiPayload, } from "./activity-normalize.mjs";
+import { loadActivityFeed, replaceActivityFeed, upsertActivityFeedItem, } from "./activity-store.mjs";
 import { buildBattleshitsMatchActivity, buildCreatureBattlerMatchActivity, buildLoversLostRunActivity, buildSumoraiMatchActivity, buildTacticalArenaMatchActivity, } from "./activity-builders.mjs";
 function queueSharedSessionRelationshipUpdate(leftPlayerId, rightPlayerId, options = {}) {
     void recordSharedSessionBetweenPlayers(leftPlayerId, rightPlayerId, options);
@@ -111,30 +111,64 @@ export function publishTacticalArenaMatchActivity(match, options = {}) {
     const item = buildTacticalArenaMatchActivity(match, options);
     return publishActivityItemWithApi(item, storage, options);
 }
-export async function syncActivityFeedFromApi(storage = getDefaultPlatformStorage(), apiClient = createPlatformApiClient()) {
+function countPendingItems(items) {
+    return items.filter((item) => item.pendingSync).length;
+}
+function buildOfflineSyncResult(storage) {
+    const items = loadActivityFeed(storage);
+    return { items, status: "offline", pendingCount: countPendingItems(items) };
+}
+// Retries anything that was saved locally while the API was unreachable or the
+// player was signed out. Stops at the first failure so an offline device does
+// not fire one doomed request per queued item.
+async function flushPendingActivityItems(storage, apiClient) {
+    if (typeof apiClient?.saveActivityItem !== "function")
+        return;
+    const pending = loadActivityFeed(storage).filter((item) => item.pendingSync);
+    for (const item of pending) {
+        const remoteItem = await apiClient.saveActivityItem(toActivityApiPayload(item)).catch(() => null);
+        if (!remoteItem)
+            return;
+        upsertActivityFeedItem(storage, normalizeActivityItem(remoteItem));
+    }
+}
+export async function syncActivityFeed(storage = getDefaultPlatformStorage(), apiClient = createPlatformApiClient()) {
     const canLoad = apiClient && typeof apiClient.listActivityItems === "function";
     if (!canLoad) {
-        return loadActivityFeed(storage);
+        return buildOfflineSyncResult(storage);
     }
+    await flushPendingActivityItems(storage, apiClient);
     const remoteFeed = await apiClient.listActivityItems().catch(() => null);
     if (!Array.isArray(remoteFeed)) {
-        return loadActivityFeed(storage);
+        return buildOfflineSyncResult(storage);
     }
-    writeActivityFeed(storage, remoteFeed.map((entry, index) => normalizeActivityItem(entry, index)));
-    return loadActivityFeed(storage);
+    const remoteItems = remoteFeed.map((entry, index) => normalizeActivityItem(entry, index));
+    const remoteIds = new Set(remoteItems.map((item) => item.id));
+    // The API is the source of truth for everything it knows about, but items it
+    // has never accepted must survive the replace instead of being wiped.
+    const stillPending = loadActivityFeed(storage)
+        .filter((item) => item.pendingSync && !remoteIds.has(item.id));
+    const items = replaceActivityFeed(storage, [...remoteItems, ...stillPending]);
+    return { items, status: "synced", pendingCount: stillPending.length };
+}
+export async function syncActivityFeedFromApi(storage = getDefaultPlatformStorage(), apiClient = createPlatformApiClient()) {
+    const result = await syncActivityFeed(storage, apiClient);
+    return result.items;
 }
 export async function publishActivityItemWithApi(item, storage = getDefaultPlatformStorage(), options = {}) {
     const apiClient = options?.apiClient || createPlatformApiClient(options);
-    const isAuth = typeof apiClient?.saveActivityItem === "function";
-    if (!isAuth) {
-        return publishActivityItem(item, storage, options);
-    }
     const normalized = normalizeActivityItem(item);
     if (!normalized.type)
         return null;
-    const remoteItem = await apiClient.saveActivityItem(normalized).catch(() => null);
-    if (!remoteItem)
-        return null;
+    if (typeof apiClient?.saveActivityItem !== "function") {
+        return publishActivityItem({ ...normalized, pendingSync: true }, storage, options);
+    }
+    const remoteItem = await apiClient.saveActivityItem(toActivityApiPayload(normalized)).catch(() => null);
+    if (!remoteItem) {
+        // Signed out, offline, or the API rejected the write. Keep the result on
+        // this device and flag it for retry rather than dropping it silently.
+        return publishActivityItem({ ...normalized, pendingSync: true }, storage, options);
+    }
     const saved = normalizeActivityItem(remoteItem);
     upsertActivityFeedItem(storage, saved);
     maybeRecordSharedSessionFromActivity(saved, storage, options);

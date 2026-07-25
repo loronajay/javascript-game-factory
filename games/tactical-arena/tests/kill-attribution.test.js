@@ -87,6 +87,22 @@ test("killing your own teammate records the death but does not count as a kill",
   assert.equal(state.units[0].kills, 0, "friendly fire does not pad your record");
 });
 
+test("a scope whose killer is the victim records a SELF death, not an unowned unit death", () => {
+  // The Fat Wizard splashes itself with its own Clumsy crit. Nothing tags this death, so
+  // the broad per-command scope sees the actor as the killer of itself.
+  const state = stateOf(unit("a", 1, 3), unit("b", 2, 10));
+  const before = snapshotAlive(state);
+
+  state.units[0].hp = 0;
+  const events = [];
+  creditDeaths(state, before, events, { killerId: "a", cause: CAUSE.UNIT });
+
+  assert.equal(state.units[0].deathCause, CAUSE.SELF, "blowing yourself up is self-inflicted");
+  assert.equal(state.units[0].killedBy, null);
+  assert.equal(state.units[0].kills, 0);
+  assert.deepEqual(events, [{ type: "UNIT_DEFEATED", unitId: "a", killerId: null, cause: CAUSE.SELF }]);
+});
+
 test("2v2 teammates on different player numbers still do not credit each other", () => {
   const state = stateOf(unit("a", 1, 10, { team: 1 }), unit("b", 3, 5, { team: 1 }));
   const before = snapshotAlive(state);

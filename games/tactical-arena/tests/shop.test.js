@@ -1,6 +1,7 @@
-import test from "node:test";
+import test, { beforeEach } from "node:test";
 import assert from "node:assert/strict";
 
+import { resetProgressionAnnouncementPresenter } from "../src/ui/progressionAnnouncements.js";
 import { isProgressSkinUnlocked, readUnlockProgress, writeUnlockProgress } from "../src/progression/unlocks.js";
 import { grantConsumable, readInventory } from "../src/progression/inventory.js";
 import { openInventory } from "../src/ui/inventory.js";
@@ -169,6 +170,12 @@ function serverSpendClient({ valorAfter = 0, packEntitlementIds = null } = {}) {
     },
   };
 }
+
+// The announcement presenter is a module-level singleton and each test leaves its popup
+// open (nothing clicks Continue), which would otherwise block the next test's drain.
+beforeEach(() => {
+  resetProgressionAnnouncementPresenter();
+});
 
 async function flushAsyncPurchase() {
   for (let i = 0; i < 6; i += 1) {
@@ -474,6 +481,8 @@ test("shop skin USD purchase embeds Stripe checkout through the configured endpo
   assert.equal(fetchCalls[1].url, "https://factory.example/api/tactical-arena/checkout-sessions/fulfill");
   assert.equal(walk(overlay, (node) => hasClass(node, "shop-checkout-dialog")).length, 0);
   assert.equal(isProgressSkinUnlocked("swordsman", "summer-vibes", storage), true);
+  // Popups are drained by the shared presenter on a scheduled pass, not inline.
+  await flushAsyncPurchase();
   const announcement = document.body.children.find((node) => hasClass(node, "progression-announcement-modal"));
   assert.ok(announcement, "checkout fulfillment should open an unlock popup");
   assert.equal(announcement.hidden, false);
@@ -553,6 +562,8 @@ test("shop unit USD purchase embeds Stripe checkout without spending Valor", asy
   assert.equal(fetchCalls.length, 2);
   assert.equal(readUnlockProgress(storage).valorBalance, 999);
   assert.ok(readUnlockProgress(storage).unlockedUnits.includes("clod"));
+  // Popups are drained by the shared presenter on a scheduled pass, not inline.
+  await flushAsyncPurchase();
   const announcement = document.body.children.find((node) => hasClass(node, "progression-announcement-modal"));
   assert.ok(announcement, "checkout fulfillment should open a unit unlock popup");
   assert.equal(announcement.hidden, false);

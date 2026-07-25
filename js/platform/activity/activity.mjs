@@ -2,4 +2,4 @@ export { ACTIVITY_FEED_LIMIT, ACTIVITY_FEED_STORAGE_KEY, } from "./activity-sche
 export { normalizeActivityItem } from "./activity-normalize.mjs";
 export { loadActivityFeed } from "./activity-store.mjs";
 export { buildBattleshitsMatchActivity, buildCreatureBattlerMatchActivity, buildLoversLostRunActivity, buildSumoraiMatchActivity, buildTacticalArenaMatchActivity, } from "./activity-builders.mjs";
-export { publishActivityItem, publishActivityItemWithApi, publishBattleshitsMatchActivity, publishCreatureBattlerMatchActivity, publishLoversLostRunActivity, publishSumoraiMatchActivity, publishTacticalArenaMatchActivity, syncActivityFeedFromApi, } from "./activity-api.mjs";
+export { publishActivityItem, publishActivityItemWithApi, publishBattleshitsMatchActivity, publishCreatureBattlerMatchActivity, publishLoversLostRunActivity, publishSumoraiMatchActivity, publishTacticalArenaMatchActivity, syncActivityFeed, syncActivityFeedFromApi, } from "./activity-api.mjs";

@@ -180,7 +180,7 @@ test("a command remembers the one it replaced (for Strike's Pursue bonus)", () =
   assert.equal(king.previousCommand, "pursue");
 });
 
-test("when an allied unit falls, the King takes 10 and the rest of the squad rallies 5", () => {
+test("when an allied unit falls, the King takes 10 and the rest of the squad rallies 5 HP / +2 STR", () => {
   // P2's turn: an enemy stands next to a 1-HP ally and finishes it. Two other p1 allies
   // survive to be rallied; the King is excluded from the rally.
   const state = createBattleState({
@@ -204,7 +204,55 @@ test("when an allied unit falls, the King takes 10 and the rest of the squad ral
   assert.equal(findUnit(s, "p1-a").hp, 23);       // 18 + 5 rally
   assert.equal(findUnit(s, "p1-b").hp, 23);       // 18 + 5 rally
   assert.ok(r.events.some((e) => e.type === "KING_MOURNS" && e.damage === 10));
-  assert.ok(r.events.some((e) => e.type === "SQUAD_RALLY" && e.healing === 5));
+  assert.ok(r.events.some((e) => e.type === "SQUAD_RALLY" && e.healing === 5 && e.strength === 2));
+
+  // The rally STR is PERMANENT: it lands as a persistent stat modifier, so it shows up
+  // in the survivors' effective stats (the King himself is excluded).
+  const archer = findUnit(s, "p1-a");
+  assert.equal(archer.statModifiers.strength, 2);
+  assert.equal(
+    getEffectiveStats(archer, s).strength,
+    getUnitType("archer").stats.strength + 2
+  );
+  assert.equal(findUnit(s, "p1-b").statModifiers.strength, 2);
+  assert.equal(findUnit(s, "p1-king").statModifiers?.strength ?? 0, 0);
+});
+
+test("the rally STR stacks with each further loss and outlives the turn it was granted", () => {
+  const state = createBattleState({
+    size: 13, seed: 1,
+    units: [
+      { id: "p1-king", type: "king", player: 1, x: 0, y: 0, hp: 30 },
+      { id: "p1-doomed", type: "swordsman", player: 1, x: 6, y: 5, hp: 1 },
+      { id: "p1-doomed2", type: "swordsman", player: 1, x: 6, y: 6, hp: 1 },
+      { id: "p1-a", type: "archer", player: 1, x: 2, y: 2, hp: 18 },
+      { id: "p2-foe", type: "swordsman", player: 2, x: 5, y: 5 },
+      { id: "p2-foe2", type: "swordsman", player: 2, x: 5, y: 6 },
+      { id: "p2-foe3", type: "swordsman", player: 2, x: 6, y: 7 }
+    ]
+  });
+  state.currentPlayer = 2;
+
+  const strike = (r, actorId, targetId) => {
+    let next = run(r.nextState ?? r, beginActivation(2, actorId));
+    next = run(next.nextState, { type: "ATTACK", player: 2, actorId, targetId, ...NORMAL_HIT });
+    return run(next.nextState, finishActivation(2, actorId));
+  };
+
+  let r = strike({ nextState: state }, "p2-foe", "p1-doomed");
+  assert.equal(findUnit(r.nextState, "p1-doomed").hp, 0);
+  assert.equal(findUnit(r.nextState, "p1-a").statModifiers.strength, 2);
+
+  // The first rally healed p1-doomed2 too, so it takes two more hits to finish it.
+  r = strike(r, "p2-foe2", "p1-doomed2");
+  r = strike(r, "p2-foe3", "p1-doomed2");
+  assert.equal(findUnit(r.nextState, "p1-doomed2").hp, 0);
+  // Second fall → a second permanent +2, stacked on the first.
+  assert.equal(findUnit(r.nextState, "p1-a").statModifiers.strength, 4);
+  assert.equal(
+    getEffectiveStats(findUnit(r.nextState, "p1-a"), r.nextState).strength,
+    getUnitType("archer").stats.strength + 4
+  );
 });
 
 test("a lone King is a loss — he cannot sustain the match on his own", () => {

@@ -23,7 +23,6 @@ export function syncResultsActions({ rematchBtn, campaignMapBtn } = {}, { online
 export function createResultsScreen({
   showScreen = () => {},
   getLastConfig = () => null,
-  announceProgression = () => {},
 } = {}) {
   const $ = (sel, root = document) => root.querySelector(sel);
   const results = $('[data-screen="results"]');
@@ -89,9 +88,10 @@ export function createResultsScreen({
     // map so a post-match cutscene + reward pick can run without the player escaping to
     // the menu first. In that case Campaign Map is the only exit off the results screen.
     if (resultsMainMenuBtn) resultsMainMenuBtn.hidden = Boolean(campaign?.forceMapReturn);
+    // Queued unlock/achievement popups are drained by the screen router on arrival
+    // (after the confetti beat), for every mode — not just campaign victories.
     showScreen("results");
     spawnConfetti(burstEl, MENU_TEAM_COLORS[summary.winner]);
-    if (campaign?.victory) announceProgression({ delay: 550 });
   }
 
   return { showResults };

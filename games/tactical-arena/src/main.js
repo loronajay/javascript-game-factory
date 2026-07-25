@@ -33,7 +33,7 @@ import { createMatchLifecycleController } from "./match/matchLifecycleController
 import { isTempoBattle, isTempoUnitReady } from "./core/tempoBattle.js";
 import { createCampaignMeta } from "./campaign/campaignMeta.js";
 import { syncGameProgress } from "./platform/bootProgressSync.js";
-import { showPendingProgressionAnnouncements } from "./ui/progressionAnnouncements.js";
+import { requestProgressionAnnouncements } from "./ui/progressionAnnouncements.js";
 
 // --- DOM refs ---
 const board = document.querySelector("#boardSvg");
@@ -843,6 +843,6 @@ document.addEventListener("keydown", (event) => {
 
 // --- Boot ---
 menu.show("title");
-void syncGameProgress().then((result) => {
-  if (result?.checkoutResult?.progress) void showPendingProgressionAnnouncements(globalThis.localStorage);
-});
+// Boot sync can reconcile in server-side entitlements; the presenter holds any queued
+// popup until the player reaches a screen where it belongs.
+void syncGameProgress().then(() => requestProgressionAnnouncements({ storage: globalThis.localStorage }));

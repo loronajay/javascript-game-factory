@@ -58,7 +58,7 @@ export function buildPresenceToneClass(presence: unknown): string {
   return normalized || "offline";
 }
 
-export function buildIdentityLinkItems(links: any = [], emptyValue = "Profile links are not wired in yet."): any[] {
+export function buildIdentityLinkItems(links: any = [], emptyValue = "No links added yet."): any[] {
   if (Array.isArray(links) && links.length > 0) {
     return links.map((link: any) => ({
       label: link.label,

@@ -139,7 +139,11 @@ The rules that matter when reading these numbers:
   authored mission fire) and self-inflicted ones (self-destruct ARTS, the Beckoned-ghost
   sacrifice) credit nobody by design. `deathCause` records which it was.
 - **Friendly fire and self-kills never count.** They are recorded in `killedBy` so the UI
-  can still explain a death, but they do not increment anyone's tally.
+  can still explain a death, but they do not increment anyone's tally. This covers the
+  indiscriminate AoE passives: a Fat Wizard's Clumsy crit splash that takes out its own
+  squadmate names the wizard in the victim's `killedBy` and scores nothing, and the same
+  splash catching the wizard itself is recorded as `SELF` rather than blamed on the unit it
+  was zapping.
 - **Fire and poison carry their own credit.** Fire tiles store `ownerId` and damaging
   statuses store `appliedBy`, so a burn or a poison tick credits whoever lit or applied it
   rather than whoever happened to be acting at the rollover.

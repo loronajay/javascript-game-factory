@@ -76,7 +76,15 @@ export function normalizeActivityItem(rawItem = {}, index = 0) {
         visibility: ACTIVITY_VISIBILITIES.has(visibility) ? visibility : "friends",
         createdAt: sanitizeSingleLine(item?.createdAt, 40) || new Date().toISOString(),
         metadata: sanitizeMetadataValue(item?.metadata) || {},
+        pendingSync: item?.pendingSync === true,
     };
+}
+// The API contract has no `pendingSync` field; strip it so a retry never sends
+// local bookkeeping to the server.
+export function toActivityApiPayload(item) {
+    const { pendingSync, ...payload } = item;
+    void pendingSync;
+    return payload;
 }
 export function buildDerivedSessionId(rawActivity) {
     const activity = rawActivity;

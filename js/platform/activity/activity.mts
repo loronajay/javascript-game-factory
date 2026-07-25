@@ -25,6 +25,11 @@ export {
   publishLoversLostRunActivity,
   publishSumoraiMatchActivity,
   publishTacticalArenaMatchActivity,
+  syncActivityFeed,
   syncActivityFeedFromApi,
 } from "./activity-api.mjs";
-export type { ActivityPublishOptions } from "./activity-api.mjs";
+export type {
+  ActivityFeedSyncResult,
+  ActivityFeedSyncStatus,
+  ActivityPublishOptions,
+} from "./activity-api.mjs";

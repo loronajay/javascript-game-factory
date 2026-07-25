@@ -19,6 +19,9 @@ export interface ActivityItem {
   visibility: ActivityVisibility;
   createdAt: string;
   metadata: Record<string, unknown>;
+  // Local-only: the item is cached on this device but has not reached the API
+  // yet. Never sent to the server; cleared once the API echoes the item back.
+  pendingSync: boolean;
 }
 
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -98,7 +101,16 @@ export function normalizeActivityItem(rawItem: unknown = {}, index = 0): Activit
     visibility: ACTIVITY_VISIBILITIES.has(visibility as ActivityVisibility) ? (visibility as ActivityVisibility) : "friends",
     createdAt: sanitizeSingleLine(item?.createdAt, 40) || new Date().toISOString(),
     metadata: (sanitizeMetadataValue(item?.metadata) as Record<string, unknown>) || {},
+    pendingSync: item?.pendingSync === true,
   };
+}
+
+// The API contract has no `pendingSync` field; strip it so a retry never sends
+// local bookkeeping to the server.
+export function toActivityApiPayload(item: ActivityItem): Omit<ActivityItem, "pendingSync"> {
+  const { pendingSync, ...payload } = item;
+  void pendingSync;
+  return payload;
 }
 
 export function buildDerivedSessionId(rawActivity: unknown): string {

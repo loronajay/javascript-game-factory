@@ -31,6 +31,17 @@ export function writeActivityFeed(storage, activityFeed = []) {
     writeStorageText(storage, ACTIVITY_FEED_STORAGE_KEY, JSON.stringify(normalized));
     return normalized;
 }
+// Like writeActivityFeed, but keeps the stored feed newest-first and inside the
+// feed limit. Used when the API response replaces the cache and locally pending
+// items have to be folded back in.
+export function replaceActivityFeed(storage, activityFeed = []) {
+    const normalized = (Array.isArray(activityFeed) ? activityFeed : [])
+        .map((entry, index) => normalizeActivityItem(entry, index))
+        .sort(compareActivityDesc)
+        .slice(0, ACTIVITY_FEED_LIMIT);
+    writeActivityFeed(storage, normalized);
+    return normalized;
+}
 export function loadActivityFeed(storage = getDefaultPlatformStorage()) {
     return parseNormalizedStoredFeed(storage).sort(compareActivityDesc);
 }
