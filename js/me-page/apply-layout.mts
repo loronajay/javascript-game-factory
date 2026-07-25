@@ -22,7 +22,10 @@ export const PLAYER_PANEL_TO_DOM: Record<string, string> = {
   hero: "playerHeroCard",
   identity: "playerIdentityPanel",
   rankings: "playerRankingsPanel",
-  friends: "playerFriendsPanel",
+  // The public rail shows the owner's top-friend slots, so it follows the `topFriends`
+  // panel — the same one the owner places on /me. The `friends` navigator is owner-only
+  // and deliberately has no public counterpart.
+  topFriends: "playerFriendsPanel",
   music: "playerMusicPanel",
   favoriteGame: "playerFavoritePanel",
   gallery: "playerGalleryPanel",
@@ -96,14 +99,27 @@ export function applyProfileLayout(doc: Document, layout: any, {
   }
   layoutEl.classList.remove("layout--flow");
 
-  layoutEl.querySelectorAll("[data-profile-composition-overlay]").forEach((el) => el.remove());
+  // Most overlays copy their panel's markup, so rebuilding them from scratch each pass is
+  // free. A few instead *move* the live node out of its panel (the thoughts composer and
+  // feed): once promoted, the panel holds no copy to rebuild from. Removing those on a
+  // second layout pass that isn't preceded by a re-render — mounting the music player runs
+  // exactly that — would replace real, wired content with an empty placeholder. Hand them
+  // back to the renderers instead, and drop whatever goes unclaimed.
+  const promotedOverlays = new Map<string, HTMLElement>();
+  layoutEl.querySelectorAll<HTMLElement>("[data-profile-composition-overlay]").forEach((el) => {
+    if (el.dataset.profileCompositionPromoted === "true" && el.dataset.profileCompositionOverlay) {
+      promotedOverlays.set(el.dataset.profileCompositionOverlay, el);
+    } else {
+      el.remove();
+    }
+  });
   const renderElements = getCompositionElementsForRender(layout.desktop.elements, { galleryPhotos });
   const compositionCategories = getCompositionCategories(renderElements);
 
   // Composition overlays are positioned as percentages of this container, so its height
   // has to be the same on /me and /player. Left to the CSS grid's implicit rows it is not:
-  // the public page has no topFriends panel, so its grid ends five rows short and every
-  // overlay gets compressed upward. Pin the track count from the saved layout instead.
+  // the public page has no friend-navigator or friendCode panel, so its grid ends short and
+  // every overlay gets compressed upward. Pin the track count from the saved layout instead.
   layoutEl.style.gridTemplateRows =
     `repeat(${getLayoutRowCount(layout.desktop.panels, compositionCategories, required)}, var(--profile-layout-row-height))`;
 
@@ -131,7 +147,10 @@ export function applyProfileLayout(doc: Document, layout: any, {
     layoutEl.appendChild(el);
   }
 
-  renderCompositionOverlays(doc, layoutEl, renderElements, layout.desktop.panels, { galleryPhotos });
+  renderCompositionOverlays(doc, layoutEl, renderElements, layout.desktop.panels, { galleryPhotos, promotedOverlays });
+  // Anything still in the map belongs to an element this pass didn't render (disabled, or
+  // no longer part of the layout), so it has no place on the page any more.
+  promotedOverlays.forEach((el) => el.remove());
   staleFlowColumns.forEach((col) => col.remove());
 }
 
@@ -249,6 +268,7 @@ function applyMobileStackLayout(
   panelToDom: Record<string, string>,
   required: Set<string>,
 ): void {
+  restorePromotedOverlays(doc, layoutEl);
   layoutEl.querySelectorAll("[data-profile-composition-overlay]").forEach((el) => el.remove());
   layoutEl.classList.add("layout--flow", "layout--mobile-stack");
   layoutEl.style.gridTemplateRows = "";
@@ -276,6 +296,33 @@ function applyMobileStackLayout(
 
   layoutEl.appendChild(column);
   staleColumns.forEach((col) => col.remove());
+}
+
+// Promoted overlays (thoughts composer/feed, identity fields, player actions) were moved
+// out of their panel rather than copied from it, so they are the only copy of that content.
+// Hand them back before the mobile stack drops every overlay, or a rotation into mobile
+// would leave those panels empty until the next full re-render.
+function restorePromotedOverlays(doc: Document, layoutEl: HTMLElement): void {
+  layoutEl.querySelectorAll<HTMLElement>("[data-profile-composition-promoted='true']").forEach((el) => {
+    const panel = promotedOverlayHomePanel(doc, el.dataset.profileCompositionOverlay || "");
+    if (!panel) return;
+    [...el.classList]
+      .filter((name) => name.startsWith("profile-composition-overlay"))
+      .forEach((name) => el.classList.remove(name));
+    delete el.dataset.profileCompositionOverlay;
+    delete el.dataset.profileCompositionPromoted;
+    el.style.left = "";
+    el.style.top = "";
+    el.style.width = "";
+    el.style.height = "";
+    panel.appendChild(el);
+  });
+}
+
+function promotedOverlayHomePanel(doc: Document, overlayId: string): HTMLElement | null {
+  const isThoughts = overlayId.startsWith("thoughts");
+  return doc.getElementById(isThoughts ? "meThoughtsPanel" : "meIdentityPanel")
+    || doc.getElementById(isThoughts ? "playerThoughtsPanel" : "playerIdentityPanel");
 }
 
 // Strips the inline percentage geometry a prior composition pass wrote onto hero
@@ -422,7 +469,13 @@ function applyHeroCompositionChild(heroEl: HTMLElement, elementId: string, child
   heroEl.classList.add("profile-composition-hero");
 }
 
-function renderCompositionOverlays(doc: Document, layoutEl: HTMLElement, elements: any, panels: any[] = [], { galleryPhotos = [] }: { galleryPhotos?: any[] } = {}): void {
+function renderCompositionOverlays(
+  doc: Document,
+  layoutEl: HTMLElement,
+  elements: any,
+  panels: any[] = [],
+  { galleryPhotos = [], promotedOverlays = new Map<string, HTMLElement>() }: { galleryPhotos?: any[]; promotedOverlays?: Map<string, HTMLElement> } = {},
+): void {
   if (!Array.isArray(elements)) return;
   const isOwnerLayout = layoutEl.classList.contains("me-layout");
   for (const element of elements) {
@@ -435,9 +488,9 @@ function renderCompositionOverlays(doc: Document, layoutEl: HTMLElement, element
     } else if (element.id === "identitySurface" || element.id === "aboutSurface" || element.id === "badgesSurface" || element.id === "friendCodeSurface" || element.id === "gallerySurface" || element.id === "thoughtsSurface") {
       renderSurfaceOverlay(doc, layoutEl, element, element.category);
     } else if (element.type === "identityField") {
-      renderIdentityFieldOverlay(doc, layoutEl, element, panels);
+      renderIdentityFieldOverlay(doc, layoutEl, element, panels, promotedOverlays);
     } else if (element.type === "playerAction") {
-      renderPlayerActionOverlay(doc, layoutEl, element, panels);
+      renderPlayerActionOverlay(doc, layoutEl, element, panels, promotedOverlays);
     } else if (element.id === "aboutText") {
       renderAboutTextOverlay(doc, layoutEl, element, panels);
     } else if (element.id === "badgesContent") {
@@ -451,9 +504,9 @@ function renderCompositionOverlays(doc: Document, layoutEl: HTMLElement, element
     } else if (element.type === "galleryPhoto") {
       renderGalleryPhotoOverlay(doc, layoutEl, element, panels, galleryPhotos);
     } else if (element.id === "thoughtsComposer") {
-      renderThoughtsComposerOverlay(doc, layoutEl, element, panels);
+      renderThoughtsComposerOverlay(doc, layoutEl, element, panels, promotedOverlays);
     } else if (element.id === "thoughtsFeed") {
-      renderThoughtsFeedOverlay(doc, layoutEl, getThoughtsFeedRenderElement(element, elements, isOwnerLayout), panels);
+      renderThoughtsFeedOverlay(doc, layoutEl, getThoughtsFeedRenderElement(element, elements, isOwnerLayout), panels, promotedOverlays);
     }
   }
 }
@@ -572,10 +625,23 @@ function renderAboutTextOverlay(doc: Document, layoutEl: HTMLElement, element: a
   layoutEl.appendChild(textEl);
 }
 
-function renderIdentityFieldOverlay(doc: Document, layoutEl: HTMLElement, element: any, panels: any[]): void {
+// Hands back an overlay this element promoted on an earlier pass. Only ever a fallback for
+// when the panel no longer holds a fresh copy — a re-rendered panel always wins, or the
+// overlay would keep showing stale content.
+function claimPromotedOverlay(promotedOverlays: Map<string, HTMLElement>, id: string): HTMLElement | null {
+  const el = promotedOverlays.get(id);
+  if (!el) return null;
+  promotedOverlays.delete(id);
+  return el;
+}
+
+function renderIdentityFieldOverlay(doc: Document, layoutEl: HTMLElement, element: any, panels: any[], promotedOverlays: Map<string, HTMLElement>): void {
   const childId = getIdentityChildId(element.id);
-  const fieldEl = (doc.querySelector(`#meIdentityPanel [data-profile-child-id='${childId}'], #playerIdentityPanel [data-profile-child-id='${childId}']`) as HTMLElement | null) || doc.createElement("div");
+  const source = (doc.querySelector(`#meIdentityPanel [data-profile-child-id='${childId}'], #playerIdentityPanel [data-profile-child-id='${childId}']`) as HTMLElement | null)
+    || claimPromotedOverlay(promotedOverlays, element.id);
+  const fieldEl = source || doc.createElement("div");
   fieldEl.classList.add("profile-composition-overlay", "profile-composition-overlay--identity-field");
+  if (source) fieldEl.dataset.profileCompositionPromoted = "true";
   fieldEl.dataset.profileCompositionOverlay = element.id;
   fieldEl.dataset.profileChildId = childId;
   if (!fieldEl.innerHTML) {
@@ -587,10 +653,13 @@ function renderIdentityFieldOverlay(doc: Document, layoutEl: HTMLElement, elemen
   layoutEl.appendChild(fieldEl);
 }
 
-function renderPlayerActionOverlay(doc: Document, layoutEl: HTMLElement, element: any, panels: any[]): void {
+function renderPlayerActionOverlay(doc: Document, layoutEl: HTMLElement, element: any, panels: any[], promotedOverlays: Map<string, HTMLElement>): void {
   const childId = getPlayerActionChildId(element.id);
-  const actionEl = (doc.querySelector(`#playerIdentityPanel [data-profile-action-id='${childId}']`) as HTMLElement | null) || doc.createElement("div");
+  const source = (doc.querySelector(`#playerIdentityPanel [data-profile-action-id='${childId}']`) as HTMLElement | null)
+    || claimPromotedOverlay(promotedOverlays, element.id);
+  const actionEl = source || doc.createElement("div");
   actionEl.classList.add("profile-composition-overlay", "profile-composition-overlay--player-action");
+  if (source) actionEl.dataset.profileCompositionPromoted = "true";
   actionEl.dataset.profileCompositionOverlay = element.id;
   actionEl.dataset.profileChildId = childId;
   actionEl.removeAttribute("data-profile-action-id");
@@ -704,10 +773,12 @@ function renderGalleryItemHtml(photo: any): string {
   `;
 }
 
-function renderThoughtsComposerOverlay(doc: Document, layoutEl: HTMLElement, element: any, panels: any[]): void {
-  const source = doc.querySelector<HTMLElement>("#meThoughtsPanel [data-profile-child-id='composer']");
+function renderThoughtsComposerOverlay(doc: Document, layoutEl: HTMLElement, element: any, panels: any[], promotedOverlays: Map<string, HTMLElement>): void {
+  const source = doc.querySelector<HTMLElement>("#meThoughtsPanel [data-profile-child-id='composer']")
+    || claimPromotedOverlay(promotedOverlays, element.id);
   const composerEl = source || doc.createElement("div");
   composerEl.classList.add("profile-composition-overlay", "profile-composition-overlay--thoughts-composer");
+  if (source) composerEl.dataset.profileCompositionPromoted = "true";
   composerEl.dataset.profileCompositionOverlay = element.id;
   composerEl.dataset.profileChildId = "composer";
   composerEl.removeAttribute("data-profile-child-scroll");
@@ -723,10 +794,12 @@ function renderThoughtsComposerOverlay(doc: Document, layoutEl: HTMLElement, ele
   layoutEl.appendChild(composerEl);
 }
 
-function renderThoughtsFeedOverlay(doc: Document, layoutEl: HTMLElement, element: any, panels: any[]): void {
-  const source = doc.querySelector<HTMLElement>("#meThoughtsPanel [data-profile-child-id='feed'], #playerThoughtsPanel .thoughts-feed");
+function renderThoughtsFeedOverlay(doc: Document, layoutEl: HTMLElement, element: any, panels: any[], promotedOverlays: Map<string, HTMLElement>): void {
+  const source = doc.querySelector<HTMLElement>("#meThoughtsPanel [data-profile-child-id='feed'], #playerThoughtsPanel .thoughts-feed")
+    || claimPromotedOverlay(promotedOverlays, element.id);
   const feedEl = source || doc.createElement("div");
   feedEl.classList.add("profile-composition-overlay", "profile-composition-overlay--thoughts-feed", "thoughts-feed");
+  if (source) feedEl.dataset.profileCompositionPromoted = "true";
   feedEl.dataset.profileCompositionOverlay = element.id;
   feedEl.dataset.profileChildId = "feed";
   feedEl.dataset.profileChildScroll = "true";

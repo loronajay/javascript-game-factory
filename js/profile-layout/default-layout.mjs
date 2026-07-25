@@ -57,8 +57,9 @@ export const DEFAULT_PROFILE_LAYOUT = {
 export function getDefaultLayout() {
     return JSON.parse(JSON.stringify(DEFAULT_PROFILE_LAYOUT));
 }
-// Player page omits topFriends and friendCode, so panels are repositioned
-// to fill those gaps compactly.
+// Player page omits the friend navigator and friendCode (both owner-only), so panels
+// are repositioned to fill those gaps compactly. The public "Top Friends" rail is the
+// `topFriends` panel, same id the owner sees on /me.
 export const PLAYER_DEFAULT_PROFILE_LAYOUT = {
     version: LAYOUT_VERSION,
     friendsPanelRevision: FRIENDS_PANEL_LAYOUT_REVISION,
@@ -70,7 +71,7 @@ export const PLAYER_DEFAULT_PROFILE_LAYOUT = {
             { id: "hero", enabled: true, x: 0, y: 0, w: 4, h: 5, children: DEFAULT_HERO_CHILDREN },
             { id: "identity", enabled: true, x: 0, y: 5, w: 4, h: 3, children: DEFAULT_IDENTITY_CHILDREN },
             { id: "rankings", enabled: true, x: 0, y: 8, w: 4, h: 3, children: DEFAULT_RANKINGS_CHILDREN },
-            { id: "friends", enabled: true, x: 0, y: 11, w: 4, h: 5, children: DEFAULT_FRIENDS_CHILDREN },
+            { id: "topFriends", enabled: true, x: 0, y: 11, w: 4, h: 5, children: DEFAULT_TOP_FRIENDS_CHILDREN },
             // Middle column (no friendCode on player page)
             { id: "music", enabled: true, x: 4, y: 0, w: 4, h: 3, children: DEFAULT_MUSIC_CHILDREN },
             { id: "favoriteGame", enabled: true, x: 4, y: 3, w: 4, h: 4, children: DEFAULT_FAVORITE_GAME_CHILDREN },
