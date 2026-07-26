@@ -108,6 +108,22 @@ test("every read passes the game slug and normalizes the response", async () => 
   assert.deepEqual(api.calls.find(([name]) => name === "searchGamePlayers"), ["searchGamePlayers", SLUG, "bob", undefined]);
 });
 
+test("the friends and blocked lists carry their own relationship", async () => {
+  // The list endpoints don't repeat the relationship per row. Without stamping it, a
+  // friend row falls back to "none" and offers the player an Add Friend button.
+  const api = fakeApi({
+    fetchGameFriends: async () => ({ friends: [{ playerId: "p1", displayName: "Bobcat" }] }),
+    fetchGameBlocks: async () => ({ blocked: [{ playerId: "p9", displayName: "Jerk" }] }),
+  });
+  const client = createTaFriendsClient({ apiClient: api, gameSlug: SLUG });
+
+  const friends = await client.listFriends();
+  assert.deepEqual(friends.friends.map((f) => f.relationship), ["friend"]);
+
+  const blocked = await client.listBlocked();
+  assert.deepEqual(blocked.blocked.map((p) => p.relationship), ["blocked"]);
+});
+
 test("every mutation forwards to the matching endpoint with the slug", async () => {
   const api = fakeApi();
   const client = createTaFriendsClient({ apiClient: api, gameSlug: SLUG });

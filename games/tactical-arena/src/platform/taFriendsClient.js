@@ -107,6 +107,13 @@ function normalizeList(values, normalize) {
   return (Array.isArray(values) ? values : []).map(normalize).filter(Boolean);
 }
 
+// The list endpoints don't repeat the viewer's relationship on each row — being in the
+// friends list *is* the relationship. Stamp it here so rows can't fall back to "none"
+// and offer a friend an Add Friend button.
+function withRelationship(players, relationship) {
+  return players.map((player) => ({ ...player, relationship }));
+}
+
 /**
  * Create the friends client. Every method resolves to normalized data or `null`
  * (network/service failure); refusals from the server arrive as `{ error }` so the
@@ -130,7 +137,7 @@ export function createTaFriendsClient({
 
     async listFriends() {
       const res = await call(() => apiClient.fetchGameFriends(gameSlug));
-      return res ? { friends: normalizeList(res.friends, normalizeTaPlayer) } : null;
+      return res ? { friends: withRelationship(normalizeList(res.friends, normalizeTaPlayer), "friend") } : null;
     },
 
     async listRequests() {
@@ -145,7 +152,7 @@ export function createTaFriendsClient({
     async listBlocked() {
       if (typeof apiClient?.fetchGameBlocks !== "function") return null;
       const res = await call(() => apiClient.fetchGameBlocks(gameSlug));
-      return res ? { blocked: normalizeList(res.blocked, normalizeTaPlayer) } : null;
+      return res ? { blocked: withRelationship(normalizeList(res.blocked, normalizeTaPlayer), "blocked") } : null;
     },
 
     async search(query, limit) {
