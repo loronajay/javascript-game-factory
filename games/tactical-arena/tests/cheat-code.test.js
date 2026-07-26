@@ -63,19 +63,8 @@ test("an invalid cheat code does not change stored progress", () => {
   assert.deepEqual(storage.snapshot(), before);
 });
 
-test("settings keeps the cheat code form unavailable in the settings menu", () => {
+test("settings menu has no cheat code UI", () => {
   const html = fs.readFileSync(new URL("../html/settings-modal.html", import.meta.url), "utf8");
 
-  assert.match(html, /id="setCheatCodeForm"[^>]*hidden/);
-  assert.match(html, /id="setCheatCode"[^>]*type="password"/);
-  assert.match(html, /id="setCheatCodeBtn"[^>]*>Confirm<\/button>/);
-  assert.match(html, /id="setCheatCodeStatus"[^>]*aria-live="polite"/);
-});
-
-test("cheat code controls stay contained inside the settings card", () => {
-  const css = fs.readFileSync(new URL("../styles/screens/shell.css", import.meta.url), "utf8");
-
-  assert.match(css, /\.set-cheat-controls\s*\{[^}]*grid-template-columns:minmax\(0,1fr\) auto/);
-  assert.match(css, /\.set-cheat-controls \.menu-btn\s*\{[^}]*width:auto/);
-  assert.match(css, /\.set-cheat-status\s*\{[^}]*width:100%[^}]*overflow-wrap:anywhere/);
+  assert.doesNotMatch(html, /setCheatCode/);
 });

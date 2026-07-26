@@ -109,8 +109,7 @@
 
   .settings-body input[type="range"],
   .settings-body input[type="checkbox"],
-  .set-select,
-  .set-cheat-stack {
+  .set-select {
     max-width: none;
   }
 

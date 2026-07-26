@@ -1,5 +1,5 @@
-// The Settings overlay: audio/theme/battery toggles, a hidden cheat-code test
-// hook, and the two-press reset-progress confirmation. Extracted from menuFlow.js; the menu
+// The Settings overlay: audio/theme/battery toggles and the two-press
+// reset-progress confirmation. Extracted from menuFlow.js; the menu
 // router injects the cross-screen refresh + reset side effects.
 
 import { THEMES, applyTheme, loadSavedThemeId, saveThemeId } from "./themes.js";
@@ -8,8 +8,6 @@ import {
   loadPerformanceMode,
   savePerformanceMode,
 } from "./performanceSettings.js";
-import { applyCheatCode } from "../progression/cheatCodes.js";
-import { resetProgressionAnnouncements } from "../progression/announcements.js";
 import { resetCampaignProgress } from "../campaign/campaign.js";
 import { resetCampaignOnServer } from "../platform/gameProgressClient.js";
 
@@ -104,9 +102,6 @@ export function createSettingsScreen({
   const batterySaverToggle = $("#setBatterySaver", settingsModal);
   const resetProgressBtn = $("#setResetProgressBtn", settingsModal);
   const progressStatus = $("#setProgressStatus", settingsModal);
-  const cheatCodeForm = $("#setCheatCodeForm", settingsModal);
-  const cheatCodeInput = $("#setCheatCode", settingsModal);
-  const cheatCodeStatus = $("#setCheatCodeStatus", settingsModal);
   let progressStatusTimer = null;
   const resetProgressConfirmation = createResetProgressConfirmation({
     button: resetProgressBtn,
@@ -139,28 +134,11 @@ export function createSettingsScreen({
     themeSelect.value = loadSavedThemeId();
     batterySaverToggle.checked = loadPerformanceMode() === "balanced";
     resetProgressConfirmation.disarm({ clearStatus: true });
-    cheatCodeInput.value = "";
-    cheatCodeStatus.textContent = "";
     settingsModal.hidden = false;
   }
   function closeSettings() {
     resetProgressConfirmation.disarm({ clearStatus: true });
-    cheatCodeInput.value = "";
-    cheatCodeStatus.textContent = "";
     settingsModal.hidden = true;
-  }
-
-  function submitCheatCode(event) {
-    event.preventDefault();
-    const result = applyCheatCode(globalThis.localStorage, cheatCodeInput.value);
-    cheatCodeInput.value = "";
-    if (!result.accepted) {
-      cheatCodeStatus.textContent = "Code not recognized.";
-      return;
-    }
-    resetProgressionAnnouncements(globalThis.localStorage);
-    cheatCodeStatus.textContent = "Everything unlocked: missions, units, tutorials, and skins.";
-    refreshUnlockedScreens();
   }
 
   function resetLocalProgress() {
@@ -192,7 +170,6 @@ export function createSettingsScreen({
   sfxRange.addEventListener("input", () => audio.setVolume(Number(sfxRange.value) / 100));
   musicRange.addEventListener("input", () => audio.setMusicVolume(Number(musicRange.value) / 100));
   $("#setCloseBtn", settingsModal).addEventListener("click", closeSettings);
-  cheatCodeForm?.addEventListener("submit", submitCheatCode);
   resetProgressBtn?.addEventListener("click", resetProgressConfirmation.requestReset);
   settingsModal.addEventListener("click", (event) => { if (event.target === settingsModal) closeSettings(); });
   document.addEventListener("keydown", (event) => {
