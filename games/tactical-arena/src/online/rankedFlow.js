@@ -9,10 +9,14 @@
 //   onMatched(match)                    a brokered match arrived { matchId, seat, bansFirst, lobbyCode, opponentPlayerId, ... }
 //   onLobbyReady({ role, code?, match}) role 'create' (seat 1) or 'join' with a code (seat 2)
 //   onError(text)
+//   onMatchSettled({ status, outcome }) the server resolved the match while we were
+//                                       still beating — normally a forfeit win after
+//                                       the opponent dropped and took our socket too
 import { createPlatformApiClient } from "../../../../js/platform/api/platform-api.mjs";
 import { TACTICAL_ARENA_GAME_SLUG } from "../platform/gameProgressClient.js";
 import { readStoredFactoryAccountSession } from "../platform/factoryAccount.js";
 import { getRankedAccountGate } from "./rankedAccountGate.js";
+import { createRankedHeartbeat } from "./rankedHeartbeat.js";
 
 export function createRankedFlow({
   apiClient = createPlatformApiClient(),
@@ -22,6 +26,7 @@ export function createRankedFlow({
   clearTimeoutFn = (id) => clearTimeout(id),
   account = undefined,
   getAccountSession = readStoredFactoryAccountSession,
+  createHeartbeat = createRankedHeartbeat,
   callbacks = {},
 } = {}) {
   let state = "idle"; // idle | queuing | awaiting_lobby | ready | in_match | cancelled
@@ -34,7 +39,16 @@ export function createRankedFlow({
     onMatched: callbacks.onMatched || (() => {}),
     onLobbyReady: callbacks.onLobbyReady || (() => {}),
     onError: callbacks.onError || (() => {}),
+    onMatchSettled: callbacks.onMatchSettled || (() => {}),
   };
+
+  // Presence reporting for the live match. See rankedHeartbeat.js for why the client
+  // reports only that it is still here and never claims a result.
+  const heartbeat = createHeartbeat({
+    gameSlug,
+    apiClient,
+    onFinished: (settled) => cb.onMatchSettled(settled),
+  });
 
   function stopTimer() {
     if (timer !== null) {
@@ -156,6 +170,7 @@ export function createRankedFlow({
     const hadMatch = Boolean(match);
     state = "cancelled";
     stopTimer();
+    heartbeat.stop();
     if (wasPolling || hadMatch) {
       try {
         await apiClient.cancelRankedMatch(gameSlug, { keepalive });
@@ -171,6 +186,7 @@ export function createRankedFlow({
   async function markMatchStarted() {
     if (!match) return null;
     state = "in_match";
+    heartbeat.start(match.matchId);
     try {
       return await apiClient.startRankedMatch?.(gameSlug, { matchId: match.matchId });
     } catch {
@@ -180,6 +196,9 @@ export function createRankedFlow({
 
   async function reportResult(outcome, { squad, unitResults, keepalive = false } = {}) {
     if (!match) return null;
+    // We have attested; the server owns the outcome from here and no longer needs to
+    // watch whether we are present.
+    heartbeat.stop();
     try {
       return await apiClient.reportRankedResult(gameSlug, { matchId: match.matchId, outcome, squad, unitResults }, { keepalive });
     } catch {
@@ -199,6 +218,11 @@ export function createRankedFlow({
     publishLobbyCode,
     reportResult,
     reportAbandon,
+    // Our socket died and we did not ask it to. We cannot attest a result, but we can
+    // keep proving we are still here, which is what lets the server tell an
+    // abandonment apart from a mutual outage.
+    keepHeartbeatAfterDisconnect: () => heartbeat.keepAliveAfterDisconnect(),
+    stopHeartbeat: () => heartbeat.stop(),
     getMatch: () => match,
     get state() {
       return state;

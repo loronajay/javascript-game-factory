@@ -3,6 +3,7 @@
 // re-exporting every public function. See the split modules for behavior:
 //   - ranked-shared.mts   slug validation, row serialization, stale-active expiry
 //   - ranked-match.mts    matchmaking + start + result/ELO resolution + rendezvous
+//   - ranked-liveness.mts heartbeats, abandonment resolution, lazy maintenance sweep
 //   - ranked-profile.mts  cosmetic ranked identity (title/avatar) storage
 //   - ranked-queries.mts  public cards, me-standing, unit stats, leaderboard
 //   - ranked-history.mts  match-history list + detail, on the shared match-history contract
@@ -23,6 +24,11 @@ export {
   reportRankedResult,
   setRankedLobbyCode,
 } from "./ranked-match.mjs";
+export {
+  recordRankedHeartbeat,
+  resolveAbandonedRankedMatches,
+  sweepRankedMaintenance,
+} from "./ranked-liveness.mjs";
 export {
   RANKED_TITLE_MAX_LENGTH,
   getRankedProfile,

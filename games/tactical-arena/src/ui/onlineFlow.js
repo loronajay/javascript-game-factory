@@ -451,6 +451,15 @@ export function createOnlineFlow({ onStartMatch }) {
           else if (code) client?.joinLobby(code);
         },
         onError: (text) => { setStatus(text); endRankedSearch(); },
+        // The heartbeat outlived our socket and the server settled the match — the
+        // opponent went silent and never came back. Say so on the ranked panel, since
+        // the disconnect screen has already handed the player back to the menu.
+        onMatchSettled: ({ status, outcome }) => {
+          if (status !== "resolved" || !outcome) return;
+          setStatus(outcome === "win"
+            ? "Opponent disconnected — ranked win awarded."
+            : "The ranked match was resolved after the disconnect.");
+        },
       },
     });
     void rankedFlow.queue();
@@ -829,6 +838,11 @@ export function createOnlineFlow({ onStartMatch }) {
           opponentPlayerId: rankedInfo.opponentPlayerId,
           report: (outcome, detail) => rankedFlow?.reportResult(outcome, detail),
           reportAbandon: (options) => rankedFlow?.reportAbandon(options),
+          // Liveness, not a claim. An unsolicited disconnect keeps the heartbeat
+          // running so the server can see which side stayed; leaving deliberately
+          // stops it. See src/online/rankedHeartbeat.js.
+          keepHeartbeatAfterDisconnect: () => rankedFlow?.keepHeartbeatAfterDisconnect(),
+          stopHeartbeat: () => rankedFlow?.stopHeartbeat(),
           // Publish the ranked result to the platform activity feed for discovery.
           // Fire-and-forget; identity + opponent are resolved here where they live.
           publishActivity: (outcome, detail) => publishTacticalArenaMatchActivity({

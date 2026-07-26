@@ -1,10 +1,12 @@
 // Ranked read views — public cards, me-standing, per-unit stats, and the
-// leaderboard. Split out of ranked.mts. These are read-mostly (getRankedStanding also
-// lazily expires stale active matches), fold in the cosmetic profile, and never leak
-// private fields except the me-standing's own active-match token.
+// leaderboard. Split out of ranked.mts. These are read-mostly (each game-scoped view
+// first runs the lazy sweep that expires stale matches and finalizes lapsed forfeits),
+// fold in the cosmetic profile, and never leak private fields except the me-standing's
+// own active-match token.
 
 import { DEFAULT_RATING, rankTier } from "./ranked-elo.mjs";
-import { serializeMatchForPlayer, expireStaleActiveRankedMatches } from "./ranked-shared.mjs";
+import { serializeMatchForPlayer } from "./ranked-shared.mjs";
+import { sweepRankedMaintenance } from "./ranked-liveness.mjs";
 import { getRankedProfile } from "./ranked-profile.mjs";
 
 // Shared rating+tier+record read used by both the me-standing and the public card.
@@ -30,6 +32,7 @@ async function loadRatingRecord(pool: any, gameSlug: any, playerId: any): Promis
 export async function getPublicRankedCard(pool: any, { playerId, gameSlug }: any): Promise<any> {
   if (!pool || !playerId || !gameSlug) return null;
   try {
+    await sweepRankedMaintenance(pool, gameSlug);
     const record = await loadRatingRecord(pool, gameSlug, playerId);
     const profile = await getRankedProfile(pool, { playerId, gameSlug });
     return {
@@ -51,9 +54,12 @@ export async function getPublicRankedCard(pool: any, { playerId, gameSlug }: any
 export async function getRankedStanding(pool: any, { playerId, gameSlug }: any): Promise<any> {
   if (!pool || !playerId || !gameSlug) return null;
   try {
+    // Sweep BEFORE reading: a forfeit that finalizes here must land in the record and
+    // clear the active-match row this same response, or the player sees a phantom
+    // live match and a stale W/L.
+    await sweepRankedMaintenance(pool, gameSlug);
     const record = await loadRatingRecord(pool, gameSlug, playerId);
     const profile = await getRankedProfile(pool, { playerId, gameSlug });
-    await expireStaleActiveRankedMatches(pool, gameSlug);
     const activeRes = await pool.query(
       `select * from ranked_matches
         where game_slug=$1 and (player_a=$2 or player_b=$2) and status in ('active','playing','pending_forfeit')
@@ -112,6 +118,7 @@ export async function getRankedLeaderboard(pool: any, { gameSlug, limit }: any):
   if (!pool || !gameSlug) return null;
   const cap = Math.max(1, Math.min(Number(limit) || 25, 100));
   try {
+    await sweepRankedMaintenance(pool, gameSlug);
     const res = await pool.query(
       `select r.player_id, r.rating, r.wins, r.losses, r.draws,
               pp.profile_name,

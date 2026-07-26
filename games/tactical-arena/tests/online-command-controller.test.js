@@ -93,12 +93,24 @@ test("local online concede waits while a command is resolving", () => {
   assert.deepEqual(calls, [{ message: "Concede after the current command resolves.", isError: true }]);
 });
 
-test("live ranked disconnect reports an abandon loss before disposing", () => {
-  const calls = [];
-  const controller = createOnlineCommandController({
+// An unsolicited close is not evidence that we abandoned. If we self-report a loss
+// here, a relay outage closes BOTH sockets, both clients report a loss, and the
+// server's conflict rule disputes a match that actually finished. Abandonment is
+// reported by leave()/pagehide instead.
+//
+// What we keep doing is reporting presence: the relay drops our socket too when the
+// opponent's machine dies, so the heartbeat outliving this screen is the only way the
+// server can tell who stayed and settle the match as a forfeit.
+function disconnectHarness(calls) {
+  return createOnlineCommandController({
     runtime: {
-      state: createBattleState(),
-      matchConfig: { ranked: { reportAbandon: () => calls.push("abandon") } },
+      state: { ...createBattleState(), phase: "playing" },
+      matchConfig: {
+        ranked: {
+          reportAbandon: () => calls.push("abandon"),
+          keepHeartbeatAfterDisconnect: () => calls.push("keep-heartbeat"),
+        },
+      },
       net: { dispose: () => calls.push("dispose") },
       mySeat: 1,
     },
@@ -115,9 +127,31 @@ test("live ranked disconnect reports an abandon loss before disposing", () => {
       },
     },
   });
+}
 
-  controller.sessionController.endOnDisconnect("Lost connection to the match.");
+test("a dropped connection does NOT self-report a ranked loss", () => {
+  const calls = [];
+  disconnectHarness(calls).sessionController.endOnDisconnect("Lost connection to the match.");
 
-  assert.ok(calls.indexOf("abandon") >= 0, "ranked abandon should be reported");
-  assert.ok(calls.indexOf("abandon") < calls.indexOf("dispose"), "report before socket disposal");
+  assert.equal(calls.includes("abandon"), false, "losing the socket is not an abandon");
+  assert.ok(calls.includes("dispose"), "the session is still torn down");
+});
+
+test("a desync does NOT self-report a ranked loss", () => {
+  const calls = [];
+  disconnectHarness(calls).sessionController.endOnDesync();
+
+  assert.equal(calls.includes("abandon"), false, "no side knows the result after a desync");
+  assert.ok(calls.includes("dispose"), "the session is still torn down");
+});
+
+test("a dropped connection keeps reporting presence so the server can settle it", () => {
+  const calls = [];
+  disconnectHarness(calls).sessionController.endOnDisconnect("Lost connection to the match.");
+
+  assert.ok(calls.includes("keep-heartbeat"), "the heartbeat must outlive the socket");
+  assert.ok(
+    calls.indexOf("keep-heartbeat") < calls.indexOf("dispose"),
+    "hand the heartbeat off before tearing down the session",
+  );
 });

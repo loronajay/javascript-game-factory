@@ -30,6 +30,7 @@ const RANKED_FLAG_NOTES: Record<string, string> = {
   report_conflict: "Both players claimed the win, so this match was left unresolved.",
   short_match: "This match ended too early to count toward ranked.",
   forfeit: "Resolved by forfeit — a player left before the match finished.",
+  abandoned_no_heartbeat: "Resolved by forfeit — a player stopped responding and never came back.",
   cancelled_before_start: "Cancelled before the match started.",
   stale_active_expired: "Abandoned without a reported result.",
 };

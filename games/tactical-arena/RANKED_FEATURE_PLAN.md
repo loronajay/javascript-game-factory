@@ -26,6 +26,10 @@ build plan and the durable design decisions behind it.
    server-backed platform features (relationships/friendships + direct messages).
    Ranked *surfaces* and links into them — it does not build parallel game-local
    friends/chat systems.
+5. **Disconnects are adjudicated by server-measured presence, never by a client
+   claim.** See "Disconnects and abandonment" below. A client may attest its own
+   result and report that it is still connected; it may never assert anything about
+   the opponent's connection.
 
 ## Current state (as-built)
 
@@ -275,6 +279,43 @@ remain (deferred — see notes).**
   game.
 - **Reuse before rebuild**: friends and chat are platform features. Ranked links into
   them; it does not reimplement them.
+
+## Disconnects and abandonment
+
+The relay closes the room when a peer drops, so one player's machine dying takes
+their opponent's socket with it. Both clients see a plain disconnect and neither can
+attest a result. Before liveness, such a match sat `playing` until the 6h TTL voided
+it: no rating, no W/L, nothing in match history for a game that plainly had a winner.
+
+Three fixes that look reasonable and are not:
+
+- *Self-report a loss on disconnect.* A relay outage closes both sockets, both
+  clients report a loss, and the conflict rule marks a finished match `disputed`.
+- *Self-report a win on disconnect.* A player who is losing pulls their cable and
+  claims the same thing, so an earned win also becomes `disputed`.
+- *Trust "my opponent disconnected".* Identical to the above — the losing side is
+  exactly the side motivated to say it.
+
+So the server measures presence instead. Every client in a live ranked match POSTs
+`/ranked/:slug/heartbeat` (presence only, no verdict) and **keeps posting through its
+own disconnect screen** for up to `ORPHAN_TIMEOUT_MS`. `decideLivenessForfeit` then
+resolves only the unambiguous case — one side silent past `RANKED_HEARTBEAT_STALE_SECONDS`
+while the other is present within `RANKED_HEARTBEAT_FRESH_SECONDS` — flagging the row
+`abandoned_no_heartbeat`. Everything else resolves nothing and voids on the TTL.
+
+Presence is the one signal a player cannot forge in their own favour: leaving is
+precisely what stops producing it. A cable-puller stops beating and loses; a genuine
+relay outage leaves both sides beating and the match honestly voids; a match still
+being played is never touched.
+
+The heartbeat also drives the maintenance sweep (`sweepRankedMaintenance`), which is
+what makes resolution timely without a cron — the surviving client's own beat is the
+thing that notices its opponent went silent. Read paths (standing/card/leaderboard)
+run the same sweep.
+
+Owners: `db/ranked-liveness.mts` (heartbeat + sweep), `ranked-elo.mts`
+(`decideLivenessForfeit`), `src/online/rankedHeartbeat.js` (client loop), with the
+disconnect handoff in `onlineCommandController.endOnlineMatch`.
 
 ## Open questions (not blocking Phase 1)
 

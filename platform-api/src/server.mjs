@@ -10,7 +10,7 @@ import { backfillLocalOwnership, findStripeGrant, getGameProgress, recordGamePro
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import { getLadderStandings, getPlayerLadderPlacements } from "./db/ladders.mjs";
-import { cancelRanked, enqueueRanked, getPublicRankedCard, getRankedLeaderboard, getRankedMatchDetail, getRankedMatches, getRankedStanding, getRankedUnitStats, pollRanked, reportRankedResult, saveRankedProfile, setRankedLobbyCode, startRankedMatch, } from "./db/ranked.mjs";
+import { cancelRanked, enqueueRanked, getPublicRankedCard, getRankedLeaderboard, getRankedMatchDetail, getRankedMatches, getRankedStanding, getRankedUnitStats, pollRanked, recordRankedHeartbeat, reportRankedResult, saveRankedProfile, setRankedLobbyCode, startRankedMatch, } from "./db/ranked.mjs";
 import { createFriendshipBetweenPlayers, loadPlayerRelationships, recordDirectInteractionBetweenPlayers, recordSharedEventBetweenPlayers, recordSharedSessionBetweenPlayers, removeFriendBetweenPlayers, savePlayerRelationships, } from "./db/relationships.mjs";
 import { commentOnThought, deleteThought, deleteThoughtComment, listThoughtComments, listThoughts, reactToThought, saveThought, shareThought, } from "./db/thoughts.mjs";
 import { deleteAccountService, loginAccountService, logoutAccountService, registerAccountService, requestPasswordResetService, resetPasswordService, verifyAccountSessionService, } from "./services/auth.mjs";
@@ -131,6 +131,7 @@ async function bootstrap() {
         cancelRanked: (gameSlug, params) => cancelRanked(pool, { ...params, gameSlug }),
         startRankedMatch: (gameSlug, params) => startRankedMatch(pool, { ...params, gameSlug }),
         reportRankedResult: (gameSlug, params) => reportRankedResult(pool, { ...params, gameSlug }),
+        recordRankedHeartbeat: (gameSlug, params) => recordRankedHeartbeat(pool, { ...params, gameSlug }),
         getRankedStanding: (gameSlug, params) => getRankedStanding(pool, { ...params, gameSlug }),
         setRankedLobby: (gameSlug, params) => setRankedLobbyCode(pool, { ...params, gameSlug }),
         saveRankedProfile: (gameSlug, params) => saveRankedProfile(pool, { ...params, gameSlug }),

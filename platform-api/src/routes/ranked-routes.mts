@@ -9,6 +9,7 @@ const VALID_OUTCOMES = new Set(["win", "loss", "draw"]);
 //   DELETE /ranked/:gameSlug/queue     leave the queue
 //   POST   /ranked/:gameSlug/start     mark a brokered match as live
 //   POST   /ranked/:gameSlug/report    attest a match result { matchId, outcome }
+//   POST   /ranked/:gameSlug/heartbeat report presence in a live match { matchId }
 //   GET    /ranked/:gameSlug/standing  rating + tier + record + my cosmetic profile + live match
 //   PUT    /ranked/:gameSlug/profile   save my ranked title/avatar (auth = me)
 //   GET    /ranked/:gameSlug/card/:playerId    public ranked card for another player
@@ -18,11 +19,12 @@ const VALID_OUTCOMES = new Set(["win", "loss", "draw"]);
 //   GET    /ranked/:gameSlug/leaderboard[?limit=]  public top-N ranked ladder
 export async function handleRankedRoute(context: any): Promise<boolean> {
   const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services } = context;
-  const { enqueueRanked, pollRanked, cancelRanked, startRankedMatch, reportRankedResult, getRankedStanding, setRankedLobby, saveRankedProfile, getRankedCard, getRankedUnitStats, getRankedMatches, getRankedMatchDetail, getRankedLeaderboard } = services;
+  const { enqueueRanked, pollRanked, cancelRanked, startRankedMatch, reportRankedResult, recordRankedHeartbeat, getRankedStanding, setRankedLobby, saveRankedProfile, getRankedCard, getRankedUnitStats, getRankedMatches, getRankedMatchDetail, getRankedLeaderboard } = services;
 
   const queueMatch = pathname.match(/^\/ranked\/([^/]+)\/queue$/);
   const startMatch = pathname.match(/^\/ranked\/([^/]+)\/start$/);
   const reportMatch = pathname.match(/^\/ranked\/([^/]+)\/report$/);
+  const heartbeatMatch = pathname.match(/^\/ranked\/([^/]+)\/heartbeat$/);
   const standingMatch = pathname.match(/^\/ranked\/([^/]+)\/standing$/);
   const lobbyMatch = pathname.match(/^\/ranked\/([^/]+)\/lobby$/);
   const profileMatch = pathname.match(/^\/ranked\/([^/]+)\/profile$/);
@@ -32,9 +34,9 @@ export async function handleRankedRoute(context: any): Promise<boolean> {
   const matchDetailMatch = pathname.match(/^\/ranked\/([^/]+)\/match\/([^/]+)$/);
   const leaderboardMatch = pathname.match(/^\/ranked\/([^/]+)\/leaderboard$/);
 
-  if (!queueMatch && !startMatch && !reportMatch && !standingMatch && !lobbyMatch && !profileMatch && !cardMatch && !unitsMatch && !matchesMatch && !matchDetailMatch && !leaderboardMatch) return false;
+  if (!queueMatch && !startMatch && !reportMatch && !heartbeatMatch && !standingMatch && !lobbyMatch && !profileMatch && !cardMatch && !unitsMatch && !matchesMatch && !matchDetailMatch && !leaderboardMatch) return false;
 
-  const gameSlug = decodeURIComponent((queueMatch || startMatch || reportMatch || standingMatch || lobbyMatch || profileMatch || cardMatch || unitsMatch || matchesMatch || matchDetailMatch || leaderboardMatch)[1]);
+  const gameSlug = decodeURIComponent((queueMatch || startMatch || reportMatch || heartbeatMatch || standingMatch || lobbyMatch || profileMatch || cardMatch || unitsMatch || matchesMatch || matchDetailMatch || leaderboardMatch)[1]);
   if (!isValidRankedSlug(gameSlug)) {
     writeJson(res, 400, { status: "error", error: "invalid_game_slug", timestamp }, requestOrigin);
     return true;
@@ -130,6 +132,36 @@ export async function handleRankedRoute(context: any): Promise<boolean> {
     });
     if (!result) {
       writeJson(res, 500, { status: "error", error: "report_failed", timestamp }, requestOrigin);
+      return true;
+    }
+    if (result.error) {
+      const code = result.error === "match_not_found" ? 404 : result.error === "not_a_member" ? 403 : 400;
+      writeJson(res, code, { status: "error", error: result.error, timestamp }, requestOrigin);
+      return true;
+    }
+    writeJson(res, 200, result, requestOrigin);
+    return true;
+  }
+
+  // Presence, not a claim: a member says only "I am still here", never anything about
+  // the opponent. The server decides what that means (see db/ranked-liveness.mts).
+  if (heartbeatMatch && method === "POST") {
+    const body = await readJsonBody(req);
+    if (!body.ok) {
+      writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+      return true;
+    }
+    const { matchId } = body.value || {};
+    if (!matchId || typeof matchId !== "string") {
+      writeJson(res, 400, { status: "error", error: "missing_match_id", timestamp }, requestOrigin);
+      return true;
+    }
+    const result = await recordRankedHeartbeat(gameSlug, {
+      matchId: matchId.trim().slice(0, 200),
+      playerId,
+    });
+    if (!result) {
+      writeJson(res, 500, { status: "error", error: "heartbeat_failed", timestamp }, requestOrigin);
       return true;
     }
     if (result.error) {

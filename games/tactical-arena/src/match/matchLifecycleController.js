@@ -191,6 +191,13 @@ export function createMatchLifecycleController({
       reportLiveRankedAbandon("leave", { keepalive: false });
       runtime.net.dispose();
     }
+    // Leaving is deliberate, so we have attested and there is nothing left for the
+    // server to infer from our presence.
+    try {
+      runtime.matchConfig?.ranked?.stopHeartbeat?.();
+    } catch {
+      // Cleanup must never interrupt leaving the match.
+    }
     clearRankedPagehideHandler();
     runtime.net = null;
     runtime.mySeat = null;

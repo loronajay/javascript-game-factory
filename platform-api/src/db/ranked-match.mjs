@@ -237,7 +237,11 @@ async function countPriorMeetings(client, gameSlug, playerA, playerB) {
 // Applies ELO for a resolved match to game_ratings (the shared ratings table) and
 // stamps the ranked_matches row. Provisional K + same-opponent gain damping happen
 // here via the pure helpers.
-async function applyResolution(client, { row, gameSlug, outcomeA, report, extraFlags }) {
+//
+// Exported for ranked-liveness.mts, the other module allowed to resolve a match.
+// Callers MUST hold a transaction with the row locked: this is several writes that
+// have to land together.
+export async function applyResolution(client, { row, gameSlug, outcomeA, report, extraFlags }) {
     const a = await loadRating(client, gameSlug, row.player_a);
     const b = await loadRating(client, gameSlug, row.player_b);
     const priorMeetings = await countPriorMeetings(client, gameSlug, row.player_a, row.player_b);

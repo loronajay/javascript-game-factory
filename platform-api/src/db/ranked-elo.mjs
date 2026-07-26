@@ -24,6 +24,14 @@ export const MIN_MATCH_SECONDS = 45;
 // How long a lone forfeit/win claim waits for the opponent to attest before it
 // finalizes. Gives a genuinely disconnected opponent a window to report.
 export const FORFEIT_GRACE_SECONDS = 90;
+// Liveness heartbeats. Clients post one every HEARTBEAT_INTERVAL while in a live
+// ranked match, and keep posting through their own disconnect screen. A side is
+// STALE once it has missed roughly four beats, and counts as present only if its
+// last beat is within FRESH. The gap between the two is deliberate: a side that is
+// merely lagging is neither stale nor able to be declared the survivor.
+export const RANKED_HEARTBEAT_INTERVAL_SECONDS = 15;
+export const RANKED_HEARTBEAT_STALE_SECONDS = 75;
+export const RANKED_HEARTBEAT_FRESH_SECONDS = 45;
 export const VALID_OUTCOMES = Object.freeze(["win", "loss", "draw"]);
 export function eloExpected(ratingA, ratingB) {
     return 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
@@ -155,6 +163,47 @@ export function decideReport({ reporterSide, outcome, existingReportA, existingR
     const base = now ? new Date(now).getTime() : Date.now();
     const deadline = new Date(base + Number(graceSeconds) * 1000).toISOString();
     return { action: "forfeit_pending", deadline, report: { side: reporterSide, outcome: myReport } };
+}
+// Liveness adjudication for a live match nobody has reported. The ONLY evidence
+// used is which side is still talking to the server, because that is the one signal
+// neither client can forge in its own favour: you cannot fake being present by
+// leaving, and the side that quits stops producing it no matter what it claims.
+//
+// Resolves only in the unambiguous case — exactly one side silent past STALE while
+// the other is present within FRESH. Both silent (relay outage, both machines gone)
+// resolves nothing and the match voids on the TTL, which is the honest outcome for a
+// game nobody saw finish. A match too short to count is left to the same void path
+// so the min-match-length rule can't be dodged by disconnecting.
+//
+// Returns { action: 'none' } or { action: 'resolve', outcomeA, reason }.
+export function decideLivenessForfeit({ status, reportA, reportB, heartbeatA, heartbeatB, createdAt, now, staleSeconds = RANKED_HEARTBEAT_STALE_SECONDS, freshSeconds = RANKED_HEARTBEAT_FRESH_SECONDS, minMatchSeconds = MIN_MATCH_SECONDS, }) {
+    // 'active' has not started; anything else is already owned by the report or
+    // forfeit-deadline paths.
+    if (status !== "playing")
+        return { action: "none" };
+    // An attestation exists, so decideReport/decideForfeitFinalize owns this match.
+    if (reportA || reportB)
+        return { action: "none" };
+    const nowMs = now ? new Date(now).getTime() : Date.now();
+    const aMs = heartbeatA ? new Date(heartbeatA).getTime() : NaN;
+    const bMs = heartbeatB ? new Date(heartbeatB).getTime() : NaN;
+    // Both sides must have beaten at least once, or we have no evidence at all —
+    // a client too old to send heartbeats must never read as abandoned.
+    if (Number.isNaN(aMs) || Number.isNaN(bMs) || Number.isNaN(nowMs))
+        return { action: "none" };
+    const createdMs = createdAt ? new Date(createdAt).getTime() : NaN;
+    if (!Number.isNaN(createdMs) && (nowMs - createdMs) / 1000 < Number(minMatchSeconds)) {
+        return { action: "none" };
+    }
+    const aSilent = (nowMs - aMs) / 1000 > Number(staleSeconds);
+    const bSilent = (nowMs - bMs) / 1000 > Number(staleSeconds);
+    const aPresent = (nowMs - aMs) / 1000 <= Number(freshSeconds);
+    const bPresent = (nowMs - bMs) / 1000 <= Number(freshSeconds);
+    if (aSilent && bPresent)
+        return { action: "resolve", outcomeA: "loss", reason: "abandoned" };
+    if (bSilent && aPresent)
+        return { action: "resolve", outcomeA: "win", reason: "abandoned" };
+    return { action: "none" };
 }
 // A pending_forfeit match whose deadline has passed and whose opponent never
 // attested finalizes to the claimer's reported result.

@@ -508,6 +508,12 @@ export function createPlatformApiClient(options = {}) {
             const gs = encodePathSegment(gameSlug);
             return gs ? post(`/ranked/${gs}/report`, { matchId, outcome, squad, unitResults }, undefined, options) : Promise.resolve(null);
         },
+        // Presence only — "I am still connected". The server decides what a silent
+        // opponent means; the client never claims anything about them.
+        sendRankedHeartbeat(gameSlug, { matchId } = {}, options = {}) {
+            const gs = encodePathSegment(gameSlug);
+            return gs ? post(`/ranked/${gs}/heartbeat`, { matchId }, undefined, options) : Promise.resolve(null);
+        },
         setRankedLobby(gameSlug, { matchId, lobbyCode } = {}) {
             const gs = encodePathSegment(gameSlug);
             return gs ? post(`/ranked/${gs}/lobby`, { matchId, lobbyCode }) : Promise.resolve(null);

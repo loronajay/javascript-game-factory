@@ -67,11 +67,31 @@ export function createOnlineCommandController({
     }
   }
 
+  // Ends the match from an UNSOLICITED event: the relay closed our socket, or the
+  // states diverged. Deliberately does NOT report a ranked loss.
+  //
+  // Abandonment is reported from the two paths that actually know we abandoned —
+  // `leave()` (quit to menu) and the `pagehide` handler (tab closed), both in
+  // matchLifecycleController. Everything that reaches here is instead a case where
+  // nobody witnessed a result, and self-reporting a loss got it wrong:
+  //   - relay outage: both clients close, both report a loss, and the server's
+  //     conflicting-report rule marks the match `disputed` — a finished game eaten.
+  //   - our own network drop: the opponent still sees us leave, wins on the concede
+  //     path, and claims it; the server arms a grace-timed forfeit and we take the
+  //     loss from there. That is already the correct outcome without our report.
+  //   - desync: neither side knows who won, so no result should be invented.
+  //
+  // What we DO keep doing is reporting that we are still here. The relay tears the
+  // room down when a peer drops, so a crashed opponent takes our socket with it and
+  // neither client can attest — which is how a ranked match ends up voided on the TTL
+  // with no rating and no history. The heartbeat keeps running through this screen so
+  // the server can see which side stayed and settle it as a forfeit. Presence is the
+  // one signal that can't be forged in our favour: quitting is what stops it.
   function endOnlineMatch(title, sub) {
     if (!runtime.net) return;
-    if (runtime.state?.phase === "playing" && typeof runtime.matchConfig?.ranked?.reportAbandon === "function") {
+    if (runtime.state?.phase === "playing") {
       try {
-        runtime.matchConfig.ranked.reportAbandon({ reason: "disconnect", keepalive: true });
+        runtime.matchConfig?.ranked?.keepHeartbeatAfterDisconnect?.();
       } catch {
         // Best effort: never block the disconnect UI.
       }
