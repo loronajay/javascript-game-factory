@@ -257,6 +257,9 @@ export function createApp(options: any = {}) {
   const backfillOwnership = typeof options?.backfillOwnership === "function"
     ? options.backfillOwnership
     : null;
+  const activateConsumable = typeof options?.activateConsumable === "function"
+    ? options.activateConsumable
+    : null;
   const createPremiumCheckoutSession = typeof options?.createPremiumCheckoutSession === "function"
     ? options.createPremiumCheckoutSession
     : null;
@@ -415,6 +418,7 @@ export function createApp(options: any = {}) {
     spendValor,
     resetCampaign,
     backfillOwnership,
+    activateConsumable,
   };
   const paymentServices = {
     createPremiumCheckoutSession,

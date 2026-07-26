@@ -9,6 +9,7 @@
 .skin-picker-kicker { color:var(--muted); font:800 .58rem var(--font-display); letter-spacing:.13em; text-transform:uppercase; }
 .skin-picker-title { max-width:100%; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--brass-hi); font:900 1rem var(--font-display); letter-spacing:.04em; }
 .skin-picker-status { color:var(--muted); font:800 .52rem var(--font-display); letter-spacing:.1em; text-transform:uppercase; }
+/* Used by the reward skin picker only; the equip picker locks a skin in on click. */
 .skin-picker-select-btn { width:auto; min-width:0; padding:.32rem .85rem; font-size:.6rem; }
 .skin-picker-select-btn:disabled { opacity:.6; cursor:default; }
 .skin-picker-grid { min-height:0; overflow-y:auto; display:grid; grid-template-columns:repeat(auto-fill,minmax(7rem,1fr)); align-content:start; gap:.5rem; padding:.9rem; }

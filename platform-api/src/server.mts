@@ -8,7 +8,7 @@ import { listActivityItems, saveActivityItem } from "./db/activity.mjs";
 import { readConfig } from "./config.mjs";
 import { loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
 import { applyMigrations } from "./db/migrations.mjs";
-import { backfillLocalOwnership, findStripeGrant, getGameProgress, recordGameProgressClaim, regrantStripeEntitlements, resetCampaignProgress, revokeGameEntitlements, spendValorForEntitlement } from "./db/game-progress.mjs";
+import { activateInventoryItem, backfillLocalOwnership, findStripeGrant, getGameProgress, recordGameProgressClaim, regrantStripeEntitlements, resetCampaignProgress, revokeGameEntitlements, spendValorForEntitlement } from "./db/game-progress.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import { getLadderStandings, getPlayerLadderPlacements } from "./db/ladders.mjs";
@@ -234,6 +234,7 @@ async function bootstrap(): Promise<void> {
     spendValor: (params: any) => spendValorForEntitlement(pool, params),
     resetCampaign: (params: any) => resetCampaignProgress(pool, params.playerId, params.gameSlug),
     backfillOwnership: (params: any) => backfillLocalOwnership(pool, params),
+    activateConsumable: (params: any) => activateInventoryItem(pool, params),
     createPremiumCheckoutSession: (params: any) => createTacticalArenaCheckoutSession({
       ...params,
       stripeApiKey: config.stripeApiKey,

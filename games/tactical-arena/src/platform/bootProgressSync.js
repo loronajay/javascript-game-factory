@@ -16,6 +16,7 @@ import {
   flushPendingGameProgressClaims,
 } from "./gameProgressClient.js";
 import { mergeServerEntitlementsIntoUnlockProgress, readUnlockProgress } from "../progression/unlocks.js";
+import { mergeServerInventory } from "../progression/inventory.js";
 import { enqueuePurchasedUnlockAnnouncements } from "../progression/announcements.js";
 
 const OWNERSHIP_BACKFILL_FLAG = "tacticalArenaOwnershipBackfilledV1";
@@ -56,6 +57,10 @@ export async function syncGameProgress() {
     const authoritativeValor = authoritative || Boolean(checkoutResult?.progress);
     const beforeProgress = readUnlockProgress(storage);
     const afterProgress = mergeServerEntitlementsIntoUnlockProgress(storage, snapshot, { authoritative, authoritativeValor });
+    // Consumable quantities ride the same authority rule as ownership: once the server is
+    // known current it owns the counts (purchases credit them, activations spend them);
+    // until then stay additive so an unsynced grant is not dropped.
+    mergeServerInventory(storage, snapshot, { authoritative });
     enqueuePurchasedUnlockAnnouncements(storage, beforeProgress, afterProgress);
   }
   return { ...flushResult, checkoutResult };

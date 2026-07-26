@@ -51,6 +51,37 @@ Enable these events on the Stripe webhook endpoint (Dashboard → Developers →
 `charge.dispute.created`, `charge.dispute.closed`, `charge.refunded`. See
 `STRIPE_CHECKOUT_SETUP.md`.
 
+### Consumables: the spend and the roll are one server transaction
+Consumables are the only shop kind that is *not* an entitlement — they stack, they are spent,
+and some of them grant something else when spent. That makes them a distinct attack surface,
+so both halves live on the server:
+
+- **Buying** goes through the same Stripe path as everything else. `resolveTacticalArenaPremiumOffer`
+  prices a `kind: "consumable"` offer from `services/consumable-catalog.mts`, and fulfillment
+  records a `premium-consumable-purchase` claim that adds *quantity* to `game_inventory_items`
+  rather than granting an entitlement. That claim kind is in `PREMIUM_CLAIM_KINDS`, so the public
+  `/claims` route refuses it exactly like the other paid kinds. A claim payload can only name
+  items that exist in the server catalog, and per-purchase quantity is capped.
+- **Using** goes through `POST /game-progress/:slug/consumables/activate` →
+  `activateInventoryItem`. The decrement and any grant happen in **one** transaction, so a crash
+  can never leave a spent item with no reward or a reward with no spend. For a random-skin
+  consumable the server does the roll (`selectRandomUnownedSkins`, `node:crypto` draw without
+  replacement over the unowned skins of that rarity) and grants the entitlement with
+  `source='consumable'`. The client only names the item — it can never name the skin it wants,
+  and because ownership self-heals from the server on boot, a client-side grant would not
+  survive anyway. If the rarity pool is exhausted the activation is refused (`no_unowned_skins`)
+  with the item left intact.
+- **Idempotency**: the caller supplies an `activationId`; a retried request replays the stored
+  result instead of spending a second item. A lost response therefore never costs the player an
+  item.
+- **Refunds** claw back quantity (`greatest(0, quantity - n)`) through the same
+  `findStripeGrant` → revoke path as entitlements. Quantity already spent is gone; the unspent
+  remainder is removed.
+
+Local `src/progression/inventory.js` stays a write-through cache: `mergeServerInventory` takes
+the server counts as truth under the same `authoritative` rule as ownership. Timed-boost
+*activation records* (armed/expiry state) remain local, because their effect is local.
+
 ### Valor is server-authoritative
 - **Earn** is recorded via the pending-claim queue (`gameProgressClient.js`) — campaign/tutorial
   grants sync up as claims. (Campaign-mission *completion* itself is still client-asserted; see
@@ -104,6 +135,11 @@ them permanently.
    `source_id`; it never touches entitlements owned through another path. Revoke/re-grant stay
    idempotent via their audit claim rows. The grant claim must keep persisting `paymentIntentId`
    — it is the only join key from a refund/dispute back to what was granted.
+7. A consumable's reward is decided server-side, in the same transaction that spends it. Never
+   roll a random grant on the client, and never let the client name what it won. Activation
+   stays idempotent on its `activationId`.
+8. `marketplace.js` `CONSUMABLE_OFFERS` must match `services/consumable-catalog.mts` offer for
+   offer (id, sku, price, effect) — guarded by a cross-import test in `tests/marketplace.test.js`.
 
 ## Known limits (accepted / future)
 

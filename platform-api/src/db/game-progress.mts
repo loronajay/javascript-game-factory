@@ -1,3 +1,5 @@
+import { getConsumableOffer, selectRandomUnownedSkins } from "../services/consumable-catalog.mjs";
+import { SKIN_CATALOG } from "../services/payments.mjs";
 import { getValorOffer, priceValorOffer } from "../services/valor-catalog.mjs";
 
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
@@ -11,6 +13,7 @@ const VALID_CLAIM_KINDS = new Set([
   "tutorial-skin-choice",
   "premium-skin-purchase",
   "premium-unit-purchase",
+  "premium-consumable-purchase",
 ]);
 
 // Premium (real-money) entitlements must never be grantable through the public
@@ -20,7 +23,15 @@ const VALID_CLAIM_KINDS = new Set([
 const PREMIUM_CLAIM_KINDS = new Set([
   "premium-skin-purchase",
   "premium-unit-purchase",
+  "premium-consumable-purchase",
 ]);
+
+// The kinds a refund/chargeback can trace back to, so revocation can find what was granted.
+const PREMIUM_GRANT_CLAIM_KINDS = [...PREMIUM_CLAIM_KINDS];
+
+// A single purchase may never add more than this much of one consumable, whatever a
+// (future) multi-quantity payload claims.
+const MAX_CONSUMABLE_PURCHASE_QUANTITY = 99;
 
 function cleanText(value: any, maxLength = 200): string {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -137,6 +148,45 @@ async function markCampaignProgress(client: any, playerId: string, gameSlug: str
            updated_at = now()`,
     [playerId, gameSlug, missionId, stars, valorClaimedAt, rewardClaimedAt],
   );
+}
+
+// Normalize the inventory grants carried on a premium-consumable claim payload. Item ids are
+// validated against the server catalog, so a tampered payload can never invent an item.
+function buildInventoryGrants(payload: Record<string, any>): any[] {
+  const rows = Array.isArray(payload.inventoryItems) ? payload.inventoryItems : [];
+  const byItemId = new Map<string, number>();
+  for (const row of rows) {
+    const offer = getConsumableOffer(row?.itemId);
+    if (!offer) continue;
+    const quantity = clampInt(row?.quantity ?? 1, { min: 1, max: MAX_CONSUMABLE_PURCHASE_QUANTITY });
+    byItemId.set(offer.id, Math.min(MAX_CONSUMABLE_PURCHASE_QUANTITY, (byItemId.get(offer.id) || 0) + quantity));
+  }
+  return [...byItemId].map(([itemId, quantity]) => ({ itemId, quantity }));
+}
+
+async function grantInventoryItem(client: any, playerId: string, gameSlug: string, itemId: string, quantity: number): Promise<void> {
+  await client.query(
+    `insert into game_inventory_items (player_id, game_slug, item_id, quantity)
+     values ($1, $2, $3, $4)
+     on conflict (player_id, game_slug, item_id) do update
+       set quantity = game_inventory_items.quantity + excluded.quantity,
+           updated_at = now()`,
+    [playerId, gameSlug, itemId, quantity],
+  );
+}
+
+// Take back consumable quantity after a refund/chargeback. Clamped at zero because the
+// player may already have spent some of it — what was spent is gone, but the unspent
+// remainder is removed.
+async function revokeInventoryItem(client: any, playerId: string, gameSlug: string, itemId: string, quantity: number): Promise<number> {
+  const res = await client.query(
+    `update game_inventory_items
+     set quantity = greatest(0, quantity - $4), updated_at = now()
+     where player_id = $1 and game_slug = $2 and item_id = $3
+     returning quantity`,
+    [playerId, gameSlug, itemId, quantity],
+  );
+  return res.rows.length ? Number(res.rows[0].quantity) || 0 : 0;
 }
 
 async function grantEntitlement(client: any, playerId: string, gameSlug: string, entitlement: any, source: string, sourceId: string): Promise<void> {
@@ -297,6 +347,10 @@ export async function recordGameProgressClaim(pool: any, params: any = {}): Prom
       for (const entitlement of entitlements) {
         await grantEntitlement(client, playerId, gameSlug, entitlement, "stripe", sourceId || claimId);
       }
+    } else if (!alreadyProcessed && kind === "premium-consumable-purchase") {
+      for (const grant of buildInventoryGrants(payload)) {
+        await grantInventoryItem(client, playerId, gameSlug, grant.itemId, grant.quantity);
+      }
     }
 
     await client.query("commit");
@@ -382,6 +436,116 @@ export async function spendValorForEntitlement(pool: any, params: any = {}): Pro
     await client.query("rollback").catch(() => {});
     process.stderr.write(`[game-progress] spendValorForEntitlement error: ${(err as any)?.message || err}\n`);
     return { ok: false, statusCode: 500, error: "spend_failed" };
+  } finally {
+    client.release();
+  }
+}
+
+// Spend one consumable from the player's inventory and apply its effect, atomically.
+//
+// The item is decremented and anything it grants is written in the SAME transaction, so a
+// crash can never leave a spent item with no reward (or a reward with no spend). Random skin
+// grants roll HERE — the client only names the item, never the skin it wants. The whole
+// activation is idempotent on the caller's `activationId`: a retried request replays the
+// stored result instead of spending a second item.
+export async function activateInventoryItem(pool: any, params: any = {}): Promise<any> {
+  const playerId = cleanText(params.playerId, 120);
+  const gameSlug = normalizeGameSlug(params.gameSlug);
+  const activationId = cleanText(params.activationId, 120);
+  if (!pool || !playerId || !gameSlug || !activationId) {
+    return { ok: false, statusCode: 400, error: "invalid_request" };
+  }
+  const offer = getConsumableOffer(params.itemId);
+  if (!offer) return { ok: false, statusCode: 400, error: "item_not_found" };
+
+  const claimId = `consumable-activation:${activationId}`;
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await ensureGameProgressProfile(client, playerId, gameSlug);
+
+    const claim = await client.query(
+      `insert into game_progress_claims (player_id, game_slug, claim_id, kind, source_id, payload)
+       values ($1, $2, $3, 'consumable-activation', $4, '{}'::jsonb)
+       on conflict (player_id, game_slug, claim_id) do nothing`,
+      [playerId, gameSlug, claimId, offer.id],
+    );
+    if (claim.rowCount === 0) {
+      // Already activated under this id — replay what it granted rather than spending again.
+      const previous = await client.query(
+        `select payload from game_progress_claims
+         where player_id = $1 and game_slug = $2 and claim_id = $3`,
+        [playerId, gameSlug, claimId],
+      );
+      await client.query("commit");
+      const payload = previous.rows[0]?.payload && typeof previous.rows[0].payload === "object"
+        ? previous.rows[0].payload
+        : {};
+      return {
+        ok: true,
+        alreadyProcessed: true,
+        itemId: cleanText(payload.itemId, 120) || offer.id,
+        effect: offer.effect,
+        entitlementIds: Array.isArray(payload.entitlementIds) ? payload.entitlementIds : [],
+        progress: await getGameProgress(pool, playerId, gameSlug),
+      };
+    }
+
+    const spent = await client.query(
+      `update game_inventory_items
+       set quantity = quantity - 1, updated_at = now()
+       where player_id = $1 and game_slug = $2 and item_id = $3 and quantity > 0
+       returning quantity`,
+      [playerId, gameSlug, offer.id],
+    );
+    if (!spent.rows.length) {
+      await client.query("rollback");
+      return { ok: false, statusCode: 409, error: "item_not_owned" };
+    }
+
+    const entitlementIds: string[] = [];
+    if (offer.effect?.kind === "random-unowned-skin") {
+      const ownedRes = await client.query(
+        `select entitlement_id from game_entitlements
+         where player_id = $1 and game_slug = $2 and kind = 'skin'`,
+        [playerId, gameSlug],
+      );
+      const ownedEntitlementIds = new Set<string>(ownedRes.rows.map((row: any) => row.entitlement_id));
+      const picks = selectRandomUnownedSkins(SKIN_CATALOG, {
+        rarity: offer.effect.rarity,
+        count: offer.effect.count,
+        ownedEntitlementIds,
+        ...(typeof params.randomIndex === "function" ? { randomIndex: params.randomIndex } : {}),
+      });
+      if (!picks.length) {
+        // Nothing left to win at this rarity — refuse rather than burn the item for nothing.
+        await client.query("rollback");
+        return { ok: false, statusCode: 409, error: "no_unowned_skins" };
+      }
+      for (const skin of picks) {
+        await grantEntitlement(client, playerId, gameSlug, { entitlementId: skin.entitlementId, kind: "skin" }, "consumable", claimId);
+        entitlementIds.push(skin.entitlementId);
+      }
+    }
+
+    await client.query(
+      `update game_progress_claims set payload = $4::jsonb
+       where player_id = $1 and game_slug = $2 and claim_id = $3`,
+      [playerId, gameSlug, claimId, JSON.stringify({ itemId: offer.id, entitlementIds })],
+    );
+    await client.query("commit");
+    return {
+      ok: true,
+      alreadyProcessed: false,
+      itemId: offer.id,
+      effect: offer.effect,
+      entitlementIds,
+      progress: await getGameProgress(pool, playerId, gameSlug),
+    };
+  } catch (err) {
+    await client.query("rollback").catch(() => {});
+    process.stderr.write(`[game-progress] activateInventoryItem error: ${(err as any)?.message || err}\n`);
+    return { ok: false, statusCode: 500, error: "activation_failed" };
   } finally {
     client.release();
   }
@@ -485,10 +649,11 @@ export async function findStripeGrant(pool: any, params: any = {}): Promise<any>
   }
 
   try {
+    values.push(PREMIUM_GRANT_CLAIM_KINDS);
     const res = await pool.query(
       `select player_id, game_slug, claim_id, payload
        from game_progress_claims
-       where kind in ('premium-skin-purchase', 'premium-unit-purchase')
+       where kind = any($${values.length}::text[])
          and (${conditions.join(" or ")})
        order by created_at asc
        limit 1`,
@@ -508,6 +673,7 @@ export async function findStripeGrant(pool: any, params: any = {}): Promise<any>
       sessionId: cleanText(payload.sessionId, 200) || cleanText(row.claim_id, 200).replace(/^stripe-checkout:/, ""),
       paymentIntentId: cleanText(payload.paymentIntentId, 200),
       entitlementIds,
+      inventoryItems: buildInventoryGrants(payload),
     };
   } catch (err) {
     process.stderr.write(`[game-progress] findStripeGrant error: ${(err as any)?.message || err}\n`);
@@ -533,10 +699,13 @@ export async function revokeGameEntitlements(pool: any, params: any = {}): Promi
       .map((value: any) => cleanText(value, 180))
       .filter(Boolean),
   )];
+  const inventoryItems = buildInventoryGrants({ inventoryItems: params.inventoryItems });
   if (!pool || !playerId || !gameSlug || !revocationId) {
     return { ok: false, statusCode: 400, error: "invalid_request" };
   }
-  if (!entitlementIds.length) return { ok: true, alreadyProcessed: false, revoked: [] };
+  if (!entitlementIds.length && !inventoryItems.length) {
+    return { ok: true, alreadyProcessed: false, revoked: [], revokedItems: [] };
+  }
 
   const client = await pool.connect();
   try {
@@ -546,25 +715,32 @@ export async function revokeGameEntitlements(pool: any, params: any = {}): Promi
       `insert into game_progress_claims (player_id, game_slug, claim_id, kind, source_id, payload)
        values ($1, $2, $3, 'premium-revocation', $4, $5::jsonb)
        on conflict (player_id, game_slug, claim_id) do nothing`,
-      [playerId, gameSlug, `stripe-revocation:${revocationId}`, sessionId, JSON.stringify({ reason, sessionId, entitlementIds })],
+      [playerId, gameSlug, `stripe-revocation:${revocationId}`, sessionId, JSON.stringify({ reason, sessionId, entitlementIds, inventoryItems })],
     );
     const alreadyProcessed = claim.rowCount === 0;
     let revoked: string[] = [];
+    const revokedItems: any[] = [];
     if (!alreadyProcessed) {
-      const del = await client.query(
-        `delete from game_entitlements
-         where player_id = $1 and game_slug = $2
-           and source = 'stripe'
-           and entitlement_id = any($3::text[])
-           ${sessionId ? "and source_id = $4" : ""}
-         returning entitlement_id`,
-        sessionId ? [playerId, gameSlug, entitlementIds, sessionId] : [playerId, gameSlug, entitlementIds],
-      );
-      revoked = del.rows.map((row: any) => row.entitlement_id);
-      process.stderr.write(`[game-progress] revoked ${revoked.length} entitlement(s) (player=${playerId} reason=${reason} revocation=${revocationId})\n`);
+      if (entitlementIds.length) {
+        const del = await client.query(
+          `delete from game_entitlements
+           where player_id = $1 and game_slug = $2
+             and source = 'stripe'
+             and entitlement_id = any($3::text[])
+             ${sessionId ? "and source_id = $4" : ""}
+           returning entitlement_id`,
+          sessionId ? [playerId, gameSlug, entitlementIds, sessionId] : [playerId, gameSlug, entitlementIds],
+        );
+        revoked = del.rows.map((row: any) => row.entitlement_id);
+      }
+      for (const item of inventoryItems) {
+        const remaining = await revokeInventoryItem(client, playerId, gameSlug, item.itemId, item.quantity);
+        revokedItems.push({ itemId: item.itemId, quantity: item.quantity, remaining });
+      }
+      process.stderr.write(`[game-progress] revoked ${revoked.length} entitlement(s) and ${revokedItems.length} item(s) (player=${playerId} reason=${reason} revocation=${revocationId})\n`);
     }
     await client.query("commit");
-    return { ok: true, alreadyProcessed, revoked, progress: await getGameProgress(pool, playerId, gameSlug) };
+    return { ok: true, alreadyProcessed, revoked, revokedItems, progress: await getGameProgress(pool, playerId, gameSlug) };
   } catch (err) {
     await client.query("rollback").catch(() => {});
     process.stderr.write(`[game-progress] revokeGameEntitlements error: ${(err as any)?.message || err}\n`);
@@ -587,10 +763,13 @@ export async function regrantStripeEntitlements(pool: any, params: any = {}): Pr
       .map((value: any) => cleanText(value, 180))
       .filter(Boolean),
   )];
+  const inventoryItems = buildInventoryGrants({ inventoryItems: params.inventoryItems });
   if (!pool || !playerId || !gameSlug || !regrantId) {
     return { ok: false, statusCode: 400, error: "invalid_request" };
   }
-  if (!entitlementIds.length) return { ok: true, alreadyProcessed: false, regranted: [] };
+  if (!entitlementIds.length && !inventoryItems.length) {
+    return { ok: true, alreadyProcessed: false, regranted: [], regrantedItems: [] };
+  }
 
   const client = await pool.connect();
   try {
@@ -600,7 +779,7 @@ export async function regrantStripeEntitlements(pool: any, params: any = {}): Pr
       `insert into game_progress_claims (player_id, game_slug, claim_id, kind, source_id, payload)
        values ($1, $2, $3, 'premium-regrant', $4, $5::jsonb)
        on conflict (player_id, game_slug, claim_id) do nothing`,
-      [playerId, gameSlug, `stripe-regrant:${regrantId}`, sessionId, JSON.stringify({ sessionId, entitlementIds })],
+      [playerId, gameSlug, `stripe-regrant:${regrantId}`, sessionId, JSON.stringify({ sessionId, entitlementIds, inventoryItems })],
     );
     const alreadyProcessed = claim.rowCount === 0;
     if (!alreadyProcessed) {
@@ -608,9 +787,18 @@ export async function regrantStripeEntitlements(pool: any, params: any = {}): Pr
         const kind = entitlementId.startsWith("unit:") ? "unit" : "skin";
         await grantEntitlement(client, playerId, gameSlug, { entitlementId, kind }, "stripe", sessionId || `stripe-regrant:${regrantId}`);
       }
+      for (const item of inventoryItems) {
+        await grantInventoryItem(client, playerId, gameSlug, item.itemId, item.quantity);
+      }
     }
     await client.query("commit");
-    return { ok: true, alreadyProcessed, regranted: alreadyProcessed ? [] : entitlementIds, progress: await getGameProgress(pool, playerId, gameSlug) };
+    return {
+      ok: true,
+      alreadyProcessed,
+      regranted: alreadyProcessed ? [] : entitlementIds,
+      regrantedItems: alreadyProcessed ? [] : inventoryItems,
+      progress: await getGameProgress(pool, playerId, gameSlug),
+    };
   } catch (err) {
     await client.query("rollback").catch(() => {});
     process.stderr.write(`[game-progress] regrantStripeEntitlements error: ${(err as any)?.message || err}\n`);

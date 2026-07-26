@@ -222,10 +222,10 @@ export function renderConsumables(body, offers, ctx) {
       const card = el("article", "shop-item shop-consumable");
       card.appendChild(createConsumableIcon(offer));
       const copy = el("div", "shop-item-copy");
-      copy.append(
-        el("b", "shop-item-title", offer.name),
-        el("span", "shop-item-meta", offer.description),
-      );
+      copy.append(el("b", "shop-item-title", offer.name));
+      // Consumables stack, so the useful ownership signal is how many are already banked.
+      if (offer.quantity > 0) copy.appendChild(el("span", "shop-item-sub", `Owned x${offer.quantity}`));
+      copy.appendChild(el("span", "shop-item-meta", offer.description));
       card.append(copy, ctx.createConsumableBuyActions(offer));
       grid.appendChild(card);
     }

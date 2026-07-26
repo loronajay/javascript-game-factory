@@ -13,6 +13,7 @@ import {
   getShopCatalog,
   groupSkinOffersByClassAndType,
   getSkinOffer,
+  getSkinOffers,
   getUnitOffer,
   purchaseSkinPackWithValor,
   purchaseSkinWithValor,
@@ -440,4 +441,34 @@ test("shop purchases require a signed-in JavaScript Game Factory account", () =>
   assert.equal(progress.valorBalance, 99999);
   assert.equal(progress.unlockedUnits.includes("clod"), false);
   assert.equal(progress.purchasedSkins.length, 0);
+});
+
+// The shop displays these prices and effects; the server charges for them, rolls their
+// rewards, and is the only place either is allowed to be decided. A drift between the two
+// catalogs means the player is shown one thing and sold another, so guard it directly
+// rather than by hand-transcribed constants.
+test("the client consumable catalog matches the server's, offer for offer", async () => {
+  const server = await import("../../../platform-api/src/services/consumable-catalog.mjs");
+
+  const clientOffers = [...getConsumableOffers()].sort((left, right) => left.id.localeCompare(right.id));
+  const serverOffers = [...server.getConsumableOffers()].sort((left, right) => left.id.localeCompare(right.id));
+
+  assert.deepEqual(clientOffers.map((offer) => offer.id), serverOffers.map((offer) => offer.id));
+  for (const clientOffer of clientOffers) {
+    const serverOffer = server.getConsumableOffer(clientOffer.id);
+    assert.equal(clientOffer.sku, serverOffer.sku, `${clientOffer.id} sku`);
+    assert.equal(clientOffer.price.cents, serverOffer.amountCents, `${clientOffer.id} price`);
+    assert.equal(clientOffer.name, serverOffer.name, `${clientOffer.id} name`);
+    assert.equal(clientOffer.activationTrigger, serverOffer.activationTrigger, `${clientOffer.id} trigger`);
+    assert.equal(clientOffer.durationHours, serverOffer.durationHours, `${clientOffer.id} duration`);
+    assert.deepEqual({ ...clientOffer.effect }, { ...serverOffer.effect }, `${clientOffer.id} effect`);
+  }
+});
+
+test("client skin rarity and the server's price-derived rarity agree", async () => {
+  const { skinRarity } = await import("../../../platform-api/src/services/consumable-catalog.mjs");
+
+  for (const offer of getSkinOffers(storageAdapter())) {
+    assert.equal(skinRarity(offer.price.cents), offer.rarity, `${offer.type}:${offer.slug} rarity`);
+  }
 });

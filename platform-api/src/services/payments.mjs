@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { getConsumableOffer } from "./consumable-catalog.mjs";
 const STRIPE_API_VERSION = "2026-06-24.dahlia";
 const STRIPE_CHECKOUT_SESSIONS_URL = "https://api.stripe.com/v1/checkout/sessions";
 const TACTICAL_ARENA_GAME_SLUG = "tactical-arena";
@@ -563,6 +564,34 @@ export async function resolveTacticalArenaPremiumOffer(offerInput, progress = {}
             },
         };
     }
+    // Consumables stack instead of being owned, so there is no already-owned check and no
+    // entitlement id — fulfillment adds quantity to the player's inventory instead.
+    if (kind === "consumable") {
+        const consumable = getConsumableOffer(offer.id);
+        if (!consumable) {
+            return stripeError(400, "offer_not_found");
+        }
+        const requestedSku = cleanText(offer.sku, 200);
+        if (requestedSku && requestedSku !== consumable.sku) {
+            return stripeError(400, "offer_mismatch");
+        }
+        return {
+            ok: true,
+            offer: {
+                kind: "consumable",
+                sku: consumable.sku,
+                name: consumable.name,
+                amountCents: consumable.amountCents,
+                currency: consumable.currency,
+                entitlementIds: [],
+                inventoryItems: [{ itemId: consumable.id, quantity: 1 }],
+                metadata: {
+                    offerKind: "consumable",
+                    itemId: consumable.id,
+                },
+            },
+        };
+    }
     return stripeError(400, "unsupported_offer_kind");
 }
 export async function createTacticalArenaCheckoutSession(params = {}) {
@@ -703,26 +732,30 @@ export async function fulfillTacticalArenaCheckoutSession(params = {}) {
         ? { kind: "skin-pack", sku: metadata.sku, packId: metadata.packId }
         : offerKind === "unit"
             ? { kind: "unit", sku: metadata.sku, type: metadata.type }
-            : { kind: "skin", sku: metadata.sku, type: metadata.type, slug: metadata.slug };
+            : offerKind === "consumable"
+                ? { kind: "consumable", sku: metadata.sku, id: metadata.itemId }
+                : { kind: "skin", sku: metadata.sku, type: metadata.type, slug: metadata.slug };
     const progress = await getGameProgress(playerId, gameSlug);
     const resolved = await resolveTacticalArenaPremiumOffer(offerInput, progress || {});
     if (!resolved.ok && resolved.error !== "offer_already_owned")
         return resolved;
     const entitlementIds = resolved.ok ? resolved.offer.entitlementIds : [];
-    if (!entitlementIds.length && resolved.error === "offer_already_owned") {
+    const inventoryItems = resolved.ok ? (resolved.offer.inventoryItems || []) : [];
+    if (!entitlementIds.length && !inventoryItems.length && resolved.error === "offer_already_owned") {
         return { ok: true, alreadyProcessed: true };
     }
     return recordGameProgressClaim({
         playerId,
         gameSlug,
         claimId: `stripe-checkout:${sessionId}`,
-        kind: resolved.offer?.kind === "unit" ? "premium-unit-purchase" : "premium-skin-purchase",
+        kind: premiumClaimKind(resolved.offer?.kind),
         sourceId: sessionId,
         payload: {
             sessionId,
             offerKind,
             sku: cleanText(metadata.sku, 200),
             entitlementIds,
+            inventoryItems,
             amountTotal: moneyCents(session.amount_total),
             currency: cleanText(session.currency, 10).toLowerCase(),
             // The join key for later refund/dispute events, which carry a payment_intent but not
@@ -730,6 +763,13 @@ export async function fulfillTacticalArenaCheckoutSession(params = {}) {
             paymentIntentId: cleanText(session.payment_intent, 200),
         },
     });
+}
+function premiumClaimKind(offerKind) {
+    if (offerKind === "unit")
+        return "premium-unit-purchase";
+    if (offerKind === "consumable")
+        return "premium-consumable-purchase";
+    return "premium-skin-purchase";
 }
 export async function fulfillPremiumCheckoutSessionFromReturn(params = {}) {
     const playerId = cleanText(params.playerId, 120);
@@ -802,7 +842,8 @@ async function resolveStripeGrantForEvent(params = {}) {
         if (sessionId)
             grant = await findStripeGrant({ sessionId });
     }
-    return grant && grant.entitlementIds?.length ? grant : null;
+    const hasGrantedAnything = Boolean(grant?.entitlementIds?.length || grant?.inventoryItems?.length);
+    return hasGrantedAnything ? grant : null;
 }
 async function revokeForStripeEvent(params = {}) {
     const revokeGameEntitlements = typeof params.revokeGameEntitlements === "function" ? params.revokeGameEntitlements : null;
@@ -816,6 +857,7 @@ async function revokeForStripeEvent(params = {}) {
         gameSlug: grant.gameSlug,
         sessionId: grant.sessionId,
         entitlementIds: grant.entitlementIds,
+        inventoryItems: grant.inventoryItems,
         revocationId: params.revocationId,
         reason: params.reason,
     });
@@ -832,6 +874,7 @@ async function regrantForStripeEvent(params = {}) {
         gameSlug: grant.gameSlug,
         sessionId: grant.sessionId,
         entitlementIds: grant.entitlementIds,
+        inventoryItems: grant.inventoryItems,
         regrantId: params.regrantId,
     });
 }

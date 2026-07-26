@@ -1,9 +1,10 @@
-import {
-  activateConsumable,
-  getInventoryCatalog,
-} from "../progression/inventory.js";
+import { getInventoryCatalog } from "../progression/inventory.js";
+import { enqueuePurchasedUnlockAnnouncements } from "../progression/announcements.js";
+import { readStoredFactoryAccountSession } from "../platform/factoryAccount.js";
 import { createConsumableIcon } from "./consumableIcons.js";
 import { el } from "./domHelpers.js";
+import { isRandomSkinConsumable, remainingSkinRolls, runConsumableActivation } from "./inventoryActivation.js";
+import { requestProgressionAnnouncements } from "./progressionAnnouncements.js";
 
 let host = null;
 let hostDocument = null;
@@ -18,10 +19,14 @@ function ensureHost() {
   return host;
 }
 
-export function openInventory(storage = globalThis.localStorage) {
+export function openInventory(storage = globalThis.localStorage, options = {}) {
   const overlay = ensureHost();
+  const account = options.account ?? readStoredFactoryAccountSession();
+  // Injected in tests; otherwise runConsumableActivation builds the default platform client.
+  const apiClient = options.apiClient;
   let statusText = "";
   let pendingActivationId = null;
+  let activationInFlight = false;
 
   function render() {
     const catalog = getInventoryCatalog(storage);
@@ -92,6 +97,7 @@ export function openInventory(storage = globalThis.localStorage) {
       const activate = el("button", "shop-buy-btn inventory-activate-btn", "Activate");
       activate.type = "button";
       activate.setAttribute("aria-label", `Activate ${item.name}`);
+      activate.disabled = activationInFlight || remainingSkinRolls(item, storage) === 0;
       activate.addEventListener("click", () => {
         pendingActivationId = item.id;
         statusText = "";
@@ -145,7 +151,7 @@ export function openInventory(storage = globalThis.localStorage) {
     const copy = el("div", "shop-confirm-copy");
     copy.append(
       el("b", "shop-confirm-name", item.name),
-      el("span", "shop-confirm-sub", activationPreview(item)),
+      el("span", "shop-confirm-sub", activationPreview(item, storage)),
     );
     itemRow.appendChild(copy);
 
@@ -161,8 +167,9 @@ export function openInventory(storage = globalThis.localStorage) {
     cancel.addEventListener("click", dismissActivation);
     const activate = el("button", "menu-btn shop-confirm-purchase inventory-confirm-activate", "Activate");
     activate.type = "button";
+    activate.disabled = activationInFlight;
     activate.setAttribute("aria-label", `Confirm activation for ${item.name}`);
-    activate.addEventListener("click", () => confirmActivation(item));
+    activate.addEventListener("click", () => void confirmActivation(item));
     foot.append(cancel, activate);
 
     dialog.append(head, itemRow, warning, foot);
@@ -170,11 +177,23 @@ export function openInventory(storage = globalThis.localStorage) {
     return layer;
   }
 
-  function confirmActivation(item) {
-    const result = activateConsumable(storage, item.id);
+  async function confirmActivation(item) {
+    if (activationInFlight) return;
+    activationInFlight = true;
     pendingActivationId = null;
-    statusText = activationStatus(result);
+    statusText = `Using ${item.name}…`;
     render();
+
+    const result = await runConsumableActivation({ item, storage, account, apiClient });
+    activationInFlight = false;
+    statusText = result.status;
+    render();
+    // Anything the activation granted (skins from a random-skin item) rides the same unlock
+    // announcement feed as a shop purchase.
+    if (result.outcome === "activated" && result.grantedNames?.length) {
+      enqueuePurchasedUnlockAnnouncements(storage, result.beforeProgress, result.afterProgress);
+      requestProgressionAnnouncements({ storage });
+    }
   }
 
   function dismissActivation() {
@@ -210,17 +229,17 @@ export function openInventory(storage = globalThis.localStorage) {
   render();
 }
 
-function activationPreview(item) {
+function activationPreview(item, storage) {
   if (item.activationTrigger === "valor-gained") return "After activation, the timer starts with your next Valor gain.";
   if (item.activationTrigger === "campaign-mission-started") return "After activation, the timer starts with your next campaign mission.";
-  return "Reward resolution coming soon.";
-}
-
-function activationStatus(result) {
-  if (!result.accepted && result.errorCode === "CONSUMABLE_NOT_OWNED") return "That consumable is no longer available.";
-  if (!result.accepted) return "That consumable cannot be activated.";
-  if (result.offer.activationTrigger === "immediate") return `${result.offer.name} activated. Reward resolution coming soon.`;
-  return `${result.offer.name} armed. Timer starts after ${triggerLabel(result.offer.activationTrigger)}.`;
+  if (isRandomSkinConsumable(item)) {
+    const remaining = remainingSkinRolls(item, storage);
+    const count = Math.max(1, Math.floor(Number(item.effect.count) || 1));
+    if (remaining === 0) return `You already own every ${item.effect.rarity} skin.`;
+    const grant = count === 1 ? `one ${item.effect.rarity} skin` : `${count} ${item.effect.rarity} skins`;
+    return `Rolls ${grant} you don't own yet. ${remaining} left to win.`;
+  }
+  return "This item resolves as soon as it is used.";
 }
 
 function activationStatusLabel(activation) {

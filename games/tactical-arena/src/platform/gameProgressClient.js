@@ -280,6 +280,46 @@ export async function spendValorOnServer({
   };
 }
 
+// Server-authoritative consumable use. The server spends the item and rolls/grants whatever
+// it awards (e.g. a random skin) in one transaction, so the client can neither pick the
+// reward nor keep the item. `activationId` is the idempotency key: if the response is lost,
+// retrying with the same id replays the original result instead of burning a second item.
+export function newConsumableActivationId() {
+  const randomUuid = globalThis.crypto?.randomUUID;
+  if (typeof randomUuid === "function") return randomUuid.call(globalThis.crypto);
+  return `act-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+}
+
+export async function activateConsumableOnServer({
+  itemId,
+  activationId = newConsumableActivationId(),
+  account = readStoredFactoryAccountSession(),
+  apiClient = createPlatformApiClient(),
+  gameSlug = TACTICAL_ARENA_GAME_SLUG,
+} = {}) {
+  if (!isFactoryAccountLoggedIn(account)) return { ok: false, errorCode: "ACCOUNT_LOGIN_REQUIRED" };
+  if (!apiClient?.isConfigured || typeof apiClient.activateGameConsumable !== "function") {
+    return { ok: false, errorCode: "PROGRESS_API_UNAVAILABLE" };
+  }
+  let result = null;
+  try {
+    result = await apiClient.activateGameConsumable(gameSlug, { itemId, activationId });
+  } catch {
+    result = null;
+  }
+  // The shared API client collapses every non-2xx response to null, so the server's specific
+  // refusal (item_not_owned / no_unowned_skins) does not reach here — the UI pre-checks the
+  // cases it can explain and otherwise reports a generic failure. The item is never spent.
+  if (!result?.ok) return { ok: false, errorCode: "ACTIVATION_FAILED" };
+  return {
+    ok: true,
+    itemId: cleanText(result.itemId, 120),
+    effect: result.effect ?? null,
+    entitlementIds: Array.isArray(result.entitlementIds) ? result.entitlementIds : [],
+    progress: result.progress ?? null,
+  };
+}
+
 // Server-authoritative campaign reset. Clears the account's campaign mission rows only;
 // Valor, unit/skin entitlements, and tutorial progress are preserved server-side.
 export async function resetCampaignOnServer({

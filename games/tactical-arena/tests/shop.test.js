@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { resetProgressionAnnouncementPresenter } from "../src/ui/progressionAnnouncements.js";
 import { isProgressSkinUnlocked, readUnlockProgress, writeUnlockProgress } from "../src/progression/unlocks.js";
 import { grantConsumable, readInventory } from "../src/progression/inventory.js";
+import { getSkinOffers } from "../src/progression/marketplace.js";
 import { openInventory } from "../src/ui/inventory.js";
 import { openShop } from "../src/ui/shop.js";
 import { openSkinGallery } from "../src/ui/skinGallery.js";
@@ -203,7 +204,7 @@ test("shop skins render under unit shelves and Valor uses an icon badge", () => 
   assert.ok(shelves.some((node) => node.dataset.type === "swordsman"));
 });
 
-test("shop consumables tab sells paid consumables with checkout coming soon feedback", () => {
+test("shop consumables tab renders every consumable with its icon treatment", () => {
   globalThis.document = new FakeDocument();
 
   openShop(storageAdapter(), { account: SIGNED_IN_ACCOUNT });
@@ -241,10 +242,94 @@ test("shop consumables tab sells paid consumables with checkout coming soon feed
 
   const buy = walk(boostCard, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-buy-btn"))[0];
   assert.equal(buy.textContent, "$1.99");
-  assert.equal(buy.getAttribute("aria-label"), "Buy Valor Boost I with $1.99 soon");
-  buy.click();
+  assert.equal(buy.getAttribute("aria-label"), "Buy Valor Boost I with $1.99");
+});
 
-  assert.match(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent, /checkout coming soon/i);
+test("shop consumables show how many are already banked", () => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  grantConsumable(storage, "valor-boost-1", 3);
+
+  openShop(storage, { account: SIGNED_IN_ACCOUNT });
+
+  const overlay = document.body.children[0];
+  walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Consumables")[0].click();
+
+  const boostCard = walk(overlay, (node) => hasClass(node, "shop-consumable") && visibleText(node).includes("Valor Boost I"))[0];
+  assert.match(visibleText(boostCard), /Owned x3/);
+  // Consumables stack, so a banked item must never render as a spent "Owned" button.
+  const buy = walk(boostCard, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-buy-btn"))[0];
+  assert.equal(buy.textContent, "$1.99");
+  assert.equal(buy.disabled, false);
+
+  const unownedCard = walk(overlay, (node) => hasClass(node, "shop-consumable") && visibleText(node).includes("Campaign Boost"))[0];
+  assert.doesNotMatch(visibleText(unownedCard), /Owned x/);
+});
+
+test("consumable USD checkout credits the server inventory quantity", async () => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  const fetchCalls = [];
+  let embeddedOptions = null;
+  const locationRef = {
+    href: "https://factory.example/games/tactical-arena/index.html",
+    assigned: "",
+    assign(url) {
+      this.assigned = url;
+      this.href = url;
+    },
+  };
+
+  openShop(storage, {
+    account: { ...SIGNED_IN_ACCOUNT, token: "token-1" },
+    checkoutEndpoint: "/api/test-checkout",
+    locationRef,
+    stripeFactory: () => ({
+      async initEmbeddedCheckout(options) {
+        embeddedOptions = options;
+        return { mount() {}, destroy() {} };
+      },
+    }),
+    fetchImpl: async (url, init) => {
+      fetchCalls.push({ url, init });
+      if (url.endsWith("/fulfill")) {
+        return {
+          ok: true,
+          async json() {
+            return { ok: true, progress: { inventoryItems: [{ itemId: "valor-boost-1", quantity: 1 }] } };
+          },
+        };
+      }
+      return {
+        ok: true,
+        async json() {
+          return {
+            sessionId: "cs_test_consumable",
+            clientSecret: "cs_test_consumable_secret_abc",
+            publishableKey: "pk_test_checkout",
+          };
+        },
+      };
+    },
+  });
+
+  const overlay = document.body.children[0];
+  walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Consumables")[0].click();
+  const boostCard = walk(overlay, (node) => hasClass(node, "shop-consumable") && visibleText(node).includes("Valor Boost I"))[0];
+  walk(boostCard, (node) => node.tagName === "BUTTON" && hasClass(node, "is-premium"))[0].click();
+
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(locationRef.assigned, "", "consumables use the embedded checkout, not a redirect");
+  const body = JSON.parse(fetchCalls[0].init.body);
+  assert.equal(body.offer.kind, "consumable");
+  assert.equal(body.offer.id, "valor-boost-1");
+  assert.equal(body.offer.sku, "ta.consumable.valor-boost-1");
+  assert.equal("price" in body.offer, false, "the client must never name a price");
+
+  await embeddedOptions.onComplete();
+  assert.equal(readInventory(storage).consumables["valor-boost-1"], 1);
+  assert.match(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent, /added to your Inventory/i);
 });
 
 test("shop purchase buttons require a signed-in factory account", () => {
@@ -286,12 +371,13 @@ test("shop purchase buttons require a signed-in factory account", () => {
   assert.equal(readUnlockProgress(storage).purchasedSkins.length, 0);
 });
 
-test("inventory activation requires confirmation before consuming an owned consumable", () => {
+test("inventory activation requires confirmation before consuming an owned consumable", async () => {
   globalThis.document = new FakeDocument();
   const storage = storageAdapter();
   grantConsumable(storage, "valor-boost-1", 1);
 
-  openInventory(storage);
+  // Signed out: timed boosts still arm locally (their effect is local anyway).
+  openInventory(storage, { account: { authenticated: false } });
 
   const overlay = document.body.children[0];
   const inventoryGuidance = walk(overlay, (node) => hasClass(node, "inventory-sub"))[0];
@@ -319,12 +405,92 @@ test("inventory activation requires confirmation before consuming an owned consu
   walk(overlay, (node) => node.tagName === "BUTTON" && hasClass(node, "inventory-activate-btn"))[0].click();
   confirm = walk(overlay, (node) => hasClass(node, "inventory-activation-confirm"))[0];
   walk(confirm, (node) => node.tagName === "BUTTON" && hasClass(node, "inventory-confirm-activate"))[0].click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
   const inventory = readInventory(storage);
   assert.equal(inventory.consumables["valor-boost-1"], undefined);
   assert.equal(inventory.activeConsumables.length, 1);
   assert.equal(inventory.activeConsumables[0].status, "pending");
   assert.match(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent, /timer starts/i);
+});
+
+test("activating a random-skin consumable grants the server's roll and announces it", async () => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  grantConsumable(storage, "random-rare-skin", 1);
+  const activateCalls = [];
+
+  openInventory(storage, {
+    account: { ...SIGNED_IN_ACCOUNT, token: "token-1" },
+    apiClient: {
+      isConfigured: true,
+      async activateGameConsumable(gameSlug, payload) {
+        activateCalls.push({ gameSlug, payload });
+        return {
+          ok: true,
+          itemId: "random-rare-skin",
+          effect: { kind: "random-unowned-skin", rarity: "rare", count: 1 },
+          entitlementIds: ["skin:archer:arcane"],
+          // The server spent the item, so its snapshot no longer carries it.
+          progress: { inventoryItems: [], entitlements: [{ entitlementId: "skin:archer:arcane" }] },
+        };
+      },
+    },
+  });
+
+  const overlay = document.body.children[0];
+  const itemCard = walk(overlay, (node) => hasClass(node, "inventory-item") && visibleText(node).includes("Random Rare Skin"))[0];
+  walk(itemCard, (node) => node.tagName === "BUTTON" && hasClass(node, "inventory-activate-btn"))[0].click();
+
+  const confirm = walk(overlay, (node) => hasClass(node, "inventory-activation-confirm"))[0];
+  assert.match(visibleText(confirm), /left to win/i, "the confirm should say how many rare skins remain");
+  walk(confirm, (node) => node.tagName === "BUTTON" && hasClass(node, "inventory-confirm-activate"))[0].click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(activateCalls.length, 1);
+  assert.equal(activateCalls[0].gameSlug, "tactical-arena");
+  assert.equal(activateCalls[0].payload.itemId, "random-rare-skin");
+  assert.ok(activateCalls[0].payload.activationId, "activation must carry an idempotency key");
+
+  assert.equal(readInventory(storage).consumables["random-rare-skin"], undefined);
+  assert.equal(isProgressSkinUnlocked("archer", "arcane", storage), true);
+  assert.match(walk(overlay, (node) => hasClass(node, "shop-status"))[0].textContent, /Arcane/);
+
+  await flushAsyncPurchase();
+  const announcement = document.body.children.find((node) => hasClass(node, "progression-announcement-modal"));
+  assert.ok(announcement, "a rolled skin should open the same unlock popup a purchase does");
+  assert.match(visibleText(announcement), /Arcane Archer Unlocked/i);
+});
+
+test("a random-skin consumable is not spendable once every skin of that rarity is owned", async () => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  grantConsumable(storage, "random-rare-skin", 1);
+  // Own every rare skin, so the roll has nothing left to give.
+  const rareSkins = getSkinOffers(storage).filter((offer) => offer.rarity === "rare");
+  writeUnlockProgress(storage, {
+    serverEntitlementSkins: rareSkins.map((offer) => ({ type: offer.type, slug: offer.slug })),
+  });
+  let called = false;
+
+  openInventory(storage, {
+    account: { ...SIGNED_IN_ACCOUNT, token: "token-1" },
+    apiClient: {
+      isConfigured: true,
+      async activateGameConsumable() {
+        called = true;
+        return { ok: true };
+      },
+    },
+  });
+
+  const overlay = document.body.children[0];
+  const itemCard = walk(overlay, (node) => hasClass(node, "inventory-item") && visibleText(node).includes("Random Rare Skin"))[0];
+  const activate = walk(itemCard, (node) => node.tagName === "BUTTON" && hasClass(node, "inventory-activate-btn"))[0];
+  assert.equal(activate.disabled, true, "an unspendable consumable should not offer activation");
+
+  assert.equal(called, false);
+  assert.equal(readInventory(storage).consumables["random-rare-skin"], 1, "the item must stay in the inventory");
 });
 
 test("shop skin cards offer USD checkout and Valor purchase buttons", async () => {

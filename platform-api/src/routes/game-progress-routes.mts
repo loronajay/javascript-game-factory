@@ -7,7 +7,7 @@ import {
 
 export async function handleGameProgressRoute(context: any): Promise<boolean> {
   const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services } = context;
-  const { getGameProgress, recordGameProgressClaim, spendValor, resetCampaign, backfillOwnership } = services;
+  const { getGameProgress, recordGameProgressClaim, spendValor, resetCampaign, backfillOwnership, activateConsumable } = services;
 
   const getMatch = pathname.match(/^\/game-progress\/([^/]+)$/);
   if (method === "GET" && getMatch) {
@@ -113,6 +113,50 @@ export async function handleGameProgressRoute(context: any): Promise<boolean> {
     writeJson(res, 200, {
       ok: true,
       valorSpent: result.valorSpent,
+      entitlementIds: result.entitlementIds || [],
+      progress: result.progress || null,
+    }, requestOrigin);
+    return true;
+  }
+
+  // Spend one consumable and apply its effect. The item is decremented and anything it
+  // grants (e.g. a random skin) is rolled and written server-side in one transaction, so the
+  // client can neither name the reward nor keep the item. Idempotent on `activationId`.
+  const activateMatch = pathname.match(/^\/game-progress\/([^/]+)\/consumables\/activate$/);
+  if (method === "POST" && activateMatch) {
+    const gameSlug = decodeURIComponent(activateMatch[1]);
+    if (!isValidGameProgressSlug(gameSlug)) {
+      writeJson(res, 400, { status: "error", error: "invalid_game_slug", timestamp }, requestOrigin);
+      return true;
+    }
+    if (!authClaims?.playerId) {
+      writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
+      return true;
+    }
+    if (typeof activateConsumable !== "function") {
+      writeJson(res, 503, { status: "error", error: "activation_not_configured", timestamp }, requestOrigin);
+      return true;
+    }
+    const body = await readJsonBody(req);
+    if (!body.ok) {
+      writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+      return true;
+    }
+    const result = await activateConsumable({
+      playerId: authClaims.playerId,
+      gameSlug,
+      itemId: body.value?.itemId,
+      activationId: body.value?.activationId,
+    });
+    if (!result?.ok) {
+      writeJson(res, result?.statusCode || 400, { status: "error", error: result?.error || "activation_failed", timestamp }, requestOrigin);
+      return true;
+    }
+    writeJson(res, 200, {
+      ok: true,
+      alreadyProcessed: Boolean(result.alreadyProcessed),
+      itemId: result.itemId,
+      effect: result.effect || null,
       entitlementIds: result.entitlementIds || [],
       progress: result.progress || null,
     }, requestOrigin);

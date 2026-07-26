@@ -22,6 +22,7 @@ import {
   startPremiumCheckout,
 } from "../platform/premiumCheckoutClient.js";
 import { mergeServerEntitlementsIntoUnlockProgress, readUnlockProgress } from "../progression/unlocks.js";
+import { getInventoryCatalog, mergeServerInventory } from "../progression/inventory.js";
 import { enqueuePurchasedUnlockAnnouncements } from "../progression/announcements.js";
 import { el } from "./domHelpers.js";
 import { openSkinViewer } from "./skinGallery.js";
@@ -161,7 +162,9 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
     else if (activeTab === "units") renderUnits(body, catalog.units, ctx);
     else if (activeTab === "skin-packs") renderSkinPacks(body, catalog.skinPacks, ctx);
     else if (activeTab === "skins") renderSkins(body, catalog.skins, ctx);
-    else if (activeTab === "consumables") renderConsumables(body, catalog.consumables, ctx);
+    // The inventory catalog is the shop offers plus the quantity already banked, so the tab
+    // can show "Owned x2" on a stackable item without the shop catalog knowing about storage.
+    else if (activeTab === "consumables") renderConsumables(body, getInventoryCatalog(storage).items, ctx);
     else renderEmpty(body);
     card.appendChild(body);
     if (activeTab === "units" && !detailOffer && unitScrollTop > 0) body.scrollTop = unitScrollTop;
@@ -310,8 +313,13 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
           const nextProgress = fulfillment?.progress
             ? mergeServerEntitlementsIntoUnlockProgress(storage, fulfillment.progress)
             : beforeProgress;
+          // Consumables are credited as inventory quantity, not as an entitlement, so the
+          // server snapshot has to land in the local inventory cache too.
+          if (fulfillment?.progress) mergeServerInventory(storage, fulfillment.progress, { authoritative: true });
           premiumCheckoutInFlight = false;
-          statusText = `${offer.name} unlocked.`;
+          statusText = offer.kind === "consumable"
+            ? `${offer.name} added to your Inventory.`
+            : `${offer.name} unlocked.`;
           closePremiumCheckoutLayer();
           render();
           if (fulfillment?.progress) announcePurchaseProgress(beforeProgress, nextProgress);
@@ -446,18 +454,14 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
       actions.appendChild(createLoginRequiredButton(offer.name));
       return actions;
     }
+    // Consumables stack, so there is no owned state and no Valor price — premium only.
     const premiumBuy = el("button", "shop-buy-btn is-premium", formatPremiumPrice(offer.price));
     premiumBuy.type = "button";
     premiumBuy.dataset.sku = offer.sku;
-    premiumBuy.setAttribute("aria-label", `Buy ${offer.name} with ${formatPremiumPrice(offer.price)} soon`);
+    premiumBuy.setAttribute("aria-label", `Buy ${offer.name} with ${formatPremiumPrice(offer.price)}`);
     premiumBuy.addEventListener("click", (event) => {
       event.stopPropagation?.();
-      statusText = "Consumable checkout coming soon.";
-      overlay.dispatchEvent(new CustomEvent(PREMIUM_CHECKOUT_EVENT, {
-        bubbles: true,
-        detail: { offer },
-      }));
-      render();
+      void beginPremiumCheckout(offer);
     });
     actions.appendChild(premiumBuy);
     return actions;

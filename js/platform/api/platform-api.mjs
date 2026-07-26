@@ -458,6 +458,15 @@ export function createPlatformApiClient(options = {}) {
             const encoded = encodePathSegment(gameSlug);
             return encoded ? post(`/game-progress/${encoded}/spend`, { offer }) : Promise.resolve(null);
         },
+        // Server-authoritative consumable use: the server spends the item and rolls/grants
+        // whatever it awards in one transaction. `activationId` makes a retry replay the same
+        // result instead of spending a second item.
+        activateGameConsumable(gameSlug, { itemId, activationId }) {
+            const encoded = encodePathSegment(gameSlug);
+            return encoded
+                ? post(`/game-progress/${encoded}/consumables/activate`, { itemId, activationId })
+                : Promise.resolve(null);
+        },
         // Reset campaign mission progress only (Valor / unlocks / skins preserved server-side).
         resetGameCampaign(gameSlug) {
             const encoded = encodePathSegment(gameSlug);

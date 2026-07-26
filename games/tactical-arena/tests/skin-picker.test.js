@@ -113,13 +113,6 @@ class FakeElement {
       handler({ target: this });
     }
   }
-
-  dblclick() {
-    if (this.disabled) return;
-    for (const handler of this.listeners.get("dblclick") ?? []) {
-      handler({ target: this });
-    }
-  }
 }
 
 class FakeDocument {
@@ -176,12 +169,9 @@ test("skin picker offers every authored skin locked (no unlock UI yet); classic 
   arcane.click();
 
   const repainted = document.body.children[0];
-  const selectBtn = walk(repainted, (node) => hasClass(node, "skin-picker-select-btn"))[0];
-  assert.ok(selectBtn, "a Select This Skin button should be present while previewing");
-  assert.equal(selectBtn.disabled, true, "select button should be disabled while previewing a locked skin");
-
   const useButton = walk(repainted, (node) =>
     node.tagName === "BUTTON" && node.dataset.skinAction === "use")[0];
+  assert.equal(useButton.textContent, "Use Classic", "clicking a locked skin must not change the locked-in selection");
   useButton.click();
 
   // Selection never moved off classic since the locked skin was only previewed.
@@ -189,7 +179,7 @@ test("skin picker offers every authored skin locked (no unlock UI yet); classic 
   assert.equal(overlay.hidden, true);
 });
 
-test("skin picker requires an explicit Select action before Use Skin locks in a previewed unlocked skin", async () => {
+test("skin picker locks in an unlocked skin on a single click — no extra Select step", async () => {
   grantArcherDesertWarriorUnlock();
   globalThis.document = new FakeDocument();
 
@@ -199,39 +189,18 @@ test("skin picker requires an explicit Select action before Use Skin locks in a 
   const desertWarrior = walk(overlay, (node) => node.tagName === "BUTTON" && node.dataset.skin === "desert-warrior")[0];
   desertWarrior.click();
 
-  // Previewing does not change what Use Skin would apply.
-  let repainted = document.body.children[0];
-  let useButton = walk(repainted, (node) =>
-    node.tagName === "BUTTON" && node.dataset.skinAction === "use")[0];
-  assert.equal(useButton.textContent, "Use Classic", "Use Skin should still reflect the locked-in selection, not the preview");
-
-  const selectBtn = walk(repainted, (node) => hasClass(node, "skin-picker-select-btn"))[0];
-  selectBtn.click();
-
-  repainted = document.body.children[0];
-  useButton = walk(repainted, (node) =>
-    node.tagName === "BUTTON" && node.dataset.skinAction === "use")[0];
-  assert.equal(useButton.textContent, "Use Skin", "Use Skin should update once the previewed skin is explicitly selected");
-
-  useButton.click();
-  assert.deepEqual(await picking, { skin: "desert-warrior" });
-});
-
-test("skin picker double-click previews and selects an unlocked skin in one step", async () => {
-  grantArcherDesertWarriorUnlock();
-  globalThis.document = new FakeDocument();
-
-  const picking = openSkinPicker({ type: "archer", initial: null });
-  const overlay = document.body.children[0];
-
-  const desertWarrior = walk(overlay, (node) => node.tagName === "BUTTON" && node.dataset.skin === "desert-warrior")[0];
-  desertWarrior.dblclick();
-
   const repainted = document.body.children[0];
+  assert.equal(
+    walk(repainted, (node) => hasClass(node, "skin-picker-select-btn")).length,
+    0,
+    "the intermediate Select This Skin button should be gone"
+  );
+
   const useButton = walk(repainted, (node) =>
     node.tagName === "BUTTON" && node.dataset.skinAction === "use")[0];
-  useButton.click();
+  assert.equal(useButton.textContent, "Use Skin", "one click should already reflect the picked skin");
 
+  useButton.click();
   assert.deepEqual(await picking, { skin: "desert-warrior" });
 });
 

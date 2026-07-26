@@ -77,14 +77,6 @@ export function openSkinPicker({ type, initial = null, accent = null } = {}) {
         "skin-picker-status",
         viewingLocked ? "Locked — not yet unlocked" : isSelected ? "Currently selected" : "Previewing"
       ));
-      const selectBtn = el("button", "menu-btn skin-picker-select-btn", isSelected ? "✓ Selected" : "Select This Skin");
-      selectBtn.type = "button";
-      selectBtn.disabled = viewingLocked || isSelected;
-      selectBtn.addEventListener("click", () => {
-        selected = viewing;
-        paint();
-      });
-      copy.appendChild(selectBtn);
       preview.appendChild(copy);
 
       const grid = el("div", "skin-picker-grid");
@@ -106,16 +98,16 @@ export function openSkinPicker({ type, initial = null, accent = null } = {}) {
         const status = el("span", "skin-picker-choice-status", locked ? "Locked" : selectedChoice ? "Selected" : "Unlocked");
         btn.append(name, status);
         btn.addEventListener("click", () => {
-          // Previewing a locked skin must NOT run it through normalizeSkinSlug — that
-          // clamps locked slugs back to null, which would make locked thumbnails
-          // un-previewable (the whole point of the view/select split).
-          viewing = choice.slug ?? null;
-          paint();
-        });
-        btn.addEventListener("dblclick", () => {
-          if (locked) return;
-          viewing = normalizeSkinSlug(type, choice.slug);
-          selected = viewing;
+          if (locked) {
+            // A locked skin can only be previewed. It must NOT run through
+            // normalizeSkinSlug — that clamps locked slugs back to null, which would
+            // make locked thumbnails un-previewable.
+            viewing = choice.slug ?? null;
+          } else {
+            // One click both previews and locks in the choice; Use Skin applies it.
+            viewing = normalizeSkinSlug(type, choice.slug);
+            selected = viewing;
+          }
           paint();
         });
         grid.appendChild(btn);

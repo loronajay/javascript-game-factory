@@ -343,6 +343,14 @@ export function getConsumableOffers() {
   return CONSUMABLE_OFFERS;
 }
 
+// How many skins of a rarity the player has left to win. The server does the actual roll for
+// a random-skin consumable, but it refuses (without spending the item) once the pool is
+// empty — this lets the Inventory say so up front instead of surfacing a bare failure.
+export function countUnownedSkinsOfRarity(rarity, storage = globalThis.localStorage) {
+  if (!rarity) return 0;
+  return getSkinOffers(storage).filter((offer) => offer.rarity === rarity && !offer.owned).length;
+}
+
 export function getConsumableOffer(id) {
   return CONSUMABLE_OFFERS.find((offer) => offer.id === id) ?? null;
 }

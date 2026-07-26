@@ -320,3 +320,55 @@ test("POST /game-progress/:gameSlug/reset requires authentication", async () => 
   const response = await invoke(app, "POST", "/game-progress/tactical-arena/reset", {});
   assert.equal(response.statusCode, 401);
 });
+
+test("POST /game-progress/:gameSlug/consumables/activate spends the item for the authenticated player", async () => {
+  const token = signToken({ playerId: "player-1", email: "p@test.com" }, TEST_SECRET);
+  let seen = null;
+  const app = createApp({
+    jwtSecret: TEST_SECRET,
+    activateConsumable: async (params) => {
+      seen = params;
+      return {
+        ok: true,
+        itemId: "random-epic-skin",
+        effect: { kind: "random-unowned-skin", rarity: "epic", count: 1 },
+        entitlementIds: ["skin:archer:floral"],
+        progress: { inventoryItems: [] },
+      };
+    },
+  });
+
+  const response = await invoke(app, "POST", "/game-progress/tactical-arena/consumables/activate", {
+    token,
+    body: { itemId: "random-epic-skin", activationId: "act-1" },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json.entitlementIds, ["skin:archer:floral"]);
+  assert.equal(seen.playerId, "player-1");
+  assert.equal(seen.gameSlug, "tactical-arena");
+  assert.equal(seen.itemId, "random-epic-skin");
+  assert.equal(seen.activationId, "act-1");
+});
+
+test("POST /game-progress/:gameSlug/consumables/activate requires authentication", async () => {
+  const app = createApp({ jwtSecret: TEST_SECRET, activateConsumable: async () => ({ ok: true }) });
+  const response = await invoke(app, "POST", "/game-progress/tactical-arena/consumables/activate", {
+    body: { itemId: "valor-boost-1", activationId: "act-1" },
+  });
+  assert.equal(response.statusCode, 401);
+});
+
+test("POST /game-progress/:gameSlug/consumables/activate surfaces the service refusal status", async () => {
+  const token = signToken({ playerId: "player-1", email: "p@test.com" }, TEST_SECRET);
+  const app = createApp({
+    jwtSecret: TEST_SECRET,
+    activateConsumable: async () => ({ ok: false, statusCode: 409, error: "item_not_owned" }),
+  });
+  const response = await invoke(app, "POST", "/game-progress/tactical-arena/consumables/activate", {
+    token,
+    body: { itemId: "valor-boost-1", activationId: "act-1" },
+  });
+  assert.equal(response.statusCode, 409);
+  assert.equal(response.json.error, "item_not_owned");
+});

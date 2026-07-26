@@ -123,18 +123,12 @@ export function grantConsumable(storage = defaultStorage(), itemId, quantity = 1
   return { accepted: true, inventory: next, offer };
 }
 
-export function activateConsumable(storage = defaultStorage(), itemId, options = {}) {
-  const offer = getConsumableOffer(itemId);
-  const inventory = readInventory(storage);
-  if (!offer) return { accepted: false, errorCode: "CONSUMABLE_NOT_FOUND", inventory, offer: null };
-  const quantity = inventory.consumables[offer.id] ?? 0;
-  if (quantity <= 0) return { accepted: false, errorCode: "CONSUMABLE_NOT_OWNED", inventory, offer };
-
+function buildActivation(offer, inventory, options = {}) {
   const activatedAt = nowIso(options.now);
   const status = offer.activationTrigger === "immediate" ? "resolved" : "pending";
   const startsAt = offer.activationTrigger === "immediate" ? activatedAt : null;
   const expiresAt = offer.durationHours && startsAt ? addHours(startsAt, offer.durationHours) : null;
-  const activation = Object.freeze({
+  return Object.freeze({
     id: `${offer.id}:${new Date(activatedAt).getTime()}:${inventory.activeConsumables.length}`,
     itemId: offer.id,
     status,
@@ -144,6 +138,31 @@ export function activateConsumable(storage = defaultStorage(), itemId, options =
     activationTrigger: offer.activationTrigger,
     durationHours: offer.durationHours,
   });
+}
+
+// Record an activation WITHOUT spending an item. Used on the server-authoritative path,
+// where the server already decremented the quantity — the local activation entry only exists
+// so the timed valor/campaign boosts know they are armed and when they expire.
+export function recordConsumableActivation(storage = defaultStorage(), itemId, options = {}) {
+  const offer = getConsumableOffer(itemId);
+  const inventory = readInventory(storage);
+  if (!offer) return { accepted: false, errorCode: "CONSUMABLE_NOT_FOUND", inventory, offer: null };
+  const activation = buildActivation(offer, inventory, options);
+  const next = writeInventory(storage, {
+    ...inventory,
+    activeConsumables: [...inventory.activeConsumables, activation],
+  });
+  return { accepted: true, inventory: next, offer, activation };
+}
+
+export function activateConsumable(storage = defaultStorage(), itemId, options = {}) {
+  const offer = getConsumableOffer(itemId);
+  const inventory = readInventory(storage);
+  if (!offer) return { accepted: false, errorCode: "CONSUMABLE_NOT_FOUND", inventory, offer: null };
+  const quantity = inventory.consumables[offer.id] ?? 0;
+  if (quantity <= 0) return { accepted: false, errorCode: "CONSUMABLE_NOT_OWNED", inventory, offer };
+
+  const activation = buildActivation(offer, inventory, options);
   const consumables = { ...inventory.consumables, [offer.id]: quantity - 1 };
   if (consumables[offer.id] <= 0) delete consumables[offer.id];
   const next = writeInventory(storage, {
@@ -152,6 +171,34 @@ export function activateConsumable(storage = defaultStorage(), itemId, options =
     activeConsumables: [...inventory.activeConsumables, activation],
   });
   return { accepted: true, inventory: next, offer, activation };
+}
+
+// Apply the server's inventory snapshot to the local cache.
+//
+// For a signed-in account the server owns consumable quantities (it is what Stripe
+// fulfillment credits and what activation spends), so `authoritative` replaces the local
+// counts outright — including dropping items the server does not have. Offline/guest boots
+// stay additive (keep the higher count) so a not-yet-synced grant is never downgraded.
+// Activation records stay local either way: the timed boosts are a local-effect concept.
+export function mergeServerInventory(storage = defaultStorage(), snapshot = {}, options = {}) {
+  const authoritative = Boolean(options.authoritative);
+  const rows = Array.isArray(snapshot?.inventoryItems) ? snapshot.inventoryItems : [];
+  const inventory = readInventory(storage);
+  const serverConsumables = {};
+  for (const row of rows) {
+    const offer = getConsumableOffer(row?.itemId);
+    if (!offer) continue;
+    const quantity = Math.max(0, Math.floor(Number(row?.quantity) || 0));
+    if (quantity > 0) serverConsumables[offer.id] = quantity;
+  }
+  if (authoritative) {
+    return writeInventory(storage, { ...inventory, consumables: serverConsumables });
+  }
+  const consumables = { ...inventory.consumables };
+  for (const [itemId, quantity] of Object.entries(serverConsumables)) {
+    consumables[itemId] = Math.max(consumables[itemId] ?? 0, quantity);
+  }
+  return writeInventory(storage, { ...inventory, consumables });
 }
 
 export function startPendingConsumables(storage = defaultStorage(), trigger, options = {}) {
