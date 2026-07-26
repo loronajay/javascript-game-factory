@@ -140,6 +140,16 @@ them permanently.
    stays idempotent on its `activationId`.
 8. `marketplace.js` `CONSUMABLE_OFFERS` must match `services/consumable-catalog.mts` offer for
    offer (id, sku, price, effect) — guarded by a cross-import test in `tests/marketplace.test.js`.
+9. A profile badge is proof of a purchase or a record, so **equipping one is validated
+   server-side** against the player's earned set (`playerHasGameBadge`), not merely sanitized
+   the way the opaque ranked avatar ids are. A refused equip keeps the previous pick. Derived
+   badges stay computed from `game_entitlements` and are never written to
+   `game_player_badges` — that is what keeps them un-injectable. Auto-awarded badges qualify
+   only on facts the player cannot write directly (a resolved-match `game_ratings` row,
+   a completed campaign row).
+10. `skin-pack:<packId>` entitlements are granted alongside a pack's skins purely as a durable
+   record that the bundle was bought. They own no content — never treat one as granting the
+   skins, and never let the client assert one.
 
 ## Known limits (accepted / future)
 
@@ -153,7 +163,13 @@ them permanently.
   times (one-time backfill is per account). Premium, new-Valor, and campaign/tutorial items are
   unaffected.
 - **Campaign completion** is still client-asserted (single-player). A future pass could
-  server-validate mission outcomes via deterministic replay of the headless core.
+  server-validate mission outcomes via deterministic replay of the headless core. Note this
+  also reaches the OG Commander badge, whose campaign path trusts the same claimed progress;
+  its ranked path (a resolved-match `game_ratings` row) does not.
+- **In-match nameplate cosmetics** — the equipped badge, like the ranked avatar and tagline,
+  travels in the peer's identity payload, so a modified client could show its opponent a badge
+  it never earned *on that opponent's screen only*. It is cosmetic, never hashed, and every
+  authoritative surface (profile, card, ladder) reads the server's own copy instead.
 - **Rare multi-source revocation edge**: an entitlement's `source` is set by whichever grant
   landed *first* and is never overwritten. So if a Stripe purchase granted an item first and the
   player *later* also earned that same item another way, a chargeback still revokes the (single)

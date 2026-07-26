@@ -6,6 +6,7 @@ import {
   isRankedMatchInProgress,
   syncRankedStandingNameplate,
 } from "../src/ui/rankedProfile.js";
+import { renderBadgePickerField } from "../src/ui/rankedBadgePicker.js";
 import { writeUnlockProgress } from "../src/progression/unlocks.js";
 
 class FakeLocalStorage {
@@ -48,17 +49,54 @@ class TestElement {
     this.attributes[name] = String(value);
   }
 
+  removeAttribute(name) {
+    delete this.attributes[name];
+  }
+
   append(...children) {
+    for (const child of children) this.adopt(child);
     this.children.push(...children);
   }
 
   appendChild(child) {
+    this.adopt(child);
     this.children.push(child);
     return child;
   }
 
   replaceChildren(...children) {
+    for (const child of children) this.adopt(child);
     this.children = children;
+  }
+
+  adopt(child) {
+    if (child && typeof child === "object") child.parentNode = this;
+  }
+
+  // Enough of the event/removal surface for the interactive fields (pickers) to be driven
+  // headlessly: register a listener, fire it, and let a node take itself out of the tree.
+  addEventListener(type, handler) {
+    if (!this.listeners) this.listeners = new Map();
+    this.listeners.set(type, [...(this.listeners.get(type) || []), handler]);
+  }
+
+  dispatch(type, event = {}) {
+    for (const handler of this.listeners?.get(type) || []) handler(event);
+  }
+
+  remove() {
+    const parent = this.parentNode;
+    if (!parent) return;
+    parent.children = parent.children.filter((child) => child !== this);
+    this.parentNode = null;
+  }
+
+  focus() {}
+
+  findAllByClass(className, found = []) {
+    if (this.className.split(/\s+/).includes(className)) found.push(this);
+    for (const child of this.children) child.findAllByClass?.(className, found);
+    return found;
   }
 
   querySelector(selector) {
@@ -91,10 +129,12 @@ function createNameplateSection() {
   name.className = "ranked-profile-nameplate-name";
   const tagline = new TestElement("span");
   tagline.className = "ranked-profile-nameplate-tagline";
+  const badge = new TestElement("span");
+  badge.className = "ranked-profile-nameplate-badge";
 
-  nameplate.append(avatar, name, tagline);
+  nameplate.append(avatar, name, tagline, badge);
   section.appendChild(nameplate);
-  return { section, avatar, name, tagline };
+  return { section, avatar, name, tagline, badge };
 }
 
 test("ranked profile standing nameplate updates tagline and avatar in-place", () => {
@@ -173,4 +213,107 @@ test("ranked profile active-match notice only treats live matches as in progress
   assert.equal(isRankedMatchInProgress({ status: "pending_forfeit", matchId: "m1" }), false);
   assert.equal(isRankedMatchInProgress({ status: "resolved", matchId: "m1" }), false);
   assert.equal(isRankedMatchInProgress({ status: "active", outcome: "win", matchId: "m1" }), false);
+});
+
+const BLOOD_MOON = {
+  badgeId: "blood-moon-collector",
+  label: "Blood Moon",
+  description: "Owns the complete Blood Moon skin collection.",
+  art: "blood-moon",
+};
+const OG = { badgeId: "og-commander", label: "OG Commander", description: "Opening days.", art: "og-commander" };
+
+// The picker loads its options asynchronously; let the whole chain settle before asserting.
+const flushAsyncField = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+test("the nameplate badge slot fills when equipped and hides when not", () => {
+  const { section, badge } = createNameplateSection();
+
+  syncRankedStandingNameplate(section, { pilot: "Leonardo", badge: BLOOD_MOON });
+  assert.equal(badge.hidden, false);
+  assert.equal(badge.children.length, 1);
+  assert.match(badge.children[0].src, /assets\/player-badges\/blood-moon\.webp$/);
+  assert.equal(badge.children[0].alt, "Blood Moon", "shown alone, so the art carries the label");
+  assert.equal(badge.title, "Blood Moon — Owns the complete Blood Moon skin collection.");
+
+  // Unequipping must leave nothing behind — an empty-but-present slot would hold space in
+  // the meta row it shares with the tier and rating.
+  syncRankedStandingNameplate(section, { pilot: "Leonardo", badge: null });
+  assert.equal(badge.hidden, true);
+  assert.equal(badge.children.length, 0);
+  assert.equal(badge.title, "", "a stale tooltip on an empty slot would still show on hover");
+});
+
+test("the badge picker offers only earned badges, plus an explicit no-badge option", async () => {
+  const section = new TestElement("section");
+  const state = { badgeId: null, badge: null };
+  const saved = [];
+
+  renderBadgePickerField(section, {
+    state,
+    save: (patch) => saved.push(patch),
+    loadBadges: async () => ({ badges: [BLOOD_MOON, OG] }),
+  });
+  await flushAsyncField();
+
+  const options = section.findAllByClass("ranked-profile-badge-option");
+  assert.equal(options.length, 3, "no badge + the two earned ones");
+  assert.equal(section.findByClass("ranked-profile-badge-selected-label").textContent, "No badge");
+
+  // Equip the second earned badge.
+  options[2].dispatch("click");
+  assert.equal(state.badgeId, "og-commander");
+  assert.equal(state.badge.label, "OG Commander");
+  assert.deepEqual(saved, [{ badgeId: "og-commander" }]);
+  assert.equal(section.findByClass("ranked-profile-badge-selected-label").textContent, "OG Commander");
+
+  // And unequip through the no-badge option.
+  section.findAllByClass("ranked-profile-badge-option")[0].dispatch("click");
+  assert.equal(state.badgeId, null);
+  assert.equal(state.badge, null);
+  assert.deepEqual(saved, [{ badgeId: "og-commander" }, { badgeId: null }]);
+});
+
+test("the badge picker says so when there is nothing to equip yet", async () => {
+  const section = new TestElement("section");
+  renderBadgePickerField(section, {
+    state: { badgeId: null, badge: null },
+    save: () => {},
+    loadBadges: async () => ({ badges: [] }),
+  });
+  await flushAsyncField();
+
+  assert.equal(section.findAllByClass("ranked-profile-badge-option").length, 0);
+  assert.match(section.findByClass("ranked-profile-badge-status").textContent, /No badges yet/);
+});
+
+test("an equipped badge the player no longer has is dropped rather than offered", async () => {
+  const section = new TestElement("section");
+  // The server is the authority on what is earned; a stale local pick must not survive as
+  // an option that can't be re-selected.
+  const state = { badgeId: "blood-moon-collector", badge: BLOOD_MOON };
+  renderBadgePickerField(section, {
+    state,
+    save: () => {},
+    loadBadges: async () => ({ badges: [OG] }),
+  });
+  await flushAsyncField();
+
+  assert.equal(state.badgeId, null);
+  assert.equal(state.badge, null);
+  assert.equal(section.findByClass("ranked-profile-badge-selected-label").textContent, "No badge");
+});
+
+test("the badge picker reports a failed load instead of silently offering nothing", async () => {
+  const section = new TestElement("section");
+  renderBadgePickerField(section, {
+    state: { badgeId: null, badge: null },
+    save: () => {},
+    loadBadges: async () => { throw new Error("offline"); },
+  });
+  await flushAsyncField();
+
+  const status = section.findByClass("ranked-profile-badge-status");
+  assert.match(status.textContent, /Couldn't load your badges/);
+  assert.equal(status.dataset.state, "err");
 });

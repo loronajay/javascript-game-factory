@@ -7,6 +7,8 @@
     "release:audit": "node --preserve-symlinks --preserve-symlinks-main scripts/release-audit.mjs",
     "release:audit:strict": "node --preserve-symlinks --preserve-symlinks-main scripts/release-audit.mjs --strict",
     "skins": "node --preserve-symlinks --preserve-symlinks-main scripts/generate-skin-manifest.mjs",
-    "test": "node --preserve-symlinks --preserve-symlinks-main scripts/generate-skin-manifest.mjs && node --preserve-symlinks --preserve-symlinks-main --test tests/*.test.js"
+    "badges": "node --preserve-symlinks --preserve-symlinks-main scripts/generate-badge-manifest.mjs",
+    "badges:art": "python scripts/convert-badge-art.py",
+    "test": "node --preserve-symlinks --preserve-symlinks-main scripts/generate-skin-manifest.mjs && node --preserve-symlinks --preserve-symlinks-main scripts/generate-badge-manifest.mjs && node --preserve-symlinks --preserve-symlinks-main --test tests/*.test.js"
   }
 }

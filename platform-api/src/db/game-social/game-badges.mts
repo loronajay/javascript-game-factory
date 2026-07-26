@@ -10,6 +10,7 @@ import {
   isValidGameSocialSlug,
   logGameSocialError,
 } from "./game-social-shared.mjs";
+import { syncAutoAwardedBadges } from "./game-badge-awards.mjs";
 import {
   derivedBadgesForEntitlements,
   findGameBadge,
@@ -17,23 +18,43 @@ import {
   serializeBadge,
 } from "../../services/game-badge-catalog.mjs";
 
+async function readAwardedRows(pool: any, gameSlug: string, playerId: string): Promise<any[]> {
+  const res = await pool.query(
+    `select badge_id, source, awarded_at from game_player_badges where player_id = $1 and game_slug = $2`,
+    [playerId, gameSlug],
+  );
+  return res.rows || [];
+}
+
 // Public read. Derived badges come first; within each group the catalog's order wins,
 // so a profile's badge row is stable rather than dependent on purchase timing.
+//
+// The read also settles any auto-awarded badge the player has come to qualify for. That
+// makes the badge itself retroactive — everyone who already played ranked or finished the
+// campaign earns it the first time a profile of theirs is read, with no backfill job — at
+// the cost of the award timestamp being "first seen" rather than "moment qualified".
 export async function getGamePlayerBadges(pool: any, { gameSlug, playerId }: any): Promise<any> {
   const target = cleanPlayerId(playerId);
   if (!pool || !isValidGameSocialSlug(gameSlug) || !target) return null;
 
   try {
-    const [entitlements, awarded] = await Promise.all([
+    const [entitlements, awardedRows] = await Promise.all([
       pool.query(
         `select entitlement_id from game_entitlements where player_id = $1 and game_slug = $2`,
         [target, gameSlug],
       ),
-      pool.query(
-        `select badge_id, source, awarded_at from game_player_badges where player_id = $1 and game_slug = $2`,
-        [target, gameSlug],
-      ),
+      readAwardedRows(pool, gameSlug, target),
     ]);
+
+    let awarded = awardedRows;
+    const newlyAwarded = await syncAutoAwardedBadges(pool, {
+      gameSlug,
+      playerId: target,
+      heldBadgeIds: new Set(awarded.map((row: any) => row.badge_id)),
+    });
+    // Only re-read when something was actually written, so the common case stays at the
+    // two queries above plus the fact lookup.
+    if (newlyAwarded.length) awarded = await readAwardedRows(pool, gameSlug, target);
 
     const derived = derivedBadgesForEntitlements(
       gameSlug,
@@ -41,7 +62,7 @@ export async function getGamePlayerBadges(pool: any, { gameSlug, playerId }: any
     );
 
     const seen = new Set(derived.map((badge: any) => badge.badgeId));
-    const explicit = (awarded.rows || [])
+    const explicit = awarded
       .map((row: any) => {
         const badge = findGameBadge(gameSlug, row.badge_id);
         // A row whose badge left the catalog is skipped rather than rendered blank.
@@ -56,6 +77,14 @@ export async function getGamePlayerBadges(pool: any, { gameSlug, playerId }: any
     logGameSocialError("getGamePlayerBadges", err);
     return null;
   }
+}
+
+// Does this player actually hold this badge? The equip path asks before storing a
+// player's chosen badge — unlike an avatar, a badge is a claim about a purchase or a
+// record, so a tampered client must not be able to display one it never earned.
+export async function playerHasGameBadge(pool: any, { gameSlug, playerId, badgeId }: any): Promise<boolean> {
+  const res = await getGamePlayerBadges(pool, { gameSlug, playerId });
+  return Boolean(res?.badges?.some((badge: any) => badge.badgeId === badgeId));
 }
 
 // Grant an awardable badge. Trusted server paths only — there is no public route to

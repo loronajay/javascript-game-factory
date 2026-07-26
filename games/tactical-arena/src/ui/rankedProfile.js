@@ -190,6 +190,10 @@ function renderSignedIn(body, { pilot, standing, apiClient }) {
     title: standing?.title || "",
     avatarUnit: standing?.avatarUnit || null,
     avatarSkin: standing?.avatarSkin || null,
+    badgeId: standing?.badgeId || standing?.badge?.badgeId || null,
+    // The server sends the equipped badge already expanded, so the nameplate can draw it
+    // before the earned list (which the picker needs) has finished loading.
+    badge: standing?.badge || null,
   };
   maybeMigrateLegacyName(state, apiClient);
   // Keep the synchronous in-match cache aligned with the authoritative title.
@@ -203,15 +207,23 @@ function renderSignedIn(body, { pilot, standing, apiClient }) {
       tagline: state.title,
       avatarUnit: state.avatarUnit,
       avatarSkin: state.avatarSkin,
+      badge: state.badge,
     });
   };
 
-  renderIdentityEditor(body, { pilot, state, apiClient, onProfileSaved: refreshStandingNameplate });
+  renderIdentityEditor(body, {
+    pilot,
+    state,
+    apiClient,
+    playerId: standing?.playerId || "",
+    onProfileSaved: refreshStandingNameplate,
+  });
   standingSection = renderStanding(body, standing, {
     pilot,
     tagline: state.title,
     avatarUnit: state.avatarUnit,
     avatarSkin: state.avatarSkin,
+    badge: state.badge,
   });
   if (standing?.playerId) {
     renderMetaSections(body, { apiClient, playerId: standing.playerId });
@@ -254,7 +266,7 @@ function renderMetaSections(body, { apiClient, playerId }) {
   }
 }
 
-function renderStanding(body, standing, { pilot = "", tagline = "", avatarUnit = null, avatarSkin = null } = {}) {
+function renderStanding(body, standing, { pilot = "", tagline = "", avatarUnit = null, avatarSkin = null, badge = null } = {}) {
   const section = el("section", "ranked-profile-standing");
   if (!standing) {
     section.appendChild(el("p", "ranked-profile-standing-error", "No rating yet. Play a ranked match to get started."));
@@ -269,7 +281,12 @@ function renderStanding(body, standing, { pilot = "", tagline = "", avatarUnit =
   const avatar = el("div", "ranked-profile-nameplate-avatar");
   nameplate.appendChild(avatar);
   const plateCopy = el("div", "ranked-profile-nameplate-copy");
-  plateCopy.appendChild(el("span", "ranked-profile-nameplate-name", ""));
+  // Name + badge share a line, the same pairing the match plate and the ladder use. The
+  // slot is always present and filled by syncRankedStandingNameplate; it collapses when
+  // nothing is equipped, so the plate's height never depends on having a badge.
+  const nameLine = el("span", "ranked-profile-nameplate-nameline");
+  nameLine.append(el("span", "ranked-profile-nameplate-name", ""), el("span", "ranked-profile-nameplate-badge"));
+  plateCopy.appendChild(nameLine);
   plateCopy.appendChild(el("span", "ranked-profile-nameplate-tagline", ""));
   const meta = el("span", "ranked-profile-nameplate-meta");
   meta.appendChild(el("b", `ranked-profile-tier ranked-tier-${tierId}`, tierLabel));
@@ -284,7 +301,7 @@ function renderStanding(body, standing, { pilot = "", tagline = "", avatarUnit =
   if (isRankedMatchInProgress(standing.activeMatch)) {
     section.appendChild(el("p", "ranked-profile-activematch", "You have a ranked match in progress."));
   }
-  syncRankedStandingNameplate(section, { pilot, tagline, avatarUnit, avatarSkin });
+  syncRankedStandingNameplate(section, { pilot, tagline, avatarUnit, avatarSkin, badge });
   body.appendChild(section);
   return section;
 }

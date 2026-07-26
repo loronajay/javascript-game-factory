@@ -527,7 +527,13 @@ export async function resolveTacticalArenaPremiumOffer(offerInput, progress = {}
                 name: skinPack.name,
                 amountCents,
                 currency: skinPack.currency,
-                entitlementIds: unownedSkins.map((skin) => skin.entitlementId),
+                // The pack marker is granted alongside the skins so "bought the pack" stays
+                // provable later. Without it, a pack purchase is indistinguishable from having
+                // bought every skin one at a time, which is what badge rules need to tell apart.
+                entitlementIds: [
+                    ...unownedSkins.map((skin) => skin.entitlementId),
+                    `skin-pack:${skinPack.packId}`,
+                ],
                 metadata: {
                     offerKind: "skin-pack",
                     packId: skinPack.packId,

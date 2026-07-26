@@ -8,6 +8,7 @@ import { TEMPO_GAUGE_MAX, canBeginTempoActivation, getTempoReadiness, getUnitAgi
 import { escapeHtml } from "./domHelpers.js";
 import { getRankedTierEmblemSrc, normalizeRankedTierId } from "./rankedEmblems.js";
 import { hasRankedAvatar, rankedAvatarHtml as rankedAvatarIconHtml } from "./rankedAvatars.js";
+import { badgeArtSrc, badgeTooltip } from "./playerBadges.js";
 
 // Icon per weather id, shown in the match HUD's weather badge (renderWeatherBadge).
 // "none" is the badge's own resting state, not a WEATHER_TYPES entry.
@@ -136,6 +137,16 @@ function rankedProfileForSeat(net, seat) {
   return displayName ? { displayName, rankedProfile: null } : null;
 }
 
+// The opponent's equipped badge, beside their name on the match plate. Built as an HTML
+// string like the rest of this plate; the art path comes from the shared badge module so
+// the manifest stays the one place that knows where badge images live.
+function rankedBadgeHtml(profile) {
+  const badge = profile?.rankedProfile?.badge;
+  const src = badge ? badgeArtSrc(badge) : "";
+  if (!src) return "";
+  return `<img class="ranked-match-badge" src="${escapeAttr(src)}" alt="" aria-hidden="true" title="${escapeAttr(badgeTooltip(badge))}" loading="lazy" decoding="async">`;
+}
+
 function rankedAvatarHtml(profile) {
   const ranked = profile?.rankedProfile;
   if (hasRankedAvatar(ranked?.avatarUnit)) return rankedAvatarIconHtml(ranked.avatarUnit, "is-ranked-avatar");
@@ -169,7 +180,10 @@ export function renderRankedMatchNameplates(host, { state, net, mySeat, ranked }
       ${rankedAvatarHtml(profile)}
       <div class="ranked-match-copy">
         <span class="ranked-match-kicker">${seat === mySeat ? "You" : "Opponent"}</span>
-        <strong class="ranked-match-name">${escapeHtml(profile.displayName || `Player ${seat}`)}</strong>
+        <span class="ranked-match-nameline">
+          <strong class="ranked-match-name">${escapeHtml(profile.displayName || `Player ${seat}`)}</strong>
+          ${rankedBadgeHtml(profile)}
+        </span>
         ${tagline ? `<span class="ranked-match-tagline">${escapeHtml(tagline)}</span>` : ""}
         <span class="ranked-match-record">${escapeHtml(rankedRecordText(rankedProfile))}</span>
       </div>

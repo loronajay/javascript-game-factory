@@ -16,6 +16,7 @@ import { syncRankedPilotProfile } from "../online/rankedPilotProfile.js";
 import { createPortrait, hasPortrait } from "./portraits.js";
 import { createRankedTierEmblem, normalizeRankedTierId } from "./rankedEmblems.js";
 import { createRankedAvatarIcon, hasRankedAvatar } from "./rankedAvatars.js";
+import { badgeTooltip, createBadgeIcon } from "./playerBadges.js";
 
 const LEADERBOARD_LIMIT = 100;
 const TOP_LEADERBOARD_COUNT = 10;
@@ -76,6 +77,9 @@ function entryMatchesSearch(entry, search) {
     entry.tier?.id,
     entry.tier?.label,
     tierId,
+    // A displayed badge is part of how a player reads on the ladder, so it is searchable
+    // like their tier and tagline are.
+    entry.badge?.label,
   ].map((value) => String(value || "").toLowerCase()).join(" ");
   return searchable.includes(search);
 }
@@ -288,7 +292,16 @@ function renderLeaderboardRows(body, entries, totalEntries, state) {
     row.appendChild(avatar);
 
     const name = el("div", "ranked-leaderboard-name");
-    name.appendChild(el("span", "ranked-leaderboard-player", leaderboardPlayerName(entry, isMe)));
+    // Name + equipped badge share a line so the badge reads as part of the identity, the
+    // same way it does on a nameplate, without adding a row to the ladder.
+    const nameLine = el("span", "ranked-leaderboard-nameline");
+    nameLine.appendChild(el("span", "ranked-leaderboard-player", leaderboardPlayerName(entry, isMe)));
+    const badgeIcon = createBadgeIcon(entry.badge, { variant: "is-row", decorative: false });
+    if (badgeIcon) {
+      badgeIcon.title = badgeTooltip(entry.badge);
+      nameLine.appendChild(badgeIcon);
+    }
+    name.appendChild(nameLine);
     const tagline = leaderboardTagline(entry);
     if (tagline) name.appendChild(el("span", "ranked-leaderboard-title", tagline));
     const record = `${entry.wins || 0}W / ${entry.losses || 0}L / ${entry.draws || 0}D`;

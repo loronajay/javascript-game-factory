@@ -31,6 +31,7 @@ export {
 export {
   awardGameBadge,
   getGamePlayerBadges,
+  playerHasGameBadge,
 } from "./game-social/game-badges.mjs";
 
 export {

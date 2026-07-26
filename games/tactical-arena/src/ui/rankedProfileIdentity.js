@@ -12,6 +12,7 @@ import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { readUnlockProgress } from "../progression/unlocks.js";
 import { getUnitSkins } from "./skinModel.js";
 import { RANKED_AVATARS, createRankedAvatarIcon, getRankedAvatar, hasRankedAvatar } from "./rankedAvatars.js";
+import { renderBadgePickerField } from "./rankedBadgePicker.js";
 
 // Matches the server-side RANKED_TITLE_MAX_LENGTH in platform-api/src/db/ranked.mts.
 export const RANKED_TITLE_MAX_LENGTH = 60;
@@ -75,7 +76,7 @@ export function maybeMigrateLegacyName(state, apiClient) {
   apiClient.saveRankedProfile(TACTICAL_ARENA_GAME_SLUG, { title: state.title }).catch(() => {});
 }
 
-export function renderIdentityEditor(body, { pilot, state, apiClient, onProfileSaved = null }) {
+export function renderIdentityEditor(body, { pilot, state, apiClient, playerId = "", onProfileSaved = null }) {
   const section = el("section", "ranked-profile-identity");
 
   const pilotRow = el("div", "ranked-profile-pilot");
@@ -100,6 +101,11 @@ export function renderIdentityEditor(body, { pilot, state, apiClient, onProfileS
         state.title = profile.title || "";
         state.avatarUnit = profile.avatarUnit || null;
         state.avatarSkin = profile.avatarSkin || null;
+        // The server refuses a badge the player hasn't earned by keeping the previous
+        // pick, so reconciling from the response is what makes a refused equip visible
+        // here instead of leaving the UI showing something the nameplate won't have.
+        state.badgeId = profile.badgeId || null;
+        if (!state.badgeId) state.badge = null;
         saveRankedName(state.title || "");
         onProfileSaved?.(state);
         flashSaved();
@@ -148,6 +154,15 @@ export function renderIdentityEditor(body, { pilot, state, apiClient, onProfileS
 
   // --- Avatar picker ---
   section.appendChild(renderAvatarField(state, save));
+
+  // --- Badge picker ---
+  renderBadgePickerField(section, {
+    state,
+    apiClient,
+    playerId,
+    save,
+    onBadgeChanged: () => onProfileSaved?.(state),
+  });
 
   section.appendChild(status);
   body.appendChild(section);

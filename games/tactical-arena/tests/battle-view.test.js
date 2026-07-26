@@ -462,6 +462,12 @@ test("ranked matches render pilot nameplates with avatar, rank, tagline, and rec
                 wins: 9,
                 losses: 4,
                 draws: 1,
+                badge: {
+                  badgeId: "blood-moon-collector",
+                  label: "Blood Moon",
+                  description: "Owns the complete Blood Moon skin collection.",
+                  art: "blood-moon",
+                },
               },
             }
           : {
@@ -495,6 +501,13 @@ test("ranked matches render pilot nameplates with avatar, rank, tagline, and rec
     assert.match(host.children[1].innerHTML, /Rival Pilot/);
     assert.match(host.children[1].innerHTML, /Never skips bans/);
     assert.match(host.children[1].innerHTML, /data-skin="summer-vibes"/);
+    // The equipped badge rides beside the name, and a seat with no badge gets no image
+    // rather than an empty slot the plate has to lay out around.
+    assert.match(host.children[0].innerHTML, /class="ranked-match-badge"[^>]*assets\/player-badges\/blood-moon\.webp/);
+    assert.match(host.children[0].innerHTML, /title="Blood Moon — Owns the complete Blood Moon skin collection\."/);
+    assert.doesNotMatch(host.children[1].innerHTML, /ranked-match-badge/);
+    assert.match(STYLE_CSS, /\.ranked-match-nameline\s*\{[^}]*display:flex/);
+    assert.match(STYLE_CSS, /\.ranked-match-badge\s*\{[^}]*flex:0 0 auto/);
     assert.match(STYLE_CSS, /\.ranked-match-nameplates\s*\{[^}]*display:grid[^}]*grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\)/);
     assert.match(STYLE_CSS, /\.ranked-match-plate\s*\{[^}]*grid-template-columns:2\.8rem minmax\(0,1fr\) 2\.55rem/);
     assert.match(STYLE_CSS, /\.ranked-match-plate\.slot-1\s*\{\s*justify-self:start;/);

@@ -87,3 +87,45 @@ test("rankedProfileFromStanding maps a server standing into the compact profile"
 
   assert.equal(rankedProfileFromStanding({ rating: "n/a" }).rating, undefined);
 });
+
+test("rankedProfileFromStanding carries the equipped badge to the nameplate", () => {
+  const shaped = rankedProfileFromStanding({
+    title: "Champ",
+    badge: {
+      badgeId: "og-commander",
+      label: "OG Commander",
+      description: "Fought in the opening days.",
+      art: "og-commander",
+      icon: "assets/player-badges/og-commander.webp",
+      // Not nameplate material, and not to be trusted from a peer either.
+      earnedAt: "2026-07-26T00:00:00.000Z",
+      source: "auto",
+    },
+  });
+  assert.deepEqual(shaped.badge, {
+    badgeId: "og-commander",
+    label: "OG Commander",
+    description: "Fought in the opening days.",
+    art: "og-commander",
+    icon: "assets/player-badges/og-commander.webp",
+  });
+
+  assert.equal(rankedProfileFromStanding({ title: "x" }).badge, null);
+  assert.equal(rankedProfileFromStanding({ badge: { label: "no id" } }).badge, null);
+});
+
+test("a cloned profile gets its own badge object", () => {
+  const original = { clientId: "c1", rankedProfile: { title: "Ace", badge: { badgeId: "og-commander", label: "OG" } } };
+  const copy = cloneRemoteProfile(original);
+  assert.notEqual(copy.rankedProfile.badge, original.rankedProfile.badge);
+  original.rankedProfile.badge.label = "Changed";
+  assert.equal(copy.rankedProfile.badge.label, "OG");
+
+  const shaped = shapeSessionProfiles({
+    membersAtStart: ["a", "b"],
+    mySeat: 1,
+    profilesByClientId: new Map([["b", { displayName: "Bob", rankedProfile: { badge: { badgeId: "x", label: "X" } } }]]),
+    profilesBySeat: new Map(),
+  });
+  assert.equal(shaped[0].rankedProfile.badge.label, "X");
+});

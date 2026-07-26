@@ -62,11 +62,16 @@ test("release hotspots delegate cohesive responsibilities to smaller modules", (
     // TA's own friends layer: panels stay renderers, with display rules in
     // taFriendsModel.js, actions in taSocialActions.js, and I/O in the platform client.
     ["src/ui/taFriendsPanel.js", 440, ["./taFriendsModel.js", "./taSocialActions.js", "./taPlayerProfile.js"]],
-    ["src/ui/taPlayerProfile.js", 330, ["./taFriendsModel.js", "./taSocialActions.js", "./rankedUnitStats.js", "./rankedMatchHistory.js"]],
+    ["src/ui/taPlayerProfile.js", 330, ["./taFriendsModel.js", "./taSocialActions.js", "./rankedUnitStats.js", "./rankedMatchHistory.js", "./playerBadges.js"]],
     ["src/ui/taSocialActions.js", 180, ["./taFriendsModel.js"]],
     ["src/ui/taFriendsModel.js", 170, []],
-    ["src/ui/rankedProfileIdentity.js", 320, []],
-    ["src/ui/rankedProfileNameplate.js", 60, []],
+    ["src/ui/rankedProfileIdentity.js", 340, ["./rankedBadgePicker.js"]],
+    ["src/ui/rankedProfileNameplate.js", 70, ["./playerBadges.js"]],
+    // Badge display is shared by every surface that shows one, and the picker is the only
+    // place that writes one — keep them apart so a new surface reuses the renderer instead
+    // of growing its own.
+    ["src/ui/playerBadges.js", 140, ["./badgeManifest.generated.js"]],
+    ["src/ui/rankedBadgePicker.js", 200, ["./playerBadges.js"]],
     ["src/ui/rankedMatchHistory.js", 80, ["./rankedMatchDetailModel.js", "./rankedMatchDetail.js"]],
     ["src/ui/rankedMatchDetail.js", 220, ["./rankedMatchDetailModel.js"]],
     ["src/ui/rankedMatchDetailModel.js", 200, []],

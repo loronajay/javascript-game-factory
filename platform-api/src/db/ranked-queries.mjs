@@ -7,6 +7,16 @@ import { DEFAULT_RATING, rankTier } from "./ranked-elo.mjs";
 import { serializeMatchForPlayer } from "./ranked-shared.mjs";
 import { sweepRankedMaintenance } from "./ranked-liveness.mjs";
 import { getRankedProfile } from "./ranked-profile.mjs";
+import { findGameBadge, serializeBadge } from "../services/game-badge-catalog.mjs";
+// The equipped badge, expanded to what a nameplate needs to draw it. Reading does not
+// re-verify that the player still holds it: the equip path validated it, derived badges
+// can only be earned (never lost), and awarded ones are permanent. A stored id that has
+// since left the catalog resolves to null rather than a blank chip.
+function equippedBadge(gameSlug, badgeId) {
+    if (!badgeId)
+        return null;
+    return serializeBadge(findGameBadge(gameSlug, badgeId));
+}
 // Shared rating+tier+record read used by both the me-standing and the public card.
 async function loadRatingRecord(pool, gameSlug, playerId) {
     const res = await pool.query(`select rating, wins, losses, draws, last_match_at from game_ratings where player_id=$1 and game_slug=$2`, [playerId, gameSlug]);
@@ -37,6 +47,7 @@ export async function getPublicRankedCard(pool, { playerId, gameSlug }) {
             title: profile?.title || null,
             avatarUnit: profile?.avatarUnit || null,
             avatarSkin: profile?.avatarSkin || null,
+            badge: equippedBadge(gameSlug, profile?.badgeId),
         };
     }
     catch (err) {
@@ -66,6 +77,8 @@ export async function getRankedStanding(pool, { playerId, gameSlug }) {
             title: profile?.title || null,
             avatarUnit: profile?.avatarUnit || null,
             avatarSkin: profile?.avatarSkin || null,
+            badgeId: profile?.badgeId || null,
+            badge: equippedBadge(gameSlug, profile?.badgeId),
             activeMatch: activeRes.rows[0] ? serializeMatchForPlayer(activeRes.rows[0], playerId) : null,
         };
     }
@@ -112,7 +125,7 @@ export async function getRankedLeaderboard(pool, { gameSlug, limit }) {
         await sweepRankedMaintenance(pool, gameSlug);
         const res = await pool.query(`select r.player_id, r.rating, r.wins, r.losses, r.draws,
               pp.profile_name,
-              p.title, p.avatar_unit, p.avatar_skin
+              p.title, p.avatar_unit, p.avatar_skin, p.badge_id
          from game_ratings r
          left join player_profiles pp
            on pp.player_id = r.player_id
@@ -135,6 +148,7 @@ export async function getRankedLeaderboard(pool, { gameSlug, limit }) {
                 title: row.title || null,
                 avatarUnit: row.avatar_unit || null,
                 avatarSkin: row.avatar_skin || null,
+                badge: equippedBadge(gameSlug, row.badge_id),
             };
         });
         return { gameSlug, entries };

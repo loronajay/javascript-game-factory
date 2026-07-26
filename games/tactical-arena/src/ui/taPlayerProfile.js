@@ -21,7 +21,8 @@ import { factoryPlayerUrl } from "../platform/factoryLinks.js";
 import { loadFactoryProfile } from "../../../../js/platform/identity/factory-profile.mjs";
 import { createOnlineIdentityPayload } from "../../../../js/platform/identity/match-identity.mjs";
 import { createRankedTierEmblem, normalizeRankedTierId } from "./rankedEmblems.js";
-import { renderNameplateAvatar } from "./rankedProfileNameplate.js";
+import { renderNameplateAvatar, renderNameplateBadge } from "./rankedProfileNameplate.js";
+import { createBadgeChip, normalizeBadges } from "./playerBadges.js";
 import { renderUnitStats } from "./rankedUnitStats.js";
 import { RANKED_MATCH_HISTORY_LIMIT, renderMatchHistory } from "./rankedMatchHistory.js";
 import { renderTaSocialActions } from "./taSocialActions.js";
@@ -124,6 +125,11 @@ function populate(body, targetId, { seed, onRelationshipChanged, injected = {} }
 
   const badges = el("section", "ta-player-badges");
   body.appendChild(badges);
+  // The badge list and the ranked card arrive independently, and the list needs the card
+  // to know which badge is the equipped one. Hold both and repaint whenever either lands,
+  // so neither read has to wait on the other.
+  const badgeView = { earned: [], equippedBadgeId: seed?.badge?.badgeId || null };
+  const paintBadges = () => renderBadges(badges, badgeView.earned, badgeView.equippedBadgeId);
 
   const actions = el("section", "ta-player-actions");
   body.appendChild(actions);
@@ -168,14 +174,19 @@ function populate(body, targetId, { seed, onRelationshipChanged, injected = {} }
       .then((cardData) => {
         if (!cardData) return;
         renderIdentity(identity, { ...(seed || {}), ...cardData, playerId: targetId });
+        badgeView.equippedBadgeId = cardData.badge?.badgeId || null;
+        paintBadges();
       })
       .catch(() => {});
   }
 
   // Badges.
   Promise.resolve(friendsClient.badgesFor(targetId))
-    .then((res) => renderBadges(badges, res?.badges || []))
-    .catch(() => renderBadges(badges, []));
+    .then((res) => {
+      badgeView.earned = normalizeBadges(res?.badges);
+      paintBadges();
+    })
+    .catch(paintBadges);
 
   // Friend actions, once the server has told us the actual relationship.
   if (availability === "ready" && !isMe) {
@@ -236,7 +247,12 @@ function renderIdentity(section, player) {
   nameplate.appendChild(avatar);
 
   const copy = el("div", "ranked-profile-nameplate-copy");
-  copy.appendChild(el("span", "ranked-profile-nameplate-name", taPlayerName(player)));
+  const nameLine = el("span", "ranked-profile-nameplate-nameline");
+  nameLine.appendChild(el("span", "ranked-profile-nameplate-name", taPlayerName(player)));
+  const badgeSlot = el("span", "ranked-profile-nameplate-badge");
+  nameLine.appendChild(badgeSlot);
+  renderNameplateBadge(badgeSlot, player.badge);
+  copy.appendChild(nameLine);
   const tagline = typeof player.tagline === "string" ? player.tagline.trim() : (player.title || "");
   if (tagline) copy.appendChild(el("span", "ranked-profile-nameplate-tagline", tagline));
   const meta = el("span", "ranked-profile-nameplate-meta");
@@ -249,26 +265,16 @@ function renderIdentity(section, player) {
   section.appendChild(nameplate);
 }
 
-function renderBadges(section, badges) {
+// The player's earned badges, with the one they display marked. Rendering is shared with
+// the picker (playerBadges.js) so a badge reads the same wherever it appears.
+function renderBadges(section, badges, equippedBadgeId = null) {
   section.replaceChildren();
   if (!badges.length) return;
   section.appendChild(el("h3", "ranked-profile-section-title", "Badges"));
   const row = el("div", "ta-player-badge-row");
   for (const badge of badges) {
-    const item = el("div", "ta-player-badge");
-    item.title = `${badge.label} — ${badge.description}`;
-    if (badge.icon) {
-      const img = document.createElement("img");
-      img.className = "ta-player-badge-icon";
-      // Badge icons are declared relative to the game folder; this module lives at
-      // src/ui/, so resolve against the document rather than assuming a depth.
-      img.src = new URL(`../../${badge.icon}`, import.meta.url).href;
-      img.alt = badge.label;
-      img.loading = "lazy";
-      item.appendChild(img);
-    }
-    item.appendChild(el("span", "ta-player-badge-label", badge.label));
-    row.appendChild(item);
+    const chip = createBadgeChip(badge, { equipped: badge.badgeId === equippedBadgeId });
+    if (chip) row.appendChild(chip);
   }
   section.appendChild(row);
 }

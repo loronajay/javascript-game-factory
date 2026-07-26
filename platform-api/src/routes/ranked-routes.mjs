@@ -211,8 +211,10 @@ export async function handleRankedRoute(context) {
         }
         // Undefined keys keep the stored value; explicit null/blank clears. Avatar ids
         // are opaque strings (ownership is client-gated in v1); the db layer sanitizes.
-        const { title, avatarUnit, avatarSkin } = body.value || {};
-        const result = await saveRankedProfile(gameSlug, { playerId, title, avatarUnit, avatarSkin });
+        // badgeId is the exception — the db layer validates it against the earned set and
+        // silently keeps the previous pick if the player never earned what they asked for.
+        const { title, avatarUnit, avatarSkin, badgeId } = body.value || {};
+        const result = await saveRankedProfile(gameSlug, { playerId, title, avatarUnit, avatarSkin, badgeId });
         if (!result) {
             writeJson(res, 500, { status: "error", error: "profile_save_failed", timestamp }, requestOrigin);
             return true;

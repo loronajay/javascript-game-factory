@@ -81,6 +81,57 @@ it belongs to the chat pass.
 - The catalog naming each badge and how it is earned is
   `platform-api/src/services/game-badge-catalog.mts`.
 
+#### Choosing between derived and awarded
+
+A derived rule is recomputed on every read, so it must be **monotonic** — owning more may
+earn a badge, but nothing a player does may take one away. That decides the split:
+
+- **Collection badges** — Blood Moon (`blood-moon-collector`) and Void Dweller
+  (`void-dweller-collector`) — are derived, and **pack-only**: the `skin-pack:<id>`
+  entitlement, or a pack's worth of that pack's skins for anyone who bought it before
+  fulfillment started stamping the marker. A single skin off the pack does not earn one.
+  Each skin-count threshold is frozen at that pack's launch size on purpose — raising it
+  when a pack grows would un-earn a badge somebody already displays. A test asserts every
+  threshold is still reachable against the payments catalog, so a genuine pack buyer can
+  never silently miss their badge. Add another with `packCollectionRule("<packId>")`.
+- **OG Commander** (`og-commander`) is awarded, because its qualifying facts are
+  "played a ranked match" (a `game_ratings` row) or "finished the campaign" (a completed
+  `the-final-battle` row) — and campaign progress is **resettable**. Derived, Reset Progress
+  would revoke the badge. The award is settled lazily by the badge read itself
+  (`game-badge-awards.mts`), which makes it retroactive with no backfill job; the trade is
+  that `awarded_at` is "first read while qualifying", not the exact moment of qualification.
+  `awardableUntil` in the catalog is the knob that closes the founding window; anyone who
+  already earned it keeps it, because the row is already written.
+
+#### Equipping
+
+Earning a badge and displaying one are separate. The **equipped** badge is one per player,
+stored as `ranked_profiles.badge_id` (migration `028-ranked-badge.sql`) beside the ranked
+title and avatar, because it is the same kind of thing: the cosmetic identity a nameplate
+draws. Unlike the avatar — an opaque, client-gated cosmetic — the equip is **validated
+server-side** against the earned set (`playerHasGameBadge`), since a badge asserts a
+purchase or a record. A refused equip keeps the previous pick rather than clearing it, so a
+forged request is a no-op. The read views (`getRankedStanding`, `getPublicRankedCard`, the
+leaderboard) fold the equipped badge in already expanded, so a nameplate needs no second
+fetch.
+
+#### Badge art pipeline
+
+Art is authored as a full-size PNG in `assets/player-badges/` and shipped as a downscaled
+lossless WebP beside it, the way `assets/ranked-emblems/` already works:
+
+1. Drop `<art-id>.png` in `games/tactical-arena/assets/player-badges/`.
+2. `npm run badges:art` — downscales to 512px and writes `<art-id>.webp` (PNG stays as
+   source). Skips anything already current; `--force` reconverts.
+3. `npm run badges` — regenerates `src/ui/badgeManifest.generated.js`, preferring WebP over
+   PNG. `npm test` runs this too.
+4. Add the catalog entry with `art: "<art-id>"`.
+
+The client resolves badge images from that manifest, not from the server's `icon` string, so
+it can only reference art that actually shipped. `tests/player-badges.test.js` fails if a
+catalog badge has no art in the manifest, or if a manifest entry is still an unconverted
+PNG — which is what stops a new badge shipping as a broken image or a 1.5 MB nameplate icon.
+
 ### `game_direct_messages` (NOT BUILT — chat pass)
 - `id`, `game_slug`, `sender_player_id`, `recipient_player_id`, `body`, `created_at`,
   `read_at` (nullable)
@@ -102,7 +153,11 @@ Follow the existing barrel-over-focused-modules pattern used by `db/ranked.mjs`:
 - `db/game-social/game-friend-blocks.mjs` — block / unblock, and a block-check used to gate
   new requests.
 - `db/game-social/game-badges.mts` — read a player's badges (derived ∪ awarded); award an
-  awardable one from a trusted server path. Refuses to write a derived badge id.
+  awardable one from a trusted server path. Refuses to write a derived badge id. Also
+  answers `playerHasGameBadge`, which is what gates equipping.
+- `db/game-social/game-badge-awards.mts` — the server-known facts a badge rule may qualify
+  on (ranked participation, campaign completion) and the write that freezes a qualification.
+  Reads only tables the player cannot write directly.
 - `db/game-social/game-player-search.mts` — TA-scoped player discovery and the viewer's
   relationship to one player. Search is restricted to players with a `game_ratings` row for
   the slug, so it surfaces people you can actually play this game with, each hit already

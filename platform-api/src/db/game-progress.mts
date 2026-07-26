@@ -92,6 +92,10 @@ function buildSkinEntitlement(payload: Record<string, any>): any {
   };
 }
 
+// A skin purchase grants the skins themselves, and a PACK purchase also grants a
+// `skin-pack:<packId>` marker. The marker owns no content — it is the durable record that
+// the bundle was bought, which badge rules read to tell a pack buyer apart from someone
+// who happened to buy the same skins individually.
 function buildSkinPurchaseEntitlements(payload: Record<string, any>): any[] {
   const rawEntitlementIds = [
     payload.entitlementId,
@@ -99,8 +103,12 @@ function buildSkinPurchaseEntitlements(payload: Record<string, any>): any[] {
   ];
   const entitlementIds = [...new Set(rawEntitlementIds.map((value) => cleanText(value, 180)).filter(Boolean))];
   return entitlementIds
-    .filter((entitlementId) => entitlementId.startsWith("skin:"))
-    .map((entitlementId) => ({ entitlementId, kind: "skin" }));
+    .map((entitlementId) => {
+      if (entitlementId.startsWith("skin:")) return { entitlementId, kind: "skin" };
+      if (entitlementId.startsWith("skin-pack:")) return { entitlementId, kind: "skin-pack" };
+      return null;
+    })
+    .filter(Boolean);
 }
 
 function buildUnitPurchaseEntitlements(payload: Record<string, any>): any[] {
