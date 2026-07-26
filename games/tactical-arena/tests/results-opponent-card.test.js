@@ -123,15 +123,15 @@ test("stale fetched ranked cards keep the pilot name and receive the just-finish
   }
 });
 
-test("add friend is blocked when the opponent is already friended locally", () => {
+// Adding a friend from this card now creates a TACTICAL ARENA friend (server-backed,
+// see src/platform/taFriendsClient.js), not a factory-wide one. The old local
+// profile.friends check is gone on purpose: TA friendship is server-authoritative, so
+// the control renders from the server's answer rather than a local cache.
+test("a signed-out player gets no TA friend control but keeps the factory links", () => {
   const restore = installDom();
   globalThis.window = {
     localStorage: memoryStorage({
-      "javascript-game-factory.factoryProfile": JSON.stringify({
-        playerId: "me-1",
-        profileName: "Me",
-        friends: ["opponent-1"],
-      }),
+      "javascript-game-factory.factoryProfile": JSON.stringify({ playerId: "me-1", profileName: "Me" }),
     }),
     location: { hostname: "" },
   };
@@ -143,11 +143,18 @@ test("add friend is blocked when the opponent is already friended locally", () =
       net: opponentNet({ displayName: "Rival Pilot" }),
     });
 
+    // No account -> nothing to add a friend with, and no misleading enabled button.
+    const friendSlot = host.findByClass("results-opponent-friend");
+    assert.equal(friendSlot.children.length, 0);
+
+    // The in-game TA profile is always offered; it is a public read.
     const actions = host.findByClass("results-opponent-actions");
-    const addFriend = actions.children.find((child) => child.tagName === "button");
-    assert.equal(addFriend.textContent, "Friend Added");
-    assert.equal(addFriend.disabled, true);
-    assert.equal(addFriend.title, "Already friends.");
+    const buttons = actions.children.filter((child) => child.tagName === "button");
+    assert.deepEqual(buttons.map((b) => b.textContent), ["View Profile"]);
+
+    // And the factory profile / DM deep-links stay available alongside it.
+    const links = actions.children.filter((child) => child.tagName === "a");
+    assert.deepEqual(links.map((a) => a.textContent), ["Factory Profile", "Message"]);
   } finally {
     restore();
   }

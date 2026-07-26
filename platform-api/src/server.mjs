@@ -11,6 +11,7 @@ import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, sav
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import { getLadderStandings, getPlayerLadderPlacements } from "./db/ladders.mjs";
 import { cancelRanked, enqueueRanked, getPublicRankedCard, getRankedLeaderboard, getRankedMatchDetail, getRankedMatches, getRankedStanding, getRankedUnitStats, pollRanked, recordRankedHeartbeat, reportRankedResult, saveRankedProfile, setRankedLobbyCode, startRankedMatch, } from "./db/ranked.mjs";
+import { blockGamePlayer, cancelGameFriendRequest, getGamePlayerBadges, getGamePlayerRelationship, listGameBlocks, listGameFriendRequests, listGameFriends, removeGameFriend, respondToGameFriendRequest, searchGamePlayers, sendGameFriendRequest, unblockGamePlayer, } from "./db/game-social.mjs";
 import { createFriendshipBetweenPlayers, loadPlayerRelationships, recordDirectInteractionBetweenPlayers, recordSharedEventBetweenPlayers, recordSharedSessionBetweenPlayers, removeFriendBetweenPlayers, savePlayerRelationships, } from "./db/relationships.mjs";
 import { commentOnThought, deleteThought, deleteThoughtComment, listThoughtComments, listThoughts, reactToThought, saveThought, shareThought, } from "./db/thoughts.mjs";
 import { deleteAccountService, loginAccountService, logoutAccountService, registerAccountService, requestPasswordResetService, resetPasswordService, verifyAccountSessionService, } from "./services/auth.mjs";
@@ -140,6 +141,18 @@ async function bootstrap() {
         getRankedMatches: (gameSlug, params) => getRankedMatches(pool, { ...params, gameSlug }),
         getRankedMatchDetail: (gameSlug, params) => getRankedMatchDetail(pool, { ...params, gameSlug }),
         getRankedLeaderboard: (gameSlug, params) => getRankedLeaderboard(pool, { ...params, gameSlug }),
+        listGameFriends: (gameSlug, params) => listGameFriends(pool, { ...params, gameSlug }),
+        removeGameFriend: (gameSlug, params) => removeGameFriend(pool, { ...params, gameSlug }),
+        listGameFriendRequests: (gameSlug, params) => listGameFriendRequests(pool, { ...params, gameSlug }),
+        sendGameFriendRequest: (gameSlug, params) => sendGameFriendRequest(pool, { ...params, gameSlug }),
+        respondToGameFriendRequest: (gameSlug, params) => respondToGameFriendRequest(pool, { ...params, gameSlug }),
+        cancelGameFriendRequest: (gameSlug, params) => cancelGameFriendRequest(pool, { ...params, gameSlug }),
+        listGameBlocks: (gameSlug, params) => listGameBlocks(pool, { ...params, gameSlug }),
+        blockGamePlayer: (gameSlug, params) => blockGamePlayer(pool, { ...params, gameSlug }),
+        unblockGamePlayer: (gameSlug, params) => unblockGamePlayer(pool, { ...params, gameSlug }),
+        searchGamePlayers: (gameSlug, params) => searchGamePlayers(pool, { ...params, gameSlug }),
+        getGamePlayerRelationship: (gameSlug, params) => getGamePlayerRelationship(pool, { ...params, gameSlug }),
+        getGamePlayerBadges: (gameSlug, params) => getGamePlayerBadges(pool, { ...params, gameSlug }),
         getLadderStandings: (gameSlug, params) => getLadderStandings(pool, { ...params, gameSlug }),
         getPlayerLadderPlacements: (playerId, params) => getPlayerLadderPlacements(pool, { ...params, playerId }),
         getGameProgress: (playerId, gameSlug) => getGameProgress(pool, playerId, gameSlug),

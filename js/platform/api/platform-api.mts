@@ -574,6 +574,76 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
       const query = Number.isFinite(Number(limit)) ? `?limit=${encodeURIComponent(String(limit))}` : "";
       return get(`/ranked/${gs}/leaderboard${query}`, "leaderboard");
     },
+
+    // ── Per-game social graph ────────────────────────────────────────────────
+    // Friends scoped to ONE cabinet, deliberately separate from the factory-wide
+    // friends graph above (createFriendshipBetweenPlayers and friends). A player can
+    // be a Tactical Arena friend without being a factory friend. The acting player is
+    // always the token's, so none of these take a "me" argument.
+    fetchGameFriends(gameSlug: string) {
+      const gs = encodePathSegment(gameSlug);
+      return gs ? get(`/games/${gs}/social/friends`, "friends") : Promise.resolve(null);
+    },
+    removeGameFriend(gameSlug: string, playerId: string) {
+      const gs = encodePathSegment(gameSlug);
+      const pid = encodePathSegment(playerId);
+      return gs && pid ? del(`/games/${gs}/social/friends/${pid}`) : Promise.resolve(null);
+    },
+    fetchGameFriendRequests(gameSlug: string) {
+      const gs = encodePathSegment(gameSlug);
+      return gs ? get(`/games/${gs}/social/requests`, "requests") : Promise.resolve(null);
+    },
+    sendGameFriendRequest(gameSlug: string, recipientPlayerId: string) {
+      const gs = encodePathSegment(gameSlug);
+      const pid = typeof recipientPlayerId === "string" ? recipientPlayerId.trim() : "";
+      return gs && pid ? post(`/games/${gs}/social/requests`, { recipientPlayerId: pid }) : Promise.resolve(null);
+    },
+    acceptGameFriendRequest(gameSlug: string, requestId: string) {
+      const gs = encodePathSegment(gameSlug);
+      const rid = encodePathSegment(requestId);
+      return gs && rid ? post(`/games/${gs}/social/requests/${rid}/accept`, {}) : Promise.resolve(null);
+    },
+    declineGameFriendRequest(gameSlug: string, requestId: string) {
+      const gs = encodePathSegment(gameSlug);
+      const rid = encodePathSegment(requestId);
+      return gs && rid ? post(`/games/${gs}/social/requests/${rid}/decline`, {}) : Promise.resolve(null);
+    },
+    cancelGameFriendRequest(gameSlug: string, requestId: string) {
+      const gs = encodePathSegment(gameSlug);
+      const rid = encodePathSegment(requestId);
+      return gs && rid ? del(`/games/${gs}/social/requests/${rid}`) : Promise.resolve(null);
+    },
+    fetchGameBlocks(gameSlug: string) {
+      const gs = encodePathSegment(gameSlug);
+      return gs ? get(`/games/${gs}/social/blocks`, "blocks") : Promise.resolve(null);
+    },
+    blockGamePlayer(gameSlug: string, playerId: string) {
+      const gs = encodePathSegment(gameSlug);
+      const pid = encodePathSegment(playerId);
+      return gs && pid ? post(`/games/${gs}/social/blocks/${pid}`, {}) : Promise.resolve(null);
+    },
+    unblockGamePlayer(gameSlug: string, playerId: string) {
+      const gs = encodePathSegment(gameSlug);
+      const pid = encodePathSegment(playerId);
+      return gs && pid ? del(`/games/${gs}/social/blocks/${pid}`) : Promise.resolve(null);
+    },
+    searchGamePlayers(gameSlug: string, query: string, limit?: number) {
+      const gs = encodePathSegment(gameSlug);
+      const q = typeof query === "string" ? query.trim() : "";
+      if (!gs || !q) return Promise.resolve(null);
+      const cap = Number.isFinite(Number(limit)) ? `&limit=${encodeURIComponent(String(limit))}` : "";
+      return get(`/games/${gs}/social/search?q=${encodeURIComponent(q)}${cap}`, "search");
+    },
+    fetchGamePlayerRelationship(gameSlug: string, playerId: string) {
+      const gs = encodePathSegment(gameSlug);
+      const pid = encodePathSegment(playerId);
+      return gs && pid ? get(`/games/${gs}/social/relationship/${pid}`, "relationship") : Promise.resolve(null);
+    },
+    fetchGamePlayerBadges(gameSlug: string, playerId: string) {
+      const gs = encodePathSegment(gameSlug);
+      const pid = encodePathSegment(playerId);
+      return gs && pid ? get(`/games/${gs}/social/badges/${pid}`, "badges") : Promise.resolve(null);
+    },
   };
 }
 

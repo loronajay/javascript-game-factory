@@ -470,3 +470,67 @@
   .shop-unit-detail-title { font-size:1rem; }
   .shop-unit-detail-rules .stat-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
 }
+
+/* ── Tactical Arena friends + player profile ──────────────────────────────────
+   TA's own social surfaces (separate from the factory friends list). Reuses the
+   ranked nameplate/section classes wherever the two show the same thing, so a
+   player row and a ranked row can't drift apart visually. */
+.ta-friends-card { width:min(40rem,94vw); max-height:90vh; }
+.ta-friends-body { flex:1; min-height:0; overflow-y:auto; display:grid; align-content:start; gap:.7rem; padding:1rem 1.1rem; }
+.ta-friends-tabs { display:flex; flex-wrap:wrap; gap:.35rem; min-width:0; }
+.ta-friends-tab { min-height:1.8rem; padding:.28rem .58rem; border:1px solid var(--parchment-edge); border-radius:7px; background:rgba(8,18,32,.58); color:var(--muted); font:900 .52rem var(--font-display); letter-spacing:.07em; text-transform:uppercase; cursor:pointer; }
+.ta-friends-tab:hover { border-color:var(--brass); color:var(--brass-hi); filter:brightness(1.08); }
+.ta-friends-tab.is-selected { border-color:var(--brass-hi); background:rgba(230,192,101,.15); color:var(--brass-hi); box-shadow:inset 0 0 0 1px rgba(230,192,101,.18); }
+.ta-friends-panel { display:grid; align-content:start; gap:.6rem; min-width:0; }
+.ta-friends-search, .ta-friends-filter { display:grid; gap:.3rem; min-width:0; }
+.ta-friends-search-input, .ta-friends-filter-input { width:100%; min-width:0; padding:.45rem .58rem; border:1px solid var(--parchment-edge); border-radius:7px; background:rgba(8,18,32,.55); color:var(--text); font:700 .72rem var(--font-display); letter-spacing:.02em; }
+.ta-friends-search-input:focus-visible, .ta-friends-filter-input:focus-visible { outline:2px solid var(--brass-hi); outline-offset:1px; }
+.ta-friends-results { display:grid; gap:.42rem; min-width:0; }
+.ta-friends-list { list-style:none; margin:0; padding:0; display:grid; gap:.42rem; min-width:0; }
+.ta-friends-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:.5rem; padding:.4rem .55rem; border:1px solid var(--parchment-edge); border-radius:9px; background:rgba(8,18,32,.5); }
+.ta-friends-rowmain { display:grid; grid-template-columns:2.4rem minmax(0,1fr) auto; align-items:center; gap:.6rem; min-width:0; padding:0; border:0; background:none; color:inherit; text-align:left; cursor:pointer; }
+.ta-friends-rowmain:hover .ta-friends-rowname { color:var(--brass-hi); }
+.ta-friends-rowmain:focus-visible { outline:2px solid var(--brass-hi); outline-offset:2px; border-radius:7px; }
+.ta-friends-avatar.ranked-profile-nameplate-avatar { width:2.4rem; height:2.9rem; border-radius:6px; }
+.ta-friends-rowcopy { display:grid; gap:.08rem; min-width:0; }
+.ta-friends-rowname { color:var(--text); font:800 .8rem var(--font-display); letter-spacing:.02em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ta-friends-rowtagline { color:var(--brass-hi); font:700 .62rem var(--font-display); letter-spacing:.02em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ta-friends-rowrecord { color:var(--muted); font:600 .56rem var(--font-display); letter-spacing:.02em; }
+.ta-friends-rowstanding { display:flex; align-items:center; gap:.3rem; }
+.ta-friends-rowactions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:.3rem; }
+
+/* Friend action buttons (shared by the panel, the profile, and the results card) */
+/* .menu-btn is width:100% for menu stacks; these sit inline in a row, so they size to
+   their label instead of forcing one button per line. */
+.ta-social-action { width:auto; padding:.4rem .7rem; font-size:.66rem; white-space:nowrap; }
+.ta-social-action.is-compact { min-height:1.75rem; padding:.26rem .5rem; font-size:.56rem; }
+.ta-social-action.is-destructive:hover { border-color:#c46a5e; color:#ffb3a8; }
+.ta-social-action.is-confirming { border-color:#c46a5e; color:#ffb3a8; }
+.ta-social-action[disabled] { opacity:.6; cursor:default; }
+.ta-social-action-status { color:#ff9a8f; font:700 .56rem var(--font-display); letter-spacing:.03em; }
+.ta-social-action-status:empty { display:none; }
+.ta-social-action-note { color:var(--muted); font:700 .6rem var(--font-display); letter-spacing:.06em; text-transform:uppercase; }
+
+/* In-game player profile */
+.ta-player-card { width:min(32rem,94vw); max-height:90vh; }
+.ta-player-body { flex:1; min-height:0; overflow-y:auto; display:grid; align-content:start; gap:1rem; padding:1.1rem; }
+.ta-player-identity { display:grid; justify-items:center; gap:.5rem; }
+.ta-player-badges { display:grid; gap:.45rem; }
+.ta-player-badges:empty { display:none; }
+.ta-player-badge-row { display:flex; flex-wrap:wrap; gap:.5rem; }
+.ta-player-badge { display:flex; align-items:center; gap:.4rem; padding:.3rem .55rem .3rem .35rem; border:1px solid color-mix(in srgb,var(--brass) 36%,var(--parchment-edge)); border-radius:999px; background:rgba(8,18,32,.5); }
+.ta-player-badge-icon { width:1.75rem; height:1.75rem; object-fit:contain; flex-shrink:0; }
+.ta-player-badge-label { color:var(--brass-hi); font:800 .6rem var(--font-display); letter-spacing:.05em; white-space:nowrap; }
+.ta-player-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem; min-height:1.8rem; }
+.ta-player-self-note { margin:0; color:var(--muted); font:600 .66rem var(--font-display); letter-spacing:.02em; }
+.ta-player-footer { display:flex; flex-wrap:wrap; gap:.45rem; }
+.ta-player-platform-link { padding:.4rem .8rem; font-size:.64rem; text-decoration:none; text-align:center; }
+
+/* Results-screen friend slot */
+.results-opponent-friend { display:flex; flex:1 1 auto; flex-wrap:wrap; align-items:center; gap:.3rem; }
+.results-opponent-friend-loading { color:var(--muted); font:700 .7rem var(--font-display); }
+
+@media (max-width:560px) {
+  .ta-friends-row { grid-template-columns:minmax(0,1fr); }
+  .ta-friends-rowactions { justify-content:flex-start; }
+}

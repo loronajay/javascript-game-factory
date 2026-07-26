@@ -7,6 +7,7 @@ import { handleNotificationRoute } from "./routes/notification-routes.mjs";
 import { handleLayoutRoute } from "./routes/layout-routes.mjs";
 import { handleRatingRoute } from "./routes/rating-routes.mjs";
 import { handleRankedRoute } from "./routes/ranked-routes.mjs";
+import { handleGameSocialRoute } from "./routes/game-social-routes.mjs";
 import { handleLadderRoute } from "./routes/ladder-routes.mjs";
 import { handleGameProgressRoute } from "./routes/game-progress-routes.mjs";
 import { handlePaymentRoute } from "./routes/payment-routes.mjs";
@@ -204,6 +205,9 @@ export function createApp(options = {}) {
     const reportRankedResult = typeof options?.reportRankedResult === "function"
         ? options.reportRankedResult
         : async () => null;
+    const recordRankedHeartbeat = typeof options?.recordRankedHeartbeat === "function"
+        ? options.recordRankedHeartbeat
+        : async () => null;
     const getRankedStanding = typeof options?.getRankedStanding === "function"
         ? options.getRankedStanding
         : async () => null;
@@ -227,6 +231,42 @@ export function createApp(options = {}) {
         : async () => null;
     const getRankedLeaderboard = typeof options?.getRankedLeaderboard === "function"
         ? options.getRankedLeaderboard
+        : async () => null;
+    const listGameFriends = typeof options?.listGameFriends === "function"
+        ? options.listGameFriends
+        : async () => null;
+    const removeGameFriend = typeof options?.removeGameFriend === "function"
+        ? options.removeGameFriend
+        : async () => null;
+    const listGameFriendRequests = typeof options?.listGameFriendRequests === "function"
+        ? options.listGameFriendRequests
+        : async () => null;
+    const sendGameFriendRequest = typeof options?.sendGameFriendRequest === "function"
+        ? options.sendGameFriendRequest
+        : async () => null;
+    const respondToGameFriendRequest = typeof options?.respondToGameFriendRequest === "function"
+        ? options.respondToGameFriendRequest
+        : async () => null;
+    const cancelGameFriendRequest = typeof options?.cancelGameFriendRequest === "function"
+        ? options.cancelGameFriendRequest
+        : async () => null;
+    const listGameBlocks = typeof options?.listGameBlocks === "function"
+        ? options.listGameBlocks
+        : async () => null;
+    const blockGamePlayer = typeof options?.blockGamePlayer === "function"
+        ? options.blockGamePlayer
+        : async () => null;
+    const unblockGamePlayer = typeof options?.unblockGamePlayer === "function"
+        ? options.unblockGamePlayer
+        : async () => null;
+    const searchGamePlayers = typeof options?.searchGamePlayers === "function"
+        ? options.searchGamePlayers
+        : async () => null;
+    const getGamePlayerRelationship = typeof options?.getGamePlayerRelationship === "function"
+        ? options.getGamePlayerRelationship
+        : async () => null;
+    const getGamePlayerBadges = typeof options?.getGamePlayerBadges === "function"
+        ? options.getGamePlayerBadges
         : async () => null;
     const getLadderStandings = typeof options?.getLadderStandings === "function"
         ? options.getLadderStandings
@@ -391,6 +431,7 @@ export function createApp(options = {}) {
         cancelRanked,
         startRankedMatch,
         reportRankedResult,
+        recordRankedHeartbeat,
         getRankedStanding,
         setRankedLobby,
         saveRankedProfile,
@@ -399,6 +440,20 @@ export function createApp(options = {}) {
         getRankedMatches,
         getRankedMatchDetail,
         getRankedLeaderboard,
+    };
+    const gameSocialServices = {
+        listGameFriends,
+        removeGameFriend,
+        listGameFriendRequests,
+        sendGameFriendRequest,
+        respondToGameFriendRequest,
+        cancelGameFriendRequest,
+        listGameBlocks,
+        blockGamePlayer,
+        unblockGamePlayer,
+        searchGamePlayers,
+        getGamePlayerRelationship,
+        getGamePlayerBadges,
     };
     const ladderServices = {
         getLadderStandings,
@@ -647,6 +702,18 @@ export function createApp(options = {}) {
                 requestOrigin,
                 timestamp,
                 services: gameProgressServices,
+            })) {
+                return;
+            }
+            if (await handleGameSocialRoute({
+                req,
+                res,
+                method,
+                pathname,
+                authClaims,
+                requestOrigin,
+                timestamp,
+                services: gameSocialServices,
             })) {
                 return;
             }

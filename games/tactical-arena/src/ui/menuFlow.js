@@ -11,6 +11,7 @@ import { openInventory } from "./inventory.js";
 import { openSkinGallery } from "./skinGallery.js";
 import { openNicknameGallery } from "./nicknameGallery.js";
 import { openRankedProfile } from "./rankedProfile.js";
+import { openTaFriendsPanel } from "./taFriendsPanel.js";
 import {
   requestProgressionAnnouncements,
   setProgressionAnnouncementsAllowed,
@@ -156,6 +157,9 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       case "skins": openSkinGallery(); break;
       case "nicknames": openNicknameGallery(); break;
       case "rankedProfile": openRankedProfile(); break;
+      // Not account-gated like Ranked: the panel itself shows a sign-in prompt, which
+      // is more discoverable than a disabled button.
+      case "friends": openTaFriendsPanel(); break;
       case "chooseTutorialReward": tutorialScreens.openTutorialRewardChoice({ title: "Juggernaut Unlocked" }); break;
       case "settings": settings.openSettings(); break;
       case "startTutorial": {

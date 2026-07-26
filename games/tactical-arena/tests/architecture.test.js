@@ -57,7 +57,14 @@ test("release hotspots delegate cohesive responsibilities to smaller modules", (
     ["src/ui/shop/shopTabs.js", 260, ["./shopWidgets.js"]],
     ["src/ui/shop/shopCheckout.js", 130, ["./shopWidgets.js"]],
     ["src/ui/shop/shopWidgets.js", 140, []],
-    ["src/ui/rankedProfile.js", 330, ["./rankedProfileIdentity.js", "./rankedProfileNameplate.js", "./rankedMatchHistory.js"]],
+    ["src/ui/rankedProfile.js", 330, ["./rankedProfileIdentity.js", "./rankedProfileNameplate.js", "./rankedMatchHistory.js", "./rankedUnitStats.js"]],
+    ["src/ui/rankedUnitStats.js", 40, []],
+    // TA's own friends layer: panels stay renderers, with display rules in
+    // taFriendsModel.js, actions in taSocialActions.js, and I/O in the platform client.
+    ["src/ui/taFriendsPanel.js", 440, ["./taFriendsModel.js", "./taSocialActions.js", "./taPlayerProfile.js"]],
+    ["src/ui/taPlayerProfile.js", 330, ["./taFriendsModel.js", "./taSocialActions.js", "./rankedUnitStats.js", "./rankedMatchHistory.js"]],
+    ["src/ui/taSocialActions.js", 180, ["./taFriendsModel.js"]],
+    ["src/ui/taFriendsModel.js", 170, []],
     ["src/ui/rankedProfileIdentity.js", 320, []],
     ["src/ui/rankedProfileNameplate.js", 60, []],
     ["src/ui/rankedMatchHistory.js", 80, ["./rankedMatchDetailModel.js", "./rankedMatchDetail.js"]],

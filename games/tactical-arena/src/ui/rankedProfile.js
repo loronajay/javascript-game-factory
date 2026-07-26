@@ -23,10 +23,10 @@ import { TACTICAL_ARENA_GAME_SLUG } from "../platform/gameProgressClient.js";
 import { loadFactoryProfile } from "../../../../js/platform/identity/factory-profile.mjs";
 import { createOnlineIdentityPayload } from "../../../../js/platform/identity/match-identity.mjs";
 import { saveRankedName } from "./rankedNameModel.js";
-import { createPortrait, hasPortrait } from "./portraits.js";
 import { openRankedLeaderboard } from "./rankedLeaderboard.js";
 import { createRankedTierEmblem, normalizeRankedTierId } from "./rankedEmblems.js";
-import { maybeMigrateLegacyName, renderIdentityEditor, unitLabel } from "./rankedProfileIdentity.js";
+import { maybeMigrateLegacyName, renderIdentityEditor } from "./rankedProfileIdentity.js";
+import { renderUnitStats } from "./rankedUnitStats.js";
 import { syncRankedStandingNameplate } from "./rankedProfileNameplate.js";
 import { getRankedPlacementProgress, placementProgressText } from "./rankedPlacements.js";
 import { RANKED_MATCH_HISTORY_LIMIT, renderMatchHistory } from "./rankedMatchHistory.js";
@@ -252,28 +252,6 @@ function renderMetaSections(body, { apiClient, playerId }) {
   } else {
     history([]);
   }
-}
-
-function renderUnitStats(container, units) {
-  container.replaceChildren();
-  if (!units.length) {
-    container.appendChild(el("p", "ranked-profile-meta-empty", "No ranked unit records yet."));
-    return;
-  }
-  const grid = el("div", "ranked-profile-unitgrid");
-  for (const u of units) {
-    const cell = el("div", "ranked-profile-unitcell");
-    if (hasPortrait(u.unitType)) {
-      cell.appendChild(createPortrait(u.unitType, { variant: "is-thumb" }));
-    }
-    const info = el("div", "ranked-profile-unitinfo");
-    info.appendChild(el("span", "ranked-profile-unitname", unitLabel(u.unitType)));
-    const winPct = u.games > 0 ? Math.round((u.wins / u.games) * 100) : 0;
-    info.appendChild(el("span", "ranked-profile-unitstat", `${u.games}G · ${winPct}% W · ${u.survivals} survived`));
-    cell.appendChild(info);
-    grid.appendChild(cell);
-  }
-  container.appendChild(grid);
 }
 
 function renderStanding(body, standing, { pilot = "", tagline = "", avatarUnit = null, avatarSkin = null } = {}) {

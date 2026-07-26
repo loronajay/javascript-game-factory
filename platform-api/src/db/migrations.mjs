@@ -26,6 +26,7 @@ export const MIGRATION_FILES = Object.freeze([
     "024-activity-actor-display-name.sql",
     "025-ladder-indexes.sql",
     "026-ranked-liveness.sql",
+    "027-game-social.sql",
 ]);
 export function migrationFileUrl(name) {
     return new URL(`./migrations/${name}`, import.meta.url);
