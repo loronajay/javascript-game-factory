@@ -1,8 +1,10 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { getUnitSkins } from "../ui/skinModel.js";
 import { UNIT_TYPE_KEYS, groupedUnitTypes } from "../ui/squadModel.js";
+import { RANKED_AVATARS, RANKED_AVATAR_VALOR_COST, isRankedAvatarFree } from "../ui/rankedAvatars.js";
 import {
   VALOR_RESOURCE,
+  isProgressAvatarUnlocked,
   isProgressUnitUnlocked,
   readUnlockProgress,
   writeUnlockProgress,
@@ -13,6 +15,7 @@ export const SHOP_TABS = Object.freeze([
   Object.freeze({ id: "units", label: "Units" }),
   Object.freeze({ id: "skin-packs", label: "Skin Packs" }),
   Object.freeze({ id: "skins", label: "Skins" }),
+  Object.freeze({ id: "avatars", label: "Avatars" }),
   Object.freeze({ id: "consumables", label: "Consumables" }),
 ]);
 
@@ -307,6 +310,38 @@ export function getSkinOffers(storage = globalThis.localStorage) {
   }));
 }
 
+// Profile icon avatars. The first RANKED_AVATAR_FREE_COUNT are a free starter set (always
+// "owned"); the rest are a flat-priced Valor purchase. Unlike units/skins, ownership has no
+// local/offline path — avatar Valor purchases always require a signed-in account, so `owned`
+// here is free-or-server-entitled only (see isProgressAvatarUnlocked).
+export function getAvatarOffer(avatarId, storage = globalThis.localStorage) {
+  const avatar = RANKED_AVATARS.find((entry) => entry.id === avatarId);
+  if (!avatar) return null;
+  const free = isRankedAvatarFree(avatar.id);
+  const owned = free || isProgressAvatarUnlocked(avatar.id, storage);
+  return Object.freeze({
+    id: `avatar:${avatar.id}`,
+    kind: "avatar",
+    avatarId: avatar.id,
+    name: avatar.label,
+    sheet: avatar.sheet,
+    sku: `ta.avatar.${avatar.id}`,
+    entitlementId: `avatar:${avatar.id}`,
+    owned,
+    free,
+    purchasable: !owned,
+    valorPrice: Object.freeze({
+      kind: "valor",
+      resourceId: VALOR_RESOURCE.id,
+      amount: RANKED_AVATAR_VALOR_COST,
+    }),
+  });
+}
+
+export function getAvatarOffers(storage = globalThis.localStorage) {
+  return Object.freeze(RANKED_AVATARS.map((avatar) => getAvatarOffer(avatar.id, storage)));
+}
+
 function rarityCounts(offers) {
   const counts = {};
   for (const offer of offers) counts[offer.rarity] = (counts[offer.rarity] ?? 0) + 1;
@@ -447,6 +482,7 @@ export function getShopCatalog(storage = globalThis.localStorage) {
     units: getUnitOffers(storage),
     skinPacks: getSkinPackOffers(storage),
     skins: getSkinOffers(storage),
+    avatars: getAvatarOffers(storage),
     consumables: getConsumableOffers(),
   });
 }

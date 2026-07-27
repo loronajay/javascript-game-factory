@@ -207,13 +207,27 @@
   }
 
   .topbar-forecast {
-    grid-template-columns: 2rem;
+    grid-template-columns: 1.05rem 2rem;
+    gap: .3rem;
     min-height: 34px;
     padding: .24rem .3rem .24rem .42rem;
   }
 
+  /* Full "Forecast" text no longer fits the compact topbar switch, but the toggle
+     still needs a visible cue (not just the `title` tooltip, which touch has no
+     hover for) — swap the label for a small target glyph instead of hiding it. */
   .topbar-forecast .forecast-toggle-copy {
-    display: none;
+    display: block;
+    width: 1.05rem;
+    overflow: hidden;
+    font-size: 0;
+    text-align: center;
+  }
+
+  .topbar-forecast .forecast-toggle-copy::before {
+    content: "\1F3AF";
+    font-size: .8rem;
+    line-height: 1;
   }
 
   .forecast-toggle-copy {
@@ -451,12 +465,24 @@
   }
 
   .topbar-forecast {
-    grid-template-columns: 1fr;
-    place-items: center;
+    grid-template-columns: .95rem auto;
+    align-items: center;
+    justify-content: center;
+    gap: .22rem;
     padding: .24rem;
   }
 
-  .forecast-toggle-copy {
-    display: none;
+  .topbar-forecast .forecast-toggle-copy {
+    display: block;
+    width: .95rem;
+    overflow: hidden;
+    font-size: 0;
+    text-align: center;
+  }
+
+  .topbar-forecast .forecast-toggle-copy::before {
+    content: "\1F3AF";
+    font-size: .7rem;
+    line-height: 1;
   }
 }

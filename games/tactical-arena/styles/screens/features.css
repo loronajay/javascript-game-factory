@@ -78,6 +78,9 @@
 .shop-skin-grid { grid-template-columns:repeat(auto-fill,minmax(10.75rem,1fr)); }
 .shop-consumable-note { margin:0; padding:.58rem .7rem; border:1px solid rgba(188,214,236,.14); border-left:3px solid var(--brass); border-radius:8px; background:rgba(4,11,19,.3); color:var(--muted); font:700 .66rem var(--font-display); letter-spacing:.035em; line-height:1.35; }
 .shop-consumable-grid { grid-template-columns:repeat(auto-fill,minmax(14rem,1fr)); }
+/* Avatar cards carry a short label rather than a description, so they tile tighter than
+   consumables. Without a column rule the grid falls back to one full-width row per avatar. */
+.shop-avatar-grid { grid-template-columns:repeat(auto-fill,minmax(11.5rem,1fr)); }
 .shop-unit-skin-section { display:grid; gap:.48rem; min-width:0; padding-top:.35rem; border-top:1px solid rgba(80,120,150,.22); }
 .shop-unit-skin-head { display:grid; grid-template-columns:2.3rem minmax(0,1fr) auto; align-items:center; gap:.55rem; min-width:0; }
 .shop-unit-skin-head .unit-portrait.is-shop-skin-unit { width:2.3rem; height:2.8rem; border-radius:6px; border:1px solid rgba(80,120,150,.35); }
@@ -89,6 +92,7 @@
 .shop-skin-pack { grid-template-columns:5.8rem minmax(0,1fr); grid-template-rows:1fr auto; gap:.65rem; align-items:center; padding:.65rem; cursor:pointer; }
 .shop-skin { grid-template-rows:auto minmax(0,1fr) auto; justify-items:center; padding:.5rem; text-align:center; cursor:pointer; }
 .shop-consumable { grid-template-columns:3.7rem minmax(0,1fr); grid-template-rows:1fr auto; gap:.65rem; align-items:center; padding:.65rem; }
+.shop-avatar { grid-template-columns:3.45rem minmax(0,1fr); grid-template-rows:1fr auto; gap:.6rem; align-items:center; padding:.6rem; }
 .shop-skin.is-epic::before { border-top-color:#8eb7ff; }
 .shop-skin.is-legendary::before { border-top-color:#e6c065; box-shadow:inset 0 1px 0 rgba(230,192,101,.25); }
 .shop-skin.is-legendary::before,.shop-skin.is-legendary-plus::before { border-top-color:#e6c065; box-shadow:inset 0 1px 0 rgba(230,192,101,.25); }
@@ -138,6 +142,10 @@
 .shop-skin .shop-buy-btn { width:100%; min-width:0; }
 .shop-consumable-actions { grid-column:1 / -1; display:grid; width:100%; }
 .shop-consumable-actions .shop-buy-btn { width:100%; }
+/* Avatars are Valor-only, so this is a single full-width button rather than the
+   premium+Valor pair the other kinds use. */
+.shop-avatar-purchase-actions { grid-column:1 / -1; display:grid; width:100%; }
+.shop-avatar-purchase-actions .shop-buy-btn { width:100%; }
 .shop-body.is-detail-view { align-content:stretch; }
 .shop-unit-detail { display:grid; grid-template-rows:auto auto minmax(0,1fr) auto; gap:.75rem; min-height:0; max-width:54rem; width:100%; justify-self:center; }
 .shop-pack-detail { display:grid; grid-template-rows:auto auto minmax(0,1fr) auto; gap:.75rem; min-height:0; max-width:56rem; width:100%; justify-self:center; }
@@ -256,7 +264,11 @@
 /* Avatar picker */
 .ranked-avatar-icon { position:relative; display:grid; place-items:center; overflow:hidden; background:rgba(8,18,32,.55); }
 .ranked-avatar-icon-sprite { position:absolute; left:50%; top:50%; width:var(--avatar-sprite-width,108%); height:var(--avatar-sprite-height,auto); aspect-ratio:1/1; background-repeat:no-repeat; transform:translate(calc(-50% + var(--avatar-nudge-x,0)),calc(-50% + var(--avatar-nudge-y,0))); }
-.ranked-avatar-icon:is(.is-profile-avatar,.is-ranked-avatar,.is-thumb) { --avatar-sprite-width:auto; --avatar-sprite-height:96%; }
+.ranked-avatar-icon:is(.is-profile-avatar,.is-ranked-avatar,.is-thumb,.is-shop-avatar) { --avatar-sprite-width:auto; --avatar-sprite-height:96%; }
+/* .ranked-avatar-icon has no intrinsic size — every consumer gives it a box (see the menu,
+   selected-icon, and leaderboard rules below). The shop card is no different, and without
+   this the icon collapses to zero height while the sprite blows up to 108% of the card. */
+.ranked-avatar-icon.is-shop-avatar { width:3.45rem; height:3.45rem; border:1px solid rgba(203,159,85,.42); border-radius:8px; box-shadow:inset 0 1px 0 rgba(var(--sheen),.1), 0 0 0 1px rgba(0,0,0,.18); }
 .ranked-profile-avatarfield { display:grid; gap:.5rem; }
 .ranked-profile-avatar-preview { display:flex; align-items:center; gap:.6rem; }
 .ranked-profile-avatar-preview .unit-portrait.is-thumb,.ranked-profile-avatar-preview .ranked-avatar-icon.is-preview { width:2.6rem; height:2.6rem; flex-shrink:0; border:1px solid var(--parchment-edge); border-radius:8px; background:rgba(8,18,32,.55); overflow:hidden; }

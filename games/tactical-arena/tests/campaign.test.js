@@ -637,7 +637,7 @@ test("Witch Doctor mission builds a 9x9 solo gauntlet: a spread Ghoul lattice ri
 
   assert.deepEqual(findUnit(match, "p1-0-archer").position, { x: 0, y: 8 });
   assert.deepEqual(findUnit(match, "p2-0-witch-doctor").position, { x: 6, y: 2 });
-  assert.equal(findUnit(match, "p1-0-archer").hp, 12);
+  assert.equal(findUnit(match, "p1-0-archer").hp, 24);
   assert.equal(findUnit(match, "p2-0-witch-doctor").hp, 12);
   assert.equal(ghouls.length, 8); // a spread 3x3 lattice (spacing 2) minus the Witch Doctor's slot
   assert.equal(ghouls.every((unit) => unit.hp === 5 && unit.mp === 0 && unit.spent === true), true);

@@ -123,8 +123,13 @@ test("the document exposes the mobile playability shell", () => {
   );
   assert.match(
     responsiveCss,
-    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.topbar-forecast\s*\{[\s\S]*?\.forecast-toggle-copy\s*\{[\s\S]*?display:\s*none/,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.topbar-forecast \.forecast-toggle-copy\s*\{[\s\S]*?font-size:\s*0/,
     "short landscape forecast controls should move to a compact topbar switch instead of sitting in the command panel",
+  );
+  assert.match(
+    responsiveCss,
+    /@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)[\s\S]*?\.topbar-forecast \.forecast-toggle-copy::before\s*\{[\s\S]*?content:/,
+    "the compact topbar forecast switch must keep a visible glyph label, not just an invisible toggle",
   );
   assert.match(
     responsiveCss,

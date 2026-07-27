@@ -6,6 +6,8 @@ import { UNIT_TYPES } from "../src/core/unitCatalog.js";
 import {
   formatPremiumPrice,
   formatValor,
+  getAvatarOffer,
+  getAvatarOffers,
   getConsumableOffer,
   getConsumableOffers,
   getSkinPackOffer,
@@ -24,6 +26,7 @@ import {
   unitValorCost,
 } from "../src/progression/marketplace.js";
 import { SKIN_MANIFEST } from "../src/ui/skinManifest.generated.js";
+import { RANKED_AVATAR_FREE_COUNT, RANKED_AVATAR_VALOR_COST } from "../src/ui/rankedAvatars.js";
 
 function storageAdapter() {
   const values = new Map();
@@ -45,10 +48,53 @@ test("shop catalog exposes units, premium skins, skin packs, and paid consumable
   assert.ok(catalog.skinPacks.length > 0);
   assert.ok(catalog.tabs.some((tab) => tab.id === "skin-packs" && tab.label === "Skin Packs"));
   assert.ok(catalog.tabs.some((tab) => tab.id === "consumables" && tab.label === "Consumables"));
+  assert.ok(catalog.tabs.some((tab) => tab.id === "avatars" && tab.label === "Avatars"));
   assert.equal(catalog.tabs.some((tab) => tab.id === "boosts"), false);
   assert.equal(catalog.consumables.length, 9);
+  assert.ok(catalog.avatars.length > 0);
   assert.equal(catalog.resource.balance, STARTING_VALOR_BALANCE);
   assert.equal(catalog.resource.name, "Valor");
+});
+
+test("avatar offers: the starter set is free/owned, the rest cost a flat Valor price", () => {
+  const storage = storageAdapter();
+  const offers = getAvatarOffers(storage);
+
+  const starters = offers.filter((offer) => offer.free);
+  const locked = offers.filter((offer) => !offer.free);
+  assert.equal(starters.length, RANKED_AVATAR_FREE_COUNT);
+  assert.ok(locked.length > 0);
+
+  for (const offer of starters) {
+    assert.equal(offer.owned, true);
+    assert.equal(offer.purchasable, false);
+  }
+  for (const offer of locked) {
+    assert.equal(offer.owned, false);
+    assert.equal(offer.purchasable, true);
+    assert.equal(offer.valorPrice.amount, RANKED_AVATAR_VALOR_COST);
+  }
+});
+
+test("getAvatarOffer reflects a purchased icon avatar as owned", () => {
+  const storage = storageAdapter();
+  const lockedId = getAvatarOffers(storage).find((offer) => !offer.free).avatarId;
+
+  const before = getAvatarOffer(lockedId, storage);
+  assert.equal(before.owned, false);
+
+  writeUnlockProgress(storage, {
+    ...readUnlockProgress(storage),
+    serverEntitlementAvatars: [lockedId],
+  });
+
+  const after = getAvatarOffer(lockedId, storage);
+  assert.equal(after.owned, true);
+  assert.equal(after.purchasable, false);
+});
+
+test("getAvatarOffer returns null for an unknown avatar id", () => {
+  assert.equal(getAvatarOffer("avatar-999", storageAdapter()), null);
 });
 
 test("consumable offers cover valor boosts, random skin grants, and campaign boost prices", () => {
@@ -520,4 +566,47 @@ test("the client and server agree on every premium skin price", async () => {
   // The reverse direction too: a server entry with no client offer is a product players can
   // be charged for but never see, which is how an orphaned Play product outlives its skin.
   assert.equal(SKIN_CATALOG.length, clientOffers.length, "the two skin catalogs differ in size");
+});
+
+// Ranked avatars are priced on the client and validated/charged on the server from two
+// hand-kept copies of the same constants. Both files carry a "keep in lockstep" comment, which
+// is not a mechanism — this is. A drift is not cosmetic: raise the client's free tier and the
+// shop shows avatars as free that the server still demands an `avatar:<id>` entitlement for,
+// so equipping one is refused after the player has already picked it.
+test("the client and server agree on the ranked avatar catalog", async () => {
+  const server = await import("../../../platform-api/src/services/ranked-avatar-catalog.mjs");
+  const { RANKED_AVATARS, RANKED_AVATAR_FREE_COUNT, RANKED_AVATAR_VALOR_COST } =
+    await import("../src/ui/rankedAvatars.js");
+
+  assert.equal(RANKED_AVATARS.length, server.RANKED_AVATAR_COUNT, "avatar count");
+  assert.equal(RANKED_AVATAR_FREE_COUNT, server.RANKED_AVATAR_FREE_COUNT, "free tier size");
+  assert.equal(RANKED_AVATAR_VALOR_COST, server.RANKED_AVATAR_VALOR_COST, "valor price");
+
+  // Every id the client can offer must be one the server recognises, and the two must agree
+  // on which of them are free — that boundary is what decides whether Valor is charged.
+  for (const avatar of RANKED_AVATARS) {
+    assert.ok(server.isValidRankedAvatarId(avatar.id), `${avatar.id} is offered but the server rejects it`);
+    assert.equal(server.isFreeRankedAvatarId(avatar.id), avatar.free, `${avatar.id} free/paid disagreement`);
+  }
+  // And nothing outside the client's range is quietly sellable.
+  assert.equal(server.isValidRankedAvatarId(`avatar-${String(RANKED_AVATARS.length + 1).padStart(3, "0")}`), false);
+});
+
+// The shop displays this price; the server /spend endpoint charges it. Same rule as units and
+// skins — displayed price must equal charged price.
+test("the avatar price the shop shows is the price the server charges", async () => {
+  const { getValorOffer } = await import("../../../platform-api/src/services/valor-catalog.mjs");
+  const storage = storageAdapter();
+
+  for (const offer of getAvatarOffers(storage)) {
+    const resolved = getValorOffer({ kind: "avatar", avatarId: offer.avatarId });
+    if (offer.free) {
+      // A free avatar must not be purchasable server-side, or it could be sold twice over.
+      assert.equal(resolved.ok, false, `${offer.avatarId} is free but the server prices it`);
+      continue;
+    }
+    assert.equal(resolved.ok, true, `${offer.avatarId} is sold but the server refuses to price it`);
+    assert.equal(resolved.entitlements[0].entitlementId, offer.entitlementId, `${offer.avatarId} entitlement id`);
+    assert.equal(resolved.entitlements[0].valorCost, offer.valorPrice.amount, `${offer.avatarId} price`);
+  }
 });

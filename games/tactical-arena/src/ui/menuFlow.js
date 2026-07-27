@@ -45,7 +45,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
 
   let lastConfig = null;
 
-  for (const name of ["title", "hsSetup", "spSetup", "tempoMenu", "tempoSpSetup", "results", "tutorialComplete"]) {
+  for (const name of ["hsSetup", "spSetup", "tempoMenu", "tempoSpSetup", "results", "tutorialComplete"]) {
     screens.register(name, { el: screenEl(name) });
   }
   // Every control whose availability depends on being signed in. Called on entering
@@ -57,9 +57,15 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     // account. They carry different copy, so each syncs its own control set.
     syncOnlineAccountFeatureControls(menu);
     syncRankedAccountFeatureControls(menu);
-    // App-only account button; hidden on web, where the shell owns session UI.
-    syncAccountControls(menu);
+    // The app-only account button lives on the title screen, not the main menu, but
+    // its selector is unique so syncing document-wide is safe and covers both.
+    syncAccountControls(document);
   }
+
+  screens.register("title", {
+    el: screenEl("title"),
+    onEnter: () => syncAccountControls(document),
+  });
 
   screens.register("mainMenu", {
     el: screenEl("mainMenu"),

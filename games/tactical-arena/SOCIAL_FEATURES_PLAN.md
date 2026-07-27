@@ -108,12 +108,15 @@ earn a badge, but nothing a player does may take one away. That decides the spli
 Earning a badge and displaying one are separate. The **equipped** badge is one per player,
 stored as `ranked_profiles.badge_id` (migration `028-ranked-badge.sql`) beside the ranked
 title and avatar, because it is the same kind of thing: the cosmetic identity a nameplate
-draws. Unlike the avatar — an opaque, client-gated cosmetic — the equip is **validated
-server-side** against the earned set (`playerHasGameBadge`), since a badge asserts a
-purchase or a record. A refused equip keeps the previous pick rather than clearing it, so a
-forged request is a no-op. The read views (`getRankedStanding`, `getPublicRankedCard`, the
-leaderboard) fold the equipped badge in already expanded, so a nameplate needs no second
-fetch.
+draws. The equip is **validated server-side** against the earned set (`playerHasGameBadge`),
+since a badge asserts a purchase or a record. A refused equip keeps the previous pick rather
+than clearing it, so a forged request is a no-op. A purchasable icon avatar (`avatar-NNN`,
+Shop-priced in Valor) is validated the same way, against `game_entitlements`
+(`resolveAvatarUnit` in `ranked-profile.mts`); a legacy unit/skin portrait avatar stays an
+opaque, client-gated cosmetic, since picking one you don't own has no separate economic
+value beyond owning the unit/skin itself. The read views (`getRankedStanding`,
+`getPublicRankedCard`, the leaderboard) fold the equipped badge in already expanded, so a
+nameplate needs no second fetch.
 
 #### Badge art pipeline
 

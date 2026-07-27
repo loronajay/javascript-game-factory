@@ -1,14 +1,14 @@
 // Ranked identity (cosmetic profile) storage — title, avatar unit/skin, and the equipped
-// badge. Split out of ranked.mts. These are cosmetic; they never enter the online state
-// hash or authoritative battle state. The server owns them so opponents can read a card.
-// getRankedProfile is also consumed by the read views in ranked-queries.mts.
+// badge. Split out of ranked.mts; cosmetic only, never part of the online state hash.
+// getRankedProfile also backs the read views in ranked-queries.mts.
 //
-// The badge is the one field here that is VALIDATED rather than merely sanitized: avatar
-// ids are opaque cosmetics, but a badge asserts a purchase or a record, so the equip path
-// asks the badge layer whether the player actually earned it. That is the only reason
-// this module reaches into game-social, and the dependency runs one way (badges never
-// read ranked identity).
+// The badge and a purchasable icon avatar are VALIDATED, not merely sanitized: both assert
+// a purchase, so the equip path checks the player actually earned/bought it. A legacy
+// portrait avatar (unit type or unit:skin slug) stays client-gated — no separate economic
+// value in picking one you don't own.
 import { playerHasGameBadge } from "./game-social/game-badges.mjs";
+import { playerHasGameEntitlement } from "./game-progress.mjs";
+import { isFreeRankedAvatarId, isValidRankedAvatarId, rankedAvatarEntitlementId } from "../services/ranked-avatar-catalog.mjs";
 export const RANKED_TITLE_MAX_LENGTH = 60;
 const AVATAR_ID_MAX_LENGTH = 60;
 function sanitizeTitle(value) {
@@ -17,8 +17,8 @@ function sanitizeTitle(value) {
     const trimmed = value.trim().replace(/\s+/g, " ").slice(0, RANKED_TITLE_MAX_LENGTH);
     return trimmed.length ? trimmed : null;
 }
-// Avatar unit/skin ids are opaque strings — ownership is client-gated (v1). The
-// server only rejects absurd lengths and empties so a bad payload can't poison the row.
+// Length/emptiness guard shared by every avatar/badge field. Ownership, where it applies,
+// is layered on top by resolveAvatarUnit/resolveBadgeId below.
 function sanitizeAvatarId(value) {
     if (typeof value !== "string")
         return null;
@@ -58,6 +58,20 @@ async function resolveBadgeId(pool, { playerId, gameSlug, badgeId, existing }) {
     const earned = await playerHasGameBadge(pool, { gameSlug, playerId, badgeId: next });
     return earned ? next : (existing ?? null);
 }
+// Resolve avatarUnit. An icon-avatar id (avatar-NNN) must be free or owned via
+// game_entitlements; an unowned pick is refused the same way an unearned badge is. Any
+// other string is a legacy unit/skin portrait id and stays sanitized-only (unchanged).
+async function resolveAvatarUnit(pool, { playerId, gameSlug, avatarUnit, existing }) {
+    if (avatarUnit === undefined)
+        return existing ?? null;
+    const next = sanitizeAvatarId(avatarUnit);
+    if (!next || !isValidRankedAvatarId(next))
+        return next;
+    if (isFreeRankedAvatarId(next))
+        return next;
+    const owned = await playerHasGameEntitlement(pool, { playerId, gameSlug, entitlementId: rankedAvatarEntitlementId(next) });
+    return owned ? next : (existing ?? null);
+}
 // Upsert my ranked identity. Patch semantics: an undefined field keeps the stored
 // value; an explicit null (or blank string) clears it. A null avatar unit also
 // clears the skin (a skin is meaningless without its unit).
@@ -67,7 +81,7 @@ export async function saveRankedProfile(pool, { playerId, gameSlug, title, avata
     try {
         const existing = await getRankedProfile(pool, { playerId, gameSlug });
         const nextTitle = title === undefined ? (existing?.title ?? null) : sanitizeTitle(title);
-        let nextUnit = avatarUnit === undefined ? (existing?.avatarUnit ?? null) : sanitizeAvatarId(avatarUnit);
+        let nextUnit = await resolveAvatarUnit(pool, { playerId, gameSlug, avatarUnit, existing: existing?.avatarUnit });
         let nextSkin = avatarSkin === undefined ? (existing?.avatarSkin ?? null) : sanitizeAvatarId(avatarSkin);
         if (!nextUnit)
             nextSkin = null;

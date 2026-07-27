@@ -152,12 +152,22 @@ them permanently.
 8. `marketplace.js` `CONSUMABLE_OFFERS` must match `services/consumable-catalog.mts` offer for
    offer (id, sku, price, effect) — guarded by a cross-import test in `tests/marketplace.test.js`.
 9. A profile badge is proof of a purchase or a record, so **equipping one is validated
-   server-side** against the player's earned set (`playerHasGameBadge`), not merely sanitized
-   the way the opaque ranked avatar ids are. A refused equip keeps the previous pick. Derived
-   badges stay computed from `game_entitlements` and are never written to
-   `game_player_badges` — that is what keeps them un-injectable. Auto-awarded badges qualify
-   only on facts the player cannot write directly (a resolved-match `game_ratings` row,
-   a completed campaign row).
+   server-side** against the player's earned set (`playerHasGameBadge`), not merely sanitized.
+   A refused equip keeps the previous pick. Derived badges stay computed from
+   `game_entitlements` and are never written to `game_player_badges` — that is what keeps
+   them un-injectable. Auto-awarded badges qualify only on facts the player cannot write
+   directly (a resolved-match `game_ratings` row, a completed campaign row).
+9a. A purchasable icon avatar (`avatar-NNN`, `rankedAvatars.js`) is validated the same way:
+   `resolveAvatarUnit` (`ranked-profile.mts`) checks `game_entitlements` for `avatar:<id>`
+   before storing an equip, refusing an unowned pick like an unearned badge. The first
+   `RANKED_AVATAR_FREE_COUNT` ids are a free starter set and always pass. A legacy unit/skin
+   portrait avatar id is **not** an `avatar-NNN` id, so it stays sanitized-only (opaque,
+   client-gated) — picking a portrait you don't own has no separate economic value beyond
+   owning the unit/skin, unlike a purchased icon avatar.
+9b. The flat Valor price for a locked icon avatar (`RANKED_AVATAR_VALOR_COST` = 200) is
+   duplicated in `platform-api/src/services/ranked-avatar-catalog.mts` and
+   `games/tactical-arena/src/ui/rankedAvatars.js` — keep both in lockstep the same way unit/
+   skin Valor pricing is, so the displayed price always matches the charged price.
 10. `skin-pack:<packId>` entitlements are granted alongside a pack's skins purely as a durable
    record that the bundle was bought. They own no content — never treat one as granting the
    skins, and never let the client assert one.
@@ -166,13 +176,20 @@ them permanently.
    binding, one token replayed under a second account opens a second claim row and grants
    twice. Store the hash, never the raw token — and keep persisting `playPurchaseTokenHash`,
    since it is the only join key from a voided purchase back to what was granted.
-12. A Play purchase that grants nothing must only return `ok` when **that token is already on
+12. A Play purchase must be refused **before Google's sheet opens** when the player already owns
+   everything it would grant (`createOwnedOfferGuard` → `isOfferFullyOwned`). Play takes the
+   money before the server is consulted, so a post-hoc refusal can only be repaired by a
+   refund — the preflight is the only place a duplicate can be stopped for free. It mirrors
+   `resolveTacticalArenaPremiumOffer` (partial skin packs stay buyable) and a cross-import test
+   holds the two in step. It fails **open**: a fetch failure must not block a legitimate sale,
+   and the backstop below still applies.
+13. A Play purchase that grants nothing must only return `ok` when **that token is already on
    one of our claim rows**. That is what separates a boot-recovery retry (grant landed,
    acknowledge failed — must settle) from a genuine duplicate purchase of an already-owned
    item (must NOT settle, so Google auto-refunds it within three days). Returning `ok` for
    both keeps the player's money for nothing; returning an error for both gets legitimate
    purchases refunded. The client settles only on `ok`, which is what makes this work.
-13. Premium USD prices are derived from a unit's **star tier**, so a balance change moves real
+14. Premium USD prices are derived from a unit's **star tier**, so a balance change moves real
    money. `tests/marketplace.test.js` cross-checks every premium unit and skin price against
    the server's `payments.mts` catalog — when it fails after a balance pass, fix the server
    catalog and re-run `npm run play:sync` so the Play Console price follows.
@@ -192,10 +209,11 @@ them permanently.
   server-validate mission outcomes via deterministic replay of the headless core. Note this
   also reaches the OG Commander badge, whose campaign path trusts the same claimed progress;
   its ranked path (a resolved-match `game_ratings` row) does not.
-- **In-match nameplate cosmetics** — the equipped badge, like the ranked avatar and tagline,
-  travels in the peer's identity payload, so a modified client could show its opponent a badge
-  it never earned *on that opponent's screen only*. It is cosmetic, never hashed, and every
-  authoritative surface (profile, card, ladder) reads the server's own copy instead.
+- **In-match nameplate cosmetics** — the equipped badge and avatar, like the tagline, travel in
+  the peer's identity payload, so a modified client could show its opponent a badge or a
+  locked icon avatar it never earned/bought *on that opponent's screen only*. It is cosmetic,
+  never hashed, and every authoritative surface (profile, card, ladder) reads the server's own
+  copy instead, which would refuse to have stored an unowned pick in the first place.
 - **Rare multi-source revocation edge**: an entitlement's `source` is set by whichever grant
   landed *first* and is never overwritten. So if a Stripe purchase granted an item first and the
   player *later* also earned that same item another way, a chargeback still revokes the (single)

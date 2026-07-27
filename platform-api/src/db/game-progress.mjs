@@ -170,6 +170,15 @@ async function revokeInventoryItem(client, playerId, gameSlug, itemId, quantity)
      returning quantity`, [playerId, gameSlug, itemId, quantity]);
     return res.rows.length ? Number(res.rows[0].quantity) || 0 : 0;
 }
+// Does this player hold this exact entitlement? Used to re-validate a cosmetic pick (e.g. a
+// purchased ranked avatar) server-side before storing it, the same way playerHasGameBadge
+// re-validates a badge equip.
+export async function playerHasGameEntitlement(pool, { playerId, gameSlug, entitlementId }) {
+    if (!pool || !playerId || !gameSlug || !entitlementId)
+        return false;
+    const res = await pool.query(`select 1 from game_entitlements where player_id = $1 and game_slug = $2 and entitlement_id = $3 limit 1`, [playerId, gameSlug, entitlementId]);
+    return res.rowCount > 0;
+}
 async function grantEntitlement(client, playerId, gameSlug, entitlement, source, sourceId) {
     await client.query(`insert into game_entitlements (player_id, game_slug, entitlement_id, kind, source, source_id)
      values ($1, $2, $3, $4, $5, $6)

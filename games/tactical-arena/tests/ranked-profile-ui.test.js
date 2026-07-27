@@ -6,8 +6,9 @@ import {
   isRankedMatchInProgress,
   syncRankedStandingNameplate,
 } from "../src/ui/rankedProfile.js";
+import { renderAvatarField } from "../src/ui/rankedProfileIdentity.js";
 import { renderBadgePickerField } from "../src/ui/rankedBadgePicker.js";
-import { writeUnlockProgress } from "../src/progression/unlocks.js";
+import { readUnlockProgress, writeUnlockProgress } from "../src/progression/unlocks.js";
 
 class FakeLocalStorage {
   constructor() {
@@ -201,6 +202,40 @@ test("ranked profile legacy avatar options include unlocked units and owned skin
     option.avatarUnit === "paladin" && option.avatarSkin === "crusader" && option.label === "Paladin: Crusader"));
   assert.equal(options.some((option) =>
     option.avatarUnit === "paladin" && option.avatarSkin === null), false);
+});
+
+// The icon-avatar picker only lists RANKED_AVATARS ids that are free or owned — locked
+// (unpurchased) ones are bought in the Shop, not offered here.
+test("the icon-avatar picker only offers free/owned avatars, not locked ones", () => {
+  const storage = new FakeLocalStorage();
+  globalThis.localStorage = storage;
+  try {
+    writeUnlockProgress(storage, { ...readUnlockProgress(storage), serverEntitlementAvatars: ["avatar-042"] });
+
+    const section = new TestElement("section");
+    section.appendChild(renderAvatarField({ avatarUnit: null, avatarSkin: null }, () => {}));
+
+    const labels = section.findAllByClass("ranked-profile-avatar-option-text").map((node) => node.textContent);
+    assert.ok(labels.includes("Avatar 001"), "free starter avatar is offered");
+    assert.ok(labels.includes("Avatar 042"), "purchased avatar is offered");
+    assert.equal(labels.includes("Avatar 020"), false, "locked, unpurchased avatar is not offered");
+  } finally {
+    delete globalThis.localStorage;
+  }
+});
+
+test("a no-longer-owned equipped icon avatar still appears in the menu, selected", () => {
+  const storage = new FakeLocalStorage();
+  globalThis.localStorage = storage;
+  try {
+    const section = new TestElement("section");
+    section.appendChild(renderAvatarField({ avatarUnit: "avatar-077", avatarSkin: null }, () => {}));
+
+    const labels = section.findAllByClass("ranked-profile-avatar-option-text").map((node) => node.textContent);
+    assert.ok(labels.includes("Avatar 077"), "currently-equipped avatar stays visible even if unowned");
+  } finally {
+    delete globalThis.localStorage;
+  }
 });
 
 test("ranked profile active-match notice only treats live matches as in progress", () => {
