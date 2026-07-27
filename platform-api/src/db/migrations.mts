@@ -29,6 +29,7 @@ export const MIGRATION_FILES = Object.freeze([
   "026-ranked-liveness.sql",
   "027-game-social.sql",
   "028-ranked-badge.sql",
+  "029-game-ratings-peak.sql",
 ]);
 
 export function migrationFileUrl(name: string): URL {

@@ -2,9 +2,10 @@ import { svgElement } from "./svgHelpers.js";
 import { createUnitFigure } from "./unitRenderer.js";
 import { createBoardMetrics, createBoardViewBox, gridToScreen, pointsToString } from "./isometric.js";
 import { updateBoardTouchAssist } from "./boardTouchAssist.js";
+import { followBoardSelection, updateBoardCamera } from "./boardCameraController.js";
 import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.js";
 import { areEnemies, getTileAffinity, unitAt } from "../core/state.js";
-import { canTrample, chebyshevDistance, getLegalMoves, getTrampleMoveOptions, isOnBoard, positionKey } from "../rules/movement.js";
+import { canTrample, chebyshevDistance, getLegalMoves, getTrampleMoveOptions, isOnBoard, positionFromKey, positionKey } from "../rules/movement.js";
 import { isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack } from "../rules/combat.js";
 import { artIsBodyBlocked, getArtTargetRange, getConeAimOptions, getConeCells, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getPyroclasmReachTiles, getPyroclasmTargets, getRevivePlacementTiles, getRushStepOptions, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastFootprint, getWallPlacementTiles } from "../rules/arts.js";
 import { isTargetable } from "../rules/statuses.js";
@@ -414,7 +415,18 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   const view = createBoardViewBox(metrics, state.size);
   updateBoardTouchAssist(board, { size: state.size, metrics, legalKeys: legal, onTileClick });
   const activeWeather = getActiveBoardWeather(state);
-  board.setAttribute("viewBox", `${view.x} ${view.y} ${view.width} ${view.height}`);
+  // The camera returns the base viewBox unchanged on precise pointers and at zoom 1,
+  // so desktop framing is identical; on touch it applies the live pan/zoom.
+  const camera = updateBoardCamera(board, { size: state.size, metrics, base: view });
+  board.setAttribute("viewBox", `${camera.x} ${camera.y} ${camera.width} ${camera.height}`);
+  // Once the player has zoomed past the whole board, slide the view to whatever they
+  // just selected and where it can act. No-op on a mouse and at zoom 1.
+  if (actor) {
+    const followPoints = [actor.position, ...[...legal].map(positionFromKey)]
+      .filter(Boolean)
+      .map((position) => gridToScreen(metrics, position.x, position.y));
+    followBoardSelection(board, { actorKey: actor.id, points: followPoints });
+  }
   boardLayer.replaceChildren();
   unitsLayer.replaceChildren();
   board.classList.toggle("board-focused", Boolean(actor));

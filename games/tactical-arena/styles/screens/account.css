@@ -1,0 +1,188 @@
+/* -----------------------------------------------------------------------
+   In-app account panel (sign in / create account / reset password).
+   Rides on the shared .ref-modal + .ref-card shell from battle/overlays.css,
+   so backdrop, sizing, and close behavior match every other overlay.
+   ----------------------------------------------------------------------- */
+
+/* The software keyboard shrinks visualViewport, and mobileViewport.js mirrors that
+   into --app-height. `vh` does NOT shrink, so the inherited .ref-card max-height:88vh
+   leaves the card sized for the full screen and the password field and submit button
+   end up hidden behind the keyboard. Size to --app-height and align to the top so the
+   card grows downward into whatever space is actually left. */
+.auth-modal {
+  height: var(--app-height, 100%);
+  place-items: start center;
+  overflow-y: auto;
+  padding: .5rem;
+}
+
+.auth-card {
+  width: min(28rem, 94vw);
+  max-height: calc(var(--app-height, 100vh) - 1rem);
+}
+
+.auth-body {
+  /* `min-height: 0` is load-bearing. .ref-card is a flex column, and a flex item
+     will not shrink below its content height without it — so the body never scrolls
+     and the password field and submit button get clipped behind the keyboard
+     instead. Same pattern as .ref-panel.is-active in battle/overlays.css. */
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 1rem 1.1rem 1.15rem;
+  overflow-y: auto;
+}
+
+.auth-blurb {
+  margin: 0 0 .9rem;
+  color: rgba(190, 210, 230, .78);
+  font-size: .84rem;
+  line-height: 1.5;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: .7rem;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+  /* Lets the field shrink inside a grid track rather than forcing it wider. */
+  min-width: 0;
+}
+
+.auth-field-label {
+  color: var(--brass-hi);
+  font: 700 .68rem var(--font-display);
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.auth-input {
+  /* A text input carries an intrinsic default width (~20 characters). Without
+     these it refuses to shrink, which pushes it past the edge of its container —
+     in a grid column that means the field is clipped by the card. */
+  width: 100%;
+  min-width: 0;
+  padding: .6rem .7rem;
+  border: 1px solid var(--parchment-edge);
+  border-radius: 8px;
+  background: rgba(6, 12, 22, .58);
+  color: var(--text);
+  /* 16px minimum: anything smaller makes the Android/iOS WebView zoom the whole
+     page on focus, which breaks the fixed landscape layout. */
+  font-size: 16px;
+  font-family: inherit;
+}
+
+.auth-input:focus {
+  outline: none;
+  border-color: var(--brass);
+  box-shadow: 0 0 0 2px rgba(var(--sheen), .16);
+}
+
+.auth-flash {
+  margin: 0;
+  min-height: 1.1rem;
+  font-size: .8rem;
+  line-height: 1.4;
+}
+
+.auth-flash.is-error { color: #ffb4a8; }
+.auth-flash.is-ok { color: #9fe8b0; }
+
+.auth-submit {
+  width: 100%;
+  margin-top: .1rem;
+}
+
+.auth-switch {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: .3rem 1rem;
+  margin-top: .2rem;
+}
+
+.auth-switch-btn {
+  padding: .35rem .2rem;
+  border: 0;
+  background: transparent;
+  color: rgba(140, 190, 230, .9);
+  font-size: .78rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.auth-switch-btn:hover { color: var(--brass-hi); }
+
+/* Account status button in the main menu. App-only: the web build gets its
+   session bar from the arcade shell, so this stays hidden there. */
+.account-status-btn[hidden] { display: none; }
+
+.account-status-btn.is-signed-in {
+  color: #9fe8b0;
+}
+
+/* Landscape phones are wide and short, and Tactical Arena is landscape-only by
+   design — players should never have to rotate just to type. So spend the axis we
+   actually have: two columns of fields instead of one tall stack, which roughly
+   halves the vertical space the form needs.
+ */
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 520px) {
+  .auth-form {
+    display: grid;
+    /* minmax(0, 1fr), not 1fr: a bare `1fr` is minmax(auto, 1fr), and `auto`
+       bottoms out at the track's min-content width — which for a text input is
+       its intrinsic ~20-character width. The tracks then overflow the card and
+       clip the second field. */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: .45rem .7rem;
+  }
+
+  .auth-flash,
+  .auth-submit,
+  .auth-switch {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Keyboard is up: measured at ~121 CSS px of viewport on a Pixel 3a in landscape.
+   Everything that is not a field or the submit button has to go. */
+@media (pointer: coarse) and (max-height: 220px) {
+  /* Roughly 121px of viewport is left. Header + fields + submit needs ~145px, so
+     the header yields: it is the only part that is pure chrome. Escape and the
+     Android back gesture both still dismiss the panel, and the header returns the
+     moment the keyboard does. */
+  .auth-head { display: none; }
+  .auth-blurb { display: none; }
+  .auth-body { padding: .4rem .7rem .5rem; }
+  .auth-form { gap: .3rem .7rem; }
+  .auth-field-label { font-size: .6rem; letter-spacing: .06em; }
+  .auth-input { padding: .3rem .5rem; }
+  .auth-flash { min-height: 0; }
+
+  /* Trim the submit and drop the mode-switch links so the button lands fully
+     inside the card instead of half under the keyboard. The links are still
+     there the moment the keyboard closes. */
+  .auth-submit {
+    min-height: 34px;
+    padding: .25rem .5rem;
+    font-size: .82rem;
+  }
+
+  .auth-switch { display: none; }
+}
+
+@media (pointer: coarse) and (max-height: 540px) {
+  /* Height is already handled by the --app-height rules above; this only tightens
+     the internal spacing so more of the form survives above the keyboard. */
+  .auth-card { width: min(30rem, 94vw); }
+
+  .auth-body { padding: .7rem .9rem .85rem; }
+  .auth-blurb { margin-bottom: .6rem; font-size: .78rem; }
+  .auth-form { gap: .5rem; }
+}

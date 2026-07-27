@@ -343,10 +343,12 @@ export async function applyResolution(client: any, { row, gameSlug, outcomeA, re
   const aDraw = outcomeA === "draw" ? 1 : 0;
 
   const upsert = `
-    insert into game_ratings (player_id, game_slug, rating, wins, losses, draws, last_match_at)
-    values ($1,$2,$3,$4,$5,$6, now())
+    insert into game_ratings (player_id, game_slug, rating, peak_rating, wins, losses, draws, last_match_at)
+    values ($1,$2,$3,$3,$4,$5,$6, now())
     on conflict (player_id, game_slug) do update
       set rating = excluded.rating,
+          -- Running max: the ladder badges qualify on the peak, so it must never fall.
+          peak_rating = greatest(coalesce(game_ratings.peak_rating, 0), excluded.rating),
           wins = game_ratings.wins + excluded.wins,
           losses = game_ratings.losses + excluded.losses,
           draws = game_ratings.draws + excluded.draws,

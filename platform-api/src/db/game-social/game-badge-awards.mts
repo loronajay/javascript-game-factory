@@ -24,10 +24,12 @@ const CAMPAIGN_FINALE_MISSION_ID: Record<string, string> = Object.freeze({
 export async function loadPlayerBadgeFacts(pool: any, { gameSlug, playerId }: any): Promise<any> {
   const finaleMissionId = CAMPAIGN_FINALE_MISSION_ID[gameSlug] || "";
   const [ranked, campaign] = await Promise.all([
-    // A game_ratings row exists only once a ranked match has RESOLVED, so this means
-    // "played ranked", not "queued for it".
+    // A game_ratings row exists only once a ranked match has RESOLVED, so its presence
+    // means "played ranked", not "queued for it". peak_rating is the high-water mark the
+    // ladder badges qualify on — coalesced with the live rating so a row written before
+    // migration 029 still reports something honest.
     pool.query(
-      `select 1 from game_ratings where player_id = $1 and game_slug = $2 limit 1`,
+      `select rating, peak_rating from game_ratings where player_id = $1 and game_slug = $2 limit 1`,
       [playerId, gameSlug],
     ),
     finaleMissionId
@@ -40,8 +42,12 @@ export async function loadPlayerBadgeFacts(pool: any, { gameSlug, playerId }: an
       : Promise.resolve({ rows: [] }),
   ]);
 
+  const ratingRow = (ranked.rows || [])[0] || null;
   return {
-    playedRanked: (ranked.rows || []).length > 0,
+    playedRanked: Boolean(ratingRow),
+    peakRating: ratingRow
+      ? Math.max(Number(ratingRow.peak_rating) || 0, Number(ratingRow.rating) || 0)
+      : 0,
     campaignComplete: (campaign.rows || []).length > 0,
   };
 }

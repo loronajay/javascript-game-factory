@@ -17,8 +17,8 @@ import { createPlatformApiClient } from "../../../../js/platform/api/platform-ap
 import {
   isFactoryAccountLoggedIn,
   readStoredFactoryAccountSession,
-  createFactoryAccountSignInUrl,
 } from "../platform/factoryAccount.js";
+import { wireSignInLink } from "./signInLink.js";
 import { TACTICAL_ARENA_GAME_SLUG } from "../platform/gameProgressClient.js";
 import { loadFactoryProfile } from "../../../../js/platform/identity/factory-profile.mjs";
 import { createOnlineIdentityPayload } from "../../../../js/platform/identity/match-identity.mjs";
@@ -165,7 +165,7 @@ function renderSignedOut(body, pilot) {
   const link = document.createElement("a");
   link.className = "ranked-profile-signin-link menu-btn";
   link.textContent = "Sign In";
-  try { link.href = createFactoryAccountSignInUrl(); } catch { link.href = "#"; }
+  wireSignInLink(link);
   standing.append(notice, link);
   body.appendChild(standing);
 }

@@ -16,7 +16,7 @@ import {
   taSocialAvailability,
   TA_SOCIAL_SIGNED_OUT,
 } from "../platform/taFriendsClient.js";
-import { createFactoryAccountSignInUrl } from "../platform/factoryAccount.js";
+import { wireSignInLink } from "./signInLink.js";
 import { factoryPlayerUrl } from "../platform/factoryLinks.js";
 import { loadFactoryProfile } from "../../../../js/platform/identity/factory-profile.mjs";
 import { createOnlineIdentityPayload } from "../../../../js/platform/identity/match-identity.mjs";
@@ -139,7 +139,7 @@ function populate(body, targetId, { seed, onRelationshipChanged, injected = {} }
     const link = document.createElement("a");
     link.className = "ranked-profile-signin-link menu-btn";
     link.textContent = "Sign In";
-    try { link.href = createFactoryAccountSignInUrl(); } catch { link.href = "#"; }
+    wireSignInLink(link);
     actions.append(notice, link);
   } else if (isMe) {
     actions.appendChild(el("p", "ta-player-self-note", "This is your Tactical Arena profile."));

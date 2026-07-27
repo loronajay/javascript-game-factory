@@ -1,0 +1,14 @@
+/* -----------------------------------------------------------------------
+   Packaged-app (Capacitor) chrome overrides.
+
+   Every rule here is scoped to :root[data-native-app="on"], which bootstrap.js
+   only sets when isNativeApp() is true. That attribute is never present in a
+   browser, so none of this can affect the web build.
+   ----------------------------------------------------------------------- */
+
+/* The "← Arcade" link points at ../../grid.html, which lives in the arcade shell
+   and is not part of the app bundle — tapping it in the app is a dead end. The
+   app's own back affordance is the Android back gesture (see androidBackButton.js). */
+:root[data-native-app="on"] .back-link {
+  display: none;
+}

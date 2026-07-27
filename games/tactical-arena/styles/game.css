@@ -6,4 +6,6 @@
 @import "./screens/features.css";
 @import "./screens/campaign.css";
 @import "./screens/polish.css";
+@import "./screens/account.css";
+@import "./screens/native-app.css";
 @import "./responsive.css";

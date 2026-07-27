@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Tactical Arena</string>
+    <string name="title_activity_main">Tactical Arena</string>
+    <string name="package_name">com.jayarcade.tacticalarena</string>
+    <string name="custom_url_scheme">com.jayarcade.tacticalarena</string>
+</resources>

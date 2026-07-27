@@ -1,5 +1,5 @@
 import { gridToScreen } from "./isometric.js";
-import { positionKey } from "../rules/movement.js";
+import { positionFromKey, positionKey } from "../rules/movement.js";
 
 const ASSISTED_BOARD_SIZE = 13;
 const SHORT_LANDSCAPE_MAX_HEIGHT = 540;
@@ -12,6 +12,9 @@ const assistState = new WeakMap();
 const pointerStarts = new WeakMap();
 const suppressClicksUntil = new WeakMap();
 const wiredBoards = new WeakSet();
+// Per-board live pointer ids, and boards whose current gesture ever had 2+ fingers.
+const activePointers = new WeakMap();
+const multiTouchGesture = new WeakSet();
 
 export function shouldUseBoardTouchAssist({ size, coarsePointer, width, height }) {
   return (
@@ -44,10 +47,6 @@ function scoreTile(metrics, position, svgPoint) {
   return Math.hypot(dx, dy);
 }
 
-function positionFromKey(key) {
-  const [x, y] = key.split(",").map(Number);
-  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
-}
 
 function closestTile(candidates, metrics, svgPoint, maxScore) {
   let best = null;
@@ -93,9 +92,32 @@ function shouldAssistPointer(event) {
   return event.pointerType !== "mouse";
 }
 
+// Whether a pointer lift should be treated as a tile tap.
+//
+// `multiTouch` is the important guard. Only one pointer-start is kept per board, so
+// the second finger of a pinch overwrites the first; without this, a pinch performed
+// with a near-stationary thumb passed the drift check on lift and selected — or
+// moved — a unit. Any gesture that ever had two fingers down belongs to the camera
+// (boardCameraController.js), never to tile selection.
+export function shouldTreatPointerAsTap({ multiTouch = false, start, pointerId, x, y } = {}) {
+  if (multiTouch) return false;
+  if (!start || start.id !== pointerId) return false;
+  return Math.hypot(x - start.x, y - start.y) <= MAX_TAP_DRIFT_PX;
+}
+
 function handlePointerDown(event) {
   if (!shouldAssistPointer(event)) return;
-  pointerStarts.set(event.currentTarget, {
+  const board = event.currentTarget;
+
+  let active = activePointers.get(board);
+  if (!active) {
+    active = new Set();
+    activePointers.set(board, active);
+  }
+  active.add(event.pointerId);
+  if (active.size >= 2) multiTouchGesture.add(board);
+
+  pointerStarts.set(board, {
     id: event.pointerId,
     x: event.clientX,
     y: event.clientY,
@@ -104,13 +126,22 @@ function handlePointerDown(event) {
 
 function handlePointerUp(event) {
   const board = event.currentTarget;
+
+  const active = activePointers.get(board);
+  active?.delete(event.pointerId);
+  const multiTouch = multiTouchGesture.has(board);
+  // The gesture is only over once every finger is up; until then a second lift must
+  // still be treated as part of the pinch.
+  if (!active || active.size === 0) multiTouchGesture.delete(board);
+
   const state = assistState.get(board);
   if (!state || !shouldAssistPointer(event)) return;
 
   const start = pointerStarts.get(board);
   pointerStarts.delete(board);
-  if (!start || start.id !== event.pointerId) return;
-  if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > MAX_TAP_DRIFT_PX) return;
+  if (!shouldTreatPointerAsTap({ multiTouch, start, pointerId: event.pointerId, x: event.clientX, y: event.clientY })) {
+    return;
+  }
 
   const windowRef = board.ownerDocument?.defaultView ?? globalThis.window;
   if (!shouldUseBoardTouchAssist({ size: state.size, ...getWindowAssistPosture(windowRef) })) return;
@@ -151,5 +182,6 @@ export function updateBoardTouchAssist(board, { size, metrics, legalKeys, onTile
   wiredBoards.add(board);
   board.addEventListener("pointerdown", handlePointerDown, true);
   board.addEventListener("pointerup", handlePointerUp, true);
+  board.addEventListener("pointercancel", handlePointerUp, true);
   board.addEventListener("click", handleClick, true);
 }

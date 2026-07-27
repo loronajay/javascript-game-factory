@@ -14,7 +14,7 @@ import {
   TA_SOCIAL_SIGNED_OUT,
   TA_SOCIAL_UNAVAILABLE,
 } from "../platform/taFriendsClient.js";
-import { createFactoryAccountSignInUrl } from "../platform/factoryAccount.js";
+import { wireSignInLink } from "./signInLink.js";
 import { createRankedTierEmblem, normalizeRankedTierId } from "./rankedEmblems.js";
 import { renderNameplateAvatar } from "./rankedProfileNameplate.js";
 import { openTaPlayerProfile } from "./taPlayerProfile.js";
@@ -100,7 +100,7 @@ function populate(body, { injectedClient = null, injectedAvailability = null } =
     const link = document.createElement("a");
     link.className = "ranked-profile-signin-link menu-btn";
     link.textContent = "Sign In";
-    try { link.href = createFactoryAccountSignInUrl(); } catch { link.href = "#"; }
+    wireSignInLink(link);
     body.append(notice, link);
     return;
   }

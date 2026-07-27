@@ -48,6 +48,43 @@ function packCollectionRule(packId: string): any {
   };
 }
 
+
+// Ladder ascent badges.
+//
+// AWARDED rather than derived, and qualified on the PEAK rating rather than the
+// current one. "Reached Gold" is a high-water mark: deriving it from the live rating
+// would revoke the badge on a losing streak, which the monotonic rule above forbids.
+// db/ratings + db/ranked-match maintain game_ratings.peak_rating as a running max.
+//
+// These minimums MUST equal RANK_TIERS in db/ranked-elo. They are duplicated rather
+// than imported because services must not depend on db (db already imports services,
+// and a cycle would be worse than a duplicated number). A test asserts they match.
+export const LADDER_BADGE_TIER_MINIMUMS = Object.freeze({
+  gold: 1400,
+  platinum: 1600,
+  diamond: 1800,
+  master: 2000,
+  grandmaster: 2200,
+});
+
+function ladderBadge(id: string, label: string, art: string, tierId: string, description: string): any {
+  const min = (LADDER_BADGE_TIER_MINIMUMS as any)[tierId];
+  return Object.freeze({
+    id,
+    label,
+    description,
+    art,
+    earn: BADGE_EARN_AWARDED,
+    tierId,
+    autoAward: (facts: any) => Number(facts?.peakRating || 0) >= min,
+    awardableUntil: null,
+  });
+}
+
+// How many skins make a collector. Lowering this later is safe; RAISING it would
+// un-earn the badge for anyone between the old and new value, so treat it as fixed.
+export const SKIN_COLLECTOR_MINIMUM = 15;
+
 const GAME_BADGE_CATALOG = Object.freeze({
   "tactical-arena": Object.freeze([
     Object.freeze({
@@ -93,6 +130,30 @@ const GAME_BADGE_CATALOG = Object.freeze({
         /^skin:[^:]+:fuck-cancer$/,
         /^skin-pack:fuck-cancer$/,
       ]),
+    }),
+    ladderBadge("ladder-climber", "Ladder Climber", "ladder-climber", "gold",
+      "Climbed to Gold on the ranked ladder."),
+    ladderBadge("platinum-ascent", "Platinum Ascent", "platinum-ascent", "platinum",
+      "Climbed to Platinum on the ranked ladder."),
+    ladderBadge("diamond-ascent", "Diamond Ascent", "diamond-ascent", "diamond",
+      "Climbed to Diamond on the ranked ladder."),
+    ladderBadge("master-ascent", "Master Ascent", "master-ascent", "master",
+      "Climbed to Master on the ranked ladder."),
+    ladderBadge("ladder-conqueror", "Ladder Conqueror", "ladder-conqueror", "grandmaster",
+      "Reached Grandmaster — the top of the ranked ladder."),
+    // Derived: owning skins is monotonic, so it recomputes safely and applies
+    // retroactively to anyone who already has a collection. Counts every owned skin,
+    // however it was bought — individually, in a pack, or granted by a consumable.
+    Object.freeze({
+      id: "skin-collector",
+      label: "Skin Collector",
+      description: `Owns ${SKIN_COLLECTOR_MINIMUM} or more skins.`,
+      art: "skin-collector",
+      earn: BADGE_EARN_DERIVED,
+      entitlementCount: Object.freeze({
+        pattern: /^skin:[^:]+:[^:]+$/,
+        min: SKIN_COLLECTOR_MINIMUM,
+      }),
     }),
   ]),
 });

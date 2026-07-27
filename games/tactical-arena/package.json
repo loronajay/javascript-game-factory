@@ -9,6 +9,8 @@
     "skins": "node --preserve-symlinks --preserve-symlinks-main scripts/generate-skin-manifest.mjs",
     "badges": "node --preserve-symlinks --preserve-symlinks-main scripts/generate-badge-manifest.mjs",
     "badges:art": "python scripts/convert-badge-art.py",
+    "mobile": "node --preserve-symlinks --preserve-symlinks-main scripts/mobile-preview.mjs",
+    "mobile:shots": "node --preserve-symlinks --preserve-symlinks-main scripts/mobile-shots.mjs",
     "test": "node --preserve-symlinks --preserve-symlinks-main scripts/generate-skin-manifest.mjs && node --preserve-symlinks --preserve-symlinks-main scripts/generate-badge-manifest.mjs && node --preserve-symlinks --preserve-symlinks-main --test tests/*.test.js"
   }
 }

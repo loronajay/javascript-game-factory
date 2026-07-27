@@ -1,0 +1,26 @@
+{
+  "name": "tactical-arena-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Capacitor Android/iOS shell for Tactical Arena. Packages the live web game; never edits it. NOTE: measure APK size with `npm run apk:clean` \u2014 incremental assembleDebug reuses the old zip layout and leaves gaps, which inflated a 54MB APK to 143MB.",
+  "scripts": {
+    "build:www": "node scripts/build-www.mjs",
+    "sync": "npm run build:www && cap sync",
+    "apk": "npm run sync && cd android && gradlew.bat assembleDebug",
+    "apk:clean": "npm run sync && cd android && gradlew.bat clean assembleDebug",
+    "run:android": "npm run sync && cap run android",
+    "verify:android": "node scripts/verify-android.mjs",
+    "open:android": "cap open android",
+    "play:products": "node scripts/play-products-report.mjs",
+    "play:sync": "node scripts/play-products-sync.mjs"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/cli": "^8.4.2",
+    "@capacitor/core": "^8.4.2",
+    "@capacitor/keyboard": "^8.0.5"
+  }
+}

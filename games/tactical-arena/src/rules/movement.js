@@ -14,6 +14,19 @@ export function positionKey({ x, y }) {
   return `${x},${y}`;
 }
 
+// Inverse of positionKey. Returns null for anything that is not a well-formed key,
+// so callers can filter rather than propagate NaN coordinates.
+export function positionFromKey(key) {
+  if (typeof key !== "string") return null;
+  const parts = key.split(",");
+  // Strict on purpose: Number("") is 0, so a lax parse turns "1," into (1, 0) and
+  // a malformed key silently becomes a real board position.
+  if (parts.length !== 2 || parts[0].trim() === "" || parts[1].trim() === "") return null;
+  const x = Number(parts[0]);
+  const y = Number(parts[1]);
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+}
+
 export function isOnBoard(state, { x, y }) {
   return Number.isInteger(x) && Number.isInteger(y) && x >= 0 && y >= 0 && x < state.size && y < state.size;
 }

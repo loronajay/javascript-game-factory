@@ -1,0 +1,139 @@
+// Bundles Cinzel + Spectral into the payload and repoints index.html at them.
+//
+// The packaged app should not need the network to render text: Google Fonts is a
+// render-blocking request on every cold start, and offline it never resolves at all.
+//
+// Only the latin and latin-ext subsets are kept — the game ships English copy, and
+// the cyrillic/greek/vietnamese subsets would roughly triple the download.
+//
+// Historical note: this URL used to differ from the one in index.html, because that
+// one was malformed (`1,500,600` instead of `1,500;1,600`, which Google rejected with
+// HTTP 400 so no font loaded at all). The web index.html has since been corrected, so
+// the two now match — keep them in sync if the families or weights ever change.
+
+import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
+import { copyFile, mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const APP_ROOT = path.resolve(HERE, "..");
+const CACHE_DIR = path.join(APP_ROOT, ".asset-cache", "fonts");
+
+// The corrected request. Keep in sync with games/tactical-arena/index.html if the
+// families or weights there ever change.
+const FONT_CSS_URL =
+  "https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900" +
+  "&family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&display=swap";
+
+// woff2 is only served to a modern UA; an unknown UA gets ttf, which is ~2x larger.
+const MODERN_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
+  "Chrome/124.0.0.0 Safari/537.36";
+
+const KEEP_SUBSETS = new Set(["latin", "latin-ext"]);
+
+const FONT_DIR_REL = "games/tactical-arena/assets/fonts";
+const CSS_REL = `${FONT_DIR_REL}/fonts.css`;
+
+function parseFaces(css) {
+  // Google emits `/* subset */` immediately before each @font-face block.
+  const faces = [];
+  const pattern = /\/\*\s*([\w-]+)\s*\*\/\s*(@font-face\s*\{[^}]*\})/g;
+  for (const match of css.matchAll(pattern)) {
+    const [, subset, block] = match;
+    const url = block.match(/url\((https:\/\/[^)]+\.woff2)\)/)?.[1];
+    if (!url) continue;
+    const family = block.match(/font-family:\s*'([^']+)'/)?.[1] ?? "font";
+    const weight = block.match(/font-weight:\s*(\d+)/)?.[1] ?? "400";
+    const style = block.match(/font-style:\s*(\w+)/)?.[1] ?? "normal";
+    faces.push({ subset, block, url, family, weight, style });
+  }
+  return faces;
+}
+
+async function download(url, dest) {
+  const res = await fetch(url, { headers: { "user-agent": MODERN_UA } });
+  if (!res.ok) throw new Error(`${res.status} fetching ${url}`);
+  await writeFile(dest, Buffer.from(await res.arrayBuffer()));
+}
+
+export async function bundleFonts(wwwDir, { onProgress } = {}) {
+  const indexPath = path.join(wwwDir, "games/tactical-arena/index.html");
+  if (!existsSync(indexPath)) throw new Error("payload index.html missing");
+
+  const original = await readFile(indexPath, "utf8");
+  if (!/fonts\.googleapis\.com/.test(original)) {
+    // Nothing to do — either already bundled, or the markup changed shape.
+    return { skipped: "no Google Fonts link in payload index.html" };
+  }
+
+  await mkdir(CACHE_DIR, { recursive: true });
+  const fontDir = path.join(wwwDir, FONT_DIR_REL);
+  await mkdir(fontDir, { recursive: true });
+
+  let css;
+  try {
+    const res = await fetch(FONT_CSS_URL, { headers: { "user-agent": MODERN_UA } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    css = await res.text();
+  } catch (error) {
+    // Offline build: leave index.html alone rather than shipping a page whose fonts
+    // point at files that do not exist.
+    return { skipped: `could not fetch font CSS (${error.message})` };
+  }
+
+  const faces = parseFaces(css).filter((f) => KEEP_SUBSETS.has(f.subset));
+  if (!faces.length) return { skipped: "no latin faces parsed from font CSS" };
+
+  onProgress?.({ total: faces.length });
+
+  let bytes = 0;
+  let downloaded = 0;
+  let cached = 0;
+  const rules = [];
+
+  for (const face of faces) {
+    const name = `${face.family.toLowerCase().replace(/\s+/g, "-")}-${face.style}-${face.weight}-${face.subset}.woff2`;
+    const dest = path.join(fontDir, name);
+    const key = createHash("sha1").update(face.url).digest("hex");
+    const cachePath = path.join(CACHE_DIR, `${key}.woff2`);
+
+    if (existsSync(cachePath)) {
+      await copyFile(cachePath, dest);
+      cached += 1;
+    } else {
+      await download(face.url, dest);
+      await copyFile(dest, cachePath);
+      downloaded += 1;
+    }
+    bytes += (await stat(dest)).size;
+
+    // Rewrite the remote src to the local file, keeping unicode-range so the browser
+    // still only downloads the subset it needs.
+    rules.push(face.block.replace(/url\(https:\/\/[^)]+\.woff2\)/, `url("./${name}")`));
+  }
+
+  await writeFile(
+    path.join(fontDir, "fonts.css"),
+    `/* Generated by mobile/tactical-arena/scripts/bundle-fonts.mjs. Do not edit. */\n${rules.join("\n")}\n`,
+    "utf8",
+  );
+
+  // Swap the three Google <link> tags for the local stylesheet.
+  let html = original
+    .replace(/\s*<link rel="preconnect" href="https:\/\/fonts\.googleapis\.com">/, "")
+    .replace(/\s*<link rel="preconnect" href="https:\/\/fonts\.gstatic\.com" crossorigin>/, "")
+    .replace(
+      /\s*<link rel="stylesheet" href="https:\/\/fonts\.googleapis\.com\/css2[^"]*">/,
+      '\n    <link rel="stylesheet" href="./assets/fonts/fonts.css">',
+    );
+
+  if (/fonts\.googleapis\.com/.test(html)) {
+    throw new Error("failed to strip every Google Fonts link from payload index.html");
+  }
+  await writeFile(indexPath, html, "utf8");
+
+  return { faces: faces.length, downloaded, cached, bytes };
+}

@@ -13,9 +13,11 @@ import {
 import {
   isFactoryAccountLoggedIn,
   readStoredFactoryAccountSession,
-  redirectToFactoryAccountSignIn,
 } from "../platform/factoryAccount.js";
+import { isNativeApp, requestFactorySignIn } from "../platform/factorySignIn.js";
 import { runValorPurchase } from "./shop/shopValorPurchase.js";
+import { PURCHASE_PROVIDERS, selectPurchaseProvider } from "../platform/purchaseProviders.js";
+import { runPlayPurchase } from "./shop/shopPlayPurchase.js";
 import {
   PREMIUM_CHECKOUT_EVENT,
   premiumCheckoutErrorMessage,
@@ -41,6 +43,7 @@ import {
   renderUnits,
 } from "./shop/shopTabs.js";
 import { createPremiumCheckoutLayer, createPurchaseConfirm } from "./shop/shopCheckout.js";
+import { createBuyActions } from "./shop/shopBuyActions.js";
 
 let host = null;
 let hostDocument = null;
@@ -72,12 +75,16 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
   let premiumCheckoutLayer = null;
   let premiumCheckoutInstance = null;
 
+  const buyActions = createBuyActions({
+    accountLoggedIn,
+    locationRef: options.locationRef,
+    onPremium: (offer) => { void beginPremiumCheckout(offer); },
+    onValor: (kind, offer) => openValorPurchase(kind, offer),
+  });
+
   // Callbacks the tab renderers use to drive shop state and build buy actions.
   const ctx = {
-    createUnitBuyActions,
-    createSkinBuyActions,
-    createPackBuyActions,
-    createConsumableBuyActions,
+    ...buyActions,
     openUnitDetail(type, scrollTop) {
       unitScrollTop = scrollTop;
       detailUnitType = type;
@@ -267,6 +274,30 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
     announcePurchaseProgress(result.beforeProgress, result.afterProgress);
   }
 
+  // Google Play purchase. Execution lives in ./shop/shopPlayPurchase.js; this only
+  // maps the outcome onto shop state, the same way the Valor path does.
+  async function beginPlayPurchase(offer, provider) {
+    premiumCheckoutInFlight = true;
+    statusText = `Opening Google Play for ${offer.name}.`;
+    render();
+
+    const result = await runPlayPurchase({
+      offer,
+      provider,
+      storage,
+      account,
+      verifyPurchase: options.verifyPlayPurchase,
+      fetchImpl: options.fetchImpl,
+    });
+
+    premiumCheckoutInFlight = false;
+    statusText = result.status;
+    render();
+    if (result.outcome === "purchased" && result.applied) {
+      announcePurchaseProgress(result.beforeProgress, result.afterProgress);
+    }
+  }
+
   async function beginPremiumCheckout(offer) {
     if (!accountLoggedIn) {
       statusText = "Sign in to buy shop items.";
@@ -278,6 +309,18 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
     if (premiumCheckoutInFlight) return;
     pendingValorPurchase = null;
     pendingValorError = "";
+
+    // The packaged Android app must buy through Google Play, not Stripe. Google
+    // renders its own purchase sheet, so this path has no embedded checkout layer.
+    const provider = selectPurchaseProvider({
+      nativeApp: isNativeApp(),
+      plugins: globalThis.Capacitor?.Plugins,
+    });
+    if (provider !== PURCHASE_PROVIDERS.stripe) {
+      await beginPlayPurchase(offer, provider);
+      return;
+    }
+
     premiumCheckoutInFlight = true;
     statusText = `Opening checkout for ${offer.name}.`;
     overlay.dispatchEvent(new CustomEvent(PREMIUM_CHECKOUT_EVENT, {
@@ -347,142 +390,6 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
       detachNode(premiumCheckoutLayer);
     }
     premiumCheckoutLayer = null;
-  }
-
-  function createUnitBuyActions(offer) {
-    const actions = el("div", `shop-unit-purchase-actions${offer.owned ? " is-owned" : ""}`);
-    if (offer.owned) {
-      actions.appendChild(createOwnedBuyButton());
-      return actions;
-    }
-    if (!accountLoggedIn) {
-      actions.appendChild(createLoginRequiredButton(offer.name));
-      return actions;
-    }
-
-    const premiumBuy = el("button", "shop-buy-btn is-premium", formatPremiumPrice(offer.premiumPrice));
-    premiumBuy.type = "button";
-    premiumBuy.dataset.sku = offer.sku;
-    premiumBuy.setAttribute("aria-label", `Buy ${offer.name} with ${formatPremiumPrice(offer.premiumPrice)}`);
-    premiumBuy.addEventListener("click", (event) => {
-      event.stopPropagation();
-      void beginPremiumCheckout(offer);
-    });
-
-    const valorBuy = el("button", "shop-buy-btn is-valor");
-    valorBuy.type = "button";
-    valorBuy.setAttribute("aria-label", `Unlock ${offer.name} for ${formatValor(offer.price.amount)}`);
-    valorBuy.appendChild(createValorBadge(offer.price.amount, "shop-price"));
-    valorBuy.addEventListener("click", (event) => {
-      event.stopPropagation?.();
-      openValorPurchase("unit", offer);
-    });
-
-    actions.append(premiumBuy, valorBuy);
-    return actions;
-  }
-
-  function createSkinBuyActions(offer) {
-    const actions = el("div", `shop-skin-actions${offer.owned ? " is-owned" : ""}`);
-    if (offer.owned) {
-      actions.appendChild(createOwnedBuyButton());
-      return actions;
-    }
-    if (!accountLoggedIn) {
-      actions.appendChild(createLoginRequiredButton(offer.name));
-      return actions;
-    }
-
-    const premiumBuy = el("button", "shop-buy-btn is-premium", formatPremiumPrice(offer.price));
-    premiumBuy.type = "button";
-    premiumBuy.dataset.sku = offer.sku;
-    premiumBuy.setAttribute("aria-label", `Buy ${offer.name} with ${formatPremiumPrice(offer.price)}`);
-    premiumBuy.addEventListener("click", (event) => {
-      event.stopPropagation?.();
-      void beginPremiumCheckout(offer);
-    });
-
-    const valorBuy = el("button", "shop-buy-btn is-valor");
-    valorBuy.type = "button";
-    valorBuy.setAttribute("aria-label", `Unlock ${offer.name} for ${formatValor(offer.valorPrice?.amount)}`);
-    valorBuy.appendChild(createValorBadge(offer.valorPrice?.amount, "shop-price"));
-    valorBuy.addEventListener("click", (event) => {
-      event.stopPropagation?.();
-      openValorPurchase("skin", offer);
-    });
-
-    actions.append(premiumBuy, valorBuy);
-    return actions;
-  }
-
-  function createPackBuyActions(offer) {
-    const actions = el("div", `shop-pack-purchase-actions${offer.owned ? " is-owned" : ""}`);
-    if (offer.owned) {
-      actions.appendChild(createOwnedBuyButton());
-      return actions;
-    }
-    if (!accountLoggedIn) {
-      actions.appendChild(createLoginRequiredButton(offer.name));
-      return actions;
-    }
-
-    const premiumBuy = el("button", "shop-buy-btn is-premium", formatPremiumPrice(offer.price));
-    premiumBuy.type = "button";
-    premiumBuy.dataset.sku = offer.sku;
-    premiumBuy.setAttribute("aria-label", `Buy ${offer.name} with ${formatPremiumPrice(offer.price)}`);
-    premiumBuy.addEventListener("click", (event) => {
-      event.stopPropagation?.();
-      void beginPremiumCheckout(offer);
-    });
-
-    const valorBuy = el("button", "shop-buy-btn is-valor");
-    valorBuy.type = "button";
-    valorBuy.setAttribute("aria-label", `Unlock ${offer.name} for ${formatValor(offer.valorPrice?.amount)}`);
-    valorBuy.appendChild(createValorBadge(offer.valorPrice?.amount, "shop-price"));
-    valorBuy.addEventListener("click", (event) => {
-      event.stopPropagation?.();
-      openValorPurchase("skin-pack", offer);
-    });
-
-    actions.append(premiumBuy, valorBuy);
-    return actions;
-  }
-
-  function createConsumableBuyActions(offer) {
-    const actions = el("div", "shop-consumable-actions");
-    if (!accountLoggedIn) {
-      actions.appendChild(createLoginRequiredButton(offer.name));
-      return actions;
-    }
-    // Consumables stack, so there is no owned state and no Valor price — premium only.
-    const premiumBuy = el("button", "shop-buy-btn is-premium", formatPremiumPrice(offer.price));
-    premiumBuy.type = "button";
-    premiumBuy.dataset.sku = offer.sku;
-    premiumBuy.setAttribute("aria-label", `Buy ${offer.name} with ${formatPremiumPrice(offer.price)}`);
-    premiumBuy.addEventListener("click", (event) => {
-      event.stopPropagation?.();
-      void beginPremiumCheckout(offer);
-    });
-    actions.appendChild(premiumBuy);
-    return actions;
-  }
-
-  function createOwnedBuyButton() {
-    const owned = el("button", "shop-buy-btn is-owned", "Owned");
-    owned.type = "button";
-    owned.disabled = true;
-    return owned;
-  }
-
-  function createLoginRequiredButton(name) {
-    const login = el("button", "shop-buy-btn is-login-required", "Sign In");
-    login.type = "button";
-    login.setAttribute("aria-label", `Sign in to buy ${name}`);
-    login.addEventListener("click", (event) => {
-      event.stopPropagation?.();
-      redirectToFactoryAccountSignIn({ locationRef: options.locationRef });
-    });
-    return login;
   }
 
   function onOverlay(event) {

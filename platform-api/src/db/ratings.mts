@@ -84,10 +84,12 @@ export async function recordMatchRating(pool: any, { reporterPlayerId, opponentP
     const drawsB   = rB.draws   + (outcome === "draw" ? 1 : 0);
 
     const upsert = `
-      insert into game_ratings (player_id, game_slug, rating, wins, losses, draws, last_match_at)
-      values ($1, $2, $3, $4, $5, $6, $7)
+      insert into game_ratings (player_id, game_slug, rating, peak_rating, wins, losses, draws, last_match_at)
+      values ($1, $2, $3, $3, $4, $5, $6, $7)
       on conflict (player_id, game_slug) do update
         set rating = excluded.rating,
+            -- Running max: the ladder badges qualify on the peak, so it must never fall.
+            peak_rating = greatest(coalesce(game_ratings.peak_rating, 0), excluded.rating),
             wins = excluded.wins,
             losses = excluded.losses,
             draws = excluded.draws,

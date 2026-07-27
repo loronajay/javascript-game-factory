@@ -18,6 +18,13 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* The board owns its own drag/pinch gestures (boardCameraController.js). Without
+     this the browser claims them first for scroll/zoom and the camera never sees a
+     pointermove. */
+  #boardSvg {
+    touch-action: none;
+  }
+
   .squad-overlays {
     display: none;
   }

@@ -27,6 +27,9 @@ import { createSettingsScreen } from "./settingsScreen.js";
 import { createTutorialMatchConfig } from "../tutorials/basics.js";
 import { syncRankedAccountFeatureControls } from "./rankedFeatureGate.js";
 import { syncOnlineAccountFeatureControls } from "../../../../js/platform/ui/online-account-feature-gate.mjs";
+import { openAccountPanel, syncAccountControls } from "./accountMenu.js";
+import { SESSION_CHANGED_EVENT } from "../platform/factorySignIn.js";
+import { wireAndroidBackButton } from "./androidBackButton.js";
 
 export function syncScreenMusic(audio, screenName) {
   if (!screenName) return;
@@ -45,15 +48,37 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   for (const name of ["title", "hsSetup", "spSetup", "tempoMenu", "tempoSpSetup", "results", "tutorialComplete"]) {
     screens.register(name, { el: screenEl(name) });
   }
+  // Every control whose availability depends on being signed in. Called on entering
+  // the main menu and again after any sign-in/sign-out, so the menu reflects the
+  // session immediately rather than only after a reload.
+  function refreshAccountGatedControls() {
+    const menu = screenEl("mainMenu");
+    // Online Versus (casual) and Ranked both require a real signed-in factory
+    // account. They carry different copy, so each syncs its own control set.
+    syncOnlineAccountFeatureControls(menu);
+    syncRankedAccountFeatureControls(menu);
+    // App-only account button; hidden on web, where the shell owns session UI.
+    syncAccountControls(menu);
+  }
+
   screens.register("mainMenu", {
     el: screenEl("mainMenu"),
     onEnter: () => {
-      // Online Versus (casual) and Ranked both require a real signed-in factory
-      // account. They carry different copy, so each syncs its own control set.
-      syncOnlineAccountFeatureControls(screenEl("mainMenu"));
-      syncRankedAccountFeatureControls(screenEl("mainMenu"));
+      refreshAccountGatedControls();
       showQueuedProgressionAnnouncements({ audit: true });
     },
+  });
+
+  // A sign-in can start from the shop, ranked, or the friends panel — not just the
+  // account button — so listen for the session change rather than threading a
+  // callback through every one of those surfaces.
+  document.addEventListener(SESSION_CHANGED_EVENT, refreshAccountGatedControls);
+
+  // Android hardware/gesture back. Self-disables when the Capacitor App plugin is
+  // absent, so this is a no-op in every browser.
+  wireAndroidBackButton({
+    getActiveScreen: () => screens.active,
+    navigate: (name) => showScreen(name),
   });
   // The match screen disposes a live online session when left mid-game.
   screens.register("match", { el: screenEl("match"), onExit: () => onLeaveMatch?.() });
@@ -162,6 +187,9 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       case "friends": openTaFriendsPanel(); break;
       case "chooseTutorialReward": tutorialScreens.openTutorialRewardChoice({ title: "Juggernaut Unlocked" }); break;
       case "settings": settings.openSettings(); break;
+      // App-only front door. The session-changed listener below re-syncs the gated
+      // controls, so Online / Ranked / Shop unlock immediately without a reload.
+      case "account": openAccountPanel(); break;
       case "startTutorial": {
         startMatchTracked(createTutorialMatchConfig(actionBtn.dataset.tutorialId || "basics"));
         break;

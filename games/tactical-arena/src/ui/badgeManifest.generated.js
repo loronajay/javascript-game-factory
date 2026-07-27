@@ -6,12 +6,36 @@ export const BADGE_ART_MANIFEST = Object.freeze([
     file: "blood-moon.webp"
   },
   {
+    id: "diamond-ascent",
+    file: "diamond-ascent.webp"
+  },
+  {
     id: "fuck-cancer",
     file: "fuck-cancer.webp"
   },
   {
+    id: "ladder-climber",
+    file: "ladder-climber.webp"
+  },
+  {
+    id: "ladder-conqueror",
+    file: "ladder-conqueror.webp"
+  },
+  {
+    id: "master-ascent",
+    file: "master-ascent.webp"
+  },
+  {
     id: "og-commander",
     file: "og-commander.webp"
+  },
+  {
+    id: "platinum-ascent",
+    file: "platinum-ascent.webp"
+  },
+  {
+    id: "skin-collector",
+    file: "skin-collector.webp"
   },
   {
     id: "void-dweller",

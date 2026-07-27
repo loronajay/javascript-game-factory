@@ -27,6 +27,10 @@
             <button data-action="shop" class="primary menu-btn menu-shop-btn">Shop</button>
           </div>
           <div class="menu-secondary-actions">
+            <!-- App-only. The web build gets its session UI from the arcade shell, so
+                 this stays hidden there; the packaged app has no shell and needs its
+                 own account front door. Shown by syncAccountControls(). -->
+            <button data-action="account" data-account-control class="menu-btn ghost account-status-btn" hidden>Sign In</button>
             <button data-action="rules" class="menu-btn ghost">Codex</button>
             <button data-action="inventory" class="menu-btn ghost">Inventory</button>
             <button data-action="skins" class="menu-btn ghost">Skins</button>
