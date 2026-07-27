@@ -118,12 +118,44 @@
 
 .auth-switch-btn:hover { color: var(--brass-hi); }
 
-/* Account status button in the main menu. App-only: the web build gets its
-   session bar from the arcade shell, so this stays hidden there. */
+/* Account status button. App-only: the web build gets its session bar from the
+   arcade shell, so this stays hidden there. */
 .account-status-btn[hidden] { display: none; }
 
 .account-status-btn.is-signed-in {
   color: #9fe8b0;
+}
+
+/* Title-screen placement: a small corner chip on the title card rather than a
+   full-width menu button, so it reads as a utility control alongside the crest
+   instead of competing with Continue/How to Play/Settings. */
+.title-account-btn {
+  position: absolute;
+  top: .85rem;
+  right: .85rem;
+  z-index: 1;
+  padding: .32rem .7rem;
+  border: 1px solid rgba(80, 120, 150, .55);
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(var(--sheen), .06), rgba(var(--sheen), 0) 46%),
+    linear-gradient(180deg, var(--surface-hi), var(--surface-lo));
+  color: var(--muted);
+  font: 700 .66rem var(--font-display);
+  letter-spacing: .07em;
+}
+
+.title-account-btn.is-signed-in {
+  border-color: rgba(159, 232, 176, .45);
+}
+
+@media (max-width: 480px) {
+  .title-account-btn {
+    top: .6rem;
+    right: .6rem;
+    padding: .28rem .55rem;
+    font-size: .6rem;
+  }
 }
 
 /* Landscape phones are wide and short, and Tactical Arena is landscape-only by

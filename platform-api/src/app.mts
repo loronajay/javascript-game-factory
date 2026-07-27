@@ -309,6 +309,9 @@ export function createApp(options: any = {}) {
   const fulfillPremiumCheckoutSession = typeof options?.fulfillPremiumCheckoutSession === "function"
     ? options.fulfillPremiumCheckoutSession
     : null;
+  const fulfillPlayPurchase = typeof options?.fulfillPlayPurchase === "function"
+    ? options.fulfillPlayPurchase
+    : null;
   const savePlayerPhoto = typeof options?.savePlayerPhoto === "function"
     ? options.savePlayerPhoto
     : async () => null;
@@ -479,6 +482,7 @@ export function createApp(options: any = {}) {
     createPremiumCheckoutSession,
     fulfillPremiumCheckoutSession,
     fulfillStripeWebhook,
+    fulfillPlayPurchase,
   };
   const notificationServices = {
     listNotifications,
@@ -502,6 +506,15 @@ export function createApp(options: any = {}) {
       match: (p: string) => p === "/payments/tactical-arena/checkout-sessions",
       bucket: "checkout",
       limit: 30,
+      windowMs: 60 * MINUTE_MS,
+    },
+    {
+      // Play purchase tokens are opaque, so the only way to probe them is to guess in bulk.
+      // The ceiling is well above a real player's traffic: boot recovery resubmits at most a
+      // handful of pending purchases, and buying is rate-limited by Play's own checkout.
+      match: (p: string) => p === "/payments/tactical-arena/play-purchases",
+      bucket: "play-purchase",
+      limit: 60,
       windowMs: 60 * MINUTE_MS,
     },
   ];

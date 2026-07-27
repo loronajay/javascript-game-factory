@@ -48,7 +48,7 @@ export const TUTORIAL_VALOR_REWARD = 500;
 
 export const TUTORIAL_REWARD_SKIN_CHOICES = Object.freeze([
   Object.freeze({ type: "juggernaut", slug: "bio-mech" }),
-  Object.freeze({ type: "swordsman", slug: "medieval" }),
+  Object.freeze({ type: "swordsman", slug: "arcane" }),
   Object.freeze({ type: "archer", slug: "desert-warrior" }),
   Object.freeze({ type: "mystic", slug: "enlightened" }),
   Object.freeze({ type: "magician", slug: "summer-vibes" }),
@@ -188,9 +188,16 @@ function unitFromEntitlementId(value) {
   return parts[1];
 }
 
+function avatarFromEntitlementId(value) {
+  const parts = typeof value === "string" ? value.trim().split(":") : [];
+  if (parts.length !== 2 || parts[0] !== "avatar" || !parts[1]) return null;
+  return parts[1];
+}
+
 function entitlementsFromServerSnapshot(snapshot) {
   const skins = [];
   const units = [];
+  const avatars = [];
   const entitlements = Array.isArray(snapshot?.entitlements) ? snapshot.entitlements : [];
   for (const entitlement of entitlements) {
     const entitlementId = typeof entitlement?.entitlementId === "string" ? entitlement.entitlementId : "";
@@ -200,11 +207,17 @@ function entitlementsFromServerSnapshot(snapshot) {
       continue;
     }
     const unit = unitFromEntitlementId(entitlementId);
-    if (unit) units.push(unit);
+    if (unit) {
+      units.push(unit);
+      continue;
+    }
+    const avatar = avatarFromEntitlementId(entitlementId);
+    if (avatar) avatars.push(avatar);
   }
   return Object.freeze({
     skins: dedupeSkins(skins),
     units: uniqueStrings(units),
+    avatars: uniqueStrings(avatars),
   });
 }
 
@@ -250,6 +263,8 @@ function progressFallback() {
     purchasedSkins: [],
     serverEntitlementUnits: [],
     serverEntitlementSkins: [],
+    serverEntitlementAvatars: [],
+    unlockedAvatars: [],
     unlockedSkins: [],
   };
 }
@@ -341,6 +356,10 @@ export function normalizeUnlockProgress(value = {}) {
   const serverEntitlementUnits = uniqueStrings(value.serverEntitlementUnits);
   for (const type of serverEntitlementUnits) unlockedUnits.add(type);
   const serverEntitlementSkins = dedupeSkins(value.serverEntitlementSkins);
+  // Purchasable icon avatars have no local/offline grant path (unlike units/skins) — Valor
+  // avatar purchases always require a signed-in account, so ownership is just the server's
+  // entitlement set, mirrored here for the picker/shop to read without an async round-trip.
+  const unlockedAvatars = uniqueStrings(value.serverEntitlementAvatars);
   // unlockedSkins is fully derived from the granted rewards (tutorial + campaign packs),
   // so it stays consistent no matter what an older/partial payload carried.
   const unlockedSkins = [];
@@ -365,6 +384,8 @@ export function normalizeUnlockProgress(value = {}) {
     purchasedSkins,
     serverEntitlementUnits,
     serverEntitlementSkins,
+    serverEntitlementAvatars: unlockedAvatars,
+    unlockedAvatars,
     unlockedSkins: dedupeSkins(unlockedSkins),
   };
 }
@@ -483,6 +504,13 @@ export function isProgressSkinUnlocked(type, slug, storage = defaultStorage()) {
   return readUnlockProgress(storage).unlockedSkins.some((skin) => skin.type === type && skin.slug === slug);
 }
 
+// Purchased-only: callers that also need to treat the free starter avatars as owned should
+// combine this with rankedAvatars.js's isRankedAvatarFree.
+export function isProgressAvatarUnlocked(avatarId, storage = defaultStorage()) {
+  if (!avatarId) return false;
+  return readUnlockProgress(storage).unlockedAvatars.includes(avatarId);
+}
+
 export function mergeServerEntitlementsIntoUnlockProgress(storage = defaultStorage(), snapshot = {}, options = {}) {
   // `authoritative` = full server authority (signed-in + a successful sync): the server owned
   // set REPLACES local ownership and all other local ownership sources are filtered down to
@@ -530,6 +558,7 @@ export function mergeServerEntitlementsIntoUnlockProgress(storage = defaultStora
       valorBalance,
       serverEntitlementUnits: [...entitlements.units],
       serverEntitlementSkins: [...entitlements.skins],
+      serverEntitlementAvatars: [...entitlements.avatars],
       unlockedUnits: [],
       purchasedSkins: [],
       campaignGrantedSkins: [],
@@ -541,12 +570,14 @@ export function mergeServerEntitlementsIntoUnlockProgress(storage = defaultStora
     });
   }
 
-  if (!entitlements.skins.length && !entitlements.units.length && valorBalance === progress.valorBalance) return progress;
+  if (!entitlements.skins.length && !entitlements.units.length && !entitlements.avatars.length
+    && valorBalance === progress.valorBalance) return progress;
   return writeUnlockProgress(storage, {
     ...progress,
     valorBalance,
     serverEntitlementUnits: [...progress.serverEntitlementUnits, ...entitlements.units],
     serverEntitlementSkins: [...progress.serverEntitlementSkins, ...entitlements.skins],
+    serverEntitlementAvatars: [...progress.serverEntitlementAvatars, ...entitlements.avatars],
   });
 }
 

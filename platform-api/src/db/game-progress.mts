@@ -197,6 +197,18 @@ async function revokeInventoryItem(client: any, playerId: string, gameSlug: stri
   return res.rows.length ? Number(res.rows[0].quantity) || 0 : 0;
 }
 
+// Does this player hold this exact entitlement? Used to re-validate a cosmetic pick (e.g. a
+// purchased ranked avatar) server-side before storing it, the same way playerHasGameBadge
+// re-validates a badge equip.
+export async function playerHasGameEntitlement(pool: any, { playerId, gameSlug, entitlementId }: any): Promise<boolean> {
+  if (!pool || !playerId || !gameSlug || !entitlementId) return false;
+  const res = await pool.query(
+    `select 1 from game_entitlements where player_id = $1 and game_slug = $2 and entitlement_id = $3 limit 1`,
+    [playerId, gameSlug, entitlementId],
+  );
+  return res.rowCount > 0;
+}
+
 async function grantEntitlement(client: any, playerId: string, gameSlug: string, entitlement: any, source: string, sourceId: string): Promise<void> {
   await client.query(
     `insert into game_entitlements (player_id, game_slug, entitlement_id, kind, source, source_id)
@@ -685,6 +697,37 @@ export async function findStripeGrant(pool: any, params: any = {}): Promise<any>
     };
   } catch (err) {
     process.stderr.write(`[game-progress] findStripeGrant error: ${(err as any)?.message || err}\n`);
+    return null;
+  }
+}
+
+// Find which account, if any, has already been granted a given Google Play purchase.
+//
+// Play purchase tokens are bearer values: whoever holds one can post it. Claim rows are keyed
+// per player, so without this lookup the same token replayed under a second account would open
+// a second claim and grant the item twice. The token itself is never stored — only a hash — so
+// this is a pure "has anyone already redeemed this?" check.
+export async function findPlayPurchaseClaim(pool: any, params: any = {}): Promise<any> {
+  const tokenHash = cleanText(params.purchaseTokenHash, 128);
+  if (!pool || !tokenHash) return null;
+  try {
+    const res = await pool.query(
+      `select player_id, game_slug, claim_id
+       from game_progress_claims
+       where kind = any($1::text[]) and payload->>'playPurchaseTokenHash' = $2
+       order by created_at asc
+       limit 1`,
+      [PREMIUM_GRANT_CLAIM_KINDS, tokenHash],
+    );
+    const row = res.rows[0];
+    if (!row) return null;
+    return {
+      playerId: cleanText(row.player_id, 120),
+      gameSlug: normalizeGameSlug(row.game_slug),
+      claimId: cleanText(row.claim_id, 200),
+    };
+  } catch (err) {
+    process.stderr.write(`[game-progress] findPlayPurchaseClaim error: ${(err as any)?.message || err}\n`);
     return null;
   }
 }

@@ -23,6 +23,7 @@ import {
   getCampaignSkinRewardChoices,
   isCampaignUnitRewardGranted,
   isCampaignSkinRewardGranted,
+  isProgressAvatarUnlocked,
   isProgressSkinUnlocked,
   mergeServerEntitlementsIntoUnlockProgress,
   readUnlockProgress,
@@ -92,7 +93,7 @@ const ALL_TUTORIAL_IDS = Object.freeze([
 test("tutorial reward choices match the first skin-choice pool", () => {
   assert.deepEqual(TUTORIAL_REWARD_SKIN_CHOICES, [
     { type: "juggernaut", slug: "bio-mech" },
-    { type: "swordsman", slug: "medieval" },
+    { type: "swordsman", slug: "arcane" },
     { type: "archer", slug: "desert-warrior" },
     { type: "mystic", slug: "enlightened" },
     { type: "magician", slug: "summer-vibes" },
@@ -464,6 +465,24 @@ test("server skin entitlements are folded into unlocked skins and equip gating",
   assert.equal(isUnitUnlocked("juggernaut", storage), true);
 });
 
+test("server avatar entitlements are folded into unlocked avatars", () => {
+  const storage = storageAdapter();
+
+  assert.equal(isProgressAvatarUnlocked("avatar-042", storage), false);
+
+  const progress = mergeServerEntitlementsIntoUnlockProgress(storage, {
+    entitlements: [
+      { entitlementId: "avatar:avatar-042", kind: "avatar" },
+      { entitlementId: "avatar:avatar-042", kind: "avatar" },
+      { entitlementId: "unit:juggernaut", kind: "unit" },
+    ],
+  });
+
+  assert.deepEqual(progress.unlockedAvatars, ["avatar-042"]);
+  assert.equal(isProgressAvatarUnlocked("avatar-042", storage), true);
+  assert.equal(isProgressAvatarUnlocked("avatar-099", storage), false);
+});
+
 test("server skin entitlements survive a local progress reset", () => {
   const storage = storageAdapter();
   mergeServerEntitlementsIntoUnlockProgress(storage, {
@@ -538,14 +557,17 @@ test("authoritative merge drops injected local ownership and mirrors the server 
     valorBalance: 999999,
     purchasedSkins: [{ type: "mystic", slug: "blood-moon" }],
     unlockedUnits: ["nemesis"],
+    serverEntitlementAvatars: ["avatar-099"],
   });
   assert.equal(isProgressSkinUnlocked("mystic", "blood-moon", storage), true, "sanity: injection works before authority");
+  assert.equal(isProgressAvatarUnlocked("avatar-099", storage), true, "sanity: injection works before authority");
 
   const snapshot = {
     valorBalance: 500,
     entitlements: [
       { entitlementId: "unit:sniper", kind: "unit" },
       { entitlementId: "skin:swordsman:medieval", kind: "skin" },
+      { entitlementId: "avatar:avatar-042", kind: "avatar" },
     ],
   };
   mergeServerEntitlementsIntoUnlockProgress(storage, snapshot, { authoritative: true });
@@ -557,4 +579,6 @@ test("authoritative merge drops injected local ownership and mirrors the server 
   assert.equal(progress.unlockedUnits.includes("nemesis"), false, "injected unit is dropped");
   assert.equal(isProgressSkinUnlocked("mystic", "blood-moon", storage), false, "injected premium skin is dropped");
   assert.equal(progress.unlockedUnits.includes("swordsman"), true, "starters stay free");
+  assert.equal(isProgressAvatarUnlocked("avatar-042", storage), true, "server-owned avatar is present");
+  assert.equal(isProgressAvatarUnlocked("avatar-099", storage), false, "injected avatar is dropped");
 });

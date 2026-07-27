@@ -151,6 +151,7 @@ export const CAMPAIGN_LAYOUTS = Object.freeze({
       unit.player === 1
         ? { ...WITCH_DOCTOR_SPAWN }
         : { ...WITCH_DOCTOR_SLOT },
+    hpFor: (unit, maxHp) => (unit.player === 1 ? maxHp : Math.ceil(maxHp / 2)),
     extraUnits: () => WITCH_DOCTOR_GHOUL_POSITIONS.map((position, index) => createCampaignGhoul(index, position)),
     tileObjects: () => Object.fromEntries(
       WITCH_DOCTOR_FIRE_POSITIONS.map((position) => [positionKey(position), { kind: "fire", permanent: true }])

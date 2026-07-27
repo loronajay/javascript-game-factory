@@ -1,6 +1,10 @@
       <!-- ============================== TITLE ============================== -->
       <section class="screen menu-screen is-active" data-screen="title">
         <div class="menu-card title-card">
+          <!-- App-only. The web build gets its session UI from the arcade shell, so
+               this stays hidden there; the packaged app has no shell and needs its
+               own account front door. Shown by syncAccountControls(). -->
+          <button data-action="account" data-account-control class="title-account-btn account-status-btn" hidden>Sign In</button>
           <div class="title-mark"></div>
           <h1 class="title-name">Tactical Arena</h1>
           <p class="title-sub">Isometric Squad Tactics</p>
@@ -27,10 +31,6 @@
             <button data-action="shop" class="primary menu-btn menu-shop-btn">Shop</button>
           </div>
           <div class="menu-secondary-actions">
-            <!-- App-only. The web build gets its session UI from the arcade shell, so
-                 this stays hidden there; the packaged app has no shell and needs its
-                 own account front door. Shown by syncAccountControls(). -->
-            <button data-action="account" data-account-control class="menu-btn ghost account-status-btn" hidden>Sign In</button>
             <button data-action="rules" class="menu-btn ghost">Codex</button>
             <button data-action="inventory" class="menu-btn ghost">Inventory</button>
             <button data-action="skins" class="menu-btn ghost">Skins</button>

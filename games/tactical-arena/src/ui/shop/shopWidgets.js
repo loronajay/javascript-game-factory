@@ -33,6 +33,14 @@ export function skinPackValorPurchaseStatus(result) {
   return "That skin pack is not for sale.";
 }
 
+export function avatarValorPurchaseStatus(result) {
+  if (result.accepted) return `${result.offer.name} unlocked.`;
+  if (result.errorCode === SHOP_LOGIN_REQUIRED_ERROR) return "Sign in to buy shop items.";
+  if (result.errorCode === "INSUFFICIENT_VALOR") return "Not enough Valor.";
+  if (result.errorCode === "AVATAR_ALREADY_OWNED") return "Already owned.";
+  return "That avatar is not for sale.";
+}
+
 export function classLabel(value) {
   return String(value || "unit")
     .split("-")
@@ -57,6 +65,7 @@ export function packOwnershipLabel(offer) {
 export function confirmSubtitle(kind, offer) {
   if (kind === "skin") return `Skin for ${offer.unitName}`;
   if (kind === "skin-pack") return `${offer.unownedSkinCount} skins`;
+  if (kind === "avatar") return "Profile avatar";
   return "Unit unlock";
 }
 

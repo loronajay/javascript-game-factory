@@ -113,6 +113,32 @@ export function createBuyActions({ accountLoggedIn, locationRef, onPremium, onVa
     return actions;
   }
 
+  // Avatars are Valor-only (no premium/USD price), so this is a single buy button rather
+  // than the premium+Valor pair the other offer kinds use.
+  function createAvatarBuyActions(offer) {
+    const actions = el("div", `shop-avatar-purchase-actions${offer.owned ? " is-owned" : ""}`);
+    if (offer.owned) {
+      actions.appendChild(createOwnedBuyButton());
+      return actions;
+    }
+    if (!accountLoggedIn) {
+      actions.appendChild(createLoginRequiredButton(offer.name));
+      return actions;
+    }
+
+    const valorBuy = el("button", "shop-buy-btn is-valor");
+    valorBuy.type = "button";
+    valorBuy.setAttribute("aria-label", `Unlock ${offer.name} for ${formatValor(offer.valorPrice?.amount)}`);
+    valorBuy.appendChild(createValorBadge(offer.valorPrice?.amount, "shop-price"));
+    valorBuy.addEventListener("click", (event) => {
+      event.stopPropagation?.();
+      openValorPurchase("avatar", offer);
+    });
+
+    actions.appendChild(valorBuy);
+    return actions;
+  }
+
   function createConsumableBuyActions(offer) {
     const actions = el("div", "shop-consumable-actions");
     if (!accountLoggedIn) {
@@ -155,6 +181,7 @@ export function createBuyActions({ accountLoggedIn, locationRef, onPremium, onVa
     createUnitBuyActions,
     createSkinBuyActions,
     createPackBuyActions,
+    createAvatarBuyActions,
     createConsumableBuyActions,
   };
 }

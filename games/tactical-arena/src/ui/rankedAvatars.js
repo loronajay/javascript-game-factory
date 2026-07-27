@@ -1,6 +1,12 @@
 const AVATAR_GRID_SIZE = 8;
 const AVATAR_COUNT_PER_SHEET = AVATAR_GRID_SIZE * AVATAR_GRID_SIZE;
 
+// The first RANKED_AVATAR_FREE_COUNT ids (avatar-001..0NN) are a free starter set; the rest
+// are Valor purchases in the Shop. Keep both constants in lockstep with the server catalog
+// in platform-api/src/services/ranked-avatar-catalog.mts, which prices/validates the same ids.
+export const RANKED_AVATAR_FREE_COUNT = 16;
+export const RANKED_AVATAR_VALOR_COST = 200;
+
 const AVATAR_SHEETS = Object.freeze([
   sheet("sheet-1", "assets/avatars/avatar-sheet-1.webp"),
   sheet("sheet-2", "assets/avatars/avatar-sheet-2.webp"),
@@ -29,6 +35,7 @@ export const RANKED_AVATARS = Object.freeze(
         col,
         nudgeX: sheetMeta.nudgeX,
         nudgeY: sheetMeta.nudgeY,
+        free: absoluteIndex < RANKED_AVATAR_FREE_COUNT,
       });
     }),
   ),
@@ -42,6 +49,10 @@ export function getRankedAvatar(id) {
 
 export function hasRankedAvatar(id) {
   return getRankedAvatar(id) !== null;
+}
+
+export function isRankedAvatarFree(id) {
+  return Boolean(getRankedAvatar(id)?.free);
 }
 
 export function rankedAvatarSpriteStyle(avatar) {

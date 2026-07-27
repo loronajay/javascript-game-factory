@@ -6,6 +6,7 @@
 import { spendValorOnServer } from "../../platform/gameProgressClient.js";
 import { mergeServerEntitlementsIntoUnlockProgress, readUnlockProgress } from "../../progression/unlocks.js";
 import {
+  avatarValorPurchaseStatus,
   skinPackValorPurchaseStatus,
   skinValorPurchaseStatus,
   unitPurchaseStatus,
@@ -14,12 +15,14 @@ import {
 function valorDescriptor(kind, offer) {
   if (kind === "unit") return { kind: "unit", type: offer.type };
   if (kind === "skin-pack") return { kind: "skin-pack", packId: offer.packId };
+  if (kind === "avatar") return { kind: "avatar", avatarId: offer.avatarId };
   return { kind: "skin", type: offer.type, slug: offer.slug };
 }
 
 function valorStatus(kind, result) {
   if (kind === "skin-pack") return skinPackValorPurchaseStatus(result);
   if (kind === "skin") return skinValorPurchaseStatus(result);
+  if (kind === "avatar") return avatarValorPurchaseStatus(result);
   return unitPurchaseStatus(result);
 }
 

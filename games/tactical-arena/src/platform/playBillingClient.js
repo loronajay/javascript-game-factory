@@ -15,6 +15,8 @@
 //
 // All I/O is injected so the whole flow is testable without a device or a store.
 
+import { fetchGameProgressSnapshot } from "./gameProgressClient.js";
+import { isOfferFullyOwned } from "./offerOwnership.js";
 import { playProductIdForOffer } from "./playProducts.js";
 
 export const PLAY_PURCHASE_CANCELLED = "PURCHASE_CANCELLED";
@@ -31,6 +33,13 @@ const ERROR_COPY = Object.freeze({
   verification_failed: "We could not confirm that purchase. You have not been charged for it.",
   offer_invalid: "That shop item cannot be purchased right now.",
   bridge_missing: "Purchases are unavailable in this build.",
+  // Stopped by the preflight: the purchase sheet never opened, so there is no charge.
+  offer_already_owned: "You already own this, so there is nothing to buy. You have not been charged.",
+  // The backstop, for the narrow race where ownership changed between the preflight and
+  // the purchase completing. Google took the money; we decline the grant and leave the
+  // purchase unacknowledged, which makes Google refund it — hence the promise in this copy.
+  offer_already_owned_refunding: "You already own this. Google Play will refund the charge automatically within a few days.",
+  purchase_already_redeemed: "That purchase has already been applied to a different account.",
 });
 
 const GENERIC = "Something went wrong with that purchase. Please try again.";
@@ -64,12 +73,48 @@ async function settle(bridge, { consume, purchaseToken }) {
   else await bridge.acknowledge({ purchaseToken });
 }
 
-export async function purchaseWithPlay(offer, { plugins = null, verifyPurchase, account = null } = {}) {
+// Ownership preflight, run BEFORE Google's purchase sheet opens.
+//
+// This is the only place a duplicate purchase can be stopped without money moving. The
+// Stripe rail gets this for free — the server refuses to create a checkout session for an
+// owned offer, so nothing is ever charged. Play is inverted: Google takes the money and
+// hands us a token, and the server only sees the purchase afterwards. By then the only
+// remedy is to decline the grant and let Google auto-refund, which works but costs the
+// player several days.
+//
+// So: ask the server what they own first, and never open the sheet for something redundant.
+//
+// Fails OPEN. If the snapshot cannot be fetched — offline, server down, signed out — the
+// purchase proceeds: a network blip must not block a legitimate sale, and the server-side
+// refusal plus auto-refund is still behind it. Note that an unreachable server also means
+// the purchase could not have been verified anyway.
+export function createOwnedOfferGuard({ fetchSnapshot = fetchGameProgressSnapshot } = {}) {
+  return async function assertOfferPurchasable({ offer, account = null } = {}) {
+    let snapshot = null;
+    try {
+      snapshot = await fetchSnapshot({ account });
+    } catch {
+      return { owned: false, snapshot: null, checked: false };
+    }
+    if (!snapshot) return { owned: false, snapshot: null, checked: false };
+    return { owned: isOfferFullyOwned(offer, snapshot), snapshot, checked: true };
+  };
+}
+
+export async function purchaseWithPlay(offer, { plugins = null, verifyPurchase, account = null, assertOfferPurchasable = null } = {}) {
   const bridge = bridgeFrom(plugins);
   if (!bridge) return { ok: false, error: "bridge_missing" };
 
   const productId = playProductIdForOffer(offer);
   if (!productId) return { ok: false, error: "offer_invalid" };
+
+  const guard = assertOfferPurchasable ?? createOwnedOfferGuard();
+  const verdict = await guard({ offer, account });
+  if (verdict?.owned) {
+    // Nothing has been charged: Google's sheet was never opened. The snapshot rides along
+    // so the caller can correct the shop, which was showing this as unowned a moment ago.
+    return { ok: false, error: "offer_already_owned", blocked: true, snapshot: verdict.snapshot ?? null };
+  }
 
   let purchase;
   try {
@@ -96,7 +141,13 @@ export async function purchaseWithPlay(offer, { plugins = null, verifyPurchase, 
   }
 
   if (!verification?.ok) {
-    return { ok: false, error: verification?.error || "verification_failed", purchaseToken: purchase.purchaseToken };
+    // Ownership changed between the preflight and the sheet closing — bought on another
+    // device mid-flow. Distinguished from the preflight block because this one WAS charged,
+    // and the player needs to be told a refund is coming rather than that nothing happened.
+    const error = verification?.error === "offer_already_owned"
+      ? "offer_already_owned_refunding"
+      : verification?.error || "verification_failed";
+    return { ok: false, error, purchaseToken: purchase.purchaseToken };
   }
 
   try {

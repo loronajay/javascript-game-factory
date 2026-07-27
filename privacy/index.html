@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jay's Javascript Arcade | Privacy Policy</title>
+  <link rel="stylesheet" href="../css/arcade.css">
+  <link rel="stylesheet" href="../css/session-nav.css">
+  <link rel="stylesheet" href="../css/page-stage.css">
+  <!-- Must load last: overrides desktop rules by source order. -->
+  <link rel="stylesheet" href="../css/mobile-landscape.css">
+  <style>
+    /* Long-form legal prose is the only thing on this page, and nothing else in the
+       arcade needs this treatment — so it stays scoped here rather than becoming a
+       stylesheet. Readability wins over arcade styling inside the document body. */
+    .legal-doc {
+      max-width: 52rem;
+      margin: 0 auto;
+      padding: 1.5rem clamp(1rem, 4vw, 2.5rem) 4rem;
+      color: #e8e2d6;
+      font-size: 1rem;
+      line-height: 1.7;
+    }
+    .legal-doc__updated {
+      color: #b9ad97;
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+    .legal-doc h2 {
+      margin: 2.5rem 0 0.75rem;
+      font-size: 1.15rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #f0c46a;
+      border-bottom: 1px solid rgba(240, 196, 106, 0.25);
+      padding-bottom: 0.35rem;
+    }
+    .legal-doc h3 {
+      margin: 1.5rem 0 0.4rem;
+      font-size: 1rem;
+      color: #f5efe3;
+    }
+    .legal-doc p, .legal-doc li { color: #ded7c8; }
+    .legal-doc ul { padding-left: 1.25rem; margin: 0.5rem 0 1rem; }
+    .legal-doc li { margin-bottom: 0.4rem; }
+    .legal-doc a { color: #f0c46a; }
+    .legal-doc table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0 1.5rem;
+      font-size: 0.94rem;
+    }
+    .legal-doc th, .legal-doc td {
+      text-align: left;
+      padding: 0.55rem 0.7rem;
+      border: 1px solid rgba(240, 196, 106, 0.2);
+      vertical-align: top;
+    }
+    .legal-doc th { color: #f0c46a; background: rgba(240, 196, 106, 0.07); }
+    .legal-doc__callout {
+      border-left: 3px solid #f0c46a;
+      background: rgba(240, 196, 106, 0.06);
+      padding: 0.85rem 1rem;
+      margin: 1.25rem 0;
+    }
+    /* Wide content must scroll inside itself; the page body never scrolls sideways. */
+    .legal-doc__scroll { overflow-x: auto; }
+  </style>
+</head>
+<body class="page-stage-shell">
+  <div class="scanlines"></div>
+  <div class="crt-overlay"></div>
+
+  <main class="arcade-shell">
+    <section class="page-stage">
+      <div class="page-stage__controls">
+        <!-- Populated by arcade-session-nav; never hand-author the nav per page. -->
+        <div id="privacyPrimaryNav" class="page-stage__nav"></div>
+      </div>
+
+      <div class="page-stage__header">
+        <h1 class="pixel-text pixel-text--title">PRIVACY POLICY</h1>
+        <p>How Jay's Javascript Arcade handles your data.</p>
+      </div>
+
+      <article class="legal-doc">
+        <p class="legal-doc__updated">Last updated: 27 July 2026</p>
+
+        <p>
+          Jay's Javascript Arcade (&ldquo;the Arcade&rdquo;, &ldquo;we&rdquo;) is a collection of
+          browser games with shared player accounts, profiles, and social features. This policy
+          covers the website at jayarcade.com and our mobile apps, including
+          <strong>Tactical Arena</strong> on Google Play.
+        </p>
+
+        <div class="legal-doc__callout">
+          <p style="margin:0">
+            The short version: we collect the account details you give us and the records of what
+            you do in our games. We do not sell your data, we do not run ads, and there are no
+            third-party analytics or tracking SDKs in our apps. You can delete your account and
+            its data at any time.
+          </p>
+        </div>
+
+        <h2>1. Who is responsible</h2>
+        <p>
+          The Arcade is operated by an independent developer. For any privacy question, data
+          request, or complaint, contact
+          <a href="mailto:privacy@jayarcade.com">privacy@jayarcade.com</a>.
+        </p>
+
+        <h2>2. What we collect</h2>
+
+        <h3>Information you give us</h3>
+        <ul>
+          <li><strong>Account details</strong> &mdash; your email address and a password. Passwords are stored only as a salted hash; we never see or store the password itself.</li>
+          <li><strong>Profile information</strong> &mdash; display name, optional real name, tagline, biography, links you choose to add, and your chosen favourite game.</li>
+          <li><strong>Images you upload</strong> &mdash; avatar, profile background, and gallery photos.</li>
+          <li><strong>Content you post</strong> &mdash; status updates, comments, reactions, and direct messages to other players.</li>
+        </ul>
+
+        <h3>Information created by playing</h3>
+        <ul>
+          <li><strong>Game records</strong> &mdash; match results, campaign progress, competitive rating and rank, per-unit statistics, badges earned, and play sessions.</li>
+          <li><strong>Relationships</strong> &mdash; your friends, friend requests, blocks, and who you have played with.</li>
+          <li><strong>Purchases and entitlements</strong> &mdash; which items you own, your in-game currency balance, and a record of each purchase.</li>
+        </ul>
+
+        <h3>Technical information</h3>
+        <ul>
+          <li>Your IP address is processed transiently to apply rate limits and to block abuse. It is held in memory only and is not written to our database or to a log we retain.</li>
+          <li>A session token is stored in your browser or app so you stay signed in.</li>
+        </ul>
+
+        <h3>What we do not collect</h3>
+        <ul>
+          <li>No advertising identifiers, and no advertising SDKs.</li>
+          <li>No third-party analytics or behavioural tracking.</li>
+          <li>No location data.</li>
+          <li>No contacts, camera, or microphone access.</li>
+          <li><strong>No payment card details.</strong> Card data goes directly to our payment providers and never reaches our servers.</li>
+        </ul>
+
+        <h2>3. Why we use it</h2>
+        <ul>
+          <li>To create your account and sign you in.</li>
+          <li>To run multiplayer matches, leaderboards, and competitive rankings.</li>
+          <li>To show your public profile and the social features you choose to use.</li>
+          <li>To deliver and protect the items you have bought.</li>
+          <li>To send you account emails, such as a password reset. We do not send marketing email.</li>
+          <li>To prevent cheating, fraud, and abuse.</li>
+        </ul>
+
+        <h2>4. What other people can see</h2>
+        <p>
+          The Arcade is a social platform, so some information is public by design. Your display
+          name, avatar, profile background, tagline, biography, links, gallery photos, status
+          posts, comments, reactions, badges, competitive rank, and match history are visible to
+          other players.
+        </p>
+        <p>
+          <strong>Your email address is never shown to other players.</strong> Direct messages are
+          visible only to you and the person you sent them to.
+        </p>
+
+        <h2>5. Who we share it with</h2>
+        <p>
+          We do not sell your personal data and we do not share it for advertising. We use the
+          following service providers, each of which processes data only to provide their service
+          to us:
+        </p>
+        <div class="legal-doc__scroll">
+          <table>
+            <thead>
+              <tr><th>Provider</th><th>What it does</th><th>What it receives</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Railway</td><td>Hosting and database</td><td>All account and gameplay data</td></tr>
+              <tr><td>Cloudinary</td><td>Image hosting</td><td>Images you upload</td></tr>
+              <tr><td>Stripe</td><td>Payments on the web</td><td>Payment details, handled by Stripe directly</td></tr>
+              <tr><td>Google Play</td><td>Payments in the Android app</td><td>Payment details, handled by Google directly</td></tr>
+              <tr><td>Resend</td><td>Account email delivery</td><td>Your email address</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          We may also disclose information where we are legally required to do so.
+        </p>
+
+        <h2>6. Payments</h2>
+        <p>
+          Purchases on the web are processed by Stripe; purchases in the Android app are processed
+          by Google Play Billing. We receive confirmation that a purchase succeeded and a reference
+          for it, so we can grant your item and handle refunds. We never receive or store your card
+          number.
+        </p>
+        <p>
+          Refunds for Google Play purchases are handled under Google Play's refund policy. Contact
+          us if a purchase did not deliver what it should have.
+        </p>
+
+        <h2>7. How long we keep it</h2>
+        <p>
+          We keep your account data for as long as your account exists. Purchase records are kept
+          for as long as we need them for accounting and refund purposes, even after account
+          deletion, because we are required to be able to account for transactions.
+        </p>
+
+        <h2>8. Deleting your account</h2>
+        <p>
+          You can delete your account at any time from your profile settings. Deleting your account
+          removes your profile, uploaded images, posts, comments, messages, friend relationships,
+          and gameplay records.
+        </p>
+        <p>
+          You can also email <a href="mailto:privacy@jayarcade.com">privacy@jayarcade.com</a> to
+          request deletion, a copy of your data, or a correction. We will respond within 30 days.
+        </p>
+        <p>
+          Depending on where you live, you may have additional rights over your data &mdash;
+          including access, correction, deletion, portability, and objecting to processing. The
+          contact address above is how to exercise any of them.
+        </p>
+
+        <h2>9. Children</h2>
+        <p>
+          The Arcade is not directed at children under 13, and we do not knowingly collect personal
+          information from them. Our games include social features &mdash; public profiles, chat,
+          and user-posted content &mdash; that are not intended for young children.
+        </p>
+        <p>
+          If you believe a child under 13 has created an account, contact
+          <a href="mailto:privacy@jayarcade.com">privacy@jayarcade.com</a> and we will delete it.
+        </p>
+
+        <h2>10. Security</h2>
+        <p>
+          All traffic between your device and our servers is encrypted with HTTPS. Passwords are
+          stored as salted hashes. Sessions are signed tokens that can be revoked. No system is
+          perfectly secure, but we treat account and purchase data as the things most worth
+          protecting.
+        </p>
+
+        <h2>11. Where your data is held</h2>
+        <p>
+          Our servers and service providers may process and store data outside your country,
+          including in the United States. By using the Arcade you accept that your data may be
+          transferred and processed there.
+        </p>
+
+        <h2>12. Changes to this policy</h2>
+        <p>
+          If we change this policy we will update the date at the top of this page. If a change
+          materially affects how we use your data, we will make a reasonable effort to tell you
+          in the app or by email.
+        </p>
+
+        <h2>13. Contact</h2>
+        <p>
+          Questions, requests, or complaints:
+          <a href="mailto:privacy@jayarcade.com">privacy@jayarcade.com</a>.
+        </p>
+      </article>
+    </section>
+  </main>
+
+  <script type="module" src="../js/pixel-text.mjs"></script>
+  <script type="module" src="../js/arcade-input.mjs"></script>
+  <script type="module">
+    // Static legal page: it needs the shared nav and nothing else, so it wires the nav
+    // inline rather than earning a js/ page controller of its own.
+    import { initSessionNav, renderPrimaryAppNav } from "../js/arcade-session-nav.mjs";
+
+    const doc = globalThis.document;
+    if (typeof doc?.getElementById === "function") {
+      renderPrimaryAppNav(doc.getElementById("privacyPrimaryNav"), {
+        basePath: "../",
+        currentPage: "privacy",
+        linkClass: "page-stage__portal",
+        sessionNavId: "privacyAuthNav",
+      });
+      void initSessionNav(doc.getElementById("privacyAuthNav"), {
+        signInPath: "../sign-in/index.html",
+        signUpPath: "../sign-up/index.html",
+        homeOnLogout: "../index.html",
+      });
+    }
+  </script>
+</body>
+</html>

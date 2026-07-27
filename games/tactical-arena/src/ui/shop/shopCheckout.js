@@ -7,6 +7,7 @@ import { formatValor } from "../../progression/marketplace.js";
 import { el } from "../domHelpers.js";
 import { createPackPreview, createValorBadge, createValorWarning, confirmSubtitle } from "./shopWidgets.js";
 import { createPortrait } from "../portraits.js";
+import { createRankedAvatarIcon } from "../rankedAvatars.js";
 
 export function createPurchaseConfirm(kind, offer, balance, { pendingValorError = "", onDismiss, onConfirm }) {
   const amount = kind === "unit" ? offer.price?.amount : offer.valorPrice?.amount;
@@ -31,11 +32,13 @@ export function createPurchaseConfirm(kind, offer, balance, { pendingValorError 
   const item = el("div", "shop-confirm-item");
   item.appendChild(kind === "skin-pack"
     ? createPackPreview(offer, "is-shop-confirm")
-    : createPortrait(offer.type, {
-      variant: "is-shop-confirm",
-      eager: true,
-      skin: kind === "skin" ? offer.slug : null,
-    }));
+    : kind === "avatar"
+      ? createRankedAvatarIcon(offer.avatarId, { className: "is-shop-confirm" })
+      : createPortrait(offer.type, {
+        variant: "is-shop-confirm",
+        eager: true,
+        skin: kind === "skin" ? offer.slug : null,
+      }));
   const copy = el("div", "shop-confirm-copy");
   copy.append(
     el("b", "shop-confirm-name", offer.name),

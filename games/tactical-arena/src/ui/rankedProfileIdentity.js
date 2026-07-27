@@ -9,7 +9,7 @@ import { TACTICAL_ARENA_GAME_SLUG } from "../platform/gameProgressClient.js";
 import { loadRankedName, saveRankedName } from "./rankedNameModel.js";
 import { createPortrait, hasPortrait } from "./portraits.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
-import { readUnlockProgress } from "../progression/unlocks.js";
+import { isProgressAvatarUnlocked, readUnlockProgress } from "../progression/unlocks.js";
 import { getUnitSkins } from "./skinModel.js";
 import { RANKED_AVATARS, createRankedAvatarIcon, getRankedAvatar, hasRankedAvatar } from "./rankedAvatars.js";
 import { renderBadgePickerField } from "./rankedBadgePicker.js";
@@ -169,7 +169,7 @@ export function renderIdentityEditor(body, { pilot, state, apiClient, playerId =
 }
 
 // Avatar picker: choose from authored sprite icons plus owned unit/skin portraits.
-function renderAvatarField(state, save) {
+export function renderAvatarField(state, save) {
   const field = el("div", "ranked-profile-avatarfield");
   field.appendChild(el("label", "ranked-profile-label", "Ranked avatar"));
   const legacyOptions = buildLegacyRankedAvatarOptions();
@@ -292,11 +292,16 @@ function renderAvatarField(state, save) {
         icon: createPortrait(state.avatarUnit, { variant: "is-thumb", skin: state.avatarSkin, eager: true }),
       });
     }
+    // Locked icon avatars are bought in the Shop, not offered here — this only lists ones
+    // that are free or owned, plus (like the legacy fallback above) whatever is currently
+    // equipped, so a revoked/unsynced pick never just vanishes from the menu.
     for (const avatar of RANKED_AVATARS) {
+      const owned = avatar.free || isProgressAvatarUnlocked(avatar.id) || avatar.id === state.avatarUnit;
+      if (!owned) continue;
       renderDropdownOption({
         id: avatar.id,
         label: avatar.label,
-        sub: avatar.sheet === "sheet-1" ? "Set 1" : "Set 2",
+        sub: avatar.free ? "Starter" : (avatar.sheet === "sheet-1" ? "Set 1" : "Set 2"),
         icon: createRankedAvatarIcon(avatar.id, { className: "is-menu" }),
       });
     }

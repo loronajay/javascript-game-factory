@@ -75,9 +75,14 @@ As-built notes (where the build refined the plan below):
   authoritative and `rankedNameModel.js` is demoted to a synchronous local *cache*:
   saving a title mirrors it down via `saveRankedName`, and `onlineFlow.js` reads that
   cache unchanged. The proper in-band avatar+title nameplate exchange is still Phase 3.
-- Avatar ownership is client-gated (v1): the picker only lists owned units (via
-  `unlocks.js`) that have portrait art, plus each unit's owned skins. The server
-  sanitizes ids but does not verify ownership.
+- Avatar ownership is split by kind. Legacy unit/skin portrait avatars stay
+  client-gated: the picker only lists owned units (via `unlocks.js`) that have
+  portrait art, plus each unit's owned skins, and the server only sanitizes those
+  ids. Icon avatars (`rankedAvatars.js`'s `avatar-NNN` sprite ids) are a separate,
+  purchasable cosmetic: the first `RANKED_AVATAR_FREE_COUNT` are a free starter set,
+  the rest cost a flat Valor price in the Shop's Avatars tab, and the server
+  validates an equip against `game_entitlements` the same way it validates a badge
+  (see `ranked-profile.mts`'s `resolveAvatarUnit` / SECURITY.md).
 
 Goal: name/title + avatar are stored server-side and readable by others. This alone
 kills the local-hybrid mess and unblocks the "view profile after a match" card.
@@ -319,8 +324,10 @@ disconnect handoff in `onlineCommandController.endOnlineMatch`.
 
 ## Open questions (not blocking Phase 1)
 
-- Avatar ownership enforcement: purely client-gated (pick only owned units/skins), or
-  also validated server-side against progression? Leaning client-gated for v1.
+- ~~Avatar ownership enforcement~~ — resolved: purchasable icon avatars are validated
+  server-side against `game_entitlements` (like the badge); legacy unit/skin portrait
+  avatars stay client-gated, since picking an unowned one is cosmetic-only and carries
+  no separate economic value beyond owning the unit/skin itself.
 - `kills` attribution granularity in `unitResults` — killer per death, or just
   alive/dead per unit for v1? Alive/dead is enough for games/win%/survival; add
   killer attribution when the UI needs it.

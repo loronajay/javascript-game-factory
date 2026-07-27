@@ -18,6 +18,9 @@ export interface ApiConfig {
   stripePublishableKey: string;
   stripeWebhookSecret: string;
   hasStripe: boolean;
+  playServiceAccountKey: string;
+  playPackageName: string;
+  hasPlayBilling: boolean;
 }
 
 function parsePort(value: unknown): number {
@@ -45,6 +48,14 @@ export function readConfig(options: { env?: Record<string, string | undefined> }
         : "";
   const stripePublishableKey = typeof env.STRIPE_PUBLISHABLE_KEY === "string" ? env.STRIPE_PUBLISHABLE_KEY.trim() : "";
   const stripeWebhookSecret = typeof env.STRIPE_WEBHOOK_SECRET === "string" ? env.STRIPE_WEBHOOK_SECRET.trim() : "";
+  // A Google service-account JSON key, raw or base64-encoded (hosts that mangle embedded
+  // newlines need the latter). Grants read access to Play purchases for verification.
+  const playServiceAccountKey = typeof env.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY === "string"
+    ? env.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY.trim()
+    : "";
+  const playPackageName = typeof env.GOOGLE_PLAY_PACKAGE_NAME === "string" && env.GOOGLE_PLAY_PACKAGE_NAME.trim()
+    ? env.GOOGLE_PLAY_PACKAGE_NAME.trim()
+    : "com.jayarcade.tacticalarena";
 
   return {
     port: parsePort(env.PORT),
@@ -64,5 +75,8 @@ export function readConfig(options: { env?: Record<string, string | undefined> }
     stripePublishableKey,
     stripeWebhookSecret,
     hasStripe: Boolean(stripeApiKey && stripeWebhookSecret),
+    playServiceAccountKey,
+    playPackageName,
+    hasPlayBilling: Boolean(playServiceAccountKey),
   };
 }

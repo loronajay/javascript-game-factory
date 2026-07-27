@@ -1000,3 +1000,88 @@ test("clicking a shop skin card surface opens the direct viewer instead of the f
   assert.equal(walk(galleryOverlay, (node) => hasClass(node, "skin-gallery-detail-close")).length, 0);
   assert.ok(walk(galleryOverlay, (node) => node.tagName === "H2").some((node) => node.textContent === "Skin Viewer"));
 });
+
+// --- open-time ownership refresh ---------------------------------------------
+//
+// The shop renders from local progress, which is only as fresh as the last boot. An item
+// bought on the web or another device since then would still be offered here — and offering
+// someone a purchase they do not need is the failure this refresh exists to prevent. The Play
+// preflight refuses such a purchase, but never showing it is the better outcome.
+
+test("opening the shop pulls server ownership so an item bought elsewhere stops being offered", async () => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  const skin = getSkinOffers(storage)[0];
+  assert.equal(isProgressSkinUnlocked(skin.type, skin.slug, storage), false, "precondition: not owned locally");
+
+  openShop(storage, {
+    account: SIGNED_IN_ACCOUNT,
+    // The same shape GET /game-progress/:slug returns.
+    fetchGameProgressSnapshot: async () => ({
+      valorBalance: 0,
+      entitlements: [{ entitlementId: `skin:${skin.type}:${skin.slug}`, kind: "skin" }],
+    }),
+  });
+
+  // The refresh is deliberately not awaited so the modal opens instantly; let it land.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(
+    isProgressSkinUnlocked(skin.type, skin.slug, storage),
+    true,
+    "server-known ownership should have been merged into local progress",
+  );
+});
+
+test("the open-time refresh is skipped when nobody is signed in", async () => {
+  globalThis.document = new FakeDocument();
+  let called = 0;
+
+  openShop(storageAdapter(), {
+    account: { authenticated: false },
+    fetchGameProgressSnapshot: async () => { called += 1; return null; },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(called, 0, "a signed-out shop has no server ownership to ask about");
+});
+
+test("a shop closed before the refresh lands is not repopulated behind the player's back", async () => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+
+  openShop(storage, {
+    account: SIGNED_IN_ACCOUNT,
+    fetchGameProgressSnapshot: () => pending,
+  });
+
+  const overlay = document.body.children[0];
+  // Escape closes the shop while the fetch is still in flight.
+  const keyHandler = document.listeners.get("keydown")[0];
+  keyHandler({ key: "Escape" });
+  assert.equal(overlay.hidden, true);
+  assert.equal(overlay.children.length, 0);
+
+  release({ valorBalance: 0, entitlements: [] });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  // Rendering into a hidden overlay would leave a stale card waiting for the next open.
+  assert.equal(overlay.hidden, true);
+  assert.equal(overlay.children.length, 0, "a late refresh must not re-render a closed shop");
+});
+
+test("a failed ownership refresh leaves the shop usable", async () => {
+  globalThis.document = new FakeDocument();
+
+  openShop(storageAdapter(), {
+    account: SIGNED_IN_ACCOUNT,
+    fetchGameProgressSnapshot: async () => { throw new Error("offline"); },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  const overlay = document.body.children[0];
+  assert.equal(overlay.hidden, false);
+  assert.ok(walk(overlay, (node) => hasClass(node, "shop-card")).length > 0, "the shop should still be rendered");
+});

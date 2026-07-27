@@ -23,6 +23,7 @@ import {
   premiumCheckoutErrorMessage,
   startPremiumCheckout,
 } from "../platform/premiumCheckoutClient.js";
+import { fetchGameProgressSnapshot } from "../platform/gameProgressClient.js";
 import { mergeServerEntitlementsIntoUnlockProgress, readUnlockProgress } from "../progression/unlocks.js";
 import { getInventoryCatalog, mergeServerInventory } from "../progression/inventory.js";
 import { enqueuePurchasedUnlockAnnouncements } from "../progression/announcements.js";
@@ -42,6 +43,7 @@ import {
   renderUnitDetail,
   renderUnits,
 } from "./shop/shopTabs.js";
+import { renderAvatars } from "./shop/shopAvatarTab.js";
 import { createPremiumCheckoutLayer, createPurchaseConfirm } from "./shop/shopCheckout.js";
 import { createBuyActions } from "./shop/shopBuyActions.js";
 
@@ -64,6 +66,9 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
   const accountLoggedIn = isFactoryAccountLoggedIn(account);
   // Injected in tests; otherwise runValorPurchase builds the default platform client.
   const apiClient = options.apiClient;
+  // Injected in tests so the open-time ownership refresh can be driven without a network.
+  const fetchSnapshot = options.fetchGameProgressSnapshot ?? fetchGameProgressSnapshot;
+  let closed = false;
   let activeTab = "units";
   let statusText = accountLoggedIn ? "" : "Sign in to buy shop items.";
   let detailUnitType = null;
@@ -169,6 +174,7 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
     else if (activeTab === "units") renderUnits(body, catalog.units, ctx);
     else if (activeTab === "skin-packs") renderSkinPacks(body, catalog.skinPacks, ctx);
     else if (activeTab === "skins") renderSkins(body, catalog.skins, ctx);
+    else if (activeTab === "avatars") renderAvatars(body, catalog.avatars, ctx);
     // The inventory catalog is the shop offers plus the quantity already banked, so the tab
     // can show "Owned x2" on a stackable item without the shop catalog knowing about storage.
     else if (activeTab === "consumables") renderConsumables(body, getInventoryCatalog(storage).items, ctx);
@@ -194,12 +200,43 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
   }
 
   function close() {
+    closed = true;
     closePremiumCheckoutLayer();
     pendingValorPurchase = null;
     overlay.hidden = true;
     overlay.removeEventListener("click", onOverlay);
     document.removeEventListener("keydown", onKey, true);
     overlay.replaceChildren();
+  }
+
+  // Pull server ownership as the shop opens, so an item bought elsewhere (the web shop, another
+  // device) is never displayed as buyable here. Without this the catalog is only as fresh as
+  // the last boot, and a stale "not owned" is what puts a player in front of a purchase they
+  // do not need — the Play preflight then refuses it, which is correct but is a worse
+  // experience than never offering it.
+  //
+  // Deliberately NOT awaited: the shop opens immediately on local state and corrects itself a
+  // moment later. Blocking the modal on a network round trip would be a visible regression for
+  // every player to fix a case that affects few.
+  //
+  // Additive merge, not `authoritative`. Two reasons: full authority is only safe after a
+  // confirmed backfill (SECURITY.md invariant 2), which is boot's job to establish; and
+  // `authoritativeValor` would overwrite the balance with the server's, dropping legitimately
+  // earned Valor that is still sitting in the unflushed claim queue. Adding ownership the
+  // server knows about is all this needs to do, and additive cannot take anything away.
+  async function refreshOwnershipFromServer() {
+    if (!accountLoggedIn) return;
+    let snapshot = null;
+    try {
+      snapshot = await fetchSnapshot({ account });
+    } catch {
+      return;
+    }
+    // The player may have closed the shop while this was in flight; re-rendering then would
+    // repopulate a hidden overlay and leave a stale card behind the next time it opens.
+    if (!snapshot || closed) return;
+    mergeServerEntitlementsIntoUnlockProgress(storage, snapshot);
+    render();
   }
 
   function openValorPurchase(kind, offer) {
@@ -214,7 +251,9 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
       ? { kind, type: offer.type, slug: offer.slug }
       : kind === "skin-pack"
         ? { kind, packId: offer.packId }
-        : { kind, type: offer.type };
+        : kind === "avatar"
+          ? { kind, avatarId: offer.avatarId }
+          : { kind, type: offer.type };
     pendingValorError = "";
     render();
   }
@@ -232,6 +271,9 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
     }
     if (pendingValorPurchase.kind === "skin-pack") {
       return catalog.skinPacks.find((offer) => offer.packId === pendingValorPurchase.packId) ?? null;
+    }
+    if (pendingValorPurchase.kind === "avatar") {
+      return catalog.avatars.find((offer) => offer.avatarId === pendingValorPurchase.avatarId) ?? null;
     }
     return catalog.skins.find((offer) =>
       offer.type === pendingValorPurchase.type && offer.slug === pendingValorPurchase.slug) ?? null;
@@ -418,4 +460,5 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
   document.addEventListener("keydown", onKey, true);
   overlay.hidden = false;
   render();
+  void refreshOwnershipFromServer();
 }

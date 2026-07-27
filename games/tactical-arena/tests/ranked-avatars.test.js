@@ -64,8 +64,15 @@ test("ranked avatar css sizes square sprite cells for both square and portrait r
     css,
     /\.ranked-avatar-icon-sprite\s*\{[^}]*width:var\(--avatar-sprite-width,108%\)[^}]*height:var\(--avatar-sprite-height,auto\)[^}]*aspect-ratio:1\/1[^}]*transform:translate\(calc\(-50% \+ var\(--avatar-nudge-x,0\)\),calc\(-50% \+ var\(--avatar-nudge-y,0\)\)\)/s,
   );
-  assert.match(
-    css,
-    /\.ranked-avatar-icon:is\(\.is-profile-avatar,\.is-ranked-avatar,\.is-thumb\)\s*\{[^}]*--avatar-sprite-width:auto[^}]*--avatar-sprite-height:96%/s,
-  );
+  // Assert membership, not the exact tuple: this list grows every time an avatar gains a new
+  // surface (the shop tab was the fourth), and pinning the literal set turns each of those
+  // into a false failure while testing nothing extra.
+  const fittingRule = css.match(/\.ranked-avatar-icon:is\(([^)]*)\)\s*\{([^}]*)\}/);
+  assert.ok(fittingRule, "the sprite-fitting rule should exist");
+  const [, fittedClasses, fittingBody] = fittingRule;
+  for (const className of [".is-profile-avatar", ".is-ranked-avatar", ".is-thumb", ".is-shop-avatar"]) {
+    assert.ok(fittedClasses.includes(className), `${className} should fit its sprite inside the frame`);
+  }
+  assert.match(fittingBody, /--avatar-sprite-width:auto/);
+  assert.match(fittingBody, /--avatar-sprite-height:96%/);
 });

@@ -7,6 +7,7 @@
 // client-supplied amount. The formulas here MUST stay in lockstep with
 // games/tactical-arena/src/progression/marketplace.js so displayed prices match charges.
 import { SKIN_CATALOG, UNIT_CATALOG } from "./payments.mjs";
+import { isFreeRankedAvatarId, isValidRankedAvatarId, rankedAvatarEntitlementId, RANKED_AVATAR_VALOR_COST, } from "./ranked-avatar-catalog.mjs";
 // Unit Valor cost is a flat price per "star" tier (marketplace UNIT_VALOR_COST_BY_STAR).
 const UNIT_VALOR_COST_BY_STAR = Object.freeze({
     1: 450,
@@ -135,6 +136,22 @@ export function getValorOffer(offerInput) {
             kind: "skin",
             packBaseValor: 0,
             entitlements: [{ entitlementId: skin.entitlementId, kind: "skin", valorCost: cost }],
+        };
+    }
+    if (kind === "avatar") {
+        const avatarId = cleanText(offer.avatarId, 40);
+        if (!isValidRankedAvatarId(avatarId) || isFreeRankedAvatarId(avatarId)) {
+            return { ok: false, statusCode: 400, error: "offer_not_found" };
+        }
+        return {
+            ok: true,
+            kind: "avatar",
+            packBaseValor: 0,
+            entitlements: [{
+                    entitlementId: rankedAvatarEntitlementId(avatarId),
+                    kind: "avatar",
+                    valorCost: RANKED_AVATAR_VALOR_COST,
+                }],
         };
     }
     if (kind === "skin-pack") {
