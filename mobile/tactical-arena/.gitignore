@@ -28,6 +28,9 @@ android/keystore.properties
 # Persistent cache for optimized payload images (see scripts/optimize-images.mjs).
 .asset-cache/
 
+# Screenshots and previews pulled off a device / emulator by scripts/verify-android.mjs.
+.device-shots/
+
 # Generated product list for the Play Console (regenerate: node scripts/play-products-report.mjs --tsv).
 play-products.tsv
 

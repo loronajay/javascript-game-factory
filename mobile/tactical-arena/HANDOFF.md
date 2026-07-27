@@ -74,6 +74,7 @@ npm run apk:clean        # clean build        (use this to measure size)
 npm run verify:android   # install, launch, screenshot, scrape logcat
 npm run play:products    # list the 317 Play products
 npm run play:sync        # dry run; --apply --key=sa.json to create them
+npm run icons            # regenerate launcher + store icons from the shield logo
 npm run release:check    # preflight: signing, versionCode, payload freshness, product count
 npm run bundle:release   # signed AAB for Play  -> app/build/outputs/bundle/release/
 npm run apk:release      # signed release APK, for testing the release build on a device
@@ -167,6 +168,10 @@ opens would close most of the window. Worth doing, not worth blocking launch on.
 ## 4. Launch runbook
 
 Everything below is console work. Do it in order; 4a and 4b are independent of each other.
+
+> **`LAUNCH_CHECKLIST.md` is the owner-facing version of this section** — same steps, written
+> for whoever is clicking through Play Console rather than for whoever is reading the code.
+> Keep the two in sync when the process changes.
 
 ### 4a. Google service account (unlocks product sync + purchase verification)
 

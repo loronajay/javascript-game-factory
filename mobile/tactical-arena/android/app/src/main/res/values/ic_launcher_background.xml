@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- The game's own theme-color (games/tactical-arena/index.html), so the launcher
+         icon, the splash, and the browser chrome all read as the same product.
+         Regenerate the foreground art with scripts/generate-app-icons.py. -->
+    <color name="ic_launcher_background">#140D06</color>
 </resources>
