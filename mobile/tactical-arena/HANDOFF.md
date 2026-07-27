@@ -120,24 +120,41 @@ What it enforces, and where each rule is tested (`platform-api/tests/play-billin
 | A *new* token buying an *owned* item is **refused** | See below — this is the double-purchase fix |
 | Raw purchase token never stored | Only a SHA-256 hash, which is enough to match a voided token back to its grant |
 
-### The double-purchase fix
+### Buying something you already own
 
-Google Play cannot see items bought on the web through Stripe, so it will happily sell one
-again. The server then has nothing to grant, and the naive answer — "already owned, that's
-fine" — would keep the player's money for nothing.
+Google Play cannot see items bought on the web through Stripe, so left alone it will happily
+sell one again. Two layers stop that, and the order matters.
 
-Two situations look identical at that point, and need opposite answers. The discriminator is
-whether *this purchase token* is already on one of our claim rows:
+**1. The preflight — no charge ever happens.** `createOwnedOfferGuard()` in
+`playBillingClient.js` asks the server what the player owns and refuses **before**
+`bridge.purchase()` opens Google's sheet. This is what makes Play match the Stripe rail,
+which has always been safe for free: the server refuses to create a checkout session for an
+owned offer, so money never moves there either.
 
-- **Our claim exists** → the grant landed, only the acknowledge failed, and boot recovery is
+`src/platform/offerOwnership.js` holds the rule, and it deliberately mirrors
+`resolveTacticalArenaPremiumOffer` — including that a **partially** owned skin pack is still
+buyable, because the server prorates it down to the missing skins. A test cross-checks the
+two implementations case by case; if they drift, the client starts blocking sales the server
+would have honoured.
+
+It **fails open**. If the snapshot cannot be fetched — offline, signed out, server down — the
+purchase proceeds. A network blip must not block a legitimate sale, and an unreachable server
+could not have verified the purchase anyway.
+
+**2. The backstop — refund.** For the narrow race where ownership changes between the
+preflight and the sheet closing (bought on another device mid-flow), the server still refuses
+the grant. Two situations look identical there, and the discriminator is whether *this
+purchase token* is already on one of our claim rows:
+
+- **Our claim exists** → the grant landed, only the acknowledge failed, boot recovery is
   retrying. Return `ok` so the client can settle it.
-- **No claim** → they just paid for something they already owned. Return `409
-  offer_already_owned`. The client only settles on `ok`, so the purchase is left
-  **unacknowledged, and Google auto-refunds it within three days.**
+- **No claim** → they paid for something they already owned. Return `409
+  offer_already_owned`, and the client leaves the purchase **unacknowledged, so Google
+  auto-refunds it within three days.**
 
-That reuses the same safety net every other failure path here relies on, so it needs no
-refund API permissions and cannot double-refund. The player sees "You already own this.
-Google Play will refund the charge automatically within a few days."
+The two paths carry different player-facing copy on purpose: the preflight says "you have not
+been charged", the backstop promises a refund. Getting those the wrong way round is worse
+than saying nothing.
 
 Configuration — set both on the platform-api service (Railway):
 
@@ -158,10 +175,10 @@ newlines in `private_key`. If in doubt, use base64:
 
 ### Remaining polish, not a correctness gap
 
-The refund above makes the player whole, but it is still a bad few days for them. The
-shop already hides owned items; the hole is *stale* ownership — the shop was rendered
-before a purchase made elsewhere reconciled. Refreshing server ownership when the shop
-opens would close most of the window. Worth doing, not worth blocking launch on.
+A blocked purchase now applies the fresh snapshot it fetched, so the shop corrects itself
+after the first refusal. What is still missing is refreshing ownership when the shop *opens*,
+so a stale item is never offered in the first place. That needs `shop.js`, which was being
+edited concurrently when this landed — see the note at the end of §6.
 
 ---
 

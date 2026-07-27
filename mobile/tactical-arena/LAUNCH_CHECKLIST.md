@@ -21,8 +21,10 @@ build is perfect. Everything else can be fixed while the clock runs.
 | Release signing | Wired; needs your keystore (step 1) |
 | App icon | **Done** — the shield mark, generated at all five densities |
 | Store listing icon (512×512) | **Done** — `store-listing/play-icon-512.png` |
-| Feature graphic, screenshots, copy | Not started — see step 5 |
-| Privacy policy | **Not started, and it is mandatory** — see step 6 |
+| Feature graphic (1024×500) | **Done** — `store-listing/play-feature-graphic-1024x500.png` |
+| Store descriptions | **Drafted** — `store-listing/DESCRIPTIONS.md`, yours to edit |
+| Privacy policy | **Written** — `/privacy` on the site. Needs deploying and a working contact address |
+| Screenshots | Not started — take these after your UI pass |
 | Play Console app entry | Not created yet |
 
 ---
@@ -144,48 +146,53 @@ talk you into a different one.
 
 ---
 
-## 4. Publish a privacy policy
+## 4. Publish the privacy policy
 
-**Mandatory. Play will not publish without a working URL, and the app does collect email
-addresses and account data.**
+**Mandatory. Play will not publish without a working URL.**
 
-Suggested: host it at `https://jayarcade.com/privacy`.
+The page is written and lives at `privacy/index.html`, so it will be at
+`https://jayarcade.com/privacy` once the site deploys. It covers what is collected, why, the
+five processors (Railway, Cloudinary, Stripe, Google Play, Resend), what is public vs private,
+retention, deletion, children, and security.
 
-It has to honestly cover, at minimum:
+**Two things you must do before using it as your policy URL:**
 
-- What you collect: email address, display name, profile/avatar images, gameplay records
-- Why: account creation, sign-in, leaderboards, friends, match history
-- Who else touches it: Stripe (web payments), Google Play (Android payments), Cloudinary
-  (image hosting), Railway (hosting), Resend (password-reset email)
-- How someone deletes their account and data, and how to contact you
+1. **Read it.** It is a legal statement about your product, written from what the code does.
+   If any of it is wrong, it needs to be wrong-free before it is public.
+2. **Make `privacy@jayarcade.com` actually receive mail** — it is named four times as the
+   contact for data requests, and a privacy contact that bounces is worse than none. Either
+   set up the alias or swap the address for one that works.
 
-> I can draft this page and wire it into the site — say the word. You should read it before
-> publishing; it is a legal statement about your product.
+One claim worth confirming: it says account deletion removes your profile, images, posts,
+messages, friendships and gameplay records. `deleteAccountService` does exist, but it is worth
+deleting a throwaway account and checking what actually disappears before you publish this.
 
 ---
 
 ## 5. Assemble the store listing
 
-**Ready to use:**
+**Ready to use** (all in `mobile/tactical-arena/store-listing/`):
 
-| Asset | Where |
+| Asset | File |
 | --- | --- |
-| App icon 512×512 | `mobile/tactical-arena/store-listing/play-icon-512.png` |
+| App icon 512×512, opaque | `play-icon-512.png` |
+| Feature graphic 1024×500 | `play-feature-graphic-1024x500.png` |
+| Short + full description drafts | `DESCRIPTIONS.md` |
+
+Regenerate the two images any time with `npm run icons`.
+
+The descriptions are a draft in your product's voice, not mine to finalise — read them and
+cut anything that overclaims. `DESCRIPTIONS.md` ends with a table of every factual claim it
+makes and where that claim comes from, so you can check them off.
 
 **Still needed:**
 
 | Asset | Spec | Notes |
 | --- | --- | --- |
-| Feature graphic | 1024×500 PNG/JPG, no alpha | `assets/logos/1ca4a45d-…png` is the wordmark lockup; it needs a background composed around it |
-| Phone screenshots | 2–8, min 320px, 16:9 landscape | `npm run mobile:shots` generates a matrix, or pull real ones off your phone |
-| Short description | ≤ 80 chars | The one-liner under the title |
-| Full description | ≤ 4000 chars | |
+| Phone screenshots | 2–8, min 320px, landscape | `npm run mobile:shots` generates a matrix, or pull real ones off your phone |
 
-For screenshots, the app is **landscape-only**, so use landscape captures. Take them *after*
-your UI pass, not before — otherwise you will redo them.
-
-> I can build the feature graphic from the wordmark and draft both descriptions for you to
-> edit. The screenshots are better taken from real play once the UI settles.
+The app is **landscape-only**, so use landscape captures. Take them *after* your UI pass, not
+before — otherwise you will redo them.
 
 ---
 
@@ -343,14 +350,18 @@ Review after that is typically days, not weeks.
 
 ## What to hand me
 
-Tell me which of these you want and I will do them:
+All four items previously offered are done: the privacy policy, the feature graphic, the
+descriptions, and the duplicate-purchase hardening (a purchase of something you already own is
+now refused **before** Google's payment sheet opens, so no money moves at all).
 
-- [ ] **Privacy policy page** — drafted and wired into the site. You review before publishing.
-- [ ] **Feature graphic** (1024×500) composed from the wordmark logo
-- [ ] **Store descriptions** — short and full, for you to edit
-- [ ] **Shop ownership refresh** — narrows the window where Play can re-sell you something you
-      already own on the web (the charge is auto-refunded today, but it is still a bad few days
-      for the player)
+Still open, and each needs something from you:
+
+- [ ] **Read the privacy policy** and make its contact address deliverable (step 4).
+- [ ] **Screenshots** — best taken from your own device after the UI pass.
+- [ ] **Refresh ownership when the shop opens.** The last piece of the duplicate-purchase
+      work. A blocked purchase already corrects the catalog, but an owned item can still be
+      *displayed* as buyable until you try it. This needs `shop.js`, which your other agent was
+      editing at the time — tell me when that has settled and I will finish it.
 
 I do **not** need: your keystore passwords, the service-account JSON, or your Play Console
 login. Those stay with you.

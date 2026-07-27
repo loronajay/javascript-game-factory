@@ -31,6 +31,16 @@ SOURCE_LOGO = GAME / "assets" / "logos" / "fe4c5300-6c7f-44ef-8977-bc0eb0f2e291.
 BACKGROUND = (0x14, 0x0D, 0x06, 0xFF)
 STORE_ICON = APP_ROOT / "store-listing" / "play-icon-512.png"
 
+# The feature graphic is the wide banner at the top of a Play listing. This poster already
+# carries the wordmark and the full roster, so it is cropped to Play's ratio rather than
+# composed from parts — 1024x500 is 2.048:1 against the poster's 1.78:1, so ~125px of height
+# has to go. Most of it comes off the bottom (rubble) to keep the title clear of the top edge,
+# because Play crops this image further on some surfaces.
+SOURCE_POSTER = GAME / "assets" / "promo-material" / "large-battle-poster.png"
+FEATURE_GRAPHIC = APP_ROOT / "store-listing" / "play-feature-graphic-1024x500.png"
+FEATURE_SIZE = (1024, 500)
+FEATURE_TOP_BIAS = 0.32  # share of the removed height taken off the top
+
 # density -> (legacy launcher px, adaptive foreground px). Adaptive foregrounds are
 # always 108dp; legacy launcher icons are 48dp.
 DENSITIES = {
@@ -131,6 +141,25 @@ def on_background(art_layer: Image.Image, rounded: str) -> Image.Image:
     return Image.alpha_composite(plate, art_layer)
 
 
+def build_feature_graphic() -> str:
+    """Crop the promo poster to Play's 1024x500 feature graphic, opaque."""
+    poster = Image.open(SOURCE_POSTER).convert("RGB")
+    target_ratio = FEATURE_SIZE[0] / FEATURE_SIZE[1]
+    keep_height = round(poster.width / target_ratio)
+    if keep_height > poster.height:
+        # Poster is wider than the target ratio: trim width instead.
+        keep_width = round(poster.height * target_ratio)
+        left = (poster.width - keep_width) // 2
+        cropped = poster.crop((left, 0, left + keep_width, poster.height))
+    else:
+        removed = poster.height - keep_height
+        top = round(removed * FEATURE_TOP_BIAS)
+        cropped = poster.crop((0, top, poster.width, top + keep_height))
+    FEATURE_GRAPHIC.parent.mkdir(parents=True, exist_ok=True)
+    cropped.resize(FEATURE_SIZE, Image.LANCZOS).save(FEATURE_GRAPHIC, quality=95)
+    return f"{cropped.width}x{cropped.height} -> {FEATURE_SIZE[0]}x{FEATURE_SIZE[1]}"
+
+
 def main() -> None:
     if not SOURCE_LOGO.exists():
         raise SystemExit(f"source logo not found: {SOURCE_LOGO}")
@@ -157,6 +186,12 @@ def main() -> None:
     store = on_background(fitted(art, 512, scale=STORE_ART_SCALE), "square").convert("RGB")
     store.save(STORE_ICON)
     print(f"  {STORE_ICON.relative_to(APP_ROOT)}: 512x512 opaque")
+
+    if SOURCE_POSTER.exists():
+        print(f"  {FEATURE_GRAPHIC.relative_to(APP_ROOT)}: {build_feature_graphic()}")
+    else:
+        print(f"  skipped feature graphic: {SOURCE_POSTER} not found")
+
     print(f"\n  {written} launcher files written. Run `npm run apk` to see it on a device.")
 
 
