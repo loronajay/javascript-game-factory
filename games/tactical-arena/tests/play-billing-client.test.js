@@ -169,8 +169,32 @@ test("recovery is a no-op without a bridge", async () => {
   assert.equal(summary.skipped, true);
 });
 
+// The server refuses to grant a purchase of something already owned (Play cannot see items
+// bought on the web via Stripe, so it re-sells them). The purchase must then be left
+// UNSETTLED — an unacknowledged purchase is auto-refunded by Google within three days,
+// which is the only thing that makes the player whole. Acknowledging it would keep their money.
+test("a refused duplicate purchase is never acknowledged, so Google refunds it", async () => {
+  const bridge = {
+    calls: { acknowledge: [], consume: [] },
+    purchase: async () => ({ purchases: [{ purchaseToken: "dupe", orderId: "GPA.1" }] }),
+    acknowledge: async (args) => { bridge.calls.acknowledge.push(args); },
+    consume: async (args) => { bridge.calls.consume.push(args); },
+  };
+
+  const result = await purchaseWithPlay(
+    { kind: "unit", sku: "ta.unit.monk", type: "monk" },
+    { plugins: { PlayBilling: bridge }, verifyPurchase: async () => ({ ok: false, error: "offer_already_owned" }) },
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error, "offer_already_owned");
+  assert.deepEqual(bridge.calls.acknowledge, []);
+  assert.deepEqual(bridge.calls.consume, []);
+  assert.match(playPurchaseErrorMessage("offer_already_owned"), /refund/i);
+});
+
 test("every failure code has player-facing copy", () => {
-  for (const code of ["PURCHASE_CANCELLED", "PURCHASE_FAILED", "PRODUCT_NOT_FOUND", "BILLING_UNAVAILABLE", "verification_failed", "", undefined]) {
+  for (const code of ["PURCHASE_CANCELLED", "PURCHASE_FAILED", "PRODUCT_NOT_FOUND", "BILLING_UNAVAILABLE", "verification_failed", "offer_already_owned", "purchase_already_redeemed", "", undefined]) {
     const message = playPurchaseErrorMessage(code);
     assert.equal(typeof message, "string");
     assert.ok(message.length > 0);

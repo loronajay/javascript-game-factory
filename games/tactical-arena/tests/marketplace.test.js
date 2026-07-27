@@ -15,6 +15,7 @@ import {
   getSkinOffer,
   getSkinOffers,
   getUnitOffer,
+  getUnitOffers,
   purchaseSkinPackWithValor,
   purchaseSkinWithValor,
   purchaseUnitWithValor,
@@ -471,4 +472,52 @@ test("client skin rarity and the server's price-derived rarity agree", async () 
   for (const offer of getSkinOffers(storageAdapter())) {
     assert.equal(skinRarity(offer.price.cents), offer.rarity, `${offer.type}:${offer.slug} rarity`);
   }
+});
+
+// Unit premium prices are DERIVED from a unit's star rating, so a balance pass that
+// re-stars a unit silently changes what real money buys it — while the server, whose
+// catalog is hand-listed per unit, keeps charging the old price. Skins are listed on both
+// sides and drift the same way on a rename. Either mismatch means the shop advertises one
+// price and the card is charged another, so compare the two catalogs directly.
+//
+// If this fails after a balance change: update platform-api RAW_UNIT_CATALOG to match, then
+// re-run `npm run play:sync` so the Play Console price follows too.
+test("the client and server agree on every premium unit price", async () => {
+  const { UNIT_CATALOG } = await import("../../../platform-api/src/services/payments.mjs");
+  const serverByType = new Map(UNIT_CATALOG.map((unit) => [unit.type, unit]));
+  const offers = getUnitOffers(storageAdapter());
+
+  for (const offer of offers) {
+    const serverOffer = serverByType.get(offer.type);
+    if (!offer.premiumPrice) {
+      // The starting roster is free. A server entry for one would put a price on something
+      // every player already owns.
+      assert.equal(serverOffer, undefined, `${offer.type} is free but the server sells it`);
+      continue;
+    }
+    assert.ok(serverOffer, `${offer.type} is sold by the client but missing from the server catalog`);
+    assert.equal(offer.premiumPrice.cents, serverOffer.amountCents, `${offer.type} premium price`);
+    assert.equal(offer.premiumPrice.sku, serverOffer.sku, `${offer.type} sku`);
+  }
+
+  // And nothing the server prices has lost its client offer — that would be a Play product
+  // players can still be charged for with nothing to show it.
+  for (const serverOffer of UNIT_CATALOG) {
+    assert.ok(offers.some((offer) => offer.type === serverOffer.type), `${serverOffer.type} is priced by the server but not offered`);
+  }
+});
+
+test("the client and server agree on every premium skin price", async () => {
+  const { SKIN_CATALOG } = await import("../../../platform-api/src/services/payments.mjs");
+  const serverBySkin = new Map(SKIN_CATALOG.map((skin) => [`${skin.type}|${skin.slug}`, skin]));
+
+  const clientOffers = getSkinOffers(storageAdapter());
+  for (const offer of clientOffers) {
+    const serverOffer = serverBySkin.get(`${offer.type}|${offer.slug}`);
+    assert.ok(serverOffer, `${offer.type}:${offer.slug} is sold by the client but missing from the server catalog`);
+    assert.equal(offer.price.cents, serverOffer.amountCents, `${offer.type}:${offer.slug} price`);
+  }
+  // The reverse direction too: a server entry with no client offer is a product players can
+  // be charged for but never see, which is how an orphaned Play product outlives its skin.
+  assert.equal(SKIN_CATALOG.length, clientOffers.length, "the two skin catalogs differ in size");
 });

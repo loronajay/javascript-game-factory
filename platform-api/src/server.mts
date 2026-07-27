@@ -8,7 +8,7 @@ import { listActivityItems, saveActivityItem } from "./db/activity.mjs";
 import { readConfig } from "./config.mjs";
 import { loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
 import { applyMigrations } from "./db/migrations.mjs";
-import { activateInventoryItem, backfillLocalOwnership, findStripeGrant, getGameProgress, recordGameProgressClaim, regrantStripeEntitlements, resetCampaignProgress, revokeGameEntitlements, spendValorForEntitlement } from "./db/game-progress.mjs";
+import { activateInventoryItem, backfillLocalOwnership, findPlayPurchaseClaim, findStripeGrant, getGameProgress, recordGameProgressClaim, regrantStripeEntitlements, resetCampaignProgress, revokeGameEntitlements, spendValorForEntitlement } from "./db/game-progress.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import { getLadderStandings, getPlayerLadderPlacements } from "./db/ladders.mjs";
@@ -75,6 +75,7 @@ import {
   fulfillPremiumCheckoutSessionFromReturn,
   fulfillStripeWebhook,
 } from "./services/payments.mjs";
+import { createPlayAccessTokenProvider, fulfillPlayPurchase } from "./services/play-billing.mjs";
 import { createEmailSender } from "./email.mjs";
 import {
   createNotification,
@@ -158,6 +159,12 @@ async function bootstrap(): Promise<void> {
     cloudinaryCloudName: config.cloudinaryCloudName,
     cloudinaryApiKey: config.cloudinaryApiKey,
     cloudinaryApiSecret: config.cloudinaryApiSecret,
+  });
+
+  // One provider for the process: it caches the androidpublisher access token, so every
+  // purchase verification after the first reuses it instead of re-signing a JWT.
+  const getPlayAccessToken = createPlayAccessTokenProvider({
+    serviceAccountKey: config.playServiceAccountKey,
   });
 
   function avatarUrlResolver(assetId: any): string {
@@ -284,6 +291,16 @@ async function bootstrap(): Promise<void> {
       revokeGameEntitlements: (revocation: any) => revokeGameEntitlements(pool, revocation),
       regrantStripeEntitlements: (regrant: any) => regrantStripeEntitlements(pool, regrant),
     }),
+    fulfillPlayPurchase: config.hasPlayBilling
+      ? (params: any) => fulfillPlayPurchase({
+        ...params,
+        packageName: config.playPackageName,
+        getAccessToken: getPlayAccessToken,
+        getGameProgress: (playerId: any, gameSlug: any) => getGameProgress(pool, playerId, gameSlug),
+        recordGameProgressClaim: (claim: any) => recordGameProgressClaim(pool, { ...claim, allowPremiumKinds: true }),
+        findPlayPurchaseClaim: (lookup: any) => findPlayPurchaseClaim(pool, lookup),
+      })
+      : null,
     savePlayerPhoto: (params: any) => savePlayerPhoto(pool, params),
     listPlayerPhotos: (playerId: any, opts: any) => listPlayerPhotos(pool, playerId, opts),
     getPlayerPhoto: (photoId: any, opts: any) => getPlayerPhoto(pool, photoId, opts),

@@ -1,6 +1,6 @@
 # Tactical Arena — Android Port Handoff
 
-Status as of 2026-07-26. Read this first if you are picking the port up cold.
+Status as of 2026-07-27. Read this first if you are picking the port up cold.
 
 The goal: ship Tactical Arena on Google Play (Android first, iOS later) **without
 fork­ing the web game**. That constraint has been honoured — see
@@ -23,11 +23,15 @@ The app builds, installs, and plays on a device. **49.4 MB APK.**
 | Audio transcode | Done | 13/13 tracks decode on device |
 | Self-hosted fonts | Done | 22 faces, zero external requests |
 | Touch CSS in the WebView | Done | Computed styles checked on device |
-| **Play Billing — client** | **Done** | 32 unit tests; native plugin compiles |
-| **Play Billing — server** | **NOT STARTED** | Blocked, see §3 |
-| **Play Console + 12 testers** | **NOT STARTED** | Blocked on identity verification |
+| **Play Billing — client** | Done | 32 unit tests; native plugin compiles |
+| **Play Billing — server** | **Done** | 26 unit tests against faked Google responses; needs a key to run live (§4a) |
+| **Release signing / AAB** | **Done** | Signed 51.3 MB AAB built and verified with `jarsigner` |
+| **Play Console + 12 testers** | **NOT STARTED** | Now unblocked — this is the whole critical path (§5) |
 
-Test suite: **1657 / 1657** green, and `platform-api` **424 / 424**.
+Test suite: **1671 / 1671** green, and `platform-api` **450 / 450**.
+
+Identity verification passed on 2026-07-27, so nothing is blocked on Google any more.
+Every remaining item is either console clicking or waiting out the 14-day closed test.
 
 Landed alongside the port (not part of it): the six new player badges — five ladder
 ascent badges awarded off a new `game_ratings.peak_rating` column (migration 029),
@@ -70,6 +74,9 @@ npm run apk:clean        # clean build        (use this to measure size)
 npm run verify:android   # install, launch, screenshot, scrape logcat
 npm run play:products    # list the 317 Play products
 npm run play:sync        # dry run; --apply --key=sa.json to create them
+npm run release:check    # preflight: signing, versionCode, payload freshness, product count
+npm run bundle:release   # signed AAB for Play  -> app/build/outputs/bundle/release/
+npm run apk:release      # signed release APK, for testing the release build on a device
 
 # from games/tactical-arena
 npm test                 # full suite
@@ -79,70 +86,194 @@ npm run mobile:shots     # headless screenshot matrix + tile-size measurements
 
 ---
 
-## 3. Remaining work
+## 3. Server-side purchase verification — shipped
 
-### 3a. Server-side purchase verification — **the last engineering piece**
-
-Everything client-side is done and tested. What is missing is one endpoint in the
-**root `platform-api/`**:
+The endpoint the client has always called now exists in the **root `platform-api/`**:
 
 ```
 POST /payments/tactical-arena/play-purchases
 Authorization: Bearer <factory token>
 body: { gameSlug, productId, purchaseToken, orderId }
-->    { ok, consume, entitlements, progress }
+->    { ok, alreadyProcessed, consume, entitlements, progress }
 ```
 
-It must:
+`src/services/play-billing.mts` owns it, deliberately separate from the 970-line
+`payments.mts` rather than bolted onto it. It shares the Stripe path's catalog and its
+`resolveTacticalArenaPremiumOffer` pricing, so the two payment rails cannot drift on what
+a purchase is worth.
 
-1. Authenticate the factory token → `playerId`.
-2. Resolve `productId` from the **server's own** catalog — never trust the client
-   about what was bought (same rule the Stripe path already follows).
-3. Verify the token with Google:
-   `GET androidpublisher/v3/applications/com.jayarcade.tacticalarena/purchases/products/{productId}/tokens/{token}`
-   Require `purchaseState === 0` (purchased).
-4. Grant the entitlement idempotently, keyed on `orderId` — a replayed token must
-   not grant twice. Boot recovery *will* resubmit tokens.
-5. Return `consume: true` for `ta.consumable.*`, plus the fresh progress snapshot
-   (same shape the Stripe fulfilment returns, so the client merge code is shared).
+The trust model is the Stripe one, unchanged: the client names a Play **product**, never
+an entitlement. The server re-resolves that product against its own catalog, asks Google
+whether the token is real and paid, and only then grants.
 
-**Blocked on:** a Google service-account key (see §4). The client already calls this
-endpoint via `createPlayPurchaseVerifier()` in `src/platform/playBillingClient.js`.
+What it enforces, and where each rule is tested (`platform-api/tests/play-billing.test.mjs`):
 
-### 3b. Create the 317 Play products
+| Rule | Why it exists |
+| --- | --- |
+| Product resolved from the server catalog | A forged `productId` finds nothing and costs no Google call |
+| `purchaseState === 0` required | Cancelled and pending purchases grant nothing; pending returns its own code so the client knows to retry |
+| Google 5xx fails closed | An outage must never fall back to granting on trust |
+| Grant keyed on **Google's** `orderId` | The client cannot choose its own claim id; a replay hits the existing claim row |
+| Token hash bound to one account | Play tokens are bearer values — without this, a shared token grants twice under two accounts |
+| A token on one of **our** claim rows returns `ok` | Boot recovery must be able to acknowledge a purchase whose grant landed but whose settle call failed, or Google refunds it |
+| A *new* token buying an *owned* item is **refused** | See below — this is the double-purchase fix |
+| Raw purchase token never stored | Only a SHA-256 hash, which is enough to match a voided token back to its grant |
 
-Play Console's CSV import was **removed in May 2025**. Use the API:
+### The double-purchase fix
+
+Google Play cannot see items bought on the web through Stripe, so it will happily sell one
+again. The server then has nothing to grant, and the naive answer — "already owned, that's
+fine" — would keep the player's money for nothing.
+
+Two situations look identical at that point, and need opposite answers. The discriminator is
+whether *this purchase token* is already on one of our claim rows:
+
+- **Our claim exists** → the grant landed, only the acknowledge failed, and boot recovery is
+  retrying. Return `ok` so the client can settle it.
+- **No claim** → they just paid for something they already owned. Return `409
+  offer_already_owned`. The client only settles on `ok`, so the purchase is left
+  **unacknowledged, and Google auto-refunds it within three days.**
+
+That reuses the same safety net every other failure path here relies on, so it needs no
+refund API permissions and cannot double-refund. The player sees "You already own this.
+Google Play will refund the charge automatically within a few days."
+
+Configuration — set both on the platform-api service (Railway):
+
+```
+GOOGLE_PLAY_SERVICE_ACCOUNT_KEY   the service-account JSON, raw or base64
+GOOGLE_PLAY_PACKAGE_NAME          optional; defaults to com.jayarcade.tacticalarena
+```
+
+Without the key the route returns `503 play_billing_not_configured` and grants nothing,
+so deploying before the key is in place is safe.
+
+Base64 is there because hosts that pass env vars through a shell mangle the embedded
+newlines in `private_key`. If in doubt, use base64:
 
 ```powershell
-npm run play:sync -- --apply --key=sa.json --only=ta.unit.monk   # prove it works
-npm run play:sync -- --apply --key=sa.json                        # then all 317
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("sa.json"))
 ```
 
-### 3c. Play Console + closed test — **the real critical path**
+### Remaining polish, not a correctness gap
 
-Nothing above matters until this runs. A new personal developer account must pass
-identity verification, then run a **closed test with 12+ testers for 14 continuous
-days** before production access can even be requested. Start recruiting now.
+The refund above makes the player whole, but it is still a bad few days for them. The
+shop already hides owned items; the hole is *stale* ownership — the shop was rendered
+before a purchase made elsewhere reconciled. Refreshing server ownership when the shop
+opens would close most of the window. Worth doing, not worth blocking launch on.
 
-### 3d. Nice-to-have, not blocking
+---
+
+## 4. Launch runbook
+
+Everything below is console work. Do it in order; 4a and 4b are independent of each other.
+
+### 4a. Google service account (unlocks product sync + purchase verification)
+
+1. **Google Cloud Console** → create or pick a project → *APIs & Services* → *Library* →
+   enable **Google Play Android Developer API**.
+2. *IAM & Admin* → **Service Accounts** → *Create service account*. Name it something
+   like `play-verifier`. No project-level roles are needed — Play grants its own.
+3. On the new account → *Keys* → *Add key* → *Create new key* → **JSON**. It downloads
+   once. **Never commit it**; `*service-account*.json` is gitignored.
+4. **Play Console** → *Users & permissions* → *Invite new users* → paste the service
+   account's email (`...@....iam.gserviceaccount.com`) → grant **on this app**:
+   - **View app information** and **View financial data** → purchase verification (§3)
+   - **Manage store presence** → product creation (4c)
+5. Permissions take a few minutes to propagate. Prove it works on one product before
+   doing all 317:
+   ```powershell
+   npm run play:sync -- --apply --key=sa.json --only=ta.unit.monk
+   ```
+6. Put the same key on the API as `GOOGLE_PLAY_SERVICE_ACCOUNT_KEY` (§3).
+
+### 4b. Upload keystore (unlocks any Play upload)
+
+Generate it once, outside the repo, and **back it up somewhere that is not this machine**.
+Losing it means losing the ability to update the app.
+
+```powershell
+& "$env:JAVA_HOME\bin\keytool.exe" -genkeypair -v `
+  -keystore tactical-arena-upload.jks -alias upload `
+  -keyalg RSA -keysize 2048 -validity 10000
+```
+
+Then create `android/keystore.properties` (gitignored):
+
+```properties
+storeFile=../../tactical-arena-upload.jks
+storePassword=<what you just typed>
+keyAlias=upload
+keyPassword=<what you just typed>
+```
+
+`storeFile` is resolved relative to `android/app/`, not `android/`. An absolute path is
+fine and less error-prone. Verify with `npm run release:check`.
+
+With the file absent the release build simply goes unsigned, so a machine without the
+keystore can still build and test.
+
+### 4c. Create the 317 Play products
+
+Play Console's CSV import was **removed in May 2025**, so the API is the only practical
+route for a catalog this size.
+
+```powershell
+npm run play:sync                                  # dry run, no key needed
+npm run play:sync -- --apply --key=sa.json         # all 317
+```
+
+Products can only be created **after** an app bundle has been uploaded to some track —
+Play refuses in-app products for an app with no release. Do 4d first if it errors.
+
+### 4d. First upload
+
+```powershell
+npm run release:check                              # catches the expensive mistakes first
+npm run bundle:release -- -PtaVersionCode=1 -PtaVersionName=1.0
+```
+
+Upload `android/app/build/outputs/bundle/release/app-release.aab`. Every later upload
+needs a **higher** `versionCode`; Play never accepts a repeat, and it can never go down.
+
+Store listing needs, none of which exist yet:
+
+- App icon 512×512, feature graphic 1024×500
+- At least 2 phone screenshots — `npm run mobile:shots` produces a matrix, or pull real
+  ones off a device
+- Short (80 char) and full (4000 char) description
+- **Privacy policy URL** — mandatory, and the app does collect accounts/email
+- Content rating questionnaire
+- **Data safety** form — declare the account/email collection and the Stripe/Play payment
+  processing honestly; a mismatch here is a common rejection
+- Target audience, ads declaration (none), and the **in-app purchases** declaration
+
+### 4e. Closed test — the 14-day clock
+
+This is the real critical path and nothing shortens it. A personal developer account must
+run a **closed test with 12+ testers opted in for 14 continuous days** before production
+access can even be *requested*.
+
+- Create a closed track, add an email list of 12+ real Google accounts.
+- The count is of testers **opted in**, not invited. Chase the opt-ins.
+- The 14 days are continuous — if you drop below 12, expect the clock to restart.
+- Testers must install from the opt-in link, not sideload.
+- **Purchases in a closed test are real money unless the account is on the licence-test
+  list.** Play Console → *Setup* → *License testing* → add the tester emails; their
+  purchases then run through the full billing flow, including your server verification,
+  without charging anyone.
+
+Start recruiting before the build is perfect — the clock is the long pole, not the code.
+
+### 4f. Nice-to-have, not blocking
 
 - iOS: the same Capacitor project plus a Mac, $99/yr, and StoreKit behind the
   existing `purchaseProviders.js` seam.
 - Mobile UX polish pass on the roster / shop / skin picker now that the phone
   layouts actually apply (they were dead until the touch-CSS fix).
-
----
-
-## 4. What is blocked, and what unblocks it
-
-One **Google service account** unblocks both remaining engineering items:
-
-1. Create it in Google Cloud; grant the `androidpublisher` scope.
-2. In Play Console → **Users & permissions**, grant it on this app:
-   - *Manage store presence* → product creation (§3b)
-   - *View financial data* → purchase verification (§3a)
-3. Download the JSON key. **Never commit it** — `*service-account*.json` is
-   gitignored. It can publish to your store.
+- Refund/void handling for Play. Stripe has webhook-driven revocation; Play does not yet.
+  The grant stores `playPurchaseTokenHash`, so Google's Voided Purchases API can be polled
+  and matched against it when this becomes worth building.
 
 ---
 
@@ -183,7 +314,19 @@ Each of these was discovered the hard way. Do not rediscover them.
 
 - **Android has no consumable product type.** Every one-time product is
   `purchaseType: managedUser`; consumability is decided at runtime by calling
-  `consumeAsync` instead of `acknowledgePurchase`.
+  `consumeAsync` instead of `acknowledgePurchase`. The **server** decides which, and
+  returns it as `consume` — the offer kind is only the client's fallback.
+
+- **`apksigner` cannot verify an AAB** — it reports `Missing AndroidManifest.xml`,
+  which looks like a broken build but is not. A bundle uses JAR signing:
+  `jarsigner -verify -verbose:summary -certs app-release.aab`.
+
+- **`storeFile` in `keystore.properties` resolves relative to `android/app/`**, not
+  `android/`, because Gradle's `file()` resolves against the project dir. An absolute
+  path avoids the whole question. `npm run release:check` checks it either way.
+
+- **Play will not create in-app products until a bundle has been uploaded** to some
+  track. If `play:sync` errors on a brand-new app, upload first and re-run.
 
 - **Debug the running app over CDP** rather than guessing:
   ```bash
@@ -225,8 +368,14 @@ browser) or a build-time payload transform.
 
 ## Open questions for the owner
 
-1. **Build the server endpoint against a faked Google response now**, so the grant
-   path is tested and credentials drop in later? Or wait so it can be verified
-   against real responses first? (It is production payment code.)
+1. ~~Build the server endpoint against a faked Google response now?~~ **Answered: built
+   that way.** 26 tests cover it against faked responses. It has never seen a real Google
+   response — the first live purchase in the closed test is the real proof, so make that
+   purchase with a licence-test account and watch the API logs.
 2. Android Studio is at **2023.2**. Irrelevant for the CLI build loop, but opening
    the project in the IDE will want Ladybug+ for AGP 8.7.
+3. `platform-api/tests/` is gitignored by the root `.gitignore` (`tests/`, with a
+   negation for `games/*/tests/` but not for `platform-api/`). Only 2 of its 49 test
+   files are tracked, so the new payment-verification suite will not commit without
+   `git add -f` or a negation rule. Worth deciding deliberately — this is security-
+   critical test coverage that currently lives only on this machine.

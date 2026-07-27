@@ -17,11 +17,22 @@ accounts, where money and durable value live.
 
 ## How it holds together
 
-### Real-money (premium) purchases — Stripe only
-Server-side price catalog, Stripe Checkout, webhook signature verified with `timingSafeEqual`,
-fulfillment idempotent by checkout session id. The public game-progress `/claims` route
-**rejects** `premium-*` claim kinds (`403 claim_kind_forbidden`); premium entitlements can only
-be granted by the server's Stripe fulfillment path. See `STRIPE_CHECKOUT_SETUP.md`.
+### Real-money (premium) purchases — two rails, one trust model
+**Web: Stripe.** Server-side price catalog, Stripe Checkout, webhook signature verified with
+`timingSafeEqual`, fulfillment idempotent by checkout session id. See `STRIPE_CHECKOUT_SETUP.md`.
+
+**Android: Google Play Billing.** The client posts a Play *product id* and an opaque purchase
+token to `POST /payments/tactical-arena/play-purchases`; `platform-api/src/services/play-billing.mts`
+re-resolves that product against the server's own catalog, verifies the token with Google's
+`androidpublisher` API (requiring `purchaseState === 0`), and grants through the same
+`recordGameProgressClaim` path Stripe uses. Both rails share
+`resolveTacticalArenaPremiumOffer`, so a purchase is priced identically wherever it happens.
+Google verification failing — outage, unknown token, cancelled or pending state — grants
+nothing. See `mobile/tactical-arena/HANDOFF.md` §3.
+
+Either way, the public game-progress `/claims` route **rejects** `premium-*` claim kinds
+(`403 claim_kind_forbidden`); premium entitlements can only be granted by a server-side
+fulfillment path.
 
 ### Refunds and chargebacks revoke entitlements
 A refund or chargeback pulls the granted item back. The webhook (`fulfillStripeWebhook` in
@@ -150,6 +161,21 @@ them permanently.
 10. `skin-pack:<packId>` entitlements are granted alongside a pack's skins purely as a durable
    record that the bundle was bought. They own no content — never treat one as granting the
    skins, and never let the client assert one.
+11. A Play purchase is keyed on **Google's** `orderId`, never the client's, and its token hash
+   is bound to the first account that redeemed it. Play tokens are bearer values: without that
+   binding, one token replayed under a second account opens a second claim row and grants
+   twice. Store the hash, never the raw token — and keep persisting `playPurchaseTokenHash`,
+   since it is the only join key from a voided purchase back to what was granted.
+12. A Play purchase that grants nothing must only return `ok` when **that token is already on
+   one of our claim rows**. That is what separates a boot-recovery retry (grant landed,
+   acknowledge failed — must settle) from a genuine duplicate purchase of an already-owned
+   item (must NOT settle, so Google auto-refunds it within three days). Returning `ok` for
+   both keeps the player's money for nothing; returning an error for both gets legitimate
+   purchases refunded. The client settles only on `ok`, which is what makes this work.
+13. Premium USD prices are derived from a unit's **star tier**, so a balance change moves real
+   money. `tests/marketplace.test.js` cross-checks every premium unit and skin price against
+   the server's `payments.mts` catalog — when it fails after a balance pass, fix the server
+   catalog and re-run `npm run play:sync` so the Play Console price follows.
 
 ## Known limits (accepted / future)
 

@@ -1,7 +1,7 @@
 import { readJsonBody, writeJson } from "../http-utils.mjs";
 export async function handlePaymentRoute(context) {
     const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services } = context;
-    const { createPremiumCheckoutSession, fulfillPremiumCheckoutSession, fulfillStripeWebhook } = services;
+    const { createPremiumCheckoutSession, fulfillPremiumCheckoutSession, fulfillStripeWebhook, fulfillPlayPurchase } = services;
     if (method === "POST" && pathname === "/payments/tactical-arena/checkout-sessions") {
         if (!authClaims?.playerId) {
             writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
@@ -73,6 +73,45 @@ export async function handlePaymentRoute(context) {
         writeJson(res, 200, {
             ok: true,
             alreadyProcessed: Boolean(result.alreadyProcessed),
+            progress: result.progress || null,
+        }, requestOrigin);
+        return true;
+    }
+    // The Android in-app-purchase counterpart to the Stripe fulfill route above. The client
+    // posts a Google Play purchase token; the server verifies it with Google, resolves the
+    // product from its own catalog, and grants. Returns `consume` because only the server
+    // knows whether the product is a consumable — the client uses it to settle the purchase.
+    if (method === "POST" && pathname === "/payments/tactical-arena/play-purchases") {
+        if (!authClaims?.playerId) {
+            writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
+            return true;
+        }
+        const body = await readJsonBody(req);
+        if (!body.ok) {
+            writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+            return true;
+        }
+        if (typeof fulfillPlayPurchase !== "function") {
+            writeJson(res, 503, { status: "error", error: "play_billing_not_configured", timestamp }, requestOrigin);
+            return true;
+        }
+        const result = await fulfillPlayPurchase({
+            playerId: authClaims.playerId,
+            body: body.value,
+        });
+        if (!result?.ok) {
+            writeJson(res, result?.statusCode || 400, {
+                status: "error",
+                error: result?.error || "play_purchase_failed",
+                timestamp,
+            }, requestOrigin);
+            return true;
+        }
+        writeJson(res, 200, {
+            ok: true,
+            alreadyProcessed: Boolean(result.alreadyProcessed),
+            consume: Boolean(result.consume),
+            entitlements: Array.isArray(result.entitlements) ? result.entitlements : [],
             progress: result.progress || null,
         }, requestOrigin);
         return true;

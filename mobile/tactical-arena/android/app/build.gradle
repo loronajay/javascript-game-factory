@@ -1,5 +1,25 @@
 apply plugin: 'com.android.application'
 
+// Release signing, driven by an untracked android/keystore.properties:
+//
+//   storeFile=../tactical-arena-upload.jks
+//   storePassword=...
+//   keyAlias=upload
+//   keyPassword=...
+//
+// The keystore and that file are gitignored. Losing them means losing the ability to
+// update the app on Play forever (Play App Signing can reset an UPLOAD key, but only via a
+// support request), so back both up somewhere outside this repo.
+//
+// When the file is absent the release build type simply goes unsigned — debug builds and
+// CI still work on a machine that has no signing material.
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+def hasReleaseSigning = keystorePropertiesFile.exists()
+if (hasReleaseSigning) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
 android {
     namespace = "com.jayarcade.tacticalarena"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +27,11 @@ android {
         applicationId "com.jayarcade.tacticalarena"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Play rejects a re-upload of a versionCode it has already seen, and the number can
+        // never go down. Override per build without editing this file:
+        //   gradlew.bat bundleRelease -PtaVersionCode=2 -PtaVersionName=1.0.1
+        versionCode project.hasProperty('taVersionCode') ? project.taVersionCode.toInteger() : 1
+        versionName project.hasProperty('taVersionName') ? project.taVersionName : "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +39,27 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
+            // Left off deliberately. R8 would strip the Play Billing plugin's reflective
+            // entry points and the Capacitor bridge, and the app is a WebView shell whose
+            // bulk is web assets — there is no meaningful size win to trade for that risk.
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

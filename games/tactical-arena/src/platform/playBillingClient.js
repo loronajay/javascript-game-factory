@@ -31,6 +31,11 @@ const ERROR_COPY = Object.freeze({
   verification_failed: "We could not confirm that purchase. You have not been charged for it.",
   offer_invalid: "That shop item cannot be purchased right now.",
   bridge_missing: "Purchases are unavailable in this build.",
+  // Google Play cannot see items bought on the web, so it will re-sell one. The server
+  // refuses the grant and we deliberately leave the purchase unacknowledged, which makes
+  // Google refund it automatically — hence the promise in this copy.
+  offer_already_owned: "You already own this. Google Play will refund the charge automatically within a few days.",
+  purchase_already_redeemed: "That purchase has already been applied to a different account.",
 });
 
 const GENERIC = "Something went wrong with that purchase. Please try again.";

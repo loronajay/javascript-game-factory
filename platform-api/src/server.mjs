@@ -6,7 +6,7 @@ import { listActivityItems, saveActivityItem } from "./db/activity.mjs";
 import { readConfig } from "./config.mjs";
 import { loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
 import { applyMigrations } from "./db/migrations.mjs";
-import { activateInventoryItem, backfillLocalOwnership, findStripeGrant, getGameProgress, recordGameProgressClaim, regrantStripeEntitlements, resetCampaignProgress, revokeGameEntitlements, spendValorForEntitlement } from "./db/game-progress.mjs";
+import { activateInventoryItem, backfillLocalOwnership, findPlayPurchaseClaim, findStripeGrant, getGameProgress, recordGameProgressClaim, regrantStripeEntitlements, resetCampaignProgress, revokeGameEntitlements, spendValorForEntitlement } from "./db/game-progress.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import { getLadderStandings, getPlayerLadderPlacements } from "./db/ladders.mjs";
@@ -16,6 +16,7 @@ import { createFriendshipBetweenPlayers, loadPlayerRelationships, recordDirectIn
 import { commentOnThought, deleteThought, deleteThoughtComment, listThoughtComments, listThoughts, reactToThought, saveThought, shareThought, } from "./db/thoughts.mjs";
 import { deleteAccountService, loginAccountService, logoutAccountService, registerAccountService, requestPasswordResetService, resetPasswordService, verifyAccountSessionService, } from "./services/auth.mjs";
 import { createTacticalArenaCheckoutSession, fulfillPremiumCheckoutSessionFromReturn, fulfillStripeWebhook, } from "./services/payments.mjs";
+import { createPlayAccessTokenProvider, fulfillPlayPurchase } from "./services/play-billing.mjs";
 import { createEmailSender } from "./email.mjs";
 import { createNotification, deleteNotificationsByPayloadRef, listNotifications, markAllNotificationsRead, } from "./db/notifications.mjs";
 import { createFriendRequest, getFriendRequest, acceptFriendRequest, rejectFriendRequest, } from "./db/friend-requests.mjs";
@@ -61,6 +62,11 @@ async function bootstrap() {
         cloudinaryCloudName: config.cloudinaryCloudName,
         cloudinaryApiKey: config.cloudinaryApiKey,
         cloudinaryApiSecret: config.cloudinaryApiSecret,
+    });
+    // One provider for the process: it caches the androidpublisher access token, so every
+    // purchase verification after the first reuses it instead of re-signing a JWT.
+    const getPlayAccessToken = createPlayAccessTokenProvider({
+        serviceAccountKey: config.playServiceAccountKey,
     });
     function avatarUrlResolver(assetId) {
         if (!assetId)
@@ -184,6 +190,16 @@ async function bootstrap() {
             revokeGameEntitlements: (revocation) => revokeGameEntitlements(pool, revocation),
             regrantStripeEntitlements: (regrant) => regrantStripeEntitlements(pool, regrant),
         }),
+        fulfillPlayPurchase: config.hasPlayBilling
+            ? (params) => fulfillPlayPurchase({
+                ...params,
+                packageName: config.playPackageName,
+                getAccessToken: getPlayAccessToken,
+                getGameProgress: (playerId, gameSlug) => getGameProgress(pool, playerId, gameSlug),
+                recordGameProgressClaim: (claim) => recordGameProgressClaim(pool, { ...claim, allowPremiumKinds: true }),
+                findPlayPurchaseClaim: (lookup) => findPlayPurchaseClaim(pool, lookup),
+            })
+            : null,
         savePlayerPhoto: (params) => savePlayerPhoto(pool, params),
         listPlayerPhotos: (playerId, opts) => listPlayerPhotos(pool, playerId, opts),
         getPlayerPhoto: (photoId, opts) => getPlayerPhoto(pool, photoId, opts),
