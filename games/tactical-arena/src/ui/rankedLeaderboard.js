@@ -17,6 +17,7 @@ import { createPortrait, hasPortrait } from "./portraits.js";
 import { createRankedTierEmblem, normalizeRankedTierId } from "./rankedEmblems.js";
 import { createRankedAvatarIcon, hasRankedAvatar } from "./rankedAvatars.js";
 import { badgeTooltip, createBadgeIcon } from "./playerBadges.js";
+import { openTaPlayerProfile } from "./taPlayerProfile.js";
 
 const LEADERBOARD_LIMIT = 100;
 const TOP_LEADERBOARD_COUNT = 10;
@@ -280,8 +281,21 @@ function renderLeaderboardRows(body, entries, totalEntries, state) {
   for (const entry of entries) {
     const isMe = mine && entry.playerId === mine;
     const row = el("li", `ranked-leaderboard-row${isMe ? " is-me" : ""}`);
+    const rowName = leaderboardPlayerName(entry, isMe);
 
-    row.appendChild(el("span", "ranked-leaderboard-rank", `#${entry.rank}`));
+    // The whole row is the button that opens this commander's Tactical Arena profile,
+    // the same identity-block-as-button pattern the friends list uses.
+    const open = el("button", "ranked-leaderboard-rowmain");
+    open.type = "button";
+    open.setAttribute("aria-label", `View ${rowName}'s Tactical Arena profile`);
+    open.addEventListener("click", () => {
+      // The row already knows this player's name, standing, and badge, so the profile
+      // can paint immediately and upgrade when its own reads land.
+      openTaPlayerProfile(entry.playerId, { seed: { ...entry, displayName: rowName } });
+    });
+    row.appendChild(open);
+
+    open.appendChild(el("span", "ranked-leaderboard-rank", `#${entry.rank}`));
 
     const avatar = el("div", "ranked-leaderboard-avatar");
     if (hasRankedAvatar(entry.avatarUnit)) {
@@ -289,13 +303,13 @@ function renderLeaderboardRows(body, entries, totalEntries, state) {
     } else if (entry.avatarUnit && hasPortrait(entry.avatarUnit)) {
       avatar.appendChild(createPortrait(entry.avatarUnit, { variant: "is-thumb", skin: entry.avatarSkin }));
     }
-    row.appendChild(avatar);
+    open.appendChild(avatar);
 
     const name = el("div", "ranked-leaderboard-name");
     // Name + equipped badge share a line so the badge reads as part of the identity, the
     // same way it does on a nameplate, without adding a row to the ladder.
     const nameLine = el("span", "ranked-leaderboard-nameline");
-    nameLine.appendChild(el("span", "ranked-leaderboard-player", leaderboardPlayerName(entry, isMe)));
+    nameLine.appendChild(el("span", "ranked-leaderboard-player", rowName));
     const badgeIcon = createBadgeIcon(entry.badge, { variant: "is-row", decorative: false });
     if (badgeIcon) {
       badgeIcon.title = badgeTooltip(entry.badge);
@@ -306,7 +320,7 @@ function renderLeaderboardRows(body, entries, totalEntries, state) {
     if (tagline) name.appendChild(el("span", "ranked-leaderboard-title", tagline));
     const record = `${entry.wins || 0}W / ${entry.losses || 0}L / ${entry.draws || 0}D`;
     name.appendChild(el("span", "ranked-leaderboard-record", record));
-    row.appendChild(name);
+    open.appendChild(name);
 
     const tierId = normalizeRankedTierId(entry.tier);
     const standing = el("div", "ranked-leaderboard-standing");
@@ -315,7 +329,7 @@ function renderLeaderboardRows(body, entries, totalEntries, state) {
     standingCopy.appendChild(el("span", `ranked-leaderboard-tier ranked-tier-${tierId}`, entry.tier?.label || "Bronze"));
     standingCopy.appendChild(el("span", "ranked-leaderboard-rating", String(entry.rating ?? 1200)));
     standing.appendChild(standingCopy);
-    row.appendChild(standing);
+    open.appendChild(standing);
 
     list.appendChild(row);
   }

@@ -27,8 +27,11 @@ The app builds, installs, and plays on a device. **49.4 MB APK.**
 | **Play Billing — server** | **NOT STARTED** | Blocked, see §3 |
 | **Play Console + 12 testers** | **NOT STARTED** | Blocked on identity verification |
 
-Test suite: **1656 / 1657**. The single failure (`diamond-ascent` badge missing its
-WebP) belongs to concurrent badge work, not to this port.
+Test suite: **1657 / 1657** green, and `platform-api` **424 / 424**.
+
+Landed alongside the port (not part of it): the six new player badges — five ladder
+ascent badges awarded off a new `game_ratings.peak_rating` column (migration 029),
+plus a derived Skin Collector at 15 skins. Migration 029 has been applied.
 
 ---
 

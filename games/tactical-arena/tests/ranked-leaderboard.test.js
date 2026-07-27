@@ -133,6 +133,37 @@ test("ranked leaderboard treats Commander display names as fallback copy", () =>
   }
 });
 
+test("ranked leaderboard rows are buttons that open the player's profile", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: (tagName) => new TestElement(tagName) };
+
+  try {
+    const body = new TestElement("div");
+
+    renderLeaderboard(body, [
+      {
+        rank: 1,
+        playerId: "pilot-1",
+        displayName: "Mara",
+        title: "Bridge Warden",
+        tier: { id: "gold", label: "Gold" },
+      },
+    ]);
+
+    const row = walk(body, (node) => hasClass(node, "ranked-leaderboard-row"))[0];
+    const open = walk(row, (node) => hasClass(node, "ranked-leaderboard-rowmain"))[0];
+    assert.ok(open, "expected the row identity block to be a button");
+    assert.equal(open.tagName, "BUTTON");
+    assert.equal(open.type, "button");
+    assert.equal(open.attributes.get("aria-label"), "View Mara's Tactical Arena profile");
+    // The whole row lives inside the button, so clicking anywhere on it opens the profile.
+    assert.ok(walk(open, (node) => hasClass(node, "ranked-leaderboard-player")).length);
+    assert.ok(walk(open, (node) => hasClass(node, "ranked-leaderboard-standing")).length);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("ranked leaderboard top tab shows only the first ten entries", () => {
   const entries = Array.from({ length: 12 }, (_, index) => ({
     rank: index + 1,
