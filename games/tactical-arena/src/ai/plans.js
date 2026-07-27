@@ -25,6 +25,7 @@
 
 import { attack, attackTile, beginActivation, defend, finishActivation, moveUnit, useArt } from "../core/commands.js";
 import { areAllies, areEnemies, findUnit, getTileAffinity, livingUnits } from "../core/state.js";
+import { canIgniteFire } from "../core/fireTiles.js";
 import { canMoveAndUseArts, getArtForUnit, getArtMpCost, getAvailableArts, getBasicAttackResourceCost, getEffectiveStats, getRageEffectValue, getSoulShuffleChoices, getUnitType, hasAbilityUsesRemaining, isCommandOnly, isRaging, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
 import { getProximityBonus, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
@@ -1038,6 +1039,8 @@ function artUsableForPlanning(state, unit, art) {
       ally.hp > 0 && ally.id !== unit.id && areAllies(ally, unit) && takesTurns(ally) && ally.spent)) &&
     (!art.rageLocked || isRaging(unit)) &&
     !(art.weather && unit.lastWeather === art.weather) &&
+    !(art.fire && !canIgniteFire(state)) && // nothing to light while it rains
+
     !(art.hpCost && !art.selfKill && unit.hp <= art.hpCost) &&
     (!art.requiresNearbyEnemy || hasNearbyEnemy(state, unit, art.targeting?.radius ?? 1)) &&
     (!art.requiresConditionEnemy || hasConditionEnemy(state, unit, art.condition)) &&

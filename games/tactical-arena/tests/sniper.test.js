@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { attackerPierces, isShotBlocked, resolvePhysicalStrike } from "../src/rules/combat.js";
-import { canMoveAndUseArts, getEffectiveStats } from "../src/core/unitCatalog.js";
+import { canMoveAndUseArts, getArt, getEffectiveStats } from "../src/core/unitCatalog.js";
+import { canUseArt, getFirePlacementTiles } from "../src/rules/arts.js";
 import { createBattleState } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { attack, beginActivation, moveUnit, useArt } from "../src/core/commands.js";
@@ -137,6 +138,27 @@ test("Throw Cigar sets a tile alight — even one an enemy stands on", () => {
   assert.deepEqual(result.nextState.tileObjects["3,0"], { kind: "fire", turnsLeft: 3, ownerId: "sniper" });
   assert.equal(result.nextState.units.find((u) => u.id === "sniper").mp, 15);
 });
+
+for (const weather of ["spring", "thunderstorm"]) {
+  test(`Throw Cigar is unusable and offers no placement while ${weather} rain falls`, () => {
+    const state = createBattleState({
+      weather,
+      units: [
+        { id: "sniper", player: 1, type: "sniper", x: 0, y: 0 },
+        { id: "ally", player: 1, type: "swordsman", x: 0, y: 1 },
+        { id: "foe", player: 2, type: "swordsman", x: 3, y: 0 }
+      ]
+    });
+    const begun = applyCommand(state, beginActivation(1, "sniper")).nextState;
+    const sniper = begun.units.find((u) => u.id === "sniper");
+    assert.equal(canUseArt(begun, sniper, "throw-cigar"), false, "the button should be greyed out");
+    assert.equal(getFirePlacementTiles(begun, sniper, getArt("sniper", "throw-cigar")).size, 0);
+
+    const result = applyCommand(begun, useArt(1, "sniper", "throw-cigar", { targetPosition: { x: 3, y: 0 } }));
+    assert.equal(result.accepted, false, "the reducer must reject it too, not just the UI");
+    assert.equal(begun.tileObjects["3,0"], undefined);
+  });
+}
 
 test("a Sniper shot pierces an intervening body without adding flat damage", () => {
   const state = createBattleState({

@@ -6,9 +6,11 @@ const weather = (id, label, persistent) => Object.freeze({
 
 export const WEATHER_TYPES = Object.freeze({
   blizzard: weather("blizzard", "Blizzard", { movementArtRangeBonus: 1 }),
-  spring: weather("spring", "Spring Shower", { restoreBonus: 1 }),
+  // Rain-bearing weather (Spring Shower, Thunderstorm) douses the board: standing fire
+  // tiles are put out and nothing can ignite a new one while it holds. See fireTiles.js.
+  spring: weather("spring", "Spring Shower", { restoreBonus: 1, extinguishesFire: true }),
   heatwave: weather("heatwave", "Heatwave", { critDamageBonus: 1, critCreatesFire: Object.freeze({ kind: "fire", permanent: true }) }),
-  thunderstorm: weather("thunderstorm", "Thunderstorm", { artMpCostReduction: 1, minArtMpCost: 0 })
+  thunderstorm: weather("thunderstorm", "Thunderstorm", { artMpCostReduction: 1, minArtMpCost: 0, extinguishesFire: true })
 });
 
 export const WEATHER_LABELS = Object.freeze(Object.fromEntries(

@@ -11,6 +11,7 @@ import { applyMagicDamageReaction, applyRockHardDefense, restoreHp } from "../co
 import { accept, ERR, reject } from "../reducerResult.js";
 import { resolveVictory, spendAndAdvance } from "../turnEngine.js";
 import { formatStatModifierLabel } from "./resolverLabels.js";
+import { extinguishFireIfRaining } from "../fireTiles.js";
 
 function weatherCommanderEffect(unit) {
   const effect = getUnitType(unit.type).passive?.effect;
@@ -85,6 +86,11 @@ export function resolveWeather(state, command, art) {
   actor.lastWeather = art.weather;
   const move = Math.max(0, Number(weatherCommanderEffect(actor)?.nextWeatherMove) || 0);
   if (move > 0) actor.weatherMoveCharged = Math.max(actor.weatherMoveCharged ?? 0, move);
+
+  // Calling down rain douses the board on the spot, so the player sees the fire go out
+  // with the cast rather than at the next rollover.
+  const doused = extinguishFireIfRaining(next);
+  if (doused.length) event.extinguishedFire = doused;
 
   spendAndAdvance(next, actor);
   resolveVictory(next);

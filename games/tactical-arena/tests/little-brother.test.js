@@ -18,14 +18,15 @@ function run(state, command) {
   return result;
 }
 
-function scenario(extraUnits = [], little = {}) {
+function scenario(extraUnits = [], little = {}, extras = {}) {
   return createBattleState({
     size: 10,
     seed: 21,
     units: [
       { id: "lb", player: 1, type: "little-brother", x: 1, y: 1, ...little },
       ...extraUnits
-    ]
+    ],
+    ...extras
   });
 }
 
@@ -164,6 +165,23 @@ test("Flamespitter gives rage stats and free orthogonal Flamethrower on basic at
   assert.deepEqual(getTileObject(s, { x: 4, y: 2 }), { kind: "fire", permanent: true, ownerId: "lb" });
   assert.equal(getTileObject(s, { x: 2, y: 2 }), null);
   assert.ok(result.events.some((event) => event.type === "FLAMESPITTER" && event.targetIds.includes("behind")));
+});
+
+test("rain smothers Flamespitter's ignition rider but not its damage", () => {
+  const state = scenario([
+    { id: "target", player: 2, type: "swordsman", x: 3, y: 1 },
+    { id: "behind", player: 2, type: "archer", x: 4, y: 1 }
+  ], { hp: 5 }, { weather: "spring" });
+
+  const result = run(run(state, beginActivation(1, "lb")).nextState, attack(1, "lb", "target", HIT));
+  const s = result.nextState;
+  assert.equal(findUnit(s, "target").hp, 17, "the cone still burns them for full damage");
+  assert.equal(findUnit(s, "behind").hp, 21);
+  assert.equal(getTileObject(s, { x: 3, y: 1 }), null, "no tile can catch in the rain");
+  assert.equal(getTileObject(s, { x: 4, y: 1 }), null);
+  const flame = result.events.find((event) => event.type === "FLAMESPITTER");
+  assert.ok(flame);
+  assert.equal(flame.createdFire, undefined, "the event must not claim fire it did not light");
 });
 
 test("Flamespitter does not trigger on diagonal basic attacks", () => {

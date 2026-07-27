@@ -5,6 +5,7 @@ import { getProximityBonus, isFireBasedDamage, isFireDamageImmune, isShotBlocked
 import { chebyshevDistance, positionKey } from "../../rules/movement.js";
 import { applyStatus, isTargetable } from "../../rules/statuses.js";
 import { applyRockHardDefense, resolvePhysicalDamageHealing } from "../combatEffects.js";
+import { igniteFireTile } from "../fireTiles.js";
 import { accept, ERR, reject } from "../reducerResult.js";
 import { resolveVictory, spendAndAdvance } from "../turnEngine.js";
 
@@ -18,7 +19,7 @@ export function resolveThrowCigar(state, command, art) {
   const actor = findUnit(next, command.unitId);
   // ownerId carries kill credit forward: a unit that later burns to death on this tile
   // is attributed to whoever lit it (see killAttribution.js).
-  next.tileObjects[positionKey(placement)] = { kind: "fire", turnsLeft: art.fire?.turns ?? 3, ownerId: actor.id };
+  igniteFireTile(next, placement, art.fire, actor.id);
   const cost = getArtMpCost(actor, art, next);
   actor.mp -= cost;
   spendAndAdvance(next, actor);
@@ -130,12 +131,9 @@ export function resolveConeArt(state, command, art) {
     targetIds.push(target.id);
     damageByTarget[target.id] = damage;
     if (damage > 0 && art.hitTileObject?.kind === "fire") {
-      const fire = art.hitTileObject;
       const firePosition = { ...target.position };
-      next.tileObjects[positionKey(firePosition)] = fire.permanent
-        ? { kind: "fire", permanent: true, ownerId: actor.id }
-        : { kind: "fire", turnsLeft: Number.isFinite(fire.turnsLeft) ? fire.turnsLeft : 3, ownerId: actor.id };
-      createdFire.push(firePosition);
+      // Rain suppresses the ignition rider; the cone still lands its damage.
+      if (igniteFireTile(next, firePosition, art.hitTileObject, actor.id)) createdFire.push(firePosition);
     }
   }
   const cost = getArtMpCost(actor, art, next);

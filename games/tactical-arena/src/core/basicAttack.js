@@ -28,6 +28,7 @@ import {
   livingUnits,
   unitAt,
 } from "./state.js";
+import { igniteFireTile } from "./fireTiles.js";
 import { getConeCells } from "../rules/arts.js";
 import { addDuelMark, duelistTracksMisses, getAttackSplashDamage, getBasicAttackAffinityMpRestore, getBasicAttackDamageType, getCritCreatesFire, getCritOnHitStatus, getCritPullEffect, getCritSplashDamage, getDuelistCritLifesteal, getLineAttackTargets, getMeleeDefendRetaliation, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack, resolveBaseStrike, rollToHit, shouldApplyAttackRecoil } from "../rules/combat.js";
 import { chebyshevDistance, positionKey } from "../rules/movement.js";
@@ -146,9 +147,8 @@ export function attack(state, command) {
     }
     if (swing.critical && (critFire || weatherCritFire)) {
       const position = { ...targetUnit.position };
-      const fire = critFire ?? weatherCritFire;
-      next.tileObjects[positionKey(position)] = { kind: fire.kind ?? "fire", permanent: Boolean(fire.permanent), ownerId: actor.id };
-      fireTiles.push(position);
+      // Rain douses the crit ignition rider (Gargoyle's); the crit itself still lands.
+      if (igniteFireTile(next, position, critFire ?? weatherCritFire, actor.id)) fireTiles.push(position);
     }
     const critPull = swing.critical ? getCritPullEffect(actor) : null;
     if (critPull && targetUnit.hp > 0) {
@@ -321,12 +321,8 @@ function applyBasicAttackFreeCone(state, actor, originalTarget) {
       targetIds.push(target.id);
       damageByTarget[target.id] = dealt;
       if (art.hitTileObject?.kind === "fire") {
-        const fire = art.hitTileObject;
         const firePosition = { ...target.position };
-        state.tileObjects[positionKey(firePosition)] = fire.permanent
-          ? { kind: "fire", permanent: true, ownerId: actor.id }
-          : { kind: "fire", turnsLeft: Number.isFinite(fire.turnsLeft) ? fire.turnsLeft : 3, ownerId: actor.id };
-        createdFire.push(firePosition);
+        if (igniteFireTile(state, firePosition, art.hitTileObject, actor.id)) createdFire.push(firePosition);
       }
     }
   }

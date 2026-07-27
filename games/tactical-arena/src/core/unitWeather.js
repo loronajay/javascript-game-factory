@@ -49,6 +49,12 @@ export function getWeatherCritCreatesFire(state) {
   return activeWeatherPersistent(state)?.critCreatesFire ?? null;
 }
 
+// True while a rain-bearing weather (Spring Shower, Thunderstorm) holds the board. Fire
+// tiles cannot survive or be lit under it; fireTiles.js owns the state effects.
+export function getWeatherExtinguishesFire(state) {
+  return Boolean(activeWeatherPersistent(state)?.extinguishesFire);
+}
+
 export function getWeatherArtMpCostReduction(state) {
   const persistent = activeWeatherPersistent(state);
   return {

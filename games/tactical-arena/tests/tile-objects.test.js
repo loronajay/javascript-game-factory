@@ -237,6 +237,48 @@ test("fire is removed once its turns run out", () => {
   assert.equal(s.tileObjects["3,3"], undefined);
 });
 
+// --- rain puts fire out (weather.js `extinguishesFire`) ----------------------
+
+function burningBoard(weather) {
+  return createBattleState({
+    weather,
+    units: [
+      { id: "p1", player: 1, type: "swordsman", x: 0, y: 0 },
+      { id: "p2", player: 2, type: "swordsman", x: 5, y: 5 }
+    ],
+    tileObjects: [{ x: 5, y: 5, kind: "fire", turnsLeft: 3 }, { x: 3, y: 3, kind: "fire", permanent: true }]
+  });
+}
+
+for (const weather of ["spring", "thunderstorm"]) {
+  test(`${weather} puts every fire tile out at the rollover, permanent fire included`, () => {
+    const s = rolloverAfterP1(burningBoard(weather));
+    assert.equal(s.tileObjects["5,5"], undefined);
+    assert.equal(s.tileObjects["3,3"], undefined, "even permanent fire is doused");
+  });
+
+  test(`${weather} spares the unit standing in the fire from the burn tick`, () => {
+    const s = rolloverAfterP1(burningBoard(weather));
+    assert.equal(s.units.find((u) => u.id === "p2").hp, 25); // doused before it could burn
+  });
+
+  test(`${weather} surfaces a FIRE_EXTINGUISHED event for the view`, () => {
+    const state = burningBoard(weather);
+    const s = applyCommand(state, beginActivation(1, "p1")).nextState;
+    const finished = applyCommand(s, defend(1, "p1"));
+    const doused = finished.events.find((e) => e.type === "FIRE_EXTINGUISHED");
+    assert.ok(doused, "rollover should report the fires it put out");
+    assert.equal(doused.cause, "weather");
+    assert.equal(doused.positions.length, 2);
+  });
+}
+
+test("heatwave leaves fire burning — only rain-bearing weather douses it", () => {
+  const s = rolloverAfterP1(burningBoard("heatwave"));
+  assert.equal(s.tileObjects["5,5"].turnsLeft, 2);
+  assert.equal(s.units.find((u) => u.id === "p2").hp, 24);
+});
+
 test("a wall blocks a pure status cast (Silence)", () => {
   const state = createBattleState({
     units: [

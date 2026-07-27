@@ -1,6 +1,7 @@
 import { areAllies, areEnemies, getTileObject, isWallAt, unitAt } from "../core/state.js";
 import { canMoveAndUseArts, getArt, getArtForUnit, getArtMpCost, getCommandRangeBonus, getEffectiveStats, getRageArtRangeBonus, getRageEffectValue, getUnitAuraRadius, getWeatherMovementArtRangeBonus, hasAbilityUsesRemaining, hasLivingStudiedTarget, isRaging, takesTurns } from "../core/unitCatalog.js";
 import { getTileAffinity } from "../core/state.js";
+import { canIgniteFire } from "../core/fireTiles.js";
 import { ORTHOGONAL_DIRECTIONS, chebyshevDistance, isOnBoard, isOrthogonallyAdjacent, positionKey } from "./movement.js";
 import { isStunned, isTargetable } from "./statuses.js";
 
@@ -257,7 +258,9 @@ export function getWallPlacementTiles(state, actor, art) {
 
 // Throw Cigar drops a hazard, so it may land on an OCCUPIED tile (fire at an enemy's
 // feet) — it only avoids a wall or an existing fire. Chebyshev radius (default 4).
+// No tile can be set alight while rain-bearing weather holds the board (fireTiles.js).
 export function getFirePlacementTiles(state, actor, art) {
+  if (!canIgniteFire(state)) return new Set();
   return tilesInRadius(state, actor, (art?.targeting?.radius ?? 4) + getCommandRangeBonus(state, actor), (pos) => !getTileObject(state, pos));
 }
 
@@ -580,6 +583,9 @@ export function canUseArt(state, actor, artId) {
     !(art.weather && permanentWeather && art.weather !== permanentWeather) &&
     !(art.weather && actor.lastWeather === art.weather) &&
     (!art.requiresPoisonedEnemy || hasPoisonedEnemy(state, actor)) &&
+    // A pure ignition ART (Throw Cigar) has nothing to do in the rain — grey it out
+    // rather than letting the player burn an activation on an empty placement set.
+    !(art.fire && !canIgniteFire(state)) &&
     // HP-cost ARTS (Blacksword) can never suicide him; an all-HP ultimate opts in via
     // selfKill instead. And a condition-gated burst is only usable with a matching enemy.
     !(art.hpCost && !art.selfKill && actor.hp <= art.hpCost) &&

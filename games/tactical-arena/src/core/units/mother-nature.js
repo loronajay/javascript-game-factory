@@ -47,7 +47,7 @@ export const MOTHER_NATURE = Object.freeze({
       selfCast: true,
       weather: "spring",
       globalHeal: Object.freeze({ amount: 2 }),
-      description: "Activate Spring Shower: heal every unit for 2 HP. Persistent: all HP and MP restoration is boosted by 1 globally.",
+      description: "Activate Spring Shower: heal every unit for 2 HP and put out every fire on the board. Persistent: all HP and MP restoration is boosted by 1 globally, and no new fire can be lit while it rains.",
       implemented: true,
       ai: Object.freeze({ intent: "healAllies", tags: Object.freeze(["weather", "heal"]) })
     }),
@@ -86,7 +86,7 @@ export const MOTHER_NATURE = Object.freeze({
       selfCast: true,
       weather: "thunderstorm",
       globalStatus: Object.freeze({ status: "weather-magic", durationTurns: 1, magicDamageBonus: 1 }),
-      description: "Activate Thunderstorm: every unit's magic damage is +1 for their next activation. Persistent: ARTS cost 1 less MP globally.",
+      description: "Activate Thunderstorm: every unit's magic damage is +1 for their next activation, and the downpour puts out every fire on the board. Persistent: ARTS cost 1 less MP globally, and no new fire can be lit while it storms.",
       implemented: true,
       ai: Object.freeze({ intent: "buffAllies", tags: Object.freeze(["weather", "magic"]) })
     })

@@ -11,6 +11,7 @@ import { getGlobalTrueTick } from "../rules/stances.js";
 import { isInvulnerable } from "../rules/statuses.js";
 import { drawValue } from "./rng.js";
 import { CAUSE, creditDeaths, snapshotAlive } from "./killAttribution.js";
+import { canIgniteFire, extinguishFireIfRaining, igniteFireTile } from "./fireTiles.js";
 
 import { restoreMp } from "./combatEffects.js";
 const FIRE_DAMAGE = 1;
@@ -19,6 +20,11 @@ const FIRE_DAMAGE = 1;
 // fire tile takes 1 TRUE damage. The fire then counts down and is removed once its
 // turns run out.
 export function applyFireTick(state, events) {
+  // Rain (Spring Shower / Thunderstorm) puts the board out instead of burning it. This is
+  // the catch-all pulse: it also covers a mission that simply starts under permanent rain,
+  // so no fire can outlive the downpour regardless of how it got lit.
+  const doused = extinguishFireIfRaining(state);
+  if (doused.length) events.push({ type: "FIRE_EXTINGUISHED", positions: doused, cause: "weather" });
   for (const [key, obj] of Object.entries(state.tileObjects ?? {})) {
     if (obj.kind !== "fire") continue;
     const [x, y] = key.split(",").map(Number);
@@ -47,6 +53,7 @@ export function applyFireTick(state, events) {
 export function applyRandomFireTick(state, events) {
   const rule = state.missionRules?.randomFire;
   if (!rule) return;
+  if (!canIgniteFire(state)) return; // rain smothers the arena's random ignitions too
   const source = rule.sourceId ? state.units.find((unit) => unit.id === rule.sourceId) : null;
   if (rule.sourceId && (!source || source.hp <= 0)) return;
   const candidates = [];
@@ -62,14 +69,9 @@ export function applyRandomFireTick(state, events) {
   const draw = drawValue(state.rngState);
   state.rngState = draw.rngState;
   const position = candidates[Math.min(candidates.length - 1, Math.floor(draw.value * candidates.length))];
-  const key = `${position.x},${position.y}`;
   // Mission random fire is credited to the mission's declared source when it has one
   // (a boss lighting the arena), and is otherwise environmental.
-  state.tileObjects[key] = {
-    kind: "fire",
-    turnsLeft: Math.max(1, Math.floor(Number(rule.turnsLeft) || 3)),
-    ownerId: source?.id ?? null,
-  };
+  igniteFireTile(state, position, { turnsLeft: Math.max(1, Math.floor(Number(rule.turnsLeft) || 3)) }, source?.id ?? null);
   events.push({
     type: "RANDOM_FIRE_LIT",
     sourceId: source?.id ?? null,
@@ -97,6 +99,10 @@ export function applyWeatherCycleTick(state, events) {
     weather,
     sourceId: rule.sourceId ?? null,
   });
+  // The cycle tick runs after applyFireTick, so a swap INTO rain has to douse here or the
+  // board would keep burning for one more rollover.
+  const doused = extinguishFireIfRaining(state);
+  if (doused.length) events.push({ type: "FIRE_EXTINGUISHED", positions: doused, cause: "weather" });
 }
 
 export function applyBlackDeathTick(state, events) {

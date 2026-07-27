@@ -1,5 +1,6 @@
 import { getAbilityUseMax, getAbilityUsesRemaining, getActiveWeather, getArtMpCost, getAvailableArts, getEffectiveStats, getRageEffectValue, getResourceMeta, getUnitType, isCommandOnly, isDefending, isRaging } from "../core/unitCatalog.js";
 import { canUseArt } from "../rules/arts.js";
+import { canIgniteFire } from "../core/fireTiles.js";
 import { isStunned } from "../rules/statuses.js";
 import { getPortrait, portraitFrameStyle } from "./portraits.js";
 import { colorOf } from "../core/state.js";
@@ -60,7 +61,9 @@ function artTip(art, unitOrDefinition = null, state = null) {
     return `${art.name} · ${remaining}/${useMax} uses left — ${art.description}`;
   }
   const cost = artCostParts(art, unitOrDefinition, state);
-  return `${art.name} · ${cost.main}${cost.unit ? ` ${cost.unit}` : ""} — ${art.description}`;
+  // An ignition ART is unusable in the rain; say so rather than leaving a bare grey button.
+  const rained = art.fire && state && !canIgniteFire(state) ? " · The rain has put the fires out." : "";
+  return `${art.name} · ${cost.main}${cost.unit ? ` ${cost.unit}` : ""} — ${art.description}${rained}`;
 }
 
 function toggleClass(element, className, enabled) {
@@ -116,7 +119,9 @@ export function renderWeatherBadge(state, weatherBadge) {
   const id = weather?.id ?? "none";
   const label = weather?.label ?? "None";
   weatherBadge.dataset.weather = id;
-  weatherBadge.title = weather ? weather.label : "No weather is currently active";
+  weatherBadge.title = weather
+    ? `${weather.label}${weather.persistent?.extinguishesFire ? " — the rain puts out fire tiles and stops new ones being lit" : ""}`
+    : "No weather is currently active";
   const icon = weatherBadge.querySelector(".weather-icon");
   const text = weatherBadge.querySelector(".weather-text");
   if (icon) icon.textContent = WEATHER_ICONS[id] ?? WEATHER_ICONS.none;

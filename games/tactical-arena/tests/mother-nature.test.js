@@ -206,6 +206,43 @@ test("activating a new weather grants +1 MOVE on Mother Nature's next turn", () 
   assert.equal(getEffectiveStats(findUnit(opened, "mn"), opened).moveRange, 4);
 });
 
+// Rain douses on the cast, not at the next rollover, so the board matches the animation.
+for (const [artId, weatherId] of [["spring-shower", "spring"], ["thunderstorm", "thunderstorm"]]) {
+  test(`${artId} puts out every fire on the board the moment it lands`, () => {
+    const state = createBattleState({
+      size: 13,
+      seed: 7,
+      units: [
+        { id: "mn", type: "mother-nature", player: 1, x: 1, y: 1 },
+        { id: "foe", type: "swordsman", player: 2, x: 7, y: 7 }
+      ],
+      tileObjects: [{ x: 5, y: 5, kind: "fire", turnsLeft: 3 }, { x: 6, y: 6, kind: "fire", permanent: true }]
+    });
+    const result = applyCommand(run(state, beginActivation(1, "mn")), useArt(1, "mn", artId));
+    assert.equal(result.accepted, true);
+    assert.deepEqual(result.nextState.weather, { id: weatherId, sourceId: "mn" });
+    assert.equal(result.nextState.tileObjects["5,5"], undefined);
+    assert.equal(result.nextState.tileObjects["6,6"], undefined);
+    const event = result.events.find((e) => e.type === "ART_RESOLVED" && e.artId === artId);
+    assert.equal(event.extinguishedFire?.length, 2, "the cast reports what it put out");
+  });
+}
+
+test("blizzard leaves fire burning — only rain douses the board", () => {
+  const state = createBattleState({
+    size: 13,
+    seed: 7,
+    units: [
+      { id: "mn", type: "mother-nature", player: 1, x: 1, y: 1 },
+      { id: "foe", type: "swordsman", player: 2, x: 7, y: 7 }
+    ],
+    tileObjects: [{ x: 5, y: 5, kind: "fire", turnsLeft: 3 }]
+  });
+  const next = run(run(state, beginActivation(1, "mn")), useArt(1, "mn", "blizzard"));
+  // Still burning — the cast rolled the turn over, so it only ticked down as usual.
+  assert.equal(next.tileObjects["5,5"].turnsLeft, 2);
+});
+
 test("authored board weather works without Mother Nature on the roster", () => {
   const heated = createBattleState({
     weather: "heatwave",

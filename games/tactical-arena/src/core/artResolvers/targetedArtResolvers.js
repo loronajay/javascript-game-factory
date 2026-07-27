@@ -14,6 +14,7 @@ import { applyBeckonedGhostSacrifice } from "../ghostSacrifice.js";
 import { pushDestinationAwayFrom } from "./displacement.js";
 import { completeArtUse } from "./artCompletion.js";
 import { markSelfInflicted } from "../killAttribution.js";
+import { igniteFireTile } from "../fireTiles.js";
 
 export function resolveRushPath(state, command, art) {
   const actorState = findUnit(state, command.unitId);
@@ -205,8 +206,7 @@ export function resolveTargetedArt(state, command, art) {
   const weatherCritFire = swing.critical ? getWeatherCritCreatesFire(next) : null;
   if (weatherCritFire) {
     const position = { ...target.position };
-    next.tileObjects[positionKey(position)] = { kind: weatherCritFire.kind ?? "fire", permanent: Boolean(weatherCritFire.permanent) };
-    fireTiles.push(position);
+    if (igniteFireTile(next, position, weatherCritFire, null)) fireTiles.push(position);
   }
   // Final Draw (Ronin RAGE): attack ART recoil only applies while enemies remain.
   const recoilEvents = [];
