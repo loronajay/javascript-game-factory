@@ -350,6 +350,29 @@ Each of these was discovered the hard way. Do not rediscover them.
 - **Play will not create in-app products until a bundle has been uploaded** to some
   track. If `play:sync` errors on a brand-new app, upload first and re-run.
 
+- **Inspect what the app actually synced by reading its localStorage** — the server snapshot
+  lands in `serverEntitlementUnits` / `…Skins` / `…Avatars` inside
+  `tacticalArenaTutorialProgressV2`, so this answers "did progress reach this device"
+  without needing DB credentials:
+  ```bash
+  PKG=com.jayarcade.tacticalarena
+  adb shell am force-stop $PKG        # REQUIRED — see below
+  adb exec-out "run-as $PKG tar -c 'app_webview/Default/Local Storage/leveldb'" > ls.tar
+  tar -xf ls.tar -C outdir
+  cat "outdir/app_webview/Default/Local Storage/leveldb/"* | tr -d '\000' \
+    | grep -aoE 'serverEntitlementUnits.{0,400}'
+  ```
+  **Force-stop first or the dump lies.** Chromium batches localStorage writes into leveldb;
+  a dump taken while the app runs shows stale, half-empty state. During the 2026-07-27
+  sync investigation this made a working sync look like it had never run, repeatedly.
+  Values are UTF-16 (hence `tr -d '\000'`); keys are plain ASCII. `run-as` needs the debug
+  build.
+
+- **`npm run apk` fails in Git Bash** — `gradlew.bat` is not recognized. Use
+  `cd android && ./gradlew.bat assembleDebug`, or run the npm script from PowerShell.
+  Related: `adb shell df /data` needs `MSYS_NO_PATHCONV=1` in Git Bash, and installs fail
+  with `INSTALL_FAILED_INSUFFICIENT_STORAGE` well before the device looks full.
+
 - **Debug the running app over CDP** rather than guessing:
   ```bash
   PID=$(adb shell pidof com.jayarcade.tacticalarena | tr -d '\r')

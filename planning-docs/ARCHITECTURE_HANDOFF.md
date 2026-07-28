@@ -1,6 +1,23 @@
 # Architecture Cleanup Handoff
 
-Last updated: 2026-05-29
+Last updated: 2026-05-29. **Status banner added 2026-07-27 — read this before the body.**
+
+> ⚠️ **Parts of this doc describe finished work as if it were still in progress.** The
+> shared platform/frontend cleanup it plans (route-family extraction in `platform-api`,
+> the `/me` and `/player` subsystem splits, the test-folder layout) is **complete** — root
+> `CLAUDE.md` and `CHANGELOG.md` are the current truth, and the TypeScript migration it
+> treats as a future gate is also done for all non-game code (Phases 0–9, `js/**` and
+> `platform-api/src/**` are `.mts` under `strict`).
+>
+> Sections dated "As Of 2026-05-15" are a historical snapshot, not the current repo shape.
+>
+> **Read in this order instead:** root `CLAUDE.md` for orientation → `CHANGELOG.md` for
+> what shipped when → `BUGS.md` for open issues → this doc for the *reasoning* behind the
+> cleanup (its Working Rules and seam philosophy are still good guidance).
+>
+> Attention has since moved to the long-lived game hotspots — `games/lovers-lost/scripts/
+> init-game.js`, `games/echo-duel/scripts/online-session-controller.js`, and the remaining
+> Battleshits controller/render seams — and to the per-cabinet TypeScript migrations.
 
 This doc is the source-of-truth handoff for the current architecture cleanup pass. Use it after a context clear instead of reconstructing history from chat.
 

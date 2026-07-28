@@ -116,6 +116,19 @@ ownership backfill** → apply the server snapshot via `mergeServerEntitlementsI
   row; entitlement ids are format-validated and capped). This is why the switch to
   server-authority loses no progress. It is one-time — injected local ownership can be
   grandfathered at most once, never re-injected later.
+- Two guards keep that one-shot from being *wasted*, added 2026-07-27 after it stranded a real
+  account (see the changelog entry for that date):
+  - **An empty payload is inert.** The server does not insert the migration claim when there is
+    nothing to grant, and the client does not post a backfill at all when it has no local
+    ownership (it marks the handoff done locally and goes straight to server authority, which
+    is correct precisely because there is nothing to lose). Without this, a fresh install
+    signing into an existing account consumed the migration with an empty set, and the device
+    that actually held the progress could never migrate it.
+  - **Stranded accounts self-heal.** While the server owns *nothing* for a player, the
+    migration stays re-runnable, so a device still holding local ownership pushes it up on its
+    next boot sync. The moment the server owns anything, the one-shot closes again and
+    re-injection is refused exactly as before. This deliberately widens the grandfather window
+    for zero-entitlement accounts — see Known limits.
 - **Authoritative reconcile** (`{ authoritative: true }`) replaces the server-entitlement fields
   with the server's exact set, empties the pure-ownership fields, and filters the flow-bearing
   reward-pick fields down to picks the server actually has. Because `normalizeUnlockProgress`
@@ -222,6 +235,14 @@ them permanently.
   multiple devices and never synced may not all carry over if devices migrate at different
   times (one-time backfill is per account). Premium, new-Valor, and campaign/tutorial items are
   unaffected.
+- **The grandfather window stays open for zero-entitlement accounts** (added 2026-07-27 so
+  accounts stranded by the empty-backfill bug could recover). A tampered client on an account
+  the server owns *nothing* for can still have injected local ownership grandfathered — the
+  same hole the original one-shot migration opened, but now permanent rather than closing after
+  one call. It shuts the instant the account owns anything server-side, so it cannot be used to
+  add to a real account. **Close this once every legitimate account has migrated**: drop the
+  `serverOwnsNothing` escape in `backfillLocalOwnership` and the matching repair block in
+  `bootProgressSync.js`, leaving only the empty-payload guard.
 - **Campaign completion** is still client-asserted (single-player). A future pass could
   server-validate mission outcomes via deterministic replay of the headless core. Note this
   also reaches the OG Commander badge, whose campaign path trusts the same claimed progress;
