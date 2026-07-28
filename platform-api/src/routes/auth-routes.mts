@@ -34,9 +34,25 @@ export async function handleAuthRoute(context: any): Promise<boolean> {
     requestPasswordReset,
     resetPassword,
     deleteAccount,
+    loadPlayerProfile,
     jwtSecret,
     isProduction,
   } = services;
+
+  // The display name lives on the profile row, not the account row. Register already
+  // returns it (it just created it); login and /auth/me have to look it up. Clients
+  // without an arcade shell — the packaged Android app — have no other way to learn
+  // who they are signed in as.
+  const readProfileName = async (playerId: any): Promise<string> => {
+    if (typeof loadPlayerProfile !== "function" || !playerId) return "";
+    try {
+      const profile = await loadPlayerProfile(playerId);
+      const name = profile?.profileName;
+      return typeof name === "string" ? name.trim() : "";
+    } catch {
+      return "";
+    }
+  };
 
   if (method === "POST" && pathname === "/auth/register") {
     const body = await readJsonBody(req);
@@ -104,7 +120,12 @@ export async function handleAuthRoute(context: any): Promise<boolean> {
 
     const token = signToken({ playerId: result.playerId, email: result.email, sessionId: result.sessionId }, jwtSecret);
     res.setHeader("set-cookie", buildSetCookieHeader(token, isProduction));
-    writeJson(res, 200, { token, playerId: result.playerId, email: result.email }, requestOrigin);
+    writeJson(res, 200, {
+      token,
+      playerId: result.playerId,
+      email: result.email,
+      profileName: await readProfileName(result.playerId),
+    }, requestOrigin);
     return true;
   }
 
@@ -129,6 +150,7 @@ export async function handleAuthRoute(context: any): Promise<boolean> {
       ok: true,
       playerId: authClaims.playerId,
       email: authClaims.email,
+      profileName: await readProfileName(authClaims.playerId),
       ...(freshToken ? { token: freshToken } : {}),
     }, requestOrigin);
     return true;

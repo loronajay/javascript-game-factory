@@ -6,6 +6,7 @@ export const PENDING_GAME_PROGRESS_CLAIMS_KEY = "tacticalArenaPendingGameProgres
 
 const VALID_CLAIM_KINDS = new Set([
   "campaign-valor",
+  "campaign-progress",
   "campaign-skin-choice",
   "campaign-unit-choice",
   "tutorial-complete",
@@ -102,6 +103,22 @@ export function buildCampaignValorClaim({ missionId, amount, stars = 0 } = {}) {
       amount: cleanAmount,
       stars: cleanInt(stars, { min: 0, max: 3 }),
     }),
+  });
+}
+
+// Mission cleared, no Valor movement. Separate from buildCampaignValorClaim because that
+// one is the payout and fires once per mission forever — it can never report a later star
+// improvement, or a mission cleared before progress sync existed. The star count is part
+// of the claim id so a better result is a new claim; the server keeps the greater value.
+export function buildCampaignProgressClaim({ missionId, stars = 0 } = {}) {
+  const cleanMissionId = cleanText(missionId);
+  if (!cleanMissionId) return null;
+  const cleanStars = cleanInt(stars, { min: 0, max: 3 });
+  return Object.freeze({
+    claimId: `campaign-progress:${cleanMissionId}:${cleanStars}`,
+    kind: "campaign-progress",
+    sourceId: cleanMissionId,
+    payload: Object.freeze({ missionId: cleanMissionId, stars: cleanStars }),
   });
 }
 

@@ -4,6 +4,11 @@ import { getValorOffer, priceValorOffer } from "../services/valor-catalog.mjs";
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
 const VALID_CLAIM_KINDS = new Set([
     "campaign-valor",
+    // Mission cleared, recorded WITHOUT any Valor movement. campaign-valor already carries
+    // stars, but it fires exactly once per mission (the payout is idempotent), so it cannot
+    // report a later star improvement or backfill a mission cleared before progress sync
+    // existed. This kind is how campaign progress alone reaches the account.
+    "campaign-progress",
     "campaign-skin-choice",
     "campaign-unit-choice",
     "tutorial-complete",
@@ -204,7 +209,7 @@ export async function getGameProgress(pool, playerId, gameSlug) {
     if (!pool || !normalizedPlayerId || !normalizedGameSlug)
         return null;
     try {
-        const [profile, entitlements, campaignProgress, inventoryItems] = await Promise.all([
+        const [profile, entitlements, campaignProgress, inventoryItems, tutorials] = await Promise.all([
             pool.query(`select player_id, game_slug, valor_balance, created_at, updated_at
          from game_progress_profiles
          where player_id = $1 and game_slug = $2`, [normalizedPlayerId, normalizedGameSlug]),
@@ -220,6 +225,11 @@ export async function getGameProgress(pool, playerId, gameSlug) {
          from game_inventory_items
          where player_id = $1 and game_slug = $2 and quantity > 0
          order by item_id asc`, [normalizedPlayerId, normalizedGameSlug]),
+            // Tutorial completion has no table of its own — the claim row IS the record.
+            // Reading it back is what lets a second device restore which tutorials are done.
+            pool.query(`select source_id from game_progress_claims
+         where player_id = $1 and game_slug = $2 and kind = 'tutorial-complete' and source_id <> ''
+         order by source_id asc`, [normalizedPlayerId, normalizedGameSlug]),
         ]);
         const row = profile.rows[0] || {};
         return {
@@ -228,6 +238,7 @@ export async function getGameProgress(pool, playerId, gameSlug) {
             valorBalance: Number(row.valor_balance) || 0,
             entitlements: entitlements.rows.map(rowToEntitlement),
             campaignProgress: campaignProgress.rows.map(rowToCampaignProgress),
+            completedTutorials: tutorials.rows.map((tutorialRow) => cleanText(tutorialRow.source_id, 200)).filter(Boolean),
             inventoryItems: inventoryItems.rows.map(rowToInventoryItem),
             createdAt: row.created_at || null,
             updatedAt: row.updated_at || null,
@@ -275,6 +286,13 @@ export async function recordGameProgressClaim(pool, params = {}) {
                     valorClaimedAt: amount > 0 ? new Date().toISOString() : null,
                 });
             }
+        }
+        else if (!alreadyProcessed && kind === "campaign-progress") {
+            const missionId = cleanText(payload.missionId || sourceId, 200);
+            // Stars only. markCampaignProgress takes greatest(existing, new), so replaying an
+            // older result can never walk a player's best score backwards.
+            if (missionId)
+                await markCampaignProgress(client, playerId, gameSlug, missionId, { stars: payload.stars });
         }
         else if (!alreadyProcessed && kind === "campaign-skin-choice") {
             const missionId = cleanText(payload.missionId || sourceId, 200);

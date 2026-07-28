@@ -743,15 +743,26 @@
     letter-spacing: .08em;
   }
 
+  /* Every roster card is exactly the same box. Cards carry a variable amount of
+     content — a locked/in-squad flag or not, a name that wraps to two lines or
+     not — and left to size themselves they produce a ragged grid of
+     different-height buttons. A fixed row height plus an explicit
+     portrait / name / flag row template pins the size AND the position of each
+     part, so the flag slot stays reserved on unlocked units. */
   .roster-class-units {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 84px;
     gap: .32rem;
   }
 
   .roster-unit {
     width: auto;
-    min-height: 68px;
+    height: 100%;
+    min-height: 0;
+    grid-template-rows: 34px minmax(0, 1fr) .66rem;
+    align-content: stretch;
+    gap: .16rem;
     padding: .3rem .2rem .34rem;
     scroll-snap-align: start;
   }
@@ -761,7 +772,21 @@
   }
 
   .roster-unit-name {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
     font-size: .58rem;
+    line-height: 1.1;
+    text-align: center;
+  }
+
+  .roster-unit-flag {
+    align-self: end;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .roster-detail-bar {

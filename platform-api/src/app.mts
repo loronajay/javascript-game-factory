@@ -373,6 +373,9 @@ export function createApp(options: any = {}) {
     requestPasswordReset,
     resetPassword,
     deleteAccount,
+    // Login / session responses carry the display name so shell-less clients (the
+    // packaged app) can show who is signed in.
+    loadPlayerProfile,
     jwtSecret,
     isProduction,
   };

@@ -27,7 +27,7 @@ import { createSettingsScreen } from "./settingsScreen.js";
 import { createTutorialMatchConfig } from "../tutorials/basics.js";
 import { syncRankedAccountFeatureControls } from "./rankedFeatureGate.js";
 import { syncOnlineAccountFeatureControls } from "../../../../js/platform/ui/online-account-feature-gate.mjs";
-import { openAccountPanel, syncAccountControls } from "./accountMenu.js";
+import { openAccountPanel, syncAccountControlsWithName } from "./accountMenu.js";
 import { SESSION_CHANGED_EVENT } from "../platform/factorySignIn.js";
 import { wireAndroidBackButton } from "./androidBackButton.js";
 
@@ -59,12 +59,12 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
     syncRankedAccountFeatureControls(menu);
     // The app-only account button lives on the title screen, not the main menu, but
     // its selector is unique so syncing document-wide is safe and covers both.
-    syncAccountControls(document);
+    syncAccountControlsWithName(document);
   }
 
   screens.register("title", {
     el: screenEl("title"),
-    onEnter: () => syncAccountControls(document),
+    onEnter: () => syncAccountControlsWithName(document),
   });
 
   screens.register("mainMenu", {

@@ -12,6 +12,7 @@ import {
   buildCampaignSkinChoiceClaim,
   buildCampaignUnitRewardClaim,
   buildCampaignUnitChoiceClaim,
+  buildCampaignProgressClaim,
   buildCampaignValorClaim,
   enqueueGameProgressClaim,
   flushPendingGameProgressClaims,
@@ -160,6 +161,9 @@ test("campaign completion enqueues direct unit and skin entitlement claims", () 
 
   assert.deepEqual(readPendingGameProgressClaims(storage), [
     buildCampaignValorClaim({ missionId: CLOD_MISSION_ID, amount: 55, stars: 3 }),
+    // The mission result itself, so the clear and its stars survive onto another device
+    // even though the Valor payout only ever fires once.
+    buildCampaignProgressClaim({ missionId: CLOD_MISSION_ID, stars: 3 }),
     buildCampaignUnitRewardClaim({ missionId: CLOD_MISSION_ID, type: "clod", stars: 3 }),
     buildCampaignSkinRewardClaim({
       missionId: "voidwood-forest",
