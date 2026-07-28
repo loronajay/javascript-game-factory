@@ -5,6 +5,7 @@ import {
   findAssistedTileTarget,
   shouldTreatPointerAsTap,
   shouldUseBoardTouchAssist,
+  updateBoardTouchAssist,
 } from "../src/ui/boardTouchAssist.js";
 import { createBoardMetrics, gridToScreen } from "../src/ui/isometric.js";
 import { positionKey } from "../src/rules/movement.js";
@@ -75,6 +76,101 @@ test("a lift only counts as a tap when it is the same finger and barely moved", 
   // A different finger than the one we recorded.
   assert.equal(shouldTreatPointerAsTap({ start, pointerId: 2, x: 101, y: 101 }), false);
   assert.equal(shouldTreatPointerAsTap({ start: null, pointerId: 1, x: 100, y: 100 }), false);
+});
+
+test("an assisted tap swallows a trailing ghost click even when it lands on a freshly opened modal", () => {
+  // The bug this guards: a tap that resolves to a tile (e.g. picking a target for
+  // Father Time's Age ART) can synchronously open a choice modal at the same screen
+  // coordinates. Mobile browsers/webviews can then fire a delayed compatibility
+  // "click" for the same touch at those coordinates, hitting whatever now sits there
+  // — a modal button, not the board. The board-scoped suppression only catches a
+  // ghost click that re-targets the board itself, so a document-wide guard is needed
+  // to swallow it wherever it lands.
+  class FakeElement {
+    constructor() {
+      this.listeners = new Map();
+    }
+    addEventListener(type, handler) {
+      const handlers = this.listeners.get(type) ?? [];
+      handlers.push(handler);
+      this.listeners.set(type, handlers);
+    }
+  }
+  class FakeDocument extends FakeElement {}
+
+  const fakeDocument = new FakeDocument();
+  globalThis.document = fakeDocument;
+
+  const board = new FakeElement();
+  board.ownerDocument = {
+    defaultView: {
+      innerWidth: 844,
+      innerHeight: 390,
+      matchMedia: () => ({ matches: true }),
+      navigator: { maxTouchPoints: 5 },
+    },
+  };
+  board.getScreenCTM = () => ({ inverse: () => ({}) });
+  board.createSVGPoint = () => {
+    const point = { x: 0, y: 0, matrixTransform() { return { x: point.x, y: point.y }; } };
+    return point;
+  };
+
+  const metrics = createBoardMetrics(13);
+  const target = { x: 6, y: 8 };
+  const center = tileCenter(metrics, target);
+
+  let clickedTile = null;
+  updateBoardTouchAssist(board, {
+    size: 13,
+    metrics,
+    legalKeys: [],
+    onTileClick: (tile) => { clickedTile = tile; },
+  });
+
+  const dispatch = (type, overrides) => {
+    const handlers = board.listeners.get(type) ?? [];
+    const event = {
+      currentTarget: board,
+      pointerType: "touch",
+      preventDefault() {},
+      stopPropagation() {},
+      stopImmediatePropagation() {},
+      ...overrides,
+    };
+    for (const handler of handlers) handler(event);
+    return event;
+  };
+
+  dispatch("pointerdown", { pointerId: 1, clientX: center.x, clientY: center.y });
+  board.createSVGPoint = () => {
+    const point = { x: center.x, y: center.y, matrixTransform() { return { x: point.x, y: point.y }; } };
+    return point;
+  };
+  dispatch("pointerup", { pointerId: 1, clientX: center.x, clientY: center.y });
+
+  assert.deepEqual(clickedTile, target, "the assisted tap should have resolved to the tapped tile");
+
+  // Now simulate the trailing ghost click landing on something else entirely — a
+  // freshly rendered modal button, not the board — via the document-level listener.
+  const documentClickHandlers = fakeDocument.listeners.get("click") ?? [];
+  assert.ok(documentClickHandlers.length > 0, "a document-level click guard should be wired");
+
+  let prevented = false;
+  let stoppedImmediate = false;
+  const ghostClick = {
+    currentTarget: fakeDocument,
+    target: { tagName: "BUTTON", className: "choice-option" }, // e.g. the modal's "Defense" button
+    preventDefault() { prevented = true; },
+    stopPropagation() {},
+    stopImmediatePropagation() { stoppedImmediate = true; },
+  };
+  for (const handler of documentClickHandlers) handler(ghostClick);
+
+  assert.equal(prevented, true, "the trailing ghost click should be swallowed regardless of its target");
+  assert.equal(stoppedImmediate, true);
+
+  delete globalThis.document;
 });
 
 test("a pinch never selects a tile, even when one finger barely moves", () => {

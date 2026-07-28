@@ -16,6 +16,31 @@ const wiredBoards = new WeakSet();
 const activePointers = new WeakMap();
 const multiTouchGesture = new WeakSet();
 
+// A trailing compatibility "click" for an assisted tap can land anywhere on screen, not
+// just back on the board: many taps (Age's stat pick, Rewind's ally pick, and other
+// ART targeting) synchronously open a modal at the same coordinates the finger just
+// lifted from. The board-scoped suppression below only catches the ghost click if it
+// re-targets the board itself; it does nothing once a fresh modal button is sitting at
+// that point instead, so that stray click "pressed" whatever choice happened to render
+// there (e.g. auto-picking Defense on Father Time's Age modal). Document-level capture
+// closes that gap regardless of what now occupies the tapped coordinates.
+let documentClickGuardWired = false;
+let globalSuppressUntil = 0;
+
+function handleGlobalClickGuard(event) {
+  if (Date.now() > globalSuppressUntil) return;
+  event.preventDefault();
+  event.stopPropagation();
+  event.stopImmediatePropagation?.();
+}
+
+function armGlobalClickGuard() {
+  globalSuppressUntil = Date.now() + CLICK_SUPPRESS_MS;
+  if (documentClickGuardWired) return;
+  documentClickGuardWired = true;
+  document.addEventListener("click", handleGlobalClickGuard, true);
+}
+
 export function shouldUseBoardTouchAssist({ size, coarsePointer, width, height }) {
   return (
     size >= ASSISTED_BOARD_SIZE &&
@@ -159,6 +184,7 @@ function handlePointerUp(event) {
   event.stopPropagation();
   event.stopImmediatePropagation?.();
   suppressClicksUntil.set(board, Date.now() + CLICK_SUPPRESS_MS);
+  armGlobalClickGuard();
   state.onTileClick(target);
 }
 
