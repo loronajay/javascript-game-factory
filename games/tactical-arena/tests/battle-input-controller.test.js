@@ -92,6 +92,50 @@ test("auto-finish predicate waits for remaining movement but Defend closes immed
   assert.equal(shouldAutoFinishActivation(blockedAttacked), true);
 });
 
+test("Age's stat-pick modal blocks a re-entrant tap while it is open (Android duplicate-touch guard)", async () => {
+  // Regression: nothing blocked a second, near-simultaneous handleTile call (a
+  // duplicate touch/click dispatch, which Android WebView is known to produce for a
+  // single fast tap) from reopening Age's choice modal on top of itself while the
+  // player was still deciding — silently replacing it and letting a stray click land
+  // on whichever button ended up under the same screen point. This shipped as Age
+  // involuntarily picking Defense roughly every other cast. `interaction.resolving`
+  // must be held for the whole time the modal is open, the same re-entrancy gate
+  // move/trample already use around their animation awaits.
+  const initial = createBattleState({
+    units: [
+      { id: "p1-father-time", player: 1, type: "father-time", x: 0, y: 0 },
+      { id: "p2-swordsman", player: 2, type: "swordsman", x: 1, y: 0 }
+    ]
+  });
+  const state = applyCommand(initial, beginActivation(1, "p1-father-time")).nextState;
+  const actor = state.units.find((unit) => unit.id === "p1-father-time");
+  const interaction = { selectedId: "p1-father-time", mode: "art:age", resolving: false };
+  let openCount = 0;
+  let resolveModal;
+  const controller = createBattleInputController({
+    runtime: { state },
+    interaction,
+    selectedUnit: () => actor,
+    inputLocked: () => interaction.resolving,
+    openChoiceModal: async () => {
+      openCount += 1;
+      return new Promise((resolve) => { resolveModal = resolve; });
+    },
+  });
+
+  const firstTap = controller.handleTile({ x: 1, y: 0 });
+  // The modal is open and awaiting a choice; resolving must already be true.
+  assert.equal(interaction.resolving, true);
+  assert.equal(openCount, 1);
+
+  await controller.handleTile({ x: 1, y: 0 }); // simulated duplicate touch dispatch
+  assert.equal(openCount, 1, "a re-entrant tap while the modal is open must not reopen it");
+
+  resolveModal(null); // player cancels
+  await firstTap;
+  assert.equal(interaction.resolving, false);
+});
+
 test("an empty tile click with no active mode deselects through the interaction adapter", async () => {
   const interaction = { selectedId: "p1-swordsman", mode: null };
   const messages = [];

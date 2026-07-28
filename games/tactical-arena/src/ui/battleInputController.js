@@ -274,6 +274,13 @@ export function createBattleInputController({
           ? [...unit.soulShuffleChoices]
           : getSoulShuffleChoices(unit, runtime.state.rngState).choices;
         setMessage(`${art.name}: choose a spirit to call.`);
+        // A choice modal is an unguarded await: nothing else in handleTile blocks a
+        // second tap (a duplicate touch/click dispatch, common on Android WebView)
+        // from re-entering this same branch while the player is still deciding, which
+        // would silently replace the open modal's buttons with a fresh instance out
+        // from under the player's finger. `resolving` is the same re-entrancy gate
+        // move/trample already use around their animation awaits.
+        interaction.resolving = true;
         render();
         const summonType = await openChoiceModal({
           title: `${art.name} — Soul Shuffle`,
@@ -286,6 +293,7 @@ export function createBattleInputController({
             type
           }))
         });
+        interaction.resolving = false;
         if (!summonType || interaction.mode !== `art:${artId}`) {
           interaction.mode = null;
           setMessage(`${art.name} cancelled. Choose an action below.`);
@@ -335,6 +343,13 @@ export function createBattleInputController({
         setMessage("Age: click a highlighted ally or enemy in range.", true);
       } else {
         const ally = areAllies(target, unit);
+        // See the Soul Shuffle comment above: block re-entrant taps for the whole
+        // time this modal is open, or a duplicate touch dispatch on the target can
+        // silently reopen it and land a stray click on whichever button ends up
+        // under the same screen point (this was shipping "Age" as an involuntary
+        // Defense pick roughly every other cast).
+        interaction.resolving = true;
+        render();
         const stat = await openChoiceModal({
           title: `Age — ${ally ? "empower" : "weaken"} ${target.nickname || getUnitType(target.type).name}`,
           subtitle: ally ? "Grant +1 to a stat until Father Time falls." : "Drain 1 from a stat until Father Time falls.",
@@ -344,6 +359,7 @@ export function createBattleInputController({
             { value: "defense", label: "Defense", sub: ally ? "+1 DEF" : "−1 DEF" }
           ]
         });
+        interaction.resolving = false;
         if (stat && interaction.mode === "art:age" && await resolveInstantArtAndMaybeAutoFinish(useArt(runtime.state.currentPlayer, unit.id, "age", { targetId: target.id, stat }))) {
           interaction.mode = null;
           setMessage("Age resolved. This unit's activation is complete.");
@@ -609,6 +625,10 @@ export function createBattleInputController({
             return;
           }
           setMessage(`${art.name} (${art.mpCost} MP): choose a fallen ally to bring back.`);
+          // See the Age/Soul Shuffle comment in handleTile: this modal is an unguarded
+          // await, so a duplicate button-tap dispatch could otherwise re-enter this
+          // branch and reopen the modal out from under the player's choice.
+          interaction.resolving = true;
           render();
           const hpFraction = Number.isFinite(art.revive?.hpFraction) ? art.revive.hpFraction : 1;
           const hpLabel = hpFraction >= 1 ? "full HP" : `${Math.ceil(hpFraction * 100)}% HP`;
@@ -618,6 +638,7 @@ export function createBattleInputController({
             accent: teamColor(unit.player),
             choices: fallen.map((ally) => ({ value: ally.id, label: ally.nickname || getUnitType(ally.type).name, sub: `Fallen - returns at ${hpLabel}`, type: ally.type }))
           });
+          interaction.resolving = false;
           if (!chosen || interaction.mode !== action) {
             interaction.mode = null;
             interaction.reviveTargetId = null;
