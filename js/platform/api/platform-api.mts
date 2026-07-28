@@ -1,5 +1,5 @@
 import { sanitizeProfileFriendCode } from "../profile/profile.mjs";
-import { getStoredAuthToken } from "./auth-token.mjs";
+import { getStoredAuthToken, handleUnauthorizedResponse } from "./auth-token.mjs";
 
 export interface PlatformApiClientOptions {
   root?: any;
@@ -60,6 +60,10 @@ async function requestJson(fetchImpl: FetchImpl, baseUrl: string, path: string, 
   try {
     const response = await fetchImpl(`${baseUrl}${path}`, options);
     if (!response?.ok) {
+      // A 401 means the stored token is dead, not that the network is. Drop it here so
+      // every caller stops sending a token the server will never accept again, and so
+      // "am I signed in?" starts answering no.
+      if (response?.status === 401) handleUnauthorizedResponse();
       return null;
     }
     return await readJsonResponse(response);

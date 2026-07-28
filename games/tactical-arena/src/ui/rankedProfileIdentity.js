@@ -6,6 +6,7 @@
 
 import { el } from "./domHelpers.js";
 import { TACTICAL_ARENA_GAME_SLUG } from "../platform/gameProgressClient.js";
+import { isFactoryAccountLoggedIn, readStoredFactoryAccountSession } from "../platform/factoryAccount.js";
 import { loadRankedName, saveRankedName } from "./rankedNameModel.js";
 import { createPortrait, hasPortrait } from "./portraits.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
@@ -89,8 +90,15 @@ export function renderIdentityEditor(body, { pilot, state, apiClient, playerId =
     status.textContent = text;
     status.dataset.state = "ok";
   };
+  // A save can fail two very different ways. If the token was rejected, the API client
+  // has already dropped it, so "no session left" is a reliable read of "that was a 401"
+  // without threading status codes through the whole client — and telling the player to
+  // check their connection when the real problem is a revoked session sends them hunting
+  // for a network fault that isn't there.
   const flashError = () => {
-    status.textContent = "Couldn't save — check your connection.";
+    status.textContent = isFactoryAccountLoggedIn(readStoredFactoryAccountSession())
+      ? "Couldn't save — check your connection."
+      : "Signed out — sign in again to save your ranked profile.";
     status.dataset.state = "err";
   };
   // Persist a patch, reconcile local state from the authoritative response.

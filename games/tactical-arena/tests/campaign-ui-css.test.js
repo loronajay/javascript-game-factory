@@ -47,6 +47,33 @@ test("campaign locked nodes defer to the painted map instead of drawing token cl
   assert.match(panelRule, /grid-template-rows\s*:\s*auto auto auto/);
 });
 
+test("the node the player is reading stacks above its neighbours", () => {
+  const baseZ = Number(ruleBody(".campaign-node").match(/z-index\s*:\s*(\d+)/)?.[1]);
+  const selectedZ = Number(ruleBody(".campaign-node.is-selected").match(/z-index\s*:\s*(\d+)/)?.[1]);
+  const hoverZ = Number(ruleBody(".campaign-node:hover:not(:disabled)").match(/z-index\s*:\s*(\d+)/)?.[1]);
+
+  // Nodes overlap on the painted map and the name label hangs below the circle, so a
+  // resting neighbour must never clip the selected mission's label.
+  assert.ok(selectedZ > baseZ, "selected nodes must sit above resting ones");
+  assert.ok(hoverZ >= selectedZ, "hover must not drop behind the selection");
+});
+
+test("touch devices get smaller campaign nodes but keep the 44px tap floor", () => {
+  const coarse = menusCss.match(/@media \(pointer: coarse\) \{([\s\S]*?)\n\}/)?.[1] ?? "";
+  const restingSize = Number(ruleBody(".campaign-node").match(/width\s*:\s*([\d.]+)rem/)?.[1]);
+  const touchSize = Number(coarse.match(/\.campaign-node \{[^}]*width\s*:\s*([\d.]+)rem/)?.[1]);
+
+  assert.ok(touchSize < restingSize, "the map is cramped on touch; nodes must shrink");
+  // responsive/touch.css floors every button at 44px — 2.75rem at the 16px root is
+  // exactly that, so going smaller would silently be ignored anyway.
+  assert.ok(touchSize * 16 >= 44, "nodes must stay at or above the coarse-pointer tap floor");
+  // The old max-width rule grew nodes instead; leaving it would win by source order.
+  assert.doesNotMatch(
+    menusCss.match(/@media \(max-width:760px\) \{([\s\S]*?)\n\}/)?.[1] ?? "",
+    /\.campaign-node \{/,
+  );
+});
+
 test("formation editor buttons do not move on hover or drag", () => {
   const modalHoverRule = ruleBody(".draft-formation-modal button:hover:not(:disabled)");
   const slotRule = ruleBody(".draft-formation-slot");

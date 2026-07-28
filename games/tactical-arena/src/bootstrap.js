@@ -1,8 +1,15 @@
 import { composePage } from "./ui/pageComposer.js";
 import { isNativeApp, notifySessionChanged, setInAppSignInHandler } from "./platform/factorySignIn.js";
+import { AUTH_SESSION_EXPIRED_EVENT } from "../../../js/platform/api/auth-token.mjs";
 
 async function bootstrap() {
   await composePage();
+
+  // The platform API client clears the stored token whenever the server rejects it
+  // (one live session per account, so signing in elsewhere revokes this one). Bridge
+  // that into TA's own session signal so account-gated menus re-render as signed out
+  // instead of sitting there looking signed in while every call 401s.
+  document.addEventListener(AUTH_SESSION_EXPIRED_EVENT, () => notifySessionChanged());
 
   // Packaged-app only. The bundle contains just the game, so the shared account
   // gate's redirect to ../../sign-in/index.html is a dead end — route every
