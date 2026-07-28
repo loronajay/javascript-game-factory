@@ -62,6 +62,24 @@ export async function syncGameProgress() {
   if (!snapshot && flushResult.ok) {
     snapshot = await fetchGameProgressSnapshot();
   }
+  // Repair for accounts stranded by the empty-backfill bug: the server is the authority,
+  // but if it owns NOTHING while this device does, the one-time handoff never actually
+  // landed and this player's progress exists only here — every other device shows zero.
+  // Push it up (the server keeps the migration open only while it owns nothing) and use
+  // the returned progress as the snapshot. Gated on an empty server set, so it can never
+  // overwrite or re-open a real one.
+  if (snapshot && flushResult.ok && isFactoryAccountLoggedIn(account)
+    && !(Array.isArray(snapshot.entitlements) && snapshot.entitlements.length)) {
+    const local = readUnlockProgress(storage);
+    if (local.unlockedUnits.length || local.unlockedSkins.length || local.valorBalance > 0) {
+      const repair = await backfillLocalOwnershipToServer({
+        ownedUnits: local.unlockedUnits,
+        ownedSkins: local.unlockedSkins,
+        valorBalance: local.valorBalance,
+      });
+      if (repair.ok && repair.progress) snapshot = repair.progress;
+    }
+  }
   if (snapshot) {
     // Full server authority (the reconcile that filters local ownership down to the server's
     // set) is only safe once we KNOW the server has this player's complete owned set — i.e.

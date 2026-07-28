@@ -653,13 +653,24 @@ export async function backfillLocalOwnership(pool: any, params: any = {}): Promi
         progress: await getGameProgress(pool, playerId, gameSlug),
       };
     }
+    // Whether the server owns anything at all for this player. An account the server owns
+    // NOTHING for has no progress to protect, and its migration may have been consumed
+    // without granting anything (see the empty-backfill guard above, which shipped after
+    // some accounts were already stranded). Keep the migration re-runnable in exactly that
+    // state so the device still holding the progress can get it across; the moment the
+    // server owns anything, the one-shot closes again and re-injection is refused.
+    const owned = await client.query(
+      `select 1 from game_entitlements where player_id = $1 and game_slug = $2 limit 1`,
+      [playerId, gameSlug],
+    );
+    const serverOwnsNothing = (owned.rows?.length ?? 0) === 0;
     const claim = await client.query(
       `insert into game_progress_claims (player_id, game_slug, claim_id, kind, source_id, payload)
        values ($1, $2, $3, 'migration', '', '{}'::jsonb)
        on conflict (player_id, game_slug, claim_id) do nothing`,
       [playerId, gameSlug, OWNERSHIP_BACKFILL_CLAIM_ID],
     );
-    const alreadyMigrated = claim.rowCount === 0;
+    const alreadyMigrated = claim.rowCount === 0 && !serverOwnsNothing;
     if (!alreadyMigrated) {
       for (const entitlementId of entitlementIds) {
         const kind = entitlementId.startsWith("unit:") ? "unit" : "skin";
