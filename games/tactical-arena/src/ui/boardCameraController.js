@@ -14,6 +14,7 @@
 
 import {
   MIN_ZOOM,
+  MAX_ZOOM_CEILING,
   cameraViewBox,
   clampCamera,
   createCamera,
@@ -26,6 +27,7 @@ import {
 
 const cameraState = new WeakMap();
 const wiredBoards = new WeakSet();
+const MIN_TOUCH_GESTURE_MAX_ZOOM = 2.25;
 
 function isCoarsePointer(windowRef) {
   return Boolean(
@@ -50,11 +52,16 @@ function applyViewBox(board, state) {
 
 function currentMaxZoom(board, state) {
   const rect = board.getBoundingClientRect?.();
-  return maxZoomForTileSize({
+  const touchTargetZoom = maxZoomForTileSize({
     base: state.base,
     viewport: { width: rect?.width ?? 0, height: rect?.height ?? 0 },
     tileWidth: state.metrics?.tileWidth ?? 0,
   });
+  // The 44px touch-target floor is a minimum useful zoom, not the whole manual
+  // camera range. On larger landscape phones that floor can be satisfied at zoom
+  // 1, which otherwise makes pinch/drag feel broken because the camera is clamped
+  // to the full-board view.
+  return Math.min(MAX_ZOOM_CEILING, Math.max(MIN_TOUCH_GESTURE_MAX_ZOOM, touchTargetZoom));
 }
 
 function pointerMidpoint(pointers) {
