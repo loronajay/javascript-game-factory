@@ -36,14 +36,26 @@ export async function syncGameProgress() {
   let backfillProgress = null;
   if (flushResult.ok && !storage.getItem(OWNERSHIP_BACKFILL_FLAG)) {
     const local = readUnlockProgress(storage);
-    const backfill = await backfillLocalOwnershipToServer({
-      ownedUnits: local.unlockedUnits,
-      ownedSkins: local.unlockedSkins,
-      valorBalance: local.valorBalance,
-    });
-    if (backfill.ok) {
-      backfillProgress = backfill.progress;
+    const hasLocalOwnership = Boolean(
+      local.unlockedUnits.length || local.unlockedSkins.length || local.valorBalance > 0,
+    );
+    if (!hasLocalOwnership) {
+      // Nothing to grandfather — a fresh device signing into an existing account. Don't
+      // post an empty backfill: the server migration is one-shot per account, so an empty
+      // one would consume it and strand the progress on whichever device still holds it.
+      // Marking it done locally is correct here precisely because there is nothing to
+      // lose: with no local ownership, going straight to server authority IS the truth.
       try { storage.setItem(OWNERSHIP_BACKFILL_FLAG, "1"); } catch { /* best-effort */ }
+    } else {
+      const backfill = await backfillLocalOwnershipToServer({
+        ownedUnits: local.unlockedUnits,
+        ownedSkins: local.unlockedSkins,
+        valorBalance: local.valorBalance,
+      });
+      if (backfill.ok) {
+        backfillProgress = backfill.progress;
+        try { storage.setItem(OWNERSHIP_BACKFILL_FLAG, "1"); } catch { /* best-effort */ }
+      }
     }
   }
   let snapshot = backfillProgress || checkoutResult?.progress || flushResult.progress;

@@ -551,6 +551,21 @@ export async function backfillLocalOwnership(pool, params = {}) {
     try {
         await client.query("begin");
         await ensureGameProgressProfile(client, playerId, gameSlug);
+        // An empty payload has nothing to grandfather, so it must not consume the one-shot.
+        // A fresh device (notably a new packaged-app install signing into an existing account)
+        // legitimately backfills an empty local set; if that burned the migration, the device
+        // that actually held the progress could never migrate it and the account would be
+        // stuck at zero ownership forever. Report the existing migration state instead.
+        if (!entitlementIds.length && valorBalance <= 0) {
+            const existing = await client.query(`select 1 from game_progress_claims
+         where player_id = $1 and game_slug = $2 and claim_id = $3 limit 1`, [playerId, gameSlug, OWNERSHIP_BACKFILL_CLAIM_ID]);
+            await client.query("commit");
+            return {
+                ok: true,
+                alreadyMigrated: (existing.rowCount ?? 0) > 0,
+                progress: await getGameProgress(pool, playerId, gameSlug),
+            };
+        }
         const claim = await client.query(`insert into game_progress_claims (player_id, game_slug, claim_id, kind, source_id, payload)
        values ($1, $2, $3, 'migration', '', '{}'::jsonb)
        on conflict (player_id, game_slug, claim_id) do nothing`, [playerId, gameSlug, OWNERSHIP_BACKFILL_CLAIM_ID]);
