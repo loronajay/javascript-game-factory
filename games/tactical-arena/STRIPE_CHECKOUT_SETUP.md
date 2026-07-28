@@ -113,7 +113,7 @@ Keep these on the server only:
 ```text
 STRIPE_RESTRICTED_KEY=rk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-APP_BASE_URL=https://loronajay.github.io/javascript-game-factory
+APP_BASE_URL=https://factory.jayarcade.com
 ```
 
 `STRIPE_SECRET_KEY` also works, but a restricted key with Checkout Session write access is preferred.

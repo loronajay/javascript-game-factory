@@ -396,7 +396,7 @@ function cleanUrl(value: any): string {
 }
 
 function fallbackCheckoutUrl(appBaseUrl: any, status: "success" | "cancel"): string {
-  const base = cleanText(appBaseUrl, 1000).replace(/\/+$/, "") || "https://loronajay.github.io/javascript-game-factory";
+  const base = cleanText(appBaseUrl, 1000).replace(/\/+$/, "") || "https://factory.jayarcade.com";
   const url = new URL(`${base}/games/tactical-arena/index.html`);
   url.searchParams.set("checkout", status);
   if (status === "success") url.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");

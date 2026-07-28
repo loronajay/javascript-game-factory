@@ -384,7 +384,7 @@ function cleanUrl(value) {
     }
 }
 function fallbackCheckoutUrl(appBaseUrl, status) {
-    const base = cleanText(appBaseUrl, 1000).replace(/\/+$/, "") || "https://loronajay.github.io/javascript-game-factory";
+    const base = cleanText(appBaseUrl, 1000).replace(/\/+$/, "") || "https://factory.jayarcade.com";
     const url = new URL(`${base}/games/tactical-arena/index.html`);
     url.searchParams.set("checkout", status);
     if (status === "success")

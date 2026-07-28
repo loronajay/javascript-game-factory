@@ -242,7 +242,8 @@ them permanently.
 ## Platform-level hardening (backend)
 
 Not game-specific but part of the same effort, in `platform-api/`: JWT pinned to HS256 + DB
-session revocation; CORS restricted to an allow-list (`https://loronajay.github.io` + localhost,
+session revocation; CORS restricted to an allow-list (`https://factory.jayarcade.com`, the legacy
+`https://loronajay.github.io` Pages origin, and localhost,
 extendable via `ALLOWED_ORIGINS`); `/activity` requires auth and stamps the server-verified
 actor; per-IP rate limiting on auth + checkout-session creation; upload content validated by
 magic bytes (not the client-declared MIME), which also guards the Cloudinary `raw` audio store.

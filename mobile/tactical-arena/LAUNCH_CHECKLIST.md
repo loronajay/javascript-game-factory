@@ -23,7 +23,7 @@ build is perfect. Everything else can be fixed while the clock runs.
 | Store listing icon (512×512) | **Done** — `store-listing/play-icon-512.png` |
 | Feature graphic (1024×500) | **Done** — `store-listing/play-feature-graphic-1024x500.png` |
 | Store descriptions | **Drafted** — `store-listing/DESCRIPTIONS.md`, yours to edit |
-| Privacy policy | **Written** — `/privacy` on the site. Needs deploying and a working contact address |
+| Privacy policy | **Written** — `/privacy` on the site, contact `leojaylorona@gmail.com`. Needs the domain live (step 4) |
 | Screenshots | Not started — take these after your UI pass |
 | Play Console app entry | Not created yet |
 
@@ -150,18 +150,37 @@ talk you into a different one.
 
 **Mandatory. Play will not publish without a working URL.**
 
-The page is written and lives at `privacy/index.html`, so it will be at
-`https://jayarcade.com/privacy` once the site deploys. It covers what is collected, why, the
+The page is written and lives at `privacy/index.html`. It covers what is collected, why, the
 five processors (Railway, Cloudinary, Stripe, Google Play, Resend), what is public vs private,
-retention, deletion, children, and security.
+retention, deletion, children, and security. Its contact address is `leojaylorona@gmail.com`.
 
-**Two things you must do before using it as your policy URL:**
+**The site is moving from the GitHub Pages URL to `factory.jayarcade.com`.** The policy URL you
+give Play should be `https://factory.jayarcade.com/privacy`, so do the domain cutover first.
 
-1. **Read it.** It is a legal statement about your product, written from what the code does.
-   If any of it is wrong, it needs to be wrong-free before it is public.
-2. **Make `privacy@jayarcade.com` actually receive mail** — it is named four times as the
-   contact for data requests, and a privacy contact that bounces is worse than none. Either
-   set up the alias or swap the address for one that works.
+The apex `jayarcade.com` belongs to the `loronajay/games-directory` repo (Jay's Retro Arcade and
+the Cabinet OS the Pi kiosks pull from). **Do not move it** — GitHub allows one repo per domain,
+and reassigning the apex takes that site and the cabinets down. A subdomain sidesteps this
+entirely and touches nothing the arcade uses.
+
+1. **Namecheap DNS** — on `jayarcade.com`, add **one** record: type `CNAME`, host `factory`,
+   value `loronajay.github.io.` — nothing else. Do not touch the apex A records, the `www`
+   record, or the Resend MX/TXT/DKIM records.
+2. **GitHub** — repo `loronajay/javascript-game-factory` → Settings → Pages → Custom domain
+   `factory.jayarcade.com` → Save, then tick **Enforce HTTPS** once the certificate is issued
+   (can take up to an hour). The `CNAME` file at the repo root is already committed, so Pages
+   may pick this up on its own.
+3. **Railway** — set `APP_BASE_URL=https://factory.jayarcade.com`. The CORS allow-list already
+   includes that origin and the old Pages origin by default, so `ALLOWED_ORIGINS` needs nothing.
+4. **Stripe** — run one live checkout and confirm the return URL lands on the new host.
+
+⚠️ The custom domain serves the repo at the **root** (`factory.jayarcade.com/`), not under
+`/javascript-game-factory/`. Every in-site path is relative, so this is fine, but the game now
+lives at `https://factory.jayarcade.com/games/tactical-arena/index.html`. GitHub redirects the
+old github.io URLs, so existing links keep working.
+
+**Before using the policy as your URL: read it.** It is a legal statement about your product,
+written from what the code does. If any of it is wrong, it needs to be wrong-free before it
+is public.
 
 One claim worth confirming: it says account deletion removes your profile, images, posts,
 messages, friendships and gameplay records. `deleteAccountService` does exist, but it is worth
@@ -356,7 +375,8 @@ now refused **before** Google's payment sheet opens, so no money moves at all).
 
 Still open, and each needs something from you:
 
-- [ ] **Read the privacy policy** and make its contact address deliverable (step 4).
+- [ ] **Point `factory.jayarcade.com` at GitHub Pages** and read the privacy policy (step 4). Its
+      contact is now `leojaylorona@gmail.com`; swap it if you'd rather not publish that.
 - [ ] **Screenshots** — best taken from your own device after the UI pass.
 - [ ] **Refresh ownership when the shop opens.** The last piece of the duplicate-purchase
       work. A blocked purchase already corrects the catalog, but an owned item can still be

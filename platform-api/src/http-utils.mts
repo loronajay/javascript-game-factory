@@ -5,7 +5,12 @@ import busboy from "busboy";
 // website make authenticated cross-origin requests as a logged-in user and read
 // the responses. The live frontend origin plus any localhost dev origin are
 // allowed by default; extra origins can be added via ALLOWED_ORIGINS (comma list).
-const DEFAULT_ALLOWED_ORIGINS = ["https://loronajay.github.io"];
+const DEFAULT_ALLOWED_ORIGINS = [
+  "https://factory.jayarcade.com",
+  // The GitHub Pages origin the site was served from before the custom domain.
+  // Pages redirects it, but keep it allow-listed for old links and bookmarks.
+  "https://loronajay.github.io",
+];
 
 function configuredAllowedOrigins(): Set<string> {
   const raw = typeof process.env.ALLOWED_ORIGINS === "string" ? process.env.ALLOWED_ORIGINS : "";
