@@ -17,6 +17,17 @@ export function tempoStructuralSignature(state, isReady = isTempoUnitReady) {
   return `${state.phase}#${state.activation?.unitId ?? ""}#${ready}#${vitals}`;
 }
 
+export function syncTempoGaugeElement(element, pct, previousPct) {
+  if (pct === previousPct) return false;
+  const ready = pct >= 100;
+  const fill = element.querySelector(".vital-fill");
+  const number = element.querySelector(".vital-num");
+  if (fill) fill.style.width = `${pct}%`;
+  if (number) number.textContent = ready ? "READY" : `${pct}%`;
+  element.classList.toggle("is-ready", ready);
+  return true;
+}
+
 export function createTempoLoopController({
   runtime,
   menu = { active: null },
@@ -32,6 +43,7 @@ export function createTempoLoopController({
   let frame = 0;
   let lastFrameAt = 0;
   let renderSignature = "";
+  const displayedGaugePcts = new WeakMap();
 
   function stop() {
     if (frame) clock.cancelAnimationFrame(frame);
@@ -51,12 +63,9 @@ export function createTempoLoopController({
       const pct = Math.max(0, Math.min(100, Math.round(
         getTempoReadiness(runtime.state, unitId) / TEMPO_GAUGE_MAX * 100,
       )));
-      const ready = pct >= 100;
-      const fill = element.querySelector(".vital-fill");
-      const number = element.querySelector(".vital-num");
-      if (fill) fill.style.width = `${pct}%`;
-      if (number) number.textContent = ready ? "READY" : `${pct}%`;
-      element.classList.toggle("is-ready", ready);
+      if (syncTempoGaugeElement(element, pct, displayedGaugePcts.get(element))) {
+        displayedGaugePcts.set(element, pct);
+      }
     }
   }
 

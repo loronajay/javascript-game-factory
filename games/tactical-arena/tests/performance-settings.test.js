@@ -86,6 +86,19 @@ test("balanced mode neutralizes continuous action-selection and backdrop repaint
   assert.match(css, /filter\s*:\s*none/);
 });
 
+test("inactive full-scene weather pauses its particle animations without hiding active weather", () => {
+  const css = readFileSync(new URL("../styles/battle/scene.css", import.meta.url), "utf8");
+
+  assert.match(
+    css,
+    /\.bk-weather:not\(\.is-active\)\s+\.bk-(?:snow|rain|heat-haze|heat-band|storm-clouds|lightning)[^{]*\{[^}]*animation-play-state\s*:\s*paused\s*!important/s,
+  );
+  assert.doesNotMatch(
+    css,
+    /\.bk-weather\.is-active[^{]*\{[^}]*(?:animation\s*:\s*none|animation-play-state\s*:\s*paused)/s,
+  );
+});
+
 test("the default renderer preserves the original full-board stone texture", () => {
   const boardCss = readFileSync(new URL("../styles/battle/board.css", import.meta.url), "utf8");
   const matchHtml = readFileSync(new URL("../html/match-screen.html", import.meta.url), "utf8");
