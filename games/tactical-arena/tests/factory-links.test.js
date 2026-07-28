@@ -31,6 +31,27 @@ test("factoryMessagesUrl returns null for a blank id", () => {
   assert.equal(factoryMessagesUrl("", { currentHref: HREF }), null);
 });
 
+test("the packaged app links to the deployed factory site, not its own bundle", () => {
+  // In the app `currentHref` is https://localhost/..., which has no /player page —
+  // the link has to point at the real site so the WebView hands it to the browser.
+  const appHref = "https://localhost/games/tactical-arena/index.html";
+  assert.equal(
+    factoryPlayerUrl("player-42", { currentHref: appHref, native: true }),
+    "https://factory.jayarcade.com/player/index.html?id=player-42",
+  );
+  assert.equal(
+    factoryMessagesUrl("player-42", { currentHref: appHref, native: true, name: "War Chief" }),
+    "https://factory.jayarcade.com/messages/index.html?player=player-42&name=War+Chief",
+  );
+});
+
+test("the web build ignores the app origin and stays relative to the current page", () => {
+  assert.equal(
+    factoryPlayerUrl("player-42", { currentHref: HREF, native: false }),
+    "https://factory.example/player/index.html?id=player-42",
+  );
+});
+
 test("ids and names are URL-encoded", () => {
   const url = factoryMessagesUrl("a b/c", { name: "x&y", currentHref: HREF });
   assert.ok(url.includes("player=a+b%2Fc"));
