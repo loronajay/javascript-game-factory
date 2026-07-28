@@ -37,6 +37,16 @@ test("the Systems tab documents the cross-unit board mechanics", () => {
   }
 });
 
+test("the Systems tab includes weather details and camera controls", () => {
+  const systems = panelHtml("systems");
+  for (const weather of [/Blizzard/, /Spring Shower/, /Heatwave/, /Thunderstorm/]) {
+    assert.match(systems, weather);
+  }
+  assert.match(systems, /pinch/i);
+  assert.match(systems, /mouse wheel/i);
+  assert.match(systems, /drag/i);
+});
+
 test("Basics stays scoped to the turn ruleset, not board/piece mechanics", () => {
   const basics = panelHtml("basics");
   // These belong in Systems now; a regression that pushes them back into Basics

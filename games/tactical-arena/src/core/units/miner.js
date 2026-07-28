@@ -93,9 +93,10 @@ export const MINER = Object.freeze({
     effect: Object.freeze({
       type: "statModifiers",
       stats: Object.freeze({ moveRange: 1, strength: 1 }),
+      pierceWalls: true,
       rageEntryRestore: Object.freeze({ mp: 25 })
     }),
-    description: "RAGE: Gain +1 MOVE and +1 STR, instantly fill ore to max, and Ore Harvester grants +2% crit chance per 5 ore.",
+    description: "RAGE: Gain +1 MOVE and +1 STR, basic attacks fire through walls, instantly fill ore to max, and Ore Harvester grants +2% crit chance per 5 ore.",
     implemented: true
   }),
   rageArt: Object.freeze({

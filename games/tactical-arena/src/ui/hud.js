@@ -10,6 +10,7 @@ import { escapeHtml } from "./domHelpers.js";
 import { getRankedTierEmblemSrc, normalizeRankedTierId } from "./rankedEmblems.js";
 import { hasRankedAvatar, rankedAvatarHtml as rankedAvatarIconHtml } from "./rankedAvatars.js";
 import { badgeArtSrc, badgeTooltip } from "./playerBadges.js";
+import { armAbilityDetails } from "./abilityDetail.js";
 
 // Icon per weather id, shown in the match HUD's weather badge (renderWeatherBadge).
 // "none" is the badge's own resting state, not a WEATHER_TYPES entry.
@@ -339,6 +340,11 @@ export function renderActions(
   { actions, actionHelp },
   { resolving, controlsEnabled = true, lockedMessage = "Wait for your turn.", onActionClick }
 ) {
+  // Hold (or right-click) any action button to read the whole ability — the answer to a
+  // `title` tooltip touch cannot hover, a message box phones have to clip, and an
+  // instant-resolving ART that fires before its text is ever shown. Armed here because
+  // this function already owns the bar's event wiring; the gesture never dispatches.
+  armAbilityDetails(actions, unit ? { unit, state, accent: colorOf(state, unit.player) } : null);
   if (state.phase !== "playing") {
     actions.innerHTML = "";
     actionHelp.textContent = state.phase === "complete" ? "The duel is complete." : "Select an unspent piece.";

@@ -30,6 +30,7 @@ import { canMoveAndUseArts, getArtForUnit, getArtMpCost, getAvailableArts, getBa
 import { getProximityBonus, isFireBasedDamage, isFireDamageImmune, isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack } from "../rules/combat.js";
 import { chebyshevDistance, getLegalMoves, positionKey } from "../rules/movement.js";
 import {
+  artIsBodyBlocked,
   getArtTargetRange,
   getConeAimOptions,
   getConeCells,
@@ -147,8 +148,8 @@ export function generatePlans(state, unit) {
 function generateArtPlans(state, unit, art, ai, plans) {
   switch (ai.intent) {
     case "strike": {
-      const physical = (art.damageType ?? "physical") === "physical";
-      for (const enemy of rangedTargetsFrom(state, unit, unit.position, physical, art)) {
+      const bodyBlocked = artIsBodyBlocked(art);
+      for (const enemy of rangedTargetsFrom(state, unit, unit.position, bodyBlocked, art)) {
         plans.push(makePlan(unit, { primary: { kind: "art", artId: art.id, targetId: enemy.id } }));
       }
       break;
@@ -768,16 +769,16 @@ function attackableWallsFrom(state, unit, pos) {
   );
 }
 
-// Enemies in range of `pos`, gated by line of sight. `physical` adds the unit
-// body-block on top of the always-on wall block (matches the reducer's split).
-function rangedTargetsFrom(state, actor, pos, physical, art = null) {
+// Enemies in range of `pos`, gated by line of sight. `bodyBlocked` adds unit cover
+// on top of the always-on wall block (matches the reducer's split).
+function rangedTargetsFrom(state, actor, pos, bodyBlocked, art = null) {
   const range = art ? getArtTargetRange(state, actor, art) : getEffectiveStats(actor, state).attackRange;
   return livingUnits(state).filter((target) =>
     isTargetable(target) &&
     areEnemies(actor, target) &&
     chebyshevDistance(pos, target.position) <= range &&
     !isWallBetween(state, pos, target.position, actor) &&
-    (!physical || !isShotBlocked(state, pos, target.position, actor))
+    (!bodyBlocked || !isShotBlocked(state, pos, target.position, actor))
   );
 }
 

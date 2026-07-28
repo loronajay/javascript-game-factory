@@ -1,7 +1,7 @@
 import { getArtMpCost } from "../unitCatalog.js";
 import { areEnemies, cloneState, findUnit } from "../state.js";
 import { getArtTargetRange } from "../../rules/arts.js";
-import { addDuelMark, duelistTracksMisses, ignoresCriticalDamage, isWallBetween, rollToHit, shouldApplyAttackRecoil } from "../../rules/combat.js";
+import { addDuelMark, duelistTracksMisses, ignoresCriticalDamage, isShotBlocked, isWallBetween, rollToHit, shouldApplyAttackRecoil } from "../../rules/combat.js";
 import { CRIT_MULTIPLIER } from "../../rules/damage.js";
 import { chebyshevDistance } from "../../rules/movement.js";
 import { applyStatus, isTargetable } from "../../rules/statuses.js";
@@ -76,8 +76,8 @@ export function resolveChallenge(state, command, art) {
 }
 
 // Ronin's Shuriken: a range-3 throw that rolls to-hit for a FIXED amount of TRUE damage
-// (bypasses DEF and Defend). A crit still multiplies. A body doesn't block a thrown blade,
-// but a wall does. Records a duel mark on a whiff against a Ronin target, and recoils under
+// (bypasses DEF and Defend). A crit still multiplies. Bodies and walls can block the throw.
+// Records a duel mark on a whiff against a Ronin target, and recoils under
 // Final Draw like his other attacks while enemies remain.
 export function resolveShuriken(state, command, art) {
   const actorState = findUnit(state, command.unitId);
@@ -86,7 +86,8 @@ export function resolveShuriken(state, command, art) {
   if (chebyshevDistance(actorState.position, targetState.position) > getArtTargetRange(state, actorState, art)) {
     return reject(ERR.TARGET_OUT_OF_RANGE);
   }
-  if (isWallBetween(state, actorState.position, targetState.position, actorState)) {
+  if (isShotBlocked(state, actorState.position, targetState.position, actorState) ||
+      isWallBetween(state, actorState.position, targetState.position, actorState)) {
     return reject(ERR.TARGET_OBSTRUCTED);
   }
 

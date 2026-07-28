@@ -96,6 +96,31 @@ test("ranged wall basic attacks spend ore and do not grant Miner wall-kill ore",
   assert.equal(result.events[0].oreGained, undefined);
 });
 
+test("Diamond Harvester lets Miner fire basic attacks through wall tiles", () => {
+  const state = scenario([{ id: "target", player: 2, type: "swordsman", x: 4, y: 1 }], { hp: 5, mp: 25 });
+  state.tileObjects["2,1"] = { kind: "wall", hp: 1 };
+
+  let s = run(state, beginActivation(1, "miner")).nextState;
+  const result = run(s, attack(1, "miner", "target", NORMAL_HIT));
+  s = result.nextState;
+
+  assert.equal(findUnit(s, "target").hp, 21, "the wall no longer blocks a raging Miner shot");
+  assert.deepEqual(s.tileObjects["2,1"], { kind: "wall", hp: 1 }, "shooting through cover does not destroy it");
+});
+
+test("Diamond Harvester does not let Miner fire through intervening units", () => {
+  const state = scenario([
+    { id: "screen", player: 1, type: "swordsman", x: 2, y: 1 },
+    { id: "target", player: 2, type: "swordsman", x: 4, y: 1 }
+  ], { hp: 5, mp: 25 });
+
+  let s = run(state, beginActivation(1, "miner")).nextState;
+  const result = applyCommand(s, attack(1, "miner", "target", NORMAL_HIT));
+
+  assert.equal(result.accepted, false);
+  assert.equal(result.errorCode, "TARGET_OBSTRUCTED");
+});
+
 test("Ore Harvest gathers weighted ore, caps at 25, and grants +1 move next turn", () => {
   const state = scenario([{ id: "foe", player: 2, type: "swordsman", x: 6, y: 6 }], { mp: 24 });
   let s = run(state, beginActivation(1, "miner")).nextState;

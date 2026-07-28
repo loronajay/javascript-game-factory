@@ -156,6 +156,9 @@
           </defs>
           <ellipse id="boardGlow" cx="600" cy="440" rx="420" ry="210" fill="url(#boardAura)"/>
           <g id="boardLayer"></g>
+          <!-- Weather must stay OUT of #boardLayer: that layer is filtered, and an
+               animating descendant re-runs the filter every frame. See boardRenderer.js. -->
+          <g id="weatherLayer"></g>
           <g id="unitsLayer"></g>
           <g id="forecastLayer"></g>
           <g id="effectsLayer"></g>

@@ -57,6 +57,34 @@
 .choice-option-label { font:800 .84rem var(--font-display); letter-spacing:.02em; overflow-wrap:anywhere; }
 .choice-option-sub { font-size:.74rem; opacity:.75; }
 .choice-foot { display:flex; justify-content:flex-end; padding:.1rem 1.1rem 1rem; }
+
+/* Ability detail pop-up — hold (or right-click) an action button to read the whole
+   ability. Same .ref-modal backdrop + .ref-card shell; the body scrolls so a long kit
+   is never clipped the way the in-board #message box has to be. */
+.ability-detail-modal .ability-detail-card { width:min(30rem,94vw); }
+.ability-detail-head { display:flex; gap:.7rem; align-items:flex-start; padding:.8rem 1rem .7rem; border-bottom:1px solid var(--parchment-edge); background:linear-gradient(180deg,var(--console-hi),var(--console-lo)); flex-shrink:0; }
+.ability-detail-heading { display:grid; gap:.14rem; min-width:0; flex:1 1 auto; }
+.ability-detail-kicker { color:color-mix(in srgb,var(--team,var(--brass)) 70%,var(--muted)); font:800 .58rem var(--font-display); letter-spacing:.14em; text-transform:uppercase; }
+.ability-detail-title { margin:0; color:var(--brass-hi); font:800 1rem var(--font-display); letter-spacing:.05em; text-transform:uppercase; overflow-wrap:anywhere; }
+.ability-detail-owner { color:var(--muted); font-size:.72rem; overflow-wrap:anywhere; }
+.ability-detail-close { flex:0 0 auto; }
+.ability-detail-body { display:grid; gap:.6rem; padding:.85rem 1rem 1rem; overflow-y:auto; color:var(--text); }
+.ability-detail-blocked { margin:0; padding:.42rem .6rem; border:1px solid rgba(255,150,120,.4); border-radius:8px; background:rgba(90,25,20,.35); color:#ffbcae; font-size:.76rem; line-height:1.4; }
+.ability-detail-facts { display:grid; grid-template-columns:auto minmax(0,1fr); gap:.24rem .7rem; margin:0; }
+.ability-detail-fact-label { color:var(--muted); font:800 .58rem var(--font-display); letter-spacing:.1em; text-transform:uppercase; align-self:center; }
+.ability-detail-fact-value { margin:0; font-size:.8rem; line-height:1.35; overflow-wrap:anywhere; }
+.ability-detail-text { margin:0; font-size:.88rem; line-height:1.5; overflow-wrap:anywhere; }
+.ability-detail-note { margin:0; padding-left:.75rem; border-left:2px solid var(--brass-lo); color:var(--muted); font-size:.76rem; line-height:1.45; overflow-wrap:anywhere; }
+.ability-detail-passives { display:grid; gap:.35rem; padding-top:.55rem; border-top:1px solid rgba(188,214,236,.16); }
+.ability-detail-section-title { margin:0; color:var(--brass); font:800 .6rem var(--font-display); letter-spacing:.12em; text-transform:uppercase; }
+.ability-detail-passive { margin:0; font-size:.78rem; line-height:1.45; overflow-wrap:anywhere; }
+.ability-detail-passive.is-dormant { opacity:.6; }
+.ability-detail-passive-tag { margin-right:.4rem; padding:.06rem .32rem; border:1px solid var(--brass-lo); border-radius:4px; color:var(--brass); font:800 .54rem var(--font-display); letter-spacing:.08em; text-transform:uppercase; }
+.ability-detail-passive-name { margin-right:.3rem; color:var(--brass-hi); }
+/* A hold must not start a text selection or the OS "copy/share" callout on the way to
+   opening the card. */
+.actions button { -webkit-touch-callout:none; user-select:none; -webkit-user-select:none; }
+.actions button:disabled { pointer-events:none; }
 .ref-unit { padding:.9rem 0; border-bottom:1px dashed rgba(70,100,130,.4); }.ref-unit:last-child { border-bottom:0; }.ref-unit h3 { display:flex; gap:.5rem; align-items:center; margin:0 0 .55rem; color:var(--text); font:800 1rem var(--font-display); letter-spacing:.04em; }.ref-glyph { font-size:1.2rem; }/* Stat grid — the shared stat display model (codex + roster picker). Labeled
    cells with a meter under each value, normalized to the roster maximum for that
    stat, so relative strengths read at a glance. */

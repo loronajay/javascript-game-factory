@@ -86,6 +86,10 @@ test("release hotspots delegate cohesive responsibilities to smaller modules", (
     ["src/ui/progressionAnnouncements.js", 170, ["./progressionAnnouncementRunner.js"]],
     ["src/ui/progressionAnnouncementRunner.js", 100, []],
     ["src/ui/progressionAnnouncementPolicy.js", 30, []],
+    // The hold-to-read ability card: the pop-up stays a renderer, with the reference
+    // text shaped in a DOM-free model so every ART in the roster can be checked.
+    ["src/ui/abilityDetail.js", 260, ["./abilityDetailModel.js"]],
+    ["src/ui/abilityDetailModel.js", 260, []],
     ["src/ui/tutorialMenuScreens.js", 170, []],
     ["src/ui/settingsScreen.js", 250, []],
     ["src/ui/matchSetupScreens.js", 220, []],

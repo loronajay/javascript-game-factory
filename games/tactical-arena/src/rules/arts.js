@@ -495,6 +495,7 @@ export function artUsesPhysicalStrike(art) {
     art &&
     art.kind === "active" &&
     (art.damageType ?? "physical") === "physical" &&
+    art.resolution !== "challenge" &&
     art.resolution !== "statusCast"
   );
 }
@@ -505,7 +506,7 @@ export function artPiercesUnits(art) {
 }
 
 export function artIsBodyBlocked(art) {
-  return artUsesPhysicalStrike(art) && !artPiercesUnits(art);
+  return !artPiercesUnits(art) && (art.targeting?.bodyBlocked === true || artUsesPhysicalStrike(art));
 }
 
 // True when at least one living enemy of `actor` is poisoned — the gate for Virus's

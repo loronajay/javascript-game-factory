@@ -121,7 +121,7 @@ export const RONIN = Object.freeze({
       mpCost: 3,
       accuracy: 0.96,
       resolution: "shuriken",
-      targeting: Object.freeze({ range: 3 }),
+      targeting: Object.freeze({ range: 3, bodyBlocked: true }),
       damageType: "true",
       damage: Object.freeze({ type: "true", amount: 3, fixed: true }),
       description: "Throw a shuriken at an enemy within 3, rolling to hit for 3 true damage.",

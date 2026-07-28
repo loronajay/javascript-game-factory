@@ -82,13 +82,20 @@
 }
 .bk-weather--spring { background:radial-gradient(120% 70% at 50% 100%, rgba(90,210,154,.1), transparent 68%); }
 
-.bk-heat-haze { position:absolute; inset:auto 0 0 0; height:38%; background:radial-gradient(120% 60% at 50% 100%, rgba(255,150,60,.22), rgba(255,120,40,.08) 55%, transparent 78%); filter:blur(6px); animation:bk-heat-pulse 3.2s ease-in-out infinite alternate; }
+/* These layers are full-viewport and animate forever, so a filter:blur() on them
+   is a full-screen blur re-rasterized every frame. Their backgrounds are already
+   soft gradients — the blur was buying almost nothing for a very large bill, so
+   the softness now comes from the gradient stops alone. */
+.bk-heat-haze { position:absolute; inset:auto 0 0 0; height:38%; background:radial-gradient(120% 60% at 50% 100%, rgba(255,150,60,.22), rgba(255,120,40,.08) 55%, transparent 82%); animation:bk-heat-pulse 3.2s ease-in-out infinite alternate; }
 @keyframes bk-heat-pulse { 0% { opacity:.7; transform:scaleY(1); } 100% { opacity:1; transform:scaleY(1.12); } }
-.bk-heat-band { position:absolute; bottom:4%; width:1px; height:42%; background:linear-gradient(to top, rgba(255,200,120,.55), transparent); filter:blur(2px); transform-origin:bottom center; animation:bk-heat-wobble var(--dur,3s) ease-in-out var(--delay,0s) infinite; }
+.bk-heat-band { position:absolute; bottom:4%; width:7px; height:42%; background:radial-gradient(ellipse 55% 100% at 50% 100%, rgba(255,200,120,.5), rgba(255,200,120,.12) 55%, transparent 78%); transform-origin:bottom center; animation:bk-heat-wobble var(--dur,3s) ease-in-out var(--delay,0s) infinite; }
 @keyframes bk-heat-wobble { 0%,100% { transform:skewX(-4deg) scaleY(1); } 50% { transform:skewX(4deg) scaleY(1.06); } }
 
-.bk-storm-clouds { position:absolute; inset:0; background:radial-gradient(50% 30% at 20% 8%, rgba(20,26,40,.55), transparent 70%), radial-gradient(60% 28% at 70% 4%, rgba(16,22,36,.6), transparent 72%); filter:blur(10px); animation:bk-clouds-drift 42s linear infinite; }
-.bk-lightning { position:absolute; inset:0; background:#eaf2ff; opacity:0; mix-blend-mode:screen; animation:bk-lightning-flash 6.5s steps(1,jump-none) infinite; }
+.bk-storm-clouds { position:absolute; inset:0; background:radial-gradient(50% 30% at 20% 8%, rgba(20,26,40,.55), transparent 78%), radial-gradient(60% 28% at 70% 4%, rgba(16,22,36,.6), transparent 80%); animation:bk-clouds-drift 42s linear infinite; }
+/* No mix-blend-mode: a full-viewport blended layer forces a full-screen backdrop
+   read on every flash frame, and a white flash over a dark sky screens to
+   essentially what normal compositing already gives. */
+.bk-lightning { position:absolute; inset:0; background:#eaf2ff; opacity:0; animation:bk-lightning-flash 6.5s steps(1,jump-none) infinite; }
 @keyframes bk-lightning-flash {
   0%, 91% { opacity:0; }
   92% { opacity:.55; }

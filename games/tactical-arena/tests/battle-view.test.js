@@ -331,6 +331,10 @@ test("the action bar enables Cancel Move only after an uncommitted move", () => 
   assert.doesNotMatch(actions.innerHTML, /data-action="cancel-move"[^>]*disabled/);
 });
 
+test("disabled action buttons let hold-to-read gestures reach the action bar", () => {
+  assert.match(STYLE_CSS, /\.actions button:disabled\s*\{[^}]*pointer-events:none/);
+});
+
 test("the action bar displays effective ART MP costs after team discounts", () => {
   const state = createBattleState({
     units: [
@@ -1233,6 +1237,76 @@ test("Curve Shot highlights an enemy behind an intervening unit as a legal targe
   }
 });
 
+test("Ronin Challenge highlights a target behind an intervening unit", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const state = createBattleState({
+      size: 9,
+      units: [
+        { id: "ronin", player: 1, type: "ronin", x: 1, y: 1, mp: 4 },
+        { id: "screen", player: 1, type: "swordsman", x: 2, y: 1 },
+        { id: "target", player: 2, type: "swordsman", x: 4, y: 1 }
+      ]
+    });
+    const board = new TestSvgElement("svg");
+    const boardLayer = new TestSvgElement("g");
+    const unitsLayer = new TestSvgElement("g");
+
+    renderBoard({
+      board,
+      boardLayer,
+      unitsLayer,
+      state,
+      mode: "art:challenge",
+      selectedId: "ronin",
+      footworkPath: [],
+      onTileClick: () => {}
+    });
+
+    const targetTile = findSvgByAttribute(boardLayer, "data-key", "4,1");
+    assert.ok(targetTile.classList.contains("legal-art"), "Challenge is a callout, not a body-blocked strike");
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("Ronin Shuriken does not highlight a target screened by an intervening unit", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const state = createBattleState({
+      size: 9,
+      units: [
+        { id: "ronin", player: 1, type: "ronin", x: 1, y: 1, mp: 3 },
+        { id: "screen", player: 1, type: "swordsman", x: 2, y: 1 },
+        { id: "target", player: 2, type: "swordsman", x: 4, y: 1 }
+      ]
+    });
+    const board = new TestSvgElement("svg");
+    const boardLayer = new TestSvgElement("g");
+    const unitsLayer = new TestSvgElement("g");
+
+    renderBoard({
+      board,
+      boardLayer,
+      unitsLayer,
+      state,
+      mode: "art:shuriken",
+      selectedId: "ronin",
+      footworkPath: [],
+      onTileClick: () => {}
+    });
+
+    const targetTile = findSvgByAttribute(boardLayer, "data-key", "4,1");
+    assert.equal(targetTile.classList.contains("legal-art"), false, "a thrown shuriken is still screened by bodies");
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("Blasting Cap highlights wall tiles as legal targets", () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
@@ -1311,6 +1385,95 @@ test("Mother Nature weather renders a persistent non-clicking board overlay", ()
   } finally {
     globalThis.document = previousDocument;
   }
+});
+
+// #boardLayer carries the feTurbulence stone-grain filter. Weather animates
+// forever, and an animating descendant of a filtered element makes the browser
+// re-run that filter over the whole board every frame — measured at ~14fps
+// against ~60fps once weather is a sibling layer. Keep them apart.
+test("weather renders into its own layer, never inside the filtered board layer", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const state = createBattleState({
+      size: 8,
+      weather: "blizzard",
+      units: [
+        { id: "hero", player: 1, type: "swordsman", x: 1, y: 1 },
+        { id: "foe", player: 2, type: "swordsman", x: 6, y: 6 }
+      ]
+    });
+    const board = new TestSvgElement("svg");
+    const boardLayer = new TestSvgElement("g");
+    const weatherLayer = new TestSvgElement("g");
+    const unitsLayer = new TestSvgElement("g");
+
+    const render = () => renderBoard({
+      board,
+      boardLayer,
+      weatherLayer,
+      unitsLayer,
+      state,
+      mode: null,
+      selectedId: null,
+      footworkPath: [],
+      onTileClick: () => {}
+    });
+    render();
+
+    assert.equal(boardLayer.findByClass("weather-overlay"), null, "weather must not live under the filtered board layer");
+    assert.ok(weatherLayer.findByClass("weather-overlay"), "weather belongs in the dedicated weather layer");
+
+    // The weather layer is not the one renderBoard clears wholesale, so it has to
+    // clear it itself or every rerender stacks another overlay on the board.
+    render();
+    assert.equal(weatherLayer.findAllByClass("weather-overlay").length, 1, "rerendering must not stack overlays");
+
+    // No animated particle may carry a filter: each one costs an offscreen
+    // rasterization per frame. Glows are baked into gradient fills instead.
+    const particles = [
+      ...weatherLayer.findAllByClass("weather-flake"),
+      ...weatherLayer.findAllByClass("weather-snow-gust")
+    ];
+    assert.ok(particles.length > 0, "blizzard should draw particles");
+    for (const particle of particles) {
+      assert.equal(particle.getAttribute("filter"), null, "particles must not carry filters");
+      assert.match(particle.getAttribute("fill"), /^url\(#wx-/, "particle glow should be a gradient fill");
+    }
+
+    // main.js does NOT pass weatherLayer — renderBoard resolves it off the board
+    // root, so a host page opts in just by declaring the layer. If that lookup
+    // ever breaks, production silently falls back to the slow nested path.
+    const resolved = new TestSvgElement("g");
+    const hostBoard = new TestSvgElement("svg");
+    hostBoard.querySelector = (selector) => (selector === "#weatherLayer" ? resolved : null);
+    renderBoard({
+      board: hostBoard,
+      boardLayer: new TestSvgElement("g"),
+      unitsLayer: new TestSvgElement("g"),
+      state,
+      mode: null,
+      selectedId: null,
+      footworkPath: [],
+      onTileClick: () => {}
+    });
+    assert.ok(resolved.findByClass("weather-overlay"), "renderBoard should find #weatherLayer on the board root");
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("the match screen declares a weather layer outside the filtered board layer", () => {
+  const markup = readFileSync(join(GAME_ROOT, "html/match-screen.html"), "utf8");
+  const boardLayerAt = markup.indexOf('<g id="boardLayer">');
+  const weatherLayerAt = markup.indexOf('<g id="weatherLayer">');
+  const unitsLayerAt = markup.indexOf('<g id="unitsLayer">');
+
+  assert.ok(weatherLayerAt > 0, "match-screen.html must declare #weatherLayer");
+  assert.ok(boardLayerAt < weatherLayerAt, "weather paints above the tiles");
+  assert.ok(weatherLayerAt < unitsLayerAt, "weather paints below the units");
+  assert.match(markup, /<g id="boardLayer"><\/g>/, "#boardLayer must stay empty in markup, i.e. weather is not nested in it");
 });
 
 test("authored board weather renders without a Mother Nature unit", () => {

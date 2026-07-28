@@ -90,6 +90,50 @@ test("a unit can generate and replay wall-attack plans", () => {
   assertPlanReplays(state, 1, wallPlan);
 });
 
+test("a raging Miner generates basic-attack plans through wall cover", () => {
+  const state = createBattleState({
+    size: 9, seed: 12,
+    units: [
+      { id: "p1-miner", type: "miner", player: 1, x: 8, y: 0, hp: 5, mp: 25 },
+      { id: "p2-target", type: "swordsman", player: 2, x: 3, y: 0 }
+    ],
+    tileObjects: [{ x: 6, y: 0, kind: "wall", hp: 1 }]
+  });
+  const plans = generatePlans(state, findUnit(state, "p1-miner"));
+  const attackPlan = plans.find((p) => p.primary.kind === "attack" && p.primary.targetId === "p2-target");
+  assert.ok(attackPlan, "expected raging Miner to see a wall-piercing shot");
+  assertPlanReplays(state, 1, attackPlan);
+});
+
+test("Ronin Challenge plans ignore intervening units", () => {
+  const state = createBattleState({
+    size: 9, seed: 3,
+    units: [
+      { id: "p1-ronin", type: "ronin", player: 1, x: 1, y: 1, mp: 4 },
+      { id: "p1-screen", type: "swordsman", player: 1, x: 2, y: 1 },
+      { id: "p2-target", type: "swordsman", player: 2, x: 4, y: 1 }
+    ]
+  });
+  const plans = generatePlans(state, findUnit(state, "p1-ronin"));
+  const challenge = plans.find((p) => p.primary.kind === "art" && p.primary.artId === "challenge" && p.primary.targetId === "p2-target");
+  assert.ok(challenge, "expected Ronin to plan Challenge through a unit screen");
+  assertPlanReplays(state, 1, challenge);
+});
+
+test("Ronin Shuriken plans respect intervening unit cover", () => {
+  const state = createBattleState({
+    size: 9, seed: 3,
+    units: [
+      { id: "p1-ronin", type: "ronin", player: 1, x: 1, y: 1, mp: 7 },
+      { id: "p1-screen", type: "swordsman", player: 1, x: 2, y: 1 },
+      { id: "p2-target", type: "swordsman", player: 2, x: 4, y: 1 }
+    ]
+  });
+  const plans = generatePlans(state, findUnit(state, "p1-ronin"));
+  assert.ok(!plans.some((p) => p.primary.kind === "art" && p.primary.artId === "shuriken" && p.primary.targetId === "p2-target"),
+    "expected Ronin not to plan Shuriken through a unit screen");
+});
+
 test("a caster yields targeted ART plans (Spark)", () => {
   const state = skirmish();
   const plans = generatePlans(state, findUnit(state, "p1-mage"));

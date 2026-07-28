@@ -143,7 +143,7 @@ function wireTargetedBlastHover(actor, art, tileByKey, unitsLayer, state, aimKey
   }
 }
 
-export function renderBoard({ board, boardLayer, unitsLayer, state, mode, selectedId, footworkPath, onTileClick, onAreaHover = null, onUnitHover = null }) {
+export function renderBoard({ board, boardLayer, weatherLayer = null, unitsLayer, state, mode, selectedId, footworkPath, onTileClick, onAreaHover = null, onUnitHover = null }) {
   let legal = new Set();
   let range = new Set();
   const actor = selectedId ? state.units.find((u) => u.id === selectedId) : null;
@@ -482,8 +482,16 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
     }
   }
 
+  // Weather goes in its own layer when the host page provides one. #boardLayer is
+  // filtered (feTurbulence stone grain), and a perpetually-animating descendant
+  // forces that whole filter to re-rasterize every frame — measured at ~14fps
+  // nested versus ~60fps as a sibling, which is the bulk of "weather is laggy".
+  // Resolved from the board root rather than passed in, so adding the layer to a
+  // host page is enough to opt it in; hosts without one fall back in place.
+  const weatherHost = weatherLayer ?? board.querySelector?.("#weatherLayer") ?? boardLayer;
+  if (weatherHost !== boardLayer) weatherHost.replaceChildren();
   const weatherOverlay = createWeatherOverlay(metrics, state.size, activeWeather);
-  if (weatherOverlay) boardLayer.append(weatherOverlay);
+  if (weatherOverlay) weatherHost.append(weatherOverlay);
 
   if (volleyCones) wireVolleyHover(volleyCones, tileByKey, unitsLayer, state, onAreaHover);
   if (blastArt) wireTargetedBlastHover(actor, blastArt, tileByKey, unitsLayer, state, legal, onAreaHover);

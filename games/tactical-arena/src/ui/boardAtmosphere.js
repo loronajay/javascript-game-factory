@@ -9,6 +9,7 @@ import { DAIS_RIM_SCALE, daisDepth, getBoardDiamond, pointsToString } from "./is
 import { getActiveWeather } from "../core/unitCatalog.js";
 import { WEATHER_LABELS } from "../core/weather.js";
 import { shouldUseLowCostBoardPresentation } from "./performanceSettings.js";
+import { DROP_GLOW_SPAN, EMBER_GLOW_SPAN, FLAKE_GLOW_SPAN, createWeatherPaintServers } from "./weatherPaintServers.js";
 export function getActiveBoardWeather(state) {
   return getActiveWeather(state)?.id ?? null;
 }
@@ -26,19 +27,23 @@ function weatherStyle(tokens) {
     .join(";");
 }
 
-function addSnowField(g, metrics, bounds) {
+function addSnowField(g, metrics, bounds, suffix) {
   const field = svgElement("g", { class: "weather-field weather-field--snow" });
 
   // Wind-driven gust streaks sweeping across the board — what makes it read as a
-  // BLIZZARD rather than gentle flurries. Big, soft, blurred bands drifting sideways.
+  // BLIZZARD rather than gentle flurries. Big, soft bands drifting sideways; the
+  // softness is the radial fill, not a blur() (see weatherPaintServers).
   const gusts = svgElement("g", { class: "weather-snow-gusts" });
   for (let i = 0; i < 4; i += 1) {
     gusts.append(svgElement("ellipse", {
       class: "weather-snow-gust",
+      fill: `url(#wx-gust-${suffix})`,
       cx: bounds.w.x.toFixed(1),
       cy: (bounds.n.y + bounds.height * (0.22 + i * 0.19)).toFixed(1),
       rx: (bounds.width * 0.32).toFixed(1),
-      ry: Math.max(10, metrics.tileHeight * 0.5).toFixed(1),
+      // The old blur(11px) spread the band vertically; the gradient falloff has
+      // to cover that spread itself or the gusts read as thin hard ellipses.
+      ry: Math.max(14, metrics.tileHeight * 0.7).toFixed(1),
       style: weatherStyle({
         "--delay": `${(-i * 1.7).toFixed(2)}s`,
         "--dur": `${(5.4 + i * 0.9).toFixed(1)}s`,
@@ -56,9 +61,12 @@ function addSnowField(g, metrics, bounds) {
     const radius = Math.max(1.1, metrics.tileWidth * (0.011 + depth * 0.004));
     field.append(svgElement("circle", {
       class: `weather-flake weather-flake--d${depth}`,
+      fill: `url(#wx-flake-${suffix})`,
       cx: x.toFixed(2),
       cy: y.toFixed(2),
-      r: radius.toFixed(2),
+      // Drawn wider than the flake core: the outer band of the gradient IS the
+      // glow that used to be a per-flake drop-shadow filter.
+      r: (radius * FLAKE_GLOW_SPAN).toFixed(2),
       style: weatherStyle({
         // sway amplitude (side to side) + total fall distance (a couple tiles)
         "--wx": `${(metrics.tileWidth * (0.05 + depth * 0.018)).toFixed(0)}px`,
@@ -71,7 +79,7 @@ function addSnowField(g, metrics, bounds) {
   g.append(field);
 }
 
-function addRainField(g, metrics, bounds, { storm = false } = {}) {
+function addRainField(g, metrics, bounds, suffix, { storm = false } = {}) {
   const count = storm ? 34 : 42;
   const field = svgElement("g", { class: `weather-field ${storm ? "weather-field--storm" : "weather-field--rain"}` });
   for (let i = 0; i < count; i += 1) {
@@ -92,14 +100,17 @@ function addRainField(g, metrics, bounds, { storm = false } = {}) {
         "--dur": `${(storm ? 0.55 : 0.8) + depth * 0.11}s`
       })
     });
+    // Drawn wider than the visible streak and filled with a left→right fade, so
+    // the soft edge is paint instead of a per-drop drop-shadow filter.
+    const glowWidth = dropWidth * DROP_GLOW_SPAN;
     cycle.append(
       svgElement("rect", {
         class: "weather-drop",
-        x: (-dropWidth / 2).toFixed(2),
+        fill: `url(#wx-drop${storm ? "-storm" : ""}-${suffix})`,
+        x: (-glowWidth / 2).toFixed(2),
         y: (-dropHeight).toFixed(2),
-        width: dropWidth.toFixed(2),
-        height: dropHeight.toFixed(2),
-        rx: (dropWidth / 2).toFixed(2)
+        width: glowWidth.toFixed(2),
+        height: dropHeight.toFixed(2)
       }),
       svgElement("ellipse", {
         class: "weather-splat",
@@ -143,25 +154,12 @@ function addSpringPetals(g, metrics, bounds) {
 }
 
 // Heatwave: rising, wobbling shimmer columns (hot-air distortion) plus a scatter of
-// drifting embers, instead of the old vague grey blobs. The shimmer rects are filled
-// with a vertical transparent→warm→transparent gradient and heavily blurred in CSS so
-// they read as air warp, not solid bars; the wobble/rise/breathe lives in the keyframes.
-function addHeatField(g, metrics, bounds, size) {
+// drifting embers, instead of the old vague grey blobs. The columns are ellipses
+// filled with a radial warm gradient whose focal point sits low, so they are soft on
+// both axes without the animated filter:blur() they used to carry; the wobble/rise/
+// breathe lives in the keyframes.
+function addHeatField(g, metrics, bounds, suffix) {
   const field = svgElement("g", { class: "weather-field weather-field--heat" });
-
-  const gradId = `weather-heat-grad-${size}`;
-  const defs = svgElement("defs");
-  const grad = svgElement("linearGradient", { id: gradId, x1: "0", y1: "1", x2: "0", y2: "0" });
-  for (const [offset, color] of [
-    ["0%", "rgba(255,150,54,0)"],
-    ["30%", "rgba(255,170,74,.55)"],
-    ["62%", "rgba(255,206,120,.34)"],
-    ["100%", "rgba(255,235,175,0)"]
-  ]) {
-    grad.append(svgElement("stop", { offset, "stop-color": color }));
-  }
-  defs.append(grad);
-  field.append(defs);
 
   const cols = 7;
   for (let i = 0; i < cols; i += 1) {
@@ -169,13 +167,15 @@ function addHeatField(g, metrics, bounds, size) {
     const w = Math.max(26, metrics.tileWidth * (0.5 + (i % 3) * 0.14));
     const h = bounds.height * (0.66 + (i % 2) * 0.22);
     const yTop = bounds.n.y + bounds.height * 0.14;
-    field.append(svgElement("rect", {
+    field.append(svgElement("ellipse", {
       class: `weather-heat-shimmer weather-heat-shimmer--d${i % 3}`,
-      x: (cx - w / 2).toFixed(1),
-      y: yTop.toFixed(1),
-      width: w.toFixed(1),
-      height: h.toFixed(1),
-      fill: `url(#${gradId})`,
+      cx: cx.toFixed(1),
+      cy: (yTop + h / 2).toFixed(1),
+      // Wider than the old rect because the gradient falloff replaces the blur
+      // that used to bleed the column outward.
+      rx: (w * 0.85).toFixed(1),
+      ry: (h / 2).toFixed(1),
+      fill: `url(#wx-heat-${suffix})`,
       style: weatherStyle({
         "--delay": `${(-i * 0.5).toFixed(2)}s`,
         "--dur": `${(3.4 + (i % 3) * 0.7).toFixed(1)}s`
@@ -187,11 +187,13 @@ function addHeatField(g, metrics, bounds, size) {
   for (let i = 0; i < 14; i += 1) {
     const x = bounds.w.x + bounds.width * (((i * 37 + 11) % 100) / 100);
     const y = bounds.n.y + bounds.height * (0.4 + ((i * 17) % 55) / 100);
+    const core = Math.max(1.3, metrics.tileWidth * 0.012 * (1 + (i % 3) * 0.5));
     embers.append(svgElement("circle", {
       class: "weather-heat-ember",
+      fill: `url(#wx-ember-${suffix})`,
       cx: x.toFixed(1),
       cy: y.toFixed(1),
-      r: Math.max(1.3, metrics.tileWidth * 0.012 * (1 + (i % 3) * 0.5)).toFixed(1),
+      r: (core * EMBER_GLOW_SPAN).toFixed(1),
       style: weatherStyle({
         "--delay": `${((-(i * 7) % 40) / 10).toFixed(1)}s`,
         "--dur": `${(3 + (i % 4) * 0.8).toFixed(1)}s`
@@ -203,15 +205,18 @@ function addHeatField(g, metrics, bounds, size) {
   g.append(field);
 }
 
-function addStormCells(g, metrics, bounds) {
+function addStormCells(g, metrics, bounds, suffix) {
   const cells = svgElement("g", { class: "weather-storm-cells" });
   for (let i = 0; i < 5; i += 1) {
     cells.append(svgElement("ellipse", {
       class: "weather-storm-cell",
+      // Soft-edged by fill; the old halo was a drop-shadow filter on a pulsing
+      // element, i.e. an offscreen pass per cell per frame.
+      fill: `url(#wx-storm-cell-${suffix})`,
       cx: (bounds.w.x + bounds.width * (0.18 + i * 0.16)).toFixed(2),
       cy: (bounds.n.y + bounds.height * (0.18 + ((i * 3) % 4) * 0.08)).toFixed(2),
-      rx: Math.max(18, metrics.tileWidth * 0.38).toFixed(2),
-      ry: Math.max(8, metrics.tileHeight * 0.18).toFixed(2),
+      rx: Math.max(24, metrics.tileWidth * 0.5).toFixed(2),
+      ry: Math.max(11, metrics.tileHeight * 0.24).toFixed(2),
       style: weatherStyle({ "--delay": `${(-i * 0.35).toFixed(2)}s` })
     }));
   }
@@ -256,11 +261,20 @@ function addLightningBolts(g, metrics, bounds) {
     const startX = bounds.w.x + bounds.width * (-0.12 + i * 0.4 + (i % 2) * 0.06);
     const startY = bounds.n.y - bounds.height * (0.16 + (i % 2) * 0.05);
     const h = bounds.height * (0.85 + (i % 3) * 0.14);
-    bolts.append(svgElement("path", {
+    const d = boltPath(startX, startY, h, i * 7 + 3);
+    // The flash animation lives on the wrapper so the halo and the core strike
+    // together. The halo is a wide translucent stroke of the same path instead of
+    // the two stacked drop-shadow filters this used to carry — a stroke is one
+    // paint, a drop-shadow is a blur pass per frame of the flash.
+    const bolt = svgElement("g", {
       class: "weather-bolt",
-      d: boltPath(startX, startY, h, i * 7 + 3),
       style: weatherStyle({ "--delay": `${(i * 1.35).toFixed(2)}s` })
-    }));
+    });
+    bolt.append(
+      svgElement("path", { class: "weather-bolt-halo", d }),
+      svgElement("path", { class: "weather-bolt-core", d })
+    );
+    bolts.append(bolt);
   }
   g.append(bolts);
 }
@@ -292,8 +306,9 @@ export function createWeatherOverlay(metrics, size, weather) {
     points: pointsToString([[n.x, n.y], [e.x, e.y], [s.x, s.y], [w.x, w.y]])
   }));
 
-  const clipId = `weather-clip-${weather}-${size}`;
-  const defs = svgElement("defs");
+  const suffix = `${weather}-${size}`;
+  const clipId = `weather-clip-${suffix}`;
+  const defs = createWeatherPaintServers(suffix);
   const clip = svgElement("clipPath", { id: clipId });
   clip.append(svgElement("polygon", {
     points: pointsToString([[n.x, n.y], [e.x, e.y], [s.x, s.y], [w.x, w.y]])
@@ -304,15 +319,15 @@ export function createWeatherOverlay(metrics, size, weather) {
 
   const bounds = { n, e, s, w, center, width, height };
   if (weather === "blizzard") {
-    addSnowField(fields, metrics, bounds);
+    addSnowField(fields, metrics, bounds, suffix);
   } else if (weather === "spring") {
-    addRainField(fields, metrics, bounds);
+    addRainField(fields, metrics, bounds, suffix);
     addSpringPetals(fields, metrics, bounds);
   } else if (weather === "heatwave") {
-    addHeatField(fields, metrics, bounds, size);
+    addHeatField(fields, metrics, bounds, suffix);
   } else if (weather === "thunderstorm") {
-    addStormCells(fields, metrics, bounds);
-    addRainField(fields, metrics, bounds, { storm: true });
+    addStormCells(fields, metrics, bounds, suffix);
+    addRainField(fields, metrics, bounds, suffix, { storm: true });
     // bolts go on the unclipped root so strikes can fall beyond the board edge
     addLightningBolts(g, metrics, bounds);
   }

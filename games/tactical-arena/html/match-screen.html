@@ -74,6 +74,12 @@
             </defs>
             <ellipse id="boardGlow" cx="600" cy="440" rx="420" ry="210" fill="url(#boardAura)"/>
             <g id="boardLayer"></g>
+            <!-- Weather is a SIBLING of #boardLayer, not a child, and that is load-
+                 bearing: #boardLayer carries filter:url(#boardStone) (feTurbulence).
+                 An animated descendant invalidates that filter's cache, so weather
+                 inside it re-ran per-pixel fractal noise over the entire board every
+                 frame. Painting order is unchanged — above tiles, below units. -->
+            <g id="weatherLayer"></g>
             <g id="unitsLayer"></g>
             <g id="forecastLayer"></g>
             <g id="effectsLayer"></g>

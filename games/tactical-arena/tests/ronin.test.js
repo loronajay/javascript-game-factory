@@ -190,6 +190,18 @@ test("Challenge: marks both duellists for +2 against each other", () => {
   assert.equal(getChallengeDamageBonus(foe, ronin), 2, "the challenged foe deals +2 to Ronin");
 });
 
+test("Challenge: intervening units do not block the callout", () => {
+  const state = scenario([
+    { id: "ronin", type: "ronin", player: 1, x: 5, y: 5, mp: 4 },
+    { id: "screen", type: "swordsman", player: 1, x: 6, y: 5 },
+    { id: "foe", type: "swordsman", player: 2, x: 8, y: 5 }
+  ]);
+  let s = run(state, beginActivation(1, "ronin")).nextState;
+  s = run(s, useArt(1, "ronin", "challenge", { targetId: "foe" })).nextState;
+
+  assert.ok(findUnit(s, "foe").statuses.some((st) => st.type === "challenged" && st.from === "ronin"));
+});
+
 test("Shuriken: rolls to hit for a fixed 3 TRUE damage, ignoring DEF", () => {
   const state = scenario([
     { id: "ronin", type: "ronin", player: 1, x: 5, y: 5 },
@@ -210,6 +222,19 @@ test("Shuriken: a miss deals nothing and marks the whiff on a Ronin target", () 
   const res = run(s, useArt(2, "thrower", "shuriken", { targetId: "ronin", ...MISS }));
   assert.equal(findUnit(res.nextState, "ronin").hp, 40, "a miss deals nothing");
   assert.deepEqual(findUnit(res.nextState, "ronin").duelMarks, ["thrower"], "the whiff is marked");
+});
+
+test("Shuriken: intervening units block the throw", () => {
+  const state = scenario([
+    { id: "ronin", type: "ronin", player: 1, x: 5, y: 5, mp: 3 },
+    { id: "screen", type: "swordsman", player: 1, x: 6, y: 5 },
+    { id: "foe", type: "swordsman", player: 2, x: 8, y: 5 }
+  ]);
+  let s = run(state, beginActivation(1, "ronin")).nextState;
+  const result = applyCommand(s, useArt(1, "ronin", "shuriken", { targetId: "foe", ...NORMAL_HIT }));
+
+  assert.equal(result.accepted, false);
+  assert.equal(result.errorCode, "TARGET_OBSTRUCTED");
 });
 
 // --- RAGE: Final Draw ---------------------------------------------------------

@@ -193,6 +193,28 @@ test("the CPU Miner may keep mining when a ranged enemy is only reachable throug
   replay(state, commands);
 });
 
+test("the CPU Miner shoots through cover while raging instead of farming a wall", () => {
+  const state = createBattleState({
+    size: 9, seed: 12,
+    units: [
+      { id: "p1-sniper", type: "sniper", player: 1, x: 3, y: 0 },
+      { id: "p2-miner", type: "miner", player: 2, x: 8, y: 0, hp: 5, mp: 25 }
+    ],
+    tileObjects: [
+      { x: 6, y: 0, kind: "wall", hp: 1 },
+      { x: 8, y: 1, kind: "wall", hp: 1 }
+    ]
+  });
+  state.currentPlayer = 2;
+
+  const commands = chooseActivation(state, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(state) });
+  assert.ok(!commands.some((c) => c.type === "ATTACK" && c.targetPosition),
+    "expected raging Miner not to farm a wall with a cover-piercing shot available");
+  assert.ok(commands.some((c) => c.type === "ATTACK" && c.targetId === "p1-sniper"),
+    "expected raging Miner to shoot through cover");
+  replay(state, commands);
+});
+
 test("a charged CPU Nemesis does not re-cast locked Realm Traversal", () => {
   const state = createBattleState({
     size: 13,

@@ -13,6 +13,23 @@ export function attackerPierces(attacker) {
   return Boolean(attacker && getUnitType(attacker.type).passive?.effect?.pierce);
 }
 
+function activeLineOfSightEffects(attacker) {
+  if (!attacker) return [];
+  const definition = getUnitType(attacker.type);
+  return [
+    definition.passive,
+    ...definition.arts,
+    ...(isRaging(attacker) ? [definition.ragePassive, definition.rageArt] : []),
+    ...(attacker.bonusPassives ?? [])
+  ]
+    .map((source) => source?.effect)
+    .filter(Boolean);
+}
+
+export function attackerPiercesWalls(attacker) {
+  return activeLineOfSightEffects(attacker).some((effect) => effect.pierce || effect.pierceWalls);
+}
+
 export function attackerHasLineAttack(attacker) {
   if (!attacker || !isRaging(attacker)) return false;
   const definition = getUnitType(attacker.type);
@@ -72,7 +89,7 @@ export function isShotBlocked(state, from, to, attacker = null) {
 // exception is a piercing attacker (the Sniper's Rifle Powered shoots through
 // cover). `from`/`to` are {x,y}; pass `attacker` to honour pierce.
 export function isWallBetween(state, from, to, attacker = null) {
-  if (attackerPierces(attacker)) return false;
+  if (attackerPiercesWalls(attacker)) return false;
   return traceGridLine(from.x, from.y, to.x, to.y)
     .slice(1, -1)
     .some((cell) => isWallAt(state, cell));
