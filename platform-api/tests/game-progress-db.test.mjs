@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  getGameProgress,
+  isPubliclyClaimableKind,
   isValidGameClaimKind,
   recordGameProgressClaim,
 } from "../src/db/game-progress.mjs";
@@ -9,6 +11,7 @@ import {
 function createGameProgressPool() {
   const state = {
     claims: new Set(),
+    claimRows: [],
     valorBalance: 0,
     entitlements: new Map(),
     campaignProgress: new Map(),
@@ -24,6 +27,7 @@ function createGameProgressPool() {
         const key = `${params[0]}:${params[1]}:${params[2]}`;
         if (state.claims.has(key)) return { rowCount: 0, rows: [] };
         state.claims.add(key);
+        state.claimRows.push({ kind: params[3], source_id: params[4] });
         return { rowCount: 1, rows: [] };
       }
       if (text.includes("update game_progress_profiles")) {
@@ -78,6 +82,13 @@ function createGameProgressPool() {
       if (text.includes("from game_entitlements")) return { rows: [...state.entitlements.values()] };
       if (text.includes("from game_campaign_progress")) return { rows: [...state.campaignProgress.values()] };
       if (text.includes("from game_inventory_items")) return { rows: [] };
+      if (text.includes("from game_progress_claims")) {
+        return {
+          rows: state.claimRows
+            .filter((row) => row.kind === "tutorial-complete" && row.source_id)
+            .map((row) => ({ source_id: row.source_id })),
+        };
+      }
       return { rows: [] };
     },
   };
@@ -165,4 +176,50 @@ test("recordGameProgressClaim refuses premium kinds unless the trusted Stripe pa
   });
   assert.equal(paid.ok, true);
   assert.equal(pool.state.entitlements.has("skin:swordsman:medieval"), true);
+});
+
+test("campaign-progress records a mission clear and its stars without moving Valor", async () => {
+  const pool = createGameProgressPool();
+
+  const result = await recordGameProgressClaim(pool, {
+    playerId: "player-1",
+    gameSlug: "tactical-arena",
+    claimId: "campaign-progress:clod-trial:3",
+    kind: "campaign-progress",
+    payload: { missionId: "clod-trial", stars: 3 },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(pool.state.valorBalance, 0);
+  assert.deepEqual(result.progress.campaignProgress, [{
+    missionId: "clod-trial",
+    stars: 3,
+    completedAt: "2026-07-18T00:00:00.000Z",
+    valorClaimedAt: null,
+    rewardClaimedAt: null,
+  }]);
+});
+
+test("campaign-progress is a publicly claimable, non-premium kind", () => {
+  assert.equal(isValidGameClaimKind("campaign-progress"), true);
+  assert.equal(isPubliclyClaimableKind("campaign-progress"), true);
+});
+
+// A second device restores which tutorials are done from the claim rows themselves —
+// tutorial completion has no table of its own.
+test("the progress snapshot reports completed tutorials", async () => {
+  const pool = createGameProgressPool();
+
+  for (const tutorialId of ["basics", "arts-mp"]) {
+    await recordGameProgressClaim(pool, {
+      playerId: "player-1",
+      gameSlug: "tactical-arena",
+      claimId: `tutorial-complete:${tutorialId}`,
+      kind: "tutorial-complete",
+      payload: { tutorialId },
+    });
+  }
+
+  const snapshot = await getGameProgress(pool, "player-1", "tactical-arena");
+  assert.deepEqual(snapshot.completedTutorials.sort(), ["arts-mp", "basics"]);
 });

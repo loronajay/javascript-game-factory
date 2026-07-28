@@ -124,6 +124,23 @@ ownership backfill** → apply the server snapshot via `mergeServerEntitlementsI
   online boot**. Ownership reads (`isProgressUnitUnlocked`/`isProgressSkinUnlocked`) therefore
   reflect server truth without every call site becoming async.
 
+### Play progress syncs, but is NOT authoritative
+Campaign clears/stars and tutorial completion travel through the same claim queue
+(`playProgressSync.js`): a `campaign-progress` claim per mission (keyed on the star count, so a
+better replay is a new claim and the server keeps `greatest`), and the existing
+`tutorial-complete` claims. `getGameProgress` returns both back, and the merges are
+**forward-only unions** — neither side can lower the other. A one-time per-device backfill
+(`PLAY_PROGRESS_BACKFILL_FLAG`) queues whatever the device already had, including reward *picks*
+(campaign packs, the tutorial reward skin), which have no other record and were otherwise lost
+when signing in on a second device.
+
+This is progress restoration, not an authority claim: campaign completion stays client-asserted
+(see Known limits), and the play-progress merge deliberately carries **no Valor** — the payout
+already happened locally and the balance is reconciled separately, so re-claiming it would pay
+twice. Because it is a union, a campaign reset that failed to reach the server (offline) will be
+restored from the server on the next online boot; `resetCampaignOnServer` is what prevents that
+and is called on the in-game reset.
+
 ### The critical safety gate
 Authoritative mode runs **only when** signed-in AND the claim flush succeeded AND the backfill
 has confirmed (`OWNERSHIP_BACKFILL_FLAG` present). If the backfill hasn't succeeded, the merge

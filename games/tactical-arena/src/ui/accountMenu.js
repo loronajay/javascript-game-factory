@@ -13,7 +13,7 @@ import { openAuthPanel, AUTH_MODES } from "./authPanel.js";
 import { isNativeApp, notifySessionChanged } from "../platform/factorySignIn.js";
 import { readStoredFactoryAccountSession } from "../platform/factoryAccount.js";
 import { createAuthApiClient } from "../../../../js/platform/api/auth-api.mjs";
-import { loadFactoryProfile } from "../../../../js/platform/identity/factory-profile.mjs";
+import { bindFactoryProfileToSession, loadFactoryProfile } from "../../../../js/platform/identity/factory-profile.mjs";
 
 export const ACCOUNT_CONTROL_SELECTOR = "[data-account-control]";
 
@@ -24,6 +24,36 @@ function currentProfileName() {
   } catch {
     return "";
   }
+}
+
+// The local factory profile only learns the display name when the player registers or
+// signs in from a build that stored it. Anyone already signed in — or signed in through
+// an older build — has a nameless local profile, which is why the account panel used to
+// say "You are signed in." with no name. Ask the server once and cache it locally.
+let profileNameLookupDone = false;
+
+export async function refreshAccountProfileName({
+  auth = createAuthApiClient(),
+  session = readStoredFactoryAccountSession(),
+} = {}) {
+  const cached = currentProfileName();
+  if (cached) return cached;
+  if (!session?.authenticated || !auth?.isConfigured) return "";
+  // An account whose profile genuinely has no name would otherwise re-ask on every
+  // visit to the title screen. One lookup per session is enough.
+  if (profileNameLookupDone) return "";
+  profileNameLookupDone = true;
+  let result = null;
+  try {
+    result = await auth.getSession();
+  } catch {
+    profileNameLookupDone = false;
+    return "";
+  }
+  const name = typeof result?.profileName === "string" ? result.profileName.trim() : "";
+  if (!result?.ok || !result.playerId) return "";
+  bindFactoryProfileToSession(result.playerId, undefined, name ? { profileName: name } : {});
+  return name;
 }
 
 export function accountControlState({ session = readStoredFactoryAccountSession(), native } = {}) {
@@ -49,6 +79,18 @@ export function syncAccountControls(root = document, options = {}) {
   return state;
 }
 
+// Sync now, then relabel once the display name arrives. The control reads "Account"
+// in the meantime rather than blocking the menu on a network round-trip.
+export function syncAccountControlsWithName(root = document, options = {}) {
+  const state = syncAccountControls(root, options);
+  if (state.visible && state.signedIn && !currentProfileName()) {
+    refreshAccountProfileName()
+      .then((name) => { if (name) syncAccountControls(root, options); })
+      .catch(() => { /* the generic label is a fine fallback */ });
+  }
+  return state;
+}
+
 // Opens the right surface for the current session. `onChanged` re-syncs the menus
 // after a sign-in or sign-out so gated buttons flip without a reload.
 export async function openAccountPanel({
@@ -61,13 +103,15 @@ export async function openAccountPanel({
       mode: AUTH_MODES.signIn,
       auth,
       onSignedIn: async (result) => {
+        // A different account means a different name to look up.
+        profileNameLookupDone = false;
         notifySessionChanged();
         await onChanged?.(result);
       },
     });
   }
 
-  const name = currentProfileName();
+  const name = currentProfileName() || await refreshAccountProfileName({ auth, session });
   const choice = await openChoiceModal({
     title: "Account",
     subtitle: name ? `Signed in as ${name}.` : "You are signed in.",

@@ -18,6 +18,7 @@ import {
 import { mergeServerEntitlementsIntoUnlockProgress, readUnlockProgress } from "../progression/unlocks.js";
 import { mergeServerInventory } from "../progression/inventory.js";
 import { enqueuePurchasedUnlockAnnouncements } from "../progression/announcements.js";
+import { applyServerPlayProgress, backfillLocalPlayProgress } from "./playProgressSync.js";
 
 const OWNERSHIP_BACKFILL_FLAG = "tacticalArenaOwnershipBackfilledV1";
 
@@ -25,6 +26,10 @@ export async function syncGameProgress() {
   const storage = globalThis.localStorage;
   const account = readStoredFactoryAccountSession(storage);
   const checkoutResult = await fulfillReturnedPremiumCheckout({ storage, account });
+  // Campaign/tutorial progress this device earned before play-progress sync existed has
+  // no claim behind it. Queue those claims BEFORE the flush so they ride the same pass.
+  // Queue-only and idempotent, so it is safe for guests and offline boots too.
+  if (isFactoryAccountLoggedIn(account)) backfillLocalPlayProgress(storage);
   const flushResult = await flushPendingGameProgressClaims({ storage });
   // One-time: grandfather existing local ownership to the server so going
   // server-authoritative loses no progress. Server-idempotent; local flag skips re-posting.
@@ -62,6 +67,11 @@ export async function syncGameProgress() {
     // until then stay additive so an unsynced grant is not dropped.
     mergeServerInventory(storage, snapshot, { authoritative });
     enqueuePurchasedUnlockAnnouncements(storage, beforeProgress, afterProgress);
+    // Cleared missions, stars, and completed tutorials. Always a forward-only union, so
+    // unlike ownership this needs no authority rule — it runs even on a partial sync.
+    // It has to come AFTER the entitlement merge: restoring campaign progress is what
+    // lets unlocks.js re-derive the mission rewards that hang off it.
+    applyServerPlayProgress(storage, snapshot);
   }
   return { ...flushResult, checkoutResult };
 }

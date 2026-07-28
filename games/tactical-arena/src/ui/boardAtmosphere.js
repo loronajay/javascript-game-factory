@@ -5,7 +5,7 @@
 // jitter here is index-seeded (no RNG) so rebuilds are deterministic.
 
 import { svgElement } from "./svgHelpers.js";
-import { getBoardDiamond, pointsToString } from "./isometric.js";
+import { DAIS_RIM_SCALE, daisDepth, getBoardDiamond, pointsToString } from "./isometric.js";
 import { getActiveWeather } from "../core/unitCatalog.js";
 import { WEATHER_LABELS } from "../core/weather.js";
 import { shouldUseLowCostBoardPresentation } from "./performanceSettings.js";
@@ -387,15 +387,18 @@ export function createWallFigure(metrics, point) {
 // around the tiles, and two side faces giving the platform real thickness so the
 // board reads as a physical table instead of tiles floating in a void. Drawn
 // behind the tiles (appended first) and rebuilt with the board so it tracks size.
+//
+// The rim scale and depth come from isometric.js because createBoardViewBox has to
+// frame this geometry — if the two ever drift the dais gets clipped by the screen edge.
 export function createBoardDais(metrics, size) {
   const d = getBoardDiamond(metrics, size);
   const scale = (p, f) => ({ x: d.cx + (p.x - d.cx) * f, y: d.cy + (p.y - d.cy) * f });
-  const rim = 1.17;
+  const rim = DAIS_RIM_SCALE;
   const N = scale(d.n, rim);
   const E = scale(d.e, rim);
   const S = scale(d.s, rim);
   const W = scale(d.w, rim);
-  const depth = Math.max(22, metrics.tileHeight * 1.05);
+  const depth = daisDepth(metrics);
 
   const aura = 1.62;
   const aN = scale(d.n, aura);

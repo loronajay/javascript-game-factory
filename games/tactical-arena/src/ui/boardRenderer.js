@@ -421,11 +421,18 @@ export function renderBoard({ board, boardLayer, unitsLayer, state, mode, select
   board.setAttribute("viewBox", `${camera.x} ${camera.y} ${camera.width} ${camera.height}`);
   // Once the player has zoomed past the whole board, slide the view to whatever they
   // just selected and where it can act. No-op on a mouse and at zoom 1.
-  if (actor) {
-    const followPoints = [actor.position, ...[...legal].map(positionFromKey)]
+  //
+  // With nothing selected locally, follow whoever the authoritative state says is
+  // activating instead — that is the CPU's or the remote player's piece. Without this
+  // the camera simply sat still through the opponent's whole turn and a zoomed-in
+  // player watched an empty patch of board.
+  const followUnit = actor
+    || (state.activation?.unitId ? state.units.find((u) => u.id === state.activation.unitId) : null);
+  if (followUnit) {
+    const followPoints = [followUnit.position, ...(actor ? [...legal].map(positionFromKey) : [])]
       .filter(Boolean)
       .map((position) => gridToScreen(metrics, position.x, position.y));
-    followBoardSelection(board, { actorKey: actor.id, points: followPoints });
+    followBoardSelection(board, { actorKey: followUnit.id, points: followPoints });
   }
   boardLayer.replaceChildren();
   unitsLayer.replaceChildren();

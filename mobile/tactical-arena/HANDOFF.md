@@ -401,3 +401,59 @@ browser) or a build-time payload transform.
    files are tracked, so the new payment-verification suite will not commit without
    `git add -f` or a negation rule. Worth deciding deliberately — this is security-
    critical test coverage that currently lives only on this machine.
+
+
+## NOTES AFTER FIRST PLAY: 
+
+App needs to force full screen, it’s leaving a bar at the top and it’s fucking with my ui
+
+Also my campaign and tutorial progress needs to migrate over, it’s dumb i have to do all of the campaign missions and tutorials from my account again. It also appears that my skin progress has also been wiped when i login to my account from the app.
+"C:\Users\leoja\Downloads\Screenshot_20260727-141525.png"
+"C:\Users\leoja\Downloads\Screenshot_20260727-141557.png"
+"C:\Users\leoja\Downloads\Screenshot_20260727-141612.png"
+"C:\Users\leoja\Downloads\Screenshot_20260727-141633.png"
+
+Units in multiplayer squad selector have different sized buttons, they need to be fixed size this shit looks so fucking stupid: "C:\Users\leoja\Downloads\Screenshot_20260727-135951.png"
+
+Got stuck after a turn cycle because the fucking camera doesn’t pan after the opponent’s turn and i can’t fucking move it either so my units are fucking stuck off screen. Camera system needs some fixing, i should be able to move the camera before activating a unit if it’s my turn. "C:\Users\leoja\Downloads\Screenshot_20260727-140218.png"
+
+Account view should also say my account name, not just “you are signed in”
+
+### What was fixed (all five, 2026-07-27)
+
+1. **Full screen.** `MainActivity.goFullScreen()` sets `setDecorFitsSystemWindows(false)` and
+   hides the system bars with `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE` (sticky immersive), re-run
+   on `onWindowFocusChanged` so they do not linger after a swipe or an app switch. Both themes
+   get transparent bars and `windowLayoutInDisplayCutoutMode=shortEdges`. This also hands the
+   layout back the ~48px the status bar was taking off an already-short landscape viewport (the
+   WebView is *inset* by the bars on Android, it is not overlapped — see the layout facts above).
+
+2. **Campaign / tutorial / skin progress migration.** Root cause: play progress was never
+   server-backed. Valor and entitlements synced; *which missions are cleared, their stars, and
+   which tutorials are done* lived only in localStorage, so a second device started from zero —
+   and any reward derived from that progress went with it.
+   `src/platform/playProgressSync.js` now syncs it both ways (new `campaign-progress` claim kind
+   + `completedTutorials` on the progress snapshot), with a one-time per-device backfill of what
+   this device already had. The wiped skin was the *tutorial reward skin pick*
+   (`magician / summer-vibes`): a player choice with no record other than the local field, which
+   the authoritative ownership merge correctly dropped on a device that had never made it. The
+   backfill now asserts reward picks as claims, so the entitlement reaches the account.
+   **The web device has to boot online once** to push its backfill up before the phone sees it.
+
+3. **Roster card sizing.** `.roster-class-units` gets a fixed `grid-auto-rows`, and `.roster-unit`
+   an explicit portrait / name / flag row template, so the flag slot stays reserved on unlocked
+   units and a two-line name cannot grow the card. Verified at 820x360: every card 73.2x84.
+
+4. **Board clipped / camera.** The war-table dais is drawn *outside* the tile grid, but
+   `createBoardViewBox` only framed the grid. SVG clips to the viewport, not the viewBox, and
+   `preserveAspectRatio: meet` leaves zero slack on the tight axis — so on a short landscape
+   screen the bottom of the board was cut off, which is what put units out of reach. The viewBox
+   now unions in `getBoardDaisExtent` (guarded by a test at every board size). Separately,
+   `boardRenderer` now follows `state.activation.unitId` when nothing is selected locally, so a
+   zoomed-in camera tracks the CPU's / opponent's piece through their turn instead of sitting
+   still. Drag-pan stays gated on `zoom > 1`, which is now truthful: at zoom 1 the whole board
+   really does fit.
+
+5. **Account name.** `/auth/login` never returned `profileName` (only `/auth/register` did), so
+   the app had nothing to show. Login and `/auth/me` now include it, and
+   `refreshAccountProfileName()` back-fills it once for anyone already signed in.

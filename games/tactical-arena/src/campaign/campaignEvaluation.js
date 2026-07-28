@@ -39,6 +39,7 @@ import { STARTER_UNIT_TYPES, readUnlockProgress, writeUnlockProgress } from "../
 import { grantCampaignMissionValor } from "../progression/valorRewards.js";
 import { enqueueBattleModeUnlockAnnouncements, enqueueSkinUnlockAnnouncements, enqueueUnitUnlockAnnouncements } from "../progression/announcements.js";
 import {
+  buildCampaignProgressClaim,
   buildCampaignSkinRewardClaim,
   buildCampaignUnitRewardClaim,
   enqueueGameProgressClaim,
@@ -553,6 +554,13 @@ export function completeCampaignMission(storage = defaultStorage(), missionId, s
       [missionId]: Math.max(previousStars, evaluation.stars),
     },
   });
+  // The mission result itself, so a second device can restore the campaign. The Valor
+  // claim also carries stars but only fires on the first clear, so it cannot report a
+  // replay that scored better; this claim is keyed on the star count and can.
+  enqueueGameProgressClaim(storage, buildCampaignProgressClaim({
+    missionId,
+    stars: progress.missionStars[missionId] ?? evaluation.stars,
+  }));
   for (const type of newRewardUnits) {
     enqueueGameProgressClaim(storage, buildCampaignUnitRewardClaim({
       missionId,
