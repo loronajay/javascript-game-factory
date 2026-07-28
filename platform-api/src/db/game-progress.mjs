@@ -130,6 +130,15 @@ async function ensureGameProgressProfile(client, playerId, gameSlug) {
      values ($1, $2)
      on conflict (player_id, game_slug) do nothing`, [playerId, gameSlug]);
 }
+// True when a claim was built before a campaign reset this player has since performed.
+// Such a claim describes a campaign the player deliberately cleared, so honoring it would
+// resurrect exactly the progress the reset removed. A claim with no epoch reads as 0,
+// which is also every un-reset account's epoch — so nothing existing is treated as stale.
+async function isStaleCampaignClaim(client, playerId, gameSlug, claimEpoch) {
+    const claimed = clampInt(claimEpoch, { min: 0, max: 1_000_000 });
+    const result = await client.query(`select campaign_epoch from game_progress_profiles where player_id = $1 and game_slug = $2`, [playerId, gameSlug]);
+    return claimed < (Number(result.rows[0]?.campaign_epoch) || 0);
+}
 async function markCampaignProgress(client, playerId, gameSlug, missionId, patch = {}) {
     const stars = clampInt(patch.stars, { min: 0, max: 3 });
     const valorClaimedAt = patch.valorClaimedAt || null;
@@ -210,7 +219,7 @@ export async function getGameProgress(pool, playerId, gameSlug) {
         return null;
     try {
         const [profile, entitlements, campaignProgress, inventoryItems, tutorials] = await Promise.all([
-            pool.query(`select player_id, game_slug, valor_balance, created_at, updated_at
+            pool.query(`select player_id, game_slug, valor_balance, campaign_epoch, created_at, updated_at
          from game_progress_profiles
          where player_id = $1 and game_slug = $2`, [normalizedPlayerId, normalizedGameSlug]),
             pool.query(`select entitlement_id, kind, source, source_id, quantity, created_at, updated_at
@@ -236,6 +245,9 @@ export async function getGameProgress(pool, playerId, gameSlug) {
             playerId: normalizedPlayerId,
             gameSlug: normalizedGameSlug,
             valorBalance: Number(row.valor_balance) || 0,
+            // How many times this player's campaign has been reset. Clients compare it against
+            // the epoch they last saw to tell a reset apart from ordinary missing progress.
+            campaignEpoch: Number(row.campaign_epoch) || 0,
             entitlements: entitlements.rows.map(rowToEntitlement),
             campaignProgress: campaignProgress.rows.map(rowToCampaignProgress),
             completedTutorials: tutorials.rows.map((tutorialRow) => cleanText(tutorialRow.source_id, 200)).filter(Boolean),
@@ -291,7 +303,11 @@ export async function recordGameProgressClaim(pool, params = {}) {
             const missionId = cleanText(payload.missionId || sourceId, 200);
             // Stars only. markCampaignProgress takes greatest(existing, new), so replaying an
             // older result can never walk a player's best score backwards.
-            if (missionId)
+            //
+            // The claim row is recorded either way — a stale device that keeps a queued claim
+            // must be able to retire it — but a pre-reset claim is not allowed to write.
+            const stale = await isStaleCampaignClaim(client, playerId, gameSlug, payload.campaignEpoch);
+            if (missionId && !stale)
                 await markCampaignProgress(client, playerId, gameSlug, missionId, { stars: payload.stars });
         }
         else if (!alreadyProcessed && kind === "campaign-skin-choice") {
@@ -516,19 +532,41 @@ export async function activateInventoryItem(pool, params = {}) {
 // Reset campaign mission progress ONLY. Per the in-game Reset Progress contract, Valor,
 // unit/skin entitlements, and tutorial progress are intentionally preserved — this only
 // clears game_campaign_progress rows so the player can replay missions.
+//
+// Also bumps campaign_epoch. That is what makes the reset stick across devices: a client
+// still holding the old campaign sees an epoch ahead of its own and replaces its state
+// instead of unioning the cleared missions back in, and any claim built under the old
+// epoch is fenced off by isStaleCampaignClaim.
 export async function resetCampaignProgress(pool, playerId, gameSlug) {
     const normalizedPlayerId = cleanText(playerId, 120);
     const normalizedGameSlug = normalizeGameSlug(gameSlug);
     if (!pool || !normalizedPlayerId || !normalizedGameSlug) {
         return { ok: false, statusCode: 400, error: "invalid_request" };
     }
+    const client = await pool.connect();
     try {
-        await pool.query(`delete from game_campaign_progress where player_id = $1 and game_slug = $2`, [normalizedPlayerId, normalizedGameSlug]);
+        // The delete and the epoch bump have to land together: an epoch that advanced without
+        // the rows going (or rows going without the epoch advancing) is exactly the split-brain
+        // this column exists to prevent.
+        await client.query("begin");
+        await ensureGameProgressProfile(client, normalizedPlayerId, normalizedGameSlug);
+        await client.query(`delete from game_campaign_progress where player_id = $1 and game_slug = $2`, [normalizedPlayerId, normalizedGameSlug]);
+        // Claim rows are deliberately left alone. Deleting them would let the player re-earn
+        // every mission's Valor and re-pick every reward pack; the campaign-progress claims
+        // that DO need to be re-recordable get a fresh id from the new epoch instead.
+        await client.query(`update game_progress_profiles
+       set campaign_epoch = campaign_epoch + 1, updated_at = now()
+       where player_id = $1 and game_slug = $2`, [normalizedPlayerId, normalizedGameSlug]);
+        await client.query("commit");
         return { ok: true, progress: await getGameProgress(pool, normalizedPlayerId, normalizedGameSlug) };
     }
     catch (err) {
+        await client.query("rollback").catch(() => { });
         process.stderr.write(`[game-progress] resetCampaignProgress error: ${err?.message || err}\n`);
         return { ok: false, statusCode: 500, error: "reset_failed" };
+    }
+    finally {
+        client.release();
     }
 }
 // One-time, per-account migration of a signed-in player's existing LOCAL ownership to the

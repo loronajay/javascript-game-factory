@@ -6,6 +6,7 @@ import {
   isPubliclyClaimableKind,
   isValidGameClaimKind,
   recordGameProgressClaim,
+  resetCampaignProgress,
 } from "../src/db/game-progress.mjs";
 
 function createGameProgressPool() {
@@ -13,6 +14,7 @@ function createGameProgressPool() {
     claims: new Set(),
     claimRows: [],
     valorBalance: 0,
+    campaignEpoch: 0,
     entitlements: new Map(),
     campaignProgress: new Map(),
   };
@@ -30,8 +32,19 @@ function createGameProgressPool() {
         state.claimRows.push({ kind: params[3], source_id: params[4] });
         return { rowCount: 1, rows: [] };
       }
+      if (text.includes("select campaign_epoch from game_progress_profiles")) {
+        return { rows: [{ campaign_epoch: state.campaignEpoch }] };
+      }
       if (text.includes("update game_progress_profiles")) {
+        if (text.includes("campaign_epoch = campaign_epoch + 1")) {
+          state.campaignEpoch += 1;
+          return { rows: [] };
+        }
         state.valorBalance += Number(params[2]) || 0;
+        return { rows: [] };
+      }
+      if (text.includes("delete from game_campaign_progress")) {
+        state.campaignProgress.clear();
         return { rows: [] };
       }
       if (text.includes("insert into game_entitlements")) {
@@ -74,6 +87,7 @@ function createGameProgressPool() {
             player_id: params[0],
             game_slug: params[1],
             valor_balance: state.valorBalance,
+            campaign_epoch: state.campaignEpoch,
             created_at: "2026-07-18T00:00:00.000Z",
             updated_at: "2026-07-18T00:00:00.000Z",
           }],
@@ -222,4 +236,91 @@ test("the progress snapshot reports completed tutorials", async () => {
 
   const snapshot = await getGameProgress(pool, "player-1", "tactical-arena");
   assert.deepEqual(snapshot.completedTutorials.sort(), ["arts-mp", "basics"]);
+});
+
+// --- Campaign reset epoch -------------------------------------------------------------
+//
+// Reset is the only progress operation that moves backward, so it is the only one the
+// clients' forward-only union merges cannot express. The epoch is what makes it stick.
+
+const COMMON = { playerId: "player-1", gameSlug: "tactical-arena" };
+
+function campaignClaim({ missionId, stars, campaignEpoch }) {
+  const epochSegment = campaignEpoch > 0 ? `e${campaignEpoch}:` : "";
+  return {
+    ...COMMON,
+    claimId: `campaign-progress:${epochSegment}${missionId}:${stars}`,
+    kind: "campaign-progress",
+    payload: { missionId, stars, campaignEpoch },
+  };
+}
+
+test("resetCampaignProgress clears the missions and bumps the campaign epoch", async () => {
+  const pool = createGameProgressPool();
+  await recordGameProgressClaim(pool, campaignClaim({ missionId: "mission-1", stars: 3, campaignEpoch: 0 }));
+
+  const before = await getGameProgress(pool, COMMON.playerId, COMMON.gameSlug);
+  assert.equal(before.campaignEpoch, 0);
+  assert.equal(before.campaignProgress.length, 1);
+
+  const result = await resetCampaignProgress(pool, COMMON.playerId, COMMON.gameSlug);
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.progress.campaignProgress, []);
+  assert.equal(result.progress.campaignEpoch, 1);
+});
+
+test("a campaign claim built before a reset cannot resurrect the cleared progress", async () => {
+  const pool = createGameProgressPool();
+  await resetCampaignProgress(pool, COMMON.playerId, COMMON.gameSlug);
+
+  // The other device still has the old campaign cached and flushes a queued claim for it.
+  const stale = await recordGameProgressClaim(pool, campaignClaim({
+    missionId: "mission-1",
+    stars: 3,
+    campaignEpoch: 0,
+  }));
+
+  // The claim is accepted and recorded (so the device stops retrying) but writes nothing.
+  assert.ok(stale);
+  const snapshot = await getGameProgress(pool, COMMON.playerId, COMMON.gameSlug);
+  assert.deepEqual(snapshot.campaignProgress, []);
+});
+
+test("a mission replayed after a reset is recorded again under the new epoch", async () => {
+  const pool = createGameProgressPool();
+  await recordGameProgressClaim(pool, campaignClaim({ missionId: "mission-1", stars: 3, campaignEpoch: 0 }));
+  await resetCampaignProgress(pool, COMMON.playerId, COMMON.gameSlug);
+
+  // Same mission, same stars — only the epoch differs. Without the epoch in the claim id
+  // this would collide with the pre-reset claim and be swallowed as a duplicate, leaving
+  // the server permanently unable to re-record the mission.
+  await recordGameProgressClaim(pool, campaignClaim({ missionId: "mission-1", stars: 3, campaignEpoch: 1 }));
+
+  const snapshot = await getGameProgress(pool, COMMON.playerId, COMMON.gameSlug);
+  assert.equal(snapshot.campaignProgress.length, 1);
+  assert.equal(snapshot.campaignProgress[0].missionId, "mission-1");
+  assert.equal(snapshot.campaignProgress[0].stars, 3);
+});
+
+test("resetting preserves Valor and entitlement claims so nothing can be re-farmed", async () => {
+  const pool = createGameProgressPool();
+  await recordGameProgressClaim(pool, {
+    ...COMMON,
+    claimId: "campaign-valor:mission-1",
+    kind: "campaign-valor",
+    payload: { missionId: "mission-1", amount: 250, stars: 3 },
+  });
+  await resetCampaignProgress(pool, COMMON.playerId, COMMON.gameSlug);
+
+  // Replaying the mission must not pay a second time: the valor claim row survives the
+  // reset, so it is still a duplicate.
+  await recordGameProgressClaim(pool, {
+    ...COMMON,
+    claimId: "campaign-valor:mission-1",
+    kind: "campaign-valor",
+    payload: { missionId: "mission-1", amount: 250, stars: 3 },
+  });
+
+  const snapshot = await getGameProgress(pool, COMMON.playerId, COMMON.gameSlug);
+  assert.equal(snapshot.valorBalance, 250);
 });

@@ -10,6 +10,7 @@ import {
 } from "./performanceSettings.js";
 import { resetCampaignProgress } from "../campaign/campaign.js";
 import { resetCampaignOnServer } from "../platform/gameProgressClient.js";
+import { applyCampaignResetEpoch } from "../platform/playProgressSync.js";
 
 const RESET_PROGRESS_IDLE_LABEL = "Reset Progress";
 const RESET_PROGRESS_CONFIRM_LABEL = "Confirm Reset";
@@ -150,7 +151,11 @@ export function createSettingsScreen({
     // Best-effort: clear the account's campaign mission rows server-side too so the
     // server state matches the local reset. Valor / unlocks / skins are preserved by
     // the endpoint. No-op for guests or when the platform client is unavailable.
-    void resetCampaignOnServer();
+    // Adopting the returned epoch matters: claims this device queues afterwards must be
+    // stamped with the new generation, or its own reset fences off its own replays.
+    void resetCampaignOnServer().then((result) => {
+      if (result?.ok) applyCampaignResetEpoch(globalThis.localStorage, result.progress);
+    });
     if (progressStatus) {
       progressStatus.textContent = "Mission progress reset. Unit unlocks, Valor, tutorials, and owned skins were preserved.";
       window.clearTimeout(progressStatusTimer);

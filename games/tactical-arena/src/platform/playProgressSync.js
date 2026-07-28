@@ -29,8 +29,38 @@ import { TUTORIAL_IDS } from "../tutorials/tutorialContent.js";
 
 export const PLAY_PROGRESS_BACKFILL_FLAG = "tacticalArenaPlayProgressBackfilledV1";
 
+// The campaign reset generation this device is on. Its own key rather than a field on the
+// campaign payload: it is sync bookkeeping, not campaign state, and campaignProgress.js
+// normalizes away anything it does not recognize.
+export const CAMPAIGN_EPOCH_KEY = "tacticalArenaCampaignEpochV1";
+
 function cleanId(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function cleanEpoch(value) {
+  const epoch = Math.floor(Number(value));
+  if (!Number.isFinite(epoch) || epoch < 0) return 0;
+  return Math.min(epoch, 1000000);
+}
+
+export function readCampaignEpoch(storage) {
+  try {
+    return cleanEpoch(storage?.getItem?.(CAMPAIGN_EPOCH_KEY));
+  } catch {
+    return 0;
+  }
+}
+
+export function writeCampaignEpoch(storage, value) {
+  const epoch = cleanEpoch(value);
+  try {
+    storage?.setItem?.(CAMPAIGN_EPOCH_KEY, String(epoch));
+  } catch {
+    // Best-effort. Without the stored epoch this device re-replaces from the server on the
+    // next boot, which is wasteful but lands on the same state.
+  }
+  return epoch;
 }
 
 function clampStars(value) {
@@ -47,8 +77,13 @@ export function buildPlayProgressBackfillClaims(storage) {
   const progress = readUnlockProgress(storage);
   const claims = [];
 
+  const campaignEpoch = readCampaignEpoch(storage);
   for (const missionId of campaign.completedMissions) {
-    claims.push(buildCampaignProgressClaim({ missionId, stars: campaign.missionStars[missionId] ?? 0 }));
+    claims.push(buildCampaignProgressClaim({
+      missionId,
+      stars: campaign.missionStars[missionId] ?? 0,
+      campaignEpoch,
+    }));
   }
   for (const tutorialId of progress.completedTutorials) {
     claims.push(buildTutorialCompleteClaim({ tutorialId }));
@@ -99,11 +134,29 @@ export function backfillLocalPlayProgress(storage) {
   return { queued, alreadyBackfilled: false };
 }
 
-// Fold the server's campaign rows into local campaign progress. A union that takes the
-// better star count per mission, so neither side can walk the other backwards.
+// Fold the server's campaign rows into local campaign progress. Normally a union that takes
+// the better star count per mission, so neither side can walk the other backwards.
+//
+// The exception is a campaign reset, the one progress operation that moves backward. A union
+// cannot express it — the resetting device clears its missions, and every other device
+// merrily unions them back in. So the server's epoch decides: ahead of ours means a reset
+// happened elsewhere and the server's campaign REPLACES ours, empty rows and all.
 export function mergeServerCampaignProgress(storage, snapshot) {
   const rows = Array.isArray(snapshot?.campaignProgress) ? snapshot.campaignProgress : [];
   const current = readCampaignProgress(storage);
+
+  const serverEpoch = cleanEpoch(snapshot?.campaignEpoch);
+  if (serverEpoch > readCampaignEpoch(storage)) {
+    writeCampaignEpoch(storage, serverEpoch);
+    return writeCampaignProgress(storage, {
+      ...current,
+      completedMissions: rows.map((row) => cleanId(row?.missionId)).filter(Boolean),
+      missionStars: Object.fromEntries(
+        rows.map((row) => [cleanId(row?.missionId), clampStars(row?.stars)]).filter(([id]) => id),
+      ),
+    });
+  }
+
   if (!rows.length) return current;
 
   const completedMissions = new Set(current.completedMissions);
@@ -127,6 +180,15 @@ export function mergeServerCampaignProgress(storage, snapshot) {
   // writeCampaignProgress normalizes: unknown mission ids are dropped and every
   // completed mission is floored at one star.
   return writeCampaignProgress(storage, { ...current, completedMissions: [...completedMissions], missionStars });
+}
+
+// Adopt the epoch a just-performed reset produced. Without this the device that did the
+// resetting keeps stamping claims with the OLD epoch, and its own replays get fenced off by
+// its own reset — the server would never record them and no other device would see them.
+export function applyCampaignResetEpoch(storage, progress) {
+  const epoch = cleanEpoch(progress?.campaignEpoch);
+  if (epoch > readCampaignEpoch(storage)) writeCampaignEpoch(storage, epoch);
+  return epoch;
 }
 
 // Fold the server's completed-tutorial list into local unlock progress.

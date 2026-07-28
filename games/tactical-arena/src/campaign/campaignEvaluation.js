@@ -44,6 +44,7 @@ import {
   buildCampaignUnitRewardClaim,
   enqueueGameProgressClaim,
 } from "../platform/gameProgressClient.js";
+import { readCampaignEpoch } from "../platform/playProgressSync.js";
 import { getCampaignMission } from "./campaignModel.js";
 import { defaultStorage, readCampaignProgress, writeCampaignProgress } from "./campaignProgress.js";
 
@@ -560,6 +561,9 @@ export function completeCampaignMission(storage = defaultStorage(), missionId, s
   enqueueGameProgressClaim(storage, buildCampaignProgressClaim({
     missionId,
     stars: progress.missionStars[missionId] ?? evaluation.stars,
+    // Stamped with the reset generation this clear happened in, so a reset on another
+    // device can tell it apart from a result earned since.
+    campaignEpoch: readCampaignEpoch(storage),
   }));
   for (const type of newRewardUnits) {
     enqueueGameProgressClaim(storage, buildCampaignUnitRewardClaim({

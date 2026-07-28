@@ -110,15 +110,25 @@ export function buildCampaignValorClaim({ missionId, amount, stars = 0 } = {}) {
 // one is the payout and fires once per mission forever — it can never report a later star
 // improvement, or a mission cleared before progress sync existed. The star count is part
 // of the claim id so a better result is a new claim; the server keeps the greater value.
-export function buildCampaignProgressClaim({ missionId, stars = 0 } = {}) {
+// `campaignEpoch` is the reset generation this result was earned in (see the campaign_epoch
+// column). It rides the payload so the server can fence a claim built before a reset, and it
+// joins the claim id so a mission replayed AFTER a reset gets a fresh id — without that the
+// pre-reset claim would still be on file and the replay would be swallowed as a duplicate,
+// leaving the server permanently unable to re-record that mission.
+//
+// Epoch 0 keeps the original id shape: it is what every account that has never reset is on,
+// and changing those ids would re-run claims already recorded against them.
+export function buildCampaignProgressClaim({ missionId, stars = 0, campaignEpoch = 0 } = {}) {
   const cleanMissionId = cleanText(missionId);
   if (!cleanMissionId) return null;
   const cleanStars = cleanInt(stars, { min: 0, max: 3 });
+  const cleanEpoch = cleanInt(campaignEpoch, { min: 0, max: 1000000 });
+  const epochSegment = cleanEpoch > 0 ? `e${cleanEpoch}:` : "";
   return Object.freeze({
-    claimId: `campaign-progress:${cleanMissionId}:${cleanStars}`,
+    claimId: `campaign-progress:${epochSegment}${cleanMissionId}:${cleanStars}`,
     kind: "campaign-progress",
     sourceId: cleanMissionId,
-    payload: Object.freeze({ missionId: cleanMissionId, stars: cleanStars }),
+    payload: Object.freeze({ missionId: cleanMissionId, stars: cleanStars, campaignEpoch: cleanEpoch }),
   });
 }
 
