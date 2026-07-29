@@ -4,13 +4,15 @@ import { createBoardMetrics, createBoardViewBox, gridToScreen, pointsToString } 
 import { updateBoardTouchAssist } from "./boardTouchAssist.js";
 import { followBoardSelection, updateBoardCamera } from "./boardCameraController.js";
 import { getArt, getAuraSources, getEffectiveStats } from "../core/unitCatalog.js";
-import { areEnemies, getTileAffinity, unitAt } from "../core/state.js";
+import { areEnemies, colorOf, getTileAffinity, unitAt } from "../core/state.js";
 import { canTrample, chebyshevDistance, getLegalMoves, getTrampleMoveOptions, isOnBoard, positionFromKey, positionKey } from "../rules/movement.js";
 import { isShotBlocked, isStraightRayTarget, isWallBetween, requiresRayBasicAttack } from "../rules/combat.js";
-import { artIsBodyBlocked, getArtTargetRange, getConeAimOptions, getConeCells, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getPyroclasmReachTiles, getPyroclasmTargets, getRevivePlacementTiles, getRushStepOptions, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getTargetedBlastFootprint, getWallPlacementTiles } from "../rules/arts.js";
+import { artIsBodyBlocked, getArtTargetRange, getConeAimOptions, getConeCells, getFirePlacementTiles, getFlightTiles, getFootworkStepOptions, getLegalFleeTiles, getLineReachTiles, getLineTargets, getProtectLandingTiles, getPyroclasmReachTiles, getPyroclasmTargets, getRevivePlacementTiles, getRushStepOptions, getSelfBlastRadius, getSummonPlacementTiles, getTargetedBlastAimTiles, getWallPlacementTiles } from "../rules/arts.js";
 import { isTargetable } from "../rules/statuses.js";
 import { setSceneWeather } from "./sceneBackdrop.js";
-import { createBoardDais, createFireFigure, createWallFigure, createWeatherOverlay, getActiveBoardWeather } from "./boardAtmosphere.js";
+import { createFireFigure, createWallFigure, getActiveBoardWeather } from "./boardAtmosphere.js";
+import { ensureBoardGeometry, reconcileUnitLayer, tileClassName, updateWeatherLayer } from "./boardDomReconciler.js";
+import { wireTargetedBlastHover, wireVolleyHover } from "./boardHoverPreview.js";
 
 function createTile(metrics, position, { affinity, selected, legal, targetKind, path, range, aura }) {
   const point = gridToScreen(metrics, position.x, position.y);
@@ -35,7 +37,6 @@ function createTile(metrics, position, { affinity, selected, legal, targetKind, 
   );
   return tile;
 }
-
 
 export function isTargetedMode(mode, actor) {
   if (mode === "attack") return true;
@@ -83,64 +84,6 @@ export function isHealArtConfirmTile(state, actor, art, position) {
 
   const clicked = unitAt(state, position);
   return Boolean(clicked && clicked.hp > 0 && clicked.player === actor.player);
-}
-
-// Hovering a Volley direction lights that cone's tiles so the player sees the
-// shot before clicking. Pure DOM class toggling — no re-render — so it can't
-// loop on mouseenter.
-function wireVolleyHover(cones, tileByKey, unitsLayer, state, onAreaHover) {
-  for (const cone of cones) {
-    const enter = () => {
-      for (const k of cone.cells) tileByKey.get(k)?.classList.add("cone-hot");
-      for (const occupant of state.units) {
-        if (occupant.hp > 0 && cone.cells.includes(positionKey(occupant.position))) {
-          unitsLayer.querySelector(`[data-key="${positionKey(occupant.position)}"]`)?.classList.add("volley-hit");
-        }
-      }
-      onAreaHover?.(cone.origin);
-    };
-    const leave = () => {
-      for (const k of cone.cells) tileByKey.get(k)?.classList.remove("cone-hot");
-      unitsLayer.querySelectorAll(".volley-hit").forEach((el) => el.classList.remove("volley-hit"));
-      onAreaHover?.(null);
-    };
-    const hoverKeys = new Set([cone.key, ...cone.cells]);
-    for (const key of hoverKeys) {
-      const tile = tileByKey.get(key);
-      if (!tile) continue;
-      tile.addEventListener("mouseenter", enter);
-      tile.addEventListener("mouseleave", leave);
-    }
-  }
-}
-
-// Hovering a Thunderous Charge aim tile lights its detonation footprint and the enemies
-// inside it, so the player sees the blast before committing. Reuses the volley hot-tile /
-// hit-glow classes; pure DOM class toggling (no re-render), so it can't loop on mouseenter.
-function wireTargetedBlastHover(actor, art, tileByKey, unitsLayer, state, aimKeys, onAreaHover) {
-  const radius = art.targeting?.radius ?? 2;
-  for (const key of aimKeys) {
-    const tile = tileByKey.get(key);
-    if (!tile) continue;
-    const [cx, cy] = key.split(",").map(Number);
-    const footprint = getTargetedBlastFootprint(state, { x: cx, y: cy }, radius).map(positionKey);
-    const enter = () => {
-      for (const k of footprint) tileByKey.get(k)?.classList.add("cone-hot");
-      for (const occupant of state.units) {
-        if (isTargetable(occupant) && areEnemies(actor, occupant) && footprint.includes(positionKey(occupant.position))) {
-          unitsLayer.querySelector(`[data-key="${positionKey(occupant.position)}"]`)?.classList.add("volley-hit");
-        }
-      }
-      onAreaHover?.({ x: cx, y: cy });
-    };
-    const leave = () => {
-      for (const k of footprint) tileByKey.get(k)?.classList.remove("cone-hot");
-      unitsLayer.querySelectorAll(".volley-hit").forEach((el) => el.classList.remove("volley-hit"));
-      onAreaHover?.(null);
-    };
-    tile.addEventListener("mouseenter", enter);
-    tile.addEventListener("mouseleave", leave);
-  }
 }
 
 export function renderBoard({ board, boardLayer, weatherLayer = null, unitsLayer, state, mode, selectedId, footworkPath, onTileClick, onAreaHover = null, onUnitHover = null }) {
@@ -434,12 +377,9 @@ export function renderBoard({ board, boardLayer, weatherLayer = null, unitsLayer
       .map((position) => gridToScreen(metrics, position.x, position.y));
     followBoardSelection(board, { actorKey: followUnit.id, points: followPoints });
   }
-  boardLayer.replaceChildren();
-  unitsLayer.replaceChildren();
   board.classList.toggle("board-focused", Boolean(actor));
   board.setAttribute("data-weather", activeWeather ?? "none");
   setSceneWeather(activeWeather);
-  boardLayer.append(createBoardDais(metrics, state.size));
 
   // Deathly Aura zones (Necromancer + the Ghoul that carries it), tile → source
   // player for faction tinting. Computed every render and independent of selection
@@ -455,31 +395,27 @@ export function renderBoard({ board, boardLayer, weatherLayer = null, unitsLayer
     }
   }
 
-  const tileByKey = new Map();
-  for (let sum = 0; sum <= (state.size - 1) * 2; sum += 1) {
-    for (let x = 0; x < state.size; x += 1) {
-      const y = sum - x;
-      if (y < 0 || y >= state.size) continue;
-      const position = { x, y };
-      const key = positionKey(position);
-      const isLegal = legal.has(key);
-      const isSelected = unitAt(state, position)?.id === selectedId;
-      const inRange = !isLegal && range.has(key);
-      const inPath = path.has(key);
-      const tile = createTile(metrics, position, {
-        affinity: getTileAffinity(state, position),
-        selected: isSelected,
-        legal: isLegal,
-        targetKind: mode === "attack" ? "attack" : mode === "move" ? "move" : isHealArt ? "heal" : "art",
-        path: inPath,
-        range: inRange ? (mode === "attack" ? "attack" : isHealArt ? "heal" : "art") : null,
-        aura: !isLegal && !inRange && !inPath && !isSelected ? (auraByKey.get(key) ?? null) : null
-      });
-      tile.setAttribute("data-key", key);
-      tile.addEventListener("click", () => onTileClick(position));
-      boardLayer.append(tile);
-      tileByKey.set(key, tile);
-    }
+  const boardCache = ensureBoardGeometry(boardLayer, metrics, state, createTile);
+  boardCache.onTileClick = onTileClick;
+  boardCache.hoverCleanups.forEach((cleanup) => cleanup());
+  boardCache.hoverCleanups = [];
+  const tileByKey = boardCache.tileByKey;
+  const targetKind = mode === "attack" ? "attack" : mode === "move" ? "move" : isHealArt ? "heal" : "art";
+  for (const [key, tile] of tileByKey) {
+    const position = positionFromKey(key);
+    const isLegal = legal.has(key);
+    const isSelected = unitAt(state, position)?.id === selectedId;
+    const inRange = !isLegal && range.has(key);
+    const inPath = path.has(key);
+    tile.setAttribute("class", tileClassName({
+      affinity: getTileAffinity(state, position),
+      selected: isSelected,
+      legal: isLegal,
+      targetKind,
+      path: inPath,
+      range: inRange ? (mode === "attack" ? "attack" : isHealArt ? "heal" : "art") : null,
+      aura: !isLegal && !inRange && !inPath && !isSelected ? (auraByKey.get(key) ?? null) : null
+    }));
   }
 
   // Weather goes in its own layer when the host page provides one. #boardLayer is
@@ -489,12 +425,11 @@ export function renderBoard({ board, boardLayer, weatherLayer = null, unitsLayer
   // Resolved from the board root rather than passed in, so adding the layer to a
   // host page is enough to opt it in; hosts without one fall back in place.
   const weatherHost = weatherLayer ?? board.querySelector?.("#weatherLayer") ?? boardLayer;
-  if (weatherHost !== boardLayer) weatherHost.replaceChildren();
-  const weatherOverlay = createWeatherOverlay(metrics, state.size, activeWeather);
-  if (weatherOverlay) weatherHost.append(weatherOverlay);
+  updateWeatherLayer(weatherHost, boardLayer, metrics, state.size, activeWeather);
 
-  if (volleyCones) wireVolleyHover(volleyCones, tileByKey, unitsLayer, state, onAreaHover);
-  if (blastArt) wireTargetedBlastHover(actor, blastArt, tileByKey, unitsLayer, state, legal, onAreaHover);
+  unitsLayer.querySelectorAll(".volley-hit").forEach((element) => element.classList.remove("volley-hit"));
+  if (volleyCones) boardCache.hoverCleanups.push(...wireVolleyHover(volleyCones, tileByKey, unitsLayer, state, onAreaHover));
+  if (blastArt) boardCache.hoverCleanups.push(...wireTargetedBlastHover(actor, blastArt, tileByKey, unitsLayer, state, legal, onAreaHover));
 
   // Units and tile props (Build Cover walls, Throw Cigar fire) share ONE depth-
   // sorted layer so isometric occlusion is correct: a prop closer to the viewer
@@ -506,23 +441,39 @@ export function renderBoard({ board, boardLayer, weatherLayer = null, unitsLayer
   const renderables = [];
   for (const u of state.units) {
     if (u.hp <= 0 || u.introHidden) continue;
+    const isTarget = actor && legal.has(positionKey(u.position)) && (
+      ((targeted || Boolean(nukeArt)) && u.player !== actor.player) ||
+      // Age / Time Stretch reticle every in-range unit they can target (ally or enemy).
+      (isAllyOrEnemyArt && u.id !== actor.id) ||
+      // Anoint reticles an in-range ally (never self).
+      (isAllyArt && u.id !== actor.id && u.player === actor.player) ||
+      // Line abilities reticle their first-contact target (ally or enemy).
+      (isLineArt && u.id !== actor.id) ||
+      // Pyroclasm reticles every enemy caught on its rays.
+      (isPyroclasm && u.player !== actor.player)
+    );
     renderables.push({
+      key: `unit:${u.id}`,
       depth: u.position.x + u.position.y,
       z: 1,
-      make: () => {
-        const isTarget = actor && legal.has(positionKey(u.position)) && (
-          ((targeted || Boolean(nukeArt)) && u.player !== actor.player) ||
-          // Age / Time Stretch reticle every in-range unit they can target (ally or enemy).
-          (isAllyOrEnemyArt && u.id !== actor.id) ||
-          // Anoint reticles an in-range ally (never self).
-          (isAllyArt && u.id !== actor.id && u.player === actor.player) ||
-          // Line abilities reticle their first-contact target (ally or enemy).
-          (isLineArt && u.id !== actor.id) ||
-          // Pyroclasm reticles every enemy caught on its rays.
-          (isPyroclasm && u.player !== actor.player)
-        );
-        return createUnitFigure(metrics, u, { isTarget, selectedId, onUnitClick: onTileClick, onUnitHover, state });
-      }
+      signature: JSON.stringify({
+        size: state.size,
+        unit: u,
+        stats: getEffectiveStats(u, state),
+        team: colorOf(state, u.player),
+        selected: u.id === selectedId,
+        isTarget: Boolean(isTarget),
+        hoverable: Boolean(onUnitHover)
+      }),
+      make: (cache) => createUnitFigure(metrics, u, {
+        isTarget,
+        selectedId,
+        onUnitClick: (position) => cache.onTileClick?.(position),
+        onUnitHover: onUnitHover
+          ? (hovered) => cache.onUnitHover?.(hovered ? cache.unitsById.get(u.id) : null)
+          : null,
+        state
+      })
     });
   }
   for (const [key, obj] of Object.entries(state.tileObjects ?? {})) {
@@ -531,15 +482,23 @@ export function renderBoard({ board, boardLayer, weatherLayer = null, unitsLayer
     const position = { x, y };
     const point = gridToScreen(metrics, x, y);
     renderables.push({
+      key: `object:${key}`,
       depth: x + y,
       z: 0,
-      make: () => {
+      signature: `${state.size}:${key}:${obj.kind}`,
+      make: (cache) => {
         const fig = obj.kind === "wall" ? createWallFigure(metrics, point) : createFireFigure(metrics, point);
-        if (obj.kind !== "wall") fig.addEventListener("click", () => onTileClick(position));
+        if (obj.kind !== "wall") fig.addEventListener("click", () => cache.onTileClick?.(position));
         return fig;
       }
     });
   }
   renderables.sort((a, b) => a.depth - b.depth || a.z - b.z);
-  for (const r of renderables) unitsLayer.append(r.make());
+  reconcileUnitLayer(unitsLayer, {
+    size: state.size,
+    renderables,
+    onTileClick,
+    onUnitHover,
+    units: state.units
+  });
 }

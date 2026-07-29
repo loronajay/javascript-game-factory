@@ -9,6 +9,7 @@ class FakeSvgBoard {
     this.attributes = new Map();
     this.listeners = new Map();
     this.rect = { width, height };
+    this.rectReads = 0;
     this.ownerDocument = {
       defaultView: {
         matchMedia: () => ({ matches: coarsePointer }),
@@ -32,6 +33,7 @@ class FakeSvgBoard {
   }
 
   getBoundingClientRect() {
+    this.rectReads += 1;
     return this.rect;
   }
 
@@ -80,4 +82,18 @@ test("touch camera can pinch zoom even when tiles already meet the tap-target fl
     viewBoxWidth(board.getAttribute("viewBox")) < base.width,
     "pinching apart should shrink the visible viewBox instead of being clamped to zoom 1",
   );
+});
+
+test("touch camera caches layout measurements for the duration of a gesture", () => {
+  const board = new FakeSvgBoard({ width: 844, height: 390 });
+  const metrics = createBoardMetrics(13);
+  const base = createBoardViewBox(metrics, 13);
+  updateBoardCamera(board, { size: 13, metrics, base });
+
+  board.dispatch("pointerdown", { pointerId: 1, clientX: 180, clientY: 160 });
+  const readsAfterPointerDown = board.rectReads;
+  board.dispatch("pointermove", { pointerId: 1, clientX: 200, clientY: 170 });
+  board.dispatch("pointermove", { pointerId: 1, clientX: 220, clientY: 180 });
+
+  assert.equal(board.rectReads, readsAfterPointerDown, "pointermove should use the gesture's cached board rectangle");
 });

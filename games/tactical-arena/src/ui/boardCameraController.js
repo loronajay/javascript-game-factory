@@ -50,11 +50,11 @@ function applyViewBox(board, state) {
   return view;
 }
 
-function currentMaxZoom(board, state) {
-  const rect = board.getBoundingClientRect?.();
+function currentMaxZoom(board, state, rect = null) {
+  const viewportRect = rect ?? board.getBoundingClientRect?.();
   const touchTargetZoom = maxZoomForTileSize({
     base: state.base,
-    viewport: { width: rect?.width ?? 0, height: rect?.height ?? 0 },
+    viewport: { width: viewportRect?.width ?? 0, height: viewportRect?.height ?? 0 },
     tileWidth: state.metrics?.tileWidth ?? 0,
   });
   // The 44px touch-target floor is a minimum useful zoom, not the whole manual
@@ -84,6 +84,10 @@ function handlePointerDown(event) {
   const state = cameraState.get(board);
   if (!state || event.pointerType === "mouse") return;
 
+  if (state.pointers.size === 0) {
+    state.gestureRect = board.getBoundingClientRect?.() ?? null;
+    state.gestureMaxZoom = currentMaxZoom(board, state, state.gestureRect);
+  }
   state.pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
   state.lastSpread = state.pointers.size === 2 ? pointerSpread(state.pointers) : 0;
   state.lastMid = pointerMidpoint(state.pointers);
@@ -96,7 +100,7 @@ function handlePointerMove(event) {
 
   state.pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
 
-  const maxZoom = currentMaxZoom(board, state);
+  const maxZoom = state.gestureMaxZoom ?? currentMaxZoom(board, state);
   const mid = pointerMidpoint(state.pointers);
 
   if (state.pointers.size >= 2) {
@@ -110,7 +114,7 @@ function handlePointerMove(event) {
   } else if (state.camera.zoom > MIN_ZOOM) {
     // Convert the screen-space drag into SVG units via the current scale. Panning is
     // pointless at zoom 1 because the whole board is already visible.
-    const rect = board.getBoundingClientRect();
+    const rect = state.gestureRect ?? board.getBoundingClientRect();
     const view = cameraViewBox(state.base, state.camera);
     const scaleX = rect.width > 0 ? view.width / rect.width : 0;
     const scaleY = rect.height > 0 ? view.height / rect.height : 0;
@@ -132,6 +136,10 @@ function handlePointerUp(event) {
   state.pointers.delete(event.pointerId);
   state.lastSpread = state.pointers.size === 2 ? pointerSpread(state.pointers) : 0;
   if (state.pointers.size > 0) state.lastMid = pointerMidpoint(state.pointers);
+  else {
+    state.gestureRect = null;
+    state.gestureMaxZoom = null;
+  }
 }
 
 // Called from renderBoard on every render. Returns the viewBox to apply, so the
@@ -155,6 +163,8 @@ export function updateBoardCamera(board, { size, metrics, base }) {
     lastSpread: previous?.lastSpread ?? 0,
     lastMid: previous?.lastMid ?? { clientX: 0, clientY: 0 },
     lastActorKey: sizeChanged ? null : previous?.lastActorKey ?? null,
+    gestureRect: previous?.gestureRect ?? null,
+    gestureMaxZoom: previous?.gestureMaxZoom ?? null,
   };
   cameraState.set(board, state);
 
@@ -172,7 +182,7 @@ export function updateBoardCamera(board, { size, metrics, base }) {
     board.addEventListener("pointercancel", handlePointerUp, { passive: true });
   }
 
-  state.camera = clampCamera(base, state.camera, { maxZoom: currentMaxZoom(board, state) });
+  state.camera = clampCamera(base, state.camera, { maxZoom: state.gestureMaxZoom ?? currentMaxZoom(board, state) });
   return cameraViewBox(base, state.camera);
 }
 

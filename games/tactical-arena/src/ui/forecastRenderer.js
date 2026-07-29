@@ -7,19 +7,26 @@ import { applyBlastEdgeFalloff, artIsBodyBlocked, artUsesPhysicalStrike, getArtT
 import { finalizeMagicDamage, getArtAccuracy, getBasicAttackDamageType, getMissChance, getProximityBonus, isShotBlocked, isStraightRayTarget, isWallBetween, negatesPhysicalWhileDefending, requiresRayBasicAttack, resolveBaseStrike, resolveFixedMagicStrike, resolveFixedPhysicalStrike } from "../rules/combat.js";
 import { resolveDamage } from "../rules/damage.js";
 
-function drawForecastBadge(forecastLayer, metrics, target, label, cls, yOffset = 0) {
+const forecastLayerCache = new WeakMap();
+
+function createForecastBadge() {
+  const group = svgElement("g");
+  const text = svgElement("text", { class: "fc-text", x: 0, y: 5, "text-anchor": "middle" });
+  group.append(svgElement("rect", { class: "fc-bg", y: -11, height: 22, rx: 11 }), text);
+  return group;
+}
+
+function updateForecastBadge(group, metrics, target, label, cls, yOffset = 0) {
   const point = gridToScreen(metrics, target.position.x, target.position.y);
   const y = point.y + metrics.tileHeight * 0.45 - 52 + yOffset;
-  const group = svgElement("g", {
-    class: `forecast-badge ${cls}`,
-    "data-target-id": target.id,
-    transform: `translate(${point.x} ${y})`
-  });
+  group.setAttribute("class", `forecast-badge ${cls}`);
+  group.setAttribute("data-target-id", target.id);
+  group.setAttribute("transform", `translate(${point.x} ${y})`);
   const halfWidth = 15 + (label.length - 1) * 4.5;
-  const text = svgElement("text", { class: "fc-text", x: 0, y: 5, "text-anchor": "middle" });
+  const [rect, text] = group.children;
+  rect.setAttribute("x", -halfWidth);
+  rect.setAttribute("width", halfWidth * 2);
   text.textContent = label;
-  group.append(svgElement("rect", { class: "fc-bg", x: -halfWidth, y: -11, width: halfWidth * 2, height: 22, rx: 11 }), text);
-  forecastLayer.append(group);
 }
 
 function accuracyLabel(missChance) {
@@ -27,9 +34,22 @@ function accuracyLabel(missChance) {
   return `${Math.round(hitChance * 100)}%`;
 }
 
-function drawForecastStack(forecastLayer, metrics, target, accuracy, label, cls) {
-  drawForecastBadge(forecastLayer, metrics, target, accuracy, "fc-accuracy", -24);
-  drawForecastBadge(forecastLayer, metrics, target, label, cls);
+function syncForecastChildren(forecastLayer, desired) {
+  const current = [...forecastLayer.children];
+  if (current.length === desired.length && desired.every((child, index) => current[index] === child)) return;
+  if (typeof forecastLayer.insertBefore !== "function") {
+    forecastLayer.replaceChildren(...desired);
+    return;
+  }
+  for (let index = 0; index < desired.length; index += 1) {
+    if (forecastLayer.children[index] !== desired[index]) {
+      forecastLayer.insertBefore(desired[index], forecastLayer.children[index] ?? null);
+    }
+  }
+  const keep = new Set(desired);
+  for (const child of [...forecastLayer.children]) {
+    if (!keep.has(child)) child.remove();
+  }
 }
 
 function drawForecastEntries(forecastLayer, metrics, entries, hoveredTargetId = null) {
@@ -38,9 +58,27 @@ function drawForecastEntries(forecastLayer, metrics, entries, hoveredTargetId = 
   for (const entry of entries) {
     (entry.target.id === hoveredTargetId ? hovered : regular).push(entry);
   }
+  const previous = forecastLayerCache.get(forecastLayer) ?? new Map();
+  const next = new Map();
+  const desired = [];
   for (const { target, accuracy, label, cls } of [...regular, ...hovered]) {
-    drawForecastStack(forecastLayer, metrics, target, accuracy, label, cls);
+    for (const badge of [
+      { key: `${target.id}:accuracy`, label: accuracy, cls: "fc-accuracy", yOffset: -24 },
+      { key: `${target.id}:damage`, label, cls, yOffset: 0 }
+    ]) {
+      const group = previous.get(badge.key) ?? createForecastBadge();
+      updateForecastBadge(group, metrics, target, badge.label, badge.cls, badge.yOffset);
+      next.set(badge.key, group);
+      desired.push(group);
+    }
   }
+  forecastLayerCache.set(forecastLayer, next);
+  syncForecastChildren(forecastLayer, desired);
+}
+
+function clearForecast(forecastLayer) {
+  if (forecastLayer.children.length) forecastLayer.replaceChildren();
+  forecastLayerCache.set(forecastLayer, new Map());
 }
 
 // Shapes whose real resolver does NOT run a plain single-target strike through
@@ -162,15 +200,14 @@ function areaForecastEntries(state, actor, art, areaCenter) {
 // when an attack or physical strike ART is blinded).
 // Uses the same strike resolver the reducer uses, so damage-type changes stay honest.
 export function renderForecast({ forecastLayer, state, mode, actor, resolving, areaCenter = null, enabled = true, hoveredTargetId = null }) {
-  forecastLayer.replaceChildren();
-  if (!enabled) return;
-  if (!actor || state.phase !== "playing" || resolving) return;
+  if (!enabled) return clearForecast(forecastLayer);
+  if (!actor || state.phase !== "playing" || resolving) return clearForecast(forecastLayer);
   const isAttack = mode === "attack";
   const artId = mode?.startsWith("art:") ? mode.slice(4) : null;
   const art = artId ? getArtForUnit(actor, artId) : null;
   const isStrikeArt = Boolean(artId) && isForecastableStrikeArt(art);
   const isAreaArt = Boolean(artId) && isForecastableAreaArt(art);
-  if (!isAttack && !isStrikeArt && !isAreaArt) return;
+  if (!isAttack && !isStrikeArt && !isAreaArt) return clearForecast(forecastLayer);
 
   const metrics = createBoardMetrics(state.size);
   if (isAreaArt && !isStrikeArt && !isAttack) {

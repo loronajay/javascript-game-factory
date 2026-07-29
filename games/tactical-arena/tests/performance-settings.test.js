@@ -99,6 +99,16 @@ test("inactive full-scene weather pauses its particle animations without hiding 
   );
 });
 
+test("the living sky avoids an animated full-screen filter", () => {
+  const css = readFileSync(new URL("../styles/battle/scene.css", import.meta.url), "utf8");
+  const start = css.indexOf("@keyframes bk-sky-drift");
+  const drift = css.slice(start, css.indexOf("/* Stars:", start));
+
+  assert.doesNotMatch(drift, /filter\s*:/, "sky drift should stay on compositor-friendly opacity");
+  assert.match(css, /\.bk-sky::after\s*\{[^}]*background/s, "the brightness pulse should retain a visible overlay");
+  assert.match(drift, /opacity\s*:/, "the replacement sky pulse should remain animated");
+});
+
 test("the default renderer preserves the original full-board stone texture", () => {
   const boardCss = readFileSync(new URL("../styles/battle/board.css", import.meta.url), "utf8");
   const matchHtml = readFileSync(new URL("../html/match-screen.html", import.meta.url), "utf8");

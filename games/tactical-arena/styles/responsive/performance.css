@@ -36,6 +36,7 @@ html[data-performance="balanced"] .weather-bolt {
 }
 
 html[data-performance="balanced"] .bk-sky,
+html[data-performance="balanced"] .bk-sky::after,
 html[data-performance="balanced"] .bk-stars,
 html[data-performance="balanced"] .bk-window,
 html[data-performance="balanced"] .unit.idle:not(.spent) .body-group,
@@ -90,10 +91,10 @@ html[data-performance="balanced"] .dais-aura {
     display: none;
   }
 
-  /* Keep the cheap static layers but stop their perpetual repaint. .bk-sky
-     animates filter:brightness on a full-viewport gradient — a full-screen
-     repaint every frame. */
+  /* Keep the cheap static layers but stop their ambient motion. The sky pulse
+     is opacity-only, but balanced and touch modes still leave it static. */
   .bk-sky,
+  .bk-sky::after,
   .bk-stars,
   .bk-window {
     animation: none !important;

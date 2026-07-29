@@ -78,6 +78,26 @@ function toggleClass(element, className, enabled) {
   element.className = [...classes].join(" ");
 }
 
+const squadRenderCache = new WeakMap();
+
+function syncElementChildren(parent, desired) {
+  const current = [...parent.children];
+  if (current.length === desired.length && desired.every((child, index) => current[index] === child)) return;
+  if (typeof parent.insertBefore !== "function") {
+    parent.replaceChildren(...desired);
+    return;
+  }
+  for (let index = 0; index < desired.length; index += 1) {
+    if (parent.children[index] !== desired[index]) {
+      parent.insertBefore(desired[index], parent.children[index] ?? null);
+    }
+  }
+  const keep = new Set(desired);
+  for (const child of [...parent.children]) {
+    if (!keep.has(child)) child.remove();
+  }
+}
+
 export function canMoveInActivation(activation) {
   return Boolean(activation && !activation.moved);
 }
@@ -415,23 +435,41 @@ export function renderActions(
 }
 
 export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnabled = true, tempoCanSelect = null } = {}) {
-  squadOverlays.replaceChildren();
   const players = state.turnOrder ?? [1, 2];
   const compactHud = players.length === 4;
+  let cache = squadRenderCache.get(squadOverlays);
+  if (!cache) {
+    cache = { panels: new Map(), rows: new Map(), onBeginUnit };
+    squadRenderCache.set(squadOverlays, cache);
+  }
+  cache.onBeginUnit = onBeginUnit;
+  const desiredPanels = [];
+  const liveRows = new Set();
+
   for (const player of players) {
-    const panel = document.createElement("section");
+    const teamTag = state.format === "teams" ? ` - ${teamLabel(state, teamOf(state, player))}` : "";
+    const headerKey = `${compactHud}:${teamTag}`;
+    let panelEntry = cache.panels.get(player);
+    if (!panelEntry) {
+      const panel = document.createElement("section");
+      panel.innerHTML = `<div class="panel-title">Player ${player}${teamTag}</div><div class="squad-list${compactHud ? " is-compact-grid" : ""}"></div>`;
+      panelEntry = { panel, list: panel.querySelector(".squad-list"), headerKey };
+      cache.panels.set(player, panelEntry);
+    } else if (panelEntry.headerKey !== headerKey) {
+      panelEntry.panel.innerHTML = `<div class="panel-title">Player ${player}${teamTag}</div><div class="squad-list${compactHud ? " is-compact-grid" : ""}"></div>`;
+      panelEntry.list = panelEntry.panel.querySelector(".squad-list");
+      panelEntry.headerKey = headerKey;
+    }
+    const { panel, list } = panelEntry;
     panel.className = `panel squad-panel squad-overlay slot-${player}${compactHud ? " is-compact" : ""}${player === state.currentPlayer && state.phase === "playing" ? " is-active" : ""}`;
     panel.style.setProperty("--team", colorOf(state, player));
-    const teamTag = state.format === "teams" ? ` - ${teamLabel(state, teamOf(state, player))}` : "";
-    panel.innerHTML = `<div class="panel-title">Player ${player}${teamTag}</div><div class="squad-list${compactHud ? " is-compact-grid" : ""}"></div>`;
-    const list = panel.querySelector(".squad-list");
+    const desiredRows = [];
 
     for (const unit of state.units.filter((u) => u.player === player && !u.introHidden && !u.ghost)) {
       const definition = getUnitType(unit.type);
       const resource = getResourceMeta(definition);
       if (definition.summon) continue;
       const stats = getEffectiveStats(unit, state);
-      const row = document.createElement("div");
       const dead = unit.hp <= 0;
       const active = state.activation?.unitId === unit.id;
       const tempoReady = isTempoBattle(state) && isTempoUnitReady(state, unit);
@@ -443,14 +481,16 @@ export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnable
           ? (tempoCanSelect ? tempoCanSelect(unit) : canBeginTempoActivation(state, unit))
           : unit.player === state.currentPlayer && !unit.spent
       );
-      row.className = `squad-unit${compactHud ? " squad-chip" : ""}${dead ? " is-dead" : unit.spent ? " spent" : ""}${isDefending(unit) ? " defending" : ""}${isRaging(unit) ? " is-raging" : ""}${active ? " is-current" : ""}${selectable ? " selectable" : ""}`;
+      const className = `squad-unit${compactHud ? " squad-chip" : ""}${dead ? " is-dead" : unit.spent ? " spent" : ""}${isDefending(unit) ? " defending" : ""}${isRaging(unit) ? " is-raging" : ""}${active ? " is-current" : ""}${selectable ? " selectable" : ""}`;
       const tags = dead
         ? `<span class="unit-tag spent">Fallen</span>`
         : unitTagsHtml(unit, definition, { includePassive: false, includeSpent: true, spentLabel: "Done" });
+      let title = "";
+      let html;
       if (compactHud) {
         const stateLabel = compactSquadStateLabel(unit, { dead, active, tempoReady });
-        row.title = compactSquadTitle(unit, definition, stats, resource, { stateLabel });
-        row.innerHTML = `${portraitHtml(unit.type, "is-squad", unit.skin)}
+        title = compactSquadTitle(unit, definition, stats, resource, { stateLabel });
+        html = `${portraitHtml(unit.type, "is-squad", unit.skin)}
           <div class="squad-chip-body">
             <div class="squad-chip-head">
               <span class="squad-unit-name">${escapeHtml(displayName(unit, definition))}</span>
@@ -462,7 +502,7 @@ export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnable
             </div>
           </div>`;
       } else {
-        row.innerHTML = `${portraitHtml(unit.type, "is-squad", unit.skin)}
+        html = `${portraitHtml(unit.type, "is-squad", unit.skin)}
           <div class="squad-unit-body">
             <div class="squad-unit-head">
               <span class="squad-unit-name">${escapeHtml(displayName(unit, definition))}</span>
@@ -476,9 +516,38 @@ export function renderSquads(state, squadOverlays, onBeginUnit, { controlsEnable
             ${statLineHtml(definition, stats)}
           </div>`;
       }
-      if (selectable) row.addEventListener("click", () => onBeginUnit(unit));
-      list.append(row);
+      let rowEntry = cache.rows.get(unit.id);
+      if (!rowEntry) {
+        const row = document.createElement("div");
+        row.dataset.unitId = unit.id;
+        row.addEventListener("click", () => {
+          const current = squadRenderCache.get(squadOverlays)?.rows.get(unit.id);
+          if (current?.selectable) squadRenderCache.get(squadOverlays)?.onBeginUnit?.(current.unit);
+        });
+        rowEntry = { row, signature: null, unit, selectable };
+        cache.rows.set(unit.id, rowEntry);
+      }
+      const signature = `${className}\n${title}\n${html}`;
+      if (rowEntry.signature !== signature) {
+        rowEntry.row.className = className;
+        rowEntry.row.title = title;
+        rowEntry.row.innerHTML = html;
+        rowEntry.signature = signature;
+      }
+      rowEntry.unit = unit;
+      rowEntry.selectable = selectable;
+      desiredRows.push(rowEntry.row);
+      liveRows.add(unit.id);
     }
-    squadOverlays.append(panel);
+    syncElementChildren(list, desiredRows);
+    desiredPanels.push(panel);
+  }
+
+  syncElementChildren(squadOverlays, desiredPanels);
+  for (const [player] of cache.panels) {
+    if (!players.includes(player)) cache.panels.delete(player);
+  }
+  for (const [unitId] of cache.rows) {
+    if (!liveRows.has(unitId)) cache.rows.delete(unitId);
   }
 }

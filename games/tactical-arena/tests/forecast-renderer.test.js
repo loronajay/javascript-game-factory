@@ -67,6 +67,26 @@ test("forecast rendering clears stale badges when disabled", () => {
   });
 });
 
+test("routine forecast renders preserve unchanged badge nodes", () => {
+  withSvgDocument(() => {
+    const state = createBattleState({
+      units: [
+        { id: "p1-archer", player: 1, type: "archer", x: 0, y: 0 },
+        { id: "p2-sword", player: 2, type: "swordsman", x: 3, y: 0 }
+      ]
+    });
+    const actor = state.units.find((unit) => unit.id === "p1-archer");
+    const forecastLayer = new TestSvgElement("g");
+
+    renderForecast({ forecastLayer, state, mode: "attack", actor, resolving: false });
+    const firstBadges = [...forecastLayer.children];
+    renderForecast({ forecastLayer, state, mode: "attack", actor, resolving: false });
+
+    assert.equal(forecastLayer.children[0], firstBadges[0]);
+    assert.equal(forecastLayer.children[1], firstBadges[1]);
+  });
+});
+
 test("self-centered blast arts render damage forecast badges for enemies in the blast", () => {
   withSvgDocument(() => {
     const state = createBattleState({

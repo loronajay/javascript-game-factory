@@ -409,6 +409,26 @@ test("the squad HUD renders each player as four stacked unit rows", () => {
   }
 });
 
+test("routine squad HUD renders preserve panel and row roots", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElement: (tagName) => new TestElement(tagName) };
+
+  try {
+    const state = createBattleState();
+    const overlay = new TestElement("div");
+    renderSquads(state, overlay, () => {});
+    const panel = overlay.children[0];
+    const row = panel.querySelector(".squad-list").children[0];
+
+    renderSquads(state, overlay, () => {});
+
+    assert.equal(overlay.children[0], panel, "unchanged player panels should keep DOM identity");
+    assert.equal(overlay.children[0].querySelector(".squad-list").children[0], row, "unchanged squad rows should keep DOM identity");
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("four-player team HUD uses compact chips in every player slot", () => {
   const previousDocument = globalThis.document;
   globalThis.document = { createElement: (tagName) => new TestElement(tagName) };
@@ -1068,7 +1088,7 @@ test("self-aura heal ARTS can be confirmed from any highlighted heal tile", () =
     assert.equal(isHealArtConfirmTile(state, actor, art, { x: 7, y: 5 }), true);
     assert.equal(isHealArtConfirmTile(state, actor, art, { x: 9, y: 5 }), false);
 
-    emptyHealTile.listeners.get("click")();
+    boardLayer.listeners.get("click")({ target: emptyHealTile });
     assert.deepEqual(clicked, [{ x: 7, y: 5 }]);
     assert.equal(outsideTile.classList.contains("legal-heal"), false);
   } finally {
@@ -1113,7 +1133,7 @@ test("global heal ARTS can be confirmed from any board heal tile", () => {
     assert.equal(isHealArtConfirmTile(state, actor, art, { x: 0, y: 0 }), true);
     assert.equal(isHealArtConfirmTile(state, actor, art, { x: 10, y: 0 }), false);
 
-    farHealTile.listeners.get("click")();
+    boardLayer.listeners.get("click")({ target: farHealTile });
     assert.deepEqual(clicked, [{ x: 0, y: 0 }]);
   } finally {
     globalThis.document = previousDocument;
@@ -1421,14 +1441,16 @@ test("weather renders into its own layer, never inside the filtered board layer"
       onTileClick: () => {}
     });
     render();
+    const firstOverlay = weatherLayer.findByClass("weather-overlay");
 
     assert.equal(boardLayer.findByClass("weather-overlay"), null, "weather must not live under the filtered board layer");
-    assert.ok(weatherLayer.findByClass("weather-overlay"), "weather belongs in the dedicated weather layer");
+    assert.ok(firstOverlay, "weather belongs in the dedicated weather layer");
 
     // The weather layer is not the one renderBoard clears wholesale, so it has to
     // clear it itself or every rerender stacks another overlay on the board.
     render();
     assert.equal(weatherLayer.findAllByClass("weather-overlay").length, 1, "rerendering must not stack overlays");
+    assert.equal(weatherLayer.findByClass("weather-overlay"), firstOverlay, "unchanged weather must keep its animated SVG tree");
 
     // No animated particle may carry a filter: each one costs an offscreen
     // rasterization per frame. Glows are baked into gradient fills instead.
@@ -1459,6 +1481,52 @@ test("weather renders into its own layer, never inside the filtered board layer"
       onTileClick: () => {}
     });
     assert.ok(resolved.findByClass("weather-overlay"), "renderBoard should find #weatherLayer on the board root");
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("routine board renders preserve static geometry, unchanged units, and delegated tile clicks", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = { createElementNS: (_ns, tagName) => new TestSvgElement(tagName) };
+
+  try {
+    const state = createBattleState({
+      size: 8,
+      units: [
+        { id: "hero", player: 1, type: "swordsman", x: 1, y: 1 },
+        { id: "foe", player: 2, type: "swordsman", x: 6, y: 6 }
+      ]
+    });
+    const board = new TestSvgElement("svg");
+    const boardLayer = new TestSvgElement("g");
+    const unitsLayer = new TestSvgElement("g");
+    const clicks = [];
+    const render = () => renderBoard({
+      board,
+      boardLayer,
+      unitsLayer,
+      state,
+      mode: null,
+      selectedId: null,
+      footworkPath: [],
+      onTileClick: (position) => clicks.push(position)
+    });
+
+    render();
+    const dais = boardLayer.findByClass("board-dais");
+    const tile = findSvgByAttribute(boardLayer, "data-key", "2,3");
+    const hero = findSvgByAttribute(unitsLayer, "data-id", "hero");
+    render();
+
+    assert.equal(boardLayer.findByClass("board-dais"), dais, "the board dais should be built once per board size");
+    assert.equal(findSvgByAttribute(boardLayer, "data-key", "2,3"), tile, "tile geometry should keep DOM identity");
+    assert.equal(findSvgByAttribute(unitsLayer, "data-id", "hero"), hero, "unchanged unit figures should keep DOM identity");
+    assert.equal(tile.listeners.has("click"), false, "tiles should not each own a click listener");
+    assert.equal(boardLayer.listeners.has("click"), true, "one board-layer listener should delegate tile clicks");
+
+    boardLayer.listeners.get("click")({ target: tile });
+    assert.deepEqual(clicks, [{ x: 2, y: 3 }]);
   } finally {
     globalThis.document = previousDocument;
   }
