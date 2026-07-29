@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { resetProgressionAnnouncementPresenter } from "../src/ui/progressionAnnouncements.js";
 import { isProgressSkinUnlocked, readUnlockProgress, writeUnlockProgress } from "../src/progression/unlocks.js";
 import { grantConsumable, readInventory } from "../src/progression/inventory.js";
-import { getSkinOffers } from "../src/progression/marketplace.js";
+import { getShopCatalog, getSkinOffers } from "../src/progression/marketplace.js";
 import { openInventory } from "../src/ui/inventory.js";
 import { openShop } from "../src/ui/shop.js";
 import { openSkinGallery } from "../src/ui/skinGallery.js";
@@ -734,6 +734,44 @@ test("shop unit USD purchase embeds Stripe checkout without spending Valor", asy
   assert.ok(announcement, "checkout fulfillment should open a unit unlock popup");
   assert.equal(announcement.hidden, false);
   assert.match(visibleText(announcement), /Clod Unlocked/);
+});
+
+test("a completed Play purchase applies ownership before the shop resumes", async (t) => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  const offer = getShopCatalog(storage).units.find((unit) => !unit.owned);
+  const previousCapacitor = globalThis.Capacitor;
+  t.after(() => { globalThis.Capacitor = previousCapacitor; });
+  globalThis.Capacitor = {
+    isNativePlatform: () => true,
+    Plugins: {
+      PlayBilling: {
+        purchase: async () => ({ purchases: [{ purchaseToken: "play-token", orderId: "GPA.test" }] }),
+        acknowledge: async () => {},
+        consume: async () => {},
+      },
+    },
+  };
+
+  openShop(storage, {
+    account: SIGNED_IN_ACCOUNT,
+    fetchGameProgressSnapshot: async () => ({ valorBalance: 0, entitlements: [] }),
+    verifyPlayPurchase: async () => ({
+      ok: true,
+      progress: {
+        valorBalance: 0,
+        entitlements: [{ entitlementId: `unit:${offer.type}`, kind: "unit" }],
+      },
+    }),
+  });
+
+  const overlay = document.body.children.find((node) => hasClass(node, "shop-modal"));
+  walk(overlay, (node) => node.tagName === "BUTTON" && node.dataset.sku === offer.sku)[0].click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.ok(readUnlockProgress(storage).unlockedUnits.includes(offer.type));
+  assert.ok(walk(overlay, (node) => hasClass(node, "shop-unit") && hasClass(node, "is-owned")).length > 0);
+  assert.match(visibleText(overlay), new RegExp(`${offer.name} unlocked`, "i"));
 });
 
 test("shop skin packs render clickable contents and use Valor confirmation", async () => {

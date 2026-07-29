@@ -29,15 +29,14 @@ import { syncRankedAccountFeatureControls } from "./rankedFeatureGate.js";
 import { syncOnlineAccountFeatureControls } from "../../../../js/platform/ui/online-account-feature-gate.mjs";
 import { openAccountPanel, syncAccountControlsWithName } from "./accountMenu.js";
 import { SESSION_CHANGED_EVENT } from "../platform/factorySignIn.js";
+import { isFactoryAccountLoggedIn, readStoredFactoryAccountSession } from "../platform/factoryAccount.js";
+import { createSessionProgressSync } from "../platform/sessionProgressSync.js";
 import { wireAndroidBackButton } from "./androidBackButton.js";
-
 export function syncScreenMusic(audio, screenName) {
   if (!screenName) return;
   if (screenName === "match") audio.stopMusic();
   else audio.startMusic("menu");
 }
-
-
 export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, onCampaignMissionSelected, onCampaignMapEntered, openCodex, onLeaveMatch, syncGameProgress = () => {} }) {
   const screens = new ScreenManager();
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -48,9 +47,6 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   for (const name of ["hsSetup", "spSetup", "tempoMenu", "tempoSpSetup", "results", "tutorialComplete"]) {
     screens.register(name, { el: screenEl(name) });
   }
-  // Every control whose availability depends on being signed in. Called on entering
-  // the main menu and again after any sign-in/sign-out, so the menu reflects the
-  // session immediately rather than only after a reload.
   function refreshAccountGatedControls() {
     const menu = screenEl("mainMenu");
     // Online Versus (casual) and Ranked both require a real signed-in factory
@@ -74,11 +70,6 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       showQueuedProgressionAnnouncements({ audit: true });
     },
   });
-
-  // A sign-in can start from the shop, ranked, or the friends panel — not just the
-  // account button — so listen for the session change rather than threading a
-  // callback through every one of those surfaces.
-  document.addEventListener(SESSION_CHANGED_EVENT, refreshAccountGatedControls);
 
   // Android hardware/gesture back. Self-disables when the Capacitor App plugin is
   // absent, so this is a no-op in every browser.
@@ -162,7 +153,16 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       matchSetup.resetLoadouts();
     },
   });
-
+  document.addEventListener(SESSION_CHANGED_EVENT, createSessionProgressSync({
+    shouldSync: () => isFactoryAccountLoggedIn(readStoredFactoryAccountSession()),
+    refreshAccount: refreshAccountGatedControls,
+    syncProgress: syncGameProgress,
+    refreshProgress: () => {
+      if (screens.active === "campaign") campaignMap.renderCampaign();
+      if (screens.active === "tutorialSelect") tutorialScreens.renderTutorialSelect();
+      if (screens.active === "mainMenu") showQueuedProgressionAnnouncements({ audit: true });
+    },
+  }));
   // ── Global delegated wiring (nav + actions + segmented controls) ──────────
   document.addEventListener("click", (event) => {
     const navBtn = event.target.closest("[data-nav]");

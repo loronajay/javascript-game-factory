@@ -17,14 +17,47 @@ import {
 } from "./gameProgressClient.js";
 import { mergeServerEntitlementsIntoUnlockProgress, readUnlockProgress } from "../progression/unlocks.js";
 import { mergeServerInventory } from "../progression/inventory.js";
-import { enqueuePurchasedUnlockAnnouncements } from "../progression/announcements.js";
+import {
+  enqueuePurchasedUnlockAnnouncements,
+  suppressRestoredUnlockAnnouncements,
+} from "../progression/announcements.js";
 import { applyServerPlayProgress, backfillLocalPlayProgress } from "./playProgressSync.js";
+import {
+  createPlayPurchaseVerifier,
+  recoverPendingPlayPurchases,
+} from "./playBillingClient.js";
 
 const OWNERSHIP_BACKFILL_FLAG = "tacticalArenaOwnershipBackfilledV1";
+const RESTORE_ANNOUNCEMENT_MIGRATION_FLAG = "tacticalArenaRestoreAnnouncementsSuppressedV1";
+
+export async function recoverPlayPurchasesForAccount(account, {
+  createVerifier = createPlayPurchaseVerifier,
+  recoverPurchases = recoverPendingPlayPurchases,
+} = {}) {
+  if (!isFactoryAccountLoggedIn(account)) {
+    return { skipped: true, recovered: 0, failed: 0 };
+  }
+  return recoverPurchases({
+    account,
+    verifyPurchase: createVerifier(),
+  });
+}
+
+export function suppressAccountRestoreAnnouncements(storage, beforeProgress, afterProgress) {
+  const migrated = Boolean(storage.getItem(RESTORE_ANNOUNCEMENT_MIGRATION_FLAG));
+  const pending = suppressRestoredUnlockAnnouncements(
+    storage,
+    migrated ? beforeProgress : {},
+    afterProgress,
+  );
+  try { storage.setItem(RESTORE_ANNOUNCEMENT_MIGRATION_FLAG, "1"); } catch { /* best-effort */ }
+  return pending;
+}
 
 export async function syncGameProgress() {
   const storage = globalThis.localStorage;
   const account = readStoredFactoryAccountSession(storage);
+  const playRecovery = await recoverPlayPurchasesForAccount(account);
   const checkoutResult = await fulfillReturnedPremiumCheckout({ storage, account });
   // Campaign/tutorial progress this device earned before play-progress sync existed has
   // no claim behind it. Queue those claims BEFORE the flush so they ride the same pass.
@@ -91,17 +124,22 @@ export async function syncGameProgress() {
     const authoritative = flushResult.ok && isFactoryAccountLoggedIn(account) && backfillConfirmed;
     const authoritativeValor = authoritative || Boolean(checkoutResult?.progress);
     const beforeProgress = readUnlockProgress(storage);
-    const afterProgress = mergeServerEntitlementsIntoUnlockProgress(storage, snapshot, { authoritative, authoritativeValor });
+    mergeServerEntitlementsIntoUnlockProgress(storage, snapshot, { authoritative, authoritativeValor });
     // Consumable quantities ride the same authority rule as ownership: once the server is
     // known current it owns the counts (purchases credit them, activations spend them);
     // until then stay additive so an unsynced grant is not dropped.
     mergeServerInventory(storage, snapshot, { authoritative });
-    enqueuePurchasedUnlockAnnouncements(storage, beforeProgress, afterProgress);
     // Cleared missions, stars, and completed tutorials. Always a forward-only union, so
     // unlike ownership this needs no authority rule — it runs even on a partial sync.
     // It has to come AFTER the entitlement merge: restoring campaign progress is what
     // lets unlocks.js re-derive the mission rewards that hang off it.
     applyServerPlayProgress(storage, snapshot);
+    const syncedProgress = readUnlockProgress(storage);
+    if (checkoutResult?.progress) {
+      enqueuePurchasedUnlockAnnouncements(storage, beforeProgress, syncedProgress);
+    } else {
+      suppressAccountRestoreAnnouncements(storage, beforeProgress, syncedProgress);
+    }
   }
-  return { ...flushResult, checkoutResult };
+  return { ...flushResult, checkoutResult, playRecovery };
 }

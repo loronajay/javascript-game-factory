@@ -24,6 +24,7 @@ import {
   readProgressionAnnouncements,
   readSeenProgressionAnnouncementIds,
   shiftProgressionAnnouncement,
+  suppressRestoredUnlockAnnouncements,
   syncMissingUnitUnlockAnnouncements,
 } from "../src/progression/announcements.js";
 import {
@@ -146,6 +147,23 @@ test("existing non-starter unit unlocks are audited into pending announcements",
   assert.deepEqual(pending.map((announcement) => announcement.id), ["unit-unlock:clod"]);
   consumeProgressionAnnouncements(storage);
   assert.deepEqual(syncMissingUnitUnlockAnnouncements(storage), []);
+});
+
+test("account-restored unlocks are treated as history instead of replayed as new popups", () => {
+  const storage = storageAdapter();
+  const before = readUnlockProgress(storage);
+  const after = writeUnlockProgress(storage, {
+    ...before,
+    unlockedUnits: [...before.unlockedUnits, "clod"],
+    serverEntitlementSkins: [{ type: "angel", slug: "summer-vibes" }],
+  });
+
+  suppressRestoredUnlockAnnouncements(storage, before, after);
+  syncMissingUnitUnlockAnnouncements(storage);
+
+  assert.deepEqual(readProgressionAnnouncements(storage), []);
+  assert.ok(readSeenProgressionAnnouncementIds(storage).includes("unit-unlock:clod"));
+  assert.ok(readSeenProgressionAnnouncementIds(storage).includes("skin-unlock:angel:summer-vibes"));
 });
 
 test("draft battle achievement queues once when the account has eight known units", () => {

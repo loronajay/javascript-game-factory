@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  PLAY_PURCHASE_CANCELLED,
   playPurchaseErrorMessage,
   purchaseWithPlay,
   recoverPendingPlayPurchases,
@@ -43,11 +44,20 @@ function fakeVerifier(result = { ok: true, entitlements: ["skin:swordsman:summer
 
 test("a managed purchase is verified server-side, then acknowledged", async () => {
   const bridge = fakeBridge();
-  const verifier = fakeVerifier();
+  const progress = {
+    valorBalance: 25,
+    entitlements: [{ entitlementId: "skin:swordsman:summer-vibes", kind: "skin" }],
+  };
+  const verifier = fakeVerifier({
+    ok: true,
+    entitlements: ["skin:swordsman:summer-vibes"],
+    progress,
+  });
 
   const result = await purchaseWithPlay(SKIN_OFFER, { plugins: bridge, verifyPurchase: verifier.verify });
 
   assert.equal(result.ok, true);
+  assert.equal(result.progress, progress, "the fresh server snapshot must reach the shop");
   // Hyphens must have been translated on the way to Play.
   assert.equal(bridge.calls.purchase[0].productId, "ta.skin.swordsman.summer_vibes");
   assert.equal(verifier.seen[0].purchaseToken, "tok-1");
@@ -102,6 +112,24 @@ test("cancelling is not an error the player should see as a failure", async () =
   assert.equal(result.ok, false);
   assert.equal(result.cancelled, true);
   assert.equal(verifier.seen.length, 0, "a cancelled purchase must never reach the server");
+});
+
+test("native bridge rejections are recognized when Capacitor supplies message before code", async () => {
+  const bridge = fakeBridge({
+    purchase: () => {
+      const error = new Error("PURCHASE_CANCELLED");
+      error.code = "cancelled";
+      throw error;
+    },
+  });
+
+  const result = await purchaseWithPlay(SKIN_OFFER, {
+    plugins: bridge,
+    verifyPurchase: async () => ({ ok: true }),
+  });
+
+  assert.equal(result.cancelled, true);
+  assert.equal(result.error, PLAY_PURCHASE_CANCELLED);
 });
 
 test("an offer with no legal Play product id never reaches the bridge", async () => {

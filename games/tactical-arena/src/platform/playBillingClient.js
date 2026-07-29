@@ -56,7 +56,12 @@ function bridgeFrom(plugins) {
 }
 
 function errorCode(error) {
-  return typeof error?.code === "string" ? error.code : typeof error?.message === "string" ? error.message : "";
+  const code = typeof error?.code === "string" ? error.code : "";
+  const message = typeof error?.message === "string" ? error.message : "";
+  // Capacitor's Java reject signature is (message, code). Accept both shapes so a
+  // native bridge that supplies the symbolic billing error as its message still
+  // returns the right cancellation/failure outcome to the shop.
+  return [code, message].find((value) => Object.hasOwn(ERROR_COPY, value)) || code || message;
 }
 
 // Durable goods stay owned; consumables must be consumed to be re-purchasable.
@@ -160,7 +165,13 @@ export async function purchaseWithPlay(offer, { plugins = null, verifyPurchase, 
     // acknowledge is retried by recoverPendingPlayPurchases() on the next boot.
   }
 
-  return { ok: true, productId, purchaseToken: purchase.purchaseToken, entitlements: verification.entitlements ?? [] };
+  return {
+    ok: true,
+    productId,
+    purchaseToken: purchase.purchaseToken,
+    entitlements: verification.entitlements ?? [],
+    progress: verification.progress ?? null,
+  };
 }
 
 // Purchases Google has recorded that we may never have granted — the app was killed

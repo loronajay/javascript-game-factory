@@ -230,6 +230,13 @@ export function enqueueBattleModeUnlockAnnouncements(storage = defaultStorage())
 
 export function enqueuePurchasedUnlockAnnouncements(storage = defaultStorage(), beforeProgress = {}, afterProgress = {}, options = {}) {
   const ignoreSeen = options.ignoreSeen ?? true;
+  const announcements = purchasedUnlockAnnouncements(beforeProgress, afterProgress);
+
+  enqueueProgressionAnnouncements(storage, announcements, { ignoreSeen });
+  return enqueueBattleModeUnlockAnnouncements(storage);
+}
+
+function purchasedUnlockAnnouncements(beforeProgress = {}, afterProgress = {}) {
   const beforeUnits = new Set(uniqueStrings(beforeProgress?.unlockedUnits));
   const newlyUnlockedUnits = uniqueStrings(afterProgress?.unlockedUnits)
     .filter((type) => !beforeUnits.has(type));
@@ -243,9 +250,27 @@ export function enqueuePurchasedUnlockAnnouncements(storage = defaultStorage(), 
     ...(afterProgress?.serverEntitlementSkins ?? []),
   ]).filter((skin) => !beforePurchasedSkins.has(skinKey(skin)));
 
-  enqueueUnitUnlockAnnouncements(storage, newlyUnlockedUnits, { ignoreSeen });
-  enqueueSkinUnlockAnnouncements(storage, newlyPurchasedSkins, { ignoreSeen });
-  return enqueueBattleModeUnlockAnnouncements(storage);
+  return [
+    ...newlyUnlockedUnits.map((type) => buildUnitUnlockAnnouncement(type)),
+    ...newlyPurchasedSkins.map((skin) => buildSkinUnlockAnnouncement(skin)),
+  ].filter(Boolean);
+}
+
+// A server snapshot restored after sign-in describes account history, not rewards earned
+// in this session. Mark those imported unlocks as seen and remove stale matching queue
+// entries so the main-menu audit cannot replay an account's whole collection.
+export function suppressRestoredUnlockAnnouncements(storage = defaultStorage(), beforeProgress = {}, afterProgress = {}) {
+  const restored = purchasedUnlockAnnouncements(beforeProgress, afterProgress);
+  if (restored.length && isDraftBattleAvailable(storage)) restored.push(buildDraftBattleUnlockAnnouncement());
+  if (restored.length && isRankedBattleAvailable(storage)) restored.push(buildRankedBattleUnlockAnnouncement());
+
+  const restoredIds = new Set(restored.map((announcement) => announcement.id));
+  if (!restoredIds.size) return readProgressionAnnouncements(storage);
+  const pending = readProgressionAnnouncements(storage)
+    .filter((announcement) => !restoredIds.has(announcement.id));
+  writeJsonArray(storage, PROGRESSION_ANNOUNCEMENTS_KEY, pending);
+  markProgressionAnnouncementsSeen(storage, restored);
+  return pending;
 }
 
 export function syncMissingUnitUnlockAnnouncements(storage = defaultStorage()) {

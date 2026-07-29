@@ -323,20 +323,24 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
     statusText = `Opening Google Play for ${offer.name}.`;
     render();
 
-    const result = await runPlayPurchase({
-      offer,
-      provider,
-      storage,
-      account,
-      verifyPurchase: options.verifyPlayPurchase,
-      fetchImpl: options.fetchImpl,
-    });
-
-    premiumCheckoutInFlight = false;
-    statusText = result.status;
-    render();
-    if (result.outcome === "purchased" && result.applied) {
-      announcePurchaseProgress(result.beforeProgress, result.afterProgress);
+    try {
+      const result = await runPlayPurchase({
+        offer,
+        provider,
+        storage,
+        account,
+        verifyPurchase: options.verifyPlayPurchase,
+        fetchImpl: options.fetchImpl,
+      });
+      statusText = result.status;
+      if (result.outcome === "purchased" && result.applied) {
+        announcePurchaseProgress(result.beforeProgress, result.afterProgress);
+      }
+    } catch {
+      statusText = "Something went wrong with that purchase. Please try again.";
+    } finally {
+      premiumCheckoutInFlight = false;
+      if (!closed) render();
     }
   }
 
