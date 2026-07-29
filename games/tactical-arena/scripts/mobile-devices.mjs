@@ -21,6 +21,7 @@ export const DEVICES = Object.freeze({
   pixel5: { label: "Pixel 5 landscape", width: 851, height: 393, dsf: 2.75 },
   "iphone-14-pro": { label: "iPhone 14 Pro landscape", width: 852, height: 393, dsf: 3 },
   pixel8: { label: "Pixel 8 landscape", width: 892, height: 412, dsf: 2.625 },
+  "store-16x9": { label: "Play Store 1920x1080", width: 960, height: 540, dsf: 2 },
   "ipad-mini": { label: "iPad mini landscape", width: 1024, height: 768, dsf: 2 },
 });
 

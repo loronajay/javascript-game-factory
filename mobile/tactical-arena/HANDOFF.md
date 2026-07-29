@@ -1,6 +1,6 @@
 # Tactical Arena — Android Port Handoff
 
-Status as of 2026-07-27. Read this first if you are picking the port up cold.
+Status as of 2026-07-29. Read this first if you are picking the port up cold.
 
 The goal: ship Tactical Arena on Google Play (Android first, iOS later) **without
 fork­ing the web game**. That constraint has been honoured — see
@@ -24,9 +24,10 @@ The app builds, installs, and plays on a device. **49.4 MB APK.**
 | Self-hosted fonts | Done | 22 faces, zero external requests |
 | Touch CSS in the WebView | Done | Computed styles checked on device |
 | **Play Billing — client** | Done | 32 unit tests; native plugin compiles |
-| **Play Billing — server** | **Done** | 26 unit tests against faked Google responses; needs a key to run live (§4a) |
+| **Play Billing — server** | **Done** | 26 unit tests against faked Google responses; Railway key still needs live confirmation (§4a) |
 | **Release signing / AAB** | **Done** | Signed 51.3 MB AAB built and verified with `jarsigner` |
-| **Play Console + 12 testers** | **NOT STARTED** | Now unblocked — this is the whole critical path (§5) |
+| **Play product catalog** | **Done** | 317/317 one-time products synchronized and activated 2026-07-29 |
+| **Play Console + 12 testers** | **IN PROGRESS** | Closed-test release published; 0 testers currently opted in (§5) |
 
 Test suite: **1671 / 1671** green, and `platform-api` **450 / 450**.
 
@@ -73,7 +74,9 @@ npm run apk              # incremental build  (size NOT trustworthy — see §5)
 npm run apk:clean        # clean build        (use this to measure size)
 npm run verify:android   # install, launch, screenshot, scrape logcat
 npm run play:products    # list the 317 Play products
-npm run play:sync        # dry run; --apply --key=sa.json to create them
+npm run play:sync        # dry run
+npm run play:sync:proof  # create/activate ta.unit.monk first
+npm run play:sync:apply  # create/activate the full catalog
 npm run icons            # regenerate launcher + store icons from the shield logo
 npm run release:check    # preflight: signing, versionCode, payload freshness, product count
 npm run bundle:release   # signed AAB for Play  -> app/build/outputs/bundle/release/
@@ -205,7 +208,7 @@ Everything below is console work. Do it in order; 4a and 4b are independent of e
 5. Permissions take a few minutes to propagate. Prove it works on one product before
    doing all 317:
    ```powershell
-   npm run play:sync -- --apply --key=sa.json --only=ta.unit.monk
+   npm run play:sync:proof
    ```
 6. Put the same key on the API as `GOOGLE_PLAY_SERVICE_ACCOUNT_KEY` (§3).
 
@@ -240,19 +243,25 @@ keystore can still build and test.
 Play Console's CSV import was **removed in May 2025**, so the API is the only practical
 route for a catalog this size.
 
+**Completed 2026-07-29:** the proof product succeeded, followed by a 317/317 full sync and
+purchase-option activation. Play Console shows the new products as active. The commands below
+remain the repeatable update path for later catalog or price changes.
+
 ```powershell
-npm run play:sync                                  # dry run, no key needed
-npm run play:sync -- --apply --key=sa.json         # all 317
+npm run play:sync          # dry run, no key needed
+npm run play:sync:proof    # create/activate ta.unit.monk first
+npm run play:sync:apply    # all 317
 ```
 
 Products can only be created **after** an app bundle has been uploaded to some track —
-Play refuses in-app products for an app with no release. Do 4d first if it errors.
+Play refuses in-app products for an app with no release. Do 4d first if it errors. The full
+sync uses Google's high-throughput publishing mode and may take up to 24 hours to propagate.
 
 ### 4d. First upload
 
 ```powershell
 npm run release:check                              # catches the expensive mistakes first
-npm run bundle:release -- -PtaVersionCode=1 -PtaVersionName=1.0
+npm run bundle:release
 ```
 
 Upload `android/app/build/outputs/bundle/release/app-release.aab`. Every later upload

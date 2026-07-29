@@ -11,13 +11,16 @@
     "apk:clean": "npm run sync && cd android && gradlew.bat clean assembleDebug",
     "apk:release": "npm run sync && cd android && gradlew.bat clean assembleRelease",
     "bundle:release": "npm run sync && cd android && gradlew.bat clean bundleRelease",
-    "release:check": "node scripts/release-check.mjs",
+    "test:release": "node --test scripts/release-optimization-check.mjs",
+    "release:check": "npm run test:release && node scripts/release-check.mjs",
     "icons": "python scripts/generate-app-icons.py",
     "run:android": "npm run sync && cap run android",
     "verify:android": "node scripts/verify-android.mjs",
     "open:android": "cap open android",
     "play:products": "node scripts/play-products-report.mjs",
-    "play:sync": "node scripts/play-products-sync.mjs"
+    "play:sync": "node scripts/play-products-sync.mjs",
+    "play:sync:proof": "node scripts/play-products-sync.mjs --apply --key=play-service-account.json --only=ta.unit.monk",
+    "play:sync:apply": "node scripts/play-products-sync.mjs --apply --key=play-service-account.json"
   },
   "license": "ISC",
   "dependencies": {

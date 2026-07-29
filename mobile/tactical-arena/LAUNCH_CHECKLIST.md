@@ -1,6 +1,7 @@
 # Tactical Arena on Google Play — Owner's Checklist
 
-Everything **you** need to do, in order. Written 2026-07-27, after identity verification.
+Everything **you** need to do, in order. Updated 2026-07-29 after the first closed-test
+release and Play product-catalog setup.
 
 `HANDOFF.md` is the engineering doc; this one is the console/account work that only you can
 do. Where a step needs code or assets, it says who does it.
@@ -17,8 +18,8 @@ build is perfect. Everything else can be fixed while the clock runs.
 | | |
 | --- | --- |
 | The app | Builds, installs, and plays on a real device |
-| Purchases (client + server) | Built and tested; never yet run against real Google |
-| Release signing | Wired; needs your keystore (step 1) |
+| Purchases (client + server) | Client is in the uploaded AAB; server is built and tested; 317 Play products are active. Railway credential + first licence-test purchase remain |
+| Release signing | **Done** — signed AAB uploaded to the closed test 2026-07-29 |
 | App icon | **Done** — the shield mark, generated at all five densities |
 | Store listing icon (512×512) | **Done** — `store-listing/play-icon-512.png` |
 | Feature graphic (1024×500) | **Done** — `store-listing/play-feature-graphic-1024x500.png` |
@@ -26,27 +27,28 @@ build is perfect. Everything else can be fixed while the clock runs.
 | Privacy policy | **Live** — `https://factory.jayarcade.com/privacy`, contact `leojaylorona@gmail.com`. Read it before you submit it (step 4) |
 | Site + domain | **Done** — `factory.jayarcade.com`, HTTPS enforced, Railway auto-deploy reconnected |
 | Progress sync (web ↔ app) | **Fixed and verified on device** 2026-07-27 — units, skins, Valor, tutorials, campaign all restore from the server |
-| Screenshots | Not started — take these after your UI pass |
-| Play Console app entry | Not created yet |
+| Screenshots | Three phone screenshots prepared in `store-listing/` |
+| Play Console app entry | **Done** — closed-test release published; 0 testers opted in as of 2026-07-29 |
 
-⚠️ **The release AAB in `android/app/build/` predates the progress-sync fix.** Rebuild with
-`npm run bundle:release` before any upload, or you ship the build where a fresh install shows
-an empty account.
+The uploaded release package contains the native Play Billing bridge and the shop's open-time
+ownership refresh. No replacement AAB is required for the product-catalog fix. Purchases still
+need the server credential in Railway and one licence-test purchase before they are proven
+end-to-end.
 
 ---
 
 ## Your critical path
 
-1. [ ] Generate the upload keystore
-2. [ ] Create the Google service account
-3. [ ] Create the app in Play Console
-4. [ ] Publish a privacy policy
+1. [x] Generate the upload keystore
+2. [x] Create the Google service account
+3. [x] Create the app in Play Console
+4. [x] Publish a privacy policy
 5. [ ] Assemble the store listing
 6. [ ] Fill the Data safety + content rating forms
-7. [ ] First upload → Internal testing
+7. [x] First Play upload → Closed testing
 8. [ ] Test on your own phone, including a real purchase
-9. [ ] Create the 317 in-app products
-10. [ ] Open the closed test and recruit 12+ testers ← **start this early**
+9. [x] Create and activate the 317 in-app products
+10. [ ] Recruit 12+ opted-in closed testers (track is open; currently 0) ← **start this early**
 11. [ ] Wait out 14 days, then request production
 
 Steps 1 and 2 are independent — do them in either order. Step 10 can start the moment step 7
@@ -239,7 +241,7 @@ It is how you get billing working on your own phone.
 ```powershell
 cd mobile\tactical-arena
 npm run release:check
-npm run bundle:release -- -PtaVersionCode=1 -PtaVersionName=1.0
+npm run bundle:release
 ```
 
 Upload `android\app\build\outputs\bundle\release\app-release.aab` to *Testing → Internal
@@ -252,7 +254,14 @@ Then: *Testers* tab → create an email list → add your own Google account →
 **opt-in URL**.
 
 ⚠️ Every later upload needs a **higher** `versionCode`. It can never repeat and never go down.
-Version 2 would be `-PtaVersionCode=2`.
+For version 2, pass the properties directly to Gradle so PowerShell/npm does not mangle them:
+
+```powershell
+npm run sync
+cd android
+.\gradlew.bat clean bundleRelease "-PtaVersionCode=2" "-PtaVersionName=1.0.1"
+cd ..
+```
 
 ---
 
@@ -301,15 +310,20 @@ proof that the Google integration works, because it has never seen a real Google
 
 Play removed CSV import in May 2025, so this is scripted.
 
+**Done 2026-07-29.** The proof product succeeded, then all 317 products synchronized and
+activated. Play Console shows the products with active purchase options. Google may take up
+to 24 hours to propagate the full catalog to tester devices.
+
 ```powershell
 cd mobile\tactical-arena
-npm run play:sync                                                    # dry run, no key needed
-npm run play:sync -- --apply --key=play-service-account.json --only=ta.unit.monk   # prove one
-npm run play:sync -- --apply --key=play-service-account.json         # then all 317
+npm run play:sync          # dry run, no key needed
+npm run play:sync:proof    # create/activate ta.unit.monk first
+npm run play:sync:apply    # then create/activate all 317
 ```
 
 Products can only be created **after** a bundle has been uploaded (step 7). If the script
-errors on a fresh app, that is why.
+errors on a fresh app, that is why. The full sync uses Google's high-throughput publishing
+mode, so the complete catalog can take up to 24 hours to appear on tester devices.
 
 ⚠️ **A Play product ID can be deactivated but never deleted or reused.** So before running the
 full sync, settle anything that changes the *set* of products — adding, removing, or renaming a
@@ -372,14 +386,16 @@ Still open, and each needs something from you:
 - [ ] **Rotate the Postgres password.** It was pasted into a chat transcript on 2026-07-27 while
       debugging. Railway → Postgres → Variables → regenerate; services referencing
       `${{Postgres.DATABASE_URL}}` pick it up on redeploy.
-- [ ] **Rebuild the release AAB** (`npm run bundle:release`) before any Play upload — the
-      existing one predates the progress-sync fix.
+- [ ] **Set or confirm `GOOGLE_PLAY_SERVICE_ACCOUNT_KEY` on the Railway API service.** Use the
+      same service-account JSON that published the catalog; enter it directly in Railway and
+      do not paste it into chat.
+- [ ] **Run one licence-test purchase from the Play-installed closed-test build.** This is the
+      final end-to-end proof of Google purchase verification and entitlement granting.
 - [ ] **Read the privacy policy** and settle its contact address (step 4).
-- [ ] **Screenshots** — best taken from your own device after the UI pass.
-- [ ] **Refresh ownership when the shop opens.** The last piece of the duplicate-purchase
-      work. A blocked purchase already corrects the catalog, but an owned item can still be
-      *displayed* as buyable until you try it. This needs `shop.js`, which your other agent was
-      editing at the time — tell me when that has settled and I will finish it.
+- [ ] **Finish/review the Play screenshots.** Three phone screenshots are already in
+      `store-listing/`.
+- [ ] **Recruit 12+ testers through the closed-test opt-in link.** The release is published,
+      but Play Console currently reports 0 opted-in testers.
 
-I do **not** need: your keystore passwords, the service-account JSON, or your Play Console
-login. Those stay with you.
+I do **not** need: your keystore passwords or the service-account JSON. Those stay with you
+and should be entered only in their destination consoles.
