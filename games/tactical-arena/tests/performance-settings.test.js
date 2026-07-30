@@ -68,6 +68,11 @@ test("low-cost board presentation applies to battery-saver, OS reduced-motion, a
   assert.equal(shouldUseLowCostBoardPresentation({ root: fullRoot, windowRef: media(["(prefers-reduced-motion: reduce)"]) }), true);
   assert.equal(shouldUseLowCostBoardPresentation({ root: fullRoot, windowRef: media(["(pointer: coarse)"]) }), true);
   assert.equal(shouldUseLowCostBoardPresentation({ root: fullRoot, windowRef: media([]) }), false);
+
+  // The packaged Android WebView reports pointer: coarse as false while touch works.
+  // Detecting it purely from matchMedia handed every phone the full-cost presentation.
+  const webView = { ...media([]), navigator: { maxTouchPoints: 5 } };
+  assert.equal(shouldUseLowCostBoardPresentation({ root: fullRoot, windowRef: webView }), true);
 });
 
 test("balanced mode neutralizes continuous action-selection and backdrop repaint costs", () => {

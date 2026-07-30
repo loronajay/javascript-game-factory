@@ -20,6 +20,7 @@ import {
   validateAuthForm,
 } from "./authFormModel.js";
 import { createAuthApiClient } from "../../../../js/platform/api/auth-api.mjs";
+import { isCoarsePointer } from "./pointerCapability.js";
 import {
   bindFactoryProfileToSession,
   loadFactoryProfile,
@@ -277,9 +278,10 @@ export function openAuthPanel({
       });
 
       // Autofocus only on pointer-precise devices. On a short landscape phone the
-      // software keyboard would immediately cover the form it just focused.
-      const coarse = documentRef.defaultView?.matchMedia?.("(pointer: coarse)")?.matches;
-      if (!coarse) inputs.email.focus?.();
+      // software keyboard would immediately cover the form it just focused — which
+      // is what the packaged app did, because a bare matchMedia("(pointer: coarse)")
+      // reports false in the Android WebView.
+      if (!isCoarsePointer(documentRef.defaultView)) inputs.email.focus?.();
     }
 
     overlay.hidden = false;

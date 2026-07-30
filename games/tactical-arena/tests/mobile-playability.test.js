@@ -192,10 +192,19 @@ test("the document exposes the mobile playability shell", () => {
     /dataset\.roster\s*=\s*"browse"/,
     "short landscape details popup needs an explicit Back action",
   );
+  // The touch half of this condition has to come from matchesCoarseQuery, not from the
+  // query string: the packaged Android WebView reports `pointer: coarse` as false, so
+  // folding it into the matchMedia call made the WHOLE query false and shipped the
+  // two-pane desktop roster onto a 360px-tall phone. The size half stays in the query.
   assert.match(
     rosterPickerJs,
-    /function shouldUseSinglePaneRoster\(\)[\s\S]*?matchMedia\("\(pointer: coarse\) and \(orientation: landscape\) and \(max-height: 540px\)"\)/,
+    /function shouldUseSinglePaneRoster\(\)[\s\S]*?matchesCoarseQuery\("\(orientation: landscape\) and \(max-height: 540px\)"\)/,
     "single-pane roster behavior should be limited to the short landscape mobile layout",
+  );
+  assert.doesNotMatch(
+    rosterPickerJs,
+    /matchMedia\([^)]*pointer:\s*coarse/,
+    "roster picker must not re-introduce a raw pointer: coarse gate — it is dead in the packaged app",
   );
   assert.match(
     rosterPickerJs,

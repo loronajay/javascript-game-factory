@@ -24,15 +24,39 @@ import {
   shouldFollowSelection,
   zoomAround,
 } from "./boardCamera.js";
+import { isCoarsePointer } from "./pointerCapability.js";
 
 const cameraState = new WeakMap();
 const wiredBoards = new WeakSet();
 const MIN_TOUCH_GESTURE_MAX_ZOOM = 2.25;
 
-function isCoarsePointer(windowRef) {
-  return Boolean(
-    windowRef?.matchMedia?.("(pointer: coarse)")?.matches || windowRef?.navigator?.maxTouchPoints > 0,
-  );
+// Cached board measurement.
+//
+// getBoundingClientRect() forces a synchronous layout of the whole document, and
+// updateBoardCamera runs on EVERY render (followBoardSelection then measures a second
+// time), so an uncached read put one or two full layouts in the middle of every tap.
+// A throttled phone profile attributed ~45% of the entire render path to it — the
+// largest single cost in the game's render, and touch-only, which is why it never
+// showed up on desktop.
+//
+// The rect cannot change as a result of a render, so it is cached and invalidated on
+// the things that DO move the board: viewport resize, orientation change, entering or
+// leaving fullscreen, a new board size, and the start of every touch gesture. A HUD
+// reflow that resizes the board without any of those leaves the cache briefly stale,
+// which is harmless: the rect only feeds maxZoomForTileSize, a soft ceiling on how far
+// the player may pinch in.
+const viewportRects = new WeakMap();
+
+function measureBoard(board) {
+  const rect = board.getBoundingClientRect?.();
+  // A board still on a hidden screen measures 0x0. Caching that would pin the camera
+  // to a collapsed viewport for the rest of the match, so only cache a real one.
+  if (rect && rect.width > 0 && rect.height > 0) viewportRects.set(board, rect);
+  return rect;
+}
+
+function boardRect(board) {
+  return viewportRects.get(board) ?? measureBoard(board);
 }
 
 function svgPoint(board, clientX, clientY) {
@@ -51,7 +75,7 @@ function applyViewBox(board, state) {
 }
 
 function currentMaxZoom(board, state, rect = null) {
-  const viewportRect = rect ?? board.getBoundingClientRect?.();
+  const viewportRect = rect ?? boardRect(board);
   const touchTargetZoom = maxZoomForTileSize({
     base: state.base,
     viewport: { width: viewportRect?.width ?? 0, height: viewportRect?.height ?? 0 },
@@ -85,7 +109,9 @@ function handlePointerDown(event) {
   if (!state || event.pointerType === "mouse") return;
 
   if (state.pointers.size === 0) {
-    state.gestureRect = board.getBoundingClientRect?.() ?? null;
+    // A gesture is a real interaction, so pay for one fresh measurement here and let
+    // it refresh the render-path cache too.
+    state.gestureRect = measureBoard(board) ?? null;
     state.gestureMaxZoom = currentMaxZoom(board, state, state.gestureRect);
   }
   state.pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
@@ -114,7 +140,7 @@ function handlePointerMove(event) {
   } else if (state.camera.zoom > MIN_ZOOM) {
     // Convert the screen-space drag into SVG units via the current scale. Panning is
     // pointless at zoom 1 because the whole board is already visible.
-    const rect = state.gestureRect ?? board.getBoundingClientRect();
+    const rect = state.gestureRect ?? boardRect(board);
     const view = cameraViewBox(state.base, state.camera);
     const scaleX = rect.width > 0 ? view.width / rect.width : 0;
     const scaleY = rect.height > 0 ? view.height / rect.height : 0;
@@ -151,7 +177,10 @@ export function updateBoardCamera(board, { size, metrics, base }) {
   const previous = cameraState.get(board);
 
   // A different board size is a different battle; start framed on the whole board.
+  // It is also the moment the match screen may only just have become visible, so the
+  // cached measurement (if any) is from the wrong layout.
   const sizeChanged = previous?.size !== size;
+  if (sizeChanged) viewportRects.delete(board);
   const camera = sizeChanged || !previous ? createCamera(base) : previous.camera;
 
   const state = {
@@ -180,6 +209,13 @@ export function updateBoardCamera(board, { size, metrics, base }) {
     board.addEventListener("pointermove", handlePointerMove, { passive: true });
     board.addEventListener("pointerup", handlePointerUp, { passive: true });
     board.addEventListener("pointercancel", handlePointerUp, { passive: true });
+
+    // Everything that can actually change the board's on-screen box. Wired here
+    // rather than at module load so a headless import stays side-effect free.
+    const invalidate = () => viewportRects.delete(board);
+    windowRef?.addEventListener?.("resize", invalidate, { passive: true });
+    windowRef?.addEventListener?.("orientationchange", invalidate, { passive: true });
+    board.ownerDocument?.addEventListener?.("fullscreenchange", invalidate, { passive: true });
   }
 
   state.camera = clampCamera(base, state.camera, { maxZoom: state.gestureMaxZoom ?? currentMaxZoom(board, state) });

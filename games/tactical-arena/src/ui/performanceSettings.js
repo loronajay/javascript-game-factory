@@ -1,3 +1,5 @@
+import { isCoarsePointer } from "./pointerCapability.js";
+
 export const PERFORMANCE_MODE_STORAGE_KEY = "tactical-arena.performance-mode";
 export const DEFAULT_PERFORMANCE_MODE = "full";
 
@@ -24,7 +26,9 @@ export function shouldUseLowCostBoardPresentation({
   return (
     normalizePerformanceMode(root?.dataset?.performance) === "balanced" ||
     shouldUseReducedMotionPresentation({ windowRef }) ||
-    mediaMatches(windowRef, "(pointer: coarse)")
+    // Not a bare matchMedia: the packaged Android WebView reports pointer: coarse as
+    // false, which silently handed every phone the full-cost board presentation.
+    isCoarsePointer(windowRef)
   );
 }
 

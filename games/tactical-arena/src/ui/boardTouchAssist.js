@@ -1,5 +1,6 @@
 import { gridToScreen } from "./isometric.js";
 import { positionFromKey, positionKey } from "../rules/movement.js";
+import { isCoarsePointer } from "./pointerCapability.js";
 
 const ASSISTED_BOARD_SIZE = 13;
 const SHORT_LANDSCAPE_MAX_HEIGHT = 540;
@@ -55,9 +56,7 @@ export function shouldUseBoardTouchAssist({ size, coarsePointer, width, height }
 function getWindowAssistPosture(windowRef) {
   const width = windowRef?.innerWidth ?? 0;
   const height = windowRef?.innerHeight ?? 0;
-  const coarsePointer = Boolean(windowRef?.matchMedia?.("(pointer: coarse)")?.matches) ||
-    Boolean(windowRef?.navigator?.maxTouchPoints);
-  return { width, height, coarsePointer };
+  return { width, height, coarsePointer: isCoarsePointer(windowRef) };
 }
 
 function tileCenter(metrics, position) {

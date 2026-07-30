@@ -165,6 +165,18 @@ shipping menu screens. Asset URLs are relative to the stylesheet that declares t
   state, CSS entry points, and the module boundaries/line caps above.
 - This is unbundled browser ESM: `node --check` cannot prove a named import exists.
   After renames/moves, load the game in a browser (or the headless smoke) at least once.
+- Never detect touch in JavaScript with a bare `matchMedia("(pointer: coarse)")`. The
+  packaged Android WebView reports that feature as FALSE while touch works, so such a
+  gate is silently dead on the devices it exists to protect. Use
+  `src/ui/pointerCapability.js` (`isCoarsePointer` / `matchesCoarseQuery`);
+  `tests/pointer-capability.test.js` fails the build if a new one appears. Stylesheets
+  are exempt — the mobile build strips the condition out of the shipped CSS
+  (`mobile/tactical-arena/scripts/enable-touch-css.mjs`).
+- Never read layout (`getBoundingClientRect`, `offsetWidth`) from the per-render path.
+  A render is not allowed to measure the page: it forces a synchronous layout of the
+  whole document, and the board's box cannot change as a result of rendering it. Cache
+  the measurement and invalidate it on resize/orientation/fullscreen, as
+  `boardCameraController.js` does.
 
 ## Remaining hotspots
 

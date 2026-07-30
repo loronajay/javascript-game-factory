@@ -180,20 +180,38 @@ function rankedAvatarHtml(profile) {
   return `<figure class="ranked-match-avatar-fallback" aria-hidden="true">${escapeHtml((profile?.displayName || "?").slice(0, 1).toUpperCase())}</figure>`;
 }
 
+// Last-rendered signature per host, so an unchanged plate is left alone.
+//
+// This runs on every render (renderBoardAndRail), and each plate is an innerHTML
+// string carrying an avatar, a badge, and a tier emblem. Rebuilding all six images on
+// every tap of a ranked match is pure waste: the plates depend only on the seats'
+// ranked identities, which change at most once mid-match. Keyed on the host element,
+// matching the reconciler pattern in boardDomReconciler.js.
+const nameplateSignatures = new WeakMap();
+
 export function renderRankedMatchNameplates(host, { state, net, mySeat, ranked } = {}) {
   if (!host) return;
   if (!ranked || !net || state?.phase === "complete") {
     host.hidden = true;
     host.replaceChildren?.();
+    nameplateSignatures.delete(host);
     return;
   }
 
   const seats = (state?.turnOrder ?? [1, 2]).filter((seat) => seat === 1 || seat === 2);
-  host.replaceChildren();
+  const profiles = seats.map((seat) => rankedProfileForSeat(net, seat) || { displayName: `Player ${seat}`, rankedProfile: null });
+  // Team colour is in the signature because colorOf depends on state, not the profile.
+  const signature = JSON.stringify({ mySeat, seats, profiles, colors: seats.map((seat) => colorOf(state, seat)) });
+  // Visibility is re-asserted every call — only the expensive rebuild is skipped, so
+  // anything else that hid the host still gets corrected on the next render.
   host.hidden = false;
+  if (nameplateSignatures.get(host) === signature) return;
+  nameplateSignatures.set(host, signature);
 
-  for (const seat of seats) {
-    const profile = rankedProfileForSeat(net, seat) || { displayName: `Player ${seat}`, rankedProfile: null };
+  host.replaceChildren();
+
+  for (const [index, seat] of seats.entries()) {
+    const profile = profiles[index];
     const rankedProfile = profile.rankedProfile || {};
     const tierId = normalizeRankedTierId(rankedProfile.tier);
     const tierLabel = rankedProfile.tier?.label || "Bronze";

@@ -16,6 +16,7 @@ import { SLOT_LAYOUT, normalizeSquadLoadout, availableTypesForSlot, groupedUnitT
 import { getSkinPref, normalizeSkinSlug, skinLabel } from "./skinModel.js";
 import { openSkinPicker } from "./skinPicker.js";
 import { el, escapeHtml } from "./domHelpers.js";
+import { matchesCoarseQuery } from "./pointerCapability.js";
 
 let host = null; // lazily-created singleton overlay, reused across opens
 
@@ -342,9 +343,8 @@ function isSkinPickerOpen() {
 }
 
 function shouldUseSinglePaneRoster() {
-  return Boolean(
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(pointer: coarse) and (orientation: landscape) and (max-height: 540px)").matches
-  );
+  // Split rather than one query string: folding `(pointer: coarse)` into the query
+  // made the whole thing false in the packaged Android WebView, so the shipped app
+  // showed the two-pane desktop roster on a 360px-tall phone screen.
+  return matchesCoarseQuery("(orientation: landscape) and (max-height: 540px)");
 }

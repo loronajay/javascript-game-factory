@@ -5,6 +5,7 @@
 // layers); this module builds the two pieces that want generated geometry —
 // the parametric skyline and the ember field — and mounts the whole stack.
 import { svgElement } from "./svgHelpers.js";
+import { isCoarsePointer } from "./pointerCapability.js";
 
 function layer(className) {
   const el = document.createElement("div");
@@ -174,8 +175,10 @@ export function mountSceneBackdrop(container) {
   // the ember field are the dominant cause of jank — styles/responsive.css strips the
   // heavy layers on a coarse pointer, and we skip the ember field at the source
   // so we never even create 28 perpetually-animating nodes there.
-  const coarse =
-    typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+  // isCoarsePointer, not a bare matchMedia: the packaged Android WebView reports
+  // pointer: coarse as false, so this gate was off in the shipped app and every
+  // phone got the desktop particle counts plus the 28-node ember field.
+  const coarse = isCoarsePointer();
   const snowWeather = buildSnowWeather(coarse ? 24 : 58);
   const springWeather = buildRainWeather(coarse ? 16 : 34, false);
   const heatWeather = buildHeatWeather();

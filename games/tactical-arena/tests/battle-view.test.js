@@ -538,6 +538,20 @@ test("ranked matches render pilot nameplates with avatar, rank, tagline, and rec
     assert.match(STYLE_CSS, /\.ranked-match-plate\.slot-2\s*\{\s*justify-self:end;/);
     assert.match(STYLE_CSS, /\.ranked-match-emblem\s*\{[^}]*grid-column:3/);
 
+    // The plates are rebuilt from an innerHTML string carrying three <img> each, and
+    // renderBoardAndRail calls this on EVERY render — so in a ranked match every tap
+    // was re-parsing and re-laying-out six images whose content had not changed. They
+    // only depend on the two profiles, so an unchanged render must reuse the elements.
+    const plateBefore = host.children[0];
+    renderRankedMatchNameplates(host, { state: createBattleState(), net, mySeat: 1, ranked: { matchId: "ranked-1" } });
+    assert.equal(host.children[0], plateBefore, "an unchanged nameplate must not be rebuilt");
+
+    // A profile change still has to repaint.
+    net.profileForSeat = (seat) => ({ displayName: seat === 1 ? "Renamed Pilot" : "Rival Pilot", rankedProfile: null });
+    renderRankedMatchNameplates(host, { state: createBattleState(), net, mySeat: 1, ranked: { matchId: "ranked-1" } });
+    assert.notEqual(host.children[0], plateBefore, "changed ranked identity must repaint the plate");
+    assert.match(host.children[0].innerHTML, /Renamed Pilot/);
+
     renderRankedMatchNameplates(host, { state: createBattleState(), net, mySeat: 1, ranked: null });
     assert.equal(host.hidden, true);
     assert.equal(host.children.length, 0);
