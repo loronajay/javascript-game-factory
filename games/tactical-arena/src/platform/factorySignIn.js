@@ -18,12 +18,23 @@ let inAppSignInHandler = null;
 // a sign-in (shop, ranked, friends) are not the ones that need to react (the menus).
 export const SESSION_CHANGED_EVENT = "tactical-arena:session-changed";
 
-export function notifySessionChanged(documentRef = globalThis.document) {
+export async function notifySessionChanged(documentRef = globalThis.document) {
+  const pending = [];
   try {
-    documentRef?.dispatchEvent?.(new CustomEvent(SESSION_CHANGED_EVENT));
+    documentRef?.dispatchEvent?.(new CustomEvent(SESSION_CHANGED_EVENT, {
+      detail: {
+        waitUntil(value) {
+          if (value && typeof value.then === "function") pending.push(Promise.resolve(value));
+        },
+      },
+    }));
   } catch {
     // No DOM (tests / headless): nothing to notify.
   }
+  // DOM dispatch is synchronous, so listeners have registered every reconciliation
+  // promise by this point. Await them without letting an offline failure turn a
+  // successful sign-in into an authentication error.
+  if (pending.length) await Promise.allSettled(pending);
 }
 
 // Registers the in-app sign-in surface. Pass null to unregister (used by tests and

@@ -17,11 +17,19 @@ test("sign-in refreshes account controls immediately, then live progress after r
     refreshProgress: () => calls.push("progress"),
   });
 
-  const result = onSessionChanged();
+  let reportedWait = null;
+  const result = onSessionChanged({
+    detail: {
+      waitUntil(promise) {
+        reportedWait = promise;
+      },
+    },
+  });
   assert.deepEqual(calls, ["account", "sync"]);
+  assert.equal(reportedWait, result);
 
   releaseSync();
-  await result;
+  await reportedWait;
   assert.deepEqual(calls, ["account", "sync", "account", "progress"]);
 });
 

@@ -120,3 +120,22 @@ test("notifySessionChanged never throws without a DOM", () => {
   notifySessionChanged({ dispatchEvent: (event) => { dispatched = event.type; } });
   assert.equal(dispatched, SESSION_CHANGED_EVENT);
 });
+
+test("notifySessionChanged waits for progress reconciliation reported by listeners", async () => {
+  let releaseSync;
+  const syncPending = new Promise((resolve) => { releaseSync = resolve; });
+  const documentRef = {
+    dispatchEvent(event) {
+      event.detail.waitUntil(syncPending);
+    },
+  };
+
+  let finished = false;
+  const notifying = notifySessionChanged(documentRef).then(() => { finished = true; });
+  await Promise.resolve();
+  assert.equal(finished, false);
+
+  releaseSync();
+  await notifying;
+  assert.equal(finished, true);
+});

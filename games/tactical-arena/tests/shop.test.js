@@ -774,6 +774,62 @@ test("a completed Play purchase applies ownership before the shop resumes", asyn
   assert.match(visibleText(overlay), new RegExp(`${offer.name} unlocked`, "i"));
 });
 
+test("a Play skin purchase refreshes ownership when verification omits its progress snapshot", async (t) => {
+  globalThis.document = new FakeDocument();
+  const storage = storageAdapter();
+  const offer = getShopCatalog(storage).skins.find(
+    (skin) => skin.type === "fat-knight" && skin.slug === "tattered",
+  );
+  const previousCapacitor = globalThis.Capacitor;
+  t.after(() => { globalThis.Capacitor = previousCapacitor; });
+  globalThis.Capacitor = {
+    isNativePlatform: () => true,
+    Plugins: {
+      PlayBilling: {
+        purchase: async () => ({ purchases: [{ purchaseToken: "play-token", orderId: "GPA.test" }] }),
+        acknowledge: async () => {},
+        consume: async () => {},
+      },
+    },
+  };
+
+  let snapshotCalls = 0;
+  openShop(storage, {
+    account: SIGNED_IN_ACCOUNT,
+    fetchGameProgressSnapshot: async () => {
+      snapshotCalls += 1;
+      return snapshotCalls === 1
+        ? { valorBalance: 0, entitlements: [] }
+        : {
+            valorBalance: 0,
+            entitlements: [{
+              entitlementId: "skin:fat-knight:tattered",
+              kind: "skin",
+            }],
+          };
+    },
+    // Some deployed verifier revisions confirm the grant without echoing progress.
+    verifyPlayPurchase: async () => ({ ok: true }),
+  });
+
+  const overlay = document.body.children.find((node) => hasClass(node, "shop-modal"));
+  const skinsTab = walk(
+    overlay,
+    (node) => node.tagName === "BUTTON" && node.textContent === "Skins",
+  )[0];
+  skinsTab.click();
+  walk(overlay, (node) => node.tagName === "BUTTON" && node.dataset.sku === offer.sku)[0].click();
+  await flushAsyncPurchase();
+
+  assert.equal(snapshotCalls, 2);
+  assert.equal(isProgressSkinUnlocked("fat-knight", "tattered", storage), true);
+  const tatteredCard = walk(
+    overlay,
+    (node) => hasClass(node, "shop-skin") && node.getAttribute("aria-label") === "View Tattered skin for Fat Knight",
+  )[0];
+  assert.ok(hasClass(tatteredCard, "is-owned"));
+});
+
 test("shop skin packs render clickable contents and use Valor confirmation", async () => {
   globalThis.document = new FakeDocument();
   const storage = storageAdapter();

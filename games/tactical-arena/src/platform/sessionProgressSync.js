@@ -12,10 +12,15 @@ export function createSessionProgressSync({
 } = {}) {
   let inFlight = null;
 
-  return function onSessionChanged() {
+  return function onSessionChanged(event) {
+    function reportWait(promise) {
+      try { event?.detail?.waitUntil?.(promise); } catch { /* optional event handshake */ }
+      return promise;
+    }
+
     refreshAccount();
-    if (!shouldSync()) return Promise.resolve();
-    if (inFlight) return inFlight;
+    if (!shouldSync()) return reportWait(Promise.resolve());
+    if (inFlight) return reportWait(inFlight);
 
     inFlight = (async () => {
       try {
@@ -28,6 +33,6 @@ export function createSessionProgressSync({
         inFlight = null;
       }
     })();
-    return inFlight;
+    return reportWait(inFlight);
   };
 }

@@ -54,6 +54,21 @@ test("portrait phones do not request fullscreen behind the rotate gate", () => {
   );
 });
 
+test("the Android host stays landscape when Google Play returns to the game", () => {
+  const manifest = readFileSync(
+    new URL(
+      "../../../mobile/tactical-arena/android/app/src/main/AndroidManifest.xml",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.match(
+    manifest,
+    /<activity[\s\S]*?android:name="\.MainActivity"[\s\S]*?android:screenOrientation="sensorLandscape"/,
+  );
+});
+
 test("desktop and laptop viewports never show the mobile landscape gate", () => {
   assert.equal(
     getViewportPosture({ width: 1024, height: 1366, coarsePointer: false }).gateVisible,

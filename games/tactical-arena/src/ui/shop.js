@@ -331,6 +331,7 @@ export function openShop(storage = globalThis.localStorage, options = {}) {
         account,
         verifyPurchase: options.verifyPlayPurchase,
         fetchImpl: options.fetchImpl,
+        fetchSnapshot,
       });
       statusText = result.status;
       if (result.outcome === "purchased" && result.applied) {

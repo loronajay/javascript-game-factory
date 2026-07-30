@@ -14,6 +14,7 @@ import {
   playPurchaseErrorMessage,
   purchaseWithPlay,
 } from "../../platform/playBillingClient.js";
+import { fetchGameProgressSnapshot } from "../../platform/gameProgressClient.js";
 import { mergeServerEntitlementsIntoUnlockProgress, readUnlockProgress } from "../../progression/unlocks.js";
 import { mergeServerInventory } from "../../progression/inventory.js";
 
@@ -28,6 +29,7 @@ export async function runPlayPurchase({
   account,
   verifyPurchase,
   fetchImpl,
+  fetchSnapshot = fetchGameProgressSnapshot,
 }) {
   if (provider === PURCHASE_PROVIDERS.unavailable) {
     return { outcome: "unavailable", status: purchaseProviderMessage(provider) };
@@ -62,20 +64,32 @@ export async function runPlayPurchase({
       : { outcome: "failed", status: playPurchaseErrorMessage(result.error) };
   }
 
+  let purchaseProgress = result.progress;
+  if (!purchaseProgress) {
+    // Verification is allowed to return only a success verdict (older deployed API
+    // revisions did). Pull the now-authoritative account snapshot before resuming the
+    // shop so the purchased skin/unit appears immediately instead of after a restart.
+    try {
+      purchaseProgress = await fetchSnapshot({ account });
+    } catch {
+      purchaseProgress = null;
+    }
+  }
+
   const beforeProgress = readUnlockProgress(storage);
   // The server is authoritative immediately after a verified purchase.
-  const afterProgress = result.progress
-    ? mergeServerEntitlementsIntoUnlockProgress(storage, result.progress)
+  const afterProgress = purchaseProgress
+    ? mergeServerEntitlementsIntoUnlockProgress(storage, purchaseProgress)
     : beforeProgress;
   // Consumables are credited as inventory quantity, not as an entitlement, so the
   // snapshot has to land in the local inventory cache too.
-  if (result.progress) mergeServerInventory(storage, result.progress, { authoritative: true });
+  if (purchaseProgress) mergeServerInventory(storage, purchaseProgress, { authoritative: true });
 
   return {
     outcome: "purchased",
     beforeProgress,
     afterProgress,
-    applied: Boolean(result.progress),
+    applied: Boolean(purchaseProgress),
     status: offer.kind === "consumable"
       ? `${offer.name} added to your Inventory.`
       : `${offer.name} unlocked.`,

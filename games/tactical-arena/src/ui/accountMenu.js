@@ -105,7 +105,7 @@ export async function openAccountPanel({
       onSignedIn: async (result) => {
         // A different account means a different name to look up.
         profileNameLookupDone = false;
-        notifySessionChanged();
+        await notifySessionChanged();
         await onChanged?.(result);
       },
     });
@@ -126,7 +126,7 @@ export async function openAccountPanel({
     // logout() clears the local token even when the network call fails, so the
     // player is signed out locally either way.
   }
-  notifySessionChanged();
+  await notifySessionChanged();
   await onChanged?.({ ok: true, signedOut: true });
   return { ok: true, signedOut: true };
 }
