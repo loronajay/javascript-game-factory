@@ -1,7 +1,7 @@
 # Tactical Arena on Google Play — Owner's Checklist
 
 Everything **you** need to do, in order. Updated 2026-07-29 after the first closed-test
-release and Play product-catalog setup.
+release, Play product-catalog setup, and end-to-end device testing.
 
 `HANDOFF.md` is the engineering doc; this one is the console/account work that only you can
 do. Where a step needs code or assets, it says who does it.
@@ -17,8 +17,8 @@ build is perfect. Everything else can be fixed while the clock runs.
 
 | | |
 | --- | --- |
-| The app | Builds, installs, and plays on a real device |
-| Purchases (client + server) | Client is in the uploaded AAB; server is built and tested; 317 Play products are active. Railway credential + first licence-test purchase remain |
+| The app | **Tested** on the Play-installed build — gameplay and shop work |
+| Purchases (client + server) | **Verified end-to-end** with a licence-test purchase; server validation and entitlement/progress grant succeeded |
 | Release signing | **Done** — signed AAB uploaded to the closed test 2026-07-29 |
 | App icon | **Done** — the shield mark, generated at all five densities |
 | Store listing icon (512×512) | **Done** — `store-listing/play-icon-512.png` |
@@ -26,14 +26,14 @@ build is perfect. Everything else can be fixed while the clock runs.
 | Store descriptions | **Drafted** — `store-listing/DESCRIPTIONS.md`, yours to edit |
 | Privacy policy | **Live** — `https://factory.jayarcade.com/privacy`, contact `leojaylorona@gmail.com`. Read it before you submit it (step 4) |
 | Site + domain | **Done** — `factory.jayarcade.com`, HTTPS enforced, Railway auto-deploy reconnected |
-| Progress sync (web ↔ app) | **Fixed and verified on device** 2026-07-27 — units, skins, Valor, tutorials, campaign all restore from the server |
+| Progress sync (web ↔ app) | **Fixed and verified on login** 2026-07-29 — units, skins, Valor, tutorials, and campaign restore from the server |
 | Screenshots | Three phone screenshots prepared in `store-listing/` |
-| Play Console app entry | **Done** — closed-test release published; 0 testers opted in as of 2026-07-29 |
+| Play Console app entry | **Done** — closed-test release published; all testers have the opt-in link and 11 are opted in as of 2026-07-29 |
 
 The uploaded release package contains the native Play Billing bridge and the shop's open-time
-ownership refresh. No replacement AAB is required for the product-catalog fix. Purchases still
-need the server credential in Railway and one licence-test purchase before they are proven
-end-to-end.
+ownership refresh. No replacement AAB is required for the product-catalog fix. The shop,
+Google test-payment sheet, server verification, and entitlement/progress update have now
+been proven end-to-end.
 
 ---
 
@@ -46,9 +46,9 @@ end-to-end.
 5. [ ] Assemble the store listing
 6. [ ] Fill the Data safety + content rating forms
 7. [x] First Play upload → Closed testing
-8. [ ] Test on your own phone, including a real purchase
+8. [x] Test on your own phone, including a licence-test purchase
 9. [x] Create and activate the 317 in-app products
-10. [ ] Recruit 12+ opted-in closed testers (track is open; currently 0) ← **start this early**
+10. [ ] Recruit 12+ opted-in closed testers (11 opted in; link sent to all testers)
 11. [ ] Wait out 14 days, then request production
 
 Steps 1 and 2 are independent — do them in either order. Step 10 can start the moment step 7
@@ -287,7 +287,7 @@ screen while every adb command still reports success, so "it installed" proves n
 This debug build talks to the **production** API, so real sign-in, ranked, friends, and
 campaign progress all work.
 
-### Purchases — needs step 7 first
+### Purchases — completed 2026-07-29
 
 Billing does **not** work from a sideloaded debug APK. Play only honours purchases for an app
 it distributed. After the internal-testing upload:
@@ -297,8 +297,9 @@ it distributed. After the internal-testing upload:
 3. Buy something in the shop.
 
 As a licence tester you will see "Test card, always approves" and **will not be charged** — but
-the entire real flow runs, including the server verification. That first purchase is the only
-proof that the Google integration works, because it has never seen a real Google response.
+the entire real flow runs, including server verification. This was completed successfully
+from the Play-installed build: the shop worked, Google approved the test payment, and the
+account's entitlement/progress updated.
 
 **Watch the API logs during it.** If something is wrong, it shows up as
 `play_verification_not_configured` (key missing/not propagated) or `purchase_not_found`
@@ -338,6 +339,9 @@ game and server disagree; when it does, update the server catalog and re-run thi
 ## 10. The closed test — start this early
 
 *Testing → Closed testing → Create track.*
+
+**Current status (2026-07-29):** the opt-in link has been sent to every tester and 11 are
+opted in. One more tester must opt in to reach the 12-tester requirement.
 
 - Add an email list of **12+ real Google accounts**. Friends, family, anyone who will actually
   opt in.
@@ -379,23 +383,20 @@ Review after that is typically days, not weeks.
 Done: the privacy policy, the feature graphic, the descriptions, the duplicate-purchase
 hardening (a purchase of something you already own is refused **before** Google's payment sheet
 opens, so no money moves at all), the `factory.jayarcade.com` cutover, and the web↔app progress
-sync fix.
+sync fix. The Play-installed app, shop, login-time progress refresh, service-account
+configuration, and licence-test purchase flow have all been verified end-to-end.
 
 Still open, and each needs something from you:
 
 - [ ] **Rotate the Postgres password.** It was pasted into a chat transcript on 2026-07-27 while
       debugging. Railway → Postgres → Variables → regenerate; services referencing
       `${{Postgres.DATABASE_URL}}` pick it up on redeploy.
-- [ ] **Set or confirm `GOOGLE_PLAY_SERVICE_ACCOUNT_KEY` on the Railway API service.** Use the
-      same service-account JSON that published the catalog; enter it directly in Railway and
-      do not paste it into chat.
-- [ ] **Run one licence-test purchase from the Play-installed closed-test build.** This is the
-      final end-to-end proof of Google purchase verification and entitlement granting.
 - [ ] **Read the privacy policy** and settle its contact address (step 4).
 - [ ] **Finish/review the Play screenshots.** Three phone screenshots are already in
       `store-listing/`.
-- [ ] **Recruit 12+ testers through the closed-test opt-in link.** The release is published,
-      but Play Console currently reports 0 opted-in testers.
+- [ ] **Get one more tester opted in.** Every tester has the closed-test opt-in link and
+      Play Console currently reports 11 opted-in testers; keep at least 12 opted in for
+      14 continuous days.
 
 I do **not** need: your keystore passwords or the service-account JSON. Those stay with you
 and should be entered only in their destination consoles.

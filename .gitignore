@@ -32,6 +32,11 @@ dev/
 !games/*/tests/
 !games/*/tests/**
 
+# Keep the platform profile route regression that protects domain-move recovery.
+!platform-api/tests/
+platform-api/tests/*
+!platform-api/tests/app-profiles.test.mjs
+
 # Echo Duel keeps its local regression tests out of shipped game builds.
 games/echo-duel/tests/
 games/echo-duel/tests/**

@@ -16,23 +16,25 @@ The app builds, installs, and plays on a device. **49.4 MB APK.**
 | --- | --- | --- |
 | Capacitor packaging | Done | Real 15×15 match played on a Pixel 3a emulator |
 | Desktop mobile harness | Done | 5 phone profiles × 7 routes, all green |
-| In-app auth (sign in / up / reset) | Done | Wrong-password login hit production API from device |
+| In-app auth (sign in / up / reset) | Done | Signed in on the Play-installed build; account progress refreshed on login |
 | Android shell (back link, back button) | Done | 4 back cases verified on device |
 | Board camera (pan / pinch / follow) | Done | Synthesised multi-touch; tiles 28→44 CSS px |
 | Asset diet | Done | 150.1 → 49.4 MB |
 | Audio transcode | Done | 13/13 tracks decode on device |
 | Self-hosted fonts | Done | 22 faces, zero external requests |
 | Touch CSS in the WebView | Done | Computed styles checked on device |
-| **Play Billing — client** | Done | 32 unit tests; native plugin compiles |
-| **Play Billing — server** | **Done** | 26 unit tests against faked Google responses; Railway key still needs live confirmation (§4a) |
+| **Play Billing — client** | Done | Shop and licence-test purchase completed on the Play-installed build |
+| **Play Billing — server** | **Done** | Live purchase verified and granted end-to-end; 26 unit tests cover failure and replay cases |
 | **Release signing / AAB** | **Done** | Signed 51.3 MB AAB built and verified with `jarsigner` |
 | **Play product catalog** | **Done** | 317/317 one-time products synchronized and activated 2026-07-29 |
-| **Play Console + 12 testers** | **IN PROGRESS** | Closed-test release published; 0 testers currently opted in (§5) |
+| **Play Console + 12 testers** | **IN PROGRESS** | Opt-in link sent to every tester; 11 testers currently opted in (§4e) |
 
 Test suite: **1671 / 1671** green, and `platform-api` **450 / 450**.
 
 Identity verification passed on 2026-07-27, so nothing is blocked on Google any more.
-Every remaining item is either console clicking or waiting out the 14-day closed test.
+The app, login/progress restore, shop, and test purchase flow have all been exercised on
+the Play-installed build. The immediate closed-test task is getting one more tester opted
+in, then keeping at least 12 opted in for 14 continuous days.
 
 Landed alongside the port (not part of it): the six new player badges — five ladder
 ascent badges awarded off a new `game_ratings.peak_rating` column (migration 029),
@@ -176,12 +178,11 @@ newlines in `private_key`. If in doubt, use base64:
 [Convert]::ToBase64String([IO.File]::ReadAllBytes("sa.json"))
 ```
 
-### Remaining polish, not a correctness gap
+### Shop ownership refresh — shipped
 
-A blocked purchase now applies the fresh snapshot it fetched, so the shop corrects itself
-after the first refusal. What is still missing is refreshing ownership when the shop *opens*,
-so a stale item is never offered in the first place. That needs `shop.js`, which was being
-edited concurrently when this landed — see the note at the end of §6.
+A blocked purchase applies the fresh snapshot it fetched, and the shop also refreshes
+ownership when it opens so stale owned items are not offered. The Play-installed shop and
+licence-test purchase flow were verified end-to-end on 2026-07-29.
 
 ---
 
@@ -284,6 +285,9 @@ Store listing needs, none of which exist yet:
 This is the real critical path and nothing shortens it. A personal developer account must
 run a **closed test with 12+ testers opted in for 14 continuous days** before production
 access can even be *requested*.
+
+**Current status (2026-07-29):** every tester has the opt-in link and 11 are opted in.
+One more tester must opt in before the 12-tester clock can run.
 
 - Create a closed track, add an email list of 12+ real Google accounts.
 - The count is of testers **opted in**, not invited. Chase the opt-ins.
@@ -423,9 +427,8 @@ browser) or a build-time payload transform.
 ## Open questions for the owner
 
 1. ~~Build the server endpoint against a faked Google response now?~~ **Answered: built
-   that way.** 26 tests cover it against faked responses. It has never seen a real Google
-   response — the first live purchase in the closed test is the real proof, so make that
-   purchase with a licence-test account and watch the API logs.
+   and live-verified.** 26 tests cover it against faked responses, and a licence-test
+   purchase from the Play-installed build completed end-to-end on 2026-07-29.
 2. Android Studio is at **2023.2**. Irrelevant for the CLI build loop, but opening
    the project in the IDE will want Ladybug+ for AGP 8.7.
 3. `platform-api/tests/` is gitignored by the root `.gitignore` (`tests/`, with a
@@ -471,6 +474,8 @@ Account view should also say my account name, not just “you are signed in”
    the authoritative ownership merge correctly dropped on a device that had never made it. The
    backfill now asserts reward picks as claims, so the entitlement reaches the account.
    **The web device has to boot online once** to push its backfill up before the phone sees it.
+   Confirmed on the Play-installed build on 2026-07-29: signing in refreshed the account's
+   progress on the device.
 
 3. **Roster card sizing.** `.roster-class-units` gets a fixed `grid-auto-rows`, and `.roster-unit`
    an explicit portrait / name / flag row template, so the flag slot stays reserved on unlocked
