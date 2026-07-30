@@ -10,6 +10,8 @@
 // must not depend on src/ui/, and the panel is only present in one build posture.
 
 import { redirectToFactoryAccountSignIn } from "./factoryAccount.js";
+import { createAuthApiClient } from "../../../../js/platform/api/auth-api.mjs";
+import { bindFactoryProfileToSession } from "../../../../js/platform/identity/factory-profile.mjs";
 
 let inAppSignInHandler = null;
 
@@ -17,6 +19,26 @@ let inAppSignInHandler = null;
 // reload. A DOM event rather than a callback chain because the surfaces that trigger
 // a sign-in (shop, ranked, friends) are not the ones that need to react (the menus).
 export const SESSION_CHANGED_EVENT = "tactical-arena:session-changed";
+
+// A custom-domain move creates a fresh localStorage origin even though the API's
+// HttpOnly session cookie can still be valid. Refresh that cookie-backed session before
+// account gates render, then bind the new origin's local cache to the canonical player.
+export async function refreshFactoryAccountSession({
+  auth = createAuthApiClient(),
+  bindProfile = bindFactoryProfileToSession,
+} = {}) {
+  try {
+    const result = await auth.getSession();
+    if (result?.ok && result.playerId) {
+      bindProfile(result.playerId, undefined, {
+        profileName: typeof result.profileName === "string" ? result.profileName : "",
+      });
+    }
+    return result;
+  } catch {
+    return { ok: false, error: "network_error" };
+  }
+}
 
 export async function notifySessionChanged(documentRef = globalThis.document) {
   const pending = [];

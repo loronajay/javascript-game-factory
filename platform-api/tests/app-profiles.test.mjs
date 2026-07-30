@@ -2,14 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createApp } from "../src/app.mjs";
-import { signToken } from "../src/auth-helpers.mjs";
-
-const TEST_SECRET = "test-jwt-secret-at-least-32-chars-long";
-
-function authHeadersFor(playerId) {
-  const token = signToken({ playerId, email: "player@example.com" }, TEST_SECRET);
-  return { authorization: `Bearer ${token}` };
-}
 
 function createMockResponse() {
   return {
@@ -25,11 +17,10 @@ function createMockResponse() {
   };
 }
 
-async function invoke(app, { method = "GET", url = "/", body = null, headers = {} } = {}) {
+async function invoke(app, { method = "GET", url = "/", body = null } = {}) {
   const req = {
     method,
     url,
-    headers,
     async *[Symbol.asyncIterator]() {
       if (body !== null) {
         yield Buffer.from(body);
@@ -56,65 +47,6 @@ test("GET /players/:playerId returns 404 when no profile exists", async () => {
 
   assert.equal(response.statusCode, 404);
   assert.equal(response.json.error, "player_not_found");
-});
-
-test("GET /players/:playerId/profile repairs a signed-in player's missing profile", async () => {
-  let savedInput = null;
-  const app = createApp({
-    config: { hasDatabaseUrl: true },
-    jwtSecret: TEST_SECRET,
-    now: () => "2026-04-22T00:00:00.000Z",
-    loadPlayerProfile: async () => null,
-    savePlayerProfile: async (playerId, patch) => {
-      savedInput = { playerId, patch };
-      return {
-        playerId,
-        profileName: "",
-        friendCode: "SELF1234",
-      };
-    },
-  });
-
-  const response = await invoke(app, {
-    url: "/players/player-1/profile",
-    headers: authHeadersFor("player-1"),
-  });
-
-  assert.equal(response.statusCode, 200);
-  assert.deepEqual(savedInput, {
-    playerId: "player-1",
-    patch: {},
-  });
-  assert.deepEqual(response.json, {
-    player: {
-      playerId: "player-1",
-      profileName: "",
-      friendCode: "SELF1234",
-    },
-  });
-});
-
-test("GET /players/:playerId/profile does not create another player's missing profile", async () => {
-  let saveCalls = 0;
-  const app = createApp({
-    config: { hasDatabaseUrl: true },
-    jwtSecret: TEST_SECRET,
-    now: () => "2026-04-22T00:00:00.000Z",
-    loadPlayerProfile: async () => null,
-    savePlayerProfile: async () => {
-      saveCalls += 1;
-      return null;
-    },
-  });
-
-  const response = await invoke(app, {
-    url: "/players/player-2/profile",
-    headers: authHeadersFor("player-1"),
-  });
-
-  assert.equal(response.statusCode, 404);
-  assert.equal(response.json.error, "player_not_found");
-  assert.equal(saveCalls, 0);
 });
 
 test("GET /players/:playerId returns a profile payload", async () => {

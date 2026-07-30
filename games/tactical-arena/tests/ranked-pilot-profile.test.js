@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { syncRankedPilotProfile } from "../src/online/rankedPilotProfile.js";
 
-test("ranked pilot sync saves the local factory pilot name before queueing", async () => {
+test("ranked pilot sync saves only the local factory pilot name before queueing", async () => {
   const calls = [];
   const result = await syncRankedPilotProfile({
     apiClient: {
@@ -23,9 +23,7 @@ test("ranked pilot sync saves the local factory pilot name before queueing", asy
   assert.deepEqual(calls, [{
     playerId: "pilot-1",
     profile: {
-      playerId: "pilot-1",
       profileName: "Mara",
-      friendCode: "MARA1111",
     },
   }]);
   assert.deepEqual(result, { playerId: "pilot-1", profileName: "Mara" });

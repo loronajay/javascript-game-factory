@@ -6,6 +6,7 @@ import {
   handleSignInLinkClick,
   isNativeApp,
   notifySessionChanged,
+  refreshFactoryAccountSession,
   requestFactorySignIn,
   setInAppSignInHandler,
 } from "../src/platform/factorySignIn.js";
@@ -138,4 +139,45 @@ test("notifySessionChanged waits for progress reconciliation reported by listene
   releaseSync();
   await notifying;
   assert.equal(finished, true);
+});
+
+test("refreshFactoryAccountSession hydrates a cookie-backed session before game gates render", async () => {
+  let calls = 0;
+  let boundProfile = null;
+  const result = await refreshFactoryAccountSession({
+    auth: {
+      async getSession() {
+        calls += 1;
+        return {
+          ok: true,
+          playerId: "player-1",
+          profileName: "Mara",
+          token: "fresh-token",
+        };
+      },
+    },
+    bindProfile(playerId, _storage, options) {
+      boundProfile = { playerId, profileName: options.profileName };
+    },
+  });
+
+  assert.equal(calls, 1);
+  assert.equal(result.ok, true);
+  assert.equal(result.playerId, "player-1");
+  assert.deepEqual(boundProfile, {
+    playerId: "player-1",
+    profileName: "Mara",
+  });
+});
+
+test("refreshFactoryAccountSession keeps game boot available when auth is offline", async () => {
+  const result = await refreshFactoryAccountSession({
+    auth: {
+      async getSession() {
+        throw new Error("offline");
+      },
+    },
+  });
+
+  assert.deepEqual(result, { ok: false, error: "network_error" });
 });

@@ -340,11 +340,17 @@ export async function savePlayerProfile(db: any, playerId: any, patch: any = {})
   const normalizedPlayerId = sanitizePlayerId(playerId);
   if (!normalizedPlayerId) return null;
 
+  // This endpoint accepts a patch, so fields omitted by a narrow caller must retain
+  // their canonical values. Treating every patch as a full replacement allowed a
+  // fresh browser origin's blank local cache to erase avatar, music, and background.
+  const existingProfile = await loadPlayerProfile(db, normalizedPlayerId);
   const normalized = normalizeFactoryProfile({
+    ...(existingProfile || {}),
     ...patch,
     playerId: normalizedPlayerId,
   });
   const normalizedProfile = normalizeStoredProfile({
+    ...(existingProfile || {}),
     ...patch,
     ...normalized,
     playerId: normalizedPlayerId,

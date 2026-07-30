@@ -1,5 +1,10 @@
 import { composePage } from "./ui/pageComposer.js";
-import { isNativeApp, notifySessionChanged, setInAppSignInHandler } from "./platform/factorySignIn.js";
+import {
+  isNativeApp,
+  notifySessionChanged,
+  refreshFactoryAccountSession,
+  setInAppSignInHandler,
+} from "./platform/factorySignIn.js";
 import { AUTH_SESSION_EXPIRED_EVENT } from "../../../js/platform/api/auth-token.mjs";
 
 async function bootstrap() {
@@ -10,6 +15,10 @@ async function bootstrap() {
   // that into TA's own session signal so account-gated menus re-render as signed out
   // instead of sitting there looking signed in while every call 401s.
   document.addEventListener(AUTH_SESSION_EXPIRED_EVENT, () => notifySessionChanged());
+
+  // Hydrate a cookie-backed account into this origin's token/profile cache before
+  // account-gated game modules read it. Failure is non-fatal: the game still boots.
+  await refreshFactoryAccountSession();
 
   // Packaged-app only. The bundle contains just the game, so the shared account
   // gate's redirect to ../../sign-in/index.html is a dead end — route every
@@ -37,4 +46,3 @@ bootstrap().catch((error) => {
   message.textContent = "Tactical Arena could not load. Refresh the page to try again.";
   document.body.append(message);
 });
-

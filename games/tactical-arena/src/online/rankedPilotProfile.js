@@ -19,7 +19,10 @@ export async function syncRankedPilotProfile({ apiClient, loadProfile } = {}) {
   if (!playerId || !profileName) return null;
 
   try {
-    return await apiClient.savePlayerProfile(playerId, { ...profile, profileName });
+    // Ranked only needs the canonical display name. Sending the whole origin-local
+    // profile is destructive after a domain move because the new origin starts with
+    // blank avatar/music/background fields.
+    return await apiClient.savePlayerProfile(playerId, { profileName });
   } catch {
     return null;
   }

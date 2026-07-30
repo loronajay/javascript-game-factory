@@ -27,6 +27,17 @@ test("index is a small shell that delegates page regions to HTML fragments", () 
   assert.doesNotMatch(html, /src="\.\/src\/main\.js"/);
 });
 
+test("bootstrap refreshes the shared account session before loading game UI", () => {
+  const source = readFileSync(new URL("../src/bootstrap.js", import.meta.url), "utf8");
+
+  assert.match(source, /await refreshFactoryAccountSession\(\)/);
+  assert.match(source, /await import\("\.\/main\.js"\)/);
+  assert.ok(
+    source.indexOf("await refreshFactoryAccountSession()") < source.indexOf('await import("./main.js")'),
+    "session refresh must finish before account-gated UI modules load",
+  );
+});
+
 test("main menu gives Shop its own prominent action outside secondary controls", () => {
   const html = readFileSync(rootFile("html/menu-screens.html"), "utf8");
   const mainMenu = html.match(/<section class="screen menu-screen" data-screen="mainMenu">([\s\S]*?)<\/section>/)?.[1];

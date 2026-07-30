@@ -76,17 +76,7 @@ export async function handlePlayerRoute(context: any): Promise<boolean> {
   }
 
   if (method === "GET" && (playerMatch || profileMatch)) {
-    const requestedPlayerId = decodeURIComponent((profileMatch || playerMatch)[1]);
-    let profile = await loadPlayerProfile(requestedPlayerId);
-
-    // A domain move gives the browser a fresh origin-local cache, which can expose
-    // legacy accounts whose player row survived but whose profile row never existed.
-    // Repair only the authenticated player's own record; public reads of unknown ids
-    // must stay side-effect free and continue to return player_not_found.
-    if (!profile && authClaims?.playerId === requestedPlayerId) {
-      profile = await savePlayerProfile(requestedPlayerId, {});
-    }
-
+    const profile = await loadPlayerProfile(decodeURIComponent((profileMatch || playerMatch)[1]));
     if (!profile) {
       writeJson(res, 404, {
         status: "error",
