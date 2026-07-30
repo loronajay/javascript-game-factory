@@ -18,6 +18,7 @@
 // room (lobby) message contract (all `value`s are JSON strings):
 //   owner -> all : config   { rulesetVersion, size, format, teamColors, teamNames }
 //   each  -> all : ready     { ready }                          lobby squad lock-in flag
+//   each  -> all : rematch   { round, available, requested }    post-match handshake
 //   each  -> all : setup     { seat, composition, skins, nicknames }  blind squad pick / completed draft squad
 //   each  -> all : draft_pick { pickIndex, seat, type, skin, nickname }   draft phase pick
 //   active-> all : command   { command }                        an ACCEPTED core command
@@ -177,6 +178,15 @@ function parseReadyMessage(value) {
   return { ready: p.ready };
 }
 
+function parseRematchMessage(value) {
+  const p = parseJson(value);
+  if (!p || typeof p !== "object") return null;
+  const round = Number(p.round);
+  if (!Number.isInteger(round) || round < 0) return null;
+  if (typeof p.available !== "boolean" || typeof p.requested !== "boolean") return null;
+  return { round, available: p.available, requested: p.requested };
+}
+
 // A player's blind squad pick, keyed by its seat so every client builds the same
 // { seat: composition } map. The composition is re-normalized at match build
 // (squadModel.normalizeSquad); here we only confirm the wire shape.
@@ -286,6 +296,7 @@ export function createOnlineClient() {
     onPlayerLeft: null, // ({ clientId, ownerId, playerCount })
     onRemoteConfig: null, // ({ rulesetVersion?, size?, format?, teamColors?, teamNames? })
     onRemoteReady: null, // ({ clientId, ready })
+    onRemoteRematch: null, // ({ clientId, round, available, requested })
     onRemoteSetup: null, // ({ seat, composition?, skins?, nicknames? })
     onRemoteDraftPick: null, // ({ pickIndex, seat, type, skin? })
     onRemoteBanPick: null, // ({ banIndex, seat, type })
@@ -328,6 +339,11 @@ export function createOnlineClient() {
       case "ready": {
         const m = parseReadyMessage(value);
         if (m && senderId) cb.onRemoteReady?.({ clientId: senderId, ready: m.ready });
+        return;
+      }
+      case "rematch": {
+        const m = parseRematchMessage(value);
+        if (m && senderId) cb.onRemoteRematch?.({ clientId: senderId, ...m });
         return;
       }
       case "setup": {
@@ -534,6 +550,13 @@ export function createOnlineClient() {
   function sendReady(ready) {
     _lobbyMsg("ready", JSON.stringify({ ready: !!ready }));
   }
+  function sendRematch({ round, available, requested } = {}) {
+    _lobbyMsg("rematch", JSON.stringify({
+      round: Math.max(0, Math.floor(Number(round) || 0)),
+      available: !!available,
+      requested: !!requested,
+    }));
+  }
   function sendCommand(command) {
     _lobbyMsg("command", JSON.stringify({ command }));
   }
@@ -593,6 +616,7 @@ export function createOnlineClient() {
     leaveLobby,
     sendConfig,
     sendReady,
+    sendRematch,
     sendSetup,
     sendDraftPick,
     sendBanPick,

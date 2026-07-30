@@ -105,7 +105,11 @@ export function createMatchOutcomeController({
       prevPlayer
     })) return;
     if (state.phase === "complete") {
-      runtime.net?.endMatch(); // clean finish: let the session keep the socket alive briefly for the peer
+      runtime.net?.endMatch({
+        // Casual peers keep the relay lobby alive through the results handshake.
+        // Ranked is one-and-done and retains the existing grace-close behavior.
+        allowRematch: !runtime.matchConfig?.ranked,
+      });
       announceTurn(state.winner);
       const summary = buildSummary(state, { matchStartedAt: runtime.matchStartedAt, initialHpByPlayer: runtime.initialHpByPlayer });
       claimOnlineMatchValorReward(storage, summary, { matchConfig: runtime.matchConfig, match: state, mySeat: runtime.mySeat });

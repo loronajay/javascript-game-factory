@@ -163,6 +163,40 @@ test("online lobby search includes match type settings for separate queues", () 
   }
 });
 
+test("online rematch payload relays results availability and consent", () => {
+  const previous = globalThis.WebSocket;
+  const sent = [];
+  try {
+    globalThis.WebSocket = class FakeWebSocket {
+      static OPEN = 1;
+      readyState = FakeWebSocket.OPEN;
+      addEventListener() {}
+      send(payload) {
+        sent.push(JSON.parse(payload));
+      }
+    };
+    const client = createOnlineClient();
+    client.connect();
+    client.sendRematch({ round: 2, available: true, requested: false });
+    client.sendRematch({ round: 2, available: true, requested: true });
+
+    assert.deepEqual(sent, [
+      {
+        type: "lobby_message",
+        messageType: "rematch",
+        value: JSON.stringify({ round: 2, available: true, requested: false }),
+      },
+      {
+        type: "lobby_message",
+        messageType: "rematch",
+        value: JSON.stringify({ round: 2, available: true, requested: true }),
+      },
+    ]);
+  } finally {
+    globalThis.WebSocket = previous;
+  }
+});
+
 test("online lobby search carries sanitized ranked profile metadata", () => {
   const previous = globalThis.WebSocket;
   const sent = [];
@@ -337,6 +371,47 @@ test("online client parses remote draft picks", () => {
       })
     });
     assert.deepEqual(picks, [{ pickIndex: 1, seat: 2, type: "archer", skin: "summer-vibes", nickname: "Ryan" }]);
+  } finally {
+    globalThis.WebSocket = previous;
+  }
+});
+
+test("online client parses remote rematch state by sender and rejects malformed state", () => {
+  const previous = globalThis.WebSocket;
+  let messageHandler = null;
+  try {
+    globalThis.WebSocket = class FakeWebSocket {
+      static OPEN = 1;
+      readyState = FakeWebSocket.OPEN;
+      addEventListener(type, handler) {
+        if (type === "message") messageHandler = handler;
+      }
+      send() {}
+    };
+    const client = createOnlineClient();
+    const rematches = [];
+    client.cb.onRemoteRematch = (payload) => rematches.push(payload);
+    client.connect();
+    for (const value of [
+      JSON.stringify({ round: 1, available: true, requested: false }),
+      JSON.stringify({ round: 1, available: true, requested: true }),
+      JSON.stringify({ round: "wrong", available: true, requested: true }),
+    ]) {
+      messageHandler({
+        data: JSON.stringify({
+          event: "message",
+          scope: "lobby",
+          senderId: "c_guest",
+          messageType: "rematch",
+          value,
+        }),
+      });
+    }
+
+    assert.deepEqual(rematches, [
+      { clientId: "c_guest", round: 1, available: true, requested: false },
+      { clientId: "c_guest", round: 1, available: true, requested: true },
+    ]);
   } finally {
     globalThis.WebSocket = previous;
   }

@@ -9,20 +9,28 @@ import { formatValor } from "../progression/marketplace.js";
 import { campaignResultsValorLabel, unitLabel } from "./campaignMenuModel.js";
 import { renderOpponentCard } from "./resultsOpponentCard.js";
 import { renderRankedResult } from "./rankedResults.js";
+import { createResultsRematch } from "./resultsRematch.js";
 
 const CONFETTI_COUNT = 44;
 
-export function syncResultsActions({ rematchBtn, campaignMapBtn } = {}, { online = false, campaign = null } = {}) {
+export function syncResultsActions(
+  { rematchBtn, campaignMapBtn } = {},
+  { online = false, ranked = false, campaign = null, rematchAvailable = false } = {},
+) {
   const isCampaign = Boolean(campaign);
   // Campaign rewards and newly opened missions live on the map, so make that the
   // primary post-mission action while still leaving Main Menu available.
-  if (rematchBtn) rematchBtn.hidden = online || isCampaign;
+  if (rematchBtn) {
+    rematchBtn.hidden = isCampaign;
+    rematchBtn.disabled = isCampaign || ranked || (online && !rematchAvailable);
+  }
   if (campaignMapBtn) campaignMapBtn.hidden = !isCampaign;
 }
 
 export function createResultsScreen({
   showScreen = () => {},
   getLastConfig = () => null,
+  startMatch = () => {},
 } = {}) {
   const $ = (sel, root = document) => root.querySelector(sel);
   const results = $('[data-screen="results"]');
@@ -31,6 +39,11 @@ export function createResultsScreen({
   const campaignMapBtn = $("[data-results='campaign-map']", results);
   const resultsMainMenuBtn = $("[data-nav='mainMenu']", results);
   const opponentEl = $("[data-results='opponent']", results);
+  const rematch = createResultsRematch({
+    rematchBtn,
+    statusEl: $("[data-results='rematch-status']", results),
+    startMatch,
+  });
 
   function showResults(summary) {
     const lastConfig = getLastConfig();
@@ -82,8 +95,11 @@ export function createResultsScreen({
     addStat(stats, "Squad turns", String(summary.turns));
     addStat(stats, "Duration", formatDuration(summary.durationMs));
     addStat(stats, "Ended by", "Squad eliminated");
-    // A finished online session can't be locally replayed — Main Menu only.
-    syncResultsActions({ rematchBtn, campaignMapBtn }, { online, campaign });
+    // Online casual starts locked; the session unlocks it when every peer reaches results.
+    syncResultsActions(
+      { rematchBtn, campaignMapBtn },
+      { online, ranked: Boolean(lastConfig?.ranked), campaign },
+    );
     // Some campaign missions (The Wandering Party) must route the player back through the
     // map so a post-match cutscene + reward pick can run without the player escaping to
     // the menu first. In that case Campaign Map is the only exit off the results screen.
@@ -91,10 +107,11 @@ export function createResultsScreen({
     // Queued unlock/achievement popups are drained by the screen router on arrival
     // (after the confetti beat), for every mode — not just campaign victories.
     showScreen("results");
+    rematch.show(lastConfig);
     spawnConfetti(burstEl, MENU_TEAM_COLORS[summary.winner]);
   }
 
-  return { showResults };
+  return { el: results, onExit: rematch.onExit, requestRematch: rematch.request, showResults };
 }
 
 // Per-player battle report card — winner first (caller sorts). Surviving force as

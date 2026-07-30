@@ -43,8 +43,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   const screenEl = (name) => $(`[data-screen="${name}"]`);
 
   let lastConfig = null;
-
-  for (const name of ["hsSetup", "spSetup", "tempoMenu", "tempoSpSetup", "results", "tutorialComplete"]) {
+  for (const name of ["hsSetup", "spSetup", "tempoMenu", "tempoSpSetup", "tutorialComplete"]) {
     screens.register(name, { el: screenEl(name) });
   }
   function refreshAccountGatedControls() {
@@ -132,7 +131,9 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   const resultsScreen = createResultsScreen({
     showScreen,
     getLastConfig: () => lastConfig,
+    startMatch: startMatchTracked,
   });
+  screens.register("results", { el: resultsScreen.el, onExit: resultsScreen.onExit });
 
   const tutorialScreens = createTutorialMenuScreens({
     showScreen,
@@ -203,7 +204,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       case "startHotSeat": { startMatchTracked(matchSetup.gatherHotSeatConfig()); break; }
       case "startSingle": { startMatchTracked(matchSetup.gatherSingleConfig()); break; }
       case "startTempoSingle": { startMatchTracked(matchSetup.gatherTempoSingleConfig()); break; }
-      case "rematch": if (lastConfig && lastConfig.mode !== "online") startMatchTracked(lastConfig); break;
+      case "rematch": resultsScreen.requestRematch(); break;
       default: break;
     }
   });

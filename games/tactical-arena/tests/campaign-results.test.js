@@ -20,7 +20,7 @@ import {
 const outcomeScreensHtml = readFileSync(new URL("../html/outcome-screens.html", import.meta.url), "utf8");
 
 function fakeButton(hidden = false) {
-  return { hidden };
+  return { hidden, disabled: false };
 }
 
 function storageAdapter() {
@@ -56,7 +56,29 @@ test("non-campaign results hide Campaign Map while preserving normal rematch rul
   syncResultsActions({ rematchBtn, campaignMapBtn }, { online: false, campaign: null });
 
   assert.equal(rematchBtn.hidden, false);
+  assert.equal(rematchBtn.disabled, false);
   assert.equal(campaignMapBtn.hidden, true);
+});
+
+test("casual online results show a locked rematch until every opponent reaches results", () => {
+  const rematchBtn = fakeButton(true);
+
+  syncResultsActions({ rematchBtn }, { online: true, ranked: false, rematchAvailable: false });
+  assert.equal(rematchBtn.hidden, false);
+  assert.equal(rematchBtn.disabled, true);
+
+  syncResultsActions({ rematchBtn }, { online: true, ranked: false, rematchAvailable: true });
+  assert.equal(rematchBtn.hidden, false);
+  assert.equal(rematchBtn.disabled, false);
+});
+
+test("ranked results keep rematch visibly disabled", () => {
+  const rematchBtn = fakeButton(true);
+
+  syncResultsActions({ rematchBtn }, { online: true, ranked: true, rematchAvailable: true });
+
+  assert.equal(rematchBtn.hidden, false);
+  assert.equal(rematchBtn.disabled, true);
 });
 
 test("campaign map panning does not capture mission node clicks", () => {
