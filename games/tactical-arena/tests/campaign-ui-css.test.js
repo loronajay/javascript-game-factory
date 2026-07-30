@@ -74,12 +74,12 @@ test("touch devices get smaller campaign nodes but keep the 44px tap floor", () 
   );
 });
 
-test("formation editor buttons do not move on hover or drag", () => {
+test("formation editor buttons stay fixed and use tap-friendly click input", () => {
   const modalHoverRule = ruleBody(".draft-formation-modal button:hover:not(:disabled)");
   const slotRule = ruleBody(".draft-formation-slot");
-  const slotDraggingRule = ruleBody(".draft-formation-slot.is-dragging");
 
   assert.match(modalHoverRule, /transform\s*:\s*none/);
-  assert.match(slotRule, /translate\(var\(--drag-x,\s*0px\),\s*var\(--drag-y,\s*0px\)\)\s*!important/);
-  assert.doesNotMatch(slotDraggingRule, /scale/);
+  assert.match(slotRule, /touch-action\s*:\s*manipulation/);
+  assert.match(slotRule, /transform\s*:\s*translate\(-50%,\s*-63%\)\s*!important/);
+  assert.doesNotMatch(menusCss, /\.draft-formation-slot\.is-dragging/);
 });

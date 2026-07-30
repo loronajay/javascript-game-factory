@@ -170,14 +170,42 @@ test("refreshFactoryAccountSession hydrates a cookie-backed session before game 
   });
 });
 
+test("refreshFactoryAccountSession expires a rejected cached session before the UI renders", async () => {
+  let expired = 0;
+  let bound = 0;
+
+  const result = await refreshFactoryAccountSession({
+    auth: {
+      async getSession() {
+        return { ok: false, error: "unauthorized" };
+      },
+    },
+    bindProfile() {
+      bound += 1;
+    },
+    expireSession() {
+      expired += 1;
+    },
+  });
+
+  assert.deepEqual(result, { ok: false, error: "unauthorized" });
+  assert.equal(expired, 1, "the stale token is gone before account controls mount");
+  assert.equal(bound, 0, "a rejected session must never hydrate a signed-in profile");
+});
+
 test("refreshFactoryAccountSession keeps game boot available when auth is offline", async () => {
+  let expired = 0;
   const result = await refreshFactoryAccountSession({
     auth: {
       async getSession() {
         throw new Error("offline");
       },
     },
+    expireSession() {
+      expired += 1;
+    },
   });
 
   assert.deepEqual(result, { ok: false, error: "network_error" });
+  assert.equal(expired, 0, "connectivity trouble is not proof that the account was signed out");
 });

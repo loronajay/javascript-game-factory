@@ -1,9 +1,9 @@
 {
   "title": "Cockpit Swarm",
   "tagline": "Strafe the rail. Clear the swarm. Hold the sector.",
-  "description": "A first-person cockpit fixed-shooter: strafe along a rail to dodge incoming fire and shoot down enemy formations advancing from the horizon across five stages, four power-ups, and a three-phase boss.",
-  "players": "1",
-  "status": "Playable — 5-stage campaign + 3-phase boss",
+  "description": "A first-person cockpit fixed-shooter: strafe along a rail to dodge incoming fire and shoot down enemy formations advancing from the horizon across fifteen stages, four power-ups, and three bosses. Play the campaign, Boss Rush, Boss Practice, or a 1v1 Dodgeball duel online.",
+  "players": "1-2",
+  "status": "Playable — 15-stage campaign, 3 bosses, Boss Rush/Practice, and online 1v1 Dodgeball",
   "order": 9,
   "featured": false,
   "theme": "cockpit",

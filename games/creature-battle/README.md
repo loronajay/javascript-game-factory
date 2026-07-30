@@ -29,10 +29,10 @@ Online: Title → Mode Select → Online Lobby (settings + matchmaking/rooms) �
 - **Input**: keyboard (WASD + arrow keys) and mouse fully supported on every screen; Space = universal action key
 
 ### Platform integration
-- Registered in `js/arcade-catalog.mjs` with slug `creature-battler`; `game.json` present
+- Fully on the grid: slug `creature-battler` in `js/arcade-catalog.mts`/`.mjs` (decoupled from the `creature-battle` folder path), `game.json` at `order: 8`, and `grid-previews/creature-battler.png` all present
 - Factory identity read via `loadFactoryProfile()` — player name shown on title screen if set
 - Match results published to activity feed via `publishCreatureBattleMatchActivity` on battle end
-- Mobile controls: desktop-only for now; no touch profile wired
+- Mobile controls: wired. `creature-battler/scripts/mobile-ui.js` mounts an on-screen touch controller (styled by `creature-battler/styles/mobile.css`, built on the shared `js/mobile-controller.mjs`) and routes its input through the same keyboard router
 
 ### Battle engine
 - Speed-based turn order; player wins ties
@@ -85,16 +85,27 @@ Online: Title → Mode Select → Online Lobby (settings + matchmaking/rooms) �
 - Float text numbers appear on field sprites at impact frame
 
 ### Tests
-- `sounds.test.js`, `battle-round.test.js`, `battle-float-text.test.js`, `battle-status.test.js`
-- Per-creature animation test files in `scripts/animations/`
+
+From `games/creature-battle/`:
+
+```bash
+npm test
+```
+
+Eight suites, all green: `creature-battler/scripts/` holds `sounds`, `battle-round`,
+`battle-float-text`, `battle-status`, `animation-components`, `mobile-ui`, and
+`registry-modules`; `creature-battler/online-client.spec.js` is the one `node:test` suite.
+Focused scripts (`test:round`, `test:status`, …) are in `package.json`.
+
+The `"type": "commonjs"` field in that `package.json` is load-bearing — the tests are CommonJS
+and inherit `"type": "module"` from the repo root without it. See `creature-battler/CLAUDE.md`
+for how the `vm`-sandbox test harness works and the two stubbing traps it has.
 
 ### Pending
 - Defense route playtest pass (Taunt, Retaliation, Damage Store, Counter Stance → Counter Surge, Shield Wall, Resilient regen, Unassailable status block)
 - Draft pick mode (roster at 12 — threshold met, not yet implemented)
-- Additional class routes (14 remaining)
+- Additional class routes (11 remaining: 10 hybrid + the no-allocation prestige route)
 - Items menu (currently disabled)
-- Grid-preview image (`grid-previews/creature-battler.png`)
-- Mobile touch controls
 
 ## How to navigate the docs
 

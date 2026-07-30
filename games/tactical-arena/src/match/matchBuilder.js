@@ -181,6 +181,9 @@ export function buildSummary(state, { matchStartedAt, initialHpByPlayer }) {
     winner: state.winner,
     winnerLabel: state.winner ? teamLabel(state, state.winner) : null,
     winnerColor: state.winner ? teamColor(state.winner, state) : null,
+    endedBy: state.units.some((unit) => unit.deathCause === "concede")
+      ? "Concession"
+      : "Squad eliminated",
     format: state.format,
     size: state.size,
     turns: state.turnNumber,

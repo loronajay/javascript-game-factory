@@ -39,8 +39,6 @@ export function openDraftFormationPicker({ title = "Arrange Formation", composit
     ? [...order]
     : defaultFormationOrder(composition.length);
   let selectedSlot = null;
-  let pointerDrag = null;
-  let suppressClick = false;
 
   return new Promise((resolve) => {
     overlay.replaceChildren();
@@ -52,7 +50,7 @@ export function openDraftFormationPicker({ title = "Arrange Formation", composit
     head.innerHTML =
       `<div class="ref-head-title"><h2>${escapeHtml(title)}</h2>` +
       `<button class="ref-close" type="button" data-formation="cancel" aria-label="Close">X</button></div>` +
-      `<p class="roster-sub">Drag units around the board, or click two units to swap them.</p>`;
+      `<p class="roster-sub">Click two units to swap their positions.</p>`;
 
     const grid = el("div", "draft-formation-board");
     const foot = el("div", "roster-foot");
@@ -102,110 +100,16 @@ export function openDraftFormationPicker({ title = "Arrange Formation", composit
         btn.style.left = `${point.x}%`;
         btn.style.top = `${point.y}%`;
         btn.setAttribute("aria-label", `Slot ${slotLabel}: ${displayName}`);
-        btn.addEventListener("click", () => {
-          if (suppressClick) {
-            suppressClick = false;
-            return;
-          }
-          chooseSlot(slot);
-        });
-        btn.addEventListener("pointerdown", (event) => beginDrag(event, slot, btn));
-        btn.addEventListener("pointermove", (event) => moveDrag(event, btn));
-        btn.addEventListener("pointerup", (event) => endDrag(event, btn));
-        btn.addEventListener("pointercancel", () => cancelDrag(btn));
+        btn.addEventListener("click", () => chooseSlot(slot));
         grid.appendChild(btn);
       }
     }
 
     function chooseSlot(slot) {
-      if (selectedSlot === null) {
-        selectedSlot = slot;
-      } else if (selectedSlot === slot) {
-        selectedSlot = null;
-      } else {
-        [formationOrder[selectedSlot], formationOrder[slot]] = [formationOrder[slot], formationOrder[selectedSlot]];
-        selectedSlot = null;
-      }
+      const next = applyFormationSlotClick(formationOrder, selectedSlot, slot);
+      formationOrder = next.order;
+      selectedSlot = next.selectedSlot;
       paint();
-    }
-
-    function swapSlots(from, to) {
-      if (from === to || from == null || to == null) return;
-      [formationOrder[from], formationOrder[to]] = [formationOrder[to], formationOrder[from]];
-      selectedSlot = null;
-      paint();
-    }
-
-    function snapshotSlotRects() {
-      return [...grid.querySelectorAll(".draft-formation-slot")].map((node) => ({
-        slot: Number(node.dataset.slot),
-        rect: node.getBoundingClientRect(),
-      }));
-    }
-
-    function beginDrag(event, slot, btn) {
-      if (event.button !== 0) return;
-      const rect = btn.getBoundingClientRect();
-      pointerDrag = {
-        pointerId: event.pointerId,
-        slot,
-        x: event.clientX,
-        y: event.clientY,
-        moved: false,
-        rect,
-        slotRects: snapshotSlotRects(),
-      };
-      btn.style.setProperty("--drag-x", "0px");
-      btn.style.setProperty("--drag-y", "0px");
-      btn.setPointerCapture?.(event.pointerId);
-    }
-
-    function moveDrag(event, btn) {
-      if (!pointerDrag || pointerDrag.pointerId !== event.pointerId) return;
-      const dx = event.clientX - pointerDrag.x;
-      const dy = event.clientY - pointerDrag.y;
-      if (!pointerDrag.moved && Math.hypot(dx, dy) < 6) return;
-      pointerDrag.moved = true;
-      btn.classList.add("is-dragging");
-      btn.style.setProperty("--drag-x", `${dx}px`);
-      btn.style.setProperty("--drag-y", `${dy}px`);
-      event.preventDefault();
-    }
-
-    function endDrag(event, btn) {
-      if (!pointerDrag || pointerDrag.pointerId !== event.pointerId) return;
-      const drag = pointerDrag;
-      pointerDrag = null;
-      btn.releasePointerCapture?.(event.pointerId);
-      if (!drag.moved) {
-        btn.style.removeProperty("--drag-x");
-        btn.style.removeProperty("--drag-y");
-        return;
-      }
-      btn.classList.remove("is-dragging");
-      btn.style.removeProperty("--drag-x");
-      btn.style.removeProperty("--drag-y");
-      const dx = event.clientX - drag.x;
-      const dy = event.clientY - drag.y;
-      const targetSlot = nearestFormationDropSlot({
-        slotRects: drag.slotRects,
-        fromSlot: drag.slot,
-        center: {
-          x: drag.rect.left + (drag.rect.width / 2) + dx,
-          y: drag.rect.top + (drag.rect.height / 2) + dy,
-        },
-        padding: Math.max(drag.rect.width, drag.rect.height) * 0.25,
-        maxDistance: Math.max(drag.rect.width, drag.rect.height) * 1.65,
-      });
-      if (Number.isInteger(targetSlot)) swapSlots(drag.slot, targetSlot);
-      suppressClick = true;
-    }
-
-    function cancelDrag(btn) {
-      pointerDrag = null;
-      btn.classList.remove("is-dragging");
-      btn.style.removeProperty("--drag-x");
-      btn.style.removeProperty("--drag-y");
     }
 
     function close(result) {
@@ -239,6 +143,23 @@ function nameFor(type, nickname, def) {
 export function normalizeFormationPlayer(player) {
   const normalized = Math.floor(Number(player));
   return normalized >= 1 && normalized <= 4 ? normalized : 1;
+}
+
+export function applyFormationSlotClick(order = [], selectedSlot = null, clickedSlot = null) {
+  const nextOrder = Array.isArray(order) ? [...order] : [];
+  if (!Number.isInteger(clickedSlot) || clickedSlot < 0 || clickedSlot >= nextOrder.length) {
+    return { order: nextOrder, selectedSlot };
+  }
+  if (!Number.isInteger(selectedSlot)) {
+    return { order: nextOrder, selectedSlot: clickedSlot };
+  }
+  if (selectedSlot === clickedSlot) {
+    return { order: nextOrder, selectedSlot: null };
+  }
+  if (selectedSlot >= 0 && selectedSlot < nextOrder.length) {
+    [nextOrder[selectedSlot], nextOrder[clickedSlot]] = [nextOrder[clickedSlot], nextOrder[selectedSlot]];
+  }
+  return { order: nextOrder, selectedSlot: null };
 }
 
 function normalizeFormationFormat(format) {
@@ -408,43 +329,4 @@ function createFormationTile(metrics, position) {
     svgElement("polygon", { class: "tile-face", points: pointsToString(top) })
   );
   return tile;
-}
-
-export function nearestFormationDropSlot({ slotRects = [], fromSlot = null, center = null, maxDistance = Infinity, padding = 0 } = {}) {
-  if (!center) return null;
-  let best = null;
-  for (const item of slotRects) {
-    const slot = Number(item?.slot);
-    const source = item?.rect;
-    if (!Number.isInteger(slot) || slot === fromSlot || !source) continue;
-    const rect = normalizeRect(source);
-    if (!rect) continue;
-    if (pointInsideRect(center, rect, padding)) return slot;
-    const cx = rect.left + (rect.width / 2);
-    const cy = rect.top + (rect.height / 2);
-    const distance = Math.hypot(center.x - cx, center.y - cy);
-    if (distance <= maxDistance && (!best || distance < best.distance)) {
-      best = { slot, distance };
-    }
-  }
-  return best?.slot ?? null;
-}
-
-function normalizeRect(rect) {
-  const left = Number(rect.left);
-  const top = Number(rect.top);
-  const width = Number(rect.width);
-  const height = Number(rect.height);
-  if (![left, top, width, height].every(Number.isFinite)) return null;
-  return { left, top, width, height, right: left + width, bottom: top + height };
-}
-
-function pointInsideRect(point, rect, padding) {
-  const x = Number(point.x);
-  const y = Number(point.y);
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
-  return x >= rect.left - padding
-    && x <= rect.right + padding
-    && y >= rect.top - padding
-    && y <= rect.bottom + padding;
 }

@@ -235,10 +235,8 @@
   background:transparent;
   box-shadow:none;
   color:var(--text); cursor:pointer;
-  touch-action:none;
-  transform:
-    translate(-50%,-63%)
-    translate(var(--drag-x,0px),var(--drag-y,0px)) !important;
+  touch-action:manipulation;
+  transform:translate(-50%,-63%) !important;
 }
 .draft-formation-slot:hover {
   border-color:transparent;
@@ -247,4 +245,3 @@
   filter:brightness(1.08);
 }
 .draft-formation-slot.is-selected { border-color:transparent; box-shadow:none; background:transparent; }
-.draft-formation-slot.is-dragging { z-index:4; border-color:transparent; opacity:.72; cursor:grabbing; }

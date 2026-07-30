@@ -29,14 +29,20 @@ Then open `http://localhost:8000`.
 
 | Block | Stages | Boss |
 |-------|--------|------|
-| 1 | 1–5 | Boss 01 — 3-phase arm/laser fight |
-| 2 | 6–10 | Boss 02 — Arbiter |
+| 1 | 1–5 | Boss 01 — Dreadmaw, 3-phase arm/laser fight |
+| 2 | 6–10 | Boss 02 — The Arbiter |
 | 3 | 11–15 | Boss 03 — Eclipsis (5-phase final boss) |
+
+Stage count is derived from `STAGES.length` in `js/systems/stages.mjs`, and the boss gate is
+`BOSS_EVERY = 5` in `js/core/constants.mjs`. Adding a stage needs no UI copy change.
 
 ## Modes
 
 - **Campaign** — 15 stages + 3 bosses in sequence
-- **Boss Rush** — straight to Boss 01
+- **Boss Rush** — straight through all three bosses
+- **Boss Practice** — a select screen to fight any single boss directly
+- **Multiplayer 1v1 Dodgeball** — online duel over the Factory Network relay
+  (lobby → countdown → fighting → result), host-authoritative
 
 ## File structure
 
@@ -61,8 +67,8 @@ js/
     boss-eclipsis.mjs        Boss 03 state machine (5-phase)
     runner-system.mjs        Runner spawn, movement, firing, hit detection
     audio.mjs                Sound pools + boss sound wiring
-    online.mjs               Relay client for multiplayer (in progress)
-    mp-controller.mjs        Host-authoritative multiplayer controller (in progress)
+    online.mjs               Factory Network relay client for 1v1 Dodgeball
+    mp-controller.mjs        Host-authoritative multiplayer match controller
   entities/
     enemy.mjs                ENEMY_TYPES, makeEnemy(), makeFormation(), spawnEnemyBullet()
     boss.mjs                 makeBoss(), arm/mouth factories, phase helpers
@@ -84,10 +90,19 @@ js/
     boss-arbiter.mjs         Boss 02 rendering
     boss-eclipsis.mjs        Boss 03 rendering
     boss-fx.mjs              Shared boss effects (explosions, flashes)
-    mp-scene.mjs             Multiplayer-specific rendering (in progress)
+    mp-scene.mjs             1v1 Dodgeball rendering (covered by mp-scene.test.js)
     quality.mjs              Render quality helpers
 css/
   game.css                   Layout — canvas centering, mobile touch zones
 assets/
   *.wav                      Sound files
+mp-scene.test.js             The cabinet's only test file
+```
+
+## Tests
+
+There is no `package.json` here. The one test file runs directly:
+
+```bash
+node mp-scene.test.js
 ```

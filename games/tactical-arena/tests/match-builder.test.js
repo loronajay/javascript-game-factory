@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { attack, beginActivation } from "../src/core/commands.js";
+import { attack, beginActivation, concede } from "../src/core/commands.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { createBattleState } from "../src/core/state.js";
-import { buildRankedUnitReport, readableError, squadForSeat } from "../src/match/matchBuilder.js";
+import { buildRankedUnitReport, buildSummary, readableError, squadForSeat } from "../src/match/matchBuilder.js";
 
 test("first-actor gate message names Mother Nature instead of King", () => {
   const state = createBattleState({
@@ -94,4 +94,33 @@ test("squadForSeat lists a seat's real unit types (alive or dead), excluding sum
   });
   assert.deepEqual(squadForSeat(state, 1), ["swordsman", "mystic"]);
   assert.deepEqual(squadForSeat(state, 2), ["archer"], "ghoul summon excluded from squad");
+});
+
+test("match summary distinguishes a concession from squad elimination", () => {
+  const state = createBattleState({
+    units: [
+      { id: "p1", type: "swordsman", player: 1, x: 1, y: 1 },
+      { id: "p2", type: "swordsman", player: 2, x: 7, y: 7 },
+    ],
+  });
+  const conceded = applyCommand(state, concede(2));
+  assert.equal(conceded.accepted, true);
+
+  const concedeSummary = buildSummary(conceded.nextState, {
+    matchStartedAt: Date.now(),
+    initialHpByPlayer: { 1: 25, 2: 25 },
+  });
+  assert.equal(concedeSummary.endedBy, "Concession");
+
+  const eliminatedState = createBattleState({
+    units: [
+      { id: "p1", type: "swordsman", player: 1, x: 1, y: 1 },
+      { id: "p2", type: "swordsman", player: 2, hp: 0, deathCause: "unit", x: 7, y: 7 },
+    ],
+  });
+  const eliminationSummary = buildSummary(eliminatedState, {
+    matchStartedAt: Date.now(),
+    initialHpByPlayer: { 1: 25, 2: 25 },
+  });
+  assert.equal(eliminationSummary.endedBy, "Squad eliminated");
 });

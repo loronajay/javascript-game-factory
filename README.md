@@ -13,10 +13,13 @@ The served site loads compiled `.mjs` directly — `tsc` emits each `.mts` to a 
 - `js/`: shared frontend modules, page wiring, platform contracts, and frontend tests
 - `css/`: shared styles for platform pages and shared shell UI
 - `images/`: shared non-game assets used across the platform shell
-- `platform-api/`: persistent backend API for accounts, profiles, thoughts, relationships, messages, notifications, metrics, and uploads
+- `platform-api/`: persistent backend API for accounts, profiles, thoughts, relationships, messages, notifications, metrics, uploads, per-game ratings/ranked/ladders, game progress sync, and payments
+- `mobile/`: packaged native app wrappers. Currently only `mobile/tactical-arena/` — a Capacitor Android build of the Tactical Arena cabinet with Google Play Billing
 - `planning-docs/`: cross-cutting plans, architecture notes, and migration handoffs
+- `scripts/`: repo-level build tooling (`sync-emitted-mjs.mjs`, which keeps the committed `.mjs` output in step with the `.mts` sources)
 - route folders such as `activity/`, `gallery/`, `me/`, `messages/`, `notifications/`, `player/`, `search/`, and `thoughts/`: page entry points that usually contain an `index.html`
-- `grid-previews/`: preview art used by the game catalog/grid experience
+- `grid-previews/`: preview art used by the game catalog/grid experience. A preview here does not put a cabinet on the grid — that needs a `games/<slug>/game.json` **and** a slug in `js/arcade-catalog.mts`
+- `dist/`: TypeScript build scratch output; gitignored and never served
 
 ## Working model
 
@@ -29,8 +32,19 @@ The served site loads compiled `.mjs` directly — `tsc` emits each `.mts` to a 
 
 ## Testing
 
-- Game tests usually live inside the relevant game folder and are run with plain Node commands from that folder.
-- Shared frontend tests live in `js/tests/`.
-- API tests live in `platform-api/tests/`.
+- Game tests usually live inside the relevant game folder and are run with that cabinet's own `npm test`, or with plain Node commands from that folder.
+- Shared frontend tests live in `js/tests/` — `node --test js/tests/*.test.mjs` from the repo root.
+- API tests live in `platform-api/tests/` — `npm --prefix platform-api test`.
+
+```bash
+npm run typecheck                    # typecheck browser + API, no emit
+npm run build:browser                # regenerate js/**/*.mjs from the .mts sources
+npm --prefix platform-api run build  # regenerate platform-api/src/**/*.mjs
+npm run verify:build                 # emit and fail if the committed .mjs is stale
+```
 
 Use the nearest README in a major folder before extending that area. Most of the important ownership boundaries in this repo now have local documentation.
+
+## Hosting
+
+The site is served from `https://factory.jayarcade.com` (GitHub Pages, from the repo root). The apex `jayarcade.com` belongs to a different repo and must not be reassigned — a domain can only attach to one Pages site. `APP_BASE_URL` on Railway and the CORS allow-list in `platform-api/src/http-utils.mts` are origin-sensitive and have to move together with any domain change.

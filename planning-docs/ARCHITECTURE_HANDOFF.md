@@ -23,10 +23,9 @@ This doc is the source-of-truth handoff for the current architecture cleanup pas
 
 ## Read This First
 
-1. `ARCHITECTURE_HANDOFF.md`
-2. `PLATFORM_IMPLEMENTATION_PLAN.md`
-3. `BUGS.md`
-4. `CLAUDE.md`
+Superseded by the banner above — read `CHANGELOG.md` → root `CLAUDE.md` → `PLATFORM_IMPLEMENTATION_PLAN.md` → `BUGS.md`, then this doc for the reasoning behind the cleanup.
+
+The route-family extraction described below as in-progress is finished, and the family list has since grown well past what this doc records. The current set is `auth`, `player`, `thought`, `photo`, `message`, `notification`, `layout`, `rating`, `ranked`, `ladder`, `game-progress`, `game-social`, and `payment` — see `platform-api/README.md` for what each owns.
 
 ## Current State
 

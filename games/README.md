@@ -10,27 +10,32 @@ assets, and tests.
 
 ## Current Inventory
 
+"On the grid" means the folder has a `game.json`, a slug in `js/arcade-catalog.mts`, and a
+`grid-previews/<slug>.png`. All three are required — a preview image alone does not list a
+cabinet. Grid position comes from `game.json`'s `order` field.
+
 | Folder | Status | Notes |
 | --- | --- | --- |
-| `battleshits/` | Playable cabinet | Battleship-style game with solo bot battle, online play, platform registration, assets, and Node tests. |
-| `bird-duty/` | Playable port | TurboWarp-origin cabinet with solo, hotseat/two-player, online menu/match work, personal bests, sounds, mobile coverage, and a broad test suite. |
-| `build-buddy/` | Playable prototype | Co-op runner/builder platformer prototype with pack/stage architecture, local dual-role controls, online/client seams, and tests. |
-| `circuit-siege/` | Active online cabinet | Server-authoritative 1v1 route-repair game with shared rules, client/server modules, map editor, and extensive tests. |
-| `cockpit-swarm/` | Playable prototype | First-person cockpit fixed-shooter with 15 campaign stages, boss encounters, mobile controls, modular systems, and multiplayer seams in progress. |
-| `creature-battle/` | Playable cabinet | Platform wrapper plus `creature-battler/`, a playable creature battler with 3v3 training, online 1v1 blind pick, activity publishing, class routes, animation, and sound. |
-| `echo-duel/` | Playable online cabinet | 2-6 player online memory duel with solo survival, personal bests, server-authoritative match support, and compatibility fallback paths. |
-| `game-sound-factory-v3/` | Tool | Hybrid game sound editor with organized pseudo-filesystem, persistent patch controls, WAV rendering, and standalone/integration entry points. |
-| `illuminauts/` | Playable online cabinet | 2-player maze race with fog/light systems, chips, doors, hazards, audio, map tools, online identity handling, and tests. |
-| `jaybox/` | Platform prototype | Shared-screen party-game host shell with room/session identity boundaries and the phone-controller model. Hosts its cabinets as nested folders: `jaybox/pot-of-greed/` (first catalog target) and `jaybox/questionable-decisions/` (trivia + phone-controlled penalty mini-games). |
+| `battleshits/` | On the grid (3) | Battleship-style game with solo bot battle, online 1v1 matchmaking, platform registration, assets, and Node tests. |
+| `bird-duty/` | On the grid (7), porting | TurboWarp-origin cabinet with solo, hotseat/two-player, online menu/match work, personal bests, sounds, mobile coverage, and a broad test suite. |
+| `build-buddy/` | On the grid (10), prototype | Co-op runner/builder platformer prototype with pack/stage architecture, local dual-role controls, online/client seams, and tests. |
+| `circuit-siege/` | On the grid (12) | Server-authoritative 1v1 route-repair game with shared rules, client/server modules, map editor, and extensive tests. One shipped map (`maps/index.json`); procedural generation is a future scope doc, not built. |
+| `cockpit-swarm/` | On the grid (9) | First-person cockpit fixed-shooter: 15 campaign stages in three 5-stage blocks, three bosses (Dreadmaw / Arbiter / Eclipsis) reachable via campaign gate, Boss Rush, and Boss Practice, plus a 1v1 Dodgeball online mode. Mobile controls and modular render/system split. |
+| `creature-battle/` | On the grid (8) as `creature-battler` | Umbrella folder: platform wrapper plus `creature-battler/`, a 12-creature 3v3 battler with solo training vs AI, online 1v1 blind pick, activity publishing, class routes, animation, and sound. The catalog maps the `creature-battler` slug onto this folder path. Draft pick is scoped but not implemented. |
+| `echo-duel/` | On the grid (11) | 2-6 player online memory duel with solo survival, personal bests, server-authoritative match support, and compatibility fallback paths. |
+| `game-sound-factory-v3/` | Tool | Hybrid game sound editor with organized pseudo-filesystem, persistent patch controls, WAV rendering, and standalone/integration entry points. Not a cabinet. |
+| `illuminauts/` | On the grid (6) | 2-player online maze race with fog/light systems, chips, doors, hazards, audio, map tools, online identity handling, and tests. Also solo Sprint/Sweep time-attack modes across a 6-map catalog. Procedural generation (Phase 5) is next. |
+| `jaybox/` | Docs-first prototype | Shared-screen party-game host shell with room/session identity boundaries and the phone-controller model. Hosts its cabinets as nested folders: `jaybox/pot-of-greed/` (first catalog target) and `jaybox/questionable-decisions/` (trivia + phone-controlled penalty mini-games). Neither is implemented; both are scope/GDD packets. |
 | `juggle-fighter/` | Engine prototype | Deterministic platform-fighter foundation with fixed-step simulation, input buffering, fighter archetypes, local training scene, and tests. |
-| `last-bastion/` | Playable prototype | Tactical defense game with campaign menu flow, authored missions/maps, deployable unit roles, wave pressure, gold rewards, and smoke/campaign tests. |
-| `lovers-lost/` | Playable cabinet | Split-screen reunion runner with mobile/name input support, scoring, obstacle, player, input, and project-structure tests. |
-| `meat-cards/` | Rules + engine workbench | Digital rules capture and implementation workspace for a paper card game, including card digitization, engine tests, and scene/layout work. |
-| `mini-tactics/` | Playable prototype | Modular isometric squad tactics extraction with deterministic headless engine, reducer, seeded RNG, settings, CPU/multiplayer seams, and Node tests. |
+| `last-bastion/` | Playable, not on the grid | Single-player real-time tactical lane-defense. Campaign is the only enabled mode: 5 stages across 4 authored battlefields, gold economy, 6 deployable unit types on a counter triangle. Endless and Skirmish are visible-but-disabled placeholders. 10 test scripts under `tests/`. |
+| `lovers-lost/` | On the grid (2), featured | Split-screen reunion runner with mobile/name input support, scoring, obstacle, player, input, and project-structure tests. |
+| `meat-cards/` | Rules + engine workbench | Digital rules capture and implementation workspace for a paper card game, including card digitization, engine tests, and scene/layout work. Not on the grid despite having a preview image. |
+| `mini-tactics/` | On the grid (5) | Isometric squad tactics on a deterministic headless engine: hot-seat 2–4P (FFA + 2v2 teams), vs CPU on three difficulties, and online 2–4P lockstep. Online is headless-validated but not yet browser-playtested. 143 tests green. A tutorial subsystem exists in `src/tutorials/` but is deliberately not linked from the main menu. |
 | `project-draw/` | Tool prototype | Mobile drawing-engine fill prototype with canvas setup, camera, joystick movement, drawing tools, shape/fill tools, undo, and raw/smooth strokes. |
-| `rts-exploration-demo/` | Playable prototype | Browser RTS slice with selection, movement, attack-move, fog of war, harvesters, neutral patrols, breakable walls, and scenario tests. |
-| `sumorai/` | Playable cabinet | Samurai-sumo fighter port with local 2P, CPU difficulty modes, online casual/ranked play, rollback netcode, grid registration, and tests. |
-| `tactical-arena/` | WIP playable prototype | Successor to Mini-Tactics: local hot-seat 1v1, menu flow, deterministic reducer, data-driven units/ARTS/statuses, seeded combat rolls, and Node tests. |
+| `questionable-decisions/` | Stray empty folder | Not a workspace. The real docs live at `jaybox/questionable-decisions/`. |
+| `rts-exploration-demo/` | Playable prototype, not on the grid | Browser RTS slice with selection, movement, attack-move, fog of war, harvesters, neutral patrols, breakable walls, and scenario tests. |
+| `sumorai/` | On the grid (4) | Samurai one-hit-kill fighter port with local 2P, CPU difficulty modes, online casual and ranked (ELO) play over rollback netcode with peer time-sync, and a headless two-client sync test. |
+| `tactical-arena/` | On the grid (1), release candidate | The flagship cabinet and successor to Mini-Tactics. 30-unit roster with ARTS/passives/statuses/summons/weather/terrain, a 22-mission campaign, five tutorials, local hot-seat 2–4P, CPU, Tempo Battle, Online Versus (Classic/Draft 1v1, 4P FFA, 2v2 Teams), server-authoritative Ranked 1v1, a TA-scoped friends/profile/badge layer, and a monetized shop on Valor plus real money. Also packaged as an Android app — see `mobile/tactical-arena/`. ~1795 tests. |
 
 ## Folder Expectations
 
@@ -79,9 +84,17 @@ node --test tests/*.test.js
 node --test
 ```
 
+There is **no test framework in this repo** — everything is Node's built-in runner
+(`node --test`) or plain scripts using `node:assert`. Do not add Jest, Vitest, or Mocha;
+copy the shape a neighbouring cabinet already uses. Note that not every `tests/` folder
+holds `node:test` files: `last-bastion/tests/*.mjs` are standalone scripts that must be run
+one at a time, so `node --test tests/` reports a single failure there rather than running them.
+
 Tests should focus on game logic, collision, scoring, deterministic reducers,
 state transitions, online contracts, and shared identity/platform seams. Avoid
-testing canvas draw calls directly.
+testing canvas draw calls directly. Online sync in particular is proven by a headless
+multi-client harness under simulated latency, never by a single-machine playtest —
+see `sumorai/tests/online-sync.test.js` and `mini-tactics/tests/online-lockstep.test.js`.
 
 ## Engineering Boundaries
 

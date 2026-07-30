@@ -1,6 +1,17 @@
 # Delete Comment - Implementation Plan
 
-Status: active
+Status: **SHIPPED 2026-07-25.** This is design history, not a work queue.
+
+> Comment deletion is live on both surfaces. A comment can be removed by its author or by the
+> author of the parent post / owner of the photo, decided server-side inside a transaction with
+> the requester taken from the verified session — never from the request body. The same pass
+> closed a wider hole: `POST /thoughts`, `/thoughts/:id/comments`, `/shares`, and `/reactions`
+> previously had no auth at all and read the actor from the body, and `DELETE /thoughts/:id`
+> had no ownership check. All now require a session. Deleting content also clears the
+> notifications that referenced it.
+>
+> See the "Comment Moderation" entry in `CHANGELOG.md` for the as-built account, and
+> `platform-api/tests/thought-routes.test.mjs` / `photo-routes.test.mjs` for the coverage.
 
   1. DB layer — two new functions
 

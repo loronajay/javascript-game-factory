@@ -4,11 +4,26 @@ Last Bastion is a tactical defense game about turning a collapsing battlefield i
 
 ## Current play loop
 
-- Deploy Strikers, Guards, Breakers, and Marksmen inside the defensive territory.
+- Deploy from a roster of six unit types inside the defensive territory.
 - Read visible route scars, terrain chokepoints, enemy entry markers, and each unit's tactical silhouette.
 - Use orders to reposition, focus-fire, hold a line, protect an ally, or retreat a damaged defender.
-- Build a physical frontline: opposing units now keep space instead of visually passing through each other.
+- Build a physical frontline: opposing units keep space instead of visually passing through each other.
 - Earn Gold from defeated enemies to reinforce the position between waves.
+
+## Roster
+
+Four mobile combat units, which take orders:
+
+- **Striker** — fast melee interceptor.
+- **Guard** — armored blocker and anchor.
+- **Breaker** — slow anti-armor bruiser.
+- **Marksman** — fragile long-range support.
+
+Plus two emplacements, which take no orders once placed:
+
+- **Sentry Turret** — a stationary long-range lane defender. Cannot move, chase, or retreat.
+- **Shock Mine** — a one-use proximity trap. Must be planted on a route scar inside the deploy
+  zone, arms after a short delay, and is consumed when it detonates.
 
 ## Menu flow
 
@@ -45,12 +60,22 @@ python3 -m http.server 8080
 
 Open `http://localhost:8080`.
 
-## Smoke test
+## Tests
+
+There is no `package.json` and no `npm test` here. The ten suites under `tests/` are standalone
+scripts, so run them one at a time — `node --test tests/` will not work:
 
 ```bash
 node tests/smoke.mjs
 node tests/campaign.mjs
 node tests/menu-flow.mjs
+node tests/emplacements.mjs
+node tests/projectiles.mjs
+node tests/battlefield-art.mjs
+node tests/interface-art-direction.mjs
+node tests/unit-renderer.mjs
+node tests/audio.mjs
+node tests/polish.mjs
 ```
 
-The campaign test checks map resolution, wave-path references, route walkability, and linear campaign progression. The smoke test checks route walkability, stationary Hold behavior, manual movement, enemy advance, explicit Attack order completion, return to Hold after a target dies, Gold naming, and the revised mission budget.
+The campaign test checks map resolution, wave-path references, route walkability, and linear campaign progression. The smoke test checks route walkability, stationary Hold behavior, manual movement, enemy advance, explicit Attack order completion, return to Hold after a target dies, Gold naming, and the revised mission budget. `emplacements.mjs` covers the Sentry Turret and Shock Mine placement/arming rules.

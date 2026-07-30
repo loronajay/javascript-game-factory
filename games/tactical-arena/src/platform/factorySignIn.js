@@ -11,6 +11,7 @@
 
 import { redirectToFactoryAccountSignIn } from "./factoryAccount.js";
 import { createAuthApiClient } from "../../../../js/platform/api/auth-api.mjs";
+import { handleUnauthorizedResponse } from "../../../../js/platform/api/auth-token.mjs";
 import { bindFactoryProfileToSession } from "../../../../js/platform/identity/factory-profile.mjs";
 
 let inAppSignInHandler = null;
@@ -26,6 +27,7 @@ export const SESSION_CHANGED_EVENT = "tactical-arena:session-changed";
 export async function refreshFactoryAccountSession({
   auth = createAuthApiClient(),
   bindProfile = bindFactoryProfileToSession,
+  expireSession = handleUnauthorizedResponse,
 } = {}) {
   try {
     const result = await auth.getSession();
@@ -33,6 +35,11 @@ export async function refreshFactoryAccountSession({
       bindProfile(result.playerId, undefined, {
         profileName: typeof result.profileName === "string" ? result.profileName : "",
       });
+    } else if (result?.error === "unauthorized") {
+      // `/auth/me` is the startup authority. If it rejects the cached bearer token,
+      // remove that token before main.js mounts account controls; otherwise the token-
+      // presence gate paints a signed-in menu that collapses on the next protected call.
+      expireSession();
     }
     return result;
   } catch {

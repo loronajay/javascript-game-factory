@@ -132,11 +132,14 @@ Not implemented yet:
 - A real badge pass instead of placeholder badge presentation
 - A public ladder board page (`GET /ladders/:slug` exists; no platform UI reads it yet)
 - API-driven bulletins and events so seasonal content can rotate without a deploy
-- Production email/domain sender verification beyond the temporary sender setup
+
+**Shipped since this list was written:** production email sender verification is done — password reset runs end-to-end through Resend on the verified `jayarcade.com` domain, sending as `noreply@jayarcade.com`.
 
 ### Active defects or missing behavior
 
-- Comment deletion for thought comments and photo comments is still missing. Track implementation in `BUGS.md` and `COMMENT_DELETE_PLAN.md`.
+- See `BUGS.md`. The current entries are the Mini-Tactics tutorial entry point, the Creature Battler test suite failing to load, the Battleshits `npm test` gap, and the layout-editor manual QA follow-up — all cabinet/test issues rather than platform gaps.
+
+**Shipped since this section was last written:** comment deletion for thought and photo comments landed 2026-07-25, enforced server-side from the verified session, and the same pass added auth to every thought mutation and cleared notifications referencing deleted content. `COMMENT_DELETE_PLAN.md` is now design history.
 
 ### Profile editor/layout status
 

@@ -2,6 +2,28 @@
 
 Dated history extracted from the root `CLAUDE.md` (2026-07-23) so that file can stay a lean orientation guide instead of an ever-growing log. This file is a curated narrative, not a replacement for `git log` — read it for *why*/*what shipped when*, not for line-level diffs.
 
+## Repo-Wide Documentation Sync (2026-07-30)
+
+A pass over every orientation doc in the repo to bring it back in line with the code, after a stretch of shipping (Play Store pipeline, badges, TA friends, ladders, payments, the domain move) that outran the docs. Claims were checked against the code and, where they were about tests, by running the suites.
+
+Corrections worth remembering: the root `CLAUDE.md` grid-order list was wrong for **every** cabinet — the real order lives in each `games/<slug>/game.json` and had been reshuffled with Tactical Arena moved to 1, so the doc now says to re-read `game.json` rather than trusting a copied list. `AGENTS.md` told contributors to use **Jest**, which appears nowhere in the repo — everything is `node:test` or plain scripts with `node:assert`, and adding a framework is now explicitly ruled out. Cockpit Swarm's `game.json`, `CLAUDE.md`, and both READMEs disagreed about its campaign length; `STAGES` has **15** entries and `BOSS_EVERY = 5`, so the 15-stage/3-block README was right and the "5-stage" copy everywhere else was wrong (the menu subtitle interpolates `STAGES.length`, which is why nobody noticed in-game). `build-buddy` was simultaneously listed as a live grid cabinet and as "scoped in GDDs only". Last Bastion had grown from 3 stages/2 maps to 5 stages/4 battlefields.
+
+Also marked shipped where docs still said pending: comment deletion (`COMMENT_DELETE_PLAN.md`, `BUGS.md`, the platform plan), password-reset sender verification, and the online login gate. `platform-api/README.md` was missing five of its thirteen route families and all seven catalog services.
+
+## Test-Suite Repairs (2026-07-30)
+
+Verifying the documentation pass above surfaced three broken or misleading test setups. All three are fixed; every cabinet suite in the repo is now green.
+
+**Creature Battler was silently untested.** All eight of its test files are CommonJS, but there was no `package.json` under `games/creature-battle/`, so they inherited `"type": "module"` from the repo root and every one died at load with `ReferenceError: require is not defined in ES module scope` — nothing executed, under either `node <file>` or `node --test`. Adding `games/creature-battle/package.json` with `"type": "commonjs"` and a `test` script fixed the load. That is safe because the cabinet's own `scripts/*.js` are classic browser scripts with no `import`/`export`, and `js/mobile-controller.mjs` stays ESM on its extension.
+
+Once they actually ran, four years-stale expectations surfaced — worth recording, because each one is a trap the next person will hit. The tests load game code by reading it with `fs` and evaluating it in a `vm` sandbox stubbed with hand-written collaborators, so **a new cross-file call in game code fails as a `ReferenceError`, not a meaningful assertion.** `battle-round.js` had grown calls to `accumulateBattleStats`, the end-of-round status/passive tickers, and `CreatureState.clearDefend`; `battle-engine.js` had grown the whole passive/skill-registry surface. Both needed new stubs. Sound-path expectations lacked the `creature-battler/` prefix that the outer platform entry point requires. And `SPD DOWN` labels are now stat-stage deltas (`SPD -1`) under the ±5-stage system.
+
+The subtlest one: stubbing `getWarlordPresenceBonus` to `0` made **every** damage number collapse to `1`. Despite the name it is a multiplier (1.0 inactive, 1.08 active) folded into `calcDamage`'s `passiveMult`, so a zero silently floors damage to `ENGINE.MIN_DAMAGE` and presents as "the engine is broken" rather than "the stub is wrong". Stub multipliers as `1`.
+
+**Battleshits' `npm test` ran eight of eleven suites.** The script chains files by name and omitted `audio`, `bot`, and `emojis` — all passing, all unguarded by the default command, including the entire bot AI. Added, along with focused `test:bot` / `test:audio` / `test:emojis` entries. The name-by-name style means a new test file still has to be registered by hand or it never runs.
+
+**Mini-Tactics' failing main-menu test was the test's fault, not the product's.** `tests/main-menu.test.js` asserted a "Tutorials" button on the main menu; removing that button was a deliberate owner decision. The assertion was inverted to pin the button's *absence*, keeping the checks that the tutorial completion screen stays wired. `mainMenuScreen.js` already bound `startTutorial` optionally (`?.addEventListener`), so the menu works either way, and the tutorial subsystem remains intact behind the scenes. 143/143.
+
 ## Factory Launcher — Custom Domain + Progress-Sync Repair (2026-07-27)
 
 **The site moved to `factory.jayarcade.com`.** The apex `jayarcade.com` belongs to the separate `loronajay/games-directory` repo (Jay's Retro Arcade and the Cabinet OS the Pi kiosks pull from) and must not be reassigned — GitHub allows one repo per domain. A subdomain avoids that entirely: one Namecheap CNAME (`factory` → `loronajay.github.io`), a `CNAME` file at the repo root, Enforce HTTPS on (Let's Encrypt cert issued 2026-07-28 01:18 UTC). The custom domain serves the repo at the **root**, not under `/javascript-game-factory/`; all in-site paths are relative so nothing broke, and GitHub redirects the old Pages URLs. `APP_BASE_URL` on Railway and the CORS allow-list in `platform-api/src/http-utils.mts` both moved with it (the old Pages origin stays allow-listed for old links). The privacy page's contact became `leojaylorona@gmail.com` — no mailbox exists on the domain.

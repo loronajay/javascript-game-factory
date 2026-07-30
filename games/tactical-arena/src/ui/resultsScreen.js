@@ -94,7 +94,7 @@ export function createResultsScreen({
     addStat(stats, "Board", `${summary.size} × ${summary.size}`);
     addStat(stats, "Squad turns", String(summary.turns));
     addStat(stats, "Duration", formatDuration(summary.durationMs));
-    addStat(stats, "Ended by", "Squad eliminated");
+    addStat(stats, "Ended by", summary.endedBy ?? "Squad eliminated");
     // Online casual starts locked; the session unlocks it when every peer reaches results.
     syncResultsActions(
       { rematchBtn, campaignMapBtn },
