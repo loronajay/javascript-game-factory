@@ -115,8 +115,8 @@ export function buildEventDetailViewModel(event: any, options: any = {}) {
       state: "missing",
       heroKicker: "EVENT DETAIL",
       heroTitle: "EVENT NOT FOUND",
-      heroSummary: "This event is not present on the local event board yet. Return to the calendar for the sessions that are currently cached on this cabinet.",
-      body: "The local-first event board only knows about the events currently bundled into the platform surface.",
+      heroSummary: "This event could not be found. Return to the calendar to browse current events.",
+      body: "The event may have ended, been removed, or the link may be incorrect.",
       metaItems: [
         { label: "Requested Slug", value: requestedSlug || "NO-SLUG" },
         { label: "Status", value: "Missing" },

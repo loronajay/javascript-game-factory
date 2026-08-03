@@ -1,5 +1,6 @@
 import { resolvePlatformApiBaseUrl } from "./platform-api.mjs";
 import type { PlatformApiClientOptions } from "./platform-api.mjs";
+import { getStoredAuthToken, handleUnauthorizedResponse } from "./auth-token.mjs";
 
 type FetchImpl = typeof fetch | null;
 
@@ -29,7 +30,14 @@ async function requestEnvelope(fetchImpl: FetchImpl, baseUrl: string, path: stri
     };
   }
   try {
-    const response = await fetchImpl(`${baseUrl}${path}`, options);
+    const token = getStoredAuthToken();
+    const response = await fetchImpl(`${baseUrl}${path}`, {
+      ...options,
+      headers: {
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...((options.headers as Record<string, string>) || {}),
+      },
+    });
     let body: any = null;
     try {
       body = await response.json();
@@ -43,6 +51,9 @@ async function requestEnvelope(fetchImpl: FetchImpl, baseUrl: string, path: stri
         error: "",
         body,
       };
+    }
+    if (response?.status === 401) {
+      handleUnauthorizedResponse();
     }
     return {
       ok: false,

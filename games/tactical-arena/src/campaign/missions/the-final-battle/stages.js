@@ -106,9 +106,9 @@ export function makeFinalBattleBoss(unit) {
 // Match prep: the confrontation. The party spawns in its usual corner block (createMatchState
 // already put it there); Blacksword takes the middle of the board and waits.
 export function prepareFinalBattle(match, units) {
-  const duelTypes = units
-    .filter((unit) => unit.player === 1)
-    .map((unit) => unit.type);
+  const party = units.filter((unit) => unit.player === 1);
+  const duelTypes = party.map((unit) => unit.type);
+  const duelUnitIds = party.map((unit) => unit.id);
   const prepared = units.map((unit) => {
     if (unit.player !== 2 || unit.type !== "blacksword") return unit;
     return {
@@ -126,6 +126,10 @@ export function prepareFinalBattle(match, units) {
         // the engine never has to know what mission 22 is.
         lastStage: FINAL_BATTLE_STAGE_LAST_STAND,
         duelTypes,
+        // Types drive captions and mirror construction; ids preserve the actual drafted
+        // roster. A Summoner can create a temporary ghost of one of these same types, so
+        // type alone is not enough to identify who belongs in a later duel.
+        duelUnitIds,
         bench: [],
         pendingStage: false,
         bossId: FINAL_BATTLE_BOSS_ID,
@@ -143,11 +147,15 @@ export function prepareFinalBattle(match, units) {
 // party members who were not in it. Fallen mirrors are dropped: a beaten copy does not come
 // back, and a corpse from a 5×5 has no coordinates that mean anything on the next board.
 function benchUnits(state) {
+  const rules = getFinalBattleRules(state);
+  const rosterIds = new Set(rules?.duelUnitIds ?? []);
   const onBoard = state.units
-    .filter((unit) => unit.player === 1 || unit.id === FINAL_BATTLE_BOSS_ID)
+    .filter((unit) =>
+      unit.id === FINAL_BATTLE_BOSS_ID ||
+      (rosterIds.size ? rosterIds.has(unit.id) : unit.player === 1 && !unit.summonerId))
     .map((unit) => ({ ...unit }));
   const standing = new Set(onBoard.map((unit) => unit.id));
-  const alreadyBenched = (getFinalBattleRules(state)?.bench ?? [])
+  const alreadyBenched = (rules?.bench ?? [])
     .filter((unit) => !standing.has(unit.id))
     .map((unit) => ({ ...unit }));
   return [...onBoard, ...alreadyBenched];
@@ -185,7 +193,10 @@ function clearBoard(state, size) {
 // nothing but carrying two fields across.
 function buildDuelStage(state, bench, stage) {
   const type = state.missionRules.finalBattle.duelTypes[stage - 1];
-  const benched = bench.find((unit) => unit.player === 1 && unit.type === type);
+  const unitId = state.missionRules.finalBattle.duelUnitIds?.[stage - 1];
+  const benched = unitId
+    ? bench.find((unit) => unit.id === unitId)
+    : bench.find((unit) => unit.player === 1 && unit.type === type && !unit.summonerId);
   if (!benched) return state;
   const definition = getUnitType(benched.type);
   const champion = {
@@ -234,8 +245,11 @@ function buildDuelStage(state, bench, stage) {
 function buildLastStand(state, bench) {
   // Rebuilt in SQUAD-SLOT order, not bench order — the bench is whatever order the units came
   // off the board in, and the party should form up the way the player arranged it.
+  const rosterIds = state.missionRules.finalBattle.duelUnitIds ?? [];
   const party = state.missionRules.finalBattle.duelTypes
-    .map((type) => bench.find((unit) => unit.player === 1 && unit.type === type))
+    .map((type, index) => rosterIds[index]
+      ? bench.find((unit) => unit.id === rosterIds[index])
+      : bench.find((unit) => unit.player === 1 && unit.type === type && !unit.summonerId))
     .filter(Boolean)
     .map((unit, index) => ({
       ...restToFull(unit),

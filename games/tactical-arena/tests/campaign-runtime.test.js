@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { BROTHERS_MISSION_ID } from "../src/campaign/campaign.js";
+import {
+  BROTHERS_MISSION_ID,
+  FINAL_BATTLE_BOSS_ID,
+  FINAL_BATTLE_MISSION_ID,
+} from "../src/campaign/campaign.js";
 import { createCampaignMeta } from "../src/campaign/campaignMeta.js";
 import {
   nextCampaignDialogueBeat,
@@ -55,4 +59,33 @@ test("dialogue selection returns a once-only brothers rage beat", () => {
   beat.markShown();
   assert.equal(campaignMeta.brothersRageWarned["big-brother"], true);
   assert.equal(nextCampaignDialogueBeat({ campaignMissionId: BROTHERS_MISSION_ID, campaignMeta, state }), null);
+});
+
+test("only the Final Battle boss can latch the enemy Banish loss dialogue", () => {
+  const campaignMeta = createCampaignMeta();
+  const state = {
+    phase: "playing",
+    units: [
+      { id: "player-blacksword", type: "blacksword", player: 1, hp: 0 },
+      { id: FINAL_BATTLE_BOSS_ID, type: "blacksword", player: 2, hp: 15 },
+    ],
+  };
+
+  recordCampaignProgress({
+    matchMode: "campaign",
+    campaignMissionId: FINAL_BATTLE_MISSION_ID,
+    campaignMeta,
+    state,
+    result: { events: [{ type: "ART_RESOLVED", artId: "banish-dark", actorId: "player-blacksword" }] },
+  });
+  assert.equal(campaignMeta.finalBattleBanished, false);
+
+  recordCampaignProgress({
+    matchMode: "campaign",
+    campaignMissionId: FINAL_BATTLE_MISSION_ID,
+    campaignMeta,
+    state,
+    result: { events: [{ type: "ART_RESOLVED", artId: "banish-dark", actorId: FINAL_BATTLE_BOSS_ID }] },
+  });
+  assert.equal(campaignMeta.finalBattleBanished, true);
 });

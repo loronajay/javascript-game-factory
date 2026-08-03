@@ -208,8 +208,8 @@ export function buildPlayerPageViewModel(profile: any, options: BuildPlayerPageV
   const friendItems = buildFriendItems(publicView, relationshipsRecord);
   const heroName = publicView.profileName || "UNNAMED PILOT";
   const heroRealName = publicView.realName || "";
-  const heroTagline = publicView.tagline || "No tagline set yet.";
-  const heroBio = publicView.bio || "This public player file is running in local-first mode while broader arcade profile discovery comes online.";
+  const heroTagline = publicView.tagline || "No tagline added yet.";
+  const heroBio = publicView.bio || "This player hasn't added a bio yet.";
   const resolvedPresence = resolveProfilePresence(publicView.presence, isOwnerView);
   const badgeItems = buildBadgeItems(publicView.badgeIds);
   const friendAction = buildFriendAction(
@@ -218,6 +218,7 @@ export function buildPlayerPageViewModel(profile: any, options: BuildPlayerPageV
     options?.viewerRelationshipsRecord,
     isOwnerView,
     options?.relationshipFlash || "",
+    options?.authSessionPlayerId || "",
   );
   const gestureAction = buildGestureAction(
     options?.viewerPlayerId,

@@ -218,6 +218,38 @@ test("the duels run in squad-slot order, one per party member", () => {
   assert.equal(getFinalBattleRules(state).stage, FINAL_BATTLE_STAGE_LAST_STAND);
 });
 
+test("a Summoner ghost can never replace the real matching party member in a later duel", () => {
+  const state = finalBattleState(["summoner", "blacksword", "archer", "mystic"]);
+  const realBlacksword = state.units.find((unit) => unit.player === 1 && unit.type === "blacksword");
+  let duel = advanceFinalBattleStage(state);
+  const summoner = duel.units.find((unit) => unit.player === 1 && unit.type === "summoner");
+
+  // Summoner ghosts remain in the reducer's unit list as dead bodies after their one turn.
+  // This one has the same type as the party's slot-two champion, but it is not that champion.
+  duel.units.push({
+    ...realBlacksword,
+    id: `${summoner.id}-ghost-0`,
+    hp: 0,
+    ghost: true,
+    summonerId: summoner.id,
+    ghostArtId: "summon",
+  });
+  duel.units.find((unit) => unit.player === 2).hp = 0;
+  resolveVictory(duel);
+
+  duel = advanceFinalBattleStage(duel);
+  const champion = duel.units.find((unit) => unit.player === 1);
+  assert.equal(champion.id, realBlacksword.id);
+  assert.notEqual(champion.ghost, true);
+  assert.equal(champion.summonerId, null);
+  assert.ok(!getFinalBattleRules(duel).bench.some((unit) => unit.ghost));
+
+  let result = applyCommand(duel, beginActivation(1, champion.id));
+  result = applyCommand(result.nextState, defend(1, champion.id));
+  assert.equal(result.accepted, true);
+  assert.equal(result.nextState.units.find((unit) => unit.id === champion.id).hp, FINAL_BATTLE_DUEL_HP);
+});
+
 test("winning a duel does not end the match — it flags the next stage instead", () => {
   const duel = advanceFinalBattleStage(finalBattleState());
   duel.units.find((unit) => unit.player === 2).hp = 0;

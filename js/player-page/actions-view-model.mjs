@@ -13,7 +13,7 @@ const CHALLENGEABLE_GAMES = Object.freeze([
     { slug: "lovers-lost", title: "Lovers Lost" },
     { slug: "battleshits", title: "Battleshits" },
 ]);
-function resolveRelationshipFlashMessage(flashMessage = "") {
+function resolveRelationshipFlashMessage(flashMessage = "", authSessionPlayerId = "") {
     if (typeof flashMessage !== "string")
         return "";
     const normalized = flashMessage.trim();
@@ -27,7 +27,9 @@ function resolveRelationshipFlashMessage(flashMessage = "") {
         case "invalid_target":
             return "You can't send a request to this player.";
         case "not_authenticated":
-            return "Sign in to add friends.";
+            return sanitizePlayerId(authSessionPlayerId)
+                ? "Your session could not be verified. Refresh the page and try again."
+                : "Sign in to add friends.";
         case "network_error":
             return "Could not reach the friend-request service.";
         default:
@@ -63,7 +65,7 @@ export function buildMessageAction(viewerPlayerId, targetPlayerId, targetProfile
         profileName: typeof targetProfileName === "string" ? targetProfileName : "",
     };
 }
-export function buildFriendAction(viewerPlayerId, targetPlayerId, viewerRelationshipsRecord, isOwnerView, flashMessage = "") {
+export function buildFriendAction(viewerPlayerId, targetPlayerId, viewerRelationshipsRecord, isOwnerView, flashMessage = "", authSessionPlayerId = "") {
     const normalizedViewerPlayerId = sanitizePlayerId(viewerPlayerId);
     const normalizedTargetPlayerId = sanitizePlayerId(targetPlayerId);
     const canRender = !isOwnerView
@@ -88,7 +90,7 @@ export function buildFriendAction(viewerPlayerId, targetPlayerId, viewerRelation
         disabled: false,
         mode: alreadyFriends ? "unfriend" : "add-friend",
         label: alreadyFriends ? "Unfriend" : "Add Friend",
-        flashMessage: resolveRelationshipFlashMessage(flashMessage),
+        flashMessage: resolveRelationshipFlashMessage(flashMessage, authSessionPlayerId),
         playerId: normalizedTargetPlayerId,
     };
 }

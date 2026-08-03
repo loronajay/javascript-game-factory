@@ -51,7 +51,7 @@ const CHALLENGEABLE_GAMES: ReadonlyArray<ChallengeableGame> = Object.freeze([
   { slug: "battleshits", title: "Battleshits" },
 ]);
 
-function resolveRelationshipFlashMessage(flashMessage: unknown = ""): string {
+function resolveRelationshipFlashMessage(flashMessage: unknown = "", authSessionPlayerId: unknown = ""): string {
   if (typeof flashMessage !== "string") return "";
   const normalized = flashMessage.trim();
   const looksLikeGenericFriendRequestError = /^Could not send request\b/i.test(normalized);
@@ -65,7 +65,9 @@ function resolveRelationshipFlashMessage(flashMessage: unknown = ""): string {
     case "invalid_target":
       return "You can't send a request to this player.";
     case "not_authenticated":
-      return "Sign in to add friends.";
+      return sanitizePlayerId(authSessionPlayerId)
+        ? "Your session could not be verified. Refresh the page and try again."
+        : "Sign in to add friends.";
     case "network_error":
       return "Could not reach the friend-request service.";
     default:
@@ -124,6 +126,7 @@ export function buildFriendAction(
   viewerRelationshipsRecord: any,
   isOwnerView: unknown,
   flashMessage: unknown = "",
+  authSessionPlayerId: unknown = "",
 ): FriendAction {
   const normalizedViewerPlayerId = sanitizePlayerId(viewerPlayerId);
   const normalizedTargetPlayerId = sanitizePlayerId(targetPlayerId);
@@ -152,7 +155,7 @@ export function buildFriendAction(
     disabled: false,
     mode: alreadyFriends ? "unfriend" : "add-friend",
     label: alreadyFriends ? "Unfriend" : "Add Friend",
-    flashMessage: resolveRelationshipFlashMessage(flashMessage),
+    flashMessage: resolveRelationshipFlashMessage(flashMessage, authSessionPlayerId),
     playerId: normalizedTargetPlayerId,
   };
 }

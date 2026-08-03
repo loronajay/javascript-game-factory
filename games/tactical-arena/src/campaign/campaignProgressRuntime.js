@@ -4,6 +4,7 @@ import {
   BROTHERS_MISSION_ID,
   CLOD_MISSION_ID,
   FATHER_TIME_MISSION_ID,
+  FINAL_BATTLE_BOSS_ID,
   FINAL_BATTLE_MISSION_ID,
   GARGOYLE_MISSION_ID,
   HASBEEN_HEROES_MISSION_ID,
@@ -237,7 +238,10 @@ export function recordCampaignProgress({
     // Banish: he spends every point of his own HP to erase every enemy standing on a dark
     // tile. Recorded here (not inferred from the corpses) so the loss beat can tell the
     // difference between "he wiped the party with the ultimate" and "he ground them down."
-    if (events.some((event) => event.type === "ART_RESOLVED" && event.artId === "banish-dark")) {
+    if (events.some((event) =>
+      event.type === "ART_RESOLVED" &&
+      event.artId === "banish-dark" &&
+      event.actorId === FINAL_BATTLE_BOSS_ID)) {
       campaignMeta.finalBattleBanished = true;
     }
     // Every stage but the last registers as a genuine victory in the engine — a side with no
@@ -390,4 +394,3 @@ export function recordCampaignProgress({
 
 // Returns the next eligible condition-triggered dialogue beat for the active mission
 // (or null). Each beat marks its own once-only flag so the same warning never repeats.
-
