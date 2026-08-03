@@ -78,6 +78,9 @@ export function createApp(options: any = {}) {
   const savePlayerMetrics = typeof options?.savePlayerMetrics === "function"
     ? options.savePlayerMetrics
     : async () => null;
+  const incrementPlayerProfileView = typeof options?.incrementPlayerProfileView === "function"
+    ? options.incrementPlayerProfileView
+    : async () => null;
   const loadPlayerRelationships = typeof options?.loadPlayerRelationships === "function"
     ? options.loadPlayerRelationships
     : async () => null;
@@ -423,6 +426,7 @@ export function createApp(options: any = {}) {
     savePlayerProfile,
     loadPlayerMetrics,
     savePlayerMetrics,
+    incrementPlayerProfileView,
     loadPlayerRelationships,
     savePlayerRelationships,
     createFriendshipBetweenPlayers,

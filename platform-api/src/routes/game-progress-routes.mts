@@ -75,6 +75,15 @@ export async function handleGameProgressRoute(context: any): Promise<boolean> {
       writeJson(res, 500, { status: "error", error: "claim_failed", timestamp }, requestOrigin);
       return true;
     }
+    if (!result.ok) {
+      writeJson(
+        res,
+        result.statusCode || 400,
+        { status: "error", error: result.error || "claim_rejected", timestamp },
+        requestOrigin,
+      );
+      return true;
+    }
     writeJson(res, 200, result, requestOrigin);
     return true;
   }

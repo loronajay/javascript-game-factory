@@ -83,6 +83,24 @@ async function checkPackageAndVersion() {
   }
 }
 
+async function checkMobileSecurity() {
+  const manifest = await read(path.join(ANDROID, "app", "src", "main", "AndroidManifest.xml"));
+  if (!/android:allowBackup="false"/.test(manifest)) {
+    problems.push("Android app backups must be disabled so WebView account/session data is not copied off-device.");
+  }
+  if (!/android:usesCleartextTraffic="false"/.test(manifest)) {
+    problems.push("Android cleartext traffic must be disabled; the packaged app and API use HTTPS.");
+  }
+
+  const capacitor = JSON.parse(await read(path.join(ROOT, "capacitor.config.json")) || "{}");
+  if (capacitor?.android?.allowMixedContent !== false) {
+    problems.push("capacitor.config.json must keep android.allowMixedContent=false.");
+  }
+  if (capacitor?.server?.androidScheme !== "https") {
+    problems.push("capacitor.config.json must keep server.androidScheme=https.");
+  }
+}
+
 // The payload is generated, gitignored, and easy to forget. Shipping a stale one is the
 // single most expensive mistake in this pipeline (see HANDOFF.md §5 on `cap sync`).
 async function checkPayload() {
@@ -125,6 +143,7 @@ async function checkProducts() {
 async function main() {
   await checkSigning();
   await checkPackageAndVersion();
+  await checkMobileSecurity();
   await checkPayload();
   await checkProducts();
 

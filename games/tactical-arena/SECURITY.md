@@ -1,5 +1,10 @@
 # Tactical Arena — Economy Security Model
 
+Last reviewed: **2026-08-03**, during Android closed testing. The review covered the shared
+platform API, account/profile mutations, ranked writes, Tactical Arena progression and
+economy claims, Stripe/Google Play fulfillment, mobile packaging, dependency advisories, and
+tracked-secret patterns.
+
 Tactical Arena sells digital goods for real money (Stripe) and soft currency (Valor). This
 doc records how ownership and currency are protected so future changes don't quietly regress
 it. The threat is a player editing `localStorage` (or replaying requests) to grant themselves
@@ -90,13 +95,17 @@ so both halves live on the server:
   remainder is removed.
 
 Local `src/progression/inventory.js` stays a write-through cache: `mergeServerInventory` takes
-the server counts as truth under the same `authoritative` rule as ownership. Timed-boost
-*activation records* (armed/expiry state) remain local, because their effect is local.
+the server counts as truth under the same `authoritative` rule as ownership. The local timed
+record drives the UI, but campaign Valor pricing reads the matching server activation claims,
+starts pending boosts at the first payout, and calculates the bonus from the server catalog.
 
 ### Valor is server-authoritative
 - **Earn** is recorded via the pending-claim queue (`gameProgressClient.js`) — campaign/tutorial
-  grants sync up as claims. (Campaign-mission *completion* itself is still client-asserted; see
-  Known limits.)
+  grants sync up as claims. Public claims are checked against
+  `tactical-arena-reward-catalog.mts`: canonical claim id, real mission/tutorial, exact allowed
+  reward, and prerequisite completion rows. Valor amounts are calculated server-side; an
+  oversized client amount is ignored. Paid Valor boosts are calculated from server activation
+  records. (Campaign-mission *completion* itself is still client-asserted; see Known limits.)
 - **Spend** goes through the server `POST /game-progress/:slug/spend`. The server prices the
   offer from its own Valor catalog (must stay in lockstep with `marketplace.js`) and does the
   balance-check + deduct + entitlement grant in one atomic transaction (`FOR UPDATE` row lock +
@@ -113,7 +122,10 @@ ownership backfill** → apply the server snapshot via `mergeServerEntitlementsI
 
 - **Backfill** (`POST /game-progress/:slug/backfill`) grandfathers the player's *existing* local
   owned set into the server once per account (gated by a `migration:local-ownership-v1` claim
-  row; entitlement ids are format-validated and capped). This is why the switch to
+  row; entitlement ids must exist in the server unit/skin catalogs and are capped). Non-empty
+  legacy backfill is accepted only for accounts created before 2026-07-28. Newer accounts
+  restore campaign/tutorial progress through canonical claims and cannot mint items or Valor
+  through the migration endpoint. This is why the switch to
   server-authority loses no progress. It is one-time — injected local ownership can be
   grandfathered at most once, never re-injected later.
 - Two guards keep that one-shot from being *wasted*, added 2026-07-27 after it stranded a real
@@ -124,11 +136,10 @@ ownership backfill** → apply the server snapshot via `mergeServerEntitlementsI
     is correct precisely because there is nothing to lose). Without this, a fresh install
     signing into an existing account consumed the migration with an empty set, and the device
     that actually held the progress could never migrate it.
-  - **Stranded accounts self-heal.** While the server owns *nothing* for a player, the
-    migration stays re-runnable, so a device still holding local ownership pushes it up on its
-    next boot sync. The moment the server owns anything, the one-shot closes again and
-    re-injection is refused exactly as before. This deliberately widens the grandfather window
-    for zero-entitlement accounts — see Known limits.
+  - **Old stranded accounts self-heal.** An already-consumed migration is re-runnable only when
+    the server owns nothing **and the account predates the 2026-07-28 repair cutoff**. That keeps
+    recovery for accounts affected by the original bug without leaving the escape open to new
+    accounts. The moment the server owns anything, the one-shot closes again.
 - **Authoritative reconcile** (`{ authoritative: true }`) replaces the server-entitlement fields
   with the server's exact set, empties the pure-ownership fields, and filters the flow-bearing
   reward-pick fields down to picks the server actually has. Because `normalizeUnlockProgress`
@@ -223,6 +234,13 @@ them permanently.
    money. `tests/marketplace.test.js` cross-checks every premium unit and skin price against
    the server's `payments.mts` catalog — when it fails after a balance pass, fix the server
    catalog and re-run `npm run play:sync` so the Play Console price follows.
+15. Tactical Arena rating changes use only the brokered ranked-match flow. The legacy generic
+   `POST /ratings/tactical-arena` endpoint is refused with `server_attestation_required`, so a
+   client cannot invent a session/outcome against the same ladder.
+16. Profile, metrics, friendship, and relationship mutations require a verified account. A
+   path player id must match the account, and pair mutations require the account to be one of
+   the two participants. Profile views use a dedicated atomic increment endpoint; clients do
+   not submit counter totals.
 
 ## Known limits (accepted / future)
 
@@ -235,14 +253,10 @@ them permanently.
   multiple devices and never synced may not all carry over if devices migrate at different
   times (one-time backfill is per account). Premium, new-Valor, and campaign/tutorial items are
   unaffected.
-- **The grandfather window stays open for zero-entitlement accounts** (added 2026-07-27 so
-  accounts stranded by the empty-backfill bug could recover). A tampered client on an account
-  the server owns *nothing* for can still have injected local ownership grandfathered — the
-  same hole the original one-shot migration opened, but now permanent rather than closing after
-  one call. It shuts the instant the account owns anything server-side, so it cannot be used to
-  add to a real account. **Close this once every legitimate account has migrated**: drop the
-  `serverOwnsNothing` escape in `backfillLocalOwnership` and the matching repair block in
-  `bootProgressSync.js`, leaving only the empty-payload guard.
+- **The grandfather repair remains open only for pre-cutoff zero-entitlement accounts.** This
+  preserves recovery for accounts stranded before 2026-07-28, but an attacker controlling one
+  of those old empty accounts could still use its remaining repair once. Remove the dated
+  repair branch after those accounts have been checked/migrated; all newer accounts are closed.
 - **Campaign completion** is still client-asserted (single-player). A future pass could
   server-validate mission outcomes via deterministic replay of the headless core. Note this
   also reaches the OG Commander badge, whose campaign path trusts the same claimed progress;
@@ -259,6 +273,10 @@ them permanently.
   aren't campaign/Valor grantable in practice, so this is a corner case, not a live path.
 - **Partial refunds** are not auto-handled — they're logged and left for manual review. Repeat
   chargeback offenders are logged (audit claim rows) but not yet blocked from future purchases.
+- **Web CSP is a deployment task.** The static web host does not currently send an enforcing
+  `Content-Security-Policy`. Add and stage a report-only policy at the host/CDN before enforcing
+  it; include the Stripe script/frame/connect origins and the platform API. Do not drop an
+  untested meta policy into the closed-test build because it can block checkout or game assets.
 
 ## Platform-level hardening (backend)
 
@@ -268,3 +286,7 @@ session revocation; CORS restricted to an allow-list (`https://factory.jayarcade
 extendable via `ALLOWED_ORIGINS`); `/activity` requires auth and stamps the server-verified
 actor; per-IP rate limiting on auth + checkout-session creation; upload content validated by
 magic bytes (not the client-declared MIME), which also guards the Cloudinary `raw` audio store.
+The Android manifest disables app-data backup and cleartext traffic; the release preflight
+enforces those flags plus Capacitor HTTPS/mixed-content settings. Stripe Checkout uses the
+current Dahlia API version, omits fixed payment-method lists, includes a tracked integration
+identifier, and prefers a restricted key (`STRIPE_RESTRICTED_KEY`) when configured.

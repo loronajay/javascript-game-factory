@@ -6,6 +6,18 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+test("release builds default to the next unused Play version code", async () => {
+  const buildGradle = await readFile(
+    path.join(ROOT, "android", "app", "build.gradle"),
+    "utf8",
+  );
+
+  assert.match(
+    buildGradle,
+    /versionCode\s+project\.hasProperty\(['"]taVersionCode['"]\)\s*\?\s*project\.taVersionCode\.toInteger\(\)\s*:\s*8\b/,
+  );
+});
+
 test("release builds enable the supported R8 optimization pipeline", async () => {
   const buildGradle = await readFile(
     path.join(ROOT, "android", "app", "build.gradle"),

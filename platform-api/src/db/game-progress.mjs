@@ -1,5 +1,6 @@
 import { getConsumableOffer, selectRandomUnownedSkins } from "../services/consumable-catalog.mjs";
-import { SKIN_CATALOG } from "../services/payments.mjs";
+import { SKIN_CATALOG, UNIT_CATALOG } from "../services/payments.mjs";
+import { TACTICAL_ARENA_TUTORIAL_IDS, validateTacticalArenaPublicClaim, } from "../services/tactical-arena-reward-catalog.mjs";
 import { getValorOffer, priceValorOffer } from "../services/valor-catalog.mjs";
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
 const VALID_CLAIM_KINDS = new Set([
@@ -153,6 +154,51 @@ async function markCampaignProgress(client, playerId, gameSlug, missionId, patch
            reward_claimed_at = coalesce(game_campaign_progress.reward_claimed_at, excluded.reward_claimed_at),
            updated_at = now()`, [playerId, gameSlug, missionId, stars, valorClaimedAt, rewardClaimedAt]);
 }
+async function hasPublicClaimPrerequisite(client, playerId, gameSlug, prerequisite) {
+    if (!prerequisite)
+        return true;
+    if (prerequisite.kind === "all-tutorials") {
+        const result = await client.query(`select source_id from game_progress_claims
+       where player_id = $1 and game_slug = $2 and kind = 'tutorial-complete'
+         and source_id = any($3::text[])`, [playerId, gameSlug, TACTICAL_ARENA_TUTORIAL_IDS]);
+        const completed = new Set(result.rows.map((row) => cleanText(row.source_id, 200)));
+        return TACTICAL_ARENA_TUTORIAL_IDS.every((tutorialId) => completed.has(tutorialId));
+    }
+    if (prerequisite.kind === "campaign-mission") {
+        const result = await client.query(`select 1 from game_campaign_progress
+       where player_id = $1 and game_slug = $2 and mission_id = $3 limit 1`, [playerId, gameSlug, prerequisite.missionId]);
+        return result.rows.length > 0;
+    }
+    return false;
+}
+// Valor boosts are paid consumables, so ignoring them would take away a purchased benefit.
+// Their activation records already live on the server. Start pending boosts at the first
+// campaign payout and price the bonus from the server catalog; the client-supplied amount is
+// never trusted. Legacy activation rows without timing data are treated as pending once so
+// deploying this during closed testing does not erase an already purchased boost.
+async function campaignValorAmountWithServerBoosts(client, playerId, gameSlug, baseAmount) {
+    const result = await client.query(`select claim_id, source_id, payload from game_progress_claims
+     where player_id = $1 and game_slug = $2 and kind = 'consumable-activation'`, [playerId, gameSlug]);
+    const now = new Date();
+    let percentBonus = 0;
+    for (const row of result.rows) {
+        const input = row.payload && typeof row.payload === "object" && !Array.isArray(row.payload) ? row.payload : {};
+        const offer = getConsumableOffer(input.itemId || row.source_id);
+        if (offer?.effect?.kind !== "valor-boost")
+            continue;
+        const startsAt = cleanText(input.boostStartsAt, 80) || now.toISOString();
+        const expiresAt = cleanText(input.boostExpiresAt, 80)
+            || new Date(new Date(startsAt).getTime() + (Number(offer.durationHours) || 0) * 60 * 60 * 1000).toISOString();
+        if (!input.boostStartsAt || !input.boostExpiresAt) {
+            await client.query(`update game_progress_claims set payload = $4::jsonb
+         where player_id = $1 and game_slug = $2 and claim_id = $3`, [playerId, gameSlug, row.claim_id, JSON.stringify({ ...input, itemId: offer.id, boostStartsAt: startsAt, boostExpiresAt: expiresAt })]);
+        }
+        if (Date.parse(startsAt) <= now.getTime() && Date.parse(expiresAt) > now.getTime()) {
+            percentBonus += Math.max(0, Number(offer.effect.percentBonus) || 0);
+        }
+    }
+    return baseAmount + Math.floor(baseAmount * percentBonus / 100);
+}
 // Normalize the inventory grants carried on a premium-consumable claim payload. Item ids are
 // validated against the server catalog, so a tampered payload can never invent an item.
 function buildInventoryGrants(payload) {
@@ -266,8 +312,8 @@ export async function recordGameProgressClaim(pool, params = {}) {
     const gameSlug = normalizeGameSlug(params.gameSlug);
     const claimId = cleanText(params.claimId, 200);
     const kind = cleanText(params.kind, 80);
-    const payload = normalizePayload(params.payload);
-    const sourceId = cleanText(params.sourceId || payload.sessionId || payload.missionId || payload.packId || payload.tutorialId || "", 200);
+    let payload = normalizePayload(params.payload);
+    let sourceId = cleanText(params.sourceId || payload.sessionId || payload.missionId || payload.packId || payload.tutorialId || "", 200);
     if (!pool || !playerId || !gameSlug || !claimId || !VALID_CLAIM_KINDS.has(kind))
         return null;
     // Defense in depth: even if a premium kind reaches this layer, only the trusted
@@ -276,16 +322,31 @@ export async function recordGameProgressClaim(pool, params = {}) {
         process.stderr.write(`[game-progress] refused premium claim kind '${kind}' from untrusted caller (player=${playerId})\n`);
         return null;
     }
+    let publicClaim = null;
+    if (!PREMIUM_CLAIM_KINDS.has(kind)) {
+        publicClaim = validateTacticalArenaPublicClaim({ gameSlug, claimId, kind, sourceId, payload });
+        if (!publicClaim.ok)
+            return publicClaim;
+        payload = publicClaim.payload;
+        sourceId = publicClaim.sourceId;
+    }
     const client = await pool.connect();
     try {
         await client.query("begin");
         await ensureGameProgressProfile(client, playerId, gameSlug);
+        if (!await hasPublicClaimPrerequisite(client, playerId, gameSlug, publicClaim?.prerequisite)) {
+            await client.query("rollback");
+            return { ok: false, statusCode: 409, error: "claim_prerequisite_missing" };
+        }
         const claim = await client.query(`insert into game_progress_claims (player_id, game_slug, claim_id, kind, source_id, payload)
        values ($1, $2, $3, $4, $5, $6::jsonb)
        on conflict (player_id, game_slug, claim_id) do nothing`, [playerId, gameSlug, claimId, kind, sourceId, JSON.stringify(payload)]);
         const alreadyProcessed = claim.rowCount === 0;
         if (!alreadyProcessed && kind === "campaign-valor") {
-            const amount = clampInt(payload.amount, { min: 0, max: 100000 });
+            const amount = await campaignValorAmountWithServerBoosts(client, playerId, gameSlug, publicClaim.valorBase);
+            payload = { ...payload, amount };
+            await client.query(`update game_progress_claims set payload = $4::jsonb
+         where player_id = $1 and game_slug = $2 and claim_id = $3`, [playerId, gameSlug, claimId, JSON.stringify(payload)]);
             const missionId = cleanText(payload.missionId || sourceId, 200);
             if (amount > 0) {
                 await client.query(`update game_progress_profiles
@@ -575,15 +636,24 @@ export async function resetCampaignProgress(pool, playerId, gameSlug) {
 // per account — after that, injected local entitlements can never be re-grandfathered.
 // Entitlement ids are format-validated (real-shaped ids only) and capped.
 const VALID_ENTITLEMENT_ID = /^(unit:[a-z0-9-]{1,60}|skin:[a-z0-9-]{1,60}:[a-z0-9-]{1,80})$/;
+const VALID_BACKFILL_ENTITLEMENTS = new Set([
+    ...UNIT_CATALOG.map((unit) => `unit:${unit.type}`),
+    ...SKIN_CATALOG.map((skin) => skin.entitlementId),
+]);
 const MAX_BACKFILL_ENTITLEMENTS = 2000;
 const OWNERSHIP_BACKFILL_CLAIM_ID = "migration:local-ownership-v1";
+// The server-authority migration was complete by this cutoff. Only accounts that existed
+// before it may import legacy local ownership/Valor; newer accounts earn through canonical
+// progress claims and server-side purchases, so a client backfill has no trusted history.
+const LEGACY_BACKFILL_CUTOFF = Date.parse("2026-07-28T00:00:00.000Z");
 export async function backfillLocalOwnership(pool, params = {}) {
     const playerId = cleanText(params.playerId, 120);
     const gameSlug = normalizeGameSlug(params.gameSlug);
     if (!pool || !playerId || !gameSlug)
         return { ok: false, statusCode: 400, error: "invalid_request" };
     const rawIds = Array.isArray(params.entitlementIds) ? params.entitlementIds : [];
-    const entitlementIds = [...new Set(rawIds.map((value) => cleanText(value, 160)).filter((id) => VALID_ENTITLEMENT_ID.test(id)))].slice(0, MAX_BACKFILL_ENTITLEMENTS);
+    const entitlementIds = [...new Set(rawIds.map((value) => cleanText(value, 160))
+            .filter((id) => VALID_ENTITLEMENT_ID.test(id) && VALID_BACKFILL_ENTITLEMENTS.has(id)))].slice(0, MAX_BACKFILL_ENTITLEMENTS);
     const valorBalance = clampInt(params.valorBalance, { min: 0, max: 100_000_000 });
     const client = await pool.connect();
     try {
@@ -604,18 +674,28 @@ export async function backfillLocalOwnership(pool, params = {}) {
                 progress: await getGameProgress(pool, playerId, gameSlug),
             };
         }
-        // Whether the server owns anything at all for this player. An account the server owns
-        // NOTHING for has no progress to protect, and its migration may have been consumed
-        // without granting anything (see the empty-backfill guard above, which shipped after
-        // some accounts were already stranded). Keep the migration re-runnable in exactly that
-        // state so the device still holding the progress can get it across; the moment the
-        // server owns anything, the one-shot closes again and re-injection is refused.
+        const account = await client.query(`select created_at from accounts where player_id = $1 order by created_at asc limit 1`, [playerId]);
+        const accountCreatedAt = Date.parse(account.rows[0]?.created_at || "");
+        const legacyMigrationEligible = Number.isFinite(accountCreatedAt) && accountCreatedAt < LEGACY_BACKFILL_CUTOFF;
+        if (!legacyMigrationEligible) {
+            await client.query("commit");
+            return {
+                ok: true,
+                alreadyMigrated: true,
+                progress: await getGameProgress(pool, playerId, gameSlug),
+            };
+        }
+        // Whether the server owns anything at all for this player. Before the empty-payload fix,
+        // an old account could consume its one shot without granting anything. The dated repair
+        // below remains available only to accounts that existed before that fix; newer accounts
+        // cannot reopen a consumed migration merely because their server set is empty.
         const owned = await client.query(`select 1 from game_entitlements where player_id = $1 and game_slug = $2 limit 1`, [playerId, gameSlug]);
         const serverOwnsNothing = (owned.rows?.length ?? 0) === 0;
         const claim = await client.query(`insert into game_progress_claims (player_id, game_slug, claim_id, kind, source_id, payload)
        values ($1, $2, $3, 'migration', '', '{}'::jsonb)
        on conflict (player_id, game_slug, claim_id) do nothing`, [playerId, gameSlug, OWNERSHIP_BACKFILL_CLAIM_ID]);
-        const alreadyMigrated = claim.rowCount === 0 && !serverOwnsNothing;
+        const strandedRepairEligible = claim.rowCount === 0 && serverOwnsNothing;
+        const alreadyMigrated = claim.rowCount === 0 && !strandedRepairEligible;
         if (!alreadyMigrated) {
             for (const entitlementId of entitlementIds) {
                 const kind = entitlementId.startsWith("unit:") ? "unit" : "skin";

@@ -1,4 +1,27 @@
 import { readJsonBody, writeJson } from "../http-utils.mjs";
+function requireAuthenticatedPlayer(res, authClaims, requestOrigin, timestamp) {
+    const playerId = typeof authClaims?.playerId === "string" ? authClaims.playerId.trim() : "";
+    if (!playerId) {
+        writeJson(res, 401, { status: "error", error: "not_authenticated", timestamp }, requestOrigin);
+    }
+    return playerId;
+}
+function requirePlayerOwner(res, authClaims, targetPlayerId, requestOrigin, timestamp) {
+    const playerId = requireAuthenticatedPlayer(res, authClaims, requestOrigin, timestamp);
+    if (playerId && playerId !== targetPlayerId) {
+        writeJson(res, 403, { status: "error", error: "forbidden", timestamp }, requestOrigin);
+        return "";
+    }
+    return playerId;
+}
+function requirePairParticipant(res, authClaims, leftPlayerId, rightPlayerId, requestOrigin, timestamp) {
+    const playerId = requireAuthenticatedPlayer(res, authClaims, requestOrigin, timestamp);
+    if (playerId && playerId !== leftPlayerId && playerId !== rightPlayerId) {
+        writeJson(res, 403, { status: "error", error: "forbidden", timestamp }, requestOrigin);
+        return "";
+    }
+    return playerId;
+}
 function resolveProfileAvatarUrl(profile, resolver) {
     if (!profile || !resolver)
         return profile;
@@ -26,11 +49,12 @@ function resolveProfileAvatarUrl(profile, resolver) {
 // one platform surface, so they move together as a route family.
 export async function handlePlayerRoute(context) {
     const { req, res, method, pathname, requestUrl, authClaims, requestOrigin, timestamp, avatarUrlResolver, services, } = context;
-    const { searchPlayers, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerProfile, loadPlayerMetrics, savePlayerMetrics, loadPlayerRelationships, savePlayerRelationships, createFriendshipBetweenPlayers, removeFriendBetweenPlayers, recordSharedSessionBetweenPlayers, recordSharedEventBetweenPlayers, recordDirectInteractionBetweenPlayers, } = services;
+    const { searchPlayers, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerProfile, loadPlayerMetrics, savePlayerMetrics, incrementPlayerProfileView, loadPlayerRelationships, savePlayerRelationships, createFriendshipBetweenPlayers, removeFriendBetweenPlayers, recordSharedSessionBetweenPlayers, recordSharedEventBetweenPlayers, recordDirectInteractionBetweenPlayers, } = services;
     const playerMatch = pathname.match(/^\/players\/([^/]+)$/);
     const friendCodeMatch = pathname.match(/^\/players\/by-friend-code\/([^/]+)$/);
     const profileMatch = pathname.match(/^\/players\/([^/]+)\/profile$/);
     const metricsMatch = pathname.match(/^\/players\/([^/]+)\/metrics$/);
+    const profileViewMatch = pathname.match(/^\/players\/([^/]+)\/profile-view$/);
     const relationshipsMatch = pathname.match(/^\/players\/([^/]+)\/relationships$/);
     const playerFriendMatch = pathname.match(/^\/players\/([^/]+)\/friends\/([^/]+)$/);
     if (method === "GET" && pathname === "/players/search") {
@@ -78,6 +102,9 @@ export async function handlePlayerRoute(context) {
         return true;
     }
     if (method === "PUT" && profileMatch) {
+        const targetPlayerId = decodeURIComponent(profileMatch[1]);
+        if (!requirePlayerOwner(res, authClaims, targetPlayerId, requestOrigin, timestamp))
+            return true;
         const body = await readJsonBody(req);
         if (!body.ok) {
             writeJson(res, 400, {
@@ -88,7 +115,7 @@ export async function handlePlayerRoute(context) {
             }, requestOrigin);
             return true;
         }
-        const profile = await savePlayerProfile(decodeURIComponent(profileMatch[1]), body.value);
+        const profile = await savePlayerProfile(targetPlayerId, body.value);
         writeJson(res, 200, { player: profile }, requestOrigin);
         return true;
     }
@@ -98,6 +125,9 @@ export async function handlePlayerRoute(context) {
         return true;
     }
     if (method === "PUT" && metricsMatch) {
+        const targetPlayerId = decodeURIComponent(metricsMatch[1]);
+        if (!requirePlayerOwner(res, authClaims, targetPlayerId, requestOrigin, timestamp))
+            return true;
         const body = await readJsonBody(req);
         if (!body.ok) {
             writeJson(res, 400, {
@@ -108,7 +138,33 @@ export async function handlePlayerRoute(context) {
             }, requestOrigin);
             return true;
         }
-        const metrics = await savePlayerMetrics(decodeURIComponent(metricsMatch[1]), body.value);
+        // Public-facing counters are derived elsewhere. The only legacy client-written metric
+        // is the signed-in player's thought count; do not let a broad patch overwrite ratings,
+        // relationship totals, or analytics fields.
+        const metrics = await savePlayerMetrics(targetPlayerId, {
+            thoughtPostCount: body.value?.thoughtPostCount,
+        });
+        writeJson(res, 200, { metrics }, requestOrigin);
+        return true;
+    }
+    if (method === "POST" && profileViewMatch) {
+        const viewerPlayerId = requireAuthenticatedPlayer(res, authClaims, requestOrigin, timestamp);
+        if (!viewerPlayerId)
+            return true;
+        if (typeof incrementPlayerProfileView !== "function") {
+            writeJson(res, 503, { status: "error", error: "metrics_unavailable", timestamp }, requestOrigin);
+            return true;
+        }
+        const body = await readJsonBody(req);
+        if (!body.ok) {
+            writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+            return true;
+        }
+        const targetPlayerId = decodeURIComponent(profileViewMatch[1]);
+        const metrics = await incrementPlayerProfileView(targetPlayerId, {
+            source: body.value?.source,
+            viewerPlayerId,
+        });
         writeJson(res, 200, { metrics }, requestOrigin);
         return true;
     }
@@ -118,6 +174,9 @@ export async function handlePlayerRoute(context) {
         return true;
     }
     if (method === "PUT" && relationshipsMatch) {
+        const targetPlayerId = decodeURIComponent(relationshipsMatch[1]);
+        if (!requirePlayerOwner(res, authClaims, targetPlayerId, requestOrigin, timestamp))
+            return true;
         const body = await readJsonBody(req);
         if (!body.ok) {
             writeJson(res, 400, {
@@ -128,11 +187,13 @@ export async function handlePlayerRoute(context) {
             }, requestOrigin);
             return true;
         }
-        const relationships = await savePlayerRelationships(decodeURIComponent(relationshipsMatch[1]), body.value);
+        const relationships = await savePlayerRelationships(targetPlayerId, body.value);
         writeJson(res, 200, { relationships }, requestOrigin);
         return true;
     }
     if (method === "POST" && pathname === "/friendships") {
+        if (!requireAuthenticatedPlayer(res, authClaims, requestOrigin, timestamp))
+            return true;
         const body = await readJsonBody(req);
         if (!body.ok) {
             writeJson(res, 400, {
@@ -143,6 +204,8 @@ export async function handlePlayerRoute(context) {
             }, requestOrigin);
             return true;
         }
+        if (!requirePairParticipant(res, authClaims, body.value?.leftPlayerId, body.value?.rightPlayerId, requestOrigin, timestamp))
+            return true;
         const friendship = await createFriendshipBetweenPlayers(body.value?.leftPlayerId, body.value?.rightPlayerId, body.value);
         writeJson(res, 200, { friendship }, requestOrigin);
         return true;
@@ -163,6 +226,8 @@ export async function handlePlayerRoute(context) {
         return true;
     }
     if (method === "POST" && pathname === "/relationships/shared-session") {
+        if (!requireAuthenticatedPlayer(res, authClaims, requestOrigin, timestamp))
+            return true;
         const body = await readJsonBody(req);
         if (!body.ok) {
             writeJson(res, 400, {
@@ -173,11 +238,15 @@ export async function handlePlayerRoute(context) {
             }, requestOrigin);
             return true;
         }
+        if (!requirePairParticipant(res, authClaims, body.value?.leftPlayerId, body.value?.rightPlayerId, requestOrigin, timestamp))
+            return true;
         const relationshipUpdate = await recordSharedSessionBetweenPlayers(body.value?.leftPlayerId, body.value?.rightPlayerId, body.value);
         writeJson(res, 200, { relationshipUpdate }, requestOrigin);
         return true;
     }
     if (method === "POST" && pathname === "/relationships/shared-event") {
+        if (!requireAuthenticatedPlayer(res, authClaims, requestOrigin, timestamp))
+            return true;
         const body = await readJsonBody(req);
         if (!body.ok) {
             writeJson(res, 400, {
@@ -188,11 +257,15 @@ export async function handlePlayerRoute(context) {
             }, requestOrigin);
             return true;
         }
+        if (!requirePairParticipant(res, authClaims, body.value?.leftPlayerId, body.value?.rightPlayerId, requestOrigin, timestamp))
+            return true;
         const relationshipUpdate = await recordSharedEventBetweenPlayers(body.value?.leftPlayerId, body.value?.rightPlayerId, body.value);
         writeJson(res, 200, { relationshipUpdate }, requestOrigin);
         return true;
     }
     if (method === "POST" && pathname === "/relationships/direct-interaction") {
+        if (!requireAuthenticatedPlayer(res, authClaims, requestOrigin, timestamp))
+            return true;
         const body = await readJsonBody(req);
         if (!body.ok) {
             writeJson(res, 400, {
@@ -203,6 +276,8 @@ export async function handlePlayerRoute(context) {
             }, requestOrigin);
             return true;
         }
+        if (!requirePairParticipant(res, authClaims, body.value?.leftPlayerId, body.value?.rightPlayerId, requestOrigin, timestamp))
+            return true;
         const relationshipUpdate = await recordDirectInteractionBetweenPlayers(body.value?.leftPlayerId, body.value?.rightPlayerId, body.value);
         writeJson(res, 200, { relationshipUpdate }, requestOrigin);
         return true;

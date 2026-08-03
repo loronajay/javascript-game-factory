@@ -179,6 +179,27 @@ test("POST /game-progress/:gameSlug/claims accepts tutorial reward claims", asyn
   }]);
 });
 
+test("POST /game-progress/:gameSlug/claims returns catalog validation errors", async () => {
+  const token = signToken({ playerId: "player-1", email: "player@test.com" }, TEST_SECRET);
+  const app = createApp({
+    jwtSecret: TEST_SECRET,
+    recordGameProgressClaim: async () => ({ ok: false, statusCode: 400, error: "invalid_claim" }),
+    now: () => "2026-07-17T00:00:00.000Z",
+  });
+
+  const response = await invoke(app, "POST", "/game-progress/tactical-arena/claims", {
+    token,
+    body: {
+      claimId: "campaign-valor:invented",
+      kind: "campaign-valor",
+      payload: { missionId: "clod-trial", amount: 100000 },
+    },
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(response.json.error, "invalid_claim");
+});
+
 test("POST /game-progress/:gameSlug/claims REJECTS premium skin purchase claims (Stripe-only)", async () => {
   const token = signToken({ playerId: "player-1", email: "player@test.com" }, TEST_SECRET);
   const seen = [];

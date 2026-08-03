@@ -175,6 +175,10 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
       const encoded = encodePathSegment(playerId);
       return encoded ? put(`/players/${encoded}/metrics`, patch, "metrics") : Promise.resolve(null);
     },
+    incrementPlayerProfileView(playerId: string, options: Record<string, unknown> = {}) {
+      const encoded = encodePathSegment(playerId);
+      return encoded ? post(`/players/${encoded}/profile-view`, { source: options.source }, "metrics") : Promise.resolve(null);
+    },
     loadPlayerRelationships(playerId: string) {
       const encoded = encodePathSegment(playerId);
       return encoded ? get(`/players/${encoded}/relationships`, "relationships") : Promise.resolve(null);

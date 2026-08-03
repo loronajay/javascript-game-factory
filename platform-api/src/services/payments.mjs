@@ -2,6 +2,9 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { getConsumableOffer } from "./consumable-catalog.mjs";
 const STRIPE_API_VERSION = "2026-06-24.dahlia";
 const STRIPE_CHECKOUT_SESSIONS_URL = "https://api.stripe.com/v1/checkout/sessions";
+// Stable flow label for Stripe Dashboard comparisons. Dahlia API versions require an
+// integration identifier with an eight-random-letter suffix for Checkout Session creation.
+const STRIPE_CHECKOUT_INTEGRATION_IDENTIFIER = "tactical_arena_checkout_qmxvptla";
 const TACTICAL_ARENA_GAME_SLUG = "tactical-arena";
 const TACTICAL_ARENA_PRODUCT_TAX_CODE = "txcd_10201000";
 const SKIN_PACK_PRICES = Object.freeze({
@@ -626,6 +629,7 @@ export async function createTacticalArenaCheckoutSession(params = {}) {
     form.set("mode", "payment");
     form.set("ui_mode", "embedded_page");
     form.set("redirect_on_completion", "never");
+    form.set("integration_identifier", STRIPE_CHECKOUT_INTEGRATION_IDENTIFIER);
     form.set("client_reference_id", playerId);
     form.set("line_items[0][quantity]", "1");
     form.set("line_items[0][price_data][currency]", premiumOffer.currency);

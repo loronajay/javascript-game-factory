@@ -37,6 +37,9 @@ dev/
 !platform-api/tests/
 platform-api/tests/*
 !platform-api/tests/profiles-db.test.mjs
+!platform-api/tests/ownership-backfill-security.test.mjs
+!platform-api/tests/rating-routes-security.test.mjs
+!platform-api/tests/stripe-checkout-security.test.mjs
 
 # Echo Duel keeps its local regression tests out of shipped game builds.
 games/echo-duel/tests/

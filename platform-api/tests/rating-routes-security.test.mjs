@@ -1,0 +1,53 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import { createApp } from "../src/app.mjs";
+import { signToken } from "../src/auth-helpers.mjs";
+
+const TEST_SECRET = "test-jwt-secret-at-least-32-chars-long";
+
+function responseSink() {
+  return {
+    statusCode: 200,
+    headers: {},
+    body: "",
+    setHeader(name, value) { this.headers[name.toLowerCase()] = value; },
+    end(value = "") { this.body = value; },
+  };
+}
+
+async function post(app, url, token, body) {
+  const chunk = Buffer.from(JSON.stringify(body));
+  const req = {
+    method: "POST",
+    url,
+    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+    async *[Symbol.asyncIterator]() { yield chunk; },
+  };
+  const res = responseSink();
+  await app(req, res);
+  return { statusCode: res.statusCode, json: JSON.parse(res.body) };
+}
+
+test("legacy client-reported ratings cannot write the Tactical Arena ladder", async () => {
+  const calls = [];
+  const app = createApp({
+    jwtSecret: TEST_SECRET,
+    recordMatchRating: async (...args) => {
+      calls.push(args);
+      return { ok: true };
+    },
+    now: () => "2026-08-03T00:00:00.000Z",
+  });
+  const token = signToken({ playerId: "player-1", email: "player@test.com" }, TEST_SECRET);
+
+  const response = await post(app, "/ratings/tactical-arena", token, {
+    opponentPlayerId: "player-2",
+    outcome: "win",
+    sessionId: "invented-session",
+  });
+
+  assert.equal(response.statusCode, 403);
+  assert.equal(response.json.error, "server_attestation_required");
+  assert.deepEqual(calls, []);
+});

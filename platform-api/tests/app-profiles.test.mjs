@@ -2,6 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createApp } from "../src/app.mjs";
+import { signToken } from "../src/auth-helpers.mjs";
+
+const TEST_SECRET = "test-secret";
+
+function authHeadersFor(playerId) {
+  return { authorization: `Bearer ${signToken({ playerId, email: "a@b.com", sessionId: "s1" }, TEST_SECRET)}` };
+}
 
 function createMockResponse() {
   return {
@@ -17,10 +24,11 @@ function createMockResponse() {
   };
 }
 
-async function invoke(app, { method = "GET", url = "/", body = null } = {}) {
+async function invoke(app, { method = "GET", url = "/", body = null, headers = {} } = {}) {
   const req = {
     method,
     url,
+    headers,
     async *[Symbol.asyncIterator]() {
       if (body !== null) {
         yield Buffer.from(body);
@@ -40,6 +48,7 @@ test("GET /players/:playerId returns 404 when no profile exists", async () => {
   const app = createApp({
     config: { hasDatabaseUrl: true },
     now: () => "2026-04-22T00:00:00.000Z",
+    jwtSecret: TEST_SECRET,
     loadPlayerProfile: async () => null,
   });
 
@@ -168,6 +177,7 @@ test("PUT /players/:playerId/profile saves the profile payload", async () => {
   const app = createApp({
     config: { hasDatabaseUrl: true },
     now: () => "2026-04-22T00:00:00.000Z",
+    jwtSecret: TEST_SECRET,
     savePlayerProfile: async (playerId, patch) => {
       savedInput = { playerId, patch };
       return {
@@ -181,6 +191,7 @@ test("PUT /players/:playerId/profile saves the profile payload", async () => {
   const response = await invoke(app, {
     method: "PUT",
     url: "/players/player-1/profile",
+    headers: authHeadersFor("player-1"),
     body: JSON.stringify({
       profileName: "Leo",
       bio: "Arcade builder",
@@ -204,15 +215,88 @@ test("PUT /players/:playerId/profile saves the profile payload", async () => {
   });
 });
 
-test("PUT /players/:playerId/profile rejects invalid json", async () => {
+test("PUT /players/:playerId/profile requires authentication", async () => {
+  let saved = false;
   const app = createApp({
     config: { hasDatabaseUrl: true },
     now: () => "2026-04-22T00:00:00.000Z",
+    jwtSecret: TEST_SECRET,
+    savePlayerProfile: async () => {
+      saved = true;
+      return {};
+    },
   });
 
   const response = await invoke(app, {
     method: "PUT",
     url: "/players/player-1/profile",
+    body: JSON.stringify({ profileName: "Attacker" }),
+  });
+
+  assert.equal(response.statusCode, 401);
+  assert.equal(response.json.error, "not_authenticated");
+  assert.equal(saved, false);
+});
+
+test("PUT /players/:playerId/profile cannot edit a different account", async () => {
+  let saved = false;
+  const app = createApp({
+    config: { hasDatabaseUrl: true },
+    now: () => "2026-04-22T00:00:00.000Z",
+    jwtSecret: TEST_SECRET,
+    savePlayerProfile: async () => {
+      saved = true;
+      return {};
+    },
+  });
+
+  const response = await invoke(app, {
+    method: "PUT",
+    url: "/players/player-2/profile",
+    headers: authHeadersFor("player-1"),
+    body: JSON.stringify({ profileName: "Attacker" }),
+  });
+
+  assert.equal(response.statusCode, 403);
+  assert.equal(response.json.error, "forbidden");
+  assert.equal(saved, false);
+});
+
+test("POST /players/:playerId/profile-view increments on the server for the signed-in viewer", async () => {
+  const calls = [];
+  const app = createApp({
+    config: { hasDatabaseUrl: true },
+    now: () => "2026-04-22T00:00:00.000Z",
+    jwtSecret: TEST_SECRET,
+    incrementPlayerProfileView: async (playerId, options) => {
+      calls.push({ playerId, options });
+      return { profileViewCount: 12, profileOpenSources: { search: 3 } };
+    },
+  });
+
+  const response = await invoke(app, {
+    method: "POST",
+    url: "/players/player-2/profile-view",
+    headers: authHeadersFor("player-1"),
+    body: JSON.stringify({ source: "search", profileViewCount: 999999 }),
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(calls, [{ playerId: "player-2", options: { source: "search", viewerPlayerId: "player-1" } }]);
+  assert.equal(response.json.metrics.profileViewCount, 12);
+});
+
+test("PUT /players/:playerId/profile rejects invalid json", async () => {
+  const app = createApp({
+    config: { hasDatabaseUrl: true },
+    now: () => "2026-04-22T00:00:00.000Z",
+    jwtSecret: TEST_SECRET,
+  });
+
+  const response = await invoke(app, {
+    method: "PUT",
+    url: "/players/player-1/profile",
+    headers: authHeadersFor("player-1"),
     body: "{bad json",
   });
 

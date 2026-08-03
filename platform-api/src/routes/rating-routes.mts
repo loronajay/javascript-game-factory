@@ -38,6 +38,13 @@ export async function handleRatingRoute(context: any): Promise<boolean> {
       writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
       return true;
     }
+    // Tactical Arena ranked matches are settled by the brokered ranked-match reporter.
+    // Letting the older generic endpoint also write this slug would allow a client to
+    // invent a session and outcome against the same public ladder.
+    if (gameSlug === "tactical-arena") {
+      writeJson(res, 403, { status: "error", error: "server_attestation_required", timestamp }, requestOrigin);
+      return true;
+    }
     const body = await readJsonBody(req);
     if (!body.ok) {
       writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);

@@ -7,6 +7,20 @@ function sanitizePlayerId(value: unknown): string {
   return typeof value === "string" ? value.trim().slice(0, 80) : "";
 }
 
+const PROFILE_OPEN_SOURCES = new Set([
+  "direct",
+  "resultsScreen",
+  "chatLobby",
+  "event",
+  "activity",
+  "thoughtFeed",
+  "bulletin",
+]);
+
+function sanitizeProfileOpenSource(value: unknown): string {
+  return typeof value === "string" && PROFILE_OPEN_SOURCES.has(value) ? value : "direct";
+}
+
 function ensureJsonObject(value: any): any {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
@@ -124,7 +138,9 @@ export async function savePlayerMetrics(db: any, playerId: any, patch: any = {})
   const normalizedPlayerId = sanitizePlayerId(playerId);
   if (!normalizedPlayerId) return null;
 
+  const existing = await loadPlayerMetrics(db, normalizedPlayerId);
   const normalized = normalizeProfileMetricsRecord({
+    ...existing,
     ...patch,
     playerId: normalizedPlayerId,
   });
@@ -237,4 +253,39 @@ export async function savePlayerMetrics(db: any, playerId: any, patch: any = {})
   `, [savedRecord.thoughtPostCount, normalizedPlayerId]).catch(() => null);
 
   return savedRecord;
+}
+
+export async function incrementPlayerProfileView(db: any, playerId: any, options: any = {}): Promise<any> {
+  const normalizedPlayerId = sanitizePlayerId(playerId);
+  if (!normalizedPlayerId) return null;
+  const source = sanitizeProfileOpenSource(options?.source);
+
+  await db.query(`
+    insert into players (player_id)
+    values ($1)
+    on conflict (player_id) do update
+      set updated_at = now()
+  `, [normalizedPlayerId]);
+
+  // Increment atomically. The caller supplies only a bounded source label; it never sends
+  // either counter, so a stale tab cannot walk totals backward and a viewer cannot replace
+  // another player's complete metrics row.
+  await db.query(`
+    insert into player_metrics (
+      player_id,
+      profile_view_count,
+      profile_open_source_breakdown
+    ) values ($1, 1, jsonb_build_object($2::text, 1))
+    on conflict (player_id) do update set
+      profile_view_count = player_metrics.profile_view_count + 1,
+      profile_open_source_breakdown = jsonb_set(
+        coalesce(player_metrics.profile_open_source_breakdown, '{}'::jsonb),
+        array[$2::text],
+        to_jsonb(coalesce((player_metrics.profile_open_source_breakdown ->> $2::text)::integer, 0) + 1),
+        true
+      ),
+      updated_at = now()
+  `, [normalizedPlayerId, source]);
+
+  return loadPlayerMetrics(db, normalizedPlayerId);
 }

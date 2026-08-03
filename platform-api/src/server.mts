@@ -6,7 +6,7 @@ import { createApp } from "./app.mjs";
 import { createUploadService } from "./services/upload.mjs";
 import { listActivityItems, saveActivityItem } from "./db/activity.mjs";
 import { readConfig } from "./config.mjs";
-import { loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
+import { incrementPlayerProfileView, loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
 import { applyMigrations } from "./db/migrations.mjs";
 import { activateInventoryItem, backfillLocalOwnership, findPlayPurchaseClaim, findStripeGrant, getGameProgress, recordGameProgressClaim, regrantStripeEntitlements, resetCampaignProgress, revokeGameEntitlements, spendValorForEntitlement } from "./db/game-progress.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
@@ -194,6 +194,7 @@ async function bootstrap(): Promise<void> {
     savePlayerProfile: (playerId: any, patch: any) => savePlayerProfile(pool, playerId, patch),
     loadPlayerMetrics: (playerId: any) => loadPlayerMetrics(pool, playerId),
     savePlayerMetrics: (playerId: any, patch: any) => savePlayerMetrics(pool, playerId, patch),
+    incrementPlayerProfileView: (playerId: any, options: any) => incrementPlayerProfileView(pool, playerId, options),
     loadPlayerRelationships: (playerId: any) => loadPlayerRelationships(pool, playerId),
     createFriendshipBetweenPlayers: (leftPlayerId: any, rightPlayerId: any, options: any) => createFriendshipBetweenPlayers(pool, leftPlayerId, rightPlayerId, options),
     removeFriendBetweenPlayers: (leftPlayerId: any, rightPlayerId: any) => removeFriendBetweenPlayers(pool, leftPlayerId, rightPlayerId),

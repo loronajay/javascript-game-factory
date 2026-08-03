@@ -88,6 +88,7 @@ export interface ProfileMetricsRecord {
 interface MetricsApiClient {
   loadPlayerMetrics?: (playerId: string) => Promise<Partial<ProfileMetricsRecord> | null>;
   savePlayerMetrics?: (playerId: string, patch: Record<string, unknown>) => Promise<Partial<ProfileMetricsRecord> | null>;
+  incrementPlayerProfileView?: (playerId: string, options: { source: ProfileOpenSource }) => Promise<Partial<ProfileMetricsRecord> | null>;
 }
 
 type MaybeStorage = StorageLike | null;
@@ -375,18 +376,14 @@ export async function incrementProfileViewCountWithApi(
   const normalizedPlayerId = sanitizePlayerId(playerId);
   if (!normalizedPlayerId) return null;
 
-  const isAuth = typeof apiClient?.savePlayerMetrics === "function";
+  const isAuth = typeof apiClient?.incrementPlayerProfileView === "function";
 
   if (!isAuth) {
     return incrementProfileViewCount(normalizedPlayerId, options, storage);
   }
 
-  const current = loadProfileMetricsRecord(normalizedPlayerId, storage);
-  const incremented = normalizeProfileMetricsRecord(computeIncrementedViewRecord(current, options));
-  const saved = await apiClient.savePlayerMetrics!(normalizedPlayerId, {
-    profileViewCount: incremented.profileViewCount,
-    profileOpenSourceBreakdown: incremented.profileOpenSourceBreakdown,
-  });
+  const source = normalizeProfileOpenSourceKey(options?.source);
+  const saved = await apiClient.incrementPlayerProfileView!(normalizedPlayerId, { source });
   if (!saved?.playerId) return null;
 
   return saveProfileMetricsRecord(saved, storage);

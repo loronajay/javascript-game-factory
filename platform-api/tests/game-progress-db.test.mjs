@@ -29,8 +29,25 @@ function createGameProgressPool() {
         const key = `${params[0]}:${params[1]}:${params[2]}`;
         if (state.claims.has(key)) return { rowCount: 0, rows: [] };
         state.claims.add(key);
-        state.claimRows.push({ kind: params[3], source_id: params[4] });
+        state.claimRows.push({
+          claim_id: params[2],
+          kind: params[3],
+          source_id: params[4],
+          payload: params[5] ? JSON.parse(params[5]) : {},
+        });
         return { rowCount: 1, rows: [] };
+      }
+      if (text.includes("select source_id from game_progress_claims")) {
+        const allowed = new Set(Array.isArray(params[2]) ? params[2] : []);
+        return {
+          rows: state.claimRows.filter((row) => row.kind === "tutorial-complete" && allowed.has(row.source_id)),
+        };
+      }
+      if (text.includes("select claim_id, source_id, payload from game_progress_claims")) {
+        return { rows: state.claimRows.filter((row) => row.kind === "consumable-activation") };
+      }
+      if (text.includes("select 1 from game_campaign_progress")) {
+        return { rows: state.campaignProgress.has(params[2]) ? [{ "?column?": 1 }] : [] };
       }
       if (text.includes("select campaign_epoch from game_progress_profiles")) {
         return { rows: [{ campaign_epoch: state.campaignEpoch }] };
@@ -120,13 +137,16 @@ test("recordGameProgressClaim applies tutorial Valor and entitlement claims idem
   const pool = createGameProgressPool();
   const common = { playerId: "player-1", gameSlug: "tactical-arena" };
 
-  const completion = await recordGameProgressClaim(pool, {
-    ...common,
-    claimId: "tutorial-complete:basics",
-    kind: "tutorial-complete",
-    sourceId: "basics",
-    payload: { tutorialId: "basics" },
-  });
+  let completion = null;
+  for (const tutorialId of ["basics", "arts-mp", "damage-types", "rage-status", "status-effects"]) {
+    completion = await recordGameProgressClaim(pool, {
+      ...common,
+      claimId: `tutorial-complete:${tutorialId}`,
+      kind: "tutorial-complete",
+      sourceId: tutorialId,
+      payload: { tutorialId },
+    });
+  }
   const valor = await recordGameProgressClaim(pool, {
     ...common,
     claimId: "tutorial-valor:all-tutorials",
@@ -257,7 +277,7 @@ function campaignClaim({ missionId, stars, campaignEpoch }) {
 
 test("resetCampaignProgress clears the missions and bumps the campaign epoch", async () => {
   const pool = createGameProgressPool();
-  await recordGameProgressClaim(pool, campaignClaim({ missionId: "mission-1", stars: 3, campaignEpoch: 0 }));
+  await recordGameProgressClaim(pool, campaignClaim({ missionId: "clod-trial", stars: 3, campaignEpoch: 0 }));
 
   const before = await getGameProgress(pool, COMMON.playerId, COMMON.gameSlug);
   assert.equal(before.campaignEpoch, 0);
@@ -269,13 +289,98 @@ test("resetCampaignProgress clears the missions and bumps the campaign epoch", a
   assert.equal(result.progress.campaignEpoch, 1);
 });
 
+test("public Tactical Arena claims reject invented ids and oversized Valor payouts", async () => {
+  const pool = createGameProgressPool();
+
+  const invented = await recordGameProgressClaim(pool, {
+    playerId: "player-1",
+    gameSlug: "tactical-arena",
+    claimId: "campaign-valor:invented-repeatable-id",
+    kind: "campaign-valor",
+    payload: { missionId: "clod-trial", amount: 100000, stars: 3 },
+  });
+
+  assert.equal(invented.ok, false);
+  assert.equal(invented.error, "invalid_claim");
+  assert.equal(pool.state.valorBalance, 0);
+});
+
+test("campaign Valor is priced from the server reward catalog", async () => {
+  const pool = createGameProgressPool();
+
+  const result = await recordGameProgressClaim(pool, {
+    playerId: "player-1",
+    gameSlug: "tactical-arena",
+    claimId: "campaign-valor:clod-trial",
+    kind: "campaign-valor",
+    payload: { missionId: "clod-trial", amount: 100000, stars: 3 },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.progress.valorBalance, 55);
+});
+
+test("campaign Valor preserves paid boosts using server activation records", async () => {
+  const pool = createGameProgressPool();
+  pool.state.claimRows.push({
+    claim_id: "consumable-activation:boost-1",
+    kind: "consumable-activation",
+    source_id: "valor-boost-x",
+    payload: { itemId: "valor-boost-x" },
+  });
+
+  const result = await recordGameProgressClaim(pool, {
+    playerId: "player-1",
+    gameSlug: "tactical-arena",
+    claimId: "campaign-valor:clod-trial",
+    kind: "campaign-valor",
+    payload: { missionId: "clod-trial", amount: 1, stars: 3 },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.progress.valorBalance, 110);
+});
+
+test("campaign reward claims cannot substitute a different mission reward", async () => {
+  const pool = createGameProgressPool();
+
+  const result = await recordGameProgressClaim(pool, {
+    playerId: "player-1",
+    gameSlug: "tactical-arena",
+    claimId: "campaign-unit-reward:clod-trial:blacksword",
+    kind: "campaign-unit-choice",
+    payload: { missionId: "clod-trial", type: "blacksword", entitlementId: "unit:blacksword" },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error, "invalid_claim");
+  assert.equal(pool.state.entitlements.has("unit:blacksword"), false);
+});
+
+test("tutorial completion rewards require every canonical tutorial claim", async () => {
+  const pool = createGameProgressPool();
+
+  const result = await recordGameProgressClaim(pool, {
+    playerId: "player-1",
+    gameSlug: "tactical-arena",
+    claimId: "tutorial-valor:all-tutorials",
+    kind: "tutorial-valor",
+    sourceId: "all-tutorials",
+    payload: { amount: 500 },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error, "claim_prerequisite_missing");
+  assert.equal(pool.state.valorBalance, 0);
+});
+
 test("a campaign claim built before a reset cannot resurrect the cleared progress", async () => {
   const pool = createGameProgressPool();
   await resetCampaignProgress(pool, COMMON.playerId, COMMON.gameSlug);
 
   // The other device still has the old campaign cached and flushes a queued claim for it.
   const stale = await recordGameProgressClaim(pool, campaignClaim({
-    missionId: "mission-1",
+    missionId: "clod-trial",
     stars: 3,
     campaignEpoch: 0,
   }));
@@ -288,17 +393,17 @@ test("a campaign claim built before a reset cannot resurrect the cleared progres
 
 test("a mission replayed after a reset is recorded again under the new epoch", async () => {
   const pool = createGameProgressPool();
-  await recordGameProgressClaim(pool, campaignClaim({ missionId: "mission-1", stars: 3, campaignEpoch: 0 }));
+  await recordGameProgressClaim(pool, campaignClaim({ missionId: "clod-trial", stars: 3, campaignEpoch: 0 }));
   await resetCampaignProgress(pool, COMMON.playerId, COMMON.gameSlug);
 
   // Same mission, same stars — only the epoch differs. Without the epoch in the claim id
   // this would collide with the pre-reset claim and be swallowed as a duplicate, leaving
   // the server permanently unable to re-record the mission.
-  await recordGameProgressClaim(pool, campaignClaim({ missionId: "mission-1", stars: 3, campaignEpoch: 1 }));
+  await recordGameProgressClaim(pool, campaignClaim({ missionId: "clod-trial", stars: 3, campaignEpoch: 1 }));
 
   const snapshot = await getGameProgress(pool, COMMON.playerId, COMMON.gameSlug);
   assert.equal(snapshot.campaignProgress.length, 1);
-  assert.equal(snapshot.campaignProgress[0].missionId, "mission-1");
+  assert.equal(snapshot.campaignProgress[0].missionId, "clod-trial");
   assert.equal(snapshot.campaignProgress[0].stars, 3);
 });
 
@@ -306,9 +411,9 @@ test("resetting preserves Valor and entitlement claims so nothing can be re-farm
   const pool = createGameProgressPool();
   await recordGameProgressClaim(pool, {
     ...COMMON,
-    claimId: "campaign-valor:mission-1",
+    claimId: "campaign-valor:clod-trial",
     kind: "campaign-valor",
-    payload: { missionId: "mission-1", amount: 250, stars: 3 },
+    payload: { missionId: "clod-trial", amount: 55, stars: 3 },
   });
   await resetCampaignProgress(pool, COMMON.playerId, COMMON.gameSlug);
 
@@ -316,11 +421,11 @@ test("resetting preserves Valor and entitlement claims so nothing can be re-farm
   // reset, so it is still a duplicate.
   await recordGameProgressClaim(pool, {
     ...COMMON,
-    claimId: "campaign-valor:mission-1",
+    claimId: "campaign-valor:clod-trial",
     kind: "campaign-valor",
-    payload: { missionId: "mission-1", amount: 250, stars: 3 },
+    payload: { missionId: "clod-trial", amount: 55, stars: 3 },
   });
 
   const snapshot = await getGameProgress(pool, COMMON.playerId, COMMON.gameSlug);
-  assert.equal(snapshot.valorBalance, 250);
+  assert.equal(snapshot.valorBalance, 55);
 });
