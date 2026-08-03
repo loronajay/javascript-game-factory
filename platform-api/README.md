@@ -32,7 +32,7 @@ This backend is **TypeScript-sourced** (`strict: true`): every `src/**` file is 
 - `src/server.mjs`: runtime entry point
 - `src/app.mjs`: top-level orchestration and route dispatch shell
 - `src/http-utils.mjs`: shared request/response helpers, including the CORS allow-list
-- `src/rate-limit.mjs`: per-IP rate limiting (in-process; see Known limits below)
+- `src/rate-limit.mjs`: in-process per-IP rate limiting; deployment and trust-model limits are documented in `../games/tactical-arena/SECURITY.md`
 - `src/config.mjs`: environment and config loading
 - `src/email.mjs`: transactional email (password reset) via Resend
 - `src/db/`: data access modules, domain helpers, and SQL migrations

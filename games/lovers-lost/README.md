@@ -19,7 +19,7 @@ From `games/lovers-lost/`:
 npm test
 ```
 
-150 tests, all green. The package also exposes focused test scripts for structure and gameplay.
+The package runs the complete cabinet suite and also exposes focused scripts for structure and gameplay checks. Avoid recording a fixed test total here; the suite grows as cabinet seams are extracted.
 
 ## Ownership notes
 

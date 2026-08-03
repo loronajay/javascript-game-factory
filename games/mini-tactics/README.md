@@ -43,7 +43,7 @@ Requires a current Node.js installation:
 npm test
 ```
 
-The project has no runtime dependencies and no build step. 143 tests, all green.
+The project has no runtime dependencies and no build step. The suite covers rules, deterministic reducers, multiplayer, CPU play, composition, mobile structure, tutorials, and the simulated-latency online lockstep contract.
 
 ## Architecture
 

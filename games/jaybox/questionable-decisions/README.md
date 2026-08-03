@@ -1,18 +1,18 @@
 # Questionable Decisions
 
-`questionable-decisions/` is a docs-first multiplayer trivia and penalty mini-game project.
+`questionable-decisions/` is a playable multiplayer trivia and penalty mini-game prototype. Its GDD and implementation plan remain the design references, while the browser app and Jaybox cabinet adapter are the authoritative implementation surfaces.
 
 ## Current status
 
 - `GDD.md` defines the base game, platform boundaries, and server-authoritative rules.
-- `IMPLEMENTATION_PLAN.md` tracks the planned build-out.
+- `IMPLEMENTATION_PLAN.md` records the online-first architecture and remaining build-out.
 - `mini-games/` contains the individual penalty-game concepts used when a player misses a trivia question.
 - `index.html` now boots a modular browser prototype through `js/main.js`.
 - `tests/` contains Node test coverage for the prototype structure and core game rules.
 
 ## Folder intent
 
-This folder is now the playable prototype home for the cabinet. Keep the main trivia board, penalty-game selection, and cabinet integration in this folder, while preserving each mini-game spec as a clear design reference.
+This folder is the standalone playable prototype home for the cabinet. The shared-screen/phone-controller integration lives one level up in `../cabinets/questionable-decisions.mjs`, with server-authoritative rules in the separate `factory-network-server` repository. Keep the main trivia board, penalty-game selection, and standalone cabinet work here while preserving each mini-game spec as a design reference.
 
 ## App structure
 

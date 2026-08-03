@@ -1,44 +1,15 @@
-# Build Buddy Engine Prototype v7 — Pack/Stage Naming Update
+# Build Buddy
 
-This update moves stage files toward the intended content model: several 10-stage packs.
+Build Buddy is a playable co-op platformer prototype built around two asymmetric roles: the Runner crosses momentum-heavy stages while the Builder places platforms, springs, and checkpoints to keep the route alive. The cabinet is registered on the arcade grid and supports local debug play plus public/private online lobby flows.
 
-## Run
+## Current status
 
-Because the project uses ES modules, run it from a local server:
+- Pack 01 is a complete 10-stage pack registered through `js/stages/stage-registry.js`.
+- Local play exposes Runner, Builder, and Hybrid debug views so one tester can exercise both roles.
+- Online play assigns role-specific Runner and Builder clients, exchanges commands/snapshots through `js/online-client.js`, and supports both client-host and server-authoritative match payloads.
+- Progression, stage results, run completion, disconnect handling, and online message contracts have Node regression coverage.
 
-```bash
-python -m http.server 8080
-```
-
-Then open:
-
-```text
-http://localhost:8080
-```
-
-## Stage architecture
-
-Stages are organized by pack and stage number, not unique stage titles.
-
-```text
-js/stages/
-  stage-registry.js
-  packs/
-    pack-01/
-      pack-01-manifest.js
-      pack-01-stage-01.js
-      pack-01-stage-02.js
-      ...
-      pack-01-stage-10.js
-```
-
-Current registered stage:
-
-```text
-pack_01_stage_01
-```
-
-Naming convention:
+The durable stage identifiers use pack/stage coordinates:
 
 ```text
 Folder:      js/stages/packs/pack-##/
@@ -48,49 +19,58 @@ Stage ID:    pack_##_stage_##
 Display:     Pack ## — Stage ##
 ```
 
-Do not force unique names for every stage. Build Buddy is structured around 10-stage packs, so pack/stage coordinates are the durable identifiers.
+Add stages through a pack manifest and `stage-registry.js`; do not hardcode stage imports into the browser entry point.
 
-## View modes
+## Run locally
 
-Keyboard:
+The cabinet uses ES modules, so serve it over HTTP from this folder:
 
-```text
-6 Runner view
-7 Builder view
-8 Hybrid debug view
+```bash
+python -m http.server 8080
 ```
 
-On-screen buttons are also available in the lower-right corner.
-
-Important: v7 view modes are rendering/view routing only. This local prototype still lets one tester drive both Runner and Builder inputs. The actual online implementation should split control authority by role while preserving this view-mode separation.
+Then open `http://localhost:8080`.
 
 ## Controls
 
 Runner:
 
 ```text
-A/D or Left/Right: move
-Space: jump / wall-jump
-W/Up: climb up
-S/Down: descend / drop through one-way platforms
-R: reposition
+A/D or Left/Right  Move
+Space              Jump / wall-jump
+W/Up               Climb
+S/Down             Descend / drop through one-way platforms
+R                  Reposition
 ```
 
 Builder:
 
 ```text
-1: platform
-2: yellow spring
-3: green spring
-4: blue spring
-5: checkpoint
-Left click: place
-Right click: delete
-Q/E: builder camera nudge
+1–5                 Select platform, spring, or checkpoint tool
+Left click          Place
+Right click         Delete
+Q/E                 Nudge builder camera
 ```
 
-## Notes for agent handoff
+Local view controls are `6` for Runner, `7` for Builder, and `8` for Hybrid debug view. Online sessions hide those controls and derive the view from the assigned role.
 
-The code should now be treated as an engine baseline, not a throwaway prototype. Avoid reintroducing hardcoded single-stage imports into `game.js`. New stages should be registered through pack manifests and `stage-registry.js`.
+## Structure
 
-The local Hybrid view is a development/testing affordance. The production game should use Runner and Builder views as role-specific clients, with Hybrid reserved for local debug or internal testing.
+- `js/app-controller.js`: browser loop, screen orchestration, and online command routing
+- `js/app-shell.js`: pure menu/lobby/session state transitions
+- `js/game.js`: fixed-step cabinet simulation
+- `js/online-client.js`: WebSocket transport
+- `js/online-gameplay.js`: online messages, authority checks, results, and disconnect state
+- `js/stages/`: stage authoring helpers, registry, manifests, and content
+- `js/render/`: focused rendering modules
+- `tests/`: Node coverage for stages, progression, sessions, online contracts, and visual structure
+
+## Tests
+
+From `games/build-buddy/`:
+
+```bash
+node --test
+```
+
+Build Buddy owns cabinet-local rules and presentation. Durable factory identity remains owned by the shared platform.

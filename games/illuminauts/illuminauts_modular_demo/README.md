@@ -1,6 +1,6 @@
 # Illuminauts Modular Debug Demo
 
-This is a lightweight JavaScript Game Factory-style demo scaffold for testing the Illuminauts core loop.
+This is a historical, intentionally offline debug scaffold for testing the early Illuminauts core loop. It is not the current production cabinet. See `../README.md` for the shipped game, online modes, solo modes, map catalog, and test commands.
 
 ## What is wired
 
@@ -46,7 +46,7 @@ src/
 
 ## Architecture notes
 
-This demo intentionally keeps networking out of the local prototype. The split is designed so the future Factory Network integration can move server-owned state into a network authority layer:
+This demo intentionally keeps networking out of the local prototype. The production cabinet has since shipped its Factory Network integration; the list below records the authority boundary this scaffold was designed around:
 
 - map seed/generated layout
 - player positions

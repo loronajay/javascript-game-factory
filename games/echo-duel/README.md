@@ -109,5 +109,5 @@ styles/
 
 - Menu music and presentation polish live entirely on the client side.
 - `local-adapter.js` is still present, but the current shipped menu flow is online-first.
-- Local regression test scripts may exist in a developer workspace, but they are not part of the shipped game folder.
+- Local regression test scripts may exist in a developer workspace, but `games/echo-duel/tests/` is intentionally excluded from the shipped repository.
 - The server-authority handoff doc remains intentionally separate so the authority migration and any optional protocol cleanup stay documented outside the shipped client files.

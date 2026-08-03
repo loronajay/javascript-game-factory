@@ -32,6 +32,11 @@ dev/
 !games/*/tests/
 !games/*/tests/**
 
+# Ship the repo-wide README coverage/freshness regression.
+!js/tests/
+js/tests/*
+!js/tests/readme-freshness.test.mjs
+
 # Keep the database regression that prevents narrow profile updates from
 # erasing canonical fields after an origin/domain change.
 !platform-api/tests/

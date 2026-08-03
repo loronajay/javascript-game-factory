@@ -5,9 +5,9 @@ This folder is the design archive for the Creature Battle initiative.
 ## Main areas
 
 - `combat-system/`: shared combat core, rule sets, modes, roster, and data contracts
-  - `CLASS_SYSTEM_IMPLEMENTATION_PLAN.md` — **current build target** — 4-phase plan for implementing class system, skills, and passives into the live engine; file map, data shapes, hook system design, done states per phase
+  - `CLASS_SYSTEM_IMPLEMENTATION_PLAN.md` — historical 4-phase implementation plan for the class system, retained for its file map, data shapes, hook design, and extension rules
   - `CLASS_CUSTOMIZATION_SCREEN_SCOPE.md` — scope for the class customization screen (between team select and battle): level tier → class depth, UX flow, passive equip, information hiding rules
-  - `CLASS_SKILLS_AND_PASSIVES_CANON.md` — living canon record of all locked skills and passives per class route and tier; Strength route complete; Defense route next
+  - `CLASS_SKILLS_AND_PASSIVES_CANON.md` — living canon record of class skills and passives. All five single-stat routes are complete in the live engine; hybrid and prestige routes remain future content.
 - `progression-system/`: long-term RPG progression planning
 - `creatures/`: per-creature scope docs; `creatures/reference/` holds loose reference art
 - `battle-scene/`: battle scene canon package, implementation spec, and reference assets (flattened from original double-nested structure)
@@ -18,7 +18,7 @@ Note: creature sprites (`.png` files) live in `../shared/creatures/` — accessi
 
 ## Implementation status
 
-The playable game is in `../creature-battler/`. Open `creature-battler/index.html` to run it. That implementation is the authoritative source for what is actually live — use these docs as design input and reference, not as a spec for what is built.
+The playable game is in `../creature-battler/`. Open `../creature-battler/index.html` to run it. The four original implementation phases and all five single-stat routes (Strength, Defense, Intelligence, Spirit, and Speed) are complete. The implementation and `../creature-battler/CLAUDE.md` are authoritative for what is live; use these docs as design input and historical context.
 
 ## How to use this folder
 
