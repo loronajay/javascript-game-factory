@@ -366,6 +366,51 @@
   line-height: 1.7;
 }
 
+/* Attachment (a tournament flyer, a patch banner).
+ *
+ * Letterboxed on a matte rather than cropped to fit, the same rule the profile backgrounds
+ * follow. Flyers are usually portrait, and cropping one into a landscape strip would cut
+ * the date, venue, and entry fees off the bottom of the poster — the exact information the
+ * announcement exists to carry. `contain` inside a capped frame keeps the whole poster
+ * visible at a size that doesn't push the rest of the board off screen; the link opens the
+ * full-resolution original for anyone who wants to read the fine print. */
+/* The frame hugs the image rather than spanning the card. Constraining the IMAGE by both
+ * max-width and max-height and letting the anchor size to its content means the matte is
+ * only ever the padding — a portrait poster doesn't sit marooned in a wide black band, and
+ * a landscape banner still grows to the full card width. No object-fit needed, because the
+ * box is never forced to a shape the image has to be fitted into. */
+.bulletin-card__attachment {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 10px;
+  border-radius: var(--profile-radius-sm);
+  background: rgba(0, 0, 0, 0.36);
+  border: 1px solid rgba(255, 214, 189, 0.16);
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.bulletin-card__attachment:hover,
+.bulletin-card__attachment:focus-visible {
+  border-color: rgba(255, 214, 189, 0.42);
+  transform: translateY(-2px);
+}
+
+.bulletin-card__attachment-image {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: min(560px, 68vh);
+  border-radius: var(--profile-radius-xs);
+}
+
+@media (max-width: 640px) {
+  .bulletin-card__attachment-image {
+    max-height: 60vh;
+  }
+}
+
 @media (max-width: 640px) {
   .bulletins-stage {
     padding: 16px 12px 30px;

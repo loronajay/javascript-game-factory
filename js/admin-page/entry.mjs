@@ -122,6 +122,18 @@ if (typeof doc?.getElementById === "function") {
         event.preventDefault();
         void dispatch(action, target.getAttribute("data-value") || "", target.closest("form"));
     });
+    // File inputs fire `change`, not `click`, so they need their own delegated listener.
+    // The chosen File is handed to the action directly rather than being re-read later —
+    // the input is destroyed by the next render, and its value would be gone with it.
+    doc.addEventListener("change", (event) => {
+        const input = event.target;
+        if (!input || input.type !== "file")
+            return;
+        const action = input.getAttribute("data-action") || "";
+        if (!action)
+            return;
+        void dispatch(action, "", input.closest("form"), input.files?.[0] || null);
+    });
     doc.addEventListener("submit", (event) => {
         const form = event.target;
         if (!form?.matches?.("[data-form]"))
@@ -133,7 +145,7 @@ if (typeof doc?.getElementById === "function") {
             return;
         void dispatch(action, submitter?.getAttribute("data-value") || "", form);
     });
-    async function dispatch(action, value, form) {
+    async function dispatch(action, value, form, file = null) {
         if (action === "tab") {
             const nextTab = readTabFromHash(value);
             if (globalThis.location)
@@ -145,6 +157,8 @@ if (typeof doc?.getElementById === "function") {
             state,
             form,
             value,
+            file,
+            rerender,
             confirmFn: (message) => globalThis.confirm?.(message) === true,
         });
         if (shouldReload)

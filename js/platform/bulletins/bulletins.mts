@@ -22,6 +22,7 @@ export interface Bulletin {
   body: string;
   status: BulletinStatus;
   audience: BulletinAudience;
+  imageUrl: string;
   publishedAt: string;
   createdBy: string;
 }
@@ -38,6 +39,7 @@ export const DEFAULT_BULLETINS: readonly Bulletin[] = Object.freeze([
     body: "Lovers Lost is now available in the arcade grid. It's a side-scrolling runner with a split-screen twist — one player pushes forward through a world of obstacles while the other navigates a parallel path. The further apart you drift, the harder the reunion. Clear obstacles, survive the run, and see if you can close the gap before the level ends.\n\nHead to the arcade grid to launch it.",
     status: "published",
     audience: "public",
+    imageUrl: "",
     publishedAt: "2026-04-19T19:00:00Z",
     createdBy: "system",
   },
@@ -49,6 +51,7 @@ export const DEFAULT_BULLETINS: readonly Bulletin[] = Object.freeze([
     body: "Battleshits is now open on the arcade floor. It's a full two-player grid combat game built on the classic fleet-vs-fleet format — place your ships, take turns calling coordinates, and try to sink the enemy before they find yours. The game features a custom fleet setup phase, an emoji-powered hit and miss system, and a clean split-screen battle view.\n\nGrab a second player and find it on the arcade grid.",
     status: "published",
     audience: "public",
+    imageUrl: "",
     publishedAt: "2026-04-21T08:00:00Z",
     createdBy: "system",
   },
@@ -60,6 +63,7 @@ export const DEFAULT_BULLETINS: readonly Bulletin[] = Object.freeze([
     body: "This item should not appear on the public board.",
     status: "draft",
     audience: "public",
+    imageUrl: "",
     publishedAt: "2026-04-22T08:00:00Z",
     createdBy: "system",
   },
@@ -73,6 +77,20 @@ function sanitizeSingleLine(value: unknown, maxLength = Number.POSITIVE_INFINITY
 function sanitizeTextBlock(value: unknown, maxLength = Number.POSITIVE_INFINITY): string {
   if (typeof value !== "string") return "";
   return value.replace(/\r\n?/g, "\n").trim().slice(0, maxLength);
+}
+
+// An attachment URL is rendered straight into an `<img src>`, so only http(s) survives
+// normalization. The server applies the same rule; this is the second half of it, so a
+// bad value can never reach the DOM even if it arrives from a fixture or a stale cache.
+function sanitizeImageUrl(value: unknown): string {
+  const raw = sanitizeSingleLine(value, 500);
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    return parsed.protocol === "https:" || parsed.protocol === "http:" ? raw : "";
+  } catch {
+    return "";
+  }
 }
 
 function comparePublishedDesc(left: Bulletin, right: Bulletin): number {
@@ -101,6 +119,7 @@ export function normalizeBulletin(bulletin: unknown = {}, index = 0): Bulletin {
     body: sanitizeTextBlock(source.body, 1200),
     status: isBulletinStatus(status) ? status : "draft",
     audience: isBulletinAudience(audience) ? audience : "public",
+    imageUrl: sanitizeImageUrl(source.imageUrl),
     publishedAt: sanitizeSingleLine(source.publishedAt, 40),
     createdBy: sanitizeSingleLine(source.createdBy, 40) || "system",
   };

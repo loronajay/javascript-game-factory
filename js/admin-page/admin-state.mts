@@ -31,6 +31,14 @@ export interface AdminState {
   // Which record each editor is currently on. "" means the form is in create mode.
   editingBulletinId: string;
   editingEventId: string;
+  // Attachment upload, held outside the record because it exists before there is one:
+  // an operator can pick a flyer while composing a bulletin that has never been saved.
+  uploadingImage: boolean;
+  pendingImageUrl: string;
+  // Unsaved bulletin form values, captured before an action that re-renders the panel
+  // mid-compose (an attachment upload). Without it, choosing a flyer would blank whatever
+  // title and body had already been typed.
+  bulletinDraft: Record<string, any> | null;
 }
 
 export function createInitialState(): AdminState {
@@ -53,6 +61,9 @@ export function createInitialState(): AdminState {
     audit: [],
     editingBulletinId: "",
     editingEventId: "",
+    uploadingImage: false,
+    pendingImageUrl: "",
+    bulletinDraft: null,
   };
 }
 

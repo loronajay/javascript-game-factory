@@ -1,4 +1,4 @@
-import { enumValue, singleLine, slugify, textBlock, toIso, toTimestampOrNull } from "./content-shared.mjs";
+import { enumValue, httpUrl, singleLine, slugify, textBlock, toIso, toTimestampOrNull } from "./content-shared.mjs";
 
 // Persistence for platform-authored announcements.
 //
@@ -19,13 +19,14 @@ export interface BulletinRecord {
   status: (typeof STATUSES)[number];
   audience: (typeof AUDIENCES)[number];
   pinned: boolean;
+  imageUrl: string;
   publishedAt: string;
   createdBy: string;
   updatedAt: string;
 }
 
 const SELECT_COLUMNS = `
-  id, slug, title, summary, body, status, audience, pinned,
+  id, slug, title, summary, body, status, audience, pinned, image_url,
   published_at, created_by, updated_at
 `;
 
@@ -39,6 +40,7 @@ function mapRow(row: any): BulletinRecord {
     status: enumValue(row.status, STATUSES, "draft"),
     audience: enumValue(row.audience, AUDIENCES, "public"),
     pinned: row.pinned === true,
+    imageUrl: String(row.image_url || ""),
     publishedAt: toIso(row.published_at),
     createdBy: String(row.created_by || "system"),
     updatedAt: toIso(row.updated_at),
@@ -58,6 +60,7 @@ function normalizeInput(input: any = {}) {
     status,
     audience: enumValue(input.audience, AUDIENCES, "public"),
     pinned: input.pinned === true,
+    imageUrl: httpUrl(input.imageUrl),
     // Publishing without an explicit date stamps "now" rather than leaving the board
     // sorted by a null — an operator hitting Publish means "live as of this moment".
     publishedAt: toTimestampOrNull(input.publishedAt) || (status === "published" ? new Date().toISOString() : null),
@@ -118,12 +121,12 @@ export async function createBulletin(pool: any, input: any, createdBy: any): Pro
 
   try {
     const result = await pool.query(
-      `insert into bulletins (slug, title, summary, body, status, audience, pinned, published_at, created_by)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `insert into bulletins (slug, title, summary, body, status, audience, pinned, image_url, published_at, created_by)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        returning ${SELECT_COLUMNS}`,
       [
         values.slug, values.title, values.summary, values.body,
-        values.status, values.audience, values.pinned, values.publishedAt,
+        values.status, values.audience, values.pinned, values.imageUrl, values.publishedAt,
         String(createdBy || "system"),
       ],
     );
@@ -146,12 +149,12 @@ export async function updateBulletin(pool: any, id: any, input: any): Promise<{ 
     const result = await pool.query(
       `update bulletins
           set slug = $2, title = $3, summary = $4, body = $5, status = $6,
-              audience = $7, pinned = $8, published_at = $9, updated_at = now()
+              audience = $7, pinned = $8, image_url = $9, published_at = $10, updated_at = now()
         where id = $1
         returning ${SELECT_COLUMNS}`,
       [
         String(id), values.slug, values.title, values.summary, values.body,
-        values.status, values.audience, values.pinned, values.publishedAt,
+        values.status, values.audience, values.pinned, values.imageUrl, values.publishedAt,
       ],
     );
     if (!result?.rowCount) return { ok: false, error: "not_found" };

@@ -16,6 +16,10 @@ export interface ActionContext {
   form: HTMLFormElement | null;
   value: string;
   confirmFn: (message: string) => boolean;
+  // Set only by the file-input change path, and `rerender` lets a long-running action
+  // paint an intermediate state (an upload spinner) before it finishes.
+  file?: File | null;
+  rerender?: () => void;
 }
 
 // Collects a form into a plain object. Checkboxes become booleans; everything else is the
@@ -58,13 +62,60 @@ export async function runAdminAction(action: string, context: ActionContext): Pr
 
   if (action === "bulletin:new") {
     state.editingBulletinId = "";
+    state.pendingImageUrl = "";
+    state.bulletinDraft = null;
     state.flash = null;
     return false;
   }
 
   if (action === "bulletin:edit") {
     state.editingBulletinId = value;
+    // A pending upload belongs to whatever was being composed, not to the record being
+    // opened next — carrying it across would silently attach one bulletin's flyer to
+    // another.
+    state.pendingImageUrl = "";
+    state.bulletinDraft = null;
     state.flash = null;
+    return false;
+  }
+
+  // Uploading happens the moment a file is chosen, not on save, so the operator sees the
+  // flyer in the form and can tell they picked the right one before committing to it.
+  if (action === "bulletin:upload-image") {
+    const file = context.file;
+    if (!file) return false;
+
+    // Capture what's typed before anything re-renders, or picking a flyer would wipe the
+    // title and body the operator just wrote.
+    state.bulletinDraft = readForm(form);
+    state.uploadingImage = true;
+    state.flash = null;
+    context.rerender?.();
+
+    const result = await api.uploadImage(file);
+    state.uploadingImage = false;
+
+    if (!result.ok) {
+      state.flash = { tone: "error", message: describeAdminError(result.error) };
+      return false;
+    }
+
+    state.pendingImageUrl = result.data?.url || "";
+    state.flash = { tone: "ok", message: "Image attached. Save the bulletin to keep it." };
+    return false;
+  }
+
+  if (action === "bulletin:remove-image") {
+    state.bulletinDraft = { ...readForm(form), imageUrl: "" };
+    // Clears the attachment from the form only. The bulletin keeps its stored image until
+    // the operator saves, so a mis-click is undone by navigating away rather than being
+    // instantly destructive. The uploaded file itself stays in Cloudinary.
+    state.pendingImageUrl = "";
+    if (state.editingBulletinId) {
+      const editing = state.bulletins.find((entry) => entry.id === state.editingBulletinId);
+      if (editing) editing.imageUrl = "";
+    }
+    state.flash = { tone: "ok", message: "Image removed. Save the bulletin to apply it." };
     return false;
   }
 
@@ -78,6 +129,10 @@ export async function runAdminAction(action: string, context: ActionContext): Pr
     // Land on the record that was just created so the operator can keep editing it
     // instead of hunting for it in the list.
     state.editingBulletinId = result.data?.bulletin?.id || state.editingBulletinId;
+    // The attachment and draft are now stored on the record, so both scratch copies have
+    // done their job. Leaving either set would keep overriding the saved values.
+    state.pendingImageUrl = "";
+    state.bulletinDraft = null;
     return true;
   }
 
@@ -86,6 +141,8 @@ export async function runAdminAction(action: string, context: ActionContext): Pr
     const result = await api.deleteBulletin(value);
     if (!setFlash(state, result, "Bulletin deleted.")) return false;
     state.editingBulletinId = "";
+    state.pendingImageUrl = "";
+    state.bulletinDraft = null;
     return true;
   }
 

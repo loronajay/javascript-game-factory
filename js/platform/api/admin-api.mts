@@ -72,6 +72,38 @@ export function createAdminApiClient(options: PlatformApiClientOptions = {}) {
     // learns the signed-in account is not an admin, rather than asking a client-side flag.
     getOverview: () => call("/admin/overview"),
 
+    // Attachment upload. Reuses the platform's existing /upload/photo endpoint rather than
+    // adding an admin-only one: it already validates by magic bytes (not the client's
+    // declared MIME type) and caps the long edge at 1200px with crop:"limit", so a portrait
+    // flyer is scaled down whole instead of being cropped to a landscape box.
+    //
+    // Multipart, so it cannot go through `call` — no JSON content-type, and the browser
+    // must set its own boundary.
+    async uploadImage(file: File | Blob | null): Promise<AdminResult<{ assetId: string; url: string }>> {
+      if (typeof fetchImpl !== "function" || !baseUrl) return { ok: false, status: 0, error: "not_configured" };
+      if (!file) return { ok: false, status: 0, error: "invalid_request" };
+
+      const formData = new FormData();
+      formData.append("file", file);
+      const token = getStoredAuthToken();
+
+      try {
+        const response = await fetchImpl(`${baseUrl}/upload/photo`, {
+          method: "POST",
+          credentials: "include",
+          headers: token ? { authorization: `Bearer ${token}` } : {},
+          body: formData,
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) {
+          return { ok: false, status: response.status, error: payload?.error || `http_${response.status}` };
+        }
+        return { ok: true, status: response.status, data: payload };
+      } catch {
+        return { ok: false, status: 0, error: "network_error" };
+      }
+    },
+
     listBulletins: () => call("/admin/bulletins"),
     createBulletin: (bulletin: any) => call("/admin/bulletins", "POST", bulletin),
     updateBulletin: (id: unknown, bulletin: any) => call(`/admin/bulletins/${encode(id)}`, "PATCH", bulletin),
@@ -111,6 +143,9 @@ export function createAdminApiClient(options: PlatformApiClientOptions = {}) {
 // to the raw code — an operator seeing `slug_taken` is still better served than by a
 // generic "something went wrong", and an unmapped code is a signal to add it here.
 const ERROR_MESSAGES: Record<string, string> = {
+  unsupported_file_type: "That file isn't an image the arcade accepts — use PNG, JPEG, GIF, or WEBP.",
+  file_too_large: "That image is too large to upload.",
+  upload_not_configured: "Image hosting isn't configured on the server.",
   slug_taken: "That slug is already in use by another item.",
   invalid_slug: "That title does not produce a usable slug — try adding some letters or numbers.",
   invalid_key: "That setting key is not valid.",

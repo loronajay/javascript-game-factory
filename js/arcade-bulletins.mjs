@@ -37,6 +37,7 @@ export function buildBulletinsPageViewModel(bulletins = buildPublicBulletinFeed(
                 title: bulletin.title,
                 summary: bulletin.summary || bulletin.body || "Fresh noticeboard signal incoming.",
                 body: bulletin.body,
+                imageUrl: bulletin.imageUrl || "",
                 publishedLabel: formatBulletinDate(bulletin.publishedAt),
                 statusLabel: formatStatusLabel(bulletin.status),
                 createdByLabel: bulletin.createdBy || "system",
@@ -47,6 +48,7 @@ export function buildBulletinsPageViewModel(bulletins = buildPublicBulletinFeed(
                     title: "Noticeboard Warming Up",
                     summary: "The bulletin board is still warming up. Public notices will appear here once more platform surfaces come online.",
                     body: "",
+                    imageUrl: "",
                     publishedLabel: "Soon",
                     statusLabel: "Standby",
                     createdByLabel: "system",
@@ -73,6 +75,22 @@ function renderHeroCard(container, model) {
 }
 function renderBulletinCard(item) {
     const cardClass = item.isPlaceholder ? "bulletin-card bulletin-card--placeholder" : "bulletin-card";
+    // Attachments are letterboxed inside a fixed frame rather than cropped to fit — the same
+    // rule the profile backgrounds follow. A tournament flyer is usually portrait, and a card
+    // that cropped it to a landscape strip would cut the date and venue off the poster.
+    // The link opens the full-resolution original for anyone who wants to read the fine print.
+    const imageHtml = item.imageUrl
+        ? `
+      <a class="bulletin-card__attachment" href="${escapeHtml(item.imageUrl)}" target="_blank" rel="noopener noreferrer">
+        <img
+          class="bulletin-card__attachment-image"
+          src="${escapeHtml(item.imageUrl)}"
+          alt="Attachment for ${escapeHtml(item.title)}"
+          loading="lazy"
+        >
+      </a>
+    `
+        : "";
     return `
     <article class="${cardClass}">
       <div class="bulletin-card__topline">
@@ -80,6 +98,7 @@ function renderBulletinCard(item) {
         <span class="bulletin-card__date">${escapeHtml(item.publishedLabel)}</span>
       </div>
       <h2 class="bulletin-card__title">${escapeHtml(item.title)}</h2>
+      ${imageHtml}
       <p class="bulletin-card__summary">${escapeHtml(item.summary)}</p>
       <p class="bulletin-card__meta">Posted by ${escapeHtml(item.createdByLabel)}</p>
     </article>

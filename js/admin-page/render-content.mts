@@ -41,6 +41,45 @@ export function renderOverview(state: AdminState): string {
 
 // ---- Bulletins ----
 
+// The attachment control. `imageUrl` is a hidden input rather than a text box because the
+// value is produced by the uploader, not typed — but keeping it in the form means it round
+// trips through readForm() with every other field and needs no special case on save.
+//
+// `state.pendingUpload` is set while a file is in flight so the operator gets feedback on a
+// slow connection instead of a form that looks like it ignored them.
+function bulletinAttachmentField(editing: any, state: AdminState): string {
+  const imageUrl = state.pendingImageUrl || editing?.imageUrl || "";
+  const previewHtml = imageUrl
+    ? `
+      <div class="admin-attachment">
+        <img class="admin-attachment__image" src="${escapeHtml(imageUrl)}" alt="Bulletin attachment preview">
+        <div class="admin-attachment__actions">
+          ${button("bulletin:remove-image", "Remove image")}
+        </div>
+      </div>
+    `
+    : "";
+
+  return `
+    <div class="admin-field">
+      <span class="admin-field__label">Attachment</span>
+      <input type="hidden" name="imageUrl" value="${escapeHtml(imageUrl)}">
+      ${previewHtml}
+      <input
+        class="admin-input admin-input--file"
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp"
+        data-action="bulletin:upload-image"
+      >
+      <span class="admin-field__hint">${escapeHtml(
+        state.uploadingImage
+          ? "Uploading…"
+          : "PNG, JPEG, GIF, or WEBP. Flyers keep their shape — portrait posters are letterboxed, never cropped.",
+      )}</span>
+    </div>
+  `;
+}
+
 function bulletinRow(bulletin: any, isEditing: boolean): string {
   return `
     <li class="admin-row${isEditing ? " admin-row--active" : ""}">
@@ -58,7 +97,10 @@ function bulletinRow(bulletin: any, isEditing: boolean): string {
 }
 
 export function renderBulletins(state: AdminState): string {
-  const editing = state.bulletins.find((entry) => entry.id === state.editingBulletinId) || null;
+  const record = state.bulletins.find((entry) => entry.id === state.editingBulletinId) || null;
+  // An unsaved draft wins over the stored record so a re-render mid-compose (an attachment
+  // upload) gives the operator their own words back, not the last saved version.
+  const editing = state.bulletinDraft ? { ...(record || {}), ...state.bulletinDraft } : record;
   const listMarkup = state.bulletins.length
     ? `<ul class="admin-list" role="list">${state.bulletins.map((entry) => bulletinRow(entry, entry.id === state.editingBulletinId)).join("")}</ul>`
     : emptyState("No bulletins yet. Write the first one on the right.");
@@ -69,6 +111,7 @@ export function renderBulletins(state: AdminState): string {
       ${field("Slug", textInput("slug", editing?.slug || ""), "Leave blank to generate one from the title.")}
       ${field("Summary", textArea("summary", editing?.summary || "", 2, "One or two lines for the board."))}
       ${field("Body", textArea("body", editing?.body || "", 8, "The full announcement."))}
+      ${bulletinAttachmentField(editing, state)}
       <div class="admin-form__row">
         ${field("Status", select("status", editing?.status || "draft", BULLETIN_STATUSES))}
         ${field("Audience", select("audience", editing?.audience || "public", BULLETIN_AUDIENCES))}
@@ -77,9 +120,9 @@ export function renderBulletins(state: AdminState): string {
         "Blank publishes at the moment you save.")}
       ${checkbox("pinned", editing?.pinned === true, "Pin to the top of the board")}
       <div class="admin-form__actions">
-        ${button("bulletin:save", editing ? "Save changes" : "Create bulletin", { tone: "primary", type: "submit" })}
-        ${editing ? button("bulletin:new", "New bulletin") : ""}
-        ${editing ? button("bulletin:delete", "Delete", { tone: "danger", value: editing.id }) : ""}
+        ${button("bulletin:save", record ? "Save changes" : "Create bulletin", { tone: "primary", type: "submit" })}
+        ${record ? button("bulletin:new", "New bulletin") : ""}
+        ${record ? button("bulletin:delete", "Delete", { tone: "danger", value: record.id }) : ""}
       </div>
     </form>
   `;
@@ -87,7 +130,7 @@ export function renderBulletins(state: AdminState): string {
   return `
     <div class="admin-split">
       ${panel(`Bulletins (${state.bulletins.length})`, listMarkup, button("bulletin:new", "New"))}
-      ${panel(editing ? "Edit Bulletin" : "New Bulletin", formMarkup)}
+      ${panel(record ? "Edit Bulletin" : "New Bulletin", formMarkup)}
     </div>
   `;
 }

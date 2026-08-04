@@ -2,6 +2,18 @@
 
 Dated history extracted from the root `CLAUDE.md` (2026-07-23) so that file can stay a lean orientation guide instead of an ever-growing log. This file is a curated narrative, not a replacement for `git log` — read it for *why*/*what shipped when*, not for line-level diffs.
 
+## Bulletin Attachments (2026-08-04)
+
+Bulletins can carry one image — the immediate need was a tournament flyer for Sactown Smackdown X. Migration `032-bulletin-image.sql` adds `bulletins.image_url`, mirroring `012-thought-image.sql`: a plain URL column with an empty-string default, not a join to `player_photos`, because a bulletin image belongs to the announcement rather than to anyone's gallery.
+
+Upload reuses the existing `/upload/photo` endpoint rather than adding an admin-only one — it already validates by magic bytes instead of the client's declared MIME type, and caps the long edge at 1200px with `crop: "limit"`, so a portrait poster is scaled whole instead of cropped.
+
+**Posters letterbox, they don't crop.** Both the board card and the console preview constrain the image by max-width *and* max-height and let the frame size to its content, so a 2:3 flyer isn't stranded in a wide black band and a landscape banner still fills the card. Cropping a flyer to a landscape strip would cut the date, venue, and entry fees off the bottom — the exact information the announcement exists to carry. Same no-destructive-crop rule the profile backgrounds follow.
+
+`httpUrl` in `db/content-shared.mts` restricts the column to http(s), with the same guard repeated in the browser normalizer — the value lands in an `<img src>` on a public page, and the column is writable through the admin API.
+
+One non-obvious fix: the console re-renders the whole panel when an upload completes, which would have silently wiped a half-typed announcement. `state.bulletinDraft` captures the form before the re-render. Edit-vs-create mode still reads the *stored record*, not the merged draft — a draft on an unsaved bulletin is truthy but has no id, which would otherwise offer Delete on nothing.
+
 ## Admin Console (2026-08-03)
 
 The platform gained an operator. Until now every route in `platform-api` authorized the same way — *is the caller the owner of this row?* — which is right for player data and cannot express "the person who runs the arcade". Bulletins and events were frozen arrays compiled into the browser bundle (`DEFAULT_BULLETINS`, `DEFAULT_EVENTS`), so publishing an announcement meant editing TypeScript and redeploying. There was no moderation beyond self-deletion of your own comments.

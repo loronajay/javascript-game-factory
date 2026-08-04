@@ -20,6 +20,9 @@ export function createInitialState() {
         audit: [],
         editingBulletinId: "",
         editingEventId: "",
+        uploadingImage: false,
+        pendingImageUrl: "",
+        bulletinDraft: null,
     };
 }
 export const api = createAdminApiClient();

@@ -69,6 +69,22 @@ export function stringList(value, maxItems = 24, maxLength = 80) {
     }
     return items;
 }
+// Attachment URLs end up in an `<img src>` on public pages, so only http(s) is accepted.
+// In practice these come from our own uploader, but the column is writable through the
+// admin API and a scheme allow-list is cheaper than trusting that it always will be.
+// Anything else — javascript:, data:, a relative path, junk — normalizes to "" (no image).
+export function httpUrl(value, maxLength = 500) {
+    const raw = singleLine(value, maxLength);
+    if (!raw)
+        return "";
+    try {
+        const parsed = new URL(raw);
+        return parsed.protocol === "https:" || parsed.protocol === "http:" ? raw : "";
+    }
+    catch {
+        return "";
+    }
+}
 export function enumValue(value, allowed, fallback) {
     const candidate = singleLine(value, 24).toLowerCase();
     return allowed.includes(candidate) ? candidate : fallback;
