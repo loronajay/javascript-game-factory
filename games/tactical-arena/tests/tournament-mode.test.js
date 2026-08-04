@@ -7,15 +7,22 @@ import {
   createTournamentLobbySettings,
   isTournamentContext,
   isTournamentLobbySettings,
+  shouldAutoStartTournamentLobby,
   tournamentBanFirstSeat,
 } from "../src/tournament/tournamentMode.js";
 
-test("tournament rooms are fixed to the ranked-style 1v1 ban/draft format", () => {
-  const settings = createTournamentLobbySettings({ banFirstSeat: 2 });
+test("tournament fixtures are fixed to the ranked-style 1v1 ban/draft format", () => {
+  const settings = createTournamentLobbySettings({
+    fixtureId: "round-1-table-1",
+    players: ["Alice", "Bob"],
+    banFirstSeat: 2,
+  });
 
   assert.deepEqual(settings, {
     matchType: "draft1v1",
     tournament: true,
+    fixtureId: "round-1-table-1",
+    players: ["Alice", "Bob"],
     banFirstSeat: 2,
   });
   assert.equal(isTournamentLobbySettings(settings), true);
@@ -28,13 +35,22 @@ test("tournament rooms are fixed to the ranked-style 1v1 ban/draft format", () =
 });
 
 test("malformed tournament settings cannot enable the mode or an invalid ban seat", () => {
+  assert.equal(isTournamentLobbySettings({ tournament: true, matchType: "draft1v1" }), false);
   assert.equal(isTournamentLobbySettings({ tournament: true, matchType: "duel" }), false);
   assert.equal(isTournamentLobbySettings({ tournament: false, matchType: "draft1v1" }), false);
   assert.equal(tournamentBanFirstSeat({ tournament: true, matchType: "draft1v1", banFirstSeat: 99 }), 1);
 });
 
+test("a full assigned fixture auto-starts for the relay owner only after both formations lock", () => {
+  const ready = { tournament: true, isOwner: true, full: true, draftComplete: true, allLocked: true };
+  assert.equal(shouldAutoStartTournamentLobby(ready), true);
+  assert.equal(shouldAutoStartTournamentLobby({ ...ready, isOwner: false }), false);
+  assert.equal(shouldAutoStartTournamentLobby({ ...ready, allLocked: false }), false);
+  assert.equal(shouldAutoStartTournamentLobby({ ...ready, alreadyRequested: true }), false);
+});
+
 test("temporary unlocks stop at the tournament lobby boundary", () => {
-  const tournament = createTournamentLobbySettings({ banFirstSeat: 1 });
+  const tournament = createTournamentLobbySettings({ fixtureId: "m1", players: ["A", "B"], banFirstSeat: 1 });
   assert.equal(isTournamentContext({ accessActive: true, onlineMode: "tournament" }), true);
   assert.equal(isTournamentContext({ accessActive: true, onlineMode: "tournament", settings: { matchType: "duel" } }), false);
   assert.equal(isTournamentContext({ accessActive: true, onlineMode: "casual", settings: tournament }), true);
@@ -52,9 +68,14 @@ test("page fragments expose organizer access and a dedicated tournament room pan
   assert.match(settings, /id="setTournamentStatus"/);
   assert.match(setup, /data-online-mode="tournament"/);
   assert.match(setup, /data-online-mode-panel="tournament"/);
-  assert.match(setup, /data-online="tournamentNameInput"/);
-  assert.match(setup, /data-action="createTournamentRoom"/);
-  assert.match(setup, /data-action="joinTournamentRoom"/);
+  assert.match(setup, /data-online="tournamentPlayerOneInput"/);
+  assert.match(setup, /data-online="tournamentPlayerTwoInput"/);
+  assert.match(setup, /data-action="addTournamentFixture"/);
+  assert.match(setup, /data-online="tournamentFixtureList"/);
+  assert.match(setup, /data-online="tournamentAssignment"/);
+  assert.match(setup, /data-action="joinAssignedTournament"/);
+  assert.doesNotMatch(setup, /data-action="createTournamentRoom"/);
+  assert.doesNotMatch(setup, /data-action="joinTournamentRoom"/);
 });
 
 test("bootstrap and online flow wire URL activation and tournament-only availability", async () => {
@@ -68,7 +89,10 @@ test("bootstrap and online flow wire URL activation and tournament-only availabi
   assert.match(bootstrap, /activateTournamentAccessFromUrl/);
   assert.match(menuFlow, /isTournamentAccessActive/);
   assert.match(onlineFlow, /createOnlineModeController/);
-  assert.match(onlineModeController, /createTournamentLobbySettings/);
+  assert.match(onlineModeController, /createTournamentMatchmakingOptions/);
+  assert.match(onlineModeController, /findLobby/);
+  assert.doesNotMatch(onlineModeController, /\.createLobby\(/);
+  assert.doesNotMatch(onlineModeController, /\.joinLobby\(/);
   assert.match(onlineFlow, /allowAll:\s*isTournamentLobby\(\)/);
   assert.match(onlineFlow, /trustSkin:\s*isTournamentLobby\(\)/);
   assert.match(onlineFlow, /isUnlocked:\s*\(\)\s*=>\s*true/);

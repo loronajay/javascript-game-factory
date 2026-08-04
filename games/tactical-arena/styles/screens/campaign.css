@@ -197,6 +197,17 @@
 .menu-tournament-btn { border-color:color-mix(in srgb,#d9a441 65%,var(--parchment-edge)); background:linear-gradient(180deg,rgba(217,164,65,.3),rgba(80,52,18,.5)); color:#fff1c4; }
 .online-player-name-input { width:100%; min-height:2.65rem; padding:.55rem .7rem; border:1px solid var(--parchment-edge); border-radius:7px; background:rgba(8,18,32,.55); color:var(--text); font:800 .82rem var(--font-display); letter-spacing:.04em; }
 .online-player-name-input:focus { border-color:var(--brass); outline:2px solid color-mix(in srgb,var(--brass) 25%,transparent); outline-offset:1px; }
+.tournament-desk,.tournament-assignment { display:grid; gap:.75rem; }
+.tournament-desk[hidden],.tournament-assignment[hidden] { display:none!important; }
+.tournament-fixture-form { display:grid; grid-template-columns:minmax(0,1fr) repeat(2,minmax(0,.8fr)); gap:.65rem; }
+.tournament-fixture-list { display:grid; gap:.7rem; }
+.tournament-fixture-card { display:grid; gap:.55rem; padding:.7rem; border:1px solid var(--parchment-edge); border-radius:8px; background:rgba(7,15,27,.5); }
+.tournament-fixture-head { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:.6rem; }
+.tournament-fixture-head span { color:var(--muted); font:700 .66rem var(--font-display); }
+.tournament-link-row { display:grid; grid-template-columns:minmax(5rem,.35fr) minmax(0,1fr) auto; align-items:center; gap:.45rem; }
+.tournament-link-row input { min-width:0; padding:.45rem .55rem; border:1px solid var(--parchment-edge); border-radius:6px; background:rgba(4,10,18,.7); color:var(--muted); font:.63rem ui-monospace,monospace; }
+.tournament-link-row .menu-btn,.tournament-fixture-head .menu-btn { width:auto; min-height:2rem; padding:.3rem .55rem; font-size:.55rem; }
+@media (max-width:700px) { .tournament-fixture-form { grid-template-columns:1fr; } .tournament-fixture-head { grid-template-columns:1fr auto; } .tournament-fixture-head span { grid-column:1/-1; } .tournament-link-row { grid-template-columns:1fr auto; } .tournament-link-row strong { grid-column:1/-1; } }
 .draft-unit .unit-portrait.is-card { width:100%; height:4.25rem; border-radius:6px; }
 .draft-unit span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:700 .58rem var(--font-display); letter-spacing:.02em; }
 .draft-unit i { color:var(--brass-hi); font:800 .48rem var(--font-display); font-style:normal; letter-spacing:.1em; text-transform:uppercase; }

@@ -656,6 +656,7 @@ test("ranked online setup keeps board size fixed out of player controls", () => 
   assert.match(rankedPanel, /13 . 13 board with a ban phase/);
   assert.doesNotMatch(rankedPanel, /data-field="boardSize"/);
   assert.match(lobbyPanel, /data-online="boardSizeField"/);
+  assert.match(lobbyPanel, /data-online="boardSizeField"[^>]*hidden/);
   assert.match(lobbyPanel, /data-field="boardSize"/);
 });
 

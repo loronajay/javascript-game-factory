@@ -519,6 +519,10 @@ export function createOnlineFlow({ onStartMatch }) {
     startBtn.disabled = view.startDisabled;
     lobbyHintEl.hidden = view.hintHidden;
     lobbyHintEl.textContent = view.hintText;
+    onlineModeController.syncLobbyStart({
+      tournament: isTournamentLobby(), isOwner, full,
+      draftComplete: draftDone, allLocked: draftReady,
+    });
   }
 
   function setLocalLocked(locked, { broadcast = true } = {}) {
@@ -662,7 +666,7 @@ export function createOnlineFlow({ onStartMatch }) {
         : isOwner ? "Your room — invite an opponent, then start." : "Joined the room.");
       roomCodeEl.hidden = false;
       roomCodeEl.textContent = isTournamentLobby()
-        ? `Tournament room: ${lobby.roomCode}`
+        ? `Assigned match: ${onlineModeController.assignment()?.label || lobby.settings?.fixtureId}`
         : rankedMode ? "Ranked match" : `Room code: ${lobby.roomCode}`;
       // Ranked rendezvous: the seat-1 creator publishes its relay code to the platform
       // so the brokered opponent can poll for it and join this exact lobby.
@@ -885,6 +889,7 @@ export function createOnlineFlow({ onStartMatch }) {
     draftMembersKey = "";
     localFormationOrder = null;
     formationPromptOpen = false;
+    onlineModeController.resetLobbyStart();
     squadPicker.setLocked(false);
     lockBtn.textContent = "Lock Squad";
     lockBtn.classList.add("primary");

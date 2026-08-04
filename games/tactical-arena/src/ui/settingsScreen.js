@@ -15,6 +15,7 @@ import {
   TOURNAMENT_ACCESS_CHANGED_EVENT,
   activateTournamentAccess,
   isTournamentAccessActive,
+  isTournamentOrganizer,
 } from "../tournament/tournamentAccess.js";
 
 const RESET_PROGRESS_IDLE_LABEL = "Reset Progress";
@@ -185,7 +186,9 @@ export function createSettingsScreen({
     }
     if (tournamentStatus) {
       tournamentStatus.textContent = message || (active
-        ? "Active for this browser tab. All units and skins are available only in Tournament rooms."
+        ? (isTournamentOrganizer()
+            ? "Organizer Match Desk enabled for this browser tab."
+            : "Assigned-player access active. Use the matchup link from your organizer.")
         : "Session-only access. No permanent unlocks.");
     }
     return active;

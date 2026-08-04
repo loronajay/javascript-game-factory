@@ -211,27 +211,47 @@
               <p class="setup-hint" data-online="rankedHint"></p>
             </div>
 
-            <!-- TOURNAMENT: organizer-enabled private rooms using Ranked's ban/draft rules. -->
+            <!-- TOURNAMENT: organizer-authored fixtures using Ranked's ban/draft rules. -->
             <div data-online-mode-panel="tournament" hidden>
               <div class="ranked-format-card tournament-format-card">
                 <span class="setup-label">Tournament · Draft 1v1</span>
-                <p class="setup-hint">13 × 13 board, one ban per commander, snake draft, every unit and skin available. Results do not affect Ranked.</p>
+                <p class="setup-hint">Standard 13 × 13 only, one ban per commander, snake draft, every unit and skin available. Results do not affect Ranked.</p>
               </div>
-              <label class="setup-field">
-                <span class="setup-label">Competitor name</span>
-                <input type="text" class="online-player-name-input" data-online="tournamentNameInput" maxlength="18" placeholder="Bracket name" autocomplete="off" spellcheck="false" />
-              </label>
-              <div class="menu-buttons">
-                <button type="button" class="primary menu-btn menu-tournament-btn" data-action="createTournamentRoom">Create Tournament Room</button>
-              </div>
-              <div class="setup-field">
-                <span class="setup-label">Join tournament room</span>
-                <div class="online-join">
-                  <input type="text" class="online-code-input" data-online="tournamentCodeInput" maxlength="5" placeholder="CODE" autocomplete="off" spellcheck="false" />
-                  <button type="button" class="menu-btn" data-action="joinTournamentRoom">Join</button>
+              <section class="tournament-desk" data-online="tournamentOrganizerDesk" hidden>
+                <span class="setup-label">Organizer Match Desk</span>
+                <p class="setup-hint">Add every matchup here. Each fixture gets two player-specific links and its own simultaneous match queue.</p>
+                <div class="tournament-fixture-form">
+                  <label class="setup-field">
+                    <span class="setup-label">Match label</span>
+                    <input type="text" class="online-player-name-input" data-online="tournamentLabelInput" maxlength="42" placeholder="Round 1 · Table 1" autocomplete="off" spellcheck="false" />
+                  </label>
+                  <label class="setup-field">
+                    <span class="setup-label">Player 1</span>
+                    <input type="text" class="online-player-name-input" data-online="tournamentPlayerOneInput" maxlength="18" placeholder="Bracket name" autocomplete="off" spellcheck="false" />
+                  </label>
+                  <label class="setup-field">
+                    <span class="setup-label">Player 2</span>
+                    <input type="text" class="online-player-name-input" data-online="tournamentPlayerTwoInput" maxlength="18" placeholder="Bracket name" autocomplete="off" spellcheck="false" />
+                  </label>
                 </div>
+                <div class="menu-buttons">
+                  <button type="button" class="primary menu-btn menu-tournament-btn" data-action="addTournamentFixture">Add Matchup</button>
+                </div>
+                <div class="tournament-fixture-list" data-online="tournamentFixtureList"></div>
+              </section>
+              <section class="tournament-assignment" data-online="tournamentPlayerDesk" hidden>
+                <span class="setup-label">Your Assigned Match</span>
+                <div class="ranked-format-card" data-online="tournamentAssignment"></div>
+                <div class="menu-buttons">
+                  <button type="button" class="primary menu-btn menu-tournament-btn" data-action="joinAssignedTournament">Join Assigned Match</button>
+                </div>
+                <p class="setup-hint">You will only be paired with the opponent named on this assignment. Match start is automatic after both formations lock.</p>
+              </section>
+              <div class="tournament-assignment" data-online="tournamentMissingAssignment" hidden>
+                <span class="setup-label">No Match Assignment</span>
+                <p class="setup-hint">Open the player-specific link sent by the tournament organizer.</p>
               </div>
-              <p class="setup-hint" data-online="tournamentHint">Tournament access lasts only for this browser tab.</p>
+              <p class="setup-hint" data-online="tournamentHint">Tournament access and fixture assignments last only for this browser tab.</p>
             </div>
           </div>
 
@@ -240,7 +260,7 @@
             <p class="online-roomcode" data-online="roomCode" hidden></p>
             <ol class="lobby-roster" data-online="roster"></ol>
 
-            <div class="setup-field" data-online="boardSizeField">
+            <div class="setup-field" data-online="boardSizeField" hidden>
               <span class="setup-label">Board size <span class="setup-hint" data-online="hostHint"></span></span>
               <div class="segmented" data-field="boardSize">
                 <button type="button" class="seg is-selected" data-size="13">13 × 13</button>

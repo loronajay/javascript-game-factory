@@ -8,6 +8,7 @@ import {
   activateTournamentAccessFromUrl,
   deactivateTournamentAccess,
   isTournamentAccessActive,
+  isTournamentOrganizer,
   readTournamentPlayerName,
   saveTournamentPlayerName,
   verifyTournamentAccessCode,
@@ -41,9 +42,35 @@ test("activation is session-only and a bad code never writes access", async () =
 
   assert.equal((await activateTournamentAccess("correct", { storage, digest, expectedHash: "expected" })).activated, true);
   assert.equal(isTournamentAccessActive(storage), true);
+  assert.equal(isTournamentOrganizer(storage), true);
 
   deactivateTournamentAccess({ storage });
   assert.equal(isTournamentAccessActive(storage), false);
+});
+
+test("an assigned player link activates player access and stores only that fixture", async () => {
+  const storage = storageAdapter();
+  const replaced = [];
+  const location = {
+    href: "https://factory.example/games/tactical-arena/index.html#tournament=player-pass&fixture=semi-a&label=Semifinal+A&p1=Alice&p2=Bob&seat=2",
+  };
+  const digest = async (value) => value === "player-pass" ? "player-hash" : "wrong";
+
+  const result = await activateTournamentAccessFromUrl({
+    storage,
+    location,
+    history: { replaceState: (...args) => replaced.push(args) },
+    digest,
+    expectedHash: "organizer-hash",
+    playerExpectedHash: "player-hash",
+  });
+
+  assert.equal(result.activated, true);
+  assert.equal(result.role, "player");
+  assert.equal(result.assignment.player, "Bob");
+  assert.equal(result.assignment.opponent, "Alice");
+  assert.equal(isTournamentOrganizer(storage), false);
+  assert.deepEqual(replaced, [[null, "", "/games/tactical-arena/index.html"]]);
 });
 
 test("a URL fragment can activate tournament access without leaving the code in browser history", async () => {
