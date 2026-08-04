@@ -40,8 +40,32 @@ function statusForError(error) {
 }
 export async function handleAdminContentRoute(context) {
     const { req, res, method, pathname, adminPlayerId, requestOrigin, timestamp, services } = context;
-    const { listAllBulletins, createBulletin, updateBulletin, deleteBulletin, listAllEvents, createEvent, updateEvent, deleteEvent, listCabinetOverrides, saveCabinetOverride, deleteCabinetOverride, listSiteSettings, saveSiteSetting, listReports, listSuspendedAccounts, listAdmins, writeAuditLog, } = services || {};
+    const { listAllBulletins, createBulletin, updateBulletin, deleteBulletin, listAllEvents, createEvent, updateEvent, deleteEvent, listCabinetOverrides, saveCabinetOverride, deleteCabinetOverride, listSiteSettings, saveSiteSetting, listReports, listSuspendedAccounts, listAdmins, writeAuditLog, announceBulletin, announceEvent, } = services || {};
     const audit = (action, targetType, targetId, details = {}) => writeAuditLog?.({ adminPlayerId, action, targetType, targetId, details });
+    // Publishing a bulletin or an event notifies every account. The service decides whether
+    // this particular save qualifies (publicly visible, never announced before) and swallows
+    // its own failures, so every call site is one unconditional line and the operator's save
+    // is never held hostage to a fan-out. It is awaited so the audit entry records what
+    // actually happened rather than what was hoped for.
+    const announce = async (announcer, record) => {
+        if (typeof announcer !== "function")
+            return { announced: false };
+        try {
+            return (await announcer(record, adminPlayerId)) || { announced: false };
+        }
+        catch {
+            // The service already swallows its own failures; this is the belt for the braces, so
+            // that a broken announcer can never turn a saved record into a 500.
+            return { announced: false };
+        }
+    };
+    // Both authoring flows report the fan-out the same way: `notified` in the response so the
+    // console can say so, and notified/recipientCount in the audit entry so the Audit tab can
+    // answer "did that actually go out?" long after the toast is gone.
+    const announceDetails = (result) => ({
+        notified: result.announced === true,
+        recipientCount: result.recipientCount || 0,
+    });
     if (method === "GET" && pathname === "/admin/overview") {
         const [bulletins, events, openReports, suspended, admins, cabinets] = await Promise.all([
             listAllBulletins(),
@@ -79,8 +103,13 @@ export async function handleAdminContentRoute(context) {
             writeJson(res, statusForError(result?.error || ""), { status: "error", error: result?.error, timestamp }, requestOrigin);
             return true;
         }
-        await audit("bulletin.create", "bulletin", result.bulletin.id, { slug: result.bulletin.slug, status: result.bulletin.status });
-        writeJson(res, 201, { bulletin: result.bulletin }, requestOrigin);
+        const announced = await announce(announceBulletin, result.bulletin);
+        await audit("bulletin.create", "bulletin", result.bulletin.id, {
+            slug: result.bulletin.slug,
+            status: result.bulletin.status,
+            ...announceDetails(announced),
+        });
+        writeJson(res, 201, { bulletin: result.bulletin, notified: announced.announced === true }, requestOrigin);
         return true;
     }
     const bulletinIdMatch = pathname.match(/^\/admin\/bulletins\/([^/]+)$/);
@@ -94,8 +123,15 @@ export async function handleAdminContentRoute(context) {
             writeJson(res, statusForError(result?.error || ""), { status: "error", error: result?.error, timestamp }, requestOrigin);
             return true;
         }
-        await audit("bulletin.update", "bulletin", id, { slug: result.bulletin.slug, status: result.bulletin.status });
-        writeJson(res, 200, { bulletin: result.bulletin }, requestOrigin);
+        // A draft published on an edit announces here, on the transition. Editing an
+        // already-announced bulletin does not — the claim in the db layer has been spent.
+        const announced = await announce(announceBulletin, result.bulletin);
+        await audit("bulletin.update", "bulletin", id, {
+            slug: result.bulletin.slug,
+            status: result.bulletin.status,
+            ...announceDetails(announced),
+        });
+        writeJson(res, 200, { bulletin: result.bulletin, notified: announced.announced === true }, requestOrigin);
         return true;
     }
     if (bulletinIdMatch && method === "DELETE") {
@@ -123,8 +159,16 @@ export async function handleAdminContentRoute(context) {
             writeJson(res, statusForError(result?.error || ""), { status: "error", error: result?.error, timestamp }, requestOrigin);
             return true;
         }
-        await audit("event.create", "event", result.event.id, { slug: result.event.slug, status: result.event.status });
-        writeJson(res, 201, { event: result.event }, requestOrigin);
+        // Unlike a bulletin, an event has no draft: a `scheduled` event is on the public
+        // calendar the moment it is created, so this first save is usually the one that
+        // notifies. Creating as `cancelled` is the way to stage one quietly.
+        const announced = await announce(announceEvent, result.event);
+        await audit("event.create", "event", result.event.id, {
+            slug: result.event.slug,
+            status: result.event.status,
+            ...announceDetails(announced),
+        });
+        writeJson(res, 201, { event: result.event, notified: announced.announced === true }, requestOrigin);
         return true;
     }
     const eventIdMatch = pathname.match(/^\/admin\/events\/([^/]+)$/);
@@ -138,8 +182,13 @@ export async function handleAdminContentRoute(context) {
             writeJson(res, statusForError(result?.error || ""), { status: "error", error: result?.error, timestamp }, requestOrigin);
             return true;
         }
-        await audit("event.update", "event", id, { slug: result.event.slug, status: result.event.status });
-        writeJson(res, 200, { event: result.event }, requestOrigin);
+        const announced = await announce(announceEvent, result.event);
+        await audit("event.update", "event", id, {
+            slug: result.event.slug,
+            status: result.event.status,
+            ...announceDetails(announced),
+        });
+        writeJson(res, 200, { event: result.event, notified: announced.announced === true }, requestOrigin);
         return true;
     }
     if (eventIdMatch && method === "DELETE") {

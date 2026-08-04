@@ -32,6 +32,8 @@ export const MIGRATION_FILES = Object.freeze([
     "030-campaign-epoch.sql",
     "031-admin-console.sql",
     "032-bulletin-image.sql",
+    "033-bulletin-announcements.sql",
+    "034-event-announcements.sql",
 ]);
 export function migrationFileUrl(name) {
     return new URL(`./migrations/${name}`, import.meta.url);

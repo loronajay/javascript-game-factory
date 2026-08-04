@@ -86,6 +86,21 @@ function formatNotificationText(notif: any): string {
     }
     case "new_message":
       return `<strong>${escapeHtml(actor)}</strong> sent you a message 💬`;
+    // Platform-authored, so these two lead with the announcement rather than with a person
+    // — every account gets them, and "Jay posted a bulletin" would read as a social action
+    // when it is a noticeboard notice.
+    case "bulletin_posted": {
+      const title = notif.payload?.title || "";
+      return title
+        ? `📢 New bulletin: <strong>${escapeHtml(title)}</strong>`
+        : "📢 A new bulletin was posted";
+    }
+    case "event_posted": {
+      const title = notif.payload?.title || "";
+      return title
+        ? `🗓️ New event: <strong>${escapeHtml(title)}</strong>`
+        : "🗓️ A new event was added to the calendar";
+    }
     default:
       return `<strong>${escapeHtml(actor)}</strong> sent you a notification`;
   }
@@ -140,6 +155,11 @@ export function renderNotificationItem(notif: any, onAccept: any, onReject: any,
   const isFriendRequest = notif.type === "friend_request" && notif.status === "unread";
   const isChallenge = notif.type === "player_challenge" && notif.status === "unread";
   const isMessage = notif.type === "new_message";
+  const isBulletin = notif.type === "bulletin_posted";
+  // Events have a per-event page, so the link goes straight to it. A slugless event (an
+  // older payload, a bad row) falls back to the calendar rather than a broken query string.
+  const isEvent = notif.type === "event_posted";
+  const eventSlug = isEvent ? String(notif.payload?.slug || "") : "";
   const isPhotoNotif = notif.type === "photo_comment" || notif.type === "photo_reaction";
   const preview = notif.payload?.preview || notif.payload?.commentText || notif.payload?.thoughtText || notif.payload?.photoCaption || "";
   const unreadClass = notif.status === "unread" ? " notif-item--unread" : "";
@@ -160,6 +180,16 @@ export function renderNotificationItem(notif: any, onAccept: any, onReject: any,
     ` : ""}
     ${isMessage && notif.payload?.conversationId ? `
       <a class="notif-item__game-link" href="${escapeHtml(buildHref(`messages/conversation/index.html?id=${notif.payload.conversationId}`))}">View Message →</a>
+    ` : ""}
+    ${isBulletin ? `
+      <a class="notif-item__game-link" href="${escapeHtml(buildHref("bulletins/index.html"))}">Read Bulletin →</a>
+    ` : ""}
+    ${isEvent ? `
+      <a class="notif-item__game-link" href="${escapeHtml(
+        eventSlug
+          ? buildHref(`event/index.html?slug=${encodeURIComponent(eventSlug)}`)
+          : buildHref("events/index.html"),
+      )}">View Event →</a>
     ` : ""}
     ${isPhotoNotif && notif.payload?.photoId && notif.payload?.photoOwnerId ? `
       <a class="notif-item__game-link" href="${escapeHtml(buildHref(`gallery/index.html?id=${notif.payload.photoOwnerId}&photo=${notif.payload.photoId}`))}">View Photo →</a>

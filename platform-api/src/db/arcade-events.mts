@@ -158,6 +158,27 @@ export async function updateEvent(pool: any, id: any, input: any): Promise<{ ok:
   }
 }
 
+// Claims the right to announce an event, exactly once, ever. See
+// claimBulletinAnnouncement for why the condition is in the WHERE clause instead of a
+// read-then-write. The state gate differs: events have no draft, so the two forward-looking
+// states qualify and `completed`/`cancelled` never do.
+export async function claimEventAnnouncement(pool: any, id: any): Promise<boolean> {
+  if (!pool || !id) return false;
+  try {
+    const result = await pool.query(
+      `update arcade_events set announced_at = now()
+        where id = $1 and announced_at is null
+          and status in ('scheduled', 'live')
+        returning id`,
+      [String(id)],
+    );
+    return Boolean(result?.rowCount);
+  } catch (err) {
+    process.stderr.write(`[arcade-events] claimEventAnnouncement error: ${(err as any)?.message || err}\n`);
+    return false;
+  }
+}
+
 export async function deleteEvent(pool: any, id: any): Promise<{ ok: boolean; error?: string }> {
   if (!pool || !id) return { ok: false, error: "invalid_request" };
   try {

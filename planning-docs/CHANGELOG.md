@@ -2,6 +2,28 @@
 
 Dated history extracted from the root `CLAUDE.md` (2026-07-23) so that file can stay a lean orientation guide instead of an ever-growing log. This file is a curated narrative, not a replacement for `git log` — read it for *why*/*what shipped when*, not for line-level diffs.
 
+## Founder Friendship + Announcement Broadcast (2026-08-04)
+
+Two "the platform greets you" features, both of which are really about one thing: a new account should not land on an empty arcade.
+
+**The founder friendship.** Every new sign-up is befriended with the account behind `FOUNDER_EMAIL` — the Tom pattern. It is a real friendship through `createFriendshipBetweenPlayers`, not a special-cased row: symmetric, ledgered, worth the standard +100 friend points, syncing the `friends` column and `player_metrics` on both sides, and removable by either party like any other. A second concept of "friend" that only this feature understood would have to be taught to every surface that reads the friends rail.
+
+Two properties are deliberate and worth not undoing. It is **opt-in by configuration** — `FOUNDER_EMAIL` is its own variable, never derived from `ADMIN_EMAILS`, because granting someone operator authority must not also make them everyone's first friend; unset means the feature does nothing and does not even spend a database round trip finding that out. And it is **best-effort** — a missing founder account, a database hiccup, anything, and registration still succeeds. Someone who just handed over an email and a password has to end up with an account; a cosmetic friendship is not worth failing that over. `services/founder.mts` returns a reason string for every failure mode and throws for none of them.
+
+It is awaited rather than fired and forgotten: the client goes straight to the profile after registering, and a friendship landing a second later would show an empty rail on the very first page load — the one load this feature exists to fix.
+
+**Announcement broadcast.** Publishing a bulletin or adding an event now notifies every registered account — `bulletin_posted` (summary as the preview, link to the board) and `event_posted` (deep link to `/event/?slug=`, since events have their own page). These are the only two writes in the platform addressed to everyone at once, so they share one implementation, `services/content-announce.mts`, differing only in a small per-kind config.
+
+The once-only guarantee lives in SQL rather than application logic. Migrations `033`/`034` add `announced_at` to both tables, and the claim is a conditional `update ... where announced_at is null and <visible> returning id`. Two concurrent publishes cannot both win — Postgres serializes the update and the loser matches no rows. An operator fixing a typo on live content re-notifies nobody, because the claim has been spent.
+
+The fan-out is one statement — `insert into notifications ... select from accounts` — with deterministic per-row ids (`notif-<kind>-<id>-<playerId>`) and `on conflict (id) do nothing`, so a retried broadcast lands on the same rows instead of giving everyone a second copy. The kind is *in* the prefix because both id spaces are uuids from the same generator; without it, a bulletin and an event that happened to share an id would silently swallow each other's announcement. The publishing operator is excluded from their own blast.
+
+**What counts as visible differs, and that's the interesting part.** A bulletin has a draft state, so `published` + `public` is the gate and the operator has a natural staging area. An event has no draft — the calendar hides only `cancelled` — so a `scheduled` event is public the instant it is created, and *creating* it is what notifies. The gate is `scheduled` or `live`: `completed` is excluded because announcing a past event tells everyone about something they can no longer attend, and that exclusion makes `cancelled` usable as the staging state, since it never spends the claim. Create quietly as cancelled, flip to scheduled, and the flip is what goes out. This is documented in the admin guide, because it is the one place the two flows genuinely behave differently.
+
+Announcing is a side effect of the save, never a precondition for it: the service swallows its own failures, the route wraps the call anyway, and the audit entry records `notified` and `recipientCount` so the Audit tab can answer "did that actually go out?" after the fact. A `friends` or `private` bulletin never broadcasts — the fan-out has no audience filter, and pretending otherwise would leak content past its own audience. Deleting either kind clears its notifications through `deleteNotificationsByPayloadRef` (`contentId` added to the allowlist), so no alert outlives what it points at.
+
+Both headlines lead with the announcement (*📢 New bulletin: Tournament Night*, *🗓️ New event: Sactown Smackdown X*) rather than with the poster. Every account receives them; "Jay posted a bulletin" reads as a social action when it is a noticeboard notice.
+
 ## Bulletin Attachments (2026-08-04)
 
 Bulletins can carry one image — the immediate need was a tournament flyer for Sactown Smackdown X. Migration `032-bulletin-image.sql` adds `bulletins.image_url`, mirroring `012-thought-image.sql`: a plain URL column with an empty-string default, not a join to `player_photos`, because a bulletin image belongs to the announcement rather than to anyone's gallery.

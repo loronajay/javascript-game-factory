@@ -21,6 +21,8 @@ export interface ApiConfig {
   playServiceAccountKey: string;
   playPackageName: string;
   hasPlayBilling: boolean;
+  founderEmail: string;
+  hasFounderAccount: boolean;
 }
 
 function parsePort(value: unknown): number {
@@ -56,6 +58,11 @@ export function readConfig(options: { env?: Record<string, string | undefined> }
   const playPackageName = typeof env.GOOGLE_PLAY_PACKAGE_NAME === "string" && env.GOOGLE_PLAY_PACKAGE_NAME.trim()
     ? env.GOOGLE_PLAY_PACKAGE_NAME.trim()
     : "com.jayarcade.tacticalarena";
+  // The account every new sign-up is befriended with. Deliberately its own variable rather
+  // than reusing ADMIN_EMAILS: operator authority and being the platform's welcoming face
+  // are separate roles, and nobody should acquire a friendship with every new player just
+  // by being granted admin. Unset means the feature is off.
+  const founderEmail = typeof env.FOUNDER_EMAIL === "string" ? env.FOUNDER_EMAIL.trim().toLowerCase() : "";
 
   return {
     port: parsePort(env.PORT),
@@ -78,5 +85,7 @@ export function readConfig(options: { env?: Record<string, string | undefined> }
     playServiceAccountKey,
     playPackageName,
     hasPlayBilling: Boolean(playServiceAccountKey),
+    founderEmail,
+    hasFounderAccount: Boolean(founderEmail),
   };
 }

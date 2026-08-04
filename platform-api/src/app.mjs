@@ -322,6 +322,14 @@ export function createApp(options = {}) {
     const updateBulletin = typeof options?.updateBulletin === "function"
         ? options.updateBulletin
         : async () => ({ ok: false, error: "database_unavailable" });
+    // Without a database there is nobody to notify, so the default is a no-op rather than an
+    // error: a publish that cannot fan out is still a successful publish.
+    const announceBulletin = typeof options?.announceBulletin === "function"
+        ? options.announceBulletin
+        : async () => ({ announced: false, reason: "not_configured" });
+    const announceEvent = typeof options?.announceEvent === "function"
+        ? options.announceEvent
+        : async () => ({ announced: false, reason: "not_configured" });
     const deleteBulletin = typeof options?.deleteBulletin === "function"
         ? options.deleteBulletin
         : async () => ({ ok: false, error: "database_unavailable" });
@@ -576,10 +584,12 @@ export function createApp(options = {}) {
         createBulletin,
         updateBulletin,
         deleteBulletin,
+        announceBulletin,
         listAllEvents,
         createEvent,
         updateEvent,
         deleteEvent,
+        announceEvent,
         listCabinetOverrides,
         saveCabinetOverride,
         deleteCabinetOverride,

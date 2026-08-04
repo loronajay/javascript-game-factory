@@ -34,6 +34,41 @@ export async function createNotification(db, { id, recipientPlayerId, actorPlaye
         return null;
     }
 }
+// Fans one notification out to every registered account in a single statement.
+//
+// This is the only write in this module that is not addressed to one player, so it is
+// deliberately narrow: the caller supplies an `idPrefix` that makes each row's primary key
+// deterministic (`<prefix><playerId>`), and the insert is `on conflict do nothing`. That
+// pair is what makes a re-run harmless — a retried broadcast lands on the same ids and
+// inserts nothing rather than giving everyone a second copy. Callers that must send only
+// once still need their own claim (see markBulletinAnnounced); this only stops duplicates.
+//
+// `actorPlayerId` is excluded from the recipients: an operator announcing something does
+// not need to be told about it.
+export async function broadcastNotification(db, { idPrefix, actorPlayerId = "", actorDisplayName = "", type, payload = {}, } = {}) {
+    if (!db || !type)
+        return 0;
+    const prefix = typeof idPrefix === "string" ? idPrefix.trim() : "";
+    if (!prefix)
+        return 0;
+    try {
+        const result = await db.query(`
+      insert into notifications (
+        id, recipient_player_id, actor_player_id, actor_display_name, type, status, payload
+      )
+      select
+        $1 || a.player_id, a.player_id, $2, $3, $4, 'unread', $5::jsonb
+      from accounts a
+      where a.player_id <> $2
+      on conflict (id) do nothing
+    `, [prefix, String(actorPlayerId || ""), String(actorDisplayName || ""), type, JSON.stringify(payload)]);
+        return Number(result?.rowCount) || 0;
+    }
+    catch (err) {
+        process.stderr.write(`[notifications] broadcastNotification error: ${err?.message || err}\n`);
+        return 0;
+    }
+}
 export async function listNotifications(db, recipientPlayerId, options = {}) {
     if (!db || !recipientPlayerId)
         return { notifications: [], unreadCount: 0 };
@@ -70,7 +105,9 @@ export async function listNotifications(db, recipientPlayerId, options = {}) {
 // post, or photo is removed the notification is left pointing at something that no longer
 // exists. Callers that delete social content clear the matching notifications through here.
 // The key is allowlisted because it is interpolated into a jsonb path lookup.
-const NOTIFICATION_PAYLOAD_REF_KEYS = new Set(["commentId", "thoughtId", "photoId"]);
+// `contentId` covers broadcast announcements (bulletins and events). Both id spaces are
+// uuids from the same generator, so one key cannot collide across the two tables.
+const NOTIFICATION_PAYLOAD_REF_KEYS = new Set(["commentId", "thoughtId", "photoId", "contentId"]);
 export async function deleteNotificationsByPayloadRef(db, payloadKey, payloadValue) {
     if (!db)
         return 0;

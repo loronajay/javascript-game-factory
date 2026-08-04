@@ -90,9 +90,11 @@ npm run build       # tsc emit + scripts/sync-emitted-mjs.mjs
 npm run verify:build  # emit + --check; fails if a committed .mjs is stale
 ```
 
-Runtime config comes from the environment: `DATABASE_URL` (Railway Postgres), `APP_BASE_URL`, `ALLOWED_ORIGINS`, `ADMIN_EMAILS`, the JWT secret, and the Resend / Cloudinary / Stripe / Play credentials. `APP_BASE_URL` and the CORS allow-list are origin-sensitive and must be changed together with any hosting/domain move.
+Runtime config comes from the environment: `DATABASE_URL` (Railway Postgres), `APP_BASE_URL`, `ALLOWED_ORIGINS`, `ADMIN_EMAILS`, `FOUNDER_EMAIL`, the JWT secret, and the Resend / Cloudinary / Stripe / Play credentials. `APP_BASE_URL` and the CORS allow-list are origin-sensitive and must be changed together with any hosting/domain move.
 
 `ADMIN_EMAILS` is a comma-separated list promoted to admin at boot, after migrations. It only ever **grants** — removing an address does not demote anyone, so a typo cannot strip authority from a live operator; demote through the console instead. The account must already exist, so the first-run order is: sign up on the site, set `ADMIN_EMAILS`, redeploy.
+
+`FOUNDER_EMAIL` is the "Tom" account: every new sign-up is befriended with it automatically (`services/founder.mts`, called from registration). It is deliberately a separate variable from `ADMIN_EMAILS` — granting someone operator authority must not also make them everyone's first friend. Unset means the feature is off. The friendship goes through the normal ledgered path, so it is symmetric, worth the usual +100 friend points, and can be removed by either side like any other. If the address matches no account, or anything else fails, registration still succeeds — the friendship is best-effort by design.
 
 ## Boundary reminder
 

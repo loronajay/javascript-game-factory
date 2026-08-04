@@ -15,12 +15,13 @@ import {
   verifyAccountPassword,
 } from "../db/auth.mjs";
 import { savePlayerProfile } from "../db/profiles.mjs";
+import { linkNewAccountToFounder } from "./founder.mjs";
 
 function makeSessionId(): string {
   return randomUUID();
 }
 
-export async function registerAccountService(pool: any, { email, password, profileName, claimPlayerId }: any): Promise<any> {
+export async function registerAccountService(pool: any, { email, password, profileName, claimPlayerId }: any, options: any = {}): Promise<any> {
   const existing = await findAccountByEmail(pool, email);
   if (existing) return { error: "email_taken" };
 
@@ -44,7 +45,25 @@ export async function registerAccountService(pool: any, { email, password, profi
   const account = await createAccount(pool, { email, password, playerId, sessionId });
   if (!account) return { error: "account_creation_failed" };
 
-  return { ok: true, playerId, email: account.email, profileName: resolvedProfileName, sessionId };
+  // Awaited rather than fired and forgotten: the client goes straight to the profile after
+  // registering, and a friendship that lands a second later would show an empty rail on the
+  // very first page load. linkNewAccountToFounder never throws and never blocks — with
+  // FOUNDER_EMAIL unset it returns immediately without touching the database.
+  const founderLink = await linkNewAccountToFounder({
+    playerId,
+    founderEmail: options?.founderEmail,
+    findAccountByEmail: (lookupEmail: any) => findAccountByEmail(pool, lookupEmail),
+    createFriendship: options?.createFriendship,
+  });
+
+  return {
+    ok: true,
+    playerId,
+    email: account.email,
+    profileName: resolvedProfileName,
+    sessionId,
+    founderFriendLinked: founderLink.linked,
+  };
 }
 
 export async function loginAccountService(pool: any, { email, password }: any): Promise<any> {

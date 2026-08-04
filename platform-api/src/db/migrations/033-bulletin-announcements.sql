@@ -1,0 +1,11 @@
+-- Broadcast bookkeeping for bulletins.
+--
+-- Publishing a bulletin fans a notification out to every account. `announced_at` is the
+-- once-only marker that makes that safe: a bulletin can be saved as a draft, published,
+-- then edited a dozen times, and only the first transition to published+public sends
+-- anything. It is claimed with a conditional UPDATE ... where announced_at is null, so two
+-- concurrent publishes cannot both win the claim and double-blast the player base.
+--
+-- Null means "never announced". Existing rows are therefore all unannounced, which is the
+-- honest state — none of them ever sent a notification.
+alter table bulletins add column if not exists announced_at timestamptz;

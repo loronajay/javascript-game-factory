@@ -11,8 +11,9 @@ import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, sav
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import { getLadderStandings, getPlayerLadderPlacements } from "./db/ladders.mjs";
 import { getAccountSuspension, isAdminPlayer, listAdmins, listAuditLog, seedAdminsFromEmails, setAdminFlag, writeAuditLog, } from "./db/admin.mjs";
-import { createBulletin, deleteBulletin, getPublicBulletinBySlug, listAllBulletins, listPublicBulletins, updateBulletin, } from "./db/bulletins.mjs";
-import { createEvent, deleteEvent, getPublicEventBySlug, listAllEvents, listPublicEvents, updateEvent, } from "./db/arcade-events.mjs";
+import { claimBulletinAnnouncement, createBulletin, deleteBulletin, getPublicBulletinBySlug, listAllBulletins, listPublicBulletins, updateBulletin, } from "./db/bulletins.mjs";
+import { announceBulletinService, announceEventService } from "./services/content-announce.mjs";
+import { claimEventAnnouncement, createEvent, deleteEvent, getPublicEventBySlug, listAllEvents, listPublicEvents, updateEvent, } from "./db/arcade-events.mjs";
 import { deleteCabinetOverride, listCabinetOverrides, listSiteSettings, saveCabinetOverride, saveSiteSetting, } from "./db/site-settings.mjs";
 import { fileReport, liftSuspension, listReports, listSuspendedAccounts, removeContentAsAdmin, resolveReport, suspendAccount, } from "./db/moderation.mjs";
 import { cancelRanked, enqueueRanked, getPublicRankedCard, getRankedLeaderboard, getRankedMatchDetail, getRankedMatches, getRankedStanding, getRankedUnitStats, pollRanked, recordRankedHeartbeat, reportRankedResult, saveRankedProfile, setRankedLobbyCode, startRankedMatch, } from "./db/ranked.mjs";
@@ -23,7 +24,7 @@ import { deleteAccountService, loginAccountService, logoutAccountService, regist
 import { createTacticalArenaCheckoutSession, fulfillPremiumCheckoutSessionFromReturn, fulfillStripeWebhook, } from "./services/payments.mjs";
 import { createPlayAccessTokenProvider, fulfillPlayPurchase } from "./services/play-billing.mjs";
 import { createEmailSender } from "./email.mjs";
-import { createNotification, deleteNotificationsByPayloadRef, listNotifications, markAllNotificationsRead, } from "./db/notifications.mjs";
+import { broadcastNotification, createNotification, deleteNotificationsByPayloadRef, listNotifications, markAllNotificationsRead, } from "./db/notifications.mjs";
 import { createFriendRequest, getFriendRequest, acceptFriendRequest, rejectFriendRequest, } from "./db/friend-requests.mjs";
 import { createChallenge, getChallenge, acceptChallenge, declineChallenge, } from "./db/challenges.mjs";
 import { findOrCreateConversation, findConversationBetween, listConversations, getConversation, listMessages, createMessage, markConversationRead, } from "./db/messages.mjs";
@@ -92,7 +93,12 @@ async function bootstrap() {
         avatarUrlResolver,
         checkDatabase: createDatabaseCheck(pool),
         searchPlayers: (q) => searchPlayers(pool, q),
-        registerAccount: (params) => registerAccountService(pool, params),
+        // Every new account is befriended with the FOUNDER_EMAIL account, if one is configured.
+        // The friendship goes through the same ledgered path a player-initiated one does.
+        registerAccount: (params) => registerAccountService(pool, params, {
+            founderEmail: config.founderEmail,
+            createFriendship: (leftPlayerId, rightPlayerId) => createFriendshipBetweenPlayers(pool, leftPlayerId, rightPlayerId),
+        }),
         loginAccount: (params) => loginAccountService(pool, params),
         verifyAccountSession: (playerId, sessionId) => verifyAccountSessionService(pool, playerId, sessionId),
         logoutAccount: (playerId, sessionId) => logoutAccountService(pool, playerId, sessionId),
@@ -114,13 +120,37 @@ async function bootstrap() {
         getPublicBulletinBySlug: (slug) => getPublicBulletinBySlug(pool, slug),
         createBulletin: (input, createdBy) => createBulletin(pool, input, createdBy),
         updateBulletin: (id, input) => updateBulletin(pool, id, input),
-        deleteBulletin: (id) => deleteBulletin(pool, id),
+        // Removing an announcement takes its notifications with it, so nobody is left with a
+        // "New bulletin" alert pointing at something that no longer exists.
+        deleteBulletin: async (id) => {
+            const result = await deleteBulletin(pool, id);
+            if (result?.ok)
+                await deleteNotificationsByPayloadRef(pool, "contentId", id);
+            return result;
+        },
+        announceBulletin: (bulletin, actorPlayerId) => announceBulletinService({
+            bulletin,
+            actorPlayerId,
+            claimAnnouncement: (id) => claimBulletinAnnouncement(pool, id),
+            broadcast: (params) => broadcastNotification(pool, params),
+        }),
         listPublicEvents: (options) => listPublicEvents(pool, options),
         listAllEvents: () => listAllEvents(pool),
         getPublicEventBySlug: (slug) => getPublicEventBySlug(pool, slug),
         createEvent: (input, createdBy) => createEvent(pool, input, createdBy),
         updateEvent: (id, input) => updateEvent(pool, id, input),
-        deleteEvent: (id) => deleteEvent(pool, id),
+        deleteEvent: async (id) => {
+            const result = await deleteEvent(pool, id);
+            if (result?.ok)
+                await deleteNotificationsByPayloadRef(pool, "contentId", id);
+            return result;
+        },
+        announceEvent: (event, actorPlayerId) => announceEventService({
+            event,
+            actorPlayerId,
+            claimAnnouncement: (id) => claimEventAnnouncement(pool, id),
+            broadcast: (params) => broadcastNotification(pool, params),
+        }),
         listCabinetOverrides: () => listCabinetOverrides(pool),
         saveCabinetOverride: (slug, input, updatedBy) => saveCabinetOverride(pool, slug, input, updatedBy),
         deleteCabinetOverride: (slug) => deleteCabinetOverride(pool, slug),

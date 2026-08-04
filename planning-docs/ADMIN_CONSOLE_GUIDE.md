@@ -69,6 +69,17 @@ The list is on the left, the editor on the right. Click **Edit** on any row to l
 
 Published bulletins appear at **/bulletins/**, newest first, pinned ones above everything.
 
+> **Publishing notifies every account.** The first time a bulletin becomes `published` + `public`, every registered player gets a notification: *📢 New bulletin: <title>*, with the summary as the preview line and a **Read Bulletin →** link. This is the one write in the platform that reaches everyone at once, so it is worth knowing exactly when it fires:
+>
+> - **Once per bulletin, ever.** Editing an already-announced bulletin — fixing a typo, swapping the flyer, changing the date — sends nothing. There is no way to re-announce a bulletin from the console; post a new one.
+> - **On the transition, not on the save.** Save as `draft` and nobody is told. Flip that same bulletin to `published` later and *that* save is the one that notifies.
+> - **`public` only.** A `friends` or `private` bulletin never notifies anyone (and, per the caveat below, is invisible anyway).
+> - **You are excluded.** The account that publishes doesn't get its own notification.
+> - **Not a delivery guarantee.** If the fan-out fails, the bulletin still saves. The audit log entry records `notified` and `recipientCount`, so the Audit tab is where you check whether a given post actually went out.
+> - **Deleting the bulletin removes its notifications**, so nobody is left with an alert pointing at a board entry that no longer exists.
+>
+> The practical rule: **draft first, publish when you mean it.** A half-written bulletin saved as `published` has already told everyone.
+
 **Attaching a flyer.** Click **Choose File** and pick the image. It uploads immediately — you'll see it appear in the form before you save, so you can tell you picked the right one. Then save the bulletin to keep it.
 
 - **Posters are never cropped.** A portrait flyer stays portrait, letterboxed on a dark matte, with the frame sized to hug the poster rather than stranding it in a wide black band. Whatever's printed at the bottom of your flyer — date, venue, entry fees — stays readable on the board.
@@ -92,7 +103,13 @@ Same list-and-editor shape as bulletins.
 
 Events appear at **/events/**, soonest first, and each has its own page at `/event/index.html?slug=<slug>`.
 
-> **Worth knowing:** there is no Events link in the top nav. Players reach the calendar from the **See Events** button on the home page, or from a link you put in a bulletin. If you want events to get traffic, announce them in a bulletin too.
+> **Adding an event notifies every account** — *🗓️ New event: \<title\>*, with a **View Event →** link straight to that event's page. Same once-per-record rule as bulletins: editing an already-announced event sends nothing.
+>
+> **The one real difference from bulletins: events have no draft.** A `scheduled` event is on the public calendar the instant you save it, so **creating the event is usually what sends the notification** — there is no quiet first save to come back and finish later. Only `scheduled` and `live` announce; `completed` never does (nobody needs an alert about something they can't attend any more).
+>
+> **To stage one quietly, create it as `cancelled`**, fill in everything at your leisure, then flip it to `scheduled`. Cancelled events are hidden from the calendar and never spend the one announcement, so the flip is what goes out. Use this any time you're not ready for the whole arcade to see it — otherwise, have the title and date right *before* you hit save the first time.
+
+> **Worth knowing:** there is no Events link in the top nav. Players reach the calendar from the **See Events** button on the home page, from the notification above, or from a link you put in a bulletin.
 
 ### Cabinets — how games appear on the grid
 

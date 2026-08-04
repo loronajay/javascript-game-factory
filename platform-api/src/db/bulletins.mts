@@ -166,6 +166,30 @@ export async function updateBulletin(pool: any, id: any, input: any): Promise<{ 
   }
 }
 
+// Claims the right to announce a bulletin, exactly once, ever.
+//
+// Returns true only for the caller that flipped `announced_at` from null. The condition is
+// in the WHERE clause rather than in a read-then-write, so two publishes racing each other
+// cannot both come back true — Postgres serializes the update and the loser matches no
+// rows. A bulletin edited after publishing has a non-null `announced_at` and never
+// re-announces, which is why an operator can fix a typo without re-alerting everyone.
+export async function claimBulletinAnnouncement(pool: any, id: any): Promise<boolean> {
+  if (!pool || !id) return false;
+  try {
+    const result = await pool.query(
+      `update bulletins set announced_at = now()
+        where id = $1 and announced_at is null
+          and status = 'published' and audience = 'public'
+        returning id`,
+      [String(id)],
+    );
+    return Boolean(result?.rowCount);
+  } catch (err) {
+    process.stderr.write(`[bulletins] claimBulletinAnnouncement error: ${(err as any)?.message || err}\n`);
+    return false;
+  }
+}
+
 export async function deleteBulletin(pool: any, id: any): Promise<{ ok: boolean; error?: string }> {
   if (!pool || !id) return { ok: false, error: "invalid_request" };
   try {

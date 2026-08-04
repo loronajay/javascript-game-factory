@@ -1,10 +1,11 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { clearAccountSession, consumePasswordResetToken, createAccount, createPasswordResetToken, deletePlayerAccount, findAccountByEmail, findAccountByPlayerId, findPasswordResetToken, isAccountSessionCurrent, rotateAccountSession, updateAccountPassword, verifyAccountPassword, } from "../db/auth.mjs";
 import { savePlayerProfile } from "../db/profiles.mjs";
+import { linkNewAccountToFounder } from "./founder.mjs";
 function makeSessionId() {
     return randomUUID();
 }
-export async function registerAccountService(pool, { email, password, profileName, claimPlayerId }) {
+export async function registerAccountService(pool, { email, password, profileName, claimPlayerId }, options = {}) {
     const existing = await findAccountByEmail(pool, email);
     if (existing)
         return { error: "email_taken" };
@@ -26,7 +27,24 @@ export async function registerAccountService(pool, { email, password, profileNam
     const account = await createAccount(pool, { email, password, playerId, sessionId });
     if (!account)
         return { error: "account_creation_failed" };
-    return { ok: true, playerId, email: account.email, profileName: resolvedProfileName, sessionId };
+    // Awaited rather than fired and forgotten: the client goes straight to the profile after
+    // registering, and a friendship that lands a second later would show an empty rail on the
+    // very first page load. linkNewAccountToFounder never throws and never blocks — with
+    // FOUNDER_EMAIL unset it returns immediately without touching the database.
+    const founderLink = await linkNewAccountToFounder({
+        playerId,
+        founderEmail: options?.founderEmail,
+        findAccountByEmail: (lookupEmail) => findAccountByEmail(pool, lookupEmail),
+        createFriendship: options?.createFriendship,
+    });
+    return {
+        ok: true,
+        playerId,
+        email: account.email,
+        profileName: resolvedProfileName,
+        sessionId,
+        founderFriendLinked: founderLink.linked,
+    };
 }
 export async function loginAccountService(pool, { email, password }) {
     const account = await findAccountByEmail(pool, email);

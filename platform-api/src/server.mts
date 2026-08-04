@@ -22,6 +22,7 @@ import {
   writeAuditLog,
 } from "./db/admin.mjs";
 import {
+  claimBulletinAnnouncement,
   createBulletin,
   deleteBulletin,
   getPublicBulletinBySlug,
@@ -29,7 +30,9 @@ import {
   listPublicBulletins,
   updateBulletin,
 } from "./db/bulletins.mjs";
+import { announceBulletinService, announceEventService } from "./services/content-announce.mjs";
 import {
+  claimEventAnnouncement,
   createEvent,
   deleteEvent,
   getPublicEventBySlug,
@@ -119,6 +122,7 @@ import {
 import { createPlayAccessTokenProvider, fulfillPlayPurchase } from "./services/play-billing.mjs";
 import { createEmailSender } from "./email.mjs";
 import {
+  broadcastNotification,
   createNotification,
   deleteNotificationsByPayloadRef,
   listNotifications,
@@ -228,7 +232,13 @@ async function bootstrap(): Promise<void> {
     avatarUrlResolver,
     checkDatabase: createDatabaseCheck(pool),
     searchPlayers: (q: any) => searchPlayers(pool, q),
-    registerAccount: (params: any) => registerAccountService(pool, params),
+    // Every new account is befriended with the FOUNDER_EMAIL account, if one is configured.
+    // The friendship goes through the same ledgered path a player-initiated one does.
+    registerAccount: (params: any) => registerAccountService(pool, params, {
+      founderEmail: config.founderEmail,
+      createFriendship: (leftPlayerId: any, rightPlayerId: any) =>
+        createFriendshipBetweenPlayers(pool, leftPlayerId, rightPlayerId),
+    }),
     loginAccount: (params: any) => loginAccountService(pool, params),
     verifyAccountSession: (playerId: any, sessionId: any) => verifyAccountSessionService(pool, playerId, sessionId),
     logoutAccount: (playerId: any, sessionId: any) => logoutAccountService(pool, playerId, sessionId),
@@ -250,13 +260,35 @@ async function bootstrap(): Promise<void> {
     getPublicBulletinBySlug: (slug: any) => getPublicBulletinBySlug(pool, slug),
     createBulletin: (input: any, createdBy: any) => createBulletin(pool, input, createdBy),
     updateBulletin: (id: any, input: any) => updateBulletin(pool, id, input),
-    deleteBulletin: (id: any) => deleteBulletin(pool, id),
+    // Removing an announcement takes its notifications with it, so nobody is left with a
+    // "New bulletin" alert pointing at something that no longer exists.
+    deleteBulletin: async (id: any) => {
+      const result = await deleteBulletin(pool, id);
+      if (result?.ok) await deleteNotificationsByPayloadRef(pool, "contentId", id);
+      return result;
+    },
+    announceBulletin: (bulletin: any, actorPlayerId: any) => announceBulletinService({
+      bulletin,
+      actorPlayerId,
+      claimAnnouncement: (id: any) => claimBulletinAnnouncement(pool, id),
+      broadcast: (params: any) => broadcastNotification(pool, params),
+    }),
     listPublicEvents: (options: any) => listPublicEvents(pool, options),
     listAllEvents: () => listAllEvents(pool),
     getPublicEventBySlug: (slug: any) => getPublicEventBySlug(pool, slug),
     createEvent: (input: any, createdBy: any) => createEvent(pool, input, createdBy),
     updateEvent: (id: any, input: any) => updateEvent(pool, id, input),
-    deleteEvent: (id: any) => deleteEvent(pool, id),
+    deleteEvent: async (id: any) => {
+      const result = await deleteEvent(pool, id);
+      if (result?.ok) await deleteNotificationsByPayloadRef(pool, "contentId", id);
+      return result;
+    },
+    announceEvent: (event: any, actorPlayerId: any) => announceEventService({
+      event,
+      actorPlayerId,
+      claimAnnouncement: (id: any) => claimEventAnnouncement(pool, id),
+      broadcast: (params: any) => broadcastNotification(pool, params),
+    }),
     listCabinetOverrides: () => listCabinetOverrides(pool),
     saveCabinetOverride: (slug: any, input: any, updatedBy: any) => saveCabinetOverride(pool, slug, input, updatedBy),
     deleteCabinetOverride: (slug: any) => deleteCabinetOverride(pool, slug),
