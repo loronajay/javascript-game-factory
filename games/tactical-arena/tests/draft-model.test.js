@@ -184,3 +184,23 @@ test("arrangeDraftLoadout reorders nicknames to match the arranged formation", (
   // picks[1] order was [swordsman, magician, paladin, witch-doctor] -> nicknames [Leo, Big Mage, null, null]
   assert.deepEqual(loadout.nicknames, [null, "Leo", null, "Big Mage"]);
 });
+
+test("tournament formation preserves authored skins without permanently unlocking them", () => {
+  let draft = createDraftState();
+  const picks = [
+    [1, "swordsman", "arcane"],
+    [2, "archer", "geisha"],
+    [2, "mystic", "heartbreaker"],
+    [1, "magician", "ghostly"],
+    [1, "paladin", "crusader"],
+    [2, "sniper", "grim-reaper"],
+    [2, "angel", "sol"],
+    [1, "witch-doctor", "black-mage"],
+  ];
+  for (const [seat, type, skin] of picks) {
+    draft = applyDraftPick(draft, { seat, type, skin, isUnlocked: () => true, trustSkin: true }).nextState;
+  }
+
+  const loadout = arrangeDraftLoadout(draft, 1, [0, 1, 2, 3], { trustSkin: true });
+  assert.deepEqual(loadout.skins, ["arcane", "ghostly", "crusader", "black-mage"]);
+});

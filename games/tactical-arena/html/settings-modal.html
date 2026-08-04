@@ -28,6 +28,14 @@
             <span class="set-label">Music volume</span>
             <input id="setMusicVolume" type="range" min="0" max="100" value="32">
           </label>
+          <div class="set-row set-action-row set-tournament-row">
+            <span class="set-label">Tournament</span>
+            <div class="set-action-stack set-tournament-stack">
+              <input id="setTournamentPassword" class="set-text-input" type="password" maxlength="80" placeholder="Organizer code" autocomplete="off" spellcheck="false">
+              <button id="setTournamentUnlockBtn" class="menu-btn" type="button">Enable Tournament</button>
+              <span id="setTournamentStatus" class="set-hint" aria-live="polite">Session-only access. No permanent unlocks.</span>
+            </div>
+          </div>
           <div class="set-row set-action-row">
             <span class="set-label">Progress</span>
             <div class="set-action-stack">

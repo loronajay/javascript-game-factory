@@ -204,6 +204,23 @@ test("skin picker locks in an unlocked skin on a single click — no extra Selec
   assert.deepEqual(await picking, { skin: "desert-warrior" });
 });
 
+test("tournament skin picker can select any authored skin without granting ownership", async () => {
+  delete globalThis.localStorage;
+  globalThis.document = new FakeDocument();
+
+  const picking = openSkinPicker({ type: "swordsman", initial: null, allowAll: true });
+  const overlay = document.body.children[0];
+  const arcane = walk(overlay, (node) => node.tagName === "BUTTON" && node.dataset.skin === "arcane")[0];
+
+  arcane.click();
+  const useButton = walk(overlay, (node) =>
+    node.tagName === "BUTTON" && node.dataset.skinAction === "use")[0];
+  assert.equal(useButton.textContent, "Use Skin");
+  useButton.click();
+
+  assert.deepEqual(await picking, { skin: "arcane" });
+});
+
 test("skin picker keeps its grid scroll position while previewing skins", () => {
   delete globalThis.localStorage;
   globalThis.document = new FakeDocument();

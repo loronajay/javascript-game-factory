@@ -76,7 +76,7 @@ test("release hotspots delegate cohesive responsibilities to smaller modules", (
     ["src/ui/rankedMatchHistory.js", 80, ["./rankedMatchDetailModel.js", "./rankedMatchDetail.js"]],
     ["src/ui/rankedMatchDetail.js", 220, ["./rankedMatchDetailModel.js"]],
     ["src/ui/rankedMatchDetailModel.js", 200, []],
-    ["src/ui/onlineFlow.js", 990, ["./onlineLobbyView.js", "./onlineFlowColors.js", "./onlineMatchTypes.js", "./onlineProfiles.js", "./onlineLobbyStatus.js"]],
+    ["src/ui/onlineFlow.js", 990, ["./onlineLobbyView.js", "./onlineFlowColors.js", "./onlineMatchTypes.js", "./onlineProfiles.js", "./onlineLobbyStatus.js", "./onlineModeController.js", "./onlineMatchTypeController.js"]],
     ["src/ui/onlineLobbyView.js", 320, ["./onlineFlowColors.js"]],
     ["src/ui/onlineFlowColors.js", 20, []],
     ["src/ui/onlineMatchTypes.js", 40, []],

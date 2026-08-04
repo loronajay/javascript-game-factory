@@ -11,6 +11,11 @@ import {
 import { resetCampaignProgress } from "../campaign/campaign.js";
 import { resetCampaignOnServer } from "../platform/gameProgressClient.js";
 import { applyCampaignResetEpoch } from "../platform/playProgressSync.js";
+import {
+  TOURNAMENT_ACCESS_CHANGED_EVENT,
+  activateTournamentAccess,
+  isTournamentAccessActive,
+} from "../tournament/tournamentAccess.js";
 
 const RESET_PROGRESS_IDLE_LABEL = "Reset Progress";
 const RESET_PROGRESS_CONFIRM_LABEL = "Confirm Reset";
@@ -103,6 +108,9 @@ export function createSettingsScreen({
   const batterySaverToggle = $("#setBatterySaver", settingsModal);
   const resetProgressBtn = $("#setResetProgressBtn", settingsModal);
   const progressStatus = $("#setProgressStatus", settingsModal);
+  const tournamentPassword = $("#setTournamentPassword", settingsModal);
+  const tournamentUnlockBtn = $("#setTournamentUnlockBtn", settingsModal);
+  const tournamentStatus = $("#setTournamentStatus", settingsModal);
   let progressStatusTimer = null;
   const resetProgressConfirmation = createResetProgressConfirmation({
     button: resetProgressBtn,
@@ -135,6 +143,7 @@ export function createSettingsScreen({
     themeSelect.value = loadSavedThemeId();
     batterySaverToggle.checked = loadPerformanceMode() === "balanced";
     resetProgressConfirmation.disarm({ clearStatus: true });
+    syncTournamentAccessUi();
     settingsModal.hidden = false;
   }
   function closeSettings() {
@@ -163,6 +172,42 @@ export function createSettingsScreen({
     }
   }
 
+  function syncTournamentAccessUi(message = "") {
+    const active = isTournamentAccessActive();
+    if (tournamentPassword) {
+      tournamentPassword.disabled = active;
+      if (active) tournamentPassword.value = "";
+    }
+    if (tournamentUnlockBtn) {
+      tournamentUnlockBtn.disabled = active;
+      tournamentUnlockBtn.textContent = active ? "Tournament Enabled" : "Enable Tournament";
+      tournamentUnlockBtn.classList.toggle("primary", active);
+    }
+    if (tournamentStatus) {
+      tournamentStatus.textContent = message || (active
+        ? "Active for this browser tab. All units and skins are available only in Tournament rooms."
+        : "Session-only access. No permanent unlocks.");
+    }
+    return active;
+  }
+
+  async function requestTournamentAccess() {
+    if (!tournamentPassword || !tournamentUnlockBtn || isTournamentAccessActive()) return;
+    tournamentUnlockBtn.disabled = true;
+    tournamentUnlockBtn.textContent = "Checking...";
+    const result = await activateTournamentAccess(tournamentPassword.value);
+    if (result.activated) {
+      tournamentPassword.value = "";
+      syncTournamentAccessUi();
+      refreshUnlockedScreens();
+      return;
+    }
+    tournamentUnlockBtn.disabled = false;
+    tournamentUnlockBtn.textContent = "Enable Tournament";
+    if (tournamentStatus) tournamentStatus.textContent = "Organizer code not recognized.";
+    tournamentPassword.select?.();
+  }
+
   soundToggle.addEventListener("change", () => {
     audio.setEnabled(soundToggle.checked);
     syncMusic();
@@ -176,6 +221,13 @@ export function createSettingsScreen({
   musicRange.addEventListener("input", () => audio.setMusicVolume(Number(musicRange.value) / 100));
   $("#setCloseBtn", settingsModal).addEventListener("click", closeSettings);
   resetProgressBtn?.addEventListener("click", resetProgressConfirmation.requestReset);
+  tournamentUnlockBtn?.addEventListener("click", () => { void requestTournamentAccess(); });
+  tournamentPassword?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    void requestTournamentAccess();
+  });
+  document.addEventListener(TOURNAMENT_ACCESS_CHANGED_EVENT, () => syncTournamentAccessUi());
   settingsModal.addEventListener("click", (event) => { if (event.target === settingsModal) closeSettings(); });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !settingsModal.hidden) closeSettings();

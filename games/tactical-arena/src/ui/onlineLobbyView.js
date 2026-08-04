@@ -37,6 +37,7 @@ import { escapeHtml } from "./domHelpers.js";
 import { PLAYER_COLOR, TEAM_COLOR } from "./onlineFlowColors.js";
 
 export function createLobbyView(ctx) {
+  const unitIsUnlocked = typeof ctx.isUnitUnlocked === "function" ? ctx.isUnitUnlocked : isUnitUnlocked;
   function renderRoster() {
     const { rosterEl } = ctx;
     rosterEl.replaceChildren();
@@ -197,8 +198,8 @@ export function createLobbyView(ctx) {
       const units = document.createElement("div");
       units.className = "draft-class-units";
       for (const type of group.types) {
-        const locked = !isUnitUnlocked(type);
-        const disabled = complete || currentSeat !== localSeat || !canDraftType(draft, localSeat, type);
+        const locked = !unitIsUnlocked(type);
+        const disabled = complete || currentSeat !== localSeat || !canDraftType(draft, localSeat, type, { isUnlocked: unitIsUnlocked });
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = `draft-unit${taken.has(type) ? " is-taken" : ""}${locked ? " is-locked" : ""}`;

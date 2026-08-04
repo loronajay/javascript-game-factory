@@ -1,6 +1,6 @@
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { createPortrait } from "./portraits.js";
-import { getUnitSkins, normalizeSkinSlug, skinLabel } from "./skinModel.js";
+import { getUnitSkins, normalizeAuthoredSkinSlug, normalizeSkinSlug, skinLabel } from "./skinModel.js";
 import { el } from "./domHelpers.js";
 
 let host = null;
@@ -14,10 +14,13 @@ function ensureHost() {
   return host;
 }
 
-export function openSkinPicker({ type, initial = null, accent = null } = {}) {
+export function openSkinPicker({ type, initial = null, accent = null, allowAll = false } = {}) {
   const overlay = ensureHost();
   const def = UNIT_TYPES[type];
-  let selected = normalizeSkinSlug(type, initial);
+  const normalizeSelection = (slug) => allowAll
+    ? normalizeAuthoredSkinSlug(type, slug)
+    : normalizeSkinSlug(type, slug);
+  let selected = normalizeSelection(initial);
   let viewing = selected;
 
   return new Promise((resolve) => {
@@ -57,7 +60,7 @@ export function openSkinPicker({ type, initial = null, accent = null } = {}) {
       const previousGridScrollTop = previousGrid?.scrollTop ?? 0;
       body.replaceChildren();
 
-      const viewingChoice = choicesFor(type).find((choice) => (choice.slug ?? null) === viewing);
+      const viewingChoice = choicesFor(type, allowAll).find((choice) => (choice.slug ?? null) === viewing);
       const viewingLocked = !!viewingChoice && !viewingChoice.unlocked;
       const isSelected = viewing === selected;
 
@@ -80,7 +83,7 @@ export function openSkinPicker({ type, initial = null, accent = null } = {}) {
       preview.appendChild(copy);
 
       const grid = el("div", "skin-picker-grid");
-      for (const choice of choicesFor(type)) {
+      for (const choice of choicesFor(type, allowAll)) {
         const slug = choice.slug ?? null;
         const selectedChoice = slug === selected;
         const viewingThisChoice = slug === viewing;
@@ -105,7 +108,7 @@ export function openSkinPicker({ type, initial = null, accent = null } = {}) {
             viewing = choice.slug ?? null;
           } else {
             // One click both previews and locks in the choice; Use Skin applies it.
-            viewing = normalizeSkinSlug(type, choice.slug);
+            viewing = normalizeSelection(choice.slug);
             selected = viewing;
           }
           paint();
@@ -148,9 +151,11 @@ export function openSkinPicker({ type, initial = null, accent = null } = {}) {
   });
 }
 
-function choicesFor(type) {
+function choicesFor(type, allowAll = false) {
   return [
     { slug: null, name: "Classic", unlocked: true },
-    ...getUnitSkins(type)
+    ...getUnitSkins(type).map((choice) => allowAll
+      ? { ...choice, status: "unlocked", unlocked: true }
+      : choice),
   ];
 }

@@ -193,6 +193,10 @@
 .menu-ranked-btn:hover:not(:disabled) { border-color:var(--brass); filter:brightness(1.08); }
 .menu-ranked-btn:disabled { opacity:.5; filter:grayscale(.4); cursor:not-allowed; }
 .menu-ranked-btn.is-searching { background:linear-gradient(180deg,color-mix(in srgb,#c4463f 30%,var(--console-hi)),var(--console-lo)); border-color:color-mix(in srgb,#c4463f 55%,var(--parchment-edge)); color:#f0b7b2; }
+.tournament-format-card { border-color:color-mix(in srgb,#d9a441 62%,var(--parchment-edge)); background:linear-gradient(180deg,rgba(217,164,65,.16),rgba(10,18,32,.42)); }
+.menu-tournament-btn { border-color:color-mix(in srgb,#d9a441 65%,var(--parchment-edge)); background:linear-gradient(180deg,rgba(217,164,65,.3),rgba(80,52,18,.5)); color:#fff1c4; }
+.online-player-name-input { width:100%; min-height:2.65rem; padding:.55rem .7rem; border:1px solid var(--parchment-edge); border-radius:7px; background:rgba(8,18,32,.55); color:var(--text); font:800 .82rem var(--font-display); letter-spacing:.04em; }
+.online-player-name-input:focus { border-color:var(--brass); outline:2px solid color-mix(in srgb,var(--brass) 25%,transparent); outline-offset:1px; }
 .draft-unit .unit-portrait.is-card { width:100%; height:4.25rem; border-radius:6px; }
 .draft-unit span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:700 .58rem var(--font-display); letter-spacing:.02em; }
 .draft-unit i { color:var(--brass-hi); font:800 .48rem var(--font-display); font-style:normal; letter-spacing:.1em; text-transform:uppercase; }

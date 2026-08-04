@@ -6,9 +6,14 @@ import {
   setInAppSignInHandler,
 } from "./platform/factorySignIn.js";
 import { AUTH_SESSION_EXPIRED_EVENT } from "../../../js/platform/api/auth-token.mjs";
+import { activateTournamentAccessFromUrl } from "./tournament/tournamentAccess.js";
 
 async function bootstrap() {
   await composePage();
+
+  // Organizer links use a URL fragment so the access code is never sent to the
+  // static host. Activation is tab-session-only and the fragment is scrubbed.
+  await activateTournamentAccessFromUrl();
 
   // The platform API client clears the stored token whenever the server rejects it
   // (one live session per account, so signing in elsewhere revokes this one). Bridge

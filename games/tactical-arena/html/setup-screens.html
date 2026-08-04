@@ -170,6 +170,7 @@
               <div class="segmented" data-field="onlineMode">
                 <button type="button" class="seg is-selected" data-online-mode="casual">Casual</button>
                 <button type="button" class="seg" data-online-mode="ranked" data-ranked-account-feature>Ranked</button>
+                <button type="button" class="seg" data-online-mode="tournament" data-online="tournamentModeButton" hidden>Tournament</button>
               </div>
             </div>
 
@@ -208,6 +209,29 @@
                 <button type="button" class="menu-btn menu-ranked-btn" data-online="rankedBtn">⚔ Find Ranked Match</button>
               </div>
               <p class="setup-hint" data-online="rankedHint"></p>
+            </div>
+
+            <!-- TOURNAMENT: organizer-enabled private rooms using Ranked's ban/draft rules. -->
+            <div data-online-mode-panel="tournament" hidden>
+              <div class="ranked-format-card tournament-format-card">
+                <span class="setup-label">Tournament · Draft 1v1</span>
+                <p class="setup-hint">13 × 13 board, one ban per commander, snake draft, every unit and skin available. Results do not affect Ranked.</p>
+              </div>
+              <label class="setup-field">
+                <span class="setup-label">Competitor name</span>
+                <input type="text" class="online-player-name-input" data-online="tournamentNameInput" maxlength="18" placeholder="Bracket name" autocomplete="off" spellcheck="false" />
+              </label>
+              <div class="menu-buttons">
+                <button type="button" class="primary menu-btn menu-tournament-btn" data-action="createTournamentRoom">Create Tournament Room</button>
+              </div>
+              <div class="setup-field">
+                <span class="setup-label">Join tournament room</span>
+                <div class="online-join">
+                  <input type="text" class="online-code-input" data-online="tournamentCodeInput" maxlength="5" placeholder="CODE" autocomplete="off" spellcheck="false" />
+                  <button type="button" class="menu-btn" data-action="joinTournamentRoom">Join</button>
+                </div>
+              </div>
+              <p class="setup-hint" data-online="tournamentHint">Tournament access lasts only for this browser tab.</p>
             </div>
           </div>
 

@@ -32,6 +32,7 @@ import { SESSION_CHANGED_EVENT } from "../platform/factorySignIn.js";
 import { isFactoryAccountLoggedIn, readStoredFactoryAccountSession } from "../platform/factoryAccount.js";
 import { createSessionProgressSync } from "../platform/sessionProgressSync.js";
 import { wireAndroidBackButton } from "./androidBackButton.js";
+import { TOURNAMENT_ACCESS_CHANGED_EVENT, isTournamentAccessActive } from "../tournament/tournamentAccess.js";
 export function syncScreenMusic(audio, screenName) {
   if (!screenName) return;
   if (screenName === "match") audio.stopMusic();
@@ -41,16 +42,14 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   const screens = new ScreenManager();
   const $ = (sel, root = document) => root.querySelector(sel);
   const screenEl = (name) => $(`[data-screen="${name}"]`);
-
   let lastConfig = null;
-  for (const name of ["hsSetup", "spSetup", "tempoMenu", "tempoSpSetup", "tutorialComplete"]) {
-    screens.register(name, { el: screenEl(name) });
-  }
+  for (const name of ["hsSetup", "spSetup", "tempoMenu", "tempoSpSetup", "tutorialComplete"]) screens.register(name, { el: screenEl(name) });
   function refreshAccountGatedControls() {
     const menu = screenEl("mainMenu");
     // Online Versus (casual) and Ranked both require a real signed-in factory
     // account. They carry different copy, so each syncs its own control set.
-    syncOnlineAccountFeatureControls(menu);
+    const tournamentAccount = isTournamentAccessActive() ? { authenticated: true, token: "tournament-session" } : readStoredFactoryAccountSession();
+    syncOnlineAccountFeatureControls(menu, { account: tournamentAccount });
     syncRankedAccountFeatureControls(menu);
     // The app-only account button lives on the title screen, not the main menu, but
     // its selector is unique so syncing document-wide is safe and covers both.
@@ -164,6 +163,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       if (screens.active === "mainMenu") showQueuedProgressionAnnouncements({ audit: true });
     },
   }));
+  document.addEventListener(TOURNAMENT_ACCESS_CHANGED_EVENT, refreshAccountGatedControls);
   // ── Global delegated wiring (nav + actions + segmented controls) ──────────
   document.addEventListener("click", (event) => {
     const navBtn = event.target.closest("[data-nav]");

@@ -137,6 +137,7 @@ function makeCtx(overrides = {}) {
     submitDraftPick: (type) => calls.submitDraftPick.push(type),
     submitBan: (type) => calls.submitBan.push(type),
     openLocalFormation: () => { calls.openLocalFormation += 1; },
+    isUnitUnlocked: state.isUnitUnlocked,
   };
   return { ctx, calls, state };
 }
@@ -250,6 +251,24 @@ test("pick phase renders the 8-step track and a pick click reaches submitDraftPi
   assert.ok(pickBtn, "an enabled draft button should exist on your pick");
   pickBtn.click();
   assert.equal(calls.submitDraftPick.length, 1);
+});
+
+test("tournament draft view exposes the complete unit roster", () => {
+  installDom();
+  const draft = createDraftState({ seats: [1, 2] });
+  const { ctx } = makeCtx({
+    matchType: "draft1v1",
+    draft,
+    localSeat: 1,
+    isUnitUnlocked: () => true,
+    lobby: { ownerId: "c1", players: [{ id: "c1", seat: 1, name: "A" }, { id: "c2", seat: 2, name: "B" }] },
+  });
+  createLobbyView(ctx).renderDraft();
+
+  const paladin = walk(ctx.draftRoster, (node) => node.tagName === "BUTTON" && node.dataset.type === "paladin")[0];
+  assert.ok(paladin);
+  assert.equal(paladin.disabled, false);
+  assert.equal(hasClass(paladin, "is-locked"), false);
 });
 
 test("completed draft offers Arrange Formation and auto-prompts once", () => {

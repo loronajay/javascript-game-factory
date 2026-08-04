@@ -19,7 +19,7 @@ import { createOnlineIdentityPayload } from "../../../../js/platform/identity/ma
 import { createOnlineClient, normalizeRoomCode } from "../online/onlineClient.js";
 import { createOnlineSession } from "../online/onlineSession.js";
 import { ONLINE_RULESET_VERSION } from "../online/ruleset.js";
-import { DRAFT_BATTLE_REQUIRED_UNITS, RANKED_BATTLE_REQUIRED_UNITS, isDraftBattleAvailable, isRankedBattleAvailable, unlockedDraftUnitCount } from "../progression/draftAvailability.js";
+import { RANKED_BATTLE_REQUIRED_UNITS, isRankedBattleAvailable } from "../progression/draftAvailability.js";
 import { openSkinPicker } from "./skinPicker.js";
 import { openDraftFormationPicker } from "./draftFormationPicker.js";
 import { applyBan, applyDraftPick, arrangeDraftLoadout, createDraftState, currentBanSeat, currentDraftSeat, isBanPhaseComplete, isDraftComplete } from "./draftModel.js";
@@ -39,6 +39,9 @@ import { getRankedPlacementProgress, placementProgressText } from "./rankedPlace
 import { normalizeMatchType, matchTypeConfigFor, isDraftMatchType } from "./onlineMatchTypes.js";
 import { cloneRemoteProfile, rankedProfileFromStanding, resolveRankedIdentity, shapeSessionProfiles } from "./onlineProfiles.js";
 import { deriveLobbyStartView } from "./onlineLobbyStatus.js";
+import { isUnitUnlocked as isRosterUnitUnlocked } from "./squadModel.js";
+import { createOnlineModeController } from "./onlineModeController.js";
+import { createOnlineMatchTypeController } from "./onlineMatchTypeController.js";
 
 const RULESET_VERSION = ONLINE_RULESET_VERSION;
 const BOARD_SIZES = [13, 15];
@@ -67,13 +70,9 @@ export function createOnlineFlow({ onStartMatch }) {
   const draftRoster = $('[data-online="draftRoster"]');
   const draftActions = $('[data-online="draftActions"]') ?? document.createElement("div");
   const sizeSegs = [...el.querySelectorAll('[data-field="boardSize"] .seg')];
-  const matchTypeSegs = [...el.querySelectorAll('[data-field="onlineMatchType"] .seg')];
-  const matchTypeHintEl = $('[data-online="matchTypeHint"]');
   const rankedBtn = $('[data-online="rankedBtn"]');
   const rankedHint = $('[data-online="rankedHint"]');
   const modeSegs = [...el.querySelectorAll('[data-field="onlineMode"] .seg')];
-  const casualModePanel = $('[data-online-mode-panel="casual"]');
-  const rankedModePanel = $('[data-online-mode-panel="ranked"]');
 
   let client = null;
   let handedOff = false;
@@ -92,13 +91,19 @@ export function createOnlineFlow({ onStartMatch }) {
   // Ranked (server-brokered matchmaking + ban phase). onlineMode is the idle-panel
   // toggle (which pairing flow is shown); rankedMode is true only once a ranked search
   // is actually in flight; rankedInfo holds the platform match once paired.
-  let onlineMode = "casual"; // "casual" | "ranked"
+  let onlineMode = "casual"; // "casual" | "ranked" | "tournament"
   let rankedFlow = null;
   let rankedMode = false;
   let rankedInfo = null;
   let rankedBanFirstSeat = null;
   let rankedIdentityProfile = null;
   let rankedPagehideHandler = null;
+  const matchTypeController = createOnlineMatchTypeController({
+    el,
+    getSelected: () => selectedMatchType,
+    setSelected: (type) => { selectedMatchType = type; },
+    canSelect: () => !lobby && !rankedMode,
+  });
 
   // Owner-authored framing, mirrored to every client via `config`.
   const config = {
@@ -152,6 +157,7 @@ export function createOnlineFlow({ onStartMatch }) {
     submitDraftPick,
     submitBan,
     openLocalFormation,
+    isUnitUnlocked: (type) => isTournamentLobby() || isRosterUnitUnlocked(type),
   });
 
   // ── view helpers ───────────────────────────────────────────────────────────
@@ -162,6 +168,12 @@ export function createOnlineFlow({ onStartMatch }) {
   function setStatus(text) {
     statusEl.textContent = text;
   }
+  const onlineModeController = createOnlineModeController({
+    el, setStatus, normalizeRoomCode,
+    getClient: () => client,
+    getIdentity: () => identity(),
+    onAccessChanged: (active) => setOnlineMode(active ? onlineMode : "casual"),
+  });
   function activeConfig() {
     return isOwner ? config : receivedConfig;
   }
@@ -198,6 +210,14 @@ export function createOnlineFlow({ onStartMatch }) {
     return rankedMode || lobby?.settings?.ranked === true;
   }
 
+  function isTournamentLobby() {
+    return onlineModeController.isTournamentLobby(lobby?.settings, onlineMode);
+  }
+
+  function isBanDraftLobby() {
+    return isRankedLobby() || isTournamentLobby();
+  }
+
   function clearRankedPagehideHandler() {
     if (!rankedPagehideHandler) return;
     globalThis.removeEventListener?.("pagehide", rankedPagehideHandler);
@@ -212,61 +232,11 @@ export function createOnlineFlow({ onStartMatch }) {
     globalThis.addEventListener?.("pagehide", rankedPagehideHandler);
   }
 
-  // Draft needs DRAFT_PICK_ORDER.length (8) unique units across both seats — one
-  // per pick, no duplicate types. With the campaign lock on, there just aren't
-  // enough unlocked units yet, so the mode stays greyed out until enough are.
-  function unlockedUnitCount() {
-    return unlockedDraftUnitCount(globalThis.localStorage);
-  }
-
-  function isDraftUnlockable() {
-    return isDraftBattleAvailable(globalThis.localStorage);
-  }
-
   // Ranked needs a bigger owned pool than plain draft: the ban phase can knock a champ
   // out from under you before you ever pick, so the gate is stricter (see
   // RANKED_BATTLE_REQUIRED_UNITS).
   function isRankedUnlockable() {
     return isRankedBattleAvailable(globalThis.localStorage);
-  }
-
-  function syncMatchTypeAvailability() {
-    const draftReady = isDraftUnlockable();
-    for (const seg of matchTypeSegs) {
-      const locked = normalizeMatchType(seg.dataset.matchType) === "draft1v1" && !draftReady;
-      seg.disabled = locked;
-      seg.classList.toggle("is-locked", locked);
-      seg.title = locked
-        ? `Must own ${DRAFT_BATTLE_REQUIRED_UNITS} unique units to draft (${unlockedUnitCount()} unlocked)`
-        : "";
-    }
-    if (matchTypeHintEl) {
-      const showHint = !draftReady && normalizeMatchType(selectedMatchType) === "draft1v1";
-      matchTypeHintEl.hidden = !showHint;
-      matchTypeHintEl.textContent = showHint
-        ? `Draft 1v1 needs ${DRAFT_BATTLE_REQUIRED_UNITS} unique units — you have ${unlockedUnitCount()} unlocked.`
-        : "";
-    }
-  }
-
-  function selectMatchType(type) {
-    const normalized = normalizeMatchType(type);
-    if (normalized === "draft1v1" && !isDraftUnlockable()) return;
-    selectedMatchType = normalized;
-    for (const seg of matchTypeSegs) {
-      seg.classList.toggle("is-selected", normalizeMatchType(seg.dataset.matchType) === selectedMatchType);
-    }
-    syncMatchTypeAvailability();
-  }
-
-  function lobbyOptions() {
-    const type = normalizeMatchType(selectedMatchType);
-    const cfg = matchTypeConfig(type);
-    return {
-      minPlayers: cfg.minPlayers,
-      maxPlayers: cfg.maxPlayers,
-      settings: { matchType: type },
-    };
   }
 
   function syncDraftMembership() {
@@ -285,7 +255,12 @@ export function createOnlineFlow({ onStartMatch }) {
       // Ranked adds a ban phase. Both clients agree on the ban-first SEAT from their
       // own bansFirst flag (exactly one is true) mapped to their lobby seat, so the
       // deterministic draft state matches on both sides.
-      if (rankedMode && rankedInfo) {
+      if (onlineModeController.matchesSettings(lobby?.settings)) {
+        draft = createDraftState({
+          seats: [1, 2],
+          banFirstSeat: onlineModeController.banFirstSeat(lobby.settings),
+        });
+      } else if (rankedMode && rankedInfo) {
         const mySeat = localLobbySeat() ?? 1;
         const otherSeat = mySeat === 1 ? 2 : 1;
         rankedBanFirstSeat = rankedInfo.bansFirst ? mySeat : otherSeat;
@@ -335,7 +310,8 @@ export function createOnlineFlow({ onStartMatch }) {
     // Pull the canonical Javascript Game Factory profile so the lobby and ranked
     // nameplate can show the pilot name separately from the Tactical Arena tagline.
     try {
-      const payload = createOnlineIdentityPayload(loadFactoryProfile());
+      const tournamentName = onlineModeController.playerName(isTournamentLobby());
+      const payload = createOnlineIdentityPayload(loadFactoryProfile(), tournamentName);
       if (!rankedMode) return payload;
       return { ...payload, rankedProfile: resolveRankedIdentity(rankedIdentityProfile, loadRankedName()) };
     } catch {
@@ -369,16 +345,12 @@ export function createOnlineFlow({ onStartMatch }) {
     return { minPlayers: 2, maxPlayers: 2, settings: { matchType: "draft1v1", ranked: true } };
   }
 
-  // Switches the idle panel between the casual pairing flow and the ranked
-  // matchmaking flow. Leaving ranked abandons any in-flight search.
+  // Switches the idle panel between casual, ranked, and organizer-enabled tournament.
+  // Leaving ranked abandons any in-flight brokered search.
   function setOnlineMode(mode) {
     const accountState = syncRankedAccountFeatureControls(el);
-    const next = mode === "ranked" && accountState.enabled ? "ranked" : "casual";
-    onlineMode = next;
-    for (const seg of modeSegs) seg.classList.toggle("is-selected", seg.dataset.onlineMode === next);
-    if (casualModePanel) casualModePanel.hidden = next !== "casual";
-    if (rankedModePanel) rankedModePanel.hidden = next !== "ranked";
-    if (next === "casual") endRankedSearch();
+    onlineMode = onlineModeController.select(mode, { rankedEnabled: accountState.enabled });
+    if (onlineMode !== "ranked") endRankedSearch();
     else syncRankedAvailability();
   }
 
@@ -494,12 +466,16 @@ export function createOnlineFlow({ onStartMatch }) {
     syncDraftMembership();
     const cfg = activeConfig() ?? config;
     cfg.format = matchTypeConfig().format;
-    const rankedLobby = isRankedLobby();
-    if (rankedLobby) cfg.size = 13;
+    const banDraftLobby = isBanDraftLobby();
+    if (banDraftLobby) cfg.size = 13;
     selectSeg(cfg.size);
-    for (const seg of sizeSegs) seg.disabled = rankedLobby || !isOwner;
-    if (boardSizeField) boardSizeField.hidden = rankedLobby;
-    hostHintEl.textContent = rankedLobby ? "(ranked fixed)" : isOwner ? "(you set it)" : "(set by host)";
+    for (const seg of sizeSegs) seg.disabled = banDraftLobby || !isOwner;
+    if (boardSizeField) boardSizeField.hidden = banDraftLobby;
+    hostHintEl.textContent = isTournamentLobby()
+      ? "(tournament fixed)"
+      : isRankedLobby()
+        ? "(ranked fixed)"
+        : isOwner ? "(you set it)" : "(set by host)";
     const draftMode = isDraftMatch();
     if (blindPickField) blindPickField.hidden = draftMode;
     if (draftField) draftField.hidden = !draftMode;
@@ -536,7 +512,7 @@ export function createOnlineFlow({ onStartMatch }) {
     const missingLocks = full ? lobbyPlayers().filter((p) => readyByClientId.get(p.id) !== true).length : 0;
     const view = deriveLobbyStartView({
       isOwner, full, locked, draftMode, draftDone, draftReady, missingLocks,
-      rankedMode, draft, count, maxPlayers: type.maxPlayers, matchLabel: type.label,
+      rankedMode: isBanDraftLobby(), draft, count, maxPlayers: type.maxPlayers, matchLabel: type.label,
       localLocked, localSeat: localLobbySeat(), draftPlayerLabel,
     });
     startBtn.hidden = view.startHidden;
@@ -561,7 +537,12 @@ export function createOnlineFlow({ onStartMatch }) {
     }
     const pickIndex = draft.pickIndex;
     setStatus("Choose a skin for this draft pick.");
-    const chosen = await openSkinPicker({ type, initial: null, accent: PLAYER_COLOR[localSeat] ?? PLAYER_COLOR[1] });
+    const chosen = await openSkinPicker({
+      type,
+      initial: null,
+      accent: PLAYER_COLOR[localSeat] ?? PLAYER_COLOR[1],
+      allowAll: isTournamentLobby(),
+    });
     if (!chosen) {
       setStatus("Draft pick cancelled.");
       syncUI();
@@ -574,7 +555,16 @@ export function createOnlineFlow({ onStartMatch }) {
     }
     const skin = chosen.skin ?? null;
     const nickname = getNicknamePref(type);
-    const result = applyDraftPick(draft, { seat: localSeat, type, skin, nickname });
+    const result = isTournamentLobby()
+      ? applyDraftPick(draft, {
+          seat: localSeat,
+          type,
+          skin,
+          nickname,
+          isUnlocked: () => true,
+          trustSkin: isTournamentLobby(),
+        })
+      : applyDraftPick(draft, { seat: localSeat, type, skin, nickname });
     if (!result.accepted) {
       setStatus("That unit is already drafted.");
       lobbyView.renderDraft();
@@ -656,15 +646,24 @@ export function createOnlineFlow({ onStartMatch }) {
 
     cb.onLobbyJoined = (snapshot) => {
       lobby = snapshot;
+      if (onlineModeController.matchesSettings(lobby.settings)) {
+        onlineMode = "tournament";
+        client.setIdentity(identity());
+        client.sendProfile();
+      }
       selectedMatchType = normalizeMatchType(lobby.settings?.matchType ?? selectedMatchType);
       myClientId = client.getClientId();
       isOwner = lobby.ownerId === myClientId;
       localLocked = false;
       forgetDepartedReadyStates();
       setPanel("lobby");
-      setStatus(isOwner ? "Your room — invite an opponent, then start." : "Joined the room.");
+      setStatus(isTournamentLobby()
+        ? (isOwner ? "Tournament room ready — share the code with the opponent." : "Joined the tournament room.")
+        : isOwner ? "Your room — invite an opponent, then start." : "Joined the room.");
       roomCodeEl.hidden = false;
-      roomCodeEl.textContent = rankedMode ? "Ranked match" : `Room code: ${lobby.roomCode}`;
+      roomCodeEl.textContent = isTournamentLobby()
+        ? `Tournament room: ${lobby.roomCode}`
+        : rankedMode ? "Ranked match" : `Room code: ${lobby.roomCode}`;
       // Ranked rendezvous: the seat-1 creator publishes its relay code to the platform
       // so the brokered opponent can poll for it and join this exact lobby.
       if (rankedMode && isOwner && rankedFlow && lobby.roomCode) {
@@ -732,7 +731,9 @@ export function createOnlineFlow({ onStartMatch }) {
       seed = matchSeed;
       setStatus("Match starting…");
 
-      const arrangedDraft = isDraftMatch() ? arrangeDraftLoadout(draft, mySeat, localFormationOrder) : null;
+      const arrangedDraft = isDraftMatch()
+        ? arrangeDraftLoadout(draft, mySeat, localFormationOrder, { trustSkin: isTournamentLobby() })
+        : null;
       const composition = arrangedDraft ? arrangedDraft.composition : squadPicker.getSquad();
       const skins = arrangedDraft ? arrangedDraft.skins : squadPicker.getSkins();
       const nicknames = arrangedDraft ? arrangedDraft.nicknames : squadPicker.getNicknames();
@@ -769,7 +770,7 @@ export function createOnlineFlow({ onStartMatch }) {
     };
 
     cb.onRemoteBanPick = ({ banIndex, seat, type }) => {
-      if (!rankedMode || !draft || banIndex !== draft.banIndex) return;
+      if (!isBanDraftLobby() || !draft || banIndex !== draft.banIndex) return;
       const result = applyBan(draft, { seat, type });
       if (!result.accepted) return;
       draft = result.nextState;
@@ -871,6 +872,7 @@ export function createOnlineFlow({ onStartMatch }) {
       teamColors: format === "teams" ? { ...cfg.teamColors } : null,
       teamNames: format === "teams" ? { ...cfg.teamNames } : null,
       ranked: rankedHandoff,
+      tournament: isTournamentLobby(),
     });
   }
 
@@ -899,12 +901,6 @@ export function createOnlineFlow({ onStartMatch }) {
   }
 
   // ── one-time control wiring (the section persists across enter/exit) ─────────
-  for (const seg of matchTypeSegs) {
-    seg.addEventListener("click", () => {
-      if (lobby || rankedMode) return;
-      selectMatchType(seg.dataset.matchType);
-    });
-  }
   for (const seg of modeSegs) {
     seg.addEventListener("click", () => {
       if (lobby || seg.disabled) return; // locked while in a lobby or mid-search
@@ -915,9 +911,8 @@ export function createOnlineFlow({ onStartMatch }) {
     if (rankedMode && !rankedInfo) endRankedSearch(); // cancel an in-progress search
     else if (!rankedMode) void startRanked();
   });
-  syncMatchTypeAvailability();
-  $('[data-action="quickMatch"]').addEventListener("click", () => client?.findLobby(lobbyOptions()));
-  $('[data-action="createRoom"]').addEventListener("click", () => client?.createLobby(lobbyOptions()));
+  $('[data-action="quickMatch"]').addEventListener("click", () => client?.findLobby(matchTypeController.lobbyOptions()));
+  $('[data-action="createRoom"]').addEventListener("click", () => client?.createLobby(matchTypeController.lobbyOptions()));
   $('[data-action="joinRoom"]').addEventListener("click", () => {
     const code = normalizeRoomCode(codeInput.value);
     codeInput.value = code;
@@ -939,11 +934,12 @@ export function createOnlineFlow({ onStartMatch }) {
     endRankedSearch();
     resetLobbyState();
     setPanel("idle");
+    setOnlineMode(onlineModeController.active() ? "tournament" : "casual");
     setStatus(`Connected to ${describeRelay(client?.getWebSocketUrl())}. Choose how to play.`);
   });
   for (const seg of sizeSegs) {
     seg.addEventListener("click", () => {
-      if (!isOwner || seg.disabled || isRankedLobby()) return;
+      if (!isOwner || seg.disabled || isBanDraftLobby()) return;
       const chosen = Number(seg.dataset.size);
       if (!BOARD_SIZES.includes(chosen)) return;
       config.size = chosen;
@@ -960,8 +956,8 @@ export function createOnlineFlow({ onStartMatch }) {
     rankedInfo = null;
     rankedBanFirstSeat = null;
     syncRankedAccountFeatureControls(el);
-    selectMatchType("duel");
-    setOnlineMode("casual"); // resets ranked search + shows the casual pairing flow
+    matchTypeController.select("duel");
+    setOnlineMode(onlineModeController.active() ? "tournament" : "casual");
     resetLobbyState();
     setPanel("none");
     setStatus("Connecting to the network…");
