@@ -27,7 +27,6 @@ export const ANGEL = Object.freeze({
   glyph: "\u{1FABD}",
   classType: "ranger",
   ai: Object.freeze({ threatValue: 15, role: "support", protect: true }),
-  tempo: Object.freeze({ agility: 6 }),
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 5,

@@ -54,15 +54,47 @@ test("full ore grants +1 STR/+1 DEF and harvested ore increases crit chance", ()
   assert.equal(getCritChance(raging), 0.25, "rage doubles the ore-band bonus to +10%");
 });
 
+test("Ore Harvester naturally gains 1 ore at the start of each fresh Miner turn", () => {
+  const state = scenario([{ id: "foe", player: 2, type: "swordsman", x: 6, y: 6 }]);
+
+  let result = run(state, beginActivation(1, "miner"));
+  let s = result.nextState;
+  assert.equal(findUnit(s, "miner").mp, 1);
+  assert.ok(result.events.some((event) => event.type === "ORE_HARVESTER_GAIN" && event.oreGained === 1 && event.oreAfter === 1));
+
+  s = run(s, beginActivation(1, "miner")).nextState;
+  assert.equal(findUnit(s, "miner").mp, 1, "reopening the same activation cannot grant ore twice");
+
+  s = run(s, defend(1, "miner")).nextState;
+  s = run(s, beginActivation(2, "foe")).nextState;
+  s = run(s, defend(2, "foe")).nextState;
+  s = run(s, beginActivation(1, "miner")).nextState;
+  assert.equal(findUnit(s, "miner").mp, 2, "the next turn grants another ore");
+
+  const capped = run(scenario([], { mp: 25 }), beginActivation(1, "miner"));
+  assert.equal(findUnit(capped.nextState, "miner").mp, 25);
+  assert.equal(capped.events.some((event) => event.type === "ORE_HARVESTER_GAIN"), false, "no gain event is emitted at the cap");
+});
+
+test("Miner's ore crit modifier is used by the real attack roll before ranged ammo is spent", () => {
+  const state = scenario([{ id: "foe", player: 2, type: "swordsman", x: 4, y: 1 }], { mp: 25 });
+  let s = run(state, beginActivation(1, "miner")).nextState;
+  const result = run(s, attack(1, "miner", "foe", { attackRoll: 0.5, critRoll: 0.195 }));
+  s = result.nextState;
+
+  assert.equal(result.events[0].critical, true, "19.5% rolls crit at the advertised 20% full-ore chance");
+  assert.equal(findUnit(s, "miner").mp, 24, "the ranged attack still consumes its ore");
+});
+
 test("basic ranged attacks cost 1 ore, while adjacent pickaxe strikes do +2 damage for free", () => {
-  const state = scenario([{ id: "far", player: 2, type: "swordsman", x: 4, y: 1 }], { mp: 2 });
+  const state = scenario([{ id: "far", player: 2, type: "swordsman", x: 4, y: 1 }], { mp: 1 });
 
   let s = run(state, beginActivation(1, "miner")).nextState;
   s = run(s, attack(1, "miner", "far", NORMAL_HIT)).nextState;
   assert.equal(findUnit(s, "miner").mp, 1, "ranged shot consumes ore");
   assert.equal(findUnit(s, "far").hp, 22, "8 STR - 5 DEF");
 
-  const adjacentState = scenario([{ id: "near", player: 2, type: "swordsman", x: 1, y: 2 }], { mp: 1 });
+  const adjacentState = scenario([{ id: "near", player: 2, type: "swordsman", x: 1, y: 2 }]);
   s = run(adjacentState, beginActivation(1, "miner")).nextState;
   s = run(s, attack(1, "miner", "near", NORMAL_HIT)).nextState;
   assert.equal(findUnit(s, "miner").mp, 1, "adjacent basic attack does not spend ore");
@@ -70,7 +102,7 @@ test("basic ranged attacks cost 1 ore, while adjacent pickaxe strikes do +2 dama
 });
 
 test("adjacent basic attacks that destroy walls grant Miner 2 ore", () => {
-  const state = scenario([{ id: "foe", player: 2, type: "swordsman", x: 6, y: 6 }], { mp: 1 });
+  const state = scenario([{ id: "foe", player: 2, type: "swordsman", x: 6, y: 6 }]);
   state.tileObjects["1,2"] = { kind: "wall", hp: 1 };
 
   let s = run(state, beginActivation(1, "miner")).nextState;
@@ -84,7 +116,7 @@ test("adjacent basic attacks that destroy walls grant Miner 2 ore", () => {
 });
 
 test("ranged wall basic attacks spend ore and do not grant Miner wall-kill ore", () => {
-  const state = scenario([{ id: "foe", player: 2, type: "swordsman", x: 6, y: 6 }], { mp: 3 });
+  const state = scenario([{ id: "foe", player: 2, type: "swordsman", x: 6, y: 6 }], { mp: 2 });
   state.tileObjects["4,1"] = { kind: "wall", hp: 1 };
 
   let s = run(state, beginActivation(1, "miner")).nextState;
@@ -122,7 +154,7 @@ test("Diamond Harvester does not let Miner fire through intervening units", () =
 });
 
 test("Ore Harvest gathers weighted ore, caps at 25, and grants +1 move next turn", () => {
-  const state = scenario([{ id: "foe", player: 2, type: "swordsman", x: 6, y: 6 }], { mp: 24 });
+  const state = scenario([{ id: "foe", player: 2, type: "swordsman", x: 6, y: 6 }], { mp: 23 });
   let s = run(state, beginActivation(1, "miner")).nextState;
   const result = run(s, useArt(1, "miner", "ore-harvest", { effectRoll: 0.95 }));
   s = result.nextState;
@@ -148,7 +180,7 @@ test("Headlamp is a range-1 guaranteed blind with no damage", () => {
 });
 
 test("Shaft Prop raises a wall within 3 and spends ore", () => {
-  const state = scenario([{ id: "foe", player: 2, type: "swordsman", x: 6, y: 6 }], { mp: 3 });
+  const state = scenario([{ id: "foe", player: 2, type: "swordsman", x: 6, y: 6 }], { mp: 2 });
   let s = run(state, beginActivation(1, "miner")).nextState;
   s = run(s, useArt(1, "miner", "shaft-prop", { targetPosition: { x: 3, y: 1 } })).nextState;
 
@@ -162,7 +194,7 @@ test("Blasting Cap deals true damage, shoves neighbors, blocks for damage, and s
     { id: "target", player: 2, type: "swordsman", x: 3, y: 3 },
     { id: "pushed", player: 2, type: "archer", x: 3, y: 4 },
     { id: "blocked", player: 2, type: "archer", x: 2, y: 3 }
-  ], { mp: 2 });
+  ], { mp: 1 });
   state.tileObjects["1,3"] = { kind: "wall", hp: 1 };
 
   let s = run(state, beginActivation(1, "miner")).nextState;
@@ -180,7 +212,7 @@ test("Blasting Cap miss spends ore but does nothing else", () => {
   const state = scenario([
     { id: "target", player: 2, type: "swordsman", x: 3, y: 3 },
     { id: "nearby", player: 2, type: "archer", x: 3, y: 4 }
-  ], { mp: 2 });
+  ], { mp: 1 });
   let s = run(state, beginActivation(1, "miner")).nextState;
   s = run(s, useArt(1, "miner", "blasting-cap", { targetId: "target", ...MISS })).nextState;
 
@@ -195,7 +227,7 @@ test("Blasting Cap can target a wall without a roll, destroy it for no ore, and 
     { id: "pushed", player: 2, type: "archer", x: 3, y: 4 },
     { id: "blocked", player: 2, type: "archer", x: 2, y: 3 },
     { id: "far", player: 2, type: "archer", x: 5, y: 5 }
-  ], { mp: 5 });
+  ], { mp: 4 });
   state.tileObjects["3,3"] = { kind: "wall", hp: 1 };
   state.tileObjects["1,3"] = { kind: "wall", hp: 1 };
   state.tileObjects["3,2"] = { kind: "wall", hp: 1 };

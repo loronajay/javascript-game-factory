@@ -4,7 +4,6 @@ export const MONK = Object.freeze({
   glyph: "🥋",
   classType: "melee",
   ai: Object.freeze({ threatValue: 13, role: "skirmisher", protect: false }),
-  tempo: Object.freeze({ agility: 7 }),
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 1,

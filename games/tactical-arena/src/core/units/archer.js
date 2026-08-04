@@ -4,7 +4,6 @@ export const ARCHER = Object.freeze({
   glyph: "🏹",
   classType: "ranger",
   ai: Object.freeze({ threatValue: 12, role: "ranged", protect: true }),
-  tempo: Object.freeze({ agility: 7 }),
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 5,

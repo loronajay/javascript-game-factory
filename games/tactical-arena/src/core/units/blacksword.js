@@ -36,7 +36,6 @@ export const BLACKSWORD = Object.freeze({
   glyph: "\u{1F5E1}", // 🗡 dagger
   classType: "melee",
   ai: Object.freeze({ threatValue: 16, role: "bruiser", protect: false }),
-  tempo: Object.freeze({ agility: 6 }),
   stats: Object.freeze({
     moveRange: 3,
     attackRange: 1,

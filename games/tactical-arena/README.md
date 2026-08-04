@@ -5,7 +5,7 @@ Tactical Arena is the flagship isometric tactics cabinet and successor to Mini-T
 ## Current product
 
 - Local hot-seat play for 2–4 players, including FFA and 2v2 Teams
-- Single-player CPU matches and the separate real-time Tempo Battle mode
+- Single-player CPU matches
 - Online Versus with Classic/Draft 1v1, 4-player FFA, and 2v2 Teams
 - Server-authoritative Ranked 1v1 matchmaking and results
 - A complete 22-mission campaign with progression, objectives, stars, reward choices, and formation editing

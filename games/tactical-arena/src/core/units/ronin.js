@@ -23,7 +23,6 @@ export const RONIN = Object.freeze({
   glyph: "\u{1F977}",
   classType: "melee",
   ai: Object.freeze({ threatValue: 13, role: "skirmisher", protect: false }),
-  tempo: Object.freeze({ agility: 7 }),
   stats: Object.freeze({
     moveRange: 3,
     attackRange: 1,

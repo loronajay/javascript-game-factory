@@ -37,7 +37,6 @@ import {
 import { isCampaignSkinRewardGranted, isCampaignUnitRewardGranted } from "../progression/unlocks.js";
 import { claimOnlineMatchValorReward } from "../progression/valorRewards.js";
 import { buildRankedUnitReport, buildSummary, squadForSeat, teamColor } from "../match/matchBuilder.js";
-import { isTempoBattle } from "../core/tempoBattle.js";
 import { shouldShowTurnAnnouncement, turnAnnouncementSub } from "./turnAnnouncement.js";
 
 // Missions that play a beat from the losing side between the final blow and the results
@@ -99,7 +98,6 @@ export function createMatchOutcomeController({
   function announceTurnChange(prevPlayer) {
     const state = runtime.state;
     if (!shouldShowTurnAnnouncement({
-      tempo: isTempoBattle(state),
       phase: state.phase,
       currentPlayer: state.currentPlayer,
       prevPlayer

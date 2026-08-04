@@ -30,6 +30,32 @@ export function refreshSoulShuffle(state, unit) {
   unit.soulShuffleChoices = [...preview.choices];
 }
 
+// Passive resource income at the start of a unit's fresh activation. Miner uses this
+// for natural ore generation; keeping the amount in unit data makes the lifecycle hook
+// reusable and ensures re-selecting an already-open activation cannot pay twice.
+export function applyTurnStartResourceGain(unit, events) {
+  const definition = getUnitType(unit.type);
+  const effect = definition.passive?.effect;
+  const amount = Math.max(0, Number(effect?.turnStartResourceGain) || 0);
+  if (amount <= 0) return false;
+  const resource = effect.resource ?? "mp";
+  const maxResource = resource === "mp" ? definition.stats.maxMp : Number.POSITIVE_INFINITY;
+  const before = Math.max(0, Number(unit[resource]) || 0);
+  unit[resource] = Math.min(maxResource, before + amount);
+  const gained = unit[resource] - before;
+  if (gained <= 0) return false;
+  events.push({
+    type: effect.type === "oreHarvester" ? "ORE_HARVESTER_GAIN" : "PASSIVE_RESOURCE_GAIN",
+    unitId: unit.id,
+    passiveId: definition.passive.id,
+    resource,
+    resourceGained: gained,
+    resourceAfter: unit[resource],
+    ...(effect.type === "oreHarvester" ? { oreGained: gained, oreAfter: unit[resource] } : {})
+  });
+  return true;
+}
+
 // Emergency Snacks (a `rageRegen` ragePassive): while raging, nibble `hp` HP back at the
 // start of the turn. The turn that nibble lifts her back above the 5-HP rage threshold she
 // also restores `exitMp`. Capped at `maxProcs` procs per battle (unit.emergencySnackCount,

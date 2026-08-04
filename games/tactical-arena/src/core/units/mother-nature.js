@@ -7,7 +7,6 @@ export const MOTHER_NATURE = Object.freeze({
   classType: "support",
   actsFirst: true,
   ai: Object.freeze({ threatValue: 20, role: "support", protect: true }),
-  tempo: Object.freeze({ agility: 4 }),
   stats: Object.freeze({
     moveRange: 3,
     attackRange: 6,

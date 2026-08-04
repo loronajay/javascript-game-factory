@@ -381,8 +381,20 @@ Each of these was discovered the hard way. Do not rediscover them.
   Values are UTF-16 (hence `tr -d '\000'`); keys are plain ASCII. `run-as` needs the debug
   build.
 
-- **`npm run apk` fails in Git Bash** — `gradlew.bat` is not recognized. Use
-  `cd android && ./gradlew.bat assembleDebug`, or run the npm script from PowerShell.
+- **The `.\` in `.\gradlew.bat` is load-bearing — do not "tidy" it away.** The gradle npm
+  scripts invoke `cd android && .\gradlew.bat ...`. A bare `gradlew.bat` resolves only
+  because cmd.exe searches the current directory first, and that search is disabled
+  whenever `NoDefaultCurrentDirectoryInExePath=1` is set in the environment (a common
+  hardening setting, and it is set inside some agent/CI shells). Without the `.\` the
+  script dies with `'gradlew.bat' is not recognized`. Note the asymmetry: cmd.exe accepts
+  `.\gradlew.bat` but rejects `./gradlew.bat` (`'.' is not recognized`), while Git Bash is
+  the exact opposite. npm defaults to cmd.exe on Windows, so `.\` is the correct form —
+  if you run the gradle line by hand in Git Bash, use `./gradlew.bat` there instead.
+
+  A failure here is easy to miss: these scripts pipe through `npm run sync` first, so a
+  build that never reached gradle still prints a wall of successful sync output. Check the
+  AAB/APK timestamp, not just the console tail.
+
   Related: `adb shell df /data` needs `MSYS_NO_PATHCONV=1` in Git Bash, and installs fail
   with `INSTALL_FAILED_INSUFFICIENT_STORAGE` well before the device looks full.
 

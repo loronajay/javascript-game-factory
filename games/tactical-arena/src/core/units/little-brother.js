@@ -4,7 +4,6 @@ export const LITTLE_BROTHER = Object.freeze({
   glyph: "\u{2699}\u{FE0F}", // ⚙️ gear
   classType: "ranger",
   ai: Object.freeze({ threatValue: 14, role: "ranged", protect: true }),
-  tempo: Object.freeze({ agility: 5 }),
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 4,

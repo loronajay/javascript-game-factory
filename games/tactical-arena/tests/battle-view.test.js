@@ -7,7 +7,6 @@ import { fileURLToPath } from "node:url";
 import { createBattleState } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
 import { beginActivation, moveUnit } from "../src/core/commands.js";
-import { TEMPO_GAUGE_MAX, enableTempoBattle } from "../src/core/tempoBattle.js";
 import { canCancelMoveInActivation, canMoveInActivation } from "../src/ui/hud.js";
 import { renderActions, renderSquads, renderUnitCard, renderRankedMatchNameplates } from "../src/ui/hud.js";
 import { isHealArtConfirmTile, isTargetedMode, renderBoard } from "../src/ui/boardRenderer.js";
@@ -583,51 +582,14 @@ test("spent defending squad rows keep Done in the status tag strip", () => {
   }
 });
 
-test("tempo squad rows are selectable for ready units while no squad turn is active", () => {
-  const previousDocument = globalThis.document;
-  globalThis.document = { createElement: (tagName) => new TestElement(tagName) };
-
-  try {
-    const state = enableTempoBattle(createBattleState({
-      units: [
-        { id: "p1-ready", player: 1, type: "archer", x: 0, y: 0 },
-        { id: "p1-waiting", player: 1, type: "swordsman", x: 1, y: 0 },
-        { id: "p2-ready", player: 2, type: "clod", x: 7, y: 7 }
-      ]
-    }), { readiness: { "p1-ready": TEMPO_GAUGE_MAX, "p2-ready": TEMPO_GAUGE_MAX } });
-    const selected = [];
-    const overlay = new TestElement("div");
-
-    renderSquads(state, overlay, (unit) => selected.push(unit.id));
-
-    const rows = overlay.children.flatMap((panel) => panel.querySelector(".squad-list").children);
-    const readyRow = rows.find((row) => row.innerHTML.includes("Archer"));
-    const waitingRow = rows.find((row) => row.innerHTML.includes("Swordsman"));
-    assert.match(readyRow.className, /\bselectable\b/);
-    assert.doesNotMatch(waitingRow.className, /\bselectable\b/);
-
-    readyRow.listeners.get("click")();
-    assert.deepEqual(selected, ["p1-ready"]);
-  } finally {
-    globalThis.document = previousDocument;
+// Tempo Battle was removed outright — it was a real-time readiness mode that never fit a
+// turn-driven tactics game, and it had already been cut off from the main menu. This guard
+// keeps its screens and wiring from creeping back in through a stale copy-paste.
+test("Tempo Battle is fully removed from the menu and setup screens", () => {
+  for (const file of ["html/menu-screens.html", "html/setup-screens.html"]) {
+    const html = readFileSync(join(GAME_ROOT, file), "utf8");
+    assert.doesNotMatch(html, /tempo/i, `${file} should carry no Tempo Battle markup`);
   }
-});
-
-test("main menu does not expose Tempo Battle while it is out of scope", () => {
-  const html = readFileSync(join(GAME_ROOT, "html/menu-screens.html"), "utf8");
-  const mainMenu = html.match(/data-screen="mainMenu"[\s\S]*?<\/section>/)?.[0] ?? "";
-
-  assert.doesNotMatch(mainMenu, /data-nav="tempoMenu"/);
-  assert.doesNotMatch(mainMenu, />\s*Tempo Battle\s*</);
-});
-
-test("tempo setup board-size labels use the same readable multiplication sign as other setup screens", () => {
-  const html = readFileSync(join(GAME_ROOT, "html/setup-screens.html"), "utf8");
-  const tempoSetup = html.match(/data-screen="tempoSpSetup"[\s\S]*?data-action="startTempoSingle"/)?.[0] ?? "";
-
-  assert.match(tempoSetup, /13 × 13/);
-  assert.match(tempoSetup, /15 × 15/);
-  assert.doesNotMatch(tempoSetup, /Ã/);
 });
 
 test("local match setup exposes compact board sizes from fifteen down to seven", () => {
@@ -637,7 +599,6 @@ test("local match setup exposes compact board sizes from fifteen down to seven",
   for (const [screen, startAction] of [
     ["hsSetup", "startHotSeat"],
     ["spSetup", "startSingle"],
-    ["tempoSpSetup", "startTempoSingle"],
   ]) {
     const setup = html.match(new RegExp(`data-screen="${screen}"[\\s\\S]*?data-action="${startAction}"`))?.[0] ?? "";
     const boardControl = setup.match(/<div class="segmented board-size-grid" data-field="boardSize">[\s\S]*?<\/div>/)?.[0] ?? "";

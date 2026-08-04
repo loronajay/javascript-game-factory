@@ -78,9 +78,6 @@ Climb a real ELO ladder in 1v1 Ranked. A public profile tracks your standing, yo
 🗺 A CAMPAIGN WORTH FINISHING
 22 missions with objectives, star ratings, dialogue, unlockable units, and multi-stage boss encounters. Special rules per mission — sometimes you are outnumbered, sometimes the board itself is against you.
 
-⏱ TEMPO BATTLE
-A different game entirely. No turns — every unit fills a readiness gauge and acts when it is ready. Same units, same rules, completely different pressure.
-
 🎓 LEARN IN FIVE MINUTES
 Five guided tutorials cover movement, combat maths, ARTS, and status effects. Then take on the CPU at Easy, Normal, or Hard until you are ready for people.
 
@@ -108,7 +105,6 @@ Verify each of these still holds at launch:
 | 5 tutorials | `src/tutorials/` |
 | ELO ladder, per-unit stats, badges | Ranked is shipped and server-authoritative |
 | FFA / 2v2 / Draft / Quick Match / codes | All shipped online modes |
-| Tempo Battle | Shipped, versus CPU |
 | CPU Easy / Normal / Hard | Shipped |
 | "No ads" | True — there is no ad SDK in the build |
 | "Free to play" | True — install is free; purchases are optional |

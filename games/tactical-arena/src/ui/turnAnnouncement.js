@@ -1,6 +1,5 @@
-export function shouldShowTurnAnnouncement({ tempo = false, phase, currentPlayer, prevPlayer } = {}) {
+export function shouldShowTurnAnnouncement({ phase, currentPlayer, prevPlayer } = {}) {
   if (phase === "complete") return true;
-  if (tempo) return false;
   return currentPlayer !== prevPlayer;
 }
 

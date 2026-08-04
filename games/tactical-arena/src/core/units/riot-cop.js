@@ -24,7 +24,6 @@ export const RIOT_COP = Object.freeze({
   glyph: "\u{1F6E1}", // 🛡 shield
   classType: "tank",
   ai: Object.freeze({ threatValue: 15, role: "bruiser", protect: false }),
-  tempo: Object.freeze({ agility: 3 }),
   stats: Object.freeze({
     moveRange: 3,
     attackRange: 1,

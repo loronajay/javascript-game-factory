@@ -29,8 +29,6 @@ test("every other screen steps back to the main menu", () => {
     "spSetup",
     "hsSetup",
     "onlineSetup",
-    "tempoMenu",
-    "tempoSpSetup",
     "tutorialSelect",
     "campaign",
     "results",

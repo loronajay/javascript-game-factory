@@ -2,7 +2,6 @@ export const SUMMONER = Object.freeze({
   id: "summoner",
   name: "Summoner",
   ai: Object.freeze({ threatValue: 15, role: "caster", protect: true }),
-  tempo: Object.freeze({ agility: 5 }),
   glyph: "✥",
   classType: "mage",
   stats: Object.freeze({

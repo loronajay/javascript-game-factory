@@ -14,6 +14,5 @@ test("arcade metadata reflects the current release feature set", () => {
   assert.match(metadata.description, /online/i);
   assert.match(metadata.description, /2v2/i);
   assert.match(metadata.status, /Online/i);
-  assert.match(metadata.status, /Tempo/i);
   assert.equal(draftableUnitCount, 30);
 });

@@ -43,7 +43,6 @@ import {
 } from "../rules/arts.js";
 import { isWallBetween } from "../rules/combat.js";
 import { canTrample, chebyshevDistance, getTrampleMoveOptions, positionKey } from "../rules/movement.js";
-import { isTempoBattle } from "../core/tempoBattle.js";
 import { teamColor } from "../match/matchBuilder.js";
 import { createBoardMetrics } from "./isometric.js";
 import { isHealArtConfirmTile } from "./boardRenderer.js";
@@ -54,7 +53,6 @@ export function createBattleInputController({
   interaction,
   selectedUnit = () => null,
   inputLocked = () => false,
-  isLocalTempoCommander = () => true,
   beginUnit = () => {},
   dispatch = () => false,
   render = () => {},
@@ -84,15 +82,6 @@ export function createBattleInputController({
   }
 
   async function handleTile(position) {
-    // Tempo: clicking one of my ready units always commands it instantly — even mid-animation,
-    // even while another of mine is selected (it switches). beginTempoUnit frees the slot and
-    // gates ownership/readiness/tempoBusy itself.
-    if (isTempoBattle(runtime.state)) {
-      const clicked = unitAt(runtime.state, position);
-      if (clicked && clicked.id !== interaction.selectedId && isLocalTempoCommander(clicked)) {
-        beginUnit(clicked); render(); return;
-      }
-    }
     if (inputLocked()) return;
     const unit = selectedUnit();
     if (!unit) {

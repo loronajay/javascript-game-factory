@@ -46,7 +46,7 @@ test("styles live behind purpose-specific entry points instead of the project ro
 
 test("release hotspots delegate cohesive responsibilities to smaller modules", () => {
   const boundaries = [
-    ["src/main.js", 850, ["./ai/cpuTurnController.js", "./online/onlineCommandController.js", "./match/matchLifecycleController.js", "./ui/battleEventPresenter.js", "./ui/commandResolutionController.js", "./ui/matchOutcomeController.js", "./ui/battleInputController.js", "./ui/tutorialPresentationController.js", "./ui/tempoLoopController.js", "./campaign/campaignPresentationController.js", "./campaign/campaignMatchHooks.js"]],
+    ["src/main.js", 850, ["./ai/cpuTurnController.js", "./online/onlineCommandController.js", "./match/matchLifecycleController.js", "./ui/battleEventPresenter.js", "./ui/commandResolutionController.js", "./ui/matchOutcomeController.js", "./ui/battleInputController.js", "./ui/tutorialPresentationController.js", "./campaign/campaignPresentationController.js", "./campaign/campaignMatchHooks.js"]],
     ["src/ui/commandResolutionController.js", 400, ["./rolledCombatPresenter.js", "./instantArtPresenter.js", "./resolutionGuard.js"]],
     ["src/ui/menuFlow.js", 220, ["./matchSetupScreens.js", "./campaignMapScreen.js", "./resultsScreen.js", "./tutorialMenuScreens.js", "./settingsScreen.js"]],
     ["src/ui/campaignMapScreen.js", 580, ["./campaignMenuModel.js"]],

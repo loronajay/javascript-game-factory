@@ -3,10 +3,7 @@ import assert from "node:assert/strict";
 
 import { createBattleState, livingUnits } from "../src/core/state.js";
 import { applyCommand } from "../src/core/reducer.js";
-import {
-  createCpuTurnController,
-  findReadyTempoCpuPlayer,
-} from "../src/ai/cpuTurnController.js";
+import { createCpuTurnController } from "../src/ai/cpuTurnController.js";
 
 // Drives a real reducer-backed CPU turn, but refuses every command type in `refuse` — a
 // stand-in for any planner/reducer disagreement (an ART planned at a reach its resolver
@@ -94,19 +91,6 @@ test("a CPU turn with no rejections is untouched by the stall guard", async () =
   assert.equal(runtime.state.currentPlayer, 1);
   // The CPU had a real plan available, so it must not have been forced into a brace.
   assert.ok(!livingUnits(runtime.state, 2).every((unit) => unit.defending));
-});
-
-test("tempo CPU selection returns the first configured player with a ready unit", () => {
-  const state = {
-    units: [
-      { id: "p3", player: 3, ready: true },
-      { id: "p2", player: 2, ready: true },
-    ],
-  };
-  const cpu = { players: new Set([2, 3]) };
-
-  assert.equal(findReadyTempoCpuPlayer(state, cpu, (_state, unit) => unit.ready), 2);
-  assert.equal(findReadyTempoCpuPlayer(state, null, () => true), null);
 });
 
 test("classic CPU startup respects presenter busy state before claiming the thinking lock", () => {

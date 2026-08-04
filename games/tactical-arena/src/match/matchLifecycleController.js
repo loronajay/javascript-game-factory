@@ -3,7 +3,6 @@ import {
   campaignOpeningScript,
   prepareCampaignMatchState,
 } from "../campaign/campaign.js";
-import { enableTempoBattle, isTempoBattle } from "../core/tempoBattle.js";
 import { musicKeyForMatchMode } from "../audio/sounds.js";
 import { createBoardMetrics } from "../ui/isometric.js";
 import { DEFAULT_FORMATION_ORDER, DEFAULT_SQUAD } from "../ui/squadPicker.js";
@@ -15,7 +14,7 @@ import {
 } from "../tutorials/basics.js";
 import { createMatchState, hpRemaining } from "./matchBuilder.js";
 
-const CPU_MATCH_MODES = new Set(["single", "tempo-single", "tutorial", "campaign"]);
+const CPU_MATCH_MODES = new Set(["single", "tutorial", "campaign"]);
 
 export function cpuConfigForMatch(config) {
   if (!CPU_MATCH_MODES.has(config.mode)) return null;
@@ -30,7 +29,6 @@ export function createMatchLifecycleController({
   runtime,
   interaction,
   tutorialPresentation,
-  tempoLoop,
   blackout,
   effects,
   restartControl,
@@ -90,7 +88,6 @@ export function createMatchLifecycleController({
     clearRankedPagehideHandler();
     clock.clearTimeout(runtime.resultsTimer);
     tutorialPresentation.reset();
-    tempoLoop.stop();
     blackout.clear();
     effects.clearActive?.();
     runtime.matchEpoch += 1;
@@ -112,7 +109,6 @@ export function createMatchLifecycleController({
       state = prepareTutorialMatchState(state, config.tutorialId ?? TUTORIAL_BASICS_ID);
     }
     if (config.mode === "campaign") state = prepareCampaignMatchState(state, config.campaignMissionId);
-    if (config.battleMode === "tempo" || config.mode?.startsWith("tempo-")) state = enableTempoBattle(state);
     runtime.state = state;
     effects.setMetrics(createBoardMetrics(config.size));
     runtime.matchConfig = config;
@@ -148,7 +144,6 @@ export function createMatchLifecycleController({
         ? "You open the battle."
         : `Player ${state.currentPlayer}'s turn — please wait.`)
       : `${isCpu(state.currentPlayer) ? `Player ${state.currentPlayer} (CPU)` : `Player ${state.currentPlayer}`} opens the battle.`);
-    if (isTempoBattle(state)) setMessage("Tempo Battle begins. Units become ready by AGILITY.");
     if (runtime.tutorial) setMessage(runtime.tutorial.prompt);
     menu.show("match");
     if (runtime.audioUnlocked && !runtime.muted) {
@@ -156,7 +151,7 @@ export function createMatchLifecycleController({
     }
     if (online) runtime.net.bind(onlineController);
     render();
-    if (!isTempoBattle(state)) announceTurn(state.currentPlayer);
+    announceTurn(state.currentPlayer);
     if (runtime.tutorial) {
       queueTutorialPresentation({ dialogue: runtime.tutorial.dialogue });
     } else if (runtime.matchConfig?.mode === "campaign" && runtime.campaignMissionId) {
@@ -169,7 +164,6 @@ export function createMatchLifecycleController({
         });
       }
     }
-    if (isTempoBattle(state)) tempoLoop.start();
     maybeStartCpuTurn();
   }
 
@@ -185,7 +179,6 @@ export function createMatchLifecycleController({
   }
 
   function leave() {
-    tempoLoop.stop();
     blackout.clear();
     if (runtime.net && runtime.state.phase === "playing") {
       reportLiveRankedAbandon("leave", { keepalive: false });

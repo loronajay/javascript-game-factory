@@ -28,9 +28,8 @@ import { commanderPending, validateOpenActivation, validateOwnedLivingUnit } fro
 import { applyPostCommandReactions, syncOneShotRageArm } from "./reactions.js";
 import { accept, ERR, reject } from "./reducerResult.js";
 import { nextActivePlayer, resolveVictory, spendAndAdvance, syncFinalBattleDarkTileStatuses } from "./turnEngine.js";
-import { isTempoBattle, normalizeTempoStateAfterCommand, prepareTempoStateForCommand } from "./tempoBattle.js";
 import { attack } from "./basicAttack.js";
-import { applyAbilityRecharge, applyRageRegen, refreshSoulShuffle } from "./activationPassives.js";
+import { applyAbilityRecharge, applyRageRegen, applyTurnStartResourceGain, refreshSoulShuffle } from "./activationPassives.js";
 import { CAUSE, creditDeaths, snapshotAlive } from "./killAttribution.js";
 
 function stationaryStrengthEffect(unit) {
@@ -38,7 +37,7 @@ function stationaryStrengthEffect(unit) {
 }
 
 export function applyCommand(state, command) {
-  const commandState = isTempoBattle(state) ? prepareTempoStateForCommand(state, command) : state;
+  const commandState = state;
   // Opens the BROAD kill-credit scope for this command. Narrow scopes inside the
   // resolvers (fire ticks, poison ticks, self-sacrifice) claim their deaths first;
   // this backstop attributes whatever is left to the acting unit, which is correct for
@@ -65,7 +64,6 @@ export function applyCommand(state, command) {
       cause: command.type === COMMANDS.CONCEDE ? CAUSE.CONCEDE : CAUSE.UNIT,
     });
     closeDeadActiveUnit(result.nextState);
-    normalizeTempoStateAfterCommand(result.nextState);
   }
   return result;
 }
@@ -123,6 +121,7 @@ function beginActivation(state, command) {
 
   const next = cloneState(state);
   const unit = findUnit(next, command.unitId);
+  const events = [{ type: "ACTIVATION_BEGAN", unitId: unit.id }];
   unit.defending = false;
   syncOneShotRageArm(unit);
   if (unit.skipNextActivation) {
@@ -143,6 +142,7 @@ function beginActivation(state, command) {
     // roll), so online lockstep clients all agree.
     applyAbilityRecharge(unit);
     refreshSoulShuffle(next, unit);
+    applyTurnStartResourceGain(unit, events);
   }
   // Rain Stance's on-attack charge (set last turn) becomes a live +MOVE buff for this
   // whole activation — applied here, not at attack time, so it lands on the NEXT turn
@@ -173,7 +173,6 @@ function beginActivation(state, command) {
   // a free Pyroclasm BEFORE the turn opens. It spends no MP and no action — the Gargoyle
   // still takes its full turn.
   // Fired here (deterministic, no roll — magic AoE) so online lockstep clients all agree.
-  const events = [{ type: "ACTIVATION_BEGAN", unitId: unit.id }];
   const freeCast = fresh ? getRageEffectValue(unit, "freePyroclasm", null) : null;
   if (freeCast && isRaging(unit)) {
     resolveVolcanicPyroclasmTick(next, unit, freeCast, events, { trigger: "activation" });
@@ -323,4 +322,3 @@ function concede(state, command) {
   }
   return accept(next, events);
 }
-

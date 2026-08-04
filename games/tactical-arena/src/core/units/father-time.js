@@ -22,7 +22,6 @@ export const FATHER_TIME = Object.freeze({
   glyph: "⏳",
   classType: "support",
   ai: Object.freeze({ threatValue: 16, role: "support", protect: true }),
-  tempo: Object.freeze({ agility: 5 }),
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 5,

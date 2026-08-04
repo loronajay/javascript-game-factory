@@ -129,7 +129,7 @@ test("the CPU Miner digs an adjacent wall for ore when boxed in", () => {
   const commands = chooseActivation(state, { difficulty: "normal", cpuPlayer: 2, rng: cpuRng(state) });
   assert.ok(commands.some((c) => c.type === "ATTACK" && c.targetPosition), "expected a wall attack");
   const after = replay(state, commands);
-  assert.equal(findUnit(after, "p2-miner").mp, 2, "adjacent wall kill grants ore");
+  assert.equal(findUnit(after, "p2-miner").mp, 3, "turn-start income plus the adjacent wall kill grants ore");
 });
 
 test("the CPU Miner stops farming walls once an enemy is adjacent", () => {

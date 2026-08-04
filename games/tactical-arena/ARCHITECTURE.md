@@ -34,7 +34,7 @@ update it deliberately when a boundary genuinely changes; never loosen it for co
 - `src/ai/` plans CPU turns without browser dependencies. `plans.js` generates and
   projects candidate plans, `evaluate.js` scores them through the shared combat rules,
   `cpuController.js` picks deterministically (state-seeded `cpuRng`; tie-breaking never
-  uses `Math.random`), and `cpuTurnController.js` coordinates classic and Tempo CPU loops
+  uses `Math.random`), and `cpuTurnController.js` coordinates the CPU turn loop
   through injected presentation and command adapters.
 - `src/campaign/` owns campaign content, progression, match preparation, and match-scoped
   campaign bookkeeping.
@@ -116,8 +116,7 @@ update it deliberately when a boundary genuinely changes; never loosen it for co
     `battleEventPresenter.js`, `rolledCombatPresenter.js`, and `instantArtPresenter.js`;
     tile and action-button routing in `battleInputController.js`; queued tutorial
     dialogue/prompts/spotlights plus the built-in scripted state mutations and completion
-    presentation in `tutorialPresentationController.js`. `tempoLoopController.js` owns
-    real-time frame scheduling and lightweight gauge updates.
+    presentation in `tutorialPresentationController.js`.
 - `src/online/` owns transport, lockstep, and remote command presentation;
   `onlineClient.js` constructs the only production WebSocket, `onlineSession.js` owns
   deterministic lockstep and state hashing, and `onlineCommandController.js` adapts

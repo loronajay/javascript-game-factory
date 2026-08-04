@@ -33,7 +33,6 @@ export const TREANT = Object.freeze({
   glyph: "\u{1F333}", // 🌳 tree
   classType: "tank",
   ai: Object.freeze({ threatValue: 14, role: "support", protect: true }),
-  tempo: Object.freeze({ agility: 3 }),
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 2,

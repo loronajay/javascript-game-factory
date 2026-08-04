@@ -62,8 +62,6 @@ export function createResultsScreen({
       ? "Online Versus"
       : lastConfig?.mode === "campaign"
         ? "Campaign"
-      : lastConfig?.mode === "tempo-single"
-        ? `Tempo Battle · ${(lastConfig.difficulty ?? "normal").replace(/^./, (c) => c.toUpperCase())}`
       : lastConfig?.mode === "single"
         ? `Single Player · ${(lastConfig.difficulty ?? "normal").replace(/^./, (c) => c.toUpperCase())}`
         : "Hot Seat");

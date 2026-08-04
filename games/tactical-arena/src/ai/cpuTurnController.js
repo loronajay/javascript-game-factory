@@ -2,7 +2,6 @@ import { defend, finishActivation } from "../core/commands.js";
 import { applyCommand } from "../core/reducer.js";
 import { findUnit } from "../core/state.js";
 import { getUnitType } from "../core/unitCatalog.js";
-import { isTempoBattle, isTempoUnitReady } from "../core/tempoBattle.js";
 import { resolveAnimatedMove } from "../ui/animatedCommands.js";
 import { chooseTutorialCpuActivation } from "../tutorials/basics.js";
 import { chooseActivation, cpuRng } from "./cpuController.js";
@@ -11,12 +10,6 @@ const CPU_TURN_LEAD_MS = 480;
 const CPU_ACTIVATION_GAP_MS = 320;
 export const CPU_STEP_MS = 260;
 const CPU_MAX_ACTIVATIONS = 64;
-
-export function findReadyTempoCpuPlayer(state, cpu, isReady = isTempoUnitReady) {
-  return [...(cpu?.players ?? [])].find((player) => (
-    state.units.some((unit) => unit.player === player && isReady(state, unit))
-  )) ?? null;
-}
 
 export function createCpuTurnController({
   runtime,
@@ -40,8 +33,7 @@ export function createCpuTurnController({
 } = {}) {
   // A rejected command leaves the board exactly as it was, so the next pass re-plans the
   // same state and deterministically re-picks the same illegal plan. Without a way out the
-  // classic turn spins until CPU_MAX_ACTIVATIONS trips (~20s of visible lockup), and a
-  // tempo activation has no counter at all — it just re-enters itself. So whenever a
+  // turn spins until CPU_MAX_ACTIVATIONS trips (~20s of visible lockup). So whenever a
   // command is rejected mid-activation, force the stuck unit to spend its turn: brace, then
   // close the activation. FINISH_ACTIVATION on its own is not enough — the reducer rejects
   // it with FINISH_REQUIRES_ACTION until the activation has used its primary action.
@@ -69,10 +61,6 @@ export function createCpuTurnController({
   }
 
   function maybeStartCpuTurn() {
-    if (isTempoBattle(runtime.state)) {
-      maybeStartTempoCpuTurn();
-      return;
-    }
     if (runtime.cpuThinking || runtime.state.phase !== "playing" || !isCpu(runtime.state.currentPlayer)) return;
     if (eventPresenter.isBusy()) return;
     maybeShowCampaignDialogue();
@@ -86,48 +74,6 @@ export function createCpuTurnController({
       runtime.cpuThinking = false;
       tutorialPresentation.flush();
     });
-  }
-
-  function maybeStartTempoCpuTurn() {
-    const state = runtime.state;
-    if (!isTempoBattle(state) || runtime.cpuThinking || runtime.resolving || runtime.tempoBusy
-      || eventPresenter.isBusy() || state.activation || state.phase !== "playing") return;
-    if (dialogue.isOpen() || runtime.tempoAnimating > 0) return;
-    const player = findReadyTempoCpuPlayer(state, runtime.cpu);
-    if (player == null) return;
-    runtime.cpuThinking = true;
-    runtime.tempoCpuAbort = false;
-    void runTempoCpuActivation(player).finally(() => {
-      runtime.cpuThinking = false;
-      maybeStartTempoCpuTurn();
-    });
-  }
-
-  async function runTempoCpuActivation(player) {
-    const epoch = runtime.matchEpoch;
-    runtime.tempoCpuActing = true;
-    render();
-    const planningState = { ...runtime.state, currentPlayer: player };
-    const commands = chooseActivation(planningState, {
-      difficulty: runtime.cpu?.difficulty ?? "normal",
-      cpuPlayer: player,
-      rng: cpuRng(planningState),
-    });
-    for (const command of commands) {
-      if (epoch !== runtime.matchEpoch || runtime.state.phase !== "playing" || runtime.tempoCpuAbort) break;
-      const applied = await applyCpuCommand(command);
-      if (epoch !== runtime.matchEpoch || runtime.tempoCpuAbort) break;
-      if (!applied || runtime.state.phase !== "playing") {
-        // Without this the `finally` hook re-enters maybeStartTempoCpuTurn on an unchanged
-        // board and the same rejected plan is chosen forever.
-        if (!applied && runtime.state.phase === "playing") recoverStalledActivation(command.unitId);
-        break;
-      }
-    }
-    runtime.tempoCpuActing = false;
-    runtime.resolving = false;
-    if (!runtime.tempoCpuAbort) clearInteraction();
-    render();
   }
 
   async function runCpuTurn() {
@@ -200,7 +146,7 @@ export function createCpuTurnController({
         const unit = findUnit(runtime.state, command.unitId);
         if (unit) setMessage(`Player ${unit.player} (CPU) activates its ${unit.nickname || getUnitType(unit.type).name}.`);
         render();
-        await sleep(isTempoBattle(runtime.state) ? 0 : CPU_STEP_MS);
+        await sleep(CPU_STEP_MS);
         return true;
       }
       case "MOVE_UNIT":
@@ -256,7 +202,6 @@ export function createCpuTurnController({
   return {
     applyCpuCommand,
     maybeStartCpuTurn,
-    maybeStartTempoCpuTurn,
     resolveCpuMove,
   };
 }

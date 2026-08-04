@@ -7,8 +7,7 @@ This pass is scoped against the live unit definitions in `src/core/units/`, incl
 passives stored in ART lists, rage-only basic attack damage types, resource economies,
 and threshold reactions.
 
-Roster: 30 draftable units plus the summon-only Ghoul. Descriptions assume the classic
-turn mode (Tempo Battle re-times the same kits against readiness gauges).
+Roster: 30 draftable units plus the summon-only Ghoul.
 
 ---
 

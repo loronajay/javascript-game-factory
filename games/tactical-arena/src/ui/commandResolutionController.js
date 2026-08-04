@@ -6,14 +6,13 @@
 // CPU kick, turn announcements) defaults to a no-op so a minimal host — the
 // sandbox — can construct it with just state + presentation.
 //
-// Runtime contract: `state` get/set, `resolving` get/set, `tempoAnimating` get/set,
-// `tempoBusy` set, `matchEpoch` get, plus optional `tutorial` and `matchConfig` gets.
+// Runtime contract: `state` get/set, `resolving` get/set, `matchEpoch` get, plus
+// optional `tutorial` and `matchConfig` gets.
 
 import { finishActivation } from "../core/commands.js";
 import { applyCommand } from "../core/reducer.js";
 import { findUnit } from "../core/state.js";
 import { getArt, getAvailableArts } from "../core/unitCatalog.js";
-import { isTempoBattle } from "../core/tempoBattle.js";
 import { getLegalMoves, positionKey } from "../rules/movement.js";
 import { canUseArt } from "../rules/arts.js";
 import { readableError } from "../match/matchBuilder.js";
@@ -53,7 +52,6 @@ export function createCommandResolutionController({
   eventPresenter,
   setMessage,
   render,
-  selectedUnit,
   announceTurnChange = () => {},
   maybeStartCpuTurn = () => {},
   broadcastIfLocal = () => {},
@@ -131,64 +129,33 @@ export function createCommandResolutionController({
     return true;
   }
 
-  async function revealRoll(outcome, label = null, originUnit = null) {
-    if (isTempoBattle(runtime.state)) {
-      const unit = originUnit ?? selectedUnit();
-      if (unit) {
-        const text = label ?? (outcome.missed ? "MISS" : outcome.critical ? "CRIT" : "HIT");
-        const color = outcome.missed ? "#cbb78b" : outcome.critical ? "#ffd26a" : "#f3dc86";
-        await effects.floatText(unitCenter(createBoardMetrics(runtime.state.size), unit), text, color);
-        return;
-      }
-    }
+  async function revealRoll(outcome, label = null) {
     await effects.rollReveal(outcome, label);
   }
 
-  // Rolled actions (attack / wall) commit their resolved state and then animate. In CLASSIC
-  // play the commit lands at the END (endResolve) and input stays locked across the animation
-  // via `resolving`. In TEMPO it lands HERE, up front — so the player can command another ready
-  // unit mid-animation without the end-of-animation commit clobbering it; `tempoAnimating` only
-  // tells the real-time loop not to rebuild the board under the animation. Either way the
-  // pre-commit board is drawn first so a dying target is still present to animate. NOTE: capture
-  // every pre-command snapshot the animation needs BEFORE calling this — `state` becomes the
-  // post-command board the instant it returns in tempo.
+  // Rolled actions (attack / wall) commit their resolved state and then animate. The commit
+  // lands at the END (endResolve) and input stays locked across the animation via `resolving`.
+  // The pre-commit board is drawn first so a dying target is still present to animate.
   function beginResolve(result, artCalloutEvent = null) {
     clearActionMode();
     if (artCalloutEvent) playArtCallout(artCalloutEvent);
-    if (isTempoBattle(runtime.state)) {
-      render();                        // pre-command board (targeting cleared, nothing committed yet)
-      runtime.state = result.nextState; // commit up front, before animating
-      runtime.tempoAnimating += 1;
-    } else {
-      runtime.resolving = true;
-      render();
-    }
+    runtime.resolving = true;
+    render();
   }
 
-  // Retire a rolled action once its animation finishes. Classic commits here; tempo already
-  // committed in beginResolve and only reconciles the board + selection.
+  // Retire a rolled action once its animation finishes.
   function endResolve(prepared, result, prevPlayer) {
     const events = result.events ?? [];
-    const tempo = isTempoBattle(runtime.state);
-    const beforeState = tempo ? null : runtime.state;
-    if (tempo) runtime.tempoAnimating = Math.max(0, runtime.tempoAnimating - 1);
-    else runtime.state = result.nextState;
+    const beforeState = runtime.state;
+    runtime.state = result.nextState;
     recordTutorialProgress(prepared, result, prevPlayer);
     recordCampaignProgressHooks(prepared, result, beforeState);
     broadcastIfLocal(prepared);
     playEventSounds(events);
     playRolloverFx(events);
-    if (tempo) {
-      // Only drop the selection if the piece we were commanding is spent/gone — never clobber a
-      // unit the player switched to mid-animation.
-      const sel = selectedUnit();
-      if (!sel || sel.spent || sel.hp <= 0) clearSelection();
-      if (runtime.tempoAnimating === 0) render();
-    } else {
-      if (!runtime.state.activation) clearSelection();
-      render();
-      runtime.resolving = false;
-    }
+    if (!runtime.state.activation) clearSelection();
+    render();
+    runtime.resolving = false;
     announceTurnChange(prevPlayer);
     maybeStartCpuTurn();
     flushTutorialPresentation();
@@ -272,9 +239,6 @@ export function createCommandResolutionController({
     const targetsBefore = targetIds.map((id) => findUnit(runtime.state, id)).filter(Boolean);
 
     runtime.resolving = true;
-    // Instant ARTs commit at the END of their animation, so in tempo we briefly hold input to
-    // keep a concurrent command from clobbering the pending commit. Cleared in the tail below.
-    if (isTempoBattle(runtime.state)) runtime.tempoBusy = true;
     clearActionMode();
     playArtCallout(resolved);
     render();
@@ -306,7 +270,6 @@ export function createCommandResolutionController({
     render();
     announceTurnChange(prevPlayer);
     runtime.resolving = false;
-    runtime.tempoBusy = false;
     maybeStartCpuTurn();
     flushTutorialPresentation();
     return true;

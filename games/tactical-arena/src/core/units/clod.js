@@ -24,7 +24,6 @@ export const CLOD = Object.freeze({
   glyph: "\u{1FAA8}", // 🪨 rock
   classType: "tank",
   ai: Object.freeze({ threatValue: 15, role: "bruiser", protect: false }),
-  tempo: Object.freeze({ agility: 2 }),
   stats: Object.freeze({
     moveRange: 2,
     attackRange: 1,

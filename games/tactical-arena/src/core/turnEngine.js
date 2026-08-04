@@ -12,7 +12,6 @@ import { chebyshevDistance } from "../rules/movement.js";
 
 import { applyStatus, isInvulnerable, isPetrified, isStunned, resolveTurnStartStatuses, tickStatuses } from "../rules/statuses.js";
 
-import { finishTempoActivation, isTempoBattle } from "./tempoBattle.js";
 import { restoreHp, restoreMp } from "./combatEffects.js";
 import { applyAutoStrikeTick, applyBlackDeathTick, applyFireTick, applyRandomFireTick, applyTimeStealTick, applyWeatherCycleTick } from "./turnHazards.js";
 import { CAUSE, creditDeaths, snapshotAlive } from "./killAttribution.js";
@@ -91,10 +90,6 @@ function applyFinalBattleVoidPressure(state, previousPlayer, events) {
 }
 
 export function spendAndAdvance(state, unit) {
-  if (isTempoBattle(state)) {
-    finishTempoActivation(state, unit);
-    return;
-  }
   if (unit.ghost && state.activation?.summonerId) {
     const summoner = findUnit(state, state.activation.summonerId);
     const position = { ...unit.position };

@@ -35,7 +35,7 @@ cabinet. Grid position comes from `game.json`'s `order` field.
 | `questionable-decisions/` | Stray empty folder | Not a workspace. The real docs live at `jaybox/questionable-decisions/`. |
 | `rts-exploration-demo/` | Playable prototype, not on the grid | Browser RTS slice with selection, movement, attack-move, fog of war, harvesters, neutral patrols, breakable walls, and scenario tests. |
 | `sumorai/` | On the grid (4) | Samurai one-hit-kill fighter port with local 2P, CPU difficulty modes, online casual and ranked (ELO) play over rollback netcode with peer time-sync, and a headless two-client sync test. |
-| `tactical-arena/` | On the grid (1), release candidate | The flagship cabinet and successor to Mini-Tactics. 30-unit roster with ARTS/passives/statuses/summons/weather/terrain, a 22-mission campaign, five tutorials, local hot-seat 2–4P, CPU, Tempo Battle, Online Versus (Classic/Draft 1v1, 4P FFA, 2v2 Teams), server-authoritative Ranked 1v1, a TA-scoped friends/profile/badge layer, and a monetized shop on Valor plus real money. Also packaged as an Android app — see `mobile/tactical-arena/`. |
+| `tactical-arena/` | On the grid (1), release candidate | The flagship cabinet and successor to Mini-Tactics. 30-unit roster with ARTS/passives/statuses/summons/weather/terrain, a 22-mission campaign, five tutorials, local hot-seat 2–4P, CPU, Online Versus (Classic/Draft 1v1, 4P FFA, 2v2 Teams), server-authoritative Ranked 1v1, a TA-scoped friends/profile/badge layer, and a monetized shop on Valor plus real money. Also packaged as an Android app — see `mobile/tactical-arena/`. |
 
 ## Folder Expectations
 

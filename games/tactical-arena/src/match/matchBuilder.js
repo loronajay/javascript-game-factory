@@ -76,7 +76,7 @@ export function buildRoster(
     // Nicknames are the device owner's personal labels for THEIR OWN units, so the
     // local-preference default (see nicknameModel.js) only rides onto player 1 — the
     // local human in every mode that omits an explicit map (hot-seat, single, campaign,
-    // tempo, tutorial). Other seats (a CPU/opponent squad) default to no nickname so a
+    // tutorial). Other seats (a CPU/opponent squad) default to no nickname so a
     // rival Swordsman keeps its base name instead of wearing your personal rename. An
     // explicit per-slot array still populates ANY seat directly — that's the path online
     // play uses so a peer's own chosen names ride over the wire.

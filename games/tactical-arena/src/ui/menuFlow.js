@@ -43,7 +43,7 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
   const $ = (sel, root = document) => root.querySelector(sel);
   const screenEl = (name) => $(`[data-screen="${name}"]`);
   let lastConfig = null;
-  for (const name of ["hsSetup", "spSetup", "tempoMenu", "tempoSpSetup", "tutorialComplete"]) screens.register(name, { el: screenEl(name) });
+  for (const name of ["hsSetup", "spSetup", "tutorialComplete"]) screens.register(name, { el: screenEl(name) });
   function refreshAccountGatedControls() {
     const menu = screenEl("mainMenu");
     // Online Versus (casual) and Ranked both require a real signed-in factory
@@ -203,7 +203,6 @@ export function createMenuFlow({ audio, onStartMatch, onStartCampaignMission, on
       }
       case "startHotSeat": { startMatchTracked(matchSetup.gatherHotSeatConfig()); break; }
       case "startSingle": { startMatchTracked(matchSetup.gatherSingleConfig()); break; }
-      case "startTempoSingle": { startMatchTracked(matchSetup.gatherTempoSingleConfig()); break; }
       case "rematch": resultsScreen.requestRematch(); break;
       default: break;
     }

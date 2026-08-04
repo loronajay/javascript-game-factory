@@ -399,7 +399,7 @@ test("popups present on reward screens and are held everywhere else", () => {
     assert.equal(progressionAnnouncementScreenPolicy(screen).present, true, screen);
   }
   // A popup must never land on the board, the lobby, or the boot/setup screens.
-  for (const screen of ["match", "onlineSetup", "title", "hsSetup", "spSetup", "tempoMenu", "tutorialSelect"]) {
+  for (const screen of ["match", "onlineSetup", "title", "hsSetup", "spSetup", "tutorialSelect"]) {
     assert.equal(progressionAnnouncementScreenPolicy(screen).present, false, screen);
     assert.equal(ANNOUNCEMENT_SCREENS.has(screen), false, screen);
   }

@@ -42,7 +42,7 @@ Fight through 22 missions with objectives, star ratings, dialogue, unlockable un
 
 Practice Your Way
 
-Five guided tutorials cover movement, combat, ARTS, and status effects. Battle the CPU on Easy, Normal, or Hard, then try Tempo Battle, where readiness gauges replace traditional turns.
+Five guided tutorials cover movement, combat, ARTS, and status effects. Battle the CPU on Easy, Normal, or Hard until you are ready for people.
 
 Make It Yours
 

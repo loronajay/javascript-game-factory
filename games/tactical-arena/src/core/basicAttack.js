@@ -71,7 +71,6 @@ export function attack(state, command) {
   const actor = findUnit(next, command.actorId);
   const nextTarget = findUnit(next, command.targetId);
   next.activation.primaryUsed = true;
-  if (resourceCost > 0) actor.mp = Math.max(0, actor.mp - resourceCost);
 
   // Witch Doctor stance on-attack triggers fire on the swing itself (hit or miss):
   // Rain charges next-turn haste, Spirit restores MP to nearby allies. No-op for
@@ -86,6 +85,11 @@ export function attack(state, command) {
     basicAttack: true
   });
   next.rngState = swing.rngState;
+  // Roll against the ore shown when the shot is declared, then spend its ammunition.
+  // Otherwise firing from an exact 5-ore band silently loses 1% crit chance during
+  // resolution, disagreeing with getCritChance/forecasting (25 ore displayed 20% but
+  // actually rolled at 19%). The cost still applies on both hits and misses.
+  if (resourceCost > 0) actor.mp = Math.max(0, actor.mp - resourceCost);
   // Dark Ether (Blacksword): a one-shot guaranteed-crit charge is spent by the attack it
   // buffed, hit OR miss ("still roll for misses").
   if (actor.guaranteedCritCharged) actor.guaranteedCritCharged = false;

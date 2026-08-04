@@ -1,4 +1,4 @@
-// Hot-seat / single-player / Tempo setup screens: squad pickers plus the
+// Hot-seat / single-player setup screens: squad pickers plus the
 // config-gathering that turns the picked options into a match config. Extracted
 // from menuFlow.js; the menu router keeps screen navigation and start actions.
 
@@ -29,11 +29,9 @@ export function createMatchSetupScreens() {
 
   const hsSetup = screenEl("hsSetup");
   const spSetup = screenEl("spSetup");
-  const tempoSpSetup = screenEl("tempoSpSetup");
   const hsSquadHost = $("[data-squad-pickers]", hsSetup);
   const hsPickers = new Map();
   const spPickers = buildSquadPickers($("[data-sp-squad-pickers]", spSetup), "Computer");
-  const tempoSpPickers = buildSquadPickers($("[data-tempo-sp-squad-pickers]", tempoSpSetup), "Computer");
 
   function ensureHotSeatPicker(player) {
     if (!hsPickers.has(player)) {
@@ -128,26 +126,10 @@ export function createMatchSetupScreens() {
     };
   }
 
-  function gatherTempoSingleConfig() {
-    const size = Number(selectedValue(tempoSpSetup, "boardSize", "size")) || 13;
-    const difficulty = selectedValue(tempoSpSetup, "difficulty", "difficulty") || "normal";
-    return {
-      mode: "tempo-single",
-      battleMode: "tempo",
-      difficulty,
-      size,
-      squads: { 1: tempoSpPickers.p1.getSquad(), 2: tempoSpPickers.p2.getSquad() },
-      skins: { 1: tempoSpPickers.p1.getSkins(), 2: tempoSpPickers.p2.getSkins() },
-      nicknames: { 1: tempoSpPickers.p1.getNicknames(), 2: tempoSpPickers.p2.getSquad().map(() => null) }
-    };
-  }
-
   // Progress reset: every picker returns to the starter loadout.
   function resetLoadouts() {
     spPickers.p1.setLoadout(DEFAULT_SQUAD);
     spPickers.p2.setLoadout(DEFAULT_SQUAD);
-    tempoSpPickers.p1.setLoadout(DEFAULT_SQUAD);
-    tempoSpPickers.p2.setLoadout(DEFAULT_SQUAD);
     for (const picker of hsPickers.values()) picker.setLoadout(DEFAULT_SQUAD);
   }
 
@@ -155,7 +137,6 @@ export function createMatchSetupScreens() {
     syncHotSeatSetup,
     gatherHotSeatConfig,
     gatherSingleConfig,
-    gatherTempoSingleConfig,
     resetLoadouts,
   };
 }

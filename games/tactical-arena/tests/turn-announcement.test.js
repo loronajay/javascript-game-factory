@@ -17,30 +17,26 @@ test("single-player turn announcements distinguish the CPU from the local player
   assert.equal(turnAnnouncementSub({ matchMode: "single", player: 2, mySeat: null, isCpu: true }), "CPU turn");
 });
 
-test("tempo battles suppress squad-turn announcements during realtime play but still announce victory", () => {
+test("a completed match always announces, even when the active player did not change", () => {
   assert.equal(shouldShowTurnAnnouncement({
-    tempo: true,
-    phase: "playing",
-    currentPlayer: 1,
-    prevPlayer: null
-  }), false);
-  assert.equal(shouldShowTurnAnnouncement({
-    tempo: true,
     phase: "complete",
     currentPlayer: null,
     prevPlayer: 1
   }), true);
+  assert.equal(shouldShowTurnAnnouncement({
+    phase: "complete",
+    currentPlayer: 1,
+    prevPlayer: 1
+  }), true);
 });
 
-test("classic battles still announce when the active player changes", () => {
+test("battles announce when the active player changes", () => {
   assert.equal(shouldShowTurnAnnouncement({
-    tempo: false,
     phase: "playing",
     currentPlayer: 2,
     prevPlayer: 1
   }), true);
   assert.equal(shouldShowTurnAnnouncement({
-    tempo: false,
     phase: "playing",
     currentPlayer: 1,
     prevPlayer: 1

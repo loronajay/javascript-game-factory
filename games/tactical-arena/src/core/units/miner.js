@@ -4,7 +4,6 @@ export const MINER = Object.freeze({
   glyph: "⛏", // ⛏ pickaxe
   classType: "ranger",
   ai: Object.freeze({ threatValue: 13, role: "ranged", protect: true }),
-  tempo: Object.freeze({ agility: 5 }),
   resource: Object.freeze({ id: "ore", label: "Ore", shortLabel: "ORE", startsAt: 0 }),
   stats: Object.freeze({
     moveRange: 2,
@@ -20,6 +19,7 @@ export const MINER = Object.freeze({
     effect: Object.freeze({
       type: "oreHarvester",
       resource: "mp",
+      turnStartResourceGain: 1,
       fullResourceStats: Object.freeze({ strength: 1, defense: 1 }),
       emptyAttackRange: 1,
       adjacentDamageBonus: 2,
@@ -28,7 +28,7 @@ export const MINER = Object.freeze({
       wallKillOreReward: 2,
       critPerResource: Object.freeze({ per: 5, bonus: 0.01, rageBonus: 0.02 })
     }),
-    description: "Gain +1% crit chance for every 5 ore harvested. At max ore, gain +1 STR and +1 DEF. Adjacent basic attacks deal +2 damage and destroying a wall within 1 grants +2 ore. Ranged basic attacks cost 1 ore; at 0 ore, range becomes 1.",
+    description: "Gain 1 ore at the start of each turn and +1% crit chance for every 5 ore harvested. At max ore, gain +1 STR and +1 DEF. Adjacent basic attacks deal +2 damage and destroying a wall within 1 grants +2 ore. Ranged basic attacks cost 1 ore; at 0 ore, range becomes 1.",
     implemented: true
   }),
   arts: Object.freeze([
