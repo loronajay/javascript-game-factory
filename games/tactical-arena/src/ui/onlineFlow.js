@@ -195,9 +195,9 @@ export function createOnlineFlow({ onStartMatch }) {
   }
 
   function activeMatchType() {
+    if (onlineModeController.matchesSettings(lobby?.settings)) return "draft1v1";
     return normalizeMatchType(lobby?.settings?.matchType ?? selectedMatchType);
   }
-
   function matchTypeConfig(matchType = activeMatchType()) {
     return matchTypeConfigFor(matchType);
   }
@@ -655,7 +655,7 @@ export function createOnlineFlow({ onStartMatch }) {
         client.setIdentity(identity());
         client.sendProfile();
       }
-      selectedMatchType = normalizeMatchType(lobby.settings?.matchType ?? selectedMatchType);
+      selectedMatchType = onlineModeController.matchesSettings(lobby.settings) ? "draft1v1" : normalizeMatchType(lobby.settings?.matchType ?? selectedMatchType);
       myClientId = client.getClientId();
       isOwner = lobby.ownerId === myClientId;
       localLocked = false;

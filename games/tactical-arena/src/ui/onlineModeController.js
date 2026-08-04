@@ -9,6 +9,7 @@ import {
   buildTournamentPlayerLink,
   createTournamentAssignment,
   createTournamentMatchmakingOptions,
+  doesTournamentSettingsMatchAssignment,
   readTournamentAssignments,
   readTournamentPlayerAssignment,
   saveTournamentAssignments,
@@ -45,10 +46,7 @@ export function createOnlineModeController({ el, setStatus, getClient, getIdenti
   function matchesSettings(settings) {
     if (!active() || !isTournamentLobbySettings(settings)) return false;
     const assigned = assignment();
-    return !assigned || (
-      assigned.fixtureId === settings.fixtureId
-      && assigned.players.join("\n") === settings.players.join("\n")
-    );
+    return !assigned || doesTournamentSettingsMatchAssignment(assigned, settings);
   }
 
   const isTournamentLobby = (settings, onlineMode) => settings

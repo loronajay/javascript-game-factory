@@ -29,6 +29,7 @@ import { initProfileMusicPlayer } from "../profile-editor/music-player.mjs";
 import { applyMeLayout } from "./apply-layout.mjs";
 import { watchMobileProfileViewport } from "../profile-layout/mobile-profile.mjs";
 import { applyMeScaling } from "./apply-scale.mjs";
+import { createContentApiClient } from "../platform/api/content-api.mjs";
 import type { PlatformApiClient } from "../platform/api/platform-api.mjs";
 import type { StorageLike } from "../platform/storage/storage.mjs";
 
@@ -161,6 +162,9 @@ export function wireMePage(
     async afterDelete(_thoughtId, currentProfile) {
       const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile?.playerId).length;
       syncThoughtPostCountWithApi(currentProfile?.playerId, updatedThoughtCount, storage, apiClient);
+    },
+    reportThought(report) {
+      return createContentApiClient().fileReport(report);
     },
   });
 

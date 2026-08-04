@@ -1,6 +1,7 @@
-import { GRID_PAGE_SIZE, fillArcadePageSlots, loadArcadeCatalog, paginateArcadeGames, } from "./arcade-catalog.mjs";
+import { GRID_PAGE_SIZE, applyCabinetOverrides, fillArcadePageSlots, loadArcadeCatalog, paginateArcadeGames, } from "./arcade-catalog.mjs";
 import { initArcadeProfilePanel } from "./arcade-profile.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "./arcade-session-nav.mjs";
+import { createContentApiClient } from "./platform/api/content-api.mjs";
 function hexToRgba(hex, alpha) {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
@@ -333,7 +334,15 @@ window.ArcadeInput?.onAction((action) => {
         visibleCards()[selectedIndex]?.click();
     }
 });
-const catalog = await loadArcadeCatalog();
+// The catalog is built from each cabinet's own game.json first, then admin presentation
+// overrides are layered on if — and only if — the platform answers. Both calls run
+// together so a slow API never delays the grid past the game.json fetches it already
+// waits on, and a null site-config leaves the catalog exactly as the files describe it.
+const [baseCatalog, siteConfig] = await Promise.all([
+    loadArcadeCatalog(),
+    createContentApiClient().getSiteConfig().catch(() => null),
+]);
+const catalog = applyCabinetOverrides(baseCatalog, siteConfig?.cabinets || []);
 const profilePanel = initArcadeProfilePanel();
 buildPages(catalog);
 renderPrimaryAppNav(document.getElementById("gridPrimaryNav"), {

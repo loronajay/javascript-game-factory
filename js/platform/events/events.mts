@@ -19,7 +19,10 @@ export interface GameEvent {
   status: EventStatus;
 }
 
-const DEFAULT_EVENTS: readonly GameEvent[] = Object.freeze([
+// Shipped fallback content. Used only when the platform API cannot be reached at all —
+// see arcade-events.mts for the null-vs-empty rule. Once events are authored in the admin
+// console these are never rendered, but they stay as the offline/static-host story.
+export const DEFAULT_EVENTS: readonly GameEvent[] = Object.freeze([
   {
     id: "event-1",
     slug: "lovers-lost-weekend",

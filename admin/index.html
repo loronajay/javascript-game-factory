@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jay's Javascript Arcade | Admin Console</title>
+  <!-- Not indexed: the console is linked only from the session nav for admins. -->
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="../css/arcade.css">
+  <link rel="stylesheet" href="../css/session-nav.css">
+  <link rel="stylesheet" href="../css/page-stage.css">
+  <link rel="stylesheet" href="../css/admin.css">
+  <!-- Must load last: overrides desktop rules by source order. -->
+  <link rel="stylesheet" href="../css/mobile-landscape.css">
+</head>
+<body class="admin-page-shell">
+  <div class="scanlines"></div>
+  <div class="crt-overlay"></div>
+
+  <main class="arcade-shell">
+    <section class="admin-stage">
+      <div class="admin-stage__controls page-stage__controls">
+        <nav id="adminPrimaryNav" class="admin-stage__nav page-stage__nav"></nav>
+      </div>
+
+      <header class="admin-stage__masthead page-stage__masthead">
+        <div class="admin-stage__header page-stage__header">
+          <h1 class="pixel-text pixel-text--title admin-stage__title">ADMIN CONSOLE</h1>
+          <p class="admin-stage__subtitle">Announcements, events, cabinet presentation, and moderation.</p>
+        </div>
+      </header>
+
+      <div class="admin-layout page-stage__layout">
+        <nav id="adminTabs" class="admin-tabs" aria-label="Admin sections"></nav>
+        <p id="adminFlash" class="admin-flash" role="status" aria-live="polite"></p>
+        <div id="adminPanels" class="admin-panels"></div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="../js/pixel-text.mjs"></script>
+  <script type="module" src="../js/platform-config.mjs"></script>
+  <script type="module" src="../js/admin-page/entry.mjs"></script>
+</body>
+</html>

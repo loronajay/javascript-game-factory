@@ -427,6 +427,30 @@ button.thought-card__action {
   color: #ff6488;
 }
 
+/* Report sits in the same slot as Delete — you only ever see one of them, since Delete is
+ * for your own posts and Report is for everyone else's. It is deliberately quieter than
+ * Delete: reporting should be available without inviting itself. */
+.thought-card__report {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--profile-radius-xs);
+  background: transparent;
+  color: rgba(255, 247, 252, 0.45);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.thought-card__report:hover,
+.thought-card__report:focus-visible {
+  border-color: rgba(255, 184, 77, 0.55);
+  background: rgba(255, 184, 77, 0.1);
+  color: var(--accent);
+}
+
 .thought-composer {
   display: grid;
   gap: 12px;

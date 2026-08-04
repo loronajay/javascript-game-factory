@@ -18,13 +18,12 @@ test("tournament fixtures are fixed to the ranked-style 1v1 ban/draft format", (
     banFirstSeat: 2,
   });
 
-  assert.deepEqual(settings, {
-    matchType: "draft1v1",
-    tournament: true,
-    fixtureId: "round-1-table-1",
-    players: ["Alice", "Bob"],
-    banFirstSeat: 2,
-  });
+  assert.match(settings.matchType, /^ta-t:[a-f0-9]{16}:2$/);
+  assert.ok(settings.matchType.length <= 32, "the relay caps matchType at 32 characters");
+  assert.equal(settings.tournament, true);
+  assert.equal(settings.fixtureId, "round-1-table-1");
+  assert.deepEqual(settings.players, ["Alice", "Bob"]);
+  assert.equal(settings.banFirstSeat, 2);
   assert.equal(isTournamentLobbySettings(settings), true);
   assert.equal(tournamentBanFirstSeat(settings), 2);
 
@@ -32,6 +31,26 @@ test("tournament fixtures are fixed to the ranked-style 1v1 ban/draft format", (
   assert.equal(isBanPhaseComplete(draft), false);
   assert.equal(currentBanSeat(draft), 2);
   assert.equal(currentDraftSeat(draft), null, "picks stay closed until both ranked-style bans finish");
+});
+
+test("tournament identity and ban order survive the production relay settings sanitizer", () => {
+  const local = createTournamentLobbySettings({
+    fixtureId: "round-1-table-1",
+    players: ["Alice", "Bob"],
+    banFirstSeat: 2,
+  });
+  // factory-network-server deliberately drops tournament, fixtureId, players, and
+  // banFirstSeat. This is the exact shape Tactical Arena receives back in lobby_joined.
+  const relayed = {
+    penaltyWord: "ECHO",
+    packId: "pack_01",
+    runFormat: "canon_10_stage",
+    matchType: local.matchType,
+    protocolVersion: 1,
+  };
+
+  assert.equal(isTournamentLobbySettings(relayed), true);
+  assert.equal(tournamentBanFirstSeat(relayed), 2);
 });
 
 test("malformed tournament settings cannot enable the mode or an invalid ban seat", () => {

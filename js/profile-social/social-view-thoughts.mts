@@ -194,6 +194,18 @@ export function renderThoughtItem({
   const deleteHtml = item.canDelete
     ? `<button class="thought-card__delete" type="button" data-delete-id="${escapeHtml(item.id)}" aria-label="Delete thought">Delete</button>`
     : "";
+  // Report is offered on other people's posts only — you delete your own, you report
+  // someone else's. Without this control the admin console's moderation queue has no way
+  // to ever receive anything, so the two halves ship together.
+  const reportHtml = !item.canDelete && !item.isPlaceholder && item.id
+    ? `<button
+        class="thought-card__report"
+        type="button"
+        data-report-id="${escapeHtml(item.id)}"
+        data-report-owner="${escapeHtml(item.posterPlayerId || "")}"
+        aria-label="Report thought"
+      >Report</button>`
+    : "";
   const reactionPickerHtml = `
     <div class="${isReactionPickerOpen ? "thought-card__reaction-picker" : "thought-card__reaction-picker thought-card__reaction-picker--hidden"}">
       ${item.reactionPickerItems.map((reaction) => `
@@ -259,6 +271,7 @@ export function renderThoughtItem({
         <span class="thought-card__author">${escapeHtml(item.authorLabel)}</span>
         <span class="thought-card__date">${escapeHtml(item.publishedLabel)}</span>
         ${deleteHtml}
+        ${reportHtml}
       </div>
       <div class="thought-card__topline">
         <div class="thought-card__title-block">

@@ -12,6 +12,7 @@ import { initProfileMusicPlayer } from "../profile-editor/music-player.mjs";
 import { applyMeLayout } from "./apply-layout.mjs";
 import { watchMobileProfileViewport } from "../profile-layout/mobile-profile.mjs";
 import { applyMeScaling } from "./apply-scale.mjs";
+import { createContentApiClient } from "../platform/api/content-api.mjs";
 export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClient, savedLayout = null }) {
     let currentLayout = savedLayout;
     initPageGalleryViewer({ doc, apiClient });
@@ -126,6 +127,9 @@ export function wireMePage(doc, renderPage, addFriendByCode, { storage, apiClien
         async afterDelete(_thoughtId, currentProfile) {
             const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile?.playerId).length;
             syncThoughtPostCountWithApi(currentProfile?.playerId, updatedThoughtCount, storage, apiClient);
+        },
+        reportThought(report) {
+            return createContentApiClient().fileReport(report);
         },
     });
     void pageData.loadGallery().then(() => rerender("", true)).then(() => {

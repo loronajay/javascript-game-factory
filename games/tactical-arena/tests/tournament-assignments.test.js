@@ -7,6 +7,7 @@ import {
   buildTournamentPlayerLink,
   createTournamentAssignment,
   createTournamentMatchmakingOptions,
+  doesTournamentSettingsMatchAssignment,
   parseTournamentPlayerAssignment,
   readTournamentAssignments,
   saveTournamentAssignments,
@@ -76,8 +77,30 @@ test("both assigned players enter one isolated fixture queue while other matches
   assert.notDeepEqual(a1.settings, b1.settings, "simultaneous fixtures must never share a queue");
   assert.equal(a1.minPlayers, 2);
   assert.equal(a1.maxPlayers, 2);
-  assert.equal(a1.settings.fixtureId, "match-a");
-  assert.deepEqual(a1.settings.players, ["Alice", "Bob"]);
+  assert.notEqual(a1.settings.matchType, "draft1v1");
+  assert.equal(a1.settings.matchType.length <= 32, true);
+});
+
+test("an assigned player still recognizes their fixture after relay sanitization", () => {
+  const fixture = createTournamentAssignment({ fixtureId: "match-a", playerOne: "Alice", playerTwo: "Bob" });
+  const assigned = assignmentForSeat(fixture, 1);
+  const localSettings = createTournamentMatchmakingOptions(assigned).settings;
+  const relayedSettings = {
+    penaltyWord: "ECHO",
+    packId: "pack_01",
+    runFormat: "canon_10_stage",
+    matchType: localSettings.matchType,
+    protocolVersion: 1,
+  };
+
+  assert.equal(doesTournamentSettingsMatchAssignment(assigned, relayedSettings), true);
+  assert.equal(doesTournamentSettingsMatchAssignment(
+    assigned,
+    createTournamentMatchmakingOptions(assignmentForSeat(
+      createTournamentAssignment({ fixtureId: "match-b", playerOne: "Cora", playerTwo: "Drew" }),
+      1,
+    )).settings,
+  ), false);
 });
 
 test("the organizer desk keeps multiple fixtures in this browser session", () => {

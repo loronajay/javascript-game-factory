@@ -12,6 +12,7 @@ import { initPageGalleryViewer } from "../gallery-page/viewer.mjs";
 import { applyPlayerLayout } from "../me-page/apply-layout.mjs";
 import { watchMobileProfileViewport } from "../profile-layout/mobile-profile.mjs";
 import { applyPlayerScaling } from "../me-page/apply-scale.mjs";
+import { createContentApiClient } from "../platform/api/content-api.mjs";
 export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClient, profilePanel, authSession, savedLayout = null }) {
     let currentLayout = savedLayout;
     initPageGalleryViewer({ doc, apiClient });
@@ -124,6 +125,9 @@ export function wirePlayerPage(doc, renderPage, loadPageData, { storage, apiClie
         async afterDelete(_thoughtId, currentProfile) {
             const updatedThoughtCount = buildPlayerThoughtFeed(loadThoughtFeed(storage), currentProfile?.playerId).length;
             syncThoughtPostCountWithApi(currentProfile?.playerId, updatedThoughtCount, storage, apiClient);
+        },
+        reportThought(report) {
+            return createContentApiClient().fileReport(report);
         },
     });
     heroActions = createPlayerHeroActions({

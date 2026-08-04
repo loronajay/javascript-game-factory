@@ -1,4 +1,5 @@
 export const TOURNAMENT_MATCH_TYPE = "draft1v1";
+export const TOURNAMENT_RELAY_MATCH_TYPE_PREFIX = "ta-t:";
 
 function normalizedBanSeat(value) {
   return Number(value) === 2 ? 2 : 1;
@@ -14,9 +15,40 @@ function normalizedFixtureId(value) {
   return typeof value === "string" ? value.trim().slice(0, 40) : "";
 }
 
+function hashFixture(text, seed) {
+  let hash = seed >>> 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, "0");
+}
+
+function tournamentFixtureFingerprint(fixtureId) {
+  const text = normalizedFixtureId(fixtureId);
+  if (!text) return "";
+  return `${hashFixture(text, 0x811c9dc5)}${hashFixture([...text].reverse().join(""), 0x9e3779b9)}`;
+}
+
+export function tournamentRelayMatchType(fixtureId, banFirstSeat = 1) {
+  const fingerprint = tournamentFixtureFingerprint(fixtureId);
+  return fingerprint
+    ? `${TOURNAMENT_RELAY_MATCH_TYPE_PREFIX}${fingerprint}:${normalizedBanSeat(banFirstSeat)}`
+    : TOURNAMENT_MATCH_TYPE;
+}
+
+export function parseTournamentRelayMatchType(value) {
+  const escapedPrefix = TOURNAMENT_RELAY_MATCH_TYPE_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = new RegExp(`^${escapedPrefix}([a-f0-9]{16}):([12])$`).exec(String(value || ""));
+  return match ? { fixtureFingerprint: match[1], banFirstSeat: Number(match[2]) } : null;
+}
+
 export function createTournamentLobbySettings({ fixtureId = "", players = [], banFirstSeat = 1 } = {}) {
   return {
-    matchType: TOURNAMENT_MATCH_TYPE,
+    // factory-network-server only preserves allowlisted settings. Encoding the
+    // fixture fingerprint and ban seat into matchType keeps concurrent fixtures
+    // isolated and recognizable after the relay sanitizes the payload.
+    matchType: tournamentRelayMatchType(fixtureId, banFirstSeat),
     tournament: true,
     fixtureId: normalizedFixtureId(fixtureId),
     players: normalizedPlayers(players),
@@ -25,9 +57,9 @@ export function createTournamentLobbySettings({ fixtureId = "", players = [], ba
 }
 
 export function isTournamentLobbySettings(settings) {
+  if (parseTournamentRelayMatchType(settings?.matchType)) return true;
   return Boolean(
-    settings
-    && settings.tournament === true
+    settings?.tournament === true
     && settings.matchType === TOURNAMENT_MATCH_TYPE
     && normalizedFixtureId(settings.fixtureId)
     && normalizedPlayers(settings.players).length === 2
@@ -43,7 +75,8 @@ export function isTournamentContext({ accessActive = false, settings, onlineMode
 }
 
 export function tournamentBanFirstSeat(settings) {
-  return normalizedBanSeat(settings?.banFirstSeat);
+  return parseTournamentRelayMatchType(settings?.matchType)?.banFirstSeat
+    ?? normalizedBanSeat(settings?.banFirstSeat);
 }
 
 export function randomTournamentBanFirstSeat(random = Math.random) {

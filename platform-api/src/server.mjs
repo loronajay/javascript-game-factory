@@ -10,6 +10,11 @@ import { activateInventoryItem, backfillLocalOwnership, findPlayPurchaseClaim, f
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import { getLadderStandings, getPlayerLadderPlacements } from "./db/ladders.mjs";
+import { getAccountSuspension, isAdminPlayer, listAdmins, listAuditLog, seedAdminsFromEmails, setAdminFlag, writeAuditLog, } from "./db/admin.mjs";
+import { createBulletin, deleteBulletin, getPublicBulletinBySlug, listAllBulletins, listPublicBulletins, updateBulletin, } from "./db/bulletins.mjs";
+import { createEvent, deleteEvent, getPublicEventBySlug, listAllEvents, listPublicEvents, updateEvent, } from "./db/arcade-events.mjs";
+import { deleteCabinetOverride, listCabinetOverrides, listSiteSettings, saveCabinetOverride, saveSiteSetting, } from "./db/site-settings.mjs";
+import { fileReport, liftSuspension, listReports, listSuspendedAccounts, removeContentAsAdmin, resolveReport, suspendAccount, } from "./db/moderation.mjs";
 import { cancelRanked, enqueueRanked, getPublicRankedCard, getRankedLeaderboard, getRankedMatchDetail, getRankedMatches, getRankedStanding, getRankedUnitStats, pollRanked, recordRankedHeartbeat, reportRankedResult, saveRankedProfile, setRankedLobbyCode, startRankedMatch, } from "./db/ranked.mjs";
 import { blockGamePlayer, cancelGameFriendRequest, getGamePlayerBadges, getGamePlayerRelationship, listGameBlocks, listGameFriendRequests, listGameFriends, removeGameFriend, respondToGameFriendRequest, searchGamePlayers, sendGameFriendRequest, unblockGamePlayer, } from "./db/game-social.mjs";
 import { createFriendshipBetweenPlayers, loadPlayerRelationships, recordDirectInteractionBetweenPlayers, recordSharedEventBetweenPlayers, recordSharedSessionBetweenPlayers, removeFriendBetweenPlayers, savePlayerRelationships, } from "./db/relationships.mjs";
@@ -53,6 +58,14 @@ async function bootstrap() {
     const pool = config.hasDatabaseUrl ? new Pool({ connectionString: config.databaseUrl }) : null;
     if (pool) {
         await applyMigrations(pool);
+        // Bootstrap admin access. Runs after migrations so the column exists, and only ever
+        // grants — see seedAdminsFromEmails for why removing an address here does not demote
+        // anyone. An account must already exist for its email to be promoted, so the normal
+        // first-run order is: sign up through the site, set ADMIN_EMAILS, redeploy.
+        const promoted = await seedAdminsFromEmails(pool, process.env.ADMIN_EMAILS);
+        if (promoted.length) {
+            process.stdout.write(`[admin] granted admin to ${promoted.length} account(s) from ADMIN_EMAILS\n`);
+        }
     }
     const emailSender = createEmailSender({
         apiKey: config.resendApiKey,
@@ -88,6 +101,38 @@ async function bootstrap() {
         deleteAccount: (playerId) => deleteAccountService(pool, playerId),
         jwtSecret: config.jwtSecret,
         isProduction: config.isProduction,
+        // Admin console. `isAdminPlayer` is the authority check the /admin/ gate calls on
+        // every request; the rest are the console's reads and writes.
+        isAdminPlayer: (playerId) => isAdminPlayer(pool, playerId),
+        getAccountSuspension: (playerId) => getAccountSuspension(pool, playerId),
+        listAdmins: () => listAdmins(pool),
+        setAdminFlag: (playerId, isAdmin) => setAdminFlag(pool, playerId, isAdmin === true),
+        writeAuditLog: (entry) => writeAuditLog(pool, entry),
+        listAuditLog: (options) => listAuditLog(pool, options),
+        listPublicBulletins: (options) => listPublicBulletins(pool, options),
+        listAllBulletins: () => listAllBulletins(pool),
+        getPublicBulletinBySlug: (slug) => getPublicBulletinBySlug(pool, slug),
+        createBulletin: (input, createdBy) => createBulletin(pool, input, createdBy),
+        updateBulletin: (id, input) => updateBulletin(pool, id, input),
+        deleteBulletin: (id) => deleteBulletin(pool, id),
+        listPublicEvents: (options) => listPublicEvents(pool, options),
+        listAllEvents: () => listAllEvents(pool),
+        getPublicEventBySlug: (slug) => getPublicEventBySlug(pool, slug),
+        createEvent: (input, createdBy) => createEvent(pool, input, createdBy),
+        updateEvent: (id, input) => updateEvent(pool, id, input),
+        deleteEvent: (id) => deleteEvent(pool, id),
+        listCabinetOverrides: () => listCabinetOverrides(pool),
+        saveCabinetOverride: (slug, input, updatedBy) => saveCabinetOverride(pool, slug, input, updatedBy),
+        deleteCabinetOverride: (slug) => deleteCabinetOverride(pool, slug),
+        listSiteSettings: () => listSiteSettings(pool),
+        saveSiteSetting: (key, value, updatedBy) => saveSiteSetting(pool, key, value, updatedBy),
+        fileReport: (input) => fileReport(pool, input),
+        listReports: (options) => listReports(pool, options),
+        resolveReport: (id, status, adminPlayerId) => resolveReport(pool, id, status, adminPlayerId),
+        removeContentAsAdmin: (targetType, targetId) => removeContentAsAdmin(pool, targetType, targetId),
+        listSuspendedAccounts: () => listSuspendedAccounts(pool),
+        suspendAccount: (playerId, options) => suspendAccount(pool, playerId, options),
+        liftSuspension: (playerId) => liftSuspension(pool, playerId),
         loadPlayerLayout: (playerId) => loadPlayerLayout(pool, playerId),
         savePlayerLayout: (playerId, layout) => savePlayerLayout(pool, playerId, layout),
         loadPlayerProfile: (playerId) => loadPlayerProfile(pool, playerId),

@@ -17,6 +17,8 @@ import { handlePaymentRoute } from "./routes/payment-routes.mjs";
 import { handlePlayerRoute } from "./routes/player-routes.mjs";
 import { handleThoughtRoute } from "./routes/thought-routes.mjs";
 import { handlePhotoRoute } from "./routes/photo-routes.mjs";
+import { handleAdminRoute } from "./routes/admin-routes.mjs";
+import { handleContentRoute } from "./routes/content-routes.mjs";
 
 function resolveProfileAvatarUrl(profile: any, resolver: any): any {
   if (!profile || !resolver) return profile;
@@ -303,6 +305,76 @@ export function createApp(options: any = {}) {
   const activateConsumable = typeof options?.activateConsumable === "function"
     ? options.activateConsumable
     : null;
+  // Admin console services. `isAdminPlayer` defaults to denying: an app constructed
+  // without it (every existing test) must have no admins rather than no gate.
+  const isAdminPlayer = typeof options?.isAdminPlayer === "function"
+    ? options.isAdminPlayer
+    : async () => false;
+  const getAccountSuspension = typeof options?.getAccountSuspension === "function"
+    ? options.getAccountSuspension
+    : async () => null;
+  const listAdmins = typeof options?.listAdmins === "function" ? options.listAdmins : async () => [];
+  const setAdminFlag = typeof options?.setAdminFlag === "function"
+    ? options.setAdminFlag
+    : async () => ({ ok: false, error: "database_unavailable" });
+  const writeAuditLog = typeof options?.writeAuditLog === "function" ? options.writeAuditLog : async () => {};
+  const listAuditLog = typeof options?.listAuditLog === "function" ? options.listAuditLog : async () => [];
+  const listPublicBulletins = typeof options?.listPublicBulletins === "function" ? options.listPublicBulletins : async () => [];
+  const listAllBulletins = typeof options?.listAllBulletins === "function" ? options.listAllBulletins : async () => [];
+  const getPublicBulletinBySlug = typeof options?.getPublicBulletinBySlug === "function"
+    ? options.getPublicBulletinBySlug
+    : async () => null;
+  const createBulletin = typeof options?.createBulletin === "function"
+    ? options.createBulletin
+    : async () => ({ ok: false, error: "database_unavailable" });
+  const updateBulletin = typeof options?.updateBulletin === "function"
+    ? options.updateBulletin
+    : async () => ({ ok: false, error: "database_unavailable" });
+  const deleteBulletin = typeof options?.deleteBulletin === "function"
+    ? options.deleteBulletin
+    : async () => ({ ok: false, error: "database_unavailable" });
+  const listPublicEvents = typeof options?.listPublicEvents === "function" ? options.listPublicEvents : async () => [];
+  const listAllEvents = typeof options?.listAllEvents === "function" ? options.listAllEvents : async () => [];
+  const getPublicEventBySlug = typeof options?.getPublicEventBySlug === "function"
+    ? options.getPublicEventBySlug
+    : async () => null;
+  const createEvent = typeof options?.createEvent === "function"
+    ? options.createEvent
+    : async () => ({ ok: false, error: "database_unavailable" });
+  const updateEvent = typeof options?.updateEvent === "function"
+    ? options.updateEvent
+    : async () => ({ ok: false, error: "database_unavailable" });
+  const deleteEvent = typeof options?.deleteEvent === "function"
+    ? options.deleteEvent
+    : async () => ({ ok: false, error: "database_unavailable" });
+  const listCabinetOverrides = typeof options?.listCabinetOverrides === "function" ? options.listCabinetOverrides : async () => [];
+  const saveCabinetOverride = typeof options?.saveCabinetOverride === "function"
+    ? options.saveCabinetOverride
+    : async () => ({ ok: false, error: "database_unavailable" });
+  const deleteCabinetOverride = typeof options?.deleteCabinetOverride === "function"
+    ? options.deleteCabinetOverride
+    : async () => ({ ok: false, error: "database_unavailable" });
+  const listSiteSettings = typeof options?.listSiteSettings === "function" ? options.listSiteSettings : async () => ({});
+  const saveSiteSetting = typeof options?.saveSiteSetting === "function"
+    ? options.saveSiteSetting
+    : async () => ({ ok: false, error: "database_unavailable" });
+  const fileReport = typeof options?.fileReport === "function"
+    ? options.fileReport
+    : async () => ({ ok: false, error: "database_unavailable" });
+  const listReports = typeof options?.listReports === "function" ? options.listReports : async () => [];
+  const resolveReport = typeof options?.resolveReport === "function"
+    ? options.resolveReport
+    : async () => ({ ok: false, error: "database_unavailable" });
+  const removeContentAsAdmin = typeof options?.removeContentAsAdmin === "function"
+    ? options.removeContentAsAdmin
+    : async () => ({ ok: false, error: "database_unavailable" });
+  const listSuspendedAccounts = typeof options?.listSuspendedAccounts === "function" ? options.listSuspendedAccounts : async () => [];
+  const suspendAccount = typeof options?.suspendAccount === "function"
+    ? options.suspendAccount
+    : async () => ({ ok: false, error: "database_unavailable" });
+  const liftSuspension = typeof options?.liftSuspension === "function"
+    ? options.liftSuspension
+    : async () => ({ ok: false, error: "database_unavailable" });
   const createPremiumCheckoutSession = typeof options?.createPremiumCheckoutSession === "function"
     ? options.createPremiumCheckoutSession
     : null;
@@ -379,6 +451,11 @@ export function createApp(options: any = {}) {
     // Login / session responses carry the display name so shell-less clients (the
     // packaged app) can show who is signed in.
     loadPlayerProfile,
+    // /auth/me reports these so the shell can show an Admin link and a suspension
+    // notice. Both are display hints; enforcement lives in the /admin/ gate and the
+    // suspension check on the request path, neither of which trusts the client.
+    isAdminPlayer,
+    getAccountSuspension,
     jwtSecret,
     isProduction,
   };
@@ -495,6 +572,43 @@ export function createApp(options: any = {}) {
     listNotifications,
     markAllNotificationsRead,
   };
+  // One bundle for the whole /admin/ family: the gate in admin-routes.mts and both
+  // sub-handlers read from it, so there is a single list of what the console can reach.
+  const adminServices = {
+    isAdminPlayer,
+    listAdmins,
+    setAdminFlag,
+    writeAuditLog,
+    listAuditLog,
+    listAllBulletins,
+    createBulletin,
+    updateBulletin,
+    deleteBulletin,
+    listAllEvents,
+    createEvent,
+    updateEvent,
+    deleteEvent,
+    listCabinetOverrides,
+    saveCabinetOverride,
+    deleteCabinetOverride,
+    listSiteSettings,
+    saveSiteSetting,
+    listReports,
+    resolveReport,
+    removeContentAsAdmin,
+    listSuspendedAccounts,
+    suspendAccount,
+    liftSuspension,
+  };
+  const contentServices = {
+    listPublicBulletins,
+    getPublicBulletinBySlug,
+    listPublicEvents,
+    getPublicEventBySlug,
+    listCabinetOverrides,
+    listSiteSettings,
+    fileReport,
+  };
 
   // Coarse per-IP abuse guards. Auth endpoints resist credential brute-force + reset/email
   // spam; checkout-session creation resists Stripe-session spam (which costs real money). The
@@ -599,6 +713,27 @@ export function createApp(options: any = {}) {
       }
     }
 
+    // Suspension gate. A suspended account keeps READ access — it can still sign in, see
+    // its own profile, and read the board, which is what makes the suspension notice
+    // visible in the first place — but every state-changing call is refused.
+    //
+    // The /auth/ family is exempt so a suspended player can still log out and reset their
+    // password; suspension is not an account lockout. Games are affected on purpose: a
+    // suspended player should not be posting scores or queueing for ranked either.
+    if (authClaims?.playerId && method !== "GET" && method !== "HEAD" && !pathname.startsWith("/auth/")) {
+      const suspension = await getAccountSuspension(authClaims.playerId);
+      if (suspension) {
+        writeJson(res, 403, {
+          status: "error",
+          error: "account_suspended",
+          suspendedUntil: suspension.until,
+          reason: suspension.reason,
+          timestamp,
+        }, requestOrigin);
+        return;
+      }
+    }
+
     // Upload routes
     if (method === "POST" && (pathname === "/upload/avatar" || pathname === "/upload/photo" || pathname === "/upload/background" || pathname === "/upload/music")) {
       if (!authClaims?.playerId) {
@@ -660,6 +795,37 @@ export function createApp(options: any = {}) {
       requestOrigin,
       timestamp,
       services: authServices,
+    })) {
+      return;
+    }
+
+    // Admin console. Dispatched early and matched on the whole /admin/ prefix so no
+    // later handler can claim an admin path and bypass the gate inside this one.
+    if (await handleAdminRoute({
+      req,
+      res,
+      method,
+      pathname,
+      requestUrl,
+      authClaims,
+      requestOrigin,
+      timestamp,
+      services: adminServices,
+    })) {
+      return;
+    }
+
+    // Public bulletins/events/site-config reads, plus report filing.
+    if (await handleContentRoute({
+      req,
+      res,
+      method,
+      pathname,
+      requestUrl,
+      authClaims,
+      requestOrigin,
+      timestamp,
+      services: contentServices,
     })) {
       return;
     }

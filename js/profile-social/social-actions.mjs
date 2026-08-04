@@ -7,7 +7,7 @@ function createInitialCommentPanelState() {
 function normalizeComments(comments) {
     return Array.isArray(comments) ? comments : [];
 }
-export function createProfileSocialActions({ loadCurrentProfile, loadThoughtComments, syncThoughtComments, commentOnThought, deleteThoughtComment, shareThought, reactToThought, deleteThought, rerenderView, rerenderPanels, afterDelete, } = {}) {
+export function createProfileSocialActions({ loadCurrentProfile, loadThoughtComments, syncThoughtComments, commentOnThought, deleteThoughtComment, shareThought, reactToThought, deleteThought, rerenderView, rerenderPanels, afterDelete, reportThought, promptFn = (message, defaultValue) => globalThis.prompt?.(message, defaultValue) ?? null, notifyFn = (message) => { globalThis.alert?.(message); }, } = {}) {
     let openReactionThoughtId = "";
     let sharePanelState = createInitialSharePanelState();
     let commentPanelState = createInitialCommentPanelState();
@@ -227,6 +227,33 @@ export function createProfileSocialActions({ loadCurrentProfile, loadThoughtComm
                 resetSharePanel();
                 resetCommentPanel();
                 await renderView();
+                return true;
+            }
+            // Reporting is fire-and-forget from the player's side: the API dedupes repeat
+            // reports on the same item, so pressing it twice is harmless and there is nothing
+            // to re-render. The acknowledgement matters more than the outcome — a player who
+            // reports something needs to know it was received.
+            const reportButton = target.closest("[data-report-id]");
+            if (reportButton) {
+                const thoughtId = reportButton.dataset.reportId || "";
+                if (!thoughtId || !reportThought) {
+                    return true;
+                }
+                const reason = promptFn?.("Why are you reporting this? (spam, harassment, hate, sexual, violence, impersonation, other)", "other");
+                if (reason === null || reason === undefined) {
+                    return true;
+                }
+                const result = await reportThought({
+                    targetType: "thought",
+                    targetId: thoughtId,
+                    targetOwnerPlayerId: reportButton.dataset.reportOwner || "",
+                    reason: String(reason || "other").trim().toLowerCase(),
+                });
+                notifyFn?.(result?.ok
+                    ? "Thanks — this has been sent to the moderators."
+                    : result?.error === "unauthorized"
+                        ? "Sign in to report content."
+                        : "Could not send that report. Try again in a moment.");
                 return true;
             }
             const deleteButton = target.closest("[data-delete-id]");

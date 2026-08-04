@@ -14,7 +14,7 @@ function isValidEmail(value) {
 // even as the main app router is split into smaller route families.
 export async function handleAuthRoute(context) {
     const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services, } = context;
-    const { registerAccount, loginAccount, logoutAccount, requestPasswordReset, resetPassword, deleteAccount, loadPlayerProfile, jwtSecret, isProduction, } = services;
+    const { registerAccount, loginAccount, logoutAccount, requestPasswordReset, resetPassword, deleteAccount, loadPlayerProfile, isAdminPlayer, getAccountSuspension, jwtSecret, isProduction, } = services;
     // The display name lives on the profile row, not the account row. Register already
     // returns it (it just created it); login and /auth/me have to look it up. Clients
     // without an arcade shell — the packaged Android app — have no other way to learn
@@ -107,11 +107,21 @@ export async function handleAuthRoute(context) {
         const freshToken = jwtSecret
             ? signToken({ playerId: authClaims.playerId, email: authClaims.email, sessionId: authClaims.sessionId }, jwtSecret)
             : null;
+        // `isAdmin` here is a UI hint only — it decides whether the nav shows an Admin link.
+        // It is deliberately NOT baked into the token, and no admin route trusts it: the
+        // /admin/ gate re-reads authority from the database on every request. A client that
+        // forges this flag gets a link to a console that will answer 403.
+        const [isAdmin, suspension] = await Promise.all([
+            typeof isAdminPlayer === "function" ? isAdminPlayer(authClaims.playerId) : Promise.resolve(false),
+            typeof getAccountSuspension === "function" ? getAccountSuspension(authClaims.playerId) : Promise.resolve(null),
+        ]);
         writeJson(res, 200, {
             ok: true,
             playerId: authClaims.playerId,
             email: authClaims.email,
             profileName: await readProfileName(authClaims.playerId),
+            isAdmin: isAdmin === true,
+            ...(suspension ? { suspendedUntil: suspension.until, suspendedReason: suspension.reason } : {}),
             ...(freshToken ? { token: freshToken } : {}),
         }, requestOrigin);
         return true;

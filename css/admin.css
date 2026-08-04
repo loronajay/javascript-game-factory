@@ -1,0 +1,568 @@
+/* Admin console (/admin/).
+ *
+ * Uses the arcade shell's tokens (--panel, --line, --accent, --ink) so the console reads
+ * as part of the same site, but deliberately drops the neon glow and CRT flourish the
+ * player-facing pages use: this is a work surface, and an operator scanning a report queue
+ * is served by contrast and density, not atmosphere.
+ *
+ * Only loaded by /admin/index.html. */
+
+.admin-page-shell {
+  min-height: 100vh;
+}
+
+/* The shared shell is 1120px, sized for reading-width player pages. The console is a work
+ * surface — a list beside its editor, a grid of cabinet cards — and cramps badly at that
+ * width, so it widens the shell for this page only. Scoped to .admin-page-shell so no
+ * other page inherits it. */
+.admin-page-shell .arcade-shell {
+  width: min(1400px, calc(100vw - 32px));
+}
+
+.admin-stage {
+  position: relative;
+  width: 100%;
+  padding: 18px 0 64px;
+}
+
+/* The pixel-text SVG is width:100% of its container, so a title in a full-width masthead
+ * scales until it overflows the page. Every stage that uses pixel-text caps it explicitly;
+ * this is the console's cap. */
+.admin-stage__title {
+  width: min(430px, 76vw);
+  margin: 0 auto;
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.42));
+}
+
+.admin-stage__masthead {
+  text-align: center;
+}
+
+.admin-stage__subtitle {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.admin-layout {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ---- Tabs ---- */
+
+.admin-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-tab {
+  padding: 9px 16px;
+  border-radius: var(--profile-radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.76rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.admin-tab:hover,
+.admin-tab:focus-visible {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.admin-tab--current {
+  background: rgba(255, 184, 77, 0.16);
+  border-color: var(--line);
+  color: var(--accent);
+}
+
+/* ---- Flash ---- */
+
+.admin-flash {
+  margin: 0;
+  min-height: 0;
+  font-size: 0.82rem;
+}
+
+.admin-flash:empty {
+  display: none;
+}
+
+.admin-flash--ok,
+.admin-flash--error {
+  padding: 10px 14px;
+  border-radius: var(--profile-radius-sm);
+  border: 1px solid;
+}
+
+.admin-flash--ok {
+  color: #b7f5d8;
+  background: rgba(140, 246, 212, 0.1);
+  border-color: rgba(140, 246, 212, 0.36);
+}
+
+.admin-flash--error {
+  color: #ffc4c4;
+  background: rgba(255, 90, 90, 0.1);
+  border-color: rgba(255, 90, 90, 0.4);
+}
+
+/* ---- Panels ---- */
+
+.admin-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Two columns where a list and its editor sit side by side. Collapses at the same 980px
+ * breakpoint the profile pages use, so the whole site changes shape at one width. */
+.admin-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.admin-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--profile-radius-md);
+  overflow: hidden;
+}
+
+.admin-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  background: rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-panel__title {
+  margin: 0;
+  font-size: 0.82rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.admin-panel__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-panel__body {
+  padding: 18px;
+}
+
+.admin-panel--refusal {
+  padding: 28px;
+  text-align: center;
+}
+
+.admin-note {
+  margin: 0 0 16px;
+  padding: 11px 14px;
+  border-radius: var(--profile-radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.admin-note code {
+  color: var(--ink);
+}
+
+.admin-empty {
+  margin: 0;
+  padding: 18px 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  text-align: center;
+}
+
+.admin-divider {
+  margin: 18px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+/* ---- Stats ---- */
+
+.admin-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.admin-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  border-radius: var(--profile-radius-sm);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-stat__value {
+  font-size: 1.7rem;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.admin-stat__label {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.admin-stat__hint {
+  font-size: 0.72rem;
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+/* ---- Lists ---- */
+
+.admin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: var(--profile-radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.admin-row--active {
+  border-color: var(--line);
+  background: rgba(255, 184, 77, 0.09);
+}
+
+.admin-row--stacked {
+  align-items: flex-start;
+}
+
+.admin-row__main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.admin-row__title {
+  color: var(--ink);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-row__meta {
+  color: var(--muted);
+  font-size: 0.74rem;
+  overflow-wrap: anywhere;
+}
+
+/* Reported text is user-authored and can be any length or shape, so it is clamped rather
+ * than allowed to stretch a queue row past the rest of the list. */
+.admin-row__detail {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--profile-radius-xs);
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--ink);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  max-height: 8em;
+  overflow-y: auto;
+}
+
+.admin-row__side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+/* ---- Badges ---- */
+
+.admin-badge {
+  padding: 3px 9px;
+  border-radius: var(--profile-radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.admin-badge--good {
+  color: #b7f5d8;
+  border-color: rgba(140, 246, 212, 0.4);
+  background: rgba(140, 246, 212, 0.1);
+}
+
+.admin-badge--warn {
+  color: #ffd9a0;
+  border-color: rgba(255, 184, 77, 0.42);
+  background: rgba(255, 184, 77, 0.1);
+}
+
+.admin-badge--muted {
+  opacity: 0.7;
+}
+
+/* ---- Forms ---- */
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-form__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.admin-form__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.admin-inline-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.admin-field__label {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.admin-field__hint {
+  font-size: 0.7rem;
+  color: var(--muted);
+  opacity: 0.78;
+}
+
+.admin-input {
+  width: 100%;
+  padding: 9px 11px;
+  border-radius: var(--profile-radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(0, 0, 0, 0.34);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.84rem;
+}
+
+.admin-input:focus-visible {
+  outline: none;
+  border-color: var(--line);
+  box-shadow: 0 0 0 2px rgba(255, 184, 77, 0.18);
+}
+
+.admin-input--area {
+  resize: vertical;
+  line-height: 1.55;
+}
+
+.admin-select {
+  cursor: pointer;
+}
+
+/* Native dropdown options inherit the OS palette, not the page's, so they need an explicit
+ * dark background or they render as black-on-white in some browsers. */
+.admin-select option {
+  background: var(--bg-1);
+  color: var(--ink);
+}
+
+.admin-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.admin-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* ---- Buttons ---- */
+
+.admin-button {
+  padding: 9px 15px;
+  border-radius: var(--profile-radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.admin-button:hover,
+.admin-button:focus-visible {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.admin-button--primary {
+  background: rgba(255, 184, 77, 0.18);
+  border-color: var(--line);
+  color: var(--accent);
+}
+
+.admin-button--primary:hover,
+.admin-button--primary:focus-visible {
+  background: rgba(255, 184, 77, 0.26);
+}
+
+/* Destructive actions are visually distinct because several of them are irreversible.
+ * They still confirm before running — the colour is a warning, not the guard. */
+.admin-button--danger {
+  background: rgba(255, 90, 90, 0.14);
+  border-color: rgba(255, 90, 90, 0.4);
+  color: #ffc4c4;
+}
+
+.admin-button--danger:hover,
+.admin-button--danger:focus-visible {
+  background: rgba(255, 90, 90, 0.22);
+}
+
+/* ---- Cabinets ---- */
+
+.admin-cabinet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.admin-cabinet {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 15px;
+  border-radius: var(--profile-radius-sm);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* A hidden cabinet is dimmed so the Cabinets tab shows at a glance which cards are off the
+ * grid without an operator having to read every checkbox. */
+.admin-cabinet--hidden {
+  opacity: 0.6;
+  border-style: dashed;
+}
+
+.admin-cabinet__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-cabinet__name {
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.admin-cabinet__slug {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.admin-cabinet__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.admin-cabinet__toggles {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* ---- Session nav admin link ---- */
+
+.session-nav__admin {
+  color: var(--accent);
+  border-color: var(--line);
+}
+
+/* ---- Narrow screens ---- */
+
+@media (max-width: 980px) {
+  .admin-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-cabinet__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-row {
+    align-items: flex-start;
+  }
+}

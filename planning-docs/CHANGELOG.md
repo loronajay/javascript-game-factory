@@ -2,6 +2,26 @@
 
 Dated history extracted from the root `CLAUDE.md` (2026-07-23) so that file can stay a lean orientation guide instead of an ever-growing log. This file is a curated narrative, not a replacement for `git log` — read it for *why*/*what shipped when*, not for line-level diffs.
 
+## Admin Console (2026-08-03)
+
+The platform gained an operator. Until now every route in `platform-api` authorized the same way — *is the caller the owner of this row?* — which is right for player data and cannot express "the person who runs the arcade". Bulletins and events were frozen arrays compiled into the browser bundle (`DEFAULT_BULLETINS`, `DEFAULT_EVENTS`), so publishing an announcement meant editing TypeScript and redeploying. There was no moderation beyond self-deletion of your own comments.
+
+**Authority is a column, not a token.** Migration `031-admin-console.sql` adds `accounts.is_admin`, and `db/admin.mts#isAdminPlayer` is re-read on *every* admin request rather than trusted from a JWT claim — tokens live 30 days, and a revoked admin has to lose access on their next call. `ADMIN_EMAILS` on Railway promotes matching accounts at boot; it can grant but never revoke, so a typo in an env var cannot strip authority from a live operator. `/auth/me` reports `isAdmin` purely so the nav can show an Admin link; nothing server-side trusts it. Demoting the last admin is refused inside a transaction, because there would be no way to grant the flag back.
+
+**One gate, one place.** `routes/admin-routes.mts` matches the whole `/admin/` prefix, checks authentication then authority, and only then delegates to `admin-content-routes.mts` and `admin-moderation-routes.mts` — neither of which contains any authorization logic. A new admin endpoint added to either is gated by construction. Every state-changing action writes to `admin_audit_log`; the audit-coverage test walks all twelve mutating routes and asserts each one logs exactly one attributable entry.
+
+**Admin deletes are separate functions, not a flag.** `db/thoughts.mts` and `db/photos.mts` bind ownership into the delete predicate itself. Threading an `asAdmin` escape hatch through them would put the ordinary player's ownership guarantee one mistaken argument away from being skipped, so `db/moderation.mts` holds ownership-free deletes reachable only from the gated route. The player-facing paths were not touched.
+
+**The stability contract for cabinets.** `cabinet_overrides` rows only change how the *grid presents* a cabinet — `games/<slug>/game.json` stays the authority for what a game is. `applyCabinetOverrides` in `arcade-catalog.mts` is the only place admin data touches the grid, and it will not change `href`, `slug`, or `previewImage`, will not add a cabinet the catalog does not already have, and treats every null field as "inherit". Deleting a row restores the shipped presentation exactly. `js/tests/admin-catalog-overrides.test.mjs` pins all of it, including that a hostile row cannot repoint a card.
+
+**Null vs empty is load-bearing.** `content-api.mts` returns `null` when the platform could not be asked and an array when it answered. Only `null` falls back to the shipped fixtures; `[]` renders an empty board. Without that distinction an operator who unpublishes everything would watch demo content reappear with no way to clear it. A backend outage degrades the public pages to exactly the pre-console site.
+
+**Suspensions are time-boxed.** A suspended account keeps read access — which is what makes the notice visible — but every non-GET outside `/auth/` is refused, games included. Suspending an admin is refused in the SQL predicate so the console cannot be locked.
+
+Also shipped: a player-facing **Report** control on thought cards (`data-report-id`), without which the moderation queue could never receive anything. It sits in the same slot as Delete and is mutually exclusive with it. `POST /reports` takes the reporter from the verified session, never the body, and dedupes repeat filings through a partial unique index.
+
+Console lives at `/admin/` (`js/admin-page/`: entry / state / actions / two renderers / shared helpers), seven tabs, hash-routed so a tab survives a reload. 512 API tests, 66 shared-frontend tests, 19 profile-social tests — all green.
+
 ## Repo-Wide Documentation Sync (2026-07-30)
 
 A pass over every orientation doc in the repo to bring it back in line with the code, after a stretch of shipping (Play Store pipeline, badges, TA friends, ladders, payments, the domain move) that outran the docs. Claims were checked against the code and, where they were about tests, by running the suites.

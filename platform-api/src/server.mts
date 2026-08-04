@@ -13,6 +13,47 @@ import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, sav
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import { getLadderStandings, getPlayerLadderPlacements } from "./db/ladders.mjs";
 import {
+  getAccountSuspension,
+  isAdminPlayer,
+  listAdmins,
+  listAuditLog,
+  seedAdminsFromEmails,
+  setAdminFlag,
+  writeAuditLog,
+} from "./db/admin.mjs";
+import {
+  createBulletin,
+  deleteBulletin,
+  getPublicBulletinBySlug,
+  listAllBulletins,
+  listPublicBulletins,
+  updateBulletin,
+} from "./db/bulletins.mjs";
+import {
+  createEvent,
+  deleteEvent,
+  getPublicEventBySlug,
+  listAllEvents,
+  listPublicEvents,
+  updateEvent,
+} from "./db/arcade-events.mjs";
+import {
+  deleteCabinetOverride,
+  listCabinetOverrides,
+  listSiteSettings,
+  saveCabinetOverride,
+  saveSiteSetting,
+} from "./db/site-settings.mjs";
+import {
+  fileReport,
+  liftSuspension,
+  listReports,
+  listSuspendedAccounts,
+  removeContentAsAdmin,
+  resolveReport,
+  suspendAccount,
+} from "./db/moderation.mjs";
+import {
   cancelRanked,
   enqueueRanked,
   getPublicRankedCard,
@@ -148,6 +189,15 @@ async function bootstrap(): Promise<void> {
 
   if (pool) {
     await applyMigrations(pool);
+
+    // Bootstrap admin access. Runs after migrations so the column exists, and only ever
+    // grants — see seedAdminsFromEmails for why removing an address here does not demote
+    // anyone. An account must already exist for its email to be promoted, so the normal
+    // first-run order is: sign up through the site, set ADMIN_EMAILS, redeploy.
+    const promoted = await seedAdminsFromEmails(pool, process.env.ADMIN_EMAILS);
+    if (promoted.length) {
+      process.stdout.write(`[admin] granted admin to ${promoted.length} account(s) from ADMIN_EMAILS\n`);
+    }
   }
 
   const emailSender = createEmailSender({
@@ -187,6 +237,38 @@ async function bootstrap(): Promise<void> {
     deleteAccount: (playerId: any) => deleteAccountService(pool, playerId),
     jwtSecret: config.jwtSecret,
     isProduction: config.isProduction,
+    // Admin console. `isAdminPlayer` is the authority check the /admin/ gate calls on
+    // every request; the rest are the console's reads and writes.
+    isAdminPlayer: (playerId: any) => isAdminPlayer(pool, playerId),
+    getAccountSuspension: (playerId: any) => getAccountSuspension(pool, playerId),
+    listAdmins: () => listAdmins(pool),
+    setAdminFlag: (playerId: any, isAdmin: any) => setAdminFlag(pool, playerId, isAdmin === true),
+    writeAuditLog: (entry: any) => writeAuditLog(pool, entry),
+    listAuditLog: (options: any) => listAuditLog(pool, options),
+    listPublicBulletins: (options: any) => listPublicBulletins(pool, options),
+    listAllBulletins: () => listAllBulletins(pool),
+    getPublicBulletinBySlug: (slug: any) => getPublicBulletinBySlug(pool, slug),
+    createBulletin: (input: any, createdBy: any) => createBulletin(pool, input, createdBy),
+    updateBulletin: (id: any, input: any) => updateBulletin(pool, id, input),
+    deleteBulletin: (id: any) => deleteBulletin(pool, id),
+    listPublicEvents: (options: any) => listPublicEvents(pool, options),
+    listAllEvents: () => listAllEvents(pool),
+    getPublicEventBySlug: (slug: any) => getPublicEventBySlug(pool, slug),
+    createEvent: (input: any, createdBy: any) => createEvent(pool, input, createdBy),
+    updateEvent: (id: any, input: any) => updateEvent(pool, id, input),
+    deleteEvent: (id: any) => deleteEvent(pool, id),
+    listCabinetOverrides: () => listCabinetOverrides(pool),
+    saveCabinetOverride: (slug: any, input: any, updatedBy: any) => saveCabinetOverride(pool, slug, input, updatedBy),
+    deleteCabinetOverride: (slug: any) => deleteCabinetOverride(pool, slug),
+    listSiteSettings: () => listSiteSettings(pool),
+    saveSiteSetting: (key: any, value: any, updatedBy: any) => saveSiteSetting(pool, key, value, updatedBy),
+    fileReport: (input: any) => fileReport(pool, input),
+    listReports: (options: any) => listReports(pool, options),
+    resolveReport: (id: any, status: any, adminPlayerId: any) => resolveReport(pool, id, status, adminPlayerId),
+    removeContentAsAdmin: (targetType: any, targetId: any) => removeContentAsAdmin(pool, targetType, targetId),
+    listSuspendedAccounts: () => listSuspendedAccounts(pool),
+    suspendAccount: (playerId: any, options: any) => suspendAccount(pool, playerId, options),
+    liftSuspension: (playerId: any) => liftSuspension(pool, playerId),
     loadPlayerLayout: (playerId: any) => loadPlayerLayout(pool, playerId),
     savePlayerLayout: (playerId: any, layout: any) => savePlayerLayout(pool, playerId, layout),
     loadPlayerProfile: (playerId: any) => loadPlayerProfile(pool, playerId),

@@ -1,5 +1,6 @@
 import {
   createTournamentLobbySettings,
+  isTournamentLobbySettings,
   tournamentBanFirstSeatForFixture,
 } from "./tournamentMode.js";
 
@@ -101,6 +102,17 @@ export function createTournamentMatchmakingOptions(value) {
       banFirstSeat: tournamentBanFirstSeatForFixture(assignment.fixtureId),
     }),
   };
+}
+
+export function doesTournamentSettingsMatchAssignment(value, settings) {
+  const assignment = assignmentForSeat(value, value?.seat);
+  const expected = createTournamentMatchmakingOptions(assignment)?.settings;
+  return Boolean(
+    assignment
+    && expected
+    && isTournamentLobbySettings(settings)
+    && settings?.matchType === expected.matchType,
+  );
 }
 
 export function saveTournamentAssignments(values, storage = globalThis.sessionStorage) {

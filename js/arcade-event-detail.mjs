@@ -3,6 +3,7 @@ import { loadFactoryProfile } from "./platform/identity/factory-profile.mjs";
 import { loadProfileRelationshipsRecord, normalizeProfileRelationshipsRecord, recordSharedEventBetweenPlayers, } from "./platform/relationships/relationships.mjs";
 import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
+import { createContentApiClient } from "./platform/api/content-api.mjs";
 function escapeHtml(value) {
     return String(value)
         .replaceAll("&", "&amp;")
@@ -252,9 +253,15 @@ const doc = globalThis.document;
 if (typeof doc?.getElementById === "function") {
     const storage = getDefaultPlatformStorage();
     let selectedPartnerId = "";
+    // The event collection this page resolves its slug against. `undefined` means "use the
+    // shipped fixtures", which is what resolvePublicEventBySlug already defaults to — so
+    // the page works unchanged before the fetch lands and on a static host where it never
+    // does. It is replaced with live events only when the platform actually answers.
+    let eventSource;
     function rerender(relationshipFlash = "") {
         const model = renderEventDetailPage(doc, {
             storage,
+            source: eventSource,
             selectedPartnerId,
             relationshipFlash,
         });
@@ -262,6 +269,12 @@ if (typeof doc?.getElementById === "function") {
         return model;
     }
     rerender("");
+    void createContentApiClient().listEvents().then((events) => {
+        if (events === null)
+            return;
+        eventSource = events;
+        rerender("");
+    });
     doc.addEventListener("change", (event) => {
         const select = event.target;
         if (!select || typeof select !== "object" || select.id !== "eventLinkedEntryPartner") {
@@ -278,7 +291,7 @@ if (typeof doc?.getElementById === "function") {
         const viewerProfile = loadFactoryProfile(storage);
         const params = new URLSearchParams(globalThis.location?.search || "");
         const requestedSlug = sanitizeSlug(params.get("slug"));
-        const resolvedEvent = resolvePublicEventBySlug(undefined, requestedSlug);
+        const resolvedEvent = resolvePublicEventBySlug(eventSource, requestedSlug);
         const partnerPlayerId = sanitizePlayerId(doc.getElementById("eventLinkedEntryPartner")?.value || selectedPartnerId);
         if (!resolvedEvent?.id || !viewerProfile.playerId || !partnerPlayerId) {
             rerender("Pick a linked-entry partner first.");

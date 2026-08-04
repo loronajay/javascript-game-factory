@@ -35,6 +35,8 @@ export async function handleAuthRoute(context: any): Promise<boolean> {
     resetPassword,
     deleteAccount,
     loadPlayerProfile,
+    isAdminPlayer,
+    getAccountSuspension,
     jwtSecret,
     isProduction,
   } = services;
@@ -146,11 +148,23 @@ export async function handleAuthRoute(context: any): Promise<boolean> {
     const freshToken = jwtSecret
       ? signToken({ playerId: authClaims.playerId, email: authClaims.email, sessionId: authClaims.sessionId }, jwtSecret)
       : null;
+
+    // `isAdmin` here is a UI hint only — it decides whether the nav shows an Admin link.
+    // It is deliberately NOT baked into the token, and no admin route trusts it: the
+    // /admin/ gate re-reads authority from the database on every request. A client that
+    // forges this flag gets a link to a console that will answer 403.
+    const [isAdmin, suspension] = await Promise.all([
+      typeof isAdminPlayer === "function" ? isAdminPlayer(authClaims.playerId) : Promise.resolve(false),
+      typeof getAccountSuspension === "function" ? getAccountSuspension(authClaims.playerId) : Promise.resolve(null),
+    ]);
+
     writeJson(res, 200, {
       ok: true,
       playerId: authClaims.playerId,
       email: authClaims.email,
       profileName: await readProfileName(authClaims.playerId),
+      isAdmin: isAdmin === true,
+      ...(suspension ? { suspendedUntil: suspension.until, suspendedReason: suspension.reason } : {}),
       ...(freshToken ? { token: freshToken } : {}),
     }, requestOrigin);
     return true;

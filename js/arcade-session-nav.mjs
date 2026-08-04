@@ -15,6 +15,16 @@ const PRIMARY_APP_NAV_ITEMS = [
     { key: "search", label: "Search", path: "search/index.html" },
     { key: "messages", label: "Messages", path: "messages/index.html" },
 ];
+// Every page already tells the session nav where sign-in lives, page-relative ("../sign-in/
+// index.html" from a subfolder, "sign-in/index.html" from the root). Reusing that prefix
+// for the admin link avoids threading a basePath through fifteen call sites to say
+// something the nav has already been told. Falls back to a root-relative path if a caller
+// ever passes a sign-in path in some other shape.
+export function resolveAdminPath(signInPath) {
+    const raw = String(signInPath || "");
+    const match = raw.match(/^(.*?)sign-in\/index\.html$/);
+    return match ? `${match[1]}admin/index.html` : "/admin/index.html";
+}
 function escapeHtml(str) {
     return String(str)
         .replace(/&/g, "&amp;")
@@ -73,7 +83,7 @@ export function buildLogoutRedirectUrl(homeOnLogout = "index.html", currentHref 
         return `${homeOnLogout}${separator}${SIGNED_OUT_QUERY_KEY}=1`;
     }
 }
-export async function initSessionNav(containerEl, { signInPath = "sign-in/index.html", signUpPath = "sign-up/index.html", homeOnLogout = "index.html", preloadedSession = null, locationRef = globalThis.location, historyRef = globalThis.history, } = {}) {
+export async function initSessionNav(containerEl, { signInPath = "sign-in/index.html", signUpPath = "sign-up/index.html", homeOnLogout = "index.html", preloadedSession = null, locationRef = globalThis.location, historyRef = globalThis.history, adminPath = "", } = {}) {
     if (!containerEl)
         return;
     let session = preloadedSession || null;
@@ -110,11 +120,18 @@ export async function initSessionNav(containerEl, { signInPath = "sign-in/index.
     if (session?.ok && session?.playerId) {
         const profile = loadFactoryProfile();
         const displayName = profile?.profileName || "Pilot";
+        // A convenience link, not a permission. /auth/me reports isAdmin so operators have a
+        // way in from any page; the console itself re-checks authority server-side, so a
+        // forged flag buys a link to a 403 and nothing more.
+        const adminLink = session?.isAdmin === true
+            ? `<a class="session-nav__admin app-shell-nav__utility-link" href="${escapeHtml(adminPath || resolveAdminPath(signInPath))}">Admin</a>`
+            : "";
         containerEl.innerHTML = `
       <div class="session-nav__identity">
         <span class="session-nav__eyebrow">Signed in as</span>
         <span class="session-nav__name">${escapeHtml(displayName)}</span>
       </div>
+      ${adminLink}
       <button class="session-nav__signout app-shell-nav__utility-link" type="button">Sign Out</button>
     `;
         containerEl.querySelector(".session-nav__signout")?.addEventListener("click", async () => {

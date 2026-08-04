@@ -1,5 +1,6 @@
-import { buildPublicBulletinFeed } from "./platform/bulletins/bulletins.mjs";
+import { DEFAULT_BULLETINS, buildPublicBulletinFeed } from "./platform/bulletins/bulletins.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "./arcade-session-nav.mjs";
+import { createContentApiClient } from "./platform/api/content-api.mjs";
 
 function escapeHtml(value: unknown): string {
   return String(value)
@@ -106,6 +107,18 @@ export function renderBulletinsPage(doc: Document = globalThis.document, bulleti
   return model;
 }
 
+// Resolves what the board should show.
+//
+// THE NULL-VS-EMPTY RULE. `listBulletins()` returns null when the platform could not be
+// asked (offline, API not configured, server error) and an array when it answered. Only
+// null falls back to the shipped fixtures. An empty array is a real answer — "nothing is
+// published right now" — and must render the empty board, otherwise an operator who
+// unpublishes everything would see demo content reappear and have no way to clear it.
+export async function loadBulletinsForPage(client: any = createContentApiClient()) {
+  const remote = await client.listBulletins();
+  return buildPublicBulletinFeed(remote === null ? DEFAULT_BULLETINS : remote);
+}
+
 const doc = globalThis.document;
 
 if (typeof doc?.getElementById === "function") {
@@ -121,5 +134,10 @@ if (typeof doc?.getElementById === "function") {
     homeOnLogout: "../index.html",
   });
 
-  renderBulletinsPage(doc);
+  // Rendered once, after the source is resolved. Painting the fixtures first and swapping
+  // would flash demo content on every load for an operator who has published real
+  // bulletins; the view model's built-in "Noticeboard Warming Up" placeholder already
+  // reads as a loading state, so the empty first frame costs nothing.
+  renderBulletinsPage(doc, []);
+  void loadBulletinsForPage().then((bulletins) => renderBulletinsPage(doc, bulletins));
 }

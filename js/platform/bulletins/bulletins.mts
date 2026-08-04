@@ -26,7 +26,10 @@ export interface Bulletin {
   createdBy: string;
 }
 
-const DEFAULT_BULLETINS: readonly Bulletin[] = Object.freeze([
+// Shipped fallback content. Used only when the platform API cannot be reached at all —
+// see arcade-bulletins.mts for the null-vs-empty rule. Once bulletins are authored in the
+// admin console these are never rendered, but they stay as the offline/static-host story.
+export const DEFAULT_BULLETINS: readonly Bulletin[] = Object.freeze([
   {
     id: "bulletin-1",
     slug: "lovers-lost-now-live",

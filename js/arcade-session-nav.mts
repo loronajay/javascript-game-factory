@@ -32,6 +32,18 @@ export interface SessionNavOptions {
   preloadedSession?: any;
   locationRef?: any;
   historyRef?: any;
+  adminPath?: string;
+}
+
+// Every page already tells the session nav where sign-in lives, page-relative ("../sign-in/
+// index.html" from a subfolder, "sign-in/index.html" from the root). Reusing that prefix
+// for the admin link avoids threading a basePath through fifteen call sites to say
+// something the nav has already been told. Falls back to a root-relative path if a caller
+// ever passes a sign-in path in some other shape.
+export function resolveAdminPath(signInPath: unknown): string {
+  const raw = String(signInPath || "");
+  const match = raw.match(/^(.*?)sign-in\/index\.html$/);
+  return match ? `${match[1]}admin/index.html` : "/admin/index.html";
 }
 
 function escapeHtml(str: unknown): string {
@@ -110,6 +122,7 @@ export async function initSessionNav(containerEl: HTMLElement | null, {
   preloadedSession = null,
   locationRef = globalThis.location,
   historyRef = globalThis.history,
+  adminPath = "",
 }: SessionNavOptions = {}): Promise<any> {
   if (!containerEl) return;
 
@@ -150,11 +163,19 @@ export async function initSessionNav(containerEl: HTMLElement | null, {
     const profile = loadFactoryProfile();
     const displayName = profile?.profileName || "Pilot";
 
+    // A convenience link, not a permission. /auth/me reports isAdmin so operators have a
+    // way in from any page; the console itself re-checks authority server-side, so a
+    // forged flag buys a link to a 403 and nothing more.
+    const adminLink = session?.isAdmin === true
+      ? `<a class="session-nav__admin app-shell-nav__utility-link" href="${escapeHtml(adminPath || resolveAdminPath(signInPath))}">Admin</a>`
+      : "";
+
     containerEl.innerHTML = `
       <div class="session-nav__identity">
         <span class="session-nav__eyebrow">Signed in as</span>
         <span class="session-nav__name">${escapeHtml(displayName)}</span>
       </div>
+      ${adminLink}
       <button class="session-nav__signout app-shell-nav__utility-link" type="button">Sign Out</button>
     `;
 

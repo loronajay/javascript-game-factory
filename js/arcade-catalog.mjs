@@ -82,6 +82,52 @@ export function fillArcadePageSlots(games, pageSize = GRID_PAGE_SIZE) {
     }
     return slots;
 }
+// Applies admin-authored presentation overrides on top of the catalog built from each
+// cabinet's game.json.
+//
+// STABILITY CONTRACT. This function is the ONLY place admin data touches the grid, and it
+// is deliberately narrow:
+//   - It never adds a cabinet. An override for a slug that is not already in the catalog
+//     is ignored, so a stale or mistyped row cannot conjure a broken card.
+//   - It never changes `href`, `slug`, or `previewImage`. Where a cabinet lives and what
+//     it launches come from ARCADE_GAME_SLUGS and game.json, full stop — no admin edit
+//     can point a card at the wrong game or a dead path.
+//   - Null/absent fields inherit. Only a value the operator explicitly set is applied.
+//   - `hidden` removes a card from the grid. The game's folder, files, and direct URL are
+//     untouched; this is a listing change, not a takedown.
+// The result: the worst an override can do is present a cabinet oddly, and deleting the
+// row restores it exactly.
+export function applyCabinetOverrides(games, overrides = []) {
+    if (!Array.isArray(overrides) || overrides.length === 0)
+        return games;
+    const bySlug = new Map();
+    for (const override of overrides) {
+        const slug = typeof override?.slug === "string" ? override.slug.trim() : "";
+        if (slug)
+            bySlug.set(slug, override);
+    }
+    if (bySlug.size === 0)
+        return games;
+    const merged = [];
+    for (const game of games) {
+        const override = bySlug.get(game.slug);
+        if (!override) {
+            merged.push(game);
+            continue;
+        }
+        if (override.hidden === true)
+            continue;
+        merged.push({
+            ...game,
+            title: typeof override.title === "string" && override.title ? override.title : game.title,
+            tagline: typeof override.tagline === "string" && override.tagline ? override.tagline : game.tagline,
+            status: typeof override.statusLabel === "string" && override.statusLabel ? override.statusLabel : game.status,
+            order: Number.isFinite(override.sortOrder) ? Number(override.sortOrder) : game.order,
+            featured: typeof override.featured === "boolean" ? override.featured : game.featured,
+        });
+    }
+    return sortArcadeGames(merged);
+}
 export async function loadArcadeCatalog(fetcher = fetch, slugs = ARCADE_GAME_SLUGS) {
     const entries = await Promise.all(slugs.map(async (entry) => {
         const slug = typeof entry === "string" ? entry : entry.slug;

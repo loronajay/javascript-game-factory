@@ -1,5 +1,6 @@
-import { buildPublicEventFeed } from "./platform/events/events.mjs";
+import { DEFAULT_EVENTS, buildPublicEventFeed } from "./platform/events/events.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "./arcade-session-nav.mjs";
+import { createContentApiClient } from "./platform/api/content-api.mjs";
 function escapeHtml(value) {
     return String(value)
         .replaceAll("&", "&amp;")
@@ -97,6 +98,13 @@ export function renderEventsPage(doc = globalThis.document, events = buildPublic
     }
     return model;
 }
+// Same null-vs-empty rule as the bulletin board: only a null answer (the platform could
+// not be asked) falls back to the shipped fixtures. An empty array means the calendar is
+// genuinely clear and must render that way.
+export async function loadEventsForPage(client = createContentApiClient()) {
+    const remote = await client.listEvents();
+    return buildPublicEventFeed(remote === null ? DEFAULT_EVENTS : remote);
+}
 const doc = globalThis.document;
 if (typeof doc?.getElementById === "function") {
     renderPrimaryAppNav(doc.getElementById("eventsPrimaryNav"), {
@@ -110,5 +118,6 @@ if (typeof doc?.getElementById === "function") {
         signUpPath: "../sign-up/index.html",
         homeOnLogout: "../index.html",
     });
-    renderEventsPage(doc);
+    renderEventsPage(doc, []);
+    void loadEventsForPage().then((events) => renderEventsPage(doc, events));
 }

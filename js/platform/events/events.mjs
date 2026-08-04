@@ -3,7 +3,10 @@ const EVENT_STATUSES = new Set(EVENT_STATUS_VALUES);
 function isEventStatus(value) {
     return EVENT_STATUSES.has(value);
 }
-const DEFAULT_EVENTS = Object.freeze([
+// Shipped fallback content. Used only when the platform API cannot be reached at all —
+// see arcade-events.mts for the null-vs-empty rule. Once events are authored in the admin
+// console these are never rendered, but they stay as the offline/static-host story.
+export const DEFAULT_EVENTS = Object.freeze([
     {
         id: "event-1",
         slug: "lovers-lost-weekend",

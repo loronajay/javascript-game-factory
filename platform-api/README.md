@@ -15,6 +15,7 @@
 - notifications
 - activity and metrics
 - uploads
+- platform administration: bulletins, the event calendar, arcade-grid presentation overrides, the report queue, account suspensions, the admin roster, and an audit log
 
 **Cross-game infrastructure** — the backend is not only the social spine; cabinets depend on it for competitive and commercial state:
 
@@ -68,6 +69,8 @@ This backend is **TypeScript-sourced** (`strict: true`): every `src/**` file is 
 - `src/db/relationships.mjs` and `src/db/thoughts.mjs` delegate pure shaping rules into `relationships-domain.mjs` and `thoughts-domain.mjs`.
 - `src/db/ranked.mjs` is a re-export barrel over `ranked-shared` (slug/serialize/stale helpers), `ranked-match` (matchmaking, start, result/ELO resolution, rendezvous), `ranked-profile` (cosmetic identity), and `ranked-queries` (cards, standing, stats, history, leaderboard). `tests/architecture.test.mjs` guards that split.
 - `src/db/game-social/` must never read or write `player_relationships` / `direct_messages`. Per-game social graphs are intentionally separate from the platform friends graph, and a guard test enforces it.
+- `src/routes/admin-routes.mjs` is the **only** place the admin check happens. It matches the whole `/admin/` prefix, then delegates to `admin-content-routes.mjs` and `admin-moderation-routes.mjs`, neither of which contains authorization logic — so a new admin endpoint added to either is gated by construction. Do not move the check downward, and do not register an `/admin/` path elsewhere in the dispatch chain.
+- `src/db/moderation.mjs` holds the only ownership-free deletes in the backend, reachable solely from the gated admin route. The player-facing deletes in `db/thoughts.mjs` / `db/photos.mjs` keep ownership in the SQL predicate and must stay that way — an `asAdmin` flag on those would put every player's ownership guarantee one argument away from being skipped.
 - New backend cleanup should usually preserve these seams rather than re-centralizing behavior in `app.mjs` or `normalize.mjs`.
 
 ## Security posture
@@ -87,7 +90,9 @@ npm run build       # tsc emit + scripts/sync-emitted-mjs.mjs
 npm run verify:build  # emit + --check; fails if a committed .mjs is stale
 ```
 
-Runtime config comes from the environment: `DATABASE_URL` (Railway Postgres), `APP_BASE_URL`, `ALLOWED_ORIGINS`, the JWT secret, and the Resend / Cloudinary / Stripe / Play credentials. `APP_BASE_URL` and the CORS allow-list are origin-sensitive and must be changed together with any hosting/domain move.
+Runtime config comes from the environment: `DATABASE_URL` (Railway Postgres), `APP_BASE_URL`, `ALLOWED_ORIGINS`, `ADMIN_EMAILS`, the JWT secret, and the Resend / Cloudinary / Stripe / Play credentials. `APP_BASE_URL` and the CORS allow-list are origin-sensitive and must be changed together with any hosting/domain move.
+
+`ADMIN_EMAILS` is a comma-separated list promoted to admin at boot, after migrations. It only ever **grants** — removing an address does not demote anyone, so a typo cannot strip authority from a live operator; demote through the console instead. The account must already exist, so the first-run order is: sign up on the site, set `ADMIN_EMAILS`, redeploy.
 
 ## Boundary reminder
 

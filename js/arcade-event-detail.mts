@@ -7,6 +7,7 @@ import {
 } from "./platform/relationships/relationships.mjs";
 import { getDefaultPlatformStorage } from "./platform/storage/storage.mjs";
 import { createPlatformApiClient } from "./platform/api/platform-api.mjs";
+import { createContentApiClient } from "./platform/api/content-api.mjs";
 
 function escapeHtml(value: unknown): string {
   return String(value)
@@ -279,10 +280,16 @@ const doc = globalThis.document;
 if (typeof doc?.getElementById === "function") {
   const storage = getDefaultPlatformStorage();
   let selectedPartnerId = "";
+  // The event collection this page resolves its slug against. `undefined` means "use the
+  // shipped fixtures", which is what resolvePublicEventBySlug already defaults to — so
+  // the page works unchanged before the fetch lands and on a static host where it never
+  // does. It is replaced with live events only when the platform actually answers.
+  let eventSource: any;
 
   function rerender(relationshipFlash = ""): any {
     const model = renderEventDetailPage(doc, {
       storage,
+      source: eventSource,
       selectedPartnerId,
       relationshipFlash,
     });
@@ -291,6 +298,12 @@ if (typeof doc?.getElementById === "function") {
   }
 
   rerender("");
+
+  void createContentApiClient().listEvents().then((events: any[] | null) => {
+    if (events === null) return;
+    eventSource = events;
+    rerender("");
+  });
 
   doc.addEventListener("change", (event) => {
     const select = event.target as HTMLSelectElement | null;
@@ -312,7 +325,7 @@ if (typeof doc?.getElementById === "function") {
     const viewerProfile = loadFactoryProfile(storage);
     const params = new URLSearchParams(globalThis.location?.search || "");
     const requestedSlug = sanitizeSlug(params.get("slug"));
-    const resolvedEvent = resolvePublicEventBySlug(undefined, requestedSlug);
+    const resolvedEvent = resolvePublicEventBySlug(eventSource, requestedSlug);
     const partnerPlayerId = sanitizePlayerId((doc.getElementById("eventLinkedEntryPartner") as HTMLSelectElement | null)?.value || selectedPartnerId);
 
     if (!resolvedEvent?.id || !viewerProfile.playerId || !partnerPlayerId) {
