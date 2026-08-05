@@ -6,7 +6,17 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-test("release builds default to the next unused Play version code", async () => {
+// This pins the default versionCode so bumping it is a deliberate, reviewed edit rather
+// than something that drifts. It is NOT evidence about what Play has accepted, and it
+// cannot be: nothing on this machine knows that. Read it as "the number we intend to
+// upload next", which is only true if whoever last uploaded also bumped it.
+//
+// That distinction cost a rejected upload. versionCode 9 was pinned here and a local
+// app-release.aab happened to predate the commit that pinned it, which looked like proof
+// that 9 was still unused. Play had already taken 9. **The authority is Play Console ->
+// Release -> App bundle explorer**; check there when you are not certain, and bump this
+// immediately after an upload succeeds rather than before the next one.
+test("release builds pin an explicit default Play version code", async () => {
   const buildGradle = await readFile(
     path.join(ROOT, "android", "app", "build.gradle"),
     "utf8",
@@ -14,7 +24,7 @@ test("release builds default to the next unused Play version code", async () => 
 
   assert.match(
     buildGradle,
-    /versionCode\s+project\.hasProperty\(['"]taVersionCode['"]\)\s*\?\s*project\.taVersionCode\.toInteger\(\)\s*:\s*9\b/,
+    /versionCode\s+project\.hasProperty\(['"]taVersionCode['"]\)\s*\?\s*project\.taVersionCode\.toInteger\(\)\s*:\s*10\b/,
   );
 });
 
