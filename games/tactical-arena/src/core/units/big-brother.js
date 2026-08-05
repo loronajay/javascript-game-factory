@@ -52,7 +52,9 @@ export const BIG_BROTHER = Object.freeze({
       damage: Object.freeze({ type: "true", amount: 2 }),
       description: "Push every adjacent unit, ally or enemy, 1 tile away. Blocked units take 2 true damage.",
       implemented: true,
-      ai: Object.freeze({ intent: "statusAoe", tags: Object.freeze(["control"]) })
+      // `displaceAoe`, not `statusAoe`: Force Push is a pure shove with no status effect,
+      // and the statusAoe scorer returns zero control without one.
+      ai: Object.freeze({ intent: "displaceAoe", tags: Object.freeze(["control"]) })
     }),
     Object.freeze({
       id: "polarity-shift",

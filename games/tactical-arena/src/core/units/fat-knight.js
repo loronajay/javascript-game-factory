@@ -50,7 +50,9 @@ export const FAT_KNIGHT = Object.freeze({
       damage: Object.freeze({ type: "true", amount: 3 }),
       description: "Push every enemy within 1 tile one orthogonal space away. If blocked by a unit, wall, or arena edge, that enemy takes 3 true damage instead.",
       implemented: true,
-      ai: Object.freeze({ intent: "statusAoe", tags: Object.freeze(["control"]) })
+      // `displaceAoe`, not `statusAoe`: Fart carries no status effect, and the statusAoe
+      // scorer returns zero control without one — which made this ART unselectable.
+      ai: Object.freeze({ intent: "displaceAoe", tags: Object.freeze(["control"]) })
     }),
     Object.freeze({
       id: "thick-boi",

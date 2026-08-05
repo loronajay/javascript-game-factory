@@ -9,6 +9,20 @@ and threshold reactions.
 
 Roster: 30 draftable units plus the summon-only Ghoul.
 
+**Where this sits in the doc set.** This file answers *what is this unit trying to do*.
+It deliberately makes no claim about how strong anything is:
+
+- `UNIT_KIT_REFERENCE.generated.md` — every stat, ART cost, accuracy, and effect, extracted
+  straight from `UNIT_TYPES` by `scripts/kit-audit.mjs`. The numbers substrate. Never edited
+  by hand, so it cannot drift from the engine.
+- `BALANCE.md` — the measured tier list: per-unit strength fitted from simulated matches
+  played through the real reducer and CPU, with the sim's blind spots stated up front.
+- `MATCHUPS.md` — measured synergies, counters, and squad recommendations.
+
+Every stat block below is verified against the generated reference, and every ART and
+passive in the engine is named somewhere in this document — both checks are mechanical, so
+a kit piece added later will show up as missing rather than quietly going undocumented.
+
 ---
 
 ## Read this first: the rules that create the archetypes
@@ -264,8 +278,10 @@ assassin — she wants the fight to go long and be
 full of unremovable problems. Emblem makes her immune to poison in return.
 
 Her rage is one of the biggest power spikes in the game: **never miss, 50% crit chance**,
-+1 STR, +1 range, and move-and-ART. A raging Archer at 5 HP is a guaranteed crit machine,
-which is exactly the kind of thing you have to decide whether to heal.
++1 STR, +1 range, +1 MOVE, and move-and-ART. A raging Archer at 5 HP is a guaranteed crit
+machine, which is exactly the kind of thing you have to decide whether to heal. The one
+seam in it: "never miss" does not beat **blind**, which still blocks the shot outright, so
+blind is the correct answer to a raging Archer rather than trying to out-trade her.
 
 ### Sniper — Siege Marksman / Terrain Engineer
 
@@ -304,8 +320,11 @@ long-range gun that hits harder the further out you stand. She has 30 HP and DEF
 survive being found. Curve Shot pierces bodies (so a screen doesn't save the caster behind
 it) and Dragonsbane rolls poison twice, guaranteed on a crit.
 
-Desperation Shot (rage) is a beautiful one-shot: her next attack gains +4 STR and +1 range —
-and then she **skips her next turn entirely**. One enormous shot for a full activation.
+Desperation Shot (rage) is a beautiful one-shot: her next basic attack, Curve Shot, or
+Dragonsbane gains +4 STR and +1 range and **cannot miss** — and then she **skips her next
+turn entirely**. One enormous shot for a full activation. Blind still blocks it, and
+leaving and re-entering RAGE reloads the shot, so a healer bouncing her across the
+threshold can hand her more than one.
 
 ### Little Brother — Splash Artillery
 
@@ -337,14 +356,19 @@ Ore Harvester / Pickaxe is the whole economy: at 0 ore his attack range collapse
 to **1** — a ranged unit with no ammunition is a melee unit. Every ranged basic attack
 costs 1 ore.
 
-So his first turn is spent mining — uncontested, since both squads spawn a corner apart and
-no enemy is anywhere near range. Ore Harvest (free) gathers 2–5 ore and grants +1 MOVE next
-turn; destroying a wall next to him grants 2 more. One harvest already lifts him off 0 and
-restores his full range 5, so the "unable to do his job" window is a single, safe turn. Once
-stocked, he converts: +1% crit per 5 ore held, and at **max ore** he gains +1 STR and +1 DEF
-outright. His ore
-total is simultaneously his ammo, his crit chance, and his stat line — a genuinely elegant
-piece of design where hoarding and spending are in direct tension.
+He is no longer wholly dependent on mining to get going: the passive now **grants 1 ore at
+the start of every turn**, which is a quiet but real change to his floor. It means he can
+never be permanently stranded at 0 by an aggressive opener, and it puts a slow trickle
+under him even in turns he spends shooting or repositioning — a range-5 shot costs 1 ore, so
+passive income alone sustains one shot per turn forever. Actively mining is now about
+*getting ahead* rather than about being functional at all.
+
+His first turn is still usually spent mining, uncontested, since both squads spawn a corner
+apart and no enemy is anywhere near range. Ore Harvest (free) gathers 2–5 ore and grants +1
+MOVE next turn; destroying a wall next to him grants 2 more. Once stocked, he converts: +1%
+crit per 5 ore held, and at **max ore** he gains +1 STR and +1 DEF outright. His ore total
+is simultaneously his ammo, his crit chance, and his stat line — a genuinely elegant piece
+of design where hoarding and spending are in direct tension.
 
 Adjacent basics deal +2 (his pickaxe), Headlamp blinds an adjacent enemy with no roll, Shaft
 Prop spends 3 ore to build a wall, and Blasting Cap spends 2 ore for a 3-true-damage blast
@@ -540,11 +564,12 @@ backfires and inflicts a random negative status on that same ally. A heal that c
 your own Swordsman is a real gamble, and the weighted table makes stun the rare disaster.
 
 Second Helping (rage) is a **revive** — bring a fallen ally back at 50% HP, with statuses
-cleared but without restoring MP. And Emergency Snacks means rage isn't a death sentence for her:
-her basic attacks become magic, she gains
-+1 HP at the start of each raging turn, and if that nibble lifts her back over the threshold
-she gulps 5 MP too (up to 3 times a battle). She's the healer designed to survive her own
-rage.
+cleared but without restoring MP. And Emergency Snacks means rage isn't a death sentence for
+her: she is **always treated as Defending** (all incoming damage halved), her basic attacks
+become magic, she gains +1 HP at the start of each raging turn, and if that nibble lifts her
+back over the threshold she gulps 5 MP too (up to 3 times a battle). Permanent Defend on a
+30-HP DEF-5 body makes a raging Fat Cleric genuinely hard to finish — she is the healer
+designed to survive her own rage, and the reason a squad can afford to leave her down there.
 
 ### Angel — White-Tile Support Ranger
 
@@ -594,6 +619,15 @@ than one who heals numbers.
 
 Coal Walker makes him immune to fire damage throughout. The skill in him is knowing which
 global rule you want live, and accepting that the enemy plays under it too.
+
+The piece that is easy to miss is **Hex Strike**, and it is the reason he is not purely a
+button-presser. His *basic attacks* carry their own rider stack: they **silence on a
+critical hit**, they gain **+20% crit chance** against a target on a dark tile while he is
+standing on one too, and that same both-on-dark condition **restores him 3 MP**. So his
+ordinary swing is a self-funding silence lottery with a hugely inflated crit rate on half
+the board. That matters for how you play him between dances — with a 30-MP pool and dances
+to pay for, the dark-tile basic attack is his refuel, and it is why footing is a real
+consideration for a unit whose headline mechanic looks entirely global.
 
 ### Father Time — Attrition Aura Controller
 

@@ -20,7 +20,7 @@ import { getEffectiveStats, getUnitType, isCommandOnly, isDefending, isRaging, n
 import { getArtAccuracy, getBasicAttackDamageType, getCritChance, getMissChance, getSelfMagicVulnerability, getTeamDamageReduction, isFireBasedDamage, isFireDamageImmune, resolveBaseStrike, resolveFixedPhysicalStrike } from "../rules/combat.js";
 import { CRIT_MULTIPLIER } from "../rules/damage.js";
 import { chebyshevDistance } from "../rules/movement.js";
-import { statusImmunities } from "../rules/statuses.js";
+import { statusImmunities, NEGATIVE_STATUS_TYPES } from "../rules/statuses.js";
 
 // Statuses a unit does NOT want on it — the ones a global cleanse (Misfortune Dance)
 // is worth removing from an ally. `empowered` is a buff, so it is deliberately absent.
@@ -70,6 +70,13 @@ export function offenseEstimate(unit, state = null) {
 // the target's threat value — disabling can never beat killing (decision 1).
 export function statusValue(target, effect, state = null, { survivingHp } = {}) {
   if (!effect?.status || statusImmunities(target).has(effect.status)) return 0;
+  // Only a HARMFUL status is worth landing on an enemy. The switch below ends in a
+  // `default` that values an unknown status as a full-turn disable, which silently
+  // mispriced every beneficial one: Heatwave's `empowered` and Thunderstorm's
+  // `weather-magic` are global buffs that land on both squads, and scoring them as
+  // "stun every enemy" is what drove Mother Nature to recast weather every single turn.
+  // `NEGATIVE_STATUS_TYPES` is the same authority the reducer's cleanse rules use.
+  if (!NEGATIVE_STATUS_TYPES.includes(effect.status)) return 0;
 
   const duration = effect.duration === "permanent"
     ? POISON_HORIZON
@@ -261,6 +268,17 @@ export function buffAlliesValue(state, caster, art) {
     return value;
   }
 
+  // Weather (Mother Nature) is a GLOBAL rules edit that BOTH squads then play under, and
+  // each cast replaces whatever was running. Two things follow that the generic
+  // globalStatus branch below gets wrong:
+  //   * the immediate buff is symmetric, so it is worth only the DIFFERENCE it makes to
+  //     your squad versus theirs — not its full value multiplied across every enemy; and
+  //   * once a weather is up, replacing it throws away the persistent rule you are
+  //     already collecting, so churning is a loss rather than a gain.
+  // Scoring each cast as a fresh gain, combined with the `lastWeather` rule that forbids
+  // repeating the weather just cast, is what made her alternate two weathers forever.
+  if (art.weather) return weatherSetupValue(state, caster, art);
+
   // Black Death Dance (rage ultimate): blind the whole enemy squad + a self power spike.
   // The blind on every enemy is the concrete immediate value.
   if (art.globalStatus || art.selfBuff) {
@@ -275,6 +293,45 @@ export function buffAlliesValue(state, caster, art) {
   }
 
   return 0;
+}
+
+// Worth of establishing a persistent global weather rule that suits your squad, in the
+// same damage-equivalent units as everything else here. Deliberately modest: the rule is
+// real value, but it is value collected slowly over the rest of the match rather than a
+// swing this turn.
+const WEATHER_SETUP_VALUE = 1.5;
+
+// Value of casting `art`'s weather. Zero while any weather is already running — the
+// persistent rule is only collected by setting one and then leaving it alone, and the CPU
+// has no way to know a *different* rule would suit it better mid-match.
+function weatherSetupValue(state, caster, art) {
+  if (state?.weather?.id) return 0;
+
+  const allies = livingUnits(state, caster.player).filter((unit) => unit.id !== caster.id);
+  const enemies = livingUnits(state).filter((unit) => areEnemies(caster, unit));
+  const global = art.globalStatus ?? null;
+
+  // A harmful global (Blizzard's slow) hits both squads: worth the damage it denies them
+  // minus the damage it denies you.
+  if (global?.status && NEGATIVE_STATUS_TYPES.includes(global.status)) {
+    const effect = { status: global.status, durationTurns: global.durationTurns };
+    let value = 0;
+    for (const enemy of enemies) value += statusValue(enemy, effect, state);
+    for (const ally of allies) value -= statusValue(ally, effect, state);
+    return Math.max(0, value) + WEATHER_SETUP_VALUE;
+  }
+
+  // A beneficial global (Heatwave's +1 STR, Thunderstorm's +1 magic damage) also hits both
+  // squads, so it is worth the difference in how many bodies on each side can actually
+  // convert it into damage this turn.
+  const bonus = (Number(global?.statModifiers?.strength) || 0) + (Number(global?.magicDamageBonus) || 0);
+  if (bonus > 0) {
+    const mine = allies.filter((ally) => canReachAnEnemy(state, ally, enemies)).length;
+    const theirs = enemies.filter((enemy) => canReachAnEnemy(state, enemy, allies)).length;
+    return Math.max(0, (mine - theirs) * bonus * HIT_BASELINE) + WEATHER_SETUP_VALUE;
+  }
+
+  return WEATHER_SETUP_VALUE;
 }
 
 function misfortuneStatusSynergyValue(state, caster, allies, enemies) {

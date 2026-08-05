@@ -16,8 +16,8 @@ import { areEnemies, findUnit, livingUnits } from "../core/state.js";
 import { getArt, getBasicAttackResourceCost, getEffectiveStats, getWallKillResourceReward, isCommander, normalizeArtAi, takesTurns } from "../core/unitCatalog.js";
 import { createRngState, nextRandom } from "../core/rng.js";
 import { getSelfBlastRadius } from "../rules/arts.js";
-import { isFireDamageImmune, isShotBlocked, isWallBetween } from "../rules/combat.js";
-import { chebyshevDistance, positionKey } from "../rules/movement.js";
+import { getCritChance, isFireDamageImmune, isShotBlocked, isWallBetween } from "../rules/combat.js";
+import { chebyshevDistance, isOnBoard, positionKey } from "../rules/movement.js";
 import { isStunned } from "../rules/statuses.js";
 import {
   ageValue,
@@ -241,6 +241,60 @@ function bonusEffectValue(state, unit, plan) {
   return { control: 0, heal: 0 };
 }
 
+// Worth of a `strike` ART's shove, in the same damage-equivalent units as everything else.
+//
+// Front Kick is the case this exists for: 10 power against the Monk's STR 9 is barely an
+// upgrade on a free basic attack, so scoring it on projected damage alone meant the CPU
+// never used it — and the stun conversion added in c79aa30d never affected CPU play at all.
+//
+// The shove is walked the way the resolver walks it: straight out along the attacker→target
+// line. If the board edge cuts it short the target is stunned; if one of the TARGET's own
+// allies cuts it short, that ally is stunned instead. Anything else is plain displacement.
+const DISPLACEMENT_VALUE = 2;
+
+function knockbackValue(state, attacker, target, art) {
+  const knockback = art.knockback;
+  if (!knockback) return 0;
+
+  const distance = Math.max(0, Number(knockback.distance) || 0);
+  if (distance <= 0) return 0;
+
+  // `criticalOnly` shoves (Front Kick outside Nirvana) only land on a crit, so the whole
+  // term is worth its own probability.
+  const chance = knockback.criticalOnly
+    ? getCritChance(attacker, { target, state, basicAttack: false })
+    : 1;
+  if (chance <= 0) return 0;
+
+  const step = {
+    x: Math.sign(target.position.x - attacker.position.x),
+    y: Math.sign(target.position.y - attacker.position.y)
+  };
+  if (step.x === 0 && step.y === 0) return 0;
+
+  let stunned = null;
+  let travelled = 0;
+  let cursor = { ...target.position };
+  for (let i = 0; i < distance; i += 1) {
+    const next = { x: cursor.x + step.x, y: cursor.y + step.y };
+    if (!isOnBoard(state, next)) { stunned = target; break; }          // edge stops it
+    const blocker = livingUnits(state).find((u) =>
+      u.position.x === next.x && u.position.y === next.y);
+    if (blocker) {
+      // Only one of the target's OWN allies converts the shove into a stun.
+      if (!areEnemies(target, blocker)) stunned = blocker;
+      break;
+    }
+    cursor = next;
+    travelled += 1;
+  }
+
+  const stunGain = stunned
+    ? statusValue(stunned, { status: "stun", durationTurns: art.stun?.durationTurns ?? 1 }, state)
+    : 0;
+  return chance * (stunGain + travelled * (DISPLACEMENT_VALUE / distance));
+}
+
 function primaryEffectValue(state, unit, plan) {
   if (plan.primary.kind !== "art") return { control: 0, heal: 0 };
   const art = getArt(unit.type, plan.primary.artId);
@@ -250,7 +304,11 @@ function primaryEffectValue(state, unit, plan) {
     const target = findUnit(state, plan.primary.targetId);
     if (!target) return { control: 0, heal: 0 };
     const rider = expectedStrike(state, unit, target, art).riderValue;
-    return art.effect?.type === "heal" ? { control: 0, heal: rider } : { control: rider, heal: 0 };
+    if (art.effect?.type === "heal") return { control: 0, heal: rider };
+    // A `strike` that also shoves (Front Kick) is scored on projected damage alone, which
+    // barely beats a free basic attack — so the CPU always swung instead and the shove's
+    // real payoff never entered the decision. Add it explicitly.
+    return { control: rider + knockbackValue(state, unit, target, art), heal: 0 };
   }
   if (ai.intent === "statusCast") {
     const target = findUnit(state, plan.primary.targetId);

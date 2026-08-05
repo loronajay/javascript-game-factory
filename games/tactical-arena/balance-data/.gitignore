@@ -1,0 +1,6 @@
+# Raw per-match records from scripts/roster-sim.mjs — tens of MB per run, and fully
+# reproducible from a seed (`npm run sim -- --games 16000 --difficulty hard`). The fitted
+# output that the docs actually cite (analysis*.json, kit-audit.json) IS committed, so the
+# numbers in BALANCE.md and MATCHUPS.md can be checked without re-running the simulation.
+sim-*.json
+*.tmp
