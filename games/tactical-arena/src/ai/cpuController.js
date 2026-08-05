@@ -26,13 +26,18 @@ import {
   cleanseAllyValue,
   commandBuffValue,
   expectedStrike,
+  focusedThreat,
+  footingBaseline,
+  footingValue,
   grabValue,
   hastenValue,
-  incomingThreat,
+  incomingStrikes,
   isKeyUnit,
   nearestEnemyDistance,
   rechargeValue,
   statusValue,
+  tileHazardCost,
+  totalThreat,
   unitThreatValue
 } from "./evaluate.js";
 import { generatePlans, planMpCost, projectPlan, toCommands } from "./plans.js";
@@ -40,19 +45,30 @@ import { generatePlans, planMpCost, projectPlan, toCommands } from "./plans.js";
 // Per-difficulty scoring weights. Easy barely values position (and picks with weighted
 // randomness, so it blunders); Normal plays a competent greedy turn; Hard leans harder
 // on threat-avoidance and protecting/hunting key units. `control` weights status
-// effects, `zone` weights placed objects (walls/fire), `mp` is the cost per MP point.
+// effects, `zone` weights placed objects (walls/fire), `mp` is the cost per MP point,
+// `hazard` the guaranteed rollover damage of the tile a unit stops on, `footing` what
+// that tile is worth to its own kit, and `survival` the risk of losing the unit outright.
+//
+// `survival` is deliberately HARD-ONLY. It is the term that stops a unit from spending
+// Footwork/Flee to dive into the enemy squad and trade its health bar for nothing, and
+// that blunder is a large part of why Normal is beatable — the campaign runs at Normal
+// (campaignMatch.js), so leaving it at 0 there keeps every authored mission playing
+// exactly as it does today.
 const WEIGHTS = Object.freeze({
   easy: {
     kill: 8, killKey: 2, damage: 1.5, heal: 1.2, control: 0.6, zone: 0.4,
-    defendBase: -2, mp: 0.15, exposure: 0.05, keyExposure: 0.05, advance: 0.6
+    defendBase: -2, mp: 0.15, exposure: 0.05, keyExposure: 0.05, advance: 0.6,
+    hazard: 0.5, footing: 0.25, survival: 0
   },
   normal: {
     kill: 14, killKey: 5, damage: 1.4, heal: 1.2, control: 1.0, zone: 0.8,
-    defendBase: -1, mp: 0.25, exposure: 0.3, keyExposure: 0.3, advance: 2.0
+    defendBase: -1, mp: 0.25, exposure: 0.3, keyExposure: 0.3, advance: 2.0,
+    hazard: 1.2, footing: 0.8, survival: 0
   },
   hard: {
     kill: 18, killKey: 8, damage: 1.4, heal: 1.3, control: 1.4, zone: 1.1,
-    defendBase: -1.5, mp: 0.3, exposure: 0.5, keyExposure: 0.5, advance: 3.2
+    defendBase: -1.5, mp: 0.3, exposure: 0.5, keyExposure: 0.5, advance: 3.2,
+    hazard: 1.5, footing: 1.2, survival: 0.9
   }
 });
 
@@ -125,6 +141,9 @@ function bestPlanFor(state, candidates, cpuPlayer, weights, difficulty, rng, exc
   const excluded = excludeArtIds && excludeArtIds.length ? new Set(excludeArtIds) : null;
   const scored = [];
   for (const unit of candidates) {
+    // The footing baseline is the unit's CURRENT tile, so it is the same for every plan
+    // that unit has — compute it once here rather than once per plan (it walks the board).
+    const footing = footingBaseline(state, unit);
     for (const plan of generatePlans(state, unit)) {
       // The denylist covers an ART used either as the primary OR as a bonus-action prefix
       // (a Witch Doctor dance rides in `plan.bonus`), so Mission 3's Rain-Dance heal-stall
@@ -132,7 +151,7 @@ function bestPlanFor(state, candidates, cpuPlayer, weights, difficulty, rng, exc
       if (excluded &&
         ((plan.primary.kind === "art" && excluded.has(plan.primary.artId)) ||
           (plan.bonus && excluded.has(plan.bonus.artId)))) continue;
-      scored.push({ plan, score: scorePlan(state, plan, unit, cpuPlayer, weights) });
+      scored.push({ plan, score: scorePlan(state, plan, unit, cpuPlayer, weights, footing) });
     }
   }
   if (scored.length === 0) return null;
@@ -143,8 +162,8 @@ function bestPlanFor(state, candidates, cpuPlayer, weights, difficulty, rng, exc
 // damage/heal emphasis is read uniformly from the projected-board diff, so attacks,
 // AoE, footwork, blasts, heals, and the bonus pulse all score through one path; status
 // effects, placed objects, MP, and positioning are added on top.
-function scorePlan(state, plan, unit, cpuPlayer, weights) {
-  const { board, finalPos } = projectPlan(state, plan);
+function scorePlan(state, plan, unit, cpuPlayer, weights, footing) {
+  const { board, actor, finalPos } = projectPlan(state, plan);
   const before = new Map(livingUnits(state).map((u) => [u.id, u.hp]));
 
   // 1. Material: every unit's self-declared standing value plus current HP, signed by
@@ -205,15 +224,49 @@ function scorePlan(state, plan, unit, cpuPlayer, weights) {
   // 8. Positioning of the acting unit's final tile: avoid crossfire, and (when nothing
   //    better) drift toward the enemy. Defending lowers the projected incoming threat.
   const defending = plan.primary.kind === "defend";
-  const threat = Math.min(THREAT_CAP, incomingThreat(state, unit, finalPos, defending));
+  const strikes = incomingStrikes(state, unit, finalPos, defending);
+  const threat = Math.min(THREAT_CAP, totalThreat(strikes));
   score -= weights.exposure * threat;
   if (isKeyUnit(unit)) score -= weights.keyExposure * threat;
   score -= weights.advance * nearestEnemyDistance(state, cpuPlayer, finalPos);
 
-  // 9. A fire-immune unit baits melee by camping on a burning tile it can't be hurt by.
+  // 8b. Survival. The cap above deliberately flattens danger so two squads don't freeze
+  //     apart — which also means a unit one hit from death reads a lethal crossfire as
+  //     barely worse than a scratch, and `advance` (a whole 3.2 per tile closed) then
+  //     buys any plan that closes distance, however it ends. A movement ART closes the
+  //     most distance of anything a unit can do, so Footwork/Dark Rush/Flee became the
+  //     CPU's favourite way to sprint into the middle of the enemy formation and die
+  //     there. Price the risk of LOSING the unit against that.
+  //
+  //     Two shape decisions matter more than the weight:
+  //       * focusedThreat, not the full sum — only the heaviest couple of attackers will
+  //         really spend their activation on this one body (see evaluate.js); and
+  //       * the risk is CUBED, so this is a lethality term rather than a second exposure
+  //         term. A healthy unit walking into a fair fight reads ~0 and still engages;
+  //         one that would actually die there pays close to its whole value. Without the
+  //         curve the same weight that stops a 5 HP dive also stops a 25 HP charge, and
+  //         the two squads stare at each other across the board.
+  //
+  //     A self-sacrifice plan (Self Destruct) is exempt: the projected board already
+  //     charges the caster's whole material value, so this would double-bill it.
+  if (weights.survival > 0 && actor.hp > 0) {
+    const risk = Math.min(1, focusedThreat(strikes) / actor.hp);
+    score -= weights.survival * risk * risk * risk * (unitThreatValue(unit) + actor.hp);
+  }
+
+  // 9. Footing. What the tile the unit stops on is worth to its own kit beyond this
+  //    activation (tile-affinity stats, Dark Tread's ground, an aura it stepped out of),
+  //    measured against the tile it is standing on now so the term stays neutral when
+  //    plans from different units are scored in one pool.
+  if (weights.footing > 0) score += weights.footing * footingValue(state, unit, finalPos, footing);
+
+  // 10. Rollover hazards on that tile: fire, and enemy auras that tick without costing
+  //     their owner an activation. Free damage the CPU used to walk into for nothing.
   if (isFireDamageImmune(unit) && state.tileObjects?.[positionKey(finalPos)]?.kind === "fire") {
+    // A fire-immune unit instead baits melee by camping on a tile it can't be hurt by.
     score += weights.zone * FIRE_CAMP_ZONE_VALUE;
   }
+  score -= weights.hazard * tileHazardCost(state, unit, finalPos);
 
   return score;
 }

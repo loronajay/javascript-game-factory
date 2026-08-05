@@ -148,6 +148,28 @@ These are keyed off existing fields so authors never re-declare them:
   `heal`, `defendBase`, `exposure`, `advance`) + new terms: `control` (status value),
   `zone` (placed-object/aura value), `summonValue`. Easy = softmax/blunder, Normal =
   greedy competent, Hard = stronger threat-avoidance + key-unit hunting/protecting.
+- **Footing terms** — what the tile a unit STOPS on is worth, all read off the same
+  authorities the reducer uses rather than per-art metadata, so a new unit or hazard is
+  priced with no authoring at all:
+  - `hazard` (`tileHazardCost`) — the guaranteed, unrollable damage the next rollover
+    deals for ending there: the fire tick (rain-aware, fire-immunity/vulnerability-aware)
+    plus enemy rollover auras (`damageAura`, `autoStrike`). None of it costs its owner an
+    activation, so `incomingThreat` cannot see it.
+  - `footing` (`footingValue`) — the tile's worth to the unit's own kit, as a DELTA
+    against the tile it stands on now. Deliberately a delta: the controller scores plans
+    across different units in one pool, so an absolute bonus would bias which unit it
+    activates instead of where it puts it. The stat half comes from `getEffectiveStats` at
+    the destination, so every position-sensitive fold (tile-affinity stats, positional
+    DEF, ally/enemy auras, weather affinity) is picked up without being named.
+  - `survival` — the risk of losing the unit outright: `focusedThreat` (the heaviest two
+    attackers, not the whole board's reach) over projected HP, **cubed**, times the unit's
+    material worth. The cube is what makes it a lethality term rather than a second
+    `exposure`; flatten it and healthy squads stop engaging at all.
+
+  **`survival` is hard-only by design.** It is what stops Footwork/Dark Rush/Flee being
+  used to sprint into the enemy formation and trade a health bar for nothing. The campaign
+  runs at Normal (`campaignMatch.js`), so Normal keeps that blunder and every authored
+  mission keeps its tuning. Guarded by `tests/ai-footing.test.js`.
 
 ---
 

@@ -189,7 +189,9 @@ export function getBasicAttackAffinityMpRestore(unit) {
 // playable unit (mission 22's Blacksword gets Void Reach this way; his drafted twin does
 // not). Scanned here so every passive reader in this module — crit riders, splash, fire
 // immunity, damage-type immunity — sees an instance grant with no further wiring.
-function passiveEffects(unit) {
+// Exported so the CPU's footing evaluator reads passives through this same authority
+// (instance grants included) rather than re-deriving the source list.
+export function passiveEffects(unit) {
   const definition = getUnitType(unit.type);
   return [
     definition.passive,

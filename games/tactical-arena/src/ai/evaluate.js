@@ -15,12 +15,13 @@
 // — see CPU_AI_METADATA_SCHEMA.md §4. Per-art/per-unit `ai` metadata is read
 // through `normalizeUnitAi` so a new unit needs no edit to this file.
 
-import { areEnemies, livingUnits } from "../core/state.js";
+import { areEnemies, getTileAffinity, livingUnits } from "../core/state.js";
+import { canIgniteFire } from "../core/fireTiles.js";
 import { getEffectiveStats, getUnitType, isCommandOnly, isDefending, isRaging, normalizeUnitAi, takesTurns } from "../core/unitCatalog.js";
-import { getArtAccuracy, getBasicAttackDamageType, getCritChance, getMissChance, getSelfMagicVulnerability, getTeamDamageReduction, isFireBasedDamage, isFireDamageImmune, resolveBaseStrike, resolveFixedPhysicalStrike } from "../rules/combat.js";
+import { getArtAccuracy, getBasicAttackAffinityMpRestore, getBasicAttackDamageType, getCritChance, getFireVulnerability, getMissChance, getSelfMagicVulnerability, getTeamDamageReduction, getTileAffinityDamageBonus, getTileVulnerability, isFireBasedDamage, isFireDamageImmune, passiveEffects, resolveBaseStrike, resolveFixedPhysicalStrike } from "../rules/combat.js";
 import { CRIT_MULTIPLIER } from "../rules/damage.js";
-import { chebyshevDistance } from "../rules/movement.js";
-import { statusImmunities, NEGATIVE_STATUS_TYPES } from "../rules/statuses.js";
+import { chebyshevDistance, positionKey } from "../rules/movement.js";
+import { isInvulnerable, statusImmunities, NEGATIVE_STATUS_TYPES } from "../rules/statuses.js";
 
 // Statuses a unit does NOT want on it — the ones a global cleanse (Misfortune Dance)
 // is worth removing from an ally. `empowered` is a buff, so it is deliberately absent.
@@ -464,15 +465,42 @@ export function expectedLineStrikeDamage(state, attacker, target, { amount, type
 // blockers and turn order (an over-estimate) so the CPU keeps its key units wary of
 // crossfire. `defending` lowers it, which is why bracing scores well under pressure.
 export function incomingThreat(state, victim, pos, defending = false) {
+  return totalThreat(incomingStrikes(state, victim, pos, defending));
+}
+
+// One expected strike per enemy that can bring an attack to bear on `pos`. Exported so a
+// caller that wants BOTH readings below pays for the scan once — it walks every enemy and
+// resolves a full strike apiece, which is the most expensive thing the scorer does.
+export function incomingStrikes(state, victim, pos, defending = false) {
   const proxy = { ...victim, position: { x: pos.x, y: pos.y }, defending };
-  let threat = 0;
+  const strikes = [];
   for (const enemy of livingUnits(state)) {
     if (!areEnemies(enemy, victim)) continue;
     const stats = getEffectiveStats(enemy, state);
     if (chebyshevDistance(enemy.position, pos) > stats.moveRange + stats.attackRange) continue;
-    threat += expectedStrike(state, enemy, proxy).expDamage;
+    strikes.push(expectedStrike(state, enemy, proxy).expDamage);
   }
+  return strikes;
+}
+
+export function totalThreat(strikes) {
+  let threat = 0;
+  for (const strike of strikes) threat += strike;
   return threat;
+}
+
+// How many enemies the CPU assumes will actually spend their next activation on ONE
+// victim. The total sums every enemy that COULD reach, which is the right shape for "is
+// this tile hot?" but a bad one for "will this unit die standing here?" — each of those
+// enemies gets a single activation and has its own targets, so counting all of them says
+// a healthy body surrounded by four foes is already dead. Two is the honest read of a
+// focus-fire, and it is what the survival term prices.
+const FOCUS_ATTACKERS = 2;
+
+// The damage that could plausibly be FOCUSED on one victim next turn: the heaviest
+// FOCUS_ATTACKERS strikes reaching it, rather than the whole board's worth.
+export function focusedThreat(strikes) {
+  return totalThreat([...strikes].sort((a, b) => b - a).slice(0, FOCUS_ATTACKERS));
 }
 
 // Value of a King command (Strike/Hold/Pursue/Higher Ground) — a one-turn team buff
@@ -510,6 +538,176 @@ function canReachEnemy(state, unit) {
 function isThreatened(state, unit) {
   if (unit.hp <= getEffectiveStats(unit, state).maxHp * 0.5) return true;
   return livingUnits(state).some((e) => areEnemies(unit, e) && chebyshevDistance(unit.position, e.position) <= 2);
+}
+
+// --- Footing: what the tile a unit STOPS on is worth ------------------------
+//
+// Two facts about a destination tile the CPU could not previously see: what standing
+// there costs at the next rollover (fire, aura ticks), and what the ground itself is
+// worth to that unit's own kit (tile affinity). Both read through the SAME authorities
+// the reducer's rollover pulses and stat folds use, so the CPU's read of the board
+// cannot drift from what the engine will actually do to it.
+//
+// Note what is deliberately NOT here: the affinity payoff on the swing a plan is making
+// right now. That is already priced, because projectPlan moves the actor before calling
+// expectedStrike, and getTileAffinityDamageBonus / getMissChance / getCritChance all read
+// live positions. These helpers cover only the part that outlives the activation.
+
+// Damage a burning tile deals to whoever stands on it at each rollover, before that
+// unit's own fire vulnerability. Mirrors FIRE_DAMAGE in core/turnHazards.js.
+const FIRE_TICK_DAMAGE = 1;
+
+// Guaranteed, unrollable damage `unit` takes at the next turn rollover for ending its
+// activation on `pos`: the fire-tile tick plus every enemy rollover aura reaching that
+// tile (Father Time's Time Steal, a Ghoul's Bite). None of it rolls to hit and none of it
+// is stopped by DEF or Defend, so it is real HP that incomingThreat cannot see —
+// incomingThreat only prices attacks an enemy has to spend an activation making. Returns
+// an ABSOLUTE cost, not a delta: a plan that walks out of the fire scores 0 here while a
+// plan that stays in it pays, which is exactly the comparison the controller needs.
+export function tileHazardCost(state, unit, pos) {
+  if (isInvulnerable(unit)) return 0;   // Petrify eats the tick outright
+  let cost = 0;
+
+  // Rain (Spring Shower / Thunderstorm) puts the board out at the top of the rollover
+  // BEFORE the tick, so a burning tile under rain is free ground — canIgniteFire is the
+  // same read fireTiles.js uses to decide that.
+  const object = state.tileObjects?.[positionKey(pos)];
+  if (object?.kind === "fire" && canIgniteFire(state) && !isFireDamageImmune(unit)) {
+    cost += FIRE_TICK_DAMAGE + getFireVulnerability(unit);
+  }
+
+  for (const source of livingUnits(state)) {
+    if (!areEnemies(source, unit)) continue;
+    const definition = getUnitType(source.type);
+    const distance = chebyshevDistance(source.position, pos);
+
+    // Time Steal (damageAura): hits EVERY enemy in radius for the full amount.
+    const aura = definition.passive?.effect;
+    if (aura?.type === "damageAura" && distance <= (aura.radius ?? 2)) {
+      cost += Math.max(0, Number(aura.amount) || 0);
+    }
+
+    // Ghoul Bite (autoStrike): picks ONE random enemy in range, so a unit's share of it
+    // falls as more of its squadmates crowd into the same reach. Mirrors the source list
+    // applyAutoStrikeTick scans (passive + passive-kind ARTS).
+    for (const passive of [definition.passive, ...definition.arts].filter(Boolean)) {
+      if (passive.kind && passive.kind !== "passive") continue;
+      const effect = passive.effect;
+      if (effect?.type !== "autoStrike") continue;
+      const range = effect.range ?? 1;
+      if (distance > range) continue;
+      let contested = 1; // this unit, at pos
+      for (const other of livingUnits(state)) {
+        if (other.id === unit.id || !areEnemies(source, other)) continue;
+        if (chebyshevDistance(source.position, other.position) <= range) contested += 1;
+      }
+      cost += Math.max(0, Number(effect.damage) || 0) / contested;
+    }
+  }
+  return cost;
+}
+
+// Tuning priors for footing, in the same damage-equivalent currency as everything else.
+// A point of STR is worth about a landed hit; a point of DEF about its mitigation — the
+// same numbers ageValue uses for a persistent ±1, so the two can't disagree.
+const FOOTING_STRENGTH_VALUE = HIT_BASELINE;
+const FOOTING_DEFENSE_VALUE = 0.8;
+const FOOTING_RANGE_VALUE = 0.6;
+const FOOTING_MOVE_VALUE = 0.3;
+const FOOTING_IDLE_FACTOR = 0.35;  // offense is worth less from ground nobody can be hit from
+
+// The origin-tile reading footingValue measures against. Hoisted out so the controller can
+// compute it once per unit instead of once per plan (getEffectiveStats walks the board).
+export function footingBaseline(state, unit) {
+  const enemies = livingUnits(state).filter((other) => areEnemies(unit, other));
+  const stats = getEffectiveStats(unit, state);
+  return { enemies, stats, kit: tileKitValue(state, unit, enemies, stats) };
+}
+
+// What ending on `pos` is worth to `unit`'s kit, RELATIVE to the tile it stands on now.
+//
+// A delta rather than an absolute, for two reasons: the controller scores plans across
+// different units in one pool, so an absolute bonus would bias unit selection toward
+// whoever happens to own a tile passive; and the CPU should be paid for IMPROVING its
+// footing, never for having good ground handed to it at spawn.
+//
+// The stat half comes straight from getEffectiveStats at the destination, so it picks up
+// every position-sensitive fold the engine already has — the Paladin's +1 DEF on a white
+// tile, the Treant's Deep Roots, Clod's Brick House, stepping out of a Necromancer's
+// Deathly Aura — without this module naming any of them.
+export function footingValue(state, unit, pos, baseline = footingBaseline(state, unit)) {
+  if (!pos) return 0;
+  if (pos.x === unit.position.x && pos.y === unit.position.y) return 0;
+  if (!baseline.enemies.length) return 0;
+
+  const there = { ...unit, position: { x: pos.x, y: pos.y } };
+  const stats = getEffectiveStats(there, state);
+  const engaged = baseline.enemies.some((enemy) =>
+    chebyshevDistance(pos, enemy.position) <= stats.moveRange + stats.attackRange);
+  const offense = engaged ? 1 : FOOTING_IDLE_FACTOR;
+
+  let value = 0;
+  value += (stats.strength - baseline.stats.strength) * FOOTING_STRENGTH_VALUE * offense;
+  value += (stats.defense - baseline.stats.defense) * FOOTING_DEFENSE_VALUE;
+  value += (stats.attackRange - baseline.stats.attackRange) * FOOTING_RANGE_VALUE * offense;
+  value += (stats.moveRange - baseline.stats.moveRange) * FOOTING_MOVE_VALUE;
+  value += tileKitValue(state, there, baseline.enemies, stats) - baseline.kit;
+  return value;
+}
+
+// The affinity-gated payoffs of the tile `at.position`, for the kit `at` carries. Only the
+// parts getEffectiveStats does NOT already fold — those are handled by the stat delta above.
+function tileKitValue(state, at, enemies, stats) {
+  // Dark Tread's other half: Blacksword takes +1 from everything while it stands on white.
+  // Mildly redundant with incomingThreat, which also sees it — but that term is capped at
+  // THREAT_CAP and only counts enemies already in reach, so it goes quiet exactly when the
+  // choice of ground is a free one. Both point the same way.
+  let value = -getTileVulnerability(at, state) * FOOTING_DEFENSE_VALUE;
+
+  const reach = stats.moveRange + stats.attackRange;
+  const reachable = enemies.filter((enemy) => chebyshevDistance(at.position, enemy.position) <= reach);
+  if (!reachable.length) return value;
+
+  // Offense this ground would add against someone the unit could actually get to next
+  // turn (Dark Tread's +damage vs enemies on dark, doubled when Blacksword is on it too).
+  let bonus = 0;
+  for (const enemy of reachable) bonus = Math.max(bonus, getTileAffinityDamageBonus(at, enemy, state));
+  value += bonus * HIT_BASELINE;
+
+  const affinity = getTileAffinity(state, at.position);
+
+  // Hex Strike (Witch Doctor): a basic attack traded on dark ground refunds MP. Worth
+  // something only while the unit is actually short of MP and could reach a target
+  // standing on the same affinity. Priced as utility, well under a point of damage.
+  const mpRestore = getBasicAttackAffinityMpRestore(at);
+  if (mpRestore?.affinity === affinity && at.mp < stats.maxMp &&
+      reachable.some((enemy) => getTileAffinity(state, enemy.position) === affinity)) {
+    value += Math.min(stats.maxMp - at.mp, Math.max(0, Number(mpRestore.amount) || 0)) * 0.15;
+  }
+
+  // Accuracy/crit riders that only pay out from the right ground (Angel's Blessed Arrow
+  // never misses when both bodies are on white; the Witch Doctor crits harder on dark).
+  // A flat prior rather than a re-derived expected strike — this runs per candidate tile.
+  for (const effect of passiveEffects(at)) {
+    const cfg = effect?.tileBasicAttack;
+    if (cfg?.affinity !== affinity) continue;
+    if (!reachable.some((enemy) => getTileAffinity(state, enemy.position) === affinity)) continue;
+    if (cfg.bothNeverMiss) value += 0.6;
+    value += (Number(cfg.bothCritBonus) || 0) * stats.strength;
+  }
+
+  // A RAGE tile bonus (the Paladin's Chosen: +2 on white while both stand on it).
+  const definition = getUnitType(at.type);
+  if (isRaging(at)) {
+    for (const source of [definition.ragePassive, definition.rageArt]) {
+      const strike = source?.effect?.tileStrikeBonus;
+      if (strike?.affinity !== affinity) continue;
+      if (!reachable.some((enemy) => getTileAffinity(state, enemy.position) === affinity)) continue;
+      value += Math.max(0, Number(strike.amount) || 0) * HIT_BASELINE;
+    }
+  }
+
+  return value;
 }
 
 // Chebyshev distance from `pos` to the nearest living enemy of `forPlayer`. Used to
