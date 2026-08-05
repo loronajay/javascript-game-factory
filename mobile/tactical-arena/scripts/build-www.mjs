@@ -42,6 +42,12 @@ const GAME_EXCLUDES = new Set([
   // every src/styles/html reference found zero uses — the title mark is a pure CSS
   // gradient, not an image. Kept in the repo as source, never shipped.
   "assets/logos",
+  // Balance-simulation output: raw per-match records plus the fitted analysis, read only
+  // by scripts/ and the docs tests, never by anything in src/ or a page. It was worth
+  // 9.2MB of a 58MB bundle — and because `sim-*.json` is gitignored, whether the shipped
+  // artifact carried it depended on whether whoever cut the release happened to have run
+  // `npm run sim` on that machine. Exclude it so the payload can't vary that way.
+  "balance-data",
   "tests",
   "scripts",
   "platform-api",
