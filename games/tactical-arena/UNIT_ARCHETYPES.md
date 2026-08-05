@@ -126,14 +126,14 @@ MOVE means he closes and hits, and Footwork (MOVE+3, walking *through* enemies f
 damage each) gives him a genuine engage tool that turns a 3-tile walk into a 6-tile one.
 
 His real identity is that his three attack ARTs are **riders on a normal swing**:
-Moonstrike blinds (70%), Mage Killer silences (70%), Life Sap has a 70% rider to heal him
+Moonstrike blinds (70%), Mage Killer silences (70%), Life Sap has a 75% rider to heal him
 for half the damage dealt. Each is an attack that does one extra thing — but because an ART eats the whole
 activation, using one means giving up his move. So the Swordsman is constantly asking a
 clean question: *is this blind worth not repositioning?* Standing still next to the enemy
 mage and silencing him for 5 MP is usually yes; doing it from open ground usually isn't.
 
-Last Stand (+3 STR below 3 HP) and Quick (+3 MOVE, +1 STR in rage) make him nastiest when
-nearly dead. A Swordsman at 4 HP with 6 MOVE and 11 STR is a real threat, not a corpse.
+Last Stand (+3 STR below 3 HP) and Quick (+3 MOVE, +2 STR in rage) make him nastiest when
+nearly dead. A Swordsman at 4 HP with 6 MOVE and 12 STR is a real threat, not a corpse.
 
 ### Paladin — Lifelink Frontliner (sustain bruiser)
 

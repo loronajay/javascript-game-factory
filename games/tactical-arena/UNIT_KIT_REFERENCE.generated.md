@@ -546,8 +546,8 @@ class `melee` · AI role `bruiser` · AI threat 10
 | Footwork | 4 MP |  | extraMove=3 | Walk your current MOVE + 3 as unique tiles, passing through enemies for 3 true damage. End on empty ground. |
 | Moonstrike | 5 MP | acc 96% | type=status status=blind chance=0.7 durationTurns=1 effect.type=status effect.status=blind effect.chance=0.7 effect.durationTurns=1 | Attack with a 70% chance to blind the target. |
 | Mage Killer | 5 MP | acc 96% | type=status status=silence chance=0.7 durationTurns=1 effect.type=status effect.status=silence effect.chance=0.7 effect.durationTurns=1 | Attack with a 70% chance to silence the target. |
-| Life Sap | 5 MP | acc 96% | type=heal chance=0.7 amount=halfDamageDealtRounded effect.type=heal effect.chance=0.7 effect.amount=halfDamageDealtRounded | Attack with a 70% chance to restore half the damage dealt, rounded. |
-| Quick | free | passive, RAGE | type=statModifiers stats.moveRange=3 stats.strength=1 effect.type=statModifiers effect.stats.moveRange=3 effect.stats.strength=1 | At 5 HP or lower, gain +3 MOVE and +1 STR. |
+| Life Sap | 5 MP | acc 96% | type=heal chance=0.75 amount=halfDamageDealtRounded effect.type=heal effect.chance=0.75 effect.amount=halfDamageDealtRounded | Attack with a 75% chance to restore half the damage dealt, rounded. |
+| Quick | free | passive, RAGE | type=statModifiers stats.moveRange=3 stats.strength=2 effect.type=statModifiers effect.stats.moveRange=3 effect.stats.strength=2 | At 5 HP or lower, gain +3 MOVE and +2 STR. |
 
 ### Treant `treant`
 

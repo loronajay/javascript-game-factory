@@ -140,9 +140,9 @@
           "radius": null,
           "selfCast": false,
           "effectType": "heal",
-          "effect": "type=heal chance=0.7 amount=halfDamageDealtRounded",
-          "detail": "effect.type=heal effect.chance=0.7 effect.amount=halfDamageDealtRounded",
-          "description": "Attack with a 70% chance to restore half the damage dealt, rounded.",
+          "effect": "type=heal chance=0.75 amount=halfDamageDealtRounded",
+          "detail": "effect.type=heal effect.chance=0.75 effect.amount=halfDamageDealtRounded",
+          "description": "Attack with a 75% chance to restore half the damage dealt, rounded.",
           "aiIntent": "strike",
           "aiTags": [
             "sustain"
@@ -168,9 +168,9 @@
         "radius": null,
         "selfCast": false,
         "effectType": "statModifiers",
-        "effect": "type=statModifiers stats.moveRange=3 stats.strength=1",
-        "detail": "effect.type=statModifiers effect.stats.moveRange=3 effect.stats.strength=1",
-        "description": "At 5 HP or lower, gain +3 MOVE and +1 STR.",
+        "effect": "type=statModifiers stats.moveRange=3 stats.strength=2",
+        "detail": "effect.type=statModifiers effect.stats.moveRange=3 effect.stats.strength=2",
+        "description": "At 5 HP or lower, gain +3 MOVE and +2 STR.",
         "aiIntent": null,
         "aiTags": []
       },

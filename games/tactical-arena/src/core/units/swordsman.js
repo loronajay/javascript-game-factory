@@ -58,8 +58,8 @@ export const SWORDSMAN = Object.freeze({
       kind: "active",
       mpCost: 5,
       accuracy: 0.96,
-      effect: Object.freeze({ type: "heal", chance: 0.7, amount: "halfDamageDealtRounded" }),
-      description: "Attack with a 70% chance to restore half the damage dealt, rounded.",
+      effect: Object.freeze({ type: "heal", chance: 0.75, amount: "halfDamageDealtRounded" }),
+      description: "Attack with a 75% chance to restore half the damage dealt, rounded.",
       implemented: true,
       ai: Object.freeze({ intent: "strike", tags: Object.freeze(["sustain"]) })
     })
@@ -69,8 +69,8 @@ export const SWORDSMAN = Object.freeze({
     name: "Quick",
     kind: "passive",
     mpCost: 0,
-    effect: Object.freeze({ type: "statModifiers", stats: Object.freeze({ moveRange: 3, strength: 1 }) }),
-    description: "At 5 HP or lower, gain +3 MOVE and +1 STR.",
+    effect: Object.freeze({ type: "statModifiers", stats: Object.freeze({ moveRange: 3, strength: 2 }) }),
+    description: "At 5 HP or lower, gain +3 MOVE and +2 STR.",
     implemented: true
   })
 });

@@ -47,7 +47,7 @@ test("swordsman owns the specified core stat line and four ART slots", () => {
   });
   assert.equal("immuneTypes" in mageKiller, false);
   assert.deepEqual(lifeSap.effect, {
-    type: "heal", chance: 0.7, amount: "halfDamageDealtRounded"
+    type: "heal", chance: 0.75, amount: "halfDamageDealtRounded"
   });
 });
 
@@ -134,11 +134,11 @@ test("Swordsman low-health passive and RAGE passive stack as derived stats", () 
   assert.deepEqual(getEffectiveStats({ type: "swordsman", hp: 6 }), {
     moveRange: 3, attackRange: 1, strength: 10, defense: 5, maxHp: 25, maxMp: 20
   });
-  assert.equal(getEffectiveStats({ type: "swordsman", hp: 3 }).strength, 11);
+  assert.equal(getEffectiveStats({ type: "swordsman", hp: 3 }).strength, 12);
   assert.deepEqual(getEffectiveStats({ type: "swordsman", hp: 5 }), {
-    moveRange: 6, attackRange: 1, strength: 11, defense: 5, maxHp: 25, maxMp: 20
+    moveRange: 6, attackRange: 1, strength: 12, defense: 5, maxHp: 25, maxMp: 20
   });
-  assert.equal(getEffectiveStats({ type: "swordsman", hp: 2 }).strength, 14);
+  assert.equal(getEffectiveStats({ type: "swordsman", hp: 2 }).strength, 15);
 });
 
 test("Archer RAGE derives its strength and range bonuses", () => {
@@ -861,7 +861,7 @@ test("Life Sap restores half of the damage dealt, rounded to the nearest HP", ()
   });
   const selected = applyCommand(initial, beginActivation(1, "p1-swordsman"));
   const result = applyCommand(selected.nextState, useArt(1, "p1-swordsman", "life-sap", {
-    targetId: "p2-swordsman", effectRoll: 0, ...NORMAL_HIT
+    targetId: "p2-swordsman", effectRoll: 0.74, ...NORMAL_HIT
   }));
 
   assert.equal(result.accepted, true);
