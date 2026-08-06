@@ -17,6 +17,7 @@ import { clamp } from "../core/math.mjs";
 import { makeStars } from "../entities/stars.mjs";
 import { createOnlineClient, hasCountdownStarted } from "./online.mjs";
 import { startMenuMusic, startGameMusic, sfxShoot, sfxPowerup, sfxPlayerHurt } from "./audio.mjs";
+import { createRematchFlow } from "./mp-rematch.mjs";
 
 // ── Client singleton ──────────────────────────────────────────────────────────
 
@@ -25,6 +26,7 @@ let _triedSide = null;
 let _roomCodeHandler = null;
 let _roomCodeInput   = null;   // hidden <input> for mobile keyboard
 let _bulletId  = 0;
+let _rematchFlow = null;
 
 const MP_COUNTDOWN_LEAD_MS = 4000;
 
@@ -227,9 +229,7 @@ function _endRound(game, input, winner, client) {
       if (!_client) return;
       _client.sendMatchEnd(matchWinner);
       game.mp.matchWinner = matchWinner;
-      game.state = STATE.MP_RESULT;
-      game.menu.selectedButton = 0;
-      _clearFlashes(game, input);
+      _enterMpResult(game, input);
     }, 2200);
   } else {
     game.mp.roundEndTimer = 2200;
@@ -433,6 +433,18 @@ export function initMpLobby(game, input) {
   const client = getClient();
   _triedSide = null;
 
+  _rematchFlow = createRematchFlow({
+    sendState: state => client.sendRematch(state),
+    sendStart: start => client.sendRematchStart(start),
+    isCoordinator: () => client.isHost(),
+    buildStart: round => ({
+      round,
+      startAt: Date.now() + game.mp.clockOffsetMs + MP_COUNTDOWN_LEAD_MS,
+    }),
+    onState: state => { game.mp.rematchState = state; },
+    onAccepted: start => _startMpRematch(game, input, start),
+  });
+
   try {
     const id   = window.FactoryIdentity?.getPlayerId?.()    ?? "";
     const name = window.FactoryIdentity?.getProfileName?.() ?? "Pilot";
@@ -506,9 +518,13 @@ export function initMpLobby(game, input) {
     if (game.state === STATE.MP_FIGHTING || game.state === STATE.MP_COUNTDOWN) {
       game.mp.matchWinner  = game.mp.side;
       game.mp.disconnected = true;
-      game.state = STATE.MP_RESULT;
-      game.menu.selectedButton = 0;
-      input.clearMenuPresses();
+      _enterMpResult(game, input, { allowRematch: false });
+    } else if (game.state === STATE.MP_RESULT) {
+      _rematchFlow?.receiveState({
+        round: game.mp.rematchRound,
+        available: false,
+        requested: false,
+      });
     } else {
       game.mp.lobbyPhase = "error";
       game.mp.errorMsg   = "OPPONENT LEFT";
@@ -527,14 +543,11 @@ export function initMpLobby(game, input) {
 
   client.cb.onMatchEnd = ({ winner }) => {
     game.mp.matchWinner = winner;
-    game.state = STATE.MP_RESULT;
-    game.menu.selectedButton = 0;
-    _clearFlashes(game, input);
+    _enterMpResult(game, input);
   };
 
-  client.cb.onRematch = ({ ready }) => {
-    game.mp.rematchOpponentReady = ready;
-  };
+  client.cb.onRematch = state => _rematchFlow?.receiveState(state);
+  client.cb.onRematchStart = start => _rematchFlow?.receiveStart(start);
 
   client.connect();
 
@@ -550,8 +563,8 @@ export function initMpLobby(game, input) {
   game.mp.p2Rounds             = 0;
   game.mp.startAt              = null;
   game.mp.matchWinner          = null;
-  game.mp.rematchReady         = false;
-  game.mp.rematchOpponentReady = false;
+  game.mp.rematchRound         = 0;
+  game.mp.rematchState         = null;
   game.mp.disconnected         = false;
   game.mp.errorMsg             = null;
   game.mp.roomCode             = null;
@@ -781,6 +794,23 @@ function _updateLocalPlayer(game, input, dt) {
 
 // ── updateMpResult ────────────────────────────────────────────────────────────
 
+function _enterMpResult(game, input, { allowRematch = true } = {}) {
+  game.state = STATE.MP_RESULT;
+  game.menu.selectedButton = 1;
+  _clearFlashes(game, input);
+  _rematchFlow?.enterResults({ round: game.mp.rematchRound, enabled: allowRematch });
+}
+
+function _startMpRematch(game, input, { round, startAt }) {
+  game.mp.rematchRound = round;
+  game.mp.p1Rounds = 0;
+  game.mp.p2Rounds = 0;
+  game.mp.matchWinner = null;
+  game.mp.disconnected = false;
+  game.mp.rematchState = null;
+  _enterCountdown(game, input, 1, startAt);
+}
+
 export function updateMpResult(game, input) {
   const btns = MP_RESULT_BTNS;
 
@@ -800,12 +830,17 @@ export function updateMpResult(game, input) {
     }
   }
   if (input.consumeConfirm()) activated = game.menu.selectedButton;
-  if (input.consumeBack())    { teardownMp(game, input); return; }
+  if (input.consumeBack()) {
+    _rematchFlow?.leaveResults();
+    teardownMp(game, input);
+    return;
+  }
 
   if (activated === 0) {
-    teardownMp(game, input);
-    initMpLobby(game, input);
+    if (!game.mp.rematchState?.available || game.mp.rematchState?.localRequested) return;
+    _rematchFlow?.request();
   } else if (activated === 1) {
+    _rematchFlow?.leaveResults();
     teardownMp(game, input);
   }
 }
@@ -821,6 +856,7 @@ export function teardownMp(game, input) {
     _client = null;
   }
   _triedSide = null;
+  _rematchFlow = null;
 
   game.state = STATE.MENU;
   game.menu.selectedButton = 0;

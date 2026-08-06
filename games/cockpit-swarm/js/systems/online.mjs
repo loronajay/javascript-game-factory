@@ -13,7 +13,8 @@
 //   host  -> both : round_start { round, startAt }   (server-clock ms)
 //   host  -> both : round_end   { winner: 'p1'|'p2'|'draw' }
 //   host  -> both : match_end   { winner: 'p1'|'p2' }
-//   either        : rematch    { ready }
+//   either        : rematch    { round, available, requested }
+//   host  -> both : rematch_start { round, startAt }
 //   either        : ping/pong  { t }   (RTT measurement)
 
 const WS_URL = "wss://factory-network-server-production.up.railway.app";
@@ -117,6 +118,26 @@ function parseMatchEndMessage(value) {
   } catch { return null; }
 }
 
+function parseRematchMessage(value) {
+  try {
+    const p = JSON.parse(value);
+    const round = Number(p?.round);
+    if (!Number.isInteger(round) || round < 0) return null;
+    if (typeof p.available !== "boolean" || typeof p.requested !== "boolean") return null;
+    return { round, available: p.available, requested: p.requested };
+  } catch { return null; }
+}
+
+function parseRematchStartMessage(value) {
+  try {
+    const p = JSON.parse(value);
+    const round = Number(p?.round);
+    const startAt = Number(p?.startAt);
+    if (!Number.isInteger(round) || round < 1 || !Number.isFinite(startAt)) return null;
+    return { round, startAt };
+  } catch { return null; }
+}
+
 function _normalizeCountValue(value) {
   const n = Number(value);
   return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : null;
@@ -173,7 +194,8 @@ export function createOnlineClient() {
     onRoundStart:      null,  // ({ round, startAt })
     onRemoteRoundEnd:  null,  // ({ winner })
     onMatchEnd:        null,  // ({ winner })
-    onRematch:         null,  // ({ ready })
+    onRematch:         null,  // ({ round, available, requested })
+    onRematchStart:    null,  // ({ round, startAt })
     onSideConflict:    null,  // ()
     onPartnerLeft:     null,  // ()
     onError:           null,  // (code, message)
@@ -204,7 +226,8 @@ export function createOnlineClient() {
       case "round_start": { const m = parseRoundStartMessage(value); if (m) cb.onRoundStart?.(m); return; }
       case "round_end":   { const m = parseRoundEndMessage(value);   if (m) cb.onRemoteRoundEnd?.(m); return; }
       case "match_end":   { const m = parseMatchEndMessage(value);   if (m) cb.onMatchEnd?.(m); return; }
-      case "rematch":     { try { cb.onRematch?.({ ready: !!JSON.parse(value).ready }); } catch {} return; }
+      case "rematch":     { const m = parseRematchMessage(value); if (m) cb.onRematch?.(m); return; }
+      case "rematch_start": { const m = parseRematchStartMessage(value); if (m) cb.onRematchStart?.(m); return; }
       case "profile":     { const m = parseProfileMessage(value);    if (m) cb.onRemoteProfile?.(m); return; }
       case "ping":        { _roomMsg("pong", value); return; }
       case "pong": {
@@ -323,7 +346,8 @@ export function createOnlineClient() {
   function sendRoundStart(round, startAt) { _roomMsg("round_start", JSON.stringify({ round, startAt })); }
   function sendRoundEnd(winner)       { _roomMsg("round_end", JSON.stringify({ winner })); }
   function sendMatchEnd(winner)       { _roomMsg("match_end", JSON.stringify({ winner })); }
-  function sendRematch(ready)         { _roomMsg("rematch", JSON.stringify({ ready: !!ready })); }
+  function sendRematch(state)         { _roomMsg("rematch", JSON.stringify(state || {})); }
+  function sendRematchStart(start)    { _roomMsg("rematch_start", JSON.stringify(start || {})); }
 
   function startPinging() {
     stopPinging();
@@ -355,7 +379,7 @@ export function createOnlineClient() {
   return {
     connect, findMatch, createRoom, joinRoom, requestQueueStatus,
     cancelSearch, cancelRoom, setIdentity,
-    sendInput, sendState, sendRoundStart, sendRoundEnd, sendMatchEnd, sendRematch,
+    sendInput, sendState, sendRoundStart, sendRoundEnd, sendMatchEnd, sendRematch, sendRematchStart,
     startPinging, stopPinging, getLatencyMs, getMySide, isHost, getRoomCode,
     disconnect, reset, cb,
   };

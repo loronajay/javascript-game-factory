@@ -178,5 +178,8 @@ function startBattle() {
       });
     });
   });
+  if (state.isOnlineMatch && typeof resetOnlineBattleSync === 'function') {
+    resetOnlineBattleSync();
+  }
   setScreen('battle');
 }

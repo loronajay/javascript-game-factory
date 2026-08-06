@@ -16,6 +16,8 @@ function wireOnlineLobbyEvents({
   stopWaitingDots,
   updateQueueHint,
   playSound = () => {},
+  leaveOnlineResults,
+  requestOnlineRematch,
 }) {
   document.querySelectorAll('.side-card').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -130,22 +132,12 @@ function wireOnlineLobbyEvents({
 
   onClick(document, 'btn-online-rematch', () => {
     playSound('ching');
-    setIsOnline(false);
-    gameState.p1.wins = 0;
-    gameState.p2.wins = 0;
-    stopAmbient();
-    if (getOnlineClient()) {
-      setSideLocked('online-side-locked');
-      updateQueueHint();
-      showScreen('screen-online-lobby');
-      showLobbyPhase('main');
-    } else {
-      showScreen('screen-menu');
-    }
+    requestOnlineRematch?.();
   });
 
   onClick(document, 'btn-online-result-menu', () => {
     playSound('swing');
+    leaveOnlineResults?.();
     gameState.p1.wins = 0;
     gameState.p2.wins = 0;
     stopAmbient();

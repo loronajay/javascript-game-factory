@@ -1,6 +1,7 @@
 import {
   createBuilderCommandMessage,
   createRunnerInputMessage,
+  createRunnerStateMessage,
   createStateSyncMessage,
 } from './online-gameplay.js';
 
@@ -256,7 +257,7 @@ export function createOnlineClient(input = {}) {
       emit({
         onlineGameplay: {
           ...snapshot.onlineGameplay,
-          lastRunnerState: { senderId, value },
+          lastRunnerState: { senderId, value: createRunnerStateMessage(value).value },
         },
       });
     }

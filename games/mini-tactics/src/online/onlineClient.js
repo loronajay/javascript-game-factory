@@ -17,6 +17,7 @@
 // room (lobby) message contract (all `value`s are JSON strings):
 //   owner -> all : config   { rulesetVersion, size, format, teamColors, teamNames }  match framing
 //   each  -> all : setup     { seat, composition }                   blind squad pick
+//   each  -> all : rematch   { round, available, requested }         post-match handshake
 //   active-> all : command   { command }                            an ACCEPTED core command
 //   owner -> all : hash      { revision, hash }                      desync check
 //   each  -> all : profile   { playerId, displayName, seat }         name exchange
@@ -127,6 +128,15 @@ function parseHashMessage(value) {
   return { revision: Math.floor(revision), hash: p.hash };
 }
 
+function parseRematchMessage(value) {
+  const p = parseJson(value);
+  if (!p || typeof p !== "object") return null;
+  const round = Number(p.round);
+  if (!Number.isInteger(round) || round < 0) return null;
+  if (typeof p.available !== "boolean" || typeof p.requested !== "boolean") return null;
+  return { round, available: p.available, requested: p.requested };
+}
+
 // Normalize a lobby payload's player roster into a stable, ordered list every
 // client can read identically (id + display name + seat).
 function normalizeLobby(data) {
@@ -171,6 +181,7 @@ export function createOnlineClient() {
     onRemoteSetup: null, // ({ seat, composition? })
     onRemoteCommand: null, // ({ command })
     onRemoteHash: null, // ({ revision, hash })
+    onRemoteRematch: null, // ({ clientId, round, available, requested })
     onRemoteProfile: null, // ({ playerId, displayName, seat })
     onLatency: null, // (ms)
     onError: null, // (code, message)
@@ -189,7 +200,7 @@ export function createOnlineClient() {
     });
   }
 
-  function _handleLobbyMessage(messageType, value) {
+  function _handleLobbyMessage(messageType, value, senderId) {
     switch (messageType) {
       case "config": {
         const m = parseConfigMessage(value);
@@ -209,6 +220,11 @@ export function createOnlineClient() {
       case "hash": {
         const m = parseHashMessage(value);
         if (m) cb.onRemoteHash?.(m);
+        return;
+      }
+      case "rematch": {
+        const m = parseRematchMessage(value);
+        if (m && senderId) cb.onRemoteRematch?.({ clientId: senderId, ...m });
         return;
       }
       case "profile": {
@@ -275,7 +291,7 @@ export function createOnlineClient() {
       case "message":
         if (data.scope !== "lobby") return;
         if (data.senderId === _clientId) return; // drop our own echo
-        _handleLobbyMessage(String(data.messageType || ""), String(data.value ?? ""));
+        _handleLobbyMessage(String(data.messageType || ""), String(data.value ?? ""), data.senderId);
         return;
       case "error":
         cb.onError?.(data.code, data.message);
@@ -367,6 +383,13 @@ export function createOnlineClient() {
   function sendHash(revision, hash) {
     _lobbyMsg("hash", JSON.stringify({ revision, hash }));
   }
+  function sendRematch({ round, available, requested } = {}) {
+    _lobbyMsg("rematch", JSON.stringify({
+      round: Math.max(0, Math.floor(Number(round) || 0)),
+      available: !!available,
+      requested: !!requested,
+    }));
+  }
   function sendProfile() {
     _broadcastProfile();
   }
@@ -420,6 +443,7 @@ export function createOnlineClient() {
     sendSetup,
     sendCommand,
     sendHash,
+    sendRematch,
     sendProfile,
     startPinging,
     stopPinging,

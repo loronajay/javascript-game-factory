@@ -6,9 +6,12 @@ function wireOnlineCallbacks({
   getOnlineIsRanked,
   getOnlineMatchSeed,
   getOnlineRemoteIdentity,
-  getOnlineSession,
+  routeRemoteInput,
   normalizeOnlineStagePlan,
+  onOpponentLeftResults,
   onlineClient,
+  receiveRematchStart,
+  receiveRematchState,
   setIsOnline,
   setOnlineClockOffset,
   setOnlineMatchSeed,
@@ -76,12 +79,11 @@ function wireOnlineCallbacks({
   };
 
   onlineClient.cb.onRemoteInput = (snap) => {
-    // The rollback session owns prediction, misprediction detection, and resimulation. It
-    // also rejects inputs tagged with a different round (epoch), so a late input from the
-    // previous round cannot corrupt this round's confirmed-frame tracking.
-    const session = getOnlineSession();
-    if (session) session.onRemoteInput(snap.seq, snap, snap.adv, snap.epoch);
+    routeRemoteInput(snap);
   };
+
+  onlineClient.cb.onRematch = state => receiveRematchState?.(state);
+  onlineClient.cb.onRematchStart = start => receiveRematchStart?.(start);
 
   onlineClient.cb.onSideConflict = () => {
     stopSearchDots();
@@ -93,6 +95,7 @@ function wireOnlineCallbacks({
   };
 
   onlineClient.cb.onPartnerLeft = () => {
+    const matchAlreadyEnded = gameState.phase === 'match_end';
     stopSearchDots();
     stopWaitingDots();
     onlineClient.stopPinging();
@@ -108,8 +111,14 @@ function wireOnlineCallbacks({
 
     setIsOnline(false);
     setOnlineRemoteIdentity(null);
-    gameState.phase = 'menu';
     stopAmbient();
+    // Leaving a completed relay room is normal when either player chooses Rematch/Menu.
+    // Keep the result intact instead of replacing it with a misleading disconnect screen.
+    if (matchAlreadyEnded) {
+      onOpponentLeftResults?.();
+      return;
+    }
+    gameState.phase = 'menu';
     showScreen('screen-online-disconnected');
   };
 

@@ -24,11 +24,24 @@ import { hashState } from "../core/state-hash.js";
 // finish animating the final command before our close would look like a drop.
 const CLEAN_CLOSE_GRACE_MS = 2500;
 
+export function rematchSeed(seed, round) {
+  const base = Number.isFinite(seed) ? Math.trunc(seed) : 1;
+  const step = Math.max(1, Math.trunc(Number(round) || 1));
+  return (base + Math.imul(step, 0x6d2b79f5)) | 0;
+}
+
 export function createOnlineSession({ client, mySeat, isOwner, members, seed, size }) {
   let _controller = null;
   let latencyMs = null;
-  let _ended = false;
+  let _disposed = false;
+  let _matchComplete = false;
   let _owner = !!isOwner;
+  let _rematchAllowed = false;
+  let _rematchRound = 0;
+  let _resultsController = null;
+  let _localAvailable = false;
+  let _localRequested = false;
+  let _declined = false;
 
   // The ordered clientId list from lobby_started: seat = index + 1, identical on
   // every client. Lets us map a departed clientId back to its seat.
@@ -40,6 +53,7 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
   // Seats we have already conceded on disconnect, so a re-fired left event (or a
   // second owner) never double-concedes.
   const handledDrops = new Set();
+  const rematchByClientId = new Map();
 
   // Remote commands that arrive before the controller binds, kept in order.
   const _pending = [];
@@ -61,8 +75,8 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
     const mine = _myHashByRevision.get(revision);
     const owner = _ownerHashByRevision.get(revision);
     if (mine == null || owner == null) return;
-    if (mine !== owner && !_ended) {
-      _ended = true;
+    if (mine !== owner && !_disposed && !_matchComplete) {
+      _disposed = true;
       _controller?.endOnDesync?.();
     }
   }
@@ -77,7 +91,7 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
 
   function _enqueueRemote(command) {
     _applyChain = _applyChain.then(async () => {
-      if (_ended || !_controller) return;
+      if (_disposed || _matchComplete || !_controller) return;
       await _controller.applyRemoteCommand(command);
       const match = _controller.getMatchState?.();
       // After applying a command, the owner is at the canonical revision —
@@ -107,6 +121,66 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
     }
   };
 
+  function opponentClientIds() {
+    return membersAtStart.filter((clientId) => clientId !== myClientId);
+  }
+
+  function allOpponentsMatch(predicate) {
+    const opponents = opponentClientIds();
+    return opponents.length > 0 && opponents.every((clientId) => predicate(rematchByClientId.get(clientId)));
+  }
+
+  function rematchAvailable() {
+    return _localAvailable && allOpponentsMatch((state) => state?.available === true);
+  }
+
+  function notifyRematchState() {
+    const opponents = opponentClientIds();
+    _resultsController?.onState?.({
+      available: rematchAvailable(),
+      localRequested: _localRequested,
+      opponentRequested: allOpponentsMatch((state) => state?.requested === true),
+      declined: _declined,
+      opponentUnavailable: opponents.some((clientId) => rematchByClientId.get(clientId)?.available === false),
+    });
+  }
+
+  function prepareRematch() {
+    const controller = _resultsController;
+    _rematchRound += 1;
+    const next = { seed: rematchSeed(seed, _rematchRound), round: _rematchRound };
+    _controller = null;
+    _matchComplete = false;
+    _rematchAllowed = false;
+    _resultsController = null;
+    _localAvailable = false;
+    _localRequested = false;
+    _declined = false;
+    rematchByClientId.clear();
+    handledDrops.clear();
+    _pending.length = 0;
+    _ownerHashByRevision.clear();
+    _myHashByRevision.clear();
+    _applyChain = Promise.resolve();
+    controller?.onAccepted?.(next);
+  }
+
+  function maybeStartRematch() {
+    if (!_disposed && _matchComplete && _rematchAllowed && _localRequested
+        && rematchAvailable() && allOpponentsMatch((state) => state?.requested === true)) {
+      prepareRematch();
+    }
+  }
+
+  client.cb.onRemoteRematch = ({ clientId, round, available, requested }) => {
+    if (_disposed || !_matchComplete || !_rematchAllowed || round !== _rematchRound) return;
+    if (!opponentClientIds().includes(clientId)) return;
+    rematchByClientId.set(clientId, { available, requested: available && requested });
+    if (!available && _localRequested) _declined = true;
+    notifyRematchState();
+    maybeStartRematch();
+  };
+
   client.cb.onLatency = (ms) => {
     latencyMs = ms;
   };
@@ -116,21 +190,38 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
   // serialized on the apply chain so it never overlaps an in-flight animation; the
   // controller broadcasts it (and the owner's hash) through the normal command path.
   client.cb.onPlayerLeft = ({ clientId, ownerId }) => {
-    if (_ended) return;
+    if (_disposed) return;
+    if (_matchComplete) {
+      if (opponentClientIds().includes(clientId)) {
+        rematchByClientId.set(clientId, { available: false, requested: false });
+        if (_localRequested) _declined = true;
+        notifyRematchState();
+      }
+      return;
+    }
     if (ownerId && ownerId === myClientId) _owner = true;
     const seat = seatForClientId(clientId);
     if (seat == null || handledDrops.has(seat)) return;
     handledDrops.add(seat);
     if (!_owner) return; // non-owners simply replay the owner's concede command
     _applyChain = _applyChain.then(async () => {
-      if (_ended || !_controller) return;
+      if (_disposed || _matchComplete || !_controller) return;
       await _controller.applyOwnerConcede(seat);
     });
   };
 
   client.cb.onClosed = () => {
-    if (_ended) return;
-    _ended = true;
+    if (_disposed) return;
+    if (_matchComplete) {
+      for (const clientId of opponentClientIds()) {
+        rematchByClientId.set(clientId, { available: false, requested: false });
+      }
+      if (_localRequested) _declined = true;
+      notifyRematchState();
+      _disposed = true;
+      return;
+    }
+    _disposed = true;
     _controller?.endOnDisconnect?.("You lost connection to the match.");
   };
 
@@ -139,7 +230,7 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
   // Called by the controller after a LOCAL command is accepted and applied.
   // Broadcast it so the others replay it; the owner also publishes its hash.
   function onLocalCommandApplied(command) {
-    if (_ended) return;
+    if (_disposed || _matchComplete) return;
     client.sendCommand(command);
     const match = _controller?.getMatchState?.();
     if (match) {
@@ -151,6 +242,7 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
   // Register the live controller and flush any commands that landed during the
   // lobby → match screen handoff.
   function bind(controller) {
+    if (_disposed) return;
     _controller = controller;
     // Seed our revision-0 hash so an immediate desync (bad seed/size) is caught.
     _recordLocalHash(controller.getMatchState?.());
@@ -160,9 +252,16 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
 
   // Match ended cleanly (a winner, or a concede). Keep the socket open briefly so
   // peers can also reach completion before our close would read as a disconnect.
-  function endMatch() {
-    if (_ended) return;
-    _ended = true;
+  function endMatch({ allowRematch = false } = {}) {
+    if (_disposed || _matchComplete) return;
+    _matchComplete = true;
+    _rematchAllowed = Boolean(allowRematch);
+    _resultsController = null;
+    _localAvailable = false;
+    _localRequested = false;
+    _declined = false;
+    rematchByClientId.clear();
+    if (_rematchAllowed) return;
     client.stopPinging();
     if (typeof setTimeout === "function") {
       setTimeout(() => client.disconnect(), CLEAN_CLOSE_GRACE_MS);
@@ -171,10 +270,50 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
     }
   }
 
+  function enterResults(controller = {}) {
+    _resultsController = controller;
+    if (_disposed || !_matchComplete || !_rematchAllowed) {
+      notifyRematchState();
+      return false;
+    }
+    _localAvailable = true;
+    _localRequested = false;
+    _declined = false;
+    client.sendRematch({ round: _rematchRound, available: true, requested: false });
+    notifyRematchState();
+    maybeStartRematch();
+    return true;
+  }
+
+  function requestRematch() {
+    if (_disposed || !_matchComplete || !_rematchAllowed || !rematchAvailable()) {
+      return { accepted: false, reason: "unavailable" };
+    }
+    if (_localRequested) return { accepted: true, waiting: true };
+    _localRequested = true;
+    client.sendRematch({ round: _rematchRound, available: true, requested: true });
+    notifyRematchState();
+    maybeStartRematch();
+    return { accepted: true, waiting: true };
+  }
+
+  function leaveResults() {
+    if (_disposed) return;
+    if (_matchComplete && _rematchAllowed) {
+      _localAvailable = false;
+      _localRequested = false;
+      client.sendRematch({ round: _rematchRound, available: false, requested: false });
+      client.leaveLobby?.();
+    }
+    _disposed = true;
+    client.stopPinging();
+    client.disconnect();
+  }
+
   // Tear down immediately (quit / abandon / desync). Peers see a disconnect, which
   // is the correct outcome for an abandoned match.
   function dispose() {
-    _ended = true;
+    _disposed = true;
     client.stopPinging();
     client.disconnect();
   }
@@ -197,6 +336,9 @@ export function createOnlineSession({ client, mySeat, isOwner, members, seed, si
     onLocalCommandApplied,
     bind,
     endMatch,
+    enterResults,
+    requestRematch,
+    leaveResults,
     dispose,
   };
 }

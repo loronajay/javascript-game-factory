@@ -5,7 +5,7 @@
   "description": "Creature Battler cabinet — 3v3 turn-based battler.",
   "type": "commonjs",
   "scripts": {
-    "test": "node creature-battler/scripts/sounds.test.js && node creature-battler/scripts/animation-components.test.js && node creature-battler/scripts/battle-float-text.test.js && node creature-battler/scripts/battle-round.test.js && node creature-battler/scripts/battle-status.test.js && node creature-battler/scripts/mobile-ui.test.js && node creature-battler/scripts/registry-modules.test.js && node --test creature-battler/online-client.spec.js",
+    "test": "node creature-battler/scripts/sounds.test.js && node creature-battler/scripts/animation-components.test.js && node creature-battler/scripts/battle-float-text.test.js && node creature-battler/scripts/battle-round.test.js && node creature-battler/scripts/battle-status.test.js && node creature-battler/scripts/mobile-ui.test.js && node creature-battler/scripts/registry-modules.test.js && node --test creature-battler/online-client.spec.js creature-battler/scripts/online-round-sync.spec.js creature-battler/scripts/battle-order-online.spec.js creature-battler/scripts/battle-round-online-protocol.spec.js creature-battler/scripts/online-lockstep.spec.js",
     "test:sounds": "node creature-battler/scripts/sounds.test.js",
     "test:animation": "node creature-battler/scripts/animation-components.test.js",
     "test:float-text": "node creature-battler/scripts/battle-float-text.test.js",
@@ -13,6 +13,6 @@
     "test:status": "node creature-battler/scripts/battle-status.test.js",
     "test:mobile": "node creature-battler/scripts/mobile-ui.test.js",
     "test:registries": "node creature-battler/scripts/registry-modules.test.js",
-    "test:online": "node --test creature-battler/online-client.spec.js"
+    "test:online": "node --test creature-battler/online-client.spec.js creature-battler/scripts/online-round-sync.spec.js creature-battler/scripts/battle-order-online.spec.js creature-battler/scripts/battle-round-online-protocol.spec.js creature-battler/scripts/online-lockstep.spec.js"
   }
 }

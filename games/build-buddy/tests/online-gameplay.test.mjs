@@ -2,6 +2,7 @@ import {
   createBuilderCommandMessage,
   createOnlineGameplayState,
   createRunnerInputMessage,
+  acceptServerRunnerStateMessage,
   createStageCompleteRequestMessage,
   createStageStartMessage,
   createStateSyncMessage,
@@ -11,6 +12,7 @@ import {
   receiveStageResultMessage,
   receiveStateSyncMessage,
   recordAuthoritativeStageResult,
+  shouldSendServerRunnerState,
 } from "../js/online-gameplay.js";
 
 let passed = 0;
@@ -161,6 +163,55 @@ test("host state snapshots expose only sync-safe runtime fields", () => {
     timerMs: 89999.2,
     stageStatus: "playing",
   });
+});
+
+test("server-authoritative runners send periodic correction snapshots", () => {
+  const serverState = createOnlineGameplayState({
+    packId: "pack_01",
+    stageSequence,
+    players,
+    localPlayerId: "host",
+    authorityPlayerId: "server",
+  });
+  const clientHostState = createOnlineGameplayState({
+    packId: "pack_01",
+    stageSequence,
+    players,
+    localPlayerId: "host",
+    authorityPlayerId: "host",
+  });
+
+  assertEqual(shouldSendServerRunnerState(serverState, "runner", 2), false);
+  assertEqual(shouldSendServerRunnerState(serverState, "runner", 3), true);
+  assertEqual(shouldSendServerRunnerState(serverState, "builder", 3), false);
+  assertEqual(shouldSendServerRunnerState(clientHostState, "runner", 3), false);
+});
+
+test("server-authoritative builders accept only fresh snapshots from the current Runner", () => {
+  const state = createOnlineGameplayState({
+    packId: "pack_01",
+    stageSequence,
+    players,
+    localPlayerId: "guest",
+    authorityPlayerId: "server",
+  });
+  const accepted = acceptServerRunnerStateMessage(state, "builder", -1, {
+    senderId: "host",
+    value: { tick: 12, x: 100, y: 200, vx: 5, vy: -2, dead: false },
+  });
+  const stale = acceptServerRunnerStateMessage(state, "builder", 12, {
+    senderId: "host",
+    value: { tick: 11, x: 90, y: 200 },
+  });
+  const wrongSender = acceptServerRunnerStateMessage(state, "builder", -1, {
+    senderId: "guest",
+    value: { tick: 13, x: 999, y: 999 },
+  });
+
+  assertEqual(accepted.tick, 12);
+  assertEqual(accepted.x, 100);
+  assertEqual(stale, null);
+  assertEqual(wrongSender, null);
 });
 
 test("only the host can record an authoritative stage result locally", () => {

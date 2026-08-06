@@ -45,14 +45,60 @@ function createTestSim() {
   return { gameState, tickSim, saveState, loadState };
 }
 
-function makeInput({ left = false, right = false, attack = false } = {}) {
-  return { ...EMPTY_INPUT, left, right, attack };
+// Gridlock-specific deterministic sim: simultaneous attack edges enter a mash duel. Three
+// later edges win it. This reproduces the prediction pressure of the real cabinet without DOM.
+function createGridlockTestSim() {
+  const gameState = {
+    p1: { x: -1, dead: false },
+    p2: { x: 1, dead: false },
+    gridlock: null,
+    pendingRoundEnd: null,
+  };
+
+  function kill(winner) {
+    gameState[winner === 'p1' ? 'p2' : 'p1'].dead = true;
+    gameState.pendingRoundEnd = { winner, isBlastKill: false, frame: null };
+  }
+
+  function tickSim(p1In, p2In) {
+    if (gameState.pendingRoundEnd) return;
+    if (gameState.gridlock) {
+      if (p1In.attackJustPressed) gameState.gridlock.p1++;
+      if (p2In.attackJustPressed) gameState.gridlock.p2++;
+      if (gameState.gridlock.p1 >= 3 || gameState.gridlock.p2 >= 3) {
+        if (gameState.gridlock.p1 >= 3 && gameState.gridlock.p2 >= 3) {
+          gameState.gridlock = null;
+        } else {
+          kill(gameState.gridlock.p1 >= 3 ? 'p1' : 'p2');
+        }
+      }
+      return;
+    }
+
+    if (p1In.attackJustPressed && p2In.attackJustPressed) {
+      gameState.gridlock = { p1: 0, p2: 0 };
+    } else if (p1In.attackJustPressed) {
+      kill('p1');
+    } else if (p2In.attackJustPressed) {
+      kill('p2');
+    }
+  }
+
+  const saveState = () => structuredClone(gameState);
+  const loadState = (snap) => {
+    Object.assign(gameState, structuredClone(snap));
+  };
+  return { gameState, tickSim, saveState, loadState };
+}
+
+function makeInput({ left = false, right = false, attack = false, attackJustPressed = false } = {}) {
+  return { ...EMPTY_INPUT, left, right, attack, attackJustPressed };
 }
 
 // Ground truth: simulate the agreed input streams with no network at all, and record the
 // first-kill frame, winner, and the exact post-kill state. Both networked clients must match.
-function groundTruth(p1Script, p2Script, maxFrames) {
-  const { gameState, tickSim } = createTestSim();
+function groundTruth(p1Script, p2Script, maxFrames, simFactory = createTestSim) {
+  const { gameState, tickSim } = simFactory();
   for (let f = 0; f < maxFrames; f++) {
     tickSim(p1Script[f] ?? EMPTY_INPUT, p2Script[f] ?? EMPTY_INPUT);
     if (gameState.pendingRoundEnd) {
@@ -68,8 +114,8 @@ function groundTruth(p1Script, p2Script, maxFrames) {
 
 // ----- harness --------------------------------------------------------------------------
 
-function buildClient(localSide, p1Script, p2Script, { window, timeSync }) {
-  const sim = createTestSim();
+function buildClient(localSide, p1Script, p2Script, { window, timeSync, simFactory = createTestSim }) {
+  const sim = simFactory();
   const outbox = [];   // { frame, input, adv } captured from send()
   let committed = null;
 
@@ -102,9 +148,9 @@ function buildClient(localSide, p1Script, p2Script, { window, timeSync }) {
 
 // Drive a full match. latency/jitter are in global driver ticks. `hitch` makes one client
 // skip ticking for a window, simulating a frame stall / GC pause / alt-tab.
-function runMatch({ p1Script, p2Script, latency = 4, jitter = 0, hitch = null, window = 60, timeSync = true, maxTicks = 4000 }) {
-  const a = buildClient('p1', p1Script, p2Script, { window, timeSync });
-  const b = buildClient('p2', p1Script, p2Script, { window, timeSync });
+function runMatch({ p1Script, p2Script, latency = 4, jitter = 0, hitch = null, window = 60, timeSync = true, maxTicks = 4000, simFactory = createTestSim }) {
+  const a = buildClient('p1', p1Script, p2Script, { window, timeSync, simFactory });
+  const b = buildClient('p2', p1Script, p2Script, { window, timeSync, simFactory });
 
   // in-flight messages: { to, deliverAt, frame, input, adv }
   const wire = [];
@@ -214,6 +260,31 @@ test('clients stay in sync under jittered delivery', () => {
     `jitter run diverged — A=${JSON.stringify(result.a)} B=${JSON.stringify(result.b)}`);
 });
 
+test('simultaneous attacks enter gridlock and commit the same mash winner under mobile-like jitter', () => {
+  const maxFrames = 80;
+  const p1Script = Array.from({ length: maxFrames }, () => makeInput());
+  const p2Script = Array.from({ length: maxFrames }, () => makeInput());
+  p1Script[5] = makeInput({ attack: true, attackJustPressed: true });
+  p2Script[5] = makeInput({ attack: true, attackJustPressed: true });
+  for (const frame of [10, 14, 18]) p1Script[frame] = makeInput({ attackJustPressed: true });
+  for (const frame of [11, 15, 19]) p2Script[frame] = makeInput({ attackJustPressed: true });
+
+  const truth = groundTruth(p1Script, p2Script, maxFrames, createGridlockTestSim);
+  assert.equal(truth?.winner, 'p1');
+  const result = runMatch({
+    p1Script,
+    p2Script,
+    latency: 7,
+    jitter: 5,
+    hitch: { who: 'b', start: 7, frames: 16 },
+    window: 60,
+    simFactory: createGridlockTestSim,
+  });
+
+  assert.ok(bothAgreeWithTruth(result, truth),
+    `gridlock diverged — A=${JSON.stringify(result.a)} B=${JSON.stringify(result.b)} truth=${JSON.stringify(truth)}`);
+});
+
 test('time-sync keeps a one-sided frame hitch within the rollback window', () => {
   const maxFrames = 220;
   const { p1Script, p2Script } = buildScripts(maxFrames);
@@ -293,4 +364,68 @@ test('time-sync prevents unbounded clock drift in steady state', () => {
   assert.ok(result.aFrame > 100 && result.bFrame > 100, 'both clients should have made progress');
   assert.ok(Math.abs(result.aFrame - result.bFrame) <= 12,
     `frame drift grew too large: A=${result.aFrame} B=${result.bFrame}`);
+});
+
+test('stalling reads input lazily and always escapes the smoothing stall cap', () => {
+  const gameState = { pendingRoundEnd: null };
+  const sent = [];
+  let inputReads = 0;
+  const session = createRollbackSession({
+    localSide: 'p1',
+    gameState,
+    tickSim: () => {},
+    saveState: () => ({ pendingRoundEnd: null }),
+    loadState: () => {},
+    inputsDiffer,
+    emptyInput: EMPTY_INPUT,
+    rollbackWindow: 60,
+    send: (frame, input) => sent.push({ frame, input }),
+    commitRoundEnd: () => {},
+  });
+
+  // A very low peer-reported advantage forces the local smoothing heuristic to stall.
+  // Frame 0 is future-confirmed so the first tick can advance and collect an advantage sample.
+  session.onRemoteInput(0, EMPTY_INPUT, -100, 0);
+  session.tick(() => {
+    inputReads++;
+    return { ...EMPTY_INPUT, attackJustPressed: true };
+  });
+  assert.equal(inputReads, 1);
+
+  // Nine capped smoothing stalls must not read/consume a tap. The tenth attempt advances.
+  for (let i = 0; i < 10; i++) {
+    session.tick(() => {
+      inputReads++;
+      return { ...EMPTY_INPUT, attackJustPressed: true };
+    });
+  }
+
+  assert.equal(inputReads, 2, 'input should only be read for the two frames that advanced');
+  assert.equal(session.localFrameNumber(), 2, 'heuristic smoothing must never become a permanent freeze');
+  assert.equal(sent.at(-1).input.attackJustPressed, true, 'the tap must survive every stalled frame');
+});
+
+test('prediction never repeats a remote just-pressed edge into later frames', () => {
+  const gameState = { pendingRoundEnd: null };
+  const remoteInputsSeen = [];
+  const session = createRollbackSession({
+    localSide: 'p1',
+    gameState,
+    tickSim: (_p1In, p2In) => remoteInputsSeen.push({ ...p2In }),
+    saveState: () => ({ pendingRoundEnd: null }),
+    loadState: () => {},
+    inputsDiffer,
+    emptyInput: EMPTY_INPUT,
+    rollbackWindow: 60,
+    send: () => {},
+    commitRoundEnd: () => {},
+  });
+
+  session.onRemoteInput(0, { ...EMPTY_INPUT, attack: true, attackJustPressed: true }, 0, 0);
+  session.tick(EMPTY_INPUT);
+  session.tick(EMPTY_INPUT);
+
+  assert.equal(remoteInputsSeen[0].attackJustPressed, true, 'the confirmed edge belongs to its exact frame');
+  assert.equal(remoteInputsSeen[1].attack, true, 'held attack state may be predicted forward');
+  assert.equal(remoteInputsSeen[1].attackJustPressed, false, 'the one-shot mash/attack edge must not repeat');
 });

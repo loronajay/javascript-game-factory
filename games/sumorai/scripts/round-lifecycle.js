@@ -57,6 +57,7 @@ function tickRoundEndState({
   camera,
   createPlatforms,
   document,
+  enterOnlineResults,
   gameState,
   isOnline,
   onlineIsRanked,
@@ -97,6 +98,7 @@ function tickRoundEndState({
       if (isOnline) {
         showOnlineResult({
           document,
+          enterOnlineResults,
           onlineIsRanked,
           onlineRemoteIdentity,
           p1Label,
@@ -181,6 +183,7 @@ function lockPlayerForRoundEnd(player) {
 
 function showOnlineResult({
   document,
+  enterOnlineResults,
   onlineIsRanked,
   onlineRemoteIdentity,
   p1Label,
@@ -199,6 +202,7 @@ function showOnlineResult({
   publishOnlineMatchResult(roundEnd.winner);
   setTimeout(() => {
     showScreen('screen-online-result');
+    enterOnlineResults?.();
     if (onlineIsRanked) showOnlineResultRating();
   }, 2000);
 }

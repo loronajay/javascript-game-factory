@@ -37,17 +37,26 @@ const STAT_LABELS = {
 
 // ── Seeded RNG (replaced per-match for online play; defaults to Math.random for training) ──
 let _battleRng = Math.random.bind(Math);
+let _battleRngState = null;
 
 function setBattleRng(seed) {
-  if (seed == null) { _battleRng = Math.random.bind(Math); return; }
-  let s = seed >>> 0;
+  if (seed == null) {
+    _battleRngState = null;
+    _battleRng = Math.random.bind(Math);
+    return;
+  }
+  _battleRngState = seed >>> 0;
   _battleRng = function() {
-    s += 0x6D2B79F5;
-    let t = s;
+    _battleRngState = (_battleRngState + 0x6D2B79F5) >>> 0;
+    let t = _battleRngState;
     t = Math.imul(t ^ (t >>> 15), 1 | t);
     t ^= t + Math.imul(t ^ (t >>> 7), 61 | t);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+function getBattleRngState() {
+  return _battleRngState;
 }
 
 function engineRandom(min, max) {
@@ -423,7 +432,13 @@ function sortActions(actions) {
     const aSpeed = aActor ? getEffectiveSpeed(aActor) : a.speed;
     const bSpeed = bActor ? getEffectiveSpeed(bActor) : b.speed;
     if (bSpeed !== aSpeed) return bSpeed - aSpeed;
-    // player side wins speed ties
+    // Online clients use opposite local perspectives, so a local "player first"
+    // tiebreaker would make them execute equal-speed actions in opposite orders.
+    if (state.isOnlineMatch && a.networkSide !== b.networkSide) {
+      if (a.networkSide === 'alpha') return -1;
+      if (b.networkSide === 'alpha') return 1;
+    }
+    // Training mode retains the cabinet's canonical player-side advantage.
     if (a.actorSide !== b.actorSide) return a.actorSide === 'player' ? -1 : 1;
     return SLOT_NAMES.indexOf(a.actorSlot) - SLOT_NAMES.indexOf(b.actorSlot);
   });

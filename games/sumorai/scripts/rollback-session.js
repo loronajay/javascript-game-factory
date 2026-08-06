@@ -80,6 +80,15 @@ function createRollbackSession(deps) {
   let displayRollbacks = 0;
   let secStartFrame = 0;
 
+  // Held controls may be predicted forward; edge-triggered controls belong to one exact
+  // frame. Repeating attackJustPressed is especially destructive during gridlock because a
+  // single remote tap otherwise becomes many predicted mash presses during resimulation.
+  function _predictedRemoteInput() {
+    return predictionBaseline
+      ? { ...predictionBaseline, attackJustPressed: false }
+      : emptyInput;
+  }
+
   function _mapInputs(localIn, remoteIn) {
     return localSide === 'p1' ? [localIn, remoteIn] : [remoteIn, localIn];
   }
@@ -107,7 +116,7 @@ function createRollbackSession(deps) {
       confirmed[slot] = true;
       futureConfirmed.delete(localFrame);
     } else {
-      remoteIn = predictionBaseline ?? emptyInput;
+      remoteIn = _predictedRemoteInput();
       confirmed[slot] = false;
     }
     remoteInputs[slot] = { ...remoteIn };
@@ -130,7 +139,7 @@ function createRollbackSession(deps) {
     for (let f = fromFrame; f < localFrame; f++) {
       const slot = f % window;
       stateBuffer[slot] = saveState();
-      if (!confirmed[slot]) remoteInputs[slot] = { ...(predictionBaseline ?? emptyInput) };
+      if (!confirmed[slot]) remoteInputs[slot] = { ..._predictedRemoteInput() };
       const localIn  = localInputs[slot]  ?? emptyInput;
       const remoteIn = remoteInputs[slot] ?? emptyInput;
       const [p1In, p2In] = _mapInputs(localIn, remoteIn);
@@ -187,7 +196,7 @@ function createRollbackSession(deps) {
 
   // Advance the session one display frame. Returns what happened so the caller's loop can
   // honor a stall (skip rendering a new sim frame) without knowing the internals.
-  function tick(localInput) {
+  function tick(localInputOrReader) {
     if (!active) return { advanced: false, stalled: false, committed: false };
 
     if (_shouldStall()) {
@@ -196,6 +205,10 @@ function createRollbackSession(deps) {
     }
     consecutiveStalls = 0;
 
+    // Read one-shot browser input only after deciding that this frame will advance.
+    const localInput = typeof localInputOrReader === 'function'
+      ? localInputOrReader()
+      : localInputOrReader;
     _advance(localInput);
     _maybeSnapshotRollbackRate();
 

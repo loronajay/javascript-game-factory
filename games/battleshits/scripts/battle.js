@@ -91,7 +91,7 @@ export function handleTargetClick(gs, net, col, row) {
   renderTargetBoard(gs);
 }
 
-function applyShotResult(gs, { clearAll }, { col, row, hit, sunk, shipId, fleetDestroyed }) {
+function applyShotResult(gs, { clearAll, onMatchEnded }, { col, row, hit, sunk, shipId, fleetDestroyed }) {
   pendingShotTimer = null;
   gs.myTarget = recordShotResult(gs.myTarget, col, row, hit, sunk, shipId);
   gs.lastShotInfo = { hit, sunk, shipId };
@@ -108,6 +108,7 @@ function applyShotResult(gs, { clearAll }, { col, row, hit, sunk, shipId, fleetD
 
   if (fleetDestroyed) {
     transitionToMatchEnded(gs, 'win', { clearAll });
+    onMatchEnded?.('win');
   } else if (gs.turn === 'awaiting_result') {
     // Only advance turn if still waiting — if an incoming shot arrived during the
     // animation delay, handleIncomingShot already set turn to 'mine'; don't stomp it.
@@ -116,13 +117,13 @@ function applyShotResult(gs, { clearAll }, { col, row, hit, sunk, shipId, fleetD
   }
 }
 
-export function handleIncomingShot(gs, net, col, row, { clearAll }) {
+export function handleIncomingShot(gs, net, col, row, { clearAll, onMatchEnded }) {
   // If our own shot result is still animating, flush it now so turn state is
   // correct before processing the opponent's shot.
   if (pendingShotTimer !== null && pendingShotTimerResult !== null) {
     const flushedResult = pendingShotTimerResult;
     clearPendingShotTimer();
-    applyShotResult(gs, { clearAll }, flushedResult);
+    applyShotResult(gs, { clearAll, onMatchEnded }, flushedResult);
   }
 
   const { valid, board, hit, shipId, sunk } = resolveIncomingShot(gs.myFleet, col, row);
@@ -151,6 +152,7 @@ export function handleIncomingShot(gs, net, col, row, { clearAll }) {
 
     if (fleetDestroyed) {
       transitionToMatchEnded(gs, 'loss', { clearAll });
+      onMatchEnded?.('loss');
     } else {
       gs.turn = 'mine';
       renderBattleStatus(gs);
@@ -173,10 +175,10 @@ export function handleIncomingShot(gs, net, col, row, { clearAll }) {
   }, SHOT_ANIMATION_MS);
 }
 
-export function handleShotResult(gs, result, { clearAll }) {
+export function handleShotResult(gs, result, { clearAll, onMatchEnded }) {
   const pendingShot = gs.pendingShot;
   if (!pendingShot) {
-    applyShotResult(gs, { clearAll }, result);
+    applyShotResult(gs, { clearAll, onMatchEnded }, result);
     return;
   }
 
@@ -186,6 +188,6 @@ export function handleShotResult(gs, result, { clearAll }) {
   pendingShotTimerResult = result;
   pendingShotTimer = setTimeout(() => {
     pendingShotTimerResult = null;
-    applyShotResult(gs, { clearAll }, result);
+    applyShotResult(gs, { clearAll, onMatchEnded }, result);
   }, remaining);
 }

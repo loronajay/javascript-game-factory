@@ -97,6 +97,26 @@ function parseEmoteMessage(value) {
   return sanitizeEmoteType(value);
 }
 
+function parseRematchMessage(value) {
+  try {
+    const parsed = JSON.parse(value);
+    const round = Number(parsed?.round);
+    if (!Number.isInteger(round) || round < 0) return null;
+    if (typeof parsed.available !== 'boolean' || typeof parsed.requested !== 'boolean') return null;
+    return { round, available: parsed.available, requested: parsed.requested };
+  } catch { return null; }
+}
+
+function parseRematchStart(value) {
+  try {
+    const parsed = JSON.parse(value);
+    const round = Number(parsed?.round);
+    const seed = Number(parsed?.seed);
+    if (!Number.isInteger(round) || round < 1 || !Number.isFinite(seed)) return null;
+    return { round, seed };
+  } catch { return null; }
+}
+
 function normalizeQueueCounts(payload) {
   if (!payload || typeof payload !== 'object') return null;
   const alpha = Number(payload.alphaWaiting ?? payload.alphaCount ?? 0);
@@ -129,7 +149,8 @@ export function createOnlineClient(gameId = 'battleshits') {
     onOpponentShot:    null,  // ({ col, row })
     onShotResult:      null,  // ({ col, row, hit, sunk, shipId, fleetDestroyed })
     onEmote:           null,  // (type: string)
-    onRematch:         null,  // (type: 'request' | 'accept')
+    onRematch:         null,  // ({ round, available, requested })
+    onRematchStart:    null,  // ({ round, seed })
     onPartnerLeft:     null,  // ()
     onSideConflict:    null,  // ()
     onError:           null,  // (code, message)
@@ -189,7 +210,14 @@ export function createOnlineClient(gameId = 'battleshits') {
     }
 
     if (messageType === 'rematch') {
-      if (value === 'request' || value === 'accept') cb.onRematch?.(value);
+      const state = parseRematchMessage(value);
+      if (state) cb.onRematch?.(state);
+      return;
+    }
+
+    if (messageType === 'rematch_start') {
+      const start = parseRematchStart(value);
+      if (start) cb.onRematchStart?.(start);
       return;
     }
   }
@@ -333,8 +361,12 @@ export function createOnlineClient(gameId = 'battleshits') {
     _roomMsg('shot_result', JSON.stringify({ col, row, hit, sunk, shipId, fleetDestroyed }));
   }
 
-  function sendRematch(type) {
-    _roomMsg('rematch', type);
+  function sendRematch(state) {
+    _roomMsg('rematch', JSON.stringify(state || {}));
+  }
+
+  function sendRematchStart(start) {
+    _roomMsg('rematch_start', JSON.stringify(start || {}));
   }
 
   function sendEmote(type) {
@@ -353,10 +385,13 @@ export function createOnlineClient(gameId = 'battleshits') {
     _roomCode = null; _inRoom = false;
   }
 
+  function getMySide() { return _mySide; }
+
   return {
     connect, findMatch, createRoom, joinRoom,
     setIdentity, requestQueueStatus, cancelSearch, cancelRoom,
-    sendPlacementReady, sendShot, sendShotResult, sendRematch, sendEmote,
+    sendPlacementReady, sendShot, sendShotResult, sendRematch, sendRematchStart, sendEmote,
+    getMySide,
     disconnect, reset,
     cb,
   };

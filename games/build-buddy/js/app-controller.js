@@ -5,6 +5,7 @@ import {
   applyOnlineGameplayDisconnect,
   applyOnlineClientSnapshot,
   applyOnlineRunComplete,
+  applyServerMatchState,
   applyOnlineStageResult,
   continueFromStageResult,
   createAppShellState,
@@ -27,12 +28,15 @@ import {
 } from './app-shell.js';
 import { createOnlineClient } from './online-client.js';
 import {
+  acceptServerRunnerStateMessage,
   createBuilderCommandMessage,
   createBuilderCursorMessage,
   createRunnerInputMessage,
+  createRunnerStateMessage,
   createStageCompleteRequestMessage,
   createStageStartMessage,
   receiveStageStartMessage,
+  shouldSendServerRunnerState,
 } from './online-gameplay.js';
 
 const FIXED_DT = 1 / 60;
@@ -87,6 +91,7 @@ export class AppController {
     // all we need — and it stays O(1) instead of the old unbounded Set that grew
     // for the whole run and re-hashed a full JSON string on every relay message.
     this.lastOnlineKeys = Object.create(null);
+    this.lastAppliedRunnerStateTick = -1;
     this.lastAppliedBuilderCursorTick = -1;
 
     this.onlineClient.subscribe?.((snapshot) => {
@@ -192,9 +197,16 @@ export class AppController {
         jump: input?.jumpHeld(),
         reposition: input?.consumeReposition?.(),
       }));
-      // Note: no separate runner_state echo. The host's state_sync already carries
-      // authoritative runner position to every non-host, so a second position
-      // stream here was pure redundant relay traffic.
+      if (shouldSendServerRunnerState(this.state.onlineGameplay, role, this.onlineTick) && this.game?.runner) {
+        this.onlineClient.sendOnlineGameplayMessage?.(createRunnerStateMessage({
+          tick: this.onlineTick,
+          x: this.game.runner.x,
+          y: this.game.runner.y,
+          vx: this.game.runner.vx,
+          vy: this.game.runner.vy,
+          dead: this.game.runner.dead,
+        }));
+      }
       input?.endFrame?.();
     }
     if (role === 'builder') {
@@ -324,38 +336,21 @@ export class AppController {
       this.setState(applyOnlineRunComplete(this.state, message));
     });
     this.applyOnce('match_state', gameplay.lastMatchState, (message) => {
-      const stage = message.value?.stage;
-      if (!stage || this.state.onlineGameplay?.authorityPlayerId !== 'server') return;
-      const session = {
-        ...this.state.session,
-        stageIndex: Number(stage.stageIndex) || 0,
-        currentStageId: stage.stageId,
-      };
-      const onlineGameplay = {
-        ...this.state.onlineGameplay,
-        session,
-        runSummary: message.value?.phase === 'run_complete' ? {
-          mode: 'online_run',
-          packId: message.value.packId,
-          totalStages: message.value.stageSequence?.length ?? 10,
-          completedStages: message.value.stageResults?.length ?? 0,
-          clearedStages: (message.value.stageResults ?? []).filter((result) => result.outcome === 'clear').length,
-          failedStages: (message.value.stageResults ?? []).filter((result) => result.outcome === 'fail').length,
-          isComplete: true,
-          results: message.value.stageResults ?? [],
-        } : null,
-      };
-      this.setState({
-        ...this.state,
-        session,
-        onlineGameplay,
-        viewMode: localOnlineRole({ ...this.state, session, onlineGameplay }) || this.state.viewMode,
-        screen: message.value?.phase === 'run_complete' ? APP_SCREENS.RUN_RESULT : this.state.screen,
-        runSummary: onlineGameplay.runSummary ?? this.state.runSummary,
-      });
-      if (stage.stageId && this.game?.currentStageId?.() !== stage.stageId) this.game?.loadStage(stage.stageId);
+      const nextState = applyServerMatchState(this.state, message.value);
+      if (nextState === this.state) return;
+      this.setState(nextState);
       this.applyServerCommands(message.value?.commands);
     });
+    const runnerState = acceptServerRunnerStateMessage(
+      this.state.onlineGameplay,
+      this.localOnlineRole(),
+      this.lastAppliedRunnerStateTick,
+      gameplay.lastRunnerState,
+    );
+    if (runnerState) {
+      this.lastAppliedRunnerStateTick = runnerState.tick;
+      this.game?.applyStateSnapshot({ runner: runnerState });
+    }
     // Builder cursor: runner receives the ghost preview position so both players share intent
     const builderCursor = gameplay.lastBuilderCursor;
     if (builderCursor && this.localOnlineRole() === 'runner') {

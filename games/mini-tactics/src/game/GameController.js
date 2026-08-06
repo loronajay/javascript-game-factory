@@ -1536,7 +1536,7 @@ export class GameController {
     // completion before our eventual close would read as a disconnect.
     if (this.mode === "online" && !this._onlineEnded) {
       this._onlineEnded = true;
-      this.net?.endMatch();
+      this.net?.endMatch({ allowRematch: true });
     }
     this.onMatchComplete(this.buildMatchSummary());
   }
@@ -1676,6 +1676,8 @@ export class GameController {
       victoryReason: this.match.victoryReason ?? "elimination",
       durationMs: this.startedAt ? Date.now() - this.startedAt : 0,
       difficulty: this.cpu?.difficulty ?? this.matchConfig.difficulty,
+      net: this.mode === "online" ? this.net : null,
+      seed: this.matchConfig.seed,
       teams: this.buildTeamReports(),
       ...extra,
     };

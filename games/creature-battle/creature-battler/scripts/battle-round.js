@@ -1,4 +1,11 @@
 let pendingAdvance = null;
+let _onlineRoundSync = createCbRoundSynchronizer();
+let _onlineSyncFailed = false;
+
+function resetOnlineBattleSync() {
+  _onlineRoundSync.reset(state.battleState?.round ?? 1);
+  _onlineSyncFailed = false;
+}
 
 function advancePlayback() {
   if (!pendingAdvance) return false;
@@ -10,7 +17,6 @@ function advancePlayback() {
 }
 
 function startRound() {
-  _resetOnlineRoundState();
   const end = checkBattleEnd();
   if (end) { showBattleEnd(end); return; }
 
@@ -40,53 +46,92 @@ function startRound() {
   CreatureState.clearDefend();
   updateBattleLog(`Round ${bs.round} — Select commands for your team.`);
   startCommandInput(onPlayerCommandsDone);
+  if (state.isOnlineMatch) {
+    _handleOnlineActionResult(_onlineRoundSync.beginRound(bs.round));
+  }
 }
 
 // ── Online round sync ─────────────────────────────────────────────────────────
 
-let _myPendingActions      = null;
-let _opponentPendingActions = null;
-
-function _resetOnlineRoundState() {
-  _myPendingActions      = null;
-  _opponentPendingActions = null;
+function _networkSideForLocalPlayer() {
+  return state.onlineClient?.isCoordinator ? 'alpha' : 'beta';
 }
 
 function handleBattleRemoteMessage(messageType, value) {
-  if (messageType !== 'player_actions') return;
-  const raw = Array.isArray(value?.actions) ? value.actions : [];
-  // Flip perspective: sender's 'player' side is our 'opponent', and vice-versa.
-  const flipped = raw.map(a => ({
-    ...a,
-    actorSide:  'opponent',
-    targetSide: a.targetSide === 'player' ? 'opponent' : a.targetSide === 'opponent' ? 'player' : null,
-  }));
-
-  if (_myPendingActions) {
-    _resolveOnlineRound(_myPendingActions, flipped);
-  } else {
-    _opponentPendingActions = flipped;
+  if (_onlineSyncFailed) return;
+  if (messageType === 'player_actions') {
+    _handleOnlineActionResult(
+      _onlineRoundSync.receiveRemoteActions(value, state.battleState?.round ?? 1)
+    );
+    return;
+  }
+  if (messageType === 'round_ready') {
+    const completedRound = Math.max(1, (state.battleState?.round ?? 1) - 1);
+    _handleOnlineBarrierResult(
+      _onlineRoundSync.receiveRemoteReady(value, completedRound),
+      value?.round
+    );
+    return;
+  }
+  if (messageType === 'sync_error') {
+    _failOnlineSync(value, false);
   }
 }
 
-function _resolveOnlineRound(myActions, opponentActions) {
-  _resetOnlineRoundState();
+function _handleOnlineActionResult(result) {
+  if (!result || ['waiting', 'buffered', 'duplicate', 'stale'].includes(result.status)) return;
+  if (result.status !== 'ready') {
+    _failOnlineSync({ round: state.battleState?.round ?? 1, cause: `action_${result.status}` });
+    return;
+  }
+  const myNetworkSide = _networkSideForLocalPlayer();
+  const opponentNetworkSide = myNetworkSide === 'alpha' ? 'beta' : 'alpha';
+  const myActions = decorateOnlineActions(result.localActions, myNetworkSide, false);
+  const opponentActions = decorateOnlineActions(result.remoteActions, opponentNetworkSide, true);
+  if (!myActions || !opponentActions) {
+    _failOnlineSync({ round: state.battleState?.round ?? 1, cause: 'invalid_actions' });
+    return;
+  }
   const allActions = sortActions([...myActions, ...opponentActions]);
   updateBattleLog('Commands locked! Resolving...');
   setTimeout(() => playbackStep(allActions, 0), 700);
+}
+
+function _handleOnlineBarrierResult(result, round) {
+  if (!result || ['waiting', 'duplicate', 'stale'].includes(result.status)) return;
+  if (result.status === 'ready') {
+    updateBattleLog(`Round ${round} synced.`);
+    setTimeout(startRound, 300);
+    return;
+  }
+  _failOnlineSync({
+    round: Number.isInteger(round) ? round : Math.max(1, (state.battleState?.round ?? 1) - 1),
+    cause: result.status,
+    localHash: result.localHash,
+    remoteHash: result.remoteHash,
+  });
+}
+
+function _failOnlineSync(details, notifyPeer = true) {
+  if (_onlineSyncFailed) return;
+  _onlineSyncFailed = true;
+  if (notifyPeer) state.onlineClient?.send('sync_error', details);
+  renderBattleSyncError(details);
 }
 
 // ── Round flow ────────────────────────────────────────────────────────────────
 
 function onPlayerCommandsDone(playerActions) {
   if (state.isOnlineMatch) {
-    state.onlineClient.send('player_actions', { actions: playerActions });
-    updateBattleLog('Waiting for opponent…');
-    if (_opponentPendingActions) {
-      _resolveOnlineRound(playerActions, _opponentPendingActions);
-    } else {
-      _myPendingActions = playerActions;
+    const round = state.battleState.round;
+    const result = _onlineRoundSync.submitLocalActions(round, playerActions);
+    if (result.status === 'invalid' || result.status === 'conflict') {
+      _failOnlineSync({ round, cause: `local_action_${result.status}` });
+      return;
     }
+    state.onlineClient.send('player_actions', { round, actions: playerActions });
+    updateBattleLog('Waiting for opponent…');
+    _handleOnlineActionResult(result);
     return;
   }
   const aiActions  = selectAiCommands();
@@ -273,7 +318,20 @@ function endRound() {
     }
   });
   renderBattleHud();
+  const completedRound = state.battleState.round;
   state.battleState.round++;
+  if (state.isOnlineMatch) {
+    const stateHash = hashOnlineBattleState(
+      state.battleState,
+      !!state.onlineClient?.isCoordinator,
+      typeof getBattleRngState === 'function' ? getBattleRngState() : null
+    );
+    const result = _onlineRoundSync.markLocalReady(completedRound, stateHash);
+    state.onlineClient.send('round_ready', { round: completedRound, stateHash });
+    updateBattleLog(`Round ${completedRound} complete — syncing opponent...`);
+    _handleOnlineBarrierResult(result, completedRound);
+    return;
+  }
   setTimeout(startRound, tickResults.length ? 900 : 500);
 }
 

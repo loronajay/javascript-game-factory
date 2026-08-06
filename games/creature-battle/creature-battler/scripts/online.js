@@ -2,11 +2,16 @@
 // All new WebSocket() calls live here.
 
 const CB_WS_URL = 'wss://factory-network-server-production.up.railway.app';
+const CB_ONLINE_PROTOCOL_VERSION = 2;
+
+function isSupportedCbProtocol(version) {
+  return version === CB_ONLINE_PROTOCOL_VERSION;
+}
 
 function buildCbGameId(pickStyle, levelCap) {
   // levelCap: 'any' or a number
   const lvlStr = (levelCap === 'any') ? 'any' : `lv${levelCap}`;
-  return `creature-battler-${pickStyle}-${lvlStr}`;
+  return `creature-battler-v${CB_ONLINE_PROTOCOL_VERSION}-${pickStyle}-${lvlStr}`;
 }
 
 function createCbOnlineClient() {

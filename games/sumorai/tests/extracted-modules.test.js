@@ -6,6 +6,7 @@ import { swapBindingForSide } from '../scripts/controls-screen.js';
 import { spawnBloodEffect, spawnChingEffect, tickEffects } from '../scripts/effects.js';
 import { createLobbyUi, queueHintText, sideLockedText } from '../scripts/lobby-ui.js';
 import { createInitialGameState, prepareRoundState, resetMatchProgress } from '../scripts/match-state.js';
+import { createInput } from '../scripts/input.js';
 import { getHumanInputBindings, isMobileControllerMounted } from '../scripts/mobile-input-routing.js';
 import {
   buildOnlineStagePlan,
@@ -19,6 +20,7 @@ import {
 import { startOnlineMatchSession } from '../scripts/online-match-start.js';
 import { wireOnlineLobbyEvents } from '../scripts/online-lobby-events.js';
 import { maybeAwardForfeitWin, wireOnlineCallbacks } from '../scripts/online-callbacks.js';
+import { createOnlineInputRouter } from '../scripts/online-input-router.js';
 import { publishOnlineMatchResult, renderOnlineResultRating, renderRankedProfile } from '../scripts/online-results.js';
 import {
   formatRankedRecord,
@@ -68,6 +70,37 @@ test('setupCanvasViewport sizes the canvas and reports the viewport scale', () =
   assert.equal(canvas.width, 960);
   assert.equal(canvas.height, 720);
   assert.deepEqual(scales, [2, 1.5]);
+});
+
+test('input keeps a quick tap buffered until an advancing simulation tick consumes it', () => {
+  const previousWindow = globalThis.window;
+  const listeners = new Map();
+  globalThis.window = {
+    addEventListener(type, handler) {
+      listeners.set(type, handler);
+    },
+  };
+
+  try {
+    const input = createInput();
+    const bindings = {
+      left: 'KeyA', right: 'KeyD', up: 'KeyW', down: 'KeyS',
+      attack: 'KeyJ', dash: 'KeyK', projectile: 'KeyL',
+    };
+    const event = { code: 'KeyJ', preventDefault() {} };
+
+    listeners.get('keydown')(event);
+    listeners.get('keyup')(event);
+
+    const buffered = input.getSnapshot(bindings);
+    assert.equal(buffered.attack, false, 'released controls must not remain held');
+    assert.equal(buffered.attackJustPressed, true, 'a quick mobile tap must survive until the next sim frame');
+
+    input.flush();
+    assert.equal(input.getSnapshot(bindings).attackJustPressed, false);
+  } finally {
+    globalThis.window = previousWindow;
+  }
 });
 
 test('audio controller clones one-shot sounds and suppresses them while resimulating', () => {
@@ -257,13 +290,16 @@ test('rollback state snapshots and restores mutable match state without retainin
     p2: { side: 'p2', x: 24, platformRef: null },
   };
 
-  const snap = saveGameState(state);
+  const camera = { x: 100, y: 180, zoom: 0.75 };
+  const snap = saveGameState(state, camera);
   state.phase = 'mutated';
   state.platforms[0].x = 999;
   state.p1.x = 999;
   state.effects[0].frame = 99;
+  camera.x = 999;
+  camera.zoom = 0.1;
 
-  loadGameState(state, snap);
+  loadGameState(state, snap, camera);
 
   assert.equal(state.phase, 'active');
   assert.equal(state.platforms[0].x, 10);
@@ -271,7 +307,33 @@ test('rollback state snapshots and restores mutable match state without retainin
   assert.equal(state.p1.platformRef, state.platforms[0]);
   assert.equal(state.p2.platformRef, null);
   assert.equal(state.effects[0].frame, 1);
+  assert.deepEqual(camera, { x: 100, y: 180, zoom: 0.75 });
   assert.notEqual(state.platforms[0], platform);
+});
+
+test('online input router buffers the next round until its rollback session is armed', () => {
+  const delivered = [];
+  let session = {
+    epoch: 1,
+    onRemoteInput: (...args) => delivered.push(['round1', ...args]),
+  };
+  const router = createOnlineInputRouter({ getSession: () => session });
+
+  assert.equal(router.route({ seq: 1, epoch: 1, adv: 2, left: true }), 'delivered');
+  assert.equal(router.route({ seq: 1, epoch: 2, adv: 4, attackJustPressed: true }), 'buffered');
+  assert.equal(router.route({ seq: 0, epoch: 2, adv: 3, right: true }), 'buffered');
+  assert.equal(router.route({ seq: 99, epoch: 0, adv: 0 }), 'discarded');
+  assert.equal(delivered.length, 1, 'future-round inputs must not be sent to the old session');
+
+  session = {
+    epoch: 2,
+    onRemoteInput: (...args) => delivered.push(['round2', ...args]),
+  };
+  assert.equal(router.activate(session), 2);
+  assert.deepEqual(delivered.slice(1).map(call => [call[0], call[1]]), [
+    ['round2', 0],
+    ['round2', 1],
+  ], 'buffered inputs must flush in frame order so confirmation remains contiguous');
 });
 
 test('lobby UI text helpers preserve queue and side wording', () => {
@@ -579,6 +641,8 @@ test('online lobby event wiring preserves side, matchmaking, room, and menu acti
     stopWaitingDots: () => calls.push(['stopWaitingDots']),
     updateQueueHint: () => calls.push(['updateQueueHint']),
     playSound: sound => sounds.push(sound),
+    leaveOnlineResults: () => calls.push(['leaveOnlineResults']),
+    requestOnlineRematch: () => calls.push(['requestOnlineRematch']),
   });
 
   sideCards[1].click();
@@ -615,17 +679,22 @@ test('online lobby event wiring preserves side, matchmaking, room, and menu acti
 
   onlineClient = client;
   elements.get('btn-online-rematch').click();
+  assert.equal(isOnline, true);
+  assert.equal(gameState.p1.wins, 2);
+  assert.equal(gameState.p2.wins, 1);
+  assert.deepEqual(calls.at(-1), ['requestOnlineRematch']);
+
+  elements.get('btn-online-result-menu').click();
   assert.equal(isOnline, false);
-  assert.equal(gameState.p1.wins, 0);
-  assert.equal(gameState.p2.wins, 0);
   assert.deepEqual(calls.slice(-5), [
     ['stopAmbient'],
-    ['setSideLocked', 'online-side-locked'],
-    ['updateQueueHint'],
-    ['showScreen', 'screen-online-lobby'],
-    ['showLobbyPhase', 'main'],
+    ['stopSearchDots'],
+    ['stopWaitingDots'],
+    ['disconnect'],
+    ['showScreen', 'screen-menu'],
   ]);
-  assert.deepEqual(sounds, ['ching', 'ching', 'ching', 'ching', 'swing', 'ching']);
+  assert.ok(calls.some(call => call[0] === 'leaveOnlineResults'));
+  assert.deepEqual(sounds, ['ching', 'ching', 'ching', 'ching', 'swing', 'ching', 'swing']);
 });
 
 test('setup event wiring preserves local, CPU, setup, and result menu actions', () => {
@@ -805,7 +874,7 @@ test('online callbacks preserve queue, match-ready, remote input, and disconnect
     getOnlineIsRanked: () => true,
     getOnlineMatchSeed: () => matchSeed,
     getOnlineRemoteIdentity: () => ({ playerId: 'remote' }),
-    getOnlineSession: () => fakeSession,
+    routeRemoteInput: snap => fakeSession.onRemoteInput(snap.seq, snap, snap.adv, snap.epoch),
     normalizeOnlineStagePlan,
     onlineClient,
     setIsOnline: value => { isOnline = value; },
@@ -891,6 +960,18 @@ test('online callbacks preserve queue, match-ready, remote input, and disconnect
     ['stopAmbient'],
     ['showScreen', 'screen-online-disconnected'],
   ]);
+
+  const callsBeforePostMatchLeave = calls.length;
+  gameState.phase = 'match_end';
+  isOnline = true;
+  onlineClient.cb.onPartnerLeft();
+  assert.equal(isOnline, false);
+  assert.equal(gameState.phase, 'match_end', 'a post-result departure must not erase the result screen');
+  assert.equal(
+    calls.slice(callsBeforePostMatchLeave).some(call => call[0] === 'showScreen'),
+    false,
+    'leaving the completed room must not look like an in-match disconnect to the opponent',
+  );
 });
 
 test('forfeit rating update only applies during active ranked matches with both profiles', () => {

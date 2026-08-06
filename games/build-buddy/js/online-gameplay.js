@@ -186,6 +186,20 @@ export function createRunnerStateMessage(runner = {}) {
   };
 }
 
+export function shouldSendServerRunnerState(state, localRole, tick) {
+  return state?.authorityPlayerId === 'server'
+    && localRole === 'runner'
+    && normalizeTick(tick) % 3 === 0;
+}
+
+export function acceptServerRunnerStateMessage(state, localRole, lastAppliedTick, message = {}) {
+  if (state?.authorityPlayerId !== 'server' || localRole !== 'builder') return null;
+  if (message.senderId !== getCurrentRoles(state.session).runnerPlayerId) return null;
+
+  const value = createRunnerStateMessage(message.value).value;
+  return value.tick > normalizeTick(lastAppliedTick) ? value : null;
+}
+
 export function createBuilderCursorMessage(cursor = {}) {
   return {
     messageType: 'builder_cursor',

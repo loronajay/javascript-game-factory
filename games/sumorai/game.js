@@ -24,11 +24,14 @@ import { setupCanvasViewport }     from './scripts/viewport.js';
 import { createPlatforms, updatePlatforms } from './scripts/platforms.js';
 import { createOnlineClient, getCountdownSecondsRemaining } from './scripts/online.js';
 import { wireOnlineCallbacks } from './scripts/online-callbacks.js';
+import { createOnlineInputRouter } from './scripts/online-input-router.js';
+import { createRematchFlow, rematchSeed } from './scripts/online-rematch.js';
 import { buildOnlineIdentity } from './scripts/online-identity.js';
 import { startOnlineMatchSession } from './scripts/online-match-start.js';
 import {
   drawOnlineCountdown,
   EMPTY_INPUT,
+  buildOnlineStagePlan,
   getOnlineStageForRound,
   inputsDiffer,
   normalizeOnlineStagePlan,
@@ -121,6 +124,9 @@ function _boot(sounds) {
   let onlineStartAt        = 0;
   let onlineRemoteIdentity = null;
   let onlineQueueCounts    = null;
+  let onlineRematch        = null;
+  let onlineRematchBaseSeed = 0;
+  let onlineRematchRound   = 0;
   let isOnline             = false;
 
   // Rollback session — owns frame counter, snapshot buffers, prediction, resimulation, and
@@ -128,6 +134,7 @@ function _boot(sounds) {
   // bookkeeping that used to live inline here now lives in scripts/rollback-session.js, which
   // is exercised headlessly by tests/online-sync.test.js.
   let onlineSession = null;
+  const onlineInputRouter = createOnlineInputRouter({ getSession: () => onlineSession });
 
   const { playSound, startAmbient, stopAmbient } = createAudioController(getSound, {
     isMuted: () => !!onlineSession && onlineSession.isResimulating(),
@@ -161,8 +168,8 @@ function _boot(sounds) {
       epoch: gameState.roundNum,
       rollbackWindow: ROLLBACK_WINDOW,
       tickSim: (p1In, p2In) => _tickSim(p1In, p2In),
-      saveState: () => saveGameState(gameState),
-      loadState: (snap) => loadGameState(gameState, snap),
+      saveState: () => saveGameState(gameState, camera),
+      loadState: (snap) => loadGameState(gameState, snap, camera),
       inputsDiffer,
       emptyInput: EMPTY_INPUT,
       send: (frame, snap, advantage, epoch) => onlineClient.sendInput(frame, snap, advantage, epoch),
@@ -178,6 +185,7 @@ function _boot(sounds) {
   function _ensureOnlineSession() {
     if (!onlineSession || onlineSession.epoch !== gameState.roundNum) {
       onlineSession = _createOnlineSession();
+      onlineInputRouter.activate(onlineSession);
     }
   }
 
@@ -218,6 +226,10 @@ function _boot(sounds) {
   // Online lobby wiring
 
   function enterOnlineFlow() {
+    onlineSession = null;
+    onlineInputRouter.reset();
+    onlineRematch = null;
+    onlineRematchRound = 0;
     onlineSide = 'p1';
     onlineStagePlan = null;
     document.querySelectorAll('.side-card').forEach(c => c.classList.remove('side-card--selected'));
@@ -230,6 +242,18 @@ function _boot(sounds) {
     onlineIdentity   = buildOnlineIdentity(factoryProfile);
     onlineClient     = createOnlineClient();
     onlineClient.setIdentity(onlineIdentity);
+    onlineRematch = createRematchFlow({
+      sendState: state => onlineClient.sendRematch(state),
+      sendStart: start => onlineClient.sendRematchStart(start),
+      isCoordinator: () => onlineClient.isCoordinator(),
+      buildStart: round => ({
+        round,
+        seed: rematchSeed(onlineRematchBaseSeed, round),
+        startAt: Date.now() + onlineClockOffset + 4000,
+      }),
+      onState: syncOnlineRematchUi,
+      onAccepted: startOnlineRematch,
+    });
     _wireOnlineCallbacks();
     onlineClient.connect();
 
@@ -247,12 +271,22 @@ function _boot(sounds) {
       getOnlineIsRanked: () => onlineIsRanked,
       getOnlineMatchSeed: () => onlineMatchSeed,
       getOnlineRemoteIdentity: () => onlineRemoteIdentity,
-      getOnlineSession: () => onlineSession,
+      routeRemoteInput: snap => onlineInputRouter.route(snap),
       normalizeOnlineStagePlan,
+      onOpponentLeftResults: () => onlineRematch?.receiveState({
+        round: onlineRematchRound,
+        available: false,
+        requested: false,
+      }),
       onlineClient,
+      receiveRematchStart: start => onlineRematch?.receiveStart(start),
+      receiveRematchState: state => onlineRematch?.receiveState(state),
       setIsOnline: value => { isOnline = value; },
       setOnlineClockOffset: value => { onlineClockOffset = value; },
-      setOnlineMatchSeed: value => { onlineMatchSeed = value; },
+      setOnlineMatchSeed: value => {
+        onlineMatchSeed = value;
+        onlineRematchBaseSeed = value;
+      },
       setOnlineQueueCounts: value => { onlineQueueCounts = value; },
       setOnlineRemoteIdentity: value => { onlineRemoteIdentity = value; },
       setOnlineStagePlan: value => { onlineStagePlan = value; },
@@ -309,6 +343,7 @@ function _boot(sounds) {
   }
   function _startOnlineMatch() {
     onlineSession = null;   // a fresh per-round session is armed when round_start begins
+    onlineInputRouter.reset();
     startOnlineMatchSession({
       factoryName,
       gameState,
@@ -321,6 +356,66 @@ function _boot(sounds) {
       showScreen,
       startAmbient,
     });
+  }
+
+  function startOnlineRematch({ round, seed, startAt }) {
+    onlineRematchRound = round;
+    onlineMatchSeed = seed;
+    onlineStagePlan = buildOnlineStagePlan(seed);
+    onlineStartAt = startAt;
+    gameState.p1.wins = 0;
+    gameState.p2.wins = 0;
+    onlineSession = null;
+    onlineInputRouter.reset();
+    _startOnlineMatch();
+  }
+
+  function enterOnlineResults() {
+    onlineRematch?.enterResults({
+      round: onlineRematchRound,
+      enabled: !onlineIsRanked,
+    });
+  }
+
+  function syncOnlineRematchUi({
+    available = false,
+    localRequested = false,
+    opponentRequested = false,
+    declined = false,
+    opponentUnavailable = false,
+    starting = false,
+    disabled = false,
+  } = {}) {
+    const button = document.getElementById('btn-online-rematch');
+    const status = document.getElementById('online-rematch-status');
+    if (!button || !status) return;
+    if (disabled) {
+      button.disabled = true;
+      button.textContent = 'Rematch Unavailable';
+      status.textContent = 'Rematches are disabled in Ranked.';
+    } else if (declined || opponentUnavailable) {
+      button.disabled = true;
+      button.textContent = declined ? 'Rematch Declined' : 'Rematch Unavailable';
+      status.textContent = declined
+        ? 'Your opponent declined the rematch.'
+        : 'Your opponent left the results screen.';
+    } else if (starting) {
+      button.disabled = true;
+      button.textContent = 'Starting Rematch';
+      status.textContent = 'Synchronizing the next match...';
+    } else if (localRequested) {
+      button.disabled = true;
+      button.textContent = 'Rematch Requested';
+      status.textContent = 'Waiting for your opponent to accept...';
+    } else if (available) {
+      button.disabled = false;
+      button.textContent = opponentRequested ? 'Accept Rematch' : 'Rematch';
+      status.textContent = opponentRequested ? 'Your opponent wants a rematch.' : '';
+    } else {
+      button.disabled = true;
+      button.textContent = 'Rematch';
+      status.textContent = 'Waiting for your opponent to reach results...';
+    }
   }
 
 
@@ -342,6 +437,8 @@ function _boot(sounds) {
     stopWaitingDots: _stopWaitingDots,
     updateQueueHint: _updateQueueHint,
     playSound,
+    leaveOnlineResults: () => onlineRematch?.leaveResults(),
+    requestOnlineRematch: () => onlineRematch?.request(),
   });
 
 
@@ -389,6 +486,7 @@ function _boot(sounds) {
       camera,
       createPlatforms,
       document,
+      enterOnlineResults,
       gameState,
       isOnline,
       onlineIsRanked,
@@ -436,10 +534,15 @@ function _boot(sounds) {
   let accum    = 0;
 
   function tick() {
-    if      (gameState.phase === 'active')           tickActive();
-    else if (gameState.phase === 'round_end')        tickRoundEnd();
-    else if (gameState.phase === 'round_start')      tickRoundStart();
-    else if (gameState.phase === 'online_countdown') tickOnlineCountdown();
+    const phaseAtStart = gameState.phase;
+    if      (phaseAtStart === 'active')           tickActive();
+    else if (phaseAtStart === 'round_end')        tickRoundEnd();
+    else if (phaseAtStart === 'round_start')      tickRoundStart();
+    else if (phaseAtStart === 'online_countdown') tickOnlineCountdown();
+
+    // Do not carry menu/countdown/round-transition taps into the first active frame. Active
+    // online input is flushed lazily by the rollback session only when a frame really advances.
+    if (phaseAtStart !== 'active') input.flush();
   }
 
 
@@ -495,19 +598,16 @@ function _boot(sounds) {
 
     _ensureOnlineSession();
 
-    // If we are running ahead of the peer, wait this frame instead of predicting further —
-    // and crucially do NOT consume input, so a tap during the stall is applied on the next
-    // advanced frame rather than being silently dropped.
-    if (onlineSession.framesToStall() > 0) return;
-
-    const localIn = input.getSnapshot(getHumanInputBindings(onlineSide, bindings, {
-      mobileControlsActive,
-      defaultMobileBindings: DEFAULT_P1,
-    }));
-    input.flush();
-
-    // The session owns snapshot/predict/send/simulate/rollback/commit for this frame.
-    onlineSession.tick(localIn);
+    // The session decides whether this frame advances before invoking the input reader. That
+    // preserves one-shot taps through stalls and lets its smoothing stall cap do its job.
+    onlineSession.tick(() => {
+      const localIn = input.getSnapshot(getHumanInputBindings(onlineSide, bindings, {
+        mobileControlsActive,
+        defaultMobileBindings: DEFAULT_P1,
+      }));
+      input.flush();
+      return localIn;
+    });
   }
 
   function loop(ts) {

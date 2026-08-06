@@ -97,7 +97,8 @@ as a later fairness upgrade if competitive play demands it.
 | host → both | `state` | `{ tick, p1x, p2x, p1hp, p2hp, p1heat, p2heat, p1burn, p2burn, bullets: [...], events: [...] }` |
 | host → both | `countdown` | `{ startsAtTick }` |
 | host → both | `result` | `{ winner: "p1"|"p2" }` |
-| either | `rematch` | `{ ready: bool }` |
+| either | `rematch` | `{ round, available, requested }` |
+| host | `rematch_start` | `{ round, startAt }` |
 
 (Exact shapes finalized at build time; keep packets small — broadcast every N ticks, not
 every frame.)

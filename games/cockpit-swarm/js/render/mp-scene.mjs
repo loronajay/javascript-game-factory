@@ -910,8 +910,34 @@ export function renderMpResult(ctx, game, t) {
   ctx.fillStyle = "rgba(52, 247, 255, 0.52)";
   ctx.fillText("P1  ·  ROUNDS  ·  P2", CX, 326);
 
+  const rematch = game.mp.rematchState ?? {};
+  let rematchLabel = "REMATCH";
+  let rematchStatus = "WAITING FOR OPPONENT TO REACH RESULTS";
+  if (rematch.disabled || rematch.declined || rematch.opponentUnavailable) {
+    rematchLabel = rematch.declined ? "REMATCH DECLINED" : "REMATCH UNAVAILABLE";
+    rematchStatus = rematch.declined ? "OPPONENT DECLINED" : "OPPONENT LEFT RESULTS";
+  } else if (rematch.starting) {
+    rematchLabel = "STARTING REMATCH";
+    rematchStatus = "SYNCHRONIZING NEXT MATCH";
+  } else if (rematch.localRequested) {
+    rematchLabel = "REMATCH REQUESTED";
+    rematchStatus = "WAITING FOR OPPONENT TO ACCEPT";
+  } else if (rematch.available) {
+    rematchLabel = rematch.opponentRequested ? "ACCEPT REMATCH" : "REMATCH";
+    rematchStatus = rematch.opponentRequested ? "OPPONENT WANTS A REMATCH" : "";
+  }
+
   for (let i = 0; i < MP_RESULT_BTNS.length; i++) {
-    _drawBtn(ctx, MP_RESULT_BTNS[i], game.menu.selectedButton === i, t);
+    const button = i === 0 ? { ...MP_RESULT_BTNS[i], label: rematchLabel } : MP_RESULT_BTNS[i];
+    const locked = i === 0 && (!rematch.available || rematch.localRequested || rematch.starting);
+    _drawBtn(ctx, button, game.menu.selectedButton === i && !locked, t);
+  }
+
+  if (rematchStatus) {
+    ctx.textBaseline = "top";
+    ctx.font = "600 12px system-ui, sans-serif";
+    ctx.fillStyle = "rgba(216, 251, 255, 0.52)";
+    ctx.fillText(rematchStatus, CX, 528);
   }
 
   ctx.textAlign    = "center";

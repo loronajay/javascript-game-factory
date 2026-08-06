@@ -156,6 +156,32 @@ function updateBattleLog(msg) {
 
 // ── End overlay ───────────────────────────────────────────────────────────────
 
+function renderBattleSyncError(details = {}) {
+  const screen = document.getElementById('screen-battle');
+  if (!screen || screen.querySelector('.battle-sync-error')) return;
+  stopBattleMusic();
+  playInvalid();
+
+  const round = Number.isInteger(details.round) ? details.round : state.battleState?.round;
+  const overlay = document.createElement('div');
+  overlay.className = 'battle-end-overlay battle-sync-error';
+  overlay.innerHTML = `
+    <div class="battle-end-card">
+      <div class="battle-end-title draw">Match Sync Stopped</div>
+      <div class="battle-end-sub">The devices disagreed${round ? ` after round ${round}` : ''}. The match was stopped before another turn could make it worse.</div>
+      <button class="btn primary" id="sync-error-back-btn">Back to Title</button>
+    </div>`;
+  screen.appendChild(overlay);
+  document.getElementById('sync-error-back-btn')?.addEventListener('click', () => {
+    playClick();
+    state.onlineClient?.disconnect();
+    state.onlineClient = null;
+    state.isOnlineMatch = false;
+    setBattleRng(null);
+    setScreen('title');
+  });
+}
+
 function _renderEndPortraits(side) {
   const bs = state.battleState;
   return SLOT_NAMES.map(slot => {

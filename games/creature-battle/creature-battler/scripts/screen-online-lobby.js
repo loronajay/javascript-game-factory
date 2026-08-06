@@ -134,6 +134,7 @@ function _startBlindPick(seed) {
     state.onlineSettings.resolvedLevelCap = resolved;
     state.onlineSettings.resolvedArenaId  = arena.id;
     client.send('match_settings', {
+      protocolVersion: CB_ONLINE_PROTOCOL_VERSION,
       pickStyle: state.onlineSettings.pickStyle,
       levelCap:  resolved,
       arenaId:   arena.id,

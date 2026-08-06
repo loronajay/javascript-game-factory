@@ -21,6 +21,7 @@ import {
   startPublicMatch, startPrivateCreate, startPrivateJoin,
 } from './scripts/matchmaking.js';
 import { createBotClient, clearBotBattleTimers } from './scripts/bot-battle.js';
+import { createRematchFlow } from './scripts/rematch-flow.js';
 
 const bgMusic = createBgMusicController();
 
@@ -51,8 +52,7 @@ function createInitialState() {
     myProfile: null,      // { playerId, displayName }
     opponentProfile: null,// { playerId, displayName }
     roomCode: null,
-    rematchPending: false,
-    opponentWantsRematch: false,
+    rematchRound: 0,
     pendingNetAction: null, // called inside onConnected
     pendingShot: null, // { col, row, startedAt }
     incomingShot: null, // { col, row } while opponent shot impact animation plays
@@ -70,6 +70,7 @@ function createInitialState() {
 
 let gs = createInitialState();
 let net = null;
+let rematchFlow = null;
 
 function clearAll() {
   clearPublicMatchRetry();
@@ -159,18 +160,23 @@ function resetForSoloBattle() {
 
 // ─── Match flow ───────────────────────────────────────────────────────────────
 
-function resetForRematch() {
+function resetForRematch({ seed, round } = {}) {
   clearAll();
   const side    = gs.mySide;
-  const seed    = (gs.seed ?? 0) + 1;
+  const nextSeed = Number.isFinite(Number(seed)) ? Number(seed) : (gs.seed ?? 0) + 1;
   const myProf  = gs.myProfile;
   const oppProf = gs.opponentProfile;
+  const matchmakingMode = gs.matchmakingMode;
+  const roomCode = gs.roomCode;
 
   gs = createInitialState();
   gs.mySide           = side;
-  gs.seed             = seed;
+  gs.seed             = nextSeed;
   gs.myProfile        = myProf;
   gs.opponentProfile  = oppProf;
+  gs.matchmakingMode  = matchmakingMode;
+  gs.roomCode          = roomCode;
+  gs.rematchRound      = Math.max(0, Math.floor(Number(round) || 0));
 
   enterPlacementScreen();
 }
@@ -178,6 +184,15 @@ function resetForRematch() {
 // ─── Online callbacks ─────────────────────────────────────────────────────────
 
 function wireOnlineCallbacks() {
+  rematchFlow = createRematchFlow({
+    sendState: state => net.sendRematch(state),
+    sendStart: start => net.sendRematchStart(start),
+    isCoordinator: () => net.getMySide() === 'alpha',
+    buildStart: round => ({ round, seed: (Number(gs.seed) || 0) + 1 }),
+    onState: syncRematchUi,
+    onAccepted: resetForRematch,
+  });
+
   net.cb.onConnected = () => {
     const statusEl = document.getElementById('matchmaking-status');
     if (statusEl) statusEl.textContent = 'Connected — searching...';
@@ -224,12 +239,12 @@ function wireOnlineCallbacks() {
 
   net.cb.onOpponentShot = ({ col, row }) => {
     if (gs.phase !== 'battle') return;
-    handleIncomingShot(gs, net, col, row, { clearAll });
+    handleIncomingShot(gs, net, col, row, { clearAll, onMatchEnded: beginOnlineResults });
   };
 
   net.cb.onShotResult = (result) => {
     if (gs.phase !== 'battle') return;
-    handleShotResult(gs, result, { clearAll });
+    handleShotResult(gs, result, { clearAll, onMatchEnded: beginOnlineResults });
   };
 
   net.cb.onEmote = (type) => {
@@ -237,20 +252,17 @@ function wireOnlineCallbacks() {
     showBattleEmote(gs, 'theirs', type);
   };
 
-  net.cb.onRematch = (type) => {
-    if (type !== 'request') return;
-    gs.opponentWantsRematch = true;
-    const statusEl = document.getElementById('rematch-status');
-    if (statusEl) statusEl.textContent = 'Opponent wants a rematch!';
-    if (gs.rematchPending) resetForRematch();
-  };
+  net.cb.onRematch = state => rematchFlow.receiveState(state);
+  net.cb.onRematchStart = start => rematchFlow.receiveStart(start);
 
   net.cb.onPartnerLeft = () => {
     clearAll();
     if (gs.phase === 'battle') {
       transitionToMatchEnded(gs, 'forfeit_win', { clearAll });
+      beginOnlineResults('forfeit_win');
     } else if (gs.phase === 'match_ended') {
       // opponent left after results — stay so the player can still add friend
+      rematchFlow.receiveState({ round: gs.rematchRound, available: false, requested: false });
     } else {
       const myProf = gs.myProfile;
       gs = createInitialState();
@@ -370,11 +382,7 @@ function wireButtons() {
       resetForSoloBattle();
       return;
     }
-    gs.rematchPending = true;
-    net.sendRematch('request');
-    const statusEl = document.getElementById('rematch-status');
-    if (statusEl) statusEl.textContent = gs.opponentWantsRematch ? 'Starting rematch...' : 'Waiting for opponent...';
-    if (gs.opponentWantsRematch) resetForRematch();
+    rematchFlow?.request();
   });
 
   document.getElementById('btn-change-difficulty')?.addEventListener('click', () => {
@@ -387,6 +395,7 @@ function wireButtons() {
 
   document.getElementById('btn-exit-to-menu')?.addEventListener('click', () => {
     clearAll();
+    if (!gs.isSoloMode && gs.phase === 'match_ended') rematchFlow?.leaveResults();
     net?.disconnect();
     net = null;
     gs = createInitialState();
@@ -410,6 +419,47 @@ function wireButtons() {
 }
 
 // ─── Entry ────────────────────────────────────────────────────────────────────
+
+function beginOnlineResults(result) {
+  rematchFlow?.enterResults({ round: gs.rematchRound, enabled: result !== 'forfeit_win' });
+}
+
+function syncRematchUi({
+  available = false,
+  localRequested = false,
+  opponentRequested = false,
+  declined = false,
+  opponentUnavailable = false,
+  starting = false,
+  disabled = false,
+} = {}) {
+  const button = document.getElementById('btn-rematch');
+  const status = document.getElementById('rematch-status');
+  if (!button || !status) return;
+  if (disabled || declined || opponentUnavailable) {
+    button.disabled = true;
+    button.textContent = declined ? 'Rematch Declined' : 'Rematch Unavailable';
+    status.textContent = declined
+      ? 'Your opponent declined the rematch.'
+      : 'Your opponent left the results screen. Rematch is unavailable.';
+  } else if (starting) {
+    button.disabled = true;
+    button.textContent = 'Starting Rematch';
+    status.textContent = 'Starting rematch...';
+  } else if (localRequested) {
+    button.disabled = true;
+    button.textContent = 'Rematch Requested';
+    status.textContent = 'Waiting for your opponent to accept...';
+  } else if (available) {
+    button.disabled = false;
+    button.textContent = opponentRequested ? 'Accept Rematch' : 'Rematch';
+    status.textContent = opponentRequested ? 'Your opponent wants a rematch.' : '';
+  } else {
+    button.disabled = true;
+    button.textContent = 'Rematch';
+    status.textContent = 'Waiting for your opponent to reach results...';
+  }
+}
 
 export function initGame() {
   wireButtons();

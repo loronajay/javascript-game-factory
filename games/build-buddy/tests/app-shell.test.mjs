@@ -3,6 +3,7 @@ import {
   applyOnlineClientSnapshot,
   applyOnlineGameplayDisconnect,
   applyOnlineRunComplete,
+  applyServerMatchState,
   applyOnlineStageResult,
   createAppShellState,
   getPracticeStageOptions,
@@ -339,6 +340,55 @@ test("server-authoritative online roles use Factory Network client ids, not prof
   assertEqual(state.session.players[0].id, "ws-host");
   assertEqual(localOnlineRole(state), "runner");
   assertEqual(state.viewMode, "runner");
+});
+
+test("server match updates swap the local control role with each new stage", () => {
+  let state = startPrivateLobby(
+    goToOnlineMenu(createAppShellState({ storage: createMemoryStorage(), stageList })),
+    { playerId: "factory-host-profile", displayName: "Host" },
+  );
+  state = applyOnlineClientSnapshot(state, {
+    status: "started",
+    clientId: "ws-host",
+    lobby: { roomCode: "AB12", ownerId: "ws-host", members: ["ws-host", "ws-guest"] },
+    profiles: {
+      "ws-host": { playerId: "factory-host-profile", displayName: "Host" },
+      "ws-guest": { playerId: "factory-guest-profile", displayName: "Guest" },
+    },
+    onlineGameplay: {
+      lastMatchState: {
+        senderId: "server",
+        value: {
+          network: { authorityMode: "server" },
+          players: [
+            { clientId: "ws-host", name: "Host" },
+            { clientId: "ws-guest", name: "Guest" },
+          ],
+          stage: {
+            stageId: "pack_01_stage_01",
+            stageIndex: 0,
+            roles: { runnerPlayerId: "ws-host", builderPlayerId: "ws-guest" },
+          },
+        },
+      },
+    },
+  });
+  state = startOnlineRunFromLobby(state);
+
+  state = applyServerMatchState(state, {
+    network: { authorityMode: "server" },
+    stage: {
+      stageId: "pack_01_stage_02",
+      stageIndex: 1,
+      roles: { runnerPlayerId: "ws-guest", builderPlayerId: "ws-host" },
+    },
+    stageResults: [{ outcome: "clear" }],
+  });
+
+  assertEqual(state.session.currentStageId, "pack_01_stage_02");
+  assertEqual(state.online.serverMatchState.stage.stageIndex, 1);
+  assertEqual(localOnlineRole(state), "builder");
+  assertEqual(state.viewMode, "builder");
 });
 
 test("guest online run accepts host stage results but cannot submit local results", () => {

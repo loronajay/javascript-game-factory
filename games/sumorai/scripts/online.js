@@ -72,6 +72,27 @@ function parseMatchSettingsPayload(value) {
   };
 }
 
+function parseRematchMessage(value) {
+  try {
+    const p = JSON.parse(value);
+    const round = Number(p?.round);
+    if (!Number.isInteger(round) || round < 0) return null;
+    if (typeof p.available !== 'boolean' || typeof p.requested !== 'boolean') return null;
+    return { round, available: p.available, requested: p.requested };
+  } catch { return null; }
+}
+
+function parseRematchStartMessage(value) {
+  try {
+    const p = JSON.parse(value);
+    const round = Number(p?.round);
+    const seed = Number(p?.seed);
+    const startAt = Number(p?.startAt);
+    if (!Number.isInteger(round) || round < 1 || !Number.isFinite(seed) || !Number.isFinite(startAt)) return null;
+    return { round, seed, startAt };
+  } catch { return null; }
+}
+
 function _normalizeCountValue(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return null;
@@ -122,6 +143,8 @@ export function createOnlineClient() {
     onMatchReady:      null,  // ({ seed, remoteSide, serverNow, startAt })
     onRemoteProfile:   null,  // ({ playerId, displayName, side })
     onRemoteInput:     null,  // (inputSnapshot) — fired per remote frame
+    onRematch:         null,
+    onRematchStart:    null,
     onSideConflict:    null,  // ()
     onPartnerLeft:     null,  // ()
     onError:           null,  // (code, message)
@@ -154,6 +177,16 @@ export function createOnlineClient() {
     if (messageType === 'profile') {
       const profile = parseProfileMessage(value);
       if (profile) cb.onRemoteProfile?.(profile);
+      return;
+    }
+    if (messageType === 'rematch') {
+      const state = parseRematchMessage(value);
+      if (state) cb.onRematch?.(state);
+      return;
+    }
+    if (messageType === 'rematch_start') {
+      const start = parseRematchStartMessage(value);
+      if (start) cb.onRematchStart?.(start);
       return;
     }
     if (messageType === 'ping') {
@@ -291,6 +324,14 @@ export function createOnlineClient() {
     _roomMsg('input', JSON.stringify({ seq, adv, epoch, ...snapshot }));
   }
 
+  function sendRematch(state) {
+    _roomMsg('rematch', JSON.stringify(state || {}));
+  }
+
+  function sendRematchStart(start) {
+    _roomMsg('rematch_start', JSON.stringify(start || {}));
+  }
+
   function startPinging() {
     stopPinging();
     _pingTimer = setInterval(() => {
@@ -304,6 +345,7 @@ export function createOnlineClient() {
   }
 
   function getLatencyMs() { return _latencyMs; }
+  function isCoordinator() { return _coordinator; }
 
   function disconnect() {
     stopPinging();
@@ -319,8 +361,9 @@ export function createOnlineClient() {
 
   return {
     connect, findMatch, createRoom, joinRoom, requestQueueStatus,
-    cancelSearch, cancelRoom, sendInput, setIdentity,
+    cancelSearch, cancelRoom, sendInput, sendRematch, sendRematchStart, setIdentity,
     startPinging, stopPinging, getLatencyMs,
+    isCoordinator,
     disconnect, reset, cb,
   };
 }

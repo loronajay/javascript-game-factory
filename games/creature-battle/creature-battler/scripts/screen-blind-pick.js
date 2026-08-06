@@ -149,7 +149,10 @@ function _lockInMyTeam() {
   if (bp.myTeam.length < 3 || bp.myLocked) return;
 
   bp.myLocked = true;
-  state.onlineClient.send('team_locked', { team: bp.myTeam });
+  state.onlineClient.send('team_locked', {
+    protocolVersion: CB_ONLINE_PROTOCOL_VERSION,
+    team: bp.myTeam,
+  });
   renderBlindPick();
   _checkBothLocked();
 }
@@ -162,6 +165,7 @@ function _checkBothLocked() {
 
   const levelCap = state.onlineSettings.resolvedLevelCap;
   client.send('match_start', {
+    protocolVersion: CB_ONLINE_PROTOCOL_VERSION,
     alphaTeam: bp.myTeam,
     betaTeam:  bp.remoteTeam,
     levelCap,
@@ -182,7 +186,10 @@ function _startOnlineClassCustomization(myTeamIds, opponentTeamIds, levelCap) {
 
 function _sendOnlineClassReady() {
   state.blindPick.myClassReady = true;
-  state.onlineClient.send('class_ready', { configs: state.classCustom.playerConfigs });
+  state.onlineClient.send('class_ready', {
+    protocolVersion: CB_ONLINE_PROTOCOL_VERSION,
+    configs: state.classCustom.playerConfigs,
+  });
   state.classCustom.view = 'waiting';
   renderClassCustomization();
   _checkBothClassReady();
@@ -196,10 +203,24 @@ function _checkBothClassReady() {
 
 function handleClassCustomRemoteMessage(messageType, value) {
   if (messageType === 'class_ready') {
+    if (!isSupportedCbProtocol(value?.protocolVersion)) {
+      _abortOnlineProtocolMismatch();
+      return;
+    }
     state.blindPick.opponentClassReady = true;
     state.blindPick.opponentClassConfigs = Array.isArray(value?.configs) ? value.configs : null;
     _checkBothClassReady();
   }
+}
+
+function _abortOnlineProtocolMismatch() {
+  playInvalid();
+  state.onlineClient?.disconnect();
+  state.onlineClient = null;
+  state.isOnlineMatch = false;
+  state.onlineLobbyPhase = 'main';
+  setScreen('online-lobby');
+  _showLobbyBanner('Online versions do not match. Refresh both devices and try again.');
 }
 
 function _launchOnlineBattle(myTeamIds, opponentTeamIds, levelCap) {
@@ -236,6 +257,19 @@ function _launchOnlineBattle(myTeamIds, opponentTeamIds, levelCap) {
     arenaFile,
     battleStats: { player: makeBattleStats(), opponent: makeBattleStats() },
   };
+  ['player', 'opponent'].forEach(side => {
+    SLOT_NAMES.forEach(slot => {
+      const creature = state.battleState[side][slot];
+      if (!creature) return;
+      creature._side = side;
+      creature._slot = slot;
+      (creature.equippedPassives || []).forEach(passive => {
+        const hook = typeof PASSIVE_REGISTRY !== 'undefined' ? PASSIVE_REGISTRY[passive.id] : null;
+        if (hook?.onBattleStart) hook.onBattleStart({ creature });
+      });
+    });
+  });
+  resetOnlineBattleSync();
   setScreen('battle');
 }
 
@@ -246,6 +280,10 @@ function handleBlindPickRemoteMessage(messageType, value) {
   const client = state.onlineClient;
 
   if (messageType === 'match_settings') {
+    if (!isSupportedCbProtocol(value?.protocolVersion)) {
+      _abortOnlineProtocolMismatch();
+      return;
+    }
     state.onlineSettings.resolvedLevelCap = value.levelCap;
     state.onlineSettings.resolvedArenaId  = value.arenaId ?? null;
     bp.settingsReceived = true;
@@ -254,6 +292,10 @@ function handleBlindPickRemoteMessage(messageType, value) {
   }
 
   if (messageType === 'team_locked') {
+    if (!isSupportedCbProtocol(value?.protocolVersion)) {
+      _abortOnlineProtocolMismatch();
+      return;
+    }
     const remoteTeam = Array.isArray(value?.team) ? value.team : [];
     bp.opponentLocked = true;
 
@@ -267,6 +309,7 @@ function handleBlindPickRemoteMessage(messageType, value) {
   }
 
   if (messageType === 'match_start') {
+    if (!isSupportedCbProtocol(value?.protocolVersion)) return;
     // Non-coordinator receives this — alpha team is opponent, beta team is ours.
     const levelCap    = value.levelCap;
     const myTeamIds   = value.betaTeam;

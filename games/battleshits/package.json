@@ -1,13 +1,14 @@
 {
   "type": "module",
   "scripts": {
-    "test": "node tests/project-structure.test.js && node tests/mobile-ui.test.js && node tests/layout-css.test.js && node tests/fleet-status.test.js && node tests/combat-presentation.test.js && node tests/presentation.test.js && node tests/board.test.js && node tests/bot.test.js && node tests/online.test.js && node tests/audio.test.js && node tests/emojis.test.js",
+    "test": "node tests/project-structure.test.js && node tests/mobile-ui.test.js && node tests/layout-css.test.js && node tests/fleet-status.test.js && node tests/combat-presentation.test.js && node tests/presentation.test.js && node tests/board.test.js && node tests/bot.test.js && node tests/online.test.js && node tests/rematch-flow.test.js && node tests/audio.test.js && node tests/emojis.test.js",
     "test:structure": "node tests/project-structure.test.js",
     "test:layout": "node tests/layout-css.test.js",
     "test:fleet-status": "node tests/fleet-status.test.js",
     "test:board": "node tests/board.test.js",
     "test:bot": "node tests/bot.test.js",
     "test:online": "node tests/online.test.js",
+    "test:rematch": "node tests/rematch-flow.test.js",
     "test:audio": "node tests/audio.test.js",
     "test:emojis": "node tests/emojis.test.js"
   }

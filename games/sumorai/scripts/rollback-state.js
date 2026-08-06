@@ -1,4 +1,4 @@
-function saveGameState(gameState) {
+function saveGameState(gameState, camera = null) {
   const { p1, p2 } = gameState;
   return {
     phase: gameState.phase,
@@ -13,12 +13,13 @@ function saveGameState(gameState) {
     effects: gameState.effects.map(effect => ({ ...effect })),
     roundEnd: gameState.roundEnd ? { ...gameState.roundEnd } : null,
     pendingRoundEnd: gameState.pendingRoundEnd ? { ...gameState.pendingRoundEnd } : null,
+    camera: camera ? { x: camera.x, y: camera.y, zoom: camera.zoom } : null,
     p1: { ...p1, platformRef: null, _platIdx: p1.platformRef ? gameState.platforms.indexOf(p1.platformRef) : -1 },
     p2: { ...p2, platformRef: null, _platIdx: p2.platformRef ? gameState.platforms.indexOf(p2.platformRef) : -1 },
   };
 }
 
-function loadGameState(gameState, snap) {
+function loadGameState(gameState, snap, camera = null) {
   if (!snap) return;
   gameState.phase = snap.phase;
   gameState.roundNum = snap.roundNum;
@@ -32,6 +33,7 @@ function loadGameState(gameState, snap) {
   gameState.effects = snap.effects.map(effect => ({ ...effect }));
   gameState.roundEnd = snap.roundEnd ? { ...snap.roundEnd } : null;
   gameState.pendingRoundEnd = snap.pendingRoundEnd ? { ...snap.pendingRoundEnd } : null;
+  if (camera && snap.camera) Object.assign(camera, snap.camera);
   Object.assign(gameState.p1, snap.p1);
   gameState.p1.platformRef = snap.p1._platIdx >= 0 ? gameState.platforms[snap.p1._platIdx] : null;
   Object.assign(gameState.p2, snap.p2);

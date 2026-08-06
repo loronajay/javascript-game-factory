@@ -17,8 +17,9 @@ function createInput() {
 
   window.addEventListener('keyup', e => {
     held.delete(e.code);
-    justPressed.delete(e.code);
-    consumed.delete(e.code);
+    // Keep the edge buffered until flush(). On touch devices a quick press/release can occur
+    // entirely between two simulation frames, especially while rollback is intentionally
+    // stalled; clearing it here silently drops gridlock mash taps.
   });
 
   // Build a snapshot from a key binding object.

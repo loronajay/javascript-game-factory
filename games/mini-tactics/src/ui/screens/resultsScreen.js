@@ -1,5 +1,6 @@
 import { bindCommonControls, screenRoot } from "./common.js";
 import { prefersReducedMotion } from "../../render/motion.js";
+import { createResultsRematch } from "./resultsRematch.js";
 
 const MODE_LABELS = {
   hotseat: "Hot Seat",
@@ -34,32 +35,18 @@ export function createResultsScreen(ctx) {
   const burstEl = el.querySelector('[data-results="burst"]');
   const rematchBtn = el.querySelector('[data-action="rematch"]');
 
-  let lastSummary = null;
+  const rematch = createResultsRematch({
+    rematchBtn,
+    statusEl: el.querySelector('[data-results="rematch-status"]'),
+    startMatch: (config) => ctx.nav("match", config),
+  });
 
   rematchBtn.addEventListener("click", () => {
-    if (!lastSummary) return;
-    // Online matches can't be re-run locally (the relay session is gone) — send
-    // the player back to the lobby to find a fresh opponent instead.
-    if (lastSummary.mode === "online") {
-      ctx.nav("onlineSetup");
-      return;
-    }
-    ctx.nav("match", {
-      mode: lastSummary.mode,
-      size: lastSummary.size,
-      playerCount: lastSummary.playerCount,
-      format: lastSummary.format,
-      teamColors: lastSummary.teamColors,
-      teamNames: lastSummary.teamNames,
-      compositions: lastSummary.compositions,
-      difficulty: lastSummary.difficulty,
-    });
+    rematch.request();
   });
 
   function onEnter(summary) {
-    lastSummary = summary;
-
-    rematchBtn.textContent = summary.mode === "online" ? "New Match" : "Rematch";
+    rematch.show(summary);
 
     // Desync/disconnect endings have no clean winner — lead with the termination
     // reason and skip the victory styling/confetti.
@@ -106,7 +93,7 @@ export function createResultsScreen(ctx) {
     }
   }
 
-  return { el, onEnter };
+  return { el, onEnter, onExit: rematch.onExit };
 }
 
 // Celebratory confetti shower tinted to the winner's hue, mixed with gold and a

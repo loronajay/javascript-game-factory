@@ -280,6 +280,51 @@ export function startOnlineRunFromLobby(state) {
   };
 }
 
+export function applyServerMatchState(state, matchState = {}) {
+  const stage = matchState?.stage;
+  if (!stage?.stageId || state.onlineGameplay?.authorityPlayerId !== 'server') return state;
+
+  const session = {
+    ...state.session,
+    stageIndex: Number(stage.stageIndex) || 0,
+    currentStageId: stage.stageId,
+  };
+  const isComplete = matchState.phase === 'run_complete';
+  const runSummary = isComplete ? {
+    mode: 'online_run',
+    packId: matchState.packId,
+    totalStages: matchState.stageSequence?.length ?? 10,
+    completedStages: matchState.stageResults?.length ?? 0,
+    clearedStages: (matchState.stageResults ?? []).filter((result) => result.outcome === 'clear').length,
+    failedStages: (matchState.stageResults ?? []).filter((result) => result.outcome === 'fail').length,
+    isComplete: true,
+    results: matchState.stageResults ?? [],
+  } : null;
+  const onlineGameplay = {
+    ...state.onlineGameplay,
+    session,
+    runSummary,
+  };
+  const next = {
+    ...state,
+    online: {
+      ...state.online,
+      authorityMode: matchState.network?.authorityMode || state.online?.authorityMode,
+      // Online client snapshots are read-only. Keep the latest server payload by
+      // reference so high-frequency command updates do not deep-clone growing arrays.
+      serverMatchState: matchState,
+    },
+    session,
+    onlineGameplay,
+    screen: isComplete ? APP_SCREENS.RUN_RESULT : state.screen,
+    runSummary: runSummary ?? state.runSummary,
+  };
+  return {
+    ...next,
+    viewMode: localOnlineRole(next) || state.viewMode,
+  };
+}
+
 export function markOnlineReady(state, ready = true) {
   if (!state.online) return state;
   const playerId = state.online.identity.playerId;

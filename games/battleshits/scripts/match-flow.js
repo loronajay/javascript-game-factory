@@ -80,6 +80,8 @@ function transitionToSoloEnded(gs, result) {
   if (messageEl) messageEl.textContent = endedCopy.message;
   if (statusEl)  statusEl.textContent  = '';
   if (oppEl)     oppEl.innerHTML       = '';
+  const rematchBtn = document.getElementById('btn-rematch');
+  if (rematchBtn) { rematchBtn.disabled = false; rematchBtn.textContent = 'Rematch'; }
 
   const diffLabel = gs.botDifficulty
     ? gs.botDifficulty.charAt(0).toUpperCase() + gs.botDifficulty.slice(1)

@@ -56,7 +56,7 @@ function loadOnlineClient() {
   vm.createContext(context);
 
   const source = fs.readFileSync(path.join(__dirname, 'scripts', 'online.js'), 'utf8');
-  vm.runInContext(`${source}\nglobalThis.__exports = { buildCbGameId, createCbOnlineClient };`, context);
+  vm.runInContext(`${source}\nglobalThis.__exports = { buildCbGameId, createCbOnlineClient, isSupportedCbProtocol };`, context);
 
   return { ...context.__exports, sockets };
 }
@@ -76,7 +76,7 @@ test('findMatch sent before socket open is delivered after connect', () => {
   assert.deepEqual(sockets[0].sent, [
     {
       type: 'find_match',
-      gameId: 'creature-battler-blind-any',
+      gameId: 'creature-battler-v2-blind-any',
       playerId: 'p1',
       displayName: 'Trainer One',
     },
@@ -113,4 +113,11 @@ test('server error events surface through onError callback', () => {
   sockets[0].message({ event: 'error', code: 'room_not_found', message: 'Room not found.' });
 
   assert.deepEqual(errors, [{ code: 'room_not_found', message: 'Room not found.' }]);
+});
+
+test('protocol compatibility is explicit for private rooms', () => {
+  const { isSupportedCbProtocol } = loadOnlineClient();
+  assert.equal(isSupportedCbProtocol(2), true);
+  assert.equal(isSupportedCbProtocol(1), false);
+  assert.equal(isSupportedCbProtocol(undefined), false);
 });
