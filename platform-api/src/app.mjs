@@ -8,6 +8,7 @@ import { handleLayoutRoute } from "./routes/layout-routes.mjs";
 import { handleRatingRoute } from "./routes/rating-routes.mjs";
 import { handleRankedRoute } from "./routes/ranked-routes.mjs";
 import { handleGameSocialRoute } from "./routes/game-social-routes.mjs";
+import { handleLoadoutRoute } from "./routes/loadout-routes.mjs";
 import { handleLadderRoute } from "./routes/ladder-routes.mjs";
 import { handleGameProgressRoute } from "./routes/game-progress-routes.mjs";
 import { handlePaymentRoute } from "./routes/payment-routes.mjs";
@@ -282,6 +283,12 @@ export function createApp(options = {}) {
     const getGameProgress = typeof options?.getGameProgress === "function"
         ? options.getGameProgress
         : async () => null;
+    // Cosmetic loadouts. Injected the same way as everything else so the route
+    // family is testable without a database.
+    const getGarage = typeof options?.getGarage === "function" ? options.getGarage : null;
+    const saveGarage = typeof options?.saveGarage === "function" ? options.saveGarage : null;
+    const getPublicLoadout = typeof options?.getPublicLoadout === "function" ? options.getPublicLoadout : null;
+    const getPublicLoadouts = typeof options?.getPublicLoadouts === "function" ? options.getPublicLoadouts : null;
     const recordGameProgressClaim = typeof options?.recordGameProgressClaim === "function"
         ? options.recordGameProgressClaim
         : async () => null;
@@ -553,6 +560,12 @@ export function createApp(options = {}) {
     const ladderServices = {
         getLadderStandings,
         getPlayerLadderPlacements,
+    };
+    const loadoutServices = {
+        getGarage,
+        saveGarage,
+        getPublicLoadout,
+        getPublicLoadouts,
     };
     const gameProgressServices = {
         getGameProgress,
@@ -907,6 +920,18 @@ export function createApp(options = {}) {
                 requestOrigin,
                 timestamp,
                 services: gameSocialServices,
+            })) {
+                return;
+            }
+            if (await handleLoadoutRoute({
+                req,
+                res,
+                method,
+                pathname,
+                authClaims,
+                requestOrigin,
+                timestamp,
+                services: loadoutServices,
             })) {
                 return;
             }

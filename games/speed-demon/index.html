@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Speed Demon</title>
+    <link rel="stylesheet" href="styles/game.css" />
+  </head>
+  <body>
+    <a href="../../grid.html" class="back-link">&larr; Arcade</a>
+    <main class="stage">
+      <canvas id="game" width="1280" height="720" aria-label="Speed Demon drag racing"></canvas>
+    </main>
+    <script type="module">
+      import { boot } from "./scripts/init-game.js";
+      // Exposed so a run can be driven and inspected from the console.
+      window.speedDemon = boot(document.getElementById("game"));
+    </script>
+  </body>
+</html>

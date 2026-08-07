@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gauge Asset Demo</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: #0b0e11;
+    color: #eef1f2;
+    font-family: Arial, Helvetica, sans-serif;
+    display: grid;
+    place-items: center;
+  }
+  .wrap {
+    width: min(1000px, 96vw);
+    display: grid;
+    gap: 24px;
+  }
+  .gauges {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(260px, 1fr));
+    gap: 24px;
+  }
+  .gauge {
+    position: relative;
+    aspect-ratio: 1;
+  }
+  .gauge img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .needle {
+    transform-origin: 50% 50%;
+    transition: transform .08s linear;
+  }
+  .readout {
+    position: absolute;
+    left: 50%;
+    top: 69%;
+    transform: translate(-50%, -50%);
+    font: 700 clamp(20px, 4vw, 42px)/1 ui-monospace, monospace;
+  }
+  .controls {
+    display: grid;
+    gap: 14px;
+    padding: 18px;
+    border: 1px solid #30363b;
+    border-radius: 10px;
+    background: #11151a;
+  }
+  label {
+    display: grid;
+    grid-template-columns: 110px 1fr 70px;
+    gap: 12px;
+    align-items: center;
+  }
+  input { width: 100%; }
+  @media (max-width: 700px) {
+    .gauges { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="gauges">
+      <div class="gauge">
+        <img src="tachometer_face.svg" alt="">
+        <img class="needle" id="tachNeedle" src="gauge_needle.svg" alt="">
+        <div class="readout" id="rpmReadout">950</div>
+      </div>
+      <div class="gauge">
+        <img src="speedometer_face.svg" alt="">
+        <img class="needle" id="speedNeedle" src="gauge_needle.svg" alt="">
+        <div class="readout" id="speedReadout">0</div>
+      </div>
+    </section>
+
+    <section class="controls">
+      <label>
+        <span>RPM</span>
+        <input id="rpm" type="range" min="0" max="8000" value="950" step="50">
+        <output id="rpmOut">950</output>
+      </label>
+      <label>
+        <span>Speed</span>
+        <input id="speed" type="range" min="0" max="200" value="0" step="1">
+        <output id="speedOut">0</output>
+      </label>
+    </section>
+  </main>
+
+<script>
+const rpm = document.getElementById("rpm");
+const speed = document.getElementById("speed");
+const rpmOut = document.getElementById("rpmOut");
+const speedOut = document.getElementById("speedOut");
+const rpmReadout = document.getElementById("rpmReadout");
+const speedReadout = document.getElementById("speedReadout");
+const tachNeedle = document.getElementById("tachNeedle");
+const speedNeedle = document.getElementById("speedNeedle");
+
+function setNeedle(el, value, max) {
+  const degrees = 270 * (value / max);
+  el.style.transform = `rotate(${degrees}deg)`;
+}
+
+function update() {
+  const rpmValue = Number(rpm.value);
+  const speedValue = Number(speed.value);
+
+  rpmOut.value = rpmValue;
+  speedOut.value = speedValue;
+  rpmReadout.textContent = rpmValue;
+  speedReadout.textContent = speedValue;
+
+  setNeedle(tachNeedle, rpmValue, 8000);
+  setNeedle(speedNeedle, speedValue, 200);
+}
+
+rpm.addEventListener("input", update);
+speed.addEventListener("input", update);
+update();
+</script>
+</body>
+</html>

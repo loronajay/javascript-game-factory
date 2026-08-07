@@ -21,6 +21,11 @@ SKILLS.md
 games/*/GDD.md
 games/*/docs/
 
+# A developer's own music folder. Speed Demon Radio points at whatever folder the
+# player picks at runtime; a local copy sitting in the cabinet is convenience, not
+# shipped content, and it is other people's music.
+games/*/my-radio/
+
 # Local test/dev harnesses should not ship
 *.test.js
 *.test.mjs

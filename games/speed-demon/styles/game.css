@@ -1,0 +1,58 @@
+/* Speed Demon — the page is a frame for the canvas and nothing more. All game
+   presentation lives on the canvas so it scales as one piece. */
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #05070a;
+  overflow: hidden;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+.stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  /* Subtle vignette so the cabinet reads as a lit instrument panel in a dark
+     room rather than a canvas floating on a flat page. */
+  background: radial-gradient(ellipse at 50% 42%, #14191f 0%, #05070a 72%);
+}
+
+/* The canvas is fitted to the window, so this link sits over its top-left corner.
+   Held right back until pointed at — the cabinet's own art should be what you see. */
+.back-link {
+  position: fixed;
+  top: 14px;
+  left: 16px;
+  z-index: 10;
+  color: rgba(200, 208, 224, 0.45);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  transition: color 120ms ease;
+}
+
+.back-link:hover,
+.back-link:focus-visible {
+  color: #ff5a2e;
+}
+
+canvas#game {
+  display: block;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.75);
+  border-radius: 4px;
+  touch-action: none;
+}

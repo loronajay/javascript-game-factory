@@ -6,6 +6,7 @@ import { listActivityItems, saveActivityItem } from "./db/activity.mjs";
 import { readConfig } from "./config.mjs";
 import { incrementPlayerProfileView, loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
 import { applyMigrations } from "./db/migrations.mjs";
+import { getGarage, saveGarage, getPublicLoadout, getPublicLoadouts } from "./db/game-loadouts.mjs";
 import { activateInventoryItem, backfillLocalOwnership, findPlayPurchaseClaim, findStripeGrant, getGameProgress, recordGameProgressClaim, regrantStripeEntitlements, resetCampaignProgress, revokeGameEntitlements, spendValorForEntitlement } from "./db/game-progress.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
@@ -238,6 +239,10 @@ async function bootstrap() {
         getLadderStandings: (gameSlug, params) => getLadderStandings(pool, { ...params, gameSlug }),
         getPlayerLadderPlacements: (playerId, params) => getPlayerLadderPlacements(pool, { ...params, playerId }),
         getGameProgress: (playerId, gameSlug) => getGameProgress(pool, playerId, gameSlug),
+        getGarage: (params) => getGarage(pool, params),
+        saveGarage: (params) => saveGarage(pool, params),
+        getPublicLoadout: (params) => getPublicLoadout(pool, params),
+        getPublicLoadouts: (params) => getPublicLoadouts(pool, params),
         recordGameProgressClaim: (params) => recordGameProgressClaim(pool, params),
         spendValor: (params) => spendValorForEntitlement(pool, params),
         resetCampaign: (params) => resetCampaignProgress(pool, params.playerId, params.gameSlug),

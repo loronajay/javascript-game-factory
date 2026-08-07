@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="96" viewBox="0 0 640 96">
+<defs>
+  <linearGradient id="housing" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#23282d"/>
+    <stop offset="100%" stop-color="#0a0c0f"/>
+  </linearGradient>
+</defs>
+<rect x="1" y="1" width="638" height="94" rx="14" fill="url(#housing)" stroke="#3a4045" stroke-width="2"/>
+<g>
+  <rect x="28"  y="28" width="56" height="40" rx="6" fill="#182019" stroke="#405142"/>
+  <rect x="102" y="28" width="56" height="40" rx="6" fill="#182019" stroke="#405142"/>
+  <rect x="176" y="28" width="56" height="40" rx="6" fill="#182019" stroke="#405142"/>
+  <rect x="250" y="28" width="56" height="40" rx="6" fill="#211c13" stroke="#5a4a26"/>
+  <rect x="324" y="28" width="56" height="40" rx="6" fill="#211c13" stroke="#5a4a26"/>
+  <rect x="398" y="28" width="56" height="40" rx="6" fill="#241515" stroke="#5d2c28"/>
+  <rect x="472" y="28" width="56" height="40" rx="6" fill="#241515" stroke="#5d2c28"/>
+  <rect x="546" y="28" width="56" height="40" rx="6" fill="#241515" stroke="#5d2c28"/>
+</g>
+</svg>
