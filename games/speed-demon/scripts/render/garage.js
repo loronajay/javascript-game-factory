@@ -60,6 +60,30 @@ export function paletteSwatchRect(index, count) {
   return { x: strip.x + index * cell, y: strip.y - 4, width: cell - 3, height: strip.height + 8 };
 }
 
+/**
+ * The clickable end of a stepper row — the ◀ or the ▶, plus enough space around
+ * it to actually hit with a mouse.
+ *
+ * A drawn arrow is a promise that clicking it does something, the same promise
+ * the radio's transport buttons make, so the glyph is centred in this rect
+ * rather than the rect being fitted to the glyph. It spans the full row height
+ * (and so stays inside `editorRowRect`) because a 20px-tall target is a target
+ * you miss.
+ */
+export const STEPPER_ARROW_WIDTH = 44;
+
+export function stepperArrowRect(index, step) {
+  const row = editorRowRect(index);
+  const control = rowControlRect(index);
+  const width = Math.min(STEPPER_ARROW_WIDTH, control.width / 2);
+  return {
+    x: step < 0 ? control.x : control.x + control.width - width,
+    y: row.y,
+    width,
+    height: row.height,
+  };
+}
+
 export function editorActionRect(index) {
   const { x, y, width, height, gap } = GARAGE_LAYOUT.actions;
   return { x: x + index * (width + gap), y, width, height };
@@ -89,8 +113,19 @@ export function hitGarage(view, x, y) {
       return { kind: "row", id: row.id };
     }
 
+    if (row.kind === ROW_TOGGLE || row.kind === ROW_CHOICE) {
+      // The arrows are drawn, so they are pressable. A stepper has no bar to
+      // drag, so its two ends are the only way the mouse can change the value.
+      for (const step of [-1, 1]) {
+        if (within(stepperArrowRect(row.index, step), x, y)) {
+          return { kind: "step", id: row.id, step };
+        }
+      }
+      return { kind: "row", id: row.id };
+    }
+
     const control = rowControlRect(row.index);
-    if (row.kind !== ROW_TOGGLE && row.kind !== ROW_CHOICE && within(control, x, y)) {
+    if (within(control, x, y)) {
       return { kind: "bar", id: row.id, ratio: (x - control.x) / control.width };
     }
     return { kind: "row", id: row.id };
@@ -144,15 +179,29 @@ function drawRatioBar(ctx, rect, row) {
   ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.width - 1, rect.height - 1);
 }
 
-/** A stepper prints its arrows, so it reads as left/right rather than as a bar. */
-function drawStepper(ctx, rect, row) {
-  const colour = row.selected ? INK : DIM;
-  label(ctx, "◀", rect.x + 6, rect.y + rect.height / 2 + 5, { size: 12, colour: row.selected ? ACCENT : MUTED });
+/**
+ * A stepper prints its arrows, so it reads as left/right rather than as a bar.
+ *
+ * Each arrow is centred in the rect `hitGarage` tests, so what lights up under
+ * the pointer is provably what pressing there does — the same rule the radio
+ * faceplate follows.
+ */
+function drawStepper(ctx, rect, row, hover) {
+  for (const step of [-1, 1]) {
+    const arrow = stepperArrowRect(row.index, step);
+    const hot = hover?.kind === "step" && hover.id === row.id && hover.step === step;
+    if (hot && !row.dimmed) {
+      ctx.fillStyle = "rgba(255,90,46,0.18)";
+      ctx.fillRect(arrow.x, arrow.y + 5, arrow.width, arrow.height - 10);
+    }
+    label(ctx, step < 0 ? "◀" : "▶", arrow.x + arrow.width / 2, arrow.y + arrow.height / 2 + 5, {
+      size: 12,
+      colour: hot ? INK : row.selected ? ACCENT : MUTED,
+      align: "center",
+    });
+  }
   label(ctx, row.value, rect.x + rect.width / 2, rect.y + rect.height / 2 + 5, {
-    size: 13, colour, align: "center",
-  });
-  label(ctx, "▶", rect.x + rect.width - 6, rect.y + rect.height / 2 + 5, {
-    size: 12, colour: row.selected ? ACCENT : MUTED, align: "right",
+    size: 13, colour: row.selected ? INK : DIM, align: "center",
   });
 }
 
@@ -186,7 +235,7 @@ function drawRows(ctx, view) {
     if (row.kind === ROW_PALETTE) {
       drawPaletteRow(ctx, view);
     } else if (row.kind === ROW_TOGGLE || row.kind === ROW_CHOICE) {
-      drawStepper(ctx, control, row);
+      drawStepper(ctx, control, row, view.hover);
     } else if (row.kind === ROW_HUE) {
       drawHueBar(ctx, control, row);
     } else {
@@ -286,7 +335,7 @@ export function drawGarage(ctx, view, { model, sheetImages, trackImages, liveryC
 
   label(
     ctx,
-    "ARROWS / WASD  move and adjust       ENTER  choose       ESC  back       drag a bar with the mouse",
+    "ARROWS / WASD  move and adjust       ENTER  choose       ESC  back       drag a bar or click an arrow",
     GARAGE_LAYOUT.title.x,
     WORLD.height - 14,
     { size: 13 },

@@ -544,6 +544,58 @@ test("every garage control is clickable, and the bars report where they were hit
   assert(Math.abs(mid.ratio - 0.5) < 0.05, `expected a mid-bar ratio, got ${mid.ratio}`);
 });
 
+test("a drawn stepper arrow is a pressable target that steps its own row", () => {
+  // The arrows are printed on the screen, so clicking one has to work; forcing
+  // the keyboard on a control that looks pressable is the bug this pins down.
+  const garageRender = loaded["scripts/render/garage.js"];
+  const editorModule = loaded["scripts/ui/garage-editor.js"];
+  const garageModule = loaded["scripts/garage/garage.js"];
+  const empty = garageModule.emptyGarage();
+  const editor = editorModule.createEditor({ modelId: "kaido-gts", livery: {} });
+  const view = editorModule.editorView(editor, empty);
+
+  const steppers = view.rows.filter(
+    (row) => row.kind === editorModule.ROW_TOGGLE || row.kind === editorModule.ROW_CHOICE,
+  );
+  assert(steppers.length > 0, "no stepper rows to check");
+
+  for (const row of steppers) {
+    for (const step of [-1, 1]) {
+      const arrow = garageRender.stepperArrowRect(row.index, step);
+      const hit = garageRender.hitGarage(view, arrow.x + arrow.width / 2, arrow.y + arrow.height / 2);
+      assert(
+        hit && hit.kind === "step" && hit.id === row.id && hit.step === step,
+        `the ${step < 0 ? "left" : "right"} arrow on ${row.id} is not clickable`,
+      );
+
+      // Both arrows have to live inside their own row, or one row's ▶ would
+      // steal the click from the row below it.
+      const rowRect = garageRender.editorRowRect(row.index);
+      assert(
+        arrow.x >= rowRect.x
+          && arrow.x + arrow.width <= rowRect.x + rowRect.width
+          && arrow.y >= rowRect.y
+          && arrow.y + arrow.height <= rowRect.y + rowRect.height,
+        `the ${row.id} arrow escapes its row`,
+      );
+    }
+
+    // The two arrows must not claim the same pixel, or one of them is dead.
+    const left = garageRender.stepperArrowRect(row.index, -1);
+    const right = garageRender.stepperArrowRect(row.index, 1);
+    assert(left.x + left.width <= right.x, `the ${row.id} arrows overlap`);
+  }
+
+  // And pressing one moves the value it is attached to.
+  const finish = steppers.find((row) => row.id === "finish");
+  const before = editorModule.editorView(editor, empty).rows.find((row) => row.id === "finish").value;
+  const after = editorModule.editorView(
+    editorModule.adjustRow(editor, finish.id, 1),
+    empty,
+  ).rows.find((row) => row.id === "finish").value;
+  assert(before !== after, "stepping the finish row changed nothing");
+});
+
 test("the shift light strip clears the readout column below it", () => {
   // A caption drawn under the strip once landed on top of the ELAPSED label.
   const dash = loaded["scripts/render/dashboard.js"];

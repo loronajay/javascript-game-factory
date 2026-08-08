@@ -94,6 +94,7 @@ import {
   focusEditor,
   selectPalette,
   setRowRatio,
+  adjustRow,
 } from "./ui/garage-editor.js";
 import {
   MENU_SPLASH,
@@ -829,6 +830,13 @@ export function boot(canvas) {
     if (!target) return;
     if (target.kind === "bar") {
       editor = setRowRatio(focusEditor(editor, { kind: "row", id: target.id }, garage), target.id, target.ratio);
+    } else if (target.kind === "step") {
+      // A stepper is an event, not a level, so only the press itself steps. The
+      // pointer reports a click per frame while held — which is exactly what a
+      // bar wants and exactly what would run a held ▶ through every finish.
+      if (!click.dragging) {
+        editor = adjustRow(focusEditor(editor, { kind: "row", id: target.id }, garage), target.id, target.step);
+      }
     } else if (target.kind === "palette") {
       editor = selectPalette(editor, target.index);
     } else if (target.kind === "action") {
@@ -860,10 +868,10 @@ export function boot(canvas) {
     if (shell.screen === SCREEN_GARAGE) {
       const at = pointer.hover();
       const hovered = at ? hitGarage(currentGarageView(), at.x, at.y) : null;
-      if (hovered && hovered.kind !== "bar") {
-        editor = focusEditor(editor, hovered, garage);
-      } else if (hovered) {
+      if (hovered && (hovered.kind === "bar" || hovered.kind === "step")) {
         editor = focusEditor(editor, { kind: "row", id: hovered.id }, garage);
+      } else if (hovered) {
+        editor = focusEditor(editor, hovered, garage);
       }
     }
 
@@ -1017,9 +1025,18 @@ export function boot(canvas) {
     return at ? hitSetup(setupView(setup, garage, { canCustomise: garageStore.available }), at.x, at.y) : null;
   }
 
-  /** The garage view, with the track it is previewed against folded in. */
-  function currentGarageView() {
-    return { ...editorView(editor, garage), trackId: setupTrack(setup).id };
+  /**
+   * The garage view, with the track it is previewed against folded in.
+   *
+   * `pointer` is opt-in so the hit test never has to consult a hover it is in
+   * the middle of computing. With one, the hover is resolved from the finished
+   * view by the same function that resolves a click — so the arrow that lights
+   * up is provably the arrow that would fire.
+   */
+  function currentGarageView({ pointer: at = null } = {}) {
+    const view = { ...editorView(editor, garage), trackId: setupTrack(setup).id };
+    view.hover = at ? hitGarage(view, at.x, at.y) : null;
+    return view;
   }
 
   function render() {
@@ -1043,8 +1060,8 @@ export function boot(canvas) {
     }
 
     if (shell.screen === SCREEN_GARAGE) {
-      const view = currentGarageView();
-      canvas.style.cursor = at && hitGarage(view, at.x, at.y) ? "pointer" : "default";
+      const view = currentGarageView({ pointer: at });
+      canvas.style.cursor = view.hover ? "pointer" : "default";
       drawGarage(ctx, view, {
         model: modelById(editor.modelId),
         sheetImages,
