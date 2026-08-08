@@ -120,6 +120,7 @@ import { createOnlineIdentityPayload } from "../../../js/platform/identity/match
 import { createNet } from "./online/net.js";
 import {
   STATUS_COUNTDOWN,
+  STATUS_LOBBY,
   STATUS_MATCH_RESULT,
   STATUS_RACING,
   STATUS_ROUND_RESULT,
