@@ -10,7 +10,7 @@
 // decides what a menu item means — `ui/shell.js` returns a command and this file
 // carries it out.
 
-import { DEFAULT_CAR, TICK_MS, TICK_SECONDS } from "./sim/constants.js";
+import { DEFAULT_CAR, RACE_DISTANCES, TICK_MS, TICK_SECONDS } from "./sim/constants.js";
 import { createGameAudio, raceSoundEvents, stickMoved } from "./audio.js";
 import { GATE_6_SPEED, createGate } from "./sim/gate.js";
 import { raceOptionsFor } from "./sim/modes.js";
@@ -41,7 +41,9 @@ import {
   SCREEN_RADIO,
   SCREEN_GARAGE,
   COMMAND_BEGIN,
+  COMMAND_RESTART,
   COMMAND_MODE,
+  COMMAND_TUTORIAL,
   createShell,
   enterScreen,
   showsTheRace,
@@ -131,7 +133,16 @@ import {
   drawGradeFlash,
 } from "./render/dashboard.js";
 import { drawShifter } from "./render/shifter.js";
-import { drawChristmasTree, drawStagingPrompt } from "./render/overlay.js";
+import { drawChristmasTree, drawDriverCue, drawStagingPrompt } from "./render/overlay.js";
+import {
+  createCoach,
+  acknowledgeCoach,
+  advanceCoach,
+  coachHolds,
+  coachFinished,
+  coachView,
+} from "./ui/coach.js";
+import { drawCoachPanel } from "./render/coach.js";
 import {
   createInput,
   ACTION_CONFIRM,
@@ -168,13 +179,21 @@ function newView(layout, race) {
   };
 }
 
-/** Turns a resolved shift into the flash label, including the early/late hint. */
+/**
+ * Turns a finished shift into the flash label.
+ *
+ * A shift can be spoiled by two different things and the player needs to know
+ * which, so the hint names whichever one actually cost them the grade. The catch
+ * wins when it went wrong, because it is the more recent of the two and the one
+ * the player is least likely to have noticed.
+ */
 function shiftFlash(shift) {
   if (!shift) {
     return null;
   }
-  const suffix = shift.reason ? ` · ${shift.reason.toUpperCase()}` : "";
-  return { label: `${shift.grade.toUpperCase()}${suffix}`, tone: shift.grade };
+  const CATCH_HINTS = { early: "EARLY GAS", late: "LATE GAS", never: "NO GAS" };
+  const hint = CATCH_HINTS[shift.catch?.reason] ?? (shift.reason ? shift.reason.toUpperCase() : null);
+  return { label: hint ? `${shift.grade.toUpperCase()} · ${hint}` : shift.grade.toUpperCase(), tone: shift.grade };
 }
 
 export function boot(canvas) {
@@ -253,6 +272,14 @@ export function boot(canvas) {
 
   let race = newRace();
   let view = newView(layout, race);
+  // The driving coach, or null. Only a guided practice run has one, and it is
+  // cleared the moment any other race is built — a lesson belongs to the run it
+  // was started for.
+  let coach = null;
+  // Whether the run on track is a guided one. Outlives `coach`, which is cleared
+  // when the lesson finishes mid-run: restarting after that has to rebuild the
+  // tutorial, not a normal race.
+  let coachedRun = false;
   const audio = createGameAudio();
 
   // -------------------------------------------------------------------------
@@ -447,6 +474,41 @@ export function boot(canvas) {
     trackTile = null; // rebuilt for the newly chosen track on the next frame
     race = newRace();
     view = newView(layout, race);
+    coach = null;
+    coachedRun = false;
+  }
+
+  /**
+   * The guided practice run. A real race on the current car and track — the
+   * coach teaches the game rather than a simulation of it — over a mile, which
+   * is long enough to hold every step and still finish on a proper run.
+   */
+  function beginTutorial() {
+    beginRace();
+    race = createRace({
+      car: carSpec,
+      gate,
+      countdownSeconds: 3,
+      distanceMetres: RACE_DISTANCES.mile.metres,
+    });
+    view = newView(layout, race);
+    coach = createCoach();
+    coachedRun = true;
+  }
+
+  /**
+   * The same run again. RESTART RUN, RUN IT AGAIN and the `R` key all mean this,
+   * and on a guided run "the same run" is the lesson — dropping out of it into a
+   * normal race is the sort of surprise that makes a menu feel untrustworthy.
+   * Picking a new car or track is the separate act that ends it, and that comes
+   * back as `COMMAND_BEGIN` from the setup screen instead.
+   */
+  function restartRun() {
+    if (coachedRun) {
+      beginTutorial();
+    } else {
+      beginRace();
+    }
   }
 
   /** Rebuilds the setup screen around a newly chosen mode, carrying the rest. */
@@ -457,6 +519,10 @@ export function boot(canvas) {
   function runCommand(command) {
     if (command === COMMAND_BEGIN) {
       beginRace();
+    } else if (command === COMMAND_RESTART) {
+      restartRun();
+    } else if (command === COMMAND_TUTORIAL) {
+      beginTutorial();
     } else if (command === COMMAND_MODE) {
       adoptMode();
     }
@@ -470,6 +536,13 @@ export function boot(canvas) {
    */
   function confirmScreen() {
     if (shell.screen === SCREEN_RACE) {
+      // A coaching beat has stopped the world, so ENTER means "read it" — the
+      // clutch has nothing to do while nothing is moving.
+      if (coachHolds(coach)) {
+        audio.play("button");
+        coach = acknowledgeCoach(coach);
+        return;
+      }
       stageOrShift();
       return;
     }
@@ -614,14 +687,28 @@ export function boot(canvas) {
   resize();
   window.addEventListener("resize", resize);
 
-  /** While racing, ENTER stages the car and then works the clutch. */
+  /**
+   * While racing, ENTER stages the car and then works the clutch.
+   *
+   * The live throttle goes with the press because the clutch cannot go in under
+   * power: on the gas, `pressShift` arms instead of opening, and the gate opens
+   * by itself on the lift. `input.throttle()` rather than the tick's argument so
+   * the pointer path and the debug handle get the same answer as the keyboard.
+   */
   function stageOrShift() {
-    updateRace(race.phase === STAGING ? startRace(race) : pressShift(race));
+    updateRace(
+      race.phase === STAGING ? startRace(race) : pressShift(race, { throttle: input.throttle() }),
+    );
   }
 
   function raceAction(action) {
     switch (action.type) {
       case ACTION_CONFIRM:
+        // Through `confirmScreen` rather than straight to `stageOrShift`, so the
+        // key, the pointer and the debug handle all get the same answer — which
+        // on a coaching beat is "read, got it" rather than the clutch.
+        confirmScreen();
+        break;
       case ACTION_SHIFT:
         stageOrShift();
         break;
@@ -630,7 +717,7 @@ export function boot(canvas) {
         break;
       case ACTION_RESTART:
         audio.play("button");
-        beginRace();
+        restartRun();
         break;
       case ACTION_CANCEL:
         audio.play("button");
@@ -924,7 +1011,21 @@ export function boot(canvas) {
       return; // nothing to advance behind a menu
     }
 
+    // A coaching beat stops the world. It is not the pause screen — the race is
+    // still the screen you are on — it is the lesson holding the car still while
+    // something gets explained.
+    if (coachHolds(coach)) {
+      audio.engine({ active: true, throttle: 0, gear: race.vehicle.gear });
+      return;
+    }
+
     updateRace(stepRace(race, { throttle }, TICK_SECONDS));
+    if (coach) {
+      coach = advanceCoach(coach, race);
+      if (coachFinished(coach)) {
+        coach = null; // the rest of the run is the player's own
+      }
+    }
 
     const speed = race.vehicle.speed;
     view.scroll += speed * PIXELS_PER_METRE * TICK_SECONDS;
@@ -955,6 +1056,11 @@ export function boot(canvas) {
     // ask the race whether it is over.
     if (race.phase === FINISHED) {
       shell = enterScreen(shell, SCREEN_RESULTS);
+      // A lesson ends with the run it belongs to, however far through it got:
+      // there is nothing left to coach, and its strip would otherwise stick out
+      // either side of the results panel. `coachedRun` is what survives, so
+      // RUN IT AGAIN still rebuilds the tutorial rather than a normal race.
+      coach = null;
     }
     audio.engine({
       active: shell.screen === SCREEN_RACE,
@@ -993,8 +1099,20 @@ export function boot(canvas) {
     });
 
     drawChristmasTree(ctx, race);
-    drawStagingPrompt(ctx, race);
-    drawGradeFlash(ctx, view.flash, view.gradeAge);
+    // The coach says everything the staging prompt would, in its own words and
+    // at its own point in the lesson. Two panels saying "press ENTER" is one too
+    // many, and they would sit on top of each other.
+    if (!coach) {
+      drawStagingPrompt(ctx, race);
+    }
+    drawDriverCue(ctx, race);
+    // The flash fades on the race clock, and a coaching beat stops that clock —
+    // so it would hang at full strength behind the panel that is already saying
+    // the same thing in more words. The beat is the better message; drop it.
+    drawGradeFlash(ctx, coachHolds(coach) ? null : view.flash, view.gradeAge);
+    // Over the world but under the cluster: a lesson never covers the gauges it
+    // is telling you to read.
+    drawCoachPanel(ctx, coach && coachView(coach, race));
 
     drawDashPanel(ctx);
     drawTachometer(ctx, gaugeImages, view.smoothedRpm);
@@ -1219,21 +1337,31 @@ export function boot(canvas) {
       render();
       return this.state();
     },
+    /** Starts the guided practice run, exactly as the title menu does. */
+    tutorial() {
+      beginTutorial();
+      shell = enterScreen(shell, SCREEN_RACE);
+      render();
+      return this.state();
+    },
     start() {
       updateRace(startRace(race));
       render();
     },
-    shift() {
-      updateRace(pressShift(race));
+    /** The clutch. `throttle` mirrors the key: on the gas, it only arms it. */
+    shift(throttle = 0) {
+      updateRace(pressShift(race, { throttle }));
       render();
+      return this.state();
     },
     gate(direction) {
       moveRaceGate(direction);
       render();
     },
     restart() {
-      beginRace();
+      restartRun();
       render();
+      return this.state();
     },
     menu() {
       shell = enterScreen(shell, SCREEN_MODES);
@@ -1261,10 +1389,15 @@ export function boot(canvas) {
         elapsed: Number(race.elapsed.toFixed(3)),
         finishTime: race.finishTime,
         shifting: race.shift !== null,
+        armed: race.shiftArmed,
+        awaitingCatch: race.pendingShift !== null,
         falseStart: race.falseStart,
         launchGrade: race.launchGrade,
         reactionTime: race.reactionTime,
-        grades: race.shifts.map((entry) => `${entry.grade}${entry.reason ? `/${entry.reason}` : ""}`),
+        grades: race.shifts.map(
+          (entry) => `${entry.grade}${entry.reason ? `/${entry.reason}` : ""}+${entry.catch?.grade ?? "open"}`,
+        ),
+        coach: coach ? { step: coachView(coach, race)?.id ?? null, holding: coachHolds(coach) } : null,
         radio: {
           status: library.state().status,
           folder: library.state().folderName,

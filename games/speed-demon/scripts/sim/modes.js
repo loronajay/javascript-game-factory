@@ -41,7 +41,7 @@ export const MODES = [
   {
     id: MODE_DISTANCE,
     label: "Distance Race",
-    blurb: "One car, one strip, one time. Launch clean and shift clean over a fixed distance.",
+    blurb: "One car, one strip, one time. Launch clean, and lift-shift-catch every gear over a fixed distance.",
     available: true,
     objective: {
       kind: OBJECTIVE_DISTANCE,

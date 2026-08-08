@@ -15,6 +15,8 @@ import {
   COMMAND_BEGIN,
   COMMAND_MODE,
   COMMAND_LOCKED,
+  COMMAND_TUTORIAL,
+  COMMAND_RESTART,
   createShell,
   enterScreen,
   isMenuScreen,
@@ -258,7 +260,7 @@ test("the pause menu can resume, restart, re-setup, or quit to the mode list", (
     return `${item.id}:${shell.screen}:${command}`;
   });
   assert(outcomes.includes(`resume:${SCREEN_RACE}:${COMMAND_NONE}`), outcomes.join(" "));
-  assert(outcomes.includes(`restart:${SCREEN_RACE}:${COMMAND_BEGIN}`), outcomes.join(" "));
+  assert(outcomes.includes(`restart:${SCREEN_RACE}:${COMMAND_RESTART}`), outcomes.join(" "));
   assert(outcomes.includes(`setup:${SCREEN_SETUP}:${COMMAND_NONE}`), outcomes.join(" "));
   assert(outcomes.includes(`menu:${SCREEN_MODES}:${COMMAND_NONE}`), outcomes.join(" "));
 });
@@ -269,7 +271,7 @@ test("the results menu can run it again, change the setup, or quit to the mode l
     const { shell, command } = confirmShell({ ...results, cursor: index });
     return `${item.id}:${shell.screen}:${command}`;
   });
-  assert(outcomes.includes(`again:${SCREEN_RACE}:${COMMAND_BEGIN}`), outcomes.join(" "));
+  assert(outcomes.includes(`again:${SCREEN_RACE}:${COMMAND_RESTART}`), outcomes.join(" "));
   assert(outcomes.includes(`setup:${SCREEN_SETUP}:${COMMAND_NONE}`), outcomes.join(" "));
   assert(outcomes.includes(`menu:${SCREEN_MODES}:${COMMAND_NONE}`), outcomes.join(" "));
 });
@@ -282,7 +284,14 @@ test("only a deliberate restart rebuilds the race", () => {
 });
 
 test("every menu item resolves to a handled command", () => {
-  const handled = new Set([COMMAND_NONE, COMMAND_BEGIN, COMMAND_MODE, COMMAND_LOCKED]);
+  const handled = new Set([
+    COMMAND_NONE,
+    COMMAND_BEGIN,
+    COMMAND_RESTART,
+    COMMAND_MODE,
+    COMMAND_LOCKED,
+    COMMAND_TUTORIAL,
+  ]);
   for (const screen of SCREENS.filter(isMenuScreen)) {
     const shell = enterScreen(createShell(), screen);
     menuFor(shell).items.forEach((item, index) => {
@@ -325,6 +334,31 @@ test("the title screen still starts a race from its first item", () => {
   const title = createShell();
   assertEqual(itemIndex(title, "start"), 0, "START must stay the item ENTER lands on");
   assertEqual(confirmShell(title).shell.screen, SCREEN_MODES);
+});
+
+test("the tutorial goes straight to the track, past the mode list and the picker", () => {
+  // A guided run is a fixed run: asking a player to choose a car before they
+  // have been told how to drive one is the wrong order.
+  const title = createShell();
+  const onTutorial = { ...title, cursor: itemIndex(title, "tutorial") };
+  assertEqual(confirmShell(onTutorial).shell.screen, SCREEN_RACE);
+  assertEqual(confirmShell(onTutorial).command, COMMAND_TUTORIAL);
+});
+
+test("restarting a run is a different request from building a picked one", () => {
+  // RESTART RUN and RUN IT AGAIN mean "the same thing again", which on a guided
+  // run is the lesson. Only the setup screen says "build what I just picked", so
+  // only it may drop the tutorial. Sharing one command is what made RESTART RUN
+  // quietly turn a tutorial into a normal race.
+  const paused = enterScreen(createShell(), SCREEN_PAUSED);
+  const onRestart = { ...paused, cursor: itemIndex(paused, "restart") };
+  assertEqual(confirmShell(onRestart).command, COMMAND_RESTART);
+
+  const results = enterScreen(createShell(), SCREEN_RESULTS);
+  const onAgain = { ...results, cursor: itemIndex(results, "again") };
+  assertEqual(confirmShell(onAgain).command, COMMAND_RESTART);
+
+  assertEqual(confirmShell(enterScreen(createShell(), SCREEN_SETUP)).command, COMMAND_BEGIN);
 });
 
 test("the stereo is reachable from a paused race too", () => {

@@ -2,7 +2,7 @@ import { suite, test, assert, assertEqual, assertClose, assertThrows, finish } f
 
 import { DEFAULT_CAR, RACE_DISTANCES, TICK_SECONDS } from "../scripts/sim/constants.js";
 import { GATE_6_SPEED, createGate } from "../scripts/sim/gate.js";
-import { PERFECT, GOOD, MISSED } from "../scripts/sim/grading.js";
+import { PERFECT, GOOD, POOR, MISSED } from "../scripts/sim/grading.js";
 import { LAUNCH_HOLESHOT, LAUNCH_LATE, LAUNCH_FOUL } from "../scripts/sim/launch.js";
 import {
   STAGING,
@@ -39,15 +39,39 @@ function run(race, ticks, controls = FLOOR) {
   return next;
 }
 
-/** Drives the knob cleanly from the current gear into the next one. */
-function shiftUp(race) {
-  let next = pressShift(race);
+/**
+ * Lifts off, declutches, and drives the knob cleanly into the next gear —
+ * stopping there, with the clutch still out and the grade still open.
+ */
+function workGate(race) {
+  let next = pressShift(race, LIFT);
   const from = next.vehicle.gear;
   const directions = from % 2 === 1 ? ["down", "down"] : ["up", "right", "up"];
   for (const direction of directions) {
     next = gateInput(next, direction);
   }
   return next;
+}
+
+/**
+ * Coasts to the moment the clutch bites and picks the gas back up on it, which
+ * is what closes the grade. `offsetTicks` shifts the catch either side of the
+ * bite; the default lands inside the clean window.
+ */
+function catchGas(race, offsetTicks = 0) {
+  let next = race;
+  const target = (race.pendingShift?.clutchAt ?? race.elapsed) + offsetTicks * TICK_SECONDS;
+  // `next.throttleHeld` keeps the loop going until the gas is genuinely off:
+  // the catch is a press, so a run that never lifted has nothing to press with.
+  while (next.pendingShift && (next.elapsed < target || next.throttleHeld)) {
+    next = stepRace(next, LIFT, TICK_SECONDS);
+  }
+  return next.pendingShift ? stepRace(next, FLOOR, TICK_SECONDS) : next;
+}
+
+/** The whole manoeuvre: lift, work the gate, catch the gas as the clutch bites. */
+function shiftUp(race) {
+  return catchGas(workGate(race));
 }
 
 // ---------------------------------------------------------------------------
@@ -161,19 +185,20 @@ test("a missed shift really does leave the car in the wrong gear", () => {
   let race = run(startRace(newRace({ countdownSeconds: 0 })), 90);
   race = shiftUp(race); // into 2nd
   race = run(race, 60);
-  race = pressShift(race); // 2 -> 3
+  race = pressShift(race, LIFT); // 2 -> 3
   for (const d of ["up", "right", "right", "up"]) {
     race = gateInput(race, d);
   }
+  race = catchGas(race);
   assertEqual(race.lastShift.grade, MISSED);
   assertEqual(race.vehicle.gear, 5, "the money shift is real, not cosmetic");
 });
 
 test("the clutch stays out for the dead time after a shift resolves", () => {
   let race = run(startRace(newRace({ countdownSeconds: 0 })), 90);
-  race = shiftUp(race);
+  race = workGate(race);
   assert(!isClutchEngaged(race), "drive should not return the instant the gear engages");
-  race = run(race, 60);
+  race = run(race, 60, LIFT);
   assert(isClutchEngaged(race), "the clutch must come back after the dead time");
 });
 
@@ -201,6 +226,151 @@ test("there is no gear above top gear to shift into", () => {
   race = { ...race, vehicle: { ...race.vehicle, gear: 6 } };
   race = pressShift(race);
   assertEqual(race.shift, null, "top gear has nowhere to go");
+});
+
+// ---------------------------------------------------------------------------
+// The throttle's half of a shift: lift to declutch, catch it coming back out
+// ---------------------------------------------------------------------------
+
+test("the clutch cannot go in while the gas is still down", () => {
+  let race = run(startRace(newRace({ countdownSeconds: 0 })), 90);
+  race = pressShift(race, FLOOR);
+  assertEqual(race.shift, null, "the gate must not open under power");
+  assert(race.shiftArmed, "the clutch is armed rather than refused");
+});
+
+test("an armed clutch goes in by itself the moment the gas comes off", () => {
+  let race = run(startRace(newRace({ countdownSeconds: 0 })), 90);
+  race = pressShift(race, FLOOR);
+  race = stepRace(race, FLOOR, TICK_SECONDS);
+  assertEqual(race.shift, null, "still on the gas, so still nothing");
+  race = stepRace(race, LIFT, TICK_SECONDS);
+  assert(race.shift !== null, "lifting is what puts the clutch in");
+  assert(!race.shiftArmed, "and the arming is spent");
+});
+
+test("the rpm that grades the shift is sampled at the lift, not at the key", () => {
+  let race = run(startRace(newRace({ countdownSeconds: 0 })), 60);
+  race = pressShift(race, FLOOR);
+  const atPress = race.vehicle.rpm;
+  race = run(race, 20, FLOOR); // still winding out, still armed
+  race = stepRace(race, LIFT, TICK_SECONDS);
+  assert(race.rpmAtEngage > atPress, "the needle kept climbing while armed");
+  assertClose(race.rpmAtEngage, race.vehicle.rpm, 400);
+});
+
+test("holding the gas with the clutch down flares the engine instead of driving", () => {
+  let race = run(startRace(newRace({ countdownSeconds: 0 })), 90);
+  race = workGate(race);
+  const speed = race.vehicle.speed;
+  const revved = run(race, 10, FLOOR);
+  assert(revved.vehicle.rpm > race.vehicle.rpm, "free revs climb on the gas");
+  assert(revved.vehicle.speed < speed, "and none of it reaches the road");
+});
+
+test("a shift is not graded until the gas comes back", () => {
+  let race = run(startRace(newRace({ countdownSeconds: 0 })), 90);
+  race = workGate(race);
+  assertEqual(race.lastShift, null, "the grade is still open");
+  assertEqual(race.shifts.length, 0);
+  assert(race.pendingShift !== null, "but the shift is on the books");
+  assertEqual(race.vehicle.gear, 2, "the gear engaged all the same");
+});
+
+test("catching the gas on the clutch keeps the grade the gate earned", () => {
+  let race = startRace(newRace({ countdownSeconds: 0 }));
+  while (race.vehicle.rpm < car.optimalShiftRpm && race.phase === RUNNING) {
+    race = stepRace(race, FLOOR, TICK_SECONDS);
+  }
+  race = catchGas(workGate(race));
+  assertEqual(race.lastShift.grade, PERFECT);
+  assertEqual(race.lastShift.catch.grade, "clean");
+});
+
+test("a loose catch costs one grade and a fumbled one costs two", () => {
+  const atShiftPoint = () => {
+    let race = startRace(newRace({ countdownSeconds: 0 }));
+    while (race.vehicle.rpm < car.optimalShiftRpm && race.phase === RUNNING) {
+      race = stepRace(race, FLOOR, TICK_SECONDS);
+    }
+    return workGate(race);
+  };
+
+  // 12 ticks past the bite is 0.2s — outside the clean window, inside the loose.
+  const loose = catchGas(atShiftPoint(), 12);
+  assertEqual(loose.lastShift.catch.grade, "loose");
+  assertEqual(loose.lastShift.grade, GOOD, "perfect timing, sloppy feet");
+
+  // 24 ticks is 0.4s, past the window entirely.
+  const fumbled = catchGas(atShiftPoint(), 24);
+  assertEqual(fumbled.lastShift.catch.grade, "fumbled");
+  assertEqual(fumbled.lastShift.grade, POOR);
+});
+
+test("never getting back on the gas settles the shift rather than hanging it", () => {
+  let race = run(startRace(newRace({ countdownSeconds: 0 })), 90);
+  race = workGate(race);
+  race = run(race, 120, LIFT);
+  assertEqual(race.pendingShift, null, "the grade cannot stay open forever");
+  assertEqual(race.shifts.length, 1);
+  assertEqual(race.lastShift.catch.reason, "never");
+});
+
+test("a fumble forfeits the reward but never turns a penalty into one", () => {
+  const shiftAt = (offsetTicks) => {
+    let race = run(startRace(newRace({ countdownSeconds: 0 })), 90);
+    return catchGas(workGate(race), offsetTicks).lastShift;
+  };
+  const clean = shiftAt(0);
+  const fumbled = shiftAt(24);
+  assert(clean.effects.forceMultiplier > fumbled.effects.forceMultiplier, "the bonus is lost");
+  assert(fumbled.effects.forceMultiplier <= 1, "and never becomes a bonus of its own");
+});
+
+test("declutching again with the gas never picked up settles the shift as fumbled", () => {
+  let race = run(startRace(newRace({ countdownSeconds: 0 })), 90);
+  race = workGate(race); // into 2nd, gas still off
+  race = pressShift(race, LIFT); // straight back in for 3rd
+  assertEqual(race.pendingShift, null);
+  assertEqual(race.shifts.length, 1, "the abandoned shift still counts");
+  assertEqual(race.lastShift.catch.grade, "fumbled");
+});
+
+test("a shift still waiting on its catch at the line is counted, not dropped", () => {
+  let race = run(startRace(newRace({ countdownSeconds: 0 })), 90);
+  // Put the line a tenth of a second in front of the car so it arrives while
+  // the gas is still off and the grade is still open.
+  race = { ...race, distanceMetres: race.vehicle.distance + race.vehicle.speed * 0.1 };
+  race = workGate(race);
+  assert(race.pendingShift !== null, "the shift must still be open at the line");
+  race = run(race, 30, LIFT);
+  assertEqual(race.phase, FINISHED);
+  assertEqual(race.shifts.length, 1, "the run's shift count must not miss it");
+  assertEqual(race.lastShift.catch.reason, "never");
+});
+
+test("driving it properly beats holding the gas through the shift", () => {
+  const quarter = { distanceMetres: RACE_DISTANCES.quarter.metres, countdownSeconds: 0 };
+  const drive = (proper) => {
+    let race = startRace(newRace(quarter));
+    let ticks = 0;
+    while (race.phase !== FINISHED && ticks < 60 * 120) {
+      if (race.shift === null && !race.shiftArmed && race.vehicle.rpm >= car.optimalShiftRpm && race.vehicle.gear < 6) {
+        race = proper ? shiftUp(race) : workGate({ ...race, throttleHeld: true });
+      }
+      race = stepRace(race, FLOOR, TICK_SECONDS);
+      ticks += 1;
+    }
+    return race;
+  };
+
+  const proper = drive(true);
+  const lazy = drive(false);
+  assert(proper.finishTime < lazy.finishTime, "the skill has to be worth something");
+  assert(
+    lazy.shifts.every((shift) => shift.catch.grade === "fumbled"),
+    "a foot that never lifts never catches anything",
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -495,10 +665,11 @@ test("a car that never gets throttle never launches", () => {
 
 test("the time spent in the gate is measured and graded", () => {
   let race = run(startRace(newRace({ countdownSeconds: 0 })), 90);
-  race = pressShift(race);
-  race = run(race, 60); // dawdle for a second
+  race = pressShift(race, LIFT);
+  race = run(race, 60, LIFT); // dawdle for a second
   race = gateInput(race, "down");
   race = gateInput(race, "down");
+  race = catchGas(race);
   assertClose(race.lastShift.durationSeconds, 1, 0.05);
 });
 
@@ -514,10 +685,11 @@ test("a snapped gate beats a dawdled one at the same rpm", () => {
   const snapped = shiftUp(atShiftPoint(startRace(newRace({ countdownSeconds: 0 }))));
 
   let slow = atShiftPoint(startRace(newRace({ countdownSeconds: 0 })));
-  slow = pressShift(slow);
-  slow = run(slow, 60);
+  slow = pressShift(slow, LIFT);
+  slow = run(slow, 60, LIFT);
   slow = gateInput(slow, "down");
   slow = gateInput(slow, "down");
+  slow = catchGas(slow);
 
   assertEqual(snapped.lastShift.grade, PERFECT);
   assertEqual(slow.lastShift.grade, GOOD, "an identical rpm but slow hands loses a grade");

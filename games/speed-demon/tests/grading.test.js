@@ -7,11 +7,19 @@ import {
   GOOD,
   POOR,
   MISSED,
+  CATCH_CLEAN,
+  CATCH_LOOSE,
+  CATCH_FUMBLED,
   gradeForRpm,
   downgrade,
   effectsFor,
   resolveShift,
+  gradeCatch,
+  catchPenaltySteps,
+  catchReason,
+  finaliseShift,
 } from "../scripts/sim/grading.js";
+import { CATCH_CLEAN_SECONDS, CATCH_LOOSE_SECONDS } from "../scripts/sim/constants.js";
 
 suite("grading — timing windows and gate penalties");
 
@@ -255,6 +263,87 @@ test("the reason describes the timing, not the grade it ended up with", () => {
   // Perfect timing spoiled by a slow gate is still not an early or late shift.
   assertEqual(resolveClean(optimal, SLOW).grade, GOOD);
   assertEqual(resolveClean(optimal, SLOW).reason, null);
+});
+
+// ---------------------------------------------------------------------------
+// The catch — picking the gas back up as the clutch bites
+// ---------------------------------------------------------------------------
+
+const settle = (rpm, deltaSeconds, durationSeconds = SNAP) =>
+  finaliseShift(resolveClean(rpm, durationSeconds), deltaSeconds);
+
+test("landing on the clutch either side is a clean catch", () => {
+  assertEqual(gradeCatch(0), CATCH_CLEAN);
+  assertEqual(gradeCatch(CATCH_CLEAN_SECONDS), CATCH_CLEAN);
+  assertEqual(gradeCatch(-CATCH_CLEAN_SECONDS), CATCH_CLEAN);
+});
+
+test("the clean window has an edge, and past it is loose", () => {
+  assertEqual(gradeCatch(CATCH_CLEAN_SECONDS + 0.001), CATCH_LOOSE);
+  assertEqual(gradeCatch(CATCH_LOOSE_SECONDS), CATCH_LOOSE);
+  assertEqual(gradeCatch(CATCH_LOOSE_SECONDS + 0.001), CATCH_FUMBLED);
+});
+
+test("never getting back on the gas is a fumble, not an infinitely late catch", () => {
+  assertEqual(gradeCatch(null), CATCH_FUMBLED);
+  assertEqual(catchReason(null), "never");
+});
+
+test("early and late cost the same, and are told apart only for feedback", () => {
+  assertEqual(catchPenaltySteps(gradeCatch(0.2)), catchPenaltySteps(gradeCatch(-0.2)));
+  assertEqual(catchReason(0.2), "late");
+  assertEqual(catchReason(-0.2), "early");
+  assertEqual(catchReason(0), null);
+});
+
+test("a clean catch leaves the grade the gate earned exactly where it was", () => {
+  assertEqual(settle(optimal, 0).grade, PERFECT);
+  assertEqual(settle(optimal, 0).catch.grade, CATCH_CLEAN);
+});
+
+test("a loose catch costs one grade and a fumble costs two", () => {
+  assertEqual(settle(optimal, 0.2).grade, GOOD);
+  assertEqual(settle(optimal, 0.5).grade, POOR);
+  assertEqual(settle(optimal, null).grade, POOR);
+});
+
+test("the catch cannot rescue a badly timed shift", () => {
+  assertEqual(settle(3000, 0).grade, POOR, "a clean catch is not a reward, only the absence of a cost");
+});
+
+test("a missed shift stays missed however the gas comes back", () => {
+  const missed = finaliseShift(
+    resolveShift({ car, rpmAtEngage: optimal, attempt: cleanAttempt(1, 3), durationSeconds: SNAP }),
+    null,
+  );
+  assertEqual(missed.grade, MISSED);
+});
+
+test("a fumble forfeits the snap bonus", () => {
+  const clean = settle(optimal, 0);
+  const fumbled = settle(optimal, null);
+  assert(clean.snap, "the gate was worked fast enough to earn one");
+  assert(clean.effects.forceMultiplier > effectsFor(PERFECT).forceMultiplier, "so it is paid");
+  assertEqual(fumbled.effects.forceMultiplier, Math.min(1, effectsFor(POOR).forceMultiplier));
+});
+
+test("a fumble never turns a punishing multiplier into a rewarding one", () => {
+  // `poor` and `missed` use the same field to punish, so forfeiting the reward
+  // has to clamp rather than reset — otherwise fumbling would beat catching.
+  const fumbled = settle(3000, null, SLOW);
+  assert(fumbled.effects.forceMultiplier < 1, "a bad shift still bogs the car");
+});
+
+test("the clutch dead time is the gate's, and the catch cannot rewrite it", () => {
+  const provisional = resolveClean(optimal, SNAP);
+  const finished = finaliseShift(provisional, null);
+  assertEqual(finished.effects.clutchSeconds, provisional.effects.clutchSeconds);
+});
+
+test("a shift carries no catch until it has one, and cannot be settled twice", () => {
+  const provisional = resolveClean(optimal, SNAP);
+  assertEqual(provisional.catch, null);
+  assertThrows(() => finaliseShift(finaliseShift(provisional, 0), 0));
 });
 
 finish();

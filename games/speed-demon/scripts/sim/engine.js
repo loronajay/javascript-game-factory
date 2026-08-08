@@ -128,7 +128,14 @@ export function stepCar(car, state, controls, dt) {
     }
     rpm = rpmForSpeed(car, state.gear, speed);
   } else {
-    rpm = Math.max(car.idleRpm, state.rpm - car.rpmDecayPerSecond * dt);
+    // Clutch in, so the engine is free of the road. Gas flares it toward the
+    // limiter and off the gas it falls back to idle. None of this reaches the
+    // wheels — its whole job is to put "you are still on the gas with the clutch
+    // down" on the tachometer, where the player can see it.
+    rpm =
+      throttle > 0
+        ? Math.min(car.limiterRpm, state.rpm + car.rpmRisePerSecond * dt)
+        : Math.max(car.idleRpm, state.rpm - car.rpmDecayPerSecond * dt);
   }
 
   return {

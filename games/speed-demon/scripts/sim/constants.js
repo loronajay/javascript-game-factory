@@ -58,6 +58,10 @@ export const DEFAULT_CAR = {
 
   // How fast the needle falls when the clutch is in and the engine is free.
   rpmDecayPerSecond: 4200,
+  // ...and how fast it climbs if you are still on the gas with the clutch in.
+  // Nothing here reaches the road: this is the flare that makes "you never
+  // lifted" visible on the tachometer instead of being an invisible rule.
+  rpmRisePerSecond: 5200,
 
   dragK: 0.42, // N per (m/s)^2
   rollK: 12, // N per (m/s)
@@ -95,6 +99,22 @@ export const GOOD_RPM_WINDOW = 450;
 export const SHIFT_SNAP_SECONDS = 0.4;
 export const SHIFT_SLOW_SECONDS = 0.75;
 export const SNAP_FORCE_BONUS = 0.06;
+
+/**
+ * The throttle's half of a shift, measured against the moment the clutch bites.
+ *
+ * A shift is three inputs, not one: lift off the gas, work the gate, then pick
+ * the gas back up as the clutch comes out. The third is timed the same way the
+ * first is — `CLEAN` either side of the bite is a properly driven shift, out to
+ * `LOOSE` is a fumble worth one grade, and anything wider (including never
+ * getting back on the gas at all) is worth two and forfeits the reward.
+ *
+ * The windows are wider than the rpm ones on purpose: this is a reaction to an
+ * event the player can see coming, not a needle they have to read, and stacking
+ * two tight windows on one shift would make the whole thing feel arbitrary.
+ */
+export const CATCH_CLEAN_SECONDS = 0.12;
+export const CATCH_LOOSE_SECONDS = 0.3;
 
 /**
  * How each grade affects the car coming out of the shift. `forceMultiplier`

@@ -5,6 +5,7 @@
 // results menus. The menu surfaces live in `menus.js` and share their chrome
 // from there, which is where `dimWorld` and `menuPanel` come from.
 
+import { CATCH_CLEAN_SECONDS, CATCH_LOOSE_SECONDS } from "../sim/constants.js";
 import { STAGING, COUNTDOWN, RUNNING, isTimeAttack } from "../sim/race.js";
 import { WORLD } from "./scene.js";
 import { dimWorld, menuPanel } from "./menus.js";
@@ -90,6 +91,92 @@ function objectiveLine(race) {
     : `${race.distanceMetres.toFixed(0)} METRES`;
 }
 
+// ---------------------------------------------------------------------------
+// The driver cue: the two moments a shift asks for the player's right foot
+// ---------------------------------------------------------------------------
+
+/** How long before the clutch bites the catch bar comes up. */
+const CATCH_LEAD_SECONDS = 0.5;
+const CUE_Y = 306;
+const BAR = { width: 260, height: 11, y: 322 };
+
+function cueWord(ctx, word, colour, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.textAlign = "center";
+  ctx.fillStyle = colour;
+  ctx.font = '800 34px "Segoe UI", system-ui, sans-serif';
+  ctx.shadowColor = "rgba(0,0,0,0.85)";
+  ctx.shadowBlur = 14;
+  ctx.fillText(word, WORLD.width / 2, CUE_Y);
+  ctx.restore();
+}
+
+/**
+ * The catch window drawn as it runs: the clean band, and a marker sweeping into
+ * it. The bar is what teaches the timing — a word alone tells the player they
+ * were late without ever showing them by how much.
+ */
+function catchBar(ctx, offsetSeconds) {
+  const left = WORLD.width / 2 - BAR.width / 2;
+  const span = CATCH_LOOSE_SECONDS * 2;
+  const atSecond = (seconds) => left + ((seconds + CATCH_LOOSE_SECONDS) / span) * BAR.width;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(8, 11, 16, 0.72)";
+  ctx.beginPath();
+  ctx.roundRect(left, BAR.y, BAR.width, BAR.height, BAR.height / 2);
+  ctx.fill();
+
+  const cleanLeft = atSecond(-CATCH_CLEAN_SECONDS);
+  ctx.fillStyle = "rgba(74, 222, 106, 0.55)";
+  ctx.beginPath();
+  ctx.roundRect(cleanLeft, BAR.y, atSecond(CATCH_CLEAN_SECONDS) - cleanLeft, BAR.height, BAR.height / 2);
+  ctx.fill();
+
+  const x = Math.max(left, Math.min(left + BAR.width, atSecond(offsetSeconds)));
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(x - 1.5, BAR.y - 4, 3, BAR.height + 8);
+  ctx.restore();
+}
+
+/**
+ * What the player's right foot should be doing, and only when it is doing the
+ * wrong thing. Two moments, and neither of them is a permanent instrument:
+ *
+ *   LIFT — the clutch has been asked for and the gas is still down, so nothing
+ *          has happened yet. This only ever appears when the player got it
+ *          wrong, which is what makes it teach rather than nag.
+ *   GAS  — the gate is done and the clutch is about to bite. Getting back on
+ *          the throttle here is the last input of the shift and the last thing
+ *          that can still cost a grade.
+ */
+export function drawDriverCue(ctx, race) {
+  if (race.phase !== RUNNING) {
+    return;
+  }
+
+  if (race.shiftArmed) {
+    // Pulses, because it is waiting on the player rather than on a clock.
+    const pulse = 0.72 + 0.28 * Math.sin(race.elapsed * 14);
+    cueWord(ctx, "LIFT", "#ffb020", pulse);
+    return;
+  }
+
+  const pending = race.pendingShift;
+  if (!pending || race.throttleHeld) {
+    return;
+  }
+  const offset = race.elapsed - pending.clutchAt;
+  if (offset < -CATCH_LEAD_SECONDS) {
+    return;
+  }
+  // Fades up as the bite approaches so the word arrives before the window does.
+  const alpha = offset < 0 ? Math.min(1, 1 - (-offset - 0.14) / (CATCH_LEAD_SECONDS - 0.14)) : 1;
+  cueWord(ctx, "GAS", offset > CATCH_CLEAN_SECONDS ? "#ff5a2e" : "#4ade6a", Math.max(0.35, alpha));
+  catchBar(ctx, offset);
+}
+
 export function drawStagingPrompt(ctx, race) {
   if (race.phase !== STAGING) {
     return;
@@ -97,18 +184,26 @@ export function drawStagingPrompt(ctx, race) {
   ctx.save();
   dimWorld(ctx);
   ctx.textAlign = "center";
-  menuPanel(ctx, WORLD.width / 2 - 270, 272, 540, 160);
+  menuPanel(ctx, WORLD.width / 2 - 290, 250, 580, 204);
   ctx.fillStyle = TEXT;
   ctx.font = '700 27px "Segoe UI", system-ui, sans-serif';
-  ctx.fillText("STAGE THE CAR", WORLD.width / 2, 314);
+  ctx.fillText("STAGE THE CAR", WORLD.width / 2, 292);
   ctx.fillStyle = "#ff5a2e";
   ctx.font = '700 13px "Segoe UI", system-ui, sans-serif';
-  ctx.fillText(objectiveLine(race), WORLD.width / 2, 338);
-  ctx.fillStyle = DIM;
-  ctx.font = '500 16px "Segoe UI", system-ui, sans-serif';
-  ctx.fillText("SPACE — throttle      ENTER — clutch in      ARROWS — work the gate", WORLD.width / 2, 372);
+  ctx.fillText(objectiveLine(race), WORLD.width / 2, 316);
+
+  // The shift spelled out in order, because it is three inputs and the middle
+  // one is the only one a player would guess. A driver who holds the throttle
+  // through the gate never gets the clutch in at all.
   ctx.fillStyle = TEXT;
   ctx.font = '600 17px "Segoe UI", system-ui, sans-serif';
-  ctx.fillText("ENTER to stage — then SPACE the moment it turns green", WORLD.width / 2, 404);
+  ctx.fillText("EVERY SHIFT:  LIFT  ·  CLUTCH  ·  GATE  ·  CATCH", WORLD.width / 2, 350);
+  ctx.fillStyle = DIM;
+  ctx.font = '500 15px "Segoe UI", system-ui, sans-serif';
+  ctx.fillText("release SPACE, press SHIFT, work the ARROWS,", WORLD.width / 2, 376);
+  ctx.fillText("then press SPACE again as the clutch bites", WORLD.width / 2, 398);
+  ctx.fillStyle = TEXT;
+  ctx.font = '600 17px "Segoe UI", system-ui, sans-serif';
+  ctx.fillText("ENTER to stage — then SPACE the moment it turns green", WORLD.width / 2, 430);
   ctx.restore();
 }

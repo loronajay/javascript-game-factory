@@ -39,15 +39,26 @@ export const SCREENS = [
 
 /**
  * What the shell asks the composition root to do on top of changing screen.
- * Everything the shell cannot do itself is one of these four.
+ * Everything the shell cannot do itself is one of these five.
  */
 export const COMMAND_NONE = "none";
 /** Build a fresh race from the current setup. */
 export const COMMAND_BEGIN = "begin";
+/**
+ * Run the *same* thing again, whatever it was.
+ *
+ * Deliberately separate from `COMMAND_BEGIN`, because "restart this run" and
+ * "build the run I just picked" are different requests and only the shell knows
+ * which screen asked. Collapsing them is what made RESTART RUN quietly drop you
+ * out of the tutorial and into a normal race.
+ */
+export const COMMAND_RESTART = "restart";
 /** Rebuild the setup screen around the newly chosen mode. */
 export const COMMAND_MODE = "mode";
 /** The player picked something not built yet — buzz, do not advance. */
 export const COMMAND_LOCKED = "locked";
+/** Build a guided practice run instead of a chosen one. */
+export const COMMAND_TUTORIAL = "tutorial";
 
 /**
  * Screens whose menu is a modal over a live race, so the world and the
@@ -82,7 +93,10 @@ const MENUS = {
     title: "SPEED DEMON",
     subtitle: "Manual-shift drag racing",
     items: [
+      // START stays item zero: ENTER on a fresh boot must start a race without
+      // anyone having to read the screen.
       { id: "start", label: "START", enabled: true },
+      { id: "tutorial", label: "HOW TO DRIVE", enabled: true },
       { id: "radio", label: "RADIO", enabled: true },
     ],
   }),
@@ -199,9 +213,17 @@ const outcome = (shell, command = COMMAND_NONE) => ({ shell, command });
 export function confirmShell(shell) {
   switch (shell.screen) {
     case SCREEN_TITLE:
-      return outcome(
-        enterScreen(shell, menuFor(shell).items[shell.cursor]?.id === "radio" ? SCREEN_RADIO : SCREEN_MODES),
-      );
+      switch (menuFor(shell).items[shell.cursor]?.id) {
+        case "radio":
+          return outcome(enterScreen(shell, SCREEN_RADIO));
+        // The tutorial skips the mode list and the picker: a guided run is a
+        // fixed run, and asking a player to choose a car before they have been
+        // told how to drive one is the wrong order.
+        case "tutorial":
+          return outcome(enterScreen(shell, SCREEN_RACE), COMMAND_TUTORIAL);
+        default:
+          return outcome(enterScreen(shell, SCREEN_MODES));
+      }
 
     case SCREEN_MODES: {
       const mode = MODES[shell.cursor];
@@ -219,7 +241,7 @@ export function confirmShell(shell) {
     case SCREEN_PAUSED:
       switch (menuFor(shell).items[shell.cursor]?.id) {
         case "restart":
-          return outcome(enterScreen(shell, SCREEN_RACE), COMMAND_BEGIN);
+          return outcome(enterScreen(shell, SCREEN_RACE), COMMAND_RESTART);
         case "setup":
           return outcome(enterScreen(shell, SCREEN_SETUP));
         case "radio":
@@ -237,7 +259,7 @@ export function confirmShell(shell) {
         case "menu":
           return outcome(enterScreen(shell, SCREEN_MODES));
         default:
-          return outcome(enterScreen(shell, SCREEN_RACE), COMMAND_BEGIN);
+          return outcome(enterScreen(shell, SCREEN_RACE), COMMAND_RESTART);
       }
 
     // The radio screen owns its own cursor and its own ENTER — play the

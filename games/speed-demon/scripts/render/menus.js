@@ -26,8 +26,10 @@ export const MENU_LAYOUT = {
   // below them rather than in the space between.
   title: {
     wordmark: { y: 148 },
-    list: { x: WORLD.width / 2 - 170, y: 548, width: 340, itemHeight: 44, gap: 10 },
-    controls: { y: 668 },
+    // Three items now, so the list starts higher and sits a little tighter. It
+    // still has to clear the splash's cars above and the legend below.
+    list: { x: WORLD.width / 2 - 170, y: 512, width: 340, itemHeight: 40, gap: 8 },
+    controls: { y: 672 },
   },
   modes: { header: { x: 140, y: 128 }, list: { x: 140, y: 216, width: 430, itemHeight: 62, gap: 12 } },
   detail: { x: 630, y: 216, width: 510, height: 300 },
@@ -255,7 +257,9 @@ export function drawTitleScreen(ctx, { menu, splashImage }) {
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,0.9)";
   ctx.shadowBlur = 12;
-  text(ctx, "SPACE throttle   ENTER stage / clutch   ARROWS or WASD work the gate", centre, controls.y, {
+  // The shift, in order, is the one thing a new player cannot guess: you have to
+  // be *off* the gas to declutch, and back *on* it as the clutch bites.
+  text(ctx, "EVERY SHIFT:  LIFT off SPACE  ·  SHIFT clutch  ·  ARROWS gate  ·  SPACE again to catch it", centre, controls.y, {
     size: 14,
     colour: "#a7b0bd",
     align: "center",

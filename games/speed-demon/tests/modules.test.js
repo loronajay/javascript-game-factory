@@ -42,6 +42,7 @@ const MODULES = [
   "scripts/ui/setup-menu.js",
   "scripts/ui/garage-editor.js",
   "scripts/ui/shell.js",
+  "scripts/ui/coach.js",
   "scripts/render/scene.js",
   "scripts/render/car.js",
   "scripts/render/setup.js",
@@ -49,6 +50,7 @@ const MODULES = [
   "scripts/render/dashboard.js",
   "scripts/render/shifter.js",
   "scripts/render/overlay.js",
+  "scripts/render/coach.js",
   "scripts/render/menus.js",
   "scripts/render/radio.js",
   "scripts/input.js",
@@ -309,6 +311,33 @@ test("the title menu sits below the splash's cars and above its control legend",
   assert(bottom < controls.y - 8, `the title menu ends at ${bottom} and runs into the controls at ${controls.y}`);
   assert(controls.y + 22 < scene.WORLD.height, "the controls legend is off the bottom");
   assert(list.x >= 0 && list.x + list.width <= scene.WORLD.width, "the title menu is off screen");
+});
+
+test("every coaching step fits the surface it is drawn on", () => {
+  // The strip is fixed-height and the words live in another module, so a step
+  // with one line too many would silently print onto the instrument cluster.
+  // This is the check that caught exactly that.
+  const scene = loaded["scripts/render/scene.js"];
+  const coachRender = loaded["scripts/render/coach.js"];
+  const coach = loaded["scripts/ui/coach.js"];
+  const { strip, stripText, panel, panelText } = coachRender.COACH_LAYOUT;
+  const race = { car: { optimalShiftRpm: 6850 }, lastShift: { grade: "perfect", catch: { grade: "clean" } } };
+
+  for (const [name, box, metrics] of [["strip", strip, stripText], ["panel", panel, panelText]]) {
+    const lastLine = metrics.firstLine + (metrics.maxLines - 1) * metrics.lineHeight;
+    assert(box.y + lastLine + 8 <= box.y + box.height, `the ${name}'s last line runs off its own panel`);
+    assert(box.y + box.height <= scene.DASH_TOP, `the ${name} overlaps the dashboard`);
+    assert(box.x >= 0 && box.x + box.width <= scene.WORLD.width, `the ${name} is off screen`);
+  }
+
+  for (let index = 0; index < coach.COACH_STEP_COUNT; index += 1) {
+    const view = coach.coachView({ index }, race);
+    const metrics = view.holding ? panelText : stripText;
+    assert(
+      view.lines.length <= metrics.maxLines,
+      `coaching step "${view.id}" has ${view.lines.length} lines and only ${metrics.maxLines} fit`,
+    );
+  }
 });
 
 test("the modal menus stay clear of the instrument cluster they sit over", () => {
