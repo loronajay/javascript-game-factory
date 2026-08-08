@@ -21,6 +21,12 @@ import {
   hueToRgb,
   paintTint,
   paintPixel,
+  paintSwatchColour,
+  preparePaint,
+  paintWith,
+  hueDelta,
+  mixPaint,
+  zoneWeight,
   tintCabinPixel,
   lampPixel,
 } from "../scripts/garage/paint.js";
@@ -417,6 +423,224 @@ test("lamp recolouring never overflows", () => {
       assert(channel <= 255 && channel >= 0, `lamp channel out of range: ${channel}`);
     }
   }
+});
+
+// ---------------------------------------------------------------------------
+// A black car — the reason the brightness floor could come down
+// ---------------------------------------------------------------------------
+
+test("preparing a paint and painting with it is the same as painting in one go", () => {
+  // The split exists only to hoist the per-paint work out of the pixel loop, so
+  // the two paths must not be able to disagree.
+  for (const paint of [
+    { hue: 0, saturation: 0, brightness: 1, finish: "gloss" },
+    { hue: 215, saturation: 0.8, brightness: 0.95, finish: "metallic" },
+    { hue: 40, saturation: 1, brightness: 0.16, finish: "matte" },
+  ]) {
+    const prepared = preparePaint(paint);
+    for (const source of [ROOF_LIGHT, ROOF_DARK, [120, 121, 122]]) {
+      const direct = paintPixel(...source, paint);
+      const viaPrepared = paintWith(...source, prepared);
+      for (let c = 0; c < 3; c += 1) assertClose(viaPrepared[c], direct[c], 1e-9);
+    }
+  }
+});
+
+test("a car painted at the brightness floor is black but still has shading", () => {
+  // The whole point of the clearcoat fix. A flat silhouette is not a black car —
+  // it is a hole in the screen — so the highlight has to survive the pigment.
+  const black = { hue: 0, saturation: 0, brightness: 0.16, finish: "gloss" };
+  const darkest = luminanceOf(...paintPixel(...ROOF_DARK, black));
+  const brightest = luminanceOf(...paintPixel(255, 255, 255, black));
+
+  assert(darkest < 60, `a black car's shadows came out at ${darkest}`);
+  assert(brightest - darkest > 90, `only ${brightest - darkest} of shading survived`);
+});
+
+test("the clearcoat is what saves a dark car, not the brightness itself", () => {
+  // Guards the specific regression: scaling the clearcoat by the *tint's*
+  // brightness makes it vanish for any neutral paint, because a black paint's
+  // tint is white. That is what pinned the old floor at 0.65.
+  const black = { hue: 0, saturation: 0, brightness: 0.16, finish: "gloss" };
+  assert(preparePaint(black).pigmentCost > 0.7, "a black paint must owe clearcoat");
+
+  const silver = { hue: 0, saturation: 0, brightness: 1, finish: "gloss" };
+  assertEqual(preparePaint(silver).pigmentCost, 0, "factory silver must owe none");
+});
+
+test("brightening a paint past 1 does not hand it free clearcoat", () => {
+  // Without the clamp a pale paint comes out *owing* highlight and every white
+  // car gains a sheen nobody asked for.
+  for (const brightness of [1, 1.15, 1.35]) {
+    const cost = preparePaint({ hue: 0, saturation: 0, brightness, finish: "gloss" }).pigmentCost;
+    assertEqual(cost, 0, `a neutral paint at ${brightness} invented clearcoat`);
+  }
+});
+
+test("shading stays monotonic all the way down to the floor", () => {
+  // Adding a term on top of a multiply is how a curve stops being monotonic, and
+  // a car whose highlights come out darker than its shadows reads as inside-out.
+  for (const brightness of [0.12, 0.16, 0.3, 0.65, 1, 1.35]) {
+    for (const finish of ["gloss", "matte", "metallic"]) {
+      let previous = -1;
+      for (let level = 0; level <= 255; level += 5) {
+        const lit = luminanceOf(...paintPixel(level, level, level, {
+          hue: 210, saturation: 0.6, brightness, finish,
+        }));
+        assert(lit >= previous - 1e-9, `${finish} at ${brightness} inverted near ${level}`);
+        previous = lit;
+      }
+    }
+  }
+});
+
+test("a swatch shows the painted result, so two different paints look different", () => {
+  // The picker used to draw the tint itself, which made Silver and White the
+  // same flat white block — both their tints are pure white — and the only way
+  // to tell two paints apart was to read the label.
+  const swatches = [
+    ["silver", { hue: 0, saturation: 0, brightness: 1, finish: "gloss" }],
+    ["black", { hue: 0, saturation: 0, brightness: 0.16, finish: "gloss" }],
+    ["gunmetal", { hue: 0, saturation: 0, brightness: 0.5, finish: "gloss" }],
+    ["white", { hue: 0, saturation: 0, brightness: 1.3, finish: "gloss" }],
+  ].map(([id, paint]) => [id, paintSwatchColour(paint)]);
+
+  assertEqual(new Set(swatches.map(([, colour]) => colour)).size, swatches.length,
+    `two swatches came out identical: ${JSON.stringify(swatches)}`);
+
+  // ...and they are ordered the way their names claim.
+  const level = (id) => Number(swatches.find(([name]) => name === id)[1].match(/\d+/)[0]);
+  assert(level("black") < level("gunmetal"), "black is not darker than gunmetal");
+  assert(level("gunmetal") < level("silver"), "gunmetal is not darker than silver");
+  assert(level("silver") < level("white"), "silver is not darker than white");
+});
+
+test("a swatch is a colour a canvas will accept", () => {
+  for (const hue of [0, 90, 215, 359]) {
+    const colour = paintSwatchColour({ hue, saturation: 0.8, brightness: 1, finish: "matte" });
+    assert(/^rgb\(\d+, \d+, \d+\)$/.test(colour), `unusable swatch colour: ${colour}`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Fading between two paints
+// ---------------------------------------------------------------------------
+
+test("hue takes the short way round the wheel", () => {
+  assertEqual(hueDelta(350, 10), 20);
+  assertEqual(hueDelta(10, 350), -20);
+  assertEqual(hueDelta(0, 180), 180);
+  assertEqual(hueDelta(0, 0), 0);
+});
+
+test("a fade from 350 to 10 goes through red, not through everything else", () => {
+  // Interpolating the raw numbers would send it the long way and put a rainbow
+  // down the side of the car.
+  const a = { hue: 350, saturation: 1, brightness: 1, finish: "gloss" };
+  const b = { hue: 10, saturation: 1, brightness: 1, finish: "gloss" };
+  for (let t = 0; t <= 1; t += 0.1) {
+    const { hue } = mixPaint(a, b, t);
+    const wrapped = ((hue % 360) + 360) % 360;
+    assert(wrapped >= 350 || wrapped <= 10, `the fade wandered to ${wrapped}`);
+  }
+});
+
+test("a fade lands exactly on its two stops, and clamps outside them", () => {
+  const a = { hue: 20, saturation: 0.2, brightness: 0.8, finish: "matte" };
+  const b = { hue: 200, saturation: 0.9, brightness: 1.2, finish: "gloss" };
+  // Closeness rather than equality: a mix is a float that feeds the renderer and
+  // never reaches storage, so accumulated drift is not the hazard `stepField`
+  // rounds against.
+  assertEqual(mixPaint(a, b, 0).hue, 20);
+  assertClose(mixPaint(a, b, 1).saturation, 0.9, 1e-9);
+  assertClose(mixPaint(a, b, 1).brightness, 1.2, 1e-9);
+  // Out of range is clamped rather than extrapolated: a paint past its own stop
+  // could leave the field's limits and produce a car the normalizer would reject.
+  assertEqual(mixPaint(a, b, -3).hue, 20);
+  assertClose(mixPaint(a, b, 9).saturation, 0.9, 1e-9);
+});
+
+test("a fade keeps the first paint's finish rather than inventing one", () => {
+  // There is no coherent halfway point between matte and metallic.
+  const a = { hue: 0, saturation: 0.5, brightness: 1, finish: "matte" };
+  const b = { hue: 90, saturation: 0.5, brightness: 1, finish: "metallic" };
+  for (const t of [0, 0.5, 1]) assertEqual(mixPaint(a, b, t).finish, "matte");
+});
+
+// ---------------------------------------------------------------------------
+// Layer zones
+// ---------------------------------------------------------------------------
+
+const band = (over) => ({ kind: "band", position: 0.5, size: 0.2, feather: 0, mirrored: false, ...over });
+const stripe = (over) => ({ kind: "stripe", position: 0.5, size: 0.2, feather: 0, mirrored: false, ...over });
+
+test("a band is measured down the car and a stripe across it", () => {
+  // The axis is the whole difference between the two shapes, so a band must
+  // ignore x entirely and a stripe must ignore y entirely.
+  assertEqual(zoneWeight(band({}), 0.02, 0.5), 1);
+  assertEqual(zoneWeight(band({}), 0.98, 0.5), 1);
+  assertEqual(zoneWeight(band({}), 0.5, 0.02), 0);
+
+  assertEqual(zoneWeight(stripe({}), 0.5, 0.02), 1);
+  assertEqual(zoneWeight(stripe({}), 0.5, 0.98), 1);
+  assertEqual(zoneWeight(stripe({}), 0.02, 0.5), 0);
+});
+
+test("a hard-edged zone covers exactly its size", () => {
+  const layer = band({ position: 0.6, size: 0.2 });
+  assertEqual(zoneWeight(layer, 0.5, 0.5), 1);   // just inside
+  assertEqual(zoneWeight(layer, 0.5, 0.7), 1);   // just inside
+  assertEqual(zoneWeight(layer, 0.5, 0.49), 0);
+  assertEqual(zoneWeight(layer, 0.5, 0.71), 0);
+});
+
+test("a feather straddles the edge, so softening one does not move it", () => {
+  // If the feather ate inward the shape would shrink as you softened it; if it
+  // grew outward it would spread. Either makes the two controls fight.
+  const hard = band({ position: 0.5, size: 0.3, feather: 0 });
+  const soft = band({ position: 0.5, size: 0.3, feather: 0.1 });
+  const edge = 0.5 + 0.15;
+  assertClose(zoneWeight(soft, 0.5, edge), 0.5, 1e-9);
+  assertEqual(zoneWeight(hard, 0.5, 0.5), zoneWeight(soft, 0.5, 0.5));
+
+  // ...and it really is soft: strictly between 0 and 1 across the ramp.
+  const inside = zoneWeight(soft, 0.5, edge - 0.03);
+  const outside = zoneWeight(soft, 0.5, edge + 0.03);
+  assert(inside > 0.5 && inside < 1, `inside the ramp read ${inside}`);
+  assert(outside > 0 && outside < 0.5, `outside the ramp read ${outside}`);
+});
+
+test("a feathered zone never reports a weight outside 0..1", () => {
+  for (const feather of [0, 0.01, 0.15, 0.3]) {
+    for (const size of [0.02, 0.2, 1]) {
+      for (let axis = 0; axis <= 1; axis += 0.02) {
+        const w = zoneWeight(band({ position: 0.5, size, feather }), 0.5, axis);
+        assert(w >= 0 && w <= 1, `weight ${w} at ${axis} (size ${size}, feather ${feather})`);
+      }
+    }
+  }
+});
+
+test("mirroring puts the same shape on the other side of the centreline", () => {
+  const one = stripe({ position: 0.2, size: 0.1, mirrored: false });
+  const pair = stripe({ position: 0.2, size: 0.1, mirrored: true });
+  assertEqual(zoneWeight(one, 0.2, 0.5), 1);
+  assertEqual(zoneWeight(one, 0.8, 0.5), 0);
+  assertEqual(zoneWeight(pair, 0.2, 0.5), 1);
+  assertEqual(zoneWeight(pair, 0.8, 0.5), 1);
+  // The gap between the pair is still a gap.
+  assertEqual(zoneWeight(pair, 0.5, 0.5), 0);
+});
+
+test("a mirrored zone at the centreline is one shape, not two overlapping ones", () => {
+  // Overlap must not read as double strength — the weight is a coverage, and a
+  // stripe painted twice is still one stripe.
+  const centred = stripe({ position: 0.5, size: 0.3, feather: 0.1, mirrored: true });
+  for (let x = 0; x <= 1; x += 0.02) {
+    const w = zoneWeight(centred, x, 0.5);
+    assert(w <= 1, `mirrored overlap reported ${w}`);
+  }
+  assertEqual(zoneWeight(centred, 0.5, 0.5), 1);
 });
 
 finish();

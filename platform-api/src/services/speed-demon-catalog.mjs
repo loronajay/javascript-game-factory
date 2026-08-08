@@ -44,16 +44,45 @@ const FINISH_SET = new Set(SPEED_DEMON_FINISHES);
  * other — the same reason `match.js` will be mirrored into the network server.
  * `tests` assert the ranges rather than the exact numbers, so a client tuning
  * pass does not break the server.
+ *
+ * **When a limit moves on the client it has to move here in the same change.**
+ * These clamps are applied on save, so a bound the server holds tighter does not
+ * reject the livery — it silently rewrites it, and the player watches their car
+ * change colour on the next load with nothing to explain it.
  */
 const LIMITS = Object.freeze({
     hue: { min: 0, max: 359, wraps: true },
     saturation: { min: 0, max: 1 },
-    brightness: { min: 0.65, max: 1.35 },
+    // The floor reaches genuine black. It used to sit at 0.65, which the client
+    // lowered once its paint model stopped losing every highlight on a dark car —
+    // see `paintWith`. A server still clamping at 0.65 would silently repaint
+    // every black car mid-grey the moment it round-tripped through a save.
+    brightness: { min: 0.12, max: 1.35 },
     windowTint: { min: 0, max: 1 },
     tailLightHue: { min: 0, max: 359, wraps: true },
     underglowHue: { min: 0, max: 359, wraps: true },
     underglowIntensity: { min: 0.2, max: 1 },
+    layerPosition: { min: 0, max: 1 },
+    layerSize: { min: 0.02, max: 1 },
+    layerFeather: { min: 0, max: 0.3 },
 });
+export const SPEED_DEMON_FADE_AXES = Object.freeze([
+    "nose-tail", "tail-nose", "left-right", "right-left",
+]);
+const FADE_AXIS_SET = new Set(SPEED_DEMON_FADE_AXES);
+export const SPEED_DEMON_LAYER_KINDS = Object.freeze(["band", "stripe"]);
+const LAYER_KIND_SET = new Set(SPEED_DEMON_LAYER_KINDS);
+/**
+ * How many colour layers one livery may carry, mirroring `MAX_LAYERS`.
+ *
+ * This one is a denial-of-service bound as much as a design one. A livery is
+ * handed to *other players'* clients during an online race, and each layer costs
+ * them a per-pixel test across the whole car during the bake — so a payload
+ * claiming five hundred layers would be a way to make somebody else's browser
+ * stutter. The list is truncated before it is walked, never after.
+ */
+export const MAX_LIVERY_LAYERS = 4;
+export const MAX_LAYER_ID_LENGTH = 40;
 /** How many saved configs one player may hold per model, and in total. */
 export const MAX_PRESETS_PER_MODEL = 6;
 export const MAX_PRESETS = 240;
@@ -89,17 +118,57 @@ function clampNumber(value, limit, fallback) {
  * because this value is handed to *other players'* clients during an online race
  * and a malformed one must not be able to break their render.
  */
+function normalizePaint(value) {
+    const paint = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    return {
+        hue: clampNumber(paint.hue, LIMITS.hue, 0),
+        saturation: clampNumber(paint.saturation, LIMITS.saturation, 0),
+        brightness: clampNumber(paint.brightness, LIMITS.brightness, 1),
+        finish: FINISH_SET.has(paint.finish) ? paint.finish : "gloss",
+    };
+}
+/**
+ * One colour layer, clamped. Mirrors `createLayer` on the client.
+ *
+ * The id is kept rather than regenerated so a client's own layer ids survive a
+ * round trip, but it is length-capped like every other free text field here —
+ * it is attacker-controlled and it is stored.
+ */
+function normalizeLayer(value, index) {
+    const layer = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    const id = typeof layer.id === "string" && layer.id.trim()
+        ? layer.id.trim().slice(0, MAX_LAYER_ID_LENGTH)
+        : `layer-${index + 1}`;
+    return {
+        id,
+        kind: LAYER_KIND_SET.has(layer.kind) ? layer.kind : "band",
+        position: clampNumber(layer.position, LIMITS.layerPosition, 0.5),
+        size: clampNumber(layer.size, LIMITS.layerSize, 0.2),
+        feather: clampNumber(layer.feather, LIMITS.layerFeather, 0),
+        mirrored: layer.mirrored === true,
+        paint: normalizePaint(layer.paint),
+    };
+}
 export function normalizeLivery(value) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
-    const paint = source.paint && typeof source.paint === "object" ? source.paint : {};
     const underglow = source.underglow && typeof source.underglow === "object" ? source.underglow : {};
+    const fade = source.fade && typeof source.fade === "object" && !Array.isArray(source.fade)
+        ? source.fade
+        : {};
+    // Truncate before mapping, not after: a payload claiming half a million layers
+    // must cost four normalizations, not half a million.
+    const layers = Array.isArray(source.layers) ? source.layers.slice(0, MAX_LIVERY_LAYERS) : [];
     return {
-        paint: {
-            hue: clampNumber(paint.hue, LIMITS.hue, 0),
-            saturation: clampNumber(paint.saturation, LIMITS.saturation, 0),
-            brightness: clampNumber(paint.brightness, LIMITS.brightness, 1),
-            finish: FINISH_SET.has(paint.finish) ? paint.finish : "gloss",
+        paint: normalizePaint(source.paint),
+        fade: {
+            // Only a literal true, mirroring the client.
+            enabled: fade.enabled === true,
+            hue: clampNumber(fade.hue, LIMITS.hue, 210),
+            saturation: clampNumber(fade.saturation, LIMITS.saturation, 0.7),
+            brightness: clampNumber(fade.brightness, LIMITS.brightness, 0.9),
+            axis: FADE_AXIS_SET.has(fade.axis) ? fade.axis : "nose-tail",
         },
+        layers: layers.map((layer, index) => normalizeLayer(layer, index)),
         windowTint: clampNumber(source.windowTint, LIMITS.windowTint, 0),
         tailLightHue: clampNumber(source.tailLightHue, LIMITS.tailLightHue, 0),
         underglow: {

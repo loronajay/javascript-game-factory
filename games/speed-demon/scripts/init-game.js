@@ -81,6 +81,7 @@ import { createPointer } from "./pointer.js";
 import { drawSetup, hitSetup } from "./render/setup.js";
 import { createLiveryCache, drawUnderglow, liverySprite, tailLightColour } from "./render/livery.js";
 import { emptyGarage, savePreset, updatePreset, deletePreset, selectPreset } from "./garage/garage.js";
+import { LAYER_PRESETS, createLivery } from "./garage/livery.js";
 import { drawGarage, hitGarage } from "./render/garage.js";
 import { createGarageStore } from "./garage/garage-store.js";
 import {
@@ -95,8 +96,12 @@ import {
   editorPresetName,
   focusEditor,
   selectPalette,
+  selectSection,
+  selectPick,
   setRowRatio,
   adjustRow,
+  activateEditorRow,
+  rowIsActionable,
 } from "./ui/garage-editor.js";
 import {
   MENU_SPLASH,
@@ -552,7 +557,15 @@ export function boot(canvas) {
     }
     if (shell.screen === SCREEN_GARAGE) {
       const focus = editorFocus(editor, garage);
+      // Two things ENTER can mean here, and the editor decides which: an action
+      // at the bottom of the screen belongs to the garage (save, delete), while
+      // a row that fires — add a layer, remove this one — belongs to the section
+      // and never leaves the editor.
       if (focus?.kind === "action") garageAction(focus.id);
+      else if (focus?.kind === "row" && rowIsActionable(editor, focus.id)) {
+        audio.play("button");
+        editor = activateEditorRow(editor, focus.id);
+      }
       return;
     }
     if (shell.screen === SCREEN_SETUP) {
@@ -926,6 +939,19 @@ export function boot(canvas) {
       }
     } else if (target.kind === "palette") {
       editor = selectPalette(editor, target.index);
+    } else if (target.kind === "section") {
+      editor = selectSection(editor, target.id);
+    } else if (target.kind === "pick") {
+      // One gesture: pointing at a layer preset picks it *and* adds it. Same
+      // rule as the setup screen — a mouse has nowhere to put a separate commit,
+      // and a click that only highlighted would read as a dead control.
+      if (!click.dragging) {
+        editor = activateEditorRow(selectPick(editor, target.index), target.id);
+      }
+    } else if (target.kind === "activate") {
+      if (!click.dragging) {
+        editor = activateEditorRow(focusEditor(editor, { kind: "row", id: target.id }, garage), target.id);
+      }
     } else if (target.kind === "action") {
       garageAction(target.id);
     } else {
@@ -955,8 +981,11 @@ export function boot(canvas) {
     if (shell.screen === SCREEN_GARAGE) {
       const at = pointer.hover();
       const hovered = at ? hitGarage(currentGarageView(), at.x, at.y) : null;
-      if (hovered && (hovered.kind === "bar" || hovered.kind === "step")) {
-        editor = focusEditor(editor, { kind: "row", id: hovered.id }, garage);
+      // Every hit inside a row carries that row's id, so the cursor follows the
+      // pointer onto the tabs and the strips too. Here that is safe — unlike on
+      // the setup screen, the garage cursor chooses nothing on its own.
+      if (hovered?.rowId) {
+        editor = focusEditor(editor, { kind: "row", id: hovered.rowId }, garage);
       } else if (hovered) {
         editor = focusEditor(editor, hovered, garage);
       }
@@ -1328,6 +1357,36 @@ export function boot(canvas) {
     /** Selects a config by its row in the paint list. Row 0 is always Factory. */
     paint(index) {
       setup = focusSetup(setup, { pane: "preset", index }, garage);
+      render();
+      return this.state();
+    },
+    /**
+     * The garage editor's section tabs, by id — `paint`, `fade`, `trim`, `glow`,
+     * `new-layer`, or `layer-0` upward.
+     *
+     * The editor is now several screens' worth of controls behind one cursor, so
+     * driving it a keypress at a time from automation means counting rows and
+     * getting it wrong. These three do what the mouse does.
+     */
+    section(id) {
+      if (!editor) throw new Error("the garage is not open");
+      editor = selectSection(editor, id);
+      render();
+      return this.state();
+    },
+    /** Adds a colour layer, as clicking a preset on the `+ Layer` tab does. */
+    addLayer(presetId = "stripes") {
+      if (!editor) throw new Error("the garage is not open");
+      const index = LAYER_PRESETS.findIndex((preset) => preset.id === presetId);
+      if (index < 0) throw new Error(`No such layer preset: ${presetId}`);
+      editor = activateEditorRow(selectPick(selectSection(editor, "new-layer"), index), "layerPreset");
+      render();
+      return this.state();
+    },
+    /** Sets fields on the working livery directly, then re-renders. */
+    livery(changes) {
+      if (!editor) throw new Error("the garage is not open");
+      editor = { ...editor, livery: createLivery({ ...editor.livery, ...changes }) };
       render();
       return this.state();
     },

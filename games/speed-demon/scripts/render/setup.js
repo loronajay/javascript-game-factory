@@ -10,7 +10,7 @@ import { WORLD } from "./scene.js";
 import { ROAD } from "../ui/track-layout.js";
 import { drawMenuBackdrop } from "./menus.js";
 import { liverySprite, drawUnderglow } from "./livery.js";
-import { hueToRgb } from "../garage/paint.js";
+import { paintSwatchColour } from "../garage/paint.js";
 
 /**
  * Where everything sits. Kept as one object so the layout can be checked by a
@@ -250,15 +250,18 @@ function drawModelGrid(ctx, view, sheetImages) {
   }
 }
 
-/** A dot in a preset's own paint, so the list reads as colours not just names. */
+/**
+ * A dot in a preset's own paint, so the list reads as colours not just names.
+ *
+ * The dot is the *painted* colour rather than the tint, which is the only way
+ * Silver and White are distinguishable — both tints are pure white. A layered
+ * car shows its base paint here; the list is a row of names and a full preview
+ * lives one pane over.
+ */
 function paintSwatch(ctx, x, y, livery) {
-  const [r, g, b] = hueToRgb(livery.paint.hue);
-  const s = livery.paint.saturation;
-  const shade = livery.paint.brightness;
-  const mix = (channel) => Math.round(Math.min(255, (255 + (channel - 255) * s) * shade));
   ctx.beginPath();
   ctx.arc(x, y, 6, 0, Math.PI * 2);
-  ctx.fillStyle = `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+  ctx.fillStyle = paintSwatchColour(livery.paint);
   ctx.fill();
   ctx.strokeStyle = "rgba(0,0,0,0.55)";
   ctx.lineWidth = 1;

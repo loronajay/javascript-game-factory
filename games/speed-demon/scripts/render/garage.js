@@ -12,15 +12,21 @@
 import { WORLD } from "./scene.js";
 import { drawMenuBackdrop } from "./menus.js";
 import { liverySprite, drawUnderglow } from "./livery.js";
-import { hueToRgb } from "../garage/paint.js";
-import { ROW_PALETTE, ROW_HUE, ROW_TOGGLE, ROW_CHOICE } from "../ui/garage-editor.js";
+import { hueToRgb, paintSwatchColour } from "../garage/paint.js";
+import {
+  ROW_PALETTE, ROW_HUE, ROW_TOGGLE, ROW_CHOICE, ROW_SECTION, ROW_PICK, ROW_BUTTON,
+} from "../ui/garage-editor.js";
 
+// Rows are shorter than they were (40px, now 36) because a layer section holds
+// eleven of them where the old flat list held ten, and the actions have to stay
+// clear of the bottom. `tests/modules.test.js` sweeps every rect for overlaps,
+// so this is checked rather than eyeballed.
 export const GARAGE_LAYOUT = {
-  title: { x: 64, y: 72 },
-  model: { x: 64, y: 100 },
-  rows: { x: 64, y: 138, width: 560, rowHeight: 40, gap: 6, labelWidth: 132, valueWidth: 74 },
+  title: { x: 64, y: 68 },
+  model: { x: 64, y: 94 },
+  rows: { x: 64, y: 124, width: 560, rowHeight: 36, gap: 6, labelWidth: 132, valueWidth: 74 },
   actions: { x: 64, y: 620, width: 130, height: 40, gap: 10 },
-  preview: { x: 680, y: 138, width: 536, height: 482 },
+  preview: { x: 680, y: 124, width: 536, height: 496 },
 };
 
 const INK = "#e8e9ee";
@@ -53,9 +59,44 @@ export function rowControlRect(index) {
   };
 }
 
-/** One palette swatch, laid out across the palette row's control area. */
-export function paletteSwatchRect(index, count) {
-  const strip = rowControlRect(0);
+/**
+ * How much of a row a strip of cells gets, by row kind.
+ *
+ * The three strips need different room. The section tabs take the whole row and
+ * print no label at all — nine tabs sharing a normal control area would be 39px
+ * each, which will not hold the word "Layer 1", and a tab strip is self-
+ * describing anyway. The layer picker keeps a short label. The palette is a row
+ * of colours with a name beside it and is left where it was.
+ */
+const STRIP_INSET = {
+  [ROW_SECTION]: { left: 14, right: 14 },
+  [ROW_PICK]: { left: 62, right: 14 },
+};
+
+/** The area a strip row's cells are laid out across. */
+export function stripRect(rowIndex, kind) {
+  const inset = STRIP_INSET[kind];
+  if (!inset) return rowControlRect(rowIndex);
+  const row = editorRowRect(rowIndex);
+  return {
+    x: row.x + inset.left,
+    y: row.y + 8,
+    width: row.width - inset.left - inset.right,
+    height: row.height - 16,
+  };
+}
+
+/**
+ * One cell of a row that is a strip of choices rather than a bar.
+ *
+ * Three rows use this shape — the section tabs, the paint palette and the layer
+ * picker — and they share one function so the hover highlight, the click target
+ * and the drawn cell are provably the same rectangle. Two of those went out of
+ * step once already on the radio faceplate, and the symptom is that the thing
+ * you click is not the thing you saw light up.
+ */
+export function stripCellRect(rowIndex, kind, index, count) {
+  const strip = stripRect(rowIndex, kind);
   const cell = strip.width / count;
   return { x: strip.x + index * cell, y: strip.y - 4, width: cell - 3, height: strip.height + 8 };
 }
@@ -104,13 +145,41 @@ export function hitGarage(view, x, y) {
     const rect = editorRowRect(row.index);
     if (!within(rect, x, y)) continue;
 
-    if (row.kind === ROW_PALETTE) {
-      for (const swatch of view.palette) {
-        if (within(paletteSwatchRect(swatch.index, view.palette.length), x, y)) {
-          return { kind: "palette", index: swatch.index };
+    // A strip row: the cell under the pointer is the answer, and missing every
+    // cell still counts as the row, so a click in the gutter moves the cursor
+    // rather than doing nothing.
+    if (row.kind === ROW_SECTION) {
+      for (const section of view.sections) {
+        if (within(stripCellRect(row.index, row.kind, section.index, view.sections.length), x, y)) {
+          return { kind: "section", id: section.id, rowId: row.id };
         }
       }
       return { kind: "row", id: row.id };
+    }
+
+    if (row.kind === ROW_PALETTE) {
+      for (const swatch of view.palette) {
+        if (within(stripCellRect(row.index, row.kind, swatch.index, view.palette.length), x, y)) {
+          return { kind: "palette", index: swatch.index, rowId: row.id };
+        }
+      }
+      return { kind: "row", id: row.id };
+    }
+
+    if (row.kind === ROW_PICK) {
+      for (const option of row.options) {
+        if (within(stripCellRect(row.index, row.kind, option.index, row.options.length), x, y)) {
+          // Picking and committing are one gesture with a mouse: pointing at a
+          // layer preset is an unambiguous request for it, and there is nowhere
+          // to put a separate confirm. The same rule the setup screen follows.
+          return { kind: "pick", id: row.id, rowId: row.id, index: option.index };
+        }
+      }
+      return { kind: "row", id: row.id };
+    }
+
+    if (row.kind === ROW_BUTTON) {
+      return { kind: "activate", id: row.id, rowId: row.id };
     }
 
     if (row.kind === ROW_TOGGLE || row.kind === ROW_CHOICE) {
@@ -118,7 +187,7 @@ export function hitGarage(view, x, y) {
       // drag, so its two ends are the only way the mouse can change the value.
       for (const step of [-1, 1]) {
         if (within(stepperArrowRect(row.index, step), x, y)) {
-          return { kind: "step", id: row.id, step };
+          return { kind: "step", id: row.id, rowId: row.id, step };
         }
       }
       return { kind: "row", id: row.id };
@@ -126,7 +195,7 @@ export function hitGarage(view, x, y) {
 
     const control = rowControlRect(row.index);
     if (within(control, x, y)) {
-      return { kind: "bar", id: row.id, ratio: (x - control.x) / control.width };
+      return { kind: "bar", id: row.id, rowId: row.id, ratio: (x - control.x) / control.width };
     }
     return { kind: "row", id: row.id };
   }
@@ -205,13 +274,12 @@ function drawStepper(ctx, rect, row, hover) {
   });
 }
 
-function drawPaletteRow(ctx, view) {
+function drawPaletteRow(ctx, view, row) {
   for (const swatch of view.palette) {
-    const rect = paletteSwatchRect(swatch.index, view.palette.length);
-    const [r, g, b] = hueToRgb(swatch.hue);
-    const mix = (channel) =>
-      Math.round(Math.min(255, (255 + (channel - 255) * swatch.saturation) * swatch.brightness));
-    ctx.fillStyle = `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+    const rect = stripCellRect(row.index, row.kind, swatch.index, view.palette.length);
+    // The painted result, not the tint — see `paintSwatchColour`. Drawing the
+    // tint made Silver and White identical blocks.
+    ctx.fillStyle = paintSwatchColour(swatch);
     ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
     if (swatch.selected) {
       ctx.strokeStyle = "#fff";
@@ -221,19 +289,71 @@ function drawPaletteRow(ctx, view) {
   }
 }
 
+/** A strip of labelled cells: the section tabs and the layer picker. */
+function drawCellStrip(ctx, row, cells, hover, hotKind) {
+  for (const cell of cells) {
+    const rect = stripCellRect(row.index, row.kind, cell.index, cells.length);
+    const hot = hover?.kind === hotKind
+      && (hotKind === "section" ? hover.id === cell.id : hover.index === cell.index);
+
+    ctx.fillStyle = cell.selected ? "rgba(255,90,46,0.22)" : hot ? "rgba(150,158,178,0.16)" : "rgba(14,16,21,0.7)";
+    ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+    ctx.strokeStyle = cell.selected ? ACCENT : "rgba(150,158,178,0.28)";
+    ctx.lineWidth = cell.selected ? 2 : 1;
+    ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.width - 1, rect.height - 1);
+
+    label(ctx, cell.label, rect.x + rect.width / 2, rect.y + rect.height / 2 + 4, {
+      size: 11,
+      colour: cell.selected ? INK : hot ? INK : DIM,
+      align: "center",
+    });
+  }
+}
+
+/** A row that is a button: no value, fires on ENTER or a click. */
+function drawButtonRow(ctx, rect, row, hover) {
+  const hot = hover?.kind === "activate" && hover.id === row.id;
+  const inner = { x: rect.x + 14, y: rect.y + 6, width: rect.width - 28, height: rect.height - 12 };
+  ctx.fillStyle = row.selected || hot ? "rgba(255,90,46,0.16)" : "rgba(14,16,21,0.7)";
+  ctx.fillRect(inner.x, inner.y, inner.width, inner.height);
+  ctx.strokeStyle = row.selected || hot ? ACCENT : "rgba(150,158,178,0.3)";
+  ctx.lineWidth = row.selected ? 2 : 1;
+  ctx.strokeRect(inner.x + 0.5, inner.y + 0.5, inner.width - 1, inner.height - 1);
+  label(ctx, row.label, inner.x + inner.width / 2, inner.y + inner.height / 2 + 4, {
+    size: 12,
+    colour: row.selected || hot ? INK : DIM,
+    align: "center",
+  });
+}
+
+/** Rows whose control fills the width and prints no separate value on the right. */
+const SILENT_VALUE = new Set([ROW_TOGGLE, ROW_CHOICE, ROW_SECTION, ROW_PICK, ROW_BUTTON]);
+
 function drawRows(ctx, view) {
   for (const row of view.rows) {
     const rect = editorRowRect(row.index);
+    if (row.kind === ROW_BUTTON) {
+      drawButtonRow(ctx, rect, row, view.hover);
+      continue;
+    }
     panel(ctx, rect, { live: row.selected, dimmed: row.dimmed });
 
-    label(ctx, row.label, rect.x + 14, rect.y + rect.height / 2 + 5, {
-      size: 13,
-      colour: row.dimmed ? MUTED : row.selected ? INK : DIM,
-    });
+    // The tab strip spans the whole row, so a label would sit underneath it —
+    // and a row of named tabs needs no second name.
+    if (row.kind !== ROW_SECTION) {
+      label(ctx, row.label, rect.x + 14, rect.y + rect.height / 2 + 5, {
+        size: 13,
+        colour: row.dimmed ? MUTED : row.selected ? INK : DIM,
+      });
+    }
 
     const control = rowControlRect(row.index);
-    if (row.kind === ROW_PALETTE) {
-      drawPaletteRow(ctx, view);
+    if (row.kind === ROW_SECTION) {
+      drawCellStrip(ctx, row, view.sections, view.hover, "section");
+    } else if (row.kind === ROW_PICK) {
+      drawCellStrip(ctx, row, row.options, view.hover, "pick");
+    } else if (row.kind === ROW_PALETTE) {
+      drawPaletteRow(ctx, view, row);
     } else if (row.kind === ROW_TOGGLE || row.kind === ROW_CHOICE) {
       drawStepper(ctx, control, row, view.hover);
     } else if (row.kind === ROW_HUE) {
@@ -242,7 +362,20 @@ function drawRows(ctx, view) {
       drawRatioBar(ctx, control, row);
     }
 
-    if (row.kind !== ROW_TOGGLE && row.kind !== ROW_CHOICE) {
+    // The add-a-layer section is one row and a lot of empty screen, so it says
+    // what pressing something will do. Everywhere else the controls speak for
+    // themselves and a caption would just be noise.
+    if (row.kind === ROW_PICK) {
+      label(
+        ctx,
+        "choose a shape, then ENTER — you can move and recolour it afterwards",
+        rect.x + 14,
+        rect.y + rect.height + 22,
+        { size: 12, colour: MUTED },
+      );
+    }
+
+    if (!SILENT_VALUE.has(row.kind)) {
       label(ctx, row.value, rect.x + rect.width - 14, rect.y + rect.height / 2 + 5, {
         size: 12,
         colour: row.dimmed ? MUTED : row.selected ? INK : DIM,
@@ -328,6 +461,15 @@ export function drawGarage(ctx, view, { model, sheetImages, trackImages, liveryC
   label(ctx, (model?.label ?? "").toUpperCase(), GARAGE_LAYOUT.model.x, GARAGE_LAYOUT.model.y, {
     size: 14, colour: ACCENT,
   });
+  // How many layer slots are spent, so the player is not left guessing why the
+  // add tab has gone. It disappears at the ceiling rather than going inert.
+  label(
+    ctx,
+    `${view.layerCount} / ${view.maxLayers} LAYERS`,
+    GARAGE_LAYOUT.rows.x + GARAGE_LAYOUT.rows.width,
+    GARAGE_LAYOUT.model.y,
+    { size: 12, colour: view.layerCount >= view.maxLayers ? MUTED : DIM, align: "right" },
+  );
 
   drawRows(ctx, view);
   drawActions(ctx, view);
@@ -335,7 +477,7 @@ export function drawGarage(ctx, view, { model, sheetImages, trackImages, liveryC
 
   label(
     ctx,
-    "ARROWS / WASD  move and adjust       ENTER  choose       ESC  back       drag a bar or click an arrow",
+    "ARROWS / WASD  move and adjust       ENTER  choose       ESC  back       drag a bar or click anything",
     GARAGE_LAYOUT.title.x,
     WORLD.height - 14,
     { size: 13 },

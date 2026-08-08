@@ -17,18 +17,117 @@
 // dozens of liveries in a second, and an unbounded cache would hold a canvas for
 // every one of them until the tab died. Oldest entries are evicted; rebuilding a
 // sprite is a few milliseconds, so a miss costs a frame at worst.
+//
+// **A pixel is painted once, from a stack resolved before it is written.** The
+// base paint (or its fade, sampled along one axis) goes down first and each
+// layer blends over the result in order, and only then is the whole thing mixed
+// into the source pixel by the bodywork coverage. Two consequences worth
+// protecting:
+//
+//   - Every level of the stack reads the *original* pixel for its shading. A
+//     layer painted over an already-painted pixel would apply the artwork's
+//     shading twice and go muddy exactly where two colours meet — which is the
+//     one place anybody is looking.
+//   - Layers are gated by the same coverage map as the base, so a stripe cannot
+//     run across the glass, the tyres or the outline however it is positioned.
+//     That is what lets the player drag one anywhere without being able to break
+//     the car.
 
-import { liveryKey, createLivery } from "../garage/livery.js";
+import { liveryKey, createLivery, findFadeAxis } from "../garage/livery.js";
 import {
   REGION_CABIN,
   REGION_LAMP,
   bodyCoverageMap,
   classifyPixel,
-  paintPixel,
+  preparePaint,
+  paintWith,
+  mixPaint,
+  zoneWeight,
   tintCabinPixel,
   lampPixel,
   hueToRgb,
 } from "../garage/paint.js";
+
+/**
+ * How finely a fade is resolved before it is reused across pixels.
+ *
+ * A gradient's colour depends only on where a pixel sits along one axis, and
+ * working it out means walking the hue wheel and weighing the result — real work
+ * to repeat twenty thousand times a bake. So it is resolved into this many
+ * prepared paints once and looked up per pixel instead. 64 steps across a ~300px
+ * car is under 5px per step, and the fades are smooth by construction, so the
+ * banding this could cause is well under one 8-bit level.
+ */
+export const FADE_STEPS = 64;
+
+/**
+ * Everything about a livery that does not depend on which pixel is being
+ * painted, arranged so the pixel loop looks up rather than computes.
+ *
+ * **Every varying quantity here runs along exactly one axis**, and that is what
+ * makes a multi-layer gradient affordable. A fade's colour depends only on
+ * position along its own axis; a band's strength depends only on how far down
+ * the car it is; a stripe's only on how far across. So each becomes either a
+ * scalar the row loop refreshes once, or a lookup table indexed by column — and
+ * the inner loop never calls `mixPaint`, `preparePaint` or `zoneWeight` at all.
+ *
+ * Getting this wrong is not a correctness bug, it is a frame-rate one: resolving
+ * per pixel measured 17ms on a 251x346 car with a fade and four layers, which
+ * misses a 60Hz frame, and the player who notices is the one dragging a colour
+ * slider — a cache miss on every single frame.
+ */
+function preparePalette(livery, width) {
+  const { paint, fade, layers } = livery;
+  const axis = fade.enabled ? findFadeAxis(fade.axis) : null;
+  const far = { hue: fade.hue, saturation: fade.saturation, brightness: fade.brightness, finish: paint.finish };
+  const ramp = axis
+    ? Array.from({ length: FADE_STEPS + 1 }, (_, step) =>
+      preparePaint(mixPaint(paint, far, step / FADE_STEPS)))
+    : [preparePaint(paint)];
+
+  const rampAt = (xf, yf) =>
+    ramp[Math.round(Math.min(1, Math.max(0, axis.at(xf, yf))) * FADE_STEPS)];
+
+  return {
+    ramp,
+    // A fade along x varies within a row, so it is tabulated by column; a fade
+    // along y is constant within a row and is resolved by `paintAt` instead.
+    baseByColumn: axis?.along === "x"
+      ? Array.from({ length: width }, (_, x) => rampAt((x + 0.5) / width, 0))
+      : null,
+    baseForRow: (yf) => (axis?.along === "y" ? rampAt(0, yf) : ramp[0]),
+
+    layers: layers.map((layer) => ({
+      prepared: preparePaint(layer.paint),
+      // Same split: a stripe is a function of the column and is tabulated once
+      // for the whole bake; a band is one number per row.
+      byColumn: layer.kind === "stripe"
+        ? Float32Array.from({ length: width }, (_, x) => zoneWeight(layer, (x + 0.5) / width, 0))
+        : null,
+      weightForRow: (yf) => (layer.kind === "stripe" ? 0 : zoneWeight(layer, 0, yf)),
+    })),
+  };
+}
+
+/**
+ * The per-model bodywork coverage map, cached.
+ *
+ * Coverage answers "which pixels of *this car* are paintable", which does not
+ * depend on the colour at all — so recomputing it per livery spent 2.2ms a frame
+ * re-deciding something that cannot have changed while the player drags a
+ * slider. Small, because only the car being previewed and the two in a race are
+ * ever live; each entry is about 300KB and holding all 24 would not be.
+ */
+export const COVERAGE_CACHE_LIMIT = 6;
+
+function coverageFor(cache, model, pixels) {
+  const cached = cache.get(model.id);
+  if (cached) return cached;
+  const coverage = bodyCoverageMap(pixels, model.sw, model.sh);
+  cache.set(model.id, coverage);
+  while (cache.size > COVERAGE_CACHE_LIMIT) cache.delete(cache.keys().next().value);
+  return coverage;
+}
 
 /**
  * How many baked sprites to keep. Sized for a player browsing the picker — the
@@ -37,9 +136,18 @@ import {
  */
 export const LIVERY_CACHE_LIMIT = 64;
 
+/**
+ * The two caches a bake reads, held together so callers pass one opaque handle.
+ *
+ * They are separate because they are keyed on different things and evict at
+ * different rates: a sprite belongs to a (model, livery) pair and churns as fast
+ * as a player drags a slider, while coverage belongs to the *model alone* and
+ * cannot change while they do. Sharing one map would throw away the expensive
+ * half every time the cheap half changed.
+ */
 export function createLiveryCache() {
-  // A Map keeps insertion order, which is all the eviction policy needs.
-  return new Map();
+  // Maps keep insertion order, which is all the eviction policy needs.
+  return { sprites: new Map(), coverage: new Map() };
 }
 
 function imageReady(image) {
@@ -53,7 +161,7 @@ function imageReady(image) {
  * proportion the atlas measured — nothing here may assume a square frame, for
  * the same reason `carBox` exists.
  */
-function bakeLiverySprite(image, model, livery) {
+function bakeLiverySprite(image, model, livery, coverageCache) {
   const canvas = document.createElement("canvas");
   canvas.width = model.sw;
   canvas.height = model.sh;
@@ -62,11 +170,35 @@ function bakeLiverySprite(image, model, livery) {
 
   const image_data = ctx.getImageData(0, 0, model.sw, model.sh);
   const pixels = image_data.data;
-  const { paint, windowTint, tailLightHue } = livery;
+  const { paint, fade, layers, windowTint, tailLightHue } = livery;
   // Skip work that provably changes nothing. A factory-silver car is the common
   // case (it is the default, and it is what every un-customized opponent shows
   // up in), so it is worth not touching 20,000 pixels to produce the input.
-  const paints = paint.saturation > 0 || paint.brightness !== 1 || paint.finish !== "gloss";
+  //
+  // A fade or a layer counts as painting even over factory silver: both put a
+  // second colour on a car whose base is the identity paint.
+  const flatBase = paint.saturation === 0 && paint.brightness === 1 && paint.finish === "gloss";
+  const paints = !flatBase || fade.enabled || layers.length > 0;
+
+  /**
+   * Whether the base paint can be left off the car entirely.
+   *
+   * **The identity paint is not the identity function**, and that distinction
+   * caused a real bug. Painting multiplies a tint through the body's *luminance*,
+   * so a white tint turns (200, 201, 201) into (201, 201, 201) — it replaces the
+   * pixel's own faint chroma with its brightest channel. Over a coloured paint
+   * that is exactly right and is the whole design. Over factory silver it is a
+   * quiet desaturation of the artwork.
+   *
+   * That never showed before because a factory car skipped the pixel loop
+   * altogether. Layers changed the arithmetic: a silver car with one stripe has
+   * to run the loop, and every body pixel outside the stripe was coming back
+   * subtly flatter than the art. Skipping the base restores it exactly, and is
+   * cheaper than painting it.
+   *
+   * A fade rules it out because only one end of the ramp is the identity.
+   */
+  const skipBase = flatBase && !fade.enabled;
   const tints = windowTint > 0;
   const relamps = tailLightHue !== 0;
   if (!paints && !tints && !relamps) {
@@ -75,10 +207,24 @@ function bakeLiverySprite(image, model, livery) {
 
   // How much of each pixel is paint. Only worth computing when something is
   // actually being painted — a tint-only or lamp-only livery never reads it.
-  const coverage = paints ? bodyCoverageMap(pixels, model.sw, model.sh) : null;
+  const coverage = paints ? coverageFor(coverageCache, model, pixels) : null;
+  const palette = paints ? preparePalette(livery, model.sw) : null;
+
+  // Reused across rows rather than rebuilt per row: at 350 rows this is the
+  // difference between a handful of allocations and a few thousand.
+  const rowWeights = palette ? new Float64Array(palette.layers.length) : null;
 
   for (let y = 0; y < model.sh; y += 1) {
     const yFraction = y / model.sh;
+    // Everything that varies down the car rather than across it, refreshed once
+    // for the whole scanline. See `preparePalette`.
+    const rowBase = palette ? palette.baseForRow(yFraction) : null;
+    if (palette) {
+      for (let n = 0; n < palette.layers.length; n += 1) {
+        rowWeights[n] = palette.layers[n].weightForRow(yFraction);
+      }
+    }
+
     for (let x = 0; x < model.sw; x += 1) {
       const k = y * model.sw + x;
       const i = k * 4;
@@ -97,9 +243,25 @@ function bakeLiverySprite(image, model, livery) {
 
       const paintWeight = coverage ? coverage[k] : 0;
       if (paintWeight > 0) {
-        // The shading always comes from the *original* pixel: a tinted base
-        // would feed the window darkening back into the paint.
-        const painted = paintPixel(r, g, b, paint);
+        // The shading always comes from the *original* pixel, at every level of
+        // the stack: a tinted base would feed the window darkening back into the
+        // paint, and a layer painted over an already-painted pixel would apply
+        // the artwork's shading twice and come out muddy where the two meet.
+        let painted = skipBase
+          ? [r, g, b]
+          : paintWith(r, g, b, palette.baseByColumn ? palette.baseByColumn[x] : rowBase);
+        for (let n = 0; n < palette.layers.length; n += 1) {
+          const entry = palette.layers[n];
+          const weight = entry.byColumn ? entry.byColumn[x] : rowWeights[n];
+          if (weight <= 0) continue;
+          const over = paintWith(r, g, b, entry.prepared);
+          painted = weight >= 1 ? over : [
+            painted[0] + (over[0] - painted[0]) * weight,
+            painted[1] + (over[1] - painted[1]) * weight,
+            painted[2] + (over[2] - painted[2]) * weight,
+          ];
+        }
+
         const base = out ?? [r, g, b];
         out = paintWeight >= 1 ? painted : [
           base[0] + (painted[0] - base[0]) * paintWeight,
@@ -128,19 +290,20 @@ export function liverySprite(cache, { image, model, livery }) {
   if (!imageReady(image) || !model) return null;
   const normalized = createLivery(livery);
   const key = `${model.id}:${liveryKey(normalized)}`;
+  const { sprites, coverage } = cache;
 
-  const cached = cache.get(key);
+  const cached = sprites.get(key);
   if (cached) {
     // Refresh recency so a sprite in active use is not the next one evicted.
-    cache.delete(key);
-    cache.set(key, cached);
+    sprites.delete(key);
+    sprites.set(key, cached);
     return cached;
   }
 
-  const sprite = bakeLiverySprite(image, model, normalized);
-  cache.set(key, sprite);
-  while (cache.size > LIVERY_CACHE_LIMIT) {
-    cache.delete(cache.keys().next().value);
+  const sprite = bakeLiverySprite(image, model, normalized, coverage);
+  sprites.set(key, sprite);
+  while (sprites.size > LIVERY_CACHE_LIMIT) {
+    sprites.delete(sprites.keys().next().value);
   }
   return sprite;
 }

@@ -510,35 +510,87 @@ test("every garage panel fits on screen and nothing collides", () => {
   const garageRender = loaded["scripts/render/garage.js"];
   const editorModule = loaded["scripts/ui/garage-editor.js"];
   const garageModule = loaded["scripts/garage/garage.js"];
+  const liveryModule = loaded["scripts/garage/livery.js"];
 
   // A garage full of saved paints offers the most actions, so it is the case
-  // that decides whether the action row still fits.
+  // that decides whether the action row still fits — and a car carrying the
+  // maximum number of layers has both the most tabs and the longest section, so
+  // it is the case that decides whether the *rows* do.
   let stocked = garageModule.emptyGarage();
   stocked = garageModule.savePreset(stocked, { modelId: "kaido-gts", name: "One" });
+
+  let livery = liveryModule.createLivery();
+  for (let i = 0; i < liveryModule.MAX_LAYERS; i += 1) livery = liveryModule.addLayer(livery, "stripes");
   const editor = editorModule.createEditor({
     modelId: "kaido-gts",
     presetId: stocked.presets[0].id,
-    livery: {},
+    livery,
   });
-  const view = editorModule.editorView(editor, stocked);
 
-  const rects = [];
-  for (const row of view.rows) {
-    rects.push({ what: `row ${row.id}`, ...garageRender.editorRowRect(row.index) });
-  }
-  view.actions.forEach((action, index) => {
-    rects.push({ what: `action ${action.id}`, ...garageRender.editorActionRect(index) });
-  });
-  rects.push({ what: "preview", ...garageRender.GARAGE_LAYOUT.preview });
+  // Every section, because they are different lengths and only the longest can
+  // run off the bottom of the screen.
+  for (const section of editorModule.editorSections(livery)) {
+    const view = editorModule.editorView(editorModule.selectSection(editor, section.id), stocked);
 
-  for (const r of rects) {
-    assert(r.x >= 0 && r.y >= 0, `${r.what} starts off screen`);
-    assert(r.x + r.width <= scene.WORLD.width, `${r.what} runs off the right edge`);
-    assert(r.y + r.height <= scene.WORLD.height, `${r.what} runs off the bottom`);
+    const rects = [];
+    for (const row of view.rows) {
+      rects.push({ what: `${section.id} row ${row.id}`, ...garageRender.editorRowRect(row.index) });
+    }
+    view.actions.forEach((action, index) => {
+      rects.push({ what: `action ${action.id}`, ...garageRender.editorActionRect(index) });
+    });
+    rects.push({ what: "preview", ...garageRender.GARAGE_LAYOUT.preview });
+
+    for (const r of rects) {
+      assert(r.x >= 0 && r.y >= 0, `${r.what} starts off screen`);
+      assert(r.x + r.width <= scene.WORLD.width, `${r.what} runs off the right edge`);
+      assert(r.y + r.height <= scene.WORLD.height, `${r.what} runs off the bottom`);
+    }
+    for (let i = 0; i < rects.length; i += 1) {
+      for (let j = i + 1; j < rects.length; j += 1) {
+        assert(!overlaps(rects[i], rects[j]), `${rects[i].what} overlaps ${rects[j].what}`);
+      }
+    }
   }
-  for (let i = 0; i < rects.length; i += 1) {
-    for (let j = i + 1; j < rects.length; j += 1) {
-      assert(!overlaps(rects[i], rects[j]), `${rects[i].what} overlaps ${rects[j].what}`);
+});
+
+test("every strip cell fits inside its own row and its neighbours", () => {
+  // The tabs, the palette and the layer picker all divide a row into cells. A
+  // cell that overhung its row would be clickable from the row above, and one
+  // that overlapped its neighbour would make the hit test order-dependent.
+  const garageRender = loaded["scripts/render/garage.js"];
+  const editorModule = loaded["scripts/ui/garage-editor.js"];
+  const garageModule = loaded["scripts/garage/garage.js"];
+  const liveryModule = loaded["scripts/garage/livery.js"];
+
+  let livery = liveryModule.createLivery();
+  for (let i = 0; i < liveryModule.MAX_LAYERS - 1; i += 1) livery = liveryModule.addLayer(livery, "stripes");
+  const base = editorModule.createEditor({ modelId: "kaido-gts", livery });
+
+  for (const section of editorModule.editorSections(livery)) {
+    const view = editorModule.editorView(editorModule.selectSection(base, section.id), garageModule.emptyGarage());
+    for (const row of view.rows) {
+      const cells = row.kind === editorModule.ROW_SECTION ? view.sections
+        : row.kind === editorModule.ROW_PALETTE ? view.palette
+        : row.kind === editorModule.ROW_PICK ? row.options
+        : null;
+      if (!cells) continue;
+
+      const rowRect = garageRender.editorRowRect(row.index);
+      const rects = cells.map((cell, index) => ({
+        what: `${section.id} ${row.id} cell ${index}`,
+        ...garageRender.stripCellRect(row.index, row.kind, index, cells.length),
+      }));
+      for (const r of rects) {
+        assert(r.x >= rowRect.x && r.x + r.width <= rowRect.x + rowRect.width,
+          `${r.what} runs outside its row horizontally`);
+        assert(r.y >= rowRect.y && r.y + r.height <= rowRect.y + rowRect.height,
+          `${r.what} runs outside its row vertically`);
+        assert(r.width > 12, `${r.what} is only ${Math.round(r.width)}px wide — unclickable`);
+      }
+      for (let i = 0; i + 1 < rects.length; i += 1) {
+        assert(!overlaps(rects[i], rects[i + 1]), `${rects[i].what} overlaps its neighbour`);
+      }
     }
   }
 });
@@ -547,17 +599,27 @@ test("every garage control is clickable, and the bars report where they were hit
   const garageRender = loaded["scripts/render/garage.js"];
   const editorModule = loaded["scripts/ui/garage-editor.js"];
   const garageModule = loaded["scripts/garage/garage.js"];
+  const liveryModule = loaded["scripts/garage/livery.js"];
   const empty = garageModule.emptyGarage();
-  const view = editorModule.editorView(
-    editorModule.createEditor({ modelId: "kaido-gts", livery: {} }),
-    empty,
-  );
+  const livery = liveryModule.addLayer(liveryModule.createLivery(), "stripes");
+  const base = editorModule.createEditor({ modelId: "kaido-gts", livery });
 
-  for (const row of view.rows) {
-    const rect = garageRender.editorRowRect(row.index);
-    const hit = garageRender.hitGarage(view, rect.x + rect.width - 20, rect.y + rect.height / 2);
-    assert(hit, `${row.id} is not clickable`);
+  // Every section: a control nobody can click is a control that does not exist,
+  // and only the paint section used to be checked.
+  for (const section of editorModule.editorSections(livery)) {
+    const sectionView = editorModule.editorView(
+      editorModule.selectSection(base, section.id), empty,
+    );
+    for (const row of sectionView.rows) {
+      const rect = garageRender.editorRowRect(row.index);
+      for (const x of [rect.x + 20, rect.x + rect.width / 2, rect.x + rect.width - 20]) {
+        const hit = garageRender.hitGarage(sectionView, x, rect.y + rect.height / 2);
+        assert(hit, `${section.id} row ${row.id} is not clickable at x=${Math.round(x)}`);
+      }
+    }
   }
+
+  const view = editorModule.editorView(base, empty);
   view.actions.forEach((action, index) => {
     const rect = garageRender.editorActionRect(index);
     const hit = garageRender.hitGarage(view, rect.x + rect.width / 2, rect.y + rect.height / 2);
@@ -579,19 +641,28 @@ test("a drawn stepper arrow is a pressable target that steps its own row", () =>
   const garageRender = loaded["scripts/render/garage.js"];
   const editorModule = loaded["scripts/ui/garage-editor.js"];
   const garageModule = loaded["scripts/garage/garage.js"];
+  const liveryModule = loaded["scripts/garage/livery.js"];
   const empty = garageModule.emptyGarage();
-  const editor = editorModule.createEditor({ modelId: "kaido-gts", livery: {} });
-  const view = editorModule.editorView(editor, empty);
+  const livery = liveryModule.addLayer(liveryModule.createLivery(), "stripes");
+  const editor = editorModule.createEditor({ modelId: "kaido-gts", livery });
 
-  const steppers = view.rows.filter(
-    (row) => row.kind === editorModule.ROW_TOGGLE || row.kind === editorModule.ROW_CHOICE,
-  );
+  const steppers = [];
+  for (const section of editorModule.editorSections(livery)) {
+    const sectionView = editorModule.editorView(
+      editorModule.selectSection(editor, section.id), empty,
+    );
+    for (const row of sectionView.rows) {
+      if (row.kind === editorModule.ROW_TOGGLE || row.kind === editorModule.ROW_CHOICE) {
+        steppers.push({ ...row, view: sectionView });
+      }
+    }
+  }
   assert(steppers.length > 0, "no stepper rows to check");
 
   for (const row of steppers) {
     for (const step of [-1, 1]) {
       const arrow = garageRender.stepperArrowRect(row.index, step);
-      const hit = garageRender.hitGarage(view, arrow.x + arrow.width / 2, arrow.y + arrow.height / 2);
+      const hit = garageRender.hitGarage(row.view, arrow.x + arrow.width / 2, arrow.y + arrow.height / 2);
       assert(
         hit && hit.kind === "step" && hit.id === row.id && hit.step === step,
         `the ${step < 0 ? "left" : "right"} arrow on ${row.id} is not clickable`,

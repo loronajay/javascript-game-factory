@@ -15,6 +15,20 @@ import {
   applyPaintPreset,
   liveryEquals,
   liveryKey,
+  FADE_AXES,
+  DEFAULT_FADE_AXIS,
+  DEFAULT_LAYER_KIND,
+  LAYER_PRESETS,
+  MAX_LAYERS,
+  findFadeAxis,
+  findLayerKind,
+  findLayerPreset,
+  addLayer,
+  removeLayer,
+  updateLayer,
+  layerById,
+  canAddLayer,
+  describeLivery,
 } from "../scripts/garage/livery.js";
 
 suite("livery — what a player changes about a car");
@@ -116,12 +130,27 @@ test("stepping does not accumulate float drift into storage", () => {
   assertEqual(String(tint).length <= 4, true, `windowTint drifted to ${tint}`);
 });
 
-test("brightness stays well inside a range that preserves panel shading", () => {
-  // The tint multiplies the body's own luminance. A wide range would crush the
-  // shading to black or blow it out to a flat silhouette, and either destroys
-  // the shape reading that makes a top-down car recognisable.
-  assert(LIVERY_LIMITS.brightness.min > 0.5, "brightness floor would crush shading");
+test("brightness reaches genuine black and stops before the highlights blow out", () => {
+  // The floor used to sit at 0.65, where the median body pixel paints to
+  // luminance 129 — a mid grey nobody would call a black car. It was there to
+  // hide a paint bug rather than to protect the artwork: the clearcoat was
+  // scaled by the tint's brightness, and a black paint's tint is white, so a
+  // dark car lost every highlight and went flat. `paintWith` fixes that, and
+  // `paint.test.js` holds the test that the shading survives down here.
+  assert(LIVERY_LIMITS.brightness.min <= 0.2, "brightness floor cannot reach black");
+  assert(LIVERY_LIMITS.brightness.min > 0, "brightness floor must leave the car visible");
+  // The ceiling is still a real limit: past it the clearcoat clips every
+  // highlight to white and the shape stops reading.
   assert(LIVERY_LIMITS.brightness.max < 1.6, "brightness ceiling would flatten the car");
+});
+
+test("the black paint preset is actually black", () => {
+  // The palette is where most players will reach for black, so the swatch has to
+  // land in the range the floor now opens up rather than at the old floor.
+  const black = PAINT_PRESETS.find((preset) => preset.id === "black");
+  assert(black, "the palette must offer black");
+  assertEqual(black.saturation, 0);
+  assert(black.brightness <= 0.2, `black preset is only ${black.brightness} bright`);
 });
 
 // ---------------------------------------------------------------------------
@@ -239,12 +268,192 @@ test("every field that changes pixels does change the cache key", () => {
     { paint: { finish: "matte" } },
     { windowTint: 0.5 },
     { tailLightHue: 90 },
+    { fade: { enabled: true } },
+    { layers: [{ kind: "band" }] },
   ]) {
     assert(
       liveryKey(createLivery(variant)) !== base,
       `${JSON.stringify(variant)} would draw from a stale cached sprite`,
     );
   }
+});
+
+// ---------------------------------------------------------------------------
+// Fade — a second colour stop on the base paint
+// ---------------------------------------------------------------------------
+
+test("a livery with no fade normalizes to a switched-off one", () => {
+  const livery = createLivery({ paint: { hue: 40 } });
+  assertEqual(livery.fade.enabled, false);
+  assertEqual(findFadeAxis(livery.fade.axis)?.id, livery.fade.axis);
+});
+
+test("an unknown fade axis falls back rather than throwing", () => {
+  assertEqual(createLivery({ fade: { axis: "diagonal" } }).fade.axis, DEFAULT_FADE_AXIS);
+  assertEqual(createLivery({ fade: { axis: null } }).fade.axis, DEFAULT_FADE_AXIS);
+});
+
+test("every fade axis maps a frame position into 0..1", () => {
+  for (const axis of FADE_AXES) {
+    for (const [xf, yf] of [[0, 0], [0.5, 0.5], [1, 1], [0, 1], [1, 0]]) {
+      const t = axis.at(xf, yf);
+      assert(t >= 0 && t <= 1, `${axis.id} produced ${t} at ${xf},${yf}`);
+    }
+  }
+});
+
+test("reversing an axis is the mirror of the one it reverses", () => {
+  const forward = FADE_AXES.find((axis) => axis.id === "nose-tail");
+  const back = FADE_AXES.find((axis) => axis.id === "tail-nose");
+  for (const yf of [0, 0.25, 0.5, 0.75, 1]) {
+    assertEqual(forward.at(0.5, yf), 1 - back.at(0.5, yf));
+  }
+});
+
+test("a switched-off fade does not change how a livery compares or caches", () => {
+  // Turning a fade off must keep its stops — toggling twice cannot lose the
+  // gradient — but a stashed colour nobody can see is not a different car.
+  const plain = createLivery();
+  const stashed = createLivery({ fade: { enabled: false, hue: 300, brightness: 0.4 } });
+  assertEqual(liveryEquals(plain, stashed), true);
+  assertEqual(liveryKey(plain), liveryKey(stashed));
+  assertEqual(stashed.fade.hue, 300, "the stops must survive being switched off");
+});
+
+test("a switched-on fade does distinguish two liveries", () => {
+  const a = createLivery({ fade: { enabled: true, hue: 100 } });
+  const b = createLivery({ fade: { enabled: true, hue: 300 } });
+  assertEqual(liveryEquals(a, b), false);
+  assert(liveryKey(a) !== liveryKey(b), "two fades must not share a cached sprite");
+});
+
+// ---------------------------------------------------------------------------
+// Layers
+// ---------------------------------------------------------------------------
+
+test("a livery with no layers normalizes to an empty list", () => {
+  assertDeepEqual(createLivery().layers, []);
+  assertDeepEqual(createLivery({ layers: null }).layers, []);
+  assertDeepEqual(createLivery({ layers: "stripes" }).layers, []);
+});
+
+test("layers past the ceiling are dropped, not honoured", () => {
+  const many = Array.from({ length: 40 }, () => ({ kind: "band" }));
+  assertEqual(createLivery({ layers: many }).layers.length, MAX_LAYERS);
+});
+
+test("every layer field is clamped, whatever arrives", () => {
+  const [layer] = createLivery({
+    layers: [{ kind: "helix", position: 9, size: -4, feather: 99, mirrored: "yes", paint: { hue: 4000 } }],
+  }).layers;
+  assertEqual(layer.kind, DEFAULT_LAYER_KIND);
+  assertEqual(layer.position, LIVERY_LIMITS.layerPosition.max);
+  assertEqual(layer.size, LIVERY_LIMITS.layerSize.min);
+  assertEqual(layer.feather, LIVERY_LIMITS.layerFeather.max);
+  // A truthy leftover must not double a stripe the player never mirrored.
+  assertEqual(layer.mirrored, false);
+  assert(layer.paint.hue >= 0 && layer.paint.hue <= 359, "layer hue escaped the wheel");
+});
+
+test("adding a layer seeds it from its preset and stops at the ceiling", () => {
+  let livery = createLivery();
+  for (const preset of LAYER_PRESETS) livery = addLayer(livery, preset.id);
+  assertEqual(livery.layers.length, MAX_LAYERS);
+
+  const roof = addLayer(createLivery(), "roof").layers[0];
+  const preset = findLayerPreset("roof");
+  assertEqual(roof.kind, preset.kind);
+  assertEqual(roof.position, preset.position);
+  assertEqual(roof.size, preset.size);
+});
+
+test("a fresh layer is visible against the car it lands on", () => {
+  // A white stripe defaulted onto factory silver is invisible, and the player's
+  // next move is to look for a bug rather than for the colour picker.
+  const onSilver = addLayer(createLivery(), "stripes").layers[0];
+  const onBlack = addLayer(createLivery({ paint: { brightness: 0.16 } }), "stripes").layers[0];
+  assert(onSilver.paint.brightness < 0.5, "a layer on a pale car must be dark");
+  assert(onBlack.paint.brightness > 1, "a layer on a dark car must be pale");
+});
+
+test("layer ids are stable, and an update finds a layer by id rather than index", () => {
+  let livery = addLayer(addLayer(createLivery(), "roof"), "stripes");
+  const [first, second] = livery.layers;
+  assert(first.id !== second.id, "two layers cannot share an id");
+
+  livery = updateLayer(livery, second.id, { position: 0.31 });
+  assertEqual(layerById(livery, second.id).position, 0.31);
+  assertEqual(layerById(livery, first.id).position, findLayerPreset("roof").position);
+
+  // Removing the one in front must not renumber the one behind, or a cursor
+  // holding an id would start editing its neighbour.
+  livery = removeLayer(livery, first.id);
+  assertEqual(livery.layers.length, 1);
+  assertEqual(livery.layers[0].id, second.id);
+});
+
+test("an update through a layer id re-clamps rather than trusting the caller", () => {
+  const livery = addLayer(createLivery(), "roof");
+  const id = livery.layers[0].id;
+  assertEqual(updateLayer(livery, id, { size: 40 }).layers[0].size, LIVERY_LIMITS.layerSize.max);
+  assertDeepEqual(updateLayer(livery, "no-such-layer", { size: 0.5 }).layers, livery.layers);
+});
+
+test("layer order is part of what a livery is", () => {
+  // Later layers paint over earlier ones, so the same two layers in the other
+  // order is a different car and must not share a cached sprite.
+  const one = addLayer(addLayer(createLivery(), "roof"), "stripes");
+  const other = { ...one, layers: [one.layers[1], one.layers[0]] };
+  assertEqual(liveryEquals(one, other), false);
+  assert(liveryKey(one) !== liveryKey(other), "two orders must not share a sprite");
+});
+
+test("canAddLayer agrees with what addLayer will do", () => {
+  let livery = createLivery();
+  for (let i = 0; i < MAX_LAYERS + 2; i += 1) {
+    const allowed = canAddLayer(livery);
+    const before = livery.layers.length;
+    livery = addLayer(livery, "stripes");
+    assertEqual(livery.layers.length > before, allowed, `disagreed at ${before} layers`);
+  }
+});
+
+test("a layer preset catalog with a duplicate id or a bad shape would break the picker", () => {
+  const ids = new Set();
+  for (const preset of LAYER_PRESETS) {
+    assert(!ids.has(preset.id), `duplicate layer preset ${preset.id}`);
+    ids.add(preset.id);
+    assert(findLayerKind(preset.kind), `${preset.id} names an unknown shape`);
+    assertEqual(clampField("layerPosition", preset.position), preset.position);
+    assertEqual(clampField("layerSize", preset.size), preset.size);
+    assertEqual(clampField("layerFeather", preset.feather), preset.feather);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Naming
+// ---------------------------------------------------------------------------
+
+test("the neutral names span the whole brightness range without a gap", () => {
+  const seen = new Set();
+  for (let b = LIVERY_LIMITS.brightness.min; b <= LIVERY_LIMITS.brightness.max; b += 0.02) {
+    const name = describeLivery({ paint: { saturation: 0, brightness: b } });
+    assert(name.length > 0, `no name at brightness ${b}`);
+    seen.add(name);
+  }
+  assert(seen.has("Black"), "the darkest paints must be called black");
+  assert(seen.has("White"), "the palest paints must be called white");
+  assert(seen.size >= 3, "one name for the whole range tells the player nothing");
+});
+
+test("a name says how many layers are on the car, and still fits in storage", () => {
+  let livery = createLivery({ paint: { hue: 215, saturation: 0.8, finish: "metallic" } });
+  assert(!describeLivery(livery).includes("+"), "an unlayered car needs no count");
+  for (let i = 0; i < MAX_LAYERS; i += 1) livery = addLayer(livery, "stripes");
+  const name = describeLivery(livery);
+  assert(name.includes(`+${MAX_LAYERS}`), `${name} does not say how many layers`);
+  // MAX_PRESET_NAME_LENGTH on the server; a longer name is silently truncated.
+  assert(name.length <= 24, `${name} is ${name.length} characters`);
 });
 
 finish();

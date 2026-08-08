@@ -28,12 +28,18 @@
 //     through a shading gradient leaves a ragged one-pixel boundary wandering
 //     across the bodywork. `bodyCoverageMap` is what stops that ramp reaching
 //     the glass.
-//   - `paintPixel` is pigment *plus clearcoat*, not a bare multiply. A multiply
+//   - `paintWith` is pigment *plus clearcoat*, not a bare multiply. A multiply
 //     alone destroyed most of the artwork's shading at any saturated colour —
 //     measured, a deep red kept 45 of the source's 201 luma range.
 //
 // Neither loosens what counts as bodywork: `classifyPixel` still answers that,
 // and still answers it exactly as before.
+//
+// **A car may wear more than one colour.** `mixPaint` fades between two paints
+// along an axis and `zoneWeight` decides how strongly a band or a stripe claims
+// a pixel. Both are geometry and colour maths over a *normalized* frame position
+// — they never see the sheet, the model or the atlas — which is what keeps them
+// here rather than in the renderer, and testable without a canvas.
 
 export const REGION_BODY = "body";
 export const REGION_CABIN = "cabin";
@@ -303,6 +309,28 @@ export function paintTint(hue, saturation) {
 }
 
 /**
+ * Everything about a paint that does not depend on which pixel is being painted.
+ *
+ * Splitting this out is what makes a gradient affordable. `paintTint` walks the
+ * hue wheel and `perceivedLuminanceOf` weighs the result, and neither reads the
+ * source pixel — so under a flat colour they are two calls for a whole car,
+ * while a naive per-pixel gradient would run them twenty thousand times a bake.
+ * `render/livery.js` prepares one of these per row (or per column) of the fade
+ * axis and reuses it across the scanline.
+ */
+export function preparePaint({ hue, saturation, brightness, finish }) {
+  const [tr, tg, tb] = paintTint(hue, saturation);
+  return {
+    finish,
+    brightness,
+    tint: [tr, tg, tb],
+    // How much brightness this paint costs the artwork, which is exactly how
+    // much clearcoat has to be given back. See `paintWith`.
+    pigmentCost: 1 - (perceivedLuminanceOf(tr, tg, tb) / 255) * Math.min(1, brightness),
+  };
+}
+
+/**
  * Repaints one bodywork pixel, as pigment plus clearcoat.
  *
  * The pigment term is a multiply: the body's own luminance carries the shading,
@@ -311,21 +339,129 @@ export function paintTint(hue, saturation) {
  * term is *added* on top, because a highlight is a reflection of the light
  * source rather than of the paint — a specular on a red car is white.
  *
- * **The clearcoat is scaled by exactly the brightness the pigment cost**, so at
- * saturation 0 the tint is white, costs nothing, and adds nothing: factory
- * silver stays a bit-exact identity rather than becoming a special case.
+ * **The clearcoat is scaled by exactly the brightness the pigment cost**, so a
+ * paint that takes nothing away adds nothing back: at saturation 0 and
+ * brightness 1 the tint is white, `pigmentCost` is 0, and factory silver stays a
+ * bit-exact identity rather than becoming a special case in the renderer.
+ *
+ * **`pigmentCost` counts brightness as well as saturation, and that is what
+ * makes a black car possible.** It used to weigh the tint alone, which is right
+ * for a saturated hue and silently wrong for a dark neutral one: the tint of a
+ * black paint *is* white, so the cost came out 0, the clearcoat vanished, and
+ * turning the brightness down produced a flat dark silhouette with no highlights
+ * and no readable shape. That is why the brightness floor used to sit at 0.65 —
+ * the floor was hiding this, not preventing a real problem. Measured on the
+ * Kaido GTS, a car at brightness 0.18 keeps a luminance spread of 8–255 through
+ * this term and reads as black gloss; without it the spread is 6–38 and the car
+ * reads as a hole in the screen.
+ *
+ * The `Math.min(1, brightness)` matters in the other direction: without it a
+ * paint brightened past 1 would come out *owing* clearcoat, and every pale car
+ * would gain a sheen nobody asked for.
  */
-export function paintPixel(r, g, b, { hue, saturation, brightness, finish }) {
+export function paintWith(r, g, b, prepared) {
   const l = luminanceOf(r, g, b) / 255;
-  const shade = finishCurve(finish, l) * brightness;
-  const [tr, tg, tb] = paintTint(hue, saturation);
-  const pigmentCost = 1 - perceivedLuminanceOf(tr, tg, tb) / 255;
-  const clearcoat = specularOf(finish, l) * pigmentCost * 255 * brightness;
+  const shade = finishCurve(prepared.finish, l) * prepared.brightness;
+  const [tr, tg, tb] = prepared.tint;
+  const clearcoat = specularOf(prepared.finish, l) * prepared.pigmentCost * 255;
   return [
     Math.min(255, tr * shade + clearcoat),
     Math.min(255, tg * shade + clearcoat),
     Math.min(255, tb * shade + clearcoat),
   ];
+}
+
+/** `paintWith` for callers holding a plain paint rather than a prepared one. */
+export function paintPixel(r, g, b, paint) {
+  return paintWith(r, g, b, preparePaint(paint));
+}
+
+/**
+ * A representative body pixel, for drawing a paint as a swatch.
+ *
+ * Measured: bodywork luminance runs 94–228 across the roster with a median of
+ * 199, so this is roughly the colour of a lit panel rather than a crease or a
+ * highlight.
+ */
+export const SWATCH_SOURCE = Object.freeze([199, 200, 200]);
+
+/**
+ * The colour a paint would actually produce, as a CSS string.
+ *
+ * **A swatch has to be the painted result, not the tint.** The picker used to
+ * draw the tint itself, and that made two visibly different paints look
+ * identical: the tint of Silver and the tint of White are both pure white, so
+ * both swatches came out the same flat block and the only way to tell them apart
+ * was to read the label. Running the real paint over a real body value fixes it
+ * for free and cannot drift from what the car will look like, because it is the
+ * same function the bake calls.
+ */
+export function paintSwatchColour(paint) {
+  const [r, g, b] = paintPixel(...SWATCH_SOURCE, paint);
+  return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+}
+
+/** The shortest way round the hue wheel from `a` to `b`, signed. */
+export function hueDelta(a, b) {
+  const raw = (((b - a) % 360) + 360) % 360;
+  return raw > 180 ? raw - 360 : raw;
+}
+
+/**
+ * Blends two paints, `t` running 0 at `a` to 1 at `b`.
+ *
+ * **Hue takes the short way round**, which is the only interesting decision
+ * here: a fade from 350° to 10° is twenty degrees through red, not three hundred
+ * and forty through every other colour on the wheel. Interpolating the raw
+ * numbers would send it the long way and put a rainbow down the side of the car.
+ *
+ * The finish is `a`'s and is deliberately not blended — a finish is a lighting
+ * model rather than a value, and there is no coherent halfway point between
+ * matte and metallic to interpolate toward.
+ */
+export function mixPaint(a, b, t) {
+  const k = Math.min(1, Math.max(0, t));
+  return {
+    hue: a.hue + hueDelta(a.hue, b.hue) * k,
+    saturation: a.saturation + (b.saturation - a.saturation) * k,
+    brightness: a.brightness + (b.brightness - a.brightness) * k,
+    finish: a.finish,
+  };
+}
+
+/**
+ * How strongly a colour layer claims a pixel, as a 0–1 weight.
+ *
+ * A layer is one shape on one axis: a **band** runs across the car and is
+ * measured down its length, a **stripe** runs down the car and is measured
+ * across its width. That is the whole geometry, and it is deliberately not a
+ * detected panel — the 24 renders do not share landmarks precise enough to place
+ * a hood or a roof automatically, so a fixed fraction that reads correctly on
+ * the GT cuts across the engine cover on the mid-engined Toro and lands wrong on
+ * both hatchbacks. The player can see the car; the code cannot. So the player
+ * positions the shape and every model works with no per-model data at all.
+ *
+ * `feather` straddles the edge rather than eating into it or growing past it —
+ * the nominal `size` stays the half-strength point, so softening an edge does
+ * not also move it. A zero feather is a hard vinyl edge, which is a real look
+ * and is the default.
+ *
+ * `mirrored` reflects the shape about the centreline, which is what turns one
+ * stripe into the classic pair without spending two of the four layer slots.
+ */
+export function zoneWeight({ kind, position, size, feather, mirrored }, xf, yf) {
+  const axis = kind === "stripe" ? xf : yf;
+  const direct = edgeWeight(axis, position, size, feather);
+  if (!mirrored) return direct;
+  return Math.max(direct, edgeWeight(axis, 1 - position, size, feather));
+}
+
+function edgeWeight(axis, position, size, feather) {
+  const half = size / 2;
+  const distance = Math.abs(axis - position);
+  if (feather <= 0) return distance <= half ? 1 : 0;
+  // Full strength inside the edge, gone outside it, smooth across.
+  return 1 - smoothstep((distance - (half - feather / 2)) / feather);
 }
 
 /**
