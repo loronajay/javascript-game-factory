@@ -10,6 +10,7 @@ import {
   SCREEN_RESULTS,
   SCREEN_RADIO,
   SCREEN_GARAGE,
+  SCREEN_ONLINE,
   SCREENS,
   COMMAND_NONE,
   COMMAND_BEGIN,
@@ -17,6 +18,8 @@ import {
   COMMAND_LOCKED,
   COMMAND_TUTORIAL,
   COMMAND_RESTART,
+  COMMAND_ONLINE,
+  COMMAND_ONLINE_LEAVE,
   createShell,
   enterScreen,
   isMenuScreen,
@@ -50,9 +53,9 @@ test("the game opens on the title screen", () => {
 
 test("every screen is handled by exactly one of the input paths", () => {
   // The game loop dispatches a key press to the menus, to the setup cursor, to
-  // the garage editor's cursor, to the radio's own cursor, or to the race. A
-  // screen belonging to none of them would swallow input; one belonging to two
-  // would double-handle it.
+  // the garage editor's cursor, to the radio's own cursor, to the online
+  // screen's cursor, or to the race. A screen belonging to none of them would
+  // swallow input; one belonging to two would double-handle it.
   for (const screen of SCREENS) {
     const paths = [
       isMenuScreen(screen),
@@ -60,6 +63,7 @@ test("every screen is handled by exactly one of the input paths", () => {
       screen === SCREEN_GARAGE,
       screen === SCREEN_RADIO,
       screen === SCREEN_RACE,
+      screen === SCREEN_ONLINE,
     ];
     assertEqual(paths.filter(Boolean).length, 1, `${screen} is handled by ${paths.filter(Boolean).length} paths`);
   }
@@ -184,12 +188,15 @@ test("the mode list opens on the mode already chosen", () => {
 });
 
 test("a locked mode says no and changes nothing", () => {
+  // Every shipped mode is playable, so this drives the machinery with a cursor
+  // parked past the end of the list — the same path a future locked entry takes.
+  // Keeping it exercised is the point: the buzz-and-stay behaviour is what an
+  // unfinished mode on the roadmap will rely on.
   const modes = enterScreen(createShell(), SCREEN_MODES);
-  const onLocked = { ...modes, cursor: MODES.findIndex((mode) => mode.id === MODE_ONLINE) };
-  const { shell, command } = confirmShell(onLocked);
+  const { shell, command } = confirmShell({ ...modes, cursor: MODES.length });
   assertEqual(command, COMMAND_LOCKED, "the caller needs to know to buzz rather than to advance");
   assertEqual(shell.screen, SCREEN_MODES);
-  assertEqual(shell.modeId, DEFAULT_MODE_ID, "hovering a locked mode must not adopt it");
+  assertEqual(shell.modeId, DEFAULT_MODE_ID, "and nothing may be adopted on the way");
 });
 
 test("each mode says what the setup screen will ask it for", () => {
@@ -202,12 +209,39 @@ test("each mode says what the setup screen will ask it for", () => {
   }
 });
 
-test("a locked mode is still listed, greyed and explained", () => {
+test("every mode is listed, and a note explains any that cannot be entered", () => {
   const menu = menuFor(enterScreen(createShell(), SCREEN_MODES));
-  const online = menu.items.find((item) => item.id === MODE_ONLINE);
-  assert(online, "the roadmap should be visible, not hidden");
-  assertEqual(online.enabled, false);
-  assert(online.note, "a locked entry has to say why it is locked");
+  assertEqual(menu.items.length, MODES.length, "the roadmap should be visible, not hidden");
+  for (const item of menu.items) {
+    if (!item.enabled) assert(item.note, `${item.id} is locked with no explanation`);
+  }
+});
+
+test("online is listed, enabled, and goes to the lobby rather than the setup screen", () => {
+  const modes = enterScreen(createShell(), SCREEN_MODES);
+  const cursor = MODES.findIndex((mode) => mode.id === MODE_ONLINE);
+  const { shell, command } = confirmShell({ ...modes, cursor });
+
+  assertEqual(shell.screen, SCREEN_ONLINE, "the strip belongs to the room, not to one driver");
+  assertEqual(command, COMMAND_ONLINE, "and the socket has to be opened");
+  assertEqual(shell.modeId, MODE_ONLINE);
+});
+
+test("backing out of online closes the session as well as the screen", () => {
+  // An abandoned lobby nobody left is a room the server keeps alive and an
+  // opponent waiting on a driver who is not coming back.
+  const online = enterScreen(createShell(), SCREEN_ONLINE);
+  const { shell, command } = cancelShell(online);
+  assertEqual(shell.screen, SCREEN_MODES);
+  assertEqual(command, COMMAND_ONLINE_LEAVE);
+});
+
+test("the online screen owns its own ENTER, as the setup and garage screens do", () => {
+  const online = enterScreen(createShell(), SCREEN_ONLINE);
+  assertEqual(confirmShell(online).command, COMMAND_NONE);
+  assertEqual(confirmShell(online).shell.screen, SCREEN_ONLINE);
+  assert(!isMenuScreen(SCREEN_ONLINE), "it is not driven by the shared menu machinery");
+  assert(!showsTheRace(SCREEN_ONLINE), "and it replaces the world rather than sitting over it");
 });
 
 test("confirming the setup screen starts the race", () => {
@@ -244,8 +278,12 @@ test("there is nothing above the title screen to back out to", () => {
 });
 
 test("backing out never restarts the race behind the menu", () => {
+  // Leaving online is the one exception, and it tears a session down rather
+  // than building anything — no race is rebuilt on any cancel path.
   for (const screen of SCREENS) {
-    assertEqual(cancelShell(enterScreen(createShell(), screen)).command, COMMAND_NONE, screen);
+    const command = cancelShell(enterScreen(createShell(), screen)).command;
+    const allowed = screen === SCREEN_ONLINE ? COMMAND_ONLINE_LEAVE : COMMAND_NONE;
+    assertEqual(command, allowed, screen);
   }
 });
 
@@ -291,6 +329,8 @@ test("every menu item resolves to a handled command", () => {
     COMMAND_MODE,
     COMMAND_LOCKED,
     COMMAND_TUTORIAL,
+    COMMAND_ONLINE,
+    COMMAND_ONLINE_LEAVE,
   ]);
   for (const screen of SCREENS.filter(isMenuScreen)) {
     const shell = enterScreen(createShell(), screen);

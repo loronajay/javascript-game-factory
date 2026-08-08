@@ -40,10 +40,13 @@ import {
   SCREEN_RESULTS,
   SCREEN_RADIO,
   SCREEN_GARAGE,
+  SCREEN_ONLINE,
   COMMAND_BEGIN,
   COMMAND_RESTART,
   COMMAND_MODE,
   COMMAND_TUTORIAL,
+  COMMAND_ONLINE,
+  COMMAND_ONLINE_LEAVE,
   createShell,
   enterScreen,
   showsTheRace,
@@ -112,6 +115,61 @@ import {
   menuListBox,
   hitMenuList,
 } from "./render/menus.js";
+import { loadFactoryProfile } from "../../../js/platform/identity/factory-profile.mjs";
+import { createOnlineIdentityPayload } from "../../../js/platform/identity/match-identity.mjs";
+import { createNet } from "./online/net.js";
+import {
+  STATUS_COUNTDOWN,
+  STATUS_MATCH_RESULT,
+  STATUS_RACING,
+  STATUS_ROUND_RESULT,
+  applyForfeit,
+  applyLobby,
+  applyRematch,
+  applyRoundResult,
+  applyRoundStart,
+  connecting,
+  createSession,
+  failed,
+  leftSession,
+  opponent,
+  racing,
+  readyToLaunch,
+  restartNote,
+  roundHeadline,
+  roundRows,
+  searchCancelled,
+  searching,
+} from "./online/session.js";
+import { advanceTo, createOpponent, receiveInputs } from "./online/opponent.js";
+import {
+  ONLINE_CREATE,
+  ONLINE_JOIN,
+  ONLINE_OPEN_JOIN,
+  ONLINE_READY,
+  ONLINE_SEARCH,
+  PANE_HOME,
+  PANE_JOIN,
+  adjustLobby,
+  closeJoin,
+  confirmOnline,
+  createOnlineMenu,
+  moveOnline,
+  onlineView,
+  openJoin,
+  paneFor,
+  typeCode,
+  wantsTextCapture,
+} from "./ui/online-menu.js";
+import { drawOnlineResult, drawOnlineScreen } from "./render/online.js";
+import {
+  createInputLog,
+  eventsSince,
+  recordClutch,
+  recordGate,
+  recordStart,
+  recordThrottle,
+} from "./sim/input-log.js";
 import { gateLayout, gateSlots, createKnob, stepKnob, knobTargetFor } from "./ui/shifter-gate.js";
 import { smoothToward, shiftLightState } from "./ui/gauges.js";
 import { gearNodeId } from "./sim/gate.js";
@@ -156,6 +214,7 @@ import {
   ACTION_SHIFT,
   ACTION_RESTART,
   ACTION_STEREO,
+  ACTION_TEXT,
 } from "./input.js";
 
 const KNOB_SPEED = 620; // px/s through the gate
@@ -451,6 +510,306 @@ export function boot(canvas) {
   });
   const pointer = createPointer(canvas, WORLD);
 
+  // -------------------------------------------------------------------------
+  // Online Versus
+  //
+  // The same split the radio follows: `online/net.js` is the only thing that
+  // touches a socket, `online/session.js` holds every rule about a match and is
+  // pure, `ui/online-menu.js` shapes the screen, and this block is where they
+  // meet. The match itself is **not a screen** — it is the race screen with a
+  // session attached, exactly as the tutorial is the race screen with a coach
+  // attached, so there is no second copy of the driving to drift out of sync.
+  // -------------------------------------------------------------------------
+
+  let session = createSession();
+  let onlineMenu = createOnlineMenu();
+  // The driver's own inputs this round, and the tick they are numbered against.
+  // Tick 0 is the tick `startRace` is called, which is the same instant on both
+  // machines because both wait for the server's `startAt`.
+  let myLog = createInputLog();
+  let raceTick = 0;
+  // How much of `myLog` has been sent. The log is append-only and the server
+  // merges by identity, so only the tail ever goes out.
+  let sentThrough = 0;
+  // The opponent's car: their inputs, run through the same sim. Null offline.
+  let opponentCar = null;
+
+  const net = createNet();
+
+  /**
+   * Lanes 1 and 2 straddle the double-yellow divider and are the drag-race pair,
+   * so this driver keeps lane 1 (the offline default) and the opponent takes 2.
+   */
+  const OPPONENT_LANE = 2;
+
+  /** True when the race on track belongs to an online match. */
+  const isOnlineRace = () => opponentCar !== null;
+
+  /**
+   * True while the server's verdict is on screen. The strip stays lit underneath
+   * it — a round result belongs to the run that just happened — but nothing
+   * advances, and the race screen's keys mean different things.
+   */
+  const showsOnlineResult = () =>
+    session.status === STATUS_ROUND_RESULT || session.status === STATUS_MATCH_RESULT;
+
+  net.on({
+    onOpen: () => {
+      net.setIdentity(onlineIdentity());
+      // Whichever way in the player chose is carried out once the socket is up,
+      // because none of them can be sent before it is.
+      if (pendingEntry) {
+        pendingEntry();
+        pendingEntry = null;
+      }
+    },
+    onError: ({ message }) => {
+      session = failed(session, message ?? "Connection lost");
+    },
+    onClose: () => {
+      // A socket that drops mid-match ends it here rather than leaving the
+      // player staring at a tree that will never resolve.
+      if (shell.screen === SCREEN_ONLINE || isOnlineRace()) {
+        session = failed(session, "Connection lost");
+        endOnlineRace();
+      }
+    },
+    onSearching: () => {
+      session = searching(session);
+    },
+    onSearchCancelled: () => {
+      session = searchCancelled(session);
+    },
+    onLobby: (message) => {
+      session = applyLobby(session, message);
+      // Leaving a finished match for a fresh lobby throws the old race away.
+      if (session.status !== STATUS_RACING && session.status !== STATUS_COUNTDOWN) endOnlineRace();
+    },
+    onRoundStart: (message, localNow) => {
+      session = applyRoundStart(session, message, localNow);
+      buildOnlineRace(message);
+    },
+    onInputs: (message) => {
+      if (opponentCar) opponentCar = receiveInputs(opponentCar, message.events);
+    },
+    onRoundResult: (message) => {
+      session = applyRoundResult(session, message);
+    },
+    onForfeit: (message) => {
+      session = applyForfeit(session, message);
+    },
+    onRematch: (message) => {
+      session = applyRematch(session, message);
+    },
+  });
+
+  /** Queued until the socket opens; see `onOpen`. */
+  let pendingEntry = null;
+
+  /**
+   * Who this driver is, and what they are driving. The car travels with every
+   * entry path so the opponent can draw the real thing — the public loadout
+   * endpoints exist for exactly this, and this is what finally consumes them.
+   */
+  function onlineIdentity() {
+    const preset = setupPreset(setup, garage);
+    // Identity comes from the factory profile, not from anything this cabinet
+    // invents — canonical player identity belongs to the shell, and a game that
+    // minted its own name would be a second source of truth for who someone is.
+    return {
+      ...createOnlineIdentityPayload(loadFactoryProfile()),
+      modelId: setupModel(setup).id,
+      livery: preset?.livery ?? null,
+    };
+  }
+
+  /** Opens the connection and remembers what to do once it is up. */
+  function enterOnline(entry) {
+    pendingEntry = entry;
+    if (net.isOpen()) {
+      net.setIdentity(onlineIdentity());
+      pendingEntry();
+      pendingEntry = null;
+      return;
+    }
+    session = connecting(session);
+    net.connect();
+  }
+
+  function leaveOnline() {
+    if (net.isOpen()) net.leaveRoom();
+    net.close();
+    session = leftSession(session);
+    onlineMenu = createOnlineMenu();
+    endOnlineRace();
+  }
+
+  /**
+   * Builds both cars for a round: the driver's, and the reconstruction of the
+   * opponent's. They are the same kind of object running the same reducer —
+   * that is what makes the two screens agree without any correction traffic.
+   */
+  function buildOnlineRace(message) {
+    const options = {
+      car: carSpec,
+      gate,
+      countdownSeconds: message.countdownSeconds,
+      distanceMetres: message.distanceMetres,
+      timeLimitSeconds: null,
+    };
+    chosen = resolveSelection(setupSelection(setup, garage));
+    // The strip belongs to the room, so the local pick is overridden by it.
+    const track = TRACKS.find((entry) => entry.id === message.config?.trackId);
+    if (track) {
+      chosen = { ...chosen, track };
+      trackTile = null;
+    }
+    race = createRace(options);
+    view = newView(layout, race);
+    coach = null;
+    coachedRun = false;
+    myLog = createInputLog();
+    raceTick = 0;
+    sentThrough = 0;
+    opponentCar = createOpponent(options);
+    shell = enterScreen(shell, SCREEN_RACE);
+  }
+
+  function endOnlineRace() {
+    opponentCar = null;
+    myLog = createInputLog();
+    raceTick = 0;
+    sentThrough = 0;
+  }
+
+  /**
+   * One tick of an online race.
+   *
+   * Three things happen here that do not offline: the tree is released only when
+   * the server's shared start time arrives, every input is recorded into a log
+   * as it is made, and the tail of that log is streamed. The driver's own car is
+   * never held up waiting for a packet — the opponent cannot affect it, so there
+   * is nothing to wait for, and the shift timing keeps its zero input delay.
+   */
+  function tickOnline(throttle) {
+    if (session.status === STATUS_COUNTDOWN) {
+      if (!readyToLaunch(session, Date.now())) {
+        return false; // the tree has not been released yet
+      }
+      session = racing(session);
+      race = startRace(race);
+      myLog = recordStart(myLog, raceTick);
+    }
+    if (session.status !== STATUS_RACING) {
+      return false;
+    }
+
+    myLog = recordThrottle(myLog, raceTick, throttle);
+    return true;
+  }
+
+  /** Sends whatever the driver has done since the last tick. */
+  function streamInputs() {
+    if (!session.liveRound) return;
+    const tail = eventsSince(myLog, sentThrough);
+    if (tail.length === 0) return;
+    net.sendInputs(session.liveRound.round, session.liveRound.attempt, tail);
+    sentThrough = raceTick + 1;
+  }
+
+  /** ENTER on the online screen. */
+  function confirmOnlineScreen() {
+    // On a result panel the key means "get on with it": ask for the next round,
+    // or ask for a rematch. The round itself is started by the server.
+    if (session.status === STATUS_ROUND_RESULT) {
+      net.sendReady(true);
+      return;
+    }
+    if (session.status === STATUS_MATCH_RESULT) {
+      net.sendRematch();
+      return;
+    }
+
+    switch (confirmOnline(onlineMenu, session)) {
+      case ONLINE_SEARCH:
+        enterOnline(() => net.findMatch());
+        break;
+      case ONLINE_CREATE:
+        enterOnline(() => net.createRoom({ trackId: chosen.track.id, distanceId: "quarter", bestOf: 3 }));
+        break;
+      case ONLINE_OPEN_JOIN:
+        onlineMenu = openJoin(onlineMenu);
+        break;
+      case ONLINE_JOIN: {
+        const code = onlineMenu.entry.value;
+        onlineMenu = closeJoin(onlineMenu);
+        enterOnline(() => net.joinRoom(code));
+        break;
+      }
+      case ONLINE_READY:
+        net.sendReady(true);
+        break;
+      default:
+        break;
+    }
+  }
+
+  /** ESC on the online screen: out of the code field, or out of online play. */
+  function cancelOnlineScreen() {
+    if (paneFor(onlineMenu, session) === PANE_JOIN) {
+      onlineMenu = closeJoin(onlineMenu);
+      return false; // handled here; the shell does not move
+    }
+    if (paneFor(onlineMenu, session) !== PANE_HOME) {
+      // Backing out of a search or a lobby returns to the ways in, rather than
+      // straight out of online play — one press, one step.
+      if (net.isOpen()) {
+        net.cancelSearch();
+        net.leaveRoom();
+      }
+      session = leftSession(session);
+      return false;
+    }
+    return true; // nothing left to back out of here; let the shell leave
+  }
+
+  function onlineAction(action) {
+    switch (action.type) {
+      case ACTION_TEXT:
+        onlineMenu = typeCode(onlineMenu, action);
+        break;
+      case ACTION_MOVE: {
+        audio.play("button");
+        const published = adjustLobby(onlineMenu, action.direction, session);
+        if (published) net.sendConfig(published);
+        else onlineMenu = moveOnline(onlineMenu, action.direction, session);
+        break;
+      }
+      case ACTION_CONFIRM:
+        audio.play("button");
+        confirmOnlineScreen();
+        break;
+      case ACTION_CANCEL:
+        audio.play("button");
+        // Through `cancelScreen` rather than straight to the shell, so the key,
+        // the pointer and the debug handle all get the same answer.
+        cancelScreen();
+        break;
+      default:
+        break;
+    }
+  }
+
+  /**
+   * Keeps the keyboard's capture mode in step with the screen. The stereo row is
+   * live everywhere *except* a focused field, because a room code contains B, N,
+   * L, P and F — see `ui/text-entry.js`.
+   */
+  function syncTextCapture() {
+    const wants = shell.screen === SCREEN_ONLINE && wantsTextCapture(onlineMenu, session);
+    if (wants !== input.capturingText()) input.setTextCapture(wants);
+  }
+
   /** Replaces race state and emits only the sounds implied by that transition. */
   function updateRace(nextRace) {
     const previous = race;
@@ -462,6 +821,10 @@ export function boot(canvas) {
 
   /** A direction key moves the physical stick only while its gate is open. */
   function moveRaceGate(direction) {
+    if (isOnlineRace()) {
+      if (session.status !== STATUS_RACING) return;
+      myLog = recordGate(myLog, raceTick, direction);
+    }
     const previous = race;
     const next = gateInput(race, direction);
     if (stickMoved(previous, next)) {
@@ -530,6 +893,13 @@ export function boot(canvas) {
       beginTutorial();
     } else if (command === COMMAND_MODE) {
       adoptMode();
+    } else if (command === COMMAND_ONLINE) {
+      // Entering the screen does not connect: the socket opens when the player
+      // picks a way in, so browsing the menu costs nobody a connection.
+      onlineMenu = createOnlineMenu();
+      session = createSession();
+    } else if (command === COMMAND_ONLINE_LEAVE) {
+      leaveOnline();
     }
   }
 
@@ -553,6 +923,10 @@ export function boot(canvas) {
     }
     if (shell.screen === SCREEN_RADIO) {
       confirmRadio();
+      return;
+    }
+    if (shell.screen === SCREEN_ONLINE) {
+      confirmOnlineScreen();
       return;
     }
     if (shell.screen === SCREEN_GARAGE) {
@@ -669,6 +1043,9 @@ export function boot(canvas) {
 
   /** ESC. Same split: a locked pane is unlocked before the shell backs out. */
   function cancelScreen() {
+    if (shell.screen === SCREEN_ONLINE && !cancelOnlineScreen()) {
+      return; // handled inside the online screen; the shell does not move
+    }
     if (shell.screen === SCREEN_GARAGE) {
       // Backing out throws the working copy away — that is what makes trying a
       // colour safe.
@@ -709,12 +1086,34 @@ export function boot(canvas) {
    * the pointer path and the debug handle get the same answer as the keyboard.
    */
   function stageOrShift() {
+    // Online, the tree is released by the server rather than by this key, so
+    // staging never happens here and ENTER is only ever the clutch.
+    if (isOnlineRace()) {
+      if (session.status !== STATUS_RACING) return;
+      myLog = recordClutch(myLog, raceTick);
+      updateRace(pressShift(race, { throttle: input.throttle() }));
+      return;
+    }
     updateRace(
       race.phase === STAGING ? startRace(race) : pressShift(race, { throttle: input.throttle() }),
     );
   }
 
   function raceAction(action) {
+    // An online result panel is drawn over the strip, and while it is up the
+    // race is over — so ENTER asks for the next round instead of the clutch, and
+    // ESC leaves the match rather than pausing a race nobody is driving.
+    if (isOnlineRace() && showsOnlineResult()) {
+      if (action.type === ACTION_CONFIRM) {
+        audio.play("button");
+        confirmOnlineScreen();
+      } else if (action.type === ACTION_CANCEL) {
+        audio.play("button");
+        leaveOnline();
+        shell = enterScreen(shell, SCREEN_MODES);
+      }
+      return;
+    }
     switch (action.type) {
       case ACTION_CONFIRM:
         // Through `confirmScreen` rather than straight to `stageOrShift`, so the
@@ -729,10 +1128,17 @@ export function boot(canvas) {
         moveRaceGate(action.direction);
         break;
       case ACTION_RESTART:
+        // Restarting is an offline convenience. Online the round belongs to the
+        // server, and a driver who could re-run one at will would be choosing
+        // which of their attempts counted.
+        if (isOnlineRace()) break;
         audio.play("button");
         restartRun();
         break;
       case ACTION_CANCEL:
+        // Likewise pause: stopping the clock to line up a shift would defeat
+        // the timing skill outright, so it is simply not available online.
+        if (isOnlineRace()) break;
         audio.play("button");
         cancelScreen(); // pauses
         break;
@@ -1014,6 +1420,8 @@ export function boot(canvas) {
         raceAction(action);
       } else if (shell.screen === SCREEN_RADIO) {
         radioAction(action);
+      } else if (shell.screen === SCREEN_ONLINE) {
+        onlineAction(action);
       } else {
         menuAction(action);
       }
@@ -1023,6 +1431,7 @@ export function boot(canvas) {
   function tick(throttle) {
     applyActions();
     applyPointer();
+    syncTextCapture();
     view.tick += 1;
 
     // The radio runs on every screen — that is what makes it a car stereo
@@ -1040,6 +1449,21 @@ export function boot(canvas) {
       return; // nothing to advance behind a menu
     }
 
+    // An online round holds on the line until the server's shared start time
+    // arrives, so both trees go green at the same instant and the two reaction
+    // times mean the same thing. Once it is over, the strip keeps rendering
+    // under the result panel but nothing advances.
+    if (isOnlineRace()) {
+      if (showsOnlineResult()) {
+        audio.engine({ active: true, throttle: 0, gear: race.vehicle.gear });
+        return;
+      }
+      if (!tickOnline(throttle)) {
+        audio.engine({ active: true, throttle: 0, gear: race.vehicle.gear });
+        return;
+      }
+    }
+
     // A coaching beat stops the world. It is not the pause screen — the race is
     // still the screen you are on — it is the lesson holding the car still while
     // something gets explained.
@@ -1049,6 +1473,21 @@ export function boot(canvas) {
     }
 
     updateRace(stepRace(race, { throttle }, TICK_SECONDS));
+
+    // The other car, run forward on the same reducer from the inputs that have
+    // arrived. It is simulated rather than interpolated — see online/opponent.js.
+    if (isOnlineRace()) {
+      raceTick += 1;
+      opponentCar = advanceTo(opponentCar, raceTick);
+      streamInputs();
+      if (race.phase === FINISHED && session.liveRound) {
+        // "I have sent you everything." Deliberately carries no time: the server
+        // replays the log and works out for itself what it achieved.
+        streamInputs();
+        net.sendDone(session.liveRound.round, session.liveRound.attempt);
+      }
+    }
+
     if (coach) {
       coach = advanceCoach(coach, race);
       if (coachFinished(coach)) {
@@ -1083,7 +1522,7 @@ export function boot(canvas) {
 
     // The run ending is what opens the results screen — the shell never has to
     // ask the race whether it is over.
-    if (race.phase === FINISHED) {
+    if (race.phase === FINISHED && !isOnlineRace()) {
       shell = enterScreen(shell, SCREEN_RESULTS);
       // A lesson ends with the run it belongs to, however far through it got:
       // there is nothing left to coach, and its strip would otherwise stick out
@@ -1096,6 +1535,48 @@ export function boot(canvas) {
       throttle,
       gear: race.vehicle.gear,
     });
+  }
+
+  /**
+   * The other car, in the neighbouring lane, offset by the real gap between the
+   * two runs.
+   *
+   * The world scrolls with *this* driver, so their car is fixed on screen and
+   * the opponent moves relative to it: ahead is up the strip. The gap comes from
+   * two independent simulations of the same deterministic reducer, so it is the
+   * true gap rather than a smoothed guess at one.
+   */
+  function drawOpponentCar() {
+    const them = opponent(session);
+    const model = them?.modelId ? modelById(them.modelId) : null;
+    if (!model) return;
+
+    const gap = opponentCar.race.vehicle.distance - race.vehicle.distance;
+    const offsetY = -gap * PIXELS_PER_METRE;
+    // Cheap enough to skip entirely once they are off the end of the strip.
+    if (Math.abs(offsetY) > WORLD.height) return;
+
+    const livery = them.livery ?? null;
+    ctx.save();
+    ctx.translate(0, offsetY);
+    drawUnderglow(ctx, carBox(model, { laneIndex: OPPONENT_LANE }), livery);
+    drawCar(
+      ctx,
+      liverySprite(liveryCache, {
+        image: sheetImages.get(model.sheetId),
+        model,
+        livery,
+      }),
+      model,
+      { laneIndex: OPPONENT_LANE },
+    );
+    drawTailLights(
+      ctx,
+      model,
+      opponentCar.race.shift !== null || opponentCar.race.clutchTimer > 0 ? 1 : 0.25,
+      { colour: (alpha) => tailLightColour(livery, alpha), laneIndex: OPPONENT_LANE },
+    );
+    ctx.restore();
   }
 
   /** The world and the instrument cluster, drawn under the race-side screens. */
@@ -1126,6 +1607,10 @@ export function boot(canvas) {
     drawTailLights(ctx, chosen.model, race.shift !== null || race.clutchTimer > 0 ? 1 : 0.25, {
       colour: (alpha) => tailLightColour(chosen.livery, alpha),
     });
+
+    if (isOnlineRace()) {
+      drawOpponentCar();
+    }
 
     drawChristmasTree(ctx, race);
     // The coach says everything the staging prompt would, in its own words and
@@ -1206,6 +1691,12 @@ export function boot(canvas) {
       return;
     }
 
+    if (shell.screen === SCREEN_ONLINE) {
+      canvas.style.cursor = "default";
+      drawOnlineScreen(ctx, onlineView(onlineMenu, session), { splashImage });
+      return;
+    }
+
     if (shell.screen === SCREEN_GARAGE) {
       const view = currentGarageView({ pointer: at });
       canvas.style.cursor = view.hover ? "pointer" : "default";
@@ -1238,6 +1729,21 @@ export function boot(canvas) {
     }
 
     renderRace();
+    if (isOnlineRace() && showsOnlineResult()) {
+      // Over the strip rather than instead of it: the run that just happened is
+      // still on screen underneath, the way pause and the offline results are.
+      drawOnlineResult(ctx, {
+        headline: roundHeadline(session),
+        note: restartNote(session),
+        rows: roundRows(session),
+        score: session.score,
+        matchResult: session.matchResult,
+        menu: session.status === STATUS_MATCH_RESULT
+          ? (session.rematch.asked ? "Waiting for your opponent…" : "ENTER — rematch    ESC — leave")
+          : "ENTER — stage for the next round",
+      });
+      return;
+    }
     if (shell.screen === SCREEN_PAUSED) {
       drawPauseMenu(ctx, menu);
     } else if (shell.screen === SCREEN_RESULTS) {
@@ -1426,6 +1932,40 @@ export function boot(canvas) {
       shell = enterScreen(shell, SCREEN_MODES);
       render();
       return this.state();
+    },
+    /**
+     * The online path, for automation. `receive` feeds a server frame straight
+     * into the net layer's parser, which is the only way to exercise the glue
+     * between the wire and the race without a live opponent — and the folder
+     * picker note above applies here too: a socket cannot be driven from a
+     * script, so the frames are injected instead.
+     */
+    online: {
+      receive(frame) {
+        net.receive(frame);
+        render();
+        return { status: session.status, round: session.round, attempt: session.attempt };
+      },
+      session: () => ({
+        status: session.status,
+        roomCode: session.roomCode,
+        isHost: session.isHost,
+        players: session.players.map((player) => player.displayName),
+        config: session.config,
+        score: session.score,
+        headline: roundHeadline(session),
+      }),
+      /** The other car, as it is currently being drawn. */
+      opponent: () =>
+        opponentCar
+          ? {
+              distance: opponentCar.race.vehicle.distance,
+              speed: opponentCar.race.vehicle.speed,
+              gear: opponentCar.race.vehicle.gear,
+              tick: opponentCar.tick,
+            }
+          : null,
+      log: () => myLog.events.length,
     },
     state() {
       const selection = setupSelection(setup, garage);

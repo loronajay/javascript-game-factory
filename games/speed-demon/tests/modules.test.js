@@ -23,7 +23,11 @@ const MODULES = [
   "scripts/sim/match.js",
   "scripts/sim/modes.js",
   "scripts/sim/race.js",
+  "scripts/sim/input-log.js",
   "scripts/audio.js",
+  "scripts/online/session.js",
+  "scripts/online/opponent.js",
+  "scripts/online/net.js",
   "scripts/radio/tracks.js",
   "scripts/radio/playlist.js",
   "scripts/radio/library-status.js",
@@ -43,6 +47,8 @@ const MODULES = [
   "scripts/ui/garage-editor.js",
   "scripts/ui/shell.js",
   "scripts/ui/coach.js",
+  "scripts/ui/text-entry.js",
+  "scripts/ui/online-menu.js",
   "scripts/render/scene.js",
   "scripts/render/car.js",
   "scripts/render/setup.js",
@@ -53,6 +59,7 @@ const MODULES = [
   "scripts/render/coach.js",
   "scripts/render/menus.js",
   "scripts/render/radio.js",
+  "scripts/render/online.js",
   "scripts/input.js",
   "scripts/pointer.js",
   "scripts/init-game.js",
@@ -391,6 +398,50 @@ test("the garage's rules never reach for a browser", () => {
   }
 });
 
+test("the online rules never reach for a browser or a socket", () => {
+  // The third instance of the same split, and the one where it matters most:
+  // `session.js` holds every rule about a match, `opponent.js` reconstructs the
+  // other car, and both are pure so the whole lifecycle can be exercised without
+  // a network. `net.js` is the one module allowed to know a WebSocket exists.
+  const forbidden = [
+    /\bdocument\s*\./,
+    /\bwindow\s*\./,
+    /\blocalStorage\s*\./,
+    /\bfetch\s*\(/,
+    /new\s+WebSocket/,
+  ];
+  for (const relative of [
+    "scripts/online/session.js",
+    "scripts/online/opponent.js",
+    "scripts/ui/text-entry.js",
+    "scripts/ui/online-menu.js",
+  ]) {
+    const source = fs.readFileSync(path.join(gameRoot, relative), "utf8");
+    for (const pattern of forbidden) {
+      assert(!pattern.test(source), `${relative} reaches for ${pattern}`);
+    }
+  }
+});
+
+test("the online rules do not import the socket layer", () => {
+  // A pure reducer importing the transport would drag a live connection into
+  // every test that touches a lobby.
+  for (const relative of ["scripts/online/session.js", "scripts/online/opponent.js"]) {
+    const source = fs.readFileSync(path.join(gameRoot, relative), "utf8");
+    assert(!/from\s+"[^"]*\/net\.js"/.test(source), `${relative} imports the socket layer`);
+  }
+});
+
+test("net.js is the only module in the cabinet that opens a socket", () => {
+  const offenders = [];
+  for (const relative of MODULES) {
+    if (relative === "scripts/online/net.js") continue;
+    const source = fs.readFileSync(path.join(gameRoot, relative), "utf8");
+    if (/new\s+WebSocket/.test(source)) offenders.push(relative);
+  }
+  assertEqual(offenders.join(", "), "", "every socket call belongs in online/net.js");
+});
+
 test("the garage's rules do not import the storage layer", () => {
   // A pure reducer importing the sync layer would drag a server client into
   // every test that touches a preset.
@@ -513,7 +564,7 @@ test("every garage panel fits on screen and nothing collides", () => {
   const liveryModule = loaded["scripts/garage/livery.js"];
 
   // A garage full of saved paints offers the most actions, so it is the case
-  // that decides whether the action row still fits — and a car carrying the
+  // that decides whether the action row still fits ï¿½ and a car carrying the
   // maximum number of layers has both the most tabs and the longest section, so
   // it is the case that decides whether the *rows* do.
   let stocked = garageModule.emptyGarage();
@@ -586,7 +637,7 @@ test("every strip cell fits inside its own row and its neighbours", () => {
           `${r.what} runs outside its row horizontally`);
         assert(r.y >= rowRect.y && r.y + r.height <= rowRect.y + rowRect.height,
           `${r.what} runs outside its row vertically`);
-        assert(r.width > 12, `${r.what} is only ${Math.round(r.width)}px wide — unclickable`);
+        assert(r.width > 12, `${r.what} is only ${Math.round(r.width)}px wide ï¿½ unclickable`);
       }
       for (let i = 0; i + 1 < rects.length; i += 1) {
         assert(!overlaps(rects[i], rects[i + 1]), `${rects[i].what} overlaps its neighbour`);

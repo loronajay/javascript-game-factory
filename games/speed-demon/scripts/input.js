@@ -19,6 +19,17 @@ export const ACTION_SHIFT = "shift";
 export const ACTION_RESTART = "restart";
 /** A stereo button. Carries which one in `control`. */
 export const ACTION_STEREO = "stereo";
+/**
+ * A typed character, or a backspace. Only ever queued while text capture is on.
+ *
+ * This is the one deliberate exception to "the stereo row means the same thing
+ * everywhere". A room code is five characters from an alphabet containing B, N,
+ * L, P and F, so typing one without suppressing the transport would pause the
+ * music, skip a track and open a folder picker. The rule is worth keeping
+ * precisely because breaking it is this visible — so it is broken in one narrow
+ * mode, entered explicitly, rather than eroded screen by screen.
+ */
+export const ACTION_TEXT = "text";
 
 /**
  * The stereo row.
@@ -72,9 +83,18 @@ const THROTTLE_KEYS = new Set(["Space"]);
 export function createInput(target = window, onActivity = () => {}) {
   const held = new Set();
   let queue = [];
+  // While a text field has focus, letters are letters. See ACTION_TEXT.
+  let capturingText = false;
 
   const onKeyDown = (event) => {
     const code = event.code;
+
+    // Text capture is checked before anything else, because its whole job is to
+    // stop the keys below from meaning what they usually mean.
+    if (capturingText && handleTextKey(event)) {
+      return;
+    }
+
     // Ctrl/Alt/Cmd combinations belong to the browser — zoom is Ctrl+Minus, and
     // swallowing it here would be the game deciding it owns a shortcut it does
     // not. Shift is deliberately not checked: it is the clutch.
@@ -138,6 +158,37 @@ export function createInput(target = window, onActivity = () => {}) {
     }
   };
 
+  /**
+   * The keyboard while a field has focus. Returns true when the key has been
+   * dealt with here and must not fall through to the game bindings.
+   *
+   * ENTER and ESC deliberately fall *through*: submitting and cancelling a field
+   * are the same two keys they are everywhere else, and a field that swallowed
+   * them would need its own way out.
+   */
+  function handleTextKey(event) {
+    if (CONFIRM_KEYS.has(event.code) || CANCEL_KEYS.has(event.code)) {
+      return false;
+    }
+    onActivity();
+    if (event.code === "Backspace") {
+      event.preventDefault();
+      if (!event.repeat) queue.push({ type: ACTION_TEXT, backspace: true });
+      return true;
+    }
+    // One printable character. `event.key` rather than `event.code`, because
+    // here the player means the letter they see on the keycap, not the physical
+    // key — the opposite of every other binding in this file.
+    if (event.key && event.key.length === 1) {
+      event.preventDefault();
+      if (!event.repeat) queue.push({ type: ACTION_TEXT, char: event.key });
+      return true;
+    }
+    // Everything else — arrows, function keys, modifiers — is swallowed so a
+    // stray key cannot reach the stereo or move a cursor behind the field.
+    return true;
+  }
+
   const onKeyUp = (event) => {
     held.delete(event.code);
   };
@@ -151,6 +202,18 @@ export function createInput(target = window, onActivity = () => {}) {
   target.addEventListener("blur", onBlur);
 
   return {
+    /**
+     * Puts the keyboard into (or out of) text capture. The throttle is released
+     * on the way in: a field cannot be typed into with a foot on the gas, and a
+     * key held down when the mode changed would otherwise stay held forever.
+     */
+    setTextCapture(enabled) {
+      capturingText = !!enabled;
+      if (capturingText) held.clear();
+    },
+    capturingText() {
+      return capturingText;
+    },
     throttle() {
       return held.size > 0 ? 1 : 0;
     },

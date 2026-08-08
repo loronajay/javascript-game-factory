@@ -25,6 +25,14 @@ export const SCREEN_PAUSED = "paused";
 export const SCREEN_RESULTS = "results";
 export const SCREEN_RADIO = "radio";
 export const SCREEN_GARAGE = "garage";
+/**
+ * Getting into an online match: quick search, a private room code, and the
+ * lobby you wait in. The match *itself* is not a screen — it is the race screen
+ * with a session attached, exactly as the tutorial is the race screen with a
+ * coach attached, and for the same reason: there must not be a second, subtly
+ * different copy of the driving for the online path to drift into.
+ */
+export const SCREEN_ONLINE = "online";
 
 export const SCREENS = [
   SCREEN_TITLE,
@@ -35,6 +43,7 @@ export const SCREENS = [
   SCREEN_RESULTS,
   SCREEN_RADIO,
   SCREEN_GARAGE,
+  SCREEN_ONLINE,
 ];
 
 /**
@@ -59,6 +68,10 @@ export const COMMAND_MODE = "mode";
 export const COMMAND_LOCKED = "locked";
 /** Build a guided practice run instead of a chosen one. */
 export const COMMAND_TUTORIAL = "tutorial";
+/** Open a connection and start looking for a match. */
+export const COMMAND_ONLINE = "online";
+/** Tear the session down: the player has backed out of online play. */
+export const COMMAND_ONLINE_LEAVE = "online-leave";
 
 /**
  * Screens whose menu is a modal over a live race, so the world and the
@@ -232,6 +245,11 @@ export function confirmShell(shell) {
         // ever changed by a confirm that actually goes through.
         return outcome(shell, COMMAND_LOCKED);
       }
+      // Online picks its car and its strip in a lobby the two drivers share, so
+      // it goes straight there rather than through the solo setup screen.
+      if (mode.online) {
+        return outcome(enterScreen({ ...shell, modeId: mode.id }, SCREEN_ONLINE), COMMAND_ONLINE);
+      }
       return outcome(enterScreen({ ...shell, modeId: mode.id }, SCREEN_SETUP), COMMAND_MODE);
     }
 
@@ -275,6 +293,12 @@ export function confirmShell(shell) {
     case SCREEN_GARAGE:
       return outcome(shell);
 
+    // The online screen owns its own ENTER too — search, create, join, ready —
+    // and what any of those mean depends on the session, which the shell
+    // deliberately cannot see.
+    case SCREEN_ONLINE:
+      return outcome(shell);
+
     default:
       return outcome(shell);
   }
@@ -304,6 +328,11 @@ export function cancelShell(shell) {
     // unlike the radio it needs no remembered return — there is one place to go.
     case SCREEN_GARAGE:
       return outcome(enterScreen(shell, SCREEN_SETUP));
+    // Backing out of online has to close the socket as well as change screen —
+    // an abandoned lobby that nobody left is a room the server keeps alive and
+    // an opponent left staring at a driver who is not coming back.
+    case SCREEN_ONLINE:
+      return outcome(enterScreen(shell, SCREEN_MODES), COMMAND_ONLINE_LEAVE);
     default:
       return outcome(shell);
   }

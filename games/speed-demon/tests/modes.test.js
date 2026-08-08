@@ -51,11 +51,12 @@ test("an unknown id resolves to nothing rather than to something plausible", () 
   assertEqual(modeById("drift"), null);
 });
 
-test("the playable list leaves the locked modes out", () => {
+test("the playable list is exactly the available modes", () => {
   assert(playableModes().every((mode) => mode.available));
-  assert(
-    playableModes().length < MODES.length,
-    "online is still locked, so this test is checking something",
+  assertEqual(
+    playableModes().length,
+    MODES.filter((mode) => mode.available).length,
+    "nothing available should be missing from the list",
   );
 });
 
@@ -144,11 +145,23 @@ test("every mode and option pair produces exactly one objective", () => {
   }
 });
 
-test("online is locked but still describes a real race, so unlocking it is data", () => {
+test("online is playable and shapes a real race", () => {
   const online = modeById(MODE_ONLINE);
-  assertEqual(online.available, false);
+  assertEqual(online.available, true, "casual online is shipped");
   const options = raceOptionsFor(MODE_ONLINE, online.objective.defaultId);
-  assert(options.distanceMetres > 0, "the locked mode must still shape a race");
+  assert(options.distanceMetres > 0);
+  assertEqual(options.timeLimitSeconds, null, "a versus race ends at a line, not on a clock");
+});
+
+test("online is the one mode that skips the solo setup screen", () => {
+  // The strip, the distance and the match length belong to the room both drivers
+  // are in, so the shell sends this mode to the lobby instead. Every other mode
+  // picks its own, and must not carry the flag.
+  assertEqual(modeById(MODE_ONLINE).online, true);
+  for (const mode of MODES) {
+    if (mode.id === MODE_ONLINE) continue;
+    assert(!mode.online, `${mode.id} picks its own race and belongs on the setup screen`);
+  }
 });
 
 test("an unknown mode fails loudly rather than racing something arbitrary", () => {
