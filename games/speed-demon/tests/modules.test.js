@@ -234,6 +234,7 @@ function setupRects(modeId) {
   }
   rects.push({ what: "preview", ...setup.SETUP_LAYOUT.preview });
   rects.push({ what: "summary", ...setup.SETUP_LAYOUT.summary });
+  rects.push({ what: "start", ...setup.startButtonRect() });
   return rects;
 }
 

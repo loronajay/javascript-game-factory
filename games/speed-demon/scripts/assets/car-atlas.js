@@ -9,8 +9,17 @@
 //
 // Every rect below was measured with `framesFromAlpha`, not typed by hand.
 // Those helpers stay here so the next authored sheet is measured the same way
-// rather than eyeballed: run the measurer over the new PNG's alpha channel and
-// paste what it returns.
+// rather than eyeballed — and `tools/measure-frames.mjs` runs the sheets back
+// through *this* function rather than a copy, which is what keeps that claim
+// true across a re-cut.
+//
+// **The sheets are cut by `tools/cut-car-sheets.py`, not by a background
+// remover.** An online remover produced the first pair, and both of its outputs
+// were wrong in ways nothing downstream could recover from: it returned 600x600
+// when the generation is 1254x1254, and it left the magenta key smeared through
+// every edge pixel, where `garage/paint.js` classified it as `REGION_OTHER` and
+// left it alone — so a repainted car came out speckled with pink. Re-cut from
+// `assets/car-sheets/source-models-{a,b}.png` when the art changes.
 
 /** Runs of consecutive non-empty counts, as inclusive [start, end] pairs. */
 export function bandsFromCounts(counts, minRun = 1) {
@@ -125,12 +134,15 @@ export function frameById(atlas, id) {
 // The committed manifest
 // ---------------------------------------------------------------------------
 //
-// Two 600x600 sheets, twelve rear-view cars each: 24 distinct base models.
+// Two 1254x1254 sheets, twelve rear-view cars each: 24 distinct base models.
+// That is the generations' native size, and it is not generous — the garage
+// preview draws a car at roughly 254x352 before the canvas fit and device pixel
+// ratio are applied, so a ~250x346 frame is close to exactly what it asks for.
 //
 // These replaced an earlier roster of five sheets holding 45 *paints* of one
 // body. That is the whole point of the change: colour is no longer baked into
 // the sprite, so it cannot be what a car is identified by. Every body here is
-// deliberately neutral — measured roof saturation runs 0.004–0.019 across all
+// deliberately neutral — measured roof saturation runs 0.006–0.041 across all
 // 24 — which is what lets `render/livery.js` tint one to any colour the player
 // asks for. A model is the shape; the paint is configuration.
 //
@@ -164,42 +176,42 @@ export const MODEL_GROUPS = [
 export const MODELS_A = {
   id: "models-a",
   src: "assets/car-sheets/models-a.png",
-  width: 600,
-  height: 600,
+  width: 1254,
+  height: 1254,
   frames: [
-    { id: "kaido-gts", label: "Kaido GTS", group: "gt", sx: 17, sy: 27, sw: 120, sh: 166 },
-    { id: "tsunami-rz", label: "Tsunami RZ", group: "coupe", sx: 164, sy: 31, sw: 121, sh: 162 },
-    { id: "shutter-z", label: "Shutter Z", group: "coupe", sx: 309, sy: 31, sw: 120, sh: 162 },
-    { id: "meridian-rs", label: "Meridian RS", group: "euro", sx: 453, sy: 39, sw: 126, sh: 151 },
-    { id: "monolith-8", label: "Monolith 8", group: "wedge", sx: 16, sy: 232, sw: 120, sh: 158 },
-    { id: "zephyr-z", label: "Zephyr Z", group: "coupe", sx: 160, sy: 231, sw: 126, sh: 159 },
-    { id: "stallion-gt", label: "Stallion GT", group: "muscle", sx: 307, sy: 227, sw: 123, sh: 164 },
-    { id: "aero-rs", label: "Aero RS", group: "euro", sx: 450, sy: 231, sw: 132, sh: 160 },
-    { id: "skyward-r", label: "Skyward R", group: "gt", sx: 16, sy: 430, sw: 121, sh: 149 },
-    { id: "gravel-stx", label: "Gravel STx", group: "gt", sx: 162, sy: 429, sw: 120, sh: 151 },
-    { id: "toro-sv", label: "Toro SV", group: "exotic", sx: 304, sy: 433, sw: 127, sh: 142 },
-    { id: "scalpel-r", label: "Scalpel R", group: "hatch", sx: 452, sy: 433, sw: 126, sh: 143 },
+    { id: "kaido-gts", label: "Kaido GTS", group: "gt", sx: 36, sy: 57, sw: 251, sh: 346 },
+    { id: "tsunami-rz", label: "Tsunami RZ", group: "coupe", sx: 342, sy: 65, sw: 254, sh: 339 },
+    { id: "shutter-z", label: "Shutter Z", group: "coupe", sx: 645, sy: 64, sw: 252, sh: 339 },
+    { id: "meridian-rs", label: "Meridian RS", group: "euro", sx: 946, sy: 81, sw: 264, sh: 319 },
+    { id: "monolith-8", label: "Monolith 8", group: "wedge", sx: 35, sy: 485, sw: 250, sh: 330 },
+    { id: "zephyr-z", label: "Zephyr Z", group: "coupe", sx: 334, sy: 483, sw: 265, sh: 333 },
+    { id: "stallion-gt", label: "Stallion GT", group: "muscle", sx: 642, sy: 475, sw: 258, sh: 348 },
+    { id: "aero-rs", label: "Aero RS", group: "euro", sx: 940, sy: 484, sw: 277, sh: 336 },
+    { id: "skyward-r", label: "Skyward R", group: "gt", sx: 34, sy: 897, sw: 253, sh: 313 },
+    { id: "gravel-stx", label: "Gravel STx", group: "gt", sx: 338, sy: 897, sw: 252, sh: 316 },
+    { id: "toro-sv", label: "Toro SV", group: "exotic", sx: 635, sy: 905, sw: 266, sh: 303 },
+    { id: "scalpel-r", label: "Scalpel R", group: "hatch", sx: 945, sy: 905, sw: 263, sh: 302 },
   ],
 };
 
 export const MODELS_B = {
   id: "models-b",
   src: "assets/car-sheets/models-b.png",
-  width: 600,
-  height: 600,
+  width: 1254,
+  height: 1254,
   frames: [
-    { id: "chrono-12", label: "Chrono 12", group: "wedge", sx: 11, sy: 40, sw: 127, sh: 163 },
-    { id: "orbit-rz", label: "Orbit RZ", group: "coupe", sx: 165, sy: 34, sw: 118, sh: 170 },
-    { id: "vega-qv", label: "Vega QV", group: "exotic", sx: 305, sy: 40, sw: 129, sh: 156 },
-    { id: "crest-s", label: "Crest S", group: "euro", sx: 454, sy: 38, sw: 131, sh: 164 },
-    { id: "titan-r", label: "Titan R", group: "gt", sx: 10, sy: 222, sw: 129, sh: 171 },
-    { id: "cyclone-rz", label: "Cyclone RZ", group: "coupe", sx: 165, sy: 221, sw: 117, sh: 173 },
-    { id: "colt-gt", label: "Colt GT", group: "muscle", sx: 307, sy: 224, sw: 123, sh: 171 },
-    { id: "ember-rs", label: "Ember RS", group: "hatch", sx: 457, sy: 222, sw: 123, sh: 173 },
-    { id: "halo-lt", label: "Halo LT", group: "exotic", sx: 13, sy: 416, sw: 123, sh: 153 },
-    { id: "vortex-fd", label: "Vortex FD", group: "coupe", sx: 164, sy: 417, sw: 119, sh: 157 },
-    { id: "kaido-r", label: "Kaido R", group: "gt", sx: 310, sy: 415, sw: 118, sh: 158 },
-    { id: "crest-turbo", label: "Crest Turbo", group: "euro", sx: 457, sy: 416, sw: 123, sh: 157 },
+    { id: "chrono-12", label: "Chrono 12", group: "wedge", sx: 24, sy: 84, sw: 264, sh: 340 },
+    { id: "orbit-rz", label: "Orbit RZ", group: "coupe", sx: 345, sy: 71, sw: 247, sh: 355 },
+    { id: "vega-qv", label: "Vega QV", group: "exotic", sx: 638, sy: 84, sw: 269, sh: 331 },
+    { id: "crest-s", label: "Crest S", group: "euro", sx: 949, sy: 79, sw: 273, sh: 345 },
+    { id: "titan-r", label: "Titan R", group: "gt", sx: 21, sy: 464, sw: 269, sh: 358 },
+    { id: "cyclone-rz", label: "Cyclone RZ", group: "coupe", sx: 345, sy: 462, sw: 245, sh: 361 },
+    { id: "colt-gt", label: "Colt GT", group: "muscle", sx: 642, sy: 468, sw: 257, sh: 362 },
+    { id: "ember-rs", label: "Ember RS", group: "hatch", sx: 955, sy: 465, sw: 257, sh: 361 },
+    { id: "halo-lt", label: "Halo LT", group: "exotic", sx: 27, sy: 870, sw: 257, sh: 321 },
+    { id: "vortex-fd", label: "Vortex FD", group: "coupe", sx: 343, sy: 872, sw: 249, sh: 329 },
+    { id: "kaido-r", label: "Kaido R", group: "gt", sx: 648, sy: 867, sw: 247, sh: 332 },
+    { id: "crest-turbo", label: "Crest Turbo", group: "euro", sx: 955, sy: 869, sw: 257, sh: 335 },
   ],
 };
 

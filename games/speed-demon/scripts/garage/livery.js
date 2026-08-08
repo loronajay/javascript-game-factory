@@ -6,7 +6,7 @@
 // reason: rules belong somewhere a test can reach without a browser.
 //
 // The 24 base models are deliberately neutral bodies (measured roof saturation
-// runs 0.004–0.019 across the whole roster), which is what makes a livery a
+// runs 0.006–0.041 across the whole roster), which is what makes a livery a
 // *tint* rather than a second set of sprites. Nothing here holds pixels; a
 // livery is a handful of numbers, which is also what makes it cheap to store
 // and cheap to hand to an opponent over the wire.

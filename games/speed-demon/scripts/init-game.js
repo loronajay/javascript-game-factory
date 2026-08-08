@@ -29,6 +29,7 @@ import {
   setupView,
   setupSelection,
   resolveSelection,
+  TARGET_START,
 } from "./ui/setup-menu.js";
 import {
   SCREEN_TITLE,
@@ -210,6 +211,10 @@ export function boot(canvas) {
   // the editor is a screen's worth of state, not part of the cabinet's.
   let editor = null;
   let setup = createSetup({ modeId: shell.modeId }, garage);
+  // What the pointer is over on the setup screen. Sampled rather than queued,
+  // like the throttle — and deliberately *not* part of `setup`, because the
+  // setup cursor is also the pick and hovering must never choose anything.
+  let setupHover = null;
 
   garageStore.load().then((loaded) => {
     garage = loaded;
@@ -489,6 +494,16 @@ export function boot(canvas) {
         return;
       }
     }
+    confirmShellNow();
+  }
+
+  /**
+   * Hands the confirmation to the shell. Split out of `confirmScreen` because
+   * the setup screen's START button means "the setup is finished with this key"
+   * without any pane left to lock — and going straight to `beginRace` instead
+   * would build the race while leaving the screen showing the picker.
+   */
+  function confirmShellNow() {
     const { shell: nextShell, command } = confirmShell(shell);
     shell = nextShell;
     runCommand(command);
@@ -764,21 +779,44 @@ export function boot(canvas) {
   }
 
   /**
-   * A click on the setup screen. Selecting and committing stay separate keys on
-   * the keyboard, but a mouse has only one gesture here, so a click on the live
-   * pane locks it in — which is what makes the picker walkable with the mouse
-   * alone. Clicking a pane you are not on only moves there.
+   * A click on the setup screen. **One click does the whole job** — it picks the
+   * thing under it and settles that pane, wherever the keyboard cursor happened
+   * to be, because pointing at a car and pressing is not an ambiguous request.
+   *
+   * The one exception is the objective strip. Locking that pane is what starts
+   * the race, so a click there would launch you for looking at a distance;
+   * clicking an objective picks it and the START button does the rest.
    */
   function clickSetup(click) {
+    // A held drag is a stream of clicks — fine for a slider, wrong for a button
+    // that opens a screen or drops the clutch.
+    if (click.dragging) return;
     const target = hitSetup(currentSetupView(), click.x, click.y);
     if (!target) return;
-    const wasLive = setup.pane === target.pane;
-    setup = focusSetup(setup, target, garage);
-    if (wasLive) {
-      const { setup: next, done } = confirmSetup(setup);
-      setup = next;
-      if (done) runCommand({ type: COMMAND_BEGIN });
+
+    if (target.target === TARGET_START) {
+      audio.play("button");
+      // Through the shell, exactly as locking the last pane does — the shell is
+      // what moves the screen, and `beginRace` alone would build a race behind a
+      // picker that never went away.
+      confirmShellNow();
+      return;
     }
+
+    audio.play("button");
+    setup = focusSetup(setup, target, garage);
+
+    // The paint pane's action row opens the garage rather than locking anything.
+    // It goes through `confirmSetup` with the real garage, exactly as ENTER
+    // does, so the mouse and the key cannot disagree about which rows are
+    // configs and which is the button.
+    const { setup: next, done, customise } = confirmSetup(setup, garage);
+    if (customise) {
+      if (garageStore.available) openGarage();
+      return;
+    }
+    if (done) return; // the objective pane: picked, not started
+    setup = next;
   }
 
   /**
@@ -809,15 +847,15 @@ export function boot(canvas) {
       shell = { ...shell, cursor: index };
     }
 
-    // On the setup screen the pointer moves the pane cursor the same way it
-    // moves a menu caret, so what lights up is what a click would take.
-    if (shell.screen === SCREEN_SETUP) {
-      const at = pointer.hover();
-      const hovered = at ? hitSetup(currentSetupView(), at.x, at.y) : null;
-      if (hovered) {
-        setup = focusSetup(setup, hovered, garage);
-      }
-    }
+    // On the setup screen the pointer only *highlights*. It used to move the
+    // cursor the way it moves a menu caret, but the setup cursor is also the
+    // pick: sweeping the mouse across the grid on the way to the track strip
+    // silently changed your car, and re-applying the hover every frame put the
+    // pane straight back under the pointer after a click had advanced it, so
+    // clicking anything looked like it did nothing.
+    setupHover = shell.screen === SCREEN_SETUP
+      ? hitSetupAt(pointer.hover())
+      : null;
 
     if (shell.screen === SCREEN_GARAGE) {
       const at = pointer.hover();
@@ -964,9 +1002,19 @@ export function boot(canvas) {
     drawNowPlaying(ctx, currentRadioView(), stripAlpha(radioAge));
   }
 
-  /** The setup view, told whether the garage is usable at this sign-in state. */
+  /**
+   * The setup view, told whether the garage is usable at this sign-in state and
+   * what the pointer is over. Hover rides through the view rather than through
+   * the setup, so pointing at something can never be mistaken for choosing it.
+   */
   function currentSetupView() {
-    return setupView(setup, garage, { canCustomise: garageStore.available });
+    return setupView(setup, garage, { canCustomise: garageStore.available, hover: setupHover });
+  }
+
+  /** What is under a world point on the setup screen, or null. */
+  function hitSetupAt(at) {
+    // Built without a hover so this cannot depend on the answer it is computing.
+    return at ? hitSetup(setupView(setup, garage, { canCustomise: garageStore.available }), at.x, at.y) : null;
   }
 
   /** The garage view, with the track it is previewed against folded in. */
@@ -1007,7 +1055,7 @@ export function boot(canvas) {
     }
 
     const overItem = shell.screen === SCREEN_SETUP
-      ? Boolean(at && hitSetup(currentSetupView(), at.x, at.y))
+      ? Boolean(setupHover)
       : Boolean(menu && at && hitMenuList(menu.items.length, menuListBox(shell.screen), at.x, at.y) >= 0);
     canvas.style.cursor = overItem ? "pointer" : "default";
 

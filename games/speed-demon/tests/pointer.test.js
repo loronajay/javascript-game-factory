@@ -10,8 +10,16 @@ import {
   presetRowRect,
   trackCardRect,
   objectiveCardRect,
+  startButtonRect,
 } from "../scripts/render/setup.js";
-import { createSetup, setupView, setupTrack, focusSetup } from "../scripts/ui/setup-menu.js";
+import {
+  createSetup,
+  setupView,
+  setupTrack,
+  setupModel,
+  focusSetup,
+  TARGET_START,
+} from "../scripts/ui/setup-menu.js";
 import { emptyGarage } from "../scripts/garage/garage.js";
 import { TRACKS } from "../scripts/ui/track-layout.js";
 
@@ -178,6 +186,58 @@ test("no two setup targets claim the same pixel", () => {
   for (const option of view.presets.options) record(`preset ${option.index}`, presetRowRect(option.index));
   for (const track of view.tracks) record(`track ${track.id}`, trackCardRect(track.index));
   for (const option of view.objective.options) record(`obj ${option.id}`, objectiveCardRect(option.index));
+  record("start", startButtonRect());
+});
+
+test("the START button is clickable and is not a pane", () => {
+  // The keyboard starts a race by locking the last pane. A mouse has no ENTER,
+  // and if the only way to start were clicking an objective card then looking at
+  // a distance would launch you — so START is its own target.
+  const view = setupView(createSetup(), EMPTY_GARAGE);
+  const box = startButtonRect();
+  const hit = hitSetup(view, box.x + box.width / 2, box.y + box.height / 2);
+  assertEqual(hit?.target, TARGET_START);
+  assertEqual(hit.pane, undefined, "START must not read as a pane, or it would move the cursor");
+});
+
+// ---------------------------------------------------------------------------
+// Hover highlights; it does not choose
+//
+// The setup cursor is also the pick, so a hover that moved it changed your car
+// for sweeping the mouse across the grid — and, re-applied every frame, put the
+// pane back under the pointer straight after a click had advanced it, which made
+// clicking a car, a paint or a track look like a dead control.
+// ---------------------------------------------------------------------------
+
+test("hovering marks the cell under the pointer and nothing else", () => {
+  const view = setupView(createSetup(), EMPTY_GARAGE, { hover: { pane: "model", row: 2, column: 1 } });
+  const hovered = view.groups.flatMap((group) => group.cells).filter((cell) => cell.hovered);
+  assertEqual(hovered.length, 1);
+  assertEqual(hovered[0].row, 2);
+  assertEqual(hovered[0].column, 1);
+});
+
+test("hovering a car does not change which car is chosen", () => {
+  const setup = createSetup();
+  const before = setupModel(setup).id;
+  const view = setupView(setup, EMPTY_GARAGE, { hover: { pane: "model", row: 3, column: 0 } });
+  assertEqual(setupModel(setup).id, before, "hovering must not touch the setup at all");
+  assertEqual(view.chosenModel.id, before, "the preview follows the pick, not the pointer");
+});
+
+test("every pane and the START button can be hovered", () => {
+  const hovers = [
+    [{ pane: "preset", index: 0 }, (v) => v.presets.options.some((o) => o.hovered)],
+    [{ pane: "track", index: 1 }, (v) => v.tracks.some((t) => t.hovered)],
+    [{ pane: "objective", index: 1 }, (v) => v.objective.options.some((o) => o.hovered)],
+    [{ target: TARGET_START }, (v) => v.start.hovered],
+  ];
+  for (const [hover, marked] of hovers) {
+    assert(marked(setupView(createSetup(), EMPTY_GARAGE, { hover })), `${JSON.stringify(hover)} lights nothing up`);
+  }
+  const none = setupView(createSetup(), EMPTY_GARAGE);
+  assert(!none.start.hovered, "nothing is hovered without a pointer");
+  assert(!none.tracks.some((t) => t.hovered), "nothing is hovered without a pointer");
 });
 
 test("empty space on the setup screen is not a target", () => {

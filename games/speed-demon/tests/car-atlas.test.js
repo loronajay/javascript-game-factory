@@ -179,12 +179,23 @@ test("frames are close to a consistent size, as rear-view cars on one sheet shou
   // These are 24 different models rather than 45 recolours of one body, so the
   // spread is genuinely wider than it used to be — a mid-engined exotic is not
   // the same shape as a hot hatch. The bound still catches a merged or clipped
-  // frame, which is what it is for.
+  // frame, which is what it is for: a merge doubles a dimension and a clip
+  // halves it, both far outside this.
+  //
+  // The bound is a *fraction* of the mean rather than a pixel count because the
+  // sheet resolution is not fixed — re-cutting the art at native size scales
+  // every rect, and an absolute bound would fail on art that had not changed.
+  const MAX_SPREAD = 0.25;
+  const spread = (values) => {
+    const mean = values.reduce((total, value) => total + value, 0) / values.length;
+    return (Math.max(...values) - Math.min(...values)) / mean;
+  };
+
   for (const sheet of MODEL_SHEETS) {
-    const widths = sheet.frames.map((frame) => frame.sw);
-    const heights = sheet.frames.map((frame) => frame.sh);
-    assert(Math.max(...widths) - Math.min(...widths) < 40, `${sheet.id} car widths drifted apart`);
-    assert(Math.max(...heights) - Math.min(...heights) < 40, `${sheet.id} car heights drifted apart`);
+    const widths = spread(sheet.frames.map((frame) => frame.sw));
+    const heights = spread(sheet.frames.map((frame) => frame.sh));
+    assert(widths < MAX_SPREAD, `${sheet.id} car widths drifted apart (${widths.toFixed(2)})`);
+    assert(heights < MAX_SPREAD, `${sheet.id} car heights drifted apart (${heights.toFixed(2)})`);
   }
 });
 

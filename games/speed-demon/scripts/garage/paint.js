@@ -6,7 +6,7 @@
 // light without standing up a browser.
 //
 // **The whole system rests on the bodies being neutral.** Measured roof
-// saturation across all 24 models runs 0.004–0.019, so "is this pixel
+// saturation across all 24 models runs 0.006–0.041, so "is this pixel
 // bodywork?" is answerable from the pixel itself: paint is desaturated and
 // reasonably bright, while the seats are strongly red, the glass and tyres are
 // dark, and the outline stroke is a near-black purple. If a future sheet ships
@@ -15,7 +15,7 @@
 // works — a widened threshold silently starts painting the seats.
 //
 // The thresholds below were measured against both sheets, not guessed: they
-// classify 59.4% of models-a and 61.1% of models-b as paintable bodywork, and a
+// classify 60.7% of models-a and 62.2% of models-b as paintable bodywork, and a
 // rendered check confirmed seats, glass, lamps, tyres, spoilers and the outline
 // are all correctly left alone.
 

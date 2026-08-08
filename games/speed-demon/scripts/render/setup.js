@@ -39,6 +39,9 @@ export const SETUP_LAYOUT = {
   preview: { x: 740, y: 138, width: 476, height: 300 },
   tracks: { x: 740, y: 476, width: 88, height: 62, gap: 9 },
   objective: { x: 740, y: 576, width: 113, height: 44, gap: 8 },
+  // Under the summary, because that panel is what it acts on: the summary says
+  // what the run is, and the button starts it.
+  start: { x: 512, y: 620, width: 200, height: 46 },
 };
 
 const INK = "#e8e9ee";
@@ -52,18 +55,22 @@ const LOCKED = "#57d98a";
  * in another pane; `locked` is that pick once ENTER has settled it. Three
  * borders, so a glance answers "where am I", "what have I got" and "what is
  * still up for grabs" separately.
+ *
+ * `hovered` is a fourth, and deliberately not one of the three: the pointer is
+ * pointing, not choosing. It borrows the accent so what lights up is what a
+ * click would take, and lifts the fill so it cannot be read as the cursor.
  */
-function panel(ctx, x, y, width, height, { live = false, chosen = false, locked = false } = {}) {
-  ctx.fillStyle = "rgba(14,16,21,0.86)";
+function panel(ctx, x, y, width, height, { live = false, chosen = false, locked = false, hovered = false } = {}) {
+  ctx.fillStyle = hovered ? "rgba(40,30,26,0.92)" : "rgba(14,16,21,0.86)";
   ctx.fillRect(x, y, width, height);
-  ctx.strokeStyle = live
+  ctx.strokeStyle = live || hovered
     ? ACCENT
     : locked
       ? LOCKED
       : chosen
         ? "rgba(226,232,240,0.75)"
         : "rgba(150,158,178,0.35)";
-  ctx.lineWidth = live || chosen || locked ? 2 : 1;
+  ctx.lineWidth = live || chosen || locked || hovered ? 2 : 1;
   ctx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
 }
 
@@ -109,6 +116,11 @@ export function objectiveCardRect(index) {
   return { x: x + index * (width + gap), y, width, height };
 }
 
+/** Screen rect of the START button. */
+export function startButtonRect() {
+  return { ...SETUP_LAYOUT.start };
+}
+
 const within = (rect, x, y) =>
   x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
 
@@ -126,8 +138,13 @@ const within = (rect, x, y) =>
  * forward; with a mouse, pointing at a track means you want that track, and
  * making the click a no-op until you have locked two panes first would read as a
  * dead control.
+ *
+ * START is the one target that is not a pane, so it reports a `target` instead.
  */
 export function hitSetup(view, x, y) {
+  if (within(startButtonRect(), x, y)) {
+    return { target: "start" };
+  }
   for (const group of view.groups) {
     for (const cell of group.cells) {
       if (within(modelCellRect(cell.row, cell.column), x, y)) {
@@ -218,6 +235,7 @@ function drawModelGrid(ctx, view, sheetImages) {
         live: cell.selected,
         chosen: cell.chosen,
         locked: cell.locked,
+        hovered: cell.hovered,
       });
 
       const image = sheetImages.get(cell.sheetId);
@@ -265,6 +283,7 @@ function drawPresetList(ctx, view) {
       live: option.selected,
       chosen: option.chosen,
       locked: option.locked,
+      hovered: option.hovered,
     });
 
     // The last row is the action that opens the garage. It has no livery, so it
@@ -309,6 +328,7 @@ function drawTrackStrip(ctx, view, trackImages) {
       live: track.selected,
       chosen: track.chosen,
       locked: track.locked,
+      hovered: track.hovered,
     });
 
     const image = trackImages.get(track.id);
@@ -351,6 +371,7 @@ function drawObjectiveStrip(ctx, view) {
       live: option.selected,
       chosen: option.chosen,
       locked: option.locked,
+      hovered: option.hovered,
     });
     label(ctx, option.label, rect.x + rect.width / 2, rect.y + rect.height / 2 + 6, {
       size: 15,
@@ -422,6 +443,29 @@ function drawSummary(ctx, view) {
   });
 }
 
+/**
+ * The button that drops you onto the grid.
+ *
+ * The keyboard reaches the line by locking the last pane, which is a fine rule
+ * for a key that already means "commit" — but a mouse has no ENTER, and making
+ * the only way to start be a click on an objective card means clicking a
+ * distance to look at it launches the race. So the go-anywhere control is drawn.
+ */
+function drawStartButton(ctx, view) {
+  const box = startButtonRect();
+  ctx.fillStyle = view.start.hovered ? "rgba(255,90,46,0.28)" : "rgba(255,90,46,0.14)";
+  ctx.fillRect(box.x, box.y, box.width, box.height);
+  ctx.strokeStyle = ACCENT;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(box.x + 0.5, box.y + 0.5, box.width - 1, box.height - 1);
+  label(ctx, view.start.label, box.x + box.width / 2, box.y + box.height / 2 + 7, {
+    size: 20,
+    weight: "800",
+    colour: view.start.hovered ? "#fff2ec" : INK,
+    align: "center",
+  });
+}
+
 export function drawSetup(ctx, view, { sheetImages, trackImages, liveryCache = null }) {
   drawMenuBackdrop(ctx, trackImages.get(view.chosenTrack.id));
 
@@ -437,10 +481,11 @@ export function drawSetup(ctx, view, { sheetImages, trackImages, liveryCache = n
   drawObjectiveStrip(ctx, view);
   drawPreview(ctx, view, sheetImages, liveryCache);
   drawSummary(ctx, view);
+  drawStartButton(ctx, view);
 
   label(
     ctx,
-    "ARROWS / WASD  move within a pane       ENTER  lock in       ESC  unlock / back       R  reset choices",
+    "CLICK anything to pick it       ARROWS / WASD  move within a pane       ENTER  lock in       ESC  unlock / back       R  reset",
     SETUP_LAYOUT.title.x,
     WORLD.height - 14,
     { size: 13 },

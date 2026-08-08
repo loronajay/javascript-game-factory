@@ -402,12 +402,33 @@ export function resolveSelection({ modelId, trackId, livery } = {}) {
   return model && track ? { model, track, livery: createLivery(livery) } : null;
 }
 
+/** The START button, which is a target rather than a pane — see `setupView`. */
+export const TARGET_START = "start";
+
+/**
+ * Whether a hover target is this cell. Hover is **highlight only**: it marks
+ * what a click would take and changes nothing else.
+ *
+ * It used to move the cursor, which quietly made the mouse unusable. The cursor
+ * is also the pick, so dragging the pointer across the grid on the way somewhere
+ * else changed your car — and because hover was re-applied every frame, it put
+ * the pane back under the mouse immediately after a click had advanced it, so
+ * clicking a car, a paint or a track appeared to do nothing at all.
+ */
+function isHovered(hover, pane, match) {
+  return Boolean(hover && hover.pane === pane && match(hover));
+}
+
 /**
  * Everything the renderer needs, with no atlas, garage or catalog lookups of its
  * own: the model grid as rows of cells, the config list, the track strip, the
  * objective strip, and which cell is live in each.
+ *
+ * `hover` is what the pointer is over, if anything. It rides through the view
+ * rather than through the setup so that pointing at something can never be
+ * mistaken for choosing it.
  */
-export function setupView(setup, garage = emptyGarage(), { canCustomise = true } = {}) {
+export function setupView(setup, garage = emptyGarage(), { canCustomise = true, hover = null } = {}) {
   const mode = setupMode(setup);
   const locked = Object.fromEntries(PANES.map((pane) => [pane, isPaneLocked(setup, pane)]));
   const model = setupModel(setup);
@@ -429,6 +450,7 @@ export function setupView(setup, garage = emptyGarage(), { canCustomise = true }
         ...option,
         index,
         selected: setup.pane === PANE_OBJECTIVE && setup.objectiveIndex === index,
+        hovered: isHovered(hover, PANE_OBJECTIVE, (h) => h.index === index),
         chosen: setup.objectiveIndex === index,
         locked: locked[PANE_OBJECTIVE] && setup.objectiveIndex === index,
       })),
@@ -447,6 +469,7 @@ export function setupView(setup, garage = emptyGarage(), { canCustomise = true }
         row,
         column,
         selected: setup.pane === PANE_MODEL && setup.model.row === row && setup.model.column === column,
+        hovered: isHovered(hover, PANE_MODEL, (h) => h.row === row && h.column === column),
         chosen: model.id === entry.id,
         // `locked` is `chosen` once the pane behind you is settled — the pick
         // that is no longer up for debate, drawn differently from the one you
@@ -460,6 +483,7 @@ export function setupView(setup, garage = emptyGarage(), { canCustomise = true }
         ...option,
         index,
         selected: setup.pane === PANE_PRESET && setup.presetIndex === index,
+        hovered: isHovered(hover, PANE_PRESET, (h) => h.index === index),
         chosen: !option.action && chosenIndex === index,
         locked: locked[PANE_PRESET] && chosenIndex === index,
       })),
@@ -468,9 +492,14 @@ export function setupView(setup, garage = emptyGarage(), { canCustomise = true }
       ...track,
       index,
       selected: setup.pane === PANE_TRACK && setup.trackIndex === index,
+      hovered: isHovered(hover, PANE_TRACK, (h) => h.index === index),
       chosen: setup.trackIndex === index,
       locked: locked[PANE_TRACK] && setup.trackIndex === index,
     })),
+    // A drawn button, because the mouse has no ENTER. The keyboard reaches the
+    // line by locking the last pane; a pointer needs somewhere to press that
+    // means "go" from any pane, since every pane always holds a valid pick.
+    start: { label: "START", hovered: hover?.target === TARGET_START },
     chosenModel: model,
     chosenPreset: presetOptions[chosenIndex],
     chosenLivery: presetOptions[chosenIndex].livery,
