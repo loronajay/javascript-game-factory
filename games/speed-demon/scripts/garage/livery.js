@@ -17,7 +17,9 @@
 //      axis toward `fade`'s second stop.
 //   2. `layers` — up to `MAX_LAYERS` shapes, each with its own flat paint, drawn
 //      over the base in order. A **band** runs across the car, a **stripe** runs
-//      down it, and either can be mirrored about the centreline.
+//      down it, either can be mirrored about the centreline, and either can be
+//      **curved** so its centreline bows to follow the bodywork rather than
+//      cutting straight across it.
 //   3. `windowTint`, `tailLightHue` and `underglow`, which are not paint at all.
 //
 // **The fade belongs to the base paint and layers are flat**, which is a scope
@@ -119,6 +121,13 @@ export const LIVERY_LIMITS = {
   layerPosition: { min: 0, max: 1, step: 0.01 },
   layerSize: { min: 0.02, max: 1, step: 0.01 },
   layerFeather: { min: 0, max: 0.3, step: 0.01 },
+  // Signed, and zero is the middle of the range rather than an end of it: a
+  // layer bends either way and "straight" has to be reachable by walking back
+  // to it from either side. ±0.35 of the frame is far more bow than a car
+  // panel has, deliberately — the roster's proportions vary enough (aspect 0.68
+  // to 0.89) that a ceiling tuned to the saloons would leave the hatchbacks
+  // short, and an exaggerated arc is a look in its own right.
+  layerCurve: { min: -0.35, max: 0.35, step: 0.01 },
 };
 
 /** Factory settings: a plain silver car with clear glass and red lamps. */
@@ -167,6 +176,14 @@ export const PAINT_PRESETS = [
  * The positions below were read off the measured renders (nose at 0, tail at 1):
  * the upper deck runs to about 0.38, the glass house 0.39–0.60, the decklid
  * 0.61–0.79, and the rear valance past 0.83.
+ *
+ * **Only the two end bands are seeded with a curve**, and only gently. Every car
+ * on the roster is rounded off at the nose and the tail, so a band placed there
+ * is the one case where the direction of the bow is a fact about cars rather
+ * than about a particular model — the middle of a bumper is further from the
+ * centre of the car than its corners are. Everywhere else the right amount, and
+ * the right sign, depends on the body under it, so the preset stays straight and
+ * the player bends it.
  */
 export const LAYER_PRESETS = [
   // The roof reaches past the top of the frame on purpose. Stopping it at 0.03
@@ -174,14 +191,14 @@ export const LAYER_PRESETS = [
   // having missed rather than as a design — and a player who wants that sliver
   // can pull the position down, where the same player would not think to push a
   // short band off the edge.
-  { id: "roof", label: "Roof", kind: "band", position: 0.185, size: 0.38, feather: 0, mirrored: false },
-  { id: "nose", label: "Nose", kind: "band", position: 0.03, size: 0.12, feather: 0, mirrored: false },
-  { id: "trunk", label: "Trunk", kind: "band", position: 0.70, size: 0.18, feather: 0, mirrored: false },
-  { id: "rear", label: "Rear", kind: "band", position: 0.92, size: 0.18, feather: 0, mirrored: false },
-  { id: "two-tone", label: "Two-Tone", kind: "band", position: 0.78, size: 0.46, feather: 0.06, mirrored: false },
-  { id: "stripes", label: "Stripes", kind: "stripe", position: 0.44, size: 0.06, feather: 0, mirrored: true },
-  { id: "sills", label: "Sills", kind: "stripe", position: 0.07, size: 0.13, feather: 0.02, mirrored: true },
-  { id: "spine", label: "Spine", kind: "stripe", position: 0.5, size: 0.1, feather: 0.03, mirrored: false },
+  { id: "roof", label: "Roof", kind: "band", position: 0.185, size: 0.38, feather: 0, curve: 0, mirrored: false },
+  { id: "nose", label: "Nose", kind: "band", position: 0.03, size: 0.12, feather: 0, curve: -0.05, mirrored: false },
+  { id: "trunk", label: "Trunk", kind: "band", position: 0.70, size: 0.18, feather: 0, curve: 0, mirrored: false },
+  { id: "rear", label: "Rear", kind: "band", position: 0.92, size: 0.18, feather: 0, curve: 0.05, mirrored: false },
+  { id: "two-tone", label: "Two-Tone", kind: "band", position: 0.78, size: 0.46, feather: 0.06, curve: 0, mirrored: false },
+  { id: "stripes", label: "Stripes", kind: "stripe", position: 0.44, size: 0.06, feather: 0, curve: 0, mirrored: true },
+  { id: "sills", label: "Sills", kind: "stripe", position: 0.07, size: 0.13, feather: 0.02, curve: 0, mirrored: true },
+  { id: "spine", label: "Spine", kind: "stripe", position: 0.5, size: 0.1, feather: 0.03, curve: 0, mirrored: false },
 ];
 
 export function findLayerPreset(id) {
@@ -198,7 +215,13 @@ const isFiniteNumber = (value) => typeof value === "number" && Number.isFinite(v
 export function clampField(name, value) {
   const limit = LIVERY_LIMITS[name];
   if (!limit) return value;
-  if (!isFiniteNumber(value)) return DEFAULT_LIVERY.paint[name] ?? limit.min;
+  // Garbage falls back to zero clamped into the range rather than to the floor.
+  // For every field whose range starts at or above zero that *is* the floor, so
+  // nothing moved when the first signed field arrived — but a curve defaulting
+  // to -0.35 would bend an unreadable layer into a shape nobody asked for.
+  if (!isFiniteNumber(value)) {
+    return DEFAULT_LIVERY.paint[name] ?? Math.min(limit.max, Math.max(limit.min, 0));
+  }
   if (limit.wraps) {
     const span = limit.max - limit.min + 1;
     return limit.min + (((Math.round(value) - limit.min) % span) + span) % span;
@@ -263,6 +286,9 @@ export function createLayer(input = {}, index = 0) {
     position: clampField("layerPosition", source.position ?? 0.5),
     size: clampField("layerSize", source.size ?? 0.2),
     feather: clampField("layerFeather", source.feather ?? 0),
+    // Straight by default, which is what every saved livery from before this
+    // field existed has to bake to.
+    curve: clampField("layerCurve", source.curve ?? 0),
     // Only a literal `true`, for the same reason underglow insists on one: a
     // truthy leftover from an older save must not silently double a stripe.
     mirrored: source.mirrored === true,
@@ -383,6 +409,7 @@ export function addLayer(livery, presetId) {
           position: preset.position,
           size: preset.size,
           feather: preset.feather,
+          curve: preset.curve,
           mirrored: preset.mirrored,
           paint: contrastPaint(current.paint),
         },
@@ -536,6 +563,7 @@ const layersEqual = (a, b) =>
     && layer.position === b[index].position
     && layer.size === b[index].size
     && layer.feather === b[index].feather
+    && layer.curve === b[index].curve
     && layer.mirrored === b[index].mirrored
     && paintEquals(layer.paint, b[index].paint)
   ));
@@ -563,6 +591,7 @@ export function liveryKey(livery) {
       layer.position,
       layer.size,
       layer.feather,
+      layer.curve,
       layer.mirrored ? "m" : "-",
       paintKey(layer.paint),
     ].join("/")).join("|"),

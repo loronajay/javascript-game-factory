@@ -43,6 +43,8 @@ import {
   paintWith,
   mixPaint,
   zoneWeight,
+  curveOffset,
+  shiftedZoneWeight,
   tintCabinPixel,
   lampPixel,
   hueToRgb,
@@ -66,10 +68,18 @@ export const FADE_STEPS = 64;
  *
  * **Every varying quantity here runs along exactly one axis**, and that is what
  * makes a multi-layer gradient affordable. A fade's colour depends only on
- * position along its own axis; a band's strength depends only on how far down
- * the car it is; a stripe's only on how far across. So each becomes either a
- * scalar the row loop refreshes once, or a lookup table indexed by column — and
- * the inner loop never calls `mixPaint`, `preparePaint` or `zoneWeight` at all.
+ * position along its own axis; a straight band's strength depends only on how
+ * far down the car it is; a straight stripe's only on how far across. So each
+ * becomes either a scalar the row loop refreshes once, or a lookup table indexed
+ * by column — and the inner loop never calls `mixPaint` or `preparePaint` at
+ * all.
+ *
+ * A *curved* layer is the exception and pays for it in the only way it can: the
+ * displacement still runs along one axis and is still resolved here, but the
+ * weight it feeds is two-dimensional, so that one layer costs an `edgeWeight`
+ * per pixel. That is arithmetic and a smoothstep, against the `paintWith` the
+ * pixel is already paying — measurably cheaper than the alternative of
+ * tabulating a whole 2-D weight field per layer per bake.
  *
  * Getting this wrong is not a correctness bug, it is a frame-rate one: resolving
  * per pixel measured 17ms on a 251x346 car with a fade and four layers, which
@@ -97,15 +107,34 @@ function preparePalette(livery, width) {
       : null,
     baseForRow: (yf) => (axis?.along === "y" ? rampAt(0, yf) : ramp[0]),
 
-    layers: layers.map((layer) => ({
-      prepared: preparePaint(layer.paint),
-      // Same split: a stripe is a function of the column and is tabulated once
-      // for the whole bake; a band is one number per row.
-      byColumn: layer.kind === "stripe"
-        ? Float32Array.from({ length: width }, (_, x) => zoneWeight(layer, (x + 0.5) / width, 0))
-        : null,
-      weightForRow: (yf) => (layer.kind === "stripe" ? 0 : zoneWeight(layer, 0, yf)),
-    })),
+    layers: layers.map((layer) => {
+      const stripe = layer.kind === "stripe";
+      // A curved layer is the one thing here that genuinely varies in two
+      // dimensions, so it cannot be reduced to a table or a scalar — but it can
+      // still be reduced to *one* `edgeWeight` per pixel, because the
+      // displacement runs along the cross axis alone. A band's offset is
+      // therefore tabulated by column once for the whole bake, and a stripe's is
+      // a single number the row loop refreshes. Nothing else changes: a straight
+      // layer takes exactly the path it always did, so the common case pays
+      // nothing for a control it is not using.
+      const curved = layer.curve !== 0;
+      return {
+        prepared: preparePaint(layer.paint),
+        layer,
+        stripe,
+        curved,
+        // Same split: a stripe is a function of the column and is tabulated once
+        // for the whole bake; a band is one number per row.
+        byColumn: stripe && !curved
+          ? Float32Array.from({ length: width }, (_, x) => zoneWeight(layer, (x + 0.5) / width, 0))
+          : null,
+        weightForRow: (yf) => (stripe || curved ? 0 : zoneWeight(layer, 0, yf)),
+        offsetByColumn: curved && !stripe
+          ? Float32Array.from({ length: width }, (_, x) => curveOffset(layer, (x + 0.5) / width))
+          : null,
+        offsetForRow: (yf) => (curved && stripe ? curveOffset(layer, yf) : 0),
+      };
+    }),
   };
 }
 
@@ -213,6 +242,14 @@ function bakeLiverySprite(image, model, livery, coverageCache) {
   // Reused across rows rather than rebuilt per row: at 350 rows this is the
   // difference between a handful of allocations and a few thousand.
   const rowWeights = palette ? new Float64Array(palette.layers.length) : null;
+  // The same offsets, for the curved layers that need one per row.
+  const rowOffsets = palette ? new Float64Array(palette.layers.length) : null;
+  // Column centres, needed only by a curved stripe — which reads a position
+  // along the row rather than a tabulated weight. Computed once because a
+  // division per pixel per layer is a real cost at 20,000 pixels a bake.
+  const columnFractions = palette
+    ? Float64Array.from({ length: model.sw }, (_, x) => (x + 0.5) / model.sw)
+    : null;
 
   for (let y = 0; y < model.sh; y += 1) {
     const yFraction = y / model.sh;
@@ -222,6 +259,7 @@ function bakeLiverySprite(image, model, livery, coverageCache) {
     if (palette) {
       for (let n = 0; n < palette.layers.length; n += 1) {
         rowWeights[n] = palette.layers[n].weightForRow(yFraction);
+        rowOffsets[n] = palette.layers[n].offsetForRow(yFraction);
       }
     }
 
@@ -252,7 +290,13 @@ function bakeLiverySprite(image, model, livery, coverageCache) {
           : paintWith(r, g, b, palette.baseByColumn ? palette.baseByColumn[x] : rowBase);
         for (let n = 0; n < palette.layers.length; n += 1) {
           const entry = palette.layers[n];
-          const weight = entry.byColumn ? entry.byColumn[x] : rowWeights[n];
+          const weight = entry.curved
+            ? shiftedZoneWeight(
+              entry.layer,
+              entry.stripe ? columnFractions[x] : yFraction,
+              entry.stripe ? rowOffsets[n] : entry.offsetByColumn[x],
+            )
+            : entry.byColumn ? entry.byColumn[x] : rowWeights[n];
           if (weight <= 0) continue;
           const over = paintWith(r, g, b, entry.prepared);
           painted = weight >= 1 ? over : [

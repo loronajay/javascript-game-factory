@@ -27,6 +27,9 @@ import {
   hueDelta,
   mixPaint,
   zoneWeight,
+  curveBow,
+  curveOffset,
+  shiftedZoneWeight,
   tintCabinPixel,
   lampPixel,
 } from "../scripts/garage/paint.js";
@@ -641,6 +644,125 @@ test("a mirrored zone at the centreline is one shape, not two overlapping ones",
     assert(w <= 1, `mirrored overlap reported ${w}`);
   }
   assertEqual(zoneWeight(centred, 0.5, 0.5), 1);
+});
+
+// ---------------------------------------------------------------------------
+// Layer curvature
+// ---------------------------------------------------------------------------
+
+test("a straight layer is exactly what it was before curvature existed", () => {
+  // The overwhelmingly common case, and every livery saved before the field
+  // existed is in it. A curve of 0 — or an older layer with no curve at all —
+  // must take the same path and produce the same number.
+  for (const kind of ["band", "stripe"]) {
+    const make = kind === "band" ? band : stripe;
+    for (let axis = 0; axis <= 1; axis += 0.05) {
+      for (const cross of [0, 0.3, 0.5, 1]) {
+        const [xf, yf] = kind === "band" ? [cross, axis] : [axis, cross];
+        const missing = make({ position: 0.4, size: 0.2, feather: 0.05 });
+        const zero = make({ position: 0.4, size: 0.2, feather: 0.05, curve: 0 });
+        assertEqual(zoneWeight(missing, xf, yf), zoneWeight(zero, xf, yf));
+      }
+    }
+  }
+});
+
+test("a curve moves the middle of a shape and leaves its ends alone", () => {
+  // That is what makes `curve` readable as one number: the player positions the
+  // layer, then bends it, and bending it does not also drag it.
+  const straight = band({ position: 0.5, size: 0.1, curve: 0 });
+  const bowed = band({ position: 0.5, size: 0.1, curve: 0.2 });
+
+  for (const edge of [0, 1]) {
+    for (let yf = 0; yf <= 1; yf += 0.05) {
+      assertClose(zoneWeight(bowed, edge, yf), zoneWeight(straight, edge, yf), 1e-9);
+    }
+  }
+  // At the centreline it has moved by the full amount, toward the tail.
+  assertEqual(zoneWeight(bowed, 0.5, 0.5), 0);
+  assertEqual(zoneWeight(bowed, 0.5, 0.7), 1);
+});
+
+test("the sign of a curve chooses which way the layer bends", () => {
+  const back = band({ position: 0.5, size: 0.1, curve: 0.2 });
+  const forward = band({ position: 0.5, size: 0.1, curve: -0.2 });
+  assertEqual(zoneWeight(back, 0.5, 0.7), 1);
+  assertEqual(zoneWeight(back, 0.5, 0.3), 0);
+  assertEqual(zoneWeight(forward, 0.5, 0.3), 1);
+  assertEqual(zoneWeight(forward, 0.5, 0.7), 0);
+});
+
+test("a curved stripe bows across the car rather than down it", () => {
+  // The axes swap with the shape, and getting this backwards would bend a
+  // stripe along the direction it already runs — which does nothing visible.
+  const bowed = stripe({ position: 0.5, size: 0.1, curve: 0.2 });
+  assertEqual(zoneWeight(bowed, 0.5, 0), 1);   // the ends stay put
+  assertEqual(zoneWeight(bowed, 0.5, 1), 1);
+  assertEqual(zoneWeight(bowed, 0.7, 0.5), 1); // the middle has moved
+  assertEqual(zoneWeight(bowed, 0.5, 0.5), 0);
+});
+
+test("a mirrored pair bows symmetrically rather than drifting sideways", () => {
+  // The mirror reflects the whole shape, offset included. Bowing both the same
+  // way in absolute terms would read as one stripe sliding across the car.
+  const pair = stripe({ position: 0.3, size: 0.08, curve: 0.15, mirrored: true });
+  for (let yf = 0; yf <= 1; yf += 0.05) {
+    for (let xf = 0; xf <= 1; xf += 0.02) {
+      assertClose(zoneWeight(pair, xf, yf), zoneWeight(pair, 1 - xf, yf), 1e-9);
+    }
+  }
+});
+
+test("a curved zone never reports a weight outside 0..1", () => {
+  for (const curve of [-0.35, -0.1, 0, 0.1, 0.35]) {
+    for (const feather of [0, 0.3]) {
+      for (const kind of [band, stripe]) {
+        for (let axis = 0; axis <= 1; axis += 0.05) {
+          for (let cross = 0; cross <= 1; cross += 0.05) {
+            const layer = kind({ position: 0.5, size: 0.2, feather, curve, mirrored: true });
+            const w = zoneWeight(layer, axis, cross);
+            assert(w >= 0 && w <= 1, `weight ${w} (curve ${curve}, feather ${feather})`);
+          }
+        }
+      }
+    }
+  }
+});
+
+test("the bow is zero at both ends of the cross axis and one in the middle", () => {
+  assertEqual(curveBow(0), 0);
+  assertEqual(curveBow(1), 0);
+  assertEqual(curveBow(0.5), 1);
+  // Out of range is clamped rather than allowed to go negative, which would
+  // bend a layer the wrong way outside the frame.
+  assertEqual(curveBow(-2), 0);
+  assertEqual(curveBow(3), 0);
+});
+
+test("the renderer's split of a curve into offset-then-weight is the same maths", () => {
+  // `render/livery.js` resolves the offset once per column (a band) or once per
+  // row (a stripe) and then calls `shiftedZoneWeight` per pixel. That is only a
+  // performance rearrangement of `zoneWeight`, and it has to stay one.
+  for (const curve of [-0.3, -0.05, 0.05, 0.3]) {
+    for (const mirrored of [false, true]) {
+      const bandLayer = band({ position: 0.35, size: 0.15, feather: 0.04, curve, mirrored });
+      const stripeLayer = stripe({ position: 0.35, size: 0.15, feather: 0.04, curve, mirrored });
+      for (let axis = 0; axis <= 1; axis += 0.05) {
+        for (let cross = 0; cross <= 1; cross += 0.05) {
+          assertClose(
+            shiftedZoneWeight(bandLayer, axis, curveOffset(bandLayer, cross)),
+            zoneWeight(bandLayer, cross, axis),
+            1e-12,
+          );
+          assertClose(
+            shiftedZoneWeight(stripeLayer, axis, curveOffset(stripeLayer, cross)),
+            zoneWeight(stripeLayer, axis, cross),
+            1e-12,
+          );
+        }
+      }
+    }
+  }
 });
 
 finish();

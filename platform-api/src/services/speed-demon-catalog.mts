@@ -70,6 +70,11 @@ const LIMITS = Object.freeze({
   layerPosition: { min: 0, max: 1 },
   layerSize: { min: 0.02, max: 1 },
   layerFeather: { min: 0, max: 0.3 },
+  // The one signed field: a layer bows either way, so zero is the middle of this
+  // range rather than an end of it. `clampNumber` takes the fallback from the
+  // caller, and this one has to be 0 — a garbage curve must land on straight,
+  // not on fully bent one way.
+  layerCurve: { min: -0.35, max: 0.35 },
 });
 
 export const SPEED_DEMON_FADE_AXES: readonly string[] = Object.freeze([
@@ -159,6 +164,7 @@ function normalizeLayer(value: any, index: number): any {
     position: clampNumber(layer.position, LIMITS.layerPosition, 0.5),
     size: clampNumber(layer.size, LIMITS.layerSize, 0.2),
     feather: clampNumber(layer.feather, LIMITS.layerFeather, 0),
+    curve: clampNumber(layer.curve, LIMITS.layerCurve, 0),
     mirrored: layer.mirrored === true,
     paint: normalizePaint(layer.paint),
   };

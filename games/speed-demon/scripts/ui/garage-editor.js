@@ -147,6 +147,11 @@ export function layerRows(index) {
     { id: "layerKind", label: "Shape", kind: ROW_CHOICE, path: into("kind"), choices: LAYER_KINDS },
     { id: "layerPosition", label: "Position", kind: ROW_RATIO, path: into("position"), limit: "layerPosition" },
     { id: "layerSize", label: "Size", kind: ROW_RATIO, path: into("size"), limit: "layerSize" },
+    // Signed, so it is a `ROW_RANGE` like brightness rather than a `ROW_RATIO`:
+    // the bar reads as a position within the range, which puts straight in the
+    // middle and either bow at an end. A percentage of nothing would be a
+    // percentage that reads 0% halfway along its own bar.
+    { id: "layerCurve", label: "Curve", kind: ROW_RANGE, path: into("curve"), limit: "layerCurve" },
     { id: "layerFeather", label: "Soft Edge", kind: ROW_RATIO, path: into("feather"), limit: "layerFeather" },
     { id: "layerMirrored", label: "Mirror", kind: ROW_TOGGLE, path: into("mirrored") },
     { id: "layerHue", label: "Colour", kind: ROW_HUE, path: into("paint", "hue"), limit: "hue" },
@@ -525,7 +530,12 @@ function rowText(livery, row, editor) {
   }
   const value = readPath(livery, row.path);
   if (row.kind === ROW_HUE) return `${Math.round(value)}°`;
-  return `${Math.round(value * 100)}%`;
+  // A field that runs through zero prints its sign, because on a signed bar the
+  // fill alone cannot say which side of the middle it is on — and for a curve
+  // the sign is the whole question of which way the layer bends.
+  const percent = Math.round(value * 100);
+  const signed = row.limit && LIVERY_LIMITS[row.limit].min < 0 && percent > 0;
+  return `${signed ? "+" : ""}${percent}%`;
 }
 
 /**

@@ -352,6 +352,12 @@ test("every layer field is clamped, whatever arrives", () => {
   assertEqual(layer.feather, LIVERY_LIMITS.layerFeather.max);
   // A truthy leftover must not double a stripe the player never mirrored.
   assertEqual(layer.mirrored, false);
+  // A curve is signed, so garbage has to land on straight rather than on the
+  // floor of the range — clamping to the minimum would bend it hard one way.
+  assertEqual(layer.curve, 0);
+  assertEqual(createLivery({ layers: [{ curve: "sideways" }] }).layers[0].curve, 0);
+  assertEqual(createLivery({ layers: [{ curve: 9 }] }).layers[0].curve, LIVERY_LIMITS.layerCurve.max);
+  assertEqual(createLivery({ layers: [{ curve: -9 }] }).layers[0].curve, LIVERY_LIMITS.layerCurve.min);
   assert(layer.paint.hue >= 0 && layer.paint.hue <= 359, "layer hue escaped the wheel");
 });
 
@@ -427,7 +433,32 @@ test("a layer preset catalog with a duplicate id or a bad shape would break the 
     assertEqual(clampField("layerPosition", preset.position), preset.position);
     assertEqual(clampField("layerSize", preset.size), preset.size);
     assertEqual(clampField("layerFeather", preset.feather), preset.feather);
+    assertEqual(clampField("layerCurve", preset.curve), preset.curve);
   }
+});
+
+test("a layer's curve survives a save, a compare and a cache key", () => {
+  // Curvature changes what the car looks like, so two liveries that differ only
+  // in it are two cars — sharing a sprite would draw the wrong one.
+  const straight = addLayer(createLivery(), "roof");
+  const bent = updateLayer(straight, straight.layers[0].id, { curve: 0.2 });
+  assertEqual(bent.layers[0].curve, 0.2);
+  assertEqual(liveryEquals(straight, bent), false);
+  assert(liveryKey(straight) !== liveryKey(bent), "a bent layer must not share a sprite");
+
+  // ...and a round trip through the normalizer keeps it.
+  assertEqual(createLivery(bent).layers[0].curve, 0.2);
+  assertEqual(liveryEquals(bent, createLivery(bent)), true);
+});
+
+test("a livery saved before curves existed bakes to the same car it always did", () => {
+  // Every stored preset is in this shape. Defaulting to anything but straight
+  // would silently bend paint people already own.
+  const old = createLivery({
+    layers: [{ kind: "stripe", position: 0.44, size: 0.06, feather: 0, mirrored: true }],
+  });
+  assertEqual(old.layers[0].curve, 0);
+  assertEqual(liveryEquals(old, { ...old, layers: [{ ...old.layers[0], curve: 0 }] }), true);
 });
 
 // ---------------------------------------------------------------------------

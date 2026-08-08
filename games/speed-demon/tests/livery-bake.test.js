@@ -56,7 +56,7 @@ const {
   createLivery, addLayer, updateLayer,
 } = await import("../scripts/garage/livery.js");
 const {
-  classifyPixel, bodyCoverageMap, luminanceOf, REGION_LAMP,
+  classifyPixel, bodyCoverageMap, luminanceOf, curveBow, REGION_LAMP,
 } = await import("../scripts/garage/paint.js");
 const { MODELS_A } = await import("../scripts/assets/car-atlas.js");
 
@@ -293,6 +293,53 @@ function changedAt(sprite, pixel) {
   const i = (pixel.y * MODEL.sw + pixel.x) * 4;
   return r !== SOURCE[i] || g !== SOURCE[i + 1] || b !== SOURCE[i + 2];
 }
+
+test("a curved band bows by the right amount in every column of the bake", () => {
+  // The geometry is proved in `paint.test.js`; what this asserts is that the
+  // renderer's per-column offset table is wired to the right axis and indexed
+  // by the right thing. Resolving a band's curve down the row instead of across
+  // it leaves the layer straight and displaced, which looks entirely plausible
+  // in a still of a symmetrical car.
+  //
+  // The probe is a pair of rows per column — where the band sits straight, and
+  // where the bow predicts it sits curved — which is hole-proof in a way that
+  // measuring the painted region's centre is not: a car is mostly rear screen
+  // through the middle, and a mean drifts wherever the glass is.
+  const position = 0.62;
+  const size = 0.08;
+  const curve = 0.2;
+  const layered = (bend) => {
+    const base = addLayer(createLivery(), "trunk");
+    return updateLayer(base, base.layers[0].id, {
+      kind: "band", position, size, feather: 0, curve: bend, mirrored: false, paint: paintOf(300),
+    });
+  };
+  const straight = bake(layered(0));
+  const bowed = bake(layered(curve), MODEL, createLiveryCache());
+
+  const straightRow = Math.round(MODEL.sh * position);
+  let checked = 0;
+  const bows = new Set();
+  for (let x = 0; x < MODEL.sw; x += 1) {
+    const offset = curve * curveBow((x + 0.5) / MODEL.sw);
+    // Only where the two positions are far enough apart to tell apart at all.
+    if (offset <= size) continue;
+    const bowedRow = Math.round(MODEL.sh * (position + offset));
+    if (bowedRow >= MODEL.sh) continue;
+    if (COVERAGE[straightRow * MODEL.sw + x] < 1 || COVERAGE[bowedRow * MODEL.sw + x] < 1) continue;
+
+    assert(changedAt(straight, { x, y: straightRow }), `column ${x}: the straight band missed its own row`);
+    assert(!changedAt(bowed, { x, y: straightRow }), `column ${x}: the curved band did not leave the straight row`);
+    assert(changedAt(bowed, { x, y: bowedRow }), `column ${x}: the curved band is not where the bow puts it`);
+    assert(!changedAt(straight, { x, y: bowedRow }), `column ${x}: the straight band reached the bowed row`);
+    checked += 1;
+    bows.add(Math.round(curveBow((x + 0.5) / MODEL.sw) * 10));
+  }
+  // The sweep has to have actually swept, over a spread of bow amounts — a
+  // filter that quietly excluded everything would pass every assertion above.
+  assert(checked > 50, `only ${checked} columns were measurable`);
+  assert(bows.size >= 4, `every measurable column had the same bow (${[...bows]})`);
+});
 
 test("a mirrored stripe lands on both flanks", () => {
   let livery = addLayer(createLivery(), "sills");

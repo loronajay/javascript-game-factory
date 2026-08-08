@@ -18,13 +18,15 @@ import {
 } from "../ui/garage-editor.js";
 
 // Rows are shorter than they were (40px, now 36) because a layer section holds
-// eleven of them where the old flat list held ten, and the actions have to stay
-// clear of the bottom. `tests/modules.test.js` sweeps every rect for overlaps,
-// so this is checked rather than eyeballed.
+// twelve of them where the old flat list held ten, and the actions have to stay
+// clear of the bottom. The gap closed rather than the row when the curve control
+// arrived: the row height is the click target, and the space between rows is
+// worth less than a control you can hit. `tests/modules.test.js` sweeps every
+// rect for overlaps, so this is checked rather than eyeballed.
 export const GARAGE_LAYOUT = {
   title: { x: 64, y: 68 },
   model: { x: 64, y: 94 },
-  rows: { x: 64, y: 124, width: 560, rowHeight: 36, gap: 6, labelWidth: 132, valueWidth: 74 },
+  rows: { x: 64, y: 124, width: 560, rowHeight: 36, gap: 3, labelWidth: 132, valueWidth: 74 },
   actions: { x: 64, y: 620, width: 130, height: 40, gap: 10 },
   preview: { x: 680, y: 124, width: 536, height: 496 },
 };

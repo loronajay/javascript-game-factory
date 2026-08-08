@@ -448,12 +448,57 @@ export function mixPaint(a, b, t) {
  *
  * `mirrored` reflects the shape about the centreline, which is what turns one
  * stripe into the classic pair without spending two of the four layer slots.
+ *
+ * `curve` bows the shape's centreline across the *other* axis — see `curveBow`.
+ * A straight band cutting across a car is straight in a way no panel on the car
+ * is, so a roof band that lines up at the centreline hangs off the shoulders and
+ * a rear band crosses the valance at an angle. Curving it is what lets a layer
+ * follow the bodywork, and it is a player control for the same reason the
+ * position is: the renders share no landmark precise enough to find a roofline
+ * automatically.
  */
-export function zoneWeight({ kind, position, size, feather, mirrored }, xf, yf) {
-  const axis = kind === "stripe" ? xf : yf;
-  const direct = edgeWeight(axis, position, size, feather);
+export function zoneWeight(layer, xf, yf) {
+  const stripe = layer.kind === "stripe";
+  return shiftedZoneWeight(layer, stripe ? xf : yf, curveOffset(layer, stripe ? yf : xf));
+}
+
+/**
+ * The arc a curved layer bows along: 0 at both ends of the cross axis, 1 in the
+ * middle. So `curve` reads as "how far the centre of the shape is pushed", with
+ * its sign choosing which way, and the ends of the shape stay where the player
+ * put them however hard it is bent.
+ *
+ * A parabola rather than a circular arc because it costs three operations and
+ * the difference is invisible at these amplitudes — this runs per pixel of a
+ * curved layer during the bake.
+ */
+export function curveBow(cross) {
+  const t = 2 * Math.min(1, Math.max(0, cross)) - 1;
+  return 1 - t * t;
+}
+
+/**
+ * How far a curved layer's centreline has moved at this point along its cross
+ * axis. Split out because the renderer resolves it once per column (for a band)
+ * or once per row (for a stripe) rather than once per pixel — the same
+ * one-axis-at-a-time trick the fade uses. See `preparePalette`.
+ */
+export function curveOffset({ curve }, cross) {
+  return curve ? curve * curveBow(cross) : 0;
+}
+
+/**
+ * `zoneWeight` once the curve has already been resolved into a displacement.
+ *
+ * **The mirror negates the offset as well as the position**, because it is a
+ * reflection of the whole shape rather than of its centre: a twin stripe pair
+ * that bowed the same way in absolute terms would read as one stripe drifting
+ * sideways, not as a symmetrical pair.
+ */
+export function shiftedZoneWeight({ position, size, feather, mirrored }, axis, offset) {
+  const direct = edgeWeight(axis, position + offset, size, feather);
   if (!mirrored) return direct;
-  return Math.max(direct, edgeWeight(axis, 1 - position, size, feather));
+  return Math.max(direct, edgeWeight(axis, 1 - position - offset, size, feather));
 }
 
 function edgeWeight(axis, position, size, feather) {
