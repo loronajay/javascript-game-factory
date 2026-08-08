@@ -20,9 +20,9 @@
 
 import { liveryKey, createLivery } from "../garage/livery.js";
 import {
-  REGION_BODY,
   REGION_CABIN,
   REGION_LAMP,
+  bodyCoverageMap,
   classifyPixel,
   paintPixel,
   tintCabinPixel,
@@ -73,20 +73,40 @@ function bakeLiverySprite(image, model, livery) {
     return canvas;
   }
 
+  // How much of each pixel is paint. Only worth computing when something is
+  // actually being painted — a tint-only or lamp-only livery never reads it.
+  const coverage = paints ? bodyCoverageMap(pixels, model.sw, model.sh) : null;
+
   for (let y = 0; y < model.sh; y += 1) {
     const yFraction = y / model.sh;
     for (let x = 0; x < model.sw; x += 1) {
-      const i = (y * model.sw + x) * 4;
+      const k = y * model.sw + x;
+      const i = k * 4;
       if (pixels[i + 3] === 0) continue;
       const r = pixels[i];
       const g = pixels[i + 1];
       const b = pixels[i + 2];
       const region = classifyPixel(r, g, b, yFraction);
 
+      // Glass and lamps go first, so a pixel that is partly both — the rim of a
+      // window is frame *and* glass — ends up a blend of the two rather than
+      // taking one and dropping the other, which would show as a hard edge.
       let out = null;
-      if (region === REGION_BODY && paints) out = paintPixel(r, g, b, paint);
-      else if (region === REGION_CABIN && tints) out = tintCabinPixel(r, g, b, windowTint);
+      if (region === REGION_CABIN && tints) out = tintCabinPixel(r, g, b, windowTint);
       else if (region === REGION_LAMP && relamps) out = lampPixel(r, g, b, tailLightHue);
+
+      const paintWeight = coverage ? coverage[k] : 0;
+      if (paintWeight > 0) {
+        // The shading always comes from the *original* pixel: a tinted base
+        // would feed the window darkening back into the paint.
+        const painted = paintPixel(r, g, b, paint);
+        const base = out ?? [r, g, b];
+        out = paintWeight >= 1 ? painted : [
+          base[0] + (painted[0] - base[0]) * paintWeight,
+          base[1] + (painted[1] - base[1]) * paintWeight,
+          base[2] + (painted[2] - base[2]) * paintWeight,
+        ];
+      }
       if (!out) continue;
 
       pixels[i] = out[0];

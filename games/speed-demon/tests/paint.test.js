@@ -8,10 +8,16 @@ import {
   BODY_MAX_SATURATION,
   BODY_MIN_LUMINANCE,
   LAMP_BAND_START,
+  PAINT_FADE_LUMINANCE,
+  PAINT_FADE_SATURATION,
   classifyPixel,
   luminanceOf,
+  perceivedLuminanceOf,
   saturationOf,
+  paintFeather,
+  bodyCoverageMap,
   finishCurve,
+  specularOf,
   hueToRgb,
   paintTint,
   paintPixel,
@@ -85,6 +91,115 @@ test("the body thresholds match what was measured off the sheets", () => {
   assert(BODY_MIN_LUMINANCE > 40 && BODY_MIN_LUMINANCE < 100);
   assertClose(saturationOf(...ROOF_LIGHT), 0, 0.02);
   assert(luminanceOf(...ROOF_LIGHT) >= BODY_MIN_LUMINANCE);
+});
+
+// ---------------------------------------------------------------------------
+// Paint coverage — the feather that replaced the hard threshold
+// ---------------------------------------------------------------------------
+
+const CREASE = [52, 52, 53];  // shading along a panel gap: neutral, just too dark to classify
+
+test("confident bodywork is fully painted", () => {
+  assertClose(paintFeather(...ROOF_LIGHT), 1, 0.0001);
+  assertClose(paintFeather(...ROOF_DARK), 1, 0.0001);
+});
+
+test("a crease shadow just under the threshold is partly painted, not dropped", () => {
+  // The cliff this replaced is what mottled a repainted car: at luminance 61 a
+  // pixel was painted and at 59 it was not, so the boundary wandered through
+  // every shading gradient on the body as a ragged one-pixel line.
+  const feather = paintFeather(...CREASE);
+  assert(feather > 0 && feather < 1, `expected a partial feather, got ${feather}`);
+});
+
+test("the feather reaches zero before it reaches glass, tyres or the outline", () => {
+  for (const [name, pixel] of [["glass", GLASS], ["tyre", TYRE], ["outline", OUTLINE]]) {
+    assertClose(paintFeather(...pixel), 0, 0.0001, `${name} picked up paint`);
+  }
+});
+
+test("the feather is monotonic, so a ramp never doubles back", () => {
+  let previous = -1;
+  for (let l = PAINT_FADE_LUMINANCE - 6; l <= BODY_MIN_LUMINANCE + 6; l += 1) {
+    const feather = paintFeather(l, l, l);
+    assert(feather >= previous, `feather fell from ${previous} to ${feather} at luminance ${l}`);
+    previous = feather;
+  }
+  assertClose(previous, 1, 0.0001);
+});
+
+test("red trim is excluded outright rather than feathered", () => {
+  // The seats and the lamp lenses are the two things paint must never touch, so
+  // they are refused before brightness is even considered — a bright lens is
+  // exactly the case a luminance ramp would let through.
+  assertClose(paintFeather(...SEAT_RED), 0, 0.0001);
+  assertClose(paintFeather(...LAMP_RED), 0, 0.0001);
+});
+
+test("the fade floors sit below the thresholds they feather away from", () => {
+  assert(PAINT_FADE_LUMINANCE < BODY_MIN_LUMINANCE, "the luminance fade must be a ramp, not a step");
+  assert(PAINT_FADE_SATURATION > BODY_MAX_SATURATION, "the saturation fade must be a ramp, not a step");
+});
+
+/** A frame of `fill`, with `patch` painted into the given rect. */
+function testFrame(width, height, fill, patches = []) {
+  const pixels = new Uint8ClampedArray(width * height * 4);
+  for (let i = 0; i < width * height; i += 1) {
+    pixels[i * 4] = fill[0];
+    pixels[i * 4 + 1] = fill[1];
+    pixels[i * 4 + 2] = fill[2];
+    pixels[i * 4 + 3] = 255;
+  }
+  for (const { x, y, w, h, colour } of patches) {
+    for (let yy = y; yy < y + h; yy += 1) {
+      for (let xx = x; xx < x + w; xx += 1) {
+        const i = (yy * width + xx) * 4;
+        pixels[i] = colour[0];
+        pixels[i + 1] = colour[1];
+        pixels[i + 2] = colour[2];
+      }
+    }
+  }
+  return pixels;
+}
+
+test("a crease inside bodywork keeps its coverage", () => {
+  // One dark row through a panel: every pixel of it has lit paint above and
+  // below, which is what a shading crease looks like.
+  const pixels = testFrame(16, 16, ROOF_LIGHT, [{ x: 0, y: 8, w: 16, h: 1, colour: CREASE }]);
+  const coverage = bodyCoverageMap(pixels, 16, 16);
+  assert(coverage[8 * 16 + 4] > 0, "a crease with bodywork either side should be painted");
+});
+
+test("a large dark field is glass, and keeps none", () => {
+  // The same colour as the crease above, but as a block rather than a line.
+  // Colour alone cannot tell these apart — measured, 10.2% of the roster's glass
+  // sits inside the feather band — so the coverage map asks a structural
+  // question instead, and this is the case that makes it necessary.
+  const pixels = testFrame(16, 16, ROOF_LIGHT, [{ x: 4, y: 4, w: 8, h: 8, colour: CREASE }]);
+  const coverage = bodyCoverageMap(pixels, 16, 16);
+  assertClose(coverage[8 * 16 + 8], 0, 0.0001, "the middle of a dark field must not be painted");
+  assert(coverage[4 * 16 + 5] > 0, "its one-pixel rim is the window frame, and is bodywork");
+});
+
+test("the feather cannot cascade across a dark field", () => {
+  // Coverage has to be judged against *confident* bodywork only. Reading it back
+  // from already-feathered neighbours would let paint creep inward one pixel per
+  // row until the whole windscreen filled in.
+  const pixels = testFrame(24, 24, ROOF_LIGHT, [{ x: 2, y: 2, w: 20, h: 20, colour: CREASE }]);
+  const coverage = bodyCoverageMap(pixels, 24, 24);
+  for (let y = 4; y < 20; y += 1) {
+    for (let x = 4; x < 20; x += 1) {
+      assertClose(coverage[y * 24 + x], 0, 0.0001, `paint crept to ${x},${y}`);
+    }
+  }
+});
+
+test("fully transparent pixels are never painted", () => {
+  const pixels = testFrame(8, 8, ROOF_LIGHT);
+  for (let i = 0; i < 8 * 8; i += 1) pixels[i * 4 + 3] = 0;
+  const coverage = bodyCoverageMap(pixels, 8, 8);
+  for (const weight of coverage) assertClose(weight, 0, 0.0001);
 });
 
 // ---------------------------------------------------------------------------
@@ -166,6 +281,91 @@ test("every finish stays in range and keeps mid-grey put", () => {
 
 test("an unknown finish behaves as gloss rather than throwing", () => {
   assertClose(finishCurve("chrome", 0.8), 0.8, 0.0001);
+  assertClose(specularOf("chrome", 0.9), specularOf("gloss", 0.9), 0.0001);
+});
+
+// ---------------------------------------------------------------------------
+// The clearcoat highlight
+// ---------------------------------------------------------------------------
+
+test("only bright pixels catch a highlight", () => {
+  for (const finish of ["gloss", "matte", "metallic"]) {
+    assertClose(specularOf(finish, 0.3), 0, 0.0001, `${finish} lit a mid-tone`);
+    assert(specularOf(finish, 1) > 0, `${finish} never highlights at all`);
+  }
+});
+
+test("matte barely catches the light and metallic catches it hardest", () => {
+  assert(specularOf("matte", 0.95) < specularOf("gloss", 0.95), "matte should be the flattest");
+  assert(specularOf("metallic", 0.95) > specularOf("gloss", 0.95), "metallic should be the brightest");
+});
+
+test("a highlight is the colour of the light, not of the paint", () => {
+  // This is the whole reason the clearcoat is added rather than multiplied. A
+  // saturated hue carries very little perceived brightness, so multiplying the
+  // tint through the artwork dragged the specular down with it and the car came
+  // out flat — measured, a deep red threw away 78% of the body's shading.
+  const red = { hue: 0, saturation: 1, brightness: 1, finish: "gloss" };
+  const highlight = paintPixel(250, 250, 250, red);
+  assert(
+    highlight[1] > 40 && highlight[2] > 40,
+    `a specular should lift toward white, got ${highlight.map(Math.round)}`,
+  );
+  // ...while the pigment underneath stays firmly the requested hue.
+  const midtone = paintPixel(150, 150, 150, red);
+  assert(midtone[0] > midtone[1] * 3, "a mid-tone should still read as saturated red");
+});
+
+test("saturation zero adds no highlight, so silver stays a bit-exact identity", () => {
+  // The clearcoat is scaled by how much brightness the pigment costs, and white
+  // costs nothing. Without that, every un-customized car would quietly gain a
+  // sheen the source art does not have.
+  for (const finish of ["gloss", "matte", "metallic"]) {
+    for (const source of [ROOF_LIGHT, ROOF_DARK, [250, 250, 250]]) {
+      const out = paintPixel(...source, { hue: 200, saturation: 0, brightness: 1, finish });
+      const expected = finishCurve(finish, luminanceOf(...source) / 255) * 255;
+      assertClose(out[0], expected, 0.001, `${finish} shifted an unpainted pixel`);
+    }
+  }
+});
+
+test("the clearcoat wins back shading that the pigment took away", () => {
+  // The regression this guards: a deep red matte car whose panels all read as
+  // one flat shade, with what noise was left showing through as blotches.
+  const paint = { hue: 0, saturation: 0.85, brightness: 0.95, finish: "matte" };
+  const spread = (from, to) =>
+    perceivedLuminanceOf(...paintPixel(to, to, to, paint))
+    - perceivedLuminanceOf(...paintPixel(from, from, from, paint));
+  // Measured on the source art, body luminance runs roughly 55-255.
+  assert(spread(55, 255) > 60, `deep red kept only ${spread(55, 255).toFixed(0)} of shading`);
+});
+
+test("brighter source art always paints brighter, at every finish and hue", () => {
+  // Adding a term on top of a multiply is exactly how a curve stops being
+  // monotonic, and a car whose highlights come out darker than its shadows
+  // would read as inside-out.
+  for (const finish of ["gloss", "matte", "metallic"]) {
+    for (const hue of [0, 120, 240]) {
+      const paint = { hue, saturation: 0.9, brightness: 1, finish };
+      let previous = -1;
+      for (let l = 0; l <= 255; l += 5) {
+        const out = perceivedLuminanceOf(...paintPixel(l, l, l, paint));
+        assert(out >= previous - 0.001, `${finish}/${hue} dipped at luminance ${l}`);
+        previous = out;
+      }
+    }
+  }
+});
+
+test("the clearcoat never overflows a channel", () => {
+  for (const finish of ["gloss", "matte", "metallic"]) {
+    for (const hue of [0, 60, 120, 180, 240, 300]) {
+      const out = paintPixel(255, 255, 255, { hue, saturation: 1, brightness: 1.35, finish });
+      for (const channel of out) {
+        assert(channel <= 255 && channel >= 0, `${finish}/${hue} out of range: ${channel}`);
+      }
+    }
+  }
 });
 
 test("hueToRgb walks the wheel and wraps", () => {
