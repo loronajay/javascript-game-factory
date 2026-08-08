@@ -13,10 +13,16 @@ import {
 import {
   HOME_ITEMS,
   LOBBY_ROW_BEST_OF,
+  LOBBY_ROW_CAR,
   LOBBY_ROW_DISTANCE,
+  LOBBY_ROW_PAINT,
   LOBBY_ROW_READY,
   LOBBY_ROW_TRACK,
+  LOBBY_SET_CONFIG,
+  LOBBY_STEP_CAR,
+  LOBBY_STEP_PAINT,
   ONLINE_CREATE,
+  ONLINE_CUSTOMISE,
   ONLINE_JOIN,
   ONLINE_NOTHING,
   ONLINE_OPEN_JOIN,
@@ -30,6 +36,7 @@ import {
   RESULT_PANEL,
   TARGET_BACK,
   TARGET_CANCEL_SEARCH,
+  TARGET_CUSTOMISE,
   TARGET_HOME,
   TARGET_JOIN_SUBMIT,
   TARGET_LOBBY_STEP,
@@ -202,10 +209,22 @@ test("opening the join pane starts from an empty field", () => {
 // The lobby
 // ---------------------------------------------------------------------------
 
-test("the lobby cursor walks the settings and the button", () => {
+/** The lobby cursor, parked on a row by id rather than by a counted index. */
+const onRow = (session, id) => ({
+  ...createOnlineMenu(),
+  lobbyCursor: onlineView(createOnlineMenu(), session).lobby.rows.findIndex((row) => row.id === id),
+});
+
+test("the lobby cursor walks your car, the race and the button", () => {
   let menu = createOnlineMenu();
   const session = lobbySession();
   const view = () => onlineView(menu, session).lobby.rows[menu.lobbyCursor].id;
+  // The car comes first so a guest's cursor opens on a row they can actually
+  // use, rather than on one of the host's.
+  assertEqual(view(), LOBBY_ROW_CAR);
+  menu = moveOnline(menu, "down", session);
+  assertEqual(view(), LOBBY_ROW_PAINT);
+  menu = moveOnline(menu, "down", session);
   assertEqual(view(), LOBBY_ROW_TRACK);
   menu = moveOnline(menu, "down", session);
   assertEqual(view(), LOBBY_ROW_DISTANCE);
@@ -216,53 +235,104 @@ test("the lobby cursor walks the settings and the button", () => {
 });
 
 test("the host steps a setting and gets a config to publish", () => {
-  const menu = createOnlineMenu();
   const session = lobbySession();
-  const next = adjustLobby(menu, "right", session);
-  assert(next, "the host should get a config back");
-  assert(next.trackId !== session.config.trackId, "and it should have moved");
+  const next = adjustLobby(onRow(session, LOBBY_ROW_TRACK), "right", session);
+  assertEqual(next.kind, LOBBY_SET_CONFIG, "the room's settings belong to the server");
+  assert(next.config.trackId !== session.config.trackId, "and it should have moved");
 });
 
-test("a guest moving the same row publishes nothing", () => {
-  const menu = createOnlineMenu();
+test("a guest moving the host's row publishes nothing", () => {
   const session = lobbySession({ youAreHost: false });
-  assertEqual(adjustLobby(menu, "right", session), null, "the guest watches, it does not set");
+  assertEqual(
+    adjustLobby(onRow(session, LOBBY_ROW_TRACK), "right", session),
+    null,
+    "the guest watches, it does not set",
+  );
+});
+
+test("your car is yours in either seat — a guest still steps it", () => {
+  for (const youAreHost of [true, false]) {
+    const session = lobbySession({ youAreHost });
+    const car = adjustLobby(onRow(session, LOBBY_ROW_CAR), "right", session);
+    const paint = adjustLobby(onRow(session, LOBBY_ROW_PAINT), "left", session);
+    assertEqual(car.kind, LOBBY_STEP_CAR, `host=${youAreHost}: nobody else owns your car`);
+    assertEqual(car.step, 1);
+    assertEqual(paint.kind, LOBBY_STEP_PAINT);
+    assertEqual(paint.step, -1, "and it steps both ways");
+  }
+});
+
+test("the car rows are live for a guest where the race rows are dimmed", () => {
+  const guest = onlineView(createOnlineMenu(), lobbySession({ youAreHost: false })).lobby;
+  const row = (id) => guest.rows.find((entry) => entry.id === id);
+  assertEqual(row(LOBBY_ROW_CAR).adjustable, true);
+  assertEqual(row(LOBBY_ROW_CAR).dimmed, false);
+  assertEqual(row(LOBBY_ROW_TRACK).adjustable, false);
+  assertEqual(row(LOBBY_ROW_TRACK).dimmed, true);
 });
 
 test("distances wrap through all four, because a private room opens every length", () => {
-  let menu = createOnlineMenu();
   const session = lobbySession();
-  menu = moveOnline(menu, "down", session); // distance row
+  const menu = onRow(session, LOBBY_ROW_DISTANCE);
   const seen = new Set();
   let config = session.config;
   for (let i = 0; i < 8; i += 1) {
-    config = adjustLobby(menu, "right", { ...session, config });
+    config = adjustLobby(menu, "right", { ...session, config }).config;
     seen.add(config.distanceId);
   }
   assertEqual(seen.size, 4, "eighth, quarter, half and mile");
 });
 
 test("match length steps through best of one, three and five", () => {
-  let menu = createOnlineMenu();
   const session = lobbySession();
-  menu = moveOnline(menu, "down", session);
-  menu = moveOnline(menu, "down", session); // bestOf row
+  const menu = onRow(session, LOBBY_ROW_BEST_OF);
   const seen = new Set();
   let config = session.config;
   for (let i = 0; i < 6; i += 1) {
-    config = adjustLobby(menu, "right", { ...session, config });
+    config = adjustLobby(menu, "right", { ...session, config }).config;
     seen.add(config.bestOf);
   }
   assertEqual(seen.size, 3);
   assert(seen.has(1) && seen.has(3) && seen.has(5));
 });
 
-test("only the button readies up — a setting row's ENTER does nothing", () => {
-  let menu = createOnlineMenu();
+test("only the button readies up, and only the paint row opens the garage", () => {
   const session = lobbySession();
-  assertEqual(confirmOnline(menu, session), ONLINE_NOTHING, "standing on the track row");
-  menu = { ...menu, lobbyCursor: 3 };
-  assertEqual(confirmOnline(menu, session), ONLINE_READY);
+  assertEqual(confirmOnline(onRow(session, LOBBY_ROW_TRACK), session), ONLINE_NOTHING);
+  assertEqual(confirmOnline(onRow(session, LOBBY_ROW_CAR), session), ONLINE_NOTHING);
+  // Reachable without a mouse: the CUSTOMISE button is a pointer convenience.
+  assertEqual(confirmOnline(onRow(session, LOBBY_ROW_PAINT), session), ONLINE_CUSTOMISE);
+  assertEqual(confirmOnline(onRow(session, LOBBY_ROW_READY), session), ONLINE_READY);
+});
+
+test("the lobby shows the car it was handed, and says so when there is no account", () => {
+  const session = lobbySession();
+  const signedIn = onlineView(createOnlineMenu(), session, {
+    car: { modelLabel: "Toro SV", paintLabel: "Lime Matte", canCustomise: true },
+  }).lobby;
+  assertEqual(signedIn.rows.find((row) => row.id === LOBBY_ROW_CAR).value, "Toro SV");
+  assertEqual(signedIn.rows.find((row) => row.id === LOBBY_ROW_PAINT).value, "Lime Matte");
+  assertEqual(signedIn.customise.enabled, true);
+
+  const signedOut = onlineView(createOnlineMenu(), session, {
+    car: { modelLabel: "Toro SV", paintLabel: "Factory", canCustomise: false },
+  }).lobby;
+  assertEqual(signedOut.customise.enabled, false);
+  assert(signedOut.customise.label.includes("SIGN IN"), "the control says why rather than vanishing");
+});
+
+test("the driver cards carry a resolved model name, not an id", () => {
+  const view = onlineView(
+    createOnlineMenu(),
+    lobbySession({
+      players: [
+        { playerId: "p1", displayName: "Ana", lane: 1, modelId: "kaido-gts" },
+        { playerId: "p2", displayName: "Bo", lane: 2, modelId: null },
+      ],
+    }),
+  ).lobby;
+  assertEqual(view.drivers[0].modelLabel, "Kaido GTS");
+  assertEqual(view.drivers[1].modelLabel, "Factory car", "and an unset car still reads as something");
 });
 
 test("the lobby shows the settings to the guest, dimmed rather than hidden", () => {
@@ -307,9 +377,10 @@ test("the button says what pressing it does next, not what it did last", () => {
 
 test("the view resolves track and distance names, so the renderer looks nothing up", () => {
   const view = onlineView(createOnlineMenu(), lobbySession()).lobby;
-  assertEqual(view.rows[0].value, "Grasslands");
-  assertEqual(view.rows[1].value, "1/4 Mile");
-  assertEqual(view.rows[2].value, "BEST OF 3");
+  const value = (id) => view.rows.find((row) => row.id === id).value;
+  assertEqual(value(LOBBY_ROW_TRACK), "Grasslands");
+  assertEqual(value(LOBBY_ROW_DISTANCE), "1/4 Mile");
+  assertEqual(value(LOBBY_ROW_BEST_OF), "BEST OF 3");
 });
 
 // ---------------------------------------------------------------------------
@@ -317,6 +388,12 @@ test("the view resolves track and distance names, so the renderer looks nothing 
 // ---------------------------------------------------------------------------
 
 const centre = (rect) => ({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 });
+
+/** A lobby with an account behind it, so every control it can draw is drawn. */
+const fullLobbyView = (overrides = {}) =>
+  onlineView(createOnlineMenu(), lobbySession(overrides), {
+    car: { modelLabel: "Toro SV", paintLabel: "Lime Matte", canCustomise: true },
+  });
 
 test("every way in is clickable, and the click lands on the one under the pointer", () => {
   const view = onlineView(createOnlineMenu(), createSession());
@@ -336,6 +413,10 @@ test("no two targets on any pane claim the same pixel", () => {
     onlineView(openJoin(createOnlineMenu()), createSession()),
     onlineView(createOnlineMenu(), searching(createSession())),
     onlineView(createOnlineMenu(), lobbySession()),
+    // Signed in, so the way into the garage is drawn too and gets checked against
+    // the LEAVE ROOM button sitting on the same line.
+    fullLobbyView(),
+    fullLobbyView({ youAreHost: false }),
   ];
   for (const view of panes) {
     const targets = onlineTargets(view);
@@ -362,20 +443,47 @@ test("a stepper arrow wins over the row it sits inside", () => {
   assertEqual(hit.direction, step.direction);
 });
 
-test("a guest's settings have no arrows to click", () => {
-  const view = onlineView(createOnlineMenu(), lobbySession({ youAreHost: false }));
-  const steps = onlineTargets(view).filter((target) => target.kind === TARGET_LOBBY_STEP);
-  assertEqual(steps.length, 0, "a control that is not drawn must not be a target");
+test("a guest has arrows on their own car and none on the host's settings", () => {
+  const session = lobbySession({ youAreHost: false });
+  const view = onlineView(createOnlineMenu(), session);
+  const rows = view.lobby.rows;
+  const stepped = new Set(
+    onlineTargets(view)
+      .filter((target) => target.kind === TARGET_LOBBY_STEP)
+      .map((target) => rows[target.index].id),
+  );
+  assertEqual(stepped.size, 2, "a control that is not drawn must not be a target");
+  assert(stepped.has(LOBBY_ROW_CAR) && stepped.has(LOBBY_ROW_PAINT));
 });
 
 test("clicking an arrow steps the row it belongs to, not the one the caret is on", () => {
   const session = lobbySession();
-  // Caret on the track row; the click lands on the distance row's arrow.
+  const rows = onlineView(createOnlineMenu(), session).lobby.rows;
+  // Caret at the top of the list; the click lands on the distance row's arrow.
   const menu = createOnlineMenu();
-  const next = adjustLobbyAt(1, "right", session);
-  assert(next.distanceId !== session.config.distanceId, "the distance moved");
-  assertEqual(next.trackId, session.config.trackId, "and the track did not");
+  const index = rows.findIndex((row) => row.id === LOBBY_ROW_DISTANCE);
+  const next = adjustLobbyAt(index, "right", session);
+  assert(next.config.distanceId !== session.config.distanceId, "the distance moved");
+  assertEqual(next.config.trackId, session.config.trackId, "and the track did not");
   assertEqual(menu.lobbyCursor, 0, "the caret is irrelevant to where a click landed");
+});
+
+test("the way into the garage is clickable, and is not a target without an account", () => {
+  const session = lobbySession();
+  const signedIn = onlineView(createOnlineMenu(), session, {
+    car: { modelLabel: "Toro SV", paintLabel: "Factory", canCustomise: true },
+  });
+  const hit = hitOnline(signedIn, centre(ONLINE_LAYOUT.customise).x, centre(ONLINE_LAYOUT.customise).y);
+  assertEqual(hit.kind, TARGET_CUSTOMISE);
+
+  const signedOut = onlineView(createOnlineMenu(), session, {
+    car: { modelLabel: "Toro SV", paintLabel: "Factory", canCustomise: false },
+  });
+  assertEqual(
+    onlineTargets(signedOut).filter((target) => target.kind === TARGET_CUSTOMISE).length,
+    0,
+    "an inert control the player can press and watch do nothing is worse than none",
+  );
 });
 
 test("hover is resolved by the same function that resolves the click", () => {
@@ -436,6 +544,10 @@ test("every target sits on screen", () => {
     onlineView(openJoin(createOnlineMenu()), createSession()),
     onlineView(createOnlineMenu(), searching(createSession())),
     onlineView(createOnlineMenu(), lobbySession()),
+    // Signed in, so the way into the garage is drawn too and gets checked against
+    // the LEAVE ROOM button sitting on the same line.
+    fullLobbyView(),
+    fullLobbyView({ youAreHost: false }),
   ];
   for (const view of panes) {
     for (const target of onlineTargets(view)) {

@@ -76,11 +76,21 @@ test("the garage is not a menu screen and does not replace the race", () => {
   assert(!showsTheRace(SCREEN_GARAGE));
 });
 
-test("backing out of the garage returns to the setup screen", () => {
-  // Unlike the radio, the garage has exactly one place it can be opened from,
-  // so it needs no remembered return.
-  const shell = enterScreen(createShell(), SCREEN_GARAGE);
-  assertEqual(cancelShell(shell).shell.screen, SCREEN_SETUP);
+test("backing out of the garage returns to whichever screen opened it", () => {
+  // Two ways in now: the setup screen's paint pane, and an online lobby. A
+  // hardcoded return would drop a driver out of the room they are sitting in.
+  const fromSetup = enterScreen(enterScreen(createShell(), SCREEN_SETUP), SCREEN_GARAGE);
+  assertEqual(cancelShell(fromSetup).shell.screen, SCREEN_SETUP);
+
+  const fromLobby = enterScreen(enterScreen(createShell(), SCREEN_ONLINE), SCREEN_GARAGE);
+  assertEqual(cancelShell(fromLobby).shell.screen, SCREEN_ONLINE);
+});
+
+test("re-entering the garage from itself cannot trap the player there", () => {
+  // The radio's rule, for the radio's reason: a return that pointed at the
+  // screen you are on is an ESC that goes nowhere.
+  const twice = enterScreen(enterScreen(enterScreen(createShell(), SCREEN_ONLINE), SCREEN_GARAGE), SCREEN_GARAGE);
+  assertEqual(cancelShell(twice).shell.screen, SCREEN_SETUP);
 });
 
 test("the garage declines ENTER, leaving it to the editor's own actions", () => {

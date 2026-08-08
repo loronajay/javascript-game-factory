@@ -468,6 +468,34 @@ test("restart and pause are both refused during an online race", () => {
   }
 });
 
+test("no server frame tears the race down without moving the screen", () => {
+  // The rematch bug, as a rule.
+  //
+  // `endOnlineRace()` clears `opponentCar`, which is what `isOnlineRace()` reads.
+  // Doing that while the shell is still on the race screen does not leave the
+  // player with no race — it leaves them with a *single-player* one: the pause
+  // menu comes back, `R` restarts, and the stale race steps forward again with
+  // nothing on screen saying the match ended. That is what pressing REMATCH did,
+  // because the server answers a completed handshake with a lobby frame and the
+  // frame handler only did half the job.
+  //
+  // So the teardown and the screen move are one operation, and a frame handler
+  // may only reach it through that.
+  const source = fs.readFileSync(path.join(gameRoot, "scripts/init-game.js"), "utf8");
+
+  const handlers = source.slice(source.indexOf("net.on({"), source.indexOf("\n  });", source.indexOf("net.on({")));
+  assert(handlers.includes("onLobby"), "the frame handlers are no longer where this test looks");
+  assert(
+    !handlers.includes("endOnlineRace("),
+    "a frame handler must go through returnToOnlineScreen, which also moves the screen",
+  );
+
+  const fn = source.slice(source.indexOf("function returnToOnlineScreen"));
+  const body = fn.slice(0, fn.indexOf("\n  }"));
+  assert(body.includes("endOnlineRace()"), "returnToOnlineScreen must tear the race down");
+  assert(body.includes("SCREEN_ONLINE"), "…and put the player back on the online screen");
+});
+
 test("the garage's rules do not import the storage layer", () => {
   // A pure reducer importing the sync layer would drag a server client into
   // every test that touches a preset.

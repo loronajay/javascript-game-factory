@@ -19,9 +19,17 @@
 // that is a *rendering* difference rather than two different lobbies: the guest
 // still sees every row and watches it change, because a race whose settings are
 // invisible to one driver is a race they did not agree to.
+//
+// **The car rows are the exception, and the split is the whole point.** The race
+// belongs to the room, so only the host sets it; the car belongs to the driver,
+// so both drivers always set their own. They sit in the same list because they
+// are answers to the same question — "what am I about to run?" — and the car
+// comes first because it is the row a guest can always use, so the cursor never
+// opens on something inert.
 
 import { BEST_OF_OPTIONS } from "../sim/match.js";
 import { RACE_DISTANCES } from "../sim/constants.js";
+import { modelById } from "../assets/car-atlas.js";
 import { TRACKS } from "./track-layout.js";
 import {
   ROOM_CODE_LENGTH,
@@ -64,6 +72,12 @@ export const ONLINE_LAYOUT = {
   back: { x: 96, y: 620, width: 200, height: 54 },
   /** The stepper arrows on an adjustable lobby row, relative to its right edge. */
   step: { width: 40, inset: 96 },
+  /**
+   * The way into the garage from a lobby. A drawn button rather than a row,
+   * because the six rows above it are all things you *hold* and this is a thing
+   * you *do* — the same reason the setup screen's START is a button.
+   */
+  customise: { x: 316, y: 620, width: 300, height: 54 },
   footer: { x: 96, y: 640 },
 };
 
@@ -94,7 +108,12 @@ export const HOME_ITEMS = [
  * The lobby's rows. The last is the button; everything above it is a setting.
  * Distances are the full four here — a private room opens every length, where
  * quick search sticks to the two competitive ones.
+ *
+ * The first two are **yours** and the middle three are the **room's**; see the
+ * note at the top of this file for why they share one list.
  */
+export const LOBBY_ROW_CAR = "car";
+export const LOBBY_ROW_PAINT = "paint";
 export const LOBBY_ROW_TRACK = "track";
 export const LOBBY_ROW_DISTANCE = "distance";
 export const LOBBY_ROW_BEST_OF = "bestOf";
@@ -103,7 +122,17 @@ export const LOBBY_ROW_READY = "ready";
 const DISTANCE_IDS = ["eighth", "quarter", "half", "mile"];
 const TRACK_IDS = TRACKS.map((track) => track.id);
 
-const LOBBY_ROWS = [LOBBY_ROW_TRACK, LOBBY_ROW_DISTANCE, LOBBY_ROW_BEST_OF, LOBBY_ROW_READY];
+const LOBBY_ROWS = [
+  LOBBY_ROW_CAR,
+  LOBBY_ROW_PAINT,
+  LOBBY_ROW_TRACK,
+  LOBBY_ROW_DISTANCE,
+  LOBBY_ROW_BEST_OF,
+  LOBBY_ROW_READY,
+];
+
+/** Rows the driver always owns, host or not. */
+const OWN_ROWS = new Set([LOBBY_ROW_CAR, LOBBY_ROW_PAINT]);
 
 export function createOnlineMenu() {
   return { cursor: 0, entry: createTextEntry(), lobbyCursor: 0, joining: false };
@@ -166,11 +195,22 @@ export function moveOnline(menu, direction, session) {
 }
 
 /**
- * Steps the setting under the lobby cursor. Returns the config the host should
- * publish, or null when there is nothing to publish — a guest moving the cursor,
- * or the cursor sitting on the button.
+ * What stepping a lobby row is a request for. Two kinds, because two different
+ * things own the rows: the room's settings go to the server as a config the host
+ * is asking for, and the driver's car is a local pick that is then published as a
+ * loadout. A single "here is a config" return could not express the second, and
+ * the version that tried made the car rows silently inert for the guest.
+ */
+export const LOBBY_SET_CONFIG = "config";
+export const LOBBY_STEP_CAR = "car";
+export const LOBBY_STEP_PAINT = "paint";
+
+/**
+ * Steps whatever is under the lobby cursor. Returns the request the composition
+ * root should carry out, or null when there is nothing to do — a guest on one of
+ * the host's rows, or the cursor sitting on the button.
  *
- * The config is returned rather than applied because the server owns it: the
+ * A config is *returned* rather than applied because the server owns it: the
  * host asks, the server decides, and both clients redraw from the frame that
  * comes back. A lobby that applied its own change locally would flicker every
  * time the server disagreed.
@@ -187,22 +227,30 @@ export function adjustLobby(menu, direction, session) {
  * on the track row must step the distance, not the track.
  */
 export function adjustLobbyAt(rowIndex, direction, session) {
-  if (!session.isHost || !session.config) return null;
   if (direction !== "left" && direction !== "right") return null;
   const step = direction === "left" ? -1 : 1;
   const row = LOBBY_ROWS[rowIndex];
 
+  // Your car is yours in either seat. Checked before the host gate, which is
+  // what these rows exist to sit outside of.
+  if (row === LOBBY_ROW_CAR) return { kind: LOBBY_STEP_CAR, step };
+  if (row === LOBBY_ROW_PAINT) return { kind: LOBBY_STEP_PAINT, step };
+
+  if (!session.isHost || !session.config) return null;
+
   if (row === LOBBY_ROW_TRACK) {
-    return { ...session.config, trackId: cycle(TRACK_IDS, session.config.trackId, step) };
+    return config(session, { trackId: cycle(TRACK_IDS, session.config.trackId, step) });
   }
   if (row === LOBBY_ROW_DISTANCE) {
-    return { ...session.config, distanceId: cycle(DISTANCE_IDS, session.config.distanceId, step) };
+    return config(session, { distanceId: cycle(DISTANCE_IDS, session.config.distanceId, step) });
   }
   if (row === LOBBY_ROW_BEST_OF) {
-    return { ...session.config, bestOf: cycle(BEST_OF_OPTIONS, session.config.bestOf, step) };
+    return config(session, { bestOf: cycle(BEST_OF_OPTIONS, session.config.bestOf, step) });
   }
   return null;
 }
+
+const config = (session, patch) => ({ kind: LOBBY_SET_CONFIG, config: { ...session.config, ...patch } });
 
 /** Wraps, because these are short lists where wrapping is the fast way round. */
 function cycle(values, current, step) {
@@ -235,6 +283,8 @@ export const ONLINE_CREATE = "online-create";
 export const ONLINE_JOIN = "online-join";
 export const ONLINE_OPEN_JOIN = "online-open-join";
 export const ONLINE_READY = "online-ready";
+/** Open the garage on the car this driver is taking to the line. */
+export const ONLINE_CUSTOMISE = "online-customise";
 export const ONLINE_NOTHING = "online-nothing";
 
 export function confirmOnline(menu, session) {
@@ -251,11 +301,18 @@ export function confirmOnline(menu, session) {
     return codeIsComplete(menu) ? ONLINE_JOIN : ONLINE_NOTHING;
   }
   if (pane === PANE_LOBBY) {
-    // Only the button commits. A setting row's ENTER does nothing rather than
-    // readying up, because arriving on a row and pressing the key you press
-    // everywhere else should not start a race you were still configuring.
+    // Only the button *starts anything*. A setting row's ENTER does not ready up,
+    // because arriving on a row and pressing the key you press everywhere else
+    // should not start a race you were still configuring.
+    //
+    // The paint row is the one row with somewhere to go: ENTER opens the garage
+    // on the car you are about to run, which is what keeps the editor reachable
+    // without a mouse — the CUSTOMISE button is a pointer convenience, not the
+    // only way in.
     const row = LOBBY_ROWS[menu.lobbyCursor];
-    return row === LOBBY_ROW_READY ? ONLINE_READY : ONLINE_NOTHING;
+    if (row === LOBBY_ROW_READY) return ONLINE_READY;
+    if (row === LOBBY_ROW_PAINT) return ONLINE_CUSTOMISE;
+    return ONLINE_NOTHING;
   }
   return ONLINE_NOTHING;
 }
@@ -270,8 +327,20 @@ export function confirmOnline(menu, session) {
  * hands over source rects: a renderer that resolves ids is a renderer that can
  * disagree with the screen it is drawing.
  */
-export function onlineView(menu, session, { pointer = null } = {}) {
-  const view = buildView(menu, session);
+/**
+ * The car this driver is taking to the line, as the lobby needs to show it.
+ *
+ * Passed in rather than read from the session, because the session is what the
+ * *server* has said and this is a local pick the player is still making. The
+ * model and paint names come from the same place the setup screen's do, so the
+ * two screens cannot disagree about what you are driving — there is one answer
+ * to that question in the cabinet, and this is a second way to change it rather
+ * than a second copy of it.
+ */
+const NO_CAR = { modelLabel: "—", paintLabel: "—", canCustomise: false };
+
+export function onlineView(menu, session, { pointer = null, car = NO_CAR } = {}) {
+  const view = buildView(menu, session, car ?? NO_CAR);
   if (!pointer) return { ...view, hover: null };
   // Resolved from the finished view by the very function that resolves a click,
   // so what lights up under the pointer is provably what pressing there does.
@@ -296,7 +365,7 @@ function highlightFor(view, hover) {
   return {};
 }
 
-function buildView(menu, session) {
+function buildView(menu, session, car) {
   const pane = paneFor(menu, session);
   return {
     pane,
@@ -315,16 +384,18 @@ function buildView(menu, session) {
       length: ROOM_CODE_LENGTH,
       hint: "Letters and numbers only. No O or I — they are 0 and 1.",
     },
-    lobby: lobbyView(menu, session),
+    lobby: lobbyView(menu, session, car),
   };
 }
 
-function lobbyView(menu, session) {
+function lobbyView(menu, session, car) {
   if (!session.config) return null;
   const track = TRACKS.find((entry) => entry.id === session.config.trackId) ?? TRACKS[0];
   const distance = RACE_DISTANCES[session.config.distanceId] ?? RACE_DISTANCES.quarter;
 
   const rows = [
+    { id: LOBBY_ROW_CAR, label: "YOUR CAR", value: car.modelLabel, own: true },
+    { id: LOBBY_ROW_PAINT, label: "PAINT", value: car.paintLabel, own: true },
     { id: LOBBY_ROW_TRACK, label: "STRIP", value: track.label ?? track.id },
     { id: LOBBY_ROW_DISTANCE, label: "DISTANCE", value: distance.label },
     { id: LOBBY_ROW_BEST_OF, label: "MATCH", value: `BEST OF ${session.config.bestOf}` },
@@ -341,9 +412,10 @@ function lobbyView(menu, session) {
     index,
     highlighted: index === menu.lobbyCursor,
     hovered: false,
-    // A guest sees every setting and watches it change, but cannot move it.
-    adjustable: !row.button && session.isHost,
-    dimmed: !row.button && !session.isHost,
+    // A guest sees every setting and watches it change, but cannot move it — with
+    // the deliberate exception of their own car, which no host owns.
+    adjustable: !row.button && (row.own || session.isHost),
+    dimmed: !row.button && !row.own && !session.isHost,
   }));
 
   return {
@@ -358,9 +430,20 @@ function lobbyView(menu, session) {
       .map((player) => ({
         ...player,
         you: player.playerId === session.youPlayerId,
+        // Resolved here so the renderer looks nothing up. It printed the raw
+        // `modelId` before, which meant the driver cards read "kaido-gts" while
+        // the row two panels over read "Kaido GTS".
+        modelLabel: modelById(player.modelId)?.label ?? "Factory car",
         wins: session.score?.players.find((entry) => entry.playerId === player.playerId)?.wins ?? 0,
       })),
     rows,
+    // Stays in the list and says why rather than disappearing when there is no
+    // account to save a paint against — the setup screen's rule, for the same
+    // reason: a control that vanishes teaches nothing.
+    customise: {
+      label: car.canCustomise ? "CUSTOMISE CAR" : "SIGN IN TO CUSTOMISE",
+      enabled: car.canCustomise,
+    },
     score: session.score,
   };
 }
@@ -385,6 +468,7 @@ export const TARGET_BACK = "back";
 export const TARGET_CANCEL_SEARCH = "cancel-search";
 export const TARGET_LOBBY_ROW = "lobby-row";
 export const TARGET_LOBBY_STEP = "lobby-step";
+export const TARGET_CUSTOMISE = "customise";
 
 const inside = (rect, x, y) =>
   x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
@@ -448,6 +532,11 @@ export function onlineTargets(view) {
         rect: { x: detail.x, y, width: detail.width, height: row.height },
       });
     });
+    // Drawn muted and inert when there is no account behind it, so — like a
+    // guest's stepper arrows — it is not a target when it cannot act.
+    if (view.lobby.customise.enabled) {
+      targets.push({ kind: TARGET_CUSTOMISE, rect: { ...ONLINE_LAYOUT.customise } });
+    }
     targets.push({ kind: TARGET_BACK, rect: { ...back } });
   }
   return targets;

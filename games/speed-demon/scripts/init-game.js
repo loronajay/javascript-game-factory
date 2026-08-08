@@ -23,6 +23,8 @@ import {
   cancelSetup,
   rewindSetup,
   focusSetup,
+  cycleSetupModel,
+  cycleSetupPreset,
   setupModel,
   setupPreset,
   setupTrack,
@@ -144,7 +146,10 @@ import {
 } from "./online/session.js";
 import { advanceTo, createOpponent, receiveInputs } from "./online/opponent.js";
 import {
+  LOBBY_SET_CONFIG,
+  LOBBY_STEP_CAR,
   ONLINE_CREATE,
+  ONLINE_CUSTOMISE,
   ONLINE_JOIN,
   ONLINE_OPEN_JOIN,
   ONLINE_READY,
@@ -153,6 +158,7 @@ import {
   PANE_JOIN,
   TARGET_BACK,
   TARGET_CANCEL_SEARCH,
+  TARGET_CUSTOMISE,
   TARGET_HOME,
   TARGET_JOIN_SUBMIT,
   TARGET_LOBBY_ROW,
@@ -583,7 +589,7 @@ export function boot(canvas) {
       // player staring at a tree that will never resolve.
       if (shell.screen === SCREEN_ONLINE || isOnlineRace()) {
         session = failed(session, "Connection lost");
-        endOnlineRace();
+        returnToOnlineScreen();
       }
     },
     onSearching: () => {
@@ -601,7 +607,7 @@ export function boot(canvas) {
       // panel was still drawn over. With the race gone, `isOnlineRace()` went
       // false, the panel's own keys and clicks stopped being routed to it, and
       // pressing its button dropped the player onto the setup screen.
-      if (session.status === STATUS_LOBBY) endOnlineRace();
+      if (session.status === STATUS_LOBBY) returnToOnlineScreen();
     },
     onRoundStart: (message, localNow) => {
       session = applyRoundStart(session, message, localNow);
@@ -703,6 +709,59 @@ export function boot(canvas) {
   }
 
   /**
+   * The round is over and the room has gone back to being a room. Tearing the
+   * race down and moving the screen are **one** operation, and separating them
+   * was the rematch bug.
+   *
+   * `endOnlineRace` clears `opponentCar`, which is what `isOnlineRace()` reads.
+   * Doing that while the shell is still on `SCREEN_RACE` does not leave the
+   * player with no race — it leaves them with a *single-player* one: the pause
+   * menu comes back, `R` restarts, the stale race steps forward again, and
+   * nothing on screen says the match ended. That is exactly what pressing
+   * REMATCH did, because the server answers a completed handshake with a lobby
+   * frame and the frame handler only did half the job.
+   */
+  function returnToOnlineScreen() {
+    endOnlineRace();
+    if (showsTheRace(shell.screen)) shell = enterScreen(shell, SCREEN_ONLINE);
+  }
+
+  /**
+   * Tells the room what this driver is driving.
+   *
+   * Sent as its own message rather than riding on the way in, because the car can
+   * change *inside* a lobby now — stepping the car or paint rows, or coming back
+   * from the garage. `setIdentity` is refreshed straight away either way, because
+   * it costs nothing and every later entry path reads it.
+   *
+   * **The wire message is coalesced, and that is not premature.** A direction key
+   * auto-repeats, and the server answers each loadout with a lobby broadcast to
+   * the whole room — so a message per step is ~30 broadcasts a second, at both
+   * drivers, for as long as somebody holds ‹. Settling first sends one message for
+   * the whole sweep. Driven from the game loop, the same place `garageStore.tick`
+   * and the stereo's `apply` run, rather than from a timer of its own.
+   */
+  const LOADOUT_SETTLE_SECONDS = 0.25;
+  let loadoutSettling = 0;
+
+  function publishLoadout({ immediate = false } = {}) {
+    net.setIdentity(onlineIdentity());
+    if (immediate) flushLoadout();
+    else loadoutSettling = LOADOUT_SETTLE_SECONDS;
+  }
+
+  function flushLoadout() {
+    loadoutSettling = 0;
+    if (net.isOpen()) net.sendLoadout();
+  }
+
+  function tickLoadout(seconds) {
+    if (loadoutSettling <= 0) return;
+    loadoutSettling -= seconds;
+    if (loadoutSettling <= 0) flushLoadout();
+  }
+
+  /**
    * One tick of an online race.
    *
    * Three things happen here that do not offline: the tree is released only when
@@ -780,9 +839,31 @@ export function boot(canvas) {
       case ONLINE_READY:
         net.sendReady(true);
         break;
+      case ONLINE_CUSTOMISE:
+        // Same guard as the setup screen's paint pane: signed out there is
+        // nowhere to save a config, so the editor is not opened at all.
+        if (garageStore.available) openGarage();
+        break;
       default:
         break;
     }
+  }
+
+  /**
+   * Carries out a step on a lobby row. Two kinds, because two different things
+   * own the rows: the room's settings are the host asking the server, and the
+   * driver's car is a local pick that is then published to the room.
+   */
+  function applyLobbyRequest(request) {
+    if (!request) return;
+    if (request.kind === LOBBY_SET_CONFIG) {
+      net.sendConfig(request.config);
+      return;
+    }
+    setup = request.kind === LOBBY_STEP_CAR
+      ? cycleSetupModel(setup, request.step, garage)
+      : cycleSetupPreset(setup, request.step, garage);
+    publishLoadout();
   }
 
   /** ESC on the online screen: out of the code field, or out of online play. */
@@ -811,8 +892,8 @@ export function boot(canvas) {
         break;
       case ACTION_MOVE: {
         audio.play("button");
-        const published = adjustLobby(onlineMenu, action.direction, session);
-        if (published) net.sendConfig(published);
+        const request = adjustLobby(onlineMenu, action.direction, session);
+        if (request) applyLobbyRequest(request);
         else onlineMenu = moveOnline(onlineMenu, action.direction, session);
         break;
       }
@@ -831,9 +912,25 @@ export function boot(canvas) {
     }
   }
 
-  /** The online view with the pointer folded in, so hover and click agree. */
+  /**
+   * The online view with the pointer folded in, so hover and click agree, and
+   * with the car this driver is taking to the line.
+   *
+   * The car comes from the *same* setup the solo picker uses. That is deliberate:
+   * "what am I driving" has one answer in this cabinet, and the lobby is a second
+   * way to change it rather than a second copy of it — a player who paints a car
+   * in a lobby and then races solo finds the car they just built.
+   */
   function currentOnlineView({ pointer: at = null } = {}) {
-    return onlineView(onlineMenu, session, { pointer: at });
+    return onlineView(onlineMenu, session, { pointer: at, car: onlineCarView() });
+  }
+
+  function onlineCarView() {
+    return {
+      modelLabel: setupModel(setup).label,
+      paintLabel: setupPreset(setup, garage).name,
+      canCustomise: garageStore.available,
+    };
   }
 
   /**
@@ -861,16 +958,22 @@ export function boot(canvas) {
       if (cancelOnlineScreen()) cancelScreen();
       return;
     }
+    if (target.kind === TARGET_CUSTOMISE) {
+      if (garageStore.available) openGarage();
+      return;
+    }
     if (target.kind === TARGET_LOBBY_STEP) {
       // Against the clicked row rather than the cursor's: pointing at a
       // distance arrow means the distance, wherever the caret happens to be.
-      const published = adjustLobbyAt(target.index, target.direction, session);
-      if (published) net.sendConfig(published);
+      applyLobbyRequest(adjustLobbyAt(target.index, target.direction, session));
       return;
     }
     if (target.kind === TARGET_LOBBY_ROW) {
       onlineMenu = { ...onlineMenu, lobbyCursor: target.index };
-      confirmOnlineScreen(); // only the button commits; a setting row is inert
+      // Through the same confirm the key takes, so the mouse and ENTER cannot
+      // disagree about which rows do something: the button stages, the paint row
+      // opens the garage, every other row is inert.
+      confirmOnlineScreen();
     }
   }
 
@@ -1116,9 +1219,10 @@ export function boot(canvas) {
   }
 
   /**
-   * Back to the setup screen, rebuilt around whatever the garage did. The setup
-   * is recreated rather than patched because the paint list may have grown,
-   * shrunk or been re-selected underneath it.
+   * Back to whichever screen opened the editor, rebuilt around whatever the
+   * garage did. The setup is recreated rather than patched because the paint list
+   * may have grown, shrunk or been re-selected underneath it — that is true of
+   * both ways out, because the online lobby reads its car from the same setup.
    */
   function leaveGarage() {
     const selection = setupSelection(setup, garage);
@@ -1130,7 +1234,14 @@ export function boot(canvas) {
     // than at the top of the walk.
     setup = confirmSetup(setup, garage).setup;
     editor = null;
-    shell = enterScreen(shell, SCREEN_SETUP);
+    const back = shell.garageReturn ?? SCREEN_SETUP;
+    shell = enterScreen(shell, back);
+    // A lobby is a room with an opponent in it who is drawing your car, so the
+    // paint you just built has to reach them. Sent on the way out rather than on
+    // every save: the working copy is not the car until the editor is done with
+    // it, and ESC discards it entirely. Immediate, because leaving the editor is
+    // one deliberate act with no auto-repeat to coalesce.
+    if (back === SCREEN_ONLINE) publishLoadout({ immediate: true });
   }
 
   /** ESC. Same split: a locked pane is unlocked before the shell backs out. */
@@ -1552,6 +1663,9 @@ export function boot(canvas) {
     // `apply` runs here: a failed save keeps trying without a timer of its own,
     // and a save must survive a dropped connection whatever screen you are on.
     garageStore.tick(TICK_SECONDS);
+    // Likewise the room's copy of which car this driver is in: coalesced so a
+    // held arrow key is one message rather than one per repeat.
+    tickLoadout(TICK_SECONDS);
 
     if (shell.screen !== SCREEN_RACE) {
       audio.engine({ active: false, throttle: 0, gear: race.vehicle.gear });
@@ -1921,6 +2035,12 @@ export function boot(canvas) {
         race = gateInput(race, direction);
       } else if (shell.screen === SCREEN_RADIO) {
         setRadio(moveCursor(radio, direction));
+      } else if (shell.screen === SCREEN_ONLINE) {
+        // Through the same handler the key takes, because a direction on this
+        // screen does two different things — walk the rows, or step the one
+        // under the caret — and only `onlineAction` knows which. Falling through
+        // to `moveShell` made the whole online screen unreachable from here.
+        onlineAction({ type: ACTION_MOVE, direction });
       } else {
         shell = moveShell(shell, direction);
       }

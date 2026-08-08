@@ -166,7 +166,9 @@ function drawLobby(ctx, lobby, hover) {
     ctx.fillText(driver.you ? `${driver.displayName} (you)` : driver.displayName, panel.x + 24, y + 40);
     ctx.font = "500 16px 'Segoe UI', system-ui, sans-serif";
     ctx.fillStyle = MUTED;
-    ctx.fillText(driver.modelId ?? "Factory car", panel.x + 24, y + 68);
+    // The label, resolved by `lobbyView` — this printed the raw model id before,
+    // so a card read "kaido-gts" while the row two panels over read "Kaido GTS".
+    ctx.fillText(driver.modelLabel, panel.x + 24, y + 68);
     if (driver.ready) {
       ctx.fillStyle = "#7ddf87";
       ctx.font = "700 16px 'Segoe UI', system-ui, sans-serif";
@@ -233,13 +235,23 @@ function drawLobby(ctx, lobby, hover) {
     ctx.globalAlpha = 1;
   });
 
-  if (!lobby.isHost) {
-    ctx.fillStyle = MUTED;
-    ctx.font = "400 15px 'Segoe UI', system-ui, sans-serif";
-    ctx.textBaseline = "alphabetic";
-    ctx.fillText("The host sets the race.", detail.x + 24, detail.y + 300);
-  }
+  ctx.fillStyle = MUTED;
+  ctx.font = "400 15px 'Segoe UI', system-ui, sans-serif";
+  ctx.textBaseline = "alphabetic";
+  // Under the rows rather than over them: the list grew from four to six when the
+  // car rows arrived, and this note used to sit where row five now is.
+  const belowRows = detail.y + lobby.rows.length * (row.height + row.gap) + 26;
+  ctx.fillText(
+    lobby.isHost ? "Your car is yours; the race is the room's." : "The host sets the race. Your car is yours.",
+    detail.x + 24,
+    belowRows,
+  );
+
   drawButton(ctx, ONLINE_LAYOUT.back, "LEAVE ROOM", { live: hover?.kind === "back" });
+  drawButton(ctx, ONLINE_LAYOUT.customise, lobby.customise.label, {
+    live: hover?.kind === "customise",
+    muted: !lobby.customise.enabled,
+  });
 }
 
 // ---------------------------------------------------------------------------

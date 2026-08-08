@@ -26,6 +26,8 @@ import {
   PANES,
   createSetup,
   moveSetup,
+  cycleSetupModel,
+  cycleSetupPreset,
   setupModel,
   setupMode,
   setupTrack,
@@ -626,6 +628,76 @@ test("the view model says which mode is being set up", () => {
   const view = setupView(createSetup({ modeId: MODE_TIME_ATTACK }), EMPTY);
   assertEqual(view.mode.id, MODE_TIME_ATTACK);
   assert(view.mode.label && view.mode.blurb);
+});
+
+// ---------------------------------------------------------------------------
+// The one-row pickers (the online lobby's car and paint rows)
+// ---------------------------------------------------------------------------
+//
+// The lobby picks a car from a single row rather than a grid, and it steps the
+// same setup the solo picker does — there is one answer in this cabinet to "what
+// am I driving", and the lobby is a second way to change it rather than a second
+// copy of it.
+
+test("stepping the car walks the whole roster in the order the grid reads it", () => {
+  const roster = modelsByGroup().flatMap((group) => group.models);
+  let setup = createSetup({ modelId: roster[0].id }, EMPTY);
+  const seen = [setupModel(setup).id];
+  for (let i = 1; i < roster.length; i += 1) {
+    setup = cycleSetupModel(setup, 1, EMPTY);
+    seen.push(setupModel(setup).id);
+  }
+  assertEqual(seen.join(","), roster.map((model) => model.id).join(","));
+});
+
+test("the car row wraps, because a one-row picker has no edge to lose a cursor against", () => {
+  const roster = modelsByGroup().flatMap((group) => group.models);
+  const first = createSetup({ modelId: roster[0].id }, EMPTY);
+  assertEqual(setupModel(cycleSetupModel(first, -1, EMPTY)).id, roster.at(-1).id);
+  const last = createSetup({ modelId: roster.at(-1).id }, EMPTY);
+  assertEqual(setupModel(cycleSetupModel(last, 1, EMPTY)).id, roster[0].id);
+});
+
+test("stepping the car does not disturb the track or the objective", () => {
+  const before = createSetup({ trackId: "track-d", objectiveId: "half" }, EMPTY);
+  const after = cycleSetupModel(before, 1, EMPTY);
+  assertEqual(setupTrack(after).id, "track-d");
+  assertEqual(setupObjective(after).id, "half");
+});
+
+test("stepping the paint moves the pick, not just a browsing cursor", () => {
+  const garage = stockedGarage();
+  const options = presetOptionsFor(DEFAULT_MODEL_ID, garage);
+  assertEqual(options.length, 3, "Factory plus the two saved configs");
+
+  let setup = createSetup({ modelId: DEFAULT_MODEL_ID }, garage);
+  assertEqual(setupPreset(setup, garage).factory, true, "starts on Factory");
+  setup = cycleSetupPreset(setup, 1, garage);
+  assertEqual(setupPreset(setup, garage).name, options[1].name);
+  assertEqual(setup.presetIndex, setup.chosenPresetIndex, "the cursor and the pick stay together");
+});
+
+test("the paint row wraps through Factory rather than stopping on it", () => {
+  const garage = stockedGarage();
+  const setup = createSetup({ modelId: DEFAULT_MODEL_ID }, garage);
+  assertEqual(setupPreset(cycleSetupPreset(setup, -1, garage), garage).name, "Lime");
+});
+
+test("a car with nothing saved for it still has a paint row that does not break", () => {
+  // Factory is the only option, so stepping it is a no-op rather than an index
+  // walking off the end of a one-item list.
+  const setup = createSetup({ modelId: DEFAULT_MODEL_ID }, EMPTY);
+  for (const step of [1, -1]) {
+    assertEqual(setupPreset(cycleSetupPreset(setup, step, EMPTY), EMPTY).factory, true);
+  }
+});
+
+test("changing car clamps a paint pick that the new car does not have", () => {
+  const garage = stockedGarage();
+  let setup = createSetup({ modelId: DEFAULT_MODEL_ID }, garage);
+  setup = cycleSetupPreset(setup, -1, garage); // the last of three
+  const moved = cycleSetupModel(setup, 1, garage); // a car with only Factory
+  assertEqual(setupPreset(moved, garage).factory, true, "a preset belongs to one model");
 });
 
 finish();

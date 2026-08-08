@@ -89,7 +89,13 @@ export function createShell({ screen = SCREEN_TITLE, modeId = DEFAULT_MODE_ID } 
   // reachable from the title *and* from a paused race, and those want opposite
   // answers — backing out of the radio must not throw away a live race — so the
   // way in is recorded rather than hardcoded.
-  return { screen, cursor: 0, modeId, radioReturn: SCREEN_TITLE };
+  //
+  // `garageReturn` is the same fact about the garage, and it did not used to
+  // exist: the editor was reachable only from the setup screen's paint pane, so
+  // ESC had one sensible answer. The online lobby is now a second way in — a
+  // driver has to be able to paint the car they are about to race without
+  // leaving the room — and a hardcoded return would drop them out of the lobby.
+  return { screen, cursor: 0, modeId, radioReturn: SCREEN_TITLE, garageReturn: SCREEN_SETUP };
 }
 
 // ---------------------------------------------------------------------------
@@ -186,17 +192,23 @@ function openingCursor(shell, screen) {
 /**
  * Moves to a screen, placing the cursor sensibly for it.
  *
- * Arriving at the radio also records where you arrived *from*, which is the one
- * piece of history the shell keeps: every other screen has a single sensible
- * place to back out to, and the radio does not.
+ * Arriving at the radio or the garage also records where you arrived *from*,
+ * which is the only history the shell keeps: those two are reachable from more
+ * than one place and want opposite answers on the way out. Every other screen
+ * has a single sensible place to back out to.
+ *
+ * Neither can be recorded as its own return, so radio→radio and garage→garage
+ * cannot trap you on a screen whose ESC leads back to itself.
  */
 export function enterScreen(shell, screen) {
   const radioReturn = screen === SCREEN_RADIO ? shell.screen : shell.radioReturn;
+  const garageReturn = screen === SCREEN_GARAGE ? shell.screen : shell.garageReturn;
   return {
     ...shell,
     screen,
     cursor: openingCursor(shell, screen),
     radioReturn: radioReturn === SCREEN_RADIO ? SCREEN_TITLE : radioReturn,
+    garageReturn: garageReturn === SCREEN_GARAGE ? SCREEN_SETUP : garageReturn,
   };
 }
 
@@ -324,10 +336,11 @@ export function cancelShell(shell) {
     // still sitting there and must be returned to, not thrown away.
     case SCREEN_RADIO:
       return outcome(enterScreen(shell, shell.radioReturn ?? SCREEN_TITLE));
-    // The garage is only ever reached from the setup screen's paint pane, so
-    // unlike the radio it needs no remembered return — there is one place to go.
+    // Back to whichever screen opened the editor — the setup screen's paint
+    // pane, or an online lobby. A lobby is a room you are still sitting in, so
+    // returning to the setup screen from it would silently leave the match.
     case SCREEN_GARAGE:
-      return outcome(enterScreen(shell, SCREEN_SETUP));
+      return outcome(enterScreen(shell, shell.garageReturn ?? SCREEN_SETUP));
     // Backing out of online has to close the socket as well as change screen —
     // an abandoned lobby that nobody left is a room the server keeps alive and
     // an opponent left staring at a driver who is not coming back.

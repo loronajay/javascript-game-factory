@@ -314,6 +314,55 @@ function withModel(setup, row, column, garage) {
 }
 
 /**
+ * The roster in the order the grid reads it — archetype by archetype, left to
+ * right across each row.
+ *
+ * The online lobby picks a car from a *single row* rather than a grid, and it
+ * steps through this, so "the next car" means the same thing on both screens.
+ * Deriving it from `modelsByGroup` rather than from `allModels` is what keeps
+ * that true when a model's archetype changes.
+ */
+function rosterOrder() {
+  return modelsByGroup().flatMap((group) => group.models);
+}
+
+/**
+ * The car one step along the roster, wrapping.
+ *
+ * Wrapping is right here and wrong on the grid, and that is not an
+ * inconsistency: a one-row picker has no edge to lose the cursor against, where
+ * a 24-cell grid with uneven rows very much does.
+ */
+export function cycleSetupModel(setup, step, garage = emptyGarage()) {
+  const roster = rosterOrder();
+  if (roster.length === 0 || (step !== 1 && step !== -1)) return setup;
+  const current = roster.findIndex((model) => model.id === setupModel(setup).id);
+  const next = roster[((current < 0 ? 0 : current) + step + roster.length) % roster.length];
+  // The grid position is set directly rather than through `withModel`, which
+  // short-circuits when the cell has not moved: a roster of one would then wrap
+  // onto itself and never reset the paint pick.
+  const moved = { ...setup, model: gridPositionOf(next.id) };
+  const options = presetOptionsFor(next.id, garage);
+  const chosen = clamp(setup.chosenPresetIndex ?? 0, options.length - 1);
+  return { ...moved, presetIndex: chosen, chosenPresetIndex: chosen };
+}
+
+/**
+ * The next config saved for this car, wrapping through `Factory`.
+ *
+ * This steps the *pick* rather than a browsing cursor, unlike `moveSetup` on the
+ * paint pane. There is no `Customise…` row to walk past in a one-row picker, so
+ * landing on a config is the whole gesture and the two indices stay together.
+ */
+export function cycleSetupPreset(setup, step, garage = emptyGarage()) {
+  const options = setupPresetOptions(setup, garage);
+  if (options.length === 0 || (step !== 1 && step !== -1)) return setup;
+  const from = clamp(setup.chosenPresetIndex ?? 0, options.length - 1);
+  const index = (from + step + options.length) % options.length;
+  return { ...setup, presetIndex: index, chosenPresetIndex: index };
+}
+
+/**
  * Puts the cursor on something the player clicked.
  *
  * A click carries its own pane, so unlike a direction key it *can* change pane —
