@@ -26,6 +26,26 @@ export const SCREEN_RESULTS = "results";
 export const SCREEN_RADIO = "radio";
 export const SCREEN_GARAGE = "garage";
 /**
+ * The collection: the whole roster on one scrolling screen, a row per model with
+ * every paint saved for it.
+ *
+ * Separate from `SCREEN_GARAGE`, which is the *editor*. This is where a player
+ * looks at what they have built and picks the car they are taking to the line;
+ * the editor is where one car is actually painted, and it is reached from here
+ * exactly as it is reached from the setup screen's paint pane.
+ */
+export const SCREEN_COLLECTION = "collection";
+/**
+ * The leaderboards: the global board for a given mode and objective, and the
+ * player's own bests, as two tabs of one screen.
+ *
+ * On the title menu rather than hanging off the results panel, because it is
+ * somewhere a player goes *instead* of racing — the same argument the collection
+ * makes. It needs no remembered return for the same reason the collection needs
+ * none: there is exactly one way in.
+ */
+export const SCREEN_BOARDS = "boards";
+/**
  * Getting into an online match: quick search, a private room code, and the
  * lobby you wait in. The match *itself* is not a screen — it is the race screen
  * with a session attached, exactly as the tutorial is the race screen with a
@@ -43,6 +63,8 @@ export const SCREENS = [
   SCREEN_RESULTS,
   SCREEN_RADIO,
   SCREEN_GARAGE,
+  SCREEN_COLLECTION,
+  SCREEN_BOARDS,
   SCREEN_ONLINE,
 ];
 
@@ -68,6 +90,16 @@ export const COMMAND_MODE = "mode";
 export const COMMAND_LOCKED = "locked";
 /** Build a guided practice run instead of a chosen one. */
 export const COMMAND_TUTORIAL = "tutorial";
+/**
+ * Open the leaderboards on the board the current setup would race for, and ask
+ * for it.
+ *
+ * A command rather than something `enterScreen` could do, for the reason all the
+ * others are: fetching a board is impure and the shell is not. It is also what
+ * makes arriving here show the board you were about to drive rather than
+ * whatever the screen was last left on.
+ */
+export const COMMAND_BOARDS = "boards";
 /** Open a connection and start looking for a match. */
 export const COMMAND_ONLINE = "online";
 /** Tear the session down: the player has backed out of online play. */
@@ -115,6 +147,14 @@ const MENUS = {
       // START stays item zero: ENTER on a fresh boot must start a race without
       // anyone having to read the screen.
       { id: "start", label: "START", enabled: true },
+      // The garage is on the title menu because it is somewhere a player goes
+      // *instead* of racing. Reaching it only through the pre-race picker made
+      // browsing what you own cost a mode choice and three locked panes first.
+      { id: "garage", label: "GARAGE", enabled: true },
+      // Next to the garage rather than buried behind a race, for the same
+      // reason: a player who wants to know where they stand should not have to
+      // drive to find out.
+      { id: "boards", label: "LEADERBOARDS", enabled: true },
       { id: "tutorial", label: "HOW TO DRIVE", enabled: true },
       { id: "radio", label: "RADIO", enabled: true },
     ],
@@ -241,6 +281,10 @@ export function confirmShell(shell) {
       switch (menuFor(shell).items[shell.cursor]?.id) {
         case "radio":
           return outcome(enterScreen(shell, SCREEN_RADIO));
+        case "garage":
+          return outcome(enterScreen(shell, SCREEN_COLLECTION));
+        case "boards":
+          return outcome(enterScreen(shell, SCREEN_BOARDS), COMMAND_BOARDS);
         // The tutorial skips the mode list and the picker: a guided run is a
         // fixed run, and asking a player to choose a car before they have been
         // told how to drive one is the wrong order.
@@ -305,6 +349,17 @@ export function confirmShell(shell) {
     case SCREEN_GARAGE:
       return outcome(shell);
 
+    // And the collection: ENTER there opens the editor on the car under the
+    // cursor, which is a question about the garage rather than about the flow.
+    case SCREEN_COLLECTION:
+      return outcome(shell);
+
+    // The leaderboards have nothing to confirm: every tab is taken by moving
+    // onto it, and a list row is read rather than chosen. ENTER is deliberately
+    // inert here rather than being given a job to justify the key.
+    case SCREEN_BOARDS:
+      return outcome(shell);
+
     // The online screen owns its own ENTER too — search, create, join, ready —
     // and what any of those mean depends on the session, which the shell
     // deliberately cannot see.
@@ -341,6 +396,13 @@ export function cancelShell(shell) {
     // returning to the setup screen from it would silently leave the match.
     case SCREEN_GARAGE:
       return outcome(enterScreen(shell, shell.garageReturn ?? SCREEN_SETUP));
+    // The collection hangs off the title menu and nowhere else, so unlike the
+    // editor it needs no remembered return.
+    case SCREEN_COLLECTION:
+      return outcome(enterScreen(shell, SCREEN_TITLE));
+    // Likewise the leaderboards: one way in, so one way out.
+    case SCREEN_BOARDS:
+      return outcome(enterScreen(shell, SCREEN_TITLE));
     // Backing out of online has to close the socket as well as change screen —
     // an abandoned lobby that nobody left is a room the server keeps alive and
     // an opponent left staring at a driver who is not coming back.

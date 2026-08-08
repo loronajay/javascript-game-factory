@@ -10,6 +10,8 @@ import {
   SCREEN_RESULTS,
   SCREEN_RADIO,
   SCREEN_GARAGE,
+  SCREEN_COLLECTION,
+  SCREEN_BOARDS,
   SCREEN_ONLINE,
   SCREENS,
   COMMAND_NONE,
@@ -18,6 +20,7 @@ import {
   COMMAND_LOCKED,
   COMMAND_TUTORIAL,
   COMMAND_RESTART,
+  COMMAND_BOARDS,
   COMMAND_ONLINE,
   COMMAND_ONLINE_LEAVE,
   createShell,
@@ -53,14 +56,17 @@ test("the game opens on the title screen", () => {
 
 test("every screen is handled by exactly one of the input paths", () => {
   // The game loop dispatches a key press to the menus, to the setup cursor, to
-  // the garage editor's cursor, to the radio's own cursor, to the online
-  // screen's cursor, or to the race. A screen belonging to none of them would
-  // swallow input; one belonging to two would double-handle it.
+  // the garage editor's cursor, to the collection's cursor, to the leaderboard
+  // screen's cursor, to the radio's own cursor, to the online screen's cursor,
+  // or to the race. A screen belonging to none of them would swallow input; one
+  // belonging to two would double-handle it.
   for (const screen of SCREENS) {
     const paths = [
       isMenuScreen(screen),
       screen === SCREEN_SETUP,
       screen === SCREEN_GARAGE,
+      screen === SCREEN_COLLECTION,
+      screen === SCREEN_BOARDS,
       screen === SCREEN_RADIO,
       screen === SCREEN_RACE,
       screen === SCREEN_ONLINE,
@@ -96,6 +102,63 @@ test("re-entering the garage from itself cannot trap the player there", () => {
 test("the garage declines ENTER, leaving it to the editor's own actions", () => {
   const shell = enterScreen(createShell(), SCREEN_GARAGE);
   assertEqual(confirmShell(shell).shell.screen, SCREEN_GARAGE);
+});
+
+test("the title menu opens the collection, and ESC comes back to it", () => {
+  // The garage is somewhere a player goes *instead* of racing, so it hangs off
+  // the title menu rather than off the pre-race picker alone.
+  const title = createShell();
+  const index = menuFor(title).items.findIndex((item) => item.id === "garage");
+  assert(index >= 0, "the title menu offers no way into the garage");
+  const { shell, command } = confirmShell({ ...title, cursor: index });
+  assertEqual(shell.screen, SCREEN_COLLECTION);
+  assertEqual(command, COMMAND_NONE);
+  assertEqual(cancelShell(shell).shell.screen, SCREEN_TITLE);
+});
+
+test("the collection is not a menu screen and does not replace the race", () => {
+  // It owns its own cursor and its own ENTER, exactly as the setup, garage and
+  // radio screens do.
+  assert(!isMenuScreen(SCREEN_COLLECTION));
+  assert(!showsTheRace(SCREEN_COLLECTION));
+  assertEqual(menuFor(enterScreen(createShell(), SCREEN_COLLECTION)), null);
+});
+
+test("the collection declines ENTER, leaving it to its own cell action", () => {
+  const shell = enterScreen(createShell(), SCREEN_COLLECTION);
+  assertEqual(confirmShell(shell).shell.screen, SCREEN_COLLECTION);
+});
+
+test("the leaderboards open from the title menu and back out to it", () => {
+  const title = createShell();
+  const index = menuFor(title).items.findIndex((item) => item.id === "boards");
+  assert(index >= 0, "the title menu offers no way to the leaderboards");
+
+  // The command is what points the tabs at the mode the player is set up for and
+  // asks for its board — entering the screen alone would show an idle list that
+  // never loads.
+  const opened = confirmShell({ ...title, cursor: index });
+  assertEqual(opened.shell.screen, SCREEN_BOARDS);
+  assertEqual(opened.command, COMMAND_BOARDS);
+  assertEqual(cancelShell(opened.shell).shell.screen, SCREEN_TITLE);
+});
+
+test("the leaderboards own their own cursor and have nothing to confirm", () => {
+  const shell = enterScreen(createShell(), SCREEN_BOARDS);
+  assert(!isMenuScreen(SCREEN_BOARDS));
+  assert(!showsTheRace(SCREEN_BOARDS), "the leaderboards replace the world rather than sitting over a race");
+  assertEqual(menuFor(shell), null);
+  // Every tab is taken by moving onto it, so ENTER is deliberately inert rather
+  // than being given a job to justify the key.
+  assertEqual(confirmShell(shell).shell.screen, SCREEN_BOARDS);
+  assertEqual(confirmShell(shell).command, COMMAND_NONE);
+});
+
+test("the editor opened from the collection backs out to the collection", () => {
+  // Third way into the garage, and the reason `garageReturn` exists at all: a
+  // hardcoded return would drop the player onto the pre-race picker instead.
+  const fromCollection = enterScreen(enterScreen(createShell(), SCREEN_COLLECTION), SCREEN_GARAGE);
+  assertEqual(cancelShell(fromCollection).shell.screen, SCREEN_COLLECTION);
 });
 
 test("the screens drawn over a live race say so", () => {
@@ -339,6 +402,7 @@ test("every menu item resolves to a handled command", () => {
     COMMAND_MODE,
     COMMAND_LOCKED,
     COMMAND_TUTORIAL,
+    COMMAND_BOARDS,
     COMMAND_ONLINE,
     COMMAND_ONLINE_LEAVE,
   ]);

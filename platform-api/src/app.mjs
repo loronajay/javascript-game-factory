@@ -10,6 +10,7 @@ import { handleRankedRoute } from "./routes/ranked-routes.mjs";
 import { handleGameSocialRoute } from "./routes/game-social-routes.mjs";
 import { handleLoadoutRoute } from "./routes/loadout-routes.mjs";
 import { handleLadderRoute } from "./routes/ladder-routes.mjs";
+import { handleLeaderboardRoute } from "./routes/leaderboard-routes.mjs";
 import { handleGameProgressRoute } from "./routes/game-progress-routes.mjs";
 import { handlePaymentRoute } from "./routes/payment-routes.mjs";
 import { handlePlayerRoute } from "./routes/player-routes.mjs";
@@ -289,6 +290,12 @@ export function createApp(options = {}) {
     const saveGarage = typeof options?.saveGarage === "function" ? options.saveGarage : null;
     const getPublicLoadout = typeof options?.getPublicLoadout === "function" ? options.getPublicLoadout : null;
     const getPublicLoadouts = typeof options?.getPublicLoadouts === "function" ? options.getPublicLoadouts : null;
+    // Solo leaderboards. Null rather than a no-op stub so the route family answers
+    // 503 "not configured" instead of silently reporting an empty board — the same
+    // distinction the loadout services draw.
+    const getBoardStandings = typeof options?.getBoardStandings === "function" ? options.getBoardStandings : null;
+    const getPlayerRunRecords = typeof options?.getPlayerRunRecords === "function" ? options.getPlayerRunRecords : null;
+    const recordRun = typeof options?.recordRun === "function" ? options.recordRun : null;
     const recordGameProgressClaim = typeof options?.recordGameProgressClaim === "function"
         ? options.recordGameProgressClaim
         : async () => null;
@@ -566,6 +573,11 @@ export function createApp(options = {}) {
         saveGarage,
         getPublicLoadout,
         getPublicLoadouts,
+    };
+    const leaderboardServices = {
+        getBoardStandings,
+        getPlayerRunRecords,
+        recordRun,
     };
     const gameProgressServices = {
         getGameProgress,
@@ -944,6 +956,18 @@ export function createApp(options = {}) {
                 requestOrigin,
                 timestamp,
                 services: paymentServices,
+            })) {
+                return;
+            }
+            if (await handleLeaderboardRoute({
+                req,
+                res,
+                method,
+                pathname,
+                authClaims,
+                requestOrigin,
+                timestamp,
+                services: leaderboardServices,
             })) {
                 return;
             }

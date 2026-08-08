@@ -35,6 +35,7 @@ export const MIGRATION_FILES = Object.freeze([
     "033-bulletin-announcements.sql",
     "034-event-announcements.sql",
     "035-game-loadouts.sql",
+    "036-game-run-records.sql",
 ]);
 export function migrationFileUrl(name) {
     return new URL(`./migrations/${name}`, import.meta.url);

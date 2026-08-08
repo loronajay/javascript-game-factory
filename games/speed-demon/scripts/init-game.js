@@ -42,11 +42,14 @@ import {
   SCREEN_RESULTS,
   SCREEN_RADIO,
   SCREEN_GARAGE,
+  SCREEN_COLLECTION,
+  SCREEN_BOARDS,
   SCREEN_ONLINE,
   COMMAND_BEGIN,
   COMMAND_RESTART,
   COMMAND_MODE,
   COMMAND_TUTORIAL,
+  COMMAND_BOARDS,
   COMMAND_ONLINE,
   COMMAND_ONLINE_LEAVE,
   createShell,
@@ -85,10 +88,22 @@ import { drawRadioScreen, drawNowPlaying } from "./render/radio.js";
 import { createPointer } from "./pointer.js";
 import { drawSetup, hitSetup } from "./render/setup.js";
 import { createLiveryCache, drawUnderglow, liverySprite, tailLightColour } from "./render/livery.js";
-import { emptyGarage, savePreset, updatePreset, deletePreset, selectPreset } from "./garage/garage.js";
+import { emptyGarage, savePreset, updatePreset, deletePreset, selectPreset, presetById } from "./garage/garage.js";
 import { LAYER_PRESETS, createLivery } from "./garage/livery.js";
 import { drawGarage, hitGarage } from "./render/garage.js";
 import { createGarageStore } from "./garage/garage-store.js";
+import {
+  CELL_NEW,
+  createCollection,
+  moveCollection,
+  focusCollection,
+  scrollCollection,
+  collectionCell,
+  collectionModel,
+  collectionSelection,
+  collectionView,
+} from "./ui/collection.js";
+import { GARAGE_SPLASH, drawCollection, hitCollection } from "./render/collection.js";
 import {
   ACTION_SAVE as GARAGE_SAVE,
   ACTION_UPDATE as GARAGE_UPDATE,
@@ -186,6 +201,16 @@ import {
   recordStart,
   recordThrottle,
 } from "./sim/input-log.js";
+import { boardIdFor, runSummary, runValue } from "./records/records.js";
+import { createRecordsStore } from "./records/records-store.js";
+import {
+  createBoards,
+  moveBoards,
+  focusBoards,
+  boardsSelection,
+  boardsView,
+} from "./ui/boards.js";
+import { drawBoards, hitBoards } from "./render/boards.js";
 import { gateLayout, gateSlots, createKnob, stepKnob, knobTargetFor } from "./ui/shifter-gate.js";
 import { smoothToward, shiftLightState } from "./ui/gauges.js";
 import { gearNodeId } from "./sim/gate.js";
@@ -289,6 +314,8 @@ export function boot(canvas) {
   const sheetImages = new Map(MODEL_SHEETS.map((sheet) => [sheet.id, loadImage(sheet.src)]));
   const trackImages = new Map(TRACKS.map((track) => [track.id, loadImage(track.src)]));
   const splashImage = loadImage(MENU_SPLASH);
+  // The collection has a backdrop of its own — a workshop rather than a strip.
+  const garageSplash = loadImage(GARAGE_SPLASH);
 
   let shell = createShell();
   // The player's saved configs, and the seam that persists them.
@@ -311,10 +338,42 @@ export function boot(canvas) {
   // the editor is a screen's worth of state, not part of the cabinet's.
   let editor = null;
   let setup = createSetup({ modeId: shell.modeId }, garage);
+  // The collection screen's cursor. Built from the setup rather than kept in
+  // step with it: there is one answer to "what am I driving", and it lives in
+  // `setup` — this is a second way of looking at it, the way the online lobby's
+  // car rows are.
+  let collection = createCollection(setupSelection(setup, garage), garage, collectionOptions());
   // What the pointer is over on the setup screen. Sampled rather than queued,
   // like the throttle — and deliberately *not* part of `setup`, because the
   // setup cursor is also the pick and hovering must never choose anything.
   let setupHover = null;
+  // The same, for the collection, and separate for the same reason.
+  let collectionHover = null;
+
+  // Personal bests. Unlike the garage this works signed out — a lap time is
+  // meaningful to the player alone, whereas a livery only means something if an
+  // opponent can see it. Signed in the same bests are also submitted to the
+  // global board. The load is not awaited for the same reason the garage's is
+  // not: the first frame must draw now.
+  const recordsStore = createRecordsStore();
+  // What the last finished run did to the player's best, or null. Lives here
+  // rather than in `view` because it belongs to the results screen rather than
+  // to the world, and it must survive the race being restarted underneath it.
+  let recordResult = null;
+
+  // The leaderboard screen's cursor: which scope, which mode, which board, and
+  // where the list is scrolled to. Built from the live setup on the way in
+  // rather than kept in step with it — the collection's arrangement, and for the
+  // same reason: there is one answer to what the player is set up to drive, and
+  // this is a second way of looking at it.
+  let boardsCursor = createBoards(setupSelection(setup, garage));
+  // What the pointer is over there. Separate from the cursor, because the board
+  // strip *is* the selection — sweeping the mouse across it on the way to the
+  // scroll arrow must not change which board is being read. The setup screen's
+  // rule.
+  let boardsHover = null;
+
+  recordsStore.load().then(() => render());
 
   garageStore.load().then((loaded) => {
     garage = loaded;
@@ -322,11 +381,20 @@ export function boot(canvas) {
     // already chosen. Only safe while they have not started a run — once a race
     // is on, `chosen` is the truth and the cursor behind it may move freely.
     setup = createSetup({ ...setupSelection(setup, garage), modeId: shell.modeId }, garage);
+    // Signing in is what makes the collection's add cells appear, so it is
+    // rebuilt with the paints that just arrived rather than left showing the
+    // empty garage the first frame drew.
+    collection = createCollection(setupSelection(setup, garage), garage, collectionOptions());
     render();
   });
   // The resolved selection: which model, which livery, which track. Replaced
   // wholesale when a race begins, never edited in place.
   let chosen = resolveSelection(setupSelection(setup, garage));
+  // The mode and objective the run on track was built from. `chosen` carries the
+  // car and the track but not these, and the board a run records to is exactly
+  // this pair — read off the live setup instead, a run finished after backing
+  // out to the picker would file itself against whatever the cursor now says.
+  let runSelection = setupSelection(setup, garage);
 
   // The seamless scrolling tile is built on the first frame after the chosen
   // track's image resolves, and thrown away when the track changes. Until then
@@ -783,7 +851,6 @@ export function boot(canvas) {
       return false;
     }
 
-    myLog = recordThrottle(myLog, raceTick, throttle);
     return true;
   }
 
@@ -1016,10 +1083,12 @@ export function boot(canvas) {
 
   /** A direction key moves the physical stick only while its gate is open. */
   function moveRaceGate(direction) {
-    if (isOnlineRace()) {
-      if (session.status !== STATUS_RACING) return;
-      myLog = recordGate(myLog, raceTick, direction);
-    }
+    if (isOnlineRace() && session.status !== STATUS_RACING) return;
+    // Logged for a solo run as well as an online one. The log used to be an
+    // online-only artefact — the server's evidence for who won — but a solo run
+    // now files a leaderboard time, and a time nobody can replay is a time
+    // nobody can check.
+    myLog = recordGate(myLog, raceTick, direction);
     const previous = race;
     const next = gateInput(race, direction);
     if (stickMoved(previous, next)) {
@@ -1028,9 +1097,45 @@ export function boot(canvas) {
     updateRace(next);
   }
 
+  /**
+   * Files the finished run against the player's bests.
+   *
+   * Called from the one place the run ends, so a race cannot reach the results
+   * screen without having been offered to the board — and cannot be offered
+   * twice, because that transition happens once.
+   *
+   * **A guided run is deliberately excluded.** The coach stops the world at each
+   * beat, so its clock bears no relation to a driven one; letting a tutorial set
+   * a record would put an unbeatable-by-accident time on a board. Online is
+   * excluded by `boardIdFor` rather than here — an online race belongs to the
+   * room, and its result is a match rather than a time.
+   */
+  function recordRun() {
+    recordResult = null;
+    if (coachedRun) return;
+
+    const { modeId, objectiveId } = runSelection;
+    const boardId = boardIdFor(modeId, objectiveId);
+    const value = runValue(race);
+    if (!boardId || value === null) return;
+
+    recordResult = recordsStore.submit({
+      boardId,
+      modeId,
+      value,
+      modelId: chosen.model.id,
+      trackId: chosen.track.id,
+      // The canonical log of what the driver actually did. It is what lets the
+      // server reproduce the time later rather than take the client's word for
+      // it, which is the whole difference between a leaderboard and a wish list.
+      inputLog: myLog.events,
+    });
+  }
+
   /** Commits the setup screen's selection and builds a race on it. */
   function beginRace() {
     chosen = resolveSelection(setupSelection(setup, garage));
+    runSelection = setupSelection(setup, garage);
     // The run is committed, so the setup screen rewinds: coming back to it from
     // the pause or results menu starts the lock walk at the car again.
     setup = rewindSetup(setup);
@@ -1039,6 +1144,12 @@ export function boot(canvas) {
     view = newView(layout, race);
     coach = null;
     coachedRun = false;
+    // A fresh run is a fresh log. `beginOnlineRace` does the same; without it
+    // here, a solo run would submit the previous run's inputs alongside its own
+    // and replay to a completely different time.
+    myLog = createInputLog();
+    raceTick = 0;
+    recordResult = null;
   }
 
   /**
@@ -1079,6 +1190,54 @@ export function boot(canvas) {
     setup = createSetup({ ...setupSelection(setup, garage), modeId: shell.modeId }, garage);
   }
 
+  /**
+   * The leaderboard screen as it is currently drawn.
+   *
+   * The store answers both halves: the player's own bests are in hand
+   * synchronously (they are held locally, and are the whole record signed out),
+   * while a global board is whatever has arrived so far, with a status saying
+   * which of loading / empty / unreachable to print when it is not a list yet.
+   */
+  function currentBoardsView({ hover = boardsHover } = {}) {
+    const { boardId } = boardsSelection(boardsCursor);
+    return boardsView(boardsCursor, {
+      records: recordsStore.records,
+      standings: recordsStore.boardStandings(boardId),
+      status: recordsStore.boardStatus(boardId),
+      ranks: recordsStore.boardRanks(),
+      playerId: recordsStore.playerId,
+      ranked: recordsStore.ranked,
+      hover,
+    });
+  }
+
+  /** How long the list is, which is what bounds the scroll and the cursor. */
+  function boardsRowCount() {
+    return currentBoardsView().totalRows;
+  }
+
+  /**
+   * Asks for whichever board the tabs now name. Cheap to call on every tab
+   * press: the store keeps what it has already fetched and only a board it has
+   * not seen — or one that failed — starts a request.
+   */
+  function requestVisibleBoard() {
+    recordsStore.requestBoard(boardsSelection(boardsCursor).boardId).then((started) => {
+      if (started) render();
+    });
+  }
+
+  /**
+   * Opens the leaderboards on the board the current setup would race for, rather
+   * than on wherever the screen was last left. A player arriving from a quarter
+   * mile wants the quarter mile board.
+   */
+  function openBoards() {
+    boardsCursor = createBoards(setupSelection(setup, garage));
+    boardsHover = null;
+    requestVisibleBoard();
+  }
+
   function runCommand(command) {
     if (command === COMMAND_BEGIN) {
       beginRace();
@@ -1088,6 +1247,8 @@ export function boot(canvas) {
       beginTutorial();
     } else if (command === COMMAND_MODE) {
       adoptMode();
+    } else if (command === COMMAND_BOARDS) {
+      openBoards();
     } else if (command === COMMAND_ONLINE) {
       // Entering the screen does not connect: the socket opens when the player
       // picks a way in, so browsing the menu costs nobody a connection.
@@ -1137,6 +1298,10 @@ export function boot(canvas) {
       }
       return;
     }
+    if (shell.screen === SCREEN_COLLECTION) {
+      confirmCollection();
+      return;
+    }
     if (shell.screen === SCREEN_SETUP) {
       const { setup: next, done, customise } = confirmSetup(setup, garage);
       setup = next;
@@ -1172,12 +1337,60 @@ export function boot(canvas) {
    */
   function openGarage() {
     const preset = setupPreset(setup, garage);
-    editor = createEditor({
-      modelId: setupModel(setup).id,
-      presetId: preset.id,
-      livery: preset.livery,
-    });
+    openGarageOn({ modelId: setupModel(setup).id, presetId: preset.id, livery: preset.livery });
+  }
+
+  /**
+   * Opens the editor on one config, wherever the request came from. Both ways in
+   * — the setup screen's paint pane and the collection — go through here, so the
+   * editor cannot end up holding a working copy that was assembled two different
+   * ways. `enterScreen` records which screen asked, and `leaveGarage` returns
+   * there.
+   */
+  function openGarageOn({ modelId, presetId = null, livery }) {
+    editor = createEditor({ modelId, presetId, livery });
     shell = enterScreen(shell, SCREEN_GARAGE);
+  }
+
+  /** Whether the garage can be used at all — see `garage-store.js`. */
+  function collectionOptions() {
+    return { canCustomise: garageStore.available };
+  }
+
+  /**
+   * The car the collection's cursor has picked, pushed into the setup.
+   *
+   * The setup is rebuilt rather than patched for the same reason `leaveGarage`
+   * rebuilds it: the paint list belongs to a model, so changing the model
+   * changes what the indices in it mean.
+   */
+  function adoptCollectionPick() {
+    const { modelId, presetId } = collectionSelection(collection);
+    setup = createSetup(
+      { ...setupSelection(setup, garage), modelId, presetId, modeId: shell.modeId },
+      garage,
+    );
+  }
+
+  /**
+   * ENTER on the collection: open the editor on the car under the cursor.
+   *
+   * The `+ New` cell and a config cell differ only in what the editor is handed
+   * — a fresh livery and no preset id, or the saved one — which is what makes
+   * "build a new paint" and "edit this one" the same screen here as on the setup
+   * screen. Signed out there is nowhere to save a config, so the key is inert
+   * rather than opening an editor that would lose the work.
+   */
+  function confirmCollection() {
+    if (!garageStore.available) return;
+    const cell = collectionCell(collection, garage, collectionOptions());
+    if (!cell) return;
+    const modelId = collectionModel(collection).id;
+    if (cell.id === CELL_NEW || cell.action) {
+      openGarageOn({ modelId, presetId: null, livery: createLivery() });
+      return;
+    }
+    openGarageOn({ modelId, presetId: cell.id, livery: cell.livery });
   }
 
   /**
@@ -1226,15 +1439,25 @@ export function boot(canvas) {
    */
   function leaveGarage() {
     const selection = setupSelection(setup, garage);
-    setup = createSetup(
-      { ...selection, presetId: garage.selection.presetId ?? selection.presetId, modeId: shell.modeId },
-      garage,
-    );
+    // Saving re-selects in the garage, so its selection is what to come back to
+    // — but **only when it belongs to the same car**. A preset id means nothing
+    // in another model's paint list, and `createSetup` would fall back to index
+    // zero: leaving the editor without saving quietly reset the pick to Factory
+    // whenever the garage happened to be sitting on some other model's paint.
+    const saved = presetById(garage, garage.selection.presetId);
+    const presetId = saved?.modelId === selection.modelId ? saved.id : selection.presetId;
+    setup = createSetup({ ...selection, presetId, modeId: shell.modeId }, garage);
     // The paint pane is where the player was, so put them back on it rather
     // than at the top of the walk.
     setup = confirmSetup(setup, garage).setup;
     editor = null;
     const back = shell.garageReturn ?? SCREEN_SETUP;
+    // Rebuilt around whatever the editor did, so a paint that was just saved is
+    // the cell the cursor lands back on rather than a row that has shifted
+    // under it — the same argument as the setup rebuild above.
+    if (back === SCREEN_COLLECTION) {
+      collection = createCollection(setupSelection(setup, garage), garage, collectionOptions());
+    }
     shell = enterScreen(shell, back);
     // A lobby is a room with an opponent in it who is drawing your car, so the
     // paint you just built has to reach them. Sent on the way out rather than on
@@ -1297,9 +1520,15 @@ export function boot(canvas) {
       updateRace(pressShift(race, { throttle: input.throttle() }));
       return;
     }
-    updateRace(
-      race.phase === STAGING ? startRace(race) : pressShift(race, { throttle: input.throttle() }),
-    );
+    if (race.phase === STAGING) {
+      // Offline, this key is what releases the tree, so it is where the run
+      // starts. Online the server releases it and `tickOnline` logs it there.
+      myLog = recordStart(myLog, raceTick);
+      updateRace(startRace(race));
+      return;
+    }
+    myLog = recordClutch(myLog, raceTick);
+    updateRace(pressShift(race, { throttle: input.throttle() }));
   }
 
   function raceAction(action) {
@@ -1357,6 +1586,17 @@ export function boot(canvas) {
         audio.play("button");
         if (shell.screen === SCREEN_GARAGE) {
           editor = moveEditor(editor, action.direction, garage);
+        } else if (shell.screen === SCREEN_COLLECTION) {
+          // Moving picks, exactly as it does on the setup screen's paint pane:
+          // the cell you stop on is the car you are taking to the line.
+          collection = moveCollection(collection, action.direction, garage, collectionOptions());
+          adoptCollectionPick();
+        } else if (shell.screen === SCREEN_BOARDS) {
+          // Left/right take a tab, up/down walk the strips and then scroll the
+          // list. Taking a tab is what asks for its board, so the request rides
+          // on the move rather than needing a confirm the screen does not have.
+          boardsCursor = moveBoards(boardsCursor, action.direction, { rowCount: boardsRowCount() });
+          requestVisibleBoard();
         } else if (shell.screen === SCREEN_SETUP) {
           setup = moveSetup(setup, action.direction, garage);
         } else {
@@ -1568,6 +1808,49 @@ export function boot(canvas) {
     }
   }
 
+  /**
+   * A click on the collection. **One click does the whole job** — it takes the
+   * car under it to the line, wherever the keyboard cursor happened to be. The
+   * setup screen's rule, and it stops short of opening the editor for the same
+   * reason clicking an objective does not start the race: pointing at a car is a
+   * request for that car, not for a screen full of colour sliders.
+   */
+  function clickCollection(click) {
+    if (click.dragging) return;
+    const target = hitCollection(currentCollectionView(), click.x, click.y);
+    if (!target) return;
+    audio.play("button");
+    if (target.kind === "scroll") {
+      collection = scrollCollection(collection, target.step, garage, collectionOptions());
+      adoptCollectionPick();
+      return;
+    }
+    collection = focusCollection(collection, target, garage, collectionOptions());
+    adoptCollectionPick();
+    // The add cell has nothing to pick, so a click on it can only mean the one
+    // thing it is for — otherwise it would be the screen's one dead target.
+    const cell = collectionCell(collection, garage, collectionOptions());
+    if (cell?.action) confirmCollection();
+  }
+
+  /**
+   * A click on the leaderboards. **One click does the whole job** — a tab is
+   * taken *and* the cursor moves onto it, which is the cabinet's rule
+   * everywhere: a mouse has nowhere to put a separate commit, so a click that
+   * only highlighted would read as a dead control.
+   *
+   * Taking a tab is what asks for the board behind it, exactly as it is on the
+   * keyboard path.
+   */
+  function clickBoards(click) {
+    if (click.dragging) return;
+    const target = hitBoards(currentBoardsView(), click.x, click.y);
+    if (!target) return;
+    audio.play("button");
+    boardsCursor = focusBoards(boardsCursor, target, { rowCount: boardsRowCount() });
+    requestVisibleBoard();
+  }
+
   function applyPointer() {
     // Hovering moves the menu cursor, so the caret is always on the item a click
     // would take. Without it the highlight and the mouse disagree, and the first
@@ -1600,6 +1883,18 @@ export function boot(canvas) {
       }
     }
 
+    // On the collection the pointer only *highlights*, for the setup screen's
+    // reason: this cursor is also the pick, so a sweep across the roster on the
+    // way to the scroll arrow must not change the car.
+    collectionHover = shell.screen === SCREEN_COLLECTION
+      ? hitCollectionAt(pointer.hover())
+      : null;
+
+    // On the leaderboards the pointer only *highlights*, for the collection's
+    // reason: the board strip is the selection, so a sweep across it on the way
+    // to the scroll arrows must not change what is being read.
+    boardsHover = shell.screen === SCREEN_BOARDS ? hitBoardsAt(pointer.hover()) : null;
+
     if (shell.screen === SCREEN_GARAGE) {
       const at = pointer.hover();
       const hovered = at ? hitGarage(currentGarageView(), at.x, at.y) : null;
@@ -1620,6 +1915,10 @@ export function boot(canvas) {
         clickSetup(click);
       } else if (shell.screen === SCREEN_GARAGE) {
         clickGarage(click);
+      } else if (shell.screen === SCREEN_COLLECTION) {
+        clickCollection(click);
+      } else if (shell.screen === SCREEN_BOARDS) {
+        clickBoards(click);
       } else if (shell.screen === SCREEN_ONLINE) {
         clickOnline(click);
       } else if (isOnlineRace() && showsOnlineResult()) {
@@ -1663,6 +1962,9 @@ export function boot(canvas) {
     // `apply` runs here: a failed save keeps trying without a timer of its own,
     // and a save must survive a dropped connection whatever screen you are on.
     garageStore.tick(TICK_SECONDS);
+    // And the records', for the same reason: a personal best set on a dropped
+    // connection still has to reach the board once it comes back.
+    recordsStore.tick(TICK_SECONDS);
     // Likewise the room's copy of which car this driver is in: coalesced so a
     // held arrow key is one message rather than one per repeat.
     tickLoadout(TICK_SECONDS);
@@ -1695,12 +1997,18 @@ export function boot(canvas) {
       return;
     }
 
+    // The throttle level for the tick about to be simulated. Recorded here
+    // rather than in `tickOnline` because a solo run is logged too now, and this
+    // is the one point both paths pass through on their way to `stepRace` —
+    // which is what keeps `raceTick` counting stepRace calls exactly, the
+    // invariant `replayRun` mirrors.
+    myLog = recordThrottle(myLog, raceTick, throttle);
     updateRace(stepRace(race, { throttle }, TICK_SECONDS));
+    raceTick += 1;
 
     // The other car, run forward on the same reducer from the inputs that have
     // arrived. It is simulated rather than interpolated — see online/opponent.js.
     if (isOnlineRace()) {
-      raceTick += 1;
       opponentCar = advanceTo(opponentCar, raceTick);
       streamInputs();
       // "I have sent you everything." Deliberately carries no time: the server
@@ -1753,6 +2061,7 @@ export function boot(canvas) {
     // The run ending is what opens the results screen — the shell never has to
     // ask the race whether it is over.
     if (race.phase === FINISHED && !isOnlineRace()) {
+      recordRun();
       shell = enterScreen(shell, SCREEN_RESULTS);
       // A lesson ends with the run it belongs to, however far through it got:
       // there is nothing left to coach, and its strip would otherwise stick out
@@ -1881,6 +2190,31 @@ export function boot(canvas) {
     return setupView(setup, garage, { canCustomise: garageStore.available, hover: setupHover });
   }
 
+  /**
+   * The collection view, told whether the garage is usable at this sign-in state
+   * and what the pointer is over.
+   */
+  function currentCollectionView() {
+    return collectionView(collection, garage, {
+      canCustomise: garageStore.available,
+      hover: collectionHover,
+    });
+  }
+
+  /** What is under a world point on the collection screen, or null. */
+  function hitCollectionAt(at) {
+    // Built without a hover so this cannot depend on the answer it is computing.
+    return at
+      ? hitCollection(collectionView(collection, garage, { canCustomise: garageStore.available }), at.x, at.y)
+      : null;
+  }
+
+  /** What is under a world point on the leaderboards, or null. */
+  function hitBoardsAt(at) {
+    // Built without a hover so this cannot depend on the answer it is computing.
+    return at ? hitBoards(currentBoardsView({ hover: null }), at.x, at.y) : null;
+  }
+
   /** What is under a world point on the setup screen, or null. */
   function hitSetupAt(at) {
     // Built without a hover so this cannot depend on the answer it is computing.
@@ -1925,6 +2259,18 @@ export function boot(canvas) {
       const onlineScreen = currentOnlineView({ pointer: at });
       canvas.style.cursor = onlineScreen.hover ? "pointer" : "default";
       drawOnlineScreen(ctx, onlineScreen, { splashImage });
+      return;
+    }
+
+    if (shell.screen === SCREEN_BOARDS) {
+      canvas.style.cursor = boardsHover ? "pointer" : "default";
+      drawBoards(ctx, currentBoardsView(), { splashImage: garageSplash });
+      return;
+    }
+
+    if (shell.screen === SCREEN_COLLECTION) {
+      canvas.style.cursor = collectionHover ? "pointer" : "default";
+      drawCollection(ctx, currentCollectionView(), { sheetImages, splashImage: garageSplash, liveryCache });
       return;
     }
 
@@ -1976,7 +2322,11 @@ export function boot(canvas) {
     if (shell.screen === SCREEN_PAUSED) {
       drawPauseMenu(ctx, menu);
     } else if (shell.screen === SCREEN_RESULTS) {
-      drawResults(ctx, race, menu);
+      drawResults(ctx, race, menu, runSummary({
+        modeId: runSelection.modeId,
+        result: recordResult,
+        ranked: recordsStore.ranked,
+      }));
     }
   }
 
@@ -2031,6 +2381,9 @@ export function boot(canvas) {
         setup = moveSetup(setup, direction, garage);
       } else if (shell.screen === SCREEN_GARAGE) {
         editor = moveEditor(editor, direction, garage);
+      } else if (shell.screen === SCREEN_COLLECTION) {
+        collection = moveCollection(collection, direction, garage, collectionOptions());
+        adoptCollectionPick();
       } else if (shell.screen === SCREEN_RACE) {
         race = gateInput(race, direction);
       } else if (shell.screen === SCREEN_RADIO) {
@@ -2041,6 +2394,11 @@ export function boot(canvas) {
         // under the caret — and only `onlineAction` knows which. Falling through
         // to `moveShell` made the whole online screen unreachable from here.
         onlineAction({ type: ACTION_MOVE, direction });
+      } else if (shell.screen === SCREEN_BOARDS) {
+        // Likewise, and for the second half of the same reason: taking a tab is
+        // what asks for its board, so a direction that skipped `menuAction`
+        // would move the strip and never load what it landed on.
+        menuAction({ type: ACTION_MOVE, direction });
       } else {
         shell = moveShell(shell, direction);
       }
@@ -2057,8 +2415,62 @@ export function boot(canvas) {
     /** Jumps straight to a screen, skipping the walk through the menus. */
     screen(name) {
       shell = enterScreen(shell, name);
+      // The collection is built from the setup on the way in rather than held in
+      // step with it, so jumping straight there has to build it too — otherwise
+      // it would still be showing whatever car was chosen at boot.
+      if (name === SCREEN_COLLECTION) {
+        collection = createCollection(setupSelection(setup, garage), garage, collectionOptions());
+      }
+      // Same for the leaderboards, which are built from the setup and have to
+      // ask for their board — jumping straight there would otherwise show an
+      // idle screen that never loads.
+      if (name === SCREEN_BOARDS) {
+        openBoards();
+      }
       render();
       return this.state();
+    },
+
+    /**
+     * The leaderboard screen as it is currently drawn: which tabs are in force,
+     * what the list is showing, and what the global board is waiting on. Three
+     * strips behind one cursor, so counting keypresses from automation gets it
+     * wrong — the collection's argument.
+     */
+    boards() {
+      const view = currentBoardsView();
+      return {
+        scope: view.scope,
+        board: view.boardId,
+        status: view.status,
+        ranked: view.ranked,
+        cursor: { row: view.row, scroll: view.scroll },
+        tabs: {
+          scope: view.tabs.scope.map((tab) => `${tab.label}${tab.selected ? "<" : ""}`),
+          mode: view.tabs.mode.map((tab) => `${tab.label}${tab.selected ? "<" : ""}`),
+          board: view.tabs.board.map((tab) => `${tab.label}${tab.selected ? "<" : ""}`),
+        },
+        rows: view.rows.map((row) => `${row.rank ?? "-"} ${row.name} ${row.value}${row.you ? " *" : ""}`),
+        totalRows: view.totalRows,
+      };
+    },
+
+    /**
+     * The collection as it is currently drawn: the visible rows, the cursor, and
+     * the car it has picked. The screen is 24 rows behind one cursor, so
+     * counting keypresses from automation gets it wrong.
+     */
+    collection() {
+      const view = currentCollectionView();
+      return {
+        cursor: { row: collection.row, column: collection.column, scroll: collection.scroll },
+        chosen: view.chosen,
+        canCustomise: view.canCustomise,
+        rows: view.rows.map((row) => ({
+          model: row.modelId,
+          cells: row.cells.map((cell) => `${cell.name}${cell.selected ? "<" : ""}${cell.chosen ? "*" : ""}`),
+        })),
+      };
     },
     /** Jumps straight to a mode, rebuilding the setup around it. */
     mode(modeId) {
@@ -2175,6 +2587,21 @@ export function boot(canvas) {
      * picker note above applies here too: a socket cannot be driven from a
      * script, so the frames are injected instead.
      */
+    /**
+     * The player's bests, and whether they are going anywhere. `ranked` is the
+     * sign-in state — the difference between a best that is only yours and one
+     * that is on a board — and `pending` is a submission the server has not
+     * acknowledged, which is the thing worth watching when a push is failing.
+     */
+    records: () => ({
+      ranked: recordsStore.ranked,
+      status: recordsStore.status,
+      pending: recordsStore.dirty,
+      boards: recordsStore.records,
+      lastRun: recordResult
+        ? { improved: recordResult.improved, value: recordResult.record?.value ?? null }
+        : null,
+    }),
     online: {
       receive(frame) {
         net.receive(frame);

@@ -11,6 +11,7 @@ import { activateInventoryItem, backfillLocalOwnership, findPlayPurchaseClaim, f
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import { getLadderStandings, getPlayerLadderPlacements } from "./db/ladders.mjs";
+import { getBoardStandings, getPlayerRunRecords, recordRun } from "./db/run-records.mjs";
 import { getAccountSuspension, isAdminPlayer, listAdmins, listAuditLog, seedAdminsFromEmails, setAdminFlag, writeAuditLog, } from "./db/admin.mjs";
 import { claimBulletinAnnouncement, createBulletin, deleteBulletin, getPublicBulletinBySlug, listAllBulletins, listPublicBulletins, updateBulletin, } from "./db/bulletins.mjs";
 import { announceBulletinService, announceEventService } from "./services/content-announce.mjs";
@@ -243,6 +244,9 @@ async function bootstrap() {
         saveGarage: (params) => saveGarage(pool, params),
         getPublicLoadout: (params) => getPublicLoadout(pool, params),
         getPublicLoadouts: (params) => getPublicLoadouts(pool, params),
+        getBoardStandings: (params) => getBoardStandings(pool, params),
+        getPlayerRunRecords: (params) => getPlayerRunRecords(pool, params),
+        recordRun: (params) => recordRun(pool, params),
         recordGameProgressClaim: (params) => recordGameProgressClaim(pool, params),
         spendValor: (params) => spendValorForEntitlement(pool, params),
         resetCampaign: (params) => resetCampaignProgress(pool, params.playerId, params.gameSlug),

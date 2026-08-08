@@ -37,6 +37,7 @@ const MODULES = [
   "scripts/garage/livery.js",
   "scripts/garage/paint.js",
   "scripts/garage/garage.js",
+  "scripts/records/records.js",
   "scripts/assets/car-atlas.js",
   "scripts/render/livery.js",
   "scripts/ui/shifter-gate.js",
@@ -44,6 +45,8 @@ const MODULES = [
   "scripts/ui/track-layout.js",
   "scripts/ui/gauges.js",
   "scripts/ui/setup-menu.js",
+  "scripts/ui/collection.js",
+  "scripts/ui/boards.js",
   "scripts/ui/garage-editor.js",
   "scripts/ui/shell.js",
   "scripts/ui/coach.js",
@@ -52,6 +55,8 @@ const MODULES = [
   "scripts/render/scene.js",
   "scripts/render/car.js",
   "scripts/render/setup.js",
+  "scripts/render/collection.js",
+  "scripts/render/boards.js",
   "scripts/render/garage.js",
   "scripts/render/dashboard.js",
   "scripts/render/shifter.js",
@@ -398,6 +403,82 @@ test("the garage's rules never reach for a browser", () => {
   }
 });
 
+test("the records' rules never reach for a browser", () => {
+  // The fourth instance of the same split. `records.js` decides what a board is
+  // and what beats what; `records-store.js` is the one module allowed to know a
+  // server and localStorage exist. Keeping the comparison pure is what lets both
+  // board directions be tested without a network — and the direction is the part
+  // that would silently invert a time-attack board if it went wrong.
+  const forbidden = [
+    /\bdocument\s*\./,
+    /\bwindow\s*\./,
+    /\blocalStorage\s*\./,
+    /\bindexedDB\s*\./,
+    /\bfetch\s*\(/,
+  ];
+  const source = fs.readFileSync(path.join(gameRoot, "scripts/records/records.js"), "utf8");
+  for (const pattern of forbidden) {
+    assert(!pattern.test(source), `records.js reaches for ${pattern}`);
+  }
+  assert(
+    !/from\s+"[^"]*records-store\.js"/.test(source),
+    "records.js imports the storage layer",
+  );
+});
+
+test("the leaderboard screen decides nothing about fetching", () => {
+  // `ui/boards.js` is the cursor and the view, and it is pure for the same
+  // reason every other `ui/` module is: the tab rules and the scroll window are
+  // testable without a browser. Only `records-store.js` may ask for a board.
+  const forbidden = [/document\s*\./, /window\s*\./, /localStorage\s*\./, /fetch\s*\(/];
+  const source = fs.readFileSync(path.join(gameRoot, "scripts/ui/boards.js"), "utf8");
+  for (const pattern of forbidden) {
+    assert(!pattern.test(source), `ui/boards.js reaches for ${pattern}`);
+  }
+  assert(
+    !/from\s+"[^"]*records-store\.js"/.test(source),
+    "ui/boards.js imports the storage layer",
+  );
+});
+
+test("the leaderboard screen and the board registry are one list", () => {
+  // The ids the screen offers and the ids a finished run files against are the
+  // same derivation from the mode catalog. Anything else is a board a player can
+  // look at but never set a time on.
+  const boards = loaded["scripts/ui/boards.js"];
+  const records = loaded["scripts/records/records.js"];
+  for (const board of boards.allBoards()) {
+    assertEqual(records.boardIdFor(board.modeId, board.objectiveId), board.id, `${board.id} is unreachable`);
+  }
+});
+
+test("the debug handle can move on every screen that owns a cursor", () => {
+  // `move()` on the debug handle is a *second* dispatch beside the one the key
+  // takes, and it silently falls through to `moveShell` for a screen it does not
+  // name — which moves a menu cursor that screen does not have, so the screen
+  // looks frozen from automation while working fine under a real keyboard. That
+  // happened; this is the check that would have caught it.
+  const shell = loaded["scripts/ui/shell.js"];
+  const source = fs.readFileSync(path.join(gameRoot, "scripts/init-game.js"), "utf8");
+  const body = source.slice(source.indexOf("    move(direction) {"));
+  const block = body.slice(0, body.indexOf("\n    },"));
+  assert(block.length > 0, "the debug handle no longer has a move()");
+
+  const owned = shell.SCREENS.filter((screen) => !shell.isMenuScreen(screen));
+  const constants = {
+    [shell.SCREEN_SETUP]: "SCREEN_SETUP",
+    [shell.SCREEN_GARAGE]: "SCREEN_GARAGE",
+    [shell.SCREEN_COLLECTION]: "SCREEN_COLLECTION",
+    [shell.SCREEN_BOARDS]: "SCREEN_BOARDS",
+    [shell.SCREEN_RADIO]: "SCREEN_RADIO",
+    [shell.SCREEN_ONLINE]: "SCREEN_ONLINE",
+    [shell.SCREEN_RACE]: "SCREEN_RACE",
+  };
+  for (const screen of owned) {
+    assert(block.includes(constants[screen]), `the debug handle's move() cannot reach ${screen}`);
+  }
+});
+
 test("the online rules never reach for a browser or a socket", () => {
   // The third instance of the same split, and the one where it matters most:
   // `session.js` holds every rule about a match, `opponent.js` reconstructs the
@@ -608,6 +689,102 @@ test("a car frame fits its grid cell without being stretched", () => {
     const fitAspect = fit.width / fit.height;
     assert(Math.abs(sourceAspect - fitAspect) < 0.001, `${car.id} was distorted to fit`);
   }
+});
+
+test("every collection row and cell fits on screen and nothing collides", () => {
+  // The widest row the garage can produce — Factory, the per-model cap, and the
+  // add cell — is the one that decides whether the strip still fits beside the
+  // scroll column. Eyeballing it on a car with two paints proves nothing.
+  const scene = loaded["scripts/render/scene.js"];
+  const render = loaded["scripts/render/collection.js"];
+  const collection = loaded["scripts/ui/collection.js"];
+  const garageModule = loaded["scripts/garage/garage.js"];
+  const liveryModule = loaded["scripts/garage/livery.js"];
+
+  const modelId = collection.collectionModels()[0].id;
+  let garage = garageModule.emptyGarage();
+  for (let i = 0; i < garageModule.MAX_PRESETS_PER_MODEL; i += 1) {
+    garage = garageModule.savePreset(garage, { modelId, name: `P${i}`, livery: liveryModule.createLivery() });
+  }
+
+  const rects = [];
+  for (let row = 0; row < collection.COLLECTION_VISIBLE_ROWS; row += 1) {
+    rects.push({ what: `row ${row}`, ...render.collectionRowRect(row) });
+  }
+  // Cells are checked against the scroll arrows rather than against their own
+  // row, which they sit inside by construction.
+  const cells = [];
+  for (let row = 0; row < collection.COLLECTION_VISIBLE_ROWS; row += 1) {
+    const count = collection.collectionCells(modelId, garage).length;
+    for (let column = 0; column < count; column += 1) {
+      cells.push({ what: `cell ${row}/${column}`, ...render.collectionCellRect(row, column) });
+    }
+  }
+  const arrows = [-1, 1].map((step) => ({ what: `scroll ${step}`, ...render.collectionScrollRect(step) }));
+
+  for (const r of [...rects, ...cells, ...arrows]) {
+    assert(r.x >= 0 && r.y >= 0, `${r.what} starts off screen`);
+    assert(r.x + r.width <= scene.WORLD.width, `${r.what} runs off the right edge`);
+    assert(r.y + r.height <= scene.WORLD.height, `${r.what} runs off the bottom`);
+  }
+  assert(
+    render.COLLECTION_LAYOUT.legend.y > render.collectionRowRect(collection.COLLECTION_VISIBLE_ROWS - 1).y
+      + render.COLLECTION_LAYOUT.rows.height,
+    "the collection's legend prints over the last row",
+  );
+  for (const group of [rects, cells, arrows]) {
+    for (let i = 0; i < group.length; i += 1) {
+      for (let j = i + 1; j < group.length; j += 1) {
+        assert(!overlaps(group[i], group[j]), `${group[i].what} overlaps ${group[j].what}`);
+      }
+    }
+  }
+  for (const cell of cells) {
+    for (const arrow of arrows) {
+      assert(!overlaps(cell, arrow), `${cell.what} overlaps ${arrow.what}`);
+    }
+  }
+  for (const row of rects) {
+    for (const arrow of arrows) {
+      assert(!overlaps(row, arrow), `${row.what} runs under ${arrow.what}`);
+    }
+  }
+});
+
+test("every drawn cell on the collection is clickable, and reports its own row", () => {
+  // The `menuListBox` rule: the geometry the renderer draws is the geometry the
+  // hit test reads, so the cell you click is the cell you saw. A cell reports an
+  // *absolute* row, which is the only thing that still means something once the
+  // list has scrolled.
+  const render = loaded["scripts/render/collection.js"];
+  const collectionModule = loaded["scripts/ui/collection.js"];
+  const garageModule = loaded["scripts/garage/garage.js"];
+
+  let state = collectionModule.createCollection({}, garageModule.emptyGarage());
+  state = collectionModule.scrollCollection(state, 2, garageModule.emptyGarage());
+  const view = collectionModule.collectionView(state, garageModule.emptyGarage());
+
+  for (const row of view.rows) {
+    for (const cell of row.cells) {
+      const rect = render.collectionCellRect(row.screenRow, cell.column);
+      const hit = render.hitCollection(view, rect.x + rect.width / 2, rect.y + rect.height / 2);
+      assert(hit, `nothing is clickable at ${row.modelId} cell ${cell.column}`);
+      assertEqual(hit.kind, "cell");
+      assertEqual(hit.row, row.row, "a cell reported its screen position rather than its row");
+      assertEqual(hit.column, cell.column);
+    }
+  }
+
+  // The arrows answer only while there is somewhere to go, so a dead one cannot
+  // eat a click that belonged to the row behind it.
+  const down = render.collectionScrollRect(1);
+  assertEqual(render.hitCollection(view, down.x + 2, down.y + 2).step, 1);
+  const top = collectionModule.collectionView(
+    collectionModule.createCollection({}, garageModule.emptyGarage()),
+    garageModule.emptyGarage(),
+  );
+  const up = render.collectionScrollRect(-1);
+  assertEqual(render.hitCollection(top, up.x + 2, up.y + 2), null);
 });
 
 test("every garage panel fits on screen and nothing collides", () => {
@@ -863,6 +1040,10 @@ test("referenced asset files are actually present", () => {
   assert(
     fs.existsSync(path.join(gameRoot, loaded["scripts/render/menus.js"].MENU_SPLASH)),
     "missing menu splash",
+  );
+  assert(
+    fs.existsSync(path.join(gameRoot, loaded["scripts/render/collection.js"].GARAGE_SPLASH)),
+    "missing garage splash",
   );
   assert(fs.existsSync(path.join(gameRoot, "styles/game.css")), "missing stylesheet");
   for (const src of Object.values(loaded["scripts/audio.js"].SOUND_SOURCES)) {

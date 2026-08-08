@@ -13,6 +13,7 @@ import { activateInventoryItem, backfillLocalOwnership, findPlayPurchaseClaim, f
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import { getLadderStandings, getPlayerLadderPlacements } from "./db/ladders.mjs";
+import { getBoardStandings, getPlayerRunRecords, recordRun } from "./db/run-records.mjs";
 import {
   getAccountSuspension,
   isAdminPlayer,
@@ -383,6 +384,9 @@ async function bootstrap(): Promise<void> {
     saveGarage: (params: any) => saveGarage(pool, params),
     getPublicLoadout: (params: any) => getPublicLoadout(pool, params),
     getPublicLoadouts: (params: any) => getPublicLoadouts(pool, params),
+    getBoardStandings: (params: any) => getBoardStandings(pool, params),
+    getPlayerRunRecords: (params: any) => getPlayerRunRecords(pool, params),
+    recordRun: (params: any) => recordRun(pool, params),
     recordGameProgressClaim: (params: any) => recordGameProgressClaim(pool, params),
     spendValor: (params: any) => spendValorForEntitlement(pool, params),
     resetCampaign: (params: any) => resetCampaignProgress(pool, params.playerId, params.gameSlug),

@@ -353,6 +353,21 @@ export function liverySprite(cache, { image, model, livery }) {
 }
 
 /**
+ * Whether a sprite is already baked, without baking one.
+ *
+ * The collection screen draws dozens of painted cars at once, and a bake is
+ * several milliseconds — a scroll that missed on every cell would spend a
+ * hundred of them in one frame. This lets a caller spend a budget on the misses
+ * and fall back to the bare body for the rest, which is what every renderer here
+ * already does on a cold cache. It deliberately does not refresh recency: asking
+ * whether something is cached is not using it.
+ */
+export function hasLiverySprite(cache, { model, livery }) {
+  if (!model) return false;
+  return cache.sprites.has(`${model.id}:${liveryKey(createLivery(livery))}`);
+}
+
+/**
  * The tail lights' colour, so the glow behind the car matches the lenses on it.
  * A car with amber lamps trailing a red glow is the kind of mismatch that reads
  * as a bug even when nobody can say why.

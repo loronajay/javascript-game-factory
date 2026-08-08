@@ -12,6 +12,7 @@
 import { MPS_TO_MPH } from "../sim/constants.js";
 import { isTimeAttack } from "../sim/race.js";
 import { LAUNCH_FOUL } from "../sim/launch.js";
+import { TONE_RECORD } from "../records/records.js";
 import { WORLD, DASH_TOP } from "./scene.js";
 
 const INK = "#e8e9ee";
@@ -26,9 +27,12 @@ export const MENU_LAYOUT = {
   // below them rather than in the space between.
   title: {
     wordmark: { y: 148 },
-    // Three items now, so the list starts higher and sits a little tighter. It
-    // still has to clear the splash's cars above and the legend below.
-    list: { x: WORLD.width / 2 - 170, y: 512, width: 340, itemHeight: 40, gap: 8 },
+    // Five items now — START, GARAGE, LEADERBOARDS, HOW TO DRIVE, RADIO — so
+    // the list starts higher again. It still has to clear the splash's cars
+    // above and the legend below, which is what `tests/modules.test.js` checks:
+    // adding a sixth item moves this line rather than silently overrunning the
+    // legend, exactly as adding the fifth did.
+    list: { x: WORLD.width / 2 - 170, y: 418, width: 340, itemHeight: 40, gap: 8 },
     controls: { y: 672 },
   },
   modes: { header: { x: 140, y: 128 }, list: { x: 140, y: 216, width: 430, itemHeight: 62, gap: 12 } },
@@ -376,7 +380,49 @@ function headline(race) {
       };
 }
 
-export function drawResults(ctx, race, menu) {
+/**
+ * The personal-best line, between the headline and the launch grade.
+ *
+ * It sits in the 50px the panel already had spare there rather than lengthening
+ * the panel: the results card is sized to clear `DASH_TOP` so the instrument
+ * cluster stays lit underneath it, and growing it downward would cover the
+ * cluster the run was just driven on.
+ *
+ * `summary` is null for a run that keeps no record — an online race, or one
+ * abandoned before the line — and this draws nothing at all rather than an empty
+ * row, so the panel does not gain a blank band in modes that have no bests.
+ */
+function drawRecordLine(ctx, summary, centre, y) {
+  if (!summary) return;
+  const tone = summary.tone === TONE_RECORD ? "#f6c453" : DIM;
+  text(ctx, `${summary.label}  ${summary.detail}`, centre, y, {
+    size: 16,
+    colour: tone,
+    weight: "700",
+    align: "center",
+    mono: true,
+  });
+  // The sign-in note rides under the line rather than beside it: appending it
+  // would make a record line and a non-record line different lengths, and the
+  // eye reads the jump as the number having changed.
+  if (summary.note) {
+    text(ctx, summary.note, centre, y + 15, { size: 11, colour: MUTED, align: "center" });
+  }
+}
+
+/**
+ * Where the record band sits inside the results panel: between the headline's
+ * `sub` (y+128) and the launch grade (y+178).
+ *
+ * Those 50px are the entire budget — the panel is sized to clear `DASH_TOP` so
+ * the cluster stays lit underneath, so it cannot grow downward — and the band
+ * has to hold two lines when a signed-out player sets a best. At y+152 the note
+ * printed straight through "RED LIGHT"; y+148 leaves 15px under the note's
+ * baseline, which clears an 11px cap height with room to spare.
+ */
+const RECORD_LINE_Y = 148;
+
+export function drawResults(ctx, race, menu, recordSummary = null) {
   const box = MENU_LAYOUT.results;
   const centre = WORLD.width / 2;
 
@@ -388,6 +434,8 @@ export function drawResults(ctx, race, menu) {
   text(ctx, caption, centre, box.y + 38, { size: 22, colour: TEXT, weight: "700", align: "center" });
   text(ctx, value, centre, box.y + 98, { size: 52, colour: "#4ade6a", weight: "700", align: "center", mono: true });
   text(ctx, sub, centre, box.y + 128, { size: 14, align: "center" });
+
+  drawRecordLine(ctx, recordSummary, centre, box.y + RECORD_LINE_Y);
 
   // Launch — the run's other half, and the only place a red light is spelled out.
   const grade = race.launchGrade;
