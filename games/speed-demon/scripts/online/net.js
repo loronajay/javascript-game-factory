@@ -13,14 +13,41 @@
 // queue, the tree and the adjudication are all its own — see
 // `games/speed-demon/server/` in that repo.
 
-const WS_URL = "wss://factory-network-server-production.up.railway.app";
+const PRODUCTION_WS_URL = "wss://factory-network-server-production.up.railway.app";
+/** What `npm start` in the factory-network-server repo listens on. */
+const LOCAL_WS_URL = "ws://localhost:3000";
 const GAME_ID = "speed-demon";
+
+/**
+ * Which server to talk to.
+ *
+ * Online play needs a *running* `factory-network-server` with this cabinet's
+ * bridge registered, and there was previously no way to point at a local one —
+ * which made the whole feature impossible to test without deploying first. Two
+ * escapes, in order:
+ *
+ *   1. `?ws=<url>` on the query string, which wins outright. This is how you
+ *      point a browser at a colleague's server or a staging deploy.
+ *   2. A page served from localhost defaults to the local server, because a
+ *      cabinet being developed is almost never meant to be matchmaking against
+ *      live players. The deployed site's origin is never localhost, so this
+ *      cannot leak into production.
+ *
+ * Everything else gets the deployed service.
+ */
+export function resolveWsUrl(location = globalThis.location) {
+  const override = new URLSearchParams(location?.search ?? "").get("ws");
+  if (override) return override;
+  const host = location?.hostname ?? "";
+  if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return LOCAL_WS_URL;
+  return PRODUCTION_WS_URL;
+}
 
 /** How long to wait before giving up on a connection that never opens. */
 const CONNECT_TIMEOUT_MS = 12000;
 
 export function createNet({
-  url = WS_URL,
+  url = resolveWsUrl(),
   socketFactory = (target) => new WebSocket(target),
   now = () => Date.now(),
 } = {}) {

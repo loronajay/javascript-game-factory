@@ -442,6 +442,32 @@ test("net.js is the only module in the cabinet that opens a socket", () => {
   assertEqual(offenders.join(", "), "", "every socket call belongs in online/net.js");
 });
 
+test("restart and pause are both refused during an online race", () => {
+  // Both are offline conveniences that would be cheats online. Restarting lets a
+  // driver choose which of their attempts counted; pausing stops the clock to
+  // line up a shift, which defeats the timing skill outright. The round belongs
+  // to the server, so neither may reach it.
+  const source = fs.readFileSync(path.join(gameRoot, "scripts/init-game.js"), "utf8");
+  const raceAction = source.slice(source.indexOf("function raceAction"));
+  const body = raceAction.slice(0, raceAction.indexOf("\n  }"));
+
+  for (const [action, effect] of [["ACTION_RESTART", "restartRun()"], ["ACTION_CANCEL", "cancelScreen()"]]) {
+    const start = body.indexOf(`case ${action}:`);
+    assert(start >= 0, `raceAction no longer handles ${action}`);
+    // Up to the next case label, so each branch is examined on its own.
+    const rest = body.slice(start + 1);
+    const end = rest.search(/\n\s+(case |default:)/);
+    const branch = end >= 0 ? rest.slice(0, end) : rest;
+
+    const guard = branch.indexOf("if (isOnlineRace()) break;");
+    assert(guard >= 0, `${action} is not guarded against an online race`);
+    assert(
+      guard < branch.indexOf(effect),
+      `${action}'s guard must come before ${effect}, or it does not guard anything`,
+    );
+  }
+});
+
 test("the garage's rules do not import the storage layer", () => {
   // A pure reducer importing the sync layer would drag a server client into
   // every test that touches a preset.

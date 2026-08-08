@@ -289,17 +289,38 @@ export function roundRows(session) {
  */
 export function roundHeadline(session) {
   const result = session.roundResult;
-  if (!result) return "";
-  if (result.redLight) {
+
+  // A red light is called out wherever it happened, because "you jumped the
+  // light" and "you were slower" are different things to have done.
+  if (result?.redLight) {
+    if (result.offenders.length > 1) return "BOTH RED-LIGHTED";
     const jumped = result.offenders.some((offender) => offender.playerId === session.youPlayerId);
-    const both = result.offenders.length > 1;
-    if (both) return "BOTH RED-LIGHTED";
     return jumped ? "RED LIGHT — YOU JUMPED" : "RED LIGHT — OPPONENT JUMPED";
   }
-  if (result.outcome?.kind === "round-restart") return "DEAD HEAT — RUN IT BACK";
+
+  // The match ending outranks the round that ended it. This is the biggest line
+  // on the panel at the moment it matters most, and it read as blank while the
+  // headline could only talk about rounds — a round-level `winnerId` is not
+  // always present on the frame that ends a match.
+  if (session.status === STATUS_MATCH_RESULT && session.matchResult) {
+    if (session.matchResult.forfeit) {
+      return youWon(session) ? "MATCH WON — OPPONENT LEFT" : "MATCH LOST";
+    }
+    const won = youWon(session);
+    if (won === null) return "MATCH OVER";
+    return won ? "MATCH WON" : "MATCH LOST";
+  }
+
+  if (!result) return "";
+  if (result.outcome?.kind === "round-restart") {
+    return result.redLight ? "RED LIGHT — RUN IT BACK" : "DEAD HEAT — RUN IT BACK";
+  }
   const winnerId = result.outcome?.winnerId;
-  if (!winnerId) return "";
-  return winnerId === session.youPlayerId ? "ROUND WON" : "ROUND LOST";
+  if (winnerId) return winnerId === session.youPlayerId ? "ROUND WON" : "ROUND LOST";
+
+  // The frame said a round ended without naming who took it. Fall back to the
+  // scoreboard rather than printing nothing at all.
+  return "ROUND OVER";
 }
 
 /** The one-line reason a round is being re-run, or null when it is not. */

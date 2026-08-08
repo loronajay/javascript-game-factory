@@ -344,6 +344,43 @@ test("eventsSince returns only the tail, so a live stream stays small", () => {
   assert(tail.every((event) => event.t >= midpoint), "and nothing before the cut");
 });
 
+test("streaming a log in tick-sized windows loses nothing", () => {
+  // The live client sends `eventsSince(log, sentThrough)` each tick and then
+  // advances `sentThrough`. Advancing it one tick too far skipped exactly one
+  // tick's worth of inputs every time — and when a launch landed on a skipped
+  // tick the server replayed a car that never moved and scored the run DNF.
+  const { race, log } = cleanQuarterMile();
+  const lastTick = Math.max(...log.events.map((event) => event.t));
+
+  let sentThrough = 0;
+  let received = createInputLog();
+  for (let tick = 0; tick <= lastTick + 1; tick += 1) {
+    // Everything recorded up to and including `tick` is available to send.
+    const available = { events: log.events.filter((event) => event.t <= tick) };
+    const tail = eventsSince(available, sentThrough);
+    if (tail.length > 0) {
+      received = mergeEvents(received, tail);
+      sentThrough = tick; // the cursor the client keeps — never tick + 1
+    }
+  }
+
+  assertEqual(received.events.length, log.events.length, "every event must reach the far end");
+  const replayed = replayRun(options(), received).race;
+  assertEqual(replayed.finishTime, race.finishTime, "and the run must replay identically");
+});
+
+test("re-sending an already-streamed window is harmless", () => {
+  // Which is why the cursor errs backwards: a duplicate is dropped on arrival,
+  // a gap loses the run.
+  const { race, log } = cleanQuarterMile();
+  let received = createInputLog();
+  for (let i = 0; i < log.events.length; i += 3) {
+    received = mergeEvents(received, log.events.slice(0, i + 3)); // always from the start
+  }
+  assertEqual(received.events.length, log.events.length);
+  assertEqual(replayRun(options(), received).race.finishTime, race.finishTime);
+});
+
 test("an empty log leaves the car on the line rather than spinning", () => {
   const { race, complete, ticks } = replayRun(options(), createInputLog());
   assertEqual(complete, false, "a car that never started never finishes");

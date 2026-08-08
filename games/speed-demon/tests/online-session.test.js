@@ -94,6 +94,25 @@ test("a lobby frame arriving mid-race does not yank the driver off the strip", (
   assertEqual(session.status, STATUS_RACING, "the race is still the screen you are on");
 });
 
+test("a lobby frame arriving over a result panel does not clear the result", () => {
+  // The server emits a lobby frame whenever anything about the room changes —
+  // including the *opponent* staging for the next round, which happens while
+  // this driver is still reading the last one. Following it would wipe the panel
+  // out from under them.
+  let session = applyRoundResult(racing(inLobby()), {
+    round: 1, attempt: 1, decided: false,
+    outcome: { kind: "round-won", winnerId: "p1", loserId: "p2" },
+    runs: [{ playerId: "p1", finishTime: 12.0, complete: true },
+           { playerId: "p2", finishTime: 12.4, complete: true }],
+    score: { players: [{ playerId: "p1", wins: 1 }, { playerId: "p2", wins: 0 }] },
+  });
+  assertEqual(session.status, STATUS_ROUND_RESULT);
+
+  session = applyLobby(session, lobbyMessage());
+  assertEqual(session.status, STATUS_ROUND_RESULT, "the result stays up");
+  assert(session.roundResult, "and the times stay on it");
+});
+
 test("a solo lobby is not full, so nothing can be started from it", () => {
   const session = applyLobby(createSession(), lobbyMessage({ players: [{ playerId: "p1", lane: 1 }] }));
   assertEqual(lobbyIsFull(session), false);
@@ -252,6 +271,52 @@ test("a headline says whether the round was won or lost", () => {
     roundResultMessage({ outcome: { kind: "round-won", winnerId: "p2", loserId: "p1" } }),
   );
   assertEqual(roundHeadline(lost), "ROUND LOST");
+});
+
+test("a finished match says so, rather than leaving the biggest line blank", () => {
+  const won = applyRoundResult(
+    racing(inLobby()),
+    roundResultMessage({ decided: true, winnerId: "p1", loserId: "p2" }),
+  );
+  assertEqual(roundHeadline(won), "MATCH WON");
+
+  const lost = applyRoundResult(
+    racing(inLobby()),
+    roundResultMessage({
+      decided: true,
+      winnerId: "p2",
+      loserId: "p1",
+      outcome: { kind: "match-won", winnerId: "p2", loserId: "p1", reason: "time" },
+    }),
+  );
+  assertEqual(roundHeadline(lost), "MATCH LOST");
+});
+
+test("a match that ends without naming a round winner still reads properly", () => {
+  // The frame that ends a match does not always carry a round-level winnerId,
+  // and the panel used to render an empty headline at the most important moment.
+  const session = applyRoundResult(
+    racing(inLobby()),
+    roundResultMessage({ decided: true, winnerId: "p1", loserId: "p2", outcome: null }),
+  );
+  assertEqual(roundHeadline(session), "MATCH WON");
+});
+
+test("an opponent walking out is named as such, not reported as a win on merit", () => {
+  const session = applyForfeit(racing(inLobby()), { winnerId: "p1", loserId: "p2" });
+  assertEqual(roundHeadline(session), "MATCH WON — OPPONENT LEFT");
+});
+
+test("a red-light re-run says it was a red light", () => {
+  const session = applyRoundResult(
+    racing(inLobby()),
+    roundResultMessage({
+      redLight: true,
+      offenders: [{ playerId: "p2" }],
+      outcome: { kind: "round-restart" },
+    }),
+  );
+  assertEqual(roundHeadline(session), "RED LIGHT — OPPONENT JUMPED");
 });
 
 test("a re-run explains itself, and only when there is one", () => {

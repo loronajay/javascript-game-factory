@@ -13,20 +13,26 @@
 
 import { WORLD } from "./scene.js";
 import { dimWorld, drawMenuBackdrop, menuPanel, wrapText } from "./menus.js";
+// Boxes come from the ui layer, which is also what resolves a click against
+// them. Two copies of this table is exactly the bug where the button you can see
+// and the button you can press are in different places.
+import { ONLINE_LAYOUT, RESULT_PANEL, resultButtons } from "../ui/online-menu.js";
+
+/** A drawn button. Every click target on this screen has one of these under it. */
+function drawButton(ctx, rect, label, { live = false, muted = false } = {}) {
+  menuPanel(ctx, rect.x, rect.y, rect.width, rect.height, { live });
+  ctx.save();
+  ctx.fillStyle = muted ? MUTED : live ? ACCENT : INK;
+  ctx.font = "700 18px 'Segoe UI', system-ui, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, rect.x + rect.width / 2, rect.y + rect.height / 2);
+  ctx.restore();
+}
 
 const ACCENT = "#ff5a2e";
 const INK = "#f4f1ea";
 const MUTED = "rgba(244, 241, 234, 0.56)";
-
-/** The boxes the online screen is laid out in. Swept for overlaps by test. */
-export const ONLINE_LAYOUT = {
-  title: { x: 96, y: 92 },
-  panel: { x: 96, y: 150, width: 520, height: 420 },
-  detail: { x: 664, y: 150, width: 520, height: 420 },
-  row: { height: 62, gap: 10 },
-  code: { x: 664, y: 250, slot: 74, gap: 14, height: 96 },
-  footer: { x: 96, y: 640 },
-};
 
 // ---------------------------------------------------------------------------
 // The screen
@@ -53,7 +59,7 @@ export function drawOnlineScreen(ctx, view, { splashImage } = {}) {
   if (view.pane === "home") drawHome(ctx, view);
   else if (view.pane === "join") drawJoin(ctx, view);
   else if (view.pane === "searching") drawSearching(ctx, view);
-  else if (view.pane === "lobby" && view.lobby) drawLobby(ctx, view.lobby);
+  else if (view.pane === "lobby" && view.lobby) drawLobby(ctx, view.lobby, view.hover);
 
   if (view.error) {
     ctx.fillStyle = "#ff6b5a";
@@ -122,9 +128,16 @@ function drawJoin(ctx, view) {
   ctx.fillStyle = MUTED;
   ctx.font = "400 16px 'Segoe UI', system-ui, sans-serif";
   ctx.fillText(view.join.hint, code.x, code.y + code.height + 40);
-  ctx.fillStyle = view.join.complete ? ACCENT : MUTED;
-  ctx.font = "600 18px 'Segoe UI', system-ui, sans-serif";
-  ctx.fillText(view.join.complete ? "ENTER to join" : "…", code.x, code.y + code.height + 74);
+
+  const hovering = view.hover?.kind;
+  // The button only exists once the code is whole — an inert one the player can
+  // press and watch do nothing is worse than one that is not offered yet.
+  if (view.join.complete) {
+    drawButton(ctx, ONLINE_LAYOUT.submit, "JOIN ROOM", { live: hovering === "join-submit" });
+  } else {
+    drawButton(ctx, ONLINE_LAYOUT.submit, `${view.join.value.length} / ${view.join.length}`, { muted: true });
+  }
+  drawButton(ctx, ONLINE_LAYOUT.back, "BACK", { live: hovering === "back" });
 }
 
 function drawSearching(ctx, view) {
@@ -137,10 +150,10 @@ function drawSearching(ctx, view) {
   ctx.font = "400 17px 'Segoe UI', system-ui, sans-serif";
   ctx.fillStyle = MUTED;
   ctx.fillText("You will be paired with the next driver looking.", panel.x + 28, panel.y + 96);
-  ctx.fillText("ESC to stop looking.", panel.x + 28, panel.y + 124);
+  drawButton(ctx, ONLINE_LAYOUT.cancel, "STOP LOOKING", { live: view.hover?.kind === "cancel-search" });
 }
 
-function drawLobby(ctx, lobby) {
+function drawLobby(ctx, lobby, hover) {
   const { panel, detail, row } = ONLINE_LAYOUT;
 
   // Who is here. This driver is always the left card.
@@ -198,13 +211,23 @@ function drawLobby(ctx, lobby) {
       ctx.fillStyle = entry.highlighted ? ACCENT : INK;
       ctx.font = "700 20px 'Segoe UI', system-ui, sans-serif";
       ctx.textAlign = "right";
-      ctx.fillText(entry.value, detail.x + detail.width - 24, y + row.height / 2);
+      // Kept clear of the stepper arrows when there are any, so the value never
+      // prints over a control the player is meant to be able to hit.
+      const valueRight = entry.adjustable
+        ? detail.x + detail.width - ONLINE_LAYOUT.step.inset - ONLINE_LAYOUT.step.width - 20
+        : detail.x + detail.width - 24;
+      ctx.fillText(entry.value, valueRight, y + row.height / 2);
       ctx.textAlign = "left";
-      if (entry.adjustable && entry.highlighted) {
-        ctx.fillStyle = ACCENT;
-        ctx.font = "700 18px 'Segoe UI', system-ui, sans-serif";
-        ctx.fillText("‹", detail.x + detail.width - 150, y + row.height / 2);
-        ctx.fillText("›", detail.x + detail.width - 134, y + row.height / 2);
+      // Drawn at the boxes the hit test uses, so the arrow you can see and the
+      // arrow you can press are the same thing.
+      if (entry.adjustable) {
+        const { step } = ONLINE_LAYOUT;
+        ctx.fillStyle = entry.highlighted || entry.hovered ? ACCENT : MUTED;
+        ctx.font = "700 22px 'Segoe UI', system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("‹", detail.x + detail.width - step.inset - step.width / 2, y + row.height / 2);
+        ctx.fillText("›", detail.x + detail.width - step.inset + step.width / 2, y + row.height / 2);
+        ctx.textAlign = "left";
       }
     }
     ctx.globalAlpha = 1;
@@ -216,16 +239,14 @@ function drawLobby(ctx, lobby) {
     ctx.textBaseline = "alphabetic";
     ctx.fillText("The host sets the race.", detail.x + 24, detail.y + 300);
   }
+  drawButton(ctx, ONLINE_LAYOUT.back, "LEAVE ROOM", { live: hover?.kind === "back" });
 }
 
 // ---------------------------------------------------------------------------
 // The result panel, drawn over the strip
 // ---------------------------------------------------------------------------
 
-/** Sized to leave the instrument cluster lit underneath, as pause and results are. */
-export const RESULT_PANEL = { x: 240, y: 60, width: 800, height: 400 };
-
-export function drawOnlineResult(ctx, { headline, note, rows, score, matchResult, menu }) {
+export function drawOnlineResult(ctx, { headline, note, rows, score, matchResult, buttons = [] }) {
   dimWorld(ctx);
   const box = RESULT_PANEL;
   menuPanel(ctx, box.x, box.y, box.width, box.height, { live: true });
@@ -276,12 +297,11 @@ export function drawOnlineResult(ctx, { headline, note, rows, score, matchResult
     ctx.fillText("Your opponent left the match.", box.x + 32, box.y + box.height - 60);
   }
 
-  if (menu) {
-    ctx.fillStyle = INK;
-    ctx.font = "600 18px 'Segoe UI', system-ui, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(menu, box.x + box.width / 2, box.y + box.height - 26);
-    ctx.textAlign = "left";
+  // Drawn buttons rather than a "press ENTER" hint: the rest of the cabinet is
+  // fully mousable, and a result screen you can only leave with the keyboard is
+  // the one place that would stop being true.
+  for (const button of buttons) {
+    drawButton(ctx, button.rect, button.label, { live: button.primary });
   }
   ctx.restore();
 }

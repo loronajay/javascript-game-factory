@@ -44,6 +44,33 @@ export const PANE_JOIN = "join";
 export const PANE_SEARCHING = "searching";
 export const PANE_LOBBY = "lobby";
 
+/**
+ * Where everything on the online screen is drawn.
+ *
+ * Geometry lives here rather than in the renderer for the reason `menuListBox`
+ * exists: the mouse and the drawing must not be able to disagree about where a
+ * button is. `render/online.js` reads these boxes, `onlineTargets` turns them
+ * into click targets, and both come from this one table.
+ */
+export const ONLINE_LAYOUT = {
+  title: { x: 96, y: 92 },
+  panel: { x: 96, y: 150, width: 520, height: 420 },
+  detail: { x: 664, y: 150, width: 520, height: 420 },
+  row: { height: 62, gap: 10 },
+  code: { x: 664, y: 250, slot: 74, gap: 14, height: 96 },
+  /** Drawn buttons. Every one of these is clickable — that is the whole point. */
+  submit: { x: 664, y: 400, width: 260, height: 60 },
+  cancel: { x: 96, y: 330, width: 300, height: 60 },
+  back: { x: 96, y: 620, width: 200, height: 54 },
+  /** The stepper arrows on an adjustable lobby row, relative to its right edge. */
+  step: { width: 40, inset: 96 },
+  footer: { x: 96, y: 640 },
+};
+
+/** The result panel, drawn over a live race. Sized to clear the cluster. */
+export const RESULT_PANEL = { x: 240, y: 60, width: 800, height: 400 };
+export const RESULT_BUTTON = { width: 300, height: 52, gap: 16 };
+
 /** What the home pane offers, in the order it reads. */
 export const HOME_ITEMS = [
   {
@@ -149,10 +176,21 @@ export function moveOnline(menu, direction, session) {
  * time the server disagreed.
  */
 export function adjustLobby(menu, direction, session) {
+  return adjustLobbyAt(menu.lobbyCursor, direction, session);
+}
+
+/**
+ * The same step, against an explicit row.
+ *
+ * A click names the row it landed on, which is not necessarily the one the
+ * keyboard cursor is parked on — clicking a distance arrow while the cursor sits
+ * on the track row must step the distance, not the track.
+ */
+export function adjustLobbyAt(rowIndex, direction, session) {
   if (!session.isHost || !session.config) return null;
   if (direction !== "left" && direction !== "right") return null;
   const step = direction === "left" ? -1 : 1;
-  const row = LOBBY_ROWS[menu.lobbyCursor];
+  const row = LOBBY_ROWS[rowIndex];
 
   if (row === LOBBY_ROW_TRACK) {
     return { ...session.config, trackId: cycle(TRACK_IDS, session.config.trackId, step) };
@@ -233,6 +271,32 @@ export function confirmOnline(menu, session) {
  * disagree with the screen it is drawing.
  */
 export function onlineView(menu, session, { pointer = null } = {}) {
+  const view = buildView(menu, session);
+  if (!pointer) return { ...view, hover: null };
+  // Resolved from the finished view by the very function that resolves a click,
+  // so what lights up under the pointer is provably what pressing there does.
+  const hover = hitOnline(view, pointer.x, pointer.y);
+  return { ...view, hover, ...highlightFor(view, hover) };
+}
+
+/** Marks whichever target the pointer is over, without touching any cursor. */
+function highlightFor(view, hover) {
+  if (!hover) return {};
+  if (hover.kind === TARGET_HOME) {
+    return { home: view.home.map((item, index) => ({ ...item, hovered: index === hover.index })) };
+  }
+  if ((hover.kind === TARGET_LOBBY_ROW || hover.kind === TARGET_LOBBY_STEP) && view.lobby) {
+    return {
+      lobby: {
+        ...view.lobby,
+        rows: view.lobby.rows.map((row, index) => ({ ...row, hovered: index === hover.index })),
+      },
+    };
+  }
+  return {};
+}
+
+function buildView(menu, session) {
   const pane = paneFor(menu, session);
   return {
     pane,
@@ -244,18 +308,18 @@ export function onlineView(menu, session, { pointer = null } = {}) {
       ...item,
       index,
       highlighted: index === menu.cursor,
-      hovered: pointer?.homeIndex === index,
+      hovered: false,
     })),
     join: {
       ...entryView(menu.entry),
       length: ROOM_CODE_LENGTH,
       hint: "Letters and numbers only. No O or I — they are 0 and 1.",
     },
-    lobby: lobbyView(menu, session, pointer),
+    lobby: lobbyView(menu, session),
   };
 }
 
-function lobbyView(menu, session, pointer) {
+function lobbyView(menu, session) {
   if (!session.config) return null;
   const track = TRACKS.find((entry) => entry.id === session.config.trackId) ?? TRACKS[0];
   const distance = RACE_DISTANCES[session.config.distanceId] ?? RACE_DISTANCES.quarter;
@@ -276,7 +340,7 @@ function lobbyView(menu, session, pointer) {
     ...row,
     index,
     highlighted: index === menu.lobbyCursor,
-    hovered: pointer?.lobbyIndex === index,
+    hovered: false,
     // A guest sees every setting and watches it change, but cannot move it.
     adjustable: !row.button && session.isHost,
     dimmed: !row.button && !session.isHost,
@@ -299,6 +363,137 @@ function lobbyView(menu, session, pointer) {
     rows,
     score: session.score,
   };
+}
+
+// ---------------------------------------------------------------------------
+// The mouse
+// ---------------------------------------------------------------------------
+//
+// Every drawn control on this screen is clickable. The rest of the cabinet works
+// that way — menus, the radio faceplate, the setup screen and the garage are all
+// fully mousable — and an online lobby that could only be driven from the
+// keyboard would be the one screen that behaved differently.
+//
+// The targets are derived from the *finished view*, and `onlineView` runs the
+// same hit test on itself to decide what to highlight. That is the radio's rule
+// and it exists because two separate hit tests is exactly the bug where the row
+// you click is not the row you saw light up.
+
+export const TARGET_HOME = "home";
+export const TARGET_JOIN_SUBMIT = "join-submit";
+export const TARGET_BACK = "back";
+export const TARGET_CANCEL_SEARCH = "cancel-search";
+export const TARGET_LOBBY_ROW = "lobby-row";
+export const TARGET_LOBBY_STEP = "lobby-step";
+
+const inside = (rect, x, y) =>
+  x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height;
+
+/**
+ * Everything clickable on the screen as it currently stands, with its box.
+ *
+ * Built from the view rather than from the session so that a control which is
+ * not drawn is not a target — a dimmed guest setting has no stepper arrows, so
+ * clicking where they would be must do nothing rather than silently publishing
+ * a config the server would refuse.
+ */
+export function onlineTargets(view) {
+  const targets = [];
+  const { panel, detail, row, submit, cancel, back, step } = ONLINE_LAYOUT;
+
+  if (view.pane === PANE_HOME) {
+    view.home.forEach((item, index) => {
+      targets.push({
+        kind: TARGET_HOME,
+        index,
+        rect: { x: panel.x, y: panel.y + index * (row.height + row.gap), width: panel.width, height: row.height },
+      });
+    });
+    return targets;
+  }
+
+  if (view.pane === PANE_JOIN) {
+    if (view.join.complete) targets.push({ kind: TARGET_JOIN_SUBMIT, rect: { ...submit } });
+    targets.push({ kind: TARGET_BACK, rect: { ...back } });
+    return targets;
+  }
+
+  if (view.pane === PANE_SEARCHING) {
+    targets.push({ kind: TARGET_CANCEL_SEARCH, rect: { ...cancel } });
+    return targets;
+  }
+
+  if (view.pane === PANE_LOBBY && view.lobby) {
+    view.lobby.rows.forEach((entry, index) => {
+      const y = detail.y + index * (row.height + row.gap);
+      // A settable row carries its two arrows as targets of their own, so a
+      // click can step either way rather than only forwards.
+      if (entry.adjustable) {
+        targets.push({
+          kind: TARGET_LOBBY_STEP,
+          index,
+          direction: "left",
+          rect: { x: detail.x + detail.width - step.inset - step.width, y, width: step.width, height: row.height },
+        });
+        targets.push({
+          kind: TARGET_LOBBY_STEP,
+          index,
+          direction: "right",
+          rect: { x: detail.x + detail.width - step.inset, y, width: step.width, height: row.height },
+        });
+      }
+      targets.push({
+        kind: TARGET_LOBBY_ROW,
+        index,
+        rect: { x: detail.x, y, width: detail.width, height: row.height },
+      });
+    });
+    targets.push({ kind: TARGET_BACK, rect: { ...back } });
+  }
+  return targets;
+}
+
+/**
+ * What is under the pointer. The arrows are pushed before the row that contains
+ * them, and the first match wins, so a click on an arrow steps that setting
+ * rather than merely selecting the row it sits in.
+ */
+/**
+ * The buttons on the result panel drawn over the strip, with their boxes.
+ *
+ * Derived from the session rather than passed in, so the renderer and the click
+ * handler cannot end up offering different things — a "REMATCH" you can see but
+ * not press is the exact failure this whole seam exists to prevent.
+ */
+export function resultButtons(session) {
+  const matchOver = session.status === "match-result";
+  const labels = matchOver
+    ? [
+        { id: "rematch", label: session.rematch?.asked ? "WAITING FOR THEM…" : "REMATCH" },
+        { id: "leave", label: "LEAVE MATCH" },
+      ]
+    : [{ id: "next", label: "STAGE FOR THE NEXT ROUND" }];
+
+  const totalWidth = labels.length * RESULT_BUTTON.width + (labels.length - 1) * RESULT_BUTTON.gap;
+  const left = RESULT_PANEL.x + (RESULT_PANEL.width - totalWidth) / 2;
+  const y = RESULT_PANEL.y + RESULT_PANEL.height - RESULT_BUTTON.height - 22;
+
+  return labels.map((button, index) => ({
+    ...button,
+    rect: {
+      x: left + index * (RESULT_BUTTON.width + RESULT_BUTTON.gap),
+      y,
+      width: RESULT_BUTTON.width,
+      height: RESULT_BUTTON.height,
+    },
+  }));
+}
+
+export function hitOnline(view, x, y) {
+  for (const target of onlineTargets(view)) {
+    if (inside(target.rect, x, y)) return target;
+  }
+  return null;
 }
 
 function readyLabel(session) {

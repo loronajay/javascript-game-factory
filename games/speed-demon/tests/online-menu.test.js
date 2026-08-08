@@ -26,12 +26,23 @@ import {
   PANE_JOIN,
   PANE_LOBBY,
   PANE_SEARCHING,
+  ONLINE_LAYOUT,
+  RESULT_PANEL,
+  TARGET_BACK,
+  TARGET_CANCEL_SEARCH,
+  TARGET_HOME,
+  TARGET_JOIN_SUBMIT,
+  TARGET_LOBBY_STEP,
   adjustLobby,
+  adjustLobbyAt,
   closeJoin,
   codeIsComplete,
   confirmOnline,
   createOnlineMenu,
+  hitOnline,
   moveOnline,
+  onlineTargets,
+  resultButtons,
   onlineView,
   openJoin,
   paneFor,
@@ -299,6 +310,191 @@ test("the view resolves track and distance names, so the renderer looks nothing 
   assertEqual(view.rows[0].value, "Grasslands");
   assertEqual(view.rows[1].value, "1/4 Mile");
   assertEqual(view.rows[2].value, "BEST OF 3");
+});
+
+// ---------------------------------------------------------------------------
+// The mouse
+// ---------------------------------------------------------------------------
+
+const centre = (rect) => ({ x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 });
+
+test("every way in is clickable, and the click lands on the one under the pointer", () => {
+  const view = onlineView(createOnlineMenu(), createSession());
+  const targets = onlineTargets(view).filter((target) => target.kind === TARGET_HOME);
+  assertEqual(targets.length, HOME_ITEMS.length, "all three, not just the highlighted one");
+
+  targets.forEach((target, index) => {
+    const hit = hitOnline(view, centre(target.rect).x, centre(target.rect).y);
+    assertEqual(hit.kind, TARGET_HOME);
+    assertEqual(hit.index, index, "the row you press is the row you pressed");
+  });
+});
+
+test("no two targets on any pane claim the same pixel", () => {
+  const panes = [
+    onlineView(createOnlineMenu(), createSession()),
+    onlineView(openJoin(createOnlineMenu()), createSession()),
+    onlineView(createOnlineMenu(), searching(createSession())),
+    onlineView(createOnlineMenu(), lobbySession()),
+  ];
+  for (const view of panes) {
+    const targets = onlineTargets(view);
+    for (let i = 0; i < targets.length; i += 1) {
+      for (let j = i + 1; j < targets.length; j += 1) {
+        const a = targets[i].rect;
+        const b = targets[j].rect;
+        const overlaps = a.x < b.x + b.width && b.x < a.x + a.width
+          && a.y < b.y + b.height && b.y < a.y + a.height;
+        // A stepper deliberately sits inside its row; the hit test resolves it
+        // first, which is what makes clicking an arrow step rather than select.
+        const nested = targets[i].kind === TARGET_LOBBY_STEP || targets[j].kind === TARGET_LOBBY_STEP;
+        assert(!overlaps || nested, `${view.pane}: ${targets[i].kind} overlaps ${targets[j].kind}`);
+      }
+    }
+  }
+});
+
+test("a stepper arrow wins over the row it sits inside", () => {
+  const view = onlineView(createOnlineMenu(), lobbySession());
+  const step = onlineTargets(view).find((target) => target.kind === TARGET_LOBBY_STEP);
+  const hit = hitOnline(view, centre(step.rect).x, centre(step.rect).y);
+  assertEqual(hit.kind, TARGET_LOBBY_STEP, "clicking an arrow must step, not merely select");
+  assertEqual(hit.direction, step.direction);
+});
+
+test("a guest's settings have no arrows to click", () => {
+  const view = onlineView(createOnlineMenu(), lobbySession({ youAreHost: false }));
+  const steps = onlineTargets(view).filter((target) => target.kind === TARGET_LOBBY_STEP);
+  assertEqual(steps.length, 0, "a control that is not drawn must not be a target");
+});
+
+test("clicking an arrow steps the row it belongs to, not the one the caret is on", () => {
+  const session = lobbySession();
+  // Caret on the track row; the click lands on the distance row's arrow.
+  const menu = createOnlineMenu();
+  const next = adjustLobbyAt(1, "right", session);
+  assert(next.distanceId !== session.config.distanceId, "the distance moved");
+  assertEqual(next.trackId, session.config.trackId, "and the track did not");
+  assertEqual(menu.lobbyCursor, 0, "the caret is irrelevant to where a click landed");
+});
+
+test("hover is resolved by the same function that resolves the click", () => {
+  const view = onlineView(createOnlineMenu(), createSession());
+  const target = onlineTargets(view)[2];
+  const hovered = onlineView(createOnlineMenu(), createSession(), { pointer: centre(target.rect) });
+  assertEqual(hovered.hover.kind, target.kind);
+  assertEqual(hovered.hover.index, target.index);
+  assertEqual(hovered.home[2].hovered, true, "and the thing under the pointer lights up");
+  assertEqual(hovered.home[0].hovered, false);
+});
+
+test("hovering nothing highlights nothing", () => {
+  const view = onlineView(createOnlineMenu(), createSession(), { pointer: { x: 5, y: 700 } });
+  assertEqual(view.hover, null);
+  assert(view.home.every((item) => !item.hovered));
+});
+
+test("hover never moves the pick — it only marks what a click would take", () => {
+  const menu = createOnlineMenu();
+  const view = onlineView(menu, createSession(), { pointer: { x: 300, y: 400 } });
+  assertEqual(menu.cursor, 0, "the menu itself is untouched by looking at it");
+  assert(view.home[0].highlighted, "the cursor is still where it was");
+});
+
+test("the join pane offers a submit button only once the code is whole", () => {
+  let menu = openJoin(createOnlineMenu());
+  const short = onlineView(menu, createSession());
+  assertEqual(
+    onlineTargets(short).some((target) => target.kind === TARGET_JOIN_SUBMIT),
+    false,
+    "an inert button the player can press and watch do nothing is worse than none",
+  );
+
+  for (const char of "K7P2M") menu = typeCode(menu, { char });
+  const whole = onlineView(menu, createSession());
+  assert(onlineTargets(whole).some((target) => target.kind === TARGET_JOIN_SUBMIT));
+});
+
+test("every pane has a way back out that can be clicked", () => {
+  const withBack = [
+    onlineView(openJoin(createOnlineMenu()), createSession()),
+    onlineView(createOnlineMenu(), lobbySession()),
+  ];
+  for (const view of withBack) {
+    assert(
+      onlineTargets(view).some((target) => target.kind === TARGET_BACK),
+      `${view.pane} has no clickable way out`,
+    );
+  }
+  const searchingView = onlineView(createOnlineMenu(), searching(createSession()));
+  assert(onlineTargets(searchingView).some((target) => target.kind === TARGET_CANCEL_SEARCH));
+});
+
+test("every target sits on screen", () => {
+  const panes = [
+    onlineView(createOnlineMenu(), createSession()),
+    onlineView(openJoin(createOnlineMenu()), createSession()),
+    onlineView(createOnlineMenu(), searching(createSession())),
+    onlineView(createOnlineMenu(), lobbySession()),
+  ];
+  for (const view of panes) {
+    for (const target of onlineTargets(view)) {
+      const { x, y, width, height } = target.rect;
+      assert(x >= 0 && y >= 0, `${view.pane}/${target.kind} starts off screen`);
+      assert(x + width <= 1280, `${view.pane}/${target.kind} runs off the right`);
+      assert(y + height <= 720, `${view.pane}/${target.kind} runs off the bottom`);
+    }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// The result panel's buttons
+// ---------------------------------------------------------------------------
+
+const finishedSession = (overrides = {}) => ({
+  ...lobbySession(),
+  status: "match-result",
+  rematch: { requested: [], asked: false },
+  ...overrides,
+});
+
+test("a finished round offers one button, a finished match offers two", () => {
+  const round = resultButtons({ ...lobbySession(), status: "round-result" });
+  assertEqual(round.length, 1);
+  assertEqual(round[0].id, "next");
+
+  const match = resultButtons(finishedSession());
+  assertEqual(match.length, 2);
+  assertEqual(match.map((button) => button.id).join(","), "rematch,leave");
+});
+
+test("the rematch button says it is waiting once this side has asked", () => {
+  const asked = resultButtons(finishedSession({ rematch: { requested: [], asked: true } }));
+  assert(asked[0].label.includes("WAITING"), "pressing it again should not look available");
+});
+
+test("the result buttons sit inside the panel and do not overlap", () => {
+  for (const session of [{ ...lobbySession(), status: "round-result" }, finishedSession()]) {
+    const buttons = resultButtons(session);
+    for (const button of buttons) {
+      assert(button.rect.x >= RESULT_PANEL.x, "a button starts left of its panel");
+      assert(
+        button.rect.x + button.rect.width <= RESULT_PANEL.x + RESULT_PANEL.width,
+        "a button runs past its panel",
+      );
+      assert(
+        button.rect.y + button.rect.height <= RESULT_PANEL.y + RESULT_PANEL.height,
+        "a button runs below its panel",
+      );
+    }
+    for (let i = 0; i < buttons.length; i += 1) {
+      for (let j = i + 1; j < buttons.length; j += 1) {
+        const a = buttons[i].rect;
+        const b = buttons[j].rect;
+        assert(a.x + a.width <= b.x || b.x + b.width <= a.x, "two result buttons overlap");
+      }
+    }
+  }
 });
 
 test("no reducer mutates the menu it is given", () => {

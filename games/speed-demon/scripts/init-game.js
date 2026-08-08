@@ -150,12 +150,21 @@ import {
   ONLINE_SEARCH,
   PANE_HOME,
   PANE_JOIN,
+  TARGET_BACK,
+  TARGET_CANCEL_SEARCH,
+  TARGET_HOME,
+  TARGET_JOIN_SUBMIT,
+  TARGET_LOBBY_ROW,
+  TARGET_LOBBY_STEP,
   adjustLobby,
+  adjustLobbyAt,
   closeJoin,
   confirmOnline,
   createOnlineMenu,
+  hitOnline,
   moveOnline,
   onlineView,
+  resultButtons,
   openJoin,
   paneFor,
   typeCode,
@@ -533,6 +542,8 @@ export function boot(canvas) {
   let sentThrough = 0;
   // The opponent's car: their inputs, run through the same sim. Null offline.
   let opponentCar = null;
+  // Whether this round's run has already been reported. See the latch in tick().
+  let reportedRound = false;
 
   const net = createNet();
 
@@ -582,8 +593,14 @@ export function boot(canvas) {
     },
     onLobby: (message) => {
       session = applyLobby(session, message);
-      // Leaving a finished match for a fresh lobby throws the old race away.
-      if (session.status !== STATUS_RACING && session.status !== STATUS_COUNTDOWN) endOnlineRace();
+      // **Only when we are genuinely back in a lobby.** A lobby frame arrives
+      // for all sorts of reasons that are not "the match is over" — the opponent
+      // staging for the next round, or repainting their car mid-result — and
+      // treating every one of them as a teardown threw away the race the result
+      // panel was still drawn over. With the race gone, `isOnlineRace()` went
+      // false, the panel's own keys and clicks stopped being routed to it, and
+      // pressing its button dropped the player onto the setup screen.
+      if (session.status === STATUS_LOBBY) endOnlineRace();
     },
     onRoundStart: (message, localNow) => {
       session = applyRoundStart(session, message, localNow);
@@ -671,6 +688,7 @@ export function boot(canvas) {
     myLog = createInputLog();
     raceTick = 0;
     sentThrough = 0;
+    reportedRound = false;
     opponentCar = createOpponent(options);
     shell = enterScreen(shell, SCREEN_RACE);
   }
@@ -680,6 +698,7 @@ export function boot(canvas) {
     myLog = createInputLog();
     raceTick = 0;
     sentThrough = 0;
+    reportedRound = false;
   }
 
   /**
@@ -714,7 +733,18 @@ export function boot(canvas) {
     const tail = eventsSince(myLog, sentThrough);
     if (tail.length === 0) return;
     net.sendInputs(session.liveRound.round, session.liveRound.attempt, tail);
-    sentThrough = raceTick + 1;
+    // `raceTick` has already been advanced past the tick just simulated, so it
+    // is the earliest tick that can still receive an input — and therefore the
+    // earliest one still worth sending from.
+    //
+    // It was `raceTick + 1`, which skipped exactly one tick's worth of inputs
+    // every time: whatever the driver did on that tick was recorded locally and
+    // never sent. A launch landing there meant the server replayed a car that
+    // never moved and scored the run DNF, with nothing on either screen to
+    // explain it. **When in doubt, under-advance this** — `mergeEvents` drops a
+    // duplicate on arrival, so re-sending an event costs a few bytes, while
+    // skipping one costs the whole run.
+    sentThrough = raceTick;
   }
 
   /** ENTER on the online screen. */
@@ -798,6 +828,67 @@ export function boot(canvas) {
       default:
         break;
     }
+  }
+
+  /** The online view with the pointer folded in, so hover and click agree. */
+  function currentOnlineView({ pointer: at = null } = {}) {
+    return onlineView(onlineMenu, session, { pointer: at });
+  }
+
+  /**
+   * A click on the online screen. One gesture does the whole job, exactly as it
+   * does on the setup screen: pressing a way in takes it, pressing a stepper
+   * steps that setting, pressing the button stages the car.
+   */
+  function clickOnline(click) {
+    const target = hitOnline(currentOnlineView(), click.x, click.y);
+    if (!target) return;
+    audio.play("button");
+
+    if (target.kind === TARGET_HOME) {
+      onlineMenu = { ...onlineMenu, cursor: target.index };
+      confirmOnlineScreen();
+      return;
+    }
+    if (target.kind === TARGET_JOIN_SUBMIT) {
+      confirmOnlineScreen();
+      return;
+    }
+    if (target.kind === TARGET_CANCEL_SEARCH || target.kind === TARGET_BACK) {
+      // The same one-step-back the key does, so the mouse and ESC cannot
+      // disagree about how far out a single press takes you.
+      if (cancelOnlineScreen()) cancelScreen();
+      return;
+    }
+    if (target.kind === TARGET_LOBBY_STEP) {
+      // Against the clicked row rather than the cursor's: pointing at a
+      // distance arrow means the distance, wherever the caret happens to be.
+      const published = adjustLobbyAt(target.index, target.direction, session);
+      if (published) net.sendConfig(published);
+      return;
+    }
+    if (target.kind === TARGET_LOBBY_ROW) {
+      onlineMenu = { ...onlineMenu, lobbyCursor: target.index };
+      confirmOnlineScreen(); // only the button commits; a setting row is inert
+    }
+  }
+
+  /** A click on the result panel drawn over the strip. */
+  function clickOnlineResult(click) {
+    const buttons = resultButtons(session);
+    const hit = buttons.find(
+      (button) =>
+        click.x >= button.rect.x && click.x <= button.rect.x + button.rect.width
+        && click.y >= button.rect.y && click.y <= button.rect.y + button.rect.height,
+    );
+    if (!hit) return;
+    audio.play("button");
+    if (hit.id === "leave") {
+      leaveOnline();
+      shell = enterScreen(shell, SCREEN_MODES);
+      return;
+    }
+    confirmOnlineScreen();
   }
 
   /**
@@ -1384,6 +1475,19 @@ export function boot(canvas) {
       ? hitSetupAt(pointer.hover())
       : null;
 
+    if (shell.screen === SCREEN_ONLINE) {
+      const at = pointer.hover();
+      const hovered = at ? hitOnline(currentOnlineView(), at.x, at.y) : null;
+      // Safe here for the same reason it is safe on the menus and in the garage:
+      // this cursor picks nothing on its own. The setup screen is the exception,
+      // because there the cursor *is* the pick.
+      if (hovered?.kind === TARGET_HOME) {
+        onlineMenu = { ...onlineMenu, cursor: hovered.index };
+      } else if (hovered?.kind === TARGET_LOBBY_ROW || hovered?.kind === TARGET_LOBBY_STEP) {
+        onlineMenu = { ...onlineMenu, lobbyCursor: hovered.index };
+      }
+    }
+
     if (shell.screen === SCREEN_GARAGE) {
       const at = pointer.hover();
       const hovered = at ? hitGarage(currentGarageView(), at.x, at.y) : null;
@@ -1404,6 +1508,10 @@ export function boot(canvas) {
         clickSetup(click);
       } else if (shell.screen === SCREEN_GARAGE) {
         clickGarage(click);
+      } else if (shell.screen === SCREEN_ONLINE) {
+        clickOnline(click);
+      } else if (isOnlineRace() && showsOnlineResult()) {
+        clickOnlineResult(click);
       } else {
         clickMenu(click);
       }
@@ -1480,9 +1588,16 @@ export function boot(canvas) {
       raceTick += 1;
       opponentCar = advanceTo(opponentCar, raceTick);
       streamInputs();
-      if (race.phase === FINISHED && session.liveRound) {
-        // "I have sent you everything." Deliberately carries no time: the server
-        // replays the log and works out for itself what it achieved.
+      // "I have sent you everything." Deliberately carries no time: the server
+      // replays the log and works out for itself what it achieved.
+      //
+      // **Once per round.** `liveRound` stays set until the verdict arrives, so
+      // without the latch this fired on every tick in between — and the server
+      // decided the round again on each one, awarding a win every time and
+      // settling a best-of-three off a single race. The server refuses a second
+      // adjudication too; this stops the flood at the source.
+      if (race.phase === FINISHED && session.liveRound && !reportedRound) {
+        reportedRound = true;
         streamInputs();
         net.sendDone(session.liveRound.round, session.liveRound.attempt);
       }
@@ -1692,8 +1807,9 @@ export function boot(canvas) {
     }
 
     if (shell.screen === SCREEN_ONLINE) {
-      canvas.style.cursor = "default";
-      drawOnlineScreen(ctx, onlineView(onlineMenu, session), { splashImage });
+      const onlineScreen = currentOnlineView({ pointer: at });
+      canvas.style.cursor = onlineScreen.hover ? "pointer" : "default";
+      drawOnlineScreen(ctx, onlineScreen, { splashImage });
       return;
     }
 
@@ -1738,9 +1854,7 @@ export function boot(canvas) {
         rows: roundRows(session),
         score: session.score,
         matchResult: session.matchResult,
-        menu: session.status === STATUS_MATCH_RESULT
-          ? (session.rematch.asked ? "Waiting for your opponent…" : "ENTER — rematch    ESC — leave")
-          : "ENTER — stage for the next round",
+        buttons: resultButtons(session).map((button, index) => ({ ...button, primary: index === 0 })),
       });
       return;
     }
@@ -1966,6 +2080,14 @@ export function boot(canvas) {
             }
           : null,
       log: () => myLog.events.length,
+      /** Where the screen's own cursor is, and what each driver has staged. */
+      menu: () => ({
+        pane: paneFor(onlineMenu, session),
+        cursor: onlineMenu.cursor,
+        lobbyCursor: onlineMenu.lobbyCursor,
+        code: onlineMenu.entry.value,
+        ready: session.players.map((player) => ({ name: player.displayName, ready: player.ready })),
+      }),
     },
     state() {
       const selection = setupSelection(setup, garage);
