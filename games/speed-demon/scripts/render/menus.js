@@ -422,7 +422,13 @@ function drawRecordLine(ctx, summary, centre, y) {
  */
 const RECORD_LINE_Y = 148;
 
-export function drawResults(ctx, race, menu, recordSummary = null) {
+/**
+ * How a rival verdict is coloured. Green and red rather than the grade palette,
+ * because this is the one line on the card that is about somebody else.
+ */
+const RIVAL_COLOURS = { win: "#4ade6a", loss: "#ff6b6b", draw: TEXT };
+
+export function drawResults(ctx, race, menu, recordSummary = null, rival = null) {
   const box = MENU_LAYOUT.results;
   const centre = WORLD.width / 2;
 
@@ -431,9 +437,18 @@ export function drawResults(ctx, race, menu, recordSummary = null) {
   menuPanel(ctx, box.x, box.y, box.width, box.height);
 
   const { caption, value, sub } = headline(race);
-  text(ctx, caption, centre, box.y + 38, { size: 22, colour: TEXT, weight: "700", align: "center" });
+  // In a rival race the caption is who won. It costs no layout — "RUN COMPLETE"
+  // is decoration, and the result of a race against somebody is the headline of
+  // that race — and the margin rides on the `sub` line, which had room beside
+  // the trap speed.
+  text(ctx, rival ? rival.caption : caption, centre, box.y + 38, {
+    size: 22,
+    colour: rival ? RIVAL_COLOURS[rival.tone] ?? TEXT : TEXT,
+    weight: "700",
+    align: "center",
+  });
   text(ctx, value, centre, box.y + 98, { size: 52, colour: "#4ade6a", weight: "700", align: "center", mono: true });
-  text(ctx, sub, centre, box.y + 128, { size: 14, align: "center" });
+  text(ctx, rival?.detail ? `${sub}      ${rival.detail}` : sub, centre, box.y + 128, { size: 14, align: "center" });
 
   drawRecordLine(ctx, recordSummary, centre, box.y + RECORD_LINE_Y);
 

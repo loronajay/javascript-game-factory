@@ -157,7 +157,10 @@ const EMPTY_LINES = {
   [BOARD_LOADING]: "LOADING THE BOARD…",
   [BOARD_EMPTY]: "NOBODY HAS SET A TIME ON THIS BOARD YET",
   [BOARD_ERROR]: "THE BOARD COULD NOT BE REACHED — IT WILL RETRY",
-  [BOARD_OFFLINE]: "SIGN IN TO SEE THE GLOBAL BOARD",
+  // OFFLINE is "no platform configured" — it is NOT the signed-out state, which
+  // still reads the global board fine and gets its own note under the list. Say
+  // "sign in" here and a signed-in player is told to do the thing they did.
+  [BOARD_OFFLINE]: "THE GLOBAL BOARD IS NOT AVAILABLE HERE",
 };
 
 function drawRow(ctx, view, row) {

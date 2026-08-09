@@ -33,7 +33,7 @@
 // board id is stored on every record row on every account — **renaming one
 // orphans every time set on it**, the same rule the model ids follow.
 
-import { MODE_DISTANCE, MODE_TIME_ATTACK, OBJECTIVE_TIME, modeById, objectiveOption } from "../sim/modes.js";
+import { MODE_DISTANCE, MODE_RIVAL, MODE_TIME_ATTACK, OBJECTIVE_TIME, boardModeId, modeById, objectiveOption } from "../sim/modes.js";
 
 /**
  * The states a global board's data can be in.
@@ -72,13 +72,19 @@ export const UNIT_CM = "cm";
  * a match rather than a time. Ranked will have its own ladder (ELO), not a board
  * here.
  */
-const RECORDED_MODES = new Set([MODE_DISTANCE, MODE_TIME_ATTACK]);
+const RECORDED_MODES = new Set([MODE_DISTANCE, MODE_TIME_ATTACK, MODE_RIVAL]);
 
 /**
  * The board a mode + objective pair records to, or null when the pair keeps no
  * record. Returning null rather than throwing is deliberate: the composition
  * root asks this on every finished run, including online ones, and "this run
  * does not go on a board" is a normal answer.
+ *
+ * **The id is built from the board's mode, not the run's.** Rival Race files to
+ * the distance boards because it is a distance race with company — the other car
+ * is in the other lane and there is no lateral axis in the sim for it to reach
+ * across. So a quarter mile driven against Redline lands on `distance:quarter`,
+ * the id it has always had, and no stored row anywhere changes meaning.
  */
 export function boardIdFor(modeId, objectiveId) {
   if (!RECORDED_MODES.has(modeId)) return null;
@@ -86,7 +92,7 @@ export function boardIdFor(modeId, objectiveId) {
   if (!mode) return null;
   // Resolved through the catalog rather than trusting the id, so a stale
   // selection lands on the mode's default instead of inventing a board.
-  return `${modeId}:${objectiveOption(mode, objectiveId).id}`;
+  return `${boardModeId(modeId)}:${objectiveOption(mode, objectiveId).id}`;
 }
 
 /** Whether a board is measured in time or in distance. */

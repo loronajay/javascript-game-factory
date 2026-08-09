@@ -36,9 +36,27 @@ export const SETUP_LAYOUT = {
   grid: { x: 120, y: 138, cellWidth: 56, cellHeight: 62, gap: 5, labelWidth: 56 },
   presets: { x: 512, y: 138, width: 200, rowHeight: 30, gap: 4 },
   summary: { x: 512, y: 420, width: 200, height: 182 },
-  preview: { x: 740, y: 138, width: 476, height: 300 },
-  tracks: { x: 740, y: 476, width: 88, height: 62, gap: 9 },
-  objective: { x: 740, y: 576, width: 113, height: 44, gap: 8 },
+  // The right column carries four boxes now rather than three, so the preview
+  // and the two strips each gave up a little height. The preview was 300 and
+  // generous with it; a car still reads at 230.
+  preview: { x: 740, y: 138, width: 476, height: 230 },
+  tracks: { x: 740, y: 406, width: 88, height: 56, gap: 9 },
+  objective: { x: 740, y: 500, width: 113, height: 38, gap: 8 },
+  /**
+   * Who you are racing. Drawn only in a mode that has the pane, but the rect
+   * exists in every mode — a layout that moved when you changed mode would make
+   * the whole right column jump, and the empty space costs nothing.
+   *
+   * **A grid rather than a strip, because eleven faces do not fit in a row.**
+   * Ten rivals plus a ghost across 476px is 43px a card, which is too small for
+   * a face to be recognisable — and recognising the face is the entire job here.
+   * Six columns at 56px reads, and wraps to a second row.
+   *
+   * The cards carry no text. A name under a 56px portrait would be four pixels
+   * tall; the *selected* rival's name is printed on the pane's heading line
+   * instead, where there is room for it and where the eye already is.
+   */
+  rivals: { x: 740, y: 572, width: 56, height: 56, gap: 8, columns: 6 },
   // Under the summary, because that panel is what it acts on: the summary says
   // what the run is, and the button starts it.
   start: { x: 512, y: 620, width: 200, height: 46 },
@@ -116,6 +134,14 @@ export function objectiveCardRect(index) {
   return { x: x + index * (width + gap), y, width, height };
 }
 
+/** Screen rect of one rival card, by index. Wraps across `columns`. */
+export function rivalCardRect(index) {
+  const { x, y, width, height, gap, columns } = SETUP_LAYOUT.rivals;
+  const column = index % columns;
+  const row = Math.floor(index / columns);
+  return { x: x + column * (width + gap), y: y + row * (height + gap), width, height };
+}
+
 /** Screen rect of the START button. */
 export function startButtonRect() {
   return { ...SETUP_LAYOUT.start };
@@ -165,6 +191,13 @@ export function hitSetup(view, x, y) {
   for (const option of view.objective.options) {
     if (within(objectiveCardRect(option.index), x, y)) {
       return { pane: "objective", index: option.index };
+    }
+  }
+  // Null in every mode but Rival Race. Hit-testing a strip that is not drawn
+  // would put a click target over empty space — the dead-control rule.
+  for (const entry of view.rivals ?? []) {
+    if (within(rivalCardRect(entry.index), x, y)) {
+      return { pane: "rival", index: entry.index };
     }
   }
   return null;
@@ -254,7 +287,7 @@ function drawModelGrid(ctx, view, sheetImages) {
  * A dot in a preset's own paint, so the list reads as colours not just names.
  *
  * The dot is the *painted* colour rather than the tint, which is the only way
- * Silver and White are distinguishable � both tints are pure white. A layered
+ * Silver and White are distinguishable � both tints are pure white. A layered
  * car shows its base paint here; the list is a row of names and a full preview
  * lives one pane over.
  */
@@ -385,6 +418,118 @@ function drawObjectiveStrip(ctx, view) {
 }
 
 /**
+ * A rival's face, or a stand-in for one.
+ *
+ * **The stand-in is the shipping state, not a fallback for a mistake.** Portrait
+ * art is authored per rival and a roster grows faster than art does, so a
+ * missing file draws the rival's initial on a plate in their own accent colour —
+ * the repo's placeholder rule. That is legible, distinct between rivals, and
+ * costs nothing; a blank square would read as a broken image.
+ *
+ * The ghost never has a file at all: it is the player, and there is no portrait
+ * of them to load.
+ */
+/**
+ * How much of a portrait to show.
+ *
+ * The art is a full scene — a driver standing by a car in a lit car park — and
+ * drawn whole into a 56px cell the face is about eight pixels across, which is
+ * not a face. This takes the upper-middle square instead, which is where a head
+ * sits in every one of these renders, so the cell shows a person rather than a
+ * colourful smudge.
+ *
+ * A framing constant rather than per-rival data on purpose: the renders share
+ * this composition, and the moment they do not the answer is a crop rect on the
+ * row, not a looser constant here.
+ */
+const PORTRAIT_CROP = { scale: 0.56, top: 0.06 };
+
+/**
+ * A rival's face, or a stand-in for one.
+ *
+ * **The stand-in is a real state, not a fallback for a mistake.** A roster grows
+ * faster than art does, so a missing file draws the rival's initial on a plate in
+ * their own accent colour — the repo's placeholder rule. That is legible and
+ * distinct between rivals; a blank square would read as a broken image.
+ *
+ * The ghost never has a file at all: it is the player, and there is no portrait
+ * of them to load.
+ */
+export function drawRivalPortrait(ctx, entry, box, image) {
+  if (image && image.complete && image.naturalWidth > 0) {
+    const side = Math.min(image.naturalWidth, image.naturalHeight) * PORTRAIT_CROP.scale;
+    const sx = (image.naturalWidth - side) / 2;
+    const sy = image.naturalHeight * PORTRAIT_CROP.top;
+    ctx.drawImage(image, sx, sy, side, side, box.x, box.y, box.width, box.height);
+    return;
+  }
+
+  const accent = entry.accent ?? ACCENT;
+  ctx.fillStyle = accent;
+  ctx.globalAlpha = 0.22;
+  ctx.fillRect(box.x, box.y, box.width, box.height);
+  ctx.globalAlpha = 1;
+  const initial = entry.initial ?? (entry.name ?? "?").trim().charAt(0).toUpperCase();
+  label(ctx, initial, box.x + box.width / 2, box.y + box.height / 2 + 7, {
+    size: initial.length > 1 ? 17 : 22,
+    weight: "800",
+    colour: accent,
+    align: "center",
+  });
+}
+
+/**
+ * The rival grid. Drawn only in a mode that has the pane — everything else
+ * leaves the space empty rather than the layout moving.
+ *
+ * The cards are faces and nothing else; the name belongs to whichever one is
+ * picked, and it goes on the heading line where there is room to read it.
+ */
+function drawRivalStrip(ctx, view, rivalImages) {
+  if (!view.rivals) return;
+
+  paneLabel(ctx, "RIVAL", SETUP_LAYOUT.rivals, {
+    live: view.pane === "rival",
+    locked: view.locked.rival,
+    prompt: view.prompt,
+  });
+
+  const chosen = view.chosenRival;
+  if (chosen) {
+    const right = SETUP_LAYOUT.preview.x + SETUP_LAYOUT.preview.width;
+    label(ctx, chosen.tier, right, SETUP_LAYOUT.rivals.y - 13, {
+      size: 11,
+      colour: chosen.accent ?? MUTED,
+      align: "right",
+    });
+    label(ctx, chosen.name.toUpperCase(), right - ctx.measureText(chosen.tier).width - 12, SETUP_LAYOUT.rivals.y - 13, {
+      size: 13,
+      colour: INK,
+      align: "right",
+    });
+  }
+
+  for (const entry of view.rivals) {
+    const rect = rivalCardRect(entry.index);
+    panel(ctx, rect.x, rect.y, rect.width, rect.height, {
+      live: entry.selected,
+      chosen: entry.chosen,
+      locked: entry.locked,
+      hovered: entry.hovered,
+    });
+    drawRivalPortrait(
+      ctx,
+      entry,
+      { x: rect.x + 3, y: rect.y + 3, width: rect.width - 6, height: rect.height - 6 },
+      rivalImages?.get(entry.id),
+    );
+    if (entry.locked) {
+      lockTick(ctx, rect);
+    }
+  }
+}
+
+/**
  * The chosen car in the chosen colours — the one place on this screen showing
  * what will actually reach the track, which is why it draws the baked livery
  * sprite rather than the bare frame the grid uses.
@@ -469,7 +614,7 @@ function drawStartButton(ctx, view) {
   });
 }
 
-export function drawSetup(ctx, view, { sheetImages, trackImages, liveryCache = null }) {
+export function drawSetup(ctx, view, { sheetImages, trackImages, liveryCache = null, rivalImages = null }) {
   drawMenuBackdrop(ctx, trackImages.get(view.chosenTrack.id));
 
   label(ctx, "SPEED DEMON", SETUP_LAYOUT.title.x, SETUP_LAYOUT.title.y, { size: 32, colour: INK, weight: "800" });
@@ -482,6 +627,7 @@ export function drawSetup(ctx, view, { sheetImages, trackImages, liveryCache = n
   drawPresetList(ctx, view);
   drawTrackStrip(ctx, view, trackImages);
   drawObjectiveStrip(ctx, view);
+  drawRivalStrip(ctx, view, rivalImages);
   drawPreview(ctx, view, sheetImages, liveryCache);
   drawSummary(ctx, view);
   drawStartButton(ctx, view);

@@ -11,6 +11,12 @@
     <main class="stage">
       <canvas id="game" width="1280" height="720" aria-label="Speed Demon drag racing"></canvas>
     </main>
+    <!-- Sets window.__JGF_PLATFORM_API_URL__ so the platform API client is
+         configured. Must come before the entry module: the garage store and the
+         records store both build their client at construction. Without it the
+         base URL resolves empty off localhost, the garage silently never syncs
+         and every global board reports OFFLINE. -->
+    <script type="module" src="../../js/platform-config.mjs"></script>
     <script type="module">
       import { boot } from "./scripts/init-game.js";
       // Exposed so a run can be driven and inspected from the console.

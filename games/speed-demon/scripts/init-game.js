@@ -26,10 +26,13 @@ import {
   cycleSetupModel,
   cycleSetupPreset,
   setupModel,
+  setupMode,
   setupPreset,
   setupTrack,
   setupView,
   setupSelection,
+  setupBoardId,
+  setupRival,
   resolveSelection,
   TARGET_START,
 } from "./ui/setup-menu.js";
@@ -195,14 +198,20 @@ import {
 import { drawOnlineResult, drawOnlineScreen } from "./render/online.js";
 import {
   createInputLog,
+  createPlayhead,
   eventsSince,
   recordClutch,
   recordGate,
   recordStart,
   recordThrottle,
+  stepPlayhead,
+  MAX_REPLAY_TICKS,
 } from "./sim/input-log.js";
 import { boardIdFor, runSummary, runValue } from "./records/records.js";
 import { createRecordsStore } from "./records/records-store.js";
+import { buildRival, rivalOutcome, rivalSummary } from "./rival/lineup.js";
+import { RIVALS, rivalPortraitSrc } from "./rival/rivals.js";
+import { createGhostStore } from "./rival/ghost-store.js";
 import {
   createBoards,
   moveBoards,
@@ -314,6 +323,11 @@ export function boot(canvas) {
   const sheetImages = new Map(MODEL_SHEETS.map((sheet) => [sheet.id, loadImage(sheet.src)]));
   const trackImages = new Map(TRACKS.map((track) => [track.id, loadImage(track.src)]));
   const splashImage = loadImage(MENU_SPLASH);
+  // Rival portraits. Loaded with everything else because the setup strip shows
+  // all of them at once, and every renderer here already degrades to a
+  // placeholder on an image that has not resolved — a missing portrait file is
+  // a normal shipping state, not an error.
+  const rivalImages = new Map(RIVALS.map((rival) => [rival.id, loadImage(rivalPortraitSrc(rival))]));
   // The collection has a backdrop of its own — a workshop rather than a strip.
   const garageSplash = loadImage(GARAGE_SPLASH);
 
@@ -360,6 +374,34 @@ export function boot(canvas) {
   // rather than in `view` because it belongs to the results screen rather than
   // to the world, and it must survive the race being restarted underneath it.
   let recordResult = null;
+  /**
+   * The logs behind the player's own bests, which is what makes a ghost
+   * raceable. Deliberately separate from `recordsStore`: a record is a number
+   * that syncs, merges and ranks, and a ghost is several hundred bytes of input
+   * that does none of those things and is meaningless on anybody else's copy of
+   * the board. Keyed by the same player id so the two cannot disagree about
+   * whose runs they are holding.
+   */
+  const ghostStore = createGhostStore({ playerId: recordsStore.playerId });
+
+  /**
+   * The car in the other lane during a solo race, or null.
+   *
+   * `{ entry, playhead, model, livery }` — a lineup entry for the identity, and
+   * a playhead stepped one tick per `stepRace` for the driving. It is
+   * deliberately *not* an `online/opponent.js` reconstruction: that one exists
+   * to guess at inputs still in flight and rebuilds the whole run whenever they
+   * land, which is exactly right for a stream and pure waste for a log that is
+   * complete before the tree goes green.
+   */
+  let rivalCar = null;
+  /**
+   * Bumped for every race built, and handed to the CPU driver as its seed. That
+   * is what makes RUN IT AGAIN a fresh run by the same driver rather than a
+   * replay of the one you just watched — a rival who makes identical mistakes
+   * every time stops being a driver and becomes a stopwatch.
+   */
+  let runCounter = 0;
 
   // The leaderboard screen's cursor: which scope, which mode, which board, and
   // where the list is scrolled to. Built from the live setup on the way in
@@ -428,6 +470,41 @@ export function boot(canvas) {
   // when the lesson finishes mid-run: restarting after that has to rebuild the
   // tutorial, not a normal race.
   let coachedRun = false;
+
+  /** True when there is a second car on the strip that is not an opponent. */
+  const isRivalRace = () => rivalCar !== null;
+
+  /**
+   * The rival's finished race, run out from wherever the playhead has reached.
+   *
+   * Needed because the results card appears the instant *this* car crosses the
+   * line, and a rival being beaten is by definition still driving at that
+   * moment — so asking who won from the drawn state would answer "nobody has
+   * finished" on every single win. The log is complete and the sim is
+   * deterministic, so their finishing time is already knowable; this is reading
+   * it, not predicting it.
+   *
+   * Deliberately a separate race rather than advancing `rivalCar.playhead`: that
+   * one is what gets drawn, and fast-forwarding it would teleport the losing car
+   * across the line behind the results panel.
+   *
+   * The bound matters. A ghost truncated mid-run, or a driver who lifted, holds
+   * its last throttle and coasts — rolling resistance alone can take a minute
+   * and a half to trickle across a quarter mile, and a hostile saved file need
+   * never arrive at all.
+   */
+  function settledRivalRace() {
+    if (!rivalCar) return null;
+    let head = rivalCar.playhead;
+    for (let i = 0; i < MAX_REPLAY_TICKS && head.race.phase !== FINISHED; i += 1) {
+      head = stepPlayhead(head);
+    }
+    return head.race;
+  }
+
+  /** Who won, or null outside a rival race. Recomputed only when a run ends. */
+  let rivalResult = null;
+
   const audio = createGameAudio();
 
   // -------------------------------------------------------------------------
@@ -764,6 +841,9 @@ export function boot(canvas) {
     raceTick = 0;
     sentThrough = 0;
     reportedRound = false;
+    // The other lane belongs to the opponent now. Reaching an online round from
+    // a rival race would otherwise leave two cars claiming the same lane.
+    rivalCar = null;
     opponentCar = createOpponent(options);
     shell = enterScreen(shell, SCREEN_RACE);
   }
@@ -1130,17 +1210,83 @@ export function boot(canvas) {
       // it, which is the whole difference between a leaderboard and a wish list.
       inputLog: myLog.events,
     });
+
+    // A run that beat the board becomes the ghost for it.
+    //
+    // Gated on `improved` rather than comparing anything here, because
+    // `records.js` has already decided which of two runs was better and a second
+    // copy of that comparison is exactly how a ghost ends up being a slower run
+    // than the time printed beside it. Note what follows: the ghost tracks the
+    // *local* best, so signed in on a machine where the server holds a better
+    // run set elsewhere, there is simply no ghost for that board — which reads
+    // as "no ghost yet" rather than as a ghost that cannot be caught.
+    if (recordResult?.improved) {
+      ghostStore.save({
+        boardId,
+        value,
+        modelId: chosen.model.id,
+        trackId: chosen.track.id,
+        // Stored so the ghost is drawn in the car that set the time. A ghost
+        // wearing whatever the player is driving now reads as a second copy of
+        // you rather than as the run you are chasing.
+        livery: chosen.livery,
+        recordedAt: recordResult.record?.recordedAt ?? "",
+        events: myLog.events,
+      });
+    }
+  }
+
+  /**
+   * The car in the other lane, or null when this mode does not have one.
+   *
+   * Built here rather than in `newRace` because it needs the race's options —
+   * a rival races the player's distance over the player's countdown in the
+   * player's car, which is the whole reason a rival cannot cheat: there is no
+   * code path by which it could be given a different one.
+   */
+  function buildRivalCar(raceOptions) {
+    if (!setupMode(setup).rival) return null;
+
+    const entry = setupRival(setup, currentGhost());
+    const built = buildRival(entry, raceOptions, runCounter);
+    if (!built) return null;
+
+    const model = modelById(entry.modelId) ?? chosen.model;
+    return {
+      entry,
+      model,
+      livery: entry.livery ?? null,
+      // Stepped one tick per `stepRace`, starting the tick the player's race
+      // leaves staging — which is what puts both trees on the same countdown.
+      playhead: createPlayhead(raceOptions, built.log),
+    };
+  }
+
+  /** The ghost for the board the setup screen is currently pointed at, if any. */
+  function currentGhost() {
+    return ghostStore.get(setupBoardId(setup));
   }
 
   /** Commits the setup screen's selection and builds a race on it. */
   function beginRace() {
     chosen = resolveSelection(setupSelection(setup, garage));
     runSelection = setupSelection(setup, garage);
+    runCounter += 1;
     // The run is committed, so the setup screen rewinds: coming back to it from
     // the pause or results menu starts the lock walk at the car again.
     setup = rewindSetup(setup);
     trackTile = null; // rebuilt for the newly chosen track on the next frame
-    race = newRace();
+    const raceOptions = {
+      car: carSpec,
+      gate,
+      countdownSeconds: 3,
+      ...raceOptionsFor(runSelection.modeId, runSelection.objectiveId),
+    };
+    race = createRace(raceOptions);
+    // Built from the same options the player's race is, and after `chosen` has
+    // been resolved — a rival with no model of its own falls back to the
+    // player's, which is a worse rival rather than a crash.
+    rivalCar = buildRivalCar(raceOptions);
     view = newView(layout, race);
     coach = null;
     coachedRun = false;
@@ -1150,6 +1296,7 @@ export function boot(canvas) {
     myLog = createInputLog();
     raceTick = 0;
     recordResult = null;
+    rivalResult = null;
   }
 
   /**
@@ -1166,6 +1313,10 @@ export function boot(canvas) {
       distanceMetres: RACE_DISTANCES.mile.metres,
     });
     view = newView(layout, race);
+    // A lesson is one car. The coach stops the world at each beat, so a rival
+    // would either be frozen mid-strip for the length of an explanation or
+    // driving away from a car that cannot move.
+    rivalCar = null;
     coach = createCoach();
     coachedRun = true;
   }
@@ -1511,13 +1662,21 @@ export function boot(canvas) {
    * by itself on the lift. `input.throttle()` rather than the tick's argument so
    * the pointer path and the debug handle get the same answer as the keyboard.
    */
-  function stageOrShift() {
+  /**
+   * ENTER during a race: stage, or put the clutch in.
+   *
+   * `throttle` overrides what the pedal is actually doing, and exists for the
+   * debug handle — automation has no held key, and whether the gas is down at
+   * this instant is the difference between opening the gate and merely arming
+   * it, which is two different grades.
+   */
+  function stageOrShift(throttle = input.throttle()) {
     // Online, the tree is released by the server rather than by this key, so
     // staging never happens here and ENTER is only ever the clutch.
     if (isOnlineRace()) {
       if (session.status !== STATUS_RACING) return;
       myLog = recordClutch(myLog, raceTick);
-      updateRace(pressShift(race, { throttle: input.throttle() }));
+      updateRace(pressShift(race, { throttle }));
       return;
     }
     if (race.phase === STAGING) {
@@ -1528,7 +1687,7 @@ export function boot(canvas) {
       return;
     }
     myLog = recordClutch(myLog, raceTick);
-    updateRace(pressShift(race, { throttle: input.throttle() }));
+    updateRace(pressShift(race, { throttle }));
   }
 
   function raceAction(action) {
@@ -1598,7 +1757,7 @@ export function boot(canvas) {
           boardsCursor = moveBoards(boardsCursor, action.direction, { rowCount: boardsRowCount() });
           requestVisibleBoard();
         } else if (shell.screen === SCREEN_SETUP) {
-          setup = moveSetup(setup, action.direction, garage);
+          setup = moveSetup(setup, action.direction, garage, { ghost: currentGhost() });
         } else {
           shell = moveShell(shell, action.direction);
         }
@@ -1754,7 +1913,7 @@ export function boot(canvas) {
     }
 
     audio.play("button");
-    setup = focusSetup(setup, target, garage);
+    setup = focusSetup(setup, target, garage, { ghost: currentGhost() });
 
     // The paint pane's action row opens the garage rather than locking anything.
     // It goes through `confirmSetup` with the real garage, exactly as ENTER
@@ -2003,8 +2162,23 @@ export function boot(canvas) {
     // which is what keeps `raceTick` counting stepRace calls exactly, the
     // invariant `replayRun` mirrors.
     myLog = recordThrottle(myLog, raceTick, throttle);
+    // Whether the rival moves on this tick, decided *before* the step. Staging
+    // is the player sitting on the line for as long as they like, and a rival
+    // that ran during it would have driven off before the tree was even lit.
+    // Once ENTER has been pressed the race is already in COUNTDOWN by the time
+    // this is read — `stageOrShift` runs up in `applyActions` — so both trees
+    // light on the same tick and the two reaction times mean the same thing.
+    const rivalRuns = race.phase !== STAGING;
     updateRace(stepRace(race, { throttle }, TICK_SECONDS));
     raceTick += 1;
+
+    // One tick of the rival's log per tick of the player's race. Exactly one,
+    // which is the invariant the whole log format rests on — stepping it twice
+    // or skipping one puts the two cars on different clocks, and in a race
+    // decided in hundredths that is the entire result.
+    if (rivalCar && rivalRuns && rivalCar.playhead.race.phase !== FINISHED) {
+      rivalCar = { ...rivalCar, playhead: stepPlayhead(rivalCar.playhead) };
+    }
 
     // The other car, run forward on the same reducer from the inputs that have
     // arrived. It is simulated rather than interpolated — see online/opponent.js.
@@ -2061,6 +2235,7 @@ export function boot(canvas) {
     // The run ending is what opens the results screen — the shell never has to
     // ask the race whether it is over.
     if (race.phase === FINISHED && !isOnlineRace()) {
+      rivalResult = isRivalRace() ? rivalOutcome(race, settledRivalRace()) : null;
       recordRun();
       shell = enterScreen(shell, SCREEN_RESULTS);
       // A lesson ends with the run it belongs to, however far through it got:
@@ -2086,11 +2261,17 @@ export function boot(canvas) {
    * true gap rather than a smoothed guess at one.
    */
   function drawOpponentCar() {
-    const them = opponent(session);
-    const model = them?.modelId ? modelById(them.modelId) : null;
+    // One draw for both kinds of second car. An online opponent's identity comes
+    // off the lobby frame and a rival's off the lineup, but by this point both
+    // are a model, a livery and a race — which is the same property that lets a
+    // CPU and a ghost share one code path, one level up.
+    const them = isRivalRace()
+      ? { modelId: rivalCar.model.id, livery: rivalCar.livery, race: rivalCar.playhead.race }
+      : { modelId: opponent(session)?.modelId, livery: opponent(session)?.livery, race: opponentCar.race };
+    const model = them.modelId ? modelById(them.modelId) : null;
     if (!model) return;
 
-    const gap = opponentCar.race.vehicle.distance - race.vehicle.distance;
+    const gap = them.race.vehicle.distance - race.vehicle.distance;
     const offsetY = -gap * PIXELS_PER_METRE;
     // Cheap enough to skip entirely once they are off the end of the strip.
     if (Math.abs(offsetY) > WORLD.height) return;
@@ -2112,7 +2293,7 @@ export function boot(canvas) {
     drawTailLights(
       ctx,
       model,
-      opponentCar.race.shift !== null || opponentCar.race.clutchTimer > 0 ? 1 : 0.25,
+      them.race.shift !== null || them.race.clutchTimer > 0 ? 1 : 0.25,
       { colour: (alpha) => tailLightColour(livery, alpha), laneIndex: OPPONENT_LANE },
     );
     ctx.restore();
@@ -2147,7 +2328,7 @@ export function boot(canvas) {
       colour: (alpha) => tailLightColour(chosen.livery, alpha),
     });
 
-    if (isOnlineRace()) {
+    if (isOnlineRace() || isRivalRace()) {
       drawOpponentCar();
     }
 
@@ -2187,7 +2368,11 @@ export function boot(canvas) {
    * the setup, so pointing at something can never be mistaken for choosing it.
    */
   function currentSetupView() {
-    return setupView(setup, garage, { canCustomise: garageStore.available, hover: setupHover });
+    return setupView(setup, garage, {
+      canCustomise: garageStore.available,
+      hover: setupHover,
+      ghost: currentGhost(),
+    });
   }
 
   /**
@@ -2218,7 +2403,9 @@ export function boot(canvas) {
   /** What is under a world point on the setup screen, or null. */
   function hitSetupAt(at) {
     // Built without a hover so this cannot depend on the answer it is computing.
-    return at ? hitSetup(setupView(setup, garage, { canCustomise: garageStore.available }), at.x, at.y) : null;
+    return at
+      ? hitSetup(setupView(setup, garage, { canCustomise: garageStore.available, ghost: currentGhost() }), at.x, at.y)
+      : null;
   }
 
   /**
@@ -2299,7 +2486,7 @@ export function boot(canvas) {
         drawModeSelect(ctx, { menu, splashImage });
         return;
       case SCREEN_SETUP:
-        drawSetup(ctx, currentSetupView(), { sheetImages, trackImages, liveryCache });
+        drawSetup(ctx, currentSetupView(), { sheetImages, trackImages, liveryCache, rivalImages });
         return;
       default:
         break;
@@ -2326,7 +2513,7 @@ export function boot(canvas) {
         modeId: runSelection.modeId,
         result: recordResult,
         ranked: recordsStore.ranked,
-      }));
+      }), rivalSummary(rivalResult, rivalCar?.entry));
     }
   }
 
@@ -2378,7 +2565,7 @@ export function boot(canvas) {
     },
     move(direction) {
       if (shell.screen === SCREEN_SETUP) {
-        setup = moveSetup(setup, direction, garage);
+        setup = moveSetup(setup, direction, garage, { ghost: currentGhost() });
       } else if (shell.screen === SCREEN_GARAGE) {
         editor = moveEditor(editor, direction, garage);
       } else if (shell.screen === SCREEN_COLLECTION) {
@@ -2472,6 +2659,48 @@ export function boot(canvas) {
         })),
       };
     },
+    /**
+     * The rival strip and the car in the other lane. The lineup changes length
+     * with the board — a ghost exists for one distance and not the next — so
+     * counting keypresses along it from automation gets it wrong, which is the
+     * collection's and the leaderboards' argument.
+     */
+    rival() {
+      const ghost = currentGhost();
+      const view = currentSetupView();
+      return {
+        board: setupBoardId(setup),
+        hasGhost: Boolean(ghost),
+        lineup: (view.rivals ?? []).map((entry) => `${entry.name}${entry.chosen ? "<" : ""}`),
+        chosen: view.chosenRival?.id ?? null,
+        car: rivalCar
+          ? {
+              id: rivalCar.entry.id,
+              model: rivalCar.model.id,
+              tick: rivalCar.playhead.tick,
+              phase: rivalCar.playhead.race.phase,
+              distance: rivalCar.playhead.race.vehicle.distance,
+              gear: rivalCar.playhead.race.vehicle.gear,
+              gap: rivalCar.playhead.race.vehicle.distance - race.vehicle.distance,
+            }
+          : null,
+        result: rivalResult,
+      };
+    },
+    /**
+     * Files a run against a board and keeps its log, so the ghost path can be
+     * exercised without driving a clean quarter mile by hand first. The
+     * `savePaint` precedent: a surface only real play can reach is a surface
+     * nothing can check.
+     */
+    saveGhost(boardId, record) {
+      return ghostStore.save({ boardId, ...record });
+    },
+    clearGhosts() {
+      ghostStore.clear();
+      render();
+      return this.state();
+    },
     /** Jumps straight to a mode, rebuilding the setup around it. */
     mode(modeId) {
       shell = { ...shell, modeId };
@@ -2556,13 +2785,24 @@ export function boot(canvas) {
       render();
       return this.state();
     },
+    /**
+     * Leaves staging.
+     *
+     * Through `stageOrShift`, not `startRace`, and that is not tidiness. Going
+     * straight to the reducer skipped `recordStart`, so every run driven from
+     * automation produced a log with no start event in it — which replays to a
+     * car that sits on the line forever. Nothing noticed while the log was only
+     * ever sent to a server, and it broke the moment a ghost was built from one.
+     */
     start() {
-      updateRace(startRace(race));
+      if (race.phase !== STAGING) throw new Error("the race has already been staged");
+      stageOrShift(0);
       render();
     },
     /** The clutch. `throttle` mirrors the key: on the gas, it only arms it. */
     shift(throttle = 0) {
-      updateRace(pressShift(race, { throttle }));
+      if (race.phase === STAGING) throw new Error("stage the car before asking for the clutch");
+      stageOrShift(throttle);
       render();
       return this.state();
     },

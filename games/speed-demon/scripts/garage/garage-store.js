@@ -12,6 +12,11 @@
 // cabinet races on Factory paint — which is why nothing in the game may treat a
 // missing garage as an error. It is a normal state, not a failure.
 //
+// `available` also requires a *configured* client, and that is not pedantry: it
+// is the difference between a garage that says it cannot save and one that
+// pretends it did. A page that forgets to load `js/platform-config.mjs` resolves
+// an empty base URL, and every request then returns null instead of throwing.
+//
 // **The local copy is a cache, never the truth.** It exists so a reload does not
 // stare at an empty garage while the network answers, and so a save survives a
 // dropped connection long enough to be retried. It is keyed by player id: a
@@ -91,7 +96,18 @@ export function createGarageStore({
   const client = api ?? (account.authenticated ? createPlatformApiClient() : null);
   const playerId = account.playerId || (account.authenticated ? "me" : "");
 
-  let status = account.authenticated ? STATUS_IDLE : STATUS_OFFLINE;
+  // Being signed in is not enough: the client also has to have somewhere to
+  // send to. With no platform base URL configured every request resolves to
+  // null rather than throwing, so a garage gated on the account alone reports
+  // itself available, writes the cache, and reports every push as a success —
+  // the player's paints look saved and never leave the browser. That is worse
+  // than the signed-out state, which at least says so.
+  //
+  // A client handed in by a caller is configured by definition; only one we
+  // built ourselves can come back without a base URL.
+  const configured = !!client && client.isConfigured !== false;
+
+  let status = configured ? STATUS_IDLE : STATUS_OFFLINE;
   // The garage waiting to be pushed. Null when the server is up to date. Holding
   // the *latest* rather than a queue is deliberate: a garage is a whole document,
   // so an older pending write has nothing left to contribute once a newer one
@@ -136,9 +152,12 @@ export function createGarageStore({
   }
 
   return {
-    /** Whether a garage can exist at all — i.e. whether anyone is signed in. */
+    /**
+     * Whether a garage can exist at all — someone is signed in *and* there is a
+     * server to keep it on. Both halves are required: see `configured` above.
+     */
     get available() {
-      return account.authenticated;
+      return account.authenticated && configured;
     },
     get playerId() {
       return playerId;
@@ -159,7 +178,7 @@ export function createGarageStore({
      * Signed out this is an empty garage, not an error.
      */
     async load() {
-      if (!account.authenticated || !client) return createGarage(null, { isKnownModel });
+      if (!account.authenticated || !configured) return createGarage(null, { isKnownModel });
 
       const cached = readCache(playerId, isKnownModel);
       try {
@@ -181,7 +200,7 @@ export function createGarageStore({
      * the player's work is safe before the network is involved at all.
      */
     save(garage) {
-      if (!account.authenticated) return;
+      if (!account.authenticated || !configured) return;
       writeCache(playerId, garage);
       pending = garage;
       retryIndex = 0;

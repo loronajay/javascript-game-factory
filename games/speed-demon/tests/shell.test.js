@@ -244,10 +244,12 @@ test("the title screen leads to the mode list", () => {
 });
 
 test("choosing a mode adopts it and moves on to the setup screen", () => {
-  const modes = confirmTo(createShell());
-  const timeAttack = modes.cursor === MODES.findIndex((m) => m.id === MODE_TIME_ATTACK)
-    ? modes
-    : moveShell(modes, "down");
+  // Walked rather than assumed adjacent: the catalog gains modes, and a test
+  // that hardcodes "one down from the top" starts asserting about whichever
+  // mode happens to have landed there.
+  let timeAttack = confirmTo(createShell());
+  const target = MODES.findIndex((m) => m.id === MODE_TIME_ATTACK);
+  while (timeAttack.cursor < target) timeAttack = moveShell(timeAttack, "down");
   const { shell, command } = confirmShell(timeAttack);
   assertEqual(shell.modeId, MODE_TIME_ATTACK);
   assertEqual(shell.screen, SCREEN_SETUP);

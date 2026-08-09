@@ -10,6 +10,7 @@ import {
 import {
   MODE_DISTANCE,
   MODE_TIME_ATTACK,
+  MODE_RIVAL,
   DEFAULT_MODE_ID,
   OBJECTIVE_TIME,
   modeById,
@@ -17,13 +18,20 @@ import {
 } from "../scripts/sim/modes.js";
 import { TRACKS, DEFAULT_TRACK_ID } from "../scripts/ui/track-layout.js";
 import { emptyGarage, savePreset } from "../scripts/garage/garage.js";
+import { RIVALS } from "../scripts/rival/rivals.js";
+import { GHOST_ID, KIND_CPU } from "../scripts/rival/lineup.js";
 import { DEFAULT_LIVERY } from "../scripts/garage/livery.js";
 import {
   PANE_MODEL,
   PANE_PRESET,
   PANE_TRACK,
   PANE_OBJECTIVE,
+  PANE_RIVAL,
   PANES,
+  panesFor,
+  setupBoardId,
+  setupLineup,
+  setupRival,
   createSetup,
   moveSetup,
   cycleSetupModel,
@@ -42,6 +50,7 @@ import {
   presetOptionsFor,
   confirmSetup,
   cancelSetup,
+  focusSetup,
   rewindSetup,
   isPaneLocked,
   resolveSelection,
@@ -304,14 +313,109 @@ test("cancelling out of the first pane means leaving the screen", () => {
 });
 
 test("every pane is reachable by locking forwards and unlocking back again", () => {
-  let setup = createSetup();
-  for (const pane of PANES) {
-    assertEqual(setup.pane, pane);
-    setup = lock(setup);
+  // Walked per mode, because the pane list is the mode's: Rival Race has a
+  // fifth pane and nothing else does.
+  for (const modeId of [MODE_DISTANCE, MODE_TIME_ATTACK, MODE_RIVAL]) {
+    let setup = createSetup({ modeId });
+    const panes = panesFor(setup);
+    for (const pane of panes) {
+      assertEqual(setup.pane, pane);
+      setup = lock(setup);
+    }
+    for (const pane of [...panes].reverse()) {
+      setup = pane === panes[panes.length - 1] ? setup : cancelSetup(setup).setup;
+    }
+    assertEqual(setup.pane, PANE_MODEL);
   }
-  for (const pane of [...PANES].reverse()) {
-    setup = pane === PANES[PANES.length - 1] ? setup : cancelSetup(setup).setup;
+});
+
+test("only Rival Race has a rival pane, and it is the last one", () => {
+  assert(!panesFor(createSetup({ modeId: MODE_DISTANCE })).includes(PANE_RIVAL));
+  assert(!panesFor(createSetup({ modeId: MODE_TIME_ATTACK })).includes(PANE_RIVAL));
+  const panes = panesFor(createSetup({ modeId: MODE_RIVAL }));
+  assertEqual(panes[panes.length - 1], PANE_RIVAL);
+});
+
+test("the last pane of the mode is the one that says START", () => {
+  // Locking the last pane *is* dropping the clutch, so exactly one pane per
+  // mode may claim it — a second would be a step that looks like it starts the
+  // race and does not.
+  for (const modeId of [MODE_DISTANCE, MODE_TIME_ATTACK, MODE_RIVAL]) {
+    const panes = panesFor(createSetup({ modeId }));
+    const prompts = panes.map((pane) => setupView(toPane(createSetup({ modeId }), pane)).prompt);
+    assertEqual(prompts.filter((prompt) => prompt === "START").length, 1);
+    assertEqual(prompts[prompts.length - 1], "START");
   }
+});
+
+test("a distance mode offers no rival strip at all", () => {
+  assertEqual(setupView(createSetup({ modeId: MODE_DISTANCE })).rivals, null);
+  assertEqual(setupView(createSetup({ modeId: MODE_DISTANCE })).chosenRival, null);
+});
+
+test("the rival strip lists the roster, and the cursor wraps along it", () => {
+  const setup = toPane(createSetup({ modeId: MODE_RIVAL }), PANE_RIVAL);
+  const view = setupView(setup);
+  assertEqual(view.rivals.length, RIVALS.length);
+  assertEqual(view.rivals.every((entry) => entry.kind === KIND_CPU), true);
+
+  // Wrapping backwards off the front lands on the last, which is the online
+  // lobby's rule for a one-row picker.
+  const atFirst = { ...setup, rivalId: RIVALS[0].id };
+  assertEqual(setupRival(moveSetup(atFirst, "left")).id, RIVALS[RIVALS.length - 1].id);
+  assertEqual(setupRival(moveSetup(moveSetup(atFirst, "left"), "right")).id, RIVALS[0].id);
+});
+
+test("a ghost for this board heads the strip and a ghost for another does not", () => {
+  const setup = createSetup({ modeId: MODE_RIVAL, objectiveId: "quarter" });
+  const ghost = { boardId: "distance:quarter", value: 12345, modelId: "toro-sv", events: [{ t: 0, k: "s", v: 0 }] };
+
+  assertEqual(setupBoardId(setup), "distance:quarter");
+  assertEqual(setupLineup(setup, ghost)[0].id, GHOST_ID);
+  assertEqual(setupLineup(setup, ghost).length, RIVALS.length + 1);
+
+  // The same ghost against a different distance is not this board's ghost.
+  const mile = createSetup({ modeId: MODE_RIVAL, objectiveId: "mile" });
+  assertEqual(setupLineup(mile, ghost).length, RIVALS.length);
+});
+
+test("walking off a board that has a ghost falls the cursor back to the roster", () => {
+  // A stale rival id is normal rather than exceptional: the ghost is offered on
+  // one distance and not the next, so it legitimately goes out from under the
+  // cursor. Landing on nothing would leave the pane unraceable.
+  const ghost = { boardId: "distance:quarter", value: 12345, modelId: "toro-sv", events: [{ t: 0, k: "s", v: 0 }] };
+  const onGhost = { ...createSetup({ modeId: MODE_RIVAL, objectiveId: "quarter" }), rivalId: GHOST_ID };
+  assertEqual(setupRival(onGhost, ghost).id, GHOST_ID);
+
+  const moved = { ...onGhost, objectiveIndex: 3 }; // the mile, which has no ghost
+  assert(setupRival(moved, ghost) !== null);
+  assertEqual(setupRival(moved, ghost).kind, KIND_CPU);
+});
+
+test("a rival run files to the distance boards, not to boards of its own", () => {
+  // The other car is in the other lane and there is no lateral axis in the sim
+  // for it to reach across, so the run is physically a solo distance run and
+  // belongs on the same board. Splitting it would break the loop the mode
+  // exists for: beat your ghost, set a best, race the new ghost.
+  assertEqual(setupBoardId(createSetup({ modeId: MODE_RIVAL, objectiveId: "quarter" })), "distance:quarter");
+  assertEqual(
+    setupBoardId(createSetup({ modeId: MODE_RIVAL, objectiveId: "half" })),
+    setupBoardId(createSetup({ modeId: MODE_DISTANCE, objectiveId: "half" })),
+  );
+});
+
+test("clicking a rival takes it and locks every pane behind it", () => {
+  const setup = createSetup({ modeId: MODE_RIVAL });
+  const clicked = focusSetup(setup, { pane: PANE_RIVAL, index: 2 });
+  assertEqual(clicked.pane, PANE_RIVAL);
+  assertEqual(setupRival(clicked).id, RIVALS[2].id);
+  assertEqual(isPaneLocked(clicked, PANE_OBJECTIVE), true);
+  assertEqual(isPaneLocked(clicked, PANE_MODEL), true);
+});
+
+test("the rival pane cannot be clicked into from a mode that has no rivals", () => {
+  const setup = createSetup({ modeId: MODE_DISTANCE });
+  assertEqual(focusSetup(setup, { pane: PANE_RIVAL, index: 1 }), setup);
 });
 
 test("rewinding reopens the first pane without touching a single choice", () => {

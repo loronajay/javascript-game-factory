@@ -67,6 +67,10 @@ const MODULES = [
   "scripts/render/online.js",
   "scripts/input.js",
   "scripts/pointer.js",
+  "scripts/rival/cpu-driver.js",
+  "scripts/rival/rivals.js",
+  "scripts/rival/ghost.js",
+  "scripts/rival/lineup.js",
   "scripts/init-game.js",
 ];
 
@@ -227,7 +231,17 @@ function setupRects(modeId) {
   const setup = loaded["scripts/render/setup.js"];
   const menu = loaded["scripts/ui/setup-menu.js"];
   const garageModule = loaded["scripts/garage/garage.js"];
-  const view = menu.setupView(menu.createSetup({ modeId }));
+  // A ghost makes the rival strip its longest, exactly as a full garage makes
+  // the config list its longest — the sweep wants the worst case, not the
+  // opening one.
+  const setupState = menu.createSetup({ modeId });
+  const ghost = {
+    boardId: menu.setupBoardId(setupState),
+    value: 12000,
+    modelId: "toro-sv",
+    events: [{ t: 0, k: "s", v: 0 }],
+  };
+  const view = menu.setupView(setupState, undefined, { ghost });
 
   const rects = [];
   for (const group of view.groups) {
@@ -245,6 +259,9 @@ function setupRects(modeId) {
   }
   for (const option of view.objective.options) {
     rects.push({ what: `objective ${option.id}`, ...setup.objectiveCardRect(option.index) });
+  }
+  for (const entry of view.rivals ?? []) {
+    rects.push({ what: `rival ${entry.id}`, ...setup.rivalCardRect(entry.index) });
   }
   rects.push({ what: "preview", ...setup.SETUP_LAYOUT.preview });
   rects.push({ what: "summary", ...setup.SETUP_LAYOUT.summary });
@@ -281,10 +298,10 @@ test("each setup pane has room for its heading above it", () => {
   // Headings are drawn 13px above their pane; a pane starting too high would
   // print its label off the top of the canvas or into the panel above.
   const setup = loaded["scripts/render/setup.js"];
-  const { grid, presets, tracks, objective, title, mode } = setup.SETUP_LAYOUT;
+  const { grid, presets, tracks, objective, rivals, title, mode } = setup.SETUP_LAYOUT;
   assert(grid.y - 13 > mode.y, "the CAR heading collides with the mode badge");
   assert(mode.y > title.y, "the mode badge collides with the wordmark");
-  for (const [name, pane] of [["presets", presets], ["tracks", tracks], ["objective", objective]]) {
+  for (const [name, pane] of [["presets", presets], ["tracks", tracks], ["objective", objective], ["rivals", rivals]]) {
     assert(pane.y - 13 > 0, `the ${name} heading is off the top of the screen`);
   }
 });
@@ -424,6 +441,47 @@ test("the records' rules never reach for a browser", () => {
     !/from\s+"[^"]*records-store\.js"/.test(source),
     "records.js imports the storage layer",
   );
+});
+
+test("the rivals' rules never reach for a browser", () => {
+  // The fifth instance of the same split, after the radio, the garage, online
+  // and the records. `cpu-driver.js` in particular has to stay reachable without
+  // one: a difficulty tier is asserted by generating sixty runs and reading
+  // their finishing times, which is only cheap because nothing here has to boot.
+  const forbidden = [
+    /\bdocument\s*\./,
+    /\bwindow\s*\./,
+    /\blocalStorage\s*\./,
+    /\bindexedDB\s*\./,
+    /\bfetch\s*\(/,
+  ];
+  for (const relative of [
+    "scripts/rival/cpu-driver.js",
+    "scripts/rival/rivals.js",
+    "scripts/rival/ghost.js",
+    "scripts/rival/lineup.js",
+  ]) {
+    const source = fs.readFileSync(path.join(gameRoot, relative), "utf8");
+    for (const pattern of forbidden) {
+      assert(!pattern.test(source), `${relative} reaches for ${pattern}`);
+    }
+    assert(!/from\s+"[^"]*ghost-store\.js"/.test(source), `${relative} imports the storage layer`);
+  }
+});
+
+test("the CPU driver is the only place in the cabinet that rolls a die", () => {
+  // `sim/` contains no randomness at all, which is what makes a run reproducible
+  // from its log — and the whole leaderboard rests on that. A rival needs jitter
+  // to read as a person rather than a metronome, so it seeds its own generator
+  // out here. `Math.random` anywhere under `sim/` would quietly make a stored
+  // input log replay to a different time on the server than it did in the
+  // browser, which is a leaderboard that rejects honest runs.
+  for (const relative of MODULES.filter((m) => m.startsWith("scripts/sim/"))) {
+    const source = fs.readFileSync(path.join(gameRoot, relative), "utf8");
+    assert(!/Math\.random/.test(source), `${relative} uses Math.random — the sim must stay deterministic`);
+  }
+  const driver = fs.readFileSync(path.join(gameRoot, "scripts/rival/cpu-driver.js"), "utf8");
+  assert(!/Math\.random/.test(driver), "even the CPU driver must be seeded, or a rival cannot be tested");
 });
 
 test("the leaderboard screen decides nothing about fetching", () => {
@@ -575,6 +633,24 @@ test("no server frame tears the race down without moving the screen", () => {
   const body = fn.slice(0, fn.indexOf("\n  }"));
   assert(body.includes("endOnlineRace()"), "returnToOnlineScreen must tear the race down");
   assert(body.includes("SCREEN_ONLINE"), "…and put the player back on the online screen");
+});
+
+test("the debug handle stages and declutches through the logged path", () => {
+  // `start()` and `shift()` used to call `startRace` and `pressShift` straight,
+  // which skipped `recordStart` and `recordClutch` — so every run driven from
+  // automation produced a log with no start and no clutch in it, replaying to a
+  // car that sits on the line forever. Nothing noticed while a log was only ever
+  // posted to a server that had no replay pass yet; it broke the first time a
+  // ghost was built from one. The bug is invisible from the outside, so it is
+  // pinned here rather than left to the next person to rediscover.
+  const source = fs.readFileSync(path.join(gameRoot, "scripts/init-game.js"), "utf8");
+  for (const name of ["start", "shift"]) {
+    const start = source.indexOf(`    ${name}(`, source.indexOf("window.speedDemon"));
+    assert(start > 0, `the debug handle has no ${name}()`);
+    const body = source.slice(start, source.indexOf("\n    },", start));
+    assert(body.includes("stageOrShift("), `debug ${name}() bypasses the logged path`);
+    assert(!/\b(startRace|pressShift)\s*\(/.test(body), `debug ${name}() reaches straight for the reducer`);
+  }
 });
 
 test("the garage's rules do not import the storage layer", () => {

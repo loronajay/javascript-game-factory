@@ -6,6 +6,7 @@ import { SCREENS, createShell, enterScreen, isMenuScreen, menuFor } from "../scr
 import { WORLD } from "../scripts/render/scene.js";
 import {
   hitSetup,
+  rivalCardRect,
   modelCellRect,
   presetRowRect,
   trackCardRect,
@@ -17,9 +18,11 @@ import {
   setupView,
   setupTrack,
   setupModel,
+  setupRival,
   focusSetup,
   TARGET_START,
 } from "../scripts/ui/setup-menu.js";
+import { MODE_DISTANCE, MODE_RIVAL } from "../scripts/sim/modes.js";
 import { emptyGarage } from "../scripts/garage/garage.js";
 import { TRACKS } from "../scripts/ui/track-layout.js";
 
@@ -164,6 +167,46 @@ test("every config row, track card and objective card is clickable", () => {
   }
 });
 
+test("every rival card is clickable, and only in a mode that has them", () => {
+  // The strip is drawn only in Rival Race, so it must be hit-tested only there
+  // too: a target over empty space is how a dead control gets drawn.
+  const ghost = { boardId: "distance:quarter", value: 12128, modelId: "toro-sv", events: [{ t: 0, k: "s", v: 0 }] };
+  const rivalView = setupView(createSetup({ modeId: MODE_RIVAL }), EMPTY_GARAGE, { ghost });
+  for (const entry of rivalView.rivals) {
+    const box = rivalCardRect(entry.index);
+    const hit = hitSetup(rivalView, box.x + box.width / 2, box.y + box.height / 2);
+    assertEqual(hit?.pane, "rival", `${entry.id} is not clickable`);
+    assertEqual(hit.index, entry.index, `${entry.id} reports the wrong index`);
+  }
+
+  // The same pixels in a mode with no rival pane hit nothing at all.
+  const plain = setupView(createSetup({ modeId: MODE_DISTANCE }), EMPTY_GARAGE);
+  const box = rivalCardRect(0);
+  assertEqual(hitSetup(plain, box.x + box.width / 2, box.y + box.height / 2), null);
+});
+
+test("clicking a rival picks it and settles every pane behind it", () => {
+  // One gesture does the whole job: a mouse has nowhere to put a separate
+  // commit, so a click that only highlighted would read as a dead control.
+  const ghost = { boardId: "distance:quarter", value: 12128, modelId: "toro-sv", events: [{ t: 0, k: "s", v: 0 }] };
+  const setup = createSetup({ modeId: MODE_RIVAL });
+  const view = setupView(setup, EMPTY_GARAGE, { ghost });
+  const box = rivalCardRect(3);
+  const hit = hitSetup(view, box.x + box.width / 2, box.y + box.height / 2);
+  const clicked = focusSetup(setup, hit, EMPTY_GARAGE, { ghost });
+  assertEqual(clicked.pane, "rival");
+  assertEqual(setupRival(clicked, ghost).id, view.rivals[3].id);
+});
+
+test("hovering a rival marks it without taking it", () => {
+  // The setup screen's rule, not the menus': here the cursor is also the pick.
+  const setup = createSetup({ modeId: MODE_RIVAL });
+  const view = setupView(setup, EMPTY_GARAGE, { hover: { pane: "rival", index: 3 } });
+  assertEqual(view.rivals.filter((entry) => entry.hovered).length, 1);
+  assertEqual(view.rivals[3].hovered, true);
+  assertEqual(setupRival(setup).id, view.chosenRival.id, "hovering must not change the pick");
+});
+
 test("no two setup targets claim the same pixel", () => {
   // Two panes overlapping would make a click ambiguous and the hover highlight
   // land on something other than what fires.
@@ -186,6 +229,12 @@ test("no two setup targets claim the same pixel", () => {
   for (const option of view.presets.options) record(`preset ${option.index}`, presetRowRect(option.index));
   for (const track of view.tracks) record(`track ${track.id}`, trackCardRect(track.index));
   for (const option of view.objective.options) record(`obj ${option.id}`, objectiveCardRect(option.index));
+  // Swept from the rival mode's view, where the strip exists and is at its
+  // longest — the worst case is the one that decides whether anything collides.
+  const ghost = { boardId: "distance:quarter", value: 12128, modelId: "toro-sv", events: [{ t: 0, k: "s", v: 0 }] };
+  for (const entry of setupView(createSetup({ modeId: MODE_RIVAL }), EMPTY_GARAGE, { ghost }).rivals) {
+    record(`rival ${entry.id}`, rivalCardRect(entry.index));
+  }
   record("start", startButtonRect());
 });
 

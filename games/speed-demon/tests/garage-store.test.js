@@ -101,6 +101,27 @@ test("signed in, the garage is available", () => {
   assertEqual(store.status, STATUS_IDLE);
 });
 
+// Signed in but with nowhere to send: a page that forgot `platform-config.mjs`
+// resolves an empty base URL, and the platform client answers null instead of
+// throwing — so an unguarded store would report every push as a success and the
+// player's paints would silently never leave the browser.
+await asyncTest("signed in with an unconfigured client, the garage is unavailable", async () => {
+  const api = { ...fakeApi(), isConfigured: false };
+  const cache = fakeStorage();
+  await withStorage(cache, async () => {
+    const store = createGarageStore({ session: signedIn, api, isKnownModel });
+    assertEqual(store.available, false);
+    assertEqual(store.status, STATUS_OFFLINE);
+    store.save(savePreset(emptyGarage(), { modelId: MODEL, name: "Lime" }));
+    assertEqual(store.dirty, false);
+    assertEqual(cache.map.size, 0);
+    const garage = await store.load();
+    assertEqual(garage.presets.length, 0);
+    assertEqual(api.calls.get.length, 0);
+    assertEqual(api.calls.put.length, 0);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Loading
 // ---------------------------------------------------------------------------

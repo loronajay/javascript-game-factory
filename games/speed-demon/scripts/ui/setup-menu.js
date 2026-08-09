@@ -36,30 +36,85 @@ import { MODEL_GROUPS, DEFAULT_MODEL_ID, modelsByGroup, modelById } from "../ass
 import { DEFAULT_MODE_ID, modeById, objectiveOption } from "../sim/modes.js";
 import { emptyGarage, presetsForModel, factoryPresetLabel } from "../garage/garage.js";
 import { DEFAULT_LIVERY, createLivery } from "../garage/livery.js";
+import { boardIdFor } from "../records/records.js";
+import { DEFAULT_RIVAL_ID, lineupEntry, lineupFor } from "../rival/lineup.js";
 import { TRACKS, DEFAULT_TRACK_ID, trackById } from "./track-layout.js";
 
 export const PANE_MODEL = "model";
 export const PANE_PRESET = "preset";
 export const PANE_TRACK = "track";
 export const PANE_OBJECTIVE = "objective";
+/**
+ * Who you are racing. Present in Rival Race and nowhere else — see `panesFor`.
+ *
+ * Last in the order on purpose: which ghost exists depends on the board, and the
+ * board is the mode plus the objective. Putting the rival pane before the
+ * distance strip would mean offering a ghost for a distance the player has not
+ * chosen yet, and taking it away again when they did.
+ */
+export const PANE_RIVAL = "rival";
 
-/** Panes in the order they are locked in. */
-export const PANES = [PANE_MODEL, PANE_PRESET, PANE_TRACK, PANE_OBJECTIVE];
+/** Every pane, in the order they are locked in. Not every mode uses all of them. */
+export const PANES = [PANE_MODEL, PANE_PRESET, PANE_TRACK, PANE_OBJECTIVE, PANE_RIVAL];
 
 /**
- * What ENTER does on each pane. The last one starts the race, so there is no
- * fifth "go" step to find — locking the objective *is* dropping the clutch.
+ * The panes this mode actually has.
+ *
+ * A mode declares whether it wants the rival pane; nothing here names a mode.
+ * That is the same rule the objective pane already follows — it is one pane in
+ * every mode and lists whatever the mode's objective offers — extended to a pane
+ * that is present rather than merely different.
  */
-const PANE_PROMPTS = {
+export function panesFor(setup) {
+  return setupMode(setup).rival ? PANES : PANES.filter((pane) => pane !== PANE_RIVAL);
+}
+
+/**
+ * What ENTER does on each pane. The *last* pane of the mode always reads START,
+ * because locking it is what drops the clutch — there is no separate "go" step
+ * to find. Derived rather than stored so a mode with a different pane list
+ * cannot end up with two panes claiming to be the last one.
+ */
+const PANE_LOCK_LABELS = {
   [PANE_MODEL]: "LOCK CAR",
   [PANE_PRESET]: "LOCK PAINT",
   [PANE_TRACK]: "LOCK TRACK",
-  [PANE_OBJECTIVE]: "START",
+  [PANE_OBJECTIVE]: "LOCK DISTANCE",
+  [PANE_RIVAL]: "LOCK RIVAL",
 };
+
+function panePrompt(setup) {
+  const panes = panesFor(setup);
+  return setup.pane === panes[panes.length - 1] ? "START" : PANE_LOCK_LABELS[setup.pane] ?? "LOCK CAR";
+}
 
 /** The mode being set up, always a real one even if a stale id was handed in. */
 export function setupMode(setup) {
   return modeById(setup.modeId) ?? modeById(DEFAULT_MODE_ID);
+}
+
+/**
+ * The board this setup's runs would file to, which is what decides whether the
+ * player has a ghost to race. Null in a mode that keeps no records.
+ */
+export function setupBoardId(setup) {
+  return boardIdFor(setupMode(setup).id, setupObjective(setup).id);
+}
+
+/**
+ * Who is on offer, ghost included when one exists for the board being set up.
+ *
+ * The ghost is passed in rather than read here for exactly the reason the garage
+ * is: a setup is cursor state, and the player's saved runs are their own data
+ * with their own lifetime and their own storage seam.
+ */
+export function setupLineup(setup, ghost = null) {
+  return lineupFor(setupBoardId(setup), ghost);
+}
+
+/** The rival the cursor is on. Falls back through the lineup — see `lineupEntry`. */
+export function setupRival(setup, ghost = null) {
+  return lineupEntry(setupLineup(setup, ghost), setup.rivalId);
 }
 
 const clamp = (value, max) => Math.max(0, Math.min(max, value));
@@ -84,6 +139,7 @@ export function createSetup({
   presetId = null,
   trackId = DEFAULT_TRACK_ID,
   objectiveId = null,
+  rivalId = DEFAULT_RIVAL_ID,
 } = {}, garage = emptyGarage()) {
   const model = modelById(modelId) ?? modelById(DEFAULT_MODEL_ID);
   const trackIndex = Math.max(0, TRACKS.findIndex((track) => track.id === trackId));
@@ -110,12 +166,17 @@ export function createSetup({
     chosenPresetIndex,
     trackIndex,
     objectiveIndex,
+    // The rival is held as an id rather than an index, because the list it
+    // indexes into changes length under it: a ghost exists for one distance and
+    // not the next, so an index would silently mean a different driver after a
+    // walk along the objective strip.
+    rivalId,
   };
 }
 
 /** Where the cursor is in the lock order. Everything before it is locked. */
 function paneIndex(setup) {
-  const index = PANES.indexOf(setup.pane);
+  const index = panesFor(setup).indexOf(setup.pane);
   return index >= 0 ? index : 0;
 }
 
@@ -123,9 +184,13 @@ function paneIndex(setup) {
  * Whether a pane is locked in. Derived from where the cursor is rather than
  * stored: you can only ever be standing on the pane you have not settled yet, so
  * a second copy of that fact could only go stale.
+ *
+ * A pane the mode does not have is never locked — it is not there to lock.
  */
 export function isPaneLocked(setup, pane) {
-  return PANES.indexOf(pane) < paneIndex(setup);
+  const panes = panesFor(setup);
+  const index = panes.indexOf(pane);
+  return index >= 0 && index < paneIndex(setup);
 }
 
 /** The model the cursor is on. */
@@ -231,7 +296,18 @@ export function setupObjective(setup) {
  *
  * Returns a new setup — callers may hold the old one.
  */
-export function moveSetup(setup, direction, garage = emptyGarage()) {
+export function moveSetup(setup, direction, garage = emptyGarage(), { ghost = null } = {}) {
+  if (setup.pane === PANE_RIVAL) {
+    // A single row that wraps, for the reason the online lobby's car row wraps
+    // and the model grid does not: there is no edge here to lose a cursor
+    // against, and the list is short enough to walk right round in a second.
+    const lineup = setupLineup(setup, ghost);
+    const step = direction === "left" ? -1 : direction === "right" ? 1 : 0;
+    if (step === 0 || lineup.length === 0) return setup;
+    const from = Math.max(0, lineup.findIndex((entry) => entry.id === setupRival(setup, ghost)?.id));
+    return { ...setup, rivalId: lineup[(from + step + lineup.length) % lineup.length].id };
+  }
+
   if (setup.pane === PANE_MODEL) {
     const groups = modelsByGroup();
     const row = clamp(setup.model.row, groups.length - 1);
@@ -373,8 +449,14 @@ export function cycleSetupPreset(setup, step, garage = emptyGarage()) {
  *
  * An unknown target returns the setup unchanged rather than resetting anything.
  */
-export function focusSetup(setup, target, garage = emptyGarage()) {
-  if (!target || !PANES.includes(target.pane)) return setup;
+export function focusSetup(setup, target, garage = emptyGarage(), { ghost = null } = {}) {
+  if (!target || !panesFor(setup).includes(target.pane)) return setup;
+
+  if (target.pane === PANE_RIVAL) {
+    const lineup = setupLineup(setup, ghost);
+    const entry = lineup[clamp(target.index, lineup.length - 1)];
+    return entry ? { ...setup, pane: PANE_RIVAL, rivalId: entry.id } : { ...setup, pane: PANE_RIVAL };
+  }
 
   if (target.pane === PANE_MODEL) {
     const moved = withModel({ ...setup, pane: PANE_MODEL }, target.row, target.column, garage);
@@ -400,6 +482,11 @@ export function setupSelection(setup, garage = emptyGarage()) {
     livery: preset.livery,
     trackId: setupTrack(setup).id,
     objectiveId: setupObjective(setup).id,
+    // Carried as the raw id rather than resolved through the lineup, because
+    // resolving needs the ghost and a selection is meant to be cheap enough to
+    // rebuild a setup from. `setupRival` is what resolves it, at the point the
+    // race is actually built.
+    rivalId: setup.rivalId ?? DEFAULT_RIVAL_ID,
   };
 }
 
@@ -415,7 +502,7 @@ export function confirmSetup(setup, garage = emptyGarage()) {
   if (setup.pane === PANE_PRESET && isPresetActionFocused(setup, garage)) {
     return { setup, done: false, customise: true };
   }
-  const next = PANES[paneIndex(setup) + 1];
+  const next = panesFor(setup)[paneIndex(setup) + 1];
   return next ? { setup: { ...setup, pane: next }, done: false } : { setup, done: true };
 }
 
@@ -426,7 +513,7 @@ export function confirmSetup(setup, garage = emptyGarage()) {
  * grid puts the cursor on the car you locked.
  */
 export function cancelSetup(setup) {
-  const previous = PANES[paneIndex(setup) - 1];
+  const previous = panesFor(setup)[paneIndex(setup) - 1];
   return previous ? { setup: { ...setup, pane: previous }, exit: false } : { setup, exit: true };
 }
 
@@ -477,19 +564,35 @@ function isHovered(hover, pane, match) {
  * rather than through the setup so that pointing at something can never be
  * mistaken for choosing it.
  */
-export function setupView(setup, garage = emptyGarage(), { canCustomise = true, hover = null } = {}) {
+export function setupView(setup, garage = emptyGarage(), { canCustomise = true, hover = null, ghost = null } = {}) {
   const mode = setupMode(setup);
   const locked = Object.fromEntries(PANES.map((pane) => [pane, isPaneLocked(setup, pane)]));
   const model = setupModel(setup);
   const presetOptions = setupPresetOptions(setup, garage);
   const chosenIndex = clamp(setup.chosenPresetIndex ?? 0, presetOptions.length - 1);
+  // Null rather than an empty list in a mode with no rival pane, so a renderer
+  // that forgets to check draws nothing rather than drawing an empty strip.
+  const chosenRival = mode.rival ? setupRival(setup, ghost) : null;
+  const rivals = mode.rival
+    ? setupLineup(setup, ghost).map((entry, index) => ({
+        ...entry,
+        index,
+        selected: setup.pane === PANE_RIVAL && chosenRival?.id === entry.id,
+        hovered: isHovered(hover, PANE_RIVAL, (h) => h.index === index),
+        chosen: chosenRival?.id === entry.id,
+        locked: locked[PANE_RIVAL] && chosenRival?.id === entry.id,
+      }))
+    : null;
 
   return {
     pane: setup.pane,
     // Which panes are settled, and what ENTER will do about the one that is
     // not — the renderer prints both rather than working either out.
     locked,
-    prompt: PANE_PROMPTS[setup.pane] ?? PANE_PROMPTS[PANE_MODEL],
+    // The panes this mode has, so the renderer draws the rival strip in Rival
+    // Race and leaves the space empty everywhere else without naming a mode.
+    panes: panesFor(setup),
+    prompt: panePrompt(setup),
     mode: { id: mode.id, label: mode.label, blurb: mode.blurb },
     objective: {
       kind: mode.objective.kind,
@@ -549,6 +652,8 @@ export function setupView(setup, garage = emptyGarage(), { canCustomise = true, 
     // line by locking the last pane; a pointer needs somewhere to press that
     // means "go" from any pane, since every pane always holds a valid pick.
     start: { label: "START", hovered: hover?.target === TARGET_START },
+    rivals,
+    chosenRival,
     chosenModel: model,
     chosenPreset: presetOptions[chosenIndex],
     chosenLivery: presetOptions[chosenIndex].livery,
