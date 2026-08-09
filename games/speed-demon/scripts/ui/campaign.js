@@ -1,6 +1,6 @@
 // The campaign screen — pure.
 //
-// Two things live behind one screen: the **node map**, and the **briefing** that
+// Two things live behind one screen: the **map**, and the **briefing** that
 // plays over a mission splash before the tree. They are one screen rather than
 // two for the reason the tutorial is not a screen: every screen that owns a
 // cursor has to belong to exactly one input path in `init-game.js`, to one case
@@ -8,43 +8,69 @@
 // briefing that owns nothing but ENTER would be a screen paying all of that for
 // a key press. So the stage is state, exactly as the setup screen's pane is.
 //
+// **The map is the painted art and this module places tokens on it.** Node
+// positions are authored percentages measured off `assets/campaign-map.png`
+// (see `campaign/map.js`); this turns them into screen points through the
+// map's drawn rect. Nothing here invents a layout, and nothing draws a route —
+// the routes are painted.
+//
 // Geometry is here rather than in the renderer for the same reason
-// `setup-menu.js` holds the setup screen's: where a node sits decides what a
+// `setup-menu.js` holds the setup screen's: where a token sits decides what a
 // click lands on, and that is a rule a test should be able to reach without a
-// canvas. `render/campaign.js` reads these numbers and `hitCampaign` resolves a
-// click against the same view the renderer drew.
+// canvas.
 
 import { modeById, objectiveOption } from "../sim/modes.js";
 import { trackById } from "./track-layout.js";
-import { EVENTS, chapterByNumber, eventById } from "../campaign/events.js";
+import { EVENTS, eventById } from "../campaign/events.js";
+import { MAP_NODES, mapRect, pointOnMap } from "../campaign/map.js";
 import { STATUS_CLEARED, STATUS_LOCKED, eventStatus, progressSummary } from "../campaign/progress.js";
 
 export const STAGE_MAP = "map";
 export const STAGE_BRIEFING = "briefing";
 
+/**
+ * A painted node with no event written for it yet.
+ *
+ * Distinct from `locked`, and the difference is honest rather than cosmetic:
+ * locked means "you have not earned this", soon means "this is not written".
+ * The whole campaign is on the artwork the moment the screen opens, so
+ * pretending an unwritten stop is a locked one would promise something that
+ * does not exist.
+ */
+export const STATUS_SOON = "soon";
+
 /** What `confirmCampaign` asks the composition root for. */
 export const CAMPAIGN_NONE = "none";
 /** The briefing is over: build the race this event describes. */
 export const CAMPAIGN_RACE = "race";
-/** The cursor is on a node that is not open yet. Buzz, do not advance. */
+/** The token is on a node that cannot be raced. Buzz, do not advance. */
 export const CAMPAIGN_LOCKED = "locked";
 
 /**
- * The map's discrete grid, and the box it is laid out inside.
+ * The screen, and where the map and the panels go on it.
  *
- * A node declares a {col,row} and the trails fall out of the graph — the
- * Tactical Arena map's arrangement, because a player of this arcade has already
- * learned to read one. Nothing is hand-placed in pixels, so adding an event is
- * a free cell rather than a layout change.
+ * The world is 1280x720; it is written here rather than imported because `ui/`
+ * does not depend on `render/` — the same reason `track-layout.js` carries its
+ * own numbers.
+ *
+ * The map fills the screen. The detail panel is a **bottom strip** rather than
+ * a sidebar: the artwork's right-hand side is Kuroda's district and its top
+ * left is the wordmark and the legend, so a column down either side would cover
+ * the two things the map uses to orient the player.
+ *
+ * **And it has to clear the lowest painted base.** The southernmost stop is
+ * START, at 83.37% of the image — which is exactly where the player is standing
+ * on a fresh career, so a strip deep enough to be comfortable covered the one
+ * node that mattered. It is sized to fit under it instead, which is checked by
+ * `tests/campaign.test.js` rather than by looking at it.
  */
-export const CAMPAIGN_GRID = { cols: 5, rows: 5 };
-
 export const CAMPAIGN_LAYOUT = {
-  map: { x: 96, y: 150, width: 800, height: 420 },
-  node: { radius: 30 },
-  header: { x: 96, y: 92 },
-  detail: { x: 928, y: 150, width: 256, height: 420 },
-  hint: { y: 640 },
+  screen: { x: 0, y: 0, width: 1280, height: 720 },
+  detail: { x: 24, y: 626, width: 1232, height: 86 },
+  // A token is drawn *around* the painted base rather than over it — the base is
+  // the art and covering it would be painting over the map to say where the map
+  // is. This is the radius of the ring that marks one.
+  token: { radius: 22 },
   briefing: {
     box: { x: 120, y: 452, width: 1040, height: 196 },
     title: { x: 120, y: 388 },
@@ -53,57 +79,67 @@ export const CAMPAIGN_LAYOUT = {
   },
 };
 
-/** How far a trail bows off the straight line, so a road reads as a road. */
-const TRAIL_BEND = 26;
+/** The map's drawn rect on this screen. One derivation, shared by everything. */
+export function campaignMapRect() {
+  return mapRect(CAMPAIGN_LAYOUT.screen);
+}
 
 export function createCampaign({ eventId = null } = {}) {
-  const index = Math.max(0, EVENTS.findIndex((event) => event.id === eventId));
+  const nodeId = eventId ? eventById(eventId)?.nodeId : null;
+  const index = Math.max(0, MAP_NODES.findIndex((node) => node.id === nodeId));
   return { stage: STAGE_MAP, cursor: index, line: 0 };
 }
 
-/** The event the cursor is on. Never null while the catalog has a row in it. */
-export function campaignEvent(campaign) {
-  return EVENTS[campaign.cursor] ?? EVENTS[0] ?? null;
+/** The painted node the token is on. */
+export function campaignNode(campaign) {
+  return MAP_NODES[campaign.cursor] ?? MAP_NODES[0] ?? null;
 }
 
-function nodeCentre(cell) {
-  const { map } = CAMPAIGN_LAYOUT;
-  const cols = Math.max(1, CAMPAIGN_GRID.cols - 1);
-  const rows = Math.max(1, CAMPAIGN_GRID.rows - 1);
-  const col = Math.min(Math.max(cell?.col ?? 0, 0), cols);
-  const row = Math.min(Math.max(cell?.row ?? 0, 0), rows);
-  return {
-    x: map.x + (col / cols) * map.width,
-    y: map.y + (row / rows) * map.height,
-  };
+/** The event written for the node the token is on, or null if none is yet. */
+export function campaignEvent(campaign) {
+  const node = campaignNode(campaign);
+  return node ? (EVENTS.find((event) => event.nodeId === node.id) ?? null) : null;
+}
+
+function eventForNode(nodeId) {
+  return EVENTS.find((event) => event.nodeId === nodeId) ?? null;
+}
+
+function nodeStatus(node, progress) {
+  const event = eventForNode(node.id);
+  return event ? eventStatus(progress, event.id) : STATUS_SOON;
+}
+
+function nodeCentre(node) {
+  return pointOnMap(campaignMapRect(), node.point);
 }
 
 /**
- * Walks the cursor to the nearest node in the direction pressed.
+ * Walks the token to the nearest painted node in the direction pressed.
  *
- * Directional rather than a walk along the authored list, because the map is a
- * map: a node drawn up and to the right must be reachable by pressing up or
- * right, or the picture and the controls disagree. Nothing wraps — on a map
- * with a handful of nodes a wrapped cursor is a cursor you lose.
+ * Directional, because the map is a map: the route bends back on itself and
+ * forks three ways at the docks, so a cursor that walked the authored list
+ * would jump across the city. Nothing wraps — on a picture this size a wrapped
+ * cursor is a cursor you lose.
  */
 export function moveCampaign(campaign, direction) {
   if (campaign.stage !== STAGE_MAP) return campaign;
 
-  const from = nodeCentre(EVENTS[campaign.cursor]?.cell);
+  const from = nodeCentre(campaignNode(campaign));
   const axis = direction === "left" || direction === "right" ? "x" : "y";
   const sign = direction === "left" || direction === "up" ? -1 : 1;
+  const other = axis === "x" ? "y" : "x";
 
   let best = null;
-  EVENTS.forEach((event, index) => {
+  MAP_NODES.forEach((node, index) => {
     if (index === campaign.cursor) return;
-    const to = nodeCentre(event.cell);
-    const along = (to[axis] - from[axis]) * sign;
-    if (along <= 0) return; // behind the cursor on this axis
-    const across = Math.abs(to[axis === "x" ? "y" : "x"] - from[axis === "x" ? "y" : "x"]);
-    // **Nearest first, then straightest.** Plain distance decides it and drift
-    // across the pressed axis only breaks a tie — the other way round (weighting
-    // the drift heavily) skips a node drawn up and to the right in favour of a
-    // distant one dead ahead, which on a map reads as the cursor jumping.
+    const to = nodeCentre(node);
+    if ((to[axis] - from[axis]) * sign <= 0) return; // behind the token on this axis
+    const across = Math.abs(to[other] - from[other]);
+    // Nearest first, then straightest: plain distance decides it and drift
+    // across the pressed axis only breaks a tie. Weighting the drift heavily
+    // instead skips a node up and to the right in favour of a distant one dead
+    // ahead, which on a map reads as the token teleporting.
     const cost = Math.hypot(to.x - from.x, to.y - from.y) + across;
     if (!best || cost < best.cost) best = { index, cost };
   });
@@ -111,28 +147,29 @@ export function moveCampaign(campaign, direction) {
   return best ? { ...campaign, cursor: best.index } : campaign;
 }
 
-/** Puts the cursor on a node by index — what a click does. */
+/** Puts the token on a node by index — what a click does. */
 export function focusCampaign(campaign, index) {
   if (campaign.stage !== STAGE_MAP) return campaign;
-  if (!Number.isInteger(index) || index < 0 || index >= EVENTS.length) return campaign;
+  if (!Number.isInteger(index) || index < 0 || index >= MAP_NODES.length) return campaign;
   return { ...campaign, cursor: index };
 }
 
 /**
- * ENTER. On the map it opens the briefing for an event that is actually open;
- * in a briefing it turns the page, and off the end of the last one it asks for
- * the race.
+ * ENTER. On the map it opens the briefing for a stop that can actually be
+ * raced; in a briefing it turns the page, and off the end of the last one it
+ * asks for the race.
  */
 export function confirmCampaign(campaign, progress) {
   const event = campaignEvent(campaign);
-  if (!event) return { campaign, command: CAMPAIGN_NONE };
 
   if (campaign.stage === STAGE_MAP) {
-    if (eventStatus(progress, event.id) === STATUS_LOCKED) {
+    if (!event || eventStatus(progress, event.id) === STATUS_LOCKED) {
       return { campaign, command: CAMPAIGN_LOCKED };
     }
     return { campaign: { ...campaign, stage: STAGE_BRIEFING, line: 0 }, command: CAMPAIGN_NONE };
   }
+
+  if (!event) return { campaign: { ...campaign, stage: STAGE_MAP, line: 0 }, command: CAMPAIGN_NONE };
 
   const beats = event.brief ?? [];
   if (campaign.line + 1 < beats.length) {
@@ -158,94 +195,78 @@ export function cancelCampaign(campaign) {
  * no catalog, no progress, no geometry.
  */
 export function campaignView(campaign, progress, { hover = null } = {}) {
-  const nodes = EVENTS.map((event, index) => ({
-    id: event.id,
-    index,
-    title: event.title,
-    status: eventStatus(progress, event.id),
-    ...nodeCentre(event.cell),
-    radius: CAMPAIGN_LAYOUT.node.radius,
-    selected: index === campaign.cursor,
-    hovered: hover?.kind === "node" && hover.index === index,
-    // The number a player counts by. Authored order, not cursor order.
-    label: String(index + 1),
-  }));
-
-  const byId = new Map(nodes.map((node) => [node.id, node]));
-  const trails = [];
-  for (const event of EVENTS) {
-    const to = byId.get(event.id);
-    for (const fromId of event.connections ?? []) {
-      const from = byId.get(fromId);
-      if (!from || !to) continue;
-      trails.push({
-        from: { x: from.x, y: from.y },
-        to: { x: to.x, y: to.y },
-        control: bend(from, to),
-        // A trail is lit once the node it leads to is open — the map shows the
-        // road you have actually been given, and the rest as where it goes.
-        active: to.status !== STATUS_LOCKED,
-      });
-    }
-  }
-
-  const event = campaignEvent(campaign);
-  const chapter = chapterByNumber(event?.chapter ?? 1);
+  const rect = campaignMapRect();
+  const nodes = MAP_NODES.map((node, index) => {
+    const event = eventForNode(node.id);
+    const status = nodeStatus(node, progress);
+    return {
+      id: node.id,
+      index,
+      kind: node.kind,
+      region: node.region,
+      // A boss plate is painted on the map already, so the token never repeats
+      // it — this is only here for the detail strip.
+      label: node.label ?? null,
+      eventId: event?.id ?? null,
+      title: event?.title ?? null,
+      status,
+      ...pointOnMap(rect, node.point),
+      radius: CAMPAIGN_LAYOUT.token.radius,
+      selected: index === campaign.cursor,
+      hovered: hover?.kind === "node" && hover.index === index,
+    };
+  });
 
   return {
     stage: campaign.stage,
-    chapter: chapter ? { ...chapter } : null,
+    map: rect,
     summary: progressSummary(progress),
     nodes,
-    trails,
-    detail: detailFor(event, progress),
-    briefing: campaign.stage === STAGE_BRIEFING ? briefingFor(event, campaign.line) : null,
+    detail: detailFor(campaignNode(campaign), campaignEvent(campaign), progress),
+    briefing: campaign.stage === STAGE_BRIEFING ? briefingFor(campaignEvent(campaign), campaign.line) : null,
     hover,
   };
 }
 
-function bend(from, to) {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const length = Math.hypot(dx, dy) || 1;
-  // Perpendicular to the line, and the same way every time for a given pair —
-  // a trail that bows differently between renders reads as the map moving.
-  return {
-    x: (from.x + to.x) / 2 + (-dy / length) * TRAIL_BEND,
-    y: (from.y + to.y) / 2 + (dx / length) * TRAIL_BEND,
-  };
-}
-
-function detailFor(event, progress) {
-  if (!event) return null;
-  const status = eventStatus(progress, event.id);
-  const record = progress.completed[event.id] ?? null;
-  const mode = modeById(event.modeId);
+function detailFor(node, event, progress) {
+  if (!node) return null;
+  const status = nodeStatus(node, progress);
+  const record = event ? progress.completed[event.id] ?? null : null;
+  const mode = event ? modeById(event.modeId) : null;
   const objective = mode ? objectiveOption(mode, event.objectiveId) : null;
+  const hidden = status === STATUS_LOCKED || status === STATUS_SOON;
 
   return {
-    id: event.id,
-    title: event.title,
-    where: event.where,
+    nodeId: node.id,
+    eventId: event?.id ?? null,
+    kind: node.kind,
+    // A stop nobody has reached still names its **place**: geography stays
+    // visible, the race does not. That is the Tactical Arena map's rule and it
+    // is what keeps a locked node worth looking at.
+    region: node.region,
+    title: hidden ? (node.label ?? node.region) : event.title,
+    where: hidden ? "" : event.where,
     status,
     locked: status === STATUS_LOCKED,
+    soon: status === STATUS_SOON,
     cleared: status === STATUS_CLEARED,
-    trackLabel: trackById(event.trackId)?.label ?? "",
-    objectiveLabel: objective?.label ?? "",
-    // A locked node says nothing about what it is. Who you would be racing is
-    // part of the reveal, and the panel prints "?????" over the title for the
-    // same reason.
-    opponent: event.opponent && status !== STATUS_LOCKED
+    trackLabel: hidden ? "" : trackById(event.trackId)?.label ?? "",
+    objectiveLabel: hidden ? "" : objective?.label ?? "",
+    opponent: !hidden && event.opponent
       ? {
         name: event.opponent.name,
         tier: event.opponent.tier,
         blurb: event.opponent.blurb,
         accent: event.opponent.accent,
-        initial: event.opponent.initial,
       }
       : null,
     attempts: record?.attempts ?? 0,
     wins: record?.wins ?? 0,
+    hint: status === STATUS_SOON
+      ? "NOT OPEN YET"
+      : status === STATUS_LOCKED
+        ? "WIN YOUR WAY HERE"
+        : "ENTER to take it",
   };
 }
 
@@ -271,11 +292,6 @@ function briefingFor(event, line) {
     last,
     hint: last ? "ENTER to drive" : "ENTER to continue",
   };
-}
-
-/** Every event, for the tests that check the catalog against the game. */
-export function allEvents() {
-  return EVENTS.map((event) => ({ ...event }));
 }
 
 export { eventById };

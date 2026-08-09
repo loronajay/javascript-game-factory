@@ -11,6 +11,7 @@ import { modelById } from "../scripts/assets/car-atlas.js";
 import { trackById } from "../scripts/ui/track-layout.js";
 import { boardIdFor } from "../scripts/records/records.js";
 import { EVENTS, FIRST_EVENT_ID, eventById, splashSrc } from "../scripts/campaign/events.js";
+import { MAP_IMAGE, MAP_NODES, mapNodeById, mapRect, pointOnMap } from "../scripts/campaign/map.js";
 import {
   STATUS_CLEARED,
   STATUS_LOCKED,
@@ -26,7 +27,10 @@ import {
   CAMPAIGN_RACE,
   STAGE_BRIEFING,
   STAGE_MAP,
+  STATUS_SOON,
   campaignEvent,
+  campaignMapRect,
+  campaignNode,
   campaignView,
   cancelCampaign,
   confirmCampaign,
@@ -50,6 +54,72 @@ const cleared = () => {
 // ---------------------------------------------------------------------------
 // The catalog
 // ---------------------------------------------------------------------------
+
+test("every event stands on a painted node, and no two share one", () => {
+  // The map paints every stop and every route between them. An event moves into
+  // a place that already exists rather than positioning itself, so a `nodeId`
+  // that names nothing is an event nobody can reach — and two events on one
+  // base would draw two tokens in the same spot.
+  const claimed = new Set();
+  for (const event of EVENTS) {
+    assert(mapNodeById(event.nodeId), `${event.id} stands on the unknown node ${event.nodeId}`);
+    assert(!claimed.has(event.nodeId), `${event.nodeId} carries more than one event`);
+    claimed.add(event.nodeId);
+  }
+});
+
+test("the painted nodes are inside the art and none of them collide", () => {
+  // Measured off the shipped PNG rather than typed, so this is the check that a
+  // re-measure actually landed on the bases: a percentage outside 0-100 is off
+  // the picture, and two within a token of each other means the pass merged two
+  // icons or split one.
+  const rect = mapRect({ x: 0, y: 0, width: 1280, height: 720 });
+  const radius = CAMPAIGN_LAYOUT.token.radius;
+  const ids = new Set();
+  for (const node of MAP_NODES) {
+    assert(!ids.has(node.id), `${node.id} is not a unique node id`);
+    ids.add(node.id);
+    assert(node.point.x > 0 && node.point.x < 100, `${node.id} is off the map horizontally`);
+    assert(node.point.y > 0 && node.point.y < 100, `${node.id} is off the map vertically`);
+  }
+  for (const a of MAP_NODES) {
+    for (const b of MAP_NODES) {
+      if (a.id >= b.id) continue;
+      const pa = pointOnMap(rect, a.point);
+      const pb = pointOnMap(rect, b.point);
+      assert(Math.hypot(pa.x - pb.x, pa.y - pb.y) > radius, `${a.id} and ${b.id} are the same base`);
+    }
+  }
+});
+
+test("the detail strip clears every painted stop", () => {
+  // The southernmost base is START, which is exactly where the player stands on
+  // a fresh career — so a strip deep enough to be comfortable covers the one
+  // node that matters. This is the check, rather than noticing it on screen.
+  const view = campaignView(createCampaign(), createProgress());
+  const strip = CAMPAIGN_LAYOUT.detail;
+  for (const node of view.nodes) {
+    assert(
+      node.y + node.radius < strip.y,
+      `${node.id} is under the detail strip (${(node.y + node.radius).toFixed(0)} vs ${strip.y})`,
+    );
+  }
+  assert(strip.y + strip.height <= CAMPAIGN_LAYOUT.screen.height, "the strip runs off the bottom");
+});
+
+test("the map is fitted whole, never cropped", () => {
+  // A cover fit crops, and a cropped map moves every authored percentage off
+  // the base it was measured against — the tokens would drift toward the edges
+  // with nothing on screen to explain it.
+  const rect = campaignMapRect();
+  const screen = CAMPAIGN_LAYOUT.screen;
+  assert(rect.width <= screen.width + 0.5 && rect.height <= screen.height + 0.5, "the map is cropped");
+  assertEqual(
+    Math.round((rect.width / rect.height) * 1000),
+    Math.round((MAP_IMAGE.width / MAP_IMAGE.height) * 1000),
+    "the map is stretched",
+  );
+});
 
 test("every event names a track, a mode and an objective the game actually has", () => {
   for (const event of EVENTS) {
@@ -217,24 +287,42 @@ test("a malformed count normalizes to zero rather than surviving as one", () => 
 // The screen
 // ---------------------------------------------------------------------------
 
-test("the map opens on a node and moves toward the one drawn that way", () => {
+test("the map opens on the first event's node and moves across the picture", () => {
   const progress = cleared();
   let campaign = createCampaign();
   assertEqual(campaign.stage, STAGE_MAP);
+  assertEqual(campaignNode(campaign).id, eventById(FIRST_EVENT_ID).nodeId);
   assertEqual(campaignEvent(campaign).id, FIRST_EVENT_ID);
 
   const view = campaignView(campaign, progress);
   const first = view.nodes[0];
-  const second = view.nodes[1];
-  assert(second.x > first.x, "the fixture assumes the second node is to the right");
+  assert(view.nodes[1].x > first.x, "the fixture assumes the route runs east");
 
   campaign = moveCampaign(campaign, "right");
-  assertEqual(campaignEvent(campaign).id, second.id);
+  assertEqual(campaignNode(campaign).id, view.nodes[1].id);
   campaign = moveCampaign(campaign, "left");
-  assertEqual(campaignEvent(campaign).id, first.id);
-  // Nothing wraps: on a map with a handful of nodes a wrapped cursor is a
-  // cursor you lose.
+  assertEqual(campaignNode(campaign).id, first.id);
+  // Nothing wraps: on a picture this size a wrapped cursor is a cursor you lose.
   assertEqual(moveCampaign(campaign, "left").cursor, campaign.cursor);
+});
+
+test("a painted node with no event written for it reads as coming soon", () => {
+  // The whole campaign is on the artwork the moment the screen opens, so an
+  // unwritten stop cannot be silently ignored — and calling it "locked" would
+  // promise a race that does not exist.
+  const written = new Set(EVENTS.map((event) => event.nodeId));
+  const unwritten = MAP_NODES.findIndex((node) => !written.has(node.id));
+  assert(unwritten >= 0, "the fixture assumes the map is ahead of the catalog");
+
+  const campaign = focusCampaign(createCampaign(), unwritten);
+  const view = campaignView(campaign, cleared());
+  assertEqual(view.nodes[unwritten].status, STATUS_SOON);
+  assertEqual(campaignEvent(campaign), null);
+  // It still names its district: geography stays visible, the race does not.
+  assert(view.detail.region.length > 0);
+  assertEqual(view.detail.opponent, null);
+  // And it refuses to open rather than starting an empty briefing.
+  assertEqual(confirmCampaign(campaign, cleared()).command, CAMPAIGN_LOCKED);
 });
 
 test("a locked node refuses to open, an open one starts its briefing", () => {
@@ -291,6 +379,7 @@ test("a locked node says nothing about what it is", () => {
   const view = campaignView(moveCampaign(createCampaign(), "right"), createProgress());
   assertEqual(view.detail.locked, true);
   assertEqual(view.detail.opponent, null, "a locked node must not name its driver");
+  assertEqual(view.detail.where, "", "a locked node must not name its race");
   const node = view.nodes.find((entry) => entry.status === STATUS_LOCKED);
   assert(node, "the fixture assumes a locked node");
 });
@@ -307,19 +396,6 @@ test("a click lands on the node that was drawn, and nowhere else", () => {
   // And a briefing has no targets at all: the whole screen is ENTER.
   const briefing = campaignView(confirmCampaign(createCampaign(), cleared()).campaign, cleared());
   assertEqual(hitCampaign(briefing, view.nodes[0].x, view.nodes[0].y), null);
-});
-
-test("no two nodes overlap", () => {
-  const view = campaignView(createCampaign(), createProgress());
-  for (const a of view.nodes) {
-    for (const b of view.nodes) {
-      if (a.index >= b.index) continue;
-      assert(
-        Math.hypot(a.x - b.x, a.y - b.y) > a.radius + b.radius + 12,
-        `${a.id} and ${b.id} are drawn on top of each other`,
-      );
-    }
-  }
 });
 
 // ---------------------------------------------------------------------------

@@ -229,7 +229,8 @@ import {
   focusCampaign,
   moveCampaign,
 } from "./ui/campaign.js";
-import { CAMPAIGN_SPLASH, drawCampaign, hitCampaign } from "./render/campaign.js";
+import { drawCampaign, hitCampaign } from "./render/campaign.js";
+import { MAP_IMAGE } from "./campaign/map.js";
 import { createGhostStore } from "./rival/ghost-store.js";
 import {
   createBoards,
@@ -349,9 +350,10 @@ export function boot(canvas) {
   const rivalImages = new Map(RIVALS.map((rival) => [rival.id, loadImage(rivalPortraitSrc(rival))]));
   // The collection has a backdrop of its own — a workshop rather than a strip.
   const garageSplash = loadImage(GARAGE_SPLASH);
-  // And the campaign map another. Loaded at boot with the rest because it is one
-  // file and the map is one keypress from the title.
-  const campaignSplash = loadImage(CAMPAIGN_SPLASH);
+  // The painted campaign map. One file, and the screen it belongs to *is* it —
+  // there is no fallback layout to degrade to, so it loads with everything else
+  // rather than on demand.
+  const campaignMap = loadImage(MAP_IMAGE.src);
   /**
    * Mission splashes, loaded **on demand**.
    *
@@ -2672,7 +2674,7 @@ export function boot(canvas) {
 
     if (shell.screen === SCREEN_CAMPAIGN) {
       canvas.style.cursor = campaignHover ? "pointer" : "default";
-      drawCampaign(ctx, currentCampaignView(), { splashImage: campaignSplash, splashImages });
+      drawCampaign(ctx, currentCampaignView(), { mapImage: campaignMap, splashImages });
       return;
     }
 
@@ -2898,10 +2900,18 @@ export function boot(canvas) {
       const view = currentCampaignView();
       return {
         stage: view.stage,
-        chapter: view.chapter?.title ?? null,
         summary: view.summary,
-        nodes: view.nodes.map((node) => `${node.label} ${node.title} [${node.status}]${node.selected ? "<" : ""}`),
-        detail: view.detail ? { id: view.detail.id, status: view.detail.status, opponent: view.detail.opponent?.name ?? null } : null,
+        nodes: view.nodes.map(
+          (node) => `${node.id} ${node.kind} ${node.title ?? node.label ?? "—"} [${node.status}]${node.selected ? "<" : ""}`,
+        ),
+        detail: view.detail
+          ? {
+              node: view.detail.nodeId,
+              event: view.detail.eventId,
+              status: view.detail.status,
+              opponent: view.detail.opponent?.name ?? null,
+            }
+          : null,
         briefing: view.briefing
           ? { beat: `${view.briefing.index}/${view.briefing.total}`, speaker: view.briefing.speaker, lines: view.briefing.lines }
           : null,

@@ -70,12 +70,13 @@ function nobody({ id, name, tier, blurb, accent, modelId, livery, profile }) {
 }
 
 /**
- * Chapter one, on the grid the map lays out.
+ * Chapter one, hung on the painted map.
  *
- * `cell` is a discrete {col,row} and `connections` are the trails drawn between
- * nodes — the Tactical Arena campaign map's vocabulary, because it is the one
- * the player has already learned in this arcade. Adding an event is a free cell
- * plus a connection; nothing is hand-placed in pixels.
+ * `nodeId` names a base that is **already on the artwork** — the map paints
+ * every stop and every route between them, so an event does not place itself,
+ * it moves into a place that exists. Adding one is picking the next painted
+ * node along the route and writing the race for it; nothing is positioned, and
+ * no trail is drawn, because both are in the picture.
  *
  * Difficulty here is the rival ladder's rule, unchanged: looser hands, never a
  * better car. The opening opponent is slower than Vee — the roster's rookie —
@@ -85,8 +86,7 @@ export const EVENTS = [
   {
     id: "ch1-first-run",
     chapter: 1,
-    cell: { col: 0, row: 2 },
-    connections: [],
+    nodeId: "start",
     title: "FIRST RUN",
     where: "Old Town — after closing",
     splash: "street-race.png",
@@ -132,8 +132,7 @@ export const EVENTS = [
   {
     id: "ch1-regulars",
     chapter: 1,
-    cell: { col: 1, row: 1 },
-    connections: ["ch1-first-run"],
+    nodeId: "street-1",
     title: "THE REGULARS",
     where: "Old Town — the same corner, a week on",
     splash: "underpass-meet.png",
@@ -142,7 +141,7 @@ export const EVENTS = [
     objectiveId: "quarter",
     seed: 9042,
     requires: ["ch1-first-run"],
-    unlocks: ["ch1-long-way"],
+    unlocks: ["ch1-closing-time"],
     opponent: nobody({
       id: "nobody-coupe",
       name: "The Regular",
@@ -170,14 +169,13 @@ export const EVENTS = [
     ],
   },
   {
-    id: "ch1-long-way",
+    id: "ch1-closing-time",
     chapter: 1,
-    cell: { col: 2, row: 2 },
-    connections: ["ch1-regulars"],
-    title: "THE LONG WAY",
-    where: "Dockside — the half mile",
-    splash: "dock-race.png",
-    trackId: "track-e",
+    nodeId: "street-2",
+    title: "CLOSING TIME",
+    where: "Old Town — the long half mile",
+    splash: "duel-race.png",
+    trackId: "street-race",
     modeId: MODE_RIVAL,
     objectiveId: "half",
     seed: 2288,
@@ -185,7 +183,7 @@ export const EVENTS = [
     unlocks: [],
     opponent: nobody({
       id: "nobody-muscle",
-      name: "Dock Hand",
+      name: "Night Shift",
       tier: "LOCAL",
       blurb: "All of it in a straight line. Nothing left once the road stops being short.",
       accent: "#b4553a",
@@ -211,21 +209,4 @@ export const FIRST_EVENT_ID = EVENTS[0].id;
 
 export function eventById(id) {
   return EVENTS.find((event) => event.id === id) ?? null;
-}
-
-/** The events in a chapter, in authored order. */
-export function chapterEvents(chapter) {
-  return EVENTS.filter((event) => event.chapter === chapter);
-}
-
-export const CHAPTERS = [
-  {
-    number: 1,
-    title: "THE STREET",
-    blurb: "Nobody knows your name yet. Good.",
-  },
-];
-
-export function chapterByNumber(number) {
-  return CHAPTERS.find((chapter) => chapter.number === number) ?? null;
 }

@@ -246,12 +246,24 @@ test("the title screen leads to the mode list", () => {
   assertEqual(command, COMMAND_NONE);
 });
 
+/**
+ * Where a row sits on the mode list.
+ *
+ * The list is not `MODES` any more: the campaign is a row at the head of it that
+ * is not a mode at all. Locating by id rather than by catalog index is what
+ * stops these tests asserting about whichever mode has landed one row down.
+ */
+function modeCursor(id) {
+  const items = menuFor(enterScreen(createShell(), SCREEN_MODES)).items;
+  return items.findIndex((item) => item.id === id);
+}
+
 test("choosing a mode adopts it and moves on to the setup screen", () => {
   // Walked rather than assumed adjacent: the catalog gains modes, and a test
   // that hardcodes "one down from the top" starts asserting about whichever
   // mode happens to have landed there.
   let timeAttack = confirmTo(createShell());
-  const target = MODES.findIndex((m) => m.id === MODE_TIME_ATTACK);
+  const target = modeCursor(MODE_TIME_ATTACK);
   while (timeAttack.cursor < target) timeAttack = moveShell(timeAttack, "down");
   const { shell, command } = confirmShell(timeAttack);
   assertEqual(shell.modeId, MODE_TIME_ATTACK);
@@ -271,7 +283,7 @@ test("a locked mode says no and changes nothing", () => {
   // Keeping it exercised is the point: the buzz-and-stay behaviour is what an
   // unfinished mode on the roadmap will rely on.
   const modes = enterScreen(createShell(), SCREEN_MODES);
-  const { shell, command } = confirmShell({ ...modes, cursor: MODES.length });
+  const { shell, command } = confirmShell({ ...modes, cursor: MODES.length + 1 });
   assertEqual(command, COMMAND_LOCKED, "the caller needs to know to buzz rather than to advance");
   assertEqual(shell.screen, SCREEN_MODES);
   assertEqual(shell.modeId, DEFAULT_MODE_ID, "and nothing may be adopted on the way");
@@ -282,6 +294,12 @@ test("each mode says what the setup screen will ask it for", () => {
   // blind commitment to whatever it turns out to offer.
   for (const item of menuFor(enterScreen(createShell(), SCREEN_MODES)).items) {
     const mode = MODES.find((m) => m.id === item.id);
+    // The campaign row is not a mode — an event names its own distance — so it
+    // is checked for having *something* to say rather than against the catalog.
+    if (!mode) {
+      assert(item.objectiveLabel && item.objectiveOptions.length > 0, `${item.id} says nothing`);
+      continue;
+    }
     assertEqual(item.objectiveLabel, mode.objective.label);
     assertEqual(item.objectiveOptions.join(","), mode.objective.options.map((o) => o.label).join(","));
   }
@@ -289,7 +307,10 @@ test("each mode says what the setup screen will ask it for", () => {
 
 test("every mode is listed, and a note explains any that cannot be entered", () => {
   const menu = menuFor(enterScreen(createShell(), SCREEN_MODES));
-  assertEqual(menu.items.length, MODES.length, "the roadmap should be visible, not hidden");
+  // Every mode, plus the campaign at the head of the list — it is a way to
+  // play, which is what this screen is a list of.
+  assertEqual(menu.items.length, MODES.length + 1, "the roadmap should be visible, not hidden");
+  assertEqual(menu.items[0].id, "campaign", "the campaign heads the list");
   for (const item of menu.items) {
     if (!item.enabled) assert(item.note, `${item.id} is locked with no explanation`);
   }
@@ -297,12 +318,25 @@ test("every mode is listed, and a note explains any that cannot be entered", () 
 
 test("online is listed, enabled, and goes to the lobby rather than the setup screen", () => {
   const modes = enterScreen(createShell(), SCREEN_MODES);
-  const cursor = MODES.findIndex((mode) => mode.id === MODE_ONLINE);
-  const { shell, command } = confirmShell({ ...modes, cursor });
+  const { shell, command } = confirmShell({ ...modes, cursor: modeCursor(MODE_ONLINE) });
 
   assertEqual(shell.screen, SCREEN_ONLINE, "the strip belongs to the room, not to one driver");
   assertEqual(command, COMMAND_ONLINE, "and the socket has to be opened");
   assertEqual(shell.modeId, MODE_ONLINE);
+});
+
+test("the campaign is on the mode list, not the title menu", () => {
+  // It is a way to *play*, and this screen is the list of those. The title menu
+  // is for everything that is not racing — the garage, the boards, the stereo.
+  const title = menuFor(createShell()).items.map((item) => item.id);
+  assert(!title.includes("campaign"), "the campaign does not belong on the title menu");
+
+  const modes = enterScreen(createShell(), SCREEN_MODES);
+  const { shell, command } = confirmShell({ ...modes, cursor: modeCursor("campaign") });
+  assertEqual(shell.screen, SCREEN_CAMPAIGN);
+  assertEqual(command, COMMAND_CAMPAIGN, "the career has to be read off disk on the way in");
+  // And picking it must not adopt it as the mode: an event names its own.
+  assertEqual(shell.modeId, DEFAULT_MODE_ID);
 });
 
 test("backing out of online closes the session as well as the screen", () => {

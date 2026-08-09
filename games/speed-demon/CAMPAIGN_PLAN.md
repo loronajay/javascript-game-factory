@@ -244,6 +244,25 @@ the fiction — that is free characterisation.
 
 ---
 
+## Status
+
+**The spine is built and browser-verified** — chapter one's first three events,
+on the painted map, off the mode list. What this document got wrong and the code
+now does instead:
+
+- **The map is `assets/campaign-map.png`, not a grid.** Nodes are authored
+  percentages measured off the painted bases, and the routes between them are
+  painted too, so nothing draws a trail. See the Campaign section of
+  `CLAUDE.md`.
+- **Campaign is on the mode list**, not the title menu.
+- **The opening opponents and the narrator are deliberately nameless.** The ten
+  roster faces are rivals and bosses, kept back rather than spent on the events
+  that teach the loop.
+- `formats.js` is **not** built: the three shipped events are all `duel`, and a
+  format table earns its place when a second kind of race needs one.
+- Bio screen, chapter rows and the campaign result card are **not** built. The
+  results panel carries the verdict `rivalSummary` already produces.
+
 ## First milestone
 
 Build the spine on **one chapter of three events** before authoring the other

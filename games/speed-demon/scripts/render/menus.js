@@ -27,13 +27,13 @@ export const MENU_LAYOUT = {
   // below them rather than in the space between.
   title: {
     wordmark: { y: 148 },
-    // Six items now — START, CAMPAIGN, GARAGE, LEADERBOARDS, HOW TO DRIVE,
-    // RADIO — so the list starts higher again. It still has to clear the
-    // splash's cars above and the legend below, which is what
-    // `tests/modules.test.js` checks: adding a seventh item moves this line
-    // rather than silently overrunning the legend, exactly as adding the fifth
-    // and the sixth did.
-    list: { x: WORLD.width / 2 - 170, y: 380, width: 340, itemHeight: 40, gap: 8 },
+    // Five items — START, GARAGE, LEADERBOARDS, HOW TO DRIVE, RADIO. The
+    // campaign is deliberately not among them: it is a way to *play*, so it
+    // lives at the head of the mode list where a player looks for one. This
+    // line still has to clear the splash's cars above and the legend below,
+    // which is what `tests/modules.test.js` checks — a sixth item moves it
+    // rather than silently overrunning the legend.
+    list: { x: WORLD.width / 2 - 170, y: 418, width: 340, itemHeight: 40, gap: 8 },
     controls: { y: 672 },
   },
   modes: { header: { x: 140, y: 128 }, list: { x: 140, y: 216, width: 430, itemHeight: 62, gap: 12 } },

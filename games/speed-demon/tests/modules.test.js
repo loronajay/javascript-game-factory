@@ -72,6 +72,7 @@ const MODULES = [
   "scripts/rival/ghost.js",
   "scripts/rival/lineup.js",
   "scripts/campaign/events.js",
+  "scripts/campaign/map.js",
   "scripts/campaign/progress.js",
   "scripts/ui/campaign.js",
   "scripts/render/campaign.js",
@@ -562,6 +563,7 @@ test("the campaign's rules never reach for a browser", () => {
   ];
   for (const relative of [
     "scripts/campaign/events.js",
+    "scripts/campaign/map.js",
     "scripts/campaign/progress.js",
     "scripts/ui/campaign.js",
   ]) {

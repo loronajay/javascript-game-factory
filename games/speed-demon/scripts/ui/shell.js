@@ -183,17 +183,40 @@ export function isCampaignRun(shell) {
  * "press start" goes through exactly the same confirm path as everything else —
  * one code path for the whole shell rather than a special case at the front.
  */
+/**
+ * The mode list, with the campaign at the head of it.
+ *
+ * The campaign belongs **here** rather than on the title menu: it is a way to
+ * play, which is exactly what this screen is a list of, and a player looking
+ * for something to do looks at the modes. It is first because it is the
+ * single-player spine — the other four are what you play once you have run out
+ * of it.
+ *
+ * It is a row shaped like a mode rather than a real one in `sim/modes.js`,
+ * because a mode names an objective and a campaign event names its own. That is
+ * also why `confirmShell` resolves this list **by id** instead of indexing
+ * `MODES`: with a row here that is not a mode, an index would open Distance
+ * Race whenever the campaign was picked.
+ */
+const CAMPAIGN_MENU_ITEM = {
+  id: "campaign",
+  label: "Campaign",
+  blurb: "A career, one race at a time. Start at the bottom of the city and work east.",
+  available: true,
+  campaign: true,
+  objective: { label: "CHAPTER", options: [{ label: "The Street" }] },
+};
+
+const MODE_MENU = [CAMPAIGN_MENU_ITEM, ...MODES];
+
 const MENUS = {
   [SCREEN_TITLE]: () => ({
     title: "SPEED DEMON",
     subtitle: "Manual-shift drag racing",
     items: [
       // START stays item zero: ENTER on a fresh boot must start a race without
-      // anyone having to read the screen. The campaign sits directly under it
-      // rather than above — it is the headline single-player content, but not
-      // at the cost of the one thing this menu guarantees.
+      // anyone having to read the screen.
       { id: "start", label: "START", enabled: true },
-      { id: "campaign", label: "CAMPAIGN", enabled: true },
       // The garage is on the title menu because it is somewhere a player goes
       // *instead* of racing. Reaching it only through the pre-race picker made
       // browsing what you own cost a mode choice and three locked panes first.
@@ -209,7 +232,7 @@ const MENUS = {
   [SCREEN_MODES]: () => ({
     title: "SELECT MODE",
     subtitle: "ESC to go back",
-    items: MODES.map((mode) => ({
+    items: MODE_MENU.map((mode) => ({
       id: mode.id,
       label: mode.label.toUpperCase(),
       blurb: mode.blurb,
@@ -278,7 +301,10 @@ function openingCursor(shell, screen) {
   if (screen !== SCREEN_MODES) {
     return 0;
   }
-  const index = MODES.findIndex((mode) => mode.id === shell.modeId);
+  // Against the menu rather than against `MODES`, because the campaign row sits
+  // at the head of it — indexing the catalog would put the cursor one row above
+  // the mode the player last chose.
+  const index = MODE_MENU.findIndex((mode) => mode.id === shell.modeId);
   return index >= 0 ? index : 0;
 }
 
@@ -338,8 +364,6 @@ export function confirmShell(shell) {
           return outcome(enterScreen(shell, SCREEN_COLLECTION));
         case "boards":
           return outcome(enterScreen(shell, SCREEN_BOARDS), COMMAND_BOARDS);
-        case "campaign":
-          return outcome(enterScreen(shell, SCREEN_CAMPAIGN), COMMAND_CAMPAIGN);
         // The tutorial skips the mode list and the picker: a guided run is a
         // fixed run, and asking a player to choose a car before they have been
         // told how to drive one is the wrong order.
@@ -350,7 +374,12 @@ export function confirmShell(shell) {
       }
 
     case SCREEN_MODES: {
-      const mode = MODES[shell.cursor];
+      const mode = MODE_MENU[shell.cursor];
+      // The campaign is a row on this list that is not a mode, so it is
+      // answered before anything asks the mode catalog about it.
+      if (mode?.campaign) {
+        return outcome(enterScreen(shell, SCREEN_CAMPAIGN), COMMAND_CAMPAIGN);
+      }
       if (!mode || !modeById(mode.id)?.available) {
         // Hovering a locked mode must not adopt it — the chosen mode is only
         // ever changed by a confirm that actually goes through.
