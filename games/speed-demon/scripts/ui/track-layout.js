@@ -100,6 +100,24 @@ export const TRACKS = [
     dash: { firstY: 289, period: 301.5, length: 34 },
     tilePeriods: 4,
   },
+  {
+    // The first of the descriptively-named art. The lettered ids above are kept
+    // exactly as they are — a track id is stored on every record row, so
+    // renaming one orphans the metadata on every time already set — but there is
+    // nothing stopping a *new* track from being named after the place it is.
+    //
+    // Measured the same way as the rest, off the shipped file: the double-yellow
+    // divider lands on the same column as every other track (465-474 against a
+    // shared centre of 471) and the lane dashes start at y=290 on a 300.0px
+    // pitch, so this is the same road in a sixth setting rather than new
+    // geometry.
+    id: "street-race",
+    label: "Old Town",
+    blurb: "Two lanes through the old quarter, after closing",
+    src: "assets/tracks/street-race.png",
+    dash: { firstY: 290, period: 300, length: 38 },
+    tilePeriods: 4,
+  },
 ];
 
 export const DEFAULT_TRACK_ID = "track-a";

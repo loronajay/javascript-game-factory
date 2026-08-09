@@ -60,9 +60,13 @@ test("lanes are evenly spaced", () => {
 // The track catalog
 // ---------------------------------------------------------------------------
 
-test("the catalog holds five tracks with unique ids", () => {
-  assertEqual(TRACKS.length, 5);
-  assertEqual(new Set(TRACKS.map((t) => t.id)).size, 5);
+test("every track has an id of its own", () => {
+  // The count is not pinned: a track is one photograph of the shared road, and
+  // adding one is a measured row rather than a change to anything. What must
+  // hold is uniqueness — an id is stored on every record row as the track a
+  // time was set on, so two rows sharing one would merge two settings into one.
+  assert(TRACKS.length >= 5);
+  assertEqual(new Set(TRACKS.map((t) => t.id)).size, TRACKS.length);
 });
 
 test("the default track is one of them", () => {

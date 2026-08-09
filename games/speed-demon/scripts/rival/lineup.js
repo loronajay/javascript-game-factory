@@ -105,9 +105,15 @@ export function buildRival(entry, options, seed = 1) {
   if (entry.kind === KIND_GHOST) {
     return { entry, log: rebaseToStart({ events: entry.ghost.events }) };
   }
-  const rival = rivalById(entry.id);
-  if (!rival) return null;
-  return { entry, log: driveRace(options, rival.profile, seed).log };
+  // A profile carried on the entry wins over the roster, and that is what lets
+  // a campaign field a **nameless** driver: the opening events race anonymous
+  // locals rather than spending one of the ten faces, so the five knobs are
+  // authored on the event instead of looked up by id. Everything downstream is
+  // untouched — it is still an input log, still generated against the player's
+  // own race options, and still cannot be handed a faster car.
+  const profile = entry.profile ?? rivalById(entry.id)?.profile ?? null;
+  if (!profile) return null;
+  return { entry, log: driveRace(options, profile, seed).log };
 }
 
 /**

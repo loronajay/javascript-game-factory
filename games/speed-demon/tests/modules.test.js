@@ -71,6 +71,10 @@ const MODULES = [
   "scripts/rival/rivals.js",
   "scripts/rival/ghost.js",
   "scripts/rival/lineup.js",
+  "scripts/campaign/events.js",
+  "scripts/campaign/progress.js",
+  "scripts/ui/campaign.js",
+  "scripts/render/campaign.js",
   "scripts/init-game.js",
 ];
 
@@ -531,9 +535,40 @@ test("the debug handle can move on every screen that owns a cursor", () => {
     [shell.SCREEN_RADIO]: "SCREEN_RADIO",
     [shell.SCREEN_ONLINE]: "SCREEN_ONLINE",
     [shell.SCREEN_RACE]: "SCREEN_RACE",
+    [shell.SCREEN_CAMPAIGN]: "SCREEN_CAMPAIGN",
   };
   for (const screen of owned) {
     assert(block.includes(constants[screen]), `the debug handle's move() cannot reach ${screen}`);
+  }
+});
+
+test("the campaign's rules never reach for a browser", () => {
+  // The fifth instance of the split, after the radio, the garage, online and
+  // the records boards. The catalog, the career and the screen are pure;
+  // `progress-store.js` is the one module under `campaign/` allowed to know
+  // storage exists. Matched as *usage* rather than as bare words, the reason
+  // the garage's sweep gives: these files legitimately name the storage layer
+  // in prose, and a purity check that fires on a comment teaches people to
+  // weaken the check.
+  const forbidden = [
+    /document\s*\./,
+    /window\s*\./,
+    /localStorage\s*\./,
+    /indexedDB\s*\./,
+    /fetch\s*\(/,
+    // And no randomness: an event's difficulty is asserted from its authored
+    // seed, so a `Math.random` here would make a measured ladder unmeasurable.
+    /Math\.random/,
+  ];
+  for (const relative of [
+    "scripts/campaign/events.js",
+    "scripts/campaign/progress.js",
+    "scripts/ui/campaign.js",
+  ]) {
+    const source = fs.readFileSync(path.join(gameRoot, relative), "utf8");
+    for (const pattern of forbidden) {
+      assert(!pattern.test(source), `${relative} reaches for ${pattern}`);
+    }
   }
 });
 

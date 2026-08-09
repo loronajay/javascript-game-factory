@@ -40,7 +40,12 @@ export const SETUP_LAYOUT = {
   // and the two strips each gave up a little height. The preview was 300 and
   // generous with it; a car still reads at 230.
   preview: { x: 740, y: 138, width: 476, height: 230 },
-  tracks: { x: 740, y: 406, width: 88, height: 56, gap: 9 },
+  // Six tracks now, in the same 476px the preview above them occupies, so the
+  // cards narrowed rather than the strip growing into the column beside it.
+  // `tests/modules.test.js` is what catches the seventh: at that point this
+  // wants wrapping into two rows, the way the rival grid already does, rather
+  // than cards too thin to tell a verge apart.
+  tracks: { x: 740, y: 406, width: 71, height: 56, gap: 9 },
   objective: { x: 740, y: 500, width: 113, height: 38, gap: 8 },
   /**
    * Who you are racing. Drawn only in a mode that has the pane, but the rect

@@ -48,6 +48,8 @@ import {
   SCREEN_COLLECTION,
   SCREEN_BOARDS,
   SCREEN_ONLINE,
+  SCREEN_CAMPAIGN,
+  COMMAND_CAMPAIGN,
   COMMAND_BEGIN,
   COMMAND_RESTART,
   COMMAND_MODE,
@@ -56,6 +58,7 @@ import {
   COMMAND_ONLINE,
   COMMAND_ONLINE_LEAVE,
   createShell,
+  setCampaignRun,
   enterScreen,
   showsTheRace,
   menuFor,
@@ -207,10 +210,26 @@ import {
   stepPlayhead,
   MAX_REPLAY_TICKS,
 } from "./sim/input-log.js";
-import { boardIdFor, runSummary, runValue } from "./records/records.js";
+import { BETTER_LOWER, boardDirection, boardIdFor, runSummary, runValue } from "./records/records.js";
 import { createRecordsStore } from "./records/records-store.js";
 import { buildRival, rivalOutcome, rivalSummary } from "./rival/lineup.js";
 import { RIVALS, rivalPortraitSrc } from "./rival/rivals.js";
+import { splashSrc } from "./campaign/events.js";
+import { createCampaignStore } from "./campaign/progress-store.js";
+import { completeEvent } from "./campaign/progress.js";
+import {
+  CAMPAIGN_LOCKED,
+  CAMPAIGN_RACE,
+  STAGE_MAP,
+  campaignEvent,
+  campaignView,
+  cancelCampaign,
+  confirmCampaign,
+  createCampaign,
+  focusCampaign,
+  moveCampaign,
+} from "./ui/campaign.js";
+import { CAMPAIGN_SPLASH, drawCampaign, hitCampaign } from "./render/campaign.js";
 import { createGhostStore } from "./rival/ghost-store.js";
 import {
   createBoards,
@@ -330,6 +349,24 @@ export function boot(canvas) {
   const rivalImages = new Map(RIVALS.map((rival) => [rival.id, loadImage(rivalPortraitSrc(rival))]));
   // The collection has a backdrop of its own — a workshop rather than a strip.
   const garageSplash = loadImage(GARAGE_SPLASH);
+  // And the campaign map another. Loaded at boot with the rest because it is one
+  // file and the map is one keypress from the title.
+  const campaignSplash = loadImage(CAMPAIGN_SPLASH);
+  /**
+   * Mission splashes, loaded **on demand**.
+   *
+   * Unlike every other image here these are not all on screen at once — a
+   * briefing shows exactly one — and they are 2MB apiece, so loading the
+   * catalog at boot would cost more than the two car sheets and every track put
+   * together for art nobody has asked to see. Requested when a briefing opens;
+   * the renderer draws the box over a plain backdrop until it lands, which is
+   * how every renderer here already degrades on a cold cache.
+   */
+  const splashImages = new Map();
+  function requestSplash(event) {
+    if (!event?.splash || splashImages.has(event.splash)) return;
+    splashImages.set(event.splash, loadImage(splashSrc(event)));
+  }
 
   let shell = createShell();
   // The player's saved configs, and the seam that persists them.
@@ -383,6 +420,33 @@ export function boot(canvas) {
    * whose runs they are holding.
    */
   const ghostStore = createGhostStore({ playerId: recordsStore.playerId });
+  /**
+   * The career, and the map's cursor into it.
+   *
+   * Keyed by the same player id as the records and the ghosts, so a shared
+   * browser cannot show one account another's progress — and local-only for
+   * now, which is the records rule rather than the garage rule: a career is
+   * meaningful to the player alone.
+   */
+  const campaignStore = createCampaignStore({ playerId: recordsStore.playerId });
+  let campaign = createCampaign();
+  let campaignHover = null;
+  /**
+   * The event the live race belongs to, or null.
+   *
+   * The fourth thing `SCREEN_RACE` can be carrying, beside a coach, an online
+   * session and a rival playhead — and, like `coachedRun`, it outlives the race
+   * itself so RUN IT AGAIN rebuilds the right kind of run. The shell keeps its
+   * own copy of the id because it changes what two menus say; this keeps the
+   * event, because building the race needs the whole row.
+   */
+  let campaignRun = null;
+  /**
+   * What the last campaign run did to the career — cleared, and what it opened.
+   * Lives beside `recordResult` and for the same reason: it belongs to the
+   * results screen rather than to the world.
+   */
+  let campaignResult = null;
 
   /**
    * The car in the other lane during a solo race, or null.
@@ -1244,11 +1308,15 @@ export function boot(canvas) {
    * player's car, which is the whole reason a rival cannot cheat: there is no
    * code path by which it could be given a different one.
    */
-  function buildRivalCar(raceOptions) {
-    if (!setupMode(setup).rival) return null;
+  function buildRivalCar(raceOptions, { entry: override = null, seed = null } = {}) {
+    if (!override && !setupMode(setup).rival) return null;
 
-    const entry = setupRival(setup, currentGhost());
-    const built = buildRival(entry, raceOptions, runCounter);
+    // A campaign event names its own driver — an anonymous local rather than
+    // one of the ten faces — and its own seed, so the event plays the same way
+    // every time it is attempted. Everything past this point is identical: it
+    // is still an input log built against the player's own race options.
+    const entry = override ?? setupRival(setup, currentGhost());
+    const built = buildRival(entry, raceOptions, seed ?? runCounter);
     if (!built) return null;
 
     const model = modelById(entry.modelId) ?? chosen.model;
@@ -1267,8 +1335,32 @@ export function boot(canvas) {
     return ghostStore.get(setupBoardId(setup));
   }
 
-  /** Commits the setup screen's selection and builds a race on it. */
-  function beginRace() {
+  /**
+   * Commits the setup screen's selection and builds a race on it.
+   *
+   * With an `event`, the same thing happens with the campaign's answers pushed
+   * into the setup first — the strip, the distance and the mode belong to the
+   * event, the car stays the player's own. Deliberately the same function
+   * rather than a second one: a campaign race *is* a rival race, and a parallel
+   * builder is how the two would drift into behaving differently.
+   */
+  function beginRace({ event = null } = {}) {
+    campaignRun = event;
+    // What the pause and results menus read, so a career run offers the map
+    // instead of the picker. Cleared here on an ordinary run, which is what
+    // stops a campaign menu surviving into a race the player set up themselves.
+    shell = setCampaignRun(shell, event?.id ?? null);
+    if (event) {
+      setup = createSetup(
+        {
+          ...setupSelection(setup, garage),
+          modeId: event.modeId,
+          objectiveId: event.objectiveId,
+          trackId: event.trackId,
+        },
+        garage,
+      );
+    }
     chosen = resolveSelection(setupSelection(setup, garage));
     runSelection = setupSelection(setup, garage);
     runCounter += 1;
@@ -1286,7 +1378,7 @@ export function boot(canvas) {
     // Built from the same options the player's race is, and after `chosen` has
     // been resolved — a rival with no model of its own falls back to the
     // player's, which is a worse rival rather than a crash.
-    rivalCar = buildRivalCar(raceOptions);
+    rivalCar = buildRivalCar(raceOptions, event ? { entry: event.opponent, seed: event.seed } : {});
     view = newView(layout, race);
     coach = null;
     coachedRun = false;
@@ -1331,6 +1423,11 @@ export function boot(canvas) {
   function restartRun() {
     if (coachedRun) {
       beginTutorial();
+    } else if (campaignRun) {
+      // The event again, briefing skipped — the player has read it, and making
+      // them read it a second time to retry a race they just lost is the sort
+      // of thing that turns a retry into a quit.
+      beginRace({ event: campaignRun });
     } else {
       beginRace();
     }
@@ -1389,8 +1486,79 @@ export function boot(canvas) {
     requestVisibleBoard();
   }
 
+  /**
+   * Opens the campaign map on the event most worth looking at: the one just
+   * played if there was one, otherwise wherever the cursor was left.
+   */
+  function openCampaign() {
+    campaign = createCampaign({ eventId: campaignRun?.id ?? campaignEvent(campaign)?.id ?? null });
+    campaignHover = null;
+  }
+
+  /** The campaign view as it is currently drawn, hover folded in. */
+  function currentCampaignView({ hover = campaignHover } = {}) {
+    return campaignView(campaign, campaignStore.progress, { hover });
+  }
+
+  /**
+   * ENTER on the campaign screen: open a briefing, turn its page, or — off the
+   * end of the last one — build the race and move the screen.
+   *
+   * Moving the screen here rather than through `confirmShell` is the setup
+   * screen's START button rule: the shell has already declined this key, and
+   * whether a briefing is finished is a question about an event.
+   */
+  function confirmCampaignScreen() {
+    const { campaign: next, command, event } = confirmCampaign(campaign, campaignStore.progress);
+    campaign = next;
+    // A locked node buzzes rather than advances — silently for now, exactly as
+    // `COMMAND_LOCKED` does on the mode list, and the same hook an audio pass
+    // would hang a sound on.
+    if (command === CAMPAIGN_LOCKED) return;
+    // Asked for as the briefing opens rather than when the map does, so a
+    // player browsing the map downloads nothing.
+    requestSplash(campaignEvent(campaign));
+    if (command !== CAMPAIGN_RACE || !event) return;
+    beginRace({ event });
+    shell = enterScreen(shell, SCREEN_RACE);
+  }
+
+  /** ESC: out of a briefing is the map's business, off the map is the shell's. */
+  function cancelCampaignScreen() {
+    const { campaign: next, exit } = cancelCampaign(campaign);
+    campaign = next;
+    return exit;
+  }
+
+  /**
+   * Files a finished campaign race against the career.
+   *
+   * Called after `recordRun`, because a campaign race files to the distance
+   * boards like any other rival race — the other car is in the other lane and
+   * cannot reach across, so the run is physically identical to a solo one over
+   * the same distance — and the career is a second, separate ledger on top.
+   */
+  function recordCampaignRun() {
+    campaignResult = null;
+    if (!campaignRun) return;
+
+    const won = Boolean(rivalResult?.won);
+    const value = runValue(race);
+    const lower = boardDirection(runSelection.modeId) === BETTER_LOWER;
+    const outcome = completeEvent(campaignStore.progress, campaignRun.id, {
+      won,
+      value,
+      at: Date.now(),
+      better: (candidate, previous) => (lower ? candidate < previous : candidate > previous),
+    });
+    campaignStore.commit(outcome.progress);
+    campaignResult = outcome;
+  }
+
   function runCommand(command) {
-    if (command === COMMAND_BEGIN) {
+    if (command === COMMAND_CAMPAIGN) {
+      openCampaign();
+    } else if (command === COMMAND_BEGIN) {
       beginRace();
     } else if (command === COMMAND_RESTART) {
       restartRun();
@@ -1451,6 +1619,10 @@ export function boot(canvas) {
     }
     if (shell.screen === SCREEN_COLLECTION) {
       confirmCollection();
+      return;
+    }
+    if (shell.screen === SCREEN_CAMPAIGN) {
+      confirmCampaignScreen();
       return;
     }
     if (shell.screen === SCREEN_SETUP) {
@@ -1629,6 +1801,9 @@ export function boot(canvas) {
       leaveGarage();
       return;
     }
+    if (shell.screen === SCREEN_CAMPAIGN && !cancelCampaignScreen()) {
+      return; // backed out of a briefing; the shell does not move
+    }
     if (shell.screen === SCREEN_SETUP) {
       const { setup: next, exit } = cancelSetup(setup);
       setup = next;
@@ -1756,6 +1931,8 @@ export function boot(canvas) {
           // on the move rather than needing a confirm the screen does not have.
           boardsCursor = moveBoards(boardsCursor, action.direction, { rowCount: boardsRowCount() });
           requestVisibleBoard();
+        } else if (shell.screen === SCREEN_CAMPAIGN) {
+          campaign = moveCampaign(campaign, action.direction);
         } else if (shell.screen === SCREEN_SETUP) {
           setup = moveSetup(setup, action.direction, garage, { ghost: currentGhost() });
         } else {
@@ -2010,6 +2187,30 @@ export function boot(canvas) {
     requestVisibleBoard();
   }
 
+  /**
+   * A click on the campaign map. **One click does the whole job**: it puts the
+   * cursor on the node and opens its briefing, the cabinet's rule everywhere —
+   * a mouse has nowhere to put a separate commit. A locked node is still a
+   * click target, because the detail panel beside it is worth reading; opening
+   * it is what `confirmCampaignScreen` refuses.
+   *
+   * A briefing is turned by clicking anywhere, which is what a dialogue box has
+   * always meant.
+   */
+  function clickCampaign(click) {
+    if (click.dragging) return;
+    if (campaign.stage !== STAGE_MAP) {
+      audio.play("button");
+      confirmCampaignScreen();
+      return;
+    }
+    const target = hitCampaign(currentCampaignView({ hover: null }), click.x, click.y);
+    if (!target) return;
+    audio.play("button");
+    campaign = focusCampaign(campaign, target.index);
+    confirmCampaignScreen();
+  }
+
   function applyPointer() {
     // Hovering moves the menu cursor, so the caret is always on the item a click
     // would take. Without it the highlight and the mouse disagree, and the first
@@ -2054,6 +2255,14 @@ export function boot(canvas) {
     // to the scroll arrows must not change what is being read.
     boardsHover = shell.screen === SCREEN_BOARDS ? hitBoardsAt(pointer.hover()) : null;
 
+    // And on the campaign map, for the third time and the same reason: the node
+    // under the cursor is the mission a click would open, so hovering marks it
+    // without taking it. A briefing has no targets at all — the whole screen is
+    // ENTER — so `hitCampaign` refuses one.
+    campaignHover = shell.screen === SCREEN_CAMPAIGN
+      ? hitCampaign(currentCampaignView({ hover: null }), pointer.hover()?.x ?? -1, pointer.hover()?.y ?? -1)
+      : null;
+
     if (shell.screen === SCREEN_GARAGE) {
       const at = pointer.hover();
       const hovered = at ? hitGarage(currentGarageView(), at.x, at.y) : null;
@@ -2078,6 +2287,8 @@ export function boot(canvas) {
         clickCollection(click);
       } else if (shell.screen === SCREEN_BOARDS) {
         clickBoards(click);
+      } else if (shell.screen === SCREEN_CAMPAIGN) {
+        clickCampaign(click);
       } else if (shell.screen === SCREEN_ONLINE) {
         clickOnline(click);
       } else if (isOnlineRace() && showsOnlineResult()) {
@@ -2237,6 +2448,10 @@ export function boot(canvas) {
     if (race.phase === FINISHED && !isOnlineRace()) {
       rivalResult = isRivalRace() ? rivalOutcome(race, settledRivalRace()) : null;
       recordRun();
+      // After the board, because a campaign race files to the distance boards
+      // like any other rival race and the career is a second ledger on top of
+      // that — not instead of it.
+      recordCampaignRun();
       shell = enterScreen(shell, SCREEN_RESULTS);
       // A lesson ends with the run it belongs to, however far through it got:
       // there is nothing left to coach, and its strip would otherwise stick out
@@ -2455,6 +2670,12 @@ export function boot(canvas) {
       return;
     }
 
+    if (shell.screen === SCREEN_CAMPAIGN) {
+      canvas.style.cursor = campaignHover ? "pointer" : "default";
+      drawCampaign(ctx, currentCampaignView(), { splashImage: campaignSplash, splashImages });
+      return;
+    }
+
     if (shell.screen === SCREEN_COLLECTION) {
       canvas.style.cursor = collectionHover ? "pointer" : "default";
       drawCollection(ctx, currentCollectionView(), { sheetImages, splashImage: garageSplash, liveryCache });
@@ -2586,6 +2807,8 @@ export function boot(canvas) {
         // what asks for its board, so a direction that skipped `menuAction`
         // would move the strip and never load what it landed on.
         menuAction({ type: ACTION_MOVE, direction });
+      } else if (shell.screen === SCREEN_CAMPAIGN) {
+        campaign = moveCampaign(campaign, direction);
       } else {
         shell = moveShell(shell, direction);
       }
@@ -2613,6 +2836,12 @@ export function boot(canvas) {
       // idle screen that never loads.
       if (name === SCREEN_BOARDS) {
         openBoards();
+      }
+      // Same again for the campaign map: it is built on the way in from the
+      // career on disk, so jumping straight here would otherwise show whatever
+      // the cursor held at boot.
+      if (name === SCREEN_CAMPAIGN) {
+        openCampaign();
       }
       render();
       return this.state();
@@ -2658,6 +2887,36 @@ export function boot(canvas) {
           cells: row.cells.map((cell) => `${cell.name}${cell.selected ? "<" : ""}${cell.chosen ? "*" : ""}`),
         })),
       };
+    },
+    /**
+     * The campaign map or the briefing on it, whichever is up, plus the career
+     * behind them. The screen is two stages behind one cursor and the node
+     * layout is a graph rather than a list, so counting keypresses from
+     * automation gets it wrong — the collection's and the leaderboards' reason.
+     */
+    campaign() {
+      const view = currentCampaignView();
+      return {
+        stage: view.stage,
+        chapter: view.chapter?.title ?? null,
+        summary: view.summary,
+        nodes: view.nodes.map((node) => `${node.label} ${node.title} [${node.status}]${node.selected ? "<" : ""}`),
+        detail: view.detail ? { id: view.detail.id, status: view.detail.status, opponent: view.detail.opponent?.name ?? null } : null,
+        briefing: view.briefing
+          ? { beat: `${view.briefing.index}/${view.briefing.total}`, speaker: view.briefing.speaker, lines: view.briefing.lines }
+          : null,
+        run: campaignRun?.id ?? null,
+        result: campaignResult
+          ? { cleared: campaignResult.cleared, firstClear: campaignResult.firstClear, unlocked: campaignResult.unlocked }
+          : null,
+      };
+    },
+    /** Back to a blank career. Here so a run through can be repeated. */
+    resetCampaign() {
+      campaignStore.reset();
+      openCampaign();
+      render();
+      return this.campaign();
     },
     /**
      * The rival strip and the car in the other lane. The lineup changes length
@@ -2888,6 +3147,10 @@ export function boot(canvas) {
         menu: menuFor(shell)?.items.map((item) => (item.highlighted ? `[${item.id}]` : item.id)) ?? null,
         mode: selection.modeId,
         objective: selection.objectiveId,
+        // Which campaign event the live race belongs to, or null. On the state
+        // dump because "why does the pause menu say BACK TO CAMPAIGN" is a
+        // question about the run rather than about the map.
+        event: campaignRun?.id ?? null,
         car: racing ? chosen.model.id : selection.modelId,
         track: racing ? chosen.track.id : selection.trackId,
         phase: race.phase,

@@ -53,6 +53,18 @@ export const SCREEN_BOARDS = "boards";
  * different copy of the driving for the online path to drift into.
  */
 export const SCREEN_ONLINE = "online";
+/**
+ * The campaign: a node map, and the briefing that plays over a mission splash
+ * before the tree.
+ *
+ * One screen for both, because a briefing owns nothing but ENTER and every
+ * screen costs an input path, a debug-handle case and a renderer branch. The
+ * stage is state inside `ui/campaign.js`, exactly as the setup screen's pane is.
+ *
+ * Like the collection and the leaderboards it has one way in — the title menu —
+ * and so needs no remembered return.
+ */
+export const SCREEN_CAMPAIGN = "campaign";
 
 export const SCREENS = [
   SCREEN_TITLE,
@@ -66,6 +78,7 @@ export const SCREENS = [
   SCREEN_COLLECTION,
   SCREEN_BOARDS,
   SCREEN_ONLINE,
+  SCREEN_CAMPAIGN,
 ];
 
 /**
@@ -104,6 +117,8 @@ export const COMMAND_BOARDS = "boards";
 export const COMMAND_ONLINE = "online";
 /** Tear the session down: the player has backed out of online play. */
 export const COMMAND_ONLINE_LEAVE = "online-leave";
+/** Open the campaign map, reading the career off disk. */
+export const COMMAND_CAMPAIGN = "campaign";
 
 /**
  * Screens whose menu is a modal over a live race, so the world and the
@@ -127,7 +142,36 @@ export function createShell({ screen = SCREEN_TITLE, modeId = DEFAULT_MODE_ID } 
   // ESC had one sensible answer. The online lobby is now a second way in — a
   // driver has to be able to paint the car they are about to race without
   // leaving the room — and a hardcoded return would drop them out of the lobby.
-  return { screen, cursor: 0, modeId, radioReturn: SCREEN_TITLE, garageReturn: SCREEN_SETUP };
+  // `campaignEventId` is the one piece of state the shell keeps about the race
+  // itself, and it is here rather than in `init-game.js` because it changes what
+  // two *menus* mean: on a campaign run, CHANGE CAR / TRACK is nonsense — the
+  // event names the car's opposition, the strip and the distance — and quitting
+  // belongs back on the map rather than on the mode list. Deciding that is the
+  // shell's job, and putting the flag anywhere else would put menu meaning in
+  // the composition root.
+  return {
+    screen,
+    cursor: 0,
+    modeId,
+    radioReturn: SCREEN_TITLE,
+    garageReturn: SCREEN_SETUP,
+    campaignEventId: null,
+  };
+}
+
+/**
+ * Marks the race about to be built as a campaign event's, or clears it.
+ *
+ * Cleared by every other way of starting a run, so a career race cannot leave
+ * the pause menu talking about a campaign after the player has gone off and
+ * picked a car themselves.
+ */
+export function setCampaignRun(shell, eventId) {
+  return { ...shell, campaignEventId: eventId ?? null };
+}
+
+export function isCampaignRun(shell) {
+  return Boolean(shell.campaignEventId);
 }
 
 // ---------------------------------------------------------------------------
@@ -145,8 +189,11 @@ const MENUS = {
     subtitle: "Manual-shift drag racing",
     items: [
       // START stays item zero: ENTER on a fresh boot must start a race without
-      // anyone having to read the screen.
+      // anyone having to read the screen. The campaign sits directly under it
+      // rather than above — it is the headline single-player content, but not
+      // at the cost of the one thing this menu guarantees.
       { id: "start", label: "START", enabled: true },
+      { id: "campaign", label: "CAMPAIGN", enabled: true },
       // The garage is on the title menu because it is somewhere a player goes
       // *instead* of racing. Reaching it only through the pre-race picker made
       // browsing what you own cost a mode choice and three locked panes first.
@@ -174,23 +221,29 @@ const MENUS = {
       objectiveOptions: mode.objective.options.map((option) => option.label),
     })),
   }),
-  [SCREEN_PAUSED]: () => ({
+  [SCREEN_PAUSED]: (shell) => ({
     title: "PAUSED",
     subtitle: "ESC to resume",
     items: [
       { id: "resume", label: "RESUME", enabled: true },
       { id: "restart", label: "RESTART RUN", enabled: true },
-      { id: "setup", label: "CHANGE CAR / TRACK", enabled: true },
+      // A campaign event names the strip, the distance and the driver in the
+      // other lane, so there is nothing to change — the way out is the map.
+      ...(isCampaignRun(shell)
+        ? [{ id: "campaign", label: "BACK TO CAMPAIGN", enabled: true }]
+        : [{ id: "setup", label: "CHANGE CAR / TRACK", enabled: true }]),
       { id: "radio", label: "RADIO", enabled: true },
       { id: "menu", label: "QUIT TO MENU", enabled: true },
     ],
   }),
-  [SCREEN_RESULTS]: () => ({
+  [SCREEN_RESULTS]: (shell) => ({
     title: "RESULTS",
     subtitle: null,
     items: [
       { id: "again", label: "RUN IT AGAIN", enabled: true },
-      { id: "setup", label: "CHANGE CAR / TRACK", enabled: true },
+      ...(isCampaignRun(shell)
+        ? [{ id: "campaign", label: "BACK TO CAMPAIGN", enabled: true }]
+        : [{ id: "setup", label: "CHANGE CAR / TRACK", enabled: true }]),
       { id: "menu", label: "QUIT TO MENU", enabled: true },
     ],
   }),
@@ -210,7 +263,7 @@ export function menuFor(shell) {
   if (!build) {
     return null;
   }
-  const menu = build();
+  const menu = build(shell);
   return {
     ...menu,
     items: menu.items.map((item, index) => ({ ...item, index, highlighted: index === shell.cursor })),
@@ -285,6 +338,8 @@ export function confirmShell(shell) {
           return outcome(enterScreen(shell, SCREEN_COLLECTION));
         case "boards":
           return outcome(enterScreen(shell, SCREEN_BOARDS), COMMAND_BOARDS);
+        case "campaign":
+          return outcome(enterScreen(shell, SCREEN_CAMPAIGN), COMMAND_CAMPAIGN);
         // The tutorial skips the mode list and the picker: a guided run is a
         // fixed run, and asking a player to choose a car before they have been
         // told how to drive one is the wrong order.
@@ -318,6 +373,8 @@ export function confirmShell(shell) {
           return outcome(enterScreen(shell, SCREEN_RACE), COMMAND_RESTART);
         case "setup":
           return outcome(enterScreen(shell, SCREEN_SETUP));
+        case "campaign":
+          return outcome(enterScreen(shell, SCREEN_CAMPAIGN), COMMAND_CAMPAIGN);
         case "radio":
           return outcome(enterScreen(shell, SCREEN_RADIO));
         case "menu":
@@ -330,6 +387,8 @@ export function confirmShell(shell) {
       switch (menuFor(shell).items[shell.cursor]?.id) {
         case "setup":
           return outcome(enterScreen(shell, SCREEN_SETUP));
+        case "campaign":
+          return outcome(enterScreen(shell, SCREEN_CAMPAIGN), COMMAND_CAMPAIGN);
         case "menu":
           return outcome(enterScreen(shell, SCREEN_MODES));
         default:
@@ -360,6 +419,14 @@ export function confirmShell(shell) {
     case SCREEN_BOARDS:
       return outcome(shell);
 
+    // And the campaign: ENTER there opens a briefing, turns its pages, and
+    // finally asks for a race — all questions about an event and a career,
+    // which the shell deliberately cannot see. `init-game.js` moves the screen
+    // itself when the briefing is done, exactly as the setup screen's START
+    // button does.
+    case SCREEN_CAMPAIGN:
+      return outcome(shell);
+
     // The online screen owns its own ENTER too — search, create, join, ready —
     // and what any of those mean depends on the session, which the shell
     // deliberately cannot see.
@@ -385,8 +452,13 @@ export function cancelShell(shell) {
       return outcome(enterScreen(shell, SCREEN_PAUSED));
     case SCREEN_PAUSED:
       return outcome(enterScreen(shell, SCREEN_RACE));
+    // Backing out of a campaign result goes to the map rather than to the
+    // picker, for the same reason its menu says so: a career race has nothing
+    // to pick.
     case SCREEN_RESULTS:
-      return outcome(enterScreen(shell, SCREEN_SETUP));
+      return isCampaignRun(shell)
+        ? outcome(enterScreen(shell, SCREEN_CAMPAIGN), COMMAND_CAMPAIGN)
+        : outcome(enterScreen(shell, SCREEN_SETUP));
     // Back to wherever the stereo was opened from. A race paused behind it is
     // still sitting there and must be returned to, not thrown away.
     case SCREEN_RADIO:
@@ -400,8 +472,11 @@ export function cancelShell(shell) {
     // editor it needs no remembered return.
     case SCREEN_COLLECTION:
       return outcome(enterScreen(shell, SCREEN_TITLE));
-    // Likewise the leaderboards: one way in, so one way out.
+    // Likewise the leaderboards and the campaign map: one way in, so one way
+    // out. (Backing out of a *briefing* is the campaign screen's own business
+    // and never reaches here — the same split the setup screen's panes make.)
     case SCREEN_BOARDS:
+    case SCREEN_CAMPAIGN:
       return outcome(enterScreen(shell, SCREEN_TITLE));
     // Backing out of online has to close the socket as well as change screen —
     // an abandoned lobby that nobody left is a room the server keeps alive and

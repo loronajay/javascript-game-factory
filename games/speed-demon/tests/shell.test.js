@@ -13,6 +13,7 @@ import {
   SCREEN_COLLECTION,
   SCREEN_BOARDS,
   SCREEN_ONLINE,
+  SCREEN_CAMPAIGN,
   SCREENS,
   COMMAND_NONE,
   COMMAND_BEGIN,
@@ -23,6 +24,7 @@ import {
   COMMAND_BOARDS,
   COMMAND_ONLINE,
   COMMAND_ONLINE_LEAVE,
+  COMMAND_CAMPAIGN,
   createShell,
   enterScreen,
   isMenuScreen,
@@ -70,6 +72,7 @@ test("every screen is handled by exactly one of the input paths", () => {
       screen === SCREEN_RADIO,
       screen === SCREEN_RACE,
       screen === SCREEN_ONLINE,
+      screen === SCREEN_CAMPAIGN,
     ];
     assertEqual(paths.filter(Boolean).length, 1, `${screen} is handled by ${paths.filter(Boolean).length} paths`);
   }
@@ -407,6 +410,7 @@ test("every menu item resolves to a handled command", () => {
     COMMAND_BOARDS,
     COMMAND_ONLINE,
     COMMAND_ONLINE_LEAVE,
+    COMMAND_CAMPAIGN,
   ]);
   for (const screen of SCREENS.filter(isMenuScreen)) {
     const shell = enterScreen(createShell(), screen);
