@@ -22,6 +22,18 @@ import { WORLD } from "./scene.js";
 import { drawMenuBackdrop, menuPanel } from "./menus.js";
 import { RADIO_LAYOUT, buttonRect, marqueeOffset, rowRect } from "../ui/radio-panel.js";
 
+/**
+ * The backdrop behind the head unit: a night cockpit, its own stereo lit up,
+ * with the strip through the windscreen.
+ *
+ * The screen's furniture is a car stereo, so this is the one backdrop in the
+ * cabinet that is *about* the screen it sits behind rather than being scenery.
+ * It is authored as a backdrop — already night, its subject down the left and
+ * bottom — so it takes almost no hold-back, unlike the menu splash which this
+ * screen used to borrow and had to hold at 0.20 to stop it fighting the type.
+ */
+export const RADIO_SPLASH = "assets/radio-splash.png";
+
 const INK = "#e8e9ee";
 const TEXT = "#dfe6ee";
 const DIM = "#8b95a2";
@@ -345,9 +357,10 @@ function drawPlaylist(ctx, view) {
 // ---------------------------------------------------------------------------
 
 export function drawRadioScreen(ctx, view, { splashImage } = {}) {
-  // Held further back than the title screen holds it: this screen is dense with
-  // small type, and the splash is a busy picture.
-  drawMenuBackdrop(ctx, splashImage, { alpha: 0.20, scrim: 0.74 });
+  // Near full strength, because this backdrop is authored as one. The scrim is
+  // still a shade heavier than the title screen's: the faceplate covers the
+  // middle, but the hint lines top and bottom sit straight on the picture.
+  drawMenuBackdrop(ctx, splashImage, { alpha: 1, scrim: 0.56 });
 
   const centre = WORLD.width / 2;
   text(ctx, "SPEED DEMON RADIO", centre, 58, { size: 30, colour: INK, weight: "800", align: "center" });

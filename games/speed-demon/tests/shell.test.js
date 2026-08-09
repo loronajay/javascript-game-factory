@@ -107,16 +107,22 @@ test("the garage declines ENTER, leaving it to the editor's own actions", () => 
   assertEqual(confirmShell(shell).shell.screen, SCREEN_GARAGE);
 });
 
-test("the title menu opens the collection, and ESC comes back to it", () => {
-  // The garage is somewhere a player goes *instead* of racing, so it hangs off
-  // the title menu rather than off the pre-race picker alone.
-  const title = createShell();
-  const index = menuFor(title).items.findIndex((item) => item.id === "garage");
-  assert(index >= 0, "the title menu offers no way into the garage");
-  const { shell, command } = confirmShell({ ...title, cursor: index });
+test("the mode list opens the collection, and ESC comes back to it", () => {
+  // The garage sits at the foot of the mode list rather than on the title menu:
+  // this is the screen a player is on when "what am I driving?" is live, and a
+  // car picked in the collection is the car the setup screen opens on. It must
+  // not be adopted as the mode on the way through — it is not one.
+  const modes = enterScreen(createShell(), SCREEN_MODES);
+  const index = menuFor(modes).items.findIndex((item) => item.id === "garage");
+  assert(index >= 0, "the mode list offers no way into the garage");
+  assert(!menuFor(createShell()).items.some((item) => item.id === "garage"),
+    "the garage does not belong on the title menu");
+
+  const { shell, command } = confirmShell({ ...modes, cursor: index });
   assertEqual(shell.screen, SCREEN_COLLECTION);
   assertEqual(command, COMMAND_NONE);
-  assertEqual(cancelShell(shell).shell.screen, SCREEN_TITLE);
+  assertEqual(shell.modeId, DEFAULT_MODE_ID, "the garage row is not a mode");
+  assertEqual(cancelShell(shell).shell.screen, SCREEN_MODES);
 });
 
 test("the collection is not a menu screen and does not replace the race", () => {
@@ -283,7 +289,9 @@ test("a locked mode says no and changes nothing", () => {
   // Keeping it exercised is the point: the buzz-and-stay behaviour is what an
   // unfinished mode on the roadmap will rely on.
   const modes = enterScreen(createShell(), SCREEN_MODES);
-  const { shell, command } = confirmShell({ ...modes, cursor: MODES.length + 1 });
+  // Past the end of the list, whatever is on it — the campaign heads it and the
+  // garage tails it, so counting `MODES` alone would land on a real row.
+  const { shell, command } = confirmShell({ ...modes, cursor: menuFor(modes).items.length + 1 });
   assertEqual(command, COMMAND_LOCKED, "the caller needs to know to buzz rather than to advance");
   assertEqual(shell.screen, SCREEN_MODES);
   assertEqual(shell.modeId, DEFAULT_MODE_ID, "and nothing may be adopted on the way");
@@ -308,9 +316,11 @@ test("each mode says what the setup screen will ask it for", () => {
 test("every mode is listed, and a note explains any that cannot be entered", () => {
   const menu = menuFor(enterScreen(createShell(), SCREEN_MODES));
   // Every mode, plus the campaign at the head of the list — it is a way to
-  // play, which is what this screen is a list of.
-  assertEqual(menu.items.length, MODES.length + 1, "the roadmap should be visible, not hidden");
+  // play, which is what this screen is a list of — and the garage at the foot,
+  // which is not, and so is as far from the ways to play as the list allows.
+  assertEqual(menu.items.length, MODES.length + 2, "the roadmap should be visible, not hidden");
   assertEqual(menu.items[0].id, "campaign", "the campaign heads the list");
+  assertEqual(menu.items.at(-1).id, "garage", "the garage tails it");
   for (const item of menu.items) {
     if (!item.enabled) assert(item.note, `${item.id} is locked with no explanation`);
   }

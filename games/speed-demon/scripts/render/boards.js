@@ -59,6 +59,17 @@ export const BOARDS_LAYOUT = {
 /** Columns inside a list row, as offsets from its left edge. */
 const COLUMN = { rank: 18, name: 76, meta: 430, date: 760, value: 1092 - 18 };
 
+/**
+ * The backdrop behind the boards — a podium and a trophy under floodlights.
+ *
+ * Authored *as* a backdrop, like `menu-splash.png` and `garage-1.png`: already
+ * night, and composed with its subject down the left where this screen's own
+ * furniture is thinnest. So it is drawn near full strength and only needs a
+ * scrim for the list rows to read against, not the heavy hold-back a daylight
+ * track aerial wants.
+ */
+export const BOARDS_SPLASH = "assets/leaderboards-splash.png";
+
 const INK = "#e8e9ee";
 const DIM = "#8b8f9c";
 const MUTED = "#5c6673";
@@ -217,7 +228,7 @@ function drawScrollButton(ctx, step, live) {
 }
 
 export function drawBoards(ctx, view, { splashImage } = {}) {
-  drawMenuBackdrop(ctx, splashImage, { alpha: 0.85, scrim: 0.5 });
+  drawMenuBackdrop(ctx, splashImage, { alpha: 1, scrim: 0.52 });
 
   label(ctx, "LEADERBOARDS", BOARDS_LAYOUT.title.x, BOARDS_LAYOUT.title.y, {
     size: 32,

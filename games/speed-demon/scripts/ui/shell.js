@@ -207,7 +207,31 @@ const CAMPAIGN_MENU_ITEM = {
   objective: { label: "CHAPTER", options: [{ label: "The Street" }] },
 };
 
-const MODE_MENU = [CAMPAIGN_MENU_ITEM, ...MODES];
+/**
+ * The garage, at the **foot** of the mode list.
+ *
+ * It sits here rather than on the title menu because this is the screen a player
+ * is on when the question "what am I driving?" is live: the mode list is one
+ * step from the picker, and a car chosen in the collection is the car the picker
+ * opens on. On the title menu it was a sibling of START, which put browsing your
+ * paints and starting a race at the same altitude — and made the first screen a
+ * five-item wall before anybody had driven anything.
+ *
+ * Last rather than first for the same reason the campaign is first: the rows
+ * above are ways to *play*, and this one is not. It is a row shaped like a mode
+ * and is not one, so `confirmShell` answers it before anything asks the mode
+ * catalog about it — exactly as the campaign row is answered.
+ */
+const GARAGE_MENU_ITEM = {
+  id: "garage",
+  label: "Garage",
+  blurb: "Every car you own, and every paint you have built for it. Pick one, or open the editor.",
+  available: true,
+  garage: true,
+  objective: { label: "ROSTER", options: [{ label: "24 MODELS" }, { label: "LIVERY EDITOR" }] },
+};
+
+const MODE_MENU = [CAMPAIGN_MENU_ITEM, ...MODES, GARAGE_MENU_ITEM];
 
 const MENUS = {
   [SCREEN_TITLE]: () => ({
@@ -217,13 +241,12 @@ const MENUS = {
       // START stays item zero: ENTER on a fresh boot must start a race without
       // anyone having to read the screen.
       { id: "start", label: "START", enabled: true },
-      // The garage is on the title menu because it is somewhere a player goes
-      // *instead* of racing. Reaching it only through the pre-race picker made
-      // browsing what you own cost a mode choice and three locked panes first.
-      { id: "garage", label: "GARAGE", enabled: true },
-      // Next to the garage rather than buried behind a race, for the same
-      // reason: a player who wants to know where they stand should not have to
-      // drive to find out.
+      // The garage is deliberately *not* here — it is at the foot of the mode
+      // list, one step closer to the picker it feeds. See `GARAGE_MENU_ITEM`.
+      //
+      // The boards stay, because they are not a question about the next race:
+      // a player who wants to know where they stand should not have to drive to
+      // find out.
       { id: "boards", label: "LEADERBOARDS", enabled: true },
       { id: "tutorial", label: "HOW TO DRIVE", enabled: true },
       { id: "radio", label: "RADIO", enabled: true },
@@ -360,8 +383,6 @@ export function confirmShell(shell) {
       switch (menuFor(shell).items[shell.cursor]?.id) {
         case "radio":
           return outcome(enterScreen(shell, SCREEN_RADIO));
-        case "garage":
-          return outcome(enterScreen(shell, SCREEN_COLLECTION));
         case "boards":
           return outcome(enterScreen(shell, SCREEN_BOARDS), COMMAND_BOARDS);
         // The tutorial skips the mode list and the picker: a guided run is a
@@ -379,6 +400,11 @@ export function confirmShell(shell) {
       // answered before anything asks the mode catalog about it.
       if (mode?.campaign) {
         return outcome(enterScreen(shell, SCREEN_CAMPAIGN), COMMAND_CAMPAIGN);
+      }
+      // And the garage row, for the same reason: it is not a mode, so it must
+      // never reach `modeById` and must never be adopted as `modeId`.
+      if (mode?.garage) {
+        return outcome(enterScreen(shell, SCREEN_COLLECTION));
       }
       if (!mode || !modeById(mode.id)?.available) {
         // Hovering a locked mode must not adopt it — the chosen mode is only
@@ -497,10 +523,10 @@ export function cancelShell(shell) {
     // returning to the setup screen from it would silently leave the match.
     case SCREEN_GARAGE:
       return outcome(enterScreen(shell, shell.garageReturn ?? SCREEN_SETUP));
-    // The collection hangs off the title menu and nowhere else, so unlike the
+    // The collection hangs off the mode list and nowhere else, so unlike the
     // editor it needs no remembered return.
     case SCREEN_COLLECTION:
-      return outcome(enterScreen(shell, SCREEN_TITLE));
+      return outcome(enterScreen(shell, SCREEN_MODES));
     // Likewise the leaderboards and the campaign map: one way in, so one way
     // out. (Backing out of a *briefing* is the campaign screen's own business
     // and never reaches here — the same split the setup screen's panes make.)

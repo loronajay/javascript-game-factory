@@ -90,7 +90,7 @@ import {
   trackFailed,
 } from "./radio/playlist.js";
 import { hitRadio, radioView, stripAlpha } from "./ui/radio-panel.js";
-import { drawRadioScreen, drawNowPlaying } from "./render/radio.js";
+import { RADIO_SPLASH, drawRadioScreen, drawNowPlaying } from "./render/radio.js";
 import { createPointer } from "./pointer.js";
 import { drawSetup, hitSetup } from "./render/setup.js";
 import { createLiveryCache, drawUnderglow, liverySprite, tailLightColour } from "./render/livery.js";
@@ -239,7 +239,7 @@ import {
   boardsSelection,
   boardsView,
 } from "./ui/boards.js";
-import { drawBoards, hitBoards } from "./render/boards.js";
+import { BOARDS_SPLASH, drawBoards, hitBoards } from "./render/boards.js";
 import { gateLayout, gateSlots, createKnob, stepKnob, knobTargetFor } from "./ui/shifter-gate.js";
 import { smoothToward, shiftLightState } from "./ui/gauges.js";
 import { gearNodeId } from "./sim/gate.js";
@@ -350,6 +350,13 @@ export function boot(canvas) {
   const rivalImages = new Map(RIVALS.map((rival) => [rival.id, loadImage(rivalPortraitSrc(rival))]));
   // The collection has a backdrop of its own — a workshop rather than a strip.
   const garageSplash = loadImage(GARAGE_SPLASH);
+  // And so do the two screens that are not about a race: a lit cockpit stereo
+  // behind the head unit, a podium behind the boards. Each is authored for the
+  // screen it sits behind, which is why neither borrows the menu splash any
+  // more — one backdrop serving four screens is what made the radio hold it at
+  // a fifth strength just to stop it fighting the type.
+  const radioSplash = loadImage(RADIO_SPLASH);
+  const boardsSplash = loadImage(BOARDS_SPLASH);
   // The painted campaign map. One file, and the screen it belongs to *is* it —
   // there is no fallback layout to degrade to, so it loads with everything else
   // rather than on demand.
@@ -2655,7 +2662,7 @@ export function boot(canvas) {
       // The one DOM write in the render path, and it earns its place: a drawn
       // button that does not change the cursor does not read as a button.
       canvas.style.cursor = radioScreen.hover ? "pointer" : "default";
-      drawRadioScreen(ctx, radioScreen, { splashImage });
+      drawRadioScreen(ctx, radioScreen, { splashImage: radioSplash });
       return;
     }
 
@@ -2668,7 +2675,7 @@ export function boot(canvas) {
 
     if (shell.screen === SCREEN_BOARDS) {
       canvas.style.cursor = boardsHover ? "pointer" : "default";
-      drawBoards(ctx, currentBoardsView(), { splashImage: garageSplash });
+      drawBoards(ctx, currentBoardsView(), { splashImage: boardsSplash });
       return;
     }
 
