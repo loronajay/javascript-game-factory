@@ -184,6 +184,11 @@ test("the car fits inside its lane", () => {
   assert(car.carWidth() > laneWidthPx * 0.5, "the car is lost in its lane");
 });
 
+test("the pulled-back race camera keeps the car visually compact", () => {
+  const car = loaded["scripts/render/car.js"];
+  assert(car.carWidth() <= 126, `the race car is still ${car.carWidth().toFixed(1)}px wide`);
+});
+
 test("the player's lane is on tarmac, between the painted road edges", () => {
   const scene = loaded["scripts/render/scene.js"];
   const layout = loaded["scripts/ui/track-layout.js"];

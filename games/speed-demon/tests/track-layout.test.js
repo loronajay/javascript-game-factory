@@ -109,6 +109,13 @@ test("the view window keeps both barriers and the whole road in frame", () => {
   assert(ROAD.view.sx + ROAD.view.sw > ROAD.roadEdges.right, "the right road edge is cropped off");
 });
 
+test("the race camera leaves scenery visible outside both sides of the road", () => {
+  const leftScenery = ROAD.roadEdges.left - ROAD.view.sx;
+  const rightScenery = ROAD.view.sx + ROAD.view.sw - ROAD.roadEdges.right;
+  assert(leftScenery >= 150, `only ${leftScenery}px of scenery shows left of the road`);
+  assert(rightScenery >= 150, `only ${rightScenery}px of scenery shows right of the road`);
+});
+
 test("the centre divider lands in the middle of the screen", () => {
   const dividerX = sourceScreenX(WORLD_WIDTH, ROAD.centreDivider);
   assertClose(dividerX, WORLD_WIDTH / 2, 4, "the road should be centred in frame");

@@ -34,11 +34,11 @@ export const ROAD = {
   laneWidthMetres: 3.5,
 
   /**
-   * The horizontal slice actually shown on screen: barrier to barrier, cropping
-   * the outer verge. Zooming in this far is what gives the car real presence —
-   * at full image width it reads as a distant speck.
+   * The horizontal slice actually shown on screen. It reaches beyond both road
+   * edges so the shoulders and scenery frame the strip, while still cropping
+   * enough of the outer image for the cars to read clearly.
    */
-  view: { sx: 150, sw: 640 },
+  view: { sx: 111, sw: 720 },
 
   /**
    * How many rows past the tile window get cross-faded over the top to hide the
