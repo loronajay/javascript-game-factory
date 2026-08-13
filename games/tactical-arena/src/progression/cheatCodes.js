@@ -1,4 +1,5 @@
 import { CAMPAIGN_MISSIONS } from "../campaign/campaignContent.js";
+import { isNativeApp } from "../platform/factorySignIn.js";
 import { writeCampaignProgress } from "../campaign/campaignProgress.js";
 import { UNIT_TYPES } from "../core/unitCatalog.js";
 import { TUTORIAL_IDS } from "../tutorials/basics.js";
@@ -15,8 +16,18 @@ function normalizedCode(value) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
 }
 
-export function isCheatCodeEnabled({ location = globalThis.location } = {}) {
+// Cheats are a developer affordance, gated on "this is a dev machine". The host checks below
+// are the whole gate, so they must not accidentally describe a shipped build.
+//
+// Capacitor serves the packaged Android app from `https://localhost` (androidScheme https +
+// hostname localhost), which makes the localhost check true on every player's phone. That is
+// not a local-only concession either: this cheat writes full campaign progress, campaign
+// completion is client-asserted, and it syncs up as claims that pay out mission Valor and
+// reward picks. So the native shell is excluded first, ahead of the opt-in flag — there
+// should be no path to a full unlock in a shipped app.
+export function isCheatCodeEnabled({ location = globalThis.location, root = globalThis } = {}) {
   if (!location?.href) return false;
+  if (isNativeApp(root)) return false;
   try {
     const url = new URL(location.href);
     if (url.searchParams.get("taCheats") === "1") return true;

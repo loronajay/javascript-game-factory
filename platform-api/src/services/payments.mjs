@@ -445,9 +445,14 @@ function appendMetadata(form, metadata) {
 function findSkinOffer(type, slug) {
     return SKIN_CATALOG.find((skin) => skin.type === type && skin.slug === slug) || null;
 }
+// The `fuck-cancer` slug is permanent (asset files, entitlement ids, Play product ids); its
+// player-facing name is not, and was renamed so the Play Console title carries no profanity
+// and does not borrow a real charity's name. Must match `SKIN_DISPLAY_NAMES` / `PACK` in the
+// game's `src/ui/skinModel.js` — the Play sheet shows the client's name and Stripe Checkout
+// shows this one. Guarded by `games/tactical-arena/tests/store-metadata.test.js`.
 function skinPackName(packId) {
     if (packId === "fuck-cancer")
-        return "Fuck Cancer Charity Pack";
+        return "Fight Cancer Pack";
     return `${titleCase(packId)} Pack`;
 }
 function findSkinPackOffer(packId) {

@@ -63,7 +63,7 @@ create index if not exists game_friend_blocks_blocked_idx
   on game_friend_blocks (game_slug, blocked_player_id);
 
 -- Explicitly AWARDED badges only. Badges that follow from something the account
--- already owns (the Fuck Cancer donation badge, for example) are DERIVED at read
+-- already owns (the Fight Cancer donation badge, for example) are DERIVED at read
 -- time from game_entitlements and are never written here -- that keeps them
 -- tamper-proof and retroactive for anyone who already bought in.
 create table if not exists game_player_badges (

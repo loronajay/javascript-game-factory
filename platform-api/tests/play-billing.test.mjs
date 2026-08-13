@@ -246,6 +246,46 @@ test("a purchase with no order id is still keyed stably, off the token hash", as
   assert.match(h.claims[0].claimId, /^play-purchase:token:[0-9a-f]{32}$/);
 });
 
+// The two cases above pass individually even when the client's order id is trusted, because
+// one has Google's id winning and the other sends none. This is the case that separates them:
+// Google supplies no order id AND the client offers one. If the client's value is used, the
+// claim id becomes attacker-chosen, and the claim id is the only thing making a replay
+// idempotent — so the same token resubmitted with fresh ids mints a claim row every time.
+test("a client order id is ignored even when Google supplies none", async () => {
+  const h = harness({ purchase: googlePurchase({ orderId: undefined }) });
+  await h.run({
+    gameSlug: "tactical-arena",
+    productId: "ta.unit.monk",
+    purchaseToken: "tok",
+    orderId: "GPA.attacker-chosen",
+  });
+
+  assert.match(h.claims[0].claimId, /^play-purchase:token:[0-9a-f]{32}$/);
+  assert.equal(h.claims[0].payload.playOrderId, "");
+  assert.doesNotMatch(h.claims[0].sourceId, /attacker-chosen/);
+});
+
+// Consumables are where a duplicated claim actually costs money: they stack, so every extra
+// claim row adds quantity. Entitlement replays are harmless (same row), which is why this
+// asserts on the consumable path specifically.
+test("replaying one consumable token with fresh client order ids grants it only once", async () => {
+  const claimIds = new Set();
+  for (const attackerOrderId of ["GPA.fake-1", "GPA.fake-2", "GPA.fake-3"]) {
+    const h = harness({ purchase: googlePurchase({ orderId: undefined }) });
+    await h.run({
+      gameSlug: "tactical-arena",
+      productId: "ta.consumable.valor_boost_1",
+      purchaseToken: "one-real-token",
+      orderId: attackerOrderId,
+    });
+    assert.equal(h.claims.length, 1);
+    claimIds.add(h.claims[0].claimId);
+  }
+
+  // One token, one claim id, no matter what the client called it.
+  assert.equal(claimIds.size, 1);
+});
+
 test("malformed requests and foreign game slugs are rejected", async () => {
   const h = harness();
   for (const body of [

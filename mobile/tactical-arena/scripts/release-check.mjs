@@ -9,10 +9,13 @@ import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { SOURCE_MANIFEST, hashSources } from "./source-manifest.mjs";
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
 const ANDROID = path.join(ROOT, "android");
 const GAME = path.resolve(ROOT, "..", "..", "games", "tactical-arena");
+const WWW = path.join(ROOT, "www");
 const PACKAGE_NAME = "com.jayarcade.tacticalarena";
 
 const problems = [];
@@ -110,11 +113,44 @@ async function checkPayload() {
     problems.push("www/ has not been built — run `npm run build:www` (the release scripts do this for you).");
     return;
   }
-  const source = await exists(path.join(GAME, "index.html"));
-  if (source && source.mtimeMs > payload.mtimeMs) {
-    problems.push("www/ is older than the game sources — rebuild the payload before shipping.");
+  // Comparing only index.html was too narrow to catch anything real: index.html barely ever
+  // changes, while the code that does — src/, styles/, and the shared js/platform modules the
+  // game imports — could all be stale with the check still green.
+  //
+  // build-www writes a content fingerprint of everything it copied to www/.build-sources.json.
+  // Re-hash the sources and compare. Content, not timestamps: `npm test` regenerates the skin
+  // and badge manifests on every run, so an mtime gate flagged the payload stale after every
+  // test run — a gate that always fires is a gate nobody reads.
+  const manifestPath = path.join(WWW, SOURCE_MANIFEST);
+  if (!(await exists(manifestPath))) {
+    problems.push(`www/${SOURCE_MANIFEST} is missing — rebuild the payload with \`npm run build:www\`.`);
+    return;
+  }
+
+  let manifest = null;
+  try {
+    manifest = JSON.parse(await read(manifestPath));
+  } catch {
+    problems.push(`www/${SOURCE_MANIFEST} is unreadable — rebuild the payload.`);
+    return;
+  }
+
+  const current = await hashSources();
+  const recorded = manifest?.files ?? {};
+  const changed = [];
+  for (const [rel, hash] of Object.entries(current.files)) {
+    if (recorded[rel] !== hash) changed.push(rel);
+  }
+  const removed = Object.keys(recorded).filter((rel) => !(rel in current.files));
+
+  if (changed.length || removed.length) {
+    const sample = [...changed, ...removed.map((r) => `${r} (deleted)`)].slice(0, 4).join(", ");
+    problems.push(
+      `www/ does not match the sources — ${changed.length + removed.length} file(s) changed since it `
+      + `was built. Rebuild with \`npm run sync\`. First few: ${sample}`,
+    );
   } else {
-    notes.push(`payload built ${new Date(payload.mtimeMs).toISOString()}`);
+    notes.push(`payload built ${manifest.builtAt} — matches all ${Object.keys(current.files).length} copied sources`);
   }
 }
 
@@ -135,6 +171,20 @@ async function checkProducts() {
     const illegal = offers.filter((_, i) => !ids[i]);
     if (illegal.length) problems.push(`${illegal.length} offer(s) have no legal Play product id`);
     notes.push(`${ids.length} premium products must exist in the Play Console (npm run play:sync)`);
+
+    // Offer names and descriptions BECOME the Play Console titles (play-products-sync.mjs), so
+    // an unfilled template placeholder would be published to the store as literal text.
+    const placeholders = offers
+      .flatMap((offer) => ["name", "description", "packName", "donationNote"]
+        .map((field) => ({ sku: offer.sku || offer.id, field, text: offer?.[field] })))
+      .filter(({ text }) => typeof text === "string" && /<[A-Z][A-Z _]+>|TODO|TBD|FIXME/.test(text));
+    if (placeholders.length) {
+      const first = placeholders[0];
+      problems.push(
+        `${placeholders.length} store-facing string(s) still contain a placeholder and would be `
+        + `published to Play verbatim — e.g. ${first.sku}.${first.field}: "${first.text}"`,
+      );
+    }
   } catch (error) {
     problems.push(`could not derive the product catalog: ${error.message}`);
   }

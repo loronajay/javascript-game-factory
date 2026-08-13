@@ -199,11 +199,21 @@ public class PlayBillingPlugin extends Plugin {
                 call.reject("PRODUCT_NOT_FOUND", productId);
                 return;
             }
-            BillingFlowParams flowParams = BillingFlowParams.newBuilder()
+            BillingFlowParams.Builder flowBuilder = BillingFlowParams.newBuilder()
                 .setProductDetailsParamsList(List.of(BillingFlowParams.ProductDetailsParams.newBuilder()
                     .setProductDetails(details.get(0))
-                    .build()))
-                .build();
+                    .build()));
+
+            // Ties the purchase to the signed-in account for Play's fraud checks. JS sends a
+            // SHA-256 of the player id, never the id itself, per Google's guidance; it is
+            // absent when no account can be resolved, and the flow proceeds without it rather
+            // than failing a legitimate sale.
+            String obfuscatedAccountId = call.getString("obfuscatedAccountId");
+            if (obfuscatedAccountId != null && !obfuscatedAccountId.isEmpty()) {
+                flowBuilder.setObfuscatedAccountId(obfuscatedAccountId);
+            }
+
+            BillingFlowParams flowParams = flowBuilder.build();
 
             // Held so the PurchasesUpdatedListener can resolve it; the billing flow is
             // a separate activity and its result arrives on that callback, not here.

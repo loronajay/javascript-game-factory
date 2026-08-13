@@ -450,7 +450,11 @@ function skinPackDonationNote(offers) {
   if (notes.length !== offers.length) return null;
   const unique = [...new Set(notes)];
   if (unique.length !== 1) return null;
-  return unique[0].replace("for this skin", "for this pack");
+  // Accepts either preposition: an exact-string replace on "for this skin" silently stopped
+  // matching when the note was reworded to "from this skin", leaving the pack advertising
+  // itself as a skin. A charity claim is not a good place for a silent no-op.
+  const packNote = unique[0].replace(/\b(for|from) this skin\b/i, "$1 this pack");
+  return packNote === unique[0] ? null : packNote;
 }
 
 export function groupSkinOffersByClassAndType(offers = []) {

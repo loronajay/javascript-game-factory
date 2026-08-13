@@ -1,5 +1,5 @@
 import { getConsumableOffer, selectRandomUnownedSkins } from "../services/consumable-catalog.mjs";
-import { SKIN_CATALOG, UNIT_CATALOG } from "../services/payments.mjs";
+import { SKIN_CATALOG } from "../services/payments.mjs";
 import { TACTICAL_ARENA_TUTORIAL_IDS, validateTacticalArenaPublicClaim, } from "../services/tactical-arena-reward-catalog.mjs";
 import { getValorOffer, priceValorOffer } from "../services/valor-catalog.mjs";
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
@@ -635,80 +635,42 @@ export async function resetCampaignProgress(pool, playerId, gameSlug) {
 // had. Gated by a single claim row (`migration:local-ownership-v1`) so it runs exactly once
 // per account — after that, injected local entitlements can never be re-grandfathered.
 // Entitlement ids are format-validated (real-shaped ids only) and capped.
-const VALID_ENTITLEMENT_ID = /^(unit:[a-z0-9-]{1,60}|skin:[a-z0-9-]{1,60}:[a-z0-9-]{1,80})$/;
-const VALID_BACKFILL_ENTITLEMENTS = new Set([
-    ...UNIT_CATALOG.map((unit) => `unit:${unit.type}`),
-    ...SKIN_CATALOG.map((skin) => skin.entitlementId),
-]);
-const MAX_BACKFILL_ENTITLEMENTS = 2000;
-const OWNERSHIP_BACKFILL_CLAIM_ID = "migration:local-ownership-v1";
-// The server-authority migration was complete by this cutoff. Only accounts that existed
-// before it may import legacy local ownership/Valor; newer accounts earn through canonical
-// progress claims and server-side purchases, so a client backfill has no trusted history.
-const LEGACY_BACKFILL_CUTOFF = Date.parse("2026-07-28T00:00:00.000Z");
+/**
+ * The one-time local-ownership grandfather. **CLOSED as of 2026-08-13 — it grants nothing.**
+ *
+ * When Tactical Arena moved to server-authoritative ownership, each player's locally-stored
+ * units, skins and Valor had to be imported once so the switch lost no purchases. That import
+ * was, unavoidably, the single place a client could assert ownership it had never paid for. It
+ * was fenced in hard — a one-shot claim row, a catalog whitelist, a 2000-item cap, and an
+ * account-age cutoff — but it existed, and the last opening (a pre-cutoff account with an empty
+ * server set could re-run its consumed migration once) was a live injection path for anyone
+ * holding an old, empty account.
+ *
+ * Every legitimate account has now migrated, so the whole path is retired: no entitlement and no
+ * Valor can be created here for any account, of any age, in any server state.
+ *
+ * The endpoint deliberately REMAINS and still answers ok. The client's boot sync only switches
+ * to server authority — the reconcile that filters injected local ownership back out — once this
+ * call has confirmed (`OWNERSHIP_BACKFILL_FLAG` in bootProgressSync.js). Removing the route, or
+ * making it fail, would leave every client permanently in additive mode, so injected ownership
+ * would never be reconciled away. Answering "already migrated" is what closes that loop.
+ *
+ * Guarded by `tests/ownership-backfill-security.test.mjs`.
+ */
 export async function backfillLocalOwnership(pool, params = {}) {
     const playerId = cleanText(params.playerId, 120);
     const gameSlug = normalizeGameSlug(params.gameSlug);
     if (!pool || !playerId || !gameSlug)
         return { ok: false, statusCode: 400, error: "invalid_request" };
-    const rawIds = Array.isArray(params.entitlementIds) ? params.entitlementIds : [];
-    const entitlementIds = [...new Set(rawIds.map((value) => cleanText(value, 160))
-            .filter((id) => VALID_ENTITLEMENT_ID.test(id) && VALID_BACKFILL_ENTITLEMENTS.has(id)))].slice(0, MAX_BACKFILL_ENTITLEMENTS);
-    const valorBalance = clampInt(params.valorBalance, { min: 0, max: 100_000_000 });
     const client = await pool.connect();
     try {
         await client.query("begin");
+        // Still ensures the profile row exists: this is often the first server contact a signed-in
+        // client makes, and the snapshot below (and later Valor spends) need somewhere to read from.
         await ensureGameProgressProfile(client, playerId, gameSlug);
-        // An empty payload has nothing to grandfather, so it must not consume the one-shot.
-        // A fresh device (notably a new packaged-app install signing into an existing account)
-        // legitimately backfills an empty local set; if that burned the migration, the device
-        // that actually held the progress could never migrate it and the account would be
-        // stuck at zero ownership forever. Report the existing migration state instead.
-        if (!entitlementIds.length && valorBalance <= 0) {
-            const existing = await client.query(`select 1 from game_progress_claims
-         where player_id = $1 and game_slug = $2 and claim_id = $3 limit 1`, [playerId, gameSlug, OWNERSHIP_BACKFILL_CLAIM_ID]);
-            await client.query("commit");
-            return {
-                ok: true,
-                alreadyMigrated: (existing.rowCount ?? 0) > 0,
-                progress: await getGameProgress(pool, playerId, gameSlug),
-            };
-        }
-        const account = await client.query(`select created_at from accounts where player_id = $1 order by created_at asc limit 1`, [playerId]);
-        const accountCreatedAt = Date.parse(account.rows[0]?.created_at || "");
-        const legacyMigrationEligible = Number.isFinite(accountCreatedAt) && accountCreatedAt < LEGACY_BACKFILL_CUTOFF;
-        if (!legacyMigrationEligible) {
-            await client.query("commit");
-            return {
-                ok: true,
-                alreadyMigrated: true,
-                progress: await getGameProgress(pool, playerId, gameSlug),
-            };
-        }
-        // Whether the server owns anything at all for this player. Before the empty-payload fix,
-        // an old account could consume its one shot without granting anything. The dated repair
-        // below remains available only to accounts that existed before that fix; newer accounts
-        // cannot reopen a consumed migration merely because their server set is empty.
-        const owned = await client.query(`select 1 from game_entitlements where player_id = $1 and game_slug = $2 limit 1`, [playerId, gameSlug]);
-        const serverOwnsNothing = (owned.rows?.length ?? 0) === 0;
-        const claim = await client.query(`insert into game_progress_claims (player_id, game_slug, claim_id, kind, source_id, payload)
-       values ($1, $2, $3, 'migration', '', '{}'::jsonb)
-       on conflict (player_id, game_slug, claim_id) do nothing`, [playerId, gameSlug, OWNERSHIP_BACKFILL_CLAIM_ID]);
-        const strandedRepairEligible = claim.rowCount === 0 && serverOwnsNothing;
-        const alreadyMigrated = claim.rowCount === 0 && !strandedRepairEligible;
-        if (!alreadyMigrated) {
-            for (const entitlementId of entitlementIds) {
-                const kind = entitlementId.startsWith("unit:") ? "unit" : "skin";
-                await grantEntitlement(client, playerId, gameSlug, { entitlementId, kind }, "migration", OWNERSHIP_BACKFILL_CLAIM_ID);
-            }
-            if (valorBalance > 0) {
-                await client.query(`update game_progress_profiles
-           set valor_balance = greatest(valor_balance, $3), updated_at = now()
-           where player_id = $1 and game_slug = $2`, [playerId, gameSlug, valorBalance]);
-            }
-        }
         await client.query("commit");
-        return { ok: true, alreadyMigrated, progress: await getGameProgress(pool, playerId, gameSlug) };
+        // `alreadyMigrated: true` unconditionally — the migration is over for everyone.
+        return { ok: true, alreadyMigrated: true, progress: await getGameProgress(pool, playerId, gameSlug) };
     }
     catch (err) {
         await client.query("rollback").catch(() => { });

@@ -1,9 +1,14 @@
 # Tactical Arena — Economy Security Model
 
-Last reviewed: **2026-08-03**, during Android closed testing. The review covered the shared
+Last reviewed: **2026-08-13**, ahead of the production application. The review covered the shared
 platform API, account/profile mutations, ranked writes, Tactical Arena progression and
 economy claims, Stripe/Google Play fulfillment, mobile packaging, dependency advisories, and
 tracked-secret patterns.
+
+That pass changed three things: the Play fulfillment path stopped trusting a client-supplied
+`orderId` (see invariant 11 — it was a live duplicate-grant path for consumables), account
+deletion was extended to actually delete the per-game economy rows, and the ownership-grandfather
+window was **closed** now that every legitimate account has migrated.
 
 Tactical Arena sells digital goods for real money (Stripe) and soft currency (Valor). This
 doc records how ownership and currency are protected so future changes don't quietly regress
@@ -120,26 +125,24 @@ starts pending boosts at the first payout, and calculates the bonus from the ser
 `bootProgressSync.js` order: fulfill any returned checkout → flush pending claims → **one-time
 ownership backfill** → apply the server snapshot via `mergeServerEntitlementsIntoUnlockProgress`.
 
-- **Backfill** (`POST /game-progress/:slug/backfill`) grandfathers the player's *existing* local
-  owned set into the server once per account (gated by a `migration:local-ownership-v1` claim
-  row; entitlement ids must exist in the server unit/skin catalogs and are capped). Non-empty
-  legacy backfill is accepted only for accounts created before 2026-07-28. Newer accounts
-  restore campaign/tutorial progress through canonical claims and cannot mint items or Valor
-  through the migration endpoint. This is why the switch to
-  server-authority loses no progress. It is one-time — injected local ownership can be
-  grandfathered at most once, never re-injected later.
-- Two guards keep that one-shot from being *wasted*, added 2026-07-27 after it stranded a real
-  account (see the changelog entry for that date):
-  - **An empty payload is inert.** The server does not insert the migration claim when there is
-    nothing to grant, and the client does not post a backfill at all when it has no local
-    ownership (it marks the handoff done locally and goes straight to server authority, which
-    is correct precisely because there is nothing to lose). Without this, a fresh install
-    signing into an existing account consumed the migration with an empty set, and the device
-    that actually held the progress could never migrate it.
-  - **Old stranded accounts self-heal.** An already-consumed migration is re-runnable only when
-    the server owns nothing **and the account predates the 2026-07-28 repair cutoff**. That keeps
-    recovery for accounts affected by the original bug without leaving the escape open to new
-    accounts. The moment the server owns anything, the one-shot closes again.
+- **Backfill** (`POST /game-progress/:slug/backfill`) — **CLOSED as of 2026-08-13. It grants
+  nothing.** It existed for exactly one migration: importing each player's locally-stored units,
+  skins and Valor once, so the switch to server authority lost no purchases. That made it the
+  only place a client could ever assert ownership it had not paid for. It was fenced hard (a
+  one-shot `migration:local-ownership-v1` claim row, a catalog whitelist, a 2000-item cap, an
+  account-age cutoff), and the last opening — a pre-2026-07-28 account with an empty server set
+  could re-run its consumed migration once — was still a live injection path for anyone holding
+  an old, empty account. Every legitimate account has now migrated, so the whole path is retired:
+  no entitlement and no Valor can be created here for any account, of any age, in any server
+  state. The history (the empty-payload and stranded-account guards, added 2026-07-27 after the
+  one-shot stranded a real account) is in the changelog; none of it is live code any more.
+- **The route deliberately still exists and still answers ok.** The client only switches to
+  server authority — the reconcile that filters injected local ownership back out — once this
+  call has confirmed (`OWNERSHIP_BACKFILL_FLAG` in `bootProgressSync.js`). Deleting the route, or
+  making it fail, would pin every client in additive mode forever, so injected ownership would
+  never be reconciled away. Answering "already migrated" is what closes that loop. The client's
+  own stranded-account repair block in `bootProgressSync.js` is now vestigial: it still posts on
+  a boot where the server owns nothing, and the server no-ops it.
 - **Authoritative reconcile** (`{ authoritative: true }`) replaces the server-entitlement fields
   with the server's exact set, empties the pure-ownership fields, and filters the flow-bearing
   reward-pick fields down to picks the server actually has. Because `normalizeUnlockProgress`
@@ -217,6 +220,18 @@ them permanently.
    binding, one token replayed under a second account opens a second claim row and grants
    twice. Store the hash, never the raw token — and keep persisting `playPurchaseTokenHash`,
    since it is the only join key from a voided purchase back to what was granted.
+   **This shipped violated for a while** (fixed 2026-08-13): fulfillment read
+   `purchase.orderId || body.orderId`, so when Google's `purchases.products` response carried
+   no order id the *client's* value named the claim. The claim id is the only thing making a
+   replay idempotent, so one verified token resubmitted with fresh order ids minted a claim row
+   each time — and for a **consumable** that adds quantity every time, because consumables stack
+   and `resolveTacticalArenaPremiumOffer` has no already-owned short-circuit for them.
+   Entitlement replays were harmless (same row). The client no longer sends `orderId` at all,
+   and the deterministic `play-purchase:token:<hash>` fallback covers the no-order-id case.
+   Regression: the "client order id is ignored even when Google supplies none" and consumable
+   replay tests in `platform-api/tests/play-billing.test.mjs` — the two pre-existing order-id
+   tests both passed against the bug, because one had Google's id winning and the other sent
+   none.
 12. A Play purchase must be refused **before Google's sheet opens** when the player already owns
    everything it would grant (`createOwnedOfferGuard` → `isOfferFullyOwned`). Play takes the
    money before the server is consulted, so a post-hoc refusal can only be repaired by a
@@ -242,6 +257,22 @@ them permanently.
    the two participants. Profile views use a dedicated atomic increment endpoint; clients do
    not submit counter totals.
 
+### Account deletion removes the economy too
+
+Google Play requires an in-app account-deletion path for any app offering in-app account
+creation, which Tactical Arena's auth panel does. The in-game Account menu now carries a
+confirm-gated **Delete Account** (`src/ui/accountMenu.js`), and the server-side delete
+(`platform-api/src/db/auth.mts`) removes the per-game rows as well as the profile.
+
+That matters here because only `players`, `accounts`, `player_profiles`, `player_metrics`,
+`player_relationships` and `player_photos` were ever wired with `on delete cascade`. Every
+game table — entitlements, Valor, claims, inventory, campaign progress, ranked profile/ELO/unit
+stats, TA friendships and badges — joins on a plain text player id, so deletion had been leaving
+a "deleted" account still owning everything it had bought. `PLAYER_SCOPED_DELETES` is the
+explicit list, and `platform-api/tests/account-deletion.test.mjs` reads the migrations and fails
+when a new player-scoped table appears that neither cascades nor is handled. `admin_audit_log`
+and `content_reports` are deliberately retained (audit and moderation integrity).
+
 ## Known limits (accepted / future)
 
 - **Session-scoped injection**: an injected item is visible until the next online boot, then
@@ -250,13 +281,9 @@ them permanently.
   local `repairUnlockProgressFromCampaignProgress` path), but it grants no purchasing power —
   the server `/spend` gates it. Cosmetic only.
 - **Multi-device old Valor purchases**: pre-migration Valor purchases made separately on
-  multiple devices and never synced may not all carry over if devices migrate at different
-  times (one-time backfill is per account). Premium, new-Valor, and campaign/tutorial items are
-  unaffected.
-- **The grandfather repair remains open only for pre-cutoff zero-entitlement accounts.** This
-  preserves recovery for accounts stranded before 2026-07-28, but an attacker controlling one
-  of those old empty accounts could still use its remaining repair once. Remove the dated
-  repair branch after those accounts have been checked/migrated; all newer accounts are closed.
+  multiple devices and never synced may not all have carried over, since the one-time backfill
+  was per account and the window is now closed. Historical only — premium, new-Valor, and
+  campaign/tutorial items are unaffected, and nothing new can land in this state.
 - **Campaign completion** is still client-asserted (single-player). A future pass could
   server-validate mission outcomes via deterministic replay of the headless core. Note this
   also reaches the OG Commander badge, whose campaign path trusts the same claimed progress;

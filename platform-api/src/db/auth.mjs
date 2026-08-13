@@ -142,23 +142,78 @@ export async function updateAccountPassword(db, email, newPassword) {
   `, [passwordHash, normalizedEmail]);
     return (result?.rows?.length ?? 0) > 0;
 }
+// Tables holding rows for one player, listed by the column(s) that name them. Only
+// `players`, `accounts`, `player_profiles`, `player_metrics`, `player_relationships` and
+// `player_photos` are wired with `on delete cascade`; everything below is joined by a plain
+// text player id and has to be deleted explicitly, which is why this list exists rather than
+// a single `delete from players`.
+//
+// `tests/account-deletion.test.mjs` reads the migrations and fails when a new player-scoped
+// table appears that is neither cascading nor listed here.
+const PLAYER_SCOPED_DELETES = Object.freeze([
+    // Thoughts feed: the player's own posts plus their marks on other people's.
+    ["thought_post_reactions", ["player_id"]],
+    ["thought_post_shares", ["player_id"]],
+    ["thought_post_comments", ["author_player_id"]],
+    ["thought_posts", ["author_player_id"]],
+    ["activity_items", ["actor_player_id"]],
+    // Photo social. The player's own photos cascade with `players`; these are their marks
+    // on other people's photos.
+    ["photo_reactions", ["player_id"]],
+    ["photo_comments", ["author_player_id"]],
+    // Platform social graph. Both directions — a pending request or challenge is equally the
+    // other party's row.
+    ["friend_requests", ["from_player_id", "to_player_id"]],
+    ["challenges", ["from_player_id", "to_player_id"]],
+    ["notifications", ["recipient_player_id", "actor_player_id"]],
+    // Deleting the conversation cascades its messages.
+    ["conversations", ["player_a_id", "player_b_id"]],
+    // Per-game progression and economy. Entitlements and claims are the record of what the
+    // player owns and bought; leaving them behind means a "deleted" account still owns things.
+    ["game_progress_profiles", ["player_id"]],
+    ["game_entitlements", ["player_id"]],
+    ["game_campaign_progress", ["player_id"]],
+    ["game_inventory_items", ["player_id"]],
+    ["game_progress_claims", ["player_id"]],
+    ["game_run_records", ["player_id"]],
+    ["game_loadouts", ["player_id"]],
+    ["game_player_badges", ["player_id"]],
+    // Ranked identity, standing, and any in-flight queue/match rows.
+    ["game_ratings", ["player_id"]],
+    ["ranked_profiles", ["player_id"]],
+    ["ranked_unit_stats", ["player_id"]],
+    ["ranked_queue", ["player_id"]],
+    ["ranked_matches", ["player_a", "player_b"]],
+    // Per-game social graph (Tactical Arena friends), kept separate from the platform one.
+    ["game_friendships", ["player_id_a", "player_id_b"]],
+    ["game_friend_requests", ["requester_player_id", "recipient_player_id"]],
+    ["game_friend_blocks", ["blocker_player_id", "blocked_player_id"]],
+]);
+/**
+ * Delete an account and the player data attached to it.
+ *
+ * Ordering matters: everything joined by a plain player id goes first, then `players` last so
+ * its cascades (profile, metrics, relationships, photos, accounts) fire against a table that
+ * nothing else still points at.
+ *
+ * Deliberately NOT deleted: `admin_audit_log` (an operator must not be able to erase their own
+ * actions) and `content_reports` (a moderation record about someone else's content, which
+ * keeps its value after the reporter leaves).
+ */
 export async function deletePlayerAccount(db, playerId) {
     const normalizedPlayerId = sanitizePlayerId(playerId);
     if (!normalizedPlayerId)
         return false;
-    // Remove reactions, shares, and comments the player made on others' posts
-    // (thought_posts cascade handles cleanup of the player's own posts)
-    await db.query(`delete from thought_post_reactions where player_id = $1`, [normalizedPlayerId]);
-    await db.query(`delete from thought_post_shares where player_id = $1`, [normalizedPlayerId]);
-    await db.query(`delete from thought_post_comments where author_player_id = $1`, [normalizedPlayerId]);
-    await db.query(`delete from thought_posts where author_player_id = $1`, [normalizedPlayerId]);
-    await db.query(`delete from activity_items where actor_player_id = $1`, [normalizedPlayerId]);
+    for (const [table, columns] of PLAYER_SCOPED_DELETES) {
+        const where = columns.map((column) => `${column} = $1`).join(" or ");
+        await db.query(`delete from ${table} where ${where}`, [normalizedPlayerId]);
+    }
+    // The relationship ledger is keyed by an "a::b" pair rather than by a player column.
     await db.query(`
     delete from relationship_ledger_entries
     where pair_key like $1 or pair_key like $2
   `, [`${normalizedPlayerId}::%`, `%::${normalizedPlayerId}`]);
-    // Deleting from players cascades to player_profiles, player_metrics,
-    // player_relationships, and accounts
+    // Cascades to player_profiles, player_metrics, player_relationships, player_photos, accounts.
     const result = await db.query(`
     delete from players where player_id = $1 returning player_id
   `, [normalizedPlayerId]);

@@ -26,10 +26,34 @@ const SKIN_PRICE_BY_RARITY = Object.freeze({
   [SKIN_RARITIES.LEGENDARY_PLUS]: 499,
 });
 
-export const CANCER_RESEARCH_DONATION_NOTE = "All proceeds for this skin will be donated for cancer research.";
+// A charity claim on a paid product is a representation, so it states the share, the recipient
+// and the cadence rather than "a portion of proceeds" — US commercial co-venture rules
+// generally want all three.
+//
+// Recipient chosen to match the claim: the V Foundation funds cancer research exclusively, so
+// "donated to cancer research" stays literally true, and its own policy that 100% of direct
+// donations reach research is consistent with the 100% pledged here. Changing the recipient is
+// a one-string edit, but it is a public promise — re-run `npm run play:sync` afterwards so the
+// Play Console descriptions match what the game says.
+export const CANCER_RESEARCH_DONATION_NOTE =
+  "100% of proceeds from this skin are donated to The V Foundation for Cancer Research, sent annually.";
+
+// Display names that must not be derived from the slug.
+//
+// Slugs are load-bearing and permanent: they name asset files (`fuck-cancer-archer.webp`),
+// entitlement ids (`skin:archer:fuck-cancer`) and Play product ids, none of which can change
+// once a product has shipped. Player-facing names can and did — this collection is published
+// to the Play Console as its title (play-products-sync.mjs builds titles from these names),
+// where profanity is reviewable metadata and conflicts with the game's Everyone 10+ rating.
+// It also avoided borrowing the name of the real registered charity it was echoing.
+const SKIN_DISPLAY_NAMES = Object.freeze({
+  "fuck-cancer": "Fight Cancer",
+});
 
 function skinName(slug) {
-  return String(slug || "")
+  const key = String(slug || "");
+  if (SKIN_DISPLAY_NAMES[key]) return SKIN_DISPLAY_NAMES[key];
+  return key
     .split("-")
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -75,7 +99,7 @@ const PACK = Object.freeze({
   SOUTHERN_KINGDOM: pack("southern-kingdom", "Southern Kingdom Pack"),
   SUMMER_VIBES: pack("summer-vibes", "Summer Vibes Pack"),
   VOID_DWELLER: pack("void-dweller", "Void Dweller Pack"),
-  FUCK_CANCER: pack("fuck-cancer", "Fuck Cancer Charity Pack"),
+  FUCK_CANCER: pack("fuck-cancer", "Fight Cancer Pack"),
 });
 
 const FUCK_CANCER_SKIN_METADATA = meta(SKIN_RARITIES.LEGENDARY, {

@@ -120,11 +120,13 @@ const GAME_BADGE_CATALOG = Object.freeze({
     }),
     Object.freeze({
       id: "fuck-cancer-donor",
-      label: "Fuck Cancer",
-      description: "Donated to cancer research through the Fuck Cancer skin collection.",
+      // Renamed with the collection; the badge id and entitlement patterns keep the original
+      // slug, which is permanent. See skinPackName in payments.mts.
+      label: "Fight Cancer",
+      description: "Donated to cancer research through the Fight Cancer skin collection.",
       art: "fuck-cancer",
       earn: BADGE_EARN_DERIVED,
-      // Any single Fuck Cancer skin, or the pack itself, earns the badge — every one of
+      // Any single Fight Cancer skin, or the pack itself, earns the badge — every one of
       // them is a donation.
       entitlementPatterns: Object.freeze([
         /^skin:[^:]+:fuck-cancer$/,

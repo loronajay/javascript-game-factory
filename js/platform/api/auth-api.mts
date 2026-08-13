@@ -93,8 +93,15 @@ export function createAuthApiClient(options: PlatformApiClientOptions = {}) {
       });
     },
 
+    // Clears the token like logout() does: the server session is gone with the account, so
+    // holding the token would leave the app reporting "signed in" (the local test is only
+    // "is a token present") while every call 401s. A failed delete keeps it — the account
+    // still exists and the session is still good.
     deleteAccount() {
-      return authRequest(fetchImpl, baseUrl, "/auth/account", { method: "DELETE" });
+      return authRequest(fetchImpl, baseUrl, "/auth/account", { method: "DELETE" }).then((result) => {
+        if (result?.ok) clearAuthToken();
+        return result;
+      });
     },
   };
 }

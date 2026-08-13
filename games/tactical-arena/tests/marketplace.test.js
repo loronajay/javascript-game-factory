@@ -27,6 +27,7 @@ import {
 } from "../src/progression/marketplace.js";
 import { SKIN_MANIFEST } from "../src/ui/skinManifest.generated.js";
 import { RANKED_AVATAR_FREE_COUNT, RANKED_AVATAR_VALOR_COST } from "../src/ui/rankedAvatars.js";
+import { CANCER_RESEARCH_DONATION_NOTE } from "../src/ui/skinModel.js";
 
 function storageAdapter() {
   const values = new Map();
@@ -185,23 +186,31 @@ test("expanded fat squad skin packs expose updated counts, rarities, and prices"
   }
 });
 
-test("Fuck Cancer charity pack offers every unit skin with charity labeling", () => {
+test("Fight Cancer pack offers every unit skin with charity labeling", () => {
   const storage = storageAdapter();
   const charity = getSkinPackOffer("fuck-cancer", storage);
   const nonSummonUnitCount = Object.values(UNIT_TYPES).filter((unit) => !unit.summon).length;
 
-  assert.ok(charity, "Fuck Cancer Charity Pack should be offered");
-  assert.equal(charity.name, "Fuck Cancer Charity Pack");
+  assert.ok(charity, "the Fight Cancer pack should be offered");
+  assert.equal(charity.name, "Fight Cancer Pack");
   assert.equal(charity.skinCount, nonSummonUnitCount);
   assert.equal(charity.ownedSkinCount, 0);
   assert.equal(charity.unownedSkinCount, nonSummonUnitCount);
   assert.equal(charity.rarityCounts.legendary, nonSummonUnitCount);
   assert.equal(charity.price.cents, 4999);
   assert.equal(charity.valorPrice.amount, 42500);
-  assert.equal(charity.donationNote, "All proceeds for this pack will be donated for cancer research.");
+  // Derived from the per-skin note by swapping "this skin" for "this pack". Asserted on shape
+  // rather than the literal so rewording the pledge (naming the charity) does not break it —
+  // but it MUST have been rewritten, or the pack advertises itself as a single skin.
+  assert.ok(charity.donationNote.includes("this pack"), charity.donationNote);
+  assert.ok(!charity.donationNote.includes("this skin"), charity.donationNote);
+  assert.equal(
+    charity.donationNote,
+    CANCER_RESEARCH_DONATION_NOTE.replace(/\b(for|from) this skin\b/i, "$1 this pack"),
+  );
   assert.ok(charity.skins.every((skin) => skin.slug === "fuck-cancer"));
   assert.ok(charity.skins.every((skin) => skin.rarity === "legendary"));
-  assert.ok(charity.skins.every((skin) => skin.donationNote === "All proceeds for this skin will be donated for cancer research."));
+  assert.ok(charity.skins.every((skin) => skin.donationNote === CANCER_RESEARCH_DONATION_NOTE));
   assert.equal(charity.skins.some((skin) => skin.type === "ghoul"), false, "Ghoul should be bundled with Necromancer instead of sold in the charity pack");
 });
 
@@ -320,7 +329,7 @@ test("skin offers expose the authored rarity price buckets and donation notes", 
   const charity = getSkinOffer("juggernaut", "fuck-cancer", storage);
   assert.equal(charity.rarity, "legendary");
   assert.equal(charity.price.cents, 399);
-  assert.equal(charity.donationNote, "All proceeds for this skin will be donated for cancer research.");
+  assert.equal(charity.donationNote, CANCER_RESEARCH_DONATION_NOTE);
 
   const arcane = getSkinOffer("swordsman", "arcane", storage);
   assert.equal(arcane.packName, "Arcane Pack");

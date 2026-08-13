@@ -23,7 +23,8 @@ import {
   normalizeSkinLoadout,
   normalizeSkinSlug,
   saveSkinPref,
-  skinAssetPath
+  skinAssetPath,
+  CANCER_RESEARCH_DONATION_NOTE,
 } from "../src/ui/skinModel.js";
 
 const GAME_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -150,25 +151,25 @@ test("skin entries carry marketplace-ready premium metadata", () => {
   assert.equal(legendary.price.cents, 399);
   assert.equal(legendaryPlus.rarity, "legendary+");
   assert.equal(legendaryPlus.price.cents, 499);
-  assert.equal(charity.donationNote, "All proceeds for this skin will be donated for cancer research.");
+  assert.equal(charity.donationNote, CANCER_RESEARCH_DONATION_NOTE);
 });
 
-test("every Fuck Cancer skin is legendary charity-pack metadata", () => {
+test("every Fight Cancer skin is legendary charity-pack metadata", () => {
   const entries = SKIN_MANIFEST.filter((entry) => entry.slug === "fuck-cancer");
 
   assert.equal(entries.length, Object.keys(UNIT_TYPES).length);
   for (const entry of entries) {
     const skin = getSkin(entry.type, entry.slug);
-    assert.equal(skin.rarity, "legendary", `${entry.type} Fuck Cancer rarity`);
-    assert.equal(skin.price.cents, 399, `${entry.type} Fuck Cancer price`);
+    assert.equal(skin.rarity, "legendary", `${entry.type} Fight Cancer rarity`);
+    assert.equal(skin.price.cents, 399, `${entry.type} Fight Cancer price`);
     if (entry.type === "ghoul") {
       assert.equal(skin.packId, null);
       assert.equal(skin.packName, null);
       assert.equal(skin.donationNote, null);
     } else {
       assert.equal(skin.packId, "fuck-cancer");
-      assert.equal(skin.packName, "Fuck Cancer Charity Pack");
-      assert.equal(skin.donationNote, "All proceeds for this skin will be donated for cancer research.");
+      assert.equal(skin.packName, "Fight Cancer Pack");
+      assert.equal(skin.donationNote, CANCER_RESEARCH_DONATION_NOTE);
     }
   }
 });

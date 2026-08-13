@@ -45,6 +45,8 @@ been proven end-to-end.
 4. [x] Publish a privacy policy
 5. [ ] Assemble the store listing
 6. [ ] Fill the Data safety + content rating forms
+6b. [x] Renamed the 31 cancer-research products to "Fight Cancer" and named the charity — see below.
+6c. [ ] `npm run play:sync` to push the renamed titles/descriptions to the Play Console.
 7. [x] First Play upload → Closed testing
 8. [x] Test on your own phone, including a licence-test purchase
 9. [x] Create and activate the 317 in-app products
@@ -220,7 +222,12 @@ because a mismatch between what you declare and what the app does is a common re
 - Collects: email address, name/display name, photos (avatar/profile uploads), in-app purchase
   history, gameplay data
 - Data is transmitted encrypted (HTTPS) — true
-- Users can request deletion — make sure this is actually true and documented in the policy
+- Users can request deletion — **true, in-app and on the web.** The in-game Account menu has a
+  confirm-gated *Delete Account*, and the deletion URL to give Play is
+  `https://factory.jayarcade.com/me/edit/`. Deletion removes the profile *and* the per-game
+  economy (entitlements, Valor, claims, campaign progress, ranked standing, TA friends); the
+  only retained records are the moderation audit log and reports filed about other people's
+  content. Answer "account and data are deleted", not "data only".
 - Payments run through Stripe and Google Play; you do not store card details — true, and worth
   stating plainly
 
@@ -230,6 +237,45 @@ no real-world violence, no gambling. Expect roughly **Everyone 10+ / PEGI 7**.
 One question deserves care: there **is** user-to-user interaction (friends, profiles, and the
 shared factory social layer). Declare it. Under-declaring social features is a classic
 rejection reason.
+
+### The cancer-research collection — renamed to "Fight Cancer"
+
+**Done in code (2026-08-13).** The 30 skins and the $49.99 pack now display as **Fight Cancer**
+/ **Fight Cancer Pack**. Two problems drove it, neither of which was about the art:
+
+1. **Profanity in IAP titles.** `play-products-sync.mjs` builds every Play product title from
+   the game's own offer names, so the old name *was* the title Google shows in the purchase
+   sheet and reviews as metadata. It also contradicted the Everyone 10+ / PEGI 7 rating.
+2. **A real charity's name.** Fuck Cancer is a registered 501(c)(3), so the old name read as
+   affiliation — trademark exposure independent of Google, and masking it ("F&%!") would not
+   have helped, since the charity brands itself with exactly that stylization.
+
+**The slugs did not change and must not** — `fuck-cancer` names the asset files
+(`fuck-cancer-archer.webp`), the entitlement ids (`skin:archer:fuck-cancer`) and the Play
+product ids (`ta.skin.archer.fuck_cancer`), none of which can change once published. Only
+display strings moved: `SKIN_DISPLAY_NAMES` + `PACK` in `games/tactical-arena/src/ui/skinModel.js`,
+`skinPackName` in `platform-api/src/services/payments.mts`, and the badge copy in
+`services/game-badge-catalog.mts`. `games/tactical-arena/tests/store-metadata.test.js` guards
+all of it and fails if profanity reappears in any store-facing string.
+
+**The pledge is now a public, specific promise:**
+
+> 100% of proceeds from this skin are donated to The V Foundation for Cancer Research, sent annually.
+
+It lives in `CANCER_RESEARCH_DONATION_NOTE` (`games/tactical-arena/src/ui/skinModel.js`) — one
+string; the pack-level wording ("this pack") derives from it. `release-check.mjs` blocks an
+upload if a template placeholder is ever left in a store-facing string.
+
+The V Foundation was chosen so the claim stays literally true: it funds cancer research
+exclusively, and its own policy that 100% of direct donations reach research is consistent with
+the 100% pledged here. **Verify its current Charity Navigator / Candid rating and that policy
+before launch** — and remember this is a commitment you now have to honour and be able to
+evidence. Changing recipient is one string plus a `play:sync`.
+
+**After any name/pledge change, re-run `npm run play:sync`** so the 31 Play Console titles and
+descriptions follow. The product *ids* are unchanged, so this is an update, not a re-creation.
+**Until that sync runs, the purchase sheet still shows the old titles** — the app build alone
+does not change them.
 
 ---
 

@@ -310,7 +310,13 @@ export async function fulfillPlayPurchase(params = {}) {
         process.stderr.write(`[play-billing] duplicate purchase of an owned offer; leaving it unsettled to auto-refund (player=${playerId}, product=${productId})\n`);
         return playError(409, "offer_already_owned");
     }
-    const orderId = cleanText(purchase.orderId || body.orderId, 200);
+    // Google's order id ONLY. The client's is never consulted: the claim id is derived from
+    // this, and the claim id's uniqueness is the sole thing that makes a replay idempotent.
+    // Letting the client name it means one verified token resubmitted with fresh ids mints a
+    // claim row each time — which for a consumable adds quantity every time, since consumables
+    // stack and have no already-owned short-circuit. When Google supplies none, the token-hash
+    // fallback below is deterministic for the same token, so replays still collide.
+    const orderId = cleanText(purchase.orderId, 200);
     const recorded = await recordGameProgressClaim({
         playerId,
         gameSlug,

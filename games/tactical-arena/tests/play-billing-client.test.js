@@ -5,6 +5,7 @@ import {
   PLAY_PURCHASE_CANCELLED,
   playPurchaseErrorMessage,
   purchaseWithPlay,
+  createPlayPurchaseVerifier,
   recoverPendingPlayPurchases,
 } from "../src/platform/playBillingClient.js";
 
@@ -327,4 +328,80 @@ test("the default guard fails open when there is no signed-in session to ask abo
   });
 
   assert.equal(result.ok, true);
+});
+
+// The server keys a purchase on Google's own order id and never reads the client's, so
+// sending one is at best dead weight and at worst an invitation to trust it again later.
+// This pins the request body to exactly what the server consumes.
+test("the verifier posts only the fields the server trusts", async () => {
+  let sent = null;
+  const verify = createPlayPurchaseVerifier({
+    endpoint: "https://api.example/payments/tactical-arena/play-purchases",
+    fetchImpl: async (url, options) => {
+      sent = { url, options };
+      return { ok: true, json: async () => ({ ok: true, consume: false, entitlements: [] }) };
+    },
+  });
+
+  await verify({
+    productId: "ta.unit.monk",
+    purchaseToken: "tok-1",
+    orderId: "GPA.whatever",
+    account: { token: "jwt-1" },
+  });
+
+  const body = JSON.parse(sent.options.body);
+  assert.deepEqual(Object.keys(body).sort(), ["gameSlug", "productId", "purchaseToken"]);
+  assert.equal(body.purchaseToken, "tok-1");
+  assert.equal(sent.options.headers.Authorization, "Bearer jwt-1");
+});
+
+// Google's obfuscatedAccountId is a per-account fraud signal on the billing flow, and a
+// second binding between a purchase and the account that made it. It must never be the raw
+// player id — Google's guidance is an obfuscated value — so this checks it is a hash, and
+// that a missing/unavailable one degrades to simply omitting the field rather than blocking
+// a sale.
+test("the billing flow carries a hashed account id, never the raw player id", async () => {
+  const bridge = fakeBridge();
+  await purchaseWithPlay(SKIN_OFFER, {
+    plugins: bridge,
+    verifyPurchase: async () => ({ ok: true }),
+    assertOfferPurchasable: async () => ({ owned: false }),
+    resolveAccountKey: async () => "player-abc-123",
+  });
+
+  const args = bridge.calls.purchase[0];
+  assert.ok(args.obfuscatedAccountId, "expected an obfuscatedAccountId on the billing flow");
+  assert.notEqual(args.obfuscatedAccountId, "player-abc-123", "must not send the raw id");
+  assert.match(args.obfuscatedAccountId, /^[0-9a-f]{64}$/);
+  // Google caps this field at 64 characters.
+  assert.ok(args.obfuscatedAccountId.length <= 64);
+});
+
+test("the same account always hashes to the same billing id", async () => {
+  const ids = [];
+  for (let i = 0; i < 2; i += 1) {
+    const bridge = fakeBridge();
+    await purchaseWithPlay(SKIN_OFFER, {
+      plugins: bridge,
+      verifyPurchase: async () => ({ ok: true }),
+      assertOfferPurchasable: async () => ({ owned: false }),
+      resolveAccountKey: async () => "player-abc-123",
+    });
+    ids.push(bridge.calls.purchase[0].obfuscatedAccountId);
+  }
+  assert.equal(ids[0], ids[1]);
+});
+
+test("no resolvable account simply omits the field instead of blocking the purchase", async () => {
+  const bridge = fakeBridge();
+  const result = await purchaseWithPlay(SKIN_OFFER, {
+    plugins: bridge,
+    verifyPurchase: async () => ({ ok: true }),
+    assertOfferPurchasable: async () => ({ owned: false }),
+    resolveAccountKey: async () => "",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(bridge.calls.purchase[0].obfuscatedAccountId, undefined);
 });

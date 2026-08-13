@@ -1,3 +1,16 @@
+// The ownership-grandfather window is CLOSED (2026-08-13).
+//
+// It existed for one migration: when Tactical Arena moved to server-authoritative ownership,
+// players' locally-stored units/skins/Valor had to be imported once so the switch lost nothing.
+// That import was, by necessity, the one place a client could assert ownership it had not paid
+// for — bounded by a one-shot claim row, a catalog whitelist, a cap, and an account-age cutoff,
+// but present. Every legitimate account has now migrated, so the endpoint grants nothing at all
+// and there is no path left for a client to mint an entitlement or Valor.
+//
+// The route still exists and still answers ok: the client's boot sync only goes
+// server-authoritative once the backfill call has confirmed (OWNERSHIP_BACKFILL_FLAG). Removing
+// the endpoint would strand that gate and keep clients in additive mode forever.
+
 import test from "node:test";
 import assert from "node:assert/strict";
 
@@ -45,62 +58,63 @@ function createPool({ migrated = false, playerCreatedAt = "2026-08-03T00:00:00.0
   return { state, connect: async () => ({ query, release() {} }), query };
 }
 
-test("a migrated account created after the repair cutoff cannot reopen an empty ownership backfill", async () => {
-  const pool = createPool({ migrated: true, playerCreatedAt: "2026-08-03T00:00:00.000Z" });
-  const result = await backfillLocalOwnership(pool, {
-    playerId: "player-new",
-    gameSlug: "tactical-arena",
-    entitlementIds: ["unit:blacksword"],
-    valorBalance: 999999,
+// Real catalog entries, so the payload is the strongest one an attacker could send: everything
+// passes id-format and catalog-membership validation and is refused anyway.
+const REAL_PAYLOAD = {
+  playerId: "player-1",
+  gameSlug: "tactical-arena",
+  entitlementIds: ["unit:monk", "unit:paladin"],
+  valorBalance: 500000,
+};
+
+// The account ages that used to matter. Neither does now.
+for (const [label, playerCreatedAt] of [
+  ["pre-cutoff", "2026-07-01T00:00:00.000Z"],
+  ["post-cutoff", "2026-08-03T00:00:00.000Z"],
+]) {
+  test(`a ${label} account cannot grandfather ownership or Valor`, async () => {
+    const pool = createPool({ playerCreatedAt });
+    const result = await backfillLocalOwnership(pool, REAL_PAYLOAD);
+
+    assert.equal(result.ok, true);
+    assert.equal(result.alreadyMigrated, true);
+    assert.equal(pool.state.entitlements.size, 0, "granted an entitlement through a closed migration");
+    assert.equal(pool.state.valorBalance, 0, "minted Valor through a closed migration");
   });
+}
 
-  assert.equal(result.ok, true);
-  assert.equal(result.alreadyMigrated, true);
-  assert.equal(pool.state.entitlements.size, 0);
-  assert.equal(pool.state.valorBalance, 0);
-});
-
-test("a first backfill rejects nonexistent catalog items even when their id format looks valid", async () => {
-  const pool = createPool();
-  const result = await backfillLocalOwnership(pool, {
-    playerId: "player-new",
-    gameSlug: "tactical-arena",
-    entitlementIds: ["unit:not-a-real-unit", "skin:not-real:but-shaped"],
-    valorBalance: 0,
-  });
-
-  assert.equal(result.ok, true);
-  assert.equal(result.alreadyMigrated, false);
-  assert.equal(pool.state.entitlements.size, 0);
-  assert.equal(pool.state.claims.has("migration:local-ownership-v1"), false);
-});
-
-test("an account created after the migration cutoff cannot use a first backfill to mint real catalog items or Valor", async () => {
-  const pool = createPool({ playerCreatedAt: "2026-08-03T00:00:00.000Z" });
-  const result = await backfillLocalOwnership(pool, {
-    playerId: "player-new",
-    gameSlug: "tactical-arena",
-    entitlementIds: ["unit:blacksword", "skin:swordsman:medieval"],
-    valorBalance: 999999,
-  });
-
-  assert.equal(result.ok, true);
-  assert.equal(result.alreadyMigrated, true);
-  assert.equal(pool.state.entitlements.size, 0);
-  assert.equal(pool.state.valorBalance, 0);
-});
-
-test("a pre-cutoff account consumed by the old empty-backfill bug can still repair once", async () => {
+// This was the last opening the security doc called out: a pre-cutoff account the server owned
+// nothing for could re-run its consumed migration once, so an attacker holding one of those old
+// empty accounts had a single injection left. All such accounts have since migrated.
+test("an empty server set no longer reopens a consumed migration", async () => {
   const pool = createPool({ migrated: true, playerCreatedAt: "2026-07-01T00:00:00.000Z" });
-  const result = await backfillLocalOwnership(pool, {
-    playerId: "player-legacy",
-    gameSlug: "tactical-arena",
-    entitlementIds: ["unit:sniper"],
-    valorBalance: 700,
-  });
+  assert.equal(pool.state.entitlements.size, 0, "precondition: server owns nothing");
+
+  const result = await backfillLocalOwnership(pool, REAL_PAYLOAD);
 
   assert.equal(result.ok, true);
-  assert.equal(result.alreadyMigrated, false);
-  assert.equal(pool.state.entitlements.has("unit:sniper"), true);
-  assert.equal(pool.state.valorBalance, 700);
+  assert.equal(result.alreadyMigrated, true);
+  assert.equal(pool.state.entitlements.size, 0, "the stranded-account repair is still open");
+  assert.equal(pool.state.valorBalance, 0);
+});
+
+// The client sets OWNERSHIP_BACKFILL_FLAG on any ok response and only then trusts the server's
+// set as authoritative. If this stopped answering ok, every client would stay in additive mode
+// and injected local ownership would never be reconciled away — the opposite of the intent.
+test("the endpoint still confirms, so the client can go server-authoritative", async () => {
+  for (const payload of [REAL_PAYLOAD, { playerId: "player-1", gameSlug: "tactical-arena", entitlementIds: [], valorBalance: 0 }]) {
+    const result = await backfillLocalOwnership(createPool(), payload);
+    assert.equal(result.ok, true);
+    assert.equal(result.alreadyMigrated, true);
+    assert.ok(result.progress, "the caller needs a snapshot back");
+  }
+});
+
+test("a malformed request is still rejected rather than silently accepted", async () => {
+  const pool = createPool();
+  for (const bad of [{ playerId: "", gameSlug: "tactical-arena" }, { playerId: "player-1", gameSlug: "" }]) {
+    const result = await backfillLocalOwnership(pool, bad);
+    assert.equal(result.ok, false);
+    assert.equal(result.statusCode, 400);
+  }
 });

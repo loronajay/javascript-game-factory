@@ -16,72 +16,24 @@
 // zero source changes.
 
 import { cp, mkdir, rm, writeFile, stat } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
+import {
+  GAME_EXCLUDES,
+  GAME_SRC,
+  PLATFORM_SRC,
+  REPO_ROOT,
+  SOURCE_MANIFEST,
+  WWW,
+  hashSources,
+  makeFilter,
+} from "./source-manifest.mjs";
 import { optimizeImages } from "./optimize-images.mjs";
 import { optimizeAudio } from "./optimize-audio.mjs";
 import { bundleFonts } from "./bundle-fonts.mjs";
 import { enableTouchCss } from "./enable-touch-css.mjs";
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const APP_ROOT = path.resolve(HERE, "..");
-// mobile/tactical-arena -> mobile -> javascript-games
-const REPO_ROOT = path.resolve(APP_ROOT, "..", "..");
-const WWW = path.join(APP_ROOT, "www");
-
-const GAME_SRC = path.join(REPO_ROOT, "games", "tactical-arena");
 const GAME_DEST = path.join(WWW, "games", "tactical-arena");
-
-// Excluded from the shipped payload. `promo-material` alone is 33MB of store art
-// that the game never loads at runtime.
-const GAME_EXCLUDES = new Set([
-  "assets/promo-material",
-  // 12.9MB of source art (UUID-named `*_removalai_preview.png` exports). An audit of
-  // every src/styles/html reference found zero uses — the title mark is a pure CSS
-  // gradient, not an image. Kept in the repo as source, never shipped.
-  "assets/logos",
-  // Balance-simulation output: raw per-match records plus the fitted analysis, read only
-  // by scripts/ and the docs tests, never by anything in src/ or a page. It was worth
-  // 9.2MB of a 58MB bundle — and because `sim-*.json` is gitignored, whether the shipped
-  // artifact carried it depended on whether whoever cut the release happened to have run
-  // `npm run sim` on that machine. Exclude it so the payload can't vary that way.
-  "balance-data",
-  "tests",
-  "scripts",
-  "platform-api",
-  "node_modules",
-  ".mobile-shots",
-  "sandbox.html",
-  "vfx-gallery.html",
-  "package.json",
-  "package-lock.json",
-  "skills-lock.json",
-  "game.json",
-]);
-
-function makeFilter(root, excludes) {
-  return (source) => {
-    const rel = path.relative(root, source).split(path.sep).join("/");
-    if (!rel) return true;
-    // Markdown is documentation, never loaded at runtime.
-    if (rel.endsWith(".md")) return false;
-    // A PNG that has a WebP sibling is the authoring master, not the runtime asset —
-    // the repo's convention (see the badge pipeline) is PNG source, WebP runtime, and
-    // an audit found zero .png references outside badgeManifest.generated.js. Badges
-    // whose WebP has not been generated yet keep their PNG, so in-progress art still
-    // ships rather than turning into a broken image.
-    if (rel.endsWith(".png") && existsSync(source.replace(/\.png$/i, ".webp"))) return false;
-    // TypeScript sources; the browser loads the emitted .mjs siblings.
-    if (rel.endsWith(".mts") || rel.endsWith(".ts")) return false;
-    if (rel.includes(".test.")) return false;
-    for (const excluded of excludes) {
-      if (rel === excluded || rel.startsWith(`${excluded}/`)) return false;
-    }
-    return true;
-  };
-}
 
 // Pure Node rather than shelling out to `du`: this script runs from PowerShell as
 // often as from Git Bash, and `du` does not exist there.
@@ -134,10 +86,9 @@ async function main() {
     filter: makeFilter(GAME_SRC, GAME_EXCLUDES),
   });
 
-  const platformSrc = path.join(REPO_ROOT, "js", "platform");
-  await cp(platformSrc, path.join(WWW, "js", "platform"), {
+  await cp(PLATFORM_SRC, path.join(WWW, "js", "platform"), {
     recursive: true,
-    filter: makeFilter(platformSrc, new Set()),
+    filter: makeFilter(PLATFORM_SRC, new Set()),
   });
 
   await cp(
@@ -146,6 +97,11 @@ async function main() {
   );
 
   await writeFile(path.join(WWW, "index.html"), ROOT_REDIRECT, "utf8");
+
+  // Written from the SOURCES, before the payload transforms below run — the manifest records
+  // what was copied in, not what the payload became.
+  const manifest = await hashSources();
+  await writeFile(path.join(WWW, SOURCE_MANIFEST), JSON.stringify(manifest), "utf8");
 
   // Fail loudly here rather than as a blank screen on the device.
   const entry = path.join(GAME_DEST, "index.html");

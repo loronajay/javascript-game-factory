@@ -15,6 +15,7 @@
 //
 // All I/O is injected so the whole flow is testable without a device or a store.
 
+import { loadFactoryProfile } from "../../../../js/platform/identity/factory-profile.mjs";
 import { fetchGameProgressSnapshot } from "./gameProgressClient.js";
 import { isOfferFullyOwned } from "./offerOwnership.js";
 import { playProductIdForOffer } from "./playProducts.js";
@@ -73,6 +74,37 @@ function shouldConsume(verification, offer, productId) {
   return typeof productId === "string" && productId.startsWith("ta.consumable.");
 }
 
+// --- account binding ---------------------------------------------------------
+//
+// Google's obfuscatedAccountId ties a billing flow to the account that started it. It feeds
+// Play's fraud detection and gives a second, Google-side binding alongside the server's own
+// token -> claim-row binding. Google's guidance is explicit that it must NOT be the raw
+// account id, so the player id is hashed; the field is also capped at 64 characters, which a
+// SHA-256 hex digest exactly fills.
+//
+// Everything here fails open. A purchase must never be blocked because a hash could not be
+// computed — the field is a signal, not a control.
+
+export function defaultAccountKey() {
+  try {
+    return loadFactoryProfile()?.playerId || "";
+  } catch {
+    return "";
+  }
+}
+
+export async function obfuscateAccountKey(accountKey) {
+  const key = typeof accountKey === "string" ? accountKey.trim() : "";
+  const subtle = globalThis.crypto?.subtle;
+  if (!key || !subtle) return "";
+  try {
+    const digest = await subtle.digest("SHA-256", new TextEncoder().encode(key));
+    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return "";
+  }
+}
+
 async function settle(bridge, { consume, purchaseToken }) {
   if (consume) await bridge.consume({ purchaseToken });
   else await bridge.acknowledge({ purchaseToken });
@@ -106,7 +138,13 @@ export function createOwnedOfferGuard({ fetchSnapshot = fetchGameProgressSnapsho
   };
 }
 
-export async function purchaseWithPlay(offer, { plugins = null, verifyPurchase, account = null, assertOfferPurchasable = null } = {}) {
+export async function purchaseWithPlay(offer, {
+  plugins = null,
+  verifyPurchase,
+  account = null,
+  assertOfferPurchasable = null,
+  resolveAccountKey = defaultAccountKey,
+} = {}) {
   const bridge = bridgeFrom(plugins);
   if (!bridge) return { ok: false, error: "bridge_missing" };
 
@@ -121,9 +159,15 @@ export async function purchaseWithPlay(offer, { plugins = null, verifyPurchase, 
     return { ok: false, error: "offer_already_owned", blocked: true, snapshot: verdict.snapshot ?? null };
   }
 
+  const obfuscatedAccountId = await obfuscateAccountKey(await resolveAccountKey());
+
   let purchase;
   try {
-    const response = await bridge.purchase({ productId });
+    // Omitted rather than sent empty when there is no resolvable account: Play validates the
+    // field's shape, and a blank one would fail the flow for no benefit.
+    const response = await bridge.purchase(
+      obfuscatedAccountId ? { productId, obfuscatedAccountId } : { productId },
+    );
     purchase = response?.purchases?.[0] ?? null;
   } catch (error) {
     const code = errorCode(error);
@@ -253,7 +297,11 @@ export function createPlayPurchaseVerifier({
   endpoint = "",
   gameSlug = "tactical-arena",
 } = {}) {
-  return async function verifyPlayPurchase({ productId, purchaseToken, orderId, account }) {
+  // `orderId` is accepted from callers (the bridge reports one) but deliberately NOT sent:
+  // the server keys the purchase on Google's own order id, read from its own verification
+  // response. A client-supplied one has no legitimate reader, and shipping it in the body
+  // invites trusting it again later.
+  return async function verifyPlayPurchase({ productId, purchaseToken, account }) {
     if (typeof fetchImpl !== "function") return { ok: false, error: "verification_failed" };
 
     const headers = { "content-type": "application/json; charset=utf-8" };
@@ -264,7 +312,7 @@ export function createPlayPurchaseVerifier({
       method: "POST",
       headers,
       credentials: "include",
-      body: JSON.stringify({ gameSlug, productId, purchaseToken, orderId }),
+      body: JSON.stringify({ gameSlug, productId, purchaseToken }),
     });
 
     let body = null;

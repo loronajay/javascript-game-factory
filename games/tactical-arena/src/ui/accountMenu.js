@@ -92,11 +92,15 @@ export function syncAccountControlsWithName(root = document, options = {}) {
 }
 
 // Opens the right surface for the current session. `onChanged` re-syncs the menus
-// after a sign-in or sign-out so gated buttons flip without a reload.
+// after a sign-in, sign-out, or deletion so gated buttons flip without a reload.
+//
+// `choose` is injected so the whole flow — including the two-step delete confirmation —
+// is testable without a DOM.
 export async function openAccountPanel({
   auth = createAuthApiClient(),
   onChanged = null,
   session = readStoredFactoryAccountSession(),
+  choose = openChoiceModal,
 } = {}) {
   if (!session?.authenticated) {
     return openAuthPanel({
@@ -112,12 +116,16 @@ export async function openAccountPanel({
   }
 
   const name = currentProfileName() || await refreshAccountProfileName({ auth, session });
-  const choice = await openChoiceModal({
+  const choice = await choose({
     title: "Account",
     subtitle: name ? `Signed in as ${name}.` : "You are signed in.",
-    choices: [{ value: "signOut", label: "Sign Out" }],
+    choices: [
+      { value: "signOut", label: "Sign Out" },
+      { value: "deleteAccount", label: "Delete Account", sub: "Permanently erase this account" },
+    ],
   });
 
+  if (choice === "deleteAccount") return deleteAccountFlow({ auth, onChanged, choose });
   if (choice !== "signOut") return null;
 
   try {
@@ -129,4 +137,36 @@ export async function openAccountPanel({
   await notifySessionChanged();
   await onChanged?.({ ok: true, signedOut: true });
   return { ok: true, signedOut: true };
+}
+
+// Account deletion, which Google Play requires to be reachable in-app for any app that
+// offers in-app account creation — the auth panel does, so this is not optional.
+//
+// Two steps on purpose: deletion is irreversible and takes paid entitlements with it, so
+// the second prompt states both rather than relying on the player reading the first.
+async function deleteAccountFlow({ auth, onChanged, choose }) {
+  const confirmed = await choose({
+    title: "Delete Account?",
+    subtitle: "This is permanent and cannot be undone. Your progress, Valor, ranked standing "
+      + "and every purchase on this account are erased. Purchases cannot be restored afterwards.",
+    choices: [{ value: "confirmDelete", label: "Delete My Account" }],
+    cancelLabel: "Keep My Account",
+  });
+  if (confirmed !== "confirmDelete") return null;
+
+  let result = null;
+  try {
+    result = await auth.deleteAccount();
+  } catch {
+    result = { ok: false, error: "delete_failed" };
+  }
+  // A failed delete leaves the account and its session intact, so the player stays signed in
+  // rather than being half-dropped into a state where the app thinks they are gone.
+  if (!result?.ok) return { ok: false, error: result?.error || "delete_failed" };
+
+  // deleteAccount() clears the stored token on success; this re-syncs everything reading it.
+  await notifySessionChanged();
+  const outcome = { ok: true, deleted: true, signedOut: true };
+  await onChanged?.(outcome);
+  return outcome;
 }

@@ -8,6 +8,11 @@ import { getShopCatalog, getSkinOffers } from "../src/progression/marketplace.js
 import { openInventory } from "../src/ui/inventory.js";
 import { openShop } from "../src/ui/shop.js";
 import { openSkinGallery } from "../src/ui/skinGallery.js";
+import { CANCER_RESEARCH_DONATION_NOTE } from "../src/ui/skinModel.js";
+
+// Mirrors skinPackDonationNote() in marketplace.js: the pack advertises the same pledge
+// with "this skin" swapped for "this pack".
+const PACK_DONATION_NOTE = CANCER_RESEARCH_DONATION_NOTE.replace(/\b(for|from) this skin\b/i, "$1 this pack");
 
 class FakeClassList {
   constructor(node) {
@@ -883,7 +888,7 @@ test("shop skin packs render clickable contents and use Valor confirmation", asy
   );
 });
 
-test("shop and confirmation show the cancer research proceeds note for Fuck Cancer skins", () => {
+test("shop and confirmation show the cancer research proceeds note for Fight Cancer skins", () => {
   globalThis.document = new FakeDocument();
   const storage = storageAdapter();
   writeUnlockProgress(storage, { valorBalance: 99999 });
@@ -894,36 +899,36 @@ test("shop and confirmation show the cancer research proceeds note for Fuck Canc
   const skinsTab = walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Skins")[0];
   skinsTab.click();
 
-  const skinCard = walk(overlay, (node) => hasClass(node, "shop-skin") && visibleText(node).includes("Fuck Cancer"))[0];
-  assert.ok(skinCard, "shop should render the Fuck Cancer skin");
-  assert.match(visibleText(skinCard), /All proceeds for this skin will be donated for cancer research\./);
+  const skinCard = walk(overlay, (node) => hasClass(node, "shop-skin") && visibleText(node).includes("Fight Cancer"))[0];
+  assert.ok(skinCard, "shop should render the Fight Cancer skin");
+  assert.ok(visibleText(skinCard).includes(CANCER_RESEARCH_DONATION_NOTE));
 
   const valorBuy = walk(skinCard, (node) => node.tagName === "BUTTON" && hasClass(node, "is-valor"))[0];
   valorBuy.click();
 
   const confirm = walk(overlay, (node) => hasClass(node, "shop-purchase-confirm"))[0];
-  assert.match(visibleText(confirm), /All proceeds for this skin will be donated for cancer research\./);
+  assert.ok(visibleText(confirm).includes(CANCER_RESEARCH_DONATION_NOTE));
 
   walk(confirm, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-confirm-cancel"))[0].click();
 
   const packsTab = walk(overlay, (node) => node.tagName === "BUTTON" && node.textContent === "Skin Packs")[0];
   packsTab.click();
 
-  const packCard = walk(overlay, (node) => hasClass(node, "shop-skin-pack") && visibleText(node).includes("Fuck Cancer Charity Pack"))[0];
-  assert.ok(packCard, "shop should render the Fuck Cancer Charity Pack");
-  assert.match(visibleText(packCard), /All proceeds for this pack will be donated for cancer research\./);
+  const packCard = walk(overlay, (node) => hasClass(node, "shop-skin-pack") && visibleText(node).includes("Fight Cancer Pack"))[0];
+  assert.ok(packCard, "shop should render the Fight Cancer Pack");
+  assert.ok(visibleText(packCard).includes(PACK_DONATION_NOTE), visibleText(packCard));
 
   const details = walk(packCard, (node) => node.tagName === "BUTTON" && hasClass(node, "shop-detail-btn"))[0];
   details.click();
 
   const detail = walk(overlay, (node) => hasClass(node, "shop-pack-detail"))[0];
-  assert.match(visibleText(detail), /All proceeds for this pack will be donated for cancer research\./);
+  assert.ok(visibleText(detail).includes(PACK_DONATION_NOTE));
 
   const packValorBuy = walk(detail, (node) => node.tagName === "BUTTON" && hasClass(node, "is-valor"))[0];
   packValorBuy.click();
 
   const packConfirm = walk(overlay, (node) => hasClass(node, "shop-purchase-confirm"))[0];
-  assert.match(visibleText(packConfirm), /All proceeds for this pack will be donated for cancer research\./);
+  assert.ok(visibleText(packConfirm).includes(PACK_DONATION_NOTE));
 });
 
 test("shop unit cards open a detail card and return to unit browsing", () => {

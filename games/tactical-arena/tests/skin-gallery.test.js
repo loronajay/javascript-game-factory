@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { writeUnlockProgress } from "../src/progression/unlocks.js";
 import { openSkinGallery, openSkinViewer } from "../src/ui/skinGallery.js";
+import { CANCER_RESEARCH_DONATION_NOTE } from "../src/ui/skinModel.js";
 
 class FakeClassList {
   constructor(node) {
@@ -185,15 +186,15 @@ test("skin viewer opens only the requested skin detail without gallery navigatio
   assert.ok(walk(overlay, (node) => hasClass(node, "skin-gallery-detail-title")).some((node) => node.textContent === "Medieval"));
 });
 
-test("skin viewer shows the cancer research proceeds note for Fuck Cancer skins", () => {
+test("skin viewer shows the cancer research proceeds note for Fight Cancer skins", () => {
   globalThis.document = new FakeDocument();
 
   openSkinViewer({ type: "juggernaut", slug: "fuck-cancer" });
 
   const overlay = document.body.children[0];
-  assert.ok(walk(overlay, (node) => hasClass(node, "skin-gallery-detail-title")).some((node) => node.textContent === "Fuck Cancer"));
+  assert.ok(walk(overlay, (node) => hasClass(node, "skin-gallery-detail-title")).some((node) => node.textContent === "Fight Cancer"));
   assert.ok(walk(overlay, (node) => hasClass(node, "skin-gallery-detail-note")).some((node) =>
-    node.textContent === "All proceeds for this skin will be donated for cancer research."
+    node.textContent === CANCER_RESEARCH_DONATION_NOTE
   ));
 });
 
