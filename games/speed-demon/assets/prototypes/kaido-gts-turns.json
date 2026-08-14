@@ -1,0 +1,44 @@
+{
+  "id": "kaido-gts-turns-prototype",
+  "modelId": "kaido-gts",
+  "src": "assets/prototypes/kaido-gts-turns.png",
+  "width": 1774,
+  "height": 887,
+  "frames": [
+    {
+      "id": "hard-left",
+      "steering": -1,
+      "headingDegrees": -24,
+      "cell": { "sx": 0, "sy": 0, "sw": 354, "sh": 887 },
+      "art": { "sx": 45, "sy": 238, "sw": 309, "sh": 416 }
+    },
+    {
+      "id": "slight-left",
+      "steering": -0.5,
+      "headingDegrees": -12,
+      "cell": { "sx": 354, "sy": 0, "sw": 355, "sh": 887 },
+      "art": { "sx": 354, "sy": 238, "sw": 346, "sh": 412 }
+    },
+    {
+      "id": "straight",
+      "steering": 0,
+      "headingDegrees": 0,
+      "cell": { "sx": 709, "sy": 0, "sw": 355, "sh": 887 },
+      "art": { "sx": 746, "sy": 240, "sw": 277, "sh": 414 }
+    },
+    {
+      "id": "slight-right",
+      "steering": 0.5,
+      "headingDegrees": 12,
+      "cell": { "sx": 1064, "sy": 0, "sw": 355, "sh": 887 },
+      "art": { "sx": 1069, "sy": 239, "sw": 350, "sh": 417 }
+    },
+    {
+      "id": "hard-right",
+      "steering": 1,
+      "headingDegrees": 24,
+      "cell": { "sx": 1419, "sy": 0, "sw": 355, "sh": 887 },
+      "art": { "sx": 1419, "sy": 238, "sw": 295, "sh": 420 }
+    }
+  ]
+}

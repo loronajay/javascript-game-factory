@@ -13,7 +13,7 @@
 import { DEFAULT_CAR, RACE_DISTANCES, TICK_MS, TICK_SECONDS } from "./sim/constants.js";
 import { createGameAudio, raceSoundEvents, stickMoved } from "./audio.js";
 import { GATE_6_SPEED, createGate } from "./sim/gate.js";
-import { raceOptionsFor } from "./sim/modes.js";
+import { modeById, objectiveOption, raceOptionsFor } from "./sim/modes.js";
 import { createRace, startRace, stepRace, pressShift, gateInput, STAGING, FINISHED } from "./sim/race.js";
 import { MODEL_SHEETS, modelById } from "./assets/car-atlas.js";
 import {
@@ -49,7 +49,10 @@ import {
   SCREEN_BOARDS,
   SCREEN_ONLINE,
   SCREEN_CAMPAIGN,
+  SCREEN_PROFILE,
+  SCREEN_VERSUS,
   COMMAND_CAMPAIGN,
+  COMMAND_PROFILE,
   COMMAND_BEGIN,
   COMMAND_RESTART,
   COMMAND_MODE,
@@ -210,13 +213,13 @@ import {
   stepPlayhead,
   MAX_REPLAY_TICKS,
 } from "./sim/input-log.js";
-import { BETTER_LOWER, boardDirection, boardIdFor, runSummary, runValue } from "./records/records.js";
+import { BETTER_LOWER, boardDirection, boardIdFor, boardUnit, formatValue, runSummary, runValue } from "./records/records.js";
 import { createRecordsStore } from "./records/records-store.js";
 import { buildRival, rivalOutcome, rivalSummary } from "./rival/lineup.js";
-import { RIVALS, rivalPortraitSrc } from "./rival/rivals.js";
+import { RIVALS, rivalThumbSrc } from "./rival/rivals.js";
 import { splashSrc } from "./campaign/events.js";
 import { createCampaignStore } from "./campaign/progress-store.js";
-import { completeEvent } from "./campaign/progress.js";
+import { completeEvent, progressSummary } from "./campaign/progress.js";
 import {
   CAMPAIGN_LOCKED,
   CAMPAIGN_RACE,
@@ -240,6 +243,26 @@ import {
   boardsView,
 } from "./ui/boards.js";
 import { BOARDS_SPLASH, drawBoards, hitBoards } from "./render/boards.js";
+import { createProfileStore } from "./profile/profile-store.js";
+import { createProfile } from "./profile/profile.js";
+import { avatarById } from "./profile/avatars.js";
+import {
+  STAGE_CARD,
+  STAGE_NAME,
+  backspaceProfile,
+  cancelProfileScreen,
+  confirmProfileScreen,
+  createProfileScreen,
+  focusProfileScreen,
+  moveProfileScreen,
+  profileCapturesText,
+  profileScreenView,
+  scrollProfileAvatars,
+  typeIntoProfile,
+} from "./ui/profile.js";
+import { PROFILE_SPLASH, drawProfile, hitProfile } from "./render/profile.js";
+import { createVersus, playerSide, rivalSide, stepVersus, versusDone, versusView } from "./ui/versus.js";
+import { VS_SPLASH, drawVersus } from "./render/versus.js";
 import { gateLayout, gateSlots, createKnob, stepKnob, knobTargetFor } from "./ui/shifter-gate.js";
 import { smoothToward, shiftLightState } from "./ui/gauges.js";
 import { gearNodeId } from "./sim/gate.js";
@@ -347,7 +370,7 @@ export function boot(canvas) {
   // all of them at once, and every renderer here already degrades to a
   // placeholder on an image that has not resolved — a missing portrait file is
   // a normal shipping state, not an error.
-  const rivalImages = new Map(RIVALS.map((rival) => [rival.id, loadImage(rivalPortraitSrc(rival))]));
+  const rivalImages = new Map(RIVALS.map((rival) => [rival.id, loadImage(rivalThumbSrc(rival))]));
   // The collection has a backdrop of its own — a workshop rather than a strip.
   const garageSplash = loadImage(GARAGE_SPLASH);
   // And so do the two screens that are not about a race: a lit cockpit stereo
@@ -487,6 +510,66 @@ export function boot(canvas) {
   // scroll arrow must not change which board is being read. The setup screen's
   // rule.
   let boardsHover = null;
+
+  /**
+   * The driver: a name, a face and five pinned cars, kept in
+   * `game_driver_profiles` on the platform and cached locally in front of it.
+   *
+   * Unlike the garage this works signed out — see the store's header — so there
+   * is always a driver to put on the card, and the load is not awaited for the
+   * same reason the garage's and the records' are not: the first frame must draw
+   * now.
+   */
+  const profileStore = createProfileStore();
+  let profile = profileStore.profile;
+  let profileScreen = createProfileScreen(profile);
+  // What the pointer is over there. Separate from the cursor, because on both
+  // pickers the cursor *is* the pick — the setup screen's rule, for the fourth
+  // time.
+  let profileHover = null;
+
+  /**
+   * Portraits, keyed by **source path** rather than by id.
+   *
+   * One map for two catalogs: a rival's portrait and a driver's avatar are both
+   * "a face at a path", and the VS card draws one of each side by side. Keying
+   * by path is what lets it hold a single map rather than asking which kind it
+   * got — the same argument that makes a CPU and a ghost one code path.
+   *
+   * **Loaded on demand.** The forty-nine avatars are ~110MB together, so unlike
+   * the car sheets they cannot all arrive at boot; the picker asks for the rows
+   * it can see and the card asks for the face it wears. Every renderer here
+   * already degrades to a plate with an initial on it, which is the ordinary
+   * first frame rather than an error.
+   */
+  const faceImages = new Map();
+  function requestFace(src) {
+    if (!src || faceImages.has(src)) return;
+    faceImages.set(src, loadImage(src));
+  }
+  requestFace(avatarById(profile.avatarId)?.cardSrc);
+
+  const profileSplash = loadImage(PROFILE_SPLASH);
+  // The VS card's frame. One small file (140KB), and it is the whole screen when
+  // it is up, so it loads with everything else rather than on demand.
+  const versusSplash = loadImage(VS_SPLASH);
+
+  /**
+   * The card standing between a built race and the tree, or null.
+   *
+   * Built by `beginRace` whenever there is somebody in the other lane, which
+   * offline means a rival or a campaign event. Never online: the server owns
+   * that countdown, and a curtain over a running tree is a way to lose a race
+   * before seeing the strip.
+   */
+  let versus = null;
+
+  profileStore.load().then((loaded) => {
+    profile = loaded;
+    profileScreen = createProfileScreen(profile);
+    requestFace(avatarById(profile.avatarId)?.cardSrc);
+    render();
+  });
 
   recordsStore.load().then(() => render());
 
@@ -917,6 +1000,10 @@ export function boot(canvas) {
     // The other lane belongs to the opponent now. Reaching an online round from
     // a rival race would otherwise leave two cars claiming the same lane.
     rivalCar = null;
+    // And no VS card, deliberately: the server owns this countdown and schedules
+    // the start, so a curtain held over it is a way to lose a race before seeing
+    // the strip. See `ui/versus.js`.
+    versus = null;
     opponentCar = createOpponent(options);
     shell = enterScreen(shell, SCREEN_RACE);
   }
@@ -1221,7 +1308,11 @@ export function boot(canvas) {
    * L, P and F — see `ui/text-entry.js`.
    */
   function syncTextCapture() {
-    const wants = shell.screen === SCREEN_ONLINE && wantsTextCapture(onlineMenu, session);
+    // Two fields in the cabinet want the keyboard: a room code and a driver
+    // name. Both suppress the stereo row while they have it, because `B`, `N`,
+    // `L`, `P` and `F` are all letters somebody might type.
+    const wants = (shell.screen === SCREEN_ONLINE && wantsTextCapture(onlineMenu, session))
+      || (shell.screen === SCREEN_PROFILE && profileCapturesText(profileScreen));
     if (wants !== input.capturingText()) input.setTextCapture(wants);
   }
 
@@ -1398,6 +1489,11 @@ export function boot(canvas) {
     raceTick = 0;
     recordResult = null;
     rivalResult = null;
+    // Built here rather than by the caller because it needs the rival, the car
+    // and the objective this run was assembled from — all of which are settled
+    // exactly now, and any of which the picker may have moved on from by the
+    // time the curtain lifts.
+    versus = buildVersus(event);
   }
 
   /**
@@ -1418,6 +1514,9 @@ export function boot(canvas) {
     // would either be frozen mid-strip for the length of an explanation or
     // driving away from a car that cannot move.
     rivalCar = null;
+    // A lesson has nobody to face, and a card announcing you against nobody is
+    // a delay with a picture on it.
+    versus = null;
     coach = createCoach();
     coachedRun = true;
   }
@@ -1529,7 +1628,7 @@ export function boot(canvas) {
     requestSplash(campaignEvent(campaign));
     if (command !== CAMPAIGN_RACE || !event) return;
     beginRace({ event });
-    shell = enterScreen(shell, SCREEN_RACE);
+    enterRaceScreen();
   }
 
   /** ESC: out of a briefing is the map's business, off the map is the shell's. */
@@ -1564,13 +1663,168 @@ export function boot(canvas) {
     campaignResult = outcome;
   }
 
+  /**
+   * Opens the driver screen, rebuilt from the profile as it stands.
+   *
+   * Built on the way in rather than kept in step with the profile, which is the
+   * collection's and the leaderboards' arrangement and for their reason: the
+   * profile is the one answer to who the driver is, and this screen is a way of
+   * looking at it.
+   */
+  function openProfile() {
+    profileScreen = createProfileScreen(profile);
+    profileHover = null;
+    requestFace(avatarById(profile.avatarId)?.cardSrc);
+  }
+
+  /**
+   * Every change to the driver goes through here, so no future edit path can
+   * change a player's name or face without the server hearing about it — the
+   * rule `commitGarage` enforces for the garage.
+   */
+  function commitProfile(next) {
+    if (next === profile) return;
+    profile = profileStore.save(next);
+    requestFace(avatarById(profile.avatarId)?.cardSrc);
+  }
+
+  /** The driver screen as it is currently drawn, with everything it reads folded in. */
+  function currentProfileView({ hover = profileHover } = {}) {
+    const summary = progressSummary(campaignStore.progress);
+    return profileScreenView(profileScreen, profile, {
+      records: recordsStore.records,
+      // Only for boards the leaderboard screen has already fetched — a rank the
+      // player has not looked up is not worth seven round trips on opening a
+      // screen, which is the boards' own rule.
+      ranks: recordsStore.boardRanks(),
+      garage,
+      campaign: {
+        eventsCleared: summary.cleared,
+        eventsTotal: summary.total,
+        attempts: Object.values(campaignStore.progress.completed)
+          .reduce((total, entry) => total + entry.attempts, 0),
+      },
+      synced: profileStore.synced,
+      hover,
+    });
+  }
+
+  /** Asks for the faces this frame can actually show. */
+  function requestVisibleFaces(view) {
+    // The worn face at card size, because it is drawn at 316px — and the grid at
+    // thumb size, because a screenful of the picker is 32 cells and a card is
+    // twenty times the bytes of a thumb.
+    requestFace(view.avatar?.cardSrc);
+    for (const row of view.avatarPicker.rows) {
+      for (const cell of row.cells) requestFace(cell.thumbSrc);
+    }
+  }
+
+  /** What is under a world point on the driver screen, or null. */
+  function hitProfileAt(at) {
+    // Built without a hover so this cannot depend on the answer it is computing.
+    return at ? hitProfile(currentProfileView({ hover: null }), at.x, at.y) : null;
+  }
+
+  /**
+   * ENTER on the driver screen: open a picker, keep a typed name, pin a car.
+   * Which of those is a question about a profile, so it is answered here rather
+   * than in the shell — the campaign briefing's split.
+   */
+  function confirmProfile() {
+    const { screen, profile: next } = confirmProfileScreen(profileScreen, profile);
+    profileScreen = screen;
+    commitProfile(next);
+  }
+
+  /** ESC: out of a picker is the screen's business, off the card is the shell's. */
+  function cancelProfile() {
+    const { screen, exit } = cancelProfileScreen(profileScreen);
+    profileScreen = screen;
+    return exit;
+  }
+
+  // -------------------------------------------------------------------------
+  // The VS card
+  // -------------------------------------------------------------------------
+
+  /**
+   * The card for the race just built, or null when there is nobody to face.
+   *
+   * A solo distance run has an empty lane beside it, and a card announcing you
+   * against nobody is a delay with a picture on it. Online is excluded for a
+   * harder reason — see `ui/versus.js`: the server owns that countdown.
+   */
+  function buildVersus(event) {
+    if (!rivalCar) return null;
+    const board = boardIdFor(runSelection.modeId, runSelection.objectiveId);
+    const best = board ? recordsStore.records[board] : null;
+    const unit = boardUnit(runSelection.modeId);
+    const player = playerSide(profile, {
+      model: chosen.model,
+      livery: chosen.livery,
+      // Their own best on this board, which is the number the run is about to be
+      // measured against. Nothing at all rather than a dash when there is none:
+      // a first attempt has no time to beat and saying so twice is noise.
+      stat: best ? `PB ${formatValue(unit, best.value)}` : "",
+    });
+    // No stat line for the other car: their tier is already on the plate, and a
+    // CPU rival has no personal best to quote.
+    const opponent = rivalSide(rivalCar.entry, {
+      model: rivalCar.model,
+      livery: rivalCar.livery,
+      profile,
+    });
+    requestFace(player.imageSrc);
+    requestFace(opponent?.imageSrc);
+    const objective = objectiveLabelFor(runSelection);
+    return createVersus({
+      player,
+      opponent,
+      // A campaign race is a mission before it is a distance, so the event's
+      // title wins where there is one.
+      headline: event ? event.title : "RIVAL RACE",
+      subtitle: `${objective}  ·  ${chosen.track.label}`,
+    });
+  }
+
+  /** What the run is measured over, as the setup screen would say it. */
+  function objectiveLabelFor(selection) {
+    const mode = modeById(selection.modeId);
+    return objectiveOption(mode, selection.objectiveId).label;
+  }
+
+  /**
+   * Puts the player on the race, behind the VS card when there is one.
+   *
+   * Every path that starts a run goes through this rather than entering
+   * `SCREEN_RACE` itself, so the curtain cannot be skipped by one of them and
+   * shown by the others.
+   */
+  function enterRaceScreen() {
+    shell = enterScreen(shell, versus ? SCREEN_VERSUS : SCREEN_RACE);
+  }
+
+  /** Lifts the curtain. Any key, any click, or the timer running out. */
+  function dismissVersus() {
+    versus = null;
+    shell = enterScreen(shell, SCREEN_RACE);
+  }
+
   function runCommand(command) {
     if (command === COMMAND_CAMPAIGN) {
       openCampaign();
+    } else if (command === COMMAND_PROFILE) {
+      openProfile();
     } else if (command === COMMAND_BEGIN) {
       beginRace();
+      // The shell has already moved to the race; this puts the curtain in front
+      // of it when the run has somebody in the other lane. Every path that
+      // starts a run goes through the same door — see `enterRaceScreen`.
+      enterRaceScreen();
     } else if (command === COMMAND_RESTART) {
       restartRun();
+      enterRaceScreen();
     } else if (command === COMMAND_TUTORIAL) {
       beginTutorial();
     } else if (command === COMMAND_MODE) {
@@ -1632,6 +1886,17 @@ export function boot(canvas) {
     }
     if (shell.screen === SCREEN_CAMPAIGN) {
       confirmCampaignScreen();
+      return;
+    }
+    if (shell.screen === SCREEN_PROFILE) {
+      confirmProfile();
+      return;
+    }
+    if (shell.screen === SCREEN_VERSUS) {
+      // Every key on the curtain means the same thing. Handled here rather than
+      // in the shell so the key, the pointer and the debug handle cannot
+      // disagree — `confirmScreen`'s whole job.
+      dismissVersus();
       return;
     }
     if (shell.screen === SCREEN_SETUP) {
@@ -1813,6 +2078,15 @@ export function boot(canvas) {
     if (shell.screen === SCREEN_CAMPAIGN && !cancelCampaignScreen()) {
       return; // backed out of a briefing; the shell does not move
     }
+    if (shell.screen === SCREEN_PROFILE && !cancelProfile()) {
+      return; // backed out of a picker; the shell does not move
+    }
+    if (shell.screen === SCREEN_VERSUS) {
+      // ESC lifts the curtain like every other key: the run is already built,
+      // so there is nothing behind it to back out to.
+      dismissVersus();
+      return;
+    }
     if (shell.screen === SCREEN_SETUP) {
       const { setup: next, exit } = cancelSetup(setup);
       setup = next;
@@ -1924,6 +2198,25 @@ export function boot(canvas) {
 
   /** Every screen that is not the race: the menus, and the setup cursor. */
   function menuAction(action) {
+    // The curtain has no cursor and no menu: any key gets on with the race.
+    // Stereo keys never reach here, which is right — they mean the same thing
+    // everywhere, and pausing the music must not also start the run.
+    if (shell.screen === SCREEN_VERSUS) {
+      dismissVersus();
+      return;
+    }
+    // A focused name field owns the letter keys, and nothing else on this path
+    // does. It is checked before the switch for the reason the online screen
+    // checks it first: `ACTION_TEXT` is not a cursor movement and must not fall
+    // through to one.
+    if (action.type === ACTION_TEXT) {
+      if (shell.screen === SCREEN_PROFILE) {
+        profileScreen = action.backspace
+          ? backspaceProfile(profileScreen)
+          : typeIntoProfile(profileScreen, action.char);
+      }
+      return;
+    }
     switch (action.type) {
       case ACTION_MOVE:
         audio.play("button");
@@ -1942,6 +2235,8 @@ export function boot(canvas) {
           requestVisibleBoard();
         } else if (shell.screen === SCREEN_CAMPAIGN) {
           campaign = moveCampaign(campaign, action.direction);
+        } else if (shell.screen === SCREEN_PROFILE) {
+          profileScreen = moveProfileScreen(profileScreen, action.direction);
         } else if (shell.screen === SCREEN_SETUP) {
           setup = moveSetup(setup, action.direction, garage, { ghost: currentGhost() });
         } else {
@@ -2220,6 +2515,29 @@ export function boot(canvas) {
     confirmCampaignScreen();
   }
 
+  /**
+   * A click on the driver screen. **One click does the whole job** — the
+   * cabinet's rule everywhere: a mouse has nowhere to put a separate commit, so
+   * a click picks the thing under it *and* acts on it.
+   *
+   * On the card that means opening the row's picker; in the avatar grid it means
+   * wearing the face; in the roster it means pinning or unpinning the car. All
+   * three go through the same `confirmProfile` the key does, so the two cannot
+   * disagree about what a press means.
+   */
+  function clickProfile(click) {
+    if (click.dragging) return;
+    const target = hitProfile(currentProfileView({ hover: null }), click.x, click.y);
+    if (!target) return;
+    audio.play("button");
+    if (target.kind === "scroll") {
+      profileScreen = scrollProfileAvatars(profileScreen, target.step);
+      return;
+    }
+    profileScreen = focusProfileScreen(profileScreen, target);
+    confirmProfile();
+  }
+
   function applyPointer() {
     // Hovering moves the menu cursor, so the caret is always on the item a click
     // would take. Without it the highlight and the mouse disagree, and the first
@@ -2264,6 +2582,11 @@ export function boot(canvas) {
     // to the scroll arrows must not change what is being read.
     boardsHover = shell.screen === SCREEN_BOARDS ? hitBoardsAt(pointer.hover()) : null;
 
+    // And on the driver screen, for the fourth time and the same reason: on both
+    // of its pickers the cursor is also the pick, so a sweep across the faces on
+    // the way to the scroll arrow must not change the one you are wearing.
+    profileHover = shell.screen === SCREEN_PROFILE ? hitProfileAt(pointer.hover()) : null;
+
     // And on the campaign map, for the third time and the same reason: the node
     // under the cursor is the mission a click would open, so hovering marks it
     // without taking it. A briefing has no targets at all — the whole screen is
@@ -2298,6 +2621,11 @@ export function boot(canvas) {
         clickBoards(click);
       } else if (shell.screen === SCREEN_CAMPAIGN) {
         clickCampaign(click);
+      } else if (shell.screen === SCREEN_PROFILE) {
+        clickProfile(click);
+      } else if (shell.screen === SCREEN_VERSUS) {
+        // Anywhere on the curtain, the way a dialogue box has always worked.
+        if (!click.dragging) dismissVersus();
       } else if (shell.screen === SCREEN_ONLINE) {
         clickOnline(click);
       } else if (isOnlineRace() && showsOnlineResult()) {
@@ -2347,6 +2675,18 @@ export function boot(canvas) {
     // Likewise the room's copy of which car this driver is in: coalesced so a
     // held arrow key is one message rather than one per repeat.
     tickLoadout(TICK_SECONDS);
+    // And the driver's, so a name or a face set on a dropped connection still
+    // reaches the account when it comes back.
+    profileStore.tick(TICK_SECONDS);
+
+    // The curtain runs on the same fixed timestep everything else does, and it
+    // is advanced *before* the screen check below because the race behind it is
+    // deliberately not running: it is sitting in staging, exactly where the
+    // driver left it.
+    if (shell.screen === SCREEN_VERSUS) {
+      versus = stepVersus(versus, TICK_SECONDS);
+      if (versusDone(versus)) dismissVersus();
+    }
 
     if (shell.screen !== SCREEN_RACE) {
       audio.engine({ active: false, throttle: 0, gear: race.vehicle.gear });
@@ -2685,6 +3025,34 @@ export function boot(canvas) {
       return;
     }
 
+    if (shell.screen === SCREEN_PROFILE) {
+      const profileView = currentProfileView();
+      // Asked for here rather than in the renderer, which may not fetch: this is
+      // the one place that knows which faces are about to be drawn.
+      requestVisibleFaces(profileView);
+      canvas.style.cursor = profileHover ? "pointer" : "default";
+      drawProfile(ctx, profileView, {
+        faces: faceImages,
+        sheetImages,
+        liveryCache,
+        splashImage: profileSplash,
+      });
+      return;
+    }
+
+    if (shell.screen === SCREEN_VERSUS) {
+      // The whole screen is one target, so the pointer is a pointer everywhere
+      // on it rather than only over a control.
+      canvas.style.cursor = "pointer";
+      drawVersus(ctx, versusView(versus), {
+        splashImage: versusSplash,
+        faces: faceImages,
+        sheetImages,
+        liveryCache,
+      });
+      return;
+    }
+
     if (shell.screen === SCREEN_COLLECTION) {
       canvas.style.cursor = collectionHover ? "pointer" : "default";
       drawCollection(ctx, currentCollectionView(), { sheetImages, splashImage: garageSplash, liveryCache });
@@ -2818,6 +3186,12 @@ export function boot(canvas) {
         menuAction({ type: ACTION_MOVE, direction });
       } else if (shell.screen === SCREEN_CAMPAIGN) {
         campaign = moveCampaign(campaign, direction);
+      } else if (shell.screen === SCREEN_PROFILE) {
+        profileScreen = moveProfileScreen(profileScreen, direction);
+      } else if (shell.screen === SCREEN_VERSUS) {
+        // The curtain owns no cursor, and falling through to `moveShell` would
+        // walk a menu that is not on screen. Named rather than left to the
+        // default for exactly that reason.
       } else {
         shell = moveShell(shell, direction);
       }
@@ -2851,6 +3225,11 @@ export function boot(canvas) {
       // the cursor held at boot.
       if (name === SCREEN_CAMPAIGN) {
         openCampaign();
+      }
+      // And the driver screen, built on the way in from the profile the way the
+      // collection is built from the setup.
+      if (name === SCREEN_PROFILE) {
+        openProfile();
       }
       render();
       return this.state();
@@ -2977,6 +3356,61 @@ export function boot(canvas) {
       render();
       return this.state();
     },
+    /**
+     * The driver card as it stands, and whether it is reaching the server.
+     *
+     * The screen is four stages behind one cursor and two of them are grids, so
+     * counting keypresses from automation gets it wrong — the collection's and
+     * the leaderboards' argument.
+     */
+    profile: () => {
+      const view = currentProfileView();
+      return {
+        stage: view.stage,
+        name: view.name,
+        avatar: view.avatar?.id ?? null,
+        synced: view.synced,
+        pending: profileStore.dirty,
+        status: profileStore.status,
+        favourites: profile.favourites,
+        rows: view.rows.map((row) => `${row.label}: ${row.value}${row.selected ? " <" : ""}`),
+        bests: view.bests.map((best) => `${best.boardId} ${best.value}${best.rank ? ` #${best.rank}` : ""}`),
+        summary: view.summary,
+      };
+    },
+    /**
+     * Sets the driver directly, the way `savePaint` sets a config: the name
+     * field needs a captured keyboard and the pickers need two grids walked, so
+     * a check that had to drive them would be testing the cursor rather than
+     * what it produced.
+     */
+    driver(changes) {
+      commitProfile(createProfile({ ...profile, ...changes }));
+      profileScreen = createProfileScreen(profile);
+      render();
+      return this.profile();
+    },
+    /**
+     * The VS card, or null when there is none. `skip` lifts it exactly as a key
+     * press does — automation that wants to drive a rival race has to get past
+     * the curtain, and waiting out a 3.2s hold a tick at a time is worse than
+     * saying so.
+     */
+    versus: () => (versus
+      ? {
+          headline: versus.headline,
+          subtitle: versus.subtitle,
+          player: versus.player.name,
+          opponent: versus.opponent?.name ?? null,
+          elapsed: Number(versus.elapsed.toFixed(2)),
+        }
+      : null),
+    skipVersus() {
+      if (shell.screen !== SCREEN_VERSUS) throw new Error("there is no VS card up");
+      dismissVersus();
+      render();
+      return this.state();
+    },
     /** Jumps straight to a mode, rebuilding the setup around it. */
     mode(modeId) {
       shell = { ...shell, modeId };
@@ -3050,7 +3484,9 @@ export function boot(canvas) {
     },
     begin() {
       beginRace();
-      shell = enterScreen(shell, SCREEN_RACE);
+      // Through the same door the menus use, so automation sees the curtain a
+      // player would — and `versus()` below is how a check skips past it.
+      enterRaceScreen();
       render();
       return this.state();
     },
@@ -3187,6 +3623,8 @@ export function boot(canvas) {
           (entry) => `${entry.grade}${entry.reason ? `/${entry.reason}` : ""}+${entry.catch?.grade ?? "open"}`,
         ),
         coach: coach ? { step: coachView(coach, race)?.id ?? null, holding: coachHolds(coach) } : null,
+        driver: { name: profile.name, avatar: profile.avatarId, favourites: profile.favourites.length },
+        versus: versus ? Number(versus.elapsed.toFixed(2)) : null,
         radio: {
           status: library.state().status,
           folder: library.state().folderName,

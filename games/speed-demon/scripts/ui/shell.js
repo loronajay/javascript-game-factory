@@ -65,6 +65,26 @@ export const SCREEN_ONLINE = "online";
  * and so needs no remembered return.
  */
 export const SCREEN_CAMPAIGN = "campaign";
+/**
+ * The driver: a name, a face, five favourite cars, and everything the cabinet
+ * knows about the player.
+ *
+ * On the **mode list** rather than the title menu, next to the garage and for
+ * the garage's reason: this is the screen a player is on when "who am I taking
+ * to the line" is a live question, and the card they build here is the card that
+ * goes on the VS screen one step later. Like the collection it has one way in,
+ * so it needs no remembered return.
+ */
+export const SCREEN_PROFILE = "profile";
+/**
+ * The VS card: the two drivers, before the tree.
+ *
+ * Not a menu and not a race — it is a **curtain** over a race that has already
+ * been built, so every key dismisses it and it lifts by itself after a few
+ * seconds. It is entered by the composition root rather than by a menu, exactly
+ * as the campaign's briefing hands over to a race.
+ */
+export const SCREEN_VERSUS = "versus";
 
 export const SCREENS = [
   SCREEN_TITLE,
@@ -79,6 +99,8 @@ export const SCREENS = [
   SCREEN_BOARDS,
   SCREEN_ONLINE,
   SCREEN_CAMPAIGN,
+  SCREEN_PROFILE,
+  SCREEN_VERSUS,
 ];
 
 /**
@@ -119,6 +141,14 @@ export const COMMAND_ONLINE = "online";
 export const COMMAND_ONLINE_LEAVE = "online-leave";
 /** Open the campaign map, reading the career off disk. */
 export const COMMAND_CAMPAIGN = "campaign";
+/**
+ * Open the driver screen, built from the profile and the stores behind it.
+ *
+ * A command rather than something `enterScreen` could do, for the reason all the
+ * others are: the card is assembled out of the records, the garage and the
+ * career, none of which the shell can see.
+ */
+export const COMMAND_PROFILE = "profile";
 
 /**
  * Screens whose menu is a modal over a live race, so the world and the
@@ -231,7 +261,27 @@ const GARAGE_MENU_ITEM = {
   objective: { label: "ROSTER", options: [{ label: "24 MODELS" }, { label: "LIVERY EDITOR" }] },
 };
 
-const MODE_MENU = [CAMPAIGN_MENU_ITEM, ...MODES, GARAGE_MENU_ITEM];
+/**
+ * The driver, above the garage at the foot of the mode list.
+ *
+ * Beside the garage rather than on the title menu, and for the same argument:
+ * the rows above are ways to *play* and these two are not, but both are things a
+ * player sets up on the way to the line. The pair reads as "who is driving, and
+ * what are they driving", in that order, which is why it sits above.
+ *
+ * It is a row shaped like a mode and is not one, so `confirmShell` answers it
+ * before anything asks the mode catalog about it — the campaign row's rule.
+ */
+const PROFILE_MENU_ITEM = {
+  id: "profile",
+  label: "Driver",
+  blurb: "Your name, your face, your five favourite cars — and every best you have set.",
+  available: true,
+  profile: true,
+  objective: { label: "CARD", options: [{ label: "NAME" }, { label: "PHOTO" }, { label: "BESTS" }] },
+};
+
+const MODE_MENU = [CAMPAIGN_MENU_ITEM, ...MODES, PROFILE_MENU_ITEM, GARAGE_MENU_ITEM];
 
 const MENUS = {
   [SCREEN_TITLE]: () => ({
@@ -406,6 +456,10 @@ export function confirmShell(shell) {
       if (mode?.garage) {
         return outcome(enterScreen(shell, SCREEN_COLLECTION));
       }
+      // And the driver row, for the third time and the same reason.
+      if (mode?.profile) {
+        return outcome(enterScreen(shell, SCREEN_PROFILE), COMMAND_PROFILE);
+      }
       if (!mode || !modeById(mode.id)?.available) {
         // Hovering a locked mode must not adopt it — the chosen mode is only
         // ever changed by a confirm that actually goes through.
@@ -482,6 +536,18 @@ export function confirmShell(shell) {
     case SCREEN_CAMPAIGN:
       return outcome(shell);
 
+    // The driver screen owns its own ENTER: opening a picker, keeping a typed
+    // name, pinning a car. All of those are questions about a profile, which
+    // the shell deliberately cannot see.
+    case SCREEN_PROFILE:
+      return outcome(shell);
+
+    // And the VS card owns nothing at all — it is a curtain over a race that is
+    // already built, so ENTER means "get on with it". The composition root moves
+    // the screen, exactly as it does off a campaign briefing.
+    case SCREEN_VERSUS:
+      return outcome(shell);
+
     // The online screen owns its own ENTER too — search, create, join, ready —
     // and what any of those mean depends on the session, which the shell
     // deliberately cannot see.
@@ -527,6 +593,17 @@ export function cancelShell(shell) {
     // editor it needs no remembered return.
     case SCREEN_COLLECTION:
       return outcome(enterScreen(shell, SCREEN_MODES));
+    // The driver screen hangs off the same list and nowhere else. Backing out of
+    // a *picker* is that screen's own business and never reaches here — the
+    // setup screen's pane split, and the campaign briefing's.
+    case SCREEN_PROFILE:
+      return outcome(enterScreen(shell, SCREEN_MODES));
+    // ESC on the VS card means the same as every other key on it: get on with
+    // the race. There is nothing behind the curtain to go back to — the run is
+    // already built — so refusing to dismiss it would be a dead key on a screen
+    // that has no others.
+    case SCREEN_VERSUS:
+      return outcome(enterScreen(shell, SCREEN_RACE));
     // Likewise the leaderboards and the campaign map: one way in, so one way
     // out. (Backing out of a *briefing* is the campaign screen's own business
     // and never reaches here — the same split the setup screen's panes make.)

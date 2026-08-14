@@ -14,6 +14,8 @@ import {
   SCREEN_BOARDS,
   SCREEN_ONLINE,
   SCREEN_CAMPAIGN,
+  SCREEN_PROFILE,
+  SCREEN_VERSUS,
   SCREENS,
   COMMAND_NONE,
   COMMAND_BEGIN,
@@ -25,6 +27,7 @@ import {
   COMMAND_ONLINE,
   COMMAND_ONLINE_LEAVE,
   COMMAND_CAMPAIGN,
+  COMMAND_PROFILE,
   createShell,
   enterScreen,
   isMenuScreen,
@@ -73,6 +76,10 @@ test("every screen is handled by exactly one of the input paths", () => {
       screen === SCREEN_RACE,
       screen === SCREEN_ONLINE,
       screen === SCREEN_CAMPAIGN,
+      screen === SCREEN_PROFILE,
+      // The VS card owns no cursor, but it is still its own path: every key on
+      // it means "get on with it", which is a different answer from any menu's.
+      screen === SCREEN_VERSUS,
     ];
     assertEqual(paths.filter(Boolean).length, 1, `${screen} is handled by ${paths.filter(Boolean).length} paths`);
   }
@@ -316,10 +323,13 @@ test("each mode says what the setup screen will ask it for", () => {
 test("every mode is listed, and a note explains any that cannot be entered", () => {
   const menu = menuFor(enterScreen(createShell(), SCREEN_MODES));
   // Every mode, plus the campaign at the head of the list — it is a way to
-  // play, which is what this screen is a list of — and the garage at the foot,
-  // which is not, and so is as far from the ways to play as the list allows.
-  assertEqual(menu.items.length, MODES.length + 2, "the roadmap should be visible, not hidden");
+  // play, which is what this screen is a list of — and the driver and the
+  // garage at the foot, which are not, and so are as far from the ways to play
+  // as the list allows. The pair reads "who is driving, and what are they
+  // driving", in that order.
+  assertEqual(menu.items.length, MODES.length + 3, "the roadmap should be visible, not hidden");
   assertEqual(menu.items[0].id, "campaign", "the campaign heads the list");
+  assertEqual(menu.items.at(-2).id, "profile", "the driver sits above the garage");
   assertEqual(menu.items.at(-1).id, "garage", "the garage tails it");
   for (const item of menu.items) {
     if (!item.enabled) assert(item.note, `${item.id} is locked with no explanation`);
@@ -455,6 +465,7 @@ test("every menu item resolves to a handled command", () => {
     COMMAND_ONLINE,
     COMMAND_ONLINE_LEAVE,
     COMMAND_CAMPAIGN,
+    COMMAND_PROFILE,
   ]);
   for (const screen of SCREENS.filter(isMenuScreen)) {
     const shell = enterScreen(createShell(), screen);

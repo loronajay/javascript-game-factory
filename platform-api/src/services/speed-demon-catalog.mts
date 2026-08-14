@@ -260,6 +260,99 @@ export function normalizeGarage(value: any): any {
   };
 }
 
+// ---------------------------------------------------------------------------
+// The driver profile
+//
+// A name, a face and up to five pinned cars, stored per player per game in
+// `game_driver_profiles` (037). Validated here for the same reason a garage is:
+// the payload comes from an installed client, so every field in it is
+// attacker-controlled, and this is the only place the server decides what any of
+// it means.
+//
+// **This is a cabinet alias, not an account.** The name is defaulted from the
+// factory profile on the client and edited locally; nothing here may be treated
+// as identity, and nothing that writes here writes back to the shell's profile.
+// ---------------------------------------------------------------------------
+
+/**
+ * Mirrors `MAX_NAME_LENGTH` and `NAME_ALPHABET` in
+ * games/speed-demon/scripts/profile/profile.js. Narrow on purpose: the string
+ * lands in a canvas `fillText` on somebody else's machine, and quite possibly on
+ * a wire before that.
+ */
+export const MAX_DRIVER_NAME_LENGTH = 14;
+const DRIVER_NAME_ALLOWED = /[A-Za-z0-9 \-'.]/;
+
+/** Mirrors `MAX_FAVOURITES`. Five is what fits on the card as real cars. */
+export const MAX_FAVOURITE_MODELS = 5;
+
+/**
+ * The avatar ids, generated from the same three bands the client's
+ * `profile/avatars.js` manifest builds. **Keep the counts in lockstep with that
+ * file** — the same rule the model list follows, and for a weaker version of the
+ * same reason: an id the server refuses is a face that silently reverts to the
+ * default on the next load, with nothing on screen to explain it.
+ */
+const AVATAR_BANDS: readonly { prefix: string; files: readonly string[] }[] = Object.freeze([
+  { prefix: "male", files: Array.from({ length: 20 }, (_, index) => String(index + 1)) },
+  { prefix: "female", files: Array.from({ length: 24 }, (_, index) => String(index + 1)) },
+  { prefix: "fast", files: ["luda", "paul", "tyrese", "vin", "yuki"] },
+]);
+
+export const SPEED_DEMON_AVATAR_IDS: readonly string[] = Object.freeze(
+  AVATAR_BANDS.flatMap((band) => band.files.map((file) => `${band.prefix}-${file}`)),
+);
+const AVATAR_ID_SET = new Set(SPEED_DEMON_AVATAR_IDS);
+
+export const DEFAULT_SPEED_DEMON_AVATAR_ID = SPEED_DEMON_AVATAR_IDS[0];
+
+export function isValidSpeedDemonAvatarId(value: any): boolean {
+  return typeof value === "string" && AVATAR_ID_SET.has(value);
+}
+
+function cleanDriverName(value: any): string {
+  if (typeof value !== "string") return "";
+  let out = "";
+  for (const char of value) {
+    if (out.length >= MAX_DRIVER_NAME_LENGTH) break;
+    if (!DRIVER_NAME_ALLOWED.test(char)) continue;
+    out += char;
+  }
+  return out.trim();
+}
+
+/**
+ * A driver profile, clamped. Total, like `normalizeLivery`: any input produces
+ * something drawable, because this document is handed to *other players'*
+ * clients and a malformed one must not be able to break their card.
+ *
+ * An unknown avatar falls back to the default rather than rejecting the save —
+ * a client one version ahead may legitimately name a face this server has not
+ * heard of, and refusing the whole document would lose the name with it. That is
+ * `normalizeGarage`'s rule about unknown models.
+ *
+ * An empty name is a legal saved state: the client prints `DRIVER` for it. There
+ * is deliberately no server-side default name, because the only sensible one
+ * would be the account's, and inventing identity here is exactly what this table
+ * must not do.
+ */
+export function normalizeDriverProfile(value: any): any {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const favourites: string[] = [];
+  // Truncate before mapping, not after — the layers rule, and a denial-of-service
+  // bound for the same reason.
+  for (const raw of (Array.isArray(source.favourites) ? source.favourites : []).slice(0, 64)) {
+    if (favourites.length >= MAX_FAVOURITE_MODELS) break;
+    if (!isValidSpeedDemonModelId(raw) || favourites.includes(raw)) continue;
+    favourites.push(raw);
+  }
+  return {
+    name: cleanDriverName(source.name),
+    avatarId: isValidSpeedDemonAvatarId(source.avatarId) ? source.avatarId : DEFAULT_SPEED_DEMON_AVATAR_ID,
+    favourites,
+  };
+}
+
 /**
  * What an opponent is shown: the car being driven, resolved, with no preset ids
  * in it — a preset id means nothing inside anyone else's garage.

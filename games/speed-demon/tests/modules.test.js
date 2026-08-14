@@ -76,6 +76,12 @@ const MODULES = [
   "scripts/campaign/progress.js",
   "scripts/ui/campaign.js",
   "scripts/render/campaign.js",
+  "scripts/profile/avatars.js",
+  "scripts/profile/profile.js",
+  "scripts/ui/profile.js",
+  "scripts/render/profile.js",
+  "scripts/ui/versus.js",
+  "scripts/render/versus.js",
   "scripts/init-game.js",
 ];
 
@@ -542,6 +548,10 @@ test("the debug handle can move on every screen that owns a cursor", () => {
     [shell.SCREEN_ONLINE]: "SCREEN_ONLINE",
     [shell.SCREEN_RACE]: "SCREEN_RACE",
     [shell.SCREEN_CAMPAIGN]: "SCREEN_CAMPAIGN",
+    [shell.SCREEN_PROFILE]: "SCREEN_PROFILE",
+    // The VS card owns no cursor, but `move()` still has to *name* it: falling
+    // through to `moveShell` there would walk a menu that is not on screen.
+    [shell.SCREEN_VERSUS]: "SCREEN_VERSUS",
   };
   for (const screen of owned) {
     assert(block.includes(constants[screen]), `the debug handle's move() cannot reach ${screen}`);
@@ -577,6 +587,187 @@ test("the campaign's rules never reach for a browser", () => {
       assert(!pattern.test(source), `${relative} reaches for ${pattern}`);
     }
   }
+});
+
+test("nothing the game loads at runtime is a full-size master", () => {
+  // The masters are 1254x1254 PNGs — 111MB of avatars and 23MB of portraits —
+  // and the largest a face is ever drawn is the VS card's slot at ~322x362.
+  // Serving one is not a slow path, it is a hundredfold one: filling the avatar
+  // picker's grid from the masters pulled ~70MB for a screen of 112px cells.
+  //
+  // So the manifests keep the master paths for the tool and for this file, and
+  // every *runtime* path resolves into `thumbs/` or `cards/`. This is the check
+  // that stops one creeping back — a `.src` in a renderer looks entirely
+  // reasonable right up until someone opens the network tab.
+  const budgets = [
+    { folder: "thumbs", limit: 60 * 1024 },
+    { folder: "cards", limit: 400 * 1024 },
+  ];
+  const faces = [
+    ...loaded["scripts/profile/avatars.js"].allAvatars().map((avatar) => ({
+      what: avatar.id,
+      master: avatar.src,
+      thumb: avatar.thumbSrc,
+      card: avatar.cardSrc,
+    })),
+    ...loaded["scripts/rival/rivals.js"].RIVALS.map((rival) => ({
+      what: rival.id,
+      master: loaded["scripts/rival/rivals.js"].rivalPortraitSrc(rival),
+      thumb: loaded["scripts/rival/rivals.js"].rivalThumbSrc(rival),
+      card: loaded["scripts/rival/rivals.js"].rivalCardSrc(rival),
+    })),
+  ];
+
+  for (const face of faces) {
+    for (const { folder, limit } of budgets) {
+      const src = folder === "thumbs" ? face.thumb : face.card;
+      assert(src.includes(`/${folder}/`), `${face.what}'s ${folder} path is not in the ${folder} folder`);
+      const file = path.join(gameRoot, src);
+      assert(fs.existsSync(file), `${face.what} has no ${folder}: run tools/make-face-thumbs.py`);
+      const bytes = fs.statSync(file).size;
+      assert(bytes <= limit, `${face.what}'s ${folder} is ${Math.round(bytes / 1024)}KB, over the ${limit / 1024}KB budget`);
+    }
+    // …and where the master is on disk, it is genuinely the heavy one, so the
+    // split is worth having. Conditional because the avatar masters are
+    // gitignored: a clone has the derived set and nothing else, which is the
+    // whole point.
+    const master = path.join(gameRoot, face.master);
+    if (fs.existsSync(master)) {
+      assert(fs.statSync(master).size > fs.statSync(path.join(gameRoot, face.card)).size,
+        `${face.what}'s master is no bigger than its card — the derived set is not earning its place`);
+    }
+  }
+
+  // No module under `scripts/` may name a master folder directly. The manifests
+  // build those paths themselves and are exempt; everything else has to go
+  // through them.
+  const exempt = new Set(["scripts/profile/avatars.js", "scripts/rival/rivals.js"]);
+  for (const relative of MODULES) {
+    if (exempt.has(relative)) continue;
+    const source = fs.readFileSync(path.join(gameRoot, relative), "utf8");
+    assert(!/assets\/avatars\//.test(source), `${relative} builds an avatar path of its own`);
+    assert(!/rivalPortraitSrc/.test(source), `${relative} loads a full-size portrait master`);
+    assert(!/\.avatar\?\.src|cell\.src\b/.test(source), `${relative} draws a face from its master`);
+  }
+});
+
+test("the whole thumb set is smaller than a single master was", () => {
+  // The number that decides whether the picker is usable over a network: all 59
+  // faces at thumb size against one 1254px PNG. 2.3MB is what a master measures
+  // — hardcoded rather than read, because the masters are gitignored and this
+  // has to mean something on a clone that has none.
+  const rivals = loaded["scripts/rival/rivals.js"];
+  const thumbs = [
+    ...loaded["scripts/profile/avatars.js"].allAvatars().map((avatar) => avatar.thumbSrc),
+    ...rivals.RIVALS.map((rival) => rivals.rivalThumbSrc(rival)),
+  ];
+  const total = thumbs.reduce((sum, src) => sum + fs.statSync(path.join(gameRoot, src)).size, 0);
+  assert(total < 2.3 * 1024 * 1024, `the whole thumb set is ${Math.round(total / 1024)}KB, more than one master`);
+});
+
+test("no derived face is stale against a master that is present", () => {
+  // The tool writes them and nothing else does, so an art re-export leaves the
+  // game serving the old face with nothing on screen to explain it. Compared by
+  // modification time, which is exactly what `--check` does.
+  //
+  // Skipped per face where the master is absent: the avatar masters are
+  // gitignored, so on a clone there is nothing to be stale against — and the
+  // derived files' own existence is checked unconditionally above.
+  const avatars = loaded["scripts/profile/avatars.js"].allAvatars();
+  const rivals = loaded["scripts/rival/rivals.js"];
+  const pairs = [
+    ...avatars.flatMap((avatar) => [[avatar.src, avatar.thumbSrc], [avatar.src, avatar.cardSrc]]),
+    ...rivals.RIVALS.flatMap((rival) => [
+      [rivals.rivalPortraitSrc(rival), rivals.rivalThumbSrc(rival)],
+      [rivals.rivalPortraitSrc(rival), rivals.rivalCardSrc(rival)],
+    ]),
+  ];
+  let checked = 0;
+  for (const [master, derived] of pairs) {
+    const file = path.join(gameRoot, master);
+    if (!fs.existsSync(file)) continue;
+    checked += 1;
+    const derivedTime = fs.statSync(path.join(gameRoot, derived)).mtimeMs;
+    assert(derivedTime >= fs.statSync(file).mtimeMs,
+      `${derived} is older than its master — run tools/make-face-thumbs.py`);
+  }
+  // The rival masters *are* tracked, so at least those twenty pairs must have
+  // been compared. A count of zero would mean this test had quietly stopped
+  // checking anything at all.
+  assert(checked >= rivals.RIVALS.length * 2, `only ${checked} faces were compared against a master`);
+});
+
+test("the driver's rules never reach for a browser", () => {
+  // The sixth instance of the split, after the radio, the garage, online, the
+  // records and the campaign. `avatars.js` is a manifest, `profile.js` decides
+  // what a driver *is*, `ui/profile.js` and `ui/versus.js` decide what is on
+  // screen; `profile-store.js` is the one module under `profile/` allowed to
+  // know a server and localStorage exist. Matched as *usage* rather than as bare
+  // words, the garage's reason: these files legitimately name the storage layer
+  // in prose.
+  const forbidden = [
+    /document\s*\./,
+    /window\s*\./,
+    /localStorage\s*\./,
+    /indexedDB\s*\./,
+    /fetch\s*\(/,
+  ];
+  for (const relative of [
+    "scripts/profile/avatars.js",
+    "scripts/profile/profile.js",
+    "scripts/ui/profile.js",
+    "scripts/ui/versus.js",
+  ]) {
+    const source = fs.readFileSync(path.join(gameRoot, relative), "utf8");
+    for (const pattern of forbidden) {
+      assert(!pattern.test(source), `${relative} reaches for ${pattern}`);
+    }
+    assert(!/from\s+"[^"]*profile-store\.js"/.test(source), `${relative} imports the storage layer`);
+  }
+});
+
+test("the driver screen's bests are the boards a run can actually reach", () => {
+  // A second list of boards would be a row a player can look at but never fill.
+  const profileUi = loaded["scripts/ui/profile.js"];
+  const boards = loaded["scripts/ui/boards.js"];
+  const view = profileUi.profileScreenView(
+    profileUi.createProfileScreen(loaded["scripts/profile/profile.js"].createProfile({})),
+    loaded["scripts/profile/profile.js"].createProfile({}),
+  );
+  assertEqual(view.bests.length, boards.allBoards().length);
+  for (const best of view.bests) {
+    assert(boards.boardById(best.boardId), `${best.boardId} is not a board`);
+  }
+});
+
+test("the VS card is built for a rival race and never for an online round", () => {
+  // The server owns an online countdown and schedules the start, so a curtain
+  // held over it is a way to lose a race before seeing the strip. The guard is
+  // in the composition root, where the race is built.
+  const source = fs.readFileSync(path.join(gameRoot, "scripts/init-game.js"), "utf8");
+  const endOfFunction = "\n  }";
+  const build = source.slice(source.indexOf("function buildVersus"));
+  const body = build.slice(0, build.indexOf(endOfFunction));
+  assert(body.includes("if (!rivalCar) return null;"), "buildVersus no longer refuses a race with an empty lane");
+
+  const online = source.slice(source.indexOf("function buildOnlineRace"));
+  const onlineBody = online.slice(0, online.indexOf(endOfFunction));
+  assert(/versus = null;/.test(onlineBody), "an online round must clear the VS card");
+
+  const tutorial = source.slice(source.indexOf("function beginTutorial"));
+  const tutorialBody = tutorial.slice(0, tutorial.indexOf(endOfFunction));
+  assert(/versus = null;/.test(tutorialBody), "a guided run has nobody to face");
+});
+
+test("every path onto the race screen goes through the same door", () => {
+  // `enterRaceScreen` is what decides whether the curtain is shown. A path that
+  // entered `SCREEN_RACE` itself would skip it for one way of starting a run and
+  // show it for the others.
+  const source = fs.readFileSync(path.join(gameRoot, "scripts/init-game.js"), "utf8");
+  const fn = source.slice(source.indexOf("function enterRaceScreen"));
+  const body = fn.slice(0, fn.indexOf("\n  }"));
+  assert(body.includes("SCREEN_VERSUS"), "enterRaceScreen must be able to show the card");
+  assert(body.includes("SCREEN_RACE"), "…and must fall through to the race without one");
 });
 
 test("the online rules never reach for a browser or a socket", () => {
@@ -1163,6 +1354,28 @@ test("referenced asset files are actually present", () => {
     fs.existsSync(path.join(gameRoot, loaded["scripts/render/collection.js"].GARAGE_SPLASH)),
     "missing garage splash",
   );
+  assert(
+    fs.existsSync(path.join(gameRoot, loaded["scripts/render/profile.js"].PROFILE_SPLASH)),
+    "missing driver-screen splash",
+  );
+  // The VS card *is* its frame — the two neon slots are painted into it — so
+  // unlike a backdrop there is nothing to degrade to if it is missing.
+  assert(
+    fs.existsSync(path.join(gameRoot, loaded["scripts/render/versus.js"].VS_SPLASH)),
+    "missing VS splash",
+  );
+  // Every face the game *loads*, in both derived sizes, because a picker cell
+  // with no file behind it is a plate with a number on it and nothing to say why.
+  // They come from `tools/make-face-thumbs.py`; a missing one means the tool has
+  // not been re-run since the art changed.
+  //
+  // The **masters are deliberately not checked here**: they are gitignored
+  // (~117MB the browser never requests), so a clone legitimately has none. What
+  // ships is the derived set, and that is what has to be present.
+  for (const avatar of loaded["scripts/profile/avatars.js"].allAvatars()) {
+    assert(fs.existsSync(path.join(gameRoot, avatar.thumbSrc)), `missing avatar thumb at ${avatar.thumbSrc}`);
+    assert(fs.existsSync(path.join(gameRoot, avatar.cardSrc)), `missing avatar card at ${avatar.cardSrc}`);
+  }
   assert(fs.existsSync(path.join(gameRoot, "styles/game.css")), "missing stylesheet");
   for (const src of Object.values(loaded["scripts/audio.js"].SOUND_SOURCES)) {
     assert(fs.existsSync(path.join(gameRoot, src)), `missing sound at ${src}`);

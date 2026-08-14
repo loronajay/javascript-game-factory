@@ -12,6 +12,7 @@ import { handleRatingRoute } from "./routes/rating-routes.mjs";
 import { handleRankedRoute } from "./routes/ranked-routes.mjs";
 import { handleGameSocialRoute } from "./routes/game-social-routes.mjs";
 import { handleLoadoutRoute } from "./routes/loadout-routes.mjs";
+import { handleGameProfileRoute } from "./routes/game-profile-routes.mjs";
 import { handleLadderRoute } from "./routes/ladder-routes.mjs";
 import { handleLeaderboardRoute } from "./routes/leaderboard-routes.mjs";
 import { handleGameProgressRoute } from "./routes/game-progress-routes.mjs";
@@ -298,6 +299,12 @@ export function createApp(options: any = {}) {
   const saveGarage = typeof options?.saveGarage === "function" ? options.saveGarage : null;
   const getPublicLoadout = typeof options?.getPublicLoadout === "function" ? options.getPublicLoadout : null;
   const getPublicLoadouts = typeof options?.getPublicLoadouts === "function" ? options.getPublicLoadouts : null;
+  // Per-game driver profiles. Null rather than a stub for the loadouts' reason:
+  // the route family must answer 503 "not configured" rather than pretend a save
+  // landed.
+  const getGameProfile = typeof options?.getGameProfile === "function" ? options.getGameProfile : null;
+  const saveGameProfile = typeof options?.saveGameProfile === "function" ? options.saveGameProfile : null;
+  const getGameProfiles = typeof options?.getGameProfiles === "function" ? options.getGameProfiles : null;
   // Solo leaderboards. Null rather than a no-op stub so the route family answers
   // 503 "not configured" instead of silently reporting an empty board — the same
   // distinction the loadout services draw.
@@ -581,6 +588,11 @@ export function createApp(options: any = {}) {
     saveGarage,
     getPublicLoadout,
     getPublicLoadouts,
+  };
+  const gameProfileServices = {
+    getGameProfile,
+    saveGameProfile,
+    getGameProfiles,
   };
   const leaderboardServices = {
     getBoardStandings,
@@ -980,6 +992,19 @@ export function createApp(options: any = {}) {
       requestOrigin,
       timestamp,
       services: loadoutServices,
+    })) {
+      return;
+    }
+
+    if (await handleGameProfileRoute({
+      req,
+      res,
+      method,
+      pathname,
+      authClaims,
+      requestOrigin,
+      timestamp,
+      services: gameProfileServices,
     })) {
       return;
     }

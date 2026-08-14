@@ -17,7 +17,7 @@ import {
   stepPlayhead,
 } from "../scripts/sim/input-log.js";
 import { driveRace, createProfile, DEFAULT_PROFILE } from "../scripts/rival/cpu-driver.js";
-import { RIVALS, DEFAULT_RIVAL_ID, rivalById, rivalPortraitSrc, rivalFullName } from "../scripts/rival/rivals.js";
+import { RIVALS, DEFAULT_RIVAL_ID, rivalById, rivalPortraitSrc, rivalThumbSrc, rivalCardSrc, rivalFullName } from "../scripts/rival/rivals.js";
 import { modelById } from "../scripts/assets/car-atlas.js";
 import { createGhost, GHOST_EVENT_CEILING } from "../scripts/rival/ghost.js";
 import {
@@ -347,6 +347,14 @@ test("every rival names a car that exists and a portrait file that is really the
     const src = rivalPortraitSrc(rival);
     assertEqual(src, `assets/characters/${rival.portrait}`);
     assert(fs.existsSync(path.join(gameRoot, src)), `${rival.id}'s portrait is missing: ${src}`);
+    // …and the two sizes the game actually loads, which are named for the **id**
+    // rather than the slug so a path can be built without consulting the roster.
+    // The `rival-` prefix keeps them from colliding with an avatar in a cache
+    // keyed by path.
+    for (const derived of [rivalThumbSrc(rival), rivalCardSrc(rival)]) {
+      assert(derived.includes(`rival-${rival.id}.jpg`), `${rival.id}'s derived face is misnamed: ${derived}`);
+      assert(fs.existsSync(path.join(gameRoot, derived)), `${rival.id} is missing ${derived}`);
+    }
     assertEqual(rivalFullName(rival), `${rival.first} "${rival.name}" ${rival.last}`);
   }
   assertEqual(new Set(RIVALS.map((r) => r.id)).size, RIVALS.length, "duplicate rival ids");

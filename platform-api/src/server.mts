@@ -9,6 +9,7 @@ import { readConfig } from "./config.mjs";
 import { incrementPlayerProfileView, loadPlayerMetrics, savePlayerMetrics } from "./db/metrics.mjs";
 import { applyMigrations } from "./db/migrations.mjs";
 import { getGarage, saveGarage, getPublicLoadout, getPublicLoadouts } from "./db/game-loadouts.mjs";
+import { getGameProfile, saveGameProfile, getGameProfiles } from "./db/game-profiles.mjs";
 import { activateInventoryItem, backfillLocalOwnership, findPlayPurchaseClaim, findStripeGrant, getGameProgress, recordGameProgressClaim, regrantStripeEntitlements, resetCampaignProgress, revokeGameEntitlements, spendValorForEntitlement } from "./db/game-progress.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
@@ -384,6 +385,9 @@ async function bootstrap(): Promise<void> {
     saveGarage: (params: any) => saveGarage(pool, params),
     getPublicLoadout: (params: any) => getPublicLoadout(pool, params),
     getPublicLoadouts: (params: any) => getPublicLoadouts(pool, params),
+    getGameProfile: (params: any) => getGameProfile(pool, params),
+    saveGameProfile: (params: any) => saveGameProfile(pool, params),
+    getGameProfiles: (params: any) => getGameProfiles(pool, params),
     getBoardStandings: (params: any) => getBoardStandings(pool, params),
     getPlayerRunRecords: (params: any) => getPlayerRunRecords(pool, params),
     recordRun: (params: any) => recordRun(pool, params),

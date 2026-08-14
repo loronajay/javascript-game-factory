@@ -177,6 +177,10 @@ const PLAYER_SCOPED_DELETES = Object.freeze([
     ["game_progress_claims", ["player_id"]],
     ["game_run_records", ["player_id"]],
     ["game_loadouts", ["player_id"]],
+    // The driver a player set up inside a cabinet — their name, face and pinned
+    // cars. Cosmetic, but it is *shown to other people*, so an account that has
+    // been deleted must stop having a face on anybody's VS card.
+    ["game_driver_profiles", ["player_id"]],
     ["game_player_badges", ["player_id"]],
     // Ranked identity, standing, and any in-flight queue/match rows.
     ["game_ratings", ["player_id"]],

@@ -40,7 +40,12 @@ export const MENU_LAYOUT = {
     list: { x: WORLD.width / 2 - 170, y: 442, width: 340, itemHeight: 40, gap: 8 },
     controls: { y: 672 },
   },
-  modes: { header: { x: 140, y: 128 }, list: { x: 140, y: 216, width: 430, itemHeight: 62, gap: 12 } },
+  // Seven rows now — the campaign, four modes, the driver and the garage — and
+  // seven at the old 62+12 stride ran 2px off the bottom of the screen. The rows
+  // shrank rather than the list moving up, because the block still has to clear
+  // the heading above it. `tests/modules.test.js` is what caught it, and it is
+  // what will catch the eighth.
+  modes: { header: { x: 140, y: 128 }, list: { x: 140, y: 190, width: 430, itemHeight: 58, gap: 10 } },
   detail: { x: 630, y: 216, width: 510, height: 300 },
   // Sized around its five items and no larger: it has to clear DASH_TOP so the
   // instrument cluster stays lit underneath a paused race.

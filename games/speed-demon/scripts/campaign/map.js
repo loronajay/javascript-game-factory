@@ -18,19 +18,28 @@
 //   are part of the artwork. Drawing a second set of lines over them is how you
 //   end up with two maps disagreeing about where the road goes.
 //
-// The points below were **measured off the shipped PNG**, not typed, in two
-// passes — and the second one is the load-bearing half:
+// The points below were **measured off the shipped PNG**, not typed, by
+// `tools/measure-map-nodes.py` — re-run it if the art is re-authored and paste
+// what it prints. It fits a circle to each icon's *outer edge*, which is a more
+// awkward measurement than it sounds and is worth knowing why:
 //
-//   1. A connected-components sweep over the near-white pixels finds the icons,
-//      because each sits inside a bright ring; the colour inside the ring gives
-//      the kind.
-//   2. **A circle fit recovers the centre**, because the bounding box of that
-//      component is not it: the painted dashed route runs *into* every ring, so
-//      the blob it belongs to is the ring plus a length of trail, and its box
-//      centre is dragged a few pixels along the road. Fitting a circle to the
-//      ring pixels (trimming anything off the median radius, which is the
-//      trail) puts the token back on the base. Worst case that was 4.3px on
-//      `downtown-2`, which is small on paper and obvious on screen.
+//   - **A blob centroid is wrong.** The painted dashed route runs *into* every
+//     ring, so the bright component is the ring plus a length of trail and its
+//     centroid is dragged a few pixels along the road.
+//   - **A Hough-style vote is wrong too**, which is how the first pass at this
+//     left five nodes ~5px out. The icons are near-solid inside the outer ring,
+//     so a great many (centre, radius) pairs score a perfect circle and the peak
+//     is a plateau rather than a point — the answer you get back is wherever the
+//     search happened to start looking.
+//   - So the tool casts 720 rays from a provisional centre, takes the outermost
+//     bright sample on each, **discards every ray more than 2.5px off the median
+//     radius** — that is the trail, and the boss plates' flourishes — and
+//     least-squares fits a circle to what is left, feeding the new centre back
+//     in until it settles. It lands inside half a pixel on all 21.
+//
+// Half a pixel is the standard because these are 941px-tall coordinates drawn
+// into a ~700px box: an error of five is small on paper and unmissable on
+// screen, as a token sitting off the side of its own icon.
 //
 // That is the same "measured, not typed" rule the car atlas and the track
 // geometry follow — re-measure with the same method rather than nudging a
@@ -65,27 +74,27 @@ export const NODE_START = "start";
  * and in every save, the same rule the car models and the boards follow.
  */
 export const MAP_NODES = [
-  { id: "start", kind: NODE_START, region: "Street Circuit", point: { x: 8.59, y: 83.38 } },
-  { id: "street-1", kind: NODE_RACE, region: "Street Circuit", point: { x: 16.17, y: 74.90 } },
-  { id: "street-2", kind: NODE_RACE, region: "Street Circuit", point: { x: 23.97, y: 69.60 } },
-  { id: "street-3", kind: NODE_BONUS, region: "Street Circuit", point: { x: 29.58, y: 76.85 } },
-  { id: "street-4", kind: NODE_RIVAL, region: "Street Circuit", point: { x: 32.15, y: 64.50 } },
-  { id: "street-5", kind: NODE_BONUS, region: "Street Circuit", point: { x: 37.87, y: 74.32 } },
-  { id: "street-6", kind: NODE_RACE, region: "Street Circuit", point: { x: 39.22, y: 57.61 } },
-  { id: "street-7", kind: NODE_RIVAL, region: "Street Circuit", point: { x: 44.49, y: 66.46 } },
-  { id: "street-boss", kind: NODE_BOSS, region: "Street Circuit", label: "STREET BOSS", point: { x: 46.15, y: 50.96 } },
-  { id: "downtown-1", kind: NODE_RACE, region: "Downtown", point: { x: 55.20, y: 46.96 } },
-  { id: "downtown-2", kind: NODE_BONUS, region: "Downtown", point: { x: 59.02, y: 59.07 } },
+  { id: "start", kind: NODE_START, region: "Street Circuit", point: { x: 8.59, y: 83.40 } },
+  { id: "street-1", kind: NODE_RACE, region: "Street Circuit", point: { x: 15.87, y: 74.82 } },
+  { id: "street-2", kind: NODE_RACE, region: "Street Circuit", point: { x: 23.96, y: 69.58 } },
+  { id: "street-3", kind: NODE_BONUS, region: "Street Circuit", point: { x: 29.27, y: 76.77 } },
+  { id: "street-4", kind: NODE_RIVAL, region: "Street Circuit", point: { x: 32.16, y: 64.51 } },
+  { id: "street-5", kind: NODE_BONUS, region: "Street Circuit", point: { x: 37.57, y: 74.36 } },
+  { id: "street-6", kind: NODE_RACE, region: "Street Circuit", point: { x: 39.20, y: 57.62 } },
+  { id: "street-7", kind: NODE_RIVAL, region: "Street Circuit", point: { x: 44.49, y: 66.47 } },
+  { id: "street-boss", kind: NODE_BOSS, region: "Street Circuit", label: "STREET BOSS", point: { x: 46.15, y: 50.95 } },
+  { id: "downtown-1", kind: NODE_RACE, region: "Downtown", point: { x: 55.21, y: 46.95 } },
+  { id: "downtown-2", kind: NODE_BONUS, region: "Downtown", point: { x: 59.03, y: 58.56 } },
   { id: "downtown-3", kind: NODE_RIVAL, region: "Downtown", point: { x: 63.80, y: 41.64 } },
-  { id: "docks-1", kind: NODE_RIVAL, region: "Docklands", point: { x: 67.02, y: 67.62 } },
-  { id: "downtown-4", kind: NODE_RACE, region: "Downtown", point: { x: 71.04, y: 36.08 } },
-  { id: "downtown-5", kind: NODE_BONUS, region: "Downtown", point: { x: 73.84, y: 47.82 } },
-  { id: "dock-boss", kind: NODE_BOSS, region: "Docklands", label: "DOCK BOSS", point: { x: 75.22, y: 71.51 } },
+  { id: "docks-1", kind: NODE_RIVAL, region: "Docklands", point: { x: 67.01, y: 67.62 } },
+  { id: "downtown-4", kind: NODE_RACE, region: "Downtown", point: { x: 70.75, y: 36.02 } },
+  { id: "downtown-5", kind: NODE_BONUS, region: "Downtown", point: { x: 73.83, y: 47.84 } },
+  { id: "dock-boss", kind: NODE_BOSS, region: "Docklands", label: "DOCK BOSS", point: { x: 75.22, y: 71.52 } },
   { id: "city-boss", kind: NODE_BOSS, region: "Downtown", label: "CITY BOSS", point: { x: 78.28, y: 30.85 } },
-  { id: "kuroda-1", kind: NODE_RIVAL, region: "Kuroda Territory", point: { x: 82.90, y: 42.76 } },
-  { id: "kuroda-2", kind: NODE_RACE, region: "Kuroda Territory", point: { x: 84.31, y: 23.80 } },
-  { id: "kuroda-3", kind: NODE_RIVAL, region: "Kuroda Territory", point: { x: 88.20, y: 17.24 } },
-  { id: "kuroda", kind: NODE_BOSS, region: "Kuroda Territory", label: "KURODA", point: { x: 91.15, y: 10.09 } },
+  { id: "kuroda-1", kind: NODE_RIVAL, region: "Kuroda Territory", point: { x: 82.91, y: 42.77 } },
+  { id: "kuroda-2", kind: NODE_RACE, region: "Kuroda Territory", point: { x: 84.29, y: 23.83 } },
+  { id: "kuroda-3", kind: NODE_RIVAL, region: "Kuroda Territory", point: { x: 88.19, y: 17.22 } },
+  { id: "kuroda", kind: NODE_BOSS, region: "Kuroda Territory", label: "KURODA", point: { x: 91.15, y: 10.08 } },
 ];
 
 export function mapNodeById(id) {

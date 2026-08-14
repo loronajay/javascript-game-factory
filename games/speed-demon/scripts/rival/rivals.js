@@ -37,8 +37,35 @@ import { createLivery } from "../garage/livery.js";
  */
 export const RIVAL_PORTRAIT_DIR = "assets/characters";
 
+/**
+ * The master. **No runtime path may point at one** — the ten are 1254x1254 PNGs
+ * totalling 23MB, and the largest a portrait is ever drawn is the VS card's slot
+ * at ~322x362. This is here for `tools/make-face-thumbs.py`, which reads them,
+ * and for the asset test, which checks they exist.
+ */
 export function rivalPortraitSrc(rival) {
   return `${RIVAL_PORTRAIT_DIR}/${rival.portrait}`;
+}
+
+/**
+ * The two sizes the game draws, derived by `tools/make-face-thumbs.py` and named
+ * for the rival's **id** rather than the master's naming-slug — so a path can be
+ * built from an id alone, the same property the avatar manifest has.
+ *
+ * The `rival-` prefix is not decoration: the derived faces from both catalogs
+ * are held in one cache keyed by path, and `zero` could as easily be an avatar.
+ *
+ *   thumbSrc  256px, ~17KB   the setup screen's 56px rival strip, all ten of
+ *                            which load at boot because the pane shows them at
+ *                            once. That used to be 23MB; it is now 170KB.
+ *   cardSrc   768px, ~100KB  the VS card's slot, one at a time.
+ */
+export function rivalThumbSrc(rival) {
+  return `${RIVAL_PORTRAIT_DIR}/thumbs/rival-${rival.id}.jpg`;
+}
+
+export function rivalCardSrc(rival) {
+  return `${RIVAL_PORTRAIT_DIR}/cards/rival-${rival.id}.jpg`;
 }
 
 /** The full name, for anywhere with room for one. The cards use the nickname. */
