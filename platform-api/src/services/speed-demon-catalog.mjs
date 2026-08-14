@@ -311,14 +311,35 @@ function cleanDriverName(value) {
 export function normalizeDriverProfile(value) {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     const favourites = [];
+    const seen = new Set();
     // Truncate before mapping, not after — the layers rule, and a denial-of-service
     // bound for the same reason.
     for (const raw of (Array.isArray(source.favourites) ? source.favourites : []).slice(0, 64)) {
         if (favourites.length >= MAX_FAVOURITE_MODELS)
             break;
-        if (!isValidSpeedDemonModelId(raw) || favourites.includes(raw))
+        // A bare string is what an older client sends, and it still says something
+        // true: that model, in factory paint. Reading it rather than dropping it is
+        // what stops a version skew wiping somebody's card.
+        const entry = typeof raw === "string" ? { modelId: raw }
+            : raw && typeof raw === "object" && !Array.isArray(raw) ? raw
+                : null;
+        if (!entry || !isValidSpeedDemonModelId(entry.modelId))
             continue;
-        favourites.push(raw);
+        const presetId = typeof entry.presetId === "string" && entry.presetId.length > 0 && entry.presetId.length <= 80
+            ? entry.presetId
+            : null;
+        // Body *and* paint: the same car in two colours is two pins, because that is
+        // what the picker offers.
+        const key = `${entry.modelId}::${presetId ?? ""}`;
+        if (seen.has(key))
+            continue;
+        seen.add(key);
+        // The livery rides along resolved, unlike the loadout routes' preset ids,
+        // and for the reason the whole driver document is publicly readable: a pin
+        // exists to be *shown*, and a preset id means nothing inside anyone else's
+        // garage. The id is kept beside it only so the owner's own client can
+        // re-resolve the pin when they re-colour that preset.
+        favourites.push({ modelId: entry.modelId, presetId, livery: normalizeLivery(entry.livery) });
     }
     return {
         name: cleanDriverName(source.name),

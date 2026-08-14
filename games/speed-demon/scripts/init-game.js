@@ -244,7 +244,7 @@ import {
 } from "./ui/boards.js";
 import { BOARDS_SPLASH, drawBoards, hitBoards } from "./render/boards.js";
 import { createProfileStore } from "./profile/profile-store.js";
-import { createProfile } from "./profile/profile.js";
+import { createProfile, refreshFavourites } from "./profile/profile.js";
 import { avatarById } from "./profile/avatars.js";
 import {
   STAGE_CARD,
@@ -257,7 +257,7 @@ import {
   moveProfileScreen,
   profileCapturesText,
   profileScreenView,
-  scrollProfileAvatars,
+  scrollProfileScreen,
   typeIntoProfile,
 } from "./ui/profile.js";
 import { PROFILE_SPLASH, drawProfile, hitProfile } from "./render/profile.js";
@@ -522,7 +522,7 @@ export function boot(canvas) {
    */
   const profileStore = createProfileStore();
   let profile = profileStore.profile;
-  let profileScreen = createProfileScreen(profile);
+  let profileScreen = createProfileScreen(profile, garage);
   // What the pointer is over there. Separate from the cursor, because on both
   // pickers the cursor *is* the pick — the setup screen's rule, for the fourth
   // time.
@@ -566,7 +566,11 @@ export function boot(canvas) {
 
   profileStore.load().then((loaded) => {
     profile = loaded;
-    profileScreen = createProfileScreen(profile);
+    // The two loads race, so whichever lands second is the one that has to
+    // reconcile them: a pin's stored paint is a snapshot, and the garage is the
+    // authority on what that preset looks like now.
+    refreshPinnedPaints();
+    profileScreen = createProfileScreen(profile, garage);
     requestFace(avatarById(profile.avatarId)?.cardSrc);
     render();
   });
@@ -583,6 +587,11 @@ export function boot(canvas) {
     // rebuilt with the paints that just arrived rather than left showing the
     // empty garage the first frame drew.
     collection = createCollection(setupSelection(setup, garage), garage, collectionOptions());
+    // The driver card's pins carry a resolved livery so a stranger can draw
+    // them; the paints that just arrived are the authority on what those
+    // liveries currently are.
+    refreshPinnedPaints();
+    profileScreen = createProfileScreen(profile, garage);
     render();
   });
   // The resolved selection: which model, which livery, which track. Replaced
@@ -1672,7 +1681,7 @@ export function boot(canvas) {
    * looking at it.
    */
   function openProfile() {
-    profileScreen = createProfileScreen(profile);
+    profileScreen = createProfileScreen(profile, garage);
     profileHover = null;
     requestFace(avatarById(profile.avatarId)?.cardSrc);
   }
@@ -1732,7 +1741,7 @@ export function boot(canvas) {
    * than in the shell — the campaign briefing's split.
    */
   function confirmProfile() {
-    const { screen, profile: next } = confirmProfileScreen(profileScreen, profile);
+    const { screen, profile: next } = confirmProfileScreen(profileScreen, profile, { garage });
     profileScreen = screen;
     commitProfile(next);
   }
@@ -2026,6 +2035,17 @@ export function boot(canvas) {
   function commitGarage(next) {
     garage = next;
     garageStore.save(garage);
+    // A pin holds the paint itself, not a pointer to it — that is what lets an
+    // opponent draw somebody else's card — so re-colouring a preset has to be
+    // written through to the pins that name it. `refreshFavourites` is a no-op
+    // when nothing pinned changed, and `commitProfile` is a no-op on an
+    // unchanged profile, so the ordinary save costs nothing.
+    refreshPinnedPaints();
+  }
+
+  /** Re-reads every pinned paint out of the garage. See `commitGarage`. */
+  function refreshPinnedPaints() {
+    commitProfile(refreshFavourites(profile, (presetId) => presetById(garage, presetId)?.livery));
   }
 
   /**
@@ -2236,7 +2256,7 @@ export function boot(canvas) {
         } else if (shell.screen === SCREEN_CAMPAIGN) {
           campaign = moveCampaign(campaign, action.direction);
         } else if (shell.screen === SCREEN_PROFILE) {
-          profileScreen = moveProfileScreen(profileScreen, action.direction);
+          profileScreen = moveProfileScreen(profileScreen, action.direction, { garage });
         } else if (shell.screen === SCREEN_SETUP) {
           setup = moveSetup(setup, action.direction, garage, { ghost: currentGhost() });
         } else {
@@ -2531,10 +2551,10 @@ export function boot(canvas) {
     if (!target) return;
     audio.play("button");
     if (target.kind === "scroll") {
-      profileScreen = scrollProfileAvatars(profileScreen, target.step);
+      profileScreen = scrollProfileScreen(profileScreen, target.step, { garage });
       return;
     }
-    profileScreen = focusProfileScreen(profileScreen, target);
+    profileScreen = focusProfileScreen(profileScreen, target, { garage });
     confirmProfile();
   }
 
@@ -3187,7 +3207,7 @@ export function boot(canvas) {
       } else if (shell.screen === SCREEN_CAMPAIGN) {
         campaign = moveCampaign(campaign, direction);
       } else if (shell.screen === SCREEN_PROFILE) {
-        profileScreen = moveProfileScreen(profileScreen, direction);
+        profileScreen = moveProfileScreen(profileScreen, direction, { garage });
       } else if (shell.screen === SCREEN_VERSUS) {
         // The curtain owns no cursor, and falling through to `moveShell` would
         // walk a menu that is not on screen. Named rather than left to the
@@ -3372,7 +3392,9 @@ export function boot(canvas) {
         synced: view.synced,
         pending: profileStore.dirty,
         status: profileStore.status,
-        favourites: profile.favourites,
+        // A pin is a car *as painted*, so printing the model id alone would hide
+        // the half of it this screen exists to choose.
+        favourites: profile.favourites.map((pin) => `${pin.modelId}/${pin.presetId ?? "factory"}`),
         rows: view.rows.map((row) => `${row.label}: ${row.value}${row.selected ? " <" : ""}`),
         bests: view.bests.map((best) => `${best.boardId} ${best.value}${best.rank ? ` #${best.rank}` : ""}`),
         summary: view.summary,
@@ -3386,7 +3408,7 @@ export function boot(canvas) {
      */
     driver(changes) {
       commitProfile(createProfile({ ...profile, ...changes }));
-      profileScreen = createProfileScreen(profile);
+      profileScreen = createProfileScreen(profile, garage);
       render();
       return this.profile();
     },

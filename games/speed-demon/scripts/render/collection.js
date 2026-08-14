@@ -11,6 +11,7 @@ import { drawMenuBackdrop } from "./menus.js";
 import { fitContain } from "./setup.js";
 import { liverySprite, hasLiverySprite, drawUnderglow } from "./livery.js";
 import { paintSwatchColour } from "../garage/paint.js";
+import { ellipsize } from "./radio.js";
 import { COLLECTION_VISIBLE_ROWS } from "../ui/collection.js";
 
 /**
@@ -60,12 +61,16 @@ const MUTED = "#5c6673";
 const ACCENT = "#ff5a2e";
 const CHOSEN = "#57d98a";
 
-function label(ctx, text, x, y, { size = 14, colour = DIM, weight = "600", align = "left" } = {}) {
+function label(ctx, text, x, y, { size = 14, colour = DIM, weight = "600", align = "left", maxWidth = 0 } = {}) {
   ctx.fillStyle = colour;
   ctx.font = `${weight} ${size}px "Segoe UI", system-ui, sans-serif`;
   ctx.textAlign = align;
   ctx.textBaseline = "alphabetic";
-  ctx.fillText(text, x, y);
+  // `maxWidth` clips rather than squashing: canvas's own maxWidth argument
+  // condenses the glyphs, which at 11px reads as a rendering fault. A paint name
+  // is player-typed-adjacent (it is derived from the paint, and will be typed
+  // once GDD §14 lands), so it has no length a cell can be sized against.
+  ctx.fillText(maxWidth > 0 ? ellipsize(ctx, text, maxWidth) : text, x, y);
 }
 
 /** Screen rect of one model row, by its position in the visible window. */
@@ -182,9 +187,13 @@ function drawConfigCell(ctx, rect, cell, model, { image, liveryCache, budget }) 
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  label(ctx, cell.name, rect.x + 21, rect.y + rect.height - 8, {
+  const nameX = rect.x + 21;
+  label(ctx, cell.name, nameX, rect.y + rect.height - 8, {
     size: 11,
     colour: cell.selected ? INK : cell.chosen ? CHOSEN : DIM,
+    // The swatch is at the left and the cell edge is at the right: what is left
+    // is all a name ever gets, and "Deep Red Metallic +2" is longer than that.
+    maxWidth: rect.x + rect.width - 6 - nameX,
   });
 }
 
@@ -215,7 +224,12 @@ function drawRow(ctx, row, { sheetImages, liveryCache, budget }) {
   ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
 
   label(ctx, row.groupLabel.toUpperCase(), rect.x + 16, rect.y + 30, { size: 10, colour: MUTED });
-  label(ctx, row.label.toUpperCase(), rect.x + 16, rect.y + 54, { size: 17, colour: INK });
+  label(ctx, row.label.toUpperCase(), rect.x + 16, rect.y + 54, {
+    size: 17,
+    colour: INK,
+    // The gutter is fixed; a long model label must stop at the first cell.
+    maxWidth: COLLECTION_LAYOUT.rows.labelWidth - 32,
+  });
   label(
     ctx,
     row.savedCount === 0 ? "no paints saved" : row.savedCount === 1 ? "1 paint" : `${row.savedCount} paints`,

@@ -27,6 +27,7 @@
 // machine.
 
 import { modelById } from "../assets/car-atlas.js";
+import { DEFAULT_LIVERY, createLivery, liveryEquals, normalizeLivery } from "../garage/livery.js";
 import { DEFAULT_AVATAR_ID, avatarById } from "./avatars.js";
 
 /**
@@ -39,6 +40,46 @@ import { DEFAULT_AVATAR_ID, avatarById } from "./avatars.js";
  * which is the one behaviour that would lose a pick the player made deliberately.
  */
 export const MAX_FAVOURITES = 5;
+
+/**
+ * A pinned car is a car **as the player painted it**, not a model id.
+ *
+ * The first cut stored bare model ids, which meant the card showed the roster's
+ * neutral silver bodies and the picker offered nothing but them — a player with
+ * twenty paints saved could not put a single one of them on their own card. The
+ * bodies are deliberately neutral (`car-atlas.js`); what makes a car *yours* in
+ * this cabinet is the livery, so that is what a favourite has to carry.
+ *
+ * Three fields, and each earns its place:
+ *
+ * - `modelId` — which body. The only part an opponent's atlas can resolve.
+ * - `presetId` — which saved paint, or `null` for Factory. It means nothing
+ *   inside anybody else's garage (`selectedLoadout`'s note), and it is kept
+ *   anyway for exactly one job: the *owner's* card re-resolves through it, so
+ *   re-colouring a paint in the garage updates the card rather than leaving a
+ *   snapshot of a colour that no longer exists.
+ * - `livery` — the paint itself, resolved. This is what makes the pin drawable
+ *   on a stranger's machine, which is the whole reason the driver document is
+ *   publicly readable. The same argument `selectedLoadout` makes for the wire.
+ */
+export function createFavourite(input = {}) {
+  const source = typeof input === "string" ? { modelId: input } : (input ?? {});
+  const modelId = typeof source.modelId === "string" ? source.modelId : "";
+  return {
+    modelId,
+    presetId: typeof source.presetId === "string" && source.presetId ? source.presetId : null,
+    livery: source.livery ? normalizeLivery(source.livery) : createLivery(DEFAULT_LIVERY),
+  };
+}
+
+/**
+ * What makes two pins the same pin: the body *and* the paint on it. The Kaido in
+ * red and the Kaido in blue are two different cars to a player who built both,
+ * so pinning one must not read as already having pinned the other.
+ */
+export function favouriteKey(entry) {
+  return `${entry?.modelId ?? ""}::${entry?.presetId ?? ""}`;
+}
 
 /**
  * A driver name is short and printable.
@@ -86,11 +127,19 @@ function cleanName(value) {
 export function createProfile(saved = {}) {
   const source = saved && typeof saved === "object" ? saved : {};
   const favourites = [];
-  for (const id of Array.isArray(source.favourites) ? source.favourites : []) {
+  const seen = new Set();
+  // A bare string is what an older save — and an older *server* — holds, and it
+  // still says something true: that model, in factory paint. Reading it rather
+  // than dropping it is what keeps an upgrade from wiping somebody's card.
+  for (const raw of Array.isArray(source.favourites) ? source.favourites : []) {
     if (favourites.length >= MAX_FAVOURITES) break; // truncate before mapping, not after
-    if (typeof id !== "string" || !modelById(id)) continue;
-    if (favourites.includes(id)) continue; // a car pinned twice is one pin
-    favourites.push(id);
+    if (typeof raw !== "string" && (!raw || typeof raw !== "object")) continue;
+    const entry = createFavourite(raw);
+    if (!modelById(entry.modelId)) continue;
+    const key = favouriteKey(entry);
+    if (seen.has(key)) continue; // the same car in the same paint twice is one pin
+    seen.add(key);
+    favourites.push(entry);
   }
   return {
     name: cleanName(source.name),
@@ -115,8 +164,16 @@ export function setAvatar(profile, avatarId) {
   return { ...profile, avatarId };
 }
 
-export function isFavourite(profile, modelId) {
-  return profile.favourites.includes(modelId);
+/** Whether this exact car — body and paint — is on the card. */
+export function isFavourite(profile, entry) {
+  const key = favouriteKey(createFavourite(entry));
+  return profile.favourites.some((pinned) => favouriteKey(pinned) === key);
+}
+
+/** Where it sits on the card, 1-based. 0 when it is not pinned at all. */
+export function favouritePosition(profile, entry) {
+  const key = favouriteKey(createFavourite(entry));
+  return profile.favourites.findIndex((pinned) => favouriteKey(pinned) === key) + 1;
 }
 
 /** Whether another car can be pinned. False is a state the picker prints. */
@@ -134,13 +191,37 @@ export function favouritesFull(profile) {
  * has a reason on screen — the `+ LAYER` rule adapted to a control that cannot
  * simply disappear, because the cell is a car in a grid of every car.
  */
-export function toggleFavourite(profile, modelId) {
-  if (!modelById(modelId)) return profile;
-  if (isFavourite(profile, modelId)) {
-    return { ...profile, favourites: profile.favourites.filter((id) => id !== modelId) };
+export function toggleFavourite(profile, entry) {
+  const pin = createFavourite(entry);
+  if (!modelById(pin.modelId)) return profile;
+  const key = favouriteKey(pin);
+  if (isFavourite(profile, pin)) {
+    return { ...profile, favourites: profile.favourites.filter((pinned) => favouriteKey(pinned) !== key) };
   }
   if (favouritesFull(profile)) return profile;
-  return { ...profile, favourites: [...profile.favourites, modelId] };
+  return { ...profile, favourites: [...profile.favourites, pin] };
+}
+
+/**
+ * Re-reads every pin's paint out of the garage.
+ *
+ * A pin holds a resolved livery so a stranger's client can draw it, which means
+ * the owner's own copy goes stale the moment they re-colour that preset. This is
+ * what closes that: `resolve` hands back the live livery for a preset id, or
+ * `undefined` where the preset has since been deleted — in which case the pin
+ * keeps the paint it was saved with rather than silently reverting to factory,
+ * because the snapshot is still the car the player chose.
+ */
+export function refreshFavourites(profile, resolve) {
+  let changed = false;
+  const favourites = profile.favourites.map((pinned) => {
+    if (!pinned.presetId) return pinned;
+    const livery = resolve(pinned.presetId, pinned.modelId);
+    if (!livery || liveryEquals(livery, pinned.livery)) return pinned;
+    changed = true;
+    return { ...pinned, livery: normalizeLivery(livery) };
+  });
+  return changed ? { ...profile, favourites } : profile;
 }
 
 /**
@@ -157,6 +238,12 @@ export function profileEquals(a, b) {
     a.name === b.name
     && a.avatarId === b.avatarId
     && a.favourites.length === b.favourites.length
-    && a.favourites.every((id, index) => id === b.favourites[index])
+    && a.favourites.every((pinned, index) => (
+      favouriteKey(pinned) === favouriteKey(b.favourites[index])
+      // The paint is part of what a pin says, so a re-coloured preset is a
+      // changed profile — which is what makes `refreshFavourites` reach the
+      // server rather than sitting in memory until something else saves.
+      && liveryEquals(pinned.livery, b.favourites[index].livery)
+    ))
   );
 }

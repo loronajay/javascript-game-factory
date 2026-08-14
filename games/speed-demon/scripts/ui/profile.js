@@ -25,10 +25,12 @@
 // an authority, and the two would disagree the first time a run was set on
 // another machine.
 
-import { modelsByGroup, modelById } from "../assets/car-atlas.js";
+import { modelById } from "../assets/car-atlas.js";
 import { boardUnit, formatValue, recordFor } from "../records/records.js";
-import { presetsForModel } from "../garage/garage.js";
-import { MAX_FAVOURITES, MAX_NAME_LENGTH, NAME_ALPHABET, displayName, favouritesFull, isFavourite, setAvatar, setName, toggleFavourite } from "../profile/profile.js";
+import { emptyGarage, presetsForModel } from "../garage/garage.js";
+import { collectionModels } from "./collection.js";
+import { presetOptionsFor } from "./setup-menu.js";
+import { MAX_FAVOURITES, MAX_NAME_LENGTH, NAME_ALPHABET, createFavourite, displayName, favouritePosition, favouritesFull, isFavourite, setAvatar, setName, toggleFavourite } from "../profile/profile.js";
 import { AVATAR_GROUPS, avatarById } from "../profile/avatars.js";
 import { createTextEntry, entryView, typeChar, backspace } from "./text-entry.js";
 import { allBoards } from "./boards.js";
@@ -56,6 +58,9 @@ export const CARD_ROWS = [
 export const AVATAR_COLUMNS = 8;
 export const AVATAR_VISIBLE_ROWS = 4;
 
+/** How many car rows are on screen. The collection's constant, for its reason. */
+export const CAR_VISIBLE_ROWS = 5;
+
 const clamp = (value, max) => Math.max(0, Math.min(max, value));
 
 /**
@@ -82,13 +87,68 @@ export function avatarRows() {
   return rows;
 }
 
-/** The roster as the car grid walks it: a row per archetype. */
-export function carRows() {
-  return modelsByGroup().map((group) => ({
-    groupId: group.id,
-    groupLabel: group.label,
-    models: group.models,
+/**
+ * The car picker's rows: **a row per model, and its cells are that model's
+ * paints** — `Factory` first, then everything saved for it, which is the same
+ * list `presetOptionsFor` builds for the setup screen and the collection rather
+ * than a second one.
+ *
+ * This replaced a grid of the 24 bare bodies. The bodies are deliberately
+ * neutral, so a picker offering only them could put nothing on the card but
+ * factory silver: a player with a garage full of paint had no way to pin any of
+ * it. A favourite is a car *as painted*, so the picker has to be the garage.
+ *
+ * **Painted models come first**, in roster order within each band. The question
+ * that brings somebody here is "which of my cars goes on the card", and making
+ * them scroll past sixteen untouched bodies to reach the four they built is the
+ * whole complaint this screen is answering. The rest of the roster stays
+ * reachable underneath, because pinning a factory car is still a legitimate
+ * thing to want — and signed out it is the only thing on offer, since the garage
+ * needs an account.
+ */
+export function carRows(garage = emptyGarage()) {
+  const rows = collectionModels().map((model) => ({
+    modelId: model.id,
+    label: model.label,
+    groupLabel: model.groupLabel,
+    model,
+    savedCount: presetsForModel(garage, model.id).length,
   }));
+  const painted = rows.filter((row) => row.savedCount > 0);
+  const rest = rows.filter((row) => row.savedCount === 0);
+  return [...painted, ...rest].map((row, index) => ({
+    ...row,
+    row: index,
+    // The first row of each band carries its caption, so the two halves read as
+    // two halves — the avatar grid's arrangement.
+    bandLabel: index === 0 ? (painted.length ? "YOUR PAINTED CARS" : "THE ROSTER")
+      : index === painted.length && painted.length ? "THE REST OF THE ROSTER"
+      : "",
+  }));
+}
+
+/**
+ * One model's cells: its paints, `Factory` first.
+ *
+ * There is deliberately no `+ New` cell, unlike the collection's rows: this
+ * screen pins cars, it does not build them, and an add cell here would open the
+ * editor from a picker the player is halfway through using. The garage is one
+ * screen away on the mode list.
+ */
+export function carCells(modelId, garage = emptyGarage()) {
+  return presetOptionsFor(modelId, garage).map((option, index) => ({
+    modelId,
+    presetId: option.id,
+    name: option.name,
+    livery: option.livery,
+    factory: option.factory,
+    column: index,
+  }));
+}
+
+/** The favourite a cell would pin: a body, a paint id and the paint itself. */
+function favouriteFor(cell) {
+  return cell ? createFavourite({ modelId: cell.modelId, presetId: cell.presetId, livery: cell.livery }) : null;
 }
 
 function avatarPosition(avatarId) {
@@ -108,13 +168,14 @@ function avatarPosition(avatarId) {
  * direction moves *from* the current state instead of jumping away from it. The
  * collection's rule.
  */
-export function createProfileScreen(profile) {
+export function createProfileScreen(profile, garage = emptyGarage()) {
   const at = avatarPosition(profile?.avatarId);
+  const car = carPosition(profile?.favourites?.[0], garage);
   return {
     stage: STAGE_CARD,
     row: 0,
     avatar: { ...at, scroll: windowFor(at.row, 0, avatarRows().length) },
-    car: { row: 0, column: 0 },
+    car: { ...car, scroll: windowFor(car.row, 0, carRows(garage).length, CAR_VISIBLE_ROWS) },
     // Null unless the name is being typed. A field that exists while nothing is
     // being edited is a field something can type into by accident.
     entry: null,
@@ -122,12 +183,25 @@ export function createProfileScreen(profile) {
 }
 
 /** Keeps `scroll` such that `row` is on screen, and never past the last page. */
-function windowFor(row, scroll, rows) {
-  const last = Math.max(0, rows - AVATAR_VISIBLE_ROWS);
+function windowFor(row, scroll, rows, visible = AVATAR_VISIBLE_ROWS) {
+  const last = Math.max(0, rows - visible);
   const held = clamp(scroll, last);
   if (row < held) return row;
-  if (row > held + AVATAR_VISIBLE_ROWS - 1) return clamp(row - AVATAR_VISIBLE_ROWS + 1, last);
+  if (row > held + visible - 1) return clamp(row - visible + 1, last);
   return held;
+}
+
+/**
+ * Where the car cursor opens: on a pin if there is one, so arriving from a card
+ * that already names a car shows that car rather than the top of the list. The
+ * collection's rule, and the avatar picker's.
+ */
+function carPosition(favourite, garage) {
+  const rows = carRows(garage);
+  const row = Math.max(0, rows.findIndex((entry) => entry.modelId === favourite?.modelId));
+  const cells = carCells(rows[row]?.modelId ?? "", garage);
+  const column = Math.max(0, cells.findIndex((cell) => cell.presetId === (favourite?.presetId ?? null)));
+  return { row, column };
 }
 
 function moveAvatar(screen, direction) {
@@ -146,8 +220,8 @@ function moveAvatar(screen, direction) {
   return { ...screen, avatar: { row, column, scroll: windowFor(row, screen.avatar.scroll, rows.length) } };
 }
 
-function moveCars(screen, direction) {
-  const rows = carRows();
+function moveCars(screen, direction, garage) {
+  const rows = carRows(garage);
   let { row, column } = screen.car;
   if (direction === "up") row -= 1;
   else if (direction === "down") row += 1;
@@ -156,8 +230,13 @@ function moveCars(screen, direction) {
   else return screen;
 
   row = clamp(row, rows.length - 1);
-  column = clamp(column, rows[row].models.length - 1);
-  return { ...screen, car: { row, column } };
+  // Rows are different lengths — a car with six paints sits above one with none
+  // — so a column has to land somewhere real in the row it arrives in.
+  column = clamp(column, carCells(rows[row].modelId, garage).length - 1);
+  return {
+    ...screen,
+    car: { row, column, scroll: windowFor(row, screen.car.scroll, rows.length, CAR_VISIBLE_ROWS) },
+  };
 }
 
 /**
@@ -168,7 +247,7 @@ function moveCars(screen, direction) {
  * direction is deliberately inert rather than quietly moving something behind
  * the field.
  */
-export function moveProfileScreen(screen, direction) {
+export function moveProfileScreen(screen, direction, { garage = emptyGarage() } = {}) {
   switch (screen.stage) {
     case STAGE_CARD: {
       if (direction !== "up" && direction !== "down") return screen;
@@ -178,7 +257,7 @@ export function moveProfileScreen(screen, direction) {
     case STAGE_AVATAR:
       return moveAvatar(screen, direction);
     case STAGE_CARS:
-      return moveCars(screen, direction);
+      return moveCars(screen, direction, garage);
     default:
       return screen;
   }
@@ -191,11 +270,13 @@ export function selectedAvatar(screen) {
   return row.avatars[clamp(screen.avatar.column, row.avatars.length - 1)] ?? null;
 }
 
-/** The car the roster cursor is on. */
-export function selectedCar(screen) {
-  const rows = carRows();
+/** The car — body *and* paint — the roster cursor is on. */
+export function selectedCar(screen, garage = emptyGarage()) {
+  const rows = carRows(garage);
   const row = rows[clamp(screen.car.row, rows.length - 1)];
-  return row.models[clamp(screen.car.column, row.models.length - 1)] ?? null;
+  if (!row) return null;
+  const cells = carCells(row.modelId, garage);
+  return cells[clamp(screen.car.column, cells.length - 1)] ?? null;
 }
 
 /**
@@ -207,7 +288,7 @@ export function selectedCar(screen) {
  * cars are five choices, so pinning one leaves the grid open — closing after
  * each would mean four more trips through the card to fill the list.
  */
-export function confirmProfileScreen(screen, profile) {
+export function confirmProfileScreen(screen, profile, { garage = emptyGarage() } = {}) {
   switch (screen.stage) {
     case STAGE_CARD: {
       const stage = CARD_ROWS[clamp(screen.row, CARD_ROWS.length - 1)].id;
@@ -239,11 +320,11 @@ export function confirmProfileScreen(screen, profile) {
       return { screen: { ...screen, stage: STAGE_CARD }, profile: setAvatar(profile, selectedAvatar(screen)?.id) };
 
     case STAGE_CARS: {
-      const car = selectedCar(screen);
+      const car = favouriteFor(selectedCar(screen, garage));
       // A no-op when the list is full and this car is not on it. The view says
       // so, which is what stops the refusal reading as a dead control — see
       // `toggleFavourite`.
-      return { screen, profile: car ? toggleFavourite(profile, car.id) : profile };
+      return { screen, profile: car ? toggleFavourite(profile, car) : profile };
     }
 
     default:
@@ -287,7 +368,7 @@ export function profileCapturesText(screen) {
  * A click carries an absolute row, so it can reach anything visible directly;
  * the window does not move, because what was clicked is by definition inside it.
  */
-export function focusProfileScreen(screen, target) {
+export function focusProfileScreen(screen, target, { garage = emptyGarage() } = {}) {
   if (!target) return screen;
   if (target.kind === "row" && Number.isFinite(target.index)) {
     return { ...screen, row: clamp(target.index, CARD_ROWS.length - 1) };
@@ -298,9 +379,10 @@ export function focusProfileScreen(screen, target) {
     return { ...screen, avatar: { ...screen.avatar, row, column: clamp(target.column, rows[row].avatars.length - 1) } };
   }
   if (target.kind === "car" && Number.isFinite(target.row)) {
-    const rows = carRows();
+    const rows = carRows(garage);
     const row = clamp(target.row, rows.length - 1);
-    return { ...screen, car: { row, column: clamp(target.column, rows[row].models.length - 1) } };
+    const cells = carCells(rows[row].modelId, garage);
+    return { ...screen, car: { ...screen.car, row, column: clamp(target.column, cells.length - 1) } };
   }
   return screen;
 }
@@ -321,6 +403,28 @@ export function scrollProfileAvatars(screen, step) {
     ...screen,
     avatar: { row, column: clamp(screen.avatar.column, rows[row].avatars.length - 1), scroll },
   };
+}
+
+/** The same, for the car list. Both arrows drag their cursor along with them. */
+export function scrollProfileCars(screen, step, { garage = emptyGarage() } = {}) {
+  const rows = carRows(garage);
+  const last = Math.max(0, rows.length - CAR_VISIBLE_ROWS);
+  const scroll = clamp(screen.car.scroll + step, last);
+  if (scroll === screen.car.scroll) return screen;
+  const row = clamp(
+    screen.car.row < scroll ? scroll
+      : screen.car.row > scroll + CAR_VISIBLE_ROWS - 1 ? scroll + CAR_VISIBLE_ROWS - 1
+      : screen.car.row,
+    rows.length - 1,
+  );
+  const cells = carCells(rows[row].modelId, garage);
+  return { ...screen, car: { row, column: clamp(screen.car.column, cells.length - 1), scroll } };
+}
+
+/** Which scroll a stage's arrows drive. The two pickers both have a window. */
+export function scrollProfileScreen(screen, step, options = {}) {
+  if (screen.stage === STAGE_CARS) return scrollProfileCars(screen, step, options);
+  return scrollProfileAvatars(screen, step);
 }
 
 // ---------------------------------------------------------------------------
@@ -409,18 +513,22 @@ export function profileScreenView(screen, profile, {
     // nulls rather than dropped, so the strip is always five cells wide and the
     // card does not reflow as pins are added.
     favourites: Array.from({ length: MAX_FAVOURITES }, (_, index) => {
-      const model = modelById(profile.favourites[index] ?? "");
-      return model
-        ? {
-            index,
-            modelId: model.id,
-            label: model.label,
-            model,
-            // Whichever paint they have saved for it first, so a pinned car
-            // shows in the player's own colours rather than factory silver.
-            livery: garage ? (presetsForModel(garage, model.id)[0]?.livery ?? null) : null,
-          }
-        : { index, modelId: null, label: "", model: null, livery: null };
+      const pin = profile.favourites[index];
+      const model = modelById(pin?.modelId ?? "");
+      if (!model) return { index, modelId: null, label: "", presetName: "", model: null, livery: null };
+      // The paint the player pinned, re-read from the garage where that preset
+      // still exists so a re-colour shows here — see `refreshFavourites`, which
+      // is what makes the same thing true of the copy on the server.
+      const preset = pin.presetId ? presetsForModel(garage ?? emptyGarage(), model.id)
+        .find((entry) => entry.id === pin.presetId) : null;
+      return {
+        index,
+        modelId: model.id,
+        label: model.label,
+        presetName: preset?.name ?? (pin.presetId ? "Saved paint" : "Factory"),
+        model,
+        livery: preset?.livery ?? pin.livery,
+      };
     }),
 
     bests,
@@ -462,30 +570,49 @@ export function profileScreenView(screen, profile, {
       }),
     },
 
-    carPicker: {
-      // The ceiling is on the view rather than left to the renderer to count,
-      // because the screen has to say *why* a press did nothing.
-      full: favouritesFull(profile),
-      pinned: profile.favourites.length,
-      limit: MAX_FAVOURITES,
-      rows: carRows().map((row, rowIndex) => ({
-        groupLabel: row.groupLabel,
-        row: rowIndex,
-        cells: row.models.map((model, column) => ({
-          modelId: model.id,
-          label: model.label,
-          model,
-          row: rowIndex,
-          column,
-          selected: screen.car.row === rowIndex && screen.car.column === column,
-          hovered: isHover("car", rowIndex, column),
-          pinned: isFavourite(profile, model.id),
-          // Where it sits on the card, so a cell can wear its number rather than
-          // the player counting the strip to find out.
-          pin: profile.favourites.indexOf(model.id) + 1,
+    carPicker: (() => {
+      const rows = carRows(garage ?? emptyGarage());
+      const carScroll = clamp(screen.car.scroll ?? 0, Math.max(0, rows.length - CAR_VISIBLE_ROWS));
+      return {
+        // The ceiling is on the view rather than left to the renderer to count,
+        // because the screen has to say *why* a press did nothing.
+        full: favouritesFull(profile),
+        pinned: profile.favourites.length,
+        limit: MAX_FAVOURITES,
+        // How much paint there is to pin. Zero is the signed-out state as much
+        // as the never-customised one, and the screen says which — the garage
+        // needs an account, and a player who cannot see why the picker is all
+        // factory silver will read it as the bug they just reported.
+        paints: (garage?.presets?.length ?? 0),
+        scroll: carScroll,
+        totalRows: rows.length,
+        visibleRows: CAR_VISIBLE_ROWS,
+        canScrollUp: carScroll > 0,
+        canScrollDown: carScroll + CAR_VISIBLE_ROWS < rows.length,
+        rows: rows.slice(carScroll, carScroll + CAR_VISIBLE_ROWS).map((row, screenRow) => ({
+          modelId: row.modelId,
+          label: row.label,
+          groupLabel: row.groupLabel,
+          bandLabel: row.bandLabel,
+          model: row.model,
+          savedCount: row.savedCount,
+          row: row.row,
+          screenRow,
+          cells: carCells(row.modelId, garage ?? emptyGarage()).map((cell) => ({
+            ...cell,
+            model: row.model,
+            row: row.row,
+            screenRow,
+            selected: screen.car.row === row.row && screen.car.column === cell.column,
+            hovered: isHover("car", row.row, cell.column),
+            pinned: isFavourite(profile, cell),
+            // Where it sits on the card, so a cell can wear its number rather
+            // than the player counting the strip to find out.
+            pin: favouritePosition(profile, cell),
+          })),
         })),
-      })),
-    },
+      };
+    })(),
 
     entry: screen.entry ? entryView(screen.entry) : null,
   };

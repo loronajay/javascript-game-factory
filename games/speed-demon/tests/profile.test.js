@@ -9,6 +9,7 @@ import {
   favouritesFull,
   isFavourite,
   profileEquals,
+  refreshFavourites,
   setAvatar,
   setName,
   toggleFavourite,
@@ -74,10 +75,42 @@ test("an unknown avatar falls back rather than being stored", () => {
 
 test("favourites are deduped, validated and capped", () => {
   const profile = createProfile({ favourites: [A_CAR, A_CAR, "not-a-car", B_CAR] });
-  assertEqual(profile.favourites.join(","), `${A_CAR},${B_CAR}`);
+  assertEqual(profile.favourites.map((pin) => pin.modelId).join(","), `${A_CAR},${B_CAR}`);
 
   const stuffed = createProfile({ favourites: allModels().map((model) => model.id) });
   assertEqual(stuffed.favourites.length, MAX_FAVOURITES);
+});
+
+test("a pin is a car as painted, and an old saved id still reads", () => {
+  // The bodies are neutral, so a pin that was only a model id could put nothing
+  // on the card but factory silver — which is what this replaced. A bare string
+  // is what an older save holds and it still says something true.
+  const saved = createProfile({
+    favourites: [A_CAR, { modelId: A_CAR, presetId: "kaido#1", livery: { paint: { hue: 110, saturation: 0.8 } } }],
+  });
+  assertEqual(saved.favourites.length, 2, "the same body in two paints is two pins");
+  assertEqual(saved.favourites[0].presetId, null, "a bare id is a factory pin");
+  assertEqual(saved.favourites[1].livery.paint.hue, 110);
+
+  // …and the same paint twice is still one pin.
+  const twice = createProfile({ favourites: [{ modelId: A_CAR, presetId: "kaido#1" }, { modelId: A_CAR, presetId: "kaido#1" }] });
+  assertEqual(twice.favourites.length, 1);
+});
+
+test("a re-coloured preset is written through to the pins that name it", () => {
+  // A pin carries the paint itself so a stranger can draw it, which means the
+  // owner's copy goes stale the moment they re-colour that preset.
+  const profile = createProfile({ favourites: [{ modelId: A_CAR, presetId: "kaido#1", livery: { paint: { hue: 10 } } }] });
+  const refreshed = refreshFavourites(profile, () => ({ paint: { hue: 200, saturation: 0.7 } }));
+  assertEqual(refreshed.favourites[0].livery.paint.hue, 200);
+  assert(!profileEquals(profile, refreshed), "the paint is part of what a pin says");
+
+  // A deleted preset keeps the paint it was saved with rather than reverting.
+  const orphaned = refreshFavourites(refreshed, () => undefined);
+  assertEqual(orphaned, refreshed, "an unresolvable preset must not wipe the pin");
+  // …and a factory pin is never looked up at all.
+  const factory = createProfile({ favourites: [A_CAR] });
+  assertEqual(refreshFavourites(factory, () => ({ paint: { hue: 9 } })), factory);
 });
 
 test("pinning past the ceiling is refused, not silently swapped", () => {

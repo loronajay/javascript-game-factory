@@ -12,8 +12,10 @@
 import { WORLD } from "./scene.js";
 import { drawMenuBackdrop } from "./menus.js";
 import { fitContain } from "./setup.js";
-import { liverySprite, hasLiverySprite } from "./livery.js";
-import { AVATAR_VISIBLE_ROWS, STAGE_AVATAR, STAGE_CARD, STAGE_CARS, STAGE_NAME } from "../ui/profile.js";
+import { liverySprite, hasLiverySprite, drawUnderglow } from "./livery.js";
+import { ellipsize } from "./radio.js";
+import { paintSwatchColour } from "../garage/paint.js";
+import { AVATAR_VISIBLE_ROWS, CAR_VISIBLE_ROWS, STAGE_AVATAR, STAGE_CARD, STAGE_CARS, STAGE_NAME } from "../ui/profile.js";
 
 /**
  * The backdrop. `garage-2.png` rather than the collection's `garage-1.png` so
@@ -46,8 +48,12 @@ export const PROFILE_LAYOUT = {
   // The avatar picker, drawn over the card.
   avatarGrid: { x: 122, y: 128, cell: 112, gap: 10, caption: 20, rowGap: 8 },
   avatarScroll: { x: WORLD.width - 96, y: 128, width: 36, height: 36 },
-  // The roster picker, drawn over the card.
-  carGrid: { x: 210, y: 116, cell: { width: 150, height: 72 }, gap: 10, rowGap: 8, gutter: 60 },
+  // The car picker, drawn over the card. A row per model and a cell per paint,
+  // so it is laid out like the collection rather than like a grid of bodies —
+  // which is what it is now showing.
+  carRows: { x: 64, y: 132, width: 1092, height: 100, gap: 8, labelWidth: 208 },
+  carCells: { width: 96, height: 88, gap: 8 },
+  carScroll: { x: WORLD.width - 100, y: 132, width: 36, height: 36 },
 };
 
 /**
@@ -63,12 +69,15 @@ const MUTED = "#5c6673";
 const ACCENT = "#ff5a2e";
 const GOOD = "#57d98a";
 
-function label(ctx, value, x, y, { size = 14, colour = DIM, weight = "600", align = "left", mono = false } = {}) {
+function label(ctx, value, x, y, { size = 14, colour = DIM, weight = "600", align = "left", mono = false, maxWidth = 0 } = {}) {
   ctx.fillStyle = colour;
   ctx.font = `${weight} ${size}px ${mono ? '"Consolas", "SF Mono", monospace' : '"Segoe UI", system-ui, sans-serif'}`;
   ctx.textAlign = align;
   ctx.textBaseline = "alphabetic";
-  ctx.fillText(value, x, y);
+  // Clipped, not condensed: canvas's own maxWidth squashes the glyphs, which at
+  // 10px reads as a rendering fault. Paint names have no length a cell can be
+  // sized against.
+  ctx.fillText(maxWidth > 0 ? ellipsize(ctx, value, maxWidth) : value, x, y);
 }
 
 function panel(ctx, rect, { live = false } = {}) {
@@ -158,14 +167,28 @@ export function avatarScrollRect(step) {
   return { x, y: step < 0 ? y : last.y + last.height - height, width, height };
 }
 
-export function carCellRect(row, column) {
-  const { x, y, cell, gap, rowGap } = PROFILE_LAYOUT.carGrid;
+/** One model's row, by its position in the visible window. */
+export function carRowRect(screenRow) {
+  const { x, y, width, height, gap } = PROFILE_LAYOUT.carRows;
+  return { x, y: y + screenRow * (height + gap), width, height };
+}
+
+/** One paint's cell, by visible row and column. */
+export function carCellRect(screenRow, column) {
+  const row = carRowRect(screenRow);
+  const { width, height, gap } = PROFILE_LAYOUT.carCells;
   return {
-    x: x + column * (cell.width + gap),
-    y: y + row * (cell.height + rowGap),
-    width: cell.width,
-    height: cell.height,
+    x: row.x + PROFILE_LAYOUT.carRows.labelWidth + column * (width + gap),
+    y: row.y + (row.height - height) / 2,
+    width,
+    height,
   };
+}
+
+export function carScrollRect(step) {
+  const { x, y, width, height } = PROFILE_LAYOUT.carScroll;
+  const last = carRowRect(CAR_VISIBLE_ROWS - 1);
+  return { x, y: step < 0 ? y : last.y + last.height - height, width, height };
 }
 
 const within = (rect, x, y) =>
@@ -197,9 +220,13 @@ export function hitProfile(view, x, y) {
   }
 
   if (view.stage === STAGE_CARS) {
+    for (const step of [-1, 1]) {
+      const live = step < 0 ? view.carPicker.canScrollUp : view.carPicker.canScrollDown;
+      if (live && within(carScrollRect(step), x, y)) return { kind: "scroll", step };
+    }
     for (const row of view.carPicker.rows) {
       for (const cell of row.cells) {
-        if (within(carCellRect(cell.row, cell.column), x, y)) {
+        if (within(carCellRect(row.screenRow, cell.column), x, y)) {
           return { kind: "car", row: cell.row, column: cell.column };
         }
       }
@@ -292,7 +319,7 @@ function drawFavourites(ctx, view, { sheetImages, liveryCache, budget }) {
       continue;
     }
 
-    const art = { x: rect.x, y: rect.y + 2, width: rect.width, height: rect.height - 24 };
+    const art = { x: rect.x, y: rect.y + 2, width: rect.width, height: rect.height - 34 };
     const image = sheetImages.get(slot.model.sheetId);
     let sprite = null;
     if (liveryCache && ready(image) && slot.livery) {
@@ -308,10 +335,20 @@ function drawFavourites(ctx, view, { sheetImages, liveryCache, budget }) {
     } else if (ready(image)) {
       ctx.drawImage(image, slot.model.sx, slot.model.sy, slot.model.sw, slot.model.sh, fit.x, fit.y, fit.width, fit.height);
     }
-    label(ctx, slot.label.toUpperCase(), rect.x + rect.width / 2, rect.y + rect.height - 8, {
+    label(ctx, slot.label.toUpperCase(), rect.x + rect.width / 2, rect.y + rect.height - 20, {
       size: 10,
       colour: TEXT,
       align: "center",
+      maxWidth: rect.width - 10,
+    });
+    // Which paint, not just which body — a card showing two Kaidos in different
+    // colours has to say which is which, and that is the whole point of a pin
+    // being a car as painted rather than a model id.
+    label(ctx, slot.presetName.toUpperCase(), rect.x + rect.width / 2, rect.y + rect.height - 7, {
+      size: 9,
+      colour: MUTED,
+      align: "center",
+      maxWidth: rect.width - 10,
     });
   }
 }
@@ -456,7 +493,54 @@ function drawAvatarStage(ctx, view, { faces }) {
   });
 }
 
-function drawCarStage(ctx, view, { sheetImages }) {
+/**
+ * One paint: the car wearing it, its name, and a dot of the paint itself — the
+ * collection's cell, because this is the same list of the same things.
+ */
+function drawCarCell(ctx, rect, cell, { image, liveryCache, budget }) {
+  const live = cell.selected || cell.hovered;
+  ctx.fillStyle = live ? "rgba(40,30,26,0.92)" : "rgba(14,16,21,0.86)";
+  ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+  ctx.strokeStyle = live ? ACCENT : cell.pinned ? GOOD : "rgba(150,158,178,0.28)";
+  ctx.lineWidth = live || cell.pinned ? 2 : 1;
+  ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.width - 1, rect.height - 1);
+
+  const art = { x: rect.x, y: rect.y + 4, width: rect.width, height: rect.height - 26 };
+  // Spend the frame's bake budget on misses only — the collection's rule, for
+  // the collection's reason: a bake is ~7ms and a scroll changes five rows.
+  let sprite = null;
+  if (liveryCache && ready(image) && cell.livery) {
+    const cached = hasLiverySprite(liveryCache, { model: cell.model, livery: cell.livery });
+    if (cached || budget.left > 0) {
+      if (!cached) budget.left -= 1;
+      sprite = liverySprite(liveryCache, { image, model: cell.model, livery: cell.livery });
+    }
+  }
+  const fit = fitContain(cell.model.sw, cell.model.sh, art, 6);
+  if (sprite) {
+    drawUnderglow(ctx, { x: fit.x + fit.width / 2, top: fit.y, width: fit.width, height: fit.height }, cell.livery);
+    ctx.drawImage(sprite, 0, 0, sprite.width, sprite.height, fit.x, fit.y, fit.width, fit.height);
+  } else if (ready(image)) {
+    ctx.drawImage(image, cell.model.sx, cell.model.sy, cell.model.sw, cell.model.sh, fit.x, fit.y, fit.width, fit.height);
+  }
+
+  ctx.beginPath();
+  ctx.arc(rect.x + 11, rect.y + rect.height - 12, 4.5, 0, Math.PI * 2);
+  ctx.fillStyle = paintSwatchColour(cell.livery.paint);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.55)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  const nameX = rect.x + 21;
+  label(ctx, cell.pinned ? `#${cell.pin} ${cell.name}` : cell.name, nameX, rect.y + rect.height - 8, {
+    size: 11,
+    colour: cell.pinned ? GOOD : live ? INK : DIM,
+    maxWidth: rect.x + rect.width - 6 - nameX,
+  });
+}
+
+function drawCarStage(ctx, view, { sheetImages, liveryCache, budget }) {
   ctx.fillStyle = "rgba(4,6,9,0.93)";
   ctx.fillRect(0, 0, WORLD.width, WORLD.height);
   label(ctx, "FAVOURITE CARS", 64, 72, { size: 26, colour: INK, weight: "800" });
@@ -469,31 +553,67 @@ function drawCarStage(ctx, view, { sheetImages }) {
     72,
     { size: 14, colour: view.carPicker.full ? ACCENT : GOOD, align: "right" },
   );
+  // Why the list may be nothing but factory silver. Without this the screen
+  // looks like the bug it used to be.
+  label(
+    ctx,
+    view.carPicker.paints > 0
+      ? "PIN A CAR IN THE PAINT YOU BUILT FOR IT"
+      : "NO PAINTS SAVED YET — BUILD ONE IN THE GARAGE AND IT SHOWS UP HERE",
+    64,
+    100,
+    { size: 12, colour: view.carPicker.paints > 0 ? MUTED : ACCENT },
+  );
 
   for (const row of view.carPicker.rows) {
-    const first = carCellRect(row.row, 0);
-    label(ctx, row.groupLabel.toUpperCase(), PROFILE_LAYOUT.carGrid.gutter, first.y + 44, { size: 13, colour: MUTED });
-    for (const cell of row.cells) {
-      const rect = carCellRect(cell.row, cell.column);
-      const live = cell.selected || cell.hovered;
-      ctx.fillStyle = live ? "rgba(40,30,26,0.92)" : "rgba(14,16,21,0.86)";
-      ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
-      ctx.strokeStyle = live ? ACCENT : cell.pinned ? GOOD : "rgba(150,158,178,0.28)";
-      ctx.lineWidth = live || cell.pinned ? 2 : 1;
-      ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.width - 1, rect.height - 1);
+    const rect = carRowRect(row.screenRow);
+    ctx.fillStyle = "rgba(9,11,15,0.55)";
+    ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
 
-      const image = sheetImages.get(cell.model.sheetId);
-      if (ready(image)) {
-        const art = { x: rect.x + 4, y: rect.y + 4, width: 60, height: rect.height - 8 };
-        const fit = fitContain(cell.model.sw, cell.model.sh, art, 2);
-        ctx.drawImage(image, cell.model.sx, cell.model.sy, cell.model.sw, cell.model.sh, fit.x, fit.y, fit.width, fit.height);
-      }
-      label(ctx, cell.label.toUpperCase(), rect.x + 72, rect.y + 32, { size: 12, colour: live ? "#ffffff" : TEXT });
-      if (cell.pinned) {
-        label(ctx, `PINNED #${cell.pin}`, rect.x + 72, rect.y + 52, { size: 11, colour: GOOD });
-      }
+    if (row.bandLabel) {
+      label(ctx, row.bandLabel, rect.x + 16, rect.y - 6, { size: 11, colour: ACCENT });
+    }
+    label(ctx, row.groupLabel.toUpperCase(), rect.x + 16, rect.y + 28, { size: 10, colour: MUTED });
+    label(ctx, row.label.toUpperCase(), rect.x + 16, rect.y + 52, {
+      size: 17,
+      colour: INK,
+      maxWidth: PROFILE_LAYOUT.carRows.labelWidth - 32,
+    });
+    label(
+      ctx,
+      row.savedCount === 0 ? "no paints saved" : row.savedCount === 1 ? "1 paint" : `${row.savedCount} paints`,
+      rect.x + 16,
+      rect.y + 74,
+      { size: 11, colour: row.savedCount === 0 ? MUTED : DIM },
+    );
+
+    const image = sheetImages.get(row.model.sheetId);
+    for (const cell of row.cells) {
+      drawCarCell(ctx, carCellRect(row.screenRow, cell.column), cell, { image, liveryCache, budget });
     }
   }
+
+  for (const step of [-1, 1]) {
+    const live = step < 0 ? view.carPicker.canScrollUp : view.carPicker.canScrollDown;
+    const rect = carScrollRect(step);
+    ctx.fillStyle = live ? "rgba(255,90,46,0.14)" : "rgba(14,16,21,0.6)";
+    ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+    ctx.strokeStyle = live ? ACCENT : "rgba(150,158,178,0.25)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(rect.x + 0.5, rect.y + 0.5, rect.width - 1, rect.height - 1);
+    label(ctx, step < 0 ? "▲" : "▼", rect.x + rect.width / 2, rect.y + rect.height / 2 + 6, {
+      size: 14,
+      colour: live ? INK : MUTED,
+      align: "center",
+    });
+  }
+  label(
+    ctx,
+    `${view.carPicker.scroll + 1}–${Math.min(view.carPicker.scroll + view.carPicker.visibleRows, view.carPicker.totalRows)} of ${view.carPicker.totalRows}`,
+    PROFILE_LAYOUT.carScroll.x + PROFILE_LAYOUT.carScroll.width / 2,
+    carRowRect(2).y + 54,
+    { size: 11, colour: MUTED, align: "center" },
+  );
 
   label(
     ctx,
@@ -530,5 +650,5 @@ export function drawProfile(ctx, view, { faces, sheetImages, liveryCache = null,
   // seeing it behind the choice is what says so.
   if (view.stage === STAGE_NAME) drawNameStage(ctx, view);
   else if (view.stage === STAGE_AVATAR) drawAvatarStage(ctx, view, { faces });
-  else if (view.stage === STAGE_CARS) drawCarStage(ctx, view, { sheetImages });
+  else if (view.stage === STAGE_CARS) drawCarStage(ctx, view, { sheetImages, liveryCache, budget });
 }
