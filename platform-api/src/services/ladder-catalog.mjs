@@ -31,6 +31,14 @@ const LADDERS = [
         unitLabel: "ELO",
         minMatches: 1,
     },
+    {
+        gameSlug: "yam-bowling",
+        title: "Yam Bowling",
+        cabinetSlug: "yam-bowling",
+        source: "game-ratings",
+        unitLabel: "ELO",
+        minMatches: 1,
+    },
     // Speed Demon's headline board. The quarter mile is the drag racing distance —
     // it is the mode's default, and it is what a time means to someone who does not
     // play the game. The other six boards are not registered here on purpose; see

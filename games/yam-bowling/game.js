@@ -1,3 +1,8 @@
+import { loadFactoryProfile } from "../../js/platform/identity/factory-profile.mjs";
+import { createOnlineIdentityPayload } from "../../js/platform/identity/match-identity.mjs";
+import { createPlatformApiClient } from "../../js/platform/api/platform-api.mjs";
+import { createOnlineClient, normalizeRoomCode } from "./online-client.mjs";
+
 (function startYamBowling() {
   "use strict";
 
@@ -12,9 +17,16 @@
   const BALLS = BallCore.BALLS;
 
   const $ = (id) => document.getElementById(id);
+  const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;",
+  })[character]);
   const canvas = $("game-canvas");
   const renderer = new window.YamBowlingRenderer(canvas);
   const audio = AudioCore.createAudioDirector();
+  const factoryProfile = loadFactoryProfile();
+  const onlineIdentity = createOnlineIdentityPayload(factoryProfile);
+  const platformApi = createPlatformApiClient();
+  const onlineClient = createOnlineClient();
   const setup = {
     modeId: "quick",
     playType: "cpu",
@@ -22,8 +34,18 @@
     activeSlot: 0,
     characterSlugs: ["daisy-monroe", "nia-brooks"],
   };
+  const onlineSetup = {
+    modeId: "quick",
+    characterSlug: "daisy-monroe",
+    intent: null,
+  };
 
   let match = null;
+  let onlineMatch = false;
+  let onlineSnapshot = null;
+  let pendingAuthoritativeRoll = null;
+  let lastAppliedOnlineRoll = 0;
+  let reportedRatingSessionId = "";
   let paused = false;
   let calloutTime = 0;
   let bannerTime = 0;
@@ -134,6 +156,103 @@
     }
   }
 
+  function buildOnlineCharacterGrid() {
+    const grid = $("online-character-grid");
+    for (const bowler of Roster) {
+      const card = document.createElement("button");
+      card.className = "character-card";
+      card.type = "button";
+      card.dataset.slug = bowler.slug;
+      card.setAttribute("role", "option");
+      card.innerHTML = `<img src="${characterPortrait(bowler.slug)}" alt="" loading="lazy"><span>${bowler.name}</span><i></i>`;
+      card.addEventListener("click", () => {
+        onlineSetup.characterSlug = bowler.slug;
+        renderOnlineSetup();
+      });
+      grid.appendChild(card);
+    }
+  }
+
+  function renderOnlineSetup() {
+    setSelected($("online-mode-options"), "data-online-mode", onlineSetup.modeId);
+    const bowler = bowlerBySlug(onlineSetup.characterSlug);
+    $("online-selected-bowler").textContent = bowler.name;
+    $("online-account-name").textContent = onlineIdentity.displayName || "Player";
+    for (const card of $("online-character-grid").querySelectorAll(".character-card")) {
+      const selected = card.dataset.slug === onlineSetup.characterSlug;
+      card.classList.toggle("is-selected", selected);
+      card.setAttribute("aria-selected", String(selected));
+    }
+  }
+
+  function onlinePlayerCards(snapshot) {
+    const players = snapshot?.matchState?.match?.players || snapshot?.lobby?.players || [];
+    if (!players.length) return [{ id: snapshot?.clientId || "local", name: onlineIdentity.displayName || "Player", characterSlug: onlineSetup.characterSlug }];
+    return players;
+  }
+
+  function renderOnlineLobby(snapshot = onlineClient.getSnapshot()) {
+    const lobby = snapshot.lobby;
+    const roomCode = lobby?.roomCode || snapshot.matchState?.roomCode || "";
+    const privateRoom = lobby?.isPrivate === true || onlineSetup.intent === "private-create" || onlineSetup.intent === "private-join";
+    $("online-lobby-kind").textContent = privateRoom ? "Private room" : "Quick match";
+    $("online-lobby-title").textContent = roomCode ? (privateRoom ? "Room ready" : "Opponent search") : "Finding a lane";
+    $("online-room-code-wrap").hidden = !roomCode || !privateRoom;
+    $("online-room-code").textContent = roomCode || "-----";
+
+    let status = "Connecting to Factory Network…";
+    if (snapshot.status === "searching") status = "Searching for an opponent on the public lanes…";
+    if (snapshot.status === "creating") status = "Opening your private lane…";
+    if (snapshot.status === "joining") status = "Joining the private lane…";
+    if (snapshot.status === "lobby") status = lobby?.playerCount >= 2 ? "Both bowlers are here. Starting match…" : "Waiting for the second bowler…";
+    if (snapshot.status === "reconnecting") status = "Connection lost. Rejoining your lane…";
+    if (snapshot.disconnectedClientId) status = "Opponent disconnected. Holding their lane for 30 seconds…";
+    if (snapshot.error?.message) status = snapshot.error.message;
+    $("online-status").textContent = status;
+    $("online-status").classList.toggle("is-error", Boolean(snapshot.error && snapshot.error.code !== "CONNECTION_LOST"));
+    $("online-menu-status").textContent = snapshot.error?.message || "Choose a bowler, then find a lane.";
+    $("online-menu-status").classList.toggle("is-error", Boolean(snapshot.error));
+
+    const host = $("online-lobby-players");
+    host.innerHTML = "";
+    const cards = onlinePlayerCards(snapshot);
+    cards.forEach((player, index) => {
+      const local = player.id === snapshot.clientId;
+      const slug = player.characterSlug || (local ? onlineSetup.characterSlug : (index === 0 ? "daisy-monroe" : "nia-brooks"));
+      const card = document.createElement("article");
+      card.className = `online-player-card${local ? " is-you" : ""}${player.connected === false ? " is-disconnected" : ""}`;
+      card.innerHTML = `<img src="${characterPortrait(slug)}" alt=""><span><strong>${escapeHtml(player.name || `Player ${index + 1}`)}</strong><small>${player.connected === false ? "Reconnecting" : local ? "You · Ready" : "Ready"}</small></span>`;
+      host.appendChild(card);
+    });
+    while (host.children.length < 2) {
+      const waiting = document.createElement("article");
+      waiting.className = "online-player-card";
+      waiting.innerHTML = `<img src="${characterPortrait("nia-brooks")}" alt=""><span><strong>Open lane</strong><small>Waiting for player</small></span>`;
+      host.appendChild(waiting);
+    }
+  }
+
+  function beginOnline(intent) {
+    onlineSetup.intent = intent;
+    onlineClient.setIdentity(onlineIdentity);
+    onlineClient.connect();
+    showScreen("online-lobby-screen");
+    renderOnlineLobby();
+    const options = { modeId: onlineSetup.modeId, characterSlug: onlineSetup.characterSlug };
+    if (intent === "quick") onlineClient.findQuickMatch(options);
+    if (intent === "private-create") onlineClient.createPrivateRoom(options);
+    if (intent === "private-join") {
+      const code = normalizeRoomCode($("join-room-code").value);
+      if (!code) {
+        showScreen("online-screen");
+        $("online-menu-status").textContent = "Enter the private room code first.";
+        $("online-menu-status").classList.add("is-error");
+        return;
+      }
+      onlineClient.joinPrivateRoom(code, options);
+    }
+  }
+
   function buildBallRack() {
     const rack = $("ball-rack");
     BALLS.forEach((ball, index) => {
@@ -180,6 +299,11 @@
   }
 
   function startMatch() {
+    onlineMatch = false;
+    onlineSnapshot = null;
+    pendingAuthoritativeRoll = null;
+    lastAppliedOnlineRoll = 0;
+    reportedRatingSessionId = "";
     match = Core.createMatch({
       modeId: setup.modeId,
       playType: setup.playType,
@@ -205,6 +329,8 @@
     cpuDelay = 0.8;
     bannerTime = 1.15;
     $("pause-overlay").hidden = true;
+    $("restart-match-button").hidden = false;
+    $("online-result-status").hidden = true;
     audio.resumeMusic();
     resetHumanShot();
     prepareActivePlayer();
@@ -212,8 +338,111 @@
     showScreen("game-screen");
   }
 
+  function clonePins(pins) {
+    return Array.isArray(pins) ? pins.map((pin) => ({ ...pin })) : Physics.createRack();
+  }
+
+  function resetSceneForOnline(snapshot) {
+    match = structuredClone(snapshot.match);
+    onlineMatch = true;
+    onlineSnapshot = snapshot;
+    pendingAuthoritativeRoll = null;
+    lastAppliedOnlineRoll = Number(snapshot.rollNumber) || 0;
+    reportedRatingSessionId = "";
+    paused = false;
+    scene.phase = "ready";
+    scene.pins = clonePins(snapshot.nextPins);
+    scene.simulation = null;
+    scene.ballZ = 0;
+    scene.throwElapsed = 0;
+    scene.spinElapsed = 0;
+    scene.spinLevel = 0;
+    scene.chargeElapsed = 0;
+    scene.chargeLevel = 0;
+    scene.chargeState = null;
+    resetChargeFeedback();
+    resetSpinFeedback();
+    playerShots = [defaultShot(), defaultShot()];
+    contactedPinCount = 0;
+    transitionTime = 0;
+    bannerTime = 1.15;
+    $("pause-overlay").hidden = true;
+    $("restart-match-button").hidden = true;
+    $("online-result-status").hidden = true;
+    audio.resumeMusic();
+    prepareActivePlayer();
+    updateMatchUI();
+    showScreen("game-screen");
+  }
+
+  function applyOnlineSnapshotDirect(snapshot) {
+    if (!snapshot?.match) return;
+    match = structuredClone(snapshot.match);
+    onlineSnapshot = snapshot;
+    lastAppliedOnlineRoll = Math.max(lastAppliedOnlineRoll, Number(snapshot.rollNumber) || 0);
+    scene.pins = clonePins(snapshot.nextPins);
+    pendingAuthoritativeRoll = null;
+    if (match.status === "complete") {
+      showResults();
+      return;
+    }
+    scene.phase = snapshot.phase === "paused" ? "network-paused" : "ready";
+    prepareActivePlayer();
+    updateMatchUI();
+  }
+
+  function playAuthoritativeRoll(snapshot) {
+    const roll = snapshot?.lastRoll;
+    if (!roll || Number(roll.rollNumber) <= lastAppliedOnlineRoll) {
+      if (snapshot?.match && !pendingAuthoritativeRoll) applyOnlineSnapshotDirect(snapshot);
+      return;
+    }
+    if (Number(pendingAuthoritativeRoll?.roll?.rollNumber) === Number(roll.rollNumber)) {
+      return;
+    }
+    if (!match || $("game-screen").hidden) {
+      resetSceneForOnline({ ...snapshot, rollNumber: Number(roll.rollNumber) - 1 });
+    }
+    onlineSnapshot = snapshot;
+    pendingAuthoritativeRoll = { snapshot, roll };
+    const shooterIndex = match.players.findIndex((player) => player.id === roll.shooterClientId);
+    if (shooterIndex >= 0) match.activePlayer = shooterIndex;
+    scene.pins = clonePins(roll.pinsBefore);
+    Object.assign(scene.liveShot, roll.shot);
+    scene.liveShot.ballIndex = roll.shot.ballIndex;
+    applyBallProfile();
+    prepareActivePlayer();
+    Object.assign(scene.liveShot, roll.shot);
+    scene.liveShot.ballIndex = roll.shot.ballIndex;
+    applyBallProfile();
+    syncControlsFromShot();
+    beginThrow(roll.shot.power, { release: roll.shot.release });
+  }
+
+  function handleOnlineSnapshot(snapshot) {
+    renderOnlineLobby(snapshot);
+    if (
+      snapshot.status === "lobby"
+      && snapshot.lobby?.status === "open"
+      && snapshot.lobby?.ownerId === snapshot.clientId
+      && snapshot.lobby.playerCount >= 2
+    ) {
+      onlineClient.startLobby();
+    }
+    if (!snapshot.matchState) return;
+    if (!onlineMatch || (onlineSnapshot?.sessionId && snapshot.matchState.sessionId !== onlineSnapshot.sessionId)) {
+      resetSceneForOnline(snapshot.matchState);
+      return;
+    }
+    playAuthoritativeRoll(snapshot.matchState);
+  }
+
   function activePlayer() {
     return match?.players[match.activePlayer] || null;
+  }
+
+  function isLocalOnlineTurn() {
+    return !onlineMatch || activePlayer()?.id === onlineClient.getSnapshot().clientId;
   }
 
   function prepareActivePlayer() {
@@ -272,7 +501,7 @@
       row.className = `score-row${match.status === "playing" && playerIndex === match.activePlayer ? " is-active" : ""}`;
       const label = document.createElement("div");
       label.className = "score-player";
-      label.innerHTML = `<strong>${player.name}</strong><small>${player.type === "cpu" ? "CPU" : `P${playerIndex + 1}`}</small>`;
+      label.innerHTML = `<strong>${escapeHtml(player.name)}</strong><small>${player.type === "cpu" ? "CPU" : `P${playerIndex + 1}`}</small>`;
       const frames = document.createElement("div");
       frames.className = "score-frames";
       frames.style.setProperty("--frames", frameCount);
@@ -296,7 +525,7 @@
     if (!match) return;
     const player = activePlayer();
     const mode = Core.MODES[match.modeId];
-    $("match-chip").textContent = `${mode.name} · ${match.playType === "cpu" ? "Vs CPU" : "Hotseat"}`;
+    $("match-chip").textContent = `${mode.name} · ${onlineMatch ? "Online" : match.playType === "cpu" ? "Vs CPU" : "Hotseat"}`;
     $("score-mode").textContent = `${mode.frames} frames`;
     $("hud-frame").textContent = Math.min(mode.frames, match.frameIndex + 1);
     $("hud-pins").textContent = scene.pins.filter((pin) => pin.standing).length;
@@ -312,20 +541,23 @@
   function updateShotControls() {
     const enabled = canAdjustShot();
     const isCpu = activePlayer()?.type === "cpu";
+    const waitingForOpponent = onlineMatch && !isLocalOnlineTurn();
     for (const control of [$("position-control"), $("aim-control")]) control.disabled = !enabled;
     for (const button of $("ball-rack").querySelectorAll("button")) button.disabled = !enabled;
-    const throwEnabled = !isCpu && !paused && ["ready", "spin", "charging"].includes(scene.phase);
+    const throwEnabled = !isCpu && isLocalOnlineTurn() && !paused && ["ready", "spin", "charging"].includes(scene.phase);
     $("throw-button").disabled = !throwEnabled;
-    $("shot-status").textContent = isCpu ? "CPU thinking" : scene.phase === "ready" ? "Set line" : scene.phase === "spin" ? "Time spin" : scene.phase === "charging" ? "Build power" : "Ball away";
-    if (scene.phase === "ready") $("throw-button").textContent = isCpu ? "CPU lining up…" : "Start spin timing";
+    $("shot-status").textContent = scene.phase === "network-paused" ? "Opponent reconnecting" : waitingForOpponent ? "Opponent bowling" : isCpu ? "CPU thinking" : scene.phase === "ready" ? "Set line" : scene.phase === "spin" ? "Time spin" : scene.phase === "charging" ? "Build power" : scene.phase === "submitting" ? "Server checking shot" : "Ball away";
+    if (scene.phase === "ready") $("throw-button").textContent = waitingForOpponent ? "Opponent's turn" : isCpu ? "CPU lining up…" : "Start spin timing";
     else if (scene.phase === "spin") $("throw-button").textContent = "Press + hold to lock spin";
     else if (scene.phase === "charging") $("throw-button").textContent = "Release to throw";
     else if (scene.phase === "transition") $("throw-button").textContent = "Rack settling…";
+    else if (scene.phase === "submitting") $("throw-button").textContent = "Scoring on server…";
+    else if (scene.phase === "network-paused") $("throw-button").textContent = "Holding lane…";
     else $("throw-button").textContent = "Ball away";
   }
 
   function canAdjustShot() {
-    return Boolean(match && match.status === "playing" && scene.phase === "ready" && activePlayer()?.type === "human" && !paused);
+    return Boolean(match && match.status === "playing" && scene.phase === "ready" && activePlayer()?.type === "human" && isLocalOnlineTurn() && !paused);
   }
 
   function startSpin() {
@@ -359,6 +591,13 @@
     if (scene.phase !== "charging") return;
     const power = scene.chargeLevel;
     $("throw-button").classList.remove("is-charging");
+    if (onlineMatch) {
+      scene.liveShot.power = power;
+      scene.phase = "submitting";
+      onlineClient.submitShot({ ...scene.liveShot, power, release: 0 });
+      updateShotControls();
+      return;
+    }
     beginThrow(power);
   }
 
@@ -460,13 +699,23 @@
 
   function finalizeRoll() {
     const startedStanding = scene.simulation.startStanding;
-    const knocked = Math.max(0, Math.min(startedStanding, Physics.knockedCount(scene.simulation)));
-    scene.pins = scene.simulation.pins;
+    const authority = onlineMatch ? pendingAuthoritativeRoll : null;
+    const knocked = authority
+      ? authority.roll.knocked
+      : Math.max(0, Math.min(startedStanding, Physics.knockedCount(scene.simulation)));
+    scene.pins = authority ? clonePins(authority.roll.pinsAfter) : scene.simulation.pins;
     showCallout(knocked, startedStanding);
     if (knocked > 0) {
       renderer.shake = Math.min(12, 3 + knocked);
     }
-    match = Core.recordRoll(match, knocked);
+    if (authority) {
+      match = structuredClone(authority.snapshot.match);
+      onlineSnapshot = authority.snapshot;
+      lastAppliedOnlineRoll = Number(authority.roll.rollNumber) || lastAppliedOnlineRoll;
+      pendingAuthoritativeRoll = null;
+    } else {
+      match = Core.recordRoll(match, knocked);
+    }
     scene.phase = "transition";
     transitionTime = 1.35;
     updateMatchUI();
@@ -478,7 +727,9 @@
       return;
     }
     const expectedPins = Core.pinsStandingForTurn(match);
-    scene.pins = expectedPins === 10 ? Physics.createRack() : Physics.clearFallen(scene.pins);
+    scene.pins = onlineMatch && onlineSnapshot?.nextPins
+      ? clonePins(onlineSnapshot.nextPins)
+      : expectedPins === 10 ? Physics.createRack() : Physics.clearFallen(scene.pins);
     scene.simulation = null;
     scene.phase = "ready";
     scene.ballZ = 0;
@@ -515,13 +766,40 @@
           <span class="result-player__outcome">${outcomeLabel}</span>
         </div>
         <div class="result-player__details">
-          <strong>${player.name}</strong>
+          <strong>${escapeHtml(player.name)}</strong>
           <span class="result-player__score"><small>Final score</small><b>${player.score.total}</b></span>
         </div>`;
       host.appendChild(card);
     });
     showScreen("results-screen");
     audio.play("win");
+    if (onlineMatch) reportOnlineResult();
+  }
+
+  async function reportOnlineResult() {
+    const sessionId = onlineSnapshot?.sessionId || "";
+    if (!sessionId || reportedRatingSessionId === sessionId) return;
+    reportedRatingSessionId = sessionId;
+    const clientId = onlineClient.getSnapshot().clientId;
+    const me = match.players.find((player) => player.id === clientId);
+    const opponent = match.players.find((player) => player.id !== clientId);
+    const status = $("online-result-status");
+    status.hidden = false;
+    if (!me?.accountPlayerId || !opponent?.accountPlayerId) {
+      status.textContent = "Sign in to a Factory account to save online records.";
+      return;
+    }
+    const outcome = match.winnerIds.length > 1 ? "draw" : match.winnerIds.includes(me.id) ? "win" : "loss";
+    status.textContent = "Saving this match to your Factory record…";
+    await platformApi.updateGameRating("yam-bowling", {
+      opponentPlayerId: opponent.accountPlayerId,
+      outcome,
+      sessionId,
+    }).catch(() => null);
+    const rating = await platformApi.getGameRating("yam-bowling", me.accountPlayerId).catch(() => null);
+    status.textContent = rating
+      ? `Factory record · ${rating.wins}W ${rating.losses}L ${rating.draws}D · ${rating.rating} ELO`
+      : "Match complete. Sign in to save wins, losses, and rating.";
   }
 
   function tick(dt) {
@@ -533,7 +811,7 @@
     const strafeDirection = (keys.strafeRight ? 1 : 0) - (keys.strafeLeft ? 1 : 0);
     const aimDirection = (keys.aimRight ? 1 : 0) - (keys.aimLeft ? 1 : 0);
 
-    if (scene.phase === "ready" && activePlayer()?.type === "human") {
+    if (canAdjustShot()) {
       if (strafeDirection) {
         scene.liveShot.position = Math.max(-0.46, Math.min(0.46, scene.liveShot.position + strafeDirection * dt * 0.46));
       }
@@ -564,7 +842,7 @@
       updateChargeFeedback();
     } else if (scene.phase === "approach") {
       scene.throwElapsed += dt;
-      if (activePlayer()?.type === "human" && scene.throwElapsed <= 0.32 && strafeDirection) {
+      if (!onlineMatch && activePlayer()?.type === "human" && scene.throwElapsed <= 0.32 && strafeDirection) {
         scene.shot.release = Math.max(-0.035, Math.min(0.035, scene.shot.release + strafeDirection * dt * 0.1));
       }
       const speed = Physics.ballSpeedForShot(scene.shot);
@@ -631,7 +909,9 @@
       syncAudioToggle();
     });
     $("play-button").addEventListener("click", () => { showScreen("setup-screen"); renderSetup(); });
+    $("online-button").addEventListener("click", () => { showScreen("online-screen"); renderOnlineSetup(); });
     $("setup-back").addEventListener("click", () => showScreen("title-screen"));
+    $("online-back").addEventListener("click", () => showScreen("title-screen"));
     $("how-button").addEventListener("click", () => { $("how-dialog").showModal(); audio.play("popup"); });
     $("how-close").addEventListener("click", () => $("how-dialog").close());
     $("mode-options").addEventListener("click", (event) => {
@@ -639,6 +919,35 @@
       if (!button) return;
       setup.modeId = button.dataset.mode;
       renderSetup();
+    });
+    $("online-mode-options").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-online-mode]");
+      if (!button) return;
+      onlineSetup.modeId = button.dataset.onlineMode;
+      renderOnlineSetup();
+    });
+    $("quick-match-button").addEventListener("click", () => beginOnline("quick"));
+    $("create-room-button").addEventListener("click", () => beginOnline("private-create"));
+    $("join-room-button").addEventListener("click", () => beginOnline("private-join"));
+    $("join-room-code").addEventListener("input", (event) => {
+      event.target.value = normalizeRoomCode(event.target.value);
+      $("online-menu-status").classList.remove("is-error");
+    });
+    $("join-room-code").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") beginOnline("private-join");
+    });
+    $("copy-room-code").addEventListener("click", async () => {
+      const code = $("online-room-code").textContent;
+      await navigator.clipboard?.writeText?.(code).catch(() => {});
+      $("copy-room-code").textContent = "Copied";
+      setTimeout(() => { $("copy-room-code").textContent = "Copy code"; }, 1200);
+    });
+    $("leave-online-button").addEventListener("click", () => {
+      onlineClient.leaveLobby();
+      onlineMatch = false;
+      onlineSnapshot = null;
+      showScreen("online-screen");
+      renderOnlineSetup();
     });
     $("play-type-options").addEventListener("click", (event) => {
       const button = event.target.closest("[data-play-type]");
@@ -713,10 +1022,42 @@
     $("pause-button").addEventListener("click", () => { paused = true; $("pause-overlay").hidden = false; audio.play("popup"); audio.pauseMusic(); });
     $("resume-button").addEventListener("click", () => { paused = false; $("pause-overlay").hidden = true; audio.resumeMusic(); });
     $("restart-match-button").addEventListener("click", startMatch);
-    $("quit-match-button").addEventListener("click", () => { paused = false; $("pause-overlay").hidden = true; showScreen("setup-screen"); audio.resumeMusic(); });
-    $("rematch-button").addEventListener("click", startMatch);
-    $("change-match-button").addEventListener("click", () => { showScreen("setup-screen"); renderSetup(); });
-    $("results-home-button").addEventListener("click", () => showScreen("title-screen"));
+    $("quit-match-button").addEventListener("click", () => {
+      paused = false;
+      $("pause-overlay").hidden = true;
+      if (onlineMatch) {
+        onlineClient.leaveLobby();
+        onlineMatch = false;
+        showScreen("online-screen");
+        renderOnlineSetup();
+      } else {
+        showScreen("setup-screen");
+      }
+      audio.resumeMusic();
+    });
+    $("rematch-button").addEventListener("click", () => {
+      if (onlineMatch) {
+        onlineClient.requestRematch();
+        $("online-result-status").hidden = false;
+        $("online-result-status").textContent = "Rematch requested. Waiting for your opponent…";
+      } else startMatch();
+    });
+    $("change-match-button").addEventListener("click", () => {
+      if (onlineMatch) {
+        onlineClient.leaveLobby();
+        onlineMatch = false;
+        showScreen("online-screen");
+        renderOnlineSetup();
+      } else {
+        showScreen("setup-screen");
+        renderSetup();
+      }
+    });
+    $("results-home-button").addEventListener("click", () => {
+      if (onlineMatch) onlineClient.leaveLobby();
+      onlineMatch = false;
+      showScreen("title-screen");
+    });
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
         audio.pauseMusic();
@@ -727,11 +1068,18 @@
 
   async function init() {
     buildCharacterGrid();
+    buildOnlineCharacterGrid();
     buildBallRack();
     Cpu.warmCpuPlanner({ pins: Physics.createRack(), balls: BALLS });
     renderSetup();
+    renderOnlineSetup();
+    onlineClient.subscribe(handleOnlineSnapshot);
     syncAudioToggle();
     bindEvents();
+    if (onlineClient.resumeSavedSession()) {
+      showScreen("online-lobby-screen");
+      renderOnlineLobby();
+    }
     $("start-match").disabled = true;
     $("start-match").textContent = "Loading lane…";
     try {

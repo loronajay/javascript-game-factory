@@ -17,6 +17,32 @@ test("the cabinet exposes title, setup, match, and results screens", () => {
   assert.match(html, /Vs CPU/i);
 });
 
+test("the cabinet exposes complete quick-match and private-room online screens", () => {
+  const html = read("index.html");
+  for (const id of [
+    "online-button", "online-screen", "online-character-grid", "quick-match-button",
+    "create-room-button", "join-room-code", "join-room-button", "online-lobby-screen",
+    "online-room-code", "online-lobby-players", "online-status", "leave-online-button",
+  ]) {
+    assert.match(html, new RegExp(`id=["']${id}["']`), `${id} should exist`);
+  }
+  assert.match(html, /Quick Match/i);
+  assert.match(html, /Create Private Room/i);
+  assert.match(html, /Join Private Room/i);
+});
+
+test("online play uses the Factory identity, server-owned shots, ratings, and reconnect client", () => {
+  const html = read("index.html");
+  const game = read("game.js");
+  assert.match(html, /type=["']module["'][^>]*src=["']game\.js["']/);
+  assert.match(game, /loadFactoryProfile/);
+  assert.match(game, /createOnlineIdentityPayload/);
+  assert.match(game, /createOnlineClient/);
+  assert.match(game, /onlineClient\.submitShot/);
+  assert.match(game, /updateGameRating\(["']yam-bowling["']/);
+  assert.match(read("online-client.mjs"), /resume_lobby/);
+});
+
 test("the title splash keeps the complete painted artwork visible", () => {
   const css = read("styles.css");
   assert.match(

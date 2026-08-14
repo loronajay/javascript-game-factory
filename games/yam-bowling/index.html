@@ -23,9 +23,69 @@
           <p class="title-tagline">Pick your bowler. Find the pocket. Feed the competition.</p>
           <div class="title-actions">
             <button class="button button--primary button--xl" id="play-button" type="button">Play local</button>
+            <button class="button button--ghost button--xl" id="online-button" type="button">Play online</button>
             <button class="button button--ghost" id="how-button" type="button">How to play</button>
           </div>
-          <p class="build-tag">First playable · Local modes</p>
+          <p class="build-tag">Local league · Quick match · Private rooms</p>
+        </div>
+      </section>
+
+      <section class="screen setup-screen online-screen" id="online-screen" aria-labelledby="online-title" hidden>
+        <header class="screen-header">
+          <button class="icon-button" id="online-back" type="button" aria-label="Back to title">←</button>
+          <div><p class="eyebrow">Factory Network</p><h2 id="online-title">Online lanes</h2></div>
+          <span class="step-chip" id="online-account-name">Player</span>
+        </header>
+
+        <div class="setup-layout online-setup-layout">
+          <aside class="setup-options panel online-actions-panel">
+            <section class="option-section">
+              <p class="option-label">Match length</p>
+              <div class="segmented segmented--stack" id="online-mode-options">
+                <button class="choice-card is-selected" type="button" data-online-mode="quick">
+                  <span><strong>Quick Bowl</strong><small>Three fast frames</small></span><b>3F</b>
+                </button>
+                <button class="choice-card" type="button" data-online-mode="classic">
+                  <span><strong>Classic Ten</strong><small>Regulation scoring</small></span><b>10F</b>
+                </button>
+              </div>
+            </section>
+            <section class="option-section online-match-actions">
+              <button class="button button--primary button--wide" id="quick-match-button" type="button">Quick Match</button>
+              <p>Join the oldest public lane using the same match length.</p>
+              <button class="button button--ghost button--wide" id="create-room-button" type="button">Create Private Room</button>
+              <div class="join-room-row">
+                <input id="join-room-code" type="text" maxlength="8" autocomplete="off" spellcheck="false" placeholder="ROOM CODE" aria-label="Private room code" />
+                <button class="button button--ghost" id="join-room-button" type="button">Join Private Room</button>
+              </div>
+            </section>
+            <p class="online-inline-status" id="online-menu-status" aria-live="polite">Choose a bowler, then find a lane.</p>
+          </aside>
+
+          <section class="character-select panel" aria-labelledby="online-roster-title">
+            <div class="section-heading">
+              <div><p class="eyebrow">Your online bowler</p><h3 id="online-roster-title">Pick a bowler</h3></div>
+              <span id="online-selected-bowler">Daisy Monroe</span>
+            </div>
+            <div class="character-grid online-character-grid" id="online-character-grid" role="listbox" aria-label="Online bowler roster"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="screen online-lobby-screen" id="online-lobby-screen" aria-labelledby="online-lobby-title" hidden>
+        <div class="online-lobby-card panel">
+          <p class="eyebrow" id="online-lobby-kind">Factory Network</p>
+          <h2 id="online-lobby-title">Finding a lane</h2>
+          <div class="online-room-code-wrap" id="online-room-code-wrap" hidden>
+            <span>Room code</span>
+            <strong id="online-room-code">-----</strong>
+            <button class="button button--ghost" id="copy-room-code" type="button">Copy code</button>
+          </div>
+          <p class="online-status" id="online-status" aria-live="polite">Connecting to Factory Network…</p>
+          <div class="online-lobby-players" id="online-lobby-players" aria-label="Players in room"></div>
+          <div class="online-lobby-actions">
+            <button class="button button--ghost" id="leave-online-button" type="button">Leave lane</button>
+          </div>
         </div>
       </section>
 
@@ -146,6 +206,7 @@
             <button class="button button--ghost" id="change-match-button" type="button">Change match</button>
             <button class="button button--ghost" id="results-home-button" type="button">Title screen</button>
           </div>
+          <p class="online-result-status" id="online-result-status" aria-live="polite" hidden></p>
         </div>
       </section>
     </main>
@@ -176,6 +237,6 @@
     <script src="ball-core.js"></script>
     <script src="cpu-core.js"></script>
     <script src="renderer.js"></script>
-    <script src="game.js"></script>
+    <script type="module" src="game.js"></script>
   </body>
 </html>

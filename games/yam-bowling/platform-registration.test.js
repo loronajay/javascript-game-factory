@@ -20,3 +20,12 @@ test("Yam Bowling satisfies the arcade grid registration contract", () => {
   const previewPath = path.join(repoRoot, "grid-previews", "yam-bowling.png");
   assert.equal(fs.existsSync(previewPath), true, "the grid preview should exist at the canonical slug path");
 });
+
+test("Yam Bowling online results use the shared account-bound ELO ladder", () => {
+  const ladderCatalog = fs.readFileSync(path.join(repoRoot, "platform-api", "src", "services", "ladder-catalog.mts"), "utf8");
+  assert.match(
+    ladderCatalog,
+    /gameSlug:\s*["']yam-bowling["'][\s\S]*?source:\s*["']game-ratings["'][\s\S]*?unitLabel:\s*["']ELO["']/,
+    "yam-bowling should persist online records through the shared game_ratings ladder",
+  );
+});
