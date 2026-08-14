@@ -80,6 +80,31 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
   font-size: 1.25rem;
 }
 .icon-button:hover { background: rgba(255,255,255,.1); }
+.arcade-link {
+  position: fixed;
+  top: max(1rem, env(safe-area-inset-top));
+  left: max(1rem, env(safe-area-inset-left));
+  z-index: 70;
+  display: inline-flex;
+  min-height: 42px;
+  padding: .65rem .85rem;
+  align-items: center;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(9, 10, 14, .88);
+  box-shadow: 0 10px 30px rgba(0,0,0,.38);
+  backdrop-filter: blur(12px);
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: color 140ms ease, border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+.arcade-link:hover { border-color: rgba(243,46,63,.72); color: var(--gold); background: rgba(28,29,36,.94); transform: translateY(-2px); }
+.arcade-link:active { transform: translateY(0); }
+.arcade-link:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
 .audio-toggle {
   position: fixed;
   right: max(1rem, env(safe-area-inset-right));
@@ -134,7 +159,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 }
 .title-content h1 span { display: block; color: var(--red); }
 .title-tagline { max-width: 430px; margin: 1.8rem 0; color: #e8e2dd; font-size: clamp(1rem, 1.8vw, 1.25rem); line-height: 1.55; }
-.title-actions { display: flex; gap: 0.75rem; align-items: center; }
+.title-actions { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
 .build-tag { margin: 1.4rem 0 0; color: #837d7f; font-size: 0.68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 
 /* Setup */
@@ -491,6 +516,40 @@ input:disabled { cursor: not-allowed; filter: grayscale(1); opacity: .45; }
 .how-grid article > b { color: var(--red); font-family: Impact, sans-serif; font-size: 1.5rem; }
 .how-grid h3 { margin: .7rem 0 .35rem; }
 .how-grid p { margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.55; }
+.menu-splash-dialog {
+  width: min(1080px, calc(100% - 2rem));
+  max-height: min(860px, calc(100svh - 2rem));
+  padding: clamp(1.1rem, 3vw, 2rem);
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  color: var(--ink);
+  background: #13141a;
+  box-shadow: var(--shadow);
+}
+.menu-splash-dialog::backdrop { background: rgba(4,4,7,.86); backdrop-filter: blur(9px); }
+.menu-splash-dialog h2 { margin: 0; font-size: clamp(2rem, 5vw, 3.4rem); }
+.menu-splash-intro { margin: .45rem 3rem 1.2rem 0; color: var(--muted); font-size: .82rem; line-height: 1.5; }
+.menu-splash-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; }
+.menu-splash-card {
+  display: grid;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  grid-template-rows: auto 42px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--ink);
+  background: #090a0e;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+.menu-splash-card:hover { border-color: rgba(255,255,255,.35); transform: translateY(-2px); }
+.menu-splash-card.is-selected { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(255,214,107,.2), 0 12px 28px rgba(0,0,0,.38); }
+.menu-splash-card img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.menu-splash-card span { display: flex; padding: 0 .7rem; align-items: center; justify-content: space-between; gap: .5rem; font-size: .68rem; font-weight: 900; }
+.menu-splash-card.is-selected span::after { content: "Selected"; color: var(--gold); font-size: .5rem; letter-spacing: .08em; text-transform: uppercase; }
 
 @media (max-width: 1100px) {
   .character-grid { grid-template-columns: repeat(5, minmax(88px, 1fr)); }
@@ -536,6 +595,7 @@ input:disabled { cursor: not-allowed; filter: grayscale(1); opacity: .45; }
   .game-panel { padding: .75rem; border-radius: 15px; }
   .score-row { grid-template-columns: 62px 1fr 38px; }
   .how-grid { grid-template-columns: 1fr; }
+  .menu-splash-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
   .results-players { grid-template-columns: 1fr 1fr; }
   .online-lobby-players { grid-template-columns: 1fr; }
   .online-room-code-wrap { grid-template-columns: 1fr; text-align: center; }

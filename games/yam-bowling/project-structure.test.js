@@ -17,6 +17,17 @@ test("the cabinet exposes title, setup, match, and results screens", () => {
   assert.match(html, /Vs CPU/i);
 });
 
+test("the title screen provides a return link to the arcade", () => {
+  const html = read("index.html");
+  const css = read("styles.css");
+  const arcadeLink = html.match(/<a[^>]*class=["'][^"']*arcade-link[^"']*["'][^>]*>[^<]*<\/a>/i)?.[0] ?? "";
+
+  assert.match(arcadeLink, /href=["']\.\.\/\.\.\/grid\.html["']/i);
+  assert.match(arcadeLink, /Return to Arcade/i);
+  assert.match(css, /\.arcade-link\s*\{[^}]*position:\s*fixed/s);
+  assert.match(css, /\.arcade-link\s*\{[^}]*z-index:\s*\d+/s);
+});
+
 test("the cabinet exposes complete quick-match and private-room online screens", () => {
   const html = read("index.html");
   for (const id of [
@@ -50,6 +61,19 @@ test("the title splash keeps the complete painted artwork visible", () => {
     /\.title-art\s*\{[^}]*object-fit:\s*contain/s,
     "the splash should fit inside the viewport instead of cropping its painted title",
   );
+});
+
+test("players can choose and persist a character-named menu splash", () => {
+  const html = read("index.html");
+  const game = read("game.js");
+
+  assert.match(html, /id=["']menu-splash-button["']/);
+  assert.match(html, /id=["']menu-splash-dialog["']/);
+  assert.match(html, /id=["']menu-splash-grid["']/);
+  assert.ok(html.indexOf("menu-splash-core.js") < html.indexOf("game.js"));
+  assert.match(game, /loadMenuSplashSlug/);
+  assert.match(game, /saveMenuSplashSlug/);
+  assert.match(game, /data-splash-slug/);
 });
 
 test("the match keeps the bowling lane centered between supporting UI rails", () => {

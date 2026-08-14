@@ -11,6 +11,7 @@ import { createOnlineClient, normalizeRoomCode } from "./online-client.mjs";
   const BallCore = window.YamBallCore;
   const Cpu = window.YamCpuPlanner;
   const AudioCore = window.YamAudio;
+  const MenuSplash = window.YamMenuSplash;
   const Roster = window.YamBowlingCore.CANON_BOWLERS;
   const TICK_MS = 1000 / 60;
   const PHYSICS_DT = 1 / 180;
@@ -55,6 +56,7 @@ import { createOnlineClient, normalizeRoomCode } from "./online-client.mjs";
   let accumulator = 0;
   let playerShots = [];
   let contactedPinCount = 0;
+  let selectedMenuSplashSlug = MenuSplash.loadMenuSplashSlug();
 
   const scene = {
     phase: "ready",
@@ -89,6 +91,41 @@ import { createOnlineClient, normalizeRoomCode } from "./online-client.mjs";
 
   function resultPortrait(slug, outcome) {
     return window.YamBowlingCore.getResultPortraitAssetPath({ slug }, outcome);
+  }
+
+  function applyMenuSplash(slug, persist = false) {
+    selectedMenuSplashSlug = persist
+      ? MenuSplash.saveMenuSplashSlug(slug)
+      : MenuSplash.getMenuSplash(slug).slug;
+    const splash = MenuSplash.getMenuSplash(selectedMenuSplashSlug);
+    const art = $("menu-splash-art");
+    art.src = splash.src;
+    art.alt = splash.alt;
+    $("menu-splash-button").title = `Current menu art: ${splash.name}`;
+
+    for (const card of $("menu-splash-grid").querySelectorAll("[data-splash-slug]")) {
+      const selected = card.dataset.splashSlug === selectedMenuSplashSlug;
+      card.classList.toggle("is-selected", selected);
+      card.setAttribute("aria-selected", String(selected));
+    }
+  }
+
+  function buildMenuSplashGrid() {
+    const grid = $("menu-splash-grid");
+    for (const splash of MenuSplash.MENU_SPLASHES) {
+      const card = document.createElement("button");
+      card.className = "menu-splash-card";
+      card.type = "button";
+      card.setAttribute("data-splash-slug", splash.slug);
+      card.setAttribute("role", "option");
+      card.innerHTML = `<img src="${splash.src}" alt="" loading="lazy"><span>${escapeHtml(splash.name)}</span>`;
+      card.addEventListener("click", () => {
+        applyMenuSplash(splash.slug, true);
+        $("menu-splash-dialog").close();
+      });
+      grid.appendChild(card);
+    }
+    applyMenuSplash(selectedMenuSplashSlug);
   }
 
   function showScreen(id) {
@@ -901,7 +938,7 @@ import { createOnlineClient, normalizeRoomCode } from "./online-client.mjs";
       const button = event.target.closest("button");
       if (!button || button.disabled || button.id === "throw-button") return;
       if (!audio.unlocked) audio.unlock();
-      const isSelection = button.matches(".character-card, .ball-button, [data-mode], [data-play-type], [data-cpu-level], [data-player-slot]");
+      const isSelection = button.matches(".character-card, .ball-button, [data-mode], [data-play-type], [data-cpu-level], [data-player-slot], [data-splash-slug]");
       audio.play(isSelection ? "select" : "click");
     });
     $("audio-toggle").addEventListener("click", () => {
@@ -914,6 +951,8 @@ import { createOnlineClient, normalizeRoomCode } from "./online-client.mjs";
     $("online-back").addEventListener("click", () => showScreen("title-screen"));
     $("how-button").addEventListener("click", () => { $("how-dialog").showModal(); audio.play("popup"); });
     $("how-close").addEventListener("click", () => $("how-dialog").close());
+    $("menu-splash-button").addEventListener("click", () => { $("menu-splash-dialog").showModal(); audio.play("popup"); });
+    $("menu-splash-close").addEventListener("click", () => $("menu-splash-dialog").close());
     $("mode-options").addEventListener("click", (event) => {
       const button = event.target.closest("[data-mode]");
       if (!button) return;
@@ -1067,6 +1106,7 @@ import { createOnlineClient, normalizeRoomCode } from "./online-client.mjs";
   }
 
   async function init() {
+    buildMenuSplashGrid();
     buildCharacterGrid();
     buildOnlineCharacterGrid();
     buildBallRack();

@@ -36,3 +36,7 @@ Source PNGs live in `assets/characters/usable/canon/`. Each character's five cle
 Front-facing selection portraits are extracted from pose zero into `assets/characters/portraits/canon/`. Throw frames remain rear-facing because they are rendered from the bowler's lane perspective.
 
 Protected hand-edited fourth-throw frames live in `assets/characters/manual-overrides/canon/<firstname-lastname>/throw-04.png`. The extractor automatically reapplies them after every rebuild.
+
+## Menu splash convention
+
+Character title-screen artwork lives at `assets/menu-splashes/<firstname-lastname>.png`, using the same canon slug as the roster and portrait assets. Add each available splash to `MENU_SPLASHES` in `menu-splash-core.js` so it appears in the player's menu-art picker.

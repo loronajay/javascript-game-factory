@@ -15,7 +15,8 @@
         <span class="audio-toggle__label">Sound on</span>
       </button>
       <section class="screen title-screen is-active" id="title-screen" aria-labelledby="game-title">
-        <img class="title-art" src="assets/menu-splash.png" alt="Yam Bowling league host carrying a plate of yams" />
+        <a class="arcade-link" href="../../grid.html">&#8592; Return to Arcade</a>
+        <img class="title-art" id="menu-splash-art" src="assets/menu-splashes/reina-sato.png" alt="Reina Sato featured on the Yam Bowling title screen" />
         <div class="title-vignette"></div>
         <div class="title-content">
           <p class="eyebrow">Jay Arcade presents</p>
@@ -25,6 +26,7 @@
             <button class="button button--primary button--xl" id="play-button" type="button">Play local</button>
             <button class="button button--ghost button--xl" id="online-button" type="button">Play online</button>
             <button class="button button--ghost" id="how-button" type="button">How to play</button>
+            <button class="button button--ghost" id="menu-splash-button" type="button">Menu art</button>
           </div>
           <p class="build-tag">Local league · Quick match · Private rooms</p>
         </div>
@@ -230,6 +232,15 @@
       </div>
     </dialog>
 
+    <dialog class="menu-splash-dialog" id="menu-splash-dialog" aria-labelledby="menu-splash-title">
+      <button class="dialog-close" id="menu-splash-close" type="button" aria-label="Close">×</button>
+      <p class="eyebrow">Make it yours</p>
+      <h2 id="menu-splash-title">Choose your menu art</h2>
+      <p class="menu-splash-intro">Pick a featured bowler. Your choice is saved on this device.</p>
+      <div class="menu-splash-grid" id="menu-splash-grid" role="listbox" aria-label="Menu splash artwork"></div>
+    </dialog>
+
+    <script src="menu-splash-core.js"></script>
     <script src="animation-core.js"></script>
     <script src="audio-core.js"></script>
     <script src="game-core.js"></script>
