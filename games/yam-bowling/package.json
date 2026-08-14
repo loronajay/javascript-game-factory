@@ -1,0 +1,9 @@
+{
+  "name": "yam-bowling",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "test": "node --test --test-concurrency=1"
+  }
+}

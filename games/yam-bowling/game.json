@@ -1,0 +1,11 @@
+{
+  "title": "Yam Bowling",
+  "tagline": "Pick your bowler. Find the pocket. Feed the competition.",
+  "description": "A character-driven arcade bowling cabinet with three-frame quick matches or regulation ten-frame scoring, playable in local hotseat or against a configurable CPU opponent.",
+  "players": "1-2",
+  "status": "Playable - local hotseat and vs CPU",
+  "order": 14,
+  "featured": false,
+  "theme": "ember",
+  "accentColor": "#e03622"
+}

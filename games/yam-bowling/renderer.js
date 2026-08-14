@@ -1,0 +1,270 @@
+(function exposeRenderer(root) {
+  const W = 1024;
+  const H = 1536;
+  const PIN_HEIGHT_FRONT = 68;
+  const PIN_GROUND_LENGTH = 0.44;
+  const BALL_COLORS = [
+    ["#ff3842", "#5d0207"], ["#33a5ff", "#031e78"], ["#bd55ff", "#33006c"], ["#53e26f", "#054c18"],
+    ["#ffad33", "#8d2100"], ["#ffe06b", "#815600"], ["#f8f8ff", "#9aa0b5"], ["#22252c", "#000000"],
+  ];
+
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+  const smooth01 = (value) => {
+    const t = clamp(value, 0, 1);
+    return t * t * (3 - 2 * t);
+  };
+
+  function loadImage(source) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error(`Could not load ${source}`));
+      image.src = source;
+    });
+  }
+
+  class YamBowlingRenderer {
+    constructor(canvas) {
+      this.canvas = canvas;
+      this.ctx = canvas.getContext("2d");
+      this.canvas.width = W;
+      this.canvas.height = H;
+      this.ctx.imageSmoothingEnabled = false;
+      this.assets = { lane: null, pin: null, character: [] };
+      this.characterSlug = "";
+      this.characterLoadId = 0;
+      this.ready = false;
+      this.debug = false;
+      this.shake = 0;
+    }
+
+    async load() {
+      [this.assets.lane, this.assets.pin] = await Promise.all([
+        loadImage("assets/lanes/1.png"),
+        loadImage("assets/pins/1.png"),
+      ]);
+      await this.setCharacter("daisy-monroe");
+      this.ready = true;
+    }
+
+    async setCharacter(slug) {
+      if (!slug || slug === this.characterSlug) return;
+      const loadId = ++this.characterLoadId;
+      const frames = await Promise.all(
+        Array.from({ length: 5 }, (_, index) =>
+          loadImage(`assets/characters/processed/canon/${slug}/throw-${String(index + 1).padStart(2, "0")}.png`),
+        ),
+      );
+      if (loadId !== this.characterLoadId) return;
+      this.characterSlug = slug;
+      this.assets.character = frames;
+    }
+
+    project(x, z) {
+      const y = 1185 - 955 * z;
+      const half = 430 - 330 * Math.pow(clamp(z, 0, 1), 0.82);
+      return { x: W / 2 + x * half, y, half };
+    }
+
+    pinZ(pin) {
+      return root.YamPhysics.RACK_FRONT_Z + pin.y / root.YamPhysics.Z_SCALE;
+    }
+
+    drawAimGuide(scene) {
+      if (!["ready", "spin", "charging"].includes(scene.phase)) return;
+      const shot = scene.liveShot;
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.beginPath();
+      for (let i = 0; i <= 30; i += 1) {
+        const z = 0.02 + i / 30 * 0.9;
+        const point = this.project(root.YamPhysics.trajectoryX(z, shot), z);
+        if (i === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      }
+      ctx.setLineDash([14, 14]);
+      ctx.strokeStyle = "rgba(255,255,255,.62)";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const breakpointZ = root.YamPhysics.hookBreakpointForPower(shot.power);
+      const breakpoint = this.project(root.YamPhysics.trajectoryX(breakpointZ, shot), breakpointZ);
+      ctx.beginPath();
+      ctx.arc(breakpoint.x, breakpoint.y, 7, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(79, 180, 255, .95)";
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255, 255, 255, .9)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      const target = this.project(root.YamPhysics.trajectoryX(0.86, shot), 0.86);
+      ctx.beginPath();
+      ctx.arc(target.x, target.y, 13, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255,214,102,.96)";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    pinMetrics(pin) {
+      const z = this.pinZ(pin);
+      const point = this.project(pin.x, z);
+      const frontHalf = this.project(0, root.YamPhysics.RACK_FRONT_Z).half;
+      const scale = clamp(point.half / frontHalf, 0.58, 1.55);
+      const height = PIN_HEIGHT_FRONT * scale;
+      const width = height * (this.assets.pin.width / this.assets.pin.height);
+      return { z, point, height, width };
+    }
+
+    pinGroundVector(pin, metrics) {
+      let dx = pin.fallAxisX || 0.9;
+      let dy = pin.fallAxisY || 0.35;
+      const magnitude = Math.hypot(dx, dy) || 1;
+      dx /= magnitude;
+      dy /= magnitude;
+      const endZ = root.YamPhysics.RACK_FRONT_Z + (pin.y + dy * PIN_GROUND_LENGTH) / root.YamPhysics.Z_SCALE;
+      const end = this.project(pin.x + dx * PIN_GROUND_LENGTH, endZ);
+      return { x: end.x - metrics.point.x, y: end.y - metrics.point.y };
+    }
+
+    drawPin(pin) {
+      const metrics = this.pinMetrics(pin);
+      const ctx = this.ctx;
+      let alpha = 1;
+      if (metrics.z > 0.94) alpha *= 1 - smooth01((metrics.z - 0.94) / 0.05);
+      if (Math.abs(pin.x) > 0.82) alpha *= 1 - smooth01((Math.abs(pin.x) - 0.82) / 0.2);
+      if (alpha <= 0.01) return;
+
+      const fall = pin.standing ? 0 : smooth01(pin.fall);
+      const ground = this.pinGroundVector(pin, metrics);
+      const angle = Math.atan2(ground.x, -ground.y) * fall;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(metrics.point.x, metrics.point.y);
+      ctx.fillStyle = `rgba(0,0,0,${0.22 * alpha})`;
+      ctx.beginPath();
+      ctx.ellipse(ground.x * fall * 0.45, ground.y * fall * 0.45 + 3, metrics.width * (0.72 + fall), metrics.height * (0.07 + fall * 0.05), angle, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.rotate(angle);
+      ctx.drawImage(this.assets.pin, -metrics.width / 2, -metrics.height, metrics.width, metrics.height);
+      ctx.restore();
+    }
+
+    drawPins(pins, filter = () => true) {
+      pins
+        .filter(filter)
+        .slice()
+        .sort((a, b) => this.pinZ(b) - this.pinZ(a))
+        .forEach((pin) => this.drawPin(pin));
+    }
+
+    drawBallAt(x, z, ballIndex, rotation = 0) {
+      const ctx = this.ctx;
+      const ground = this.project(x, z);
+      const size = 76 - clamp(z, 0, 1) * 51;
+      const [light, dark] = BALL_COLORS[ballIndex % BALL_COLORS.length];
+      const cy = ground.y - size * 0.43;
+      ctx.save();
+      ctx.translate(ground.x, cy);
+      ctx.rotate(rotation);
+      ctx.fillStyle = "rgba(0,0,0,.28)";
+      ctx.beginPath();
+      ctx.ellipse(0, size * 0.48, size * 0.48, size * 0.14, 0, 0, Math.PI * 2);
+      ctx.fill();
+      const gradient = ctx.createRadialGradient(-size * 0.18, -size * 0.2, size * 0.04, 0, 0, size * 0.54);
+      gradient.addColorStop(0, "#fff");
+      gradient.addColorStop(0.14, light);
+      gradient.addColorStop(1, dark);
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,.35)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "rgba(0,0,0,.7)";
+      for (const [hx, hy] of [[-0.08, -0.08], [0.05, -0.11], [-0.02, 0.02]]) {
+        ctx.beginPath();
+        ctx.arc(hx * size, hy * size, Math.max(1.5, size * 0.035), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    drawPlayer(scene) {
+      const frames = this.assets.character;
+      if (!frames.length) return;
+      let frame = 0;
+      if (scene.phase === "approach" || scene.phase === "deck" || scene.phase === "resolve") {
+        frame = clamp(Math.floor(scene.throwElapsed / 0.14), 0, 4);
+      }
+      const image = frames[frame] || frames[0];
+      const height = 665;
+      const width = height * image.width / image.height;
+      this.ctx.save();
+      this.ctx.translate(W / 2 + scene.liveShot.position * 420, 1460);
+      this.ctx.drawImage(image, -width / 2, -height, width, height);
+      this.ctx.restore();
+    }
+
+    debugDraw(scene) {
+      if (!this.debug) return;
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.lineWidth = 3;
+      for (const pin of scene.pins) {
+        const metrics = this.pinMetrics(pin);
+        ctx.strokeStyle = "#45ff7a";
+        ctx.beginPath();
+        ctx.arc(metrics.point.x, metrics.point.y, Math.max(5, metrics.width * 0.35), 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      if (scene.simulation?.ball?.active) {
+        const ball = scene.simulation.ball;
+        const z = root.YamPhysics.RACK_FRONT_Z + ball.y / root.YamPhysics.Z_SCALE;
+        const point = this.project(ball.x, z);
+        ctx.strokeStyle = "#ff3b4c";
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 13, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    render(scene) {
+      if (!this.ready) return;
+      const ctx = this.ctx;
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, W, H);
+      ctx.save();
+      if (this.shake > 0.1) {
+        ctx.translate((Math.random() - 0.5) * this.shake, (Math.random() - 0.5) * this.shake);
+        this.shake *= 0.86;
+      }
+      ctx.drawImage(this.assets.lane, 0, 0, W, H);
+      this.drawAimGuide(scene);
+
+      let ballZ = null;
+      let ballX = null;
+      if (scene.phase === "approach") {
+        ballZ = scene.ballZ;
+        ballX = root.YamPhysics.trajectoryX(ballZ, scene.shot);
+      } else if (scene.simulation?.ball?.active) {
+        ballZ = root.YamPhysics.RACK_FRONT_Z + scene.simulation.ball.y / root.YamPhysics.Z_SCALE;
+        ballX = scene.simulation.ball.x;
+      }
+
+      if (ballZ == null) {
+        this.drawPins(scene.pins);
+      } else {
+        this.drawPins(scene.pins, (pin) => this.pinZ(pin) >= ballZ);
+        this.drawBallAt(ballX, clamp(ballZ, 0, 1), scene.shot.ballIndex, scene.throwElapsed * 9);
+        this.drawPins(scene.pins, (pin) => this.pinZ(pin) < ballZ);
+      }
+      this.drawPlayer(scene);
+      this.debugDraw(scene);
+      ctx.restore();
+    }
+  }
+
+  root.YamBowlingRenderer = YamBowlingRenderer;
+})(typeof globalThis !== "undefined" ? globalThis : this);

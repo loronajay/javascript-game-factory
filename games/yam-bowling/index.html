@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#08090d" />
+    <meta name="description" content="Yam Bowling — a character-driven arcade bowling game." />
+    <title>Yam Bowling</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main id="app">
+      <button class="audio-toggle" id="audio-toggle" type="button" aria-pressed="true" aria-label="Mute music and sound">
+        <span class="audio-toggle__icon" aria-hidden="true">♫</span>
+        <span class="audio-toggle__label">Sound on</span>
+      </button>
+      <section class="screen title-screen is-active" id="title-screen" aria-labelledby="game-title">
+        <img class="title-art" src="assets/menu-splash.png" alt="Yam Bowling league host carrying a plate of yams" />
+        <div class="title-vignette"></div>
+        <div class="title-content">
+          <p class="eyebrow">Jay Arcade presents</p>
+          <h1 id="game-title"><span>Yam</span> Bowling</h1>
+          <p class="title-tagline">Pick your bowler. Find the pocket. Feed the competition.</p>
+          <div class="title-actions">
+            <button class="button button--primary button--xl" id="play-button" type="button">Play local</button>
+            <button class="button button--ghost" id="how-button" type="button">How to play</button>
+          </div>
+          <p class="build-tag">First playable · Local modes</p>
+        </div>
+      </section>
+
+      <section class="screen setup-screen" id="setup-screen" aria-labelledby="setup-title" hidden>
+        <header class="screen-header">
+          <button class="icon-button" id="setup-back" type="button" aria-label="Back to title">←</button>
+          <div><p class="eyebrow">Local match</p><h2 id="setup-title">Set the lanes</h2></div>
+          <span class="step-chip">1 / 1</span>
+        </header>
+
+        <div class="setup-layout">
+          <aside class="setup-options panel">
+            <section class="option-section">
+              <p class="option-label">Match length</p>
+              <div class="segmented segmented--stack" id="mode-options">
+                <button class="choice-card is-selected" type="button" data-mode="quick">
+                  <span><strong>Quick Bowl</strong><small>Three fast frames</small></span><b>3F</b>
+                </button>
+                <button class="choice-card" type="button" data-mode="classic">
+                  <span><strong>Classic Ten</strong><small>Regulation scoring</small></span><b>10F</b>
+                </button>
+              </div>
+            </section>
+            <section class="option-section">
+              <p class="option-label">Opponent</p>
+              <div class="segmented" id="play-type-options">
+                <button type="button" data-play-type="hotseat">Hotseat</button>
+                <button class="is-selected" type="button" data-play-type="cpu">Vs CPU</button>
+              </div>
+              <div class="cpu-options" id="cpu-options">
+                <button class="is-selected" type="button" data-cpu-level="casual">Casual</button>
+                <button type="button" data-cpu-level="pro">Pro</button>
+              </div>
+            </section>
+            <section class="player-slots" aria-label="Player character slots">
+              <button class="player-slot is-active" id="player-one-slot" type="button" data-player-slot="0">
+                <img alt="" /><span><small>Player 1</small><strong>Daisy Monroe</strong></span><b>YOU</b>
+              </button>
+              <button class="player-slot" id="player-two-slot" type="button" data-player-slot="1">
+                <img alt="" /><span><small id="player-two-label">CPU</small><strong>Nia Brooks</strong></span><b id="player-two-badge">CPU</b>
+              </button>
+            </section>
+            <button class="button button--primary button--wide" id="start-match" type="button">Start match</button>
+          </aside>
+
+          <section class="character-select panel" aria-labelledby="roster-title">
+            <div class="section-heading">
+              <div><p class="eyebrow" id="selecting-label">Choosing Player 1</p><h3 id="roster-title">Pick a bowler</h3></div>
+              <span>28 competitors</span>
+            </div>
+            <div class="character-grid" id="character-grid" role="listbox" aria-label="Bowler roster"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="screen game-screen" id="game-screen" aria-label="Bowling match" hidden>
+        <header class="game-header">
+          <div class="mini-brand"><span>Y</span><strong>Yam Bowling</strong></div>
+          <div class="match-chip" id="match-chip">Quick Bowl · Vs CPU</div>
+          <button class="icon-button" id="pause-button" type="button" aria-label="Pause match">☰</button>
+        </header>
+
+        <div class="match-layout">
+          <aside class="game-panel game-panel--score panel" aria-label="Match status">
+            <div class="turn-card">
+              <img id="turn-avatar" alt="Current bowler" />
+              <div><p class="eyebrow">On the approach</p><h2 id="turn-name">Player 1</h2><span id="turn-detail">Frame 1 · Roll 1</span></div>
+            </div>
+
+            <section class="score-section" aria-labelledby="score-title">
+              <div class="section-heading section-heading--small"><h3 id="score-title">Scorecard</h3><span id="score-mode">3 frames</span></div>
+              <div class="scoreboard" id="scoreboard"></div>
+            </section>
+          </aside>
+
+          <section class="lane-shell" aria-label="Bowling lane">
+            <canvas id="game-canvas" width="1024" height="1536"></canvas>
+            <div class="lane-hud">
+              <span>Frame <b id="hud-frame">1</b></span>
+              <span><b id="hud-pins">10</b> pins up</span>
+            </div>
+            <div class="turn-banner" id="turn-banner"><small>Up now</small><strong>Player 1</strong></div>
+            <div class="callout" id="callout"><strong>Strike!</strong><span>Clean pocket hit</span></div>
+          </section>
+
+          <aside class="game-panel game-panel--shot panel" aria-label="Shot controls">
+            <section class="shot-section" id="shot-controls" aria-labelledby="shot-title">
+              <div class="section-heading section-heading--small"><h3 id="shot-title">Shot setup</h3><span id="shot-status">Ready</span></div>
+              <label class="range-control"><span>Position</span><input id="position-control" type="range" min="-46" max="46" value="0" /><output id="position-output">C</output></label>
+              <label class="range-control"><span>Aim</span><input id="aim-control" type="range" min="-45" max="45" value="10" /><output id="aim-output">R 10</output></label>
+              <div class="ball-rack" id="ball-rack" aria-label="Choose a bowling ball"></div>
+              <article class="ball-profile" id="ball-profile" aria-live="polite">
+                <div class="ball-profile__heading"><strong id="ball-profile-name">Yam Red</strong><span id="ball-profile-type">Balanced</span></div>
+                <p id="ball-profile-description">A forgiving all-rounder with familiar timing.</p>
+                <dl id="ball-profile-stats"></dl>
+              </article>
+              <div class="meter-heading"><span>Spin timing</span><output id="spin-output">Tap throw to start</output></div>
+              <div class="spin-meter" id="spin-meter" role="meter" aria-label="Timed spin from left hook to right hook" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0"><span id="spin-cursor"></span></div>
+              <div class="meter-scale"><span>Left</span><i>Straight</i><span>Right</span></div>
+              <div class="meter-heading"><span>Power</span><output id="power-output">0%</output></div>
+              <div class="power-meter" id="power-meter" role="meter" aria-label="Throw power" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="power-fill"></span></div>
+              <p class="charge-warning" id="charge-warning">Release in the gold window. Overcharging drains power.</p>
+              <button class="button button--throw" id="throw-button" type="button">Start spin timing</button>
+              <p class="control-help">1 Set line with A / D + ← / → aim · 2 Tap for spin · 3 Hold for power</p>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <section class="screen results-screen" id="results-screen" aria-labelledby="results-title" hidden>
+        <div class="results-card panel">
+          <p class="eyebrow">Match complete</p>
+          <h2 id="results-title">Player 1 wins!</h2>
+          <p id="results-subtitle">Three frames. One clear winner.</p>
+          <div class="results-players" id="results-players"></div>
+          <div class="results-actions">
+            <button class="button button--primary" id="rematch-button" type="button">Rematch</button>
+            <button class="button button--ghost" id="change-match-button" type="button">Change match</button>
+            <button class="button button--ghost" id="results-home-button" type="button">Title screen</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="modal-layer" id="pause-overlay" hidden>
+      <div class="pause-card panel" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+        <p class="eyebrow">Match paused</p><h2 id="pause-title">Take five</h2>
+        <button class="button button--primary button--wide" id="resume-button" type="button">Resume</button>
+        <button class="button button--ghost button--wide" id="restart-match-button" type="button">Restart match</button>
+        <button class="button button--ghost button--wide" id="quit-match-button" type="button">Quit to setup</button>
+      </div>
+    </div>
+
+    <dialog class="how-dialog" id="how-dialog">
+      <button class="dialog-close" id="how-close" type="button" aria-label="Close">×</button>
+      <p class="eyebrow">League orientation</p><h2>Roll it your way</h2>
+      <div class="how-grid">
+        <article><b>01</b><h3>Build a line</h3><p>Use A / D to strafe and ← / → to aim, or use the sliders. The blue dot marks where the ball leaves the oil and begins to hook.</p></article>
+        <article><b>02</b><h3>Time the spin</h3><p>Tap Throw or Space to start the spin needle. Press again when it reaches the hook you want.</p></article>
+        <article><b>03</b><h3>Commit the power</h3><p>Each ball aims and charges at its own pace. Release in the gold window—holding too long drains power. More speed skids farther.</p></article>
+      </div>
+    </dialog>
+
+    <script src="animation-core.js"></script>
+    <script src="audio-core.js"></script>
+    <script src="game-core.js"></script>
+    <script src="physics-core.js"></script>
+    <script src="ball-core.js"></script>
+    <script src="cpu-core.js"></script>
+    <script src="renderer.js"></script>
+    <script src="game.js"></script>
+  </body>
+</html>
