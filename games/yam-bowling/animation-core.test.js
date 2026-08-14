@@ -15,7 +15,6 @@ const assert = require("node:assert/strict");
 describe("canon bowler manifest", () => {
   const EXPECTED_ROSTER = [
     ["Daisy Monroe", "daisy-monroe"],
-    ["Maren Holt", "maren-holt"],
     ["Nia Brooks", "nia-brooks"],
     ["Tessa Quinn", "tessa-quinn"],
     ["Zuri Banks", "zuri-banks"],
@@ -28,12 +27,9 @@ describe("canon bowler manifest", () => {
     ["Skye Bennett", "skye-bennett"],
     ["Carmen Blaze", "carmen-blaze"],
     ["Piper Hart", "piper-hart"],
-    ["Maeve Sinclair", "maeve-sinclair"],
     ["Reina Sato", "reina-sato"],
-    ["Jade Mercer", "jade-mercer"],
     ["Imani Cole", "imani-cole"],
     ["Sabrina Wilde", "sabrina-wilde"],
-    ["Willa Grant", "willa-grant"],
     ["Aaliyah Storm", "aaliyah-storm"],
     ["Mina Park", "mina-park"],
     ["Scarlett Voss", "scarlett-voss"],
@@ -45,17 +41,21 @@ describe("canon bowler manifest", () => {
   ];
 
   test("includes the complete named canon roster in stable order", () => {
-    assert.equal(CANON_BOWLERS.length, 28);
+    assert.equal(CANON_BOWLERS.length, 24);
     assert.deepEqual(CANON_BOWLERS.map(({ name, slug }) => [name, slug]), EXPECTED_ROSTER);
   });
 
   test("uses unique firstname-lastname PNG slugs while retaining provenance", () => {
-    assert.equal(new Set(CANON_BOWLERS.map(({ slug }) => slug)).size, 28);
+    assert.equal(new Set(CANON_BOWLERS.map(({ slug }) => slug)).size, 24);
     assert.equal(CANON_BOWLERS.every(({ file, slug }) => file === `${slug}.png`), true);
     assert.equal(CANON_BOWLERS.every(({ legacyId }) => /^[a-f0-9-]{36}$/.test(legacyId)), true);
 
     const sourceRoot = path.join(__dirname, "assets/characters/usable/canon");
     assert.equal(CANON_BOWLERS.every(({ file }) => fs.existsSync(path.join(sourceRoot, file))), true);
+    assert.deepEqual(
+      fs.readdirSync(sourceRoot).sort(),
+      CANON_BOWLERS.map(({ file }) => file).sort(),
+    );
   });
 });
 
@@ -80,7 +80,7 @@ describe("throw playback", () => {
       ),
     );
 
-    assert.equal(framePaths.length, 140);
+    assert.equal(framePaths.length, 120);
     assert.equal(framePaths.every((framePath) => fs.existsSync(path.join(__dirname, framePath))), true);
   });
 

@@ -19,7 +19,7 @@
     ["Aaliyah Storm", "aaliyah-storm"],
     ["Lumi Vega", "lumi-vega"],
     ["Claire Rowan", "claire-rowan"],
-    ["Willa Grant", "willa-grant"],
+    ["Hazel Ward", "hazel-ward"],
   ].map(([name, slug]) => Object.freeze({
     name,
     slug,

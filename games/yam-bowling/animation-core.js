@@ -9,7 +9,6 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function createAnimationCore() {
   const CANON_ROSTER = [
     ["Daisy Monroe", "daisy-monroe", "055f40b8-ba11-4466-815a-e7613378200f"],
-    ["Maren Holt", "maren-holt", "116c8343-9c0d-4ac3-920b-e12fb0791616"],
     ["Nia Brooks", "nia-brooks", "121280c1-15bc-44a6-9651-d48dc216707c"],
     ["Tessa Quinn", "tessa-quinn", "1604f430-19bd-4784-88a6-ea0b40a32701"],
     ["Zuri Banks", "zuri-banks", "216c1ecf-d93e-4216-8eb8-fd02eea3de90"],
@@ -22,12 +21,9 @@
     ["Skye Bennett", "skye-bennett", "6865360a-f471-456b-96a5-5050cc2b62d1"],
     ["Carmen Blaze", "carmen-blaze", "6fb7681c-ad7d-44d9-a8d9-6fb8e20e8d13"],
     ["Piper Hart", "piper-hart", "76232de6-1d24-47cb-b7b6-c95f3a2f1ba6"],
-    ["Maeve Sinclair", "maeve-sinclair", "889d12fa-d791-489c-9436-1efd030419b8"],
     ["Reina Sato", "reina-sato", "89139eef-f8e9-4197-9e28-126d80fd037a"],
-    ["Jade Mercer", "jade-mercer", "8f23884e-e464-45b2-a0a3-4dff8a570a8b"],
     ["Imani Cole", "imani-cole", "9c34c1a8-9ca6-4fd7-af29-c816edba3d0c"],
     ["Sabrina Wilde", "sabrina-wilde", "a33452cb-edc7-4067-b65f-7a6ae210d0b0"],
-    ["Willa Grant", "willa-grant", "a7d77962-553c-4ee1-ba0f-6a6c1166be4d"],
     ["Aaliyah Storm", "aaliyah-storm", "a9fb839c-f8cd-40da-bc73-da6733c1b891"],
     ["Mina Park", "mina-park", "abe3a683-0dad-4977-9e23-48868626f7c4"],
     ["Scarlett Voss", "scarlett-voss", "bb233e35-bb0e-4495-b3b1-93c9b13da997"],

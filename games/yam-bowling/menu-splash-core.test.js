@@ -20,7 +20,7 @@ const expectedSlugs = [
   "aaliyah-storm",
   "lumi-vega",
   "claire-rowan",
-  "willa-grant",
+  "hazel-ward",
 ];
 
 test("menu splashes use canon character slugs and predictable asset paths", () => {
