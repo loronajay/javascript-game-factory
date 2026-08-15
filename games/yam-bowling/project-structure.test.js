@@ -6,6 +6,20 @@ const { AVAILABLE_SKINS, CANON_BOWLERS } = require("./animation-core.js");
 
 const root = __dirname;
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+// Ownership assertions of the "this module must NOT do X" shape have to read
+// code, not prose: a comment explaining why X is forbidden otherwise fails the
+// very rule it documents.
+const readCode = (file) => read(file)
+  .replace(/\/\*[^]*?\*\//g, "")
+  .replace(/(^|[^:])\/\/.*$/gm, "$1");
+
+// The stylesheet is split per screen, and what matters for appearance is what
+// the browser ends up with: every sheet index.html links, concatenated in link
+// order, which is exactly the cascade. Reading them this way keeps these
+// assertions about the rendered result rather than pinning them to a file.
+const readStyles = () => [...read("index.html").matchAll(/<link[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']+)["']/g)]
+  .map((match) => read(match[1]))
+  .join("\n");
 
 test("every canon bowler has every reusable processed skin package", () => {
   for (const bowler of CANON_BOWLERS) {
@@ -50,15 +64,15 @@ test("the setup screen exposes skin equipment controls", () => {
 
   assert.match(html, /id=["']skin-options["']/);
   assert.match(html, /id=["']online-skin-options["']/);
-  assert.match(game, /saveEquippedSkinId/);
-  assert.match(game, /skinId/);
+  assert.match(read("ui/skin-options.mjs"), /saveEquippedSkinId/);
+  assert.match(read("ui/skin-options.mjs"), /skinId/);
   assert.match(read("renderer.js"), /getFrameAssetPath/);
 });
 
 test("local and online character selection expose the read-only bowler inspector", () => {
   const html = read("index.html");
   const game = read("game.js");
-  const css = read("styles.css");
+  const css = readStyles();
 
   for (const id of [
     "inspect-bowler-button", "online-inspect-bowler-button", "character-inspector-dialog",
@@ -73,26 +87,72 @@ test("local and online character selection expose the read-only bowler inspector
 
   assert.ok(html.indexOf("character-catalog-data.js") < html.indexOf("character-catalog.js"));
   assert.ok(html.indexOf("character-catalog.js") < html.indexOf("game.js"));
-  assert.match(game, /function openCharacterInspector/);
-  assert.match(game, /Catalog\.getCharacter/);
-  assert.match(game, /Catalog\.getAdjacentCharacterSlug/);
+  const inspector = read("ui/character-inspector.mjs");
+  assert.match(game, /characterInspector\.open\(/);
+  assert.match(inspector, /catalog\.getCharacter\(/);
+  assert.match(inspector, /catalog\.getAdjacentCharacterSlug\(/);
   assert.match(css, /\.character-inspector-dialog\s*\{/);
   assert.match(css, /\.character-inspector-layout\s*\{[^}]*grid-template-columns:/s);
 });
 
 test("inspector skin previews never use the equipment persistence path", () => {
-  const game = read("game.js");
-  const previewFunction = game.match(/function renderInspectorSkinOptions\([^]*?\n  \}/)?.[0] ?? "";
+  const inspector = read("ui/character-inspector.mjs");
+  const previewFunction = inspector.match(/function renderSkinOptions\([^]*?\n  \}/)?.[0] ?? "";
 
-  assert.match(previewFunction, /inspectorPreviewSkinId/);
+  assert.notEqual(previewFunction, "", "the inspector should own a skin-preview renderer");
+  assert.match(previewFunction, /previewSkinId/);
   assert.match(previewFunction, /getSkinPreviewLabel/);
   assert.doesNotMatch(previewFunction, /saveEquippedSkinId/);
+  // The whole module is preview-only; equipping belongs to the setup screens.
+  assert.doesNotMatch(readCode("ui/character-inspector.mjs"), /saveEquippedSkinId/);
 });
 
 test("the published runtime includes the generated character catalog", () => {
   const manifest = JSON.parse(read("runtime-assets.json"));
   assert.ok(manifest.include.includes("character-catalog-data.js"));
   assert.ok(manifest.include.includes("character-catalog.js"));
+});
+
+// A module that is imported but not matched by the manifest works locally and
+// 404s in the published overlay, which is the worst shape of breakage: invisible
+// until deploy. Splitting game.js multiplies the chances, so the manifest is
+// checked against the real import graph rather than trusted.
+test("every module the cabinet imports is matched by the runtime manifest", () => {
+  const manifest = JSON.parse(read("runtime-assets.json"));
+  // Minimal glob support, matching what package_runtime.py's Path.glob does:
+  // `**/` spans directories, `*` stops at a separator.
+  const globToRegExp = (pattern) => {
+    const text = String(pattern);
+    let source = "";
+    for (let index = 0; index < text.length; index += 1) {
+      if (text.startsWith("**/", index)) { source += "(?:.*/)?"; index += 2; continue; }
+      const character = text[index];
+      if (character === "*") { source += "[^/]*"; continue; }
+      source += /[.+^${}()|[\]\\?]/.test(character) ? `\\${character}` : character;
+    }
+    return new RegExp(`^${source}$`);
+  };
+  const patterns = manifest.include.map(globToRegExp);
+  const shipped = (relativePath) => patterns.some((pattern) => pattern.test(relativePath));
+
+  const collectModules = (entry, seen = new Set()) => {
+    if (seen.has(entry)) return seen;
+    seen.add(entry);
+    const source = read(entry);
+    const directory = path.posix.dirname(entry);
+    for (const match of source.matchAll(/\bfrom\s+["'](\.[^"']+)["']/g)) {
+      const resolved = path.posix.normalize(path.posix.join(directory, match[1]));
+      // `../../js/platform/**` is shared factory code served from the repo root,
+      // not a game-local file, so it is outside this cabinet's manifest.
+      if (resolved.startsWith("..")) continue;
+      collectModules(resolved, seen);
+    }
+    return seen;
+  };
+
+  for (const module of collectModules("game.js")) {
+    assert.equal(shipped(module), true, `${module} is imported but missing from runtime-assets.json`);
+  }
 });
 
 test("the cabinet exposes title, setup, match, and results screens", () => {
@@ -108,7 +168,7 @@ test("the cabinet exposes title, setup, match, and results screens", () => {
 
 test("the title screen provides a return link to the arcade", () => {
   const html = read("index.html");
-  const css = read("styles.css");
+  const css = readStyles();
   const arcadeLink = html.match(/<a[^>]*class=["'][^"']*arcade-link[^"']*["'][^>]*>[^<]*<\/a>/i)?.[0] ?? "";
 
   assert.match(arcadeLink, /href=["']\.\.\/\.\.\/grid\.html["']/i);
@@ -138,13 +198,13 @@ test("online play uses the Factory identity, server-owned shots, ratings, and re
   assert.match(game, /loadFactoryProfile/);
   assert.match(game, /createOnlineIdentityPayload/);
   assert.match(game, /createOnlineClient/);
-  assert.match(game, /onlineClient\.submitShot/);
-  assert.match(game, /updateGameRating\(["']yam-bowling["']/);
+  assert.match(read("match/match-runtime.mjs"), /onlineClient\.submitShot/);
+  assert.match(read("online/online-session.mjs"), /updateGameRating\(["']yam-bowling["']/);
   assert.match(read("online-client.mjs"), /resume_lobby/);
 });
 
 test("the title splash keeps the complete painted artwork visible", () => {
-  const css = read("styles.css");
+  const css = readStyles();
   assert.match(
     css,
     /\.title-art\s*\{[^}]*object-fit:\s*contain/s,
@@ -160,9 +220,11 @@ test("players can choose and persist a character-named menu splash", () => {
   assert.match(html, /id=["']menu-splash-dialog["']/);
   assert.match(html, /id=["']menu-splash-grid["']/);
   assert.ok(html.indexOf("menu-splash-core.js") < html.indexOf("game.js"));
-  assert.match(game, /loadMenuSplashSlug/);
-  assert.match(game, /saveMenuSplashSlug/);
-  assert.match(game, /data-splash-slug/);
+  const picker = read("ui/menu-splash-picker.mjs");
+  assert.match(game, /menuSplashPicker\.build\(\)/);
+  assert.match(picker, /loadMenuSplashSlug/);
+  assert.match(picker, /saveMenuSplashSlug/);
+  assert.match(picker, /data-splash-slug/);
 });
 
 test("local setup lets a player choose a lane and remembers it", () => {
@@ -178,27 +240,41 @@ test("local setup lets a player choose a lane and remembers it", () => {
   assert.match(html, /id=["']lane-dialog["']/);
   assert.match(html, /id=["']lane-grid["']/);
   assert.ok(html.indexOf("lane-core.js") < html.indexOf("game.js"));
-  assert.match(game, /loadLaneSlug/);
-  assert.match(game, /saveLaneSlug/);
-  assert.match(game, /data-lane-slug/);
-  assert.match(game, /renderer\.load\(selectedLaneSlug\)/);
+  const picker = read("ui/lane-picker.mjs");
+  assert.match(picker, /loadLaneSlug/);
+  assert.match(picker, /saveLaneSlug/);
+  assert.match(picker, /data-lane-slug/);
+  assert.match(game, /renderer\.load\(lanePicker\.getSelectedSlug\(\)\)/);
+  // The picker reports a preference; it must not own the match-lane seam.
+  assert.doesNotMatch(readCode("ui/lane-picker.mjs"), /applyMatchLane|renderer\./,
+    "choosing which house a match uses is match logic, not picker logic");
 });
 
 test("online matches bowl on the lane the server dealt, not the local pick", () => {
   const game = read("game.js");
+  const runtime = read("match/match-runtime.mjs");
+  const onlineSession = read("online/online-session.mjs");
 
-  const online = game.slice(game.indexOf("function resetSceneForOnline"));
+  const online = onlineSession.slice(onlineSession.indexOf("function resetSceneForOnline"));
   assert.ok(
-    online.indexOf("applyMatchLane(LaneCore.laneFromRoll(snapshot.laneRoll).slug)") <
-      online.indexOf("match = structuredClone(snapshot.match)"),
+    online.indexOf("applyMatchLane(laneCore.laneFromRoll(snapshot.laneRoll).slug)") <
+      online.indexOf("session.match = structuredClone(snapshot.match)"),
     "an online match should take its lane from the served roll before the scene builds",
   );
-  assert.match(game, /function startMatch\(\) \{\s*applyMatchLane\(selectedLaneSlug\);/,
+  assert.match(runtime, /function startMatch\(\) \{\s*applyMatchLane\(getLocalLaneSlug\(\)\);/,
     "a local match should return to the player's own saved lane");
-  assert.doesNotMatch(game, /onlineSetup\.lane|laneSlug: *selectedLaneSlug/,
+  assert.doesNotMatch(onlineSession, /onlineSetup\.lane|laneSlug:/,
     "a local lane preference must never be published to an online room");
-  assert.doesNotMatch(game, /renderer\.ready.*renderer\.setLane/,
+  assert.doesNotMatch(readCode("game.js"), /renderer\.ready.*renderer\.setLane/,
     "a served lane must apply even while boot art is still loading");
+  // applyMatchLane stays the single seam: only the composition root defines it,
+  // and the two callers above are the only ways a lane reaches the renderer.
+  assert.match(game, /function applyMatchLane\(slug\)/);
+  for (const [name, source] of [["match runtime", runtime], ["online session", onlineSession]]) {
+    assert.doesNotMatch(readCode(name === "match runtime" ? "match/match-runtime.mjs" : "online/online-session.mjs"),
+      /renderer\.setLane/, `${name} should route lane changes through applyMatchLane`);
+    assert.ok(source.includes("applyMatchLane"), `${name} should use the lane seam`);
+  }
 });
 
 test("lane artwork is resolved through the catalog rather than a hard-coded file", () => {
@@ -221,7 +297,7 @@ test("the match keeps the bowling lane centered between supporting UI rails", ()
   assert.ok(rightRail > -1, "shot controls should live in a right rail");
   assert.ok(leftRail < lane && lane < rightRail, "the lane should be the center of the match layout");
 
-  const css = read("styles.css");
+  const css = readStyles();
   assert.match(css, /\.match-layout\s*\{[^}]*grid-template-columns:\s*minmax\([^;]+\)\s+minmax\([^;]+\)\s+minmax\(/s);
   assert.match(css, /\.lane-shell\s*\{[^}]*aspect-ratio:\s*2\s*\/\s*3/s);
 });
@@ -246,9 +322,9 @@ test("ball properties and overcharge consequences are labeled in the shot UI", (
   assert.match(html, /id=["']ball-profile["']/);
   assert.match(html, /id=["']charge-warning["']/);
   assert.ok(html.indexOf("ball-core.js") < html.indexOf("game.js"));
-  assert.match(game, /BallCore\.profileStats/);
-  assert.match(game, /ball\.aimSpeed/);
-  assert.match(game, /Physics\.chargeStateAtTime/);
+  assert.match(read("ui/shot-hud.mjs"), /ballCore\.profileStats/);
+  assert.match(read("match/match-runtime.mjs"), /ball\.aimSpeed/);
+  assert.match(read("match/match-runtime.mjs"), /physics\.chargeStateAtTime/);
 });
 
 test("the physics-aware CPU planner loads after physics and before browser orchestration", () => {
@@ -258,9 +334,9 @@ test("the physics-aware CPU planner loads after physics and before browser orche
 });
 
 test("CPU turns plan against the live pin bodies and retain planner ball choice", () => {
-  const game = read("game.js");
-  assert.match(game, /Cpu\.createCpuPlan\(\{[^}]*pins:\s*scene\.pins[^}]*balls:\s*BALLS/s);
-  assert.match(game, /scene\.liveShot\.ballIndex\s*=\s*plan\.ballIndex/);
+  const runtime = read("match/match-runtime.mjs");
+  assert.match(runtime, /cpu\.createCpuPlan\(\{[^}]*pins:\s*scene\.pins[^}]*balls,/s);
+  assert.match(runtime, /scene\.liveShot\.ballIndex\s*=\s*plan\.ballIndex/);
 });
 
 test("the cabinet exposes an accessible audio control and loads audio before the game", () => {
@@ -281,25 +357,28 @@ test("the lane and default menu artwork use compressed runtime images", () => {
 });
 
 test("screen transitions reset the viewport for phone navigation", () => {
-  assert.match(read("game.js"), /window\.scrollTo\(\{\s*top:\s*0/);
+  assert.match(read("ui/dom.mjs"), /window\.scrollTo\(\{\s*top:\s*0/);
 });
 
 test("selection and identity surfaces use portraits while the lane uses throw frames", () => {
   const game = read("game.js");
-  assert.match(game, /function characterPortrait/);
-  assert.match(game, /characterPortrait\(bowler\.slug\)/);
-  assert.match(game, /characterPortrait\(player\.characterSlug, playerSkinId\(player\)\)/);
-  assert.match(game, /renderer\.setCharacter\(player\.characterSlug, playerSkinId\(player\)\)/);
+  assert.match(read("ui/character-assets.mjs"), /characterPortrait:/);
+  assert.match(read("ui/setup-screen.mjs"), /assets\.characterPortrait\(bowler\.slug\)/);
+  const runtime = read("match/match-runtime.mjs");
+  assert.match(runtime, /session\.playerSkinId\(player\)/);
+  assert.match(runtime, /assets\.characterPortrait\(player\.characterSlug, skinId\)/);
+  assert.match(runtime, /renderer\.setCharacter\(player\.characterSlug, skinId\)/);
 });
 
 test("results give both bowlers large outcome-specific character art", () => {
   const game = read("game.js");
-  const css = read("styles.css");
+  const css = readStyles();
 
-  assert.match(game, /getResultPortraitAssetPath/);
-  assert.match(game, /is-defeated/);
-  assert.match(game, /result-player__portrait/);
-  assert.match(game, /result-player__outcome/);
+  assert.match(read("ui/character-assets.mjs"), /getResultPortraitAssetPath/);
+  const results = read("ui/results-screen.mjs");
+  assert.match(results, /is-defeated/);
+  assert.match(results, /result-player__portrait/);
+  assert.match(results, /result-player__outcome/);
   assert.match(css, /\.result-player__portrait\s*\{[^}]*min-height:/s);
   assert.match(css, /\.result-player__portrait img\s*\{[^}]*object-fit:\s*contain/s);
   assert.match(css, /\.result-player\.is-winner[^}]*box-shadow:/s);
@@ -308,12 +387,12 @@ test("results give both bowlers large outcome-specific character art", () => {
 test("strike and spare callouts pop a bowler pose clear of the callout text", () => {
   const html = read("index.html");
   const game = read("game.js");
-  const css = read("styles.css");
+  const css = readStyles();
 
   assert.match(html, /id=["']callout-pose["']/);
   assert.match(html, /id=["']callout-pose-art["']/);
-  assert.match(game, /getCalloutPoseAssetPath/);
-  assert.match(game, /function showCalloutPose/);
+  assert.match(read("ui/character-assets.mjs"), /getCalloutPoseAssetPath/);
+  assert.match(read("ui/results-screen.mjs"), /function showCalloutPose/);
 
   const poseRule = css.match(/\.callout-pose\s*\{[^}]*\}/s)?.[0] ?? "";
   const calloutTop = Number(css.match(/\.callout\s*\{[^}]*top:\s*(\d+)%/s)?.[1]);
@@ -340,17 +419,19 @@ test("human throws use a timed spin stage before hold-to-charge power", () => {
   assert.match(html, /id=["']spin-meter["']/);
   assert.match(html, /id=["']spin-cursor["']/);
   assert.doesNotMatch(html, /id=["']hook-control["']/);
-  assert.match(game, /function startSpin/);
-  assert.match(game, /scene\.phase === ["']spin["']/);
-  assert.match(game, /Physics\.spinAtTime/);
+  const runtime = read("match/match-runtime.mjs");
+  assert.match(runtime, /function startSpin/);
+  assert.match(runtime, /scene\.phase === ["']spin["']/);
+  assert.match(runtime, /physics\.spinAtTime/);
 });
 
 test("keyboard shot setup keeps A/D on strafe and arrow keys on aim", () => {
-  const game = read("game.js");
+  const bindings = read("input/bindings.mjs");
+  const runtime = read("match/match-runtime.mjs");
 
-  assert.match(game, /event\.code === ["']ArrowLeft["']/);
-  assert.match(game, /event\.code === ["']ArrowRight["']/);
-  assert.match(game, /scene\.liveShot\.position\s*=.*strafeDirection/s);
-  assert.match(game, /scene\.liveShot\.aim\s*=.*aimDirection/s);
-  assert.match(game, /Math\.min\(0\.45,\s*scene\.liveShot\.aim/);
+  assert.match(bindings, /event\.code === ["']ArrowLeft["']/);
+  assert.match(bindings, /event\.code === ["']ArrowRight["']/);
+  assert.match(runtime, /scene\.liveShot\.position\s*=.*strafeDirection/s);
+  assert.match(runtime, /scene\.liveShot\.aim\s*=.*aimDirection/s);
+  assert.match(runtime, /Math\.min\(0\.45,\s*scene\.liveShot\.aim/);
 });

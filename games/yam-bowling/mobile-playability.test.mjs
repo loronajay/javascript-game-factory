@@ -6,6 +6,11 @@ import { fileURLToPath } from "node:url";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+// Every stylesheet index.html links, concatenated in link order — the cascade
+// the browser actually applies, now that the sheet is split per screen.
+const readStyles = () => [...read("index.html").matchAll(/<link[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']+)["']/g)]
+  .map((match) => read(match[1]))
+  .join("\n");
 
 test("touch phones are gated until they are landscape and fullscreen-ready", async () => {
   const { getMobileViewportState, renderMobileLandscapeGate } = await import("./mobile-ui.mjs");
@@ -40,7 +45,7 @@ test("the game initializes the mobile landscape gate", () => {
 });
 
 test("landscape phones retain the desktop three-rail match inside one viewport", () => {
-  const css = read("styles.css");
+  const css = readStyles();
   assert.match(css, /\.mobile-landscape-gate\s*\{[^}]*position:\s*fixed;[^}]*env\(safe-area-inset-top\)[^}]*env\(safe-area-inset-left\)/s);
   assert.match(css, /\.mobile-landscape-gate\.is-visible\s*\{[^}]*pointer-events:\s*auto/s);
   assert.match(css, /\.mobile-play-gated\s+#app\s*\{[^}]*pointer-events:\s*none/s);
@@ -56,7 +61,7 @@ test("landscape phones retain the desktop three-rail match inside one viewport",
 });
 
 test("long-pressing controls never raises the mobile text-selection callout", () => {
-  const css = read("styles.css");
+  const css = readStyles();
   assert.match(css, /body\s*\{[^}]*-webkit-touch-callout:\s*none;[^}]*-webkit-user-select:\s*none;[^}]*user-select:\s*none/s);
   assert.match(css, /body\s*\{[^}]*-webkit-tap-highlight-color:\s*transparent/s);
   assert.match(
@@ -64,12 +69,11 @@ test("long-pressing controls never raises the mobile text-selection callout", ()
     /input,\s*textarea,\s*\[data-selectable\]\s*\{[^}]*-webkit-touch-callout:\s*default;[^}]*user-select:\s*text/s,
   );
 
-  const game = read("game.js");
-  assert.match(game, /addEventListener\("contextmenu"/);
+  assert.match(read("input/bindings.mjs"), /addEventListener\("contextmenu"/);
 });
 
 test("landscape phone menus use compact desktop-like columns", () => {
-  const css = read("styles.css");
+  const css = readStyles();
   assert.match(css, /@media\s*\(hover:\s*none\)\s*and\s*\(orientation:\s*landscape\)[\s\S]*?\.setup-layout,\s*\.online-setup-layout\s*\{[^}]*grid-template-columns:\s*minmax\([^;]+\)\s+minmax\(/s);
   assert.match(css, /@media\s*\(hover:\s*none\)\s*and\s*\(orientation:\s*landscape\)[\s\S]*?\.character-grid\s*\{[^}]*overflow-y:\s*auto/s);
   assert.match(css, /@media\s*\(hover:\s*none\)\s*and\s*\(orientation:\s*landscape\)[\s\S]*?\.results-card\s*\{[^}]*max-height:\s*100%/s);

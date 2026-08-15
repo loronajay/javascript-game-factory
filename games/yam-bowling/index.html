@@ -6,7 +6,14 @@
     <meta name="theme-color" content="#08090d" />
     <meta name="description" content="Yam Bowling — a character-driven arcade bowling game." />
     <title>Yam Bowling</title>
-    <link rel="stylesheet" href="styles.css" />
+    <!-- Load order is the cascade: base first, mobile-landscape last (it overrides). -->
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/title.css" />
+    <link rel="stylesheet" href="styles/setup.css" />
+    <link rel="stylesheet" href="styles/online.css" />
+    <link rel="stylesheet" href="styles/match.css" />
+    <link rel="stylesheet" href="styles/results.css" />
+    <link rel="stylesheet" href="styles/mobile-landscape.css" />
   </head>
   <body>
     <main id="app">

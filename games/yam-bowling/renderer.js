@@ -2,6 +2,8 @@
   const W = 1024;
   const H = 1536;
   const PIN_HEIGHT_FRONT = 68;
+  const PIN_RACK_VISUAL_FRONT_Z = 0.875;
+  const PIN_RACK_DEPTH_SCALE = 0.42;
   const PIN_GROUND_LENGTH = 0.44;
   const BALL_COLORS = [
     ["#ff3842", "#5d0207"], ["#33a5ff", "#031e78"], ["#bd55ff", "#33006c"], ["#53e26f", "#054c18"],
@@ -29,7 +31,8 @@
       this.ctx = canvas.getContext("2d");
       this.canvas.width = W;
       this.canvas.height = H;
-      this.ctx.imageSmoothingEnabled = false;
+      this.ctx.imageSmoothingEnabled = true;
+      this.ctx.imageSmoothingQuality = "high";
       this.assets = { lane: null, pin: null, character: [] };
       this.laneSlug = "";
       this.requestedLaneSlug = "";
@@ -100,6 +103,14 @@
       return root.YamPhysics.RACK_FRONT_Z + pin.y / root.YamPhysics.Z_SCALE;
     }
 
+    pinRenderZ(pin) {
+      const homeZ = root.YamPhysics.RACK_FRONT_Z + pin.homeY / root.YamPhysics.Z_SCALE;
+      const movementZ = (pin.y - pin.homeY) / root.YamPhysics.Z_SCALE;
+      return PIN_RACK_VISUAL_FRONT_Z
+        + (homeZ - root.YamPhysics.RACK_FRONT_Z) * PIN_RACK_DEPTH_SCALE
+        + movementZ;
+    }
+
     drawAimGuide(scene) {
       if (!["ready", "spin", "charging"].includes(scene.phase)) return;
       const shot = scene.liveShot;
@@ -136,9 +147,9 @@
     }
 
     pinMetrics(pin) {
-      const z = this.pinZ(pin);
+      const z = this.pinRenderZ(pin);
       const point = this.project(pin.x, z);
-      const frontHalf = this.project(0, root.YamPhysics.RACK_FRONT_Z).half;
+      const frontHalf = this.project(0, PIN_RACK_VISUAL_FRONT_Z).half;
       const scale = clamp(point.half / frontHalf, 0.58, 1.55);
       const height = PIN_HEIGHT_FRONT * scale;
       const width = height * (this.assets.pin.width / this.assets.pin.height);
@@ -151,7 +162,7 @@
       const magnitude = Math.hypot(dx, dy) || 1;
       dx /= magnitude;
       dy /= magnitude;
-      const endZ = root.YamPhysics.RACK_FRONT_Z + (pin.y + dy * PIN_GROUND_LENGTH) / root.YamPhysics.Z_SCALE;
+      const endZ = metrics.z + dy * PIN_GROUND_LENGTH / root.YamPhysics.Z_SCALE;
       const end = this.project(pin.x + dx * PIN_GROUND_LENGTH, endZ);
       return { x: end.x - metrics.point.x, y: end.y - metrics.point.y };
     }
@@ -277,7 +288,8 @@
     render(scene) {
       if (!this.ready) return;
       const ctx = this.ctx;
-      ctx.imageSmoothingEnabled = false;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
       ctx.clearRect(0, 0, W, H);
       ctx.save();
       if (this.shake > 0.1) {

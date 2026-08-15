@@ -1,0 +1,53 @@
+/* Online matchmaking, private rooms and the lobby. */
+
+/* Online matchmaking and private rooms */
+.online-setup-layout { grid-template-columns: minmax(310px, 380px) 1fr; }
+.online-actions-panel { align-self: start; }
+.online-match-actions { display: grid; gap: .65rem; }
+.online-match-actions > p { margin: -.22rem 0 .2rem; color: var(--muted); font-size: .67rem; line-height: 1.45; }
+.join-room-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: .55rem; padding-top: .35rem; border-top: 1px solid var(--line); }
+.join-room-row input {
+  width: 100%;
+  min-height: 50px;
+  padding: .75rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--gold);
+  background: #090a0e;
+  font-size: 1.05rem;
+  font-weight: 950;
+  letter-spacing: .2em;
+  text-align: center;
+  text-transform: uppercase;
+}
+.online-inline-status { min-height: 2.5rem; margin: auto 0 0; color: var(--muted); font-size: .68rem; line-height: 1.45; text-align: center; }
+.online-inline-status.is-error { color: #ff7180; }
+.online-character-grid .character-card.is-selected i { display: block; }
+.online-character-grid .character-card.is-selected i::before { content: "YOU"; }
+.online-lobby-screen {
+  display: grid;
+  padding: 1rem;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(243,46,63,.2), transparent 34rem),
+    radial-gradient(circle at 80% 75%, rgba(255,214,107,.09), transparent 28rem),
+    #08090d;
+}
+.online-lobby-card { width: min(720px, 100%); padding: clamp(1.2rem, 4vw, 2.4rem); text-align: center; }
+.online-lobby-card h2 { margin: 0; font-family: Impact, sans-serif; font-size: clamp(2.5rem, 8vw, 4.8rem); letter-spacing: -.035em; line-height: .95; text-transform: uppercase; }
+.online-room-code-wrap { display: grid; width: min(480px, 100%); margin: 1.4rem auto; padding: 1rem; grid-template-columns: 1fr auto; gap: .5rem 1rem; align-items: center; border: 1px solid rgba(255,214,107,.28); border-radius: 18px; background: rgba(255,214,107,.055); text-align: left; }
+.online-room-code-wrap > span { color: var(--muted); font-size: .62rem; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+.online-room-code-wrap > strong { grid-row: 2; color: var(--gold); font-family: Impact, sans-serif; font-size: clamp(2rem, 7vw, 3.6rem); font-weight: 400; letter-spacing: .16em; line-height: 1; }
+.online-room-code-wrap > button { grid-row: 1 / 3; grid-column: 2; }
+.online-status { min-height: 1.5rem; margin: 1rem 0; color: var(--muted); line-height: 1.5; }
+.online-status.is-error { color: #ff7180; }
+.online-lobby-players { display: grid; margin: 1.2rem 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+.online-player-card { display: grid; min-height: 92px; padding: .8rem; grid-template-columns: 58px 1fr; gap: .75rem; align-items: center; border: 1px solid var(--line); border-radius: 16px; background: rgba(255,255,255,.035); text-align: left; }
+.online-player-card.is-you { border-color: rgba(243,46,63,.6); background: rgba(243,46,63,.08); }
+.online-player-card img { width: 58px; height: 66px; border-radius: 10px; object-fit: contain; background: #090a0e; }
+.online-player-card span { display: grid; min-width: 0; gap: .2rem; }
+.online-player-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.online-player-card small { color: var(--muted); font-size: .58rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.online-player-card.is-disconnected { opacity: .55; }
+.online-lobby-actions { display: flex; justify-content: center; }
+.online-result-status { margin: 1rem 0 0; color: var(--gold); font-size: .72rem; font-weight: 800; }

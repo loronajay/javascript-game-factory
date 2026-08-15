@@ -49,8 +49,8 @@ describe("Yam Bowling audio", () => {
     assert.ok(EFFECTS.select.tones.length >= 2, "selection buttons should have a layered confirmation");
     assert.ok(EFFECTS.announce.tones.length >= 2, "announcements should use a recognizable stinger");
 
-    const game = fs.readFileSync(require.resolve("./game.js"), "utf8");
-    assert.match(game, /function prepareActivePlayer\(\)[\s\S]*?audio\.play\("announce"/);
+    const runtime = fs.readFileSync(require.resolve("./match/match-runtime.mjs"), "utf8");
+    assert.match(runtime, /function prepareActivePlayer\(\)[\s\S]*?audio\.play\("announce"/);
   });
 
   test("keeps music at a steady volume while effects play", async () => {

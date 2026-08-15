@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const { test } = require("node:test");
 
 require("./lane-core.js");
+require("./physics-core.js");
 
 // The bowler pipeline is not under test here; boot only needs it to resolve.
 globalThis.YamBowlingCore = {
@@ -124,4 +125,28 @@ test("boot does not refetch a lane the game already asked for", async () => {
   const requests = pending.filter((entry) => entry.src.includes("/lanes/")).length;
   renderer.setLane("royal-gold");
   assert.equal(pending.filter((entry) => entry.src.includes("/lanes/")).length, requests);
+});
+
+test("the rack is visually compressed onto the distant pin deck", () => {
+  const renderer = createRenderer();
+  renderer.assets.pin = { width: 256, height: 384 };
+  const rack = globalThis.YamPhysics.createRack();
+  const front = renderer.pinMetrics(rack[0]);
+  const back = renderer.pinMetrics(rack[9]);
+
+  // Physics keeps full rack depth, but the portrait background's distant deck
+  // needs a tighter projection so rear pins do not climb onto the masking unit.
+  assert.ok(front.point.y > 345 && front.point.y < 355);
+  assert.ok(front.point.y - back.point.y > 20);
+  assert.ok(front.point.y - back.point.y < 35);
+});
+
+test("scaled sprites use high-quality interpolation", () => {
+  pending.length = 0;
+  const ctx = {};
+  const canvas = { width: 0, height: 0, getContext: () => ctx };
+  new globalThis.YamBowlingRenderer(canvas);
+
+  assert.equal(ctx.imageSmoothingEnabled, true);
+  assert.equal(ctx.imageSmoothingQuality, "high");
 });
