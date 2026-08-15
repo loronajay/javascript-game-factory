@@ -38,7 +38,8 @@ class OptimizeRuntimeAssetsTests(unittest.TestCase):
                 "assets/characters/skins/daisy-monroe/swimsuit/portrait.png",
                 "assets/characters/skins/daisy-monroe/swimsuit/throw-01.png",
                 "assets/characters/skins/daisy-monroe/swimsuit/source.png",
-                "assets/lanes/1.png",
+                "assets/lanes/crimson-crown.png",
+                "assets/lanes/cosmic-bowl.png",
                 "assets/pins/1.png",
             ]
             for relative_path in paths:
@@ -56,7 +57,10 @@ class OptimizeRuntimeAssetsTests(unittest.TestCase):
             self.assertIn("assets/characters/portraits/victory/daisy-monroe.webp", destinations)
             self.assertIn("assets/characters/skins/daisy-monroe/swimsuit/portrait.webp", destinations)
             self.assertIn("assets/characters/skins/daisy-monroe/swimsuit/throw-01.webp", destinations)
-            self.assertIn("assets/lanes/1.webp", destinations)
+            self.assertIn("assets/lanes/crimson-crown.webp", destinations)
+            self.assertIn("assets/lanes/thumbs/crimson-crown.webp", destinations)
+            self.assertIn("assets/lanes/cosmic-bowl.webp", destinations)
+            self.assertIn("assets/lanes/thumbs/cosmic-bowl.webp", destinations)
             self.assertIn("assets/pins/1.webp", destinations)
             self.assertNotIn("assets/characters/skins/daisy-monroe/swimsuit/source.webp", destinations)
 

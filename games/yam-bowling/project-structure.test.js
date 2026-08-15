@@ -2,38 +2,40 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { CANON_BOWLERS } = require("./animation-core.js");
+const { AVAILABLE_SKINS, CANON_BOWLERS } = require("./animation-core.js");
 
 const root = __dirname;
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
-test("every canon bowler has a reusable processed swimsuit skin package", () => {
+test("every canon bowler has every reusable processed skin package", () => {
   for (const bowler of CANON_BOWLERS) {
     const bowlerDirectory = path.join(root, "assets", "characters", "skins", bowler.slug);
-    const skinDirectory = path.join(bowlerDirectory, "swimsuit");
-    const expectedFiles = [
-      "source.png",
-      "portrait.webp",
-      "victory.webp",
-      "defeat.webp",
-      ...Array.from({ length: 5 }, (_, index) => `throw-${String(index + 1).padStart(2, "0")}.webp`),
-    ];
+    for (const skin of AVAILABLE_SKINS.filter(({ id }) => id !== "canon")) {
+      const skinDirectory = path.join(bowlerDirectory, skin.id);
+      const expectedFiles = [
+        "source.png",
+        "portrait.webp",
+        "victory.webp",
+        "defeat.webp",
+        ...Array.from({ length: 5 }, (_, index) => `throw-${String(index + 1).padStart(2, "0")}.webp`),
+      ];
 
-    const imageFiles = fs.readdirSync(skinDirectory).filter((file) => /\.(?:png|webp)$/.test(file));
-    for (const expectedFile of expectedFiles) {
-      assert.equal(
-        imageFiles.includes(expectedFile),
-        true,
-        `${bowler.name} should include ${expectedFile}`,
+      const imageFiles = fs.readdirSync(skinDirectory).filter((file) => /\.(?:png|webp)$/.test(file));
+      for (const expectedFile of expectedFiles) {
+        assert.equal(
+          imageFiles.includes(expectedFile),
+          true,
+          `${bowler.name} ${skin.name} should include ${expectedFile}`,
+        );
+      }
+      assert.deepEqual(
+        imageFiles.filter(
+          (file) => !expectedFiles.includes(file) && !/^throw-0[1-5]\.png$/.test(file),
+        ),
+        [],
+        `${bowler.name} ${skin.name} should contain only runtime assets and optional throw overrides`,
       );
     }
-    assert.deepEqual(
-      imageFiles.filter(
-        (file) => !expectedFiles.includes(file) && !/^throw-0[1-5]\.png$/.test(file),
-      ),
-      [],
-      `${bowler.name} should contain only runtime assets and optional throw overrides`,
-    );
     assert.equal(
       fs.readdirSync(bowlerDirectory).filter((file) => file.endsWith(".png")).length,
       0,
@@ -51,6 +53,46 @@ test("the setup screen exposes skin equipment controls", () => {
   assert.match(game, /saveEquippedSkinId/);
   assert.match(game, /skinId/);
   assert.match(read("renderer.js"), /getFrameAssetPath/);
+});
+
+test("local and online character selection expose the read-only bowler inspector", () => {
+  const html = read("index.html");
+  const game = read("game.js");
+  const css = read("styles.css");
+
+  for (const id of [
+    "inspect-bowler-button", "online-inspect-bowler-button", "character-inspector-dialog",
+    "character-inspector-close", "character-inspector-previous", "character-inspector-next",
+    "character-inspector-art", "character-inspector-name", "character-inspector-skins",
+    "character-inspector-age", "character-inspector-hometown", "character-inspector-occupation",
+    "character-inspector-style", "character-inspector-ball", "character-inspector-personality",
+    "character-inspector-bio",
+  ]) {
+    assert.match(html, new RegExp(`id=["']${id}["']`), `${id} should exist`);
+  }
+
+  assert.ok(html.indexOf("character-catalog-data.js") < html.indexOf("character-catalog.js"));
+  assert.ok(html.indexOf("character-catalog.js") < html.indexOf("game.js"));
+  assert.match(game, /function openCharacterInspector/);
+  assert.match(game, /Catalog\.getCharacter/);
+  assert.match(game, /Catalog\.getAdjacentCharacterSlug/);
+  assert.match(css, /\.character-inspector-dialog\s*\{/);
+  assert.match(css, /\.character-inspector-layout\s*\{[^}]*grid-template-columns:/s);
+});
+
+test("inspector skin previews never use the equipment persistence path", () => {
+  const game = read("game.js");
+  const previewFunction = game.match(/function renderInspectorSkinOptions\([^]*?\n  \}/)?.[0] ?? "";
+
+  assert.match(previewFunction, /inspectorPreviewSkinId/);
+  assert.match(previewFunction, /getSkinPreviewLabel/);
+  assert.doesNotMatch(previewFunction, /saveEquippedSkinId/);
+});
+
+test("the published runtime includes the generated character catalog", () => {
+  const manifest = JSON.parse(read("runtime-assets.json"));
+  assert.ok(manifest.include.includes("character-catalog-data.js"));
+  assert.ok(manifest.include.includes("character-catalog.js"));
 });
 
 test("the cabinet exposes title, setup, match, and results screens", () => {
@@ -123,6 +165,52 @@ test("players can choose and persist a character-named menu splash", () => {
   assert.match(game, /data-splash-slug/);
 });
 
+test("local setup lets a player choose a lane and remembers it", () => {
+  const html = read("index.html");
+  const game = read("game.js");
+
+  const setupStart = html.indexOf('id="setup-screen"');
+  const lanePick = html.indexOf('id="lane-button"');
+  const startMatch = html.indexOf('id="start-match"');
+  assert.ok(setupStart > -1 && setupStart < lanePick && lanePick < startMatch,
+    "the lane picker should sit inside setup, ahead of the start button");
+
+  assert.match(html, /id=["']lane-dialog["']/);
+  assert.match(html, /id=["']lane-grid["']/);
+  assert.ok(html.indexOf("lane-core.js") < html.indexOf("game.js"));
+  assert.match(game, /loadLaneSlug/);
+  assert.match(game, /saveLaneSlug/);
+  assert.match(game, /data-lane-slug/);
+  assert.match(game, /renderer\.load\(selectedLaneSlug\)/);
+});
+
+test("online matches bowl on the lane the server dealt, not the local pick", () => {
+  const game = read("game.js");
+
+  const online = game.slice(game.indexOf("function resetSceneForOnline"));
+  assert.ok(
+    online.indexOf("applyMatchLane(LaneCore.laneFromRoll(snapshot.laneRoll).slug)") <
+      online.indexOf("match = structuredClone(snapshot.match)"),
+    "an online match should take its lane from the served roll before the scene builds",
+  );
+  assert.match(game, /function startMatch\(\) \{\s*applyMatchLane\(selectedLaneSlug\);/,
+    "a local match should return to the player's own saved lane");
+  assert.doesNotMatch(game, /onlineSetup\.lane|laneSlug: *selectedLaneSlug/,
+    "a local lane preference must never be published to an online room");
+  assert.doesNotMatch(game, /renderer\.ready.*renderer\.setLane/,
+    "a served lane must apply even while boot art is still loading");
+});
+
+test("lane artwork is resolved through the catalog rather than a hard-coded file", () => {
+  const renderer = read("renderer.js");
+  const laneCore = read("lane-core.js");
+
+  assert.match(renderer, /async setLane\(/);
+  assert.doesNotMatch(renderer, /assets\/lanes\/[^$]/,
+    "renderer should never name a lane image directly");
+  assert.match(laneCore, /assets\/lanes\/\$\{slug\}\.webp/);
+});
+
 test("the match keeps the bowling lane centered between supporting UI rails", () => {
   const html = read("index.html");
   const leftRail = html.indexOf('class="game-panel game-panel--score');
@@ -188,7 +276,7 @@ test("the lane and default menu artwork use compressed runtime images", () => {
   const renderer = read("renderer.js");
 
   assert.match(html, /assets\/menu-splashes\/reina-sato\.webp/);
-  assert.match(renderer, /assets\/lanes\/1\.webp/);
+  assert.match(renderer, /root\.YamLaneCore\.getLane/);
   assert.match(renderer, /assets\/pins\/1\.webp/);
 });
 
@@ -215,6 +303,34 @@ test("results give both bowlers large outcome-specific character art", () => {
   assert.match(css, /\.result-player__portrait\s*\{[^}]*min-height:/s);
   assert.match(css, /\.result-player__portrait img\s*\{[^}]*object-fit:\s*contain/s);
   assert.match(css, /\.result-player\.is-winner[^}]*box-shadow:/s);
+});
+
+test("strike and spare callouts pop a bowler pose clear of the callout text", () => {
+  const html = read("index.html");
+  const game = read("game.js");
+  const css = read("styles.css");
+
+  assert.match(html, /id=["']callout-pose["']/);
+  assert.match(html, /id=["']callout-pose-art["']/);
+  assert.match(game, /getCalloutPoseAssetPath/);
+  assert.match(game, /function showCalloutPose/);
+
+  const poseRule = css.match(/\.callout-pose\s*\{[^}]*\}/s)?.[0] ?? "";
+  const calloutTop = Number(css.match(/\.callout\s*\{[^}]*top:\s*(\d+)%/s)?.[1]);
+  const poseBottom = Number(poseRule.match(/bottom:\s*(\d+)%/)?.[1]);
+  const poseTop = 100 - Number(poseRule.match(/height:\s*(\d+)%/)?.[1]) - poseBottom;
+
+  assert.match(poseRule, /position:\s*absolute/);
+  assert.match(poseRule, /pointer-events:\s*none/);
+  assert.match(css, /\.callout-pose img\s*\{[^}]*object-fit:\s*contain/s);
+  assert.match(css, /\.callout-pose\.is-visible\s*\{[^}]*opacity:\s*1/s);
+  // The pose sits over the bowler sprite, so it needs a frame of its own to read as a popup.
+  assert.match(poseRule, /border:\s*1px solid/);
+  assert.match(poseRule, /border-radius:/);
+  assert.match(poseRule, /background:/);
+  assert.match(poseRule, /box-shadow:/);
+  assert.ok(Number.isFinite(calloutTop) && Number.isFinite(poseTop));
+  assert.ok(poseTop >= calloutTop + 20, "the pose must start well below the callout headline");
 });
 
 test("human throws use a timed spin stage before hold-to-charge power", () => {

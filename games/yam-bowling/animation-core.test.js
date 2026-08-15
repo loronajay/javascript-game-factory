@@ -7,6 +7,7 @@ const {
   getFrameAssetPath,
   getFrameAtElapsed,
   getFrameDuration,
+  getCalloutPoseAssetPath,
   getPortraitAssetPath,
   getResultPortraitAssetPath,
   saveEquippedSkinId,
@@ -128,6 +129,25 @@ describe("throw playback", () => {
     }
   });
 
+  test("celebrates a strike with the victory pose and a spare with the portrait pose", () => {
+    const bowler = CANON_BOWLERS[0];
+    assert.equal(
+      getCalloutPoseAssetPath(bowler, "strike"),
+      "assets/characters/portraits/victory/daisy-monroe.webp",
+    );
+    assert.equal(
+      getCalloutPoseAssetPath(bowler, "spare"),
+      "assets/characters/portraits/canon/daisy-monroe.webp",
+    );
+  });
+
+  test("shows no callout pose for outcomes that are neither a strike nor a spare", () => {
+    const bowler = CANON_BOWLERS[0];
+    assert.equal(getCalloutPoseAssetPath(bowler, "gutter"), null);
+    assert.equal(getCalloutPoseAssetPath(bowler, "popup"), null);
+    assert.equal(getCalloutPoseAssetPath(bowler, ""), null);
+  });
+
   test("has no stale or misnamed processed character directories", () => {
     const processedRoot = path.join(__dirname, "assets/characters/processed/canon");
     const processedSlugs = fs
@@ -162,11 +182,11 @@ describe("character skins", () => {
     };
   }
 
-  test("publishes stable classic and swimsuit skin ids", () => {
+  test("publishes stable classic, swimsuit, and maid skin ids", () => {
     assert.equal(DEFAULT_SKIN_ID, "canon");
     assert.deepEqual(
       AVAILABLE_SKINS.map(({ id, name }) => [id, name]),
-      [["canon", "Classic"], ["swimsuit", "Swimsuit"]],
+      [["canon", "Classic"], ["swimsuit", "Swimsuit"], ["maid", "Maid Café"]],
     );
   });
 
@@ -187,6 +207,22 @@ describe("character skins", () => {
     assert.equal(
       getResultPortraitAssetPath(bowler, "defeat", "swimsuit"),
       "assets/characters/skins/daisy-monroe/swimsuit/defeat.webp",
+    );
+  });
+
+  test("draws callout poses from the equipped skin, falling back to canon art", () => {
+    const bowler = CANON_BOWLERS[0];
+    assert.equal(
+      getCalloutPoseAssetPath(bowler, "strike", "swimsuit"),
+      "assets/characters/skins/daisy-monroe/swimsuit/victory.webp",
+    );
+    assert.equal(
+      getCalloutPoseAssetPath(bowler, "spare", "swimsuit"),
+      "assets/characters/skins/daisy-monroe/swimsuit/portrait.webp",
+    );
+    assert.equal(
+      getCalloutPoseAssetPath(bowler, "strike", "not-a-skin"),
+      "assets/characters/portraits/victory/daisy-monroe.webp",
     );
   });
 

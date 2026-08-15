@@ -166,6 +166,33 @@ test("lobby join publishes the selected bowler and owner can start a full lobby"
   assert.equal(socket.sent.at(-1).type, "start_lobby");
 });
 
+test("the opponent's bowler and equipped skin survive lobby normalization", () => {
+  const client = createClient();
+  client.connect();
+  const socket = MockWebSocket.instances[0];
+  socket.open();
+  socket.receive({ event: "connected", clientId: "socket-1", sessionToken: "resume-1" });
+  socket.receive({
+    event: "lobby_updated",
+    roomCode: "YAM42",
+    ownerId: "socket-1",
+    members: ["socket-1", "socket-2"],
+    players: [
+      { id: "socket-1", name: "Bowler One", characterSlug: "daisy-monroe", skinId: "swimsuit" },
+      { id: "socket-2", name: "Bowler Two", characterSlug: "roxy-chen", skinId: "maid" },
+    ],
+    playerCount: 2,
+    minPlayers: 2,
+    maxPlayers: 2,
+    status: "open",
+    settings: { matchType: "quick", protocolVersion: 1 },
+  });
+
+  const opponent = client.getSnapshot().lobby.players[1];
+  assert.equal(opponent.characterSlug, "roxy-chen");
+  assert.equal(opponent.skinId, "maid");
+});
+
 test("server match snapshots, errors, and disconnect state reach subscribers", () => {
   const client = createClient();
   const updates = [];

@@ -1,6 +1,13 @@
 # Yam Bowling Character Bios
 
-24 canon character bios.
+30 canon character bios. These Markdown files are the editorial source for the generated browser catalog at `../../../character-catalog-data.js`.
+
+After editing a biography, rebuild and validate the runtime catalog from the game directory:
+
+```powershell
+node tools/build-character-catalog.mjs
+node --test character-catalog-generator.test.mjs character-catalog.test.js
+```
 
 - [Daisy Monroe](daisy-monroe.md)
 - [Nia Brooks](nia-brooks.md)
@@ -26,3 +33,9 @@
 - [Roxy Chen](roxy-chen.md)
 - [Naomi Okafor](naomi-okafor.md)
 - [Echo Sterling](echo-sterling.md)
+- [Kevya Desai](kevya-desai.md)
+- [Lillie Chen](lillie-chen.md)
+- [Marisol Cruz](marisol-cruz.md)
+- [Rei Nakamura](rei-nakamura.md)
+- [Simone Carter](simone-carter.md)
+- [Talia Dodson](talia-dodson.md)

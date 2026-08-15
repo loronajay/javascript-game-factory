@@ -5,13 +5,17 @@ const { test } = require("node:test");
 
 const Animation = require("./animation-core.js");
 const MenuSplash = require("./menu-splash-core.js");
+const LaneCore = require("./lane-core.js");
 const runtimeManifest = require("./runtime-assets.json");
 
 const root = __dirname;
 const imageBudgetBytes = runtimeManifest.budgets.runtimeImageBytes;
 
 function runtimeImagePaths() {
-  const images = ["assets/lanes/1.webp", "assets/pins/1.webp"];
+  const images = ["assets/pins/1.webp"];
+  for (const lane of LaneCore.LANES) {
+    images.push(lane.src, lane.thumbnailSrc);
+  }
   for (const splash of MenuSplash.MENU_SPLASHES) {
     images.push(splash.src, splash.thumbnailSrc);
   }
@@ -21,6 +25,8 @@ function runtimeImagePaths() {
     images.push(Animation.getResultPortraitAssetPath(bowler, "defeat"));
     for (const skin of Animation.AVAILABLE_SKINS) {
       images.push(Animation.getPortraitAssetPath(bowler, skin.id));
+      images.push(Animation.getResultPortraitAssetPath(bowler, "victory", skin.id));
+      images.push(Animation.getResultPortraitAssetPath(bowler, "defeat", skin.id));
       for (let frame = 1; frame <= Animation.THROW_FRAME_COUNT; frame += 1) {
         images.push(Animation.getFrameAssetPath(bowler, frame, skin.id));
       }
@@ -31,7 +37,7 @@ function runtimeImagePaths() {
 
 test("every player-facing image is WebP and the complete runtime set stays under budget", () => {
   const images = runtimeImagePaths();
-  assert.equal(images.length, 482);
+  assert.equal(images.length, 799);
   assert.equal(images.every((imagePath) => imagePath.endsWith(".webp")), true);
   assert.deepEqual(images.filter((imagePath) => !fs.existsSync(path.join(root, imagePath))), []);
 

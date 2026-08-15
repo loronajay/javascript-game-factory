@@ -39,6 +39,8 @@ class PackageRuntimeTests(unittest.TestCase):
         relative_paths = {path.relative_to(root).as_posix() for path in files}
 
         self.assertIn("index.html", relative_paths)
+        self.assertIn("character-catalog-data.js", relative_paths)
+        self.assertIn("character-catalog.js", relative_paths)
         self.assertIn("assets/menu-splashes/reina-sato.webp", relative_paths)
         self.assertIn("assets/characters/processed/canon/daisy-monroe/throw-01.webp", relative_paths)
         self.assertNotIn("assets/menu-splashes/reina-sato.png", relative_paths)

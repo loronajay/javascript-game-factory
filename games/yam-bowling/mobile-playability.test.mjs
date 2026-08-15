@@ -55,6 +55,19 @@ test("landscape phones retain the desktop three-rail match inside one viewport",
   assert.match(css, /@media\s*\(hover:\s*none\)\s*and\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*360px\),\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*360px\),\s*\(max-height:\s*360px\)\s*and\s*\(min-width:\s*560px\)/);
 });
 
+test("long-pressing controls never raises the mobile text-selection callout", () => {
+  const css = read("styles.css");
+  assert.match(css, /body\s*\{[^}]*-webkit-touch-callout:\s*none;[^}]*-webkit-user-select:\s*none;[^}]*user-select:\s*none/s);
+  assert.match(css, /body\s*\{[^}]*-webkit-tap-highlight-color:\s*transparent/s);
+  assert.match(
+    css,
+    /input,\s*textarea,\s*\[data-selectable\]\s*\{[^}]*-webkit-touch-callout:\s*default;[^}]*user-select:\s*text/s,
+  );
+
+  const game = read("game.js");
+  assert.match(game, /addEventListener\("contextmenu"/);
+});
+
 test("landscape phone menus use compact desktop-like columns", () => {
   const css = read("styles.css");
   assert.match(css, /@media\s*\(hover:\s*none\)\s*and\s*\(orientation:\s*landscape\)[\s\S]*?\.setup-layout,\s*\.online-setup-layout\s*\{[^}]*grid-template-columns:\s*minmax\([^;]+\)\s+minmax\(/s);

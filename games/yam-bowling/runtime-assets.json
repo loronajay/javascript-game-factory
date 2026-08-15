@@ -8,16 +8,20 @@
     "animation-core.js",
     "audio-core.js",
     "ball-core.js",
+    "character-catalog-data.js",
+    "character-catalog.js",
     "cpu-core.js",
     "game-core.js",
     "game.js",
     "menu-splash-core.js",
+    "lane-core.js",
     "mobile-ui.mjs",
     "online-client.mjs",
     "physics-core.js",
     "renderer.js",
     "sounds/*.mp3",
     "assets/lanes/*.webp",
+    "assets/lanes/thumbs/*.webp",
     "assets/pins/*.webp",
     "assets/menu-splashes/**/*.webp",
     "assets/characters/processed/canon/**/*.webp",
@@ -25,6 +29,6 @@
     "assets/characters/skins/*/*/*.webp"
   ],
   "budgets": {
-    "runtimeImageBytes": 50331648
+    "runtimeImageBytes": 58720256
   }
 }

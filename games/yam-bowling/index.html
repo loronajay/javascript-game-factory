@@ -55,6 +55,7 @@
             <section class="option-section skin-section">
               <p class="option-label">Outfit</p>
               <div class="skin-options" id="online-skin-options" aria-label="Equip an online bowler skin"></div>
+              <button class="button button--ghost button--wide inspect-bowler-button" id="online-inspect-bowler-button" type="button">Inspect bowler</button>
             </section>
             <section class="option-section online-match-actions">
               <button class="button button--primary button--wide" id="quick-match-button" type="button">Quick Match</button>
@@ -84,7 +85,7 @@
           <h2 id="online-lobby-title">Finding a lane</h2>
           <div class="online-room-code-wrap" id="online-room-code-wrap" hidden>
             <span>Room code</span>
-            <strong id="online-room-code">-----</strong>
+            <strong id="online-room-code" data-selectable>-----</strong>
             <button class="button button--ghost" id="copy-room-code" type="button">Copy code</button>
           </div>
           <p class="online-status" id="online-status" aria-live="polite">Connecting to Factory Network…</p>
@@ -126,6 +127,14 @@
                 <button type="button" data-cpu-level="pro">Pro</button>
               </div>
             </section>
+            <section class="option-section">
+              <p class="option-label">Lane</p>
+              <button class="lane-pick" id="lane-button" type="button">
+                <img id="lane-button-art" alt="" decoding="async" />
+                <span><strong id="lane-button-name">Crimson Crown</strong><small id="lane-button-description">The house lane.</small></span>
+                <b>Change</b>
+              </button>
+            </section>
             <section class="player-slots" aria-label="Player character slots">
               <button class="player-slot is-active" id="player-one-slot" type="button" data-player-slot="0">
                 <img alt="" /><span><small>Player 1</small><strong>Daisy Monroe</strong></span><b>YOU</b>
@@ -137,6 +146,7 @@
             <section class="option-section skin-section">
               <p class="option-label">Outfit for selected player</p>
               <div class="skin-options" id="skin-options" aria-label="Equip a bowler skin"></div>
+              <button class="button button--ghost button--wide inspect-bowler-button" id="inspect-bowler-button" type="button">Inspect bowler</button>
             </section>
             <button class="button button--primary button--wide" id="start-match" type="button">Start match</button>
           </aside>
@@ -178,6 +188,7 @@
               <span><b id="hud-pins">10</b> pins up</span>
             </div>
             <div class="turn-banner" id="turn-banner"><small>Up now</small><strong>Player 1</strong></div>
+            <div class="callout-pose" id="callout-pose" aria-hidden="true" hidden><img id="callout-pose-art" alt="" decoding="async" /></div>
             <div class="callout" id="callout"><strong>Strike!</strong><span>Clean pocket hit</span></div>
           </section>
 
@@ -240,6 +251,42 @@
       </div>
     </dialog>
 
+    <dialog class="character-inspector-dialog" id="character-inspector-dialog" aria-labelledby="character-inspector-name">
+      <button class="dialog-close" id="character-inspector-close" type="button" aria-label="Close character inspector">&#215;</button>
+      <nav class="character-inspector-nav" aria-label="Browse bowlers">
+        <button class="icon-button" id="character-inspector-previous" type="button" aria-label="Previous bowler">&#8592;</button>
+        <span>Bowler inspector</span>
+        <button class="icon-button" id="character-inspector-next" type="button" aria-label="Next bowler">&#8594;</button>
+      </nav>
+      <div class="character-inspector-layout">
+        <section class="character-inspector-preview" aria-label="Front-view outfit preview">
+          <div class="character-inspector-art-stage">
+            <img id="character-inspector-art" alt="" decoding="async" />
+            <span>Front view</span>
+          </div>
+          <div class="character-inspector-skins" id="character-inspector-skins" aria-label="Preview this bowler's skins"></div>
+          <p class="character-inspector-preview-note">Preview only. Your equipped gameplay outfit will not change.</p>
+        </section>
+        <section class="character-inspector-profile">
+          <p class="eyebrow">League dossier</p>
+          <h2 id="character-inspector-name">Bowler name</h2>
+          <dl class="character-inspector-facts">
+            <div><dt>Age</dt><dd id="character-inspector-age"></dd></div>
+            <div><dt>Hometown</dt><dd id="character-inspector-hometown"></dd></div>
+            <div><dt>Occupation</dt><dd id="character-inspector-occupation"></dd></div>
+            <div><dt>Bowling style</dt><dd id="character-inspector-style"></dd></div>
+            <div><dt>Favorite ball</dt><dd id="character-inspector-ball"></dd></div>
+          </dl>
+          <article class="character-inspector-story">
+            <h3>Personality</h3>
+            <p id="character-inspector-personality"></p>
+            <h3>Bio</h3>
+            <p id="character-inspector-bio"></p>
+          </article>
+        </section>
+      </div>
+    </dialog>
+
     <dialog class="menu-splash-dialog" id="menu-splash-dialog" aria-labelledby="menu-splash-title">
       <button class="dialog-close" id="menu-splash-close" type="button" aria-label="Close">×</button>
       <p class="eyebrow">Make it yours</p>
@@ -248,8 +295,19 @@
       <div class="menu-splash-grid" id="menu-splash-grid" role="listbox" aria-label="Menu splash artwork"></div>
     </dialog>
 
+    <dialog class="menu-splash-dialog lane-dialog" id="lane-dialog" aria-labelledby="lane-dialog-title">
+      <button class="dialog-close" id="lane-close" type="button" aria-label="Close">×</button>
+      <p class="eyebrow">House selection</p>
+      <h2 id="lane-dialog-title">Choose your lane</h2>
+      <p class="menu-splash-intro">Every house bowls the same. Pick the room you want to bowl it in.</p>
+      <div class="lane-grid" id="lane-grid" role="listbox" aria-label="Lane houses"></div>
+    </dialog>
+
     <script src="menu-splash-core.js"></script>
+    <script src="lane-core.js"></script>
     <script src="animation-core.js"></script>
+    <script src="character-catalog-data.js"></script>
+    <script src="character-catalog.js"></script>
     <script src="audio-core.js"></script>
     <script src="game-core.js"></script>
     <script src="physics-core.js"></script>

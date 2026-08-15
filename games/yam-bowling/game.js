@@ -15,7 +15,9 @@ initMobileLandscapeGate();
   const Cpu = window.YamCpuPlanner;
   const AudioCore = window.YamAudio;
   const MenuSplash = window.YamMenuSplash;
+  const LaneCore = window.YamLaneCore;
   const Animation = window.YamBowlingCore;
+  const Catalog = window.YamCharacterCatalog;
   const Roster = Animation.CANON_BOWLERS;
   const TICK_MS = 1000 / 60;
   const PHYSICS_DT = 1 / 180;
@@ -66,6 +68,11 @@ initMobileLandscapeGate();
   let playerShots = [];
   let contactedPinCount = 0;
   let selectedMenuSplashSlug = MenuSplash.loadMenuSplashSlug();
+  let selectedLaneSlug = LaneCore.loadLaneSlug();
+  let matchLaneSlug = selectedLaneSlug;
+  let inspectorSlug = Roster[0].slug;
+  let inspectorPreviewSkinId = Animation.DEFAULT_SKIN_ID;
+  let inspectorReturnFocus = null;
 
   const scene = {
     phase: "ready",
@@ -100,6 +107,10 @@ initMobileLandscapeGate();
 
   function resultPortrait(slug, outcome, skinId = Animation.DEFAULT_SKIN_ID) {
     return Animation.getResultPortraitAssetPath({ slug }, outcome, skinId);
+  }
+
+  function calloutPose(slug, outcomeCue, skinId = Animation.DEFAULT_SKIN_ID) {
+    return Animation.getCalloutPoseAssetPath({ slug }, outcomeCue, skinId);
   }
 
   function playerSkinId(player) {
@@ -143,6 +154,55 @@ initMobileLandscapeGate();
     applyMenuSplash(selectedMenuSplashSlug);
   }
 
+  function applyLane(slug, persist = false) {
+    selectedLaneSlug = persist ? LaneCore.saveLaneSlug(slug) : LaneCore.getLane(slug).slug;
+    const lane = LaneCore.getLane(selectedLaneSlug);
+    const art = $("lane-button-art");
+    art.src = lane.thumbnailSrc;
+    art.alt = "";
+    $("lane-button-name").textContent = lane.name;
+    $("lane-button-description").textContent = lane.description;
+    $("lane-button").title = `Current lane: ${lane.name}`;
+
+    for (const card of $("lane-grid").querySelectorAll("[data-lane-slug]")) {
+      const selected = card.dataset.laneSlug === selectedLaneSlug;
+      card.classList.toggle("is-selected", selected);
+      card.setAttribute("aria-selected", String(selected));
+    }
+
+    // The backdrop swaps immediately so the picker reads as a live preview.
+    applyMatchLane(selectedLaneSlug);
+  }
+
+  // One seam decides the house a match is bowled in: local play uses the saved
+  // pick, online play uses the lane the server dealt both bowlers.
+  // Never gate this on renderer.ready: a resumed online match can be served its
+  // lane while boot art is still loading, and skipping the request there would
+  // leave the screen on a lane the scoreboard no longer claims. The renderer
+  // already drops a redundant request for the lane it is on or fetching.
+  function applyMatchLane(slug) {
+    matchLaneSlug = LaneCore.getLane(slug).slug;
+    renderer.setLane(matchLaneSlug).catch((error) => console.error(error));
+  }
+
+  function buildLaneGrid() {
+    const grid = $("lane-grid");
+    for (const lane of LaneCore.LANES) {
+      const card = document.createElement("button");
+      card.className = "lane-card";
+      card.type = "button";
+      card.setAttribute("data-lane-slug", lane.slug);
+      card.setAttribute("role", "option");
+      card.innerHTML = `<img src="${lane.thumbnailSrc}" alt="" loading="lazy" decoding="async"><span><strong>${escapeHtml(lane.name)}</strong><small>${escapeHtml(lane.description)}</small></span>`;
+      card.addEventListener("click", () => {
+        applyLane(lane.slug, true);
+        $("lane-dialog").close();
+      });
+      grid.appendChild(card);
+    }
+    applyLane(selectedLaneSlug);
+  }
+
   function showScreen(id) {
     for (const screen of document.querySelectorAll(".screen")) {
       const active = screen.id === id;
@@ -177,6 +237,66 @@ initMobileLandscapeGate();
     }
   }
 
+  function renderInspectorSkinOptions() {
+    const host = $("character-inspector-skins");
+    const equippedSkinId = storedSkinId(inspectorSlug);
+    host.innerHTML = "";
+    for (const skin of Animation.AVAILABLE_SKINS) {
+      const previewing = skin.id === inspectorPreviewSkinId;
+      const equipped = skin.id === equippedSkinId;
+      const button = document.createElement("button");
+      button.className = `character-inspector-skin${previewing ? " is-previewed" : ""}${equipped ? " is-equipped" : ""}`;
+      button.type = "button";
+      button.dataset.inspectorSkinId = skin.id;
+      button.setAttribute("aria-pressed", String(previewing));
+      button.innerHTML = `<img src="${characterPortrait(inspectorSlug, skin.id)}" alt="" loading="lazy" decoding="async"><span><strong>${escapeHtml(skin.name)}</strong><small>${escapeHtml(Catalog.getSkinPreviewLabel(skin.id, inspectorPreviewSkinId, equippedSkinId))}</small></span>`;
+      button.addEventListener("click", () => {
+        inspectorPreviewSkinId = skin.id;
+        renderCharacterInspector();
+      });
+      host.appendChild(button);
+    }
+  }
+
+  function renderCharacterInspector() {
+    const character = Catalog.getCharacter(inspectorSlug);
+    const skin = Animation.AVAILABLE_SKINS.find(({ id }) => id === inspectorPreviewSkinId) || Animation.AVAILABLE_SKINS[0];
+    const art = $("character-inspector-art");
+    art.src = characterPortrait(character.slug, skin.id);
+    art.alt = `Front view of ${character.name} wearing the ${skin.name} outfit`;
+    $("character-inspector-name").textContent = character.name;
+    $("character-inspector-age").textContent = character.age;
+    $("character-inspector-hometown").textContent = character.hometown;
+    $("character-inspector-occupation").textContent = character.occupation;
+    $("character-inspector-style").textContent = character.bowlingStyle;
+    $("character-inspector-ball").textContent = character.favoriteBall;
+    $("character-inspector-personality").textContent = character.personality;
+    $("character-inspector-bio").textContent = character.bio;
+    renderInspectorSkinOptions();
+  }
+
+  function showAdjacentInspectorCharacter(direction) {
+    inspectorSlug = Catalog.getAdjacentCharacterSlug(inspectorSlug, direction);
+    inspectorPreviewSkinId = storedSkinId(inspectorSlug);
+    renderCharacterInspector();
+  }
+
+  function openCharacterInspector(slug, returnFocus = document.activeElement) {
+    inspectorSlug = bowlerBySlug(slug).slug;
+    inspectorPreviewSkinId = storedSkinId(inspectorSlug);
+    inspectorReturnFocus = returnFocus instanceof HTMLElement ? returnFocus : null;
+    renderCharacterInspector();
+    const dialog = $("character-inspector-dialog");
+    if (!dialog.open) dialog.showModal();
+    $("character-inspector-close").focus();
+    audio.play("popup");
+  }
+
+  function closeCharacterInspector() {
+    const dialog = $("character-inspector-dialog");
+    if (dialog.open) dialog.close();
+  }
+
   function renderSetup() {
     setSelected($("mode-options"), "data-mode", setup.modeId);
     setSelected($("play-type-options"), "data-play-type", setup.playType);
@@ -203,6 +323,7 @@ initMobileLandscapeGate();
         renderSetup();
       },
     );
+    $("inspect-bowler-button").textContent = `Inspect ${bowlerBySlug(setup.characterSlugs[setup.activeSlot]).name}`;
 
     for (const card of $("character-grid").querySelectorAll(".character-card")) {
       card.classList.toggle("is-selected", card.dataset.slug === setup.characterSlugs[setup.activeSlot]);
@@ -278,6 +399,7 @@ initMobileLandscapeGate();
         renderOnlineSetup();
       },
     );
+    $("online-inspect-bowler-button").textContent = `Inspect ${bowler.name}`;
   }
 
   function onlinePlayerCards(snapshot) {
@@ -313,8 +435,10 @@ initMobileLandscapeGate();
     const cards = onlinePlayerCards(snapshot);
     cards.forEach((player, index) => {
       const local = player.id === snapshot.clientId;
-      const slug = player.characterSlug || (local ? onlineSetup.characterSlug : (index === 0 ? "daisy-monroe" : "nia-brooks"));
-      const skinId = player.skinId || (local ? onlineSetup.skinId : Animation.DEFAULT_SKIN_ID);
+      // Remote looks arrive over the wire, so resolve them against the local
+      // roster and skin catalog rather than trusting them into an asset path.
+      const slug = bowlerBySlug(player.characterSlug || (local ? onlineSetup.characterSlug : (index === 0 ? "daisy-monroe" : "nia-brooks"))).slug;
+      const skinId = Animation.normalizeSkinId(player.skinId || (local ? onlineSetup.skinId : Animation.DEFAULT_SKIN_ID));
       const card = document.createElement("article");
       card.className = `online-player-card${local ? " is-you" : ""}${player.connected === false ? " is-disconnected" : ""}`;
       card.innerHTML = `<img src="${characterPortrait(slug, skinId)}" alt=""><span><strong>${escapeHtml(player.name || `Player ${index + 1}`)}</strong><small>${player.connected === false ? "Reconnecting" : local ? "You · Ready" : "Ready"}</small></span>`;
@@ -396,6 +520,7 @@ initMobileLandscapeGate();
   }
 
   function startMatch() {
+    applyMatchLane(selectedLaneSlug);
     onlineMatch = false;
     onlineSnapshot = null;
     pendingAuthoritativeRoll = null;
@@ -440,6 +565,9 @@ initMobileLandscapeGate();
   }
 
   function resetSceneForOnline(snapshot) {
+    // The server deals the house so both bowlers see one lane; a player's own
+    // pick is a local-play preference and never travels into an online room.
+    applyMatchLane(LaneCore.laneFromRoll(snapshot.laneRoll).slug);
     match = structuredClone(snapshot.match);
     onlineMatch = true;
     onlineSnapshot = snapshot;
@@ -552,6 +680,7 @@ initMobileLandscapeGate();
     $("ball-rack").querySelectorAll(".ball-button").forEach((entry, index) => entry.classList.toggle("is-selected", index === scene.liveShot.ballIndex));
     renderer.setCharacter(player.characterSlug, playerSkinId(player)).catch(console.error);
     $("turn-avatar").src = characterPortrait(player.characterSlug, playerSkinId(player));
+    preloadCalloutPoses(player);
     if (player.type === "cpu") cpuDelay = 0.8;
     bannerTime = 1;
     audio.play("announce");
@@ -622,7 +751,8 @@ initMobileLandscapeGate();
     if (!match) return;
     const player = activePlayer();
     const mode = Core.MODES[match.modeId];
-    $("match-chip").textContent = `${mode.name} · ${onlineMatch ? "Online" : match.playType === "cpu" ? "Vs CPU" : "Hotseat"}`;
+    const opponent = onlineMatch ? "Online" : match.playType === "cpu" ? "Vs CPU" : "Hotseat";
+    $("match-chip").textContent = `${mode.name} · ${opponent} · ${LaneCore.getLane(matchLaneSlug).name}`;
     $("score-mode").textContent = `${mode.frames} frames`;
     $("hud-frame").textContent = Math.min(mode.frames, match.frameIndex + 1);
     $("hud-pins").textContent = scene.pins.filter((pin) => pin.standing).length;
@@ -631,6 +761,7 @@ initMobileLandscapeGate();
     $("turn-banner").querySelector("strong").textContent = player.name;
     $("turn-banner").classList.toggle("is-visible", bannerTime > 0);
     $("callout").classList.toggle("is-visible", calloutTime > 0);
+    if (calloutTime <= 0) hideCalloutPose();
     updateScoreboard();
     updateShotControls();
   }
@@ -791,7 +922,47 @@ initMobileLandscapeGate();
     $("callout").querySelector("strong").textContent = big;
     $("callout").querySelector("span").textContent = small;
     calloutTime = 1.15;
-    audio.play(AudioCore.getOutcomeCue(knocked, startedStanding, firstRoll), { intensity: 0.65 + knocked / 15 });
+    const cue = AudioCore.getOutcomeCue(knocked, startedStanding, firstRoll);
+    showCalloutPose(cue);
+    audio.play(cue, { intensity: 0.65 + knocked / 15 });
+  }
+
+  function showCalloutPose(outcomeCue) {
+    const pose = $("callout-pose");
+    const art = $("callout-pose-art");
+    const player = activePlayer();
+    const source = player ? calloutPose(player.characterSlug, outcomeCue, playerSkinId(player)) : null;
+    if (!source) {
+      hideCalloutPose();
+      return;
+    }
+    // A skin whose celebration art has not shipped yet still gets the canon pose.
+    art.onerror = () => {
+      const canonSource = calloutPose(player.characterSlug, outcomeCue);
+      if (canonSource && !art.src.endsWith(canonSource)) {
+        art.src = canonSource;
+        return;
+      }
+      pose.classList.remove("is-visible");
+      art.removeAttribute("src");
+      pose.hidden = true;
+    };
+    pose.hidden = false;
+    art.src = source;
+    pose.classList.add("is-visible");
+  }
+
+  function hideCalloutPose() {
+    const pose = $("callout-pose");
+    if (pose.classList.contains("is-visible")) pose.classList.remove("is-visible");
+  }
+
+  function preloadCalloutPoses(player) {
+    if (!player) return;
+    for (const cue of ["strike", "spare"]) {
+      const source = calloutPose(player.characterSlug, cue, playerSkinId(player));
+      if (source) new Image().src = source;
+    }
   }
 
   function finalizeRoll() {
@@ -905,6 +1076,7 @@ initMobileLandscapeGate();
     calloutTime = Math.max(0, calloutTime - dt);
     $("turn-banner").classList.toggle("is-visible", bannerTime > 0);
     $("callout").classList.toggle("is-visible", calloutTime > 0);
+    if (calloutTime <= 0) hideCalloutPose();
     const strafeDirection = (keys.strafeRight ? 1 : 0) - (keys.strafeLeft ? 1 : 0);
     const aimDirection = (keys.aimRight ? 1 : 0) - (keys.aimLeft ? 1 : 0);
 
@@ -994,11 +1166,16 @@ initMobileLandscapeGate();
 
   function bindEvents() {
     document.addEventListener("pointerdown", () => audio.unlock(), { capture: true, once: true });
+    // Long-pressing the throw button or a slider must not open the touch text menu.
+    document.addEventListener("contextmenu", (event) => {
+      if (event.target?.closest?.("input, textarea, [data-selectable]")) return;
+      event.preventDefault();
+    });
     document.addEventListener("click", (event) => {
       const button = event.target.closest("button");
       if (!button || button.disabled || button.id === "throw-button") return;
       if (!audio.unlocked) audio.unlock();
-      const isSelection = button.matches(".character-card, .ball-button, [data-mode], [data-play-type], [data-cpu-level], [data-player-slot], [data-splash-slug], [data-skin-id]");
+      const isSelection = button.matches(".character-card, .ball-button, [data-mode], [data-play-type], [data-cpu-level], [data-player-slot], [data-splash-slug], [data-skin-id], [data-lane-slug]");
       audio.play(isSelection ? "select" : "click");
     });
     $("audio-toggle").addEventListener("click", () => {
@@ -1013,6 +1190,30 @@ initMobileLandscapeGate();
     $("how-close").addEventListener("click", () => $("how-dialog").close());
     $("menu-splash-button").addEventListener("click", () => { $("menu-splash-dialog").showModal(); audio.play("popup"); });
     $("menu-splash-close").addEventListener("click", () => $("menu-splash-dialog").close());
+    $("lane-button").addEventListener("click", () => { $("lane-dialog").showModal(); audio.play("popup"); });
+    $("lane-close").addEventListener("click", () => $("lane-dialog").close());
+    $("inspect-bowler-button").addEventListener("click", (event) => {
+      openCharacterInspector(setup.characterSlugs[setup.activeSlot], event.currentTarget);
+    });
+    $("online-inspect-bowler-button").addEventListener("click", (event) => {
+      openCharacterInspector(onlineSetup.characterSlug, event.currentTarget);
+    });
+    $("character-inspector-close").addEventListener("click", closeCharacterInspector);
+    $("character-inspector-previous").addEventListener("click", () => showAdjacentInspectorCharacter(-1));
+    $("character-inspector-next").addEventListener("click", () => showAdjacentInspectorCharacter(1));
+    $("character-inspector-dialog").addEventListener("close", () => {
+      inspectorReturnFocus?.focus?.();
+      inspectorReturnFocus = null;
+    });
+    $("character-inspector-dialog").addEventListener("click", (event) => {
+      if (event.target === event.currentTarget) closeCharacterInspector();
+    });
+    $("character-inspector-dialog").addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      event.preventDefault();
+      event.stopPropagation();
+      showAdjacentInspectorCharacter(event.key === "ArrowLeft" ? -1 : 1);
+    });
     $("mode-options").addEventListener("click", (event) => {
       const button = event.target.closest("[data-mode]");
       if (!button) return;
@@ -1167,6 +1368,7 @@ initMobileLandscapeGate();
 
   async function init() {
     buildMenuSplashGrid();
+    buildLaneGrid();
     buildCharacterGrid();
     buildOnlineCharacterGrid();
     buildBallRack();
@@ -1183,7 +1385,7 @@ initMobileLandscapeGate();
     $("start-match").disabled = true;
     $("start-match").textContent = "Loading lane…";
     try {
-      await renderer.load();
+      await renderer.load(selectedLaneSlug);
       $("start-match").disabled = false;
       $("start-match").textContent = "Start match";
     } catch (error) {

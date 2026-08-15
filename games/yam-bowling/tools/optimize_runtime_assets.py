@@ -17,6 +17,7 @@ from PIL import Image
 DEFAULT_QUALITY = 88
 CHARACTER_QUALITY = 90
 MENU_THUMBNAIL_SIZE = (480, 270)
+LANE_THUMBNAIL_SIZE = (300, 450)
 RESULT_PORTRAIT_SIZE = (640, 960)
 PIN_SIZE = (256, 384)
 
@@ -106,9 +107,17 @@ def discover_jobs(project_root: Path) -> list[ConversionJob]:
         if source.name != "source.png":
             jobs.append(_webp_job(source, quality=CHARACTER_QUALITY))
 
-    lane = assets / "lanes" / "1.png"
-    if lane.exists():
-        jobs.append(_webp_job(lane, quality=88))
+    for source in sorted((assets / "lanes").glob("*.png")):
+        jobs.append(_webp_job(source, quality=88))
+        jobs.append(
+            _webp_job(
+                source,
+                destination=source.parent / "thumbs" / f"{source.stem}.webp",
+                max_size=LANE_THUMBNAIL_SIZE,
+                quality=80,
+            )
+        )
+
     pin = assets / "pins" / "1.png"
     if pin.exists():
         jobs.append(_webp_job(pin, max_size=PIN_SIZE, quality=90))

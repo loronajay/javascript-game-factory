@@ -65,6 +65,141 @@ class ExtractCanonFramesTests(unittest.TestCase):
         self.assertEqual(alpha[80, 20], 0)
         self.assertEqual(alpha[80, 275], 0)
 
+    def test_instance_mask_removes_upper_neighbor_and_restores_target_feet(self) -> None:
+        rgba = np.zeros((120, 300, 4), dtype=np.uint8)
+        rgba[15:115, 110:175] = (40, 80, 220, 255)
+        rgba[25:55, 175:235] = (220, 40, 40, 255)
+        instance_mask = np.zeros((120, 300), dtype=np.float32)
+        instance_mask[15:70, 110:175] = 1.0
+
+        clean, _ = extractor.extract_instance_pose(
+            Image.fromarray(rgba, "RGBA"),
+            boundaries=[0, 100, 200, 300],
+            pose_index=1,
+            instance_mask=instance_mask,
+            lower_restore_row=70,
+            mask_dilation=0,
+            crop_margin=20,
+        )
+        pixels = np.asarray(clean.convert("RGBA"))
+        visible = pixels[:, :, 3] > 0
+
+        self.assertTrue(np.any(visible & (pixels[:, :, 2] > pixels[:, :, 0])))
+        self.assertFalse(np.any(visible & (pixels[:, :, 0] > pixels[:, :, 2])))
+        self.assertTrue(np.any(visible[90:, :]))
+
+    def test_default_instance_mask_margin_restores_hair_above_the_prediction(self) -> None:
+        rgba = np.zeros((140, 220, 4), dtype=np.uint8)
+        rgba[5:130, 85:145] = (40, 80, 220, 255)
+        instance_mask = np.zeros((140, 220), dtype=np.float32)
+        instance_mask[70:130, 85:145] = 1.0
+
+        clean, _ = extractor.extract_instance_pose(
+            Image.fromarray(rgba, "RGBA"),
+            boundaries=[0, 70, 150, 220],
+            pose_index=1,
+            instance_mask=instance_mask,
+            lower_restore_row=100,
+            crop_margin=20,
+        )
+
+        self.assertGreater(np.asarray(clean.getchannel("A"))[5:15].max(), 0)
+
+    def test_instance_mask_dilation_does_not_reach_into_a_neighboring_cell(self) -> None:
+        rgba = np.zeros((140, 260, 4), dtype=np.uint8)
+        rgba[15:130, 105:200] = (40, 80, 220, 255)
+        rgba[35:70, 200:225] = (220, 40, 40, 255)
+        instance_mask = np.zeros((140, 260), dtype=np.float32)
+        instance_mask[15:130, 105:195] = 1.0
+        neighbor_mask = np.zeros((140, 260), dtype=np.float32)
+        neighbor_mask[35:70, 200:225] = 1.0
+
+        clean, _ = extractor.extract_instance_pose(
+            Image.fromarray(rgba, "RGBA"),
+            boundaries=[0, 100, 200, 260],
+            pose_index=1,
+            instance_mask=instance_mask,
+            foreign_masks=[neighbor_mask],
+            lower_restore_row=100,
+            upper_restore_row=70,
+            mask_dilation=32,
+            crop_margin=30,
+        )
+        pixels = np.asarray(clean.convert("RGBA"))
+        visible = pixels[:, :, 3] > 0
+
+        self.assertTrue(np.any(visible & (pixels[:, :, 2] > pixels[:, :, 0])))
+        self.assertFalse(np.any(visible & (pixels[:, :, 0] > pixels[:, :, 2])))
+
+    def test_foreign_mask_does_not_erase_ambiguous_pixels_inside_target_cell(self) -> None:
+        rgba = np.zeros((120, 240, 4), dtype=np.uint8)
+        rgba[20:110, 105:190] = (40, 80, 220, 255)
+        instance_mask = np.zeros((120, 240), dtype=np.float32)
+        instance_mask[20:110, 125:190] = 1.0
+        neighbor_mask = np.zeros((120, 240), dtype=np.float32)
+        neighbor_mask[20:75, 105:135] = 1.0
+
+        clean, _ = extractor.extract_instance_pose(
+            Image.fromarray(rgba, "RGBA"),
+            boundaries=[0, 100, 200, 240],
+            pose_index=1,
+            instance_mask=instance_mask,
+            foreign_masks=[neighbor_mask],
+            lower_restore_row=90,
+            upper_restore_row=75,
+            mask_dilation=20,
+            crop_margin=20,
+        )
+
+        self.assertGreater(np.asarray(clean.getchannel("A"))[35, 25], 0)
+
+    def test_reference_silhouettes_remove_residual_instance_artifacts(self) -> None:
+        rgba = np.zeros((100, 120, 4), dtype=np.uint8)
+        rgba[10:95, 35:80] = (40, 80, 220, 255)
+        rgba[30:50, 90:110] = (220, 40, 40, 255)
+        frame = Image.fromarray(rgba, "RGBA")
+        reference = Image.fromarray(
+            np.where(
+                np.indices((100, 120))[1][..., None] < 85,
+                rgba,
+                np.zeros_like(rgba),
+            ).astype(np.uint8),
+            "RGBA",
+        )
+
+        clean = extractor.constrain_frame_to_references(
+            frame,
+            [reference],
+            padding=2,
+            lower_padding=2,
+            lower_restore_row=80,
+        )
+        pixels = np.asarray(clean.convert("RGBA"))
+        visible = pixels[:, :, 3] > 0
+
+        self.assertTrue(np.any(visible & (pixels[:, :, 2] > pixels[:, :, 0])))
+        self.assertFalse(np.any(visible & (pixels[:, :, 0] > pixels[:, :, 2])))
+
+    def test_reference_silhouettes_drop_detached_pixels_inside_the_padding(self) -> None:
+        rgba = np.zeros((100, 120, 4), dtype=np.uint8)
+        rgba[10:95, 35:80] = (40, 80, 220, 255)
+        rgba[35:45, 82:86] = (220, 40, 40, 255)
+        reference_rgba = np.zeros_like(rgba)
+        reference_rgba[10:95, 35:80] = (40, 80, 220, 255)
+
+        clean = extractor.constrain_frame_to_references(
+            Image.fromarray(rgba, "RGBA"),
+            [Image.fromarray(reference_rgba, "RGBA")],
+            padding=8,
+            lower_padding=8,
+            lower_restore_row=80,
+        )
+        pixels = np.asarray(clean.convert("RGBA"))
+        visible = pixels[:, :, 3] > 0
+
+        self.assertTrue(np.any(visible & (pixels[:, :, 2] > pixels[:, :, 0])))
+        self.assertFalse(np.any(visible & (pixels[:, :, 0] > pixels[:, :, 2])))
+
     def test_portrait_crop_removes_a_connected_neighbor_at_the_right_edge(self) -> None:
         rgba = np.zeros((180, 360, 4), dtype=np.uint8)
         rgba[20:170, 25:150] = (40, 180, 220, 255)
@@ -83,6 +218,20 @@ class ExtractCanonFramesTests(unittest.TestCase):
 
     def test_report_tracks_clipping_at_the_source_crop(self) -> None:
         self.assertIn("crop_edge_pixels", extractor.FrameReport.__dataclass_fields__)
+
+    def test_sheet_outer_edge_is_not_reported_as_neighbor_contamination(self) -> None:
+        image = Image.new("RGBA", (20, 30), (0, 0, 0, 0))
+        for y in range(10, 20):
+            image.putpixel((19, y), (40, 80, 220, 255))
+
+        self.assertEqual(
+            extractor.count_internal_crop_edge_pixels(image, (80, 100), 100),
+            0,
+        )
+        self.assertGreater(
+            extractor.count_internal_crop_edge_pixels(image, (80, 99), 100),
+            0,
+        )
 
     def test_manual_override_replaces_a_generated_frame(self) -> None:
         with TemporaryDirectory() as temporary_directory:

@@ -2,6 +2,8 @@
 
 A playable local and online bowling cabinet built from the V5 depth and physics prototype.
 
+Character identity, cosmetics, progression, Yam-specific profiles, and campaign progression are tracked in [`METAGAME_SCOPE.md`](METAGAME_SCOPE.md).
+
 ## Play
 
 From the JavaScript Game Factory repository root, serve the site over HTTP and open
@@ -64,3 +66,10 @@ test keeps the 482 player-facing runtime images below 48 MB.
 - `tools/process_character_skins.py`: reusable alternate-skin batch processor.
 - `tools/optimize_runtime_assets.py`: WebP conversion, resizing, and derived-PNG cleanup.
 - `tools/package_runtime.py`: source-free game-local deployment overlay builder.
+
+For tightly overlapping six-pose sheets, use the instance-aware skin pass so
+neighboring hair and limbs are removed before the transparent WebPs are written:
+
+```powershell
+.\.venv\Scripts\python.exe tools\process_character_skins.py --only maid --instance-model .models\yolo11n-seg.pt --mask-reference-skin swimsuit
+```

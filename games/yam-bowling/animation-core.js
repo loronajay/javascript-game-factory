@@ -43,11 +43,14 @@
   const THROW_FRAME_COUNT = 5;
   const BASE_FRAME_DURATION_MS = 200;
   const RESULT_PORTRAIT_OUTCOMES = Object.freeze(["victory", "defeat"]);
+  // A strike earns the celebration art; a spare gets the calmer default portrait pose.
+  const CALLOUT_POSE_BY_OUTCOME_CUE = Object.freeze({ strike: "victory", spare: "portrait" });
   const DEFAULT_SKIN_ID = "canon";
   const EQUIPPED_SKINS_STORAGE_KEY = "yam-bowling.equipped-skins.v1";
   const AVAILABLE_SKINS = Object.freeze([
     Object.freeze({ id: "canon", name: "Classic" }),
     Object.freeze({ id: "swimsuit", name: "Swimsuit" }),
+    Object.freeze({ id: "maid", name: "Maid Café" }),
   ]);
 
   const CANON_BOWLERS = Object.freeze(
@@ -116,6 +119,14 @@
       : `assets/characters/skins/${bowler.slug}/${resolvedSkinId}/${outcome}.webp`;
   }
 
+  function getCalloutPoseAssetPath(bowler, outcomeCue, skinId = DEFAULT_SKIN_ID) {
+    const pose = CALLOUT_POSE_BY_OUTCOME_CUE[outcomeCue];
+    if (!pose) return null;
+    return pose === "portrait"
+      ? getPortraitAssetPath(bowler, skinId)
+      : getResultPortraitAssetPath(bowler, pose, skinId);
+  }
+
   function readEquippedSkins(storage = root.localStorage) {
     try {
       const value = JSON.parse(storage?.getItem?.(EQUIPPED_SKINS_STORAGE_KEY) || "{}");
@@ -160,6 +171,7 @@
     CANON_BOWLERS,
     DEFAULT_SKIN_ID,
     THROW_FRAME_COUNT,
+    getCalloutPoseAssetPath,
     getEquippedSkinId,
     getFrameAssetPath,
     getFrameAtElapsed,

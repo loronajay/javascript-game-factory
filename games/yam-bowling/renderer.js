@@ -31,6 +31,9 @@
       this.canvas.height = H;
       this.ctx.imageSmoothingEnabled = false;
       this.assets = { lane: null, pin: null, character: [] };
+      this.laneSlug = "";
+      this.requestedLaneSlug = "";
+      this.laneLoadId = 0;
       this.characterSlug = "";
       this.skinId = "";
       this.characterLoadId = 0;
@@ -39,13 +42,37 @@
       this.shake = 0;
     }
 
-    async load() {
-      [this.assets.lane, this.assets.pin] = await Promise.all([
-        loadImage("assets/lanes/1.webp"),
+    async load(laneSlug = root.YamLaneCore.DEFAULT_LANE_SLUG) {
+      const lane = root.YamLaneCore.getLane(laneSlug);
+      this.requestedLaneSlug = lane.slug;
+      const loadId = ++this.laneLoadId;
+      const [laneImage, pinImage] = await Promise.all([
+        loadImage(lane.src),
         loadImage("assets/pins/1.webp"),
       ]);
+      this.assets.pin = pinImage;
+      if (loadId === this.laneLoadId) {
+        this.assets.lane = laneImage;
+        this.laneSlug = lane.slug;
+      }
       await this.setCharacter("daisy-monroe");
       this.ready = true;
+    }
+
+    // Lanes are pure backdrop, so a swap never touches the rack or the projection.
+    // The skip test is against the lane last *asked* for, not the one last painted:
+    // leaving an online house back to a local pick can ask for a lane whose art is
+    // still in flight, and comparing against the painted one would drop that hop
+    // and leave the screen showing a lane the match no longer believes it is on.
+    async setLane(laneSlug) {
+      const lane = root.YamLaneCore.getLane(laneSlug);
+      if (lane.slug === this.requestedLaneSlug) return;
+      this.requestedLaneSlug = lane.slug;
+      const loadId = ++this.laneLoadId;
+      const image = await loadImage(lane.src);
+      if (loadId !== this.laneLoadId) return;
+      this.assets.lane = image;
+      this.laneSlug = lane.slug;
     }
 
     async setCharacter(slug, skinId = "canon") {
@@ -166,30 +193,44 @@
       const size = 76 - clamp(z, 0, 1) * 51;
       const [light, dark] = BALL_COLORS[ballIndex % BALL_COLORS.length];
       const cy = ground.y - size * 0.43;
+      const radius = size / 2;
       ctx.save();
       ctx.translate(ground.x, cy);
-      ctx.rotate(rotation);
+
+      // The shadow lies on the lane, so it must not spin with the ball.
       ctx.fillStyle = "rgba(0,0,0,.28)";
       ctx.beginPath();
       ctx.ellipse(0, size * 0.48, size * 0.48, size * 0.14, 0, 0, Math.PI * 2);
       ctx.fill();
+
+      // Body and specular highlight: the light source is fixed, so these stay upright too.
       const gradient = ctx.createRadialGradient(-size * 0.18, -size * 0.2, size * 0.04, 0, 0, size * 0.54);
       gradient.addColorStop(0, "#fff");
       gradient.addColorStop(0.14, light);
       gradient.addColorStop(1, dark);
       ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = "rgba(255,255,255,.35)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
+
+      // Only the surface detail rolls, clipped to the ball so a hole can never spill past its edge.
+      ctx.save();
+      ctx.clip();
+      ctx.rotate(rotation);
       ctx.fillStyle = "rgba(0,0,0,.7)";
       for (const [hx, hy] of [[-0.08, -0.08], [0.05, -0.11], [-0.02, 0.02]]) {
         ctx.beginPath();
         ctx.arc(hx * size, hy * size, Math.max(1.5, size * 0.035), 0, Math.PI * 2);
         ctx.fill();
       }
+      ctx.restore();
+
+      // Inset the rim stroke so its width sits inside the fill instead of ringing the lane behind it.
+      ctx.strokeStyle = "rgba(255,255,255,.35)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.max(1, radius - 1), 0, Math.PI * 2);
+      ctx.stroke();
       ctx.restore();
     }
 

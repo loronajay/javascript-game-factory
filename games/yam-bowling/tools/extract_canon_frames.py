@@ -173,6 +173,56 @@ def separate_edge_neighbors(
     )
 
 
+def extract_instance_pose(
+    segmented: Image.Image,
+    boundaries: list[int],
+    pose_index: int,
+    instance_mask: np.ndarray,
+    foreign_masks: list[np.ndarray] | None = None,
+    lower_restore_row: int | None = None,
+    upper_restore_row: int | None = None,
+    mask_dilation: int = 32,
+    crop_margin: int = SOURCE_CROP_MARGIN,
+) -> tuple[Image.Image, tuple[int, int, int, int]]:
+    """Extract one pose using a person-instance mask plus a safe lower-body cell."""
+    rgba = np.asarray(segmented.convert("RGBA")).copy()
+    if instance_mask.shape != rgba.shape[:2]:
+        raise ValueError("Instance mask dimensions must match the segmented sheet.")
+    foreign_masks = foreign_masks or []
+    if any(mask.shape != rgba.shape[:2] for mask in foreign_masks):
+        raise ValueError("Foreign mask dimensions must match the segmented sheet.")
+
+    cell_left, cell_right = boundaries[pose_index], boundaries[pose_index + 1]
+    raw_keep = ndimage.binary_fill_holes(instance_mask > 0.35)
+    keep = raw_keep.copy()
+    if mask_dilation:
+        keep = ndimage.binary_dilation(
+            keep,
+            structure=np.ones((mask_dilation * 2 + 1, mask_dilation * 2 + 1), dtype=np.uint8),
+        )
+    lower_restore_row = lower_restore_row or round(segmented.height * 0.55)
+    upper_restore_row = upper_restore_row or round(segmented.height * 0.55)
+    cell_width = cell_right - cell_left
+    upper_inset = round(cell_width * 0.25)
+    keep[:upper_restore_row, cell_left + upper_inset : cell_right - upper_inset] = True
+    keep[lower_restore_row:, cell_left:cell_right] = True
+    if foreign_masks:
+        foreign = np.logical_or.reduce([mask > 0.35 for mask in foreign_masks])
+        foreign_conflict = foreign & ~raw_keep
+        foreign_conflict[:, cell_left:cell_right] = False
+        keep &= ~foreign_conflict
+    rgba[:, :, 3] = np.where(keep, rgba[:, :, 3], 0).astype(np.uint8)
+
+    crop_left = max(0, cell_left - crop_margin)
+    crop_right = min(segmented.width, cell_right + crop_margin)
+    crop = Image.fromarray(rgba, "RGBA").crop((crop_left, 0, crop_right, segmented.height))
+    return retain_target_component(
+        crop,
+        keep_interior_satellites=False,
+        opening_size=component_opening_size("", pose_index),
+    )
+
+
 def retain_target_component(
     crop: Image.Image,
     keep_interior_satellites: bool = True,
@@ -297,11 +347,60 @@ def count_edge_pixels(image: Image.Image) -> int:
     )
 
 
+def count_internal_crop_edge_pixels(
+    image: Image.Image,
+    source_bounds: tuple[int, int],
+    sheet_width: int,
+) -> int:
+    """Count crop-edge foreground while ignoring the source sheet's outer sides."""
+    alpha = np.asarray(image.getchannel("A"))
+    total = int(np.count_nonzero(alpha[0, :]) + np.count_nonzero(alpha[-1, :]))
+    if source_bounds[0] > 0:
+        total += int(np.count_nonzero(alpha[:, 0]))
+    if source_bounds[1] < sheet_width:
+        total += int(np.count_nonzero(alpha[:, -1]))
+    return total
+
+
 def clear_invisible_rgb(image: Image.Image) -> Image.Image:
     """Remove hidden source colors from fully transparent pixels."""
     rgba = np.asarray(image.convert("RGBA")).copy()
     rgba[rgba[:, :, 3] == 0, :3] = 0
     return Image.fromarray(rgba, "RGBA")
+
+
+def constrain_frame_to_references(
+    frame: Image.Image,
+    references: list[Image.Image],
+    padding: int = 4,
+    lower_padding: int = 12,
+    lower_restore_row: int = 620,
+) -> Image.Image:
+    """Trim residual instance bleed using clean silhouettes from matching poses."""
+    rgba = np.asarray(frame.convert("RGBA")).copy()
+    reference_mask = np.zeros(rgba.shape[:2], dtype=bool)
+    for reference in references:
+        reference_rgba = reference.convert("RGBA")
+        if reference_rgba.size != frame.size:
+            raise ValueError("Reference frame dimensions must match the generated frame.")
+        reference_mask |= np.asarray(reference_rgba.getchannel("A")) > ALPHA_THRESHOLD
+
+    gate = ndimage.binary_dilation(reference_mask, iterations=padding)
+    lower_gate = ndimage.binary_dilation(reference_mask, iterations=lower_padding)
+    gate[lower_restore_row:, :] = lower_gate[lower_restore_row:, :]
+    rgba[:, :, 3] = np.where(gate, rgba[:, :, 3], 0).astype(np.uint8)
+
+    # Padding protects small costume/hair differences, but it can also admit a
+    # fingertip from a neighboring pose after the reference gate severs its
+    # thin bridge. The instance extraction entered this step as one connected
+    # figure, so any new satellite is gate-induced debris.
+    visible = rgba[:, :, 3] > 0
+    labels, count = ndimage.label(visible, structure=np.ones((3, 3), dtype=np.uint8))
+    if count:
+        areas = ndimage.sum(visible, labels, index=np.arange(1, count + 1))
+        keep = labels == int(areas.argmax()) + 1
+        rgba[:, :, 3] = np.where(keep, rgba[:, :, 3], 0).astype(np.uint8)
+    return clear_invisible_rgb(Image.fromarray(rgba, "RGBA"))
 
 
 def apply_manual_override(
@@ -461,6 +560,8 @@ def process_sheet(
     short_id: str | None = None,
     output_directory: Path | None = None,
     portrait_path: Path | None = None,
+    instance_masks: list[np.ndarray] | None = None,
+    frame_reference_paths: list[list[Path]] | None = None,
 ) -> list[FrameReport]:
     short_id = short_id or source_path.stem
     source = Image.open(source_path).convert("RGBA")
@@ -476,7 +577,26 @@ def process_sheet(
 
     extracted: list[tuple[Image.Image, tuple[int, int, int, int]]] = []
     source_bounds: list[tuple[int, int]] = []
+    if instance_masks is not None and len(instance_masks) != SOURCE_POSE_COUNT:
+        raise ValueError(f"Expected {SOURCE_POSE_COUNT} ordered instance masks.")
+    if frame_reference_paths is not None and len(frame_reference_paths) != THROW_POSE_COUNT:
+        raise ValueError(f"Expected references for {THROW_POSE_COUNT} throw frames.")
     for pose_index in range(1, SOURCE_POSE_COUNT):
+        if instance_masks is not None:
+            clean_crop, subject_bounds = extract_instance_pose(
+                segmented,
+                boundaries,
+                pose_index,
+                instance_masks[pose_index],
+                foreign_masks=[
+                    mask for index, mask in enumerate(instance_masks) if index != pose_index
+                ],
+            )
+            left = max(0, boundaries[pose_index] - SOURCE_CROP_MARGIN)
+            right = min(segmented.width, boundaries[pose_index + 1] + SOURCE_CROP_MARGIN)
+            extracted.append((clean_crop, subject_bounds))
+            source_bounds.append((left, right))
+            continue
         left, right, target_left, target_right = expand_pose_crop(
             boundaries[pose_index],
             boundaries[pose_index + 1],
@@ -504,6 +624,12 @@ def process_sheet(
     reports: list[FrameReport] = []
 
     for index, frame in enumerate(normalized, start=1):
+        if frame_reference_paths is not None:
+            references = []
+            for reference_path in frame_reference_paths[index - 1]:
+                with Image.open(reference_path) as reference:
+                    references.append(reference.convert("RGBA"))
+            frame = constrain_frame_to_references(frame, references)
         if override_root is not None:
             frame = apply_manual_override(
                 frame,
@@ -524,7 +650,15 @@ def process_sheet(
                 subject_bounds=extracted[index - 1][1],
                 output_bounds=bounds,
                 alpha_pixels=int(np.count_nonzero(np.asarray(frame.getchannel("A")))),
-                crop_edge_pixels=count_edge_pixels(extracted[index - 1][0]),
+                crop_edge_pixels=(
+                    count_internal_crop_edge_pixels(
+                        extracted[index - 1][0],
+                        source_bounds[index - 1],
+                        segmented.width,
+                    )
+                    if instance_masks is not None
+                    else count_edge_pixels(extracted[index - 1][0])
+                ),
                 edge_pixels=count_edge_pixels(frame),
             )
         )
