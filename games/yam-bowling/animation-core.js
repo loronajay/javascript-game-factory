@@ -1,12 +1,12 @@
 (function exposeAnimationCore(root, factory) {
-  const api = factory();
+  const api = factory(root);
 
   if (typeof module === "object" && module.exports) {
     module.exports = api;
   }
 
   root.YamBowlingCore = api;
-})(typeof globalThis !== "undefined" ? globalThis : this, function createAnimationCore() {
+})(typeof globalThis !== "undefined" ? globalThis : this, function createAnimationCore(root) {
   const CANON_ROSTER = [
     ["Daisy Monroe", "daisy-monroe", "055f40b8-ba11-4466-815a-e7613378200f"],
     ["Nia Brooks", "nia-brooks", "121280c1-15bc-44a6-9651-d48dc216707c"],

@@ -71,6 +71,7 @@ const MODULES = [
   "scripts/rival/rivals.js",
   "scripts/rival/ghost.js",
   "scripts/rival/lineup.js",
+  "scripts/campaign/contacts.js",
   "scripts/campaign/events.js",
   "scripts/campaign/map.js",
   "scripts/campaign/progress.js",
@@ -577,7 +578,8 @@ test("the campaign's rules never reach for a browser", () => {
     /Math\.random/,
   ];
   for (const relative of [
-    "scripts/campaign/events.js",
+    "scripts/campaign/contacts.js",
+  "scripts/campaign/events.js",
     "scripts/campaign/map.js",
     "scripts/campaign/progress.js",
     "scripts/ui/campaign.js",

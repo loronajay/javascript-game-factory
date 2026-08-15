@@ -225,6 +225,7 @@ import {
   CAMPAIGN_RACE,
   STAGE_MAP,
   campaignEvent,
+  campaignFaceSrcs,
   campaignView,
   cancelCampaign,
   confirmCampaign,
@@ -1610,6 +1611,11 @@ export function boot(canvas) {
   function openCampaign() {
     campaign = createCampaign({ eventId: campaignRun?.id ?? campaignEvent(campaign)?.id ?? null });
     campaignHover = null;
+    // Every face in the chapter, in one go on the way in. The detail strip
+    // changes driver on each cursor move, so a per-frame request would fire on
+    // a held arrow key — and these are thumbs, so the whole chapter costs about
+    // what one card does. The rival strip makes the same trade at boot.
+    for (const src of campaignFaceSrcs()) requestFace(src);
   }
 
   /** The campaign view as it is currently drawn, hover folded in. */
@@ -3041,7 +3047,7 @@ export function boot(canvas) {
 
     if (shell.screen === SCREEN_CAMPAIGN) {
       canvas.style.cursor = campaignHover ? "pointer" : "default";
-      drawCampaign(ctx, currentCampaignView(), { mapImage: campaignMap, splashImages });
+      drawCampaign(ctx, currentCampaignView(), { mapImage: campaignMap, splashImages, faces: faceImages });
       return;
     }
 

@@ -113,9 +113,25 @@ function rosterOpponent(id) {
  * node along the route and writing the race for it; nothing is positioned, and
  * no trail is drawn, because both are in the picture.
  *
+ * **Chapter one is the whole Street Circuit**, all nine painted bases from START
+ * to the boss plate. A region finished end to end is what makes the rest of the
+ * map read as "not yet" rather than as "unfinished": the player can see exactly
+ * what a completed district looks like before they are told the next one is shut.
+ *
  * Difficulty here is the rival ladder's rule, unchanged: looser hands, never a
  * better car. The opening opponent is slower than Vee — the roster's rookie —
  * on purpose, because the first thing a campaign has to do is let somebody win.
+ * Every figure is a **measured** replay time over that event's own distance, and
+ * `tests/campaign.test.js` re-measures them: within any one distance the chapter
+ * gets monotonically quicker in route order, and nobody in it is beyond a
+ * flawless human run.
+ *
+ * **The three distances are a deliberate braid rather than a ramp.** An eighth
+ * is a launch and one shift, a quarter is the mode's home ground, and a half is
+ * where the top two gears decide it — so a chapter that only ran quarters would
+ * be nine attempts at the same skill. Because each distance keeps its own
+ * ordering, a bonus stop can be a *change of question* without also having to be
+ * a step up in difficulty.
  */
 export const EVENTS = [
   {
@@ -139,6 +155,7 @@ export const EVENTS = [
       tier: "LOCAL",
       blurb: "Somebody's hatchback and somebody's nerve. Grabs third about a thousand early.",
       accent: "#8fa3b8",
+      avatarId: "male-3",
       modelId: "scalpel-r",
       livery: { paint: { hue: 205, saturation: 0.45, brightness: 0.8, finish: "gloss" } },
       profile: {
@@ -183,13 +200,14 @@ export const EVENTS = [
       tier: "LOCAL",
       blurb: "Turns up every week and wins most of them. Tidy launch, lazy third.",
       accent: "#c9a227",
+      avatarId: "male-9",
       modelId: "shutter-z",
       livery: { paint: { hue: 38, saturation: 0.62, brightness: 0.9, finish: "gloss" } },
       profile: {
-        reactionSeconds: 0.5, reactionJitter: 0.22,
-        shiftRpmOffset: -750, shiftRpmJitter: 500,
-        gateTicks: 14, gateTicksJitter: 4,
-        catchSeconds: 0.18, catchJitter: 0.1,
+        reactionSeconds: 0.58, reactionJitter: 0.26,
+        shiftRpmOffset: -930, shiftRpmJitter: 600,
+        gateTicks: 16, gateTicksJitter: 4,
+        catchSeconds: 0.22, catchJitter: 0.12,
       },
     }),
     brief: [
@@ -197,8 +215,12 @@ export const EVENTS = [
         "Word travels. They have been racing that corner for years",
         "and they would like to know who you are.",
       ] },
-      { speaker: VOICE_UNKNOWN, text: [
-        "Same quarter. He will get off the line before you do.",
+      { speaker: "mari", text: [
+        "I run this corner. That means I decide who gets a lane,",
+        "and tonight you get his. Same quarter.",
+      ] },
+      { speaker: "mari", text: [
+        "He will get off the line before you do. He always does.",
         "Take it back in the gears.",
       ] },
     ],
@@ -215,26 +237,251 @@ export const EVENTS = [
     objectiveId: "half",
     seed: 2288,
     requires: ["ch1-regulars"],
-    unlocks: [],
+    unlocks: ["ch1-short-money"],
     opponent: nobody({
       id: "nobody-muscle",
       name: "Night Shift",
       tier: "LOCAL",
       blurb: "All of it in a straight line. Nothing left once the road stops being short.",
       accent: "#b4553a",
+      avatarId: "male-17",
       modelId: "colt-gt",
       livery: { paint: { hue: 12, saturation: 0.7, brightness: 0.85, finish: "gloss" } },
       profile: {
-        reactionSeconds: 0.42, reactionJitter: 0.2,
-        shiftRpmOffset: -600, shiftRpmJitter: 430,
-        gateTicks: 13, gateTicksJitter: 3,
-        catchSeconds: 0.15, catchJitter: 0.09,
+        reactionSeconds: 0.6, reactionJitter: 0.26,
+        shiftRpmOffset: -930, shiftRpmJitter: 580,
+        gateTicks: 16, gateTicksJitter: 4,
+        catchSeconds: 0.23, catchJitter: 0.12,
       },
     }),
     brief: [
-      { speaker: VOICE_UNKNOWN, text: [
+      { speaker: "mari", text: [
         "Twice the distance, twice as many chances to throw it away.",
         "Fifth and sixth decide this one, not the launch.",
+      ] },
+      { speaker: "dez", text: [
+        "Long road. Whatever you are doing at the top of third,",
+        "keep doing it — you have got three more gears of it.",
+      ] },
+    ],
+  },
+  {
+    id: "ch1-short-money",
+    chapter: 1,
+    nodeId: "street-3",
+    title: "SHORT MONEY",
+    where: "Old Town — the market run",
+    splash: "roof-meet.png",
+    trackId: "street-race",
+    modeId: MODE_RIVAL,
+    // An eighth: a launch and one shift, and the whole race is over before the
+    // long-road skills the last event asked for have anything to say. That is
+    // what a bonus stop is for — a different question, not a harder one.
+    objectiveId: "eighth",
+    seed: 7731,
+    requires: ["ch1-closing-time"],
+    unlocks: ["ch1-vee"],
+    opponent: nobody({
+      id: "nobody-hatch-2",
+      name: "Bracket",
+      tier: "LOCAL",
+      blurb: "Only ever races to the second light. Reckons that is the only bit that counts.",
+      accent: "#6fb7c9",
+      avatarId: "female-11",
+      modelId: "ember-rs",
+      livery: { paint: { hue: 190, saturation: 0.66, brightness: 0.95, finish: "gloss" } },
+      profile: {
+        reactionSeconds: 0.44, reactionJitter: 0.2,
+        shiftRpmOffset: -820, shiftRpmJitter: 520,
+        gateTicks: 15, gateTicksJitter: 4,
+        catchSeconds: 0.2, catchJitter: 0.11,
+      },
+    }),
+    brief: [
+      { speaker: "rook", text: [
+        "Eighth mile. The money is already down and it is not mine,",
+        "so please do not embarrass either of us.",
+      ] },
+      { speaker: "rook", text: [
+        "It is over in second gear. One launch, one shift.",
+        "Get that shift wrong and there is no road left to fix it on.",
+      ] },
+    ],
+  },
+  {
+    id: "ch1-vee",
+    chapter: 1,
+    nodeId: "street-4",
+    // Named for the race rather than for the driver. The dossier and the
+    // speaker's plate both say VEE a moment later, and a title that says it a
+    // third time is the screen repeating itself instead of telling you anything.
+    title: "ON THE LADDER",
+    where: "Old Town — she picked the corner",
+    splash: "rivals-and-bosses/vee.png",
+    trackId: "street-race",
+    modeId: MODE_RIVAL,
+    objectiveId: "quarter",
+    seed: 5310,
+    requires: ["ch1-short-money"],
+    unlocks: ["ch1-toll-booth"],
+    // The first of the ten, on a base the artwork paints as a rival stop. Her
+    // hands come from `rivals.js` rather than from here — see `rosterOpponent`.
+    opponent: rosterOpponent("vee"),
+    brief: [
+      { speaker: "mari", text: [
+        "This one is not a regular. She is on the ladder,",
+        "which means somebody keeps score of what happens next.",
+      ] },
+      { speaker: "vee", text: [
+        "I have watched three of your runs. You are quick and you",
+        "are messy, and only one of those is hard to fix.",
+      ] },
+      { speaker: "vee", text: [
+        "Quarter mile. Take it and I will tell them you are worth",
+        "the drive. If you do not, I am here next week anyway.",
+      ] },
+    ],
+  },
+  {
+    id: "ch1-toll-booth",
+    chapter: 1,
+    nodeId: "street-5",
+    title: "TOLL BOOTH",
+    where: "Old Town — under the flyover",
+    splash: "circuit-race.png",
+    trackId: "street-race",
+    modeId: MODE_RIVAL,
+    objectiveId: "eighth",
+    seed: 6194,
+    requires: ["ch1-vee"],
+    unlocks: ["ch1-last-orders"],
+    opponent: nobody({
+      id: "nobody-euro",
+      name: "Tollgate",
+      tier: "LOCAL",
+      blurb: "Charges everyone an eighth mile to use his road. Has not lost it in a while.",
+      accent: "#a97bff",
+      avatarId: "female-19",
+      modelId: "crest-s",
+      livery: {
+        paint: { hue: 268, saturation: 0.6, brightness: 0.8, finish: "metallic" },
+        layers: [
+          { kind: "stripe", position: 0.5, size: 0.08, feather: 0.02, curve: 0, mirrored: false,
+            paint: { hue: 0, saturation: 0, brightness: 1.15, finish: "gloss" } },
+        ],
+      },
+      profile: {
+        reactionSeconds: 0.3, reactionJitter: 0.14,
+        shiftRpmOffset: -520, shiftRpmJitter: 380,
+        gateTicks: 12, gateTicksJitter: 3,
+        catchSeconds: 0.13, catchJitter: 0.08,
+      },
+    }),
+    brief: [
+      { speaker: "rook", text: [
+        "He does not want your money. He wants the eighth,",
+        "and he has taken it off everybody who has asked.",
+      ] },
+      { speaker: "dez", text: [
+        "One shift again. Only this time the other lane knows",
+        "exactly when it is coming.",
+      ] },
+    ],
+  },
+  {
+    id: "ch1-last-orders",
+    chapter: 1,
+    nodeId: "street-6",
+    title: "LAST ORDERS",
+    where: "Old Town — out past the depot",
+    splash: "rooftop-meet-high-stakes.png",
+    trackId: "street-race",
+    modeId: MODE_RIVAL,
+    objectiveId: "half",
+    seed: 8825,
+    requires: ["ch1-toll-booth"],
+    unlocks: ["ch1-switch"],
+    opponent: nobody({
+      id: "nobody-gt",
+      name: "Depot",
+      tier: "LOCAL",
+      blurb: "Drives it like a job. Never brilliant, never once throws one away either.",
+      accent: "#8fd14f",
+      avatarId: "male-5",
+      modelId: "gravel-stx",
+      livery: { paint: { hue: 95, saturation: 0.5, brightness: 0.7, finish: "matte" } },
+      profile: {
+        reactionSeconds: 0.42, reactionJitter: 0.18,
+        shiftRpmOffset: -640, shiftRpmJitter: 420,
+        gateTicks: 13, gateTicksJitter: 3,
+        catchSeconds: 0.16, catchJitter: 0.09,
+      },
+    }),
+    brief: [
+      { speaker: "dez", text: [
+        "Half mile, and this one does not make mistakes.",
+        "You cannot wait for him to hand it to you.",
+      ] },
+      { speaker: "dez", text: [
+        "So it is on the tacho. Every gear, on the number,",
+        "six times. That is the whole race.",
+      ] },
+    ],
+  },
+  {
+    id: "ch1-switch",
+    chapter: 1,
+    nodeId: "street-7",
+    title: "PACKED HOUSE",
+    where: "Old Town — the corner, packed out",
+    splash: "rivals-and-bosses/switch.png",
+    trackId: "street-race",
+    modeId: MODE_RIVAL,
+    objectiveId: "quarter",
+    seed: 3466,
+    requires: ["ch1-last-orders"],
+    unlocks: ["ch1-street-boss"],
+    opponent: rosterOpponent("switch"),
+    brief: [
+      { speaker: "switch", text: [
+        "Vee said you were worth the drive. She says that about",
+        "a lot of people and she is wrong about most of them.",
+      ] },
+      { speaker: "switch", text: [
+        "Quarter. Whoever takes it gets the boss next,",
+        "and I have waited on that a lot longer than you have.",
+      ] },
+    ],
+  },
+  {
+    id: "ch1-street-boss",
+    chapter: 1,
+    nodeId: "street-boss",
+    title: "THE ROAD OUT",
+    where: "Old Town — the last half mile out of the district",
+    splash: "rivals-and-bosses/saint.png",
+    trackId: "street-race",
+    modeId: MODE_RIVAL,
+    objectiveId: "half",
+    seed: 1207,
+    requires: ["ch1-switch"],
+    // The end of the district. What it opens is chapter two, which is not
+    // written — an empty `unlocks` is the honest way to say so, and every base
+    // past here reads as `soon` rather than as locked.
+    unlocks: [],
+    opponent: rosterOpponent("saint"),
+    brief: [
+      { speaker: "mari", text: [
+        "That is the corner done. Everything east of here is",
+        "somebody else's, and he is the one who says so.",
+      ] },
+      { speaker: "saint", text: [
+        "I have got the best launch in this district and you have",
+        "got half a mile to make that not matter.",
+      ] },
+      { speaker: "saint", text: [
+        "Beat me and the road out of Old Town is yours.",
+        "Nobody has managed it yet. Somebody will.",
       ] },
     ],
   },

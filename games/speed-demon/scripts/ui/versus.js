@@ -29,8 +29,7 @@
 // and rules belong where a test can reach them. The renderer takes two finished
 // sides and draws them; it never asks the roster anything.
 
-import { rivalCardSrc, rivalById } from "../rival/rivals.js";
-import { KIND_GHOST } from "../rival/lineup.js";
+import { KIND_GHOST, entryFaceSrc } from "../rival/lineup.js";
 import { avatarById, avatarSrc } from "../profile/avatars.js";
 import { displayName } from "../profile/profile.js";
 
@@ -109,15 +108,16 @@ export function rivalSide(entry, { model = null, livery = null, stat = "", profi
       stat,
     });
   }
-  // A campaign event fields a driver who is not on the roster at all, so the
-  // portrait is only looked up when the id names one — `buildRival`'s rule about
-  // profiles, applied to the art.
-  const rival = rivalById(entry.id);
+  // A campaign event fields a driver who is not on the roster at all, and they
+  // wear a face from the generic avatar roster instead. `entryFaceSrc` is the
+  // one place that fork lives — `buildRival`'s rule about profiles, applied to
+  // the art — so this asks for a card-sized portrait and never for which
+  // catalog it came out of.
   return side({
     id: entry.id,
     name: entry.name,
     tag: entry.tier ?? "RIVAL",
-    imageSrc: rival ? rivalCardSrc(rival) : null,
+    imageSrc: entryFaceSrc(entry, { card: true }),
     initial: entry.initial ?? "?",
     accent: entry.accent ?? "#4aa8ff",
     model,

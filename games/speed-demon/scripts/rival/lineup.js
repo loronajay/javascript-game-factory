@@ -8,8 +8,9 @@
 import { rebaseToStart } from "../sim/input-log.js";
 import { boardUnit, formatValue } from "../records/records.js";
 import { createLivery } from "../garage/livery.js";
+import { avatarById, avatarSrc, avatarThumbSrc } from "../profile/avatars.js";
 import { driveRace } from "./cpu-driver.js";
-import { RIVALS, DEFAULT_RIVAL_ID, rivalById } from "./rivals.js";
+import { RIVALS, DEFAULT_RIVAL_ID, rivalById, rivalCardSrc, rivalThumbSrc } from "./rivals.js";
 
 export { DEFAULT_RIVAL_ID };
 
@@ -80,6 +81,30 @@ export function lineupFor(boardId, ghost = null) {
     },
     ...entries,
   ];
+}
+
+/**
+ * The face to draw beside a lineup entry, at whichever of the two derived sizes
+ * the surface actually wants — or null, which every renderer here survives by
+ * drawing the driver's initial on a plate in their accent.
+ *
+ * **Two catalogs, one question.** A roster driver's portrait comes from
+ * `rivals.js` and a campaign local's from the generic avatar roster, and every
+ * surface that draws "the other car's driver" — the VS slot, the campaign map's
+ * detail strip, a briefing's dossier — wants the answer without caring which it
+ * got. That is `buildRival`'s own argument about profiles, applied to the art:
+ * where the thing came from stops mattering the moment it exists.
+ *
+ * The size is a flag rather than the caller building a path, because picking the
+ * wrong one is the mistake `tests/modules.test.js` sweeps for: a card is nine
+ * times the pixels of a thumb and the difference is invisible in a 56px cell.
+ */
+export function entryFaceSrc(entry, { card = false } = {}) {
+  if (!entry) return null;
+  const rival = rivalById(entry.id);
+  if (rival) return card ? rivalCardSrc(rival) : rivalThumbSrc(rival);
+  const avatar = avatarById(entry.avatarId);
+  return card ? avatarSrc(avatar) : avatarThumbSrc(avatar);
 }
 
 /**

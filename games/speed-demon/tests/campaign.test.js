@@ -5,13 +5,23 @@ import { GATE_6_SPEED, createGate } from "../scripts/sim/gate.js";
 import { FINISHED } from "../scripts/sim/race.js";
 import { raceOptionsFor, modeById, objectiveOption } from "../scripts/sim/modes.js";
 import { replayRun } from "../scripts/sim/input-log.js";
-import { buildRival } from "../scripts/rival/lineup.js";
+import { buildRival, entryFaceSrc } from "../scripts/rival/lineup.js";
 import { RIVALS } from "../scripts/rival/rivals.js";
+import { avatarById } from "../scripts/profile/avatars.js";
 import { modelById } from "../scripts/assets/car-atlas.js";
 import { trackById } from "../scripts/ui/track-layout.js";
 import { boardIdFor } from "../scripts/records/records.js";
 import { EVENTS, FIRST_EVENT_ID, eventById, splashSrc } from "../scripts/campaign/events.js";
-import { MAP_IMAGE, MAP_NODES, mapNodeById, mapRect, pointOnMap } from "../scripts/campaign/map.js";
+import { VOICE_UNKNOWN, allContacts, speakerById } from "../scripts/campaign/contacts.js";
+import {
+  MAP_IMAGE,
+  MAP_NODES,
+  NODE_BOSS,
+  NODE_RIVAL,
+  mapNodeById,
+  mapRect,
+  pointOnMap,
+} from "../scripts/campaign/map.js";
 import {
   STATUS_CLEARED,
   STATUS_LOCKED,
@@ -29,6 +39,7 @@ import {
   STAGE_MAP,
   STATUS_SOON,
   campaignEvent,
+  campaignFaceSrcs,
   campaignMapRect,
   campaignNode,
   campaignView,
@@ -144,17 +155,78 @@ test("an event's run files to a board a solo run can also reach", () => {
   }
 });
 
-test("the opening opponents are nobody, and the roster is untouched", () => {
-  // The ten faces are the campaign's rivals and bosses. Spending one on a
-  // tutorial race wastes it, so chapter one races anonymous locals whose
-  // profile rides on the event rather than on a roster row.
+test("the painted base decides whether a roster face is spent on the race", () => {
+  // The ten are rationed: a rival the player has already beaten twice is not a
+  // rival any more, so they are saved for the bases the *artwork* marks out as
+  // rival and boss stops. A plain race base fields an anonymous local, whose
+  // hands ride on the event rather than on a roster row.
   const rosterIds = new Set(RIVALS.map((rival) => rival.id));
+  const spent = new Set();
   for (const event of EVENTS) {
     assert(event.opponent, `${event.id} has no opponent`);
-    assert(event.opponent.profile, `${event.id}'s opponent has no hands`);
-    assert(!rosterIds.has(event.opponent.id), `${event.id} spends the roster face ${event.opponent.id}`);
     assert(modelById(event.opponent.modelId), `${event.id}'s opponent drives an unknown car`);
+
+    const node = mapNodeById(event.nodeId);
+    const painted = node.kind === NODE_RIVAL || node.kind === NODE_BOSS;
+    const roster = rosterIds.has(event.opponent.id);
+    assertEqual(roster, painted, `${event.id} is on a ${node.kind} base and fields ${event.opponent.id}`);
+
+    if (roster) {
+      // No profile of its own: the hands come from `rivals.js`, so a retune of
+      // the ladder moves the campaign with it rather than leaving a driver who
+      // drives differently depending on which screen you met them from.
+      assert(!event.opponent.profile, `${event.id} overrides the roster's hands for ${event.opponent.id}`);
+      assert(!spent.has(event.opponent.id), `${event.opponent.id} is spent twice`);
+      spent.add(event.opponent.id);
+    } else {
+      assert(event.opponent.profile, `${event.id}'s opponent has no hands`);
+    }
   }
+});
+
+test("every driver and every voice has a face the game can actually load", () => {
+  // A face is cheap now and a roster face is not — the generic avatar roster is
+  // what lets a nameless local and an unnamed contact look like people without
+  // spending one of the ten. A stale avatar id resolves to null and degrades to
+  // an initial on a plate, which is silent, so this is the only warning there
+  // is that a row points at nothing.
+  for (const event of EVENTS) {
+    if (event.opponent.profile) {
+      // A local's portrait comes from the avatar manifest. Roster drivers keep
+      // their own and are covered by the rival asset test.
+      assert(avatarById(event.opponent.avatarId), `${event.id}'s opponent wears the unknown face ${event.opponent.avatarId}`);
+    }
+    assert(entryFaceSrc(event.opponent), `${event.id}'s opponent has no portrait at all`);
+
+    for (const beat of event.brief) {
+      const speaker = speakerById(beat.speaker);
+      assert(speaker, `${event.id} is spoken by the unknown ${beat.speaker}`);
+      assert(speaker.name && speaker.role, `${beat.speaker} has no plate to draw`);
+    }
+  }
+
+  // `VOICE_UNKNOWN` has no face **on purpose** — the number you found does not
+  // come with a photograph — so a null here is the characterisation rather than
+  // a missing asset. Everyone else has one.
+  for (const contact of allContacts()) {
+    const speaker = speakerById(contact.id);
+    if (contact.id === VOICE_UNKNOWN) assertEqual(speaker.faceSrc, null, "the unknown voice must stay faceless");
+    else assert(speaker.faceSrc, `${contact.id} has no portrait`);
+  }
+});
+
+test("nothing the campaign draws asks for a full-size master", () => {
+  // The map's strip draws a face at 62px and the briefing at 88; a card is
+  // 768px and a master is 1254. `tests/modules.test.js` sweeps the source for a
+  // `.src`, and this is the same claim checked through the values themselves.
+  for (const src of campaignFaceSrcs()) {
+    assert(src.includes("/thumbs/"), `${src} is not a thumb`);
+    assert(!src.endsWith(".png"), `${src} is a master`);
+  }
+  // One per driver plus one per distinct voice, and no duplicates — this is
+  // requested as a set on the way into the screen, so a list that grew with
+  // every beat would be re-requesting the same contact nine times.
+  assertEqual(campaignFaceSrcs().length, new Set(campaignFaceSrcs()).size);
 });
 
 test("every event is reachable from the first one", () => {
@@ -194,6 +266,30 @@ test("a briefing fits the box it is drawn in", () => {
     }
   }
   assert(splashSrc(EVENTS[0]).endsWith(".png"));
+});
+
+test("the briefing's furniture all fits inside its fixed box", () => {
+  // The box does not grow to fit its copy — one that did would land on the
+  // artwork — so everything drawn in it has to be checked against it instead.
+  // The speaker's plate arriving on the left is what made this worth sweeping:
+  // it pushed the dialogue down past where the hint sits.
+  const { box, face, text, firstLine, lineHeight, maxLines, hint, dossier, title } = CAMPAIGN_LAYOUT.briefing;
+
+  assert(face.y + face.size < box.height, "the speaker's plate runs out of the bottom of the box");
+  assert(text.x > face.x + face.size, "the dialogue is drawn over the speaker's plate");
+  const lastLine = firstLine + (maxLines - 1) * lineHeight;
+  assert(lastLine < hint, `a ${maxLines}-line beat (${lastLine}) prints through the hint (${hint})`);
+  assert(hint < box.height, "the hint is drawn below the box");
+
+  // And the dossier is clear of the title beside it and the box beneath it. The
+  // title is a baseline rather than a rect, so the separation that matters is
+  // the column: the dossier lives in the right-hand third, which is also why the
+  // splash art is composed around an empty middle.
+  assert(dossier.x > title.x + CAMPAIGN_LAYOUT.screen.width / 2, "the dossier is drawn into the title's column");
+  assert(dossier.y + dossier.height < box.y, "the dossier overlaps the dialogue box");
+  assert(dossier.x + dossier.width <= CAMPAIGN_LAYOUT.screen.width, "the dossier runs off the screen");
+  assert(dossier.face < dossier.width, "the dossier's face is wider than the card holding it");
+  assert(box.y + box.height <= CAMPAIGN_LAYOUT.screen.height, "the dialogue box runs off the bottom");
 });
 
 // ---------------------------------------------------------------------------
@@ -425,16 +521,38 @@ test("every event's opponent is beatable, and the opening one is a gift", () => 
   const quarters = times.filter((entry) => entry.objectiveId === "quarter");
   assert(quarters.length >= 2, "the fixture assumes two quarter-mile events");
   assert(quarters[0].seconds > 13.6, `the opener is ${quarters[0].seconds.toFixed(2)}s — too quick for a first race`);
-  // And the chapter gets harder, which is the only progression claim it makes.
-  for (let index = 1; index < quarters.length; index += 1) {
-    assert(
-      quarters[index].seconds < quarters[index - 1].seconds,
-      `${quarters[index].id} is not quicker than ${quarters[index - 1].id}`,
-    );
+
+  // The chapter gets harder, which is the only progression claim it makes —
+  // and it is made **per distance** rather than across the whole route. The
+  // three distances braid rather than ramp: an eighth is a launch and one
+  // shift, a half is decided in the top two gears, and comparing a time from
+  // one against a time from the other says nothing at all. That is also what
+  // frees a bonus stop to be a change of question instead of a step up.
+  const byDistance = new Map();
+  for (const entry of times) {
+    if (!byDistance.has(entry.objectiveId)) byDistance.set(entry.objectiveId, []);
+    byDistance.get(entry.objectiveId).push(entry);
   }
-  // Nobody in chapter one is beyond a clean run.
-  for (const entry of quarters) {
-    assert(entry.seconds > 12.04, `${entry.id} is quicker than a flawless human lap`);
+  for (const [objectiveId, rungs] of byDistance) {
+    for (let index = 1; index < rungs.length; index += 1) {
+      assert(
+        rungs[index].seconds < rungs[index - 1].seconds,
+        `over the ${objectiveId}, ${rungs[index].id} (${rungs[index].seconds.toFixed(2)}s) is not quicker ` +
+          `than ${rungs[index - 1].id} (${rungs[index - 1].seconds.toFixed(2)}s)`,
+      );
+    }
+  }
+
+  // Nobody in chapter one is beyond a clean run. Measured against the roster's
+  // own best over the same distance rather than against one hardcoded number,
+  // because the ladder's top rung is itself held above a flawless human lap —
+  // so a campaign driver inside it is inside the human range by construction.
+  const ceiling = { eighth: 8.2, quarter: 12.04, half: 19.4 };
+  for (const entry of times) {
+    assert(
+      entry.seconds > ceiling[entry.objectiveId],
+      `${entry.id} at ${entry.seconds.toFixed(2)}s is quicker than a flawless human ${entry.objectiveId}`,
+    );
   }
 });
 

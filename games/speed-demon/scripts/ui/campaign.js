@@ -22,6 +22,8 @@
 import { modeById, objectiveOption } from "../sim/modes.js";
 import { trackById } from "./track-layout.js";
 import { EVENTS, eventById } from "../campaign/events.js";
+import { speakerById } from "../campaign/contacts.js";
+import { entryFaceSrc } from "../rival/lineup.js";
 import { MAP_NODES, mapRect, pointOnMap } from "../campaign/map.js";
 import { STATUS_CLEARED, STATUS_LOCKED, eventStatus, progressSummary } from "../campaign/progress.js";
 
@@ -71,11 +73,43 @@ export const CAMPAIGN_LAYOUT = {
   // the art and covering it would be painting over the map to say where the map
   // is. This is the radius of the ring that marks one.
   token: { radius: 22 },
+  // The face on the detail strip, in the column that names the other driver.
+  // Square, because every face in the cabinet is — the avatar manifest's note
+  // about there being no crop rectangle, which is what lets one cell size serve
+  // a roster portrait and a generic avatar without per-face data.
+  detailFace: { size: 62, gap: 12 },
   briefing: {
-    box: { x: 120, y: 452, width: 1040, height: 196 },
+    // Sixteen pixels taller than it was, and lower, because the speaker's name
+    // and role now sit above the dialogue where the dialogue used to start. The
+    // box is still a **fixed** height — one that grew to fit its copy would land
+    // on the artwork — so a four-line beat is checked by `tests/campaign.test.js`
+    // against `hint`, not by somebody noticing the overlap on screen.
+    box: { x: 120, y: 440, width: 1040, height: 212 },
     title: { x: 120, y: 388 },
     lineHeight: 30,
     maxLines: 4,
+    /** Where the first line of dialogue sits, from the top of the box. */
+    firstLine: 84,
+    /** The page counter's and the hint's baselines, likewise. */
+    hint: 194,
+    /**
+     * The speaker's plate, inside the box on its left.
+     *
+     * The dialogue indents past it rather than wrapping around it: a fixed
+     * indent is one number, and text that flows around a portrait is a
+     * line-breaking problem in a box whose height is deliberately fixed.
+     */
+    face: { x: 22, y: 22, size: 88 },
+    text: { x: 132 },
+    /**
+     * The dossier: who is in the other lane, over the splash and above the box.
+     *
+     * On the right because the splash art is composed around an empty middle
+     * and the title already owns the left — and *above* the dialogue rather
+     * than beside it because the briefing reads top to bottom: this is the race,
+     * that is somebody talking about it.
+     */
+    dossier: { x: 858, y: 176, width: 302, height: 236, face: 96 },
   },
 };
 
@@ -252,14 +286,7 @@ function detailFor(node, event, progress) {
     cleared: status === STATUS_CLEARED,
     trackLabel: hidden ? "" : trackById(event.trackId)?.label ?? "",
     objectiveLabel: hidden ? "" : objective?.label ?? "",
-    opponent: !hidden && event.opponent
-      ? {
-        name: event.opponent.name,
-        tier: event.opponent.tier,
-        blurb: event.opponent.blurb,
-        accent: event.opponent.accent,
-      }
-      : null,
+    opponent: !hidden && event.opponent ? opponentFor(event.opponent) : null,
     attempts: record?.attempts ?? 0,
     wins: record?.wins ?? 0,
     hint: status === STATUS_SOON
@@ -270,18 +297,55 @@ function detailFor(node, event, progress) {
   };
 }
 
+/**
+ * The driver in the other lane, as both surfaces that name one want them.
+ *
+ * One shaping rather than two because the strip and the dossier are the same
+ * claim at two sizes, and the day one gains a field the other should have it.
+ * `faceSrc` is the **thumb**: the larger of the two cells is 96px, where a
+ * card-sized portrait is eight times the pixels nobody can see.
+ */
+function opponentFor(entry) {
+  return {
+    id: entry.id,
+    name: entry.name,
+    tier: entry.tier,
+    blurb: entry.blurb,
+    accent: entry.accent,
+    // The plate a face falls back to. Normal rather than exceptional — it is
+    // what a portrait still in flight draws, on every first frame.
+    initial: entry.initial ?? "?",
+    faceSrc: entryFaceSrc(entry),
+  };
+}
+
 function briefingFor(event, line) {
   if (!event) return null;
   const beats = event.brief ?? [];
   const index = Math.min(Math.max(line, 0), Math.max(0, beats.length - 1));
   const beat = beats[index] ?? { speaker: "", text: [] };
   const last = index >= beats.length - 1;
+  const mode = modeById(event.modeId);
   return {
     id: event.id,
     title: event.title,
     where: event.where,
     splash: event.splash,
-    speaker: beat.speaker,
+    // Resolved here rather than in the renderer, which would otherwise have to
+    // consult a catalog to draw a name — the rule every view model in the
+    // cabinet follows. Null is survivable: an unresolved id draws no plate.
+    speaker: speakerById(beat.speaker),
+    // The dossier. It repeats what the detail strip said a moment ago, which is
+    // the point: the map is browsed and the briefing is committed to, and the
+    // last thing a player should have to do before a race is remember who they
+    // agreed to drive against.
+    opponent: event.opponent
+      ? {
+        ...opponentFor(event.opponent),
+        trackLabel: trackById(event.trackId)?.label ?? "",
+        objectiveLabel: mode ? objectiveOption(mode, event.objectiveId)?.label ?? "" : "",
+      }
+      : null,
     // Clipped to what the box holds. The box is a fixed height on purpose — a
     // panel that grows to fit its copy is a panel that lands on the artwork —
     // so an over-long beat is caught by `tests/campaign.test.js` rather than by
@@ -292,6 +356,32 @@ function briefingFor(event, line) {
     last,
     hint: last ? "ENTER to drive" : "ENTER to continue",
   };
+}
+
+/**
+ * Every face the campaign screen can put on screen, as paths.
+ *
+ * Asked for as a set when the map opens rather than per frame, because the
+ * strip changes face on every cursor move and a request driven off the drawn
+ * view would fire on a key repeat. These are thumbs — the whole chapter is
+ * roughly the cost of one card — which is the same trade the rival strip makes
+ * when it loads all ten portraits at boot.
+ *
+ * Here rather than in the composition root because it is a walk over the
+ * catalog, and the root's job is to load what it is handed rather than to know
+ * that a beat has a speaker.
+ */
+export function campaignFaceSrcs() {
+  const srcs = new Set();
+  for (const event of EVENTS) {
+    const opponent = event.opponent ? entryFaceSrc(event.opponent) : null;
+    if (opponent) srcs.add(opponent);
+    for (const beat of event.brief ?? []) {
+      const face = speakerById(beat.speaker)?.faceSrc;
+      if (face) srcs.add(face);
+    }
+  }
+  return [...srcs];
 }
 
 export { eventById };

@@ -13,6 +13,7 @@ const {
 } = require("./animation-core.js");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 const { describe, test } = require("node:test");
 const assert = require("node:assert/strict");
 
@@ -194,5 +195,22 @@ describe("character skins", () => {
     assert.equal(getEquippedSkinId(bowler, storage), "swimsuit");
     assert.equal(saveEquippedSkinId(bowler, "future-invalid-skin", storage), "canon");
     assert.equal(getEquippedSkinId(bowler, storage), "canon");
+  });
+
+  test("uses the browser's localStorage when storage is omitted", () => {
+    const storage = memoryStorage({
+      "yam-bowling.equipped-skins.v1": JSON.stringify({ "daisy-monroe": "swimsuit" }),
+    });
+    const browser = { localStorage: storage };
+
+    vm.runInNewContext(
+      fs.readFileSync(path.join(__dirname, "animation-core.js"), "utf8"),
+      browser,
+    );
+
+    assert.equal(
+      browser.YamBowlingCore.getEquippedSkinId(browser.YamBowlingCore.CANON_BOWLERS[0]),
+      "swimsuit",
+    );
   });
 });
