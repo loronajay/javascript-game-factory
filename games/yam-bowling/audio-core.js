@@ -7,7 +7,6 @@
 
   const STORAGE_KEY = "yam-bowling-audio";
   const MUSIC_VOLUME = 0.16;
-  const DUCKED_MUSIC_VOLUME = 0.055;
   const SFX_MASTER_VOLUME = 0.86;
   const MUSIC_TRACKS = Object.freeze([
     "sounds/theme-1.mp3",
@@ -83,15 +82,11 @@
       contextFactory = defaultContextFactory,
       storage = root.localStorage,
       random = Math.random,
-      schedule = (callback, delay) => root.setTimeout(callback, delay),
-      cancelSchedule = (handle) => root.clearTimeout(handle),
     } = {}) {
       this.audioFactory = audioFactory;
       this.contextFactory = contextFactory;
       this.storage = storage;
       this.random = random;
-      this.schedule = schedule;
-      this.cancelSchedule = cancelSchedule;
       this.enabled = safeStorageRead(storage) !== "off";
       this.unlocked = false;
       this.context = null;
@@ -99,7 +94,6 @@
       this.music = null;
       this.musicIndex = Math.floor(Math.max(0, Math.min(0.999999, random())) * MUSIC_TRACKS.length);
       this.lastPlayed = {};
-      this.duckTimer = null;
     }
 
     ensureContext() {
@@ -164,17 +158,6 @@
       return this.setEnabled(!this.enabled);
     }
 
-    duckMusic(duration = 300) {
-      const music = this.music;
-      if (!music || music.paused) return;
-      music.volume = DUCKED_MUSIC_VOLUME;
-      if (this.duckTimer !== null) this.cancelSchedule(this.duckTimer);
-      this.duckTimer = this.schedule(() => {
-        if (this.music === music) music.volume = MUSIC_VOLUME;
-        this.duckTimer = null;
-      }, duration);
-    }
-
     play(name, { intensity = 1 } = {}) {
       const effect = EFFECTS[name];
       if (!this.enabled || !effect) return false;
@@ -184,7 +167,6 @@
       const now = context.currentTime;
       if (now - (this.lastPlayed[name] ?? -Infinity) < effect.cooldown) return false;
       this.lastPlayed[name] = now;
-      this.duckMusic(name === "win" ? 650 : name === "pin" ? 220 : 300);
       const strength = Math.max(0.2, Math.min(1.4, intensity));
       for (const tone of effect.tones || []) this.playTone(tone, strength);
       const noiseLayers = effect.noises || (effect.noise ? [effect.noise] : []);
@@ -236,7 +218,6 @@
     STORAGE_KEY,
     MUSIC_TRACKS,
     MUSIC_VOLUME,
-    DUCKED_MUSIC_VOLUME,
     SFX_MASTER_VOLUME,
     EFFECTS,
     getOutcomeCue,

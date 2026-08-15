@@ -65,6 +65,22 @@ class ExtractCanonFramesTests(unittest.TestCase):
         self.assertEqual(alpha[80, 20], 0)
         self.assertEqual(alpha[80, 275], 0)
 
+    def test_portrait_crop_removes_a_connected_neighbor_at_the_right_edge(self) -> None:
+        rgba = np.zeros((180, 360, 4), dtype=np.uint8)
+        rgba[20:170, 25:150] = (40, 180, 220, 255)
+        rgba[35:170, 270:320] = (220, 80, 80, 255)
+        rgba[60:72, 140:280] = (40, 180, 220, 255)
+
+        portrait = extractor.extract_portrait(
+            Image.fromarray(rgba, "RGBA"),
+            [0, 240, 360],
+        )
+        pixels = np.asarray(portrait.convert("RGBA"))
+        visible = pixels[:, :, 3] > 0
+
+        self.assertTrue(np.any(visible & (pixels[:, :, 2] > pixels[:, :, 0])))
+        self.assertFalse(np.any(visible & (pixels[:, :, 0] > pixels[:, :, 2])))
+
     def test_report_tracks_clipping_at_the_source_crop(self) -> None:
         self.assertIn("crop_edge_pixels", extractor.FrameReport.__dataclass_fields__)
 

@@ -14,13 +14,25 @@ test("every canon bowler has a reusable processed swimsuit skin package", () => 
     const expectedFiles = [
       "source.png",
       "portrait.webp",
+      "victory.webp",
+      "defeat.webp",
       ...Array.from({ length: 5 }, (_, index) => `throw-${String(index + 1).padStart(2, "0")}.webp`),
     ];
 
+    const imageFiles = fs.readdirSync(skinDirectory).filter((file) => /\.(?:png|webp)$/.test(file));
+    for (const expectedFile of expectedFiles) {
+      assert.equal(
+        imageFiles.includes(expectedFile),
+        true,
+        `${bowler.name} should include ${expectedFile}`,
+      );
+    }
     assert.deepEqual(
-      fs.readdirSync(skinDirectory).filter((file) => /\.(?:png|webp)$/.test(file)).sort(),
-      expectedFiles.sort(),
-      `${bowler.name} should have a complete swimsuit package`,
+      imageFiles.filter(
+        (file) => !expectedFiles.includes(file) && !/^throw-0[1-5]\.png$/.test(file),
+      ),
+      [],
+      `${bowler.name} should contain only runtime assets and optional throw overrides`,
     );
     assert.equal(
       fs.readdirSync(bowlerDirectory).filter((file) => file.endsWith(".png")).length,

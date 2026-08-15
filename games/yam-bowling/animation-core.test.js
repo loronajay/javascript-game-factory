@@ -170,7 +170,7 @@ describe("character skins", () => {
     );
   });
 
-  test("resolves throw and portrait artwork from the equipped skin", () => {
+  test("resolves throw, portrait, and result artwork from the equipped skin", () => {
     const bowler = CANON_BOWLERS[0];
     assert.equal(
       getFrameAssetPath(bowler, 2, "swimsuit"),
@@ -182,7 +182,11 @@ describe("character skins", () => {
     );
     assert.equal(
       getResultPortraitAssetPath(bowler, "victory", "swimsuit"),
-      "assets/characters/skins/daisy-monroe/swimsuit/portrait.webp",
+      "assets/characters/skins/daisy-monroe/swimsuit/victory.webp",
+    );
+    assert.equal(
+      getResultPortraitAssetPath(bowler, "defeat", "swimsuit"),
+      "assets/characters/skins/daisy-monroe/swimsuit/defeat.webp",
     );
   });
 

@@ -75,6 +75,11 @@ def main() -> None:
         action="append",
         help="Process a character, skin id, or character/skin pair. Repeatable.",
     )
+    parser.add_argument(
+        "--portraits-only",
+        action="store_true",
+        help="Rebuild portraits without rewriting throw frames or QA reports.",
+    )
     args = parser.parse_args()
 
     packages = select_packages(discover_skin_packages(args.skins), args.only)
@@ -89,6 +94,14 @@ def main() -> None:
     for index, package in enumerate(packages, start=1):
         print(f"[{index:02d}/{len(packages):02d}] {package.key}", flush=True)
         output_directory = package.source_path.parent
+        if args.portraits_only:
+            extractor.process_portrait_sheet(
+                package.source_path,
+                output_directory,
+                session,
+                portrait_path=output_directory / "portrait.webp",
+            )
+            continue
         qa_directory = args.qa / package.skin_id
         reports = extractor.process_sheet(
             package.source_path,
@@ -101,6 +114,10 @@ def main() -> None:
             portrait_path=output_directory / "portrait.webp",
         )
         report_updates[package.key] = [asdict(report) for report in reports]
+
+    if args.portraits_only:
+        print(f"Wrote {len(packages)} portraits.")
+        return
 
     report_path = args.qa / "extraction-report.json"
     existing = {}

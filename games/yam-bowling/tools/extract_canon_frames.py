@@ -392,23 +392,26 @@ def select_sources(sources: list[Path], selectors: list[str] | None) -> list[Pat
     ]
 
 
+def extract_portrait(
+    segmented: Image.Image,
+    boundaries: list[int],
+) -> Image.Image:
+    """Extract pose zero without admitting pixels from the neighboring pose."""
+    # Throw poses need a wide crop because arms and hair cross their detected
+    # cells. The upright portrait does not; expanding it was the source of the
+    # stray torsos, arms, and legs found on several swimsuit portraits.
+    crop = segmented.crop((boundaries[0], 0, boundaries[1], segmented.height))
+    clean_crop, subject_bounds = retain_target_component(crop)
+    return clear_invisible_rgb(normalize_frames([(clean_crop, subject_bounds)])[0])
+
+
 def save_portrait(
     segmented: Image.Image,
     boundaries: list[int],
     destination: Path,
 ) -> Image.Image:
     """Extract pose zero as a normalized transparent front-facing portrait."""
-    left, right, _, _ = expand_pose_crop(
-        boundaries[0],
-        boundaries[1],
-        segmented.width,
-    )
-    crop = segmented.crop((left, 0, right, segmented.height))
-    clean_crop, subject_bounds = retain_target_component(
-        crop,
-        keep_interior_satellites=False,
-    )
-    portrait = clear_invisible_rgb(normalize_frames([(clean_crop, subject_bounds)])[0])
+    portrait = extract_portrait(segmented, boundaries)
     if count_edge_pixels(portrait):
         raise RuntimeError(f"Portrait foreground touches an output edge: {destination.stem}")
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -416,12 +419,18 @@ def save_portrait(
     return portrait
 
 
-def process_portrait_sheet(source_path: Path, portrait_root: Path, session) -> Image.Image:
+def process_portrait_sheet(
+    source_path: Path,
+    portrait_root: Path,
+    session,
+    portrait_path: Path | None = None,
+) -> Image.Image:
     source = Image.open(source_path).convert("RGBA")
     segmented = remove(source, session=session, alpha_matting=False)
     segmented = segmented if isinstance(segmented, Image.Image) else Image.open(segmented).convert("RGBA")
     boundaries = find_pose_boundaries(np.asarray(segmented.getchannel("A")))
-    return save_portrait(segmented, boundaries, portrait_root / f"{source_path.stem}.webp")
+    destination = portrait_path or portrait_root / f"{source_path.stem}.webp"
+    return save_portrait(segmented, boundaries, destination)
 
 
 def resolve_output_directory(

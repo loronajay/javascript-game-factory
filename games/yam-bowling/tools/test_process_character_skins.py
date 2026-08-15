@@ -50,6 +50,12 @@ class ProcessCharacterSkinsTests(unittest.TestCase):
         self.assertIn('output_directory / "portrait.webp"', script)
         self.assertNotIn('output_directory / "portrait.png"', script)
 
+    def test_portraits_can_be_rebuilt_without_rewriting_throw_frames(self) -> None:
+        script = Path(processor.__file__).read_text(encoding="utf-8")
+
+        self.assertIn('"--portraits-only"', script)
+        self.assertIn("extractor.process_portrait_sheet(", script)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -5,7 +5,6 @@ const fs = require("node:fs");
 const {
   MUSIC_TRACKS,
   MUSIC_VOLUME,
-  DUCKED_MUSIC_VOLUME,
   SFX_MASTER_VOLUME,
   EFFECTS,
   getOutcomeCue,
@@ -54,7 +53,7 @@ describe("Yam Bowling audio", () => {
     assert.match(game, /function prepareActivePlayer\(\)[\s\S]*?audio\.play\("announce"/);
   });
 
-  test("keeps music behind effects and ducks it while a cue plays", async () => {
+  test("keeps music at a steady volume while effects play", async () => {
     const scheduled = [];
     const director = createAudioDirector({
       audioFactory: createFakeAudioFactory([]),
@@ -76,9 +75,8 @@ describe("Yam Bowling audio", () => {
     director.playNoise = () => {};
     director.play("click");
 
-    assert.equal(director.music.volume, DUCKED_MUSIC_VOLUME);
-    scheduled.at(-1)();
     assert.equal(director.music.volume, MUSIC_VOLUME);
+    assert.deepEqual(scheduled, [], "effects should not schedule a music volume change");
   });
 
   test("layers the prototype crash underneath the current bright pin texture", () => {

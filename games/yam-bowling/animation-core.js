@@ -113,7 +113,7 @@
     const resolvedSkinId = normalizeSkinId(skinId);
     return resolvedSkinId === DEFAULT_SKIN_ID
       ? `assets/characters/portraits/${outcome}/${bowler.slug}.webp`
-      : getPortraitAssetPath(bowler, resolvedSkinId);
+      : `assets/characters/skins/${bowler.slug}/${resolvedSkinId}/${outcome}.webp`;
   }
 
   function readEquippedSkins(storage = root.localStorage) {
