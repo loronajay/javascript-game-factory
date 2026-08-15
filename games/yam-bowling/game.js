@@ -2,6 +2,9 @@ import { loadFactoryProfile } from "../../js/platform/identity/factory-profile.m
 import { createOnlineIdentityPayload } from "../../js/platform/identity/match-identity.mjs";
 import { createPlatformApiClient } from "../../js/platform/api/platform-api.mjs";
 import { createOnlineClient, normalizeRoomCode } from "./online-client.mjs";
+import { initMobileLandscapeGate } from "./mobile-ui.mjs";
+
+initMobileLandscapeGate();
 
 (function startYamBowling() {
   "use strict";
