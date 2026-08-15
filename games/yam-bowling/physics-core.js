@@ -104,7 +104,7 @@
   }
 
   function hookStrength({ hook = 0, hookScale = 1, power = 0.7 } = {}) {
-    return hook * hookScale * 0.32 * (1.12 - clamp(power, 0, 1) * 0.25);
+    return hook * hookScale * 0.44 * (1.12 - clamp(power, 0, 1) * 0.25);
   }
 
   function trajectoryX(z, shot = {}) {

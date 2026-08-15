@@ -1,9 +1,9 @@
 (function exposeRenderer(root) {
   const W = 1024;
   const H = 1536;
-  const PIN_HEIGHT_FRONT = 68;
+  const PIN_HEIGHT_FRONT = 74;
   const PIN_RACK_VISUAL_FRONT_Z = 0.875;
-  const PIN_RACK_DEPTH_SCALE = 0.42;
+  const PIN_RACK_DEPTH_SCALE = 0.58;
   const PIN_GROUND_LENGTH = 0.44;
   const BALL_COLORS = [
     ["#ff3842", "#5d0207"], ["#33a5ff", "#031e78"], ["#bd55ff", "#33006c"], ["#53e26f", "#054c18"],
@@ -116,19 +116,26 @@
       const shot = scene.liveShot;
       const ctx = this.ctx;
       ctx.save();
-      ctx.beginPath();
-      for (let i = 0; i <= 30; i += 1) {
-        const z = 0.02 + i / 30 * 0.9;
-        const point = this.project(root.YamPhysics.trajectoryX(z, shot), z);
-        if (i === 0) ctx.moveTo(point.x, point.y);
-        else ctx.lineTo(point.x, point.y);
-      }
-      ctx.setLineDash([14, 14]);
-      ctx.strokeStyle = "rgba(255,255,255,.62)";
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      ctx.setLineDash([]);
       const breakpointZ = root.YamPhysics.hookBreakpointForPower(shot.power);
+      const strokePath = (startZ, endZ, color, dash, width) => {
+        ctx.beginPath();
+        for (let i = 0; i <= 18; i += 1) {
+          const z = startZ + i / 18 * (endZ - startZ);
+          const point = this.project(root.YamPhysics.trajectoryX(z, shot), z);
+          if (i === 0) ctx.moveTo(point.x, point.y);
+          else ctx.lineTo(point.x, point.y);
+        }
+        ctx.setLineDash(dash);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.stroke();
+      };
+      strokePath(0.02, breakpointZ, "rgba(255,255,255,.58)", [14, 14], 3);
+      ctx.shadowColor = "rgba(255, 201, 75, .55)";
+      ctx.shadowBlur = 8;
+      strokePath(breakpointZ, 0.92, "rgba(255,214,102,.95)", [], 4);
+      ctx.shadowBlur = 0;
+      ctx.setLineDash([]);
       const breakpoint = this.project(root.YamPhysics.trajectoryX(breakpointZ, shot), breakpointZ);
       ctx.beginPath();
       ctx.arc(breakpoint.x, breakpoint.y, 7, 0, Math.PI * 2);
@@ -181,11 +188,22 @@
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.translate(metrics.point.x, metrics.point.y);
-      ctx.fillStyle = `rgba(0,0,0,${0.22 * alpha})`;
+      ctx.fillStyle = `rgba(0,0,0,${(0.4 - metrics.z * 0.12) * alpha})`;
       ctx.beginPath();
-      ctx.ellipse(ground.x * fall * 0.45, ground.y * fall * 0.45 + 3, metrics.width * (0.72 + fall), metrics.height * (0.07 + fall * 0.05), angle, 0, Math.PI * 2);
+      ctx.ellipse(
+        ground.x * fall * 0.45,
+        ground.y * fall * 0.45 + 2,
+        metrics.width * (0.38 + fall * 0.62),
+        metrics.height * (0.045 + fall * 0.07),
+        angle,
+        0,
+        Math.PI * 2,
+      );
       ctx.fill();
       ctx.rotate(angle);
+      ctx.shadowColor = "rgba(0,0,0,.48)";
+      ctx.shadowBlur = 3;
+      ctx.shadowOffsetY = 2;
       ctx.drawImage(this.assets.pin, -metrics.width / 2, -metrics.height, metrics.width, metrics.height);
       ctx.restore();
     }

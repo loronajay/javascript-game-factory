@@ -1,5 +1,11 @@
 import { $ } from "./dom.mjs";
 
+export function formatSpinReadout(value) {
+  const percent = Math.round(value * 100);
+  if (Math.abs(percent) < 5) return "Straight";
+  return `${Math.abs(percent)}% ${percent < 0 ? "LEFT" : "RIGHT"} HOOK`;
+}
+
 // The right-hand shot rail: ball rack, ball profile, line controls, spin and
 // power meters.
 //
@@ -82,8 +88,8 @@ export function createShotHud({ session, balls, ballCore }) {
 
     if (scene.phase === "ready") {
       $("throw-button").textContent = waitingForOpponent ? "Opponent's turn"
-        : isCpu ? "CPU lining up…" : "Start spin timing";
-    } else if (scene.phase === "spin") $("throw-button").textContent = "Press + hold to lock spin";
+        : isCpu ? "CPU lining up…" : "Start spin meter";
+    } else if (scene.phase === "spin") $("throw-button").textContent = "Lock this spin + hold for power";
     else if (scene.phase === "charging") $("throw-button").textContent = "Release to throw";
     else if (scene.phase === "transition") $("throw-button").textContent = "Rack settling…";
     else if (scene.phase === "submitting") $("throw-button").textContent = "Scoring on server…";
@@ -118,9 +124,7 @@ export function createShotHud({ session, balls, ballCore }) {
     const cursorPosition = 4 + ((scene.spinLevel + 1) / 2) * 92;
     $("spin-cursor").style.left = `${cursorPosition}%`;
     $("spin-meter").setAttribute("aria-valuenow", String(percent));
-    $("spin-output").textContent = Math.abs(percent) < 5
-      ? "Straight"
-      : `${percent < 0 ? "L" : "R"} ${Math.abs(percent)}`;
+    $("spin-output").textContent = formatSpinReadout(scene.spinLevel);
   }
 
   function resetChargeFeedback() {
@@ -135,7 +139,7 @@ export function createShotHud({ session, balls, ballCore }) {
   function resetSpinFeedback() {
     $("spin-cursor").style.left = "50%";
     $("spin-meter").setAttribute("aria-valuenow", "0");
-    $("spin-output").textContent = "Tap throw to start";
+    $("spin-output").textContent = "Start meter, then lock a side";
   }
 
   return {

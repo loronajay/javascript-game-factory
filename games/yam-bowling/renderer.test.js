@@ -127,18 +127,28 @@ test("boot does not refetch a lane the game already asked for", async () => {
   assert.equal(pending.filter((entry) => entry.src.includes("/lanes/")).length, requests);
 });
 
-test("the rack is visually compressed onto the distant pin deck", () => {
+test("the rack preserves readable depth on the distant pin deck", () => {
   const renderer = createRenderer();
   renderer.assets.pin = { width: 256, height: 384 };
   const rack = globalThis.YamPhysics.createRack();
   const front = renderer.pinMetrics(rack[0]);
   const back = renderer.pinMetrics(rack[9]);
 
-  // Physics keeps full rack depth, but the portrait background's distant deck
-  // needs a tighter projection so rear pins do not climb onto the masking unit.
+  // Keep enough perspective to separate all four rows without letting the rear
+  // pins climb so far into the masking unit that their silhouettes get muddy.
   assert.ok(front.point.y > 345 && front.point.y < 355);
-  assert.ok(front.point.y - back.point.y > 20);
-  assert.ok(front.point.y - back.point.y < 35);
+  assert.ok(front.point.y - back.point.y >= 38);
+  assert.ok(front.point.y - back.point.y <= 48);
+  assert.ok(back.height <= front.height * 0.94, "rear pins should be visibly smaller than the head pin");
+});
+
+test("standing pins stay readable at cabinet scale", () => {
+  const renderer = createRenderer();
+  renderer.assets.pin = { width: 125, height: 384 };
+  const front = renderer.pinMetrics(globalThis.YamPhysics.createRack()[0]);
+
+  assert.ok(front.height >= 72, `expected a substantial front-pin sprite, got ${front.height}`);
+  assert.ok(front.width >= 23, `expected bold pin proportions, got ${front.width}`);
 });
 
 test("scaled sprites use high-quality interpolation", () => {

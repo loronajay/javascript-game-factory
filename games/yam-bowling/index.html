@@ -13,6 +13,9 @@
     <link rel="stylesheet" href="styles/online.css" />
     <link rel="stylesheet" href="styles/match.css" />
     <link rel="stylesheet" href="styles/results.css" />
+    <link rel="stylesheet" href="styles/dialogs.css" />
+    <link rel="stylesheet" href="styles/inspector.css" />
+    <link rel="stylesheet" href="styles/responsive.css" />
     <link rel="stylesheet" href="styles/mobile-landscape.css" />
   </head>
   <body>
@@ -210,14 +213,14 @@
                 <p id="ball-profile-description">A forgiving all-rounder with familiar timing.</p>
                 <dl id="ball-profile-stats"></dl>
               </article>
-              <div class="meter-heading"><span>Spin timing</span><output id="spin-output">Tap throw to start</output></div>
+              <div class="meter-heading"><span>Hook / spin</span><output id="spin-output">Start meter, then lock a side</output></div>
               <div class="spin-meter" id="spin-meter" role="meter" aria-label="Timed spin from left hook to right hook" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0"><span id="spin-cursor"></span></div>
-              <div class="meter-scale"><span>Left</span><i>Straight</i><span>Right</span></div>
+              <div class="meter-scale"><span>Hard left</span><i>Straight</i><span>Hard right</span></div>
               <div class="meter-heading"><span>Power</span><output id="power-output">0%</output></div>
               <div class="power-meter" id="power-meter" role="meter" aria-label="Throw power" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="power-fill"></span></div>
               <p class="charge-warning" id="charge-warning">Release in the gold window. Overcharging drains power.</p>
-              <button class="button button--throw" id="throw-button" type="button">Start spin timing</button>
-              <p class="control-help">1 Set line with A / D + ← / → aim · 2 Tap for spin · 3 Hold for power</p>
+              <button class="button button--throw" id="throw-button" type="button">Start spin meter</button>
+              <p class="control-help">Hook tip: start outside, aim across the head pin, then lock spin back toward the pocket.</p>
             </section>
           </aside>
         </div>
@@ -253,7 +256,7 @@
       <p class="eyebrow">League orientation</p><h2>Roll it your way</h2>
       <div class="how-grid">
         <article><b>01</b><h3>Build a line</h3><p>Use A / D to strafe and ← / → to aim, or use the sliders. The blue dot marks where the ball leaves the oil and begins to hook.</p></article>
-        <article><b>02</b><h3>Time the spin</h3><p>Tap Throw or Space to start the spin needle. Press again when it reaches the hook you want.</p></article>
+        <article><b>02</b><h3>Lock the hook</h3><p>Tap Throw or Space to start the spin needle. Press and hold near an edge for a strong left or right hook; the gold guide shows the late turn.</p></article>
         <article><b>03</b><h3>Commit the power</h3><p>Each ball aims and charges at its own pace. Release in the gold window—holding too long drains power. More speed skids farther.</p></article>
       </div>
     </dialog>

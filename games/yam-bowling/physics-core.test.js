@@ -103,6 +103,24 @@ describe("lane physics primitives", () => {
     assert.ok(trajectoryX(0.9, slow) > trajectoryX(0.9, fast), "slower shots should hook more by the pocket");
   });
 
+  test("makes a full spin meter produce an unmistakable late hook", () => {
+    const straight = { position: 0, aim: 0, hook: 0, hookScale: 1, power: 0.78 };
+    const fullHook = { ...straight, hook: 1 };
+
+    assert.equal(trajectoryX(0.3, fullHook), trajectoryX(0.3, straight), "full spin should still skid first");
+    assert.ok(
+      trajectoryX(0.86, fullHook) - trajectoryX(0.86, straight) >= 0.2,
+      "the meter edge should create a clearly visible pocket move",
+    );
+  });
+
+  test("supports the classic outside-to-pocket hook line", () => {
+    const shot = { position: 0.3, aim: -0.12, hook: -1, hookScale: 1, power: 0.78 };
+
+    assert.ok(trajectoryX(0.3, shot) > 0.24, "the ball should hold the outside line through the oil");
+    assert.ok(trajectoryX(0.86, shot) < 0.02, "the hook should bring it back to the head-pin pocket");
+  });
+
   test("applies only a small progressive release nudge", () => {
     const base = { position: 0.12, aim: 0, hook: 0, release: 0 };
     const nudged = { ...base, release: -0.03 };

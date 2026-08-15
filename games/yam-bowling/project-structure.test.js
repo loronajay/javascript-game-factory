@@ -21,6 +21,45 @@ const readStyles = () => [...read("index.html").matchAll(/<link[^>]*rel=["']styl
   .map((match) => read(match[1]))
   .join("\n");
 
+test("split stylesheets keep screen, dialog, inspector, and responsive rules separate", () => {
+  const html = read("index.html");
+  const stylesheetLinks = [...html.matchAll(/<link[^>]*rel=["']stylesheet["'][^>]*href=["']([^"']+)["']/g)]
+    .map((match) => match[1]);
+  const results = read("styles/results.css");
+  const dialogs = read("styles/dialogs.css");
+  const inspector = read("styles/inspector.css");
+  const responsive = read("styles/responsive.css");
+
+  assert.deepEqual(stylesheetLinks.slice(-5), [
+    "styles/results.css",
+    "styles/dialogs.css",
+    "styles/inspector.css",
+    "styles/responsive.css",
+    "styles/mobile-landscape.css",
+  ]);
+
+  assert.match(results, /\.results-screen\s*\{/);
+  assert.match(results, /\.result-player__portrait\s*\{/);
+  assert.doesNotMatch(results, /\.(?:modal-layer|how-dialog|menu-splash|character-inspector)|@media/);
+
+  assert.match(dialogs, /\.modal-layer\s*\{/);
+  assert.match(dialogs, /\.pause-card\s*\{/);
+  assert.match(dialogs, /\.how-dialog\s*\{/);
+  assert.match(dialogs, /\.dialog-close\s*\{/);
+  assert.doesNotMatch(dialogs, /\.(?:results-screen|result-player|menu-splash|character-inspector)|@media/);
+
+  assert.match(inspector, /\.menu-splash-dialog\s*\{/);
+  assert.match(inspector, /\.inspect-bowler-button\s*\{/);
+  assert.match(inspector, /\.character-inspector-dialog\s*\{/);
+  assert.doesNotMatch(inspector, /\.(?:results-screen|result-player|modal-layer|pause-card|how-dialog)|@media/);
+
+  assert.deepEqual(
+    [...responsive.matchAll(/@media\s*\(max-width:\s*(\d+)px\)/g)].map((match) => Number(match[1])),
+    [1100, 960, 560],
+  );
+  assert.match(responsive, /@media\s*\(max-width:\s*560px\)[^]*\.results-players\s*\{/);
+});
+
 test("every canon bowler has every reusable processed skin package", () => {
   for (const bowler of CANON_BOWLERS) {
     const bowlerDirectory = path.join(root, "assets", "characters", "skins", bowler.slug);
