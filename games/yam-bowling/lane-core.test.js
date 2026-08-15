@@ -23,8 +23,21 @@ test("every lane carries a kebab-case slug and slug-derived artwork paths", () =
     assert.equal(typeof lane.description, "string");
     assert.equal(lane.src, `assets/lanes/${lane.slug}.webp`);
     assert.equal(lane.thumbnailSrc, `assets/lanes/thumbs/${lane.slug}.webp`);
+    assert.equal(Number.isFinite(lane.pinDeckOffsetY), true);
     assert.match(lane.alt, new RegExp(lane.name));
   }
+});
+
+test("lane artwork carries its measured pin-deck horizon correction", () => {
+  assert.equal(LaneCore.getLane("crimson-crown").pinDeckOffsetY, 0);
+  assert.equal(LaneCore.getLane("blue-circuit").pinDeckOffsetY, 0);
+  assert.equal(LaneCore.getLane("emerald-vault").pinDeckOffsetY, 0);
+  assert.equal(LaneCore.getLane("royal-gold").pinDeckOffsetY, 39);
+  assert.equal(LaneCore.getLane("sunset-strip").pinDeckOffsetY, 18);
+  assert.equal(LaneCore.getLane("neon-carnival").pinDeckOffsetY, 18);
+  assert.equal(LaneCore.getLane("cosmic-bowl").pinDeckOffsetY, 21);
+  assert.equal(LaneCore.getLane("liberty-lanes").pinDeckOffsetY, 38);
+  assert.equal(LaneCore.getLane("oak-and-onyx").pinDeckOffsetY, 18);
 });
 
 test("lane slugs are unique and the default is part of the catalog", () => {

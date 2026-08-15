@@ -12,22 +12,23 @@
   const DEFAULT_LANE_SLUG = "crimson-crown";
   const LANE_STORAGE_KEY = "yam-bowling.lane";
 
-  // Every lane render shares the same deck geometry, so a lane is pure presentation:
-  // the slug picks artwork and never changes projection, rack layout, or physics.
+  // A lane is pure presentation: its small pin-deck offset compensates for the
+  // painted horizon in that backdrop and never changes rack layout or physics.
   const LANES = Object.freeze([
-    ["Crimson Crown", "crimson-crown", "The house lane. Red neon crests over black lacquer."],
-    ["Blue Circuit", "blue-circuit", "Cool electric blue chevrons down a clean modern hall."],
-    ["Emerald Vault", "emerald-vault", "Deep green light in a quiet, locked-away room."],
-    ["Royal Gold", "royal-gold", "Violet velvet and a gilded crown above the pin deck."],
-    ["Sunset Strip", "sunset-strip", "Palms, magenta haze, and a synth sun that never sets."],
-    ["Neon Carnival", "neon-carnival", "Every colour at once, like a midway that took over the alley."],
-    ["Cosmic Bowl", "cosmic-bowl", "Blacklight planets and starfield walls over glowing gutters."],
-    ["Liberty Lanes", "liberty-lanes", "Stars, stripes, and a trophy case that remembers everything."],
-    ["Oak & Onyx", "oak-and-onyx", "Dark timber and low blue light in a members-only room."],
-  ].map(([name, slug, description]) => Object.freeze({
+    ["Crimson Crown", "crimson-crown", "The house lane. Red neon crests over black lacquer.", 0],
+    ["Blue Circuit", "blue-circuit", "Cool electric blue chevrons down a clean modern hall.", 0],
+    ["Emerald Vault", "emerald-vault", "Deep green light in a quiet, locked-away room.", 0],
+    ["Royal Gold", "royal-gold", "Violet velvet and a gilded crown above the pin deck.", 39],
+    ["Sunset Strip", "sunset-strip", "Palms, magenta haze, and a synth sun that never sets.", 18],
+    ["Neon Carnival", "neon-carnival", "Every colour at once, like a midway that took over the alley.", 18],
+    ["Cosmic Bowl", "cosmic-bowl", "Blacklight planets and starfield walls over glowing gutters.", 21],
+    ["Liberty Lanes", "liberty-lanes", "Stars, stripes, and a trophy case that remembers everything.", 38],
+    ["Oak & Onyx", "oak-and-onyx", "Dark timber and low blue light in a members-only room.", 18],
+  ].map(([name, slug, description, pinDeckOffsetY]) => Object.freeze({
     name,
     slug,
     description,
+    pinDeckOffsetY,
     src: `assets/lanes/${slug}.webp`,
     thumbnailSrc: `assets/lanes/thumbs/${slug}.webp`,
     alt: `${name} bowling lane`,

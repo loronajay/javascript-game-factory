@@ -94,7 +94,9 @@
     }
 
     project(x, z) {
-      const y = 1185 - 955 * z;
+      const lane = root.YamLaneCore.getLane(this.laneSlug);
+      const deckBlend = smooth01((z - 0.45) / (PIN_RACK_VISUAL_FRONT_Z - 0.45));
+      const y = 1185 - 955 * z + lane.pinDeckOffsetY * deckBlend;
       const half = 430 - 330 * Math.pow(clamp(z, 0, 1), 0.82);
       return { x: W / 2 + x * half, y, half };
     }

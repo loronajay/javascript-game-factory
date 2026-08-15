@@ -142,6 +142,35 @@ test("the rack preserves readable depth on the distant pin deck", () => {
   assert.ok(back.height <= front.height * 0.94, "rear pins should be visibly smaller than the head pin");
 });
 
+test("far-lane projection follows each artwork's pin-deck horizon", () => {
+  const renderer = createRenderer();
+  const baselineNear = renderer.project(0, 0.3);
+  const baselineDeck = renderer.project(0, 0.875);
+
+  renderer.laneSlug = "liberty-lanes";
+  const correctedNear = renderer.project(0, 0.3);
+  const correctedDeck = renderer.project(0, 0.875);
+
+  assert.equal(correctedNear.y, baselineNear.y, "the approach should not move");
+  assert.equal(correctedDeck.y, baselineDeck.y + 38, "the rack should sit on Liberty's lower pin deck");
+});
+
+test("pin bodies and the ball share the same lane projection correction", () => {
+  const renderer = createRenderer();
+  renderer.assets.pin = { width: 125, height: 384 };
+  const headPin = globalThis.YamPhysics.createRack()[0];
+  const baselinePin = renderer.pinMetrics(headPin);
+  const baselineBall = renderer.project(headPin.x, baselinePin.z);
+
+  renderer.laneSlug = "royal-gold";
+  const correctedPin = renderer.pinMetrics(headPin);
+  const correctedBall = renderer.project(headPin.x, correctedPin.z);
+
+  assert.equal(correctedPin.point.y - baselinePin.point.y, 39);
+  assert.equal(correctedBall.y - baselineBall.y, 39);
+  assert.equal(correctedPin.point.y, correctedBall.y);
+});
+
 test("standing pins stay readable at cabinet scale", () => {
   const renderer = createRenderer();
   renderer.assets.pin = { width: 125, height: 384 };
