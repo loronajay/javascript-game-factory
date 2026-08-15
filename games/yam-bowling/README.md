@@ -24,14 +24,43 @@ npm test
 
 The suite covers the roster contract, scoring, final-frame bonuses, turn handoffs, CPU planning, contact response, trajectories, online commands, reconnect handshakes, and required cabinet structure. It uses Node's built-in test runner and has no package dependencies.
 
+Python pipeline tests run with:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tools -p "test_*.py"
+```
+
+## Runtime assets
+
+Browser-facing artwork is WebP. Editable source lineups and protected manual
+overrides remain PNG so the art pipeline can regenerate clean runtime files.
+To rebuild the optimized image set from the current sources, run:
+
+```powershell
+.\.venv\Scripts\python.exe tools\optimize_runtime_assets.py --clean-derived-png
+```
+
+`runtime-assets.json` is the allowlist for published game-local files. It omits
+source sheets, archived characters, QA previews, and tests. To create a clean
+overlay that can be placed at `games/yam-bowling/` in a Factory deployment:
+
+```powershell
+.\.venv\Scripts\python.exe tools\package_runtime.py C:\path\to\new\yam-bowling-runtime
+```
+
+The packager refuses to overwrite an existing directory. The Node asset-budget
+test keeps the 482 player-facing runtime images below 48 MB.
+
 ## Project map
 
 - `GDD.md`: current local and online design scope.
 - `online-client.mjs`: Factory Network v2 lobby client and reconnect state.
 - `CLAUDE.md`: as-built architecture and ownership boundaries.
-- `prototype/yam-bowling-v5-standalone.html`: original all-in-one scene/physics reference.
-- `assets/characters/processed/canon/`: five cleaned throw frames for each bowler.
-- `assets/characters/portraits/canon/`: front-facing selection and identity portraits.
+- `runtime-assets.json`: deployment allowlist and runtime image budget.
+- `assets/characters/processed/canon/`: five optimized WebP throw frames for each bowler.
+- `assets/characters/portraits/canon/`: optimized front-facing selection and identity portraits.
 - `assets/characters/skins/<bowler>/<skin-id>/`: drop-in source sheet plus processed alternate outfit assets.
 - `tools/extract_canon_frames.py`: character extraction pipeline.
 - `tools/process_character_skins.py`: reusable alternate-skin batch processor.
+- `tools/optimize_runtime_assets.py`: WebP conversion, resizing, and derived-PNG cleanup.
+- `tools/package_runtime.py`: source-free game-local deployment overlay builder.

@@ -33,7 +33,7 @@
 | 29 | Simone Carter | `simone-carter.png` |
 | 30 | Talia Dodson | `talia-dodson.png` |
 
-Source PNGs live in `assets/characters/usable/canon/`. Each character's five cleaned throw frames live in `assets/characters/processed/canon/<firstname-lastname>/`. When a source originally had a UUID filename, that UUID remains in `animation-core.js` as `legacyId` provenance.
+Source PNGs live in `assets/characters/usable/canon/`. Each character's five cleaned WebP throw frames live in `assets/characters/processed/canon/<firstname-lastname>/`. When a source originally had a UUID filename, that UUID remains in `animation-core.js` as `legacyId` provenance.
 
 Front-facing selection portraits are extracted from pose zero into `assets/characters/portraits/canon/`. Throw frames remain rear-facing because they are rendered from the bowler's lane perspective.
 
@@ -43,7 +43,7 @@ Characters removed from canon are archived under `assets/characters/not-usable/r
 
 ## Skin package convention
 
-Every alternate outfit is a self-contained package at `assets/characters/skins/<character-slug>/<skin-id>/`. A package contains the original six-pose `source.png`, extracted `portrait.png`, and `throw-01.png` through `throw-05.png`.
+Every alternate outfit is a self-contained package at `assets/characters/skins/<character-slug>/<skin-id>/`. A package contains the original six-pose `source.png`, optimized `portrait.webp`, and `throw-01.webp` through `throw-05.webp`.
 
 To add another collection, make a folder such as `assets/characters/skins/daisy-monroe/winter/`, drop the lineup in as `source.png`, add the collection id and display name to `AVAILABLE_SKINS` in `animation-core.js`, then run:
 
@@ -55,4 +55,4 @@ Use `--only daisy-monroe/winter` to rebuild one package. QA contact sheets and t
 
 ## Menu splash convention
 
-Character title-screen artwork lives at `assets/menu-splashes/<firstname-lastname>.png`, using the same canon slug as the roster and portrait assets. Add each available splash to `MENU_SPLASHES` in `menu-splash-core.js` so it appears in the player's menu-art picker.
+Character title-screen PNG masters live at `assets/menu-splashes/<firstname-lastname>.png`. The optimizer writes full-size and picker-thumbnail WebPs using the same canon slug. Add each available splash to `MENU_SPLASHES` in `menu-splash-core.js`, then run `tools/optimize_runtime_assets.py` so it appears in the player's menu-art picker.

@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "description": "Game-local files that belong in the published Yam Bowling runtime.",
+  "include": [
+    "index.html",
+    "styles.css",
+    "game.json",
+    "animation-core.js",
+    "audio-core.js",
+    "ball-core.js",
+    "cpu-core.js",
+    "game-core.js",
+    "game.js",
+    "menu-splash-core.js",
+    "mobile-ui.mjs",
+    "online-client.mjs",
+    "physics-core.js",
+    "renderer.js",
+    "sounds/*.mp3",
+    "assets/lanes/*.webp",
+    "assets/pins/*.webp",
+    "assets/menu-splashes/**/*.webp",
+    "assets/characters/processed/canon/**/*.webp",
+    "assets/characters/portraits/**/*.webp",
+    "assets/characters/skins/*/*/*.webp"
+  ],
+  "budgets": {
+    "runtimeImageBytes": 50331648
+  }
+}

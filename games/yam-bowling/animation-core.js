@@ -86,7 +86,7 @@
       throw new RangeError(`Throw frame must be between 1 and ${THROW_FRAME_COUNT}.`);
     }
 
-    const filename = `throw-${String(frame).padStart(2, "0")}.png`;
+    const filename = `throw-${String(frame).padStart(2, "0")}.webp`;
     const resolvedSkinId = normalizeSkinId(skinId);
     return resolvedSkinId === DEFAULT_SKIN_ID
       ? `assets/characters/processed/canon/${bowler.slug}/${filename}`
@@ -99,8 +99,8 @@
     }
     const resolvedSkinId = normalizeSkinId(skinId);
     return resolvedSkinId === DEFAULT_SKIN_ID
-      ? `assets/characters/portraits/canon/${bowler.slug}.png`
-      : `assets/characters/skins/${bowler.slug}/${resolvedSkinId}/portrait.png`;
+      ? `assets/characters/portraits/canon/${bowler.slug}.webp`
+      : `assets/characters/skins/${bowler.slug}/${resolvedSkinId}/portrait.webp`;
   }
 
   function getResultPortraitAssetPath(bowler, outcome, skinId = DEFAULT_SKIN_ID) {
@@ -112,7 +112,7 @@
     }
     const resolvedSkinId = normalizeSkinId(skinId);
     return resolvedSkinId === DEFAULT_SKIN_ID
-      ? `assets/characters/portraits/${outcome}/${bowler.slug}.png`
+      ? `assets/characters/portraits/${outcome}/${bowler.slug}.webp`
       : getPortraitAssetPath(bowler, resolvedSkinId);
   }
 

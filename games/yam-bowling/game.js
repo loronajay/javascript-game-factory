@@ -133,7 +133,7 @@ initMobileLandscapeGate();
       card.type = "button";
       card.setAttribute("data-splash-slug", splash.slug);
       card.setAttribute("role", "option");
-      card.innerHTML = `<img src="${splash.src}" alt="" loading="lazy"><span>${escapeHtml(splash.name)}</span>`;
+      card.innerHTML = `<img src="${splash.thumbnailSrc}" alt="" loading="lazy" decoding="async"><span>${escapeHtml(splash.name)}</span>`;
       card.addEventListener("click", () => {
         applyMenuSplash(splash.slug, true);
         $("menu-splash-dialog").close();
@@ -168,7 +168,7 @@ initMobileLandscapeGate();
       button.type = "button";
       button.dataset.skinId = skin.id;
       button.setAttribute("aria-pressed", String(skin.id === selectedSkinId));
-      button.innerHTML = `<img src="${characterPortrait(slug, skin.id)}" alt=""><span><strong>${escapeHtml(skin.name)}</strong><small>${skin.id === selectedSkinId ? "Equipped" : "Equip"}</small></span>`;
+      button.innerHTML = `<img src="${characterPortrait(slug, skin.id)}" alt="" loading="lazy" decoding="async"><span><strong>${escapeHtml(skin.name)}</strong><small>${skin.id === selectedSkinId ? "Equipped" : "Equip"}</small></span>`;
       button.addEventListener("click", () => {
         const equipped = Animation.saveEquippedSkinId(bowler, skin.id);
         chooseSkin(equipped);

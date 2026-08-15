@@ -23,6 +23,8 @@ from skimage.color import rgb2gray
 from skimage.filters import sobel
 from skimage.segmentation import watershed
 
+from optimize_runtime_assets import CHARACTER_QUALITY, save_runtime_webp
+
 
 CANVAS_SIZE = (440, 960)
 THROW_POSE_COUNT = 5
@@ -410,7 +412,7 @@ def save_portrait(
     if count_edge_pixels(portrait):
         raise RuntimeError(f"Portrait foreground touches an output edge: {destination.stem}")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    portrait.save(destination, format="PNG", optimize=True)
+    save_runtime_webp(portrait, destination, quality=CHARACTER_QUALITY)
     return portrait
 
 
@@ -419,7 +421,7 @@ def process_portrait_sheet(source_path: Path, portrait_root: Path, session) -> I
     segmented = remove(source, session=session, alpha_matting=False)
     segmented = segmented if isinstance(segmented, Image.Image) else Image.open(segmented).convert("RGBA")
     boundaries = find_pose_boundaries(np.asarray(segmented.getchannel("A")))
-    return save_portrait(segmented, boundaries, portrait_root / f"{source_path.stem}.png")
+    return save_portrait(segmented, boundaries, portrait_root / f"{source_path.stem}.webp")
 
 
 def resolve_output_directory(
@@ -436,7 +438,7 @@ def resolve_portrait_path(
     short_id: str,
     portrait_path: Path | None = None,
 ) -> Path:
-    return portrait_path if portrait_path is not None else portrait_root / f"{short_id}.png"
+    return portrait_path if portrait_path is not None else portrait_root / f"{short_id}.webp"
 
 
 def process_sheet(
@@ -503,8 +505,8 @@ def process_sheet(
             )
         frame = clear_invisible_rgb(frame)
         normalized[index - 1] = frame
-        destination = character_root / f"throw-{index:02d}.png"
-        frame.save(destination, format="PNG", optimize=True)
+        destination = character_root / f"throw-{index:02d}.webp"
+        save_runtime_webp(frame, destination, quality=CHARACTER_QUALITY)
         bounds = alpha_bounds(frame)
         reports.append(
             FrameReport(

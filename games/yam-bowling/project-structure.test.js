@@ -12,13 +12,13 @@ test("every canon bowler has a reusable processed swimsuit skin package", () => 
     const bowlerDirectory = path.join(root, "assets", "characters", "skins", bowler.slug);
     const skinDirectory = path.join(bowlerDirectory, "swimsuit");
     const expectedFiles = [
-      "portrait.png",
       "source.png",
-      ...Array.from({ length: 5 }, (_, index) => `throw-${String(index + 1).padStart(2, "0")}.png`),
+      "portrait.webp",
+      ...Array.from({ length: 5 }, (_, index) => `throw-${String(index + 1).padStart(2, "0")}.webp`),
     ];
 
     assert.deepEqual(
-      fs.readdirSync(skinDirectory).filter((file) => file.endsWith(".png")).sort(),
+      fs.readdirSync(skinDirectory).filter((file) => /\.(?:png|webp)$/.test(file)).sort(),
       expectedFiles.sort(),
       `${bowler.name} should have a complete swimsuit package`,
     );
@@ -169,6 +169,15 @@ test("the cabinet exposes an accessible audio control and loads audio before the
   assert.match(html, /aria-pressed=["']true["']/);
   assert.ok(html.indexOf("audio-core.js") < html.indexOf("game.js"));
   assert.match(read("tools/serve.mjs"), /["']\.mp3["']\s*:\s*["']audio\/mpeg/);
+});
+
+test("the lane and default menu artwork use compressed runtime images", () => {
+  const html = read("index.html");
+  const renderer = read("renderer.js");
+
+  assert.match(html, /assets\/menu-splashes\/reina-sato\.webp/);
+  assert.match(renderer, /assets\/lanes\/1\.webp/);
+  assert.match(renderer, /assets\/pins\/1\.webp/);
 });
 
 test("screen transitions reset the viewport for phone navigation", () => {

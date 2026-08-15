@@ -3,7 +3,7 @@
 Place each six-pose sheet at:
 assets/characters/skins/<character-slug>/<skin-id>/source.png
 
-The processor writes portrait.png and throw-01.png through throw-05.png beside
+The processor writes portrait.webp and throw-01.webp through throw-05.webp beside
 the source, so adding another collection never requires changing this script.
 """
 
@@ -98,7 +98,7 @@ def main() -> None:
             session,
             short_id=package.character_slug,
             output_directory=output_directory,
-            portrait_path=output_directory / "portrait.png",
+            portrait_path=output_directory / "portrait.webp",
         )
         report_updates[package.key] = [asdict(report) for report in reports]
 

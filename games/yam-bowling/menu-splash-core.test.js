@@ -48,8 +48,10 @@ const expectedSlugs = [
 test("menu splashes use canon character slugs and predictable asset paths", () => {
   assert.deepEqual(MENU_SPLASHES.map((splash) => splash.slug), expectedSlugs);
   for (const splash of MENU_SPLASHES) {
-    assert.equal(splash.src, `assets/menu-splashes/${splash.slug}.png`);
+    assert.equal(splash.src, `assets/menu-splashes/${splash.slug}.webp`);
+    assert.equal(splash.thumbnailSrc, `assets/menu-splashes/thumbs/${splash.slug}.webp`);
     assert.equal(fs.existsSync(path.join(__dirname, splash.src)), true, `${splash.name} should have menu art`);
+    assert.equal(fs.existsSync(path.join(__dirname, splash.thumbnailSrc)), true, `${splash.name} should have thumbnail art`);
     assert.ok(splash.name.length > 0);
     assert.match(splash.alt, new RegExp(splash.name, "i"));
   }

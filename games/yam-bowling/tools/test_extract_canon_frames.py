@@ -9,13 +9,29 @@ import sys
 from tempfile import TemporaryDirectory
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageChops, ImageStat
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import extract_canon_frames as extractor
 
 
 class ExtractCanonFramesTests(unittest.TestCase):
+    def assert_runtime_matches_source(self, source_path: Path, runtime_path: Path) -> None:
+        with Image.open(source_path) as source, Image.open(runtime_path) as runtime:
+            source_rgba = source.convert("RGBA")
+            runtime_rgba = runtime.convert("RGBA")
+            self.assertEqual(runtime.format, "WEBP")
+            self.assertEqual(runtime_rgba.size, source_rgba.size)
+            alpha_difference = ImageChops.difference(
+                source_rgba.getchannel("A"),
+                runtime_rgba.getchannel("A"),
+            )
+            alpha_stats = ImageStat.Stat(alpha_difference)
+            self.assertLess(alpha_stats.mean[0], 0.1)
+            self.assertLessEqual(alpha_stats.extrema[0][1], 2)
+            difference = ImageChops.difference(source_rgba.convert("RGB"), runtime_rgba.convert("RGB"))
+            self.assertLess(max(ImageStat.Stat(difference).mean), 8)
+
     def test_uses_high_fidelity_foreground_model_by_default(self) -> None:
         self.assertEqual(extractor.DEFAULT_MODEL, "birefnet-general-lite")
 
@@ -94,7 +110,7 @@ class ExtractCanonFramesTests(unittest.TestCase):
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
             output_directory = root / "daisy-monroe" / "swimsuit"
-            portrait_path = output_directory / "portrait.png"
+            portrait_path = output_directory / "portrait.webp"
 
             self.assertEqual(
                 extractor.resolve_output_directory(
@@ -126,9 +142,11 @@ class ExtractCanonFramesTests(unittest.TestCase):
         self.assertEqual(override_slugs, source_slugs)
         for slug in source_slugs:
             override_path = override_root / slug / "throw-04.png"
-            processed_path = output_root / slug / "throw-04.png"
+            processed_path = output_root / slug / "throw-04.webp"
             self.assertTrue(override_path.exists())
-            self.assertEqual(override_path.read_bytes(), processed_path.read_bytes())
+            self.assertTrue(processed_path.exists())
+            with Image.open(processed_path) as runtime:
+                self.assertEqual(runtime.format, "WEBP")
 
     def test_missing_hand_repairs_are_protected_manual_overrides(self) -> None:
         project_root = Path(__file__).resolve().parents[1]
@@ -140,11 +158,12 @@ class ExtractCanonFramesTests(unittest.TestCase):
             ("marisol-cruz", 5),
             ("simone-carter", 3),
         ):
-            filename = f"throw-{frame_number:02d}.png"
-            override_path = override_root / slug / filename
-            processed_path = output_root / slug / filename
+            source_filename = f"throw-{frame_number:02d}.png"
+            runtime_filename = f"throw-{frame_number:02d}.webp"
+            override_path = override_root / slug / source_filename
+            processed_path = output_root / slug / runtime_filename
             self.assertTrue(override_path.exists())
-            self.assertEqual(override_path.read_bytes(), processed_path.read_bytes())
+            self.assert_runtime_matches_source(override_path, processed_path)
 
     def test_heavily_overlapping_final_hair_uses_stronger_bridge_separation(self) -> None:
         self.assertEqual(extractor.component_opening_size("naomi-okafor", 5), 17)
@@ -184,7 +203,7 @@ class ExtractCanonFramesTests(unittest.TestCase):
         portrait_root = project_root / "assets" / "characters" / "portraits" / "canon"
 
         source_slugs = {path.stem for path in source_root.glob("*.png")}
-        portrait_slugs = {path.stem for path in portrait_root.glob("*.png")}
+        portrait_slugs = {path.stem for path in portrait_root.glob("*.webp")}
 
         self.assertEqual(portrait_slugs, source_slugs)
 

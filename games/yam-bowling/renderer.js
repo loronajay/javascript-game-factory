@@ -41,8 +41,8 @@
 
     async load() {
       [this.assets.lane, this.assets.pin] = await Promise.all([
-        loadImage("assets/lanes/1.png"),
-        loadImage("assets/pins/1.png"),
+        loadImage("assets/lanes/1.webp"),
+        loadImage("assets/pins/1.webp"),
       ]);
       await this.setCharacter("daisy-monroe");
       this.ready = true;

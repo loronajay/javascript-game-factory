@@ -45,7 +45,8 @@
   ].map(([name, slug]) => Object.freeze({
     name,
     slug,
-    src: `assets/menu-splashes/${slug}.png`,
+    src: `assets/menu-splashes/${slug}.webp`,
+    thumbnailSrc: `assets/menu-splashes/thumbs/${slug}.webp`,
     alt: `${name} featured on the Yam Bowling title screen`,
   })));
 

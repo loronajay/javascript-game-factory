@@ -45,6 +45,11 @@ class ProcessCharacterSkinsTests(unittest.TestCase):
             packages[:2],
         )
 
+    def test_runtime_package_names_keep_the_png_source_and_use_webp_outputs(self) -> None:
+        script = Path(processor.__file__).read_text(encoding="utf-8")
+        self.assertIn('output_directory / "portrait.webp"', script)
+        self.assertNotIn('output_directory / "portrait.png"', script)
+
 
 if __name__ == "__main__":
     unittest.main()

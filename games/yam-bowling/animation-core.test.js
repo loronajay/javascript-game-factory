@@ -85,7 +85,7 @@ describe("throw playback", () => {
 
   test("maps every throw pose to its own cleaned transparent asset", () => {
     assert.equal(getFrameAssetPath(CANON_BOWLERS[0], 1),
-      "assets/characters/processed/canon/daisy-monroe/throw-01.png",
+      "assets/characters/processed/canon/daisy-monroe/throw-01.webp",
     );
 
     const framePaths = CANON_BOWLERS.flatMap((bowler) =>
@@ -101,7 +101,7 @@ describe("throw playback", () => {
   test("maps every bowler to a dedicated front-facing portrait", () => {
     assert.equal(
       getPortraitAssetPath(CANON_BOWLERS[0]),
-      "assets/characters/portraits/canon/daisy-monroe.png",
+      "assets/characters/portraits/canon/daisy-monroe.webp",
     );
     assert.equal(
       CANON_BOWLERS.every((bowler) => fs.existsSync(path.join(__dirname, getPortraitAssetPath(bowler)))),
@@ -112,18 +112,18 @@ describe("throw playback", () => {
   test("maps every bowler to dedicated victory and defeat portraits", () => {
     assert.equal(
       getResultPortraitAssetPath(CANON_BOWLERS[0], "victory"),
-      "assets/characters/portraits/victory/daisy-monroe.png",
+      "assets/characters/portraits/victory/daisy-monroe.webp",
     );
     assert.equal(
       getResultPortraitAssetPath(CANON_BOWLERS[0], "defeat"),
-      "assets/characters/portraits/defeat/daisy-monroe.png",
+      "assets/characters/portraits/defeat/daisy-monroe.webp",
     );
 
     for (const outcome of ["victory", "defeat"]) {
       for (const bowler of CANON_BOWLERS) {
         const resultPath = getResultPortraitAssetPath(bowler, outcome);
         assert.equal(fs.existsSync(path.join(__dirname, resultPath)), true);
-        assert.equal(resultPath, `assets/characters/portraits/${outcome}/${bowler.slug}.png`);
+        assert.equal(resultPath, `assets/characters/portraits/${outcome}/${bowler.slug}.webp`);
       }
     }
   });
@@ -174,15 +174,15 @@ describe("character skins", () => {
     const bowler = CANON_BOWLERS[0];
     assert.equal(
       getFrameAssetPath(bowler, 2, "swimsuit"),
-      "assets/characters/skins/daisy-monroe/swimsuit/throw-02.png",
+      "assets/characters/skins/daisy-monroe/swimsuit/throw-02.webp",
     );
     assert.equal(
       getPortraitAssetPath(bowler, "swimsuit"),
-      "assets/characters/skins/daisy-monroe/swimsuit/portrait.png",
+      "assets/characters/skins/daisy-monroe/swimsuit/portrait.webp",
     );
     assert.equal(
       getResultPortraitAssetPath(bowler, "victory", "swimsuit"),
-      "assets/characters/skins/daisy-monroe/swimsuit/portrait.png",
+      "assets/characters/skins/daisy-monroe/swimsuit/portrait.webp",
     );
   });
 
