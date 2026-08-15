@@ -25,6 +25,13 @@ class ExtractCanonFramesTests(unittest.TestCase):
             (204, 646, 96, 346),
         )
 
+    def test_incremental_rebuild_can_select_multiple_characters(self) -> None:
+        sources = [Path("kevya-desai.png"), Path("lillie-chen.png"), Path("daisy-monroe.png")]
+
+        selected = extractor.select_sources(sources, ["kevya", "lillie-chen.png"])
+
+        self.assertEqual([path.name for path in selected], ["kevya-desai.png", "lillie-chen.png"])
+
     def test_wide_crop_keeps_target_extensions_and_removes_edge_neighbors(self) -> None:
         rgba = np.zeros((120, 300, 4), dtype=np.uint8)
         rgba[20:105, 0:80] = (220, 40, 40, 255)
@@ -63,6 +70,50 @@ class ExtractCanonFramesTests(unittest.TestCase):
 
             self.assertEqual(result.getpixel((0, 0)), (20, 180, 90, 255))
 
+    def test_manual_override_can_be_refreshed_from_a_recolored_sheet(self) -> None:
+        with TemporaryDirectory() as temporary_directory:
+            override_root = Path(temporary_directory)
+            override_path = override_root / "nia-brooks" / "throw-04.png"
+            override_path.parent.mkdir(parents=True)
+            Image.new("RGBA", extractor.CANVAS_SIZE, (240, 180, 30, 255)).save(override_path)
+            recolored = Image.new("RGBA", extractor.CANVAS_SIZE, (90, 35, 150, 255))
+
+            result = extractor.apply_manual_override(
+                recolored,
+                override_root,
+                "nia-brooks",
+                4,
+                refresh=True,
+            )
+
+            with Image.open(override_path) as refreshed:
+                self.assertEqual(refreshed.getpixel((0, 0)), (90, 35, 150, 255))
+            self.assertEqual(result.getpixel((0, 0)), (90, 35, 150, 255))
+
+    def test_explicit_skin_destinations_do_not_depend_on_source_filename(self) -> None:
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            output_directory = root / "daisy-monroe" / "swimsuit"
+            portrait_path = output_directory / "portrait.png"
+
+            self.assertEqual(
+                extractor.resolve_output_directory(
+                    root / "daisy-monroe" / "swimsuit" / "source.png",
+                    root / "processed",
+                    "daisy-monroe",
+                    output_directory,
+                ),
+                output_directory,
+            )
+            self.assertEqual(
+                extractor.resolve_portrait_path(
+                    root / "portraits",
+                    "daisy-monroe",
+                    portrait_path,
+                ),
+                portrait_path,
+            )
+
     def test_every_active_bowler_has_a_protected_throw_four_override(self) -> None:
         project_root = Path(__file__).resolve().parents[1]
         source_root = project_root / "assets" / "characters" / "usable" / "canon"
@@ -79,6 +130,22 @@ class ExtractCanonFramesTests(unittest.TestCase):
             self.assertTrue(override_path.exists())
             self.assertEqual(override_path.read_bytes(), processed_path.read_bytes())
 
+    def test_missing_hand_repairs_are_protected_manual_overrides(self) -> None:
+        project_root = Path(__file__).resolve().parents[1]
+        output_root = project_root / "assets" / "characters" / "processed" / "canon"
+        override_root = project_root / "assets" / "characters" / "manual-overrides" / "canon"
+
+        for slug, frame_number in (
+            ("lillie-chen", 5),
+            ("marisol-cruz", 5),
+            ("simone-carter", 3),
+        ):
+            filename = f"throw-{frame_number:02d}.png"
+            override_path = override_root / slug / filename
+            processed_path = output_root / slug / filename
+            self.assertTrue(override_path.exists())
+            self.assertEqual(override_path.read_bytes(), processed_path.read_bytes())
+
     def test_heavily_overlapping_final_hair_uses_stronger_bridge_separation(self) -> None:
         self.assertEqual(extractor.component_opening_size("naomi-okafor", 5), 17)
         self.assertEqual(extractor.component_opening_size("tessa-quinn", 5), 23)
@@ -87,6 +154,18 @@ class ExtractCanonFramesTests(unittest.TestCase):
         self.assertEqual(
             extractor.component_preserve_rects("tessa-quinn", 5),
             ((30, 410, 125, 560),),
+        )
+        self.assertEqual(
+            extractor.component_foreign_rects("rei-nakamura", 5),
+            ((0, 100, 80, 420),),
+        )
+        self.assertEqual(
+            extractor.component_foreign_rects("nia-brooks", 4),
+            ((350, 400, 443, 700),),
+        )
+        self.assertEqual(
+            extractor.component_foreign_rects("naomi-okafor", 4),
+            ((345, 250, 393, 350), (350, 500, 393, 750)),
         )
 
     def test_processed_roster_matches_source_roster(self) -> None:

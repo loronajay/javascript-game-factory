@@ -14,7 +14,7 @@ const {
 } = require("./game-core.js");
 
 const players = [
-  { id: "p1", name: "Player 1", characterSlug: "daisy-monroe", type: "human" },
+  { id: "p1", name: "Player 1", characterSlug: "daisy-monroe", skinId: "swimsuit", type: "human" },
   { id: "p2", name: "Player 2", characterSlug: "nia-brooks", type: "human" },
 ];
 
@@ -39,6 +39,12 @@ describe("bowling scoring", () => {
 });
 
 describe("local match turns", () => {
+  test("keeps each player's equipped skin in match state", () => {
+    const match = createMatch({ modeId: "quick", playType: "hotseat", players });
+    assert.equal(match.players[0].skinId, "swimsuit");
+    assert.equal(match.players[1].skinId, "canon");
+  });
+
   test("hands a completed frame to the next hotseat player", () => {
     let match = createMatch({ modeId: "quick", playType: "hotseat", players });
     match = recordRoll(match, 10);

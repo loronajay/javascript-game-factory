@@ -31,8 +31,17 @@ export const KIND_CPU = "cpu";
  * The board is what decides whether there is a ghost, not the mode: a best set
  * over a quarter mile is not a rival over a mile.
  */
-export function lineupFor(boardId, ghost = null) {
-  const entries = RIVALS.map((rival) => ({
+/**
+ * One roster rival, as a lineup entry.
+ *
+ * Exported because the campaign fields roster drivers on the map's painted
+ * `rival` and `boss` bases, and an event assembling this shape by hand would be
+ * a second copy of it — one that would quietly stop matching the day an entry
+ * gains a field. `buildRival` finds the profile by id, so nothing here carries
+ * the hands.
+ */
+export function rivalEntry(rival) {
+  return {
     id: rival.id,
     kind: KIND_CPU,
     name: rival.name,
@@ -45,7 +54,11 @@ export function lineupFor(boardId, ghost = null) {
     initial: rival.name.charAt(0).toUpperCase(),
     modelId: rival.modelId,
     livery: rival.livery,
-  }));
+  };
+}
+
+export function lineupFor(boardId, ghost = null) {
+  const entries = RIVALS.map(rivalEntry);
 
   if (!ghost || !boardId || ghost.boardId !== boardId) return entries;
 

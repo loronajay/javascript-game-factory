@@ -5,30 +5,50 @@
 // script around it, so authoring a mission is a row here and nothing else. That
 // is the property `MODES`, `RIVALS` and the car atlas already have.
 //
-// ## The opponent in chapter one is nobody
+// ## Two kinds of opponent, and the map decides which
 //
-// The ten drivers in `rival/rivals.js` are the campaign's rivals and bosses —
-// they have faces, bios and a difficulty ladder, and they are spent once they
-// are introduced. The opening events are deliberately against **anonymous**
-// drivers: a name at the start of a career is a name the player has no reason
-// to care about, and burning a roster face on a tutorial race wastes it.
+// The ten drivers in `rival/rivals.js` have faces, bios and a measured
+// difficulty ladder, and they are **spent** once they are introduced — a rival
+// the player has already beaten twice is not a rival any more. So they are not
+// spread evenly across the campaign; they are saved for the bases the artwork
+// itself marks out.
 //
-// So an event may carry its own `opponent`, which is a lineup entry with the
-// five driver knobs on it rather than a roster id. `buildRival` reads a profile
-// off the entry when there is one, which is the only change the rival layer
-// needed: everything downstream still sees an input log and cannot tell where
-// it came from.
+// `campaign-map.png` paints four kinds of stop, and the rule follows the
+// picture rather than being invented on top of it:
 //
-// ## And the voice is nobody either
+//   race / bonus / start   an **anonymous local**. The event carries its own
+//                          `opponent` — a lineup entry with the five driver
+//                          knobs on it rather than a roster id.
+//   rival / boss           one of the ten, through `rosterOpponent`.
 //
-// The briefing is spoken by an unnamed contact — no portrait, no name, a phone
-// that knows where the races are. Same reasoning: the characters worth meeting
-// are the ones you race, and a narrator who turns out to be somebody is a card
-// that can be played later. Anything with a face belongs in `rivals.js`.
+// That is checked in `tests/campaign.test.js`, both ways: a roster face on a
+// plain race base spends a character on a filler event, and a nameless driver on
+// a painted boss plate is a boss fight against nobody. **No roster face may
+// appear twice**, for the reason they are rationed at all.
+//
+// `buildRival` reads a profile off the entry when there is one and falls back to
+// the roster row when there is not, which is the only change the rival layer
+// ever needed: everything downstream still sees an input log and cannot tell
+// where it came from.
+//
+// ## And every driver has a face now
+//
+// An anonymous local is anonymous in *name* — "Some Kid" — and that was once
+// also true of their portrait, because the only faces in the cabinet were the
+// ten. The generic avatar roster changed that: `avatarId` puts a real face on a
+// nameless driver at no cost to the ten, so the VS card, the map's detail strip
+// and the briefing all show a person rather than a letter on a plate. The
+// placeholder path still works and is still exercised — it is what a missing
+// file degrades to — but it is no longer the ordinary case.
+//
+// The briefing's voice is `campaign/contacts.js`, which is where the same
+// argument is written out in full.
 
 import { MODE_RIVAL } from "../sim/modes.js";
 import { createLivery } from "../garage/livery.js";
-import { KIND_CPU } from "../rival/lineup.js";
+import { KIND_CPU, rivalEntry } from "../rival/lineup.js";
+import { rivalById } from "../rival/rivals.js";
+import { VOICE_UNKNOWN } from "./contacts.js";
 
 /** Where the mission art lives. Splashes are 1672x941 and drawn full-bleed. */
 export const SPLASH_DIR = "assets/mission-splashes";
@@ -37,23 +57,22 @@ export function splashSrc(event) {
   return `${SPLASH_DIR}/${event.splash}`;
 }
 
-/**
- * The speaker label for the unnamed contact.
- *
- * A constant rather than a string typed into each line, because the day this
- * turns out to be somebody, it is one edit — and until then every line it
- * speaks is provably the same voice.
- */
-export const VOICE_UNKNOWN = "UNKNOWN";
+/** Re-exported so a `brief` row can name the voice without a second import. */
+export { VOICE_UNKNOWN };
 
 /**
  * A nameless driver, as a lineup entry.
  *
- * The shape matches what `lineupFor` builds for a roster rival, minus the
- * identity: no portrait file (so the card falls back to the initial plate, the
- * repo's placeholder rule) and a profile carried inline.
+ * The shape matches what `rivalEntry` builds for a roster rival, minus the
+ * identity: no roster portrait — the face comes from the generic avatar roster
+ * instead — and a profile carried inline.
+ *
+ * `avatarId` is deliberately a plain id rather than a resolved path. This module
+ * is the catalog; which of the two derived sizes a given surface wants is the
+ * surface's business, and baking a `cards/` path in here would be the one thing
+ * `tests/modules.test.js` sweeps for the moment a small cell drew it.
  */
-function nobody({ id, name, tier, blurb, accent, modelId, livery, profile }) {
+function nobody({ id, name, tier, blurb, accent, avatarId = null, modelId, livery, profile }) {
   return {
     id,
     kind: KIND_CPU,
@@ -61,12 +80,28 @@ function nobody({ id, name, tier, blurb, accent, modelId, livery, profile }) {
     tier,
     blurb,
     accent,
+    avatarId,
     initial: name.charAt(0).toUpperCase(),
     modelId,
     livery: createLivery(livery),
     // What makes this raceable without a roster row. See `buildRival`.
     profile,
   };
+}
+
+/**
+ * One of the ten, as an event's opponent.
+ *
+ * Through `rivalEntry` rather than by hand so the campaign and the rival pane
+ * agree on what a roster driver *is* — and with no profile of its own, so the
+ * hands come from `rivals.js` and a retune of the ladder moves the campaign with
+ * it. An event that wanted its own knobs on a roster face would be a rival who
+ * drives differently depending on which screen you met them from.
+ */
+function rosterOpponent(id) {
+  const rival = rivalById(id);
+  if (!rival) throw new Error(`campaign: unknown rival ${id}`);
+  return rivalEntry(rival);
 }
 
 /**

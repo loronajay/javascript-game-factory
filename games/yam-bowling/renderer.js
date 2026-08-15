@@ -32,6 +32,7 @@
       this.ctx.imageSmoothingEnabled = false;
       this.assets = { lane: null, pin: null, character: [] };
       this.characterSlug = "";
+      this.skinId = "";
       this.characterLoadId = 0;
       this.ready = false;
       this.debug = false;
@@ -47,16 +48,18 @@
       this.ready = true;
     }
 
-    async setCharacter(slug) {
-      if (!slug || slug === this.characterSlug) return;
+    async setCharacter(slug, skinId = "canon") {
+      const resolvedSkinId = root.YamBowlingCore.normalizeSkinId(skinId);
+      if (!slug || (slug === this.characterSlug && resolvedSkinId === this.skinId)) return;
       const loadId = ++this.characterLoadId;
       const frames = await Promise.all(
         Array.from({ length: 5 }, (_, index) =>
-          loadImage(`assets/characters/processed/canon/${slug}/throw-${String(index + 1).padStart(2, "0")}.png`),
+          loadImage(root.YamBowlingCore.getFrameAssetPath({ slug }, index + 1, resolvedSkinId)),
         ),
       );
       if (loadId !== this.characterLoadId) return;
       this.characterSlug = slug;
+      this.skinId = resolvedSkinId;
       this.assets.character = frames;
     }
 

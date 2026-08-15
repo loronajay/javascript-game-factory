@@ -125,7 +125,7 @@ test("lobby join publishes the selected bowler and owner can start a full lobby"
   const socket = MockWebSocket.instances[0];
   socket.open();
   socket.receive({ event: "connected", clientId: "socket-1", sessionToken: "resume-1" });
-  client.createPrivateRoom({ modeId: "quick", characterSlug: "daisy-monroe" });
+  client.createPrivateRoom({ modeId: "quick", characterSlug: "daisy-monroe", skinId: "swimsuit" });
   socket.receive({
     event: "lobby_joined",
     clientId: "socket-1",
@@ -146,6 +146,7 @@ test("lobby join publishes the selected bowler and owner can start a full lobby"
     playerId: "factory-p1",
     displayName: "Bowler One",
     characterSlug: "daisy-monroe",
+    skinId: "swimsuit",
     protocolVersion: 1,
   });
 

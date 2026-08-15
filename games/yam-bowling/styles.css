@@ -283,6 +283,27 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 .player-slot small { color: var(--muted); font-size: .62rem; font-weight: 800; text-transform: uppercase; }
 .player-slot strong { overflow: hidden; font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
 .player-slot b { padding: .26rem .38rem; border-radius: 6px; color: var(--red); background: rgba(243,46,63,.11); font-size: .55rem; }
+.skin-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; }
+.skin-option {
+  display: grid;
+  min-width: 0;
+  min-height: 64px;
+  padding: .35rem;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: .45rem;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255,255,255,.035);
+  text-align: left;
+}
+.skin-option:hover, .skin-option.is-selected { border-color: var(--gold); background: rgba(255,214,107,.09); }
+.skin-option.is-selected { box-shadow: 0 0 0 2px rgba(255,214,107,.12); }
+.skin-option img { width: 42px; height: 54px; border-radius: 8px; object-fit: contain; object-position: center bottom; background: #090a0e; }
+.skin-option span { display: grid; min-width: 0; gap: .14rem; }
+.skin-option strong { overflow: hidden; font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
+.skin-option small { color: var(--muted); font-size: .52rem; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
+.skin-option.is-selected small { color: var(--gold); }
 .character-select { min-width: 0; padding: 1.25rem; }
 .section-heading { display: flex; gap: 1rem; align-items: end; justify-content: space-between; }
 .section-heading h3 { margin: 0; font-size: 1.5rem; letter-spacing: -.035em; }
@@ -693,6 +714,10 @@ input:disabled { cursor: not-allowed; filter: grayscale(1); opacity: .45; }
   .setup-options { min-height: 0; padding: .48rem; gap: .38rem; overflow-y: auto; scrollbar-width: thin; }
   .option-section { padding-bottom: .35rem; }
   .option-label { margin-bottom: .3rem; font-size: .54rem; }
+  .skin-option { min-height: 44px; padding: .22rem; grid-template-columns: 30px minmax(0, 1fr); gap: .3rem; border-radius: 8px; }
+  .skin-option img { width: 30px; height: 38px; border-radius: 6px; }
+  .skin-option strong { font-size: .54rem; }
+  .skin-option small { font-size: .44rem; }
   .segmented { padding: 2px; gap: 2px; }
   .segmented > button, .cpu-options button { min-height: 34px; padding: .35rem .45rem; font-size: .6rem; }
   .segmented .choice-card { min-height: 39px; padding: .35rem .48rem; }

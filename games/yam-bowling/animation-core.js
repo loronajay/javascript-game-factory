@@ -32,11 +32,23 @@
     ["Roxy Chen", "roxy-chen", "e85ca33c-f095-4e0d-9903-b3bbf608e0aa"],
     ["Naomi Okafor", "naomi-okafor", "ed3534bc-fc54-4aad-8d2f-76fb0b8389ce"],
     ["Echo Sterling", "echo-sterling", "ffdaef24-0eaf-42e7-a852-0154d7a2d129"],
+    ["Kevya Desai", "kevya-desai", null],
+    ["Lillie Chen", "lillie-chen", null],
+    ["Marisol Cruz", "marisol-cruz", null],
+    ["Rei Nakamura", "rei-nakamura", null],
+    ["Simone Carter", "simone-carter", null],
+    ["Talia Dodson", "talia-dodson", null],
   ];
 
   const THROW_FRAME_COUNT = 5;
   const BASE_FRAME_DURATION_MS = 200;
   const RESULT_PORTRAIT_OUTCOMES = Object.freeze(["victory", "defeat"]);
+  const DEFAULT_SKIN_ID = "canon";
+  const EQUIPPED_SKINS_STORAGE_KEY = "yam-bowling.equipped-skins.v1";
+  const AVAILABLE_SKINS = Object.freeze([
+    Object.freeze({ id: "canon", name: "Classic" }),
+    Object.freeze({ id: "swimsuit", name: "Swimsuit" }),
+  ]);
 
   const CANON_BOWLERS = Object.freeze(
     CANON_ROSTER.map(([name, slug, legacyId]) =>
@@ -61,7 +73,11 @@
     return (Math.floor(elapsedMs / frameDurationMs) % THROW_FRAME_COUNT) + 1;
   }
 
-  function getFrameAssetPath(bowler, frame) {
+  function normalizeSkinId(skinId) {
+    return AVAILABLE_SKINS.some((skin) => skin.id === skinId) ? skinId : DEFAULT_SKIN_ID;
+  }
+
+  function getFrameAssetPath(bowler, frame, skinId = DEFAULT_SKIN_ID) {
     if (!bowler || typeof bowler.slug !== "string") {
       throw new TypeError("A canon bowler is required.");
     }
@@ -70,24 +86,65 @@
       throw new RangeError(`Throw frame must be between 1 and ${THROW_FRAME_COUNT}.`);
     }
 
-    return `assets/characters/processed/canon/${bowler.slug}/throw-${String(frame).padStart(2, "0")}.png`;
+    const filename = `throw-${String(frame).padStart(2, "0")}.png`;
+    const resolvedSkinId = normalizeSkinId(skinId);
+    return resolvedSkinId === DEFAULT_SKIN_ID
+      ? `assets/characters/processed/canon/${bowler.slug}/${filename}`
+      : `assets/characters/skins/${bowler.slug}/${resolvedSkinId}/${filename}`;
   }
 
-  function getPortraitAssetPath(bowler) {
+  function getPortraitAssetPath(bowler, skinId = DEFAULT_SKIN_ID) {
     if (!bowler || typeof bowler.slug !== "string") {
       throw new TypeError("A canon bowler is required.");
     }
-    return `assets/characters/portraits/canon/${bowler.slug}.png`;
+    const resolvedSkinId = normalizeSkinId(skinId);
+    return resolvedSkinId === DEFAULT_SKIN_ID
+      ? `assets/characters/portraits/canon/${bowler.slug}.png`
+      : `assets/characters/skins/${bowler.slug}/${resolvedSkinId}/portrait.png`;
   }
 
-  function getResultPortraitAssetPath(bowler, outcome) {
+  function getResultPortraitAssetPath(bowler, outcome, skinId = DEFAULT_SKIN_ID) {
     if (!bowler || typeof bowler.slug !== "string") {
       throw new TypeError("A canon bowler is required.");
     }
     if (!RESULT_PORTRAIT_OUTCOMES.includes(outcome)) {
       throw new RangeError(`Result portrait outcome must be one of: ${RESULT_PORTRAIT_OUTCOMES.join(", ")}.`);
     }
-    return `assets/characters/portraits/${outcome}/${bowler.slug}.png`;
+    const resolvedSkinId = normalizeSkinId(skinId);
+    return resolvedSkinId === DEFAULT_SKIN_ID
+      ? `assets/characters/portraits/${outcome}/${bowler.slug}.png`
+      : getPortraitAssetPath(bowler, resolvedSkinId);
+  }
+
+  function readEquippedSkins(storage = root.localStorage) {
+    try {
+      const value = JSON.parse(storage?.getItem?.(EQUIPPED_SKINS_STORAGE_KEY) || "{}");
+      return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function getEquippedSkinId(bowler, storage = root.localStorage) {
+    if (!bowler || typeof bowler.slug !== "string") {
+      throw new TypeError("A canon bowler is required.");
+    }
+    return normalizeSkinId(readEquippedSkins(storage)[bowler.slug]);
+  }
+
+  function saveEquippedSkinId(bowler, skinId, storage = root.localStorage) {
+    if (!bowler || typeof bowler.slug !== "string") {
+      throw new TypeError("A canon bowler is required.");
+    }
+    const resolvedSkinId = normalizeSkinId(skinId);
+    const equipped = readEquippedSkins(storage);
+    equipped[bowler.slug] = resolvedSkinId;
+    try {
+      storage?.setItem?.(EQUIPPED_SKINS_STORAGE_KEY, JSON.stringify(equipped));
+    } catch {
+      // Storage is a convenience; equipped state still applies to this match.
+    }
+    return resolvedSkinId;
   }
 
   function getFrameDuration(speed) {
@@ -99,12 +156,17 @@
   }
 
   return {
+    AVAILABLE_SKINS,
     CANON_BOWLERS,
+    DEFAULT_SKIN_ID,
     THROW_FRAME_COUNT,
+    getEquippedSkinId,
     getFrameAssetPath,
     getFrameAtElapsed,
     getFrameDuration,
     getPortraitAssetPath,
     getResultPortraitAssetPath,
+    normalizeSkinId,
+    saveEquippedSkinId,
   };
 });

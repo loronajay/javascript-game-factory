@@ -38,6 +38,11 @@ COMPONENT_OPENING_OVERRIDES = {
 COMPONENT_PRESERVE_RECTS = {
     ("tessa-quinn", 5): ((30, 410, 125, 560),),
 }
+COMPONENT_FOREIGN_RECTS = {
+    ("nia-brooks", 4): ((350, 400, 443, 700),),
+    ("naomi-okafor", 4): ((345, 250, 393, 350), (350, 500, 393, 750)),
+    ("rei-nakamura", 5): ((0, 100, 80, 420),),
+}
 FRAME_LABELS = ("SET", "APPROACH", "BACKSWING", "RELEASE", "FOLLOW-THROUGH")
 
 
@@ -112,11 +117,19 @@ def component_preserve_rects(
     return COMPONENT_PRESERVE_RECTS.get((short_id, frame_number), ())
 
 
+def component_foreign_rects(
+    short_id: str,
+    frame_number: int,
+) -> tuple[tuple[int, int, int, int], ...]:
+    return COMPONENT_FOREIGN_RECTS.get((short_id, frame_number), ())
+
+
 def separate_edge_neighbors(
     crop: Image.Image,
     target_window: tuple[int, int],
     opening_size: int = 6,
     preserve_rects: tuple[tuple[int, int, int, int], ...] = (),
+    foreign_rects: tuple[tuple[int, int, int, int], ...] = (),
 ) -> tuple[Image.Image, tuple[int, int, int, int]]:
     """Keep the centered pose while removing adjacent poses entering the crop."""
     rgba = np.asarray(crop.convert("RGBA")).copy()
@@ -129,6 +142,8 @@ def separate_edge_neighbors(
     target_left, target_right = target_window
     markers = np.zeros(mask.shape, dtype=np.int32)
     foreign_edge = mask & ((xx < 4) | (xx >= mask.shape[1] - 4))
+    for x1, y1, x2, y2 in foreign_rects:
+        foreign_edge[y1:y2, x1:x2] |= mask[y1:y2, x1:x2]
     target_core = ndimage.binary_erosion(mask, iterations=10)
     target_core &= (xx >= target_left + TARGET_CORE_INSET) & (
         xx < target_right - TARGET_CORE_INSET
@@ -292,10 +307,15 @@ def apply_manual_override(
     override_root: Path,
     short_id: str,
     frame_number: int,
+    refresh: bool = False,
 ) -> Image.Image:
     """Use protected hand-edited artwork when an override exists."""
     override_path = override_root / short_id / f"throw-{frame_number:02d}.png"
     if not override_path.exists():
+        return generated_frame
+
+    if refresh:
+        generated_frame.save(override_path, format="PNG", optimize=True)
         return generated_frame
 
     with Image.open(override_path) as source:
@@ -345,15 +365,29 @@ def write_extraction_report(
     report_path: Path,
     updates: dict[str, list[dict[str, object]]],
     merge_existing: bool = False,
+    active_slugs: set[str] | None = None,
 ) -> dict[str, list[dict[str, object]]]:
     """Write QA metadata without dropping untouched characters on --only runs."""
     combined: dict[str, list[dict[str, object]]] = {}
     if merge_existing and report_path.exists():
         combined = json.loads(report_path.read_text(encoding="utf-8"))
     combined.update(updates)
+    if active_slugs is not None:
+        combined = {slug: reports for slug, reports in combined.items() if slug in active_slugs}
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(combined, indent=2), encoding="utf-8")
     return combined
+
+
+def select_sources(sources: list[Path], selectors: list[str] | None) -> list[Path]:
+    """Select one or more sheets by full filename or slug prefix."""
+    if not selectors:
+        return sources
+    return [
+        path
+        for path in sources
+        if any(path.name == selector or path.stem.startswith(selector) for selector in selectors)
+    ]
 
 
 def save_portrait(
@@ -388,6 +422,23 @@ def process_portrait_sheet(source_path: Path, portrait_root: Path, session) -> I
     return save_portrait(segmented, boundaries, portrait_root / f"{source_path.stem}.png")
 
 
+def resolve_output_directory(
+    source_path: Path,
+    output_root: Path,
+    short_id: str,
+    output_directory: Path | None = None,
+) -> Path:
+    return output_directory if output_directory is not None else output_root / short_id
+
+
+def resolve_portrait_path(
+    portrait_root: Path,
+    short_id: str,
+    portrait_path: Path | None = None,
+) -> Path:
+    return portrait_path if portrait_path is not None else portrait_root / f"{short_id}.png"
+
+
 def process_sheet(
     source_path: Path,
     output_root: Path,
@@ -395,14 +446,22 @@ def process_sheet(
     qa_root: Path,
     session,
     override_root: Path | None = None,
+    refresh_overrides: bool = False,
+    short_id: str | None = None,
+    output_directory: Path | None = None,
+    portrait_path: Path | None = None,
 ) -> list[FrameReport]:
-    short_id = source_path.stem
+    short_id = short_id or source_path.stem
     source = Image.open(source_path).convert("RGBA")
     segmented = remove(source, session=session, alpha_matting=False)
     segmented = segmented if isinstance(segmented, Image.Image) else Image.open(segmented).convert("RGBA")
     alpha = np.asarray(segmented.getchannel("A"))
     boundaries = find_pose_boundaries(alpha)
-    save_portrait(segmented, boundaries, portrait_root / f"{short_id}.png")
+    save_portrait(
+        segmented,
+        boundaries,
+        resolve_portrait_path(portrait_root, short_id, portrait_path),
+    )
 
     extracted: list[tuple[Image.Image, tuple[int, int, int, int]]] = []
     source_bounds: list[tuple[int, int]] = []
@@ -418,18 +477,30 @@ def process_sheet(
             (target_left, target_right),
             opening_size=component_opening_size(short_id, pose_index),
             preserve_rects=component_preserve_rects(short_id, pose_index),
+            foreign_rects=component_foreign_rects(short_id, pose_index),
         )
         extracted.append((clean_crop, subject_bounds))
         source_bounds.append((left, right))
 
     normalized = normalize_frames(extracted)
-    character_root = output_root / short_id
+    character_root = resolve_output_directory(
+        source_path,
+        output_root,
+        short_id,
+        output_directory,
+    )
     character_root.mkdir(parents=True, exist_ok=True)
     reports: list[FrameReport] = []
 
     for index, frame in enumerate(normalized, start=1):
         if override_root is not None:
-            frame = apply_manual_override(frame, override_root, short_id, index)
+            frame = apply_manual_override(
+                frame,
+                override_root,
+                short_id,
+                index,
+                refresh=refresh_overrides,
+            )
         frame = clear_invisible_rgb(frame)
         normalized[index - 1] = frame
         destination = character_root / f"throw-{index:02d}.png"
@@ -467,9 +538,18 @@ def main() -> None:
         default=Path("assets/characters/manual-overrides/canon"),
         help="Protected hand-edited frames applied after automatic extraction.",
     )
+    parser.add_argument(
+        "--refresh-overrides",
+        action="store_true",
+        help="Replace existing overrides for selected sheets with freshly extracted frames.",
+    )
     parser.add_argument("--models", type=Path, default=Path(".models"))
     parser.add_argument("--model", default=DEFAULT_MODEL, help="rembg foreground model name")
-    parser.add_argument("--only", help="Process only a filename or its first eight characters.")
+    parser.add_argument(
+        "--only",
+        action="append",
+        help="Process only a filename or slug prefix. Repeat to select multiple characters.",
+    )
     parser.add_argument(
         "--portraits-only",
         action="store_true",
@@ -480,9 +560,9 @@ def main() -> None:
     args.models.mkdir(parents=True, exist_ok=True)
     os.environ["U2NET_HOME"] = str(args.models.resolve())
     sessions = {args.model: new_session(args.model)}
-    sources = sorted(args.source.glob("*.png"))
-    if args.only:
-        sources = [path for path in sources if path.name == args.only or path.stem.startswith(args.only)]
+    all_sources = sorted(args.source.glob("*.png"))
+    active_slugs = {path.stem for path in all_sources}
+    sources = select_sources(all_sources, args.only)
     if not sources:
         raise SystemExit("No matching canon sheets found.")
 
@@ -500,6 +580,7 @@ def main() -> None:
             args.qa,
             sessions[args.model],
             args.overrides,
+            args.refresh_overrides,
         )
         all_reports[short_id] = [asdict(report) for report in reports]
 
@@ -513,6 +594,7 @@ def main() -> None:
         report_path,
         all_reports,
         merge_existing=bool(args.only),
+        active_slugs=active_slugs,
     )
     edge_failures = [
         f"{short_id}/throw-{report['frame']:02d}"

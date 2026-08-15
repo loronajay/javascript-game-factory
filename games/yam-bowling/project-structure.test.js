@@ -2,9 +2,44 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const { CANON_BOWLERS } = require("./animation-core.js");
 
 const root = __dirname;
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+
+test("every canon bowler has a reusable processed swimsuit skin package", () => {
+  for (const bowler of CANON_BOWLERS) {
+    const bowlerDirectory = path.join(root, "assets", "characters", "skins", bowler.slug);
+    const skinDirectory = path.join(bowlerDirectory, "swimsuit");
+    const expectedFiles = [
+      "portrait.png",
+      "source.png",
+      ...Array.from({ length: 5 }, (_, index) => `throw-${String(index + 1).padStart(2, "0")}.png`),
+    ];
+
+    assert.deepEqual(
+      fs.readdirSync(skinDirectory).filter((file) => file.endsWith(".png")).sort(),
+      expectedFiles.sort(),
+      `${bowler.name} should have a complete swimsuit package`,
+    );
+    assert.equal(
+      fs.readdirSync(bowlerDirectory).filter((file) => file.endsWith(".png")).length,
+      0,
+      `${bowler.name} should not keep a legacy sheet outside a skin-id folder`,
+    );
+  }
+});
+
+test("the setup screen exposes skin equipment controls", () => {
+  const html = read("index.html");
+  const game = read("game.js");
+
+  assert.match(html, /id=["']skin-options["']/);
+  assert.match(html, /id=["']online-skin-options["']/);
+  assert.match(game, /saveEquippedSkinId/);
+  assert.match(game, /skinId/);
+  assert.match(read("renderer.js"), /getFrameAssetPath/);
+});
 
 test("the cabinet exposes title, setup, match, and results screens", () => {
   const html = read("index.html");
@@ -144,8 +179,8 @@ test("selection and identity surfaces use portraits while the lane uses throw fr
   const game = read("game.js");
   assert.match(game, /function characterPortrait/);
   assert.match(game, /characterPortrait\(bowler\.slug\)/);
-  assert.match(game, /characterPortrait\(player\.characterSlug\)/);
-  assert.match(game, /renderer\.setCharacter\(player\.characterSlug\)/);
+  assert.match(game, /characterPortrait\(player\.characterSlug, playerSkinId\(player\)\)/);
+  assert.match(game, /renderer\.setCharacter\(player\.characterSlug, playerSkinId\(player\)\)/);
 });
 
 test("results give both bowlers large outcome-specific character art", () => {

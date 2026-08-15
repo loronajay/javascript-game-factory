@@ -26,14 +26,32 @@
 | 22 | Roxy Chen | `roxy-chen.png` |
 | 23 | Naomi Okafor | `naomi-okafor.png` |
 | 24 | Echo Sterling | `echo-sterling.png` |
+| 25 | Kevya Desai | `kevya-desai.png` |
+| 26 | Lillie Chen | `lillie-chen.png` |
+| 27 | Marisol Cruz | `marisol-cruz.png` |
+| 28 | Rei Nakamura | `rei-nakamura.png` |
+| 29 | Simone Carter | `simone-carter.png` |
+| 30 | Talia Dodson | `talia-dodson.png` |
 
-Source PNGs live in `assets/characters/usable/canon/`. Each character's five cleaned throw frames live in `assets/characters/processed/canon/<firstname-lastname>/`. The original UUID for every source remains in `animation-core.js` as `legacyId` provenance.
+Source PNGs live in `assets/characters/usable/canon/`. Each character's five cleaned throw frames live in `assets/characters/processed/canon/<firstname-lastname>/`. When a source originally had a UUID filename, that UUID remains in `animation-core.js` as `legacyId` provenance.
 
 Front-facing selection portraits are extracted from pose zero into `assets/characters/portraits/canon/`. Throw frames remain rear-facing because they are rendered from the bowler's lane perspective.
 
 Protected hand-edited fourth-throw frames live in `assets/characters/manual-overrides/canon/<firstname-lastname>/throw-04.png`. The extractor automatically reapplies them after every rebuild.
 
 Characters removed from canon are archived under `assets/characters/not-usable/removed-canon/` so their source and derived artwork cannot be reintroduced by the extractor.
+
+## Skin package convention
+
+Every alternate outfit is a self-contained package at `assets/characters/skins/<character-slug>/<skin-id>/`. A package contains the original six-pose `source.png`, extracted `portrait.png`, and `throw-01.png` through `throw-05.png`.
+
+To add another collection, make a folder such as `assets/characters/skins/daisy-monroe/winter/`, drop the lineup in as `source.png`, add the collection id and display name to `AVAILABLE_SKINS` in `animation-core.js`, then run:
+
+```powershell
+.\.venv\Scripts\python.exe tools\process_character_skins.py --only winter
+```
+
+Use `--only daisy-monroe/winter` to rebuild one package. QA contact sheets and the extraction report are written under `tmp/skin-qa/`. Equipped outfits are stored per bowler on the device and copied into each match's player state.
 
 ## Menu splash convention
 

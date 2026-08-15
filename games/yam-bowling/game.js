@@ -15,10 +15,14 @@ initMobileLandscapeGate();
   const Cpu = window.YamCpuPlanner;
   const AudioCore = window.YamAudio;
   const MenuSplash = window.YamMenuSplash;
-  const Roster = window.YamBowlingCore.CANON_BOWLERS;
+  const Animation = window.YamBowlingCore;
+  const Roster = Animation.CANON_BOWLERS;
   const TICK_MS = 1000 / 60;
   const PHYSICS_DT = 1 / 180;
   const BALLS = BallCore.BALLS;
+  const storedSkinId = (slug) => Animation.getEquippedSkinId(
+    Roster.find((bowler) => bowler.slug === slug) || Roster[0],
+  );
 
   const $ = (id) => document.getElementById(id);
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
@@ -37,10 +41,12 @@ initMobileLandscapeGate();
     cpuLevelId: "casual",
     activeSlot: 0,
     characterSlugs: ["daisy-monroe", "nia-brooks"],
+    skinIds: [storedSkinId("daisy-monroe"), storedSkinId("nia-brooks")],
   };
   const onlineSetup = {
     modeId: "quick",
     characterSlug: "daisy-monroe",
+    skinId: storedSkinId("daisy-monroe"),
     intent: null,
   };
 
@@ -84,16 +90,22 @@ initMobileLandscapeGate();
     return Roster.find((bowler) => bowler.slug === slug) || Roster[0];
   }
 
-  function characterFrame(slug, frame = 1) {
-    return `assets/characters/processed/canon/${slug}/throw-${String(frame).padStart(2, "0")}.png`;
+  function characterFrame(slug, frame = 1, skinId = Animation.DEFAULT_SKIN_ID) {
+    return Animation.getFrameAssetPath({ slug }, frame, skinId);
   }
 
-  function characterPortrait(slug) {
-    return window.YamBowlingCore.getPortraitAssetPath({ slug });
+  function characterPortrait(slug, skinId = Animation.DEFAULT_SKIN_ID) {
+    return Animation.getPortraitAssetPath({ slug }, skinId);
   }
 
-  function resultPortrait(slug, outcome) {
-    return window.YamBowlingCore.getResultPortraitAssetPath({ slug }, outcome);
+  function resultPortrait(slug, outcome, skinId = Animation.DEFAULT_SKIN_ID) {
+    return Animation.getResultPortraitAssetPath({ slug }, outcome, skinId);
+  }
+
+  function playerSkinId(player) {
+    if (onlineMatch && player?.id === onlineClient.getSnapshot().clientId) return onlineSetup.skinId;
+    if (player?.skinId) return Animation.normalizeSkinId(player.skinId);
+    return Animation.DEFAULT_SKIN_ID;
   }
 
   function applyMenuSplash(slug, persist = false) {
@@ -146,6 +158,25 @@ initMobileLandscapeGate();
     }
   }
 
+  function renderSkinOptions(containerId, slug, selectedSkinId, chooseSkin) {
+    const host = $(containerId);
+    host.innerHTML = "";
+    const bowler = bowlerBySlug(slug);
+    for (const skin of Animation.AVAILABLE_SKINS) {
+      const button = document.createElement("button");
+      button.className = `skin-option${skin.id === selectedSkinId ? " is-selected" : ""}`;
+      button.type = "button";
+      button.dataset.skinId = skin.id;
+      button.setAttribute("aria-pressed", String(skin.id === selectedSkinId));
+      button.innerHTML = `<img src="${characterPortrait(slug, skin.id)}" alt=""><span><strong>${escapeHtml(skin.name)}</strong><small>${skin.id === selectedSkinId ? "Equipped" : "Equip"}</small></span>`;
+      button.addEventListener("click", () => {
+        const equipped = Animation.saveEquippedSkinId(bowler, skin.id);
+        chooseSkin(equipped);
+      });
+      host.appendChild(button);
+    }
+  }
+
   function renderSetup() {
     setSelected($("mode-options"), "data-mode", setup.modeId);
     setSelected($("play-type-options"), "data-play-type", setup.playType);
@@ -159,9 +190,19 @@ initMobileLandscapeGate();
       const bowler = bowlerBySlug(slug);
       const slot = index === 0 ? $("player-one-slot") : $("player-two-slot");
       slot.classList.toggle("is-active", setup.activeSlot === index);
-      slot.querySelector("img").src = characterPortrait(slug);
+      slot.querySelector("img").src = characterPortrait(slug, setup.skinIds[index]);
       slot.querySelector("strong").textContent = bowler.name;
     });
+
+    renderSkinOptions(
+      "skin-options",
+      setup.characterSlugs[setup.activeSlot],
+      setup.skinIds[setup.activeSlot],
+      (skinId) => {
+        setup.skinIds[setup.activeSlot] = skinId;
+        renderSetup();
+      },
+    );
 
     for (const card of $("character-grid").querySelectorAll(".character-card")) {
       card.classList.toggle("is-selected", card.dataset.slug === setup.characterSlugs[setup.activeSlot]);
@@ -186,10 +227,14 @@ initMobileLandscapeGate();
       card.innerHTML = `<img src="${characterPortrait(bowler.slug)}" alt="" loading="lazy"><span>${bowler.name}</span><i></i>`;
       card.addEventListener("click", () => {
         const other = setup.activeSlot === 0 ? 1 : 0;
+        const previousSlug = setup.characterSlugs[setup.activeSlot];
+        const previousSkinId = setup.skinIds[setup.activeSlot];
         if (setup.characterSlugs[other] === bowler.slug) {
-          setup.characterSlugs[other] = setup.characterSlugs[setup.activeSlot];
+          setup.characterSlugs[other] = previousSlug;
+          setup.skinIds[other] = previousSkinId;
         }
         setup.characterSlugs[setup.activeSlot] = bowler.slug;
+        setup.skinIds[setup.activeSlot] = storedSkinId(bowler.slug);
         renderSetup();
       });
       grid.appendChild(card);
@@ -207,6 +252,7 @@ initMobileLandscapeGate();
       card.innerHTML = `<img src="${characterPortrait(bowler.slug)}" alt="" loading="lazy"><span>${bowler.name}</span><i></i>`;
       card.addEventListener("click", () => {
         onlineSetup.characterSlug = bowler.slug;
+        onlineSetup.skinId = storedSkinId(bowler.slug);
         renderOnlineSetup();
       });
       grid.appendChild(card);
@@ -223,11 +269,20 @@ initMobileLandscapeGate();
       card.classList.toggle("is-selected", selected);
       card.setAttribute("aria-selected", String(selected));
     }
+    renderSkinOptions(
+      "online-skin-options",
+      onlineSetup.characterSlug,
+      onlineSetup.skinId,
+      (skinId) => {
+        onlineSetup.skinId = skinId;
+        renderOnlineSetup();
+      },
+    );
   }
 
   function onlinePlayerCards(snapshot) {
     const players = snapshot?.matchState?.match?.players || snapshot?.lobby?.players || [];
-    if (!players.length) return [{ id: snapshot?.clientId || "local", name: onlineIdentity.displayName || "Player", characterSlug: onlineSetup.characterSlug }];
+    if (!players.length) return [{ id: snapshot?.clientId || "local", name: onlineIdentity.displayName || "Player", characterSlug: onlineSetup.characterSlug, skinId: onlineSetup.skinId }];
     return players;
   }
 
@@ -259,9 +314,10 @@ initMobileLandscapeGate();
     cards.forEach((player, index) => {
       const local = player.id === snapshot.clientId;
       const slug = player.characterSlug || (local ? onlineSetup.characterSlug : (index === 0 ? "daisy-monroe" : "nia-brooks"));
+      const skinId = player.skinId || (local ? onlineSetup.skinId : Animation.DEFAULT_SKIN_ID);
       const card = document.createElement("article");
       card.className = `online-player-card${local ? " is-you" : ""}${player.connected === false ? " is-disconnected" : ""}`;
-      card.innerHTML = `<img src="${characterPortrait(slug)}" alt=""><span><strong>${escapeHtml(player.name || `Player ${index + 1}`)}</strong><small>${player.connected === false ? "Reconnecting" : local ? "You · Ready" : "Ready"}</small></span>`;
+      card.innerHTML = `<img src="${characterPortrait(slug, skinId)}" alt=""><span><strong>${escapeHtml(player.name || `Player ${index + 1}`)}</strong><small>${player.connected === false ? "Reconnecting" : local ? "You · Ready" : "Ready"}</small></span>`;
       host.appendChild(card);
     });
     while (host.children.length < 2) {
@@ -278,7 +334,7 @@ initMobileLandscapeGate();
     onlineClient.connect();
     showScreen("online-lobby-screen");
     renderOnlineLobby();
-    const options = { modeId: onlineSetup.modeId, characterSlug: onlineSetup.characterSlug };
+    const options = { modeId: onlineSetup.modeId, characterSlug: onlineSetup.characterSlug, skinId: onlineSetup.skinId };
     if (intent === "quick") onlineClient.findQuickMatch(options);
     if (intent === "private-create") onlineClient.createPrivateRoom(options);
     if (intent === "private-join") {
@@ -328,11 +384,12 @@ initMobileLandscapeGate();
 
   function createPlayers() {
     return [
-      { id: "p1", name: "Player 1", characterSlug: setup.characterSlugs[0], type: "human" },
+      { id: "p1", name: "Player 1", characterSlug: setup.characterSlugs[0], skinId: setup.skinIds[0], type: "human" },
       {
         id: "p2",
         name: setup.playType === "cpu" ? Core.chooseCpuName() : "Player 2",
         characterSlug: setup.characterSlugs[1],
+        skinId: setup.skinIds[1],
         type: setup.playType === "cpu" ? "cpu" : "human",
       },
     ];
@@ -493,8 +550,8 @@ initMobileLandscapeGate();
     renderBallProfile();
     syncControlsFromShot();
     $("ball-rack").querySelectorAll(".ball-button").forEach((entry, index) => entry.classList.toggle("is-selected", index === scene.liveShot.ballIndex));
-    renderer.setCharacter(player.characterSlug).catch(console.error);
-    $("turn-avatar").src = characterPortrait(player.characterSlug);
+    renderer.setCharacter(player.characterSlug, playerSkinId(player)).catch(console.error);
+    $("turn-avatar").src = characterPortrait(player.characterSlug, playerSkinId(player));
     if (player.type === "cpu") cpuDelay = 0.8;
     bannerTime = 1;
     audio.play("announce");
@@ -802,7 +859,7 @@ initMobileLandscapeGate();
       card.className = `result-player ${isWinner ? "is-winner" : "is-defeated"}`;
       card.innerHTML = `
         <div class="result-player__portrait">
-          <img src="${resultPortrait(player.characterSlug, outcome)}" alt="${bowler.name}, ${outcomeLabel.toLowerCase()}">
+          <img src="${resultPortrait(player.characterSlug, outcome, playerSkinId(player))}" alt="${bowler.name}, ${outcomeLabel.toLowerCase()}">
           <span class="result-player__outcome">${outcomeLabel}</span>
         </div>
         <div class="result-player__details">
@@ -941,7 +998,7 @@ initMobileLandscapeGate();
       const button = event.target.closest("button");
       if (!button || button.disabled || button.id === "throw-button") return;
       if (!audio.unlocked) audio.unlock();
-      const isSelection = button.matches(".character-card, .ball-button, [data-mode], [data-play-type], [data-cpu-level], [data-player-slot], [data-splash-slug]");
+      const isSelection = button.matches(".character-card, .ball-button, [data-mode], [data-play-type], [data-cpu-level], [data-player-slot], [data-splash-slug], [data-skin-id]");
       audio.play(isSelection ? "select" : "click");
     });
     $("audio-toggle").addEventListener("click", () => {

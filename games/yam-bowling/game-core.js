@@ -225,6 +225,7 @@
         id: String(player.id || `p${index + 1}`),
         name: String(player.name || `Player ${index + 1}`),
         characterSlug: String(player.characterSlug || "daisy-monroe"),
+        skinId: String(player.skinId || "canon"),
         type: player.type === "cpu" ? "cpu" : "human",
         frames: Array.from({ length: mode.frames }, () => []),
         score: { total: 0, cumulative: Array(mode.frames).fill(null) },

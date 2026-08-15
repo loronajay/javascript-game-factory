@@ -88,9 +88,11 @@ export function sanitizeShot(shot = {}) {
 function normalizeLobby(data = {}) {
   const members = Array.isArray(data.members) ? data.members.filter((id) => typeof id === "string" && id) : [];
   const players = Array.isArray(data.players)
-    ? data.players.map((player, index) => ({
+      ? data.players.map((player, index) => ({
         id: boundedText(player?.id, 80, members[index] || `player-${index + 1}`),
         name: boundedText(player?.name, 24, `Player ${index + 1}`),
+        characterSlug: boundedText(player?.characterSlug, 64),
+        skinId: boundedText(player?.skinId, 40),
       }))
     : members.map((id, index) => ({ id, name: `Player ${index + 1}` }));
   return {
@@ -125,6 +127,7 @@ export function createOnlineClient(options = {}) {
   let socket = null;
   let identity = sanitizeOnlineIdentity(null);
   let selectedCharacterSlug = "daisy-monroe";
+  let selectedSkinId = "canon";
   let pending = [];
   let manualClose = false;
   let resumeCredentials = null;
@@ -176,6 +179,7 @@ export function createOnlineClient(options = {}) {
     lobbyMessage("yam_profile", {
       ...identity,
       characterSlug: selectedCharacterSlug,
+      skinId: selectedSkinId,
       protocolVersion: YAM_BOWLING_PROTOCOL_VERSION,
     });
   }
@@ -294,8 +298,9 @@ export function createOnlineClient(options = {}) {
     identity = sanitizeOnlineIdentity(value);
   }
 
-  function lobbyRequest(type, { modeId = "quick", characterSlug = "daisy-monroe", roomCode = "", privateRoom = false } = {}) {
+  function lobbyRequest(type, { modeId = "quick", characterSlug = "daisy-monroe", skinId = "canon", roomCode = "", privateRoom = false } = {}) {
     selectedCharacterSlug = boundedText(characterSlug, 64, "daisy-monroe");
+    selectedSkinId = boundedText(skinId, 40, "canon");
     const payload = {
       type,
       gameId: YAM_BOWLING_GAME_ID,
