@@ -12,6 +12,7 @@
 }
 
 @media (max-width: 960px) {
+  .public-profile-content { grid-template-columns: minmax(260px, .7fr) minmax(380px, 1.3fr); }
   .profile-room { grid-template-columns: 1fr; }
   .profile-hero { min-height: 72svh; }
   .profile-dashboard { max-height: none; overflow: visible; }
@@ -38,6 +39,11 @@
 }
 
 @media (max-width: 560px) {
+  .public-profile-dialog { width: calc(100% - 1rem); height: calc(100dvh - 1rem); padding: .7rem; }
+  .public-profile-header { align-items: start; flex-direction: column; gap: .35rem; }
+  .public-profile-content { height: calc(100% - 92px); grid-template-columns: 1fr; overflow-y: auto; }
+  .public-profile-hero { min-height: 60svh; }
+  .public-profile-dashboard { align-content: start; overflow-y: visible; }
   .profile-screen { padding: .8rem; }
   .profile-header { grid-template-columns: auto 1fr; }
   .profile-sync-status { grid-column: 1 / -1; justify-self: start; }

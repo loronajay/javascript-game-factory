@@ -138,3 +138,31 @@
 .profile-bowler-option:hover, .profile-skin-option:hover, .profile-room-option:hover,
 .profile-bowler-option.is-selected, .profile-skin-option.is-selected, .profile-room-option.is-selected { border-color: var(--gold); background: rgba(255,214,107,.1); }
 .profile-bowler-option.is-selected, .profile-skin-option.is-selected, .profile-room-option.is-selected { box-shadow: 0 0 0 2px rgba(255,214,107,.14); }
+
+/* Read-only inspection of another player's public presentation. */
+.public-profile-dialog {
+  width: min(1120px, calc(100% - 2rem));
+  max-width: none;
+  height: min(760px, calc(100dvh - 2rem));
+  max-height: none;
+  padding: 1rem;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 24px;
+  color: var(--ink);
+  background: #08090d;
+}
+.public-profile-dialog::backdrop { background: rgba(2,3,6,.86); backdrop-filter: blur(8px); }
+.public-profile-room-art, .public-profile-shade { position: absolute; inset: 0; width: 100%; height: 100%; }
+.public-profile-room-art { object-fit: cover; }
+.public-profile-shade { background: linear-gradient(90deg, rgba(5,6,9,.22), rgba(5,6,9,.72) 58%, rgba(5,6,9,.94)); }
+.public-profile-header, .public-profile-content { position: relative; z-index: 1; }
+.public-profile-header { display: flex; min-height: 64px; padding-right: 3rem; gap: 1rem; align-items: center; justify-content: space-between; }
+.public-profile-header h2 { margin: 0; font-size: clamp(1.5rem, 3vw, 2.5rem); }
+.public-profile-content { display: grid; height: calc(100% - 72px); grid-template-columns: minmax(300px, .8fr) minmax(440px, 1.2fr); gap: 1rem; }
+.public-profile-content[hidden] { display: none; }
+.public-profile-hero { position: relative; min-height: 0; overflow: hidden; }
+.public-profile-hero::after { content: ""; position: absolute; inset: 58% 0 0; background: linear-gradient(transparent, rgba(5,6,9,.82)); }
+.public-profile-bowler-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center bottom; filter: drop-shadow(0 26px 34px rgba(0,0,0,.62)); }
+.public-profile-dashboard { display: grid; min-width: 0; align-content: center; gap: .8rem; overflow-y: auto; }
+.public-profile-privacy { margin: 0; color: var(--muted); font-size: .62rem; line-height: 1.5; text-align: center; }

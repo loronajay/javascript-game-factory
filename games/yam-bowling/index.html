@@ -446,6 +446,42 @@
       </div>
     </dialog>
 
+    <dialog class="public-profile-dialog" id="public-profile-dialog" aria-labelledby="public-profile-name">
+      <img class="public-profile-room-art" id="public-profile-room-art" alt="" decoding="async" />
+      <div class="public-profile-shade"></div>
+      <button class="dialog-close" id="public-profile-close" type="button" aria-label="Close public profile">&#215;</button>
+      <header class="public-profile-header">
+        <div><p class="eyebrow">Read-only Factory profile</p><h2 id="public-profile-name">Factory Bowler</h2></div>
+        <span class="profile-sync-status" id="public-profile-status" aria-live="polite">Loading public profile&hellip;</span>
+      </header>
+      <div class="public-profile-content" id="public-profile-content" hidden>
+        <section class="public-profile-hero" aria-label="Featured bowler">
+          <div class="profile-level-medallion">
+            <small>Player level</small><strong id="public-profile-player-level">1</strong><span id="public-profile-player-xp">0 XP</span>
+          </div>
+          <img class="public-profile-bowler-art" id="public-profile-bowler-art" alt="" />
+          <div class="profile-hero__identity">
+            <p><span id="public-profile-title">Rookie</span><i></i><span id="public-profile-badge">Founding Bowler</span></p>
+            <h3 id="public-profile-bowler-name">Daisy Monroe</h3>
+            <span id="public-profile-bowler-skin">Classic outfit</span>
+          </div>
+        </section>
+        <aside class="public-profile-dashboard">
+          <section class="profile-card">
+            <div class="profile-card__heading"><div><p class="eyebrow">Career book</p><h3>Public numbers</h3></div><span id="public-profile-record">0-0</span></div>
+            <dl class="profile-stat-grid" id="public-profile-career-stats"></dl>
+          </section>
+          <section class="profile-card">
+            <div class="profile-card__heading"><div><p class="eyebrow">Featured mastery</p><h3 id="public-profile-mastery-name">Daisy mastery</h3></div><span>Lv. <b id="public-profile-mastery-level">1</b></span></div>
+            <div class="profile-xp-track" aria-hidden="true"><i id="public-profile-mastery-progress"></i></div>
+            <p class="profile-xp-copy" id="public-profile-mastery-xp">0 / 200 XP to next level</p>
+            <dl class="profile-bowler-stat-grid" id="public-profile-bowler-stats"></dl>
+          </section>
+          <p class="public-profile-privacy">Only this player&rsquo;s public display and sanctioned progression records are shown.</p>
+        </aside>
+      </div>
+    </dialog>
+
     <dialog class="menu-splash-dialog" id="menu-splash-dialog" aria-labelledby="menu-splash-title">
       <button class="dialog-close" id="menu-splash-close" type="button" aria-label="Close">×</button>
       <p class="eyebrow">Make it yours</p>

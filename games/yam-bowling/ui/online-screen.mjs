@@ -1,8 +1,10 @@
-import { $, escapeHtml, setSelected } from "./dom.mjs";
+import { $, setSelected } from "./dom.mjs";
 import { renderSkinOptions } from "./skin-options.mjs";
+import { buildCompactIdentityModel } from "../profile/public-profile-model.mjs";
+import { compactIdentityCardMarkup } from "./compact-identity-card.mjs";
 
 // The online bowler picker and the lobby it leads into. This module paints what
-// the server reports; it does not connect, queue, or start a match — that is the
+// the server reports; it does not connect, queue, or start a match - that is the
 // online session's job, reached through `onBegin`.
 export function createOnlineScreen({
   session,
@@ -12,11 +14,14 @@ export function createOnlineScreen({
   loadout,
   onlineIdentity,
   normalizeRoomCode,
+  publicProfiles,
+  onOpenProfile,
   onInspect,
   onBegin,
   onLeave,
 }) {
   const { onlineSetup } = session;
+  let latestLobbySnapshot = null;
 
   function renderSetup() {
     setSelected($("online-mode-options"), "data-online-mode", onlineSetup.modeId);
@@ -58,29 +63,32 @@ export function createOnlineScreen({
 
   function statusFor(snapshot) {
     if (snapshot.error?.message) return snapshot.error.message;
-    if (snapshot.disconnectedClientId) return "Opponent disconnected. Holding their lane for 30 seconds…";
-    if (snapshot.status === "searching") return "Searching for an opponent on the public lanes…";
-    if (snapshot.status === "creating") return "Opening your private lane…";
-    if (snapshot.status === "joining") return "Joining the private lane…";
-    if (snapshot.status === "reconnecting") return "Connection lost. Rejoining your lane…";
+    if (snapshot.disconnectedClientId) return "Opponent disconnected. Holding their lane for 30 seconds...";
+    if (snapshot.status === "searching") return "Searching for an opponent on the public lanes...";
+    if (snapshot.status === "creating") return "Opening your private lane...";
+    if (snapshot.status === "joining") return "Joining the private lane...";
+    if (snapshot.status === "reconnecting") return "Connection lost. Rejoining your lane...";
     if (snapshot.status === "lobby") {
       return snapshot.lobby?.playerCount >= 2
-        ? "Both bowlers are here. Starting match…"
-        : "Waiting for the second bowler…";
+        ? "Both bowlers are here. Starting match..."
+        : "Waiting for the second bowler...";
     }
-    return "Connecting to Factory Network…";
+    return "Connecting to Factory Network...";
   }
 
   function renderLobby(snapshot) {
+    latestLobbySnapshot = snapshot;
     const lobby = snapshot.lobby;
     const roomCode = lobby?.roomCode || snapshot.matchState?.roomCode || "";
     const privateRoom = lobby?.isPrivate === true
       || onlineSetup.intent === "private-create"
       || onlineSetup.intent === "private-join";
     $("online-lobby-kind").textContent = privateRoom ? "Private room" : "Quick match";
-    $("online-lobby-title").textContent = roomCode
-      ? (privateRoom ? "Room ready" : "Opponent search")
-      : "Finding a lane";
+    $("online-lobby-title").textContent = lobby?.playerCount >= 2
+      ? "Match found"
+      : roomCode
+        ? (privateRoom ? "Room ready" : "Opponent search")
+        : "Finding a lane";
     $("online-room-code-wrap").hidden = !roomCode || !privateRoom;
     $("online-room-code").textContent = roomCode || "-----";
 
@@ -93,8 +101,7 @@ export function createOnlineScreen({
     $("online-menu-status").classList.toggle("is-error", Boolean(snapshot.error));
 
     const host = $("online-lobby-players");
-    host.innerHTML = "";
-    playerCards(snapshot).forEach((player, index) => {
+    host.innerHTML = playerCards(snapshot).map((player, index) => {
       const local = player.id === snapshot.clientId;
       // Remote looks arrive over the wire, so resolve them against the local
       // roster and skin catalog rather than trusting them into an asset path.
@@ -105,11 +112,24 @@ export function createOnlineScreen({
       const skinId = animation.normalizeSkinId(
         player.skinId || (local ? onlineSetup.skinId : animation.DEFAULT_SKIN_ID),
       );
-      const card = document.createElement("article");
-      card.className = `online-player-card${local ? " is-you" : ""}${player.connected === false ? " is-disconnected" : ""}`;
-      card.innerHTML = `<img src="${assets.characterPortrait(slug, skinId)}" alt=""><span><strong>${escapeHtml(player.name || `Player ${index + 1}`)}</strong><small>${player.connected === false ? "Reconnecting" : local ? "You · Ready" : "Ready"}</small></span>`;
-      host.appendChild(card);
-    });
+      const playerId = player.accountPlayerId || player.playerId || "";
+      const profile = publicProfiles.peek(playerId);
+      if (playerId && !publicProfiles.has(playerId)) {
+        publicProfiles.load(playerId, player.name).then(() => {
+          if (latestLobbySnapshot) renderLobby(latestLobbySnapshot);
+        });
+      }
+      const model = buildCompactIdentityModel({
+        profile,
+        matchPlayer: { ...player, playerId, characterSlug: slug, skinId },
+        animation,
+      });
+      return compactIdentityCardMarkup(model, {
+        local,
+        connected: player.connected !== false && snapshot.disconnectedClientId !== player.id,
+        inspectable: !local && Boolean(playerId),
+      });
+    }).join("");
     while (host.children.length < 2) {
       const waiting = document.createElement("article");
       waiting.className = "online-player-card";
@@ -160,6 +180,10 @@ export function createOnlineScreen({
       setTimeout(() => { $("copy-room-code").textContent = "Copy code"; }, 1200);
     });
     $("leave-online-button").addEventListener("click", onLeave);
+    $("online-lobby-players").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-public-profile-id]");
+      if (button) onOpenProfile(button.dataset.publicProfileId, button.dataset.publicProfileName, button);
+    });
     $("online-inspect-bowler-button").addEventListener("click", (event) => {
       onInspect(onlineSetup.characterSlug, event.currentTarget);
     });

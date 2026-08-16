@@ -387,14 +387,22 @@ until the backend gives each one a single trustworthy definition. The starter
 room is currently the only ordinary owned room because campaign room reward
 cadence remains intentionally undecided.
 
-### Next recommended profile slice
+### Shipped: public inspection and Match Found identity
 
-Build read-only public profile inspection by player id, composing the existing
-public loadout and public progression endpoints without exposing the private
-garage. Link that view from online opponent presentation, then reuse its compact
-identity card for Match Found. Keep rank/ELO and spare rate out of the card until
-their authoritative records are joined; keep room rewards out of claims until a
-campaign cadence has been approved.
+Read-only inspection now joins the existing public loadout and public
+progression endpoints by player id. It has no private garage request, editor, or
+save path. The opponent link is available from online identity presentation and
+the completed match, while unavailable player ids and failed public reads stay
+explicitly non-inspectable instead of treating a socket id as an account id.
+
+Match Found uses the same compact identity card. The card uses the selected
+gameplay bowler and skin, while the full public room uses Featured Bowler and
+Featured Skin. Public profile reads are cached for the session, and levels remain
+unknown until the authoritative progression document arrives rather than being
+invented locally.
+
+Rank/ELO and spare rate remain absent until their authoritative records can be
+joined. Room reward grants remain absent until a campaign cadence is approved.
 
 ### Per-character history
 
@@ -403,9 +411,12 @@ campaign cadence has been approved.
 
 ### Social visibility
 
-- [ ] Add Match Found cards with player name, equipped bowler/skin, Bowler Level, rank, and ELO.
-- [ ] Use the actual gameplay skin in match presentation; use Featured Skin only on the profile.
-- [ ] Verify privacy, moderation, and missing-profile behavior for public inspection.
+- [x] Add read-only public profile inspection by player id from online opponent presentation.
+- [x] Add Match Found cards with player name, equipped bowler/skin, Player Level, and Bowler Level.
+- [ ] Add rank/ELO to Match Found after those records have one authoritative public definition.
+- [x] Use the actual gameplay skin in match presentation; use Featured Skin only on the profile.
+- [x] Verify the privacy boundary and missing-profile fallback for public inspection.
+- [ ] Apply platform moderation policy to profile names when that policy exposes a cabinet-facing contract.
 
 ## Milestone 7 — Campaign progression and achievements
 

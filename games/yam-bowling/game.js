@@ -4,6 +4,8 @@ import { createPlatformApiClient } from "../../js/platform/api/platform-api.mjs"
 import { createYamAccountAccess } from "./account-access.mjs";
 import { createCampaignProgressClient } from "./campaign-progress-client.mjs";
 import { createProfileSyncClient } from "./profile/profile-sync-client.mjs";
+import { createPublicProfileClient } from "./profile/public-profile-client.mjs";
+import { createPublicProfileRepository } from "./profile/public-profile-repository.mjs";
 import { createOnlineClient, normalizeRoomCode } from "./online-client.mjs";
 import { initMobileLandscapeGate } from "./mobile-ui.mjs";
 import { $, showScreen } from "./ui/dom.mjs";
@@ -15,6 +17,7 @@ import { createSetupScreen } from "./ui/setup-screen.mjs";
 import { createOnlineScreen } from "./ui/online-screen.mjs";
 import { createCircuitScreen } from "./ui/circuit-screen.mjs";
 import { createProfileScreen } from "./ui/profile-screen.mjs";
+import { createPublicProfileScreen } from "./ui/public-profile-screen.mjs";
 import { createShotHud } from "./ui/shot-hud.mjs";
 import { createScoreboard } from "./ui/scoreboard.mjs";
 import { createResultsScreen } from "./ui/results-screen.mjs";
@@ -137,6 +140,12 @@ initMobileLandscapeGate();
     syncClient: profileSync,
     audio,
   });
+  const publicProfiles = createPublicProfileRepository({
+    client: createPublicProfileClient({ platformApi }),
+    animation: Animation,
+    roomCore: window.YamRoomCore,
+  });
+  const publicProfileScreen = createPublicProfileScreen({ repository: publicProfiles, audio });
   const lanePicker = createLanePicker({ laneCore: LaneCore, audio, onPreview: applyMatchLane });
   session.matchLaneSlug = lanePicker.getSelectedSlug();
 
@@ -166,6 +175,8 @@ initMobileLandscapeGate();
     assets,
     audio,
     audioCore: AudioCore,
+    localClientId: () => onlineClient.getSnapshot().clientId,
+    onOpenProfile: (playerId, profileName, focusTarget) => publicProfileScreen.open(playerId, profileName, focusTarget),
     onShown: () => {
       circuitScreen?.handleResultsShown();
       onlineSession?.reportResult();
@@ -186,6 +197,8 @@ initMobileLandscapeGate();
     loadout,
     onlineIdentity,
     normalizeRoomCode,
+    publicProfiles,
+    onOpenProfile: (playerId, profileName, focusTarget) => publicProfileScreen.open(playerId, profileName, focusTarget),
     onInspect: openInspector,
     onBegin: (intent) => onlineSession.begin(intent),
     onLeave: () => onlineSession.leave(),
@@ -299,6 +312,7 @@ initMobileLandscapeGate();
     onlineScreen.bind();
     circuitScreen.bind();
     profileScreen.bind();
+    publicProfileScreen.bind();
     bindEvents({
       session, keys, audio, renderer, matchRuntime, onlineSession,
       circuitScreen, profileScreen, setupScreen, onlineScreen, shotHud, syncAudioToggle, accountAccess,

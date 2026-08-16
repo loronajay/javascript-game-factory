@@ -90,6 +90,7 @@ function normalizeLobby(data = {}) {
   const players = Array.isArray(data.players)
       ? data.players.map((player, index) => ({
         id: boundedText(player?.id, 80, members[index] || `player-${index + 1}`),
+        playerId: boundedText(player?.playerId || player?.accountPlayerId, 64),
         name: boundedText(player?.name, 24, `Player ${index + 1}`),
         characterSlug: boundedText(player?.characterSlug, 64),
         skinId: boundedText(player?.skinId, 40),

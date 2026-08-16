@@ -61,6 +61,7 @@
 .result-player.is-winner .result-player__outcome { border-color: var(--gold); color: #241600; background: var(--gold); }
 .result-player__details { display: flex; min-height: 72px; padding: .8rem 1rem; align-items: center; justify-content: space-between; gap: .8rem; border-top: 1px solid var(--line); background: linear-gradient(180deg, rgba(36,37,45,.98), rgba(20,21,27,.98)); text-align: left; }
 .result-player__details > strong { overflow: hidden; font-size: clamp(.82rem, 2vw, 1rem); text-overflow: ellipsis; white-space: nowrap; }
+.result-player__profile { min-height: 32px; padding: .35rem .55rem; border: 1px solid rgba(255,214,107,.35); border-radius: 8px; color: var(--gold); background: rgba(255,214,107,.07); font-size: .5rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
 .result-player__score { display: flex; align-items: center; gap: .55rem; color: var(--gold); }
 .result-player__score small { color: var(--muted); font-size: .54rem; font-weight: 900; letter-spacing: .08em; line-height: 1.15; text-align: right; text-transform: uppercase; }
 .result-player__score b { font-family: Impact, sans-serif; font-size: clamp(2rem, 4vw, 2.65rem); font-weight: 400; line-height: 1; letter-spacing: .02em; }

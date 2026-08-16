@@ -6,7 +6,16 @@ import { $, escapeHtml, showScreen } from "./dom.mjs";
 // session files the match to the player's Factory record. Reporting is not this
 // module's job, but every path that reaches results must trigger it, so the hook
 // lives at the single place results are shown rather than at each caller.
-export function createResultsScreen({ session, core, assets, audio, audioCore, onShown }) {
+export function createResultsScreen({
+  session,
+  core,
+  assets,
+  audio,
+  audioCore,
+  localClientId = () => "",
+  onOpenProfile = () => {},
+  onShown,
+}) {
   function showCalloutPose(outcomeCue) {
     const pose = $("callout-pose");
     const art = $("callout-pose-art");
@@ -77,6 +86,12 @@ export function createResultsScreen({ session, core, assets, audio, audioCore, o
       const outcome = isWinner ? "victory" : "defeat";
       const outcomeLabel = tie ? "Tied for first" : isWinner ? "Victory" : "Defeat";
       const bowler = assets.bowlerBySlug(player.characterSlug);
+      const inspectable = session.onlineMatch
+        && player.id !== localClientId()
+        && Boolean(player.accountPlayerId);
+      const profileAction = inspectable
+        ? `<button class="result-player__profile" type="button" data-public-profile-id="${escapeHtml(player.accountPlayerId)}">View profile</button>`
+        : "";
       const card = document.createElement("article");
       card.className = `result-player ${isWinner ? "is-winner" : "is-defeated"}`;
       card.innerHTML = `
@@ -86,8 +101,12 @@ export function createResultsScreen({ session, core, assets, audio, audioCore, o
         </div>
         <div class="result-player__details">
           <strong>${escapeHtml(player.name)}</strong>
+          ${profileAction}
           <span class="result-player__score"><small>Final score</small><b>${player.score.total}</b></span>
         </div>`;
+      card.querySelector("[data-public-profile-id]")?.addEventListener("click", (event) => {
+        onOpenProfile(player.accountPlayerId, player.name, event.currentTarget);
+      });
       host.appendChild(card);
     });
     showScreen("results-screen");

@@ -179,7 +179,7 @@ test("the opponent's bowler and equipped skin survive lobby normalization", () =
     members: ["socket-1", "socket-2"],
     players: [
       { id: "socket-1", name: "Bowler One", characterSlug: "daisy-monroe", skinId: "swimsuit" },
-      { id: "socket-2", name: "Bowler Two", characterSlug: "roxy-chen", skinId: "maid" },
+      { id: "socket-2", playerId: "factory-p2", name: "Bowler Two", characterSlug: "roxy-chen", skinId: "maid" },
     ],
     playerCount: 2,
     minPlayers: 2,
@@ -191,6 +191,7 @@ test("the opponent's bowler and equipped skin survive lobby normalization", () =
   const opponent = client.getSnapshot().lobby.players[1];
   assert.equal(opponent.characterSlug, "roxy-chen");
   assert.equal(opponent.skinId, "maid");
+  assert.equal(opponent.playerId, "factory-p2");
 });
 
 test("server match snapshots, errors, and disconnect state reach subscribers", () => {

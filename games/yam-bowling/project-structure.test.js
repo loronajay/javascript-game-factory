@@ -403,6 +403,39 @@ test("the signed-in player profile composes server loadout, room art, and progre
   assert.ok(manifest.include.includes("profile/*.mjs"));
 });
 
+test("public profiles use public documents, stay read-only, and share the Match Found identity card", () => {
+  const html = read("index.html");
+  const game = read("game.js");
+  const client = read("profile/public-profile-client.mjs");
+  const model = read("profile/public-profile-model.mjs");
+  const publicScreen = read("ui/public-profile-screen.mjs");
+  const onlineScreen = read("ui/online-screen.mjs");
+  const resultsScreen = read("ui/results-screen.mjs");
+
+  for (const id of [
+    "public-profile-dialog", "public-profile-close", "public-profile-name",
+    "public-profile-room-art", "public-profile-bowler-art", "public-profile-player-level",
+    "public-profile-career-stats", "public-profile-bowler-stats", "public-profile-status",
+  ]) {
+    assert.match(html, new RegExp(`id=["']${id}["']`), `${id} should exist`);
+  }
+  assert.match(game, /createPublicProfileClient/);
+  assert.match(game, /createPublicProfileRepository/);
+  assert.match(game, /createPublicProfileScreen/);
+  assert.match(client, /\/games\/\$\{GAME_SLUG\}\/loadout\/\$\{encoded\}/);
+  assert.match(client, /getGameProgression/);
+  assert.doesNotMatch(client, /\/garage|exportGarage|applyServerGarage/);
+  assert.match(publicScreen, /buildPublicProfileModel|repository\.load/);
+  assert.doesNotMatch(publicScreen, /setFeatured|setRoomSlug|\.save\(/);
+  assert.match(onlineScreen, /compactIdentityCardMarkup/);
+  assert.match(onlineScreen, /buildCompactIdentityModel/);
+  assert.match(onlineScreen, /data-public-profile-id/);
+  assert.match(resultsScreen, /data-public-profile-id/);
+  assert.match(resultsScreen, /accountPlayerId/);
+  assert.doesNotMatch(model, /rank|elo|spareRate/i);
+  assert.doesNotMatch(onlineScreen, /rank|elo|spareRate/i);
+});
+
 test("the cabinet exposes complete quick-match and private-room online screens", () => {
   const html = read("index.html");
   for (const id of [
