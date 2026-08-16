@@ -344,6 +344,25 @@ test("Yam Bowling cannot skip ahead in the canonical circuit", async () => {
   assert.equal(pool.state.entitlements.size, 0);
 });
 
+test("Yam Bowling match achievements grant fixed cosmetics once", async () => {
+  const pool = createGameProgressPool();
+  const claim = {
+    playerId: "player-1",
+    gameSlug: "yam-bowling",
+    claimId: "match-achievement:comeback-kid",
+    kind: "match-achievement",
+    sourceId: "comeback-kid",
+    payload: { achievementId: "comeback-kid", entitlementId: "room:champion-room" },
+  };
+
+  const first = await recordGameProgressClaim(pool, claim);
+  const replay = await recordGameProgressClaim(pool, claim);
+
+  assert.equal(first.ok, true);
+  assert.equal(replay.alreadyProcessed, true);
+  assert.deepEqual([...pool.state.entitlements.keys()], ["title:comeback-kid"]);
+});
+
 test("Yam Bowling circuit XP can use an earned bowler but never a forged active bowler", async () => {
   const pool = createGameProgressPool();
 

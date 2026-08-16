@@ -4,7 +4,7 @@ const GAME_SLUG = "yam-bowling";
 const CLAIM_KIND = "circuit-clear";
 
 function failed(error = "claim_failed") {
-  return { ok: false, firstClear: false, error, achievement: null, unlockedBowlerSlug: null };
+  return { ok: false, firstClear: false, error, achievement: null, unlockedBowlerSlug: null, unlockedRoomSlugs: [] };
 }
 
 export function createCampaignProgressClient({
@@ -52,6 +52,9 @@ export function createCampaignProgressClient({
       alreadyProcessed: Boolean(result.alreadyProcessed),
       achievementId: match?.achievementId || null,
       unlockedBowlerSlug,
+      unlockedRoomSlugs: (result.entitlementIds || [])
+        .filter((entitlementId) => typeof entitlementId === "string" && entitlementId.startsWith("room:"))
+        .map((entitlementId) => entitlementId.slice("room:".length)),
     };
   }
 

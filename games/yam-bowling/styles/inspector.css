@@ -119,6 +119,7 @@
 .mastery-celebration-rewards li { display: grid; padding: .68rem .75rem; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: .6rem; border: 1px solid rgba(255,214,107,.2); border-radius: 11px; background: rgba(255,255,255,.035); }
 .mastery-celebration-rewards b { color: var(--gold); font-size: .52rem; }
 .mastery-celebration-rewards span { font-size: .7rem; font-weight: 850; }
+.mastery-celebration-reward-status { display: block; margin-top: .16rem; color: var(--muted); font-size: .48rem; font-weight: 700; }
 .mastery-celebration-skip { margin: .65rem 0 0; color: var(--muted); font-size: .48rem; }
 .character-inspector-story { margin-top: .8rem; padding: clamp(.85rem, 2vw, 1.2rem); border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.018)); }
 .character-inspector-story h3 { margin: 0 0 .35rem; color: var(--gold); font-size: .6rem; letter-spacing: .12em; text-transform: uppercase; }

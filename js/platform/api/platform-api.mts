@@ -494,6 +494,14 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
         ? post(`/game-progress/${encoded}/consumables/activate`, { itemId, activationId })
         : Promise.resolve(null);
     },
+    redeemGameSkinVoucher(gameSlug: string, { entitlementId, redemptionId }: { entitlementId?: unknown; redemptionId?: unknown }) {
+      const encoded = encodePathSegment(gameSlug);
+      return encoded
+        ? post(`/game-progress/${encoded}/vouchers/redeem`, { entitlementId, redemptionId }).then((result: any) => (
+          result ? { ...result, gameProgress: result.progress || null } : null
+        ))
+        : Promise.resolve(null);
+    },
     // Reset campaign mission progress only (Valor / unlocks / skins preserved server-side).
     resetGameCampaign(gameSlug: string) {
       const encoded = encodePathSegment(gameSlug);

@@ -66,8 +66,11 @@ for (const burstId of STRIKE_BURST_IDS) {
 for (const [id, type, founding] of [
     ["title:rookie", "title", true],
     ["title:pin-chaser", "title", false],
+    ["title:comeback-kid", "title", false],
+    ["title:yam-champion", "title", false],
     ["badge:founding-bowler", "badge", true],
     ["badge:perfect-game", "badge", false],
+    ["badge:split-decision", "badge", false],
 ]) {
     register({ id, type, founding, entitlementId: id });
 }

@@ -12,6 +12,7 @@ export function createResultsScreen({
   assets,
   audio,
   audioCore,
+  cosmetics,
   localClientId = () => "",
   onOpenProfile = () => {},
   onShown,
@@ -80,6 +81,7 @@ export function createResultsScreen({
     $("results-title").textContent = tie ? "Dead heat!" : `${winner.name} wins!`;
     $("results-subtitle").textContent = `${core.MODES[match.modeId].name}. ${tie ? "Nothing between them." : "The rack has spoken."}`;
     const host = $("results-players");
+    $("match-achievements").hidden = true;
     host.innerHTML = "";
     match.players.forEach((player) => {
       const isWinner = match.winnerIds.includes(player.id);
@@ -115,5 +117,21 @@ export function createResultsScreen({
     onShown();
   }
 
-  return { showCallout, showCalloutPose, hideCalloutPose, preloadCalloutPoses, showResults };
+  function showAchievements(achievementIds = []) {
+    const rewards = achievementIds.map((achievementId) => {
+      const itemId = achievementId === "comeback-kid" ? "title:comeback-kid" : `badge:${achievementId}`;
+      return cosmetics?.getItem?.(itemId);
+    }).filter(Boolean);
+    if (!rewards.length) return;
+    $("match-achievements-title").textContent = rewards.length === 1
+      ? rewards[0].name
+      : `${rewards.length} achievements earned`;
+    $("match-achievements-rewards").innerHTML = rewards.map((item) => `
+      <span><img src="${escapeHtml(item.assets?.art || item.assets?.thumbnail || "")}" alt="" /><b>${escapeHtml(item.name)}</b><small>${escapeHtml(item.type)}</small></span>
+    `).join("");
+    $("match-achievements").hidden = false;
+    audio.play("confirm");
+  }
+
+  return { showAchievements, showCallout, showCalloutPose, hideCalloutPose, preloadCalloutPoses, showResults };
 }

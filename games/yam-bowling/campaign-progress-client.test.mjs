@@ -87,12 +87,14 @@ test("a circuit clear changes ownership only after the claim returns a server sn
     alreadyProcessed: false,
     progress: firstClearSnapshot(),
     progression: progressionSnapshot(),
+    entitlementIds: [],
   });
 
   const result = await resultPromise;
   assert.equal(result.ok, true);
   assert.equal(result.firstClear, true);
   assert.equal(result.unlockedBowlerSlug, "hazel-ward");
+  assert.deepEqual(result.unlockedRoomSlugs, []);
   assert.equal(store.getUnlockedBowlerSlugs().includes("hazel-ward"), true);
 });
 

@@ -1,6 +1,7 @@
 import { buildProfileModel } from "../profile/profile-model.mjs";
 import { $, escapeHtml, showScreen } from "./dom.mjs";
 import { playerRewardTreeMarkup } from "./reward-tree.mjs";
+import { buildVoucherChoices } from "../profile/voucher-client.mjs";
 
 function stat(label, value) {
   return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`;
@@ -15,6 +16,7 @@ export function createProfileScreen({
   cosmetics,
   playerRewards,
   syncClient,
+  voucherClient = null,
   audio,
 }) {
   let dirty = false;
@@ -127,7 +129,29 @@ export function createProfileScreen({
       ? `Level ${track.currentLevel} - synced with your Factory profile`
       : "Not synced - sign in to see your earned rewards";
     status.dataset.state = track.synced ? "synced" : "stale";
-    $("profile-reward-vouchers").textContent = `Skin Vouchers at level ${track.voucherLevels.join(" and ")}`;
+  }
+
+  function voucherChoices(model) {
+    return buildVoucherChoices({
+      ownedBowlers: model.ownedBowlers,
+      availableSkins: animation.AVAILABLE_SKINS,
+      owns: (itemId) => loadout.owns(itemId),
+    });
+  }
+
+  function renderVoucherPicker(model) {
+    const state = voucherClient?.getState?.() || { balance: 0, status: "idle" };
+    $("profile-reward-vouchers").textContent = `${state.balance} Skin Voucher${state.balance === 1 ? "" : "s"}`;
+    const button = $("profile-voucher-button");
+    button.disabled = state.balance < 1 || state.status === "redeeming" || voucherChoices(model).length === 0;
+    $("voucher-choice-grid").innerHTML = voucherChoices(model).map((choice) => {
+      const bowler = animation.CANON_BOWLERS.find((entry) => entry.slug === choice.bowlerSlug);
+      const art = animation.getPortraitAssetPath(bowler, choice.skinId);
+      return `<button class="voucher-choice" type="button" role="listitem" data-voucher-entitlement="${escapeHtml(choice.entitlementId)}">
+        <img src="${escapeHtml(art)}" alt="" loading="lazy" />
+        <span><strong>${escapeHtml(choice.bowlerName)}</strong><small>${escapeHtml(choice.skinName)}</small></span>
+      </button>`;
+    }).join("") || `<p class="voucher-choice-empty">Every voucher skin for your owned bowlers is already unlocked.</p>`;
   }
 
   function render() {
@@ -164,6 +188,7 @@ export function createProfileScreen({
       stat("High game", model.mastery.highGame || "--"),
     ].join("");
     renderRewardTrack(model);
+    renderVoucherPicker(model);
     renderBowlerOptions(model);
     renderSkinOptions(model);
     renderRoomOptions(model);
@@ -247,6 +272,26 @@ export function createProfileScreen({
     return saved;
   }
 
+  function openVoucherPicker() {
+    const model = render();
+    if ((voucherClient?.getState?.().balance || 0) < 1 || voucherChoices(model).length === 0) return;
+    $("voucher-status").textContent = "";
+    $("voucher-dialog").showModal();
+  }
+
+  async function redeemVoucher(entitlementId) {
+    $("voucher-status").textContent = "Redeeming with Factory…";
+    render();
+    const redeemed = await voucherClient?.redeem?.(entitlementId);
+    render();
+    $("voucher-status").textContent = redeemed ? "Outfit unlocked." : "Could not redeem that voucher.";
+    if (redeemed) {
+      audio?.play?.("confirm");
+      if ((voucherClient.getState().balance || 0) < 1) $("voucher-dialog").close();
+    }
+    return Boolean(redeemed);
+  }
+
   function bind() {
     $("profile-bowler-options").addEventListener("click", (event) => {
       const button = event.target.closest("[data-profile-bowler]");
@@ -265,6 +310,12 @@ export function createProfileScreen({
       if (button) selectPresentation(button.dataset.slotKey, button.dataset.slotItem);
     });
     $("profile-save").addEventListener("click", () => save());
+    $("profile-voucher-button").addEventListener("click", openVoucherPicker);
+    $("voucher-close").addEventListener("click", () => $("voucher-dialog").close());
+    $("voucher-choice-grid").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-voucher-entitlement]");
+      if (button) redeemVoucher(button.dataset.voucherEntitlement);
+    });
   }
 
   return { bind, leaveToTitle, open, refresh: render, save };

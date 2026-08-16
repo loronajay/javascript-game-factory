@@ -332,6 +332,9 @@ export function createApp(options: any = {}) {
   const activateConsumable = typeof options?.activateConsumable === "function"
     ? options.activateConsumable
     : null;
+  const redeemSkinVoucher = typeof options?.redeemSkinVoucher === "function"
+    ? options.redeemSkinVoucher
+    : null;
   // Admin console services. `isAdminPlayer` defaults to denying: an app constructed
   // without it (every existing test) must have no admins rather than no gate.
   const isAdminPlayer = typeof options?.isAdminPlayer === "function"
@@ -615,6 +618,7 @@ export function createApp(options: any = {}) {
     resetCampaign,
     backfillOwnership,
     activateConsumable,
+    redeemSkinVoucher,
   };
   const paymentServices = {
     createPremiumCheckoutSession,

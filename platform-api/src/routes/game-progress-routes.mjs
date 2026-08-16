@@ -2,7 +2,7 @@ import { readJsonBody, writeJson } from "../http-utils.mjs";
 import { isPubliclyClaimableKind, isValidGameClaimKind, isValidGameProgressSlug, } from "../db/game-progress.mjs";
 export async function handleGameProgressRoute(context) {
     const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services } = context;
-    const { getGameProgress, recordGameProgressClaim, spendValor, resetCampaign, backfillOwnership, activateConsumable } = services;
+    const { getGameProgress, recordGameProgressClaim, spendValor, resetCampaign, backfillOwnership, activateConsumable, redeemSkinVoucher } = services;
     const getMatch = pathname.match(/^\/game-progress\/([^/]+)$/);
     if (method === "GET" && getMatch) {
         const gameSlug = decodeURIComponent(getMatch[1]);
@@ -150,6 +150,44 @@ export async function handleGameProgressRoute(context) {
             itemId: result.itemId,
             effect: result.effect || null,
             entitlementIds: result.entitlementIds || [],
+            progress: result.progress || null,
+        }, requestOrigin);
+        return true;
+    }
+    const voucherMatch = pathname.match(/^\/game-progress\/([^/]+)\/vouchers\/redeem$/);
+    if (method === "POST" && voucherMatch) {
+        const gameSlug = decodeURIComponent(voucherMatch[1]);
+        if (!isValidGameProgressSlug(gameSlug)) {
+            writeJson(res, 400, { status: "error", error: "invalid_game_slug", timestamp }, requestOrigin);
+            return true;
+        }
+        if (!authClaims?.playerId) {
+            writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
+            return true;
+        }
+        if (typeof redeemSkinVoucher !== "function") {
+            writeJson(res, 503, { status: "error", error: "redemption_not_configured", timestamp }, requestOrigin);
+            return true;
+        }
+        const body = await readJsonBody(req);
+        if (!body.ok) {
+            writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+            return true;
+        }
+        const result = await redeemSkinVoucher({
+            playerId: authClaims.playerId,
+            gameSlug,
+            entitlementId: body.value?.entitlementId,
+            redemptionId: body.value?.redemptionId,
+        });
+        if (!result?.ok) {
+            writeJson(res, result?.statusCode || 400, { status: "error", error: result?.error || "redemption_failed", timestamp }, requestOrigin);
+            return true;
+        }
+        writeJson(res, 200, {
+            ok: true,
+            alreadyProcessed: Boolean(result.alreadyProcessed),
+            entitlementId: result.entitlementId,
             progress: result.progress || null,
         }, requestOrigin);
         return true;

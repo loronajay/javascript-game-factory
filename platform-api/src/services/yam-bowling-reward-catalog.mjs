@@ -4,6 +4,12 @@
 // their reward cadence has not been designed yet, and the client cannot invent it.
 export const YAM_BOWLING_GAME_SLUG = "yam-bowling";
 export const YAM_BOWLING_CIRCUIT_CLAIM_KIND = "circuit-clear";
+export const YAM_BOWLING_MATCH_ACHIEVEMENT_CLAIM_KIND = "match-achievement";
+const MATCH_ACHIEVEMENTS = Object.freeze({
+    "perfect-game": Object.freeze({ entitlementId: "badge:perfect-game", kind: "badge" }),
+    "split-decision": Object.freeze({ entitlementId: "badge:split-decision", kind: "badge" }),
+    "comeback-kid": Object.freeze({ entitlementId: "title:comeback-kid", kind: "title" }),
+});
 const CIRCUIT_UNLOCKS = Object.freeze([
     ["local-hazel-ward", "hazel-ward"],
     ["local-piper-hart", "piper-hart"],
@@ -31,6 +37,13 @@ const CIRCUIT_UNLOCKS = Object.freeze([
     ["championship-scarlett-voss", "scarlett-voss"],
     ["championship-reina-sato", "reina-sato"],
 ]);
+const PROMOTION_ROOM_REWARDS = Object.freeze({
+    "local-talia-dodson": ["teal-lounge", "hot-pink-hideout"],
+    "city-carmen-blaze": ["retro-arcade", "beach-house"],
+    "regional-aaliyah-storm": ["industrial-workshop", "botanical-glasshouse"],
+    "nationals-naomi-okafor": ["frosted-suite", "lavender-cosmic"],
+    "championship-reina-sato": ["black-gothic", "circuit-red", "tower-penthouse"],
+});
 const STARTER_BOWLER_SLUGS = new Set([
     "daisy-monroe",
     "nia-brooks",
@@ -58,8 +71,22 @@ function rejected() {
     return { ok: false, statusCode: 400, error: "invalid_claim" };
 }
 export function validateYamBowlingPublicClaim(params = {}) {
-    if (cleanText(params.gameSlug, 60) !== YAM_BOWLING_GAME_SLUG
-        || cleanText(params.kind, 80) !== YAM_BOWLING_CIRCUIT_CLAIM_KIND)
+    if (cleanText(params.gameSlug, 60) !== YAM_BOWLING_GAME_SLUG)
+        return rejected();
+    const kind = cleanText(params.kind, 80);
+    if (kind === YAM_BOWLING_MATCH_ACHIEVEMENT_CLAIM_KIND) {
+        const achievementId = cleanText(params.sourceId || params.payload?.achievementId, 80);
+        const reward = MATCH_ACHIEVEMENTS[achievementId];
+        if (!reward || cleanText(params.claimId) !== `${YAM_BOWLING_MATCH_ACHIEVEMENT_CLAIM_KIND}:${achievementId}`)
+            return rejected();
+        return {
+            ok: true,
+            sourceId: achievementId,
+            payload: { achievementId, entitlementId: reward.entitlementId },
+            entitlementGrants: [{ ...reward }],
+        };
+    }
+    if (kind !== YAM_BOWLING_CIRCUIT_CLAIM_KIND)
         return rejected();
     const input = params.payload && typeof params.payload === "object" && !Array.isArray(params.payload)
         ? params.payload
@@ -71,6 +98,8 @@ export function validateYamBowlingPublicClaim(params = {}) {
         || cleanText(params.claimId) !== `${YAM_BOWLING_CIRCUIT_CLAIM_KIND}:${matchId}`)
         return rejected();
     const entitlementId = `bowler:${match.bowlerSlug}`;
+    const roomEntitlements = (PROMOTION_ROOM_REWARDS[matchId] || [])
+        .map((roomSlug) => ({ entitlementId: `room:${roomSlug}`, kind: "room" }));
     return {
         ok: true,
         sourceId: matchId,
@@ -84,10 +113,18 @@ export function validateYamBowlingPublicClaim(params = {}) {
             entitlementId,
             activeBowlerSlug,
         },
-        entitlementGrants: [{ entitlementId, kind: "bowler" }],
+        entitlementGrants: [{ entitlementId, kind: "bowler" }, ...roomEntitlements],
         campaignProgress: { missionId: matchId, stars: 1 },
         campaignXp: { trackId: activeBowlerSlug, kind: match.isPromotionMatch ? "boss" : "encounter" },
     };
+}
+export function validateYamBowlingSkinVoucherTarget(gameSlug, entitlementId) {
+    if (gameSlug !== YAM_BOWLING_GAME_SLUG || typeof entitlementId !== "string")
+        return null;
+    const match = /^skin:([a-z0-9-]+):(swimsuit|maid)$/.exec(entitlementId);
+    if (!match || !ALL_BOWLER_SLUGS.has(match[1]))
+        return null;
+    return { entitlementId, bowlerSlug: match[1], skinId: match[2] };
 }
 export function isYamBowlingStarterBowler(value) {
     return typeof value === "string" && STARTER_BOWLER_SLUGS.has(value);

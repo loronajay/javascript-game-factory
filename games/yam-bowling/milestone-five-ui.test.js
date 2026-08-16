@@ -17,12 +17,12 @@ test("the inspector owns the full mastery path and next-reward presentation", ()
 test("level-up presentation is a skippable dialog wired to authoritative snapshot callbacks", () => {
   const html = read("index.html");
   const game = read("game.js");
-  const presenter = read("ui/mastery-celebration.mjs");
+  const presenter = read("ui/progression-celebration.mjs");
 
   assert.match(html, /id="mastery-celebration-dialog"/);
   assert.match(html, /id="mastery-celebration-dismiss"/);
   assert.match(presenter, /addEventListener\("cancel"/);
   assert.match(presenter, /queue\.acknowledge/);
-  assert.ok((game.match(/masteryCelebration\.observe\(\)/g) || []).length >= 3);
+  assert.match(game, /createPlayerLevelCelebrationQueue\(\{ rewards: PlayerRewards \}\)/);
+  assert.ok((game.match(/progressionCelebration\.observe\(\)/g) || []).length >= 3);
 });
-

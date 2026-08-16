@@ -1,5 +1,5 @@
 import { validateTacticalArenaPublicClaim } from "./tactical-arena-reward-catalog.mjs";
-import { YAM_BOWLING_CIRCUIT_CLAIM_KIND, validateYamBowlingPublicClaim, } from "./yam-bowling-reward-catalog.mjs";
+import { YAM_BOWLING_CIRCUIT_CLAIM_KIND, YAM_BOWLING_MATCH_ACHIEVEMENT_CLAIM_KIND, validateYamBowlingPublicClaim, } from "./yam-bowling-reward-catalog.mjs";
 // Claim vocabulary is a per-game server contract. Keeping kind registration beside the
 // validator prevents one cabinet from borrowing another cabinet's mutation branches, while
 // the public/premium split keeps paid Tactical Arena fulfillment server-only.
@@ -23,7 +23,7 @@ const CLAIM_POLICIES = Object.freeze({
         validatePublicClaim: validateTacticalArenaPublicClaim,
     }),
     "yam-bowling": Object.freeze({
-        publicKinds: new Set([YAM_BOWLING_CIRCUIT_CLAIM_KIND]),
+        publicKinds: new Set([YAM_BOWLING_CIRCUIT_CLAIM_KIND, YAM_BOWLING_MATCH_ACHIEVEMENT_CLAIM_KIND]),
         premiumKinds: new Set(),
         validatePublicClaim: validateYamBowlingPublicClaim,
     }),

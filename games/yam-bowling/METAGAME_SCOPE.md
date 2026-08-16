@@ -405,6 +405,13 @@ not enqueue twice, and a pending presentation survives reload until Continue or
 Escape acknowledges it. The celebration is presentation only: it never changes
 XP, ownership, or equipment.
 
+`state/player-level-celebrations.mjs` applies the same acknowledgement contract
+to the player track without folding player state into the bowler queue. A jump
+across several player levels becomes one modal containing every reward returned
+by `player-rewards-core.js`; equippable rewards are identified as unlocked (or
+already equipped), and the player event is presented before the accompanying
+bowler-mastery event from the same authoritative snapshot.
+
 ## Milestone 6 — Yam player profiles and online presentation
 
 ### Yam-specific profile layer
@@ -516,9 +523,11 @@ also the idempotent XP grant id. The claim carries the bowler actually used, but
 the server accepts it only when that bowler was a starter or already owned before
 the clear; a client cannot redirect mastery XP into a locked bowler.
 
-Player rooms are the first campaign-sourced cosmetics, catalogued and gated but not
-yet grantable. The authoritative loadout validator now exists, but the room reward
-cadence still needs to be designed before any circuit claim may award one.
+Player rooms are the first campaign-sourced cosmetics. Promotion clears now grant
+two fixed rooms per division, and clearing the championship summit also grants the
+Tower Penthouse. The authoritative loadout validator and room reward
+cadence now agree on the same entitlement ids, so a room can be equipped as
+soon as the Factory accepts the promotion clear.
 
 ### Achievements
 
