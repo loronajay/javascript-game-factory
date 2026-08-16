@@ -43,6 +43,10 @@ test("a fresh device gets canon defaults in every slot", () => {
   const store = storeWith();
 
   assert.equal(store.getEquippedSkinId("reina-sato"), animation.DEFAULT_SKIN_ID);
+  assert.deepEqual(
+    store.listOwned("skin").map((item) => item.id),
+    animation.CANON_BOWLERS.map((bowler) => `skin:${bowler.slug}:canon`),
+  );
   assert.equal(store.getMenuSplashSlug(), menuSplashCore.DEFAULT_MENU_SPLASH_SLUG);
   assert.equal(store.getGlobalSlot("ballTrail"), "ball-trail:none");
   assert.equal(store.getGlobalSlot("strikeBurst"), "strike-burst:classic");
@@ -78,15 +82,17 @@ test("menu art ownership is derived live from campaign unlocks and never becomes
   assert.deepEqual(JSON.parse(storage.getItem(LOADOUT_STORAGE_KEY)).granted, []);
 });
 
-test("both existing local preferences migrate into one versioned record", () => {
+test("legacy local skin preferences migrate as selections without creating ownership", () => {
   const storage = memoryStorage({
     "yam-bowling.equipped-skins.v1": JSON.stringify({ "reina-sato": "maid", "nia-brooks": "swimsuit" }),
     "yam-bowling.menu-splash": "nia-brooks",
   });
   const store = createLoadoutStore({ storage });
 
-  assert.equal(store.getEquippedSkinId("reina-sato"), "maid");
-  assert.equal(store.getEquippedSkinId("nia-brooks"), "swimsuit");
+  assert.equal(store.getEquippedSkinId("reina-sato"), "canon");
+  assert.equal(store.getEquippedSkinId("nia-brooks"), "canon");
+  assert.equal(store.owns("skin:reina-sato:maid"), false);
+  assert.equal(store.owns("skin:nia-brooks:swimsuit"), false);
   assert.equal(store.getMenuSplashSlug(), "nia-brooks");
 
   const persisted = JSON.parse(storage.getItem(LOADOUT_STORAGE_KEY));
@@ -115,16 +121,17 @@ test("a stored record from an unknown schema version is rebuilt rather than trus
     "yam-bowling.equipped-skins.v1": JSON.stringify({ "reina-sato": "swimsuit" }),
   });
 
-  assert.equal(store.getEquippedSkinId("reina-sato"), "swimsuit");
+  assert.equal(store.getEquippedSkinId("reina-sato"), "canon");
 });
 
-test("equipping persists and normalizes through the catalog", () => {
+test("an authoritative entitlement is required before a non-Canon skin can equip", () => {
   const storage = memoryStorage();
   const store = createLoadoutStore({ storage });
 
+  assert.equal(store.equipSkin("reina-sato", "maid"), "canon");
+  store.applyServerEntitlements([{ entitlementId: "skin:reina-sato:maid" }]);
   assert.equal(store.equipSkin("reina-sato", "maid"), "maid");
   assert.equal(store.getEquippedSkinId("reina-sato"), "maid");
-  assert.equal(createLoadoutStore({ storage }).getEquippedSkinId("reina-sato"), "maid");
 
   // An unknown skin id falls back to canon rather than writing a broken path.
   assert.equal(store.equipSkin("reina-sato", "future-skin"), animation.DEFAULT_SKIN_ID);
@@ -186,6 +193,10 @@ test("a slot only accepts items of its own reward type and scope", () => {
 test("the featured bowler is kept separate from the gameplay loadout", () => {
   const store = storeWith();
 
+  store.applyServerEntitlements([
+    { entitlementId: "skin:reina-sato:maid" },
+    { entitlementId: "skin:nia-brooks:swimsuit" },
+  ]);
   store.equipSkin("reina-sato", "maid");
   assert.deepEqual(store.getFeatured(), { bowlerSlug: null, skinId: animation.DEFAULT_SKIN_ID });
 
@@ -217,8 +228,8 @@ test("unavailable storage still yields a usable session loadout", () => {
   const store = createLoadoutStore({ storage: blocked });
 
   assert.equal(store.getEquippedSkinId("reina-sato"), animation.DEFAULT_SKIN_ID);
-  assert.equal(store.equipSkin("reina-sato", "maid"), "maid");
-  assert.equal(store.getEquippedSkinId("reina-sato"), "maid");
+  assert.equal(store.equipSkin("reina-sato", "maid"), "canon");
+  assert.equal(store.getEquippedSkinId("reina-sato"), "canon");
 });
 
 // --------------------------------------------------------------- player rooms
@@ -292,6 +303,7 @@ test("a server snapshot becomes the only ownership source for an authenticated l
   store.applyServerEntitlements([
     { entitlementId: "bowler:hazel-ward" },
     { entitlementId: "room:teal-lounge" },
+    { entitlementId: "skin:hazel-ward:maid" },
   ]);
   store.applyServerGarage({
     version: SCHEMA_VERSION,
@@ -327,4 +339,42 @@ test("server entitlement revocation removes the choice and falls back safely", (
   assert.equal(store.owns("room:teal-lounge"), false);
   assert.equal(store.getRoomSlug(), roomCore.DEFAULT_ROOM_SLUG);
   assert.deepEqual(store.listOwned("room").map((item) => item.id), ["room:default"]);
+});
+
+test("a skin entitlement owns only that exact skin and its matching outcome poses", () => {
+  const store = createLoadoutStore({ storage: memoryStorage(), campaign: campaignUnlocks() });
+  store.applyServerEntitlements([{ entitlementId: "skin:reina-sato:swimsuit" }]);
+
+  assert.equal(store.owns("skin:reina-sato:swimsuit"), true);
+  assert.equal(store.owns("victory-pose:reina-sato:swimsuit"), true);
+  assert.equal(store.owns("defeat-pose:reina-sato:swimsuit"), true);
+  assert.equal(store.owns("skin:reina-sato:maid"), false);
+  assert.equal(store.owns("skin:nia-brooks:swimsuit"), false);
+});
+
+test("skin revocation sanitizes gameplay, poses, profile presentation, and exported garage", () => {
+  const store = createLoadoutStore({ storage: memoryStorage(), campaign: campaignUnlocks() });
+  store.applyServerEntitlements([{ entitlementId: "skin:reina-sato:maid" }]);
+  store.applyServerGarage({
+    version: SCHEMA_VERSION,
+    bowlers: {
+      "reina-sato": {
+        skin: "skin:reina-sato:maid",
+        victoryPose: "victory-pose:reina-sato:maid",
+        defeatPose: "defeat-pose:reina-sato:maid",
+      },
+    },
+    global: {},
+    featured: { bowlerSlug: "reina-sato", skinId: "maid" },
+  });
+  assert.equal(store.getEquippedSkinId("reina-sato"), "maid");
+
+  store.applyServerEntitlements([]);
+
+  assert.equal(store.getEquippedSkinId("reina-sato"), "canon");
+  assert.equal(store.getBowlerSlot("reina-sato", "victoryPose"), "victory-pose:reina-sato:canon");
+  assert.equal(store.getBowlerSlot("reina-sato", "defeatPose"), "defeat-pose:reina-sato:canon");
+  assert.deepEqual(store.getFeatured(), { bowlerSlug: "reina-sato", skinId: "canon" });
+  assert.deepEqual(store.exportGarage().bowlers["reina-sato"], { skin: "skin:reina-sato:canon" });
+  assert.deepEqual(store.exportGarage().featured, { bowlerSlug: "reina-sato", skinId: "canon" });
 });

@@ -24,6 +24,7 @@ export function createOnlineScreen({
   let latestLobbySnapshot = null;
 
   function renderSetup() {
+    onlineSetup.skinId = assets.storedSkinId(onlineSetup.characterSlug);
     setSelected($("online-mode-options"), "data-online-mode", onlineSetup.modeId);
     const bowler = assets.bowlerBySlug(onlineSetup.characterSlug);
     $("online-selected-bowler").textContent = bowler.name;

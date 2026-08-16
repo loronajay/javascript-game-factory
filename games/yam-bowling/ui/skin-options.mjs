@@ -5,9 +5,8 @@ import { $, escapeHtml } from "./dom.mjs";
 // a skin becomes the bowler's equipped look, and it writes through the
 // presentation loadout so equipment has a single owner.
 //
-// Only skins this device owns are offered. Everything shipped so far is owned
-// by default, so this reads as "all three" today; it is the seam that shows a
-// locked skin once ownership becomes authoritative.
+// Only skins the current ownership source permits are offered. Canon is always
+// present; server-entitled looks appear only after authenticated sync.
 export function renderSkinOptions({ containerId, slug, selectedSkinId, animation, assets, loadout, onEquip }) {
   const host = $(containerId);
   host.innerHTML = "";

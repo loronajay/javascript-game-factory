@@ -1,5 +1,11 @@
 import { $, showScreen } from "../ui/dom.mjs";
 
+export function sanitizeOnlineSetupSkin(onlineSetup, getOwnedSkinId) {
+  const skinId = getOwnedSkinId?.(onlineSetup?.characterSlug);
+  onlineSetup.skinId = typeof skinId === "string" && skinId ? skinId : "canon";
+  return onlineSetup.skinId;
+}
+
 // The client half of an online match. `factory-network-server` owns physics
 // outcomes, scoring, turn order and rematches; this module's whole job is to
 // take the snapshots it sends and make the local scene agree with them.
@@ -19,6 +25,7 @@ export function createOnlineSession({
   applyMatchLane,
   normalizeRoomCode,
   accountAccess,
+  getOwnedSkinId = () => "canon",
 }) {
   const { scene } = session;
 
@@ -118,6 +125,7 @@ export function createOnlineSession({
 
   function begin(intent) {
     if (!accountAccess.requireFactoryAccount()) return false;
+    sanitizeOnlineSetupSkin(session.onlineSetup, getOwnedSkinId);
     session.onlineSetup.intent = intent;
     onlineClient.setIdentity(onlineIdentity);
     onlineClient.connect();

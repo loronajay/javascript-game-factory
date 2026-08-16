@@ -1,10 +1,16 @@
 import { $, escapeHtml } from "./dom.mjs";
 
+export function ownedSkinsForBowler(animation, loadout, slug) {
+  const skins = Array.isArray(animation?.AVAILABLE_SKINS) ? animation.AVAILABLE_SKINS : [];
+  return skins.filter((skin) => skin.id === animation.DEFAULT_SKIN_ID
+    || Boolean(loadout?.owns?.(`skin:${slug}:${skin.id}`)));
+}
+
 // The read-only bowler inspector. Its slug, its previewed skin and its focus
 // return target are private to this module: nothing else in the cabinet can
 // observe or corrupt them, which is what keeps a preview from leaking into the
 // equipped-skin persistence used by the setup screens.
-export function createCharacterInspector({ animation, catalog, assets, audio, initialSlug }) {
+export function createCharacterInspector({ animation, catalog, assets, loadout, audio, initialSlug }) {
   let slug = initialSlug;
   let previewSkinId = animation.DEFAULT_SKIN_ID;
   let returnFocus = null;
@@ -15,7 +21,7 @@ export function createCharacterInspector({ animation, catalog, assets, audio, in
     const host = $("character-inspector-skins");
     const equippedSkinId = assets.storedSkinId(slug);
     host.innerHTML = "";
-    for (const skin of animation.AVAILABLE_SKINS) {
+    for (const skin of ownedSkinsForBowler(animation, loadout, slug)) {
       const previewing = skin.id === previewSkinId;
       const equipped = skin.id === equippedSkinId;
       const button = document.createElement("button");
@@ -34,8 +40,10 @@ export function createCharacterInspector({ animation, catalog, assets, audio, in
 
   function render() {
     const character = catalog.getCharacter(slug);
-    const skin = animation.AVAILABLE_SKINS.find(({ id }) => id === previewSkinId)
-      || animation.AVAILABLE_SKINS[0];
+    const ownedSkins = ownedSkinsForBowler(animation, loadout, slug);
+    const skin = ownedSkins.find(({ id }) => id === previewSkinId)
+      || ownedSkins.find(({ id }) => id === animation.DEFAULT_SKIN_ID)
+      || ownedSkins[0];
     const art = $("character-inspector-art");
     art.src = assets.characterPortrait(character.slug, skin.id);
     art.alt = `Front view of ${character.name} wearing the ${skin.name} outfit`;

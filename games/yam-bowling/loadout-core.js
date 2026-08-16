@@ -20,11 +20,12 @@
   // here changes, and no catalog entry, slot, or UI call site moves.
   //
   // Before authenticated sync, ownership has four compatibility sources:
-  //   1. catalog default   -- everything that shipped before progression.
+  //   1. catalog default   -- Canon and other explicit starter items.
   //   2. campaign progress -- character-linked art follows its bowler live.
   //   3. persisted grants  -- legacy/dev-only compatibility data.
   //   4. dev entitlement   -- a deliberate authoring switch, never a grant.
-  // A successful server entitlement read supersedes sources 2-4 for the whole
+  // Server-entitled skins never use the persisted grant ledger. A successful
+  // server entitlement read supersedes sources 2-4 for the whole
   // session. A dev entitlement is deliberately NOT written to the grant ledger,
   // so no local experiment can turn into a balance the server must reconcile.
 
@@ -159,7 +160,10 @@
     if (Array.isArray(raw.granted)) {
       record.granted = raw.granted.filter((id) => {
         const item = cosmetics.getItem(id);
-        return item && !cosmetics.isOwnedByDefault(id) && item.unlock.source !== "character-unlock";
+        return item
+          && !cosmetics.isOwnedByDefault(id)
+          && item.unlock.source !== "character-unlock"
+          && item.unlock.source !== "server-entitlement";
       });
     }
 
@@ -217,7 +221,7 @@
         if (item.unlock.source === "character-unlock" && item.characterSlug) {
           return serverEntitlementIds.has(`bowler:${item.characterSlug}`);
         }
-        return serverEntitlementIds.has(itemId);
+        return serverEntitlementIds.has(item.entitlementId || itemId);
       }
       let unlockedWithBowler = false;
       if (item.unlock.source === "character-unlock" && item.characterSlug) {
@@ -258,8 +262,34 @@
     }
 
     function exportGarage() {
-      const { granted: _ignored, ...garage } = record;
-      return JSON.parse(JSON.stringify(garage));
+      const garage = {
+        version: SCHEMA_VERSION,
+        bowlers: {},
+        global: {},
+        featured: getFeatured(),
+      };
+
+      for (const [slug, storedSlots] of Object.entries(record.bowlers)) {
+        const slots = {};
+        for (const [slotName, itemId] of Object.entries(storedSlots)) {
+          const slot = BOWLER_SLOTS[slotName];
+          const item = cosmetics.getItem(itemId);
+          if (slot && accepts(slot, item, slug) && owns(itemId)) {
+            slots[slotName] = itemId;
+          } else if (slotName === "skin") {
+            slots.skin = defaultBowlerSlotId(slug, "skin", animation.DEFAULT_SKIN_ID);
+          }
+        }
+        if (Object.keys(slots).length) garage.bowlers[slug] = slots;
+      }
+
+      for (const [slotName, itemId] of Object.entries(record.global)) {
+        const slot = GLOBAL_SLOTS[slotName];
+        const item = cosmetics.getItem(itemId);
+        if (slot && accepts(slot, item) && owns(itemId)) garage.global[slotName] = itemId;
+      }
+
+      return garage;
     }
 
     function accepts(slot, item, characterSlug) {
@@ -348,13 +378,24 @@
     }
 
     function getFeatured() {
-      return { ...record.featured };
+      const bowlerSlug = canonBowler(record.featured.bowlerSlug)?.slug || null;
+      const skinId = animation.normalizeSkinId(record.featured.skinId);
+      const itemId = bowlerSlug ? cosmetics.buildItemId("skin", bowlerSlug, skinId) : null;
+      return {
+        bowlerSlug,
+        skinId: itemId && owns(itemId) ? skinId : animation.DEFAULT_SKIN_ID,
+      };
     }
 
     function setFeatured(bowlerSlug, skinId) {
+      const normalizedBowlerSlug = canonBowler(bowlerSlug)?.slug || null;
+      const normalizedSkinId = animation.normalizeSkinId(skinId);
+      const itemId = normalizedBowlerSlug
+        ? cosmetics.buildItemId("skin", normalizedBowlerSlug, normalizedSkinId)
+        : null;
       record.featured = {
-        bowlerSlug: canonBowler(bowlerSlug) ? bowlerSlug : null,
-        skinId: animation.normalizeSkinId(skinId),
+        bowlerSlug: normalizedBowlerSlug,
+        skinId: itemId && owns(itemId) ? normalizedSkinId : animation.DEFAULT_SKIN_ID,
       };
       persist();
       return getFeatured();
@@ -362,7 +403,10 @@
 
     function grant(itemId) {
       const item = cosmetics.getItem(itemId);
-      if (!item || cosmetics.isOwnedByDefault(itemId) || item.unlock.source === "character-unlock") return false;
+      if (!item
+        || cosmetics.isOwnedByDefault(itemId)
+        || item.unlock.source === "character-unlock"
+        || item.unlock.source === "server-entitlement") return false;
       if (record.granted.includes(itemId)) return false;
       record.granted = [...record.granted, itemId];
       persist();

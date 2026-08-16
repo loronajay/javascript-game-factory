@@ -18,11 +18,9 @@
   // server-backed unlock milestone can replace the ownership source without
   // touching a single item definition here.
   //
-  // Everything already shipped -- Classic/Swimsuit/Maid Cafe skins, the outcome
-  // portraits, the menu splashes -- is derived from the catalogs that already
-  // own it rather than being re-listed. That is what makes existing content a
-  // migration input instead of a hard-coded exception: add a skin to
-  // `AVAILABLE_SKINS` or a splash to `MENU_SPLASHES` and it appears here.
+  // Existing skins and their outcome portraits are derived from the animation
+  // catalog rather than re-listed. Canon is the starter look; every alternate
+  // names the exact server entitlement that owns it and its paired poses.
 
   const REWARD_TYPES = Object.freeze([
     "skin",
@@ -42,10 +40,11 @@
   // how it performs -- progression rewards in this cabinet are cosmetic.
   const PRESENTATION_TIERS = Object.freeze(["standard", "rare", "legendary"]);
 
-  // `founding` marks content that shipped before progression existed, which is
-  // exactly the set that must stay available to everyone after the migration.
+  // `founding` marks starter content. Shipped alternate skins are deliberately
+  // server-entitled rather than grandfathered as one whole catalog.
   const UNLOCK_SOURCES = Object.freeze([
     "founding",
+    "server-entitlement",
     "bowler-level",
     "player-level",
     "campaign",
@@ -59,7 +58,16 @@
     return [type, ...parts].join(":");
   }
 
-  function defineItem({ type, idParts, name, characterSlug = null, assets = {}, tier = "standard", unlock }) {
+  function defineItem({
+    type,
+    idParts,
+    name,
+    characterSlug = null,
+    assets = {},
+    tier = "standard",
+    unlock,
+    entitlementId = null,
+  }) {
     return Object.freeze({
       id: buildItemId(type, ...idParts),
       name,
@@ -69,10 +77,15 @@
       assets: Object.freeze({ ...assets }),
       tier,
       unlock: Object.freeze({ ...unlock }),
+      entitlementId,
     });
   }
 
   const founding = Object.freeze({ source: "founding", detail: "Available to every bowler." });
+  const serverEntitlement = Object.freeze({
+    source: "server-entitlement",
+    detail: "Requires an authoritative skin entitlement; acquisition cadence is deferred.",
+  });
   const starterBowlerSlugs = new Set(campaign.STARTER_BOWLER_SLUGS);
 
   function buildCharacterItems() {
@@ -80,13 +93,17 @@
 
     for (const bowler of animation.CANON_BOWLERS) {
       for (const skin of animation.AVAILABLE_SKINS) {
+        const isCanon = skin.id === animation.DEFAULT_SKIN_ID;
+        const entitlementId = isCanon ? null : buildItemId("skin", bowler.slug, skin.id);
+        const unlock = isCanon ? founding : serverEntitlement;
         items.push(defineItem({
           type: "skin",
           idParts: [bowler.slug, skin.id],
           name: skin.name,
           characterSlug: bowler.slug,
           assets: { portrait: animation.getPortraitAssetPath(bowler, skin.id) },
-          unlock: founding,
+          unlock,
+          entitlementId,
         }));
 
         // A skin's outcome art is a separate equippable slot even though it
@@ -98,7 +115,8 @@
           name: `${skin.name} Victory`,
           characterSlug: bowler.slug,
           assets: { art: animation.getResultPortraitAssetPath(bowler, "victory", skin.id) },
-          unlock: founding,
+          unlock,
+          entitlementId,
         }));
 
         items.push(defineItem({
@@ -107,7 +125,8 @@
           name: `${skin.name} Defeat`,
           characterSlug: bowler.slug,
           assets: { art: animation.getResultPortraitAssetPath(bowler, "defeat", skin.id) },
-          unlock: founding,
+          unlock,
+          entitlementId,
         }));
       }
 

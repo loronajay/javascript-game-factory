@@ -21,6 +21,13 @@ This document is the checkable backlog for character identity, cosmetics, progre
 - Character levels cannot be purchased. A maximum-mastery reward must always signify play with that bowler.
 - A Featured Bowler/Featured Skin on the player profile is independent of the skin equipped for gameplay.
 - New progression systems must migrate safely from existing local cosmetic selections.
+- Canon is the only starting skin. Swimsuit and Maid require exact, authoritative
+  per-bowler skin entitlements; the same entitlement owns that skin's victory
+  and defeat poses.
+- Legacy non-Canon selections are preserved only when a one-time server
+  migration grants the exact skin already equipped in a saved server garage.
+  Local preferences never create ownership, and the migration never grants the
+  rest of the skin catalog.
 
 ## Current foundation
 
@@ -93,7 +100,7 @@ Milestones 0–3 are the easy-win track. Milestones 4–7 require cross-reposito
 - [x] Show front-view art only; no 360-degree or rear-view inspector is in scope.
 - [x] Show name, age, hometown, occupation, bowling style, favorite ball, personality, and full bio.
 - [x] Add a Skins section using existing front-facing skin portraits.
-- [x] Clearly distinguish `Previewing` and `Equipped`. `Locked` belongs to the server-backed unlock milestone.
+- [x] Clearly distinguish `Previewing` and `Equipped`; inspection only offers skins the current ownership source permits.
 - [x] Let the player preview a skin without equipping it.
 - [x] Continue to use the existing equipment control as the only action that changes the gameplay skin.
 
@@ -122,15 +129,15 @@ Milestones 0–3 are the easy-win track. Milestones 4–7 require cross-reposito
   - [x] Player room
 - [x] Each item declares display name, reward type, character/global ownership, asset references, rarity/presentation tier, and unlock source.
 - [x] Separate item ownership from item equipment.
-- [x] Treat existing Classic/Swimsuit/Maid Café content and existing menu splashes as migration inputs, not hard-coded exceptions.
+- [x] Treat existing Classic/Swimsuit/Maid Café content and existing menu splashes as migration inputs, not hard-coded exceptions. Only an exact saved server selection qualifies for the one-time alternate-skin grant.
 
-Player rooms (`room-core.js`) are the eleventh reward type and the first added
-after this scope was written. They are the proof the contract works: because they
-are **new** content, they ship mostly **locked** without taking anything from
-anyone — the starter room is the only `founding` entry and the other twelve are
-`campaign` or `achievement`. Retro-fitting locks onto content that already shipped
-is the case this cabinet still refuses. Rooms also own no persistence and carry no
-legacy key: the loadout has been their only owner from the first line.
+Player rooms (`room-core.js`) are the eleventh reward type. The starter room is
+the only `founding` room and the other twelve are `campaign` or `achievement`.
+Skins use the same ownership/equipment split with a narrower starter rule: Canon
+is founding, while each Swimsuit or Maid look and its outcome poses share one
+exact server entitlement. Rooms own no legacy preference key; alternate skins
+instead use migration `039`, which grants only a non-Canon selection already
+saved in that player's authoritative garage.
 
 ### Presentation loadout
 
@@ -359,9 +366,15 @@ Suggested cadence to validate in a prototype:
 Yam is registered with the platform's generic `game_loadouts` storage rather
 than creating a second identity or profile table. The server catalog validates
 the complete presentation document against the current entitlement set on both
-write and read. Founding items remain available, unknown or cross-bowler slot
-values are stripped, revoked selections fall back safely, and the client cannot
-persist its own `granted` ownership ledger.
+write and read. Canon and other starter items remain available, unknown or
+cross-bowler slot values are stripped, revoked skin selections fall back to
+Canon, and the client cannot persist its own `granted` ownership ledger.
+
+Migration `039` is the only legacy alternate-skin bridge. It reads the existing
+server-owned garage once and grants only each exact Swimsuit/Maid skin found in
+a saved per-bowler or Featured selection. Victory and defeat poses derive from
+that same entitlement. It does not accept a client claim or grant another
+bowler's skin, another variant, or the full catalog.
 
 The public loadout is deliberately narrower than the owner's document. It
 exposes Featured Bowler + Featured Skin, room, title, badge, profile frame, and
@@ -375,7 +388,7 @@ layer by the profile room.
 The signed-in title menu now opens a responsive `My room` screen. It puts the
 featured bowler and selected skin over the equipped room art, displays Player
 Level, eligible career totals, and that bowler's mastery, and offers only owned
-bowlers, founding skins, and entitled rooms in its editor. Saves replace the
+bowlers, owned skins, and entitled rooms in its editor. Saves replace the
 private server garage and immediately reapply the server-sanitized answer. Boot,
 profile-open, and circuit-clear syncs all replace client ownership with the
 current entitlement set; local grants and stale campaign caches cannot add a
@@ -458,6 +471,8 @@ cadence still needs to be designed before any circuit claim may award one.
 - Rear-view/rotatable character inspection.
 - Intro poses and strike-celebration animations beyond the loadout hooks needed for shipped assets.
 - Sportsmanship streaks, daily tasks, battle passes, seasons, or prestige resets.
+- Swimsuit/Maid acquisition cadence and grant sources beyond the one-time exact
+  legacy migration; define them authoritatively before exposing an unlock claim.
 
 ## Recommended first implementation slice
 

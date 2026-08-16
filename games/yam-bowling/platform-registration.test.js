@@ -37,7 +37,11 @@ test("the platform registers an ownership-aware Yam profile loadout", async () =
 
   const state = {
     garage: null,
-    entitlements: new Set(["bowler:hazel-ward", "room:teal-lounge"]),
+    entitlements: new Set([
+      "bowler:hazel-ward",
+      "room:teal-lounge",
+      "skin:hazel-ward:maid",
+    ]),
   };
   const pool = {
     async query(sql, params = []) {

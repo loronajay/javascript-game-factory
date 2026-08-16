@@ -153,6 +153,7 @@ initMobileLandscapeGate();
     animation: Animation,
     catalog: Catalog,
     assets,
+    loadout,
     audio,
     initialSlug: Roster[0].slug,
   });
@@ -253,6 +254,7 @@ initMobileLandscapeGate();
     applyMatchLane,
     normalizeRoomCode,
     accountAccess,
+    getOwnedSkinId: assets.storedSkinId,
   });
 
   function syncAudioToggle() {

@@ -8,6 +8,7 @@ export function createSetupScreen({ session, roster, animation, assets, loadout,
   const { setup } = session;
 
   function render() {
+    setup.skinIds = setup.characterSlugs.map((slug) => assets.storedSkinId(slug));
     setSelected($("mode-options"), "data-mode", setup.modeId);
     setSelected($("play-type-options"), "data-play-type", setup.playType);
     setSelected($("cpu-options"), "data-cpu-level", setup.cpuLevelId);

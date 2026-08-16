@@ -115,10 +115,20 @@ test("menu art follows the bowler unlock it represents", () => {
   }
 });
 
-test("shipped content is owned by default while future rewards are not", () => {
-  const shippedSkin = getItem(buildItemId("skin", "reina-sato", "maid"));
-  assert.equal(shippedSkin.unlock.source, "founding");
-  assert.ok(isOwnedByDefault(shippedSkin.id));
+test("Canon is the only default-owned skin and its entitlement gates matching outcome poses", () => {
+  const canonSkin = getItem(buildItemId("skin", "reina-sato", "canon"));
+  assert.equal(canonSkin.unlock.source, "founding");
+  assert.ok(isOwnedByDefault(canonSkin.id));
+
+  for (const skinId of ["swimsuit", "maid"]) {
+    const entitlementId = buildItemId("skin", "reina-sato", skinId);
+    for (const type of ["skin", "victory-pose", "defeat-pose"]) {
+      const item = getItem(buildItemId(type, "reina-sato", skinId));
+      assert.equal(item.unlock.source, "server-entitlement");
+      assert.equal(item.entitlementId, entitlementId);
+      assert.equal(isOwnedByDefault(item.id), false);
+    }
+  }
 
   const defaultTrail = getItem("ball-trail:none");
   const rewardTrail = getItem("ball-trail:red-neon");

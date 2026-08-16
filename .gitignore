@@ -36,6 +36,8 @@ dev/
 !games/*/*.test.mjs
 !games/*/tests/
 !games/*/tests/**
+!games/yam-bowling/online/online-session.test.mjs
+!games/yam-bowling/ui/character-inspector.test.mjs
 
 # Ship the repo-wide README coverage/freshness regression.
 !js/tests/
@@ -50,6 +52,7 @@ platform-api/tests/*
 !platform-api/tests/ownership-backfill-security.test.mjs
 !platform-api/tests/rating-routes-security.test.mjs
 !platform-api/tests/stripe-checkout-security.test.mjs
+!platform-api/tests/yam-bowling-skin-ownership.test.mjs
 
 # Echo Duel keeps its local regression tests out of shipped game builds.
 games/echo-duel/tests/

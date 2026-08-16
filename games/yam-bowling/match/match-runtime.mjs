@@ -130,6 +130,7 @@ export function createMatchRuntime({
 
   function startMatch() {
     applyMatchLane(session.campaignMatch?.venueSlug || getLocalLaneSlug());
+    session.setup.skinIds = session.setup.characterSlugs.map((slug) => assets.storedSkinId(slug));
     session.onlineMatch = false;
     session.onlineSnapshot = null;
     session.pendingAuthoritativeRoll = null;

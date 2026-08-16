@@ -36,8 +36,10 @@ function register(item: Item): void {
 
 for (const bowlerSlug of BOWLER_SLUGS) {
   for (const skinId of SKIN_IDS) {
+    const founding = skinId === "canon";
+    const entitlementId = founding ? undefined : `skin:${bowlerSlug}:${skinId}`;
     for (const type of ["skin", "victory-pose", "defeat-pose"]) {
-      register({ id: `${type}:${bowlerSlug}:${skinId}`, type, characterSlug: bowlerSlug, founding: true });
+      register({ id: `${type}:${bowlerSlug}:${skinId}`, type, characterSlug: bowlerSlug, founding, entitlementId });
     }
   }
   register({ id: `player-card:${bowlerSlug}`, type: "player-card", characterSlug: bowlerSlug, founding: true });
@@ -117,7 +119,11 @@ export function normalizeYamBowlingGarage(raw: any, context: any = {}): any {
       const slots: Record<string, string> = {};
       for (const [slotName, type] of Object.entries(BOWLER_SLOTS)) {
         const item = items.get((value as any)[slotName]);
-        if (item?.type === type && item.characterSlug === bowlerSlug && ownsItem(item, owned)) slots[slotName] = item.id;
+        if (item?.type === type && item.characterSlug === bowlerSlug && ownsItem(item, owned)) {
+          slots[slotName] = item.id;
+        } else if (slotName === "skin" && Object.hasOwn(value as object, slotName)) {
+          slots.skin = `skin:${bowlerSlug}:canon`;
+        }
       }
       if (Object.keys(slots).length) garage.bowlers[bowlerSlug] = slots;
     }
@@ -133,8 +139,11 @@ export function normalizeYamBowlingGarage(raw: any, context: any = {}): any {
   const featuredSlug = raw.featured?.bowlerSlug;
   const skinId = SKIN_IDS.includes(raw.featured?.skinId) ? raw.featured.skinId : "canon";
   const featuredSkin = items.get(`skin:${featuredSlug}:${skinId}`);
-  if (ownsBowler(featuredSlug, owned) && ownsItem(featuredSkin, owned)) {
-    garage.featured = { bowlerSlug: featuredSlug, skinId };
+  if (ownsBowler(featuredSlug, owned)) {
+    garage.featured = {
+      bowlerSlug: featuredSlug,
+      skinId: ownsItem(featuredSkin, owned) ? skinId : "canon",
+    };
   }
   return garage;
 }
