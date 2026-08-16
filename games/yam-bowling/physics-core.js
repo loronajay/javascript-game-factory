@@ -12,6 +12,7 @@
   // decision permanent and ride the trough just beyond the boards.
   const GUTTER_CONTACT_X = 0.92;
   const GUTTER_CENTER_X = 1.08;
+  const GUTTER_EXIT_Z = 0.92;
   const PIN_RADIUS = 0.067;
   const FALLEN_PIN_RADIUS = 0.092;
   const BALL_MASS = 3.4;
@@ -259,7 +260,8 @@
         captureBallInGutter(ball);
       }
       ball.y += ball.vy * dt;
-      if (ball.y > 1.62) ball.active = false;
+      const ballZ = RACK_FRONT_Z + ball.y / Z_SCALE;
+      if ((ball.gutterSide && ballZ >= GUTTER_EXIT_Z) || ball.y > 1.62) ball.active = false;
     }
 
     const pinDamping = Math.exp(-3.35 * dt);
@@ -329,6 +331,7 @@
     BALL_RADIUS,
     GUTTER_CONTACT_X,
     GUTTER_CENTER_X,
+    GUTTER_EXIT_Z,
     PIN_RADIUS,
     CHARGE_DURATION_SECONDS,
     MIN_THROW_POWER,

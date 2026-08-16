@@ -181,11 +181,15 @@ because the content that would fill them belongs to later milestones:
 
 ### Data model
 
-- [ ] Define versioned Player Progress, Bowler Progress, Match Grant, Inventory, and Equipment records.
-- [ ] Store per-bowler level, XP, eligible match count, wins, strikes, high game, and unlocked reward IDs.
-- [ ] Define XP curves centrally and test every level boundary through level 30.
-- [ ] Make every grant idempotent by authoritative match/campaign-clear ID.
-- [ ] Define migration, offline/error behavior, and recovery before enabling grants.
+- [x] Define versioned Player Progress, Bowler Progress, Match Grant, Inventory, and Equipment records.
+- [x] Store per-bowler level, XP, eligible match count, wins, strikes, high game, and unlocked reward IDs.
+- [x] Define XP curves centrally and test every level boundary through level 30.
+- [x] Make every grant idempotent by authoritative match/campaign-clear ID.
+- [x] Define migration, offline/error behavior, and recovery before enabling grants.
+
+Level is **derived from XP, never stored**: a stored level disagrees with the
+curve the moment the curve is retuned. Unlocked reward IDs stay in the milestone-2
+loadout ledger rather than being copied into progress, so ownership keeps one owner.
 
 ### Launch XP proposal
 
@@ -205,19 +209,74 @@ These numbers are starting values for playtesting, not immutable economy promise
 
 ### Match eligibility and anti-farming
 
-- [ ] Grant only after the authoritative match reaches a qualifying terminal state.
-- [ ] A player who deliberately leaves early receives no completion or win XP.
-- [ ] Define the non-leaving player's forfeit reward separately from ordinary wins.
-- [ ] Reject duplicate, stale, client-authored, and mode-ineligible grants.
-- [ ] Do not let rematches reuse a grant ID.
+- [x] Grant only after the authoritative match reaches a qualifying terminal state.
+- [x] A player who deliberately leaves early receives no completion or win XP.
+- [x] Define the non-leaving player's forfeit reward separately from ordinary wins.
+- [x] Reject duplicate, stale, client-authored, and mode-ineligible grants.
+- [x] Do not let rematches reuse a grant ID.
 - [ ] Add abuse telemetry before adding completion streaks, sportsmanship bonuses, or uncapped performance XP.
 
 ### Definition of done
 
-- [ ] Unit tests cover eligibility, level boundaries, duplicate grants, forfeits, reconnects, and every mode family.
-- [ ] Integration tests prove the same match cannot grant twice across retry/reconnect.
+- [x] Unit tests cover eligibility, level boundaries, duplicate grants, forfeits, reconnects, and every mode family.
+- [x] Integration tests prove the same match cannot grant twice across retry/reconnect.
 - [ ] The client can display a pending/retry state without inventing a balance.
-- [ ] Existing wins/losses/ELO remain intact.
+- [x] Existing wins/losses/ELO remain intact.
+
+### Shipped: the progression domain
+
+`progression-core.js` owns the XP curves, the grant table, eligibility, forfeits,
+and the device-local cache of an authoritative balance. Two rules make the rest of
+the milestone safe to build on top:
+
+- **The client never awards itself XP.** `computeMatchGrant` says what a finished
+  match is *worth*; only `applySnapshot` — the server's answer — moves a balance.
+  An unconfirmed grant sits in a pending queue that survives a reload, so a result
+  bowled offline is neither lost nor spent.
+- **The same pure grant function is what the server evaluates.** Porting it is how
+  the two stay in agreement without the client ever naming a number on the wire.
+
+### Shipped: authoritative persistence
+
+Migration `038` adds `game_xp_profiles`, `game_xp_tracks`, and `game_xp_grants` —
+generic on `game_slug` like loadouts (035) and run records (036), so a cabinet
+onboards through `services/progression-catalog.mts` without touching schema or
+route code. A track is a bowler here and a car or a unit elsewhere, which is why
+the column is `track_id`. **No level is stored anywhere**; it is derived from the
+catalog's curve.
+
+The award is folded into the existing `recordMatchRating` transaction, keyed by
+the same session id `game_rating_sessions` already dedups on — so a rematch is
+automatically a new grant and a reconnect is not. Two asymmetries make that work:
+
+- **The rating settles once; XP settles per player.** An ELO update grades both
+  sides in one transaction, so only the first reporter runs it. XP is earned
+  individually from an individual bowler, so `game_xp_grants` is keyed by
+  `(player, game, grant)` and the second reporter is still paid.
+- **A disputed mode is clamped, not refused.** The first reporter stamps
+  `mode_id` on the rating session; a later reporter naming a different mode causes
+  both to be paid the *lesser* payout. Refusing instead would have handed a
+  griefer a way to deny an honest opponent's XP by reporting an inflated mode
+  first.
+
+Reads go through a public `GET /progression/:gameSlug/:playerId` — public for the
+reason a driver profile is, since milestone 6 renders an opponent's mastery on a
+Match Found card. There is deliberately **no write route**: a second endpoint that
+could grant would be a second key, free to disagree with the first.
+
+Residual trust, recorded in the migration rather than left implicit: the reporter
+still self-reports that a match happened at all, exactly as the ELO report already
+does. Closing that needs `factory-network-server` to attest results over a shared
+secret — a scoped upgrade this schema does not have to change for, since the
+attester would write these same rows under the same grant ids.
+
+### Still to come
+
+- [ ] Wire the cabinet's results screen to report its progression block and read
+      the snapshot back, with a pending/retry indicator.
+- [ ] Abuse telemetry, before any streak, sportsmanship, or uncapped bonus.
+- [ ] A campaign grant path (milestone 7), which reuses the same ledger under its
+      own `source` value.
 
 ## Milestone 5 — Bowler unlock tree and progression UI
 

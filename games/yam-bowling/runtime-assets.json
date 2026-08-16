@@ -21,6 +21,7 @@
     "mobile-ui.mjs",
     "online-client.mjs",
     "physics-core.js",
+    "progression-core.js",
     "renderer.js",
     "ui/*.mjs",
     "input/*.mjs",

@@ -40,6 +40,29 @@ test("lane artwork carries its measured pin-deck horizon correction", () => {
   assert.equal(LaneCore.getLane("oak-and-onyx").pinDeckOffsetY, 18);
 });
 
+test("every lane carries an immutable measured lane-edge path", () => {
+  for (const lane of LaneCore.LANES) {
+    assert.equal(Object.isFrozen(lane.laneEdges), true);
+    assert.equal(lane.laneEdges.length, 7);
+    assert.deepEqual(lane.laneEdges.map((point) => point.z), [0, 0.2, 0.4, 0.6, 0.8, 0.95, 1]);
+    for (const point of lane.laneEdges) {
+      assert.equal(Object.isFrozen(point), true);
+      assert.ok(point.left < 512 && point.right > 512);
+      assert.ok([point.z, point.left, point.right].every(Number.isFinite));
+    }
+    assert.equal(Object.isFrozen(lane.gutterCenters), true);
+    assert.equal(lane.gutterCenters.length, 7);
+    assert.deepEqual(lane.gutterCenters.map((point) => point.z), [0, 0.2, 0.4, 0.6, 0.8, 0.95, 1]);
+    for (const point of lane.gutterCenters) {
+      assert.equal(Object.isFrozen(point), true);
+      assert.ok(point.left <= lane.laneEdges.find((edge) => edge.z === point.z).left);
+      assert.ok(point.right >= lane.laneEdges.find((edge) => edge.z === point.z).right);
+    }
+    assert.ok(lane.gutterCenters[2].left < lane.laneEdges[2].left);
+    assert.ok(lane.gutterCenters[2].right > lane.laneEdges[2].right);
+  }
+});
+
 test("lane slugs are unique and the default is part of the catalog", () => {
   const slugs = LaneCore.LANES.map((lane) => lane.slug);
   assert.equal(new Set(slugs).size, slugs.length);

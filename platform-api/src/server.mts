@@ -13,6 +13,7 @@ import { getGameProfile, saveGameProfile, getGameProfiles } from "./db/game-prof
 import { activateInventoryItem, backfillLocalOwnership, findPlayPurchaseClaim, findStripeGrant, getGameProgress, recordGameProgressClaim, regrantStripeEntitlements, resetCampaignProgress, revokeGameEntitlements, spendValorForEntitlement } from "./db/game-progress.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
+import { getGameXpProgress } from "./db/game-xp.mjs";
 import { getLadderStandings, getPlayerLadderPlacements } from "./db/ladders.mjs";
 import { getBoardStandings, getPlayerRunRecords, recordRun } from "./db/run-records.mjs";
 import {
@@ -352,6 +353,7 @@ async function bootstrap(): Promise<void> {
     markConversationRead: (convId: any, playerId: any) => markConversationRead(pool, convId, playerId),
     getGameRating: (gameSlug: any, playerId: any) => getGameRating(pool, playerId, gameSlug),
     recordMatchRating: (gameSlug: any, params: any) => recordMatchRating(pool, { ...params, gameSlug }),
+    getGameXpProgress: (gameSlug: any, playerId: any) => getGameXpProgress(pool, playerId, gameSlug),
     enqueueRanked: (gameSlug: any, params: any) => enqueueRanked(pool, { ...params, gameSlug }),
     pollRanked: (gameSlug: any, params: any) => pollRanked(pool, { ...params, gameSlug }),
     cancelRanked: (gameSlug: any, params: any) => cancelRanked(pool, { ...params, gameSlug }),

@@ -207,6 +207,12 @@ const PLAYER_SCOPED_DELETES: ReadonlyArray<readonly [string, readonly string[]]>
   // cars. Cosmetic, but it is *shown to other people*, so an account that has
   // been deleted must stop having a face on anybody's VS card.
   ["game_driver_profiles", ["player_id"]],
+  // Earned advancement. The grant ledger goes with the totals rather than being
+  // kept as history: its only job is to stop one match paying twice, and a
+  // re-registered account starting from zero has no match left to double-pay.
+  ["game_xp_profiles", ["player_id"]],
+  ["game_xp_tracks", ["player_id"]],
+  ["game_xp_grants", ["player_id"]],
   ["game_player_badges", ["player_id"]],
   // Ranked identity, standing, and any in-flight queue/match rows.
   ["game_ratings", ["player_id"]],

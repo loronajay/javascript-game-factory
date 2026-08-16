@@ -171,6 +171,97 @@ test("pin bodies and the ball share the same lane projection correction", () => 
   assert.equal(correctedPin.point.y, correctedBall.y);
 });
 
+test("lane coordinates interpolate through the measured painted board edges", () => {
+  const renderer = createRenderer();
+  renderer.laneSlug = "crimson-crown";
+
+  assert.equal(renderer.project(-1, 0).x, 43);
+  assert.equal(renderer.project(1, 0).x, 979);
+  assert.equal(renderer.project(-1, 0.6).x, 294);
+  assert.equal(renderer.project(1, 0.6).x, 727);
+
+  const between = renderer.project(1, 0.5).x;
+  assert.ok(between < 811 && between > 727, "the painted edge should interpolate continuously between anchors");
+});
+
+test("the aiming highlight keeps its original continuous lane projection", () => {
+  const renderer = createRenderer();
+  renderer.ctx = {
+    save() {}, restore() {}, beginPath() {}, moveTo() {}, lineTo() {},
+    setLineDash() {}, stroke() {}, arc() {}, fill() {},
+  };
+  let projectedPoints = 0;
+  const originalProject = renderer.project.bind(renderer);
+  const originalTrajectory = globalThis.YamPhysics.trajectoryX;
+  const originalGutterAwareTrajectory = globalThis.YamPhysics.gutterAwareTrajectoryX;
+  let trajectoryPoints = 0;
+  renderer.project = (...args) => {
+    projectedPoints += 1;
+    return originalProject(...args);
+  };
+  renderer.projectLaneObject = () => {
+    throw new Error("the aiming highlight must not snap onto presentation-only gutter geometry");
+  };
+
+  globalThis.YamPhysics.trajectoryX = (...args) => {
+    trajectoryPoints += 1;
+    return originalTrajectory(...args);
+  };
+  globalThis.YamPhysics.gutterAwareTrajectoryX = () => {
+    throw new Error("the aiming highlight must not be rewritten as a gutter outcome preview");
+  };
+  try {
+    renderer.drawAimGuide({
+      phase: "ready",
+      liveShot: { startX: 0.46, aim: 0.45, hook: 0.4, power: 0.8 },
+    });
+  } finally {
+    globalThis.YamPhysics.trajectoryX = originalTrajectory;
+    globalThis.YamPhysics.gutterAwareTrajectoryX = originalGutterAwareTrajectory;
+  }
+
+  assert.equal(projectedPoints, 40);
+  assert.equal(trajectoryPoints, 40);
+});
+
+test("captured balls use the painted gutter trough instead of a normalized off-art x", () => {
+  const renderer = createRenderer();
+  renderer.laneSlug = "crimson-crown";
+
+  const near = renderer.projectGutter(1, 0.2);
+  const far = renderer.projectGutter(1, 0.8);
+
+  assert.equal(near.x, 1007);
+  assert.equal(far.x, 676);
+  assert.equal(
+    renderer.projectLaneObject(globalThis.YamPhysics.GUTTER_CENTER_X, 0.8).x,
+    far.x,
+    "guttered balls, debug markers, and trails should share one painted trough centerline",
+  );
+  const jitteredTrail = renderer.projectLaneObject(globalThis.YamPhysics.GUTTER_CENTER_X - 0.005, 0.8);
+  assert.ok(Math.abs(jitteredTrail.x - 675.33) < 0.001,
+    "trail jitter should stay around the trough instead of falling back to the generic projection");
+});
+
+test("the forgiveness hitbox visibly overlaps each measured painted edge", () => {
+  const renderer = createRenderer();
+  for (const lane of globalThis.YamLaneCore.LANES) {
+    renderer.laneSlug = lane.slug;
+    for (const side of [-1, 1]) {
+      for (const z of [0.2, 0.4, 0.6, 0.8]) {
+        const ball = renderer.project(side * globalThis.YamPhysics.GUTTER_CONTACT_X, z);
+        const paintedEdge = renderer.project(side, z).x;
+        const radius = renderer.ballSizeAt(z) / 2;
+        const overlap = side > 0
+          ? ball.x + radius - paintedEdge
+          : paintedEdge - (ball.x - radius);
+        assert.ok(overlap >= 0 && overlap <= 8,
+          `${lane.slug} side=${side} capture at z=${z} should overlap the painted edge by a small visible amount, got ${overlap}`);
+      }
+    }
+  }
+});
+
 test("standing pins stay readable at cabinet scale", () => {
   const renderer = createRenderer();
   renderer.assets.pin = { width: 125, height: 384 };

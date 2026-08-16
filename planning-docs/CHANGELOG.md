@@ -2,6 +2,30 @@
 
 Dated history extracted from the root `CLAUDE.md` (2026-07-23) so that file can stay a lean orientation guide instead of an ever-growing log. This file is a curated narrative, not a replacement for `git log` — read it for *why*/*what shipped when*, not for line-level diffs.
 
+## Yam Bowling Progression: the Domain and the Third Persistence Shape (2026-08-15)
+
+Milestone 4 of Yam Bowling's metagame plan — XP and mastery levels that are worth trusting. Two slices: the cabinet's progression domain, then the platform tables that make it authoritative.
+
+**The client never awards itself XP, and that is a structural fact rather than a promise.** `games/yam-bowling/progression-core.js` owns the curves, the grant table, eligibility, forfeits, and a device-local cache. `computeMatchGrant` says what a finished match is *worth*; `applySnapshot` — the server's answer — is the only path in the module that moves a balance, and `project-structure.test.js` asserts there is exactly one such write. A grant the server has not answered sits in a pending queue that survives a reload, so a result bowled with a flaky connection is neither lost nor spent, and the results screen will be able to say "syncing" without inventing a total. A refused grant joins the ledger instead of being retried forever.
+
+**A level is derived from XP and never stored, anywhere.** A stored level disagrees with the curve the moment the curve is retuned, and nothing afterwards can tell which of the two is wrong. Both curves cap at 30; the player curve is dearer than the bowler curve so that spreading play across the roster does not outrank mastery of one.
+
+**Migration 038 is the third table shape generic on `game_slug`,** after loadouts (035) and run records (036). `game_xp_profiles`, `game_xp_tracks`, `game_xp_grants` — and the column is `track_id`, not `character_id`, because a track is a bowler here and a car or a unit elsewhere. It is deliberately not folded into 019's `game_progress_*`: that family owns *entitlements*, which are granted and then spent, while this one owns *earned advancement*, which only accumulates, and one table doing both would need every reader to know which of its rows meant which. Onboarding a cabinet is one entry in `services/progression-catalog.mts` — the third of the per-game catalog seams, beside `ladder-catalog` and `leaderboard-catalog`.
+
+**The award rides the ELO transaction, on the same session id.** `game_rating_sessions` already decides "this match settles once", so reusing its key means no second call for a network drop to lose and no second key free to disagree. But the two halves are asymmetric in a way that took some care. An ELO update grades *both* players in one transaction, so only the first reporter runs it. XP is earned individually, from an individual bowler, so `game_xp_grants` is keyed by `(player, game, grant)` and the second reporter is still paid — which meant the already-processed branch had to stop rolling back and start committing.
+
+**A disputed mode is clamped, not refused.** The first reporter stamps `mode_id` on the rating session; when a later reporter names a different mode, both are paid the *lesser* of the two payouts. The obvious design — refuse the mismatched claim — would have handed a griefer a way to deny an honest opponent's XP by reporting an inflated mode first. Clamping pays the honest player for what they actually played and earns the liar nothing, so one honest participant makes mode inflation pointless.
+
+The residual trust is written into the migration rather than left implicit: a reporter still self-reports that a match happened at all, exactly as the ELO report has always done. `track_id` is unchecked but low-stakes (it picks who receives the XP, not how much), and the performance count is unchecked but hard-capped. Closing the rest needs `factory-network-server` to attest results over a shared secret — the same open question Speed Demon's ranked survey reached — and this schema would not change for it, since the attester writes these same rows under these same grant ids.
+
+Reads are public (`GET /progression/:gameSlug/:playerId`), for the reason a driver profile is: a mastery level exists to be shown, and milestone 6 renders an opponent's on a Match Found card. There is no write route at all.
+
+The account-deletion guard caught the new tables before they shipped, which is what it is for. The grant ledger goes with the totals rather than being kept as history — its only job is to stop one match paying twice, and a re-registered account starting from zero has no match left to double-pay.
+
+The economy table is a twin: the same numbers live in the cabinet (so it can describe a pending grant offline) and in the catalog (which is authoritative). They are deliberately not imported across the project boundary, so both suites assert the table explicitly and a half-applied retune fails loudly in the file that was not edited.
+
+656 API tests (+39), 233 cabinet tests (+40). Not yet wired: the results screen still reports only its rating, so no XP is being earned in the live game until that slice lands.
+
 ## Speed Demon Personal Bests + the Platform's Second Rating Source (2026-08-08)
 
 Speed Demon's results screen used to show you a time and nothing to beat. It now keeps personal bests, submits them to a global board, and places one of them on the cross-game ladder rail — which meant teaching the platform that a ladder can be built on something other than head-to-head ELO.

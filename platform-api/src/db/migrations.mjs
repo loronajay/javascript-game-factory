@@ -37,6 +37,7 @@ export const MIGRATION_FILES = Object.freeze([
     "035-game-loadouts.sql",
     "036-game-run-records.sql",
     "037-game-driver-profiles.sql",
+    "038-game-xp-progression.sql",
 ]);
 export function migrationFileUrl(name) {
     return new URL(`./migrations/${name}`, import.meta.url);

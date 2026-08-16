@@ -15,6 +15,7 @@ import { handleLoadoutRoute } from "./routes/loadout-routes.mjs";
 import { handleGameProfileRoute } from "./routes/game-profile-routes.mjs";
 import { handleLadderRoute } from "./routes/ladder-routes.mjs";
 import { handleLeaderboardRoute } from "./routes/leaderboard-routes.mjs";
+import { handleProgressionRoute } from "./routes/progression-routes.mjs";
 import { handleGameProgressRoute } from "./routes/game-progress-routes.mjs";
 import { handlePaymentRoute } from "./routes/payment-routes.mjs";
 import { handlePlayerRoute } from "./routes/player-routes.mjs";
@@ -311,6 +312,11 @@ export function createApp(options: any = {}) {
   const getBoardStandings = typeof options?.getBoardStandings === "function" ? options.getBoardStandings : null;
   const getPlayerRunRecords = typeof options?.getPlayerRunRecords === "function" ? options.getPlayerRunRecords : null;
   const recordRun = typeof options?.recordRun === "function" ? options.recordRun : null;
+  // Earned advancement, read-only. Null for the leaderboards' reason: an
+  // unconfigured backend must answer 503 rather than report a level-1 document a
+  // client would cache as the truth. There is no write service — XP is awarded
+  // inside the rating transaction, never through a route of its own.
+  const getGameXpProgress = typeof options?.getGameXpProgress === "function" ? options.getGameXpProgress : null;
   const recordGameProgressClaim = typeof options?.recordGameProgressClaim === "function"
     ? options.recordGameProgressClaim
     : async () => null;
@@ -598,6 +604,9 @@ export function createApp(options: any = {}) {
     getBoardStandings,
     getPlayerRunRecords,
     recordRun,
+  };
+  const progressionServices = {
+    getGameXpProgress,
   };
   const gameProgressServices = {
     getGameProgress,
@@ -1031,6 +1040,19 @@ export function createApp(options: any = {}) {
       requestOrigin,
       timestamp,
       services: leaderboardServices,
+    })) {
+      return;
+    }
+
+    if (await handleProgressionRoute({
+      req,
+      res,
+      method,
+      pathname,
+      authClaims,
+      requestOrigin,
+      timestamp,
+      services: progressionServices,
     })) {
       return;
     }

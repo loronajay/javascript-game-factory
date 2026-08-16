@@ -1,3 +1,4 @@
+import { awardMatchXp } from "./game-xp.mjs";
 const DEFAULT_RATING = 1200;
 const K_FACTOR = 32;
 function eloExpected(ratingA, ratingB) {
@@ -12,6 +13,41 @@ function computeNewRatings(ratingA, ratingB, outcomeA) {
         newRatingA: Math.max(100, Math.round(ratingA + K_FACTOR * (outcomeA - eA))),
         newRatingB: Math.max(100, Math.round(ratingB + K_FACTOR * (outcomeB - eB))),
     };
+}
+// The progression half of a reported match, inside the rating transaction.
+//
+// Two guarantees are load-bearing here. It awards the REPORTER only — XP is
+// earned per player from their own bowler, unlike an ELO update which settles
+// both sides at once. And it never fails the caller: a progression error must
+// not roll back a rating, because a lost level is recoverable from a re-report
+// and a lost rating is not.
+async function awardProgression(client, { reporterPlayerId, gameSlug, sessionId, outcome, progression }) {
+    if (!progression || typeof progression !== "object")
+        return null;
+    try {
+        // What the first reporter of this session stamped, so a disputed mode can be
+        // clamped to the lesser payout rather than taken on this reporter's word.
+        const stamped = await client.query(`select mode_id from game_rating_sessions where session_id = $1 and game_slug = $2`, [sessionId, gameSlug]);
+        return await awardMatchXp(client, {
+            playerId: reporterPlayerId,
+            gameSlug,
+            // The rating session id IS the grant id: a rematch is a new session and so
+            // automatically a new grant, and a reconnect is neither.
+            grantId: sessionId,
+            trackId: progression.trackId,
+            modeId: progression.modeId,
+            attestedModeId: stamped.rows[0]?.mode_id ?? null,
+            outcome,
+            performance: progression.performance,
+            forfeitRole: progression.forfeitRole ?? null,
+            stats: progression.stats,
+            source: "online-match",
+        });
+    }
+    catch (err) {
+        process.stderr.write(`[ratings] progression award error: ${err?.message || err}\n`);
+        return { awarded: false, reason: "award-failed" };
+    }
 }
 export async function getGameRating(pool, playerId, gameSlug) {
     if (!pool || !playerId || !gameSlug)
@@ -39,7 +75,7 @@ export async function getGameRating(pool, playerId, gameSlug) {
 // Updates ELO for both players atomically.
 // Returns null if session was already processed (dedup) or on DB error.
 // outcome: 'win' | 'loss' | 'draw' — from the perspective of reporterPlayerId.
-export async function recordMatchRating(pool, { reporterPlayerId, opponentPlayerId, gameSlug, outcome, sessionId, occurredAt }) {
+export async function recordMatchRating(pool, { reporterPlayerId, opponentPlayerId, gameSlug, outcome, sessionId, occurredAt, progression }) {
     if (!pool || !reporterPlayerId || !opponentPlayerId || !gameSlug || !sessionId)
         return null;
     if (reporterPlayerId === opponentPlayerId)
@@ -47,12 +83,22 @@ export async function recordMatchRating(pool, { reporterPlayerId, opponentPlayer
     const client = await pool.connect();
     try {
         await client.query("begin");
-        // Session dedup — only the first reporter processes the ELO update
-        const dedup = await client.query(`insert into game_rating_sessions (session_id, game_slug) values ($1, $2)
-       on conflict (session_id, game_slug) do nothing`, [sessionId, gameSlug]);
+        // Session dedup — only the first reporter processes the ELO update, because
+        // one transaction settles BOTH players' ratings. XP is not like that: each
+        // player earns their own and files their own report, so the progression
+        // award below runs for every reporter and dedups on its own per-player key.
+        const dedup = await client.query(`insert into game_rating_sessions (session_id, game_slug, mode_id) values ($1, $2, $3)
+       on conflict (session_id, game_slug) do nothing`, [sessionId, gameSlug, progression?.modeId ?? null]);
         if (dedup.rowCount === 0) {
-            await client.query("rollback");
-            return { ok: true, alreadyProcessed: true };
+            // The rating is settled, but this reporter may still be owed their XP.
+            // Committing rather than rolling back is what makes the second player's
+            // progression land; with no progression block nothing was written and the
+            // commit is a no-op.
+            const settled = await awardProgression(client, {
+                reporterPlayerId, gameSlug, sessionId, outcome, progression,
+            });
+            await client.query("commit");
+            return { ok: true, alreadyProcessed: true, progression: settled };
         }
         const now = occurredAt || new Date().toISOString();
         // Fetch both current ratings (default 1200 if new)
@@ -84,11 +130,15 @@ export async function recordMatchRating(pool, { reporterPlayerId, opponentPlayer
     `;
         await client.query(upsert, [reporterPlayerId, gameSlug, newRatingA, winsA, lossesA, drawsA, now]);
         await client.query(upsert, [opponentPlayerId, gameSlug, newRatingB, winsB, lossesB, drawsB, now]);
+        const granted = await awardProgression(client, {
+            reporterPlayerId, gameSlug, sessionId, outcome, progression,
+        });
         await client.query("commit");
         return {
             ok: true,
             reporter: { playerId: reporterPlayerId, oldRating: rA.rating, newRating: newRatingA },
             opponent: { playerId: opponentPlayerId, oldRating: rB.rating, newRating: newRatingB },
+            progression: granted,
         };
     }
     catch (err) {

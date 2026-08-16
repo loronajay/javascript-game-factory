@@ -8,6 +8,7 @@ const {
   createSimulation,
   GUTTER_CENTER_X,
   GUTTER_CONTACT_X,
+  GUTTER_EXIT_Z,
   gutterAwareTrajectoryX,
   gutterSideForX,
   hookBreakpointForPower,
@@ -209,5 +210,14 @@ describe("lane physics primitives", () => {
     assert.ok(simulation.ball.y > startingY, "the captured ball should keep rolling toward the pit");
     assert.equal(simulation.pins.some((pin) => pin.contacted), false,
       "a ball in the gutter cannot climb back onto the deck and hit a pin");
+  });
+
+  test("retires a guttered ball underneath the painted pit before it runs onto the back wall", () => {
+    const simulation = createSimulation(createRack(), { power: 0.9 }, { gutterSide: 1 });
+    simulation.ball.y = (GUTTER_EXIT_Z - 0.001 - 0.86) * 11.76;
+
+    stepSimulation(simulation, 1 / 60);
+
+    assert.equal(simulation.ball.active, false);
   });
 });

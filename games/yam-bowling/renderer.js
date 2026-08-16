@@ -16,6 +16,19 @@
     return t * t * (3 - 2 * t);
   };
 
+  function interpolatePath(points, z) {
+    let upperIndex = points.findIndex((point) => point.z >= z);
+    if (upperIndex < 0) upperIndex = points.length - 1;
+    const lowerIndex = Math.max(0, upperIndex - 1);
+    const lower = points[lowerIndex];
+    const upper = points[upperIndex];
+    const progress = upper.z === lower.z ? 0 : (z - lower.z) / (upper.z - lower.z);
+    return {
+      left: lower.left + (upper.left - lower.left) * progress,
+      right: lower.right + (upper.right - lower.right) * progress,
+    };
+  }
+
   function loadImage(source) {
     return new Promise((resolve, reject) => {
       const image = new Image();
@@ -95,10 +108,43 @@
 
     project(x, z) {
       const lane = root.YamLaneCore.getLane(this.laneSlug);
-      const deckBlend = smooth01((z - 0.45) / (PIN_RACK_VISUAL_FRONT_Z - 0.45));
-      const y = 1185 - 955 * z + lane.pinDeckOffsetY * deckBlend;
-      const half = 430 - 330 * Math.pow(clamp(z, 0, 1), 0.82);
-      return { x: W / 2 + x * half, y, half };
+      const clampedZ = clamp(z, 0, 1);
+      const deckBlend = smooth01((clampedZ - 0.45) / (PIN_RACK_VISUAL_FRONT_Z - 0.45));
+      const y = 1185 - 955 * clampedZ + lane.pinDeckOffsetY * deckBlend;
+      const { left, right } = interpolatePath(lane.laneEdges, clampedZ);
+      const center = (left + right) / 2;
+      const half = (right - left) / 2;
+      return { x: center + x * half, y, half, left, right };
+    }
+
+    ballSizeAt(z) {
+      return 76 - clamp(z, 0, 1) * 51;
+    }
+
+    depthScaleAt(z) {
+      return 430 - 330 * Math.pow(clamp(z, 0, 1), 0.82);
+    }
+
+    projectGutter(side, z) {
+      const direction = side < 0 ? -1 : 1;
+      const clampedZ = clamp(z, 0, 1);
+      const lane = root.YamLaneCore.getLane(this.laneSlug);
+      const center = interpolatePath(lane.gutterCenters, clampedZ);
+      const ground = this.project(0, clampedZ);
+      return {
+        ...ground,
+        x: direction < 0 ? center.left : center.right,
+      };
+    }
+
+    projectLaneObject(x, z) {
+      if (Math.abs(x) >= root.YamPhysics.GUTTER_CONTACT_X) {
+        const side = Math.sign(x) || 1;
+        const gutter = this.projectGutter(side, z);
+        const railJitter = x - side * root.YamPhysics.GUTTER_CENTER_X;
+        return { ...gutter, x: gutter.x + railJitter * gutter.half };
+      }
+      return this.project(x, z);
     }
 
     pinZ(pin) {
@@ -123,7 +169,7 @@
         ctx.beginPath();
         for (let i = 0; i <= 18; i += 1) {
           const z = startZ + i / 18 * (endZ - startZ);
-          const point = this.project(root.YamPhysics.gutterAwareTrajectoryX(z, shot), z);
+          const point = this.project(root.YamPhysics.trajectoryX(z, shot), z);
           if (i === 0) ctx.moveTo(point.x, point.y);
           else ctx.lineTo(point.x, point.y);
         }
@@ -138,7 +184,7 @@
       strokePath(breakpointZ, 0.92, "rgba(255,214,102,.95)", [], 4);
       ctx.shadowBlur = 0;
       ctx.setLineDash([]);
-      const breakpoint = this.project(root.YamPhysics.gutterAwareTrajectoryX(breakpointZ, shot), breakpointZ);
+      const breakpoint = this.project(root.YamPhysics.trajectoryX(breakpointZ, shot), breakpointZ);
       ctx.beginPath();
       ctx.arc(breakpoint.x, breakpoint.y, 7, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(79, 180, 255, .95)";
@@ -146,7 +192,7 @@
       ctx.strokeStyle = "rgba(255, 255, 255, .9)";
       ctx.lineWidth = 2;
       ctx.stroke();
-      const target = this.project(root.YamPhysics.gutterAwareTrajectoryX(0.86, shot), 0.86);
+      const target = this.project(root.YamPhysics.trajectoryX(0.86, shot), 0.86);
       ctx.beginPath();
       ctx.arc(target.x, target.y, 13, 0, Math.PI * 2);
       ctx.strokeStyle = "rgba(255,214,102,.96)";
@@ -158,8 +204,8 @@
     pinMetrics(pin) {
       const z = this.pinRenderZ(pin);
       const point = this.project(pin.x, z);
-      const frontHalf = this.project(0, PIN_RACK_VISUAL_FRONT_Z).half;
-      const scale = clamp(point.half / frontHalf, 0.58, 1.55);
+      const frontHalf = this.depthScaleAt(PIN_RACK_VISUAL_FRONT_Z);
+      const scale = clamp(this.depthScaleAt(z) / frontHalf, 0.58, 1.55);
       const height = PIN_HEIGHT_FRONT * scale;
       const width = height * (this.assets.pin.width / this.assets.pin.height);
       return { z, point, height, width };
@@ -220,8 +266,8 @@
 
     drawBallAt(x, z, ballIndex, rotation = 0, guttered = false) {
       const ctx = this.ctx;
-      const ground = this.project(x, z);
-      const size = 76 - clamp(z, 0, 1) * 51;
+      const ground = guttered ? this.projectGutter(Math.sign(x), z) : this.project(x, z);
+      const size = this.ballSizeAt(z);
       const [light, dark] = BALL_COLORS[ballIndex % BALL_COLORS.length];
       // A captured ball sits visibly lower than one riding on the boards. Its
       // normalized x remains fixed, so perspective carries it along the rail.
@@ -279,7 +325,7 @@
       for (const particle of particles) {
         const alpha = root.YamEffects.particleAlpha(particle);
         if (alpha <= 0) continue;
-        const point = this.project(particle.x, clamp(particle.z, 0, 1));
+        const point = this.projectLaneObject(particle.x, clamp(particle.z, 0, 1));
         // Scaled by the same perspective the ball uses, so a particle far down
         // the lane shrinks with it instead of floating at a fixed size.
         const radius = Math.max(1, (76 - clamp(particle.z, 0, 1) * 51) * 0.12 * particle.size);
@@ -342,7 +388,7 @@
       if (scene.simulation?.ball?.active) {
         const ball = scene.simulation.ball;
         const z = root.YamPhysics.RACK_FRONT_Z + ball.y / root.YamPhysics.Z_SCALE;
-        const point = this.project(ball.x, z);
+        const point = this.projectLaneObject(ball.x, z);
         ctx.strokeStyle = "#ff3b4c";
         ctx.beginPath();
         ctx.arc(point.x, point.y, 13, 0, Math.PI * 2);

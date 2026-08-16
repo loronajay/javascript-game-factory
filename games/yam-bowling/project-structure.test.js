@@ -209,6 +209,39 @@ test("equippable effects are render-only and cannot reach gameplay", () => {
   assert.match(readCode("game.js"), /prefers-reduced-motion/);
 });
 
+test("progression is the one owner of XP, and the client never awards itself any", () => {
+  const html = read("index.html");
+  const code = readCode("progression-core.js");
+
+  // Its only dependency is the canon roster, so it loads straight after it.
+  assert.ok(html.indexOf("animation-core.js") < html.indexOf("progression-core.js"));
+  assert.ok(html.indexOf("progression-core.js") < html.indexOf("game.js"));
+  assert.ok(JSON.parse(read("runtime-assets.json")).include.includes("progression-core.js"));
+
+  // The XP table and the curves live in exactly one file. A second copy is how
+  // a retune ships half-applied.
+  assert.match(code, /GRANT_SOURCES\s*=/);
+  assert.match(code, /MAX_LEVEL\s*=\s*30/);
+  for (const file of ["game-core.js", "cosmetics-core.js", "loadout-core.js", "match/match-runtime.mjs"]) {
+    assert.doesNotMatch(readCode(file), /GRANT_SOURCES|xpForLevel|computeMatchGrant/, `${file} must not own an XP rule`);
+  }
+
+  // The grant calculator is pure: it reads no storage and banks nothing. The
+  // server evaluates the same inputs, which is what keeps the two in agreement.
+  const grantFunction = code.slice(code.indexOf("function computeMatchGrant"), code.indexOf("function emptyRecord"));
+  assert.notEqual(grantFunction, "", "progression-core should own the grant calculator");
+  assert.doesNotMatch(grantFunction, /localStorage|\.setItem\(|\.getItem\(|persist\(/);
+
+  // Only an authoritative snapshot moves a balance. `recordPending` queues a
+  // grant so the UI can show a pending state without inventing one.
+  const store = code.slice(code.indexOf("function createProgressionStore"));
+  const balanceWrites = [...store.matchAll(/record\.player\s*=|record\s*=\s*next|record\.bowlers\s*=/g)];
+  assert.equal(balanceWrites.length, 1, "applySnapshot must be the only path that changes XP");
+  assert.match(store, /function applySnapshot/);
+  const pendingFunction = store.slice(store.indexOf("function recordPending"), store.indexOf("function listPending"));
+  assert.doesNotMatch(pendingFunction, /record\.player|record\.bowlers/, "queuing a grant must not move a balance");
+});
+
 test("no surface shows a price or an unlock claim before ownership is authoritative", () => {
   // Milestone 2 rule: a dev entitlement is allowed to open the catalog for
   // authoring, but nothing may advertise an XP cost the server cannot honor.
