@@ -11,20 +11,22 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function createLoadoutCore(root, animation, menuSplash, cosmetics, roomCore) {
   "use strict";
 
-  // The presentation loadout: what this device has, and what it has equipped.
+  // The presentation loadout: what the current player has equipped, cached on
+  // this device and replaced by the authenticated server document when online.
   //
   // `cosmetics-core.js` says what exists; this module says what is owned and
   // worn. Keeping the two apart is the whole point of the contract -- when
   // milestone 4 makes ownership authoritative, only the ownership source in
   // here changes, and no catalog entry, slot, or UI call site moves.
   //
-  // Ownership has four sources, in this order:
+  // Before authenticated sync, ownership has four compatibility sources:
   //   1. catalog default   -- everything that shipped before progression.
   //   2. campaign progress -- character-linked art follows its bowler live.
-  //   3. persisted grants  -- the ledger an authoritative server will own.
+  //   3. persisted grants  -- legacy/dev-only compatibility data.
   //   4. dev entitlement   -- a deliberate authoring switch, never a grant.
-  // A dev entitlement is deliberately NOT written to the grant ledger, so no
-  // local experiment can turn into a balance the server has to reconcile.
+  // A successful server entitlement read supersedes sources 2-4 for the whole
+  // session. A dev entitlement is deliberately NOT written to the grant ledger,
+  // so no local experiment can turn into a balance the server must reconcile.
 
   const SCHEMA_VERSION = 1;
   const LOADOUT_STORAGE_KEY = "yam-bowling.loadout.v1";
@@ -189,6 +191,8 @@
     }
 
     let devEntitlement = false;
+    let serverAuthoritative = false;
+    let serverEntitlementIds = new Set();
     try {
       devEntitlement = storage?.getItem?.(DEV_ENTITLEMENT_STORAGE_KEY) === "on";
     } catch {
@@ -208,6 +212,13 @@
     function owns(itemId) {
       const item = cosmetics.getItem(itemId);
       if (!item) return false;
+      if (cosmetics.isOwnedByDefault(itemId)) return true;
+      if (serverAuthoritative) {
+        if (item.unlock.source === "character-unlock" && item.characterSlug) {
+          return serverEntitlementIds.has(`bowler:${item.characterSlug}`);
+        }
+        return serverEntitlementIds.has(itemId);
+      }
       let unlockedWithBowler = false;
       if (item.unlock.source === "character-unlock" && item.characterSlug) {
         try {
@@ -216,8 +227,39 @@
           unlockedWithBowler = false;
         }
       }
-      return cosmetics.isOwnedByDefault(itemId) || unlockedWithBowler
-        || record.granted.includes(itemId) || devEntitlement;
+      return unlockedWithBowler || record.granted.includes(itemId) || devEntitlement;
+    }
+
+    // A successful signed-in progress read flips ownership to the server. The
+    // ids are intentionally session-only: a revoked token must not leave a
+    // durable ownership ledger another account could inherit on this device.
+    function applyServerEntitlements(entitlements) {
+      const values = entitlements instanceof Set ? [...entitlements] : entitlements;
+      serverEntitlementIds = new Set((Array.isArray(values) ? values : [])
+        .map((entry) => typeof entry === "string" ? entry : entry?.entitlementId)
+        .filter((entry) => typeof entry === "string" && entry));
+      serverAuthoritative = true;
+      record.granted = [];
+      persist();
+      return serverEntitlementIds.size;
+    }
+
+    function applyServerGarage(garage) {
+      const normalized = normalizeRecord({ ...(garage || {}), granted: [] });
+      if (!normalized) return false;
+      record = normalized;
+      persist();
+      return true;
+    }
+
+    function clearServerAuthority() {
+      serverEntitlementIds = new Set();
+      serverAuthoritative = false;
+    }
+
+    function exportGarage() {
+      const { granted: _ignored, ...garage } = record;
+      return JSON.parse(JSON.stringify(garage));
     }
 
     function accepts(slot, item, characterSlug) {
@@ -331,6 +373,11 @@
       return cosmetics.CATALOG.filter((item) => (!type || item.type === type) && owns(item.id));
     }
 
+    function listOwnedBowlerSlugs() {
+      const owned = new Set(listOwned("menu-splash").map((item) => item.characterSlug).filter(Boolean));
+      return animation.CANON_BOWLERS.map((bowler) => bowler.slug).filter((slug) => owned.has(slug));
+    }
+
     function hasDevEntitlement() {
       return devEntitlement;
     }
@@ -346,9 +393,13 @@
     }
 
     return {
+      applyServerEntitlements,
+      applyServerGarage,
+      clearServerAuthority,
       equipBowlerSlot,
       equipGlobalSlot,
       equipSkin,
+      exportGarage,
       getBowlerSlot,
       getEquippedSkinId,
       getFeatured,
@@ -358,7 +409,9 @@
       grant,
       hasDevEntitlement,
       listOwned,
+      listOwnedBowlerSlugs,
       owns,
+      isServerAuthoritative: () => serverAuthoritative,
       setDevEntitlement,
       setFeatured,
       setMenuSplashSlug,

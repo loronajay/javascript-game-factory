@@ -16,14 +16,11 @@
 // the rows, the catalog owns what a valid garage means. A second cabinet wanting
 // server-backed cosmetics registers its own catalog and reuses this table.
 import { SPEED_DEMON_GAME_SLUG, loadoutFromGarage, normalizeGarage, } from "../services/speed-demon-catalog.mjs";
+import { YAM_BOWLING_GAME_SLUG, YAM_BOWLING_LOADOUT_CATALOG, } from "../services/yam-bowling-loadout-catalog.mjs";
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
-/**
- * Per-game validation. A slug with no catalog cannot store a loadout at all —
- * silently accepting unvalidated JSON from any client that names a new slug is
- * exactly the hole this registry closes.
- */
 const CATALOGS = {
     [SPEED_DEMON_GAME_SLUG]: { normalizeGarage, loadoutFromGarage },
+    [YAM_BOWLING_GAME_SLUG]: YAM_BOWLING_LOADOUT_CATALOG,
 };
 function cleanText(value, maxLength = 120) {
     return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -35,6 +32,12 @@ function normalizeGameSlug(value) {
 export function isValidLoadoutSlug(value) {
     return Boolean(normalizeGameSlug(value)) && Object.hasOwn(CATALOGS, normalizeGameSlug(value));
 }
+async function getOwnershipContext(pool, playerId, gameSlug, catalog) {
+    if (!catalog.requiresEntitlements)
+        return {};
+    const result = await pool.query(`select entitlement_id from game_entitlements where player_id = $1 and game_slug = $2`, [playerId, gameSlug]);
+    return { ownedEntitlementIds: new Set(result.rows.map((row) => row.entitlement_id)) };
+}
 /** The owner's whole garage. Null when the slug is unknown or the read fails. */
 export async function getGarage(pool, { playerId, gameSlug } = {}) {
     const normalizedPlayerId = cleanText(playerId);
@@ -45,13 +48,14 @@ export async function getGarage(pool, { playerId, gameSlug } = {}) {
     try {
         const res = await pool.query(`select garage, updated_at from game_loadouts where player_id = $1 and game_slug = $2`, [normalizedPlayerId, slug]);
         const row = res.rows[0];
+        const context = await getOwnershipContext(pool, normalizedPlayerId, slug, catalog);
         return {
             playerId: normalizedPlayerId,
             gameSlug: slug,
             // Normalized on the way out as well as in. A row written by an older
             // build, or by a catalog that has since tightened a bound, must not be
             // able to hand a client something it would refuse to draw.
-            garage: catalog.normalizeGarage(row?.garage ?? null),
+            garage: catalog.normalizeGarage(row?.garage ?? null, context),
             updatedAt: row?.updated_at ?? null,
         };
     }
@@ -73,8 +77,9 @@ export async function saveGarage(pool, { playerId, gameSlug, garage } = {}) {
     if (!pool || !normalizedPlayerId || !catalog) {
         return { ok: false, statusCode: 400, error: "invalid_request" };
     }
-    const normalized = catalog.normalizeGarage(garage);
     try {
+        const context = await getOwnershipContext(pool, normalizedPlayerId, slug, catalog);
+        const normalized = catalog.normalizeGarage(garage, context);
         await pool.query(`insert into game_loadouts (player_id, game_slug, garage, updated_at)
        values ($1, $2, $3::jsonb, now())
        on conflict (player_id, game_slug) do update
@@ -103,10 +108,11 @@ export async function getPublicLoadout(pool, { playerId, gameSlug } = {}) {
         return null;
     try {
         const res = await pool.query(`select garage from game_loadouts where player_id = $1 and game_slug = $2`, [normalizedPlayerId, slug]);
+        const context = await getOwnershipContext(pool, normalizedPlayerId, slug, catalog);
         return {
             playerId: normalizedPlayerId,
             gameSlug: slug,
-            ...catalog.loadoutFromGarage(res.rows[0]?.garage ?? null),
+            ...catalog.loadoutFromGarage(res.rows[0]?.garage ?? null, context),
         };
     }
     catch (err) {
@@ -130,10 +136,21 @@ export async function getPublicLoadouts(pool, { playerIds, gameSlug } = {}) {
     try {
         const res = await pool.query(`select player_id, garage from game_loadouts where game_slug = $1 and player_id = any($2::text[])`, [slug, ids]);
         const byPlayer = new Map(res.rows.map((row) => [row.player_id, row.garage]));
+        const entitlementRows = catalog.requiresEntitlements
+            ? await pool.query(`select player_id, entitlement_id from game_entitlements where game_slug = $1 and player_id = any($2::text[])`, [slug, ids])
+            : { rows: [] };
+        const ownedByPlayer = new Map();
+        for (const row of entitlementRows.rows) {
+            if (!ownedByPlayer.has(row.player_id))
+                ownedByPlayer.set(row.player_id, new Set());
+            ownedByPlayer.get(row.player_id).add(row.entitlement_id);
+        }
         return ids.map((playerId) => ({
             playerId,
             gameSlug: slug,
-            ...catalog.loadoutFromGarage(byPlayer.get(playerId) ?? null),
+            ...catalog.loadoutFromGarage(byPlayer.get(playerId) ?? null, {
+                ownedEntitlementIds: ownedByPlayer.get(playerId) || new Set(),
+            }),
         }));
     }
     catch (err) {

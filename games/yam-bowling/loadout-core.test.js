@@ -282,3 +282,49 @@ test("the dev entitlement opens every room for authoring without granting one", 
   const stored = JSON.parse(storage.getItem(LOADOUT_STORAGE_KEY));
   assert.deepEqual(stored.granted, []);
 });
+
+test("a server snapshot becomes the only ownership source for an authenticated loadout", () => {
+  const storage = memoryStorage();
+  const campaign = campaignUnlocks([...campaignCore.STARTER_BOWLER_SLUGS, "hazel-ward", "roxy-chen"]);
+  const store = createLoadoutStore({ storage, campaign });
+
+  store.grant("room:champion-room");
+  store.applyServerEntitlements([
+    { entitlementId: "bowler:hazel-ward" },
+    { entitlementId: "room:teal-lounge" },
+  ]);
+  store.applyServerGarage({
+    version: SCHEMA_VERSION,
+    bowlers: { "hazel-ward": { skin: "skin:hazel-ward:maid" } },
+    global: { room: "room:teal-lounge" },
+    featured: { bowlerSlug: "hazel-ward", skinId: "maid" },
+  });
+
+  assert.equal(store.isServerAuthoritative(), true);
+  assert.equal(store.owns("room:teal-lounge"), true);
+  assert.equal(store.owns("room:champion-room"), false, "a local grant must not survive authenticated sync");
+  assert.equal(store.owns("menu-splash:hazel-ward"), true);
+  assert.equal(store.owns("menu-splash:roxy-chen"), false, "cached campaign state must not create ownership");
+  assert.deepEqual(store.listOwnedBowlerSlugs(), [...campaignCore.STARTER_BOWLER_SLUGS, "hazel-ward"]);
+  assert.deepEqual(store.getFeatured(), { bowlerSlug: "hazel-ward", skinId: "maid" });
+  assert.equal(store.getRoomSlug(), "teal-lounge");
+  assert.equal(Object.hasOwn(store.exportGarage(), "granted"), false);
+});
+
+test("server entitlement revocation removes the choice and falls back safely", () => {
+  const store = createLoadoutStore({ storage: memoryStorage(), campaign: campaignUnlocks() });
+  store.applyServerEntitlements([{ entitlementId: "room:teal-lounge" }]);
+  store.applyServerGarage({
+    version: SCHEMA_VERSION,
+    bowlers: {},
+    global: { room: "room:teal-lounge" },
+    featured: { bowlerSlug: "daisy-monroe", skinId: "canon" },
+  });
+  assert.equal(store.getRoomSlug(), "teal-lounge");
+
+  store.applyServerEntitlements([]);
+
+  assert.equal(store.owns("room:teal-lounge"), false);
+  assert.equal(store.getRoomSlug(), roomCore.DEFAULT_ROOM_SLUG);
+  assert.deepEqual(store.listOwned("room").map((item) => item.id), ["room:default"]);
+});

@@ -3,6 +3,7 @@ import { createOnlineIdentityPayload } from "../../js/platform/identity/match-id
 import { createPlatformApiClient } from "../../js/platform/api/platform-api.mjs";
 import { createYamAccountAccess } from "./account-access.mjs";
 import { createCampaignProgressClient } from "./campaign-progress-client.mjs";
+import { createProfileSyncClient } from "./profile/profile-sync-client.mjs";
 import { createOnlineClient, normalizeRoomCode } from "./online-client.mjs";
 import { initMobileLandscapeGate } from "./mobile-ui.mjs";
 import { $, showScreen } from "./ui/dom.mjs";
@@ -13,6 +14,7 @@ import { createCharacterInspector } from "./ui/character-inspector.mjs";
 import { createSetupScreen } from "./ui/setup-screen.mjs";
 import { createOnlineScreen } from "./ui/online-screen.mjs";
 import { createCircuitScreen } from "./ui/circuit-screen.mjs";
+import { createProfileScreen } from "./ui/profile-screen.mjs";
 import { createShotHud } from "./ui/shot-hud.mjs";
 import { createScoreboard } from "./ui/scoreboard.mjs";
 import { createResultsScreen } from "./ui/results-screen.mjs";
@@ -53,7 +55,8 @@ initMobileLandscapeGate();
 
   const renderer = new window.YamBowlingRenderer($("game-canvas"));
   const audio = AudioCore.createAudioDirector();
-  const onlineIdentity = createOnlineIdentityPayload(loadFactoryProfile());
+  const factoryProfile = loadFactoryProfile();
+  const onlineIdentity = createOnlineIdentityPayload(factoryProfile);
   const platformApi = createPlatformApiClient();
   const accountAccess = createYamAccountAccess();
   const onlineClient = createOnlineClient();
@@ -64,6 +67,7 @@ initMobileLandscapeGate();
   // The device-local cache of an authoritative balance. It never awards itself
   // XP; only a server snapshot moves a number in it.
   const progression = ProgressionCore.createProgressionStore();
+  let profileScreen = null;
   const assets = createCharacterAssets({ animation: Animation, roster: Roster, loadout });
   const progressionReporter = createProgressionReporter({
     progressionCore: ProgressionCore,
@@ -104,8 +108,34 @@ initMobileLandscapeGate();
   const menuSplashPicker = createMenuSplashPicker({ menuSplash: MenuSplash, loadout, audio });
   const campaignProgress = createCampaignProgressClient({
     campaignStore,
+    progressionCore: ProgressionCore,
+    progressionStore: progression,
     platformApi,
-    onSnapshotApplied: () => menuSplashPicker.refresh(),
+    onSnapshotApplied: (snapshot) => {
+      loadout.applyServerEntitlements(snapshot?.entitlements || []);
+      menuSplashPicker.refresh();
+      profileScreen?.refresh();
+    },
+  });
+  const profileSync = createProfileSyncClient({
+    platformApi,
+    playerId: factoryProfile.playerId,
+    loadout,
+    progressionCore: ProgressionCore,
+    progressionStore: progression,
+    onSnapshotApplied: () => {
+      menuSplashPicker.refresh();
+      profileScreen?.refresh();
+    },
+  });
+  profileScreen = createProfileScreen({
+    profileName: factoryProfile.profileName,
+    loadout,
+    progression,
+    animation: Animation,
+    roomCore: window.YamRoomCore,
+    syncClient: profileSync,
+    audio,
   });
   const lanePicker = createLanePicker({ laneCore: LaneCore, audio, onPreview: applyMatchLane });
   session.matchLaneSlug = lanePicker.getSelectedSlug();
@@ -244,10 +274,15 @@ initMobileLandscapeGate();
     menuSplashPicker.build();
     accountAccess.syncControls();
     accountAccess.bindSessionChanges(document, () => {
+      loadout.clearServerAuthority();
       onlineSession.leaveToTitle();
       circuitScreen.leaveToTitle();
+      profileScreen.leaveToTitle();
     });
-    if (accountAccess.isEligible()) await campaignProgress.sync();
+    if (accountAccess.isEligible()) {
+      await campaignProgress.sync();
+      await profileSync.sync();
+    }
     lanePicker.build();
     setupScreen.build();
     onlineScreen.build();
@@ -263,9 +298,10 @@ initMobileLandscapeGate();
     setupScreen.bind();
     onlineScreen.bind();
     circuitScreen.bind();
+    profileScreen.bind();
     bindEvents({
       session, keys, audio, renderer, matchRuntime, onlineSession,
-      circuitScreen, setupScreen, onlineScreen, shotHud, syncAudioToggle, accountAccess,
+      circuitScreen, profileScreen, setupScreen, onlineScreen, shotHud, syncAudioToggle, accountAccess,
     });
 
     if (accountAccess.isEligible() && onlineClient.resumeSavedSession()) {

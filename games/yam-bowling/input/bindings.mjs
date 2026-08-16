@@ -19,6 +19,7 @@ export function bindEvents({
   onlineSession,
   accountAccess,
   circuitScreen,
+  profileScreen,
   setupScreen,
   onlineScreen,
   shotHud,
@@ -53,7 +54,7 @@ export function bindEvents({
     if (!button || button.disabled || button.id === "throw-button") return;
     if (!audio.unlocked) audio.unlock();
     const isSelection = button.matches(
-      ".character-card, .ball-button, [data-mode], [data-play-type], [data-cpu-level], [data-player-slot], [data-splash-slug], [data-skin-id], [data-lane-slug]",
+      ".character-card, .ball-button, [data-mode], [data-play-type], [data-cpu-level], [data-player-slot], [data-splash-slug], [data-skin-id], [data-lane-slug], [data-profile-bowler], [data-profile-skin], [data-profile-room]",
     );
     audio.play(isSelection ? "select" : "click");
   });
@@ -67,6 +68,9 @@ export function bindEvents({
   $("circuit-button").addEventListener("click", () => {
     if (accountAccess.requireFactoryAccount()) circuitScreen.open();
   });
+  $("profile-button").addEventListener("click", () => {
+    if (accountAccess.requireFactoryAccount()) profileScreen.open();
+  });
   $("play-button").addEventListener("click", () => { showScreen("setup-screen"); setupScreen.render(); });
   $("online-button").addEventListener("click", () => {
     if (!accountAccess.requireFactoryAccount()) return;
@@ -75,6 +79,7 @@ export function bindEvents({
   });
   $("setup-back").addEventListener("click", () => showScreen("title-screen"));
   $("circuit-back").addEventListener("click", () => circuitScreen.leaveToTitle());
+  $("profile-back").addEventListener("click", () => profileScreen.leaveToTitle());
   $("online-back").addEventListener("click", () => showScreen("title-screen"));
   $("how-button").addEventListener("click", () => { $("how-dialog").showModal(); audio.play("popup"); });
   $("how-close").addEventListener("click", () => $("how-dialog").close());

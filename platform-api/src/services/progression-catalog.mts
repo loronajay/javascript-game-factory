@@ -40,6 +40,7 @@ export interface ProgressionDefinition {
   // Keyed by the mode id the cabinet reports. An unlisted mode earns nothing
   // rather than falling back to a payout.
   modes: Record<string, ProgressionModeAward>;
+  campaign: Record<string, number>;
   // A capped bonus on a countable performance stat. Capped on purpose: the scope
   // wants abuse telemetry before any uncapped performance XP, so a perfect game
   // cannot out-earn simply playing more.
@@ -63,6 +64,7 @@ const YAM_BOWLING: ProgressionDefinition = {
     quick: { completion: 100, win: 25 },
     classic: { completion: 300, win: 75 },
   },
+  campaign: { encounter: 300, boss: 600 },
   performanceXpPerUnit: 4,
   maxPerformanceXp: 20,
   trackStats: { strikes: "sum", highGame: "max" },
@@ -162,4 +164,22 @@ export function computeOnlineGrant(gameSlug: unknown, {
 
   const xp = breakdown.completion + breakdown.win + breakdown.performance + breakdown.forfeit;
   return { eligible: true, reason: "eligible", xp, breakdown };
+}
+
+export function computeCampaignGrant(gameSlug: unknown, {
+  kind,
+  firstClear = true,
+}: { kind?: unknown; firstClear?: unknown } = {}): GrantVerdict {
+  const definition = getProgression(gameSlug);
+  if (!definition) return refused("game-not-registered");
+  const xp = typeof kind === "string" ? definition.campaign[kind] : undefined;
+  if (!Number.isFinite(xp)) return refused("unknown-campaign-clear");
+  if (firstClear !== true) return refused("campaign-replay");
+  const amount = Number(xp);
+  return {
+    eligible: true,
+    reason: "eligible",
+    xp: amount,
+    breakdown: { completion: amount, win: 0, performance: 0, forfeit: 0 },
+  };
 }

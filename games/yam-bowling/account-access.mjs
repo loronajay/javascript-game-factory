@@ -7,7 +7,7 @@ import { syncOnlineAccountFeatureControls } from "../../js/platform/ui/online-ac
 import { AUTH_SESSION_EXPIRED_EVENT } from "../../js/platform/api/auth-token.mjs";
 
 export const FACTORY_ACCOUNT_FEATURE_SELECTOR = "[data-factory-account-feature]";
-export const FACTORY_ACCOUNT_FEATURE_MESSAGE = "Sign in to your Factory profile to enter the Circuit or play online.";
+export const FACTORY_ACCOUNT_FEATURE_MESSAGE = "Sign in to your Factory profile to open your room, enter the Circuit, or play online.";
 
 export function createYamAccountAccess({
   readAccount = readFactoryAccountSession,

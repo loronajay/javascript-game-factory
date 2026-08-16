@@ -17,6 +17,9 @@ function createGameProgressPool() {
     campaignEpoch: 0,
     entitlements: new Map(),
     campaignProgress: new Map(),
+    xpProfiles: new Map(),
+    xpTracks: new Map(),
+    xpGrants: [],
   };
   const calls = [];
   const client = {
@@ -48,6 +51,9 @@ function createGameProgressPool() {
       }
       if (text.includes("select 1 from game_campaign_progress")) {
         return { rows: state.campaignProgress.has(params[2]) ? [{ "?column?": 1 }] : [] };
+      }
+      if (text.includes("select 1 from game_entitlements")) {
+        return { rows: state.entitlements.has(params[2]) ? [{ "?column?": 1 }] : [], rowCount: state.entitlements.has(params[2]) ? 1 : 0 };
       }
       if (text.includes("select campaign_epoch from game_progress_profiles")) {
         return { rows: [{ campaign_epoch: state.campaignEpoch }] };
@@ -86,6 +92,39 @@ function createGameProgressPool() {
         });
         return { rows: [] };
       }
+      if (text.includes("insert into game_xp_grants")) {
+        const [player_id, game_slug, grant_id, track_id, xp, source] = params;
+        if (state.xpGrants.some((row) => row.player_id === player_id && row.game_slug === game_slug && row.grant_id === grant_id)) {
+          return { rows: [], rowCount: 0 };
+        }
+        state.xpGrants.push({ player_id, game_slug, grant_id, track_id, xp, source });
+        return { rows: [], rowCount: 1 };
+      }
+      if (text.includes("insert into game_xp_profiles")) {
+        const key = `${params[0]}:${params[1]}`;
+        const previous = state.xpProfiles.get(key) || { xp: 0, matches: 0 };
+        state.xpProfiles.set(key, {
+          xp: previous.xp + Number(params[2]),
+          matches: previous.matches + 1,
+          updated_at: "2026-07-18T00:00:00.000Z",
+        });
+        return { rows: [], rowCount: 1 };
+      }
+      if (text.includes("select stats from game_xp_tracks")) {
+        const row = state.xpTracks.get(`${params[0]}:${params[1]}:${params[2]}`);
+        return { rows: row ? [{ stats: row.stats }] : [] };
+      }
+      if (text.includes("insert into game_xp_tracks")) {
+        const key = `${params[0]}:${params[1]}:${params[2]}`;
+        const previous = state.xpTracks.get(key) || { xp: 0, matches: 0, wins: 0 };
+        state.xpTracks.set(key, {
+          xp: previous.xp + Number(params[3]),
+          matches: previous.matches + 1,
+          wins: previous.wins + Number(params[4]),
+          stats: JSON.parse(params[5]),
+        });
+        return { rows: [], rowCount: 1 };
+      }
       return { rows: [] };
     },
     release() {},
@@ -98,6 +137,24 @@ function createGameProgressPool() {
     },
     async query(sql, params = []) {
       const text = String(sql);
+      if (text.includes("from game_xp_profiles")) {
+        const row = state.xpProfiles.get(`${params[0]}:${params[1]}`);
+        return { rows: row ? [row] : [] };
+      }
+      if (text.includes("from game_xp_tracks")) {
+        return {
+          rows: [...state.xpTracks.entries()]
+            .filter(([key]) => key.startsWith(`${params[0]}:${params[1]}:`))
+            .map(([key, row]) => ({ track_id: key.split(":").slice(2).join(":"), ...row })),
+        };
+      }
+      if (text.includes("from game_xp_grants")) {
+        return {
+          rows: state.xpGrants
+            .filter((row) => row.player_id === params[0] && row.game_slug === params[1])
+            .map((row) => ({ grant_id: row.grant_id })),
+        };
+      }
       if (text.includes("from game_progress_profiles")) {
         return {
           rows: [{
@@ -248,6 +305,7 @@ test("Yam Bowling circuit clears grant only the server-catalogued bowler", async
     kind: "circuit-clear",
     payload: {
       matchId: "local-hazel-ward",
+      activeBowlerSlug: "daisy-monroe",
       unlockedBowlerSlug: "reina-sato",
       entitlementIds: ["room:champion-room"],
     },
@@ -256,6 +314,9 @@ test("Yam Bowling circuit clears grant only the server-catalogued bowler", async
   assert.equal(result.ok, true);
   assert.deepEqual([...pool.state.entitlements.keys()], ["bowler:hazel-ward"]);
   assert.equal(result.progress.campaignProgress.length, 1);
+  assert.equal(result.progression.player.xp, 300);
+  assert.equal(result.progression.tracks["daisy-monroe"].xp, 300);
+  assert.deepEqual(result.progression.grants, ["circuit-clear:local-hazel-ward"]);
   assert.deepEqual({
     ...result.progress.campaignProgress[0],
     rewardClaimedAt: Boolean(result.progress.campaignProgress[0].rewardClaimedAt),
@@ -275,12 +336,46 @@ test("Yam Bowling cannot skip ahead in the canonical circuit", async () => {
     gameSlug: "yam-bowling",
     claimId: "circuit-clear:local-piper-hart",
     kind: "circuit-clear",
-    payload: { matchId: "local-piper-hart" },
+    payload: { matchId: "local-piper-hart", activeBowlerSlug: "daisy-monroe" },
   });
 
   assert.equal(result.ok, false);
   assert.equal(result.error, "claim_prerequisite_missing");
   assert.equal(pool.state.entitlements.size, 0);
+});
+
+test("Yam Bowling circuit XP can use an earned bowler but never a forged active bowler", async () => {
+  const pool = createGameProgressPool();
+
+  const forged = await recordGameProgressClaim(pool, {
+    playerId: "player-1",
+    gameSlug: "yam-bowling",
+    claimId: "circuit-clear:local-hazel-ward",
+    kind: "circuit-clear",
+    payload: { matchId: "local-hazel-ward", activeBowlerSlug: "hazel-ward" },
+  });
+  assert.equal(forged.ok, false);
+  assert.equal(forged.error, "active_bowler_not_owned");
+  assert.equal(pool.state.xpGrants.length, 0);
+  assert.equal(pool.state.entitlements.size, 0);
+
+  await recordGameProgressClaim(pool, {
+    playerId: "player-1",
+    gameSlug: "yam-bowling",
+    claimId: "circuit-clear:local-hazel-ward",
+    kind: "circuit-clear",
+    payload: { matchId: "local-hazel-ward", activeBowlerSlug: "daisy-monroe" },
+  });
+  const earned = await recordGameProgressClaim(pool, {
+    playerId: "player-1",
+    gameSlug: "yam-bowling",
+    claimId: "circuit-clear:local-piper-hart",
+    kind: "circuit-clear",
+    payload: { matchId: "local-piper-hart", activeBowlerSlug: "hazel-ward" },
+  });
+
+  assert.equal(earned.ok, true);
+  assert.equal(earned.progression.tracks["hazel-ward"].xp, 300);
 });
 
 // A second device restores which tutorials are done from the claim rows themselves —

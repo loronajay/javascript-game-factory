@@ -25,6 +25,7 @@
     "online-client.mjs",
     "physics-core.js",
     "progression-core.js",
+    "profile/*.mjs",
     "room-core.js",
     "renderer.js",
     "ui/*.mjs",

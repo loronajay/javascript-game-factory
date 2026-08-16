@@ -372,6 +372,37 @@ test("the title screen provides a return link to the arcade", () => {
   assert.match(css, /\.arcade-link\s*\{[^}]*z-index:\s*\d+/s);
 });
 
+test("the signed-in player profile composes server loadout, room art, and progression", () => {
+  const html = read("index.html");
+  const game = read("game.js");
+  const profile = read("ui/profile-screen.mjs");
+  const sync = read("profile/profile-sync-client.mjs");
+  const manifest = JSON.parse(read("runtime-assets.json"));
+
+  for (const id of [
+    "profile-button", "profile-screen", "profile-back", "profile-room-art",
+    "profile-bowler-art", "profile-player-level", "profile-career-stats",
+    "profile-bowler-stats", "profile-bowler-options", "profile-skin-options",
+    "profile-room-options", "profile-save", "profile-sync-status",
+  ]) {
+    assert.match(html, new RegExp(`id=["']${id}["']`), `${id} should exist`);
+  }
+  assert.match(html.match(/<button[^>]+id=["']profile-button["'][^>]*>/)?.[0] || "", /data-factory-account-feature/);
+  assert.ok(html.includes('href="styles/profile.css"'));
+  assert.match(read("styles/profile.css"), /\.profile-room\s*\{/);
+  assert.match(read("styles/profile.css"), /\.profile-hero__bowler\s*\{/);
+  assert.match(game, /createProfileSyncClient/);
+  assert.match(game, /createProfileScreen/);
+  assert.match(game, /profileScreen/);
+  assert.match(read("input/bindings.mjs"), /profileScreen\.open\(\)/);
+  assert.match(profile, /buildProfileModel/);
+  assert.match(profile, /loadout\.setFeatured/);
+  assert.match(profile, /loadout\.setRoomSlug/);
+  assert.match(profile, /syncClient\.save\(\)/);
+  assert.match(sync, /\/games\/\$\{GAME_SLUG\}\/garage/);
+  assert.ok(manifest.include.includes("profile/*.mjs"));
+});
+
 test("the cabinet exposes complete quick-match and private-room online screens", () => {
   const html = read("index.html");
   for (const id of [

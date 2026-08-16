@@ -6,6 +6,7 @@ import { createCampaignProgressClient } from "./campaign-progress-client.mjs";
 
 const require = createRequire(import.meta.url);
 const Campaign = require("./campaign-core.js");
+const Progression = require("./progression-core.js");
 
 function memoryStorage() {
   const values = new Map();
@@ -19,6 +20,16 @@ function firstClearSnapshot() {
   return {
     campaignProgress: [{ missionId: "local-hazel-ward", stars: 1 }],
     entitlements: [{ entitlementId: "bowler:hazel-ward", kind: "bowler" }],
+  };
+}
+
+function progressionSnapshot() {
+  return {
+    playerId: "player-1",
+    gameSlug: "yam-bowling",
+    player: { xp: 300, matches: 1 },
+    tracks: { "daisy-monroe": { xp: 300, matches: 1, wins: 1 } },
+    grants: ["circuit-clear:local-hazel-ward"],
   };
 }
 
@@ -45,6 +56,14 @@ test("a circuit clear changes ownership only after the claim returns a server sn
   const pendingClaim = new Promise((resolve) => { releaseClaim = resolve; });
   const client = createCampaignProgressClient({
     campaignStore: store,
+    progressionCore: Progression,
+    progressionStore: { applySnapshot: (snapshot) => assert.deepEqual(snapshot, {
+      version: Progression.SCHEMA_VERSION,
+      player: { xp: 300 },
+      bowlers: progressionSnapshot().tracks,
+      grants: progressionSnapshot().grants,
+      syncedAt: null,
+    }) },
     platformApi: {
       fetchGameProgress: async () => ({ campaignProgress: [], entitlements: [] }),
       recordGameProgressClaim: async (slug, claim) => {
@@ -53,7 +72,7 @@ test("a circuit clear changes ownership only after the claim returns a server sn
           claimId: "circuit-clear:local-hazel-ward",
           kind: "circuit-clear",
           sourceId: "local-hazel-ward",
-          payload: { matchId: "local-hazel-ward" },
+          payload: { matchId: "local-hazel-ward", activeBowlerSlug: "daisy-monroe" },
         });
         return pendingClaim;
       },
@@ -61,9 +80,14 @@ test("a circuit clear changes ownership only after the claim returns a server sn
   });
   await client.sync();
 
-  const resultPromise = client.claimCircuitClear("local-hazel-ward");
+  const resultPromise = client.claimCircuitClear("local-hazel-ward", "daisy-monroe");
   assert.equal(store.getUnlockedBowlerSlugs().includes("hazel-ward"), false);
-  releaseClaim({ ok: true, alreadyProcessed: false, progress: firstClearSnapshot() });
+  releaseClaim({
+    ok: true,
+    alreadyProcessed: false,
+    progress: firstClearSnapshot(),
+    progression: progressionSnapshot(),
+  });
 
   const result = await resultPromise;
   assert.equal(result.ok, true);
@@ -83,7 +107,7 @@ test("a failed claim never falls back to a local character grant", async () => {
   });
   await client.sync();
 
-  const result = await client.claimCircuitClear("local-hazel-ward");
+  const result = await client.claimCircuitClear("local-hazel-ward", "daisy-monroe");
   assert.equal(result.ok, false);
   assert.equal(store.getCurrentMatch().id, "local-hazel-ward");
   assert.equal(store.getUnlockedBowlerSlugs().includes("hazel-ward"), false);

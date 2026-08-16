@@ -31,12 +31,24 @@ const CIRCUIT_UNLOCKS = Object.freeze([
     ["championship-scarlett-voss", "scarlett-voss"],
     ["championship-reina-sato", "reina-sato"],
 ]);
+const STARTER_BOWLER_SLUGS = new Set([
+    "daisy-monroe",
+    "nia-brooks",
+    "tessa-quinn",
+    "zuri-banks",
+    "amara-reed",
+]);
+const ALL_BOWLER_SLUGS = new Set([
+    ...STARTER_BOWLER_SLUGS,
+    ...CIRCUIT_UNLOCKS.map(([, bowlerSlug]) => bowlerSlug),
+]);
 const CIRCUIT_BY_MATCH_ID = new Map(CIRCUIT_UNLOCKS.map(([matchId, bowlerSlug], index) => [
     matchId,
     Object.freeze({
         matchId,
         bowlerSlug,
         previousMatchId: index > 0 ? CIRCUIT_UNLOCKS[index - 1][0] : null,
+        isPromotionMatch: (index + 1) % 5 === 0,
     }),
 ]));
 function cleanText(value, maxLength = 200) {
@@ -53,8 +65,10 @@ export function validateYamBowlingPublicClaim(params = {}) {
         ? params.payload
         : {};
     const matchId = cleanText(input.matchId || params.sourceId);
+    const activeBowlerSlug = cleanText(input.activeBowlerSlug, 80);
     const match = CIRCUIT_BY_MATCH_ID.get(matchId);
-    if (!match || cleanText(params.claimId) !== `${YAM_BOWLING_CIRCUIT_CLAIM_KIND}:${matchId}`)
+    if (!match || !ALL_BOWLER_SLUGS.has(activeBowlerSlug)
+        || cleanText(params.claimId) !== `${YAM_BOWLING_CIRCUIT_CLAIM_KIND}:${matchId}`)
         return rejected();
     const entitlementId = `bowler:${match.bowlerSlug}`;
     return {
@@ -68,10 +82,15 @@ export function validateYamBowlingPublicClaim(params = {}) {
             achievementId: `beat-${match.bowlerSlug}`,
             unlockedBowlerSlug: match.bowlerSlug,
             entitlementId,
+            activeBowlerSlug,
         },
         entitlementGrants: [{ entitlementId, kind: "bowler" }],
         campaignProgress: { missionId: matchId, stars: 1 },
+        campaignXp: { trackId: activeBowlerSlug, kind: match.isPromotionMatch ? "boss" : "encounter" },
     };
+}
+export function isYamBowlingStarterBowler(value) {
+    return typeof value === "string" && STARTER_BOWLER_SLUGS.has(value);
 }
 export function getYamBowlingCircuitUnlockCatalog() {
     return CIRCUIT_UNLOCKS;

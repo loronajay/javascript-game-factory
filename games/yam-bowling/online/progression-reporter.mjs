@@ -12,6 +12,8 @@
 // queue can describe what is pending — that number is never sent and never
 // banked.
 
+import { applyProgressionDocument } from "../state/progression-snapshot.mjs";
+
 const GAME_SLUG = "yam-bowling";
 
 // Strikes bowled in one match. A roll of 10 can only happen off a full rack —
@@ -85,14 +87,7 @@ export function createProgressionReporter({ progressionCore, store, platformApi 
     if (!playerId) return null;
     const document = await platformApi.getGameProgression(GAME_SLUG, playerId).catch(() => null);
     if (!document) return null;
-    // The API speaks of generic `tracks`; a track is a bowler in this cabinet.
-    store.applySnapshot({
-      version: progressionCore.SCHEMA_VERSION,
-      player: { xp: document.player?.xp },
-      bowlers: document.tracks || {},
-      grants: document.grants || [],
-      syncedAt: document.syncedAt || new Date().toISOString(),
-    });
+    applyProgressionDocument({ progressionCore, store, document });
     lastSnapshot = document;
     return document;
   }

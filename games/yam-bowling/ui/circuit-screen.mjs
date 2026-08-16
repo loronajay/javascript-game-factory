@@ -158,6 +158,7 @@ export function createCircuitScreen({
     session.setup.skinIds = [assets.storedSkinId(playerSlug), assets.storedSkinId(match.opponentSlug)];
     session.campaignMatch = {
       matchId: match.id,
+      playerBowlerSlug: playerSlug,
       venueSlug: match.venueSlug,
       opponentSlug: match.opponentSlug,
       achievementId: match.achievement.id,
@@ -197,7 +198,10 @@ export function createCircuitScreen({
     $("campaign-result-kicker").textContent = "Factory profile";
     $("campaign-result-title").textContent = "Confirming circuit victoryâ€¦";
     $("campaign-result-copy").textContent = "Your roster will update after the Factory accepts this clear.";
-    const result = await campaignProgress.claimCircuitClear(session.campaignMatch.matchId);
+    const result = await campaignProgress.claimCircuitClear(
+      session.campaignMatch.matchId,
+      session.campaignMatch.playerBowlerSlug,
+    );
     filingResult = false;
     $("rematch-button").disabled = false;
 

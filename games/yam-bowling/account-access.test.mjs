@@ -31,9 +31,10 @@ test("a real Factory auth token opens account-backed modes without redirecting",
   assert.equal(redirects, 0);
 });
 
-test("Yam uses one explicit gate selector and copy for Circuit and Online", () => {
+test("Yam uses one explicit gate selector and copy for Profile, Circuit, and Online", () => {
   assert.equal(FACTORY_ACCOUNT_FEATURE_SELECTOR, "[data-factory-account-feature]");
   assert.match(FACTORY_ACCOUNT_FEATURE_MESSAGE, /sign in/i);
   assert.match(FACTORY_ACCOUNT_FEATURE_MESSAGE, /circuit/i);
   assert.match(FACTORY_ACCOUNT_FEATURE_MESSAGE, /online/i);
+  assert.match(FACTORY_ACCOUNT_FEATURE_MESSAGE, /room/i);
 });

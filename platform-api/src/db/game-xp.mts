@@ -1,4 +1,5 @@
 import {
+  computeCampaignGrant,
   computeOnlineGrant,
   getProgression,
   levelFromXp,
@@ -86,6 +87,56 @@ export interface AwardMatchXpParams {
   source?: string;
 }
 
+interface PersistXpParams {
+  playerId: string;
+  gameSlug: string;
+  grantId: string;
+  trackId: string;
+  source: string;
+  isWin: boolean;
+  stats?: Record<string, unknown>;
+}
+
+async function persistXpAward(client: any, definition: any, params: PersistXpParams, verdict: any): Promise<any> {
+  const ledger = await client.query(
+    `insert into game_xp_grants (player_id, game_slug, grant_id, track_id, xp, source)
+     values ($1, $2, $3, $4, $5, $6)
+     on conflict (player_id, game_slug, grant_id) do nothing`,
+    [params.playerId, params.gameSlug, params.grantId, params.trackId, verdict.xp, params.source],
+  );
+  if (ledger.rowCount === 0) return { awarded: false, reason: "already-granted" };
+
+  await client.query(
+    `insert into game_xp_profiles (player_id, game_slug, xp, matches, updated_at)
+     values ($1, $2, $3, 1, now())
+     on conflict (player_id, game_slug) do update
+       set xp = game_xp_profiles.xp + excluded.xp,
+           matches = game_xp_profiles.matches + 1,
+           updated_at = now()`,
+    [params.playerId, params.gameSlug, verdict.xp],
+  );
+
+  const existing = await client.query(
+    `select stats from game_xp_tracks where player_id = $1 and game_slug = $2 and track_id = $3 for update`,
+    [params.playerId, params.gameSlug, params.trackId],
+  );
+  const stats = mergeTrackStats(definition, existing.rows[0]?.stats || {}, params.stats || {});
+
+  await client.query(
+    `insert into game_xp_tracks (player_id, game_slug, track_id, xp, matches, wins, stats, updated_at)
+     values ($1, $2, $3, $4, 1, $5, $6, now())
+     on conflict (player_id, game_slug, track_id) do update
+       set xp = game_xp_tracks.xp + excluded.xp,
+           matches = game_xp_tracks.matches + 1,
+           wins = game_xp_tracks.wins + excluded.wins,
+           stats = excluded.stats,
+           updated_at = now()`,
+    [params.playerId, params.gameSlug, params.trackId, verdict.xp, params.isWin ? 1 : 0, JSON.stringify(stats)],
+  );
+
+  return { awarded: true, reason: "eligible", xp: verdict.xp, trackId: params.trackId, breakdown: verdict.breakdown };
+}
+
 // Awards one player's XP for one authoritative match, inside the caller's
 // transaction. Idempotent by (player, game, grant): a retry, a reconnect, or a
 // double-submitted results screen all land on the same refused insert.
@@ -105,50 +156,45 @@ export async function awardMatchXp(client: any, params: AwardMatchXpParams): Pro
   const verdict = resolveDisputedMode(gameSlug, params);
   if (!verdict.eligible) return { awarded: false, reason: verdict.reason };
 
-  // The ledger insert IS the idempotency check. Doing it first means a duplicate
-  // costs one refused write rather than a read followed by a race.
-  const ledger = await client.query(
-    `insert into game_xp_grants (player_id, game_slug, grant_id, track_id, xp, source)
-     values ($1, $2, $3, $4, $5, $6)
-     on conflict (player_id, game_slug, grant_id) do nothing`,
-    [playerId, gameSlug, grantId, trackId, verdict.xp, params.source || "online-match"],
-  );
-  if (ledger.rowCount === 0) return { awarded: false, reason: "already-granted" };
+  return persistXpAward(client, definition, {
+    playerId,
+    gameSlug,
+    grantId,
+    trackId,
+    source: params.source || "online-match",
+    isWin: outcome === "win",
+    stats: params.stats,
+  }, verdict);
+}
 
-  const isWin = outcome === "win" ? 1 : 0;
+export interface AwardCampaignXpParams {
+  playerId: string;
+  gameSlug: string;
+  grantId: string;
+  trackId: string;
+  kind: string;
+  firstClear?: boolean;
+  source?: string;
+}
 
-  await client.query(
-    `insert into game_xp_profiles (player_id, game_slug, xp, matches, updated_at)
-     values ($1, $2, $3, 1, now())
-     on conflict (player_id, game_slug) do update
-       set xp = game_xp_profiles.xp + excluded.xp,
-           matches = game_xp_profiles.matches + 1,
-           updated_at = now()`,
-    [playerId, gameSlug, verdict.xp],
-  );
-
-  // The per-game extras merge in JS rather than SQL because their rules differ
-  // per key. The row is locked by the ledger insert above being in the same
-  // transaction, so read-modify-write is safe here.
-  const existing = await client.query(
-    `select stats from game_xp_tracks where player_id = $1 and game_slug = $2 and track_id = $3 for update`,
-    [playerId, gameSlug, trackId],
-  );
-  const stats = mergeTrackStats(definition, existing.rows[0]?.stats || {}, params.stats || {});
-
-  await client.query(
-    `insert into game_xp_tracks (player_id, game_slug, track_id, xp, matches, wins, stats, updated_at)
-     values ($1, $2, $3, $4, 1, $5, $6, now())
-     on conflict (player_id, game_slug, track_id) do update
-       set xp = game_xp_tracks.xp + excluded.xp,
-           matches = game_xp_tracks.matches + 1,
-           wins = game_xp_tracks.wins + excluded.wins,
-           stats = excluded.stats,
-           updated_at = now()`,
-    [playerId, gameSlug, trackId, verdict.xp, isWin, JSON.stringify(stats)],
-  );
-
-  return { awarded: true, reason: "eligible", xp: verdict.xp, trackId, breakdown: verdict.breakdown };
+export async function awardCampaignXp(client: any, params: AwardCampaignXpParams): Promise<any> {
+  const { playerId, gameSlug, grantId, trackId, kind } = params || ({} as AwardCampaignXpParams);
+  if (!client || !playerId || !gameSlug || !grantId || !trackId) {
+    return { awarded: false, reason: "incomplete-grant" };
+  }
+  const definition = getProgression(gameSlug);
+  if (!definition) return { awarded: false, reason: "game-not-registered" };
+  const verdict = computeCampaignGrant(gameSlug, { kind, firstClear: params.firstClear ?? true });
+  if (!verdict.eligible) return { awarded: false, reason: verdict.reason };
+  return persistXpAward(client, definition, {
+    playerId,
+    gameSlug,
+    grantId,
+    trackId,
+    source: params.source || "campaign-clear",
+    isWin: true,
+    stats: {},
+  }, verdict);
 }
 
 // The player's whole progression document for one cabinet. Public: a mastery

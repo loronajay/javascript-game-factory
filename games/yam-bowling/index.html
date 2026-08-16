@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="styles/base.css" />
     <link rel="stylesheet" href="styles/title.css" />
     <link rel="stylesheet" href="styles/campaign.css" />
+    <link rel="stylesheet" href="styles/profile.css" />
     <link rel="stylesheet" href="styles/setup.css" />
     <link rel="stylesheet" href="styles/online.css" />
     <link rel="stylesheet" href="styles/match.css" />
@@ -35,12 +36,82 @@
           <p class="title-tagline">Pick your bowler. Find the pocket. Feed the competition.</p>
           <div class="title-actions">
             <button class="button button--primary button--xl" id="circuit-button" type="button" data-factory-account-feature>Enter circuit</button>
+            <button class="button button--ghost button--xl" id="profile-button" type="button" data-factory-account-feature>My room</button>
             <button class="button button--ghost button--xl" id="play-button" type="button">Exhibition</button>
             <button class="button button--ghost button--xl" id="online-button" type="button" data-factory-account-feature>Play online</button>
             <button class="button button--ghost" id="how-button" type="button">How to play</button>
             <button class="button button--ghost" id="menu-splash-button" type="button">Menu art</button>
           </div>
           <p class="build-tag">Official circuit · Exhibition · Factory Network</p>
+        </div>
+      </section>
+
+      <section class="screen profile-screen" id="profile-screen" aria-labelledby="profile-name" hidden>
+        <img class="profile-room-art" id="profile-room-art" alt="" decoding="async" />
+        <div class="profile-room-shade"></div>
+        <header class="profile-header">
+          <button class="icon-button" id="profile-back" type="button" aria-label="Back to title">&#8592;</button>
+          <div>
+            <p class="eyebrow">Factory player profile</p>
+            <h2 id="profile-name">Factory Bowler</h2>
+          </div>
+          <span class="profile-sync-status" id="profile-sync-status" aria-live="polite">Loading profile&hellip;</span>
+        </header>
+
+        <div class="profile-room">
+          <section class="profile-hero" aria-label="Featured bowler">
+            <div class="profile-level-medallion">
+              <small>Player level</small>
+              <strong id="profile-player-level">1</strong>
+              <span id="profile-player-xp">0 XP</span>
+            </div>
+            <img class="profile-hero__bowler" id="profile-bowler-art" alt="" />
+            <div class="profile-hero__identity">
+              <p><span id="profile-title">Rookie</span><i></i><span id="profile-badge">Founding Bowler</span></p>
+              <h3 id="profile-bowler-name">Daisy Monroe</h3>
+              <span id="profile-bowler-skin">Classic outfit</span>
+            </div>
+          </section>
+
+          <aside class="profile-dashboard">
+            <section class="profile-card profile-career-card">
+              <div class="profile-card__heading">
+                <div><p class="eyebrow">Career book</p><h3>Your numbers</h3></div>
+                <span id="profile-record">0&ndash;0</span>
+              </div>
+              <dl class="profile-stat-grid" id="profile-career-stats"></dl>
+            </section>
+
+            <section class="profile-card profile-mastery-card">
+              <div class="profile-card__heading">
+                <div><p class="eyebrow">Featured mastery</p><h3 id="profile-mastery-name">Daisy mastery</h3></div>
+                <span>Lv. <b id="profile-mastery-level">1</b></span>
+              </div>
+              <div class="profile-xp-track" aria-hidden="true"><i id="profile-mastery-progress"></i></div>
+              <p class="profile-xp-copy" id="profile-mastery-xp">0 / 200 XP to next level</p>
+              <dl class="profile-bowler-stat-grid" id="profile-bowler-stats"></dl>
+            </section>
+
+            <section class="profile-card profile-customizer" aria-labelledby="profile-customize-title">
+              <div class="profile-card__heading">
+                <div><p class="eyebrow">Display cabinet</p><h3 id="profile-customize-title">Make the room yours</h3></div>
+                <span>Owned only</span>
+              </div>
+              <div class="profile-option-group">
+                <p>Featured bowler</p>
+                <div class="profile-bowler-options" id="profile-bowler-options" role="listbox" aria-label="Choose a featured bowler"></div>
+              </div>
+              <div class="profile-option-group">
+                <p>Display outfit</p>
+                <div class="profile-skin-options" id="profile-skin-options" role="listbox" aria-label="Choose the featured bowler outfit"></div>
+              </div>
+              <div class="profile-option-group">
+                <p>Player room</p>
+                <div class="profile-room-options" id="profile-room-options" role="listbox" aria-label="Choose an unlocked player room"></div>
+              </div>
+              <button class="button button--primary button--wide" id="profile-save" type="button">Save profile display</button>
+            </section>
+          </aside>
         </div>
       </section>
 

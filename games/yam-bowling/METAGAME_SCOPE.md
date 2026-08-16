@@ -152,7 +152,7 @@ it. These slots exist and are tested but have no player-facing control yet,
 because the content that would fill them belongs to later milestones:
 
 - [ ] A loadout screen for the victory/defeat pose, player card, and profile art slots (milestone 5's unlock tree is their natural home).
-- [ ] Featured Bowler / Featured Skin selection UI (milestone 6 owns the profile that displays them).
+- [x] Featured Bowler / Featured Skin selection UI (milestone 6 owns the profile that displays them).
 - [ ] Ball trail and strike burst equipping become visible when milestone 3 renders them.
 
 ## Milestone 3 — Equippable visual effects
@@ -301,8 +301,6 @@ clears it.
       reload and a lost response self-heals, but a request that never landed waits
       for the next match to be noticed.
 - [ ] Abuse telemetry, before any streak, sportsmanship, or uncapped bonus.
-- [ ] A campaign grant path (milestone 7), which reuses the same ledger under its
-      own `source` value.
 
 Not yet browser-verified end to end: that needs `factory-network-server`, the API,
 and two signed-in clients running together.
@@ -347,12 +345,56 @@ Suggested cadence to validate in a prototype:
 
 ### Yam-specific profile layer
 
-- [ ] Extend the existing Factory identity/profile model rather than replacing it.
-- [ ] Add Player Level, rank/ELO, wins/losses, high game, strikes, spare rate, and character mastery summary.
-- [ ] Add Featured Bowler, Featured Skin, Profile Background, Profile Frame, Title, and Badges.
-- [ ] Make the featured bowler the visual centerpiece, occupying roughly 30–40% of the profile composition on desktop.
-- [ ] Define stat denominators and eligible modes so numbers cannot mix practice/local games with progression records.
-- [ ] Provide safe fallback presentation for old profiles and unavailable cosmetics.
+- [x] Extend the existing Factory identity/profile model rather than replacing it.
+- [x] Add Player Level, wins/losses, high game, strikes, and character mastery summary.
+- [ ] Add rank/ELO and spare rate after those records have one authoritative source and denominator.
+- [x] Add Featured Bowler, Featured Skin, Title, and Badge presentation.
+- [ ] Add authored Profile Background and Profile Frame rewards and their editor controls.
+- [x] Make the featured bowler the visual centerpiece, occupying roughly 30–40% of the profile composition on desktop.
+- [x] Keep profile statistics on progression-eligible online/campaign tracks so practice and local exhibition cannot inflate them.
+- [x] Provide safe fallback presentation for old profiles and unavailable cosmetics.
+
+### Shipped: profile/loadout backend foundation
+
+Yam is registered with the platform's generic `game_loadouts` storage rather
+than creating a second identity or profile table. The server catalog validates
+the complete presentation document against the current entitlement set on both
+write and read. Founding items remain available, unknown or cross-bowler slot
+values are stripped, revoked selections fall back safely, and the client cannot
+persist its own `granted` ownership ledger.
+
+The public loadout is deliberately narrower than the owner's document. It
+exposes Featured Bowler + Featured Skin, room, title, badge, profile frame, and
+profile background—the presentation another player may inspect—without exposing
+the owner's saved per-bowler equipment collection. Player level and bowler stats
+remain in the public progression document and are composed with this presentation
+layer by the profile room.
+
+### Shipped: first usable player room
+
+The signed-in title menu now opens a responsive `My room` screen. It puts the
+featured bowler and selected skin over the equipped room art, displays Player
+Level, eligible career totals, and that bowler's mastery, and offers only owned
+bowlers, founding skins, and entitled rooms in its editor. Saves replace the
+private server garage and immediately reapply the server-sanitized answer. Boot,
+profile-open, and circuit-clear syncs all replace client ownership with the
+current entitlement set; local grants and stale campaign caches cannot add a
+choice to an authenticated profile.
+
+The stats shown in this first pass are the records the XP tracks already own:
+matches, wins/losses, strikes, and high game. Rank/ELO and spare rate stay absent
+until the backend gives each one a single trustworthy definition. The starter
+room is currently the only ordinary owned room because campaign room reward
+cadence remains intentionally undecided.
+
+### Next recommended profile slice
+
+Build read-only public profile inspection by player id, composing the existing
+public loadout and public progression endpoints without exposing the private
+garage. Link that view from online opponent presentation, then reuse its compact
+identity card for Match Found. Keep rank/ELO and spare rate out of the card until
+their authoritative records are joined; keep room rewards out of claims until a
+campaign cadence has been approved.
 
 ### Per-character history
 
@@ -371,20 +413,21 @@ Suggested cadence to validate in a prototype:
 
 - [x] Scope a bowling circuit: Local Alley → City League → Regional → Nationals → Yam Championship.
 - [x] Define named CPU rivals and first-clear IDs before authoring rewards.
-- [ ] Award Player XP + active Bowler XP on first clear only, with a small or zero replay reward.
+- [x] Award Player XP + active Bowler XP on first clear only, with a small or zero replay reward.
 - [x] Keep ordinary Vs CPU as zero-XP practice.
 - [ ] Add campaign-only cosmetics/titles without creating gameplay advantages.
 
 `campaign-core.js` ships the five divisions, their sanctioned matches, the rival each
-unlocks and the per-match achievement. Two things are built but not yet joined:
-`progression-core.js` already computes campaign grants (`encounter`/`boss`,
-first-clear only, replay refused) and the `game_xp_grants` ledger already accepts a
-`source` other than `online-match`, but nothing calls that path yet — a circuit
-clear currently awards a bowler and no XP.
+unlocks and the per-match achievement. A successful server claim now joins that
+clear to the existing XP transaction: ordinary encounters award 300 Player XP
+and active Bowler XP, promotion matches award 600, and the circuit claim id is
+also the idempotent XP grant id. The claim carries the bowler actually used, but
+the server accepts it only when that bowler was a starter or already owned before
+the clear; a client cannot redirect mastery XP into a locked bowler.
 
 Player rooms are the first campaign-sourced cosmetics, catalogued and gated but not
-yet grantable: circuit unlocks are device-local, so the grant that would award a
-room has nowhere authoritative to land until the entitlement validator exists.
+yet grantable. The authoritative loadout validator now exists, but the room reward
+cadence still needs to be designed before any circuit claim may award one.
 
 ### Achievements
 

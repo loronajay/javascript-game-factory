@@ -34,10 +34,23 @@ const CIRCUIT_UNLOCKS = Object.freeze([
   ["championship-reina-sato", "reina-sato"],
 ] as const);
 
+const STARTER_BOWLER_SLUGS = new Set([
+  "daisy-monroe",
+  "nia-brooks",
+  "tessa-quinn",
+  "zuri-banks",
+  "amara-reed",
+]);
+const ALL_BOWLER_SLUGS = new Set([
+  ...STARTER_BOWLER_SLUGS,
+  ...CIRCUIT_UNLOCKS.map(([, bowlerSlug]) => bowlerSlug),
+]);
+
 type CircuitUnlock = Readonly<{
   matchId: string;
   bowlerSlug: string;
   previousMatchId: string | null;
+  isPromotionMatch: boolean;
 }>;
 
 const CIRCUIT_BY_MATCH_ID = new Map<string, CircuitUnlock>(CIRCUIT_UNLOCKS.map(([matchId, bowlerSlug], index) => [
@@ -46,6 +59,7 @@ const CIRCUIT_BY_MATCH_ID = new Map<string, CircuitUnlock>(CIRCUIT_UNLOCKS.map((
     matchId,
     bowlerSlug,
     previousMatchId: index > 0 ? CIRCUIT_UNLOCKS[index - 1][0] : null,
+    isPromotionMatch: (index + 1) % 5 === 0,
   }),
 ]));
 
@@ -64,8 +78,10 @@ export function validateYamBowlingPublicClaim(params: any = {}): any {
     ? params.payload
     : {};
   const matchId = cleanText(input.matchId || params.sourceId);
+  const activeBowlerSlug = cleanText(input.activeBowlerSlug, 80);
   const match = CIRCUIT_BY_MATCH_ID.get(matchId);
-  if (!match || cleanText(params.claimId) !== `${YAM_BOWLING_CIRCUIT_CLAIM_KIND}:${matchId}`) return rejected();
+  if (!match || !ALL_BOWLER_SLUGS.has(activeBowlerSlug)
+    || cleanText(params.claimId) !== `${YAM_BOWLING_CIRCUIT_CLAIM_KIND}:${matchId}`) return rejected();
 
   const entitlementId = `bowler:${match.bowlerSlug}`;
   return {
@@ -79,10 +95,16 @@ export function validateYamBowlingPublicClaim(params: any = {}): any {
       achievementId: `beat-${match.bowlerSlug}`,
       unlockedBowlerSlug: match.bowlerSlug,
       entitlementId,
+      activeBowlerSlug,
     },
     entitlementGrants: [{ entitlementId, kind: "bowler" }],
     campaignProgress: { missionId: matchId, stars: 1 },
+    campaignXp: { trackId: activeBowlerSlug, kind: match.isPromotionMatch ? "boss" : "encounter" },
   };
+}
+
+export function isYamBowlingStarterBowler(value: unknown): boolean {
+  return typeof value === "string" && STARTER_BOWLER_SLUGS.has(value);
 }
 
 export function getYamBowlingCircuitUnlockCatalog(): readonly (readonly [string, string])[] {

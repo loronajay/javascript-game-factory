@@ -10,6 +10,8 @@ import {
   validatePublicGameClaim,
 } from "../services/game-progress-claim-catalog.mjs";
 import { getValorOffer, priceValorOffer } from "../services/valor-catalog.mjs";
+import { awardCampaignXp, getGameXpProgress } from "./game-xp.mjs";
+import { isYamBowlingStarterBowler } from "../services/yam-bowling-reward-catalog.mjs";
 
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
 
@@ -391,6 +393,17 @@ export async function recordGameProgressClaim(pool: any, params: any = {}): Prom
       await client.query("rollback");
       return { ok: false, statusCode: 409, error: "claim_prerequisite_missing" };
     }
+    if (publicClaim?.campaignXp && !isYamBowlingStarterBowler(publicClaim.campaignXp.trackId)) {
+      const ownedBowler = await playerHasGameEntitlement(client, {
+        playerId,
+        gameSlug,
+        entitlementId: `bowler:${publicClaim.campaignXp.trackId}`,
+      });
+      if (!ownedBowler) {
+        await client.query("rollback");
+        return { ok: false, statusCode: 409, error: "active_bowler_not_owned" };
+      }
+    }
     const claim = await client.query(
       `insert into game_progress_claims (player_id, game_slug, claim_id, kind, source_id, payload)
        values ($1, $2, $3, $4, $5, $6::jsonb)
@@ -417,6 +430,20 @@ export async function recordGameProgressClaim(pool: any, params: any = {}): Prom
             : null,
         },
       );
+    }
+    if (!alreadyProcessed && publicClaim?.campaignXp) {
+      const xpAward = await awardCampaignXp(client, {
+        playerId,
+        gameSlug,
+        grantId: claimId,
+        trackId: publicClaim.campaignXp.trackId,
+        kind: publicClaim.campaignXp.kind,
+        firstClear: true,
+        source: "campaign-clear",
+      });
+      if (!xpAward.awarded && xpAward.reason !== "already-granted") {
+        throw new Error(`campaign XP refused: ${xpAward.reason}`);
+      }
     }
     if (!alreadyProcessed && kind === "campaign-valor") {
       const amount = await campaignValorAmountWithServerBoosts(client, playerId, gameSlug, publicClaim.valorBase);
@@ -493,10 +520,14 @@ export async function recordGameProgressClaim(pool: any, params: any = {}): Prom
     }
 
     await client.query("commit");
+    const progression = publicClaim?.campaignXp
+      ? await getGameXpProgress(pool, playerId, gameSlug)
+      : undefined;
     return {
       ok: true,
       alreadyProcessed,
       progress: await getGameProgress(pool, playerId, gameSlug),
+      ...(progression ? { progression } : {}),
     };
   } catch (err) {
     await client.query("rollback").catch(() => {});
