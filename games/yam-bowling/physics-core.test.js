@@ -126,6 +126,20 @@ describe("lane physics primitives", () => {
     assert.ok(trajectoryX(0.86, shot) < 0.02, "the hook should bring it back to the head-pin pocket");
   });
 
+  test("opens the pocket entry angle without moving an established target", () => {
+    const shot = { position: 0.3, aim: -0.12, hook: -1, hookScale: 1, power: 0.78 };
+    const establishedTarget = -0.004853659947148564;
+
+    assert.ok(
+      Math.abs(trajectoryX(0.86, shot) - establishedTarget) < 1e-12,
+      "retuning the shape should not move the existing head-pin target",
+    );
+    assert.ok(
+      trajectoryDerivative(0.86, shot) < -1.6,
+      "the same target should now be reachable on a meaningfully steeper inward angle",
+    );
+  });
+
   test("applies only a small progressive release nudge", () => {
     const base = { position: 0.12, aim: 0, hook: 0, release: 0 };
     const nudged = { ...base, release: -0.03 };

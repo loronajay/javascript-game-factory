@@ -28,6 +28,7 @@
   const MIN_BALL_SPEED = 0.32;
   const MAX_BALL_SPEED = 0.95;
   const SPIN_SWEEP_SECONDS = 1.4;
+  const HOOK_CURVE_EXPONENT = 2.5;
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -106,10 +107,16 @@
     if (z <= breakpoint) return { progress: 0, slope: 0, curvature: 0 };
     const remainingLane = 1 - breakpoint;
     const progress = clamp((z - breakpoint) / remainingLane, 0, 1.15);
+    // Shape the same lateral move into a later bite. Anchoring the curve at the
+    // head pin keeps every established aim target in place, while the higher
+    // exponent gives hook shots a steeper and more varied pocket-entry angle.
+    const rackProgress = (RACK_FRONT_Z - breakpoint) / remainingLane;
+    const targetScale = Math.pow(rackProgress, 2 - HOOK_CURVE_EXPONENT);
     return {
-      progress: progress * progress,
-      slope: 2 * progress / remainingLane,
-      curvature: 2 / (remainingLane * remainingLane),
+      progress: targetScale * Math.pow(progress, HOOK_CURVE_EXPONENT),
+      slope: targetScale * HOOK_CURVE_EXPONENT * Math.pow(progress, HOOK_CURVE_EXPONENT - 1) / remainingLane,
+      curvature: targetScale * HOOK_CURVE_EXPONENT * (HOOK_CURVE_EXPONENT - 1)
+        * Math.pow(progress, HOOK_CURVE_EXPONENT - 2) / (remainingLane * remainingLane),
     };
   }
 
