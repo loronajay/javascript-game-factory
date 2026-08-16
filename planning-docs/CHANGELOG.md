@@ -24,7 +24,19 @@ The account-deletion guard caught the new tables before they shipped, which is w
 
 The economy table is a twin: the same numbers live in the cabinet (so it can describe a pending grant offline) and in the catalog (which is authoritative). They are deliberately not imported across the project boundary, so both suites assert the table explicitly and a half-applied retune fails loudly in the file that was not edited.
 
-656 API tests (+39), 233 cabinet tests (+40). Not yet wired: the results screen still reports only its rating, so no XP is being earned in the live game until that slice lands.
+**The cabinet now reports.** `online/progression-reporter.mjs` builds the block a finished online match carries and opens no connection of its own — it rides the existing rating report, so one request, one session id, one thing for a dropped connection to lose. Strikes are counted off the scorecard (a roll of ten can only happen off a full rack, so counting tens counts strikes exactly, tenth-frame bonus balls included), and a disconnect forfeit is read from the server's own `result.reason` rather than guessed: the leaver earns nothing, the player left standing files a forfeit rather than a win.
+
+The pending state is honest by construction. Preparing a report queues the grant *before* the call, and only an accepted response settles it — a network failure is not a ruling. Until then the results screen says the XP has not synced instead of showing a total the server never agreed to. A lost *response* self-heals, because the next sync finds the grant in the server's own list and clears it; a request that never landed is still outstanding, which is the one gap left.
+
+**Player rooms, the first cosmetic that ships locked.** `room-core.js` catalogues the thirteen backdrops of a bowler's own space, and it is the proof the milestone-2 contract works: a `room` reward type, a global loadout slot, and an ownership gate, with no change to any existing item, slot, or call site. Only the starter room is `founding`; the other twelve are `campaign` or `achievement`.
+
+That split is only honest because rooms are *new*. Retro-fitting a lock onto content players already chose takes something away from them, which is why the nine lanes stay unlocked and why the same question had blocked them — a brand-new cosmetic has no such debt. Rooms also own no persistence and carry no legacy key: lanes and menu splashes each keep one because they predate the loadout, but the loadout has been the room's only owner from the first line. `asset-budget.test.js` now enumerates rooms too (799 -> 812 images, +1.96 MB against a 56 MB budget), so a half-processed room cannot ship.
+
+**The circuit's first slice.** `campaign-core.js` and `ui/circuit-screen.mjs` add five divisions — Local Alley, City League, Regional Series, National Tour, Yam Championship — where each sanctioned match is a named rival at a named house, and beating one adds that bowler to the playable roster. Five starters, an achievement per match, and a promotion match closing each division at regulation length.
+
+**Unlocks now have two owners, deliberately.** The campaign owns which *bowlers* are earned; the loadout owns every *cosmetic* owned and worn. The seam is asserted in both directions — `campaign-ui.test.js` forbids campaign-core from naming a skin, room, trail or burst, and `project-structure.test.js` forbids rooms from reaching for campaign-core. The consequence to keep in view: circuit unlocks live in device-local storage rather than in a server-backed grant ledger, so a bowler earned on one device is not yet earned on another. Making that authoritative is the same work as making cosmetics authoritative, and both wait on turning `validateTacticalArenaPublicClaim` into a per-game entitlement validator.
+
+656 API tests (+39), 278 cabinet tests (+85), 73 shared-frontend. Not browser-verified end to end — that needs `factory-network-server`, the API, and two signed-in clients running together.
 
 ## Speed Demon Personal Bests + the Platform's Second Rating Source (2026-08-08)
 

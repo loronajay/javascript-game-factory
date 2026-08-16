@@ -119,9 +119,18 @@ Milestones 0–3 are the easy-win track. Milestones 4–7 require cross-reposito
   - [x] Strike burst
   - [x] Profile title
   - [x] Badge
+  - [x] Player room
 - [x] Each item declares display name, reward type, character/global ownership, asset references, rarity/presentation tier, and unlock source.
 - [x] Separate item ownership from item equipment.
 - [x] Treat existing Classic/Swimsuit/Maid Café content and existing menu splashes as migration inputs, not hard-coded exceptions.
+
+Player rooms (`room-core.js`) are the eleventh reward type and the first added
+after this scope was written. They are the proof the contract works: because they
+are **new** content, they ship mostly **locked** without taking anything from
+anyone — the starter room is the only `founding` entry and the other twelve are
+`campaign` or `achievement`. Retro-fitting locks onto content that already shipped
+is the case this cabinet still refuses. Rooms also own no persistence and carry no
+legacy key: the loadout has been their only owner from the first line.
 
 ### Presentation loadout
 
@@ -220,7 +229,7 @@ These numbers are starting values for playtesting, not immutable economy promise
 
 - [x] Unit tests cover eligibility, level boundaries, duplicate grants, forfeits, reconnects, and every mode family.
 - [x] Integration tests prove the same match cannot grant twice across retry/reconnect.
-- [ ] The client can display a pending/retry state without inventing a balance.
+- [x] The client can display a pending/retry state without inventing a balance.
 - [x] Existing wins/losses/ELO remain intact.
 
 ### Shipped: the progression domain
@@ -270,13 +279,33 @@ does. Closing that needs `factory-network-server` to attest results over a share
 secret — a scoped upgrade this schema does not have to change for, since the
 attester would write these same rows under the same grant ids.
 
+### Shipped: the cabinet reports
+
+`online/progression-reporter.mjs` builds the block a finished online match
+carries. It opens no connection of its own — the block rides the existing rating
+report, so one request, one session id, and one thing for a dropped connection to
+lose. Strikes are counted from the scorecard, and a disconnect forfeit is read
+from the server's own `result.reason`, so the leaver earns nothing and the player
+left standing files a forfeit rather than a win.
+
+The pending/retry state is honest by construction. Preparing a report queues the
+grant *before* the network call; only an accepted response settles it, because a
+network failure is not a ruling. Until then the results screen says the XP has not
+synced rather than showing a total the server has not agreed to. A lost *response*
+recovers on its own: the next sync sees the grant in the server's own list and
+clears it.
+
 ### Still to come
 
-- [ ] Wire the cabinet's results screen to report its progression block and read
-      the snapshot back, with a pending/retry indicator.
+- [ ] Re-send a grant whose request never reached the server. The queue survives a
+      reload and a lost response self-heals, but a request that never landed waits
+      for the next match to be noticed.
 - [ ] Abuse telemetry, before any streak, sportsmanship, or uncapped bonus.
 - [ ] A campaign grant path (milestone 7), which reuses the same ledger under its
       own `source` value.
+
+Not yet browser-verified end to end: that needs `factory-network-server`, the API,
+and two signed-in clients running together.
 
 ## Milestone 5 — Bowler unlock tree and progression UI
 
@@ -340,11 +369,22 @@ Suggested cadence to validate in a prototype:
 
 ### Lightweight campaign
 
-- [ ] Scope a bowling circuit: Local Alley → City League → Regional → Nationals → Yam Championship.
-- [ ] Define named CPU rivals and first-clear IDs before authoring rewards.
+- [x] Scope a bowling circuit: Local Alley → City League → Regional → Nationals → Yam Championship.
+- [x] Define named CPU rivals and first-clear IDs before authoring rewards.
 - [ ] Award Player XP + active Bowler XP on first clear only, with a small or zero replay reward.
-- [ ] Keep ordinary Vs CPU as zero-XP practice.
+- [x] Keep ordinary Vs CPU as zero-XP practice.
 - [ ] Add campaign-only cosmetics/titles without creating gameplay advantages.
+
+`campaign-core.js` ships the five divisions, their sanctioned matches, the rival each
+unlocks and the per-match achievement. Two things are built but not yet joined:
+`progression-core.js` already computes campaign grants (`encounter`/`boss`,
+first-clear only, replay refused) and the `game_xp_grants` ledger already accepts a
+`source` other than `online-match`, but nothing calls that path yet — a circuit
+clear currently awards a bowler and no XP.
+
+Player rooms are the first campaign-sourced cosmetics, catalogued and gated but not
+yet grantable: circuit unlocks are device-local, so the grant that would award a
+room has nowhere authoritative to land until the entitlement validator exists.
 
 ### Achievements
 

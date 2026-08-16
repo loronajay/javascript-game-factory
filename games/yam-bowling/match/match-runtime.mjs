@@ -87,20 +87,26 @@ export function createMatchRuntime({
 
   function createPlayers() {
     const { setup } = session;
+    const campaignOpponent = session.campaignMatch
+      ? assets.bowlerBySlug(session.campaignMatch.opponentSlug)
+      : null;
+    const campaignPlayer = session.campaignMatch
+      ? assets.bowlerBySlug(setup.characterSlugs[0])
+      : null;
     return [
       {
         id: "p1",
-        name: "Player 1",
+        name: campaignPlayer?.name || "Player 1",
         characterSlug: setup.characterSlugs[0],
         skinId: setup.skinIds[0],
         type: "human",
       },
       {
         id: "p2",
-        name: setup.playType === "cpu" ? core.chooseCpuName() : "Player 2",
+        name: campaignOpponent?.name || (setup.playType === "cpu" ? core.chooseCpuName() : "Player 2"),
         characterSlug: setup.characterSlugs[1],
         skinId: setup.skinIds[1],
-        type: setup.playType === "cpu" ? "cpu" : "human",
+        type: session.campaignMatch || setup.playType === "cpu" ? "cpu" : "human",
       },
     ];
   }
@@ -123,7 +129,7 @@ export function createMatchRuntime({
   }
 
   function startMatch() {
-    applyMatchLane(getLocalLaneSlug());
+    applyMatchLane(session.campaignMatch?.venueSlug || getLocalLaneSlug());
     session.onlineMatch = false;
     session.onlineSnapshot = null;
     session.pendingAuthoritativeRoll = null;
@@ -131,7 +137,7 @@ export function createMatchRuntime({
     session.reportedRatingSessionId = "";
     session.match = core.createMatch({
       modeId: session.setup.modeId,
-      playType: session.setup.playType,
+      playType: session.campaignMatch ? "campaign" : session.setup.playType,
       cpuLevelId: session.setup.cpuLevelId,
       players: createPlayers(),
     });
@@ -141,6 +147,7 @@ export function createMatchRuntime({
     shotHud.resetSpinFeedback();
     $("pause-overlay").hidden = true;
     $("restart-match-button").hidden = false;
+    $("quit-match-button").textContent = session.campaignMatch ? "Quit to circuit" : "Quit to setup";
     $("online-result-status").hidden = true;
     audio.resumeMusic();
     resetHumanShot();

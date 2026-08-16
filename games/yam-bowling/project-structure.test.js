@@ -209,6 +209,33 @@ test("equippable effects are render-only and cannot reach gameplay", () => {
   assert.match(readCode("game.js"), /prefers-reduced-motion/);
 });
 
+test("player rooms are unlockable content the loadout alone equips", () => {
+  const html = read("index.html");
+  const rooms = readCode("room-core.js");
+
+  // The catalog is built from the room list, so rooms load before it.
+  assert.ok(html.indexOf("room-core.js") < html.indexOf("cosmetics-core.js"));
+  assert.ok(html.indexOf("cosmetics-core.js") < html.indexOf("loadout-core.js"));
+  assert.ok(JSON.parse(read("runtime-assets.json")).include.includes("room-core.js"));
+
+  // Rooms are the first cosmetic to ship after progression, so unlike lanes and
+  // splashes they own no persistence and carry no legacy key: the loadout has
+  // been their only owner from the first line.
+  assert.doesNotMatch(rooms, /localStorage|\.setItem\(|\.getItem\(|STORAGE_KEY/);
+  assert.match(readCode("loadout-core.js"), /getRoomSlug/);
+  assert.match(readCode("loadout-core.js"), /setRoomSlug/);
+
+  // Nothing else may name a room's image file: the path is derived from the slug
+  // so a new room is one catalog row plus one processed PNG.
+  assert.match(rooms, /assets\/menu-splashes\/player-rooms\/\$\{slug\}\.webp/);
+  for (const file of ["cosmetics-core.js", "loadout-core.js", "index.html"]) {
+    assert.doesNotMatch(read(file), /player-rooms\//, `${file} must not name a room asset path`);
+  }
+
+  // Campaign owns circuit unlocks; a room is loadout content it must not absorb.
+  assert.doesNotMatch(readCode("room-core.js"), /campaign-core|CampaignCore/);
+});
+
 test("progression is the one owner of XP, and the client never awards itself any", () => {
   const html = read("index.html");
   const code = readCode("progression-core.js");
@@ -240,6 +267,28 @@ test("progression is the one owner of XP, and the client never awards itself any
   assert.match(store, /function applySnapshot/);
   const pendingFunction = store.slice(store.indexOf("function recordPending"), store.indexOf("function listPending"));
   assert.doesNotMatch(pendingFunction, /record\.player|record\.bowlers/, "queuing a grant must not move a balance");
+});
+
+test("XP and the rating are reported together, through one call site", () => {
+  const reporter = readCode("online/progression-reporter.mjs");
+  const onlineSession = readCode("online/online-session.mjs");
+
+  // One request carries both, under one session id, so a dropped connection has
+  // one thing to lose rather than two that can disagree.
+  assert.match(onlineSession, /updateGameRating\([^)]*"yam-bowling"/);
+  assert.match(onlineSession, /progression: prepared\?\.block/);
+  assert.doesNotMatch(reporter, /updateGameRating|fetch\(/, "the reporter must not open a second report path");
+
+  // The block describes what was played. An XP amount on the wire would be the
+  // client declaring its own economy, which is the one thing this milestone exists
+  // to prevent.
+  const block = reporter.slice(reporter.indexOf("block: {"), reporter.indexOf("function settle"));
+  assert.notEqual(block, "", "the reporter should own the report block");
+  assert.doesNotMatch(block, /\bxp\b|playerXp|bowlerXp|\blevel\b/i);
+
+  // The reporter reads the loadout's neighbours but must never equip anything:
+  // earning a level and wearing a reward are different milestones.
+  assert.doesNotMatch(reporter, /equipSkin|equipBowlerSlot|equipGlobalSlot|grant\(/);
 });
 
 test("no surface shows a price or an unlock claim before ownership is authoritative", () => {
@@ -404,8 +453,8 @@ test("online matches bowl on the lane the server dealt, not the local pick", () 
       online.indexOf("session.match = structuredClone(snapshot.match)"),
     "an online match should take its lane from the served roll before the scene builds",
   );
-  assert.match(runtime, /function startMatch\(\) \{\s*applyMatchLane\(getLocalLaneSlug\(\)\);/,
-    "a local match should return to the player's own saved lane");
+  assert.match(runtime, /function startMatch\(\) \{\s*applyMatchLane\(session\.campaignMatch\?\.venueSlug \|\| getLocalLaneSlug\(\)\);/,
+    "a sanctioned match should use its declared venue and an exhibition should return to the saved lane");
   assert.doesNotMatch(onlineSession, /onlineSetup\.lane|laneSlug:/,
     "a local lane preference must never be published to an online room");
   assert.doesNotMatch(readCode("game.js"), /renderer\.ready.*renderer\.setLane/,

@@ -7,8 +7,11 @@
   "use strict";
 
   const LEVELS = Object.freeze({
+    rookie: Object.freeze({ poolSize: 14, positionError: 0.07, aimError: 0.14, hookError: 0.48, powerError: 0.24, releaseError: 0.034 }),
     casual: Object.freeze({ poolSize: 8, positionError: 0.03, aimError: 0.06, hookError: 0.22, powerError: 0.12, releaseError: 0.018 }),
+    competitive: Object.freeze({ poolSize: 4, positionError: 0.015, aimError: 0.028, hookError: 0.1, powerError: 0.052, releaseError: 0.008 }),
     pro: Object.freeze({ poolSize: 1, positionError: 0.006, aimError: 0.01, hookError: 0.035, powerError: 0.02, releaseError: 0.003 }),
+    champion: Object.freeze({ poolSize: 1, positionError: 0.002, aimError: 0.0035, hookError: 0.012, powerError: 0.007, releaseError: 0.001 }),
   });
   const SEARCH_BALL_INDICES = Object.freeze([0, 2, 5, 7]);
   const SEARCH_POSITIONS = Object.freeze([-0.24, 0.24]);

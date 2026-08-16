@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const animation = require("./animation-core.js");
 const menuSplashCore = require("./menu-splash-core.js");
 const cosmetics = require("./cosmetics-core.js");
+const roomCore = require("./room-core.js");
 const loadoutCore = require("./loadout-core.js");
 
 const {
@@ -165,7 +166,7 @@ test("slot names cover the reward types the loadout is responsible for", () => {
     "skin", "victoryPose", "defeatPose", "playerCard", "menuSplash", "profileArt",
   ]);
   assert.deepEqual(Object.keys(GLOBAL_SLOTS), [
-    "ballTrail", "strikeBurst", "title", "badge", "menuSplash", "profileFrame", "profileBackground",
+    "ballTrail", "strikeBurst", "title", "badge", "menuSplash", "room", "profileFrame", "profileBackground",
   ]);
 
   for (const slot of [...Object.values(BOWLER_SLOTS), ...Object.values(GLOBAL_SLOTS)]) {
@@ -183,4 +184,66 @@ test("unavailable storage still yields a usable session loadout", () => {
   assert.equal(store.getEquippedSkinId("reina-sato"), animation.DEFAULT_SKIN_ID);
   assert.equal(store.equipSkin("reina-sato", "maid"), "maid");
   assert.equal(store.getEquippedSkinId("reina-sato"), "maid");
+});
+
+// --------------------------------------------------------------- player rooms
+
+test("a new device starts in the starter room and owns no other", () => {
+  const store = storeWith();
+
+  assert.equal(store.getRoomSlug(), roomCore.DEFAULT_ROOM_SLUG);
+  assert.equal(store.getGlobalSlot("room"), cosmetics.buildItemId("room", roomCore.DEFAULT_ROOM_SLUG));
+  assert.deepEqual(store.listOwned("room").map((item) => item.id), [
+    cosmetics.buildItemId("room", roomCore.DEFAULT_ROOM_SLUG),
+  ]);
+});
+
+test("a locked room cannot be equipped, and the attempt leaves the starter room in place", () => {
+  const store = storeWith();
+  assert.equal(store.setRoomSlug("champion-room"), roomCore.DEFAULT_ROOM_SLUG);
+  assert.equal(store.getRoomSlug(), roomCore.DEFAULT_ROOM_SLUG);
+});
+
+test("a granted room equips and persists, which is the whole point of the ledger", () => {
+  const storage = memoryStorage();
+  const first = createLoadoutStore({ storage });
+
+  assert.equal(first.grant(cosmetics.buildItemId("room", "teal-lounge")), true);
+  assert.equal(first.setRoomSlug("teal-lounge"), "teal-lounge");
+
+  const second = createLoadoutStore({ storage });
+  assert.equal(second.getRoomSlug(), "teal-lounge");
+  assert.equal(second.owns(cosmetics.buildItemId("room", "champion-room")), false);
+});
+
+test("a room the player stops owning falls back rather than leaving them nowhere", () => {
+  const store = storeWith({
+    [LOADOUT_STORAGE_KEY]: JSON.stringify({
+      version: SCHEMA_VERSION,
+      bowlers: {},
+      global: { room: cosmetics.buildItemId("room", "champion-room") },
+      featured: { bowlerSlug: null, skinId: "canon" },
+      granted: [],
+    }),
+  });
+  assert.equal(store.getRoomSlug(), roomCore.DEFAULT_ROOM_SLUG);
+});
+
+test("an unknown room slug normalizes back to the starter room", () => {
+  const store = storeWith();
+  assert.equal(store.setRoomSlug("not-a-room"), roomCore.DEFAULT_ROOM_SLUG);
+});
+
+test("the dev entitlement opens every room for authoring without granting one", () => {
+  const storage = memoryStorage();
+  const store = createLoadoutStore({ storage });
+  store.setDevEntitlement(true);
+
+  assert.equal(store.listOwned("room").length, roomCore.ROOMS.length);
+  assert.equal(store.setRoomSlug("champion-room"), "champion-room");
+
+  // The ledger stays clean: a local experiment must never become a balance the
+  // server has to reconcile.
+  const stored = JSON.parse(storage.getItem(LOADOUT_STORAGE_KEY));
+  assert.deepEqual(stored.granted, []);
 });

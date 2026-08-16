@@ -4,10 +4,11 @@
   const animation = isCommonJs ? require("./animation-core.js") : root.YamBowlingCore;
   const menuSplash = isCommonJs ? require("./menu-splash-core.js") : root.YamMenuSplash;
   const cosmetics = isCommonJs ? require("./cosmetics-core.js") : root.YamCosmetics;
-  const api = factory(root, animation, menuSplash, cosmetics);
+  const roomCore = isCommonJs ? require("./room-core.js") : root.YamRoomCore;
+  const api = factory(root, animation, menuSplash, cosmetics, roomCore);
   if (isCommonJs) module.exports = api;
   root.YamLoadout = api;
-})(typeof globalThis !== "undefined" ? globalThis : this, function createLoadoutCore(root, animation, menuSplash, cosmetics) {
+})(typeof globalThis !== "undefined" ? globalThis : this, function createLoadoutCore(root, animation, menuSplash, cosmetics, roomCore) {
   "use strict";
 
   // The presentation loadout: what this device has, and what it has equipped.
@@ -51,6 +52,9 @@
     badge: Object.freeze({ type: "badge", defaultId: "badge:founding-bowler" }),
     // The title-screen splash: the one global cosmetic that already shipped.
     menuSplash: Object.freeze({ type: "menu-splash", defaultId: null }),
+    // The player's own room. New content, so unlike every slot above it has no
+    // legacy key to migrate -- this has been its only owner from the first line.
+    room: Object.freeze({ type: "room", defaultId: null }),
     // Profile decoration reuses character profile art, so a featured bowler
     // can frame and back their own page without new asset types.
     profileFrame: Object.freeze({ type: "profile-art", defaultId: null }),
@@ -75,6 +79,9 @@
     if (slot.defaultId) return slot.defaultId;
     if (slotName === "menuSplash") {
       return cosmetics.buildItemId("menu-splash", menuSplash.DEFAULT_MENU_SPLASH_SLUG);
+    }
+    if (slotName === "room") {
+      return cosmetics.buildItemId("room", roomCore.DEFAULT_ROOM_SLUG);
     }
     return null;
   }
@@ -271,6 +278,19 @@
       return getMenuSplashSlug();
     }
 
+    // Room accessors mirror the splash pair: callers deal in slugs, and the item
+    // id stays an implementation detail of the loadout.
+    function getRoomSlug() {
+      const itemId = getGlobalSlot("room");
+      return roomCore.getRoom(itemId?.split(":")[1]).slug;
+    }
+
+    function setRoomSlug(slug) {
+      const normalizedSlug = roomCore.getRoom(slug).slug;
+      equipGlobalSlot("room", cosmetics.buildItemId("room", normalizedSlug));
+      return getRoomSlug();
+    }
+
     function getFeatured() {
       return { ...record.featured };
     }
@@ -319,6 +339,7 @@
       getFeatured,
       getGlobalSlot,
       getMenuSplashSlug,
+      getRoomSlug,
       grant,
       hasDevEntitlement,
       listOwned,
@@ -326,6 +347,7 @@
       setDevEntitlement,
       setFeatured,
       setMenuSplashSlug,
+      setRoomSlug,
     };
   }
 

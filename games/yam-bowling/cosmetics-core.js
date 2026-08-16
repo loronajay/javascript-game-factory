@@ -3,10 +3,11 @@
   const isCommonJs = typeof module === "object" && module.exports;
   const animation = isCommonJs ? require("./animation-core.js") : root.YamBowlingCore;
   const menuSplash = isCommonJs ? require("./menu-splash-core.js") : root.YamMenuSplash;
-  const api = factory(animation, menuSplash);
+  const roomCore = isCommonJs ? require("./room-core.js") : root.YamRoomCore;
+  const api = factory(animation, menuSplash, roomCore);
   if (isCommonJs) module.exports = api;
   root.YamCosmetics = api;
-})(typeof globalThis !== "undefined" ? globalThis : this, function createCosmeticsCore(animation, menuSplash) {
+})(typeof globalThis !== "undefined" ? globalThis : this, function createCosmeticsCore(animation, menuSplash, roomCore) {
   "use strict";
 
   // One catalog contract for every present and future cosmetic reward.
@@ -28,6 +29,7 @@
     "defeat-pose",
     "player-card",
     "menu-splash",
+    "room",
     "profile-art",
     "ball-trail",
     "strike-burst",
@@ -142,6 +144,20 @@
     }));
   }
 
+  // A player room is the backdrop of a bowler's own space. Unlike every other
+  // entry above, rooms did not ship before progression, so their unlock sources
+  // come straight from the room catalog rather than all defaulting to founding.
+  function buildRoomItems() {
+    return roomCore.ROOMS.map((room) => defineItem({
+      type: "room",
+      idParts: [room.slug],
+      name: room.name,
+      assets: { art: room.src, alt: room.alt },
+      tier: room.tier,
+      unlock: room.unlock,
+    }));
+  }
+
   // Effects are pure code, so they are catalogued here before milestone 3
   // renders them. Declaring them early is what lets the loadout contract and
   // its slots be tested without waiting on a particle emitter.
@@ -206,6 +222,7 @@
   const CATALOG = Object.freeze([
     ...buildCharacterItems(),
     ...buildMenuSplashItems(),
+    ...buildRoomItems(),
     ...buildEffectItems(),
     ...buildProfileItems(),
   ]);

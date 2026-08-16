@@ -9,6 +9,7 @@
     <!-- Load order is the cascade: base first, mobile-landscape last (it overrides). -->
     <link rel="stylesheet" href="styles/base.css" />
     <link rel="stylesheet" href="styles/title.css" />
+    <link rel="stylesheet" href="styles/campaign.css" />
     <link rel="stylesheet" href="styles/setup.css" />
     <link rel="stylesheet" href="styles/online.css" />
     <link rel="stylesheet" href="styles/match.css" />
@@ -33,12 +34,80 @@
           <h1 id="game-title"><span>Yam</span> Bowling</h1>
           <p class="title-tagline">Pick your bowler. Find the pocket. Feed the competition.</p>
           <div class="title-actions">
-            <button class="button button--primary button--xl" id="play-button" type="button">Play local</button>
+            <button class="button button--primary button--xl" id="circuit-button" type="button">Enter circuit</button>
+            <button class="button button--ghost button--xl" id="play-button" type="button">Exhibition</button>
             <button class="button button--ghost button--xl" id="online-button" type="button">Play online</button>
             <button class="button button--ghost" id="how-button" type="button">How to play</button>
             <button class="button button--ghost" id="menu-splash-button" type="button">Menu art</button>
           </div>
-          <p class="build-tag">Local league · Quick match · Private rooms</p>
+          <p class="build-tag">Official circuit · Exhibition · Factory Network</p>
+        </div>
+      </section>
+
+      <section class="screen circuit-screen" id="circuit-screen" aria-labelledby="circuit-title" hidden>
+        <img class="circuit-backdrop" src="assets/menu-splashes/inner-menus/registration-counter.webp" alt="Yam Bowling circuit registration counter overlooking the lanes" decoding="async" />
+        <div class="circuit-vignette"></div>
+        <header class="circuit-header">
+          <button class="icon-button" id="circuit-back" type="button" aria-label="Back to title">&#8592;</button>
+          <div>
+            <p class="eyebrow">Yam Bowling sanctioned play</p>
+            <h2 id="circuit-title">Circuit registration</h2>
+          </div>
+          <span class="circuit-status-seal">Tour card active</span>
+        </header>
+
+        <div class="circuit-layout">
+          <aside class="circuit-card circuit-license" aria-label="Circuit standing">
+            <p class="eyebrow">Current division</p>
+            <h3 id="circuit-division-name">Local Alley</h3>
+            <div class="circuit-progress" id="circuit-progress" aria-label="Division progress"></div>
+            <div class="circuit-division-rail" id="circuit-division-rail" aria-label="Circuit divisions"></div>
+            <dl class="circuit-record">
+              <div><dt>Rank</dt><dd id="circuit-rank">Provisional</dd></div>
+              <div><dt>Achievements</dt><dd id="circuit-achievement-count">0 / 25</dd></div>
+              <div><dt>Roster</dt><dd id="circuit-roster-count">5 / 30</dd></div>
+            </dl>
+          </aside>
+
+          <section class="circuit-card circuit-event" aria-labelledby="circuit-event-title">
+            <div class="circuit-event-heading">
+              <div>
+                <p class="eyebrow" id="circuit-event-number">Sanctioned match 01</p>
+                <h3 id="circuit-event-title">The Fundamentals</h3>
+              </div>
+              <span id="circuit-event-format">3F</span>
+            </div>
+            <div class="circuit-faceoff">
+              <div class="circuit-player-mark">
+                <img id="circuit-player-art" alt="" />
+                <small>Your entry</small>
+                <strong id="circuit-player-name">Daisy Monroe</strong>
+              </div>
+              <div class="circuit-versus"><span>VS</span><i></i></div>
+              <div class="circuit-opponent-mark">
+                <img id="circuit-opponent-art" alt="" />
+                <small>Registered rival</small>
+                <strong id="circuit-opponent-name">Hazel Ward</strong>
+              </div>
+            </div>
+            <blockquote id="circuit-rival-line">Flash is optional. Making the spare isn't.</blockquote>
+            <div class="circuit-match-meta">
+              <span><small>House</small><strong id="circuit-venue-name">Oak &amp; Onyx</strong></span>
+              <span><small>CPU challenge</small><strong id="circuit-difficulty">Rookie</strong></span>
+              <span><small>Clear achievement</small><strong id="circuit-achievement-title">Every Pin Counts</strong></span>
+              <span><small>Reward</small><strong id="circuit-character-reward">Hazel Ward</strong></span>
+            </div>
+            <button class="button button--primary button--wide" id="start-circuit-match" type="button">Bowl sanctioned match</button>
+          </section>
+
+          <aside class="circuit-card circuit-roster-panel" aria-labelledby="circuit-roster-title">
+            <div class="circuit-roster-heading">
+              <div><p class="eyebrow">Active entry</p><h3 id="circuit-roster-title">Choose your bowler</h3></div>
+              <span id="circuit-selected-label">Daisy</span>
+            </div>
+            <div class="circuit-roster" id="circuit-roster" role="listbox" aria-label="Unlocked circuit bowlers"></div>
+            <p class="circuit-roster-note">Circuit achievements add defeated rivals to this roster.</p>
+          </aside>
         </div>
       </section>
 
@@ -237,6 +306,10 @@
           <h2 id="results-title">Player 1 wins!</h2>
           <p id="results-subtitle">Three frames. One clear winner.</p>
           <div class="results-players" id="results-players"></div>
+          <article class="campaign-result" id="campaign-result" aria-live="polite" hidden>
+            <span class="campaign-result__stamp" id="campaign-result-stamp">Official result</span>
+            <div><small id="campaign-result-kicker">Circuit achievement</small><strong id="campaign-result-title">Every Pin Counts</strong><p id="campaign-result-copy"></p></div>
+          </article>
           <div class="results-actions">
             <button class="button button--primary" id="rematch-button" type="button">Rematch</button>
             <button class="button button--ghost" id="change-match-button" type="button">Change match</button>
@@ -320,7 +393,9 @@
 
     <script src="menu-splash-core.js"></script>
     <script src="lane-core.js"></script>
+    <script src="room-core.js"></script>
     <script src="animation-core.js"></script>
+    <script src="campaign-core.js"></script>
     <script src="cosmetics-core.js"></script>
     <script src="loadout-core.js"></script>
     <script src="effects-core.js"></script>

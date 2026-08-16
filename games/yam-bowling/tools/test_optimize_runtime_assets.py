@@ -32,6 +32,8 @@ class OptimizeRuntimeAssetsTests(unittest.TestCase):
             root = Path(temporary_directory)
             paths = [
                 "assets/menu-splashes/daisy-monroe.png",
+                "assets/menu-splashes/inner-menus/registration-counter.png",
+                "assets/menu-splashes/player-rooms/default.png",
                 "assets/characters/processed/canon/daisy-monroe/throw-01.png",
                 "assets/characters/portraits/canon/daisy-monroe.png",
                 "assets/characters/portraits/victory/daisy-monroe.png",
@@ -52,6 +54,10 @@ class OptimizeRuntimeAssetsTests(unittest.TestCase):
 
             self.assertIn("assets/menu-splashes/daisy-monroe.webp", destinations)
             self.assertIn("assets/menu-splashes/thumbs/daisy-monroe.webp", destinations)
+            self.assertIn("assets/menu-splashes/inner-menus/registration-counter.webp", destinations)
+            self.assertIn("assets/menu-splashes/player-rooms/default.webp", destinations)
+            self.assertNotIn("assets/menu-splashes/inner-menus/thumbs/registration-counter.webp", destinations)
+            self.assertNotIn("assets/menu-splashes/player-rooms/thumbs/default.webp", destinations)
             self.assertIn("assets/characters/processed/canon/daisy-monroe/throw-01.webp", destinations)
             self.assertIn("assets/characters/portraits/canon/daisy-monroe.webp", destinations)
             self.assertIn("assets/characters/portraits/victory/daisy-monroe.webp", destinations)

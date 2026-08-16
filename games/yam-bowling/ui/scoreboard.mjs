@@ -42,7 +42,7 @@ export function createScoreboard({ session, core, laneCore, shotHud, onCalloutHi
     if (!match) return;
     const player = session.activePlayer();
     const mode = core.MODES[match.modeId];
-    const opponent = session.onlineMatch ? "Online" : match.playType === "cpu" ? "Vs CPU" : "Hotseat";
+    const opponent = session.onlineMatch ? "Online" : match.playType === "campaign" ? "Circuit" : match.playType === "cpu" ? "Vs CPU" : "Hotseat";
     $("match-chip").textContent = `${mode.name} · ${opponent} · ${laneCore.getLane(session.matchLaneSlug).name}`;
     $("score-mode").textContent = `${mode.frames} frames`;
     $("hud-frame").textContent = Math.min(mode.frames, match.frameIndex + 1);

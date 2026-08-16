@@ -1,7 +1,7 @@
 const { describe, test } = require("node:test");
 const assert = require("node:assert/strict");
 const Physics = require("./physics-core.js");
-const { createCpuPlan } = require("./cpu-core.js");
+const { LEVELS, createCpuPlan } = require("./cpu-core.js");
 
 const BALLS = [
   { hookScale: 1, speedScale: 1, massScale: 1 },
@@ -57,6 +57,20 @@ function benchmarkFrames(levelId, seed, samples = 100) {
 }
 
 describe("physics-aware CPU planning", () => {
+  test("offers five increasingly precise difficulty tiers", () => {
+    const ids = ["rookie", "casual", "competitive", "pro", "champion"];
+
+    assert.deepEqual(Object.keys(LEVELS), ids);
+    for (let index = 1; index < ids.length; index += 1) {
+      const easier = LEVELS[ids[index - 1]];
+      const harder = LEVELS[ids[index]];
+      assert.ok(harder.poolSize <= easier.poolSize, `${ids[index]} should choose from no more candidate shots`);
+      for (const field of ["positionError", "aimError", "hookError", "powerError", "releaseError"]) {
+        assert.ok(harder[field] < easier[field], `${ids[index]} should have less ${field}`);
+      }
+    }
+  });
+
   test("searches legal shot and ball combinations against the live rack", () => {
     const pins = Physics.createRack();
     const plan = createCpuPlan({ levelId: "pro", pins, balls: BALLS, random: () => 0.5 });
@@ -98,5 +112,14 @@ describe("physics-aware CPU planning", () => {
     assert.ok(casual.averagePins < 9.25, `Casual averaged ${casual.averagePins.toFixed(2)} pins per frame`);
     assert.ok(pro.averagePins > casual.averagePins + 0.35, `${casual.averagePins.toFixed(2)} vs ${pro.averagePins.toFixed(2)}`);
     assert.ok(pro.spareRate > casual.spareRate + 0.2, `${casual.spareRate.toFixed(2)} vs ${pro.spareRate.toFixed(2)}`);
+  });
+
+  test("campaign endpoints create a meaningful skill curve", () => {
+    const rookie = benchmarkFrames("rookie", 9201, 60);
+    const champion = benchmarkFrames("champion", 9202, 60);
+
+    assert.ok(rookie.averagePins < 9, `Rookie averaged ${rookie.averagePins.toFixed(2)} pins per frame`);
+    assert.ok(champion.averagePins > rookie.averagePins + 0.75, `${rookie.averagePins.toFixed(2)} vs ${champion.averagePins.toFixed(2)}`);
+    assert.ok(champion.spareRate > rookie.spareRate + 0.35, `${rookie.spareRate.toFixed(2)} vs ${champion.spareRate.toFixed(2)}`);
   });
 });

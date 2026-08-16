@@ -450,15 +450,26 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
       const encoded = encodePathSegment(playerId);
       return encoded ? get(`/players/${encoded}/layout`, "layout") : Promise.resolve(null);
     },
-    // ELO/MMR
-    updateGameRating(gameSlug: string, { opponentPlayerId, outcome, sessionId }: { opponentPlayerId?: unknown; outcome?: unknown; sessionId?: unknown }) {
+    // ELO/MMR. `progression` is optional and describes what was PLAYED — the mode,
+    // the character, a performance count. It must never carry an XP amount: the
+    // server derives every award from its own catalog, and a client that named a
+    // number would be declaring its own economy.
+    updateGameRating(gameSlug: string, { opponentPlayerId, outcome, sessionId, progression }: { opponentPlayerId?: unknown; outcome?: unknown; sessionId?: unknown; progression?: unknown }) {
       const encoded = encodePathSegment(gameSlug);
-      return encoded ? post(`/ratings/${encoded}`, { opponentPlayerId, outcome, sessionId }) : Promise.resolve(null);
+      return encoded ? post(`/ratings/${encoded}`, { opponentPlayerId, outcome, sessionId, progression }) : Promise.resolve(null);
     },
     getGameRating(gameSlug: string, playerId: string) {
       const gs = encodePathSegment(gameSlug);
       const pid = encodePathSegment(playerId);
       return gs && pid ? get(`/ratings/${gs}/${pid}`, "rating") : Promise.resolve(null);
+    },
+    // Earned advancement for one cabinet: XP totals and per-track mastery, with
+    // levels already derived. Public, so a profile or a match card can show an
+    // opponent's mastery.
+    getGameProgression(gameSlug: string, playerId: string) {
+      const gs = encodePathSegment(gameSlug);
+      const pid = encodePathSegment(playerId);
+      return gs && pid ? get(`/progression/${gs}/${pid}`, "progression") : Promise.resolve(null);
     },
     fetchGameProgress(gameSlug: string) {
       const encoded = encodePathSegment(gameSlug);

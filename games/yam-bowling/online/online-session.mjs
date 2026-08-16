@@ -8,6 +8,7 @@ export function createOnlineSession({
   onlineClient,
   onlineIdentity,
   platformApi,
+  progressionReporter,
   laneCore,
   matchRuntime,
   onlineScreen,
@@ -180,15 +181,34 @@ export function createOnlineSession({
     const outcome = session.match.winnerIds.length > 1 ? "draw"
       : session.match.winnerIds.includes(me.id) ? "win" : "loss";
     status.textContent = "Saving this match to your Factory record…";
-    await platformApi.updateGameRating("yam-bowling", {
+
+    // The rating and the XP travel together, under one session id. Preparing the
+    // block queues the grant locally first, so a report that never lands is still
+    // known to be outstanding rather than silently lost.
+    const prepared = progressionReporter.prepare({
+      match: session.match,
+      clientId,
+      sessionId,
+      snapshotResult: session.onlineSnapshot?.result || null,
+    });
+
+    const reported = await platformApi.updateGameRating("yam-bowling", {
       opponentPlayerId: opponent.accountPlayerId,
       outcome,
       sessionId,
+      progression: prepared?.block || undefined,
     }).catch(() => null);
-    const rating = await platformApi.getGameRating("yam-bowling", me.accountPlayerId).catch(() => null);
-    status.textContent = rating
+    progressionReporter.settle({ grant: prepared?.grant, accepted: Boolean(reported) });
+
+    const [rating] = await Promise.all([
+      platformApi.getGameRating("yam-bowling", me.accountPlayerId).catch(() => null),
+      progressionReporter.sync(me.accountPlayerId),
+    ]);
+    const ratingLine = rating
       ? `Factory record · ${rating.wins}W ${rating.losses}L ${rating.draws}D · ${rating.rating} ELO`
       : "Match complete. Sign in to save wins, losses, and rating.";
+    const progressionLine = progressionReporter.describe();
+    status.textContent = progressionLine ? `${ratingLine} · ${progressionLine}` : ratingLine;
   }
 
   return { handleSnapshot, begin, leave, leaveToTitle, requestRematch, reportResult };

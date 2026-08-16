@@ -9,8 +9,11 @@
   });
 
   const CPU_LEVELS = Object.freeze({
+    rookie: Object.freeze({ id: "rookie", name: "Rookie", noise: 0.26 }),
     casual: Object.freeze({ id: "casual", name: "Casual", noise: 0.18 }),
+    competitive: Object.freeze({ id: "competitive", name: "Competitive", noise: 0.12 }),
     pro: Object.freeze({ id: "pro", name: "Pro", noise: 0.07 }),
+    champion: Object.freeze({ id: "champion", name: "Champion", noise: 0.025 }),
   });
 
   // The canon bowlers are all women, so every CPU nickname is a feminine name spin.

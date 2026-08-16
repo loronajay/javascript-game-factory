@@ -10,12 +10,14 @@ import { createLanePicker } from "./ui/lane-picker.mjs";
 import { createCharacterInspector } from "./ui/character-inspector.mjs";
 import { createSetupScreen } from "./ui/setup-screen.mjs";
 import { createOnlineScreen } from "./ui/online-screen.mjs";
+import { createCircuitScreen } from "./ui/circuit-screen.mjs";
 import { createShotHud } from "./ui/shot-hud.mjs";
 import { createScoreboard } from "./ui/scoreboard.mjs";
 import { createResultsScreen } from "./ui/results-screen.mjs";
 import { createSessionState } from "./state/session-state.mjs";
 import { createMatchRuntime } from "./match/match-runtime.mjs";
 import { createOnlineSession } from "./online/online-session.mjs";
+import { createProgressionReporter } from "./online/progression-reporter.mjs";
 import { bindEvents, createHeldKeys } from "./input/bindings.mjs";
 
 initMobileLandscapeGate();
@@ -38,6 +40,8 @@ initMobileLandscapeGate();
   const Animation = window.YamBowlingCore;
   const Cosmetics = window.YamCosmetics;
   const LoadoutCore = window.YamLoadout;
+  const ProgressionCore = window.YamProgression;
+  const Campaign = window.YamCampaign;
   const Effects = window.YamEffects;
   const Catalog = window.YamCharacterCatalog;
   const Roster = Animation.CANON_BOWLERS;
@@ -53,7 +57,16 @@ initMobileLandscapeGate();
   // What this device owns and wears. Every cosmetic read goes through it, so
   // equipment has one owner and one migration off the old preference keys.
   const loadout = LoadoutCore.createLoadoutStore();
+  // The device-local cache of an authoritative balance. It never awards itself
+  // XP; only a server snapshot moves a number in it.
+  const progression = ProgressionCore.createProgressionStore();
+  const campaignStore = Campaign.createCampaignStore();
   const assets = createCharacterAssets({ animation: Animation, roster: Roster, loadout });
+  const progressionReporter = createProgressionReporter({
+    progressionCore: ProgressionCore,
+    store: progression,
+    platformApi,
+  });
 
   const session = createSessionState({
     physics: Physics,
@@ -107,6 +120,7 @@ initMobileLandscapeGate();
   // close over them; both are assigned before any event or frame can fire.
   let onlineSession = null;
   let matchRuntime = null;
+  let circuitScreen = null;
 
   const resultsScreen = createResultsScreen({
     session,
@@ -114,7 +128,10 @@ initMobileLandscapeGate();
     assets,
     audio,
     audioCore: AudioCore,
-    onShown: () => onlineSession?.reportResult(),
+    onShown: () => {
+      circuitScreen?.handleResultsShown();
+      onlineSession?.reportResult();
+    },
   });
   const scoreboard = createScoreboard({
     session,
@@ -157,11 +174,22 @@ initMobileLandscapeGate();
     physicsStep: PHYSICS_DT,
   });
 
+  circuitScreen = createCircuitScreen({
+    session,
+    campaign: Campaign,
+    store: campaignStore,
+    assets,
+    laneCore: LaneCore,
+    audio,
+    getMatchRuntime: () => matchRuntime,
+  });
+
   onlineSession = createOnlineSession({
     session,
     onlineClient,
     onlineIdentity,
     platformApi,
+    progressionReporter,
     laneCore: LaneCore,
     matchRuntime,
     onlineScreen,
@@ -217,9 +245,10 @@ initMobileLandscapeGate();
     characterInspector.bind();
     setupScreen.bind();
     onlineScreen.bind();
+    circuitScreen.bind();
     bindEvents({
       session, keys, audio, renderer, matchRuntime, onlineSession,
-      setupScreen, onlineScreen, shotHud, syncAudioToggle,
+      circuitScreen, setupScreen, onlineScreen, shotHud, syncAudioToggle,
     });
 
     if (onlineClient.resumeSavedSession()) {

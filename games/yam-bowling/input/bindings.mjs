@@ -17,6 +17,7 @@ export function bindEvents({
   renderer,
   matchRuntime,
   onlineSession,
+  circuitScreen,
   setupScreen,
   onlineScreen,
   shotHud,
@@ -33,6 +34,7 @@ export function bindEvents({
     session.paused = false;
     $("pause-overlay").hidden = true;
     if (session.onlineMatch) onlineSession.leave();
+    else if (session.campaignMatch) circuitScreen.returnToCircuit();
     else showScreen("setup-screen");
     audio.resumeMusic();
   }
@@ -61,9 +63,11 @@ export function bindEvents({
   });
 
   // --- Navigation ---
+  $("circuit-button").addEventListener("click", () => circuitScreen.open());
   $("play-button").addEventListener("click", () => { showScreen("setup-screen"); setupScreen.render(); });
   $("online-button").addEventListener("click", () => { showScreen("online-screen"); onlineScreen.renderSetup(); });
   $("setup-back").addEventListener("click", () => showScreen("title-screen"));
+  $("circuit-back").addEventListener("click", () => circuitScreen.leaveToTitle());
   $("online-back").addEventListener("click", () => showScreen("title-screen"));
   $("how-button").addEventListener("click", () => { $("how-dialog").showModal(); audio.play("popup"); });
   $("how-close").addEventListener("click", () => $("how-dialog").close());
@@ -149,14 +153,17 @@ export function bindEvents({
 
   $("rematch-button").addEventListener("click", () => {
     if (session.onlineMatch) onlineSession.requestRematch();
+    else if (session.campaignMatch) circuitScreen.handlePrimaryResultAction();
     else matchRuntime.startMatch();
   });
   $("change-match-button").addEventListener("click", () => {
     if (session.onlineMatch) onlineSession.leave();
+    else if (session.campaignMatch) circuitScreen.returnToCircuit();
     else { showScreen("setup-screen"); setupScreen.render(); }
   });
   $("results-home-button").addEventListener("click", () => {
-    onlineSession.leaveToTitle();
+    if (session.campaignMatch) circuitScreen.leaveToTitle();
+    else onlineSession.leaveToTitle();
   });
 
   // Backgrounding the tab pauses a live match rather than letting it run on.

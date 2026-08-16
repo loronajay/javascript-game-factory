@@ -93,6 +93,13 @@ def discover_jobs(project_root: Path) -> list[ConversionJob]:
             )
         )
 
+    # Full-screen interface paintings are runtime backdrops, not title-splash
+    # picker entries. Preserve their directory taxonomy and do not generate
+    # picker thumbnails for them.
+    for collection in ("inner-menus", "player-rooms"):
+        for source in sorted((assets / "menu-splashes" / collection).glob("*.png")):
+            jobs.append(_webp_job(source, quality=86))
+
     for source in sorted((assets / "characters" / "processed" / "canon").glob("*/*.png")):
         jobs.append(_webp_job(source, quality=CHARACTER_QUALITY))
 

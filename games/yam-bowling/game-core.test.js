@@ -92,6 +92,7 @@ describe("modes and CPU planning", () => {
     assert.equal(MODES.classic.frames, 10);
     assert.ok(CPU_LEVELS.casual);
     assert.ok(CPU_LEVELS.pro);
+    assert.deepEqual(Object.keys(CPU_LEVELS), ["rookie", "casual", "competitive", "pro", "champion"]);
   });
 
   test("creates bounded, deterministic CPU setup from an injected random source", () => {
