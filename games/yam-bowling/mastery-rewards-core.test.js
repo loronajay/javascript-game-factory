@@ -105,3 +105,42 @@ test("the mastery badge milestones point at real equippable cabinet badges", () 
     assert.deepEqual(reward.equipment, { scope: "global", slot: "badge", itemId });
   }
 });
+
+// A mastery title is the one reward whose id is scoped to the bowler who earned
+// it while the slot it fills is global. Reaching the summit with Reina makes you
+// Reina's master whichever bowler you then take to the lane, so the check that
+// it is worn has to be a plain global-slot comparison.
+test("the two mastery titles are bowler-scoped ids worn in the global title slot", () => {
+  const tree = masteryRewards.buildRewardTree({ character, currentLevel: 30 });
+  const nameplate = tree.nodes[28].rewards[0];
+  const master = tree.nodes[29].rewards.find((reward) => reward.family === "title");
+
+  assert.equal(nameplate.equipment.itemId, "title:reina-sato:nameplate");
+  assert.equal(nameplate.equipment.slot, "title");
+  assert.equal(nameplate.equipment.scope, "global");
+  assert.equal(master.equipment.itemId, "title:reina-sato:master");
+  assert.equal(master.equipment.slot, "title");
+  assert.equal(master.equipment.scope, "global");
+});
+
+test("a mastery title belongs to the bowler who earned it and to no other", () => {
+  const other = masteryRewards.buildRewardTree({
+    character: { slug: "daisy-monroe", name: "Daisy Monroe" },
+    currentLevel: 30,
+  });
+  assert.equal(other.nodes[28].rewards[0].equipment.itemId, "title:daisy-monroe:nameplate");
+  assert.equal(other.nodes[28].rewards[0].label, "Daisy Mastery Nameplate");
+});
+
+test("a bowler-scoped title is only equipped when the global slot holds that exact id", () => {
+  const loadout = { getGlobalSlot: (slot) => (slot === "title" ? "title:reina-sato:master" : null) };
+  const mine = masteryRewards.buildRewardTree({ character, currentLevel: 30, loadout });
+  const theirs = masteryRewards.buildRewardTree({
+    character: { slug: "daisy-monroe", name: "Daisy Monroe" },
+    currentLevel: 30,
+    loadout,
+  });
+
+  assert.equal(mine.nodes[29].rewards.find((r) => r.family === "title").equipped, true);
+  assert.equal(theirs.nodes[29].rewards.find((r) => r.family === "title").equipped, false);
+});

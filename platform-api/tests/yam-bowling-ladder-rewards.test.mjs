@@ -61,13 +61,34 @@ test("crossing a bowler mastery level grants that level's cosmetic entitlement",
     { level: 13, entitlementId: "badge:laser-focus", kind: "badge" },
   ]);
   assert.deepEqual(
-    entitlementRewardsBetween(definition, "track", at(1), at(30)).map((entry) => entry.entitlementId),
+    entitlementRewardsBetween(definition, "track", at(1), at(30), { trackId: "reina-sato" })
+      .map((entry) => entry.entitlementId),
     [
       "ball-trail:red-neon", "strike-burst:ember", "ball-trail:orange-flare",
-      "ball-trail:sky-blue", "badge:laser-focus", "ball-trail:gold-rush",
-      "title:pin-chaser", "badge:precision-bowler", "ball-trail:diamond-white",
-      "badge:lane-legend",
+      "strike-burst:red-supernova", "ball-trail:sky-blue", "badge:laser-focus",
+      "ball-trail:gold-rush", "title:pin-chaser", "badge:precision-bowler",
+      "strike-burst:sky-shatter", "ball-trail:diamond-white", "strike-burst:diamond-spark",
+      "ball-trail:perfect-line", "badge:lane-legend",
+      "title:reina-sato:nameplate", "title:reina-sato:master",
     ],
+  );
+});
+
+// The two mastery titles belong to the bowler who earned them, so the id is a
+// template the grant resolves. Without a track there is nothing to resolve it
+// to, and granting the literal placeholder would mint an id nothing can match.
+test("a bowler-scoped mastery title is granted to the track that earned it", () => {
+  const definition = getProgression("yam-bowling");
+  const at = (level) => xpForLevel(definition.curves.track, level);
+
+  assert.deepEqual(
+    entitlementRewardsBetween(definition, "track", at(29), at(30), { trackId: "daisy-monroe" }),
+    [{ level: 30, entitlementId: "title:daisy-monroe:master", kind: "title" }],
+  );
+  assert.deepEqual(entitlementRewardsBetween(definition, "track", at(29), at(30)), []);
+  assert.ok(
+    entitlementRewardsBetween(definition, "track", at(1), at(30))
+      .every((entry) => !entry.entitlementId.includes("{track}")),
   );
 });
 
@@ -110,7 +131,7 @@ test("every level-granted cosmetic survives a save once its entitlement exists",
   const rewards = [
     ...definition.levelEntitlements.player,
     ...definition.levelEntitlements.track,
-  ];
+  ].map((reward) => ({ ...reward, entitlementId: reward.entitlementId.replace("{track}", "reina-sato") }));
   assert.ok(rewards.length >= 30, "both ladders contribute");
 
   for (const reward of rewards) {
@@ -194,12 +215,15 @@ test("voucher targets are restricted to alternate skins on canonical bowlers", (
   assert.equal(validateYamBowlingSkinVoucherTarget("another-game", "skin:daisy-monroe:maid"), null);
 });
 
-test("the level-entitlement migration backfills every node on both ladders", async () => {
+test("the level-entitlement migrations backfill every node on both ladders", async () => {
   const definition = getProgression("yam-bowling");
-  const sql = await readFile(
-    new URL("../src/db/migrations/041-yam-bowling-level-entitlements.sql", import.meta.url),
-    "utf8",
-  );
+  // Read as one corpus: a shipped migration is never edited, so a node bound
+  // after 041 is backfilled by 042 and the next one by 043. What matters is
+  // that every node is covered by *some* migration.
+  const sql = (await Promise.all([
+    "041-yam-bowling-level-entitlements.sql",
+    "042-yam-bowling-mastery-rewards.sql",
+  ].map((name) => readFile(new URL(`../src/db/migrations/${name}`, import.meta.url), "utf8")))).join("\n");
 
   // A node added to a ladder without a backfill leaves existing accounts owing
   // a reward they have already earned, which is the failure 040 exists to avoid.
@@ -209,6 +233,10 @@ test("the level-entitlement migration backfills every node on both ladders", asy
       `${reward.entitlementId} is granted at level ${reward.level} but never backfilled`,
     );
   }
+
+  // A per-bowler title is one row per qualifying track, not per player, so its
+  // backfill has to read game_xp_tracks rather than the best-track rollup.
+  assert.match(sql, /replace\(reward\.entitlement_id, '\{track\}', tracks\.track_id\)/);
 
   // The player ladder reads the account total; the bowler ladder reads the best
   // single track, since its bound rewards are global and earned with any bowler.

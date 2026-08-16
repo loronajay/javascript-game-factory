@@ -78,6 +78,9 @@
     [30, [
       ["title-master", "title", "Yam Legend Title"],
       ["badge-master", "badge", "The 30 Club Badge"],
+      // The one reward at this summit that is bound today, so reaching 30 pays
+      // something wearable while the title and badge above are still unbound.
+      ["lime-pop-burst", "strike-burst", "Lime Pop Burst", ["global", "strikeBurst", "lime-pop"]],
     ]],
   ];
 

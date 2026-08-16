@@ -122,7 +122,10 @@ async function grantLevelEntitlements(
   previousXp: number,
   nextXp: number,
 ): Promise<void> {
-  for (const reward of entitlementRewardsBetween(definition, scope, previousXp, nextXp)) {
+  const rewards = entitlementRewardsBetween(definition, scope, previousXp, nextXp, {
+    trackId: scope === "track" ? params.trackId : null,
+  });
+  for (const reward of rewards) {
     await client.query(
       `insert into game_entitlements (player_id, game_slug, entitlement_id, kind, source, source_id)
        values ($1, $2, $3, $4, $5, $6)

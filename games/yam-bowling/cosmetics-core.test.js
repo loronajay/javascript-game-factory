@@ -143,7 +143,7 @@ test("the trail cabinet offers a broad, distinct color collection to unlock", ()
   const trails = listByType("ball-trail");
   const colorTrails = trails.filter((item) => item.id !== "ball-trail:none");
 
-  assert.equal(trails.length, 20, "No Trail plus nineteen color rewards should be visible");
+  assert.equal(trails.length, 21, "No Trail plus twenty color rewards should be visible");
   assert.deepEqual(colorTrails.map((item) => item.id), [
     "ball-trail:red-neon",
     "ball-trail:orange-flare",
@@ -160,6 +160,7 @@ test("the trail cabinet offers a broad, distinct color collection to unlock", ()
     "ball-trail:magenta-pop",
     "ball-trail:hot-pink",
     "ball-trail:diamond-white",
+    "ball-trail:perfect-line",
     "ball-trail:championship-gold",
     "ball-trail:bracket-fire",
     "ball-trail:cosmic-ribbon",
@@ -299,4 +300,31 @@ test("the catalog exposes no prices or XP claims before server-backed ownership 
     assert.equal("cost" in item, false, `${item.id} must not carry a cost`);
     assert.equal("xp" in item.unlock, false, `${item.id} must not claim an XP amount`);
   }
+});
+
+// The summit of every bowler's ladder. Text-only rewards on purpose: a mastery
+// ladder that can only pay out when new art exists is a ladder that stays
+// unbound, and these two are what let levels 29 and 30 mean something now.
+test("every bowler has a mastery nameplate and an exclusive master title", () => {
+  const titles = listByType("title");
+
+  for (const bowler of animation.CANON_BOWLERS) {
+    const nameplate = titles.find((item) => item.id === `title:${bowler.slug}:nameplate`);
+    const master = titles.find((item) => item.id === `title:${bowler.slug}:master`);
+
+    for (const [item, tier] of [[nameplate, "rare"], [master, "legendary"]]) {
+      assert.ok(item, `${bowler.slug} is missing a mastery title`);
+      assert.equal(item.type, "title");
+      assert.equal(item.characterSlug, bowler.slug, "a mastery title belongs to its bowler");
+      assert.equal(item.unlock.source, "bowler-level");
+      assert.equal(item.tier, tier);
+      assert.equal(isOwnedByDefault(item.id), false, "a mastery title must be earned");
+    }
+    assert.equal(master.name, `${bowler.name.split(/\s+/)[0]} Master`);
+  }
+
+  assert.equal(
+    titles.filter((item) => item.characterSlug).length,
+    animation.CANON_BOWLERS.length * 2,
+  );
 });

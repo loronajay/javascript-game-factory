@@ -356,27 +356,49 @@ and two signed-in clients running together.
   - [x] `Red Neon Ball Trail`
 - [x] Reserve level 30 for a mastery skin plus an exclusive character title.
 - [x] Ensure the tree supports future levels 31–40 without changing existing reward IDs.
-- [ ] Bind the 20 label-only mastery nodes to real catalog items (see below).
+- [x] Bind every mastery node that needs no new art (see below).
+- [ ] Author the art and the four new reward types the remaining 15 nodes need.
 
 ### Content still unbound
 
-The mastery cadence is authored in full, but **20 of its 31 rewards are labels
+The mastery cadence was authored in full, but **20 of its 31 rewards were labels
 with no `equipment` binding** — the same gap milestone 8 records for the player
-ladder's 8 nodes, and it was not written down here. Levels 3, 5, 7, 8, 9, 10, 12,
-14, 15, 17, 18, 20, 22, 24, 25, 26, 27, 29 and both level-30 rewards resolve a
-name and nothing a player can wear. Level 30 is the one that matters most:
-`{first} Mastery Skin` and `{first} Master` are the promised summit of the track
-and today they pay a string, because `AVAILABLE_SKINS` carries only Canon,
-Swimsuit and Maid and no per-bowler mastery title exists in the catalog.
+ladder, and it had not been written down here. Five of those have been bound,
+because they needed no new art:
 
-Four nodes need new art or new reward types before they can be bound at all —
-profile icon, character banner, entrance stinger, lane emote — so they are
-content decisions, not wiring. The rest are wiring.
+| Level | Reward | Bound to |
+|---:|---|---|
+| 8 | Crimson Strike Spark | `strike-burst:red-supernova` |
+| 22 | Crowd Roar Strike Burst | `strike-burst:sky-shatter` |
+| 23 | Diamond Spark Burst *(new node)* | `strike-burst:diamond-spark` |
+| 27 | Perfect Line Ball Trail | `ball-trail:perfect-line` *(new item)* |
+| 29 | `{first}` Mastery Nameplate | `title:<bowler>:nameplate` *(new item)* |
+| 30 | `{first}` Master | `title:<bowler>:master` *(new item)* |
 
-Four strike bursts (`red-supernova`, `lime-pop`, `sky-shatter`, `diamond-spark`)
-carry `unlock.source: "bowler-level"` in `cosmetics-core.js` while no mastery
-node pays them, so their own unlock copy promises a ladder that does not offer
-them. Either bind them or restate the source.
+**The two mastery titles are the first reward whose id is scoped to the bowler
+who earned it while the slot it fills is global** — you are Reina's master
+whichever bowler you then take to the lane. That is why `resolveEquipment` maps
+the cadence's `bowlerTitle` slot back onto `title`, why the server registers them
+*without* a `characterSlug` (a global slot matches on type alone), and why their
+grant is the only one that has to know which track crossed the level: the
+entitlement id carries a `{track}` the award resolves. Migration `042` backfills
+them per track rather than per player, unlike every other level reward.
+
+Every strike burst now has an earn route. The four that claimed `bowler-level`
+while no node paid them are bound above, except `lime-pop`, which moved to the
+**player** ladder's level 30 — the mastery ladder has no lime trail to pair it
+with, and that summit had nothing equippable on it either.
+
+**The remaining 15 nodes cannot be bound without new content**, so they are
+authoring decisions rather than wiring:
+
+- **Ten need art**: the three skins (10, 20, 30), two victory poses (5, 18), four
+  player cards (9, 12, 24, 25) and the alternate menu splash (15). Binding these
+  to existing art would either re-gift founding content or hand out part of a
+  skin entitlement, which the product rules forbid.
+- **Five need a whole new reward type**: profile icon (3), character banner (7),
+  entrance stingers (14, 26) and the lane emote (17). None exists in
+  `cosmetics-core.js`'s `REWARD_TYPES` or in the server's slot map.
 
 Suggested cadence to validate in a prototype:
 

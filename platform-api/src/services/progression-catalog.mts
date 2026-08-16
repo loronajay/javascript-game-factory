@@ -129,18 +129,28 @@ const YAM_BOWLING: ProgressionDefinition = {
       levelReward(27, "strike-burst:magenta-blast"),
       levelReward(28, "ball-trail:hot-pink"),
       levelReward(29, "strike-burst:hot-pink-pop"),
+      levelReward(30, "strike-burst:lime-pop"),
     ]),
     track: Object.freeze([
       levelReward(2, "ball-trail:red-neon"),
       levelReward(4, "strike-burst:ember"),
       levelReward(6, "ball-trail:orange-flare"),
+      levelReward(8, "strike-burst:red-supernova"),
       levelReward(11, "ball-trail:sky-blue"),
       levelReward(13, "badge:laser-focus"),
       levelReward(16, "ball-trail:gold-rush"),
       levelReward(19, "title:pin-chaser"),
       levelReward(21, "badge:precision-bowler"),
+      levelReward(22, "strike-burst:sky-shatter"),
       levelReward(23, "ball-trail:diamond-white"),
+      levelReward(23, "strike-burst:diamond-spark"),
+      levelReward(27, "ball-trail:perfect-line"),
       levelReward(28, "badge:lane-legend"),
+      // The two rewards on either ladder that belong to the bowler who earned
+      // them. `{track}` is substituted with the track that crossed the level,
+      // which is why this ladder's grant has to know which one that was.
+      levelReward(29, "title:{track}:nameplate"),
+      levelReward(30, "title:{track}:master"),
     ]),
   }),
 };
@@ -208,6 +218,7 @@ export function entitlementRewardsBetween(
   scope: LadderScope,
   previousXp: unknown,
   nextXp: unknown,
+  { trackId }: { trackId?: string | null } = {},
 ): Array<{ level: number; entitlementId: string; kind: string }> {
   const curve = definition?.curves?.[scope as keyof ProgressionDefinition["curves"]];
   const rewards = definition?.levelEntitlements?.[scope];
@@ -217,7 +228,15 @@ export function entitlementRewardsBetween(
   if (nextLevel <= previousLevel) return [];
   return rewards
     .filter((reward) => reward.level > previousLevel && reward.level <= nextLevel)
-    .map((reward) => ({ level: reward.level, entitlementId: reward.entitlementId, kind: reward.kind }));
+    // A `{track}` reward belongs to the track that earned it. Without a track to
+    // name it is skipped rather than granted under a literal placeholder, which
+    // would mint an entitlement id nothing can ever match.
+    .filter((reward) => !reward.entitlementId.includes("{track}") || Boolean(trackId))
+    .map((reward) => ({
+      level: reward.level,
+      entitlementId: reward.entitlementId.replace("{track}", String(trackId)),
+      kind: reward.kind,
+    }));
 }
 
 export interface GrantBreakdown {

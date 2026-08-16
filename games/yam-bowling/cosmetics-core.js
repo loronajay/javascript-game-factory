@@ -143,6 +143,37 @@
         unlock: founding,
       }));
 
+      // The two rewards that make the summit of a bowler's ladder mean
+      // something. They are scoped to the bowler who earned them but worn in
+      // the global title slot, because a title says something about the player
+      // wearing it — you are Reina's master whichever bowler you take to the
+      // lane. Text only, so a mastery ladder can pay out without new art.
+      const firstName = bowler.name.split(/\s+/)[0];
+      items.push(defineItem({
+        type: "title",
+        idParts: [bowler.slug, "nameplate"],
+        name: `${bowler.name} Nameplate`,
+        characterSlug: bowler.slug,
+        assets: {},
+        tier: "rare",
+        unlock: Object.freeze({
+          source: "bowler-level",
+          detail: `Reach mastery level 29 with ${bowler.name}.`,
+        }),
+      }));
+      items.push(defineItem({
+        type: "title",
+        idParts: [bowler.slug, "master"],
+        name: `${firstName} Master`,
+        characterSlug: bowler.slug,
+        assets: {},
+        tier: "legendary",
+        unlock: Object.freeze({
+          source: "bowler-level",
+          detail: `Reach maximum mastery with ${bowler.name}.`,
+        }),
+      }));
+
       const splash = menuSplash.getMenuSplash(bowler.slug);
       items.push(defineItem({
         type: "profile-art",
@@ -203,6 +234,11 @@
       "indigo-drive", "violet-haze", "purple-plasma", "magenta-pop", "hot-pink",
       "gold-star", "emerald-impact", "mint-crackle", "cyan-flash",
       "indigo-ring", "violet-bloom", "purple-nova", "magenta-blast", "hot-pink-pop",
+      // The player ladder's summit. It sits here rather than on the mastery
+      // ladder because that one has no lime trail to pair it with, and a burst
+      // no level pays out would be a reward whose own unlock copy contradicts
+      // every ladder offering it.
+      "lime-pop",
     ]);
     const unlockFor = (id) => (PLAYER_LEVEL_EFFECTS.has(id) ? playerUnlock : effectUnlock);
     const colorTrails = [
@@ -221,6 +257,7 @@
       ["magenta-pop", "Magenta Pop Ball Trail", ["#ff00d4", "#ff8ae8"]],
       ["hot-pink", "Hot Pink Ball Trail", ["#ff1493", "#ff9bd4"]],
       ["diamond-white", "Diamond White Ball Trail", ["#ffffff", "#b8e9ff"], "legendary"],
+      ["perfect-line", "Perfect Line Ball Trail", ["#fdfdff", "#9d7bff"], "legendary"],
     ];
     const colorBursts = [
       ["ember", "Ember Burst", ["#ffb347", "#ff5f1f"]],

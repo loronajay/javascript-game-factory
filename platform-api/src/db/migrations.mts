@@ -42,6 +42,7 @@ export const MIGRATION_FILES = Object.freeze([
   "039-yam-bowling-skin-entitlements.sql",
   "040-yam-bowling-skin-vouchers.sql",
   "041-yam-bowling-level-entitlements.sql",
+  "042-yam-bowling-mastery-rewards.sql",
 ]);
 
 export function migrationFileUrl(name: string): URL {

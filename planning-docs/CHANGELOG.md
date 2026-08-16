@@ -2,6 +2,18 @@
 
 Dated history extracted from the root `CLAUDE.md` (2026-07-23) so that file can stay a lean orientation guide instead of an ever-growing log. This file is a curated narrative, not a replacement for `git log` — read it for *why*/*what shipped when*, not for line-level diffs.
 
+## Yam Bowling: Binding the Mastery Ladder (2026-08-16)
+
+The audit below found the bowler mastery ladder was **20 of 31 rewards label-only** — a name and nothing wearable — while the scope doc marked Milestone 5 complete. Five of those are now bound, which is every node that needed no new art.
+
+**The two mastery titles are the first reward whose id is scoped to the bowler who earned it while the slot it fills is global.** You are Reina's master whichever bowler you then take to the lane. That one fact drives the whole shape: the cadence declares a `bowlerTitle` slot that `resolveEquipment` maps back onto `title`, so the equipped check stays a plain global-slot comparison; the server registers `title:<bowler>:nameplate` and `title:<bowler>:master` *without* a `characterSlug`, because a global slot matches on type alone and a character-scoped registration would never validate; and their grant is the only one that has to know which track crossed the level, since the entitlement id carries a `{track}` the award resolves. Migration `042` backfills them per track rather than per player, unlike every other level reward. They are text-only on purpose — a ladder that can only pay out when new art exists is a ladder that stays unbound.
+
+**Every strike burst now has an earn route.** Four claimed `bowler-level` while no node paid them; `red-supernova`, `sky-shatter` and `diamond-spark` bound to mastery levels 8, 22 and 23, and `lime-pop` moved to the *player* ladder's level 30 — the mastery ladder has no lime trail to pair it with, and that summit had nothing equippable on it either. A pre-existing test asserting every burst has an earn route is what rejected the first attempt, which had tried to restate the two leftovers as "acquisition deferred" instead of binding them; the repo had already decided that question and the test held the line.
+
+Migration `042` rather than an edit to `041`: a shipped migration is never edited, so the coverage test now reads both as one corpus and a node bound after `042` will need `043`.
+
+**The remaining 15 nodes cannot be bound without new content.** Ten need art — three skins, two victory poses, four player cards, one menu splash — and binding them to existing art would either re-gift founding content or hand out part of a skin entitlement, which the product rules forbid. Five need a whole new reward type that exists in neither the cabinet catalog nor the server's slot map: profile icon, character banner, two entrance stingers, lane emote.
+
 ## Yam Bowling: a Metagame Audit, and Level Rewards That Actually Save (2026-08-16)
 
 An audit of `games/yam-bowling/METAGAME_SCOPE.md` against the code, then the fix for the one live defect it turned up.

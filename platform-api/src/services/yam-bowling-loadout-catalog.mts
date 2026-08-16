@@ -24,7 +24,8 @@ const BALL_TRAIL_IDS = Object.freeze([
   "none", "red-neon", "orange-flare", "gold-rush", "lime-shock",
   "emerald-glow", "mint-frost", "cyan-pulse", "sky-blue", "electric-blue",
   "indigo-drive", "violet-haze", "purple-plasma", "magenta-pop", "hot-pink",
-  "diamond-white", "championship-gold", "bracket-fire", "cosmic-ribbon", "royal-confetti",
+  "diamond-white", "perfect-line", "championship-gold", "bracket-fire", "cosmic-ribbon",
+  "royal-confetti",
 ]);
 const STRIKE_BURST_IDS = Object.freeze([
   "classic", "ember", "red-supernova", "gold-star", "lime-pop",
@@ -63,6 +64,15 @@ for (const bowlerSlug of BOWLER_SLUGS) {
     founding: STARTER_BOWLERS.has(bowlerSlug),
     entitlementId: `bowler:${bowlerSlug}`,
   });
+  // Mastery levels 29 and 30. Deliberately registered WITHOUT a characterSlug:
+  // the id is scoped to the bowler who earned it, but the slot it fills is the
+  // one global title slot, and the global-slot check below matches on type
+  // alone. Giving it a characterSlug would make it look like a per-bowler slot
+  // value and it would never validate.
+  for (const suffix of ["nameplate", "master"]) {
+    const id = `title:${bowlerSlug}:${suffix}`;
+    register({ id, type: "title", founding: false, entitlementId: id });
+  }
 }
 for (const roomSlug of ROOM_SLUGS) {
   register({ id: `room:${roomSlug}`, type: "room", founding: roomSlug === "default", entitlementId: `room:${roomSlug}` });
