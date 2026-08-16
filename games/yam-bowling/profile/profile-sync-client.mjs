@@ -25,6 +25,7 @@ export function createProfileSyncClient({
   getAuthToken = getStoredAuthToken,
   onUnauthorized = handleUnauthorizedResponse,
   onSnapshotApplied = () => {},
+  onGameProgress = () => {},
 }) {
   let state = { status: "idle", error: "", progressionStatus: "unavailable" };
 
@@ -68,6 +69,7 @@ export function createProfileSyncClient({
       return false;
     }
     loadout.applyServerEntitlements(gameProgress.entitlements);
+    onGameProgress(gameProgress);
     if (!loadout.applyServerGarage(garageResult.garage)) {
       setState("error", "sync_failed", "unavailable");
       return false;

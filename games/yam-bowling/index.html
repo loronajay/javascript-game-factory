@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="styles/base.css" />
     <link rel="stylesheet" href="styles/title.css" />
     <link rel="stylesheet" href="styles/campaign.css" />
+    <link rel="stylesheet" href="styles/tournament.css" />
     <link rel="stylesheet" href="styles/profile.css" />
     <link rel="stylesheet" href="styles/setup.css" />
     <link rel="stylesheet" href="styles/online.css" />
@@ -36,13 +37,14 @@
           <p class="title-tagline">Pick your bowler. Find the pocket. Feed the competition.</p>
           <div class="title-actions">
             <button class="button button--primary button--xl" id="circuit-button" type="button" data-factory-account-feature>Enter circuit</button>
+            <button class="button button--ghost button--xl" id="tournament-button" type="button" data-factory-account-feature>Tournaments</button>
             <button class="button button--ghost button--xl" id="profile-button" type="button" data-factory-account-feature>My room</button>
             <button class="button button--ghost button--xl" id="play-button" type="button">Exhibition</button>
             <button class="button button--ghost button--xl" id="online-button" type="button" data-factory-account-feature>Play online</button>
             <button class="button button--ghost" id="how-button" type="button">How to play</button>
             <button class="button button--ghost" id="menu-splash-button" type="button">Menu art</button>
           </div>
-          <p class="build-tag">Official circuit · Exhibition · Factory Network</p>
+          <p class="build-tag">Official circuit · Rotating tournaments · Exhibition · Factory Network</p>
         </div>
       </section>
 
@@ -97,10 +99,14 @@
             <section class="profile-card profile-reward-card" aria-labelledby="profile-reward-title">
               <div class="profile-card__heading">
                 <div><p class="eyebrow">Player reward path</p><h3 id="profile-reward-title">What levelling pays out</h3></div>
-                <span id="profile-reward-vouchers">Skin Vouchers at level 10 and 25</span>
+                <span id="profile-reward-vouchers">0 Skin Vouchers</span>
               </div>
               <p class="profile-reward-status" id="profile-reward-status">Not synced - sign in to see your earned rewards</p>
               <p class="profile-reward-next">Next: <b id="profile-reward-next">Level 2 - Lime Shock Ball Trail</b></p>
+              <div class="profile-voucher-bar">
+                <span>Earned at levels 10 and 25</span>
+                <button class="button button--ghost" id="profile-voucher-button" type="button" disabled>Redeem a skin</button>
+              </div>
               <ol class="player-reward-tree" id="profile-reward-tree" aria-label="Complete player level reward path"></ol>
             </section>
 
@@ -192,6 +198,49 @@
             </div>
             <div class="circuit-roster" id="circuit-roster" role="listbox" aria-label="Unlocked circuit bowlers"></div>
             <p class="circuit-roster-note">Circuit achievements add defeated rivals to this roster.</p>
+          </aside>
+        </div>
+      </section>
+
+      <section class="screen circuit-screen tournament-screen" id="tournament-screen" aria-labelledby="tournament-title" hidden>
+        <img class="circuit-backdrop" src="assets/menu-splashes/inner-menus/registration-counter.webp" alt="Yam Bowling tournament registration desk" decoding="async" />
+        <div class="circuit-vignette"></div>
+        <header class="circuit-header">
+          <button class="icon-button" id="tournament-back" type="button" aria-label="Back to title">&#8592;</button>
+          <div><p class="eyebrow">Rotating CPU championship</p><h2 id="tournament-title">Yam tournament</h2></div>
+          <span class="circuit-status-seal" id="tournament-status-seal">Checking entries</span>
+        </header>
+        <div class="circuit-layout">
+          <aside class="circuit-card circuit-license" aria-label="Tournament bracket">
+            <p class="eyebrow">Event window</p>
+            <p class="tournament-window" id="tournament-window">Checking the schedule&hellip;</p>
+            <div class="tournament-bracket" id="tournament-bracket"></div>
+            <p class="tournament-prize-note"><b>Championship roll:</b> common tournament-only trails and strike bursts, with rare Skin Voucher and Champion&rsquo;s Room outcomes.</p>
+          </aside>
+          <section class="circuit-card circuit-event" aria-labelledby="tournament-round-name">
+            <div class="circuit-event-heading">
+              <div><p class="eyebrow" id="tournament-round-label">Round 1 of 3</p><h3 id="tournament-round-name">Opening Round</h3></div>
+              <span id="tournament-event-format">3F</span>
+            </div>
+            <div class="circuit-faceoff">
+              <div class="circuit-player-mark"><img id="tournament-player-art" alt="" /><small>Your entry</small><strong id="tournament-player-name">Daisy Monroe</strong></div>
+              <div class="circuit-versus"><span>VS</span><i></i></div>
+              <div class="circuit-opponent-mark"><img id="tournament-opponent-art" alt="" /><small>Bracket rival</small><strong id="tournament-opponent-name">Lumi Vega</strong></div>
+            </div>
+            <blockquote id="tournament-rival-line">Win to advance through the bracket.</blockquote>
+            <div class="circuit-match-meta">
+              <span><small>House</small><strong id="tournament-venue-name">Neon Carnival</strong></span>
+              <span><small>CPU challenge</small><strong id="tournament-difficulty">Competitive</strong></span>
+              <span><small>Final format</small><strong>Champion CPU · 10F</strong></span>
+              <span><small>Prize</small><strong id="tournament-prize-name">Weighted cosmetic roll</strong></span>
+            </div>
+            <p class="circuit-sync-status" id="tournament-sync-status" aria-live="polite" hidden></p>
+            <button class="button button--primary button--wide" id="start-tournament-match" type="button" disabled>Checking entries&hellip;</button>
+          </section>
+          <aside class="circuit-card circuit-roster-panel" aria-labelledby="tournament-roster-title">
+            <div class="circuit-roster-heading"><div><p class="eyebrow">Active entry</p><h3 id="tournament-roster-title">Choose your bowler</h3></div><span id="tournament-selected-label">Daisy</span></div>
+            <div class="circuit-roster" id="tournament-roster" role="listbox" aria-label="Unlocked tournament bowlers"></div>
+            <p class="circuit-roster-note">Your circuit roster is eligible. Tournament prizes are cosmetic and never improve CPU performance.</p>
           </aside>
         </div>
       </section>
@@ -395,6 +444,10 @@
             <span class="campaign-result__stamp" id="campaign-result-stamp">Official result</span>
             <div><small id="campaign-result-kicker">Circuit achievement</small><strong id="campaign-result-title">Every Pin Counts</strong><p id="campaign-result-copy"></p></div>
           </article>
+          <article class="match-achievements" id="match-achievements" aria-live="polite" hidden>
+            <div><small>Achievement unlocked</small><strong id="match-achievements-title">Perfect Game</strong></div>
+            <div class="match-achievements__rewards" id="match-achievements-rewards"></div>
+          </article>
           <div class="results-actions">
             <button class="button button--primary" id="rematch-button" type="button">Rematch</button>
             <button class="button button--ghost" id="change-match-button" type="button">Change match</button>
@@ -492,7 +545,7 @@
       <div class="mastery-celebration-flare" aria-hidden="true"></div>
       <div id="mastery-celebration-content" aria-live="polite"></div>
       <button class="button button--primary button--wide" id="mastery-celebration-dismiss" type="button">Continue</button>
-      <p class="mastery-celebration-skip">Press Escape to skip. Earned rewards remain in the bowler inspector.</p>
+      <p class="mastery-celebration-skip">Press Escape to skip. Earned rewards remain available after this message.</p>
     </dialog>
 
     <dialog class="public-profile-dialog" id="public-profile-dialog" aria-labelledby="public-profile-name">
@@ -547,6 +600,15 @@
       <div class="lane-grid" id="lane-grid" role="listbox" aria-label="Lane houses"></div>
     </dialog>
 
+    <dialog class="menu-splash-dialog voucher-dialog" id="voucher-dialog" aria-labelledby="voucher-dialog-title">
+      <button class="dialog-close" id="voucher-close" type="button" aria-label="Close skin voucher picker">Ã—</button>
+      <p class="eyebrow">Player ladder reward</p>
+      <h2 id="voucher-dialog-title">Redeem a Skin Voucher</h2>
+      <p class="menu-splash-intro" id="voucher-dialog-copy">Choose one unowned outfit for a bowler you own. This cannot be undone.</p>
+      <div class="voucher-choice-grid" id="voucher-choice-grid" role="list" aria-label="Available voucher skins"></div>
+      <p class="profile-sync-status" id="voucher-status" aria-live="polite"></p>
+    </dialog>
+
     <script src="menu-splash-core.js"></script>
     <script src="lane-core.js"></script>
     <script src="room-core.js"></script>
@@ -559,6 +621,7 @@
     <script src="reward-tree-core.js"></script>
     <script src="mastery-rewards-core.js"></script>
     <script src="player-rewards-core.js"></script>
+    <script src="achievement-core.js"></script>
     <script src="character-catalog-data.js"></script>
     <script src="character-catalog.js"></script>
     <script src="audio-core.js"></script>

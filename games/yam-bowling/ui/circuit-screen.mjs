@@ -226,7 +226,10 @@ export function createCircuitScreen({
         (match) => match.achievement.id === session.campaignMatch.achievementId,
       );
       $("campaign-result-title").textContent = clearedMatch?.achievement.title || "Circuit achievement";
-      $("campaign-result-copy").textContent = `${opponent.name} is now available for circuit entry.`;
+      const roomLine = result.unlockedRoomSlugs?.length
+        ? ` New rooms: ${result.unlockedRoomSlugs.map((slug) => slug.split("-").map((word) => `${word[0].toUpperCase()}${word.slice(1)}`).join(" ")).join(" and ")}.`
+        : "";
+      $("campaign-result-copy").textContent = `${opponent.name} is now available for circuit entry.${roomLine}`;
     } else {
       $("campaign-result-stamp").textContent = "Win confirmed";
       $("campaign-result-kicker").textContent = "Sanctioned result";

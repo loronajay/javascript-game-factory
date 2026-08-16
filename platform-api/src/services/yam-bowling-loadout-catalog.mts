@@ -24,13 +24,13 @@ const BALL_TRAIL_IDS = Object.freeze([
   "none", "red-neon", "orange-flare", "gold-rush", "lime-shock",
   "emerald-glow", "mint-frost", "cyan-pulse", "sky-blue", "electric-blue",
   "indigo-drive", "violet-haze", "purple-plasma", "magenta-pop", "hot-pink",
-  "diamond-white",
+  "diamond-white", "championship-gold", "bracket-fire", "cosmic-ribbon", "royal-confetti",
 ]);
 const STRIKE_BURST_IDS = Object.freeze([
   "classic", "ember", "red-supernova", "gold-star", "lime-pop",
   "emerald-impact", "mint-crackle", "cyan-flash", "sky-shatter", "electric-blue",
   "indigo-ring", "violet-bloom", "purple-nova", "magenta-blast", "hot-pink-pop",
-  "diamond-spark",
+  "diamond-spark", "pin-crown", "finals-fireworks", "cosmic-cup", "victory-ribbon",
 ]);
 
 type Item = Readonly<{
@@ -78,8 +78,11 @@ for (const burstId of STRIKE_BURST_IDS) {
 for (const [id, type, founding] of [
   ["title:rookie", "title", true],
   ["title:pin-chaser", "title", false],
+  ["title:comeback-kid", "title", false],
+  ["title:yam-champion", "title", false],
   ["badge:founding-bowler", "badge", true],
   ["badge:perfect-game", "badge", false],
+  ["badge:split-decision", "badge", false],
 ] as const) {
   register({ id, type, founding, entitlementId: id });
 }

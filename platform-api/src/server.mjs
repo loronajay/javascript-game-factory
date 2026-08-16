@@ -8,7 +8,7 @@ import { incrementPlayerProfileView, loadPlayerMetrics, savePlayerMetrics } from
 import { applyMigrations } from "./db/migrations.mjs";
 import { getGarage, saveGarage, getPublicLoadout, getPublicLoadouts } from "./db/game-loadouts.mjs";
 import { getGameProfile, saveGameProfile, getGameProfiles } from "./db/game-profiles.mjs";
-import { activateInventoryItem, backfillLocalOwnership, findPlayPurchaseClaim, findStripeGrant, getGameProgress, recordGameProgressClaim, regrantStripeEntitlements, resetCampaignProgress, revokeGameEntitlements, spendValorForEntitlement } from "./db/game-progress.mjs";
+import { activateInventoryItem, backfillLocalOwnership, findPlayPurchaseClaim, findStripeGrant, getGameProgress, getYamBowlingTournamentState, recordGameProgressClaim, recordYamBowlingTournamentRound, redeemYamBowlingSkinVoucher, regrantStripeEntitlements, resetCampaignProgress, revokeGameEntitlements, spendValorForEntitlement } from "./db/game-progress.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
 import { getGameXpProgress } from "./db/game-xp.mjs";
@@ -258,6 +258,9 @@ async function bootstrap() {
         resetCampaign: (params) => resetCampaignProgress(pool, params.playerId, params.gameSlug),
         backfillOwnership: (params) => backfillLocalOwnership(pool, params),
         activateConsumable: (params) => activateInventoryItem(pool, params),
+        redeemSkinVoucher: (params) => redeemYamBowlingSkinVoucher(pool, params),
+        getTournamentState: (params) => getYamBowlingTournamentState(pool, params),
+        recordTournamentRound: (params) => recordYamBowlingTournamentRound(pool, params),
         createPremiumCheckoutSession: (params) => createTacticalArenaCheckoutSession({
             ...params,
             stripeApiKey: config.stripeApiKey,

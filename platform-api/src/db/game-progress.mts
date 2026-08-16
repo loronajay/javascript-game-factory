@@ -11,7 +11,16 @@ import {
 } from "../services/game-progress-claim-catalog.mjs";
 import { getValorOffer, priceValorOffer } from "../services/valor-catalog.mjs";
 import { awardCampaignXp, getGameXpProgress } from "./game-xp.mjs";
-import { isYamBowlingStarterBowler } from "../services/yam-bowling-reward-catalog.mjs";
+import {
+  isYamBowlingStarterBowler,
+  validateYamBowlingSkinVoucherTarget,
+} from "../services/yam-bowling-reward-catalog.mjs";
+import {
+  getYamBowlingTournamentEvent,
+  selectYamBowlingTournamentPrize,
+  YAM_BOWLING_TOURNAMENT_KIND,
+  YAM_BOWLING_TOURNAMENT_TITLE,
+} from "../services/yam-bowling-tournament-catalog.mjs";
 
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
 
@@ -414,7 +423,14 @@ export async function recordGameProgressClaim(pool: any, params: any = {}): Prom
     const alreadyProcessed = claim.rowCount === 0;
     if (!alreadyProcessed && Array.isArray(publicClaim?.entitlementGrants)) {
       for (const entitlement of publicClaim.entitlementGrants) {
-        await grantEntitlement(client, playerId, gameSlug, entitlement, "campaign", sourceId || claimId);
+        await grantEntitlement(
+          client,
+          playerId,
+          gameSlug,
+          entitlement,
+          kind === "match-achievement" ? "achievement" : "campaign",
+          sourceId || claimId,
+        );
       }
     }
     if (!alreadyProcessed && publicClaim?.campaignProgress) {
@@ -527,6 +543,9 @@ export async function recordGameProgressClaim(pool: any, params: any = {}): Prom
       ok: true,
       alreadyProcessed,
       progress: await getGameProgress(pool, playerId, gameSlug),
+      entitlementIds: alreadyProcessed
+        ? []
+        : (publicClaim?.entitlementGrants || []).map((entry: any) => entry.entitlementId),
       ...(progression ? { progression } : {}),
     };
   } catch (err) {
@@ -716,6 +735,259 @@ export async function activateInventoryItem(pool: any, params: any = {}): Promis
     await client.query("rollback").catch(() => {});
     process.stderr.write(`[game-progress] activateInventoryItem error: ${(err as any)?.message || err}\n`);
     return { ok: false, statusCode: 500, error: "activation_failed" };
+  } finally {
+    client.release();
+  }
+}
+
+export async function getYamBowlingTournamentState(pool: any, params: any = {}): Promise<any> {
+  const playerId = cleanText(params.playerId, 120);
+  const gameSlug = normalizeGameSlug(params.gameSlug);
+  if (!pool || !playerId || gameSlug !== "yam-bowling") {
+    return { ok: false, statusCode: 400, error: "invalid_request" };
+  }
+  const availability = getYamBowlingTournamentEvent(params.now);
+  if (availability.status !== "open") {
+    return { ok: true, ...availability, completedRoundIndexes: [], champion: false, prize: null };
+  }
+  try {
+    const result = await pool.query(
+      `select payload from game_progress_claims
+       where player_id = $1 and game_slug = $2 and kind = 'yam-tournament-round' and source_id = $3`,
+      [playerId, gameSlug, availability.event.id],
+    );
+    const payloads = result.rows
+      .map((row: any) => normalizePayload(row.payload))
+      .filter((payload: any) => payload.eventId === availability.event.id);
+    const completedRoundIndexes: number[] = [...new Set<number>(payloads
+      .map((payload: any): number => clampInt(payload.roundIndex, { min: 0, max: availability.event.rounds.length - 1 })))]
+      .sort((left, right) => left - right);
+    const finalPayload = payloads.find((payload: any) => payload.roundIndex === availability.event.rounds.length - 1);
+    return {
+      ok: true,
+      ...availability,
+      completedRoundIndexes,
+      champion: Boolean(finalPayload),
+      prize: finalPayload?.prize || null,
+    };
+  } catch (err) {
+    process.stderr.write(`[game-progress] getYamBowlingTournamentState error: ${(err as any)?.message || err}\n`);
+    return { ok: false, statusCode: 500, error: "tournament_unavailable" };
+  }
+}
+
+export async function recordYamBowlingTournamentRound(pool: any, params: any = {}): Promise<any> {
+  const playerId = cleanText(params.playerId, 120);
+  const gameSlug = normalizeGameSlug(params.gameSlug);
+  const eventId = cleanText(params.eventId, 120);
+  const bowlerSlug = cleanText(params.bowlerSlug, 120);
+  const roundIndex = Number(params.roundIndex);
+  if (!pool || !playerId || gameSlug !== "yam-bowling" || !eventId || !bowlerSlug) {
+    return { ok: false, statusCode: 400, error: "invalid_request" };
+  }
+  const availability = getYamBowlingTournamentEvent(params.now);
+  if (availability.status !== "open") return { ok: false, statusCode: 409, error: "tournament_closed" };
+  if (availability.event.id !== eventId) return { ok: false, statusCode: 409, error: "event_not_active" };
+  const round = availability.event.rounds.find((entry: any) => entry.index === roundIndex);
+  if (!round || !Number.isInteger(roundIndex)) return { ok: false, statusCode: 400, error: "invalid_round" };
+
+  const claimId = `tournament-round:${eventId}:${roundIndex}`;
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await ensureGameProgressProfile(client, playerId, gameSlug);
+    if (!isYamBowlingStarterBowler(bowlerSlug)) {
+      const bowler = await client.query(
+        `select 1 from game_entitlements
+         where player_id = $1 and game_slug = $2 and entitlement_id = $3 limit 1`,
+        [playerId, gameSlug, `bowler:${bowlerSlug}`],
+      );
+      if (!bowler.rows.length) {
+        await client.query("rollback");
+        return { ok: false, statusCode: 409, error: "active_bowler_not_owned" };
+      }
+    }
+    if (roundIndex > 0) {
+      const prerequisite = await client.query(
+        `select 1 from game_progress_claims
+         where player_id = $1 and game_slug = $2 and claim_id = $3 limit 1`,
+        [playerId, gameSlug, `tournament-round:${eventId}:${roundIndex - 1}`],
+      );
+      if (!prerequisite.rows.length) {
+        await client.query("rollback");
+        return { ok: false, statusCode: 409, error: "previous_round_incomplete" };
+      }
+    }
+
+    const initialPayload = { eventId, roundIndex, bowlerSlug };
+    const claim = await client.query(
+      `insert into game_progress_claims (player_id, game_slug, claim_id, kind, source_id, payload)
+       values ($1, $2, $3, $4, $5, $6::jsonb)
+       on conflict (player_id, game_slug, claim_id) do nothing`,
+      [playerId, gameSlug, claimId, YAM_BOWLING_TOURNAMENT_KIND, eventId, JSON.stringify(initialPayload)],
+    );
+    if (claim.rowCount === 0) {
+      const previous = await client.query(
+        `select payload from game_progress_claims
+         where player_id = $1 and game_slug = $2 and claim_id = $3`,
+        [playerId, gameSlug, claimId],
+      );
+      const payload = normalizePayload(previous.rows[0]?.payload);
+      await client.query("commit");
+      return {
+        ok: true,
+        alreadyProcessed: true,
+        prize: payload.prize || null,
+        entitlementIds: Array.isArray(payload.entitlementIds) ? payload.entitlementIds : [],
+        tournament: await getYamBowlingTournamentState(pool, params),
+        progress: await getGameProgress(pool, playerId, gameSlug),
+      };
+    }
+
+    let prize: any = null;
+    const entitlementIds: string[] = [];
+    if (roundIndex === availability.event.rounds.length - 1) {
+      const owned = await client.query(
+        `select entitlement_id from game_entitlements where player_id = $1 and game_slug = $2`,
+        [playerId, gameSlug],
+      );
+      prize = selectYamBowlingTournamentPrize({
+        playerId,
+        eventId,
+        ownedEntitlementIds: owned.rows.map((row: any) => row.entitlement_id),
+        ...(Number.isFinite(Number(params.prizeRoll)) ? { roll: Number(params.prizeRoll) } : {}),
+      });
+      await grantEntitlement(client, playerId, gameSlug, YAM_BOWLING_TOURNAMENT_TITLE, "tournament", eventId);
+      entitlementIds.push(YAM_BOWLING_TOURNAMENT_TITLE.entitlementId);
+      if (prize.kind === "entitlement") {
+        await grantEntitlement(client, playerId, gameSlug, {
+          entitlementId: prize.entitlementId,
+          kind: prize.entitlementId.split(":")[0],
+        }, "tournament", eventId);
+        entitlementIds.push(prize.entitlementId);
+      } else {
+        await grantInventoryItem(client, playerId, gameSlug, prize.itemId, prize.quantity);
+      }
+      await client.query(
+        `update game_progress_claims set payload = $4::jsonb
+         where player_id = $1 and game_slug = $2 and claim_id = $3`,
+        [playerId, gameSlug, claimId, JSON.stringify({ ...initialPayload, prize, entitlementIds })],
+      );
+    }
+
+    await client.query("commit");
+    return {
+      ok: true,
+      alreadyProcessed: false,
+      prize,
+      entitlementIds,
+      tournament: await getYamBowlingTournamentState(pool, params),
+      progress: await getGameProgress(pool, playerId, gameSlug),
+    };
+  } catch (err) {
+    await client.query("rollback").catch(() => {});
+    process.stderr.write(`[game-progress] recordYamBowlingTournamentRound error: ${(err as any)?.message || err}\n`);
+    return { ok: false, statusCode: 500, error: "tournament_claim_failed" };
+  } finally {
+    client.release();
+  }
+}
+
+// Redeem exactly one Yam Bowling ladder voucher for one named alternate skin.
+// The target is constrained by the server catalog, the bowler must be owned,
+// and decrement + entitlement grant share one transaction. A caller-generated
+// redemption id makes a lost response safe to retry without spending twice.
+export async function redeemYamBowlingSkinVoucher(pool: any, params: any = {}): Promise<any> {
+  const playerId = cleanText(params.playerId, 120);
+  const gameSlug = normalizeGameSlug(params.gameSlug);
+  const redemptionId = cleanText(params.redemptionId, 120);
+  const target = validateYamBowlingSkinVoucherTarget(gameSlug, cleanText(params.entitlementId, 180));
+  if (!pool || !playerId || !redemptionId) {
+    return { ok: false, statusCode: 400, error: "invalid_request" };
+  }
+  if (!target) return { ok: false, statusCode: 400, error: "invalid_skin_target" };
+
+  const claimId = `skin-voucher-redemption:${redemptionId}`;
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await ensureGameProgressProfile(client, playerId, gameSlug);
+    const claim = await client.query(
+      `insert into game_progress_claims (player_id, game_slug, claim_id, kind, source_id, payload)
+       values ($1, $2, $3, 'skin-voucher-redemption', $4, '{}'::jsonb)
+       on conflict (player_id, game_slug, claim_id) do nothing`,
+      [playerId, gameSlug, claimId, target.entitlementId],
+    );
+    if (claim.rowCount === 0) {
+      const previous = await client.query(
+        `select payload from game_progress_claims
+         where player_id = $1 and game_slug = $2 and claim_id = $3`,
+        [playerId, gameSlug, claimId],
+      );
+      const payload = normalizePayload(previous.rows[0]?.payload);
+      if (payload.entitlementId !== target.entitlementId) {
+        await client.query("rollback");
+        return { ok: false, statusCode: 409, error: "redemption_id_conflict" };
+      }
+      await client.query("commit");
+      return {
+        ok: true,
+        alreadyProcessed: true,
+        entitlementId: target.entitlementId,
+        progress: await getGameProgress(pool, playerId, gameSlug),
+      };
+    }
+
+    if (!isYamBowlingStarterBowler(target.bowlerSlug)) {
+      const bowler = await client.query(
+        `select 1 from game_entitlements
+         where player_id = $1 and game_slug = $2 and entitlement_id = $3 limit 1`,
+        [playerId, gameSlug, `bowler:${target.bowlerSlug}`],
+      );
+      if (!bowler.rows.length) {
+        await client.query("rollback");
+        return { ok: false, statusCode: 409, error: "bowler_not_owned" };
+      }
+    }
+    const owned = await client.query(
+      `select 1 from game_entitlements
+       where player_id = $1 and game_slug = $2 and entitlement_id = $3 limit 1`,
+      [playerId, gameSlug, target.entitlementId],
+    );
+    if (owned.rows.length) {
+      await client.query("rollback");
+      return { ok: false, statusCode: 409, error: "skin_already_owned" };
+    }
+
+    const spent = await client.query(
+      `update game_inventory_items
+       set quantity = quantity - 1, updated_at = now()
+       where player_id = $1 and game_slug = $2 and item_id = 'skin-voucher' and quantity > 0
+       returning quantity`,
+      [playerId, gameSlug],
+    );
+    if (!spent.rows.length) {
+      await client.query("rollback");
+      return { ok: false, statusCode: 409, error: "voucher_not_owned" };
+    }
+
+    await grantEntitlement(client, playerId, gameSlug, { entitlementId: target.entitlementId, kind: "skin" }, "skin-voucher", redemptionId);
+    await client.query(
+      `update game_progress_claims set payload = $4::jsonb
+       where player_id = $1 and game_slug = $2 and claim_id = $3`,
+      [playerId, gameSlug, claimId, JSON.stringify({ entitlementId: target.entitlementId })],
+    );
+    await client.query("commit");
+    return {
+      ok: true,
+      alreadyProcessed: false,
+      entitlementId: target.entitlementId,
+      progress: await getGameProgress(pool, playerId, gameSlug),
+    };
+  } catch (err) {
+    await client.query("rollback").catch(() => {});
+    process.stderr.write(`[game-progress] redeemYamBowlingSkinVoucher error: ${(err as any)?.message || err}\n`);
+    return { ok: false, statusCode: 500, error: "redemption_failed" };
   } finally {
     client.release();
   }

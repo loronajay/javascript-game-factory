@@ -53,17 +53,12 @@ test("boot sync applies only the authenticated server snapshot", async () => {
 test("a circuit clear changes ownership only after the claim returns a server snapshot", async () => {
   const store = Campaign.createCampaignStore({ storage: memoryStorage() });
   let releaseClaim;
+  let appliedProgression = null;
   const pendingClaim = new Promise((resolve) => { releaseClaim = resolve; });
   const client = createCampaignProgressClient({
     campaignStore: store,
     progressionCore: Progression,
-    progressionStore: { applySnapshot: (snapshot) => assert.deepEqual(snapshot, {
-      version: Progression.SCHEMA_VERSION,
-      player: { xp: 300 },
-      bowlers: progressionSnapshot().tracks,
-      grants: progressionSnapshot().grants,
-      syncedAt: null,
-    }) },
+    progressionStore: { applySnapshot: (snapshot) => { appliedProgression = snapshot; return true; } },
     platformApi: {
       fetchGameProgress: async () => ({ campaignProgress: [], entitlements: [] }),
       recordGameProgressClaim: async (slug, claim) => {
@@ -87,13 +82,23 @@ test("a circuit clear changes ownership only after the claim returns a server sn
     alreadyProcessed: false,
     progress: firstClearSnapshot(),
     progression: progressionSnapshot(),
+    entitlementIds: [],
   });
 
   const result = await resultPromise;
   assert.equal(result.ok, true);
   assert.equal(result.firstClear, true);
   assert.equal(result.unlockedBowlerSlug, "hazel-ward");
+  assert.deepEqual(result.unlockedRoomSlugs, []);
   assert.equal(store.getUnlockedBowlerSlugs().includes("hazel-ward"), true);
+  assert.deepEqual(appliedProgression, {
+    version: Progression.SCHEMA_VERSION,
+    player: { xp: 300 },
+    bowlers: progressionSnapshot().tracks,
+    grants: progressionSnapshot().grants,
+    syncedAt: appliedProgression.syncedAt,
+  });
+  assert.equal(typeof appliedProgression.syncedAt, "string", "the confirmed claim leaves progression fresh");
 });
 
 test("a failed claim never falls back to a local character grant", async () => {

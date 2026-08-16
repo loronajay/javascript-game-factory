@@ -62,10 +62,12 @@ export function createSessionState({ physics, animation, effects, storedSkinId, 
 
     // --- Match progress ---
     match: null,
+    matchFacts: { rolls: [] },
     // Present only while a sanctioned single-player circuit match is active.
     // The campaign domain owns its meaning; the match runtime only uses the
     // declared venue and opponent presentation.
     campaignMatch: null,
+    tournamentMatch: null,
     playerShots: [],
     contactedPinCount: 0,
     paused: false,

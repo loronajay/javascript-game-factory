@@ -87,10 +87,11 @@ export function createMatchRuntime({
 
   function createPlayers() {
     const { setup } = session;
-    const campaignOpponent = session.campaignMatch
-      ? assets.bowlerBySlug(session.campaignMatch.opponentSlug)
+    const sanctionedMatch = session.tournamentMatch || session.campaignMatch;
+    const campaignOpponent = sanctionedMatch
+      ? assets.bowlerBySlug(sanctionedMatch.opponentSlug)
       : null;
-    const campaignPlayer = session.campaignMatch
+    const campaignPlayer = sanctionedMatch
       ? assets.bowlerBySlug(setup.characterSlugs[0])
       : null;
     return [
@@ -106,7 +107,7 @@ export function createMatchRuntime({
         name: campaignOpponent?.name || (setup.playType === "cpu" ? core.chooseCpuName() : "Player 2"),
         characterSlug: setup.characterSlugs[1],
         skinId: setup.skinIds[1],
-        type: session.campaignMatch || setup.playType === "cpu" ? "cpu" : "human",
+        type: sanctionedMatch || setup.playType === "cpu" ? "cpu" : "human",
       },
     ];
   }
@@ -129,16 +130,17 @@ export function createMatchRuntime({
   }
 
   function startMatch() {
-    applyMatchLane(session.campaignMatch?.venueSlug || getLocalLaneSlug());
+    applyMatchLane(session.tournamentMatch?.venueSlug || session.campaignMatch?.venueSlug || getLocalLaneSlug());
     session.setup.skinIds = session.setup.characterSlugs.map((slug) => assets.storedSkinId(slug));
     session.onlineMatch = false;
     session.onlineSnapshot = null;
     session.pendingAuthoritativeRoll = null;
     session.lastAppliedOnlineRoll = 0;
     session.reportedRatingSessionId = "";
+    session.matchFacts.rolls = [];
     session.match = core.createMatch({
       modeId: session.setup.modeId,
-      playType: session.campaignMatch ? "campaign" : session.setup.playType,
+      playType: session.tournamentMatch ? "tournament" : session.campaignMatch ? "campaign" : session.setup.playType,
       cpuLevelId: session.setup.cpuLevelId,
       players: createPlayers(),
     });
@@ -148,7 +150,9 @@ export function createMatchRuntime({
     shotHud.resetSpinFeedback();
     $("pause-overlay").hidden = true;
     $("restart-match-button").hidden = false;
-    $("quit-match-button").textContent = session.campaignMatch ? "Quit to circuit" : "Quit to setup";
+    $("quit-match-button").textContent = session.tournamentMatch
+      ? "Quit to tournament"
+      : session.campaignMatch ? "Quit to circuit" : "Quit to setup";
     $("online-result-status").hidden = true;
     audio.resumeMusic();
     resetHumanShot();
@@ -246,6 +250,9 @@ export function createMatchRuntime({
   }
 
   function finalizeRoll() {
+    const shooter = session.activePlayer();
+    const frameIndex = session.match.frameIndex;
+    const rollIndex = shooter?.frames?.[frameIndex]?.length || 0;
     const startedStanding = scene.simulation.startStanding;
     // Online, the server's count is the truth and the local simulation was only
     // the animation of it.
@@ -254,6 +261,12 @@ export function createMatchRuntime({
       ? authority.roll.knocked
       : Math.max(0, Math.min(startedStanding, physics.knockedCount(scene.simulation)));
     scene.pins = authority ? clonePins(authority.roll.pinsAfter) : scene.simulation.pins;
+    session.matchFacts.rolls.push({
+      playerId: shooter?.id || "",
+      frameIndex,
+      rollIndex,
+      standingPinIdsAfter: scene.pins.filter((pin) => pin.standing).map((pin) => Number(pin.id)).sort((a, b) => a - b),
+    });
     if (!authority) localRollSequence += 1;
     resultsScreen.showCallout(knocked, startedStanding);
     if (knocked > 0) renderer.shake = Math.min(12, 3 + knocked);

@@ -35,6 +35,10 @@ const YAM_BOWLING = {
     performanceXpPerUnit: 4,
     maxPerformanceXp: 20,
     trackStats: { strikes: "sum", highGame: "max" },
+    playerInventoryRewards: Object.freeze([
+        Object.freeze({ level: 10, itemId: "skin-voucher", quantity: 1 }),
+        Object.freeze({ level: 25, itemId: "skin-voucher", quantity: 1 }),
+    ]),
 };
 const PROGRESSIONS = [YAM_BOWLING];
 export function getProgression(gameSlug) {
@@ -71,6 +75,17 @@ export function levelFromXp(curve, xp) {
         xpForNextLevel: isMaxLevel ? 0 : xpForLevel(curve, level + 1) - xpForLevel(curve, level),
         isMaxLevel,
     };
+}
+export function inventoryRewardsBetween(definition, previousXp, nextXp) {
+    if (!definition?.curves?.player)
+        return [];
+    const previousLevel = levelFromXp(definition.curves.player, previousXp).level;
+    const nextLevel = levelFromXp(definition.curves.player, nextXp).level;
+    if (nextLevel <= previousLevel)
+        return [];
+    return (definition.playerInventoryRewards || [])
+        .filter((reward) => reward.level > previousLevel && reward.level <= nextLevel)
+        .map((reward) => ({ level: reward.level, itemId: reward.itemId, quantity: reward.quantity }));
 }
 function refused(reason) {
     return { eligible: false, reason, xp: 0, breakdown: { completion: 0, win: 0, performance: 0, forfeit: 0 } };

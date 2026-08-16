@@ -39,6 +39,7 @@ export function createOnlineSession({
     session.pendingAuthoritativeRoll = null;
     session.lastAppliedOnlineRoll = Number(snapshot.rollNumber) || 0;
     session.reportedRatingSessionId = "";
+    session.matchFacts.rolls = [];
     session.resetScene(matchRuntime.clonePins(snapshot.nextPins));
     shotHud.resetChargeFeedback();
     shotHud.resetSpinFeedback();

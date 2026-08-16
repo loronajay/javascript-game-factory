@@ -3,7 +3,10 @@ import { createOnlineIdentityPayload } from "../../js/platform/identity/match-id
 import { createPlatformApiClient } from "../../js/platform/api/platform-api.mjs";
 import { createYamAccountAccess } from "./account-access.mjs";
 import { createCampaignProgressClient } from "./campaign-progress-client.mjs";
+import { createTournamentClient } from "./tournament-client.mjs";
 import { createProfileSyncClient } from "./profile/profile-sync-client.mjs";
+import { createVoucherClient } from "./profile/voucher-client.mjs";
+import { createAchievementClient } from "./profile/achievement-client.mjs";
 import { createPublicProfileClient } from "./profile/public-profile-client.mjs";
 import { createPublicProfileRepository } from "./profile/public-profile-repository.mjs";
 import { createOnlineClient, normalizeRoomCode } from "./online-client.mjs";
@@ -16,6 +19,7 @@ import { createCharacterInspector } from "./ui/character-inspector.mjs";
 import { createSetupScreen } from "./ui/setup-screen.mjs";
 import { createOnlineScreen } from "./ui/online-screen.mjs";
 import { createCircuitScreen } from "./ui/circuit-screen.mjs";
+import { createTournamentScreen } from "./ui/tournament-screen.mjs";
 import { createProfileScreen } from "./ui/profile-screen.mjs";
 import { createPublicProfileScreen } from "./ui/public-profile-screen.mjs";
 import { createShotHud } from "./ui/shot-hud.mjs";
@@ -26,7 +30,8 @@ import { createMatchRuntime } from "./match/match-runtime.mjs";
 import { createOnlineSession } from "./online/online-session.mjs";
 import { createProgressionReporter } from "./online/progression-reporter.mjs";
 import { createMasteryCelebrationQueue } from "./state/mastery-celebrations.mjs";
-import { createMasteryCelebrationPresenter } from "./ui/mastery-celebration.mjs";
+import { createPlayerLevelCelebrationQueue } from "./state/player-level-celebrations.mjs";
+import { createProgressionCelebrationPresenter } from "./ui/progression-celebration.mjs";
 import { bindEvents, createHeldKeys } from "./input/bindings.mjs";
 
 initMobileLandscapeGate();
@@ -52,6 +57,7 @@ initMobileLandscapeGate();
   const ProgressionCore = window.YamProgression;
   const MasteryRewards = window.YamMasteryRewards;
   const PlayerRewards = window.YamPlayerRewards;
+  const AchievementCore = window.YamAchievementCore;
   const Campaign = window.YamCampaign;
   const Effects = window.YamEffects;
   const Catalog = window.YamCharacterCatalog;
@@ -74,20 +80,27 @@ initMobileLandscapeGate();
   // The device-local cache of an authoritative balance. It never awards itself
   // XP; only a server snapshot moves a number in it.
   const progression = ProgressionCore.createProgressionStore();
-  const masteryCelebration = createMasteryCelebrationPresenter({
-    queue: createMasteryCelebrationQueue({ rewards: MasteryRewards }),
+  const progressionCelebration = createProgressionCelebrationPresenter({
+    masteryQueue: createMasteryCelebrationQueue({ rewards: MasteryRewards }),
+    playerQueue: createPlayerLevelCelebrationQueue({ rewards: PlayerRewards }),
     playerId: factoryProfile.playerId,
     progression,
     roster: Roster,
+    loadout,
     audio,
   });
   let profileScreen = null;
+  const voucherClient = createVoucherClient({ platformApi, loadout });
   const assets = createCharacterAssets({ animation: Animation, roster: Roster, loadout });
   const progressionReporter = createProgressionReporter({
     progressionCore: ProgressionCore,
     store: progression,
     platformApi,
-    onSnapshotApplied: () => masteryCelebration.observe(),
+    onSnapshotApplied: () => {
+      applyLevelUnlocks();
+      profileScreen?.refresh();
+      progressionCelebration.observe();
+    },
   });
 
   const session = createSessionState({
@@ -148,10 +161,11 @@ initMobileLandscapeGate();
     platformApi,
     onSnapshotApplied: (snapshot) => {
       loadout.applyServerEntitlements(snapshot?.entitlements || []);
+      voucherClient.applyProgress(snapshot);
       applyLevelUnlocks();
       menuSplashPicker.refresh();
       profileScreen?.refresh();
-      masteryCelebration.observe();
+      progressionCelebration.observe();
     },
   });
   const profileSync = createProfileSyncClient({
@@ -160,11 +174,22 @@ initMobileLandscapeGate();
     loadout,
     progressionCore: ProgressionCore,
     progressionStore: progression,
+    onGameProgress: (snapshot) => voucherClient.applyProgress(snapshot),
     onSnapshotApplied: () => {
       applyLevelUnlocks();
       menuSplashPicker.refresh();
       profileScreen?.refresh();
-      masteryCelebration.observe();
+      progressionCelebration.observe();
+    },
+  });
+  const tournamentClient = createTournamentClient({
+    platformApi,
+    loadout,
+    voucherClient,
+    onSnapshotApplied: () => {
+      applyLevelUnlocks();
+      menuSplashPicker.refresh();
+      profileScreen?.refresh();
     },
   });
   profileScreen = createProfileScreen({
@@ -176,6 +201,7 @@ initMobileLandscapeGate();
     cosmetics: Cosmetics,
     playerRewards: PlayerRewards,
     syncClient: profileSync,
+    voucherClient,
     audio,
   });
   const publicProfiles = createPublicProfileRepository({
@@ -216,6 +242,8 @@ initMobileLandscapeGate();
   let onlineSession = null;
   let matchRuntime = null;
   let circuitScreen = null;
+  let tournamentScreen = null;
+  let achievementClient = null;
 
   const resultsScreen = createResultsScreen({
     session,
@@ -223,11 +251,29 @@ initMobileLandscapeGate();
     assets,
     audio,
     audioCore: AudioCore,
+    cosmetics: Cosmetics,
     localClientId: () => onlineClient.getSnapshot().clientId,
     onOpenProfile: (playerId, profileName, focusTarget) => publicProfileScreen.open(playerId, profileName, focusTarget),
     onShown: () => {
       circuitScreen?.handleResultsShown();
+      tournamentScreen?.handleResultsShown();
       onlineSession?.reportResult();
+      const localPlayerId = session.onlineMatch ? onlineClient.getSnapshot().clientId : "p1";
+      achievementClient?.handleFinishedMatch({
+        match: session.onlineMatch ? { ...session.match, playType: "online" } : session.match,
+        localPlayerId,
+        rolls: session.matchFacts.rolls,
+      }).catch(() => {});
+    },
+  });
+  achievementClient = createAchievementClient({
+    achievementCore: AchievementCore,
+    platformApi,
+    loadout,
+    onEarned: (achievementIds) => resultsScreen.showAchievements(achievementIds),
+    onSnapshotApplied: () => {
+      menuSplashPicker.refresh();
+      profileScreen?.refresh();
     },
   });
   const scoreboard = createScoreboard({
@@ -285,6 +331,17 @@ initMobileLandscapeGate();
     campaignProgress,
   });
 
+  tournamentScreen = createTournamentScreen({
+    session,
+    client: tournamentClient,
+    campaignStore,
+    assets,
+    laneCore: LaneCore,
+    audio,
+    accountAccess,
+    getMatchRuntime: () => matchRuntime,
+  });
+
   onlineSession = createOnlineSession({
     session,
     onlineClient,
@@ -334,12 +391,13 @@ initMobileLandscapeGate();
 
   async function init() {
     menuSplashPicker.build();
-    masteryCelebration.bind();
+    progressionCelebration.bind();
     accountAccess.syncControls();
     accountAccess.bindSessionChanges(document, () => {
       loadout.clearServerAuthority();
       onlineSession.leaveToTitle();
       circuitScreen.leaveToTitle();
+      tournamentScreen.leaveToTitle();
       profileScreen.leaveToTitle();
     });
     if (accountAccess.isEligible()) {
@@ -365,11 +423,12 @@ initMobileLandscapeGate();
     setupScreen.bind();
     onlineScreen.bind();
     circuitScreen.bind();
+    tournamentScreen.bind();
     profileScreen.bind();
     publicProfileScreen.bind();
     bindEvents({
       session, keys, audio, renderer, matchRuntime, onlineSession,
-      circuitScreen, profileScreen, setupScreen, onlineScreen, shotHud, syncAudioToggle, accountAccess,
+      circuitScreen, tournamentScreen, profileScreen, setupScreen, onlineScreen, shotHud, syncAudioToggle, accountAccess,
     });
 
     if (accountAccess.isEligible() && onlineClient.resumeSavedSession()) {

@@ -143,7 +143,7 @@ test("the trail cabinet offers a broad, distinct color collection to unlock", ()
   const trails = listByType("ball-trail");
   const colorTrails = trails.filter((item) => item.id !== "ball-trail:none");
 
-  assert.equal(trails.length, 16, "No Trail plus fifteen color rewards should be visible");
+  assert.equal(trails.length, 20, "No Trail plus nineteen color rewards should be visible");
   assert.deepEqual(colorTrails.map((item) => item.id), [
     "ball-trail:red-neon",
     "ball-trail:orange-flare",
@@ -160,6 +160,10 @@ test("the trail cabinet offers a broad, distinct color collection to unlock", ()
     "ball-trail:magenta-pop",
     "ball-trail:hot-pink",
     "ball-trail:diamond-white",
+    "ball-trail:championship-gold",
+    "ball-trail:bracket-fire",
+    "ball-trail:cosmic-ribbon",
+    "ball-trail:royal-confetti",
   ]);
 
   const paletteSignatures = new Set();
@@ -168,8 +172,8 @@ test("the trail cabinet offers a broad, distinct color collection to unlock", ()
     // are player-level loot -- so what matters here is that every one of them
     // is earned by levelling and none of it starts owned.
     assert.ok(
-      ["bowler-level", "player-level"].includes(trail.unlock.source),
-      `${trail.id} should be earnable level loot`,
+      ["bowler-level", "player-level", "tournament"].includes(trail.unlock.source),
+      `${trail.id} should have an earn route`,
     );
     assert.equal(isOwnedByDefault(trail.id), false, `${trail.id} must begin locked`);
     assert.ok(trail.assets.palette.length >= 2, `${trail.id} needs a gradient palette`);
@@ -183,7 +187,7 @@ test("the strike cabinet offers a broad, distinct burst collection to unlock", (
   const bursts = listByType("strike-burst");
   const rewardBursts = bursts.filter((item) => item.id !== "strike-burst:classic");
 
-  assert.equal(bursts.length, 16, "Classic plus fifteen color rewards should be visible");
+  assert.equal(bursts.length, 20, "Classic plus nineteen color rewards should be visible");
   assert.deepEqual(rewardBursts.map((item) => item.id), [
     "strike-burst:ember",
     "strike-burst:red-supernova",
@@ -200,13 +204,17 @@ test("the strike cabinet offers a broad, distinct burst collection to unlock", (
     "strike-burst:magenta-blast",
     "strike-burst:hot-pink-pop",
     "strike-burst:diamond-spark",
+    "strike-burst:pin-crown",
+    "strike-burst:finals-fireworks",
+    "strike-burst:cosmic-cup",
+    "strike-burst:victory-ribbon",
   ]);
 
   const paletteSignatures = new Set();
   for (const burst of rewardBursts) {
     assert.ok(
-      ["bowler-level", "player-level"].includes(burst.unlock.source),
-      `${burst.id} should be earnable level loot`,
+      ["bowler-level", "player-level", "tournament"].includes(burst.unlock.source),
+      `${burst.id} should have an earn route`,
     );
     assert.equal(isOwnedByDefault(burst.id), false, `${burst.id} must begin locked`);
     assert.ok(burst.assets.palette.length >= 2, `${burst.id} needs a gradient palette`);
@@ -241,6 +249,27 @@ test("profile rewards span mastery, achievement, behavior, and tournament presti
 
   assert.ok(UNLOCK_SOURCES.includes("tournament"), "tournament prizes need a first-class unlock source");
   assert.equal(new Set(expected.map(([, source]) => source)).size, 3, "the pilot collection should not be one-note");
+});
+
+test("rotating tournaments have an exclusive common effect pool", () => {
+  const tournamentEffects = CATALOG
+    .filter((item) => ["ball-trail", "strike-burst"].includes(item.type) && item.unlock.source === "tournament")
+    .map((item) => item.id);
+  assert.deepEqual(tournamentEffects, [
+    "ball-trail:championship-gold",
+    "ball-trail:bracket-fire",
+    "ball-trail:cosmic-ribbon",
+    "ball-trail:royal-confetti",
+    "strike-burst:pin-crown",
+    "strike-burst:finals-fireworks",
+    "strike-burst:cosmic-cup",
+    "strike-burst:victory-ribbon",
+  ]);
+  for (const itemId of tournamentEffects) {
+    const item = getItem(itemId);
+    assert.equal(item.tier, "rare");
+    assert.equal(item.assets.palette.length, 2);
+  }
 });
 
 test("unknown ids resolve to nothing rather than a fabricated item", () => {

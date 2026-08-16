@@ -19,6 +19,7 @@ export function bindEvents({
   onlineSession,
   accountAccess,
   circuitScreen,
+  tournamentScreen,
   profileScreen,
   setupScreen,
   onlineScreen,
@@ -36,6 +37,7 @@ export function bindEvents({
     session.paused = false;
     $("pause-overlay").hidden = true;
     if (session.onlineMatch) onlineSession.leave();
+    else if (session.tournamentMatch) tournamentScreen.returnToTournament();
     else if (session.campaignMatch) circuitScreen.returnToCircuit();
     else showScreen("setup-screen");
     audio.resumeMusic();
@@ -68,6 +70,9 @@ export function bindEvents({
   $("circuit-button").addEventListener("click", () => {
     if (accountAccess.requireFactoryAccount()) circuitScreen.open();
   });
+  $("tournament-button").addEventListener("click", () => {
+    if (accountAccess.requireFactoryAccount()) tournamentScreen.open();
+  });
   $("profile-button").addEventListener("click", () => {
     if (accountAccess.requireFactoryAccount()) profileScreen.open();
   });
@@ -79,6 +84,7 @@ export function bindEvents({
   });
   $("setup-back").addEventListener("click", () => showScreen("title-screen"));
   $("circuit-back").addEventListener("click", () => circuitScreen.leaveToTitle());
+  $("tournament-back").addEventListener("click", () => tournamentScreen.leaveToTitle());
   $("profile-back").addEventListener("click", () => profileScreen.leaveToTitle());
   $("online-back").addEventListener("click", () => showScreen("title-screen"));
   $("how-button").addEventListener("click", () => { $("how-dialog").showModal(); audio.play("popup"); });
@@ -165,16 +171,19 @@ export function bindEvents({
 
   $("rematch-button").addEventListener("click", () => {
     if (session.onlineMatch) onlineSession.requestRematch();
+    else if (session.tournamentMatch) tournamentScreen.handlePrimaryResultAction();
     else if (session.campaignMatch) circuitScreen.handlePrimaryResultAction();
     else matchRuntime.startMatch();
   });
   $("change-match-button").addEventListener("click", () => {
     if (session.onlineMatch) onlineSession.leave();
+    else if (session.tournamentMatch) tournamentScreen.returnToTournament();
     else if (session.campaignMatch) circuitScreen.returnToCircuit();
     else { showScreen("setup-screen"); setupScreen.render(); }
   });
   $("results-home-button").addEventListener("click", () => {
-    if (session.campaignMatch) circuitScreen.leaveToTitle();
+    if (session.tournamentMatch) tournamentScreen.leaveToTitle();
+    else if (session.campaignMatch) circuitScreen.leaveToTitle();
     else onlineSession.leaveToTitle();
   });
 

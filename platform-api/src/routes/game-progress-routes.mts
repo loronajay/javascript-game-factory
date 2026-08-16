@@ -7,7 +7,70 @@ import {
 
 export async function handleGameProgressRoute(context: any): Promise<boolean> {
   const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services } = context;
-  const { getGameProgress, recordGameProgressClaim, spendValor, resetCampaign, backfillOwnership, activateConsumable } = services;
+  const {
+    getGameProgress, recordGameProgressClaim, spendValor, resetCampaign, backfillOwnership,
+    activateConsumable, redeemSkinVoucher, getTournamentState, recordTournamentRound,
+  } = services;
+
+  const tournamentCurrentMatch = pathname.match(/^\/game-progress\/([^/]+)\/tournaments\/current$/);
+  if (method === "GET" && tournamentCurrentMatch) {
+    const gameSlug = decodeURIComponent(tournamentCurrentMatch[1]);
+    if (gameSlug !== "yam-bowling") {
+      writeJson(res, 400, { status: "error", error: "invalid_game_slug", timestamp }, requestOrigin);
+      return true;
+    }
+    if (!authClaims?.playerId) {
+      writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
+      return true;
+    }
+    if (typeof getTournamentState !== "function") {
+      writeJson(res, 503, { status: "error", error: "tournament_not_configured", timestamp }, requestOrigin);
+      return true;
+    }
+    const result = await getTournamentState({ playerId: authClaims.playerId, gameSlug, now: timestamp });
+    if (!result?.ok) {
+      writeJson(res, result?.statusCode || 500, { status: "error", error: result?.error || "tournament_unavailable", timestamp }, requestOrigin);
+      return true;
+    }
+    writeJson(res, 200, result, requestOrigin);
+    return true;
+  }
+
+  const tournamentRoundMatch = pathname.match(/^\/game-progress\/([^/]+)\/tournaments\/rounds\/(\d+)$/);
+  if (method === "POST" && tournamentRoundMatch) {
+    const gameSlug = decodeURIComponent(tournamentRoundMatch[1]);
+    if (gameSlug !== "yam-bowling") {
+      writeJson(res, 400, { status: "error", error: "invalid_game_slug", timestamp }, requestOrigin);
+      return true;
+    }
+    if (!authClaims?.playerId) {
+      writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
+      return true;
+    }
+    if (typeof recordTournamentRound !== "function") {
+      writeJson(res, 503, { status: "error", error: "tournament_not_configured", timestamp }, requestOrigin);
+      return true;
+    }
+    const body = await readJsonBody(req);
+    if (!body.ok) {
+      writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+      return true;
+    }
+    const result = await recordTournamentRound({
+      playerId: authClaims.playerId,
+      gameSlug,
+      now: timestamp,
+      eventId: body.value?.eventId,
+      roundIndex: Number(tournamentRoundMatch[2]),
+      bowlerSlug: body.value?.bowlerSlug,
+    });
+    if (!result?.ok) {
+      writeJson(res, result?.statusCode || 400, { status: "error", error: result?.error || "tournament_claim_failed", timestamp }, requestOrigin);
+      return true;
+    }
+    writeJson(res, 200, result, requestOrigin);
+    return true;
+  }
 
   const getMatch = pathname.match(/^\/game-progress\/([^/]+)$/);
   if (method === "GET" && getMatch) {
@@ -167,6 +230,45 @@ export async function handleGameProgressRoute(context: any): Promise<boolean> {
       itemId: result.itemId,
       effect: result.effect || null,
       entitlementIds: result.entitlementIds || [],
+      progress: result.progress || null,
+    }, requestOrigin);
+    return true;
+  }
+
+  const voucherMatch = pathname.match(/^\/game-progress\/([^/]+)\/vouchers\/redeem$/);
+  if (method === "POST" && voucherMatch) {
+    const gameSlug = decodeURIComponent(voucherMatch[1]);
+    if (!isValidGameProgressSlug(gameSlug)) {
+      writeJson(res, 400, { status: "error", error: "invalid_game_slug", timestamp }, requestOrigin);
+      return true;
+    }
+    if (!authClaims?.playerId) {
+      writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
+      return true;
+    }
+    if (typeof redeemSkinVoucher !== "function") {
+      writeJson(res, 503, { status: "error", error: "redemption_not_configured", timestamp }, requestOrigin);
+      return true;
+    }
+    const body = await readJsonBody(req);
+    if (!body.ok) {
+      writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
+      return true;
+    }
+    const result = await redeemSkinVoucher({
+      playerId: authClaims.playerId,
+      gameSlug,
+      entitlementId: body.value?.entitlementId,
+      redemptionId: body.value?.redemptionId,
+    });
+    if (!result?.ok) {
+      writeJson(res, result?.statusCode || 400, { status: "error", error: result?.error || "redemption_failed", timestamp }, requestOrigin);
+      return true;
+    }
+    writeJson(res, 200, {
+      ok: true,
+      alreadyProcessed: Boolean(result.alreadyProcessed),
+      entitlementId: result.entitlementId,
       progress: result.progress || null,
     }, requestOrigin);
     return true;

@@ -2,6 +2,7 @@ import {
   computeCampaignGrant,
   computeOnlineGrant,
   getProgression,
+  inventoryRewardsBetween,
   levelFromXp,
 } from "../services/progression-catalog.mjs";
 
@@ -106,15 +107,27 @@ async function persistXpAward(client: any, definition: any, params: PersistXpPar
   );
   if (ledger.rowCount === 0) return { awarded: false, reason: "already-granted" };
 
-  await client.query(
+  const profile = await client.query(
     `insert into game_xp_profiles (player_id, game_slug, xp, matches, updated_at)
      values ($1, $2, $3, 1, now())
      on conflict (player_id, game_slug) do update
        set xp = game_xp_profiles.xp + excluded.xp,
            matches = game_xp_profiles.matches + 1,
-           updated_at = now()`,
+           updated_at = now()
+     returning xp`,
     [params.playerId, params.gameSlug, verdict.xp],
   );
+  const nextPlayerXp = clampCount(profile.rows[0]?.xp);
+  for (const reward of inventoryRewardsBetween(definition, nextPlayerXp - verdict.xp, nextPlayerXp)) {
+    await client.query(
+      `insert into game_inventory_items (player_id, game_slug, item_id, quantity)
+       values ($1, $2, $3, $4)
+       on conflict (player_id, game_slug, item_id) do update
+         set quantity = game_inventory_items.quantity + excluded.quantity,
+             updated_at = now()`,
+      [params.playerId, params.gameSlug, reward.itemId, reward.quantity],
+    );
+  }
 
   const existing = await client.query(
     `select stats from game_xp_tracks where player_id = $1 and game_slug = $2 and track_id = $3 for update`,

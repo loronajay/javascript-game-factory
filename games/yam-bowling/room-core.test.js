@@ -42,9 +42,15 @@ test("the starter room is the default, and it is the only room a new player owns
 test("every other room is earned, and names the route it is earned by", () => {
   for (const room of ROOMS.filter((entry) => entry.slug !== DEFAULT_ROOM_SLUG)) {
     assert.notEqual(room.unlock.source, "founding", `${room.slug} should be unlockable`);
-    assert.ok(["campaign", "achievement"].includes(room.unlock.source), `${room.slug} has an unroutable unlock source`);
+    assert.ok(["campaign", "achievement", "tournament"].includes(room.unlock.source), `${room.slug} has an unroutable unlock source`);
     assert.ok(room.unlock.detail.length > 0);
   }
+});
+
+test("the champion room is the rare room prize for tournament winners", () => {
+  const room = getRoom("champion-room");
+  assert.equal(room.unlock.source, "tournament");
+  assert.equal(room.tier, "legendary");
 });
 
 test("an unknown or missing slug falls back to the starter room rather than throwing", () => {

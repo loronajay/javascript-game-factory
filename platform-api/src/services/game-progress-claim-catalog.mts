@@ -1,6 +1,7 @@
 import { validateTacticalArenaPublicClaim } from "./tactical-arena-reward-catalog.mjs";
 import {
   YAM_BOWLING_CIRCUIT_CLAIM_KIND,
+  YAM_BOWLING_MATCH_ACHIEVEMENT_CLAIM_KIND,
   validateYamBowlingPublicClaim,
 } from "./yam-bowling-reward-catalog.mjs";
 
@@ -27,7 +28,7 @@ const CLAIM_POLICIES = Object.freeze({
     validatePublicClaim: validateTacticalArenaPublicClaim,
   }),
   "yam-bowling": Object.freeze({
-    publicKinds: new Set([YAM_BOWLING_CIRCUIT_CLAIM_KIND]),
+    publicKinds: new Set([YAM_BOWLING_CIRCUIT_CLAIM_KIND, YAM_BOWLING_MATCH_ACHIEVEMENT_CLAIM_KIND]),
     premiumKinds: new Set<string>(),
     validatePublicClaim: validateYamBowlingPublicClaim,
   }),

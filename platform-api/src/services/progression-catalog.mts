@@ -49,6 +49,11 @@ export interface ProgressionDefinition {
   // How the per-track extras merge when a grant lands. Universal counters
   // (matches, wins, xp) are always summed; these are the per-game ones.
   trackStats: Record<string, "sum" | "max">;
+  playerInventoryRewards?: ReadonlyArray<Readonly<{
+    level: number;
+    itemId: string;
+    quantity: number;
+  }>>;
 }
 
 const YAM_BOWLING: ProgressionDefinition = {
@@ -68,6 +73,10 @@ const YAM_BOWLING: ProgressionDefinition = {
   performanceXpPerUnit: 4,
   maxPerformanceXp: 20,
   trackStats: { strikes: "sum", highGame: "max" },
+  playerInventoryRewards: Object.freeze([
+    Object.freeze({ level: 10, itemId: "skin-voucher", quantity: 1 }),
+    Object.freeze({ level: 25, itemId: "skin-voucher", quantity: 1 }),
+  ]),
 };
 
 const PROGRESSIONS: ProgressionDefinition[] = [YAM_BOWLING];
@@ -108,6 +117,20 @@ export function levelFromXp(curve: ProgressionCurve, xp: unknown) {
     xpForNextLevel: isMaxLevel ? 0 : xpForLevel(curve, level + 1) - xpForLevel(curve, level),
     isMaxLevel,
   };
+}
+
+export function inventoryRewardsBetween(
+  definition: ProgressionDefinition,
+  previousXp: unknown,
+  nextXp: unknown,
+): Array<{ level: number; itemId: string; quantity: number }> {
+  if (!definition?.curves?.player) return [];
+  const previousLevel = levelFromXp(definition.curves.player, previousXp).level;
+  const nextLevel = levelFromXp(definition.curves.player, nextXp).level;
+  if (nextLevel <= previousLevel) return [];
+  return (definition.playerInventoryRewards || [])
+    .filter((reward) => reward.level > previousLevel && reward.level <= nextLevel)
+    .map((reward) => ({ level: reward.level, itemId: reward.itemId, quantity: reward.quantity }));
 }
 
 export interface GrantBreakdown {
