@@ -4,10 +4,11 @@
   const animation = isCommonJs ? require("./animation-core.js") : root.YamBowlingCore;
   const menuSplash = isCommonJs ? require("./menu-splash-core.js") : root.YamMenuSplash;
   const roomCore = isCommonJs ? require("./room-core.js") : root.YamRoomCore;
-  const api = factory(animation, menuSplash, roomCore);
+  const campaign = isCommonJs ? require("./campaign-core.js") : root.YamCampaign;
+  const api = factory(animation, menuSplash, roomCore, campaign);
   if (isCommonJs) module.exports = api;
   root.YamCosmetics = api;
-})(typeof globalThis !== "undefined" ? globalThis : this, function createCosmeticsCore(animation, menuSplash, roomCore) {
+})(typeof globalThis !== "undefined" ? globalThis : this, function createCosmeticsCore(animation, menuSplash, roomCore, campaign) {
   "use strict";
 
   // One catalog contract for every present and future cosmetic reward.
@@ -49,6 +50,7 @@
     "player-level",
     "campaign",
     "achievement",
+    "character-unlock",
   ]);
 
   const DEFAULT_OWNED_SOURCE = "founding";
@@ -71,6 +73,7 @@
   }
 
   const founding = Object.freeze({ source: "founding", detail: "Available to every bowler." });
+  const starterBowlerSlugs = new Set(campaign.STARTER_BOWLER_SLUGS);
 
   function buildCharacterItems() {
     const items = [];
@@ -139,8 +142,11 @@
       type: "menu-splash",
       idParts: [splash.slug],
       name: `${splash.name} Splash`,
+      characterSlug: splash.slug,
       assets: { art: splash.src, thumbnail: splash.thumbnailSrc, alt: splash.alt },
-      unlock: founding,
+      unlock: starterBowlerSlugs.has(splash.slug)
+        ? founding
+        : Object.freeze({ source: "character-unlock", detail: `Unlock ${splash.name} in the circuit.` }),
     }));
   }
 

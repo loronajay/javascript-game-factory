@@ -18,10 +18,11 @@
   // milestone 4 makes ownership authoritative, only the ownership source in
   // here changes, and no catalog entry, slot, or UI call site moves.
   //
-  // Ownership has three sources, in this order:
+  // Ownership has four sources, in this order:
   //   1. catalog default   -- everything that shipped before progression.
-  //   2. persisted grants  -- the ledger an authoritative server will own.
-  //   3. dev entitlement   -- a deliberate authoring switch, never a grant.
+  //   2. campaign progress -- character-linked art follows its bowler live.
+  //   3. persisted grants  -- the ledger an authoritative server will own.
+  //   4. dev entitlement   -- a deliberate authoring switch, never a grant.
   // A dev entitlement is deliberately NOT written to the grant ledger, so no
   // local experiment can turn into a balance the server has to reconcile.
 
@@ -154,7 +155,10 @@
     }
 
     if (Array.isArray(raw.granted)) {
-      record.granted = raw.granted.filter((id) => cosmetics.isValidItemId(id) && !cosmetics.isOwnedByDefault(id));
+      record.granted = raw.granted.filter((id) => {
+        const item = cosmetics.getItem(id);
+        return item && !cosmetics.isOwnedByDefault(id) && item.unlock.source !== "character-unlock";
+      });
     }
 
     return record;
@@ -168,7 +172,7 @@
     }
   }
 
-  function createLoadoutStore({ storage = defaultStorage() } = {}) {
+  function createLoadoutStore({ storage = defaultStorage(), campaign = null } = {}) {
     let record = null;
     try {
       record = normalizeRecord(JSON.parse(storage?.getItem?.(LOADOUT_STORAGE_KEY) || "null"));
@@ -202,8 +206,18 @@
     if (migrated) persist();
 
     function owns(itemId) {
-      if (!cosmetics.isValidItemId(itemId)) return false;
-      return cosmetics.isOwnedByDefault(itemId) || record.granted.includes(itemId) || devEntitlement;
+      const item = cosmetics.getItem(itemId);
+      if (!item) return false;
+      let unlockedWithBowler = false;
+      if (item.unlock.source === "character-unlock" && item.characterSlug) {
+        try {
+          unlockedWithBowler = campaign.getUnlockedBowlerSlugs().includes(item.characterSlug);
+        } catch {
+          unlockedWithBowler = false;
+        }
+      }
+      return cosmetics.isOwnedByDefault(itemId) || unlockedWithBowler
+        || record.granted.includes(itemId) || devEntitlement;
     }
 
     function accepts(slot, item, characterSlug) {
@@ -305,7 +319,8 @@
     }
 
     function grant(itemId) {
-      if (!cosmetics.isValidItemId(itemId) || cosmetics.isOwnedByDefault(itemId)) return false;
+      const item = cosmetics.getItem(itemId);
+      if (!item || cosmetics.isOwnedByDefault(itemId) || item.unlock.source === "character-unlock") return false;
       if (record.granted.includes(itemId)) return false;
       record.granted = [...record.granted, itemId];
       persist();

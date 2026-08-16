@@ -19,8 +19,11 @@ export function createCircuitScreen({
   laneCore,
   audio,
   getMatchRuntime,
+  accountAccess,
+  campaignProgress,
 }) {
   let lastResultWon = false;
+  let filingResult = false;
 
   function currentDivision(currentMatch = store.getCurrentMatch()) {
     const id = currentMatch?.divisionId || campaign.DIVISIONS.at(-1).id;
@@ -127,12 +130,23 @@ export function createCircuitScreen({
     renderEvent(match);
   }
 
-  function open() {
+  async function open() {
+    if (!accountAccess.requireFactoryAccount()) return false;
+    if (!campaignProgress.isReady() && !await campaignProgress.sync()) {
+      render();
+      const button = $("start-circuit-match");
+      button.disabled = true;
+      button.textContent = "Factory profile unavailable";
+      showScreen("circuit-screen");
+      return false;
+    }
     render();
     showScreen("circuit-screen");
+    return true;
   }
 
   function beginCurrentMatch() {
+    if (!accountAccess.requireFactoryAccount() || !campaignProgress.isReady()) return false;
     const match = store.getCurrentMatch();
     if (!match) return false;
     const playerSlug = store.getSelectedBowlerSlug();
@@ -153,7 +167,7 @@ export function createCircuitScreen({
     return true;
   }
 
-  function handleResultsShown() {
+  async function handleResultsShown() {
     if (!session.campaignMatch || !session.match) {
       $("campaign-result").hidden = true;
       $("rematch-button").textContent = "Rematch";
@@ -161,31 +175,54 @@ export function createCircuitScreen({
       return null;
     }
     const won = session.match.winnerIds.length === 1 && session.match.winnerIds[0] === "p1";
-    const result = store.recordMatchResult(session.campaignMatch.matchId, { won });
     const opponent = assets.bowlerBySlug(session.campaignMatch.opponentSlug);
     const panel = $("campaign-result");
     lastResultWon = won;
     panel.hidden = false;
     panel.classList.toggle("is-defeat", !won);
 
-    if (won && result.firstClear) {
-      $("campaign-result-stamp").textContent = "Achievement cleared";
-      $("campaign-result-kicker").textContent = "Circuit roster updated";
-      $("campaign-result-title").textContent = result.achievement.title;
-      $("campaign-result-copy").textContent = `${opponent.name} is now available for circuit entry.`;
-    } else if (won) {
-      $("campaign-result-stamp").textContent = "Win confirmed";
-      $("campaign-result-kicker").textContent = "Sanctioned result";
-      $("campaign-result-title").textContent = "Circuit victory";
-      $("campaign-result-copy").textContent = `${opponent.name}'s achievement was already on your tour card.`;
-    } else {
+    if (!won) {
       $("campaign-result-stamp").textContent = "Result filed";
       $("campaign-result-kicker").textContent = "Circuit match incomplete";
       $("campaign-result-title").textContent = `${opponent.name} holds the lane`;
       $("campaign-result-copy").textContent = "No achievement was awarded. Retry the sanctioned match when ready.";
+      $("rematch-button").textContent = "Retry match";
+      $("change-match-button").textContent = "Circuit desk";
+      return { ok: true, won: false, firstClear: false };
     }
 
-    $("rematch-button").textContent = won ? "Continue circuit" : "Retry match";
+    filingResult = true;
+    $("rematch-button").disabled = true;
+    $("campaign-result-stamp").textContent = "Filing result";
+    $("campaign-result-kicker").textContent = "Factory profile";
+    $("campaign-result-title").textContent = "Confirming circuit victoryâ€¦";
+    $("campaign-result-copy").textContent = "Your roster will update after the Factory accepts this clear.";
+    const result = await campaignProgress.claimCircuitClear(session.campaignMatch.matchId);
+    filingResult = false;
+    $("rematch-button").disabled = false;
+
+    if (!result.ok) {
+      lastResultWon = false;
+      $("campaign-result-stamp").textContent = "Result not filed";
+      $("campaign-result-kicker").textContent = "Factory profile unavailable";
+      $("campaign-result-title").textContent = "Circuit victory needs confirmation";
+      $("campaign-result-copy").textContent = "No character was unlocked. Reconnect and retry this sanctioned match.";
+    } else if (result.firstClear) {
+      $("campaign-result-stamp").textContent = "Achievement cleared";
+      $("campaign-result-kicker").textContent = "Circuit roster updated";
+      const clearedMatch = campaign.CIRCUIT_MATCHES.find(
+        (match) => match.achievement.id === session.campaignMatch.achievementId,
+      );
+      $("campaign-result-title").textContent = clearedMatch?.achievement.title || "Circuit achievement";
+      $("campaign-result-copy").textContent = `${opponent.name} is now available for circuit entry.`;
+    } else {
+      $("campaign-result-stamp").textContent = "Win confirmed";
+      $("campaign-result-kicker").textContent = "Sanctioned result";
+      $("campaign-result-title").textContent = "Circuit victory";
+      $("campaign-result-copy").textContent = `${opponent.name}'s achievement was already on your tour card.`;
+    }
+
+    $("rematch-button").textContent = result.ok ? "Continue circuit" : "Retry match";
     $("change-match-button").textContent = "Circuit desk";
     return result;
   }
@@ -197,8 +234,10 @@ export function createCircuitScreen({
   }
 
   function handlePrimaryResultAction() {
+    if (filingResult) return false;
     if (lastResultWon) returnToCircuit();
     else getMatchRuntime().startMatch();
+    return true;
   }
 
   function leaveToTitle() {

@@ -28,13 +28,31 @@ test("the title enters a dedicated circuit registration screen", () => {
   assert.match(bindings, /circuitScreen\.open\(\)/);
 });
 
+test("Circuit and Online are both gated by the real Factory account session", () => {
+  const html = read("index.html");
+  const game = read("game.js");
+  const bindings = read("input/bindings.mjs");
+  const onlineSession = read("online/online-session.mjs");
+
+  for (const id of ["circuit-button", "online-button"]) {
+    const button = html.match(new RegExp(`<button[^>]*id=["']${id}["'][^>]*>`, "i"))?.[0] || "";
+    assert.match(button, /data-factory-account-feature/);
+  }
+  assert.match(game, /createYamAccountAccess/);
+  assert.match(game, /accountAccess\.syncControls/);
+  assert.match(game, /accountAccess\.isEligible\(\)\s*&&\s*onlineClient\.resumeSavedSession\(\)/);
+  assert.match(bindings, /accountAccess\.requireFactoryAccount\(\)/);
+  assert.match(onlineSession, /accountAccess\.requireFactoryAccount\(\)/);
+});
+
 test("campaign owns circuit unlocks without absorbing tournaments or loadout rooms", () => {
   const html = read("index.html");
   const core = read("campaign-core.js");
   const screen = read("ui/circuit-screen.mjs");
 
   assert.ok(html.indexOf("campaign-core.js") < html.indexOf("game.js"));
-  assert.match(screen, /recordMatchResult\(/);
+  assert.match(screen, /campaignProgress\.claimCircuitClear\(/);
+  assert.doesNotMatch(screen, /recordMatchResult\(/);
   assert.match(screen, /session\.campaignMatch/);
   assert.match(screen, /matchRuntime\.startMatch\(\)/);
   assert.doesNotMatch(core, /TOURNAMENT_(?:MATCHES|REWARDS)|equipSkin|equipGlobalSlot|player-room|locker-room/i);

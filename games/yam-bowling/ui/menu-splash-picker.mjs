@@ -26,11 +26,12 @@ export function createMenuSplashPicker({ menuSplash, loadout, audio }) {
     }
   }
 
-  function build() {
+  function renderOwnedCards() {
     const grid = $("menu-splash-grid");
-    // Owned splashes only. Every shipped splash is owned by default today, so
-    // this is the full grid; it is where an unearned alt splash stays hidden
-    // once bowler mastery starts handing them out.
+    grid.replaceChildren();
+    // Owned splashes only. Character-linked art follows live circuit progress,
+    // so rebuilding on open makes a newly introduced rival available without a
+    // page reload while unearned bowlers remain hidden.
     const ownedSlugs = new Set(loadout.listOwned("menu-splash").map((item) => item.id.split(":")[1]));
     for (const splash of menuSplash.MENU_SPLASHES.filter((option) => ownedSlugs.has(option.slug))) {
       const card = document.createElement("button");
@@ -46,13 +47,23 @@ export function createMenuSplashPicker({ menuSplash, loadout, audio }) {
       grid.appendChild(card);
     }
     apply(selectedSlug);
+  }
+
+  function build() {
+    renderOwnedCards();
 
     $("menu-splash-button").addEventListener("click", () => {
+      renderOwnedCards();
       $("menu-splash-dialog").showModal();
       audio.play("popup");
     });
     $("menu-splash-close").addEventListener("click", () => $("menu-splash-dialog").close());
   }
 
-  return { build, getSelectedSlug: () => selectedSlug };
+  function refresh() {
+    selectedSlug = loadout.getMenuSplashSlug();
+    renderOwnedCards();
+  }
+
+  return { build, getSelectedSlug: () => selectedSlug, refresh };
 }

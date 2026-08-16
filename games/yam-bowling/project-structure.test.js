@@ -154,6 +154,7 @@ test("the cosmetic catalog and the presentation loadout own separate halves of t
   // Both cores are built from the roster and splash catalogs, so they load after them.
   assert.ok(html.indexOf("animation-core.js") < html.indexOf("cosmetics-core.js"));
   assert.ok(html.indexOf("menu-splash-core.js") < html.indexOf("cosmetics-core.js"));
+  assert.ok(html.indexOf("campaign-core.js") < html.indexOf("cosmetics-core.js"));
   assert.ok(html.indexOf("cosmetics-core.js") < html.indexOf("loadout-core.js"));
   assert.ok(html.indexOf("loadout-core.js") < html.indexOf("game.js"));
 
@@ -166,6 +167,8 @@ test("the cosmetic catalog and the presentation loadout own separate halves of t
   assert.match(loadout, /SCHEMA_VERSION\s*=\s*1/);
   assert.match(loadout, /LEGACY_EQUIPPED_SKINS_STORAGE_KEY/, "the old skin key must be a migration input");
   assert.match(loadout, /MENU_SPLASH_STORAGE_KEY/, "the old splash key must be a migration input");
+  assert.match(loadout, /campaign\.getUnlockedBowlerSlugs\(\)/, "character-linked art should derive ownership from campaign progress");
+  assert.match(readCode("game.js"), /createLoadoutStore\(\{\s*campaign:\s*campaignStore\s*\}\)/);
 
   const manifest = JSON.parse(read("runtime-assets.json"));
   assert.ok(manifest.include.includes("cosmetics-core.js"));
@@ -543,7 +546,7 @@ test("the lane and default menu artwork use compressed runtime images", () => {
   const html = read("index.html");
   const renderer = read("renderer.js");
 
-  assert.match(html, /assets\/menu-splashes\/reina-sato\.webp/);
+  assert.match(html, /assets\/menu-splashes\/daisy-monroe\.webp/);
   assert.match(renderer, /root\.YamLaneCore\.getLane/);
   assert.match(renderer, /assets\/pins\/1\.webp/);
 });

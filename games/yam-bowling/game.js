@@ -1,6 +1,8 @@
 import { loadFactoryProfile } from "../../js/platform/identity/factory-profile.mjs";
 import { createOnlineIdentityPayload } from "../../js/platform/identity/match-identity.mjs";
 import { createPlatformApiClient } from "../../js/platform/api/platform-api.mjs";
+import { createYamAccountAccess } from "./account-access.mjs";
+import { createCampaignProgressClient } from "./campaign-progress-client.mjs";
 import { createOnlineClient, normalizeRoomCode } from "./online-client.mjs";
 import { initMobileLandscapeGate } from "./mobile-ui.mjs";
 import { $, showScreen } from "./ui/dom.mjs";
@@ -53,14 +55,15 @@ initMobileLandscapeGate();
   const audio = AudioCore.createAudioDirector();
   const onlineIdentity = createOnlineIdentityPayload(loadFactoryProfile());
   const platformApi = createPlatformApiClient();
+  const accountAccess = createYamAccountAccess();
   const onlineClient = createOnlineClient();
+  const campaignStore = Campaign.createCampaignStore();
   // What this device owns and wears. Every cosmetic read goes through it, so
   // equipment has one owner and one migration off the old preference keys.
-  const loadout = LoadoutCore.createLoadoutStore();
+  const loadout = LoadoutCore.createLoadoutStore({ campaign: campaignStore });
   // The device-local cache of an authoritative balance. It never awards itself
   // XP; only a server snapshot moves a number in it.
   const progression = ProgressionCore.createProgressionStore();
-  const campaignStore = Campaign.createCampaignStore();
   const assets = createCharacterAssets({ animation: Animation, roster: Roster, loadout });
   const progressionReporter = createProgressionReporter({
     progressionCore: ProgressionCore,
@@ -99,6 +102,11 @@ initMobileLandscapeGate();
   });
 
   const menuSplashPicker = createMenuSplashPicker({ menuSplash: MenuSplash, loadout, audio });
+  const campaignProgress = createCampaignProgressClient({
+    campaignStore,
+    platformApi,
+    onSnapshotApplied: () => menuSplashPicker.refresh(),
+  });
   const lanePicker = createLanePicker({ laneCore: LaneCore, audio, onPreview: applyMatchLane });
   session.matchLaneSlug = lanePicker.getSelectedSlug();
 
@@ -182,6 +190,8 @@ initMobileLandscapeGate();
     laneCore: LaneCore,
     audio,
     getMatchRuntime: () => matchRuntime,
+    accountAccess,
+    campaignProgress,
   });
 
   onlineSession = createOnlineSession({
@@ -199,6 +209,7 @@ initMobileLandscapeGate();
     audio,
     applyMatchLane,
     normalizeRoomCode,
+    accountAccess,
   });
 
   function syncAudioToggle() {
@@ -231,6 +242,12 @@ initMobileLandscapeGate();
 
   async function init() {
     menuSplashPicker.build();
+    accountAccess.syncControls();
+    accountAccess.bindSessionChanges(document, () => {
+      onlineSession.leaveToTitle();
+      circuitScreen.leaveToTitle();
+    });
+    if (accountAccess.isEligible()) await campaignProgress.sync();
     lanePicker.build();
     setupScreen.build();
     onlineScreen.build();
@@ -248,10 +265,10 @@ initMobileLandscapeGate();
     circuitScreen.bind();
     bindEvents({
       session, keys, audio, renderer, matchRuntime, onlineSession,
-      circuitScreen, setupScreen, onlineScreen, shotHud, syncAudioToggle,
+      circuitScreen, setupScreen, onlineScreen, shotHud, syncAudioToggle, accountAccess,
     });
 
-    if (onlineClient.resumeSavedSession()) {
+    if (accountAccess.isEligible() && onlineClient.resumeSavedSession()) {
       showScreen("online-lobby-screen");
       onlineScreen.renderLobby(onlineClient.getSnapshot());
     }

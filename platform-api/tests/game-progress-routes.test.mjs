@@ -141,6 +141,56 @@ test("POST /game-progress/:gameSlug/claims records a campaign claim idempotency 
   }]);
 });
 
+test("POST /game-progress/yam-bowling/claims accepts the registered circuit vocabulary", async () => {
+  const token = signToken({ playerId: "player-1", email: "player@test.com" }, TEST_SECRET);
+  const seen = [];
+  const app = createApp({
+    jwtSecret: TEST_SECRET,
+    recordGameProgressClaim: async (params) => {
+      seen.push(params);
+      return { ok: true, alreadyProcessed: false, progress: { entitlements: [] } };
+    },
+    now: () => "2026-07-17T00:00:00.000Z",
+  });
+
+  const response = await invoke(app, "POST", "/game-progress/yam-bowling/claims", {
+    token,
+    body: {
+      claimId: "circuit-clear:local-hazel-ward",
+      kind: "circuit-clear",
+      payload: { matchId: "local-hazel-ward" },
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(seen[0].gameSlug, "yam-bowling");
+  assert.equal(seen[0].kind, "circuit-clear");
+});
+
+test("POST /game-progress/yam-bowling/claims cannot create an entitlement while signed out", async () => {
+  let called = false;
+  const app = createApp({
+    jwtSecret: TEST_SECRET,
+    recordGameProgressClaim: async () => {
+      called = true;
+      return { ok: true };
+    },
+    now: () => "2026-07-17T00:00:00.000Z",
+  });
+
+  const response = await invoke(app, "POST", "/game-progress/yam-bowling/claims", {
+    body: {
+      claimId: "circuit-clear:local-hazel-ward",
+      kind: "circuit-clear",
+      payload: { matchId: "local-hazel-ward" },
+    },
+  });
+
+  assert.equal(response.statusCode, 401);
+  assert.equal(response.json.error, "unauthorized");
+  assert.equal(called, false);
+});
+
 test("POST /game-progress/:gameSlug/claims accepts tutorial reward claims", async () => {
   const token = signToken({ playerId: "player-1", email: "player@test.com" }, TEST_SECRET);
   const seen = [];

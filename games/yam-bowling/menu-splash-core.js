@@ -9,7 +9,7 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function createMenuSplashCore(root) {
   "use strict";
 
-  const DEFAULT_MENU_SPLASH_SLUG = "reina-sato";
+  const DEFAULT_MENU_SPLASH_SLUG = "daisy-monroe";
   // Legacy: the chosen splash is a loadout slot now. This key is kept only so
   // the migration in `loadout-core.js` can name it in one place.
   const MENU_SPLASH_STORAGE_KEY = "yam-bowling.menu-splash";

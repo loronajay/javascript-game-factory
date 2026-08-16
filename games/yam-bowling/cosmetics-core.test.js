@@ -2,6 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
 const animation = require("./animation-core.js");
+const campaign = require("./campaign-core.js");
 const menuSplash = require("./menu-splash-core.js");
 const cosmetics = require("./cosmetics-core.js");
 
@@ -95,6 +96,22 @@ test("existing skins, poses, and menu splashes are migration inputs rather than 
     assert.ok(item, `${splash.slug} splash should be catalogued`);
     assert.equal(item.assets.art, splash.src);
     assert.equal(item.assets.thumbnail, splash.thumbnailSrc);
+  }
+});
+
+test("menu art follows the bowler unlock it represents", () => {
+  const starterSlugs = new Set(campaign.STARTER_BOWLER_SLUGS);
+
+  assert.ok(UNLOCK_SOURCES.includes("character-unlock"));
+  for (const splash of menuSplash.MENU_SPLASHES) {
+    const item = getItem(buildItemId("menu-splash", splash.slug));
+    assert.equal(item.characterSlug, splash.slug);
+    assert.equal(item.scope, "character");
+    assert.equal(
+      item.unlock.source,
+      starterSlugs.has(splash.slug) ? "founding" : "character-unlock",
+      `${splash.slug} should follow its campaign bowler unlock`,
+    );
   }
 });
 

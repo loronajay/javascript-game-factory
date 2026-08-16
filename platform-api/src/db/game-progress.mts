@@ -2,41 +2,23 @@ import { getConsumableOffer, selectRandomUnownedSkins } from "../services/consum
 import { SKIN_CATALOG, UNIT_CATALOG } from "../services/payments.mjs";
 import {
   TACTICAL_ARENA_TUTORIAL_IDS,
-  validateTacticalArenaPublicClaim,
 } from "../services/tactical-arena-reward-catalog.mjs";
+import {
+  isPremiumGameClaimKind,
+  isPublicGameClaimKind,
+  isRegisteredGameClaimKind,
+  validatePublicGameClaim,
+} from "../services/game-progress-claim-catalog.mjs";
 import { getValorOffer, priceValorOffer } from "../services/valor-catalog.mjs";
 
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
-const VALID_CLAIM_KINDS = new Set([
-  "campaign-valor",
-  // Mission cleared, recorded WITHOUT any Valor movement. campaign-valor already carries
-  // stars, but it fires exactly once per mission (the payout is idempotent), so it cannot
-  // report a later star improvement or backfill a mission cleared before progress sync
-  // existed. This kind is how campaign progress alone reaches the account.
-  "campaign-progress",
-  "campaign-skin-choice",
-  "campaign-unit-choice",
-  "tutorial-complete",
-  "tutorial-valor",
-  "tutorial-unit-reward",
-  "tutorial-skin-choice",
-  "premium-skin-purchase",
-  "premium-unit-purchase",
-  "premium-consumable-purchase",
-]);
-
-// Premium (real-money) entitlements must never be grantable through the public
-// claims route. They may only be recorded by the server-side Stripe fulfillment
-// path, which calls recordGameProgressClaim with allowPremiumKinds: true after a
-// verified payment. Every other caller is untrusted and is refused below.
-const PREMIUM_CLAIM_KINDS = new Set([
-  "premium-skin-purchase",
-  "premium-unit-purchase",
-  "premium-consumable-purchase",
-]);
 
 // The kinds a refund/chargeback can trace back to, so revocation can find what was granted.
-const PREMIUM_GRANT_CLAIM_KINDS = [...PREMIUM_CLAIM_KINDS];
+const PREMIUM_GRANT_CLAIM_KINDS = [
+  "premium-skin-purchase",
+  "premium-unit-purchase",
+  "premium-consumable-purchase",
+];
 
 // A single purchase may never add more than this much of one consumable, whatever a
 // (future) multi-quantity payload claims.
@@ -303,15 +285,14 @@ export function isValidGameProgressSlug(value: any): boolean {
   return Boolean(normalizeGameSlug(value));
 }
 
-export function isValidGameClaimKind(value: any): boolean {
-  return VALID_CLAIM_KINDS.has(cleanText(value, 80));
+export function isValidGameClaimKind(gameSlug: any, value: any): boolean {
+  return isRegisteredGameClaimKind(normalizeGameSlug(gameSlug), value);
 }
 
 // A claim kind that untrusted (public-route) callers are allowed to submit.
 // Premium purchase kinds are excluded — those are Stripe-fulfillment only.
-export function isPubliclyClaimableKind(value: any): boolean {
-  const kind = cleanText(value, 80);
-  return VALID_CLAIM_KINDS.has(kind) && !PREMIUM_CLAIM_KINDS.has(kind);
+export function isPubliclyClaimableKind(gameSlug: any, value: any): boolean {
+  return isPublicGameClaimKind(normalizeGameSlug(gameSlug), value);
 }
 
 export async function getGameProgress(pool: any, playerId: any, gameSlug: any): Promise<any> {
@@ -385,17 +366,18 @@ export async function recordGameProgressClaim(pool: any, params: any = {}): Prom
   const kind = cleanText(params.kind, 80);
   let payload = normalizePayload(params.payload);
   let sourceId = cleanText(params.sourceId || payload.sessionId || payload.missionId || payload.packId || payload.tutorialId || "", 200);
-  if (!pool || !playerId || !gameSlug || !claimId || !VALID_CLAIM_KINDS.has(kind)) return null;
+  if (!pool || !playerId || !gameSlug || !claimId || !isRegisteredGameClaimKind(gameSlug, kind)) return null;
   // Defense in depth: even if a premium kind reaches this layer, only the trusted
   // Stripe fulfillment path (allowPremiumKinds: true) may grant a paid entitlement.
-  if (PREMIUM_CLAIM_KINDS.has(kind) && params.allowPremiumKinds !== true) {
+  const premiumKind = isPremiumGameClaimKind(gameSlug, kind);
+  if (premiumKind && params.allowPremiumKinds !== true) {
     process.stderr.write(`[game-progress] refused premium claim kind '${kind}' from untrusted caller (player=${playerId})\n`);
     return null;
   }
 
   let publicClaim: any = null;
-  if (!PREMIUM_CLAIM_KINDS.has(kind)) {
-    publicClaim = validateTacticalArenaPublicClaim({ gameSlug, claimId, kind, sourceId, payload });
+  if (!premiumKind) {
+    publicClaim = validatePublicGameClaim({ gameSlug, claimId, kind, sourceId, payload });
     if (!publicClaim.ok) return publicClaim;
     payload = publicClaim.payload;
     sourceId = publicClaim.sourceId;
@@ -417,6 +399,25 @@ export async function recordGameProgressClaim(pool: any, params: any = {}): Prom
     );
 
     const alreadyProcessed = claim.rowCount === 0;
+    if (!alreadyProcessed && Array.isArray(publicClaim?.entitlementGrants)) {
+      for (const entitlement of publicClaim.entitlementGrants) {
+        await grantEntitlement(client, playerId, gameSlug, entitlement, "campaign", sourceId || claimId);
+      }
+    }
+    if (!alreadyProcessed && publicClaim?.campaignProgress) {
+      await markCampaignProgress(
+        client,
+        playerId,
+        gameSlug,
+        publicClaim.campaignProgress.missionId,
+        {
+          stars: publicClaim.campaignProgress.stars,
+          rewardClaimedAt: Array.isArray(publicClaim.entitlementGrants) && publicClaim.entitlementGrants.length
+            ? new Date().toISOString()
+            : null,
+        },
+      );
+    }
     if (!alreadyProcessed && kind === "campaign-valor") {
       const amount = await campaignValorAmountWithServerBoosts(client, playerId, gameSlug, publicClaim.valorBase);
       payload = { ...payload, amount };

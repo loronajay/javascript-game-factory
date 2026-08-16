@@ -127,10 +127,10 @@ function createGameProgressPool() {
 }
 
 test("tutorial progress claim kinds are accepted by platform validation", () => {
-  assert.equal(isValidGameClaimKind("tutorial-complete"), true);
-  assert.equal(isValidGameClaimKind("tutorial-valor"), true);
-  assert.equal(isValidGameClaimKind("tutorial-unit-reward"), true);
-  assert.equal(isValidGameClaimKind("tutorial-skin-choice"), true);
+  assert.equal(isValidGameClaimKind("tactical-arena", "tutorial-complete"), true);
+  assert.equal(isValidGameClaimKind("tactical-arena", "tutorial-valor"), true);
+  assert.equal(isValidGameClaimKind("tactical-arena", "tutorial-unit-reward"), true);
+  assert.equal(isValidGameClaimKind("tactical-arena", "tutorial-skin-choice"), true);
 });
 
 test("recordGameProgressClaim applies tutorial Valor and entitlement claims idempotently", async () => {
@@ -235,8 +235,52 @@ test("campaign-progress records a mission clear and its stars without moving Val
 });
 
 test("campaign-progress is a publicly claimable, non-premium kind", () => {
-  assert.equal(isValidGameClaimKind("campaign-progress"), true);
-  assert.equal(isPubliclyClaimableKind("campaign-progress"), true);
+  assert.equal(isValidGameClaimKind("tactical-arena", "campaign-progress"), true);
+  assert.equal(isPubliclyClaimableKind("tactical-arena", "campaign-progress"), true);
+});
+
+test("Yam Bowling circuit clears grant only the server-catalogued bowler", async () => {
+  const pool = createGameProgressPool();
+  const result = await recordGameProgressClaim(pool, {
+    playerId: "player-1",
+    gameSlug: "yam-bowling",
+    claimId: "circuit-clear:local-hazel-ward",
+    kind: "circuit-clear",
+    payload: {
+      matchId: "local-hazel-ward",
+      unlockedBowlerSlug: "reina-sato",
+      entitlementIds: ["room:champion-room"],
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual([...pool.state.entitlements.keys()], ["bowler:hazel-ward"]);
+  assert.equal(result.progress.campaignProgress.length, 1);
+  assert.deepEqual({
+    ...result.progress.campaignProgress[0],
+    rewardClaimedAt: Boolean(result.progress.campaignProgress[0].rewardClaimedAt),
+  }, {
+    missionId: "local-hazel-ward",
+    stars: 1,
+    completedAt: "2026-07-18T00:00:00.000Z",
+    valorClaimedAt: null,
+    rewardClaimedAt: true,
+  });
+});
+
+test("Yam Bowling cannot skip ahead in the canonical circuit", async () => {
+  const pool = createGameProgressPool();
+  const result = await recordGameProgressClaim(pool, {
+    playerId: "player-1",
+    gameSlug: "yam-bowling",
+    claimId: "circuit-clear:local-piper-hart",
+    kind: "circuit-clear",
+    payload: { matchId: "local-piper-hart" },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error, "claim_prerequisite_missing");
+  assert.equal(pool.state.entitlements.size, 0);
 });
 
 // A second device restores which tutorials are done from the claim rows themselves —

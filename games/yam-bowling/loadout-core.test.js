@@ -2,6 +2,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
 const animation = require("./animation-core.js");
+const campaignCore = require("./campaign-core.js");
 const menuSplashCore = require("./menu-splash-core.js");
 const cosmetics = require("./cosmetics-core.js");
 const roomCore = require("./room-core.js");
@@ -30,6 +31,14 @@ function storeWith(seed = {}) {
   return createLoadoutStore({ storage: memoryStorage(seed) });
 }
 
+function campaignUnlocks(initialSlugs = campaignCore.STARTER_BOWLER_SLUGS) {
+  let unlockedSlugs = [...initialSlugs];
+  return {
+    getUnlockedBowlerSlugs: () => [...unlockedSlugs],
+    unlock: (slug) => { unlockedSlugs = [...new Set([...unlockedSlugs, slug])]; },
+  };
+}
+
 test("a fresh device gets canon defaults in every slot", () => {
   const store = storeWith();
 
@@ -43,21 +52,47 @@ test("a fresh device gets canon defaults in every slot", () => {
   );
 });
 
+test("fresh menu art is an owned starter and locked bowlers stay out of the picker catalog", () => {
+  const campaign = campaignUnlocks();
+  const store = createLoadoutStore({ storage: memoryStorage(), campaign });
+  const ownedSplashSlugs = store.listOwned("menu-splash").map((item) => item.characterSlug);
+
+  assert.equal(store.getMenuSplashSlug(), campaignCore.STARTER_BOWLER_SLUGS[0]);
+  assert.ok(store.owns(`menu-splash:${store.getMenuSplashSlug()}`));
+  assert.deepEqual(ownedSplashSlugs, campaignCore.STARTER_BOWLER_SLUGS);
+  assert.equal(store.setMenuSplashSlug("hazel-ward"), campaignCore.STARTER_BOWLER_SLUGS[0]);
+});
+
+test("menu art ownership is derived live from campaign unlocks and never becomes a grant", () => {
+  const storage = memoryStorage();
+  const campaign = campaignUnlocks();
+  const store = createLoadoutStore({ storage, campaign });
+  const hazelSplashId = "menu-splash:hazel-ward";
+
+  assert.equal(store.owns(hazelSplashId), false);
+  assert.equal(store.grant(hazelSplashId), false);
+
+  campaign.unlock("hazel-ward");
+  assert.equal(store.owns(hazelSplashId), true);
+  assert.equal(store.setMenuSplashSlug("hazel-ward"), "hazel-ward");
+  assert.deepEqual(JSON.parse(storage.getItem(LOADOUT_STORAGE_KEY)).granted, []);
+});
+
 test("both existing local preferences migrate into one versioned record", () => {
   const storage = memoryStorage({
     "yam-bowling.equipped-skins.v1": JSON.stringify({ "reina-sato": "maid", "nia-brooks": "swimsuit" }),
-    "yam-bowling.menu-splash": "lumi-vega",
+    "yam-bowling.menu-splash": "nia-brooks",
   });
   const store = createLoadoutStore({ storage });
 
   assert.equal(store.getEquippedSkinId("reina-sato"), "maid");
   assert.equal(store.getEquippedSkinId("nia-brooks"), "swimsuit");
-  assert.equal(store.getMenuSplashSlug(), "lumi-vega");
+  assert.equal(store.getMenuSplashSlug(), "nia-brooks");
 
   const persisted = JSON.parse(storage.getItem(LOADOUT_STORAGE_KEY));
   assert.equal(persisted.version, SCHEMA_VERSION);
   assert.equal(persisted.bowlers["reina-sato"].skin, cosmetics.buildItemId("skin", "reina-sato", "maid"));
-  assert.equal(persisted.global.menuSplash, cosmetics.buildItemId("menu-splash", "lumi-vega"));
+  assert.equal(persisted.global.menuSplash, cosmetics.buildItemId("menu-splash", "nia-brooks"));
 
   // Legacy keys are left alone so an older build still boots into the same look.
   assert.ok(storage.has("yam-bowling.equipped-skins.v1"));

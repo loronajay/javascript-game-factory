@@ -50,52 +50,45 @@ test("each circuit division advances to a harder CPU tier", () => {
   });
 });
 
-test("circuit progress is achievement-backed and a loss never unlocks a character", () => {
+test("circuit progress starts empty and has no local result mutation path", () => {
   const storage = memoryStorage();
   const store = Campaign.createCampaignStore({ storage });
   const opening = store.getCurrentMatch();
 
   assert.equal(opening.id, "local-hazel-ward");
   assert.deepEqual(store.getUnlockedBowlerSlugs(), Campaign.STARTER_BOWLER_SLUGS);
-
-  const loss = store.recordMatchResult(opening.id, { won: false });
-  assert.deepEqual(loss, {
-    recorded: false,
-    firstClear: false,
-    won: false,
-    achievement: null,
-    unlockedBowlerSlug: null,
-  });
+  assert.equal(store.recordMatchResult, undefined);
   assert.equal(store.getCurrentMatch().id, opening.id);
   assert.equal(store.getUnlockedBowlerSlugs().includes("hazel-ward"), false);
 });
 
-test("winning a circuit match earns its achievement and unlocks its rival exactly once", () => {
+test("only a matching server progress row and bowler entitlement unlock a rival", () => {
   const storage = memoryStorage();
   const store = Campaign.createCampaignStore({ storage });
 
-  const first = store.recordMatchResult("local-hazel-ward", { won: true });
-  assert.equal(first.recorded, true);
-  assert.equal(first.firstClear, true);
-  assert.equal(first.achievement.id, "beat-hazel-ward");
-  assert.equal(first.unlockedBowlerSlug, "hazel-ward");
+  assert.equal(store.applyServerSnapshot({
+    campaignProgress: [{ missionId: "local-hazel-ward", stars: 1 }],
+    entitlements: [],
+  }), false);
+  assert.equal(store.getUnlockedBowlerSlugs().includes("hazel-ward"), false);
+
+  assert.equal(store.applyServerSnapshot({
+    campaignProgress: [{ missionId: "local-hazel-ward", stars: 1 }],
+    entitlements: [{ entitlementId: "bowler:hazel-ward", kind: "bowler" }],
+  }), true);
   assert.equal(store.getCurrentMatch().id, "local-piper-hart");
   assert.equal(store.getUnlockedBowlerSlugs().includes("hazel-ward"), true);
-
-  const replay = store.recordMatchResult("local-hazel-ward", { won: true });
-  assert.equal(replay.recorded, false);
-  assert.equal(replay.firstClear, false);
-  assert.equal(replay.unlockedBowlerSlug, null);
-
-  const persisted = JSON.parse(storage.value(Campaign.CAMPAIGN_STORAGE_KEY));
-  assert.deepEqual(persisted.earnedAchievementIds, ["beat-hazel-ward"]);
+  assert.equal(storage.value(Campaign.CAMPAIGN_STORAGE_KEY), undefined,
+    "applying server ownership must not mirror it into device storage");
 });
 
-test("a future circuit result cannot skip the sanctioned match order", () => {
+test("a malformed server snapshot cannot skip the sanctioned match order", () => {
   const store = Campaign.createCampaignStore({ storage: memoryStorage() });
 
-  const skipped = store.recordMatchResult("city-lumi-vega", { won: true });
-  assert.equal(skipped.recorded, false);
+  assert.equal(store.applyServerSnapshot({
+    campaignProgress: [{ missionId: "city-lumi-vega", stars: 1 }],
+    entitlements: [{ entitlementId: "bowler:lumi-vega", kind: "bowler" }],
+  }), false);
   assert.equal(store.getCurrentMatch().id, "local-hazel-ward");
   assert.equal(store.getUnlockedBowlerSlugs().includes("lumi-vega"), false);
 });
@@ -112,7 +105,7 @@ test("the selected circuit bowler must be unlocked and persists across reloads",
   assert.equal(reloaded.getSelectedBowlerSlug(), "zuri-banks");
 });
 
-test("unknown stored achievements and locked selections are discarded", () => {
+test("old device-local achievements are ignored instead of becoming entitlements", () => {
   const storage = memoryStorage({
     [Campaign.CAMPAIGN_STORAGE_KEY]: JSON.stringify({
       version: Campaign.SCHEMA_VERSION,
@@ -122,6 +115,6 @@ test("unknown stored achievements and locked selections are discarded", () => {
   });
   const store = Campaign.createCampaignStore({ storage });
 
-  assert.deepEqual(store.getSnapshot().earnedAchievementIds, ["beat-hazel-ward"]);
+  assert.deepEqual(store.getSnapshot().earnedAchievementIds, []);
   assert.equal(store.getSelectedBowlerSlug(), Campaign.STARTER_BOWLER_SLUGS[0]);
 });

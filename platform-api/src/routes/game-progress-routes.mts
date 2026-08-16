@@ -52,13 +52,13 @@ export async function handleGameProgressRoute(context: any): Promise<boolean> {
       writeJson(res, 400, { status: "error", error: "missing_claim_id", timestamp }, requestOrigin);
       return true;
     }
-    if (!isValidGameClaimKind(kind)) {
+    if (!isValidGameClaimKind(gameSlug, kind)) {
       writeJson(res, 400, { status: "error", error: "invalid_claim_kind", timestamp }, requestOrigin);
       return true;
     }
     // Real-money entitlements can only be granted by the server-side Stripe
     // fulfillment path, never by a client posting a claim directly.
-    if (!isPubliclyClaimableKind(kind)) {
+    if (!isPubliclyClaimableKind(gameSlug, kind)) {
       writeJson(res, 403, { status: "error", error: "claim_kind_forbidden", timestamp }, requestOrigin);
       return true;
     }

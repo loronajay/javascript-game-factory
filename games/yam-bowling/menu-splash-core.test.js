@@ -56,7 +56,7 @@ test("menu splashes use canon character slugs and predictable asset paths", () =
 });
 
 test("unknown splash preferences fall back to the default", () => {
-  assert.equal(DEFAULT_MENU_SPLASH_SLUG, "reina-sato");
+  assert.equal(DEFAULT_MENU_SPLASH_SLUG, "daisy-monroe");
   assert.equal(getMenuSplash("missing-character").slug, DEFAULT_MENU_SPLASH_SLUG);
   assert.equal(getMenuSplash(null).slug, DEFAULT_MENU_SPLASH_SLUG);
 });

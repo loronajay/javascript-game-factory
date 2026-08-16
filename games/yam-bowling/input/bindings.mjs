@@ -17,6 +17,7 @@ export function bindEvents({
   renderer,
   matchRuntime,
   onlineSession,
+  accountAccess,
   circuitScreen,
   setupScreen,
   onlineScreen,
@@ -63,9 +64,15 @@ export function bindEvents({
   });
 
   // --- Navigation ---
-  $("circuit-button").addEventListener("click", () => circuitScreen.open());
+  $("circuit-button").addEventListener("click", () => {
+    if (accountAccess.requireFactoryAccount()) circuitScreen.open();
+  });
   $("play-button").addEventListener("click", () => { showScreen("setup-screen"); setupScreen.render(); });
-  $("online-button").addEventListener("click", () => { showScreen("online-screen"); onlineScreen.renderSetup(); });
+  $("online-button").addEventListener("click", () => {
+    if (!accountAccess.requireFactoryAccount()) return;
+    showScreen("online-screen");
+    onlineScreen.renderSetup();
+  });
   $("setup-back").addEventListener("click", () => showScreen("title-screen"));
   $("circuit-back").addEventListener("click", () => circuitScreen.leaveToTitle());
   $("online-back").addEventListener("click", () => showScreen("title-screen"));

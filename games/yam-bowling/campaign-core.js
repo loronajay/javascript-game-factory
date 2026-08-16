@@ -106,15 +106,13 @@
 
   function normalizeRecord(raw) {
     if (!raw || typeof raw !== "object" || raw.version !== SCHEMA_VERSION) return emptyRecord();
-    const earnedAchievementIds = [];
-    for (const id of Array.isArray(raw.earnedAchievementIds) ? raw.earnedAchievementIds : []) {
-      if (MATCH_BY_ACHIEVEMENT.has(id) && !earnedAchievementIds.includes(id)) earnedAchievementIds.push(id);
-    }
-    const unlocked = unlockedSlugsFor(earnedAchievementIds);
-    const selectedBowlerSlug = unlocked.includes(raw.selectedBowlerSlug)
+    // Device storage is a preference cache only. Older builds wrote earned
+    // achievements here, but those values are deliberately ignored: the
+    // authenticated game-progress snapshot is now the sole unlock authority.
+    const selectedBowlerSlug = CANON_SLUGS.has(raw.selectedBowlerSlug)
       ? raw.selectedBowlerSlug
       : STARTER_BOWLER_SLUGS[0];
-    return { version: SCHEMA_VERSION, earnedAchievementIds, selectedBowlerSlug };
+    return { version: SCHEMA_VERSION, earnedAchievementIds: [], selectedBowlerSlug };
   }
 
   function defaultStorage() {
@@ -135,7 +133,10 @@
 
     function persist() {
       try {
-        storage?.setItem?.(CAMPAIGN_STORAGE_KEY, JSON.stringify(record));
+        storage?.setItem?.(CAMPAIGN_STORAGE_KEY, JSON.stringify({
+          version: SCHEMA_VERSION,
+          selectedBowlerSlug: record.selectedBowlerSlug,
+        }));
       } catch (_error) {
         // Campaign progress remains usable for this session if storage is unavailable.
       }
@@ -146,7 +147,9 @@
     }
 
     function getSelectedBowlerSlug() {
-      return record.selectedBowlerSlug;
+      return getUnlockedBowlerSlugs().includes(record.selectedBowlerSlug)
+        ? record.selectedBowlerSlug
+        : STARTER_BOWLER_SLUGS[0];
     }
 
     function selectBowler(slug) {
@@ -168,21 +171,29 @@
       };
     }
 
-    function recordMatchResult(matchId, { won = false } = {}) {
-      const match = MATCH_BY_ID.get(matchId);
-      const refused = { recorded: false, firstClear: false, won: Boolean(won), achievement: null, unlockedBowlerSlug: null };
-      if (!match || !won || getCurrentMatch()?.id !== match.id
-        || record.earnedAchievementIds.includes(match.achievement.id)) return refused;
-
-      record.earnedAchievementIds.push(match.achievement.id);
-      persist();
-      return {
-        recorded: true,
-        firstClear: true,
-        won: true,
-        achievement: match.achievement,
-        unlockedBowlerSlug: match.unlockBowlerSlug,
-      };
+    function applyServerSnapshot(snapshot) {
+      if (!snapshot || typeof snapshot !== "object") return false;
+      const completedMatchIds = new Set(
+        (Array.isArray(snapshot.campaignProgress) ? snapshot.campaignProgress : [])
+          .map((entry) => entry?.missionId)
+          .filter((matchId) => MATCH_BY_ID.has(matchId)),
+      );
+      const entitlementIds = new Set(
+        (Array.isArray(snapshot.entitlements) ? snapshot.entitlements : [])
+          .map((entry) => entry?.entitlementId)
+          .filter((entitlementId) => typeof entitlementId === "string"),
+      );
+      const earnedAchievementIds = [];
+      // A server response still crosses a trust boundary. Accept only one
+      // contiguous circuit prefix, and require both halves of the atomic
+      // server award before exposing a character locally.
+      for (const match of CIRCUIT_MATCHES) {
+        if (!completedMatchIds.has(match.id)
+          || !entitlementIds.has(`bowler:${match.unlockBowlerSlug}`)) break;
+        earnedAchievementIds.push(match.achievement.id);
+      }
+      record.earnedAchievementIds = earnedAchievementIds;
+      return earnedAchievementIds.length > 0;
     }
 
     function getSnapshot() {
@@ -194,12 +205,12 @@
     }
 
     return {
+      applyServerSnapshot,
       getCurrentMatch,
       getDivisionProgress,
       getSelectedBowlerSlug,
       getSnapshot,
       getUnlockedBowlerSlugs,
-      recordMatchResult,
       selectBowler,
     };
   }

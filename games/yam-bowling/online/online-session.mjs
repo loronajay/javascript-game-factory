@@ -18,6 +18,7 @@ export function createOnlineSession({
   audio,
   applyMatchLane,
   normalizeRoomCode,
+  accountAccess,
 }) {
   const { scene } = session;
 
@@ -116,6 +117,7 @@ export function createOnlineSession({
   }
 
   function begin(intent) {
+    if (!accountAccess.requireFactoryAccount()) return false;
     session.onlineSetup.intent = intent;
     onlineClient.setIdentity(onlineIdentity);
     onlineClient.connect();
@@ -138,6 +140,7 @@ export function createOnlineSession({
       }
       onlineClient.joinPrivateRoom(code, options);
     }
+    return true;
   }
 
   function leave() {
@@ -151,7 +154,7 @@ export function createOnlineSession({
   // Leaving from the results screen goes home rather than back to the lobby, so
   // it drops the room without re-rendering the online setup on the way past.
   function leaveToTitle() {
-    if (session.onlineMatch) onlineClient.leaveLobby();
+    onlineClient.leaveLobby();
     session.onlineMatch = false;
     showScreen("title-screen");
   }
