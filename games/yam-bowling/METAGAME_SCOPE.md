@@ -108,56 +108,74 @@ Milestones 0–3 are the easy-win track. Milestones 4–7 require cross-reposito
 
 ### Catalog model
 
-- [ ] Define one catalog contract with stable IDs for these reward types:
-  - [ ] Skin
-  - [ ] Victory pose
-  - [ ] Defeat pose
-  - [ ] Player card
-  - [ ] Menu splash
-  - [ ] Profile art
-  - [ ] Ball trail
-  - [ ] Strike burst
-  - [ ] Profile title
-  - [ ] Badge
-- [ ] Each item declares display name, reward type, character/global ownership, asset references, rarity/presentation tier, and unlock source.
-- [ ] Separate item ownership from item equipment.
-- [ ] Treat existing Classic/Swimsuit/Maid Café content and existing menu splashes as migration inputs, not hard-coded exceptions.
+- [x] Define one catalog contract with stable IDs for these reward types:
+  - [x] Skin
+  - [x] Victory pose
+  - [x] Defeat pose
+  - [x] Player card
+  - [x] Menu splash
+  - [x] Profile art
+  - [x] Ball trail
+  - [x] Strike burst
+  - [x] Profile title
+  - [x] Badge
+- [x] Each item declares display name, reward type, character/global ownership, asset references, rarity/presentation tier, and unlock source.
+- [x] Separate item ownership from item equipment.
+- [x] Treat existing Classic/Swimsuit/Maid Café content and existing menu splashes as migration inputs, not hard-coded exceptions.
 
 ### Presentation loadout
 
-- [ ] Add per-bowler Skin, Victory Pose, Defeat Pose, Player Card, Menu Splash, and Profile Art slots.
-- [ ] Add global Ball Trail, Strike Burst, Title, Badge, Profile Frame, and Profile Background slots where appropriate.
-- [ ] Preserve graceful canon/default fallbacks when optional art is missing.
-- [ ] Store a schema version and migrate existing `equipped-skins` and `menu-splash` local preferences.
-- [ ] Keep Featured Bowler and Featured Skin separate from the gameplay loadout.
+- [x] Add per-bowler Skin, Victory Pose, Defeat Pose, Player Card, Menu Splash, and Profile Art slots.
+- [x] Add global Ball Trail, Strike Burst, Title, Badge, Profile Frame, and Profile Background slots where appropriate.
+- [x] Preserve graceful canon/default fallbacks when optional art is missing.
+- [x] Store a schema version and migrate existing `equipped-skins` and `menu-splash` local preferences.
+- [x] Keep Featured Bowler and Featured Skin separate from the gameplay loadout.
 
 ### Pre-progression behavior
 
-- [ ] During development, expose catalog items through a deliberate debug/dev entitlement rather than pretending local ownership is authoritative.
-- [ ] Do not show XP prices or unlock claims until server-backed ownership exists.
+- [x] During development, expose catalog items through a deliberate debug/dev entitlement rather than pretending local ownership is authoritative.
+- [x] Do not show XP prices or unlock claims until server-backed ownership exists.
+
+### Not yet surfaced
+
+The data layer is shipped and the two existing preferences read and write through
+it. These slots exist and are tested but have no player-facing control yet,
+because the content that would fill them belongs to later milestones:
+
+- [ ] A loadout screen for the victory/defeat pose, player card, and profile art slots (milestone 5's unlock tree is their natural home).
+- [ ] Featured Bowler / Featured Skin selection UI (milestone 6 owns the profile that displays them).
+- [ ] Ball trail and strike burst equipping become visible when milestone 3 renders them.
 
 ## Milestone 3 — Equippable visual effects
 
 ### Ball trails
 
-- [ ] Add a render-only trail emitter driven by the displayed ball transform.
-- [ ] Ship a no-trail/default option and at least one equipped example such as `Red Neon Ball Trail`.
-- [ ] Ensure trails never alter trajectory, collision, timing, or server shot inputs.
-- [ ] Bound particle count and object lifetime for desktop and mobile.
+- [x] Add a render-only trail emitter driven by the displayed ball transform, reading the equipped `ball-trail` item from the loadout.
+- [x] Ship a no-trail/default option and at least one equipped example such as `Red Neon Ball Trail`.
+- [x] Ensure trails never alter trajectory, collision, timing, or server shot inputs.
+- [x] Bound particle count and object lifetime for desktop and mobile.
 
 ### Strike bursts
 
-- [ ] Add a render-only burst triggered by the authoritative strike outcome.
-- [ ] Support unique equipped palettes/shapes while keeping the strike readable.
-- [ ] Ship a default burst and at least one alternate effect.
-- [ ] Avoid double-triggering when an online snapshot is replayed or resumed.
+- [x] Add a render-only burst triggered by the authoritative strike outcome, reading the equipped `strike-burst` item from the loadout.
+- [x] Support unique equipped palettes/shapes while keeping the strike readable.
+- [x] Ship a default burst and at least one alternate effect.
+- [x] Avoid double-triggering when an online snapshot is replayed or resumed.
 
 ### Accessibility and performance
 
-- [ ] Respect reduced-motion preferences with a subdued replacement effect.
-- [ ] Keep effects inside the lane/cabinet presentation and clear of critical score/input UI.
-- [ ] Add deterministic emitter tests and a particle-budget regression test.
-- [ ] Verify no measurable change to physics outcomes or fixed-timestep behavior.
+- [x] Respect reduced-motion preferences with a subdued replacement effect.
+- [x] Keep effects inside the lane/cabinet presentation and clear of critical score/input UI.
+- [x] Add deterministic emitter tests and a particle-budget regression test.
+- [x] Verify no measurable change to physics outcomes or fixed-timestep behavior.
+
+### Not yet surfaced
+
+- [ ] A player-facing control for equipping a trail or a burst. Both slots are
+      live and equippable through the loadout, but the only unlockable options
+      are milestone-5 rewards, so the picker arrives with the unlock tree that
+      gives it something to show. Until then the shipped defaults are what a
+      player sees, and the dev entitlement is how the alternates are exercised.
 
 ## Milestone 4 — Progression domain and authoritative persistence
 

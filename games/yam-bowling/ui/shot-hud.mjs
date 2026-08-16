@@ -59,17 +59,21 @@ export function createShotHud({ session, balls, ballCore }) {
   }
 
   function syncControlsFromShot() {
-    $("position-control").value = String(Math.round(scene.liveShot.position * 100));
-    $("aim-control").value = String(Math.round(scene.liveShot.aim * 100));
-    $("position-output").textContent = formatDirection(scene.liveShot.position);
-    $("aim-output").textContent = formatDirection(scene.liveShot.aim);
+    document.querySelectorAll('[data-shot-control="position"]')
+      .forEach((control) => { control.value = String(Math.round(scene.liveShot.position * 100)); });
+    document.querySelectorAll('[data-shot-control="aim"]')
+      .forEach((control) => { control.value = String(Math.round(scene.liveShot.aim * 100)); });
+    document.querySelectorAll('[data-shot-output="position"]')
+      .forEach((output) => { output.textContent = formatDirection(scene.liveShot.position); });
+    document.querySelectorAll('[data-shot-output="aim"]')
+      .forEach((output) => { output.textContent = formatDirection(scene.liveShot.aim); });
   }
 
   function updateShotControls() {
     const enabled = session.canAdjustShot();
     const isCpu = session.activePlayer()?.type === "cpu";
     const waitingForOpponent = session.onlineMatch && !session.isLocalOnlineTurn();
-    for (const control of [$("position-control"), $("aim-control")]) control.disabled = !enabled;
+    for (const control of document.querySelectorAll("[data-shot-control]")) control.disabled = !enabled;
     for (const button of $("ball-rack").querySelectorAll("button")) button.disabled = !enabled;
 
     const throwEnabled = !isCpu

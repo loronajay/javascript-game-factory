@@ -3,12 +3,15 @@ import { $, escapeHtml } from "./dom.mjs";
 // The title splash picker: a per-device cosmetic with no reach into a match.
 // It owns its own dialog, grid and selection state so nothing outside has to
 // know the splash exists.
-export function createMenuSplashPicker({ menuSplash, audio }) {
-  let selectedSlug = menuSplash.loadMenuSplashSlug();
+//
+// The chosen splash is the loadout's global `menuSplash` slot, so the title
+// screen and the presentation loadout can never disagree about it.
+export function createMenuSplashPicker({ menuSplash, loadout, audio }) {
+  let selectedSlug = loadout.getMenuSplashSlug();
 
   function apply(slug, persist = false) {
     selectedSlug = persist
-      ? menuSplash.saveMenuSplashSlug(slug)
+      ? loadout.setMenuSplashSlug(slug)
       : menuSplash.getMenuSplash(slug).slug;
     const splash = menuSplash.getMenuSplash(selectedSlug);
     const art = $("menu-splash-art");
@@ -25,7 +28,11 @@ export function createMenuSplashPicker({ menuSplash, audio }) {
 
   function build() {
     const grid = $("menu-splash-grid");
-    for (const splash of menuSplash.MENU_SPLASHES) {
+    // Owned splashes only. Every shipped splash is owned by default today, so
+    // this is the full grid; it is where an unearned alt splash stays hidden
+    // once bowler mastery starts handing them out.
+    const ownedSlugs = new Set(loadout.listOwned("menu-splash").map((item) => item.id.split(":")[1]));
+    for (const splash of menuSplash.MENU_SPLASHES.filter((option) => ownedSlugs.has(option.slug))) {
       const card = document.createElement("button");
       card.className = "menu-splash-card";
       card.type = "button";

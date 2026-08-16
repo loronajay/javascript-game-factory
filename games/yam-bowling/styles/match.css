@@ -83,6 +83,7 @@
 .score-rolls { position: absolute; top: 0; right: 0; display: flex; }
 .score-rolls i { display: grid; min-width: 14px; height: 15px; place-items: center; border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: .48rem; font-style: normal; }
 .score-total { display: grid; place-items: center; border-radius: 9px; background: #090a0e; color: var(--gold); font-size: 1.05rem; font-weight: 950; }
+.mobile-line-controls { display: none; }
 .shot-section { display: grid; gap: .6rem; }
 .range-control { display: grid; grid-template-columns: 58px 1fr 42px; gap: .55rem; align-items: center; color: var(--muted); font-size: .64rem; font-weight: 800; text-transform: uppercase; }
 .range-control output { color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }

@@ -123,7 +123,7 @@
         ctx.beginPath();
         for (let i = 0; i <= 18; i += 1) {
           const z = startZ + i / 18 * (endZ - startZ);
-          const point = this.project(root.YamPhysics.trajectoryX(z, shot), z);
+          const point = this.project(root.YamPhysics.gutterAwareTrajectoryX(z, shot), z);
           if (i === 0) ctx.moveTo(point.x, point.y);
           else ctx.lineTo(point.x, point.y);
         }
@@ -138,7 +138,7 @@
       strokePath(breakpointZ, 0.92, "rgba(255,214,102,.95)", [], 4);
       ctx.shadowBlur = 0;
       ctx.setLineDash([]);
-      const breakpoint = this.project(root.YamPhysics.trajectoryX(breakpointZ, shot), breakpointZ);
+      const breakpoint = this.project(root.YamPhysics.gutterAwareTrajectoryX(breakpointZ, shot), breakpointZ);
       ctx.beginPath();
       ctx.arc(breakpoint.x, breakpoint.y, 7, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(79, 180, 255, .95)";
@@ -146,7 +146,7 @@
       ctx.strokeStyle = "rgba(255, 255, 255, .9)";
       ctx.lineWidth = 2;
       ctx.stroke();
-      const target = this.project(root.YamPhysics.trajectoryX(0.86, shot), 0.86);
+      const target = this.project(root.YamPhysics.gutterAwareTrajectoryX(0.86, shot), 0.86);
       ctx.beginPath();
       ctx.arc(target.x, target.y, 13, 0, Math.PI * 2);
       ctx.strokeStyle = "rgba(255,214,102,.96)";
@@ -218,12 +218,14 @@
         .forEach((pin) => this.drawPin(pin));
     }
 
-    drawBallAt(x, z, ballIndex, rotation = 0) {
+    drawBallAt(x, z, ballIndex, rotation = 0, guttered = false) {
       const ctx = this.ctx;
       const ground = this.project(x, z);
       const size = 76 - clamp(z, 0, 1) * 51;
       const [light, dark] = BALL_COLORS[ballIndex % BALL_COLORS.length];
-      const cy = ground.y - size * 0.43;
+      // A captured ball sits visibly lower than one riding on the boards. Its
+      // normalized x remains fixed, so perspective carries it along the rail.
+      const cy = ground.y - size * (guttered ? 0.24 : 0.43);
       const radius = size / 2;
       ctx.save();
       ctx.translate(ground.x, cy);
@@ -261,6 +263,50 @@
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(0, 0, Math.max(1, radius - 1), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Equipped visual effects are painted from particle state the tick loop
+    // already advanced. The renderer never emits, ages, or clears a particle --
+    // it only projects one. `YamEffects` owns the fade curve so both sides agree
+    // on when a particle is gone.
+    drawParticles(particles, { glow = false } = {}) {
+      if (!particles.length) return;
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (const particle of particles) {
+        const alpha = root.YamEffects.particleAlpha(particle);
+        if (alpha <= 0) continue;
+        const point = this.project(particle.x, clamp(particle.z, 0, 1));
+        // Scaled by the same perspective the ball uses, so a particle far down
+        // the lane shrinks with it instead of floating at a fixed size.
+        const radius = Math.max(1, (76 - clamp(particle.z, 0, 1) * 51) * 0.12 * particle.size);
+        ctx.globalAlpha = alpha * (glow ? 0.85 : 0.6);
+        ctx.fillStyle = particle.color;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y - radius, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    // The reduced-motion replacement for the strike spray: one soft ring at the
+    // deck that fades, with nothing flying outward.
+    drawStrikeFlash(effectsState) {
+      const life = effectsState.flash;
+      if (life <= 0) return;
+      const ctx = this.ctx;
+      const progress = 1 - life / root.YamEffects.FLASH_LIFE;
+      const point = this.project(0, root.YamPhysics.RACK_FRONT_Z);
+      const radius = 60 + progress * 90;
+      ctx.save();
+      ctx.globalAlpha = clamp(life / root.YamEffects.FLASH_LIFE, 0, 1) * 0.5;
+      ctx.strokeStyle = "#fff6d5";
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y - radius * 0.4, radius, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
@@ -305,7 +351,7 @@
       ctx.restore();
     }
 
-    render(scene) {
+    render(scene, effectsState = null) {
       if (!this.ready) return;
       const ctx = this.ctx;
       ctx.imageSmoothingEnabled = true;
@@ -323,7 +369,9 @@
       let ballX = null;
       if (scene.phase === "approach") {
         ballZ = scene.ballZ;
-        ballX = root.YamPhysics.trajectoryX(ballZ, scene.shot);
+        ballX = scene.gutterSide
+          ? scene.gutterSide * root.YamPhysics.GUTTER_CENTER_X
+          : root.YamPhysics.trajectoryX(ballZ, scene.shot);
       } else if (scene.simulation?.ball?.active) {
         ballZ = root.YamPhysics.RACK_FRONT_Z + scene.simulation.ball.y / root.YamPhysics.Z_SCALE;
         ballX = scene.simulation.ball.x;
@@ -333,8 +381,16 @@
         this.drawPins(scene.pins);
       } else {
         this.drawPins(scene.pins, (pin) => this.pinZ(pin) >= ballZ);
-        this.drawBallAt(ballX, clamp(ballZ, 0, 1), scene.shot.ballIndex, scene.throwElapsed * 9);
+        if (effectsState) this.drawParticles(effectsState.trail);
+        const guttered = scene.phase === "approach"
+          ? Boolean(scene.gutterSide)
+          : Boolean(scene.simulation?.ball?.gutterSide);
+        this.drawBallAt(ballX, clamp(ballZ, 0, 1), scene.shot.ballIndex, scene.throwElapsed * 9, guttered);
         this.drawPins(scene.pins, (pin) => this.pinZ(pin) < ballZ);
+      }
+      if (effectsState) {
+        this.drawParticles(effectsState.burst, { glow: true });
+        this.drawStrikeFlash(effectsState);
       }
       this.drawPlayer(scene);
       this.debugDraw(scene);

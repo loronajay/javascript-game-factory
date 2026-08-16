@@ -25,7 +25,7 @@ export function defaultShot() {
   };
 }
 
-export function createSessionState({ physics, animation, storedSkinId, localClientId }) {
+export function createSessionState({ physics, animation, effects, storedSkinId, localClientId }) {
   const session = {
     // --- Match configuration, owned by the setup screens ---
     setup: {
@@ -51,6 +51,7 @@ export function createSessionState({ physics, animation, storedSkinId, localClie
       liveShot: defaultShot(),
       shot: null,
       ballZ: 0,
+      gutterSide: 0,
       throwElapsed: 0,
       spinElapsed: 0,
       spinLevel: 0,
@@ -65,6 +66,11 @@ export function createSessionState({ physics, animation, storedSkinId, localClie
     contactedPinCount: 0,
     paused: false,
     matchLaneSlug: "",
+
+    // --- Equipped visual effects: particles only, never gameplay ---
+    // Advanced by the tick loop and painted by the renderer. Nothing in here
+    // is ever read back into a shot, a score or an online message.
+    effects: effects.createEffectsState(),
 
     // --- Presentation timers, counted down by the tick loop ---
     calloutTime: 0,
@@ -122,6 +128,7 @@ export function createSessionState({ physics, animation, storedSkinId, localClie
         pins,
         simulation: null,
         ballZ: 0,
+        gutterSide: 0,
         throwElapsed: 0,
         spinElapsed: 0,
         spinLevel: 0,
@@ -131,6 +138,10 @@ export function createSessionState({ physics, animation, storedSkinId, localClie
       });
       session.playerShots = [defaultShot(), defaultShot()];
       session.contactedPinCount = 0;
+      // Live particles belong to the deck that is being replaced. The fired-roll
+      // key deliberately survives, so a resumed online match cannot re-fire a
+      // burst it has already shown.
+      effects.resetEffects(session.effects);
       session.transitionTime = 0;
       session.bannerTime = 1.15;
       session.paused = false;

@@ -4,7 +4,7 @@ import { renderSkinOptions } from "./skin-options.mjs";
 // The local (hot-seat / vs CPU) setup screen: mode, play type, CPU level, the
 // two bowler slots and the roster grid. It reads and writes `session.setup` and
 // nothing else in the session.
-export function createSetupScreen({ session, roster, animation, assets, onInspect }) {
+export function createSetupScreen({ session, roster, animation, assets, loadout, onInspect }) {
   const { setup } = session;
 
   function render() {
@@ -30,6 +30,7 @@ export function createSetupScreen({ session, roster, animation, assets, onInspec
       selectedSkinId: setup.skinIds[setup.activeSlot],
       animation,
       assets,
+      loadout,
       onEquip: (skinId) => {
         setup.skinIds[setup.activeSlot] = skinId;
         render();

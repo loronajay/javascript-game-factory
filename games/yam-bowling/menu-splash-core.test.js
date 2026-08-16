@@ -8,8 +8,6 @@ const {
   MENU_SPLASH_STORAGE_KEY,
   MENU_SPLASHES,
   getMenuSplash,
-  loadMenuSplashSlug,
-  saveMenuSplashSlug,
 } = require("./menu-splash-core");
 
 const expectedSlugs = [
@@ -60,37 +58,17 @@ test("menu splashes use canon character slugs and predictable asset paths", () =
 test("unknown splash preferences fall back to the default", () => {
   assert.equal(DEFAULT_MENU_SPLASH_SLUG, "reina-sato");
   assert.equal(getMenuSplash("missing-character").slug, DEFAULT_MENU_SPLASH_SLUG);
-  assert.equal(loadMenuSplashSlug({ getItem: () => "missing-character" }), DEFAULT_MENU_SPLASH_SLUG);
-  assert.equal(loadMenuSplashSlug({ getItem: () => null }), DEFAULT_MENU_SPLASH_SLUG);
+  assert.equal(getMenuSplash(null).slug, DEFAULT_MENU_SPLASH_SLUG);
 });
 
-test("valid splash preferences are loaded and saved", () => {
-  let savedKey = "";
-  let savedValue = "";
-  const storage = {
-    getItem(key) {
-      assert.equal(key, MENU_SPLASH_STORAGE_KEY);
-      return "lumi-vega";
-    },
-    setItem(key, value) {
-      savedKey = key;
-      savedValue = value;
-    },
-  };
+// The chosen splash is a loadout slot now, so persistence lives in
+// `loadout-core.test.js`. This module keeps only the catalog and the legacy key
+// the migration reads.
+test("names the legacy splash key without owning the choice anymore", () => {
+  assert.equal(MENU_SPLASH_STORAGE_KEY, "yam-bowling.menu-splash");
 
-  assert.equal(loadMenuSplashSlug(storage), "lumi-vega");
-  assert.equal(saveMenuSplashSlug("claire-rowan", storage), "claire-rowan");
-  assert.equal(savedKey, MENU_SPLASH_STORAGE_KEY);
-  assert.equal(savedValue, "claire-rowan");
-});
-
-test("storage failures never prevent the title screen from loading", () => {
-  const blockedStorage = {
-    getItem() { throw new Error("blocked"); },
-    setItem() { throw new Error("blocked"); },
-  };
-
-  assert.equal(loadMenuSplashSlug(blockedStorage), DEFAULT_MENU_SPLASH_SLUG);
-  assert.equal(saveMenuSplashSlug("cassy-cruz", blockedStorage), "cassy-cruz");
-  assert.equal(saveMenuSplashSlug("not-real", blockedStorage), DEFAULT_MENU_SPLASH_SLUG);
+  const module = require("./menu-splash-core");
+  for (const removed of ["loadMenuSplashSlug", "saveMenuSplashSlug"]) {
+    assert.equal(removed in module, false, `${removed} should live in the loadout, not here`);
+  }
 });

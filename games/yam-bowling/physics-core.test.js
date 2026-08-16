@@ -6,6 +6,10 @@ const {
   chargePowerAtTime,
   createRack,
   createSimulation,
+  GUTTER_CENTER_X,
+  GUTTER_CONTACT_X,
+  gutterAwareTrajectoryX,
+  gutterSideForX,
   hookBreakpointForPower,
   resolveContact,
   stepSimulation,
@@ -151,5 +155,59 @@ describe("lane physics primitives", () => {
     for (let i = 0; i < 500; i += 1) stepSimulation(simulation, 1 / 180);
     const bodies = [simulation.ball, ...simulation.pins];
     assert.equal(bodies.every((body) => [body.x, body.y, body.vx, body.vy].every(Number.isFinite)), true);
+  });
+
+  test("captures the ball when its outside edge reaches either gutter", () => {
+    for (const side of [-1, 1]) {
+      const simulation = createSimulation(createRack(), { power: 0.75 });
+      simulation.ball.x = side * (GUTTER_CONTACT_X + 0.001);
+      simulation.ball.vx = side * 0.4;
+
+      stepSimulation(simulation, 1 / 180);
+
+      assert.equal(simulation.ball.gutterSide, side);
+      assert.equal(simulation.ball.active, true, "a guttered ball should remain visible down-lane");
+    }
+  });
+
+  test("gives a grazing ball a small, symmetric forgiveness margin", () => {
+    assert.equal(GUTTER_CONTACT_X, 0.92);
+    assert.equal(gutterSideForX(0.9), 0, "a slight overhang should remain playable");
+    assert.equal(gutterSideForX(-0.9), 0, "forgiveness should match on the left");
+    assert.equal(gutterSideForX(GUTTER_CONTACT_X), 1);
+    assert.equal(gutterSideForX(-GUTTER_CONTACT_X), -1);
+  });
+
+  test("projects the aim guide onto the gutter rail after its first crossing", () => {
+    const shot = {
+      position: 0.46,
+      aim: 0.45,
+      hook: 1,
+      hookScale: 1.35,
+      power: 0.7,
+      release: 0.035,
+    };
+
+    assert.equal(gutterAwareTrajectoryX(0.3, shot), trajectoryX(0.3, shot));
+    assert.ok(trajectoryX(0.9, shot) > GUTTER_CONTACT_X, "the raw guide should cross the gutter");
+    assert.equal(gutterAwareTrajectoryX(0.9, shot), GUTTER_CENTER_X,
+      "the visible guide should show permanent gutter capture");
+  });
+
+  test("locks a guttered ball onto the gutter rail and keeps it away from the pins", () => {
+    const simulation = createSimulation(createRack(), { power: 0.9 });
+    simulation.ball.x = GUTTER_CONTACT_X + 0.001;
+    simulation.ball.vx = 0.55;
+    simulation.ball.hookAcceleration = -30;
+    const startingY = simulation.ball.y;
+
+    for (let i = 0; i < 180; i += 1) stepSimulation(simulation, 1 / 180);
+
+    assert.equal(simulation.ball.gutterSide, 1, "gutter capture must be one-way");
+    assert.ok(Math.abs(simulation.ball.x - GUTTER_CENTER_X) < 0.002,
+      `ball should settle onto the gutter rail at ${GUTTER_CENTER_X}, got ${simulation.ball.x}`);
+    assert.ok(simulation.ball.y > startingY, "the captured ball should keep rolling toward the pit");
+    assert.equal(simulation.pins.some((pin) => pin.contacted), false,
+      "a ball in the gutter cannot climb back onto the deck and hit a pin");
   });
 });

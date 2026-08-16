@@ -36,6 +36,9 @@ initMobileLandscapeGate();
   const MenuSplash = window.YamMenuSplash;
   const LaneCore = window.YamLaneCore;
   const Animation = window.YamBowlingCore;
+  const Cosmetics = window.YamCosmetics;
+  const LoadoutCore = window.YamLoadout;
+  const Effects = window.YamEffects;
   const Catalog = window.YamCharacterCatalog;
   const Roster = Animation.CANON_BOWLERS;
   const BALLS = BallCore.BALLS;
@@ -47,11 +50,15 @@ initMobileLandscapeGate();
   const onlineIdentity = createOnlineIdentityPayload(loadFactoryProfile());
   const platformApi = createPlatformApiClient();
   const onlineClient = createOnlineClient();
-  const assets = createCharacterAssets({ animation: Animation, roster: Roster });
+  // What this device owns and wears. Every cosmetic read goes through it, so
+  // equipment has one owner and one migration off the old preference keys.
+  const loadout = LoadoutCore.createLoadoutStore();
+  const assets = createCharacterAssets({ animation: Animation, roster: Roster, loadout });
 
   const session = createSessionState({
     physics: Physics,
     animation: Animation,
+    effects: Effects,
     storedSkinId: assets.storedSkinId,
     localClientId: () => onlineClient.getSnapshot().clientId,
   });
@@ -67,7 +74,18 @@ initMobileLandscapeGate();
     renderer.setLane(session.matchLaneSlug).catch((error) => console.error(error));
   }
 
-  const menuSplashPicker = createMenuSplashPicker({ menuSplash: MenuSplash, audio });
+  // The equipped effects, resolved per read rather than captured once, so a
+  // change in the loadout applies to the next roll without a reload. Reduced
+  // motion is asked of the browser the same way, so a preference change during
+  // a session is honored too.
+  const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)") ?? null;
+  const effectsConfig = () => ({
+    trailStyle: Effects.styleForItem(Cosmetics.getItem(loadout.getGlobalSlot("ballTrail"))),
+    burstStyle: Effects.styleForItem(Cosmetics.getItem(loadout.getGlobalSlot("strikeBurst"))),
+    reducedMotion: Boolean(prefersReducedMotion?.matches),
+  });
+
+  const menuSplashPicker = createMenuSplashPicker({ menuSplash: MenuSplash, loadout, audio });
   const lanePicker = createLanePicker({ laneCore: LaneCore, audio, onPreview: applyMatchLane });
   session.matchLaneSlug = lanePicker.getSelectedSlug();
 
@@ -81,7 +99,7 @@ initMobileLandscapeGate();
   const openInspector = (slug, focusTarget) => characterInspector.open(slug, focusTarget);
 
   const setupScreen = createSetupScreen({
-    session, roster: Roster, animation: Animation, assets, onInspect: openInspector,
+    session, roster: Roster, animation: Animation, assets, loadout, onInspect: openInspector,
   });
   const shotHud = createShotHud({ session, balls: BALLS, ballCore: BallCore });
 
@@ -110,6 +128,7 @@ initMobileLandscapeGate();
     roster: Roster,
     animation: Animation,
     assets,
+    loadout,
     onlineIdentity,
     normalizeRoomCode,
     onInspect: openInspector,
@@ -124,6 +143,9 @@ initMobileLandscapeGate();
     cpu: Cpu,
     balls: BALLS,
     audio,
+    audioCore: AudioCore,
+    effects: Effects,
+    effectsConfig,
     renderer,
     assets,
     shotHud,
@@ -175,7 +197,7 @@ initMobileLandscapeGate();
       accumulator -= TICK_MS;
     }
     renderer.ctx.imageSmoothingEnabled = false;
-    if (session.match && !$("game-screen").hidden) renderer.render(session.scene);
+    if (session.match && !$("game-screen").hidden) renderer.render(session.scene, session.effects);
     requestAnimationFrame(loop);
   }
 

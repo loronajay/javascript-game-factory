@@ -10,7 +10,7 @@ export function createCharacterInspector({ animation, catalog, assets, audio, in
   let returnFocus = null;
 
   // A preview is a look, not a purchase: this renderer reads the equipped skin
-  // to label options but must never call saveEquippedSkinId.
+  // to label options but must never reach an equip path.
   function renderSkinOptions() {
     const host = $("character-inspector-skins");
     const equippedSkinId = assets.storedSkinId(slug);

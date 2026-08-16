@@ -4,14 +4,15 @@
 //
 // Injected rather than reaching for `window.YamBowlingCore` directly so the
 // resolver can be unit-tested without a DOM or the classic script tags.
-export function createCharacterAssets({ animation, roster }) {
+export function createCharacterAssets({ animation, roster, loadout }) {
   const bowlerBySlug = (slug) => roster.find((bowler) => bowler.slug === slug) || roster[0];
 
   return {
     bowlerBySlug,
 
-    // The equipped skin persisted for a bowler, normalized through the catalog.
-    storedSkinId: (slug) => animation.getEquippedSkinId(bowlerBySlug(slug)),
+    // The equipped skin comes from the presentation loadout, which owns both
+    // the equipment record and the migration off the old per-skin storage key.
+    storedSkinId: (slug) => loadout.getEquippedSkinId(bowlerBySlug(slug).slug),
 
     characterPortrait: (slug, skinId = animation.DEFAULT_SKIN_ID) => animation
       .getPortraitAssetPath({ slug }, skinId),

@@ -189,6 +189,11 @@
               <div class="section-heading section-heading--small"><h3 id="score-title">Scorecard</h3><span id="score-mode">3 frames</span></div>
               <div class="scoreboard" id="scoreboard"></div>
             </section>
+
+            <section class="mobile-line-controls" aria-label="Shot line controls">
+              <label class="range-control"><span>Strafe</span><input id="mobile-position-control" data-shot-control="position" type="range" min="-46" max="46" value="0" /><output data-shot-output="position">C</output></label>
+              <label class="range-control"><span>Aim</span><input id="mobile-aim-control" data-shot-control="aim" type="range" min="-45" max="45" value="10" /><output data-shot-output="aim">R 10</output></label>
+            </section>
           </aside>
 
           <section class="lane-shell" aria-label="Bowling lane">
@@ -205,8 +210,8 @@
           <aside class="game-panel game-panel--shot panel" aria-label="Shot controls">
             <section class="shot-section" id="shot-controls" aria-labelledby="shot-title">
               <div class="section-heading section-heading--small"><h3 id="shot-title">Shot setup</h3><span id="shot-status">Ready</span></div>
-              <label class="range-control"><span>Position</span><input id="position-control" type="range" min="-46" max="46" value="0" /><output id="position-output">C</output></label>
-              <label class="range-control"><span>Aim</span><input id="aim-control" type="range" min="-45" max="45" value="10" /><output id="aim-output">R 10</output></label>
+              <label class="range-control desktop-line-control"><span>Strafe</span><input id="position-control" data-shot-control="position" type="range" min="-46" max="46" value="0" /><output id="position-output" data-shot-output="position">C</output></label>
+              <label class="range-control desktop-line-control"><span>Aim</span><input id="aim-control" data-shot-control="aim" type="range" min="-45" max="45" value="10" /><output id="aim-output" data-shot-output="aim">R 10</output></label>
               <div class="ball-rack" id="ball-rack" aria-label="Choose a bowling ball"></div>
               <article class="ball-profile" id="ball-profile" aria-live="polite">
                 <div class="ball-profile__heading"><strong id="ball-profile-name">Yam Red</strong><span id="ball-profile-type">Balanced</span></div>
@@ -316,6 +321,9 @@
     <script src="menu-splash-core.js"></script>
     <script src="lane-core.js"></script>
     <script src="animation-core.js"></script>
+    <script src="cosmetics-core.js"></script>
+    <script src="loadout-core.js"></script>
+    <script src="effects-core.js"></script>
     <script src="character-catalog-data.js"></script>
     <script src="character-catalog.js"></script>
     <script src="audio-core.js"></script>

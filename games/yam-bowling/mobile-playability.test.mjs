@@ -45,6 +45,7 @@ test("the game initializes the mobile landscape gate", () => {
 });
 
 test("landscape phones retain the desktop three-rail match inside one viewport", () => {
+  const html = read("index.html");
   const css = readStyles();
   assert.match(css, /\.mobile-landscape-gate\s*\{[^}]*position:\s*fixed;[^}]*env\(safe-area-inset-top\)[^}]*env\(safe-area-inset-left\)/s);
   assert.match(css, /\.mobile-landscape-gate\.is-visible\s*\{[^}]*pointer-events:\s*auto/s);
@@ -57,7 +58,25 @@ test("landscape phones retain the desktop three-rail match inside one viewport",
   assert.match(landscapeBlock, /\.game-panel\s*\{[^}]*max-height:\s*100%;[^}]*overflow:\s*hidden/s);
   assert.match(landscapeBlock, /\.button--throw\s*\{[^}]*min-height:\s*44px/s);
   assert.match(landscapeBlock, /input\[type=["']range["']\][^}]*touch-action:\s*none/s);
+  assert.ok(
+    html.indexOf('class="scoreboard"') < html.indexOf('class="mobile-line-controls"'),
+    "mobile strafe and aim controls should follow the scorecard in the left rail",
+  );
+  assert.match(landscapeBlock, /\.mobile-line-controls\s*\{[^}]*display:\s*grid/s);
+  assert.match(landscapeBlock, /\.game-panel--shot\s+\.desktop-line-control\s*\{[^}]*display:\s*none/s);
   assert.match(css, /@media\s*\(hover:\s*none\)\s*and\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*360px\),\s*\(pointer:\s*coarse\)\s*and\s*\(orientation:\s*landscape\)\s*and\s*\(max-height:\s*360px\),\s*\(max-height:\s*360px\)\s*and\s*\(min-width:\s*560px\)/);
+});
+
+test("desktop and mobile line controls stay linked to one shot state", () => {
+  const html = read("index.html");
+  const bindings = read("input/bindings.mjs");
+  const shotHud = read("ui/shot-hud.mjs");
+
+  assert.equal((html.match(/data-shot-control=["']position["']/g) || []).length, 2);
+  assert.equal((html.match(/data-shot-control=["']aim["']/g) || []).length, 2);
+  assert.match(bindings, /querySelectorAll\([^)]*data-shot-control/);
+  assert.match(shotHud, /querySelectorAll\([^)]*data-shot-control/);
+  assert.match(shotHud, /querySelectorAll\([^)]*data-shot-output/);
 });
 
 test("long-pressing controls never raises the mobile text-selection callout", () => {
@@ -76,5 +95,9 @@ test("landscape phone menus use compact desktop-like columns", () => {
   const css = readStyles();
   assert.match(css, /@media\s*\(hover:\s*none\)\s*and\s*\(orientation:\s*landscape\)[\s\S]*?\.setup-layout,\s*\.online-setup-layout\s*\{[^}]*grid-template-columns:\s*minmax\([^;]+\)\s+minmax\(/s);
   assert.match(css, /@media\s*\(hover:\s*none\)\s*and\s*\(orientation:\s*landscape\)[\s\S]*?\.character-grid\s*\{[^}]*overflow-y:\s*auto/s);
+  assert.match(css, /@media\s*\(hover:\s*none\)\s*and\s*\(orientation:\s*landscape\)[\s\S]*?\.character-grid\s*\{[^}]*grid-auto-rows:\s*max-content/s);
+  assert.match(css, /@media\s*\(hover:\s*none\)\s*and\s*\(orientation:\s*landscape\)[\s\S]*?\.character-grid\s*\{[^}]*align-content:\s*start/s);
+  assert.match(css, /@media\s*\(hover:\s*none\)\s*and\s*\(orientation:\s*landscape\)[\s\S]*?\.character-grid\s*\{[^}]*row-gap:\s*\.55rem/s);
+  assert.match(css, /@media\s*\(hover:\s*none\)\s*and\s*\(orientation:\s*landscape\)[\s\S]*?\.character-card:hover,\s*\.character-card\.is-selected\s*\{[^}]*transform:\s*none/s);
   assert.match(css, /@media\s*\(hover:\s*none\)\s*and\s*\(orientation:\s*landscape\)[\s\S]*?\.results-card\s*\{[^}]*max-height:\s*100%/s);
 });

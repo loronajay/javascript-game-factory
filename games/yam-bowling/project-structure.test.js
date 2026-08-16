@@ -103,7 +103,7 @@ test("the setup screen exposes skin equipment controls", () => {
 
   assert.match(html, /id=["']skin-options["']/);
   assert.match(html, /id=["']online-skin-options["']/);
-  assert.match(read("ui/skin-options.mjs"), /saveEquippedSkinId/);
+  assert.match(read("ui/skin-options.mjs"), /loadout\.equipSkin\(/);
   assert.match(read("ui/skin-options.mjs"), /skinId/);
   assert.match(read("renderer.js"), /getFrameAssetPath/);
 });
@@ -141,9 +141,80 @@ test("inspector skin previews never use the equipment persistence path", () => {
   assert.notEqual(previewFunction, "", "the inspector should own a skin-preview renderer");
   assert.match(previewFunction, /previewSkinId/);
   assert.match(previewFunction, /getSkinPreviewLabel/);
-  assert.doesNotMatch(previewFunction, /saveEquippedSkinId/);
+  assert.doesNotMatch(previewFunction, /saveEquippedSkinId|equipSkin|equipBowlerSlot/);
   // The whole module is preview-only; equipping belongs to the setup screens.
-  assert.doesNotMatch(readCode("ui/character-inspector.mjs"), /saveEquippedSkinId/);
+  assert.doesNotMatch(readCode("ui/character-inspector.mjs"), /saveEquippedSkinId|equipSkin|equipBowlerSlot/);
+});
+
+test("the cosmetic catalog and the presentation loadout own separate halves of the contract", () => {
+  const html = read("index.html");
+  const catalog = readCode("cosmetics-core.js");
+  const loadout = readCode("loadout-core.js");
+
+  // Both cores are built from the roster and splash catalogs, so they load after them.
+  assert.ok(html.indexOf("animation-core.js") < html.indexOf("cosmetics-core.js"));
+  assert.ok(html.indexOf("menu-splash-core.js") < html.indexOf("cosmetics-core.js"));
+  assert.ok(html.indexOf("cosmetics-core.js") < html.indexOf("loadout-core.js"));
+  assert.ok(html.indexOf("loadout-core.js") < html.indexOf("game.js"));
+
+  // The catalog describes what exists. It must not know what a player owns,
+  // wears, or paid: that belongs to the loadout and, later, to the server.
+  assert.doesNotMatch(catalog, /localStorage|\.setItem\(|\.getItem\(|\bequip|\bgranted\b/i);
+
+  // Equipment and ownership have exactly one owner.
+  assert.match(loadout, /LOADOUT_STORAGE_KEY\s*=\s*"yam-bowling\.loadout\.v1"/);
+  assert.match(loadout, /SCHEMA_VERSION\s*=\s*1/);
+  assert.match(loadout, /LEGACY_EQUIPPED_SKINS_STORAGE_KEY/, "the old skin key must be a migration input");
+  assert.match(loadout, /MENU_SPLASH_STORAGE_KEY/, "the old splash key must be a migration input");
+
+  const manifest = JSON.parse(read("runtime-assets.json"));
+  assert.ok(manifest.include.includes("cosmetics-core.js"));
+  assert.ok(manifest.include.includes("loadout-core.js"));
+});
+
+test("equippable effects are render-only and cannot reach gameplay", () => {
+  const html = read("index.html");
+  const effects = readCode("effects-core.js");
+  const renderer = readCode("renderer.js");
+  const runtime = readCode("match/match-runtime.mjs");
+
+  assert.ok(html.indexOf("cosmetics-core.js") < html.indexOf("effects-core.js"));
+  assert.ok(html.indexOf("effects-core.js") < html.indexOf("game.js"));
+  assert.ok(JSON.parse(read("runtime-assets.json")).include.includes("effects-core.js"));
+
+  // The emitter is presentation. It has no route to physics, scoring, the deck
+  // simulation or the wire, which is what makes "effects never alter trajectory,
+  // collision, timing or server shot inputs" a structural fact.
+  assert.doesNotMatch(effects, /require\(|YamPhysics|YamGameCore|simulation|submitShot|knocked/i);
+  // Deterministic: a seeded generator, never Math.random, so the scatter and the
+  // particle budget can both be asserted exactly.
+  assert.doesNotMatch(effects, /Math\.random/);
+  assert.match(effects, /MAX_TRAIL_PARTICLES\s*=\s*\d+/);
+  assert.match(effects, /MAX_BURST_PARTICLES\s*=\s*\d+/);
+
+  // The runtime advances particles; the renderer only paints them. Keeping that
+  // arrow straight is the same rule the HUD follows.
+  assert.match(runtime, /effects\.advance\(/);
+  assert.match(runtime, /effects\.emitTrail\(/);
+  assert.match(runtime, /effects\.triggerBurst\(/);
+  assert.doesNotMatch(renderer, /emitTrail|triggerBurst|advance\(/);
+
+  // A burst is keyed by the roll that earned it, so a replayed online snapshot
+  // or a resumed match cannot fire it twice.
+  assert.match(runtime, /rollEffectKey\(/);
+  assert.match(readCode("effects-core.js"), /lastBurstKey/);
+
+  // Reduced motion is honored from the composition root, not guessed at inside
+  // the emitter.
+  assert.match(readCode("game.js"), /prefers-reduced-motion/);
+});
+
+test("no surface shows a price or an unlock claim before ownership is authoritative", () => {
+  // Milestone 2 rule: a dev entitlement is allowed to open the catalog for
+  // authoring, but nothing may advertise an XP cost the server cannot honor.
+  for (const file of ["cosmetics-core.js", "loadout-core.js", "ui/skin-options.mjs", "ui/menu-splash-picker.mjs"]) {
+    assert.doesNotMatch(readCode(file), /price|cost|purchase|XP/i, `${file} should not price a cosmetic yet`);
+  }
 });
 
 test("the published runtime includes the generated character catalog", () => {
@@ -261,8 +332,8 @@ test("players can choose and persist a character-named menu splash", () => {
   assert.ok(html.indexOf("menu-splash-core.js") < html.indexOf("game.js"));
   const picker = read("ui/menu-splash-picker.mjs");
   assert.match(game, /menuSplashPicker\.build\(\)/);
-  assert.match(picker, /loadMenuSplashSlug/);
-  assert.match(picker, /saveMenuSplashSlug/);
+  assert.match(picker, /loadout\.getMenuSplashSlug\(/);
+  assert.match(picker, /loadout\.setMenuSplashSlug\(/);
   assert.match(picker, /data-splash-slug/);
 });
 

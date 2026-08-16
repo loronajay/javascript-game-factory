@@ -7,6 +7,11 @@
   const Z_SCALE = 11.76;
   const PHYSICS_START_Z = 0.735;
   const BALL_RADIUS = 0.12;
+  // The playable boards span x = -1..1. Let roughly one third of the ball hang
+  // over the edge before capture so a visual graze is forgiving, then make the
+  // decision permanent and ride the trough just beyond the boards.
+  const GUTTER_CONTACT_X = 0.92;
+  const GUTTER_CENTER_X = 1.08;
   const PIN_RADIUS = 0.067;
   const FALLEN_PIN_RADIUS = 0.092;
   const BALL_MASS = 3.4;
@@ -183,10 +188,38 @@
     return pin.standing ? PIN_RADIUS : FALLEN_PIN_RADIUS;
   }
 
-  function createSimulation(pins, shot) {
+  function gutterSideForX(x) {
+    if (!Number.isFinite(x) || Math.abs(x) < GUTTER_CONTACT_X) return 0;
+    return Math.sign(x) || 1;
+  }
+
+  // The setup guide must promise the same one-way capture as the live ball.
+  // Sampling at fine-grained lane intervals is enough to
+  // preserve an earlier crossing even when a strong hook later turns inward.
+  function gutterAwareTrajectoryX(z, shot = {}) {
+    const endZ = Math.max(0, Number.isFinite(z) ? z : 0);
+    const sampleCount = Math.max(1, Math.ceil(endZ / 0.005));
+    for (let index = 0; index <= sampleCount; index += 1) {
+      const sampleZ = endZ * index / sampleCount;
+      const side = gutterSideForX(trajectoryX(sampleZ, shot));
+      if (side) return side * GUTTER_CENTER_X;
+    }
+    return trajectoryX(z, shot);
+  }
+
+  function captureBallInGutter(ball, side = gutterSideForX(ball.x)) {
+    if (!side || ball.gutterSide) return ball.gutterSide || 0;
+    ball.gutterSide = side < 0 ? -1 : 1;
+    ball.x = ball.gutterSide * GUTTER_CENTER_X;
+    ball.vx = 0;
+    ball.hookAcceleration = 0;
+    return ball.gutterSide;
+  }
+
+  function createSimulation(pins, shot, { gutterSide = 0 } = {}) {
     const speed = ballSpeedForShot(shot);
     const ballX = trajectoryX(PHYSICS_START_Z, shot);
-    return {
+    const simulation = {
       pins: pins.map((pin) => ({ ...pin })),
       startStanding: pins.filter((pin) => pin.standing).length,
       elapsed: 0,
@@ -200,9 +233,12 @@
         vy: speed * Z_SCALE,
         mass: BALL_MASS * (shot.massScale || 1),
         hookAcceleration: trajectorySecondDerivative(PHYSICS_START_Z, shot) * speed * speed * 0.75,
+        gutterSide: 0,
         active: true,
       },
     };
+    captureBallInGutter(simulation.ball, gutterSide || gutterSideForX(ballX));
+    return simulation;
   }
 
   function stepSimulation(simulation, dt) {
@@ -210,13 +246,20 @@
     const { ball, pins } = simulation;
     simulation.elapsed += dt;
     if (ball.active) {
-      ball.vx += ball.hookAcceleration * (simulation.firstContact ? 0.16 : 1) * dt;
-      const damping = Math.exp(-0.12 * dt);
-      ball.vx *= damping;
-      ball.vy *= damping;
-      ball.x += ball.vx * dt;
+      if (ball.gutterSide) {
+        ball.x = ball.gutterSide * GUTTER_CENTER_X;
+        ball.vx = 0;
+        ball.vy *= Math.exp(-0.32 * dt);
+      } else {
+        ball.vx += ball.hookAcceleration * (simulation.firstContact ? 0.16 : 1) * dt;
+        const damping = Math.exp(-0.12 * dt);
+        ball.vx *= damping;
+        ball.vy *= damping;
+        ball.x += ball.vx * dt;
+        captureBallInGutter(ball);
+      }
       ball.y += ball.vy * dt;
-      if (Math.abs(ball.x) > 0.96 || ball.y > 1.62) ball.active = false;
+      if (ball.y > 1.62) ball.active = false;
     }
 
     const pinDamping = Math.exp(-3.35 * dt);
@@ -235,7 +278,7 @@
     }
 
     for (let iteration = 0; iteration < 3; iteration += 1) {
-      if (ball.active) {
+      if (ball.active && !ball.gutterSide) {
         for (const pin of pins) {
           const impulse = resolveContact(ball, pin, BALL_RADIUS, pinRadius(pin), 0.2);
           if (impulse > 0) {
@@ -284,6 +327,8 @@
     Z_SCALE,
     PHYSICS_START_Z,
     BALL_RADIUS,
+    GUTTER_CONTACT_X,
+    GUTTER_CENTER_X,
     PIN_RADIUS,
     CHARGE_DURATION_SECONDS,
     MIN_THROW_POWER,
@@ -297,6 +342,8 @@
     trajectoryX,
     trajectoryDerivative,
     trajectorySecondDerivative,
+    gutterSideForX,
+    gutterAwareTrajectoryX,
     resolveContact,
     createSimulation,
     stepSimulation,

@@ -10,6 +10,8 @@
   "use strict";
 
   const DEFAULT_MENU_SPLASH_SLUG = "reina-sato";
+  // Legacy: the chosen splash is a loadout slot now. This key is kept only so
+  // the migration in `loadout-core.js` can name it in one place.
   const MENU_SPLASH_STORAGE_KEY = "yam-bowling.menu-splash";
   const MENU_SPLASHES = Object.freeze([
     ["Daisy Monroe", "daisy-monroe"],
@@ -55,38 +57,10 @@
       || MENU_SPLASHES.find((splash) => splash.slug === DEFAULT_MENU_SPLASH_SLUG);
   }
 
-  function defaultStorage() {
-    try {
-      return root.localStorage;
-    } catch (_error) {
-      return null;
-    }
-  }
-
-  function loadMenuSplashSlug(storage = defaultStorage()) {
-    try {
-      return getMenuSplash(storage?.getItem(MENU_SPLASH_STORAGE_KEY)).slug;
-    } catch (_error) {
-      return DEFAULT_MENU_SPLASH_SLUG;
-    }
-  }
-
-  function saveMenuSplashSlug(slug, storage = defaultStorage()) {
-    const normalizedSlug = getMenuSplash(slug).slug;
-    try {
-      storage?.setItem(MENU_SPLASH_STORAGE_KEY, normalizedSlug);
-    } catch (_error) {
-      // The choice still applies for this visit when storage is unavailable.
-    }
-    return normalizedSlug;
-  }
-
   return {
     DEFAULT_MENU_SPLASH_SLUG,
     MENU_SPLASH_STORAGE_KEY,
     MENU_SPLASHES,
     getMenuSplash,
-    loadMenuSplashSlug,
-    saveMenuSplashSlug,
   };
 });

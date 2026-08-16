@@ -70,17 +70,21 @@ export function bindEvents({
   $("start-match").addEventListener("click", () => matchRuntime.startMatch());
 
   // --- Shot controls ---
-  $("position-control").addEventListener("input", (event) => {
-    if (!session.canAdjustShot()) return;
-    scene.liveShot.position = Number(event.target.value) / 100;
-    audio.play("select", { intensity: 0.55 });
-    shotHud.syncControlsFromShot();
+  document.querySelectorAll('[data-shot-control="position"]').forEach((control) => {
+    control.addEventListener("input", (event) => {
+      if (!session.canAdjustShot()) return;
+      scene.liveShot.position = Number(event.target.value) / 100;
+      audio.play("select", { intensity: 0.55 });
+      shotHud.syncControlsFromShot();
+    });
   });
-  $("aim-control").addEventListener("input", (event) => {
-    if (!session.canAdjustShot()) return;
-    scene.liveShot.aim = Number(event.target.value) / 100;
-    audio.play("select", { intensity: 0.55 });
-    shotHud.syncControlsFromShot();
+  document.querySelectorAll('[data-shot-control="aim"]').forEach((control) => {
+    control.addEventListener("input", (event) => {
+      if (!session.canAdjustShot()) return;
+      scene.liveShot.aim = Number(event.target.value) / 100;
+      audio.play("select", { intensity: 0.55 });
+      shotHud.syncControlsFromShot();
+    });
   });
 
   const throwButton = $("throw-button");

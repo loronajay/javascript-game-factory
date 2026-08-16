@@ -13,6 +13,9 @@ export function createMatchRuntime({
   cpu,
   balls,
   audio,
+  audioCore,
+  effects,
+  effectsConfig,
   renderer,
   assets,
   shotHud,
@@ -24,6 +27,45 @@ export function createMatchRuntime({
   physicsStep,
 }) {
   const { scene } = session;
+
+  // Every roll this client ever animates gets a distinct key, so a burst fires
+  // exactly once. Online it is the server's own roll identity (stable across a
+  // replay or a resume, and scoped by session so a rematch starts clean);
+  // locally it is a counter that never resets, so no two rolls can collide.
+  let localRollSequence = 0;
+
+  function rollEffectKey(authority) {
+    if (!authority) return `local:${localRollSequence}`;
+    const sessionId = authority.snapshot?.sessionId ?? "session";
+    return `online:${sessionId}:${Number(authority.roll.rollNumber) || 0}`;
+  }
+
+  // The ball position the picture is already using. Read, never written: the
+  // trail follows the shot, it does not steer it.
+  function displayedBallPosition() {
+    if (scene.phase === "approach") {
+      return {
+        x: scene.gutterSide
+          ? scene.gutterSide * physics.GUTTER_CENTER_X
+          : physics.trajectoryX(scene.ballZ, scene.shot),
+        z: scene.ballZ,
+      };
+    }
+    if (scene.simulation?.ball?.active) {
+      return {
+        x: scene.simulation.ball.x,
+        z: physics.RACK_FRONT_Z + scene.simulation.ball.y / physics.Z_SCALE,
+      };
+    }
+    return null;
+  }
+
+  function emitBallTrail(dt) {
+    const position = displayedBallPosition();
+    if (!position) return;
+    const { trailStyle, reducedMotion } = effectsConfig();
+    effects.emitTrail(session.effects, { ...position, dt, style: trailStyle, reducedMotion });
+  }
 
   function clonePins(pins) {
     return Array.isArray(pins) ? pins.map((pin) => ({ ...pin })) : physics.createRack();
@@ -171,6 +213,7 @@ export function createMatchRuntime({
     session.playerShots[session.match.activePlayer] = { ...scene.liveShot };
     scene.phase = "approach";
     scene.ballZ = 0.02;
+    scene.gutterSide = 0;
     scene.throwElapsed = 0;
     scene.liveShot.power = power;
     scene.simulation = null;
@@ -203,8 +246,22 @@ export function createMatchRuntime({
       ? authority.roll.knocked
       : Math.max(0, Math.min(startedStanding, physics.knockedCount(scene.simulation)));
     scene.pins = authority ? clonePins(authority.roll.pinsAfter) : scene.simulation.pins;
+    if (!authority) localRollSequence += 1;
     resultsScreen.showCallout(knocked, startedStanding);
     if (knocked > 0) renderer.shake = Math.min(12, 3 + knocked);
+
+    // The equipped strike burst, fired off the same outcome the callout and the
+    // audio cue use so there is only ever one definition of a strike.
+    if (audioCore.getOutcomeCue(knocked, startedStanding, session.frameRollNumber() === 1) === "strike") {
+      const { burstStyle, reducedMotion } = effectsConfig();
+      effects.triggerBurst(session.effects, {
+        x: 0,
+        z: physics.RACK_FRONT_Z,
+        key: rollEffectKey(authority),
+        style: burstStyle,
+        reducedMotion,
+      });
+    }
 
     if (authority) {
       session.match = structuredClone(authority.snapshot.match);
@@ -232,6 +289,7 @@ export function createMatchRuntime({
       simulation: null,
       phase: "ready",
       ballZ: 0,
+      gutterSide: 0,
       throwElapsed: 0,
       spinElapsed: 0,
       spinLevel: 0,
@@ -253,6 +311,8 @@ export function createMatchRuntime({
     if (!session.match || session.paused || $("game-screen").hidden) return;
     session.bannerTime = Math.max(0, session.bannerTime - dt);
     session.calloutTime = Math.max(0, session.calloutTime - dt);
+    emitBallTrail(dt);
+    effects.advance(session.effects, dt);
     scoreboard.updateOverlayVisibility();
 
     const strafeDirection = (keys.strafeRight ? 1 : 0) - (keys.strafeLeft ? 1 : 0);
@@ -293,9 +353,12 @@ export function createMatchRuntime({
         scene.shot.release = Math.max(-0.035, Math.min(0.035, scene.shot.release + strafeDirection * dt * 0.1));
       }
       scene.ballZ += physics.ballSpeedForShot(scene.shot) * dt;
+      if (!scene.gutterSide) {
+        scene.gutterSide = physics.gutterSideForX(physics.trajectoryX(scene.ballZ, scene.shot));
+      }
       if (scene.ballZ >= physics.PHYSICS_START_Z) {
         scene.ballZ = physics.PHYSICS_START_Z;
-        scene.simulation = physics.createSimulation(scene.pins, scene.shot);
+        scene.simulation = physics.createSimulation(scene.pins, scene.shot, { gutterSide: scene.gutterSide });
         session.contactedPinCount = 0;
         scene.phase = "deck";
       }

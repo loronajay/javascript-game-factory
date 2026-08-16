@@ -2,15 +2,14 @@ const {
   AVAILABLE_SKINS,
   CANON_BOWLERS,
   DEFAULT_SKIN_ID,
+  LEGACY_EQUIPPED_SKINS_STORAGE_KEY,
   THROW_FRAME_COUNT,
-  getEquippedSkinId,
   getFrameAssetPath,
   getFrameAtElapsed,
   getFrameDuration,
   getCalloutPoseAssetPath,
   getPortraitAssetPath,
   getResultPortraitAssetPath,
-  saveEquippedSkinId,
 } = require("./animation-core.js");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -174,14 +173,6 @@ describe("throw playback", () => {
 });
 
 describe("character skins", () => {
-  function memoryStorage(initial = {}) {
-    const values = new Map(Object.entries(initial));
-    return {
-      getItem(key) { return values.get(key) ?? null; },
-      setItem(key, value) { values.set(key, String(value)); },
-    };
-  }
-
   test("publishes stable classic, swimsuit, and maid skin ids", () => {
     assert.equal(DEFAULT_SKIN_ID, "canon");
     assert.deepEqual(
@@ -226,31 +217,26 @@ describe("character skins", () => {
     );
   });
 
-  test("persists one equipped skin per bowler and rejects unknown skin ids", () => {
-    const storage = memoryStorage();
-    const bowler = CANON_BOWLERS[0];
+  // Equipment itself belongs to `loadout-core.js`. What stays here is the old
+  // storage key, named once so the migration has a single source for it.
+  test("names the legacy equipped-skin key without owning equipment anymore", () => {
+    assert.equal(LEGACY_EQUIPPED_SKINS_STORAGE_KEY, "yam-bowling.equipped-skins.v1");
 
-    assert.equal(getEquippedSkinId(bowler, storage), "canon");
-    assert.equal(saveEquippedSkinId(bowler, "swimsuit", storage), "swimsuit");
-    assert.equal(getEquippedSkinId(bowler, storage), "swimsuit");
-    assert.equal(saveEquippedSkinId(bowler, "future-invalid-skin", storage), "canon");
-    assert.equal(getEquippedSkinId(bowler, storage), "canon");
+    const module = require("./animation-core.js");
+    for (const removed of ["getEquippedSkinId", "saveEquippedSkinId"]) {
+      assert.equal(removed in module, false, `${removed} should live in the loadout, not here`);
+    }
   });
 
-  test("uses the browser's localStorage when storage is omitted", () => {
-    const storage = memoryStorage({
-      "yam-bowling.equipped-skins.v1": JSON.stringify({ "daisy-monroe": "swimsuit" }),
-    });
-    const browser = { localStorage: storage };
+  test("hangs itself on the browser global so the classic script tag works", () => {
+    const browser = {};
 
     vm.runInNewContext(
       fs.readFileSync(path.join(__dirname, "animation-core.js"), "utf8"),
       browser,
     );
 
-    assert.equal(
-      browser.YamBowlingCore.getEquippedSkinId(browser.YamBowlingCore.CANON_BOWLERS[0]),
-      "swimsuit",
-    );
+    assert.equal(browser.YamBowlingCore.CANON_BOWLERS.length, CANON_BOWLERS.length);
+    assert.equal(browser.YamBowlingCore.DEFAULT_SKIN_ID, DEFAULT_SKIN_ID);
   });
 });

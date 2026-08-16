@@ -46,7 +46,10 @@
   // A strike earns the celebration art; a spare gets the calmer default portrait pose.
   const CALLOUT_POSE_BY_OUTCOME_CUE = Object.freeze({ strike: "victory", spare: "portrait" });
   const DEFAULT_SKIN_ID = "canon";
-  const EQUIPPED_SKINS_STORAGE_KEY = "yam-bowling.equipped-skins.v1";
+  // Legacy: `loadout-core.js` owns equipment now and reads this key once to
+  // migrate. Nothing writes it anymore; it stays exported so the migration
+  // names it in one place rather than repeating the string.
+  const LEGACY_EQUIPPED_SKINS_STORAGE_KEY = "yam-bowling.equipped-skins.v1";
   const AVAILABLE_SKINS = Object.freeze([
     Object.freeze({ id: "canon", name: "Classic" }),
     Object.freeze({ id: "swimsuit", name: "Swimsuit" }),
@@ -127,37 +130,6 @@
       : getResultPortraitAssetPath(bowler, pose, skinId);
   }
 
-  function readEquippedSkins(storage = root.localStorage) {
-    try {
-      const value = JSON.parse(storage?.getItem?.(EQUIPPED_SKINS_STORAGE_KEY) || "{}");
-      return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-    } catch {
-      return {};
-    }
-  }
-
-  function getEquippedSkinId(bowler, storage = root.localStorage) {
-    if (!bowler || typeof bowler.slug !== "string") {
-      throw new TypeError("A canon bowler is required.");
-    }
-    return normalizeSkinId(readEquippedSkins(storage)[bowler.slug]);
-  }
-
-  function saveEquippedSkinId(bowler, skinId, storage = root.localStorage) {
-    if (!bowler || typeof bowler.slug !== "string") {
-      throw new TypeError("A canon bowler is required.");
-    }
-    const resolvedSkinId = normalizeSkinId(skinId);
-    const equipped = readEquippedSkins(storage);
-    equipped[bowler.slug] = resolvedSkinId;
-    try {
-      storage?.setItem?.(EQUIPPED_SKINS_STORAGE_KEY, JSON.stringify(equipped));
-    } catch {
-      // Storage is a convenience; equipped state still applies to this match.
-    }
-    return resolvedSkinId;
-  }
-
   function getFrameDuration(speed) {
     if (!Number.isFinite(speed) || speed <= 0) {
       throw new RangeError("Playback speed must be greater than zero.");
@@ -170,15 +142,14 @@
     AVAILABLE_SKINS,
     CANON_BOWLERS,
     DEFAULT_SKIN_ID,
+    LEGACY_EQUIPPED_SKINS_STORAGE_KEY,
     THROW_FRAME_COUNT,
     getCalloutPoseAssetPath,
-    getEquippedSkinId,
     getFrameAssetPath,
     getFrameAtElapsed,
     getFrameDuration,
     getPortraitAssetPath,
     getResultPortraitAssetPath,
     normalizeSkinId,
-    saveEquippedSkinId,
   };
 });

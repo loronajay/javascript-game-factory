@@ -9,6 +9,7 @@ export function createOnlineScreen({
   roster,
   animation,
   assets,
+  loadout,
   onlineIdentity,
   normalizeRoomCode,
   onInspect,
@@ -33,6 +34,7 @@ export function createOnlineScreen({
       selectedSkinId: onlineSetup.skinId,
       animation,
       assets,
+      loadout,
       onEquip: (skinId) => {
         onlineSetup.skinId = skinId;
         renderSetup();
