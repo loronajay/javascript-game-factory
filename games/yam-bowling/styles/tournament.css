@@ -1,0 +1,28 @@
+.tournament-screen .circuit-vignette {
+  background: linear-gradient(110deg, rgba(6, 5, 16, .88), rgba(10, 8, 22, .3) 58%, rgba(0, 0, 0, .72));
+}
+.tournament-screen .circuit-event { border-color: rgba(255, 214, 107, .52); }
+.tournament-screen .circuit-event blockquote { border-left-color: var(--gold); }
+.tournament-window { margin: .85rem 0 1rem; color: #d7d0d5; font-size: .7rem; line-height: 1.5; }
+.tournament-bracket { display: grid; gap: .55rem; }
+.tournament-bracket-step {
+  display: grid;
+  padding: .65rem;
+  grid-template-columns: 28px 1fr auto;
+  gap: .6rem;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: #8e878d;
+  background: rgba(255,255,255,.025);
+}
+.tournament-bracket-step > b { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; background: rgba(255,255,255,.08); font-size: .65rem; }
+.tournament-bracket-step span { display: grid; gap: .12rem; }
+.tournament-bracket-step strong { color: inherit; font-size: .67rem; }
+.tournament-bracket-step small { font-size: .53rem; }
+.tournament-bracket-step > i { font-size: .46rem; font-style: normal; font-weight: 950; letter-spacing: .08em; }
+.tournament-bracket-step.is-current { border-color: rgba(255,214,107,.58); color: #fff; background: rgba(255,214,107,.09); }
+.tournament-bracket-step.is-current > b { color: #171006; background: var(--gold); }
+.tournament-bracket-step.is-cleared { color: #8ff0bb; border-color: rgba(57,210,132,.28); }
+.tournament-prize-note { margin: 1rem 0 0; color: var(--muted); font-size: .61rem; line-height: 1.55; }
+.tournament-prize-note b { color: var(--gold); }

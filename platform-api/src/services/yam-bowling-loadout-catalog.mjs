@@ -22,13 +22,13 @@ const BALL_TRAIL_IDS = Object.freeze([
     "none", "red-neon", "orange-flare", "gold-rush", "lime-shock",
     "emerald-glow", "mint-frost", "cyan-pulse", "sky-blue", "electric-blue",
     "indigo-drive", "violet-haze", "purple-plasma", "magenta-pop", "hot-pink",
-    "diamond-white",
+    "diamond-white", "championship-gold", "bracket-fire", "cosmic-ribbon", "royal-confetti",
 ]);
 const STRIKE_BURST_IDS = Object.freeze([
     "classic", "ember", "red-supernova", "gold-star", "lime-pop",
     "emerald-impact", "mint-crackle", "cyan-flash", "sky-shatter", "electric-blue",
     "indigo-ring", "violet-bloom", "purple-nova", "magenta-blast", "hot-pink-pop",
-    "diamond-spark",
+    "diamond-spark", "pin-crown", "finals-fireworks", "cosmic-cup", "victory-ribbon",
 ]);
 const items = new Map();
 function register(item) {

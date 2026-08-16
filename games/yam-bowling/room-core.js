@@ -32,6 +32,7 @@
   const founding = Object.freeze({ source: "founding", detail: "Available to every bowler." });
 
   const achievement = Object.freeze({ source: "achievement", detail: "Won at the top of the circuit." });
+  const tournament = Object.freeze({ source: "tournament", detail: "Rare prize from a rotating Yam tournament." });
 
   // `default` is the room every bowler starts in and the only founding entry:
   // every other room is earned. That is only fair because rooms are new content
@@ -49,7 +50,7 @@
     ["Black Gothic", "black-gothic", "Dark arches and candlelight over polished stone.", campaign, "rare"],
     ["Circuit Red", "circuit-red", "Sanctioned red and chrome, the colours of the tour.", campaign, "rare"],
     ["Tower Penthouse", "tower-penthouse", "The whole city below, and nobody above you.", achievement, "legendary"],
-    ["Champion's Room", "champion-room", "Silverware on every surface. You earned each piece.", achievement, "legendary"],
+    ["Champion's Room", "champion-room", "Silverware on every surface. You earned each piece.", tournament, "legendary"],
   ].map(([name, slug, description, unlock, tier]) => Object.freeze({
     name,
     slug,

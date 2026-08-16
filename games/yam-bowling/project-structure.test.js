@@ -578,8 +578,8 @@ test("online matches bowl on the lane the server dealt, not the local pick", () 
       online.indexOf("session.match = structuredClone(snapshot.match)"),
     "an online match should take its lane from the served roll before the scene builds",
   );
-  assert.match(runtime, /function startMatch\(\) \{\s*applyMatchLane\(session\.campaignMatch\?\.venueSlug \|\| getLocalLaneSlug\(\)\);/,
-    "a sanctioned match should use its declared venue and an exhibition should return to the saved lane");
+  assert.match(runtime, /function startMatch\(\) \{\s*applyMatchLane\(session\.tournamentMatch\?\.venueSlug \|\| session\.campaignMatch\?\.venueSlug \|\| getLocalLaneSlug\(\)\);/,
+    "a sanctioned circuit or tournament match should use its declared venue and an exhibition should return to the saved lane");
   assert.doesNotMatch(onlineSession, /onlineSetup\.lane|laneSlug:/,
     "a local lane preference must never be published to an online room");
   assert.doesNotMatch(readCode("game.js"), /renderer\.ready.*renderer\.setLane/,
@@ -766,6 +766,30 @@ test("the reward ladders load in dependency order and share one state machine", 
     assert.match(readCode(file), /createRewardTrack\(/, `${file} must not re-implement the tree`);
   }
   assert.match(readCode("reward-tree-core.js"), /function createRewardTrack/);
+});
+
+test("rotating tournaments are a separate signed-in CPU bracket surface", () => {
+  const html = read("index.html");
+  const game = read("game.js");
+  const screen = read("ui/tournament-screen.mjs");
+  const client = read("tournament-client.mjs");
+  const runtime = read("match/match-runtime.mjs");
+  const bindings = read("input/bindings.mjs");
+  for (const id of [
+    "tournament-button", "tournament-screen", "tournament-back", "tournament-bracket",
+    "tournament-roster", "start-tournament-match", "tournament-prize-name",
+  ]) assert.match(html, new RegExp(`id=["']${id}["']`), `${id} should exist`);
+  assert.match(html.match(/<button[^>]+id=["']tournament-button["'][^>]*>/)?.[0] || "", /data-factory-account-feature/);
+  assert.ok(html.includes('href="styles/tournament.css"'));
+  assert.match(game, /createTournamentClient/);
+  assert.match(game, /createTournamentScreen/);
+  assert.match(screen, /cpuLevelId/);
+  assert.match(screen, /session\.setup\.playType = "tournament"/);
+  assert.match(client, /claimGameTournamentRound/);
+  assert.match(runtime, /session\.tournamentMatch/);
+  assert.match(bindings, /tournamentScreen\.handlePrimaryResultAction/);
+  assert.doesNotMatch(client, /Math\.random|localStorage|setItem/,
+    "the client must not roll or persist a prize");
 });
 
 test("the player reward ladder stores no ownership of its own", () => {

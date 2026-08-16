@@ -11,6 +11,7 @@
     "ball-core.js",
     "campaign-core.js",
     "campaign-progress-client.mjs",
+    "tournament-client.mjs",
     "character-catalog-data.js",
     "character-catalog.js",
     "cosmetics-core.js",

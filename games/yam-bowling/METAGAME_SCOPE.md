@@ -465,8 +465,8 @@ choice to an authenticated profile.
 The stats shown in this first pass are the records the XP tracks already own:
 matches, wins/losses, strikes, and high game. Rank/ELO and spare rate stay absent
 until the backend gives each one a single trustworthy definition. The starter
-room is currently the only ordinary owned room because campaign room reward
-cadence remains intentionally undecided.
+room begins owned; circuit promotions and the rotating tournament prize pool
+add server-entitled rooms after their authoritative claims settle.
 
 ### Shipped: public inspection and Match Found identity
 
@@ -483,7 +483,8 @@ unknown until the authoritative progression document arrives rather than being
 invented locally.
 
 Rank/ELO and spare rate remain absent until their authoritative records can be
-joined. Room reward grants remain absent until a campaign cadence is approved.
+joined. Circuit promotion and tournament room grants share the normal
+server-entitlement/loadout path.
 
 ### Per-character history
 
@@ -593,13 +594,37 @@ bowler unlock raise the value of a voucher already in hand.
 - [x] Exactly two vouchers in the player tree, at levels 10 and 25.
 - [x] The first lands early enough to teach the mechanic while there is tree left.
 - [x] Vouchers carry no equipment and are never equippable.
-- [ ] Server balance in `game_inventory_items` and the spend transaction (decrement + entitlement grant, one transaction).
-- [ ] Redemption UI: pick a skin from an owned bowler.
-- [ ] Further voucher sources: tournament prizes and circuit milestones.
+- [x] Server balance in `game_inventory_items` and the spend transaction (decrement + entitlement grant, one transaction).
+- [x] Redemption UI: pick a skin from an owned bowler.
+- [x] Rare tournament voucher source; circuit voucher milestones remain deferred.
 - [ ] Real-money vouchers, after the earned path is established.
 
 Nothing may advertise a voucher price or offer redemption until that authoritative
 spend exists. The tree may say a voucher is coming; it may not say what it buys.
+
+## Milestone 9 — Rotating CPU tournaments
+
+Tournaments are limited-time **single-player** brackets, not human matchmaking.
+They open for four days every other week and rotate among four named majors. Each
+event has three CPU rounds: a Competitive opening round, a Pro semifinal, and a
+Champion final. The final is a full Classic Ten match so the prize is not gated
+behind a three-frame pushover.
+
+- [x] Use the unlocked circuit roster for the player's tournament entry.
+- [x] Keep tournament progress separate from the permanent circuit.
+- [x] Require round claims in order and accept only the server's active event id.
+- [x] Grant the `Yam Champion` title on the first championship clear.
+- [x] Roll prizes on the server and persist the exact result for replay safety.
+- [x] Common pool: four tournament-only Ball Trails and four Strike Bursts.
+- [x] Rare pool: `Champion's Room` and one Skin Voucher.
+- [x] Remove already entitled cosmetics before rolling; fall back to a voucher
+      after the finite cosmetic pool is exhausted.
+- [x] Keep tournament rewards presentational: no prize reaches scoring, physics,
+      CPU strength, or input.
+
+The platform schedule uses server time. The cabinet can show the upcoming event
+while entries are closed, but it cannot move the window, skip a round, name a
+prize, or apply ownership before the returned game-progress snapshot arrives.
 
 ## Explicitly deferred
 

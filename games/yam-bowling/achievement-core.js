@@ -3,7 +3,7 @@
   if (typeof module === "object" && module.exports) module.exports = api;
   root.YamAchievementCore = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function createAchievementCore() {
-  const SANCTIONED_PLAY_TYPES = new Set(["campaign", "online"]);
+  const SANCTIONED_PLAY_TYPES = new Set(["campaign", "online", "tournament"]);
 
   function completedPlayer(match, localPlayerId) {
     if (match?.status !== "complete") return null;

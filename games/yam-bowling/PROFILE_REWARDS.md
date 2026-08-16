@@ -31,10 +31,10 @@ or won. They never change scoring, physics, timing, or matchmaking.
 | Comeback Kid | Title | Behavior achievement | Win after trailing by 30 entering the final frame | A bowling-ball phoenix climbing back from the embers |
 | Yam Champion | Title | Tournament | Win the Yam Championship | A pin crown, jewel ball, championship lane, and laurels |
 
-The optimized transparent WebP crests live in `assets/profile-rewards/`. The
-mastery rewards already resolve to their equippable catalog ids. Achievement and
-tournament grant authorities still need to award their catalog ids when those
-server-owned event systems are implemented.
+The optimized transparent WebP crests live in `assets/profile-rewards/`. Mastery
+rewards resolve through their levels, the three shipped match achievements claim
+their fixed catalog ids, and a replay-safe rotating CPU tournament grants Yam
+Champion alongside its server-selected cosmetic prize.
 
 ## Strong next-wave candidates
 
@@ -83,4 +83,3 @@ server-owned event systems are implemented.
 - Rare: beveled metal, two-material contrast, more expressive silhouette.
 - Legendary: jewelry-like materials, unique silhouette, layered depth, and a
   composition that still reads in the 46-by-52-pixel cabinet thumbnail.
-

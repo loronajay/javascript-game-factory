@@ -3,6 +3,7 @@ import { createOnlineIdentityPayload } from "../../js/platform/identity/match-id
 import { createPlatformApiClient } from "../../js/platform/api/platform-api.mjs";
 import { createYamAccountAccess } from "./account-access.mjs";
 import { createCampaignProgressClient } from "./campaign-progress-client.mjs";
+import { createTournamentClient } from "./tournament-client.mjs";
 import { createProfileSyncClient } from "./profile/profile-sync-client.mjs";
 import { createVoucherClient } from "./profile/voucher-client.mjs";
 import { createAchievementClient } from "./profile/achievement-client.mjs";
@@ -18,6 +19,7 @@ import { createCharacterInspector } from "./ui/character-inspector.mjs";
 import { createSetupScreen } from "./ui/setup-screen.mjs";
 import { createOnlineScreen } from "./ui/online-screen.mjs";
 import { createCircuitScreen } from "./ui/circuit-screen.mjs";
+import { createTournamentScreen } from "./ui/tournament-screen.mjs";
 import { createProfileScreen } from "./ui/profile-screen.mjs";
 import { createPublicProfileScreen } from "./ui/public-profile-screen.mjs";
 import { createShotHud } from "./ui/shot-hud.mjs";
@@ -180,6 +182,16 @@ initMobileLandscapeGate();
       progressionCelebration.observe();
     },
   });
+  const tournamentClient = createTournamentClient({
+    platformApi,
+    loadout,
+    voucherClient,
+    onSnapshotApplied: () => {
+      applyLevelUnlocks();
+      menuSplashPicker.refresh();
+      profileScreen?.refresh();
+    },
+  });
   profileScreen = createProfileScreen({
     profileName: factoryProfile.profileName,
     loadout,
@@ -230,6 +242,7 @@ initMobileLandscapeGate();
   let onlineSession = null;
   let matchRuntime = null;
   let circuitScreen = null;
+  let tournamentScreen = null;
   let achievementClient = null;
 
   const resultsScreen = createResultsScreen({
@@ -243,6 +256,7 @@ initMobileLandscapeGate();
     onOpenProfile: (playerId, profileName, focusTarget) => publicProfileScreen.open(playerId, profileName, focusTarget),
     onShown: () => {
       circuitScreen?.handleResultsShown();
+      tournamentScreen?.handleResultsShown();
       onlineSession?.reportResult();
       const localPlayerId = session.onlineMatch ? onlineClient.getSnapshot().clientId : "p1";
       achievementClient?.handleFinishedMatch({
@@ -317,6 +331,17 @@ initMobileLandscapeGate();
     campaignProgress,
   });
 
+  tournamentScreen = createTournamentScreen({
+    session,
+    client: tournamentClient,
+    campaignStore,
+    assets,
+    laneCore: LaneCore,
+    audio,
+    accountAccess,
+    getMatchRuntime: () => matchRuntime,
+  });
+
   onlineSession = createOnlineSession({
     session,
     onlineClient,
@@ -372,6 +397,7 @@ initMobileLandscapeGate();
       loadout.clearServerAuthority();
       onlineSession.leaveToTitle();
       circuitScreen.leaveToTitle();
+      tournamentScreen.leaveToTitle();
       profileScreen.leaveToTitle();
     });
     if (accountAccess.isEligible()) {
@@ -397,11 +423,12 @@ initMobileLandscapeGate();
     setupScreen.bind();
     onlineScreen.bind();
     circuitScreen.bind();
+    tournamentScreen.bind();
     profileScreen.bind();
     publicProfileScreen.bind();
     bindEvents({
       session, keys, audio, renderer, matchRuntime, onlineSession,
-      circuitScreen, profileScreen, setupScreen, onlineScreen, shotHud, syncAudioToggle, accountAccess,
+      circuitScreen, tournamentScreen, profileScreen, setupScreen, onlineScreen, shotHud, syncAudioToggle, accountAccess,
     });
 
     if (accountAccess.isEligible() && onlineClient.resumeSavedSession()) {

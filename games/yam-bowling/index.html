@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="styles/base.css" />
     <link rel="stylesheet" href="styles/title.css" />
     <link rel="stylesheet" href="styles/campaign.css" />
+    <link rel="stylesheet" href="styles/tournament.css" />
     <link rel="stylesheet" href="styles/profile.css" />
     <link rel="stylesheet" href="styles/setup.css" />
     <link rel="stylesheet" href="styles/online.css" />
@@ -36,13 +37,14 @@
           <p class="title-tagline">Pick your bowler. Find the pocket. Feed the competition.</p>
           <div class="title-actions">
             <button class="button button--primary button--xl" id="circuit-button" type="button" data-factory-account-feature>Enter circuit</button>
+            <button class="button button--ghost button--xl" id="tournament-button" type="button" data-factory-account-feature>Tournaments</button>
             <button class="button button--ghost button--xl" id="profile-button" type="button" data-factory-account-feature>My room</button>
             <button class="button button--ghost button--xl" id="play-button" type="button">Exhibition</button>
             <button class="button button--ghost button--xl" id="online-button" type="button" data-factory-account-feature>Play online</button>
             <button class="button button--ghost" id="how-button" type="button">How to play</button>
             <button class="button button--ghost" id="menu-splash-button" type="button">Menu art</button>
           </div>
-          <p class="build-tag">Official circuit · Exhibition · Factory Network</p>
+          <p class="build-tag">Official circuit · Rotating tournaments · Exhibition · Factory Network</p>
         </div>
       </section>
 
@@ -196,6 +198,49 @@
             </div>
             <div class="circuit-roster" id="circuit-roster" role="listbox" aria-label="Unlocked circuit bowlers"></div>
             <p class="circuit-roster-note">Circuit achievements add defeated rivals to this roster.</p>
+          </aside>
+        </div>
+      </section>
+
+      <section class="screen circuit-screen tournament-screen" id="tournament-screen" aria-labelledby="tournament-title" hidden>
+        <img class="circuit-backdrop" src="assets/menu-splashes/inner-menus/registration-counter.webp" alt="Yam Bowling tournament registration desk" decoding="async" />
+        <div class="circuit-vignette"></div>
+        <header class="circuit-header">
+          <button class="icon-button" id="tournament-back" type="button" aria-label="Back to title">&#8592;</button>
+          <div><p class="eyebrow">Rotating CPU championship</p><h2 id="tournament-title">Yam tournament</h2></div>
+          <span class="circuit-status-seal" id="tournament-status-seal">Checking entries</span>
+        </header>
+        <div class="circuit-layout">
+          <aside class="circuit-card circuit-license" aria-label="Tournament bracket">
+            <p class="eyebrow">Event window</p>
+            <p class="tournament-window" id="tournament-window">Checking the schedule&hellip;</p>
+            <div class="tournament-bracket" id="tournament-bracket"></div>
+            <p class="tournament-prize-note"><b>Championship roll:</b> common tournament-only trails and strike bursts, with rare Skin Voucher and Champion&rsquo;s Room outcomes.</p>
+          </aside>
+          <section class="circuit-card circuit-event" aria-labelledby="tournament-round-name">
+            <div class="circuit-event-heading">
+              <div><p class="eyebrow" id="tournament-round-label">Round 1 of 3</p><h3 id="tournament-round-name">Opening Round</h3></div>
+              <span id="tournament-event-format">3F</span>
+            </div>
+            <div class="circuit-faceoff">
+              <div class="circuit-player-mark"><img id="tournament-player-art" alt="" /><small>Your entry</small><strong id="tournament-player-name">Daisy Monroe</strong></div>
+              <div class="circuit-versus"><span>VS</span><i></i></div>
+              <div class="circuit-opponent-mark"><img id="tournament-opponent-art" alt="" /><small>Bracket rival</small><strong id="tournament-opponent-name">Lumi Vega</strong></div>
+            </div>
+            <blockquote id="tournament-rival-line">Win to advance through the bracket.</blockquote>
+            <div class="circuit-match-meta">
+              <span><small>House</small><strong id="tournament-venue-name">Neon Carnival</strong></span>
+              <span><small>CPU challenge</small><strong id="tournament-difficulty">Competitive</strong></span>
+              <span><small>Final format</small><strong>Champion CPU · 10F</strong></span>
+              <span><small>Prize</small><strong id="tournament-prize-name">Weighted cosmetic roll</strong></span>
+            </div>
+            <p class="circuit-sync-status" id="tournament-sync-status" aria-live="polite" hidden></p>
+            <button class="button button--primary button--wide" id="start-tournament-match" type="button" disabled>Checking entries&hellip;</button>
+          </section>
+          <aside class="circuit-card circuit-roster-panel" aria-labelledby="tournament-roster-title">
+            <div class="circuit-roster-heading"><div><p class="eyebrow">Active entry</p><h3 id="tournament-roster-title">Choose your bowler</h3></div><span id="tournament-selected-label">Daisy</span></div>
+            <div class="circuit-roster" id="tournament-roster" role="listbox" aria-label="Unlocked tournament bowlers"></div>
+            <p class="circuit-roster-note">Your circuit roster is eligible. Tournament prizes are cosmetic and never improve CPU performance.</p>
           </aside>
         </div>
       </section>

@@ -56,6 +56,9 @@ platform-api/tests/*
 !platform-api/tests/yam-bowling-ladder-rewards.test.mjs
 !platform-api/tests/yam-bowling-voucher-db.test.mjs
 !platform-api/tests/yam-bowling-voucher-route.test.mjs
+!platform-api/tests/yam-bowling-tournament-catalog.test.mjs
+!platform-api/tests/yam-bowling-tournament-route.test.mjs
+!platform-api/tests/yam-bowling-tournament-db.test.mjs
 
 # Echo Duel keeps its local regression tests out of shipped game builds.
 games/echo-duel/tests/

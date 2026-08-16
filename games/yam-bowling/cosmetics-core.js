@@ -190,6 +190,7 @@
   function buildEffectItems() {
     const effectUnlock = Object.freeze({ source: "bowler-level", detail: "Earned through bowler mastery." });
     const playerUnlock = Object.freeze({ source: "player-level", detail: "Earned through Yam Bowling play." });
+    const tournamentUnlock = Object.freeze({ source: "tournament", detail: "Random prize from a rotating Yam tournament." });
 
     // Which ladder earns an effect is a fact about the item, so it is recorded
     // here beside the item rather than inferred from whichever tree happens to
@@ -238,6 +239,18 @@
       ["hot-pink-pop", "Hot Pink Pop Burst", ["#ff1493", "#ff9bd4"]],
       ["diamond-spark", "Diamond Spark Burst", ["#ffffff", "#b8e9ff"], "legendary"],
     ];
+    const tournamentTrails = [
+      ["championship-gold", "Championship Gold Ball Trail", ["#ffd96a", "#fff7c2"]],
+      ["bracket-fire", "Bracket Fire Ball Trail", ["#ff3b30", "#ffb347"]],
+      ["cosmic-ribbon", "Cosmic Ribbon Ball Trail", ["#6e5cff", "#f15bff"]],
+      ["royal-confetti", "Royal Confetti Ball Trail", ["#ffd60a", "#ff2d9a"]],
+    ];
+    const tournamentBursts = [
+      ["pin-crown", "Pin Crown Burst", ["#ffe27a", "#ffffff"]],
+      ["finals-fireworks", "Finals Fireworks Burst", ["#ff453a", "#ffd60a"]],
+      ["cosmic-cup", "Cosmic Cup Burst", ["#7d5cff", "#55e6ff"]],
+      ["victory-ribbon", "Victory Ribbon Burst", ["#ff2d9a", "#fff0a6"]],
+    ];
 
     return [
       defineItem({
@@ -255,6 +268,14 @@
         tier,
         unlock: unlockFor(id),
       })),
+      ...tournamentTrails.map(([id, name, palette]) => defineItem({
+        type: "ball-trail",
+        idParts: [id],
+        name,
+        assets: { palette: Object.freeze(palette) },
+        tier: "rare",
+        unlock: tournamentUnlock,
+      })),
       defineItem({
         type: "strike-burst",
         idParts: ["classic"],
@@ -269,6 +290,14 @@
         assets: { palette: Object.freeze(palette) },
         tier,
         unlock: unlockFor(id),
+      })),
+      ...tournamentBursts.map(([id, name, palette]) => defineItem({
+        type: "strike-burst",
+        idParts: [id],
+        name,
+        assets: { palette: Object.freeze(palette) },
+        tier: "rare",
+        unlock: tournamentUnlock,
       })),
     ];
   }

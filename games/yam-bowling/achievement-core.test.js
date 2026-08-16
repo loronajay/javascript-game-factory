@@ -82,3 +82,13 @@ test("near misses, local quick play, and unfinished matches grant nothing", () =
     localPlayerId: "p1",
   }), []);
 });
+
+test("tournament matches are sanctioned for finished-match achievements", () => {
+  const match = finishedMatch({
+    playType: "tournament",
+    players: [player("p1", 300, Array(10).fill(300)), player("cpu", 190, [])],
+  });
+  assert.deepEqual(achievements.detectMatchAchievements({ match, localPlayerId: "p1" }), [
+    "perfect-game",
+  ]);
+});

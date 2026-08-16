@@ -327,6 +327,12 @@ export function createApp(options = {}) {
     const redeemSkinVoucher = typeof options?.redeemSkinVoucher === "function"
         ? options.redeemSkinVoucher
         : null;
+    const getTournamentState = typeof options?.getTournamentState === "function"
+        ? options.getTournamentState
+        : null;
+    const recordTournamentRound = typeof options?.recordTournamentRound === "function"
+        ? options.recordTournamentRound
+        : null;
     // Admin console services. `isAdminPlayer` defaults to denying: an app constructed
     // without it (every existing test) must have no admins rather than no gate.
     const isAdminPlayer = typeof options?.isAdminPlayer === "function"
@@ -611,6 +617,8 @@ export function createApp(options = {}) {
         backfillOwnership,
         activateConsumable,
         redeemSkinVoucher,
+        getTournamentState,
+        recordTournamentRound,
     };
     const paymentServices = {
         createPremiumCheckoutSession,
