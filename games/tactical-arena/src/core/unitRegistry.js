@@ -223,4 +223,3 @@ export function stableValueKey(value) {
 export function passiveStackKey(passive, effect = passive?.effect) {
   return passive?.stackKey ?? effect?.stackKey ?? `${effect?.type ?? "passive"}:${stableValueKey(effect)}`;
 }
-

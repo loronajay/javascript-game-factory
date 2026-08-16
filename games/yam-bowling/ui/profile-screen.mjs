@@ -1,5 +1,6 @@
 import { buildProfileModel } from "../profile/profile-model.mjs";
 import { $, escapeHtml, showScreen } from "./dom.mjs";
+import { playerRewardTreeMarkup } from "./reward-tree.mjs";
 
 function stat(label, value) {
   return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`;
@@ -12,13 +13,22 @@ export function createProfileScreen({
   animation,
   roomCore,
   cosmetics,
+  playerRewards,
   syncClient,
   audio,
 }) {
   let dirty = false;
 
   function readModel() {
-    return buildProfileModel({ profileName, loadout, progression, animation, roomCore, cosmetics });
+    return buildProfileModel({
+      profileName,
+      loadout,
+      progression,
+      animation,
+      roomCore,
+      cosmetics,
+      playerRewards,
+    });
   }
 
   function setStatus(message, state = "") {
@@ -65,8 +75,9 @@ export function createProfileScreen({
     $("profile-presentation").innerHTML = model.presentation.map((slot) => {
       const options = slot.options.map((option) => {
         const selected = option.id === slot.equippedId;
+        const crestClass = slot.type === "title" || slot.type === "badge" ? ' class="profile-reward-crest"' : "";
         const swatch = option.art
-          ? `<img src="${escapeHtml(option.art)}" alt="" loading="lazy" />`
+          ? `<img${crestClass} src="${escapeHtml(option.art)}" alt="" loading="lazy" />`
           : `<i class="profile-slot-swatch" style="${paletteStyle(option.palette)}"></i>`;
         return `<button class="profile-slot-option${selected ? " is-selected" : ""}${option.owned ? "" : " is-locked"}"
           type="button" role="option" aria-selected="${selected}" ${option.owned ? "" : "disabled"}
@@ -98,6 +109,25 @@ export function createProfileScreen({
       element.hidden = !art;
       if (art) element.src = art;
     }
+  }
+
+  // The reward path is derived from the synced player level, so an unsynced
+  // device must say so rather than presenting a cached level 1 as earned
+  // progress. The ladder itself stays fully visible either way: a reward nobody
+  // can see is a reward nobody plays for.
+  function renderRewardTrack(model) {
+    const track = model.rewardTrack;
+    if (!track) return;
+    $("profile-reward-tree").innerHTML = playerRewardTreeMarkup(track.nodes);
+    $("profile-reward-next").textContent = track.nextReward
+      ? `Level ${track.nextReward.level} - ${track.nextReward.label}`
+      : "Every launch reward earned";
+    const status = $("profile-reward-status");
+    status.textContent = track.synced
+      ? `Level ${track.currentLevel} - synced with your Factory profile`
+      : "Not synced - sign in to see your earned rewards";
+    status.dataset.state = track.synced ? "synced" : "stale";
+    $("profile-reward-vouchers").textContent = `Skin Vouchers at level ${track.voucherLevels.join(" and ")}`;
   }
 
   function render() {
@@ -133,6 +163,7 @@ export function createProfileScreen({
       stat("Strikes", model.mastery.strikes),
       stat("High game", model.mastery.highGame || "--"),
     ].join("");
+    renderRewardTrack(model);
     renderBowlerOptions(model);
     renderSkinOptions(model);
     renderRoomOptions(model);

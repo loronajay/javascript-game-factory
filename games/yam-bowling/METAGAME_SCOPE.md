@@ -348,14 +348,14 @@ and two signed-in clients running together.
 
 ### Level 1–30 reward plan
 
-- [ ] Create one reusable 30-level reward cadence before writing character-specific flavor.
-- [ ] Preserve competitive equality at every level.
-- [ ] Give every node a tempting, specific label even when locked, for example:
-  - [ ] `Gym Day Skin`
-  - [ ] `Alt Menu Splash`
-  - [ ] `Red Neon Ball Trail`
-- [ ] Reserve level 30 for a mastery skin plus an exclusive character title.
-- [ ] Ensure the tree supports future levels 31–40 without changing existing reward IDs.
+- [x] Create one reusable 30-level reward cadence before writing character-specific flavor.
+- [x] Preserve competitive equality at every level.
+- [x] Give every node a tempting, specific label even when locked, for example:
+  - [x] `Gym Day Skin`
+  - [x] `Alt Menu Splash`
+  - [x] `Red Neon Ball Trail`
+- [x] Reserve level 30 for a mastery skin plus an exclusive character title.
+- [x] Ensure the tree supports future levels 31–40 without changing existing reward IDs.
 
 Suggested cadence to validate in a prototype:
 
@@ -375,10 +375,35 @@ Suggested cadence to validate in a prototype:
 
 ### UI
 
-- [ ] Put the unlock tree in the character inspector.
-- [ ] Show current level, XP progress, next reward, owned/equipped state, and the full locked path.
-- [ ] Celebrate newly earned items once, then leave them discoverable in inventory.
-- [ ] Make level-up presentation skippable and safe across reconnect/reload.
+- [x] Put the unlock tree in the character inspector.
+- [x] Show current level, XP progress, next reward, owned/equipped state, and the full locked path.
+- [x] Celebrate newly earned items once, then leave them discoverable in inventory.
+- [x] Make level-up presentation skippable and safe across reconnect/reload.
+
+### Shipped: mastery path and level-up presentation
+
+`mastery-rewards-core.js` defines one immutable node for every launch level and
+resolves bowler-specific reward IDs shaped as
+`mastery:<bowler>:level-<nn>:<reward>`. Appending levels 31–40 therefore cannot
+rename any launch reward. The definitions carry presentation and equipment
+references only; none can reach physics, scoring, shot timing, or online input.
+Level 30 resolves two rewards for every bowler: her mastery skin and exclusive
+`<First Name> Master` title.
+
+The character inspector always renders the full path, including while signed
+out, so locked rewards remain discoverable without exposing cached private
+stats. After an authoritative progression sync it joins the synced bowler level
+to the loadout, labels reached nodes `Owned`, and labels the exact matching worn
+item `Equipped`; current level, XP, next reward, collection completion, and all
+future locked levels remain visible together.
+
+`state/mastery-celebrations.mjs` keeps a per-account, per-bowler high-water mark
+and a durable pending queue. The first authoritative observation establishes a
+baseline instead of replaying an established account's old levels. Later level
+gains are persisted before their modal opens, duplicate/replayed snapshots do
+not enqueue twice, and a pending presentation survives reload until Continue or
+Escape acknowledges it. The celebration is presentation only: it never changes
+XP, ownership, or equipment.
 
 ## Milestone 6 — Yam player profiles and online presentation
 
@@ -503,9 +528,75 @@ cadence still needs to be designed before any circuit claim may award one.
 - [ ] `Yam Connoisseur` — reach maximum mastery with five bowlers.
 - [ ] Decide whether achievements award badges/titles only after the inventory contract exists.
 
+## Milestone 8 — Player level reward tree and Skin Vouchers
+
+### The split that makes two ladders worth having
+
+The player track rewards the **player**; bowler mastery rewards the **bowler**.
+Every player-tree reward is global — ball trails, strike bursts, titles, badges
+and Skin Vouchers — and none of it is a bowler's own art. The two ladders also
+never promise the same trail or burst, because a reward you could have earned on
+the other ladder is not a reward. `player-rewards-core.test.js` asserts both
+rules against the live mastery cadence rather than trusting the authored lists.
+
+- [x] Reuse one 30-level state machine across both ladders (`reward-tree-core.js`).
+- [x] Give every level a specific, tempting label even while locked.
+- [x] Keep reward ids (`player:level-<nn>:<key>`) stable so levels 31–40 can be appended.
+- [x] Preserve competitive equality: no player-tree reward can reach physics, scoring or the wire.
+- [x] Show the full ladder signed out, with locked levels visible.
+- [x] Make level rewards actually ownable and equippable (see below).
+- [ ] Author the player ladder's own titles/badges and bind them (`PENDING_CONTENT`, 8 nodes).
+
+### A level reward needs no entitlement row
+
+`loadout.owns()` resolves a `bowler-level` or `player-level` item against the set
+the ladders have paid out at the account's synced levels, recomputed by
+`applyLevelUnlocks()` in the composition root on every authoritative snapshot.
+The XP the server already holds is the proof, so minting a durable grant for
+"reached level 13" would duplicate a fact the account owns — the same
+second-source-of-truth problem the tree itself avoids. The earned set is
+session-only and never persisted, and an unsynced device earns nothing.
+
+It is deliberately an *extra* route, not the only one: if the server grants a
+level reward directly — a tournament prize, a make-good — the client defers to it
+rather than overruling the authority it is supposed to follow.
+
+Which ladder earns an effect is recorded in `cosmetics-core.js` beside the item,
+because the catalog sits underneath the ladders and cannot import them.
+`player-rewards-core.test.js` asserts the two never drift, and that no item is
+ever promised by both ladders.
+
+### Unlock progress is account state, not device state
+
+There is no stored unlock record anywhere in this milestone. A node is owned when
+the authoritative player level reaches it, and that level is derived by
+`progression-core.js` from server-synced XP. The profile screen reads
+`getSyncState()` and says plainly when a device is unsynced instead of presenting
+a cached level 1 as earned progress. `project-structure.test.js` asserts the
+player ladder can never persist, cache, or name a balance.
+
+### Skin Vouchers
+
+A voucher is the scarce reward of this track: **one voucher buys one skin**, chosen
+by the player from the bowlers they already own, which is what makes a circuit
+bowler unlock raise the value of a voucher already in hand.
+
+- [x] Exactly two vouchers in the player tree, at levels 10 and 25.
+- [x] The first lands early enough to teach the mechanic while there is tree left.
+- [x] Vouchers carry no equipment and are never equippable.
+- [ ] Server balance in `game_inventory_items` and the spend transaction (decrement + entitlement grant, one transaction).
+- [ ] Redemption UI: pick a skin from an owned bowler.
+- [ ] Further voucher sources: tournament prizes and circuit milestones.
+- [ ] Real-money vouchers, after the earned path is established.
+
+Nothing may advertise a voucher price or offer redemption until that authoritative
+spend exists. The tree may say a voucher is coming; it may not say what it buys.
+
 ## Explicitly deferred
 
-- Paid cosmetics, storefront, currencies, and pricing.
+- Paid cosmetics, storefront, and pricing. Skin Vouchers are an *earned* currency
+  as of Milestone 8; buying them with real money stays deferred until the earned
+  path and the server spend transaction are both shipped.
 - Buying Player XP, Bowler XP, levels, or mastery rewards.
 - Gameplay-stat upgrades tied to characters or cosmetics.
 - A level cap above 30.

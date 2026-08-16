@@ -164,6 +164,18 @@ test("a new color trail unlocks through its exact authoritative entitlement", ()
   assert.equal(store.getGlobalSlot("ballTrail"), "ball-trail:none", "revocation should restore the safe default");
 });
 
+test("a new color burst unlocks through its exact authoritative entitlement", () => {
+  const store = storeWith();
+
+  store.applyServerEntitlements([{ entitlementId: "strike-burst:purple-nova" }]);
+  assert.equal(store.owns("strike-burst:purple-nova"), true);
+  assert.equal(store.owns("strike-burst:cyan-flash"), false, "one color grant must not unlock the whole collection");
+  assert.equal(store.equipGlobalSlot("strikeBurst", "strike-burst:purple-nova"), "strike-burst:purple-nova");
+
+  store.applyServerEntitlements([]);
+  assert.equal(store.getGlobalSlot("strikeBurst"), "strike-burst:classic", "revocation should restore the safe default");
+});
+
 test("a granted item survives a reload while default ownership is never persisted", () => {
   const storage = memoryStorage();
   createLoadoutStore({ storage }).grant("ball-trail:red-neon");
@@ -418,4 +430,54 @@ test("an emptied decoration slot stays empty across a reload", () => {
   first.clearGlobalSlot("profileFrame");
 
   assert.equal(createLoadoutStore({ storage }).getGlobalSlot("profileFrame"), null);
+});
+
+test("a level-earned badge is owned once the ladder has paid it out", () => {
+  const store = createLoadoutStore({ storage: memoryStorage() });
+
+  // Catalogued as bowler mastery, so no entitlement row will ever name it.
+  assert.equal(store.owns("badge:laser-focus"), false, "nothing is earned before a sync");
+
+  store.applyLevelEntitlements(["badge:laser-focus"]);
+  assert.equal(store.owns("badge:laser-focus"), true);
+  assert.equal(store.owns("badge:lane-legend"), false, "a higher level stays locked");
+});
+
+test("level unlocks are session-only and recomputed rather than accumulated", () => {
+  const storage = memoryStorage();
+  const store = createLoadoutStore({ storage });
+
+  store.applyLevelEntitlements(["badge:laser-focus", "badge:precision-bowler"]);
+  assert.equal(store.owns("badge:precision-bowler"), true);
+
+  // The whole earned set is passed every time, so a corrected or retuned level
+  // takes effect in both directions instead of leaving a stale grant behind.
+  store.applyLevelEntitlements(["badge:laser-focus"]);
+  assert.equal(store.owns("badge:precision-bowler"), false);
+
+  store.clearLevelEntitlements();
+  assert.equal(store.owns("badge:laser-focus"), false);
+
+  // Nothing about a level unlock may reach the device record.
+  assert.doesNotMatch(JSON.stringify([...storage.raw().values()]), /laser-focus/);
+});
+
+test("a level unlock cannot be conjured from an unknown or mistyped item id", () => {
+  const store = createLoadoutStore({ storage: memoryStorage() });
+
+  assert.equal(store.applyLevelEntitlements(["badge:not-a-real-badge", null, 7]), 0);
+  assert.equal(store.owns("badge:not-a-real-badge"), false);
+});
+
+test("the ladder is an extra route to a level reward, never the only one", () => {
+  const store = createLoadoutStore({ storage: memoryStorage() });
+
+  // The server stays the authority. If it grants a level-sourced reward
+  // directly -- a tournament prize, a make-good -- the client must not overrule
+  // it just because the ladder has not paid that level out.
+  store.applyServerEntitlements(["badge:lane-legend"]);
+  assert.equal(store.owns("badge:lane-legend"), true);
+
+  store.applyLevelEntitlements(["badge:laser-focus"]);
+  assert.equal(store.owns("badge:laser-focus"), true, "and the ladder works without an entitlement");
 });

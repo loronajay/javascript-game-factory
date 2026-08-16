@@ -100,4 +100,3 @@ export function getNextTutorialId(storage = globalThis.localStorage, afterTutori
     .find((tutorial) => tutorial.available && !tutorial.locked && !tutorial.completed);
   return next?.id ?? null;
 }
-

@@ -245,4 +245,3 @@ export function prepareTutorialCommand(tutorial, command) {
 
   return command;
 }
-

@@ -48,6 +48,7 @@
     "bowler-level",
     "player-level",
     "campaign",
+    "tournament",
     "achievement",
     "character-unlock",
   ]);
@@ -187,7 +188,22 @@
   // renders them. Declaring them early is what lets the loadout contract and
   // its slots be tested without waiting on a particle emitter.
   function buildEffectItems() {
-    const trailUnlock = Object.freeze({ source: "bowler-level", detail: "Earned through bowler mastery." });
+    const effectUnlock = Object.freeze({ source: "bowler-level", detail: "Earned through bowler mastery." });
+    const playerUnlock = Object.freeze({ source: "player-level", detail: "Earned through Yam Bowling play." });
+
+    // Which ladder earns an effect is a fact about the item, so it is recorded
+    // here beside the item rather than inferred from whichever tree happens to
+    // list it -- the catalog cannot import the ladders, since they are built on
+    // top of it. `player-rewards-core.test.js` asserts the two agree, so a
+    // retuned cadence that forgets to move an id fails rather than shipping a
+    // reward whose own unlock copy contradicts the tree offering it.
+    const PLAYER_LEVEL_EFFECTS = new Set([
+      "lime-shock", "emerald-glow", "mint-frost", "cyan-pulse", "electric-blue",
+      "indigo-drive", "violet-haze", "purple-plasma", "magenta-pop", "hot-pink",
+      "gold-star", "emerald-impact", "mint-crackle", "cyan-flash",
+      "indigo-ring", "violet-bloom", "purple-nova", "magenta-blast", "hot-pink-pop",
+    ]);
+    const unlockFor = (id) => (PLAYER_LEVEL_EFFECTS.has(id) ? playerUnlock : effectUnlock);
     const colorTrails = [
       ["red-neon", "Red Neon Ball Trail", ["#ff2d55", "#ff8a5c"]],
       ["orange-flare", "Orange Flare Ball Trail", ["#ff6b00", "#ffb000"]],
@@ -205,6 +221,23 @@
       ["hot-pink", "Hot Pink Ball Trail", ["#ff1493", "#ff9bd4"]],
       ["diamond-white", "Diamond White Ball Trail", ["#ffffff", "#b8e9ff"], "legendary"],
     ];
+    const colorBursts = [
+      ["ember", "Ember Burst", ["#ffb347", "#ff5f1f"]],
+      ["red-supernova", "Red Supernova Burst", ["#ff1744", "#ff6b6b"]],
+      ["gold-star", "Gold Star Burst", ["#ffd60a", "#fff3a3"]],
+      ["lime-pop", "Lime Pop Burst", ["#b7ff00", "#efff85"]],
+      ["emerald-impact", "Emerald Impact Burst", ["#00e676", "#69f0ae"]],
+      ["mint-crackle", "Mint Crackle Burst", ["#00f5d4", "#b8fff4"]],
+      ["cyan-flash", "Cyan Flash Burst", ["#00e5ff", "#80f3ff"]],
+      ["sky-shatter", "Sky Shatter Burst", ["#38bdf8", "#bae6fd"]],
+      ["electric-blue", "Electric Blue Burst", ["#2563ff", "#70a5ff"]],
+      ["indigo-ring", "Indigo Ring Burst", ["#5b5cff", "#a5a6ff"]],
+      ["violet-bloom", "Violet Bloom Burst", ["#8b5cf6", "#d8b4fe"]],
+      ["purple-nova", "Purple Nova Burst", ["#c026ff", "#efabff"]],
+      ["magenta-blast", "Magenta Blast Burst", ["#ff00d4", "#ff8ae8"]],
+      ["hot-pink-pop", "Hot Pink Pop Burst", ["#ff1493", "#ff9bd4"]],
+      ["diamond-spark", "Diamond Spark Burst", ["#ffffff", "#b8e9ff"], "legendary"],
+    ];
 
     return [
       defineItem({
@@ -220,7 +253,7 @@
         name,
         assets: { palette: Object.freeze(palette) },
         tier,
-        unlock: trailUnlock,
+        unlock: unlockFor(id),
       })),
       defineItem({
         type: "strike-burst",
@@ -229,36 +262,89 @@
         assets: { palette: Object.freeze(["#fff6d5", "#ffd166"]) },
         unlock: founding,
       }),
-      defineItem({
+      ...colorBursts.map(([id, name, palette, tier = "rare"]) => defineItem({
         type: "strike-burst",
-        idParts: ["ember"],
-        name: "Ember Burst",
-        assets: { palette: Object.freeze(["#ffb347", "#ff5f1f"]) },
-        tier: "rare",
-        unlock: Object.freeze({ source: "bowler-level", detail: "Earned through bowler mastery." }),
-      }),
+        idParts: [id],
+        name,
+        assets: { palette: Object.freeze(palette) },
+        tier,
+        unlock: unlockFor(id),
+      })),
     ];
   }
 
   function buildProfileItems() {
+    const mastery = (detail) => Object.freeze({ source: "bowler-level", detail });
+    const achievement = (detail) => Object.freeze({ source: "achievement", detail });
+    const tournament = (detail) => Object.freeze({ source: "tournament", detail });
+    const art = (slug) => ({ art: `assets/profile-rewards/${slug}.webp` });
+
     return [
       defineItem({ type: "title", idParts: ["rookie"], name: "Rookie", assets: {}, unlock: founding }),
       defineItem({
         type: "title",
         idParts: ["pin-chaser"],
         name: "Pin Chaser",
-        assets: {},
+        assets: art("pin-chaser"),
         tier: "rare",
-        unlock: Object.freeze({ source: "player-level", detail: "Earned through Yam Bowling play." }),
+        unlock: mastery("Reach mastery level 19 with any bowler."),
+      }),
+      defineItem({
+        type: "title",
+        idParts: ["comeback-kid"],
+        name: "Comeback Kid",
+        assets: art("comeback-kid"),
+        tier: "rare",
+        unlock: achievement("Win after trailing by 30 or more entering the final frame."),
+      }),
+      defineItem({
+        type: "title",
+        idParts: ["yam-champion"],
+        name: "Yam Champion",
+        assets: art("yam-champion"),
+        tier: "legendary",
+        unlock: tournament("Win the Yam Championship tournament."),
       }),
       defineItem({ type: "badge", idParts: ["founding-bowler"], name: "Founding Bowler", assets: {}, unlock: founding }),
       defineItem({
         type: "badge",
+        idParts: ["laser-focus"],
+        name: "Laser Focus",
+        assets: art("laser-focus"),
+        tier: "rare",
+        unlock: mastery("Reach mastery level 13 with any bowler."),
+      }),
+      defineItem({
+        type: "badge",
+        idParts: ["precision-bowler"],
+        name: "Precision Bowler",
+        assets: art("precision-bowler"),
+        tier: "rare",
+        unlock: mastery("Reach mastery level 21 with any bowler."),
+      }),
+      defineItem({
+        type: "badge",
+        idParts: ["lane-legend"],
+        name: "Lane Legend",
+        assets: art("lane-legend"),
+        tier: "legendary",
+        unlock: mastery("Reach mastery level 28 with any bowler."),
+      }),
+      defineItem({
+        type: "badge",
         idParts: ["perfect-game"],
         name: "Perfect Game",
-        assets: {},
+        assets: art("perfect-game"),
         tier: "legendary",
-        unlock: Object.freeze({ source: "achievement", detail: "Bowl a 300." }),
+        unlock: achievement("Bowl a 300."),
+      }),
+      defineItem({
+        type: "badge",
+        idParts: ["split-decision"],
+        name: "Split Decision",
+        assets: art("split-decision"),
+        tier: "rare",
+        unlock: achievement("Convert a 7-10 split."),
       }),
     ];
   }

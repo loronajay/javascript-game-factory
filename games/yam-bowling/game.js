@@ -25,6 +25,8 @@ import { createSessionState } from "./state/session-state.mjs";
 import { createMatchRuntime } from "./match/match-runtime.mjs";
 import { createOnlineSession } from "./online/online-session.mjs";
 import { createProgressionReporter } from "./online/progression-reporter.mjs";
+import { createMasteryCelebrationQueue } from "./state/mastery-celebrations.mjs";
+import { createMasteryCelebrationPresenter } from "./ui/mastery-celebration.mjs";
 import { bindEvents, createHeldKeys } from "./input/bindings.mjs";
 
 initMobileLandscapeGate();
@@ -48,6 +50,8 @@ initMobileLandscapeGate();
   const Cosmetics = window.YamCosmetics;
   const LoadoutCore = window.YamLoadout;
   const ProgressionCore = window.YamProgression;
+  const MasteryRewards = window.YamMasteryRewards;
+  const PlayerRewards = window.YamPlayerRewards;
   const Campaign = window.YamCampaign;
   const Effects = window.YamEffects;
   const Catalog = window.YamCharacterCatalog;
@@ -70,12 +74,20 @@ initMobileLandscapeGate();
   // The device-local cache of an authoritative balance. It never awards itself
   // XP; only a server snapshot moves a number in it.
   const progression = ProgressionCore.createProgressionStore();
+  const masteryCelebration = createMasteryCelebrationPresenter({
+    queue: createMasteryCelebrationQueue({ rewards: MasteryRewards }),
+    playerId: factoryProfile.playerId,
+    progression,
+    roster: Roster,
+    audio,
+  });
   let profileScreen = null;
   const assets = createCharacterAssets({ animation: Animation, roster: Roster, loadout });
   const progressionReporter = createProgressionReporter({
     progressionCore: ProgressionCore,
     store: progression,
     platformApi,
+    onSnapshotApplied: () => masteryCelebration.observe(),
   });
 
   const session = createSessionState({
@@ -109,6 +121,26 @@ initMobileLandscapeGate();
   });
 
   const menuSplashPicker = createMenuSplashPicker({ menuSplash: MenuSplash, loadout, audio });
+
+  // A level-earned reward is proved by the level itself, so the owned set is
+  // recomputed from each authoritative snapshot rather than granted once and
+  // stored. Both sync paths share this one definition for the same reason
+  // `applyMatchLane` does: two callers must never be able to disagree about what
+  // the account has unlocked. An unsynced device earns nothing -- a cached level
+  // is not evidence.
+  function applyLevelUnlocks() {
+    if (progression.getSyncState().stale) {
+      loadout.clearLevelEntitlements();
+      return;
+    }
+    loadout.applyLevelEntitlements([
+      ...PlayerRewards.earnedItemIds({ currentLevel: progression.getPlayer().level }),
+      ...progression.listBowlers().flatMap((bowler) => MasteryRewards.earnedItemIds({
+        character: bowler,
+        currentLevel: bowler.level,
+      })),
+    ]);
+  }
   const campaignProgress = createCampaignProgressClient({
     campaignStore,
     progressionCore: ProgressionCore,
@@ -116,8 +148,10 @@ initMobileLandscapeGate();
     platformApi,
     onSnapshotApplied: (snapshot) => {
       loadout.applyServerEntitlements(snapshot?.entitlements || []);
+      applyLevelUnlocks();
       menuSplashPicker.refresh();
       profileScreen?.refresh();
+      masteryCelebration.observe();
     },
   });
   const profileSync = createProfileSyncClient({
@@ -127,8 +161,10 @@ initMobileLandscapeGate();
     progressionCore: ProgressionCore,
     progressionStore: progression,
     onSnapshotApplied: () => {
+      applyLevelUnlocks();
       menuSplashPicker.refresh();
       profileScreen?.refresh();
+      masteryCelebration.observe();
     },
   });
   profileScreen = createProfileScreen({
@@ -138,6 +174,7 @@ initMobileLandscapeGate();
     animation: Animation,
     roomCore: window.YamRoomCore,
     cosmetics: Cosmetics,
+    playerRewards: PlayerRewards,
     syncClient: profileSync,
     audio,
   });
@@ -157,6 +194,7 @@ initMobileLandscapeGate();
     assets,
     loadout,
     progression,
+    masteryRewards: MasteryRewards,
     historyStatus: () => {
       if (!accountAccess.isEligible()) return "signed-out";
       const syncState = profileSync.getState();
@@ -296,6 +334,7 @@ initMobileLandscapeGate();
 
   async function init() {
     menuSplashPicker.build();
+    masteryCelebration.bind();
     accountAccess.syncControls();
     accountAccess.bindSessionChanges(document, () => {
       loadout.clearServerAuthority();

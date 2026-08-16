@@ -28,6 +28,10 @@ import { commanderPending, validateOpenActivation, validateOwnedLivingUnit } fro
 import { applyPostCommandReactions, syncOneShotRageArm } from "./reactions.js";
 import { accept, ERR, reject } from "./reducerResult.js";
 import { nextActivePlayer, resolveVictory, spendAndAdvance, syncFinalBattleDarkTileStatuses } from "./turnEngine.js";
+<<<<<<< Updated upstream
+=======
+import { isTempoBattle, normalizeTempoStateAfterCommand, prepareTempoStateForCommand } from "./tempoBattle.js";
+>>>>>>> Stashed changes
 import { attack } from "./basicAttack.js";
 import { applyAbilityRecharge, applyRageRegen, applyTurnStartResourceGain, refreshSoulShuffle } from "./activationPassives.js";
 import { CAUSE, creditDeaths, snapshotAlive } from "./killAttribution.js";
@@ -37,12 +41,16 @@ function stationaryStrengthEffect(unit) {
 }
 
 export function applyCommand(state, command) {
+<<<<<<< Updated upstream
   const commandState = state;
   // Opens the BROAD kill-credit scope for this command. Narrow scopes inside the
   // resolvers (fire ticks, poison ticks, self-sacrifice) claim their deaths first;
   // this backstop attributes whatever is left to the acting unit, which is correct for
   // the ordinary case of "their attack/ART/splash killed it". See killAttribution.js.
   const aliveBefore = snapshotAlive(commandState);
+=======
+  const commandState = isTempoBattle(state) ? prepareTempoStateForCommand(state, command) : state;
+>>>>>>> Stashed changes
   const result = dispatchCommand(commandState, command);
   // A single reconciliation seam runs after EVERY accepted command, diffing the input
   // state against the result to catch every unit that fell or was revived — regardless
@@ -102,6 +110,7 @@ function beginActivation(state, command) {
   // of its turns (turnEngine.js) until it wakes.
   if (!takesTurns(result.unit) || result.unit.spent || isStunned(result.unit) || isPetrified(result.unit)) return reject(ERR.UNIT_SPENT);
   if (state.activation?.summonerId && state.activation.unitId !== result.unit.id) return reject(ERR.ACTIVATION_ALREADY_OPEN);
+<<<<<<< Updated upstream
   // Switching to a different unit is only allowed while the open activation has done
   // nothing at all. A spent BONUS ACTION (the Witch Doctor's dance, the Paladin's
   // seeker) counts: it leaves `moved`/`primaryUsed` false, but the unit has acted, and
@@ -109,6 +118,10 @@ function beginActivation(state, command) {
   // dancer a whole second turn, second dance included, when it was re-selected.
   if (state.activation && state.activation.unitId !== result.unit.id &&
       activationHasActed(state.activation)) return reject(ERR.ACTIVATION_ALREADY_OPEN);
+=======
+  if (state.activation && state.activation.unitId !== result.unit.id &&
+      (state.activation.moved || state.activation.primaryUsed)) return reject(ERR.ACTIVATION_ALREADY_OPEN);
+>>>>>>> Stashed changes
   // First-actor supports go first: no other unit of this owner may open an activation
   // while a living first-actor still owes its turn.
   if (!getUnitType(result.unit.type).actsFirst && commanderPending(state, command.player)) {
@@ -121,7 +134,10 @@ function beginActivation(state, command) {
 
   const next = cloneState(state);
   const unit = findUnit(next, command.unitId);
+<<<<<<< Updated upstream
   const events = [{ type: "ACTIVATION_BEGAN", unitId: unit.id }];
+=======
+>>>>>>> Stashed changes
   unit.defending = false;
   syncOneShotRageArm(unit);
   if (unit.skipNextActivation) {
@@ -164,15 +180,32 @@ function beginActivation(state, command) {
     if (empowered.applied) unit.statuses = empowered.statuses;
     unit.etherCharged = null;
   }
+<<<<<<< Updated upstream
   // Only a genuinely fresh activation gets a blank record. Re-selecting the unit whose
   // activation is already open keeps the cloned one: rebuilding it would clear `moved`,
   // `primaryUsed`, and `bonusActionGroups`, handing out a free extra move, primary
   // action, or bonus action (the Witch Doctor's second dance).
   if (fresh) next.activation = createActivationRecord(unit);
+=======
+  next.activation = {
+    unitId: unit.id,
+    origin: { ...unit.position },
+    moved: false,
+    primaryUsed: false,
+    spellUsed: false,
+    bonusActionGroups: [],
+    realmTraversalActive: Boolean(unit.realmTraversalCharged)
+  };
+  if (unit.realmTraversalCharged) unit.realmTraversalCharged = false;
+>>>>>>> Stashed changes
   // Volcanic Rage (Gargoyle): the first raging activation and every Nth one after erupt
   // a free Pyroclasm BEFORE the turn opens. It spends no MP and no action — the Gargoyle
   // still takes its full turn.
   // Fired here (deterministic, no roll — magic AoE) so online lockstep clients all agree.
+<<<<<<< Updated upstream
+=======
+  const events = [{ type: "ACTIVATION_BEGAN", unitId: unit.id }];
+>>>>>>> Stashed changes
   const freeCast = fresh ? getRageEffectValue(unit, "freePyroclasm", null) : null;
   if (freeCast && isRaging(unit)) {
     resolveVolcanicPyroclasmTick(next, unit, freeCast, events, { trigger: "activation" });
@@ -282,7 +315,10 @@ function defend(state, command) {
       events.push({ type: "SNACK_BREAK", unitId: recipientId, sourceId: unit.id, hpRestored, mpRestored });
     }
   }
+<<<<<<< Updated upstream
   spendAndAdvance(next, unit);
+=======
+>>>>>>> Stashed changes
   return accept(next, events);
 }
 
@@ -305,11 +341,19 @@ function concede(state, command) {
   if (!Number.isInteger(command.player) || command.player < 1) return reject(ERR.INVALID_COMMAND);
   const next = cloneState(state);
   const events = [];
+<<<<<<< Updated upstream
   // Resigning wipes the squad. The UNIT_DEFEATED events are emitted by the shared
   // attribution pass in applyCommand (cause: "concede", crediting nobody) rather than
   // here, so a death is announced exactly once no matter how it happened.
   for (const unit of next.units) {
     if (unit.player === command.player && unit.hp > 0) unit.hp = 0;
+=======
+  for (const unit of next.units) {
+    if (unit.player === command.player && unit.hp > 0) {
+      unit.hp = 0;
+      events.push({ type: "UNIT_DEFEATED", unitId: unit.id });
+    }
+>>>>>>> Stashed changes
   }
   events.push({ type: "PLAYER_CONCEDED", player: command.player });
   next.activation = null;

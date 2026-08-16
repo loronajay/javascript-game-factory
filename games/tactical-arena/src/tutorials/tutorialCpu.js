@@ -151,4 +151,3 @@ export function chooseTutorialCpuActivation(match, tutorial) {
   commands.push(defend(player, unit.id));
   return commands;
 }
-

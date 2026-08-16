@@ -57,6 +57,17 @@ test("every colored trail catalog entry resolves to a renderable effect style", 
   }
 });
 
+test("every colored strike burst catalog entry resolves to a renderable effect style", () => {
+  const rewardBursts = cosmetics.listByType("strike-burst").filter((item) => item.id !== "strike-burst:classic");
+
+  assert.equal(rewardBursts.length, 15);
+  for (const item of rewardBursts) {
+    const style = styleForItem(item);
+    assert.equal(style.id, item.id);
+    assert.deepEqual(style.palette, item.assets.palette);
+  }
+});
+
 test("an equipped trail emits, ages, and fully clears once the ball stops", () => {
   const state = createEffectsState();
   rollBall(state, { style: neonTrail });

@@ -34,7 +34,7 @@ function forfeitRoleFor(snapshotResult, clientId) {
   return snapshotResult.loserClientId === clientId ? "leaver" : "remaining";
 }
 
-export function createProgressionReporter({ progressionCore, store, platformApi }) {
+export function createProgressionReporter({ progressionCore, store, platformApi, onSnapshotApplied = () => {} }) {
   let lastSnapshot = null;
   let lastGrant = null;
 
@@ -114,8 +114,9 @@ export function createProgressionReporter({ progressionCore, store, platformApi 
     if (!playerId) return null;
     const document = await platformApi.getGameProgression(GAME_SLUG, playerId).catch(() => null);
     if (!document) return null;
-    applyProgressionDocument({ progressionCore, store, document });
+    if (!applyProgressionDocument({ progressionCore, store, document })) return null;
     lastSnapshot = document;
+    onSnapshotApplied(document);
     return document;
   }
 

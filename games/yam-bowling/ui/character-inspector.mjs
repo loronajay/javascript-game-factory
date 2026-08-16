@@ -1,5 +1,6 @@
 import { $, escapeHtml } from "./dom.mjs";
 import { buildCharacterHistoryModel } from "./character-history-model.mjs";
+import { masteryRewardTreeMarkup } from "./reward-tree.mjs";
 
 export function ownedSkinsForBowler(animation, loadout, slug) {
   const skins = Array.isArray(animation?.AVAILABLE_SKINS) ? animation.AVAILABLE_SKINS : [];
@@ -18,6 +19,7 @@ export function createCharacterInspector({
   assets,
   loadout,
   progression,
+  masteryRewards,
   historyStatus,
   audio,
   initialSlug,
@@ -56,12 +58,17 @@ export function createCharacterInspector({
       progression,
       cosmetics,
       loadout,
+      masteryRewards,
     });
     const status = $("character-inspector-history-status");
     const content = $("character-inspector-history-content");
     const levelBadge = $("character-inspector-history-level-badge");
     $("character-inspector-history-heading").textContent = model.heading;
     levelBadge.hidden = model.status !== "ready";
+    $("character-inspector-mastery-next").textContent = model.nextReward
+      ? `Lv. ${model.nextReward.level} · ${model.nextReward.label}`
+      : "All 30 levels mastered";
+    $("character-inspector-mastery-tree").innerHTML = masteryRewardTreeMarkup(model.rewardTree);
 
     if (model.status !== "ready") {
       status.textContent = model.message;

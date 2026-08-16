@@ -24,6 +24,12 @@ const BALL_TRAIL_IDS = Object.freeze([
     "indigo-drive", "violet-haze", "purple-plasma", "magenta-pop", "hot-pink",
     "diamond-white",
 ]);
+const STRIKE_BURST_IDS = Object.freeze([
+    "classic", "ember", "red-supernova", "gold-star", "lime-pop",
+    "emerald-impact", "mint-crackle", "cyan-flash", "sky-shatter", "electric-blue",
+    "indigo-ring", "violet-bloom", "purple-nova", "magenta-blast", "hot-pink-pop",
+    "diamond-spark",
+]);
 const items = new Map();
 function register(item) {
     items.set(item.id, Object.freeze(item));
@@ -53,9 +59,11 @@ for (const trailId of BALL_TRAIL_IDS) {
     const id = `ball-trail:${trailId}`;
     register({ id, type: "ball-trail", founding: trailId === "none", entitlementId: id });
 }
+for (const burstId of STRIKE_BURST_IDS) {
+    const id = `strike-burst:${burstId}`;
+    register({ id, type: "strike-burst", founding: burstId === "classic", entitlementId: id });
+}
 for (const [id, type, founding] of [
-    ["strike-burst:classic", "strike-burst", true],
-    ["strike-burst:ember", "strike-burst", false],
     ["title:rookie", "title", true],
     ["title:pin-chaser", "title", false],
     ["badge:founding-bowler", "badge", true],

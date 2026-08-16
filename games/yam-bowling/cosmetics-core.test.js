@@ -1,5 +1,7 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const animation = require("./animation-core.js");
 const campaign = require("./campaign-core.js");
@@ -162,13 +164,83 @@ test("the trail cabinet offers a broad, distinct color collection to unlock", ()
 
   const paletteSignatures = new Set();
   for (const trail of colorTrails) {
-    assert.equal(trail.unlock.source, "bowler-level", `${trail.id} should be earnable mastery loot`);
+    // Effects are split across the two ladders -- some are mastery loot, some
+    // are player-level loot -- so what matters here is that every one of them
+    // is earned by levelling and none of it starts owned.
+    assert.ok(
+      ["bowler-level", "player-level"].includes(trail.unlock.source),
+      `${trail.id} should be earnable level loot`,
+    );
     assert.equal(isOwnedByDefault(trail.id), false, `${trail.id} must begin locked`);
     assert.ok(trail.assets.palette.length >= 2, `${trail.id} needs a gradient palette`);
     for (const color of trail.assets.palette) assert.match(color, /^#[0-9a-f]{6}$/i);
     paletteSignatures.add(trail.assets.palette.join(","));
   }
   assert.equal(paletteSignatures.size, colorTrails.length, "every trail needs its own visible color identity");
+});
+
+test("the strike cabinet offers a broad, distinct burst collection to unlock", () => {
+  const bursts = listByType("strike-burst");
+  const rewardBursts = bursts.filter((item) => item.id !== "strike-burst:classic");
+
+  assert.equal(bursts.length, 16, "Classic plus fifteen color rewards should be visible");
+  assert.deepEqual(rewardBursts.map((item) => item.id), [
+    "strike-burst:ember",
+    "strike-burst:red-supernova",
+    "strike-burst:gold-star",
+    "strike-burst:lime-pop",
+    "strike-burst:emerald-impact",
+    "strike-burst:mint-crackle",
+    "strike-burst:cyan-flash",
+    "strike-burst:sky-shatter",
+    "strike-burst:electric-blue",
+    "strike-burst:indigo-ring",
+    "strike-burst:violet-bloom",
+    "strike-burst:purple-nova",
+    "strike-burst:magenta-blast",
+    "strike-burst:hot-pink-pop",
+    "strike-burst:diamond-spark",
+  ]);
+
+  const paletteSignatures = new Set();
+  for (const burst of rewardBursts) {
+    assert.ok(
+      ["bowler-level", "player-level"].includes(burst.unlock.source),
+      `${burst.id} should be earnable level loot`,
+    );
+    assert.equal(isOwnedByDefault(burst.id), false, `${burst.id} must begin locked`);
+    assert.ok(burst.assets.palette.length >= 2, `${burst.id} needs a gradient palette`);
+    for (const color of burst.assets.palette) assert.match(color, /^#[0-9a-f]{6}$/i);
+    paletteSignatures.add(burst.assets.palette.join(","));
+  }
+  assert.equal(paletteSignatures.size, rewardBursts.length, "every burst needs its own visible color identity");
+});
+
+test("profile rewards span mastery, achievement, behavior, and tournament prestige", () => {
+  const expected = [
+    ["title:pin-chaser", "bowler-level", "rare"],
+    ["title:comeback-kid", "achievement", "rare"],
+    ["title:yam-champion", "tournament", "legendary"],
+    ["badge:laser-focus", "bowler-level", "rare"],
+    ["badge:precision-bowler", "bowler-level", "rare"],
+    ["badge:lane-legend", "bowler-level", "legendary"],
+    ["badge:perfect-game", "achievement", "legendary"],
+    ["badge:split-decision", "achievement", "rare"],
+  ];
+
+  for (const [id, source, tier] of expected) {
+    const item = getItem(id);
+    assert.ok(item, `${id} should be in the display cabinet`);
+    assert.equal(item.unlock.source, source);
+    assert.equal(item.tier, tier);
+    assert.match(item.unlock.detail, /\S/);
+    assert.match(item.assets.art, /^assets\/profile-rewards\/[a-z-]+\.webp$/);
+    assert.equal(fs.existsSync(path.join(__dirname, item.assets.art)), true, `${id} needs shipped crest art`);
+    assert.equal(isOwnedByDefault(id), false, `${id} must be earned`);
+  }
+
+  assert.ok(UNLOCK_SOURCES.includes("tournament"), "tournament prizes need a first-class unlock source");
+  assert.equal(new Set(expected.map(([, source]) => source)).size, 3, "the pilot collection should not be one-note");
 });
 
 test("unknown ids resolve to nothing rather than a fabricated item", () => {

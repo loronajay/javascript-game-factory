@@ -94,6 +94,16 @@
               <dl class="profile-bowler-stat-grid" id="profile-bowler-stats"></dl>
             </section>
 
+            <section class="profile-card profile-reward-card" aria-labelledby="profile-reward-title">
+              <div class="profile-card__heading">
+                <div><p class="eyebrow">Player reward path</p><h3 id="profile-reward-title">What levelling pays out</h3></div>
+                <span id="profile-reward-vouchers">Skin Vouchers at level 10 and 25</span>
+              </div>
+              <p class="profile-reward-status" id="profile-reward-status">Not synced - sign in to see your earned rewards</p>
+              <p class="profile-reward-next">Next: <b id="profile-reward-next">Level 2 - Lime Shock Ball Trail</b></p>
+              <ol class="player-reward-tree" id="profile-reward-tree" aria-label="Complete player level reward path"></ol>
+            </section>
+
             <section class="profile-card profile-customizer" aria-labelledby="profile-customize-title">
               <div class="profile-card__heading">
                 <div><p class="eyebrow">Display cabinet</p><h3 id="profile-customize-title">Make the room yours</h3></div>
@@ -460,6 +470,13 @@
                 <div class="character-inspector-history-track" role="progressbar" aria-label="Bowler collection completion" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="character-inspector-history-collection-progress"></i></div>
               </div>
             </div>
+            <section class="character-inspector-mastery" aria-labelledby="character-inspector-mastery-heading">
+              <div class="character-inspector-mastery-heading">
+                <span><small>Next reward</small><strong id="character-inspector-mastery-next">Lv. 2 · Red Neon Ball Trail</strong></span>
+                <h4 id="character-inspector-mastery-heading">Level 1&ndash;30 reward path</h4>
+              </div>
+              <ol class="mastery-reward-tree" id="character-inspector-mastery-tree" aria-label="Complete bowler mastery reward path"></ol>
+            </section>
           </section>
           <article class="character-inspector-story" aria-label="Fictional bowler biography">
             <h3>Personality</h3>
@@ -469,6 +486,13 @@
           </article>
         </section>
       </div>
+    </dialog>
+
+    <dialog class="mastery-celebration-dialog" id="mastery-celebration-dialog" aria-labelledby="mastery-celebration-content">
+      <div class="mastery-celebration-flare" aria-hidden="true"></div>
+      <div id="mastery-celebration-content" aria-live="polite"></div>
+      <button class="button button--primary button--wide" id="mastery-celebration-dismiss" type="button">Continue</button>
+      <p class="mastery-celebration-skip">Press Escape to skip. Earned rewards remain in the bowler inspector.</p>
     </dialog>
 
     <dialog class="public-profile-dialog" id="public-profile-dialog" aria-labelledby="public-profile-name">
@@ -532,6 +556,9 @@
     <script src="loadout-core.js"></script>
     <script src="effects-core.js"></script>
     <script src="progression-core.js"></script>
+    <script src="reward-tree-core.js"></script>
+    <script src="mastery-rewards-core.js"></script>
+    <script src="player-rewards-core.js"></script>
     <script src="character-catalog-data.js"></script>
     <script src="character-catalog.js"></script>
     <script src="audio-core.js"></script>

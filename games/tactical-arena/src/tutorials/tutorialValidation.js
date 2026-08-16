@@ -957,4 +957,3 @@ function recordArtsMpCommand(tutorial, { command, events = [], match, previousPl
 
   return noUpdate();
 }
-

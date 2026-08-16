@@ -7,6 +7,7 @@ const Animation = require("./animation-core.js");
 const MenuSplash = require("./menu-splash-core.js");
 const LaneCore = require("./lane-core.js");
 const RoomCore = require("./room-core.js");
+const Cosmetics = require("./cosmetics-core.js");
 const runtimeManifest = require("./runtime-assets.json");
 
 const root = __dirname;
@@ -24,6 +25,11 @@ function runtimeImagePaths() {
   // ownership decides who may equip one, never whether the art is published.
   for (const room of RoomCore.ROOMS) {
     images.push(room.src);
+  }
+  for (const type of ["title", "badge"]) {
+    for (const item of Cosmetics.listByType(type)) {
+      if (item.assets.art) images.push(item.assets.art);
+    }
   }
   for (const bowler of Animation.CANON_BOWLERS) {
     images.push(Animation.getPortraitAssetPath(bowler));
@@ -43,7 +49,7 @@ function runtimeImagePaths() {
 
 test("every player-facing image is WebP and the complete runtime set stays under budget", () => {
   const images = runtimeImagePaths();
-  assert.equal(images.length, 812);
+  assert.equal(images.length, 820);
   assert.equal(images.every((imagePath) => imagePath.endsWith(".webp")), true);
   assert.deepEqual(images.filter((imagePath) => !fs.existsSync(path.join(root, imagePath))), []);
 

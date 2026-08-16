@@ -76,6 +76,24 @@ test("each Yam trail entitlement preserves only its exact equipped color", () =>
   );
 });
 
+test("each Yam strike burst entitlement preserves only its exact equipped color", () => {
+  const purpleGarage = {
+    ...legacyGarage("canon"),
+    global: { strikeBurst: "strike-burst:purple-nova" },
+  };
+  const ownedEntitlementIds = new Set(["strike-burst:purple-nova"]);
+
+  assert.equal(
+    normalizeYamBowlingGarage(purpleGarage, { ownedEntitlementIds }).global.strikeBurst,
+    "strike-burst:purple-nova",
+  );
+  assert.deepEqual(
+    normalizeYamBowlingGarage({ ...purpleGarage, global: { strikeBurst: "strike-burst:cyan-flash" } }, { ownedEntitlementIds }).global,
+    {},
+    "one color entitlement must not unlock another burst",
+  );
+});
+
 test("the one-time migration grants only exact non-Canon skins saved in the server garage", async () => {
   const migrationName = "039-yam-bowling-skin-entitlements.sql";
   assert.ok(MIGRATION_FILES.includes(migrationName));

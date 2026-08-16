@@ -185,6 +185,12 @@
   cursor: pointer;
 }
 .profile-slot-option img, .profile-slot-swatch { display: block; width: 46px; height: 52px; object-fit: cover; object-position: center top; }
+.profile-slot-option img.profile-reward-crest {
+  padding: 4px;
+  object-fit: contain;
+  object-position: center;
+  background: radial-gradient(circle, rgba(255,214,107,.1), rgba(5,6,9,.52) 72%);
+}
 .profile-slot-swatch { border-right: 1px solid rgba(255,255,255,.1); }
 .profile-slot-option span { display: grid; min-width: 0; padding: .45rem .5rem; gap: .1rem; }
 .profile-slot-option strong { overflow: hidden; font-size: .58rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -220,3 +226,24 @@
 .public-profile-bowler-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center bottom; filter: drop-shadow(0 26px 34px rgba(0,0,0,.62)); }
 .public-profile-dashboard { display: grid; min-width: 0; align-content: center; gap: .8rem; overflow-y: auto; }
 .public-profile-privacy { margin: 0; color: var(--muted); font-size: .62rem; line-height: 1.5; text-align: center; }
+
+/* Player reward path. The ladder is always fully drawn, locked levels included,
+   so the next thing worth playing for is visible before it is earned. Ownership
+   is derived from the synced player level and never stored here. */
+.profile-reward-status { margin: 0; color: var(--muted); font-size: .58rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.profile-reward-status[data-state="synced"] { color: var(--gold); }
+.profile-reward-status[data-state="stale"] { color: #ff9d6b; }
+.profile-reward-next { margin: .3rem 0 .55rem; color: var(--muted); font-size: .62rem; font-weight: 800; }
+.profile-reward-next b { color: #fff; }
+.player-reward-tree { display: grid; max-height: 268px; margin: 0; padding: 0 .25rem 0 0; overflow-y: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .38rem; list-style: none; scrollbar-color: rgba(255,214,107,.35) transparent; }
+.player-reward-node { display: grid; min-width: 0; min-height: 48px; padding: .42rem; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: .42rem; border: 1px solid rgba(255,255,255,.075); border-radius: 9px; background: rgba(5,5,8,.26); }
+.player-reward-node > b { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; color: var(--muted); background: rgba(255,255,255,.06); font-size: .48rem; }
+.player-reward-node > span { display: grid; min-width: 0; gap: .12rem; }
+.player-reward-node strong { overflow: hidden; font-size: .51rem; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.player-reward-node small { color: var(--muted); font-size: .4rem; font-weight: 900; letter-spacing: .07em; text-transform: uppercase; }
+.player-reward-node.is-owned { border-color: rgba(255,214,107,.24); }
+.player-reward-node.is-owned > b { color: #121217; background: var(--gold); }
+.player-reward-node.is-owned small { color: var(--gold); }
+.player-reward-node.is-equipped { border-color: rgba(92,230,161,.38); box-shadow: inset 0 0 18px rgba(92,230,161,.045); }
+.player-reward-node.is-equipped small { color: #5ce6a1; }
+.player-reward-empty { color: var(--muted); font-size: .55rem; list-style: none; }

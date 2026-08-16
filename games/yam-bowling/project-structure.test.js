@@ -752,3 +752,85 @@ test("keyboard shot setup keeps A/D on strafe and arrow keys on aim", () => {
   assert.match(runtime, /scene\.liveShot\.aim\s*=.*aimDirection/s);
   assert.match(runtime, /Math\.min\(0\.45,\s*scene\.liveShot\.aim/);
 });
+
+test("the reward ladders load in dependency order and share one state machine", () => {
+  const html = read("index.html");
+
+  assert.ok(html.indexOf("reward-tree-core.js") < html.indexOf("mastery-rewards-core.js"));
+  assert.ok(html.indexOf("reward-tree-core.js") < html.indexOf("player-rewards-core.js"));
+  assert.ok(html.indexOf("player-rewards-core.js") < html.indexOf("game.js"));
+
+  // Both ladders build their nodes through the shared track, so locked/owned/
+  // equipped state cannot come to mean two different things.
+  for (const file of ["mastery-rewards-core.js", "player-rewards-core.js"]) {
+    assert.match(readCode(file), /createRewardTrack\(/, `${file} must not re-implement the tree`);
+  }
+  assert.match(readCode("reward-tree-core.js"), /function createRewardTrack/);
+});
+
+test("the player reward ladder stores no ownership of its own", () => {
+  const code = readCode("player-rewards-core.js");
+
+  // Unlock progress belongs to the account. A node is owned when the synced
+  // player level reaches it, so anything that could cache that answer here
+  // would be a second source of truth able to disagree with the profile.
+  for (const forbidden of [/localStorage/, /sessionStorage/, /setItem/, /getItem/, /STORAGE_KEY/]) {
+    assert.doesNotMatch(code, forbidden, "the player ladder must never persist unlock state");
+  }
+  // A voucher balance is server inventory. This file may say which levels pay
+  // one; it may never decide how many an account holds.
+  assert.doesNotMatch(code, /balance/i, "the voucher balance is not the cabinet's to keep");
+  // progression-core is the only module allowed to name an XP amount.
+  assert.doesNotMatch(code, /\bxp\b/i);
+});
+
+test("the player ladder is global-only and never reaches the roster or the circuit", () => {
+  const code = readCode("player-rewards-core.js");
+
+  assert.doesNotMatch(code, /campaign/i, "circuit unlocks are campaign-core's, not the level ladder's");
+  assert.doesNotMatch(code, /CANON_BOWLERS/);
+  assert.doesNotMatch(code, /characterSlug/, "a player reward belongs to the player, not to a bowler");
+});
+
+test("the profile screen derives the reward path from synced level and says when it is not synced", () => {
+  const html = read("index.html");
+  const screen = readCode("ui/profile-screen.mjs");
+  const model = readCode("profile/profile-model.mjs");
+
+  assert.match(html, /id="profile-reward-tree"/);
+  assert.match(html, /id="profile-reward-status"/);
+  assert.match(screen, /playerRewardTreeMarkup/);
+  // The ladder is a function of the authoritative level and the sync flag, so a
+  // cached level 1 is presented as unsynced rather than as earned progress.
+  assert.match(model, /buildRewardTree\(\{ currentLevel: level/);
+  assert.match(model, /getSyncState/);
+  assert.match(screen, /track\.synced/);
+});
+
+test("level-earned ownership has one seam and never becomes device state", () => {
+  const game = readCode("game.js");
+  const loadout = readCode("loadout-core.js");
+
+  // Both sync paths share one definition, for the same reason applyMatchLane
+  // does: two callers must not be able to disagree about what is unlocked.
+  assert.equal((game.match(/function applyLevelUnlocks\(/g) || []).length, 1);
+  assert.ok((game.match(/applyLevelUnlocks\(\)/g) || []).length >= 2);
+  // An unsynced device earns nothing: a cached level is not evidence.
+  assert.match(game, /getSyncState\(\)\.stale/);
+  assert.match(game, /clearLevelEntitlements\(\)/);
+
+  // The earned set is session-only, exactly like the server entitlement set.
+  const persistBlock = loadout.slice(loadout.indexOf("function applyLevelEntitlements"), loadout.indexOf("function clearLevelEntitlements"));
+  assert.doesNotMatch(persistBlock, /persist\(\)/, "a level unlock must never reach the device record");
+});
+
+test("the catalog stays underneath the ladders that read it", () => {
+  const cosmetics = readCode("cosmetics-core.js");
+  const html = read("index.html");
+
+  // The ladders are built on the catalog, so the catalog cannot reach back for
+  // them. Which ladder earns an item is recorded as catalog data instead, and
+  // player-rewards-core.test.js asserts the two never drift apart.
+  assert.doesNotMatch(cosmetics, /YamPlayerRewards|YamMasteryRewards|player-rewards-core|mastery-rewards-core/);
+  assert.ok(html.indexOf("cosmetics-core.js") < html.indexOf("player-rewards-core.js"));
+});

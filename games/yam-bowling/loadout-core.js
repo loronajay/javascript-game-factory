@@ -35,6 +35,11 @@
   const LEGACY_EQUIPPED_SKINS_KEY = animation.LEGACY_EQUIPPED_SKINS_STORAGE_KEY;
   const LEGACY_MENU_SPLASH_KEY = menuSplash.MENU_SPLASH_STORAGE_KEY;
 
+  // The two unlock sources whose answer is a level rather than an entitlement
+  // row. The server already holds the XP that proves the level, so minting a
+  // durable grant for one of these would duplicate a fact the account owns.
+  const LEVEL_UNLOCK_SOURCES = new Set(["bowler-level", "player-level"]);
+
   // A slot declares the one reward type it accepts. `character` slots also
   // require the item to belong to that bowler, which is what stops another
   // bowler's art from being worn.
@@ -197,6 +202,11 @@
     let devEntitlement = false;
     let serverAuthoritative = false;
     let serverEntitlementIds = new Set();
+    // Items the reward ladders have already paid out at the account's synced
+    // levels. Session-only and never persisted, exactly like the server
+    // entitlement set: the proof is the XP the server holds, so a durable copy
+    // here could only ever be a second answer able to contradict it.
+    let levelEntitlementIds = new Set();
     try {
       devEntitlement = storage?.getItem?.(DEV_ENTITLEMENT_STORAGE_KEY) === "on";
     } catch {
@@ -217,6 +227,17 @@
       const item = cosmetics.getItem(itemId);
       if (!item) return false;
       if (cosmetics.isOwnedByDefault(itemId)) return true;
+      // A reward the catalog says is earned by levelling is owned once the
+      // synced level reaches it. That answer is derived from the same
+      // authoritative XP as the level, so it needs no entitlement row, and it is
+      // only ever populated from a successful sync -- a cached level can never
+      // quietly unlock anything.
+      //
+      // This is deliberately an extra way to own the item rather than the only
+      // one. If the server ever grants a level reward directly -- a tournament
+      // prize, a make-good -- refusing it here would be the client overruling
+      // the authority it is supposed to defer to.
+      if (LEVEL_UNLOCK_SOURCES.has(item.unlock.source) && levelEntitlementIds.has(itemId)) return true;
       if (serverAuthoritative) {
         if (item.unlock.source === "character-unlock" && item.characterSlug) {
           return serverEntitlementIds.has(`bowler:${item.characterSlug}`);
@@ -232,6 +253,20 @@
         }
       }
       return unlockedWithBowler || record.granted.includes(itemId) || devEntitlement;
+    }
+
+    // The ids the reward ladders have paid out, recomputed from a synced
+    // progression snapshot. Callers pass the whole earned set every time rather
+    // than a delta, so a retuned curve or a corrected level takes effect
+    // immediately in both directions instead of leaving a stale grant behind.
+    function applyLevelEntitlements(itemIds) {
+      levelEntitlementIds = new Set((Array.isArray(itemIds) ? itemIds : [])
+        .filter((itemId) => typeof itemId === "string" && cosmetics.isValidItemId(itemId)));
+      return levelEntitlementIds.size;
+    }
+
+    function clearLevelEntitlements() {
+      levelEntitlementIds = new Set();
     }
 
     // A successful signed-in progress read flips ownership to the server. The
@@ -448,9 +483,11 @@
     }
 
     return {
+      applyLevelEntitlements,
       applyServerEntitlements,
       applyServerGarage,
       clearGlobalSlot,
+      clearLevelEntitlements,
       clearServerAuthority,
       equipBowlerSlot,
       equipGlobalSlot,

@@ -82,7 +82,31 @@ function buildPresentation({ cosmetics, loadout, bowlerSlug, ownedBowlerSlugs })
   });
 }
 
-export function buildProfileModel({ profileName, loadout, progression, animation, roomCore, cosmetics = null }) {
+// The player ladder, derived from the authoritative level rather than from any
+// stored unlock record -- there is nothing here to fall out of step with the
+// account. `synced` is carried alongside it so the screen can say plainly that
+// an unsynced device is showing a cache instead of dressing level 1 up as fact.
+function buildRewardTrack({ playerRewards, loadout, level, sync }) {
+  if (!playerRewards?.buildRewardTree) return null;
+  const tree = playerRewards.buildRewardTree({ currentLevel: level, loadout });
+  return {
+    nodes: tree.nodes,
+    nextReward: tree.nextReward,
+    currentLevel: tree.currentLevel,
+    voucherLevels: playerRewards.SKIN_VOUCHER_LEVELS,
+    synced: !sync.stale,
+  };
+}
+
+export function buildProfileModel({
+  profileName,
+  loadout,
+  progression,
+  animation,
+  roomCore,
+  cosmetics = null,
+  playerRewards = null,
+}) {
   const roster = Array.isArray(animation?.CANON_BOWLERS) ? animation.CANON_BOWLERS : [];
   const defaultBowler = roster[0] || { slug: "daisy-monroe", name: "Daisy Monroe" };
   const featured = loadout.getFeatured();
@@ -101,8 +125,11 @@ export function buildProfileModel({ profileName, loadout, progression, animation
   const room = roomCore.getRoom(loadout.getRoomSlug());
   const ownedRoomSlugs = new Set(loadout.listOwned("room").map((item) => item.id.split(":")[1]));
   const ownedBowlerSlugs = loadout.listOwnedBowlerSlugs();
+  const sync = progression.getSyncState?.() || { stale: true, pendingCount: 0, syncedAt: null };
 
   return {
+    sync,
+    rewardTrack: buildRewardTrack({ playerRewards, loadout, level: player.level, sync }),
     profileName: typeof profileName === "string" && profileName.trim() ? profileName.trim() : "Factory Bowler",
     title: displayItemId(loadout.getGlobalSlot("title"), "Rookie"),
     badge: displayItemId(loadout.getGlobalSlot("badge"), "Founding Bowler"),

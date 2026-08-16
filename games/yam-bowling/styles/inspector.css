@@ -90,6 +90,36 @@
 .character-inspector-collection p { display: flex; margin: 0 0 .38rem; align-items: center; justify-content: space-between; gap: .7rem; font-size: .52rem; font-weight: 850; }
 .character-inspector-collection span { color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
 .character-inspector-collection strong { color: var(--gold); }
+.character-inspector-mastery { margin-top: .85rem; padding-top: .8rem; border-top: 1px solid rgba(255,255,255,.09); }
+.character-inspector-mastery-heading { display: grid; gap: .55rem; }
+.character-inspector-mastery-heading > span { display: flex; padding: .62rem .7rem; align-items: center; justify-content: space-between; gap: .8rem; border: 1px solid rgba(255,214,107,.25); border-radius: 11px; background: rgba(255,214,107,.055); }
+.character-inspector-mastery-heading small, .character-inspector-mastery-heading h4 { margin: 0; color: var(--muted); font-size: .46rem; font-weight: 950; letter-spacing: .09em; text-transform: uppercase; }
+.character-inspector-mastery-heading strong { color: var(--gold); font-size: .58rem; text-align: right; }
+.mastery-reward-tree { display: grid; max-height: 255px; margin: .55rem 0 0; padding: 0 .25rem 0 0; overflow-y: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .38rem; list-style: none; scrollbar-color: rgba(255,214,107,.35) transparent; }
+.mastery-reward-node { display: grid; min-width: 0; min-height: 48px; padding: .42rem; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: .42rem; border: 1px solid rgba(255,255,255,.075); border-radius: 9px; background: rgba(5,5,8,.26); }
+.mastery-reward-node > b { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; color: var(--muted); background: rgba(255,255,255,.06); font-size: .48rem; }
+.mastery-reward-node > span { display: grid; min-width: 0; gap: .12rem; }
+.mastery-reward-node strong { overflow: hidden; font-size: .51rem; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.mastery-reward-node small { color: var(--muted); font-size: .4rem; font-weight: 900; letter-spacing: .07em; text-transform: uppercase; }
+.mastery-reward-node.is-owned { border-color: rgba(255,214,107,.24); }
+.mastery-reward-node.is-owned > b { color: #121217; background: var(--gold); }
+.mastery-reward-node.is-owned small { color: var(--gold); }
+.mastery-reward-node.is-equipped { border-color: rgba(92,230,161,.38); box-shadow: inset 0 0 18px rgba(92,230,161,.045); }
+.mastery-reward-node.is-equipped > b { color: #07130e; background: #5ce6a1; }
+.mastery-reward-node.is-equipped small { color: #5ce6a1; }
+.mastery-reward-node.is-locked { opacity: .56; }
+.mastery-reward-empty { grid-column: 1 / -1; padding: .75rem; color: var(--muted); font-size: .58rem; text-align: center; }
+.mastery-celebration-dialog { width: min(590px, calc(100% - 2rem)); padding: clamp(1.2rem, 4vw, 2.3rem); overflow: hidden; border: 1px solid rgba(255,214,107,.42); border-radius: 24px; color: var(--ink); background: radial-gradient(circle at 50% -10%, rgba(255,214,107,.26), transparent 44%), #111218; box-shadow: 0 30px 100px rgba(0,0,0,.8), 0 0 55px rgba(243,46,63,.12); text-align: center; }
+.mastery-celebration-dialog::backdrop { background: rgba(3,3,6,.9); backdrop-filter: blur(10px); }
+.mastery-celebration-flare { position: absolute; width: 240px; height: 240px; top: -180px; left: calc(50% - 120px); border-radius: 50%; background: var(--gold); filter: blur(45px); opacity: .28; pointer-events: none; }
+.mastery-celebration-dialog .eyebrow { margin: 0 0 .45rem; color: var(--gold); }
+.mastery-celebration-dialog h2 { margin: 0; font-size: clamp(1.65rem, 5vw, 2.8rem); line-height: 1.02; }
+.mastery-celebration-copy { margin: .7rem auto 1rem; color: var(--muted); font-size: .72rem; line-height: 1.5; }
+.mastery-celebration-rewards { display: grid; max-height: min(340px, 42dvh); margin: 0 0 1.1rem; padding: 0; overflow-y: auto; gap: .45rem; list-style: none; text-align: left; }
+.mastery-celebration-rewards li { display: grid; padding: .68rem .75rem; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: .6rem; border: 1px solid rgba(255,214,107,.2); border-radius: 11px; background: rgba(255,255,255,.035); }
+.mastery-celebration-rewards b { color: var(--gold); font-size: .52rem; }
+.mastery-celebration-rewards span { font-size: .7rem; font-weight: 850; }
+.mastery-celebration-skip { margin: .65rem 0 0; color: var(--muted); font-size: .48rem; }
 .character-inspector-story { margin-top: .8rem; padding: clamp(.85rem, 2vw, 1.2rem); border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.018)); }
 .character-inspector-story h3 { margin: 0 0 .35rem; color: var(--gold); font-size: .6rem; letter-spacing: .12em; text-transform: uppercase; }
 .character-inspector-story h3:not(:first-child) { margin-top: 1rem; }
