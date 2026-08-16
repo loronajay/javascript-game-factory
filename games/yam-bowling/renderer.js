@@ -125,26 +125,12 @@
       return 430 - 330 * Math.pow(clamp(z, 0, 1), 0.82);
     }
 
+    // The painted trough is the lane plane carried past the boards, so a ball in
+    // the gutter is projected by the same measured edges as a ball on the wood.
+    // Anything with a lane x -- ball, trail particle, debug marker -- goes
+    // through `project`, which is what keeps them on one centerline.
     projectGutter(side, z) {
-      const direction = side < 0 ? -1 : 1;
-      const clampedZ = clamp(z, 0, 1);
-      const lane = root.YamLaneCore.getLane(this.laneSlug);
-      const center = interpolatePath(lane.gutterCenters, clampedZ);
-      const ground = this.project(0, clampedZ);
-      return {
-        ...ground,
-        x: direction < 0 ? center.left : center.right,
-      };
-    }
-
-    projectLaneObject(x, z) {
-      if (Math.abs(x) >= root.YamPhysics.GUTTER_CONTACT_X) {
-        const side = Math.sign(x) || 1;
-        const gutter = this.projectGutter(side, z);
-        const railJitter = x - side * root.YamPhysics.GUTTER_CENTER_X;
-        return { ...gutter, x: gutter.x + railJitter * gutter.half };
-      }
-      return this.project(x, z);
+      return this.project((side < 0 ? -1 : 1) * root.YamPhysics.GUTTER_CENTER_X, z);
     }
 
     pinZ(pin) {
@@ -266,7 +252,7 @@
 
     drawBallAt(x, z, ballIndex, rotation = 0, guttered = false) {
       const ctx = this.ctx;
-      const ground = guttered ? this.projectGutter(Math.sign(x), z) : this.project(x, z);
+      const ground = this.project(x, z);
       const size = this.ballSizeAt(z);
       const [light, dark] = BALL_COLORS[ballIndex % BALL_COLORS.length];
       // A captured ball sits visibly lower than one riding on the boards. Its
@@ -325,7 +311,7 @@
       for (const particle of particles) {
         const alpha = root.YamEffects.particleAlpha(particle);
         if (alpha <= 0) continue;
-        const point = this.projectLaneObject(particle.x, clamp(particle.z, 0, 1));
+        const point = this.project(particle.x, clamp(particle.z, 0, 1));
         // Scaled by the same perspective the ball uses, so a particle far down
         // the lane shrinks with it instead of floating at a fixed size.
         const radius = Math.max(1, (76 - clamp(particle.z, 0, 1) * 51) * 0.12 * particle.size);
@@ -388,7 +374,7 @@
       if (scene.simulation?.ball?.active) {
         const ball = scene.simulation.ball;
         const z = root.YamPhysics.RACK_FRONT_Z + ball.y / root.YamPhysics.Z_SCALE;
-        const point = this.projectLaneObject(ball.x, z);
+        const point = this.project(ball.x, z);
         ctx.strokeStyle = "#ff3b4c";
         ctx.beginPath();
         ctx.arc(point.x, point.y, 13, 0, Math.PI * 2);

@@ -30,7 +30,59 @@ function emptyMastery(slug) {
   };
 }
 
-export function buildProfileModel({ profileName, loadout, progression, animation, roomCore }) {
+// The slots the room editor may change, in the order it shows them. Skin, room
+// and featured bowler are deliberately absent: they already have their own
+// controls, and menu art has its own picker. Everything here is presentation —
+// no slot in this list can reach scoring, physics or the wire.
+const PRESENTATION_SLOTS = Object.freeze([
+  Object.freeze({ key: "ballTrail", scope: "global", type: "ball-trail", label: "Ball trail" }),
+  Object.freeze({ key: "strikeBurst", scope: "global", type: "strike-burst", label: "Strike burst" }),
+  Object.freeze({ key: "victoryPose", scope: "bowler", type: "victory-pose", label: "Victory pose" }),
+  Object.freeze({ key: "defeatPose", scope: "bowler", type: "defeat-pose", label: "Defeat pose" }),
+  Object.freeze({ key: "playerCard", scope: "bowler", type: "player-card", label: "Player card" }),
+  Object.freeze({ key: "profileArt", scope: "bowler", type: "profile-art", label: "Profile art" }),
+  Object.freeze({ key: "title", scope: "global", type: "title", label: "Title" }),
+  Object.freeze({ key: "badge", scope: "global", type: "badge", label: "Badge" }),
+  // The two decoration slots have no default, so empty is one of their real
+  // answers and has to be offerable — otherwise a frame could be put on but
+  // never taken off again.
+  Object.freeze({ key: "profileFrame", scope: "global", type: "profile-art", label: "Profile frame", optional: true }),
+  Object.freeze({ key: "profileBackground", scope: "global", type: "profile-art", label: "Profile background", optional: true }),
+]);
+
+// Locked items stay in the list on purpose: a reward nobody can see is a reward
+// nobody plays for. Ownership decides what may be EQUIPPED, never what is shown,
+// which is the same rule the skin picker follows.
+function buildPresentation({ cosmetics, loadout, bowlerSlug, ownedBowlerSlugs }) {
+  if (!cosmetics?.listByType) return [];
+  return PRESENTATION_SLOTS.map((slot) => {
+    const scopedToBowler = slot.scope === "bowler";
+    const items = cosmetics.listByType(slot.type, scopedToBowler ? { characterSlug: bowlerSlug } : {});
+    const empty = slot.optional
+      ? [{ id: "", name: "None", tier: "standard", art: null, palette: null, owned: true }]
+      : [];
+    return {
+      ...slot,
+      optional: Boolean(slot.optional),
+      equippedId: (scopedToBowler
+        ? loadout.getBowlerSlot(bowlerSlug, slot.key)
+        : loadout.getGlobalSlot(slot.key)) || (slot.optional ? "" : null),
+      options: empty.concat(items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        tier: item.tier,
+        art: item.assets?.thumbnail || item.assets?.art || null,
+        palette: item.assets?.palette || null,
+        // A global slot filled with a bowler's own art is gated by that bowler,
+        // not by the art: the profile frame is earned by earning the bowler.
+        owned: loadout.owns(item.id)
+          && (scopedToBowler || !item.characterSlug || ownedBowlerSlugs.has(item.characterSlug)),
+      }))),
+    };
+  });
+}
+
+export function buildProfileModel({ profileName, loadout, progression, animation, roomCore, cosmetics = null }) {
   const roster = Array.isArray(animation?.CANON_BOWLERS) ? animation.CANON_BOWLERS : [];
   const defaultBowler = roster[0] || { slug: "daisy-monroe", name: "Daisy Monroe" };
   const featured = loadout.getFeatured();
@@ -74,5 +126,11 @@ export function buildProfileModel({ profileName, loadout, progression, animation
     ownedBowlers: ownedBowlerSlugs.map((slug) => roster.find((entry) => entry.slug === slug)).filter(Boolean),
     ownedRooms: roomCore.ROOMS.filter((entry) => ownedRoomSlugs.has(entry.slug)),
     ownedSkins: availableSkins.filter((entry) => loadout.owns(`skin:${bowler.slug}:${entry.id}`)),
+    presentation: buildPresentation({
+      cosmetics,
+      loadout,
+      bowlerSlug: bowler.slug,
+      ownedBowlerSlugs: new Set(ownedBowlerSlugs),
+    }),
   };
 }

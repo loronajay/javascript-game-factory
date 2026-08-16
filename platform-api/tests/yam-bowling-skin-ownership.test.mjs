@@ -58,6 +58,24 @@ test("one exact skin entitlement unlocks that skin and both matching outcome pos
   assert.deepEqual(wrongBowler.featured, { bowlerSlug: "nia-brooks", skinId: "canon" });
 });
 
+test("each Yam trail entitlement preserves only its exact equipped color", () => {
+  const cyanGarage = {
+    ...legacyGarage("canon"),
+    global: { ballTrail: "ball-trail:cyan-pulse" },
+  };
+  const ownedEntitlementIds = new Set(["ball-trail:cyan-pulse"]);
+
+  assert.equal(
+    normalizeYamBowlingGarage(cyanGarage, { ownedEntitlementIds }).global.ballTrail,
+    "ball-trail:cyan-pulse",
+  );
+  assert.deepEqual(
+    normalizeYamBowlingGarage({ ...cyanGarage, global: { ballTrail: "ball-trail:hot-pink" } }, { ownedEntitlementIds }).global,
+    {},
+    "one color entitlement must not unlock another trail",
+  );
+});
+
 test("the one-time migration grants only exact non-Canon skins saved in the server garage", async () => {
   const migrationName = "039-yam-bowling-skin-entitlements.sql";
   assert.ok(MIGRATION_FILES.includes(migrationName));

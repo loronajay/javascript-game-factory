@@ -128,13 +128,15 @@
   background: rgba(255,255,255,.035);
   text-align: left;
 }
-.skin-option:hover, .skin-option.is-selected { border-color: var(--gold); background: rgba(255,214,107,.09); }
+.skin-option:not(.is-locked):hover, .skin-option.is-selected { border-color: var(--gold); background: rgba(255,214,107,.09); }
 .skin-option.is-selected { box-shadow: 0 0 0 2px rgba(255,214,107,.12); }
 .skin-option img { width: 42px; height: 54px; border-radius: 8px; object-fit: contain; object-position: center bottom; background: #090a0e; }
 .skin-option span { display: grid; min-width: 0; gap: .14rem; }
 .skin-option strong { overflow: hidden; font-size: .65rem; text-overflow: ellipsis; white-space: nowrap; }
 .skin-option small { color: var(--muted); font-size: .52rem; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
 .skin-option.is-selected small { color: var(--gold); }
+.skin-option.is-locked { cursor: not-allowed; opacity: .45; }
+.skin-option.is-locked img { filter: grayscale(1); }
 .character-select { min-width: 0; padding: 1.25rem; }
 .section-heading { display: flex; gap: 1rem; align-items: end; justify-content: space-between; }
 .section-heading h3 { margin: 0; font-size: 1.5rem; letter-spacing: -.035em; }

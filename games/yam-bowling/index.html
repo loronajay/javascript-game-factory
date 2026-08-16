@@ -60,6 +60,8 @@
 
         <div class="profile-room">
           <section class="profile-hero" aria-label="Featured bowler">
+            <img class="profile-hero__backdrop" id="profile-hero-backdrop" alt="" decoding="async" hidden />
+            <img class="profile-hero__frame" id="profile-frame-art" alt="" decoding="async" hidden />
             <div class="profile-level-medallion">
               <small>Player level</small>
               <strong id="profile-player-level">1</strong>
@@ -109,6 +111,7 @@
                 <p>Player room</p>
                 <div class="profile-room-options" id="profile-room-options" role="listbox" aria-label="Choose an unlocked player room"></div>
               </div>
+              <div class="profile-presentation" id="profile-presentation"></div>
               <button class="button button--primary button--wide" id="profile-save" type="button">Save profile display</button>
             </section>
           </aside>
@@ -168,6 +171,7 @@
               <span><small>Clear achievement</small><strong id="circuit-achievement-title">Every Pin Counts</strong></span>
               <span><small>Reward</small><strong id="circuit-character-reward">Hazel Ward</strong></span>
             </div>
+            <p class="circuit-sync-status" id="circuit-sync-status" aria-live="polite" hidden></p>
             <button class="button button--primary button--wide" id="start-circuit-match" type="button">Bowl sanctioned match</button>
           </section>
 
@@ -536,6 +540,7 @@
     <script src="ball-core.js"></script>
     <script src="cpu-core.js"></script>
     <script src="renderer.js"></script>
+    <script type="module" src="../../js/platform-config.mjs"></script>
     <script type="module" src="game.js"></script>
   </body>
 </html>

@@ -17,8 +17,22 @@ export function createCharacterAssets({ animation, roster, loadout }) {
     characterPortrait: (slug, skinId = animation.DEFAULT_SKIN_ID) => animation
       .getPortraitAssetPath({ slug }, skinId),
 
-    resultPortrait: (slug, outcome, skinId = animation.DEFAULT_SKIN_ID) => animation
-      .getResultPortraitAssetPath({ slug }, outcome, skinId),
+    // The outcome portrait a finished match shows. A victory or defeat pose is
+    // its own equippable slot, so the pose is not always the skin worn on the
+    // lane — but a REMOTE bowler's look arrived over the wire, and this device's
+    // equipment has no say over it.
+    resultPortrait: (slug, outcome, skinId = animation.DEFAULT_SKIN_ID, { remote = false } = {}) => {
+      const bowlerSlug = bowlerBySlug(slug).slug;
+      const slotName = outcome === "victory" ? "victoryPose" : "defeatPose";
+      const equipped = remote ? null : loadout.getBowlerSlot(bowlerSlug, slotName);
+      // `<type>:<bowler>:<skin>`. Another bowler's pose is not wearable here, so
+      // anything that does not name this one falls back to the equipped skin.
+      const [, poseSlug, poseSkinId] = typeof equipped === "string" ? equipped.split(":") : [];
+      const resolvedSkinId = poseSlug === bowlerSlug && poseSkinId
+        ? animation.normalizeSkinId(poseSkinId)
+        : skinId;
+      return animation.getResultPortraitAssetPath({ slug: bowlerSlug }, outcome, resolvedSkinId);
+    },
 
     calloutPose: (slug, outcomeCue, skinId = animation.DEFAULT_SKIN_ID) => animation
       .getCalloutPoseAssetPath({ slug }, outcomeCue, skinId),

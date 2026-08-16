@@ -152,15 +152,31 @@ saved in that player's authoritative garage.
 - [x] During development, expose catalog items through a deliberate debug/dev entitlement rather than pretending local ownership is authoritative.
 - [x] Do not show XP prices or unlock claims until server-backed ownership exists.
 
-### Not yet surfaced
+### Surfaced
 
-The data layer is shipped and the two existing preferences read and write through
-it. These slots exist and are tested but have no player-facing control yet,
-because the content that would fill them belongs to later milestones:
+Every slot the loadout owns now has a player-facing control:
 
-- [ ] A loadout screen for the victory/defeat pose, player card, and profile art slots (milestone 5's unlock tree is their natural home).
+- [x] A loadout screen for the victory/defeat pose, player card, and profile art slots.
 - [x] Featured Bowler / Featured Skin selection UI (milestone 6 owns the profile that displays them).
-- [ ] Ball trail and strike burst equipping become visible when milestone 3 renders them.
+- [x] Ball trail and strike burst equipping.
+
+They live in the room editor on the `My room` screen rather than in a screen of
+their own, because that editor already owns the dirty/save path into the server
+garage — a second screen would have needed a second one. The rows are generated
+from the catalog, so a reward type added to `cosmetics-core.js` appears without
+new UI code. Ownership decides what may be **equipped**, never what is **shown**:
+locked rewards stay visible and disabled, the same rule the skin picker follows.
+
+Two consequences worth recording:
+
+- An **outcome pose is now resolved through the equipped slot**, not through the
+  skin worn on the lane, so the control is not decoration. `ui/character-assets.mjs`
+  owns that resolution, and a remote bowler keeps the look that came over the
+  wire — this device's equipment has no say over an opponent.
+- The two decoration slots have **no default**, so empty is one of their real
+  answers. `clearGlobalSlot` exists for exactly that: without it a frame could be
+  put on and never taken off. Slots that have a default cannot be cleared,
+  because there the default *is* the answer.
 
 ## Milestone 3 — Equippable visual effects
 
@@ -185,13 +201,13 @@ because the content that would fill them belongs to later milestones:
 - [x] Add deterministic emitter tests and a particle-budget regression test.
 - [x] Verify no measurable change to physics outcomes or fixed-timestep behavior.
 
-### Not yet surfaced
+### Surfaced
 
-- [ ] A player-facing control for equipping a trail or a burst. Both slots are
-      live and equippable through the loadout, but the only unlockable options
-      are milestone-5 rewards, so the picker arrives with the unlock tree that
-      gives it something to show. Until then the shipped defaults are what a
-      player sees, and the dev entitlement is how the alternates are exercised.
+- [x] A player-facing control for equipping a trail or a burst, in the room
+      editor beside the rest of the presentation slots. The alternates are still
+      milestone-5 rewards, so a player who has earned nothing sees the founding
+      default equipped and the alternate locked; the dev entitlement remains how
+      an owned alternate is exercised until the unlock tree grants one.
 
 ## Milestone 4 — Progression domain and authoritative persistence
 
@@ -302,11 +318,27 @@ synced rather than showing a total the server has not agreed to. A lost *respons
 recovers on its own: the next sync sees the grant in the server's own list and
 clears it.
 
+### Shipped: the re-send
+
+- [x] Re-send a grant whose request never reached the server.
+
+A queued grant now keeps the **whole request** that would file it, not just what
+it was worth, so a report that never landed can be sent again exactly as it was
+first built. The queue stores it opaquely — `progression-core.js` owns *when* a
+grant may be replayed, not what a report says — and hands back a copy, so nothing
+can edit the envelope the queue would replay.
+
+The replay goes through the same single call site a fresh result does
+(`flushPendingReports` in `online-session.mjs`), which is what keeps "one request,
+one session id" true: a replay path of its own would be a second thing that could
+disagree. It runs on the first signed-in boot and after each online match. Sending
+again is safe rather than double-paying because the server dedups on the same
+session id the grant is keyed by, and a request is stored only if it is complete —
+half of one would have to be guessed at, and a guessed rating report is a wrong
+record.
+
 ### Still to come
 
-- [ ] Re-send a grant whose request never reached the server. The queue survives a
-      reload and a lost response self-heals, but a request that never landed waits
-      for the next match to be noticed.
 - [ ] Abuse telemetry, before any streak, sportsmanship, or uncapped bonus.
 
 Not yet browser-verified end to end: that needs `factory-network-server`, the API,
@@ -356,7 +388,11 @@ Suggested cadence to validate in a prototype:
 - [x] Add Player Level, wins/losses, high game, strikes, and character mastery summary.
 - [ ] Add rank/ELO and spare rate after those records have one authoritative source and denominator.
 - [x] Add Featured Bowler, Featured Skin, Title, and Badge presentation.
-- [ ] Add authored Profile Background and Profile Frame rewards and their editor controls.
+- [x] Add Profile Background and Profile Frame editor controls.
+- [ ] Add *authored* background and frame art. Both slots are typed `profile-art`
+      on the client and on the server, so today they are filled from the roster's
+      existing portrait art and are gated by owning that bowler. Authored
+      decoration would be new reward types on both sides of that contract.
 - [x] Make the featured bowler the visual centerpiece, occupying roughly 30–40% of the profile composition on desktop.
 - [x] Keep profile statistics on progression-eligible online/campaign tracks so practice and local exhibition cannot inflate them.
 - [x] Provide safe fallback presentation for old profiles and unavailable cosmetics.

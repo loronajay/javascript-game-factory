@@ -137,6 +137,40 @@ test("Canon is the only default-owned skin and its entitlement gates matching ou
   assert.notEqual(rewardTrail.unlock.source, "founding");
 });
 
+test("the trail cabinet offers a broad, distinct color collection to unlock", () => {
+  const trails = listByType("ball-trail");
+  const colorTrails = trails.filter((item) => item.id !== "ball-trail:none");
+
+  assert.equal(trails.length, 16, "No Trail plus fifteen color rewards should be visible");
+  assert.deepEqual(colorTrails.map((item) => item.id), [
+    "ball-trail:red-neon",
+    "ball-trail:orange-flare",
+    "ball-trail:gold-rush",
+    "ball-trail:lime-shock",
+    "ball-trail:emerald-glow",
+    "ball-trail:mint-frost",
+    "ball-trail:cyan-pulse",
+    "ball-trail:sky-blue",
+    "ball-trail:electric-blue",
+    "ball-trail:indigo-drive",
+    "ball-trail:violet-haze",
+    "ball-trail:purple-plasma",
+    "ball-trail:magenta-pop",
+    "ball-trail:hot-pink",
+    "ball-trail:diamond-white",
+  ]);
+
+  const paletteSignatures = new Set();
+  for (const trail of colorTrails) {
+    assert.equal(trail.unlock.source, "bowler-level", `${trail.id} should be earnable mastery loot`);
+    assert.equal(isOwnedByDefault(trail.id), false, `${trail.id} must begin locked`);
+    assert.ok(trail.assets.palette.length >= 2, `${trail.id} needs a gradient palette`);
+    for (const color of trail.assets.palette) assert.match(color, /^#[0-9a-f]{6}$/i);
+    paletteSignatures.add(trail.assets.palette.join(","));
+  }
+  assert.equal(paletteSignatures.size, colorTrails.length, "every trail needs its own visible color identity");
+});
+
 test("unknown ids resolve to nothing rather than a fabricated item", () => {
   assert.equal(getItem("skin:not-a-bowler:canon"), null);
   assert.equal(getItem("nonsense"), null);

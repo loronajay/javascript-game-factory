@@ -173,6 +173,21 @@ export function createOnlineSession({
     $("online-result-status").textContent = "Rematch requested. Waiting for your opponent…";
   }
 
+  // Re-files results whose request never reached the server. It runs through the
+  // same call site a fresh result does, so the wire still has exactly one owner,
+  // and it sends each stored request verbatim: the server dedups on the session
+  // id, so a replay settles the grant instead of paying it twice.
+  async function flushPendingReports() {
+    let settled = 0;
+    for (const { grantId, request } of progressionReporter.listUnsentRequests()) {
+      const accepted = await platformApi.updateGameRating("yam-bowling", request).catch(() => null);
+      if (!accepted) continue;
+      progressionReporter.settleSent(grantId);
+      settled += 1;
+    }
+    return settled;
+  }
+
   // Files the finished match to the player's Factory record. Guarded by session
   // id so a re-render of the results screen cannot double-report a result.
   async function reportResult() {
@@ -201,15 +216,19 @@ export function createOnlineSession({
       clientId,
       sessionId,
       snapshotResult: session.onlineSnapshot?.result || null,
+      opponentPlayerId: opponent.accountPlayerId,
+      outcome,
     });
 
-    const reported = await platformApi.updateGameRating("yam-bowling", {
+    const reported = await platformApi.updateGameRating("yam-bowling", prepared?.request || {
       opponentPlayerId: opponent.accountPlayerId,
       outcome,
       sessionId,
-      progression: prepared?.block || undefined,
     }).catch(() => null);
     progressionReporter.settle({ grant: prepared?.grant, accepted: Boolean(reported) });
+    // An older result whose request never landed files here too, rather than
+    // waiting for a match that may never be bowled.
+    await flushPendingReports();
 
     const [rating] = await Promise.all([
       platformApi.getGameRating("yam-bowling", me.accountPlayerId).catch(() => null),
@@ -222,5 +241,5 @@ export function createOnlineSession({
     status.textContent = progressionLine ? `${ratingLine} · ${progressionLine}` : ratingLine;
   }
 
-  return { handleSnapshot, begin, leave, leaveToTitle, requestRematch, reportResult };
+  return { handleSnapshot, begin, flushPendingReports, leave, leaveToTitle, requestRematch, reportResult };
 }

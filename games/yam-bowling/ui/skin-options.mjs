@@ -5,8 +5,8 @@ import { $, escapeHtml } from "./dom.mjs";
 // a skin becomes the bowler's equipped look, and it writes through the
 // presentation loadout so equipment has a single owner.
 //
-// Only skins the current ownership source permits are offered. Canon is always
-// present; server-entitled looks appear only after authenticated sync.
+// The full catalog stays visible so locked looks can motivate collection.
+// Ownership still controls interaction: only entitled skins can be equipped.
 export function renderSkinOptions({ containerId, slug, selectedSkinId, animation, assets, loadout, onEquip }) {
   const host = $(containerId);
   host.innerHTML = "";
@@ -15,14 +15,16 @@ export function renderSkinOptions({ containerId, slug, selectedSkinId, animation
     .filter((item) => item.characterSlug === bowler.slug)
     .map((item) => item.id.split(":")[2]));
 
-  for (const skin of animation.AVAILABLE_SKINS.filter((option) => ownedSkinIds.has(option.id))) {
+  for (const skin of animation.AVAILABLE_SKINS) {
+    const owned = ownedSkinIds.has(skin.id);
     const button = document.createElement("button");
-    button.className = `skin-option${skin.id === selectedSkinId ? " is-selected" : ""}`;
+    button.className = `skin-option${skin.id === selectedSkinId ? " is-selected" : ""}${owned ? "" : " is-locked"}`;
     button.type = "button";
+    button.disabled = !owned;
     button.dataset.skinId = skin.id;
     button.setAttribute("aria-pressed", String(skin.id === selectedSkinId));
-    button.innerHTML = `<img src="${assets.characterPortrait(slug, skin.id)}" alt="" loading="lazy" decoding="async"><span><strong>${escapeHtml(skin.name)}</strong><small>${skin.id === selectedSkinId ? "Equipped" : "Equip"}</small></span>`;
-    button.addEventListener("click", () => onEquip(loadout.equipSkin(bowler.slug, skin.id)));
+    button.innerHTML = `<img src="${assets.characterPortrait(slug, skin.id)}" alt="" loading="lazy" decoding="async"><span><strong>${escapeHtml(skin.name)}</strong><small>${owned ? (skin.id === selectedSkinId ? "Equipped" : "Equip") : "Locked"}</small></span>`;
+    if (owned) button.addEventListener("click", () => onEquip(loadout.equipSkin(bowler.slug, skin.id)));
     host.appendChild(button);
   }
 }

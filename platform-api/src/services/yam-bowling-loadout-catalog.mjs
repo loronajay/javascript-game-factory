@@ -18,6 +18,12 @@ const ROOM_SLUGS = Object.freeze([
     "industrial-workshop", "botanical-glasshouse", "frosted-suite", "lavender-cosmic",
     "black-gothic", "circuit-red", "tower-penthouse", "champion-room",
 ]);
+const BALL_TRAIL_IDS = Object.freeze([
+    "none", "red-neon", "orange-flare", "gold-rush", "lime-shock",
+    "emerald-glow", "mint-frost", "cyan-pulse", "sky-blue", "electric-blue",
+    "indigo-drive", "violet-haze", "purple-plasma", "magenta-pop", "hot-pink",
+    "diamond-white",
+]);
 const items = new Map();
 function register(item) {
     items.set(item.id, Object.freeze(item));
@@ -43,9 +49,11 @@ for (const bowlerSlug of BOWLER_SLUGS) {
 for (const roomSlug of ROOM_SLUGS) {
     register({ id: `room:${roomSlug}`, type: "room", founding: roomSlug === "default", entitlementId: `room:${roomSlug}` });
 }
+for (const trailId of BALL_TRAIL_IDS) {
+    const id = `ball-trail:${trailId}`;
+    register({ id, type: "ball-trail", founding: trailId === "none", entitlementId: id });
+}
 for (const [id, type, founding] of [
-    ["ball-trail:none", "ball-trail", true],
-    ["ball-trail:red-neon", "ball-trail", false],
     ["strike-burst:classic", "strike-burst", true],
     ["strike-burst:ember", "strike-burst", false],
     ["title:rookie", "title", true],

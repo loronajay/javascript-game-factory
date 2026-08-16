@@ -175,10 +175,13 @@ test("lane coordinates interpolate through the measured painted board edges", ()
   const renderer = createRenderer();
   renderer.laneSlug = "crimson-crown";
 
-  assert.equal(renderer.project(-1, 0).x, 43);
-  assert.equal(renderer.project(1, 0).x, 979);
-  assert.equal(renderer.project(-1, 0.6).x, 294);
-  assert.equal(renderer.project(1, 0.6).x, 727);
+  assert.equal(renderer.project(-1, 0).x, 44);
+  assert.equal(renderer.project(1, 0).x, 978);
+  assert.equal(renderer.project(-1, 1).x, 461);
+  assert.equal(renderer.project(1, 1).x, 559);
+  // Sampled against the artwork: the painted right board sits at these rows.
+  assert.ok(Math.abs(renderer.project(1, 0.6).x - 727) <= 2);
+  assert.ok(Math.abs(renderer.project(1, 0.874).x - 613) <= 2);
 
   const between = renderer.project(1, 0.5).x;
   assert.ok(between < 811 && between > 727, "the painted edge should interpolate continuously between anchors");
@@ -224,23 +227,53 @@ test("the aiming highlight keeps its original continuous lane projection", () =>
   assert.equal(trajectoryPoints, 40);
 });
 
-test("captured balls use the painted gutter trough instead of a normalized off-art x", () => {
+test("captured balls ride the painted trough through one lane projection", () => {
   const renderer = createRenderer();
-  renderer.laneSlug = "crimson-crown";
+  const { GUTTER_CENTER_X } = globalThis.YamPhysics;
 
-  const near = renderer.projectGutter(1, 0.2);
-  const far = renderer.projectGutter(1, 0.8);
+  for (const lane of globalThis.YamLaneCore.LANES) {
+    renderer.laneSlug = lane.slug;
+    for (const side of [-1, 1]) {
+      for (const z of [0.05, 0.2, 0.4, 0.6, 0.8, 0.95]) {
+        const trough = renderer.projectGutter(side, z);
+        const paintedEdge = renderer.project(side, z);
+        const clearance = (trough.x - paintedEdge.x) * side;
+        // The trough is the lane plane past the boards, so a ball in the gutter
+        // must clear the painted wood by the same fraction of the lane at every
+        // depth -- the earlier separate trough path drifted onto the capping
+        // mid-lane and folded back onto the boards at the pin deck.
+        assert.ok(
+          Math.abs(clearance - (GUTTER_CENTER_X - 1) * paintedEdge.half) < 0.001,
+          `${lane.slug} side=${side} z=${z} should sit a fixed board offset outside the painted edge, got ${clearance}`,
+        );
+        assert.ok(clearance > 8, `${lane.slug} side=${side} z=${z} must never fold back onto the boards`);
+        assert.equal(
+          renderer.project(side * GUTTER_CENTER_X, z).x,
+          trough.x,
+          "guttered balls, debug markers, and trails should share one centerline",
+        );
+      }
+    }
+  }
+});
 
-  assert.equal(near.x, 1007);
-  assert.equal(far.x, 676);
-  assert.equal(
-    renderer.projectLaneObject(globalThis.YamPhysics.GUTTER_CENTER_X, 0.8).x,
-    far.x,
-    "guttered balls, debug markers, and trails should share one painted trough centerline",
-  );
-  const jitteredTrail = renderer.projectLaneObject(globalThis.YamPhysics.GUTTER_CENTER_X - 0.005, 0.8);
-  assert.ok(Math.abs(jitteredTrail.x - 675.33) < 0.001,
-    "trail jitter should stay around the trough instead of falling back to the generic projection");
+test("an off-centre line stays straight down the whole lane", () => {
+  const renderer = createRenderer();
+  for (const lane of globalThis.YamLaneCore.LANES) {
+    renderer.laneSlug = lane.slug;
+    for (const x of [-1.13, -0.6, 0.35, 1]) {
+      // A shot held at one lane x draws a straight line on screen, so a player
+      // strafing left and right sees the guide slide across rather than bend.
+      // A kink here is a mismeasured edge sample, which is what the aim guide
+      // used to inherit at the pin deck.
+      const screenX = [0, 0.2, 0.4, 0.6, 0.8, 1].map((z) => renderer.project(x, z).x);
+      const steps = screenX.slice(1).map((value, index) => value - screenX[index]);
+      for (const step of steps) {
+        assert.ok(Math.abs(step - steps[0]) < 0.001,
+          `${lane.slug} x=${x} should not bend: ${steps.join(", ")}`);
+      }
+    }
+  }
 });
 
 test("the forgiveness hitbox visibly overlaps each measured painted edge", () => {

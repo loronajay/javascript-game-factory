@@ -130,17 +130,25 @@ export function createCircuitScreen({
     renderEvent(match);
   }
 
+  function setSyncStatus(message, state = "") {
+    const status = $("circuit-sync-status");
+    status.textContent = message;
+    status.dataset.state = state;
+    status.hidden = !message;
+  }
+
   async function open() {
     if (!accountAccess.requireFactoryAccount()) return false;
+    setSyncStatus("Checking tour card");
     if (!campaignProgress.isReady() && !await campaignProgress.sync()) {
       render();
-      const button = $("start-circuit-match");
-      button.disabled = true;
-      button.textContent = "Factory profile unavailable";
+      $("start-circuit-match").disabled = true;
+      setSyncStatus("Could not load your Factory campaign progress. Return to the title and try again.", "error");
       showScreen("circuit-screen");
       return false;
     }
     render();
+    setSyncStatus("");
     showScreen("circuit-screen");
     return true;
   }
@@ -208,7 +216,7 @@ export function createCircuitScreen({
     if (!result.ok) {
       lastResultWon = false;
       $("campaign-result-stamp").textContent = "Result not filed";
-      $("campaign-result-kicker").textContent = "Factory profile unavailable";
+      $("campaign-result-kicker").textContent = "Circuit progress unavailable";
       $("campaign-result-title").textContent = "Circuit victory needs confirmation";
       $("campaign-result-copy").textContent = "No character was unlocked. Reconnect and retry this sanctioned match.";
     } else if (result.firstClear) {

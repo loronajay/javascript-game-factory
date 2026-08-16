@@ -45,6 +45,15 @@ test("Circuit and Online are both gated by the real Factory account session", ()
   assert.match(onlineSession, /accountAccess\.requireFactoryAccount\(\)/);
 });
 
+test("a failed campaign sync is status copy, never a repurposed match button", () => {
+  const html = read("index.html");
+  const screen = read("ui/circuit-screen.mjs");
+
+  assert.match(html, /id=["']circuit-sync-status["']/);
+  assert.match(screen, /circuit-sync-status/);
+  assert.doesNotMatch(screen, /button\.textContent\s*=\s*["']Factory profile unavailable["']/);
+});
+
 test("campaign owns circuit unlocks without absorbing tournaments or loadout rooms", () => {
   const html = read("index.html");
   const core = read("campaign-core.js");

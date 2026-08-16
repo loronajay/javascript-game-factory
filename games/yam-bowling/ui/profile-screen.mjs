@@ -11,13 +11,14 @@ export function createProfileScreen({
   progression,
   animation,
   roomCore,
+  cosmetics,
   syncClient,
   audio,
 }) {
   let dirty = false;
 
   function readModel() {
-    return buildProfileModel({ profileName, loadout, progression, animation, roomCore });
+    return buildProfileModel({ profileName, loadout, progression, animation, roomCore, cosmetics });
   }
 
   function setStatus(message, state = "") {
@@ -56,6 +57,49 @@ export function createProfileScreen({
     }).join("");
   }
 
+  // The presentation slots the loadout owns but nothing else offers: the two
+  // effects, the featured bowler's poses and card, and the profile decoration.
+  // Locked options stay on screen — a reward nobody can see is a reward nobody
+  // plays for — but only an owned one can be clicked.
+  function renderPresentationOptions(model) {
+    $("profile-presentation").innerHTML = model.presentation.map((slot) => {
+      const options = slot.options.map((option) => {
+        const selected = option.id === slot.equippedId;
+        const swatch = option.art
+          ? `<img src="${escapeHtml(option.art)}" alt="" loading="lazy" />`
+          : `<i class="profile-slot-swatch" style="${paletteStyle(option.palette)}"></i>`;
+        return `<button class="profile-slot-option${selected ? " is-selected" : ""}${option.owned ? "" : " is-locked"}"
+          type="button" role="option" aria-selected="${selected}" ${option.owned ? "" : "disabled"}
+          data-slot-key="${escapeHtml(slot.key)}" data-slot-item="${escapeHtml(option.id)}">
+          ${swatch}
+          <span><strong>${escapeHtml(option.name)}</strong><small>${option.owned ? (selected ? "Equipped" : "Equip") : "Locked"}</small></span>
+        </button>`;
+      }).join("");
+      return `<div class="profile-option-group">
+        <p>${escapeHtml(slot.label)}</p>
+        <div class="profile-slot-options" role="listbox" aria-label="Choose a ${slot.label.toLowerCase()}">${options}</div>
+      </div>`;
+    }).join("");
+  }
+
+  // An effect has no art, so its two colours stand in for a thumbnail.
+  function paletteStyle(palette) {
+    const [from, to] = Array.isArray(palette) && palette.length ? palette : ["#4a4f5e", "#2a2e3a"];
+    return `background: linear-gradient(135deg, ${escapeHtml(from)}, ${escapeHtml(to || from)})`;
+  }
+
+  // The decoration slots are the only presentation the room itself draws. An
+  // empty slot leaves the composition exactly as it was before frames existed.
+  function renderDecoration(model) {
+    for (const [key, elementId] of [["profileBackground", "profile-hero-backdrop"], ["profileFrame", "profile-frame-art"]]) {
+      const slot = model.presentation.find((entry) => entry.key === key);
+      const art = cosmetics?.getItem?.(slot?.equippedId)?.assets?.art || "";
+      const element = $(elementId);
+      element.hidden = !art;
+      if (art) element.src = art;
+    }
+  }
+
   function render() {
     const model = readModel();
     $("profile-name").textContent = model.profileName;
@@ -92,6 +136,8 @@ export function createProfileScreen({
     renderBowlerOptions(model);
     renderSkinOptions(model);
     renderRoomOptions(model);
+    renderPresentationOptions(model);
+    renderDecoration(model);
     $("profile-save").disabled = syncClient.getState().status === "saving";
     return model;
   }
@@ -136,6 +182,25 @@ export function createProfileScreen({
     setStatus("Unsaved display changes");
   }
 
+  // Equipment has one owner, so this writes through the loadout like every other
+  // control here. An option the player does not own is refused rather than
+  // trusted from the markup it was clicked in.
+  function selectPresentation(key, itemId) {
+    const current = readModel();
+    const slot = current.presentation.find((entry) => entry.key === key);
+    if (!slot?.options.some((option) => option.id === itemId && option.owned)) return;
+    if (!itemId) {
+      loadout.clearGlobalSlot(key);
+    } else if (slot.scope === "bowler") {
+      loadout.equipBowlerSlot(current.featuredBowler.slug, key, itemId);
+    } else {
+      loadout.equipGlobalSlot(key, itemId);
+    }
+    dirty = true;
+    render();
+    setStatus("Unsaved display changes");
+  }
+
   async function save() {
     if (!dirty) {
       setStatus("Factory profile current", "saved");
@@ -163,6 +228,10 @@ export function createProfileScreen({
     $("profile-room-options").addEventListener("click", (event) => {
       const button = event.target.closest("[data-profile-room]");
       if (button) selectRoom(button.dataset.profileRoom);
+    });
+    $("profile-presentation").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-slot-key]");
+      if (button) selectPresentation(button.dataset.slotKey, button.dataset.slotItem);
     });
     $("profile-save").addEventListener("click", () => save());
   }

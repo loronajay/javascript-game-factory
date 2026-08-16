@@ -2,7 +2,7 @@
    because these rules override the per-screen defaults for all screens at once. */
 
 @media (max-width: 1100px) {
-  .profile-room { grid-template-columns: minmax(320px, .75fr) minmax(470px, 1.25fr); }
+  .profile-room { grid-template-columns: minmax(320px, 1fr) minmax(470px, 560px); }
   .profile-stat-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .character-grid { grid-template-columns: repeat(5, minmax(88px, 1fr)); }
   .match-layout { grid-template-columns: minmax(230px, 280px) minmax(370px, 430px) minmax(260px, 300px); }

@@ -187,6 +187,25 @@
   // renders them. Declaring them early is what lets the loadout contract and
   // its slots be tested without waiting on a particle emitter.
   function buildEffectItems() {
+    const trailUnlock = Object.freeze({ source: "bowler-level", detail: "Earned through bowler mastery." });
+    const colorTrails = [
+      ["red-neon", "Red Neon Ball Trail", ["#ff2d55", "#ff8a5c"]],
+      ["orange-flare", "Orange Flare Ball Trail", ["#ff6b00", "#ffb000"]],
+      ["gold-rush", "Gold Rush Ball Trail", ["#ffd60a", "#fff3a3"]],
+      ["lime-shock", "Lime Shock Ball Trail", ["#b7ff00", "#efff85"]],
+      ["emerald-glow", "Emerald Glow Ball Trail", ["#00e676", "#69f0ae"]],
+      ["mint-frost", "Mint Frost Ball Trail", ["#00f5d4", "#b8fff4"]],
+      ["cyan-pulse", "Cyan Pulse Ball Trail", ["#00e5ff", "#80f3ff"]],
+      ["sky-blue", "Sky Blue Ball Trail", ["#38bdf8", "#bae6fd"]],
+      ["electric-blue", "Electric Blue Ball Trail", ["#2563ff", "#70a5ff"]],
+      ["indigo-drive", "Indigo Drive Ball Trail", ["#5b5cff", "#a5a6ff"]],
+      ["violet-haze", "Violet Haze Ball Trail", ["#8b5cf6", "#d8b4fe"]],
+      ["purple-plasma", "Purple Plasma Ball Trail", ["#c026ff", "#efabff"]],
+      ["magenta-pop", "Magenta Pop Ball Trail", ["#ff00d4", "#ff8ae8"]],
+      ["hot-pink", "Hot Pink Ball Trail", ["#ff1493", "#ff9bd4"]],
+      ["diamond-white", "Diamond White Ball Trail", ["#ffffff", "#b8e9ff"], "legendary"],
+    ];
+
     return [
       defineItem({
         type: "ball-trail",
@@ -195,14 +214,14 @@
         assets: {},
         unlock: founding,
       }),
-      defineItem({
+      ...colorTrails.map(([id, name, palette, tier = "rare"]) => defineItem({
         type: "ball-trail",
-        idParts: ["red-neon"],
-        name: "Red Neon Ball Trail",
-        assets: { palette: Object.freeze(["#ff2d55", "#ff8a5c"]) },
-        tier: "rare",
-        unlock: Object.freeze({ source: "bowler-level", detail: "Earned through bowler mastery." }),
-      }),
+        idParts: [id],
+        name,
+        assets: { palette: Object.freeze(palette) },
+        tier,
+        unlock: trailUnlock,
+      })),
       defineItem({
         type: "strike-burst",
         idParts: ["classic"],

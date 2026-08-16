@@ -359,6 +359,35 @@ test("the pending queue survives a reload so an offline result is not lost", () 
   assert.equal(second.listPending()[0].grantId, "session-1");
 });
 
+test("a queued grant keeps the report that would file it, so a request that never landed can be re-sent", () => {
+  const storage = memoryStorage();
+  const first = createProgressionStore({ storage });
+  const report = { opponentPlayerId: "player-2", outcome: "win", sessionId: "session-1", progression: { trackId: SLUG } };
+
+  first.recordPending(computeMatchGrant(onlineResult()), report);
+
+  const second = createProgressionStore({ storage });
+  assert.deepEqual(second.listPending()[0].report, report, "the envelope must survive a reload with the grant");
+});
+
+test("the queue holds the report as opaque data and refuses anything it could not re-send", () => {
+  const store = storeWith();
+  store.recordPending(computeMatchGrant(onlineResult({ grantId: "session-1" })), "not-an-envelope");
+  store.recordPending(computeMatchGrant(onlineResult({ grantId: "session-2" })));
+
+  assert.equal(store.listPending()[0].report, null);
+  assert.equal(store.listPending()[1].report, null, "a grant with no envelope is still queued, just not re-sendable");
+});
+
+test("a re-sent report cannot mutate the queued copy", () => {
+  const store = storeWith();
+  store.recordPending(computeMatchGrant(onlineResult()), { outcome: "win" });
+
+  store.listPending()[0].report.outcome = "loss";
+
+  assert.equal(store.listPending()[0].report.outcome, "win");
+});
+
 test("a snapshot from a schema this build does not understand is discarded, not guessed at", () => {
   const store = storeWith({
     [PROGRESSION_STORAGE_KEY]: JSON.stringify({ version: SCHEMA_VERSION + 1, player: { xp: 999999 } }),

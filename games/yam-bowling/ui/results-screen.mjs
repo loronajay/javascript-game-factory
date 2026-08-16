@@ -86,9 +86,10 @@ export function createResultsScreen({
       const outcome = isWinner ? "victory" : "defeat";
       const outcomeLabel = tie ? "Tied for first" : isWinner ? "Victory" : "Defeat";
       const bowler = assets.bowlerBySlug(player.characterSlug);
-      const inspectable = session.onlineMatch
-        && player.id !== localClientId()
-        && Boolean(player.accountPlayerId);
+      // An opponent across the wire wears what their own device equipped, so an
+      // outcome pose equipped here applies only to bowlers on this one.
+      const remote = Boolean(session.onlineMatch) && player.id !== localClientId();
+      const inspectable = remote && Boolean(player.accountPlayerId);
       const profileAction = inspectable
         ? `<button class="result-player__profile" type="button" data-public-profile-id="${escapeHtml(player.accountPlayerId)}">View profile</button>`
         : "";
@@ -96,7 +97,7 @@ export function createResultsScreen({
       card.className = `result-player ${isWinner ? "is-winner" : "is-defeated"}`;
       card.innerHTML = `
         <div class="result-player__portrait">
-          <img src="${assets.resultPortrait(player.characterSlug, outcome, session.playerSkinId(player))}" alt="${bowler.name}, ${outcomeLabel.toLowerCase()}">
+          <img src="${assets.resultPortrait(player.characterSlug, outcome, session.playerSkinId(player), { remote })}" alt="${bowler.name}, ${outcomeLabel.toLowerCase()}">
           <span class="result-player__outcome">${outcomeLabel}</span>
         </div>
         <div class="result-player__details">

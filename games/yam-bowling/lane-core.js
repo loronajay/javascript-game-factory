@@ -11,7 +11,7 @@
 
   const DEFAULT_LANE_SLUG = "crimson-crown";
   const LANE_STORAGE_KEY = "yam-bowling.lane";
-  const EDGE_DEPTHS = [0, 0.2, 0.4, 0.6, 0.8, 0.95, 1];
+  const EDGE_DEPTHS = [0, 1];
 
   function measuredEdges(values) {
     return Object.freeze(values.map(([left, right], index) => Object.freeze({
@@ -19,35 +19,29 @@
     })));
   }
 
-  // Inner edges of the painted gutters, measured directly from each 1024x1536
-  // lane asset at the same depth samples used by the renderer. Keeping these
-  // with the artwork prevents a generic perspective guess from drifting across
-  // the wood, trough, and outer rail as the ball travels down-lane.
+  // Inner edges of the painted gutters, fitted to each 1024x1536 lane asset by
+  // reading the wood boundary at every depth the renderer draws. Every backdrop
+  // paints the boards as a straight taper under the renderer's depth-to-row
+  // mapping, so two endpoints describe the whole lane exactly -- and a straight
+  // taper is the point: sampling the same line at extra depths only invites a
+  // mismeasured knot, which is what once put a visible elbow at z = 0.8 in the
+  // aim guide and in any ball travelling off the centerline.
+  //
+  // This is the only lane geometry there is. The painted trough sits at a fixed
+  // board offset outside these edges, so the renderer reaches it by projecting
+  // past x = 1 rather than through a second table: a separate trough path drifts
+  // out of step with this one, which is how captured balls once ended up riding
+  // the capping mid-lane and climbing back onto the wood at the pin deck.
   const LANE_EDGES = Object.freeze({
-    "crimson-crown": measuredEdges([[43, 979], [127, 895], [212, 811], [294, 727], [377, 645], [389, 634], [389, 634]]),
-    "blue-circuit": measuredEdges([[40, 976], [124, 891], [209, 807], [292, 724], [376, 648], [389, 635], [389, 635]]),
-    "emerald-vault": measuredEdges([[44, 978], [128, 895], [212, 810], [298, 726], [379, 645], [390, 634], [390, 634]]),
-    "royal-gold": measuredEdges([[54, 963], [138, 879], [221, 797], [297, 721], [369, 651], [382, 636], [382, 636]]),
-    "sunset-strip": measuredEdges([[53, 965], [138, 882], [223, 799], [303, 720], [381, 643], [391, 633], [391, 633]]),
-    "neon-carnival": measuredEdges([[42, 975], [127, 890], [212, 805], [294, 723], [373, 645], [388, 631], [388, 631]]),
-    "cosmic-bowl": measuredEdges([[45, 979], [131, 893], [217, 808], [298, 726], [379, 645], [390, 634], [390, 634]]),
-    "liberty-lanes": measuredEdges([[54, 967], [138, 884], [222, 800], [300, 722], [376, 647], [390, 634], [390, 634]]),
-    "oak-and-onyx": measuredEdges([[38, 979], [123, 895], [208, 809], [290, 726], [370, 648], [387, 633], [387, 633]]),
-  });
-
-  // Centers of the dark painted troughs. These are deliberately separate from
-  // the board edges above: gutter width changes with perspective, so deriving a
-  // center from the ball radius makes the ball cling to the wood down-lane.
-  const GUTTER_CENTERS = Object.freeze({
-    "crimson-crown": measuredEdges([[-98, 1118], [14, 1007], [126, 896], [238, 785], [347, 676], [382, 641], [389, 634]]),
-    "blue-circuit": measuredEdges([[-80, 1095], [26, 990], [132, 885], [238, 780], [351, 672], [382, 642], [389, 635]]),
-    "emerald-vault": measuredEdges([[-96, 1116], [15, 1006], [126, 896], [237, 786], [348, 676], [383, 641], [390, 634]]),
-    "royal-gold": measuredEdges([[-32, 1048], [55, 962], [142, 876], [229, 790], [334, 686], [375, 643], [382, 636]]),
-    "sunset-strip": measuredEdges([[-72, 1090], [34, 986], [140, 882], [246, 778], [350, 675], [384, 640], [391, 633]]),
-    "neon-carnival": measuredEdges([[-95, 1111], [16, 1000], [127, 889], [238, 778], [342, 676], [381, 638], [388, 631]]),
-    "cosmic-bowl": measuredEdges([[-77, 1107], [30, 998], [137, 889], [244, 780], [349, 676], [383, 641], [390, 634]]),
-    "liberty-lanes": measuredEdges([[-56, 1078], [46, 976], [148, 874], [250, 772], [347, 677], [383, 641], [390, 634]]),
-    "oak-and-onyx": measuredEdges([[-86, 1104], [19, 999], [124, 894], [229, 789], [338, 680], [380, 640], [387, 633]]),
+    "crimson-crown": measuredEdges([[44, 978], [461, 559]]),
+    "blue-circuit": measuredEdges([[40, 975], [462, 557]]),
+    "emerald-vault": measuredEdges([[45, 978], [461, 559]]),
+    "royal-gold": measuredEdges([[60, 956], [450, 572]]),
+    "sunset-strip": measuredEdges([[57, 961], [465, 560]]),
+    "neon-carnival": measuredEdges([[45, 973], [458, 560]]),
+    "cosmic-bowl": measuredEdges([[48, 976], [465, 560]]),
+    "liberty-lanes": measuredEdges([[58, 964], [458, 565]]),
+    "oak-and-onyx": measuredEdges([[41, 977], [455, 562]]),
   });
 
   // A lane is pure presentation: its small pin-deck offset compensates for the
@@ -68,7 +62,6 @@
     description,
     pinDeckOffsetY,
     laneEdges: LANE_EDGES[slug],
-    gutterCenters: GUTTER_CENTERS[slug],
     src: `assets/lanes/${slug}.webp`,
     thumbnailSrc: `assets/lanes/thumbs/${slug}.webp`,
     alt: `${name} bowling lane`,

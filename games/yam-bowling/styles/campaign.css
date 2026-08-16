@@ -106,6 +106,7 @@
 .circuit-match-meta span { display: grid; min-width: 0; padding: .58rem .65rem; gap: .15rem; border: 1px solid var(--line); border-radius: 10px; background: rgba(255,255,255,.035); }
 .circuit-match-meta small { color: var(--muted); font-size: .48rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
 .circuit-match-meta strong { overflow: hidden; font-size: .62rem; text-overflow: ellipsis; white-space: nowrap; }
+.circuit-sync-status { margin: 0 0 .8rem; padding: .62rem .75rem; border: 1px solid rgba(243,46,63,.55); border-radius: 10px; color: #ff9aa3; background: rgba(243,46,63,.1); font-size: .65rem; font-weight: 850; line-height: 1.35; text-align: center; }
 
 .circuit-roster-heading { display: flex; gap: .5rem; align-items: end; justify-content: space-between; }
 .circuit-roster-heading > span { color: var(--gold); font-size: .58rem; font-weight: 900; text-transform: uppercase; }

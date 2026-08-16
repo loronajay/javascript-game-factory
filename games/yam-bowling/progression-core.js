@@ -216,6 +216,21 @@
     return bowlers;
   }
 
+  // The report that would file a queued grant, kept beside it so a request that
+  // never reached the server can be sent again exactly as it was first built.
+  // It is stored OPAQUELY on purpose: this module owns when a grant may be
+  // re-sent, not what a report says, and a copy is taken both in and out so a
+  // caller cannot edit the envelope the queue would replay.
+  function normalizeReport(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    try {
+      const copy = JSON.parse(JSON.stringify(raw));
+      return copy && typeof copy === "object" && !Array.isArray(copy) ? copy : null;
+    } catch {
+      return null;
+    }
+  }
+
   function normalizePending(raw) {
     if (!Array.isArray(raw)) return [];
     const pending = [];
@@ -228,6 +243,7 @@
         characterSlug: canonBowler(entry.characterSlug) ? entry.characterSlug : null,
         playerXp: clampCount(entry.playerXp),
         bowlerXp: clampCount(entry.bowlerXp),
+        report: normalizeReport(entry.report),
       });
     }
     return pending;
@@ -301,7 +317,7 @@
 
     // Queues a grant for reporting. It deliberately does not touch a balance --
     // only `applySnapshot` does that, and only with the server's own numbers.
-    function recordPending(grant) {
+    function recordPending(grant, report = null) {
       if (!grant?.eligible || !grant.grantId) return false;
       if (hasGrant(grant.grantId) || isPending(grant.grantId)) return false;
       record.pending = [...record.pending, {
@@ -309,13 +325,14 @@
         characterSlug: grant.characterSlug,
         playerXp: grant.playerXp,
         bowlerXp: grant.bowlerXp,
+        report: normalizeReport(report),
       }];
       persist();
       return true;
     }
 
     function listPending() {
-      return record.pending.map((entry) => ({ ...entry }));
+      return record.pending.map((entry) => ({ ...entry, report: normalizeReport(entry.report) }));
     }
 
     // Accepted or refused, the grant leaves the queue and joins the ledger: a

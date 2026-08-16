@@ -324,6 +324,17 @@
       return defaultGlobalSlotId(slotName);
     }
 
+    // Empties a slot that is allowed to be empty. Only slots with no default
+    // qualify: clearing one that has a default would leave the loadout with no
+    // answer at all, where the default IS the answer.
+    function clearGlobalSlot(slotName) {
+      if (!GLOBAL_SLOTS[slotName] || defaultGlobalSlotId(slotName)) return getGlobalSlot(slotName);
+      const { [slotName]: _cleared, ...rest } = record.global;
+      record.global = rest;
+      persist();
+      return getGlobalSlot(slotName);
+    }
+
     function equipGlobalSlot(slotName, itemId) {
       const slot = GLOBAL_SLOTS[slotName];
       if (!slot) return null;
@@ -439,6 +450,7 @@
     return {
       applyServerEntitlements,
       applyServerGarage,
+      clearGlobalSlot,
       clearServerAuthority,
       equipBowlerSlot,
       equipGlobalSlot,

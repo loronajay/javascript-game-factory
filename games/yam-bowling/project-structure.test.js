@@ -224,6 +224,37 @@ test("equippable effects are render-only and cannot reach gameplay", () => {
   assert.match(readCode("game.js"), /prefers-reduced-motion/);
 });
 
+test("every equippable presentation slot has a player-facing control, and it writes through the loadout", () => {
+  const html = read("index.html");
+  const model = readCode("profile/profile-model.mjs");
+  const screen = readCode("ui/profile-screen.mjs");
+
+  // The room editor is where a slot with no picker of its own is equipped. Skin,
+  // room and menu art are absent because they already have their own controls.
+  assert.match(html, /id="profile-presentation"/);
+  for (const key of ["ballTrail", "strikeBurst", "victoryPose", "defeatPose", "playerCard", "profileArt", "title", "badge", "profileFrame", "profileBackground"]) {
+    assert.match(model, new RegExp(`key: "${key}"`), `${key} needs a control, not just a slot`);
+  }
+
+  // Equipment keeps one owner: the editor may only ask the loadout to equip,
+  // never write the record itself.
+  assert.match(screen, /loadout\.equipGlobalSlot\(/);
+  assert.match(screen, /loadout\.equipBowlerSlot\(/);
+  assert.match(screen, /loadout\.clearGlobalSlot\(/);
+  assert.doesNotMatch(screen, /setItem|localStorage|LOADOUT_STORAGE_KEY/);
+
+  // Ownership decides what may be equipped, never what is shown: a locked reward
+  // stays visible so it can be played for.
+  assert.match(screen, /is-locked/);
+  assert.match(screen, /option\.owned/);
+
+  // An outcome pose is a slot, so the results screen resolves it through the one
+  // module that owns character paths — and a remote bowler keeps their own look.
+  assert.match(readCode("ui/character-assets.mjs"), /victoryPose|defeatPose/);
+  assert.match(readCode("ui/results-screen.mjs"), /\{ remote \}/);
+  assert.doesNotMatch(readCode("ui/results-screen.mjs"), /getBowlerSlot|getResultPortraitAssetPath/);
+});
+
 test("player rooms are unlockable content the loadout alone equips", () => {
   const html = read("index.html");
   const rooms = readCode("room-core.js");
@@ -291,13 +322,24 @@ test("XP and the rating are reported together, through one call site", () => {
   // One request carries both, under one session id, so a dropped connection has
   // one thing to lose rather than two that can disagree.
   assert.match(onlineSession, /updateGameRating\([^)]*"yam-bowling"/);
-  assert.match(onlineSession, /progression: prepared\?\.block/);
+  assert.match(reporter, /progression: block/, "the reporter builds the whole request it queues");
   assert.doesNotMatch(reporter, /updateGameRating|fetch\(/, "the reporter must not open a second report path");
+
+  // A result whose request never landed is re-sent through that SAME call site.
+  // A replay path of its own would be a second thing that could disagree, which
+  // is the failure the single site exists to prevent.
+  assert.match(onlineSession, /function flushPendingReports/);
+  assert.equal(
+    [...onlineSession.matchAll(/platformApi\.updateGameRating/g)].length,
+    2,
+    "the fresh report and the replay are the only two sends, and both live here",
+  );
+  assert.match(reporter, /function listUnsentRequests/, "the reporter owns which grants may be replayed");
 
   // The block describes what was played. An XP amount on the wire would be the
   // client declaring its own economy, which is the one thing this milestone exists
   // to prevent.
-  const block = reporter.slice(reporter.indexOf("block: {"), reporter.indexOf("function settle"));
+  const block = reporter.slice(reporter.indexOf("const block = {"), reporter.indexOf("function listUnsentRequests"));
   assert.notEqual(block, "", "the reporter should own the report block");
   assert.doesNotMatch(block, /\bxp\b|playerXp|bowlerXp|\blevel\b/i);
 
@@ -413,6 +455,10 @@ test("the signed-in player profile composes server loadout, room art, and progre
   assert.match(profile, /syncClient\.save\(\)/);
   assert.match(sync, /\/games\/\$\{GAME_SLUG\}\/garage/);
   assert.ok(manifest.include.includes("profile/*.mjs"));
+  assert.ok(
+    html.indexOf("../../js/platform-config.mjs") < html.indexOf('src="game.js"'),
+    "the production platform API URL must be configured before Yam creates its API client",
+  );
 });
 
 test("public profiles use public documents, stay read-only, and share the Match Found identity card", () => {

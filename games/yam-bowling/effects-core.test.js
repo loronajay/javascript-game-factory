@@ -46,6 +46,17 @@ test("the default no-trail and default burst items emit nothing extra", () => {
   assert.notEqual(classicBurst, null);
 });
 
+test("every colored trail catalog entry resolves to a renderable effect style", () => {
+  const colorTrails = cosmetics.listByType("ball-trail").filter((item) => item.id !== "ball-trail:none");
+
+  assert.equal(colorTrails.length, 15);
+  for (const item of colorTrails) {
+    const style = styleForItem(item);
+    assert.equal(style.id, item.id);
+    assert.deepEqual(style.palette, item.assets.palette);
+  }
+});
+
 test("an equipped trail emits, ages, and fully clears once the ball stops", () => {
   const state = createEffectsState();
   rollBall(state, { style: neonTrail });

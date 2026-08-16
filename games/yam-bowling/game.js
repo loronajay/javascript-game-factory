@@ -137,6 +137,7 @@ initMobileLandscapeGate();
     progression,
     animation: Animation,
     roomCore: window.YamRoomCore,
+    cosmetics: Cosmetics,
     syncClient: profileSync,
     audio,
   });
@@ -305,6 +306,10 @@ initMobileLandscapeGate();
     if (accountAccess.isEligible()) {
       await campaignProgress.sync();
       await profileSync.sync();
+      // A finished match whose report never reached the server is filed on the
+      // first boot that has a connection again, rather than waiting for the
+      // next match to notice it.
+      onlineSession.flushPendingReports().catch(() => {});
     }
     lanePicker.build();
     setupScreen.build();

@@ -40,7 +40,12 @@ export function createProgressionReporter({ progressionCore, store, platformApi 
 
   // Builds the report block and queues the grant. Queuing deliberately does not
   // move a balance — only the server's snapshot does that.
-  function prepare({ match, clientId, sessionId, snapshotResult }) {
+  //
+  // `opponentPlayerId` and `outcome` belong to the rating half of the same
+  // request. They are taken here so the whole request can be queued beside the
+  // grant: a request that never reached the server is otherwise known to be
+  // outstanding but impossible to file again.
+  function prepare({ match, clientId, sessionId, snapshotResult, opponentPlayerId = null, outcome = null }) {
     const me = match?.players?.find((player) => player.id === clientId);
     if (!me || !sessionId) return null;
 
@@ -57,21 +62,43 @@ export function createProgressionReporter({ progressionCore, store, platformApi 
     });
 
     lastGrant = grant;
-    if (!grant.eligible) return { grant, block: null };
-    store.recordPending(grant);
+    if (!grant.eligible) return { grant, block: null, request: null };
 
-    return {
-      grant,
-      block: {
-        trackId: me.characterSlug,
-        modeId: match.modeId,
-        // The countable stat the capped bonus rides on. Named for what it is
-        // rather than for what it pays, because the payout is the server's.
-        performance: countStrikes(me),
-        forfeitRole: grant.breakdown.forfeit > 0 ? "remaining" : null,
-        stats: { strikes: countStrikes(me), highGame: me.score?.total || 0 },
-      },
+    const block = {
+      trackId: me.characterSlug,
+      modeId: match.modeId,
+      // The countable stat the capped bonus rides on. Named for what it is
+      // rather than for what it pays, because the payout is the server's.
+      performance: countStrikes(me),
+      forfeitRole: grant.breakdown.forfeit > 0 ? "remaining" : null,
+      stats: { strikes: countStrikes(me), highGame: me.score?.total || 0 },
     };
+    // Only a complete request is worth queuing. Half of one would have to be
+    // guessed at on replay, and a guessed rating report is a wrong record.
+    const request = opponentPlayerId && outcome
+      ? { opponentPlayerId, outcome, sessionId, progression: block }
+      : null;
+    store.recordPending(grant, request);
+
+    return { grant, block, request };
+  }
+
+  // The results a request never reached the server with. They stay queued and
+  // invisible until something asks; `online-session.mjs` asks on the next boot
+  // and after the next match, and sends them through the one call site it owns.
+  // Replaying is safe rather than double-paying because the server dedups on the
+  // same session id the grant is keyed by — which is also why a stored request
+  // is handed back verbatim rather than rebuilt from a match that is long gone.
+  function listUnsentRequests() {
+    return store.listPending()
+      .filter((entry) => entry.report)
+      .map((entry) => ({ grantId: entry.grantId, request: entry.report }));
+  }
+
+  // A replayed request the server accepted. Same ruling as `settle`, reached
+  // without a grant object, because the match it came from ended sessions ago.
+  function settleSent(grantId) {
+    return store.resolvePending(grantId);
   }
 
   // Accepted or refused, a grant the server RULED on leaves the queue. A network
@@ -109,5 +136,5 @@ export function createProgressionReporter({ progressionCore, store, platformApi 
     return `Level ${player.level} · Bowler level ${bowler.level} (${bowlerLine})`;
   }
 
-  return { prepare, settle, sync, describe };
+  return { prepare, settle, settleSent, sync, describe, listUnsentRequests };
 }

@@ -10,8 +10,12 @@
   // The playable boards span x = -1..1. Let roughly one third of the ball hang
   // over the edge before capture so a visual graze is forgiving, then make the
   // decision permanent and ride the trough just beyond the boards.
+  // The trough offset is measured off the lane art: every backdrop paints its
+  // gutter channel centred an eighth of a half-lane outside the boards, so the
+  // renderer can place a captured ball with the same projection it uses for a
+  // ball on the wood rather than carrying a second geometry table.
   const GUTTER_CONTACT_X = 0.92;
-  const GUTTER_CENTER_X = 1.08;
+  const GUTTER_CENTER_X = 1.13;
   const GUTTER_EXIT_Z = 0.92;
   const PIN_RADIUS = 0.067;
   const FALLEN_PIN_RADIUS = 0.092;

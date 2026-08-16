@@ -152,6 +152,18 @@ test("ownership is separate from equipment and unowned items cannot be equipped"
   assert.equal(store.equipGlobalSlot("ballTrail", "ball-trail:red-neon"), "ball-trail:red-neon");
 });
 
+test("a new color trail unlocks through its exact authoritative entitlement", () => {
+  const store = storeWith();
+
+  store.applyServerEntitlements([{ entitlementId: "ball-trail:cyan-pulse" }]);
+  assert.equal(store.owns("ball-trail:cyan-pulse"), true);
+  assert.equal(store.owns("ball-trail:hot-pink"), false, "one color grant must not unlock the whole collection");
+  assert.equal(store.equipGlobalSlot("ballTrail", "ball-trail:cyan-pulse"), "ball-trail:cyan-pulse");
+
+  store.applyServerEntitlements([]);
+  assert.equal(store.getGlobalSlot("ballTrail"), "ball-trail:none", "revocation should restore the safe default");
+});
+
 test("a granted item survives a reload while default ownership is never persisted", () => {
   const storage = memoryStorage();
   createLoadoutStore({ storage }).grant("ball-trail:red-neon");
@@ -377,4 +389,33 @@ test("skin revocation sanitizes gameplay, poses, profile presentation, and expor
   assert.deepEqual(store.getFeatured(), { bowlerSlug: "reina-sato", skinId: "canon" });
   assert.deepEqual(store.exportGarage().bowlers["reina-sato"], { skin: "skin:reina-sato:canon" });
   assert.deepEqual(store.exportGarage().featured, { bowlerSlug: "reina-sato", skinId: "canon" });
+});
+
+test("a decoration slot can be emptied again, because empty is a real choice for it", () => {
+  const store = storeWith();
+  const frameId = `profile-art:${animation.CANON_BOWLERS[0].slug}`;
+
+  store.equipGlobalSlot("profileFrame", frameId);
+  assert.equal(store.getGlobalSlot("profileFrame"), frameId);
+
+  assert.equal(store.clearGlobalSlot("profileFrame"), null);
+  assert.equal(store.getGlobalSlot("profileFrame"), null);
+});
+
+test("a slot with a default cannot be emptied, because the default is its answer", () => {
+  const store = storeWith();
+
+  assert.equal(store.clearGlobalSlot("ballTrail"), "ball-trail:none");
+  assert.equal(store.getGlobalSlot("ballTrail"), "ball-trail:none");
+  assert.equal(store.clearGlobalSlot("nonsense"), null);
+});
+
+test("an emptied decoration slot stays empty across a reload", () => {
+  const storage = memoryStorage();
+  const first = createLoadoutStore({ storage });
+  const frameId = `profile-art:${animation.CANON_BOWLERS[0].slug}`;
+  first.equipGlobalSlot("profileFrame", frameId);
+  first.clearGlobalSlot("profileFrame");
+
+  assert.equal(createLoadoutStore({ storage }).getGlobalSlot("profileFrame"), null);
 });
