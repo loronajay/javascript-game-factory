@@ -18,6 +18,11 @@
 // THE SERVER DERIVES EVERY XP AMOUNT. A client reports what it played, never
 // what it earned. See the trust note in db/migrations/038-game-xp-progression.sql
 // for exactly which of those reported fields are checkable and which are not.
+// An entitlement id is `<kind>:<slug>`, so the kind is read off the id rather
+// than repeated beside it — two spellings of the same fact could disagree.
+function levelReward(level, entitlementId) {
+    return Object.freeze({ level, entitlementId, kind: entitlementId.split(":")[0] });
+}
 const YAM_BOWLING = {
     gameSlug: "yam-bowling",
     curves: {
@@ -39,6 +44,51 @@ const YAM_BOWLING = {
         Object.freeze({ level: 10, itemId: "skin-voucher", quantity: 1 }),
         Object.freeze({ level: 25, itemId: "skin-voucher", quantity: 1 }),
     ]),
+    // Keep in lockstep with the cabinet's two ladder cadences —
+    // games/yam-bowling/player-rewards-core.js and mastery-rewards-core.js. Only
+    // their *bound* nodes appear here: a label-only node has nothing to grant.
+    // The founding rewards (level 1 canon skin, Rookie title) are deliberately
+    // absent, since founding content needs no row.
+    //
+    // Every entry is a global cosmetic, including the mastery ones. That is what
+    // lets the bowler ladder grant per player rather than per track: reaching
+    // level 13 with any bowler earns the badge once.
+    levelEntitlements: Object.freeze({
+        player: Object.freeze([
+            levelReward(2, "ball-trail:lime-shock"),
+            levelReward(3, "strike-burst:gold-star"),
+            levelReward(5, "ball-trail:emerald-glow"),
+            levelReward(6, "strike-burst:emerald-impact"),
+            levelReward(8, "ball-trail:mint-frost"),
+            levelReward(9, "strike-burst:mint-crackle"),
+            levelReward(11, "ball-trail:cyan-pulse"),
+            levelReward(12, "strike-burst:cyan-flash"),
+            levelReward(14, "ball-trail:electric-blue"),
+            levelReward(15, "strike-burst:electric-blue"),
+            levelReward(17, "ball-trail:indigo-drive"),
+            levelReward(18, "strike-burst:indigo-ring"),
+            levelReward(20, "ball-trail:violet-haze"),
+            levelReward(21, "strike-burst:violet-bloom"),
+            levelReward(23, "ball-trail:purple-plasma"),
+            levelReward(24, "strike-burst:purple-nova"),
+            levelReward(26, "ball-trail:magenta-pop"),
+            levelReward(27, "strike-burst:magenta-blast"),
+            levelReward(28, "ball-trail:hot-pink"),
+            levelReward(29, "strike-burst:hot-pink-pop"),
+        ]),
+        track: Object.freeze([
+            levelReward(2, "ball-trail:red-neon"),
+            levelReward(4, "strike-burst:ember"),
+            levelReward(6, "ball-trail:orange-flare"),
+            levelReward(11, "ball-trail:sky-blue"),
+            levelReward(13, "badge:laser-focus"),
+            levelReward(16, "ball-trail:gold-rush"),
+            levelReward(19, "title:pin-chaser"),
+            levelReward(21, "badge:precision-bowler"),
+            levelReward(23, "ball-trail:diamond-white"),
+            levelReward(28, "badge:lane-legend"),
+        ]),
+    }),
 };
 const PROGRESSIONS = [YAM_BOWLING];
 export function getProgression(gameSlug) {
@@ -86,6 +136,23 @@ export function inventoryRewardsBetween(definition, previousXp, nextXp) {
     return (definition.playerInventoryRewards || [])
         .filter((reward) => reward.level > previousLevel && reward.level <= nextLevel)
         .map((reward) => ({ level: reward.level, itemId: reward.itemId, quantity: reward.quantity }));
+}
+// The cosmetics a ladder just paid out over the half-open range `(previous,
+// next]`. Same shape as `inventoryRewardsBetween`, and deliberately a separate
+// function rather than a flag on it: the two write to different tables, and the
+// player ladder pays both while a track ladder pays only this one.
+export function entitlementRewardsBetween(definition, scope, previousXp, nextXp) {
+    const curve = definition?.curves?.[scope];
+    const rewards = definition?.levelEntitlements?.[scope];
+    if (!curve || !rewards)
+        return [];
+    const previousLevel = levelFromXp(curve, previousXp).level;
+    const nextLevel = levelFromXp(curve, nextXp).level;
+    if (nextLevel <= previousLevel)
+        return [];
+    return rewards
+        .filter((reward) => reward.level > previousLevel && reward.level <= nextLevel)
+        .map((reward) => ({ level: reward.level, entitlementId: reward.entitlementId, kind: reward.kind }));
 }
 function refused(reason) {
     return { eligible: false, reason, xp: 0, breakdown: { completion: 0, win: 0, performance: 0, forfeit: 0 } };

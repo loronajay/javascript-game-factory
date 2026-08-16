@@ -83,6 +83,12 @@ for (const [id, type, founding] of [
   ["badge:founding-bowler", "badge", true],
   ["badge:perfect-game", "badge", false],
   ["badge:split-decision", "badge", false],
+  // Earned on the bowler mastery ladder at levels 13, 21 and 28. An id this
+  // registry does not carry is stripped rather than refused, so leaving these
+  // out silently reverted a badge the player had earned the moment they saved.
+  ["badge:laser-focus", "badge", false],
+  ["badge:precision-bowler", "badge", false],
+  ["badge:lane-legend", "badge", false],
 ] as const) {
   register({ id, type, founding, entitlementId: id });
 }

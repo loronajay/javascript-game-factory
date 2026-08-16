@@ -1,4 +1,4 @@
-import { computeCampaignGrant, computeOnlineGrant, getProgression, inventoryRewardsBetween, levelFromXp, } from "../services/progression-catalog.mjs";
+import { computeCampaignGrant, computeOnlineGrant, entitlementRewardsBetween, getProgression, inventoryRewardsBetween, levelFromXp, } from "../services/progression-catalog.mjs";
 // Earned advancement: XP totals, per-track mastery counters, and the grant
 // ledger that makes an award happen exactly once.
 //
@@ -56,6 +56,34 @@ function resolveDisputedMode(gameSlug, params) {
         return claimed;
     return alternative.xp < claimed.xp ? alternative : claimed;
 }
+// A cosmetic a level pays out, written in the same transaction as the XP that
+// earned it. It has to be a durable row rather than something the cabinet
+// re-derives: `db/game-loadouts.mts` builds its ownership context from
+// `game_entitlements` alone, so an equipped reward with no row here survives
+// until the player's next save and is then stripped.
+//
+// Granted per player even for the bowler ladder, because every bound mastery
+// reward is a global cosmetic — reaching the level with any bowler earns it
+// once. `source` records which ladder paid, which is the only thing that would
+// otherwise be lost by collapsing them onto one table.
+const LADDER_SOURCES = Object.freeze({
+    player: "player-level",
+    track: "bowler-level",
+});
+async function grantLevelEntitlements(client, params, definition, scope, previousXp, nextXp) {
+    for (const reward of entitlementRewardsBetween(definition, scope, previousXp, nextXp)) {
+        await client.query(`insert into game_entitlements (player_id, game_slug, entitlement_id, kind, source, source_id)
+       values ($1, $2, $3, $4, $5, $6)
+       on conflict (player_id, game_slug, entitlement_id) do nothing`, [
+            params.playerId,
+            params.gameSlug,
+            reward.entitlementId,
+            reward.kind,
+            LADDER_SOURCES[scope],
+            `level-${reward.level}`,
+        ]);
+    }
+}
 async function persistXpAward(client, definition, params, verdict) {
     const ledger = await client.query(`insert into game_xp_grants (player_id, game_slug, grant_id, track_id, xp, source)
      values ($1, $2, $3, $4, $5, $6)
@@ -77,16 +105,20 @@ async function persistXpAward(client, definition, params, verdict) {
          set quantity = game_inventory_items.quantity + excluded.quantity,
              updated_at = now()`, [params.playerId, params.gameSlug, reward.itemId, reward.quantity]);
     }
+    await grantLevelEntitlements(client, params, definition, "player", nextPlayerXp - verdict.xp, nextPlayerXp);
     const existing = await client.query(`select stats from game_xp_tracks where player_id = $1 and game_slug = $2 and track_id = $3 for update`, [params.playerId, params.gameSlug, params.trackId]);
     const stats = mergeTrackStats(definition, existing.rows[0]?.stats || {}, params.stats || {});
-    await client.query(`insert into game_xp_tracks (player_id, game_slug, track_id, xp, matches, wins, stats, updated_at)
+    const track = await client.query(`insert into game_xp_tracks (player_id, game_slug, track_id, xp, matches, wins, stats, updated_at)
      values ($1, $2, $3, $4, 1, $5, $6, now())
      on conflict (player_id, game_slug, track_id) do update
        set xp = game_xp_tracks.xp + excluded.xp,
            matches = game_xp_tracks.matches + 1,
            wins = game_xp_tracks.wins + excluded.wins,
            stats = excluded.stats,
-           updated_at = now()`, [params.playerId, params.gameSlug, params.trackId, verdict.xp, params.isWin ? 1 : 0, JSON.stringify(stats)]);
+           updated_at = now()
+     returning xp`, [params.playerId, params.gameSlug, params.trackId, verdict.xp, params.isWin ? 1 : 0, JSON.stringify(stats)]);
+    const nextTrackXp = clampCount(track.rows[0]?.xp);
+    await grantLevelEntitlements(client, params, definition, "track", nextTrackXp - verdict.xp, nextTrackXp);
     return { awarded: true, reason: "eligible", xp: verdict.xp, trackId: params.trackId, breakdown: verdict.breakdown };
 }
 // Awards one player's XP for one authoritative match, inside the caller's

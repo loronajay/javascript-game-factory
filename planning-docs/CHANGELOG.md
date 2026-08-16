@@ -2,6 +2,22 @@
 
 Dated history extracted from the root `CLAUDE.md` (2026-07-23) so that file can stay a lean orientation guide instead of an ever-growing log. This file is a curated narrative, not a replacement for `git log` — read it for *why*/*what shipped when*, not for line-level diffs.
 
+## Yam Bowling: a Metagame Audit, and Level Rewards That Actually Save (2026-08-16)
+
+An audit of `games/yam-bowling/METAGAME_SCOPE.md` against the code, then the fix for the one live defect it turned up.
+
+**A level reward could be equipped but never saved.** Milestone 8 established that "a level reward needs no entitlement row" — the client derives ownership from the synced level, so minting a durable grant for "reached level 13" would duplicate a fact the account already owns. That reasoning is sound, and it was only ever taught to the *client*. `db/game-loadouts.mts` builds its ownership context from `game_entitlements` alone, so `normalizeYamBowlingGarage` dropped every level-earned slot value it was handed, and because a save reapplies the server's sanitized answer, the player watched a newly earned trail, burst or badge revert the instant they saved it. Every player-ladder trail and burst was affected, plus the three bound mastery badges. All suites were green through this: each side was tested against its own assumption and nothing covered the round trip.
+
+**The fix was already in the file, one field away.** Skin Vouchers at player levels 10 and 25 are level-triggered rewards the *server* mints: `playerInventoryRewards` declares them and `awardMatchXp` grants them inside the XP transaction by comparing previous and next XP. A level-earned cosmetic is that same shape with a different destination, so it is now `levelEntitlements` in the same definition, granted by the same transaction — `game_entitlements` instead of `game_inventory_items`, with a matching per-track pass for bowler mastery. The garage validator needed no change at all: the row exists before the cabinet can equip the item. This retires the "no entitlement row" rule, which was the outlier — every other durable reward in the repo is a row — and demotes the client's `applyLevelUnlocks()` to an optimistic mirror.
+
+Both ladders' bound rewards turned out to be **global** cosmetics, which is why the mastery grant is keyed to the player rather than the track: reaching level 13 with any bowler earns that badge once. The cadences now have a server-side twin, which is the house style rather than a compromise — `tactical-arena-reward-catalog.mts` opens by telling you to keep it in lockstep with the client's `unlocks.js` — and a test asserts every level-granted id survives `normalizeYamBowlingGarage`, so the two registries cannot drift apart silently. Migration `041` backfills accounts that crossed a node before the grant existed, the job `040` did for vouchers; its thresholds are literals so it keeps meaning what it meant after a curve is retuned.
+
+Three mastery badges (`laser-focus`, `precision-bowler`, `lane-legend`) were bound in the ladder but absent from `yam-bowling-loadout-catalog.mts` entirely, so they would have been stripped as unknown ids even once the level check existed. Now registered.
+
+**What else the audit found, recorded in the scope doc rather than fixed.** The bowler mastery ladder is **20 of 31 rewards label-only** — including both level-30 nodes, the promised summit of the track — while the doc marked Milestone 5 complete and admitted only the player ladder's 8 pending nodes. Four strike bursts carry `unlock.source: "bowler-level"` while no mastery node pays them. And the three *match* achievements (`perfect-game`, `comeback-kid`, `split-decision`) have been shipped end to end for some time without the scope doc mentioning them, which is what made the checkbox state untrustworthy as a work queue in the first place; Milestone 7's achievement list is now split into match achievements (shipped) and threshold achievements (unbuilt, and needing a claim prerequisite the server checks against its own `game_xp_*` rows).
+
+Not browser-verified: that still needs `factory-network-server`, the API and a signed-in client running together.
+
 ## Yam Bowling Progression: the Domain and the Third Persistence Shape (2026-08-15)
 
 Milestone 4 of Yam Bowling's metagame plan — XP and mastery levels that are worth trusting. Two slices: the cabinet's progression domain, then the platform tables that make it authoritative.

@@ -356,6 +356,27 @@ and two signed-in clients running together.
   - [x] `Red Neon Ball Trail`
 - [x] Reserve level 30 for a mastery skin plus an exclusive character title.
 - [x] Ensure the tree supports future levels 31–40 without changing existing reward IDs.
+- [ ] Bind the 20 label-only mastery nodes to real catalog items (see below).
+
+### Content still unbound
+
+The mastery cadence is authored in full, but **20 of its 31 rewards are labels
+with no `equipment` binding** — the same gap milestone 8 records for the player
+ladder's 8 nodes, and it was not written down here. Levels 3, 5, 7, 8, 9, 10, 12,
+14, 15, 17, 18, 20, 22, 24, 25, 26, 27, 29 and both level-30 rewards resolve a
+name and nothing a player can wear. Level 30 is the one that matters most:
+`{first} Mastery Skin` and `{first} Master` are the promised summit of the track
+and today they pay a string, because `AVAILABLE_SKINS` carries only Canon,
+Swimsuit and Maid and no per-bowler mastery title exists in the catalog.
+
+Four nodes need new art or new reward types before they can be bound at all —
+profile icon, character banner, entrance stinger, lane emote — so they are
+content decisions, not wiring. The rest are wiring.
+
+Four strike bursts (`red-supernova`, `lime-pop`, `sky-shatter`, `diamond-spark`)
+carry `unlock.source: "bowler-level"` in `cosmetics-core.js` while no mastery
+node pays them, so their own unlock copy promises a ladder that does not offer
+them. Either bind them or restate the source.
 
 Suggested cadence to validate in a prototype:
 
@@ -532,11 +553,29 @@ soon as the Factory accepts the promotion clear.
 
 ### Achievements
 
+Two kinds, and the split matters: a **match achievement** is decided by one
+finished match, so the client can detect it and the server can fix its reward
+from a claim. A **threshold achievement** is decided by an account's accumulated
+levels, which no single match knows — the server has to read its own XP rows.
+
+Match achievements are shipped. `achievement-core.js` detects them from a
+sanctioned finished match, `profile/achievement-client.mjs` files them through
+the generic game-progress claim path, and `yam-bowling-reward-catalog.mts` fixes
+the entitlement each one grants, so a client cannot name its own prize.
+
+- [x] `Perfect Game` — bowl a sanctioned regulation 300.
+- [x] `Comeback Kid` — win after trailing by 30 or more entering the tenth.
+- [x] `Split Decision` — convert a 7-10 split.
+- [x] Achievements award badges/titles only, through the same entitlement path
+      as every other reward.
+
+Threshold achievements are not built, and they need a claim kind the server can
+verify against `game_xp_tracks` rather than against a reported match:
+
 - [ ] `The Roster` — get every bowler to level 5.
 - [ ] `Dedicated` — reach level 20 with one bowler.
 - [ ] Character mastery achievements such as `Reina Master`.
 - [ ] `Yam Connoisseur` — reach maximum mastery with five bowlers.
-- [ ] Decide whether achievements award badges/titles only after the inventory contract exists.
 
 ## Milestone 8 — Player level reward tree and Skin Vouchers
 
@@ -570,6 +609,65 @@ session-only and never persisted, and an unsynced device earns nothing.
 It is deliberately an *extra* route, not the only one: if the server grants a
 level reward directly — a tournament prize, a make-good — the client defers to it
 rather than overruling the authority it is supposed to follow.
+
+#### Fixed: a level reward could be equipped but not saved
+
+- [x] Grant a level's cosmetic as a durable entitlement, in the XP transaction
+      that earned it.
+
+The rule above was only ever taught to the *client*. `loadout.owns()` consults
+the level-derived set, so a reward earned at a level equips locally — but
+`getOwnershipContext` in `db/game-loadouts.mts` builds its ownership context from
+`game_entitlements` alone, and a level reward mints no entitlement row by design.
+`normalizeYamBowlingGarage` therefore drops every level-earned slot value it is
+handed, and because a save reapplies the server's sanitized answer
+(`profile/profile-sync-client.mjs:91`), the player watches their new trail, burst
+or badge revert the moment they save it.
+
+This hits both ladders: every player-tree trail and burst, and the three mastery
+badges (`laser-focus`, `precision-bowler`, `lane-legend`) that *are* bound. Those
+three are additionally not registered in `yam-bowling-loadout-catalog.mts` at
+all, so they would be stripped as unknown ids even if the level check existed.
+
+The fix is the pattern this cabinet already used one field away, rather than a
+new one. Skin Vouchers at player levels 10 and 25 are level-triggered rewards the
+*server* mints: `playerInventoryRewards` in `services/progression-catalog.mts`
+declares them and `awardMatchXp` grants them inside the XP transaction by
+comparing the player's previous and next XP. A level-earned cosmetic is that same
+shape with a different destination, so it is now `levelEntitlements` in the same
+definition, granted by the same transaction — `game_entitlements` instead of
+`game_inventory_items`, with a matching per-track pass for bowler mastery.
+
+That makes the garage validator correct without changing it: the row exists by
+the time the cabinet can equip the item, so `ownsItem` finds it and the save
+sticks. It also retires this milestone's "no entitlement row" rule, which was the
+outlier — every other durable reward in the repo is a row. `applyLevelUnlocks()`
+on the client is now an optimistic display of the same fact rather than the only
+record of it, and could be removed once the sync is proven in a browser.
+
+Both ladders' bound rewards turned out to be **global** cosmetics, which is why
+the mastery grant is keyed to the player and not to the track: reaching level 13
+with any bowler earns that badge once.
+
+Two consequences, recorded rather than left to be discovered:
+
+- **The cadences have a server-side twin**, duplicating what the ladder modules
+  say. That is the house style rather than a compromise:
+  `tactical-arena-reward-catalog.mts` opens by telling you to keep it in lockstep
+  with the client's `unlocks.js`, and Yam's own loadout catalog already re-lists
+  the roster, skins, trails and bursts. A test now asserts every level-granted id
+  survives `normalizeYamBowlingGarage`, so the two registries cannot drift apart
+  silently.
+- **Existing accounts are backfilled** by migration `041`, since a player already
+  past a node crossed it before the grant existed — the job `040` did for
+  vouchers. Its thresholds are literals so it keeps meaning what it meant if a
+  curve is later retuned.
+
+The three unregistered mastery badges (`laser-focus`, `precision-bowler`,
+`lane-legend`) are now in `yam-bowling-loadout-catalog.mts`.
+
+Not yet browser-verified: that still needs `factory-network-server`, the API and
+a signed-in client running together.
 
 Which ladder earns an effect is recorded in `cosmetics-core.js` beside the item,
 because the catalog sits underneath the ladders and cannot import them.
