@@ -73,6 +73,23 @@
 .character-inspector-facts > div:nth-child(4) { grid-column: 1 / -1; }
 .character-inspector-facts dt { margin-bottom: .23rem; color: var(--muted); font-size: .48rem; font-weight: 950; letter-spacing: .1em; text-transform: uppercase; }
 .character-inspector-facts dd { margin: 0; font-size: .72rem; font-weight: 800; line-height: 1.45; }
+.character-inspector-history { margin-top: .8rem; padding: clamp(.8rem, 1.8vw, 1rem); border: 1px solid rgba(255,214,107,.24); border-radius: 16px; background: linear-gradient(145deg, rgba(255,214,107,.075), rgba(255,255,255,.018)); }
+.character-inspector-history-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.character-inspector-history-heading .eyebrow { margin: 0 0 .2rem; }
+.character-inspector-history-heading h3 { margin: 0; font-size: 1.05rem; }
+.character-inspector-history-heading > span { flex: 0 0 auto; padding: .32rem .55rem; border: 1px solid rgba(255,214,107,.3); border-radius: 999px; color: var(--gold); font-size: .58rem; font-weight: 850; }
+.character-inspector-history-status { min-height: 2.8rem; margin: .8rem 0 0; color: var(--muted); font-size: .7rem; line-height: 1.5; }
+.character-inspector-history-track { height: 6px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.08); }
+.character-inspector-history-track > i { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--red), var(--gold)); transition: width 180ms ease; }
+.character-inspector-history-xp { margin: .35rem 0 .7rem; color: var(--muted); font-size: .54rem; font-weight: 800; text-align: right; }
+.character-inspector-history-stats { display: grid; margin: 0; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .45rem; }
+.character-inspector-history-stats > div { min-width: 0; padding: .48rem; border: 1px solid rgba(255,255,255,.08); border-radius: 10px; background: rgba(5,5,8,.28); text-align: center; }
+.character-inspector-history-stats dt { color: var(--muted); font-size: .42rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.character-inspector-history-stats dd { margin: .15rem 0 0; font-size: .85rem; font-weight: 900; }
+.character-inspector-collection { margin-top: .7rem; }
+.character-inspector-collection p { display: flex; margin: 0 0 .38rem; align-items: center; justify-content: space-between; gap: .7rem; font-size: .52rem; font-weight: 850; }
+.character-inspector-collection span { color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
+.character-inspector-collection strong { color: var(--gold); }
 .character-inspector-story { margin-top: .8rem; padding: clamp(.85rem, 2vw, 1.2rem); border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.018)); }
 .character-inspector-story h3 { margin: 0 0 .35rem; color: var(--gold); font-size: .6rem; letter-spacing: .12em; text-transform: uppercase; }
 .character-inspector-story h3:not(:first-child) { margin-top: 1rem; }

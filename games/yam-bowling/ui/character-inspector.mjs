@@ -1,4 +1,5 @@
 import { $, escapeHtml } from "./dom.mjs";
+import { buildCharacterHistoryModel } from "./character-history-model.mjs";
 
 export function ownedSkinsForBowler(animation, loadout, slug) {
   const skins = Array.isArray(animation?.AVAILABLE_SKINS) ? animation.AVAILABLE_SKINS : [];
@@ -10,7 +11,17 @@ export function ownedSkinsForBowler(animation, loadout, slug) {
 // return target are private to this module: nothing else in the cabinet can
 // observe or corrupt them, which is what keeps a preview from leaking into the
 // equipped-skin persistence used by the setup screens.
-export function createCharacterInspector({ animation, catalog, assets, loadout, audio, initialSlug }) {
+export function createCharacterInspector({
+  animation,
+  catalog,
+  cosmetics,
+  assets,
+  loadout,
+  progression,
+  historyStatus,
+  audio,
+  initialSlug,
+}) {
   let slug = initialSlug;
   let previewSkinId = animation.DEFAULT_SKIN_ID;
   let returnFocus = null;
@@ -38,6 +49,45 @@ export function createCharacterInspector({ animation, catalog, assets, loadout, 
     }
   }
 
+  function renderHistory(character) {
+    const model = buildCharacterHistoryModel({
+      character,
+      status: historyStatus(),
+      progression,
+      cosmetics,
+      loadout,
+    });
+    const status = $("character-inspector-history-status");
+    const content = $("character-inspector-history-content");
+    const levelBadge = $("character-inspector-history-level-badge");
+    $("character-inspector-history-heading").textContent = model.heading;
+    levelBadge.hidden = model.status !== "ready";
+
+    if (model.status !== "ready") {
+      status.textContent = model.message;
+      status.hidden = false;
+      content.hidden = true;
+      return;
+    }
+
+    status.hidden = true;
+    content.hidden = false;
+    $("character-inspector-history-level").textContent = model.level;
+    $("character-inspector-history-xp").textContent = model.xpLabel;
+    $("character-inspector-history-matches").textContent = model.matches;
+    $("character-inspector-history-wins").textContent = model.wins;
+    $("character-inspector-history-strikes").textContent = model.strikes;
+    $("character-inspector-history-high-game").textContent = model.highGame;
+    $("character-inspector-history-collection").textContent = model.collection.label;
+
+    const masteryProgress = $("character-inspector-history-progress");
+    masteryProgress.style.width = `${model.progressPercent}%`;
+    masteryProgress.parentElement.setAttribute("aria-valuenow", String(model.progressPercent));
+    const collectionProgress = $("character-inspector-history-collection-progress");
+    collectionProgress.style.width = `${model.collection.percent}%`;
+    collectionProgress.parentElement.setAttribute("aria-valuenow", String(model.collection.percent));
+  }
+
   function render() {
     const character = catalog.getCharacter(slug);
     const ownedSkins = ownedSkinsForBowler(animation, loadout, slug);
@@ -55,6 +105,7 @@ export function createCharacterInspector({ animation, catalog, assets, loadout, 
     $("character-inspector-ball").textContent = character.favoriteBall;
     $("character-inspector-personality").textContent = character.personality;
     $("character-inspector-bio").textContent = character.bio;
+    renderHistory(character);
     renderSkinOptions();
   }
 

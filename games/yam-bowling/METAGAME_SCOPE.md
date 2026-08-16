@@ -419,8 +419,14 @@ joined. Room reward grants remain absent until a campaign cadence is approved.
 
 ### Per-character history
 
-- [ ] In the inspector, add a `Your <Bowler>` section with level, matches, wins, strikes, high game, and collection completion.
-- [ ] Keep fictional biography data separate from player-owned/statistical data even when presented together.
+- [x] In the inspector, add a `Your <Bowler>` section with level, matches, wins, strikes, high game, and collection completion.
+- [x] Keep fictional biography data separate from player-owned/statistical data even when presented together.
+
+The inspector now joins the current session's authoritative bowler progression
+snapshot with owned character-scoped catalog items. It withholds cached numbers
+when signed out or when the current session has not successfully applied a
+progression document, and presents the player-owned history in a card separate
+from the fictional league dossier and biography.
 
 ### Social visibility
 

@@ -436,7 +436,28 @@
             <div><dt>Bowling style</dt><dd id="character-inspector-style"></dd></div>
             <div><dt>Favorite ball</dt><dd id="character-inspector-ball"></dd></div>
           </dl>
-          <article class="character-inspector-story">
+          <section class="character-inspector-history" aria-labelledby="character-inspector-history-heading">
+            <div class="character-inspector-history-heading">
+              <div><p class="eyebrow">Player-owned history</p><h3 id="character-inspector-history-heading">Your bowler</h3></div>
+              <span id="character-inspector-history-level-badge">Lv. <b id="character-inspector-history-level">1</b></span>
+            </div>
+            <p class="character-inspector-history-status" id="character-inspector-history-status" aria-live="polite"></p>
+            <div id="character-inspector-history-content" hidden>
+              <div class="character-inspector-history-track" role="progressbar" aria-label="Bowler mastery progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="character-inspector-history-progress"></i></div>
+              <p class="character-inspector-history-xp" id="character-inspector-history-xp">0 / 200 XP</p>
+              <dl class="character-inspector-history-stats">
+                <div><dt>Matches</dt><dd id="character-inspector-history-matches">0</dd></div>
+                <div><dt>Wins</dt><dd id="character-inspector-history-wins">0</dd></div>
+                <div><dt>Strikes</dt><dd id="character-inspector-history-strikes">0</dd></div>
+                <div><dt>High game</dt><dd id="character-inspector-history-high-game">0</dd></div>
+              </dl>
+              <div class="character-inspector-collection">
+                <p><span>Collection completion</span><strong id="character-inspector-history-collection">0 / 0 owned</strong></p>
+                <div class="character-inspector-history-track" role="progressbar" aria-label="Bowler collection completion" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="character-inspector-history-collection-progress"></i></div>
+              </div>
+            </div>
+          </section>
+          <article class="character-inspector-story" aria-label="Fictional bowler biography">
             <h3>Personality</h3>
             <p id="character-inspector-personality"></p>
             <h3>Bio</h3>

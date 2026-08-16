@@ -214,6 +214,17 @@
   .character-inspector-facts > div { padding: .38rem .45rem; border-radius: 8px; }
   .character-inspector-facts dt { font-size: .4rem; }
   .character-inspector-facts dd { font-size: .55rem; line-height: 1.25; }
+  .character-inspector-history { margin-top: .4rem; padding: .5rem; border-radius: 10px; }
+  .character-inspector-history-heading h3 { font-size: .72rem; }
+  .character-inspector-history-heading > span { padding: .2rem .38rem; font-size: .44rem; }
+  .character-inspector-history-status { min-height: 0; margin-top: .4rem; font-size: .5rem; }
+  .character-inspector-history-xp { margin: .22rem 0 .38rem; font-size: .42rem; }
+  .character-inspector-history-stats { gap: .25rem; }
+  .character-inspector-history-stats > div { padding: .28rem; border-radius: 6px; }
+  .character-inspector-history-stats dt { font-size: .34rem; }
+  .character-inspector-history-stats dd { font-size: .62rem; }
+  .character-inspector-collection { margin-top: .38rem; }
+  .character-inspector-collection p { margin-bottom: .22rem; font-size: .4rem; }
   .character-inspector-story { margin-top: .4rem; padding: .55rem; border-radius: 10px; }
   .character-inspector-story h3 { font-size: .46rem; }
   .character-inspector-story h3:not(:first-child) { margin-top: .5rem; }

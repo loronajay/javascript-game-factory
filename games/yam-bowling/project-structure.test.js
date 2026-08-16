@@ -119,7 +119,11 @@ test("local and online character selection expose the read-only bowler inspector
     "character-inspector-art", "character-inspector-name", "character-inspector-skins",
     "character-inspector-age", "character-inspector-hometown", "character-inspector-occupation",
     "character-inspector-style", "character-inspector-ball", "character-inspector-personality",
-    "character-inspector-bio",
+    "character-inspector-bio", "character-inspector-history-heading", "character-inspector-history-status",
+    "character-inspector-history-content", "character-inspector-history-level-badge", "character-inspector-history-level", "character-inspector-history-xp",
+    "character-inspector-history-progress", "character-inspector-history-matches", "character-inspector-history-wins",
+    "character-inspector-history-strikes", "character-inspector-history-high-game",
+    "character-inspector-history-collection", "character-inspector-history-collection-progress",
   ]) {
     assert.match(html, new RegExp(`id=["']${id}["']`), `${id} should exist`);
   }
@@ -130,8 +134,16 @@ test("local and online character selection expose the read-only bowler inspector
   assert.match(game, /characterInspector\.open\(/);
   assert.match(inspector, /catalog\.getCharacter\(/);
   assert.match(inspector, /catalog\.getAdjacentCharacterSlug\(/);
+  assert.match(inspector, /buildCharacterHistoryModel/);
+  assert.match(inspector, /levelBadge\.hidden\s*=\s*model\.status\s*!==\s*["']ready["']/);
+  assert.match(game, /progressionStatus/);
   assert.match(css, /\.character-inspector-dialog\s*\{/);
   assert.match(css, /\.character-inspector-layout\s*\{[^}]*grid-template-columns:/s);
+  assert.match(css, /\.character-inspector-history\s*\{/);
+  assert.ok(
+    html.indexOf("character-inspector-history") < html.indexOf("character-inspector-story"),
+    "player-owned history should be structurally separate from the fictional dossier",
+  );
 });
 
 test("inspector skin previews never use the equipment persistence path", () => {

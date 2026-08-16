@@ -26,10 +26,10 @@ export function createProfileSyncClient({
   onUnauthorized = handleUnauthorizedResponse,
   onSnapshotApplied = () => {},
 }) {
-  let state = { status: "idle", error: "" };
+  let state = { status: "idle", error: "", progressionStatus: "unavailable" };
 
-  function setState(status, error = "") {
-    state = { status, error };
+  function setState(status, error = "", progressionStatus = state.progressionStatus) {
+    state = { status, error, progressionStatus };
   }
 
   async function garageRequest(method = "GET", garage = null) {
@@ -57,26 +57,29 @@ export function createProfileSyncClient({
   }
 
   async function sync() {
-    setState("syncing");
+    setState("syncing", "", "syncing");
     const [garageResult, gameProgress, progressionDocument] = await Promise.all([
       garageRequest("GET"),
       platformApi?.fetchGameProgress?.(GAME_SLUG)?.catch?.(() => null) ?? null,
       platformApi?.getGameProgression?.(GAME_SLUG, playerId)?.catch?.(() => null) ?? null,
     ]);
     if (!garageResult?.garage || !gameProgress?.entitlements) {
-      setState("error", "sync_failed");
+      setState("error", "sync_failed", "unavailable");
       return false;
     }
     loadout.applyServerEntitlements(gameProgress.entitlements);
     if (!loadout.applyServerGarage(garageResult.garage)) {
-      setState("error", "sync_failed");
+      setState("error", "sync_failed", "unavailable");
       return false;
     }
+    let progressionStatus = "unavailable";
     if (progressionDocument && progressionCore && progressionStore) {
-      applyProgression({ progressionCore, store: progressionStore, document: progressionDocument });
+      progressionStatus = applyProgression({ progressionCore, store: progressionStore, document: progressionDocument })
+        ? "ready"
+        : "unavailable";
     }
     onSnapshotApplied();
-    setState("ready");
+    setState("ready", "", progressionStatus);
     return true;
   }
 

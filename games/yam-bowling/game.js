@@ -152,8 +152,16 @@ initMobileLandscapeGate();
   const characterInspector = createCharacterInspector({
     animation: Animation,
     catalog: Catalog,
+    cosmetics: Cosmetics,
     assets,
     loadout,
+    progression,
+    historyStatus: () => {
+      if (!accountAccess.isEligible()) return "signed-out";
+      const syncState = profileSync.getState();
+      if (syncState.progressionStatus === "ready") return "ready";
+      return ["idle", "syncing"].includes(syncState.status) ? "syncing" : "unavailable";
+    },
     audio,
     initialSlug: Roster[0].slug,
   });
