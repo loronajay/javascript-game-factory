@@ -26,7 +26,7 @@ import { createPublicProfileScreen } from "./ui/public-profile-screen.mjs";
 import { createShotHud } from "./ui/shot-hud.mjs";
 import { createScoreboard } from "./ui/scoreboard.mjs";
 import { createResultsScreen } from "./ui/results-screen.mjs";
-import { createMatchEmotes } from "./ui/match-emotes.mjs";
+import { createMatchReactions } from "./ui/match-reactions.mjs";
 import { createMatchEntrance } from "./ui/match-entrance.mjs";
 import { createSessionState } from "./state/session-state.mjs";
 import { createMatchRuntime } from "./match/match-runtime.mjs";
@@ -253,7 +253,7 @@ initMobileLandscapeGate();
     session, roster: Roster, animation: Animation, assets, loadout, onInspect: openInspector,
   });
   const shotHud = createShotHud({ session, balls: BALLS, ballCore: BallCore });
-  const matchEmotes = createMatchEmotes({ session, onlineClient, emoteCore: EmoteCore });
+  const matchReactions = createMatchReactions({ session, onlineClient, loadout, cosmetics: Cosmetics });
   const matchEntrance = createMatchEntrance({ cosmetics: Cosmetics });
 
   // Declared ahead of the modules that call into them so the wiring below can
@@ -446,8 +446,8 @@ initMobileLandscapeGate();
     onlineScreen.renderSetup();
     onlineClient.subscribe((snapshot) => {
       onlineSession.handleSnapshot(snapshot);
-      matchEmotes.handle(snapshot.lastEmote);
-      matchEmotes.refresh();
+      matchReactions.handle(snapshot.lastReaction);
+      matchReactions.refresh();
     });
     syncAudioToggle();
 
@@ -457,11 +457,12 @@ initMobileLandscapeGate();
     circuitScreen.bind();
     tournamentScreen.bind();
     profileScreen.bind();
-    matchEmotes.bind();
+    matchReactions.bind();
     publicProfileScreen.bind();
     bindEvents({
       session, keys, audio, renderer, matchRuntime, onlineSession,
       circuitScreen, tournamentScreen, profileScreen, setupScreen, onlineScreen, shotHud, syncAudioToggle, accountAccess,
+      matchReactions,
     });
 
     if (accountAccess.isEligible() && onlineClient.resumeSavedSession()) {

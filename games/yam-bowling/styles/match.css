@@ -46,10 +46,28 @@
 .callout-pose { position: absolute; z-index: 7; bottom: 3%; left: 50%; height: 46%; padding: .5rem .5rem 0; border: 1px solid rgba(255,255,255,.22); border-radius: 18px; background: linear-gradient(180deg, rgba(12,13,18,.93), rgba(28,10,14,.95)); box-shadow: 0 22px 60px rgba(0,0,0,.62), 0 0 0 3px rgba(243,46,63,.3), 0 0 44px rgba(243,46,63,.22); opacity: 0; overflow: hidden; transform: translate(-50%, 14%) scale(.94); transition: 220ms ease; pointer-events: none; }
 .callout-pose img { display: block; width: auto; height: 100%; object-fit: contain; object-position: bottom center; }
 .callout-pose.is-visible { opacity: 1; transform: translate(-50%, 0) scale(1); }
-.match-emote-bubble { position: absolute; z-index: 10; right: 3%; top: 17%; width: clamp(100px, 19%, 190px); padding: .4rem; border: 2px solid rgba(255,255,255,.75); border-radius: 20px; background: rgba(9,10,15,.9); box-shadow: 0 15px 45px rgba(0,0,0,.55), 0 0 28px rgba(255,209,102,.2); text-align: center; pointer-events: none; }
-.match-emote-bubble small { display: block; color: var(--gold); font-size: .55rem; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.match-emote-bubble img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; }
-.match-emote-button { width: 100%; margin-top: .55rem; }
+.match-reaction-bubble { position: absolute; z-index: 10; right: 3%; top: 17%; width: clamp(110px, 20%, 200px); padding: .45rem; border: 2px solid rgba(255,255,255,.75); border-radius: 20px; background: rgba(9,10,15,.9); box-shadow: 0 15px 45px rgba(0,0,0,.55), 0 0 28px rgba(255,209,102,.2); text-align: center; pointer-events: none; }
+.match-reaction-bubble small { display: block; color: var(--gold); font-size: .55rem; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.match-reaction-bubble img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; }
+.match-reaction-bubble p { margin: .3rem 0 .1rem; color: #fff; font-size: .78rem; font-weight: 700; line-height: 1.25; }
+.match-reaction-bubble[data-reaction-kind="catch-line"] { border-color: rgba(255,209,102,.85); }
+
+/* The tray is the whole point of the reaction pass: it is visible for the length
+   of an online match rather than hidden behind a menu, because an emote nobody
+   can find is an emote nobody sends. */
+.reaction-tray { display: flex; margin-top: .55rem; padding-top: .55rem; flex-direction: column; gap: .4rem; border-top: 1px solid rgba(255,255,255,.1); }
+.reaction-tray__row { display: flex; align-items: center; gap: .45rem; }
+.reaction-tray__label { display: flex; min-width: 3.6rem; flex-direction: column; color: rgba(255,255,255,.62); font-size: .58rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.reaction-tray__label i { color: rgba(255,255,255,.38); font-size: .52rem; font-style: normal; font-weight: 700; letter-spacing: .02em; }
+.reaction-wheel { display: grid; flex: 1; min-width: 0; gap: .3rem; grid-template-columns: repeat(4, 1fr); }
+.reaction-chip { display: flex; padding: .2rem; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,.16); border-radius: 12px; background: rgba(255,255,255,.05); color: #fff; cursor: pointer; transition: transform .12s ease, border-color .12s ease, background .12s ease; }
+.reaction-chip:hover:not(:disabled) { border-color: rgba(255,209,102,.7); background: rgba(255,209,102,.14); transform: translateY(-1px); }
+.reaction-chip:disabled { cursor: default; opacity: .38; }
+.reaction-chip img { width: 100%; aspect-ratio: 1; object-fit: contain; }
+.reaction-chip--catch-line { min-height: 2.1rem; padding: .25rem .3rem; }
+/* A line is text of unpredictable length in a fixed cell, so it clamps to two
+   lines rather than stretching the row -- the full line is in the tooltip. */
+.reaction-chip--catch-line span { display: -webkit-box; overflow: hidden; font-size: .55rem; font-weight: 700; line-height: 1.15; text-align: center; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .match-entrance { position: absolute; z-index: 11; inset: 8% 6% auto; padding: 1rem; border-radius: 18px; color: white; font-family: Impact, sans-serif; font-size: clamp(1.5rem, 4vw, 3.2rem); letter-spacing: .06em; text-align: center; text-transform: uppercase; pointer-events: none; animation: entrance-pop 1.8s ease both; }
 .match-entrance.is-spotlight { background: radial-gradient(circle, rgba(255,255,255,.92), rgba(255,214,107,.35) 18%, rgba(0,0,0,.88) 65%); text-shadow: 0 4px 0 #8c171d; }
 .match-entrance.is-champion { background: linear-gradient(135deg, rgba(243,46,63,.9), rgba(255,214,107,.75), rgba(43,34,109,.92)); box-shadow: 0 0 50px rgba(255,214,107,.65); text-shadow: 0 4px 0 #371015; }

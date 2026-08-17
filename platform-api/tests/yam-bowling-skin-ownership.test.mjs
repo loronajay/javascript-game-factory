@@ -114,3 +114,40 @@ test("the one-time migration grants only exact non-Canon skins saved in the serv
   assert.match(sql, /source_id[\s\S]*yam-bowling-equipped-skin-v1/i);
   assert.doesNotMatch(sql, /generate_series|cross\s+join\s+.*skin_ids/i);
 });
+
+test("both reaction wheels survive a garage round trip slot by slot", () => {
+  // The wheels are the cabinet's only mid-match expression, and they are stored
+  // one slot per key rather than as a list — so a slot the server silently drops
+  // is a chip that disappears from the player's tray on the next save. Founding
+  // reactions need no entitlement, which is what lets a new account fill both.
+  const wheels = {
+    emote: "emote:wave",
+    emote2: "emote:thumbs-up",
+    emote3: "emote:good-luck",
+    emote4: "emote:nice-one",
+    catchLine: "catch-line:ready-to-roll",
+    catchLine2: "catch-line:good-game",
+    catchLine3: "catch-line:keep-it-clean",
+    catchLine4: "catch-line:find-the-pocket",
+  };
+  const garage = normalizeYamBowlingGarage(
+    { ...legacyGarage("canon"), global: { ...wheels } },
+    { ownedEntitlementIds: new Set() },
+  );
+
+  for (const [slot, itemId] of Object.entries(wheels)) {
+    assert.equal(garage.global[slot], itemId, `${slot} should survive normalization`);
+  }
+});
+
+test("a reaction slot refuses an item of the other wheel's kind", () => {
+  // Each slot declares one reward type. Without that, a catch line could be
+  // stored in an emote slot and the match HUD would have a chip it cannot draw.
+  const garage = normalizeYamBowlingGarage(
+    { ...legacyGarage("canon"), global: { emote2: "catch-line:good-game", catchLine2: "emote:wave" } },
+    { ownedEntitlementIds: new Set() },
+  );
+
+  assert.equal(garage.global.emote2, undefined);
+  assert.equal(garage.global.catchLine2, undefined);
+});

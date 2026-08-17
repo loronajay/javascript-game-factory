@@ -44,11 +44,20 @@ const PRESENTATION_SLOTS = Object.freeze([
   Object.freeze({ key: "profileArt", scope: "bowler", type: "profile-art", label: "Profile art" }),
   Object.freeze({ key: "title", scope: "global", type: "title", label: "Title" }),
   Object.freeze({ key: "badge", scope: "global", type: "badge", label: "Badge" }),
-  // The sticker thrown on the lane. Global like the two above, because the pool
-  // is shared by the whole roster rather than drawn per bowler.
-  Object.freeze({ key: "emote", scope: "global", type: "emote", label: "Emote" }),
+  // The four stickers thrown on the lane, in the order the match wheel paints
+  // them. Global like the two above, because the pool is shared by the whole
+  // roster rather than drawn per bowler.
+  Object.freeze({ key: "emote", scope: "global", type: "emote", label: "Emote 1" }),
+  Object.freeze({ key: "emote2", scope: "global", type: "emote", label: "Emote 2" }),
+  Object.freeze({ key: "emote3", scope: "global", type: "emote", label: "Emote 3" }),
+  Object.freeze({ key: "emote4", scope: "global", type: "emote", label: "Emote 4" }),
   Object.freeze({ key: "entrance", scope: "global", type: "entrance", label: "Entrance", optional: true }),
-  Object.freeze({ key: "catchLine", scope: "global", type: "catch-line", label: "Catch line" }),
+  // The catch-line wheel. Slot 1 is also the entrance line, which is why it is
+  // labelled for that second job rather than as plain "Catch line 1".
+  Object.freeze({ key: "catchLine", scope: "global", type: "catch-line", label: "Catch line 1 (entrance)" }),
+  Object.freeze({ key: "catchLine2", scope: "global", type: "catch-line", label: "Catch line 2" }),
+  Object.freeze({ key: "catchLine3", scope: "global", type: "catch-line", label: "Catch line 3" }),
+  Object.freeze({ key: "catchLine4", scope: "global", type: "catch-line", label: "Catch line 4" }),
   // The two decoration slots have no default, so empty is one of their real
   // answers and has to be offerable — otherwise a frame could be put on but
   // never taken off again.

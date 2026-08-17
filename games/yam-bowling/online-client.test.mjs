@@ -133,11 +133,11 @@ test("lobby join publishes the selected bowler and owner can start a full lobby"
       ballTrailId: "ball-trail:red-neon",
       strikeBurstId: "strike-burst:ember",
       victoryPoseId: "victory-pose:daisy-monroe:maid",
-      emoteId: "emote:wave",
+      emoteIds: ["emote:wave", "emote:cheer"],
+      catchLineIds: ["catch-line:find-the-pocket"],
       playerCardId: "",
       profileIconId: "",
       entranceId: "",
-      catchLineId: "catch-line:find-the-pocket",
     },
   });
   socket.receive({
@@ -165,11 +165,14 @@ test("lobby join publishes the selected bowler and owner can start a full lobby"
       ballTrailId: "ball-trail:red-neon",
       strikeBurstId: "strike-burst:ember",
       victoryPoseId: "victory-pose:daisy-monroe:maid",
-      emoteId: "emote:wave",
       playerCardId: "",
       profileIconId: "",
       entranceId: "",
-      catchLineId: "catch-line:find-the-pocket",
+      // Both wheels ride the profile at full length. A short wheel is padded
+      // with empty slots rather than sent short, because the slot index a
+      // reaction carries is only meaningful against a fixed-length wheel.
+      emoteIds: ["emote:wave", "emote:cheer", "", ""],
+      catchLineIds: ["catch-line:find-the-pocket", "", "", ""],
     },
     protocolVersion: YAM_BOWLING_PROTOCOL_VERSION,
   });
@@ -252,7 +255,7 @@ test("shot and rematch requests carry no client-authored result", () => {
   assert.equal(socket.sent[1].messageType, "yam_rematch");
 });
 
-test("emote requests carry no client-authored slug and received emotes reach subscribers", () => {
+test("reaction requests carry a wheel slot, never a slug, and reach subscribers by kind", () => {
   const client = createClient();
   const updates = [];
   client.subscribe((snapshot) => updates.push(snapshot));
@@ -261,22 +264,56 @@ test("emote requests carry no client-authored slug and received emotes reach sub
   socket.open();
   socket.receive({ event: "connected", clientId: "socket-1", sessionToken: "resume-1" });
 
-  client.sendEmote();
-  assert.equal(socket.sent[0].messageType, "yam_emote");
-  assert.deepEqual(JSON.parse(socket.sent[0].value), {});
+  assert.equal(client.sendReaction("emote", 2), true);
+  assert.equal(socket.sent[0].messageType, "yam_reaction");
+  assert.deepEqual(JSON.parse(socket.sent[0].value), { kind: "emote", slot: 2 });
+
+  assert.equal(client.sendReaction("catch-line", 3), true);
+  assert.deepEqual(JSON.parse(socket.sent[1].value), { kind: "catch-line", slot: 3 });
+
+  // An unknown kind or an out-of-range slot never reaches the wire: the wheel's
+  // length is the whole validation, so a slot the server could not resolve is
+  // refused here rather than spending the sender's cooldown on a fallback.
+  assert.equal(client.sendReaction("chat", 0), false);
+  assert.equal(client.sendReaction("emote", 4), false);
+  assert.equal(client.sendReaction("emote", -1), false);
+  assert.equal(client.sendReaction("emote", "two"), false);
+  assert.equal(socket.sent.length, 2);
 
   socket.receive({
     event: "message",
     scope: "lobby",
     senderId: "server",
-    messageType: "yam_emote",
-    value: JSON.stringify({ senderClientId: "socket-2", emoteId: "emote:cheer", sequence: 4 }),
+    messageType: "yam_reaction",
+    value: JSON.stringify({ senderClientId: "socket-2", reactionId: "emote:cheer", sequence: 4 }),
   });
-  assert.deepEqual(updates.at(-1).lastEmote, {
+  assert.deepEqual(updates.at(-1).lastReaction, {
     senderClientId: "socket-2",
-    emoteId: "emote:cheer",
+    kind: "emote",
+    reactionId: "emote:cheer",
     sequence: 4,
   });
+
+  // The kind is read off the resolved id's prefix, so a catch line arrives on
+  // the same channel without the server naming the kind twice.
+  socket.receive({
+    event: "message",
+    scope: "lobby",
+    senderId: "server",
+    messageType: "yam_reaction",
+    value: JSON.stringify({ senderClientId: "socket-2", reactionId: "catch-line:good-game", sequence: 5 }),
+  });
+  assert.equal(updates.at(-1).lastReaction.kind, "catch-line");
+
+  // An id of no known kind is dropped rather than emitted for the HUD to paint.
+  socket.receive({
+    event: "message",
+    scope: "lobby",
+    senderId: "server",
+    messageType: "yam_reaction",
+    value: JSON.stringify({ senderClientId: "socket-2", reactionId: "title:rookie", sequence: 6 }),
+  });
+  assert.equal(updates.at(-1).lastReaction.sequence, 5);
 });
 
 test("a dropped active match attempts session resume with the relay token", () => {

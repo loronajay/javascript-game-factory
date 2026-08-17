@@ -15,7 +15,10 @@ export function createMatchEntrance({
   }
 
   function catchLine(player) {
-    const item = cosmetics?.getItem?.(player?.presentation?.catchLineId);
+    // Slot 1 of the catch-line wheel is the line a bowler walks on to. The other
+    // three are thrown mid-match; only the first one speaks at the entrance,
+    // because an entrance has room for one line and the player chose its order.
+    const item = cosmetics?.getItem?.(player?.presentation?.catchLineIds?.[0]);
     return item?.type === "catch-line" && typeof item.assets?.text === "string"
       ? item.assets.text.trim()
       : "";

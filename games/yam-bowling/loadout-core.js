@@ -65,18 +65,50 @@
     // The player's own room. New content, so unlike every slot above it has no
     // legacy key to migrate -- this has been its only owner from the first line.
     room: Object.freeze({ type: "room", defaultId: null }),
-    // The sticker thrown on the lane. It carries a default, unlike the two
-    // decoration slots below, because an emote nobody has equipped is a button
-    // that does nothing -- every account owns the founding six, so the slot can
-    // always resolve to something real.
+    // The stickers thrown on the lane -- four slots, not one. A single slot
+    // made thirty emotes reachable only by leaving the match, and an emote you
+    // have to quit a frame to change is not a reaction. Four is the wheel the
+    // match HUD paints, and every slot carries a founding default because an
+    // emote nobody has equipped is a button that does nothing.
+    //
+    // `emote` is deliberately still named `emote` rather than `emote1`: it is
+    // the slot already stored in shipped garages and already frozen into live
+    // matches, so renaming it would orphan every equipped sticker to buy
+    // nothing but symmetry.
     emote: Object.freeze({ type: "emote", defaultId: "emote:wave" }),
+    emote2: Object.freeze({ type: "emote", defaultId: "emote:thumbs-up" }),
+    emote3: Object.freeze({ type: "emote", defaultId: "emote:good-luck" }),
+    emote4: Object.freeze({ type: "emote", defaultId: "emote:nice-one" }),
     entrance: Object.freeze({ type: "entrance", defaultId: null }),
+    // Catch lines are the second reaction wheel: the same four slots, thrown
+    // the same way, saying it in words instead of a sticker. Slot 1 keeps its
+    // original name and its original second job -- it is still the line the
+    // entrance banner speaks when a bowler walks on.
     catchLine: Object.freeze({ type: "catch-line", defaultId: "catch-line:ready-to-roll" }),
+    catchLine2: Object.freeze({ type: "catch-line", defaultId: "catch-line:good-game" }),
+    catchLine3: Object.freeze({ type: "catch-line", defaultId: "catch-line:keep-it-clean" }),
+    catchLine4: Object.freeze({ type: "catch-line", defaultId: "catch-line:find-the-pocket" }),
     // Profile decoration reuses character profile art, so a featured bowler
     // can frame and back their own page without new asset types.
     profileFrame: Object.freeze({ type: "profile-art", defaultId: null }),
     profileBackground: Object.freeze({ type: "profile-art", defaultId: null }),
   });
+
+  // The two reaction wheels, in the order the match HUD paints them and the
+  // order the wire indexes them. Nothing else re-lists these names: a fifth slot
+  // is one row here plus one row above, and the HUD, the presentation editor,
+  // the wire and the server's slot index all follow.
+  //
+  // The kinds are keyed by reward type on purpose. A reaction is "one of the
+  // things I equipped, of a kind the wire understands", so a third wheel is a
+  // row here rather than a third code path anywhere downstream.
+  const REACTION_WHEEL_SLOTS = Object.freeze({
+    emote: Object.freeze(["emote", "emote2", "emote3", "emote4"]),
+    "catch-line": Object.freeze(["catchLine", "catchLine2", "catchLine3", "catchLine4"]),
+  });
+
+  const REACTION_KINDS = Object.freeze(Object.keys(REACTION_WHEEL_SLOTS));
+  const REACTION_WHEEL_SIZE = REACTION_WHEEL_SLOTS.emote.length;
 
   function canonBowler(slug) {
     return animation.CANON_BOWLERS.find((bowler) => bowler.slug === slug) || null;
@@ -419,6 +451,12 @@
       return getMenuSplashSlug();
     }
 
+    // One equipped wheel, always four long and always resolvable, so a caller
+    // can index it by wheel slot without checking for a hole.
+    function getReactionWheel(kind) {
+      return (REACTION_WHEEL_SLOTS[kind] || []).map((slotName) => getGlobalSlot(slotName));
+    }
+
     // Room accessors mirror the splash pair: callers deal in slugs, and the item
     // id stays an implementation detail of the loadout.
     function getRoomSlug() {
@@ -503,6 +541,7 @@
       equipSkin,
       exportGarage,
       getBowlerSlot,
+      getReactionWheel,
       getEquippedSkinId,
       getFeatured,
       getGlobalSlot,
@@ -524,6 +563,9 @@
   return {
     BOWLER_SLOTS,
     DEV_ENTITLEMENT_STORAGE_KEY,
+    REACTION_KINDS,
+    REACTION_WHEEL_SIZE,
+    REACTION_WHEEL_SLOTS,
     GLOBAL_SLOTS,
     LOADOUT_STORAGE_KEY,
     SCHEMA_VERSION,

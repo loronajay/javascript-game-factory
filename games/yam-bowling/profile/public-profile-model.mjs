@@ -142,7 +142,8 @@ export function buildCompactIdentityModel({ profile, matchPlayer, animation, cos
   const bowler = resolveBowler(animation, player.characterSlug);
   const skin = resolveSkin(animation, player.skinId);
   const mastery = profile?.masteryByBowler?.[bowler.slug] || emptyMastery(bowler.slug);
-  const catchLineItem = cosmetics?.getItem?.(player.presentation?.catchLineId);
+  // The identity card quotes the same line the entrance speaks: wheel slot 1.
+  const catchLineItem = cosmetics?.getItem?.(player.presentation?.catchLineIds?.[0]);
   const profileIconItem = cosmetics?.getItem?.(player.presentation?.profileIconId);
   return {
     profileAvailable: Boolean(profile),

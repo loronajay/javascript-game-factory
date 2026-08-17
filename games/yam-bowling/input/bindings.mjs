@@ -25,6 +25,7 @@ export function bindEvents({
   onlineScreen,
   shotHud,
   syncAudioToggle,
+  matchReactions,
 }) {
   const { scene } = session;
 
@@ -134,6 +135,10 @@ export function bindEvents({
         if (event.code === "ArrowRight") keys.aimRight = true;
       }
     }
+    // The reaction wheels get the digit row: 1-4 throws a sticker, Shift+1-4
+    // says a line. Handled before the movement keys because a digit means
+    // nothing to the shot controls and a swallowed reaction would look broken.
+    if (!event.repeat && matchReactions?.handleKey?.(event)) event.preventDefault();
     if ((event.key === "a" || event.key === "A") && !event.shiftKey) keys.strafeLeft = true;
     if ((event.key === "d" || event.key === "D") && event.shiftKey && !event.repeat) {
       renderer.debug = !renderer.debug;

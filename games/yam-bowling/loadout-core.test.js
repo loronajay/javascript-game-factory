@@ -11,6 +11,9 @@ const loadoutCore = require("./loadout-core.js");
 const {
   BOWLER_SLOTS,
   GLOBAL_SLOTS,
+  REACTION_KINDS,
+  REACTION_WHEEL_SIZE,
+  REACTION_WHEEL_SLOTS,
   LOADOUT_STORAGE_KEY,
   SCHEMA_VERSION,
   createLoadoutStore,
@@ -236,12 +239,58 @@ test("slot names cover the reward types the loadout is responsible for", () => {
     "skin", "victoryPose", "defeatPose", "playerCard", "profileIcon", "menuSplash", "profileArt",
   ]);
   assert.deepEqual(Object.keys(GLOBAL_SLOTS), [
-    "ballTrail", "strikeBurst", "title", "badge", "menuSplash", "room", "emote", "entrance", "catchLine", "profileFrame", "profileBackground",
+    "ballTrail", "strikeBurst", "title", "badge", "menuSplash", "room",
+    "emote", "emote2", "emote3", "emote4",
+    "entrance",
+    "catchLine", "catchLine2", "catchLine3", "catchLine4",
+    "profileFrame", "profileBackground",
   ]);
 
   for (const slot of [...Object.values(BOWLER_SLOTS), ...Object.values(GLOBAL_SLOTS)]) {
     assert.ok(cosmetics.REWARD_TYPES.includes(slot.type), `${slot.type} should be a catalogued reward type`);
   }
+});
+
+test("every reaction wheel is four founding slots a match can index without a hole", () => {
+  const store = createLoadoutStore({ storage: memoryStorage() });
+
+  for (const kind of REACTION_KINDS) {
+    const wheel = store.getReactionWheel(kind);
+    assert.equal(wheel.length, REACTION_WHEEL_SIZE, `${kind} wheel should be full length`);
+    // Every default has to be genuinely owned by a brand-new account, or a
+    // wheel would boot with a slot that silently falls back to something else.
+    for (const itemId of wheel) {
+      const item = cosmetics.getItem(itemId);
+      assert.equal(item?.type, kind, `${itemId} should be a catalogued ${kind}`);
+      assert.ok(store.owns(itemId), `${itemId} should be founding content`);
+    }
+    assert.equal(new Set(wheel).size, REACTION_WHEEL_SIZE, `${kind} wheel should have no repeats`);
+    assert.deepEqual(wheel, REACTION_WHEEL_SLOTS[kind].map((slot) => store.getGlobalSlot(slot)));
+  }
+
+  // An unknown kind is an empty wheel rather than a thrown error: it is the same
+  // answer a caller gets for a wheel whose content has not shipped yet.
+  assert.deepEqual(store.getReactionWheel("nonsense"), []);
+});
+
+test("equipping one reaction slot leaves the rest of its wheel alone", () => {
+  const store = createLoadoutStore({ storage: memoryStorage() });
+  const before = store.getReactionWheel("emote");
+
+  assert.equal(store.equipGlobalSlot("emote3", "emote:oh-no"), "emote:oh-no");
+
+  const after = store.getReactionWheel("emote");
+  assert.equal(after[2], "emote:oh-no");
+  assert.deepEqual([after[0], after[1], after[3]], [before[0], before[1], before[3]]);
+});
+
+test("a reaction slot refuses an item of the other wheel's kind", () => {
+  const store = createLoadoutStore({ storage: memoryStorage() });
+
+  // The slot's declared type is what enforces this, so a catch line cannot land
+  // in an emote slot even though both are reactions on the same wire.
+  assert.equal(store.equipGlobalSlot("emote2", "catch-line:good-game"), GLOBAL_SLOTS.emote2.defaultId);
+  assert.equal(store.equipGlobalSlot("catchLine2", "emote:cheer"), GLOBAL_SLOTS.catchLine2.defaultId);
 });
 
 test("unavailable storage still yields a usable session loadout", () => {

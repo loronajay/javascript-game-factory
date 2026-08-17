@@ -56,11 +56,29 @@ function normalizeModeId(modeId) {
 }
 
 const PRESENTATION_FIELDS = Object.freeze([
-  "ballTrailId", "strikeBurstId", "victoryPoseId", "emoteId", "playerCardId", "profileIconId", "entranceId", "catchLineId",
+  "ballTrailId", "strikeBurstId", "victoryPoseId", "playerCardId", "profileIconId", "entranceId",
 ]);
 
+// The presentation fields that are lists rather than ids: the two reaction
+// wheels. They are bounded here as well as on the server, because a wheel's
+// length is what a slot index is checked against, and an unbounded list on the
+// wire is an unbounded index to validate.
+const REACTION_WHEEL_FIELDS = Object.freeze({ emote: "emoteIds", "catch-line": "catchLineIds" });
+const REACTION_WHEEL_SIZE = 4;
+
+function sanitizeWheel(raw) {
+  return Array.from(
+    { length: REACTION_WHEEL_SIZE },
+    (_unused, index) => boundedText(Array.isArray(raw) ? raw[index] : "", 96),
+  );
+}
+
 function sanitizePresentation(raw) {
-  return Object.fromEntries(PRESENTATION_FIELDS.map((key) => [key, boundedText(raw?.[key], 96)]));
+  return {
+    ...Object.fromEntries(PRESENTATION_FIELDS.map((key) => [key, boundedText(raw?.[key], 96)])),
+    ...Object.fromEntries(Object.values(REACTION_WHEEL_FIELDS)
+      .map((field) => [field, sanitizeWheel(raw?.[field])])),
+  };
 }
 
 export function resolveWebSocketUrl(locationLike = globalThis.location) {
@@ -151,7 +169,7 @@ export function createOnlineClient(options = {}) {
     disconnectedClientId: "",
     reconnectExpiresAt: null,
     error: null,
-    lastEmote: null,
+    lastReaction: null,
   };
   const subscribers = new Set();
 
@@ -163,7 +181,7 @@ export function createOnlineClient(options = {}) {
         : null,
       matchState: snapshot.matchState ? { ...snapshot.matchState } : null,
       error: snapshot.error ? { ...snapshot.error } : null,
-      lastEmote: snapshot.lastEmote ? { ...snapshot.lastEmote } : null,
+      lastReaction: snapshot.lastReaction ? { ...snapshot.lastReaction } : null,
     };
   }
 
@@ -249,13 +267,18 @@ export function createOnlineClient(options = {}) {
       return;
     }
 
-    if (data.event === "message" && data.scope === "lobby" && data.messageType === "yam_emote") {
+    if (data.event === "message" && data.scope === "lobby" && data.messageType === "yam_reaction") {
       const value = parseJson(data.value);
       const senderClientId = boundedText(value?.senderClientId, 80);
-      const emoteId = boundedText(value?.emoteId, 96);
+      // The server resolved the slot into a whole item id, so the id's own
+      // prefix is the kind. Trusting the prefix rather than a separate `kind`
+      // field is what stops the two from ever arriving in disagreement.
+      const reactionId = boundedText(value?.reactionId, 96);
       const sequence = Number(value?.sequence);
-      if (senderClientId && /^emote:[a-z0-9-]{1,64}$/.test(emoteId) && Number.isInteger(sequence) && sequence > 0) {
-        emit({ lastEmote: { senderClientId, emoteId, sequence } });
+      const kind = Object.keys(REACTION_WHEEL_FIELDS)
+        .find((entry) => new RegExp(`^${entry}:[a-z0-9-]{1,64}$`).test(reactionId)) || "";
+      if (senderClientId && kind && Number.isInteger(sequence) && sequence > 0) {
+        emit({ lastReaction: { senderClientId, kind, reactionId, sequence } });
       }
       return;
     }
@@ -369,10 +392,16 @@ export function createOnlineClient(options = {}) {
     lobbyMessage("yam_rematch", { requested: true });
   }
 
-  function sendEmote() {
-    // The server chooses the sender's equipped emote from the frozen match
-    // presentation. A client-authored slug never reaches the wire.
-    lobbyMessage("yam_emote", {});
+  function sendReaction(kind, slot = 0) {
+    // The wire carries a kind and a wheel slot, never a slug. The server
+    // resolves the id from the wheel frozen into the match at start, so choosing
+    // in-match still cannot send a sticker or a line this account does not own
+    // -- ownership was decided once, by the garage the server itself sanitized.
+    const index = Number(slot);
+    if (!Object.hasOwn(REACTION_WHEEL_FIELDS, kind)) return false;
+    if (!Number.isInteger(index) || index < 0 || index >= REACTION_WHEEL_SIZE) return false;
+    lobbyMessage("yam_reaction", { kind, slot: index });
+    return true;
   }
 
   function leaveLobby() {
@@ -404,7 +433,7 @@ export function createOnlineClient(options = {}) {
     startLobby,
     submitShot,
     requestRematch,
-    sendEmote,
+    sendReaction,
     leaveLobby,
     disconnect,
     subscribe,

@@ -164,9 +164,20 @@ const GLOBAL_SLOTS = Object.freeze({
     badge: "badge",
     menuSplash: "menu-splash",
     room: "room",
+    // The four-slot emote wheel. `emote` keeps its original name because it is
+    // the slot already stored in live garages; the other three are new.
     emote: "emote",
+    emote2: "emote",
+    emote3: "emote",
+    emote4: "emote",
     entrance: "entrance",
+    // The catch-line wheel, the second half of the same reaction channel. Slot 1
+    // keeps its name because it is what live garages store, and because it is
+    // still the line a bowler's entrance speaks.
     catchLine: "catch-line",
+    catchLine2: "catch-line",
+    catchLine3: "catch-line",
+    catchLine4: "catch-line",
     profileFrame: "profile-art",
     profileBackground: "profile-art",
 });

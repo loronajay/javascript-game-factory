@@ -257,6 +257,39 @@ test("every equippable presentation slot has a player-facing control, and it wri
   assert.doesNotMatch(readCode("ui/results-screen.mjs"), /getBowlerSlot|getResultPortraitAssetPath/);
 });
 
+test("reactions travel as a wheel slot and are owned by one HUD module", () => {
+  const hud = readCode("ui/match-reactions.mjs");
+  const client = readCode("online-client.mjs");
+  const html = read("index.html");
+
+  // The tray is the only sender and the loadout is the only source of what is in
+  // it: a reaction the player has not equipped has no chip and no slot.
+  assert.match(hud, /sendReaction\?\.\(kind, slot\)/);
+  assert.match(hud, /getReactionWheel\?\.\(kind\)/);
+  assert.match(client, /lobbyMessage\("yam_reaction", \{ kind, slot: index \}\)/);
+
+  // No emote or catch-line slug may reach the wire. The server resolves the slot
+  // against the wheel it froze at match start, which is what keeps ownership
+  // decided by the garage it sanitized rather than by whatever a client claims.
+  assert.doesNotMatch(client, /"emote:|"catch-line:/);
+
+  // The HUD paints and sends; it never equips. Persisting from here would give
+  // the loadout a second writer that a server garage save could not see.
+  assert.doesNotMatch(hud, /equipGlobalSlot|setItem|localStorage/);
+
+  // Both wheels are in the match screen's shot panel rather than behind a menu,
+  // and each chip is reachable by keyboard shortcut as well as by pointer.
+  assert.match(html, /id="match-reaction-tray"/);
+  assert.match(html, /id="match-emote-wheel"/);
+  assert.match(html, /id="match-catch-line-wheel"/);
+  assert.match(readCode("input/bindings.mjs"), /matchReactions\?\.handleKey\?\.\(event\)/);
+
+  // Slot 1 of the catch-line wheel keeps its second job: the entrance line. The
+  // entrance reads the wheel rather than a field of its own, so the two cannot
+  // drift into disagreeing about what a bowler walks on to.
+  assert.match(readCode("ui/match-entrance.mjs"), /catchLineIds\?\.\[0\]/);
+});
+
 test("player rooms are unlockable content the loadout alone equips", () => {
   const html = read("index.html");
   const rooms = readCode("room-core.js");
@@ -473,7 +506,7 @@ test("public profiles use public documents, stay read-only, and share the Match 
   const resultsScreen = read("ui/results-screen.mjs");
 
   for (const id of [
-    "public-profile-dialog", "public-profile-close", "public-profile-name",
+    "public-profile-dialog", "public-profile-close", "public-profile-close-hint", "public-profile-name",
     "public-profile-room-art", "public-profile-bowler-art", "public-profile-player-level",
     "public-profile-career-stats", "public-profile-bowler-stats", "public-profile-status",
   ]) {
@@ -494,6 +527,13 @@ test("public profiles use public documents, stay read-only, and share the Match 
   assert.match(resultsScreen, /accountPlayerId/);
   assert.doesNotMatch(model, /rank|elo|spareRate/i);
   assert.doesNotMatch(onlineScreen, /rank|elo|spareRate/i);
+  assert.match(html.match(/<button[^>]+id=["']public-profile-close["'][^>]*>/)?.[0] || "", /aria-keyshortcuts=["']Escape["']/);
+  assert.match(html, /id=["']public-profile-close-hint["'][^>]*>[\s\S]*?<kbd>Esc<\/kbd>[\s\S]*?Close/i);
+  assert.match(
+    read("styles/profile.css"),
+    /\.public-profile-dialog\s+\.dialog-close\s*\{[^}]*z-index\s*:\s*[2-9]\d*/s,
+    "the public-profile close button must sit above the positioned header and content",
+  );
 });
 
 test("the cabinet exposes complete quick-match and private-room online screens", () => {
