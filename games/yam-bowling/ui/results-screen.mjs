@@ -58,18 +58,16 @@ export function createResultsScreen({
   }
 
   function showCallout(knocked, startedStanding) {
-    const cleared = knocked === startedStanding;
-    const firstRoll = session.frameRollNumber() === 1;
+    const cue = audioCore.getOutcomeCue(knocked, startedStanding);
     let big = `${knocked} pins`;
     let small = "Keep working the rack";
-    if (cleared && startedStanding === 10 && firstRoll) { big = "Strike!"; small = "Clean pocket hit"; }
-    else if (cleared && startedStanding < 10) { big = "Spare!"; small = "Every pin accounted for"; }
+    if (cue === "strike") { big = "Strike!"; small = "Clean pocket hit"; }
+    else if (cue === "spare") { big = "Spare!"; small = "Every pin accounted for"; }
     else if (knocked === 0) { big = "Gutter"; small = "Reset the line"; }
     else if (knocked >= 8) { big = "Great ball"; small = `${knocked} pins down`; }
     $("callout").querySelector("strong").textContent = big;
     $("callout").querySelector("span").textContent = small;
     session.calloutTime = 1.15;
-    const cue = audioCore.getOutcomeCue(knocked, startedStanding, firstRoll);
     showCalloutPose(cue);
     audio.play(cue, { intensity: 0.65 + knocked / 15 });
   }

@@ -121,7 +121,7 @@ export function createMatchRuntime({
     ];
   }
 
-  function prepareActivePlayer() {
+  function prepareActivePlayer({ announce = true } = {}) {
     const player = session.activePlayer();
     if (!player) return;
     Object.assign(scene.liveShot, session.playerShots[session.match.activePlayer] || defaultShot());
@@ -134,8 +134,10 @@ export function createMatchRuntime({
     $("turn-avatar").src = assets.characterPortrait(player.characterSlug, skinId);
     resultsScreen.preloadCalloutPoses(player);
     if (player.type === "cpu") session.cpuDelay = 0.8;
-    session.bannerTime = 1;
-    audio.play("announce");
+    if (announce) {
+      session.bannerTime = 1;
+      audio.play("announce");
+    }
   }
 
   function startMatch() {
@@ -283,7 +285,7 @@ export function createMatchRuntime({
 
     // The equipped strike burst, fired off the same outcome the callout and the
     // audio cue use so there is only ever one definition of a strike.
-    if (audioCore.getOutcomeCue(knocked, startedStanding, session.frameRollNumber() === 1) === "strike") {
+    if (audioCore.getOutcomeCue(knocked, startedStanding) === "strike") {
       const { burstStyle, reducedMotion } = effectsConfig(shooter);
       effects.triggerBurst(session.effects, {
         x: 0,

@@ -52,8 +52,10 @@
     win: { cooldown: 0.8, tones: [[294, 0.14, 0.035, "triangle", 1.04], [392, 0.18, 0.038, "triangle", 1.04, 0.11], [494, 0.2, 0.038, "triangle", 1.04, 0.22], [659, 0.42, 0.045, "triangle", 1.12, 0.34]] },
   });
 
-  function getOutcomeCue(knocked, startedStanding, firstRoll) {
-    if (knocked === startedStanding && startedStanding === 10 && firstRoll) return "strike";
+  function getOutcomeCue(knocked, startedStanding) {
+    // Any full-rack clear is a strike. In the final frame, bonus balls can be
+    // the second or third roll while still beginning from a freshly set rack.
+    if (knocked === startedStanding && startedStanding === 10) return "strike";
     if (knocked === startedStanding && startedStanding < 10) return "spare";
     if (knocked === 0) return "gutter";
     return "popup";

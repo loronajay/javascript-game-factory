@@ -87,7 +87,10 @@ export function createOnlineSession({
       return;
     }
     scene.phase = snapshot.phase === "paused" ? "network-paused" : "ready";
-    matchRuntime.prepareActivePlayer();
+    // Presence and reaction messages carry the latest match document too. They
+    // need a visual refresh, but they are not a new turn and must not replay the
+    // "who's up" banner or its announcement sound.
+    matchRuntime.prepareActivePlayer({ announce: false });
     scoreboard.updateMatchUI();
   }
 

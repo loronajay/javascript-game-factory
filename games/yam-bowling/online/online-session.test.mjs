@@ -42,6 +42,40 @@ test("online presentation replaces a stale selection with the currently owned sk
   assert.equal(setup.skinId, "canon");
 });
 
+test("a reaction-only snapshot refreshes the active bowler without announcing the turn again", () => {
+  const preparedWith = [];
+  const session = {
+    scene: {},
+    onlineMatch: true,
+    onlineSnapshot: { sessionId: "session-1" },
+    lastAppliedOnlineRoll: 4,
+    pendingAuthoritativeRoll: null,
+    match: { status: "playing", activePlayer: 0, players: [] },
+  };
+  const onlineSession = createOnlineSession({
+    session,
+    onlineScreen: { renderLobby() {} },
+    matchRuntime: {
+      clonePins: (pins) => pins,
+      prepareActivePlayer: (options) => preparedWith.push(options),
+    },
+    scoreboard: { updateMatchUI() {} },
+  });
+
+  onlineSession.handleSnapshot({
+    status: "match",
+    matchState: {
+      sessionId: "session-1",
+      rollNumber: 4,
+      phase: "ready",
+      nextPins: [],
+      match: { status: "playing", activePlayer: 0, players: [] },
+    },
+  });
+
+  assert.deepEqual(preparedWith, [{ announce: false }]);
+});
+
 // ------------------------------------------ re-sending a report that never landed
 
 test("a stored request is re-sent verbatim, under the session id its grant is keyed by", async () => {

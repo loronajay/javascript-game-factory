@@ -50,7 +50,11 @@
 .match-reaction-bubble small { display: block; color: var(--gold); font-size: .55rem; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .match-reaction-bubble img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; }
 .match-reaction-bubble p { margin: .3rem 0 .1rem; color: #fff; font-size: .78rem; font-weight: 700; line-height: 1.25; }
+.match-reaction-bubble[data-reaction-kind="emote"] { padding: 0; border: 0; background: transparent; box-shadow: none; animation: emote-pop 220ms cubic-bezier(.2, 1.45, .45, 1) both; }
+.match-reaction-bubble[data-reaction-kind="emote"] small { text-shadow: 0 2px 4px #000, 0 0 8px #000; }
+.match-reaction-bubble[data-reaction-kind="emote"] img { filter: drop-shadow(0 5px 3px rgba(0,0,0,.65)) drop-shadow(0 12px 18px rgba(0,0,0,.38)); }
 .match-reaction-bubble[data-reaction-kind="catch-line"] { border-color: rgba(255,209,102,.85); }
+@keyframes emote-pop { from { opacity: 0; transform: translateY(8px) scale(.72) rotate(-4deg); } to { opacity: 1; transform: translateY(0) scale(1) rotate(0); } }
 
 /* The tray is the whole point of the reaction pass: it is visible for the length
    of an online match rather than hidden behind a menu, because an emote nobody

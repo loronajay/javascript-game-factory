@@ -661,6 +661,18 @@ test("the match keeps the bowling lane centered between supporting UI rails", ()
   assert.match(css, /\.lane-shell\s*\{[^}]*aspect-ratio:\s*2\s*\/\s*3/s);
 });
 
+test("online emotes float without borrowing the catch-line card", () => {
+  const css = readStyles();
+  const floatingEmote = css.match(/\.match-reaction-bubble\[data-reaction-kind="emote"\]\s*\{([^}]*)\}/s)?.[1] || "";
+
+  assert.match(floatingEmote, /padding:\s*0/);
+  assert.match(floatingEmote, /border:\s*0/);
+  assert.match(floatingEmote, /background:\s*transparent/);
+  assert.match(floatingEmote, /box-shadow:\s*none/);
+  assert.match(floatingEmote, /animation:\s*emote-pop/);
+  assert.match(css, /\.match-reaction-bubble\[data-reaction-kind="emote"\]\s+img\s*\{[^}]*filter:\s*drop-shadow\(/s);
+});
+
 test("the runtime owns a fixed-timestep update loop and pixel-sharp canvas", () => {
   const game = read("game.js");
   assert.match(game, /requestAnimationFrame\s*\(/);

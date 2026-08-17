@@ -50,7 +50,7 @@ describe("Yam Bowling audio", () => {
     assert.ok(EFFECTS.announce.tones.length >= 2, "announcements should use a recognizable stinger");
 
     const runtime = fs.readFileSync(require.resolve("./match/match-runtime.mjs"), "utf8");
-    assert.match(runtime, /function prepareActivePlayer\(\)[\s\S]*?audio\.play\("announce"/);
+    assert.match(runtime, /function prepareActivePlayer\([^)]*\)[\s\S]*?audio\.play\("announce"/);
   });
 
   test("keeps music at a steady volume while effects play", async () => {
@@ -101,6 +101,7 @@ describe("Yam Bowling audio", () => {
 
   test("chooses outcome cues from the roll result", () => {
     assert.equal(getOutcomeCue(10, 10, true), "strike");
+    assert.equal(getOutcomeCue(10, 10, false), "strike", "a final-frame bonus ball still clears a full rack");
     assert.equal(getOutcomeCue(4, 4, false), "spare");
     assert.equal(getOutcomeCue(0, 10, true), "gutter");
     assert.equal(getOutcomeCue(8, 10, true), "popup");
