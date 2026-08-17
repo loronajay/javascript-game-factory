@@ -31,23 +31,28 @@ export const TUTORIAL_STEPS = Object.freeze([
   Object.freeze({
     id: "spin",
     title: "Start the spin meter",
-    copy: "Press Throw — or Space — to send the needle sweeping between a hard left and a hard right hook.",
-    hint: "Hit Throw when your line looks right.",
+    copy: "Tap Throw — or Space — to send the needle sweeping between a hard left and a hard right hook. Your next press is the one you hold.",
+    hint: "Tap Throw when your line looks right.",
     highlight: Object.freeze(["throw-button"]),
     isDone: (view) => view.phase !== READY,
   }),
+  // The second press is a hold, and the player has to know that *before* they
+  // make it: stopping the needle also starts the power build, so a tap here is
+  // already a bowled shot with no power in it and the power step arrives too
+  // late to say so. Both this step and the one before it say "hold" for that
+  // reason, and `tutorial.test.mjs` holds them to it.
   Object.freeze({
     id: "hook",
     title: "Lock the hook",
-    copy: "Press again to stop the needle. Near an edge is a big hook back toward the pocket; the middle rolls it straight.",
-    hint: "Stop the needle where you want the ball to turn.",
+    copy: "Press and hold this time. The press stops the needle — near an edge is a big hook back toward the pocket, the middle rolls it straight — and power starts building the instant it stops. Keep holding.",
+    hint: "Hold Throw down where you want the ball to turn. Don't let go yet.",
     highlight: Object.freeze(["spin-meter", "throw-button"]),
     isDone: (view) => view.phase !== READY && view.phase !== SPIN,
   }),
   Object.freeze({
     id: "power",
     title: "Release in the gold",
-    copy: "Power is building now. Let go inside the gold window for the most speed — hold past it and the ball drains power instead.",
+    copy: "Still holding — that is the power meter climbing. Let go inside the gold window for the most speed; hold past it and the ball drains power instead.",
     hint: "Release Throw or Space to bowl.",
     highlight: Object.freeze(["power-meter", "throw-button"]),
     isDone: (view) => view.phase !== READY && view.phase !== SPIN && view.phase !== CHARGING,

@@ -12,7 +12,6 @@ export function sanitizeOnlineSetupSkin(onlineSetup, getOwnedSkinId) {
 export function createOnlineSession({
   session,
   onlineClient,
-  onlineIdentity,
   platformApi,
   progressionReporter,
   laneCore,
@@ -61,7 +60,10 @@ export function createOnlineSession({
     shotHud.resetChargeFeedback();
     shotHud.resetSpinFeedback();
     $("pause-overlay").hidden = true;
-    $("restart-match-button").hidden = true;
+    // Same seam the local start uses, so the pause card can never be left saying
+    // what the previous match was — an ended lesson used to leave "End lesson"
+    // on the quit button of an online room.
+    matchRuntime.syncPauseChrome();
     $("online-result-status").hidden = true;
     audio.resumeMusic();
     matchRuntime.prepareActivePlayer();
@@ -152,12 +154,12 @@ export function createOnlineSession({
     if (!accountAccess.requireFactoryAccount()) return false;
     sanitizeOnlineSetupSkin(session.onlineSetup, getOwnedSkinId);
     session.onlineSetup.intent = intent;
-    onlineClient.setIdentity(onlineIdentity);
     onlineClient.connect();
     showScreen("online-lobby-screen");
     onlineScreen.renderLobby(onlineClient.getSnapshot());
     const options = {
       modeId: session.onlineSetup.modeId,
+      ranked: session.onlineSetup.ranked === true,
       characterSlug: session.onlineSetup.characterSlug,
       skinId: session.onlineSetup.skinId,
       presentation: getMatchPresentation(session.onlineSetup.characterSlug),
@@ -232,7 +234,14 @@ export function createOnlineSession({
     }
     const outcome = session.match.winnerIds.length > 1 ? "draw"
       : session.match.winnerIds.includes(me.id) ? "win" : "loss";
-    status.textContent = "Saving this match to your Factory record…";
+    // The stakes are read off the authoritative snapshot, never off this device's
+    // setup screen: the server froze them into the match at start, and a local
+    // toggle flipped afterwards — or a resumed match whose setup was never
+    // touched — must not be able to decide whether somebody's ELO moves.
+    const ranked = session.onlineSnapshot?.ranked === true;
+    status.textContent = ranked
+      ? "Saving this match to your Factory record…"
+      : "Casual match — filing your XP…";
 
     // The rating and the XP travel together, under one session id. Preparing the
     // block queues the grant locally first, so a report that never lands is still
@@ -244,12 +253,14 @@ export function createOnlineSession({
       snapshotResult: session.onlineSnapshot?.result || null,
       opponentPlayerId: opponent.accountPlayerId,
       outcome,
+      ranked,
     });
 
     const reported = await platformApi.updateGameRating("yam-bowling", prepared?.request || {
       opponentPlayerId: opponent.accountPlayerId,
       outcome,
       sessionId,
+      ranked,
     }).catch(() => null);
     progressionReporter.settle({ grant: prepared?.grant, accepted: Boolean(reported) });
     // An older result whose request never landed files here too, rather than
@@ -257,12 +268,16 @@ export function createOnlineSession({
     await flushPendingReports();
 
     const [rating] = await Promise.all([
+      // A casual match still shows the standing record, so a player can see for
+      // themselves that it did not move.
       platformApi.getGameRating("yam-bowling", me.accountPlayerId).catch(() => null),
       progressionReporter.sync(me.accountPlayerId),
     ]);
-    const ratingLine = rating
-      ? `Factory record · ${rating.wins}W ${rating.losses}L ${rating.draws}D · ${rating.rating} ELO`
-      : "Match complete. Sign in to save wins, losses, and rating.";
+    const ratingLine = !rating
+      ? "Match complete. Sign in to save wins, losses, and rating."
+      : ranked
+        ? `Factory record · ${rating.wins}W ${rating.losses}L ${rating.draws}D · ${rating.rating} ELO`
+        : `Casual match · record unchanged at ${rating.wins}W ${rating.losses}L ${rating.draws}D · ${rating.rating} ELO`;
     const progressionLine = progressionReporter.describe();
     status.textContent = progressionLine ? `${ratingLine} · ${progressionLine}` : ratingLine;
   }

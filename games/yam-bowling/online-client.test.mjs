@@ -61,6 +61,7 @@ function createClient(options = {}) {
   MockWebSocket.instances = [];
   return createOnlineClient({
     WebSocketCtor: MockWebSocket,
+    resolveIdentity: () => ({ playerId: "factory-p1", displayName: "Bowler One" }),
     locationLike: { protocol: "http:", hostname: "localhost" },
     storage: createStorage(),
     reconnectDelayMs: 0,
@@ -92,12 +93,11 @@ test("normalizes Factory identity, room codes, and declared shot inputs", () => 
 
 test("quick match and private room commands use the shared lobby protocol", () => {
   const client = createClient();
-  client.setIdentity({ playerId: "factory-p1", displayName: "Bowler One" });
   client.connect();
   MockWebSocket.instances[0].open();
   MockWebSocket.instances[0].receive({ event: "connected", clientId: "socket-1", sessionToken: "resume-1" });
 
-  client.findQuickMatch({ modeId: "classic", characterSlug: "daisy-monroe" });
+  client.findQuickMatch({ modeId: "classic", characterSlug: "daisy-monroe", ranked: true });
   client.createPrivateRoom({ modeId: "quick", characterSlug: "nia-brooks" });
   client.joinPrivateRoom(" y4m!2 ", { characterSlug: "nia-brooks" });
 
@@ -108,7 +108,7 @@ test("quick match and private room commands use the shared lobby protocol", () =
     minPlayers: 2,
     maxPlayers: 2,
     private: false,
-    settings: { matchType: "classic", protocolVersion: YAM_BOWLING_PROTOCOL_VERSION },
+    settings: { matchType: "classic", ranked: true, protocolVersion: YAM_BOWLING_PROTOCOL_VERSION },
     identity: { playerId: "factory-p1", displayName: "Bowler One" },
   });
   assert.equal(create.type, "create_lobby");
@@ -118,9 +118,27 @@ test("quick match and private room commands use the shared lobby protocol", () =
   assert.equal(join.roomCode, "Y4M2");
 });
 
+test("the stakes are declared with the queue and never assumed", () => {
+  const client = createClient();
+  client.connect();
+  MockWebSocket.instances[0].open();
+  MockWebSocket.instances[0].receive({ event: "connected", clientId: "socket-1", sessionToken: "resume-1" });
+
+  // A caller that says nothing gets a casual lane: ELO is opted into, never
+  // defaulted into.
+  client.findQuickMatch({ modeId: "quick", characterSlug: "daisy-monroe" });
+  client.createPrivateRoom({ modeId: "quick", characterSlug: "daisy-monroe", ranked: true });
+  // A joiner names only the room; the stakes belong to the room it joins.
+  client.joinPrivateRoom("Y4M2", { characterSlug: "nia-brooks", ranked: true });
+
+  const [find, create, join] = MockWebSocket.instances[0].sent;
+  assert.equal(find.settings.ranked, false);
+  assert.equal(create.settings.ranked, true);
+  assert.equal(join.settings, undefined);
+});
+
 test("lobby join publishes the selected bowler and owner can start a full lobby", () => {
   const client = createClient();
-  client.setIdentity({ playerId: "factory-p1", displayName: "Bowler One" });
   client.connect();
   const socket = MockWebSocket.instances[0];
   socket.open();
@@ -348,4 +366,30 @@ test("a reloaded page resumes the saved relay session on startup", () => {
   assert.deepEqual(socket.sent[0], { type: "resume_lobby", clientId: "socket-1", sessionToken: "resume-1" });
   socket.receive({ event: "session_resumed", clientId: "socket-1", sessionToken: "resume-1" });
   assert.equal(client.getSnapshot().status, "started");
+});
+
+// The bug this covers: identity used to be captured by `setIdentity`, which only
+// the lobby setup screen called. A resumed session reconnects at boot without
+// ever passing through that screen, so it published the "Player" default and the
+// opponent saw it for the whole match.
+test("a resumed session still introduces the player by name", () => {
+  const storage = createStorage();
+  storage.setItem("yam-bowling.online-session.v1", JSON.stringify({ clientId: "socket-1", sessionToken: "resume-1" }));
+  let displayName = "";
+  const client = createClient({
+    storage,
+    resolveIdentity: () => ({ playerId: "factory-p1", displayName }),
+  });
+
+  client.resumeSavedSession();
+  const socket = MockWebSocket.instances[0];
+  socket.open();
+  socket.receive({ event: "connected", clientId: "socket-new", sessionToken: "resume-new" });
+  // The account answers after the socket is already up, which is exactly why the
+  // name is resolved at publish time rather than held.
+  displayName = "Bowler One";
+  socket.receive({ event: "lobby_joined", roomCode: "YAM42" });
+
+  const published = socket.sent.find((message) => message.messageType === "yam_profile");
+  assert.equal(JSON.parse(published.value).displayName, "Bowler One");
 });

@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
+from unittest.mock import Mock
 
 import numpy as np
 from PIL import Image, ImageChops, ImageStat
@@ -34,6 +35,44 @@ class ExtractCanonFramesTests(unittest.TestCase):
 
     def test_uses_high_fidelity_foreground_model_by_default(self) -> None:
         self.assertEqual(extractor.DEFAULT_MODEL, "birefnet-general-lite")
+
+    def test_true_alpha_source_bypasses_background_segmentation(self) -> None:
+        source = Image.new("RGBA", (12, 8), (10, 20, 30, 0))
+        source.putpixel((6, 4), (100, 120, 140, 255))
+        remove_background = Mock()
+
+        segmented = extractor.segment_source(source, session=object(), remover=remove_background)
+
+        remove_background.assert_not_called()
+        self.assertEqual(segmented.mode, "RGBA")
+        self.assertEqual(segmented.getpixel((6, 4)), (100, 120, 140, 255))
+
+    def test_decontaminates_white_from_soft_matte_edges(self) -> None:
+        foreground = np.array([180, 80, 20], dtype=np.float64)
+        background = np.array([254, 254, 254], dtype=np.float64)
+        alpha = 0.5
+        observed = np.round(foreground * alpha + background * (1 - alpha)).astype(np.uint8)
+        image = Image.new("RGBA", (1, 1), (*observed.tolist(), round(alpha * 255)))
+
+        clean = extractor.decontaminate_matte(image, tuple(background.astype(int)))
+
+        pixel = clean.getpixel((0, 0))
+        self.assertTrue(np.allclose(pixel[:3], foreground, atol=2), pixel)
+        self.assertEqual(pixel[3], round(alpha * 255))
+
+    def test_rebuilds_six_pose_sheet_with_empty_fixed_cell_gutters(self) -> None:
+        image = Image.new("RGBA", (600, 300), (0, 0, 0, 0))
+        # Deliberately shift each separated pose across the nominal 100px cells.
+        for left in (5, 92, 190, 288, 386, 484):
+            image.paste((220, 80, 40, 255), (left, 20, left + 78, 280))
+
+        rebuilt = extractor.rebuild_pose_sheet(image, gutter=10)
+        alpha = np.asarray(rebuilt.getchannel("A"))
+
+        self.assertEqual(rebuilt.size, image.size)
+        for boundary in (100, 200, 300, 400, 500):
+            self.assertEqual(int(alpha[:, boundary - 4 : boundary + 5].max()), 0)
+        self.assertGreater(int(alpha.max()), 0)
 
     def test_pose_crop_adds_room_for_limbs_hair_and_feet(self) -> None:
         self.assertEqual(

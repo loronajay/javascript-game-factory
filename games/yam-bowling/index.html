@@ -295,6 +295,18 @@
                 </button>
               </div>
             </section>
+            <section class="option-section online-stakes-section">
+              <p class="option-label">Stakes</p>
+              <div class="segmented segmented--stack" id="online-stakes-options">
+                <button class="choice-card is-selected" type="button" data-online-stakes="casual">
+                  <span><strong>Casual</strong><small>Bowl for XP only — no ELO</small></span><b>XP</b>
+                </button>
+                <button class="choice-card" type="button" data-online-stakes="ranked">
+                  <span><strong>Ranked</strong><small>Wins, losses and ELO are recorded</small></span><b>ELO</b>
+                </button>
+              </div>
+              <p class="online-stakes-note" id="online-stakes-note">Casual matches still earn XP and bowler mastery. Nothing touches your Factory record.</p>
+            </section>
             <section class="option-section skin-section">
               <p class="option-label">Outfit</p>
               <div class="skin-options" id="online-skin-options" aria-label="Equip an online bowler skin"></div>
@@ -321,6 +333,7 @@
             <div class="section-heading">
               <div><p class="eyebrow">Your online bowler</p><h3 id="online-roster-title">Pick a bowler</h3></div>
               <span id="online-selected-bowler">Daisy Monroe</span>
+              <small class="online-roster-count" id="online-roster-count">5 / 30 unlocked</small>
             </div>
             <div class="character-grid online-character-grid" id="online-character-grid" role="listbox" aria-label="Online bowler roster"></div>
           </section>

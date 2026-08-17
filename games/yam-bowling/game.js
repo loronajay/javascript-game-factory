@@ -1,5 +1,6 @@
 import { loadFactoryProfile } from "../../js/platform/identity/factory-profile.mjs";
-import { createOnlineIdentityPayload } from "../../js/platform/identity/match-identity.mjs";
+import { createAuthApiClient } from "../../js/platform/api/auth-api.mjs";
+import { createYamOnlineIdentity } from "./online-identity.mjs";
 import { createPlatformApiClient } from "../../js/platform/api/platform-api.mjs";
 import { createYamAccountAccess } from "./account-access.mjs";
 import { createCampaignProgressClient } from "./campaign-progress-client.mjs";
@@ -75,10 +76,13 @@ initMobileLandscapeGate();
   const renderer = new window.YamBowlingRenderer($("game-canvas"));
   const audio = AudioCore.createAudioDirector();
   const factoryProfile = loadFactoryProfile();
-  const onlineIdentity = createOnlineIdentityPayload(factoryProfile);
   const platformApi = createPlatformApiClient();
+  // Resolved per read, never captured: a sign-in or a profile edit can fill in
+  // the name after boot, and the lobby must introduce the player by whatever it
+  // says at that moment rather than by what the cache held at page load.
+  const onlineIdentity = createYamOnlineIdentity({ authApi: createAuthApiClient() });
   const accountAccess = createYamAccountAccess();
-  const onlineClient = createOnlineClient();
+  const onlineClient = createOnlineClient({ resolveIdentity: () => onlineIdentity.resolve() });
   const campaignStore = Campaign.createCampaignStore();
   // What this device owns and wears. Every cosmetic read goes through it, so
   // equipment has one owner and one migration off the old preference keys.
@@ -177,6 +181,9 @@ initMobileLandscapeGate();
       applyLevelUnlocks();
       menuSplashPicker.refresh();
       profileScreen?.refresh();
+      // A circuit clear or a fresh sign-in can hand this account a bowler, and
+      // the online roster is gated on exactly that set.
+      onlineScreen?.renderSetup();
       progressionCelebration.observe();
     },
   });
@@ -263,6 +270,7 @@ initMobileLandscapeGate();
   let matchRuntime = null;
   let circuitScreen = null;
   let tournamentScreen = null;
+  let onlineScreen = null;
   let achievementClient = null;
 
   const resultsScreen = createResultsScreen({
@@ -294,6 +302,7 @@ initMobileLandscapeGate();
     onSnapshotApplied: () => {
       menuSplashPicker.refresh();
       profileScreen?.refresh();
+      onlineScreen?.renderSetup();
     },
   });
   const scoreboard = createScoreboard({
@@ -303,13 +312,14 @@ initMobileLandscapeGate();
     shotHud,
     onCalloutHidden: () => resultsScreen.hideCalloutPose(),
   });
-  const onlineScreen = createOnlineScreen({
+  onlineScreen = createOnlineScreen({
     session,
     roster: Roster,
     animation: Animation,
     cosmetics: Cosmetics,
     assets,
     loadout,
+    campaign: campaignStore,
     onlineIdentity,
     normalizeRoomCode,
     publicProfiles,
@@ -381,7 +391,6 @@ initMobileLandscapeGate();
   onlineSession = createOnlineSession({
     session,
     onlineClient,
-    onlineIdentity,
     platformApi,
     progressionReporter,
     laneCore: LaneCore,
@@ -480,6 +489,16 @@ initMobileLandscapeGate();
       circuitScreen, tournamentScreen, profileScreen, setupScreen, onlineScreen, shotHud, syncAudioToggle, accountAccess,
       matchReactions, tutorial,
     });
+
+    // A player who signed in but has never opened their profile page in this
+    // browser has a real name on the server and an empty local cache. Ask the
+    // account for it once so the lobby does not introduce them as "Player".
+    // Never awaited: identity resolves per read, so a late answer still lands.
+    if (accountAccess.isEligible()) {
+      onlineIdentity.seedFromAccount()
+        .then(() => onlineScreen.renderSetup())
+        .catch(console.error);
+    }
 
     if (accountAccess.isEligible() && onlineClient.resumeSavedSession()) {
       showScreen("online-lobby-screen");

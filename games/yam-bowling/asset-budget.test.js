@@ -49,7 +49,7 @@ function runtimeImagePaths() {
 
 test("every player-facing image is WebP and the complete runtime set stays under budget", () => {
   const images = runtimeImagePaths();
-  assert.equal(images.length, 831);
+  assert.equal(images.length, 1071);
   assert.equal(images.every((imagePath) => imagePath.endsWith(".webp")), true);
   assert.deepEqual(images.filter((imagePath) => !fs.existsSync(path.join(root, imagePath))), []);
 

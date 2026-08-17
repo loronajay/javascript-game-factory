@@ -15,7 +15,12 @@
 .online-actions-panel { align-self: start; }
 .online-desk-heading { order: 0; display: flex; align-items: end; justify-content: space-between; gap: .75rem; }
 .online-actions-panel > .option-section:first-of-type { order: 1; }
+/* The stakes sit directly under match length: both describe the match about to
+   be bowled, and a player should read them together before choosing a route. */
+.online-actions-panel > .online-stakes-section { order: 1; }
 .online-actions-panel > .skin-section { order: 3; }
+.online-stakes-note { margin: .55rem 0 0; color: var(--muted); font-size: .6rem; line-height: 1.45; }
+.online-stakes-section .choice-card[data-online-stakes="ranked"].is-selected { border-color: rgba(243,46,63,.55); background: linear-gradient(145deg, rgba(243,46,63,.16), rgba(6,7,10,.16)); }
 .online-actions-panel > .online-inline-status { order: 4; }
 .online-desk-heading h3 { margin: 0; font-size: 1.35rem; letter-spacing: -.035em; }
 .online-desk-heading > span { padding: .35rem .48rem; border: 1px solid rgba(103,211,151,.28); border-radius: 999px; color: #8ee3b2; background: rgba(5,34,20,.2); font-size: .48rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
@@ -47,6 +52,14 @@
 .online-inline-status.is-error { color: #ff7180; }
 .online-character-grid .character-card.is-selected i { display: block; }
 .online-character-grid .character-card.is-selected i::before { content: "YOU"; }
+/* Locked bowlers stay on the grid and stay readable - they are the reason to
+   bowl the circuit - but they cannot be taken onto a scored online lane. */
+.online-character-grid .character-card b { position: absolute; z-index: 2; top: .4rem; left: .4rem; display: none; padding: .22rem .32rem; border-radius: 5px; background: rgba(6,7,10,.82); color: var(--muted); font-size: .5rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.online-character-grid .character-card.is-locked { cursor: not-allowed; opacity: .46; }
+.online-character-grid .character-card.is-locked img { filter: grayscale(1); }
+.online-character-grid .character-card.is-locked:hover { border-color: var(--line); transform: none; }
+.online-character-grid .character-card.is-locked b { display: block; }
+.online-roster-count { color: var(--gold); font-size: .62rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
 .online-lobby-screen {
   position: relative;
   display: grid;

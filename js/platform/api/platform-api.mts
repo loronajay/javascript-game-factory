@@ -454,9 +454,21 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
     // the character, a performance count. It must never carry an XP amount: the
     // server derives every award from its own catalog, and a client that named a
     // number would be declaring its own economy.
-    updateGameRating(gameSlug: string, { opponentPlayerId, outcome, sessionId, progression }: { opponentPlayerId?: unknown; outcome?: unknown; sessionId?: unknown; progression?: unknown }) {
+    // `ranked` says whether the result stakes a rating. It is omitted by every
+    // cabinet with only one kind of online match, and the API defaults it to
+    // true, so those callers report exactly as they always have. A cabinet with a
+    // casual mode sends `false` and gets the progression half without the ladder.
+    updateGameRating(gameSlug: string, { opponentPlayerId, outcome, sessionId, progression, ranked }: { opponentPlayerId?: unknown; outcome?: unknown; sessionId?: unknown; progression?: unknown; ranked?: unknown }) {
       const encoded = encodePathSegment(gameSlug);
-      return encoded ? post(`/ratings/${encoded}`, { opponentPlayerId, outcome, sessionId, progression }) : Promise.resolve(null);
+      return encoded
+        ? post(`/ratings/${encoded}`, {
+          opponentPlayerId,
+          outcome,
+          sessionId,
+          progression,
+          ...(ranked === undefined ? {} : { ranked: ranked !== false }),
+        })
+        : Promise.resolve(null);
     },
     getGameRating(gameSlug: string, playerId: string) {
       const gs = encodePathSegment(gameSlug);

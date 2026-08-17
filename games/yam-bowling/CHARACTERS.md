@@ -53,6 +53,18 @@ To add another collection, make a folder such as `assets/characters/skins/daisy-
 
 Use `--only daisy-monroe/winter` to rebuild one package. QA contact sheets and the extraction report are written under `tmp/skin-qa/`. Equipped outfits are stored per bowler on the device and copied into each match's player state.
 
+## Full asset audit
+
+Run the deterministic image audit after adding or rebuilding character art:
+
+```powershell
+.\.venv\Scripts\python.exe tools\audit_character_assets.py
+```
+
+It checks every canon and alternate portrait, result pose, throw frame, and six-pose source for missing files, invalid dimensions or alpha, clipped silhouettes, detached pose debris, large transparency punch-through, and occupied pose gutters. It also writes the complete labeled review atlases and JSON report under `tmp/character-asset-audit/`. Reviewed intentional detached details are bounded by pixel budgets, so larger future contamination still fails review.
+
+Legacy or edited packages should be finalized with `tools/repack_skin_source.py`; it rebuilds `source.png` from the approved runtime sprites with true alpha and protected per-pose gutters.
+
 ## Menu splash convention
 
 Character title-screen PNG masters live at `assets/menu-splashes/<firstname-lastname>.png`. The optimizer writes full-size and picker-thumbnail WebPs using the same canon slug. Add each available splash to `MENU_SPLASHES` in `menu-splash-core.js`, then run `tools/optimize_runtime_assets.py` so it appears in the player's menu-art picker.

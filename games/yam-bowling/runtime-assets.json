@@ -24,6 +24,7 @@
     "lane-core.js",
     "mobile-ui.mjs",
     "online-client.mjs",
+    "online-identity.mjs",
     "physics-core.js",
     "progression-core.js",
     "reward-tree-core.js",
@@ -50,6 +51,6 @@
     "assets/characters/skins/*/*/*.webp"
   ],
   "budgets": {
-    "runtimeImageBytes": 62914560
+    "runtimeImageBytes": 75497472
   }
 }

@@ -54,6 +54,7 @@
     Object.freeze({ id: "canon", name: "Classic" }),
     Object.freeze({ id: "swimsuit", name: "Swimsuit" }),
     Object.freeze({ id: "maid", name: "Maid Café" }),
+    Object.freeze({ id: "halloween", name: "Halloween" }),
   ]);
 
   const CANON_BOWLERS = Object.freeze(

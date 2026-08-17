@@ -51,3 +51,31 @@ test("legacy client-reported ratings cannot write the Tactical Arena ladder", as
   assert.equal(response.json.error, "server_attestation_required");
   assert.deepEqual(calls, []);
 });
+
+test("a reported match is ranked unless it opts out, so no existing caller changes meaning", async () => {
+  const calls = [];
+  const app = createApp({
+    jwtSecret: TEST_SECRET,
+    recordMatchRating: async (gameSlug, options) => {
+      calls.push(options);
+      return { ok: true };
+    },
+    now: () => "2026-08-03T00:00:00.000Z",
+  });
+  const token = signToken({ playerId: "player-1", email: "player@test.com" }, TEST_SECRET);
+  const base = { opponentPlayerId: "player-2", outcome: "win", sessionId: "yam-bowling:ROOM:1:1" };
+
+  // No flag at all: every cabinet that predates the split keeps staking a rating.
+  assert.equal((await post(app, "/ratings/yam-bowling", token, base)).statusCode, 200);
+  assert.equal(calls[0].ranked, true);
+
+  assert.equal((await post(app, "/ratings/yam-bowling", token, { ...base, ranked: true })).statusCode, 200);
+  assert.equal(calls[1].ranked, true);
+
+  // Only an explicit `false` opts out. Anything else is not an opt-out.
+  assert.equal((await post(app, "/ratings/yam-bowling", token, { ...base, ranked: false })).statusCode, 200);
+  assert.equal(calls[2].ranked, false);
+
+  assert.equal((await post(app, "/ratings/yam-bowling", token, { ...base, ranked: "false" })).statusCode, 200);
+  assert.equal(calls[3].ranked, true);
+});

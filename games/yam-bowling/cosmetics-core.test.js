@@ -129,7 +129,7 @@ test("Canon is the only default-owned skin and its entitlement gates matching ou
   assert.equal(canonSkin.unlock.source, "founding");
   assert.ok(isOwnedByDefault(canonSkin.id));
 
-  for (const skinId of ["swimsuit", "maid"]) {
+  for (const skinId of ["swimsuit", "maid", "halloween"]) {
     const entitlementId = buildItemId("skin", "reina-sato", skinId);
     for (const type of ["skin", "victory-pose", "defeat-pose"]) {
       const item = getItem(buildItemId(type, "reina-sato", skinId));

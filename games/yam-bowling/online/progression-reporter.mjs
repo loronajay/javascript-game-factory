@@ -45,7 +45,10 @@ export function createProgressionReporter({ progressionCore, store, platformApi,
   // request. They are taken here so the whole request can be queued beside the
   // grant: a request that never reached the server is otherwise known to be
   // outstanding but impossible to file again.
-  function prepare({ match, clientId, sessionId, snapshotResult, opponentPlayerId = null, outcome = null }) {
+  // `ranked` belongs to the rating half too, and is stored with the rest of the
+  // request for the same reason: a replay months later must file the match at the
+  // stakes it was bowled at, and the snapshot that knew them is long gone.
+  function prepare({ match, clientId, sessionId, snapshotResult, opponentPlayerId = null, outcome = null, ranked = false }) {
     const me = match?.players?.find((player) => player.id === clientId);
     if (!me || !sessionId) return null;
 
@@ -76,7 +79,7 @@ export function createProgressionReporter({ progressionCore, store, platformApi,
     // Only a complete request is worth queuing. Half of one would have to be
     // guessed at on replay, and a guessed rating report is a wrong record.
     const request = opponentPlayerId && outcome
-      ? { opponentPlayerId, outcome, sessionId, progression: block }
+      ? { opponentPlayerId, outcome, sessionId, ranked: ranked === true, progression: block }
       : null;
     store.recordPending(grant, request);
 

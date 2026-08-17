@@ -82,7 +82,7 @@ export async function getGameRating(pool: any, playerId: any, gameSlug: any): Pr
 // Updates ELO for both players atomically.
 // Returns null if session was already processed (dedup) or on DB error.
 // outcome: 'win' | 'loss' | 'draw' — from the perspective of reporterPlayerId.
-export async function recordMatchRating(pool: any, { reporterPlayerId, opponentPlayerId, gameSlug, outcome, sessionId, occurredAt, progression }: any): Promise<any> {
+export async function recordMatchRating(pool: any, { reporterPlayerId, opponentPlayerId, gameSlug, outcome, sessionId, occurredAt, progression, ranked = true }: any): Promise<any> {
   if (!pool || !reporterPlayerId || !opponentPlayerId || !gameSlug || !sessionId) return null;
   if (reporterPlayerId === opponentPlayerId) return null;
 
@@ -94,6 +94,10 @@ export async function recordMatchRating(pool: any, { reporterPlayerId, opponentP
     // one transaction settles BOTH players' ratings. XP is not like that: each
     // player earns their own and files their own report, so the progression
     // award below runs for every reporter and dedups on its own per-player key.
+    // That also means the FIRST reporter decides the stakes. Both clients read
+    // `ranked` off the same authoritative match snapshot so they cannot honestly
+    // disagree, and if they somehow do, the casual claim is the one that sticks —
+    // the safe direction, since it costs nobody a rating.
     const dedup = await client.query(
       `insert into game_rating_sessions (session_id, game_slug, mode_id) values ($1, $2, $3)
        on conflict (session_id, game_slug) do nothing`,
@@ -108,7 +112,20 @@ export async function recordMatchRating(pool: any, { reporterPlayerId, opponentP
         reporterPlayerId, gameSlug, sessionId, outcome, progression,
       });
       await client.query("commit");
-      return { ok: true, alreadyProcessed: true, progression: settled };
+      return { ok: true, alreadyProcessed: true, ranked: ranked !== false, progression: settled };
+    }
+
+    // A casual match: the session is stamped and the reporter's XP is awarded,
+    // but no rating moves and no win/loss is written. The dedup row is still
+    // claimed above, because the session id is the XP grant id and the mode
+    // stamp both players are clamped against — a casual result is a real result,
+    // it just is not a competitive one.
+    if (ranked === false) {
+      const settled = await awardProgression(client, {
+        reporterPlayerId, gameSlug, sessionId, outcome, progression,
+      });
+      await client.query("commit");
+      return { ok: true, ranked: false, progression: settled };
     }
 
     const now = occurredAt || new Date().toISOString();
@@ -154,6 +171,7 @@ export async function recordMatchRating(pool: any, { reporterPlayerId, opponentP
     await client.query("commit");
     return {
       ok: true,
+      ranked: true,
       reporter: { playerId: reporterPlayerId, oldRating: rA.rating, newRating: newRatingA },
       opponent: { playerId: opponentPlayerId, oldRating: rB.rating, newRating: newRatingB },
       progression: granted,

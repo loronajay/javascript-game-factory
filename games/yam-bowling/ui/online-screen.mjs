@@ -13,6 +13,7 @@ export function createOnlineScreen({
   cosmetics,
   assets,
   loadout,
+  campaign,
   onlineIdentity,
   normalizeRoomCode,
   publicProfiles,
@@ -24,17 +25,45 @@ export function createOnlineScreen({
   const { onlineSetup } = session;
   let latestLobbySnapshot = null;
 
+  // Online is the scored track: a finished online match files a record and XP
+  // against the bowler that played it, so a bowler this account has not
+  // unlocked must not be able to take the lane. The card stays visible and
+  // locked rather than hidden, the same rule the skin strip uses - a reward
+  // nobody can see is a reward nobody plays for.
+  function ownedSlugs() {
+    return new Set(campaign.getUnlockedBowlerSlugs());
+  }
+
+  function resolveOwnedSlug(preferred, owned) {
+    if (owned.has(preferred)) return preferred;
+    return roster.find((bowler) => owned.has(bowler.slug))?.slug || roster[0].slug;
+  }
+
   function renderSetup() {
+    // A revoked entitlement or a sign-out can strip the bowler that was already
+    // chosen, so the selection is re-resolved against ownership on every paint.
+    const owned = ownedSlugs();
+    onlineSetup.characterSlug = resolveOwnedSlug(onlineSetup.characterSlug, owned);
     onlineSetup.skinId = assets.storedSkinId(onlineSetup.characterSlug);
     setSelected($("online-mode-options"), "data-online-mode", onlineSetup.modeId);
+    setSelected($("online-stakes-options"), "data-online-stakes", onlineSetup.ranked ? "ranked" : "casual");
+    $("online-stakes-note").textContent = onlineSetup.ranked
+      ? "Ranked matches move your Factory rating and win/loss record — and your opponent's."
+      : "Casual matches still earn XP and bowler mastery. Nothing touches your Factory record.";
     const bowler = assets.bowlerBySlug(onlineSetup.characterSlug);
     $("online-selected-bowler").textContent = bowler.name;
     $("online-account-name").textContent = onlineIdentity.displayName || "Player";
     for (const card of $("online-character-grid").querySelectorAll(".character-card")) {
       const selected = card.dataset.slug === onlineSetup.characterSlug;
+      const locked = !owned.has(card.dataset.slug);
       card.classList.toggle("is-selected", selected);
+      card.classList.toggle("is-locked", locked);
       card.setAttribute("aria-selected", String(selected));
+      // Locked cards stay clickable so the click can explain itself; a disabled
+      // button would swallow the event and say nothing.
+      card.setAttribute("aria-disabled", String(locked));
     }
+    $("online-roster-count").textContent = `${owned.size} / ${roster.length} unlocked`;
     renderSkinOptions({
       containerId: "online-skin-options",
       slug: onlineSetup.characterSlug,
@@ -85,7 +114,17 @@ export function createOnlineScreen({
     const privateRoom = lobby?.isPrivate === true
       || onlineSetup.intent === "private-create"
       || onlineSetup.intent === "private-join";
-    $("online-lobby-kind").textContent = privateRoom ? "Private room" : "Quick match";
+    // The stakes shown are the room's, not this device's pick: a player joining
+    // by code takes the stakes the room was opened with, so the toggle they left
+    // behind on the setup screen must not be what the lobby card claims. Before
+    // the server has answered there is no room yet, and the local intent is the
+    // only honest thing to show.
+    const ranked = snapshot.matchState
+      ? snapshot.matchState.ranked === true
+      : lobby?.settings
+        ? lobby.settings.ranked === true
+        : onlineSetup.ranked === true;
+    $("online-lobby-kind").textContent = `${privateRoom ? "Private room" : "Quick match"} · ${ranked ? "Ranked" : "Casual"}`;
     $("online-lobby-title").textContent = lobby?.playerCount >= 2
       ? "Match found"
       : roomCode
@@ -149,8 +188,15 @@ export function createOnlineScreen({
       card.type = "button";
       card.dataset.slug = bowler.slug;
       card.setAttribute("role", "option");
-      card.innerHTML = `<img src="${assets.characterPortrait(bowler.slug)}" alt="" loading="lazy"><span>${bowler.name}</span><i></i>`;
+      card.innerHTML = `<img src="${assets.characterPortrait(bowler.slug)}" alt="" loading="lazy"><span>${bowler.name}</span><i></i><b>Locked</b>`;
       card.addEventListener("click", () => {
+        // Ownership is re-read on the click rather than captured at build time,
+        // because a circuit clear or a sign-in can unlock a bowler mid-session.
+        if (!ownedSlugs().has(bowler.slug)) {
+          $("online-menu-status").textContent = `${bowler.name} is locked. Win their circuit match to bowl as them online.`;
+          $("online-menu-status").classList.remove("is-error");
+          return;
+        }
         onlineSetup.characterSlug = bowler.slug;
         onlineSetup.skinId = assets.storedSkinId(bowler.slug);
         renderSetup();
@@ -164,6 +210,12 @@ export function createOnlineScreen({
       const button = event.target.closest("[data-online-mode]");
       if (!button) return;
       onlineSetup.modeId = button.dataset.onlineMode;
+      renderSetup();
+    });
+    $("online-stakes-options").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-online-stakes]");
+      if (!button) return;
+      onlineSetup.ranked = button.dataset.onlineStakes === "ranked";
       renderSetup();
     });
     $("quick-match-button").addEventListener("click", () => onBegin("quick"));

@@ -140,6 +140,21 @@ export function createMatchRuntime({
     }
   }
 
+  // The pause overlay says what *this* match is, so it is derived from the live
+  // session at every start rather than written once per entry point. The online
+  // path resets the same chrome, and when only one of the two wrote the label an
+  // ended lesson left "End lesson" sitting in an online match's pause card.
+  function syncPauseChrome() {
+    // Restarting is the lesson's problem (the coach would be left on a step the
+    // lane has moved past) and not this client's to offer online at all.
+    $("restart-match-button").hidden = Boolean(session.tutorialMatch) || Boolean(session.onlineMatch);
+    $("quit-match-button").textContent = session.onlineMatch
+      ? "Leave match"
+      : session.tournamentMatch ? "Quit to tournament"
+        : session.campaignMatch ? "Quit to circuit"
+          : session.tutorialMatch ? "End lesson" : "Quit to setup";
+  }
+
   function startMatch() {
     applyMatchLane(session.tournamentMatch?.venueSlug || session.campaignMatch?.venueSlug || getLocalLaneSlug());
     session.setup.skinIds = session.setup.characterSlugs.map((slug) => assets.storedSkinId(slug));
@@ -160,13 +175,7 @@ export function createMatchRuntime({
     shotHud.resetChargeFeedback();
     shotHud.resetSpinFeedback();
     $("pause-overlay").hidden = true;
-    // Restarting a lesson mid-step would leave the coach on a step the lane has
-    // already moved past, so the tutorial gets no restart button at all.
-    $("restart-match-button").hidden = Boolean(session.tutorialMatch);
-    $("quit-match-button").textContent = session.tournamentMatch
-      ? "Quit to tournament"
-      : session.campaignMatch ? "Quit to circuit"
-        : session.tutorialMatch ? "End lesson" : "Quit to setup";
+    syncPauseChrome();
     $("online-result-status").hidden = true;
     audio.resumeMusic();
     resetHumanShot();
@@ -428,6 +437,7 @@ export function createMatchRuntime({
     beginThrow,
     applyBallProfile,
     clonePins,
+    syncPauseChrome,
     tick,
   };
 }

@@ -86,7 +86,7 @@ export async function handleRatingRoute(context: any): Promise<boolean> {
       writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
       return true;
     }
-    const { opponentPlayerId, outcome, sessionId, progression } = body.value || {};
+    const { opponentPlayerId, outcome, sessionId, progression, ranked } = body.value || {};
     if (!opponentPlayerId || typeof opponentPlayerId !== "string") {
       writeJson(res, 400, { status: "error", error: "missing_opponent", timestamp }, requestOrigin);
       return true;
@@ -104,6 +104,12 @@ export async function handleRatingRoute(context: any): Promise<boolean> {
       opponentPlayerId: opponentPlayerId.trim(),
       outcome,
       sessionId: sessionId.trim().slice(0, 200),
+      // Whether this result moves ELO and the win/loss record. It defaults to
+      // true because every caller that predates the split reports ranked play and
+      // must keep doing so; a cabinet with a casual mode opts out explicitly.
+      // A casual report is still a report — it carries its XP and stamps the
+      // session — so the progression half is unaffected either way.
+      ranked: ranked !== false,
       progression: normalizeProgression(progression),
     });
     if (result === null) {

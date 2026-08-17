@@ -41,8 +41,10 @@ export function bindEvents({
     if (session.onlineMatch) onlineSession.leave();
     else if (session.tournamentMatch) tournamentScreen.returnToTournament();
     else if (session.campaignMatch) circuitScreen.returnToCircuit();
-    else if (session.tutorialMatch) tutorial.exit("title");
-    else showScreen("setup-screen");
+    // The lesson owns its own way out, and `exit` reports whether it took it. A
+    // flag left standing by a coach that is no longer running must not swallow
+    // the quit and strand the player on the lane, so setup is the fallback.
+    else if (!session.tutorialMatch || !tutorial.exit("title")) showScreen("setup-screen");
     audio.resumeMusic();
   }
 

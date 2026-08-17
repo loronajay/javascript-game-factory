@@ -549,7 +549,10 @@ test("public profiles use public documents, stay read-only, and share the Match 
   assert.match(resultsScreen, /data-public-profile-id/);
   assert.match(resultsScreen, /accountPlayerId/);
   assert.doesNotMatch(model, /rank|elo|spareRate/i);
-  assert.doesNotMatch(onlineScreen, /rank|elo|spareRate/i);
+  // The online screen names the STAKES — it owns the ranked/casual toggle — but
+  // it must still never read or paint a competitive figure. The identity card is
+  // an identity card: a bowler, a level, a title, never a ladder position.
+  assert.doesNotMatch(onlineScreen, /spareRate|\bELO\b|getGameRating|\.rating\b|ratingLine/);
   assert.match(html.match(/<button[^>]+id=["']public-profile-close["'][^>]*>/)?.[0] || "", /aria-keyshortcuts=["']Escape["']/);
   assert.match(html, /id=["']public-profile-close-hint["'][^>]*>[\s\S]*?<kbd>Esc<\/kbd>[\s\S]*?Close/i);
   assert.match(
@@ -578,11 +581,53 @@ test("online play uses the Factory identity, server-owned shots, ratings, and re
   const game = read("game.js");
   assert.match(html, /type=["']module["'][^>]*src=["']game\.js["']/);
   assert.match(game, /loadFactoryProfile/);
-  assert.match(game, /createOnlineIdentityPayload/);
   assert.match(game, /createOnlineClient/);
+  // The lobby name is derived from the Factory profile through one module, and
+  // resolved per send rather than captured: the identity a client publishes must
+  // never be older than the profile it came from.
+  assert.match(read("online-identity.mjs"), /createOnlineIdentityPayload/);
+  assert.match(game, /createYamOnlineIdentity/);
+  assert.match(game, /resolveIdentity:/);
+  assert.doesNotMatch(read("online-client.mjs"), /function setIdentity/);
+  // A cabinet derives a match alias; it never writes the shared factory profile.
+  assert.doesNotMatch(read("online-identity.mjs"), /saveFactoryProfile|bindFactoryProfileToSession/);
   assert.match(read("match/match-runtime.mjs"), /onlineClient\.submitShot/);
   assert.match(read("online/online-session.mjs"), /updateGameRating\(["']yam-bowling["']/);
   assert.match(read("online-client.mjs"), /resume_lobby/);
+});
+
+// Ranked and casual are one lane apart, so the thing that decides which is which
+// has to be the server's answer and nothing else. The client picks the stakes it
+// QUEUES for; it never picks the stakes it REPORTS.
+test("online stakes are chosen on the setup screen and decided by the server", () => {
+  const html = read("index.html");
+  const onlineScreen = readCode("ui/online-screen.mjs");
+  const onlineClient = readCode("online-client.mjs");
+  const onlineSession = readCode("online/online-session.mjs");
+  const reporter = readCode("online/progression-reporter.mjs");
+
+  assert.match(html, /id=["']online-stakes-options["']/);
+  assert.match(html, /data-online-stakes=["']ranked["']/);
+  assert.match(html, /data-online-stakes=["']casual["']/);
+  assert.match(onlineScreen, /onlineSetup\.ranked/);
+
+  // The stakes ride in lobby settings, where matchmaking can see them: a ranked
+  // search must never be paired with a casual room.
+  assert.match(onlineClient, /settings:\s*\{[^}]*ranked:/);
+
+  // The report takes the stakes off the authoritative snapshot. Reading them off
+  // the setup screen instead is the bug this whole seam exists to prevent — a
+  // toggle flipped after the match, or a resumed match whose setup was never
+  // touched, would otherwise decide whether somebody's rating moves.
+  assert.match(onlineSession, /session\.onlineSnapshot\?\.ranked === true/);
+  assert.doesNotMatch(
+    onlineSession.slice(onlineSession.indexOf("async function reportResult")),
+    /onlineSetup/,
+    "reportResult must not consult the local setup screen for the stakes",
+  );
+  // And the queued re-send remembers them, because the snapshot is long gone by
+  // the time an unsent report is replayed.
+  assert.match(reporter, /ranked: ranked === true/);
 });
 
 test("the title splash keeps the complete painted artwork visible", () => {

@@ -59,6 +59,39 @@ class FrameReport:
     edge_pixels: int
 
 
+def segment_source(source: Image.Image, session, remover=remove) -> Image.Image:
+    """Use a supplied true-alpha source directly; segment opaque source art."""
+    rgba = source.convert("RGBA")
+    alpha_extrema = rgba.getchannel("A").getextrema()
+    if alpha_extrema[0] == 0 and alpha_extrema[1] > 0:
+        return rgba.copy()
+    segmented = remover(rgba, session=session, alpha_matting=False)
+    return segmented if isinstance(segmented, Image.Image) else Image.open(segmented).convert("RGBA")
+
+
+def decontaminate_matte(
+    image: Image.Image,
+    background_rgb: tuple[int, int, int] = (254, 254, 254),
+    alpha_floor: int = ALPHA_THRESHOLD,
+) -> Image.Image:
+    """Remove a known key color from semi-transparent foreground edge pixels."""
+    rgba = np.asarray(image.convert("RGBA")).copy()
+    rgb = rgba[:, :, :3].astype(np.float64)
+    alpha_bytes = rgba[:, :, 3]
+    alpha = alpha_bytes.astype(np.float64) / 255.0
+    visible = alpha_bytes > alpha_floor
+    safe_alpha = np.maximum(alpha[:, :, None], 1 / 255)
+    background = np.asarray(background_rgb, dtype=np.float64)[None, None, :]
+    foreground = (rgb - (1.0 - alpha[:, :, None]) * background) / safe_alpha
+    rgba[:, :, :3] = np.where(
+        visible[:, :, None],
+        np.clip(np.round(foreground), 0, 255),
+        0,
+    ).astype(np.uint8)
+    rgba[:, :, 3] = np.where(visible, alpha_bytes, 0).astype(np.uint8)
+    return Image.fromarray(rgba, "RGBA")
+
+
 def smooth_projection(mask: np.ndarray, radius: int = 11) -> np.ndarray:
     projection = mask.sum(axis=0).astype(np.float64)
     return ndimage.uniform_filter1d(projection, size=radius * 2 + 1, mode="nearest")
@@ -331,6 +364,39 @@ def normalize_frames(frames: list[tuple[Image.Image, tuple[int, int, int, int]]]
     return outputs
 
 
+def rebuild_pose_sheet(image: Image.Image, gutter: int = 10) -> Image.Image:
+    """Recompose six separated figures into fixed cells with guaranteed gutters."""
+    rgba = image.convert("RGBA")
+    if rgba.width % SOURCE_POSE_COUNT:
+        raise ValueError(f"Sheet width must be divisible by {SOURCE_POSE_COUNT}.")
+    boundaries = find_pose_boundaries(np.asarray(rgba.getchannel("A")))
+    subjects: list[Image.Image] = []
+    for pose_index in range(SOURCE_POSE_COUNT):
+        crop = rgba.crop((boundaries[pose_index], 0, boundaries[pose_index + 1], rgba.height))
+        clean, bounds = retain_target_component(crop, opening_size=3)
+        subjects.append(clean.crop(bounds))
+
+    cell_width = rgba.width // SOURCE_POSE_COUNT
+    maximum_width = max(subject.width for subject in subjects)
+    maximum_height = max(subject.height for subject in subjects)
+    scale = min(
+        1.0,
+        (cell_width - gutter * 2) / maximum_width,
+        (rgba.height - gutter * 2) / maximum_height,
+    )
+    canvas = Image.new("RGBA", rgba.size, (0, 0, 0, 0))
+    for pose_index, subject in enumerate(subjects):
+        size = (
+            max(1, round(subject.width * scale)),
+            max(1, round(subject.height * scale)),
+        )
+        subject = subject.resize(size, Image.Resampling.LANCZOS)
+        x = pose_index * cell_width + (cell_width - subject.width) // 2
+        y = rgba.height - gutter - subject.height
+        canvas.alpha_composite(subject, (x, y))
+    return clear_invisible_rgb(canvas)
+
+
 def alpha_bounds(image: Image.Image) -> tuple[int, int, int, int]:
     alpha = np.asarray(image.getchannel("A"))
     ys, xs = np.nonzero(alpha > 0)
@@ -525,8 +591,7 @@ def process_portrait_sheet(
     portrait_path: Path | None = None,
 ) -> Image.Image:
     source = Image.open(source_path).convert("RGBA")
-    segmented = remove(source, session=session, alpha_matting=False)
-    segmented = segmented if isinstance(segmented, Image.Image) else Image.open(segmented).convert("RGBA")
+    segmented = segment_source(source, session)
     boundaries = find_pose_boundaries(np.asarray(segmented.getchannel("A")))
     destination = portrait_path or portrait_root / f"{source_path.stem}.webp"
     return save_portrait(segmented, boundaries, destination)
@@ -565,8 +630,7 @@ def process_sheet(
 ) -> list[FrameReport]:
     short_id = short_id or source_path.stem
     source = Image.open(source_path).convert("RGBA")
-    segmented = remove(source, session=session, alpha_matting=False)
-    segmented = segmented if isinstance(segmented, Image.Image) else Image.open(segmented).convert("RGBA")
+    segmented = segment_source(source, session)
     alpha = np.asarray(segmented.getchannel("A"))
     boundaries = find_pose_boundaries(alpha)
     save_portrait(

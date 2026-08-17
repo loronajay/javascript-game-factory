@@ -38,6 +38,11 @@ export function createSessionState({ physics, animation, effects, storedSkinId, 
     },
     onlineSetup: {
       modeId: "quick",
+      // The stakes of the next online match. Casual by default on purpose: a
+      // rating should be staked deliberately, and the cost of the wrong default
+      // is asymmetric — an unrecorded ranked match can be bowled again, an
+      // accidental ranked loss is somebody else's ladder.
+      ranked: false,
       characterSlug: "daisy-monroe",
       skinId: storedSkinId("daisy-monroe"),
       intent: null,

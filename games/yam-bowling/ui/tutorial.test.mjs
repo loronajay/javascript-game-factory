@@ -87,6 +87,21 @@ test("the script teaches the shot in the order the shot is taken", () => {
   }
 });
 
+// The press that stops the spin needle is the same press that charges power, so
+// a player told only to "press again" taps it and bowls a dead shot before the
+// power step is ever shown. The hold has to be taught on the press itself.
+test("the hold is taught on the press that starts the power build, not after it", () => {
+  const byId = Object.fromEntries(TUTORIAL_STEPS.map((step) => [step.id, step]));
+  const hook = `${byId.hook.copy} ${byId.hook.hint}`.toLowerCase();
+  assert.match(hook, /hold/, "the hook step must tell the player to hold the press, not tap it");
+  assert.doesNotMatch(byId.hook.copy.toLowerCase(), /press again\b(?!.*hold)/);
+  assert.match(
+    `${byId.spin.copy} ${byId.spin.hint}`.toLowerCase(),
+    /hold/,
+    "the step before it must warn that the next press is held",
+  );
+});
+
 test("starting the tutorial bowls a real match on its own setup and restores the player's", () => {
   const { session, started, coach, nodes } = harness();
   coach.bind();

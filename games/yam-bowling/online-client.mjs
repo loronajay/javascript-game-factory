@@ -135,6 +135,7 @@ function normalizeLobby(data = {}) {
     isPrivate: data.isPrivate === true,
     settings: {
       matchType: normalizeModeId(data.settings?.matchType),
+      ranked: data.settings?.ranked === true,
       protocolVersion: Number(data.settings?.protocolVersion) || 1,
     },
     startAt: Number.isFinite(Number(data.startAt)) ? Number(data.startAt) : null,
@@ -152,8 +153,13 @@ export function createOnlineClient(options = {}) {
   const storage = options.storage || globalThis.sessionStorage || globalThis.localStorage;
   const setTimer = options.setTimer || globalThis.setTimeout;
   const reconnectDelayMs = Number.isFinite(Number(options.reconnectDelayMs)) ? Number(options.reconnectDelayMs) : 1500;
+  // Identity is resolved every time it is sent, never captured once. The resumed
+  // session is why: it reconnects at boot without passing through the lobby
+  // screen, so a client holding a stored value published the "Player" default to
+  // the opponent for the whole match.
+  const resolveIdentity = typeof options.resolveIdentity === "function" ? options.resolveIdentity : () => null;
+  const currentIdentity = () => sanitizeOnlineIdentity(resolveIdentity());
   let socket = null;
-  let identity = sanitizeOnlineIdentity(null);
   let selectedCharacterSlug = "daisy-monroe";
   let selectedSkinId = "canon";
   let selectedPresentation = sanitizePresentation(null);
@@ -208,7 +214,7 @@ export function createOnlineClient(options = {}) {
 
   function publishProfile() {
     lobbyMessage("yam_profile", {
-      ...identity,
+      ...currentIdentity(),
       characterSlug: selectedCharacterSlug,
       skinId: selectedSkinId,
       presentation: selectedPresentation,
@@ -342,11 +348,7 @@ export function createOnlineClient(options = {}) {
     return true;
   }
 
-  function setIdentity(value) {
-    identity = sanitizeOnlineIdentity(value);
-  }
-
-  function lobbyRequest(type, { modeId = "quick", characterSlug = "daisy-monroe", skinId = "canon", presentation = {}, roomCode = "", privateRoom = false } = {}) {
+  function lobbyRequest(type, { modeId = "quick", ranked = false, characterSlug = "daisy-monroe", skinId = "canon", presentation = {}, roomCode = "", privateRoom = false } = {}) {
     selectedCharacterSlug = boundedText(characterSlug, 64, "daisy-monroe");
     selectedSkinId = boundedText(skinId, 40, "canon");
     selectedPresentation = sanitizePresentation(presentation);
@@ -357,9 +359,14 @@ export function createOnlineClient(options = {}) {
         minPlayers: 2,
         maxPlayers: 2,
         private: privateRoom,
-        settings: { matchType: normalizeModeId(modeId), protocolVersion: YAM_BOWLING_PROTOCOL_VERSION },
+        // The stakes ride in lobby settings rather than in the profile message,
+        // because matchmaking pairs on settings: a ranked search must never be
+        // handed a casual room. A join names only the room code, so a joiner
+        // takes the stakes the room was opened with rather than declaring their
+        // own — the same rule as the mode.
+        settings: { matchType: normalizeModeId(modeId), ranked: ranked === true, protocolVersion: YAM_BOWLING_PROTOCOL_VERSION },
       }),
-      identity,
+      identity: currentIdentity(),
     };
     send(payload);
     emit({ status: type === "find_lobby" ? "searching" : type === "create_lobby" ? "creating" : "joining", error: null });
@@ -426,7 +433,6 @@ export function createOnlineClient(options = {}) {
   return {
     connect,
     resumeSavedSession,
-    setIdentity,
     findQuickMatch,
     createPrivateRoom,
     joinPrivateRoom,
