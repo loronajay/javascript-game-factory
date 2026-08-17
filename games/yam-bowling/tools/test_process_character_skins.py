@@ -58,6 +58,18 @@ class ProcessCharacterSkinsTests(unittest.TestCase):
         self.assertIn('"--portraits-only"', script)
         self.assertIn("extractor.process_portrait_sheet(", script)
 
+    def test_manual_overrides_are_scoped_by_skin_collection(self) -> None:
+        package = processor.SkinPackage(
+            "cassy-cruz",
+            "halloween",
+            Path("assets/characters/skins/cassy-cruz/halloween/source.png"),
+        )
+
+        self.assertEqual(
+            processor.skin_override_root(Path("manual-overrides"), package),
+            Path("manual-overrides/halloween"),
+        )
+
     def test_instance_candidates_keep_best_six_and_sort_left_to_right(self) -> None:
         boxes = [
             [500, 0, 590, 100],

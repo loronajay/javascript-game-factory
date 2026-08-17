@@ -17,6 +17,71 @@ from scipy import ndimage
 ASSET_ROOT = Path("assets/characters")
 HALLOWEEN_ROOT = ASSET_ROOT / "skins"
 ALPHA_THRESHOLD = 8
+RUNTIME_SIZE = (440, 960)
+
+
+def remove_white_matte(
+    image: Image.Image,
+    background_rgb: tuple[int, int, int] = (255, 255, 255),
+) -> Image.Image:
+    """Unblend the generated white backdrop from antialiased edge pixels."""
+    rgba = np.asarray(image.convert("RGBA")).copy()
+    alpha_bytes = rgba[:, :, 3]
+    alpha = alpha_bytes.astype(np.float64) / 255.0
+    visible = alpha_bytes > ALPHA_THRESHOLD
+    soft = visible & (alpha_bytes < 255)
+    safe_alpha = np.maximum(alpha[:, :, None], 1 / 255)
+    rgb = rgba[:, :, :3].astype(np.float64)
+    background = np.asarray(background_rgb, dtype=np.float64)[None, None, :]
+    foreground = (rgb - (1.0 - alpha[:, :, None]) * background) / safe_alpha
+    rgba[:, :, :3] = np.where(
+        soft[:, :, None],
+        np.clip(np.round(foreground), 0, 255),
+        rgba[:, :, :3],
+    ).astype(np.uint8)
+    rgba[:, :, 3] = np.where(visible, alpha_bytes, 0).astype(np.uint8)
+    rgba[rgba[:, :, 3] == 0, :3] = 0
+    return Image.fromarray(rgba, "RGBA")
+
+
+def normalize_override(
+    image: Image.Image,
+    *,
+    side_margin: int = 24,
+    top_margin: int = 30,
+    bottom_margin: int = 30,
+    subject_height: int | None = None,
+) -> Image.Image:
+    """Fit a complete edited subject onto the standard transparent canvas."""
+    rgba = clear_invisible_rgb(image)
+    alpha = np.asarray(rgba.getchannel("A"))
+    ys, xs = np.where(alpha > ALPHA_THRESHOLD)
+    if not len(xs):
+        raise ValueError("Cannot normalize an empty generated override.")
+    subject = rgba.crop(
+        (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
+    )
+    maximum_scale = min(
+        (RUNTIME_SIZE[0] - side_margin * 2) / subject.width,
+        (RUNTIME_SIZE[1] - top_margin - bottom_margin) / subject.height,
+    )
+    scale = min(
+        maximum_scale,
+        subject_height / subject.height if subject_height is not None else maximum_scale,
+    )
+    size = (
+        max(1, round(subject.width * scale)),
+        max(1, round(subject.height * scale)),
+    )
+    subject = subject.convert("RGBa").resize(
+        size, Image.Resampling.LANCZOS
+    ).convert("RGBA")
+    canvas = Image.new("RGBA", RUNTIME_SIZE, (0, 0, 0, 0))
+    canvas.alpha_composite(
+        subject,
+        ((RUNTIME_SIZE[0] - subject.width) // 2, RUNTIME_SIZE[1] - bottom_margin - subject.height),
+    )
+    return clear_invisible_rgb(canvas)
 
 def clear_invisible_rgb(image: Image.Image) -> Image.Image:
     rgba = np.asarray(image.convert("RGBA")).copy()
@@ -104,7 +169,7 @@ def repair_sprite(slug: str, frame: int, image: Image.Image) -> Image.Image:
                 [(143, 245), (163, 245), (163, 292), (143, 292)],
             ],
         )
-    return clear_invisible_rgb(result)
+    return clear_invisible_rgb(remove_white_matte(result))
 
 
 def save_runtime(image: Image.Image, destination: Path) -> None:
@@ -117,10 +182,37 @@ def save_runtime(image: Image.Image, destination: Path) -> None:
     )
 
 
+def clean_runtime_mattes(output_root: Path | None = None) -> list[Path]:
+    """Remove the white generation matte from every Halloween runtime asset."""
+    outputs = []
+    for source in sorted(HALLOWEEN_ROOT.glob("*/halloween/*.webp")):
+        with Image.open(source) as opened:
+            cleaned = remove_white_matte(opened)
+        destination = (
+            output_root / source.parent.parent.name / source.name
+            if output_root
+            else source
+        )
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        save_runtime(cleaned, destination)
+        outputs.append(destination)
+    return outputs
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, help="Write a review copy instead of overwriting assets.")
+    parser.add_argument(
+        "--all-mattes",
+        action="store_true",
+        help="Remove the generated white matte from every Halloween runtime asset.",
+    )
     args = parser.parse_args()
+
+    if args.all_mattes:
+        for destination in clean_runtime_mattes(args.output):
+            print(destination)
+        return
 
     targets = [
         ("carmen-blaze", 2),

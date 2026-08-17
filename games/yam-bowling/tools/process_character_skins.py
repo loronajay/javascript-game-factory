@@ -156,6 +156,11 @@ def select_packages(
     ]
 
 
+def skin_override_root(overrides_root: Path, package: SkinPackage) -> Path:
+    """Keep generated-skin overrides separate from canon and other skins."""
+    return overrides_root / package.skin_id
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -179,6 +184,12 @@ def main() -> None:
         "--canon-reference-root",
         type=Path,
         default=Path("assets/characters/processed/canon"),
+    )
+    parser.add_argument(
+        "--overrides",
+        type=Path,
+        default=Path("assets/characters/manual-overrides/skins"),
+        help="Skin-scoped manual frame overrides protected from regeneration.",
     )
     parser.add_argument(
         "--only",
@@ -225,6 +236,7 @@ def main() -> None:
             output_directory,
             qa_directory,
             session,
+            override_root=skin_override_root(args.overrides, package),
             short_id=package.character_slug,
             output_directory=output_directory,
             portrait_path=output_directory / "portrait.webp",
