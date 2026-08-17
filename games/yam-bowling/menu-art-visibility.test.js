@@ -16,14 +16,14 @@ function backgroundAlphas(cssRule) {
   return [...background.matchAll(/rgba\([^)]*,\s*(\.?\d+)\)/g)].map((match) => Number(match[1]));
 }
 
-function assertGlassSurface(cssRule, label) {
+function assertArtFirstSurface(cssRule, label) {
   const alphas = backgroundAlphas(cssRule);
   assert.ok(alphas.length, `${label} should use an rgba glass background`);
   assert.ok(
-    Math.max(...alphas) <= 0.5,
-    `${label} should stay at or below 50% opacity so its splash art remains visible`,
+    Math.max(...alphas) <= 0.22,
+    `${label} should stay at or below 22% opacity so its splash art remains obvious`,
   );
-  assert.match(cssRule, /backdrop-filter:\s*blur\(/, `${label} should preserve readability with blur`);
+  assert.doesNotMatch(cssRule, /backdrop-filter:\s*[^;]*blur\(/, `${label} must not blur away the splash art`);
 }
 
 test("painted menu screens use genuinely transparent glass panels", () => {
@@ -31,8 +31,8 @@ test("painted menu screens use genuinely transparent glass panels", () => {
   const tournament = read("styles/tournament.css");
   const profile = read("styles/profile.css");
 
-  assertGlassSurface(rule(campaign, ".circuit-card"), "circuit cards");
-  assertGlassSurface(
+  assertArtFirstSurface(rule(campaign, ".circuit-card"), "circuit cards");
+  assertArtFirstSurface(
     rule(tournament, ".tournament-bracket-board,\n.tournament-stage,\n.tournament-entry"),
     "tournament panels",
   );
@@ -40,17 +40,20 @@ test("painted menu screens use genuinely transparent glass panels", () => {
   const profileScreen = rule(profile, ".profile-screen");
   const profileGlass = profileScreen.match(/--profile-glass:\s*rgba\([^)]*,\s*(\.?\d+)\)/)?.[1];
   assert.ok(profileGlass, "My Room should define a shared rgba glass surface");
-  assert.ok(Number(profileGlass) <= 0.5, "My Room cards should stay at or below 50% opacity");
-  assert.match(rule(profile, ".profile-card"), /backdrop-filter:\s*blur\(/);
+  assert.ok(Number(profileGlass) <= 0.22, "My Room cards should stay at or below 22% opacity");
+  assert.doesNotMatch(rule(profile, ".profile-card"), /backdrop-filter:\s*[^;]*blur\(/);
 });
 
 test("full-screen art washes do not bury the painted backdrops", () => {
+  const campaign = read("styles/campaign.css");
   const tournament = read("styles/tournament.css");
   const profile = read("styles/profile.css");
 
+  const circuitWash = backgroundAlphas(rule(campaign, ".circuit-vignette"));
   const tournamentWash = backgroundAlphas(rule(tournament, ".tournament-atmosphere"));
   const profileWash = backgroundAlphas(rule(profile, ".profile-room-shade"));
 
-  assert.ok(Math.max(...tournamentWash) <= 0.7, "the tournament atmosphere should leave the stage art visible");
-  assert.ok(Math.max(...profileWash) <= 0.6, "the room shade should leave the equipped room visible");
+  assert.ok(Math.max(...circuitWash) <= 0.3, "the circuit wash should leave the registration art obvious");
+  assert.ok(Math.max(...tournamentWash) <= 0.3, "the tournament atmosphere should leave the stage art obvious");
+  assert.ok(Math.max(...profileWash) <= 0.3, "the room shade should leave the equipped room obvious");
 });

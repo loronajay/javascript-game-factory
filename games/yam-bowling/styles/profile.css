@@ -1,7 +1,7 @@
 /* Server-backed player room and display editor. */
 
 .profile-screen {
-  --profile-glass: rgba(8,9,13,.42);
+  --profile-glass: rgba(8,9,13,.18);
   position: relative;
   min-height: 100svh;
   padding: clamp(1rem, 2.4vw, 2rem);
@@ -13,8 +13,8 @@
   position: fixed;
   inset: 0;
   background:
-    linear-gradient(90deg, rgba(5,6,9,.06), rgba(5,6,9,.02) 44%, rgba(5,6,9,.18) 76%, rgba(5,6,9,.4)),
-    linear-gradient(0deg, rgba(5,6,9,.46), transparent 46%, rgba(5,6,9,.24));
+    linear-gradient(90deg, rgba(5,6,9,.04), rgba(5,6,9,.01) 44%, rgba(5,6,9,.1) 76%, rgba(5,6,9,.2)),
+    linear-gradient(0deg, rgba(5,6,9,.22), transparent 46%, rgba(5,6,9,.12));
   backdrop-filter: saturate(.82);
 }
 .profile-header {
@@ -56,7 +56,7 @@
 }
 .profile-room, .profile-dashboard, .profile-card { min-width: 0; }
 .profile-hero { position: relative; min-height: calc(100svh - 130px); overflow: hidden; }
-.profile-hero::after { content: ""; position: absolute; inset: 55% 0 0; background: linear-gradient(transparent, rgba(5,6,9,.82)); }
+.profile-hero::after { content: ""; position: absolute; inset: 55% 0 0; background: linear-gradient(transparent, rgba(5,6,9,.42)); }
 /* Equipped decoration. Both sit behind the featured bowler and are hidden when
    their slot is empty, so a profile with no frame reads exactly as before. */
 .profile-hero__backdrop {
@@ -122,7 +122,6 @@
   border-radius: 18px;
   background: var(--profile-glass);
   box-shadow: 0 18px 48px rgba(0,0,0,.22), inset 0 1px rgba(255,255,255,.045);
-  backdrop-filter: blur(12px) saturate(1.08);
 }
 .profile-card__heading { display: flex; gap: 1rem; align-items: end; justify-content: space-between; }
 .profile-card__heading h3 { margin: 0; font-size: 1.2rem; letter-spacing: -.03em; }

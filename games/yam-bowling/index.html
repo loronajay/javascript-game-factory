@@ -268,14 +268,20 @@
       </section>
 
       <section class="screen setup-screen online-screen" id="online-screen" aria-labelledby="online-title" hidden>
+        <img class="setup-backdrop" src="assets/menu-splashes/inner-menus/online-lounge.webp" alt="A premium connected bowling lounge overlooking illuminated lanes" decoding="async" />
+        <div class="setup-atmosphere" aria-hidden="true"></div>
         <header class="screen-header">
           <button class="icon-button" id="online-back" type="button" aria-label="Back to title">←</button>
           <div><p class="eyebrow">Factory Network</p><h2 id="online-title">Online lanes</h2></div>
-          <span class="step-chip" id="online-account-name">Player</span>
+          <div class="online-network-mark"><i aria-hidden="true"></i><span class="step-chip" id="online-account-name">Player</span></div>
         </header>
 
         <div class="setup-layout online-setup-layout">
           <aside class="setup-options panel online-actions-panel">
+            <div class="online-desk-heading">
+              <div><p class="eyebrow">Match desk</p><h3>Choose your route</h3></div>
+              <span>Network ready</span>
+            </div>
             <section class="option-section">
               <p class="option-label">Match length</p>
               <div class="segmented segmented--stack" id="online-mode-options">
@@ -293,12 +299,17 @@
               <button class="button button--ghost button--wide inspect-bowler-button" id="online-inspect-bowler-button" type="button">Inspect bowler</button>
             </section>
             <section class="option-section online-match-actions">
-              <button class="button button--primary button--wide" id="quick-match-button" type="button">Quick Match</button>
-              <p>Join the oldest public lane using the same match length.</p>
-              <button class="button button--ghost button--wide" id="create-room-button" type="button">Create Private Room</button>
-              <div class="join-room-row">
-                <input id="join-room-code" type="text" maxlength="8" autocomplete="off" spellcheck="false" placeholder="ROOM CODE" aria-label="Private room code" />
-                <button class="button button--ghost" id="join-room-button" type="button">Join Private Room</button>
+              <div class="online-match-route online-match-route--public">
+                <div class="online-route-copy"><span>01 · Public matchmaking</span><strong>Find the next open lane</strong><p>Enter the oldest compatible queue and meet another Factory bowler.</p></div>
+                <button class="button button--primary button--wide" id="quick-match-button" type="button">Quick Match</button>
+              </div>
+              <div class="online-match-route online-match-route--private">
+                <div class="online-route-copy"><span>02 · Private room</span><strong>Bowl with your people</strong><p>Open a room to share, or enter a code from another player.</p></div>
+                <button class="button button--ghost button--wide" id="create-room-button" type="button">Create Private Room</button>
+                <div class="join-room-row">
+                  <input id="join-room-code" type="text" maxlength="8" autocomplete="off" spellcheck="false" placeholder="ROOM CODE" aria-label="Private room code" />
+                  <button class="button button--ghost" id="join-room-button" type="button">Join Private Room</button>
+                </div>
               </div>
             </section>
             <p class="online-inline-status" id="online-menu-status" aria-live="polite">Choose a bowler, then find a lane.</p>
@@ -315,7 +326,10 @@
       </section>
 
       <section class="screen online-lobby-screen" id="online-lobby-screen" aria-labelledby="online-lobby-title" hidden>
+        <img class="online-lobby-backdrop" src="assets/menu-splashes/inner-menus/online-lounge.webp" alt="A connected bowling lounge prepared for online competitors" decoding="async" />
+        <div class="online-lobby-atmosphere" aria-hidden="true"></div>
         <div class="online-lobby-card panel">
+          <div class="online-lobby-beacon" aria-hidden="true"><i></i><span></span><b></b></div>
           <p class="eyebrow" id="online-lobby-kind">Factory Network</p>
           <h2 id="online-lobby-title">Finding a lane</h2>
           <div class="online-room-code-wrap" id="online-room-code-wrap" hidden>
@@ -332,6 +346,8 @@
       </section>
 
       <section class="screen setup-screen" id="setup-screen" aria-labelledby="setup-title" hidden>
+        <img class="setup-backdrop" src="assets/menu-splashes/inner-menus/locker-room.webp" alt="A premium bowling locker room prepared for an exhibition match" decoding="async" />
+        <div class="setup-atmosphere" aria-hidden="true"></div>
         <header class="screen-header">
           <button class="icon-button" id="setup-back" type="button" aria-label="Back to title">←</button>
           <div><p class="eyebrow">Local match</p><h2 id="setup-title">Set the lanes</h2></div>

@@ -17,7 +17,7 @@
   height: 100%;
   object-fit: cover;
   object-position: center 38%;
-  filter: saturate(.9) contrast(1.04);
+  filter: saturate(.96) contrast(1.02);
 }
 
 .tournament-atmosphere {
@@ -25,8 +25,8 @@
   inset: 0;
   background:
     radial-gradient(circle at 50% 9%, rgba(255, 238, 194, .13), transparent 29%),
-    linear-gradient(180deg, rgba(4, 4, 7, .28), rgba(5, 5, 8, .42) 44%, rgba(3, 3, 5, .66)),
-    linear-gradient(90deg, rgba(2, 2, 4, .45), transparent 24%, transparent 76%, rgba(2, 2, 4, .45));
+    linear-gradient(180deg, rgba(4, 4, 7, .1), rgba(5, 5, 8, .16) 44%, rgba(3, 3, 5, .24)),
+    linear-gradient(90deg, rgba(2, 2, 4, .18), transparent 24%, transparent 76%, rgba(2, 2, 4, .18));
   backdrop-filter: saturate(.82);
 }
 
@@ -78,9 +78,8 @@
   gap: .16rem;
   border: 1px solid rgba(255, 217, 111, .42);
   border-radius: 10px;
-  background: linear-gradient(135deg, rgba(18, 14, 11, .5), rgba(6, 6, 8, .46));
+  background: linear-gradient(135deg, rgba(18, 14, 11, .18), rgba(6, 6, 8, .14));
   box-shadow: inset 3px 0 #d9a332, 0 12px 28px rgba(0, 0, 0, .35);
-  backdrop-filter: blur(10px) saturate(1.08);
   text-align: right;
 }
 .tournament-live-status small { color: #a9a097; font-size: .48rem; font-weight: 850; letter-spacing: .13em; text-transform: uppercase; }
@@ -91,9 +90,8 @@
 .tournament-stage,
 .tournament-entry {
   border: 1px solid rgba(255, 226, 157, .22);
-  background: linear-gradient(155deg, rgba(17, 15, 16, .46), rgba(6, 6, 8, .5));
+  background: linear-gradient(155deg, rgba(17, 15, 16, .14), rgba(6, 6, 8, .18));
   box-shadow: 0 28px 70px rgba(0, 0, 0, .52), inset 0 1px rgba(255, 255, 255, .07);
-  backdrop-filter: blur(13px) saturate(1.1);
 }
 .tournament-bracket-board { overflow: hidden; border-radius: 20px; }
 .tournament-bracket-board::before {

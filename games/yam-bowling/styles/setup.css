@@ -1,7 +1,38 @@
 /* Local match setup: mode, opponent, roster grid, skin equip, bowler inspector. */
 
 /* Setup */
-.setup-screen { padding: clamp(1rem, 3vw, 2.3rem); background: radial-gradient(circle at 70% -10%, rgba(243,46,63,.15), transparent 36rem); }
+.setup-screen {
+  position: relative;
+  min-height: 100svh;
+  padding: clamp(1rem, 3vw, 2.3rem);
+  overflow: hidden auto;
+  isolation: isolate;
+  background: #08090d;
+}
+.setup-backdrop {
+  position: fixed;
+  z-index: -2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: saturate(.96) contrast(1.02);
+}
+.setup-atmosphere {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(4,5,8,.2), rgba(4,5,8,.04) 42%, rgba(4,5,8,.1)),
+    linear-gradient(0deg, rgba(4,5,8,.22), transparent 52%, rgba(4,5,8,.08));
+  pointer-events: none;
+}
+.setup-screen .panel {
+  border-color: rgba(255,255,255,.2);
+  background: linear-gradient(155deg, rgba(18,19,25,.14), rgba(7,8,11,.18));
+  box-shadow: 0 24px 64px rgba(0,0,0,.34), inset 0 1px rgba(255,255,255,.08);
+}
 .screen-header, .game-header {
   display: grid;
   width: min(1420px, 100%);
@@ -11,6 +42,7 @@
   align-items: center;
 }
 .screen-header h2 { margin: 0; font-size: clamp(1.65rem, 3vw, 2.6rem); letter-spacing: -.04em; }
+.setup-screen .screen-header h2, .setup-screen .screen-header .eyebrow { text-shadow: 0 3px 18px rgba(0,0,0,.88); }
 .step-chip, .match-chip {
   padding: .55rem .8rem;
   border: 1px solid var(--line);
@@ -26,7 +58,7 @@
 .setup-options { display: flex; padding: 1.25rem; flex-direction: column; gap: 1.25rem; }
 .option-section { padding-bottom: 1.15rem; border-bottom: 1px solid var(--line); }
 .option-label { margin: 0 0 .7rem; color: var(--muted); font-size: .68rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
-.segmented { display: grid; padding: 4px; grid-template-columns: repeat(2, 1fr); gap: 4px; border: 1px solid var(--line); border-radius: 13px; background: #0b0c10; }
+.segmented { display: grid; padding: 4px; grid-template-columns: repeat(2, 1fr); gap: 4px; border: 1px solid var(--line); border-radius: 13px; background: rgba(8,9,13,.34); }
 .segmented > button, .cpu-options button {
   min-height: 42px;
   padding: .65rem .7rem;
