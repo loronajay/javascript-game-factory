@@ -36,8 +36,12 @@ function normalizeWheel(kind, raw, accepts = () => true) {
 
 export function buildMatchPresentation({ characterSlug, loadout } = {}) {
   return {
-    ballTrailId: loadout?.getGlobalSlot?.("ballTrail") || DEFAULTS.ballTrailId,
-    strikeBurstId: loadout?.getGlobalSlot?.("strikeBurst") || DEFAULTS.strikeBurstId,
+    ballTrailId: loadout?.getBowlerSlot?.(characterSlug, "ballTrail")
+      || loadout?.getGlobalSlot?.("ballTrail")
+      || DEFAULTS.ballTrailId,
+    strikeBurstId: loadout?.getBowlerSlot?.(characterSlug, "strikeBurst")
+      || loadout?.getGlobalSlot?.("strikeBurst")
+      || DEFAULTS.strikeBurstId,
     victoryPoseId: loadout?.getBowlerSlot?.(characterSlug, "victoryPose")
       || `victory-pose:${characterSlug}:canon`,
     emoteIds: normalizeWheel("emote", loadout?.getReactionWheel?.("emote")),

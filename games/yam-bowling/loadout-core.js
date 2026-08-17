@@ -45,6 +45,12 @@
   // bowler's art from being worn.
   const BOWLER_SLOTS = Object.freeze({
     skin: Object.freeze({ type: "skin", perSkin: true }),
+    // Trails and bursts may override the player's global defaults for one
+    // bowler. The catalog items are player-owned rather than character-owned,
+    // so these are the two bowler slots that deliberately accept unscoped art.
+    // A null default means "inherit the player setting".
+    ballTrail: Object.freeze({ type: "ball-trail", perSkin: false, defaultId: null, characterScoped: false }),
+    strikeBurst: Object.freeze({ type: "strike-burst", perSkin: false, defaultId: null, characterScoped: false }),
     victoryPose: Object.freeze({ type: "victory-pose", perSkin: true }),
     defeatPose: Object.freeze({ type: "defeat-pose", perSkin: true }),
     playerCard: Object.freeze({ type: "player-card", perSkin: false }),
@@ -370,7 +376,7 @@
 
     function accepts(slot, item, characterSlug) {
       if (!item || item.type !== slot.type) return false;
-      if (characterSlug === undefined) return true;
+      if (characterSlug === undefined || slot.characterScoped === false) return true;
       return item.characterSlug === characterSlug;
     }
 
@@ -390,6 +396,21 @@
         record.bowlers[slug] = { ...record.bowlers[slug], [slotName]: itemId };
         persist();
       }
+      return getBowlerSlot(slug, slotName);
+    }
+
+    // Optional bowler slots use absence as a meaningful value. For effects it
+    // means "use the player's default"; for a profile icon it means no icon.
+    // Required slots keep their catalog-derived default and cannot be cleared.
+    function clearBowlerSlot(slug, slotName) {
+      if (!BOWLER_SLOTS[slotName] || !canonBowler(slug)) return null;
+      if (defaultBowlerSlotId(slug, slotName, getEquippedSkinId(slug))) {
+        return getBowlerSlot(slug, slotName);
+      }
+      const { [slotName]: _cleared, ...rest } = record.bowlers[slug] || {};
+      if (Object.keys(rest).length) record.bowlers[slug] = rest;
+      else delete record.bowlers[slug];
+      persist();
       return getBowlerSlot(slug, slotName);
     }
 
@@ -533,6 +554,7 @@
       applyLevelEntitlements,
       applyServerEntitlements,
       applyServerGarage,
+      clearBowlerSlot,
       clearGlobalSlot,
       clearLevelEntitlements,
       clearServerAuthority,

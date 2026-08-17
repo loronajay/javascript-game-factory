@@ -34,14 +34,9 @@ function emptyMastery(slug) {
 // and featured bowler are deliberately absent: they already have their own
 // controls, and menu art has its own picker. Everything here is presentation —
 // no slot in this list can reach scoring, physics or the wire.
-const PRESENTATION_SLOTS = Object.freeze([
-  Object.freeze({ key: "ballTrail", scope: "global", type: "ball-trail", label: "Ball trail" }),
-  Object.freeze({ key: "strikeBurst", scope: "global", type: "strike-burst", label: "Strike burst" }),
-  Object.freeze({ key: "victoryPose", scope: "bowler", type: "victory-pose", label: "Victory pose" }),
-  Object.freeze({ key: "defeatPose", scope: "bowler", type: "defeat-pose", label: "Defeat pose" }),
-  Object.freeze({ key: "playerCard", scope: "bowler", type: "player-card", label: "Player card" }),
-  Object.freeze({ key: "profileIcon", scope: "bowler", type: "profile-icon", label: "Profile icon", optional: true }),
-  Object.freeze({ key: "profileArt", scope: "bowler", type: "profile-art", label: "Profile art" }),
+const PLAYER_PRESENTATION_SLOTS = Object.freeze([
+  Object.freeze({ key: "ballTrail", scope: "global", type: "ball-trail", label: "Default ball trail" }),
+  Object.freeze({ key: "strikeBurst", scope: "global", type: "strike-burst", label: "Default strike burst" }),
   Object.freeze({ key: "title", scope: "global", type: "title", label: "Title" }),
   Object.freeze({ key: "badge", scope: "global", type: "badge", label: "Badge" }),
   // The four stickers thrown on the lane, in the order the match wheel paints
@@ -65,23 +60,47 @@ const PRESENTATION_SLOTS = Object.freeze([
   Object.freeze({ key: "profileBackground", scope: "global", type: "profile-art", label: "Profile background", optional: true }),
 ]);
 
+// A bowler popup owns everything that changes when a different bowler is
+// selected for a match. Effects are optional overrides of the player's room
+// defaults; every other row is intrinsically attached to this bowler.
+const BOWLER_CONFIGURATION_SLOTS = Object.freeze([
+  Object.freeze({ key: "ballTrail", scope: "bowler", type: "ball-trail", label: "Ball trail", optional: true, inheritGlobal: true, characterItems: false }),
+  Object.freeze({ key: "strikeBurst", scope: "bowler", type: "strike-burst", label: "Strike burst", optional: true, inheritGlobal: true, characterItems: false }),
+  Object.freeze({ key: "victoryPose", scope: "bowler", type: "victory-pose", label: "Victory pose", characterItems: true }),
+  Object.freeze({ key: "defeatPose", scope: "bowler", type: "defeat-pose", label: "Defeat pose", characterItems: true }),
+  Object.freeze({ key: "playerCard", scope: "bowler", type: "player-card", label: "Player card", characterItems: true }),
+  Object.freeze({ key: "profileIcon", scope: "bowler", type: "profile-icon", label: "Profile icon", optional: true, characterItems: true }),
+  Object.freeze({ key: "profileArt", scope: "bowler", type: "profile-art", label: "Profile art", characterItems: true }),
+]);
+
 // Locked items stay in the list on purpose: a reward nobody can see is a reward
 // nobody plays for. Ownership decides what may be EQUIPPED, never what is shown,
 // which is the same rule the skin picker follows.
-function buildPresentation({ cosmetics, loadout, bowlerSlug, ownedBowlerSlugs }) {
-  if (!cosmetics?.listByType) return [];
-  return PRESENTATION_SLOTS.map((slot) => {
+function buildPresentation({ slots, cosmetics, loadout, bowlerSlug, ownedBowlerSlugs }) {
+  return slots.map((slot) => {
     const scopedToBowler = slot.scope === "bowler";
-    const items = cosmetics.listByType(slot.type, scopedToBowler ? { characterSlug: bowlerSlug } : {});
+    const itemFilter = slot.characterItems ? { characterSlug: bowlerSlug } : {};
+    const items = cosmetics?.listByType?.(slot.type, itemFilter) || [];
+    const inheritedId = slot.inheritGlobal ? loadout.getGlobalSlot(slot.key) : null;
+    const equippedId = scopedToBowler
+      ? loadout.getBowlerSlot(bowlerSlug, slot.key)
+      : loadout.getGlobalSlot(slot.key);
     const empty = slot.optional
-      ? [{ id: "", name: "None", tier: "standard", art: null, palette: null, owned: true }]
+      ? [{
+        id: "",
+        name: slot.inheritGlobal ? "Use player default" : "None",
+        tier: "standard",
+        art: null,
+        palette: null,
+        owned: true,
+      }]
       : [];
     return {
       ...slot,
       optional: Boolean(slot.optional),
-      equippedId: (scopedToBowler
-        ? loadout.getBowlerSlot(bowlerSlug, slot.key)
-        : loadout.getGlobalSlot(slot.key)) || (slot.optional ? "" : null),
+      inheritedId,
+      equippedId: equippedId || (slot.optional ? "" : null),
+      effectiveId: equippedId || inheritedId || null,
       options: empty.concat(items.map((item) => ({
         id: item.id,
         name: item.name,
@@ -95,6 +114,42 @@ function buildPresentation({ cosmetics, loadout, bowlerSlug, ownedBowlerSlugs })
       }))),
     };
   });
+}
+
+export function buildBowlerConfigurationModel({
+  bowlerSlug,
+  loadout,
+  progression,
+  animation,
+  cosmetics = null,
+}) {
+  const roster = Array.isArray(animation?.CANON_BOWLERS) ? animation.CANON_BOWLERS : [];
+  const fallback = roster[0] || { slug: "daisy-monroe", name: "Daisy Monroe" };
+  const bowler = roster.find((entry) => entry.slug === bowlerSlug) || fallback;
+  const skinId = loadout.getEquippedSkinId(bowler.slug);
+  const skins = Array.isArray(animation?.AVAILABLE_SKINS) ? animation.AVAILABLE_SKINS : [];
+  const skin = skins.find((entry) => entry.id === skinId)
+    || skins.find((entry) => entry.id === animation?.DEFAULT_SKIN_ID)
+    || { id: "canon", name: "Classic" };
+  const mastery = progression.getBowler(bowler.slug) || emptyMastery(bowler.slug);
+
+  return {
+    bowler: {
+      ...bowler,
+      skinId: skin.id,
+      skinName: skin.name,
+      art: animation.getPortraitAssetPath(bowler, skin.id),
+    },
+    mastery: { ...emptyMastery(bowler.slug), ...mastery, progressPercent: progressPercent(mastery) },
+    ownedSkins: skins.filter((entry) => loadout.owns(`skin:${bowler.slug}:${entry.id}`)),
+    presentation: buildPresentation({
+      slots: BOWLER_CONFIGURATION_SLOTS,
+      cosmetics,
+      loadout,
+      bowlerSlug: bowler.slug,
+      ownedBowlerSlugs: new Set(loadout.listOwnedBowlerSlugs()),
+    }),
+  };
 }
 
 // The player ladder, derived from the authoritative level rather than from any
@@ -168,7 +223,8 @@ export function buildProfileModel({
     ownedBowlers: ownedBowlerSlugs.map((slug) => roster.find((entry) => entry.slug === slug)).filter(Boolean),
     ownedRooms: roomCore.ROOMS.filter((entry) => ownedRoomSlugs.has(entry.slug)),
     ownedSkins: availableSkins.filter((entry) => loadout.owns(`skin:${bowler.slug}:${entry.id}`)),
-    presentation: buildPresentation({
+    playerPresentation: buildPresentation({
+      slots: PLAYER_PRESENTATION_SLOTS,
       cosmetics,
       loadout,
       bowlerSlug: bowler.slug,

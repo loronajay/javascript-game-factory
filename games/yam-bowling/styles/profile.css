@@ -127,6 +127,9 @@
 .profile-card__heading { display: flex; gap: 1rem; align-items: end; justify-content: space-between; }
 .profile-card__heading h3 { margin: 0; font-size: 1.2rem; letter-spacing: -.03em; }
 .profile-card__heading > span { color: var(--gold); font-size: .62rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.profile-customizer-actions { display: flex; gap: .55rem; align-items: center; }
+.profile-customizer-actions > span { color: var(--gold); font-size: .58rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.profile-customizer-actions .button { min-height: 34px; padding: .45rem .7rem; font-size: .5rem; }
 .profile-stat-grid { display: grid; margin: .85rem 0 0; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .45rem; }
 .profile-stat-grid div, .profile-bowler-stat-grid div { min-width: 0; padding: .65rem; border: 1px solid rgba(255,255,255,.08); border-radius: 12px; background: rgba(255,255,255,.035); }
 .profile-stat-grid dt, .profile-bowler-stat-grid dt { color: var(--muted); font-size: .51rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
@@ -150,9 +153,12 @@
   background: rgba(255,255,255,.035);
   cursor: pointer;
 }
-.profile-bowler-option { position: relative; width: 74px; height: 88px; }
+.profile-bowler-choice { display: grid; flex: 0 0 auto; width: 84px; gap: .3rem; }
+.profile-bowler-option { position: relative; width: 84px; height: 94px; }
 .profile-bowler-option img { width: 100%; height: 100%; object-fit: contain; object-position: center bottom; }
 .profile-bowler-option span { position: absolute; right: .2rem; bottom: .25rem; left: .2rem; overflow: hidden; font-size: .48rem; font-weight: 900; text-overflow: ellipsis; text-shadow: 0 2px 8px #000; white-space: nowrap; }
+.profile-bowler-configure { min-height: 28px; border: 1px solid rgba(255,214,107,.25); border-radius: 8px; color: var(--gold); background: rgba(255,214,107,.06); font-size: .44rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+.profile-bowler-configure:hover, .profile-bowler-configure:focus-visible { border-color: var(--gold); background: rgba(255,214,107,.12); }
 .profile-skin-option { display: grid; min-width: 92px; padding: .55rem .7rem; gap: .12rem; text-align: left; }
 .profile-skin-option strong { font-size: .65rem; }
 .profile-skin-option small { color: var(--muted); font-size: .5rem; font-weight: 800; text-transform: uppercase; }
@@ -162,8 +168,8 @@
 .profile-room-option strong { overflow: hidden; font-size: .62rem; text-overflow: ellipsis; white-space: nowrap; }
 .profile-room-option small { color: var(--muted); font-size: .47rem; font-weight: 800; text-transform: uppercase; }
 .profile-bowler-option:hover, .profile-skin-option:hover, .profile-room-option:hover,
-.profile-bowler-option.is-selected, .profile-skin-option.is-selected, .profile-room-option.is-selected { border-color: var(--gold); background: rgba(255,214,107,.1); }
-.profile-bowler-option.is-selected, .profile-skin-option.is-selected, .profile-room-option.is-selected { box-shadow: 0 0 0 2px rgba(255,214,107,.14); }
+.profile-bowler-choice.is-selected .profile-bowler-option, .profile-skin-option.is-selected, .profile-room-option.is-selected { border-color: var(--gold); background: rgba(255,214,107,.1); }
+.profile-bowler-choice.is-selected .profile-bowler-option, .profile-skin-option.is-selected, .profile-room-option.is-selected { box-shadow: 0 0 0 2px rgba(255,214,107,.14); }
 
 /* The presentation slots: effects, outcome poses, card, and decoration. One
    generic row per slot, so a reward type added to the catalog needs no CSS. */
@@ -198,6 +204,60 @@
 .profile-slot-option:hover:not(.is-locked), .profile-slot-option.is-selected { border-color: var(--gold); background: rgba(255,214,107,.1); }
 .profile-slot-option.is-selected { box-shadow: 0 0 0 2px rgba(255,214,107,.14); }
 .profile-slot-option.is-locked { opacity: .42; cursor: not-allowed; }
+
+/* Per-bowler loadout. The online identity card is rendered by the exact same
+   component as the lobby, making icon and player-card choices inspectable
+   before matchmaking. */
+.bowler-config-dialog {
+  width: min(1160px, calc(100% - 2rem));
+  max-width: none;
+  height: min(820px, calc(100dvh - 2rem));
+  max-height: none;
+  padding: 1rem;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 24px;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 10% 10%, rgba(243,46,63,.16), transparent 28rem),
+    radial-gradient(circle at 90% 80%, rgba(255,214,107,.08), transparent 32rem),
+    #0a0b10;
+  box-shadow: 0 30px 90px rgba(0,0,0,.66);
+}
+.bowler-config-dialog::backdrop { background: rgba(2,3,6,.86); backdrop-filter: blur(8px); }
+.bowler-config-dialog .dialog-close { z-index: 3; }
+.bowler-config-header { display: flex; min-height: 72px; padding-right: 3.5rem; gap: 1rem; align-items: center; justify-content: space-between; }
+.bowler-config-header h2 { margin: 0; font-size: clamp(1.8rem, 4vw, 3rem); letter-spacing: -.045em; }
+.bowler-config-header > p { max-width: 390px; margin: 0; color: var(--muted); font-size: .68rem; line-height: 1.5; text-align: right; }
+.bowler-config-layout { display: grid; height: calc(100% - 138px); min-height: 0; grid-template-columns: minmax(300px, 390px) minmax(0, 1fr); gap: 1rem; }
+.bowler-config-preview { display: grid; min-height: 0; padding: 1rem; align-content: center; gap: 1rem; border: 1px solid rgba(255,255,255,.1); border-radius: 18px; background: rgba(255,255,255,.035); }
+.bowler-config-preview h3 { margin: 0; font-size: 1.25rem; }
+.bowler-config-preview > p { margin: 0; color: var(--muted); font-size: .62rem; line-height: 1.55; }
+.bowler-config-controls { min-width: 0; padding: .2rem .35rem .8rem 0; overflow-y: auto; scrollbar-color: var(--red) rgba(0,0,0,.2); }
+.bowler-config-presentation { display: grid; margin-top: 1rem; gap: .9rem; }
+.bowler-config-skins { display: flex; padding: 2px 2px .35rem; gap: .55rem; overflow-x: auto; }
+.bowler-config-skin { display: grid; flex: 0 0 150px; overflow: hidden; padding: 0; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; color: var(--ink); background: rgba(255,255,255,.035); text-align: left; cursor: pointer; }
+.bowler-config-skin img { width: 100%; height: 138px; object-fit: contain; object-position: center bottom; background: radial-gradient(circle at 50% 70%, rgba(255,214,107,.1), transparent 65%); }
+.bowler-config-skin span { display: grid; padding: .55rem .65rem; gap: .12rem; }
+.bowler-config-skin strong { font-size: .62rem; }
+.bowler-config-skin small { color: var(--muted); font-size: .46rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
+.bowler-config-skin:hover, .bowler-config-skin.is-selected { border-color: var(--gold); background: rgba(255,214,107,.08); }
+.bowler-config-skin.is-selected { box-shadow: 0 0 0 2px rgba(255,214,107,.14); }
+.bowler-config-footer { display: flex; min-height: 58px; padding-top: .75rem; gap: 1rem; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,.08); }
+.bowler-config-footer .button { min-width: 190px; }
+
+@media (max-width: 760px) {
+  .profile-card__heading { align-items: start; }
+  .profile-customizer-actions { align-items: end; flex-direction: column; }
+  .bowler-config-dialog { width: calc(100% - 1rem); height: calc(100dvh - 1rem); padding: .75rem; }
+  .bowler-config-header { align-items: start; flex-direction: column; justify-content: center; }
+  .bowler-config-header > p { max-width: none; text-align: left; }
+  .bowler-config-layout { height: calc(100% - 170px); grid-template-columns: 1fr; overflow-y: auto; }
+  .bowler-config-preview { min-height: 330px; }
+  .bowler-config-controls { overflow-y: visible; }
+  .bowler-config-footer { min-height: 64px; }
+  .bowler-config-footer .profile-sync-status { max-width: 48%; }
+}
 
 /* Read-only inspection of another player's public presentation. */
 .public-profile-dialog {

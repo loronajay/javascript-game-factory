@@ -150,6 +150,11 @@ for (const [id, type, founding] of [
 }
 const BOWLER_SLOTS = Object.freeze({
     skin: "skin",
+    // Effects are player-owned but may be worn as per-bowler overrides. Unlike
+    // the remaining bowler slots, their catalog items intentionally have no
+    // characterSlug and therefore use the shared-slot exception below.
+    ballTrail: "ball-trail",
+    strikeBurst: "strike-burst",
     victoryPose: "victory-pose",
     defeatPose: "defeat-pose",
     playerCard: "player-card",
@@ -157,6 +162,7 @@ const BOWLER_SLOTS = Object.freeze({
     menuSplash: "profile-art",
     profileArt: "profile-art",
 });
+const SHARED_BOWLER_SLOTS = new Set(["ballTrail", "strikeBurst"]);
 const GLOBAL_SLOTS = Object.freeze({
     ballTrail: "ball-trail",
     strikeBurst: "strike-burst",
@@ -210,7 +216,9 @@ export function normalizeYamBowlingGarage(raw, context = {}) {
             const slots = {};
             for (const [slotName, type] of Object.entries(BOWLER_SLOTS)) {
                 const item = items.get(value[slotName]);
-                if (item?.type === type && item.characterSlug === bowlerSlug && ownsItem(item, owned)) {
+                if (item?.type === type
+                    && (SHARED_BOWLER_SLOTS.has(slotName) || item.characterSlug === bowlerSlug)
+                    && ownsItem(item, owned)) {
                     slots[slotName] = item.id;
                 }
                 else if (slotName === "skin" && Object.hasOwn(value, slotName)) {

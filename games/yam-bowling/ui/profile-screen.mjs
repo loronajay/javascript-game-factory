@@ -1,8 +1,11 @@
-import { buildProfileModel } from "../profile/profile-model.mjs";
+import { buildBowlerConfigurationModel, buildProfileModel } from "../profile/profile-model.mjs";
 import { $, escapeHtml, showScreen } from "./dom.mjs";
 import { playerRewardTreeMarkup } from "./reward-tree.mjs";
 import { buildVoucherChoices } from "../profile/voucher-client.mjs";
 import { buildEmoteVoucherChoices } from "../profile/emote-voucher-client.mjs";
+import { buildCompactIdentityModel } from "../profile/public-profile-model.mjs";
+import { buildMatchPresentation } from "../online/match-presentation.mjs";
+import { compactIdentityCardMarkup } from "./compact-identity-card.mjs";
 
 function stat(label, value) {
   return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`;
@@ -24,6 +27,7 @@ export function createProfileScreen({
 }) {
   let dirty = false;
   let syncing = false;
+  let configuredBowlerSlug = null;
 
   function readModel() {
     return buildProfileModel({
@@ -47,10 +51,13 @@ export function createProfileScreen({
     $("profile-bowler-options").innerHTML = model.ownedBowlers.map((bowler) => {
       const selected = bowler.slug === model.featuredBowler.slug;
       const art = animation.getPortraitAssetPath(bowler, animation.DEFAULT_SKIN_ID);
-      return `<button class="profile-bowler-option${selected ? " is-selected" : ""}" type="button" data-profile-bowler="${escapeHtml(bowler.slug)}" role="option" aria-selected="${selected}"${syncing ? " disabled" : ""}>
-        <img src="${escapeHtml(art)}" alt="" loading="lazy" />
-        <span>${escapeHtml(bowler.name)}</span>
-      </button>`;
+      return `<article class="profile-bowler-choice${selected ? " is-selected" : ""}">
+        <button class="profile-bowler-option" type="button" data-profile-bowler="${escapeHtml(bowler.slug)}" role="option" aria-selected="${selected}"${syncing ? " disabled" : ""}>
+          <img src="${escapeHtml(art)}" alt="" loading="lazy" />
+          <span>${escapeHtml(bowler.name)}</span>
+        </button>
+        <button class="profile-bowler-configure" type="button" data-configure-bowler="${escapeHtml(bowler.slug)}"${syncing ? " disabled" : ""}>Customize</button>
+      </article>`;
     }).join("");
   }
 
@@ -73,12 +80,11 @@ export function createProfileScreen({
     }).join("");
   }
 
-  // The presentation slots the loadout owns but nothing else offers: the two
-  // effects, the featured bowler's poses and card, and the profile decoration.
-  // Locked options stay on screen — a reward nobody can see is a reward nobody
-  // plays for — but only an owned one can be clicked.
-  function renderPresentationOptions(model) {
-    $("profile-presentation").innerHTML = model.presentation.map((slot) => {
+  // One renderer serves both clearly separated scopes. The data attributes are
+  // different so a delegated click can never equip a bowler item globally (or
+  // a room item onto one bowler) by accident.
+  function presentationMarkup(slots, { bowler = false } = {}) {
+    return slots.map((slot) => {
       const options = slot.options.map((option) => {
         const selected = option.id === slot.equippedId;
         const disabled = syncing || !option.owned;
@@ -86,11 +92,16 @@ export function createProfileScreen({
         const swatch = option.art
           ? `<img${crestClass} src="${escapeHtml(option.art)}" alt="" loading="lazy" />`
           : `<i class="profile-slot-swatch" style="${paletteStyle(option.palette)}"></i>`;
+        const status = option.owned
+          ? (selected ? (slot.inheritGlobal && !option.id ? "Inheriting" : "Equipped") : "Equip")
+          : "Locked";
+        const keyAttribute = bowler ? "data-bowler-slot-key" : "data-slot-key";
+        const itemAttribute = bowler ? "data-bowler-slot-item" : "data-slot-item";
         return `<button class="profile-slot-option${selected ? " is-selected" : ""}${option.owned ? "" : " is-locked"}"
           type="button" role="option" aria-selected="${selected}" ${disabled ? "disabled" : ""}
-          data-slot-key="${escapeHtml(slot.key)}" data-slot-item="${escapeHtml(option.id)}">
+          ${keyAttribute}="${escapeHtml(slot.key)}" ${itemAttribute}="${escapeHtml(option.id)}">
           ${swatch}
-          <span><strong>${escapeHtml(option.name)}</strong><small>${option.owned ? (selected ? "Equipped" : "Equip") : "Locked"}</small></span>
+          <span><strong>${escapeHtml(option.name)}</strong><small>${status}</small></span>
         </button>`;
       }).join("");
       return `<div class="profile-option-group">
@@ -98,6 +109,58 @@ export function createProfileScreen({
         <div class="profile-slot-options" role="listbox" aria-label="Choose a ${slot.label.toLowerCase()}">${options}</div>
       </div>`;
     }).join("");
+  }
+
+  function renderPresentationOptions(model) {
+    $("profile-presentation").innerHTML = presentationMarkup(model.playerPresentation);
+  }
+
+  function readBowlerModel(slug = configuredBowlerSlug) {
+    return buildBowlerConfigurationModel({
+      bowlerSlug: slug,
+      loadout,
+      progression,
+      animation,
+      cosmetics,
+    });
+  }
+
+  function renderBowlerConfiguration(profileModel = readModel()) {
+    if (!configuredBowlerSlug) return null;
+    const model = readBowlerModel();
+    $("bowler-config-title").textContent = `Configure ${model.bowler.name}`;
+    $("bowler-config-copy").textContent = `These choices apply only when you bowl as ${model.bowler.name}.`;
+    $("bowler-config-skins").innerHTML = model.ownedSkins.map((skin) => {
+      const selected = skin.id === model.bowler.skinId;
+      const art = animation.getPortraitAssetPath(model.bowler, skin.id);
+      return `<button class="bowler-config-skin${selected ? " is-selected" : ""}" type="button" data-bowler-skin="${escapeHtml(skin.id)}" aria-selected="${selected}"${syncing ? " disabled" : ""}>
+        <img src="${escapeHtml(art)}" alt="" loading="lazy" />
+        <span><strong>${escapeHtml(skin.name)}</strong><small>${selected ? "Equipped" : "Equip outfit"}</small></span>
+      </button>`;
+    }).join("");
+    $("bowler-config-presentation").innerHTML = presentationMarkup(model.presentation, { bowler: true });
+
+    const matchPresentation = buildMatchPresentation({ characterSlug: model.bowler.slug, loadout });
+    const cardModel = buildCompactIdentityModel({
+      profile: {
+        profileName: profileModel.profileName,
+        player: profileModel.player,
+        title: profileModel.title,
+        badge: profileModel.badge,
+        masteryByBowler: { [model.bowler.slug]: model.mastery },
+      },
+      matchPlayer: {
+        name: profileModel.profileName,
+        characterSlug: model.bowler.slug,
+        skinId: model.bowler.skinId,
+        presentation: matchPresentation,
+      },
+      animation,
+      cosmetics,
+    });
+    $("bowler-config-card-preview").innerHTML = compactIdentityCardMarkup(cardModel, { local: true });
+    $("bowler-config-save").disabled = syncing || syncClient.getState().status === "saving";
+    return model;
   }
 
   // An effect has no art, so its two colours stand in for a thumbnail.
@@ -110,7 +173,7 @@ export function createProfileScreen({
   // empty slot leaves the composition exactly as it was before frames existed.
   function renderDecoration(model) {
     for (const [key, elementId] of [["profileBackground", "profile-hero-backdrop"], ["profileFrame", "profile-frame-art"]]) {
-      const slot = model.presentation.find((entry) => entry.key === key);
+      const slot = model.playerPresentation.find((entry) => entry.key === key);
       const art = cosmetics?.getItem?.(slot?.equippedId)?.assets?.art || "";
       const element = $(elementId);
       element.hidden = !art;
@@ -157,6 +220,12 @@ export function createProfileScreen({
         <span><strong>${escapeHtml(choice.bowlerName)}</strong><small>${escapeHtml(choice.skinName)}</small></span>
       </button>`;
     }).join("") || `<p class="voucher-choice-empty">Every voucher skin for your owned bowlers is already unlocked.</p>`;
+  }
+
+  function setBowlerStatus(message, state = "") {
+    const status = $("bowler-config-status");
+    status.textContent = message;
+    status.dataset.state = state;
   }
 
   function emoteVoucherChoices() {
@@ -219,7 +288,9 @@ export function createProfileScreen({
     renderRoomOptions(model);
     renderPresentationOptions(model);
     renderDecoration(model);
+    if (configuredBowlerSlug) renderBowlerConfiguration(model);
     $("profile-save").disabled = syncing || syncClient.getState().status === "saving";
+    $("profile-preview-card").disabled = syncing;
     return model;
   }
 
@@ -280,12 +351,10 @@ export function createProfileScreen({
   function selectPresentation(key, itemId) {
     if (syncing) return;
     const current = readModel();
-    const slot = current.presentation.find((entry) => entry.key === key);
+    const slot = current.playerPresentation.find((entry) => entry.key === key);
     if (!slot?.options.some((option) => option.id === itemId && option.owned)) return;
     if (!itemId) {
       loadout.clearGlobalSlot(key);
-    } else if (slot.scope === "bowler") {
-      loadout.equipBowlerSlot(current.featuredBowler.slug, key, itemId);
     } else {
       loadout.equipGlobalSlot(key, itemId);
     }
@@ -294,18 +363,61 @@ export function createProfileScreen({
     setStatus("Unsaved display changes");
   }
 
+  function openBowlerConfiguration(slug) {
+    if (syncing) return;
+    const profileModel = readModel();
+    if (!profileModel.ownedBowlers.some((bowler) => bowler.slug === slug)) return;
+    configuredBowlerSlug = slug;
+    renderBowlerConfiguration(profileModel);
+    setBowlerStatus(dirty ? "Unsaved profile changes" : "Changes save with your Factory profile");
+    $("bowler-config-dialog").showModal();
+  }
+
+  function closeBowlerConfiguration() {
+    $("bowler-config-dialog").close();
+  }
+
+  function selectBowlerSkin(skinId) {
+    if (syncing || !configuredBowlerSlug) return;
+    const model = readBowlerModel();
+    if (!model.ownedSkins.some((skin) => skin.id === skinId)) return;
+    loadout.equipSkin(configuredBowlerSlug, skinId);
+    dirty = true;
+    render();
+    setStatus("Unsaved bowler changes");
+    setBowlerStatus("Unsaved bowler changes");
+  }
+
+  function selectBowlerPresentation(key, itemId) {
+    if (syncing || !configuredBowlerSlug) return;
+    const model = readBowlerModel();
+    const slot = model.presentation.find((entry) => entry.key === key);
+    if (!slot?.options.some((option) => option.id === itemId && option.owned)) return;
+    if (!itemId) loadout.clearBowlerSlot(configuredBowlerSlug, key);
+    else loadout.equipBowlerSlot(configuredBowlerSlug, key, itemId);
+    dirty = true;
+    render();
+    setStatus("Unsaved bowler changes");
+    setBowlerStatus("Unsaved bowler changes");
+  }
+
   async function save() {
     if (syncing) return false;
     if (!dirty) {
       setStatus("Factory profile current", "saved");
+      if (configuredBowlerSlug) setBowlerStatus("Factory profile current", "saved");
       return true;
     }
     $("profile-save").disabled = true;
     setStatus("Saving display");
+    if (configuredBowlerSlug) setBowlerStatus("Saving bowler configuration");
     const saved = await syncClient.save();
     dirty = !saved;
     render();
     setStatus(saved ? "Saved to Factory" : "Could not save - try again", saved ? "saved" : "error");
+    if (configuredBowlerSlug) {
+      setBowlerStatus(saved ? "Saved to Factory" : "Could not save - try again", saved ? "saved" : "error");
+    }
     if (saved) audio?.play?.("confirm");
     return saved;
   }
@@ -382,6 +494,11 @@ export function createProfileScreen({
 
   function bind() {
     $("profile-bowler-options").addEventListener("click", (event) => {
+      const configure = event.target.closest("[data-configure-bowler]");
+      if (configure) {
+        openBowlerConfiguration(configure.dataset.configureBowler);
+        return;
+      }
       const button = event.target.closest("[data-profile-bowler]");
       if (button) selectBowler(button.dataset.profileBowler);
     });
@@ -397,6 +514,20 @@ export function createProfileScreen({
       const button = event.target.closest("[data-slot-key]");
       if (button) selectPresentation(button.dataset.slotKey, button.dataset.slotItem);
     });
+    $("profile-preview-card").addEventListener("click", () => {
+      openBowlerConfiguration(readModel().featuredBowler.slug);
+    });
+    $("bowler-config-skins").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-bowler-skin]");
+      if (button) selectBowlerSkin(button.dataset.bowlerSkin);
+    });
+    $("bowler-config-presentation").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-bowler-slot-key]");
+      if (button) selectBowlerPresentation(button.dataset.bowlerSlotKey, button.dataset.bowlerSlotItem);
+    });
+    $("bowler-config-close").addEventListener("click", closeBowlerConfiguration);
+    $("bowler-config-dialog").addEventListener("close", () => { configuredBowlerSlug = null; });
+    $("bowler-config-save").addEventListener("click", () => save());
     $("profile-save").addEventListener("click", () => save());
     $("profile-voucher-button").addEventListener("click", openVoucherPicker);
     $("profile-emote-voucher-button").addEventListener("click", openEmoteVoucherPicker);

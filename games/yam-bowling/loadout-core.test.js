@@ -155,6 +155,40 @@ test("ownership is separate from equipment and unowned items cannot be equipped"
   assert.equal(store.equipGlobalSlot("ballTrail", "ball-trail:red-neon"), "ball-trail:red-neon");
 });
 
+test("a bowler can override the player effect defaults and return to inheriting them", () => {
+  const store = storeWith();
+  store.setDevEntitlement(true);
+  store.equipGlobalSlot("ballTrail", "ball-trail:cyan-pulse");
+  store.equipGlobalSlot("strikeBurst", "strike-burst:purple-nova");
+
+  assert.equal(store.getBowlerSlot("daisy-monroe", "ballTrail"), null);
+  assert.equal(store.getBowlerSlot("daisy-monroe", "strikeBurst"), null);
+
+  store.equipBowlerSlot("daisy-monroe", "ballTrail", "ball-trail:red-neon");
+  store.equipBowlerSlot("daisy-monroe", "strikeBurst", "strike-burst:ember");
+
+  assert.equal(store.getBowlerSlot("daisy-monroe", "ballTrail"), "ball-trail:red-neon");
+  assert.equal(store.getBowlerSlot("daisy-monroe", "strikeBurst"), "strike-burst:ember");
+  assert.equal(store.getBowlerSlot("nia-brooks", "ballTrail"), null, "another bowler keeps inheriting");
+  assert.equal(store.getGlobalSlot("ballTrail"), "ball-trail:cyan-pulse", "the player default is unchanged");
+
+  assert.equal(store.clearBowlerSlot("daisy-monroe", "ballTrail"), null);
+  assert.equal(store.clearBowlerSlot("daisy-monroe", "strikeBurst"), null);
+  assert.equal(store.getGlobalSlot("ballTrail"), "ball-trail:cyan-pulse");
+  assert.equal(store.getGlobalSlot("strikeBurst"), "strike-burst:purple-nova");
+});
+
+test("bowler effect overrides and player defaults survive garage export", () => {
+  const store = storeWith();
+  store.setDevEntitlement(true);
+  store.equipGlobalSlot("ballTrail", "ball-trail:cyan-pulse");
+  store.equipBowlerSlot("daisy-monroe", "ballTrail", "ball-trail:red-neon");
+
+  const garage = store.exportGarage();
+  assert.equal(garage.global.ballTrail, "ball-trail:cyan-pulse");
+  assert.equal(garage.bowlers["daisy-monroe"].ballTrail, "ball-trail:red-neon");
+});
+
 test("a new color trail unlocks through its exact authoritative entitlement", () => {
   const store = storeWith();
 
@@ -236,7 +270,7 @@ test("the featured bowler is kept separate from the gameplay loadout", () => {
 
 test("slot names cover the reward types the loadout is responsible for", () => {
   assert.deepEqual(Object.keys(BOWLER_SLOTS), [
-    "skin", "victoryPose", "defeatPose", "playerCard", "profileIcon", "menuSplash", "profileArt",
+    "skin", "ballTrail", "strikeBurst", "victoryPose", "defeatPose", "playerCard", "profileIcon", "menuSplash", "profileArt",
   ]);
   assert.deepEqual(Object.keys(GLOBAL_SLOTS), [
     "ballTrail", "strikeBurst", "title", "badge", "menuSplash", "room",

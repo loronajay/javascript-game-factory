@@ -22,7 +22,7 @@ export function progressionCelebrationMarkup(event = {}) {
   }
   return `<p class="eyebrow">Bowler mastery advanced</p>
     <h2>${escapeHtml(event.characterName || "Bowler")} reached Level ${escapeHtml(event.toLevel || 1)}</h2>
-    <p class="mastery-celebration-copy">New rewards are now recorded on this bowler&rsquo;s full mastery path.</p>
+    <p class="mastery-celebration-copy">Equip new rewards from this bowler&rsquo;s Customize menu in My room.</p>
     <ul class="mastery-celebration-rewards">${rewardsMarkup}</ul>`;
 }
 

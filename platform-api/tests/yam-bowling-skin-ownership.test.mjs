@@ -103,6 +103,30 @@ test("each Yam strike burst entitlement preserves only its exact equipped color"
   );
 });
 
+test("per-bowler effect overrides survive while remaining player-owned cosmetics", () => {
+  const raw = {
+    ...legacyGarage("canon"),
+    bowlers: {
+      "daisy-monroe": {
+        ...legacyGarage("canon").bowlers["daisy-monroe"],
+        ballTrail: "ball-trail:cyan-pulse",
+        strikeBurst: "strike-burst:purple-nova",
+      },
+      "nia-brooks": {
+        ballTrail: "ball-trail:cyan-pulse",
+      },
+    },
+  };
+  const garage = normalizeYamBowlingGarage(raw, {
+    ownedEntitlementIds: new Set(["ball-trail:cyan-pulse", "strike-burst:purple-nova"]),
+  });
+
+  assert.equal(garage.bowlers["daisy-monroe"].ballTrail, "ball-trail:cyan-pulse");
+  assert.equal(garage.bowlers["daisy-monroe"].strikeBurst, "strike-burst:purple-nova");
+  assert.equal(garage.bowlers["nia-brooks"].ballTrail, "ball-trail:cyan-pulse");
+  assert.equal(garage.global.ballTrail, undefined, "an override does not rewrite the player default");
+});
+
 test("the one-time migration grants only exact non-Canon skins saved in the server garage", async () => {
   const migrationName = "039-yam-bowling-skin-entitlements.sql";
   assert.ok(MIGRATION_FILES.includes(migrationName));

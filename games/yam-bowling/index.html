@@ -117,7 +117,10 @@
             <section class="profile-card profile-customizer" aria-labelledby="profile-customize-title">
               <div class="profile-card__heading">
                 <div><p class="eyebrow">Display cabinet</p><h3 id="profile-customize-title">Make the room yours</h3></div>
-                <span>Owned only</span>
+                <div class="profile-customizer-actions">
+                  <span>Player settings</span>
+                  <button class="button button--ghost" id="profile-preview-card" type="button">Preview player card</button>
+                </div>
               </div>
               <div class="profile-option-group">
                 <p>Featured bowler</p>
@@ -603,6 +606,32 @@
           <p class="public-profile-privacy">Only this player&rsquo;s public display and sanctioned progression records are shown.</p>
         </aside>
       </div>
+    </dialog>
+
+    <dialog class="bowler-config-dialog" id="bowler-config-dialog" aria-labelledby="bowler-config-title">
+      <button class="dialog-close" id="bowler-config-close" type="button" aria-label="Close bowler configuration">&#215;</button>
+      <header class="bowler-config-header">
+        <div><p class="eyebrow">Per-bowler loadout</p><h2 id="bowler-config-title">Configure bowler</h2></div>
+        <p id="bowler-config-copy">These choices apply only to this bowler.</p>
+      </header>
+      <div class="bowler-config-layout">
+        <aside class="bowler-config-preview" aria-labelledby="bowler-config-preview-title">
+          <div><p class="eyebrow">Online lobby preview</p><h3 id="bowler-config-preview-title">Your player card</h3></div>
+          <div id="bowler-config-card-preview"></div>
+          <p>This is the identity card other players see before an online match. Your profile icon replaces the bowler portrait here.</p>
+        </aside>
+        <section class="bowler-config-controls" aria-label="Bowler customization choices">
+          <div class="profile-option-group">
+            <p>Match outfit</p>
+            <div class="bowler-config-skins" id="bowler-config-skins" role="listbox" aria-label="Choose this bowler's match outfit"></div>
+          </div>
+          <div class="bowler-config-presentation" id="bowler-config-presentation"></div>
+        </section>
+      </div>
+      <footer class="bowler-config-footer">
+        <span class="profile-sync-status" id="bowler-config-status" aria-live="polite">Changes save with your Factory profile</span>
+        <button class="button button--primary" id="bowler-config-save" type="button">Save bowler config</button>
+      </footer>
     </dialog>
 
     <dialog class="menu-splash-dialog" id="menu-splash-dialog" aria-labelledby="menu-splash-title">
