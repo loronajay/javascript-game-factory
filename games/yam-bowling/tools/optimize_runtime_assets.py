@@ -83,6 +83,13 @@ def _webp_job(
     )
 
 
+def discover_emote_jobs(project_root: Path) -> list[ConversionJob]:
+    return [
+        _webp_job(source, max_size=EMOTE_SIZE, quality=86)
+        for source in sorted((project_root / "assets" / "emotes").glob("*.png"))
+    ]
+
+
 def discover_jobs(project_root: Path) -> list[ConversionJob]:
     assets = project_root / "assets"
     jobs: list[ConversionJob] = []
@@ -130,8 +137,7 @@ def discover_jobs(project_root: Path) -> list[ConversionJob]:
             )
         )
 
-    for source in sorted((assets / "emotes").glob("*.png")):
-        jobs.append(_webp_job(source, max_size=EMOTE_SIZE, quality=86))
+    jobs.extend(discover_emote_jobs(project_root))
 
     pin = assets / "pins" / "1.png"
     if pin.exists():
@@ -152,8 +158,12 @@ def derived_pngs(project_root: Path) -> list[Path]:
     return sorted(paths)
 
 
-def optimize(project_root: Path, clean_derived: bool = False) -> tuple[int, int, int]:
-    jobs = discover_jobs(project_root)
+def optimize(
+    project_root: Path,
+    clean_derived: bool = False,
+    collection: str = "all",
+) -> tuple[int, int, int]:
+    jobs = discover_emote_jobs(project_root) if collection == "emotes" else discover_jobs(project_root)
     source_bytes = 0
     output_bytes = 0
     for job in jobs:
@@ -182,9 +192,19 @@ def main() -> None:
         action="store_true",
         help="Remove reproducible character PNG outputs after successful conversion.",
     )
+    parser.add_argument(
+        "--collection",
+        choices=("all", "emotes"),
+        default="all",
+        help="Limit conversion to one runtime asset collection.",
+    )
     args = parser.parse_args()
 
-    count, source_bytes, output_bytes = optimize(args.root.resolve(), args.clean_derived_png)
+    count, source_bytes, output_bytes = optimize(
+        args.root.resolve(),
+        args.clean_derived_png,
+        args.collection,
+    )
     savings = 0 if source_bytes == 0 else 1 - output_bytes / source_bytes
     print(
         f"Wrote {count} runtime images: "

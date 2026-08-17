@@ -117,7 +117,9 @@ export function createOnlineSession({
     // shot has to be written over it afterwards, not before.
     Object.assign(scene.liveShot, roll.shot);
     matchRuntime.applyBallProfile();
-    matchRuntime.prepareActivePlayer();
+    // This is a replay of the shot the server just accepted, not a new turn.
+    // The actual handoff is announced after the roll settles.
+    matchRuntime.prepareActivePlayer({ announce: false });
     Object.assign(scene.liveShot, roll.shot);
     matchRuntime.applyBallProfile();
     shotHud.syncControlsFromShot();

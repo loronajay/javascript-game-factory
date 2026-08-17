@@ -76,6 +76,53 @@ test("a reaction-only snapshot refreshes the active bowler without announcing th
   assert.deepEqual(preparedWith, [{ announce: false }]);
 });
 
+test("an authoritative shot replay does not announce the shooter again at release", () => {
+  const preparedWith = [];
+  const previousDocument = globalThis.document;
+  globalThis.document = { getElementById: () => ({ hidden: false }) };
+  try {
+    const session = {
+      scene: { liveShot: {} },
+      onlineMatch: true,
+      onlineSnapshot: { sessionId: "session-1" },
+      lastAppliedOnlineRoll: 4,
+      pendingAuthoritativeRoll: null,
+      match: { status: "playing", activePlayer: 0, players: [{ id: "player-1" }] },
+    };
+    const onlineSession = createOnlineSession({
+      session,
+      onlineScreen: { renderLobby() {} },
+      matchRuntime: {
+        clonePins: (pins) => pins,
+        applyBallProfile() {},
+        prepareActivePlayer: (options) => preparedWith.push(options),
+        beginThrow() {},
+      },
+      shotHud: { syncControlsFromShot() {} },
+    });
+
+    onlineSession.handleSnapshot({
+      status: "match",
+      matchState: {
+        sessionId: "session-1",
+        rollNumber: 5,
+        nextPins: [],
+        match: { status: "playing", activePlayer: 0, players: [{ id: "player-1" }] },
+        lastRoll: {
+          rollNumber: 5,
+          shooterClientId: "player-1",
+          pinsBefore: [],
+          shot: { ballIndex: 0, power: .7, release: .4 },
+        },
+      },
+    });
+
+    assert.deepEqual(preparedWith, [{ announce: false }]);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 // ------------------------------------------ re-sending a report that never landed
 
 test("a stored request is re-sent verbatim, under the session id its grant is keyed by", async () => {

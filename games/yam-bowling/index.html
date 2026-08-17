@@ -209,47 +209,62 @@
         </div>
       </section>
 
-      <section class="screen circuit-screen tournament-screen" id="tournament-screen" aria-labelledby="tournament-title" hidden>
-        <img class="circuit-backdrop" src="assets/menu-splashes/inner-menus/registration-counter.webp" alt="Yam Bowling tournament registration desk" decoding="async" />
-        <div class="circuit-vignette"></div>
-        <header class="circuit-header">
+      <section class="screen tournament-screen" id="tournament-screen" aria-labelledby="tournament-title" hidden>
+        <img class="tournament-backdrop" src="assets/menu-splashes/inner-menus/tournament-registration.webp" alt="Championship lanes, broadcast stage, and silver trophy" decoding="async" />
+        <div class="tournament-atmosphere" aria-hidden="true"><i></i><i></i><i></i></div>
+        <header class="tournament-header">
           <button class="icon-button" id="tournament-back" type="button" aria-label="Back to title">&#8592;</button>
-          <div><p class="eyebrow">Rotating CPU championship</p><h2 id="tournament-title">Yam tournament</h2></div>
-          <span class="circuit-status-seal" id="tournament-status-seal">Checking entries</span>
+          <div class="tournament-heading">
+            <p class="eyebrow"><span>YB</span> Official championship series</p>
+            <h2 id="tournament-title">Yam tournament</h2>
+          </div>
+          <div class="tournament-live-status"><small id="tournament-event-edition">Yam Major</small><strong id="tournament-status-seal">Checking entries</strong></div>
         </header>
-        <div class="circuit-layout">
-          <aside class="circuit-card circuit-license" aria-label="Tournament bracket">
-            <p class="eyebrow">Event window</p>
-            <p class="tournament-window" id="tournament-window">Checking the schedule&hellip;</p>
-            <div class="tournament-bracket" id="tournament-bracket"></div>
-            <p class="tournament-prize-note"><b>Championship roll:</b> common tournament-only trails and strike bursts, with rare Skin Voucher and Champion&rsquo;s Room outcomes.</p>
-          </aside>
-          <section class="circuit-card circuit-event" aria-labelledby="tournament-round-name">
-            <div class="circuit-event-heading">
-              <div><p class="eyebrow" id="tournament-round-label">Round 1 of 3</p><h3 id="tournament-round-name">Opening Round</h3></div>
-              <span id="tournament-event-format">3F</span>
+
+        <main class="tournament-arena">
+          <section class="tournament-bracket-board" aria-labelledby="tournament-bracket-title">
+            <header class="tournament-bracket-heading">
+              <div><p class="eyebrow">Official bracket</p><h3 id="tournament-bracket-title">Road to the trophy</h3></div>
+              <div class="tournament-bracket-status"><strong id="tournament-progress-copy">0 of 3 rounds cleared</strong><span id="tournament-window">Checking the schedule&hellip;</span></div>
+            </header>
+            <div class="tournament-bracket-scroll">
+              <ol class="tournament-bracket-track" id="tournament-bracket" aria-label="Your official tournament elimination route"></ol>
             </div>
-            <div class="circuit-faceoff">
-              <div class="circuit-player-mark"><img id="tournament-player-art" alt="" /><small>Your entry</small><strong id="tournament-player-name">Daisy Monroe</strong></div>
-              <div class="circuit-versus"><span>VS</span><i></i></div>
-              <div class="circuit-opponent-mark"><img id="tournament-opponent-art" alt="" /><small>Bracket rival</small><strong id="tournament-opponent-name">Lumi Vega</strong></div>
-            </div>
-            <blockquote id="tournament-rival-line">Win to advance through the bracket.</blockquote>
-            <div class="circuit-match-meta">
-              <span><small>House</small><strong id="tournament-venue-name">Neon Carnival</strong></span>
-              <span><small>CPU challenge</small><strong id="tournament-difficulty">Competitive</strong></span>
-              <span><small>Final format</small><strong>Champion CPU · 10F</strong></span>
-              <span><small>Prize</small><strong id="tournament-prize-name">Weighted cosmetic roll</strong></span>
-            </div>
-            <p class="circuit-sync-status" id="tournament-sync-status" aria-live="polite" hidden></p>
-            <button class="button button--primary button--wide" id="start-tournament-match" type="button" disabled>Checking entries&hellip;</button>
+            <footer class="tournament-prize-bar">
+              <span class="tournament-prize-emblem" aria-hidden="true">★</span>
+              <p><small>Championship purse</small><strong id="tournament-prize-name">Weighted cosmetic roll</strong></p>
+              <p class="tournament-prize-note">Tournament-only trails and strike bursts, with rare Skin Voucher and Champion&rsquo;s Room outcomes.</p>
+            </footer>
           </section>
-          <aside class="circuit-card circuit-roster-panel" aria-labelledby="tournament-roster-title">
-            <div class="circuit-roster-heading"><div><p class="eyebrow">Active entry</p><h3 id="tournament-roster-title">Choose your bowler</h3></div><span id="tournament-selected-label">Daisy</span></div>
-            <div class="circuit-roster" id="tournament-roster" role="listbox" aria-label="Unlocked tournament bowlers"></div>
-            <p class="circuit-roster-note">Your circuit roster is eligible. Tournament prizes are cosmetic and never improve CPU performance.</p>
-          </aside>
-        </div>
+
+          <div class="tournament-lower-deck">
+            <section class="tournament-stage" aria-labelledby="tournament-round-name">
+              <header class="tournament-stage-heading">
+                <div><p class="eyebrow" id="tournament-round-label">Round 1 of 3</p><h3 id="tournament-round-name">Opening Round</h3></div>
+                <span><small>Format</small><strong id="tournament-event-format">3F</strong></span>
+              </header>
+              <div class="tournament-faceoff">
+                <div class="tournament-contender tournament-contender--player"><img id="tournament-player-art" alt="" /><span><small>Your contender</small><strong id="tournament-player-name">Daisy Monroe</strong></span></div>
+                <div class="tournament-versus"><small>Head to head</small><strong>VS</strong><i></i></div>
+                <div class="tournament-contender tournament-contender--rival"><img id="tournament-opponent-art" alt="" /><span><small>Seeded rival</small><strong id="tournament-opponent-name">Lumi Vega</strong></span></div>
+              </div>
+              <p class="tournament-rival-line" id="tournament-rival-line">Win to advance through the bracket.</p>
+              <div class="tournament-match-meta">
+                <span><small>Championship house</small><strong id="tournament-venue-name">Neon Carnival</strong></span>
+                <span><small>Opponent class</small><strong id="tournament-difficulty">Competitive</strong></span>
+                <span><small>Title match</small><strong>Champion CPU · 10F</strong></span>
+              </div>
+              <p class="tournament-sync-status" id="tournament-sync-status" aria-live="polite" hidden></p>
+              <button class="button button--primary button--wide tournament-bowl-button" id="start-tournament-match" type="button" disabled>Checking entries&hellip;</button>
+            </section>
+
+            <aside class="tournament-entry" aria-labelledby="tournament-roster-title">
+              <header><div><p class="eyebrow">Tournament entry</p><h3 id="tournament-roster-title">Name your contender</h3></div><span id="tournament-selected-label">Daisy</span></header>
+              <div class="tournament-roster" id="tournament-roster" role="listbox" aria-label="Unlocked tournament bowlers"></div>
+              <p>Your unlocked circuit roster is eligible. Choose who carries your colors into the bracket.</p>
+            </aside>
+          </div>
+        </main>
       </section>
 
       <section class="screen setup-screen online-screen" id="online-screen" aria-labelledby="online-title" hidden>

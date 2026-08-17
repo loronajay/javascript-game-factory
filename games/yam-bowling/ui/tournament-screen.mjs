@@ -12,6 +12,55 @@ function formatDate(value) {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", timeZone: "UTC" }).format(date);
 }
 
+export function tournamentBracketMarkup(state, assets, playerSlug) {
+  const rounds = state?.event?.rounds || [];
+  const completed = new Set(state?.completedRoundIndexes || []);
+  const activeRound = state?.champion ? null : rounds.find((round) => !completed.has(round.index));
+  const player = assets.bowlerBySlug(playerSlug);
+
+  const route = rounds.map((round, position) => {
+    const cleared = completed.has(round.index);
+    const current = activeRound?.index === round.index;
+    const status = cleared ? "cleared" : current ? "current" : "locked";
+    const reached = cleared || current || state?.champion;
+    const opponent = assets.bowlerBySlug(round.opponentSlug);
+    const playerSource = reached
+      ? `<img src="${escapeHtml(assets.characterPortrait(playerSlug, assets.storedSkinId(playerSlug)))}" alt="">`
+      : `<span class="tournament-bracket-placeholder" aria-hidden="true">?</span>`;
+    const playerName = reached
+      ? player.name
+      : `${rounds[position - 1]?.name || "Previous round"} winner`;
+    const statusCopy = cleared ? "Advanced" : current ? "On deck" : "Awaiting winner";
+
+    return `
+      <li class="tournament-bracket-round">
+        <article data-round="${round.index}" class="tournament-matchup is-${status}" aria-label="${escapeHtml(round.name)}: ${escapeHtml(statusCopy)}">
+          <header><span>${escapeHtml(round.name)}</span><b>${statusCopy}</b></header>
+          <div class="tournament-entrant tournament-entrant--player">
+            ${playerSource}
+            <span><small>${reached ? "Your entry" : "Advancing entry"}</small><strong>${escapeHtml(playerName)}</strong></span>
+            <i>${cleared ? "W" : current ? "•" : "—"}</i>
+          </div>
+          <div class="tournament-matchup-divider"><span>VS</span></div>
+          <div class="tournament-entrant tournament-entrant--rival">
+            <img src="${escapeHtml(assets.characterPortrait(round.opponentSlug, assets.storedSkinId(round.opponentSlug)))}" alt="">
+            <span><small>Seeded rival</small><strong>${escapeHtml(opponent.name)}</strong></span>
+            <i>${cleared ? "L" : "—"}</i>
+          </div>
+        </article>
+        <div class="tournament-bracket-connector${cleared ? " is-cleared" : ""}" aria-hidden="true"><i></i><span></span><b></b></div>
+      </li>`;
+  }).join("");
+
+  return `${route}
+    <li class="tournament-champion-destination${state?.champion ? " is-crowned" : ""}">
+      <span class="tournament-crown" aria-hidden="true">♛</span>
+      <small>${state?.champion ? "Tournament complete" : "Final destination"}</small>
+      <strong>${state?.champion ? escapeHtml(player.name) : "Crown the champion"}</strong>
+      <i>${state?.champion ? "UNDISPUTED" : "ONE ENTRY REMAINS"}</i>
+    </li>`;
+}
+
 export function createTournamentScreen({
   session,
   client,
@@ -32,15 +81,18 @@ export function createTournamentScreen({
   }
 
   function renderBracket(state) {
-    const completed = new Set(state.completedRoundIndexes || []);
-    const active = currentRound(state)?.index;
-    $("tournament-bracket").innerHTML = (state.event?.rounds || []).map((round) => `
-      <div class="tournament-bracket-step${completed.has(round.index) ? " is-cleared" : ""}${active === round.index ? " is-current" : ""}">
-        <b>${round.index + 1}</b>
-        <span><strong>${escapeHtml(round.name)}</strong><small>${escapeHtml(assets.bowlerBySlug(round.opponentSlug).name)}</small></span>
-        <i>${completed.has(round.index) ? "WIN" : active === round.index ? "NEXT" : "LOCKED"}</i>
-      </div>
-    `).join("");
+    const playerSlug = campaignStore.getSelectedBowlerSlug();
+    const bracket = $("tournament-bracket");
+    bracket.innerHTML = tournamentBracketMarkup(state, assets, playerSlug);
+    const bracketScroll = bracket.parentElement;
+    const currentMatchup = bracket.querySelector(".tournament-matchup.is-current");
+    if (currentMatchup && bracketScroll.scrollWidth > bracketScroll.clientWidth) {
+      bracketScroll.scrollLeft = Math.max(0, currentMatchup.offsetLeft - 16);
+    }
+    const complete = (state.completedRoundIndexes || []).length;
+    $("tournament-progress-copy").textContent = state.champion
+      ? "The bracket is yours"
+      : `${complete} of ${state.event?.rounds?.length || 0} rounds cleared`;
   }
 
   function renderRoster() {
@@ -52,8 +104,10 @@ export function createTournamentScreen({
       const bowler = assets.bowlerBySlug(slug);
       const button = document.createElement("button");
       button.type = "button";
-      button.className = `circuit-roster-entry${slug === selectedSlug ? " is-selected" : ""}`;
+      button.className = `tournament-entry-option${slug === selectedSlug ? " is-selected" : ""}`;
       button.dataset.tournamentBowler = slug;
+      button.setAttribute("role", "option");
+      button.setAttribute("aria-selected", slug === selectedSlug ? "true" : "false");
       button.innerHTML = `<img src="${assets.characterPortrait(slug, assets.storedSkinId(slug))}" alt=""><span>${escapeHtml(bowler.name)}</span>`;
       button.addEventListener("click", () => {
         if (!campaignStore.selectBowler(slug)) return;
@@ -80,6 +134,7 @@ export function createTournamentScreen({
       ? `Opens ${formatDate(state.event.startsAt)} UTC`
       : `${formatDate(state.event.startsAt)}–${formatDate(state.event.endsAt)} UTC`;
     $("tournament-status-seal").textContent = state.champion ? "Champion" : closed ? "Entries closed" : "Entries open";
+    $("tournament-event-edition").textContent = state.event.shortName || "Yam Major";
     $("tournament-round-label").textContent = state.champion
       ? "Bracket complete"
       : closed ? "Next tournament" : `Round ${round.index + 1} of ${state.event.rounds.length}`;

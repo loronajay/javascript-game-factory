@@ -70,6 +70,21 @@ class OptimizeRuntimeAssetsTests(unittest.TestCase):
             self.assertIn("assets/pins/1.webp", destinations)
             self.assertNotIn("assets/characters/skins/daisy-monroe/swimsuit/source.webp", destinations)
 
+    def test_can_discover_only_emotes_for_a_targeted_rebuild(self) -> None:
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            emote = root / "assets" / "emotes" / "wave.png"
+            lane = root / "assets" / "lanes" / "crimson-crown.png"
+            for source in (emote, lane):
+                source.parent.mkdir(parents=True, exist_ok=True)
+                Image.new("RGBA", (16, 16), (255, 0, 0, 255)).save(source)
+
+            jobs = optimizer.discover_emote_jobs(root)
+
+            self.assertEqual([job.source for job in jobs], [emote])
+            self.assertEqual(jobs[0].destination, emote.with_suffix(".webp"))
+            self.assertEqual(jobs[0].max_size, optimizer.EMOTE_SIZE)
+
 
 if __name__ == "__main__":
     unittest.main()
