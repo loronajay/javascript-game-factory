@@ -61,6 +61,12 @@ const EFFECT_PRIZES = [
 }));
 const PRIZES = Object.freeze([
     ...EFFECT_PRIZES,
+    // An Emote Voucher rather than a named emote. Dropping one specific sticker
+    // would mean re-rolling a prize the player already owns; a voucher is always
+    // worth something while any of the thirty remain unowned, and it lets them
+    // pick. Weighted high because it is the repeatable route into that pool —
+    // the ladder pays only four across all thirty levels.
+    Object.freeze({ kind: "inventory", itemId: "emote-voucher", quantity: 1, name: "Emote Voucher", tier: "rare", weight: 14 }),
     Object.freeze({ kind: "entitlement", entitlementId: "room:champion-room", itemId: "room:champion-room", name: "Champion's Room", tier: "legendary", weight: 6 }),
     Object.freeze({ kind: "inventory", itemId: "skin-voucher", quantity: 1, name: "Skin Voucher", tier: "legendary", weight: 3 }),
 ]);

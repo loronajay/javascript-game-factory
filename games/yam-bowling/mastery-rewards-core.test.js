@@ -29,14 +29,18 @@ test("the approved anchor levels keep their promised reward families", () => {
   assert.deepEqual(familiesAt(1), ["bowler"]);
   assert.deepEqual(familiesAt(3), ["profile-icon"]);
   assert.deepEqual(familiesAt(5), ["victory-pose"]);
-  assert.deepEqual(familiesAt(7), ["character-banner"]);
-  assert.deepEqual(familiesAt(10), ["skin"]);
+  // 7/15/25 pay rooms and 10/20/30 pay effects. They were authored as banners,
+  // splashes and per-bowler skins -- all of which needed art per bowler, thirty
+  // times over -- and were rebound to content that costs one image or none.
+  // The node KEYS still carry the old names because a reward id is permanent.
+  assert.deepEqual(familiesAt(7), ["room"]);
+  assert.deepEqual(familiesAt(10), ["ball-trail"]);
   assert.deepEqual(familiesAt(12), ["player-card"]);
-  assert.deepEqual(familiesAt(15), ["menu-splash"]);
+  assert.deepEqual(familiesAt(15), ["room"]);
   assert.deepEqual(familiesAt(18), ["victory-pose"]);
-  assert.deepEqual(familiesAt(20), ["skin"]);
-  assert.deepEqual(familiesAt(25), ["rare-card"]);
-  assert.deepEqual(familiesAt(30), ["skin", "title"]);
+  assert.deepEqual(familiesAt(20), ["strike-burst"]);
+  assert.deepEqual(familiesAt(25), ["room"]);
+  assert.deepEqual(familiesAt(30), ["ball-trail", "strike-burst", "title"]);
 });
 
 test("resolved reward ids are bowler-specific, stable, and leave room for levels 31 through 40", () => {
@@ -49,7 +53,8 @@ test("resolved reward ids are bowler-specific, stable, and leave room for levels
   );
   assert.equal(first.nodes[2].rewards[0].id, "mastery:reina-sato:level-03:profile-icon");
   assert.equal(first.nodes[29].rewards[0].id, "mastery:reina-sato:level-30:mastery-skin");
-  assert.equal(first.nodes[29].rewards[1].id, "mastery:reina-sato:level-30:exclusive-title");
+  assert.equal(first.nodes[29].rewards[1].id, "mastery:reina-sato:level-30:mastery-burst");
+  assert.equal(first.nodes[29].rewards[2].id, "mastery:reina-sato:level-30:exclusive-title");
   assert.ok(first.nodes.every((node) => node.level <= 30));
 });
 
@@ -87,22 +92,22 @@ test("equipped labels are reserved for exact shipped equipment references", () =
 
   assert.equal(tree.nodes[1].label, "Red Neon Ball Trail");
   assert.equal(tree.nodes[1].state, "equipped");
-  assert.equal(tree.nodes[9].label, "Gym Day Skin");
-  assert.equal(tree.nodes[9].state, "owned", "a different shipped skin must not impersonate the mastery reward");
+  assert.equal(tree.nodes[9].label, "Rose Gold Ball Trail");
+  assert.equal(tree.nodes[9].state, "owned", "a different shipped trail must not impersonate the mastery reward");
 });
 
-test("the mastery badge milestones point at real equippable cabinet badges", () => {
+test("the mastery milestones point at titles, leaving badges for actual feats", () => {
   const tree = masteryRewards.buildRewardTree({ character, currentLevel: 30 });
   const expected = new Map([
-    [13, "badge:laser-focus"],
-    [21, "badge:precision-bowler"],
-    [28, "badge:lane-legend"],
+    [13, "title:pocket-hunter"],
+    [21, "title:lane-reader"],
+    [28, "title:shotmaker"],
   ]);
 
   for (const [level, itemId] of expected) {
     const reward = tree.nodes[level - 1].rewards[0];
-    assert.equal(reward.family, "badge");
-    assert.deepEqual(reward.equipment, { scope: "global", slot: "badge", itemId });
+    assert.equal(reward.family, "title");
+    assert.deepEqual(reward.equipment, { scope: "global", slot: "title", itemId });
   }
 });
 

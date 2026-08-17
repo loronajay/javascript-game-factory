@@ -82,7 +82,15 @@ test("an owned prize is removed before the weighted roll and voucher remains the
   });
 
   assert.notEqual(rerolled.entitlementId, first.entitlementId);
-  assert.equal(fallback.itemId, "skin-voucher");
+  // Once every entitlement prize is owned only the two currencies are left, and
+  // either is a real prize: an Emote Voucher buys from a pool of twenty-three,
+  // a Skin Voucher from the alternates. What matters is that the roll can never
+  // come back empty-handed, not which of the two it lands on.
+  assert.equal(fallback.kind, "inventory");
+  assert.ok(
+    ["skin-voucher", "emote-voucher"].includes(fallback.itemId),
+    `${fallback.itemId} should be a spendable voucher`,
+  );
 });
 
 test("the authoritative loadout accepts every tournament cosmetic it can grant", () => {

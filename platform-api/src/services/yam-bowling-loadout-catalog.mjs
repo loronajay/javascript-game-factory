@@ -17,6 +17,8 @@ const ROOM_SLUGS = Object.freeze([
     "default", "teal-lounge", "hot-pink-hideout", "retro-arcade", "beach-house",
     "industrial-workshop", "botanical-glasshouse", "frosted-suite", "lavender-cosmic",
     "black-gothic", "circuit-red", "tower-penthouse", "champion-room",
+    // Mastery levels 7, 15 and 25.
+    "fireside-lodge", "desert-vista", "deep-sea-suite",
 ]);
 const BALL_TRAIL_IDS = Object.freeze([
     "none", "red-neon", "orange-flare", "gold-rush", "lime-shock",
@@ -24,12 +26,31 @@ const BALL_TRAIL_IDS = Object.freeze([
     "indigo-drive", "violet-haze", "purple-plasma", "magenta-pop", "hot-pink",
     "diamond-white", "perfect-line", "championship-gold", "bracket-fire", "cosmic-ribbon",
     "royal-confetti",
+    // Mastery levels 10 and 30.
+    "rose-gold", "eclipse",
 ]);
+// The emote pool is global rather than per bowler: thirty stickers shared by
+// thirty bowlers is thirty images, where one set each would be nine hundred.
+// The first six are founding, so a new account can always react to something.
+const FOUNDING_EMOTE_SLUGS = Object.freeze([
+    "wave", "thumbs-up", "good-luck", "nice-one", "lets-go", "oh-no",
+]);
+const EMOTE_SLUGS = Object.freeze([
+    ...FOUNDING_EMOTE_SLUGS,
+    "cheer", "peace", "hair-flip", "crowned", "game-face",
+    "fist-pump", "salute", "number-one", "proud", "finger-heart",
+    "blow-kiss", "cheeky", "wink", "brush-it-off", "you-next",
+    "phew", "please-fall", "rattled", "shush", "well-actually",
+    "heads-up", "after-you", "lock-in", "fist-bump",
+]);
+const FOUNDING_EMOTES = new Set(FOUNDING_EMOTE_SLUGS);
 const STRIKE_BURST_IDS = Object.freeze([
     "classic", "ember", "red-supernova", "gold-star", "lime-pop",
     "emerald-impact", "mint-crackle", "cyan-flash", "sky-shatter", "electric-blue",
     "indigo-ring", "violet-bloom", "purple-nova", "magenta-blast", "hot-pink-pop",
     "diamond-spark", "pin-crown", "finals-fireworks", "cosmic-cup", "victory-ribbon",
+    // Mastery levels 20 and 30.
+    "rose-gold", "eclipse-corona",
 ]);
 const items = new Map();
 function register(item) {
@@ -73,6 +94,10 @@ for (const burstId of STRIKE_BURST_IDS) {
     const id = `strike-burst:${burstId}`;
     register({ id, type: "strike-burst", founding: burstId === "classic", entitlementId: id });
 }
+for (const emoteSlug of EMOTE_SLUGS) {
+    const id = `emote:${emoteSlug}`;
+    register({ id, type: "emote", founding: FOUNDING_EMOTES.has(emoteSlug), entitlementId: id });
+}
 for (const [id, type, founding] of [
     ["title:rookie", "title", true],
     ["title:pin-chaser", "title", false],
@@ -87,6 +112,12 @@ for (const [id, type, founding] of [
     ["badge:laser-focus", "badge", false],
     ["badge:precision-bowler", "badge", false],
     ["badge:lane-legend", "badge", false],
+    // The titles that replaced those three on the mastery ladder at 13, 21 and
+    // 28. The badges above stay registered because accounts earned them there
+    // before the change and an unregistered id is stripped, not refused.
+    ["title:pocket-hunter", "title", false],
+    ["title:lane-reader", "title", false],
+    ["title:shotmaker", "title", false],
 ]) {
     register({ id, type, founding, entitlementId: id });
 }
@@ -105,6 +136,7 @@ const GLOBAL_SLOTS = Object.freeze({
     badge: "badge",
     menuSplash: "menu-splash",
     room: "room",
+    emote: "emote",
     profileFrame: "profile-art",
     profileBackground: "profile-art",
 });

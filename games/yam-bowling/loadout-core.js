@@ -64,6 +64,11 @@
     // The player's own room. New content, so unlike every slot above it has no
     // legacy key to migrate -- this has been its only owner from the first line.
     room: Object.freeze({ type: "room", defaultId: null }),
+    // The sticker thrown on the lane. It carries a default, unlike the two
+    // decoration slots below, because an emote nobody has equipped is a button
+    // that does nothing -- every account owns the founding six, so the slot can
+    // always resolve to something real.
+    emote: Object.freeze({ type: "emote", defaultId: "emote:wave" }),
     // Profile decoration reuses character profile art, so a featured bowler
     // can frame and back their own page without new asset types.
     profileFrame: Object.freeze({ type: "profile-art", defaultId: null }),

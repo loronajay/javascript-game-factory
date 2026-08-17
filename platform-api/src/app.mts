@@ -335,6 +335,9 @@ export function createApp(options: any = {}) {
   const redeemSkinVoucher = typeof options?.redeemSkinVoucher === "function"
     ? options.redeemSkinVoucher
     : null;
+  const redeemEmoteVoucher = typeof options?.redeemEmoteVoucher === "function"
+    ? options.redeemEmoteVoucher
+    : null;
   const getTournamentState = typeof options?.getTournamentState === "function"
     ? options.getTournamentState
     : null;
@@ -625,6 +628,7 @@ export function createApp(options: any = {}) {
     backfillOwnership,
     activateConsumable,
     redeemSkinVoucher,
+    redeemEmoteVoucher,
     getTournamentState,
     recordTournamentRound,
   };

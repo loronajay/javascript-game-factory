@@ -31,6 +31,10 @@ test("every reward type named by the metagame scope has a stable catalog identit
     // scope was written: rooms are new content, so unlike everything above them
     // they ship mostly locked rather than all founding.
     "room",
+    // The twelfth type. Emotes are the first reward that is global by design
+    // rather than by convenience: one shared pool of gestures, because a set
+    // per bowler would be thirty times the art for the same thirty reactions.
+    "emote",
     "profile-art",
     "ball-trail",
     "strike-burst",
@@ -143,7 +147,7 @@ test("the trail cabinet offers a broad, distinct color collection to unlock", ()
   const trails = listByType("ball-trail");
   const colorTrails = trails.filter((item) => item.id !== "ball-trail:none");
 
-  assert.equal(trails.length, 21, "No Trail plus twenty color rewards should be visible");
+  assert.equal(trails.length, 23, "No Trail plus twenty-two color rewards should be visible");
   assert.deepEqual(colorTrails.map((item) => item.id), [
     "ball-trail:red-neon",
     "ball-trail:orange-flare",
@@ -161,6 +165,8 @@ test("the trail cabinet offers a broad, distinct color collection to unlock", ()
     "ball-trail:hot-pink",
     "ball-trail:diamond-white",
     "ball-trail:perfect-line",
+    "ball-trail:rose-gold",
+    "ball-trail:eclipse",
     "ball-trail:championship-gold",
     "ball-trail:bracket-fire",
     "ball-trail:cosmic-ribbon",
@@ -188,7 +194,7 @@ test("the strike cabinet offers a broad, distinct burst collection to unlock", (
   const bursts = listByType("strike-burst");
   const rewardBursts = bursts.filter((item) => item.id !== "strike-burst:classic");
 
-  assert.equal(bursts.length, 20, "Classic plus nineteen color rewards should be visible");
+  assert.equal(bursts.length, 22, "Classic plus twenty-one color rewards should be visible");
   assert.deepEqual(rewardBursts.map((item) => item.id), [
     "strike-burst:ember",
     "strike-burst:red-supernova",
@@ -205,6 +211,8 @@ test("the strike cabinet offers a broad, distinct burst collection to unlock", (
     "strike-burst:magenta-blast",
     "strike-burst:hot-pink-pop",
     "strike-burst:diamond-spark",
+    "strike-burst:rose-gold",
+    "strike-burst:eclipse-corona",
     "strike-burst:pin-crown",
     "strike-burst:finals-fireworks",
     "strike-burst:cosmic-cup",
@@ -230,11 +238,22 @@ test("profile rewards span mastery, achievement, behavior, and tournament presti
     ["title:pin-chaser", "bowler-level", "rare"],
     ["title:comeback-kid", "achievement", "rare"],
     ["title:yam-champion", "tournament", "legendary"],
-    ["badge:laser-focus", "bowler-level", "rare"],
-    ["badge:precision-bowler", "bowler-level", "rare"],
-    ["badge:lane-legend", "bowler-level", "legendary"],
+    ["title:ice-in-the-tenth", "achievement", "rare"],
+    ["title:spare-architect", "achievement", "rare"],
+    ["title:bracket-breaker", "tournament", "rare"],
+    ["title:undisputed", "tournament", "legendary"],
+    // Badges, and earned by achievement rather than by level. Their type is
+    // pinned here because it is also their entitlement id: retyping them would
+    // orphan every row already granted to a live account.
+    ["badge:laser-focus", "achievement", "rare"],
+    ["badge:precision-bowler", "achievement", "rare"],
+    ["badge:lane-legend", "achievement", "legendary"],
     ["badge:perfect-game", "achievement", "legendary"],
     ["badge:split-decision", "achievement", "rare"],
+    ["badge:clean-card", "achievement", "rare"],
+    ["badge:turkey-club", "achievement", "rare"],
+    ["badge:road-tested", "achievement", "rare"],
+    ["badge:deep-bench", "achievement", "legendary"],
   ];
 
   for (const [id, source, tier] of expected) {
@@ -250,6 +269,15 @@ test("profile rewards span mastery, achievement, behavior, and tournament presti
 
   assert.ok(UNLOCK_SOURCES.includes("tournament"), "tournament prizes need a first-class unlock source");
   assert.equal(new Set(expected.map(([, source]) => source)).size, 3, "the pilot collection should not be one-note");
+});
+
+test("badges certify earned distinctions rather than passive level milestones", () => {
+  for (const badge of CATALOG.filter((item) => item.type === "badge")) {
+    assert.ok(
+      ["founding", "achievement", "tournament"].includes(badge.unlock.source),
+      `${badge.id} should represent an earned distinction`,
+    );
+  }
 });
 
 test("rotating tournaments have an exclusive common effect pool", () => {

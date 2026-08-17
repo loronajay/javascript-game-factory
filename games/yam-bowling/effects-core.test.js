@@ -49,7 +49,7 @@ test("the default no-trail and default burst items emit nothing extra", () => {
 test("every colored trail catalog entry resolves to a renderable effect style", () => {
   const colorTrails = cosmetics.listByType("ball-trail").filter((item) => item.id !== "ball-trail:none");
 
-  assert.equal(colorTrails.length, 20);
+  assert.equal(colorTrails.length, 22);
   for (const item of colorTrails) {
     const style = styleForItem(item);
     assert.equal(style.id, item.id);
@@ -60,7 +60,7 @@ test("every colored trail catalog entry resolves to a renderable effect style", 
 test("every colored strike burst catalog entry resolves to a renderable effect style", () => {
   const rewardBursts = cosmetics.listByType("strike-burst").filter((item) => item.id !== "strike-burst:classic");
 
-  assert.equal(rewardBursts.length, 19);
+  assert.equal(rewardBursts.length, 21);
   for (const item of rewardBursts) {
     const style = styleForItem(item);
     assert.equal(style.id, item.id);

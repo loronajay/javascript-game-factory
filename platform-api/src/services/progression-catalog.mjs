@@ -40,9 +40,21 @@ const YAM_BOWLING = {
     performanceXpPerUnit: 4,
     maxPerformanceXp: 20,
     trackStats: { strikes: "sum", highGame: "max" },
+    // Two spendable currencies, listed in level order because that is the order a
+    // player meets them and the order the reward reader returns them in.
+    //
+    // Emote Vouchers sit on the four rungs that used to promise badges, and are
+    // the commoner of the two: the emote pool is thirty deep where the skin pool
+    // is two per bowler. Both are currencies rather than named items because a
+    // ladder has far fewer rungs than either pool has entries — naming one item
+    // per rung would leave most of the pool permanently unreachable.
     playerInventoryRewards: Object.freeze([
+        Object.freeze({ level: 7, itemId: "emote-voucher", quantity: 1 }),
         Object.freeze({ level: 10, itemId: "skin-voucher", quantity: 1 }),
+        Object.freeze({ level: 16, itemId: "emote-voucher", quantity: 1 }),
+        Object.freeze({ level: 22, itemId: "emote-voucher", quantity: 1 }),
         Object.freeze({ level: 25, itemId: "skin-voucher", quantity: 1 }),
+        Object.freeze({ level: 30, itemId: "emote-voucher", quantity: 1 }),
     ]),
     // Keep in lockstep with the cabinet's two ladder cadences —
     // games/yam-bowling/player-rewards-core.js and mastery-rewards-core.js. Only
@@ -81,21 +93,35 @@ const YAM_BOWLING = {
             levelReward(2, "ball-trail:red-neon"),
             levelReward(4, "strike-burst:ember"),
             levelReward(6, "ball-trail:orange-flare"),
+            levelReward(7, "room:fireside-lodge"),
             levelReward(8, "strike-burst:red-supernova"),
+            levelReward(10, "ball-trail:rose-gold"),
             levelReward(11, "ball-trail:sky-blue"),
-            levelReward(13, "badge:laser-focus"),
+            // 13/21/28 used to pay badges. A badge is an achievement reward now, so
+            // they pay titles instead. The badge ids themselves were deliberately NOT
+            // retyped: an id is what a granted row is keyed by, and rewriting one
+            // would orphan every row already held by a live account. Accounts that
+            // earned those badges here keep them, and everyone after earns them
+            // through the achievements that now own them -- so no migration.
+            levelReward(13, "title:pocket-hunter"),
+            levelReward(15, "room:desert-vista"),
             levelReward(16, "ball-trail:gold-rush"),
+            levelReward(17, "emote:game-face"),
             levelReward(19, "title:pin-chaser"),
-            levelReward(21, "badge:precision-bowler"),
+            levelReward(20, "strike-burst:rose-gold"),
+            levelReward(21, "title:lane-reader"),
             levelReward(22, "strike-burst:sky-shatter"),
             levelReward(23, "ball-trail:diamond-white"),
             levelReward(23, "strike-burst:diamond-spark"),
+            levelReward(25, "room:deep-sea-suite"),
             levelReward(27, "ball-trail:perfect-line"),
-            levelReward(28, "badge:lane-legend"),
+            levelReward(28, "title:shotmaker"),
             // The two rewards on either ladder that belong to the bowler who earned
             // them. `{track}` is substituted with the track that crossed the level,
             // which is why this ladder's grant has to know which one that was.
             levelReward(29, "title:{track}:nameplate"),
+            levelReward(30, "ball-trail:eclipse"),
+            levelReward(30, "strike-burst:eclipse-corona"),
             levelReward(30, "title:{track}:master"),
         ]),
     }),

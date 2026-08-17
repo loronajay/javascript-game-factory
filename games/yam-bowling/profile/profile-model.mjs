@@ -43,6 +43,9 @@ const PRESENTATION_SLOTS = Object.freeze([
   Object.freeze({ key: "profileArt", scope: "bowler", type: "profile-art", label: "Profile art" }),
   Object.freeze({ key: "title", scope: "global", type: "title", label: "Title" }),
   Object.freeze({ key: "badge", scope: "global", type: "badge", label: "Badge" }),
+  // The sticker thrown on the lane. Global like the two above, because the pool
+  // is shared by the whole roster rather than drawn per bowler.
+  Object.freeze({ key: "emote", scope: "global", type: "emote", label: "Emote" }),
   // The two decoration slots have no default, so empty is one of their real
   // answers and has to be offerable — otherwise a frame could be put on but
   // never taken off again.

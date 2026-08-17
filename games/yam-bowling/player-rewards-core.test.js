@@ -170,8 +170,12 @@ test("equipped state reads the loadout and refuses a near-miss", () => {
 });
 
 test("pending content is declared, not silently missing", () => {
+  // A voucher has no equipment because it is a currency, not a cosmetic: it is
+  // spent on one later. That is the opposite of pending content, which is a
+  // named reward still waiting to be authored.
+  const currencies = new Set(["skin-voucher", "emote-voucher"]);
   const unbound = playerRewards.listRewards()
-    .filter((reward) => reward.family !== "skin-voucher" && !reward.equipment)
+    .filter((reward) => !currencies.has(reward.family) && !reward.equipment)
     .map((reward) => ({ level: reward.level, family: reward.family, key: reward.key }));
 
   assert.deepEqual(
@@ -180,8 +184,18 @@ test("pending content is declared, not silently missing", () => {
     "a label-only node must appear in PENDING_CONTENT so it cannot be forgotten",
   );
   for (const entry of playerRewards.PENDING_CONTENT) {
-    assert.ok(["title", "badge"].includes(entry.family), "only titles and badges are awaiting authoring");
+    assert.ok(
+      ["title", "player-card", "profile-art"].includes(entry.family),
+      "only identity and profile presentation rewards are awaiting authoring",
+    );
   }
+});
+
+test("the player level ladder never hands out an achievement badge", () => {
+  assert.equal(
+    playerRewards.listRewards().some((reward) => reward.family === "badge"),
+    false,
+  );
 });
 
 test("a pending node is still visible and still owned at its level", () => {

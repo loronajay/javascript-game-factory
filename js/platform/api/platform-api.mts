@@ -502,6 +502,14 @@ export function createPlatformApiClient(options: PlatformApiClientOptions = {}) 
         ))
         : Promise.resolve(null);
     },
+    redeemGameEmoteVoucher(gameSlug: string, { entitlementId, redemptionId }: { entitlementId?: unknown; redemptionId?: unknown }) {
+      const encoded = encodePathSegment(gameSlug);
+      return encoded
+        ? post(`/game-progress/${encoded}/emote-vouchers/redeem`, { entitlementId, redemptionId }).then((result: any) => (
+          result ? { ...result, gameProgress: result.progress || null } : null
+        ))
+        : Promise.resolve(null);
+    },
     fetchGameTournament(gameSlug: string) {
       const encoded = encodePathSegment(gameSlug);
       return encoded ? get(`/game-progress/${encoded}/tournaments/current`) : Promise.resolve(null);

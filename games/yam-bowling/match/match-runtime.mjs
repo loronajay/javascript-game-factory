@@ -79,9 +79,14 @@ export function createMatchRuntime({
   }
 
   function resetHumanShot() {
-    scene.liveShot.position = 0;
-    scene.liveShot.aim = 0.1;
-    scene.liveShot.hook = -0.1;
+    const playerIndex = session.match?.activePlayer ?? 0;
+    const previousShot = session.playerShots[playerIndex] || scene.liveShot;
+    const freshShot = {
+      ...defaultShot(),
+      ballIndex: previousShot?.ballIndex ?? 0,
+    };
+    session.playerShots[playerIndex] = freshShot;
+    Object.assign(scene.liveShot, freshShot);
     shotHud.syncControlsFromShot();
   }
 
@@ -321,6 +326,7 @@ export function createMatchRuntime({
     session.contactedPinCount = 0;
     shotHud.resetChargeFeedback();
     shotHud.resetSpinFeedback();
+    if (session.activePlayer()?.type === "human") resetHumanShot();
     prepareActivePlayer();
     scoreboard.updateMatchUI();
   }

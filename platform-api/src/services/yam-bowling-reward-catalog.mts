@@ -139,6 +139,26 @@ export function validateYamBowlingSkinVoucherTarget(gameSlug: unknown, entitleme
   return { entitlementId, bowlerSlug: match[1], skinId: match[2] };
 }
 
+// The twenty-three emotes an Emote Voucher can buy. The six founding ones are
+// excluded because every account already holds them — spending a voucher on one
+// would burn it for nothing — and `game-face` because the mastery ladder grants
+// it outright at level 17. Listed explicitly rather than derived from the whole
+// pool so widening what a voucher reaches is always a deliberate edit.
+const EMOTE_VOUCHER_SLUGS = new Set([
+  "cheer", "peace", "hair-flip", "crowned",
+  "fist-pump", "salute", "number-one", "proud", "finger-heart",
+  "blow-kiss", "cheeky", "wink", "brush-it-off", "you-next",
+  "phew", "please-fall", "rattled", "shush", "well-actually",
+  "heads-up", "after-you", "lock-in", "fist-bump",
+]);
+
+export function validateYamBowlingEmoteVoucherTarget(gameSlug: unknown, entitlementId: unknown): any {
+  if (gameSlug !== YAM_BOWLING_GAME_SLUG || typeof entitlementId !== "string") return null;
+  const match = /^emote:([a-z0-9-]+)$/.exec(entitlementId);
+  if (!match || !EMOTE_VOUCHER_SLUGS.has(match[1])) return null;
+  return { entitlementId, emoteSlug: match[1] };
+}
+
 export function isYamBowlingStarterBowler(value: unknown): boolean {
   return typeof value === "string" && STARTER_BOWLER_SLUGS.has(value);
 }

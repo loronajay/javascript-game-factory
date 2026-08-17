@@ -17,37 +17,48 @@ or won. They never change scoring, physics, timing, or matchmaking.
 - Locked rewards stay visible in the cabinet with their exact earning condition.
 - Prefer feats a player can intentionally pursue. Hidden surprises are welcome,
   but opaque chores and pure luck should not dominate the collection.
+- Badges are receipts for feats. Player and bowler levels may award titles,
+  cards, profile art, effects, and skins, but never badges merely for levelling.
 
 ## First production collection
 
 | Reward | Kind | Source | Requirement | Visual story |
 | --- | --- | --- | --- | --- |
 | Pin Chaser | Title | Mastery | Reach bowler mastery 19 | A red ball pursuing a pin across a target crest |
-| Laser Focus | Badge | Mastery | Reach bowler mastery 13 | A pin held in a cool-blue precision sight |
-| Precision Bowler | Badge | Mastery | Reach bowler mastery 21 | A measured pocket line inside mechanical calipers |
-| Lane Legend | Badge | Mastery | Reach bowler mastery 28 | A luminous lane passing through a monumental pin arch |
+| Laser Focus | Title | Mastery | Reach bowler mastery 13 | A pin held in a cool-blue precision sight |
+| Precision Bowler | Title | Mastery | Reach bowler mastery 21 | A measured pocket line inside mechanical calipers |
+| Lane Legend | Title | Mastery | Reach bowler mastery 28 | A luminous lane passing through a monumental pin arch |
 | Perfect Game | Badge | Achievement | Bowl a 300 | A black-diamond and gold perfect-rack medallion |
 | Split Decision | Badge | Achievement | Convert the 7-10 split | Two fractured halves joined by the impossible line |
 | Comeback Kid | Title | Behavior achievement | Win after trailing by 30 entering the final frame | A bowling-ball phoenix climbing back from the embers |
 | Yam Champion | Title | Tournament | Win the Yam Championship | A pin crown, jewel ball, championship lane, and laurels |
 
-The optimized transparent WebP crests live in `assets/profile-rewards/`. Mastery
-rewards resolve through their levels, the three shipped match achievements claim
-their fixed catalog ids, and a replay-safe rotating CPU tournament grants Yam
-Champion alongside its server-selected cosmetic prize.
+## Second production collection
+
+| Reward | Kind | Source | Requirement | Visual story |
+| --- | --- | --- | --- | --- |
+| Ice in the Tenth | Title | Achievement | Strike in the tenth when only a strike preserves the win | An ice ball shattering a red pressure ring |
+| Spare Architect | Title | Career achievement | Convert 100 sanctioned career spares | Blueprint geometry, compass, pins, and a measured ball path |
+| Bracket Breaker | Title | Tournament | Win a first sanctioned tournament | A cobalt ball breaking a steel tournament bracket |
+| Undisputed | Title | Tournament | Win every major tournament in one season | A black-platinum grand-slam seal with four event jewels |
+| Clean Card | Badge | Achievement | Finish regulation play without an open frame | An emerald ten-cell scorecard sealed with a perfect check |
+| Turkey Club | Badge | Achievement | Roll three consecutive strikes | Three linked copper impact chevrons; deliberately no cartoon turkey |
+| Road Tested | Badge | Career achievement | Complete a sanctioned match at every venue | A travel-case shield, destination panels, pins, and a winding lane route |
+| Deep Bench | Badge | Career achievement | Win with every unlocked bowler | Five distinct balls on a legendary locker-room champion bench |
+
+The optimized transparent WebP crests live in `assets/profile-rewards/`. Clean
+Card and Turkey Club are detected from completed sanctioned matches, including
+tenth-frame bonus balls. The career and tournament rewards have stable catalog
+identities ready for their authoritative trackers.
+
+Deployment note: the platform API's progression, loadout, fixed-claim catalog,
+and entitlement migration must mirror the new ids and the three mastery-title
+reclassifications before these rewards can be granted on live accounts.
 
 ## Strong next-wave candidates
 
 ### Skill and match feats
 
-- **Clean Card** badge — complete a ten-frame game without an open frame. Use an
-  immaculate ivory scorecard seal, not another pin rack.
-- **Ice in the Tenth** title — strike when only a strike can win in the tenth.
-  Use a frozen ball cracking a red pressure ring.
-- **Spare Architect** title — convert 100 career spares. Use blueprint geometry
-  assembling two pin groups into one frame.
-- **Turkey Club** badge — roll three consecutive strikes. Use three linked
-  impact chevrons; avoid literal cartoon poultry.
 - **Rail Rider** badge — convert a spare after a legal gutter-edge recovery. Use
   a chrome rail and a ball balancing on a razor-thin line.
 
@@ -55,27 +66,19 @@ Champion alongside its server-selected cosmetic prize.
 
 - **House Regular** title — finish 100 sanctioned games. Use a worn league patch
   with stitched lane boards.
-- **Road Tested** badge — complete a match at every venue. Use a travel-case
-  shield assembled from venue color chips.
 - **Character Actor** title — win with ten different bowlers. Use ten spotlights
   converging on a player-card silhouette.
-- **Deep Bench** badge — record a win with every unlocked bowler. Use a panoramic
-  locker-room crest; this should be legendary and visibly dense.
 - **No Quit** badge — win three matches after losing the opening frames. Use a
   bent pin springing upright; track actual competitive recovery, not disconnects.
 
 ### Tournament prizes
 
-- **Bracket Breaker** title — win a first sanctioned tournament. Use a steel
-  bracket physically split by a bowling ball.
 - **Upset Artist** badge — defeat a higher-seeded player in an elimination match.
   Use a low seed punching upward through a gilded bracket.
 - **Back-to-Back** title — defend a tournament title. Use two interlocked crowns,
   visually rarer than the first-win crest.
 - **National Champion** badge — win the national event. Use an engraved silver
   eagle-lane medallion, keeping it below Yam Champion prestige.
-- **Undisputed** title — win every major tournament in one season. Use a black
-  platinum grand-slam seal with the major event jewels around its rim.
 
 ## Prestige ladder
 

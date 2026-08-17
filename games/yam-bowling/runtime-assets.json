@@ -31,6 +31,7 @@
     "player-rewards-core.js",
     "profile/*.mjs",
     "room-core.js",
+    "emote-core.js",
     "renderer.js",
     "ui/*.mjs",
     "input/*.mjs",
@@ -42,12 +43,13 @@
     "assets/lanes/thumbs/*.webp",
     "assets/pins/*.webp",
     "assets/profile-rewards/*.webp",
+    "assets/emotes/*.webp",
     "assets/menu-splashes/**/*.webp",
     "assets/characters/processed/canon/**/*.webp",
     "assets/characters/portraits/**/*.webp",
     "assets/characters/skins/*/*/*.webp"
   ],
   "budgets": {
-    "runtimeImageBytes": 58720256
+    "runtimeImageBytes": 62914560
   }
 }

@@ -493,6 +493,12 @@ export function createPlatformApiClient(options = {}) {
                 ? post(`/game-progress/${encoded}/vouchers/redeem`, { entitlementId, redemptionId }).then((result) => (result ? { ...result, gameProgress: result.progress || null } : null))
                 : Promise.resolve(null);
         },
+        redeemGameEmoteVoucher(gameSlug, { entitlementId, redemptionId }) {
+            const encoded = encodePathSegment(gameSlug);
+            return encoded
+                ? post(`/game-progress/${encoded}/emote-vouchers/redeem`, { entitlementId, redemptionId }).then((result) => (result ? { ...result, gameProgress: result.progress || null } : null))
+                : Promise.resolve(null);
+        },
         fetchGameTournament(gameSlug) {
             const encoded = encodePathSegment(gameSlug);
             return encoded ? get(`/game-progress/${encoded}/tournaments/current`) : Promise.resolve(null);

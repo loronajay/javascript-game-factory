@@ -20,6 +20,7 @@ export function createProfileScreen({
   audio,
 }) {
   let dirty = false;
+  let syncing = false;
 
   function readModel() {
     return buildProfileModel({
@@ -43,7 +44,7 @@ export function createProfileScreen({
     $("profile-bowler-options").innerHTML = model.ownedBowlers.map((bowler) => {
       const selected = bowler.slug === model.featuredBowler.slug;
       const art = animation.getPortraitAssetPath(bowler, animation.DEFAULT_SKIN_ID);
-      return `<button class="profile-bowler-option${selected ? " is-selected" : ""}" type="button" data-profile-bowler="${escapeHtml(bowler.slug)}" role="option" aria-selected="${selected}">
+      return `<button class="profile-bowler-option${selected ? " is-selected" : ""}" type="button" data-profile-bowler="${escapeHtml(bowler.slug)}" role="option" aria-selected="${selected}"${syncing ? " disabled" : ""}>
         <img src="${escapeHtml(art)}" alt="" loading="lazy" />
         <span>${escapeHtml(bowler.name)}</span>
       </button>`;
@@ -53,7 +54,7 @@ export function createProfileScreen({
   function renderSkinOptions(model) {
     $("profile-skin-options").innerHTML = model.ownedSkins.map((skin) => {
       const selected = skin.id === model.featuredBowler.skinId;
-      return `<button class="profile-skin-option${selected ? " is-selected" : ""}" type="button" data-profile-skin="${escapeHtml(skin.id)}" role="option" aria-selected="${selected}">
+      return `<button class="profile-skin-option${selected ? " is-selected" : ""}" type="button" data-profile-skin="${escapeHtml(skin.id)}" role="option" aria-selected="${selected}"${syncing ? " disabled" : ""}>
         <strong>${escapeHtml(skin.name)}</strong><small>${selected ? "Displayed" : "Choose outfit"}</small>
       </button>`;
     }).join("");
@@ -62,7 +63,7 @@ export function createProfileScreen({
   function renderRoomOptions(model) {
     $("profile-room-options").innerHTML = model.ownedRooms.map((room) => {
       const selected = room.slug === model.room.slug;
-      return `<button class="profile-room-option${selected ? " is-selected" : ""}" type="button" data-profile-room="${escapeHtml(room.slug)}" role="option" aria-selected="${selected}">
+      return `<button class="profile-room-option${selected ? " is-selected" : ""}" type="button" data-profile-room="${escapeHtml(room.slug)}" role="option" aria-selected="${selected}"${syncing ? " disabled" : ""}>
         <img src="${escapeHtml(room.src)}" alt="" loading="lazy" />
         <span><strong>${escapeHtml(room.name)}</strong><small>${selected ? "On display" : room.tier || "Owned"}</small></span>
       </button>`;
@@ -77,12 +78,13 @@ export function createProfileScreen({
     $("profile-presentation").innerHTML = model.presentation.map((slot) => {
       const options = slot.options.map((option) => {
         const selected = option.id === slot.equippedId;
+        const disabled = syncing || !option.owned;
         const crestClass = slot.type === "title" || slot.type === "badge" ? ' class="profile-reward-crest"' : "";
         const swatch = option.art
           ? `<img${crestClass} src="${escapeHtml(option.art)}" alt="" loading="lazy" />`
           : `<i class="profile-slot-swatch" style="${paletteStyle(option.palette)}"></i>`;
         return `<button class="profile-slot-option${selected ? " is-selected" : ""}${option.owned ? "" : " is-locked"}"
-          type="button" role="option" aria-selected="${selected}" ${option.owned ? "" : "disabled"}
+          type="button" role="option" aria-selected="${selected}" ${disabled ? "disabled" : ""}
           data-slot-key="${escapeHtml(slot.key)}" data-slot-item="${escapeHtml(option.id)}">
           ${swatch}
           <span><strong>${escapeHtml(option.name)}</strong><small>${option.owned ? (selected ? "Equipped" : "Equip") : "Locked"}</small></span>
@@ -143,11 +145,11 @@ export function createProfileScreen({
     const state = voucherClient?.getState?.() || { balance: 0, status: "idle" };
     $("profile-reward-vouchers").textContent = `${state.balance} Skin Voucher${state.balance === 1 ? "" : "s"}`;
     const button = $("profile-voucher-button");
-    button.disabled = state.balance < 1 || state.status === "redeeming" || voucherChoices(model).length === 0;
+    button.disabled = syncing || state.balance < 1 || state.status === "redeeming" || voucherChoices(model).length === 0;
     $("voucher-choice-grid").innerHTML = voucherChoices(model).map((choice) => {
       const bowler = animation.CANON_BOWLERS.find((entry) => entry.slug === choice.bowlerSlug);
       const art = animation.getPortraitAssetPath(bowler, choice.skinId);
-      return `<button class="voucher-choice" type="button" role="listitem" data-voucher-entitlement="${escapeHtml(choice.entitlementId)}">
+      return `<button class="voucher-choice" type="button" role="listitem" data-voucher-entitlement="${escapeHtml(choice.entitlementId)}"${syncing ? " disabled" : ""}>
         <img src="${escapeHtml(art)}" alt="" loading="lazy" />
         <span><strong>${escapeHtml(choice.bowlerName)}</strong><small>${escapeHtml(choice.skinName)}</small></span>
       </button>`;
@@ -194,14 +196,22 @@ export function createProfileScreen({
     renderRoomOptions(model);
     renderPresentationOptions(model);
     renderDecoration(model);
-    $("profile-save").disabled = syncClient.getState().status === "saving";
+    $("profile-save").disabled = syncing || syncClient.getState().status === "saving";
     return model;
   }
 
   async function open() {
     showScreen("profile-screen");
+    syncing = true;
     setStatus("Syncing with Factory");
-    const synced = await syncClient.sync();
+    render();
+    let synced = false;
+    try {
+      synced = await syncClient.sync();
+    } catch {
+      synced = false;
+    }
+    syncing = false;
     dirty = false;
     render();
     setStatus(synced ? "Factory profile current" : "Showing cached profile", synced ? "saved" : "error");
@@ -212,6 +222,7 @@ export function createProfileScreen({
   }
 
   function selectBowler(slug) {
+    if (syncing) return;
     const current = readModel();
     if (!current.ownedBowlers.some((bowler) => bowler.slug === slug)) return;
     loadout.setFeatured(slug, loadout.getEquippedSkinId(slug));
@@ -221,6 +232,7 @@ export function createProfileScreen({
   }
 
   function selectSkin(skinId) {
+    if (syncing) return;
     const current = readModel();
     if (!current.ownedSkins.some((skin) => skin.id === skinId)) return;
     loadout.setFeatured(current.featuredBowler.slug, skinId);
@@ -230,6 +242,7 @@ export function createProfileScreen({
   }
 
   function selectRoom(slug) {
+    if (syncing) return;
     const current = readModel();
     if (!current.ownedRooms.some((room) => room.slug === slug)) return;
     loadout.setRoomSlug(slug);
@@ -242,6 +255,7 @@ export function createProfileScreen({
   // control here. An option the player does not own is refused rather than
   // trusted from the markup it was clicked in.
   function selectPresentation(key, itemId) {
+    if (syncing) return;
     const current = readModel();
     const slot = current.presentation.find((entry) => entry.key === key);
     if (!slot?.options.some((option) => option.id === itemId && option.owned)) return;
@@ -258,6 +272,7 @@ export function createProfileScreen({
   }
 
   async function save() {
+    if (syncing) return false;
     if (!dirty) {
       setStatus("Factory profile current", "saved");
       return true;
@@ -273,13 +288,32 @@ export function createProfileScreen({
   }
 
   function openVoucherPicker() {
+    if (syncing) return;
     const model = render();
     if ((voucherClient?.getState?.().balance || 0) < 1 || voucherChoices(model).length === 0) return;
     $("voucher-status").textContent = "";
+    armedVoucherChoice = null;
     $("voucher-dialog").showModal();
   }
 
+  // Spending is irreversible, so a single click must not do it. The first click
+  // on a tile arms it and the second confirms; clicking a different tile re-arms
+  // rather than spending, and closing the dialog forgets the armed choice. This
+  // is the one guard between a mis-click and a voucher the player cannot get
+  // back -- the dialog's own copy has always said "cannot be undone".
+  let armedVoucherChoice = null;
+
   async function redeemVoucher(entitlementId) {
+    if (syncing) return false;
+    if (armedVoucherChoice !== entitlementId) {
+      armedVoucherChoice = entitlementId;
+      const choice = voucherChoices(render()).find((entry) => entry.entitlementId === entitlementId);
+      $("voucher-status").textContent = choice
+        ? `Spend your voucher on ${choice.bowlerName}'s ${choice.skinName}? Choose it again to confirm.`
+        : "Choose it again to confirm.";
+      return false;
+    }
+    armedVoucherChoice = null;
     $("voucher-status").textContent = "Redeeming with Factory…";
     render();
     const redeemed = await voucherClient?.redeem?.(entitlementId);
@@ -311,7 +345,13 @@ export function createProfileScreen({
     });
     $("profile-save").addEventListener("click", () => save());
     $("profile-voucher-button").addEventListener("click", openVoucherPicker);
-    $("voucher-close").addEventListener("click", () => $("voucher-dialog").close());
+    $("voucher-close").addEventListener("click", () => {
+      armedVoucherChoice = null;
+      $("voucher-dialog").close();
+    });
+    // Escape closes a <dialog> without firing the close button, so the armed
+    // choice has to be forgotten here too or it would still be armed on reopen.
+    $("voucher-dialog").addEventListener("close", () => { armedVoucherChoice = null; });
     $("voucher-choice-grid").addEventListener("click", (event) => {
       const button = event.target.closest("[data-voucher-entitlement]");
       if (button) redeemVoucher(button.dataset.voucherEntitlement);

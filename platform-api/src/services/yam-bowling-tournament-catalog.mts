@@ -68,14 +68,26 @@ type EntitlementPrize = Readonly<{
   tier: "rare" | "legendary";
   weight: number;
 }>;
-type InventoryPrize = Readonly<{
-  kind: "inventory";
-  itemId: "skin-voucher";
-  quantity: 1;
-  name: "Skin Voucher";
-  tier: "legendary";
-  weight: number;
-}>;
+// The two spendable currencies. The union is written out rather than widened to
+// `string` so a typo in a prize row is a compile error, not a prize that mints
+// inventory no redemption path can ever spend.
+type InventoryPrize =
+  | Readonly<{
+    kind: "inventory";
+    itemId: "skin-voucher";
+    quantity: 1;
+    name: "Skin Voucher";
+    tier: "legendary";
+    weight: number;
+  }>
+  | Readonly<{
+    kind: "inventory";
+    itemId: "emote-voucher";
+    quantity: 1;
+    name: "Emote Voucher";
+    tier: "rare";
+    weight: number;
+  }>;
 type WeightedPrize = EntitlementPrize | InventoryPrize;
 
 const EFFECT_PRIZES: ReadonlyArray<WeightedPrize> = [
@@ -97,6 +109,12 @@ const EFFECT_PRIZES: ReadonlyArray<WeightedPrize> = [
 }));
 const PRIZES: ReadonlyArray<WeightedPrize> = Object.freeze([
   ...EFFECT_PRIZES,
+  // An Emote Voucher rather than a named emote. Dropping one specific sticker
+  // would mean re-rolling a prize the player already owns; a voucher is always
+  // worth something while any of the thirty remain unowned, and it lets them
+  // pick. Weighted high because it is the repeatable route into that pool —
+  // the ladder pays only four across all thirty levels.
+  Object.freeze({ kind: "inventory" as const, itemId: "emote-voucher" as const, quantity: 1 as const, name: "Emote Voucher" as const, tier: "rare" as const, weight: 14 }),
   Object.freeze({ kind: "entitlement" as const, entitlementId: "room:champion-room", itemId: "room:champion-room", name: "Champion's Room", tier: "legendary" as const, weight: 6 }),
   Object.freeze({ kind: "inventory" as const, itemId: "skin-voucher" as const, quantity: 1 as const, name: "Skin Voucher" as const, tier: "legendary" as const, weight: 3 }),
 ]);

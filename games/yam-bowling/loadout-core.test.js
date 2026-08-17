@@ -236,7 +236,7 @@ test("slot names cover the reward types the loadout is responsible for", () => {
     "skin", "victoryPose", "defeatPose", "playerCard", "menuSplash", "profileArt",
   ]);
   assert.deepEqual(Object.keys(GLOBAL_SLOTS), [
-    "ballTrail", "strikeBurst", "title", "badge", "menuSplash", "room", "profileFrame", "profileBackground",
+    "ballTrail", "strikeBurst", "title", "badge", "menuSplash", "room", "emote", "profileFrame", "profileBackground",
   ]);
 
   for (const slot of [...Object.values(BOWLER_SLOTS), ...Object.values(GLOBAL_SLOTS)]) {
@@ -432,34 +432,34 @@ test("an emptied decoration slot stays empty across a reload", () => {
   assert.equal(createLoadoutStore({ storage }).getGlobalSlot("profileFrame"), null);
 });
 
-test("a level-earned badge is owned once the ladder has paid it out", () => {
+test("a level-earned title is owned once the ladder has paid it out", () => {
   const store = createLoadoutStore({ storage: memoryStorage() });
 
   // Catalogued as bowler mastery, so no entitlement row will ever name it.
-  assert.equal(store.owns("badge:laser-focus"), false, "nothing is earned before a sync");
+  assert.equal(store.owns("title:pocket-hunter"), false, "nothing is earned before a sync");
 
-  store.applyLevelEntitlements(["badge:laser-focus"]);
-  assert.equal(store.owns("badge:laser-focus"), true);
-  assert.equal(store.owns("badge:lane-legend"), false, "a higher level stays locked");
+  store.applyLevelEntitlements(["title:pocket-hunter"]);
+  assert.equal(store.owns("title:pocket-hunter"), true);
+  assert.equal(store.owns("title:shotmaker"), false, "a higher level stays locked");
 });
 
 test("level unlocks are session-only and recomputed rather than accumulated", () => {
   const storage = memoryStorage();
   const store = createLoadoutStore({ storage });
 
-  store.applyLevelEntitlements(["badge:laser-focus", "badge:precision-bowler"]);
-  assert.equal(store.owns("badge:precision-bowler"), true);
+  store.applyLevelEntitlements(["title:pocket-hunter", "title:lane-reader"]);
+  assert.equal(store.owns("title:lane-reader"), true);
 
   // The whole earned set is passed every time, so a corrected or retuned level
   // takes effect in both directions instead of leaving a stale grant behind.
-  store.applyLevelEntitlements(["badge:laser-focus"]);
-  assert.equal(store.owns("badge:precision-bowler"), false);
+  store.applyLevelEntitlements(["title:pocket-hunter"]);
+  assert.equal(store.owns("title:lane-reader"), false);
 
   store.clearLevelEntitlements();
-  assert.equal(store.owns("badge:laser-focus"), false);
+  assert.equal(store.owns("title:pocket-hunter"), false);
 
   // Nothing about a level unlock may reach the device record.
-  assert.doesNotMatch(JSON.stringify([...storage.raw().values()]), /laser-focus/);
+  assert.doesNotMatch(JSON.stringify([...storage.raw().values()]), /pocket-hunter/);
 });
 
 test("a level unlock cannot be conjured from an unknown or mistyped item id", () => {
@@ -475,9 +475,9 @@ test("the ladder is an extra route to a level reward, never the only one", () =>
   // The server stays the authority. If it grants a level-sourced reward
   // directly -- a tournament prize, a make-good -- the client must not overrule
   // it just because the ladder has not paid that level out.
-  store.applyServerEntitlements(["badge:lane-legend"]);
-  assert.equal(store.owns("badge:lane-legend"), true);
+  store.applyServerEntitlements(["title:shotmaker"]);
+  assert.equal(store.owns("title:shotmaker"), true);
 
-  store.applyLevelEntitlements(["badge:laser-focus"]);
-  assert.equal(store.owns("badge:laser-focus"), true, "and the ladder works without an entitlement");
+  store.applyLevelEntitlements(["title:pocket-hunter"]);
+  assert.equal(store.owns("title:pocket-hunter"), true, "and the ladder works without an entitlement");
 });

@@ -4,11 +4,12 @@
   const animation = isCommonJs ? require("./animation-core.js") : root.YamBowlingCore;
   const menuSplash = isCommonJs ? require("./menu-splash-core.js") : root.YamMenuSplash;
   const roomCore = isCommonJs ? require("./room-core.js") : root.YamRoomCore;
+  const emoteCore = isCommonJs ? require("./emote-core.js") : root.YamEmoteCore;
   const campaign = isCommonJs ? require("./campaign-core.js") : root.YamCampaign;
-  const api = factory(animation, menuSplash, roomCore, campaign);
+  const api = factory(animation, menuSplash, roomCore, emoteCore, campaign);
   if (isCommonJs) module.exports = api;
   root.YamCosmetics = api;
-})(typeof globalThis !== "undefined" ? globalThis : this, function createCosmeticsCore(animation, menuSplash, roomCore, campaign) {
+})(typeof globalThis !== "undefined" ? globalThis : this, function createCosmeticsCore(animation, menuSplash, roomCore, emoteCore, campaign) {
   "use strict";
 
   // One catalog contract for every present and future cosmetic reward.
@@ -29,6 +30,7 @@
     "player-card",
     "menu-splash",
     "room",
+    "emote",
     "profile-art",
     "ball-trail",
     "strike-burst",
@@ -45,6 +47,10 @@
   const UNLOCK_SOURCES = Object.freeze([
     "founding",
     "server-entitlement",
+    // Bought with an Emote Voucher rather than pinned to one level or prize.
+    // The pool is far deeper than the number of rungs that could name an entry
+    // from it, so the currency is what makes all of it reachable.
+    "emote-voucher",
     "bowler-level",
     "player-level",
     "campaign",
@@ -215,6 +221,20 @@
     }));
   }
 
+  // Emotes carry no presentation tier. Unlike a trail or a room there is no
+  // rarer version of a gesture -- a wave is a wave -- so rarity would be a
+  // label with nothing underneath it. What separates them is where they are
+  // earned, which the catalog already records.
+  function buildEmoteItems() {
+    return emoteCore.EMOTES.map((emote) => defineItem({
+      type: "emote",
+      idParts: [emote.slug],
+      name: emote.name,
+      assets: { art: emote.src, alt: emote.alt, description: emote.description },
+      unlock: emote.unlock,
+    }));
+  }
+
   // Effects are pure code, so they are catalogued here before milestone 3
   // renders them. Declaring them early is what lets the loadout contract and
   // its slots be tested without waiting on a particle emitter.
@@ -258,6 +278,11 @@
       ["hot-pink", "Hot Pink Ball Trail", ["#ff1493", "#ff9bd4"]],
       ["diamond-white", "Diamond White Ball Trail", ["#ffffff", "#b8e9ff"], "legendary"],
       ["perfect-line", "Perfect Line Ball Trail", ["#fdfdff", "#9d7bff"], "legendary"],
+      // The mastery ladder's own metals. The player ladder owns the whole
+      // green-to-pink spectrum above, so these deliberately sit outside it:
+      // a warm metal, and the summit's deep-indigo eclipse with a warm corona.
+      ["rose-gold", "Rose Gold Ball Trail", ["#f4a08c", "#ffd9c9"]],
+      ["eclipse", "Eclipse Ball Trail", ["#312e81", "#f0abfc"], "legendary"],
     ];
     const colorBursts = [
       ["ember", "Ember Burst", ["#ffb347", "#ff5f1f"]],
@@ -275,6 +300,11 @@
       ["magenta-blast", "Magenta Blast Burst", ["#ff00d4", "#ff8ae8"]],
       ["hot-pink-pop", "Hot Pink Pop Burst", ["#ff1493", "#ff9bd4"]],
       ["diamond-spark", "Diamond Spark Burst", ["#ffffff", "#b8e9ff"], "legendary"],
+      // The bursts that pair with the mastery ladder's two metals, so levels
+      // 10/20 and the summit read as one escalating set rather than three
+      // unrelated colours.
+      ["rose-gold", "Rose Gold Burst", ["#f4a08c", "#ffd9c9"]],
+      ["eclipse-corona", "Eclipse Corona Burst", ["#1e1b4b", "#fde68a"], "legendary"],
     ];
     const tournamentTrails = [
       ["championship-gold", "Championship Gold Ball Trail", ["#ffd96a", "#fff7c2"]],
@@ -372,13 +402,51 @@
         unlock: tournament("Win the Yam Championship tournament."),
       }),
       defineItem({ type: "badge", idParts: ["founding-bowler"], name: "Founding Bowler", assets: {}, unlock: founding }),
+      // The mastery ladder's three title rungs, replacing the badges that used
+      // to sit at 13/21/28 -- a badge is an achievement reward now, never a
+      // level one. Crest art is deliberately optional: a title is live text, so
+      // these are wearable the moment the level lands and gain a crest later,
+      // exactly as `title:rookie` has always worked.
+      defineItem({
+        type: "title",
+        idParts: ["pocket-hunter"],
+        name: "Pocket Hunter",
+        assets: {},
+        tier: "rare",
+        unlock: mastery("Reach mastery level 13 with any bowler."),
+      }),
+      defineItem({
+        type: "title",
+        idParts: ["lane-reader"],
+        name: "Lane Reader",
+        assets: {},
+        tier: "rare",
+        unlock: mastery("Reach mastery level 21 with any bowler."),
+      }),
+      defineItem({
+        type: "title",
+        idParts: ["shotmaker"],
+        name: "Shotmaker",
+        assets: {},
+        tier: "legendary",
+        unlock: mastery("Reach mastery level 28 with any bowler."),
+      }),
+      // These three keep `badge` as their type, and therefore their launch ids,
+      // even though a badge is no longer a level reward. Retyping them to
+      // `title` would rename `badge:laser-focus` to `title:laser-focus`, and
+      // since `db/game-loadouts.mts` builds ownership from `game_entitlements`
+      // alone, every row already granted to a live account would stop resolving
+      // and be stripped on that account's next save. Moving the unlock SOURCE
+      // costs nothing and takes no migration: the id is what a granted row is
+      // keyed by, and it has not moved. Accounts that earned these through
+      // mastery keep them; everyone after earns them where badges now live.
       defineItem({
         type: "badge",
         idParts: ["laser-focus"],
         name: "Laser Focus",
         assets: art("laser-focus"),
         tier: "rare",
-        unlock: mastery("Reach mastery level 13 with any bowler."),
+        unlock: achievement("Bowl a game with no shot outside the pocket."),
       }),
       defineItem({
         type: "badge",
@@ -386,7 +454,7 @@
         name: "Precision Bowler",
         assets: art("precision-bowler"),
         tier: "rare",
-        unlock: mastery("Reach mastery level 21 with any bowler."),
+        unlock: achievement("Convert twenty spares without missing one."),
       }),
       defineItem({
         type: "badge",
@@ -394,7 +462,39 @@
         name: "Lane Legend",
         assets: art("lane-legend"),
         tier: "legendary",
-        unlock: mastery("Reach mastery level 28 with any bowler."),
+        unlock: achievement("Win a sanctioned match on every lane in the house."),
+      }),
+      defineItem({
+        type: "title",
+        idParts: ["ice-in-the-tenth"],
+        name: "Ice in the Tenth",
+        assets: art("ice-in-the-tenth"),
+        tier: "rare",
+        unlock: achievement("Strike in the tenth when only a strike can preserve the win."),
+      }),
+      defineItem({
+        type: "title",
+        idParts: ["spare-architect"],
+        name: "Spare Architect",
+        assets: art("spare-architect"),
+        tier: "rare",
+        unlock: achievement("Convert 100 spares in sanctioned career play."),
+      }),
+      defineItem({
+        type: "title",
+        idParts: ["bracket-breaker"],
+        name: "Bracket Breaker",
+        assets: art("bracket-breaker"),
+        tier: "rare",
+        unlock: tournament("Win a first sanctioned tournament."),
+      }),
+      defineItem({
+        type: "title",
+        idParts: ["undisputed"],
+        name: "Undisputed",
+        assets: art("undisputed"),
+        tier: "legendary",
+        unlock: tournament("Win every major tournament in one season."),
       }),
       defineItem({
         type: "badge",
@@ -412,6 +512,38 @@
         tier: "rare",
         unlock: achievement("Convert a 7-10 split."),
       }),
+      defineItem({
+        type: "badge",
+        idParts: ["clean-card"],
+        name: "Clean Card",
+        assets: art("clean-card"),
+        tier: "rare",
+        unlock: achievement("Complete a regulation game without an open frame."),
+      }),
+      defineItem({
+        type: "badge",
+        idParts: ["turkey-club"],
+        name: "Turkey Club",
+        assets: art("turkey-club"),
+        tier: "rare",
+        unlock: achievement("Roll three consecutive strikes in sanctioned play."),
+      }),
+      defineItem({
+        type: "badge",
+        idParts: ["road-tested"],
+        name: "Road Tested",
+        assets: art("road-tested"),
+        tier: "rare",
+        unlock: achievement("Complete a sanctioned match at every venue."),
+      }),
+      defineItem({
+        type: "badge",
+        idParts: ["deep-bench"],
+        name: "Deep Bench",
+        assets: art("deep-bench"),
+        tier: "legendary",
+        unlock: achievement("Record a sanctioned win with every unlocked bowler."),
+      }),
     ];
   }
 
@@ -419,6 +551,7 @@
     ...buildCharacterItems(),
     ...buildMenuSplashItems(),
     ...buildRoomItems(),
+    ...buildEmoteItems(),
     ...buildEffectItems(),
     ...buildProfileItems(),
   ]);

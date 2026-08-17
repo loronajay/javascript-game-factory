@@ -28,21 +28,31 @@
   // lands early enough to teach the mechanic while there is still tree left.
   const SKIN_VOUCHER_LEVELS = Object.freeze([10, 25]);
 
-  const voucher = ["skin-voucher", "skin-voucher", "Skin Voucher"];
+  // Emote Vouchers are the commoner currency: four of them against two skin
+  // vouchers, because the emote pool is thirty deep where the skin pool is two
+  // per bowler. They sit on the rungs that badges used to occupy.
+  const EMOTE_VOUCHER_LEVELS = Object.freeze([7, 16, 22, 30]);
 
-  // Titles and badges the tree wants but the catalog does not carry yet. They
-  // are declared here as label-only nodes so the ladder is complete and
+  const voucher = ["skin-voucher", "skin-voucher", "Skin Voucher"];
+  // The emote pool is thirty deep and this ladder has four rungs to spend, so
+  // naming one emote per rung would leave most of the pool unreachable. A
+  // voucher spends on any emote the player does not already own.
+  const emoteVoucher = ["emote-voucher", "emote-voucher", "Emote Voucher"];
+
+  // Titles the tree wants but the catalog does not carry crest art for yet.
+  // They are declared here as label-only nodes so the ladder is complete and
   // playable, and binding one later is a single `equipment` edit that cannot
   // disturb any id a player has already earned.
+  //
+  // Badges are deliberately absent: they certify achievements, not passive
+  // progress through a level ladder. The four rungs that once promised them now
+  // pay Emote Vouchers, which are spendable today, so those rungs left this
+  // pending list entirely rather than waiting on art.
   const PENDING_CONTENT = Object.freeze([
     Object.freeze({ level: 4, family: "title", key: "title-i" }),
-    Object.freeze({ level: 7, family: "badge", key: "badge-i" }),
     Object.freeze({ level: 13, family: "title", key: "title-ii" }),
-    Object.freeze({ level: 16, family: "badge", key: "badge-ii" }),
     Object.freeze({ level: 19, family: "title", key: "title-iii" }),
-    Object.freeze({ level: 22, family: "badge", key: "badge-iii" }),
     Object.freeze({ level: 30, family: "title", key: "title-master" }),
-    Object.freeze({ level: 30, family: "badge", key: "badge-master" }),
   ]);
 
   const RAW_CADENCE = [
@@ -52,7 +62,7 @@
     [4, [["title-i", "title", "Lane Regular Title"]]],
     [5, [["emerald-glow-trail", "ball-trail", "Emerald Glow Ball Trail", ["global", "ballTrail", "emerald-glow"]]]],
     [6, [["emerald-impact-burst", "strike-burst", "Emerald Impact Burst", ["global", "strikeBurst", "emerald-impact"]]]],
-    [7, [["badge-i", "badge", "Lane Regular Badge"]]],
+    [7, [emoteVoucher]],
     [8, [["mint-frost-trail", "ball-trail", "Mint Frost Ball Trail", ["global", "ballTrail", "mint-frost"]]]],
     [9, [["mint-crackle-burst", "strike-burst", "Mint Crackle Burst", ["global", "strikeBurst", "mint-crackle"]]]],
     [10, [voucher]],
@@ -61,13 +71,13 @@
     [13, [["title-ii", "title", "House Favourite Title"]]],
     [14, [["electric-blue-trail", "ball-trail", "Electric Blue Ball Trail", ["global", "ballTrail", "electric-blue"]]]],
     [15, [["electric-blue-burst", "strike-burst", "Electric Blue Burst", ["global", "strikeBurst", "electric-blue"]]]],
-    [16, [["badge-ii", "badge", "Pocket Shot Badge"]]],
+    [16, [emoteVoucher]],
     [17, [["indigo-drive-trail", "ball-trail", "Indigo Drive Ball Trail", ["global", "ballTrail", "indigo-drive"]]]],
     [18, [["indigo-ring-burst", "strike-burst", "Indigo Ring Burst", ["global", "strikeBurst", "indigo-ring"]]]],
     [19, [["title-iii", "title", "Lane Veteran Title"]]],
     [20, [["violet-haze-trail", "ball-trail", "Violet Haze Ball Trail", ["global", "ballTrail", "violet-haze"]]]],
     [21, [["violet-bloom-burst", "strike-burst", "Violet Bloom Burst", ["global", "strikeBurst", "violet-bloom"]]]],
-    [22, [["badge-iii", "badge", "Strike Streak Badge"]]],
+    [22, [emoteVoucher]],
     [23, [["purple-plasma-trail", "ball-trail", "Purple Plasma Ball Trail", ["global", "ballTrail", "purple-plasma"]]]],
     [24, [["purple-nova-burst", "strike-burst", "Purple Nova Burst", ["global", "strikeBurst", "purple-nova"]]]],
     [25, [voucher]],
@@ -77,9 +87,9 @@
     [29, [["hot-pink-pop-burst", "strike-burst", "Hot Pink Pop Burst", ["global", "strikeBurst", "hot-pink-pop"]]]],
     [30, [
       ["title-master", "title", "Yam Legend Title"],
-      ["badge-master", "badge", "The 30 Club Badge"],
-      // The one reward at this summit that is bound today, so reaching 30 pays
-      // something wearable while the title and badge above are still unbound.
+      emoteVoucher,
+      // The summit lands three rewards at once: a title, an emote voucher,
+      // and this.
       ["lime-pop-burst", "strike-burst", "Lime Pop Burst", ["global", "strikeBurst", "lime-pop"]],
     ]],
   ];
@@ -91,6 +101,7 @@
     if (slot === "ballTrail") itemId = `ball-trail:${value}`;
     else if (slot === "strikeBurst") itemId = `strike-burst:${value}`;
     else if (slot === "badge") itemId = `badge:${value}`;
+    else if (slot === "emote") itemId = `emote:${value}`;
     else if (slot === "title") itemId = `title:${value}`;
     return Object.freeze({ scope, slot, itemId });
   }
@@ -120,10 +131,20 @@
       .filter((reward) => reward.family === "skin-voucher").length;
   }
 
+  // The same count for the other currency. Kept as its own function rather than
+  // a parameterised one so a caller cannot accidentally spend a skin voucher's
+  // count on an emote redemption.
+  function emoteVouchersBetween({ fromLevel = 1, toLevel = 1 } = {}) {
+    return track.rewardsBetween({ fromLevel, toLevel })
+      .filter((reward) => reward.family === "emote-voucher").length;
+  }
+
   return {
+    EMOTE_VOUCHER_LEVELS,
     PENDING_CONTENT,
     REWARD_CADENCE: track.REWARD_CADENCE,
     SKIN_VOUCHER_LEVELS,
+    emoteVouchersBetween,
     buildRewardTree: track.buildRewardTree,
     earnedItemIds: track.earnedItemIds,
     listRewards: track.listRewards,

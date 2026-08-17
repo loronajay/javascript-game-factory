@@ -20,6 +20,11 @@ MENU_THUMBNAIL_SIZE = (480, 270)
 LANE_THUMBNAIL_SIZE = (300, 450)
 RESULT_PORTRAIT_SIZE = (640, 960)
 PIN_SIZE = (256, 384)
+# Emotes are sticker overlays shown beside a bowler, never full-screen, so they
+# are the most aggressively downscaled collection here. The generated masters
+# arrive around 1024px and roughly 2 MB each; at this size thirty of them cost
+# less than one lane backdrop.
+EMOTE_SIZE = (320, 320)
 
 
 @dataclass(frozen=True)
@@ -124,6 +129,9 @@ def discover_jobs(project_root: Path) -> list[ConversionJob]:
                 quality=80,
             )
         )
+
+    for source in sorted((assets / "emotes").glob("*.png")):
+        jobs.append(_webp_job(source, max_size=EMOTE_SIZE, quality=86))
 
     pin = assets / "pins" / "1.png"
     if pin.exists():

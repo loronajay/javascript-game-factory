@@ -14,7 +14,7 @@ import {
 } from "../src/services/yam-bowling-reward-catalog.mjs";
 import { normalizeYamBowlingGarage } from "../src/services/yam-bowling-loadout-catalog.mjs";
 
-test("Yam Bowling awards one skin voucher at player levels 10 and 25", () => {
+test("Yam Bowling awards its two currencies on their own rungs", () => {
   const definition = getProgression("yam-bowling");
   assert.ok(definition);
 
@@ -26,8 +26,18 @@ test("Yam Bowling awards one skin voucher at player levels 10 and 25", () => {
     inventoryRewardsBetween(definition, xpForLevel(definition.curves.player, 9), xpForLevel(definition.curves.player, 25)),
     [
       { itemId: "skin-voucher", quantity: 1, level: 10 },
+      { itemId: "emote-voucher", quantity: 1, level: 16 },
+      { itemId: "emote-voucher", quantity: 1, level: 22 },
       { itemId: "skin-voucher", quantity: 1, level: 25 },
     ],
+  );
+  // The four emote rungs. They are the commoner currency because the emote pool
+  // is thirty deep where the skin pool is two per bowler.
+  assert.deepEqual(
+    inventoryRewardsBetween(definition, 0, xpForLevel(definition.curves.player, 30))
+      .filter((reward) => reward.itemId === "emote-voucher")
+      .map((reward) => reward.level),
+    [7, 16, 22, 30],
   );
   assert.deepEqual(
     inventoryRewardsBetween(definition, xpForLevel(definition.curves.player, 25), xpForLevel(definition.curves.player, 26)),
@@ -58,18 +68,21 @@ test("crossing a bowler mastery level grants that level's cosmetic entitlement",
   const at = (level) => xpForLevel(definition.curves.track, level);
 
   assert.deepEqual(entitlementRewardsBetween(definition, "track", at(12), at(13)), [
-    { level: 13, entitlementId: "badge:laser-focus", kind: "badge" },
+    { level: 13, entitlementId: "title:pocket-hunter", kind: "title" },
   ]);
   assert.deepEqual(
     entitlementRewardsBetween(definition, "track", at(1), at(30), { trackId: "reina-sato" })
       .map((entry) => entry.entitlementId),
     [
       "ball-trail:red-neon", "strike-burst:ember", "ball-trail:orange-flare",
-      "strike-burst:red-supernova", "ball-trail:sky-blue", "badge:laser-focus",
-      "ball-trail:gold-rush", "title:pin-chaser", "badge:precision-bowler",
-      "strike-burst:sky-shatter", "ball-trail:diamond-white", "strike-burst:diamond-spark",
-      "ball-trail:perfect-line", "badge:lane-legend",
-      "title:reina-sato:nameplate", "title:reina-sato:master",
+      "room:fireside-lodge", "strike-burst:red-supernova", "ball-trail:rose-gold",
+      "ball-trail:sky-blue", "title:pocket-hunter", "room:desert-vista",
+      "ball-trail:gold-rush", "emote:game-face", "title:pin-chaser",
+      "strike-burst:rose-gold", "title:lane-reader", "strike-burst:sky-shatter",
+      "ball-trail:diamond-white", "strike-burst:diamond-spark",
+      "room:deep-sea-suite", "ball-trail:perfect-line", "title:shotmaker",
+      "title:reina-sato:nameplate",
+      "ball-trail:eclipse", "strike-burst:eclipse-corona", "title:reina-sato:master",
     ],
   );
 });
@@ -81,11 +94,25 @@ test("a bowler-scoped mastery title is granted to the track that earned it", () 
   const definition = getProgression("yam-bowling");
   const at = (level) => xpForLevel(definition.curves.track, level);
 
+  // The summit pays three: two global effects and the one reward scoped to the
+  // bowler who got there.
   assert.deepEqual(
     entitlementRewardsBetween(definition, "track", at(29), at(30), { trackId: "daisy-monroe" }),
-    [{ level: 30, entitlementId: "title:daisy-monroe:master", kind: "title" }],
+    [
+      { level: 30, entitlementId: "ball-trail:eclipse", kind: "ball-trail" },
+      { level: 30, entitlementId: "strike-burst:eclipse-corona", kind: "strike-burst" },
+      { level: 30, entitlementId: "title:daisy-monroe:master", kind: "title" },
+    ],
   );
-  assert.deepEqual(entitlementRewardsBetween(definition, "track", at(29), at(30)), []);
+  // Without a track to name, the bowler-scoped title drops out and only the
+  // globals remain -- it must never be minted as a literal `{track}` row.
+  assert.deepEqual(
+    entitlementRewardsBetween(definition, "track", at(29), at(30)),
+    [
+      { level: 30, entitlementId: "ball-trail:eclipse", kind: "ball-trail" },
+      { level: 30, entitlementId: "strike-burst:eclipse-corona", kind: "strike-burst" },
+    ],
+  );
   assert.ok(
     entitlementRewardsBetween(definition, "track", at(1), at(30))
       .every((entry) => !entry.entitlementId.includes("{track}")),
@@ -101,8 +128,8 @@ test("each ladder is measured on its own curve", () => {
   const trackXpForLevel13 = xpForLevel(definition.curves.track, 13);
   assert.deepEqual(entitlementRewardsBetween(definition, "track", 0, trackXpForLevel13).at(-1), {
     level: 13,
-    entitlementId: "badge:laser-focus",
-    kind: "badge",
+    entitlementId: "title:pocket-hunter",
+    kind: "title",
   });
   // The same XP is a lower player level, so it must not pay the level-13 node.
   assert.ok(
@@ -127,6 +154,8 @@ test("every level-granted cosmetic survives a save once its entitlement exists",
     "strike-burst": "strikeBurst",
     title: "title",
     badge: "badge",
+    emote: "emote",
+    room: "room",
   };
   const rewards = [
     ...definition.levelEntitlements.player,
@@ -152,7 +181,7 @@ test("every level-granted cosmetic survives a save once its entitlement exists",
 
 test("a level cosmetic is still stripped for a player who has not earned it", () => {
   const saved = normalizeYamBowlingGarage(
-    { version: 1, global: { badge: "badge:lane-legend" } },
+    { version: 1, global: { badge: "title:shotmaker" } },
     { ownedEntitlementIds: new Set() },
   );
   assert.equal(saved.global.badge, undefined);
@@ -223,6 +252,7 @@ test("the level-entitlement migrations backfill every node on both ladders", asy
   const sql = (await Promise.all([
     "041-yam-bowling-level-entitlements.sql",
     "042-yam-bowling-mastery-rewards.sql",
+    "043-yam-bowling-emote-and-title-rewards.sql",
   ].map((name) => readFile(new URL(`../src/db/migrations/${name}`, import.meta.url), "utf8")))).join("\n");
 
   // A node added to a ladder without a backfill leaves existing accounts owing

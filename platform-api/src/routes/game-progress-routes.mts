@@ -9,7 +9,7 @@ export async function handleGameProgressRoute(context: any): Promise<boolean> {
   const { req, res, method, pathname, authClaims, requestOrigin, timestamp, services } = context;
   const {
     getGameProgress, recordGameProgressClaim, spendValor, resetCampaign, backfillOwnership,
-    activateConsumable, redeemSkinVoucher, getTournamentState, recordTournamentRound,
+    activateConsumable, redeemSkinVoucher, redeemEmoteVoucher, getTournamentState, recordTournamentRound,
   } = services;
 
   const tournamentCurrentMatch = pathname.match(/^\/game-progress\/([^/]+)\/tournaments\/current$/);
@@ -235,9 +235,12 @@ export async function handleGameProgressRoute(context: any): Promise<boolean> {
     return true;
   }
 
-  const voucherMatch = pathname.match(/^\/game-progress\/([^/]+)\/vouchers\/redeem$/);
+  // Both currencies share this handler. They differ only in which redeemer is
+  // called, so the path segment selects one rather than the block being copied.
+  const voucherMatch = pathname.match(/^\/game-progress\/([^/]+)\/(vouchers|emote-vouchers)\/redeem$/);
   if (method === "POST" && voucherMatch) {
     const gameSlug = decodeURIComponent(voucherMatch[1]);
+    const redeemVoucher = voucherMatch[2] === "emote-vouchers" ? redeemEmoteVoucher : redeemSkinVoucher;
     if (!isValidGameProgressSlug(gameSlug)) {
       writeJson(res, 400, { status: "error", error: "invalid_game_slug", timestamp }, requestOrigin);
       return true;
@@ -246,7 +249,7 @@ export async function handleGameProgressRoute(context: any): Promise<boolean> {
       writeJson(res, 401, { status: "error", error: "unauthorized", timestamp }, requestOrigin);
       return true;
     }
-    if (typeof redeemSkinVoucher !== "function") {
+    if (typeof redeemVoucher !== "function") {
       writeJson(res, 503, { status: "error", error: "redemption_not_configured", timestamp }, requestOrigin);
       return true;
     }
@@ -255,7 +258,7 @@ export async function handleGameProgressRoute(context: any): Promise<boolean> {
       writeJson(res, 400, { status: "error", error: body.error, timestamp }, requestOrigin);
       return true;
     }
-    const result = await redeemSkinVoucher({
+    const result = await redeemVoucher({
       playerId: authClaims.playerId,
       gameSlug,
       entitlementId: body.value?.entitlementId,

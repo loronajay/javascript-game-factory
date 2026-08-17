@@ -11,6 +11,33 @@
   // level and semantic key, so adding levels 31-40 later cannot rename anything
   // a player has already earned. Everything here is presentational: there is no
   // route for a reward to carry a physics, scoring or input value.
+  // Several node KEYS below no longer describe what they pay -- `gym-day-skin`
+  // pays a trail, `character-banner` pays a room. That is deliberate: a reward
+  // id is permanent, and renaming one would re-fire its level-up celebration
+  // for every player who has already seen it. The label is what the player
+  // reads; the key is only an identity.
+
+  // The rungs still awaiting a reward type this cabinet does not have yet.
+  // Declared rather than left silently unbound, exactly as the player ladder
+  // declares its own, so a rung that pays nothing is a visible decision instead
+  // of something to discover later.
+  //
+  // All eight need a new equippable type rather than new art: profile icons crop
+  // the portrait already on disk, card frames are drawn over the card that
+  // already ships, entrances are CSS, and the two victory poses can bind to the
+  // outcome art the alternate skins already carry. None of them is blocked on a
+  // per-bowler asset, which is what the banner, splash and skin rungs were.
+  const PENDING_CONTENT = Object.freeze([
+    Object.freeze({ level: 3, family: "profile-icon", key: "profile-icon" }),
+    Object.freeze({ level: 5, family: "victory-pose", key: "spotlight-victory" }),
+    Object.freeze({ level: 9, family: "player-card", key: "rivalry-card" }),
+    Object.freeze({ level: 12, family: "player-card", key: "player-card-art" }),
+    Object.freeze({ level: 14, family: "entrance", key: "entrance-stinger" }),
+    Object.freeze({ level: 18, family: "victory-pose", key: "victory-pose-ii" }),
+    Object.freeze({ level: 24, family: "player-card", key: "elite-card-border" }),
+    Object.freeze({ level: 26, family: "entrance", key: "champion-entrance" }),
+  ]);
+
   const RAW_CADENCE = [
     [1, [["default-bowler", "bowler", "Canon Bowler", ["bowler", "skin", "canon"]]]],
     [2, [["red-neon-trail", "ball-trail", "Red Neon Ball Trail", ["global", "ballTrail", "red-neon"]]]],
@@ -18,34 +45,35 @@
     [4, [["ember-burst", "strike-burst", "Ember Strike Burst", ["global", "strikeBurst", "ember"]]]],
     [5, [["spotlight-victory", "victory-pose", "Spotlight Victory Pose"]]],
     [6, [["orange-flare-trail", "ball-trail", "Orange Flare Ball Trail", ["global", "ballTrail", "orange-flare"]]]],
-    [7, [["character-banner", "character-banner", "{first} Character Banner"]]],
+    [7, [["character-banner", "room", "Fireside Lodge", ["global", "room", "fireside-lodge"]]]],
     [8, [["strike-spark", "strike-burst", "Crimson Strike Spark", ["global", "strikeBurst", "red-supernova"]]]],
     [9, [["rivalry-card", "player-card", "Rivalry Player Card"]]],
-    [10, [["gym-day-skin", "skin", "Gym Day Skin"]]],
+    [10, [["gym-day-skin", "ball-trail", "Rose Gold Ball Trail", ["global", "ballTrail", "rose-gold"]]]],
     [11, [["sky-blue-trail", "ball-trail", "Sky Blue Ball Trail", ["global", "ballTrail", "sky-blue"]]]],
     [12, [["player-card-art", "player-card", "{first} Player-Card Artwork"]]],
-    [13, [["focus-badge", "badge", "Laser Focus Badge", ["global", "badge", "laser-focus"]]]],
+    [13, [["focus-badge", "title", "Pocket Hunter Title", ["global", "title", "pocket-hunter"]]]],
     [14, [["entrance-stinger", "entrance", "Spotlight Entrance Stinger"]]],
-    [15, [["alt-menu-splash", "menu-splash", "{first} Alt Menu Splash"]]],
+    [15, [["alt-menu-splash", "room", "Desert Vista", ["global", "room", "desert-vista"]]]],
     [16, [["gold-trail", "ball-trail", "Gold Rush Ball Trail", ["global", "ballTrail", "gold-rush"]]]],
-    [17, [["signature-emote", "emote", "Signature Lane Emote"]]],
+    [17, [["signature-emote", "emote", "Game Face Emote", ["global", "emote", "game-face"]]]],
     [18, [["victory-pose-ii", "victory-pose", "Victory Pose II"]]],
     [19, [["pin-chaser-title", "title", "Pin Chaser Title", ["global", "title", "pin-chaser"]]]],
-    [20, [["special-skin", "skin", "Special Event Skin"]]],
-    [21, [["precision-badge", "badge", "Precision Bowler Badge", ["global", "badge", "precision-bowler"]]]],
+    [20, [["special-skin", "strike-burst", "Rose Gold Burst", ["global", "strikeBurst", "rose-gold"]]]],
+    [21, [["precision-badge", "title", "Lane Reader Title", ["global", "title", "lane-reader"]]]],
     [22, [["crowd-burst", "strike-burst", "Crowd Roar Strike Burst", ["global", "strikeBurst", "sky-shatter"]]]],
     [23, [
       ["diamond-trail", "ball-trail", "Diamond White Ball Trail", ["global", "ballTrail", "diamond-white"]],
       ["diamond-burst", "strike-burst", "Diamond Spark Burst", ["global", "strikeBurst", "diamond-spark"]],
     ]],
     [24, [["elite-card-border", "player-card", "Elite Player-Card Border"]]],
-    [25, [["rare-splash-card", "rare-card", "Rare Splash and Player Card"]]],
+    [25, [["rare-splash-card", "room", "Deep Sea Suite", ["global", "room", "deep-sea-suite"]]]],
     [26, [["champion-entrance", "entrance", "Champion Entrance"]]],
     [27, [["perfect-line-trail", "ball-trail", "Perfect Line Ball Trail", ["global", "ballTrail", "perfect-line"]]]],
-    [28, [["legend-badge", "badge", "Lane Legend Badge", ["global", "badge", "lane-legend"]]]],
+    [28, [["legend-badge", "title", "Shotmaker Title", ["global", "title", "shotmaker"]]]],
     [29, [["mastery-nameplate", "title", "{first} Mastery Nameplate", ["global", "bowlerTitle", "nameplate"]]]],
     [30, [
-      ["mastery-skin", "skin", "{first} Mastery Skin"],
+      ["mastery-skin", "ball-trail", "Eclipse Ball Trail", ["global", "ballTrail", "eclipse"]],
+      ["mastery-burst", "strike-burst", "Eclipse Corona Burst", ["global", "strikeBurst", "eclipse-corona"]],
       ["exclusive-title", "title", "{first} Master", ["global", "bowlerTitle", "master"]],
     ]],
   ];
@@ -69,6 +97,8 @@
     else if (slot === "ballTrail") itemId = `ball-trail:${value}`;
     else if (slot === "strikeBurst") itemId = `strike-burst:${value}`;
     else if (slot === "badge") itemId = `badge:${value}`;
+    else if (slot === "emote") itemId = `emote:${value}`;
+    else if (slot === "room") itemId = `room:${value}`;
     else if (slot === "title") itemId = `title:${value}`;
     // A mastery title is earned from one bowler but worn in the one global
     // title slot, so it is the only reward whose id is bowler-scoped while its
@@ -113,6 +143,7 @@
   }
 
   return {
+    PENDING_CONTENT,
     REWARD_CADENCE: track.REWARD_CADENCE,
     buildRewardTree: track.buildRewardTree,
     earnedItemIds: track.earnedItemIds,

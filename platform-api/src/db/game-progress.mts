@@ -14,6 +14,7 @@ import { awardCampaignXp, getGameXpProgress } from "./game-xp.mjs";
 import {
   isYamBowlingStarterBowler,
   validateYamBowlingSkinVoucherTarget,
+  validateYamBowlingEmoteVoucherTarget,
 } from "../services/yam-bowling-reward-catalog.mjs";
 import {
   getYamBowlingTournamentEvent,
@@ -893,21 +894,69 @@ export async function recordYamBowlingTournamentRound(pool: any, params: any = {
   }
 }
 
-// Redeem exactly one Yam Bowling ladder voucher for one named alternate skin.
-// The target is constrained by the server catalog, the bowler must be owned,
-// and decrement + entitlement grant share one transaction. A caller-generated
+// Redeem exactly one Yam Bowling voucher for one named cosmetic.
+//
+// Both currencies run through here. They differ only in what the voucher is
+// called, what a valid target looks like, and whether the target has a
+// prerequisite -- so those three are the config below and the transaction
+// itself exists once. Spending is the part that must not be duplicated: the
+// decrement and the grant share a transaction, and a caller-generated
 // redemption id makes a lost response safe to retry without spending twice.
-export async function redeemYamBowlingSkinVoucher(pool: any, params: any = {}): Promise<any> {
+const VOUCHER_KINDS: Record<string, any> = {
+  skin: {
+    itemId: "skin-voucher",
+    claimKind: "skin-voucher-redemption",
+    grantKind: "skin",
+    invalidTargetError: "invalid_skin_target",
+    ownedError: "skin_already_owned",
+    validateTarget: validateYamBowlingSkinVoucherTarget,
+    // A skin is a bowler's, so the bowler has to be owned first. An emote
+    // belongs to nobody, which is why it has no prerequisite.
+    prerequisite: async (client: any, playerId: string, gameSlug: string, target: any) => {
+      if (isYamBowlingStarterBowler(target.bowlerSlug)) return null;
+      const bowler = await client.query(
+        `select 1 from game_entitlements
+         where player_id = $1 and game_slug = $2 and entitlement_id = $3 limit 1`,
+        [playerId, gameSlug, `bowler:${target.bowlerSlug}`],
+      );
+      return bowler.rows.length ? null : "bowler_not_owned";
+    },
+  },
+  emote: {
+    itemId: "emote-voucher",
+    claimKind: "emote-voucher-redemption",
+    grantKind: "emote",
+    invalidTargetError: "invalid_emote_target",
+    ownedError: "emote_already_owned",
+    validateTarget: validateYamBowlingEmoteVoucherTarget,
+    prerequisite: async () => null,
+  },
+};
+
+// The shipped name for the skin currency. Kept as a thin alias rather than
+// renamed at every call site: the generalisation above is an internal change
+// and must not become a breaking one for callers.
+export function redeemYamBowlingSkinVoucher(pool: any, params: any = {}): Promise<any> {
+  return redeemYamBowlingVoucher(pool, { ...params, voucherKind: "skin" });
+}
+
+export function redeemYamBowlingEmoteVoucher(pool: any, params: any = {}): Promise<any> {
+  return redeemYamBowlingVoucher(pool, { ...params, voucherKind: "emote" });
+}
+
+export async function redeemYamBowlingVoucher(pool: any, params: any = {}): Promise<any> {
+  const kind = VOUCHER_KINDS[String(params.voucherKind || "skin")];
+  if (!kind) return { ok: false, statusCode: 400, error: "invalid_request" };
   const playerId = cleanText(params.playerId, 120);
   const gameSlug = normalizeGameSlug(params.gameSlug);
   const redemptionId = cleanText(params.redemptionId, 120);
-  const target = validateYamBowlingSkinVoucherTarget(gameSlug, cleanText(params.entitlementId, 180));
+  const target = kind.validateTarget(gameSlug, cleanText(params.entitlementId, 180));
   if (!pool || !playerId || !redemptionId) {
     return { ok: false, statusCode: 400, error: "invalid_request" };
   }
-  if (!target) return { ok: false, statusCode: 400, error: "invalid_skin_target" };
+  if (!target) return { ok: false, statusCode: 400, error: kind.invalidTargetError };
 
-  const claimId = `skin-voucher-redemption:${redemptionId}`;
+  const claimId = `${kind.claimKind}:${redemptionId}`;
   const client = await pool.connect();
   try {
     await client.query("begin");
@@ -938,16 +987,10 @@ export async function redeemYamBowlingSkinVoucher(pool: any, params: any = {}): 
       };
     }
 
-    if (!isYamBowlingStarterBowler(target.bowlerSlug)) {
-      const bowler = await client.query(
-        `select 1 from game_entitlements
-         where player_id = $1 and game_slug = $2 and entitlement_id = $3 limit 1`,
-        [playerId, gameSlug, `bowler:${target.bowlerSlug}`],
-      );
-      if (!bowler.rows.length) {
-        await client.query("rollback");
-        return { ok: false, statusCode: 409, error: "bowler_not_owned" };
-      }
+    const blocked = await kind.prerequisite(client, playerId, gameSlug, target);
+    if (blocked) {
+      await client.query("rollback");
+      return { ok: false, statusCode: 409, error: blocked };
     }
     const owned = await client.query(
       `select 1 from game_entitlements
@@ -956,22 +999,22 @@ export async function redeemYamBowlingSkinVoucher(pool: any, params: any = {}): 
     );
     if (owned.rows.length) {
       await client.query("rollback");
-      return { ok: false, statusCode: 409, error: "skin_already_owned" };
+      return { ok: false, statusCode: 409, error: kind.ownedError };
     }
 
     const spent = await client.query(
       `update game_inventory_items
        set quantity = quantity - 1, updated_at = now()
-       where player_id = $1 and game_slug = $2 and item_id = 'skin-voucher' and quantity > 0
+       where player_id = $1 and game_slug = $2 and item_id = $3 and quantity > 0
        returning quantity`,
-      [playerId, gameSlug],
+      [playerId, gameSlug, kind.itemId],
     );
     if (!spent.rows.length) {
       await client.query("rollback");
       return { ok: false, statusCode: 409, error: "voucher_not_owned" };
     }
 
-    await grantEntitlement(client, playerId, gameSlug, { entitlementId: target.entitlementId, kind: "skin" }, "skin-voucher", redemptionId);
+    await grantEntitlement(client, playerId, gameSlug, { entitlementId: target.entitlementId, kind: kind.grantKind }, kind.itemId, redemptionId);
     await client.query(
       `update game_progress_claims set payload = $4::jsonb
        where player_id = $1 and game_slug = $2 and claim_id = $3`,
@@ -986,7 +1029,7 @@ export async function redeemYamBowlingSkinVoucher(pool: any, params: any = {}): 
     };
   } catch (err) {
     await client.query("rollback").catch(() => {});
-    process.stderr.write(`[game-progress] redeemYamBowlingSkinVoucher error: ${(err as any)?.message || err}\n`);
+    process.stderr.write(`[game-progress] redeemYamBowlingVoucher error: ${(err as any)?.message || err}\n`);
     return { ok: false, statusCode: 500, error: "redemption_failed" };
   } finally {
     client.release();

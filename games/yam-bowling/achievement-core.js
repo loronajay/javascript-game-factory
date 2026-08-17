@@ -24,6 +24,29 @@
       && opponentEnteringTenth - playerEnteringTenth >= 30;
   }
 
+  function earnedCleanCard(player) {
+    if (!Array.isArray(player?.frames) || player.frames.length !== 10) return false;
+    return player.frames.every((frame) => {
+      if (!Array.isArray(frame) || frame.length === 0) return false;
+      const first = Number(frame[0]);
+      const second = Number(frame[1]);
+      return first === 10 || (Number.isFinite(first) && Number.isFinite(second) && first + second === 10);
+    });
+  }
+
+  function earnedTurkeyClub(player) {
+    if (!Array.isArray(player?.frames) || player.frames.length !== 10) return false;
+    const strikeChances = player.frames.flatMap((frame, index) => (
+      index < 9 ? [frame?.[0]] : frame
+    ));
+    let streak = 0;
+    for (const pins of strikeChances) {
+      streak = Number(pins) === 10 ? streak + 1 : 0;
+      if (streak >= 3) return true;
+    }
+    return false;
+  }
+
   function samePins(actual, expected) {
     if (!Array.isArray(actual) || actual.length !== expected.length) return false;
     const sorted = actual.map(Number).sort((a, b) => a - b);
@@ -47,6 +70,8 @@
     if (!player) return [];
     const earned = [];
     if (earnedPerfectGame(match, player)) earned.push("perfect-game");
+    if (match.modeId === "classic" && earnedCleanCard(player)) earned.push("clean-card");
+    if (match.modeId === "classic" && earnedTurkeyClub(player)) earned.push("turkey-club");
     if (match.modeId === "classic" && earnedComebackKid(match, player)) earned.push("comeback-kid");
     if (earnedSplitDecision(rolls, player.id)) earned.push("split-decision");
     return earned;
