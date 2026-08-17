@@ -88,7 +88,7 @@ test("the circuit has a dedicated short-landscape composition", () => {
 test("registration panels preserve the painted venue behind the interface", () => {
   const css = read("styles/campaign.css");
   const cardRule = css.match(/\.circuit-card\s*\{[^}]*\}/s)?.[0] || "";
-  assert.match(cardRule, /rgba\(18,19,25,\.6\)/);
+  assert.match(cardRule, /rgba\(18,19,25,\.42\)/);
   assert.match(cardRule, /backdrop-filter:\s*blur\(8px\)/);
-  assert.doesNotMatch(cardRule, /rgba\([^)]*,\.(?:9\d|100)\)/);
+  assert.doesNotMatch(cardRule, /background:[^;]*rgba\([^)]*,\.(?:[6-9]\d|100)\)/s);
 });

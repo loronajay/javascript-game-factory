@@ -53,7 +53,7 @@
 .circuit-card {
   border: 1px solid rgba(255,255,255,.14);
   border-radius: 22px;
-  background: linear-gradient(155deg, rgba(18,19,25,.6), rgba(7,8,11,.68));
+  background: linear-gradient(155deg, rgba(18,19,25,.42), rgba(7,8,11,.48));
   box-shadow: 0 24px 64px rgba(0,0,0,.38), inset 0 1px rgba(255,255,255,.09);
   backdrop-filter: blur(8px) saturate(1.08);
 }
