@@ -27,36 +27,27 @@
   // already ships, entrances are CSS, and the two victory poses can bind to the
   // outcome art the alternate skins already carry. None of them is blocked on a
   // per-bowler asset, which is what the banner, splash and skin rungs were.
-  const PENDING_CONTENT = Object.freeze([
-    Object.freeze({ level: 3, family: "profile-icon", key: "profile-icon" }),
-    Object.freeze({ level: 5, family: "victory-pose", key: "spotlight-victory" }),
-    Object.freeze({ level: 9, family: "player-card", key: "rivalry-card" }),
-    Object.freeze({ level: 12, family: "player-card", key: "player-card-art" }),
-    Object.freeze({ level: 14, family: "entrance", key: "entrance-stinger" }),
-    Object.freeze({ level: 18, family: "victory-pose", key: "victory-pose-ii" }),
-    Object.freeze({ level: 24, family: "player-card", key: "elite-card-border" }),
-    Object.freeze({ level: 26, family: "entrance", key: "champion-entrance" }),
-  ]);
+  const PENDING_CONTENT = Object.freeze([]);
 
   const RAW_CADENCE = [
     [1, [["default-bowler", "bowler", "Canon Bowler", ["bowler", "skin", "canon"]]]],
     [2, [["red-neon-trail", "ball-trail", "Red Neon Ball Trail", ["global", "ballTrail", "red-neon"]]]],
-    [3, [["profile-icon", "profile-icon", "{first} Profile Icon"]]],
+    [3, [["profile-icon", "profile-icon", "{first} Profile Icon", ["character", "profileIcon", "canon"]]]],
     [4, [["ember-burst", "strike-burst", "Ember Strike Burst", ["global", "strikeBurst", "ember"]]]],
-    [5, [["spotlight-victory", "victory-pose", "Spotlight Victory Pose"]]],
+    [5, [["spotlight-victory", "victory-pose", "Spotlight Victory Pose", ["character", "victoryPose", "spotlight"]]]],
     [6, [["orange-flare-trail", "ball-trail", "Orange Flare Ball Trail", ["global", "ballTrail", "orange-flare"]]]],
     [7, [["character-banner", "room", "Fireside Lodge", ["global", "room", "fireside-lodge"]]]],
     [8, [["strike-spark", "strike-burst", "Crimson Strike Spark", ["global", "strikeBurst", "red-supernova"]]]],
-    [9, [["rivalry-card", "player-card", "Rivalry Player Card"]]],
+    [9, [["rivalry-card", "player-card", "Rivalry Player Card", ["character", "playerCard", "rivalry"]]]],
     [10, [["gym-day-skin", "ball-trail", "Rose Gold Ball Trail", ["global", "ballTrail", "rose-gold"]]]],
     [11, [["sky-blue-trail", "ball-trail", "Sky Blue Ball Trail", ["global", "ballTrail", "sky-blue"]]]],
-    [12, [["player-card-art", "player-card", "{first} Player-Card Artwork"]]],
+    [12, [["player-card-art", "player-card", "{first} Player-Card Artwork", ["character", "playerCard", "signature"]]]],
     [13, [["focus-badge", "title", "Pocket Hunter Title", ["global", "title", "pocket-hunter"]]]],
-    [14, [["entrance-stinger", "entrance", "Spotlight Entrance Stinger"]]],
+    [14, [["entrance-stinger", "entrance", "Spotlight Entrance Stinger", ["global", "entrance", "spotlight"]]]],
     [15, [["alt-menu-splash", "room", "Desert Vista", ["global", "room", "desert-vista"]]]],
     [16, [["gold-trail", "ball-trail", "Gold Rush Ball Trail", ["global", "ballTrail", "gold-rush"]]]],
     [17, [["signature-emote", "emote", "Game Face Emote", ["global", "emote", "game-face"]]]],
-    [18, [["victory-pose-ii", "victory-pose", "Victory Pose II"]]],
+    [18, [["victory-pose-ii", "victory-pose", "Victory Pose II", ["character", "victoryPose", "champion"]]]],
     [19, [["pin-chaser-title", "title", "Pin Chaser Title", ["global", "title", "pin-chaser"]]]],
     [20, [["special-skin", "strike-burst", "Rose Gold Burst", ["global", "strikeBurst", "rose-gold"]]]],
     [21, [["precision-badge", "title", "Lane Reader Title", ["global", "title", "lane-reader"]]]],
@@ -65,9 +56,9 @@
       ["diamond-trail", "ball-trail", "Diamond White Ball Trail", ["global", "ballTrail", "diamond-white"]],
       ["diamond-burst", "strike-burst", "Diamond Spark Burst", ["global", "strikeBurst", "diamond-spark"]],
     ]],
-    [24, [["elite-card-border", "player-card", "Elite Player-Card Border"]]],
+    [24, [["elite-card-border", "player-card", "Elite Player-Card Border", ["character", "playerCard", "elite"]]]],
     [25, [["rare-splash-card", "room", "Deep Sea Suite", ["global", "room", "deep-sea-suite"]]]],
-    [26, [["champion-entrance", "entrance", "Champion Entrance"]]],
+    [26, [["champion-entrance", "entrance", "Champion Entrance", ["global", "entrance", "champion"]]]],
     [27, [["perfect-line-trail", "ball-trail", "Perfect Line Ball Trail", ["global", "ballTrail", "perfect-line"]]]],
     [28, [["legend-badge", "title", "Shotmaker Title", ["global", "title", "shotmaker"]]]],
     [29, [["mastery-nameplate", "title", "{first} Mastery Nameplate", ["global", "bowlerTitle", "nameplate"]]]],
@@ -91,13 +82,15 @@
     let itemId = null;
     if (slot === "skin") itemId = `skin:${slug}:${value}`;
     else if (slot === "victoryPose") itemId = `victory-pose:${slug}:${value}`;
+    else if (slot === "profileIcon") itemId = `profile-icon:${slug}:${value}`;
     else if (slot === "profileArt") itemId = `profile-art:${slug}`;
-    else if (slot === "playerCard") itemId = `player-card:${slug}`;
+    else if (slot === "playerCard") itemId = `player-card:${slug}${value ? `:${value}` : ""}`;
     else if (slot === "menuSplash") itemId = `menu-splash:${slug}`;
     else if (slot === "ballTrail") itemId = `ball-trail:${value}`;
     else if (slot === "strikeBurst") itemId = `strike-burst:${value}`;
     else if (slot === "badge") itemId = `badge:${value}`;
     else if (slot === "emote") itemId = `emote:${value}`;
+    else if (slot === "entrance") itemId = `entrance:${value}`;
     else if (slot === "room") itemId = `room:${value}`;
     else if (slot === "title") itemId = `title:${value}`;
     // A mastery title is earned from one bowler but worn in the one global

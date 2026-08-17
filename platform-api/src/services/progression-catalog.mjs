@@ -62,23 +62,26 @@ const YAM_BOWLING = {
     // The founding rewards (level 1 canon skin, Rookie title) are deliberately
     // absent, since founding content needs no row.
     //
-    // Every entry is a global cosmetic, including the mastery ones. That is what
-    // lets the bowler ladder grant per player rather than per track: reaching
-    // level 13 with any bowler earns the badge once.
+    // Global mastery rewards can be earned with any bowler. The identity rewards
+    // containing `{track}` belong to the bowler that crossed the rung and are
+    // resolved before their entitlement row is minted.
     levelEntitlements: Object.freeze({
         player: Object.freeze([
             levelReward(2, "ball-trail:lime-shock"),
             levelReward(3, "strike-burst:gold-star"),
+            levelReward(4, "title:lane-regular"),
             levelReward(5, "ball-trail:emerald-glow"),
             levelReward(6, "strike-burst:emerald-impact"),
             levelReward(8, "ball-trail:mint-frost"),
             levelReward(9, "strike-burst:mint-crackle"),
             levelReward(11, "ball-trail:cyan-pulse"),
             levelReward(12, "strike-burst:cyan-flash"),
+            levelReward(13, "title:house-favourite"),
             levelReward(14, "ball-trail:electric-blue"),
             levelReward(15, "strike-burst:electric-blue"),
             levelReward(17, "ball-trail:indigo-drive"),
             levelReward(18, "strike-burst:indigo-ring"),
+            levelReward(19, "title:lane-veteran"),
             levelReward(20, "ball-trail:violet-haze"),
             levelReward(21, "strike-burst:violet-bloom"),
             levelReward(23, "ball-trail:purple-plasma"),
@@ -87,16 +90,21 @@ const YAM_BOWLING = {
             levelReward(27, "strike-burst:magenta-blast"),
             levelReward(28, "ball-trail:hot-pink"),
             levelReward(29, "strike-burst:hot-pink-pop"),
+            levelReward(30, "title:yam-legend"),
             levelReward(30, "strike-burst:lime-pop"),
         ]),
         track: Object.freeze([
             levelReward(2, "ball-trail:red-neon"),
+            levelReward(3, "profile-icon:{track}:canon"),
             levelReward(4, "strike-burst:ember"),
+            levelReward(5, "victory-pose:{track}:spotlight"),
             levelReward(6, "ball-trail:orange-flare"),
             levelReward(7, "room:fireside-lodge"),
             levelReward(8, "strike-burst:red-supernova"),
+            levelReward(9, "player-card:{track}:rivalry"),
             levelReward(10, "ball-trail:rose-gold"),
             levelReward(11, "ball-trail:sky-blue"),
+            levelReward(12, "player-card:{track}:signature"),
             // 13/21/28 used to pay badges. A badge is an achievement reward now, so
             // they pay titles instead. The badge ids themselves were deliberately NOT
             // retyped: an id is what a granted row is keyed by, and rewriting one
@@ -104,16 +112,20 @@ const YAM_BOWLING = {
             // earned those badges here keep them, and everyone after earns them
             // through the achievements that now own them -- so no migration.
             levelReward(13, "title:pocket-hunter"),
+            levelReward(14, "entrance:spotlight"),
             levelReward(15, "room:desert-vista"),
             levelReward(16, "ball-trail:gold-rush"),
             levelReward(17, "emote:game-face"),
+            levelReward(18, "victory-pose:{track}:champion"),
             levelReward(19, "title:pin-chaser"),
             levelReward(20, "strike-burst:rose-gold"),
             levelReward(21, "title:lane-reader"),
             levelReward(22, "strike-burst:sky-shatter"),
             levelReward(23, "ball-trail:diamond-white"),
             levelReward(23, "strike-burst:diamond-spark"),
+            levelReward(24, "player-card:{track}:elite"),
             levelReward(25, "room:deep-sea-suite"),
+            levelReward(26, "entrance:champion"),
             levelReward(27, "ball-trail:perfect-line"),
             levelReward(28, "title:shotmaker"),
             // The two rewards on either ladder that belong to the bowler who earned

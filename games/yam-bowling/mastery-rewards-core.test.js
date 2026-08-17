@@ -128,6 +128,24 @@ test("the two mastery titles are bowler-scoped ids worn in the global title slot
   assert.equal(master.equipment.scope, "global");
 });
 
+test("every no-new-art mastery rung resolves to wearable equipment", () => {
+  const tree = masteryRewards.buildRewardTree({ character, currentLevel: 30 });
+  assert.deepEqual(masteryRewards.PENDING_CONTENT, []);
+  const expected = new Map([
+    [3, "profile-icon:reina-sato:canon"],
+    [5, "victory-pose:reina-sato:spotlight"],
+    [9, "player-card:reina-sato:rivalry"],
+    [12, "player-card:reina-sato:signature"],
+    [14, "entrance:spotlight"],
+    [18, "victory-pose:reina-sato:champion"],
+    [24, "player-card:reina-sato:elite"],
+    [26, "entrance:champion"],
+  ]);
+  for (const [level, itemId] of expected) {
+    assert.equal(tree.nodes[level - 1].rewards[0].equipment?.itemId, itemId);
+  }
+});
+
 test("a mastery title belongs to the bowler who earned it and to no other", () => {
   const other = masteryRewards.buildRewardTree({
     character: { slug: "daisy-monroe", name: "Daisy Monroe" },

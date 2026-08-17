@@ -233,10 +233,10 @@ test("the featured bowler is kept separate from the gameplay loadout", () => {
 
 test("slot names cover the reward types the loadout is responsible for", () => {
   assert.deepEqual(Object.keys(BOWLER_SLOTS), [
-    "skin", "victoryPose", "defeatPose", "playerCard", "menuSplash", "profileArt",
+    "skin", "victoryPose", "defeatPose", "playerCard", "profileIcon", "menuSplash", "profileArt",
   ]);
   assert.deepEqual(Object.keys(GLOBAL_SLOTS), [
-    "ballTrail", "strikeBurst", "title", "badge", "menuSplash", "room", "emote", "profileFrame", "profileBackground",
+    "ballTrail", "strikeBurst", "title", "badge", "menuSplash", "room", "emote", "entrance", "catchLine", "profileFrame", "profileBackground",
   ]);
 
   for (const slot of [...Object.values(BOWLER_SLOTS), ...Object.values(GLOBAL_SLOTS)]) {

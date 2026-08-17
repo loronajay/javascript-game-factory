@@ -38,6 +38,7 @@ function ladderItemIds(track, options = {}) {
         badge: "badge",
         emote: "emote",
         room: "room",
+        entrance: "entrance",
       }[slot];
       assert.ok(type, `${options.name}: unmapped equipment slot ${slot}`);
       ids.add(`${type}:${value}`);

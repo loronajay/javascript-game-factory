@@ -74,13 +74,15 @@ test("crossing a bowler mastery level grants that level's cosmetic entitlement",
     entitlementRewardsBetween(definition, "track", at(1), at(30), { trackId: "reina-sato" })
       .map((entry) => entry.entitlementId),
     [
-      "ball-trail:red-neon", "strike-burst:ember", "ball-trail:orange-flare",
-      "room:fireside-lodge", "strike-burst:red-supernova", "ball-trail:rose-gold",
-      "ball-trail:sky-blue", "title:pocket-hunter", "room:desert-vista",
-      "ball-trail:gold-rush", "emote:game-face", "title:pin-chaser",
-      "strike-burst:rose-gold", "title:lane-reader", "strike-burst:sky-shatter",
-      "ball-trail:diamond-white", "strike-burst:diamond-spark",
-      "room:deep-sea-suite", "ball-trail:perfect-line", "title:shotmaker",
+      "ball-trail:red-neon", "profile-icon:reina-sato:canon", "strike-burst:ember",
+      "victory-pose:reina-sato:spotlight", "ball-trail:orange-flare", "room:fireside-lodge",
+      "strike-burst:red-supernova", "player-card:reina-sato:rivalry", "ball-trail:rose-gold",
+      "ball-trail:sky-blue", "player-card:reina-sato:signature", "title:pocket-hunter",
+      "entrance:spotlight", "room:desert-vista", "ball-trail:gold-rush", "emote:game-face",
+      "victory-pose:reina-sato:champion", "title:pin-chaser", "strike-burst:rose-gold",
+      "title:lane-reader", "strike-burst:sky-shatter", "ball-trail:diamond-white",
+      "strike-burst:diamond-spark", "player-card:reina-sato:elite", "room:deep-sea-suite",
+      "entrance:champion", "ball-trail:perfect-line", "title:shotmaker",
       "title:reina-sato:nameplate",
       "ball-trail:eclipse", "strike-burst:eclipse-corona", "title:reina-sato:master",
     ],
@@ -156,7 +158,12 @@ test("every level-granted cosmetic survives a save once its entitlement exists",
     badge: "badge",
     emote: "emote",
     room: "room",
+    "profile-icon": "profileIcon",
+    "victory-pose": "victoryPose",
+    "player-card": "playerCard",
+    entrance: "entrance",
   };
+  const bowlerScopedKinds = new Set(["profile-icon", "victory-pose", "player-card"]);
   const rewards = [
     ...definition.levelEntitlements.player,
     ...definition.levelEntitlements.track,
@@ -167,12 +174,17 @@ test("every level-granted cosmetic survives a save once its entitlement exists",
     const slotName = slotForKind[reward.kind];
     assert.ok(slotName, `unmapped reward kind ${reward.kind}`);
 
+    const raw = bowlerScopedKinds.has(reward.kind)
+      ? { version: 1, bowlers: { "reina-sato": { [slotName]: reward.entitlementId } } }
+      : { version: 1, global: { [slotName]: reward.entitlementId } };
     const saved = normalizeYamBowlingGarage(
-      { version: 1, global: { [slotName]: reward.entitlementId } },
+      raw,
       { ownedEntitlementIds: new Set([reward.entitlementId]) },
     );
     assert.equal(
-      saved.global[slotName],
+      bowlerScopedKinds.has(reward.kind)
+        ? saved.bowlers["reina-sato"]?.[slotName]
+        : saved.global[slotName],
       reward.entitlementId,
       `${reward.entitlementId} is granted at level ${reward.level} but stripped on save`,
     );
@@ -253,6 +265,7 @@ test("the level-entitlement migrations backfill every node on both ladders", asy
     "041-yam-bowling-level-entitlements.sql",
     "042-yam-bowling-mastery-rewards.sql",
     "043-yam-bowling-emote-and-title-rewards.sql",
+    "044-yam-bowling-identity-rewards.sql",
   ].map((name) => readFile(new URL(`../src/db/migrations/${name}`, import.meta.url), "utf8")))).join("\n");
 
   // A node added to a ladder without a backfill leaves existing accounts owing

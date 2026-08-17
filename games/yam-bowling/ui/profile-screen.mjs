@@ -2,6 +2,7 @@ import { buildProfileModel } from "../profile/profile-model.mjs";
 import { $, escapeHtml, showScreen } from "./dom.mjs";
 import { playerRewardTreeMarkup } from "./reward-tree.mjs";
 import { buildVoucherChoices } from "../profile/voucher-client.mjs";
+import { buildEmoteVoucherChoices } from "../profile/emote-voucher-client.mjs";
 
 function stat(label, value) {
   return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`;
@@ -17,6 +18,8 @@ export function createProfileScreen({
   playerRewards,
   syncClient,
   voucherClient = null,
+  emoteCore = null,
+  emoteVoucherClient = null,
   audio,
 }) {
   let dirty = false;
@@ -156,6 +159,25 @@ export function createProfileScreen({
     }).join("") || `<p class="voucher-choice-empty">Every voucher skin for your owned bowlers is already unlocked.</p>`;
   }
 
+  function emoteVoucherChoices() {
+    return buildEmoteVoucherChoices({
+      emotes: emoteCore?.EMOTES || [],
+      owns: (itemId) => loadout.owns(itemId),
+    });
+  }
+
+  function renderEmoteVoucherPicker() {
+    const state = emoteVoucherClient?.getState?.() || { balance: 0, status: "idle" };
+    $("profile-emote-reward-vouchers").textContent = `${state.balance} Emote Voucher${state.balance === 1 ? "" : "s"}`;
+    const button = $("profile-emote-voucher-button");
+    button.disabled = syncing || state.balance < 1 || state.status === "redeeming" || emoteVoucherChoices().length === 0;
+    $("emote-voucher-choice-grid").innerHTML = emoteVoucherChoices().map((choice) => `
+      <button class="voucher-choice" type="button" role="listitem" data-emote-voucher-entitlement="${escapeHtml(choice.entitlementId)}"${syncing ? " disabled" : ""}>
+        <img src="${escapeHtml(choice.art)}" alt="" loading="lazy" />
+        <span><strong>${escapeHtml(choice.name)}</strong><small>${escapeHtml(choice.description)}</small></span>
+      </button>`).join("") || `<p class="voucher-choice-empty">Every voucher emote is already unlocked.</p>`;
+  }
+
   function render() {
     const model = readModel();
     $("profile-name").textContent = model.profileName;
@@ -191,6 +213,7 @@ export function createProfileScreen({
     ].join("");
     renderRewardTrack(model);
     renderVoucherPicker(model);
+    renderEmoteVoucherPicker();
     renderBowlerOptions(model);
     renderSkinOptions(model);
     renderRoomOptions(model);
@@ -302,6 +325,7 @@ export function createProfileScreen({
   // is the one guard between a mis-click and a voucher the player cannot get
   // back -- the dialog's own copy has always said "cannot be undone".
   let armedVoucherChoice = null;
+  let armedEmoteVoucherChoice = null;
 
   async function redeemVoucher(entitlementId) {
     if (syncing) return false;
@@ -326,6 +350,36 @@ export function createProfileScreen({
     return Boolean(redeemed);
   }
 
+  function openEmoteVoucherPicker() {
+    if (syncing || (emoteVoucherClient?.getState?.().balance || 0) < 1 || emoteVoucherChoices().length === 0) return;
+    $("emote-voucher-status").textContent = "";
+    armedEmoteVoucherChoice = null;
+    $("emote-voucher-dialog").showModal();
+  }
+
+  async function redeemEmoteVoucher(entitlementId) {
+    if (syncing) return false;
+    if (armedEmoteVoucherChoice !== entitlementId) {
+      armedEmoteVoucherChoice = entitlementId;
+      const choice = emoteVoucherChoices().find((entry) => entry.entitlementId === entitlementId);
+      $("emote-voucher-status").textContent = choice
+        ? `Spend your voucher on ${choice.name}? Choose it again to confirm.`
+        : "Choose it again to confirm.";
+      return false;
+    }
+    armedEmoteVoucherChoice = null;
+    $("emote-voucher-status").textContent = "Redeeming with Factory…";
+    render();
+    const redeemed = await emoteVoucherClient?.redeem?.(entitlementId);
+    render();
+    $("emote-voucher-status").textContent = redeemed ? "Emote unlocked." : "Could not redeem that voucher.";
+    if (redeemed) {
+      audio?.play?.("confirm");
+      if ((emoteVoucherClient.getState().balance || 0) < 1) $("emote-voucher-dialog").close();
+    }
+    return Boolean(redeemed);
+  }
+
   function bind() {
     $("profile-bowler-options").addEventListener("click", (event) => {
       const button = event.target.closest("[data-profile-bowler]");
@@ -345,6 +399,7 @@ export function createProfileScreen({
     });
     $("profile-save").addEventListener("click", () => save());
     $("profile-voucher-button").addEventListener("click", openVoucherPicker);
+    $("profile-emote-voucher-button").addEventListener("click", openEmoteVoucherPicker);
     $("voucher-close").addEventListener("click", () => {
       armedVoucherChoice = null;
       $("voucher-dialog").close();
@@ -355,6 +410,16 @@ export function createProfileScreen({
     $("voucher-choice-grid").addEventListener("click", (event) => {
       const button = event.target.closest("[data-voucher-entitlement]");
       if (button) redeemVoucher(button.dataset.voucherEntitlement);
+    });
+    $("emote-voucher-close").addEventListener("click", () => {
+      armedEmoteVoucherChoice = null;
+      $("emote-voucher-dialog").close();
+    });
+    $("emote-voucher-dialog").addEventListener("close", () => { armedEmoteVoucherChoice = null; });
+    $("emote-voucher-choice-grid").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-emote-voucher-entitlement]");
+      if (button) return redeemEmoteVoucher(button.dataset.emoteVoucherEntitlement);
+      return false;
     });
   }
 

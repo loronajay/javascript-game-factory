@@ -6,6 +6,7 @@ import { createCampaignProgressClient } from "./campaign-progress-client.mjs";
 import { createTournamentClient } from "./tournament-client.mjs";
 import { createProfileSyncClient } from "./profile/profile-sync-client.mjs";
 import { createVoucherClient } from "./profile/voucher-client.mjs";
+import { createEmoteVoucherClient } from "./profile/emote-voucher-client.mjs";
 import { createAchievementClient } from "./profile/achievement-client.mjs";
 import { createPublicProfileClient } from "./profile/public-profile-client.mjs";
 import { createPublicProfileRepository } from "./profile/public-profile-repository.mjs";
@@ -25,10 +26,13 @@ import { createPublicProfileScreen } from "./ui/public-profile-screen.mjs";
 import { createShotHud } from "./ui/shot-hud.mjs";
 import { createScoreboard } from "./ui/scoreboard.mjs";
 import { createResultsScreen } from "./ui/results-screen.mjs";
+import { createMatchEmotes } from "./ui/match-emotes.mjs";
+import { createMatchEntrance } from "./ui/match-entrance.mjs";
 import { createSessionState } from "./state/session-state.mjs";
 import { createMatchRuntime } from "./match/match-runtime.mjs";
 import { createOnlineSession } from "./online/online-session.mjs";
 import { createProgressionReporter } from "./online/progression-reporter.mjs";
+import { buildMatchPresentation, normalizeMatchPresentation } from "./online/match-presentation.mjs";
 import { createMasteryCelebrationQueue } from "./state/mastery-celebrations.mjs";
 import { createPlayerLevelCelebrationQueue } from "./state/player-level-celebrations.mjs";
 import { createProgressionCelebrationPresenter } from "./ui/progression-celebration.mjs";
@@ -60,6 +64,7 @@ initMobileLandscapeGate();
   const AchievementCore = window.YamAchievementCore;
   const Campaign = window.YamCampaign;
   const Effects = window.YamEffects;
+  const EmoteCore = window.YamEmoteCore;
   const Catalog = window.YamCharacterCatalog;
   const Roster = Animation.CANON_BOWLERS;
   const BALLS = BallCore.BALLS;
@@ -91,7 +96,8 @@ initMobileLandscapeGate();
   });
   let profileScreen = null;
   const voucherClient = createVoucherClient({ platformApi, loadout });
-  const assets = createCharacterAssets({ animation: Animation, roster: Roster, loadout });
+  const emoteVoucherClient = createEmoteVoucherClient({ platformApi, loadout });
+  const assets = createCharacterAssets({ animation: Animation, roster: Roster, loadout, cosmetics: Cosmetics });
   const progressionReporter = createProgressionReporter({
     progressionCore: ProgressionCore,
     store: progression,
@@ -127,9 +133,13 @@ initMobileLandscapeGate();
   // motion is asked of the browser the same way, so a preference change during
   // a session is honored too.
   const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)") ?? null;
-  const effectsConfig = () => ({
-    trailStyle: Effects.styleForItem(Cosmetics.getItem(loadout.getGlobalSlot("ballTrail"))),
-    burstStyle: Effects.styleForItem(Cosmetics.getItem(loadout.getGlobalSlot("strikeBurst"))),
+  const effectsConfig = (player) => ({
+    trailStyle: Effects.styleForItem(Cosmetics.getItem(
+      session.onlineMatch ? player?.presentation?.ballTrailId : loadout.getGlobalSlot("ballTrail"),
+    )),
+    burstStyle: Effects.styleForItem(Cosmetics.getItem(
+      session.onlineMatch ? player?.presentation?.strikeBurstId : loadout.getGlobalSlot("strikeBurst"),
+    )),
     reducedMotion: Boolean(prefersReducedMotion?.matches),
   });
 
@@ -162,6 +172,7 @@ initMobileLandscapeGate();
     onSnapshotApplied: (snapshot) => {
       loadout.applyServerEntitlements(snapshot?.entitlements || []);
       voucherClient.applyProgress(snapshot);
+      emoteVoucherClient.applyProgress(snapshot);
       applyLevelUnlocks();
       menuSplashPicker.refresh();
       profileScreen?.refresh();
@@ -174,7 +185,10 @@ initMobileLandscapeGate();
     loadout,
     progressionCore: ProgressionCore,
     progressionStore: progression,
-    onGameProgress: (snapshot) => voucherClient.applyProgress(snapshot),
+    onGameProgress: (snapshot) => {
+      voucherClient.applyProgress(snapshot);
+      emoteVoucherClient.applyProgress(snapshot);
+    },
     onSnapshotApplied: () => {
       applyLevelUnlocks();
       menuSplashPicker.refresh();
@@ -186,7 +200,8 @@ initMobileLandscapeGate();
     platformApi,
     loadout,
     voucherClient,
-    onSnapshotApplied: () => {
+    onSnapshotApplied: (snapshot) => {
+      emoteVoucherClient.applyProgress(snapshot);
       applyLevelUnlocks();
       menuSplashPicker.refresh();
       profileScreen?.refresh();
@@ -202,6 +217,8 @@ initMobileLandscapeGate();
     playerRewards: PlayerRewards,
     syncClient: profileSync,
     voucherClient,
+    emoteCore: EmoteCore,
+    emoteVoucherClient,
     audio,
   });
   const publicProfiles = createPublicProfileRepository({
@@ -236,6 +253,8 @@ initMobileLandscapeGate();
     session, roster: Roster, animation: Animation, assets, loadout, onInspect: openInspector,
   });
   const shotHud = createShotHud({ session, balls: BALLS, ballCore: BallCore });
+  const matchEmotes = createMatchEmotes({ session, onlineClient, emoteCore: EmoteCore });
+  const matchEntrance = createMatchEntrance({ cosmetics: Cosmetics });
 
   // Declared ahead of the modules that call into them so the wiring below can
   // close over them; both are assigned before any event or frame can fire.
@@ -287,6 +306,7 @@ initMobileLandscapeGate();
     session,
     roster: Roster,
     animation: Animation,
+    cosmetics: Cosmetics,
     assets,
     loadout,
     onlineIdentity,
@@ -317,6 +337,8 @@ initMobileLandscapeGate();
     applyMatchLane,
     getLocalLaneSlug: () => lanePicker.getSelectedSlug(),
     physicsStep: PHYSICS_DT,
+    getMatchPresentation: (characterSlug) => buildMatchPresentation({ characterSlug, loadout }),
+    onMatchStarted: (players) => matchEntrance.showAll(players),
   });
 
   circuitScreen = createCircuitScreen({
@@ -359,6 +381,12 @@ initMobileLandscapeGate();
     normalizeRoomCode,
     accountAccess,
     getOwnedSkinId: assets.storedSkinId,
+    getMatchPresentation: (characterSlug) => buildMatchPresentation({ characterSlug, loadout }),
+    normalizePresentation: (presentation, characterSlug) => normalizeMatchPresentation(
+      presentation,
+      { characterSlug, cosmetics: Cosmetics, animation: Animation },
+    ),
+    onMatchStarted: (players) => matchEntrance.showAll(players),
   });
 
   function syncAudioToggle() {
@@ -416,7 +444,11 @@ initMobileLandscapeGate();
 
     setupScreen.render();
     onlineScreen.renderSetup();
-    onlineClient.subscribe((snapshot) => onlineSession.handleSnapshot(snapshot));
+    onlineClient.subscribe((snapshot) => {
+      onlineSession.handleSnapshot(snapshot);
+      matchEmotes.handle(snapshot.lastEmote);
+      matchEmotes.refresh();
+    });
     syncAudioToggle();
 
     characterInspector.bind();
@@ -425,6 +457,7 @@ initMobileLandscapeGate();
     circuitScreen.bind();
     tournamentScreen.bind();
     profileScreen.bind();
+    matchEmotes.bind();
     publicProfileScreen.bind();
     bindEvents({
       session, keys, audio, renderer, matchRuntime, onlineSession,

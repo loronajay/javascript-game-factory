@@ -189,6 +189,17 @@ test("pending content is declared, not silently missing", () => {
       "only identity and profile presentation rewards are awaiting authoring",
     );
   }
+  assert.deepEqual(playerRewards.PENDING_CONTENT, [], "all four player titles are now real equipment");
+});
+
+test("the four identity rungs equip their finished live-text titles", () => {
+  const tree = playerRewards.buildRewardTree({ currentLevel: 30 });
+  assert.deepEqual([4, 13, 19, 30].map((level) => tree.nodes[level - 1].rewards[0].equipment?.itemId), [
+    "title:lane-regular",
+    "title:house-favourite",
+    "title:lane-veteran",
+    "title:yam-legend",
+  ]);
 });
 
 test("the player level ladder never hands out an achievement badge", () => {

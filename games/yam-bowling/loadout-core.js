@@ -48,6 +48,7 @@
     victoryPose: Object.freeze({ type: "victory-pose", perSkin: true }),
     defeatPose: Object.freeze({ type: "defeat-pose", perSkin: true }),
     playerCard: Object.freeze({ type: "player-card", perSkin: false }),
+    profileIcon: Object.freeze({ type: "profile-icon", perSkin: false, defaultId: null }),
     // A bowler's own splash variant. Only the canon one exists today; the
     // alternate splash at bowler level 15 lands in this slot.
     menuSplash: Object.freeze({ type: "profile-art", perSkin: false }),
@@ -69,6 +70,8 @@
     // that does nothing -- every account owns the founding six, so the slot can
     // always resolve to something real.
     emote: Object.freeze({ type: "emote", defaultId: "emote:wave" }),
+    entrance: Object.freeze({ type: "entrance", defaultId: null }),
+    catchLine: Object.freeze({ type: "catch-line", defaultId: "catch-line:ready-to-roll" }),
     // Profile decoration reuses character profile art, so a featured bowler
     // can frame and back their own page without new asset types.
     profileFrame: Object.freeze({ type: "profile-art", defaultId: null }),
@@ -82,6 +85,7 @@
   function defaultBowlerSlotId(slug, slotName, skinId) {
     const slot = BOWLER_SLOTS[slotName];
     if (!slot) return null;
+    if (Object.hasOwn(slot, "defaultId")) return slot.defaultId;
     return slot.perSkin
       ? cosmetics.buildItemId(slot.type, slug, skinId)
       : cosmetics.buildItemId(slot.type, slug);

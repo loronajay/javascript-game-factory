@@ -1,5 +1,5 @@
 export const YAM_BOWLING_GAME_ID = "yam-bowling";
-export const YAM_BOWLING_PROTOCOL_VERSION = 1;
+export const YAM_BOWLING_PROTOCOL_VERSION = 2;
 
 const PROD_WS_URL = "wss://factory-network-server-production.up.railway.app";
 const LOCAL_WS_PORT = "3000";
@@ -55,6 +55,14 @@ function normalizeModeId(modeId) {
   return modeId === "classic" ? "classic" : "quick";
 }
 
+const PRESENTATION_FIELDS = Object.freeze([
+  "ballTrailId", "strikeBurstId", "victoryPoseId", "emoteId", "playerCardId", "profileIconId", "entranceId", "catchLineId",
+]);
+
+function sanitizePresentation(raw) {
+  return Object.fromEntries(PRESENTATION_FIELDS.map((key) => [key, boundedText(raw?.[key], 96)]));
+}
+
 export function resolveWebSocketUrl(locationLike = globalThis.location) {
   const hostname = typeof locationLike?.hostname === "string" ? locationLike.hostname : "";
   if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
@@ -94,6 +102,7 @@ function normalizeLobby(data = {}) {
         name: boundedText(player?.name, 24, `Player ${index + 1}`),
         characterSlug: boundedText(player?.characterSlug, 64),
         skinId: boundedText(player?.skinId, 40),
+        presentation: sanitizePresentation(player?.presentation),
       }))
     : members.map((id, index) => ({ id, name: `Player ${index + 1}` }));
   return {
@@ -129,6 +138,7 @@ export function createOnlineClient(options = {}) {
   let identity = sanitizeOnlineIdentity(null);
   let selectedCharacterSlug = "daisy-monroe";
   let selectedSkinId = "canon";
+  let selectedPresentation = sanitizePresentation(null);
   let pending = [];
   let manualClose = false;
   let resumeCredentials = null;
@@ -141,6 +151,7 @@ export function createOnlineClient(options = {}) {
     disconnectedClientId: "",
     reconnectExpiresAt: null,
     error: null,
+    lastEmote: null,
   };
   const subscribers = new Set();
 
@@ -152,6 +163,7 @@ export function createOnlineClient(options = {}) {
         : null,
       matchState: snapshot.matchState ? { ...snapshot.matchState } : null,
       error: snapshot.error ? { ...snapshot.error } : null,
+      lastEmote: snapshot.lastEmote ? { ...snapshot.lastEmote } : null,
     };
   }
 
@@ -181,6 +193,7 @@ export function createOnlineClient(options = {}) {
       ...identity,
       characterSlug: selectedCharacterSlug,
       skinId: selectedSkinId,
+      presentation: selectedPresentation,
       protocolVersion: YAM_BOWLING_PROTOCOL_VERSION,
     });
   }
@@ -233,6 +246,17 @@ export function createOnlineClient(options = {}) {
     if (data.event === "message" && data.scope === "lobby" && (data.messageType === "yam_match" || data.messageType === "yam_match_ended")) {
       const matchState = parseJson(data.value);
       if (matchState) emit({ status: matchState.phase === "complete" ? "complete" : "started", matchState, error: null });
+      return;
+    }
+
+    if (data.event === "message" && data.scope === "lobby" && data.messageType === "yam_emote") {
+      const value = parseJson(data.value);
+      const senderClientId = boundedText(value?.senderClientId, 80);
+      const emoteId = boundedText(value?.emoteId, 96);
+      const sequence = Number(value?.sequence);
+      if (senderClientId && /^emote:[a-z0-9-]{1,64}$/.test(emoteId) && Number.isInteger(sequence) && sequence > 0) {
+        emit({ lastEmote: { senderClientId, emoteId, sequence } });
+      }
       return;
     }
 
@@ -299,9 +323,10 @@ export function createOnlineClient(options = {}) {
     identity = sanitizeOnlineIdentity(value);
   }
 
-  function lobbyRequest(type, { modeId = "quick", characterSlug = "daisy-monroe", skinId = "canon", roomCode = "", privateRoom = false } = {}) {
+  function lobbyRequest(type, { modeId = "quick", characterSlug = "daisy-monroe", skinId = "canon", presentation = {}, roomCode = "", privateRoom = false } = {}) {
     selectedCharacterSlug = boundedText(characterSlug, 64, "daisy-monroe");
     selectedSkinId = boundedText(skinId, 40, "canon");
+    selectedPresentation = sanitizePresentation(presentation);
     const payload = {
       type,
       gameId: YAM_BOWLING_GAME_ID,
@@ -344,6 +369,12 @@ export function createOnlineClient(options = {}) {
     lobbyMessage("yam_rematch", { requested: true });
   }
 
+  function sendEmote() {
+    // The server chooses the sender's equipped emote from the frozen match
+    // presentation. A client-authored slug never reaches the wire.
+    lobbyMessage("yam_emote", {});
+  }
+
   function leaveLobby() {
     send({ type: "leave_lobby" });
     clearSession(storage);
@@ -373,6 +404,7 @@ export function createOnlineClient(options = {}) {
     startLobby,
     submitShot,
     requestRematch,
+    sendEmote,
     leaveLobby,
     disconnect,
     subscribe,

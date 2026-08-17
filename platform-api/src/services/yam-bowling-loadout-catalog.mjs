@@ -52,6 +52,9 @@ const STRIKE_BURST_IDS = Object.freeze([
     // Mastery levels 20 and 30.
     "rose-gold", "eclipse-corona",
 ]);
+const CATCH_LINE_IDS = Object.freeze([
+    "ready-to-roll", "good-game", "keep-it-clean", "find-the-pocket", "lights-on", "one-frame-at-a-time",
+]);
 const items = new Map();
 function register(item) {
     items.set(item.id, Object.freeze(item));
@@ -65,6 +68,21 @@ for (const bowlerSlug of BOWLER_SLUGS) {
         }
     }
     register({ id: `player-card:${bowlerSlug}`, type: "player-card", characterSlug: bowlerSlug, founding: true });
+    register({
+        id: `profile-icon:${bowlerSlug}:canon`,
+        type: "profile-icon",
+        characterSlug: bowlerSlug,
+        founding: false,
+        entitlementId: `profile-icon:${bowlerSlug}:canon`,
+    });
+    for (const suffix of ["spotlight", "champion"]) {
+        const id = `victory-pose:${bowlerSlug}:${suffix}`;
+        register({ id, type: "victory-pose", characterSlug: bowlerSlug, founding: false, entitlementId: id });
+    }
+    for (const suffix of ["rivalry", "signature", "elite"]) {
+        const id = `player-card:${bowlerSlug}:${suffix}`;
+        register({ id, type: "player-card", characterSlug: bowlerSlug, founding: false, entitlementId: id });
+    }
     register({ id: `profile-art:${bowlerSlug}`, type: "profile-art", characterSlug: bowlerSlug, founding: true });
     register({
         id: `menu-splash:${bowlerSlug}`,
@@ -98,11 +116,20 @@ for (const emoteSlug of EMOTE_SLUGS) {
     const id = `emote:${emoteSlug}`;
     register({ id, type: "emote", founding: FOUNDING_EMOTES.has(emoteSlug), entitlementId: id });
 }
+for (const catchLineId of CATCH_LINE_IDS) {
+    register({ id: `catch-line:${catchLineId}`, type: "catch-line", founding: true });
+}
 for (const [id, type, founding] of [
     ["title:rookie", "title", true],
     ["title:pin-chaser", "title", false],
     ["title:comeback-kid", "title", false],
     ["title:yam-champion", "title", false],
+    ["title:lane-regular", "title", false],
+    ["title:house-favourite", "title", false],
+    ["title:lane-veteran", "title", false],
+    ["title:yam-legend", "title", false],
+    ["entrance:spotlight", "entrance", false],
+    ["entrance:champion", "entrance", false],
     ["badge:founding-bowler", "badge", true],
     ["badge:perfect-game", "badge", false],
     ["badge:split-decision", "badge", false],
@@ -126,6 +153,7 @@ const BOWLER_SLOTS = Object.freeze({
     victoryPose: "victory-pose",
     defeatPose: "defeat-pose",
     playerCard: "player-card",
+    profileIcon: "profile-icon",
     menuSplash: "profile-art",
     profileArt: "profile-art",
 });
@@ -137,6 +165,8 @@ const GLOBAL_SLOTS = Object.freeze({
     menuSplash: "menu-splash",
     room: "room",
     emote: "emote",
+    entrance: "entrance",
+    catchLine: "catch-line",
     profileFrame: "profile-art",
     profileBackground: "profile-art",
 });
@@ -205,6 +235,7 @@ export function loadoutFromYamBowlingGarage(raw, context = {}) {
         roomId: garage.global.room || "room:default",
         titleId: garage.global.title || "title:rookie",
         badgeId: garage.global.badge || "badge:founding-bowler",
+        catchLineId: garage.global.catchLine || "catch-line:ready-to-roll",
         profileFrameId: garage.global.profileFrame || null,
         profileBackgroundId: garage.global.profileBackground || null,
     };

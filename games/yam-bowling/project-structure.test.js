@@ -251,7 +251,9 @@ test("every equippable presentation slot has a player-facing control, and it wri
   // An outcome pose is a slot, so the results screen resolves it through the one
   // module that owns character paths — and a remote bowler keeps their own look.
   assert.match(readCode("ui/character-assets.mjs"), /victoryPose|defeatPose/);
-  assert.match(readCode("ui/results-screen.mjs"), /\{ remote \}/);
+  const results = readCode("ui/results-screen.mjs");
+  assert.match(results, /remote,/);
+  assert.match(results, /poseId:\s*player\.presentation\?\.victoryPoseId/);
   assert.doesNotMatch(readCode("ui/results-screen.mjs"), /getBowlerSlot|getResultPortraitAssetPath/);
 });
 

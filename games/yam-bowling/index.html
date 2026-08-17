@@ -107,6 +107,10 @@
                 <span>Earned at levels 10 and 25</span>
                 <button class="button button--ghost" id="profile-voucher-button" type="button" disabled>Redeem a skin</button>
               </div>
+              <div class="profile-voucher-bar">
+                <span id="profile-emote-reward-vouchers">0 Emote Vouchers</span>
+                <button class="button button--ghost" id="profile-emote-voucher-button" type="button" disabled>Redeem an emote</button>
+              </div>
               <ol class="player-reward-tree" id="profile-reward-tree" aria-label="Complete player level reward path"></ol>
             </section>
 
@@ -406,8 +410,12 @@
               <span><b id="hud-pins">10</b> pins up</span>
             </div>
             <div class="turn-banner" id="turn-banner"><small>Up now</small><strong>Player 1</strong></div>
+            <div class="match-entrance" id="match-entrance" hidden>Bowler enters the lane</div>
             <div class="callout-pose" id="callout-pose" aria-hidden="true" hidden><img id="callout-pose-art" alt="" decoding="async" /></div>
             <div class="callout" id="callout"><strong>Strike!</strong><span>Clean pocket hit</span></div>
+            <div class="match-emote-bubble" id="match-emote-bubble" aria-live="polite" hidden>
+              <small id="match-emote-sender">Bowler</small><img id="match-emote-art" alt="" decoding="async" />
+            </div>
           </section>
 
           <aside class="game-panel game-panel--shot panel" aria-label="Shot controls">
@@ -428,6 +436,7 @@
               <div class="power-meter" id="power-meter" role="meter" aria-label="Throw power" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="power-fill"></span></div>
               <p class="charge-warning" id="charge-warning">Release in the gold window. Overcharging drains power.</p>
               <button class="button button--throw" id="throw-button" type="button">Start spin meter</button>
+              <button class="button button--ghost match-emote-button" id="match-emote-button" type="button" hidden disabled>Send equipped emote</button>
               <p class="control-help">Hook tip: start outside, aim across the head pin, then lock spin back toward the pocket.</p>
             </section>
           </aside>
@@ -607,6 +616,15 @@
       <p class="menu-splash-intro" id="voucher-dialog-copy">Choose one unowned outfit for a bowler you own. This cannot be undone.</p>
       <div class="voucher-choice-grid" id="voucher-choice-grid" role="list" aria-label="Available voucher skins"></div>
       <p class="profile-sync-status" id="voucher-status" aria-live="polite"></p>
+    </dialog>
+
+    <dialog class="menu-splash-dialog voucher-dialog" id="emote-voucher-dialog" aria-labelledby="emote-voucher-dialog-title">
+      <button class="dialog-close" id="emote-voucher-close" type="button" aria-label="Close Emote Voucher picker">&#215;</button>
+      <p class="eyebrow">Factory inventory</p>
+      <h2 id="emote-voucher-dialog-title">Redeem an Emote Voucher</h2>
+      <p class="menu-splash-intro">Choose one unowned emote. This cannot be undone.</p>
+      <div class="voucher-choice-grid" id="emote-voucher-choice-grid" role="list" aria-label="Available voucher emotes"></div>
+      <p class="voucher-status" id="emote-voucher-status" aria-live="polite"></p>
     </dialog>
 
     <script src="menu-splash-core.js"></script>

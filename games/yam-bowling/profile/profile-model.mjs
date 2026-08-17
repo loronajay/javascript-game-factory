@@ -40,12 +40,15 @@ const PRESENTATION_SLOTS = Object.freeze([
   Object.freeze({ key: "victoryPose", scope: "bowler", type: "victory-pose", label: "Victory pose" }),
   Object.freeze({ key: "defeatPose", scope: "bowler", type: "defeat-pose", label: "Defeat pose" }),
   Object.freeze({ key: "playerCard", scope: "bowler", type: "player-card", label: "Player card" }),
+  Object.freeze({ key: "profileIcon", scope: "bowler", type: "profile-icon", label: "Profile icon", optional: true }),
   Object.freeze({ key: "profileArt", scope: "bowler", type: "profile-art", label: "Profile art" }),
   Object.freeze({ key: "title", scope: "global", type: "title", label: "Title" }),
   Object.freeze({ key: "badge", scope: "global", type: "badge", label: "Badge" }),
   // The sticker thrown on the lane. Global like the two above, because the pool
   // is shared by the whole roster rather than drawn per bowler.
   Object.freeze({ key: "emote", scope: "global", type: "emote", label: "Emote" }),
+  Object.freeze({ key: "entrance", scope: "global", type: "entrance", label: "Entrance", optional: true }),
+  Object.freeze({ key: "catchLine", scope: "global", type: "catch-line", label: "Catch line" }),
   // The two decoration slots have no default, so empty is one of their real
   // answers and has to be offerable — otherwise a frame could be put on but
   // never taken off again.

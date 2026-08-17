@@ -33,9 +33,18 @@ test("new players and unentitled legacy garages normalize to Canon", () => {
     roomId: "room:default",
     titleId: "title:rookie",
     badgeId: "badge:founding-bowler",
+    catchLineId: "catch-line:ready-to-roll",
     profileFrameId: null,
     profileBackgroundId: null,
   });
+});
+
+test("a founding catch line persists and is exposed in the public loadout", () => {
+  const raw = { ...legacyGarage("canon"), global: { catchLine: "catch-line:find-the-pocket" } };
+  const garage = normalizeYamBowlingGarage(raw);
+
+  assert.equal(garage.global.catchLine, "catch-line:find-the-pocket");
+  assert.equal(loadoutFromYamBowlingGarage(raw).catchLineId, "catch-line:find-the-pocket");
 });
 
 test("one exact skin entitlement unlocks that skin and both matching outcome poses", () => {

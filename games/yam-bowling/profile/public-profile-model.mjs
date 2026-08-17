@@ -137,11 +137,13 @@ export function buildPublicProfileModel({
   };
 }
 
-export function buildCompactIdentityModel({ profile, matchPlayer, animation }) {
+export function buildCompactIdentityModel({ profile, matchPlayer, animation, cosmetics = null }) {
   const player = matchPlayer && typeof matchPlayer === "object" ? matchPlayer : {};
   const bowler = resolveBowler(animation, player.characterSlug);
   const skin = resolveSkin(animation, player.skinId);
   const mastery = profile?.masteryByBowler?.[bowler.slug] || emptyMastery(bowler.slug);
+  const catchLineItem = cosmetics?.getItem?.(player.presentation?.catchLineId);
+  const profileIconItem = cosmetics?.getItem?.(player.presentation?.profileIconId);
   return {
     profileAvailable: Boolean(profile),
     playerId: player.accountPlayerId || player.playerId || profile?.playerId || "",
@@ -156,5 +158,8 @@ export function buildCompactIdentityModel({ profile, matchPlayer, animation }) {
       art: animation.getPortraitAssetPath(bowler, skin.id),
       level: Math.max(1, safeCount(mastery.level) || 1),
     },
+    presentation: player.presentation || {},
+    catchLine: catchLineItem?.type === "catch-line" ? catchLineItem.assets?.text || "" : "",
+    profileIconArt: profileIconItem?.type === "profile-icon" ? profileIconItem.assets?.art || "" : "",
   };
 }

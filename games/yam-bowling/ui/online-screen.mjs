@@ -10,6 +10,7 @@ export function createOnlineScreen({
   session,
   roster,
   animation,
+  cosmetics,
   assets,
   loadout,
   onlineIdentity,
@@ -124,6 +125,7 @@ export function createOnlineScreen({
         profile,
         matchPlayer: { ...player, playerId, characterSlug: slug, skinId },
         animation,
+        cosmetics,
       });
       return compactIdentityCardMarkup(model, {
         local,

@@ -28,6 +28,9 @@
     "victory-pose",
     "defeat-pose",
     "player-card",
+    "profile-icon",
+    "entrance",
+    "catch-line",
     "menu-splash",
     "room",
     "emote",
@@ -148,6 +151,48 @@
         assets: { art: animation.getPortraitAssetPath(bowler, animation.DEFAULT_SKIN_ID) },
         unlock: founding,
       }));
+
+      const masteryUnlock = (level) => Object.freeze({
+        source: "bowler-level",
+        detail: `Reach mastery level ${level} with ${bowler.name}.`,
+      });
+      items.push(defineItem({
+        type: "profile-icon",
+        idParts: [bowler.slug, "canon"],
+        name: `${bowler.name} Profile Icon`,
+        characterSlug: bowler.slug,
+        assets: { art: animation.getPortraitAssetPath(bowler, animation.DEFAULT_SKIN_ID) },
+        unlock: masteryUnlock(3),
+      }));
+      for (const [id, name, skinId, level, tier] of [
+        ["spotlight", "Spotlight Victory", "swimsuit", 5, "rare"],
+        ["champion", "Champion Victory", "maid", 18, "legendary"],
+      ]) {
+        items.push(defineItem({
+          type: "victory-pose",
+          idParts: [bowler.slug, id],
+          name: `${bowler.name} ${name}`,
+          characterSlug: bowler.slug,
+          assets: { art: animation.getResultPortraitAssetPath(bowler, "victory", skinId) },
+          tier,
+          unlock: masteryUnlock(level),
+        }));
+      }
+      for (const [id, name, level, tier] of [
+        ["rivalry", "Rivalry Card", 9, "rare"],
+        ["signature", "Signature Card", 12, "rare"],
+        ["elite", "Elite Card", 24, "legendary"],
+      ]) {
+        items.push(defineItem({
+          type: "player-card",
+          idParts: [bowler.slug, id],
+          name: `${bowler.name} ${name}`,
+          characterSlug: bowler.slug,
+          assets: { art: animation.getPortraitAssetPath(bowler, animation.DEFAULT_SKIN_ID), frameStyle: id },
+          tier,
+          unlock: masteryUnlock(level),
+        }));
+      }
 
       // The two rewards that make the summit of a bowler's ladder mean
       // something. They are scoped to the bowler who earned them but worn in
@@ -377,6 +422,26 @@
 
     return [
       defineItem({ type: "title", idParts: ["rookie"], name: "Rookie", assets: {}, unlock: founding }),
+      defineItem({ type: "title", idParts: ["lane-regular"], name: "Lane Regular", assets: {}, tier: "rare", unlock: Object.freeze({ source: "player-level", detail: "Reach player level 4." }) }),
+      defineItem({ type: "title", idParts: ["house-favourite"], name: "House Favourite", assets: {}, tier: "rare", unlock: Object.freeze({ source: "player-level", detail: "Reach player level 13." }) }),
+      defineItem({ type: "title", idParts: ["lane-veteran"], name: "Lane Veteran", assets: {}, tier: "rare", unlock: Object.freeze({ source: "player-level", detail: "Reach player level 19." }) }),
+      defineItem({ type: "title", idParts: ["yam-legend"], name: "Yam Legend", assets: {}, tier: "legendary", unlock: Object.freeze({ source: "player-level", detail: "Reach player level 30." }) }),
+      defineItem({ type: "entrance", idParts: ["spotlight"], name: "Spotlight Entrance", assets: { style: "spotlight" }, tier: "rare", unlock: mastery("Reach mastery level 14 with any bowler.") }),
+      defineItem({ type: "entrance", idParts: ["champion"], name: "Champion Entrance", assets: { style: "champion" }, tier: "legendary", unlock: mastery("Reach mastery level 26 with any bowler.") }),
+      ...[
+        ["ready-to-roll", "Ready to Roll", "Ready when you are."],
+        ["good-game", "Good Game", "Let's make it a good one."],
+        ["keep-it-clean", "Keep It Clean", "Clean frames. Clean finish."],
+        ["find-the-pocket", "Find the Pocket", "See you in the pocket."],
+        ["lights-on", "Lights On", "Lane's lit. Let's bowl."],
+        ["one-frame-at-a-time", "One Frame at a Time", "One frame at a time."],
+      ].map(([id, name, text]) => defineItem({
+        type: "catch-line",
+        idParts: [id],
+        name,
+        assets: { text },
+        unlock: founding,
+      })),
       defineItem({
         type: "title",
         idParts: ["pin-chaser"],

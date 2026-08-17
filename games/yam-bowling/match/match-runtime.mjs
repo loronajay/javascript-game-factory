@@ -25,6 +25,8 @@ export function createMatchRuntime({
   applyMatchLane,
   getLocalLaneSlug,
   physicsStep,
+  getMatchPresentation = () => ({}),
+  onMatchStarted = () => {},
 }) {
   const { scene } = session;
 
@@ -63,7 +65,7 @@ export function createMatchRuntime({
   function emitBallTrail(dt) {
     const position = displayedBallPosition();
     if (!position) return;
-    const { trailStyle, reducedMotion } = effectsConfig();
+    const { trailStyle, reducedMotion } = effectsConfig(session.activePlayer());
     effects.emitTrail(session.effects, { ...position, dt, style: trailStyle, reducedMotion });
   }
 
@@ -105,6 +107,7 @@ export function createMatchRuntime({
         name: campaignPlayer?.name || "Player 1",
         characterSlug: setup.characterSlugs[0],
         skinId: setup.skinIds[0],
+        presentation: getMatchPresentation(setup.characterSlugs[0]),
         type: "human",
       },
       {
@@ -112,6 +115,7 @@ export function createMatchRuntime({
         name: campaignOpponent?.name || (setup.playType === "cpu" ? core.chooseCpuName() : "Player 2"),
         characterSlug: setup.characterSlugs[1],
         skinId: setup.skinIds[1],
+        presentation: getMatchPresentation(setup.characterSlugs[1]),
         type: sanctionedMatch || setup.playType === "cpu" ? "cpu" : "human",
       },
     ];
@@ -164,6 +168,7 @@ export function createMatchRuntime({
     prepareActivePlayer();
     scoreboard.updateMatchUI();
     showScreen("game-screen");
+    onMatchStarted(session.match.players);
   }
 
   function selectBall(index) {
@@ -279,7 +284,7 @@ export function createMatchRuntime({
     // The equipped strike burst, fired off the same outcome the callout and the
     // audio cue use so there is only ever one definition of a strike.
     if (audioCore.getOutcomeCue(knocked, startedStanding, session.frameRollNumber() === 1) === "strike") {
-      const { burstStyle, reducedMotion } = effectsConfig();
+      const { burstStyle, reducedMotion } = effectsConfig(shooter);
       effects.triggerBurst(session.effects, {
         x: 0,
         z: physics.RACK_FRONT_Z,

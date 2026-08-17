@@ -99,7 +99,10 @@ export function createResultsScreen({
       card.className = `result-player ${isWinner ? "is-winner" : "is-defeated"}`;
       card.innerHTML = `
         <div class="result-player__portrait">
-          <img src="${assets.resultPortrait(player.characterSlug, outcome, session.playerSkinId(player), { remote })}" alt="${bowler.name}, ${outcomeLabel.toLowerCase()}">
+          <img src="${assets.resultPortrait(player.characterSlug, outcome, session.playerSkinId(player), {
+            remote,
+            poseId: player.presentation?.victoryPoseId || null,
+          })}" alt="${bowler.name}, ${outcomeLabel.toLowerCase()}">
           <span class="result-player__outcome">${outcomeLabel}</span>
         </div>
         <div class="result-player__details">

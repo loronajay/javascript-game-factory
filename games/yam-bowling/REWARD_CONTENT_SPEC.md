@@ -12,7 +12,8 @@ Everything not listed here is being built in code and needs no art.
 
 **Done and wired:** the 3 rooms (`fireside-lodge`, `desert-vista`, `deep-sea-suite`)
 are in the catalog on mastery 7/15/25. The 8 new crests are wired to achievements
-and tournaments. The 4 emote stickers are renamed. Cabinet 440/440, API 707/707.
+and tournaments. The emote pool, voucher picker and online match reactions are live.
+All player and mastery ladder nodes now resolve to wearable content.
 
 **Naming note:** rooms and crests came back with different slugs than section 1 and 2
 below requested. That was fine — the catalog now follows the delivered filenames
@@ -40,7 +41,7 @@ Same crest spec as section 2. Suggested subjects:
 - `shotmaker` — a single perfect shot frozen mid-strike inside a laurel of pins,
   legendary treatment: obsidian, mirror gold, white fire.
 
-## 1. Player rooms — 3 new (in progress)
+## 1. Player rooms — 3 new (done)
 
 Drop PNG masters at `assets/menu-splashes/player-rooms/<slug>.png`, then run
 `python tools/optimize_runtime_assets.py` to produce the `.webp` the game loads.
@@ -57,45 +58,35 @@ where the profile card sits).
 | `trophy-loft` | Trophy Loft | rare | 15 | Warm wood and glass cases, filling one shelf at a time. |
 | `midnight-observatory` | Midnight Observatory | legendary | 25 | A brass telescope, a domed roof cranked open, and the whole sky. |
 
-## 2. Titles and badges — 8 new (in progress)
+## 2. Player ladder titles — 4 live-text rewards (done)
 
 Drop at `assets/profile-rewards/<slug>.webp`, 512px, alpha, following the crest
 style in `assets/profile-rewards/PROMPTS.md` — centered, text-free, bold silhouette
 readable at 48px, generous padding, no cast shadow. Reward names stay live UI text,
 so **do not render the name into the image**.
 
-These fill the player ladder's 8 label-only nodes. The tree already reserves the
-node keys, so only the art slug below is a new decision.
+These fill the player ladder's four identity nodes. Titles are live text, so the
+rewards are complete without crest art; matching crests remain an optional visual
+enhancement. The other former identity nodes at 7/16/22/30 now pay Emote Vouchers,
+not badges.
 
 | Slug | Name | Type | Tier | Player level | Node key |
 |---|---|---|---|---|---|
 | `lane-regular` | Lane Regular | title | rare | 4 | `title-i` |
-| `lane-regular-badge` | Lane Regular | badge | rare | 7 | `badge-i` |
 | `house-favourite` | House Favourite | title | rare | 13 | `title-ii` |
-| `pocket-shot` | Pocket Shot | badge | rare | 16 | `badge-ii` |
 | `lane-veteran` | Lane Veteran | title | rare | 19 | `title-iii` |
-| `strike-streak` | Strike Streak | badge | rare | 22 | `badge-iii` |
 | `yam-legend` | Yam Legend | title | legendary | 30 | `title-master` |
-| `the-30-club` | The 30 Club | badge | legendary | 30 | `badge-master` |
 
 Suggested subjects, in the voice of the existing eight:
 
 - `lane-regular` — a worn house ball resting in a return rack with a lane stretching
   behind it; approachable bronze and warm oak, nothing gilded.
-- `lane-regular-badge` — a simple enamel shield with three pins and a repeating
-  lane-arrow border; brushed brass and cream.
 - `house-favourite` — a pin wearing a small laurel with a crowd silhouette behind,
   amber stage light, ruby enamel and warm gold.
-- `pocket-shot` — a ball threading the 1-3 pocket seen from above, with a precise
-  amber vector line and calipers; deep teal and titanium.
 - `lane-veteran` — a chevron rank insignia built from stacked lane arrows over
   crossed pins; gunmetal, olive enamel, aged silver.
-- `strike-streak` — a chain of overlapping X marks trailing into fire, each X a
-  pair of crossed pins; crimson enamel and ember gold.
 - `yam-legend` — a monumental engraved emblem: a yam-red ball at the centre of a
   radiant sunburst crowned with pins, obsidian foundation, mirror gold, amethyst.
-- `the-30-club` — the numeral 30 formed from standing pins inside a heavy circular
-  medallion, black diamond facets, pearl enamel, platinum rim.
 
 ## 3. Emotes — done
 

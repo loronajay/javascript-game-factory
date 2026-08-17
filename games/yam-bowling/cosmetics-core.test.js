@@ -26,6 +26,9 @@ test("every reward type named by the metagame scope has a stable catalog identit
     "victory-pose",
     "defeat-pose",
     "player-card",
+    "profile-icon",
+    "entrance",
+    "catch-line",
     "menu-splash",
     // A player room is the eleventh type and the first added after the metagame
     // scope was written: rooms are new content, so unlike everything above them

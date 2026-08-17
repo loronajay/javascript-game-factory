@@ -90,7 +90,7 @@ test("normalizes Factory identity, room codes, and declared shot inputs", () => 
   });
 });
 
-test("quick match and private room commands use the shared v2 lobby protocol", () => {
+test("quick match and private room commands use the shared lobby protocol", () => {
   const client = createClient();
   client.setIdentity({ playerId: "factory-p1", displayName: "Bowler One" });
   client.connect();
@@ -125,7 +125,21 @@ test("lobby join publishes the selected bowler and owner can start a full lobby"
   const socket = MockWebSocket.instances[0];
   socket.open();
   socket.receive({ event: "connected", clientId: "socket-1", sessionToken: "resume-1" });
-  client.createPrivateRoom({ modeId: "quick", characterSlug: "daisy-monroe", skinId: "swimsuit" });
+  client.createPrivateRoom({
+    modeId: "quick",
+    characterSlug: "daisy-monroe",
+    skinId: "swimsuit",
+    presentation: {
+      ballTrailId: "ball-trail:red-neon",
+      strikeBurstId: "strike-burst:ember",
+      victoryPoseId: "victory-pose:daisy-monroe:maid",
+      emoteId: "emote:wave",
+      playerCardId: "",
+      profileIconId: "",
+      entranceId: "",
+      catchLineId: "catch-line:find-the-pocket",
+    },
+  });
   socket.receive({
     event: "lobby_joined",
     clientId: "socket-1",
@@ -137,7 +151,7 @@ test("lobby join publishes the selected bowler and owner can start a full lobby"
     minPlayers: 2,
     maxPlayers: 2,
     status: "open",
-    settings: { matchType: "quick", protocolVersion: 1 },
+    settings: { matchType: "quick", protocolVersion: YAM_BOWLING_PROTOCOL_VERSION },
   });
 
   assert.equal(socket.sent[1].type, "lobby_message");
@@ -147,7 +161,17 @@ test("lobby join publishes the selected bowler and owner can start a full lobby"
     displayName: "Bowler One",
     characterSlug: "daisy-monroe",
     skinId: "swimsuit",
-    protocolVersion: 1,
+    presentation: {
+      ballTrailId: "ball-trail:red-neon",
+      strikeBurstId: "strike-burst:ember",
+      victoryPoseId: "victory-pose:daisy-monroe:maid",
+      emoteId: "emote:wave",
+      playerCardId: "",
+      profileIconId: "",
+      entranceId: "",
+      catchLineId: "catch-line:find-the-pocket",
+    },
+    protocolVersion: YAM_BOWLING_PROTOCOL_VERSION,
   });
 
   socket.receive({
@@ -226,6 +250,33 @@ test("shot and rematch requests carry no client-authored result", () => {
   assert.equal(shot.messageType, "yam_shot");
   assert.equal(Object.hasOwn(JSON.parse(shot.value), "knocked"), false);
   assert.equal(socket.sent[1].messageType, "yam_rematch");
+});
+
+test("emote requests carry no client-authored slug and received emotes reach subscribers", () => {
+  const client = createClient();
+  const updates = [];
+  client.subscribe((snapshot) => updates.push(snapshot));
+  client.connect();
+  const socket = MockWebSocket.instances[0];
+  socket.open();
+  socket.receive({ event: "connected", clientId: "socket-1", sessionToken: "resume-1" });
+
+  client.sendEmote();
+  assert.equal(socket.sent[0].messageType, "yam_emote");
+  assert.deepEqual(JSON.parse(socket.sent[0].value), {});
+
+  socket.receive({
+    event: "message",
+    scope: "lobby",
+    senderId: "server",
+    messageType: "yam_emote",
+    value: JSON.stringify({ senderClientId: "socket-2", emoteId: "emote:cheer", sequence: 4 }),
+  });
+  assert.deepEqual(updates.at(-1).lastEmote, {
+    senderClientId: "socket-2",
+    emoteId: "emote:cheer",
+    sequence: 4,
+  });
 });
 
 test("a dropped active match attempts session resume with the relay token", () => {

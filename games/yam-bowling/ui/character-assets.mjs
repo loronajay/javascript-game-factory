@@ -4,7 +4,7 @@
 //
 // Injected rather than reaching for `window.YamBowlingCore` directly so the
 // resolver can be unit-tested without a DOM or the classic script tags.
-export function createCharacterAssets({ animation, roster, loadout }) {
+export function createCharacterAssets({ animation, roster, loadout, cosmetics = null }) {
   const bowlerBySlug = (slug) => roster.find((bowler) => bowler.slug === slug) || roster[0];
 
   return {
@@ -21,10 +21,14 @@ export function createCharacterAssets({ animation, roster, loadout }) {
     // its own equippable slot, so the pose is not always the skin worn on the
     // lane — but a REMOTE bowler's look arrived over the wire, and this device's
     // equipment has no say over it.
-    resultPortrait: (slug, outcome, skinId = animation.DEFAULT_SKIN_ID, { remote = false } = {}) => {
+    resultPortrait: (slug, outcome, skinId = animation.DEFAULT_SKIN_ID, { remote = false, poseId = null } = {}) => {
       const bowlerSlug = bowlerBySlug(slug).slug;
       const slotName = outcome === "victory" ? "victoryPose" : "defeatPose";
-      const equipped = remote ? null : loadout.getBowlerSlot(bowlerSlug, slotName);
+      const equipped = remote ? poseId : loadout.getBowlerSlot(bowlerSlug, slotName);
+      const equippedItem = cosmetics?.getItem?.(equipped);
+      if (equippedItem?.type === `${outcome}-pose` && equippedItem.characterSlug === bowlerSlug && equippedItem.assets?.art) {
+        return equippedItem.assets.art;
+      }
       // `<type>:<bowler>:<skin>`. Another bowler's pose is not wearable here, so
       // anything that does not name this one falls back to the equipped skin.
       const [, poseSlug, poseSkinId] = typeof equipped === "string" ? equipped.split(":") : [];

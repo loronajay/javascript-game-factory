@@ -26,8 +26,25 @@ export function createOnlineSession({
   normalizeRoomCode,
   accountAccess,
   getOwnedSkinId = () => "canon",
+  getMatchPresentation = () => ({}),
+  normalizePresentation = (value) => value || {},
+  onMatchStarted = () => {},
 }) {
   const { scene } = session;
+
+  function normalizeMatchState(matchState) {
+    if (!matchState?.match?.players) return matchState;
+    return {
+      ...matchState,
+      match: {
+        ...matchState.match,
+        players: matchState.match.players.map((player) => ({
+          ...player,
+          presentation: normalizePresentation(player.presentation, player.characterSlug),
+        })),
+      },
+    };
+  }
 
   function resetSceneForOnline(snapshot) {
     // The server deals the house so both bowlers see one lane; a player's own
@@ -50,6 +67,7 @@ export function createOnlineSession({
     matchRuntime.prepareActivePlayer();
     scoreboard.updateMatchUI();
     showScreen("game-screen");
+    onMatchStarted(session.match.players);
   }
 
   // A snapshot with no new roll in it: adopt the server's match state without
@@ -104,6 +122,7 @@ export function createOnlineSession({
   }
 
   function handleSnapshot(snapshot) {
+    if (snapshot?.matchState) snapshot = { ...snapshot, matchState: normalizeMatchState(snapshot.matchState) };
     onlineScreen.renderLobby(snapshot);
     if (
       snapshot.status === "lobby"
@@ -136,6 +155,7 @@ export function createOnlineSession({
       modeId: session.onlineSetup.modeId,
       characterSlug: session.onlineSetup.characterSlug,
       skinId: session.onlineSetup.skinId,
+      presentation: getMatchPresentation(session.onlineSetup.characterSlug),
     };
     if (intent === "quick") onlineClient.findQuickMatch(options);
     if (intent === "private-create") onlineClient.createPrivateRoom(options);
