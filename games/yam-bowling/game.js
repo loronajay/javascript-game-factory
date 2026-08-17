@@ -27,6 +27,7 @@ import { createShotHud } from "./ui/shot-hud.mjs";
 import { createScoreboard } from "./ui/scoreboard.mjs";
 import { createResultsScreen } from "./ui/results-screen.mjs";
 import { createMatchReactions } from "./ui/match-reactions.mjs";
+import { createTutorialCoach } from "./ui/tutorial.mjs";
 import { createMatchEntrance } from "./ui/match-entrance.mjs";
 import { createSessionState } from "./state/session-state.mjs";
 import { createMatchRuntime } from "./match/match-runtime.mjs";
@@ -341,6 +342,19 @@ initMobileLandscapeGate();
     onMatchStarted: (players) => matchEntrance.showAll(players),
   });
 
+  // The coached first frame behind "How to play". It observes the session and
+  // paints a step card; the match itself is an ordinary local one.
+  const tutorial = createTutorialCoach({
+    session,
+    matchRuntime,
+    audio,
+    onLeave: (destination) => {
+      if (destination === "setup") { showScreen("setup-screen"); setupScreen.render(); }
+      else showScreen("title-screen");
+      audio.resumeMusic();
+    },
+  });
+
   circuitScreen = createCircuitScreen({
     session,
     campaign: Campaign,
@@ -412,6 +426,7 @@ initMobileLandscapeGate();
       matchRuntime.tick(TICK_MS / 1000, keys);
       accumulator -= TICK_MS;
     }
+    tutorial.observe();
     renderer.ctx.imageSmoothingEnabled = false;
     if (session.match && !$("game-screen").hidden) renderer.render(session.scene, session.effects);
     requestAnimationFrame(loop);
@@ -458,11 +473,12 @@ initMobileLandscapeGate();
     tournamentScreen.bind();
     profileScreen.bind();
     matchReactions.bind();
+    tutorial.bind();
     publicProfileScreen.bind();
     bindEvents({
       session, keys, audio, renderer, matchRuntime, onlineSession,
       circuitScreen, tournamentScreen, profileScreen, setupScreen, onlineScreen, shotHud, syncAudioToggle, accountAccess,
-      matchReactions,
+      matchReactions, tutorial,
     });
 
     if (accountAccess.isEligible() && onlineClient.resumeSavedSession()) {

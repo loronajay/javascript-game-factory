@@ -1,0 +1,50 @@
+/* The coached first frame: the step card over the match screen and the glow on
+   whichever control the current step is talking about. */
+
+.tutorial-coach {
+  position: fixed;
+  z-index: 40;
+  bottom: clamp(.75rem, 3vh, 2rem);
+  left: 50%;
+  width: min(560px, calc(100% - 1.5rem));
+  padding: 1.1rem 1.3rem;
+  border: 1px solid rgba(255, 214, 107, .45);
+  border-radius: 18px;
+  background: rgba(14, 15, 20, .95);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .55);
+  transform: translateX(-50%);
+  backdrop-filter: blur(12px);
+}
+.tutorial-coach[hidden] { display: none; }
+/* Once the match screen is wide enough to have a left rail, the card moves off
+   the lane and sits over the scorecard instead: the bowler and the pins are what
+   the lesson is asking the player to watch. */
+@media (min-width: 1101px) {
+  .tutorial-coach { left: clamp(1rem, 3vw, 2.5rem); width: min(430px, 34vw); transform: none; }
+}
+.tutorial-coach .eyebrow { color: var(--gold); }
+.tutorial-coach h2 { margin: .3rem 0 .5rem; font-size: clamp(1.3rem, 3.4vw, 1.9rem); }
+.tutorial-coach__copy { margin: 0; color: var(--ink); font-size: .88rem; line-height: 1.55; }
+.tutorial-coach__hint { margin: .55rem 0 0; color: var(--gold); font-size: .74rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.tutorial-coach__hint[hidden] { display: none; }
+.tutorial-coach #tutorial-skip { margin-top: .9rem; padding: .4rem .9rem; font-size: .74rem; }
+
+.tutorial-complete__copy { margin: 0 0 1.1rem; color: var(--muted); font-size: .85rem; line-height: 1.55; }
+
+/* The step points at a control by lighting it, so the copy never has to describe
+   where on the rail something lives. */
+.is-coached {
+  border-radius: 12px;
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+  animation: coach-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes coach-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 214, 107, .5); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 214, 107, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-coached { animation: none; }
+}

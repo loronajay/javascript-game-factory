@@ -173,11 +173,11 @@ describe("throw playback", () => {
 });
 
 describe("character skins", () => {
-  test("publishes stable classic, swimsuit, and maid skin ids", () => {
+  test("publishes stable classic, swimsuit, maid, and Halloween skin ids", () => {
     assert.equal(DEFAULT_SKIN_ID, "canon");
     assert.deepEqual(
       AVAILABLE_SKINS.map(({ id, name }) => [id, name]),
-      [["canon", "Classic"], ["swimsuit", "Swimsuit"], ["maid", "Maid Café"]],
+      [["canon", "Classic"], ["swimsuit", "Swimsuit"], ["maid", "Maid Café"], ["halloween", "Halloween"]],
     );
   });
 

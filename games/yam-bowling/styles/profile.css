@@ -1,14 +1,14 @@
 /* Server-backed player room and display editor. */
 
 .profile-screen {
-  --profile-glass: rgba(8,9,13,.18);
+  --profile-glass: rgba(8,9,13,.15);
   position: relative;
   min-height: 100svh;
   padding: clamp(1rem, 2.4vw, 2rem);
   overflow: hidden auto;
   background: #08090d;
 }
-.profile-room-art { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+.profile-room-art { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center; background: #08090d; }
 .profile-room-shade {
   position: fixed;
   inset: 0;
@@ -273,7 +273,7 @@
 }
 .public-profile-dialog::backdrop { background: rgba(2,3,6,.86); backdrop-filter: blur(8px); }
 .public-profile-room-art, .public-profile-shade { position: absolute; inset: 0; width: 100%; height: 100%; }
-.public-profile-room-art { object-fit: cover; }
+.public-profile-room-art { object-fit: contain; background: #08090d; }
 .public-profile-shade { background: linear-gradient(90deg, rgba(5,6,9,.12), rgba(5,6,9,.34) 58%, rgba(5,6,9,.64)); }
 .public-profile-dialog .dialog-close {
   z-index: 2;

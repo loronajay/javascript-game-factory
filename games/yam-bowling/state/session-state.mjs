@@ -68,6 +68,9 @@ export function createSessionState({ physics, animation, effects, storedSkinId, 
     // declared venue and opponent presentation.
     campaignMatch: null,
     tournamentMatch: null,
+    // Set only while the coached first frame is being bowled. It marks a match
+    // as a lesson; nothing about the shot, the scoring or the deck changes.
+    tutorialMatch: false,
     playerShots: [],
     contactedPinCount: 0,
     paused: false,

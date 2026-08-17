@@ -40,18 +40,17 @@ test("split stylesheets keep screen, dialog, inspector, and responsive rules sep
 
   assert.match(results, /\.results-screen\s*\{/);
   assert.match(results, /\.result-player__portrait\s*\{/);
-  assert.doesNotMatch(results, /\.(?:modal-layer|how-dialog|menu-splash|character-inspector)|@media/);
+  assert.doesNotMatch(results, /\.(?:modal-layer|tutorial-coach|menu-splash|character-inspector)|@media/);
 
   assert.match(dialogs, /\.modal-layer\s*\{/);
   assert.match(dialogs, /\.pause-card\s*\{/);
-  assert.match(dialogs, /\.how-dialog\s*\{/);
   assert.match(dialogs, /\.dialog-close\s*\{/);
-  assert.doesNotMatch(dialogs, /\.(?:results-screen|result-player|menu-splash|character-inspector)|@media/);
+  assert.doesNotMatch(dialogs, /\.(?:results-screen|result-player|menu-splash|character-inspector|tutorial-coach)|@media/);
 
   assert.match(inspector, /\.menu-splash-dialog\s*\{/);
   assert.match(inspector, /\.inspect-bowler-button\s*\{/);
   assert.match(inspector, /\.character-inspector-dialog\s*\{/);
-  assert.doesNotMatch(inspector, /\.(?:results-screen|result-player|modal-layer|pause-card|how-dialog)|@media/);
+  assert.doesNotMatch(inspector, /\.(?:results-screen|result-player|modal-layer|pause-card|tutorial-coach)|@media/);
 
   assert.deepEqual(
     [...responsive.matchAll(/@media\s*\(max-width:\s*(\d+)px\)/g)].map((match) => Number(match[1])),
@@ -288,6 +287,30 @@ test("reactions travel as a wheel slot and are owned by one HUD module", () => {
   // entrance reads the wheel rather than a field of its own, so the two cannot
   // drift into disagreeing about what a bowler walks on to.
   assert.match(readCode("ui/match-entrance.mjs"), /catchLineIds\?\.\[0\]/);
+});
+
+test("how-to-play bowls a coached frame and the coach only observes it", () => {
+  const html = read("index.html");
+  const coach = readCode("ui/tutorial.mjs");
+  const bindings = readCode("input/bindings.mjs");
+
+  // The orientation card is gone: the button starts the lesson instead. A player
+  // who never reads a dialog still learns the shot.
+  assert.doesNotMatch(html, /how-dialog|how-grid/);
+  assert.match(html, /id="tutorial-coach"/);
+  assert.match(html, /id="tutorial-complete"/);
+  assert.match(bindings, /\$\("how-button"\)\.addEventListener\("click", \(\) => tutorial\.start\(\)\)/);
+
+  // The coach reads the session and paints a card. Advancing a match, simulating
+  // a roll or writing equipment all belong to modules that already own them --
+  // a second mover in the shot pipeline is exactly what this file exists to stop.
+  assert.doesNotMatch(coach, /beginThrow|startSpin|startCharge|releaseCharge|recordRoll|createSimulation|localStorage|equipGlobalSlot/);
+  assert.match(coach, /matchRuntime\.startMatch\(\)/);
+
+  // Its stylesheet is its own and loads with the match screen it sits over.
+  assert.ok(html.includes('href="styles/tutorial.css"'));
+  assert.match(read("styles/tutorial.css"), /\.tutorial-coach\s*\{/);
+  assert.ok(html.indexOf("styles/match.css") < html.indexOf("styles/tutorial.css"));
 });
 
 test("player rooms are unlockable content the loadout alone equips", () => {

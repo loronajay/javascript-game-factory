@@ -23,6 +23,7 @@ export function bindEvents({
   profileScreen,
   setupScreen,
   onlineScreen,
+  tutorial,
   shotHud,
   syncAudioToggle,
   matchReactions,
@@ -40,6 +41,7 @@ export function bindEvents({
     if (session.onlineMatch) onlineSession.leave();
     else if (session.tournamentMatch) tournamentScreen.returnToTournament();
     else if (session.campaignMatch) circuitScreen.returnToCircuit();
+    else if (session.tutorialMatch) tutorial.exit("title");
     else showScreen("setup-screen");
     audio.resumeMusic();
   }
@@ -88,8 +90,9 @@ export function bindEvents({
   $("tournament-back").addEventListener("click", () => tournamentScreen.leaveToTitle());
   $("profile-back").addEventListener("click", () => profileScreen.leaveToTitle());
   $("online-back").addEventListener("click", () => showScreen("title-screen"));
-  $("how-button").addEventListener("click", () => { $("how-dialog").showModal(); audio.play("popup"); });
-  $("how-close").addEventListener("click", () => $("how-dialog").close());
+  // "How to play" bowls the lesson rather than opening a card of text: the shot
+  // is three timed inputs, and a paragraph about them teaches nobody.
+  $("how-button").addEventListener("click", () => tutorial.start());
   $("start-match").addEventListener("click", () => matchRuntime.startMatch());
 
   // --- Shot controls ---

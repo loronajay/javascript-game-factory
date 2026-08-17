@@ -160,10 +160,13 @@ export function createMatchRuntime({
     shotHud.resetChargeFeedback();
     shotHud.resetSpinFeedback();
     $("pause-overlay").hidden = true;
-    $("restart-match-button").hidden = false;
+    // Restarting a lesson mid-step would leave the coach on a step the lane has
+    // already moved past, so the tutorial gets no restart button at all.
+    $("restart-match-button").hidden = Boolean(session.tutorialMatch);
     $("quit-match-button").textContent = session.tournamentMatch
       ? "Quit to tournament"
-      : session.campaignMatch ? "Quit to circuit" : "Quit to setup";
+      : session.campaignMatch ? "Quit to circuit"
+        : session.tutorialMatch ? "End lesson" : "Quit to setup";
     $("online-result-status").hidden = true;
     audio.resumeMusic();
     resetHumanShot();

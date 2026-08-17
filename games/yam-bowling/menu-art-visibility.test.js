@@ -44,6 +44,31 @@ test("painted menu screens use genuinely transparent glass panels", () => {
   assert.doesNotMatch(rule(profile, ".profile-card"), /backdrop-filter:\s*[^;]*blur\(/);
 });
 
+test("room and circuit panels use a consistent fifteen-percent tint", () => {
+  const campaign = read("styles/campaign.css");
+  const profile = read("styles/profile.css");
+
+  assert.match(
+    rule(campaign, ".circuit-card"),
+    /background:\s*rgba\(8,\s*9,\s*13,\s*\.15\)/,
+    "circuit panels should retain a subtle dark surface over the artwork",
+  );
+  assert.match(
+    rule(profile, ".profile-screen"),
+    /--profile-glass:\s*rgba\(8,\s*9,\s*13,\s*\.15\)/,
+    "My Room panels should share the same subtle dark surface",
+  );
+});
+
+test("room and circuit backdrops show the complete splash artwork", () => {
+  const campaign = read("styles/campaign.css");
+  const profile = read("styles/profile.css");
+
+  assert.match(rule(campaign, ".circuit-backdrop"), /object-fit:\s*contain/, "the circuit splash should not be cropped");
+  assert.match(rule(profile, ".profile-room-art"), /object-fit:\s*contain/, "the equipped room splash should not be cropped");
+  assert.match(rule(profile, ".public-profile-room-art"), /object-fit:\s*contain/, "public room splashes should not be cropped");
+});
+
 test("full-screen art washes do not bury the painted backdrops", () => {
   const campaign = read("styles/campaign.css");
   const tournament = read("styles/tournament.css");

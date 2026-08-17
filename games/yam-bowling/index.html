@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="styles/setup.css" />
     <link rel="stylesheet" href="styles/online.css" />
     <link rel="stylesheet" href="styles/match.css" />
+    <link rel="stylesheet" href="styles/tutorial.css" />
     <link rel="stylesheet" href="styles/results.css" />
     <link rel="stylesheet" href="styles/dialogs.css" />
     <link rel="stylesheet" href="styles/inspector.css" />
@@ -42,6 +43,7 @@
             <button class="button button--ghost button--xl" id="play-button" type="button">Exhibition</button>
             <button class="button button--ghost button--xl" id="online-button" type="button" data-factory-account-feature>Play online</button>
             <button class="button button--ghost" id="how-button" type="button">How to play</button>
+            <!-- Bowls a coached first frame; there is no orientation card any more. -->
             <button class="button button--ghost" id="menu-splash-button" type="button">Menu art</button>
           </div>
           <p class="build-tag">Official circuit · Rotating tournaments · Exhibition · Factory Network</p>
@@ -521,15 +523,24 @@
       </div>
     </div>
 
-    <dialog class="how-dialog" id="how-dialog">
-      <button class="dialog-close" id="how-close" type="button" aria-label="Close">×</button>
-      <p class="eyebrow">League orientation</p><h2>Roll it your way</h2>
-      <div class="how-grid">
-        <article><b>01</b><h3>Build a line</h3><p>Use A / D to strafe and ← / → to aim, or use the sliders. The blue dot marks where the ball leaves the oil and begins to hook.</p></article>
-        <article><b>02</b><h3>Lock the hook</h3><p>Tap Throw or Space to start the spin needle. Press and hold near an edge for a strong left or right hook; the gold guide shows the late turn.</p></article>
-        <article><b>03</b><h3>Commit the power</h3><p>Each ball aims and charges at its own pace. Release in the gold window—holding too long drains power. More speed skids farther.</p></article>
+    <!-- The coached first frame. It sits over the match screen rather than in
+         front of the title, because the lesson is bowled, not read. -->
+    <aside class="tutorial-coach" id="tutorial-coach" aria-live="polite" hidden>
+      <p class="eyebrow" id="tutorial-step">Step 1 of 6</p>
+      <h2 id="tutorial-title">Walk your line</h2>
+      <p class="tutorial-coach__copy" id="tutorial-copy"></p>
+      <p class="tutorial-coach__hint" id="tutorial-hint"></p>
+      <button class="button button--ghost" id="tutorial-skip" type="button">Skip lesson</button>
+    </aside>
+
+    <div class="modal-layer" id="tutorial-complete" hidden>
+      <div class="pause-card panel" role="dialog" aria-modal="true" aria-labelledby="tutorial-complete-title">
+        <p class="eyebrow">Lesson complete</p><h2 id="tutorial-complete-title">That's the shot</h2>
+        <p class="tutorial-complete__copy">Line, hook, power. Everything else in the house is those three inputs under pressure.</p>
+        <button class="button button--primary button--wide" id="tutorial-play" type="button">Bowl for real</button>
+        <button class="button button--ghost button--wide" id="tutorial-exit" type="button">Back to title</button>
       </div>
-    </dialog>
+    </div>
 
     <dialog class="character-inspector-dialog" id="character-inspector-dialog" aria-labelledby="character-inspector-name">
       <button class="dialog-close" id="character-inspector-close" type="button" aria-label="Close character inspector">&#215;</button>

@@ -38,6 +38,7 @@ dev/
 !games/*/tests/**
 !games/yam-bowling/online/online-session.test.mjs
 !games/yam-bowling/ui/character-inspector.test.mjs
+!games/yam-bowling/ui/tutorial.test.mjs
 
 # Ship the repo-wide README coverage/freshness regression.
 !js/tests/
