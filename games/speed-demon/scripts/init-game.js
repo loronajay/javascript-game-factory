@@ -16,6 +16,16 @@ import { GATE_6_SPEED, createGate } from "./sim/gate.js";
 import { modeById, objectiveOption, raceOptionsFor } from "./sim/modes.js";
 import { createRace, startRace, stepRace, pressShift, gateInput, STAGING, FINISHED } from "./sim/race.js";
 import { MODEL_SHEETS, modelById } from "./assets/car-atlas.js";
+import { CIRCUIT_MODELS, hasCircuitAtlas } from "./circuit/assets.js";
+import { createCircuitLiveryCache } from "./circuit/livery-atlas.js";
+import { CIRCUIT_TRACKS, circuitTrackById } from "./circuit/tracks.js";
+import { roadMaskFromImage } from "./circuit/road-mask.js";
+import { createCircuitAdapter } from "./runtime/circuit-adapter.js";
+import { createDragAdapter } from "./runtime/drag-adapter.js";
+import { createRuntimeRegistry } from "./runtime/registry.js";
+import { buildRuntimeDefinition } from "./runtime/definitions.js";
+import { createCircuitView, stepCircuitView, renderCircuit } from "./circuit/renderer.js";
+import { STATUS_FINISHED as CIRCUIT_FINISHED } from "./circuit/race.js";
 import {
   createSetup,
   moveSetup,
@@ -131,6 +141,7 @@ import {
   adjustRow,
   activateEditorRow,
   rowIsActionable,
+  circuitPreviewFrame,
 } from "./ui/garage-editor.js";
 import {
   MENU_SPLASH,
@@ -138,12 +149,20 @@ import {
   drawModeSelect,
   drawPauseMenu,
   drawResults,
+  drawNormalizedResults,
   menuListBox,
   hitMenuList,
 } from "./render/menus.js";
 import { loadFactoryProfile } from "../../../js/platform/identity/factory-profile.mjs";
 import { createOnlineIdentityPayload } from "../../../js/platform/identity/match-identity.mjs";
 import { createNet } from "./online/net.js";
+import {
+  createCircuitPrediction,
+  markCircuitInputsSent,
+  predictCircuitTick,
+  reconcileCircuitSnapshot,
+  unsentCircuitInputs,
+} from "./online/circuit-sync.js";
 import {
   STATUS_COUNTDOWN,
   STATUS_LOBBY,
@@ -365,7 +384,10 @@ export function boot(canvas) {
   // once. The renderers already skip images that have not resolved, so a cold
   // cache degrades to empty cells rather than blocking the first frame.
   const sheetImages = new Map(MODEL_SHEETS.map((sheet) => [sheet.id, loadImage(sheet.src)]));
+  const circuitImages = new Map(CIRCUIT_MODELS.map((model) => [model.modelId, loadImage(model.src)]));
   const trackImages = new Map(TRACKS.map((track) => [track.id, loadImage(track.src)]));
+  for (const track of CIRCUIT_TRACKS) trackImages.set(track.id, loadImage(track.src));
+  const circuitMaskImages = new Map(CIRCUIT_TRACKS.map((track) => [track.id, loadImage(track.roadMask)]));
   const splashImage = loadImage(MENU_SPLASH);
   // Rival portraits. Loaded with everything else because the setup strip shows
   // all of them at once, and every renderer here already degrades to a
@@ -418,6 +440,27 @@ export function boot(canvas) {
   // Baked livery sprites, keyed by model + livery. Held by the composition root
   // so the preview and the in-race car draw the same pixels.
   const liveryCache = createLiveryCache();
+  const circuitLiveryCache = createCircuitLiveryCache();
+  let circuitRoadMask = null;
+  const circuitTrack = circuitTrackById("japan-noir");
+  function ensureCircuitRoadMask() {
+    if (!circuitRoadMask) {
+      circuitRoadMask = roadMaskFromImage(circuitMaskImages.get(circuitTrack.id), circuitTrack.world);
+    }
+    return circuitRoadMask;
+  }
+  const dragAdapter = createDragAdapter({ car: carSpec, gate });
+  const circuitAdapter = createCircuitAdapter({
+    track: circuitTrack,
+    containsVehicle: (vehicle) => ensureCircuitRoadMask()?.containsVehicle(vehicle) ?? true,
+  });
+  const runtimeRegistry = createRuntimeRegistry({ drag: dragAdapter, circuit: circuitAdapter });
+  let activeRuntimeId = "drag";
+  let activeRuntime = dragAdapter;
+  let runtimeDefinition = null;
+  let circuitRace = null;
+  let circuitView = null;
+  let runtimeResult = null;
   // The garage editor's working copy. Null unless the garage screen is open —
   // the editor is a screen's worth of state, not part of the cabinet's.
   let editor = null;
@@ -860,6 +903,8 @@ export function boot(canvas) {
   let sentThrough = 0;
   // The opponent's car: their inputs, run through the same sim. Null offline.
   let opponentCar = null;
+  let onlineCircuit = false;
+  let circuitPrediction = null;
   // Whether this round's run has already been reported. See the latch in tick().
   let reportedRound = false;
 
@@ -872,7 +917,7 @@ export function boot(canvas) {
   const OPPONENT_LANE = 2;
 
   /** True when the race on track belongs to an online match. */
-  const isOnlineRace = () => opponentCar !== null;
+  const isOnlineRace = () => opponentCar !== null || onlineCircuit;
 
   /**
    * True while the server's verdict is on screen. The strip stays lit underneath
@@ -926,6 +971,11 @@ export function boot(canvas) {
     },
     onInputs: (message) => {
       if (opponentCar) opponentCar = receiveInputs(opponentCar, message.events);
+    },
+    onCircuitSnapshot: (message) => {
+      if (!onlineCircuit || !circuitPrediction) return;
+      circuitPrediction = reconcileCircuitSnapshot(circuitPrediction, circuitAdapter, message);
+      circuitRace = circuitPrediction.state;
     },
     onRoundResult: (message) => {
       session = applyRoundResult(session, message);
@@ -985,6 +1035,15 @@ export function boot(canvas) {
    * that is what makes the two screens agree without any correction traffic.
    */
   function buildOnlineRace(message) {
+    if (message.raceTypeId === "circuit" || message.config?.raceTypeId === "circuit") {
+      buildOnlineCircuitRace(message);
+      return;
+    }
+    activeRuntimeId = "drag";
+    activeRuntime = dragAdapter;
+    circuitRace = null;
+    circuitView = null;
+    runtimeResult = null;
     const options = {
       car: carSpec,
       gate,
@@ -1015,11 +1074,46 @@ export function boot(canvas) {
     // the strip. See `ui/versus.js`.
     versus = null;
     opponentCar = createOpponent(options);
+    onlineCircuit = false;
+    circuitPrediction = null;
+    shell = enterScreen(shell, SCREEN_RACE);
+  }
+
+  function buildOnlineCircuitRace(message) {
+    activeRuntimeId = "circuit";
+    activeRuntime = circuitAdapter;
+    opponentCar = null;
+    onlineCircuit = true;
+    runtimeResult = null;
+    ensureCircuitRoadMask();
+    const players = message.participants ?? session.players;
+    runtimeDefinition = {
+      runtime: "circuit",
+      modeId: "circuit",
+      trackId: "japan-noir",
+      rules: { laps: message.config?.laps ?? 3, countdownSeconds: 0, timeoutSeconds: 300 },
+      participants: players.map((player) => ({
+        playerId: player.playerId,
+        control: player.playerId === session.youPlayerId ? "local" : "remote",
+        modelId: player.modelId,
+        livery: player.livery,
+      })),
+      source: { kind: "online", id: session.roomCode },
+    };
+    circuitRace = circuitAdapter.create(runtimeDefinition);
+    circuitView = createCircuitView(circuitRace);
+    circuitPrediction = createCircuitPrediction(circuitRace, session.youPlayerId);
+    raceTick = 0;
+    reportedRound = false;
+    rivalCar = null;
+    versus = null;
     shell = enterScreen(shell, SCREEN_RACE);
   }
 
   function endOnlineRace() {
     opponentCar = null;
+    onlineCircuit = false;
+    circuitPrediction = null;
     myLog = createInputLog();
     raceTick = 0;
     sentThrough = 0;
@@ -1142,7 +1236,7 @@ export function boot(canvas) {
         enterOnline(() => net.findMatch());
         break;
       case ONLINE_CREATE:
-        enterOnline(() => net.createRoom({ trackId: chosen.track.id, distanceId: "quarter", bestOf: 3 }));
+        enterOnline(() => net.createRoom({ raceTypeId: "drag", trackId: chosen.track.id, distanceId: "quarter", laps: 3, bestOf: 3 }));
         break;
       case ONLINE_OPEN_JOIN:
         onlineMenu = openJoin(onlineMenu);
@@ -1478,18 +1572,56 @@ export function boot(canvas) {
     // the pause or results menu starts the lock walk at the car again.
     setup = rewindSetup(setup);
     trackTile = null; // rebuilt for the newly chosen track on the next frame
+    const mode = modeById(runSelection.modeId);
+    const localParticipant = {
+      playerId: "local",
+      control: "local",
+      modelId: chosen.model.id,
+      livery: chosen.livery,
+    };
+    const source = { kind: event ? "campaign" : "freeplay", id: event?.id ?? null };
+    runtimeDefinition = buildRuntimeDefinition({
+      modeId: runSelection.modeId,
+      objectiveId: runSelection.objectiveId,
+      trackId: chosen.track.id,
+      participants: mode.runtime === "circuit"
+        ? [
+          localParticipant,
+          {
+            playerId: event?.opponent?.id ?? "cpu",
+            control: "cpu",
+            modelId: event?.opponent?.modelId ?? "colt-gt",
+            livery: event?.opponent?.livery ?? createLivery(),
+          },
+        ]
+        : [localParticipant],
+      source,
+    });
+    activeRuntimeId = runtimeDefinition.runtime;
+    activeRuntime = runtimeRegistry.forDefinition(runtimeDefinition);
+    runtimeResult = null;
+
     const raceOptions = {
       car: carSpec,
       gate,
-      countdownSeconds: 3,
-      ...raceOptionsFor(runSelection.modeId, runSelection.objectiveId),
+      ...runtimeDefinition.rules,
     };
-    race = createRace(raceOptions);
+    if (activeRuntimeId === "circuit") {
+      ensureCircuitRoadMask();
+      circuitRace = activeRuntime.create(runtimeDefinition);
+      circuitView = createCircuitView(circuitRace);
+    } else {
+      race = activeRuntime.create(runtimeDefinition).race;
+      circuitRace = null;
+      circuitView = null;
+    }
     // Built from the same options the player's race is, and after `chosen` has
     // been resolved — a rival with no model of its own falls back to the
     // player's, which is a worse rival rather than a crash.
-    rivalCar = buildRivalCar(raceOptions, event ? { entry: event.opponent, seed: event.seed } : {});
-    view = newView(layout, race);
+    rivalCar = activeRuntimeId === "drag"
+      ? buildRivalCar(raceOptions, event ? { entry: event.opponent, seed: event.seed } : {})
+      : null;
+    if (activeRuntimeId === "drag") view = newView(layout, race);
     coach = null;
     coachedRun = false;
     // A fresh run is a fresh log. `beginOnlineRace` does the same; without it
@@ -1503,7 +1635,7 @@ export function boot(canvas) {
     // and the objective this run was assembled from — all of which are settled
     // exactly now, and any of which the picker may have moved on from by the
     // time the curtain lifts.
-    versus = buildVersus(event);
+    versus = activeRuntimeId === "drag" ? buildVersus(event) : null;
   }
 
   /**
@@ -1513,6 +1645,11 @@ export function boot(canvas) {
    */
   function beginTutorial() {
     beginRace();
+    activeRuntimeId = "drag";
+    activeRuntime = dragAdapter;
+    circuitRace = null;
+    circuitView = null;
+    runtimeResult = null;
     race = createRace({
       car: carSpec,
       gate,
@@ -1620,7 +1757,10 @@ export function boot(canvas) {
 
   /** The campaign view as it is currently drawn, hover folded in. */
   function currentCampaignView({ hover = campaignHover } = {}) {
-    return campaignView(campaign, campaignStore.progress, { hover });
+    return campaignView(campaign, campaignStore.progress, {
+      hover,
+      circuitModelId: setupModel(setup).id,
+    });
   }
 
   /**
@@ -1642,6 +1782,10 @@ export function boot(canvas) {
     // player browsing the map downloads nothing.
     requestSplash(campaignEvent(campaign));
     if (command !== CAMPAIGN_RACE || !event) return;
+    if (modeById(event.modeId)?.runtime === "circuit" && !hasCircuitAtlas(setupModel(setup).id)) {
+      campaign = createCampaign({ eventId: event.id });
+      return;
+    }
     beginRace({ event });
     enterRaceScreen();
   }
@@ -1661,16 +1805,19 @@ export function boot(canvas) {
    * cannot reach across, so the run is physically identical to a solo one over
    * the same distance — and the career is a second, separate ledger on top.
    */
-  function recordCampaignRun() {
+  function recordCampaignRun(result = runtimeResult) {
     campaignResult = null;
     if (!campaignRun) return;
 
-    const won = Boolean(rivalResult?.won);
-    const value = runValue(race);
-    const lower = boardDirection(runSelection.modeId) === BETTER_LOWER;
+    const normalized = result ?? {
+      won: Boolean(rivalResult?.won),
+      value: runValue(race),
+      better: boardDirection(runSelection.modeId),
+    };
+    const lower = normalized.better === BETTER_LOWER;
     const outcome = completeEvent(campaignStore.progress, campaignRun.id, {
-      won,
-      value,
+      won: Boolean(normalized.won),
+      value: normalized.value,
       at: Date.now(),
       better: (candidate, previous) => (lower ? candidate < previous : candidate > previous),
     });
@@ -2155,6 +2302,7 @@ export function boot(canvas) {
    * it, which is two different grades.
    */
   function stageOrShift(throttle = input.throttle()) {
+    if (activeRuntimeId === "circuit") return;
     // Online, the tree is released by the server rather than by this key, so
     // staging never happens here and ENTER is only ever the clutch.
     if (isOnlineRace()) {
@@ -2200,7 +2348,7 @@ export function boot(canvas) {
         stageOrShift();
         break;
       case ACTION_MOVE:
-        moveRaceGate(action.direction);
+        if (activeRuntimeId !== "circuit") moveRaceGate(action.direction);
         break;
       case ACTION_RESTART:
         // Restarting is an offline convenience. Online the round belongs to the
@@ -2412,6 +2560,7 @@ export function boot(canvas) {
 
     if (target.target === TARGET_START) {
       audio.play("button");
+      if (currentSetupView().start.disabled) return;
       // Through the shell, exactly as locking the last pane does — the shell is
       // what moves the screen, and `beginRace` alone would build a race behind a
       // picker that never went away.
@@ -2680,6 +2829,43 @@ export function boot(canvas) {
     }
   }
 
+  function tickCircuitRuntime() {
+    const controls = input.circuitControls();
+    if (onlineCircuit) {
+      if (showsOnlineResult()) return;
+      if (session.status === STATUS_COUNTDOWN) {
+        if (!readyToLaunch(session, Date.now())) return;
+        session = racing(session);
+      }
+      if (session.status !== STATUS_RACING) return;
+      circuitPrediction = predictCircuitTick(circuitPrediction, activeRuntime, controls);
+      circuitPrediction = predictCircuitTick(circuitPrediction, activeRuntime, controls);
+      const events = unsentCircuitInputs(circuitPrediction);
+      if (session.liveRound && events.length > 0) {
+        net.sendInputs(session.liveRound.round, session.liveRound.attempt, events);
+        circuitPrediction = markCircuitInputsSent(circuitPrediction, events);
+      }
+      circuitRace = circuitPrediction.state;
+    } else {
+      circuitRace = activeRuntime.input(circuitRace, { playerId: "local", ...controls });
+      // Circuit physics runs at 120Hz while the cabinet shell runs at 60Hz.
+      circuitRace = activeRuntime.step(circuitRace, 1 / 120);
+      circuitRace = activeRuntime.step(circuitRace, 1 / 120);
+    }
+    circuitView = stepCircuitView(circuitView, circuitRace, TICK_SECONDS, {
+      viewportWidth: WORLD.width,
+      viewportHeight: WORLD.height,
+      worldWidth: circuitTrack.world.width,
+      worldHeight: circuitTrack.world.height,
+    });
+    if (circuitRace.status === CIRCUIT_FINISHED && !onlineCircuit) {
+      runtimeResult = activeRuntime.result(circuitRace, "local");
+      recordCampaignRun(runtimeResult);
+      shell = enterScreen(shell, SCREEN_RESULTS);
+    }
+    audio.engine({ active: false, throttle: 0, gear: 0 });
+  }
+
   function tick(throttle) {
     applyActions();
     applyPointer();
@@ -2717,6 +2903,11 @@ export function boot(canvas) {
     if (shell.screen !== SCREEN_RACE) {
       audio.engine({ active: false, throttle: 0, gear: race.vehicle.gear });
       return; // nothing to advance behind a menu
+    }
+
+    if (activeRuntimeId === "circuit") {
+      tickCircuitRuntime();
+      return;
     }
 
     // An online round holds on the line until the server's shared start time
@@ -2822,11 +3013,16 @@ export function boot(canvas) {
     // ask the race whether it is over.
     if (race.phase === FINISHED && !isOnlineRace()) {
       rivalResult = isRivalRace() ? rivalOutcome(race, settledRivalRace()) : null;
+      runtimeResult = {
+        won: Boolean(rivalResult?.won),
+        value: runValue(race),
+        better: boardDirection(runSelection.modeId),
+      };
       recordRun();
       // After the board, because a campaign race files to the distance boards
       // like any other rival race and the career is a second ledger on top of
       // that — not instead of it.
-      recordCampaignRun();
+      recordCampaignRun(runtimeResult);
       shell = enterScreen(shell, SCREEN_RESULTS);
       // A lesson ends with the run it belongs to, however far through it got:
       // there is nothing left to coach, and its strip would otherwise stick out
@@ -3007,9 +3203,14 @@ export function boot(canvas) {
    * up is provably the arrow that would fire.
    */
   function currentGarageView({ pointer: at = null } = {}) {
-    const view = { ...editorView(editor, garage), trackId: setupTrack(setup).id };
-    view.hover = at ? hitGarage(view, at.x, at.y) : null;
-    return view;
+    const garageView = {
+      ...editorView(editor, garage),
+      trackId: setupTrack(setup).id,
+      circuitFrame: circuitPreviewFrame(view.tick),
+      circuitAvailable: hasCircuitAtlas(editor.modelId),
+    };
+    garageView.hover = at ? hitGarage(garageView, at.x, at.y) : null;
+    return garageView;
   }
 
   function render() {
@@ -3093,6 +3294,8 @@ export function boot(canvas) {
         sheetImages,
         trackImages,
         liveryCache,
+        circuitImages,
+        circuitLiveryCache,
       });
       return;
     }
@@ -3114,6 +3317,27 @@ export function boot(canvas) {
         return;
       default:
         break;
+    }
+
+    if (activeRuntimeId === "circuit" && circuitRace && circuitView) {
+      renderCircuit(ctx, circuitRace, circuitView, {
+        track: circuitTrack,
+        trackImage: trackImages.get(circuitTrack.id),
+        carImages: circuitImages,
+        liveryCache: circuitLiveryCache,
+        viewportWidth: WORLD.width,
+        viewportHeight: WORLD.height,
+      });
+      if (shell.screen === SCREEN_PAUSED) drawPauseMenu(ctx, menu);
+      else if (shell.screen === SCREEN_RESULTS) drawNormalizedResults(ctx, runtimeResult, menu);
+      else if (isOnlineRace() && showsOnlineResult()) {
+        drawOnlineResult(ctx, {
+          headline: roundHeadline(session), note: restartNote(session), rows: roundRows(session),
+          score: session.score, matchResult: session.matchResult,
+          buttons: resultButtons(session).map((button, index) => ({ ...button, primary: index === 0 })),
+        });
+      }
+      return;
     }
 
     renderRace();

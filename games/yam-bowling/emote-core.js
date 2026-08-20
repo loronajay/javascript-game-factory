@@ -39,9 +39,9 @@
     source: "emote-voucher",
     detail: "Redeem an Emote Voucher.",
   });
-  const masteryLevel = (level) => Object.freeze({
-    source: "bowler-level",
-    detail: `Reach mastery level ${level} with any bowler.`,
+  const playerLevel = (level) => Object.freeze({
+    source: "player-level",
+    detail: `Reach player level ${level}.`,
   });
 
   // Six founding emotes, all of them warm or neutral. A player who has just
@@ -60,7 +60,7 @@
     ["Hair Flip", "hair-flip", "Unbothered, sparkling.", voucher],
     ["Crowned", "crowned", "A crown of pins, worn like it was always yours.", voucher],
 
-    ["Game Face", "game-face", "The look that arrives before the shot does.", masteryLevel(17)],
+    ["Game Face", "game-face", "The look that arrives before the shot does.", playerLevel(7)],
 
     ["Fist Pump", "fist-pump", "The full-body yes.", voucher],
     ["Salute", "salute", "Two fingers off the brow, target acquired.", voucher],

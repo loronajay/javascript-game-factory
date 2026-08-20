@@ -12,6 +12,8 @@
 import { WORLD } from "./scene.js";
 import { drawMenuBackdrop } from "./menus.js";
 import { liverySprite, drawUnderglow } from "./livery.js";
+import { CIRCUIT_FRAME_SIZE, circuitModelById } from "../circuit/assets.js";
+import { circuitLiveryAtlas } from "../circuit/livery-atlas.js";
 import { hueToRgb, paintSwatchColour } from "../garage/paint.js";
 import {
   ROW_PALETTE, ROW_HUE, ROW_TOGGLE, ROW_CHOICE, ROW_SECTION, ROW_PICK, ROW_BUTTON,
@@ -415,7 +417,15 @@ function drawActions(ctx, view) {
  * from the same baked sprite the race uses, so what is previewed here is
  * literally what reaches the road.
  */
-function drawPreview(ctx, view, model, sheetImages, liveryCache) {
+function drawPreview(
+  ctx,
+  view,
+  model,
+  sheetImages,
+  liveryCache,
+  circuitImages,
+  circuitLiveryCache,
+) {
   const box = GARAGE_LAYOUT.preview;
   panel(ctx, box);
   if (!model) return;
@@ -425,19 +435,59 @@ function drawPreview(ctx, view, model, sheetImages, liveryCache) {
     ? liverySprite(liveryCache, { image, model, livery: view.livery })
     : null;
 
-  const maxWidth = box.width - 120;
-  const maxHeight = box.height - 130;
+  const maxWidth = box.width - 180;
+  const maxHeight = 220;
   const scale = Math.min(maxWidth / model.sw, maxHeight / model.sh);
   const width = model.sw * scale;
   const height = model.sh * scale;
   const x = box.x + box.width / 2;
-  const top = box.y + 46;
+  const top = box.y + 28;
 
   drawUnderglow(ctx, { x, top, width, height }, view.livery);
   if (sprite) {
     ctx.drawImage(sprite, 0, 0, sprite.width, sprite.height, x - width / 2, top, width, height);
   } else if (image && image.complete && image.naturalWidth > 0) {
     ctx.drawImage(image, model.sx, model.sy, model.sw, model.sh, x - width / 2, top, width, height);
+  }
+
+  const circuitModel = circuitModelById(model.id);
+  const circuitImage = circuitImages?.get(model.id) ?? null;
+  const circuitAtlas = circuitModel && circuitLiveryCache
+    ? circuitLiveryAtlas(circuitLiveryCache, {
+      image: circuitImage,
+      modelId: model.id,
+      livery: view.livery,
+    })
+    : null;
+  const frame = Math.max(0, Math.min(7, view.circuitFrame ?? 0));
+  label(ctx, "CIRCUIT TURNAROUND", box.x + 32, box.y + 300, {
+    size: 12,
+    colour: view.circuitAvailable ? ACCENT : MUTED,
+  });
+  label(ctx, view.circuitAvailable ? `${frame + 1} / 8` : "ATLAS UNAVAILABLE", box.x + box.width - 32, box.y + 300, {
+    size: 12,
+    colour: view.circuitAvailable ? DIM : ACCENT,
+    align: "right",
+  });
+
+  if (circuitAtlas) {
+    const size = 88;
+    const circuitX = box.x + box.width / 2;
+    const circuitTop = box.y + 308;
+    drawUnderglow(ctx, { x: circuitX, top: circuitTop, width: size, height: size }, view.livery);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(
+      circuitAtlas,
+      frame * CIRCUIT_FRAME_SIZE,
+      0,
+      CIRCUIT_FRAME_SIZE,
+      CIRCUIT_FRAME_SIZE,
+      circuitX - size / 2,
+      circuitTop,
+      size,
+      size,
+    );
+    ctx.imageSmoothingEnabled = true;
   }
 
   label(ctx, view.name.toUpperCase(), box.x + box.width / 2, box.y + box.height - 46, {
@@ -454,7 +504,14 @@ function drawPreview(ctx, view, model, sheetImages, liveryCache) {
   );
 }
 
-export function drawGarage(ctx, view, { model, sheetImages, trackImages, liveryCache = null }) {
+export function drawGarage(ctx, view, {
+  model,
+  sheetImages,
+  trackImages,
+  liveryCache = null,
+  circuitImages = null,
+  circuitLiveryCache = null,
+}) {
   drawMenuBackdrop(ctx, trackImages.get(view.trackId));
 
   label(ctx, "GARAGE", GARAGE_LAYOUT.title.x, GARAGE_LAYOUT.title.y, {
@@ -475,7 +532,15 @@ export function drawGarage(ctx, view, { model, sheetImages, trackImages, liveryC
 
   drawRows(ctx, view);
   drawActions(ctx, view);
-  drawPreview(ctx, view, model, sheetImages, liveryCache);
+  drawPreview(
+    ctx,
+    view,
+    model,
+    sheetImages,
+    liveryCache,
+    circuitImages,
+    circuitLiveryCache,
+  );
 
   label(
     ctx,

@@ -65,6 +65,19 @@ It checks every canon and alternate portrait, result pose, throw frame, and six-
 
 Legacy or edited packages should be finalized with `tools/repack_skin_source.py`; it rebuilds `source.png` from the approved runtime sprites with true alpha and protected per-pose gutters.
 
+### 2026 full-audit repair
+
+The August 2026 native-resolution audit found three systemic failure modes in the alternate throw art:
+
+- a prior swimsuit hand repair pasted rectangular source regions over seven frames, producing duplicate arms and hard seams;
+- crowded six-pose sheets allowed neighboring hands or hair into a pose cell, while some rightmost poses were already cut at the source-sheet boundary.
+- the first audit implementation unit-tested an internal straight-edge detector but never called it from the production inventory scan, allowing severe internal half-body crops to be reported as clean;
+- its first production threshold still ignored short, cell-aligned limb cuts such as Aaliyah Storm's 45-pixel forearm edge, and one supposedly safe Talia Dodson fallback contained source-cell debris of its own.
+
+The initial repair pass incorrectly replaced damaged timeline frames with other clean poses, flattening motion in multiple skin animations. That strategy is disabled. All 71 frames it could affect were restored from their original committed timeline art, and the 42 affected source sheets were rebuilt from the restored runtime frames. The current audit therefore reports the remaining source-cell anatomy defects honestly instead of hiding them with repeated poses.
+
+The production audit now calls the internal vertical-truncation detector, adds a shorter-edge check in the outer quarter of each silhouette for chopped hands and forearms, and treats exact or re-encoded repeated timeline frames as errors. Visually reviewed natural straight edges are stored with their exact geometry signature, so any pixel change reopens the finding instead of being broadly allowlisted. After timeline restoration, the deterministic audit reports 0 animation errors and 70 unresolved anatomy review findings. The complete native throw and static review sheets are written below the audit output directory in `native-throws/` and `native-static/`.
+
 ## Menu splash convention
 
 Character title-screen PNG masters live at `assets/menu-splashes/<firstname-lastname>.png`. The optimizer writes full-size and picker-thumbnail WebPs using the same canon slug. Add each available splash to `MENU_SPLASHES` in `menu-splash-core.js`, then run `tools/optimize_runtime_assets.py` so it appears in the player's menu-art picker.

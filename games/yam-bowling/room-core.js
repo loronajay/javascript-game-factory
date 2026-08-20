@@ -34,14 +34,9 @@
   const achievement = Object.freeze({ source: "achievement", detail: "Won at the top of the circuit." });
   const tournament = Object.freeze({ source: "tournament", detail: "Rare prize from a rotating Yam tournament." });
 
-  // Mastery rooms. They are global like every other room -- reaching the level
-  // with any bowler earns the room once -- but they hang off the mastery ladder
-  // rather than the circuit so that ladder has somewhere to pay out that costs
-  // no per-bowler art. A room is one image for all thirty, which is exactly why
-  // it can fill a node the deferred banner and splash rewards could not.
-  const mastery = (level) => Object.freeze({
-    source: "bowler-level",
-    detail: `Reach mastery level ${level} with any bowler.`,
+  const playerLevel = (level) => Object.freeze({
+    source: "player-level",
+    detail: `Reach player level ${level}.`,
   });
 
   // `default` is the room every bowler starts in and the only founding entry:
@@ -61,9 +56,9 @@
     ["Circuit Red", "circuit-red", "Sanctioned red and chrome, the colours of the tour.", campaign, "rare"],
     ["Tower Penthouse", "tower-penthouse", "The whole city below, and nobody above you.", achievement, "legendary"],
     ["Champion's Room", "champion-room", "Silverware on every surface. You earned each piece.", tournament, "legendary"],
-    ["Fireside Lodge", "fireside-lodge", "Split logs, a low fire, and snow against the glass.", mastery(7), "standard"],
-    ["Desert Vista", "desert-vista", "Red rock to the horizon and a sky that goes on too long.", mastery(15), "rare"],
-    ["Deep Sea Suite", "deep-sea-suite", "Pressure glass, drifting light, and something large passing by.", mastery(25), "legendary"],
+    ["Fireside Lodge", "fireside-lodge", "Split logs, a low fire, and snow against the glass.", playerLevel(9), "standard"],
+    ["Desert Vista", "desert-vista", "Red rock to the horizon and a sky that goes on too long.", playerLevel(16), "rare"],
+    ["Deep Sea Suite", "deep-sea-suite", "Pressure glass, drifting light, and something large passing by.", playerLevel(24), "legendary"],
   ].map(([name, slug, description, unlock, tier]) => Object.freeze({
     name,
     slug,

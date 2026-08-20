@@ -392,12 +392,6 @@ export function createMatchRuntime({
       shotHud.updateChargeFeedback();
     } else if (scene.phase === "approach") {
       scene.throwElapsed += dt;
-      // A late nudge during the approach is a local human's release tweak; it
-      // has no meaning online, where the shot is already with the server.
-      if (!session.onlineMatch && session.activePlayer()?.type === "human"
-        && scene.throwElapsed <= 0.32 && strafeDirection) {
-        scene.shot.release = Math.max(-0.035, Math.min(0.035, scene.shot.release + strafeDirection * dt * 0.1));
-      }
       scene.ballZ += physics.ballSpeedForShot(scene.shot) * dt;
       if (!scene.gutterSide) {
         scene.gutterSide = physics.gutterSideForX(physics.trajectoryX(scene.ballZ, scene.shot));

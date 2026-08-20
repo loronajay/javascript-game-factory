@@ -3,14 +3,16 @@ import { suite, test, assert, assertEqual, finish } from "./harness.js";
 import { DEFAULT_CAR, TICK_SECONDS } from "../scripts/sim/constants.js";
 import { GATE_6_SPEED, createGate } from "../scripts/sim/gate.js";
 import { FINISHED } from "../scripts/sim/race.js";
-import { raceOptionsFor, modeById, objectiveOption } from "../scripts/sim/modes.js";
+import { MODE_CIRCUIT, raceOptionsFor, modeById, objectiveOption } from "../scripts/sim/modes.js";
 import { replayRun } from "../scripts/sim/input-log.js";
 import { buildRival, entryFaceSrc } from "../scripts/rival/lineup.js";
 import { RIVALS } from "../scripts/rival/rivals.js";
 import { avatarById } from "../scripts/profile/avatars.js";
 import { modelById } from "../scripts/assets/car-atlas.js";
 import { trackById } from "../scripts/ui/track-layout.js";
+import { circuitTrackById } from "../scripts/circuit/tracks.js";
 import { boardIdFor } from "../scripts/records/records.js";
+import { buildRuntimeDefinition } from "../scripts/runtime/definitions.js";
 import { EVENTS, FIRST_EVENT_ID, eventById, splashSrc } from "../scripts/campaign/events.js";
 import { VOICE_UNKNOWN, allContacts, speakerById } from "../scripts/campaign/contacts.js";
 import {
@@ -134,14 +136,14 @@ test("the map is fitted whole, never cropped", () => {
 
 test("every event names a track, a mode and an objective the game actually has", () => {
   for (const event of EVENTS) {
-    assert(trackById(event.trackId), `${event.id} names an unknown track`);
+    assert(trackById(event.trackId) ?? circuitTrackById(event.trackId), `${event.id} names an unknown track`);
     const mode = modeById(event.modeId);
     assert(mode, `${event.id} names an unknown mode`);
     // Through the catalog rather than by string match, because a stale id
     // silently falls back to the mode's default — which would mean an event
     // quietly racing a different distance from the one it advertises.
     assertEqual(objectiveOption(mode, event.objectiveId).id, event.objectiveId, `${event.id}'s objective`);
-    assert(mode.rival, `${event.id} must build on a mode that has a second car`);
+    assert(mode.rival || mode.runtime === "circuit", `${event.id} has no opponent runtime`);
   }
 });
 
@@ -151,8 +153,37 @@ test("an event's run files to a board a solo run can also reach", () => {
   // of its own would split one ladder in two.
   for (const event of EVENTS) {
     const boardId = boardIdFor(event.modeId, event.objectiveId);
-    assert(boardId?.startsWith("distance:"), `${event.id} files to ${boardId}`);
+    if (event.modeId === MODE_CIRCUIT) assertEqual(boardId, null, `${event.id} reached a drag board`);
+    else assert(boardId?.startsWith("distance:"), `${event.id} files to ${boardId}`);
   }
+});
+
+test("the authored circuit mission builds the same serializable circuit definition", () => {
+  const event = EVENTS.find((entry) => entry.modeId === MODE_CIRCUIT);
+  assert(event, "the campaign has no circuit mission");
+  const definition = buildRuntimeDefinition({
+    modeId: event.modeId,
+    objectiveId: event.objectiveId,
+    trackId: event.trackId,
+    participants: [
+      { playerId: "local", control: "local", modelId: "kaido-gts", livery: {} },
+      { playerId: event.opponent.id, control: "cpu", modelId: event.opponent.modelId, livery: event.opponent.livery },
+    ],
+    source: { kind: "campaign", id: event.id },
+  });
+  assertEqual(definition.runtime, "circuit");
+  assertEqual(definition.trackId, "japan-noir");
+  assertEqual(definition.rules.laps, 3);
+  assertEqual(definition.source.kind, "campaign");
+  assertEqual(Object.keys(definition.participants[0]).sort().join(), "control,livery,modelId,playerId");
+});
+
+test("a campaign circuit mission clearly blocks a selected model with no atlas", () => {
+  const event = EVENTS.find((entry) => entry.modeId === MODE_CIRCUIT);
+  const campaign = createCampaign({ eventId: event.id });
+  const view = campaignView(campaign, cleared(), { circuitModelId: "shutter-z" });
+  assertEqual(view.detail.circuitUnavailable, true);
+  assert(view.detail.hint.includes("ATLAS UNAVAILABLE"));
 });
 
 test("the painted base decides whether a roster face is spent on the race", () => {
@@ -498,7 +529,7 @@ test("a click lands on the node that was drawn, and nowhere else", () => {
 // Difficulty, measured
 // ---------------------------------------------------------------------------
 
-test("every event's opponent is beatable, and the opening one is a gift", () => {
+test("every drag event's opponent is beatable, and the opening one is a gift", () => {
   // The rival ladder's rule, applied to the campaign: difficulty is looser
   // hands, never a better car — so an event's difficulty is a measured
   // finishing time rather than an eyeballed one. A flawless human quarter is
@@ -510,7 +541,8 @@ test("every event's opponent is beatable, and the opening one is a gift", () => 
     ...raceOptionsFor(event.modeId, event.objectiveId),
   });
 
-  const times = EVENTS.map((event) => {
+  const dragEvents = EVENTS.filter((event) => modeById(event.modeId).runtime === "drag");
+  const times = dragEvents.map((event) => {
     const built = buildRival(event.opponent, options(event), event.seed);
     assert(built, `${event.id}'s opponent could not be built`);
     const replayed = replayRun(options(event), { events: built.log.events });

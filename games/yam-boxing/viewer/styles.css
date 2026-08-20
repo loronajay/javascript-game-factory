@@ -1,0 +1,164 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-rounded, "Segoe UI", system-ui, sans-serif;
+  background: #130f18;
+  color: #fff8f4;
+  --pink: #f3a9b6;
+  --cream: #fff6ea;
+  --ink: #261a2d;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 50% -10%, rgba(243, 169, 182, .25), transparent 38%),
+    linear-gradient(#17111d, #0e0b12);
+}
+
+button, input { font: inherit; }
+
+.viewer-shell {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: clamp(14px, 2.5vw, 30px);
+}
+
+.viewer-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 14px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: #d9aeba;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+h1 { margin: 0; font-size: clamp(27px, 5vw, 52px); line-height: .95; }
+
+.status { text-align: right; }
+.status span { display: block; color: var(--pink); font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }
+.status strong { display: block; margin-top: 3px; font-size: 14px; color: #d9d1d8; }
+
+.stage {
+  position: relative;
+  height: min(68vh, 690px);
+  min-height: 430px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, #211a29 0 49%, transparent 49%),
+    linear-gradient(165deg, #bdb3ae 0 49%, #8f8582 50% 51%, #b7aca6 52% 100%);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .45), inset 0 0 70px rgba(0, 0, 0, .32);
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.arena-glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 13%, rgba(255, 238, 219, .3), transparent 24%),
+    linear-gradient(90deg, rgba(0, 0, 0, .3), transparent 30% 70%, rgba(0, 0, 0, .3));
+  z-index: 0;
+}
+
+.rope { position: absolute; left: 0; right: 0; height: 5px; z-index: 1; box-shadow: 0 2px 5px rgba(0,0,0,.45); }
+.rope-one { top: 31%; background: #f4eee6; }
+.rope-two { top: 40%; background: #ca5261; }
+.rope-three { top: 49%; background: #f4eee6; }
+
+.sprite-rig {
+  position: absolute;
+  inset: 2.5% 15% 4%;
+  z-index: 3;
+}
+
+.sprite-rig img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center bottom;
+  pointer-events: none;
+}
+
+.floor-mark {
+  position: absolute;
+  left: 50%;
+  bottom: 3%;
+  width: 44%;
+  height: 8%;
+  transform: translateX(-50%);
+  border: 3px solid rgba(89, 55, 69, .24);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: rgba(70, 43, 55, .55);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .15em;
+  z-index: 2;
+}
+
+.controls {
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 18px;
+  background: rgba(29, 22, 35, .88);
+}
+
+.action-row, .angle-stops { display: flex; flex-wrap: wrap; gap: 8px; }
+
+button {
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 999px;
+  padding: 9px 15px;
+  background: #31263a;
+  color: #f8edf2;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+button:hover { border-color: rgba(255, 255, 255, .42); }
+button.active { color: #2a1720; background: var(--pink); border-color: #ffd3da; }
+button.punch { background: #8f3851; }
+button.punch.active { background: #ffb2c0; }
+
+.yaw-control {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin: 15px 0;
+  color: #ddd1db;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+input[type="range"] { width: 100%; accent-color: var(--pink); }
+.auto-toggle { white-space: nowrap; }
+.angle-stops button { padding: 7px 11px; font-size: 11px; }
+.hint { margin: 12px 0 0; color: #a99ca8; font-size: 12px; }
+
+@media (max-width: 680px) {
+  .viewer-header { align-items: start; }
+  .stage { min-height: 390px; height: 58vh; }
+  .sprite-rig { inset-inline: 2%; }
+  .yaw-control { grid-template-columns: 1fr; gap: 7px; }
+  .status strong { max-width: 135px; }
+}

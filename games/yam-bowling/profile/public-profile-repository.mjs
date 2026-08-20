@@ -18,6 +18,7 @@ export function createPublicProfileRepository({ client, animation, roomCore }) {
         profileName,
         loadout: documents.loadout,
         progression: documents.progression,
+        rating: documents.rating,
         animation,
         roomCore,
       }) : null)

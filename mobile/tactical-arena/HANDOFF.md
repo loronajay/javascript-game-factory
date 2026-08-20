@@ -186,6 +186,75 @@ licence-test purchase flow were verified end-to-end on 2026-07-29.
 
 ---
 
+## 3b. Forced update gate — shipped
+
+The packaged app asks the server on every boot whether its own build is still supported, and
+if it is not, it renders a full-screen non-dismissable "Update required" screen and never
+imports the game at all. The web build never asks — it is always current by definition.
+
+```
+GET /app-version?app=com.jayarcade.tacticalarena&platform=android
+-> { "release": { "minimumVersionCode": 12, "latestVersionCode": 12,
+                  "storeUrl": "https://play.google.com/...", "updateUrl": "market://..." } }
+```
+
+| Piece | File |
+| --- | --- |
+| Policy registry (per app id + platform) | `platform-api/src/services/app-release-catalog.mts` |
+| Public route (unauthenticated) | `platform-api/src/routes/content-routes.mts` |
+| Client decision | `games/tactical-arena/src/platform/appUpdateGate.js` |
+| Blocking screen | `games/tactical-arena/src/ui/appUpdateOverlay.js` |
+| Boot wiring (before `main.js`) | `games/tactical-arena/src/bootstrap.js` |
+
+### It fails OPEN, deliberately
+
+Blocking is the destructive outcome: a false positive locks a paying player out of a game
+they own, offline, with no way to argue. So every uncertain input resolves to "play":
+
+- not running inside the packaged app
+- the native bridge cannot report a build
+- the API is unreachable, slow (4s timeout), errors, or returns malformed JSON
+- no minimum is configured (`minimumVersionCode` 0)
+- the database is down — the route still answers 200 with a policy that gates nobody
+
+The only path that blocks is affirmative: we know our build, the server named a minimum, and
+ours is below it. Do not "harden" any of these into failing closed.
+
+### Setting the minimum
+
+Either of these, first one wins:
+
+1. `site_settings["app_release:com.jayarcade.tacticalarena:android"]` =
+   `{"minimumVersionCode": 12}` — takes effect immediately, no redeploy.
+2. `TA_ANDROID_MIN_VERSION_CODE=12` on the Railway platform-api service.
+
+Operator-entered values are parsed strictly: `"12.5"` is rejected outright rather than
+truncated to `12`, because a truncated typo is a silently wrong gate that locks out real
+installs.
+
+### ⚠️ The ordering rule
+
+**Never raise the minimum until the new build is actually live on Play and rolled out.**
+
+Raising it first blocks every installed copy and points them at a store listing that still
+offers the old build — an unrecoverable loop for the player, and there is no in-app way out
+because the gate is deliberately non-dismissable. The safe order is always:
+
+1. Upload the new `versionCode`, let the rollout complete.
+2. Confirm the new build is downloadable from the listing.
+3. *Then* raise `minimumVersionCode` to it.
+
+Also remember Play rollouts are staged: at 20% rollout, 80% of players cannot get the build
+you are about to demand. Raise the minimum at 100%, or not at all.
+
+### When to use it
+
+This is for a change that makes an old client genuinely unsafe or broken — a server contract
+change, a purchase-flow fix, a save-corruption bug. It is not for ordinary content updates;
+those should just ship, because a forced update is a hard interruption and players resent it.
+
+---
+
 ## 4. Launch runbook
 
 Everything below is console work. Do it in order; 4a and 4b are independent of each other.

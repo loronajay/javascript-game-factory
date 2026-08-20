@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "modelId": "tsunami-rz",
+  "image": "spritesheet-clockwise-from-north.png",
+  "frameWidth": 64,
+  "frameHeight": 64,
+  "frameCount": 8,
+  "order": [
+    "north",
+    "north-east",
+    "east",
+    "south-east",
+    "south",
+    "south-west",
+    "west",
+    "north-west"
+  ],
+  "source": {
+    "image": "source/tsunami-rz-eight-direction-master-v1.png",
+    "provider": "OpenAI ImageGen",
+    "role": "generated rotation master",
+    "backgroundExtraction": "edge-connected-neutral"
+  },
+  "frames": [
+    {
+      "direction": "north",
+      "sourceBounds": {
+        "x": 111,
+        "y": 323,
+        "width": 133,
+        "height": 165
+      },
+      "targetBounds": {
+        "x": 9,
+        "y": 4,
+        "width": 45,
+        "height": 56
+      }
+    },
+    {
+      "direction": "north-east",
+      "sourceBounds": {
+        "x": 283,
+        "y": 311,
+        "width": 186,
+        "height": 173
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 6,
+        "width": 56,
+        "height": 52
+      }
+    },
+    {
+      "direction": "east",
+      "sourceBounds": {
+        "x": 525,
+        "y": 339,
+        "width": 231,
+        "height": 117
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 18,
+        "width": 56,
+        "height": 28
+      }
+    },
+    {
+      "direction": "south-east",
+      "sourceBounds": {
+        "x": 811,
+        "y": 336,
+        "width": 189,
+        "height": 135
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 12,
+        "width": 56,
+        "height": 40
+      }
+    },
+    {
+      "direction": "south",
+      "sourceBounds": {
+        "x": 1072,
+        "y": 311,
+        "width": 134,
+        "height": 168
+      },
+      "targetBounds": {
+        "x": 9,
+        "y": 4,
+        "width": 45,
+        "height": 56
+      }
+    },
+    {
+      "direction": "south-west",
+      "sourceBounds": {
+        "x": 1271,
+        "y": 335,
+        "width": 189,
+        "height": 136
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 12,
+        "width": 56,
+        "height": 40
+      }
+    },
+    {
+      "direction": "west",
+      "sourceBounds": {
+        "x": 1482,
+        "y": 337,
+        "width": 222,
+        "height": 118
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 17,
+        "width": 56,
+        "height": 30
+      }
+    },
+    {
+      "direction": "north-west",
+      "sourceBounds": {
+        "x": 1722,
+        "y": 311,
+        "width": 172,
+        "height": 171
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 4,
+        "width": 56,
+        "height": 56
+      }
+    }
+  ]
+}

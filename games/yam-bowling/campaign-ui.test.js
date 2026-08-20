@@ -54,6 +54,13 @@ test("a failed campaign sync is status copy, never a repurposed match button", (
   assert.doesNotMatch(screen, /button\.textContent\s*=\s*["']Factory profile unavailable["']/);
 });
 
+test("the circuit confirmation message ships as valid text", () => {
+  const screen = read("ui/circuit-screen.mjs");
+
+  assert.match(screen, /Confirming circuit victory(?:&hellip;|…|\.\.\.)/);
+  assert.doesNotMatch(screen, /â€¦/);
+});
+
 test("campaign owns circuit unlocks without absorbing tournaments or loadout rooms", () => {
   const html = read("index.html");
   const core = read("campaign-core.js");

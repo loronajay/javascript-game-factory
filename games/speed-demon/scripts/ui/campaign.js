@@ -21,11 +21,13 @@
 
 import { modeById, objectiveOption } from "../sim/modes.js";
 import { trackById } from "./track-layout.js";
+import { circuitTrackById } from "../circuit/tracks.js";
 import { EVENTS, eventById } from "../campaign/events.js";
 import { speakerById } from "../campaign/contacts.js";
 import { entryFaceSrc } from "../rival/lineup.js";
 import { MAP_NODES, mapRect, pointOnMap } from "../campaign/map.js";
 import { STATUS_CLEARED, STATUS_LOCKED, eventStatus, progressSummary } from "../campaign/progress.js";
+import { hasCircuitAtlas } from "../circuit/assets.js";
 
 export const STAGE_MAP = "map";
 export const STAGE_BRIEFING = "briefing";
@@ -228,7 +230,7 @@ export function cancelCampaign(campaign) {
  * Everything both surfaces need, already shaped. The renderer looks nothing up:
  * no catalog, no progress, no geometry.
  */
-export function campaignView(campaign, progress, { hover = null } = {}) {
+export function campaignView(campaign, progress, { hover = null, circuitModelId = null } = {}) {
   const rect = campaignMapRect();
   const nodes = MAP_NODES.map((node, index) => {
     const event = eventForNode(node.id);
@@ -256,19 +258,23 @@ export function campaignView(campaign, progress, { hover = null } = {}) {
     map: rect,
     summary: progressSummary(progress),
     nodes,
-    detail: detailFor(campaignNode(campaign), campaignEvent(campaign), progress),
+    detail: detailFor(campaignNode(campaign), campaignEvent(campaign), progress, circuitModelId),
     briefing: campaign.stage === STAGE_BRIEFING ? briefingFor(campaignEvent(campaign), campaign.line) : null,
     hover,
   };
 }
 
-function detailFor(node, event, progress) {
+function detailFor(node, event, progress, circuitModelId) {
   if (!node) return null;
   const status = nodeStatus(node, progress);
   const record = event ? progress.completed[event.id] ?? null : null;
   const mode = event ? modeById(event.modeId) : null;
   const objective = mode ? objectiveOption(mode, event.objectiveId) : null;
   const hidden = status === STATUS_LOCKED || status === STATUS_SOON;
+  const circuitUnavailable = !hidden
+    && mode?.runtime === "circuit"
+    && circuitModelId !== null
+    && !hasCircuitAtlas(circuitModelId);
 
   return {
     nodeId: node.id,
@@ -284,7 +290,8 @@ function detailFor(node, event, progress) {
     locked: status === STATUS_LOCKED,
     soon: status === STATUS_SOON,
     cleared: status === STATUS_CLEARED,
-    trackLabel: hidden ? "" : trackById(event.trackId)?.label ?? "",
+    circuitUnavailable,
+    trackLabel: hidden ? "" : (trackById(event.trackId) ?? circuitTrackById(event.trackId))?.label ?? "",
     objectiveLabel: hidden ? "" : objective?.label ?? "",
     opponent: !hidden && event.opponent ? opponentFor(event.opponent) : null,
     attempts: record?.attempts ?? 0,
@@ -293,7 +300,9 @@ function detailFor(node, event, progress) {
       ? "NOT OPEN YET"
       : status === STATUS_LOCKED
         ? "WIN YOUR WAY HERE"
-        : "ENTER to take it",
+        : circuitUnavailable
+          ? "CIRCUIT ATLAS UNAVAILABLE — CHANGE CAR"
+          : "ENTER to take it",
   };
 }
 
@@ -342,7 +351,7 @@ function briefingFor(event, line) {
     opponent: event.opponent
       ? {
         ...opponentFor(event.opponent),
-        trackLabel: trackById(event.trackId)?.label ?? "",
+        trackLabel: (trackById(event.trackId) ?? circuitTrackById(event.trackId))?.label ?? "",
         objectiveLabel: mode ? objectiveOption(mode, event.objectiveId)?.label ?? "" : "",
       }
       : null,

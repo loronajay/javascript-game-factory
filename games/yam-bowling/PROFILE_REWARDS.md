@@ -24,10 +24,13 @@ or won. They never change scoring, physics, timing, or matchmaking.
 
 | Reward | Kind | Source | Requirement | Visual story |
 | --- | --- | --- | --- | --- |
-| Pin Chaser | Title | Mastery | Reach bowler mastery 19 | A red ball pursuing a pin across a target crest |
-| Laser Focus | Title | Mastery | Reach bowler mastery 13 | A pin held in a cool-blue precision sight |
-| Precision Bowler | Title | Mastery | Reach bowler mastery 21 | A measured pocket line inside mechanical calipers |
-| Lane Legend | Title | Mastery | Reach bowler mastery 28 | A luminous lane passing through a monumental pin arch |
+| Pin Chaser | Title | Player Level | Reach Player Level 19 | A red ball pursuing a pin across a target crest |
+| Pocket Hunter | Title | Player Level | Reach Player Level 13 | A ball curving into the pocket inside a hunter's reticle |
+| Lane Reader | Title | Player Level | Reach Player Level 22 | An oil pattern rendered as a topographic lane map |
+| Shotmaker | Title | Player Level | Reach Player Level 28 | A perfect strike inside a laurel of pins |
+| Laser Focus | Badge | Achievement | Bowl a game with no shot outside the pocket | A pin held in a cool-blue precision sight |
+| Precision Bowler | Badge | Achievement | Convert twenty spares without missing one | A measured pocket line inside mechanical calipers |
+| Lane Legend | Badge | Achievement | Win a sanctioned match on every lane | A luminous lane passing through a monumental pin arch |
 | Perfect Game | Badge | Achievement | Bowl a 300 | A black-diamond and gold perfect-rack medallion |
 | Split Decision | Badge | Achievement | Convert the 7-10 split | Two fractured halves joined by the impossible line |
 | Comeback Kid | Title | Behavior achievement | Win after trailing by 30 entering the final frame | A bowling-ball phoenix climbing back from the embers |
@@ -51,9 +54,9 @@ Card and Turkey Club are detected from completed sanctioned matches, including
 tenth-frame bonus balls. The career and tournament rewards have stable catalog
 identities ready for their authoritative trackers.
 
-Deployment note: the platform API's progression, loadout, fixed-claim catalog,
-and entitlement migration must mirror the new ids and the three mastery-title
-reclassifications before these rewards can be granted on live accounts.
+Deployment note: the platform API mirrors the current Player Level and sparse
+Bowler Mastery ladders. Migration `045` reconciles existing accounts that already
+passed a moved threshold; it must run before the redesigned ladder is deployed.
 
 ## Strong next-wave candidates
 

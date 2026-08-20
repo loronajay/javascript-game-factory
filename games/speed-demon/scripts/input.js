@@ -82,6 +82,8 @@ const THROTTLE_KEYS = new Set(["Space"]);
 
 export function createInput(target = window, onActivity = () => {}) {
   const held = new Set();
+  const heldMoves = new Set();
+  let circuitShift = 0;
   let queue = [];
   // While a text field has focus, letters are letters. See ACTION_TEXT.
   let capturingText = false;
@@ -124,6 +126,7 @@ export function createInput(target = window, onActivity = () => {}) {
     if (THROTTLE_KEYS.has(code)) {
       held.add(code);
     }
+    if (MOVE_KEYS[code]) heldMoves.add(MOVE_KEYS[code]);
 
     if (event.repeat) {
       // Auto-repeat must never fake extra gate moves. Volume is the one
@@ -143,6 +146,7 @@ export function createInput(target = window, onActivity = () => {}) {
     }
     if (SHIFT_KEYS.has(code)) {
       queue.push({ type: ACTION_SHIFT });
+      circuitShift = 1;
     }
     if (MOVE_KEYS[code]) {
       queue.push({ type: ACTION_MOVE, direction: MOVE_KEYS[code] });
@@ -191,10 +195,13 @@ export function createInput(target = window, onActivity = () => {}) {
 
   const onKeyUp = (event) => {
     held.delete(event.code);
+    if (MOVE_KEYS[event.code]) heldMoves.delete(MOVE_KEYS[event.code]);
   };
 
   const onBlur = () => {
     held.clear(); // never leave the throttle stuck on after an alt-tab
+    heldMoves.clear();
+    circuitShift = 0;
   };
 
   target.addEventListener("keydown", onKeyDown);
@@ -210,12 +217,28 @@ export function createInput(target = window, onActivity = () => {}) {
     setTextCapture(enabled) {
       capturingText = !!enabled;
       if (capturingText) held.clear();
+      if (capturingText) heldMoves.clear();
+      if (capturingText) circuitShift = 0;
     },
     capturingText() {
       return capturingText;
     },
     throttle() {
       return held.size > 0 ? 1 : 0;
+    },
+    circuitControls() {
+      const forward = held.size > 0 || heldMoves.has("up");
+      const braking = heldMoves.has("down");
+      const shift = circuitShift;
+      circuitShift = 0;
+      return {
+        throttle: forward && !braking ? 1 : 0,
+        brake: braking ? 1 : 0,
+        steer: heldMoves.has("left") === heldMoves.has("right")
+          ? 0
+          : heldMoves.has("left") ? -1 : 1,
+        shift,
+      };
     },
     drain() {
       const actions = queue;

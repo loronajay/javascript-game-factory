@@ -1,6 +1,6 @@
-# Reward Content Spec — art the ladders are waiting on
+# Reward Content Spec — current ladder content
 
-Generated content this pass needs, with the exact slugs the catalogs will reference.
+Reward content in the current ladders, with the exact slugs the catalogs reference.
 **Filenames are contracts**: `room-core.js` and `cosmetics-core.js` derive every path
 from the slug, so a misnamed file is a broken node, not a cosmetic issue.
 
@@ -11,25 +11,31 @@ Everything not listed here is being built in code and needs no art.
 ## 0. Status — what has landed
 
 **Done and wired:** the 3 rooms (`fireside-lodge`, `desert-vista`, `deep-sea-suite`)
-are in the catalog on mastery 7/15/25. The 8 new crests are wired to achievements
-and tournaments. The emote pool, voucher picker and online match reactions are live.
-All player and mastery ladder nodes now resolve to wearable content.
+are on Player Levels 9/16/24. The 8 new crests are wired to achievements and
+tournaments. The emote pool, voucher picker and online match reactions are live.
+All player and mastery milestones resolve to usable content.
+
+The two progression trees now have separate jobs. The Player Level ladder owns
+account-wide effects, rooms, entrances, generic titles, emotes and vouchers.
+Bowler Mastery is intentionally sparse and contains only rewards whose identity
+is tied to the bowler: icon, poses, cards, nameplate and master title. Levels
+between mastery milestones still advance XP without displaying filler unlocks.
 
 **Naming note:** rooms and crests came back with different slugs than section 1 and 2
 below requested. That was fine — the catalog now follows the delivered filenames
 rather than the other way round. Sections 1 and 2 are kept as a record of the
 convention, not as outstanding work.
 
-## 1b. Mastery titles — 3 needed (crest art optional)
+## 1b. Career titles — live-text rewards (crest art optional)
 
-Mastery 13/21/28 used to pay badges. Badges are achievement rewards now, so those
-rungs pay titles. **They already work** — a title is live text and needs no image —
-so this art is an enhancement, not a blocker.
+These titles moved from Bowler Mastery to the account-wide Player Level ladder.
+They already work because a title is live text and needs no image, so matching
+crest art remains an enhancement rather than a blocker.
 
-| Slug | Name | Tier | Mastery level |
+| Slug | Name | Tier | Player level |
 |---|---|---|---|
 | `pocket-hunter` | Pocket Hunter | rare | 13 |
-| `lane-reader` | Lane Reader | rare | 21 |
+| `lane-reader` | Lane Reader | rare | 22 |
 | `shotmaker` | Shotmaker | legendary | 28 |
 
 Same crest spec as section 2. Suggested subjects:
@@ -52,11 +58,11 @@ Match the existing 13: a personal space seen from inside, no characters, no text
 horizontal, readable behind UI panels (avoid busy detail in the upper-left third,
 where the profile card sits).
 
-| Slug | Name | Tier | Mastery level | Description (catalog copy) |
+| Slug | Name | Tier | Player level | Description (catalog copy) |
 |---|---|---|---|---|
-| `practice-garage` | Practice Garage | standard | 7 | Oil, rubber, and a lane you taped out yourself. |
-| `trophy-loft` | Trophy Loft | rare | 15 | Warm wood and glass cases, filling one shelf at a time. |
-| `midnight-observatory` | Midnight Observatory | legendary | 25 | A brass telescope, a domed roof cranked open, and the whole sky. |
+| `fireside-lodge` | Fireside Lodge | standard | 9 | A warm lodge retreat built around the bowling life. |
+| `desert-vista` | Desert Vista | rare | 16 | A wide-open desert room under a glowing horizon. |
+| `deep-sea-suite` | Deep Sea Suite | legendary | 24 | A submerged suite lit by the deep ocean outside. |
 
 ## 2. Player ladder titles — 4 live-text rewards (done)
 
@@ -101,7 +107,7 @@ name.
 | Earned by | Count | Which |
 |---|---|---|
 | founding | 6 | `wave`, `thumbs-up`, `good-luck`, `nice-one`, `lets-go`, `oh-no` |
-| mastery level 17 | 1 | `game-face` |
+| Player Level 7 | 1 | `game-face` |
 | Emote Voucher | 23 | everything else |
 
 The founding six are deliberately warm or neutral — they are shown to an
@@ -114,6 +120,24 @@ levels 7, 16, 22 and 30, plus the tournament prize pool at a high weight (it is
 the repeatable source — the ladder pays only four across all thirty levels). A
 voucher buys any of the 23; it can never be spent on a founding emote or on
 `game-face`, since both would burn it for something already owned or granted.
+
+## 4. Bowler Mastery cadence — complete without new raster art
+
+| Mastery level | Bowler-specific reward |
+|---:|---|
+| 1 | Canon bowler |
+| 3 | Profile icon cropped from the canon portrait |
+| 5 | Spotlight victory pose |
+| 9 | Rivalry player card |
+| 12 | Signature player-card artwork |
+| 18 | Champion victory pose |
+| 24 | Elite player-card border |
+| 29 | Bowler mastery nameplate |
+| 30 | Exclusive `<First Name> Master` title |
+
+Every post-starter entitlement ID contains the bowler slug. There are no rooms,
+generic effects, generic titles, emotes or entrances in this tree, so mastering a
+second bowler cannot repay an account-wide item already earned on the first.
 
 Adding an emote later is: one PNG in `assets/emotes/`, one row in
 `emote-core.js`, one slug in `EMOTE_SLUGS` in `yam-bowling-loadout-catalog.mts`,
@@ -128,7 +152,7 @@ Deliberately **not** being generated, so nobody spends a Codex run on them:
   tournaments — never from mastery.
 - **Character banners, alt menu splashes, rare splashes.** Deferred; those nodes are
   now rooms.
-- **Player card artwork.** L9/L12/L24 are drawn frames over the portrait that already
+- **Player card artwork.** Mastery L9/L12/L24 are drawn frames over the portrait that already
   ships. No new per-bowler images.
 - **Trails and bursts.** Palette data written in code, not assets.
 - **More emotes.** Thirty is a deep pool; the voucher economy is tuned to it.

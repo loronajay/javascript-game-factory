@@ -39,54 +39,107 @@
   // voucher spends on any emote the player does not already own.
   const emoteVoucher = ["emote-voucher", "emote-voucher", "Emote Voucher"];
 
-  // Titles the tree wants but the catalog does not carry crest art for yet.
-  // They are declared here as label-only nodes so the ladder is complete and
-  // playable, and binding one later is a single `equipment` edit that cannot
-  // disturb any id a player has already earned.
-  //
-  // Badges are deliberately absent: they certify achievements, not passive
-  // progress through a level ladder. The four rungs that once promised them now
-  // pay Emote Vouchers, which are spendable today, so those rungs left this
-  // pending list entirely rather than waiting on art.
+  // All launch rewards are bound. Keep this exported list so authoring and UI
+  // diagnostics retain a stable contract if a future level is intentionally
+  // drafted before its content type lands. Badges remain achievement receipts,
+  // not passive level rewards.
   const PENDING_CONTENT = Object.freeze([]);
 
+  // Effects now arrive as coherent trail/burst sets instead of alternating one
+  // colour chip per level. The spaces that creates are where the rest of the
+  // cabinet lives: rooms, entrances, reactions, titles and spendable choices.
   const RAW_CADENCE = [
     [1, [["starter-title", "title", "Rookie Title", ["global", "title", "rookie"]]]],
-    [2, [["lime-shock-trail", "ball-trail", "Lime Shock Ball Trail", ["global", "ballTrail", "lime-shock"]]]],
-    [3, [["gold-star-burst", "strike-burst", "Gold Star Burst", ["global", "strikeBurst", "gold-star"]]]],
-    [4, [["title-i", "title", "Lane Regular Title", ["global", "title", "lane-regular"]]]],
-    [5, [["emerald-glow-trail", "ball-trail", "Emerald Glow Ball Trail", ["global", "ballTrail", "emerald-glow"]]]],
-    [6, [["emerald-impact-burst", "strike-burst", "Emerald Impact Burst", ["global", "strikeBurst", "emerald-impact"]]]],
-    [7, [emoteVoucher]],
-    [8, [["mint-frost-trail", "ball-trail", "Mint Frost Ball Trail", ["global", "ballTrail", "mint-frost"]]]],
-    [9, [["mint-crackle-burst", "strike-burst", "Mint Crackle Burst", ["global", "strikeBurst", "mint-crackle"]]]],
-    [10, [voucher]],
-    [11, [["cyan-pulse-trail", "ball-trail", "Cyan Pulse Ball Trail", ["global", "ballTrail", "cyan-pulse"]]]],
-    [12, [["cyan-flash-burst", "strike-burst", "Cyan Flash Burst", ["global", "strikeBurst", "cyan-flash"]]]],
-    [13, [["title-ii", "title", "House Favourite Title", ["global", "title", "house-favourite"]]]],
-    [14, [["electric-blue-trail", "ball-trail", "Electric Blue Ball Trail", ["global", "ballTrail", "electric-blue"]]]],
-    [15, [["electric-blue-burst", "strike-burst", "Electric Blue Burst", ["global", "strikeBurst", "electric-blue"]]]],
-    [16, [emoteVoucher]],
-    [17, [["indigo-drive-trail", "ball-trail", "Indigo Drive Ball Trail", ["global", "ballTrail", "indigo-drive"]]]],
-    [18, [["indigo-ring-burst", "strike-burst", "Indigo Ring Burst", ["global", "strikeBurst", "indigo-ring"]]]],
-    [19, [["title-iii", "title", "Lane Veteran Title", ["global", "title", "lane-veteran"]]]],
-    [20, [["violet-haze-trail", "ball-trail", "Violet Haze Ball Trail", ["global", "ballTrail", "violet-haze"]]]],
-    [21, [["violet-bloom-burst", "strike-burst", "Violet Bloom Burst", ["global", "strikeBurst", "violet-bloom"]]]],
-    [22, [emoteVoucher]],
-    [23, [["purple-plasma-trail", "ball-trail", "Purple Plasma Ball Trail", ["global", "ballTrail", "purple-plasma"]]]],
-    [24, [["purple-nova-burst", "strike-burst", "Purple Nova Burst", ["global", "strikeBurst", "purple-nova"]]]],
-    [25, [voucher]],
-    [26, [["magenta-pop-trail", "ball-trail", "Magenta Pop Ball Trail", ["global", "ballTrail", "magenta-pop"]]]],
-    [27, [["magenta-blast-burst", "strike-burst", "Magenta Blast Burst", ["global", "strikeBurst", "magenta-blast"]]]],
-    [28, [["hot-pink-trail", "ball-trail", "Hot Pink Ball Trail", ["global", "ballTrail", "hot-pink"]]]],
-    [29, [["hot-pink-pop-burst", "strike-burst", "Hot Pink Pop Burst", ["global", "strikeBurst", "hot-pink-pop"]]]],
-    [30, [
-      ["title-master", "title", "Yam Legend Title", ["global", "title", "yam-legend"]],
-      emoteVoucher,
-      // The summit lands three rewards at once: a title, an emote voucher,
-      // and this.
+    [2, [
+      ["lime-shock-trail", "ball-trail", "Lime Shock Ball Trail", ["global", "ballTrail", "lime-shock"]],
       ["lime-pop-burst", "strike-burst", "Lime Pop Burst", ["global", "strikeBurst", "lime-pop"]],
     ]],
+    [3, [
+      ["red-neon-trail", "ball-trail", "Red Neon Ball Trail", ["global", "ballTrail", "red-neon"]],
+      ["red-supernova-burst", "strike-burst", "Red Supernova Burst", ["global", "strikeBurst", "red-supernova"]],
+    ]],
+    [4, [["title-i", "title", "Lane Regular Title", ["global", "title", "lane-regular"]]]],
+    [5, [
+      ["emerald-glow-trail", "ball-trail", "Emerald Glow Ball Trail", ["global", "ballTrail", "emerald-glow"]],
+      ["emerald-impact-burst", "strike-burst", "Emerald Impact Burst", ["global", "strikeBurst", "emerald-impact"]],
+    ]],
+    [6, [
+      ["orange-flare-trail", "ball-trail", "Orange Flare Ball Trail", ["global", "ballTrail", "orange-flare"]],
+      ["ember-burst", "strike-burst", "Ember Strike Burst", ["global", "strikeBurst", "ember"]],
+    ]],
+    [7, [emoteVoucher, ["game-face-emote", "emote", "Game Face Emote", ["global", "emote", "game-face"]]]],
+    [8, [
+      ["mint-frost-trail", "ball-trail", "Mint Frost Ball Trail", ["global", "ballTrail", "mint-frost"]],
+      ["mint-crackle-burst", "strike-burst", "Mint Crackle Burst", ["global", "strikeBurst", "mint-crackle"]],
+    ]],
+    [9, [["fireside-room", "room", "Fireside Lodge", ["global", "room", "fireside-lodge"]]]],
+    [10, [voucher, ["spotlight-entrance", "entrance", "Spotlight Entrance", ["global", "entrance", "spotlight"]]]],
+    [11, [
+      ["cyan-pulse-trail", "ball-trail", "Cyan Pulse Ball Trail", ["global", "ballTrail", "cyan-pulse"]],
+      ["cyan-flash-burst", "strike-burst", "Cyan Flash Burst", ["global", "strikeBurst", "cyan-flash"]],
+    ]],
+    [12, [
+      ["sky-blue-trail", "ball-trail", "Sky Blue Ball Trail", ["global", "ballTrail", "sky-blue"]],
+      ["sky-shatter-burst", "strike-burst", "Sky Shatter Burst", ["global", "strikeBurst", "sky-shatter"]],
+    ]],
+    [13, [
+      ["title-ii", "title", "House Favourite Title", ["global", "title", "house-favourite"]],
+      ["pocket-hunter-title", "title", "Pocket Hunter Title", ["global", "title", "pocket-hunter"]],
+    ]],
+    [14, [
+      ["electric-blue-trail", "ball-trail", "Electric Blue Ball Trail", ["global", "ballTrail", "electric-blue"]],
+      ["electric-blue-burst", "strike-burst", "Electric Blue Burst", ["global", "strikeBurst", "electric-blue"]],
+    ]],
+    [15, [
+      ["gold-rush-trail", "ball-trail", "Gold Rush Ball Trail", ["global", "ballTrail", "gold-rush"]],
+      ["gold-star-burst", "strike-burst", "Gold Star Burst", ["global", "strikeBurst", "gold-star"]],
+    ]],
+    [16, [emoteVoucher, ["desert-room", "room", "Desert Vista", ["global", "room", "desert-vista"]]]],
+    [17, [
+      ["indigo-drive-trail", "ball-trail", "Indigo Drive Ball Trail", ["global", "ballTrail", "indigo-drive"]],
+      ["indigo-ring-burst", "strike-burst", "Indigo Ring Burst", ["global", "strikeBurst", "indigo-ring"]],
+    ]],
+    [18, [
+      ["rose-gold-trail", "ball-trail", "Rose Gold Ball Trail", ["global", "ballTrail", "rose-gold"]],
+      ["rose-gold-burst", "strike-burst", "Rose Gold Burst", ["global", "strikeBurst", "rose-gold"]],
+    ]],
+    [19, [
+      ["title-iii", "title", "Lane Veteran Title", ["global", "title", "lane-veteran"]],
+      ["pin-chaser-title", "title", "Pin Chaser Title", ["global", "title", "pin-chaser"]],
+    ]],
+    [20, [
+      ["violet-haze-trail", "ball-trail", "Violet Haze Ball Trail", ["global", "ballTrail", "violet-haze"]],
+      ["violet-bloom-burst", "strike-burst", "Violet Bloom Burst", ["global", "strikeBurst", "violet-bloom"]],
+    ]],
+    [21, [
+      ["diamond-trail", "ball-trail", "Diamond White Ball Trail", ["global", "ballTrail", "diamond-white"]],
+      ["diamond-burst", "strike-burst", "Diamond Spark Burst", ["global", "strikeBurst", "diamond-spark"]],
+    ]],
+    [22, [emoteVoucher, ["lane-reader-title", "title", "Lane Reader Title", ["global", "title", "lane-reader"]]]],
+    [23, [
+      ["purple-plasma-trail", "ball-trail", "Purple Plasma Ball Trail", ["global", "ballTrail", "purple-plasma"]],
+      ["purple-nova-burst", "strike-burst", "Purple Nova Burst", ["global", "strikeBurst", "purple-nova"]],
+    ]],
+    [24, [
+      ["deep-sea-room", "room", "Deep Sea Suite", ["global", "room", "deep-sea-suite"]],
+      ["champion-entrance", "entrance", "Champion Entrance", ["global", "entrance", "champion"]],
+    ]],
+    [25, [voucher]],
+    [26, [
+      ["magenta-pop-trail", "ball-trail", "Magenta Pop Ball Trail", ["global", "ballTrail", "magenta-pop"]],
+      ["magenta-blast-burst", "strike-burst", "Magenta Blast Burst", ["global", "strikeBurst", "magenta-blast"]],
+    ]],
+    [27, [["perfect-line-trail", "ball-trail", "Perfect Line Ball Trail", ["global", "ballTrail", "perfect-line"]]]],
+    [28, [
+      ["hot-pink-trail", "ball-trail", "Hot Pink Ball Trail", ["global", "ballTrail", "hot-pink"]],
+      ["hot-pink-pop-burst", "strike-burst", "Hot Pink Pop Burst", ["global", "strikeBurst", "hot-pink-pop"]],
+      ["shotmaker-title", "title", "Shotmaker Title", ["global", "title", "shotmaker"]],
+    ]],
+    [29, [
+      ["eclipse-trail", "ball-trail", "Eclipse Ball Trail", ["global", "ballTrail", "eclipse"]],
+      ["eclipse-burst", "strike-burst", "Eclipse Corona Burst", ["global", "strikeBurst", "eclipse-corona"]],
+    ]],
+    [30, [["title-master", "title", "Yam Legend Title", ["global", "title", "yam-legend"]], emoteVoucher]],
   ];
 
   function resolveEquipment(context, equipment) {
@@ -97,6 +150,8 @@
     else if (slot === "strikeBurst") itemId = `strike-burst:${value}`;
     else if (slot === "badge") itemId = `badge:${value}`;
     else if (slot === "emote") itemId = `emote:${value}`;
+    else if (slot === "entrance") itemId = `entrance:${value}`;
+    else if (slot === "room") itemId = `room:${value}`;
     else if (slot === "title") itemId = `title:${value}`;
     return Object.freeze({ scope, slot, itemId });
   }

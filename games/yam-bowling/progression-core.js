@@ -64,6 +64,13 @@
   // rather than growing for the life of the device.
   const MAX_TRACKED_GRANTS = 400;
 
+  const BOWLING_STAT_FIELDS = Object.freeze([
+    "quickGames", "quickTotalScore", "quickHighGame",
+    "quickStrikeOpportunities", "quickStrikes", "quickSpareOpportunities", "quickSpares",
+    "classicGames", "classicTotalScore", "classicHighGame",
+    "classicStrikeOpportunities", "classicStrikes", "classicSpareOpportunities", "classicSpares",
+  ]);
+
   function curveFor(track) {
     return Object.prototype.hasOwnProperty.call(CURVES, track) ? CURVES[track] : null;
   }
@@ -205,13 +212,16 @@
     if (!raw || typeof raw !== "object") return bowlers;
     for (const [slug, stats] of Object.entries(raw)) {
       if (!canonBowler(slug) || !stats || typeof stats !== "object") continue;
-      bowlers[slug] = {
+      const normalized = {
         xp: clampCount(stats.xp),
         matches: clampCount(stats.matches),
         wins: clampCount(stats.wins),
+        draws: clampCount(stats.draws),
         strikes: clampCount(stats.strikes),
         highGame: clampCount(stats.highGame),
       };
+      for (const field of BOWLING_STAT_FIELDS) normalized[field] = clampCount(stats[field]);
+      bowlers[slug] = normalized;
     }
     return bowlers;
   }
@@ -307,7 +317,10 @@
 
     function getBowler(slug) {
       if (!canonBowler(slug)) return null;
-      const stats = record.bowlers[slug] || { xp: 0, matches: 0, wins: 0, strikes: 0, highGame: 0 };
+      const stats = record.bowlers[slug] || {
+        xp: 0, matches: 0, wins: 0, draws: 0, strikes: 0, highGame: 0,
+        ...Object.fromEntries(BOWLING_STAT_FIELDS.map((field) => [field, 0])),
+      };
       return { slug, ...stats, ...levelFromXp("bowler", stats.xp) };
     }
 

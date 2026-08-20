@@ -1,15 +1,35 @@
 # Tactical Arena on Google Play — Owner's Checklist
 
-Everything **you** need to do, in order. Updated 2026-07-29 after the first closed-test
-release, Play product-catalog setup, and end-to-end device testing.
+Everything **you** need to do, in order. Updated 2026-08-20: **production access granted**.
+The 14-day closed-test clock is done; what follows is the production release itself.
 
 `HANDOFF.md` is the engineering doc; this one is the console/account work that only you can
 do. Where a step needs code or assets, it says who does it.
 
-**The one thing that matters most:** the closed test needs **12+ testers opted in for 14
-continuous days** before you can even *request* production access. That clock is the long
-pole — nothing else on this list takes 14 days. Start recruiting testers today, before the
-build is perfect. Everything else can be fixed while the clock runs.
+## Production release — do these in order
+
+1. [ ] `npm run release:check` (green as of 2026-08-20, versionCode **12** / 1.1.0)
+2. [ ] `npm run bundle:release` → upload the AAB to **Production**
+3. [ ] Finish the store listing (step 5) and the Data safety + content rating forms (step 6)
+4. [ ] `npm run play:sync` — the renamed "Fight Cancer" titles are still unpushed (step 6c)
+5. [ ] Roll out. Watch crash/ANR for a day at a partial rollout before going to 100%
+6. [ ] **Only after 100% rollout**, if you need to retire build 11, set the update gate's
+       minimum — see the ordering warning below
+
+> ### ⚠️ The forced-update gate
+> The app now checks on boot whether its build is still supported and hard-blocks with an
+> "Update on Google Play" screen if not. It is **off until you configure a minimum**, and it
+> should stay off until you actually need it.
+>
+> Set it with `TA_ANDROID_MIN_VERSION_CODE` on the Railway platform-api service (or the
+> `app_release:com.jayarcade.tacticalarena:android` site setting).
+>
+> **Never raise the minimum before the new build is live and at 100% rollout.** Doing so
+> blocks installed copies and sends them to a listing that still offers the old build — the
+> player has no way out, because the gate is deliberately non-dismissable. At a 20% staged
+> rollout, 80% of players cannot get the build you would be demanding.
+>
+> Full detail: `HANDOFF.md` §3b.
 
 ---
 
@@ -50,8 +70,8 @@ been proven end-to-end.
 7. [x] First Play upload → Closed testing
 8. [x] Test on your own phone, including a licence-test purchase
 9. [x] Create and activate the 317 in-app products
-10. [ ] Recruit 12+ opted-in closed testers (11 opted in; link sent to all testers)
-11. [ ] Wait out 14 days, then request production
+10. [x] Recruit 12+ opted-in closed testers
+11. [x] Wait out 14 days, then request production — **granted 2026-08-20**
 
 Steps 1 and 2 are independent — do them in either order. Step 10 can start the moment step 7
 lands; do not wait for the rest to be polished.

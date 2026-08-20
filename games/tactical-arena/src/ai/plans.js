@@ -1006,6 +1006,13 @@ function placementCandidates(state, unit, art, ai) {
 function artPrimaryKeepsActivationOpen(unit, primary) {
   if (primary?.kind !== "art") return false;
   const art = getArtForUnit(unit, primary.artId);
+  // A ghost summon HANDS the open activation to the ghost it calls (resolveSummonGhost), so
+  // the caster stops being the active unit the moment the ART resolves. Its activation is
+  // not "still open" in any sense the caster can act on, and a trailing finishActivation
+  // aimed at the caster is rejected with WRONG_ACTIVE_UNIT — which surfaced as an error
+  // toast during the opponent's turn. The ghost's own turn is planned on the next pass,
+  // through the resume path at the top of chooseActivation.
+  if (art?.resolution === "summonGhost") return false;
   return Boolean(!art?.bonusActionGroup && canMoveAndUseArts(unit));
 }
 

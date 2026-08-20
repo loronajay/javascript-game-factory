@@ -64,6 +64,7 @@ export function createNet({
     onLobby: null,
     onRoundStart: null,
     onInputs: null,
+    onCircuitSnapshot: null,
     onRoundResult: null,
     onForfeit: null,
     onRematch: null,
@@ -155,6 +156,8 @@ export function createNet({
         return void handlers.onRoundStart?.(data, now());
       case "sd_inputs":
         return void handlers.onInputs?.(data);
+      case "sd_circuit_snapshot":
+        return void handlers.onCircuitSnapshot?.(data);
       case "sd_round_result":
         return void handlers.onRoundResult?.(data);
       case "sd_match_forfeit":

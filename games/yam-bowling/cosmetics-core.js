@@ -284,7 +284,6 @@
   // renders them. Declaring them early is what lets the loadout contract and
   // its slots be tested without waiting on a particle emitter.
   function buildEffectItems() {
-    const effectUnlock = Object.freeze({ source: "bowler-level", detail: "Earned through bowler mastery." });
     const playerUnlock = Object.freeze({ source: "player-level", detail: "Earned through Yam Bowling play." });
     const tournamentUnlock = Object.freeze({ source: "tournament", detail: "Random prize from a rotating Yam tournament." });
 
@@ -295,8 +294,11 @@
     // retuned cadence that forgets to move an id fails rather than shipping a
     // reward whose own unlock copy contradicts the tree offering it.
     const PLAYER_LEVEL_EFFECTS = new Set([
+      "red-neon", "orange-flare", "gold-rush", "sky-blue", "rose-gold",
+      "diamond-white", "perfect-line", "eclipse",
       "lime-shock", "emerald-glow", "mint-frost", "cyan-pulse", "electric-blue",
       "indigo-drive", "violet-haze", "purple-plasma", "magenta-pop", "hot-pink",
+      "ember", "red-supernova", "sky-shatter", "diamond-spark", "eclipse-corona",
       "gold-star", "emerald-impact", "mint-crackle", "cyan-flash",
       "indigo-ring", "violet-bloom", "purple-nova", "magenta-blast", "hot-pink-pop",
       // The player ladder's summit. It sits here rather than on the mastery
@@ -305,7 +307,7 @@
       // every ladder offering it.
       "lime-pop",
     ]);
-    const unlockFor = (id) => (PLAYER_LEVEL_EFFECTS.has(id) ? playerUnlock : effectUnlock);
+    const unlockFor = (id) => (PLAYER_LEVEL_EFFECTS.has(id) ? playerUnlock : tournamentUnlock);
     const colorTrails = [
       ["red-neon", "Red Neon Ball Trail", ["#ff2d55", "#ff8a5c"]],
       ["orange-flare", "Orange Flare Ball Trail", ["#ff6b00", "#ffb000"]],
@@ -323,9 +325,8 @@
       ["hot-pink", "Hot Pink Ball Trail", ["#ff1493", "#ff9bd4"]],
       ["diamond-white", "Diamond White Ball Trail", ["#ffffff", "#b8e9ff"], "legendary"],
       ["perfect-line", "Perfect Line Ball Trail", ["#fdfdff", "#9d7bff"], "legendary"],
-      // The mastery ladder's own metals. The player ladder owns the whole
-      // green-to-pink spectrum above, so these deliberately sit outside it:
-      // a warm metal, and the summit's deep-indigo eclipse with a warm corona.
+      // Warm metals and the summit eclipse complete the player ladder's paired
+      // effect sets. Mastery itself now stays character-specific.
       ["rose-gold", "Rose Gold Ball Trail", ["#f4a08c", "#ffd9c9"]],
       ["eclipse", "Eclipse Ball Trail", ["#312e81", "#f0abfc"], "legendary"],
     ];
@@ -345,9 +346,7 @@
       ["magenta-blast", "Magenta Blast Burst", ["#ff00d4", "#ff8ae8"]],
       ["hot-pink-pop", "Hot Pink Pop Burst", ["#ff1493", "#ff9bd4"]],
       ["diamond-spark", "Diamond Spark Burst", ["#ffffff", "#b8e9ff"], "legendary"],
-      // The bursts that pair with the mastery ladder's two metals, so levels
-      // 10/20 and the summit read as one escalating set rather than three
-      // unrelated colours.
+      // Bursts that complete the account ladder's warm-metal and eclipse sets.
       ["rose-gold", "Rose Gold Burst", ["#f4a08c", "#ffd9c9"]],
       ["eclipse-corona", "Eclipse Corona Burst", ["#1e1b4b", "#fde68a"], "legendary"],
     ];
@@ -415,7 +414,7 @@
   }
 
   function buildProfileItems() {
-    const mastery = (detail) => Object.freeze({ source: "bowler-level", detail });
+    const playerLevel = (level) => Object.freeze({ source: "player-level", detail: `Reach player level ${level}.` });
     const achievement = (detail) => Object.freeze({ source: "achievement", detail });
     const tournament = (detail) => Object.freeze({ source: "tournament", detail });
     const art = (slug) => ({ art: `assets/profile-rewards/${slug}.webp` });
@@ -426,8 +425,8 @@
       defineItem({ type: "title", idParts: ["house-favourite"], name: "House Favourite", assets: {}, tier: "rare", unlock: Object.freeze({ source: "player-level", detail: "Reach player level 13." }) }),
       defineItem({ type: "title", idParts: ["lane-veteran"], name: "Lane Veteran", assets: {}, tier: "rare", unlock: Object.freeze({ source: "player-level", detail: "Reach player level 19." }) }),
       defineItem({ type: "title", idParts: ["yam-legend"], name: "Yam Legend", assets: {}, tier: "legendary", unlock: Object.freeze({ source: "player-level", detail: "Reach player level 30." }) }),
-      defineItem({ type: "entrance", idParts: ["spotlight"], name: "Spotlight Entrance", assets: { style: "spotlight" }, tier: "rare", unlock: mastery("Reach mastery level 14 with any bowler.") }),
-      defineItem({ type: "entrance", idParts: ["champion"], name: "Champion Entrance", assets: { style: "champion" }, tier: "legendary", unlock: mastery("Reach mastery level 26 with any bowler.") }),
+      defineItem({ type: "entrance", idParts: ["spotlight"], name: "Spotlight Entrance", assets: { style: "spotlight" }, tier: "rare", unlock: playerLevel(10) }),
+      defineItem({ type: "entrance", idParts: ["champion"], name: "Champion Entrance", assets: { style: "champion" }, tier: "legendary", unlock: playerLevel(24) }),
       ...[
         ["ready-to-roll", "Ready to Roll", "Ready when you are."],
         ["good-game", "Good Game", "Let's make it a good one."],
@@ -448,7 +447,7 @@
         name: "Pin Chaser",
         assets: art("pin-chaser"),
         tier: "rare",
-        unlock: mastery("Reach mastery level 19 with any bowler."),
+        unlock: playerLevel(19),
       }),
       defineItem({
         type: "title",
@@ -467,18 +466,15 @@
         unlock: tournament("Win the Yam Championship tournament."),
       }),
       defineItem({ type: "badge", idParts: ["founding-bowler"], name: "Founding Bowler", assets: {}, unlock: founding }),
-      // The mastery ladder's three title rungs, replacing the badges that used
-      // to sit at 13/21/28 -- a badge is an achievement reward now, never a
-      // level one. Crest art is deliberately optional: a title is live text, so
-      // these are wearable the moment the level lands and gain a crest later,
-      // exactly as `title:rookie` has always worked.
+      // Additional player-level identity rungs. Crest art is optional because a
+      // title is live text; the wearable reward is complete without an image.
       defineItem({
         type: "title",
         idParts: ["pocket-hunter"],
         name: "Pocket Hunter",
         assets: {},
         tier: "rare",
-        unlock: mastery("Reach mastery level 13 with any bowler."),
+        unlock: playerLevel(13),
       }),
       defineItem({
         type: "title",
@@ -486,7 +482,7 @@
         name: "Lane Reader",
         assets: {},
         tier: "rare",
-        unlock: mastery("Reach mastery level 21 with any bowler."),
+        unlock: playerLevel(22),
       }),
       defineItem({
         type: "title",
@@ -494,7 +490,7 @@
         name: "Shotmaker",
         assets: {},
         tier: "legendary",
-        unlock: mastery("Reach mastery level 28 with any bowler."),
+        unlock: playerLevel(28),
       }),
       // These three keep `badge` as their type, and therefore their launch ids,
       // even though a badge is no longer a level reward. Retyping them to

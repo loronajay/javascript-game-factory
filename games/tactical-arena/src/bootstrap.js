@@ -34,6 +34,22 @@ async function bootstrap() {
     // Never set in a browser, so the web build cannot be affected.
     document.documentElement.dataset.nativeApp = "on";
 
+    // Version gate. Runs BEFORE main.js so a build the server refuses to talk to never
+    // reaches the menu, a save, or a purchase. It only ever blocks on an affirmative
+    // answer — an unreachable API, an unknown build, or no configured minimum all fall
+    // through and play normally (see platform/appUpdateGate.js).
+    const { checkForRequiredUpdate } = await import("./platform/appUpdateGate.js");
+    const { resolvePlatformApiBaseUrl } = await import("../../../js/platform/api/platform-api.mjs");
+    const requirement = await checkForRequiredUpdate({
+      baseUrl: resolvePlatformApiBaseUrl(),
+      platform: "android",
+    });
+    if (requirement.blocked) {
+      const { renderAppUpdateOverlay } = await import("./ui/appUpdateOverlay.js");
+      renderAppUpdateOverlay(requirement);
+      return;
+    }
+
     const { openAuthPanel } = await import("./ui/authPanel.js");
     setInAppSignInHandler((options = {}) =>
       openAuthPanel({ ...options, onSignedIn: () => notifySessionChanged() }),

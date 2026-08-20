@@ -62,10 +62,9 @@ function resolveDisputedMode(gameSlug, params) {
 // `game_entitlements` alone, so an equipped reward with no row here survives
 // until the player's next save and is then stripped.
 //
-// Granted per player even for the bowler ladder, because every bound mastery
-// reward is a global cosmetic — reaching the level with any bowler earns it
-// once. `source` records which ladder paid, which is the only thing that would
-// otherwise be lost by collapsing them onto one table.
+// Entitlements are rows on the player account. Bowler-specific rewards encode
+// the track in their entitlement id, so two mastery paths stay distinct even
+// though the durable table is shared.
 const LADDER_SOURCES = Object.freeze({
     player: "player-level",
     track: "bowler-level",
@@ -111,15 +110,24 @@ async function persistXpAward(client, definition, params, verdict) {
     await grantLevelEntitlements(client, params, definition, "player", nextPlayerXp - verdict.xp, nextPlayerXp);
     const existing = await client.query(`select stats from game_xp_tracks where player_id = $1 and game_slug = $2 and track_id = $3 for update`, [params.playerId, params.gameSlug, params.trackId]);
     const stats = mergeTrackStats(definition, existing.rows[0]?.stats || {}, params.stats || {});
-    const track = await client.query(`insert into game_xp_tracks (player_id, game_slug, track_id, xp, matches, wins, stats, updated_at)
-     values ($1, $2, $3, $4, 1, $5, $6, now())
+    const track = await client.query(`insert into game_xp_tracks (player_id, game_slug, track_id, xp, matches, wins, draws, stats, updated_at)
+     values ($1, $2, $3, $4, 1, $5, $6, $7, now())
      on conflict (player_id, game_slug, track_id) do update
        set xp = game_xp_tracks.xp + excluded.xp,
            matches = game_xp_tracks.matches + 1,
            wins = game_xp_tracks.wins + excluded.wins,
+           draws = game_xp_tracks.draws + excluded.draws,
            stats = excluded.stats,
            updated_at = now()
-     returning xp`, [params.playerId, params.gameSlug, params.trackId, verdict.xp, params.isWin ? 1 : 0, JSON.stringify(stats)]);
+     returning xp`, [
+        params.playerId,
+        params.gameSlug,
+        params.trackId,
+        verdict.xp,
+        params.isWin ? 1 : 0,
+        params.isDraw ? 1 : 0,
+        JSON.stringify(stats),
+    ]);
     const nextTrackXp = clampCount(track.rows[0]?.xp);
     await grantLevelEntitlements(client, params, definition, "track", nextTrackXp - verdict.xp, nextTrackXp);
     return { awarded: true, reason: "eligible", xp: verdict.xp, trackId: params.trackId, breakdown: verdict.breakdown };
@@ -149,6 +157,7 @@ export async function awardMatchXp(client, params) {
         trackId,
         source: params.source || "online-match",
         isWin: outcome === "win",
+        isDraw: outcome === "draw",
         stats: params.stats,
     }, verdict);
 }
@@ -170,6 +179,7 @@ export async function awardCampaignXp(client, params) {
         trackId,
         source: params.source || "campaign-clear",
         isWin: true,
+        isDraw: false,
         stats: {},
     }, verdict);
 }
@@ -185,7 +195,7 @@ export async function getGameXpProgress(pool, playerId, gameSlug) {
     try {
         const [profile, tracks, grants] = await Promise.all([
             pool.query(`select xp, matches, updated_at from game_xp_profiles where player_id = $1 and game_slug = $2`, [playerId, gameSlug]),
-            pool.query(`select track_id, xp, matches, wins, stats from game_xp_tracks
+            pool.query(`select track_id, xp, matches, wins, draws, stats from game_xp_tracks
          where player_id = $1 and game_slug = $2 order by track_id asc`, [playerId, gameSlug]),
             pool.query(`select grant_id from game_xp_grants where player_id = $1 and game_slug = $2
          order by granted_at desc limit ${MAX_RETURNED_GRANTS}`, [playerId, gameSlug]),
@@ -197,6 +207,7 @@ export async function getGameXpProgress(pool, playerId, gameSlug) {
             trackDocuments[String(row.track_id)] = {
                 matches: clampCount(row.matches),
                 wins: clampCount(row.wins),
+                draws: clampCount(row.draws),
                 ...(row.stats && typeof row.stats === "object" ? row.stats : {}),
                 ...levelFromXp(definition.curves.track, xp),
             };

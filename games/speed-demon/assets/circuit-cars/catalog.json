@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "configurationContract": "canonical-speed-demon-loadout-v1",
+  "render": {
+    "frameWidth": 64,
+    "frameHeight": 64,
+    "frameCount": 8,
+    "order": [
+      "north",
+      "north-east",
+      "east",
+      "south-east",
+      "south",
+      "south-west",
+      "west",
+      "north-west"
+    ]
+  },
+  "models": [
+    {
+      "modelId": "kaido-gts",
+      "label": "Kaido GTS",
+      "archetype": "gt",
+      "spritesheet": "kaido-gts/spritesheet-clockwise-from-north.png",
+      "manifest": "kaido-gts/spritesheet.json",
+      "footprint": { "halfLength": 16, "halfWidth": 9 }
+    },
+    {
+      "modelId": "tsunami-rz",
+      "label": "Tsunami RZ",
+      "archetype": "coupe",
+      "spritesheet": "tsunami-rz/spritesheet-clockwise-from-north.png",
+      "manifest": "tsunami-rz/spritesheet.json",
+      "footprint": { "halfLength": 16, "halfWidth": 9 }
+    },
+    {
+      "modelId": "meridian-rs",
+      "label": "Meridian RS",
+      "archetype": "euro",
+      "spritesheet": "meridian-rs/spritesheet-clockwise-from-north.png",
+      "manifest": "meridian-rs/spritesheet.json",
+      "footprint": { "halfLength": 16, "halfWidth": 9 }
+    },
+    {
+      "modelId": "skyward-r",
+      "label": "Skyward R",
+      "archetype": "gt",
+      "spritesheet": "skyward-r/spritesheet-clockwise-from-north.png",
+      "manifest": "skyward-r/spritesheet.json",
+      "footprint": { "halfLength": 16, "halfWidth": 9 }
+    },
+    {
+      "modelId": "toro-sv",
+      "label": "Toro SV",
+      "archetype": "exotic",
+      "spritesheet": "toro-sv/spritesheet-clockwise-from-north.png",
+      "manifest": "toro-sv/spritesheet.json",
+      "footprint": { "halfLength": 16, "halfWidth": 9 }
+    },
+    {
+      "modelId": "scalpel-r",
+      "label": "Scalpel R",
+      "archetype": "hatch",
+      "spritesheet": "scalpel-r/spritesheet-clockwise-from-north.png",
+      "manifest": "scalpel-r/spritesheet.json",
+      "footprint": { "halfLength": 16, "halfWidth": 9 }
+    },
+    {
+      "modelId": "chrono-12",
+      "label": "Chrono 12",
+      "archetype": "wedge",
+      "spritesheet": "chrono-12/spritesheet-clockwise-from-north.png",
+      "manifest": "chrono-12/spritesheet.json",
+      "footprint": { "halfLength": 16, "halfWidth": 9 }
+    },
+    {
+      "modelId": "colt-gt",
+      "label": "Colt GT",
+      "archetype": "muscle",
+      "spritesheet": "colt-gt/spritesheet-clockwise-from-north.png",
+      "manifest": "colt-gt/spritesheet.json",
+      "footprint": { "halfLength": 16, "halfWidth": 9 }
+    }
+  ]
+}

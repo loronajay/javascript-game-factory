@@ -1,4 +1,4 @@
-import { suite, test, assert, assertEqual, assertThrows, finish } from "./harness.js";
+import { suite, test, assert, assertEqual, assertDeepEqual, assertThrows, finish } from "./harness.js";
 
 import { RACE_DISTANCES } from "../scripts/sim/constants.js";
 import {
@@ -6,8 +6,10 @@ import {
   MODE_DISTANCE,
   MODE_TIME_ATTACK,
   MODE_ONLINE,
+  MODE_CIRCUIT,
   OBJECTIVE_DISTANCE,
   OBJECTIVE_TIME,
+  OBJECTIVE_LAPS,
   DEFAULT_MODE_ID,
   modeById,
   playableModes,
@@ -96,8 +98,10 @@ test("distance modes measure in metres and time modes measure in seconds", () =>
     for (const option of mode.objective.options) {
       if (mode.objective.kind === OBJECTIVE_DISTANCE) {
         assert(option.metres > 0, `${mode.id}/${option.id} has no distance`);
-      } else {
+      } else if (mode.objective.kind === OBJECTIVE_TIME) {
         assert(option.seconds > 0, `${mode.id}/${option.id} has no clock`);
+      } else {
+        assert(option.laps > 0, `${mode.id}/${option.id} has no lap count`);
       }
       assert(option.label, `${mode.id}/${option.id} has no label`);
     }
@@ -114,6 +118,21 @@ test("the distance modes offer the distances the race constants define", () => {
 
 test("time attack is measured on a clock", () => {
   assertEqual(modeById(MODE_TIME_ATTACK).objective.kind, OBJECTIVE_TIME);
+});
+
+test("Circuit Race is one shared circuit runtime with lap objectives", () => {
+  const circuit = modeById(MODE_CIRCUIT);
+  assertEqual(circuit.runtime, "circuit");
+  assertEqual(circuit.objective.kind, OBJECTIVE_LAPS);
+  assert(circuit.objective.options.every((option) => option.laps > 0));
+  assert(!MODES.some((mode) => mode.id === "online-circuit"));
+});
+
+test("all existing race types remain on the drag runtime", () => {
+  for (const mode of MODES) {
+    if (mode.id === MODE_CIRCUIT) continue;
+    assertEqual(mode.runtime, "drag", `${mode.id} changed runtime family`);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -134,12 +153,18 @@ test("time attack produces a clock and no distance", () => {
   assertEqual(options.distanceMetres, null);
 });
 
+test("circuit produces laps without drag distance or clock fields", () => {
+  const options = raceOptionsFor(MODE_CIRCUIT, "three-laps");
+  assertDeepEqual(options, { laps: 3 });
+});
+
 test("every mode and option pair produces exactly one objective", () => {
   // A race with both, or with neither, is not a race — see createRace.
   for (const mode of MODES) {
     for (const option of mode.objective.options) {
       const produced = raceOptionsFor(mode.id, option.id);
-      const named = [produced.distanceMetres, produced.timeLimitSeconds].filter((v) => v !== null);
+      const named = [produced.distanceMetres, produced.timeLimitSeconds, produced.laps]
+        .filter((v) => v !== null && v !== undefined);
       assertEqual(named.length, 1, `${mode.id}/${option.id} named ${named.length} objectives`);
     }
   }

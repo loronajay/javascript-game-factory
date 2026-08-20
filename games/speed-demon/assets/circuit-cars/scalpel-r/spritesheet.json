@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "modelId": "scalpel-r",
+  "image": "spritesheet-clockwise-from-north.png",
+  "frameWidth": 64,
+  "frameHeight": 64,
+  "frameCount": 8,
+  "order": [
+    "north",
+    "north-east",
+    "east",
+    "south-east",
+    "south",
+    "south-west",
+    "west",
+    "north-west"
+  ],
+  "source": {
+    "image": "source/scalpel-r-eight-direction-master-v1.png",
+    "provider": "OpenAI ImageGen",
+    "role": "generated rotation master",
+    "backgroundExtraction": "edge-connected-neutral"
+  },
+  "frames": [
+    {
+      "direction": "north",
+      "sourceBounds": {
+        "x": 50,
+        "y": 248,
+        "width": 156,
+        "height": 228
+      },
+      "targetBounds": {
+        "x": 13,
+        "y": 4,
+        "width": 38,
+        "height": 56
+      }
+    },
+    {
+      "direction": "north-east",
+      "sourceBounds": {
+        "x": 267,
+        "y": 251,
+        "width": 219,
+        "height": 218
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 4,
+        "width": 56,
+        "height": 56
+      }
+    },
+    {
+      "direction": "east",
+      "sourceBounds": {
+        "x": 531,
+        "y": 302,
+        "width": 253,
+        "height": 139
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 16,
+        "width": 56,
+        "height": 31
+      }
+    },
+    {
+      "direction": "south-east",
+      "sourceBounds": {
+        "x": 837,
+        "y": 295,
+        "width": 231,
+        "height": 169
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 11,
+        "width": 56,
+        "height": 41
+      }
+    },
+    {
+      "direction": "south",
+      "sourceBounds": {
+        "x": 1144,
+        "y": 269,
+        "width": 152,
+        "height": 181
+      },
+      "targetBounds": {
+        "x": 8,
+        "y": 4,
+        "width": 47,
+        "height": 56
+      }
+    },
+    {
+      "direction": "south-west",
+      "sourceBounds": {
+        "x": 1370,
+        "y": 295,
+        "width": 232,
+        "height": 169
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 11,
+        "width": 56,
+        "height": 41
+      }
+    },
+    {
+      "direction": "west",
+      "sourceBounds": {
+        "x": 1651,
+        "y": 303,
+        "width": 250,
+        "height": 139
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 16,
+        "width": 56,
+        "height": 31
+      }
+    },
+    {
+      "direction": "north-west",
+      "sourceBounds": {
+        "x": 1908,
+        "y": 258,
+        "width": 224,
+        "height": 215
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 5,
+        "width": 56,
+        "height": 54
+      }
+    }
+  ]
+}

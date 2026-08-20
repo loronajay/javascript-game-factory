@@ -42,7 +42,7 @@ test("the starter room is the default, and it is the only room a new player owns
 test("every other room is earned, and names the route it is earned by", () => {
   for (const room of ROOMS.filter((entry) => entry.slug !== DEFAULT_ROOM_SLUG)) {
     assert.notEqual(room.unlock.source, "founding", `${room.slug} should be unlockable`);
-    assert.ok(["campaign", "achievement", "tournament", "bowler-level"].includes(room.unlock.source), `${room.slug} has an unroutable unlock source`);
+    assert.ok(["campaign", "achievement", "tournament", "player-level"].includes(room.unlock.source), `${room.slug} has an unroutable unlock source`);
     assert.ok(room.unlock.detail.length > 0);
   }
 });

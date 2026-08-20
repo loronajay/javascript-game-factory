@@ -55,10 +55,11 @@ test("crossing a player level grants that level's cosmetic entitlement", () => {
 
   assert.deepEqual(entitlementRewardsBetween(definition, "player", at(1), at(2)), [
     { level: 2, entitlementId: "ball-trail:lime-shock", kind: "ball-trail" },
+    { level: 2, entitlementId: "strike-burst:lime-pop", kind: "strike-burst" },
   ]);
   assert.deepEqual(
     entitlementRewardsBetween(definition, "player", at(1), at(3)).map((entry) => entry.entitlementId),
-    ["ball-trail:lime-shock", "strike-burst:gold-star"],
+    ["ball-trail:lime-shock", "strike-burst:lime-pop", "ball-trail:red-neon", "strike-burst:red-supernova"],
   );
   assert.deepEqual(entitlementRewardsBetween(definition, "player", at(3), at(3)), []);
 });
@@ -67,24 +68,19 @@ test("crossing a bowler mastery level grants that level's cosmetic entitlement",
   const definition = getProgression("yam-bowling");
   const at = (level) => xpForLevel(definition.curves.track, level);
 
-  assert.deepEqual(entitlementRewardsBetween(definition, "track", at(12), at(13)), [
-    { level: 13, entitlementId: "title:pocket-hunter", kind: "title" },
-  ]);
+  assert.deepEqual(entitlementRewardsBetween(definition, "track", at(12), at(13), { trackId: "reina-sato" }), []);
   assert.deepEqual(
     entitlementRewardsBetween(definition, "track", at(1), at(30), { trackId: "reina-sato" })
       .map((entry) => entry.entitlementId),
     [
-      "ball-trail:red-neon", "profile-icon:reina-sato:canon", "strike-burst:ember",
-      "victory-pose:reina-sato:spotlight", "ball-trail:orange-flare", "room:fireside-lodge",
-      "strike-burst:red-supernova", "player-card:reina-sato:rivalry", "ball-trail:rose-gold",
-      "ball-trail:sky-blue", "player-card:reina-sato:signature", "title:pocket-hunter",
-      "entrance:spotlight", "room:desert-vista", "ball-trail:gold-rush", "emote:game-face",
-      "victory-pose:reina-sato:champion", "title:pin-chaser", "strike-burst:rose-gold",
-      "title:lane-reader", "strike-burst:sky-shatter", "ball-trail:diamond-white",
-      "strike-burst:diamond-spark", "player-card:reina-sato:elite", "room:deep-sea-suite",
-      "entrance:champion", "ball-trail:perfect-line", "title:shotmaker",
+      "profile-icon:reina-sato:canon",
+      "victory-pose:reina-sato:spotlight",
+      "player-card:reina-sato:rivalry",
+      "player-card:reina-sato:signature",
+      "victory-pose:reina-sato:champion",
+      "player-card:reina-sato:elite",
       "title:reina-sato:nameplate",
-      "ball-trail:eclipse", "strike-burst:eclipse-corona", "title:reina-sato:master",
+      "title:reina-sato:master",
     ],
   );
 });
@@ -96,25 +92,15 @@ test("a bowler-scoped mastery title is granted to the track that earned it", () 
   const definition = getProgression("yam-bowling");
   const at = (level) => xpForLevel(definition.curves.track, level);
 
-  // The summit pays three: two global effects and the one reward scoped to the
-  // bowler who got there.
+  // The summit pays only the reward scoped to the bowler who got there.
   assert.deepEqual(
     entitlementRewardsBetween(definition, "track", at(29), at(30), { trackId: "daisy-monroe" }),
     [
-      { level: 30, entitlementId: "ball-trail:eclipse", kind: "ball-trail" },
-      { level: 30, entitlementId: "strike-burst:eclipse-corona", kind: "strike-burst" },
       { level: 30, entitlementId: "title:daisy-monroe:master", kind: "title" },
     ],
   );
-  // Without a track to name, the bowler-scoped title drops out and only the
-  // globals remain -- it must never be minted as a literal `{track}` row.
-  assert.deepEqual(
-    entitlementRewardsBetween(definition, "track", at(29), at(30)),
-    [
-      { level: 30, entitlementId: "ball-trail:eclipse", kind: "ball-trail" },
-      { level: 30, entitlementId: "strike-burst:eclipse-corona", kind: "strike-burst" },
-    ],
-  );
+  // Without a track to name there is no global fallback and nothing is granted.
+  assert.deepEqual(entitlementRewardsBetween(definition, "track", at(29), at(30)), []);
   assert.ok(
     entitlementRewardsBetween(definition, "track", at(1), at(30))
       .every((entry) => !entry.entitlementId.includes("{track}")),
@@ -127,17 +113,39 @@ test("each ladder is measured on its own curve", () => {
   const definition = getProgression("yam-bowling");
   assert.notEqual(definition.curves.player.base, definition.curves.track.base);
 
-  const trackXpForLevel13 = xpForLevel(definition.curves.track, 13);
-  assert.deepEqual(entitlementRewardsBetween(definition, "track", 0, trackXpForLevel13).at(-1), {
-    level: 13,
-    entitlementId: "title:pocket-hunter",
-    kind: "title",
+  const trackXpForLevel12 = xpForLevel(definition.curves.track, 12);
+  assert.deepEqual(entitlementRewardsBetween(definition, "track", 0, trackXpForLevel12, { trackId: "reina-sato" }).at(-1), {
+    level: 12,
+    entitlementId: "player-card:reina-sato:signature",
+    kind: "player-card",
   });
   // The same XP is a lower player level, so it must not pay the level-13 node.
   assert.ok(
-    entitlementRewardsBetween(definition, "player", 0, trackXpForLevel13)
+    entitlementRewardsBetween(definition, "player", 0, trackXpForLevel12)
       .every((entry) => entry.level < 13),
   );
+});
+
+test("Yam Bowling registers every bowling-native career counter with its merge rule", () => {
+  const definition = getProgression("yam-bowling");
+  assert.deepEqual(definition.trackStats, {
+    strikes: "sum",
+    highGame: "max",
+    quickGames: "sum",
+    quickTotalScore: "sum",
+    quickHighGame: "max",
+    quickStrikeOpportunities: "sum",
+    quickStrikes: "sum",
+    quickSpareOpportunities: "sum",
+    quickSpares: "sum",
+    classicGames: "sum",
+    classicTotalScore: "sum",
+    classicHighGame: "max",
+    classicStrikeOpportunities: "sum",
+    classicStrikes: "sum",
+    classicSpareOpportunities: "sum",
+    classicSpares: "sum",
+  });
 });
 
 test("an unknown ladder scope pays nothing rather than defaulting to a ladder", () => {
@@ -168,7 +176,7 @@ test("every level-granted cosmetic survives a save once its entitlement exists",
     ...definition.levelEntitlements.player,
     ...definition.levelEntitlements.track,
   ].map((reward) => ({ ...reward, entitlementId: reward.entitlementId.replace("{track}", "reina-sato") }));
-  assert.ok(rewards.length >= 30, "both ladders contribute");
+  assert.ok(rewards.length >= 40, "the diversified player ladder and sparse mastery ladder both contribute");
 
   for (const reward of rewards) {
     const slotName = slotForKind[reward.kind];
@@ -266,6 +274,7 @@ test("the level-entitlement migrations backfill every node on both ladders", asy
     "042-yam-bowling-mastery-rewards.sql",
     "043-yam-bowling-emote-and-title-rewards.sql",
     "044-yam-bowling-identity-rewards.sql",
+    "045-yam-bowling-progression-reconciliation.sql",
   ].map((name) => readFile(new URL(`../src/db/migrations/${name}`, import.meta.url), "utf8")))).join("\n");
 
   // A node added to a ladder without a backfill leaves existing accounts owing
@@ -281,16 +290,37 @@ test("the level-entitlement migrations backfill every node on both ladders", asy
   // backfill has to read game_xp_tracks rather than the best-track rollup.
   assert.match(sql, /replace\(reward\.entitlement_id, '\{track\}', tracks\.track_id\)/);
 
-  // The player ladder reads the account total; the bowler ladder reads the best
-  // single track, since its bound rewards are global and earned with any bowler.
+  // The player ladder reads the account total. The reconciled mastery ladder
+  // evaluates each track independently because every remaining reward is tied
+  // to the bowler that earned it.
   assert.match(sql, /from game_xp_profiles/);
-  assert.match(sql, /max\(xp\)[\s\S]*from game_xp_tracks/);
+  assert.match(sql, /from game_xp_tracks tracks/);
+  assert.match(sql, /on tracks\.xp >= reward\.min_xp/);
   assert.match(sql, /on conflict \(player_id, game_slug, entitlement_id\) do nothing/);
 
   // Thresholds are literals so the migration keeps its meaning after a retune;
   // spot-check two against the curves they were derived from today.
   assert.ok(sql.includes(`${xpForLevel(definition.curves.player, 2)}`), "player level 2");
-  assert.ok(sql.includes(`${xpForLevel(definition.curves.track, 13)}`), "bowler level 13");
+  assert.ok(sql.includes(`${xpForLevel(definition.curves.track, 30)}`), "bowler level 30");
+});
+
+test("the progression reconciliation adds an explicit draw counter", async () => {
+  const sql = await readFile(
+    new URL("../src/db/migrations/045-yam-bowling-progression-reconciliation.sql", import.meta.url),
+    "utf8",
+  );
+  assert.match(sql, /alter table game_xp_tracks[\s\S]*add column if not exists draws integer/i);
+  assert.match(sql, /check \(draws >= 0\)/i);
+});
+
+test("XP persistence records and publishes draws separately from wins", async () => {
+  const source = await readFile(new URL("../src/db/game-xp.mts", import.meta.url), "utf8");
+
+  assert.match(source, /isDraw:\s*outcome === "draw"/);
+  assert.match(source, /insert into game_xp_tracks[\s\S]*wins, draws, stats/i);
+  assert.match(source, /draws = game_xp_tracks\.draws \+ excluded\.draws/);
+  assert.match(source, /select track_id, xp, matches, wins, draws, stats/i);
+  assert.match(source, /draws:\s*clampCount\(row\.draws\)/);
 });
 
 test("the voucher migration backfills existing level 10 and 25 players", async () => {

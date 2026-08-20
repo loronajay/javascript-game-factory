@@ -1,4 +1,5 @@
 import { readJsonBody, writeJson } from "../http-utils.mjs";
+import { resolveAppReleasePolicy } from "../services/app-release-catalog.mjs";
 
 // Public reads of admin-authored content, plus the one write any signed-in player makes
 // into the moderation system.
@@ -8,6 +9,7 @@ import { readJsonBody, writeJson } from "../http-utils.mjs";
 //   GET  /events                   the public calendar (cancelled hidden)
 //   GET  /events/:slug             one public event
 //   GET  /site-config              cabinet overrides + keyed settings for the grid
+//   GET  /app-version              minimum supported build for a packaged app
 //   POST /reports                  file a report (auth required)
 //
 // Deliberately unauthenticated on the reads: a bulletin board and an event calendar are
@@ -76,6 +78,34 @@ export async function handleContentRoute(context: any): Promise<boolean> {
       cabinets: cabinets || [],
       settings: settings || {},
     }, requestOrigin);
+    return true;
+  }
+
+  // The packaged app calls this on every boot, BEFORE the menu, to decide whether it is too
+  // old to keep playing. Unauthenticated on purpose: an out-of-date build must be told so
+  // even when its stored session is stale or the player is signed out.
+  //
+  // Fails open in every direction — an unregistered app id, an empty settings table, or a
+  // database that is down all resolve to minimumVersionCode 0, which the client reads as
+  // "play normally". See services/app-release-catalog.mts for why that is deliberate.
+  if (method === "GET" && pathname === "/app-version") {
+    let settings: Record<string, unknown> = {};
+    try {
+      settings = (await listSiteSettings()) || {};
+    } catch {
+      settings = {};
+    }
+    const release = resolveAppReleasePolicy({
+      appId: searchParams.get("app") || undefined,
+      platform: searchParams.get("platform") || undefined,
+      settings,
+      env: process.env as Record<string, unknown>,
+    });
+    if (!release) {
+      writeJson(res, 404, { status: "error", error: "unknown_app", timestamp }, requestOrigin);
+      return true;
+    }
+    writeJson(res, 200, { release }, requestOrigin);
     return true;
   }
 

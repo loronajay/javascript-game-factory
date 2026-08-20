@@ -540,6 +540,7 @@ test("public profiles use public documents, stay read-only, and share the Match 
   assert.match(game, /createPublicProfileScreen/);
   assert.match(client, /\/games\/\$\{GAME_SLUG\}\/loadout\/\$\{encoded\}/);
   assert.match(client, /getGameProgression/);
+  assert.match(client, /getGameRating/);
   assert.doesNotMatch(client, /\/garage|exportGarage|applyServerGarage/);
   assert.match(publicScreen, /buildPublicProfileModel|repository\.load/);
   assert.doesNotMatch(publicScreen, /setFeatured|setRoomSlug|\.save\(/);
@@ -548,11 +549,11 @@ test("public profiles use public documents, stay read-only, and share the Match 
   assert.match(onlineScreen, /data-public-profile-id/);
   assert.match(resultsScreen, /data-public-profile-id/);
   assert.match(resultsScreen, /accountPlayerId/);
-  assert.doesNotMatch(model, /rank|elo|spareRate/i);
-  // The online screen names the STAKES — it owns the ranked/casual toggle — but
-  // it must still never read or paint a competitive figure. The identity card is
-  // an identity card: a bowler, a level, a title, never a ladder position.
-  assert.doesNotMatch(onlineScreen, /spareRate|\bELO\b|getGameRating|\.rating\b|ratingLine/);
+  assert.match(model, /competitive/);
+  // The online screen owns the stakes, while the shared public identity model
+  // owns the rating figure. Keeping the API read out of the screen prevents a
+  // second normalization path for Match Found.
+  assert.doesNotMatch(onlineScreen, /spareRate|getGameRating|ratingLine/);
   assert.match(html.match(/<button[^>]+id=["']public-profile-close["'][^>]*>/)?.[0] || "", /aria-keyshortcuts=["']Escape["']/);
   assert.match(html, /id=["']public-profile-close-hint["'][^>]*>[\s\S]*?<kbd>Esc<\/kbd>[\s\S]*?Close/i);
   assert.match(

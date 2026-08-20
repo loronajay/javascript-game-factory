@@ -16,6 +16,7 @@ import {
   LOBBY_ROW_CAR,
   LOBBY_ROW_DISTANCE,
   LOBBY_ROW_PAINT,
+  LOBBY_ROW_RACE_TYPE,
   LOBBY_ROW_READY,
   LOBBY_ROW_TRACK,
   LOBBY_SET_CONFIG,
@@ -225,6 +226,8 @@ test("the lobby cursor walks your car, the race and the button", () => {
   menu = moveOnline(menu, "down", session);
   assertEqual(view(), LOBBY_ROW_PAINT);
   menu = moveOnline(menu, "down", session);
+  assertEqual(view(), LOBBY_ROW_RACE_TYPE);
+  menu = moveOnline(menu, "down", session);
   assertEqual(view(), LOBBY_ROW_TRACK);
   menu = moveOnline(menu, "down", session);
   assertEqual(view(), LOBBY_ROW_DISTANCE);
@@ -232,6 +235,34 @@ test("the lobby cursor walks your car, the race and the button", () => {
   assertEqual(view(), LOBBY_ROW_BEST_OF);
   menu = moveOnline(menu, "down", session);
   assertEqual(view(), LOBBY_ROW_READY);
+});
+
+test("a private room switches between drag and circuit without changing the loadout shape", () => {
+  const session = lobbySession({
+    config: { raceTypeId: "drag", trackId: "track-a", distanceId: "quarter", laps: 3, bestOf: 3 },
+  });
+  const request = adjustLobby(onRow(session, LOBBY_ROW_RACE_TYPE), "right", session);
+  assertEqual(request.kind, LOBBY_SET_CONFIG);
+  assertEqual(request.config.raceTypeId, "circuit");
+  assertEqual(request.config.trackId, "japan-noir");
+  assertEqual(request.config.laps, 3);
+  assertEqual(Object.hasOwn(request.config, "modelId"), false, "car config remains a separate loadout");
+});
+
+test("circuit rows show laps and block ready when either car lacks a circuit atlas", () => {
+  const config = { raceTypeId: "circuit", trackId: "japan-noir", laps: 3, bestOf: 1 };
+  const unavailable = lobbySession({
+    config,
+    players: [
+      { playerId: "p1", displayName: "Ana", modelId: "kaido-gts", ready: false },
+      { playerId: "p2", displayName: "Bo", modelId: "shutter-z", ready: false },
+    ],
+  });
+  const view = onlineView(createOnlineMenu(), unavailable).lobby;
+  assertEqual(view.rows.find((row) => row.id === LOBBY_ROW_DISTANCE).label, "LAPS");
+  assertEqual(view.rows.find((row) => row.id === LOBBY_ROW_DISTANCE).value, "3 LAPS");
+  assert(view.issue.includes("Bo"));
+  assertEqual(confirmOnline(onRow(unavailable, LOBBY_ROW_READY), unavailable), ONLINE_NOTHING);
 });
 
 test("the host steps a setting and gets a config to publish", () => {

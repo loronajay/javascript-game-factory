@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yam Boxing — Sprite Review Tool</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="viewer-shell">
+    <header class="viewer-header">
+      <div>
+        <p class="eyebrow">Yam Boxing · Reusable sprite review tool</p>
+        <h1>Maddie Bloom</h1>
+      </div>
+      <div class="status" aria-live="polite">
+        <span id="actionLabel">Idle</span>
+        <strong id="angleLabel">Front · 0°</strong>
+      </div>
+    </header>
+
+    <section class="stage" id="stage" aria-label="Rotatable Maddie Bloom sprite viewer">
+      <div class="arena-glow"></div>
+      <div class="rope rope-one"></div>
+      <div class="rope rope-two"></div>
+      <div class="rope rope-three"></div>
+      <div class="sprite-rig" id="spriteRig">
+        <img id="spriteA" alt="Maddie Bloom primary directional sprite" draggable="false">
+      </div>
+      <div class="floor-mark"><span>DRAG TO STEP ROTATION</span></div>
+    </section>
+
+    <section class="controls" aria-label="Viewer controls">
+      <div class="action-row" role="group" aria-label="Sprite action"></div>
+
+      <div class="yaw-control">
+        <label for="yaw">Camera-relative yaw</label>
+        <input id="yaw" type="range" min="0" max="315" value="0" step="45">
+        <label class="auto-toggle"><input id="autoRotate" type="checkbox"> Auto rotate</label>
+      </div>
+
+      <div class="angle-stops" id="angleStops" aria-label="Exact angle stops"></div>
+      <p class="hint">Eight approved directions. Use the slider, drag, press ←/→, or choose a stop.</p>
+    </section>
+  </main>
+  <script type="module" src="./src/viewer.mjs"></script>
+</body>
+</html>

@@ -6,6 +6,7 @@ import { chooseActivation } from "../src/ai/cpuController.js";
 import { generatePlans } from "../src/ai/plans.js";
 import { attack, beginActivation, defend, moveUnit, useArt } from "../src/core/commands.js";
 import { createBattleState, findUnit } from "../src/core/state.js";
+import { createMatchState } from "../src/match/matchBuilder.js";
 import { getArt, getSoulShuffleChoices, isRaging, UNIT_TYPES } from "../src/core/unitCatalog.js";
 import { getLegalFleeTiles, getSummonPlacementTiles } from "../src/rules/arts.js";
 import { getAbilityVfx } from "../src/ui/vfxCatalog.js";
@@ -435,4 +436,59 @@ test("the CPU won't spend a turn summoning a ghost that cannot reach anything", 
   const engagedPlans = generatePlans(engaged, findUnit(engaged, "summoner"))
     .filter((plan) => plan.primary.artId === "summon");
   assert.ok(engagedPlans.length > 0, "the CPU refused a summon that would have reached the enemy");
+});
+
+// Summon hands the open activation straight to the ghost it calls (resolveSummonGhost), so
+// the Summoner stops being the active unit the moment the ART resolves. A plan that still
+// appended a trailing finishActivation for the CASTER had it rejected with
+// WRONG_ACTIVE_UNIT — harmless to the board, but it surfaced as an error toast during the
+// opponent's turn, which reads as a broken game.
+test("a CPU summon plan does not try to finish the Summoner's own activation", () => {
+  const state = createBattleState({
+    seed: 5,
+    size: 13,
+    units: [
+      { id: "summoner", player: 2, type: "summoner", x: 5, y: 5, hp: 23 },
+      { id: "foe", player: 1, type: "swordsman", x: 7, y: 7 }
+    ],
+    currentPlayer: 2,
+  });
+  const summoner = findUnit(state, "summoner");
+  const summonPlans = generatePlans(state, summoner).filter((plan) => plan.primary.artId === "summon");
+  assert.ok(summonPlans.length > 0, "precondition: the CPU can plan a summon here");
+
+  for (const plan of summonPlans) {
+    assert.equal(
+      plan.primaryKeepsActivationOpen,
+      false,
+      "the caster's activation is gone once the ghost has it",
+    );
+  }
+});
+
+test("every command a CPU issues in a match with Summoners is accepted by the reducer", () => {
+  // A full CPU-vs-CPU match rather than a staged board: the rejection only appears once a
+  // Summoner actually reaches for Summon under its own scoring, which a hand-placed
+  // two-unit board does not reliably produce.
+  for (let seed = 1000; seed < 1006; seed += 1) {
+    let next = createMatchState({
+      size: 13,
+      squads: { 1: ["summoner", "archer", "mystic", "magician"], 2: ["summoner", "monk", "paladin", "necromancer"] },
+      seed,
+    });
+    for (let turn = 0; turn < 200 && next.phase === "playing"; turn += 1) {
+      const commands = chooseActivation(next, { difficulty: "hard", cpuPlayer: next.currentPlayer });
+      if (!commands.length) break;
+      for (const command of commands) {
+        const result = applyCommand(next, command);
+        assert.equal(
+          result.accepted,
+          true,
+          `seed ${seed}: illegal ${command.type} (${result.errorCode}) in [${commands.map((c) => c.type).join(" > ")}]`,
+        );
+        next = result.nextState;
+        if (next.phase !== "playing") break;
+      }
+    }
+  }
 });

@@ -1,0 +1,208 @@
+import { suite, test, assert, assertEqual, assertDeepEqual, assertClose, finish } from "./harness.js";
+import fs from "node:fs";
+import { createLivery } from "../scripts/garage/livery.js";
+import { hasCircuitAtlas } from "../scripts/circuit/assets.js";
+import { vehicleFootprintPoints, createRoadMask } from "../scripts/circuit/road-mask.js";
+import { createVehicle, stepVehicle } from "../scripts/circuit/vehicle.js";
+import { resolveVehicleCollision } from "../scripts/circuit/vehicle-collision.js";
+import {
+  createCircuitRace,
+  inputCircuitRace,
+  stepCircuitRace,
+  circuitRaceResult,
+  STATUS_COUNTDOWN,
+  STATUS_RACING,
+  STATUS_FINISHED,
+} from "../scripts/circuit/race.js";
+import { createCircuitAdapter } from "../scripts/runtime/circuit-adapter.js";
+import { createRuntimeRegistry } from "../scripts/runtime/registry.js";
+
+suite("circuit race — shared deterministic runtime");
+
+const circuitGolden = JSON.parse(fs.readFileSync(new URL("./fixtures/circuit-golden.json", import.meta.url), "utf8"));
+
+const checkpoints = [
+  { x: 0, y: 0, radius: 12 },
+  { x: 100, y: 0, radius: 12 },
+  { x: 100, y: 100, radius: 12 },
+  { x: 0, y: 100, radius: 12 },
+];
+
+function definition(sourceKind = "freeplay", participants = null) {
+  return {
+    runtime: "circuit",
+    modeId: "circuit",
+    trackId: "test-loop",
+    rules: { laps: 1, countdownSeconds: 0, timeoutSeconds: 60 },
+    participants: participants ?? [
+      { playerId: "local", control: "local", modelId: "kaido-gts", livery: createLivery() },
+      { playerId: "cpu", control: "cpu", modelId: "colt-gt", livery: createLivery() },
+    ],
+    source: { kind: sourceKind, id: sourceKind === "freeplay" ? null : "event-1" },
+  };
+}
+
+const track = {
+  id: "test-loop",
+  checkpoints,
+  racingLine: checkpoints,
+  spawns: [
+    { x: 0, y: 0, angle: Math.PI / 2 },
+    { x: 0, y: 8, angle: Math.PI / 2 },
+  ],
+};
+
+const driveable = () => true;
+
+test("canonical model identity is required and never substituted", () => {
+  assert(hasCircuitAtlas("kaido-gts"));
+  let threw = false;
+  try {
+    createCircuitAdapter({ track }).create(definition("freeplay", [
+      { playerId: "local", control: "local", modelId: "shutter-z", livery: {} },
+    ]), track);
+  } catch (error) {
+    threw = /atlas unavailable/.test(error.message);
+  }
+  assert(threw, "an unavailable model started a circuit race");
+});
+
+test("source is routing metadata and cannot change the simulation", () => {
+  const freeplay = createCircuitRace(definition("freeplay"), track);
+  const campaign = createCircuitRace(definition("campaign"), track);
+  const online = createCircuitRace(definition("online"), track);
+  const stripSource = ({ source, ...state }) => state;
+  assertDeepEqual(stripSource(freeplay), stripSource(campaign));
+  assertDeepEqual(stripSource(freeplay), stripSource(online));
+});
+
+test("countdown, input and fixed-step vehicle movement share one reducer", () => {
+  const withCountdown = {
+    ...definition(),
+    rules: { ...definition().rules, countdownSeconds: 1 },
+  };
+  let race = createCircuitRace(withCountdown, track);
+  assertEqual(race.status, STATUS_COUNTDOWN);
+  race = inputCircuitRace(race, { playerId: "local", throttle: 1, steer: 0 });
+  const startX = race.participants[0].vehicle.x;
+  for (let tick = 0; tick < 10; tick += 1) {
+    race = stepCircuitRace(race, 0.05, { track, containsVehicle: driveable });
+  }
+  assertClose(race.participants[0].vehicle.x, startX, 1e-9);
+  for (let tick = 0; tick < 10; tick += 1) {
+    race = stepCircuitRace(race, 0.05, { track, containsVehicle: driveable });
+  }
+  assertEqual(race.status, STATUS_RACING);
+  race = stepCircuitRace(race, 1 / 60, { track, containsVehicle: driveable });
+  assert(race.participants[0].vehicle.x > startX, "the local car did not use the two-axis reducer");
+});
+
+test("road containment samples the full normalized footprint", () => {
+  const width = 40;
+  const height = 40;
+  const pixels = new Uint8Array(width * height).fill(255);
+  const mask = createRoadMask({ width, height, pixels });
+  const car = createVehicle({ x: 20, y: 20, angle: 0 });
+  assertEqual(vehicleFootprintPoints(car).length, 9);
+  assert(mask.containsVehicle(car));
+  assert(!mask.containsVehicle({ ...car, x: 3 }), "centre-only containment let the body leave the road");
+});
+
+test("ordered checkpoints reject shortcuts and only the finish checkpoint counts a lap", () => {
+  let race = createCircuitRace(definition("freeplay", [
+    { playerId: "local", control: "local", modelId: "kaido-gts", livery: {} },
+  ]), track);
+  const placeAt = (x, y) => {
+    race = {
+      ...race,
+      status: STATUS_RACING,
+      participants: race.participants.map((participant) => ({
+        ...participant,
+        vehicle: { ...participant.vehicle, x, y, velocityX: 0, velocityY: 0 },
+      })),
+    };
+    race = stepCircuitRace(race, 0, { track, containsVehicle: driveable });
+  };
+
+  placeAt(0, 0);
+  assertEqual(race.participants[0].lap, 0, "crossing finish before checkpoint 1 counted");
+  placeAt(100, 100);
+  assertEqual(race.participants[0].nextCheckpoint, 1, "checkpoint 2 accepted out of order");
+  placeAt(100, 0);
+  placeAt(100, 100);
+  placeAt(0, 100);
+  placeAt(0, 0);
+  assertEqual(race.participants[0].lap, 1);
+  assertEqual(race.participants[0].place, 1);
+  assertEqual(race.status, STATUS_FINISHED);
+});
+
+test("car contact changes both vehicles symmetrically", () => {
+  const left = createVehicle({ x: 10, y: 10, angle: Math.PI / 2, velocityX: 50 });
+  const right = createVehicle({ x: 20, y: 10, angle: Math.PI / 2, velocityX: 0 });
+  const contact = resolveVehicleCollision(left, right);
+  assert(contact.impact, "overlapping cars did not collide");
+  const before = Math.hypot(right.x - left.x, right.y - left.y);
+  const after = Math.hypot(contact.cpu.x - contact.player.x, contact.cpu.y - contact.player.y);
+  assert(after > before, "contact did not separate both bodies");
+  assert(contact.player.x !== left.x || contact.player.y !== left.y);
+  assert(contact.cpu.x !== right.x || contact.cpu.y !== right.y);
+});
+
+test("finish order and normalized results are deterministic", () => {
+  let race = createCircuitRace(definition(), track);
+  race = {
+    ...race,
+    status: STATUS_RACING,
+    participants: race.participants.map((participant) => ({
+      ...participant,
+      nextCheckpoint: 0,
+      vehicle: { ...participant.vehicle, x: 0, y: 0, velocityX: 0, velocityY: 0 },
+    })),
+  };
+  race = stepCircuitRace(race, 0, { track, containsVehicle: driveable });
+  assertEqual(race.participants[0].place, 1);
+  assertEqual(race.participants[1].place, 2);
+  assertDeepEqual(circuitRaceResult(race, "local"), {
+    won: true,
+    value: 0,
+    better: "lower",
+    place: 1,
+    finished: true,
+  });
+});
+
+test("the runtime registry exposes one stable adapter shape", () => {
+  const circuit = createCircuitAdapter({ track, containsVehicle: driveable });
+  const drag = {
+    create() {}, input() {}, step() {}, result() {}, render() {},
+  };
+  const registry = createRuntimeRegistry({ drag, circuit });
+  assert(registry.forDefinition(definition()) === circuit);
+  assert(registry.forDefinition({ runtime: "drag" }) === drag);
+  for (const method of ["create", "input", "step", "result", "render"]) {
+    assertEqual(typeof circuit[method], "function", `circuit adapter has no ${method}`);
+  }
+});
+
+test("vehicle integration remains pure", () => {
+  const vehicle = createVehicle({ x: 5, y: 5 });
+  const next = stepVehicle(vehicle, { throttle: 1, steer: 1 }, 1 / 60);
+  assertEqual(vehicle.x, 5);
+  assert(next !== vehicle);
+});
+
+test("the browser reducer matches the committed cross-runtime golden replay", () => {
+  let vehicle = createVehicle({ x: 610, y: 850, angle: Math.PI / 2 });
+  for (let tick = 0; tick < circuitGolden.ticks; tick += 1) {
+    vehicle = stepVehicle(vehicle, {
+      throttle: tick < 180 ? 1 : 0,
+      steer: tick < 80 ? 0.2 : tick < 160 ? -0.15 : 0,
+    }, 1 / 120);
+  }
+  for (const [key, expected] of Object.entries(circuitGolden.vehicle)) {
+    assertClose(vehicle[key], expected, 1e-12, `${key} drifted`);
+  }
+});
+
+finish();

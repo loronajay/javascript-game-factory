@@ -151,7 +151,7 @@ test("the tree exposes locked, owned, equipped, and next-reward state without eq
   assert.equal(tree.nodes[1].state, "equipped");
   assert.equal(tree.nodes[3].state, "owned");
   assert.equal(tree.nodes[4].state, "locked");
-  assert.equal(queried.length, 4, "locked rewards are never queried as equipped");
+  assert.equal(queried.length, 6, "every reward through level 4 is queried, and locked rewards are not");
 });
 
 test("equipped state reads the loadout and refuses a near-miss", () => {
@@ -192,13 +192,27 @@ test("pending content is declared, not silently missing", () => {
   assert.deepEqual(playerRewards.PENDING_CONTENT, [], "all four player titles are now real equipment");
 });
 
-test("the four identity rungs equip their finished live-text titles", () => {
+test("the player ladder spans the cabinet instead of repeating one effect per level", () => {
+  const nodes = playerRewards.REWARD_CADENCE;
+  const families = new Set(nodes.flatMap((node) => node.rewards.map((reward) => reward.family)));
+  const effectFamilies = new Set(["ball-trail", "strike-burst"]);
+  const effectOnlyLevels = nodes.filter((node) => node.rewards.every((reward) => effectFamilies.has(reward.family)));
+
+  for (const family of ["title", "room", "entrance", "emote", "emote-voucher", "skin-voucher"]) {
+    assert.equal(families.has(family), true, `the account ladder should include ${family}`);
+  }
+  assert.ok(effectOnlyLevels.length <= 18,
+    `paired effect sets may occupy at most 18 levels, got ${effectOnlyLevels.length}`);
+});
+
+test("identity rungs offer the complete account title progression", () => {
   const tree = playerRewards.buildRewardTree({ currentLevel: 30 });
-  assert.deepEqual([4, 13, 19, 30].map((level) => tree.nodes[level - 1].rewards[0].equipment?.itemId), [
-    "title:lane-regular",
-    "title:house-favourite",
-    "title:lane-veteran",
-    "title:yam-legend",
+  const titles = tree.nodes.flatMap((node) => node.rewards)
+    .filter((reward) => reward.family === "title")
+    .map((reward) => reward.equipment?.itemId);
+  assert.deepEqual(titles, [
+    "title:rookie", "title:lane-regular", "title:house-favourite", "title:pocket-hunter",
+    "title:lane-veteran", "title:pin-chaser", "title:lane-reader", "title:shotmaker", "title:yam-legend",
   ]);
 });
 

@@ -79,3 +79,37 @@ test("a reported match is ranked unless it opts out, so no existing caller chang
   assert.equal((await post(app, "/ratings/yam-bowling", token, { ...base, ranked: "false" })).statusCode, 200);
   assert.equal(calls[3].ranked, true);
 });
+
+test("a Yam Bowling report preserves the complete bounded bowling stat block", async () => {
+  const calls = [];
+  const app = createApp({
+    jwtSecret: TEST_SECRET,
+    recordMatchRating: async (_gameSlug, options) => {
+      calls.push(options);
+      return { ok: true };
+    },
+    now: () => "2026-08-03T00:00:00.000Z",
+  });
+  const token = signToken({ playerId: "player-1", email: "player@test.com" }, TEST_SECRET);
+  const stats = {
+    strikes: 3,
+    highGame: 87,
+    quickGames: 1,
+    quickTotalScore: 87,
+    quickHighGame: 87,
+    quickStrikeOpportunities: 4,
+    quickStrikes: 3,
+    quickSpareOpportunities: 1,
+    quickSpares: 1,
+  };
+
+  const response = await post(app, "/ratings/yam-bowling", token, {
+    opponentPlayerId: "player-2",
+    outcome: "draw",
+    sessionId: "yam-bowling:ROOM:1:2",
+    progression: { trackId: "reina-sato", modeId: "quick", performance: 3, stats },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(calls[0].progression.stats, stats);
+});

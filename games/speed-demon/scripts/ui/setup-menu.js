@@ -39,6 +39,8 @@ import { DEFAULT_LIVERY, createLivery } from "../garage/livery.js";
 import { boardIdFor } from "../records/records.js";
 import { DEFAULT_RIVAL_ID, lineupEntry, lineupFor } from "../rival/lineup.js";
 import { TRACKS, DEFAULT_TRACK_ID, trackById } from "./track-layout.js";
+import { CIRCUIT_TRACKS, DEFAULT_CIRCUIT_TRACK_ID, circuitTrackById } from "../circuit/tracks.js";
+import { hasCircuitAtlas } from "../circuit/assets.js";
 
 export const PANE_MODEL = "model";
 export const PANE_PRESET = "preset";
@@ -93,6 +95,10 @@ export function setupMode(setup) {
   return modeById(setup.modeId) ?? modeById(DEFAULT_MODE_ID);
 }
 
+export function setupTracks(setup) {
+  return setupMode(setup).runtime === "circuit" ? CIRCUIT_TRACKS : TRACKS;
+}
+
 /**
  * The board this setup's runs would file to, which is what decides whether the
  * player has a ghost to race. Null in a mode that keeps no records.
@@ -141,13 +147,15 @@ export function createSetup({
   objectiveId = null,
   rivalId = DEFAULT_RIVAL_ID,
 } = {}, garage = emptyGarage()) {
+  const mode = modeById(modeId) ?? modeById(DEFAULT_MODE_ID);
   const model = modelById(modelId) ?? modelById(DEFAULT_MODEL_ID);
-  const trackIndex = Math.max(0, TRACKS.findIndex((track) => track.id === trackId));
+  const tracks = mode.runtime === "circuit" ? CIRCUIT_TRACKS : TRACKS;
+  const fallbackTrackId = mode.runtime === "circuit" ? DEFAULT_CIRCUIT_TRACK_ID : DEFAULT_TRACK_ID;
+  const trackIndex = Math.max(0, tracks.findIndex((track) => track.id === (trackId ?? fallbackTrackId)));
 
   // The objective is carried between modes by id where it makes sense, and
   // falls back to the new mode's default where it does not — a distance id
   // means nothing to a mode measured on a clock.
-  const mode = modeById(modeId) ?? modeById(DEFAULT_MODE_ID);
   const objectiveIndex = Math.max(
     0,
     mode.objective.options.indexOf(objectiveOption(mode, objectiveId)),
@@ -279,7 +287,8 @@ export function setupLivery(setup, garage = emptyGarage()) {
 }
 
 export function setupTrack(setup) {
-  return TRACKS[clamp(setup.trackIndex, TRACKS.length - 1)];
+  const tracks = setupTracks(setup);
+  return tracks[clamp(setup.trackIndex, tracks.length - 1)];
 }
 
 /** The objective option the cursor is on — a distance, or a clock. */
@@ -337,9 +346,9 @@ export function moveSetup(setup, direction, garage = emptyGarage(), { ghost = nu
   if (setup.pane === PANE_TRACK) {
     switch (direction) {
       case "left":
-        return { ...setup, trackIndex: clamp(setup.trackIndex - 1, TRACKS.length - 1) };
+        return { ...setup, trackIndex: clamp(setup.trackIndex - 1, setupTracks(setup).length - 1) };
       case "right":
-        return { ...setup, trackIndex: clamp(setup.trackIndex + 1, TRACKS.length - 1) };
+        return { ...setup, trackIndex: clamp(setup.trackIndex + 1, setupTracks(setup).length - 1) };
       default:
         return setup;
     }
@@ -466,7 +475,7 @@ export function focusSetup(setup, target, garage = emptyGarage(), { ghost = null
     return withPresetCursor({ ...setup, pane: PANE_PRESET }, target.index, garage);
   }
   if (target.pane === PANE_TRACK) {
-    return { ...setup, pane: PANE_TRACK, trackIndex: clamp(target.index, TRACKS.length - 1) };
+    return { ...setup, pane: PANE_TRACK, trackIndex: clamp(target.index, setupTracks(setup).length - 1) };
   }
   const options = setupMode(setup).objective.options.length;
   return { ...setup, pane: PANE_OBJECTIVE, objectiveIndex: clamp(target.index, options - 1) };
@@ -497,6 +506,9 @@ export function setupSelection(setup, garage = emptyGarage()) {
  * panes, so a pick can never be disturbed by navigating away from it.
  */
 export function confirmSetup(setup, garage = emptyGarage()) {
+  if (setupMode(setup).runtime === "circuit" && !hasCircuitAtlas(setupModel(setup).id)) {
+    return { setup, done: false, unavailable: true };
+  }
   // The paint pane's last row is an action, not a config. Confirming it opens
   // the garage rather than locking the pane, so the caller is told which.
   if (setup.pane === PANE_PRESET && isPresetActionFocused(setup, garage)) {
@@ -534,7 +546,7 @@ export function rewindSetup(setup) {
  */
 export function resolveSelection({ modelId, trackId, livery } = {}) {
   const model = modelById(modelId);
-  const track = trackById(trackId);
+  const track = trackById(trackId) ?? circuitTrackById(trackId);
   return model && track ? { model, track, livery: createLivery(livery) } : null;
 }
 
@@ -627,6 +639,7 @@ export function setupView(setup, garage = emptyGarage(), { canCustomise = true, 
         // that is no longer up for debate, drawn differently from the one you
         // are still browsing.
         locked: locked[PANE_MODEL] && model.id === entry.id,
+        available: mode.runtime !== "circuit" || hasCircuitAtlas(entry.id),
       })),
     })),
     presets: {
@@ -640,7 +653,7 @@ export function setupView(setup, garage = emptyGarage(), { canCustomise = true, 
         locked: locked[PANE_PRESET] && chosenIndex === index,
       })),
     },
-    tracks: TRACKS.map((track, index) => ({
+    tracks: setupTracks(setup).map((track, index) => ({
       ...track,
       index,
       selected: setup.pane === PANE_TRACK && setup.trackIndex === index,
@@ -651,7 +664,11 @@ export function setupView(setup, garage = emptyGarage(), { canCustomise = true, 
     // A drawn button, because the mouse has no ENTER. The keyboard reaches the
     // line by locking the last pane; a pointer needs somewhere to press that
     // means "go" from any pane, since every pane always holds a valid pick.
-    start: { label: "START", hovered: hover?.target === TARGET_START },
+    start: {
+      label: mode.runtime === "circuit" && !hasCircuitAtlas(model.id) ? "ATLAS UNAVAILABLE" : "START",
+      disabled: mode.runtime === "circuit" && !hasCircuitAtlas(model.id),
+      hovered: hover?.target === TARGET_START,
+    },
     rivals,
     chosenRival,
     chosenModel: model,

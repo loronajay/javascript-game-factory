@@ -204,7 +204,7 @@ export function createCircuitScreen({
     $("rematch-button").disabled = true;
     $("campaign-result-stamp").textContent = "Filing result";
     $("campaign-result-kicker").textContent = "Factory profile";
-    $("campaign-result-title").textContent = "Confirming circuit victoryâ€¦";
+    $("campaign-result-title").textContent = "Confirming circuit victory…";
     $("campaign-result-copy").textContent = "Your roster will update after the Factory accepts this clear.";
     const result = await campaignProgress.claimCircuitClear(
       session.campaignMatch.matchId,

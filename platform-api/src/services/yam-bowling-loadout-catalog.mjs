@@ -17,7 +17,7 @@ const ROOM_SLUGS = Object.freeze([
     "default", "teal-lounge", "hot-pink-hideout", "retro-arcade", "beach-house",
     "industrial-workshop", "botanical-glasshouse", "frosted-suite", "lavender-cosmic",
     "black-gothic", "circuit-red", "tower-penthouse", "champion-room",
-    // Mastery levels 7, 15 and 25.
+    // Player levels 9, 16 and 24.
     "fireside-lodge", "desert-vista", "deep-sea-suite",
 ]);
 const BALL_TRAIL_IDS = Object.freeze([
@@ -26,7 +26,7 @@ const BALL_TRAIL_IDS = Object.freeze([
     "indigo-drive", "violet-haze", "purple-plasma", "magenta-pop", "hot-pink",
     "diamond-white", "perfect-line", "championship-gold", "bracket-fire", "cosmic-ribbon",
     "royal-confetti",
-    // Mastery levels 10 and 30.
+    // Player levels 18 and 29.
     "rose-gold", "eclipse",
 ]);
 // The emote pool is global rather than per bowler: thirty stickers shared by
@@ -49,7 +49,7 @@ const STRIKE_BURST_IDS = Object.freeze([
     "emerald-impact", "mint-crackle", "cyan-flash", "sky-shatter", "electric-blue",
     "indigo-ring", "violet-bloom", "purple-nova", "magenta-blast", "hot-pink-pop",
     "diamond-spark", "pin-crown", "finals-fireworks", "cosmic-cup", "victory-ribbon",
-    // Mastery levels 20 and 30.
+    // Player levels 18 and 29.
     "rose-gold", "eclipse-corona",
 ]);
 const CATCH_LINE_IDS = Object.freeze([
@@ -133,15 +133,13 @@ for (const [id, type, founding] of [
     ["badge:founding-bowler", "badge", true],
     ["badge:perfect-game", "badge", false],
     ["badge:split-decision", "badge", false],
-    // Earned on the bowler mastery ladder at levels 13, 21 and 28. An id this
-    // registry does not carry is stripped rather than refused, so leaving these
-    // out silently reverted a badge the player had earned the moment they saved.
+    // Historical mastery grants now owned by achievements. They stay registered
+    // so an older entitlement is not stripped when its owner saves a loadout.
     ["badge:laser-focus", "badge", false],
     ["badge:precision-bowler", "badge", false],
     ["badge:lane-legend", "badge", false],
-    // The titles that replaced those three on the mastery ladder at 13, 21 and
-    // 28. The badges above stay registered because accounts earned them there
-    // before the change and an unregistered id is stripped, not refused.
+    // Account-wide Player Level titles. The historical badges above stay
+    // registered because an unregistered legacy id is stripped, not refused.
     ["title:pocket-hunter", "title", false],
     ["title:lane-reader", "title", false],
     ["title:shotmaker", "title", false],

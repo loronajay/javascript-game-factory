@@ -286,7 +286,7 @@ const MODE_MENU = [CAMPAIGN_MENU_ITEM, ...MODES, PROFILE_MENU_ITEM, GARAGE_MENU_
 const MENUS = {
   [SCREEN_TITLE]: () => ({
     title: "SPEED DEMON",
-    subtitle: "Manual-shift drag racing",
+    subtitle: "Drag & circuit racing",
     items: [
       // START stays item zero: ENTER on a fresh boot must start a race without
       // anyone having to read the screen.

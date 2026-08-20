@@ -226,6 +226,15 @@ export const ACTION_UPDATE = "update";
 export const ACTION_DELETE = "delete";
 export const ACTION_DONE = "done";
 
+/** Slow fixed-timestep turntable for the circuit preview; rendering reads it. */
+export function circuitPreviewFrame(tick, ticksPerHeading = 24) {
+  const safeTick = Number.isFinite(tick) ? Math.max(0, Math.trunc(tick)) : 0;
+  const dwell = Number.isFinite(ticksPerHeading) && ticksPerHeading > 0
+    ? Math.max(1, Math.trunc(ticksPerHeading))
+    : 24;
+  return Math.floor(safeTick / dwell) % 8;
+}
+
 /** The section tab strip, always row zero. Left/right walks sections. */
 export const ROW_SECTION = "section";
 const SECTION_ROW = { id: "section", label: "Editing", kind: ROW_SECTION };

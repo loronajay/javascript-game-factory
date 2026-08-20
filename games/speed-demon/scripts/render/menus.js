@@ -40,12 +40,10 @@ export const MENU_LAYOUT = {
     list: { x: WORLD.width / 2 - 170, y: 442, width: 340, itemHeight: 40, gap: 8 },
     controls: { y: 672 },
   },
-  // Seven rows now — the campaign, four modes, the driver and the garage — and
-  // seven at the old 62+12 stride ran 2px off the bottom of the screen. The rows
-  // shrank rather than the list moving up, because the block still has to clear
-  // the heading above it. `tests/modules.test.js` is what caught it, and it is
-  // what will catch the eighth.
-  modes: { header: { x: 140, y: 128 }, list: { x: 140, y: 190, width: 430, itemHeight: 58, gap: 10 } },
+  // Eight rows now — Circuit Race joins the campaign, four drag entries, the
+  // driver and the garage. The rows stay tall enough to carry their optional
+  // note while the tighter rhythm keeps the last one inside the 720px frame.
+  modes: { header: { x: 140, y: 128 }, list: { x: 140, y: 190, width: 430, itemHeight: 54, gap: 8 } },
   detail: { x: 630, y: 216, width: 510, height: 300 },
   // Sized around its five items and no larger: it has to clear DASH_TOP so the
   // instrument cluster stays lit underneath a paused race.
@@ -718,6 +716,37 @@ export function drawResults(ctx, race, menu, recordSummary = null, rival = null)
   });
   text(ctx, `${race.shifts.length} shifts`, centre, box.y + 280, { size: 14, align: "center", weight: "500" });
 
+  drawMenuList(ctx, menu.items, menuListBox("results"), { centred: true });
+  ctx.restore();
+}
+
+/** Results surface shared by non-drag runtimes through the normalized result contract. */
+export function drawNormalizedResults(ctx, result, menu) {
+  const box = MENU_LAYOUT.results;
+  const centre = WORLD.width / 2;
+  ctx.save();
+  dimWorld(ctx);
+  menuPanel(ctx, box.x, box.y, box.width, box.height);
+  text(ctx, result.won ? "WINNER" : "RACE COMPLETE", centre, box.y + 58, {
+    size: 26,
+    colour: result.won ? "#4ade6a" : TEXT,
+    weight: "800",
+    align: "center",
+  });
+  const value = Number.isFinite(result.value) ? `${result.value.toFixed(2)}s` : "DNF";
+  text(ctx, value, centre, box.y + 130, {
+    size: 54,
+    colour: "#ffffff",
+    weight: "700",
+    align: "center",
+    mono: true,
+  });
+  text(ctx, result.place ? `FINISH POSITION  ${result.place}` : "RACE TIMEOUT", centre, box.y + 178, {
+    size: 18,
+    colour: DIM,
+    weight: "700",
+    align: "center",
+  });
   drawMenuList(ctx, menu.items, menuListBox("results"), { centred: true });
   ctx.restore();
 }

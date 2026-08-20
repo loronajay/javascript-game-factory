@@ -74,6 +74,35 @@ class ExtractCanonFramesTests(unittest.TestCase):
             self.assertEqual(int(alpha[:, boundary - 4 : boundary + 5].max()), 0)
         self.assertGreater(int(alpha.max()), 0)
 
+    def test_rebuild_keeps_an_extremity_that_spans_the_pose_valley(self) -> None:
+        # Hair and outstretched arms routinely reach across the gap into the
+        # neighbouring pose, so the silhouette valley falls *on* the extremity.
+        # Cropping at that valley guillotines it in a dead-straight vertical
+        # line, which is exactly what the shipped runtime frames were showing.
+        image = Image.new("RGBA", (600, 300), (0, 0, 0, 0))
+        for left in (12, 112, 212, 312, 412, 512):
+            image.paste((220, 80, 40, 255), (left, 40, left + 60, 280))
+        # Pose 3's arm reaches left across the pose-2/pose-3 gap, so the valley
+        # falls on the arm. It must not touch pose 2, or the two are one figure.
+        image.paste((220, 80, 40, 255), (178, 90, 212, 118))
+
+        rebuilt = extractor.rebuild_pose_sheet(image, gutter=6)
+
+        # The repack rescales every pose by one shared factor, so compare the
+        # reaching pose against a plain one rather than counting raw pixels.
+        alpha = np.asarray(rebuilt.getchannel("A")) > extractor.ALPHA_THRESHOLD
+        cell = rebuilt.width // 6
+        widths = []
+        for index in range(6):
+            columns = np.where(alpha[:, index * cell : (index + 1) * cell].any(axis=0))[0]
+            widths.append(int(columns[-1] - columns[0] + 1) if columns.size else 0)
+
+        self.assertGreater(
+            widths[2],
+            widths[0] * 1.5,
+            f"the reaching arm was cropped at the pose cell boundary: {widths}",
+        )
+
     def test_pose_crop_adds_room_for_limbs_hair_and_feet(self) -> None:
         self.assertEqual(
             extractor.expand_pose_crop(300, 550, 1536),
@@ -143,6 +172,38 @@ class ExtractCanonFramesTests(unittest.TestCase):
         )
 
         self.assertGreater(np.asarray(clean.getchannel("A"))[5:15].max(), 0)
+
+    def test_instance_pose_honours_per_character_opening_overrides(self) -> None:
+        # Every sheet has its own quirks, so the pipeline carries per-character,
+        # per-frame tuning. The instance path used to look those up under an
+        # empty id, which silently disabled it for exactly the frames that need
+        # a firmer opening to shed a neighbour's stray hand.
+        rgba = np.zeros((140, 300, 4), dtype=np.uint8)
+        rgba[15:130, 110:190] = (40, 80, 220, 255)
+        instance_mask = np.zeros((140, 300), dtype=np.float32)
+        instance_mask[15:130, 110:190] = 1.0
+        seen = []
+        original = extractor.component_opening_size
+
+        def spy(short_id, frame_number):
+            seen.append((short_id, frame_number))
+            return original(short_id, frame_number)
+
+        extractor.component_opening_size = spy
+        try:
+            extractor.extract_instance_pose(
+                Image.fromarray(rgba, "RGBA"),
+                boundaries=[0, 100, 200, 300],
+                pose_index=1,
+                instance_mask=instance_mask,
+                short_id="lillie-chen",
+                mask_dilation=0,
+                crop_margin=20,
+            )
+        finally:
+            extractor.component_opening_size = original
+
+        self.assertIn(("lillie-chen", 1), seen)
 
     def test_instance_mask_dilation_does_not_reach_into_a_neighboring_cell(self) -> None:
         rgba = np.zeros((140, 260, 4), dtype=np.uint8)
@@ -370,7 +431,13 @@ class ExtractCanonFramesTests(unittest.TestCase):
             self.assert_runtime_matches_source(override_path, processed_path)
 
     def test_heavily_overlapping_final_hair_uses_stronger_bridge_separation(self) -> None:
-        self.assertEqual(extractor.component_opening_size("naomi-okafor", 5), 17)
+        # These are per-sheet, eyes-on tunings, not derived numbers: each was
+        # raised until the neighbour's stray hair or hand stopped surviving in
+        # that one frame, and verified by looking at the render. Retuned for
+        # the direct extraction path, which no longer repacks the pose cells.
+        self.assertEqual(extractor.component_opening_size("naomi-okafor", 5), 24)
+        self.assertEqual(extractor.component_opening_size("piper-hart", 1), 14)
+        self.assertEqual(extractor.component_opening_size("sage-holloway", 5), 16)
         self.assertEqual(extractor.component_opening_size("tessa-quinn", 5), 23)
         self.assertEqual(extractor.component_opening_size("cassy-cruz", 5), 6)
         self.assertEqual(extractor.component_support_iterations(23), 12)

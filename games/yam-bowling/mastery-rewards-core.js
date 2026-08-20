@@ -7,66 +7,28 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function createMasteryRewards(rewardTree) {
   "use strict";
 
-  // One reusable launch cadence for every bowler. Reward ids contain the bowler,
-  // level and semantic key, so adding levels 31-40 later cannot rename anything
-  // a player has already earned. Everything here is presentational: there is no
-  // route for a reward to carry a physics, scoring or input value.
-  // Several node KEYS below no longer describe what they pay -- `gym-day-skin`
-  // pays a trail, `character-banner` pays a room. That is deliberate: a reward
-  // id is permanent, and renaming one would re-fire its level-up celebration
-  // for every player who has already seen it. The label is what the player
-  // reads; the key is only an identity.
+  // Mastery answers one question: what did dedication to THIS bowler earn?
+  // Account-wide effects, rooms, entrances and generic titles belong to the
+  // player ladder. Putting them here made the second bowler's path a row of
+  // already-owned rewards. This deliberately sparse cadence shows only real
+  // character milestones; levels between them still advance mastery and point
+  // toward the next actual unlock.
 
-  // The rungs still awaiting a reward type this cabinet does not have yet.
-  // Declared rather than left silently unbound, exactly as the player ladder
-  // declares its own, so a rung that pays nothing is a visible decision instead
-  // of something to discover later.
-  //
-  // All eight need a new equippable type rather than new art: profile icons crop
-  // the portrait already on disk, card frames are drawn over the card that
-  // already ships, entrances are CSS, and the two victory poses can bind to the
-  // outcome art the alternate skins already carry. None of them is blocked on a
-  // per-bowler asset, which is what the banner, splash and skin rungs were.
+  // All displayed launch milestones are bound. Keep this exported list so
+  // authoring and UI diagnostics retain a stable contract if future mastery
+  // levels are drafted before their content types land.
   const PENDING_CONTENT = Object.freeze([]);
 
   const RAW_CADENCE = [
     [1, [["default-bowler", "bowler", "Canon Bowler", ["bowler", "skin", "canon"]]]],
-    [2, [["red-neon-trail", "ball-trail", "Red Neon Ball Trail", ["global", "ballTrail", "red-neon"]]]],
     [3, [["profile-icon", "profile-icon", "{first} Profile Icon", ["character", "profileIcon", "canon"]]]],
-    [4, [["ember-burst", "strike-burst", "Ember Strike Burst", ["global", "strikeBurst", "ember"]]]],
     [5, [["spotlight-victory", "victory-pose", "Spotlight Victory Pose", ["character", "victoryPose", "spotlight"]]]],
-    [6, [["orange-flare-trail", "ball-trail", "Orange Flare Ball Trail", ["global", "ballTrail", "orange-flare"]]]],
-    [7, [["character-banner", "room", "Fireside Lodge", ["global", "room", "fireside-lodge"]]]],
-    [8, [["strike-spark", "strike-burst", "Crimson Strike Spark", ["global", "strikeBurst", "red-supernova"]]]],
     [9, [["rivalry-card", "player-card", "Rivalry Player Card", ["character", "playerCard", "rivalry"]]]],
-    [10, [["gym-day-skin", "ball-trail", "Rose Gold Ball Trail", ["global", "ballTrail", "rose-gold"]]]],
-    [11, [["sky-blue-trail", "ball-trail", "Sky Blue Ball Trail", ["global", "ballTrail", "sky-blue"]]]],
     [12, [["player-card-art", "player-card", "{first} Player-Card Artwork", ["character", "playerCard", "signature"]]]],
-    [13, [["focus-badge", "title", "Pocket Hunter Title", ["global", "title", "pocket-hunter"]]]],
-    [14, [["entrance-stinger", "entrance", "Spotlight Entrance Stinger", ["global", "entrance", "spotlight"]]]],
-    [15, [["alt-menu-splash", "room", "Desert Vista", ["global", "room", "desert-vista"]]]],
-    [16, [["gold-trail", "ball-trail", "Gold Rush Ball Trail", ["global", "ballTrail", "gold-rush"]]]],
-    [17, [["signature-emote", "emote", "Game Face Emote", ["global", "emote", "game-face"]]]],
     [18, [["victory-pose-ii", "victory-pose", "Victory Pose II", ["character", "victoryPose", "champion"]]]],
-    [19, [["pin-chaser-title", "title", "Pin Chaser Title", ["global", "title", "pin-chaser"]]]],
-    [20, [["special-skin", "strike-burst", "Rose Gold Burst", ["global", "strikeBurst", "rose-gold"]]]],
-    [21, [["precision-badge", "title", "Lane Reader Title", ["global", "title", "lane-reader"]]]],
-    [22, [["crowd-burst", "strike-burst", "Crowd Roar Strike Burst", ["global", "strikeBurst", "sky-shatter"]]]],
-    [23, [
-      ["diamond-trail", "ball-trail", "Diamond White Ball Trail", ["global", "ballTrail", "diamond-white"]],
-      ["diamond-burst", "strike-burst", "Diamond Spark Burst", ["global", "strikeBurst", "diamond-spark"]],
-    ]],
     [24, [["elite-card-border", "player-card", "Elite Player-Card Border", ["character", "playerCard", "elite"]]]],
-    [25, [["rare-splash-card", "room", "Deep Sea Suite", ["global", "room", "deep-sea-suite"]]]],
-    [26, [["champion-entrance", "entrance", "Champion Entrance", ["global", "entrance", "champion"]]]],
-    [27, [["perfect-line-trail", "ball-trail", "Perfect Line Ball Trail", ["global", "ballTrail", "perfect-line"]]]],
-    [28, [["legend-badge", "title", "Shotmaker Title", ["global", "title", "shotmaker"]]]],
     [29, [["mastery-nameplate", "title", "{first} Mastery Nameplate", ["global", "bowlerTitle", "nameplate"]]]],
-    [30, [
-      ["mastery-skin", "ball-trail", "Eclipse Ball Trail", ["global", "ballTrail", "eclipse"]],
-      ["mastery-burst", "strike-burst", "Eclipse Corona Burst", ["global", "strikeBurst", "eclipse-corona"]],
-      ["exclusive-title", "title", "{first} Master", ["global", "bowlerTitle", "master"]],
-    ]],
+    [30, [["exclusive-title", "title", "{first} Master", ["global", "bowlerTitle", "master"]]]],
   ];
 
   function displayName(characterSlug, characterName) {

@@ -24,7 +24,7 @@ test("release builds pin an explicit default Play version code", async () => {
 
   assert.match(
     buildGradle,
-    /versionCode\s+project\.hasProperty\(['"]taVersionCode['"]\)\s*\?\s*project\.taVersionCode\.toInteger\(\)\s*:\s*11\b/,
+    /versionCode\s+project\.hasProperty\(['"]taVersionCode['"]\)\s*\?\s*project\.taVersionCode\.toInteger\(\)\s*:\s*12\b/,
   );
 });
 

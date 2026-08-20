@@ -348,73 +348,34 @@ and two signed-in clients running together.
 
 ### Level 1–30 reward plan
 
-- [x] Create one reusable 30-level reward cadence before writing character-specific flavor.
+- [x] Use one reusable reward-tree engine without forcing both tracks to share a cadence.
 - [x] Preserve competitive equality at every level.
-- [x] Give every node a tempting, specific label even when locked, for example:
-  - [x] `Gym Day Skin`
-  - [x] `Alt Menu Splash`
-  - [x] `Red Neon Ball Trail`
-- [x] Reserve level 30 for a mastery skin plus an exclusive character title.
+- [x] Keep Bowler Mastery strictly bowler-specific so a second mastery path never
+      repays an account-wide unlock earned on the first.
+- [x] Reserve level 30 for the exclusive character master title.
 - [x] Ensure the tree supports future levels 31–40 without changing existing reward IDs.
-- [x] Bind every mastery node that needs no new art (see below).
-- [ ] Author the art and the four new reward types the remaining 15 nodes need.
+- [x] Bind every displayed mastery milestone to a real item.
 
-### Content still unbound
+The original 30-row cadence mixed character rewards with rooms, effects, emotes,
+generic titles and placeholder skins. That made every bowler look like the same
+unlock tree and caused later mastery paths to advertise account-wide items the
+player already owned. The shipped cadence is deliberately sparse: XP advances
+at every level, while the UI displays only real bowler-specific milestones.
 
-The mastery cadence was authored in full, but **20 of its 31 rewards were labels
-with no `equipment` binding** — the same gap milestone 8 records for the player
-ladder, and it had not been written down here. Five of those have been bound,
-because they needed no new art:
-
-| Level | Reward | Bound to |
-|---:|---|---|
-| 8 | Crimson Strike Spark | `strike-burst:red-supernova` |
-| 22 | Crowd Roar Strike Burst | `strike-burst:sky-shatter` |
-| 23 | Diamond Spark Burst *(new node)* | `strike-burst:diamond-spark` |
-| 27 | Perfect Line Ball Trail | `ball-trail:perfect-line` *(new item)* |
-| 29 | `{first}` Mastery Nameplate | `title:<bowler>:nameplate` *(new item)* |
-| 30 | `{first}` Master | `title:<bowler>:master` *(new item)* |
-
-**The two mastery titles are the first reward whose id is scoped to the bowler
-who earned it while the slot it fills is global** — you are Reina's master
-whichever bowler you then take to the lane. That is why `resolveEquipment` maps
-the cadence's `bowlerTitle` slot back onto `title`, why the server registers them
-*without* a `characterSlug` (a global slot matches on type alone), and why their
-grant is the only one that has to know which track crossed the level: the
-entitlement id carries a `{track}` the award resolves. Migration `042` backfills
-them per track rather than per player, unlike every other level reward.
-
-Every strike burst now has an earn route. The four that claimed `bowler-level`
-while no node paid them are bound above, except `lime-pop`, which moved to the
-**player** ladder's level 30 — the mastery ladder has no lime trail to pair it
-with, and that summit had nothing equippable on it either.
-
-**The remaining 15 nodes cannot be bound without new content**, so they are
-authoring decisions rather than wiring:
-
-- **Ten need art**: the three skins (10, 20, 30), two victory poses (5, 18), four
-  player cards (9, 12, 24, 25) and the alternate menu splash (15). Binding these
-  to existing art would either re-gift founding content or hand out part of a
-  skin entitlement, which the product rules forbid.
-- **Five need a whole new reward type**: profile icon (3), character banner (7),
-  entrance stingers (14, 26) and the lane emote (17). None exists in
-  `cosmetics-core.js`'s `REWARD_TYPES` or in the server's slot map.
-
-Suggested cadence to validate in a prototype:
-
-| Level | Reward family |
+| Level | Bowler-specific reward |
 |---:|---|
 | 1 | Default bowler |
 | 3 | Profile icon |
-| 5 | Alternate victory pose |
-| 7 | Character banner |
-| 10 | Named skin, e.g. Gym Day |
-| 12 | Player-card artwork |
-| 15 | Alternate menu splash |
-| 18 | Alternate victory pose II |
-| 20 | Special skin |
-| 25 | Rare splash/card |
-| 30 | Mastery skin + exclusive title |
+| 5 | Spotlight victory pose |
+| 9 | Rivalry player card |
+| 12 | Signature player card |
+| 18 | Champion victory pose |
+| 24 | Elite player-card border |
+| 29 | Bowler mastery nameplate |
+| 30 | Exclusive character master title |
+
+Every post-starter reward ID contains the bowler slug. Account-wide content now
+lives only on the Player Level ladder.
 
 ### UI
 
@@ -425,13 +386,12 @@ Suggested cadence to validate in a prototype:
 
 ### Shipped: mastery path and level-up presentation
 
-`mastery-rewards-core.js` defines one immutable node for every launch level and
-resolves bowler-specific reward IDs shaped as
+`mastery-rewards-core.js` defines immutable nodes at the nine actual launch
+milestones and resolves bowler-specific reward IDs shaped as
 `mastery:<bowler>:level-<nn>:<reward>`. Appending levels 31–40 therefore cannot
 rename any launch reward. The definitions carry presentation and equipment
 references only; none can reach physics, scoring, shot timing, or online input.
-Level 30 resolves two rewards for every bowler: her mastery skin and exclusive
-`<First Name> Master` title.
+Level 30 resolves the exclusive `<First Name> Master` title.
 
 The character inspector always renders the full path, including while signed
 out, so locked rewards remain discoverable without exposing cached private
@@ -460,8 +420,9 @@ bowler-mastery event from the same authoritative snapshot.
 ### Yam-specific profile layer
 
 - [x] Extend the existing Factory identity/profile model rather than replacing it.
-- [x] Add Player Level, wins/losses, high game, strikes, and character mastery summary.
-- [ ] Add rank/ELO and spare rate after those records have one authoritative source and denominator.
+- [x] Add Player Level, wins/losses/draws, high game, strikes, Quick and Classic
+      averages, strike rate, spare rate, and character mastery summary.
+- [x] Add authoritative public ELO to profiles and Match Found identity.
 - [x] Add Featured Bowler, Featured Skin, Title, and Badge presentation.
 - [x] Add Profile Background and Profile Frame editor controls.
 - [ ] Add *authored* background and frame art. Both slots are typed `profile-art`
@@ -505,11 +466,15 @@ profile-open, and circuit-clear syncs all replace client ownership with the
 current entitlement set; local grants and stale campaign caches cannot add a
 choice to an authenticated profile.
 
-The stats shown in this first pass are the records the XP tracks already own:
-matches, wins/losses, strikes, and high game. Rank/ELO and spare rate stay absent
-until the backend gives each one a single trustworthy definition. The starter
-room begins owned; circuit promotions and the rotating tournament prize pool
-add server-entitled rooms after their authoritative claims settle.
+The client now reports and aggregates mode-specific games, total score, high
+game, strike opportunities/strikes, and spare opportunities/spares. Profiles
+show Quick and Classic averages plus strike and spare rates, using `--` rather
+than inventing a denominator for older records. Draws remain separate from
+losses. The platform API registers and accumulates the full counter set, and its
+draw column keeps draws out of the loss total. Public profiles also join the
+existing rating endpoint, showing `Unranked` for a real zero-match record and
+`--` when the read is unavailable. The starter room begins owned; circuit promotions and the
+rotating tournament prize pool add server-entitled rooms after their claims settle.
 
 ### Shipped: public inspection and Match Found identity
 
@@ -525,9 +490,10 @@ Featured Skin. Public profile reads are cached for the session, and levels remai
 unknown until the authoritative progression document arrives rather than being
 invented locally.
 
-Rank/ELO and spare rate remain absent until their authoritative records can be
-joined. Circuit promotion and tournament room grants share the normal
-server-entitlement/loadout path.
+Public inspection joins the authoritative rating, progression, and loadout
+documents. Bowling rate and mode-average fields render when the progression
+response contains their counters. Circuit promotion and tournament room grants
+share the normal server-entitlement/loadout path.
 
 ### Per-character history
 
@@ -544,7 +510,7 @@ from the fictional league dossier and biography.
 
 - [x] Add read-only public profile inspection by player id from online opponent presentation.
 - [x] Add Match Found cards with player name, equipped bowler/skin, Player Level, and Bowler Level.
-- [ ] Add rank/ELO to Match Found after those records have one authoritative public definition.
+- [x] Add public ELO to Match Found through the shared compact identity model.
 - [x] Use the actual gameplay skin in match presentation; use Featured Skin only on the profile.
 - [x] Verify the privacy boundary and missing-profile fallback for public inspection.
 - [ ] Apply platform moderation policy to profile names when that policy exposes a cabinet-facing contract.
@@ -604,11 +570,11 @@ verify against `game_xp_tracks` rather than against a reported match:
 ### The split that makes two ladders worth having
 
 The player track rewards the **player**; bowler mastery rewards the **bowler**.
-Every player-tree reward is global — ball trails, strike bursts, titles, badges
-and Skin Vouchers — and none of it is a bowler's own art. The two ladders also
-never promise the same trail or burst, because a reward you could have earned on
-the other ladder is not a reward. `player-rewards-core.test.js` asserts both
-rules against the live mastery cadence rather than trusting the authored lists.
+Every player-tree reward is account-wide: coherent trail/burst sets, rooms,
+entrances, generic titles, Game Face, and Skin/Emote Vouchers. Bowler Mastery has
+no account-wide effects at all. `player-rewards-core.test.js` and
+`mastery-rewards-core.test.js` assert the split against the live catalogs rather
+than trusting authored lists.
 
 - [x] Reuse one 30-level state machine across both ladders (`reward-tree-core.js`).
 - [x] Give every level a specific, tempting label even while locked.
@@ -616,91 +582,31 @@ rules against the live mastery cadence rather than trusting the authored lists.
 - [x] Preserve competitive equality: no player-tree reward can reach physics, scoring or the wire.
 - [x] Show the full ladder signed out, with locked levels visible.
 - [x] Make level rewards actually ownable and equippable (see below).
-- [ ] Author the player ladder's own titles/badges and bind them (`PENDING_CONTENT`, 8 nodes).
+- [x] Bind every Player Level reward; the ladder has no placeholder nodes.
 
-### A level reward needs no entitlement row
+### Authoritative ownership and deployment sync
 
-`loadout.owns()` resolves a `bowler-level` or `player-level` item against the set
-the ladders have paid out at the account's synced levels, recomputed by
-`applyLevelUnlocks()` in the composition root on every authoritative snapshot.
-The XP the server already holds is the proof, so minting a durable grant for
-"reached level 13" would duplicate a fact the account owns — the same
-second-source-of-truth problem the tree itself avoids. The earned set is
-session-only and never persisted, and an unsynced device earns nothing.
+`applyLevelUnlocks()` derives optimistic client ownership only from the latest
+server-synced level. Durable ownership still comes from `game_entitlements`,
+minted by the platform API when a threshold is crossed. This keeps a newly earned
+item savable while preventing local storage from inventing progression.
 
-It is deliberately an *extra* route, not the only one: if the server grants a
-level reward directly — a tournament prize, a make-good — the client defers to it
-rather than overruling the authority it is supposed to follow.
+The cadence therefore has a server-side twin in
+`services/progression-catalog.mts`. The client redesign is complete, but the API
+catalog must still be updated to the new Player Level cadence and sparse,
+bowler-scoped mastery milestones before deployment. Existing accounts above a
+moved threshold require a one-time reconciliation; a crossing-only grant will
+not rediscover a reward they passed under the old cadence.
 
-#### Fixed: a level reward could be equipped but not saved
-
-- [x] Grant a level's cosmetic as a durable entitlement, in the XP transaction
-      that earned it.
-
-The rule above was only ever taught to the *client*. `loadout.owns()` consults
-the level-derived set, so a reward earned at a level equips locally — but
-`getOwnershipContext` in `db/game-loadouts.mts` builds its ownership context from
-`game_entitlements` alone, and a level reward mints no entitlement row by design.
-`normalizeYamBowlingGarage` therefore drops every level-earned slot value it is
-handed, and because a save reapplies the server's sanitized answer
-(`profile/profile-sync-client.mjs:91`), the player watches their new trail, burst
-or badge revert the moment they save it.
-
-This hits both ladders: every player-tree trail and burst, and the three mastery
-badges (`laser-focus`, `precision-bowler`, `lane-legend`) that *are* bound. Those
-three are additionally not registered in `yam-bowling-loadout-catalog.mts` at
-all, so they would be stripped as unknown ids even if the level check existed.
-
-The fix is the pattern this cabinet already used one field away, rather than a
-new one. Skin Vouchers at player levels 10 and 25 are level-triggered rewards the
-*server* mints: `playerInventoryRewards` in `services/progression-catalog.mts`
-declares them and `awardMatchXp` grants them inside the XP transaction by
-comparing the player's previous and next XP. A level-earned cosmetic is that same
-shape with a different destination, so it is now `levelEntitlements` in the same
-definition, granted by the same transaction — `game_entitlements` instead of
-`game_inventory_items`, with a matching per-track pass for bowler mastery.
-
-That makes the garage validator correct without changing it: the row exists by
-the time the cabinet can equip the item, so `ownsItem` finds it and the save
-sticks. It also retires this milestone's "no entitlement row" rule, which was the
-outlier — every other durable reward in the repo is a row. `applyLevelUnlocks()`
-on the client is now an optimistic display of the same fact rather than the only
-record of it, and could be removed once the sync is proven in a browser.
-
-Both ladders' bound rewards turned out to be **global** cosmetics, which is why
-the mastery grant is keyed to the player and not to the track: reaching level 13
-with any bowler earns that badge once.
-
-Two consequences, recorded rather than left to be discovered:
-
-- **The cadences have a server-side twin**, duplicating what the ladder modules
-  say. That is the house style rather than a compromise:
-  `tactical-arena-reward-catalog.mts` opens by telling you to keep it in lockstep
-  with the client's `unlocks.js`, and Yam's own loadout catalog already re-lists
-  the roster, skins, trails and bursts. A test now asserts every level-granted id
-  survives `normalizeYamBowlingGarage`, so the two registries cannot drift apart
-  silently.
-- **Existing accounts are backfilled** by migration `041`, since a player already
-  past a node crossed it before the grant existed — the job `040` did for
-  vouchers. Its thresholds are literals so it keeps meaning what it meant if a
-  curve is later retuned.
-
-The three unregistered mastery badges (`laser-focus`, `precision-bowler`,
-`lane-legend`) are now in `yam-bowling-loadout-catalog.mts`.
-
-Not yet browser-verified: that still needs `factory-network-server`, the API and
-a signed-in client running together.
-
-Which ladder earns an effect is recorded in `cosmetics-core.js` beside the item,
-because the catalog sits underneath the ladders and cannot import them.
-`player-rewards-core.test.js` asserts the two never drift, and that no item is
-ever promised by both ladders.
+Which ladder earns an item is recorded beside that item in the content catalogs.
+Consistency tests assert that every advertised item has exactly one valid route
+and that post-starter mastery IDs are tied to a bowler.
 
 ### Unlock progress is account state, not device state
 
-There is no stored unlock record anywhere in this milestone. A node is owned when
-the authoritative player level reaches it, and that level is derived by
-`progression-core.js` from server-synced XP. The profile screen reads
+There is no device-local unlock authority in this milestone. A node is displayed
+as earned when the authoritative player level reaches it, and durable ownership
+is a server entitlement. The profile screen reads
 `getSyncState()` and says plainly when a device is unsynced instead of presenting
 a cached level 1 as earned progress. `project-structure.test.js` asserts the
 player ladder can never persist, cache, or name a balance.

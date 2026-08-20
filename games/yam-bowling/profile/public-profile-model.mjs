@@ -1,3 +1,5 @@
+import { aggregateCareerStats } from "./career-stats.mjs";
+
 function safeCount(value) {
   const number = Math.floor(Number(value));
   return Number.isFinite(number) ? Math.max(0, number) : 0;
@@ -29,6 +31,7 @@ function emptyMastery(slug) {
     isMaxLevel: false,
     matches: 0,
     wins: 0,
+    draws: 0,
     strikes: 0,
     highGame: 0,
   };
@@ -37,7 +40,7 @@ function emptyMastery(slug) {
 function normalizedMastery(slug, value) {
   const fallback = emptyMastery(slug);
   const source = value && typeof value === "object" ? value : {};
-  return {
+  const normalized = {
     ...fallback,
     level: Math.max(1, safeCount(source.level) || 1),
     xp: safeCount(source.xp),
@@ -46,10 +49,17 @@ function normalizedMastery(slug, value) {
     isMaxLevel: source.isMaxLevel === true,
     matches: safeCount(source.matches),
     wins: safeCount(source.wins),
+    draws: safeCount(source.draws),
     strikes: safeCount(source.strikes),
     highGame: safeCount(source.highGame),
     progressPercent: progressPercent(source),
   };
+  for (const mode of ["quick", "classic"]) {
+    for (const suffix of [
+      "Games", "TotalScore", "HighGame", "StrikeOpportunities", "Strikes", "SpareOpportunities", "Spares",
+    ]) normalized[`${mode}${suffix}`] = safeCount(source[`${mode}${suffix}`]);
+  }
+  return normalized;
 }
 
 function publicTracks(progression, roster) {
@@ -82,11 +92,33 @@ function roomSlug(roomId) {
     : "default";
 }
 
+function normalizeCompetitive(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { available: false, rating: null, label: "--", matches: 0, wins: 0, losses: 0, draws: 0 };
+  }
+  const wins = safeCount(raw.wins);
+  const losses = safeCount(raw.losses);
+  const draws = safeCount(raw.draws);
+  const matches = wins + losses + draws;
+  const parsedRating = Math.round(Number(raw.rating));
+  const rating = Number.isFinite(parsedRating) ? Math.max(0, parsedRating) : null;
+  return {
+    available: true,
+    rating,
+    label: matches === 0 ? "Unranked" : rating === null ? "--" : `${rating} ELO`,
+    matches,
+    wins,
+    losses,
+    draws,
+  };
+}
+
 export function buildPublicProfileModel({
   playerId,
   profileName,
   loadout,
   progression,
+  rating,
   animation,
   roomCore,
 }) {
@@ -96,10 +128,7 @@ export function buildPublicProfileModel({
   const skin = resolveSkin(animation, presentation.featured?.skinId);
   const tracksByBowler = publicTracks(progression, roster);
   const tracks = Object.values(tracksByBowler).filter((entry) => entry.matches > 0);
-  const matches = tracks.reduce((total, entry) => total + entry.matches, 0);
-  const wins = tracks.reduce((total, entry) => total + entry.wins, 0);
-  const strikes = tracks.reduce((total, entry) => total + entry.strikes, 0);
-  const highGame = tracks.reduce((best, entry) => Math.max(best, entry.highGame), 0);
+  const career = aggregateCareerStats(tracks);
   const playerSource = progression?.player && typeof progression.player === "object" ? progression.player : {};
   const player = {
     ...emptyPlayer(),
@@ -117,15 +146,8 @@ export function buildPublicProfileModel({
     badge: displayItemId(presentation.badgeId, "Founding Bowler"),
     room: roomCore.getRoom(roomSlug(presentation.roomId)),
     player,
-    career: {
-      matches,
-      wins,
-      losses: Math.max(0, matches - wins),
-      winRate: matches ? Math.round((wins / matches) * 100) : 0,
-      strikes,
-      highGame,
-      bowlersUsed: tracks.length,
-    },
+    career: { ...career, bowlersUsed: tracks.length },
+    competitive: normalizeCompetitive(rating),
     mastery: tracksByBowler[bowler.slug] || emptyMastery(bowler.slug),
     masteryByBowler: tracksByBowler,
     featuredBowler: {
@@ -152,6 +174,7 @@ export function buildCompactIdentityModel({ profile, matchPlayer, animation, cos
     playerLevel: Math.max(1, safeCount(profile?.player?.level) || 1),
     title: profile?.title || "Rookie",
     badge: profile?.badge || "Founding Bowler",
+    competitive: profile?.competitive || normalizeCompetitive(null),
     bowler: {
       ...bowler,
       skinId: skin.id,

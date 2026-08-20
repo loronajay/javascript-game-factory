@@ -59,14 +59,20 @@ test("a multi-level player gain queues one celebration containing every crossed 
   assert.equal(queue.list("player-1").length, 1);
 });
 
-test("the live player ladder announces Emerald Glow when level five is crossed", () => {
+test("the live player ladder announces the complete Emerald set when level five is crossed", () => {
   const queue = createPlayerLevelCelebrationQueue({ storage: memoryStorage(), rewards: playerRewards });
   queue.observe("player-1", { level: 4 });
 
   const [event] = queue.observe("player-1", { level: 5 });
 
-  assert.deepEqual(event.rewards.map((reward) => reward.label), ["Emerald Glow Ball Trail"]);
-  assert.equal(event.rewards[0].equipment.itemId, "ball-trail:emerald-glow");
+  assert.deepEqual(event.rewards.map((reward) => reward.label), [
+    "Emerald Glow Ball Trail",
+    "Emerald Impact Burst",
+  ]);
+  assert.deepEqual(event.rewards.map((reward) => reward.equipment.itemId), [
+    "ball-trail:emerald-glow",
+    "strike-burst:emerald-impact",
+  ]);
 });
 
 test("pending player celebrations persist until acknowledged", () => {

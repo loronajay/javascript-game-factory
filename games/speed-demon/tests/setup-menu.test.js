@@ -11,6 +11,7 @@ import {
   MODE_DISTANCE,
   MODE_TIME_ATTACK,
   MODE_RIVAL,
+  MODE_CIRCUIT,
   DEFAULT_MODE_ID,
   OBJECTIVE_TIME,
   modeById,
@@ -794,6 +795,20 @@ test("a car with nothing saved for it still has a paint row that does not break"
   for (const step of [1, -1]) {
     assertEqual(setupPreset(cycleSetupPreset(setup, step, EMPTY), EMPTY).factory, true);
   }
+});
+
+test("Circuit Race uses Japan Noir and blocks models without directional art", () => {
+  const available = createSetup({ modeId: MODE_CIRCUIT, modelId: "kaido-gts" });
+  assertEqual(setupTrack(available).id, "japan-noir");
+  assertEqual(setupView(available, EMPTY).start.disabled, false);
+
+  const unavailable = createSetup({ modeId: MODE_CIRCUIT, modelId: "shutter-z" });
+  const view = setupView(unavailable, EMPTY);
+  assertEqual(view.start.disabled, true);
+  assertEqual(view.start.label, "ATLAS UNAVAILABLE");
+  const result = confirmSetup({ ...unavailable, pane: PANE_OBJECTIVE }, EMPTY);
+  assertEqual(result.done, false);
+  assertEqual(result.unavailable, true);
 });
 
 test("changing car clamps a paint pick that the new car does not have", () => {

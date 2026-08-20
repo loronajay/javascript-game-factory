@@ -16,7 +16,7 @@ npm start
 
 Open `http://127.0.0.1:4189`. Choose Quick Bowl or Classic Ten, equip an outfit, then play Hotseat, Vs CPU, Quick Match, or a code-based private room with any of the 30 canon bowlers. Local online development expects `factory-network-server` on port 3000.
 
-On the lane, use A/D to strafe and the left/right arrow keys to aim (or use the sliders), then tap Throw or Space to start the moving spin needle. Press and hold again to lock spin and build power; release to bowl. Quick taps roll slowly, while longer holds build steadily to maximum speed. More power carries farther through the oil before the ball hooks, and A/D can add a tiny correction during release. Shift+D toggles the physics hitbox overlay.
+On the lane, use A/D to strafe and the left/right arrow keys to aim (or use the sliders), then tap Throw or Space to start the moving spin needle. Press and hold again to lock spin and build power; release to bowl. Quick taps roll slowly, while longer holds build steadily to maximum speed. More power carries farther through the oil before the ball hooks. Shift+D toggles the physics hitbox overlay.
 
 ## Test
 

@@ -4,6 +4,14 @@ function stat(label, value) {
   return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`;
 }
 
+function rateLabel(value) {
+  return value === null ? "--" : `${value}%`;
+}
+
+function averageLabel(value) {
+  return value === null ? "--" : value;
+}
+
 export function createPublicProfileScreen({ repository, audio }) {
   let requestId = 0;
   let returnFocus = null;
@@ -27,12 +35,15 @@ export function createPublicProfileScreen({ repository, audio }) {
     $("public-profile-badge").textContent = model.badge;
     $("public-profile-player-level").textContent = model.player.level;
     $("public-profile-player-xp").textContent = `${model.player.xp.toLocaleString()} XP`;
-    $("public-profile-record").textContent = `${model.career.wins}-${model.career.losses}`;
+    $("public-profile-record").textContent = `${model.career.wins}W ${model.career.losses}L ${model.career.draws}D`;
     $("public-profile-career-stats").innerHTML = [
       stat("Matches", model.career.matches),
       stat("Win rate", `${model.career.winRate}%`),
-      stat("Strikes", model.career.strikes),
-      stat("High game", model.career.highGame || "--"),
+      stat("Ranked rating", model.competitive.label),
+      stat("Quick avg", averageLabel(model.career.quick.averageScore)),
+      stat("Classic avg", averageLabel(model.career.classic.averageScore)),
+      stat("Strike rate", rateLabel(model.career.strikeRate)),
+      stat("Spare rate", rateLabel(model.career.spareRate)),
       stat("Bowlers used", model.career.bowlersUsed),
     ].join("");
     $("public-profile-mastery-name").textContent = `${model.featuredBowler.name.split(" ")[0]} mastery`;

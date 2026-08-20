@@ -30,6 +30,8 @@
 import { BEST_OF_OPTIONS } from "../sim/match.js";
 import { RACE_DISTANCES } from "../sim/constants.js";
 import { modelById } from "../assets/car-atlas.js";
+import { hasCircuitAtlas } from "../circuit/assets.js";
+import { CIRCUIT_TRACKS } from "../circuit/tracks.js";
 import { TRACKS } from "./track-layout.js";
 import {
   ROOM_CODE_LENGTH,
@@ -114,6 +116,7 @@ export const HOME_ITEMS = [
  */
 export const LOBBY_ROW_CAR = "car";
 export const LOBBY_ROW_PAINT = "paint";
+export const LOBBY_ROW_RACE_TYPE = "raceType";
 export const LOBBY_ROW_TRACK = "track";
 export const LOBBY_ROW_DISTANCE = "distance";
 export const LOBBY_ROW_BEST_OF = "bestOf";
@@ -121,10 +124,14 @@ export const LOBBY_ROW_READY = "ready";
 
 const DISTANCE_IDS = ["eighth", "quarter", "half", "mile"];
 const TRACK_IDS = TRACKS.map((track) => track.id);
+const CIRCUIT_TRACK_IDS = CIRCUIT_TRACKS.map((track) => track.id);
+const RACE_TYPE_IDS = ["drag", "circuit"];
+const LAP_OPTIONS = [1, 3, 5];
 
 const LOBBY_ROWS = [
   LOBBY_ROW_CAR,
   LOBBY_ROW_PAINT,
+  LOBBY_ROW_RACE_TYPE,
   LOBBY_ROW_TRACK,
   LOBBY_ROW_DISTANCE,
   LOBBY_ROW_BEST_OF,
@@ -238,10 +245,21 @@ export function adjustLobbyAt(rowIndex, direction, session) {
 
   if (!session.isHost || !session.config) return null;
 
+  if (row === LOBBY_ROW_RACE_TYPE) {
+    const raceTypeId = cycle(RACE_TYPE_IDS, session.config.raceTypeId ?? "drag", step);
+    return config(session, raceTypeId === "circuit"
+      ? { raceTypeId, trackId: "japan-noir", laps: LAP_OPTIONS.includes(session.config.laps) ? session.config.laps : 3 }
+      : { raceTypeId, trackId: "track-a", distanceId: session.config.distanceId ?? "quarter" });
+  }
+
   if (row === LOBBY_ROW_TRACK) {
-    return config(session, { trackId: cycle(TRACK_IDS, session.config.trackId, step) });
+    const ids = session.config.raceTypeId === "circuit" ? CIRCUIT_TRACK_IDS : TRACK_IDS;
+    return config(session, { trackId: cycle(ids, session.config.trackId, step) });
   }
   if (row === LOBBY_ROW_DISTANCE) {
+    if (session.config.raceTypeId === "circuit") {
+      return config(session, { laps: cycle(LAP_OPTIONS, session.config.laps, step) });
+    }
     return config(session, { distanceId: cycle(DISTANCE_IDS, session.config.distanceId, step) });
   }
   if (row === LOBBY_ROW_BEST_OF) {
@@ -310,7 +328,7 @@ export function confirmOnline(menu, session) {
     // without a mouse — the CUSTOMISE button is a pointer convenience, not the
     // only way in.
     const row = LOBBY_ROWS[menu.lobbyCursor];
-    if (row === LOBBY_ROW_READY) return ONLINE_READY;
+    if (row === LOBBY_ROW_READY) return circuitLobbyIssue(session) ? ONLINE_NOTHING : ONLINE_READY;
     if (row === LOBBY_ROW_PAINT) return ONLINE_CUSTOMISE;
     return ONLINE_NOTHING;
   }
@@ -390,21 +408,25 @@ function buildView(menu, session, car) {
 
 function lobbyView(menu, session, car) {
   if (!session.config) return null;
-  const track = TRACKS.find((entry) => entry.id === session.config.trackId) ?? TRACKS[0];
+  const circuit = session.config.raceTypeId === "circuit";
+  const trackCatalog = circuit ? CIRCUIT_TRACKS : TRACKS;
+  const track = trackCatalog.find((entry) => entry.id === session.config.trackId) ?? trackCatalog[0];
   const distance = RACE_DISTANCES[session.config.distanceId] ?? RACE_DISTANCES.quarter;
+  const issue = circuitLobbyIssue(session);
 
   const rows = [
     { id: LOBBY_ROW_CAR, label: "YOUR CAR", value: car.modelLabel, own: true },
     { id: LOBBY_ROW_PAINT, label: "PAINT", value: car.paintLabel, own: true },
-    { id: LOBBY_ROW_TRACK, label: "STRIP", value: track.label ?? track.id },
-    { id: LOBBY_ROW_DISTANCE, label: "DISTANCE", value: distance.label },
+    { id: LOBBY_ROW_RACE_TYPE, label: "RACE", value: circuit ? "CIRCUIT" : "DRAG" },
+    { id: LOBBY_ROW_TRACK, label: circuit ? "CIRCUIT" : "STRIP", value: track.label ?? track.id },
+    { id: LOBBY_ROW_DISTANCE, label: circuit ? "LAPS" : "DISTANCE", value: circuit ? `${session.config.laps ?? 3} LAPS` : distance.label },
     { id: LOBBY_ROW_BEST_OF, label: "MATCH", value: `BEST OF ${session.config.bestOf}` },
     {
       id: LOBBY_ROW_READY,
       label: null,
       // Named for what pressing it does next, so a driver who has already
       // readied up is not invited to do it again.
-      value: readyLabel(session),
+      value: issue ? "CIRCUIT CAR REQUIRED" : readyLabel(session),
       button: true,
     },
   ].map((row, index) => ({
@@ -424,6 +446,7 @@ function lobbyView(menu, session, car) {
     isHost: session.isHost,
     full: session.players.length === 2,
     waitingFor: session.players.length < 2 ? "Waiting for another driver…" : null,
+    issue,
     // Always this driver first, so the left-hand card is always yours.
     drivers: [...session.players]
       .sort((a, b) => Number(b.playerId === session.youPlayerId) - Number(a.playerId === session.youPlayerId))
@@ -589,4 +612,10 @@ function readyLabel(session) {
   if (session.players.length < 2) return "WAITING FOR AN OPPONENT";
   const me = session.players.find((player) => player.playerId === session.youPlayerId);
   return me?.ready ? "READY — WAITING FOR THEM" : "STAGE THE CAR";
+}
+
+export function circuitLobbyIssue(session) {
+  if (session?.config?.raceTypeId !== "circuit") return null;
+  const unavailable = (session.players ?? []).find((player) => !hasCircuitAtlas(player.modelId));
+  return unavailable ? `${unavailable.displayName || "A driver"} needs a Circuit Race car` : null;
 }

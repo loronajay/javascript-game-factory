@@ -284,6 +284,15 @@ function drawModelGrid(ctx, view, sheetImages) {
       if (cell.locked) {
         lockTick(ctx, rect);
       }
+      if (cell.available === false) {
+        ctx.fillStyle = "rgba(8,10,14,0.68)";
+        ctx.fillRect(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2);
+        label(ctx, "NO ATLAS", rect.x + rect.width / 2, rect.y + rect.height / 2 + 4, {
+          size: 8,
+          colour: MUTED,
+          align: "center",
+        });
+      }
     }
   }
 }
@@ -373,7 +382,22 @@ function drawTrackStrip(ctx, view, trackImages) {
     });
 
     const image = trackImages.get(track.id);
-    if (image && image.complete && image.naturalWidth > 0) {
+    if (image && image.complete && image.naturalWidth > 0 && track.circuit) {
+      const scale = Math.max((rect.width - 2) / image.naturalWidth, (rect.height - 24) / image.naturalHeight);
+      const sw = (rect.width - 2) / scale;
+      const sh = (rect.height - 24) / scale;
+      ctx.drawImage(
+        image,
+        (image.naturalWidth - sw) / 2,
+        (image.naturalHeight - sh) / 2,
+        sw,
+        sh,
+        rect.x + 1,
+        rect.y + 1,
+        rect.width - 2,
+        rect.height - 24,
+      );
+    } else if (image && image.complete && image.naturalWidth > 0) {
       // The full image width, not the race's barrier-to-barrier crop. What tells
       // these five apart is the verge — grass, sand, forest, surf — and the race
       // crop is deliberately tight enough to leave almost all of it out.

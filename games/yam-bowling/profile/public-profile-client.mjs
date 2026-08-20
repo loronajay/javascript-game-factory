@@ -13,8 +13,9 @@ async function readJson(response) {
 }
 
 // Public profile inspection has no garage route by design. It joins the one
-// public presentation document with the one public progression document and
-// returns nothing unless both authoritative reads succeeded.
+// public presentation document with public progression and rating documents.
+// Presentation and progression are required to draw the room; rating is an
+// optional public enhancement and stays explicitly unavailable if its read fails.
 export function createPublicProfileClient({
   platformApi,
   fetchImpl = globalThis.fetch?.bind(globalThis),
@@ -24,12 +25,13 @@ export function createPublicProfileClient({
     if (!normalizedPlayerId || typeof fetchImpl !== "function") return null;
 
     const encoded = encodeURIComponent(normalizedPlayerId);
-    const [loadoutResponse, progression] = await Promise.all([
+    const [loadoutResponse, progression, rating] = await Promise.all([
       fetchImpl(`${platformApi?.baseUrl || ""}/games/${GAME_SLUG}/loadout/${encoded}`, {
         method: "GET",
         credentials: "include",
       }).catch(() => null),
       platformApi?.getGameProgression?.(GAME_SLUG, normalizedPlayerId)?.catch?.(() => null) ?? null,
+      platformApi?.getGameRating?.(GAME_SLUG, normalizedPlayerId)?.catch?.(() => null) ?? null,
     ]);
     if (!loadoutResponse?.ok || !progression) return null;
     const payload = await readJson(loadoutResponse);
@@ -38,6 +40,7 @@ export function createPublicProfileClient({
       playerId: normalizedPlayerId,
       loadout: payload.loadout,
       progression,
+      rating,
     };
   }
 

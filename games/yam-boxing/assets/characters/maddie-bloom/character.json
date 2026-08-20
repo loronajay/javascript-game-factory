@@ -1,0 +1,30 @@
+{
+  "id": "maddie-bloom",
+  "displayName": "Maddie Bloom",
+  "approvalStatus": "approved",
+  "assetVersion": 2,
+  "fixedWorldYawDegrees": 0,
+  "source": {
+    "file": "source/idle-turnaround-approved.png",
+    "generatedFile": "exec-3f6992ac-748a-4f92-9c53-98671b4ac947.png",
+    "editTarget": "the previously approved live-match eight-direction standing sheet",
+    "processing": "background-only chroma edit followed by deterministic RGBA extraction"
+  },
+  "design": {
+    "outfit": "Off-shoulder cropped white ribbed sweater with blush-pink camisole straps, layered blush-pink ruffle skirt with ribbon ties and a heart-chain waist detail, slouchy white leg warmers, and chunky pink-and-white heart fashion sneakers.",
+    "boxingGear": ["boxing gloves"],
+    "wardrobeRule": "Every character wears character-specific fashion; boxing gloves are the only boxing gear."
+  },
+  "actions": {
+    "idle": {
+      "front": "sprites/idle/front.png",
+      "front-right": "sprites/idle/front-right.png",
+      "right": "sprites/idle/right.png",
+      "rear-right": "sprites/idle/rear-right.png",
+      "rear": "sprites/idle/rear.png",
+      "rear-left": "sprites/idle/rear-left.png",
+      "left": "sprites/idle/left.png",
+      "front-left": "sprites/idle/front-left.png"
+    }
+  }
+}

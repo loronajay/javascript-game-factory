@@ -11,6 +11,14 @@ function stat(label, value) {
   return `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`;
 }
 
+function rateLabel(value) {
+  return value === null ? "--" : `${value}%`;
+}
+
+function averageLabel(value) {
+  return value === null ? "--" : value;
+}
+
 export function createProfileScreen({
   profileName,
   loadout,
@@ -260,12 +268,14 @@ export function createProfileScreen({
     $("profile-badge").textContent = model.badge;
     $("profile-player-level").textContent = model.player.level;
     $("profile-player-xp").textContent = `${model.player.xp.toLocaleString()} XP`;
-    $("profile-record").textContent = `${model.career.wins}-${model.career.losses}`;
+    $("profile-record").textContent = `${model.career.wins}W ${model.career.losses}L ${model.career.draws}D`;
     $("profile-career-stats").innerHTML = [
       stat("Matches", model.career.matches),
       stat("Win rate", `${model.career.winRate}%`),
-      stat("Strikes", model.career.strikes),
-      stat("High game", model.career.highGame || "--"),
+      stat("Quick avg", averageLabel(model.career.quick.averageScore)),
+      stat("Classic avg", averageLabel(model.career.classic.averageScore)),
+      stat("Strike rate", rateLabel(model.career.strikeRate)),
+      stat("Spare rate", rateLabel(model.career.spareRate)),
       stat("Bowlers used", progression.listBowlers().filter((entry) => entry.matches > 0).length),
     ].join("");
     $("profile-mastery-name").textContent = `${model.featuredBowler.name.split(" ")[0]} mastery`;

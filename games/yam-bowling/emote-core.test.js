@@ -55,7 +55,7 @@ test("six founding emotes ship unlocked so a new account can always react", () =
 test("every other emote names the route it is earned by", () => {
   for (const emote of EMOTES.filter((entry) => entry.unlock.source !== "founding")) {
     assert.ok(
-      ["emote-voucher", "bowler-level"].includes(emote.unlock.source),
+      ["emote-voucher", "player-level"].includes(emote.unlock.source),
       `${emote.slug} has an unroutable unlock source`,
     );
     assert.match(emote.unlock.detail, /\S/);
@@ -72,9 +72,9 @@ test("all but one earnable emote is bought with a voucher", () => {
   }
 
   assert.deepEqual([...bySource.entries()].sort(), [
-    ["bowler-level", 1],
     ["emote-voucher", 23],
     ["founding", 6],
+    ["player-level", 1],
   ]);
 });
 
@@ -100,33 +100,33 @@ test("every emote reaches the cosmetic catalog with a matching unlock", () => {
   }
 });
 
-test("the one ladder-granted emote agrees with the ladder that pays it", () => {
+test("the one ladder-granted emote agrees with the account ladder that pays it", () => {
   // The catalog sits underneath the ladders and cannot import them, so an
   // unlock source is recorded beside the item. This is what stops the two
   // drifting into a reward whose own copy contradicts the tree offering it.
-  const masteryEmotes = masteryRewards.REWARD_CADENCE
+  const playerEmotes = playerRewards.REWARD_CADENCE
     .flatMap((node) => node.rewards)
     .filter((reward) => reward.family === "emote" && reward.equipment)
     .map((reward) => `emote:${reward.equipment[2]}`);
 
-  assert.deepEqual(masteryEmotes, ["emote:game-face"]);
-  for (const itemId of masteryEmotes) {
+  assert.deepEqual(playerEmotes, ["emote:game-face"]);
+  for (const itemId of playerEmotes) {
     const item = cosmetics.getItem(itemId);
     assert.ok(item, `${itemId} is paid by a ladder and must exist`);
-    assert.equal(item.unlock.source, "bowler-level");
+    assert.equal(item.unlock.source, "player-level");
   }
 
   // And the reverse: an entry claiming a ladder must actually be on one.
   for (const item of cosmetics.listByType("emote")) {
-    if (item.unlock.source === "bowler-level") {
-      assert.ok(masteryEmotes.includes(item.id), `${item.id} claims a ladder that never pays it`);
+    if (item.unlock.source === "player-level") {
+      assert.ok(playerEmotes.includes(item.id), `${item.id} claims a ladder that never pays it`);
     }
   }
 });
 
-test("the player ladder pays emote vouchers rather than named emotes", () => {
+test("the player ladder pays vouchers plus one authored milestone emote", () => {
   const emoteRewards = playerRewards.listRewards().filter((reward) => reward.family === "emote");
-  assert.deepEqual(emoteRewards, [], "a player rung naming one emote would strand the rest of the pool");
+  assert.deepEqual(emoteRewards.map((reward) => [reward.level, reward.equipment?.[2]]), [[7, "game-face"]]);
 
   assert.deepEqual(
     playerRewards.listRewards()

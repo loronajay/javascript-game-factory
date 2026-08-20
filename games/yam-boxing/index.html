@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <title>Yam Boxing — Match View</title>
+  <link rel="stylesheet" href="./styles/match.css?v=3">
+</head>
+<body>
+  <main class="match-shell" aria-label="Yam Boxing match-view prototype">
+    <canvas id="game" aria-label="First-person view inside a boxing ring with Maddie Bloom"></canvas>
+
+    <div class="hud" aria-live="polite">
+      <div class="top-hud">
+        <div class="fighter-card player">
+          <span class="fighter-name">You</span>
+          <div class="health"><span></span></div>
+        </div>
+        <div class="round-card"><span>ROUND 1</span><strong>3:00</strong></div>
+        <div class="fighter-card opponent">
+          <span class="fighter-name" id="opponentName">Maddie Bloom</span>
+          <div class="health"><span></span></div>
+        </div>
+      </div>
+      <div class="crosshair" aria-hidden="true"></div>
+      <div class="view-status">
+        <strong>Viewing <span id="angleLabel">front</span></strong>
+        <span id="positionLabel">x 0.0 · z 3.7 · 180°</span>
+      </div>
+    </div>
+
+    <button type="button" class="guard-toggle" id="guardToggle" data-action="guard" aria-pressed="false">
+      <span class="guard-key" aria-hidden="true">G</span>
+      <span id="guardLabel">Guard Off</span>
+    </button>
+
+    <p class="help"><b>Move:</b> WASD &nbsp; <b>Look:</b> drag or ←/→ &nbsp; <b>Face Maddie:</b> F &nbsp; <b>Guard:</b> G &nbsp; <b>Reset:</b> R</p>
+
+    <div class="mobile-controls" aria-label="Touch movement controls">
+      <div class="dpad">
+        <button type="button" data-hold="forward" aria-label="Move forward">▲</button>
+        <button type="button" data-hold="left" aria-label="Strafe left">◀</button>
+        <button type="button" data-action="face" aria-label="Face Maddie">◎</button>
+        <button type="button" data-hold="right" aria-label="Strafe right">▶</button>
+        <button type="button" data-hold="backward" aria-label="Move backward">▼</button>
+      </div>
+      <div class="look-pad">
+        <button type="button" data-hold="turnLeft" aria-label="Look left">↶</button>
+        <button type="button" data-hold="turnRight" aria-label="Look right">↷</button>
+        <button type="button" class="reset" data-action="reset">RESET</button>
+      </div>
+    </div>
+
+    <div class="loading" id="loading">Loading Maddie Bloom</div>
+  </main>
+  <script type="module" src="./src/match.mjs?v=4"></script>
+</body>
+</html>

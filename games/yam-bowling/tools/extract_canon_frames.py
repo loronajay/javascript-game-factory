@@ -33,8 +33,19 @@ ALPHA_THRESHOLD = 20
 DEFAULT_MODEL = "birefnet-general-lite"
 SOURCE_CROP_MARGIN = 96
 TARGET_CORE_INSET = 24
+# How far a pose window reaches into each neighbouring cell, as a fraction of
+# the cell width, so extremities that cross the valley survive the repack.
+POSE_WINDOW_MARGIN_RATIO = 0.4
+# The part of that reach, nearest this pose's own cell, left unseeded so a
+# crossing extremity is resolved by what it connects to rather than claimed
+# outright. Beyond it the reach is seeded as the neighbour's territory.
+POSE_WINDOW_NEUTRAL_RATIO = 0.45
 COMPONENT_OPENING_OVERRIDES = {
-    ("naomi-okafor", 5): 17,
+    # Per-sheet tuning: a firmer opening sheds a neighbour's stray hand or a
+    # floating scrap of their hair without trimming the target's own outline.
+    ("naomi-okafor", 5): 24,
+    ("piper-hart", 1): 14,
+    ("sage-holloway", 5): 16,
     ("tessa-quinn", 5): 23,
 }
 COMPONENT_PRESERVE_RECTS = {
@@ -212,6 +223,7 @@ def extract_instance_pose(
     pose_index: int,
     instance_mask: np.ndarray,
     foreign_masks: list[np.ndarray] | None = None,
+    short_id: str = "",
     lower_restore_row: int | None = None,
     upper_restore_row: int | None = None,
     mask_dilation: int = 32,
@@ -252,7 +264,7 @@ def extract_instance_pose(
     return retain_target_component(
         crop,
         keep_interior_satellites=False,
-        opening_size=component_opening_size("", pose_index),
+        opening_size=component_opening_size(short_id, pose_index),
     )
 
 
@@ -370,13 +382,49 @@ def rebuild_pose_sheet(image: Image.Image, gutter: int = 10) -> Image.Image:
     if rgba.width % SOURCE_POSE_COUNT:
         raise ValueError(f"Sheet width must be divisible by {SOURCE_POSE_COUNT}.")
     boundaries = find_pose_boundaries(np.asarray(rgba.getchannel("A")))
+    cell_width = rgba.width // SOURCE_POSE_COUNT
+    # Hair and outstretched arms routinely reach across the gap, so the valley
+    # between two poses can fall on the extremity itself. Cropping at the
+    # boundary amputates it in a dead-straight vertical line. Take a window
+    # that reaches into both neighbours instead and let the component selector
+    # below decide what belongs to this pose: the extremity is attached to the
+    # target, while a neighbouring figure is far wider than the margin and so
+    # always meets the window edge, which is how it is discarded.
+    margin = round(cell_width * POSE_WINDOW_MARGIN_RATIO)
     subjects: list[Image.Image] = []
     for pose_index in range(SOURCE_POSE_COUNT):
-        crop = rgba.crop((boundaries[pose_index], 0, boundaries[pose_index + 1], rgba.height))
-        clean, bounds = retain_target_component(crop, opening_size=3)
+        left, right = boundaries[pose_index], boundaries[pose_index + 1]
+        window_left = max(0, left - margin)
+        window_right = min(rgba.width, right + margin)
+        crop = rgba.crop((window_left, 0, window_right, rgba.height))
+        # Generated poses frequently touch, so a connected-component pick would
+        # drag the neighbour in and then slice it at the window edge. Watershed
+        # splits them instead: the eroded core inside the pose cell seeds the
+        # target, foreground meeting the window edge seeds the foreign side.
+        #
+        # The window reaches into both neighbours on purpose, to recover an
+        # extremity that crosses the valley. But the far end of that reach is
+        # the neighbour's own body, and left unseeded the watershed will hand
+        # their hand to this pose - which is exactly how stray forearms ended
+        # up floating beside bowlers. Seed the outer part of each reach as
+        # foreign, leaving a margin next to the cell where a genuine crossing
+        # extremity stays unclaimed and is resolved by what it connects to.
+        reach = round(margin * POSE_WINDOW_NEUTRAL_RATIO)
+        foreign_rects = []
+        if left - window_left > reach:
+            foreign_rects.append((0, 0, left - window_left - reach, rgba.height))
+        if window_right - right > reach:
+            foreign_rects.append(
+                (right - window_left + reach, 0, window_right - window_left, rgba.height)
+            )
+        clean, bounds = separate_edge_neighbors(
+            crop,
+            (left - window_left, right - window_left),
+            opening_size=3,
+            foreign_rects=tuple(foreign_rects),
+        )
         subjects.append(clean.crop(bounds))
 
-    cell_width = rgba.width // SOURCE_POSE_COUNT
     maximum_width = max(subject.width for subject in subjects)
     maximum_height = max(subject.height for subject in subjects)
     scale = min(
@@ -655,6 +703,7 @@ def process_sheet(
                 foreign_masks=[
                     mask for index, mask in enumerate(instance_masks) if index != pose_index
                 ],
+                short_id=short_id,
             )
             left = max(0, boundaries[pose_index] - SOURCE_CROP_MARGIN)
             right = min(segmented.width, boundaries[pose_index + 1] + SOURCE_CROP_MARGIN)

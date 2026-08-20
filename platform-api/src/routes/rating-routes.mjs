@@ -1,7 +1,10 @@
 import { readJsonBody, writeJson } from "../http-utils.mjs";
 const VALID_OUTCOMES = new Set(["win", "loss", "draw"]);
 const VALID_FORFEIT_ROLES = new Set(["leaver", "remaining"]);
-const MAX_TRACK_STATS = 8;
+// Yam Bowling sends two legacy summary fields plus seven counters for the mode
+// that was played. Keep a little headroom for other registered cabinets while
+// retaining a hard cap on the JSONB write surface.
+const MAX_TRACK_STATS = 12;
 // The optional progression block on a reported match. It says what was PLAYED —
 // never what was earned: every XP amount is derived server-side from
 // services/progression-catalog. A malformed or absent block costs the reporter

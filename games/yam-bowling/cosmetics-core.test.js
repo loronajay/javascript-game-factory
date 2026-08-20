@@ -238,7 +238,7 @@ test("the strike cabinet offers a broad, distinct burst collection to unlock", (
 
 test("profile rewards span mastery, achievement, behavior, and tournament prestige", () => {
   const expected = [
-    ["title:pin-chaser", "bowler-level", "rare"],
+    ["title:pin-chaser", "player-level", "rare"],
     ["title:comeback-kid", "achievement", "rare"],
     ["title:yam-champion", "tournament", "legendary"],
     ["title:ice-in-the-tenth", "achievement", "rare"],

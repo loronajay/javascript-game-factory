@@ -44,7 +44,7 @@
 // The briefing's voice is `campaign/contacts.js`, which is where the same
 // argument is written out in full.
 
-import { MODE_RIVAL } from "../sim/modes.js";
+import { MODE_CIRCUIT, MODE_RIVAL } from "../sim/modes.js";
 import { createLivery } from "../garage/livery.js";
 import { KIND_CPU, rivalEntry } from "../rival/lineup.js";
 import { rivalById } from "../rival/rivals.js";
@@ -349,9 +349,9 @@ export const EVENTS = [
     title: "TOLL BOOTH",
     where: "Old Town — under the flyover",
     splash: "circuit-race.png",
-    trackId: "street-race",
-    modeId: MODE_RIVAL,
-    objectiveId: "eighth",
+    trackId: "japan-noir",
+    modeId: MODE_CIRCUIT,
+    objectiveId: "three-laps",
     seed: 6194,
     requires: ["ch1-vee"],
     unlocks: ["ch1-last-orders"],
@@ -362,7 +362,7 @@ export const EVENTS = [
       blurb: "Charges everyone an eighth mile to use his road. Has not lost it in a while.",
       accent: "#a97bff",
       avatarId: "female-19",
-      modelId: "crest-s",
+      modelId: "meridian-rs",
       livery: {
         paint: { hue: 268, saturation: 0.6, brightness: 0.8, finish: "metallic" },
         layers: [
@@ -379,12 +379,12 @@ export const EVENTS = [
     }),
     brief: [
       { speaker: "rook", text: [
-        "He does not want your money. He wants the eighth,",
-        "and he has taken it off everybody who has asked.",
+        "He does not want your money. He wants three laps,",
+        "and every barrier on Japan Noir knows his name.",
       ] },
       { speaker: "dez", text: [
-        "One shift again. Only this time the other lane knows",
-        "exactly when it is coming.",
+        "This is not the strip. Brake, turn, and hit every gate.",
+        "Same car, same paint — now make it go around corners.",
       ] },
     ],
   },

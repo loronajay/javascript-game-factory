@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "source": "canonical Speed Demon car atlas",
+  "models": [
+    { "modelId": "kaido-gts", "label": "Kaido GTS", "archetype": "gt", "sheet": "A", "row": 1, "column": 1 },
+    { "modelId": "tsunami-rz", "label": "Tsunami RZ", "archetype": "coupe", "sheet": "A", "row": 1, "column": 2 },
+    { "modelId": "shutter-z", "label": "Shutter Z", "archetype": "coupe", "sheet": "A", "row": 1, "column": 3 },
+    { "modelId": "meridian-rs", "label": "Meridian RS", "archetype": "euro", "sheet": "A", "row": 1, "column": 4 },
+    { "modelId": "monolith-8", "label": "Monolith 8", "archetype": "wedge", "sheet": "A", "row": 2, "column": 1 },
+    { "modelId": "zephyr-z", "label": "Zephyr Z", "archetype": "coupe", "sheet": "A", "row": 2, "column": 2 },
+    { "modelId": "stallion-gt", "label": "Stallion GT", "archetype": "muscle", "sheet": "A", "row": 2, "column": 3 },
+    { "modelId": "aero-rs", "label": "Aero RS", "archetype": "euro", "sheet": "A", "row": 2, "column": 4 },
+    { "modelId": "skyward-r", "label": "Skyward R", "archetype": "gt", "sheet": "A", "row": 3, "column": 1 },
+    { "modelId": "gravel-stx", "label": "Gravel STx", "archetype": "gt", "sheet": "A", "row": 3, "column": 2 },
+    { "modelId": "toro-sv", "label": "Toro SV", "archetype": "exotic", "sheet": "A", "row": 3, "column": 3 },
+    { "modelId": "scalpel-r", "label": "Scalpel R", "archetype": "hatch", "sheet": "A", "row": 3, "column": 4 },
+    { "modelId": "chrono-12", "label": "Chrono 12", "archetype": "wedge", "sheet": "B", "row": 1, "column": 1 },
+    { "modelId": "orbit-rz", "label": "Orbit RZ", "archetype": "coupe", "sheet": "B", "row": 1, "column": 2 },
+    { "modelId": "vega-qv", "label": "Vega QV", "archetype": "exotic", "sheet": "B", "row": 1, "column": 3 },
+    { "modelId": "crest-s", "label": "Crest S", "archetype": "euro", "sheet": "B", "row": 1, "column": 4 },
+    { "modelId": "titan-r", "label": "Titan R", "archetype": "gt", "sheet": "B", "row": 2, "column": 1 },
+    { "modelId": "cyclone-rz", "label": "Cyclone RZ", "archetype": "coupe", "sheet": "B", "row": 2, "column": 2 },
+    { "modelId": "colt-gt", "label": "Colt GT", "archetype": "muscle", "sheet": "B", "row": 2, "column": 3 },
+    { "modelId": "ember-rs", "label": "Ember RS", "archetype": "hatch", "sheet": "B", "row": 2, "column": 4 },
+    { "modelId": "halo-lt", "label": "Halo LT", "archetype": "exotic", "sheet": "B", "row": 3, "column": 1 },
+    { "modelId": "vortex-fd", "label": "Vortex FD", "archetype": "coupe", "sheet": "B", "row": 3, "column": 2 },
+    { "modelId": "kaido-r", "label": "Kaido R", "archetype": "gt", "sheet": "B", "row": 3, "column": 3 },
+    { "modelId": "crest-turbo", "label": "Crest Turbo", "archetype": "euro", "sheet": "B", "row": 3, "column": 4 }
+  ]
+}

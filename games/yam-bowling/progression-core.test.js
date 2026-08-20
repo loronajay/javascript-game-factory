@@ -433,7 +433,13 @@ test("a bowler summary carries the stats mastery is measured by", () => {
   store.applySnapshot({
     version: SCHEMA_VERSION,
     player: { xp: 0 },
-    bowlers: { [SLUG]: { xp: 900, matches: 12, wins: 7, strikes: 30, highGame: 201 } },
+    bowlers: { [SLUG]: {
+      xp: 900, matches: 12, wins: 7, draws: 2, strikes: 30, highGame: 201,
+      quickGames: 5, quickTotalScore: 390, quickHighGame: 91,
+      quickStrikeOpportunities: 19, quickStrikes: 8, quickSpareOpportunities: 9, quickSpares: 5,
+      classicGames: 7, classicTotalScore: 1180, classicHighGame: 201,
+      classicStrikeOpportunities: 78, classicStrikes: 22, classicSpareOpportunities: 42, classicSpares: 30,
+    } },
     grants: [],
     syncedAt: "2026-08-15T00:00:00.000Z",
   });
@@ -442,8 +448,13 @@ test("a bowler summary carries the stats mastery is measured by", () => {
   assert.equal(summary.slug, SLUG);
   assert.equal(summary.matches, 12);
   assert.equal(summary.wins, 7);
+  assert.equal(summary.draws, 2);
   assert.equal(summary.strikes, 30);
   assert.equal(summary.highGame, 201);
+  assert.equal(summary.quickGames, 5);
+  assert.equal(summary.quickTotalScore, 390);
+  assert.equal(summary.classicGames, 7);
+  assert.equal(summary.classicSpares, 30);
   assert.equal(summary.level, levelFromXp("bowler", 900).level);
 });
 

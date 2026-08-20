@@ -16,14 +16,82 @@ import { applyProgressionDocument } from "../state/progression-snapshot.mjs";
 
 const GAME_SLUG = "yam-bowling";
 
-// Strikes bowled in one match. A roll of 10 can only happen off a full rack —
-// a spare's second ball has at most nine pins to take — so counting rolls equal
-// to ten counts strikes exactly, including the tenth frame's bonus balls.
-function countStrikes(player) {
-  return (player?.frames || []).reduce(
-    (total, frame) => total + frame.filter((roll) => roll === 10).length,
-    0,
-  );
+function safePins(value) {
+  const pins = Math.floor(Number(value));
+  return Number.isFinite(pins) ? Math.max(0, Math.min(10, pins)) : null;
+}
+
+// Produces the additive counters a server needs to calculate averages and
+// conversion rates without ever averaging an average. Quick and Classic keep
+// separate game/score denominators because a three-frame 87 and a ten-frame 87
+// are not comparable games. The final frame is walked explicitly: bonus balls
+// may begin on a fresh rack, while a 0-then-10 spare must never masquerade as a
+// strike merely because one roll knocked down ten pins.
+export function summarizeBowlingStats(player, modeId) {
+  const frames = Array.isArray(player?.frames) ? player.frames : [];
+  let strikeOpportunities = 0;
+  let strikes = 0;
+  let spareOpportunities = 0;
+  let spares = 0;
+
+  frames.forEach((rawFrame, frameIndex) => {
+    const frame = Array.isArray(rawFrame) ? rawFrame.map(safePins) : [];
+    const first = frame[0];
+    if (first === null || first === undefined) return;
+    const final = frameIndex === frames.length - 1;
+
+    strikeOpportunities += 1;
+    if (first === 10) strikes += 1;
+
+    if (!final) {
+      if (first < 10) {
+        spareOpportunities += 1;
+        if (frame[1] !== null && frame[1] !== undefined && first + frame[1] === 10) spares += 1;
+      }
+      return;
+    }
+
+    const second = frame[1];
+    const third = frame[2];
+    if (first < 10) {
+      spareOpportunities += 1;
+      if (second !== null && second !== undefined && first + second === 10) {
+        spares += 1;
+        if (third !== null && third !== undefined) {
+          strikeOpportunities += 1;
+          if (third === 10) strikes += 1;
+        }
+      }
+      return;
+    }
+
+    if (second === null || second === undefined) return;
+    strikeOpportunities += 1;
+    if (second === 10) {
+      strikes += 1;
+      if (third !== null && third !== undefined) {
+        strikeOpportunities += 1;
+        if (third === 10) strikes += 1;
+      }
+    } else {
+      spareOpportunities += 1;
+      if (third !== null && third !== undefined && second + third === 10) spares += 1;
+    }
+  });
+
+  const score = Math.max(0, Math.floor(Number(player?.score?.total)) || 0);
+  const stats = { strikes, highGame: score };
+  if (modeId !== "quick" && modeId !== "classic") return stats;
+  return {
+    ...stats,
+    [`${modeId}Games`]: 1,
+    [`${modeId}TotalScore`]: score,
+    [`${modeId}HighGame`]: score,
+    [`${modeId}StrikeOpportunities`]: strikeOpportunities,
+    [`${modeId}Strikes`]: strikes,
+    [`${modeId}SpareOpportunities`]: spareOpportunities,
+    [`${modeId}Spares`]: spares,
+  };
 }
 
 // A disconnect forfeit is the server's ruling, carried on the snapshot. The
@@ -51,6 +119,7 @@ export function createProgressionReporter({ progressionCore, store, platformApi,
   function prepare({ match, clientId, sessionId, snapshotResult, opponentPlayerId = null, outcome = null, ranked = false }) {
     const me = match?.players?.find((player) => player.id === clientId);
     if (!me || !sessionId) return null;
+    const stats = summarizeBowlingStats(me, match.modeId);
 
     const grant = progressionCore.computeMatchGrant({
       grantId: sessionId,
@@ -60,7 +129,7 @@ export function createProgressionReporter({ progressionCore, store, platformApi,
       terminal: match.status === "complete",
       outcome: match.winnerIds.length > 1 ? "draw"
         : match.winnerIds.includes(me.id) ? "win" : "loss",
-      strikes: countStrikes(me),
+      strikes: stats.strikes,
       forfeitRole: forfeitRoleFor(snapshotResult, clientId),
     });
 
@@ -72,9 +141,9 @@ export function createProgressionReporter({ progressionCore, store, platformApi,
       modeId: match.modeId,
       // The countable stat the capped bonus rides on. Named for what it is
       // rather than for what it pays, because the payout is the server's.
-      performance: countStrikes(me),
+      performance: stats.strikes,
       forfeitRole: grant.breakdown.forfeit > 0 ? "remaining" : null,
-      stats: { strikes: countStrikes(me), highGame: me.score?.total || 0 },
+      stats,
     };
     // Only a complete request is worth queuing. Half of one would have to be
     // guessed at on replay, and a guessed rating report is a wrong record.
