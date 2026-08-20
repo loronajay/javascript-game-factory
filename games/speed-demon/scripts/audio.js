@@ -22,10 +22,33 @@ const ONE_SHOT_VOLUMES = {
 const IDLE_VOLUME = 0.32;
 const REV_VOLUME = 0.62;
 
+const clamp01 = (value) => Math.max(0, Math.min(1, Number(value) || 0));
+
 /** A clearly audible half-octave rise across the six-speed box. */
 export function revRateForGear(gear) {
   const clampedGear = Math.max(1, Math.min(6, Number(gear) || 1));
   return 0.85 + (clampedGear - 1) * 0.1;
+}
+
+/**
+ * Continuous engine mix for a circuit car, which has no discrete gearbox RPM.
+ * Road speed carries pitch and throttle carries load; coasting therefore still
+ * sounds like a connected engine instead of dropping to silence between key
+ * presses.
+ */
+export function circuitEngineMix({ active, throttle, speed, maxSpeed }) {
+  if (!active) return { idleVolume: 0, revVolume: 0, playbackRate: 1 };
+  const load = clamp01(throttle);
+  const safeMaxSpeed = Math.max(1, Number(maxSpeed) || 1);
+  const speedRatio = clamp01(Math.abs(Number(speed) || 0) / safeMaxSpeed);
+  const rpmShape = Math.sqrt(speedRatio);
+  const idleVolume = IDLE_VOLUME * (1 - speedRatio) ** 2 * (1 - load * 0.85);
+  const revPresence = Math.min(1, rpmShape * 0.7 + load * 0.3);
+  return {
+    idleVolume,
+    revVolume: REV_VOLUME * revPresence,
+    playbackRate: 0.72 + rpmShape * 0.93 + load * 0.15,
+  };
 }
 
 /** Returns the tree cue caused by one race-state transition, if any. */
@@ -144,13 +167,20 @@ export function createGameAudio({ AudioClass = globalThis.Audio } = {}) {
       swallowRejectedPlay(sound.play());
     },
 
-    engine({ active, throttle, gear }) {
+    engine({ active, throttle, gear, speed = null, maxSpeed = null }) {
       if (!active) {
         idle.volume = 0;
         revving.volume = 0;
         return;
       }
       startLoops();
+      if (speed !== null && Number(maxSpeed) > 0) {
+        const mix = circuitEngineMix({ active, throttle, speed, maxSpeed });
+        idle.volume = mix.idleVolume;
+        revving.volume = mix.revVolume;
+        revving.playbackRate = mix.playbackRate;
+        return;
+      }
       const onThrottle = throttle > 0;
       idle.volume = onThrottle ? 0 : IDLE_VOLUME;
       revving.volume = onThrottle ? REV_VOLUME : 0;

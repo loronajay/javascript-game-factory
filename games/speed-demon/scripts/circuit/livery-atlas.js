@@ -11,7 +11,6 @@ import {
   REGION_BODY,
   REGION_CABIN,
   REGION_LAMP,
-  bodyCoverageMap,
   classifyPixel,
   lampPixel,
   mixPaint,
@@ -28,11 +27,58 @@ export const CIRCUIT_LIVERY_CACHE_LIMIT = 32;
 const CIRCUIT_COVERAGE_CACHE_LIMIT = 8;
 
 export function createCircuitLiveryCache() {
-  return { atlases: new Map(), coverage: new Map(), geometry: new Map() };
+  return {
+    atlases: new Map(),
+    coverage: new Map(),
+    geometry: new Map(),
+    projection: new Map(),
+  };
 }
 
 function imageReady(image) {
   return Boolean(image && image.complete && image.naturalWidth > 0);
+}
+
+function percentile(values, fraction, fallback) {
+  if (!values.length) return fallback;
+  values.sort((a, b) => a - b);
+  return values[Math.round((values.length - 1) * fraction)];
+}
+
+/**
+ * Measures the paintable body independently from the complete silhouette.
+ * Wheels, cast shadows, glass and wings still count when the sprite is centred
+ * and sized, but cannot move the canonical livery's nose/tail/side anchors.
+ */
+export function measureCircuitBodyGeometry(pixels, width, height, silhouette) {
+  const frameCount = Math.floor(width / CIRCUIT_FRAME_SIZE);
+  return Array.from({ length: frameCount }, (_, frame) => {
+    const longitudinal = [];
+    const lateral = [];
+    const base = silhouette[frame];
+    const angle = ((frame + 4) % 8) * Math.PI / 4;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < CIRCUIT_FRAME_SIZE; x += 1) {
+        const pixel = (y * width + frame * CIRCUIT_FRAME_SIZE + x) * 4;
+        if (pixels[pixel + 3] <= 8) continue;
+        const bootstrap = localCarCoordinates(frame, x, y, CIRCUIT_FRAME_SIZE, base);
+        if (classifyPixel(pixels[pixel], pixels[pixel + 1], pixels[pixel + 2], bootstrap.v)
+          !== REGION_BODY) continue;
+        const dx = x + 0.5 - CIRCUIT_FRAME_SIZE / 2;
+        const dy = y + 0.5 - height / 2;
+        lateral.push(dx * cos + dy * sin);
+        longitudinal.push(dx * sin - dy * cos);
+      }
+    }
+    return Object.freeze({
+      lateralMin: percentile(lateral, 0.02, base.lateralMin),
+      lateralMax: percentile(lateral, 0.98, base.lateralMax),
+      longitudinalMin: percentile(longitudinal, 0.02, base.longitudinalMin),
+      longitudinalMax: percentile(longitudinal, 0.98, base.longitudinalMax),
+    });
+  });
 }
 
 function hasConfidentNeighbour(confident, width, height, x, y, frameStart) {
@@ -48,21 +94,18 @@ function hasConfidentNeighbour(confident, width, height, x, y, frameStart) {
   return false;
 }
 
-/** Direction-aware equivalent of `bodyCoverageMap` for a horizontal atlas. */
-export function circuitBodyCoverageMap(pixels, width, height) {
-  // Keep the established north-frame algorithm as the behavioral reference;
-  // the implementation below differs only in supplying local v per heading.
-  if (width === CIRCUIT_FRAME_SIZE) return bodyCoverageMap(pixels, width, height);
-
+/** Per-frame-UV equivalent of `bodyCoverageMap` for a horizontal atlas. */
+export function circuitBodyCoverageMap(pixels, width, height, geometry = null) {
   const coverage = new Float32Array(width * height);
   const confident = new Uint8Array(width * height);
   const frameCount = Math.floor(width / CIRCUIT_FRAME_SIZE);
+  const frames = geometry ?? measureCircuitFrameGeometry(pixels, width, height);
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const frame = Math.min(frameCount - 1, Math.floor(x / CIRCUIT_FRAME_SIZE));
       const localX = x - frame * CIRCUIT_FRAME_SIZE;
-      const local = localCarCoordinates(frame, localX, y);
+      const local = localCarCoordinates(frame, localX, y, CIRCUIT_FRAME_SIZE, frames[frame]);
       const k = y * width + x;
       const i = k * 4;
       if (pixels[i + 3] === 0) continue;
@@ -89,10 +132,10 @@ export function circuitBodyCoverageMap(pixels, width, height) {
   return coverage;
 }
 
-function coverageFor(cache, modelId, pixels, width, height) {
+function coverageFor(cache, modelId, pixels, width, height, geometry) {
   const found = cache.get(modelId);
   if (found) return found;
-  const coverage = circuitBodyCoverageMap(pixels, width, height);
+  const coverage = circuitBodyCoverageMap(pixels, width, height, geometry);
   cache.set(modelId, coverage);
   while (cache.size > CIRCUIT_COVERAGE_CACHE_LIMIT) cache.delete(cache.keys().next().value);
   return coverage;
@@ -132,11 +175,30 @@ function geometryFor(cache, modelId, pixels, width, height) {
   return geometry;
 }
 
+function projectionFor(cache, modelId, pixels, width, height, silhouette) {
+  const found = cache.get(modelId);
+  if (found) return found;
+  const projection = measureCircuitBodyGeometry(pixels, width, height, silhouette);
+  cache.set(modelId, projection);
+  return projection;
+}
+
 export function circuitFrameScale(cache, modelId, frameIndex) {
   return cache.geometry.get(modelId)?.[frameIndex]?.scale ?? 1;
 }
 
-function bakeCircuitAtlas(image, modelId, livery, coverageCache, geometryCache) {
+export function circuitFrameGeometry(cache, modelId, frameIndex) {
+  return cache.geometry.get(modelId)?.[frameIndex] ?? null;
+}
+
+function bakeCircuitAtlas(
+  image,
+  modelId,
+  livery,
+  coverageCache,
+  geometryCache,
+  projectionCache,
+) {
   const canvas = document.createElement("canvas");
   canvas.width = image.naturalWidth;
   canvas.height = image.naturalHeight || CIRCUIT_FRAME_SIZE;
@@ -145,7 +207,15 @@ function bakeCircuitAtlas(image, modelId, livery, coverageCache, geometryCache) 
   context.drawImage(image, 0, 0);
   const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
   const pixels = imageData.data;
-  geometryFor(geometryCache, modelId, pixels, canvas.width, canvas.height);
+  const geometry = geometryFor(geometryCache, modelId, pixels, canvas.width, canvas.height);
+  const projection = projectionFor(
+    projectionCache,
+    modelId,
+    pixels,
+    canvas.width,
+    canvas.height,
+    geometry,
+  );
 
   const flatBase = livery.paint.saturation === 0
     && livery.paint.brightness === 1
@@ -157,7 +227,7 @@ function bakeCircuitAtlas(image, modelId, livery, coverageCache, geometryCache) 
 
   const skipBase = flatBase && !livery.fade.enabled;
   const coverage = paints
-    ? coverageFor(coverageCache, modelId, pixels, canvas.width, canvas.height)
+    ? coverageFor(coverageCache, modelId, pixels, canvas.width, canvas.height, projection)
     : null;
 
   for (let y = 0; y < canvas.height; y += 1) {
@@ -166,7 +236,13 @@ function bakeCircuitAtlas(image, modelId, livery, coverageCache, geometryCache) 
       const i = k * 4;
       if (pixels[i + 3] === 0) continue;
       const frame = Math.floor(x / CIRCUIT_FRAME_SIZE);
-      const local = localCarCoordinates(frame, x - frame * CIRCUIT_FRAME_SIZE, y);
+      const local = localCarCoordinates(
+        frame,
+        x - frame * CIRCUIT_FRAME_SIZE,
+        y,
+        CIRCUIT_FRAME_SIZE,
+        projection[frame],
+      );
       const r = pixels[i];
       const g = pixels[i + 1];
       const b = pixels[i + 2];
@@ -208,7 +284,14 @@ export function circuitLiveryAtlas(cache, { image, modelId, livery }) {
     return found;
   }
 
-  const atlas = bakeCircuitAtlas(image, modelId, normalized, cache.coverage, cache.geometry);
+  const atlas = bakeCircuitAtlas(
+    image,
+    modelId,
+    normalized,
+    cache.coverage,
+    cache.geometry,
+    cache.projection ?? new Map(),
+  );
   cache.atlases.set(key, atlas);
   while (cache.atlases.size > CIRCUIT_LIVERY_CACHE_LIMIT) {
     cache.atlases.delete(cache.atlases.keys().next().value);

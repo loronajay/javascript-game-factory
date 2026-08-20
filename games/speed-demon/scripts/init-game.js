@@ -26,6 +26,8 @@ import { createRuntimeRegistry } from "./runtime/registry.js";
 import { buildRuntimeDefinition } from "./runtime/definitions.js";
 import { createCircuitView, stepCircuitView, renderCircuit } from "./circuit/renderer.js";
 import { STATUS_FINISHED as CIRCUIT_FINISHED } from "./circuit/race.js";
+import { VEHICLE_TUNING } from "./circuit/config.js";
+import { getSpeed as getCircuitSpeed } from "./circuit/vehicle.js";
 import {
   createSetup,
   moveSetup,
@@ -2831,13 +2833,32 @@ export function boot(canvas) {
 
   function tickCircuitRuntime() {
     const controls = input.circuitControls();
+    const syncCircuitEngine = (active = true) => {
+      const local = circuitRace.participants.find((participant) => participant.control === "local")
+        ?? circuitRace.participants[0];
+      audio.engine({
+        active,
+        throttle: controls.throttle,
+        speed: getCircuitSpeed(local.vehicle),
+        maxSpeed: VEHICLE_TUNING.maxForwardSpeed,
+      });
+    };
     if (onlineCircuit) {
-      if (showsOnlineResult()) return;
+      if (showsOnlineResult()) {
+        syncCircuitEngine(false);
+        return;
+      }
       if (session.status === STATUS_COUNTDOWN) {
-        if (!readyToLaunch(session, Date.now())) return;
+        if (!readyToLaunch(session, Date.now())) {
+          syncCircuitEngine();
+          return;
+        }
         session = racing(session);
       }
-      if (session.status !== STATUS_RACING) return;
+      if (session.status !== STATUS_RACING) {
+        syncCircuitEngine(false);
+        return;
+      }
       circuitPrediction = predictCircuitTick(circuitPrediction, activeRuntime, controls);
       circuitPrediction = predictCircuitTick(circuitPrediction, activeRuntime, controls);
       const events = unsentCircuitInputs(circuitPrediction);
@@ -2863,7 +2884,7 @@ export function boot(canvas) {
       recordCampaignRun(runtimeResult);
       shell = enterScreen(shell, SCREEN_RESULTS);
     }
-    audio.engine({ active: false, throttle: 0, gear: 0 });
+    syncCircuitEngine(circuitRace.status !== CIRCUIT_FINISHED);
   }
 
   function tick(throttle) {

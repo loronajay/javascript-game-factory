@@ -13,7 +13,7 @@ import { WORLD } from "./scene.js";
 import { drawMenuBackdrop } from "./menus.js";
 import { liverySprite, drawUnderglow } from "./livery.js";
 import { CIRCUIT_FRAME_SIZE, circuitModelById } from "../circuit/assets.js";
-import { circuitFrameScale, circuitLiveryAtlas } from "../circuit/livery-atlas.js";
+import { circuitFrameGeometry, circuitLiveryAtlas } from "../circuit/livery-atlas.js";
 import { circuitDrawBox } from "../circuit/sprite-geometry.js";
 import { hueToRgb, paintSwatchColour } from "../garage/paint.js";
 import {
@@ -479,7 +479,7 @@ function drawPreview(
       circuitX,
       circuitTop + size / 2,
       size,
-      circuitFrameScale(circuitLiveryCache, model.id, frame),
+      circuitFrameGeometry(circuitLiveryCache, model.id, frame),
     );
     drawUnderglow(ctx, {
       x: circuitX,

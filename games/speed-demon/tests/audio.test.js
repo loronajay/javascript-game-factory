@@ -2,6 +2,7 @@ import { suite, test, assert, assertEqual, assertDeepEqual, assertClose, finish 
 
 import {
   SOUND_SOURCES,
+  circuitEngineMix,
   countdownCue,
   raceSoundEvents,
   revRateForGear,
@@ -75,6 +76,21 @@ test("rev pitch rises monotonically from first through sixth", () => {
   assertClose(revRateForGear(6), 1.35, 1e-9);
 });
 
+test("circuit engine sound follows road speed and load instead of a fake gear", () => {
+  const stopped = circuitEngineMix({ active: true, throttle: 0, speed: 0, maxSpeed: 350 });
+  const coasting = circuitEngineMix({ active: true, throttle: 0, speed: 175, maxSpeed: 350 });
+  const accelerating = circuitEngineMix({ active: true, throttle: 1, speed: 175, maxSpeed: 350 });
+  const fast = circuitEngineMix({ active: true, throttle: 1, speed: 350, maxSpeed: 350 });
+  const inactive = circuitEngineMix({ active: false, throttle: 1, speed: 350, maxSpeed: 350 });
+
+  assert(stopped.idleVolume > stopped.revVolume, "a stopped circuit car should idle");
+  assert(coasting.revVolume > 0, "a moving car went silent off throttle");
+  assert(accelerating.revVolume > coasting.revVolume, "engine load did not add any presence");
+  assert(accelerating.playbackRate > stopped.playbackRate);
+  assert(fast.playbackRate > accelerating.playbackRate);
+  assertDeepEqual(inactive, { idleVolume: 0, revVolume: 0, playbackRate: 1 });
+});
+
 class FakeAudio {
   static instances = [];
 
@@ -124,6 +140,19 @@ test("engine control switches between idle and rev and applies real pitch shifti
   audio.engine({ active: false, throttle: 1, gear: 6 });
   assertEqual(idle.volume, 0);
   assertEqual(revving.volume, 0);
+});
+
+test("engine control applies the continuous circuit mix to the real loops", () => {
+  FakeAudio.instances = [];
+  const audio = createGameAudio({ AudioClass: FakeAudio });
+  const idle = FakeAudio.instances.find((sound) => sound.src === SOUND_SOURCES.idle);
+  const revving = FakeAudio.instances.find((sound) => sound.src === SOUND_SOURCES.revving);
+
+  audio.engine({ active: true, throttle: 0.65, speed: 180, maxSpeed: 350 });
+  const expected = circuitEngineMix({ active: true, throttle: 0.65, speed: 180, maxSpeed: 350 });
+  assertClose(idle.volume, expected.idleVolume, 1e-9);
+  assertClose(revving.volume, expected.revVolume, 1e-9);
+  assertClose(revving.playbackRate, expected.playbackRate, 1e-9);
 });
 
 test("one-shot cues rewind so repeated countdown ticks are never skipped", () => {

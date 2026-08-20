@@ -7,7 +7,10 @@ import { readPng } from "./png.js";
 import { createLivery, addLayer, updateLayer } from "../scripts/garage/livery.js";
 import { classifyPixel, REGION_BODY, REGION_CABIN, REGION_LAMP } from "../scripts/garage/paint.js";
 import { circuitPreviewFrame } from "../scripts/ui/garage-editor.js";
-import { localCarCoordinates } from "../scripts/circuit/sprite-geometry.js";
+import {
+  localCarCoordinates,
+  measureCircuitFrameGeometry,
+} from "../scripts/circuit/sprite-geometry.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -32,6 +35,7 @@ const {
   CIRCUIT_LIVERY_CACHE_LIMIT,
   createCircuitLiveryCache,
   circuitLiveryAtlas,
+  measureCircuitBodyGeometry,
 } = await import("../scripts/circuit/livery-atlas.js");
 
 suite("circuit livery — one canonical paint across eight headings");
@@ -69,21 +73,44 @@ function complexLivery() {
   });
 }
 
-test("local coordinates follow the artwork's actual nose at every cardinal heading", () => {
-  const southFacingNose = localCarCoordinates(0, 32, 48);
-  const westFacingNose = localCarCoordinates(2, 16, 32);
-  const northFacingNose = localCarCoordinates(4, 32, 16);
-  const eastFacingNose = localCarCoordinates(6, 48, 32);
-  for (const point of [westFacingNose, northFacingNose, eastFacingNose]) {
-    // Pixel centres cannot land on the exact same sub-pixel after a 90-degree
-    // turn on an even-sized frame; one pixel is the tight meaningful bound.
-    assertClose(point.u, southFacingNose.u, 1 / 64);
-    assertClose(point.v, southFacingNose.v, 1 / 64);
+test("each generated view maps the same authored UV to the same car-local point", () => {
+  const silhouette = measureCircuitFrameGeometry(sheet.pixels, sheet.width, sheet.height);
+  const geometry = measureCircuitBodyGeometry(sheet.pixels, sheet.width, sheet.height, silhouette);
+  const expected = { u: 0.27, v: 0.18 };
+  for (let frame = 0; frame < 8; frame += 1) {
+    const measured = geometry[frame];
+    const angle = ((frame + 4) % 8) * Math.PI / 4;
+    const lateral = measured.lateralMin
+      + expected.u * (measured.lateralMax - measured.lateralMin);
+    const longitudinal = measured.longitudinalMax
+      - expected.v * (measured.longitudinalMax - measured.longitudinalMin);
+    const x = 31.5 + longitudinal * Math.sin(angle) + lateral * Math.cos(angle);
+    const y = 31.5 - longitudinal * Math.cos(angle) + lateral * Math.sin(angle);
+    const point = localCarCoordinates(frame, x, y, 64, measured);
+    assertClose(point.u, expected.u, 1e-9, `frame ${frame} drifted across the body`);
+    assertClose(point.v, expected.v, 1e-9, `frame ${frame} drifted nose-to-tail`);
   }
-  assert(southFacingNose.v < 0.3, "the sheet's first frame still treats the tail as the nose");
 });
 
-test("a complex livery paints body, glass and lamps at north, east, south and west", () => {
+test("paint projection is calibrated to bodywork, not wheels, wings or shadows", () => {
+  const silhouette = measureCircuitFrameGeometry(sheet.pixels, sheet.width, sheet.height);
+  const body = measureCircuitBodyGeometry(sheet.pixels, sheet.width, sheet.height, silhouette);
+  let tightenedViews = 0;
+  for (let frame = 0; frame < 8; frame += 1) {
+    const fullLong = silhouette[frame].longitudinalMax - silhouette[frame].longitudinalMin;
+    const fullWide = silhouette[frame].lateralMax - silhouette[frame].lateralMin;
+    const bodyLong = body[frame].longitudinalMax - body[frame].longitudinalMin;
+    const bodyWide = body[frame].lateralMax - body[frame].lateralMin;
+    assert(bodyLong <= fullLong, `frame ${frame} body projection exceeds its silhouette length`);
+    assert(bodyWide <= fullWide, `frame ${frame} body projection exceeds its silhouette width`);
+    if (bodyLong < fullLong - 1 || bodyWide < fullWide - 1) tightenedViews += 1;
+  }
+  assert(tightenedViews >= 6, "body projection did not reject exterior sprite features");
+});
+
+test("a complex livery paints body, glass and lamps in every generated view", () => {
+  const silhouette = measureCircuitFrameGeometry(sheet.pixels, sheet.width, sheet.height);
+  const geometry = measureCircuitBodyGeometry(sheet.pixels, sheet.width, sheet.height, silhouette);
   const atlas = circuitLiveryAtlas(createCircuitLiveryCache(), {
     image,
     modelId: "kaido-gts",
@@ -91,13 +118,13 @@ test("a complex livery paints body, glass and lamps at north, east, south and we
   });
   assert(atlas, "the loaded atlas should bake");
 
-  for (const frame of [0, 2, 4, 6]) {
+  for (let frame = 0; frame < 8; frame += 1) {
     const changed = { [REGION_BODY]: 0, [REGION_CABIN]: 0, [REGION_LAMP]: 0 };
     for (let y = 0; y < 64; y += 1) {
       for (let x = 0; x < 64; x += 1) {
         const index = (y * sheet.width + frame * 64 + x) * 4;
         if (sheet.pixels[index + 3] === 0) continue;
-        const local = localCarCoordinates(frame, x, y);
+        const local = localCarCoordinates(frame, x, y, 64, geometry[frame]);
         const region = classifyPixel(
           sheet.pixels[index],
           sheet.pixels[index + 1],

@@ -12,7 +12,6 @@ import {
   hasCircuitAtlas,
 } from "../scripts/circuit/assets.js";
 import {
-  CIRCUIT_TARGET_LENGTH,
   circuitDrawBox,
   circuitFrameIndex,
   measureCircuitFrameGeometry,
@@ -102,30 +101,29 @@ test("every atlas is eight transparent 64px frames clockwise from north", () => 
   }
 });
 
-test("every view is normalized to one physical car length", () => {
+test("every view is normalized to one rendered silhouette diameter", () => {
   for (const model of CIRCUIT_MODELS) {
     const sheet = readPng(fs.readFileSync(path.join(CARS_DIR, model.spritesheet)));
     const geometry = measureCircuitFrameGeometry(sheet.pixels, sheet.width, sheet.height);
-    const rawLengths = geometry.map((frame) => frame.localLength);
-    const normalizedLengths = geometry.map((frame) => frame.localLength * frame.scale);
+    const normalizedDiameters = geometry.map((frame) => frame.footprintDiameter * frame.scale);
 
-    assert(
-      Math.max(...rawLengths) - Math.min(...rawLengths) > 4,
-      `${model.modelId} no longer exercises unequal source views`,
-    );
-    for (const length of normalizedLengths) {
-      assertEqual(Number(length.toFixed(6)), CIRCUIT_TARGET_LENGTH);
+    for (const diameter of normalizedDiameters) {
+      assertEqual(Number(diameter.toFixed(6)), Number(geometry[0].targetFootprintDiameter.toFixed(6)));
     }
   }
 });
 
-test("normalized sprites stay centred on the vehicle", () => {
-  assertDeepEqual(circuitDrawBox(120, 80, 64, 0.75), {
-    x: 96,
-    y: 56,
+test("normalized sprites anchor their measured visual centre on the vehicle", () => {
+  const geometry = { scale: 0.75, sourceCentreX: 40, sourceCentreY: 24 };
+  const box = circuitDrawBox(120, 80, 64, geometry);
+  assertDeepEqual(box, {
+    x: 90,
+    y: 62,
     width: 48,
     height: 48,
   });
+  assertEqual(box.x + geometry.sourceCentreX / 64 * box.width, 120);
+  assertEqual(box.y + geometry.sourceCentreY / 64 * box.height, 80);
 });
 
 finish();

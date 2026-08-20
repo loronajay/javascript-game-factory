@@ -1,5 +1,5 @@
 import { drawUnderglow } from "../render/livery.js";
-import { circuitFrameScale, circuitLiveryAtlas } from "./livery-atlas.js";
+import { circuitFrameGeometry, circuitLiveryAtlas } from "./livery-atlas.js";
 import { CIRCUIT_FRAME_SIZE } from "./assets.js";
 import { circuitDrawBox, circuitFrameIndex } from "./sprite-geometry.js";
 import { getSpeed } from "./vehicle.js";
@@ -34,7 +34,7 @@ function drawCar(ctx, participant, image, cache, debug) {
     participant.vehicle.x,
     participant.vehicle.y,
     size,
-    circuitFrameScale(cache, participant.modelId, frame),
+    circuitFrameGeometry(cache, participant.modelId, frame),
   );
   drawUnderglow(ctx, {
     x: participant.vehicle.x,
