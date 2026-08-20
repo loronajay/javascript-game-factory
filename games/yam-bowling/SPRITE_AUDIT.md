@@ -24,48 +24,44 @@ or limbs, white spots, inconsistent anatomy, or a generally unusable sheet.
 
 ## Recovery inventory for flagged source sheets
 
-`available` means a matching sheet exists under
-`recovery/pre-pipeline-source-sheets/`. It has not been copied over the live
-sheet by this audit, so no current work is silently overwritten.
+`recovery available` tags below mean a matching sheet was copied byte-for-byte
+over the live `source.png` on 2026-08-20. Most came from
+`recovery/pre-pipeline-source-sheets/`; the additional swimsuit sheets came
+from `tmp/pre-fix-baseline/`. The checklist items remain open because their
+manual visual repairs and frame exports have not been performed.
 
-### Available
+### Restored from recovery
 
 - Amara Reed — swimsuit
 - Carmen Blaze — maid, swimsuit
-- Cassy Cruz — maid
+- Cassy Cruz — maid, swimsuit
 - Claire Rowan — maid
-- Daisy Monroe — maid
+- Daisy Monroe — maid, swimsuit
 - Echo Sterling — maid
-- Hazel Ward — Halloween
+- Fiona Vale — swimsuit
+- Hazel Ward — Halloween, swimsuit
 - Imani Cole — Halloween, maid
-- Kevya Desai — Halloween, maid
+- Kevya Desai — Halloween, maid, swimsuit
 - Lillie Chen — maid
-- Lumi Vega — maid
+- Lumi Vega — maid, swimsuit (the original note omitted the variant; swimsuit
+  was used because it is the remaining variant in the note sequence)
 - Marisol Cruz — maid
 - Mina Park — maid
 - Naomi Okafor — maid, swimsuit
 - Nia Brooks — maid
-- Nyx Calder — Halloween, maid
-- Piper Hart — maid
+- Nyx Calder — Halloween, maid, swimsuit
+- Piper Hart — maid, swimsuit
 - Rei Nakamura — maid
 - Reina Sato — maid
-- Sabrina Wilde — maid (the original note omitted the variant; verify this is
-  the intended sheet)
+- Sabrina Wilde — maid (the original note omitted the variant; maid was used
+  because it is the recovery sheet matching the note's position in the list)
 - Scarlett Voss — maid
 - Simone Carter — maid, swimsuit
 - Skye Bennett — maid
 - Tessa Quinn — maid, swimsuit
 
-### Not found in recovery
+### Still requires a new source
 
-- Cassy Cruz — swimsuit (inferred from "same issue as maid")
-- Daisy Monroe — swimsuit
-- Fiona Vale — swimsuit
-- Hazel Ward — swimsuit
-- Kevya Desai — swimsuit
-- Lumi Vega — likely swimsuit (the original note omitted the variant)
-- Nyx Calder — swimsuit
-- Piper Hart — swimsuit
 - Rei Nakamura — swimsuit needs an entirely new sheet, per the audit note
 
 ## Full visual checklist
@@ -90,7 +86,7 @@ sheet by this audit, so no current work is silently overwritten.
 - [ ] Halloween — needs a new throw sheet and portrait sheet; character is too
   buff.
 - [ ] Maid — portrait is too buff; old source sheet needed. `recovery available`
-- [ ] Swimsuit — same issue as maid. `recovery source not found`
+- [ ] Swimsuit — same issue as maid. `source restored from pre-fix baseline`
 
 ### Claire Rowan
 
@@ -99,7 +95,7 @@ sheet by this audit, so no current work is silently overwritten.
 ### Daisy Monroe
 
 - [ ] Maid — source sheet and throw 5. `recovery available`
-- [ ] Swimsuit — source sheet and throw 5. `recovery source not found`
+- [ ] Swimsuit — source sheet and throw 5. `source restored from pre-fix baseline`
 
 ### Echo Sterling
 
@@ -107,12 +103,12 @@ sheet by this audit, so no current work is silently overwritten.
 
 ### Fiona Vale
 
-- [ ] Swimsuit — source sheet and throw 3. `recovery source not found`
+- [ ] Swimsuit — source sheet and throw 3. `source restored from pre-fix baseline`
 
 ### Hazel Ward
 
 - [ ] Halloween — source sheet and throw 5. `recovery available`
-- [ ] Swimsuit — source sheet and throw 3. `recovery source not found`
+- [ ] Swimsuit — source sheet and throw 3. `source restored from pre-fix baseline`
 
 ### Imani Cole
 
@@ -124,7 +120,7 @@ sheet by this audit, so no current work is silently overwritten.
 - [ ] Halloween — source sheet, throw 4, and throw 5. `recovery available`
 - [ ] Maid — source sheet and throw 5. `recovery available`
 - [ ] Swimsuit — source sheet, throw 3, and throw 5.
-  `recovery source not found`
+  `source restored from pre-fix baseline`
 
 ### Lillie Chen
 
@@ -136,7 +132,7 @@ sheet by this audit, so no current work is silently overwritten.
 - [ ] Halloween — white spots on all.
 - [ ] Maid — source sheet and throw 5. `recovery available`
 - [ ] Variant omitted in original note, likely swimsuit — source sheet and
-  throw 5 hand. `recovery source not found`
+  throw 5 hand. `source restored from pre-fix baseline`
 
 ### Marisol Cruz
 
@@ -164,14 +160,15 @@ sheet by this audit, so no current work is silently overwritten.
 - [ ] Halloween — victory/defeat poses do not match source sheet; source sheet
   also needed. `recovery available`
 - [ ] Maid — throw 5 loses fingers; source sheet needed. `recovery available`
-- [ ] Swimsuit — source sheet; all throws are bad. `recovery source not found`
+- [ ] Swimsuit — source sheet; all throws are bad.
+  `source restored from pre-fix baseline`
 
 ### Piper Hart
 
 - [ ] Halloween — throw 5.
 - [ ] Maid — source sheet, throw 2, and throw 4. `recovery available`
 - [ ] Swimsuit — source sheet, throw 2, throw 4, and white spots.
-  `recovery source not found`
+  `source restored from pre-fix baseline`
 
 ### Rei Nakamura
 

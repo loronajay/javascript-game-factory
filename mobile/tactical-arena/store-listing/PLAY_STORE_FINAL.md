@@ -81,12 +81,14 @@ They live in:
 
 `mobile/tactical-arena/store-listing/`
 
-These are technically valid temporary assets. Replace them before production because the
-battle is at an early turn, the campaign has no progress, and the roster screen shows sign-in
-gates. Do not use the existing main-menu screenshot: Online Versus and Shop appear disabled.
-Do not lead with the title screen: the first screenshot should show gameplay.
+These are technically valid and are already live in the default listing. They are acceptable
+for the initial Production release, but stronger captures are recommended later because the
+battle is at an early turn, the campaign has no progress, and `phone-03-roster.png` is actually
+a signed-out Shop view with purchase gates. Screenshot replacement is launch polish, not a
+technical blocker. Do not use the existing main-menu screenshot: Online Versus and Shop appear
+disabled. Do not lead with the title screen: the first screenshot should show gameplay.
 
-## Production screenshot replacement plan
+## Optional screenshot improvement plan
 
 Capture six native 16:9 landscape screenshots from the Play-installed build, with no device
 frame or added marketing text:

@@ -1,6 +1,6 @@
 # Tactical Arena — Android Port Handoff
 
-Status as of 2026-07-29. Read this first if you are picking the port up cold.
+Status as of 2026-08-20. Read this first if you are picking the port up cold.
 
 The goal: ship Tactical Arena on Google Play (Android first, iOS later) **without
 fork­ing the web game**. That constraint has been honoured — see
@@ -10,7 +10,9 @@ fork­ing the web game**. That constraint has been honoured — see
 
 ## 1. Where it stands
 
-The app builds, installs, and plays on a device. **49.4 MB APK.**
+The app builds, installs, and plays on a device. Production access is granted. A fresh,
+signed **versionCode 12 / versionName 1.1.0** release bundle is ready for final Play-installed
+device QA and the first Production release.
 
 | Area | State | How it was verified |
 | --- | --- | --- |
@@ -25,16 +27,18 @@ The app builds, installs, and plays on a device. **49.4 MB APK.**
 | Touch CSS in the WebView | Done | Computed styles checked on device |
 | **Play Billing — client** | Done | Shop and licence-test purchase completed on the Play-installed build |
 | **Play Billing — server** | **Done** | Live purchase verified and granted end-to-end; 26 unit tests cover failure and replay cases |
-| **Release signing / AAB** | **Done** | Signed 51.3 MB AAB built and verified with `jarsigner` |
-| **Play product catalog** | **Done** | 317/317 one-time products synchronized and activated 2026-07-29 |
-| **Play Console + 12 testers** | **IN PROGRESS** | Opt-in link sent to every tester; 11 testers currently opted in (§4e) |
+| **Release signing / AAB** | **Done** | Signed 46.58 MiB build 12 AAB built and verified 2026-08-20 |
+| **Play product catalog** | **Done** | 317/317 one-time products active; all 31 Fight Cancer titles verified live 2026-08-20 |
+| **Play Console / production access** | **Done** | Closed-test requirement completed; production access granted 2026-08-20 (§4e) |
 
-Test suite: **1671 / 1671** green, and `platform-api` **450 / 450**.
+Test suite: **1906 / 1906** green, and `platform-api` **730 / 730** (2026-08-20).
 
-Identity verification passed on 2026-07-27, so nothing is blocked on Google any more.
-The app, login/progress restore, shop, and test purchase flow have all been exercised on
-the Play-installed build. The immediate closed-test task is getting one more tester opted
-in, then keeping at least 12 opted in for 14 continuous days.
+Identity verification and the closed-test requirement are complete, so nothing is blocked on
+production access. The app, login/progress restore, shop, and test purchase flow have all been
+exercised on the Play-installed build. The remaining release path is to select production
+countries, upload build 12 to Internal or Closed testing, test that exact Play-delivered build,
+then create and submit the first Production release. See `LAUNCH_CHECKLIST.md` for the current
+owner-facing sequence and the verified bundle hash.
 
 Landed alongside the port (not part of it): the six new player badges — five ladder
 ascent badges awarded off a new `game_ratings.peak_rating` column (migration 029),
@@ -234,18 +238,21 @@ installs.
 
 ### ⚠️ The ordering rule
 
-**Never raise the minimum until the new build is actually live on Play and rolled out.**
+**Never raise the minimum until the new build is actually live on Play and available to every
+intended user.**
 
 Raising it first blocks every installed copy and points them at a store listing that still
 offers the old build — an unrecoverable loop for the player, and there is no in-app way out
 because the gate is deliberately non-dismissable. The safe order is always:
 
-1. Upload the new `versionCode`, let the rollout complete.
+1. Upload the new `versionCode` and let Play finish making it available.
 2. Confirm the new build is downloadable from the listing.
 3. *Then* raise `minimumVersionCode` to it.
 
-Also remember Play rollouts are staged: at 20% rollout, 80% of players cannot get the build
-you are about to demand. Raise the minimum at 100%, or not at all.
+The first Production release cannot use a percentage staged rollout; it goes to all eligible
+users in the selected countries. Later updates can be staged. During a later 20% rollout, 80%
+of players cannot get the build you would be demanding, so raise the minimum only after 100%
+availability, or not at all.
 
 ### When to use it
 
@@ -327,47 +334,36 @@ Products can only be created **after** an app bundle has been uploaded to some t
 Play refuses in-app products for an app with no release. Do 4d first if it errors. The full
 sync uses Google's high-throughput publishing mode and may take up to 24 hours to propagate.
 
-### 4d. First upload
+### 4d. Build 12 release candidate
 
 ```powershell
 npm run release:check                              # catches the expensive mistakes first
 npm run bundle:release
 ```
 
-Upload `android/app/build/outputs/bundle/release/app-release.aab`. Every later upload
+The fresh build 12 candidate is ready at
+`android/app/build/outputs/bundle/release/app-release.aab` (46.58 MiB, SHA-256 recorded in
+`LAUNCH_CHECKLIST.md`). Upload it to Internal or Closed testing first, install it from Play,
+run the final device checks, and then use that tested build for Production. Every later upload
 needs a **higher** `versionCode`; Play never accepts a repeat, and it can never go down.
 
-Store listing needs, none of which exist yet:
+The default store listing is live and all required declarations are actioned. Current assets:
 
-- App icon 512×512, feature graphic 1024×500
-- At least 2 phone screenshots — `npm run mobile:shots` produces a matrix, or pull real
-  ones off a device
-- Short (80 char) and full (4000 char) description
-- **Privacy policy URL** — mandatory, and the app does collect accounts/email
-- Content rating questionnaire
-- **Data safety** form — declare the account/email collection and the Stripe/Play payment
-  processing honestly; a mismatch here is a common rejection
-- Target audience, ads declaration (none), and the **in-app purchases** declaration
+- App icon 512×512 and feature graphic 1024×500: live.
+- Short and full descriptions: live; source copy is in `store-listing/DESCRIPTIONS.md`.
+- Three valid landscape phone screenshots: live. Replacing them is a quality improvement,
+  not a technical launch blocker.
+- Privacy policy, Content rating, Data safety, target audience, ads, and in-app-purchases
+  declarations: actioned in Play Console.
 
-### 4e. Closed test — the 14-day clock
+### 4e. Closed test — completed
 
-This is the real critical path and nothing shortens it. A personal developer account must
-run a **closed test with 12+ testers opted in for 14 continuous days** before production
-access can even be *requested*.
+The personal-account closed-test requirement was completed and Production access was granted
+on 2026-08-20. It is no longer a launch prerequisite.
 
-**Current status (2026-07-29):** every tester has the opt-in link and 11 are opted in.
-One more tester must opt in before the 12-tester clock can run.
-
-- Create a closed track, add an email list of 12+ real Google accounts.
-- The count is of testers **opted in**, not invited. Chase the opt-ins.
-- The 14 days are continuous — if you drop below 12, expect the clock to restart.
-- Testers must install from the opt-in link, not sideload.
-- **Purchases in a closed test are real money unless the account is on the licence-test
-  list.** Play Console → *Setup* → *License testing* → add the tester emails; their
-  purchases then run through the full billing flow, including your server verification,
-  without charging anyone.
-
-Start recruiting before the build is perfect — the clock is the long pole, not the code.
+Keep licence testing configured for accounts used in final QA. Purchases from non-licence-test
+accounts are real money; licence-test accounts exercise the complete purchase and server
+verification flow without a real charge.
 
 ### 4f. Nice-to-have, not blocking
 
@@ -512,11 +508,11 @@ browser) or a build-time payload transform.
    purchase from the Play-installed build completed end-to-end on 2026-07-29.
 2. Android Studio is at **2023.2**. Irrelevant for the CLI build loop, but opening
    the project in the IDE will want Ladybug+ for AGP 8.7.
-3. `platform-api/tests/` is gitignored by the root `.gitignore` (`tests/`, with a
-   negation for `games/*/tests/` but not for `platform-api/`). Only 2 of its 49 test
-   files are tracked, so the new payment-verification suite will not commit without
-   `git add -f` or a negation rule. Worth deciding deliberately — this is security-
-   critical test coverage that currently lives only on this machine.
+3. `platform-api/tests/` is still broadly gitignored by the root `.gitignore` (`tests/`, with
+   a negation for `games/*/tests/` but not for `platform-api/`). As of 2026-08-20, 16 of 73
+   files are tracked and the rest are local-only. Decide deliberately whether to add a scoped
+   negation before relying on that local-only coverage in CI; the Play payment-verification
+   suite itself is tracked.
 
 
 ## NOTES AFTER FIRST PLAY: 

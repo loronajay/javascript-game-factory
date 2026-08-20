@@ -8,13 +8,37 @@ do. Where a step needs code or assets, it says who does it.
 
 ## Production release — do these in order
 
-1. [ ] `npm run release:check` (green as of 2026-08-20, versionCode **12** / 1.1.0)
-2. [ ] `npm run bundle:release` → upload the AAB to **Production**
-3. [ ] Finish the store listing (step 5) and the Data safety + content rating forms (step 6)
-4. [ ] `npm run play:sync` — the renamed "Fight Cancer" titles are still unpushed (step 6c)
-5. [ ] Roll out. Watch crash/ANR for a day at a partial rollout before going to 100%
-6. [ ] **Only after 100% rollout**, if you need to retire build 11, set the update gate's
+1. [x] `npm run release:check` (green 2026-08-20, versionCode **12** / 1.1.0)
+2. [x] `npm run bundle:release` (fresh signed AAB built 2026-08-20; SHA-256 recorded below)
+3. [ ] Select the production countries and regions in Play Console
+4. [ ] Upload build 12 to Internal or Closed testing, install it from Play, and run final device QA
+5. [ ] Create the first Production release from that tested build and send it for review
+6. [ ] After it is live, watch Android vitals, reviews, and backend logs closely
+7. [ ] **Only after build 12 is available everywhere you launched**, if you need to retire build 11, set the update gate's
        minimum — see the ordering warning below
+
+The store listing, Data safety, and content rating are done. The 317 Play products and their
+"Fight Cancer" titles are already created and live — a sync is only needed again if product
+metadata, availability, or pricing changes. `npm run play:sync` is a dry run; the mutating
+command is `npm run play:sync:apply`.
+
+**Nothing in this repo can tell you whether `play:sync` has run** — the script talks to Google
+and keeps no local record. Play Console → Monetize → In-app products is the only authority;
+don't infer it from a checkbox here.
+
+> **First-production rollout:** Google does not offer a percentage staged rollout for an
+> app's first Production release. The first release goes to every eligible user in the
+> countries you select. Percentage staged rollouts are available for later updates. Reduce
+> launch risk by testing this exact AAB on Internal/Closed testing before Production.
+
+### Build 12 artifact
+
+- File: `android/app/build/outputs/bundle/release/app-release.aab`
+- Size: 48,847,710 bytes (46.58 MiB)
+- Built: 2026-08-20 11:33 PDT
+- SHA-256: `F9CCE53236918AD89B49E1D97C3CDCEE60A9C1B46CEEA77FEFF263E948374825`
+- Verified: signed, package `com.jayarcade.tacticalarena`, versionCode 12 / versionName 1.1.0,
+  payload matches all 737 sources, and no merge-conflict markers are present
 
 > ### ⚠️ The forced-update gate
 > The app now checks on boot whether its build is still supported and hard-blocks with an
@@ -24,10 +48,10 @@ do. Where a step needs code or assets, it says who does it.
 > Set it with `TA_ANDROID_MIN_VERSION_CODE` on the Railway platform-api service (or the
 > `app_release:com.jayarcade.tacticalarena:android` site setting).
 >
-> **Never raise the minimum before the new build is live and at 100% rollout.** Doing so
-> blocks installed copies and sends them to a listing that still offers the old build — the
-> player has no way out, because the gate is deliberately non-dismissable. At a 20% staged
-> rollout, 80% of players cannot get the build you would be demanding.
+> **Never raise the minimum before the new build is available to every intended user.** Doing
+> so blocks installed copies and sends them to a listing that may still offer the old build —
+> the player has no way out, because the gate is deliberately non-dismissable. This matters
+> especially on later percentage-staged updates, where most players may not yet be eligible.
 >
 > Full detail: `HANDOFF.md` §3b.
 
@@ -39,16 +63,16 @@ do. Where a step needs code or assets, it says who does it.
 | --- | --- |
 | The app | **Tested** on the Play-installed build — gameplay and shop work |
 | Purchases (client + server) | **Verified end-to-end** with a licence-test purchase; server validation and entitlement/progress grant succeeded |
-| Release signing | **Done** — signed AAB uploaded to the closed test 2026-07-29 |
+| Release signing | **Done** — fresh signed build 12 AAB created and verified 2026-08-20 |
 | App icon | **Done** — the shield mark, generated at all five densities |
 | Store listing icon (512×512) | **Done** — `store-listing/play-icon-512.png` |
 | Feature graphic (1024×500) | **Done** — `store-listing/play-feature-graphic-1024x500.png` |
-| Store descriptions | **Drafted** — `store-listing/DESCRIPTIONS.md`, yours to edit |
+| Store descriptions | **Live** — default Play listing is active; source copy is `store-listing/DESCRIPTIONS.md` |
 | Privacy policy | **Live** — `https://factory.jayarcade.com/privacy`, contact `leojaylorona@gmail.com`. Read it before you submit it (step 4) |
 | Site + domain | **Done** — `factory.jayarcade.com`, HTTPS enforced, Railway auto-deploy reconnected |
 | Progress sync (web ↔ app) | **Fixed and verified on login** 2026-07-29 — units, skins, Valor, tutorials, and campaign restore from the server |
 | Screenshots | Three phone screenshots prepared in `store-listing/` |
-| Play Console app entry | **Done** — closed-test release published; all testers have the opt-in link and 11 are opted in as of 2026-07-29 |
+| Play Console app entry | **Done** — production access granted; build 11 remains on Closed testing |
 
 The uploaded release package contains the native Play Billing bridge and the shop's open-time
 ownership refresh. No replacement AAB is required for the product-catalog fix. The shop,
@@ -63,10 +87,10 @@ been proven end-to-end.
 2. [x] Create the Google service account
 3. [x] Create the app in Play Console
 4. [x] Publish a privacy policy
-5. [ ] Assemble the store listing
-6. [ ] Fill the Data safety + content rating forms
+5. [x] Assemble the store listing
+6. [x] Fill the Data safety + content rating forms
 6b. [x] Renamed the 31 cancer-research products to "Fight Cancer" and named the charity — see below.
-6c. [ ] `npm run play:sync` to push the renamed titles/descriptions to the Play Console.
+6c. [x] Renamed titles/descriptions verified live in Play Console on 2026-08-20.
 7. [x] First Play upload → Closed testing
 8. [x] Test on your own phone, including a licence-test purchase
 9. [x] Create and activate the 317 in-app products
@@ -424,11 +448,17 @@ before starting this.**
 
 ---
 
-## 11. Request production
+## 11. Publish the first Production release
 
-After 14 continuous days with 12+ testers, the *Production* track unlocks a **Apply for
-production access** flow. Expect to describe your testing and what you changed from feedback.
-Review after that is typically days, not weeks.
+Production access was granted on 2026-08-20. In Play Console, first select the countries and
+regions where the app should be available. Then upload build 12 to Internal or Closed testing,
+install that exact Play-delivered build, and complete final device QA. Once it passes, create
+the first Production release from the tested bundle and send it for review.
+
+The first Production release cannot use a percentage staged rollout. When it is approved and
+published, it is offered to all eligible users in the countries you selected. Keep the forced-
+update minimum unset until build 12 is actually available from the public listing everywhere
+you launched.
 
 ---
 
@@ -458,11 +488,18 @@ Still open, and each needs something from you:
       debugging. Railway → Postgres → Variables → regenerate; services referencing
       `${{Postgres.DATABASE_URL}}` pick it up on redeploy.
 - [ ] **Read the privacy policy** and settle its contact address (step 4).
-- [ ] **Finish/review the Play screenshots.** Three phone screenshots are already in
-      `store-listing/`.
-- [ ] **Get one more tester opted in.** Every tester has the closed-test opt-in link and
-      Play Console currently reports 11 opted-in testers; keep at least 12 opted in for
-      14 continuous days.
+- [ ] **Review the Play screenshots.** Three valid phone screenshots are live and already in
+      `store-listing/`; replacing them is optional launch polish.
+- [ ] **Select Production countries and regions** in Play Console.
+- [ ] **Upload build 12 to Internal or Closed testing** and install it through Play.
+- [ ] **Run final device QA** on that Play-installed build: update/install, sign-in and progress
+      restore, campaign/tutorials, local/CPU/online play, shop purchase, restore purchase, and
+      the fail-open update-policy path.
+- [ ] **Create and submit the first Production release** from the tested build 12 bundle.
+- [ ] **After launch, monitor** Android vitals, reviews, and backend purchase/auth/version-policy
+      logs. Only then, if retiring build 11 is necessary, set the minimum version to 12.
+- [x] **Closed-test requirement completed.** Production access was granted 2026-08-20, so
+      additional opt-ins are no longer a launch prerequisite.
 
 I do **not** need: your keystore passwords or the service-account JSON. Those stay with you
 and should be entered only in their destination consoles.
