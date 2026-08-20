@@ -13,7 +13,8 @@ import { WORLD } from "./scene.js";
 import { drawMenuBackdrop } from "./menus.js";
 import { liverySprite, drawUnderglow } from "./livery.js";
 import { CIRCUIT_FRAME_SIZE, circuitModelById } from "../circuit/assets.js";
-import { circuitLiveryAtlas } from "../circuit/livery-atlas.js";
+import { circuitFrameScale, circuitLiveryAtlas } from "../circuit/livery-atlas.js";
+import { circuitDrawBox } from "../circuit/sprite-geometry.js";
 import { hueToRgb, paintSwatchColour } from "../garage/paint.js";
 import {
   ROW_PALETTE, ROW_HUE, ROW_TOGGLE, ROW_CHOICE, ROW_SECTION, ROW_PICK, ROW_BUTTON,
@@ -474,7 +475,18 @@ function drawPreview(
     const size = 88;
     const circuitX = box.x + box.width / 2;
     const circuitTop = box.y + 308;
-    drawUnderglow(ctx, { x: circuitX, top: circuitTop, width: size, height: size }, view.livery);
+    const circuitBox = circuitDrawBox(
+      circuitX,
+      circuitTop + size / 2,
+      size,
+      circuitFrameScale(circuitLiveryCache, model.id, frame),
+    );
+    drawUnderglow(ctx, {
+      x: circuitX,
+      top: circuitBox.y,
+      width: circuitBox.width,
+      height: circuitBox.height,
+    }, view.livery);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(
       circuitAtlas,
@@ -482,10 +494,10 @@ function drawPreview(
       0,
       CIRCUIT_FRAME_SIZE,
       CIRCUIT_FRAME_SIZE,
-      circuitX - size / 2,
-      circuitTop,
-      size,
-      size,
+      circuitBox.x,
+      circuitBox.y,
+      circuitBox.width,
+      circuitBox.height,
     );
     ctx.imageSmoothingEnabled = true;
   }

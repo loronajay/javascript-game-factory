@@ -22,25 +22,13 @@ import {
   zoneWeight,
 } from "../garage/paint.js";
 import { CIRCUIT_FRAME_SIZE, hasCircuitAtlas } from "./assets.js";
+import { localCarCoordinates, measureCircuitFrameGeometry } from "./sprite-geometry.js";
 
 export const CIRCUIT_LIVERY_CACHE_LIMIT = 32;
 const CIRCUIT_COVERAGE_CACHE_LIMIT = 8;
 
 export function createCircuitLiveryCache() {
-  return { atlases: new Map(), coverage: new Map() };
-}
-
-/** Screen pixel to car-local `(u, v)`, where v=0 is the nose and v=1 the tail. */
-export function localCarCoordinates(frameIndex, x, y, frameSize = CIRCUIT_FRAME_SIZE) {
-  const angle = (frameIndex % 8) * Math.PI / 4;
-  const dx = (x + 0.5) / frameSize - 0.5;
-  const dy = (y + 0.5) / frameSize - 0.5;
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  return {
-    u: 0.5 + dx * cos + dy * sin,
-    v: 0.5 - dx * sin + dy * cos,
-  };
+  return { atlases: new Map(), coverage: new Map(), geometry: new Map() };
 }
 
 function imageReady(image) {
@@ -136,7 +124,19 @@ function paintStack(r, g, b, local, livery, skipBase) {
   return painted;
 }
 
-function bakeCircuitAtlas(image, modelId, livery, coverageCache) {
+function geometryFor(cache, modelId, pixels, width, height) {
+  const found = cache.get(modelId);
+  if (found) return found;
+  const geometry = measureCircuitFrameGeometry(pixels, width, height);
+  cache.set(modelId, geometry);
+  return geometry;
+}
+
+export function circuitFrameScale(cache, modelId, frameIndex) {
+  return cache.geometry.get(modelId)?.[frameIndex]?.scale ?? 1;
+}
+
+function bakeCircuitAtlas(image, modelId, livery, coverageCache, geometryCache) {
   const canvas = document.createElement("canvas");
   canvas.width = image.naturalWidth;
   canvas.height = image.naturalHeight || CIRCUIT_FRAME_SIZE;
@@ -145,6 +145,7 @@ function bakeCircuitAtlas(image, modelId, livery, coverageCache) {
   context.drawImage(image, 0, 0);
   const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
   const pixels = imageData.data;
+  geometryFor(geometryCache, modelId, pixels, canvas.width, canvas.height);
 
   const flatBase = livery.paint.saturation === 0
     && livery.paint.brightness === 1
@@ -207,7 +208,7 @@ export function circuitLiveryAtlas(cache, { image, modelId, livery }) {
     return found;
   }
 
-  const atlas = bakeCircuitAtlas(image, modelId, normalized, cache.coverage);
+  const atlas = bakeCircuitAtlas(image, modelId, normalized, cache.coverage, cache.geometry);
   cache.atlases.set(key, atlas);
   while (cache.atlases.size > CIRCUIT_LIVERY_CACHE_LIMIT) {
     cache.atlases.delete(cache.atlases.keys().next().value);

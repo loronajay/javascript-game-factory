@@ -7,6 +7,7 @@ import { readPng } from "./png.js";
 import { createLivery, addLayer, updateLayer } from "../scripts/garage/livery.js";
 import { classifyPixel, REGION_BODY, REGION_CABIN, REGION_LAMP } from "../scripts/garage/paint.js";
 import { circuitPreviewFrame } from "../scripts/ui/garage-editor.js";
+import { localCarCoordinates } from "../scripts/circuit/sprite-geometry.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -31,7 +32,6 @@ const {
   CIRCUIT_LIVERY_CACHE_LIMIT,
   createCircuitLiveryCache,
   circuitLiveryAtlas,
-  localCarCoordinates,
 } = await import("../scripts/circuit/livery-atlas.js");
 
 suite("circuit livery — one canonical paint across eight headings");
@@ -69,17 +69,18 @@ function complexLivery() {
   });
 }
 
-test("local coordinates rotate with the frame at every cardinal heading", () => {
-  const north = localCarCoordinates(0, 48, 32);
-  const east = localCarCoordinates(2, 32, 48);
-  const south = localCarCoordinates(4, 16, 32);
-  const west = localCarCoordinates(6, 32, 16);
-  for (const point of [north, east, south, west]) {
+test("local coordinates follow the artwork's actual nose at every cardinal heading", () => {
+  const southFacingNose = localCarCoordinates(0, 32, 48);
+  const westFacingNose = localCarCoordinates(2, 16, 32);
+  const northFacingNose = localCarCoordinates(4, 32, 16);
+  const eastFacingNose = localCarCoordinates(6, 48, 32);
+  for (const point of [westFacingNose, northFacingNose, eastFacingNose]) {
     // Pixel centres cannot land on the exact same sub-pixel after a 90-degree
     // turn on an even-sized frame; one pixel is the tight meaningful bound.
-    assertClose(point.u, north.u, 1 / 64);
-    assertClose(point.v, north.v, 1 / 64);
+    assertClose(point.u, southFacingNose.u, 1 / 64);
+    assertClose(point.v, southFacingNose.v, 1 / 64);
   }
+  assert(southFacingNose.v < 0.3, "the sheet's first frame still treats the tail as the nose");
 });
 
 test("a complex livery paints body, glass and lamps at north, east, south and west", () => {

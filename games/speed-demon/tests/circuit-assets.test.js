@@ -11,6 +11,12 @@ import {
   circuitModelById,
   hasCircuitAtlas,
 } from "../scripts/circuit/assets.js";
+import {
+  CIRCUIT_TARGET_LENGTH,
+  circuitDrawBox,
+  circuitFrameIndex,
+  measureCircuitFrameGeometry,
+} from "../scripts/circuit/sprite-geometry.js";
 
 suite("circuit assets — representative canonical atlas set");
 
@@ -39,6 +45,16 @@ test("availability never substitutes another model", () => {
   assert(hasCircuitAtlas("kaido-gts"));
   assert(!hasCircuitAtlas("shutter-z"));
   assertEqual(circuitModelById("shutter-z"), null);
+});
+
+test("world headings select the artwork frame whose nose points forward", () => {
+  // The generated sheets are stored rear-first: frame 0's nose points south,
+  // frame 4's nose points north. The renderer must account for that instead of
+  // presenting the cars tail-first while the physics moves them forward.
+  assertEqual(circuitFrameIndex(0), 4);
+  assertEqual(circuitFrameIndex(Math.PI / 2), 6);
+  assertEqual(circuitFrameIndex(Math.PI), 0);
+  assertEqual(circuitFrameIndex(-Math.PI / 2), 2);
 });
 
 test("every atlas is eight transparent 64px frames clockwise from north", () => {
@@ -84,6 +100,32 @@ test("every atlas is eight transparent 64px frames clockwise from north", () => 
       `${model.modelId} bottom-right must be transparent`,
     );
   }
+});
+
+test("every view is normalized to one physical car length", () => {
+  for (const model of CIRCUIT_MODELS) {
+    const sheet = readPng(fs.readFileSync(path.join(CARS_DIR, model.spritesheet)));
+    const geometry = measureCircuitFrameGeometry(sheet.pixels, sheet.width, sheet.height);
+    const rawLengths = geometry.map((frame) => frame.localLength);
+    const normalizedLengths = geometry.map((frame) => frame.localLength * frame.scale);
+
+    assert(
+      Math.max(...rawLengths) - Math.min(...rawLengths) > 4,
+      `${model.modelId} no longer exercises unequal source views`,
+    );
+    for (const length of normalizedLengths) {
+      assertEqual(Number(length.toFixed(6)), CIRCUIT_TARGET_LENGTH);
+    }
+  }
+});
+
+test("normalized sprites stay centred on the vehicle", () => {
+  assertDeepEqual(circuitDrawBox(120, 80, 64, 0.75), {
+    x: 96,
+    y: 56,
+    width: 48,
+    height: 48,
+  });
 });
 
 finish();

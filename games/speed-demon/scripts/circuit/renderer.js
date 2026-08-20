@@ -1,7 +1,8 @@
 import { drawUnderglow } from "../render/livery.js";
-import { circuitLiveryAtlas } from "./livery-atlas.js";
+import { circuitFrameScale, circuitLiveryAtlas } from "./livery-atlas.js";
 import { CIRCUIT_FRAME_SIZE } from "./assets.js";
-import { directionIndex, getSpeed } from "./vehicle.js";
+import { circuitDrawBox, circuitFrameIndex } from "./sprite-geometry.js";
+import { getSpeed } from "./vehicle.js";
 import { createCamera, updateCamera } from "./camera.js";
 import { VEHICLE_FOOTPRINT } from "./config.js";
 
@@ -27,13 +28,19 @@ function drawCar(ctx, participant, image, cache, debug) {
     modelId: participant.modelId,
     livery: participant.livery,
   });
-  const frame = directionIndex(participant.vehicle.angle);
+  const frame = circuitFrameIndex(participant.vehicle.angle);
   const size = CIRCUIT_FRAME_SIZE;
+  const box = circuitDrawBox(
+    participant.vehicle.x,
+    participant.vehicle.y,
+    size,
+    circuitFrameScale(cache, participant.modelId, frame),
+  );
   drawUnderglow(ctx, {
     x: participant.vehicle.x,
-    top: participant.vehicle.y - size / 2,
-    width: size,
-    height: size,
+    top: box.y,
+    width: box.width,
+    height: box.height,
   }, participant.livery);
   if (atlas) {
     ctx.drawImage(
@@ -42,10 +49,10 @@ function drawCar(ctx, participant, image, cache, debug) {
       0,
       size,
       size,
-      participant.vehicle.x - size / 2,
-      participant.vehicle.y - size / 2,
-      size,
-      size,
+      box.x,
+      box.y,
+      box.width,
+      box.height,
     );
   }
   if (debug) debugDrawCircuit(ctx, participant.vehicle);
