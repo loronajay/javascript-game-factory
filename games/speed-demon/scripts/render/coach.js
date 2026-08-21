@@ -9,6 +9,7 @@
 
 import { WORLD } from "./scene.js";
 import { dimWorld, menuPanel } from "./menus.js";
+import { inputHintsFor, mobileCoachLine } from "../mobile-ui.js";
 
 const INK = "#f2f5f8";
 const TEXT = "#dfe6ee";
@@ -45,7 +46,7 @@ function stepCounter(ctx, view, x, y) {
   centred(ctx, `STEP ${view.index} / ${view.total}`, x, y, { size: 12, colour: DIM, weight: "600" });
 }
 
-export function drawCoachPanel(ctx, view) {
+export function drawCoachPanel(ctx, view, { mobile = false } = {}) {
   if (!view) {
     return;
   }
@@ -61,9 +62,9 @@ export function drawCoachPanel(ctx, view) {
     stepCounter(ctx, view, centre, PANEL.y + metrics.counter);
     centred(ctx, view.title, centre, PANEL.y + metrics.title, { size: 32, colour: INK, weight: "800" });
     view.lines.slice(0, metrics.maxLines).forEach((line, index) => {
-      centred(ctx, line, centre, PANEL.y + metrics.firstLine + index * metrics.lineHeight, { size: 17 });
+      centred(ctx, mobile ? mobileCoachLine(line) : line, centre, PANEL.y + metrics.firstLine + index * metrics.lineHeight, { size: 17 });
     });
-    centred(ctx, "ENTER to continue", centre, PANEL.y + metrics.hint, {
+    centred(ctx, inputHintsFor("coach", { mobile }).continue, centre, PANEL.y + metrics.hint, {
       size: 15,
       colour: ACCENT,
       weight: "700",
@@ -81,7 +82,7 @@ export function drawCoachPanel(ctx, view) {
   // halfway through reading.
   const lines = view.hint ? [...view.lines.slice(0, -1), view.hint] : view.lines;
   lines.slice(0, metrics.maxLines).forEach((line, index) => {
-    centred(ctx, line, centre, STRIP.y + metrics.firstLine + index * metrics.lineHeight, {
+    centred(ctx, mobile ? mobileCoachLine(line) : line, centre, STRIP.y + metrics.firstLine + index * metrics.lineHeight, {
       size: 15,
       colour: view.hint && index === lines.length - 1 ? ACCENT : DIM,
       weight: view.hint && index === lines.length - 1 ? "700" : "500",

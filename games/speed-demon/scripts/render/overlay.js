@@ -9,6 +9,7 @@ import { CATCH_CLEAN_SECONDS, CATCH_LOOSE_SECONDS } from "../sim/constants.js";
 import { STAGING, COUNTDOWN, RUNNING, isTimeAttack } from "../sim/race.js";
 import { WORLD } from "./scene.js";
 import { dimWorld, menuPanel } from "./menus.js";
+import { inputHintsFor } from "../mobile-ui.js";
 
 const TEXT = "#dfe6ee";
 const DIM = "#8b95a2";
@@ -177,7 +178,7 @@ export function drawDriverCue(ctx, race) {
   catchBar(ctx, offset);
 }
 
-export function drawStagingPrompt(ctx, race) {
+export function drawStagingPrompt(ctx, race, { mobile = false } = {}) {
   if (race.phase !== STAGING) {
     return;
   }
@@ -197,13 +198,14 @@ export function drawStagingPrompt(ctx, race) {
   // through the gate never gets the clutch in at all.
   ctx.fillStyle = TEXT;
   ctx.font = '600 17px "Segoe UI", system-ui, sans-serif';
-  ctx.fillText("EVERY SHIFT:  LIFT  ·  CLUTCH  ·  GATE  ·  CATCH", WORLD.width / 2, 350);
+  const hints = inputHintsFor("staging", { mobile });
+  ctx.fillText(hints.steps, WORLD.width / 2, 350);
   ctx.fillStyle = DIM;
   ctx.font = '500 15px "Segoe UI", system-ui, sans-serif';
-  ctx.fillText("release SPACE, press SHIFT, work the ARROWS,", WORLD.width / 2, 376);
-  ctx.fillText("then press SPACE again as the clutch bites", WORLD.width / 2, 398);
+  ctx.fillText(hints.detail1, WORLD.width / 2, 376);
+  ctx.fillText(hints.detail2, WORLD.width / 2, 398);
   ctx.fillStyle = TEXT;
   ctx.font = '600 17px "Segoe UI", system-ui, sans-serif';
-  ctx.fillText("ENTER to stage — then SPACE the moment it turns green", WORLD.width / 2, 430);
+  ctx.fillText(hints.action, WORLD.width / 2, 430);
   ctx.restore();
 }

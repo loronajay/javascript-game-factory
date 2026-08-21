@@ -13,6 +13,7 @@ import { MPS_TO_MPH } from "../sim/constants.js";
 import { isTimeAttack } from "../sim/race.js";
 import { LAUNCH_FOUL } from "../sim/launch.js";
 import { TONE_RECORD } from "../records/records.js";
+import { inputHintsFor } from "../mobile-ui.js";
 import { WORLD, DASH_TOP } from "./scene.js";
 
 const INK = "#e8e9ee";
@@ -368,7 +369,7 @@ export function hitMenuList(count, box, x, y) {
  * now more than one of them: the stereo is reachable without starting a race,
  * so that a folder can be set before the first run rather than after it.
  */
-export function drawTitleScreen(ctx, { menu, splashImage }) {
+export function drawTitleScreen(ctx, { menu, splashImage, mobile = false }) {
   drawSplashBackdrop(ctx, splashImage);
 
   const centre = WORLD.width / 2;
@@ -446,7 +447,8 @@ export function drawTitleScreen(ctx, { menu, splashImage }) {
   ctx.shadowBlur = 12;
   // The shift, in order, is the one thing a new player cannot guess: you have to
   // be *off* the gas to declutch, and back *on* it as the clutch bites.
-  text(ctx, "EVERY SHIFT:  LIFT off SPACE  ·  SHIFT clutch  ·  ARROWS gate  ·  SPACE again to catch it", centre, controls.y, {
+  const hints = inputHintsFor("title", { mobile });
+  text(ctx, hints.primary, centre, controls.y, {
     size: 14,
     colour: "#a7b0bd",
     align: "center",
@@ -454,7 +456,7 @@ export function drawTitleScreen(ctx, { menu, splashImage }) {
   // The stereo keys are named here, not shown as a symbol row: B/P/N/L are the
   // reason the transport moved off punctuation, and a hint that still listed the
   // old keycaps would be worse than no hint at all.
-  text(ctx, "R restart a run   ESC back   B P N stereo   L repeat   - = volume   F folder", centre, controls.y + 22, {
+  text(ctx, hints.secondary, centre, controls.y + 22, {
     size: 13,
     colour: MUTED,
     align: "center",

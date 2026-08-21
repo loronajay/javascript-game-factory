@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Speed Demon</title>
-    <link rel="stylesheet" href="styles/game.css?v=mobile-20260821" />
+    <link rel="stylesheet" href="styles/game.css?v=mobile-intentional-v2-20260821" />
   </head>
   <body>
     <a href="../../grid.html" class="back-link">&larr; Arcade</a>
@@ -23,6 +23,7 @@
       import {
         SPEED_DEMON_MOBILE_PROFILE,
         initMobileLandscapeGate,
+        initMobilePlayShell,
         isTouchLike,
       } from "./scripts/mobile-ui.js";
 
@@ -33,10 +34,19 @@
       // a desktop user agent even though it is still a touch-only device.
       const mobileControlsActive = forceMobileControls || isTouchLike(window);
       initMobileLandscapeGate({ force: mobileControlsActive });
-      mountMobileController({ profile: SPEED_DEMON_MOBILE_PROFILE, force: mobileControlsActive });
+      const mobileController = mountMobileController({
+        profile: SPEED_DEMON_MOBILE_PROFILE,
+        force: mobileControlsActive,
+      });
 
       // Exposed so a run can be driven and inspected from the console.
-      window.speedDemon = boot(document.getElementById("game"));
+      const game = boot(document.getElementById("game"), { mobile: mobileControlsActive });
+      window.speedDemon = game;
+      initMobilePlayShell({
+        active: mobileControlsActive,
+        controller: mobileController,
+        getState: () => game.mobileState(),
+      });
     </script>
   </body>
 </html>

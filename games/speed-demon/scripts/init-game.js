@@ -375,8 +375,9 @@ function shiftFlash(shift) {
   return { label: hint ? `${shift.grade.toUpperCase()} · ${hint}` : shift.grade.toUpperCase(), tone: shift.grade };
 }
 
-export function boot(canvas) {
+export function boot(canvas, options = {}) {
   const ctx = canvas.getContext("2d");
+  const mobile = Boolean(options.mobile);
   const carSpec = DEFAULT_CAR;
   const gate = createGate(GATE_6_SPEED);
   const layout = gateLayout(gate, SHIFTER_BOX);
@@ -3146,7 +3147,7 @@ export function boot(canvas) {
     // at its own point in the lesson. Two panels saying "press ENTER" is one too
     // many, and they would sit on top of each other.
     if (!coach) {
-      drawStagingPrompt(ctx, race);
+      drawStagingPrompt(ctx, race, { mobile });
     }
     drawDriverCue(ctx, race);
     // The flash fades on the race clock, and a coaching beat stops that clock —
@@ -3155,7 +3156,7 @@ export function boot(canvas) {
     drawGradeFlash(ctx, coachHolds(coach) ? null : view.flash, view.gradeAge);
     // Over the world but under the cluster: a lesson never covers the gauges it
     // is telling you to read.
-    drawCoachPanel(ctx, coach && coachView(coach, race));
+    drawCoachPanel(ctx, coach && coachView(coach, race), { mobile });
 
     drawDashPanel(ctx);
     drawTachometer(ctx, gaugeImages, view.smoothedRpm);
@@ -3330,13 +3331,13 @@ export function boot(canvas) {
 
     switch (shell.screen) {
       case SCREEN_TITLE:
-        drawTitleScreen(ctx, { menu, splashImage });
+        drawTitleScreen(ctx, { menu, splashImage, mobile });
         return;
       case SCREEN_MODES:
         drawModeSelect(ctx, { menu, splashImage });
         return;
       case SCREEN_SETUP:
-        drawSetup(ctx, currentSetupView(), { sheetImages, trackImages, liveryCache, rivalImages });
+        drawSetup(ctx, currentSetupView(), { sheetImages, trackImages, liveryCache, rivalImages, mobile });
         return;
       default:
         break;
@@ -3866,6 +3867,17 @@ export function boot(canvas) {
         ready: session.players.map((player) => ({ name: player.displayName, ready: player.ready })),
       }),
     },
+    /** The few live fields the phone shell needs; deliberately cheap at 60hz. */
+    mobileState() {
+      const coaching = coach ? coachView(coach, race) : null;
+      return {
+        screen: shell.screen,
+        runtime: activeRuntimeId,
+        onlineResult: isOnlineRace() && showsOnlineResult(),
+        phase: race.phase,
+        coach: coaching ? { step: coaching.id, holding: coaching.holding } : null,
+      };
+    },
     state() {
       const selection = setupSelection(setup, garage);
       // Before the race is built the cursor is the truth; once it is on track,
@@ -3873,6 +3885,8 @@ export function boot(canvas) {
       const racing = showsTheRace(shell.screen);
       return {
         screen: shell.screen,
+        runtime: activeRuntimeId,
+        onlineResult: isOnlineRace() && showsOnlineResult(),
         pane: shell.screen === SCREEN_SETUP ? setup.pane : null,
         menu: menuFor(shell)?.items.map((item) => (item.highlighted ? `[${item.id}]` : item.id)) ?? null,
         mode: selection.modeId,

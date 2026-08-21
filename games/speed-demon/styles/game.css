@@ -95,6 +95,10 @@ canvas#game {
   pointer-events: none;
 }
 
+.mobile-play-gated .mobile-play-helper {
+  opacity: 0 !important;
+}
+
 .mobile-landscape-gate-card {
   width: min(430px, 100%);
   border: 1px solid rgba(255, 90, 46, 0.55);
@@ -145,10 +149,84 @@ canvas#game {
   touch-action: manipulation;
 }
 
+/* A short-lived, context-specific call from the pit crew. It never accepts
+   pointer input, so a card or START button underneath remains directly tappable. */
+.mobile-play-helper {
+  position: fixed;
+  left: 50%;
+  bottom: max(9px, env(safe-area-inset-bottom));
+  z-index: 999910;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas:
+    "kicker title"
+    "copy copy";
+  align-items: baseline;
+  column-gap: 8px;
+  width: min(360px, calc(100vw - 330px));
+  min-width: 250px;
+  padding: 8px 12px 9px;
+  border: 1px solid rgba(255, 90, 46, 0.38);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(15, 18, 24, 0.94), rgba(7, 9, 13, 0.88));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.48), 0 0 22px rgba(255, 90, 46, 0.08);
+  color: #eef2f7;
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition: opacity 180ms ease, transform 180ms ease;
+  pointer-events: none;
+}
+
+.mobile-play-helper.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.mobile-play-helper-kicker {
+  grid-area: kicker;
+  color: #ffb21c;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.mobile-play-helper-title {
+  grid-area: title;
+  overflow: hidden;
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 900;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-play-helper-copy {
+  grid-area: copy;
+  margin-top: 4px;
+  color: rgba(223, 230, 239, 0.78);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+}
+
+body[data-mobile-context-group="drag"] .mobile-play-helper,
+body[data-mobile-context-group="circuit"] .mobile-play-helper,
+body[data-mobile-context-group="coach"] .mobile-play-helper,
+body[data-mobile-context-group="detail"] .mobile-play-helper {
+  top: max(8px, env(safe-area-inset-top));
+  bottom: auto;
+}
+
 /* The shared controller supplies behaviour and base art; these overrides make
    its footprint fit Speed Demon's low dashboard and the phone safe area. */
 .mobile-controller[data-mobile-controller-root="speed-demon-touch"] {
   z-index: 999920;
+}
+
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"] [hidden] {
+  display: none !important;
 }
 
 .mobile-controller[data-mobile-controller-root="speed-demon-touch"] .mobile-controller__pad {
@@ -204,6 +282,70 @@ canvas#game {
   opacity: 1;
 }
 
+/* Menus use two compact, literal actions instead of carrying race pedals over
+   every screen. The title hides BACK because the Arcade link is its way out. */
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"][data-mobile-context-group="menu"] .mobile-controller__button,
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"][data-mobile-context-group="detail"] .mobile-controller__button {
+  width: clamp(58px, 15vmin, 76px);
+  height: clamp(48px, 12vmin, 58px);
+  border-radius: 16px;
+}
+
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"][data-mobile-context-group="menu"] [data-mobile-control="confirm"],
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"][data-mobile-context-group="detail"] [data-mobile-control="confirm"] {
+  right: max(12px, env(safe-area-inset-right)) !important;
+  bottom: max(14px, env(safe-area-inset-bottom)) !important;
+}
+
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"][data-mobile-context-group="menu"] [data-mobile-control="back"],
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"][data-mobile-context-group="detail"] [data-mobile-control="back"] {
+  right: max(82px, calc(env(safe-area-inset-right) + 82px)) !important;
+  bottom: max(14px, env(safe-area-inset-bottom)) !important;
+}
+
+/* Drag controls arc around the right thumb. GAS remains the anchor, CLUTCH is
+   raised above it, and PAUSE stays available without resembling a race pedal. */
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"][data-mobile-context-group="drag"] [data-mobile-control="gas"] {
+  right: max(12px, env(safe-area-inset-right)) !important;
+  bottom: max(14px, env(safe-area-inset-bottom)) !important;
+}
+
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"][data-mobile-context-group="drag"] [data-mobile-control="shift"] {
+  right: max(76px, calc(env(safe-area-inset-right) + 76px)) !important;
+  bottom: max(54px, calc(env(safe-area-inset-bottom) + 42px)) !important;
+}
+
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"][data-mobile-context-group="drag"] [data-mobile-control="back"] {
+  right: max(140px, calc(env(safe-area-inset-right) + 140px)) !important;
+  bottom: max(14px, env(safe-area-inset-bottom)) !important;
+}
+
+/* Circuit play needs simultaneous left-thumb steering and right-thumb gas.
+   The unused shift action is removed entirely; pulling the pad down brakes. */
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"][data-mobile-context-group="circuit"] [data-mobile-control="gas"] {
+  right: max(12px, env(safe-area-inset-right)) !important;
+  bottom: max(14px, env(safe-area-inset-bottom)) !important;
+}
+
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"][data-mobile-context-group="circuit"] [data-mobile-control="back"] {
+  right: max(82px, calc(env(safe-area-inset-right) + 82px)) !important;
+  bottom: max(14px, env(safe-area-inset-bottom)) !important;
+}
+
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"][data-mobile-context-group="coach"] [data-mobile-control="confirm"],
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"][data-mobile-context-group="versus"] [data-mobile-control="confirm"] {
+  right: max(12px, env(safe-area-inset-right)) !important;
+  bottom: max(14px, env(safe-area-inset-bottom)) !important;
+  width: clamp(64px, 16vmin, 82px);
+  height: clamp(52px, 13vmin, 64px);
+  border-radius: 18px;
+}
+
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"][data-mobile-context-group="coach"] [data-mobile-control="back"] {
+  right: max(88px, calc(env(safe-area-inset-right) + 88px)) !important;
+  bottom: max(14px, env(safe-area-inset-bottom)) !important;
+}
+
 @media (hover: none), (pointer: coarse), (max-width: 720px) {
   html,
   body {
@@ -239,5 +381,15 @@ canvas#game {
 
   .mobile-landscape-ready .back-link {
     opacity: 0.38;
+  }
+}
+
+@media (max-height: 350px) and (orientation: landscape) {
+  .mobile-play-helper {
+    padding: 6px 10px;
+  }
+
+  .mobile-play-helper-copy {
+    display: none;
   }
 }

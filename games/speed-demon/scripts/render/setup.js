@@ -11,6 +11,7 @@ import { ROAD } from "../ui/track-layout.js";
 import { drawMenuBackdrop } from "./menus.js";
 import { liverySprite, drawUnderglow } from "./livery.js";
 import { paintSwatchColour } from "../garage/paint.js";
+import { inputHintsFor } from "../mobile-ui.js";
 
 /**
  * Where everything sits. Kept as one object so the layout can be checked by a
@@ -596,7 +597,7 @@ function drawPreview(ctx, view, sheetImages, liveryCache) {
 }
 
 /** The run about to be started, in one place: car, track, objective, and the key. */
-function drawSummary(ctx, view) {
+function drawSummary(ctx, view, mobile = false) {
   const box = SETUP_LAYOUT.summary;
   panel(ctx, box.x, box.y, box.width, box.height);
 
@@ -613,7 +614,8 @@ function drawSummary(ctx, view) {
 
   // The prompt is the live pane's, not a fixed "START" — ENTER means lock while
   // there is anything left to lock, and the screen has to say which it is.
-  label(ctx, `ENTER  ${view.prompt}`, box.x + box.width - 16, box.y + 26, {
+  const hints = inputHintsFor("setup", { mobile });
+  label(ctx, `${hints.promptPrefix}  ${view.prompt}`, box.x + box.width - 16, box.y + 26, {
     size: 12,
     colour: ACCENT,
     align: "right",
@@ -643,7 +645,13 @@ function drawStartButton(ctx, view) {
   });
 }
 
-export function drawSetup(ctx, view, { sheetImages, trackImages, liveryCache = null, rivalImages = null }) {
+export function drawSetup(ctx, view, {
+  sheetImages,
+  trackImages,
+  liveryCache = null,
+  rivalImages = null,
+  mobile = false,
+}) {
   drawMenuBackdrop(ctx, trackImages.get(view.chosenTrack.id));
 
   label(ctx, "SPEED DEMON", SETUP_LAYOUT.title.x, SETUP_LAYOUT.title.y, { size: 32, colour: INK, weight: "800" });
@@ -658,12 +666,12 @@ export function drawSetup(ctx, view, { sheetImages, trackImages, liveryCache = n
   drawObjectiveStrip(ctx, view);
   drawRivalStrip(ctx, view, rivalImages);
   drawPreview(ctx, view, sheetImages, liveryCache);
-  drawSummary(ctx, view);
+  drawSummary(ctx, view, mobile);
   drawStartButton(ctx, view);
 
   label(
     ctx,
-    "CLICK anything to pick it       ARROWS / WASD  move within a pane       ENTER  lock in       ESC  unlock / back       R  reset",
+    inputHintsFor("setup", { mobile }).footer,
     SETUP_LAYOUT.title.x,
     WORLD.height - 14,
     { size: 13 },
