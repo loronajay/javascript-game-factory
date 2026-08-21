@@ -101,14 +101,23 @@ test("every atlas is eight transparent 64px frames clockwise from north", () => 
   }
 });
 
-test("every view is normalized to one rendered silhouette diameter", () => {
+test("three-quarter views get a modest lift and direct sides get the stronger measured correction", () => {
   for (const model of CIRCUIT_MODELS) {
     const sheet = readPng(fs.readFileSync(path.join(CARS_DIR, model.spritesheet)));
     const geometry = measureCircuitFrameGeometry(sheet.pixels, sheet.width, sheet.height);
-    const normalizedDiameters = geometry.map((frame) => frame.footprintDiameter * frame.scale);
-
-    for (const diameter of normalizedDiameters) {
-      assertEqual(Number(diameter.toFixed(6)), Number(geometry[0].targetFootprintDiameter.toFixed(6)));
+    for (const frame of [0, 4]) {
+      assertEqual(geometry[frame].scale, 1, `${model.modelId} front/rear frame ${frame} was resized`);
+    }
+    for (const frame of [1, 3, 5, 7]) {
+      assertEqual(geometry[frame].scale, 1.05, `${model.modelId} frame ${frame} missed the 3/4 lift`);
+    }
+    for (const frame of [2, 6]) {
+      const before = geometry[(frame + 7) % 8].alphaArea;
+      const after = geometry[(frame + 1) % 8].alphaArea;
+      const targetArea = (before + after) / 2;
+      const expectedScale = Math.max(1.1, Math.sqrt(targetArea / geometry[frame].alphaArea));
+      assert(geometry[frame].scale > 1.05, `${model.modelId} frame ${frame} needs the stronger lift`);
+      assertEqual(Number(geometry[frame].scale.toFixed(6)), Number(expectedScale.toFixed(6)));
     }
   }
 });

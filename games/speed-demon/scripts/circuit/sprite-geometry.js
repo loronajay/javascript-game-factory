@@ -9,6 +9,8 @@ import { CIRCUIT_FRAME_SIZE } from "./assets.js";
 import { directionIndex } from "./vehicle.js";
 
 const CIRCUIT_ALPHA_THRESHOLD = 8;
+const CIRCUIT_THREE_QUARTER_SCALE = 1.05;
+const CIRCUIT_SIDE_MIN_SCALE = 1.1;
 
 /** World heading to the atlas frame whose visible nose points that way. */
 export function circuitFrameIndex(angle) {
@@ -60,12 +62,10 @@ export function localCarCoordinates(
 /**
  * Measures every frame as its own camera view.
  *
- * The source master changes perspective as it turns, but every authored view
- * was fitted to one common outer footprint. The stable size invariant is that
- * footprint's diameter (the larger occupied source dimension), not opaque area:
- * equal-area scaling makes a naturally thin side profile balloon outward. A
- * uniform per-frame scale brings the occupied diameter to the model median
- * without distorting the artwork.
+ * The source master changes perspective as it turns. Front and rear are the
+ * authored reference size. The four three-quarter views get a restrained 5%
+ * lift, while each exact side profile is enlarged by its measured loss of
+ * alpha-weighted body mass against the two three-quarter views beside it.
  *
  * The measured oriented bounds are also the UV calibration for liveries. Each
  * independently generated view gets its own nose, tail, left and right rather
@@ -137,17 +137,19 @@ export function measureCircuitFrameGeometry(
     };
   });
 
-  const sortedDiameters = measured
-    .map((frame) => frame.footprintDiameter)
-    .sort((a, b) => a - b);
-  const middle = Math.floor(sortedDiameters.length / 2);
-  const targetFootprintDiameter = sortedDiameters.length % 2
-    ? sortedDiameters[middle]
-    : (sortedDiameters[middle - 1] + sortedDiameters[middle]) / 2;
-
-  return measured.map((frame) => Object.freeze({
-    ...frame,
-    targetFootprintDiameter,
-    scale: targetFootprintDiameter / frame.footprintDiameter,
-  }));
+  return measured.map((frame, frameIndex) => {
+    const directSide = frameIndex === 2 || frameIndex === 6;
+    const threeQuarter = frameIndex % 2 === 1;
+    const targetAlphaArea = directSide
+      ? (measured[(frameIndex + frameCount - 1) % frameCount].alphaArea
+        + measured[(frameIndex + 1) % frameCount].alphaArea) / 2
+      : frame.alphaArea;
+    return Object.freeze({
+      ...frame,
+      targetAlphaArea,
+      scale: directSide
+        ? Math.max(CIRCUIT_SIDE_MIN_SCALE, Math.sqrt(targetAlphaArea / frame.alphaArea))
+        : threeQuarter ? CIRCUIT_THREE_QUARTER_SCALE : 1,
+    });
+  });
 }
