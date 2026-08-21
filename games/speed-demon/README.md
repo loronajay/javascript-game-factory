@@ -33,6 +33,10 @@ The server side of the garage lives in `platform-api/`: `services/speed-demon-ca
 
 Serve the **repository root** over HTTP and open `games/speed-demon/index.html`. `file://` blocks module loading. `window.speedDemon` exposes a console handle for driving and inspecting a run — see `CLAUDE.md` for the full surface.
 
+### Circuit stripe-flow authoring
+
+Open `games/speed-demon/tools/circuit-mask-editor.html` from the same local server to author stripe-flow paths over every circuit sprite angle. Dragging over a sprite records an arrowed vector path in the exact direction drawn, including bends; multiple parallel paths can describe perspective changes across a panel. A secondary Band Flow pass is available for cross-car shapes, while Window Tint and Tail Lights remain optional pixel masks. User-facing direction names follow the car's visible nose rather than the legacy camera-facing atlas labels. The tool keeps all eight headings visible, autosaves each model in the browser, and exports an authoritative, model-checked JSON project plus PNG references.
+
 ## Tests
 
 From a development workspace that includes the local `tests/` harness, run from `games/speed-demon/`:

@@ -4,7 +4,10 @@ import { createLivery } from "../scripts/garage/livery.js";
 import { hasCircuitAtlas } from "../scripts/circuit/assets.js";
 import { vehicleFootprintPoints, createRoadMask } from "../scripts/circuit/road-mask.js";
 import { createVehicle, stepVehicle } from "../scripts/circuit/vehicle.js";
+import { forwardVector } from "../scripts/circuit/vehicle.js";
 import { resolveVehicleCollision } from "../scripts/circuit/vehicle-collision.js";
+import { circuitHudView } from "../scripts/ui/circuit-hud.js";
+import { circuitTrackById } from "../scripts/circuit/tracks.js";
 import {
   createCircuitRace,
   inputCircuitRace,
@@ -97,6 +100,27 @@ test("countdown, input and fixed-step vehicle movement share one reducer", () =>
   assert(race.participants[0].vehicle.x > startX, "the local car did not use the two-axis reducer");
 });
 
+test("Japan Noir starts both cars on one fair line rather than gifting the CPU a lead", () => {
+  const japanNoir = circuitTrackById("japan-noir");
+  const [player, opponent] = japanNoir.spawns;
+  const forward = forwardVector(player.angle);
+  const opponentLead = (opponent.x - player.x) * forward.x + (opponent.y - player.y) * forward.y;
+  assertClose(opponentLead, 0, 1e-9, "the opponent starts ahead along the racing direction");
+  assert(Math.hypot(opponent.x - player.x, opponent.y - player.y) >= 24, "the grid slots overlap");
+
+  const race = createCircuitRace({
+    ...definition(),
+    trackId: "japan-noir",
+    rules: { ...definition().rules, countdownSeconds: 3 },
+    participants: definition().participants.map((participant) => participant.control === "local"
+      ? { ...participant, displayName: "DRIVER" }
+      : participant),
+  }, japanNoir);
+  const hud = circuitHudView(race, japanNoir, "local");
+  assertEqual(hud.position.current, 1, "a stationary fair grid calls the local car P2");
+  assertEqual(hud.runners[0].name, "YOU");
+});
+
 test("road containment samples the full normalized footprint", () => {
   const width = 40;
   const height = 40;
@@ -137,6 +161,35 @@ test("ordered checkpoints reject shortcuts and only the finish checkpoint counts
   assertEqual(race.status, STATUS_FINISHED);
 });
 
+test("a three-lap race requires three complete checkpoint sequences and records each lap", () => {
+  const threeLaps = {
+    ...definition("freeplay", [
+      { playerId: "local", control: "local", modelId: "kaido-gts", livery: {} },
+    ]),
+    rules: { laps: 3, countdownSeconds: 0, timeoutSeconds: 60 },
+  };
+  let race = createCircuitRace(threeLaps, track);
+  const cross = (checkpoint, elapsedStep = 1) => {
+    race = {
+      ...race,
+      participants: race.participants.map((participant) => ({
+        ...participant,
+        vehicle: { ...participant.vehicle, x: checkpoint.x, y: checkpoint.y, velocityX: 0, velocityY: 0 },
+      })),
+    };
+    race = stepCircuitRace(race, elapsedStep, { track, containsVehicle: driveable });
+  };
+
+  for (let lap = 1; lap <= 3; lap += 1) {
+    for (const checkpoint of checkpoints.slice(1)) cross(checkpoint);
+    cross(checkpoints[0]);
+    assertEqual(race.participants[0].lap, lap);
+    assertEqual(race.participants[0].lapTimes.length, lap);
+    assertEqual(race.status, lap === 3 ? STATUS_FINISHED : STATUS_RACING);
+  }
+  assertEqual(race.finishOrder.join(), "local");
+});
+
 test("car contact changes both vehicles symmetrically", () => {
   const left = createVehicle({ x: 10, y: 10, angle: Math.PI / 2, velocityX: 50 });
   const right = createVehicle({ x: 20, y: 10, angle: Math.PI / 2, velocityX: 0 });
@@ -165,11 +218,82 @@ test("finish order and normalized results are deterministic", () => {
   assertEqual(race.participants[1].place, 2);
   assertDeepEqual(circuitRaceResult(race, "local"), {
     won: true,
+    outcome: "victory",
     value: 0,
     better: "lower",
     place: 1,
     finished: true,
+    fieldSize: 2,
+    laps: 1,
+    winnerId: "local",
+    winnerName: "local",
+    playerName: "local",
   });
+});
+
+test("a losing result explicitly names defeat and the driver who took the flag", () => {
+  let race = createCircuitRace(definition(), track);
+  race = {
+    ...race,
+    status: STATUS_FINISHED,
+    finishOrder: ["cpu", "local"],
+    participants: race.participants.map((participant, index) => ({
+      ...participant,
+      displayName: index === 0 ? "YOU" : "TOLLGATE",
+      lap: 1,
+      place: index === 0 ? 2 : 1,
+      finishedAt: index === 0 ? 15.2 : 14.8,
+    })),
+  };
+  const result = circuitRaceResult(race, "local");
+  assertEqual(result.won, false);
+  assertEqual(result.outcome, "defeat");
+  assertEqual(result.winnerName, "TOLLGATE");
+  assertEqual(result.place, 2);
+});
+
+test("the circuit HUD exposes real race instruments, timing and running order", () => {
+  let race = createCircuitRace({
+    ...definition(),
+    rules: { laps: 3, countdownSeconds: 0, timeoutSeconds: 60 },
+    participants: [
+      { playerId: "local", displayName: "YOU", control: "local", modelId: "kaido-gts", livery: {} },
+      { playerId: "cpu", displayName: "TOLLGATE", control: "cpu", modelId: "colt-gt", livery: {} },
+    ],
+  }, track);
+  race = {
+    ...race,
+    elapsed: 24.5,
+    participants: race.participants.map((participant, index) => {
+      const { checkpointsPassed, ...wireParticipant } = participant;
+      return {
+      ...wireParticipant,
+      // Authoritative online snapshots carry lap + nextCheckpoint, not the
+      // browser-only convenience counter. Running order must survive one.
+      nextCheckpoint: index === 0 ? 3 : 2,
+      lap: 1,
+      lapStartedAt: 18,
+      lastLapTime: index === 0 ? 18 : 18.5,
+      bestLapTime: index === 0 ? 18 : 18.5,
+      vehicle: {
+        ...participant.vehicle,
+        x: index === 0 ? 0 : 100,
+        y: index === 0 ? 0 : 100,
+        velocityX: index === 0 ? 200 : 180,
+        velocityY: 0,
+      },
+    };
+    }),
+  };
+  const hud = circuitHudView(race, track, "local");
+  assertDeepEqual(hud.position, { current: 1, total: 2 });
+  assertDeepEqual(hud.lap, { current: 2, total: 3, completed: 1 });
+  assertEqual(hud.timing.currentLap, 6.5);
+  assertEqual(hud.timing.lastLap, 18);
+  assert(hud.instruments.speedKph > 0);
+  assert(hud.instruments.gear >= 1 && hud.instruments.gear <= 6);
+  assert(hud.instruments.rpm >= 900 && hud.instruments.rpm <= 8000);
+  assertEqual(hud.runners[0].name, "YOU");
 });
 
 test("the runtime registry exposes one stable adapter shape", () => {

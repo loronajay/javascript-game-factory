@@ -6,6 +6,7 @@ type FetchImpl = typeof fetch | null;
 
 export interface AuthResult {
   ok: boolean;
+  httpStatus?: number;
   token?: string;
   error?: string;
   [key: string]: any;
@@ -13,7 +14,7 @@ export interface AuthResult {
 
 async function authRequest(fetchImpl: FetchImpl, baseUrl: string, path: string, options: RequestInit = {}): Promise<AuthResult> {
   if (typeof fetchImpl !== "function" || !baseUrl) {
-    return { ok: false, error: "not_configured" };
+    return { ok: false, httpStatus: 0, error: "not_configured" };
   }
   try {
     const token = getStoredAuthToken();
@@ -28,9 +29,11 @@ async function authRequest(fetchImpl: FetchImpl, baseUrl: string, path: string, 
     });
     let body: any = null;
     try { body = await response.json(); } catch { /* ignore */ }
-    return response.ok ? { ok: true, ...(body || {}) } : { ok: false, ...(body || {}) };
+    return response.ok
+      ? { ok: true, ...(body || {}), httpStatus: response.status }
+      : { ok: false, ...(body || {}), httpStatus: response.status };
   } catch {
-    return { ok: false, error: "network_error" };
+    return { ok: false, httpStatus: 0, error: "network_error" };
   }
 }
 

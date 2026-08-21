@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Circuit Stripe Viewer · Speed Demon</title>
+    <link rel="stylesheet" href="circuit-livery-viewer.css" />
+  </head>
+  <body>
+    <header>
+      <div>
+        <p class="eyebrow">Speed Demon · Real circuit renderer</p>
+        <h1>Circuit Stripe Viewer</h1>
+        <p class="lede">All eight baked in-game frames, shown together with the authored panel correction.</p>
+      </div>
+      <a href="../index.html">Back to game</a>
+    </header>
+
+    <main>
+      <aside class="controls" aria-label="Stripe preview controls">
+        <div class="status-line">
+          <span class="live-dot"></span>
+          <strong id="status">Loading circuit atlas…</strong>
+        </div>
+
+        <label>
+          <span>Car model</span>
+          <select id="modelSelect"></select>
+        </label>
+
+        <label>
+          <span>Stripe layout</span>
+          <select id="layout">
+            <option value="twin" selected>Twin stripes</option>
+            <option value="spine">Centre stripe</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Position <output id="positionValue">44%</output></span>
+          <input id="position" type="range" min="5" max="50" value="44" />
+        </label>
+
+        <label>
+          <span>Width <output id="sizeValue">8%</output></span>
+          <input id="size" type="range" min="2" max="30" value="8" />
+        </label>
+
+        <label>
+          <span>Player curve <output id="curveValue">0%</output></span>
+          <input id="curve" type="range" min="-35" max="35" value="0" />
+        </label>
+
+        <label>
+          <span>Body hue <output id="bodyHueValue">0°</output></span>
+          <input id="bodyHue" type="range" min="0" max="359" value="0" />
+        </label>
+
+        <label>
+          <span>Stripe hue <output id="stripeHueValue">0°</output></span>
+          <input id="stripeHue" type="range" min="0" max="359" value="0" />
+        </label>
+
+        <button id="reset" type="button">Reset high-contrast preview</button>
+
+        <p class="note"><strong>What is fixed:</strong> each visible hood, roof and deck segment follows its own authored stripe axis. Position, width and curve still come from the real player livery.</p>
+        <p class="note"><strong>North and South:</strong> unchanged, because those frames were already correct.</p>
+      </aside>
+
+      <section class="viewer" aria-labelledby="viewerTitle">
+        <div class="viewer-heading">
+          <div>
+            <p class="eyebrow">Corrected output</p>
+            <h2 id="viewerTitle">Every direction</h2>
+          </div>
+          <span>64px source · 4× nearest-neighbour preview</span>
+        </div>
+        <div id="directionGrid" class="direction-grid"></div>
+      </section>
+    </main>
+
+    <script type="module" src="circuit-livery-viewer.js"></script>
+  </body>
+</html>

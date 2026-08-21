@@ -30,7 +30,9 @@ export const CIRCUIT_TRACKS = Object.freeze([
     world: CIRCUIT_WORLD,
     spawns: Object.freeze([
       Object.freeze({ x: 610, y: 850, angle: Math.PI / 2 }),
-      Object.freeze({ x: 650, y: 825, angle: Math.PI / 2 }),
+      // A two-wide grid on one start line. The old second slot was 40 world
+      // units farther east — already ahead in the direction both cars face.
+      Object.freeze({ x: 610, y: 825, angle: Math.PI / 2 }),
     ]),
     checkpoints: Object.freeze(checkpoints),
     racingLine: JAPAN_NOIR_LINE,

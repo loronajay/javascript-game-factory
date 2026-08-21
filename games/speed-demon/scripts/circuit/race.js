@@ -18,6 +18,7 @@ function normalizeParticipant(entry, index, track) {
   const control = validControl(entry?.control) ? entry.control : "cpu";
   return {
     playerId: String(entry?.playerId ?? `participant-${index + 1}`),
+    displayName: String(entry?.displayName ?? entry?.playerId ?? `DRIVER ${index + 1}`),
     control,
     modelId,
     livery: entry?.livery ?? null,
@@ -25,7 +26,12 @@ function normalizeParticipant(entry, index, track) {
     input: { throttle: 0, brake: 0, steer: 0, shift: 0 },
     driver: control === "cpu" ? createCpuDriver(track.racingLine) : null,
     nextCheckpoint: track.checkpoints.length > 1 ? 1 : 0,
+    checkpointsPassed: 0,
     lap: 0,
+    lapStartedAt: 0,
+    lapTimes: [],
+    lastLapTime: null,
+    bestLapTime: null,
     finishedAt: null,
     place: null,
   };
@@ -100,10 +106,20 @@ function advanceParticipant(participant, previousVehicle, track, rules, elapsed,
   let lap = participant.lap;
   let finishedAt = participant.finishedAt;
   let finishPlace = participant.place;
+  let lapStartedAt = participant.lapStartedAt;
+  let lapTimes = participant.lapTimes;
+  let lastLapTime = participant.lastLapTime;
+  let bestLapTime = participant.bestLapTime;
   let event = { type: "checkpoint", playerId: participant.playerId, checkpoint: completedIndex };
   if (completedIndex === 0) {
     lap += 1;
-    event = { type: "lap", playerId: participant.playerId, lap };
+    lastLapTime = Math.max(0, elapsed - participant.lapStartedAt);
+    bestLapTime = participant.bestLapTime === null
+      ? lastLapTime
+      : Math.min(participant.bestLapTime, lastLapTime);
+    lapTimes = [...participant.lapTimes, lastLapTime];
+    lapStartedAt = elapsed;
+    event = { type: "lap", playerId: participant.playerId, lap, lapTime: lastLapTime };
     if (lap >= rules.laps) {
       finishedAt = elapsed;
       finishPlace = place;
@@ -111,7 +127,18 @@ function advanceParticipant(participant, previousVehicle, track, rules, elapsed,
     }
   }
   return {
-    participant: { ...participant, nextCheckpoint, lap, finishedAt, place: finishPlace },
+    participant: {
+      ...participant,
+      nextCheckpoint,
+      checkpointsPassed: participant.checkpointsPassed + 1,
+      lap,
+      lapStartedAt,
+      lapTimes,
+      lastLapTime,
+      bestLapTime,
+      finishedAt,
+      place: finishPlace,
+    },
     event,
   };
 }
@@ -202,12 +229,22 @@ export function stepCircuitRace(state, dt, environment = {}) {
 
 export function circuitRaceResult(state, playerId = "local") {
   const participant = state.participants.find((entry) => entry.playerId === playerId) ?? null;
+  const winner = state.participants.find((entry) => entry.place === 1)
+    ?? state.participants.find((entry) => entry.playerId === state.finishOrder[0])
+    ?? null;
   const finished = participant?.finishedAt !== null && participant?.finishedAt !== undefined;
+  const won = participant?.place === 1;
   return {
-    won: participant?.place === 1,
+    won,
+    outcome: won ? "victory" : "defeat",
     value: finished ? participant.finishedAt : null,
     better: "lower",
     place: participant?.place ?? null,
     finished,
+    fieldSize: state.participants.length,
+    laps: state.rules.laps,
+    winnerId: winner?.playerId ?? null,
+    winnerName: winner?.displayName ?? winner?.playerId ?? null,
+    playerName: participant?.displayName ?? participant?.playerId ?? null,
   };
 }

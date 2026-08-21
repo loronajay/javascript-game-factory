@@ -44,6 +44,7 @@ const MODULES = [
   "scripts/ui/radio-panel.js",
   "scripts/ui/track-layout.js",
   "scripts/ui/gauges.js",
+  "scripts/ui/circuit-hud.js",
   "scripts/ui/setup-menu.js",
   "scripts/ui/collection.js",
   "scripts/ui/boards.js",

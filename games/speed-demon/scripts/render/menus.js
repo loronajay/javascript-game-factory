@@ -721,32 +721,54 @@ export function drawResults(ctx, race, menu, recordSummary = null, rival = null)
 }
 
 /** Results surface shared by non-drag runtimes through the normalized result contract. */
-export function drawNormalizedResults(ctx, result, menu) {
+export function drawNormalizedResults(ctx, result, menu, { campaign = null, event = null } = {}) {
   const box = MENU_LAYOUT.results;
   const centre = WORLD.width / 2;
   ctx.save();
   dimWorld(ctx);
   menuPanel(ctx, box.x, box.y, box.width, box.height);
-  text(ctx, result.won ? "WINNER" : "RACE COMPLETE", centre, box.y + 58, {
-    size: 26,
-    colour: result.won ? "#4ade6a" : TEXT,
+  text(ctx, result.won ? "VICTORY" : "DEFEAT", centre, box.y + 54, {
+    size: 31,
+    colour: result.won ? "#4ade6a" : "#ff6b6b",
     weight: "800",
     align: "center",
   });
+  const flagLine = result.won
+    ? "YOU TOOK THE FLAG"
+    : `${(result.winnerName ?? "YOUR RIVAL").toUpperCase()} TOOK THE FLAG`;
+  text(ctx, flagLine, centre, box.y + 82, { size: 14, colour: TEXT, weight: "800", align: "center" });
   const value = Number.isFinite(result.value) ? `${result.value.toFixed(2)}s` : "DNF";
-  text(ctx, value, centre, box.y + 130, {
-    size: 54,
+  text(ctx, value, centre, box.y + 142, {
+    size: 48,
     colour: "#ffffff",
     weight: "700",
     align: "center",
     mono: true,
   });
-  text(ctx, result.place ? `FINISH POSITION  ${result.place}` : "RACE TIMEOUT", centre, box.y + 178, {
-    size: 18,
+  const position = result.place
+    ? `P${result.place} OF ${result.fieldSize ?? "—"}   ·   ${result.laps ?? "—"} LAPS`
+    : "DID NOT FINISH";
+  text(ctx, position, centre, box.y + 177, {
+    size: 16,
     colour: DIM,
     weight: "700",
     align: "center",
   });
+  if (event) {
+    text(ctx, `MISSION  //  ${event.title}`, centre, box.y + 212, {
+      size: 13, colour: DIM, weight: "800", align: "center",
+    });
+    const missionLine = campaign?.cleared
+      ? (campaign.firstClear ? "MISSION CLEARED  ·  NEXT EVENT UNLOCKED" : "MISSION CLEARED")
+      : "MISSION FAILED  ·  RETRY WHEN READY";
+    text(ctx, missionLine, centre, box.y + 240, {
+      size: 15, colour: campaign?.cleared ? "#4ade6a" : "#ffb020", weight: "800", align: "center",
+    });
+  } else {
+    text(ctx, "JAPAN NOIR  //  CIRCUIT RACE", centre, box.y + 226, {
+      size: 13, colour: DIM, weight: "800", align: "center",
+    });
+  }
   drawMenuList(ctx, menu.items, menuListBox("results"), { centred: true });
   ctx.restore();
 }

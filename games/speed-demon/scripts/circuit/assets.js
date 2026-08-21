@@ -18,6 +18,19 @@ export const CIRCUIT_DIRECTIONS = Object.freeze([
   "north-west",
 ]);
 
+// The generated files use camera-facing legacy names. These are the headings
+// of the car's visible nose in the same physical frame order.
+export const CIRCUIT_FRAME_HEADINGS = Object.freeze([
+  "south",
+  "south-west",
+  "west",
+  "north-west",
+  "north",
+  "north-east",
+  "east",
+  "south-east",
+]);
+
 const REPRESENTATIVE_MODELS = [
   ["kaido-gts", "Kaido GTS", "gt"],
   ["tsunami-rz", "Tsunami RZ", "coupe"],

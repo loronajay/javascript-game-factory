@@ -175,7 +175,21 @@ test("the authored circuit mission builds the same serializable circuit definiti
   assertEqual(definition.trackId, "japan-noir");
   assertEqual(definition.rules.laps, 3);
   assertEqual(definition.source.kind, "campaign");
-  assertEqual(Object.keys(definition.participants[0]).sort().join(), "control,livery,modelId,playerId");
+  assertEqual(Object.keys(definition.participants[0]).sort().join(), "control,displayName,livery,modelId,playerId");
+});
+
+test("the circuit mission is presented as a grid race throughout the canon briefing", () => {
+  const event = EVENTS.find((entry) => entry.modeId === MODE_CIRCUIT);
+  const campaign = createCampaign({ eventId: event.id });
+  const map = campaignView(campaign, cleared(), { circuitModelId: "kaido-gts" });
+  assertEqual(map.detail.formatLabel, "CIRCUIT RACE");
+  assertEqual(map.detail.opponentHeading, "ON THE GRID");
+
+  const briefing = campaignView(confirmCampaign(campaign, cleared()).campaign, cleared(), {
+    circuitModelId: "kaido-gts",
+  });
+  assertEqual(briefing.briefing.formatLabel, "CIRCUIT RACE");
+  assertEqual(briefing.briefing.opponent.heading, "ON THE GRID");
 });
 
 test("a campaign circuit mission clearly blocks a selected model with no atlas", () => {

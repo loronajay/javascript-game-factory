@@ -7,6 +7,7 @@ import { readPng } from "./png.js";
 import { allModels } from "../scripts/assets/car-atlas.js";
 import {
   CIRCUIT_DIRECTIONS,
+  CIRCUIT_FRAME_HEADINGS,
   CIRCUIT_MODELS,
   circuitModelById,
   hasCircuitAtlas,
@@ -54,6 +55,16 @@ test("world headings select the artwork frame whose nose points forward", () => 
   assertEqual(circuitFrameIndex(Math.PI / 2), 6);
   assertEqual(circuitFrameIndex(Math.PI), 0);
   assertEqual(circuitFrameIndex(-Math.PI / 2), 2);
+  assertDeepEqual(CIRCUIT_FRAME_HEADINGS, [
+    "south",
+    "south-west",
+    "west",
+    "north-west",
+    "north",
+    "north-east",
+    "east",
+    "south-east",
+  ]);
 });
 
 test("every atlas is eight transparent 64px frames clockwise from north", () => {
@@ -101,13 +112,21 @@ test("every atlas is eight transparent 64px frames clockwise from north", () => 
   }
 });
 
-test("three-quarter views get a modest lift and direct sides get the stronger measured correction", () => {
+test("rear, three-quarter and side views are calibrated against the authored front", () => {
   for (const model of CIRCUIT_MODELS) {
     const sheet = readPng(fs.readFileSync(path.join(CARS_DIR, model.spritesheet)));
     const geometry = measureCircuitFrameGeometry(sheet.pixels, sheet.width, sheet.height);
-    for (const frame of [0, 4]) {
-      assertEqual(geometry[frame].scale, 1, `${model.modelId} front/rear frame ${frame} was resized`);
-    }
+    assertEqual(geometry[0].scale, 1, `${model.modelId} authored front was resized`);
+    const expectedRearScale = Math.min(1, Math.sqrt(geometry[0].alphaArea / geometry[4].alphaArea));
+    assertEqual(
+      Number(geometry[4].scale.toFixed(6)),
+      Number(expectedRearScale.toFixed(6)),
+      `${model.modelId} rear was not capped to its front-view mass`,
+    );
+    assert(
+      geometry[4].alphaArea * geometry[4].scale ** 2 <= geometry[0].alphaArea + 1e-6,
+      `${model.modelId} rear still renders larger than its front`,
+    );
     for (const frame of [1, 3, 5, 7]) {
       assertEqual(geometry[frame].scale, 1.05, `${model.modelId} frame ${frame} missed the 3/4 lift`);
     }
@@ -133,6 +152,29 @@ test("normalized sprites anchor their measured visual centre on the vehicle", ()
   });
   assertEqual(box.x + geometry.sourceCentreX / 64 * box.width, 120);
   assertEqual(box.y + geometry.sourceCentreY / 64 * box.height, 80);
+});
+
+test("Tsunami East is the opposite side of the same car, not a generated substitute", () => {
+  const manifest = JSON.parse(fs.readFileSync(
+    path.join(CARS_DIR, "tsunami-rz", "spritesheet.json"),
+    "utf8",
+  ));
+  const sheet = readPng(fs.readFileSync(path.join(
+    CARS_DIR,
+    "tsunami-rz",
+    "spritesheet-clockwise-from-north.png",
+  )));
+  assertEqual(manifest.repairs?.[0]?.targetFrame, 6);
+  assertEqual(manifest.repairs?.[0]?.mirroredFromFrame, 2);
+  for (let y = 0; y < 64; y += 1) {
+    for (let x = 0; x < 64; x += 1) {
+      for (let channel = 0; channel < 4; channel += 1) {
+        const west = (y * sheet.width + 2 * 64 + x) * 4 + channel;
+        const east = (y * sheet.width + 6 * 64 + (63 - x)) * 4 + channel;
+        assertEqual(sheet.pixels[east], sheet.pixels[west], `Tsunami side mismatch at ${x},${y},${channel}`);
+      }
+    }
+  }
 });
 
 finish();

@@ -22,6 +22,7 @@ import {
 } from "../garage/paint.js";
 import { CIRCUIT_FRAME_SIZE, hasCircuitAtlas } from "./assets.js";
 import { localCarCoordinates, measureCircuitFrameGeometry } from "./sprite-geometry.js";
+import { circuitStripeCoordinates } from "./stripe-projection.js";
 
 export const CIRCUIT_LIVERY_CACHE_LIMIT = 32;
 const CIRCUIT_COVERAGE_CACHE_LIMIT = 8;
@@ -141,7 +142,7 @@ function coverageFor(cache, modelId, pixels, width, height, geometry) {
   return coverage;
 }
 
-function paintStack(r, g, b, local, livery, skipBase) {
+function paintStack(r, g, b, local, livery, skipBase, modelId, frame, geometry, point) {
   const axis = livery.fade.enabled ? findFadeAxis(livery.fade.axis) : null;
   const far = {
     hue: livery.fade.hue,
@@ -155,7 +156,10 @@ function paintStack(r, g, b, local, livery, skipBase) {
   let painted = skipBase ? [r, g, b] : paintWith(r, g, b, preparePaint(base));
 
   for (const layer of livery.layers) {
-    const weight = zoneWeight(layer, local.u, local.v);
+    const layerLocal = layer.kind === "stripe"
+      ? circuitStripeCoordinates(modelId, frame, local, geometry, point)
+      : local;
+    const weight = zoneWeight(layer, layerLocal.u, layerLocal.v);
     if (weight <= 0) continue;
     const over = paintWith(r, g, b, preparePaint(layer.paint));
     painted = weight >= 1 ? over : [
@@ -254,7 +258,18 @@ function bakeCircuitAtlas(
 
       const weight = coverage ? coverage[k] : 0;
       if (weight > 0) {
-        const painted = paintStack(r, g, b, local, livery, skipBase);
+        const painted = paintStack(
+          r,
+          g,
+          b,
+          local,
+          livery,
+          skipBase,
+          modelId,
+          frame,
+          projection[frame],
+          { x: x - frame * CIRCUIT_FRAME_SIZE, y },
+        );
         const under = out ?? [r, g, b];
         out = weight >= 1 ? painted : [
           under[0] + (painted[0] - under[0]) * weight,

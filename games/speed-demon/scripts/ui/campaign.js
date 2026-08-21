@@ -293,6 +293,8 @@ function detailFor(node, event, progress, circuitModelId) {
     circuitUnavailable,
     trackLabel: hidden ? "" : (trackById(event.trackId) ?? circuitTrackById(event.trackId))?.label ?? "",
     objectiveLabel: hidden ? "" : objective?.label ?? "",
+    formatLabel: hidden ? "" : mode?.label?.toUpperCase() ?? "",
+    opponentHeading: mode?.runtime === "circuit" ? "ON THE GRID" : "IN THE OTHER LANE",
     opponent: !hidden && event.opponent ? opponentFor(event.opponent) : null,
     attempts: record?.attempts ?? 0,
     wins: record?.wins ?? 0,
@@ -339,6 +341,7 @@ function briefingFor(event, line) {
     id: event.id,
     title: event.title,
     where: event.where,
+    formatLabel: mode?.label?.toUpperCase() ?? "",
     splash: event.splash,
     // Resolved here rather than in the renderer, which would otherwise have to
     // consult a catalog to draw a name — the rule every view model in the
@@ -351,6 +354,7 @@ function briefingFor(event, line) {
     opponent: event.opponent
       ? {
         ...opponentFor(event.opponent),
+        heading: mode?.runtime === "circuit" ? "ON THE GRID" : "IN THE OTHER LANE",
         trackLabel: (trackById(event.trackId) ?? circuitTrackById(event.trackId))?.label ?? "",
         objectiveLabel: mode ? objectiveOption(mode, event.objectiveId)?.label ?? "" : "",
       }

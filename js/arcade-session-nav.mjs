@@ -83,6 +83,16 @@ export function buildLogoutRedirectUrl(homeOnLogout = "index.html", currentHref 
         return `${homeOnLogout}${separator}${SIGNED_OUT_QUERY_KEY}=1`;
     }
 }
+// Only a definite 401 proves that the stored credentials are dead. During a deploy,
+// Railway can briefly answer 5xx while the replacement is starting; treating that as
+// an auth rejection turns a momentary outage into a permanent logout. The error fallback
+// keeps compatibility with preloaded/test session results that predate httpStatus.
+export function shouldInvalidateStoredSession(session) {
+    const httpStatus = Number(session?.httpStatus);
+    if (Number.isFinite(httpStatus) && httpStatus > 0)
+        return httpStatus === 401;
+    return session?.error === "not_authenticated";
+}
 export async function initSessionNav(containerEl, { signInPath = "sign-in/index.html", signUpPath = "sign-up/index.html", homeOnLogout = "index.html", preloadedSession = null, locationRef = globalThis.location, historyRef = globalThis.history, adminPath = "", } = {}) {
     if (!containerEl)
         return;
@@ -106,14 +116,12 @@ export async function initSessionNav(containerEl, { signInPath = "sign-in/index.
             // Best-effort cleanup only.
         }
     }
-    // A stored auth token with no valid session means the session was invalidated
-    // server-side (an expiry or a site update), not an explicit sign-out. Purge the
-    // stale token and cached factory identity so no page keeps presenting the
-    // signed-out player's pilot name as if they were still signed in. A network/config
-    // failure is inconclusive, so leave the cached identity alone in that case.
+    // A definite authentication rejection means the session was invalidated server-side
+    // (expiry or another login), not explicitly signed out. Purge the stale token and cached
+    // identity. Network failures and deploy-time 5xx responses are inconclusive and must
+    // leave the token intact so the next successful request can recover automatically.
     const authenticated = !!(session?.ok && session?.playerId);
-    const sessionCheckInconclusive = session?.error === "network_error" || session?.error === "not_configured";
-    if (!authenticated && !skipSessionCheck && !sessionCheckInconclusive && getStoredAuthToken()) {
+    if (!authenticated && !skipSessionCheck && shouldInvalidateStoredSession(session) && getStoredAuthToken()) {
         clearAuthToken();
         clearPlatformStorage(getDefaultPlatformStorage());
     }

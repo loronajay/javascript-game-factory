@@ -62,10 +62,11 @@ export function localCarCoordinates(
 /**
  * Measures every frame as its own camera view.
  *
- * The source master changes perspective as it turns. Front and rear are the
- * authored reference size. The four three-quarter views get a restrained 5%
- * lift, while each exact side profile is enlarged by its measured loss of
- * alpha-weighted body mass against the two three-quarter views beside it.
+ * The source master changes perspective as it turns. The front is the authored
+ * cardinal reference. A rear view with more visible mass is reduced to match
+ * it (an already smaller rear is left alone). The four three-quarter views get
+ * a restrained 5% lift, while each exact side profile is enlarged by its
+ * measured loss of alpha-weighted body mass against its neighbouring views.
  *
  * The measured oriented bounds are also the UV calibration for liveries. Each
  * independently generated view gets its own nose, tail, left and right rather
@@ -140,7 +141,10 @@ export function measureCircuitFrameGeometry(
   return measured.map((frame, frameIndex) => {
     const directSide = frameIndex === 2 || frameIndex === 6;
     const threeQuarter = frameIndex % 2 === 1;
-    const targetAlphaArea = directSide
+    const rear = frameIndex === 4;
+    const targetAlphaArea = rear
+      ? Math.min(frame.alphaArea, measured[0].alphaArea)
+      : directSide
       ? (measured[(frameIndex + frameCount - 1) % frameCount].alphaArea
         + measured[(frameIndex + 1) % frameCount].alphaArea) / 2
       : frame.alphaArea;
@@ -149,7 +153,9 @@ export function measureCircuitFrameGeometry(
       targetAlphaArea,
       scale: directSide
         ? Math.max(CIRCUIT_SIDE_MIN_SCALE, Math.sqrt(targetAlphaArea / frame.alphaArea))
-        : threeQuarter ? CIRCUIT_THREE_QUARTER_SCALE : 1,
+        : threeQuarter
+          ? CIRCUIT_THREE_QUARTER_SCALE
+          : rear ? Math.sqrt(targetAlphaArea / frame.alphaArea) : 1,
     });
   });
 }

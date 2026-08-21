@@ -266,7 +266,7 @@ import {
 } from "./ui/boards.js";
 import { BOARDS_SPLASH, drawBoards, hitBoards } from "./render/boards.js";
 import { createProfileStore } from "./profile/profile-store.js";
-import { createProfile, refreshFavourites } from "./profile/profile.js";
+import { createProfile, displayName as profileDisplayName, refreshFavourites } from "./profile/profile.js";
 import { avatarById } from "./profile/avatars.js";
 import {
   STAGE_CARD,
@@ -1577,6 +1577,7 @@ export function boot(canvas) {
     const mode = modeById(runSelection.modeId);
     const localParticipant = {
       playerId: "local",
+      displayName: profileDisplayName(profile),
       control: "local",
       modelId: chosen.model.id,
       livery: chosen.livery,
@@ -1591,6 +1592,7 @@ export function boot(canvas) {
           localParticipant,
           {
             playerId: event?.opponent?.id ?? "cpu",
+            displayName: event?.opponent?.name ?? "NIGHT RUNNER",
             control: "cpu",
             modelId: event?.opponent?.modelId ?? "colt-gt",
             livery: event?.opponent?.livery ?? createLivery(),
@@ -3350,7 +3352,9 @@ export function boot(canvas) {
         viewportHeight: WORLD.height,
       });
       if (shell.screen === SCREEN_PAUSED) drawPauseMenu(ctx, menu);
-      else if (shell.screen === SCREEN_RESULTS) drawNormalizedResults(ctx, runtimeResult, menu);
+      else if (shell.screen === SCREEN_RESULTS) {
+        drawNormalizedResults(ctx, runtimeResult, menu, { campaign: campaignResult, event: campaignRun });
+      }
       else if (isOnlineRace() && showsOnlineResult()) {
         drawOnlineResult(ctx, {
           headline: roundHeadline(session), note: restartNote(session), rows: roundRows(session),

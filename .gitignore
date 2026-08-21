@@ -44,6 +44,10 @@ dev/
 !js/tests/
 js/tests/*
 !js/tests/readme-freshness.test.mjs
+# Session durability is a production deploy invariant, not a local-only harness.
+!js/tests/arcade-session-nav.test.mjs
+!js/tests/auth-api.test.mjs
+!js/tests/deployment-config.test.mjs
 
 # Keep the database regression that prevents narrow profile updates from
 # erasing canonical fields after an origin/domain change.

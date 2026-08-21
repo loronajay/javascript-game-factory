@@ -21,6 +21,15 @@
     "role": "generated rotation master",
     "backgroundExtraction": "edge-connected-neutral"
   },
+  "repairs": [
+    {
+      "targetFrame": 6,
+      "targetHeading": "east",
+      "mirroredFromFrame": 2,
+      "mirroredFromHeading": "west",
+      "reason": "generated east side used a different vehicle body"
+    }
+  ],
   "frames": [
     {
       "direction": "north",

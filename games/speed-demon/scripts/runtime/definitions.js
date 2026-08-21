@@ -21,6 +21,7 @@ export function buildRuntimeDefinition({
   const objective = objectiveOption(mode, objectiveId);
   const normalizedParticipants = (participants ?? []).map((participant) => ({
     playerId: String(participant.playerId),
+    displayName: String(participant.displayName ?? participant.playerId),
     control: participant.control,
     ...canonicalLoadout(participant),
   }));

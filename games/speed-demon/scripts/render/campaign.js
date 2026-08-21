@@ -198,7 +198,7 @@ function drawDetail(ctx, view, detail, faces) {
   // a line of type on the water.
   // The distance, not the track: an event's `where` already names the place, and
   // printing the track label beside it says "Old Town" twice.
-  const where = [detail.where, detail.objectiveLabel].filter(Boolean).join("   ·   ");
+  const where = [detail.where, detail.formatLabel, detail.objectiveLabel].filter(Boolean).join("   ·   ");
   text(ctx, where, left, box.y + 70, { size: 13 });
 
   if (detail.opponent) {
@@ -213,7 +213,7 @@ function drawDetail(ctx, view, detail, faces) {
       faces,
     );
     const column = middle + cell.size + cell.gap;
-    text(ctx, "IN THE OTHER LANE", column, box.y + 20, { size: 11, colour: DIM, weight: "800" });
+    text(ctx, detail.opponentHeading, column, box.y + 20, { size: 11, colour: DIM, weight: "800" });
     text(ctx, detail.opponent.name.toUpperCase(), column, box.y + 46, {
       size: 18, colour: detail.opponent.accent, weight: "800",
     });
@@ -307,7 +307,7 @@ function drawDossier(ctx, opponent, faces) {
     faces,
   );
 
-  text(ctx, "IN THE OTHER LANE", centre, card.y + card.face + 42, {
+  text(ctx, opponent.heading, centre, card.y + card.face + 42, {
     size: 10, colour: DIM, weight: "800", align: "center",
   });
   text(ctx, opponent.name.toUpperCase(), centre, card.y + card.face + 68, {

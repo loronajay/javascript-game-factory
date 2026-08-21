@@ -1,0 +1,782 @@
+[
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/aaliyah-storm/halloween/portrait.webp",
+    "detail": "internal x=345 has 44 aligned edge pixels (longest run 44)"
+  },
+  {
+    "severity": "error",
+    "code": "occupied-pose-gutter",
+    "path": "assets/characters/skins/aaliyah-storm/swimsuit/source.png",
+    "detail": "foreground crosses x=256, 512, 768, 1024, 1280"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/amara-reed/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/amara-reed/halloween/throw-02.webp",
+    "detail": "internal x=95 has 48 aligned edge pixels (longest run 48)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/amara-reed/halloween/throw-03.webp",
+    "detail": "internal x=114 has 85 aligned edge pixels (longest run 53)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/amara-reed/halloween/throw-04.webp",
+    "detail": "internal x=330 has 72 aligned edge pixels (longest run 72)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/amara-reed/maid/throw-05.webp",
+    "detail": "internal x=390 has 80 aligned edge pixels (longest run 27)"
+  },
+  {
+    "severity": "error",
+    "code": "occupied-pose-gutter",
+    "path": "assets/characters/skins/amara-reed/swimsuit/source.png",
+    "detail": "foreground crosses x=256, 512, 768, 1024, 1280"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/amara-reed/swimsuit/portrait.webp",
+    "detail": "internal x=75 has 49 aligned edge pixels (longest run 49)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/amara-reed/swimsuit/throw-02.webp",
+    "detail": "internal x=88 has 51 aligned edge pixels (longest run 51)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/carmen-blaze/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/carmen-blaze/halloween/portrait.webp",
+    "detail": "internal x=335 has 45 aligned edge pixels (longest run 45)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/carmen-blaze/halloween/throw-05.webp",
+    "detail": "internal x=100 has 121 aligned edge pixels (longest run 82)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/carmen-blaze/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/carmen-blaze/maid/portrait.webp",
+    "detail": "internal x=337 has 58 aligned edge pixels (longest run 58)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/carmen-blaze/maid/throw-01.webp",
+    "detail": "internal x=114 has 78 aligned edge pixels (longest run 46)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/carmen-blaze/maid/throw-03.webp",
+    "detail": "internal x=330 has 43 aligned edge pixels (longest run 43)"
+  },
+  {
+    "severity": "error",
+    "code": "occupied-pose-gutter",
+    "path": "assets/characters/skins/carmen-blaze/swimsuit/source.png",
+    "detail": "foreground crosses x=256, 512, 768, 1024, 1280"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/cassy-cruz/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/cassy-cruz/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/cassy-cruz/maid/portrait.webp",
+    "detail": "internal x=350 has 51 aligned edge pixels (longest run 51)"
+  },
+  {
+    "severity": "error",
+    "code": "occupied-pose-gutter",
+    "path": "assets/characters/skins/cassy-cruz/swimsuit/source.png",
+    "detail": "foreground crosses x=256, 512, 768, 1024, 1280"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/claire-rowan/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/claire-rowan/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/claire-rowan/maid/portrait.webp",
+    "detail": "internal x=339 has 49 aligned edge pixels (longest run 49)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/claire-rowan/maid/throw-05.webp",
+    "detail": "internal x=350 has 43 aligned edge pixels (longest run 43)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/daisy-monroe/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "error",
+    "code": "occupied-pose-gutter",
+    "path": "assets/characters/skins/daisy-monroe/swimsuit/source.png",
+    "detail": "foreground crosses x=256, 512, 768, 1024, 1280"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/daisy-monroe/swimsuit/portrait.webp",
+    "detail": "internal x=267 has 87 aligned edge pixels (longest run 87)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/daisy-monroe/swimsuit/throw-05.webp",
+    "detail": "internal x=346 has 52 aligned edge pixels (longest run 52)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/echo-sterling/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/echo-sterling/halloween/portrait.webp",
+    "detail": "internal x=348 has 48 aligned edge pixels (longest run 48)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/echo-sterling/halloween/throw-05.webp",
+    "detail": "internal x=111 has 72 aligned edge pixels (longest run 72)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/echo-sterling/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/echo-sterling/maid/portrait.webp",
+    "detail": "internal x=348 has 48 aligned edge pixels (longest run 48)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/fiona-vale/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/fiona-vale/halloween/throw-05.webp",
+    "detail": "internal x=119 has 123 aligned edge pixels (longest run 123)"
+  },
+  {
+    "severity": "error",
+    "code": "occupied-pose-gutter",
+    "path": "assets/characters/skins/fiona-vale/swimsuit/source.png",
+    "detail": "foreground crosses x=256, 512, 768, 1024, 1280"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/hazel-ward/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/hazel-ward/halloween/throw-05.webp",
+    "detail": "internal x=127 has 61 aligned edge pixels (longest run 61)"
+  },
+  {
+    "severity": "error",
+    "code": "occupied-pose-gutter",
+    "path": "assets/characters/skins/hazel-ward/swimsuit/source.png",
+    "detail": "foreground crosses x=256, 512, 768, 1024, 1280"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/imani-cole/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/imani-cole/halloween/throw-01.webp",
+    "detail": "internal x=332 has 48 aligned edge pixels (longest run 48)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/imani-cole/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/kevya-desai/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/kevya-desai/halloween/throw-05.webp",
+    "detail": "internal x=124 has 75 aligned edge pixels (longest run 75)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/kevya-desai/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "error",
+    "code": "occupied-pose-gutter",
+    "path": "assets/characters/skins/kevya-desai/swimsuit/source.png",
+    "detail": "foreground crosses x=256, 512, 768, 1024, 1280"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/lillie-chen/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/lillie-chen/halloween/throw-02.webp",
+    "detail": "internal x=355 has 49 aligned edge pixels (longest run 49)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/lillie-chen/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/lumi-vega/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/lumi-vega/maid/throw-02.webp",
+    "detail": "internal x=136 has 80 aligned edge pixels (longest run 53)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/lumi-vega/maid/throw-05.webp",
+    "detail": "internal x=356 has 77 aligned edge pixels (longest run 77)"
+  },
+  {
+    "severity": "error",
+    "code": "occupied-pose-gutter",
+    "path": "assets/characters/skins/lumi-vega/swimsuit/source.png",
+    "detail": "foreground crosses x=256, 512, 768, 1024, 1280"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/marisol-cruz/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/marisol-cruz/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/marisol-cruz/maid/throw-01.webp",
+    "detail": "internal x=335 has 47 aligned edge pixels (longest run 47)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/mina-park/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/mina-park/halloween/portrait.webp",
+    "detail": "internal x=78 has 77 aligned edge pixels (longest run 77)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/mina-park/halloween/throw-05.webp",
+    "detail": "internal x=118 has 62 aligned edge pixels (longest run 62)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/mina-park/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/naomi-okafor/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/naomi-okafor/halloween/throw-05.webp",
+    "detail": "internal x=100 has 72 aligned edge pixels (longest run 72)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/naomi-okafor/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/naomi-okafor/maid/throw-05.webp",
+    "detail": "internal x=402 has 43 aligned edge pixels (longest run 43)"
+  },
+  {
+    "severity": "error",
+    "code": "occupied-pose-gutter",
+    "path": "assets/characters/skins/naomi-okafor/swimsuit/source.png",
+    "detail": "foreground crosses x=256, 512, 768, 1024, 1280"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/nia-brooks/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/nia-brooks/halloween/throw-05.webp",
+    "detail": "internal x=81 has 51 aligned edge pixels (longest run 51)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/nia-brooks/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/nyx-calder/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/nyx-calder/halloween/throw-01.webp",
+    "detail": "internal x=273 has 64 aligned edge pixels (longest run 64)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/nyx-calder/halloween/throw-04.webp",
+    "detail": "internal x=237 has 60 aligned edge pixels (longest run 60)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/nyx-calder/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "error",
+    "code": "occupied-pose-gutter",
+    "path": "assets/characters/skins/nyx-calder/swimsuit/source.png",
+    "detail": "foreground crosses x=256, 512, 768, 1024, 1280"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/piper-hart/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/piper-hart/halloween/throw-05.webp",
+    "detail": "internal x=332 has 153 aligned edge pixels (longest run 153)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/piper-hart/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "error",
+    "code": "occupied-pose-gutter",
+    "path": "assets/characters/skins/piper-hart/swimsuit/source.png",
+    "detail": "foreground crosses x=256, 512, 768, 1024, 1280"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/rei-nakamura/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/rei-nakamura/halloween/throw-02.webp",
+    "detail": "internal x=350 has 45 aligned edge pixels (longest run 45)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/rei-nakamura/halloween/throw-03.webp",
+    "detail": "internal x=94 has 83 aligned edge pixels (longest run 83)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/rei-nakamura/halloween/throw-05.webp",
+    "detail": "internal x=122 has 101 aligned edge pixels (longest run 101)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/rei-nakamura/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/rei-nakamura/maid/portrait.webp",
+    "detail": "internal x=101 has 46 aligned edge pixels (longest run 46)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/rei-nakamura/maid/throw-01.webp",
+    "detail": "internal x=321 has 118 aligned edge pixels (longest run 118)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/rei-nakamura/maid/throw-02.webp",
+    "detail": "internal x=282 has 63 aligned edge pixels (longest run 63)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/rei-nakamura/maid/throw-05.webp",
+    "detail": "internal x=371 has 63 aligned edge pixels (longest run 63)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/reina-sato/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/reina-sato/halloween/throw-05.webp",
+    "detail": "internal x=100 has 88 aligned edge pixels (longest run 88)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/reina-sato/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/reina-sato/maid/portrait.webp",
+    "detail": "internal x=104 has 47 aligned edge pixels (longest run 47)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/reina-sato/maid/throw-02.webp",
+    "detail": "internal x=109 has 57 aligned edge pixels (longest run 57)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/roxy-chen/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/roxy-chen/halloween/throw-05.webp",
+    "detail": "internal x=105 has 53 aligned edge pixels (longest run 53)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/sabrina-wilde/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/sabrina-wilde/halloween/portrait.webp",
+    "detail": "internal x=347 has 47 aligned edge pixels (longest run 47)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/sabrina-wilde/halloween/throw-01.webp",
+    "detail": "internal x=107 has 62 aligned edge pixels (longest run 62)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/sabrina-wilde/halloween/throw-02.webp",
+    "detail": "internal x=314 has 70 aligned edge pixels (longest run 70)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/sabrina-wilde/halloween/throw-03.webp",
+    "detail": "internal x=363 has 60 aligned edge pixels (longest run 60)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/sabrina-wilde/halloween/throw-04.webp",
+    "detail": "internal x=331 has 48 aligned edge pixels (longest run 48)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/sabrina-wilde/halloween/throw-05.webp",
+    "detail": "internal x=138 has 112 aligned edge pixels (longest run 112)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/sabrina-wilde/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/sabrina-wilde/maid/portrait.webp",
+    "detail": "internal x=348 has 47 aligned edge pixels (longest run 47)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/sabrina-wilde/maid/throw-01.webp",
+    "detail": "internal x=224 has 66 aligned edge pixels (longest run 66)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/sage-holloway/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/sage-holloway/halloween/throw-05.webp",
+    "detail": "internal x=100 has 58 aligned edge pixels (longest run 58)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/scarlett-voss/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/scarlett-voss/halloween/throw-02.webp",
+    "detail": "internal x=159 has 60 aligned edge pixels (longest run 60)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/scarlett-voss/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/scarlett-voss/maid/portrait.webp",
+    "detail": "internal x=347 has 134 aligned edge pixels (longest run 49)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/scarlett-voss/maid/throw-04.webp",
+    "detail": "internal x=230 has 71 aligned edge pixels (longest run 71)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/scarlett-voss/swimsuit/throw-04.webp",
+    "detail": "internal x=261 has 71 aligned edge pixels (longest run 71)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/simone-carter/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/simone-carter/halloween/throw-01.webp",
+    "detail": "internal x=278 has 77 aligned edge pixels (longest run 77)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/simone-carter/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/simone-carter/maid/portrait.webp",
+    "detail": "internal x=107 has 46 aligned edge pixels (longest run 46)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/simone-carter/swimsuit/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/skye-bennett/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/skye-bennett/halloween/throw-05.webp",
+    "detail": "internal x=119 has 120 aligned edge pixels (longest run 91)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/skye-bennett/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/skye-bennett/maid/portrait.webp",
+    "detail": "internal x=355 has 62 aligned edge pixels (longest run 62)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/talia-dodson/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/talia-dodson/halloween/portrait.webp",
+    "detail": "internal x=358 has 79 aligned edge pixels (longest run 79)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/talia-dodson/halloween/throw-03.webp",
+    "detail": "internal x=86 has 94 aligned edge pixels (longest run 94)"
+  },
+  {
+    "severity": "review",
+    "code": "internal-vertical-truncation",
+    "path": "assets/characters/skins/talia-dodson/maid/portrait.webp",
+    "detail": "internal x=103 has 50 aligned edge pixels (longest run 50)"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/tessa-quinn/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/tessa-quinn/maid/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/tessa-quinn/swimsuit/source.png",
+    "detail": "expected RGBA, got RGB"
+  },
+  {
+    "severity": "error",
+    "code": "invalid-source-mode",
+    "path": "assets/characters/skins/zuri-banks/halloween/source.png",
+    "detail": "expected RGBA, got RGB"
+  }
+]

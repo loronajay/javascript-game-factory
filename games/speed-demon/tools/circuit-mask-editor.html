@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Circuit Stripe Flow Lab · Speed Demon</title>
+    <link rel="stylesheet" href="circuit-mask-editor.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Speed Demon · Art pipeline</p>
+        <h1>Circuit Stripe Flow Lab</h1>
+      </div>
+      <div class="top-actions">
+        <span id="saveState" class="save-state" role="status">Loading sprites…</span>
+        <a class="button quiet" href="../index.html">Back to game</a>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="panel directions-panel" aria-labelledby="directionsTitle">
+        <div class="panel-heading">
+          <div>
+            <p class="kicker">01 · Choose model</p>
+            <h2 id="directionsTitle">All eight angles</h2>
+          </div>
+          <div id="overallProgress" class="progress-badge">0%</div>
+        </div>
+
+        <label class="field-label" for="modelSelect">Circuit car</label>
+        <select id="modelSelect" class="select"></select>
+
+        <div class="progress-track" aria-hidden="true">
+          <span id="overallProgressBar"></span>
+        </div>
+        <p id="progressCopy" class="muted progress-copy">0 of 0 visible pixels identified</p>
+
+        <div id="directionGrid" class="direction-grid" aria-label="Sprite directions"></div>
+        <p class="microcopy">Every source view stays on screen. Click an angle to edit it; use ← and → to step around the car.</p>
+      </section>
+
+      <section class="panel editor-panel" aria-labelledby="editorTitle">
+        <div class="panel-heading editor-heading">
+          <div>
+            <p class="kicker">02 · Draw the flow</p>
+            <h2 id="editorTitle">North</h2>
+          </div>
+          <div id="cursorReadout" class="cursor-readout">x — · y —</div>
+        </div>
+
+        <div class="tool-row" role="toolbar" aria-label="Mask tools">
+          <button id="primaryTool" class="tool active" data-tool="pencil" type="button" title="Draw flow (D)">Draw Flow <kbd>D</kbd></button>
+          <button id="fillTool" class="tool" data-tool="fill" type="button" title="Bucket fill (F)" disabled>Fill <kbd>F</kbd></button>
+          <button id="pickerTool" class="tool" data-tool="picker" type="button" title="Pick mask (I)" disabled>Pick <kbd>I</kbd></button>
+          <button id="eraserTool" class="tool" data-tool="eraser" type="button" title="Eraser (E)" disabled>Erase <kbd>E</kbd></button>
+          <span class="tool-divider"></span>
+          <button id="undoButton" class="tool icon-tool" type="button" title="Undo (Ctrl+Z)" disabled>↶</button>
+          <button id="redoButton" class="tool icon-tool" type="button" title="Redo (Ctrl+Y)" disabled>↷</button>
+          <label id="brushLabel" class="brush-label" for="brushSize">Brush</label>
+          <select id="brushSize" class="small-select" disabled>
+            <option value="0">1 px</option>
+            <option value="1">3 px</option>
+            <option value="2">5 px</option>
+            <option value="4">9 px</option>
+          </select>
+        </div>
+
+        <div class="canvas-shell">
+          <canvas id="editorCanvas" width="640" height="640" aria-label="Zoomed circuit car stripe-flow editor"></canvas>
+          <div id="noseAxis" class="axis">NOSE</div>
+          <div id="tailAxis" class="axis">TAIL</div>
+        </div>
+
+        <div class="editor-foot">
+          <p id="editorHelp"><strong>Draw:</strong> drag from stripe start to stripe end. The arrow preserves your direction and curve.</p>
+          <p id="scopeHelp">Add more paths where perspective changes across the body.</p>
+        </div>
+      </section>
+
+      <aside class="panel controls-panel" aria-labelledby="paletteTitle">
+        <div class="panel-heading">
+          <div>
+            <p class="kicker">03 · Author the angle</p>
+            <h2 id="paletteTitle">Flow guides</h2>
+          </div>
+        </div>
+
+        <h3>Directional paths</h3>
+        <p class="muted compact">Drag directly over the sprite. The direction you drag becomes the arrow direction; bends stay in the exported path.</p>
+        <div id="guideTargets" class="palette guide-targets" role="listbox" aria-label="Directional guide type">
+          <button class="palette-item active" data-guide="stripes" type="button" role="option" aria-selected="true">
+            <span class="swatch" style="background:#23d9ff"></span>
+            <span class="target-copy"><span>Stripe Flow</span><span class="target-kind">PRIMARY · D</span></span>
+          </button>
+          <button class="palette-item" data-guide="bands" type="button" role="option" aria-selected="false">
+            <span class="swatch" style="background:#ff9a3d"></span>
+            <span class="target-copy"><span>Band Flow</span><span class="target-kind">OPTIONAL · C</span></span>
+          </button>
+        </div>
+
+        <p class="scope-note"><strong>One arrow is enough for a flat panel.</strong> Add parallel paths where a stripe changes angle or curves differently across the visible body.</p>
+
+        <div class="control-group optional-mask-group">
+          <h3>Optional pixel masks</h3>
+          <p class="muted compact">Only keep these if you want to correct tint/lamp detection too.</p>
+          <div id="optionalMasks" class="palette" role="listbox" aria-label="Optional pixel masks">
+            <button class="palette-item" data-surface="2" type="button" role="option" aria-selected="false"><span class="swatch" style="background:#2787ff"></span><span>Window Tint</span><span class="palette-key">2</span></button>
+            <button class="palette-item" data-surface="3" type="button" role="option" aria-selected="false"><span class="swatch" style="background:#ff354d"></span><span>Tail Lights</span><span class="palette-key">3</span></button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <h3>View</h3>
+          <label class="range-row" for="maskOpacity">
+            <span>Overlay opacity</span>
+            <output id="opacityValue">68%</output>
+          </label>
+          <input id="maskOpacity" type="range" min="15" max="100" value="68" />
+          <label class="check-row"><input id="showGrid" type="checkbox" checked /> Pixel grid</label>
+          <label class="check-row"><input id="showGaps" type="checkbox" checked /> Highlight unassigned pixels</label>
+          <label class="check-row"><input id="maskOnly" type="checkbox" /> Mask only</label>
+        </div>
+
+        <div class="control-group">
+          <h3>Project files</h3>
+          <p class="muted compact">JSON preserves every arrow point and optional mask pixel. PNG is a visual reference.</p>
+          <div class="button-stack">
+            <button id="exportJson" class="button primary" type="button">Export guide JSON</button>
+            <button id="exportPng" class="button" type="button">Export active PNG</button>
+            <button id="copyJson" class="button" type="button">Copy JSON</button>
+            <label class="button file-button">Import guide JSON<input id="importJson" type="file" accept="application/json,.json" /></label>
+          </div>
+        </div>
+
+        <div class="control-group danger-zone">
+          <button id="clearModel" class="text-button" type="button">Clear this model’s guides</button>
+        </div>
+      </aside>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="circuit-mask-editor.js"></script>
+  </body>
+</html>

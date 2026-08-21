@@ -2,7 +2,7 @@ import { resolvePlatformApiBaseUrl } from "./platform-api.mjs";
 import { clearAuthToken, getStoredAuthToken, storeAuthToken } from "./auth-token.mjs";
 async function authRequest(fetchImpl, baseUrl, path, options = {}) {
     if (typeof fetchImpl !== "function" || !baseUrl) {
-        return { ok: false, error: "not_configured" };
+        return { ok: false, httpStatus: 0, error: "not_configured" };
     }
     try {
         const token = getStoredAuthToken();
@@ -20,10 +20,12 @@ async function authRequest(fetchImpl, baseUrl, path, options = {}) {
             body = await response.json();
         }
         catch { /* ignore */ }
-        return response.ok ? { ok: true, ...(body || {}) } : { ok: false, ...(body || {}) };
+        return response.ok
+            ? { ok: true, ...(body || {}), httpStatus: response.status }
+            : { ok: false, ...(body || {}), httpStatus: response.status };
     }
     catch {
-        return { ok: false, error: "network_error" };
+        return { ok: false, httpStatus: 0, error: "network_error" };
     }
 }
 export function createAuthApiClient(options = {}) {
