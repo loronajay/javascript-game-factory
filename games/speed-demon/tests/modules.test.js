@@ -68,6 +68,7 @@ const MODULES = [
   "scripts/render/online.js",
   "scripts/input.js",
   "scripts/pointer.js",
+  "scripts/mobile-ui.js",
   "scripts/rival/cpu-driver.js",
   "scripts/rival/rivals.js",
   "scripts/rival/ghost.js",

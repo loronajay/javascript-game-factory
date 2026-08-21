@@ -13,7 +13,9 @@ html,
 body {
   margin: 0;
   padding: 0;
+  width: 100%;
   height: 100%;
+  min-height: 100dvh;
   background: #05070a;
   overflow: hidden;
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -34,8 +36,8 @@ body {
    Held right back until pointed at — the cabinet's own art should be what you see. */
 .back-link {
   position: fixed;
-  top: 14px;
-  left: 16px;
+  top: max(14px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
   z-index: 10;
   color: rgba(200, 208, 224, 0.45);
   font-size: 13px;
@@ -55,4 +57,187 @@ canvas#game {
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.75);
   border-radius: 4px;
   touch-action: none;
+}
+
+/* Mobile orientation/fullscreen gate. It is always in the DOM on a phone so a
+   resize or browser-toolbar change can update it without re-booting the game. */
+.mobile-landscape-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 999950;
+  display: grid;
+  place-items: center;
+  padding:
+    max(18px, env(safe-area-inset-top))
+    max(18px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom))
+    max(18px, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 50% 34%, rgba(255, 90, 46, 0.19), transparent 35%),
+    rgba(5, 7, 10, 0.94);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
+.mobile-landscape-gate.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.mobile-play-gated .stage {
+  filter: brightness(0.38) saturate(0.72);
+  pointer-events: none;
+}
+
+.mobile-play-gated .mobile-controller {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.mobile-landscape-gate-card {
+  width: min(430px, 100%);
+  border: 1px solid rgba(255, 90, 46, 0.55);
+  border-radius: 10px;
+  padding: 24px;
+  background: rgba(12, 15, 20, 0.96);
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.65), 0 0 38px rgba(255, 178, 28, 0.12);
+  color: #f4f7fb;
+  text-align: center;
+}
+
+.mobile-landscape-gate-kicker {
+  color: #ffb21c;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.mobile-landscape-gate-title {
+  margin-top: 9px;
+  color: #fff;
+  font-size: clamp(27px, 8vw, 42px);
+  font-style: italic;
+  font-weight: 950;
+  line-height: 0.98;
+  text-transform: uppercase;
+}
+
+.mobile-landscape-gate-copy {
+  margin-top: 13px;
+  color: rgba(228, 234, 244, 0.8);
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.mobile-landscape-gate-btn {
+  margin-top: 19px;
+  min-width: 176px;
+  min-height: 48px;
+  border: 1px solid rgba(255, 178, 28, 0.86);
+  border-radius: 7px;
+  background: linear-gradient(180deg, rgba(255, 90, 46, 0.3), rgba(255, 90, 46, 0.15));
+  color: #fff;
+  font: 900 13px/1 "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  touch-action: manipulation;
+}
+
+/* The shared controller supplies behaviour and base art; these overrides make
+   its footprint fit Speed Demon's low dashboard and the phone safe area. */
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"] {
+  z-index: 999920;
+}
+
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"] .mobile-controller__pad {
+  left: max(12px, env(safe-area-inset-left)) !important;
+  bottom: max(12px, env(safe-area-inset-bottom)) !important;
+  width: clamp(104px, 28vmin, 154px);
+  height: clamp(104px, 28vmin, 154px);
+  min-width: 104px;
+  min-height: 104px;
+  opacity: 0.78;
+}
+
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"] .mobile-controller__pad-label {
+  width: 42%;
+  font-size: 8px;
+  line-height: 1.05;
+  text-align: center;
+}
+
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"] .mobile-controller__button {
+  width: clamp(50px, 13vmin, 70px);
+  height: clamp(50px, 13vmin, 70px);
+  min-width: 50px;
+  min-height: 50px;
+  bottom: max(14px, env(safe-area-inset-bottom)) !important;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  opacity: 0.8;
+}
+
+/* The pad is div 1; these face controls are divs 2–5. A shallow arc keeps four
+   complete actions in thumb reach without turning them into one long rail. */
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"] .mobile-controller__button:nth-of-type(2) {
+  right: max(12px, env(safe-area-inset-right)) !important;
+}
+
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"] .mobile-controller__button:nth-of-type(3) {
+  right: max(76px, calc(env(safe-area-inset-right) + 76px)) !important;
+  bottom: max(54px, calc(env(safe-area-inset-bottom) + 42px)) !important;
+}
+
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"] .mobile-controller__button:nth-of-type(4) {
+  right: max(140px, calc(env(safe-area-inset-right) + 140px)) !important;
+}
+
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"] .mobile-controller__button:nth-of-type(5) {
+  right: max(204px, calc(env(safe-area-inset-right) + 204px)) !important;
+  bottom: max(54px, calc(env(safe-area-inset-bottom) + 42px)) !important;
+}
+
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"] .mobile-controller__pad.is-active,
+.mobile-controller[data-mobile-controller-root="speed-demon-touch"] .mobile-controller__button.is-active {
+  opacity: 1;
+}
+
+@media (hover: none), (pointer: coarse), (max-width: 720px) {
+  html,
+  body {
+    height: 100dvh;
+    overscroll-behavior: none;
+    touch-action: none;
+  }
+
+  .stage {
+    height: 100dvh;
+  }
+
+  .back-link {
+    top: max(8px, env(safe-area-inset-top));
+    left: max(10px, env(safe-area-inset-left));
+    font-size: 10px;
+    opacity: 0.55;
+  }
+
+  canvas#game {
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+@media (hover: none) and (orientation: landscape),
+  (pointer: coarse) and (orientation: landscape),
+  (max-height: 520px) and (min-width: 560px) {
+  .mobile-landscape-ready .stage {
+    width: 100vw;
+    height: 100dvh;
+  }
+
+  .mobile-landscape-ready .back-link {
+    opacity: 0.38;
+  }
 }

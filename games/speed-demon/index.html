@@ -2,9 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Speed Demon</title>
-    <link rel="stylesheet" href="styles/game.css" />
+    <link rel="stylesheet" href="styles/game.css?v=mobile-20260821" />
   </head>
   <body>
     <a href="../../grid.html" class="back-link">&larr; Arcade</a>
@@ -18,7 +18,23 @@
          and every global board reports OFFLINE. -->
     <script type="module" src="../../js/platform-config.mjs"></script>
     <script type="module">
+      import { mountMobileController } from "../../js/mobile-controller.mjs";
       import { boot } from "./scripts/init-game.js";
+      import {
+        SPEED_DEMON_MOBILE_PROFILE,
+        initMobileLandscapeGate,
+        isTouchLike,
+      } from "./scripts/mobile-ui.js";
+
+      // The query switch makes the real phone shell available to a desktop
+      // browser at a phone-sized viewport for visual QA.
+      const forceMobileControls = new URLSearchParams(window.location.search).has("mobileControls");
+      // Pass the shared controller an explicit answer because iPadOS can present
+      // a desktop user agent even though it is still a touch-only device.
+      const mobileControlsActive = forceMobileControls || isTouchLike(window);
+      initMobileLandscapeGate({ force: mobileControlsActive });
+      mountMobileController({ profile: SPEED_DEMON_MOBILE_PROFILE, force: mobileControlsActive });
+
       // Exposed so a run can be driven and inspected from the console.
       window.speedDemon = boot(document.getElementById("game"));
     </script>
