@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { getConsumableOffer } from "./consumable-catalog.mjs";
 const STRIPE_API_VERSION = "2026-06-24.dahlia";
-const STRIPE_CHECKOUT_SESSIONS_URL = "https://api.stripe.com/v1/checkout/sessions";
+export const STRIPE_CHECKOUT_SESSIONS_URL = "https://api.stripe.com/v1/checkout/sessions";
 // Stable flow label for Stripe Dashboard comparisons. Dahlia API versions require an
 // integration identifier with an eight-random-letter suffix for Checkout Session creation.
 const STRIPE_CHECKOUT_INTEGRATION_IDENTIFIER = "tactical_arena_checkout_qmxvptla";
@@ -371,7 +371,7 @@ export const UNIT_CATALOG = Object.freeze(RAW_UNIT_CATALOG
         entitlementId: `unit:${type}`,
     });
 }));
-function cleanText(value, maxLength = 500) {
+export function cleanText(value, maxLength = 500) {
     return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
 function cleanUrl(value) {
@@ -398,17 +398,17 @@ function ownedEntitlements(progress) {
     const rows = Array.isArray(progress?.entitlements) ? progress.entitlements : [];
     return new Set(rows.map((row) => cleanText(row?.entitlementId, 200)).filter(Boolean));
 }
-function moneyCents(value) {
+export function moneyCents(value) {
     const cents = Math.floor(Number(value));
     return Number.isFinite(cents) && cents > 0 ? cents : 0;
 }
-function stripeError(statusCode, error) {
+export function stripeError(statusCode, error) {
     return { ok: false, statusCode, error };
 }
 function stripeErrorMessage(value) {
     return cleanText(value, 1000);
 }
-function logStripeCheckoutError(json) {
+export function logStripeCheckoutError(json) {
     const error = json?.error && typeof json.error === "object" ? json.error : {};
     const code = stripeErrorMessage(error.code) || "stripe_checkout_failed";
     const message = stripeErrorMessage(error.message);
@@ -416,7 +416,7 @@ function logStripeCheckoutError(json) {
     const requestLogUrl = stripeErrorMessage(error.request_log_url);
     process.stderr.write(`[stripe-checkout] ${code}${param ? ` param=${param}` : ""}${message ? ` message=${message}` : ""}${requestLogUrl ? ` log=${requestLogUrl}` : ""}\n`);
 }
-function stripeCheckoutError(json) {
+export function stripeCheckoutError(json) {
     const error = json?.error && typeof json.error === "object" ? json.error : {};
     const code = stripeErrorMessage(error.code) || "stripe_checkout_failed";
     const message = stripeErrorMessage(error.message);
@@ -429,13 +429,13 @@ function stripeCheckoutError(json) {
         param,
     };
 }
-function stripeFetchHeaders(stripeApiKey) {
+export function stripeFetchHeaders(stripeApiKey) {
     return {
         authorization: `Bearer ${stripeApiKey}`,
         "Stripe-Version": STRIPE_API_VERSION,
     };
 }
-function appendMetadata(form, metadata) {
+export function appendMetadata(form, metadata) {
     for (const [key, value] of Object.entries(metadata)) {
         if (!value)
             continue;
@@ -669,7 +669,7 @@ export async function createTacticalArenaCheckoutSession(params = {}) {
         ? { ok: true, url, clientSecret, sessionId, publishableKey: stripePublishableKey }
         : stripeError(502, "stripe_checkout_failed");
 }
-async function retrieveStripeCheckoutSession(params = {}) {
+export async function retrieveStripeCheckoutSession(params = {}) {
     const stripeApiKey = cleanText(params.stripeApiKey, 500);
     const sessionId = cleanText(params.sessionId, 200);
     if (!stripeApiKey)
@@ -893,6 +893,21 @@ async function regrantForStripeEvent(params = {}) {
         regrantId: params.regrantId,
     });
 }
+// A refund or dispute names a payment intent, not a product. Ask the calendar first: if a
+// physical order matches, that order owns the outcome -- it closes the shipment and revokes
+// its own promotional vouchers, and the generic entitlement revocation must not also fire.
+// Returns null when this event has nothing to do with a calendar order.
+async function closeCalendarForEvent(params, object, reason, paymentState) {
+    if (typeof params.closeCalendarOrderForStripeEvent !== "function")
+        return null;
+    const result = await params.closeCalendarOrderForStripeEvent({
+        eventObject: object,
+        revocationId: cleanText(object?.id, 200),
+        reason,
+        paymentState,
+    });
+    return result?.ignored ? null : result;
+}
 export async function fulfillStripeWebhook(params = {}) {
     const stripeWebhookSecret = cleanText(params.stripeWebhookSecret, 500);
     if (!stripeWebhookSecret)
@@ -915,10 +930,20 @@ export async function fulfillStripeWebhook(params = {}) {
     }
     const type = cleanText(event?.type, 80);
     const object = event?.data?.object || {};
+    // Which product a session belongs to is decided by its own metadata, and the handler for
+    // each is injected rather than imported -- the calendar's fulfillment builds on this
+    // module, so importing it back here would close a cycle.
+    const isCalendarSession = typeof params.isCalendarCheckoutSession === "function"
+        && params.isCalendarCheckoutSession(object);
     // Fulfillment: grant entitlements on a paid checkout session.
     if (type === "checkout.session.completed" || type === "checkout.session.async_payment_succeeded") {
         if (object.payment_status && object.payment_status !== "paid") {
             return { ok: true, ignored: true };
+        }
+        if (isCalendarSession) {
+            return typeof params.fulfillCalendarCheckoutSession === "function"
+                ? params.fulfillCalendarCheckoutSession({ session: object })
+                : { ok: true, ignored: true, reason: "calendar_fulfillment_not_configured" };
         }
         return fulfillTacticalArenaCheckoutSession({
             session: object,
@@ -928,11 +953,19 @@ export async function fulfillStripeWebhook(params = {}) {
     }
     // Chargeback opened: revoke immediately (policy: revoke on dispute created).
     if (type === "charge.dispute.created") {
+        const calendar = await closeCalendarForEvent(params, object, "chargeback", "refunded");
+        if (calendar)
+            return calendar;
         return revokeForStripeEvent({ ...params, eventObject: object, revocationId: cleanText(object.id, 200), reason: "chargeback" });
     }
     // Dispute resolved: re-grant if we won, otherwise ensure it stays revoked (idempotent).
     if (type === "charge.dispute.closed") {
         const status = cleanText(object.status, 40);
+        if (status !== "won") {
+            const calendar = await closeCalendarForEvent(params, object, "chargeback_lost", "refunded");
+            if (calendar)
+                return calendar;
+        }
         return status === "won"
             ? regrantForStripeEvent({ ...params, eventObject: object, regrantId: cleanText(object.id, 200) })
             : revokeForStripeEvent({ ...params, eventObject: object, revocationId: cleanText(object.id, 200), reason: "chargeback_lost" });
@@ -944,6 +977,9 @@ export async function fulfillStripeWebhook(params = {}) {
         const fullyRefunded = object.refunded === true || (amount > 0 && refundedAmount >= amount);
         if (!fullyRefunded)
             return { ok: true, ignored: true, reason: "partial_refund" };
+        const calendar = await closeCalendarForEvent(params, object, "refund", "refunded");
+        if (calendar)
+            return calendar;
         return revokeForStripeEvent({ ...params, eventObject: object, revocationId: cleanText(object.id, 200), reason: "refund" });
     }
     return { ok: true, ignored: true };

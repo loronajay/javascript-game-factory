@@ -18,6 +18,7 @@ import { handleLeaderboardRoute } from "./routes/leaderboard-routes.mjs";
 import { handleProgressionRoute } from "./routes/progression-routes.mjs";
 import { handleGameProgressRoute } from "./routes/game-progress-routes.mjs";
 import { handlePaymentRoute } from "./routes/payment-routes.mjs";
+import { handleCalendarRoute } from "./routes/calendar-routes.mjs";
 import { handlePlayerRoute } from "./routes/player-routes.mjs";
 import { handleThoughtRoute } from "./routes/thought-routes.mjs";
 import { handlePhotoRoute } from "./routes/photo-routes.mjs";
@@ -434,6 +435,29 @@ export function createApp(options: any = {}) {
   const fulfillPlayPurchase = typeof options?.fulfillPlayPurchase === "function"
     ? options.fulfillPlayPurchase
     : null;
+  // Physical calendar store. Each defaults to null/empty so an instance wired without a
+  // database (the route tests do this) answers "not configured" rather than throwing.
+  const createCalendarCheckoutSession = typeof options?.createCalendarCheckoutSession === "function"
+    ? options.createCalendarCheckoutSession
+    : null;
+  const fulfillCalendarCheckoutFromReturn = typeof options?.fulfillCalendarCheckoutFromReturn === "function"
+    ? options.fulfillCalendarCheckoutFromReturn
+    : null;
+  const listCalendarOrdersForPlayer = typeof options?.listCalendarOrdersForPlayer === "function"
+    ? options.listCalendarOrdersForPlayer
+    : async () => [];
+  const listCalendarOrders = typeof options?.listCalendarOrders === "function"
+    ? options.listCalendarOrders
+    : async () => [];
+  const getCalendarOrder = typeof options?.getCalendarOrder === "function"
+    ? options.getCalendarOrder
+    : async () => null;
+  const updateCalendarFulfillment = typeof options?.updateCalendarFulfillment === "function"
+    ? options.updateCalendarFulfillment
+    : null;
+  const getCalendarPreorderMetrics = typeof options?.getCalendarPreorderMetrics === "function"
+    ? options.getCalendarPreorderMetrics
+    : async () => null;
   const savePlayerPhoto = typeof options?.savePlayerPhoto === "function"
     ? options.savePlayerPhoto
     : async () => null;
@@ -638,6 +662,13 @@ export function createApp(options: any = {}) {
     fulfillStripeWebhook,
     fulfillPlayPurchase,
   };
+  // The physical calendar store. Separate from paymentServices because a physical order
+  // needs shipping and fulfillment behavior a digital entitlement never has.
+  const calendarServices = {
+    createCalendarCheckoutSession,
+    fulfillCalendarCheckoutFromReturn,
+    listCalendarOrdersForPlayer,
+  };
   const notificationServices = {
     listNotifications,
     markAllNotificationsRead,
@@ -646,6 +677,10 @@ export function createApp(options: any = {}) {
   // sub-handlers read from it, so there is a single list of what the console can reach.
   const adminServices = {
     isAdminPlayer,
+    listCalendarOrders,
+    getCalendarOrder,
+    updateCalendarFulfillment,
+    getCalendarPreorderMetrics,
     listAdmins,
     setAdminFlag,
     writeAuditLog,
@@ -1043,6 +1078,19 @@ export function createApp(options: any = {}) {
       requestOrigin,
       timestamp,
       services: paymentServices,
+    })) {
+      return;
+    }
+
+    if (await handleCalendarRoute({
+      req,
+      res,
+      method,
+      pathname,
+      authClaims,
+      requestOrigin,
+      timestamp,
+      services: calendarServices,
     })) {
       return;
     }

@@ -48,7 +48,12 @@
     "assets/menu-splashes/**/*.webp",
     "assets/characters/processed/canon/**/*.webp",
     "assets/characters/portraits/**/*.webp",
-    "assets/characters/skins/*/*/*.webp"
+    "assets/characters/skins/*/*/*.webp",
+    "calendar/index.html",
+    "calendar/*.css",
+    "calendar/*.mjs",
+    "assets/calendar/*.webp",
+    "assets/calendar/thumbs/*.webp"
   ],
   "budgets": {
     "runtimeImageBytes": 75497472

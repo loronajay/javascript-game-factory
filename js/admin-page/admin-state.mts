@@ -9,7 +9,7 @@ import { ARCADE_GAME_SLUGS, loadArcadeCatalog } from "../arcade-catalog.mjs";
 // its own fetch and they disagree" problem the platform page controllers were cleaned up
 // to avoid.
 
-export type AdminTab = "overview" | "bulletins" | "events" | "cabinets" | "moderation" | "accounts" | "audit";
+export type AdminTab = "overview" | "bulletins" | "events" | "cabinets" | "calendar" | "moderation" | "accounts" | "audit";
 
 export interface AdminState {
   tab: AdminTab;
@@ -25,6 +25,10 @@ export interface AdminState {
   settings: Record<string, unknown>;
   reports: any[];
   reportFilter: string;
+  calendarOrders: any[];
+  calendarMetrics: any;
+  calendarFilter: string;
+  calendarSearch: string;
   suspended: any[];
   admins: any[];
   audit: any[];
@@ -56,6 +60,11 @@ export function createInitialState(): AdminState {
     settings: {},
     reports: [],
     reportFilter: "open",
+    calendarOrders: [],
+    calendarMetrics: null,
+    // Paid first: an unpaid preorder is not something anyone packs.
+    calendarFilter: "paid",
+    calendarSearch: "",
     suspended: [],
     admins: [],
     audit: [],
@@ -116,6 +125,15 @@ export async function loadAccounts(state: AdminState): Promise<void> {
   state.admins = admins.data?.admins || [];
 }
 
+export async function loadCalendar(state: AdminState): Promise<void> {
+  const [orders, metrics] = await Promise.all([
+    api.listCalendarOrders({ paymentState: state.calendarFilter, search: state.calendarSearch }),
+    api.getCalendarMetrics(),
+  ]);
+  state.calendarOrders = orders.data?.orders || [];
+  state.calendarMetrics = metrics.data?.metrics || null;
+}
+
 export async function loadAudit(state: AdminState): Promise<void> {
   const result = await api.listAudit(150);
   state.audit = result.data?.entries || [];
@@ -128,6 +146,7 @@ export function loadTabData(state: AdminState): Promise<void> {
   if (state.tab === "bulletins") return loadBulletins(state);
   if (state.tab === "events") return loadEvents(state);
   if (state.tab === "cabinets") return loadCabinets(state);
+  if (state.tab === "calendar") return loadCalendar(state);
   if (state.tab === "moderation") return loadReports(state);
   if (state.tab === "accounts") return loadAccounts(state);
   if (state.tab === "audit") return loadAudit(state);

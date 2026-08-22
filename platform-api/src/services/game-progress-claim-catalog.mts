@@ -1,4 +1,5 @@
 import { validateTacticalArenaPublicClaim } from "./tactical-arena-reward-catalog.mjs";
+import { CALENDAR_PREORDER_CLAIM_KIND } from "./calendar-catalog.mjs";
 import {
   YAM_BOWLING_CIRCUIT_CLAIM_KIND,
   YAM_BOWLING_MATCH_ACHIEVEMENT_CLAIM_KIND,
@@ -29,7 +30,9 @@ const CLAIM_POLICIES = Object.freeze({
   }),
   "yam-bowling": Object.freeze({
     publicKinds: new Set([YAM_BOWLING_CIRCUIT_CLAIM_KIND, YAM_BOWLING_MATCH_ACHIEVEMENT_CLAIM_KIND]),
-    premiumKinds: new Set<string>(),
+    // The calendar preorder bonus. Premium, so only the trusted Stripe fulfillment path may
+    // submit it -- a browser can never claim its own vouchers.
+    premiumKinds: new Set<string>([CALENDAR_PREORDER_CLAIM_KIND]),
     validatePublicClaim: validateYamBowlingPublicClaim,
   }),
 });

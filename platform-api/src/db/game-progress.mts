@@ -1,4 +1,5 @@
 import { getConsumableOffer, selectRandomUnownedSkins } from "../services/consumable-catalog.mjs";
+import { normalizeInventoryGrants } from "../services/game-inventory-catalog.mjs";
 import { SKIN_CATALOG, UNIT_CATALOG } from "../services/payments.mjs";
 import {
   TACTICAL_ARENA_TUTORIAL_IDS,
@@ -25,11 +26,26 @@ import {
 
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
 
-// The kinds a refund/chargeback can trace back to, so revocation can find what was granted.
+// The kinds a refund/chargeback can trace back to through findStripeGrant, so generic
+// revocation can find what was granted.
+//
+// The calendar preorder bonus is deliberately NOT here. Its claim is scoped to the promotion
+// rather than to one purchase, so the payment intent recorded on it belongs to whichever
+// order happened to trigger it first. Matching refunds against that claim would let a
+// generic revocation and the calendar's own revocation both fire on the same grant, and
+// would attribute the bonus to the wrong order once a player buys twice. calendar_orders
+// records which order actually paid the bonus, so the calendar path revokes from there.
 const PREMIUM_GRANT_CLAIM_KINDS = [
   "premium-skin-purchase",
   "premium-unit-purchase",
   "premium-consumable-purchase",
+];
+
+// The kinds whose payload carries inventory quantity rather than entitlements. Listed once
+// so a new paid item grant is a row here, not a fourth branch that forgets to be revocable.
+const INVENTORY_GRANT_CLAIM_KINDS = [
+  "premium-consumable-purchase",
+  "premium-calendar-preorder",
 ];
 
 // A single purchase may never add more than this much of one consumable, whatever a
@@ -231,18 +247,12 @@ async function campaignValorAmountWithServerBoosts(client: any, playerId: string
   return baseAmount + Math.floor(baseAmount * percentBonus / 100);
 }
 
-// Normalize the inventory grants carried on a premium-consumable claim payload. Item ids are
-// validated against the server catalog, so a tampered payload can never invent an item.
-function buildInventoryGrants(payload: Record<string, any>): any[] {
-  const rows = Array.isArray(payload.inventoryItems) ? payload.inventoryItems : [];
-  const byItemId = new Map<string, number>();
-  for (const row of rows) {
-    const offer = getConsumableOffer(row?.itemId);
-    if (!offer) continue;
-    const quantity = clampInt(row?.quantity ?? 1, { min: 1, max: MAX_CONSUMABLE_PURCHASE_QUANTITY });
-    byItemId.set(offer.id, Math.min(MAX_CONSUMABLE_PURCHASE_QUANTITY, (byItemId.get(offer.id) || 0) + quantity));
-  }
-  return [...byItemId].map(([itemId, quantity]) => ({ itemId, quantity }));
+// Normalize the inventory grants carried on a paid claim payload. Item ids are validated
+// against the *game's own* grantable-item policy, so a tampered payload can never invent an
+// item or borrow another cabinet's. Validating against one cabinet's catalog used to drop a
+// second cabinet's item silently, which paid the money and granted nothing.
+function buildInventoryGrants(gameSlug: string, payload: Record<string, any>): any[] {
+  return normalizeInventoryGrants(gameSlug, payload?.inventoryItems);
 }
 
 async function grantInventoryItem(client: any, playerId: string, gameSlug: string, itemId: string, quantity: number): Promise<void> {
@@ -530,8 +540,8 @@ export async function recordGameProgressClaim(pool: any, params: any = {}): Prom
       for (const entitlement of entitlements) {
         await grantEntitlement(client, playerId, gameSlug, entitlement, "stripe", sourceId || claimId);
       }
-    } else if (!alreadyProcessed && kind === "premium-consumable-purchase") {
-      for (const grant of buildInventoryGrants(payload)) {
+    } else if (!alreadyProcessed && INVENTORY_GRANT_CLAIM_KINDS.includes(kind)) {
+      for (const grant of buildInventoryGrants(gameSlug, payload)) {
         await grantInventoryItem(client, playerId, gameSlug, grant.itemId, grant.quantity);
       }
     }
@@ -1176,7 +1186,7 @@ export async function findStripeGrant(pool: any, params: any = {}): Promise<any>
       sessionId: cleanText(payload.sessionId, 200) || cleanText(row.claim_id, 200).replace(/^stripe-checkout:/, ""),
       paymentIntentId: cleanText(payload.paymentIntentId, 200),
       entitlementIds,
-      inventoryItems: buildInventoryGrants(payload),
+      inventoryItems: buildInventoryGrants(normalizeGameSlug(row.game_slug), payload),
     };
   } catch (err) {
     process.stderr.write(`[game-progress] findStripeGrant error: ${(err as any)?.message || err}\n`);
@@ -1233,7 +1243,7 @@ export async function revokeGameEntitlements(pool: any, params: any = {}): Promi
       .map((value: any) => cleanText(value, 180))
       .filter(Boolean),
   )];
-  const inventoryItems = buildInventoryGrants({ inventoryItems: params.inventoryItems });
+  const inventoryItems = buildInventoryGrants(gameSlug, { inventoryItems: params.inventoryItems });
   if (!pool || !playerId || !gameSlug || !revocationId) {
     return { ok: false, statusCode: 400, error: "invalid_request" };
   }
@@ -1297,7 +1307,7 @@ export async function regrantStripeEntitlements(pool: any, params: any = {}): Pr
       .map((value: any) => cleanText(value, 180))
       .filter(Boolean),
   )];
-  const inventoryItems = buildInventoryGrants({ inventoryItems: params.inventoryItems });
+  const inventoryItems = buildInventoryGrants(gameSlug, { inventoryItems: params.inventoryItems });
   if (!pool || !playerId || !gameSlug || !regrantId) {
     return { ok: false, statusCode: 400, error: "invalid_request" };
   }

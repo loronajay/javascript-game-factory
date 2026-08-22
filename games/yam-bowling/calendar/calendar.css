@@ -1,0 +1,348 @@
+/* The calendar viewer: one physical object on a wall. Everything here is presentation --
+   the geometry constants are the real product's, so the preview reads as the thing that
+   arrives in the box.
+
+   Page ratio is the artwork's own 3375x2625 rather than a rounded 11:8.5. The difference is
+   under 1%, and using the true ratio means no page is ever cropped or letterboxed. Two of
+   them stacked give the open form, which lands at 11:17.1 -- the "approximately 11 x 17"
+   the product is sold as. */
+.cal-viewer {
+  --cal-page-w: 3375;
+  --cal-page-h: 2625;
+  --cal-paper: #f7f4ef;
+  /* Two caps, because the two states have very different heights: closed is a short
+     landscape sheet, open is half again as tall as it is wide. Sizing both from one width
+     either shrinks the cover to nothing or pushes the open spread off the screen. */
+  --cal-closed-w: min(100%, 660px, 58vh);
+  --cal-open-w: min(100%, 540px, 41vh);
+  --cal-flip-ms: 620ms;
+  --cal-ease: cubic-bezier(.22, .72, .16, 1);
+  display: grid;
+  gap: clamp(14px, 2.4vw, 26px);
+  justify-items: center;
+}
+
+/* --- the wall ------------------------------------------------------------------------- */
+
+.cal-wall {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  width: 100%;
+  padding: clamp(26px, 5vw, 54px) clamp(10px, 3vw, 32px) clamp(18px, 3vw, 34px);
+  border-radius: 18px;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 8%, rgba(255, 255, 255, .10), transparent 70%),
+    linear-gradient(178deg, #3a3436 0%, #262123 46%, #171416 100%);
+  box-shadow: inset 0 0 90px rgba(0, 0, 0, .55);
+  overflow: hidden;
+}
+
+/* A faint plaster tooth, so the backdrop reads as a wall rather than a gradient. */
+.cal-wall::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: .3;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.11'/%3E%3C/svg%3E");
+}
+
+/* The nail the calendar hangs from. */
+.cal-hanger {
+  position: relative;
+  z-index: 3;
+  width: 11px;
+  height: 11px;
+  margin-bottom: -5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #efeae4, #8b8681 58%, #46423f);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, .5);
+}
+
+/* --- the calendar --------------------------------------------------------------------- */
+
+.cal-object {
+  position: relative;
+  width: var(--cal-closed-w);
+  aspect-ratio: var(--cal-page-w) / var(--cal-page-h);
+  cursor: pointer;
+  transform-style: preserve-3d;
+  perspective: 2200px;
+  /* The box snaps between the closed and open geometry rather than tweening. Animating
+     aspect-ratio interpolates unreliably -- it can settle on the start value and leave
+     the open spread painted at closed proportions -- and the page-turn above it is what
+     actually reads as the calendar opening. */
+  filter: drop-shadow(0 22px 26px rgba(0, 0, 0, .5));
+}
+
+.cal-object.is-open {
+  width: var(--cal-open-w);
+  aspect-ratio: var(--cal-page-w) / calc(var(--cal-page-h) * 2);
+}
+
+.cal-object:focus-visible {
+  outline: 2px solid #ffd34d;
+  outline-offset: 12px;
+}
+
+.cal-stack,
+.cal-flip {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+.cal-half {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  overflow: hidden;
+  background: var(--cal-paper);
+}
+
+.cal-half-single {
+  height: 100%;
+  border-radius: 3px 3px 9px 9px;
+  /* Paper thickness: the stack of sheets under the cover. */
+  box-shadow: 0 2px 0 #cdc6bd, 0 4px 0 #a49d95, 0 6px 0 #7d7770;
+}
+
+.cal-half-art {
+  top: 0;
+  border-radius: 3px 3px 0 0;
+}
+
+.cal-half-grid {
+  bottom: 0;
+  border-radius: 0 0 9px 9px;
+  box-shadow: 0 2px 0 #cdc6bd, 0 4px 0 #a49d95;
+}
+
+/* contain, never cover: the acceptance criteria forbid cropping either the artwork or the
+   grid, and the page ratio already matches the slot to within a percent. */
+.cal-half img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Paper sheen. */
+.cal-half::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  background:
+    linear-gradient(104deg, rgba(255, 255, 255, .10), transparent 26%, transparent 76%, rgba(0, 0, 0, .06));
+}
+
+/* --- the binding ---------------------------------------------------------------------- */
+
+.cal-binding {
+  position: absolute;
+  z-index: 6;
+  left: 2%;
+  right: 2%;
+  top: 50%;
+  height: clamp(15px, 3.4%, 26px);
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 2px rgba(0, 0, 0, .38));
+}
+
+/* Twin-loop wire, drawn once and repeated across the bound edge. */
+.cal-binding::before {
+  content: "";
+  flex: 1;
+  height: 100%;
+  background-image: radial-gradient(closest-side ellipse at 50% 50%,
+    transparent 0 32%, #e3e7ea 33% 44%, #8d9398 46% 55%, transparent 57%);
+  background-size: 6.2% 100%;
+  background-repeat: repeat-x;
+}
+
+/* Shadow the binding casts onto the sheet hanging below it. */
+.cal-object.is-open .cal-half-grid::before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 0 0 auto 0;
+  height: 5%;
+  pointer-events: none;
+  background: linear-gradient(rgba(0, 0, 0, .30), transparent);
+}
+
+/* --- the page turn -------------------------------------------------------------------- */
+
+.cal-flip {
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.cal-flip.is-turning {
+  opacity: 1;
+  backface-visibility: hidden;
+  transform-origin: 50% 0;
+}
+
+/* A month sheet is the lower half and hinges on the mid binding. */
+.cal-flip.is-turning[data-kind="month"] {
+  top: 50%;
+  bottom: 0;
+  inset-inline: 0;
+}
+
+.cal-flip.is-turning[data-kind="month"] .cal-half-art,
+.cal-flip.is-turning[data-kind="month"] .cal-binding {
+  display: none;
+}
+
+.cal-flip.is-turning[data-kind="month"] .cal-half-grid {
+  height: 100%;
+}
+
+.cal-flip.is-turning.turn-forward {
+  animation: cal-turn-up var(--cal-flip-ms) var(--cal-ease) forwards;
+}
+
+.cal-flip.is-turning.turn-back {
+  animation: cal-turn-down var(--cal-flip-ms) var(--cal-ease) forwards;
+}
+
+@keyframes cal-turn-up {
+  0%   { transform: rotateX(0deg);    filter: brightness(1); }
+  50%  {                              filter: brightness(.72); }
+  100% { transform: rotateX(-176deg); filter: brightness(1); opacity: 0; }
+}
+
+@keyframes cal-turn-down {
+  0%   { transform: rotateX(-176deg); filter: brightness(1); opacity: 0; }
+  50%  {                              filter: brightness(.72); opacity: 1; }
+  100% { transform: rotateX(0deg);    filter: brightness(1); }
+}
+
+/* --- controls ------------------------------------------------------------------------- */
+
+.cal-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 2vw, 20px);
+}
+
+.cal-step {
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .07);
+  color: inherit;
+  font-size: 19px;
+  cursor: pointer;
+  transition: background .18s, color .18s, transform .18s, opacity .18s;
+}
+
+.cal-step:hover:not(:disabled) {
+  background: #fff;
+  color: #17151a;
+  transform: translateY(-2px);
+}
+
+.cal-step:disabled {
+  opacity: .28;
+  cursor: not-allowed;
+}
+
+/* Flexible, not a viewport fraction: sized against the viewport this could stay 300px wide
+   inside a narrow container and push the whole page into horizontal scroll. */
+.cal-readout {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 300px;
+  margin: 0;
+  text-align: center;
+}
+
+.cal-readout .cal-title {
+  display: block;
+  font-size: clamp(16px, 2.2vw, 21px);
+  letter-spacing: .01em;
+}
+
+.cal-readout .cal-sub {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  opacity: .68;
+}
+
+.cal-rail {
+  max-width: min(560px, 100%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.cal-chip {
+  min-width: 46px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .05);
+  color: inherit;
+  font-size: 11px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .18s, color .18s, border-color .18s;
+}
+
+.cal-chip:hover {
+  background: rgba(255, 255, 255, .14);
+}
+
+.cal-chip.is-active {
+  background: #e42032;
+  border-color: #e42032;
+  color: #fff;
+}
+
+/* --- responsive ----------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  .cal-viewer {
+    --cal-closed-w: min(100%, 420px, 52vh);
+    --cal-open-w: min(100%, 360px, 38vh);
+  }
+  .cal-step { width: 46px; height: 46px; }
+  .cal-chip { min-width: 42px; padding: 7px 9px; }
+}
+
+/* Landscape phones have almost no vertical room, so height becomes the binding constraint. */
+@media (max-height: 560px) and (orientation: landscape) {
+  .cal-viewer {
+    --cal-closed-w: min(100%, 300px, 56vh);
+    --cal-open-w: min(100%, 240px, 40vh);
+  }
+  .cal-wall { padding-top: 22px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cal-flip.is-turning { animation: none !important; opacity: 0; }
+  .cal-step:hover:not(:disabled) { transform: none; }
+}

@@ -8,6 +8,8 @@ import { incrementPlayerProfileView, loadPlayerMetrics, savePlayerMetrics } from
 import { applyMigrations } from "./db/migrations.mjs";
 import { getGarage, saveGarage, getPublicLoadout, getPublicLoadouts } from "./db/game-loadouts.mjs";
 import { getGameProfile, saveGameProfile, getGameProfiles } from "./db/game-profiles.mjs";
+import { createCalendarOrder, findCalendarOrderByPaymentIntent, getCalendarOrder, getCalendarPreorderMetrics, listCalendarOrders, listCalendarOrdersForPlayer, markCalendarOrderClosed, markCalendarOrderPaid, recordCalendarBonus, updateCalendarFulfillment, } from "./db/calendar-orders.mjs";
+import { closeCalendarOrderForStripeEvent, createCalendarCheckoutSession, fulfillCalendarCheckoutFromReturn, fulfillCalendarCheckoutSession, isCalendarCheckoutSession, } from "./services/calendar-payments.mjs";
 import { activateInventoryItem, backfillLocalOwnership, findPlayPurchaseClaim, findStripeGrant, getGameProgress, getYamBowlingTournamentState, recordGameProgressClaim, recordYamBowlingTournamentRound, redeemYamBowlingSkinVoucher, redeemYamBowlingEmoteVoucher, regrantStripeEntitlements, resetCampaignProgress, revokeGameEntitlements, spendValorForEntitlement } from "./db/game-progress.mjs";
 import { loadPlayerLayout, loadPlayerProfile, loadPlayerProfileByFriendCode, savePlayerLayout, savePlayerProfile, searchPlayers } from "./db/profiles.mjs";
 import { getGameRating, recordMatchRating } from "./db/ratings.mjs";
@@ -91,6 +93,19 @@ async function bootstrap() {
             return "";
         return `https://res.cloudinary.com/${config.cloudinaryCloudName}/image/upload/${assetId}`;
     }
+    // One definition of how a paid calendar session is settled, shared by the Stripe webhook
+    // and by the buyer's return to the success page. Both converge on the same order row and
+    // the same promotion-scoped bonus claim, so whichever arrives first wins and the other is
+    // a no-op -- which is what makes a redelivered webhook harmless.
+    const calendarFulfillmentDeps = {
+        markCalendarOrderPaid: (paid) => markCalendarOrderPaid(pool, paid),
+        recordCalendarBonus: (bonus) => recordCalendarBonus(pool, bonus),
+        recordGameProgressClaim: (claim) => recordGameProgressClaim(pool, { ...claim, allowPremiumKinds: true }),
+    };
+    const calendarFulfillment = (params) => fulfillCalendarCheckoutSession({
+        ...params,
+        ...calendarFulfillmentDeps,
+    });
     const app = createApp({
         config,
         uploadService,
@@ -284,7 +299,34 @@ async function bootstrap() {
             findStripeGrant: (lookup) => findStripeGrant(pool, lookup),
             revokeGameEntitlements: (revocation) => revokeGameEntitlements(pool, revocation),
             regrantStripeEntitlements: (regrant) => regrantStripeEntitlements(pool, regrant),
+            // Injected, not imported: calendar fulfillment builds on the payments module, so
+            // importing it there would close a cycle.
+            isCalendarCheckoutSession,
+            fulfillCalendarCheckoutSession: calendarFulfillment,
+            closeCalendarOrderForStripeEvent: (event) => closeCalendarOrderForStripeEvent({
+                ...event,
+                findCalendarOrderByPaymentIntent: (intent) => findCalendarOrderByPaymentIntent(pool, intent),
+                markCalendarOrderClosed: (close) => markCalendarOrderClosed(pool, close),
+                recordCalendarBonus: (bonus) => recordCalendarBonus(pool, bonus),
+                revokeGameEntitlements: (revocation) => revokeGameEntitlements(pool, revocation),
+            }),
         }),
+        createCalendarCheckoutSession: (params) => createCalendarCheckoutSession({
+            ...params,
+            stripeApiKey: config.stripeApiKey,
+            appBaseUrl: config.appBaseUrl,
+            createCalendarOrder: (order) => createCalendarOrder(pool, order),
+        }),
+        fulfillCalendarCheckoutFromReturn: (params) => fulfillCalendarCheckoutFromReturn({
+            ...params,
+            stripeApiKey: config.stripeApiKey,
+            ...calendarFulfillmentDeps,
+        }),
+        listCalendarOrdersForPlayer: (playerId) => listCalendarOrdersForPlayer(pool, playerId),
+        listCalendarOrders: (options) => listCalendarOrders(pool, options),
+        getCalendarOrder: (orderId) => getCalendarOrder(pool, orderId),
+        updateCalendarFulfillment: (params) => updateCalendarFulfillment(pool, params),
+        getCalendarPreorderMetrics: () => getCalendarPreorderMetrics(pool),
         fulfillPlayPurchase: config.hasPlayBilling
             ? (params) => fulfillPlayPurchase({
                 ...params,

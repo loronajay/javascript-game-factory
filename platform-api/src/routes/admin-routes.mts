@@ -1,6 +1,7 @@
 import { writeJson } from "../http-utils.mjs";
 import { handleAdminContentRoute } from "./admin-content-routes.mjs";
 import { handleAdminModerationRoute } from "./admin-moderation-routes.mjs";
+import { handleAdminCalendarRoute } from "./admin-calendar-routes.mjs";
 
 // The admin console's single front door.
 //
@@ -40,6 +41,7 @@ export async function handleAdminRoute(context: any): Promise<boolean> {
 
   if (await handleAdminContentRoute(adminContext)) return true;
   if (await handleAdminModerationRoute(adminContext)) return true;
+  if (await handleAdminCalendarRoute(adminContext)) return true;
 
   writeJson(res, 404, { status: "error", error: "unknown_admin_route", timestamp }, requestOrigin);
   return true;

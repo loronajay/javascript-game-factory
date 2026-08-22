@@ -15,6 +15,11 @@ export function createInitialState() {
         settings: {},
         reports: [],
         reportFilter: "open",
+        calendarOrders: [],
+        calendarMetrics: null,
+        // Paid first: an unpaid preorder is not something anyone packs.
+        calendarFilter: "paid",
+        calendarSearch: "",
         suspended: [],
         admins: [],
         audit: [],
@@ -66,6 +71,14 @@ export async function loadAccounts(state) {
     state.suspended = suspended.data?.accounts || [];
     state.admins = admins.data?.admins || [];
 }
+export async function loadCalendar(state) {
+    const [orders, metrics] = await Promise.all([
+        api.listCalendarOrders({ paymentState: state.calendarFilter, search: state.calendarSearch }),
+        api.getCalendarMetrics(),
+    ]);
+    state.calendarOrders = orders.data?.orders || [];
+    state.calendarMetrics = metrics.data?.metrics || null;
+}
 export async function loadAudit(state) {
     const result = await api.listAudit(150);
     state.audit = result.data?.entries || [];
@@ -80,6 +93,8 @@ export function loadTabData(state) {
         return loadEvents(state);
     if (state.tab === "cabinets")
         return loadCabinets(state);
+    if (state.tab === "calendar")
+        return loadCalendar(state);
     if (state.tab === "moderation")
         return loadReports(state);
     if (state.tab === "accounts")

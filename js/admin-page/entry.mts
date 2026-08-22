@@ -7,6 +7,7 @@ import {
 } from "./admin-state.mjs";
 import { renderBulletins, renderCabinets, renderEvents, renderOverview } from "./render-content.mjs";
 import { renderAccounts, renderAudit, renderModeration } from "./render-moderation.mjs";
+import { renderCalendar } from "./render-calendar.mjs";
 import { escapeHtml } from "./render-shared.mjs";
 
 // Boot, authorization gate, tab routing, and event delegation for the admin console.
@@ -20,6 +21,7 @@ const TABS: ReadonlyArray<{ key: AdminTab; label: string }> = [
   { key: "bulletins", label: "Bulletins" },
   { key: "events", label: "Events" },
   { key: "cabinets", label: "Cabinets" },
+  { key: "calendar", label: "Calendar" },
   { key: "moderation", label: "Moderation" },
   { key: "accounts", label: "Accounts" },
   { key: "audit", label: "Audit" },
@@ -60,6 +62,7 @@ export function renderPanels(state: AdminState): string {
   if (state.tab === "bulletins") return renderBulletins(state);
   if (state.tab === "events") return renderEvents(state);
   if (state.tab === "cabinets") return renderCabinets(state);
+  if (state.tab === "calendar") return renderCalendar(state);
   if (state.tab === "moderation") return renderModeration(state);
   if (state.tab === "accounts") return renderAccounts(state);
   if (state.tab === "audit") return renderAudit(state);

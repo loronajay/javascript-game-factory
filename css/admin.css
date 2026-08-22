@@ -618,3 +618,162 @@
     align-items: flex-start;
   }
 }
+
+/* ---- Calendar fulfillment ---- */
+
+.admin-metrics {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.admin-metric {
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.admin-metric__value {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.admin-metric__label {
+  margin: 6px 0 0;
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.admin-metric__hint {
+  margin: 3px 0 0;
+  font-size: 11.5px;
+  opacity: .62;
+}
+
+.admin-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.admin-filter {
+  padding: 7px 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+  text-transform: capitalize;
+  cursor: pointer;
+}
+
+.admin-filter.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.admin-search {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+.admin-orders {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-order {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.admin-order__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-order__id {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .05em;
+}
+
+.admin-order__meta {
+  margin: 2px 0 0;
+  font-size: 12px;
+  opacity: .66;
+}
+
+.admin-order__flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-order__grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.admin-order__grid p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.admin-order__label {
+  margin: 0 0 4px !important;
+  font-size: 10.5px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  opacity: .6;
+}
+
+.admin-order__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-order__actions input,
+.admin-order__actions select {
+  flex: 1 1 150px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+@media (max-width: 980px) {
+  .admin-order__actions > * {
+    flex-basis: 100%;
+  }
+}

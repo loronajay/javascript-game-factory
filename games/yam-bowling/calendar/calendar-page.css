@@ -1,0 +1,341 @@
+/* The preorder page around the viewer. Presentation only -- it borrows the arcade shell's
+   type and chrome rather than introducing a second design language. */
+
+.cal-page-shell {
+  margin: 0;
+  background: #0d0c0f;
+  color: #f4f1ec;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.cal-page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: clamp(16px, 3vw, 34px) clamp(14px, 4vw, 40px) clamp(50px, 8vw, 90px);
+  display: grid;
+  /* minmax(0, 1fr), not the default `auto`: an auto column takes the widest child's
+     min-content width, so one wide row would stretch every section and put the page into
+     horizontal scroll. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(40px, 7vw, 84px);
+}
+
+.cal-page__nav { min-height: 1px; }
+
+/* --- shared bits ---------------------------------------------------------------------- */
+
+.cal-flag {
+  display: inline-block;
+  margin: 0 0 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #e42032;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+.cal-flag--gold {
+  background: linear-gradient(100deg, #f2c14e, #e09b1c);
+  color: #241a04;
+}
+
+.cal-section { display: grid; gap: clamp(16px, 2.6vw, 28px); }
+
+.cal-section__head { text-align: center; display: grid; gap: 8px; }
+
+.cal-section__head h2 {
+  margin: 0;
+  font-size: clamp(22px, 3.4vw, 34px);
+  letter-spacing: -.01em;
+}
+
+.cal-section__head p {
+  margin: 0 auto;
+  max-width: 56ch;
+  color: #b3aaa6;
+  font-size: clamp(14px, 1.7vw, 16px);
+  line-height: 1.6;
+}
+
+/* --- hero ----------------------------------------------------------------------------- */
+
+.cal-hero {
+  display: grid;
+  gap: clamp(24px, 4vw, 52px);
+  align-items: center;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+}
+
+.cal-hero__art img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  box-shadow: 0 2px 0 #cdc6bd, 0 5px 0 #8c8681, 0 26px 46px rgba(0, 0, 0, .6);
+}
+
+.cal-hero__title {
+  margin: 0 0 14px;
+  font-size: clamp(30px, 5.2vw, 54px);
+  line-height: 1.04;
+  letter-spacing: -.02em;
+}
+
+.cal-hero__price {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+
+.cal-hero__amount { font-size: clamp(28px, 4vw, 40px); font-weight: 700; }
+
+.cal-hero__note { color: #b3aaa6; font-size: 14px; }
+
+.cal-hero__pitch {
+  margin: 0 0 22px;
+  max-width: 44ch;
+  color: #ded7d2;
+  font-size: clamp(15px, 1.9vw, 17px);
+  line-height: 1.6;
+}
+
+.cal-hero__pitch strong { color: #f2c14e; }
+
+.cal-hero__fineprint {
+  margin: 14px 0 0;
+  max-width: 46ch;
+  color: #8f8783;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+/* --- buy ------------------------------------------------------------------------------ */
+
+.cal-buy { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+
+.cal-buy__qty { display: grid; gap: 6px; }
+
+.cal-buy__qty span {
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: #b3aaa6;
+}
+
+.cal-buy__qty input {
+  width: 84px;
+  padding: 14px 12px;
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .06);
+  color: inherit;
+  font: inherit;
+  font-size: 16px;
+}
+
+.cal-buy__cta {
+  flex: 1 1 220px;
+  padding: 17px 26px;
+  border: 0;
+  border-radius: 10px;
+  background: #e42032;
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background .18s, transform .18s;
+}
+
+.cal-buy__cta:hover:not(:disabled) { background: #ff2f42; transform: translateY(-2px); }
+
+.cal-buy__cta:disabled { opacity: .55; cursor: progress; transform: none; }
+
+.cal-buy__total { margin: 12px 0 0; color: #ded7d2; font-size: 14px; }
+
+.cal-buy__status { margin: 8px 0 0; min-height: 1.4em; font-size: 13.5px; color: #b3aaa6; }
+
+.cal-buy__status[data-tone="ok"] { color: #7fd39b; }
+
+.cal-buy__status[data-tone="error"] { color: #ff8a94; }
+
+/* --- viewer hint ---------------------------------------------------------------------- */
+
+.cal-viewer__hint {
+  margin: 0;
+  text-align: center;
+  color: #8f8783;
+  font-size: 12.5px;
+}
+
+/* The viewer's own controls inherit page colour. */
+#calendarViewer { color: #f4f1ec; }
+
+/* --- bonus ---------------------------------------------------------------------------- */
+
+.cal-bonus {
+  justify-items: center;
+  text-align: center;
+  padding: clamp(28px, 5vw, 52px) clamp(18px, 4vw, 44px);
+  border: 1px solid rgba(242, 193, 78, .3);
+  border-radius: 18px;
+  background:
+    radial-gradient(ellipse 80% 100% at 50% 0%, rgba(242, 193, 78, .14), transparent 70%),
+    rgba(255, 255, 255, .03);
+}
+
+.cal-bonus__headline {
+  margin: 0;
+  font-size: clamp(30px, 5.6vw, 52px);
+  letter-spacing: -.02em;
+  color: #f2c14e;
+}
+
+.cal-bonus__copy {
+  margin: 0;
+  max-width: 54ch;
+  color: #ded7d2;
+  font-size: clamp(14px, 1.8vw, 16px);
+  line-height: 1.65;
+}
+
+.cal-bonus__rule,
+.cal-bonus__signin {
+  margin: 0;
+  max-width: 54ch;
+  color: #9a9290;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.cal-bonus__signin a { color: #f2c14e; }
+
+/* --- specs ---------------------------------------------------------------------------- */
+
+.cal-specs {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, .1);
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.cal-specs > div {
+  display: grid;
+  gap: 5px;
+  padding: 16px 18px;
+  background: #131215;
+}
+
+.cal-specs dt {
+  font-size: 10.5px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: #8f8783;
+}
+
+.cal-specs dd { margin: 0; font-size: 14.5px; }
+
+/* --- roster --------------------------------------------------------------------------- */
+
+.cal-roster {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.cal-roster li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .04);
+}
+
+.cal-roster__month {
+  font-size: 10.5px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: #8f8783;
+}
+
+.cal-roster__name { font-size: 14px; }
+
+/* --- orders --------------------------------------------------------------------------- */
+
+.cal-orders > div { display: grid; gap: 14px; }
+
+.cal-order {
+  display: grid;
+  gap: 7px;
+  padding: 20px 22px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .04);
+}
+
+.cal-order__state {
+  margin: 0;
+  justify-self: start;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: #2f7d4f;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.cal-order__state[data-state="cancelled"],
+.cal-order__state[data-state="refunded"] { background: #8a3b3b; }
+
+.cal-order__state[data-state="shipped"],
+.cal-order__state[data-state="delivered"] { background: #2f5f8a; }
+
+.cal-order__title { margin: 3px 0 0; font-size: 18px; }
+
+.cal-order__line,
+.cal-order__bonus,
+.cal-order__tracking { margin: 0; font-size: 14px; color: #ded7d2; }
+
+.cal-order__line span { color: #8f8783; font-size: 12.5px; }
+
+.cal-order__bonus strong { color: #f2c14e; }
+
+.cal-order__id {
+  margin: 5px 0 0;
+  color: #8f8783;
+  font-size: 11.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+/* --- responsive ------------------------------------------------------------------------ */
+
+@media (max-width: 860px) {
+  .cal-hero { grid-template-columns: 1fr; }
+  .cal-hero__art { max-width: 420px; margin: 0 auto; }
+  .cal-hero__copy { text-align: center; }
+  .cal-hero__pitch, .cal-hero__fineprint { margin-inline: auto; }
+  .cal-buy { justify-content: center; }
+  .cal-buy__cta { flex-basis: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cal-buy__cta:hover:not(:disabled) { transform: none; }
+}

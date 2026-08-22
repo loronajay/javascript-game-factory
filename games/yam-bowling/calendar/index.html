@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yam Bowling 2027 Pinup Calendar | Preorder</title>
+  <meta name="description" content="Preorder the Yam Bowling 2027 Pinup Calendar. 12 months, 12 featured bowlers, and 10 Skin Vouchers for your Yam Bowling account.">
+  <link rel="stylesheet" href="../../../css/arcade.css">
+  <link rel="stylesheet" href="../../../css/session-nav.css">
+  <link rel="stylesheet" href="calendar.css">
+  <link rel="stylesheet" href="calendar-page.css">
+  <!-- Must load last: overrides desktop rules by source order. -->
+  <link rel="stylesheet" href="../../../css/mobile-landscape.css">
+</head>
+<body class="cal-page-shell">
+  <div class="scanlines"></div>
+  <div class="crt-overlay"></div>
+
+  <main class="cal-page">
+    <nav id="calendarSessionNav" class="cal-page__nav"></nav>
+
+    <!-- Hero -------------------------------------------------------------------------- -->
+    <header class="cal-hero">
+      <div class="cal-hero__art">
+        <img src="../assets/calendar/cover.webp" alt="Yam Bowling 2027 Pinup Calendar front cover"
+             width="1600" height="1244" fetchpriority="high">
+      </div>
+      <div class="cal-hero__copy">
+        <p class="cal-flag">Preorder</p>
+        <h1 class="cal-hero__title">Yam Bowling 2027<br>Pinup Calendar</h1>
+        <p class="cal-hero__price"><span class="cal-hero__amount">$29.99</span>
+          <span class="cal-hero__note">+ shipping</span></p>
+        <p class="cal-hero__pitch">
+          Preorder your copy and receive <strong>10 Skin Vouchers</strong> for your Yam Bowling account.
+        </p>
+
+        <form class="cal-buy" id="calBuyForm" novalidate>
+          <label class="cal-buy__qty">
+            <span>Quantity</span>
+            <input type="number" id="calQuantity" name="quantity" value="1" min="1" max="10" step="1" inputmode="numeric">
+          </label>
+          <button type="submit" class="cal-buy__cta" id="calPreorderCta">Preorder now</button>
+        </form>
+
+        <p class="cal-buy__total" id="calTotal">1 calendar &middot; $29.99 plus shipping and tax</p>
+        <p class="cal-buy__status" id="calStatus" role="status" aria-live="polite"></p>
+        <p class="cal-hero__fineprint">
+          Physical product. Ships when the first print run is complete &mdash; this is a preorder.
+          Shipping and tax are calculated at checkout.
+        </p>
+      </div>
+    </header>
+
+    <!-- Viewer ------------------------------------------------------------------------ -->
+    <section class="cal-section" id="viewer">
+      <div class="cal-section__head">
+        <h2>Flip through the calendar</h2>
+        <p>12 months. 12 featured bowlers. See exactly how the calendar will look hanging on your wall.</p>
+      </div>
+      <div id="calendarViewer"></div>
+      <p class="cal-viewer__hint">
+        Use the arrows, pick a month, or press the arrow keys. On a phone you can swipe.
+      </p>
+    </section>
+
+    <!-- Bonus ------------------------------------------------------------------------- -->
+    <section class="cal-section cal-bonus">
+      <p class="cal-flag cal-flag--gold">Preorder bonus</p>
+      <h2 class="cal-bonus__headline">10 Skin Vouchers</h2>
+      <p class="cal-bonus__copy">
+        Every qualifying preorder account receives 10 Skin Vouchers, redeemed in Yam Bowling
+        exactly like any other voucher &mdash; spend them on alternate skins for the bowlers you own.
+      </p>
+      <p class="cal-bonus__rule">
+        One 10-voucher bonus per account. Ordering several calendars ships several calendars,
+        but the bonus stays at 10.
+      </p>
+      <p class="cal-bonus__signin" id="calBonusSignin" hidden>
+        <a href="../../../sign-in/">Sign in</a> before you order so the vouchers reach your account.
+      </p>
+    </section>
+
+    <!-- Details ----------------------------------------------------------------------- -->
+    <section class="cal-section">
+      <div class="cal-section__head">
+        <h2>Product details</h2>
+      </div>
+      <dl class="cal-specs">
+        <div><dt>Year</dt><dd>2027 wall calendar</dd></div>
+        <div><dt>Featured</dt><dd>12 Yam Bowling characters, full-colour artwork</dd></div>
+        <div><dt>Grids</dt><dd>Monthly writing grids</dd></div>
+        <div><dt>Closed</dt><dd>Approx. 11 &times; 8.5 in</dd></div>
+        <div><dt>Hanging</dt><dd>Approx. 11 &times; 17 in</dd></div>
+        <div><dt>Binding</dt><dd>Top-bound wall calendar</dd></div>
+        <div><dt>Type</dt><dd>Physical product &mdash; shipping charged separately</dd></div>
+        <div><dt>Bonus</dt><dd>10 Skin Vouchers per qualifying account</dd></div>
+      </dl>
+      <ol class="cal-roster" id="calRoster"></ol>
+    </section>
+
+    <!-- Orders ------------------------------------------------------------------------ -->
+    <section class="cal-section cal-orders" id="calOrdersSection" hidden>
+      <div class="cal-section__head">
+        <h2>Your preorder</h2>
+      </div>
+      <div id="calOrders"></div>
+    </section>
+  </main>
+
+  <script type="module" src="calendar-page.mjs"></script>
+</body>
+</html>

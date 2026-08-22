@@ -92,6 +92,37 @@ export function createAdminApiClient(options = {}) {
         grantAdmin: (playerId) => call(`/admin/admins/${encode(playerId)}`, "POST"),
         revokeAdmin: (playerId) => call(`/admin/admins/${encode(playerId)}`, "DELETE"),
         listAudit: (limit = 100) => call(`/admin/audit?limit=${encode(limit)}`),
+        // Physical calendar fulfillment.
+        listCalendarOrders: (filters = {}) => {
+            const query = new URLSearchParams();
+            if (filters.paymentState)
+                query.set("paymentState", filters.paymentState);
+            if (filters.fulfillmentState)
+                query.set("fulfillmentState", filters.fulfillmentState);
+            if (filters.search)
+                query.set("search", filters.search);
+            const suffix = query.toString();
+            return call(`/admin/calendar/orders${suffix ? `?${suffix}` : ""}`);
+        },
+        getCalendarMetrics: () => call("/admin/calendar/metrics"),
+        updateCalendarOrder: (orderId, patch) => call(`/admin/calendar/orders/${encode(orderId)}`, "PATCH", patch),
+        // Fetched rather than linked: /admin/ is gated by a bearer token, and a plain <a href>
+        // cannot carry one -- the link would come back 401 as an HTML error page saved to disk.
+        // The caller turns this text into a download.
+        async fetchCalendarOrdersCsv(paymentState = "paid") {
+            if (typeof fetchImpl !== "function" || !baseUrl)
+                return { ok: false, status: 0, error: "not_configured" };
+            const token = getStoredAuthToken();
+            try {
+                const response = await fetchImpl(`${baseUrl}/admin/calendar/orders.csv?paymentState=${encode(paymentState)}`, { headers: token ? { authorization: `Bearer ${token}` } : {} });
+                if (!response.ok)
+                    return { ok: false, status: response.status, error: "export_failed" };
+                return { ok: true, status: response.status, data: await response.text() };
+            }
+            catch {
+                return { ok: false, status: 0, error: "network_error" };
+            }
+        },
     };
 }
 // Console-facing text for the named errors the API returns. Anything unmapped falls back

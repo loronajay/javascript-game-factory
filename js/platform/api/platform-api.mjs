@@ -511,6 +511,23 @@ export function createPlatformApiClient(options = {}) {
                 ? post(`/game-progress/${encoded}/emote-vouchers/redeem`, { entitlementId, redemptionId }).then((result) => (result ? { ...result, gameProgress: result.progress || null } : null))
                 : Promise.resolve(null);
         },
+        // --- Yam Bowling 2027 calendar (physical preorder) ------------------------------
+        // The client sends a quantity and nothing else. Price, bonus size and the once-per-
+        // account rule are all server-side; a tampered request can only ask for more calendars.
+        fetchCalendarOffer() {
+            return get("/calendar/offer");
+        },
+        createCalendarCheckoutSession({ quantity } = {}) {
+            return post("/calendar/checkout-sessions", { quantity });
+        },
+        // Settle the buyer's return from Stripe. The webhook is the authority; this converges on
+        // the same order row and the same promotion-scoped bonus claim.
+        fulfillCalendarCheckout({ sessionId } = {}) {
+            return post("/calendar/checkout-sessions/fulfill", { sessionId });
+        },
+        listCalendarOrders() {
+            return get("/calendar/orders");
+        },
         fetchGameTournament(gameSlug) {
             const encoded = encodePathSegment(gameSlug);
             return encoded ? get(`/game-progress/${encoded}/tournaments/current`) : Promise.resolve(null);

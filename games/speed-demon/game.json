@@ -1,9 +1,9 @@
 {
   "title": "Speed Demon",
   "tagline": "Stage it, launch it, row the gate clean.",
-  "description": "A top-down drag racer built around manual-shift execution. Work an H-pattern gate as real geometry, read the christmas tree for a holeshot, and hold the needle in the window every shift. Distance Race over four lengths and Time Attack over three clocks, across a 24-model roster and five tracks, with a server-backed garage for paint, finish, tint, tail lights and underglow — plus Speed Demon Radio, your own music folder played through a car-stereo faceplate.",
-  "players": "1",
-  "status": "Playable — Distance Race + Time Attack, 24-car customizable garage (Online Versus locked)",
+  "description": "A top-down racer built around manual-shift execution. Work an H-pattern gate as real geometry, read the christmas tree for a holeshot, and hold the needle in the window every shift. Distance Race, Time Attack, Rival Race against ten CPU drivers or your own ghost, three-lap Circuit Race, a street-racing campaign, and casual Online Versus. Paint any of 24 cars yourself, chase seven leaderboards, and play your own music folder through the car stereo.",
+  "players": "1-2",
+  "status": "Playable — drag + circuit racing, campaign chapter one, vs CPU and ghosts, casual online, customizable garage",
   "order": 13,
   "featured": false,
   "theme": "asphalt",

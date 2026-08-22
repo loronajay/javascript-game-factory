@@ -54,6 +54,22 @@ export function writeJson(res: any, statusCode: number, payload: any, requestOri
   res.end(JSON.stringify(payload));
 }
 
+// A non-JSON response body (a CSV export, say). Goes through the same CORS path as
+// writeJson so a download cannot quietly get different headers from every other response.
+export function writeText(
+  res: any,
+  statusCode: number,
+  body: string,
+  requestOrigin?: any,
+  headers: Record<string, string> = {},
+): void {
+  res.statusCode = statusCode;
+  applyCorsHeaders(res, requestOrigin);
+  res.setHeader("content-type", "text/plain; charset=utf-8");
+  for (const [name, value] of Object.entries(headers)) res.setHeader(name, value);
+  res.end(body);
+}
+
 export async function readJsonBody(req: any): Promise<{ ok: boolean; value?: any; error?: string }> {
   const chunks: Buffer[] = [];
 

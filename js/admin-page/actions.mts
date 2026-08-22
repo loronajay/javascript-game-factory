@@ -256,6 +256,55 @@ export async function runAdminAction(action: string, context: ActionContext): Pr
     return setFlash(state, result, "Admin access revoked.");
   }
 
+  // ---- Calendar fulfillment ----
+
+  if (action === "calendar-filter") {
+    state.calendarFilter = value;
+    state.flash = null;
+    return true;
+  }
+
+  if (action === "calendar-search") {
+    state.calendarSearch = String(readForm(form).calendarSearch || "");
+    state.flash = null;
+    return true;
+  }
+
+  if (action === "calendar-export") {
+    const result = await api.fetchCalendarOrdersCsv(state.calendarFilter);
+    if (!result.ok) {
+      state.flash = { tone: "error", message: describeAdminError(result.error) };
+      return false;
+    }
+    const blob = new Blob([result.data || ""], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `calendar-orders-${state.calendarFilter}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    state.flash = { tone: "ok", message: "Export downloaded." };
+    return false;
+  }
+
+  if (action === "calendar-order-save") {
+    const values = readForm(form);
+    // Marking an order shipped is what tells the customer it is on its way, so it is worth
+    // one confirmation -- an accidental click here reads as a dispatch that never happened.
+    if (values.fulfillmentState === "shipped" && !values.trackingNumber
+      && !confirmFn("Mark this order shipped without a tracking number?")) {
+      return false;
+    }
+    const result = await api.updateCalendarOrder(value, {
+      fulfillmentState: values.fulfillmentState,
+      trackingNumber: values.trackingNumber,
+      carrier: values.carrier,
+    });
+    return setFlash(state, result, "Order updated.");
+  }
+
   return false;
 }
 
