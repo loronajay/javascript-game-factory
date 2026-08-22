@@ -57,6 +57,7 @@ async function bootstrap() {
   }
 
   await import("./main.js");
+  document.documentElement.dataset.gameReady = "true";
 }
 
 bootstrap().catch((error) => {

@@ -69,20 +69,35 @@ def largest_component(image: Image.Image) -> Image.Image:
 
 
 def split_pose_sheet(image: Image.Image) -> list[Image.Image]:
-    """Split six fixed cells after extraction and clean each independently."""
+    """Extract six complete subjects without clipping poses at cell boundaries."""
 
     if image.width % POSE_COUNT:
         raise ValueError("Pose sheet width must divide evenly into six cells.")
     segmented = remove_sheet_background(image)
-    cell_width = segmented.width // POSE_COUNT
-    return [
-        largest_component(
-            segmented.crop(
-                (index * cell_width, 0, (index + 1) * cell_width, segmented.height)
-            )
+    rgba = np.asarray(segmented).copy()
+    visible = rgba[:, :, 3] > ALPHA_THRESHOLD
+    labels, count = ndimage.label(
+        visible, structure=np.ones((3, 3), dtype=np.uint8)
+    )
+    if count < POSE_COUNT:
+        raise ValueError(f"Expected six disconnected poses, found {count}.")
+
+    areas = np.asarray(
+        ndimage.sum(visible, labels, index=np.arange(1, count + 1)),
+        dtype=np.int64,
+    )
+    subject_labels = np.argsort(areas)[-POSE_COUNT:] + 1
+    subjects: list[tuple[int, Image.Image]] = []
+    for label in subject_labels:
+        keep = labels == int(label)
+        ys, xs = np.where(keep)
+        isolated = rgba.copy()
+        isolated[~keep] = 0
+        crop = Image.fromarray(isolated, "RGBA").crop(
+            (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
         )
-        for index in range(POSE_COUNT)
-    ]
+        subjects.append((int(xs.min() + xs.max()), crop))
+    return [subject for _, subject in sorted(subjects, key=lambda item: item[0])]
 
 
 def normalize_pose_set(subjects: list[Image.Image], margin: int = 24) -> list[Image.Image]:

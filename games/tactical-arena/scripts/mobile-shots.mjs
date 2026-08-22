@@ -178,7 +178,11 @@ async function main() {
       try {
         await applyDeviceEmulation(page, device);
         await page.setCacheEnabled(false);
-        await page.goto(targetUrl, { waitUntil: "networkidle2", timeout: 30000 });
+        // The game keeps live platform and relay requests open after boot, so
+        // network-idle is not a stable readiness signal. Bootstrap stamps the
+        // document only after main.js has installed the menu event handlers.
+        await page.goto(targetUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
+        await page.waitForSelector('html[data-game-ready="true"]', { timeout: 30000 });
 
         for (const step of ROUTES[routeKey]) {
           await runStep(page, step);

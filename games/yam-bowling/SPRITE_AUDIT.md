@@ -66,66 +66,6 @@ manual visual repairs and frame exports have not been performed.
 
 ## Full visual checklist
 
-### Aaliyah Storm
-
-- [x] Swimsuit — throw 4 PNG needed WebP conversion.
-
-### Amara Reed
-
-- [ ] Maid — throw 5.
-- [ ] Swimsuit — source sheet. `recovery available`
-
-### Carmen Blaze
-
-- [ ] Halloween — throw 2.
-- [ ] Maid — source sheet. `recovery available`
-- [ ] Swimsuit — source sheet. `recovery available`
-
-### Cassy Cruz
-
-- [ ] Halloween — needs a new throw sheet and portrait sheet; character is too
-  buff.
-- [ ] Maid — portrait is too buff; old source sheet needed. `recovery available`
-- [ ] Swimsuit — same issue as maid. `source restored from pre-fix baseline`
-
-### Claire Rowan
-
-- [ ] Maid — source sheet. `recovery available`
-
-### Daisy Monroe
-
-- [ ] Maid — source sheet and throw 5. `recovery available`
-- [ ] Swimsuit — source sheet and throw 5. `source restored from pre-fix baseline`
-
-### Echo Sterling
-
-- [ ] Maid — source sheet and throw 4. `recovery available`
-
-### Fiona Vale
-
-- [ ] Swimsuit — source sheet and throw 3. `source restored from pre-fix baseline`
-
-### Hazel Ward
-
-- [ ] Halloween — source sheet and throw 5. `recovery available`
-- [ ] Swimsuit — source sheet and throw 3. `source restored from pre-fix baseline`
-
-### Imani Cole
-
-- [ ] Halloween — source sheet and throw 5. `recovery available`
-- [ ] Maid — source sheet and throw 4. `recovery available`
-
-### Kevya Desai
-
-- [ ] Halloween — source sheet, throw 4, and throw 5. `recovery available`
-- [ ] Maid — source sheet and throw 5. `recovery available`
-- [ ] Swimsuit — source sheet, throw 3, and throw 5.
-  `source restored from pre-fix baseline`
-
-### Lillie Chen
-
-- [ ] Halloween — throw 2, throw 4, and throw 5.
-- [ ] Maid — source sheet and all throws. `recovery available`
 
 ### Lumi Vega
 

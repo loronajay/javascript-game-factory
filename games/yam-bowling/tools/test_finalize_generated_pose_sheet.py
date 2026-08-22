@@ -30,6 +30,21 @@ class FinalizeGeneratedPoseSheetTests(unittest.TestCase):
         self.assertLess(poses[5].height, 180)
         self.assertEqual(poses[5].getchannel("A").getextrema(), (0, 255))
 
+    def test_split_recovers_complete_poses_that_cross_fixed_cell_boundaries(self) -> None:
+        sheet = Image.new("RGB", (600, 200), "white")
+        pixels = np.asarray(sheet).copy()
+        for index in range(6):
+            center = index * 100 + 50
+            pixels[30:190, center - 20 : center + 20] = (110, 55, 25)
+        # Pose four's connected hair crosses the old x=400 cell boundary.
+        pixels[30:55, 370:425] = (110, 55, 25)
+
+        poses = finalizer.split_pose_sheet(Image.fromarray(pixels, "RGB"))
+
+        self.assertEqual(len(poses), 6)
+        self.assertGreaterEqual(poses[3].width, 90)
+        self.assertEqual(poses[3].getchannel("A").getextrema(), (0, 255))
+
     def test_uniform_normalization_uses_runtime_canvas_and_one_scale(self) -> None:
         subjects = []
         for width in (40, 44, 48, 52, 56, 60):
