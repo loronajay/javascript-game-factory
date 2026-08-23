@@ -655,6 +655,24 @@ test("players can choose and persist a character-named menu splash", () => {
   assert.match(picker, /data-splash-slug/);
 });
 
+test("the title screen links out to the calendar preorder without wiring it into the game", () => {
+  const html = read("index.html");
+
+  const link = html.match(/<a[^>]*id=["']calendar-button["'][^>]*>/);
+  assert.ok(link, "the title screen should offer a way to reach the calendar preorder");
+  assert.match(link[0], /href=["']calendar\/index\.html["']/);
+
+  // Merchandise, not gameplay: the calendar is a plain navigation out of the cabinet, so no
+  // module may bind it, read it, or otherwise let a preorder reach match code.
+  for (const file of ["game.js", "input/bindings.mjs"]) {
+    assert.doesNotMatch(
+      read(file),
+      /calendar/i,
+      `${file} should not know the calendar exists`,
+    );
+  }
+});
+
 test("local setup lets a player choose a lane and remembers it", () => {
   const html = read("index.html");
   const game = read("game.js");

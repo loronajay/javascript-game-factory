@@ -78,6 +78,18 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 .button--ghost { border-color: var(--line); background: rgba(255,255,255,.05); }
 .button--ghost:hover { border-color: rgba(255,255,255,.24); background: rgba(255,255,255,.09); }
 .button--wide { width: 100%; }
+/* An anchor wearing the button vocabulary: `button` gets these from the element, `a` does not. */
+.button--link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: inherit;
+}
+.button--link:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+/* Merchandise, not a mode: reads as a promo without breaking the menu row's rhythm. */
+.button--merch { border-color: rgba(255, 214, 107, 0.42); color: var(--gold); }
+.button--merch:hover { border-color: rgba(255, 214, 107, 0.7); background: rgba(255, 214, 107, 0.1); }
 .button--xl { min-height: 58px; min-width: 230px; font-size: 0.94rem; }
 .icon-button {
   display: grid;
