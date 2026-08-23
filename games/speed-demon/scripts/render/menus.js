@@ -767,7 +767,7 @@ export function drawNormalizedResults(ctx, result, menu, { campaign = null, even
       size: 15, colour: campaign?.cleared ? "#4ade6a" : "#ffb020", weight: "800", align: "center",
     });
   } else {
-    text(ctx, "JAPAN NOIR  //  CIRCUIT RACE", centre, box.y + 226, {
+    text(ctx, "CIRCUIT RACE", centre, box.y + 226, {
       size: 13, colour: DIM, weight: "800", align: "center",
     });
   }

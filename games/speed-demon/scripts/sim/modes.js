@@ -109,7 +109,7 @@ export const MODES = [
     id: MODE_CIRCUIT,
     runtime: "circuit",
     label: "Circuit Race",
-    blurb: "Two-axis racing through Japan Noir. Hit every checkpoint, complete the laps, and finish first.",
+    blurb: "Two-axis racing on circuits across the campaign map. Hit every checkpoint, complete the laps, and finish first.",
     available: true,
     objective: {
       kind: OBJECTIVE_LAPS,

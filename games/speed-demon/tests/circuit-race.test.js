@@ -100,9 +100,9 @@ test("countdown, input and fixed-step vehicle movement share one reducer", () =>
   assert(race.participants[0].vehicle.x > startX, "the local car did not use the two-axis reducer");
 });
 
-test("Japan Noir starts both cars on one fair line rather than gifting the CPU a lead", () => {
-  const japanNoir = circuitTrackById("japan-noir");
-  const [player, opponent] = japanNoir.spawns;
+test("Old Town Shrine Loop starts both cars on one fair line rather than gifting the CPU a lead", () => {
+  const oldTown = circuitTrackById("old-town-shrine-loop");
+  const [player, opponent] = oldTown.spawns;
   const forward = forwardVector(player.angle);
   const opponentLead = (opponent.x - player.x) * forward.x + (opponent.y - player.y) * forward.y;
   assertClose(opponentLead, 0, 1e-9, "the opponent starts ahead along the racing direction");
@@ -110,15 +110,25 @@ test("Japan Noir starts both cars on one fair line rather than gifting the CPU a
 
   const race = createCircuitRace({
     ...definition(),
-    trackId: "japan-noir",
+    trackId: "old-town-shrine-loop",
     rules: { ...definition().rules, countdownSeconds: 3 },
     participants: definition().participants.map((participant) => participant.control === "local"
       ? { ...participant, displayName: "DRIVER" }
       : participant),
-  }, japanNoir);
-  const hud = circuitHudView(race, japanNoir, "local");
+  }, oldTown);
+  const hud = circuitHudView(race, oldTown, "local");
   assertEqual(hud.position.current, 1, "a stationary fair grid calls the local car P2");
   assertEqual(hud.runners[0].name, "YOU");
+});
+
+test("Old Town Shrine Loop checkpoint gates span the full driveable road", () => {
+  const oldTown = circuitTrackById("old-town-shrine-loop");
+  for (const [index, checkpoint] of oldTown.checkpoints.entries()) {
+    assert(
+      checkpoint.radius >= 106,
+      `checkpoint ${index} can discard a legal outside line and force an extra lap`,
+    );
+  }
 });
 
 test("road containment samples the full normalized footprint", () => {
@@ -307,6 +317,27 @@ test("the runtime registry exposes one stable adapter shape", () => {
   for (const method of ["create", "input", "step", "result", "render"]) {
     assertEqual(typeof circuit[method], "function", `circuit adapter has no ${method}`);
   }
+});
+
+test("one circuit adapter resolves the selected catalog track for create and step", () => {
+  const alternate = {
+    ...track,
+    id: "alternate-loop",
+    spawns: [{ x: 300, y: 400, angle: Math.PI }, { x: 330, y: 400, angle: Math.PI }],
+  };
+  const seen = [];
+  const adapter = createCircuitAdapter({
+    trackById: (id) => (id === alternate.id ? alternate : id === track.id ? track : null),
+    containsVehicle: (_vehicle, selectedTrack) => {
+      seen.push(selectedTrack.id);
+      return true;
+    },
+  });
+  const selected = adapter.create({ ...definition(), trackId: alternate.id });
+  assertEqual(selected.trackId, alternate.id);
+  assertEqual(selected.participants[0].vehicle.x, alternate.spawns[0].x);
+  adapter.step(selected, 1 / 120);
+  assert(seen.every((id) => id === alternate.id), "collision used a different circuit's mask");
 });
 
 test("vehicle integration remains pure", () => {

@@ -452,14 +452,6 @@ initMobileLandscapeGate();
       tournamentScreen.leaveToTitle();
       profileScreen.leaveToTitle();
     });
-    if (accountAccess.isEligible()) {
-      await campaignProgress.sync();
-      await profileSync.sync();
-      // A finished match whose report never reached the server is filed on the
-      // first boot that has a connection again, rather than waiting for the
-      // next match to notice it.
-      onlineSession.flushPendingReports().catch(() => {});
-    }
     lanePicker.build();
     setupScreen.build();
     onlineScreen.build();
@@ -489,6 +481,22 @@ initMobileLandscapeGate();
       circuitScreen, tournamentScreen, profileScreen, setupScreen, onlineScreen, shotHud, syncAudioToggle, accountAccess,
       matchReactions, tutorial,
     });
+
+    // Account reads can be slow or remain pending while the Factory is
+    // unreachable. The cabinet is already fully wired before they begin, so
+    // exhibition, tutorial, circuit and tournament controls never become
+    // inert just because remote profile data has not arrived yet. The two
+    // reads stay ordered because profile state is the final authority applied
+    // to the loadout; their snapshot callbacks repaint any open surfaces.
+    if (accountAccess.isEligible()) {
+      campaignProgress.sync()
+        .then(() => profileSync.sync())
+        .catch(console.error);
+      // A finished match whose report never reached the server is filed on the
+      // first boot that has a connection again, rather than waiting for the
+      // next match to notice it.
+      onlineSession.flushPendingReports().catch(() => {});
+    }
 
     // A player who signed in but has never opened their profile page in this
     // browser has a real name on the server and an empty local cache. Ask the

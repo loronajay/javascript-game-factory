@@ -2,11 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { suite, test, assert, assertEqual, assertDeepEqual, finish } from "./harness.js";
+import { suite, test, assert, assertEqual, assertDeepEqual, assertClose, finish } from "./harness.js";
 import { readPng } from "./png.js";
 import { allModels } from "../scripts/assets/car-atlas.js";
 import {
   CIRCUIT_DIRECTIONS,
+  CIRCUIT_FRAME_SIZE,
   CIRCUIT_FRAME_HEADINGS,
   CIRCUIT_MODELS,
   circuitModelById,
@@ -15,6 +16,7 @@ import {
 import {
   circuitDrawBox,
   circuitFrameIndex,
+  localCarCoordinates,
   measureCircuitFrameGeometry,
 } from "../scripts/circuit/sprite-geometry.js";
 
@@ -48,23 +50,30 @@ test("availability never substitutes another model", () => {
 });
 
 test("world headings select the artwork frame whose nose points forward", () => {
-  // The generated sheets are stored rear-first: frame 0's nose points south,
-  // frame 4's nose points north. The renderer must account for that instead of
-  // presenting the cars tail-first while the physics moves them forward.
-  assertEqual(circuitFrameIndex(0), 4);
-  assertEqual(circuitFrameIndex(Math.PI / 2), 6);
-  assertEqual(circuitFrameIndex(Math.PI), 0);
-  assertEqual(circuitFrameIndex(-Math.PI / 2), 2);
-  assertDeepEqual(CIRCUIT_FRAME_HEADINGS, [
-    "south",
-    "south-west",
-    "west",
-    "north-west",
-    "north",
-    "north-east",
-    "east",
-    "south-east",
-  ]);
+  // The compiler manifests and physical atlas columns share one order. Applying
+  // another half-turn here makes every car appear to drive tail-first.
+  assertEqual(circuitFrameIndex(0), 0);
+  assertEqual(circuitFrameIndex(Math.PI / 2), 2);
+  assertEqual(circuitFrameIndex(Math.PI), 4);
+  assertEqual(circuitFrameIndex(-Math.PI / 2), 6);
+  assertDeepEqual(CIRCUIT_FRAME_HEADINGS, CIRCUIT_DIRECTIONS);
+});
+
+test("atlas pixels use the same nose direction as their declared frame", () => {
+  const noseSamples = [
+    [0, 31.5, 0],
+    [2, 63, 31.5],
+    [4, 31.5, 63],
+    [6, 0, 31.5],
+  ];
+  for (const [frame, x, y] of noseSamples) {
+    assertClose(
+      localCarCoordinates(frame, x, y).v,
+      0.5 / CIRCUIT_FRAME_SIZE,
+      1e-9,
+      `frame ${frame} reversed its nose and tail`,
+    );
+  }
 });
 
 test("every atlas is eight transparent 64px frames clockwise from north", () => {
@@ -138,6 +147,28 @@ test("rear, three-quarter and side views are calibrated against the authored fro
       assert(geometry[frame].scale > 1.05, `${model.modelId} frame ${frame} needs the stronger lift`);
       assertEqual(Number(geometry[frame].scale.toFixed(6)), Number(expectedScale.toFixed(6)));
     }
+  }
+});
+
+test("every model is normalized to the same apparent race size", () => {
+  const normalizedAreas = [];
+  for (const model of CIRCUIT_MODELS) {
+    assert(Number.isFinite(model.renderScale) && model.renderScale > 0,
+      `${model.modelId} has no model-to-model render scale`);
+    const sheet = readPng(fs.readFileSync(path.join(CARS_DIR, model.spritesheet)));
+    const geometry = measureCircuitFrameGeometry(sheet.pixels, sheet.width, sheet.height);
+    const meanArea = geometry.reduce(
+      (sum, frame) => sum + frame.alphaArea * frame.scale ** 2,
+      0,
+    ) / geometry.length;
+    normalizedAreas.push({ modelId: model.modelId, area: meanArea * model.renderScale ** 2 });
+  }
+
+  const target = normalizedAreas.reduce((sum, entry) => sum + entry.area, 0)
+    / normalizedAreas.length;
+  for (const entry of normalizedAreas) {
+    assertClose(entry.area, target, target * 0.01,
+      `${entry.modelId} still renders at a different apparent size`);
   }
 });
 

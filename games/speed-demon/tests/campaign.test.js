@@ -172,7 +172,7 @@ test("the authored circuit mission builds the same serializable circuit definiti
     source: { kind: "campaign", id: event.id },
   });
   assertEqual(definition.runtime, "circuit");
-  assertEqual(definition.trackId, "japan-noir");
+  assertEqual(definition.trackId, "old-town-shrine-loop");
   assertEqual(definition.rules.laps, 3);
   assertEqual(definition.source.kind, "campaign");
   assertEqual(Object.keys(definition.participants[0]).sort().join(), "control,displayName,livery,modelId,playerId");

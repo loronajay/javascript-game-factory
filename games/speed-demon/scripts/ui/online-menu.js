@@ -31,7 +31,7 @@ import { BEST_OF_OPTIONS } from "../sim/match.js";
 import { RACE_DISTANCES } from "../sim/constants.js";
 import { modelById } from "../assets/car-atlas.js";
 import { hasCircuitAtlas } from "../circuit/assets.js";
-import { CIRCUIT_TRACKS } from "../circuit/tracks.js";
+import { CIRCUIT_TRACKS, DEFAULT_CIRCUIT_TRACK_ID } from "../circuit/tracks.js";
 import { TRACKS } from "./track-layout.js";
 import {
   ROOM_CODE_LENGTH,
@@ -248,7 +248,7 @@ export function adjustLobbyAt(rowIndex, direction, session) {
   if (row === LOBBY_ROW_RACE_TYPE) {
     const raceTypeId = cycle(RACE_TYPE_IDS, session.config.raceTypeId ?? "drag", step);
     return config(session, raceTypeId === "circuit"
-      ? { raceTypeId, trackId: "japan-noir", laps: LAP_OPTIONS.includes(session.config.laps) ? session.config.laps : 3 }
+      ? { raceTypeId, trackId: DEFAULT_CIRCUIT_TRACK_ID, laps: LAP_OPTIONS.includes(session.config.laps) ? session.config.laps : 3 }
       : { raceTypeId, trackId: "track-a", distanceId: session.config.distanceId ?? "quarter" });
   }
 

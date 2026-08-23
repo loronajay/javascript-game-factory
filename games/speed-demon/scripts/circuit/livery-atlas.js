@@ -20,7 +20,7 @@ import {
   tintCabinPixel,
   zoneWeight,
 } from "../garage/paint.js";
-import { CIRCUIT_FRAME_SIZE, hasCircuitAtlas } from "./assets.js";
+import { CIRCUIT_FRAME_SIZE, circuitModelById, hasCircuitAtlas } from "./assets.js";
 import { localCarCoordinates, measureCircuitFrameGeometry } from "./sprite-geometry.js";
 import { circuitStripeCoordinates } from "./stripe-projection.js";
 
@@ -57,7 +57,7 @@ export function measureCircuitBodyGeometry(pixels, width, height, silhouette) {
     const longitudinal = [];
     const lateral = [];
     const base = silhouette[frame];
-    const angle = ((frame + 4) % 8) * Math.PI / 4;
+    const angle = frame * Math.PI / 4;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
     for (let y = 0; y < height; y += 1) {
@@ -174,7 +174,11 @@ function paintStack(r, g, b, local, livery, skipBase, modelId, frame, geometry, 
 function geometryFor(cache, modelId, pixels, width, height) {
   const found = cache.get(modelId);
   if (found) return found;
-  const geometry = measureCircuitFrameGeometry(pixels, width, height);
+  const renderScale = circuitModelById(modelId)?.renderScale ?? 1;
+  const geometry = measureCircuitFrameGeometry(pixels, width, height).map((frame) => Object.freeze({
+    ...frame,
+    scale: frame.scale * renderScale,
+  }));
   cache.set(modelId, geometry);
   return geometry;
 }

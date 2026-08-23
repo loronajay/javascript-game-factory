@@ -797,9 +797,10 @@ test("a car with nothing saved for it still has a paint row that does not break"
   }
 });
 
-test("Circuit Race uses Japan Noir and blocks models without directional art", () => {
+test("Circuit Race defaults to Old Town, offers Docklands, and blocks models without directional art", () => {
   const available = createSetup({ modeId: MODE_CIRCUIT, modelId: "kaido-gts" });
-  assertEqual(setupTrack(available).id, "japan-noir");
+  assertEqual(setupTrack(available).id, "old-town-shrine-loop");
+  assertEqual(setupTrack(moveSetup({ ...available, pane: PANE_TRACK }, "right", EMPTY)).id, "docklands-freight-loop");
   assertEqual(setupView(available, EMPTY).start.disabled, false);
 
   const unavailable = createSetup({ modeId: MODE_CIRCUIT, modelId: "shutter-z" });

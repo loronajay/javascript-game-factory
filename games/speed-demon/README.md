@@ -6,7 +6,7 @@ Speed Demon is a top-down racer built around manual-shift execution. Stage again
 
 Live on the arcade grid (order 13).
 
-- **Five ways to race.** Distance Race (four distances), Time Attack (three clocks), Rival Race against a ten-driver CPU roster or your own ghost, Circuit Race (a three-lap Japan Noir loop with free steering), and casual **Online Versus** — best of three, server-authoritative, on the separate `factory-network-server`.
+- **Five ways to race.** Distance Race (four distances), Time Attack (three clocks), Rival Race against a ten-driver CPU roster or your own ghost, Circuit Race across Old Town Shrine Loop and Docklands Freight Loop, and casual **Online Versus** — best of three, server-authoritative, on the separate `factory-network-server`.
 - **A campaign.** Chapter one is the whole painted Street Circuit: nine events, START to the boss plate. The other three districts are painted and read `soon`.
 - **24-model roster, cosmetic-only.** No stat differences and no alternate gate layouts yet. Bodies are neutral and a livery — base paint, optional gradient, up to four player-placed bands and stripes, window tint, tail-light hue, underglow — is tinted on at runtime, so a new colour costs no art.
 - **Customization is server-backed and requires sign-in.** Signed out, the garage reports itself unavailable and the cabinet races on Factory paint — a normal state, not an error.
@@ -45,6 +45,10 @@ Serve the **repository root** over HTTP and open `games/speed-demon/index.html`.
 ### Circuit stripe-flow authoring
 
 Open `games/speed-demon/tools/circuit-mask-editor.html` from the same local server to author stripe-flow paths over every circuit sprite angle. Dragging over a sprite records an arrowed vector path in the exact direction drawn, including bends; multiple parallel paths can describe perspective changes across a panel. A secondary Band Flow pass is available for cross-car shapes, while Window Tint and Tail Lights remain optional pixel masks. User-facing direction names follow the car's visible nose rather than the legacy camera-facing atlas labels. The tool keeps all eight headings visible, autosaves each model in the browser, and exports an authoritative, model-checked JSON project plus PNG references.
+
+### Circuit track testing
+
+Open `games/speed-demon/tools/circuit-track-viewer.html` from the repository server. It switches between every circuit and drives the real 120Hz vehicle and swept road-mask collision used by the game. Collision, CPU-line and checkpoint overlays can be toggled independently.
 
 ## Tests
 

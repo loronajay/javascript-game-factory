@@ -696,6 +696,20 @@ test("local setup lets a player choose a lane and remembers it", () => {
     "choosing which house a match uses is match logic, not picker logic");
 });
 
+test("match controls bind before signed-in account synchronization can stall startup", () => {
+  const game = read("game.js");
+  const init = game.slice(game.indexOf("async function init()"));
+  const bindings = init.indexOf("bindEvents({");
+  const campaignSync = init.indexOf("campaignProgress.sync()");
+  const profileSync = init.indexOf("profileSync.sync()");
+
+  assert.ok(bindings > -1, "startup should attach the shared match controls");
+  assert.ok(campaignSync > -1 && bindings < campaignSync,
+    "a slow campaign request must not leave every start-match button inert");
+  assert.ok(profileSync > -1 && bindings < profileSync,
+    "a slow profile request must not leave every start-match button inert");
+});
+
 test("online matches bowl on the lane the server dealt, not the local pick", () => {
   const game = read("game.js");
   const runtime = read("match/match-runtime.mjs");

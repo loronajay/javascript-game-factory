@@ -347,9 +347,9 @@ export const EVENTS = [
     chapter: 1,
     nodeId: "street-5",
     title: "TOLL BOOTH",
-    where: "Old Town — under the flyover",
+    where: "Old Town — shrine road",
     splash: "circuit-race.png",
-    trackId: "japan-noir",
+    trackId: "old-town-shrine-loop",
     modeId: MODE_CIRCUIT,
     objectiveId: "three-laps",
     seed: 6194,
@@ -380,7 +380,7 @@ export const EVENTS = [
     brief: [
       { speaker: "rook", text: [
         "He does not want your money. He wants three laps,",
-        "and every barrier on Japan Noir knows his name.",
+        "and every barrier on the shrine loop knows his name.",
       ] },
       { speaker: "dez", text: [
         "This is not the strip. Brake, turn, and hit every gate.",

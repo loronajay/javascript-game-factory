@@ -7,6 +7,7 @@ import { readPng } from "./png.js";
 import { createLivery, addLayer, updateLayer } from "../scripts/garage/livery.js";
 import { classifyPixel, REGION_BODY, REGION_CABIN, REGION_LAMP } from "../scripts/garage/paint.js";
 import { circuitPreviewFrame } from "../scripts/ui/garage-editor.js";
+import { CIRCUIT_MODELS } from "../scripts/circuit/assets.js";
 import {
   localCarCoordinates,
   measureCircuitFrameGeometry,
@@ -127,7 +128,7 @@ test("each generated view maps the same authored UV to the same car-local point"
   const expected = { u: 0.27, v: 0.18 };
   for (let frame = 0; frame < 8; frame += 1) {
     const measured = geometry[frame];
-    const angle = ((frame + 4) % 8) * Math.PI / 4;
+    const angle = frame * Math.PI / 4;
     const lateral = measured.lateralMin
       + expected.u * (measured.lateralMax - measured.lateralMin);
     const longitudinal = measured.longitudinalMax
@@ -244,6 +245,19 @@ test("Tsunami uses its authored panels and mirrors the valid West guide over rep
         assertClose(east[line][endpoint][0], 63 - west[line][endpoint][0], 1e-9);
         assertClose(east[line][endpoint][1], west[line][endpoint][1], 1e-9);
       }
+    }
+  }
+});
+
+test("every race-ready model calibrates stripes in all six perspective-sensitive views", () => {
+  for (const model of CIRCUIT_MODELS) {
+    const guides = circuitStripePanelGuides(model.modelId);
+    assertEqual(guides.length, 8, `${model.modelId} has an incomplete guide catalog`);
+    assertEqual(guides[0].length, 0, `${model.modelId} changed the correct South projection`);
+    assertEqual(guides[4].length, 0, `${model.modelId} changed the correct North projection`);
+    for (const frame of [1, 2, 3, 5, 6, 7]) {
+      assert(guides[frame].length > 0,
+        `${model.modelId} frame ${frame} still uses the broken flat stripe projection`);
     }
   }
 });

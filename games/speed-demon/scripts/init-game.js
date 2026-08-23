@@ -18,7 +18,7 @@ import { createRace, startRace, stepRace, pressShift, gateInput, STAGING, FINISH
 import { MODEL_SHEETS, modelById } from "./assets/car-atlas.js";
 import { CIRCUIT_MODELS, hasCircuitAtlas } from "./circuit/assets.js";
 import { createCircuitLiveryCache } from "./circuit/livery-atlas.js";
-import { CIRCUIT_TRACKS, circuitTrackById } from "./circuit/tracks.js";
+import { CIRCUIT_TRACKS, DEFAULT_CIRCUIT_TRACK_ID, circuitTrackById } from "./circuit/tracks.js";
 import { roadMaskFromImage } from "./circuit/road-mask.js";
 import { createCircuitAdapter } from "./runtime/circuit-adapter.js";
 import { createDragAdapter } from "./runtime/drag-adapter.js";
@@ -444,18 +444,20 @@ export function boot(canvas, options = {}) {
   // so the preview and the in-race car draw the same pixels.
   const liveryCache = createLiveryCache();
   const circuitLiveryCache = createCircuitLiveryCache();
-  let circuitRoadMask = null;
-  const circuitTrack = circuitTrackById("japan-noir");
-  function ensureCircuitRoadMask() {
-    if (!circuitRoadMask) {
-      circuitRoadMask = roadMaskFromImage(circuitMaskImages.get(circuitTrack.id), circuitTrack.world);
+  const circuitRoadMasks = new Map();
+  let circuitTrack = circuitTrackById(DEFAULT_CIRCUIT_TRACK_ID);
+  function ensureCircuitRoadMask(track = circuitTrack) {
+    if (!track) return null;
+    if (!circuitRoadMasks.has(track.id)) {
+      const mask = roadMaskFromImage(circuitMaskImages.get(track.id), track.world);
+      if (mask) circuitRoadMasks.set(track.id, mask);
     }
-    return circuitRoadMask;
+    return circuitRoadMasks.get(track.id) ?? null;
   }
   const dragAdapter = createDragAdapter({ car: carSpec, gate });
   const circuitAdapter = createCircuitAdapter({
-    track: circuitTrack,
-    containsVehicle: (vehicle) => ensureCircuitRoadMask()?.containsVehicle(vehicle) ?? true,
+    trackById: circuitTrackById,
+    containsVehicle: (vehicle, track) => ensureCircuitRoadMask(track)?.containsVehicle(vehicle) ?? true,
   });
   const runtimeRegistry = createRuntimeRegistry({ drag: dragAdapter, circuit: circuitAdapter });
   let activeRuntimeId = "drag";
@@ -1088,12 +1090,14 @@ export function boot(canvas, options = {}) {
     opponentCar = null;
     onlineCircuit = true;
     runtimeResult = null;
-    ensureCircuitRoadMask();
+    circuitTrack = circuitTrackById(message.config?.trackId ?? DEFAULT_CIRCUIT_TRACK_ID)
+      ?? circuitTrackById(DEFAULT_CIRCUIT_TRACK_ID);
+    ensureCircuitRoadMask(circuitTrack);
     const players = message.participants ?? session.players;
     runtimeDefinition = {
       runtime: "circuit",
       modeId: "circuit",
-      trackId: "japan-noir",
+      trackId: circuitTrack.id,
       rules: { laps: message.config?.laps ?? 3, countdownSeconds: 0, timeoutSeconds: 300 },
       participants: players.map((player) => ({
         playerId: player.playerId,
@@ -1612,7 +1616,9 @@ export function boot(canvas, options = {}) {
       ...runtimeDefinition.rules,
     };
     if (activeRuntimeId === "circuit") {
-      ensureCircuitRoadMask();
+      circuitTrack = circuitTrackById(runtimeDefinition.trackId)
+        ?? circuitTrackById(DEFAULT_CIRCUIT_TRACK_ID);
+      ensureCircuitRoadMask(circuitTrack);
       circuitRace = activeRuntime.create(runtimeDefinition);
       circuitView = createCircuitView(circuitRace);
     } else {

@@ -6,15 +6,14 @@
 // that a car sheet came back from a background remover full of chroma residue;
 // a test can.
 //
-// Deliberately narrow: 8-bit RGBA, non-interlaced, which is what
-// `tools/cut-car-sheets.py` writes. Anything else throws rather than guessing,
-// because a decoder that quietly mis-reads a format would make the tests above
-// it lie.
+// Deliberately narrow: 8-bit grayscale, RGB or RGBA, non-interlaced. Those are
+// the three formats the cabinet's authored PNG tools emit. Anything else throws
+// rather than guessing, because a decoder that quietly mis-reads a format would
+// make the tests above it lie.
 
 import { inflateSync } from "node:zlib";
 
 const SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-const CHANNELS = 4;
 
 function chunks(buffer) {
   const found = [];
@@ -29,8 +28,8 @@ function chunks(buffer) {
 }
 
 /** Undoes the per-scanline filter each row carries as its first byte. */
-function unfilter(raw, width, height) {
-  const stride = width * CHANNELS;
+function unfilter(raw, width, height, channels) {
+  const stride = width * channels;
   const out = Buffer.alloc(stride * height);
 
   for (let y = 0; y < height; y += 1) {
@@ -39,9 +38,9 @@ function unfilter(raw, width, height) {
     const target = y * stride;
 
     for (let x = 0; x < stride; x += 1) {
-      const left = x >= CHANNELS ? out[target + x - CHANNELS] : 0;
+      const left = x >= channels ? out[target + x - channels] : 0;
       const up = y > 0 ? out[target - stride + x] : 0;
-      const upLeft = y > 0 && x >= CHANNELS ? out[target - stride + x - CHANNELS] : 0;
+      const upLeft = y > 0 && x >= channels ? out[target - stride + x - channels] : 0;
 
       let value;
       if (filter === 0) value = line[x];
@@ -79,13 +78,26 @@ export function readPng(buffer) {
   const colourType = header.data[9];
   const interlace = header.data[12];
 
-  if (depth !== 8 || colourType !== 6 || interlace !== 0) {
+  const channels = colourType === 0 ? 1 : colourType === 2 ? 3 : colourType === 6 ? 4 : 0;
+  if (depth !== 8 || channels === 0 || interlace !== 0) {
     throw new Error(
-      `only 8-bit non-interlaced RGBA is supported (got depth ${depth}, ` +
+      `only 8-bit non-interlaced grayscale, RGB or RGBA is supported (got depth ${depth}, ` +
         `colour type ${colourType}, interlace ${interlace})`,
     );
   }
 
   const data = Buffer.concat(parts.filter((chunk) => chunk.type === "IDAT").map((c) => c.data));
-  return { width, height, pixels: unfilter(inflateSync(data), width, height) };
+  const decoded = unfilter(inflateSync(data), width, height, channels);
+  if (channels === 4) return { width, height, pixels: decoded };
+  const pixels = Buffer.alloc(width * height * 4);
+  for (let index = 0; index < width * height; index += 1) {
+    const source = index * channels;
+    const target = index * 4;
+    const red = decoded[source];
+    pixels[target] = red;
+    pixels[target + 1] = channels === 1 ? red : decoded[source + 1];
+    pixels[target + 2] = channels === 1 ? red : decoded[source + 2];
+    pixels[target + 3] = 255;
+  }
+  return { width, height, pixels };
 }

@@ -244,13 +244,13 @@ test("a private room switches between drag and circuit without changing the load
   const request = adjustLobby(onRow(session, LOBBY_ROW_RACE_TYPE), "right", session);
   assertEqual(request.kind, LOBBY_SET_CONFIG);
   assertEqual(request.config.raceTypeId, "circuit");
-  assertEqual(request.config.trackId, "japan-noir");
+  assertEqual(request.config.trackId, "old-town-shrine-loop");
   assertEqual(request.config.laps, 3);
   assertEqual(Object.hasOwn(request.config, "modelId"), false, "car config remains a separate loadout");
 });
 
 test("circuit rows show laps and block ready when either car lacks a circuit atlas", () => {
-  const config = { raceTypeId: "circuit", trackId: "japan-noir", laps: 3, bestOf: 1 };
+  const config = { raceTypeId: "circuit", trackId: "old-town-shrine-loop", laps: 3, bestOf: 1 };
   const unavailable = lobbySession({
     config,
     players: [
@@ -263,6 +263,14 @@ test("circuit rows show laps and block ready when either car lacks a circuit atl
   assertEqual(view.rows.find((row) => row.id === LOBBY_ROW_DISTANCE).value, "3 LAPS");
   assert(view.issue.includes("Bo"));
   assertEqual(confirmOnline(onRow(unavailable, LOBBY_ROW_READY), unavailable), ONLINE_NOTHING);
+});
+
+test("a circuit room cycles through the location track catalog", () => {
+  const session = lobbySession({
+    config: { raceTypeId: "circuit", trackId: "old-town-shrine-loop", laps: 3, bestOf: 1 },
+  });
+  const request = adjustLobby(onRow(session, LOBBY_ROW_TRACK), "right", session);
+  assertEqual(request.config.trackId, "docklands-freight-loop");
 });
 
 test("the host steps a setting and gets a config to publish", () => {

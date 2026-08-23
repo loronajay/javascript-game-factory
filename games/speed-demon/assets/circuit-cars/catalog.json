@@ -21,6 +21,7 @@
       "modelId": "kaido-gts",
       "label": "Kaido GTS",
       "archetype": "gt",
+      "renderScale": 1.0404223810178697,
       "spritesheet": "kaido-gts/spritesheet-clockwise-from-north.png",
       "manifest": "kaido-gts/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }
@@ -29,6 +30,7 @@
       "modelId": "tsunami-rz",
       "label": "Tsunami RZ",
       "archetype": "coupe",
+      "renderScale": 0.9736575032883077,
       "spritesheet": "tsunami-rz/spritesheet-clockwise-from-north.png",
       "manifest": "tsunami-rz/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }
@@ -37,6 +39,7 @@
       "modelId": "meridian-rs",
       "label": "Meridian RS",
       "archetype": "euro",
+      "renderScale": 1.001656433139303,
       "spritesheet": "meridian-rs/spritesheet-clockwise-from-north.png",
       "manifest": "meridian-rs/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }
@@ -45,6 +48,7 @@
       "modelId": "skyward-r",
       "label": "Skyward R",
       "archetype": "gt",
+      "renderScale": 1.037823336392831,
       "spritesheet": "skyward-r/spritesheet-clockwise-from-north.png",
       "manifest": "skyward-r/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }
@@ -53,6 +57,7 @@
       "modelId": "toro-sv",
       "label": "Toro SV",
       "archetype": "exotic",
+      "renderScale": 0.9765656028304245,
       "spritesheet": "toro-sv/spritesheet-clockwise-from-north.png",
       "manifest": "toro-sv/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }
@@ -61,6 +66,7 @@
       "modelId": "scalpel-r",
       "label": "Scalpel R",
       "archetype": "hatch",
+      "renderScale": 0.9729539197796079,
       "spritesheet": "scalpel-r/spritesheet-clockwise-from-north.png",
       "manifest": "scalpel-r/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }
@@ -69,6 +75,7 @@
       "modelId": "chrono-12",
       "label": "Chrono 12",
       "archetype": "wedge",
+      "renderScale": 0.9989523711318379,
       "spritesheet": "chrono-12/spritesheet-clockwise-from-north.png",
       "manifest": "chrono-12/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }
@@ -77,6 +84,7 @@
       "modelId": "colt-gt",
       "label": "Colt GT",
       "archetype": "muscle",
+      "renderScale": 1.0054534480305393,
       "spritesheet": "colt-gt/spritesheet-clockwise-from-north.png",
       "manifest": "colt-gt/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }

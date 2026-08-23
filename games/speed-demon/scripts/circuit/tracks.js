@@ -1,6 +1,7 @@
 import { CIRCUIT_WORLD } from "./config.js";
+import { DOCKLANDS_TRACK_DATA } from "./docklands-track-data.js";
 
-export const JAPAN_NOIR_LINE = Object.freeze([
+export const OLD_TOWN_SHRINE_LINE = Object.freeze([
   { x: 622, y: 861 }, { x: 973, y: 860 }, { x: 1216, y: 807 },
   { x: 1324, y: 723 }, { x: 1381, y: 574 }, { x: 1354, y: 417 },
   { x: 1273, y: 311 }, { x: 1104, y: 232 }, { x: 879, y: 179 },
@@ -13,20 +14,28 @@ export const JAPAN_NOIR_LINE = Object.freeze([
 ]);
 
 const CHECKPOINT_INDICES = [0, 3, 6, 9, 12, 15, 18, 21, 24];
-const checkpoints = CHECKPOINT_INDICES.map((index) => Object.freeze({
-  ...JAPAN_NOIR_LINE[index],
-  radius: index === 0 ? 62 : 72,
+const oldTownCheckpoints = CHECKPOINT_INDICES.map((index) => Object.freeze({
+  ...OLD_TOWN_SHRINE_LINE[index],
+  // The broadest legal line is 106 world units from the racing line. Leave a
+  // little tolerance so driving beside the barrier cannot silently void a lap.
+  radius: 112,
+}));
+
+const docklandsLine = Object.freeze(DOCKLANDS_TRACK_DATA.racingLine.map(Object.freeze));
+const docklandsCheckpoints = DOCKLANDS_TRACK_DATA.checkpointIndices.map((index) => Object.freeze({
+  ...docklandsLine[index],
+  radius: 112,
 }));
 
 export const CIRCUIT_TRACKS = Object.freeze([
   Object.freeze({
-    id: "japan-noir",
-    label: "Japan Noir",
-    blurb: "A neon city loop with a technical infield.",
+    id: "old-town-shrine-loop",
+    label: "Old Town Shrine Loop",
+    blurb: "A wet shrine road above Old Town, folding back through a technical infield.",
     circuit: true,
-    src: "assets/circuit-tracks/japan-noir.png",
-    image: "assets/circuit-tracks/japan-noir.png",
-    roadMask: "assets/circuit-tracks/japan-noir-road-mask.png",
+    src: "assets/circuit-tracks/old-town-shrine-loop.png",
+    image: "assets/circuit-tracks/old-town-shrine-loop.png",
+    roadMask: "assets/circuit-tracks/old-town-shrine-loop-road-mask.png",
     world: CIRCUIT_WORLD,
     spawns: Object.freeze([
       Object.freeze({ x: 610, y: 850, angle: Math.PI / 2 }),
@@ -34,10 +43,26 @@ export const CIRCUIT_TRACKS = Object.freeze([
       // units farther east — already ahead in the direction both cars face.
       Object.freeze({ x: 610, y: 825, angle: Math.PI / 2 }),
     ]),
-    checkpoints: Object.freeze(checkpoints),
-    racingLine: JAPAN_NOIR_LINE,
+    checkpoints: Object.freeze(oldTownCheckpoints),
+    racingLine: OLD_TOWN_SHRINE_LINE,
+  }),
+  Object.freeze({
+    id: "docklands-freight-loop",
+    label: "Docklands Freight Loop",
+    blurb: "A fast harbor sweep joined to a tight freight-yard infield.",
+    circuit: true,
+    src: "assets/circuit-tracks/docklands-freight-loop.png",
+    image: "assets/circuit-tracks/docklands-freight-loop.png",
+    roadMask: "assets/circuit-tracks/docklands-freight-loop-road-mask.png",
+    world: CIRCUIT_WORLD,
+    spawns: Object.freeze([
+      Object.freeze({ x: 720, y: 820, angle: Math.PI / 2 }),
+      Object.freeze({ x: 720, y: 850, angle: Math.PI / 2 }),
+    ]),
+    checkpoints: Object.freeze(docklandsCheckpoints),
+    racingLine: docklandsLine,
   }),
 ]);
 
-export const DEFAULT_CIRCUIT_TRACK_ID = "japan-noir";
+export const DEFAULT_CIRCUIT_TRACK_ID = "old-town-shrine-loop";
 export const circuitTrackById = (id) => CIRCUIT_TRACKS.find((track) => track.id === id) ?? null;

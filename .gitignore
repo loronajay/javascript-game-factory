@@ -96,3 +96,10 @@ games/tactical-arena/.mobile-shots/
 # in the history, so ignoring them now would remove them from checkouts without
 # making the repo any smaller.
 games/speed-demon/assets/avatars/*/*.png
+
+# Internal operator/security docs. These describe the admin surface and the
+# trust model's known limits, which is a free head start for anyone probing a
+# live site that takes payments. They stay local and current; nothing in the
+# public tree should depend on them being published.
+planning-docs/ADMIN_CONSOLE_GUIDE.md
+games/tactical-arena/SECURITY.md

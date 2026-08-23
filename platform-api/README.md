@@ -33,7 +33,7 @@ This backend is **TypeScript-sourced** (`strict: true`): every `src/**` file is 
 - `src/server.mjs`: runtime entry point
 - `src/app.mjs`: top-level orchestration and route dispatch shell
 - `src/http-utils.mjs`: shared request/response helpers, including the CORS allow-list
-- `src/rate-limit.mjs`: in-process per-IP rate limiting; deployment and trust-model limits are documented in `../games/tactical-arena/SECURITY.md`
+- `src/rate-limit.mjs`: in-process per-IP rate limiting; deployment and trust-model limits are documented in the repo's local `SECURITY.md` operator notes (not published)
 - `src/config.mjs`: environment and config loading
 - `src/email.mjs`: transactional email (password reset) via Resend
 - `src/db/`: data access modules, domain helpers, and SQL migrations
@@ -75,7 +75,7 @@ This backend is **TypeScript-sourced** (`strict: true`): every `src/**` file is 
 
 ## Security posture
 
-CORS is an allow-list (not origin reflection), JWT verification is pinned to HS256, auth and checkout-session creation are rate-limited per IP, and uploads are validated by magic bytes rather than the client-declared MIME type. For signed-in players the server — not localStorage — is the authority on currency balances and owned entitlements, and premium entitlements can only be granted by Stripe/Play fulfillment, never claimed through the public claims route. The full trust model, invariants, and known limits live in `../games/tactical-arena/SECURITY.md`.
+CORS is an allow-list (not origin reflection), JWT verification is pinned to HS256, auth and checkout-session creation are rate-limited per IP, and uploads are validated by magic bytes rather than the client-declared MIME type. For signed-in players the server — not localStorage — is the authority on currency balances and owned entitlements, and premium entitlements can only be granted by Stripe/Play fulfillment, never claimed through the public claims route. The full trust model, invariants, and known limits are kept in local operator notes rather than published here.
 
 ## Commands
 

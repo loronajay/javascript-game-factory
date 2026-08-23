@@ -15,7 +15,7 @@ const pair = (a0, a1, b0, b1) => Object.freeze({
 });
 
 // Atlas frame order by visible nose:
-// South, Southwest, West, Northwest, North, Northeast, East, Southeast.
+// North, Northeast, East, Southeast, South, Southwest, West, Northwest.
 // These are distilled endpoints from kaido-gts-stripe-flow.json. North/South
 // were already correct and deliberately remain empty identity mappings.
 export const KAIDO_STRIPE_PANEL_GUIDES = Object.freeze([
@@ -110,6 +110,15 @@ const EMPTY_STRIPE_PANEL_GUIDES = Object.freeze(Array.from(
 const STRIPE_PANEL_GUIDES_BY_MODEL = Object.freeze({
   "kaido-gts": KAIDO_STRIPE_PANEL_GUIDES,
   "tsunami-rz": TSUNAMI_STRIPE_PANEL_GUIDES,
+  // All six remaining masters use the same camera pose and panel layout as
+  // Kaido. Sharing its calibrated perspective axes gives every race-ready body
+  // honest hood/roof/deck angles instead of falling back to one flat rectangle.
+  "meridian-rs": KAIDO_STRIPE_PANEL_GUIDES,
+  "skyward-r": KAIDO_STRIPE_PANEL_GUIDES,
+  "toro-sv": KAIDO_STRIPE_PANEL_GUIDES,
+  "scalpel-r": KAIDO_STRIPE_PANEL_GUIDES,
+  "chrono-12": KAIDO_STRIPE_PANEL_GUIDES,
+  "colt-gt": KAIDO_STRIPE_PANEL_GUIDES,
 });
 
 export function circuitStripePanelGuides(modelId) {
