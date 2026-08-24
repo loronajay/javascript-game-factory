@@ -14,11 +14,11 @@ export function circuitFrameIndex(angle) {
   return (directionIndex(angle) + 4) % 8;
 }
 
-export function circuitDrawBox(centreX, centreY, baseSize, geometry = null) {
+export function circuitDrawBox(centreX, centreY, baseSize, geometry = null, presentationScale = 1) {
   const scale = geometry?.scale ?? 1;
   const sourceCentreX = geometry?.sourceCentreX ?? baseSize / 2;
   const sourceCentreY = geometry?.sourceCentreY ?? baseSize / 2;
-  const size = baseSize * scale;
+  const size = baseSize * scale * presentationScale;
   return {
     x: centreX - sourceCentreX / baseSize * size,
     y: centreY - sourceCentreY / baseSize * size,

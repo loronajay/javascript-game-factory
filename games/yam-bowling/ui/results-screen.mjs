@@ -1,5 +1,29 @@
 import { $, escapeHtml, showScreen } from "./dom.mjs";
 
+export function buildFinalScoreboardMarkup(match, core) {
+  const mode = core.MODES[match.modeId];
+  const tie = match.winnerIds.length > 1;
+  return match.players.map((player, playerIndex) => {
+    const isWinner = match.winnerIds.includes(player.id);
+    const finish = tie && isWinner ? "Tied first" : isWinner ? "Winner" : "Runner-up";
+    const frames = Array.from({ length: mode.frames }, (_, frameIndex) => {
+      const rolls = player.frames[frameIndex] || [];
+      const slots = frameIndex === mode.frames - 1 ? 3 : 2;
+      const rollHtml = Array.from(
+        { length: slots },
+        (_, rollIndex) => `<i>${escapeHtml(core.notation(rolls, rollIndex, frameIndex === mode.frames - 1))}</i>`,
+      ).join("");
+      return `<div class="result-score-frame"><small>${frameIndex + 1}</small><span>${rollHtml}</span><b>${player.score.cumulative[frameIndex] ?? ""}</b></div>`;
+    }).join("");
+    return `
+      <div class="result-score-row${isWinner ? " is-winner" : ""}">
+        <div class="result-score-player"><em>${isWinner ? "★" : playerIndex + 1}</em><span><strong>${escapeHtml(player.name)}</strong><small>${finish}</small></span></div>
+        <div class="result-score-frames" style="--frames:${mode.frames}">${frames}</div>
+        <div class="result-score-total"><small>Final</small><strong>${player.score.total}</strong></div>
+      </div>`;
+  }).join("");
+}
+
 // Everything the player sees when a roll or a match lands: the pin callout, the
 // celebration pose over the lane, and the final results screen.
 // `onShown` fires once the results are painted, which is where the online
@@ -78,6 +102,8 @@ export function createResultsScreen({
     const winner = match.players.find((player) => match.winnerIds.includes(player.id));
     $("results-title").textContent = tie ? "Dead heat!" : `${winner.name} wins!`;
     $("results-subtitle").textContent = `${core.MODES[match.modeId].name}. ${tie ? "Nothing between them." : "The rack has spoken."}`;
+    $("results-scoreboard-mode").textContent = `${core.MODES[match.modeId].name} · ${core.MODES[match.modeId].frames} frames`;
+    $("results-scoreboard").innerHTML = buildFinalScoreboardMarkup(match, core);
     const host = $("results-players");
     $("match-achievements").hidden = true;
     host.innerHTML = "";
@@ -104,7 +130,7 @@ export function createResultsScreen({
           <span class="result-player__outcome">${outcomeLabel}</span>
         </div>
         <div class="result-player__details">
-          <strong>${escapeHtml(player.name)}</strong>
+          <span class="result-player__identity"><small>${isWinner ? "Lane champion" : "Finalist"}</small><strong>${escapeHtml(player.name)}</strong></span>
           ${profileAction}
           <span class="result-player__score"><small>Final score</small><b>${player.score.total}</b></span>
         </div>`;

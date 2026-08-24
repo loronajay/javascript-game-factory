@@ -3,27 +3,35 @@ import { circuitFrameGeometry, circuitLiveryAtlas } from "./livery-atlas.js";
 import { CIRCUIT_FRAME_SIZE } from "./assets.js";
 import { circuitDrawBox, circuitFrameIndex } from "./sprite-geometry.js";
 import { createCamera, updateCamera } from "./camera.js";
-import { VEHICLE_FOOTPRINT } from "./config.js";
+import { CAMERA_TUNING, VEHICLE_FOOTPRINT } from "./config.js";
 import { circuitHudView } from "../ui/circuit-hud.js";
 import { gaugeTicks, needleAngle, TACH_SWEEP } from "../ui/gauges.js";
 
-export function createCircuitView(state) {
-  const local = state.participants.find((participant) => participant.control === "local")
-    ?? state.participants[0];
-  return { camera: createCamera({ x: local.vehicle.x, y: local.vehicle.y }), impact: 0 };
+function cameraTuningFor(track) {
+  return { ...CAMERA_TUNING, ...track?.presentation?.camera };
 }
 
-export function stepCircuitView(view, state, dt, viewport) {
+export function createCircuitView(state, track = null) {
+  const local = state.participants.find((participant) => participant.control === "local")
+    ?? state.participants[0];
+  const tuning = cameraTuningFor(track);
+  return {
+    camera: createCamera({ x: local.vehicle.x, y: local.vehicle.y, zoom: tuning.maxZoom }),
+    impact: 0,
+  };
+}
+
+export function stepCircuitView(view, state, dt, viewport, track = null) {
   const local = state.participants.find((participant) => participant.control === "local")
     ?? state.participants[0];
   return {
     ...view,
-    camera: updateCamera(view.camera, local.vehicle, dt, viewport),
+    camera: updateCamera(view.camera, local.vehicle, dt, viewport, cameraTuningFor(track)),
     impact: Math.max(0, view.impact - dt),
   };
 }
 
-function drawCar(ctx, participant, image, cache, debug) {
+function drawCar(ctx, participant, image, cache, debug, presentationScale) {
   const atlas = circuitLiveryAtlas(cache, {
     image,
     modelId: participant.modelId,
@@ -36,6 +44,7 @@ function drawCar(ctx, participant, image, cache, debug) {
     participant.vehicle.y,
     size,
     circuitFrameGeometry(cache, participant.modelId, frame),
+    presentationScale,
   );
   drawUnderglow(ctx, {
     x: participant.vehicle.x,
@@ -57,6 +66,14 @@ function drawCar(ctx, participant, image, cache, debug) {
     );
   }
   if (debug) debugDrawCircuit(ctx, participant.vehicle);
+}
+
+export function circuitDepthOrder(participants) {
+  return [...participants].sort((a, b) => (
+    a.vehicle.y - b.vehicle.y
+    || a.vehicle.x - b.vehicle.x
+    || String(a.playerId).localeCompare(String(b.playerId))
+  ));
 }
 
 export function debugDrawCircuit(ctx, vehicle) {
@@ -259,9 +276,10 @@ export function renderCircuit(ctx, state, view, {
     ctx.fillStyle = "#111820";
     ctx.fillRect(0, 0, track.world.width, track.world.height);
   }
-  const ordered = [...state.participants].sort((a, b) => (a.control === "local") - (b.control === "local"));
+  const ordered = circuitDepthOrder(state.participants);
+  const presentationScale = track.presentation?.carScale ?? 1;
   for (const participant of ordered) {
-    drawCar(ctx, participant, carImages.get(participant.modelId), liveryCache, debug);
+    drawCar(ctx, participant, carImages.get(participant.modelId), liveryCache, debug, presentationScale);
   }
   ctx.restore();
   hud(ctx, state, track);

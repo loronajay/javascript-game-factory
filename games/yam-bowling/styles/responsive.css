@@ -75,11 +75,18 @@
   .online-lobby-players { grid-template-columns: 1fr; }
   .online-room-code-wrap { grid-template-columns: 1fr; text-align: center; }
   .online-room-code-wrap > strong, .online-room-code-wrap > button { grid-row: auto; grid-column: auto; }
-  .results-card { padding: 1rem .7rem; }
+  .results-card { padding: .75rem 0; }
   .results-card h2 { font-size: clamp(2.4rem, 13vw, 3.7rem); }
-  .result-player { border-radius: 16px; }
-  .result-player__portrait { height: clamp(210px, 34svh, 300px); min-height: clamp(210px, 34svh, 300px); }
+  .results-players { min-height: clamp(250px, 36svh, 310px); gap: .4rem; }
+  .results-players::after { width: 38px; height: 38px; font-size: .75rem; }
+  .result-player__portrait { height: clamp(225px, 31svh, 280px); min-height: clamp(225px, 31svh, 280px); }
   .result-player__outcome { top: .55rem; left: .55rem; padding: .35rem .5rem; font-size: .54rem; }
-  .result-player__details { min-height: 64px; padding: .65rem .7rem; }
+  .result-player__details { width: 100%; min-height: 58px; margin-top: -1.25rem; padding: .55rem .6rem; }
+  .result-player__identity small { display: none; }
   .result-player__score small { display: none; }
+  .results-scoreboard { padding: .55rem; }
+  .result-score-row { grid-template-columns: minmax(86px, 105px) minmax(0, 1fr) 50px; gap: .3rem; }
+  .result-score-player { padding: .35rem; gap: .3rem; }
+  .result-score-player em { display: none; }
+  .result-score-total strong { font-size: 1.35rem; }
 }

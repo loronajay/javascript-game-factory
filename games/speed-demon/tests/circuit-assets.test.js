@@ -173,6 +173,17 @@ test("normalized sprites anchor their measured visual centre on the vehicle", ()
   assertEqual(box.y + geometry.sourceCentreY / 64 * box.height, 80);
 });
 
+test("track presentation scale resizes around the measured vehicle centre", () => {
+  const geometry = { scale: 0.75, sourceCentreX: 40, sourceCentreY: 24 };
+  const box = circuitDrawBox(120, 80, 64, geometry, 0.8);
+  assertClose(box.x, 96, 1e-9);
+  assertClose(box.y, 65.6, 1e-9);
+  assertClose(box.width, 38.4, 1e-9);
+  assertClose(box.height, 38.4, 1e-9);
+  assertClose(box.x + geometry.sourceCentreX / 64 * box.width, 120, 1e-9);
+  assertClose(box.y + geometry.sourceCentreY / 64 * box.height, 80, 1e-9);
+});
+
 test("Tsunami East is the opposite side of the same car, not a generated substitute", () => {
   const manifest = JSON.parse(fs.readFileSync(
     path.join(CARS_DIR, "tsunami-rz", "spritesheet.json"),

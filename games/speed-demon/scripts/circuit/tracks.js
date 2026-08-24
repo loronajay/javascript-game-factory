@@ -33,6 +33,11 @@ const downtownCanalCheckpoints = DOWNTOWN_CANAL_TRACK_DATA.checkpointIndices.map
   radius: 112,
 }));
 
+const presentation = (carScale, minZoom, maxZoom) => Object.freeze({
+  carScale,
+  camera: Object.freeze({ minZoom, maxZoom }),
+});
+
 export const CIRCUIT_TRACKS = Object.freeze([
   Object.freeze({
     id: "old-town-shrine-loop",
@@ -43,6 +48,7 @@ export const CIRCUIT_TRACKS = Object.freeze([
     image: "assets/circuit-tracks/old-town-shrine-loop.png",
     roadMask: "assets/circuit-tracks/old-town-shrine-loop-road-mask.png",
     world: CIRCUIT_WORLD,
+    presentation: presentation(1, 1.65, 2),
     spawns: Object.freeze([
       Object.freeze({ x: 610, y: 850, angle: Math.PI / 2 }),
       // A two-wide grid on one start line. The old second slot was 40 world
@@ -61,6 +67,7 @@ export const CIRCUIT_TRACKS = Object.freeze([
     image: "assets/circuit-tracks/docklands-freight-loop.png",
     roadMask: "assets/circuit-tracks/docklands-freight-loop-road-mask.png",
     world: CIRCUIT_WORLD,
+    presentation: presentation(1, 1.65, 2),
     spawns: Object.freeze([
       Object.freeze({ x: 720, y: 820, angle: Math.PI / 2 }),
       Object.freeze({ x: 720, y: 850, angle: Math.PI / 2 }),
@@ -77,6 +84,9 @@ export const CIRCUIT_TRACKS = Object.freeze([
     image: "assets/circuit-tracks/downtown-canal-ring.png",
     roadMask: "assets/circuit-tracks/downtown-canal-ring-road-mask.png",
     world: CIRCUIT_WORLD,
+    // Downtown's lanes are materially thinner. More world-space zoom exposes
+    // the road edge sooner while the smaller sprite keeps the car coherent.
+    presentation: presentation(0.82, 2, 2.4),
     spawns: Object.freeze([
       Object.freeze({ x: 845, y: 820, angle: Math.PI / 2 }),
       Object.freeze({ x: 845, y: 850, angle: Math.PI / 2 }),

@@ -1108,7 +1108,7 @@ export function boot(canvas, options = {}) {
       source: { kind: "online", id: session.roomCode },
     };
     circuitRace = circuitAdapter.create(runtimeDefinition);
-    circuitView = createCircuitView(circuitRace);
+    circuitView = createCircuitView(circuitRace, circuitTrack);
     circuitPrediction = createCircuitPrediction(circuitRace, session.youPlayerId);
     raceTick = 0;
     reportedRound = false;
@@ -1620,7 +1620,7 @@ export function boot(canvas, options = {}) {
         ?? circuitTrackById(DEFAULT_CIRCUIT_TRACK_ID);
       ensureCircuitRoadMask(circuitTrack);
       circuitRace = activeRuntime.create(runtimeDefinition);
-      circuitView = createCircuitView(circuitRace);
+      circuitView = createCircuitView(circuitRace, circuitTrack);
     } else {
       race = activeRuntime.create(runtimeDefinition).race;
       circuitRace = null;
@@ -2887,7 +2887,7 @@ export function boot(canvas, options = {}) {
       viewportHeight: WORLD.height,
       worldWidth: circuitTrack.world.width,
       worldHeight: circuitTrack.world.height,
-    });
+    }, circuitTrack);
     if (circuitRace.status === CIRCUIT_FINISHED && !onlineCircuit) {
       runtimeResult = activeRuntime.result(circuitRace, "local");
       recordCampaignRun(runtimeResult);

@@ -506,11 +506,20 @@
       </section>
 
       <section class="screen results-screen" id="results-screen" aria-labelledby="results-title" hidden>
-        <div class="results-card panel">
-          <p class="eyebrow">Match complete</p>
-          <h2 id="results-title">Player 1 wins!</h2>
-          <p id="results-subtitle">Three frames. One clear winner.</p>
+        <div class="results-card">
+          <header class="results-header">
+            <p class="eyebrow">Match complete</p>
+            <h2 id="results-title">Player 1 wins!</h2>
+            <p id="results-subtitle">Three frames. One clear winner.</p>
+          </header>
           <div class="results-players" id="results-players"></div>
+          <section class="results-scoreboard" aria-labelledby="results-scoreboard-title">
+            <div class="results-scoreboard__heading">
+              <p><small>Official scorecard</small><strong id="results-scoreboard-title">Final scoreboard</strong></p>
+              <span id="results-scoreboard-mode">Quick Bowl · 3 frames</span>
+            </div>
+            <div class="results-scoreboard__table" id="results-scoreboard"></div>
+          </section>
           <article class="campaign-result" id="campaign-result" aria-live="polite" hidden>
             <span class="campaign-result__stamp" id="campaign-result-stamp">Official result</span>
             <div><small id="campaign-result-kicker">Circuit achievement</small><strong id="campaign-result-title">Every Pin Counts</strong><p id="campaign-result-copy"></p></div>

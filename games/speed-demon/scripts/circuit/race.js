@@ -214,7 +214,10 @@ export function stepCircuitRace(state, dt, environment = {}) {
     return advanced.participant;
   });
   const timedOut = elapsed >= state.rules.timeoutSeconds;
-  const complete = timedOut || participants.every((participant) => participant.finishedAt !== null);
+  const local = participants.find((participant) => participant.control === "local") ?? null;
+  const complete = timedOut || (local
+    ? local.finishedAt !== null
+    : participants.every((participant) => participant.finishedAt !== null));
   if (timedOut) lastEvents.push({ type: "timeout" });
   return {
     ...state,

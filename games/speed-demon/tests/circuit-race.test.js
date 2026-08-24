@@ -19,6 +19,7 @@ import {
 } from "../scripts/circuit/race.js";
 import { createCircuitAdapter } from "../scripts/runtime/circuit-adapter.js";
 import { createRuntimeRegistry } from "../scripts/runtime/registry.js";
+import { circuitDepthOrder, createCircuitView } from "../scripts/circuit/renderer.js";
 
 suite("circuit race — shared deterministic runtime");
 
@@ -239,6 +240,54 @@ test("finish order and normalized results are deterministic", () => {
     winnerName: "local",
     playerName: "local",
   });
+});
+
+test("the local driver's finish ends the race without waiting for the CPU", () => {
+  let race = createCircuitRace(definition(), track);
+  race = {
+    ...race,
+    status: STATUS_RACING,
+    participants: race.participants.map((participant, index) => ({
+      ...participant,
+      nextCheckpoint: index === 0 ? 0 : 1,
+      vehicle: {
+        ...participant.vehicle,
+        x: index === 0 ? 0 : 50,
+        y: index === 0 ? 0 : 50,
+        velocityX: 0,
+        velocityY: 0,
+      },
+    })),
+  };
+
+  race = stepCircuitRace(race, 0, { track, containsVehicle: driveable });
+
+  assertEqual(race.status, STATUS_FINISHED);
+  assertEqual(race.participants[0].place, 1);
+  assertEqual(race.participants[1].finishedAt, null);
+  assertDeepEqual(race.finishOrder, ["local"]);
+});
+
+test("overlapping cars draw from upper road position to lower road position", () => {
+  const participants = [
+    { playerId: "local", control: "local", vehicle: { x: 200, y: 180 } },
+    { playerId: "cpu", control: "cpu", vehicle: { x: 200, y: 140 } },
+    { playerId: "remote", control: "remote", vehicle: { x: 190, y: 180 } },
+  ];
+
+  assertDeepEqual(
+    circuitDepthOrder(participants).map((participant) => participant.playerId),
+    ["cpu", "remote", "local"],
+  );
+});
+
+test("the circuit view starts at the selected track's low-speed zoom", () => {
+  const race = createCircuitRace(definition(), track);
+  const selectedTrack = {
+    ...track,
+    presentation: { carScale: 0.82, camera: { minZoom: 2, maxZoom: 2.4 } },
+  };
+  assertEqual(createCircuitView(race, selectedTrack).camera.zoom, 2.4);
 });
 
 test("a losing result explicitly names defeat and the driver who took the flag", () => {

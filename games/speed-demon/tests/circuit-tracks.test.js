@@ -127,6 +127,29 @@ test("the catalog contains three location-named circuits rather than one named t
   assert(!/japan|noir/i.test(modeById(MODE_CIRCUIT).blurb));
 });
 
+test("each track owns its camera zoom and apparent car scale", () => {
+  for (const track of CIRCUIT_TRACKS) {
+    assert(Number.isFinite(track.presentation?.carScale) && track.presentation.carScale > 0,
+      `${track.id} has no positive car scale`);
+    assert(Number.isFinite(track.presentation?.camera?.minZoom) && track.presentation.camera.minZoom > 0,
+      `${track.id} has no minimum camera zoom`);
+    assert(
+      Number.isFinite(track.presentation?.camera?.maxZoom)
+        && track.presentation.camera.maxZoom >= track.presentation.camera.minZoom,
+      `${track.id} has an invalid maximum camera zoom`,
+    );
+  }
+
+  const oldTown = circuitTrackById("old-town-shrine-loop");
+  const downtown = circuitTrackById("downtown-canal-ring");
+  assert(downtown.presentation.carScale < oldTown.presentation.carScale,
+    "Downtown's thinner road needs a smaller world-space car");
+  assert(downtown.presentation.camera.minZoom > oldTown.presentation.camera.minZoom,
+    "Downtown's thinner road needs a tighter high-speed camera");
+  assert(downtown.presentation.camera.maxZoom > oldTown.presentation.camera.maxZoom,
+    "Downtown's thinner road needs a tighter low-speed camera");
+});
+
 test("TOLL BOOTH names the Old Town circuit and its actual shrine-road setting", () => {
   const event = eventById("ch1-toll-booth");
   assertEqual(event.trackId, "old-town-shrine-loop");
