@@ -3,15 +3,13 @@
 // The generated atlases and their manifests are ordered clockwise by the car's
 // actual nose. Rendering and customization both consume that canonical order.
 
-import { CIRCUIT_FRAME_SIZE } from "./assets.js";
+import { CIRCUIT_FRAME_SIZE, circuitFrameAngle } from "./assets.js";
 import { directionIndex } from "./vehicle.js";
 
 const CIRCUIT_ALPHA_THRESHOLD = 8;
 /** World heading to the atlas frame whose visible nose points that way. */
 export function circuitFrameIndex(angle) {
-  // The generated columns are named for the view presented to the camera; the
-  // physical nose points in the opposite world direction.
-  return (directionIndex(angle) + 4) % 8;
+  return directionIndex(angle);
 }
 
 export function circuitDrawBox(centreX, centreY, baseSize, geometry = null, presentationScale = 1) {
@@ -35,7 +33,7 @@ export function localCarCoordinates(
   frameSize = CIRCUIT_FRAME_SIZE,
   geometry = null,
 ) {
-  const angle = frameIndex * Math.PI / 4;
+  const angle = circuitFrameAngle(frameIndex);
   const dx = x + 0.5 - frameSize / 2;
   const dy = y + 0.5 - frameSize / 2;
   const cos = Math.cos(angle);
@@ -76,7 +74,7 @@ export function measureCircuitFrameGeometry(
 ) {
   const frameCount = Math.floor(width / frameSize);
   const measured = Array.from({ length: frameCount }, (_, frameIndex) => {
-    const angle = frameIndex * Math.PI / 4;
+    const angle = circuitFrameAngle(frameIndex);
     const forwardX = Math.sin(angle);
     const forwardY = -Math.cos(angle);
     const rightX = Math.cos(angle);

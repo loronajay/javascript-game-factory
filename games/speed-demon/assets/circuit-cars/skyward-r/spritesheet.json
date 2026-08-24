@@ -25,66 +25,6 @@
     {
       "direction": "north",
       "sourceBounds": {
-        "x": 81,
-        "y": 271,
-        "width": 129,
-        "height": 177
-      },
-      "targetBounds": {
-        "x": 11,
-        "y": 4,
-        "width": 41,
-        "height": 56
-      }
-    },
-    {
-      "direction": "north-east",
-      "sourceBounds": {
-        "x": 305,
-        "y": 271,
-        "width": 208,
-        "height": 170
-      },
-      "targetBounds": {
-        "x": 4,
-        "y": 9,
-        "width": 56,
-        "height": 46
-      }
-    },
-    {
-      "direction": "east",
-      "sourceBounds": {
-        "x": 564,
-        "y": 299,
-        "width": 232,
-        "height": 115
-      },
-      "targetBounds": {
-        "x": 4,
-        "y": 18,
-        "width": 56,
-        "height": 28
-      }
-    },
-    {
-      "direction": "south-east",
-      "sourceBounds": {
-        "x": 859,
-        "y": 294,
-        "width": 213,
-        "height": 158
-      },
-      "targetBounds": {
-        "x": 4,
-        "y": 11,
-        "width": 56,
-        "height": 42
-      }
-    },
-    {
-      "direction": "south",
-      "sourceBounds": {
         "x": 1171,
         "y": 283,
         "width": 121,
@@ -98,7 +38,7 @@
       }
     },
     {
-      "direction": "south-west",
+      "direction": "north-east",
       "sourceBounds": {
         "x": 1386,
         "y": 285,
@@ -113,7 +53,7 @@
       }
     },
     {
-      "direction": "west",
+      "direction": "east",
       "sourceBounds": {
         "x": 1656,
         "y": 305,
@@ -128,7 +68,7 @@
       }
     },
     {
-      "direction": "north-west",
+      "direction": "south-east",
       "sourceBounds": {
         "x": 1959,
         "y": 286,
@@ -141,6 +81,67 @@
         "width": 56,
         "height": 48
       }
+    },
+    {
+      "direction": "south",
+      "sourceBounds": {
+        "x": 81,
+        "y": 271,
+        "width": 129,
+        "height": 177
+      },
+      "targetBounds": {
+        "x": 11,
+        "y": 4,
+        "width": 41,
+        "height": 56
+      }
+    },
+    {
+      "direction": "south-west",
+      "sourceBounds": {
+        "x": 305,
+        "y": 271,
+        "width": 208,
+        "height": 170
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 9,
+        "width": 56,
+        "height": 46
+      }
+    },
+    {
+      "direction": "west",
+      "sourceBounds": {
+        "x": 564,
+        "y": 299,
+        "width": 232,
+        "height": 115
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 18,
+        "width": 56,
+        "height": 28
+      }
+    },
+    {
+      "direction": "north-west",
+      "sourceBounds": {
+        "x": 859,
+        "y": 294,
+        "width": 213,
+        "height": 158
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 11,
+        "width": 56,
+        "height": 42
+      }
     }
-  ]
+  ],
+  "headingConvention": "physical-nose-clockwise-from-north"
 }

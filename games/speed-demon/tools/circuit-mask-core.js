@@ -3,6 +3,7 @@
 // quietly invent a second set of customization layers again.
 
 import { LAYER_PRESETS } from "../scripts/garage/livery.js";
+import { CIRCUIT_FRAME_HEADINGS } from "../scripts/circuit/assets.js";
 
 export const CIRCUIT_MASK_KIND = "speed-demon-circuit-surface-mask";
 export const CIRCUIT_MASK_SCHEMA_VERSION = 2;
@@ -10,22 +11,15 @@ export const CIRCUIT_MASK_FRAME_WIDTH = 64;
 export const CIRCUIT_MASK_FRAME_HEIGHT = 64;
 export const CIRCUIT_MASK_FRAME_COUNT = 8;
 
-// These are the historic names stored in spritesheet.json. They describe the
-// camera-facing atlas slots, not the direction of the vehicle's nose.
-export const CIRCUIT_MASK_ATLAS_SLOTS = Object.freeze([
-  "north",
-  "north-east",
-  "east",
-  "south-east",
-  "south",
-  "south-west",
-  "west",
-  "north-west",
-]);
+// Runtime rendering, manifests and authoring tools share this one physical-nose
+// order. Keeping aliases for the serialized field names preserves schema 2
+// without allowing a second direction convention to grow beside the runtime.
+export const CIRCUIT_MASK_ATLAS_SLOTS = CIRCUIT_FRAME_HEADINGS;
+export const CIRCUIT_MASK_HEADINGS = CIRCUIT_FRAME_HEADINGS;
 
-// User-facing headings. Frame 0 visibly points down (south), frame 6 right
-// (east), matching circuitFrameIndex's documented 180-degree correction.
-export const CIRCUIT_MASK_HEADINGS = Object.freeze([
+// Early schema-2 exports used camera-side labels while storing pixels in the
+// same frame slots. They remain importable, but all new exports use nose names.
+const LEGACY_REVERSED_HEADINGS = Object.freeze([
   "south",
   "south-west",
   "west",
@@ -264,7 +258,7 @@ function assertIdentity(project, expectedModelId) {
   }
 }
 
-function decodeFrameSet(frames, target, maxValue) {
+function decodeFrameSet(frames, target, maxValue, headings, headingOffset = 0) {
   if (!Array.isArray(frames) || frames.length !== CIRCUIT_MASK_FRAME_COUNT) {
     throw new Error("circuit mask must contain all eight headings");
   }
@@ -272,14 +266,15 @@ function decodeFrameSet(frames, target, maxValue) {
     const frame = frames[frameIndex];
     const legacyAtlasSlot = frame?.legacyAtlasSlot ?? frame?.atlasSlot;
     if (legacyAtlasSlot !== CIRCUIT_MASK_ATLAS_SLOTS[frameIndex]
-      || frame?.heading !== CIRCUIT_MASK_HEADINGS[frameIndex]) {
+      || frame?.heading !== headings[frameIndex]) {
       throw new Error(`circuit mask frame ${frameIndex} has the wrong heading`);
     }
-    decodeRuns(frame.runs, target, frameOffset(frameIndex), maxValue);
+    const canonicalFrame = (frameIndex + headingOffset) % CIRCUIT_MASK_FRAME_COUNT;
+    decodeRuns(frame.runs, target, frameOffset(canonicalFrame), maxValue);
   }
 }
 
-function decodeGuideFrameSet(frames, data, kind) {
+function decodeGuideFrameSet(frames, data, kind, headings, headingOffset = 0) {
   if (frames === undefined) return;
   if (!Array.isArray(frames) || frames.length !== CIRCUIT_MASK_FRAME_COUNT) {
     throw new Error(`circuit ${kind} guides must contain all eight headings`);
@@ -288,11 +283,12 @@ function decodeGuideFrameSet(frames, data, kind) {
     const frame = frames[frameIndex];
     const legacyAtlasSlot = frame?.legacyAtlasSlot ?? frame?.atlasSlot;
     if (legacyAtlasSlot !== CIRCUIT_MASK_ATLAS_SLOTS[frameIndex]
-      || frame?.heading !== CIRCUIT_MASK_HEADINGS[frameIndex]
+      || frame?.heading !== headings[frameIndex]
       || !Array.isArray(frame.paths)) {
       throw new Error(`circuit ${kind} guide frame ${frameIndex} has the wrong heading`);
     }
-    for (const path of frame.paths) addGuidePath(data, kind, frameIndex, path);
+    const canonicalFrame = (frameIndex + headingOffset) % CIRCUIT_MASK_FRAME_COUNT;
+    for (const path of frame.paths) addGuidePath(data, kind, canonicalFrame, path);
   }
 }
 
@@ -304,25 +300,30 @@ export function decodeCircuitMaskProject(input, expectedModelId = null) {
   }
   assertIdentity(project, expectedModelId);
   const legacyAtlasSlots = project.legacyAtlasSlots ?? project.atlasSlots;
+  const headings = [CIRCUIT_MASK_HEADINGS, LEGACY_REVERSED_HEADINGS].find(
+    (candidate) => Array.isArray(project.headings)
+      && project.headings.length === candidate.length
+      && project.headings.every((heading, index) => heading === candidate[index]),
+  );
   if (!Array.isArray(legacyAtlasSlots)
     || legacyAtlasSlots.some((slot, index) => slot !== CIRCUIT_MASK_ATLAS_SLOTS[index])
-    || !Array.isArray(project.headings)
-    || project.headings.some((heading, index) => heading !== CIRCUIT_MASK_HEADINGS[index])) {
+    || !headings) {
     throw new Error("circuit mask atlas order or headings do not match the sprites");
   }
+  const headingOffset = headings === LEGACY_REVERSED_HEADINGS ? 4 : 0;
 
   const data = createCircuitMaskData();
-  decodeFrameSet(project.surfaceFrames, data.surfaces, MAX_SURFACE_ID);
+  decodeFrameSet(project.surfaceFrames, data.surfaces, MAX_SURFACE_ID, headings, headingOffset);
   if (!Array.isArray(project.layerGuides) || project.layerGuides.length !== CIRCUIT_MASK_LAYER_TARGETS.length) {
     throw new Error("circuit mask canonical guide catalog is incomplete");
   }
   for (const target of CIRCUIT_MASK_LAYER_TARGETS) {
     const guide = project.layerGuides.find((candidate) => candidate?.presetId === target.id);
     if (!guide || guide.kind !== target.kind) throw new Error(`missing canonical ${target.id} guide`);
-    decodeFrameSet(guide.frames, data.layers[target.id], 1);
+    decodeFrameSet(guide.frames, data.layers[target.id], 1, headings, headingOffset);
   }
-  decodeGuideFrameSet(project.directionGuides?.stripes, data, "stripes");
-  decodeGuideFrameSet(project.directionGuides?.bands, data, "bands");
+  decodeGuideFrameSet(project.directionGuides?.stripes, data, "stripes", headings, headingOffset);
+  decodeGuideFrameSet(project.directionGuides?.bands, data, "bands", headings, headingOffset);
   return { modelId: project.modelId, data, project, migrated: false };
 }
 

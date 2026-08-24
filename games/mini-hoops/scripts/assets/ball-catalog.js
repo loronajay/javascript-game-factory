@@ -1,0 +1,90 @@
+// The registry of throwable balls.
+//
+// Adding a ball should be a data change, never a code change: drop its frames in
+// `assets/balls/<id>/roll-NN.png`, add a row here, and the setup screen, the
+// preloader, the renderer and the roll animation all pick it up. Nothing outside
+// this file may assume how many frames a ball has — the basketball has 12 and the
+// paper wad has 8, and a future ball will have some third number.
+//
+// FRAME COUNT IS LOAD-BEARING, not decoration. The renderer does not tick an
+// animation timer; it derives the frame from the ball's real angular position, so
+// one full 2*PI rotation advances exactly `frameCount` frames. Declare the wrong
+// count and the ball visibly slips against its own roll.
+//
+// BALLS ARE COSMETIC ONLY, and that is a constraint rather than a shrug: a
+// leaderboard entry is keyed on hoop mode and round length, not on ball. The
+// moment a ball changed mass, bounce or size it would make those boards
+// meaningless — a paper-wad 40 and a basketball 40 would no longer be the same
+// achievement. If a ball should ever play differently, it has to become part of
+// the board key first. See `store/boards.js`.
+
+/** Where a ball's frames live, relative to the cabinet root. */
+const BALL_ASSET_ROOT = "assets/balls";
+
+/** Authored size of every roll frame, in pixels. `tools/resize-ball-frames.mjs` enforces it. */
+export const BALL_FRAME_SIZE = 512;
+
+export const BALLS = Object.freeze([
+  Object.freeze({
+    id: "basketball",
+    label: "Basketball",
+    blurb: "The house ball. Twelve frames of honest orange leather.",
+    frameCount: 12,
+  }),
+  Object.freeze({
+    id: "paper",
+    label: "Paper Wad",
+    blurb: "Yesterday's memo, balled up and ready for the bin.",
+    frameCount: 8,
+  }),
+  Object.freeze({
+    id: "snowball",
+    label: "Snowball",
+    blurb: "Packed hard, indoors, against all advice.",
+    frameCount: 8,
+  }),
+]);
+
+export const DEFAULT_BALL = "basketball";
+
+export function ballIds() {
+  return BALLS.map((ball) => ball.id);
+}
+
+/** Resolve a ball id, falling back to the default rather than throwing. */
+export function ballById(id) {
+  return BALLS.find((ball) => ball.id === id) || BALLS.find((ball) => ball.id === DEFAULT_BALL);
+}
+
+/** The frame filenames for a ball, in roll order. */
+export function ballFramePaths(id) {
+  const ball = ballById(id);
+  return Array.from(
+    { length: ball.frameCount },
+    (_, index) => `${BALL_ASSET_ROOT}/${ball.id}/roll-${String(index).padStart(2, "0")}.png`,
+  );
+}
+
+/**
+ * Which frame to draw for a given roll phase.
+ *
+ * `rollPhase` is a continuous frame position accumulated from angular velocity,
+ * so it is fractional and it goes negative whenever the ball rolls backward —
+ * a plain `%` would return a negative index for exactly that case.
+ */
+export function ballFrameIndex(id, rollPhase) {
+  const { frameCount } = ballById(id);
+  if (!Number.isFinite(rollPhase)) return 0;
+  const index = Math.floor(rollPhase) % frameCount;
+  return index < 0 ? index + frameCount : index;
+}
+
+/**
+ * How much roll phase one radian of rotation is worth for this ball.
+ *
+ * This is the whole reason frame count cannot be a global: the physics reports
+ * radians, and each ball converts them into its own frame space.
+ */
+export function rollPhasePerRadian(id) {
+  return ballById(id).frameCount / (Math.PI * 2);
+}

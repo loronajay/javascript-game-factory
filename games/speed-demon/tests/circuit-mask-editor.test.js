@@ -9,6 +9,7 @@ import {
 } from "./harness.js";
 
 import { LAYER_PRESETS } from "../scripts/garage/livery.js";
+import { CIRCUIT_DIRECTIONS } from "../scripts/circuit/assets.js";
 import {
   CIRCUIT_MASK_ATLAS_SLOTS,
   CIRCUIT_MASK_FRAME_COUNT,
@@ -34,16 +35,10 @@ import {
 suite("circuit mask editor — canonical customization truth for every view");
 
 test("display headings name the direction the car nose actually faces", () => {
-  assertDeepEqual(CIRCUIT_MASK_ATLAS_SLOTS, [
-    "north", "north-east", "east", "south-east",
-    "south", "south-west", "west", "north-west",
-  ]);
-  assertDeepEqual(CIRCUIT_MASK_HEADINGS, [
-    "south", "south-west", "west", "north-west",
-    "north", "north-east", "east", "south-east",
-  ]);
-  assertEqual(CIRCUIT_MASK_HEADINGS[0], "south", "the down-facing car was mislabeled north");
-  assertEqual(CIRCUIT_MASK_HEADINGS[6], "east", "the right-facing car was mislabeled west");
+  assertDeepEqual(CIRCUIT_MASK_ATLAS_SLOTS, CIRCUIT_DIRECTIONS);
+  assertDeepEqual(CIRCUIT_MASK_HEADINGS, CIRCUIT_DIRECTIONS);
+  assertEqual(CIRCUIT_MASK_HEADINGS[2], "east", "the east-facing car was mislabeled west");
+  assertEqual(CIRCUIT_MASK_HEADINGS[6], "west", "the west-facing car was mislabeled east");
 });
 
 test("surface routing contains only customization categories the renderer owns", () => {
@@ -117,8 +112,8 @@ test("JSON export round-trips routing and overlapping canonical layer guides", (
   const project = encodeCircuitMaskProject("kaido-gts", data);
   assertEqual(project.kind, CIRCUIT_MASK_KIND);
   assertEqual(project.schemaVersion, CIRCUIT_MASK_SCHEMA_VERSION);
-  assertEqual(project.surfaceFrames[0].heading, "south");
-  assertEqual(project.surfaceFrames[7].heading, "south-east");
+  assertEqual(project.surfaceFrames[0].heading, "north");
+  assertEqual(project.surfaceFrames[7].heading, "north-west");
   assertEqual(project.layerGuides.length, LAYER_PRESETS.length);
 
   const decoded = decodeCircuitMaskProject(JSON.stringify(project), "kaido-gts");
@@ -151,6 +146,31 @@ test("the transitional schema-2 atlas field names remain readable", () => {
   const decoded = decodeCircuitMaskProject(project, "kaido-gts");
   assertEqual(decoded.data.surfaces[20], 2);
   assertEqual(decoded.data.layers.stripes[20], 1);
+});
+
+test("schema-2 projects exported with the old reversed display labels remain readable", () => {
+  const data = createCircuitMaskData();
+  data.surfaces[42] = 3;
+  data.layers.roof[42] = 1;
+  const project = encodeCircuitMaskProject("kaido-gts", data);
+  const reversed = [
+    "south", "south-west", "west", "north-west",
+    "north", "north-east", "east", "south-east",
+  ];
+  project.headings = [...reversed];
+  const relabel = (frames) => frames.forEach((frame, index) => {
+    frame.heading = reversed[index];
+  });
+  relabel(project.surfaceFrames);
+  project.layerGuides.forEach((guide) => relabel(guide.frames));
+  relabel(project.directionGuides.stripes);
+  relabel(project.directionGuides.bands);
+
+  const decoded = decodeCircuitMaskProject(project, "kaido-gts");
+  const canonicalNorthPixel = 4 * 64 * 64 + 42;
+  assertEqual(decoded.data.surfaces[canonicalNorthPixel], 3);
+  assertEqual(decoded.data.layers.roof[canonicalNorthPixel], 1);
+  assertEqual(decoded.data.surfaces[42], 0, "legacy South pixels remained mislabeled North");
 });
 
 test("legacy physical-part masks migrate without destroying the saved work", () => {

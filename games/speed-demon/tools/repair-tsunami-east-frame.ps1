@@ -9,8 +9,9 @@ if (-not $target.StartsWith($targetPrefix, [StringComparison]::OrdinalIgnoreCase
   throw "Refusing to write outside the Speed Demon workspace: $target"
 }
 
-$sourceFrame = 2
-$targetFrame = 6
+# Canonical physical-nose headings: frame 6 is West and frame 2 is East.
+$sourceFrame = 6
+$targetFrame = 2
 $frameSize = 64
 $source = [Drawing.Bitmap]::FromFile($target)
 try {
@@ -44,4 +45,4 @@ try {
 }
 
 Move-Item -LiteralPath $temporary -Destination $target -Force
-Write-Output "Repaired Tsunami frame 6 from mirrored frame 2: $target"
+Write-Output "Repaired Tsunami East frame 2 from mirrored West frame 6: $target"

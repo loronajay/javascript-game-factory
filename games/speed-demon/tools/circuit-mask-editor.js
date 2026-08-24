@@ -1,4 +1,4 @@
-import { CIRCUIT_MODELS } from "../scripts/circuit/assets.js";
+import { CIRCUIT_MODELS, circuitFrameAngle } from "../scripts/circuit/assets.js";
 import {
   CIRCUIT_MASK_FRAME_COUNT,
   CIRCUIT_MASK_FRAME_HEIGHT,
@@ -339,7 +339,7 @@ function renderEditor() {
 }
 
 function positionAxisLabels() {
-  const angle = ((state.frame + 4) % CIRCUIT_MASK_FRAME_COUNT) * Math.PI / 4;
+  const angle = circuitFrameAngle(state.frame);
   const x = Math.sin(angle);
   const y = -Math.cos(angle);
   for (const [element, direction] of [[elements.noseAxis, 1], [elements.tailAxis, -1]]) {

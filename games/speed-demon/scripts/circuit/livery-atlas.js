@@ -20,7 +20,12 @@ import {
   tintCabinPixel,
   zoneWeight,
 } from "../garage/paint.js";
-import { CIRCUIT_FRAME_SIZE, circuitModelById, hasCircuitAtlas } from "./assets.js";
+import {
+  CIRCUIT_FRAME_SIZE,
+  circuitFrameAngle,
+  circuitModelById,
+  hasCircuitAtlas,
+} from "./assets.js";
 import { localCarCoordinates, measureCircuitFrameGeometry } from "./sprite-geometry.js";
 import { circuitStripeCoordinates } from "./stripe-projection.js";
 
@@ -57,7 +62,7 @@ export function measureCircuitBodyGeometry(pixels, width, height, silhouette) {
     const longitudinal = [];
     const lateral = [];
     const base = silhouette[frame];
-    const angle = frame * Math.PI / 4;
+    const angle = circuitFrameAngle(frame);
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
     for (let y = 0; y < height; y += 1) {

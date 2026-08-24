@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Mini Hoops</title>
+    <link rel="stylesheet" href="styles/game.css" />
+    <link rel="stylesheet" href="styles/menu.css" />
+  </head>
+  <body>
+    <div id="mini-hoops" class="cabinet">
+      <a href="../../grid.html" class="back-link">&larr; Arcade</a>
+
+      <!-- ============================ MENU ============================ -->
+      <!-- The room is the hero here: full strength, gently alive, with the
+           marquee lit on its wall. See styles/menu.css. -->
+      <section id="menuScreen" class="screen is-active" aria-label="Main menu">
+        <div id="menuScene" class="marquee-scene">
+          <div class="marquee-drift">
+            <img id="menuBackdrop" class="marquee-backdrop" alt="" />
+          </div>
+          <div class="marquee-vignette" aria-hidden="true"></div>
+
+          <div class="marquee">
+            <div class="marquee-sign">
+              <span class="marquee-bulbs" aria-hidden="true"></span>
+              <p class="marquee-kicker">Est. one bored afternoon</p>
+              <h1 class="marquee-title">Mini Hoops</h1>
+              <p class="marquee-sub">Pull. Aim. Don't miss.</p>
+            </div>
+
+            <nav id="menuOptions" class="marquee-options" aria-label="Main menu">
+              <button type="button" class="marquee-option" data-command="play">
+                <span class="marquee-option-index">01</span>
+                <span class="marquee-option-label">Play</span>
+                <span class="marquee-option-note">Pick a rim, a clock, a room and a ball.</span>
+              </button>
+              <button type="button" class="marquee-option" data-command="boards">
+                <span class="marquee-option-index">02</span>
+                <span class="marquee-option-label">Leaderboards</span>
+                <span class="marquee-option-note">A top five for every rim and every clock.</span>
+              </button>
+              <button type="button" class="marquee-option" data-command="howto">
+                <span class="marquee-option-index">03</span>
+                <span class="marquee-option-label">How to Play</span>
+                <span class="marquee-option-note">Three things to know. That's all of them.</span>
+              </button>
+            </nav>
+
+            <div class="marquee-card">
+              <span id="menuSummary" class="marquee-card-line">Still · 30 sec · Bedroom · Basketball</span>
+              <span id="menuBest" class="marquee-card-best">No local best yet</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =========================== SETUP ============================ -->
+      <section id="setupScreen" class="screen" aria-label="Game setup">
+        <header class="screen-head">
+          <button type="button" class="ghost-btn" data-intent="back">Back</button>
+          <div>
+            <h2>Set Up the Run</h2>
+            <p>The clock starts on your first real pull, not before.</p>
+          </div>
+        </header>
+
+        <div class="setup-layout">
+          <figure class="setup-preview">
+            <img id="setupPreview" alt="" />
+            <figcaption>
+              <span>Court</span>
+              <strong id="setupPreviewName">Bedroom</strong>
+            </figcaption>
+          </figure>
+
+          <div class="setup-panels">
+            <fieldset class="panel">
+              <legend>Hoop movement</legend>
+              <div id="setupModes" class="chip-grid"></div>
+            </fieldset>
+
+            <fieldset class="panel">
+              <legend>Round length</legend>
+              <div id="setupDurations" class="chip-grid chip-grid--tight"></div>
+            </fieldset>
+
+            <fieldset class="panel">
+              <legend>Ball</legend>
+              <p class="panel-note">Cosmetic. Every ball plays exactly the same.</p>
+              <div id="setupBalls" class="chip-grid"></div>
+            </fieldset>
+
+            <fieldset class="panel">
+              <legend>Court</legend>
+              <p class="panel-note">Cosmetic. The room never changes the shot.</p>
+              <div id="setupLocations" class="chip-grid"></div>
+            </fieldset>
+
+            <div class="setup-start">
+              <p id="setupSummary" class="setup-summary">Still · 30 sec · Bedroom · Basketball</p>
+              <button type="button" class="primary-btn" data-intent="start">Start Run</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ GAME ============================ -->
+      <section id="gameScreen" class="screen game-screen" aria-label="Game">
+        <div class="court">
+          <canvas id="court" width="960" height="760" aria-label="Mini basketball court"></canvas>
+
+          <div class="hud" aria-live="polite">
+            <button type="button" class="hud-menu" data-intent="pause">MENU</button>
+
+            <div class="hud-clock">
+              <span id="hudMode" class="hud-clock-mode">STILL</span>
+              <span id="hudClock" class="hud-clock-time">0:30</span>
+            </div>
+
+            <div class="hud-stat hud-stat--left">
+              <small>SCORE</small>
+              <strong id="hudScore">0</strong>
+              <span><b id="hudShots">0</b> shots</span>
+            </div>
+
+            <div class="hud-stat hud-stat--right">
+              <small>STREAK</small>
+              <strong id="hudStreak">0</strong>
+              <span>best <b id="hudBest">0</b></span>
+            </div>
+          </div>
+
+          <p id="hudShout" class="hud-shout" aria-live="polite"></p>
+          <p id="hudHint" class="hud-hint">Grab the ball · pull back to aim &amp; power · release</p>
+
+          <div id="pauseOverlay" class="overlay" aria-label="Paused">
+            <div class="overlay-card">
+              <h3>Paused</h3>
+              <p>The clock, the hoop and the ball are all frozen.</p>
+              <div class="overlay-actions">
+                <button type="button" class="primary-btn" data-intent="resume">Resume</button>
+                <div class="overlay-actions overlay-actions--split">
+                  <button type="button" class="ghost-btn" data-intent="restart">Restart</button>
+                  <button type="button" class="ghost-btn" data-intent="quit">Quit to Menu</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="resultsOverlay" class="overlay" aria-label="Run results">
+            <div class="overlay-card">
+              <p class="result-label">FINAL SCORE</p>
+              <p id="resultScore" class="result-score">0</p>
+              <h3 id="resultTitle">Run Complete</h3>
+              <p id="resultMeta" class="result-meta">Still · 30 sec · Bedroom · Basketball</p>
+
+              <div class="result-grid">
+                <div><strong id="resultShots">0</strong><span>Shots</span></div>
+                <div><strong id="resultAccuracy">0%</strong><span>Accuracy</span></div>
+                <div><strong id="resultRank">—</strong><span>Local Rank</span></div>
+              </div>
+
+              <p class="result-streak">Best streak: <strong id="resultStreak">0</strong></p>
+
+              <div class="overlay-actions">
+                <button type="button" class="primary-btn" data-intent="restart">Play Again</button>
+                <div class="overlay-actions overlay-actions--split">
+                  <button type="button" class="ghost-btn" data-intent="change-setup">Change Setup</button>
+                  <button type="button" class="ghost-btn" data-intent="view-boards">Leaderboard</button>
+                </div>
+                <button type="button" class="ghost-btn" data-intent="quit">Main Menu</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="shot-panel">
+          <div class="meter-head">
+            <span>SHOT POWER</span>
+            <span id="meterReadout">0%</span>
+          </div>
+          <div class="meter" aria-label="Shot power">
+            <div id="meterFill" class="meter-fill"></div>
+            <div class="meter-sweet" aria-hidden="true"></div>
+          </div>
+          <p class="meter-legend">
+            <span>Pull <b>length</b> = power</span>
+            <span>Pull <b>angle</b> = aim &amp; arc</span>
+          </p>
+        </div>
+      </section>
+
+      <!-- ========================= LEADERBOARDS ======================== -->
+      <section id="boardsScreen" class="screen" aria-label="Local leaderboards">
+        <header class="screen-head">
+          <button type="button" class="ghost-btn" data-intent="back">Back</button>
+          <div>
+            <h2>Local Leaderboards</h2>
+            <p>Every rim and every clock keeps its own top five. Stored in this browser only.</p>
+          </div>
+        </header>
+
+        <div class="board-filters">
+          <fieldset class="panel">
+            <legend>Hoop movement</legend>
+            <div id="boardModes" class="chip-grid chip-grid--tight"></div>
+          </fieldset>
+          <fieldset class="panel">
+            <legend>Round length</legend>
+            <div id="boardDurations" class="chip-grid chip-grid--tight"></div>
+          </fieldset>
+        </div>
+
+        <div class="board">
+          <div class="board-head">
+            <div>
+              <p class="board-title">TOP FIVE</p>
+              <p id="boardMeta" class="board-meta">Still · 30 sec</p>
+            </div>
+            <button type="button" id="boardClear" class="ghost-btn ghost-btn--small">Clear this board</button>
+          </div>
+          <ol id="boardList" class="board-list"></ol>
+        </div>
+      </section>
+
+      <!-- =========================== HOW TO ============================ -->
+      <section id="howToScreen" class="screen" aria-label="How to play">
+        <header class="screen-head">
+          <button type="button" class="ghost-btn" data-intent="back">Back</button>
+          <div>
+            <h2>How to Play</h2>
+            <p>Three things. There is no fourth thing.</p>
+          </div>
+        </header>
+
+        <ol class="how-grid">
+          <li class="how-card">
+            <span class="how-num">1</span>
+            <h3>Grab the ball</h3>
+            <p>Start the drag on the ball itself. Your aim always begins dead centre — a moving hoop never drags your reticle along with it.</p>
+          </li>
+          <li class="how-card">
+            <span class="how-num">2</span>
+            <h3>Pull back</h3>
+            <p>How far you pull is power, and nothing else. 80% is the shot that swishes; the meter is telling you the truth, not a difficulty curve.</p>
+          </li>
+          <li class="how-card">
+            <span class="how-num">3</span>
+            <h3>Angle, then release</h3>
+            <p>Pull off to one side and the ball goes the other way — and flattens out as it does. Straight back is the steepest, kindest arc. Against a moving rim, aim where it is going to be.</p>
+          </li>
+        </ol>
+      </section>
+    </div>
+
+    <script type="module">
+      import { boot } from "./scripts/init-game.js";
+
+      // Exposed so a run can be driven and inspected from the console.
+      window.miniHoops = boot(document.getElementById("mini-hoops"));
+    </script>
+  </body>
+</html>

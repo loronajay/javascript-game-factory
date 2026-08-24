@@ -1,0 +1,353 @@
+/* Mini Hoops — the title screen.
+ *
+ * The brief was to get away from the default shape of a menu: a dark scrim over
+ * a screenshot with three rounded rectangles on it. So this menu is DIEGETIC —
+ * it lives in the room you are about to play in.
+ *
+ * Three rules hold it together:
+ *
+ *   1. THE ROOM IS NOT DIMMED. No full-bleed scrim. The painted art is the
+ *      hero, and covering it is what made the old menu look like a placeholder.
+ *      Legibility comes from a shaped vignette that only darkens the left third,
+ *      where the type actually sits.
+ *
+ *   2. THE MENU IS AN OBJECT IN THE ROOM. A lit marquee bolted to the wall, with
+ *      a bulb strip, warm spill onto the wall behind it, and a real drop shadow.
+ *      It reads as a thing hanging there rather than as UI floating on top.
+ *
+ *   3. THE ROOM IS ALIVE. A slow drift plus a slight lean toward the pointer.
+ *      Both are pure CSS driven by two custom properties, so this costs the main
+ *      thread nothing and is switched off wholesale under reduced-motion.
+ */
+
+.marquee-scene {
+  position: relative;
+  /* Fills the viewport rather than sitting in a band with dead space beneath —
+     a menu that stops two thirds of the way down reads as an unfinished page. */
+  min-height: clamp(520px, calc(100dvh - 42px), 820px);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  isolation: isolate;
+  background: #120b09;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.45);
+
+  /* Fed by menu-view.js on pointer move. */
+  --lean-x: 0%;
+  --lean-y: 0%;
+}
+
+/* Two nested layers because the idle drift is an animation and the pointer lean
+   is a transform — one element cannot carry both without them fighting. */
+.marquee-drift {
+  position: absolute;
+  inset: -3%;
+  animation: room-drift 26s ease-in-out infinite alternate;
+}
+
+.marquee-backdrop {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Only slightly over-scaled: enough to give the lean somewhere to travel
+     without cropping the room down to a patch of bare wall. */
+  transform: translate3d(var(--lean-x), var(--lean-y), 0) scale(1.03);
+  transition: transform 900ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes room-drift {
+  from {
+    transform: scale(1.02) translate3d(-0.6%, 0.4%, 0);
+  }
+  to {
+    transform: scale(1.05) translate3d(0.6%, -0.4%, 0);
+  }
+}
+
+/* Shaped, not full-bleed: dense behind the type on the left, gone by the middle,
+   with just enough weight along the bottom to seat the index card. */
+.marquee-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  /* Dense where the type sits and gone by the halfway mark, so the right side
+     of the room stays at full strength. The room is the hero; this only buys
+     back the contrast the text actually needs. */
+  background:
+    linear-gradient(
+      100deg,
+      rgba(14, 8, 7, 0.9) 0%,
+      rgba(14, 8, 7, 0.74) 30%,
+      rgba(14, 8, 7, 0.26) 50%,
+      rgba(14, 8, 7, 0) 66%
+    ),
+    linear-gradient(to top, rgba(11, 7, 6, 0.6) 0%, rgba(11, 7, 6, 0) 38%);
+}
+
+.marquee {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  align-content: center;
+  gap: 22px;
+  min-height: inherit;
+  max-width: 540px;
+  padding: clamp(30px, 5vw, 56px) clamp(22px, 4vw, 46px);
+}
+
+/* --- The sign ----------------------------------------------------------- */
+
+.marquee-sign {
+  position: relative;
+  padding: 20px 26px 22px;
+  border: 1px solid rgba(240, 176, 116, 0.34);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(46, 27, 21, 0.72), rgba(24, 14, 12, 0.66));
+  /* The outer glow is the light this sign is throwing onto the wall behind it —
+     it is what makes the marquee sit *in* the room instead of on top of it. */
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 18px 40px rgba(0, 0, 0, 0.5),
+    0 0 90px 10px rgba(240, 176, 116, 0.16);
+}
+
+/* The bulb strip along the top edge. Repeating-gradient dots rather than 14
+   elements, so it costs one paint. */
+.marquee-bulbs {
+  position: absolute;
+  top: -5px;
+  left: 20px;
+  right: 20px;
+  height: 10px;
+  background-image: radial-gradient(circle, rgba(255, 226, 178, 0.95) 0 2.4px, rgba(255, 226, 178, 0) 2.6px);
+  background-size: 26px 10px;
+  background-repeat: repeat-x;
+  filter: drop-shadow(0 0 5px rgba(255, 198, 122, 0.75));
+  animation: bulb-flicker 4.5s steps(1, end) infinite;
+}
+
+@keyframes bulb-flicker {
+  0%, 46%, 52%, 100% {
+    opacity: 1;
+  }
+  48% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+.marquee-kicker {
+  margin: 0 0 8px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(240, 176, 116, 0.82);
+}
+
+.marquee-title {
+  margin: 0;
+  font-size: clamp(46px, 8.4vw, 82px);
+  font-weight: 950;
+  line-height: 0.86;
+  letter-spacing: -0.055em;
+  text-transform: uppercase;
+  color: #fff6e9;
+  text-shadow:
+    0 2px 0 rgba(120, 62, 36, 0.55),
+    0 0 34px rgba(255, 189, 118, 0.42);
+}
+
+.marquee-sub {
+  margin: 12px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: rgba(246, 239, 230, 0.72);
+}
+
+/* --- The options board -------------------------------------------------- */
+
+.marquee-options {
+  display: grid;
+  gap: 2px;
+  /* A whisper of backing under the rows only. The wall behind them is the
+     brightest part of most rooms, and the note lines lose against it without
+     this — but a full panel would put the menu back on top of the art instead
+     of in it. */
+  background: linear-gradient(90deg, rgba(12, 7, 6, 0.5) 0%, rgba(12, 7, 6, 0.34) 62%, rgba(12, 7, 6, 0) 100%);
+  border-radius: 10px;
+}
+
+.marquee-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "index label"
+    "index note";
+  gap: 0 14px;
+  align-items: baseline;
+  padding: 11px 14px 12px;
+  border: 0;
+  /* Deliberately not a card. A hairline rule between rows reads as a listed
+     board, which is the thing a card grid was failing to be. */
+  border-top: 1px solid rgba(246, 239, 230, 0.12);
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  transition: background 160ms ease, padding-left 160ms ease;
+}
+
+.marquee-option:last-child {
+  border-bottom: 1px solid rgba(246, 239, 230, 0.12);
+}
+
+.marquee-option-index {
+  grid-area: index;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+  color: rgba(240, 176, 116, 0.5);
+  transition: color 160ms ease;
+}
+
+.marquee-option-label {
+  grid-area: label;
+  font-size: 21px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-shadow: 0 1px 4px rgba(10, 6, 5, 0.6);
+}
+
+.marquee-option-note {
+  grid-area: note;
+  margin-top: 2px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: rgba(246, 239, 230, 0.64);
+  text-shadow: 0 1px 3px rgba(10, 6, 5, 0.7);
+}
+
+.marquee-option:hover,
+.marquee-option:focus-visible {
+  padding-left: 22px;
+  background: linear-gradient(90deg, rgba(240, 176, 116, 0.16), rgba(240, 176, 116, 0));
+}
+
+.marquee-option:hover .marquee-option-index,
+.marquee-option:focus-visible .marquee-option-index {
+  color: var(--brass);
+}
+
+/* The chalk underline: a rule that wipes in from the left on hover. */
+.marquee-option::after {
+  content: "";
+  grid-area: note;
+  align-self: end;
+  width: 0;
+  height: 2px;
+  margin-top: 7px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--brass), rgba(240, 176, 116, 0));
+  transition: width 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.marquee-option:hover::after,
+.marquee-option:focus-visible::after {
+  width: 74%;
+}
+
+/* --- The taped index card ----------------------------------------------- */
+
+.marquee-card {
+  justify-self: start;
+  display: grid;
+  gap: 3px;
+  padding: 11px 18px 12px;
+  border-radius: 3px;
+  /* Slightly off-square, like something actually stuck to the wall. */
+  transform: rotate(-1.1deg);
+  background: linear-gradient(180deg, #f4ead6, #e6d8bd);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.42);
+  color: #3a2a20;
+}
+
+/* The strip of tape, half on the card and half on the wall. Kept low-contrast
+   and slightly warm so it reads as translucent tape rather than a grey block. */
+.marquee-card::before {
+  content: "";
+  position: absolute;
+  top: -7px;
+  left: 46%;
+  width: 54px;
+  height: 15px;
+  transform: translateX(-50%) rotate(2.5deg);
+  background: linear-gradient(180deg, rgba(255, 248, 230, 0.22), rgba(255, 248, 230, 0.34));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.marquee-card {
+  position: relative;
+}
+
+.marquee-card-line {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.marquee-card-best {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(58, 42, 32, 0.62);
+}
+
+/* --- Responsive --------------------------------------------------------- */
+
+@media (max-width: 720px) {
+  .marquee-scene {
+    min-height: calc(100dvh - 30px);
+  }
+
+  /* A portrait crop of a landscape room lands on bare wall, so bias it down
+     toward the floor and furniture where there is something to look at. */
+  .marquee-backdrop {
+    object-position: 50% 64%;
+  }
+
+  /* On a narrow screen the shaped vignette cannot carry legibility on its own,
+     so it becomes a bottom-weighted wash and the marquee sits over it. */
+  .marquee-vignette {
+    background: linear-gradient(to top, rgba(11, 7, 6, 0.94) 0%, rgba(11, 7, 6, 0.66) 46%, rgba(11, 7, 6, 0.12) 100%);
+  }
+
+  .marquee {
+    max-width: none;
+    gap: 16px;
+    padding: 24px 20px 26px;
+  }
+
+  .marquee-option-label {
+    font-size: 19px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-drift {
+    animation: none;
+  }
+
+  .marquee-backdrop {
+    transform: scale(1.02);
+    transition: none;
+  }
+
+  .marquee-bulbs {
+    animation: none;
+  }
+}

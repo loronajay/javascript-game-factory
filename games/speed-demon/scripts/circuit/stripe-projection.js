@@ -14,11 +14,18 @@ const pair = (a0, a1, b0, b1) => Object.freeze({
   b: Object.freeze([Object.freeze(b0), Object.freeze(b1)]),
 });
 
+// The original generated masters stored the view from the opposite side of the
+// car in each named slot. The PNGs are now canonical physical-nose atlases; the
+// authored per-frame guides make the same one-time half-turn here.
+const physicalHeadingOrder = (frames) => Object.freeze(frames.map(
+  (_, frame) => frames[(frame + 4) % 8],
+));
+
 // Atlas frame order by visible nose:
 // North, Northeast, East, Southeast, South, Southwest, West, Northwest.
 // These are distilled endpoints from kaido-gts-stripe-flow.json. North/South
 // were already correct and deliberately remain empty identity mappings.
-export const KAIDO_STRIPE_PANEL_GUIDES = Object.freeze([
+const KAIDO_CAMERA_VIEW_PANEL_GUIDES = Object.freeze([
   Object.freeze([]),
   Object.freeze([
     pair([11.27, 44.3], [20.64, 34.47], [14.93, 46.13], [23.16, 36.07]),
@@ -58,6 +65,8 @@ export const KAIDO_STRIPE_PANEL_GUIDES = Object.freeze([
   ]),
 ]);
 
+export const KAIDO_STRIPE_PANEL_GUIDES = physicalHeadingOrder(KAIDO_CAMERA_VIEW_PANEL_GUIDES);
+
 const TSUNAMI_WEST_GUIDES = Object.freeze([
   pair([18.87, 25.56], [6.64, 27.96], [18.64, 27.84], [6.19, 30.7]),
   pair([30.53, 21.1], [42.3, 20.76], [30.19, 23.96], [41.96, 23.16]),
@@ -74,7 +83,7 @@ const mirrorGuide = (guide) => pair(
 // Tsunami's generated East body was invalid and is repaired from mirrored West
 // art. Its East guide follows the same identity-preserving mirror rather than
 // retaining paths authored over the discarded car.
-export const TSUNAMI_STRIPE_PANEL_GUIDES = Object.freeze([
+const TSUNAMI_CAMERA_VIEW_PANEL_GUIDES = Object.freeze([
   Object.freeze([]),
   Object.freeze([
     pair([32.81, 16.76], [25.73, 23.27], [38.53, 18.36], [31.21, 25.1]),
@@ -102,6 +111,8 @@ export const TSUNAMI_STRIPE_PANEL_GUIDES = Object.freeze([
     pair([47.9, 45.79], [48.7, 55.39], [50.53, 43.84], [51.67, 55.04]),
   ]),
 ]);
+
+export const TSUNAMI_STRIPE_PANEL_GUIDES = physicalHeadingOrder(TSUNAMI_CAMERA_VIEW_PANEL_GUIDES);
 
 const EMPTY_STRIPE_PANEL_GUIDES = Object.freeze(Array.from(
   { length: 8 },

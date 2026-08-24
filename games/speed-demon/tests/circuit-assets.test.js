@@ -49,13 +49,24 @@ test("availability never substitutes another model", () => {
   assertEqual(circuitModelById("shutter-z"), null);
 });
 
+test("the JSON catalog and runtime share one heading and scale contract", () => {
+  const catalog = JSON.parse(fs.readFileSync(path.join(CARS_DIR, "catalog.json"), "utf8"));
+  assertEqual(catalog.render.headingConvention, "physical-nose-clockwise-from-north");
+  assertDeepEqual(catalog.render.order, CIRCUIT_DIRECTIONS);
+  for (const model of CIRCUIT_MODELS) {
+    const entry = catalog.models.find((candidate) => candidate.modelId === model.modelId);
+    assert(entry, `${model.modelId} is missing from the JSON catalog`);
+    assertEqual(entry.renderScale, model.renderScale, `${model.modelId} has two render scales`);
+  }
+});
+
 test("world headings select the artwork frame whose nose points forward", () => {
-  // The generated sheet names the camera-facing view, which is opposite the
-  // car's physical nose. World heading therefore needs one explicit half-turn.
-  assertEqual(circuitFrameIndex(0), 4);
-  assertEqual(circuitFrameIndex(Math.PI / 2), 6);
-  assertEqual(circuitFrameIndex(Math.PI), 0);
-  assertEqual(circuitFrameIndex(-Math.PI / 2), 2);
+  // Physics and every atlas use the same clockwise-from-north nose headings.
+  // Cover all eight views so an east/west workaround cannot invert the other
+  // six directions without this regression test catching it.
+  for (let frame = 0; frame < CIRCUIT_DIRECTIONS.length; frame += 1) {
+    assertEqual(circuitFrameIndex(frame * Math.PI / 4), frame, CIRCUIT_DIRECTIONS[frame]);
+  }
   assertDeepEqual(CIRCUIT_FRAME_HEADINGS, CIRCUIT_DIRECTIONS);
 });
 
@@ -95,6 +106,11 @@ test("every atlas is eight transparent 64px frames clockwise from north", () => 
     const sheet = readPng(fs.readFileSync(path.join(CARS_DIR, model.spritesheet)));
 
     assertEqual(manifest.modelId, model.modelId);
+    assertEqual(
+      manifest.headingConvention,
+      "physical-nose-clockwise-from-north",
+      `${model.modelId} can regress to camera-side frame labels`,
+    );
     assertDeepEqual(manifest.order, expectedOrder);
     assertEqual(manifest.frameWidth, 64);
     assertEqual(manifest.frameHeight, 64);
@@ -118,6 +134,24 @@ test("every atlas is eight transparent 64px frames clockwise from north", () => 
       0,
       `${model.modelId} bottom-right must be transparent`,
     );
+  }
+});
+
+test("asset repair metadata uses the canonical physical heading of each frame", () => {
+  for (const model of CIRCUIT_MODELS) {
+    const manifest = JSON.parse(fs.readFileSync(path.join(CARS_DIR, model.manifest), "utf8"));
+    for (const repair of manifest.repairs ?? []) {
+      assertEqual(
+        repair.targetHeading,
+        manifest.frames[repair.targetFrame]?.direction,
+        `${model.modelId} repair target frame is mislabeled`,
+      );
+      assertEqual(
+        repair.mirroredFromHeading,
+        manifest.frames[repair.mirroredFromFrame]?.direction,
+        `${model.modelId} repair source frame is mislabeled`,
+      );
+    }
   }
 });
 
@@ -194,13 +228,15 @@ test("Tsunami East is the opposite side of the same car, not a generated substit
     "tsunami-rz",
     "spritesheet-clockwise-from-north.png",
   )));
-  assertEqual(manifest.repairs?.[0]?.targetFrame, 6);
-  assertEqual(manifest.repairs?.[0]?.mirroredFromFrame, 2);
+  assertEqual(manifest.repairs?.[0]?.targetFrame, 2);
+  assertEqual(manifest.repairs?.[0]?.targetHeading, "east");
+  assertEqual(manifest.repairs?.[0]?.mirroredFromFrame, 6);
+  assertEqual(manifest.repairs?.[0]?.mirroredFromHeading, "west");
   for (let y = 0; y < 64; y += 1) {
     for (let x = 0; x < 64; x += 1) {
       for (let channel = 0; channel < 4; channel += 1) {
-        const west = (y * sheet.width + 2 * 64 + x) * 4 + channel;
-        const east = (y * sheet.width + 6 * 64 + (63 - x)) * 4 + channel;
+        const west = (y * sheet.width + 6 * 64 + x) * 4 + channel;
+        const east = (y * sheet.width + 2 * 64 + (63 - x)) * 4 + channel;
         assertEqual(sheet.pixels[east], sheet.pixels[west], `Tsunami side mismatch at ${x},${y},${channel}`);
       }
     }

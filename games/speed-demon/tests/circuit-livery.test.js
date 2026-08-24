@@ -62,7 +62,7 @@ const image = Object.assign(sheet.pixels, {
 // parallel direction samples over one visible panel. They are not literal
 // stripe positions; endpoints are enough to lock the local angle without
 // turning the hand-drawn marks into final artwork.
-const KAIDO_GUIDED_PATHS = {
+const KAIDO_CAMERA_VIEW_GUIDED_PATHS = {
   1: [
     [[11.27, 44.3], [20.64, 34.47]], [[14.93, 46.13], [23.16, 36.07]],
     [[29.33, 21.56], [37.1, 14.47]], [[34.47, 23.84], [42.81, 15.96]],
@@ -99,6 +99,9 @@ const KAIDO_GUIDED_PATHS = {
     [[17.56, 17.33], [16.3, 16.19]], [[15.73, 18.01], [13.9, 17.1]],
   ],
 };
+const KAIDO_GUIDED_PATHS = Object.fromEntries(Object.entries(KAIDO_CAMERA_VIEW_GUIDED_PATHS).map(
+  ([frame, paths]) => [(Number(frame) + 4) % 8, paths],
+));
 
 function complexLivery() {
   let livery = createLivery({
@@ -213,7 +216,7 @@ test("editor turntable visits all eight headings without changing the livery", (
 });
 
 test("Kaido stripe projection has authored panels in six views and preserves North and South", () => {
-  const expectedPanelCounts = [0, 4, 3, 4, 0, 4, 4, 4];
+  const expectedPanelCounts = [0, 4, 4, 4, 0, 4, 3, 4];
   assertEqual(KAIDO_STRIPE_PANEL_GUIDES.length, 8);
   for (let frame = 0; frame < 8; frame += 1) {
     assertEqual(KAIDO_STRIPE_PANEL_GUIDES[frame].length, expectedPanelCounts[frame], `frame ${frame}`);
@@ -228,18 +231,18 @@ test("Kaido stripe projection has authored panels in six views and preserves Nor
   };
   assertEqual(circuitStripeCoordinates("kaido-gts", 0, local, geometry), local);
   assertEqual(circuitStripeCoordinates("kaido-gts", 4, local, geometry), local);
-  assertEqual(circuitStripeCoordinates("tsunami-rz", 6, local, geometry), local);
+  assertEqual(circuitStripeCoordinates("tsunami-rz", 4, local, geometry), local);
 });
 
 test("Tsunami uses its authored panels and mirrors the valid West guide over repaired East", () => {
-  const expectedPanelCounts = [0, 3, 3, 4, 0, 4, 3, 3];
+  const expectedPanelCounts = [0, 4, 3, 3, 0, 3, 3, 4];
   assertEqual(circuitStripePanelGuides("tsunami-rz"), TSUNAMI_STRIPE_PANEL_GUIDES);
   for (let frame = 0; frame < 8; frame += 1) {
     assertEqual(TSUNAMI_STRIPE_PANEL_GUIDES[frame].length, expectedPanelCounts[frame], `frame ${frame}`);
   }
   for (let panel = 0; panel < TSUNAMI_STRIPE_PANEL_GUIDES[2].length; panel += 1) {
-    const west = TSUNAMI_STRIPE_PANEL_GUIDES[2][panel];
-    const east = TSUNAMI_STRIPE_PANEL_GUIDES[6][panel];
+    const east = TSUNAMI_STRIPE_PANEL_GUIDES[2][panel];
+    const west = TSUNAMI_STRIPE_PANEL_GUIDES[6][panel];
     for (const line of ["a", "b"]) {
       for (let endpoint = 0; endpoint < 2; endpoint += 1) {
         assertClose(east[line][endpoint][0], 63 - west[line][endpoint][0], 1e-9);
@@ -253,8 +256,8 @@ test("every race-ready model calibrates stripes in all six perspective-sensitive
   for (const model of CIRCUIT_MODELS) {
     const guides = circuitStripePanelGuides(model.modelId);
     assertEqual(guides.length, 8, `${model.modelId} has an incomplete guide catalog`);
-    assertEqual(guides[0].length, 0, `${model.modelId} changed the correct South projection`);
-    assertEqual(guides[4].length, 0, `${model.modelId} changed the correct North projection`);
+    assertEqual(guides[0].length, 0, `${model.modelId} changed the correct North projection`);
+    assertEqual(guides[4].length, 0, `${model.modelId} changed the correct South projection`);
     for (const frame of [1, 2, 3, 5, 6, 7]) {
       assert(guides[frame].length > 0,
         `${model.modelId} frame ${frame} still uses the broken flat stripe projection`);

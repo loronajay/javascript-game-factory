@@ -21,18 +21,25 @@ export const CIRCUIT_DIRECTIONS = Object.freeze([
 // The compiler manifest and physical atlas columns use the same nose headings.
 export const CIRCUIT_FRAME_HEADINGS = CIRCUIT_DIRECTIONS;
 
+/** The screen-space angle of a canonical atlas frame, clockwise from north. */
+export function circuitFrameAngle(frameIndex) {
+  const frameCount = CIRCUIT_FRAME_HEADINGS.length;
+  const normalized = ((Math.trunc(frameIndex) % frameCount) + frameCount) % frameCount;
+  return normalized * Math.PI / 4;
+}
+
 // The generated masters do not share one silhouette mass. These measured
 // factors normalize their mean visible area, so choosing a slim body does not
 // make the player's car look smaller than the fixed CPU model in a race.
 const REPRESENTATIVE_MODELS = [
-  ["kaido-gts", "Kaido GTS", "gt", 1.08283424713437],
-  ["tsunami-rz", "Tsunami RZ", "coupe", 0.9439812351400176],
-  ["meridian-rs", "Meridian RS", "euro", 0.9696792529865279],
-  ["skyward-r", "Skyward R", "gt", 1.0133990378504156],
-  ["toro-sv", "Toro SV", "exotic", 0.8816582348554188],
-  ["scalpel-r", "Scalpel R", "hatch", 1.043432172800136],
-  ["chrono-12", "Chrono 12", "wedge", 1.0764103447512017],
-  ["colt-gt", "Colt GT", "muscle", 1.0373220569718429],
+  ["kaido-gts", "Kaido GTS", "gt", 1.0124582021614492],
+  ["tsunami-rz", "Tsunami RZ", "coupe", 0.9754665882886004],
+  ["meridian-rs", "Meridian RS", "euro", 1.004380237844021],
+  ["skyward-r", "Skyward R", "gt", 1.073622027420821],
+  ["toro-sv", "Toro SV", "exotic", 0.905228093365718],
+  ["scalpel-r", "Scalpel R", "hatch", 0.9557750924830416],
+  ["chrono-12", "Chrono 12", "wedge", 1.080411272370425],
+  ["colt-gt", "Colt GT", "muscle", 1.0298041716846214],
 ];
 
 export const CIRCUIT_MODELS = Object.freeze(REPRESENTATIVE_MODELS.map(

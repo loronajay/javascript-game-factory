@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "configurationContract": "canonical-speed-demon-loadout-v1",
   "render": {
+    "headingConvention": "physical-nose-clockwise-from-north",
     "frameWidth": 64,
     "frameHeight": 64,
     "frameCount": 8,
@@ -21,7 +22,7 @@
       "modelId": "kaido-gts",
       "label": "Kaido GTS",
       "archetype": "gt",
-      "renderScale": 1.0404223810178697,
+      "renderScale": 1.0124582021614492,
       "spritesheet": "kaido-gts/spritesheet-clockwise-from-north.png",
       "manifest": "kaido-gts/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }
@@ -30,7 +31,7 @@
       "modelId": "tsunami-rz",
       "label": "Tsunami RZ",
       "archetype": "coupe",
-      "renderScale": 0.9736575032883077,
+      "renderScale": 0.9754665882886004,
       "spritesheet": "tsunami-rz/spritesheet-clockwise-from-north.png",
       "manifest": "tsunami-rz/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }
@@ -39,7 +40,7 @@
       "modelId": "meridian-rs",
       "label": "Meridian RS",
       "archetype": "euro",
-      "renderScale": 1.001656433139303,
+      "renderScale": 1.004380237844021,
       "spritesheet": "meridian-rs/spritesheet-clockwise-from-north.png",
       "manifest": "meridian-rs/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }
@@ -48,7 +49,7 @@
       "modelId": "skyward-r",
       "label": "Skyward R",
       "archetype": "gt",
-      "renderScale": 1.037823336392831,
+      "renderScale": 1.073622027420821,
       "spritesheet": "skyward-r/spritesheet-clockwise-from-north.png",
       "manifest": "skyward-r/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }
@@ -57,7 +58,7 @@
       "modelId": "toro-sv",
       "label": "Toro SV",
       "archetype": "exotic",
-      "renderScale": 0.9765656028304245,
+      "renderScale": 0.905228093365718,
       "spritesheet": "toro-sv/spritesheet-clockwise-from-north.png",
       "manifest": "toro-sv/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }
@@ -66,7 +67,7 @@
       "modelId": "scalpel-r",
       "label": "Scalpel R",
       "archetype": "hatch",
-      "renderScale": 0.9729539197796079,
+      "renderScale": 0.9557750924830416,
       "spritesheet": "scalpel-r/spritesheet-clockwise-from-north.png",
       "manifest": "scalpel-r/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }
@@ -75,7 +76,7 @@
       "modelId": "chrono-12",
       "label": "Chrono 12",
       "archetype": "wedge",
-      "renderScale": 0.9989523711318379,
+      "renderScale": 1.080411272370425,
       "spritesheet": "chrono-12/spritesheet-clockwise-from-north.png",
       "manifest": "chrono-12/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }
@@ -84,7 +85,7 @@
       "modelId": "colt-gt",
       "label": "Colt GT",
       "archetype": "muscle",
-      "renderScale": 1.0054534480305393,
+      "renderScale": 1.0298041716846214,
       "spritesheet": "colt-gt/spritesheet-clockwise-from-north.png",
       "manifest": "colt-gt/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }
