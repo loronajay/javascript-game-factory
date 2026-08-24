@@ -39,7 +39,7 @@ const REPRESENTATIVE_MODELS = [
   ["toro-sv", "Toro SV", "exotic", 0.905228093365718],
   ["scalpel-r", "Scalpel R", "hatch", 0.9557750924830416],
   ["chrono-12", "Chrono 12", "wedge", 1.080411272370425],
-  ["colt-gt", "Colt GT", "muscle", 1.0298041716846214],
+  ["colt-gt", "Colt GT", "muscle", 1.0679081921361615],
 ];
 
 export const CIRCUIT_MODELS = Object.freeze(REPRESENTATIVE_MODELS.map(

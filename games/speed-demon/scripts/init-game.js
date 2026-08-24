@@ -11,7 +11,7 @@
 // carries it out.
 
 import { DEFAULT_CAR, RACE_DISTANCES, TICK_MS, TICK_SECONDS } from "./sim/constants.js";
-import { createGameAudio, raceSoundEvents, stickMoved } from "./audio.js";
+import { circuitCountdownCue, createGameAudio, raceSoundEvents, stickMoved } from "./audio.js";
 import { GATE_6_SPEED, createGate } from "./sim/gate.js";
 import { modeById, objectiveOption, raceOptionsFor } from "./sim/modes.js";
 import { createRace, startRace, stepRace, pressShift, gateInput, STAGING, FINISHED } from "./sim/race.js";
@@ -1621,6 +1621,8 @@ export function boot(canvas, options = {}) {
       ensureCircuitRoadMask(circuitTrack);
       circuitRace = activeRuntime.create(runtimeDefinition);
       circuitView = createCircuitView(circuitRace, circuitTrack);
+      const cue = circuitCountdownCue(null, circuitRace);
+      if (cue) audio.play(cue);
     } else {
       race = activeRuntime.create(runtimeDefinition).race;
       circuitRace = null;
@@ -2841,6 +2843,7 @@ export function boot(canvas, options = {}) {
   }
 
   function tickCircuitRuntime() {
+    const previousCircuitRace = circuitRace;
     const controls = input.circuitControls();
     const syncCircuitEngine = (active = true) => {
       const local = circuitRace.participants.find((participant) => participant.control === "local")
@@ -2882,6 +2885,8 @@ export function boot(canvas, options = {}) {
       circuitRace = activeRuntime.step(circuitRace, 1 / 120);
       circuitRace = activeRuntime.step(circuitRace, 1 / 120);
     }
+    const countdownSound = circuitCountdownCue(previousCircuitRace, circuitRace);
+    if (countdownSound) audio.play(countdownSound);
     circuitView = stepCircuitView(circuitView, circuitRace, TICK_SECONDS, {
       viewportWidth: WORLD.width,
       viewportHeight: WORLD.height,

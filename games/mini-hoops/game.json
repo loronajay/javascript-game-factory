@@ -1,0 +1,11 @@
+{
+  "title": "Mini Hoops",
+  "tagline": "Pull back. Read the rim. Sink it before the clock does.",
+  "description": "Pull-back mini basketball where one drag sets power, aim and arc at once. Four hoop motion modes, two round lengths, five rooms and three balls, scored against local best-run boards.",
+  "players": "1",
+  "status": "Playable - solo time attack",
+  "order": 15,
+  "featured": false,
+  "theme": "court",
+  "accentColor": "#f08a34"
+}

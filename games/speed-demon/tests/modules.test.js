@@ -561,6 +561,18 @@ test("the debug handle can move on every screen that owns a cursor", () => {
   }
 });
 
+test("circuit races route every countdown transition through the shared tree audio", () => {
+  const source = fs.readFileSync(path.join(gameRoot, "scripts/init-game.js"), "utf8");
+  assert(
+    source.includes("circuitCountdownCue(null, circuitRace)"),
+    "the initial 3 light has no circuit audio cue",
+  );
+  assert(
+    source.includes("circuitCountdownCue(previousCircuitRace, circuitRace)"),
+    "the 2, 1 and GO circuit transitions have no audio cue",
+  );
+});
+
 test("the campaign's rules never reach for a browser", () => {
   // The fifth instance of the split, after the radio, the garage, online and
   // the records boards. The catalog, the career and the screen are pure;

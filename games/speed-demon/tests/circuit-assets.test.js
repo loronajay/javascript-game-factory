@@ -137,6 +137,31 @@ test("every atlas is eight transparent 64px frames clockwise from north", () => 
   }
 });
 
+test("each atlas records whether its generated source labels describe the camera side or the nose", () => {
+  for (const model of CIRCUIT_MODELS) {
+    const manifest = JSON.parse(fs.readFileSync(path.join(CARS_DIR, model.manifest), "utf8"));
+    const expected = model.modelId === "colt-gt"
+      ? "physical-nose-clockwise-from-north"
+      : "camera-side-opposite-physical-nose";
+    assertEqual(
+      manifest.source.headingConvention,
+      expected,
+      `${model.modelId} source convention is undocumented, so a blanket repair can reverse it`,
+    );
+  }
+});
+
+test("Colt GT keeps its authored east and west views instead of receiving the opposite-side repair", () => {
+  const manifest = JSON.parse(fs.readFileSync(
+    path.join(CARS_DIR, "colt-gt", "spritesheet.json"),
+    "utf8",
+  ));
+  assertEqual(manifest.frames[2].direction, "east");
+  assertEqual(manifest.frames[2].sourceBounds.x, 524, "Colt east was replaced by its west-facing source view");
+  assertEqual(manifest.frames[6].direction, "west");
+  assertEqual(manifest.frames[6].sourceBounds.x, 1559, "Colt west was replaced by its east-facing source view");
+});
+
 test("asset repair metadata uses the canonical physical heading of each frame", () => {
   for (const model of CIRCUIT_MODELS) {
     const manifest = JSON.parse(fs.readFileSync(path.join(CARS_DIR, model.manifest), "utf8"));

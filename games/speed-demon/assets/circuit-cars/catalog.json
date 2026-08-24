@@ -85,7 +85,7 @@
       "modelId": "colt-gt",
       "label": "Colt GT",
       "archetype": "muscle",
-      "renderScale": 1.0298041716846214,
+      "renderScale": 1.0679081921361615,
       "spritesheet": "colt-gt/spritesheet-clockwise-from-north.png",
       "manifest": "colt-gt/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }

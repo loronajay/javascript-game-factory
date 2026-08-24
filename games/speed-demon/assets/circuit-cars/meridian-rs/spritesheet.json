@@ -19,7 +19,8 @@
     "image": "source/meridian-rs-eight-direction-master-v1.png",
     "provider": "OpenAI ImageGen",
     "role": "generated rotation master",
-    "backgroundExtraction": "none"
+    "backgroundExtraction": "none",
+    "headingConvention": "camera-side-opposite-physical-nose"
   },
   "frames": [
     {

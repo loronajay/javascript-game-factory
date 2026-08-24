@@ -10,6 +10,7 @@ $directions = @(
   "south", "south-west", "west", "north-west"
 )
 $canonicalConvention = "physical-nose-clockwise-from-north"
+$cameraSideConvention = "camera-side-opposite-physical-nose"
 
 Get-ChildItem -LiteralPath $carsRoot -Filter "spritesheet.json" -Recurse | ForEach-Object {
   $manifestPath = [IO.Path]::GetFullPath($_.FullName)
@@ -28,6 +29,14 @@ Get-ChildItem -LiteralPath $carsRoot -Filter "spritesheet.json" -Recurse | ForEa
   if ($manifest.frameWidth -ne 64 -or $manifest.frameHeight -ne 64 -or $manifest.frameCount -ne 8) {
     throw "Unexpected atlas shape for $($manifest.modelId)"
   }
+  $sourceConvention = $manifest.source.headingConvention
+  if ($sourceConvention -eq $canonicalConvention) {
+    $sourceFrameOffset = 0
+  } elseif ($sourceConvention -eq $cameraSideConvention) {
+    $sourceFrameOffset = 4
+  } else {
+    throw "Unknown source heading convention for $($manifest.modelId): $sourceConvention"
+  }
 
   $imagePath = [IO.Path]::GetFullPath((Join-Path $_.DirectoryName $manifest.image))
   if (-not $imagePath.StartsWith($rootPrefix, [StringComparison]::OrdinalIgnoreCase)) {
@@ -41,7 +50,7 @@ Get-ChildItem -LiteralPath $carsRoot -Filter "spritesheet.json" -Recurse | ForEa
     $output = New-Object Drawing.Bitmap(512, 64, [Drawing.Imaging.PixelFormat]::Format32bppArgb)
     try {
       for ($targetFrame = 0; $targetFrame -lt 8; $targetFrame += 1) {
-        $sourceFrame = ($targetFrame + 4) % 8
+        $sourceFrame = ($targetFrame + $sourceFrameOffset) % 8
         for ($y = 0; $y -lt 64; $y += 1) {
           for ($x = 0; $x -lt 64; $x += 1) {
             $output.SetPixel($targetFrame * 64 + $x, $y, $source.GetPixel($sourceFrame * 64 + $x, $y))
@@ -60,16 +69,16 @@ Get-ChildItem -LiteralPath $carsRoot -Filter "spritesheet.json" -Recurse | ForEa
   $oldFrames = @($manifest.frames)
   $manifest.frames = @(
     for ($targetFrame = 0; $targetFrame -lt 8; $targetFrame += 1) {
-      $frame = $oldFrames[($targetFrame + 4) % 8]
+      $frame = $oldFrames[($targetFrame + $sourceFrameOffset) % 8]
       $frame.direction = $directions[$targetFrame]
       $frame
     }
   )
   foreach ($repair in @($manifest.repairs)) {
     if ($null -eq $repair) { continue }
-    $repair.targetFrame = ($repair.targetFrame + 4) % 8
+    $repair.targetFrame = ($repair.targetFrame - $sourceFrameOffset + 8) % 8
     $repair.targetHeading = $directions[$repair.targetFrame]
-    $repair.mirroredFromFrame = ($repair.mirroredFromFrame + 4) % 8
+    $repair.mirroredFromFrame = ($repair.mirroredFromFrame - $sourceFrameOffset + 8) % 8
     $repair.mirroredFromHeading = $directions[$repair.mirroredFromFrame]
   }
   $manifest | Add-Member -NotePropertyName headingConvention -NotePropertyValue $canonicalConvention

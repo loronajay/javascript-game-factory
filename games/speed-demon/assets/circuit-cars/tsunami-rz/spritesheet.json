@@ -19,7 +19,8 @@
     "image": "source/tsunami-rz-eight-direction-master-v1.png",
     "provider": "OpenAI ImageGen",
     "role": "generated rotation master",
-    "backgroundExtraction": "edge-connected-neutral"
+    "backgroundExtraction": "edge-connected-neutral",
+    "headingConvention": "camera-side-opposite-physical-nose"
   },
   "repairs": [
     {

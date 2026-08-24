@@ -77,6 +77,21 @@ export function countdownCue(previous, next) {
   return nextBulb < previousBulb ? "countdownLow" : null;
 }
 
+/** Maps the circuit reducer's status names onto the same 3-2-1-GO tree. */
+export function circuitCountdownCue(previous, next) {
+  if (!next) return null;
+  if (!previous) {
+    return next.status === "countdown" && Math.ceil(Math.max(0, next.countdown)) > 0
+      ? "countdownLow"
+      : null;
+  }
+  const asDragState = (state) => ({
+    phase: state.status === "racing" ? "running" : state.status,
+    countdown: state.countdown,
+  });
+  return countdownCue(asDragState(previous), asDragState(next));
+}
+
 /** One-shot sounds that are implied by a race transition. */
 export function raceSoundEvents(previous, next) {
   const events = [];

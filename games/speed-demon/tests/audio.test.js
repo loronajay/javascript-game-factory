@@ -2,6 +2,7 @@ import { suite, test, assert, assertEqual, assertDeepEqual, assertClose, finish 
 
 import {
   SOUND_SOURCES,
+  circuitCountdownCue,
   circuitEngineMix,
   countdownCue,
   raceSoundEvents,
@@ -37,6 +38,20 @@ test("the tree ticks low at each amber and high on green", () => {
   assertEqual(countdownCue(almostTwo, two), "countdownLow");
   assertEqual(countdownCue(two, one), "countdownLow");
   assertEqual(countdownCue(one, green), "countdownHigh");
+});
+
+test("the circuit lights reuse the drag tree sounds for 3-2-1-GO", () => {
+  const three = { status: "countdown", countdown: 3 };
+  const almostTwo = { status: "countdown", countdown: 2.01 };
+  const two = { status: "countdown", countdown: 1.99 };
+  const one = { status: "countdown", countdown: 0.99 };
+  const green = { status: "racing", countdown: 0 };
+
+  assertEqual(circuitCountdownCue(null, three), "countdownLow", "3 must sound when the race is built");
+  assertEqual(circuitCountdownCue(three, almostTwo), null, "3 must not repeat every physics tick");
+  assertEqual(circuitCountdownCue(almostTwo, two), "countdownLow");
+  assertEqual(circuitCountdownCue(two, one), "countdownLow");
+  assertEqual(circuitCountdownCue(one, green), "countdownHigh");
 });
 
 test("only a newly completed perfect shift earns the perfect cue", () => {
