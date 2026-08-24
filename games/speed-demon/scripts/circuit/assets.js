@@ -25,14 +25,14 @@ export const CIRCUIT_FRAME_HEADINGS = CIRCUIT_DIRECTIONS;
 // factors normalize their mean visible area, so choosing a slim body does not
 // make the player's car look smaller than the fixed CPU model in a race.
 const REPRESENTATIVE_MODELS = [
-  ["kaido-gts", "Kaido GTS", "gt", 1.0404223810178697],
-  ["tsunami-rz", "Tsunami RZ", "coupe", 0.9736575032883077],
-  ["meridian-rs", "Meridian RS", "euro", 1.001656433139303],
-  ["skyward-r", "Skyward R", "gt", 1.037823336392831],
-  ["toro-sv", "Toro SV", "exotic", 0.9765656028304245],
-  ["scalpel-r", "Scalpel R", "hatch", 0.9729539197796079],
-  ["chrono-12", "Chrono 12", "wedge", 0.9989523711318379],
-  ["colt-gt", "Colt GT", "muscle", 1.0054534480305393],
+  ["kaido-gts", "Kaido GTS", "gt", 1.08283424713437],
+  ["tsunami-rz", "Tsunami RZ", "coupe", 0.9439812351400176],
+  ["meridian-rs", "Meridian RS", "euro", 0.9696792529865279],
+  ["skyward-r", "Skyward R", "gt", 1.0133990378504156],
+  ["toro-sv", "Toro SV", "exotic", 0.8816582348554188],
+  ["scalpel-r", "Scalpel R", "hatch", 1.043432172800136],
+  ["chrono-12", "Chrono 12", "wedge", 1.0764103447512017],
+  ["colt-gt", "Colt GT", "muscle", 1.0373220569718429],
 ];
 
 export const CIRCUIT_MODELS = Object.freeze(REPRESENTATIVE_MODELS.map(

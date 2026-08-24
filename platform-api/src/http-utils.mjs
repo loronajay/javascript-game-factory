@@ -44,7 +44,7 @@ export function applyCorsHeaders(res, requestOrigin) {
         // credentials, so the browser blocks any cross-origin credentialed read.
         res.setHeader("vary", "Origin");
     }
-    res.setHeader("access-control-allow-methods", "GET,POST,PUT,DELETE,OPTIONS");
+    res.setHeader("access-control-allow-methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
     res.setHeader("access-control-allow-headers", "content-type, authorization");
 }
 export function writeJson(res, statusCode, payload, requestOrigin) {

@@ -1,9 +1,13 @@
-import { CIRCUIT_TRACKS } from "../scripts/circuit/tracks.js";
-import { roadMaskFromImage } from "../scripts/circuit/road-mask.js";
-import { createVehicle, getSpeed, stepVehicle } from "../scripts/circuit/vehicle.js";
-import { resolveTrackCollision } from "../scripts/circuit/collision.js";
-import { CIRCUIT_FRAME_SIZE, circuitModelById } from "../scripts/circuit/assets.js";
-import { circuitFrameIndex } from "../scripts/circuit/sprite-geometry.js";
+import { CIRCUIT_TRACKS } from "../scripts/circuit/tracks.js?v=downtown-curb-path-final7";
+import { roadMaskFromImage } from "../scripts/circuit/road-mask.js?v=downtown-curb-path-final7";
+import { createVehicle, getSpeed, stepVehicle } from "../scripts/circuit/vehicle.js?v=downtown-curb-path-final7";
+import { resolveTrackCollision } from "../scripts/circuit/collision.js?v=downtown-curb-path-final7";
+import { CIRCUIT_FRAME_SIZE, circuitModelById } from "../scripts/circuit/assets.js?v=downtown-curb-path-final7";
+import {
+  circuitDrawBox,
+  circuitFrameIndex,
+  measureCircuitFrameGeometry,
+} from "../scripts/circuit/sprite-geometry.js?v=downtown-curb-path-final7";
 
 const canvas = document.querySelector("#viewer");
 const ctx = canvas.getContext("2d");
@@ -33,6 +37,19 @@ let impactAge = 0;
 
 const car = circuitModelById("kaido-gts");
 const carImage = new Image();
+let carGeometry = null;
+carImage.onload = () => {
+  const source = document.createElement("canvas");
+  source.width = carImage.naturalWidth;
+  source.height = carImage.naturalHeight;
+  const context = source.getContext("2d", { willReadFrequently: true });
+  context.drawImage(carImage, 0, 0);
+  const image = context.getImageData(0, 0, source.width, source.height);
+  carGeometry = measureCircuitFrameGeometry(image.data, image.width, image.height).map((frame) => ({
+    ...frame,
+    scale: frame.scale * car.renderScale,
+  }));
+};
 carImage.src = `../${car.src}`;
 
 function loadImage(src) {
@@ -88,7 +105,8 @@ async function selectTrack(id) {
   const selected = CIRCUIT_TRACKS.find((entry) => entry.id === id) ?? CIRCUIT_TRACKS[0];
   const token = ++loadingToken;
   status.textContent = `Loading ${selected.label}…`;
-  const [art, mask] = await Promise.all([loadImage(selected.src), loadImage(selected.roadMask)]);
+  const versioned = (src) => `${src}?viewer=downtown-curb-path-final7`;
+  const [art, mask] = await Promise.all([loadImage(versioned(selected.src)), loadImage(versioned(selected.roadMask))]);
   if (token !== loadingToken) return;
   track = selected;
   trackImage = art;
@@ -159,7 +177,8 @@ function drawCar() {
   if (carImage.complete && carImage.naturalWidth > 0) {
     const frame = circuitFrameIndex(vehicle.angle);
     const size = CIRCUIT_FRAME_SIZE;
-    ctx.drawImage(carImage, frame * size, 0, size, size, vehicle.x - 32, vehicle.y - 32, 64, 64);
+    const box = circuitDrawBox(vehicle.x, vehicle.y, size, carGeometry?.[frame]);
+    ctx.drawImage(carImage, frame * size, 0, size, size, box.x, box.y, box.width, box.height);
   } else {
     ctx.translate(vehicle.x, vehicle.y);
     ctx.rotate(vehicle.angle);

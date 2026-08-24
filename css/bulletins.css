@@ -366,6 +366,16 @@
   line-height: 1.7;
 }
 
+/* The notice itself, one <p> per authored paragraph. Dimmer and slightly smaller than the
+ * summary so the standfirst still leads the card when a bulletin carries both. */
+.bulletin-card__body {
+  margin: 0;
+  color: rgba(255, 248, 255, 0.72);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  white-space: pre-line;
+}
+
 /* Attachment (a tournament flyer, a patch banner).
  *
  * Letterboxed on a matte rather than cropped to fit, the same rule the profile backgrounds

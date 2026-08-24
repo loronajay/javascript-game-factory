@@ -7,12 +7,11 @@ import { CIRCUIT_FRAME_SIZE } from "./assets.js";
 import { directionIndex } from "./vehicle.js";
 
 const CIRCUIT_ALPHA_THRESHOLD = 8;
-const CIRCUIT_THREE_QUARTER_SCALE = 1.05;
-const CIRCUIT_SIDE_MIN_SCALE = 1.1;
-
 /** World heading to the atlas frame whose visible nose points that way. */
 export function circuitFrameIndex(angle) {
-  return directionIndex(angle);
+  // The generated columns are named for the view presented to the camera; the
+  // physical nose points in the opposite world direction.
+  return (directionIndex(angle) + 4) % 8;
 }
 
 export function circuitDrawBox(centreX, centreY, baseSize, geometry = null) {
@@ -60,11 +59,10 @@ export function localCarCoordinates(
 /**
  * Measures every frame as its own camera view.
  *
- * The source master changes perspective as it turns. The front is the authored
- * cardinal reference. A rear view with more visible mass is reduced to match
- * it (an already smaller rear is left alone). The four three-quarter views get
- * a restrained 5% lift, while each exact side profile is enlarged by its
- * measured loss of alpha-weighted body mass against its neighbouring views.
+ * The source master changes perspective and apparent scale as it turns. The
+ * authored first view is the reference; every other heading is scaled so its
+ * alpha-weighted body area matches that reference exactly. Width and height
+ * remain perspective-correct, so side views stay wide and cardinal views tall.
  *
  * The measured oriented bounds are also the UV calibration for liveries. Each
  * independently generated view gets its own nose, tail, left and right rather
@@ -136,24 +134,12 @@ export function measureCircuitFrameGeometry(
     };
   });
 
-  return measured.map((frame, frameIndex) => {
-    const directSide = frameIndex === 2 || frameIndex === 6;
-    const threeQuarter = frameIndex % 2 === 1;
-    const rear = frameIndex === 4;
-    const targetAlphaArea = rear
-      ? Math.min(frame.alphaArea, measured[0].alphaArea)
-      : directSide
-      ? (measured[(frameIndex + frameCount - 1) % frameCount].alphaArea
-        + measured[(frameIndex + 1) % frameCount].alphaArea) / 2
-      : frame.alphaArea;
+  const targetAlphaArea = measured[0]?.alphaArea ?? 1;
+  return measured.map((frame) => {
     return Object.freeze({
       ...frame,
       targetAlphaArea,
-      scale: directSide
-        ? Math.max(CIRCUIT_SIDE_MIN_SCALE, Math.sqrt(targetAlphaArea / frame.alphaArea))
-        : threeQuarter
-          ? CIRCUIT_THREE_QUARTER_SCALE
-          : rear ? Math.sqrt(targetAlphaArea / frame.alphaArea) : 1,
+      scale: Math.sqrt(targetAlphaArea / frame.alphaArea),
     });
   });
 }

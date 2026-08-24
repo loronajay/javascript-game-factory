@@ -30,14 +30,96 @@ function maskFor(track) {
   };
 }
 
-test("the catalog contains two location-named circuits rather than one named theme", () => {
+function curbAlignmentScore(track, radius = 5, bounds = {}) {
+  const art = readPng(fs.readFileSync(path.join(GAME_DIR, track.src)));
+  const { image: maskImage } = maskFor(track);
+  const { width, height, pixels } = art;
+  const isRoad = (x, y) => maskImage.pixels[(y * width + x) * 4] === 255;
+  const isCurbPaint = (x, y) => {
+    if (x < 0 || x >= width || y < 0 || y >= height) return false;
+    const offset = (y * width + x) * 4;
+    const red = pixels[offset];
+    const green = pixels[offset + 1];
+    const blue = pixels[offset + 2];
+    const white = Math.min(red, green, blue) >= 88 && Math.max(red, green, blue) - Math.min(red, green, blue) <= 58;
+    const curbRed = red >= 72 && red >= green * 1.35 && red >= blue * 1.15;
+    return white || curbRed;
+  };
+
+  let aligned = 0;
+  let sampled = 0;
+  const left = Math.max(1, bounds.x ?? 1);
+  const top = Math.max(1, bounds.y ?? 1);
+  const right = Math.min(width - 1, left + (bounds.width ?? width - 2));
+  const bottom = Math.min(height - 1, top + (bounds.height ?? height - 2));
+  for (let y = top; y < bottom; y += 1) {
+    for (let x = left; x < right; x += 1) {
+      if (!isRoad(x, y)) continue;
+      if (isRoad(x - 1, y) && isRoad(x + 1, y) && isRoad(x, y - 1) && isRoad(x, y + 1)) continue;
+      if ((x + y) % 5 !== 0) continue;
+      sampled += 1;
+      let found = false;
+      for (let dy = -radius; dy <= radius && !found; dy += 1) {
+        for (let dx = -radius; dx <= radius; dx += 1) {
+          if (dx * dx + dy * dy > radius * radius) continue;
+          if (isCurbPaint(x + dx, y + dy)) {
+            found = true;
+            break;
+          }
+        }
+      }
+      if (found) aligned += 1;
+    }
+  }
+  return aligned / sampled;
+}
+
+function columnEdgeRoughness(track, bounds, edge) {
+  const { image } = maskFor(track);
+  const values = [];
+  for (let x = bounds.x; x < bounds.x + bounds.width; x += 1) {
+    const roadRows = [];
+    for (let y = bounds.y; y < bounds.y + bounds.height; y += 1) {
+      if (image.pixels[(y * image.width + x) * 4] === 255) roadRows.push(y);
+    }
+    if (roadRows.length > 0) values.push(edge === "top" ? roadRows[0] : roadRows.at(-1));
+  }
+  const deviations = [];
+  const radius = 10;
+  for (let index = radius; index < values.length - radius; index += 1) {
+    const window = values.slice(index - radius, index + radius + 1).sort((a, b) => a - b);
+    deviations.push(Math.abs(values[index] - window[Math.floor(window.length / 2)]));
+  }
+  deviations.sort((a, b) => a - b);
+  return deviations[Math.floor(deviations.length * 0.95)];
+}
+
+function columnEdgeCurvature(track, bounds, edge) {
+  const { image } = maskFor(track);
+  const values = [];
+  for (let x = bounds.x; x < bounds.x + bounds.width; x += 1) {
+    const roadRows = [];
+    for (let y = bounds.y; y < bounds.y + bounds.height; y += 1) {
+      if (image.pixels[(y * image.width + x) * 4] === 255) roadRows.push(y);
+    }
+    if (roadRows.length > 0) values.push(edge === "top" ? roadRows[0] : roadRows.at(-1));
+  }
+  const span = 5;
+  const slopes = values.slice(span).map((value, index) => value - values[index]);
+  const changes = slopes.slice(span).map((value, index) => Math.abs(value - slopes[index])).sort((a, b) => a - b);
+  return changes[Math.floor(changes.length * 0.95)];
+}
+
+test("the catalog contains three location-named circuits rather than one named theme", () => {
   assertDeepEqual(CIRCUIT_TRACKS.map((track) => track.id), [
     "old-town-shrine-loop",
     "docklands-freight-loop",
+    "downtown-canal-ring",
   ]);
   assertDeepEqual(CIRCUIT_TRACKS.map((track) => track.label), [
     "Old Town Shrine Loop",
     "Docklands Freight Loop",
+    "Downtown Canal Ring",
   ]);
   assertEqual(DEFAULT_CIRCUIT_TRACK_ID, "old-town-shrine-loop");
   assertEqual(new Set(CIRCUIT_TRACKS.map((track) => track.id)).size, CIRCUIT_TRACKS.length);
@@ -91,15 +173,14 @@ test("Docklands collision reaches the visibly painted asphalt instead of a narro
   const { image, mask } = maskFor(track);
   const paintedRoadAnchors = [
     { x: 720, y: 770, label: "inside edge of the start straight" },
-    { x: 300, y: 440, label: "upper edge of the freight-yard sweep" },
+    { x: 300, y: 455, label: "asphalt beside the upper freight-yard curb" },
     { x: 300, y: 550, label: "lower edge of the freight-yard sweep" },
     { x: 1000, y: 225, label: "inside edge of the harbor hairpin" },
     { x: 1320, y: 500, label: "inside edge of the right-hand climb" },
-    { x: 700, y: 575, label: "upper edge of the central return" },
-    { x: 720, y: 905, label: "outside edge of the start straight" },
+    { x: 700, y: 590, label: "asphalt beside the upper central-return curb" },
+    { x: 720, y: 850, label: "asphalt beside the outside start-straight curb" },
     { x: 782, y: 480, label: "wide side of the upper S-bend" },
-    { x: 768, y: 490, label: "wide side of the central S-bend" },
-    { x: 1485, y: 438, label: "outside edge of the right-hand climb" },
+    { x: 850, y: 500, label: "central S-bend asphalt" },
   ];
   for (const point of paintedRoadAnchors) {
     assert(mask.containsPoint(point.x, point.y), `${point.label} is incorrectly blocked`);
@@ -112,6 +193,9 @@ test("Docklands collision reaches the visibly painted asphalt instead of a narro
     { x: 100, y: 200, label: "harbor crane apron" },
     { x: 912, y: 405, label: "narrow-side S-bend infield" },
     { x: 933, y: 533, label: "central crane infield" },
+    { x: 1485, y: 438, label: "dock apron beyond the right-hand climb" },
+    { x: 1304, y: 315, label: "paved shoulder beyond the upper-right curb" },
+    { x: 1182, y: 209, label: "paved shoulder beyond the top-right crest" },
   ];
   for (const point of sceneryAnchors) {
     assert(!mask.containsPoint(point.x, point.y), `${point.label} is incorrectly driveable`);
@@ -127,25 +211,124 @@ test("Docklands collision reaches the visibly painted asphalt instead of a narro
     const next = track.racingLine[(index + 1) % track.racingLine.length];
     lapLength += Math.hypot(next.x - point.x, next.y - point.y);
   }
-  assert(roadPixels / lapLength >= 132, "Docklands usable width must be comparable to the original circuit");
+  const averageRoadWidth = roadPixels / lapLength;
+  assert(averageRoadWidth >= 105, `Docklands average road width ${averageRoadWidth.toFixed(1)} is implausibly narrow`);
+});
+
+test("Docklands collision edge hugs its painted curbs as closely as the Old Town mask", () => {
+  const oldTownScore = curbAlignmentScore(circuitTrackById("old-town-shrine-loop"));
+  const docklandsScore = curbAlignmentScore(circuitTrackById("docklands-freight-loop"));
+  assert(
+    docklandsScore >= oldTownScore * 0.95,
+    `Docklands curb alignment ${docklandsScore.toFixed(3)} must be at least 95% of Old Town ${oldTownScore.toFixed(3)}`,
+  );
+});
+
+test("Downtown collision follows the paired canal curbs instead of swallowing its infields", () => {
+  const track = circuitTrackById("downtown-canal-ring");
+  const { mask } = maskFor(track);
+  const paintedRoadAnchors = [
+    { x: 845, y: 835, label: "start straight" },
+    { x: 1375, y: 500, label: "right-side canal climb" },
+    { x: 1240, y: 140, label: "upper-right hairpin" },
+    { x: 960, y: 470, label: "central double-apex" },
+    { x: 580, y: 340, label: "upper-left return" },
+    { x: 240, y: 155, label: "left hairpin" },
+    { x: 150, y: 500, label: "left-side canal descent" },
+  ];
+  for (const point of paintedRoadAnchors) {
+    assert(mask.containsPoint(point.x, point.y), `${point.label} is incorrectly blocked`);
+  }
+
+  const sceneryAnchors = [
+    { x: 960, y: 120, label: "canal above the upper-right hairpin" },
+    { x: 700, y: 600, label: "central tower infield" },
+    { x: 1150, y: 600, label: "right canal infield" },
+    { x: 300, y: 500, label: "left tower infield" },
+    { x: 20, y: 500, label: "city beyond the outer left curb" },
+    { x: 1260, y: 220, label: "upper-right plaza infield" },
+    { x: 980, y: 610, label: "lower central infield" },
+    { x: 1050, y: 390, label: "central canal shoulder above the double-apex" },
+    { x: 1080, y: 370, label: "central hairpin shoulder outside the curb" },
+  ];
+  for (const point of sceneryAnchors) {
+    assert(!mask.containsPoint(point.x, point.y), `${point.label} is incorrectly driveable`);
+  }
+
+  // Downtown's curb blocks carry darker seams and broader wet reflections than
+  // the original art, so compare both tracks with the same eight-pixel radius.
+  const oldTownScore = curbAlignmentScore(circuitTrackById("old-town-shrine-loop"), 8);
+  const downtownScore = curbAlignmentScore(track, 8);
+  assert(
+    downtownScore >= oldTownScore * 0.95,
+    `Downtown curb alignment ${downtownScore.toFixed(3)} must be at least 95% of Old Town ${oldTownScore.toFixed(3)}`,
+  );
+});
+
+test("Downtown collision stays curb-tight in each reported failure region", () => {
+  const track = circuitTrackById("downtown-canal-ring");
+  const regions = [
+    { x: 1240, y: 210, width: 220, height: 650, label: "right climb and lower return" },
+    { x: 70, y: 70, width: 790, height: 390, label: "upper-left hairpin and straight" },
+    { x: 70, y: 650, width: 620, height: 230, label: "lower-left inner exit" },
+    { x: 650, y: 250, width: 650, height: 340, radius: 3, label: "central double-apex" },
+  ];
+  for (const region of regions) {
+    const score = curbAlignmentScore(track, region.radius ?? 1, region);
+    assert(score >= 0.90, `${region.label} curb alignment ${score.toFixed(3)} must be at least 0.900`);
+  }
+});
+
+test("Downtown upper-right contour stays directly on the finished curb paint", () => {
+  const track = circuitTrackById("downtown-canal-ring");
+  const regions = [
+    { x: 650, y: 280, width: 520, height: 190, label: "central bend upper edge" },
+    { x: 650, y: 430, width: 520, height: 130, label: "central bend lower edge" },
+    { x: 900, y: 60, width: 570, height: 320, label: "right hairpin" },
+    { x: 1250, y: 200, width: 230, height: 360, label: "right chute" },
+  ];
+  const scores = regions.map((region) => ({
+    label: region.label,
+    score: curbAlignmentScore(track, 3, region),
+  }));
+  const centralBounds = { x: 650, y: 280, width: 520, height: 280 };
+  const roughness = {
+    upper: columnEdgeRoughness(track, centralBounds, "top"),
+    lower: columnEdgeRoughness(track, centralBounds, "bottom"),
+  };
+  const curvature = {
+    upper: columnEdgeCurvature(track, centralBounds, "top"),
+    lower: columnEdgeCurvature(track, centralBounds, "bottom"),
+  };
+  assert(
+    scores.every(({ score }) => score >= 0.93)
+      && roughness.upper <= 1
+      && roughness.lower <= 1
+      && curvature.upper <= 3
+      && curvature.lower <= 3,
+    `${scores.map(({ label, score }) => `${label} ${score.toFixed(3)}`).join(", ")}; central roughness upper ${roughness.upper}, lower ${roughness.lower}; curvature upper ${curvature.upper}, lower ${curvature.lower}`,
+  );
 });
 
 test("the track viewer exercises the real catalog, vehicle step and collision resolver", () => {
   const html = fs.readFileSync(path.join(GAME_DIR, "tools", "circuit-track-viewer.html"), "utf8");
   const source = fs.readFileSync(path.join(GAME_DIR, "tools", "circuit-track-viewer.js"), "utf8");
   assert(html.includes("Circuit Track Viewer"));
-  assert(source.includes('from "../scripts/circuit/tracks.js"'));
-  assert(source.includes('from "../scripts/circuit/vehicle.js"'));
-  assert(source.includes('from "../scripts/circuit/collision.js"'));
+  assert(source.includes('../scripts/circuit/tracks.js'));
+  assert(source.includes('../scripts/circuit/vehicle.js'));
+  assert(source.includes('../scripts/circuit/collision.js'));
   assert(source.includes("resolveTrackCollision"));
   assert(source.includes("buildMaskEdge"));
   assert(source.includes("maskEdgeCanvas"));
+  assert(source.includes("measureCircuitFrameGeometry"));
+  assert(source.includes("circuitDrawBox"));
   assert(!source.includes("ctx.drawImage(maskImage"), "viewer must draw the mask boundary, not wash over the whole road");
 });
 
-test("both location ids resolve through the shared catalog", () => {
+test("all location ids resolve through the shared catalog", () => {
   assertEqual(circuitTrackById("old-town-shrine-loop")?.label, "Old Town Shrine Loop");
   assertEqual(circuitTrackById("docklands-freight-loop")?.label, "Docklands Freight Loop");
+  assertEqual(circuitTrackById("downtown-canal-ring")?.label, "Downtown Canal Ring");
   assertEqual(circuitTrackById("japan-noir"), null);
 });
 

@@ -43,7 +43,7 @@ export function applyCorsHeaders(res: any, requestOrigin: any): void {
     // credentials, so the browser blocks any cross-origin credentialed read.
     res.setHeader("vary", "Origin");
   }
-  res.setHeader("access-control-allow-methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.setHeader("access-control-allow-methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
   res.setHeader("access-control-allow-headers", "content-type, authorization");
 }
 

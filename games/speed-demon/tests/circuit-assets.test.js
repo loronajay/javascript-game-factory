@@ -50,12 +50,12 @@ test("availability never substitutes another model", () => {
 });
 
 test("world headings select the artwork frame whose nose points forward", () => {
-  // The compiler manifests and physical atlas columns share one order. Applying
-  // another half-turn here makes every car appear to drive tail-first.
-  assertEqual(circuitFrameIndex(0), 0);
-  assertEqual(circuitFrameIndex(Math.PI / 2), 2);
-  assertEqual(circuitFrameIndex(Math.PI), 4);
-  assertEqual(circuitFrameIndex(-Math.PI / 2), 6);
+  // The generated sheet names the camera-facing view, which is opposite the
+  // car's physical nose. World heading therefore needs one explicit half-turn.
+  assertEqual(circuitFrameIndex(0), 4);
+  assertEqual(circuitFrameIndex(Math.PI / 2), 6);
+  assertEqual(circuitFrameIndex(Math.PI), 0);
+  assertEqual(circuitFrameIndex(-Math.PI / 2), 2);
   assertDeepEqual(CIRCUIT_FRAME_HEADINGS, CIRCUIT_DIRECTIONS);
 });
 
@@ -121,31 +121,19 @@ test("every atlas is eight transparent 64px frames clockwise from north", () => 
   }
 });
 
-test("rear, three-quarter and side views are calibrated against the authored front", () => {
+test("all eight views normalize to one apparent car size", () => {
   for (const model of CIRCUIT_MODELS) {
     const sheet = readPng(fs.readFileSync(path.join(CARS_DIR, model.spritesheet)));
     const geometry = measureCircuitFrameGeometry(sheet.pixels, sheet.width, sheet.height);
     assertEqual(geometry[0].scale, 1, `${model.modelId} authored front was resized`);
-    const expectedRearScale = Math.min(1, Math.sqrt(geometry[0].alphaArea / geometry[4].alphaArea));
-    assertEqual(
-      Number(geometry[4].scale.toFixed(6)),
-      Number(expectedRearScale.toFixed(6)),
-      `${model.modelId} rear was not capped to its front-view mass`,
-    );
-    assert(
-      geometry[4].alphaArea * geometry[4].scale ** 2 <= geometry[0].alphaArea + 1e-6,
-      `${model.modelId} rear still renders larger than its front`,
-    );
-    for (const frame of [1, 3, 5, 7]) {
-      assertEqual(geometry[frame].scale, 1.05, `${model.modelId} frame ${frame} missed the 3/4 lift`);
-    }
-    for (const frame of [2, 6]) {
-      const before = geometry[(frame + 7) % 8].alphaArea;
-      const after = geometry[(frame + 1) % 8].alphaArea;
-      const targetArea = (before + after) / 2;
-      const expectedScale = Math.max(1.1, Math.sqrt(targetArea / geometry[frame].alphaArea));
-      assert(geometry[frame].scale > 1.05, `${model.modelId} frame ${frame} needs the stronger lift`);
-      assertEqual(Number(geometry[frame].scale.toFixed(6)), Number(expectedScale.toFixed(6)));
+    const targetArea = geometry[0].alphaArea;
+    for (const [frameIndex, frame] of geometry.entries()) {
+      assertClose(
+        frame.alphaArea * frame.scale ** 2,
+        targetArea,
+        targetArea * 0.01,
+        `${model.modelId} frame ${frameIndex} changes apparent size`,
+      );
     }
   }
 });

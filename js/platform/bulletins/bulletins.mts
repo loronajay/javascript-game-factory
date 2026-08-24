@@ -25,6 +25,9 @@ export interface Bulletin {
   imageUrl: string;
   publishedAt: string;
   createdBy: string;
+  // Display name for `createdBy`, resolved server-side. Empty for fixtures and for any
+  // author id with no profile behind it; the byline falls back to `createdBy` then.
+  createdByName: string;
 }
 
 // Shipped fallback content. Used only when the platform API cannot be reached at all —
@@ -42,6 +45,7 @@ export const DEFAULT_BULLETINS: readonly Bulletin[] = Object.freeze([
     imageUrl: "",
     publishedAt: "2026-04-19T19:00:00Z",
     createdBy: "system",
+    createdByName: "",
   },
   {
     id: "bulletin-2",
@@ -54,6 +58,7 @@ export const DEFAULT_BULLETINS: readonly Bulletin[] = Object.freeze([
     imageUrl: "",
     publishedAt: "2026-04-21T08:00:00Z",
     createdBy: "system",
+    createdByName: "",
   },
   {
     id: "bulletin-3",
@@ -66,6 +71,7 @@ export const DEFAULT_BULLETINS: readonly Bulletin[] = Object.freeze([
     imageUrl: "",
     publishedAt: "2026-04-22T08:00:00Z",
     createdBy: "system",
+    createdByName: "",
   },
 ]);
 
@@ -116,12 +122,15 @@ export function normalizeBulletin(bulletin: unknown = {}, index = 0): Bulletin {
     slug,
     title,
     summary: sanitizeTextBlock(source.summary, 220),
-    body: sanitizeTextBlock(source.body, 1200),
+    // Matches the server's own body cap so a long notice is not silently truncated on
+    // the way to the card, which renders the body in full.
+    body: sanitizeTextBlock(source.body, 4000),
     status: isBulletinStatus(status) ? status : "draft",
     audience: isBulletinAudience(audience) ? audience : "public",
     imageUrl: sanitizeImageUrl(source.imageUrl),
     publishedAt: sanitizeSingleLine(source.publishedAt, 40),
     createdBy: sanitizeSingleLine(source.createdBy, 40) || "system",
+    createdByName: sanitizeSingleLine(source.createdByName, 80),
   };
 }
 

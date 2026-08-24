@@ -1,5 +1,6 @@
 import { CIRCUIT_WORLD } from "./config.js";
 import { DOCKLANDS_TRACK_DATA } from "./docklands-track-data.js";
+import { DOWNTOWN_CANAL_TRACK_DATA } from "./downtown-canal-track-data.js";
 
 export const OLD_TOWN_SHRINE_LINE = Object.freeze([
   { x: 622, y: 861 }, { x: 973, y: 860 }, { x: 1216, y: 807 },
@@ -24,6 +25,11 @@ const oldTownCheckpoints = CHECKPOINT_INDICES.map((index) => Object.freeze({
 const docklandsLine = Object.freeze(DOCKLANDS_TRACK_DATA.racingLine.map(Object.freeze));
 const docklandsCheckpoints = DOCKLANDS_TRACK_DATA.checkpointIndices.map((index) => Object.freeze({
   ...docklandsLine[index],
+  radius: 112,
+}));
+const downtownCanalLine = Object.freeze(DOWNTOWN_CANAL_TRACK_DATA.racingLine.map(Object.freeze));
+const downtownCanalCheckpoints = DOWNTOWN_CANAL_TRACK_DATA.checkpointIndices.map((index) => Object.freeze({
+  ...downtownCanalLine[index],
   radius: 112,
 }));
 
@@ -61,6 +67,22 @@ export const CIRCUIT_TRACKS = Object.freeze([
     ]),
     checkpoints: Object.freeze(docklandsCheckpoints),
     racingLine: docklandsLine,
+  }),
+  Object.freeze({
+    id: "downtown-canal-ring",
+    label: "Downtown Canal Ring",
+    blurb: "A rain-black canal circuit threading Downtown towers and elevated rail lines.",
+    circuit: true,
+    src: "assets/circuit-tracks/downtown-canal-ring.png",
+    image: "assets/circuit-tracks/downtown-canal-ring.png",
+    roadMask: "assets/circuit-tracks/downtown-canal-ring-road-mask.png",
+    world: CIRCUIT_WORLD,
+    spawns: Object.freeze([
+      Object.freeze({ x: 845, y: 820, angle: Math.PI / 2 }),
+      Object.freeze({ x: 845, y: 850, angle: Math.PI / 2 }),
+    ]),
+    checkpoints: Object.freeze(downtownCanalCheckpoints),
+    racingLine: downtownCanalLine,
   }),
 ]);
 

@@ -22,6 +22,11 @@ export interface BulletinRecord {
   imageUrl: string;
   publishedAt: string;
   createdBy: string;
+  // The author's display name, resolved from the profile that `createdBy` points at.
+  // Empty when the id has no profile (or on an insert/update, which cannot join), and the
+  // browser falls back to `createdBy` then. Stored ids stay the durable reference; this is
+  // presentation only, so renaming a profile renames the byline everywhere at once.
+  createdByName: string;
   updatedAt: string;
 }
 
@@ -29,6 +34,16 @@ const SELECT_COLUMNS = `
   id, slug, title, summary, body, status, audience, pinned, image_url,
   published_at, created_by, updated_at
 `;
+
+// The read-path column list. Same columns, qualified and joined to the author's profile so
+// a board shows "Jay" rather than a player id. LEFT JOIN, because `created_by` is also the
+// literal "system" for shipped/seeded rows and those must still list.
+const SELECT_WITH_AUTHOR = `
+  b.id, b.slug, b.title, b.summary, b.body, b.status, b.audience, b.pinned, b.image_url,
+  b.published_at, b.created_by, b.updated_at,
+  coalesce(p.profile_name, '') as created_by_name
+`;
+const AUTHOR_JOIN = "left join player_profiles p on p.player_id = b.created_by";
 
 function mapRow(row: any): BulletinRecord {
   return {
@@ -43,6 +58,7 @@ function mapRow(row: any): BulletinRecord {
     imageUrl: String(row.image_url || ""),
     publishedAt: toIso(row.published_at),
     createdBy: String(row.created_by || "system"),
+    createdByName: String(row.created_by_name || ""),
     updatedAt: toIso(row.updated_at),
   };
 }
@@ -74,9 +90,9 @@ export async function listPublicBulletins(pool: any, options: any = {}): Promise
   const limit = Math.min(Math.max(Number.parseInt(String(options?.limit || "50"), 10) || 50, 1), 200);
   try {
     const result = await pool.query(
-      `select ${SELECT_COLUMNS} from bulletins
-        where status = 'published' and audience = 'public'
-        order by pinned desc, published_at desc nulls last, title asc
+      `select ${SELECT_WITH_AUTHOR} from bulletins b ${AUTHOR_JOIN}
+        where b.status = 'published' and b.audience = 'public'
+        order by b.pinned desc, b.published_at desc nulls last, b.title asc
         limit $1`,
       [limit],
     );
@@ -91,8 +107,8 @@ export async function listAllBulletins(pool: any): Promise<BulletinRecord[]> {
   if (!pool) return [];
   try {
     const result = await pool.query(
-      `select ${SELECT_COLUMNS} from bulletins
-        order by pinned desc, coalesce(published_at, updated_at) desc, title asc`,
+      `select ${SELECT_WITH_AUTHOR} from bulletins b ${AUTHOR_JOIN}
+        order by b.pinned desc, coalesce(b.published_at, b.updated_at) desc, b.title asc`,
     );
     return (result?.rows || []).map(mapRow);
   } catch {
@@ -104,8 +120,8 @@ export async function getPublicBulletinBySlug(pool: any, slug: any): Promise<Bul
   if (!pool || !slug) return null;
   try {
     const result = await pool.query(
-      `select ${SELECT_COLUMNS} from bulletins
-        where slug = $1 and status = 'published' and audience = 'public'`,
+      `select ${SELECT_WITH_AUTHOR} from bulletins b ${AUTHOR_JOIN}
+        where b.slug = $1 and b.status = 'published' and b.audience = 'public'`,
       [String(slug)],
     );
     return result?.rows?.[0] ? mapRow(result.rows[0]) : null;

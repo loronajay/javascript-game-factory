@@ -23,6 +23,7 @@ export const DEFAULT_BULLETINS = Object.freeze([
         imageUrl: "",
         publishedAt: "2026-04-19T19:00:00Z",
         createdBy: "system",
+        createdByName: "",
     },
     {
         id: "bulletin-2",
@@ -35,6 +36,7 @@ export const DEFAULT_BULLETINS = Object.freeze([
         imageUrl: "",
         publishedAt: "2026-04-21T08:00:00Z",
         createdBy: "system",
+        createdByName: "",
     },
     {
         id: "bulletin-3",
@@ -47,6 +49,7 @@ export const DEFAULT_BULLETINS = Object.freeze([
         imageUrl: "",
         publishedAt: "2026-04-22T08:00:00Z",
         createdBy: "system",
+        createdByName: "",
     },
 ]);
 function sanitizeSingleLine(value, maxLength = Number.POSITIVE_INFINITY) {
@@ -94,12 +97,15 @@ export function normalizeBulletin(bulletin = {}, index = 0) {
         slug,
         title,
         summary: sanitizeTextBlock(source.summary, 220),
-        body: sanitizeTextBlock(source.body, 1200),
+        // Matches the server's own body cap so a long notice is not silently truncated on
+        // the way to the card, which renders the body in full.
+        body: sanitizeTextBlock(source.body, 4000),
         status: isBulletinStatus(status) ? status : "draft",
         audience: isBulletinAudience(audience) ? audience : "public",
         imageUrl: sanitizeImageUrl(source.imageUrl),
         publishedAt: sanitizeSingleLine(source.publishedAt, 40),
         createdBy: sanitizeSingleLine(source.createdBy, 40) || "system",
+        createdByName: sanitizeSingleLine(source.createdByName, 80),
     };
 }
 export function buildPublicBulletinFeed(source = DEFAULT_BULLETINS) {

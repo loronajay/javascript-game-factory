@@ -22,6 +22,15 @@ function formatBulletinDate(value: any): string {
   }).format(new Date(timestamp));
 }
 
+// Authored bodies are plain text with blank lines between paragraphs. Splitting here keeps
+// the renderer escaping every character it prints — the body never becomes markup.
+function splitParagraphs(value: any): string[] {
+  return String(value || "")
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+}
+
 function formatStatusLabel(status: any): string {
   if (!status) return "Draft";
   return status.charAt(0).toUpperCase() + status.slice(1);
@@ -39,19 +48,25 @@ export function buildBulletinsPageViewModel(bulletins: any = buildPublicBulletin
       ? items.map((bulletin: any) => ({
           id: bulletin.id,
           title: bulletin.title,
-          summary: bulletin.summary || bulletin.body || "Fresh noticeboard signal incoming.",
-          body: bulletin.body,
+          // Summary and body are two different fields and the card shows both: the summary
+          // is the standfirst, the body is the notice itself. Only when a bulletin has
+          // neither does the card fall back to filler.
+          summary: bulletin.summary || (bulletin.body ? "" : "Fresh noticeboard signal incoming."),
+          bodyParagraphs: splitParagraphs(bulletin.body),
           imageUrl: bulletin.imageUrl || "",
           publishedLabel: formatBulletinDate(bulletin.publishedAt),
           statusLabel: formatStatusLabel(bulletin.status),
-          createdByLabel: bulletin.createdBy || "system",
+          // The stored author is a player id; the resolved profile name is what a reader
+          // should see. The id is the fallback so an author with no profile still gets a
+          // byline rather than a blank one.
+          createdByLabel: bulletin.createdByName || bulletin.createdBy || "system",
           isPlaceholder: false,
         }))
       : [{
           id: "bulletin-placeholder",
           title: "Noticeboard Warming Up",
           summary: "The bulletin board is still warming up. Public notices will appear here once more platform surfaces come online.",
-          body: "",
+          bodyParagraphs: [],
           imageUrl: "",
           publishedLabel: "Soon",
           statusLabel: "Standby",
@@ -107,7 +122,10 @@ function renderBulletinCard(item: any): string {
       </div>
       <h2 class="bulletin-card__title">${escapeHtml(item.title)}</h2>
       ${imageHtml}
-      <p class="bulletin-card__summary">${escapeHtml(item.summary)}</p>
+      ${item.summary ? `<p class="bulletin-card__summary">${escapeHtml(item.summary)}</p>` : ""}
+      ${(item.bodyParagraphs || [])
+        .map((paragraph: string) => `<p class="bulletin-card__body">${escapeHtml(paragraph)}</p>`)
+        .join("")}
       <p class="bulletin-card__meta">Posted by ${escapeHtml(item.createdByLabel)}</p>
     </article>
   `;
