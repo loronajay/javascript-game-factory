@@ -577,7 +577,11 @@ a:focus-visible {
   grid-template-columns: 1fr 1fr;
 }
 
-.result-label {
+/* Scoped through .overlay-card on purpose. Both of these are <p>, so the plain
+   `.result-*` class alone LOSES to the `.overlay-card p` rule above it on
+   specificity no matter how far down the file it sits — which is how the final
+   score spent a while being rendered as 12px dim body text. */
+.overlay-card .result-label {
   margin: 0;
   font-size: 10px;
   font-weight: 900;
@@ -585,7 +589,7 @@ a:focus-visible {
   color: rgba(255, 255, 255, 0.55);
 }
 
-.result-score {
+.overlay-card .result-score {
   margin: 6px 0 4px;
   font-size: 64px;
   font-weight: 950;
@@ -619,6 +623,76 @@ a:focus-visible {
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: rgba(255, 255, 255, 0.55);
+}
+
+/* --- Splash backdrops ----------------------------------------------------
+ *
+ * The title screen is not the only one that earns a painted room. Leaderboards
+ * is a trophy hall and How to Play is the court itself, each with its own pair
+ * of orientation crops in assets/menu-splashes/, picked by <picture> exactly as
+ * the menu's are.
+ *
+ * The marquee treatment stays in menu.css because it is a one-off object built
+ * out of the art. This is the plain version, and it is deliberately plainer:
+ * a backdrop, a scrim heavy enough to read a table through, and the existing
+ * panels sitting on top completely unchanged. These screens carry real content
+ * — a top five, three numbered rules — and content wins over atmosphere here in
+ * a way it does not on a title screen.
+ */
+
+.screen--splash {
+  position: relative;
+  /* Contains the backdrop's negative z-index, so it can sit behind the panels
+     without escaping behind the page itself. */
+  isolation: isolate;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.screen--splash.is-active {
+  padding: 20px;
+  min-height: calc(100dvh - 28px);
+}
+
+.splash-backdrop-layer {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+
+/* <picture> is an inline wrapper by default and would collapse, leaving the
+   img no percentage height to resolve against. */
+.splash-backdrop-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.splash-backdrop {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Heavier at the top and bottom than through the middle: the headers and the
+   longest rows are at the ends, and both splashes keep their subject — the
+   trophy cases, the hoop — out in the band this leaves alone. */
+.splash-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(13, 9, 8, 0.76) 0%,
+    rgba(13, 9, 8, 0.5) 30%,
+    rgba(13, 9, 8, 0.56) 62%,
+    rgba(13, 9, 8, 0.8) 100%
+  );
+}
+
+@media (max-width: 720px) {
+  .screen--splash.is-active {
+    padding: 14px;
+  }
 }
 
 /* --- Leaderboards ------------------------------------------------------- */
@@ -790,14 +864,24 @@ a:focus-visible {
   .game-screen.is-active {
     display: flex;
     flex-direction: column;
+    /* Centred, so whatever the court and the meter do not use is split above
+       and below them. Left at the default the slack all pooled beneath the
+       power meter and the court sat high with a third of the phone empty. */
+    justify-content: center;
+    gap: 8px;
     height: 100%;
     min-height: 0;
   }
 
+  /* The court is capped rather than stretched. Its canvas is drawn at a fixed
+     960x760 and cropped to width here, so a taller court is also a NARROWER
+     view of the room — past this the walls close in without the ball getting
+     usefully bigger. The cap still leaves the full travel of every hoop mode on
+     screen. */
   .game-screen .court {
-    flex: 0 0 auto;
+    flex: 0 1 auto;
     width: 100%;
-    height: min(62dvh, 520px);
+    height: min(66dvh, 580px);
     min-height: 330px;
     border-radius: 12px;
   }
@@ -865,6 +949,37 @@ a:focus-visible {
 
   .hud-hint {
     display: none;
+  }
+
+  /* The results card is the tallest thing in the cabinet, and a phone held
+     sideways is shorter than it is. Left alone it ran off both ends of the
+     screen with "Main Menu" below the fold — an overlay you cannot dismiss.
+     So it shrinks first and scrolls as a last resort. */
+  .overlay {
+    padding: 8px;
+  }
+
+  .overlay-card {
+    max-height: 100%;
+    padding: 14px 16px;
+    overflow-y: auto;
+  }
+
+  .overlay-card .result-score {
+    margin: 2px 0;
+    font-size: 38px;
+  }
+
+  .overlay-card h3 {
+    font-size: 19px;
+  }
+
+  .overlay-card p {
+    margin-bottom: 9px;
+  }
+
+  .result-grid {
+    margin: 9px 0;
   }
 }
 

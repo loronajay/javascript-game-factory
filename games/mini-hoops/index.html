@@ -12,12 +12,25 @@
       <a href="../../grid.html" class="back-link">&larr; Arcade</a>
 
       <!-- ============================ MENU ============================ -->
-      <!-- The room is the hero here: full strength, gently alive, with the
-           marquee lit on its wall. See styles/menu.css. -->
+      <!-- The splash is the hero here: full strength, gently alive, with the
+           marquee lit on its wall. See styles/menu.css.
+
+           Two crops of the same court, chosen by <picture> on orientation
+           rather than by script: the browser re-runs the media query when a
+           phone is rotated, so the swap is free and never lags a frame behind
+           the layout. Both are decorative, so a single alt covers the pair. -->
       <section id="menuScreen" class="screen is-active" aria-label="Main menu">
         <div id="menuScene" class="marquee-scene">
           <div class="marquee-drift">
-            <img id="menuBackdrop" class="marquee-backdrop" alt="" />
+            <picture class="marquee-backdrop-frame">
+              <source media="(orientation: portrait)" srcset="assets/menu-splashes/menu-portrait.jpg" />
+              <img
+                id="menuBackdrop"
+                class="marquee-backdrop"
+                src="assets/menu-splashes/menu-landscape.jpg"
+                alt="A neon-lit indoor court at dusk, a basketball resting on the floor"
+              />
+            </picture>
           </div>
           <div class="marquee-vignette" aria-hidden="true"></div>
 
@@ -192,7 +205,15 @@
       </section>
 
       <!-- ========================= LEADERBOARDS ======================== -->
-      <section id="boardsScreen" class="screen" aria-label="Local leaderboards">
+      <section id="boardsScreen" class="screen screen--splash" aria-label="Local leaderboards">
+        <div class="splash-backdrop-layer" aria-hidden="true">
+          <picture class="splash-backdrop-frame">
+            <source media="(orientation: portrait)" srcset="assets/menu-splashes/leaderboards-portrait.jpg" />
+            <img class="splash-backdrop" src="assets/menu-splashes/leaderboards-landscape.jpg" alt="" />
+          </picture>
+          <div class="splash-scrim"></div>
+        </div>
+
         <header class="screen-head">
           <button type="button" class="ghost-btn" data-intent="back">Back</button>
           <div>
@@ -225,7 +246,15 @@
       </section>
 
       <!-- =========================== HOW TO ============================ -->
-      <section id="howToScreen" class="screen" aria-label="How to play">
+      <section id="howToScreen" class="screen screen--splash" aria-label="How to play">
+        <div class="splash-backdrop-layer" aria-hidden="true">
+          <picture class="splash-backdrop-frame">
+            <source media="(orientation: portrait)" srcset="assets/menu-splashes/how-to-play-portrait.jpg" />
+            <img class="splash-backdrop" src="assets/menu-splashes/how-to-play-landscape.jpg" alt="" />
+          </picture>
+          <div class="splash-scrim"></div>
+        </div>
+
         <header class="screen-head">
           <button type="button" class="ghost-btn" data-intent="back">Back</button>
           <div>

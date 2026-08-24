@@ -20,71 +20,11 @@
     "provider": "OpenAI ImageGen",
     "role": "generated rotation master",
     "backgroundExtraction": "edge-connected-neutral",
-    "headingConvention": "physical-nose-clockwise-from-north"
+    "headingConvention": "camera-side-opposite-physical-nose"
   },
   "frames": [
     {
       "direction": "north",
-      "sourceBounds": {
-        "x": 51,
-        "y": 259,
-        "width": 156,
-        "height": 232
-      },
-      "targetBounds": {
-        "x": 13,
-        "y": 4,
-        "width": 38,
-        "height": 56
-      }
-    },
-    {
-      "direction": "north-east",
-      "sourceBounds": {
-        "x": 269,
-        "y": 265,
-        "width": 208,
-        "height": 211
-      },
-      "targetBounds": {
-        "x": 4,
-        "y": 4,
-        "width": 55,
-        "height": 56
-      }
-    },
-    {
-      "direction": "east",
-      "sourceBounds": {
-        "x": 524,
-        "y": 317,
-        "width": 255,
-        "height": 127
-      },
-      "targetBounds": {
-        "x": 4,
-        "y": 18,
-        "width": 56,
-        "height": 28
-      }
-    },
-    {
-      "direction": "south-east",
-      "sourceBounds": {
-        "x": 814,
-        "y": 300,
-        "width": 232,
-        "height": 168
-      },
-      "targetBounds": {
-        "x": 4,
-        "y": 11,
-        "width": 56,
-        "height": 41
-      }
-    },
-    {
-      "direction": "south",
       "sourceBounds": {
         "x": 1102,
         "y": 261,
@@ -99,7 +39,7 @@
       }
     },
     {
-      "direction": "south-west",
+      "direction": "north-east",
       "sourceBounds": {
         "x": 1302,
         "y": 307,
@@ -114,7 +54,7 @@
       }
     },
     {
-      "direction": "west",
+      "direction": "east",
       "sourceBounds": {
         "x": 1559,
         "y": 354,
@@ -129,7 +69,7 @@
       }
     },
     {
-      "direction": "north-west",
+      "direction": "south-east",
       "sourceBounds": {
         "x": 1812,
         "y": 291,
@@ -141,6 +81,66 @@
         "y": 4,
         "width": 48,
         "height": 56
+      }
+    },
+    {
+      "direction": "south",
+      "sourceBounds": {
+        "x": 51,
+        "y": 259,
+        "width": 156,
+        "height": 232
+      },
+      "targetBounds": {
+        "x": 13,
+        "y": 4,
+        "width": 38,
+        "height": 56
+      }
+    },
+    {
+      "direction": "south-west",
+      "sourceBounds": {
+        "x": 269,
+        "y": 265,
+        "width": 208,
+        "height": 211
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 4,
+        "width": 55,
+        "height": 56
+      }
+    },
+    {
+      "direction": "west",
+      "sourceBounds": {
+        "x": 524,
+        "y": 317,
+        "width": 255,
+        "height": 127
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 18,
+        "width": 56,
+        "height": 28
+      }
+    },
+    {
+      "direction": "north-west",
+      "sourceBounds": {
+        "x": 814,
+        "y": 300,
+        "width": 232,
+        "height": 168
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 11,
+        "width": 56,
+        "height": 41
       }
     }
   ],

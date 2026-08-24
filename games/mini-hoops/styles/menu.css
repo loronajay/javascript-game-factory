@@ -2,22 +2,28 @@
  *
  * The brief was to get away from the default shape of a menu: a dark scrim over
  * a screenshot with three rounded rectangles on it. So this menu is DIEGETIC —
- * it lives in the room you are about to play in.
+ * it lives in a painted court.
  *
- * Three rules hold it together:
+ * Four rules hold it together:
  *
- *   1. THE ROOM IS NOT DIMMED. No full-bleed scrim. The painted art is the
+ *   1. THE SPLASH IS NOT DIMMED. No full-bleed scrim. The painted art is the
  *      hero, and covering it is what made the old menu look like a placeholder.
  *      Legibility comes from a shaped vignette that only darkens the left third,
  *      where the type actually sits.
  *
- *   2. THE MENU IS AN OBJECT IN THE ROOM. A lit marquee bolted to the wall, with
- *      a bulb strip, warm spill onto the wall behind it, and a real drop shadow.
- *      It reads as a thing hanging there rather than as UI floating on top.
+ *   2. THE MENU IS AN OBJECT IN THE SCENE. A lit marquee bolted to the wall,
+ *      with a bulb strip, warm spill onto the wall behind it, and a real drop
+ *      shadow. It reads as a thing hanging there rather than UI floating on top.
  *
- *   3. THE ROOM IS ALIVE. A slow drift plus a slight lean toward the pointer.
+ *   3. THE SCENE IS ALIVE. A slow drift plus a slight lean toward the pointer.
  *      Both are pure CSS driven by two custom properties, so this costs the main
  *      thread nothing and is switched off wholesale under reduced-motion.
+ *
+ *   4. EACH ORIENTATION GETS ITS OWN ART. There are two splashes, a landscape
+ *      and a portrait one, painted as separate pictures rather than cropped from
+ *      each other — a portrait crop of a landscape court lands on bare wall. The
+ *      <picture> in index.html picks between them on `(orientation: portrait)`,
+ *      so a phone rotating swaps the art with the layout, not a beat after it.
  */
 
 .marquee-scene {
@@ -42,6 +48,14 @@
   position: absolute;
   inset: -3%;
   animation: room-drift 26s ease-in-out infinite alternate;
+}
+
+/* <picture> is an inline wrapper by default, so it would collapse and leave the
+   img no percentage height to resolve against. */
+.marquee-backdrop-frame {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .marquee-backdrop {
@@ -309,21 +323,29 @@
 
 /* --- Responsive --------------------------------------------------------- */
 
+/* The vignette follows the ART, not the viewport width, because the two
+   splashes are lit differently: the landscape one has its bright window on the
+   left, exactly where the type sits, so it needs the shaped left wash; the
+   portrait one puts the lit floor and the ball there instead and reads better
+   under a bottom-weighted one. Keying this on width would hand a portrait
+   tablet a gradient shaped for the other picture.
+
+   The portrait splash is also composed for its own frame — `cover` on a
+   matching aspect is close to a straight fit — so there is no crop bias here.
+   The marquee drops to the foot of it, out of the backboard. */
+@media (orientation: portrait) {
+  .marquee-vignette {
+    background: linear-gradient(to top, rgba(11, 7, 6, 0.94) 0%, rgba(11, 7, 6, 0.66) 46%, rgba(11, 7, 6, 0.12) 100%);
+  }
+
+  .marquee {
+    align-content: end;
+  }
+}
+
 @media (max-width: 720px) {
   .marquee-scene {
     min-height: calc(100dvh - 30px);
-  }
-
-  /* A portrait crop of a landscape room lands on bare wall, so bias it down
-     toward the floor and furniture where there is something to look at. */
-  .marquee-backdrop {
-    object-position: 50% 64%;
-  }
-
-  /* On a narrow screen the shaped vignette cannot carry legibility on its own,
-     so it becomes a bottom-weighted wash and the marquee sits over it. */
-  .marquee-vignette {
-    background: linear-gradient(to top, rgba(11, 7, 6, 0.94) 0%, rgba(11, 7, 6, 0.66) 46%, rgba(11, 7, 6, 0.12) 100%);
   }
 
   .marquee {
@@ -334,6 +356,60 @@
 
   .marquee-option-label {
     font-size: 19px;
+  }
+}
+
+/* A phone held sideways is about 390px tall — less than the scene's 520px
+   floor, which pushed the third option and the index card under the fold on the
+   one screen where having to scroll to find "Play" is least excusable. Here the
+   scene stops being a stage with a minimum height and simply becomes the
+   viewport, and the type steps down to fit inside it.
+
+   The title is sized in vh rather than vw on purpose: in this shape the screen
+   is wide and short, so vw would make the headline grow in the direction there
+   is no room to grow. */
+@media (orientation: landscape) and (max-height: 620px) {
+  .marquee-scene {
+    min-height: calc(100dvh - 28px);
+  }
+
+  .marquee {
+    gap: 10px;
+    max-width: 470px;
+    padding: 14px clamp(16px, 3vw, 34px);
+  }
+
+  .marquee-sign {
+    padding: 10px 16px 12px;
+  }
+
+  .marquee-kicker {
+    margin-bottom: 4px;
+  }
+
+  .marquee-title {
+    font-size: clamp(30px, 5.4vh, 46px);
+  }
+
+  .marquee-sub {
+    margin-top: 6px;
+    font-size: 11px;
+  }
+
+  .marquee-option {
+    padding: 6px 12px 7px;
+  }
+
+  .marquee-option-label {
+    font-size: 16px;
+  }
+
+  .marquee-option-note {
+    font-size: 10.5px;
+  }
+
+  .marquee-card {
+    padding: 7px 14px 8px;
   }
 }
 

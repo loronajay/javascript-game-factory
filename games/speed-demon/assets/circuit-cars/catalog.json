@@ -40,7 +40,7 @@
       "modelId": "meridian-rs",
       "label": "Meridian RS",
       "archetype": "euro",
-      "renderScale": 1.004380237844021,
+      "renderScale": 1.0043802378440208,
       "spritesheet": "meridian-rs/spritesheet-clockwise-from-north.png",
       "manifest": "meridian-rs/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }
@@ -49,7 +49,7 @@
       "modelId": "skyward-r",
       "label": "Skyward R",
       "archetype": "gt",
-      "renderScale": 1.073622027420821,
+      "renderScale": 1.0736220274208208,
       "spritesheet": "skyward-r/spritesheet-clockwise-from-north.png",
       "manifest": "skyward-r/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }
@@ -85,7 +85,7 @@
       "modelId": "colt-gt",
       "label": "Colt GT",
       "archetype": "muscle",
-      "renderScale": 1.0679081921361615,
+      "renderScale": 1.0298041716846214,
       "spritesheet": "colt-gt/spritesheet-clockwise-from-north.png",
       "manifest": "colt-gt/spritesheet.json",
       "footprint": { "halfLength": 16, "halfWidth": 9 }

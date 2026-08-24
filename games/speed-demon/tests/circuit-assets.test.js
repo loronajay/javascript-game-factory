@@ -60,6 +60,15 @@ test("the JSON catalog and runtime share one heading and scale contract", () => 
   }
 });
 
+test("runtime atlas URLs carry the heading revision so repaired PNGs cannot stay cached", () => {
+  for (const model of CIRCUIT_MODELS) {
+    assert(
+      model.src.endsWith("?v=circuit-headings-20260824-2"),
+      `${model.modelId} can reuse a stale pre-repair atlas from browser cache`,
+    );
+  }
+});
+
 test("world headings select the artwork frame whose nose points forward", () => {
   // Physics and every atlas use the same clockwise-from-north nose headings.
   // Cover all eight views so an east/west workaround cannot invert the other
@@ -140,26 +149,91 @@ test("every atlas is eight transparent 64px frames clockwise from north", () => 
 test("each atlas records whether its generated source labels describe the camera side or the nose", () => {
   for (const model of CIRCUIT_MODELS) {
     const manifest = JSON.parse(fs.readFileSync(path.join(CARS_DIR, model.manifest), "utf8"));
-    const expected = model.modelId === "colt-gt"
-      ? "physical-nose-clockwise-from-north"
-      : "camera-side-opposite-physical-nose";
     assertEqual(
       manifest.source.headingConvention,
-      expected,
+      "camera-side-opposite-physical-nose",
       `${model.modelId} source convention is undocumented, so a blanket repair can reverse it`,
     );
   }
 });
 
-test("Colt GT keeps its authored east and west views instead of receiving the opposite-side repair", () => {
-  const manifest = JSON.parse(fs.readFileSync(
-    path.join(CARS_DIR, "colt-gt", "spritesheet.json"),
-    "utf8",
-  ));
-  assertEqual(manifest.frames[2].direction, "east");
-  assertEqual(manifest.frames[2].sourceBounds.x, 524, "Colt east was replaced by its west-facing source view");
-  assertEqual(manifest.frames[6].direction, "west");
-  assertEqual(manifest.frames[6].sourceBounds.x, 1559, "Colt west was replaced by its east-facing source view");
+test("every canonical manifest pins the source column selected for its east slot", () => {
+  const eastSourceX = new Map([
+    ["kaido-gts", 1629],
+    ["tsunami-rz", 1482],
+    ["meridian-rs", 1617],
+    ["skyward-r", 1656],
+    ["toro-sv", 1629],
+    ["scalpel-r", 1651],
+    ["chrono-12", 1627],
+    ["colt-gt", 1559],
+  ]);
+  for (const model of CIRCUIT_MODELS) {
+    const manifest = JSON.parse(fs.readFileSync(path.join(CARS_DIR, model.manifest), "utf8"));
+    assertEqual(manifest.frames[2].direction, "east");
+    assertEqual(
+      manifest.frames[2].sourceBounds.x,
+      eastSourceX.get(model.modelId),
+      `${model.modelId} east was replaced by its west-facing source view`,
+    );
+  }
+});
+
+test("Meridian and Skyward replace every duplicated opposite view from a valid heading", () => {
+  const expectedRepairs = [
+    { targetFrame: 1, mirroredFromFrame: 5, transform: "rotate-180" },
+    { targetFrame: 2, mirroredFromFrame: 6, transform: "mirror-x" },
+    { targetFrame: 3, mirroredFromFrame: 7, transform: "rotate-180" },
+    { targetFrame: 4, mirroredFromFrame: 0, transform: "mirror-y" },
+  ];
+  for (const modelId of ["meridian-rs", "skyward-r"]) {
+    const manifest = JSON.parse(fs.readFileSync(path.join(CARS_DIR, modelId, "spritesheet.json"), "utf8"));
+    const sheet = readPng(fs.readFileSync(path.join(
+      CARS_DIR,
+      modelId,
+      "spritesheet-clockwise-from-north.png",
+    )));
+    assertEqual(
+      manifest.repairFrameConvention,
+      "physical-nose-clockwise-from-north",
+      `${modelId} repair indices can be remapped during a future source normalization`,
+    );
+    assertDeepEqual(
+      (manifest.repairs ?? []).map(({ targetFrame, mirroredFromFrame, transform }) => (
+        { targetFrame, mirroredFromFrame, transform }
+      )),
+      expectedRepairs,
+      `${modelId} does not declare all four duplicated source views`,
+    );
+    for (const repair of expectedRepairs) {
+      for (let y = 0; y < 64; y += 1) {
+        for (let x = 0; x < 64; x += 1) {
+          const sourceX = repair.transform === "mirror-x" || repair.transform === "rotate-180"
+            ? 63 - x
+            : x;
+          const sourceY = repair.transform === "mirror-y" || repair.transform === "rotate-180"
+            ? 63 - y
+            : y;
+          const targetPixel = (y * sheet.width + repair.targetFrame * 64 + x) * 4;
+          const sourcePixel = (sourceY * sheet.width + repair.mirroredFromFrame * 64 + sourceX) * 4;
+          assertEqual(
+            sheet.pixels[targetPixel + 3],
+            sheet.pixels[sourcePixel + 3],
+            `${modelId} frame ${repair.targetFrame} alpha repair drifted at ${x},${y}`,
+          );
+          if (sheet.pixels[sourcePixel + 3] <= 8) continue;
+          for (let channel = 0; channel < 3; channel += 1) {
+            assertClose(
+              sheet.pixels[targetPixel + channel],
+              sheet.pixels[sourcePixel + channel],
+              2,
+              `${modelId} frame ${repair.targetFrame} repair drifted at ${x},${y},${channel}`,
+            );
+          }
+        }
+      }
+    }
+  }
 });
 
 test("asset repair metadata uses the canonical physical heading of each frame", () => {

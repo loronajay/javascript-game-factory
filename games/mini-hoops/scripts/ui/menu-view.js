@@ -1,24 +1,29 @@
 // The title screen.
 //
 // The design brief was to stop the menu looking like a settings dialog stacked
-// on a dimmed screenshot. So the menu is DIEGETIC: the room you are about to
-// play in is shown at full strength, and the menu is a lit marquee hanging on
-// its wall with a hand-lettered options board beneath it.
+// on a dimmed screenshot. So the menu is DIEGETIC: a painted court is shown at
+// full strength, and the menu is a lit marquee hanging on its wall with a
+// hand-lettered options board beneath it.
 //
-// Two consequences shape this file:
+// Three consequences shape this file:
 //
-//   The room is the hero, so it is not covered by a full-bleed scrim. Legibility
-//   comes from a shaped vignette behind the marquee only (see menu.css), which
-//   means the art stays readable as art.
+//   The splash is the hero, so it is not covered by a full-bleed scrim.
+//   Legibility comes from a shaped vignette behind the marquee only (see
+//   menu.css), which means the art stays readable as art.
 //
-//   The room must feel alive, or a static photo behind a static menu is just a
+//   The scene must feel alive, or a static photo behind a static menu is just a
 //   dimmer screenshot. Hence parallax — a slow idle drift plus a slight lean
 //   toward the pointer. Both are CSS; this file only feeds it two numbers, so
 //   the animation stays off the main thread and costs the menu nothing.
 //
+//   The backdrop is NOT this file's business. It is a fixed pair of splashes
+//   picked by <picture> on orientation in index.html, so rotating a phone swaps
+//   the crop with no script involved. It used to be the selected room, which
+//   meant the title screen re-skinned itself from a setup choice made two
+//   screens away — the setup screen already previews the room, and doing it
+//   twice made the menu read as a settings echo rather than a front door.
+//
 // Motion is suppressed for `prefers-reduced-motion` in the stylesheet, not here.
-
-import { locationBackdropPath, locationById } from "../assets/location-catalog.js";
 
 // How far the scene leans, as a fraction of its own size. Small on purpose:
 // enough to feel like a held camera, not enough to read as a moving background.
@@ -26,7 +31,6 @@ const PARALLAX_RANGE = 0.02;
 
 export function createMenuView(root, { onCommand = () => {} } = {}) {
   const scene = root.querySelector("#menuScene");
-  const backdrop = root.querySelector("#menuBackdrop");
   const summary = root.querySelector("#menuSummary");
   const best = root.querySelector("#menuBest");
   const items = [...root.querySelectorAll("#menuOptions [data-command]")];
@@ -69,12 +73,8 @@ export function createMenuView(root, { onCommand = () => {} } = {}) {
   }
 
   return {
-    /** Point the marquee at the room the player has selected. */
+    /** Refresh the taped index card. The backdrop is fixed art, not state. */
     render({ selection, bestScore }) {
-      if (backdrop) {
-        backdrop.src = locationBackdropPath(selection.locationId);
-        backdrop.alt = `${locationById(selection.locationId).label} — the court you are about to play`;
-      }
       if (summary) summary.textContent = selection.summary;
       if (best) {
         best.textContent = bestScore > 0 ? `Local best · ${bestScore}` : "No local best yet";

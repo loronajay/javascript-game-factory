@@ -74,12 +74,14 @@ Get-ChildItem -LiteralPath $carsRoot -Filter "spritesheet.json" -Recurse | ForEa
       $frame
     }
   )
-  foreach ($repair in @($manifest.repairs)) {
-    if ($null -eq $repair) { continue }
-    $repair.targetFrame = ($repair.targetFrame - $sourceFrameOffset + 8) % 8
-    $repair.targetHeading = $directions[$repair.targetFrame]
-    $repair.mirroredFromFrame = ($repair.mirroredFromFrame - $sourceFrameOffset + 8) % 8
-    $repair.mirroredFromHeading = $directions[$repair.mirroredFromFrame]
+  if ($manifest.repairFrameConvention -ne $canonicalConvention) {
+    foreach ($repair in @($manifest.repairs)) {
+      if ($null -eq $repair) { continue }
+      $repair.targetFrame = ($repair.targetFrame - $sourceFrameOffset + 8) % 8
+      $repair.targetHeading = $directions[$repair.targetFrame]
+      $repair.mirroredFromFrame = ($repair.mirroredFromFrame - $sourceFrameOffset + 8) % 8
+      $repair.mirroredFromHeading = $directions[$repair.mirroredFromFrame]
+    }
   }
   $manifest | Add-Member -NotePropertyName headingConvention -NotePropertyValue $canonicalConvention
 
