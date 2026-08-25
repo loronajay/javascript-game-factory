@@ -5,7 +5,7 @@
 // `complete && naturalWidth` and falls back to a painted placeholder. So the game
 // is playable on the first frame and the art fades in as it arrives.
 //
-// That matters here more than it sounds: the five rooms and two balls together
+// That matters here more than it sounds: the eight rooms and four balls together
 // are several megabytes, and a player who only ever picks the bedroom should
 // never wait on the warehouse.
 //

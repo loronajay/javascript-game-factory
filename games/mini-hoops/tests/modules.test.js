@@ -25,6 +25,8 @@ suite("modules — wiring and markup coherence");
 
 const gameRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const html = fs.readFileSync(path.join(gameRoot, "index.html"), "utf8");
+const ticTacToeHtml = fs.readFileSync(path.join(gameRoot, "tic-tac-toe-stage.html"), "utf8");
+const allMarkup = `${html}\n${ticTacToeHtml}`;
 
 // ---------------------------------------------------------------------------
 // Every module imports cleanly
@@ -43,6 +45,8 @@ const MODULES = [
   "scripts/sim/launch.js",
   "scripts/sim/collision.js",
   "scripts/sim/physics.js",
+  "scripts/sim/bin-physics.js",
+  "scripts/sim/tic-tac-toe.js",
   "scripts/sim/shot.js",
   "scripts/sim/run.js",
   "scripts/assets/ball-catalog.js",
@@ -66,6 +70,7 @@ const MODULES = [
   "scripts/render/aim.js",
   "scripts/render/frame.js",
   "scripts/render/splats.js",
+  "scripts/staging/tic-tac-toe-stage.js",
   "scripts/ui/screens.js",
   "scripts/ui/pointer.js",
   "scripts/ui/hud.js",
@@ -76,6 +81,7 @@ const MODULES = [
   "scripts/ui/practice-view.js",
   "scripts/ui/sound-toggle.js",
   "scripts/practice-court.js",
+  "scripts/tic-tac-toe-game.js",
   "scripts/init-game.js",
 ];
 
@@ -218,15 +224,21 @@ test("every element id the scripts query actually exists in the markup", () => {
   });
 
   assert(ids.size > 10, "the scan found suspiciously few ids");
-  const missing = [...ids].filter((id) => !html.includes(`id="${id}"`));
+  const missing = [...ids].filter((id) => !allMarkup.includes(`id="${id}"`));
   assertEqual(missing.join(", "), "", "ids queried by script but absent from index.html");
 });
 
 test("every screen the router knows about has a section in the markup", () => {
   for (const screen of SCREENS) {
-    const id = { menu: "menuScreen", setup: "setupScreen", game: "gameScreen", boards: "boardsScreen", howto: "howToScreen" }[screen];
+    const id = { menu: "menuScreen", setup: "setupScreen", online: "onlineScreen", game: "gameScreen", boards: "boardsScreen", howto: "howToScreen" }[screen];
     assert(html.includes(`id="${id}"`), `no section for the ${screen} screen`);
   }
+});
+
+test("floor tic-tac-toe offers CPU and local multiplayer matches", () => {
+  assert(ticTacToeHtml.includes('id="opponent"'), "tic-tac-toe needs an opponent mode control");
+  assert(ticTacToeHtml.includes('value="cpu"'), "tic-tac-toe needs a CPU option");
+  assert(ticTacToeHtml.includes('value="local"'), "tic-tac-toe needs a local multiplayer option");
 });
 
 test("every button intent in the markup is handled by the composition root", () => {
@@ -242,7 +254,7 @@ test("every button intent in the markup is handled by the composition root", () 
 test("every menu command in the markup is handled", () => {
   const source = fs.readFileSync(path.join(gameRoot, "scripts", "init-game.js"), "utf8");
   const commands = new Set([...html.matchAll(/data-command="([a-z-]+)"/g)].map((match) => match[1]));
-  assertEqual(commands.size, 3, "the menu has three options");
+  assertEqual(commands.size, 5, "the menu exposes solo, hotseat, online, boards and how-to-play commands");
   for (const command of commands) {
     assert(source.includes(`"${command}"`), `menu command "${command}" is not handled`);
   }

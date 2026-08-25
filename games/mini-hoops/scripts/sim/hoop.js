@@ -19,9 +19,31 @@ import {
   RIM_CENTER_Z,
   RIM_SCREEN_HALF_WIDTH,
 } from "./constants.js";
-import { screenToWorldAtZ, screenVelocityToWorld } from "./projection.js";
+import { depthScaleAt, screenToWorldAtZ, screenVelocityToWorld } from "./projection.js";
 
 const TAU = Math.PI * 2;
+
+/**
+ * How far the BACKBOARD slides on screen for every pixel the RIM slides.
+ *
+ * The board is bolted to the wall at `BOARD_Z`; the rim hangs out into the room
+ * at `RIM_CENTER_Z`. They are ONE RIGID OBJECT, so when the assembly moves they
+ * move by the same distance in WORLD space — which is a smaller distance on
+ * screen for the deeper of the two. This ratio is that fact, and nothing else.
+ *
+ * They used to move by the same number of SCREEN pixels, which is a backboard
+ * and a rim travelling at different speeds through the room while bolted
+ * together. Two things came of that. The visible one: the assembly slid as a
+ * flat cut-out, with no parallax between the board and the ring in front of it.
+ * The invisible one was worse — `hoopWorldState` converted that one screen
+ * velocity at two depths and handed the collider two different world velocities
+ * for the same object, so a ball banked off the board was kicked by a board
+ * moving faster than the rim it was welded to.
+ *
+ * At rest the offsets are zero and every base position below is untouched, so
+ * this changes no calibration.
+ */
+const BOARD_PARALLAX = depthScaleAt(BOARD_Z) / depthScaleAt(RIM_CENTER_Z);
 
 /**
  * The catalog the setup screen, the HUD, and the leaderboard keys are all built
@@ -243,6 +265,9 @@ export function hoopAt(modeId, elapsedSeconds) {
 
   const cx = HOOP_BASE_X + dx;
   const rimY = HOOP_BASE_RIM_Y + dy;
+  // The same world displacement, seen at the board's depth instead of the rim's.
+  const boardCx = HOOP_BASE_X + dx * BOARD_PARALLAX;
+  const boardY = HOOP_BASE_RIM_Y - BACKBOARD_RISE + dy * BOARD_PARALLAX;
 
   return {
     modeId: mode.id,
@@ -250,10 +275,11 @@ export function hoopAt(modeId, elapsedSeconds) {
     rimY,
     left: cx - RIM_SCREEN_HALF_WIDTH,
     right: cx + RIM_SCREEN_HALF_WIDTH,
+    boardCx,
     boardW: BACKBOARD_WIDTH,
     boardH: BACKBOARD_HEIGHT,
-    boardX: cx - BACKBOARD_WIDTH / 2,
-    boardY: rimY - BACKBOARD_RISE,
+    boardX: boardCx - BACKBOARD_WIDTH / 2,
+    boardY,
     vxScreen: vx,
     vyScreen: vy,
   };
@@ -261,24 +287,28 @@ export function hoopAt(modeId, elapsedSeconds) {
 
 /**
  * The hoop as the physics solver sees it: a ring centre on the rim plane, plus
- * the world-space velocity of the ring and of the backboard.
+ * the world-space velocity of the assembly.
  *
- * The two velocities differ because they sit on different depth planes, and the
- * same screen-space speed is a different world speed at each.
+ * ONE VELOCITY, REPORTED TWICE. The board and the rim are bolted together, so
+ * they share a world velocity by definition — the board fields are kept as their
+ * own names only because `sim/collision.js` reads them separately, not because
+ * they can ever differ. The screen path is authored at the RIM plane (that is
+ * the plane the player is aiming at), so that is the plane it is read back on;
+ * `BOARD_PARALLAX` is what carries the same motion to the board's depth for
+ * drawing.
  */
 export function hoopWorldState(hoop) {
   const rim = screenToWorldAtZ(hoop.cx, hoop.rimY, RIM_CENTER_Z);
-  const rimVelocity = screenVelocityToWorld(hoop.vxScreen, hoop.vyScreen, RIM_CENTER_Z);
-  const boardVelocity = screenVelocityToWorld(hoop.vxScreen, hoop.vyScreen, BOARD_Z);
+  const velocity = screenVelocityToWorld(hoop.vxScreen, hoop.vyScreen, RIM_CENTER_Z);
 
   return {
     rimX: rim.x,
     rimY: rim.y,
     rimZ: RIM_CENTER_Z,
-    rimVx: rimVelocity.vx,
-    rimVy: rimVelocity.vy,
-    boardVx: boardVelocity.vx,
-    boardVy: boardVelocity.vy,
+    rimVx: velocity.vx,
+    rimVy: velocity.vy,
+    boardVx: velocity.vx,
+    boardVy: velocity.vy,
   };
 }
 

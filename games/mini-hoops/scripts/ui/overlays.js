@@ -18,8 +18,13 @@ export function createOverlays(root, { onIntent = () => {} } = {}) {
     shots: root.querySelector("#resultShots"),
     accuracy: root.querySelector("#resultAccuracy"),
     rank: root.querySelector("#resultRank"),
+    rankLabel: root.querySelector("#resultRankLabel"),
     streak: root.querySelector("#resultStreak"),
   };
+  const nextHotseat = root.querySelector("#nextHotseatButton");
+  const replay = results?.querySelector('[data-intent="restart"]');
+  const changeSetup = results?.querySelector('[data-intent="change-setup"]');
+  const viewBoards = results?.querySelector('[data-intent="view-boards"]');
 
   // One delegated listener rather than a handler per button: adding a button to
   // an overlay becomes a markup change plus a case in the caller's switch.
@@ -47,6 +52,10 @@ export function createOverlays(root, { onIntent = () => {} } = {}) {
      * @param placement `{ rank, previousBest }` from the board store
      */
     showResults(summary, placement) {
+      if (nextHotseat) nextHotseat.hidden = true;
+      if (replay) replay.hidden = false;
+      if (changeSetup) changeSetup.hidden = false;
+      if (viewBoards) viewBoards.hidden = false;
       setText(resultNodes.score, summary.score);
       setText(
         resultNodes.title,
@@ -64,8 +73,28 @@ export function createOverlays(root, { onIntent = () => {} } = {}) {
       setText(resultNodes.shots, summary.shots);
       setText(resultNodes.accuracy, `${summary.accuracy}%`);
       setText(resultNodes.rank, placement.rank > 0 ? `#${placement.rank}` : "—");
+      setText(resultNodes.rankLabel, "Local Rank");
       setText(resultNodes.streak, summary.bestStreak);
       results?.classList.add("is-shown");
+    },
+    showHotseatPass(summary, playerName = "Player 1") {
+      this.showResults(summary, { rank: 0, previousBest: summary.score });
+      setText(resultNodes.title, `${playerName} scored ${summary.score}`);
+      setText(resultNodes.rank, "—");
+      setText(resultNodes.rankLabel, "Next");
+      if (nextHotseat) nextHotseat.hidden = false;
+      if (replay) replay.hidden = true;
+      if (changeSetup) changeSetup.hidden = true;
+      if (viewBoards) viewBoards.hidden = true;
+    },
+    showDuelResults(summary, { title, record = "—", recordLabel = "Duel", replayable = true } = {}) {
+      this.showResults(summary, { rank: 0, previousBest: summary.score });
+      setText(resultNodes.title, title || "Match Complete");
+      setText(resultNodes.rank, record);
+      setText(resultNodes.rankLabel, recordLabel);
+      if (nextHotseat) nextHotseat.hidden = true;
+      if (replay) replay.hidden = !replayable;
+      if (viewBoards) viewBoards.hidden = true;
     },
     hideResults() {
       results?.classList.remove("is-shown");

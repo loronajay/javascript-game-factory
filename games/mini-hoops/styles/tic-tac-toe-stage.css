@@ -1,0 +1,71 @@
+.stage-court canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 960 / 760;
+  background: #39434b;
+}
+
+.stage-badge {
+  display: block;
+  pointer-events: none;
+}
+
+.ttt-cabinet { min-height: 100dvh; }
+
+.stage-back { color: inherit; text-decoration: none; }
+
+.stage-court { touch-action: none; }
+
+.stage-court .hud-stat--left { min-width: 220px; }
+
+.stage-court .hud-stat--left strong {
+  font-size: clamp(.9rem, 2vw, 1.35rem);
+  white-space: nowrap;
+}
+
+.stage-panel {
+  text-align: center;
+}
+
+.ttt-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: #d9efff;
+  font: 700 .78rem/1 system-ui, sans-serif;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.ttt-control-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ttt-control-group[hidden] { display: none; }
+
+.ttt-controls select {
+  border: 1px solid rgba(83, 246, 255, .55);
+  border-radius: 6px;
+  background: #101824;
+  color: #fff;
+  padding: 7px 10px;
+}
+
+.stage-panel .meter-head {
+  margin-bottom: 0;
+}
+
+.stage-panel .meter-legend {
+  margin-top: 6px;
+}
+
+@media (max-width: 600px) {
+  .stage-court .hud-stat--left { min-width: 0; }
+  .ttt-controls { flex-wrap: wrap; }
+  .ttt-control-group { flex-wrap: wrap; justify-content: center; }
+}

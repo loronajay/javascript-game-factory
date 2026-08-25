@@ -9,8 +9,9 @@ export const SCREEN_SETUP = "setup";
 export const SCREEN_GAME = "game";
 export const SCREEN_BOARDS = "boards";
 export const SCREEN_HOWTO = "howto";
+export const SCREEN_ONLINE = "online";
 
-export const SCREENS = Object.freeze([SCREEN_MENU, SCREEN_SETUP, SCREEN_GAME, SCREEN_BOARDS, SCREEN_HOWTO]);
+export const SCREENS = Object.freeze([SCREEN_MENU, SCREEN_SETUP, SCREEN_ONLINE, SCREEN_GAME, SCREEN_BOARDS, SCREEN_HOWTO]);
 
 /**
  * Where "back" goes from each screen.
@@ -22,6 +23,7 @@ export const SCREENS = Object.freeze([SCREEN_MENU, SCREEN_SETUP, SCREEN_GAME, SC
 const BACK_TARGETS = Object.freeze({
   [SCREEN_MENU]: SCREEN_MENU,
   [SCREEN_SETUP]: SCREEN_MENU,
+  [SCREEN_ONLINE]: SCREEN_MENU,
   [SCREEN_GAME]: SCREEN_MENU,
   [SCREEN_BOARDS]: SCREEN_MENU,
   [SCREEN_HOWTO]: SCREEN_MENU,

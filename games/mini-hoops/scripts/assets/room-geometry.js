@@ -3,7 +3,7 @@
 //
 // PRESENTATION ONLY, AND THAT IS A CONTRACT. Nothing under `sim/` may import
 // this file — `tests/modules.test.js` enforces it. A room still cannot change
-// the shot, which is what keeps one leaderboard comparable across five rooms.
+// the shot, which is what keeps one leaderboard comparable across eight rooms.
 // What a room *can* do is say where its own paint is, so the one camera in
 // `sim/projection.js` draws onto it correctly.
 //
@@ -15,7 +15,7 @@
 // ---------------------------------------------------------------------------
 // ALIGNMENT
 //
-// The five rooms were painted independently and their back walls do not meet the
+// The rooms were painted independently and their back walls do not meet the
 // floor on the same scanline: the cubicle's does at y=478, the bedroom's at
 // y=546 — 68px apart, which at this scale is most of a metre of room depth. The
 // camera is one camera, so the art moves to it rather than the other way round:
@@ -119,6 +119,36 @@ const ROOMS = Object.freeze({
       { z: 0.05, polygon: [[0, 0], [110, 0], [110, 412], [135, 432], [135, 540], [80, 566], [0, 572]] },
       // The same down the right, running forward into the crate and pallet jack.
       { z: 0.05, polygon: [[900, 0], [960, 0], [960, 626], [898, 612], [878, 556], [878, 452], [900, 436]] },
+    ],
+  },
+  "rec-hall": {
+    // Black skirting ends at y=489; maple boards start at 490.
+    wallBaseY: 490,
+    occluders: [
+      // Stacked folding chairs and the narrow ball cart at the left edge.
+      { z: 0.05, polygon: [[0, 292], [116, 310], [159, 328], [159, 492], [108, 512], [108, 536], [0, 514]] },
+      // Trophy cabinet, plant and rolled mats along the right wall.
+      { z: 0.06, polygon: [[817, 362], [860, 362], [860, 383], [960, 382], [960, 532], [824, 532], [824, 406]] },
+    ],
+  },
+  "school-gym": {
+    // Black skirting ends at y=460; maple boards start at 461.
+    wallBaseY: 461,
+    occluders: [
+      // Folded bleachers stay entirely outside the moving-hoop lane.
+      { z: 0.05, polygon: [[0, 172], [105, 207], [105, 462], [0, 485]] },
+      // Crash mats and the rolling equipment cage at the opposite edge.
+      { z: 0.06, polygon: [[798, 270], [889, 263], [889, 283], [960, 276], [960, 486], [798, 466]] },
+    ],
+  },
+  fieldhouse: {
+    // The recessed black base ends at y=484; maple boards start at 485.
+    wallBaseY: 485,
+    occluders: [
+      // A short bank of folded retractable seating.
+      { z: 0.05, polygon: [[0, 344], [99, 365], [151, 387], [151, 487], [104, 505], [104, 526], [0, 528]] },
+      // Equipment trunks and their railings on the right.
+      { z: 0.06, polygon: [[808, 369], [873, 367], [873, 386], [960, 374], [960, 524], [808, 493]] },
     ],
   },
 });

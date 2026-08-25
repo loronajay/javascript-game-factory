@@ -42,6 +42,21 @@ export const LOCATIONS = Object.freeze([
     label: "Cubicle",
     blurb: "The wastebasket league's spiritual home.",
   }),
+  Object.freeze({
+    id: "rec-hall",
+    label: "Rec Hall",
+    blurb: "The chairs are folded. The court is still open.",
+  }),
+  Object.freeze({
+    id: "school-gym",
+    label: "School Gym",
+    blurb: "After the last bell, the floor is yours.",
+  }),
+  Object.freeze({
+    id: "fieldhouse",
+    label: "Fieldhouse",
+    blurb: "Old brick, bright maple, one very long echo.",
+  }),
 ]);
 
 export const DEFAULT_LOCATION = "bedroom";

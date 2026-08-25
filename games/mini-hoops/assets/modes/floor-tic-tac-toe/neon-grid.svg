@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="760" viewBox="0 0 960 760">
+  <defs>
+    <filter id="neon-glow" x="-25%" y="-60%" width="150%" height="220%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="11" result="wide-blur"/>
+      <feFlood flood-color="#009dff" flood-opacity="0.72" result="wide-color"/>
+      <feComposite in="wide-color" in2="wide-blur" operator="in" result="wide-glow"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="tight-blur"/>
+      <feFlood flood-color="#35ceff" flood-opacity="0.95" result="tight-color"/>
+      <feComposite in="tight-color" in2="tight-blur" operator="in" result="tight-glow"/>
+      <feMerge>
+        <feMergeNode in="wide-glow"/>
+        <feMergeNode in="tight-glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!--
+    Authored against Mini Hoops' 960x760 room camera:
+    horizon y=298, player floor y=726, wall base y=512.
+    The grid spans world depth z=.15 to z=.90 and converges on x=480.
+  -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" filter="url(#neon-glow)">
+    <path
+      d="M225.65 670.17 L734.35 670.17 L633.95 523.26 L326.05 523.26 Z
+         M271.07 603.71 L688.93 603.71
+         M302.73 557.39 L657.27 557.39
+         M395.22 670.17 L428.68 523.26
+         M564.78 670.17 L531.32 523.26"
+      stroke="#19bfff"
+      stroke-opacity="0.82"
+      stroke-width="9"
+    />
+    <path
+      d="M225.65 670.17 L734.35 670.17 L633.95 523.26 L326.05 523.26 Z
+         M271.07 603.71 L688.93 603.71
+         M302.73 557.39 L657.27 557.39
+         M395.22 670.17 L428.68 523.26
+         M564.78 670.17 L531.32 523.26"
+      stroke="#dffaff"
+      stroke-width="3"
+    />
+  </g>
+</svg>

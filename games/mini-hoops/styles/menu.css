@@ -210,6 +210,7 @@
   border-radius: 8px;
   background: transparent;
   text-align: left;
+  text-decoration: none;
   transition: background 160ms ease, padding-left 160ms ease;
 }
 

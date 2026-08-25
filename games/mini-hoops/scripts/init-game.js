@@ -53,12 +53,19 @@ import { createOverlays } from "./ui/overlays.js";
 import { createBoardsView } from "./ui/boards-view.js";
 import { createSetupView, describeSetup } from "./ui/setup-view.js";
 import { createSoundToggle } from "./ui/sound-toggle.js";
+import { createOnlineView } from "./ui/online-view.js";
 import { canvasPoint, isGrab } from "./ui/pointer.js";
+import { createMiniHoopsAccountAccess } from "./multiplayer/account-access.js";
+import { createMiniHoopsOnlineClient } from "./multiplayer/online-client.js";
+import { createHotseatDuel, completeHotseatTurn, resumeHotseatDuel } from "./multiplayer/hotseat-duel.js";
+import { normalizeMatchConfig } from "./multiplayer/match-config.js";
+import { createPlatformApiClient } from "../../../js/platform/api/platform-api.mjs";
 import {
   SCREEN_BOARDS,
   SCREEN_GAME,
   SCREEN_HOWTO,
   SCREEN_MENU,
+  SCREEN_ONLINE,
   SCREEN_SETUP,
   createScreenRouter,
 } from "./ui/screens.js";
@@ -82,6 +89,15 @@ export function boot(root) {
   const ball = createBall();
   let shot = createShot();
   let run = createRun(preferences.snapshot());
+  let playMode = "solo";
+  let hotseat = null;
+  let onlineSnapshot = null;
+  let onlineRating = null;
+  let onlineMatchKey = "";
+  let onlineStartsLocal = 0;
+  let onlineEndsLocal = 0;
+  let onlineResultShown = false;
+  let reportedOnlineSession = "";
 
   // The live pull, or null when the player is not touching the ball.
   let pull = null;
@@ -113,6 +129,7 @@ export function boot(root) {
     {
       [SCREEN_MENU]: root.querySelector("#menuScreen"),
       [SCREEN_SETUP]: root.querySelector("#setupScreen"),
+      [SCREEN_ONLINE]: root.querySelector("#onlineScreen"),
       [SCREEN_GAME]: root.querySelector("#gameScreen"),
       [SCREEN_BOARDS]: root.querySelector("#boardsScreen"),
       [SCREEN_HOWTO]: root.querySelector("#howToScreen"),
@@ -136,6 +153,25 @@ export function boot(root) {
   });
   const overlays = createOverlays(root, { onIntent: handleIntent });
   const soundToggle = createSoundToggle(root);
+  const accountAccess = createMiniHoopsAccountAccess();
+  const platformApi = createPlatformApiClient();
+  const onlineClient = createMiniHoopsOnlineClient({ resolveIdentity: () => accountAccess.identity() });
+  const onlineView = createOnlineView(root, {
+    onQuick: (config) => onlineClient.findQuickMatch(config),
+    onCreate: (config) => onlineClient.createPrivateRoom(config),
+    onJoin: (code) => code && onlineClient.joinPrivateRoom(code),
+    onConfig: (config) => {
+      if (onlineSnapshot?.lobby?.ownerId === onlineSnapshot.clientId) onlineClient.updateConfig(config);
+    },
+    onStart: () => onlineClient.startMatch(),
+    onLeave: () => {
+      onlineClient.leave();
+      onlineSnapshot = null;
+      screens.show(SCREEN_MENU);
+    },
+  });
+  onlineClient.subscribe(handleOnlineSnapshot);
+  if (accountAccess.isEligible()) onlineClient.resumeSavedSession();
 
   // The How to Play demo. It runs the same sim on its own canvas, so the only
   // thing this file owes it is a place in the tick order and the cosmetic
@@ -174,6 +210,14 @@ export function boot(root) {
 
   function renderSetup() {
     setup.render(preferences.snapshot());
+    const title = root.querySelector("#setupTitle");
+    const intro = root.querySelector("#setupIntro");
+    const start = root.querySelector("#setupStartButton");
+    if (title) title.textContent = playMode === "hotseat" ? "Set Up Hotseat" : "Set Up the Run";
+    if (intro) intro.textContent = playMode === "hotseat"
+      ? "Player 1 takes a full timed turn, then passes the court to Player 2."
+      : "The clock starts on your first real pull, not before.";
+    if (start) start.textContent = playMode === "hotseat" ? "Start Player 1" : "Start Run";
   }
 
   function renderBoards() {
@@ -187,8 +231,8 @@ export function boot(root) {
   // Run lifecycle
   // ---------------------------------------------------------------------
 
-  function startRun() {
-    run = createRun(preferences.snapshot());
+  function startRun(config = preferences.snapshot()) {
+    run = createRun(normalizeMatchConfig(config));
     shot = createShot();
     resetBall(ball);
     pull = null;
@@ -199,6 +243,11 @@ export function boot(root) {
     kicks.rim = 0;
     clearSplatField(splats);
 
+    if (playMode === "online") {
+      run.status = RUN_RUNNING;
+      run.remaining = run.duration;
+    }
+
     overlays.hideAll();
     audio.runStarted();
     hud.setMode(hoopModeById(run.modeId).hudLabel);
@@ -207,14 +256,31 @@ export function boot(root) {
     hud.shout("");
     syncHud();
     screens.show(SCREEN_GAME);
+    syncMatchStrip();
   }
 
   function finishRun() {
     if (resultsShown) return;
     resultsShown = true;
-    run.recorded = true;
-
     const summary = runSummary(run);
+    run.recorded = true;
+    if (playMode === "hotseat") {
+      completeHotseatTurn(hotseat, summary);
+      if (hotseat.phase === "pass") {
+        hud.shout("PASS THE COURT");
+        overlays.showHotseatPass(summary, hotseat.players[0].name);
+      } else {
+        const draw = hotseat.winnerIndexes.length > 1;
+        const winner = hotseat.players[hotseat.winnerIndexes[0]];
+        hud.shout(draw ? "DRAW!" : `${winner.name.toUpperCase()} WINS!`);
+        overlays.showDuelResults(summary, {
+          title: draw ? `Draw · ${winner.score} each` : `${winner.name} wins ${winner.score}–${hotseat.players[1 - hotseat.winnerIndexes[0]].score}`,
+        });
+      }
+      syncMatchStrip();
+      return;
+    }
+
     const placement = boards.submitRun(summary);
     const isNewBest = summary.score > placement.previousBest && summary.score > 0;
     hud.shout(isNewBest ? "NEW BEST!" : "TIME!");
@@ -234,6 +300,29 @@ export function boot(root) {
     hud.setShots(run.shots);
     hud.setStreak(run.streak);
     hud.setBest(boards.bestScore(run.modeId, run.duration));
+    syncMatchStrip();
+  }
+
+  function syncMatchStrip() {
+    const strip = root.querySelector("#matchScoreStrip");
+    if (!strip) return;
+    strip.hidden = playMode === "solo";
+    if (playMode === "hotseat" && hotseat) {
+      root.querySelector("#matchLocalName").textContent = hotseat.players[0].name;
+      root.querySelector("#matchRemoteName").textContent = hotseat.players[1].name;
+      root.querySelector("#matchLocalScore").textContent = hotseat.activePlayerIndex === 0 ? run.score : hotseat.players[0].score;
+      root.querySelector("#matchRemoteScore").textContent = hotseat.activePlayerIndex === 1 ? run.score : hotseat.players[1].score;
+      return;
+    }
+    if (playMode === "online" && onlineSnapshot?.matchState) {
+      const state = onlineSnapshot.matchState;
+      const me = state.players?.find(({ id }) => id === onlineSnapshot.clientId);
+      const opponent = state.players?.find(({ id }) => id !== onlineSnapshot.clientId);
+      root.querySelector("#matchLocalName").textContent = me?.name || "You";
+      root.querySelector("#matchRemoteName").textContent = opponent?.name || "Opponent";
+      root.querySelector("#matchLocalScore").textContent = me?.score || 0;
+      root.querySelector("#matchRemoteScore").textContent = opponent?.score || 0;
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -247,6 +336,7 @@ export function boot(root) {
       !resultsShown &&
       shot.state !== SHOT_FLIGHT &&
       run.status !== RUN_EXPIRED
+      && (playMode !== "online" || Date.now() >= onlineStartsLocal)
     );
   }
 
@@ -313,7 +403,7 @@ export function boot(root) {
     hud.setPower(pull.power);
     // The clock starts on the first pull that is actually a shot, so an
     // accidental brush of the ball costs nothing.
-    if (pull.distance >= PULL_MIN) startClock(run);
+    if (pull.distance >= PULL_MIN && playMode !== "online") startClock(run);
   }
 
   function releasePull() {
@@ -340,7 +430,18 @@ export function boot(root) {
     launchBall(ball, launch, launchSpin(launch));
     beginShot(shot);
     audio.released(run.ballId);
-    recordShot(run);
+    if (playMode === "online") {
+      const me = onlineSnapshot?.matchState?.players?.find(({ id }) => id === onlineSnapshot.clientId);
+      onlineClient.submitShot({
+        power: released.power,
+        aimX: released.aimX,
+        aimY: released.aimY,
+        loft: released.loft,
+        expectedShotNumber: me?.shots || 0,
+      });
+    } else {
+      recordShot(run);
+    }
     syncHud();
   }
 
@@ -356,9 +457,103 @@ export function boot(root) {
   // ---------------------------------------------------------------------
 
   function handleMenuCommand(command) {
-    if (command === "play") screens.show(SCREEN_SETUP);
+    if (command === "solo") {
+      playMode = "solo";
+      hotseat = null;
+      screens.show(SCREEN_SETUP);
+    }
+    else if (command === "hotseat") {
+      playMode = "hotseat";
+      hotseat = createHotseatDuel(preferences.snapshot());
+      screens.show(SCREEN_SETUP);
+    }
+    else if (command === "online") openOnline();
     else if (command === "boards") screens.show(SCREEN_BOARDS);
     else if (command === "howto") screens.show(SCREEN_HOWTO);
+  }
+
+  async function openOnline() {
+    if (!accountAccess.requireAccount()) return;
+    playMode = "online";
+    screens.show(SCREEN_ONLINE);
+    onlineClient.connect();
+    const identity = accountAccess.identity();
+    onlineRating = await platformApi.getGameRating("mini-hoops", identity.playerId).catch(() => null);
+    renderOnline();
+  }
+
+  function renderOnline() {
+    onlineView.render({
+      snapshot: onlineSnapshot || onlineClient.getSnapshot(),
+      config: preferences.snapshot(),
+      identity: accountAccess.identity(),
+      rating: onlineRating,
+    });
+  }
+
+  function handleOnlineSnapshot(snapshot) {
+    onlineSnapshot = snapshot;
+    renderOnline();
+    if (!snapshot.matchState) return;
+    playMode = "online";
+    const state = snapshot.matchState;
+    const key = `${state.roomCode}:${state.startAt}`;
+    if (onlineMatchKey !== key) {
+      onlineMatchKey = key;
+      onlineResultShown = false;
+      const offset = Date.now() - Number(state.serverNow || Date.now());
+      onlineStartsLocal = Number(state.startAt) + offset;
+      onlineEndsLocal = Number(state.endsAt) + offset;
+      startRun(state.config);
+    }
+    syncAuthoritativeOnlineState(state);
+    if (state.phase === "complete") finishOnlineMatch(state);
+  }
+
+  function syncAuthoritativeOnlineState(state) {
+    const me = state.players?.find(({ id }) => id === onlineSnapshot.clientId);
+    if (me) {
+      run.score = me.score;
+      run.shots = me.shots;
+      run.made = me.made;
+      run.streak = me.streak;
+      run.bestStreak = me.bestStreak;
+    }
+    syncHud();
+  }
+
+  function finishOnlineMatch(state) {
+    if (onlineResultShown) return;
+    onlineResultShown = true;
+    resultsShown = true;
+    const me = state.players.find(({ id }) => id === onlineSnapshot.clientId);
+    const opponent = state.players.find(({ id }) => id !== onlineSnapshot.clientId);
+    const winners = state.result?.winnerIds || [];
+    const draw = winners.length > 1;
+    const won = winners.includes(me?.id);
+    const title = draw ? `Draw · ${me?.score || 0} each` : won
+      ? `You win ${me?.score || 0}–${opponent?.score || 0}`
+      : `${opponent?.name || "Opponent"} wins ${opponent?.score || 0}–${me?.score || 0}`;
+    overlays.showDuelResults(runSummary(run), {
+      title,
+      record: onlineRating ? `${onlineRating.wins}W–${onlineRating.losses}L` : "Saving…",
+      recordLabel: "Factory Record",
+      replayable: false,
+    });
+    reportOnlineResult(state, me, opponent, draw ? "draw" : won ? "win" : "loss");
+  }
+
+  async function reportOnlineResult(state, me, opponent, outcome) {
+    const sessionId = `${state.roomCode}:${state.startAt}`;
+    if (!me?.accountPlayerId || !opponent?.accountPlayerId || reportedOnlineSession === sessionId) return;
+    reportedOnlineSession = sessionId;
+    await platformApi.updateGameRating("mini-hoops", {
+      opponentPlayerId: opponent.accountPlayerId,
+      outcome,
+      sessionId,
+    }).catch(() => null);
+    onlineRating = await platformApi.getGameRating("mini-hoops", me.accountPlayerId).catch(() => onlineRating);
+    if (onlineRating) root.querySelector("#resultRank").textContent = `${onlineRating.wins}W–${onlineRating.losses}L`;
   }
 
   function handleSetupSelect(kind, value) {
@@ -382,7 +577,12 @@ export function boot(root) {
         screens.back();
         break;
       case "start":
-        startRun();
+        if (playMode === "hotseat") hotseat = createHotseatDuel(preferences.snapshot());
+        startRun(hotseat?.config || preferences.snapshot());
+        break;
+      case "next-hotseat":
+        resumeHotseatDuel(hotseat);
+        startRun(hotseat.config);
         break;
       case "pause":
         setPaused(true);
@@ -391,10 +591,12 @@ export function boot(root) {
         setPaused(false);
         break;
       case "restart":
-        startRun();
+        if (playMode === "hotseat") hotseat = createHotseatDuel(hotseat?.config || preferences.snapshot());
+        startRun(hotseat?.config || preferences.snapshot());
         break;
       case "quit":
         overlays.hideAll();
+        if (playMode === "online") onlineClient.leave();
         screens.show(SCREEN_MENU);
         break;
       case "change-setup":
@@ -452,10 +654,13 @@ export function boot(root) {
     // followed the player back to the menu would be a bug you could hear.
     if (next !== SCREEN_GAME) audio.silence();
     if (next === SCREEN_MENU) {
+      accountAccess.syncButton(root.querySelector("#onlineMenuButton"));
       renderMenu();
       menu.focus();
     } else if (next === SCREEN_SETUP) {
       renderSetup();
+    } else if (next === SCREEN_ONLINE) {
+      renderOnline();
     } else if (next === SCREEN_BOARDS) {
       renderBoards();
     } else if (next === SCREEN_HOWTO) {
@@ -495,7 +700,7 @@ export function boot(root) {
     }
     if (screens.current() !== SCREEN_GAME || paused || resultsShown) return;
 
-    const { expired } = tickClock(run, TICK_SECONDS);
+    const { expired } = playMode === "online" ? tickOnlineClock() : tickClock(run, TICK_SECONDS);
     // Armed at three seconds and seeked to the beat, so the sample's beeps fall
     // on 3, 2 and 1 and the buzzer takes the place of its fourth. See
     // `audio/game-audio.js`.
@@ -513,7 +718,7 @@ export function boot(root) {
 
       if (stepped.scored) {
         kicks.net = 1;
-        const streak = recordMade(run);
+        const streak = playMode === "online" ? run.streak : recordMade(run);
         hud.shout(madeAnnouncement(streak));
         audio.scored(streak);
       }
@@ -552,7 +757,7 @@ export function boot(root) {
       for (const announcement of progress.announcements) hud.shout(announcement);
 
       if (progress.finished) {
-        if (!shot.scored) {
+        if (!shot.scored && playMode !== "online") {
           recordMiss(run);
           audio.missed();
         }
@@ -576,7 +781,17 @@ export function boot(root) {
     if (Math.abs(kicks.net) < 0.002) kicks.net = 0;
     if (Math.abs(kicks.rim) < 0.002) kicks.rim = 0;
 
-    if (isRunComplete(run, { shotInFlight: shot.state === SHOT_FLIGHT })) finishRun();
+    if (playMode !== "online" && isRunComplete(run, { shotInFlight: shot.state === SHOT_FLIGHT })) finishRun();
+  }
+
+  function tickOnlineClock() {
+    const now = Date.now();
+    run.elapsed = Math.max(0, (now - onlineStartsLocal) / 1000);
+    run.played = Math.max(0, Math.min(run.duration, run.elapsed));
+    run.remaining = Math.max(0, (onlineEndsLocal - now) / 1000);
+    const expired = run.status !== RUN_EXPIRED && run.remaining <= 0;
+    if (expired) run.status = RUN_EXPIRED;
+    return { expired };
   }
 
   function draw() {
@@ -648,6 +863,7 @@ export function boot(root) {
   renderSetup();
   renderBoards();
   soundToggle.render(audio.isMuted());
+  accountAccess.syncButton(root.querySelector("#onlineMenuButton"));
   hud.setMode(hoopModeById(run.modeId).hudLabel);
   syncHud();
   requestAnimationFrame(loop);

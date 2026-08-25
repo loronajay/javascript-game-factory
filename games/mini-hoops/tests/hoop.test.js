@@ -2,11 +2,14 @@ import { suite, test, assert, assertEqual, assertClose, finish } from "./harness
 
 import {
   BACKBOARD_HEIGHT,
+  BACKBOARD_RISE,
   BACKBOARD_WIDTH,
+  BOARD_Z,
   HOOP_BASE_RIM_Y,
   HOOP_BASE_X,
   RIM_CENTER_Z,
 } from "../scripts/sim/constants.js";
+import { depthScaleAt } from "../scripts/sim/projection.js";
 import {
   DEFAULT_HOOP_MODE,
   HOOP_MODES,
@@ -185,10 +188,59 @@ test("motion is a pure function of elapsed time, so a replay lands identically",
 test("rim and backboard stay centred on the hoop wherever it travels", () => {
   const hoop = hoopAt("circle", 1.9);
   assertClose((hoop.left + hoop.right) / 2, hoop.cx, 1e-9, "rim straddles the centre");
-  assertClose(hoop.boardX + BACKBOARD_WIDTH / 2, hoop.cx, 1e-9, "board straddles the centre");
+  assertClose(hoop.boardX + BACKBOARD_WIDTH / 2, hoop.boardCx, 1e-9, "board straddles its own centre");
   assertEqual(hoop.boardW, BACKBOARD_WIDTH);
   assertEqual(hoop.boardH, BACKBOARD_HEIGHT);
   assert(hoop.boardY < hoop.rimY, "the backboard hangs above the rim");
+});
+
+test("at rest the board is exactly behind the rim, however the mode is authored", () => {
+  for (const id of hoopModeIds()) {
+    const hoop = hoopAt(id, 0);
+    assertClose(hoop.boardCx, hoop.cx, 1e-9, `${id} opens with the board behind the rim`);
+    assertClose(hoop.boardY, hoop.rimY - BACKBOARD_RISE, 1e-9, `${id} opens at the calibrated rise`);
+  }
+});
+
+test("the deeper backboard parallaxes: it lags the rim, in the same direction, by one fixed ratio", () => {
+  // The board is bolted to the rim. One rigid object moving through the room
+  // covers the same WORLD distance at both depths, which is fewer SCREEN pixels
+  // at the deeper one — so the board must trail the rim rather than track it
+  // pixel for pixel, and must never overtake it or lead it.
+  const expected = depthScaleAt(BOARD_Z) / depthScaleAt(RIM_CENTER_Z);
+  assert(expected > 0 && expected < 1, "the board's plane must shrink motion, not amplify it");
+
+  let sawTravel = false;
+  for (const id of hoopModeIds()) {
+    for (let t = 0; t < 6; t += 0.31) {
+      const hoop = hoopAt(id, t);
+      const rimTravel = hoop.cx - HOOP_BASE_X;
+      const boardTravel = hoop.boardCx - HOOP_BASE_X;
+      const rimRise = hoop.rimY - HOOP_BASE_RIM_Y;
+      const boardRise = hoop.boardY - (HOOP_BASE_RIM_Y - BACKBOARD_RISE);
+      assertClose(boardTravel, rimTravel * expected, 1e-9, `${id} board x at ${t}`);
+      assertClose(boardRise, rimRise * expected, 1e-9, `${id} board y at ${t}`);
+      if (Math.abs(rimTravel) > 20) {
+        sawTravel = true;
+        assert(Math.abs(boardTravel) < Math.abs(rimTravel), "the board must lag");
+        assert(boardTravel * rimTravel > 0, "and lag on the same side, never the other");
+      }
+    }
+  }
+  assert(sawTravel, "sampled a mode actually travelling");
+});
+
+test("the board and the rim are one rigid body, so they share one world velocity", () => {
+  // They used to be handed different world velocities — the same screen speed
+  // read at two depths — which is a backboard travelling through the room faster
+  // than the rim welded to it, and a bank shot kicked by the difference.
+  for (const id of hoopModeIds()) {
+    for (let t = 0; t < 5; t += 0.37) {
+      const world = hoopWorldState(hoopAt(id, t));
+      assertClose(world.boardVx, world.rimVx, 1e-12, `${id} shares vx at ${t}`);
+      assertClose(world.boardVy, world.rimVy, 1e-12, `${id} shares vy at ${t}`);
+    }
+  }
 });
 
 test("the world-space rim sits on the rim plane and moves with the screen hoop", () => {

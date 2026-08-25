@@ -9,6 +9,7 @@ import {
   HORIZON_SCREEN_Y,
   PROJECTION_ORIGIN_X,
   RIM_CENTER_Z,
+  RIM_RADIUS_WORLD,
   WALL_BASE_SCREEN_Y,
 } from "../scripts/sim/constants.js";
 import {
@@ -17,7 +18,9 @@ import {
   depthScaleAt,
   floorScreenY,
   projectPoint,
+  ringEllipseAt,
   screenToWorldAtZ,
+  worldToScreenLength,
 } from "../scripts/sim/projection.js";
 
 suite("projection — the single owner of world <-> screen arithmetic");
@@ -127,6 +130,63 @@ test("the drawn ball shrinks with depth but never below the legibility floor", (
 test("depth is clamped, so a ball behind the camera cannot invert the projection", () => {
   assert(depthScaleAt(-99) > 0, "scale stays positive below the clamp");
   assert(Number.isFinite(projectPoint({ x: 0, y: 0, z: -99 }).x), "no infinities escape");
+});
+
+// ---------------------------------------------------------------------------
+// Projected rings — the rim, the net's hem, and everything between
+// ---------------------------------------------------------------------------
+
+const rimAt = (screenY) => ringEllipseAt(PROJECTION_ORIGIN_X, screenY, RIM_RADIUS_WORLD);
+
+test("a ring's width is its world radius through the camera, and does not move with height", () => {
+  const wide = worldToScreenLength(RIM_RADIUS_WORLD, RIM_CENTER_Z);
+  // Height changes how OPEN a ring looks, never how WIDE — the ring has not
+  // moved in depth, so its horizontal extent cannot change.
+  for (const screenY of [174, 222, 272, 340]) {
+    assertClose(rimAt(screenY).radiusX, wide, 1e-9, `width at y=${screenY}`);
+  }
+});
+
+test("a ring flattens toward eye level and opens away from it", () => {
+  const high = rimAt(HORIZON_SCREEN_Y - 124);
+  const rest = rimAt(HORIZON_SCREEN_Y - 76);
+  const low = rimAt(HORIZON_SCREEN_Y - 26);
+  assert(high.radiusY > rest.radiusY, "further above the eye is more open");
+  assert(rest.radiusY > low.radiusY, "closer to the eye is flatter");
+  // The swing over the rim's real travel is the whole point: drawn as a
+  // constant this was wrong by better than three to one at the extremes.
+  assert(high.radiusY / low.radiusY > 3, "the travel genuinely changes the shape");
+});
+
+test("a ring level with the eye is edge-on", () => {
+  assertClose(rimAt(HORIZON_SCREEN_Y).radiusY, 0, 0.02, "a ring at eye level is a line");
+});
+
+test("which arc is the far one flips across eye level", () => {
+  // Above the eye we see the ring's underside and its NEAR edge draws HIGHER;
+  // below the eye that inverts. `render/hoop.js` reads this to decide which half
+  // of the rim and net the ball passes behind, so getting it backwards puts the
+  // ball on the wrong side of the cords.
+  assert(rimAt(HORIZON_SCREEN_Y - 80).fromBelow, "the rim rides above eye level");
+  assert(!rimAt(HORIZON_SCREEN_Y + 80).fromBelow, "a ring below eye level is seen from above");
+});
+
+test("a ring's drawn centre carries the near half's bulge", () => {
+  // The near half is nearer the camera and projects larger, so the ellipse's
+  // centre is not the ring's centre. Small, but it is the difference between a
+  // projected circle and a drawn one.
+  const ring = rimAt(222);
+  assert(ring.cy !== 222, "the centre is derived, not assumed");
+  assertClose(ring.cy, 222, 3, "and only by a couple of pixels");
+});
+
+test("the rim's own ring is the one the collider uses", () => {
+  // The drawn rim and the rim the ball hits must be the same object. The width
+  // is RIM_RADIUS_WORLD through the camera and nothing else, which is what makes
+  // a ball that looks like it caught the near edge one that actually did.
+  const ring = rimAt(222);
+  const edge = projectPoint({ x: RIM_RADIUS_WORLD, y: 1.6, z: RIM_CENTER_Z });
+  assertClose(ring.cx + ring.radiusX, edge.x, 1e-9);
 });
 
 finish();

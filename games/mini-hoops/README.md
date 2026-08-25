@@ -18,10 +18,14 @@ any static server works:
 npx serve ..\..
 ```
 
-Pick a hoop mode (still, left-right, up-down, circle, pendulum, figure 8, cross or
-wander), a round length (30s or
-60s), a room and a ball, then drag the ball back and release. Boards are keyed by
-`mode:duration` and are stored locally.
+Pick Solo Run, Local Hotseat, or Online Multiplayer. Hotseat gives two players one
+full timed turn each on the same configured court. Online play requires a signed-in
+Factory account and provides Quick Search, private room codes, a host-owned match
+config, and Factory win/loss/ELO records.
+
+Online matches run through the sibling `full-games/factory-network-server` repo.
+The browser submits normalized pull intent only; that server replays the mirrored
+Mini Hoops physics, owns scores and the deadline, and publishes the final winner.
 
 ## Test
 
@@ -29,10 +33,17 @@ wander), a round length (30s or
 npm test
 ```
 
+After changing shot physics or the ball flight catalog, refresh the server mirror:
+
+```powershell
+npm run mirror:server
+```
+
 Node's built-in runner, no dependencies. The suite covers the projection
 arithmetic, hoop geometry and motion catalog, the pull gesture, the backward
 launch solve, collision and physics ordering, shot resolution, the round clock and
-scoring, both asset catalogs, the store, and the module-layering contract —
+scoring, hotseat rules, the Factory Network client contract, the exact server
+physics mirror, both asset catalogs, the store, and the module-layering contract —
 `tests/modules.test.js` mechanically enforces that the sim never reaches for the
 DOM, a store or a renderer, and that only `store/local-storage.js` says
 `localStorage`.
@@ -45,4 +56,6 @@ DOM, a store or a renderer, and that only `store/local-storage.js` says
 - `scripts/assets/`: the ball and location registries plus a non-blocking image cache. Frame count is per-ball and load-bearing.
 - `scripts/render/`: draw calls only — never mutates state, never reads a store.
 - `scripts/ui/`: DOM bindings, holding no game state.
+- `scripts/multiplayer/`: hotseat duel state, Factory account gate, lobby client, and shared match config.
 - `tools/resize-ball-frames.mjs`: ball roll-frame resizer.
+- `tools/mirror-server.mjs`: refreshes the authoritative physics mirror in `factory-network-server`.

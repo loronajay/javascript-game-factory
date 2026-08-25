@@ -6,6 +6,7 @@
     <title>Mini Hoops</title>
     <link rel="stylesheet" href="styles/game.css" />
     <link rel="stylesheet" href="styles/menu.css" />
+    <link rel="stylesheet" href="styles/online.css" />
   </head>
   <body>
     <div id="mini-hoops" class="cabinet">
@@ -43,21 +44,36 @@
             </div>
 
             <nav id="menuOptions" class="marquee-options" aria-label="Main menu">
-              <button type="button" class="marquee-option" data-command="play">
+              <button type="button" class="marquee-option" data-command="solo">
                 <span class="marquee-option-index">01</span>
-                <span class="marquee-option-label">Play</span>
+                <span class="marquee-option-label">Solo Run</span>
                 <span class="marquee-option-note">Pick a rim, a clock, a room and a ball.</span>
               </button>
-              <button type="button" class="marquee-option" data-command="boards">
+              <button type="button" class="marquee-option" data-command="hotseat">
                 <span class="marquee-option-index">02</span>
+                <span class="marquee-option-label">Local Hotseat</span>
+                <span class="marquee-option-note">Two players, one court, one timed turn each.</span>
+              </button>
+              <button id="onlineMenuButton" type="button" class="marquee-option" data-command="online" data-factory-account-feature>
+                <span class="marquee-option-index">03</span>
+                <span class="marquee-option-label">Online Multiplayer</span>
+                <span class="marquee-option-note">Sign in to use Quick Search and private rooms.</span>
+              </button>
+              <button type="button" class="marquee-option" data-command="boards">
+                <span class="marquee-option-index">04</span>
                 <span class="marquee-option-label">Leaderboards</span>
                 <span class="marquee-option-note">A top five for every rim and every clock.</span>
               </button>
               <button type="button" class="marquee-option" data-command="howto">
-                <span class="marquee-option-index">03</span>
+                <span class="marquee-option-index">05</span>
                 <span class="marquee-option-label">How to Play</span>
                 <span class="marquee-option-note">Three things to know. That's all of them.</span>
               </button>
+              <a class="marquee-option" href="tic-tac-toe-stage.html">
+                <span class="marquee-option-index">06</span>
+                <span class="marquee-option-label">Tic-Tac-Toe</span>
+                <span class="marquee-option-note">Shoot physical bins against the CPU or a local player.</span>
+              </a>
             </nav>
 
             <div class="marquee-card">
@@ -73,8 +89,8 @@
         <header class="screen-head">
           <button type="button" class="ghost-btn" data-intent="back">Back</button>
           <div>
-            <h2>Set Up the Run</h2>
-            <p>The clock starts on your first real pull, not before.</p>
+            <h2 id="setupTitle">Set Up the Run</h2>
+            <p id="setupIntro">The clock starts on your first real pull, not before.</p>
           </div>
         </header>
 
@@ -112,12 +128,59 @@
 
             <div class="setup-start">
               <p id="setupSummary" class="setup-summary">Still · 30 sec · Bedroom · Basketball</p>
-              <button type="button" class="primary-btn" data-intent="start">Start Run</button>
+              <button id="setupStartButton" type="button" class="primary-btn" data-intent="start">Start Run</button>
               <!-- Every copy of this switch is the same setting; scripts/ui/sound-toggle.js
                    keeps their labels together. The M key does the same thing anywhere. -->
               <button type="button" class="ghost-btn ghost-btn--small sound-btn" data-intent="toggle-sound" aria-pressed="false">Sound: On</button>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- =========================== ONLINE ============================ -->
+      <section id="onlineScreen" class="screen" aria-label="Online multiplayer lobby">
+        <header class="screen-head">
+          <button type="button" class="ghost-btn" data-intent="back">Back</button>
+          <div>
+            <h2>Factory Network</h2>
+            <p>Server-authoritative score duels using your signed-in Factory identity.</p>
+          </div>
+        </header>
+
+        <div class="online-shell">
+          <aside class="panel online-account-card">
+            <span>Signed in as</span>
+            <strong id="onlineAccountName">Factory Player</strong>
+            <small id="onlineRecord">Factory record loading…</small>
+          </aside>
+
+          <fieldset class="panel online-config">
+            <legend>Host match config</legend>
+            <label>Hoop<select id="onlineMode"></select></label>
+            <label>Clock<select id="onlineDuration"></select></label>
+            <label>Ball<select id="onlineBall"></select></label>
+            <label>Court<select id="onlineLocation"></select></label>
+            <p>The host owns these settings. Guests receive the room config from the server.</p>
+          </fieldset>
+
+          <div id="onlinePairing" class="panel online-pairing">
+            <button id="onlineQuick" type="button" class="primary-btn">Quick Search</button>
+            <button id="onlineCreate" type="button" class="ghost-btn">Create Private Room</button>
+            <div class="online-code-entry">
+              <input id="onlineRoomInput" maxlength="8" autocomplete="off" placeholder="ROOM CODE" aria-label="Private room code" />
+              <button id="onlineJoin" type="button" class="ghost-btn">Join Room</button>
+            </div>
+          </div>
+
+          <div id="onlineLobbyPanel" class="panel online-lobby" hidden>
+            <div class="online-room-heading"><span>Room</span><strong id="onlineRoomCode">-----</strong></div>
+            <div id="onlinePlayers" class="online-players"></div>
+            <div class="online-lobby-actions">
+              <button id="onlineStart" type="button" class="primary-btn" hidden>Start Match</button>
+              <button id="onlineLeave" type="button" class="ghost-btn">Leave Lobby</button>
+            </div>
+          </div>
+          <p id="onlineStatus" class="online-status" aria-live="polite">Choose Quick Search or open a private room.</p>
         </div>
       </section>
 
@@ -140,11 +203,16 @@
               <span><b id="hudShots">0</b> shots</span>
             </div>
 
-            <div class="hud-stat hud-stat--right">
+          <div class="hud-stat hud-stat--right">
               <small>STREAK</small>
               <strong id="hudStreak">0</strong>
               <span>best <b id="hudBest">0</b></span>
             </div>
+          </div>
+          <div id="matchScoreStrip" class="match-score-strip" hidden>
+            <span id="matchLocalName">Player 1</span><strong id="matchLocalScore">0</strong>
+            <b>VS</b>
+            <strong id="matchRemoteScore">0</strong><span id="matchRemoteName">Player 2</span>
           </div>
 
           <p id="hudShout" class="hud-shout" aria-live="polite"></p>
@@ -175,12 +243,13 @@
               <div class="result-grid">
                 <div><strong id="resultShots">0</strong><span>Shots</span></div>
                 <div><strong id="resultAccuracy">0%</strong><span>Accuracy</span></div>
-                <div><strong id="resultRank">—</strong><span>Local Rank</span></div>
+                <div><strong id="resultRank">—</strong><span id="resultRankLabel">Local Rank</span></div>
               </div>
 
               <p class="result-streak">Best streak: <strong id="resultStreak">0</strong></p>
 
               <div class="overlay-actions">
+                <button id="nextHotseatButton" type="button" class="primary-btn" data-intent="next-hotseat" hidden>Pass to Player 2</button>
                 <button type="button" class="primary-btn" data-intent="restart">Play Again</button>
                 <div class="overlay-actions overlay-actions--split">
                   <button type="button" class="ghost-btn" data-intent="change-setup">Change Setup</button>
@@ -304,6 +373,7 @@
       </section>
     </div>
 
+    <script type="module" src="../../js/platform-config.mjs"></script>
     <script type="module">
       import { boot } from "./scripts/init-game.js";
 

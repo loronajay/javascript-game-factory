@@ -16,7 +16,7 @@ import {
   roomWallBaseY,
 } from "../scripts/assets/room-geometry.js";
 
-suite("room geometry — lining five painted rooms up with one camera");
+suite("room geometry — lining every painted room up with one camera");
 
 const gameRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 

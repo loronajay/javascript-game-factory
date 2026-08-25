@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Mini Hoops — Floor Tic-Tac-Toe</title>
+    <link rel="stylesheet" href="styles/game.css" />
+    <link rel="stylesheet" href="styles/tic-tac-toe-stage.css" />
+  </head>
+  <body class="is-playing">
+    <main id="ticTacToe" class="cabinet ttt-cabinet">
+      <section class="screen game-screen is-active" aria-label="Floor Tic-Tac-Toe">
+        <div class="court stage-court">
+          <canvas id="stageCourt" width="960" height="760" aria-label="Nine physical bins on a floor Tic-Tac-Toe grid"></canvas>
+
+          <div class="hud">
+            <a href="index.html" class="hud-menu stage-back">MENU</a>
+            <div class="hud-clock">
+              <span class="hud-clock-mode">FLOOR TIC-TAC-TOE</span>
+              <span id="tttStatus" class="hud-clock-time">Your turn</span>
+            </div>
+            <div class="hud-stat hud-stat--left">
+              <small>ASSIGNMENT</small>
+              <strong id="tttAssignment">YOU: X · CPU: O</strong>
+              <span>three in a row wins</span>
+            </div>
+          </div>
+          <p class="hud-hint">Tap an open bin · pull the ball · release to shoot</p>
+        </div>
+
+        <div class="shot-panel stage-panel">
+          <div class="ttt-controls">
+            <span class="ttt-control-group">
+              <label for="opponent">Mode</label>
+              <select id="opponent">
+                <option value="cpu">Vs CPU</option>
+                <option value="local">Local 2 Player</option>
+              </select>
+            </span>
+            <span id="difficultyControls" class="ttt-control-group">
+              <label for="difficulty">CPU difficulty</label>
+              <select id="difficulty">
+                <option value="easy">Easy</option>
+                <option value="medium" selected>Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </span>
+            <button id="newMatch" type="button" class="ghost-btn ghost-btn--small">New match</button>
+          </div>
+          <div class="meter-head"><span>SHOT POWER</span><span id="tttMeterReadout">0%</span></div>
+          <div class="meter" aria-label="Shot power"><div id="tttMeterFill" class="meter-fill"></div></div>
+          <p class="meter-legend">A clean entry falls behind the front wall · scored bins become marks after one second</p>
+        </div>
+      </section>
+    </main>
+
+    <script type="module">
+      import { bootTicTacToe } from "./scripts/tic-tac-toe-game.js";
+      window.ticTacToe = bootTicTacToe(document.getElementById("ticTacToe"));
+    </script>
+  </body>
+</html>

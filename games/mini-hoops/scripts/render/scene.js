@@ -72,7 +72,7 @@ export function drawRoom(ctx, backdrop, locationId) {
     }
   }
 
-  // A soft vertical grade unifies five differently-lit rooms under one light,
+  // A soft vertical grade unifies the differently-lit rooms under one light,
   // so the hoop and ball do not look pasted onto whichever backdrop is loaded.
   const shade = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
   shade.addColorStop(0, "rgba(40,21,16,.06)");

@@ -30,6 +30,12 @@ test("the default location exists in the catalog", () => {
   assert(locationIds().includes(DEFAULT_LOCATION));
 });
 
+test("the spec-authored hall, gym and arena rooms ship in the picker", () => {
+  for (const id of ["rec-hall", "school-gym", "fieldhouse"]) {
+    assert(locationIds().includes(id), `${id} is missing from the location catalog`);
+  }
+});
+
 test("an unknown location id falls back to the default instead of throwing", () => {
   assertEqual(locationById("moon-base").id, DEFAULT_LOCATION);
   assertEqual(locationById(undefined).id, DEFAULT_LOCATION);

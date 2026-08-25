@@ -13,7 +13,7 @@
 //     outlines.
 //
 // The ceiling line is the one to look at hardest. It is a single world height
-// for all five rooms — the rooms are not painted with the same ceiling height,
+// for every room — the rooms are not painted with the same ceiling height,
 // so it cannot sit on every cornice — and this is how you check the compromise
 // still reads as a ceiling in each of them rather than as thin air.
 //

@@ -63,7 +63,7 @@ export function entryVelocityForLoft(loft) {
  * @param loft   0..1, straight from the pull angle
  * @param weight the ball's gravity multiplier, from `ballFlight`. 1 is the house ball.
  */
-export function solveLaunch({ origin, aim, power, loft, weight = 1 }) {
+export function solveLaunch({ origin, aim, power, loft, weight = 1, targetZ = RIM_CENTER_Z, entryVelocity = null }) {
   const clampedPower = clamp(power, 0, 1);
   const clampedLoft = clamp(loft, 0, 1);
   // Guarded rather than trusted: a zero or negative weight would divide the
@@ -73,8 +73,11 @@ export function solveLaunch({ origin, aim, power, loft, weight = 1 }) {
   // Honest power: velocity scales linearly against the calibrated reference pull.
   const powerScale = clampedPower / REFERENCE_POWER;
 
-  const entryVy = entryVelocityForLoft(clampedLoft);
-  const target = screenToWorldAtZ(aim.x, aim.y, RIM_CENTER_Z);
+  const entryVy = Number.isFinite(entryVelocity) && entryVelocity < 0
+    ? entryVelocity
+    : entryVelocityForLoft(clampedLoft);
+  const safeTargetZ = Number.isFinite(targetZ) ? targetZ : RIM_CENTER_Z;
+  const target = screenToWorldAtZ(aim.x, aim.y, safeTargetZ);
 
   // How far the ball has to climb. Floored so a target level with (or below) the
   // launch point still yields a real, positive flight time.
@@ -87,7 +90,7 @@ export function solveLaunch({ origin, aim, power, loft, weight = 1 }) {
   // The exact velocity that lands on the reticle...
   const perfectVx = (target.x - origin.x) / flightTime;
   const perfectVy = entryVy + gravity * flightTime;
-  const perfectVz = (RIM_CENTER_Z - origin.z) / flightTime;
+  const perfectVz = (safeTargetZ - origin.z) / flightTime;
 
   // ...scaled by how far off the reference the player actually pulled.
   const vx = perfectVx * powerScale;
@@ -109,7 +112,8 @@ export function solveLaunch({ origin, aim, power, loft, weight = 1 }) {
     // Roughly when the ball reaches the rim plane. Used to decide how far to draw
     // the trajectory preview, not by the physics — the physics finds the plane by
     // actually integrating to it.
-    planeTime: (RIM_CENTER_Z - origin.z) / Math.max(LAUNCH_MIN_DEPTH_SPEED, vz),
+    targetZ: safeTargetZ,
+    planeTime: (safeTargetZ - origin.z) / Math.max(LAUNCH_MIN_DEPTH_SPEED, vz),
   };
 }
 

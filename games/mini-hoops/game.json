@@ -1,9 +1,9 @@
 {
   "title": "Mini Hoops",
   "tagline": "Pull back. Read the rim. Sink it before the clock does.",
-  "description": "Pull-back mini basketball where one drag sets power, aim and arc at once. Four hoop motion modes, two round lengths, five rooms and three balls, scored against local best-run boards.",
-  "players": "1",
-  "status": "Playable - solo time attack",
+  "description": "Pull-back mini basketball where one drag sets power, aim and arc. Play solo time attack, two-player local hotseat, or signed-in Factory Network score duels with Quick Search, private rooms, host match config, and server-authoritative results.",
+  "players": "1-2",
+  "status": "Playable - solo, local hotseat, and online 1v1",
   "order": 15,
   "featured": false,
   "theme": "court",

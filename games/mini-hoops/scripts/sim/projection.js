@@ -32,6 +32,7 @@ import {
   PROJECTION_ORIGIN_X,
   PROJECTION_X_SCALE,
   PROJECTION_Y_SCALE,
+  RIM_CENTER_Z,
 } from "./constants.js";
 
 // A ball that overshoots hard can leave the playable depth band. Clamping keeps
@@ -110,6 +111,47 @@ export function screenToWorldAtZ(screenX, screenY, z) {
  */
 export function worldToScreenLength(length, z) {
   return length * PROJECTION_X_SCALE * depthScaleAt(z);
+}
+
+/**
+ * The screen ellipse traced by a HORIZONTAL RING of world radius `worldRadius`
+ * whose centre projects to `(centreScreenX, centreScreenY)` on the depth plane
+ * `z`.
+ *
+ * This is the rim, the net's hem, and every ring of cords in between. It exists
+ * because those used to be drawn at a FIXED width and a FIXED height, and only
+ * the width was ever right.
+ *
+ * How open a ring looks is entirely a function of how far it is from EYE LEVEL,
+ * and eye level on this camera is `HORIZON_SCREEN_Y`. A ring level with the eye
+ * is a line; one well above or below it is close to a circle. The rim in this
+ * cabinet rides 174..272 on screen against a horizon at 298, so its honest
+ * half-height swings by better than four to one over the travel of a single
+ * motion mode — drawn as a constant, the rim slides around as a rigid decal
+ * instead of hanging in the room.
+ *
+ * `fromBelow` says which side of eye level the ring is on, and therefore which
+ * arc is the FAR one: looking UP at a ring, its near edge draws HIGHER on screen
+ * than its far edge, and the whole near/far split of `render/hoop.js` inverts.
+ * That is not a detail — it decides which cords the ball passes behind.
+ *
+ * The centre is returned as `cy` rather than assumed to be `centreScreenY`: the
+ * near half of a ring is nearer the camera and so projects LARGER, which pushes
+ * the ellipse's centre a little off the ring's own centre. A couple of pixels,
+ * but it is free and it is the difference between a projected circle and a
+ * drawn one.
+ */
+export function ringEllipseAt(centreScreenX, centreScreenY, worldRadius, z = RIM_CENTER_Z) {
+  const centre = screenToWorldAtZ(centreScreenX, centreScreenY, z);
+  const near = projectPoint({ x: centre.x, y: centre.y, z: z - worldRadius });
+  const far = projectPoint({ x: centre.x, y: centre.y, z: z + worldRadius });
+  return {
+    cx: centreScreenX,
+    cy: (near.y + far.y) / 2,
+    radiusX: worldToScreenLength(worldRadius, z),
+    radiusY: Math.abs(far.y - near.y) / 2,
+    fromBelow: near.y < far.y,
+  };
 }
 
 /** Draw radius of the ball sprite at depth `z`. */

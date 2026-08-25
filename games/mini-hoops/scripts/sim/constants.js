@@ -68,7 +68,7 @@ export const WALL_BASE_SCREEN_Y = HORIZON_SCREEN_Y + (FLOOR_SCREEN_Y - HORIZON_S
 
 // Where the ceiling meets that same back wall. Measured off the art like the
 // rest of the camera, and the one number in this block that is a COMPROMISE
-// rather than a reading: the five rooms genuinely have five different ceiling
+// rather than a reading: the shipped rooms genuinely have different ceiling
 // heights (the warehouse's visible wall stops at y=129 under its steel, the
 // detention room's runs to y=47), and a room may not change the physics. This
 // is close to the middle of them, which puts the bounce within about half a
@@ -112,8 +112,12 @@ export const RIM_FRICTION = 0.07;
 export const HOOP_BASE_X = 480;
 export const HOOP_BASE_RIM_Y = 222;
 export const RIM_SCREEN_HALF_WIDTH = 42;
-export const RIM_DRAW_RADIUS_X = 48;
-export const RIM_DRAW_RADIUS_Y = 12;
+// There is deliberately no RIM_DRAW_RADIUS here any more. The rim's drawn
+// ellipse is not a constant — it depends on how far the rim is from eye level,
+// which every motion mode changes — so it is projected from RIM_RADIUS_WORLD by
+// `sim/projection.js`'s `ringEllipseAt` instead. The pair that used to live here
+// (48 x 12) was right about the width by luck and wrong about the height at
+// every rim position except one.
 export const BACKBOARD_WIDTH = 154;
 export const BACKBOARD_HEIGHT = 98;
 // Vertical gap from the rim up to the top edge of the backboard.
