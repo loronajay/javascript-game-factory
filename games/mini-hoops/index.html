@@ -47,7 +47,7 @@
               <button type="button" class="marquee-option" data-command="solo">
                 <span class="marquee-option-index">01</span>
                 <span class="marquee-option-label">Solo Run</span>
-                <span class="marquee-option-note">Pick a rim, a clock, a room and a ball.</span>
+                <span class="marquee-option-note">Classic Hoops or Floor Tic-Tac-Toe vs the CPU.</span>
               </button>
               <button type="button" class="marquee-option" data-command="hotseat">
                 <span class="marquee-option-index">02</span>
@@ -68,11 +68,6 @@
                 <span class="marquee-option-index">05</span>
                 <span class="marquee-option-label">How to Play</span>
                 <span class="marquee-option-note">Three things to know. That's all of them.</span>
-              </button>
-              <button type="button" class="marquee-option" data-command="tic-tac-toe">
-                <span class="marquee-option-index">06</span>
-                <span class="marquee-option-label">Tic-Tac-Toe vs CPU</span>
-                <span class="marquee-option-note">Pull and shoot directly into nine physical bins.</span>
               </button>
             </nav>
 
@@ -196,7 +191,7 @@
       <!-- ============================ GAME ============================ -->
       <section id="gameScreen" class="screen game-screen" aria-label="Game">
         <div class="court">
-          <canvas id="court" width="960" height="760" aria-label="Mini basketball court"></canvas>
+          <canvas id="court" class="court-canvas" width="960" height="760" aria-label="Mini basketball court"></canvas>
 
           <div class="hud" aria-live="polite">
             <button type="button" class="hud-menu" data-intent="pause">MENU</button>
@@ -297,7 +292,7 @@
            audio, its mute switch and its phone rules. -->
       <section id="ticTacToeScreen" class="screen game-screen" aria-label="Floor Tic-Tac-Toe">
         <div class="court">
-          <canvas id="ticTacToeCourt" width="960" height="760" aria-label="Nine open physical bins on a floor Tic-Tac-Toe grid"></canvas>
+          <canvas id="ticTacToeCourt" class="court-canvas" width="960" height="760" aria-label="Nine open physical bins on a floor Tic-Tac-Toe grid"></canvas>
 
           <div class="hud" aria-live="polite">
             <button type="button" class="hud-menu" data-intent="leave-tic-tac-toe">MENU</button>
@@ -432,7 +427,7 @@
         <div class="how-layout">
           <div class="how-demo">
             <div class="court court--demo">
-              <canvas id="practiceCourt" width="960" height="760" aria-label="Practice court"></canvas>
+              <canvas id="practiceCourt" class="court-canvas" width="960" height="760" aria-label="Practice court"></canvas>
               <p id="practiceShout" class="hud-shout" aria-live="polite"></p>
               <p id="practiceHint" class="hud-hint">Grab the ball · pull back · release</p>
             </div>

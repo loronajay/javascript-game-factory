@@ -45,10 +45,23 @@ import {
 } from "./sim/tic-tac-toe.js";
 import { drawBall } from "./render/ball.js";
 import { drawAim } from "./render/aim.js";
-import { binMouthEllipse, drawBinBody, drawBinLip, drawBinMark } from "./render/bin.js";
+import {
+  binMouthEllipse,
+  drawBinBody,
+  drawBinColliders,
+  drawBinLip,
+  drawColliderLegend,
+  drawFloorMark,
+} from "./render/bin.js";
 import { clearScene, depthGradeFilter, drawBallShadow, drawRoom, prepareContext } from "./render/scene.js";
 import { canvasPoint, isGrab } from "./ui/pointer.js";
 
+// One definition of what each side looks like. The floor glyph, the claimed
+// cell's tint and the debug fallback all read it, so a colour cannot drift
+// between the three places a player sees it.
+export const MARK_COLOURS = Object.freeze({ x: "#ff4fd8", o: "#28d8ff" });
+
+const BIN_PATH = "assets/modes/floor-tic-tac-toe/open-bin.png";
 const X_PATH = "assets/modes/floor-tic-tac-toe/neon-x.png";
 const O_PATH = "assets/modes/floor-tic-tac-toe/neon-o.png";
 // The room and the ball are fixed for this mode — the setup screen reads the
@@ -102,10 +115,9 @@ export function bootTicTacToe(root, options = {}) {
   prepareContext(ctx);
 
   const assets = createAssetLibrary({ onLoad: () => draw() });
-  // No bin image. The bins are drawn from the collider's own numbers — see
-  // `render/bin.js` for why the sprite could not stay.
   const art = {
     room: assets.backdrop(ROOM_ID),
+    bin: assets.image(BIN_PATH),
     x: assets.image(X_PATH),
     o: assets.image(O_PATH),
     ballFrames: assets.ballFrames(BALL_ID),
@@ -140,6 +152,10 @@ export function bootTicTacToe(root, options = {}) {
   const meter = root.querySelector("#tttMeterFill");
   const readout = root.querySelector("#tttMeterReadout");
   const newMatchButton = root.querySelector("#newMatch");
+  // The collider overlay. Off by default, toggled with C while the court is
+  // up — a way to SEE where the physics is against where the art is, rather
+  // than argue about it from a screenshot. See `render/bin.js`.
+  let showColliders = false;
   const onlinePanel = root.querySelector("#tttOnlinePanel");
   const modeLabel = root.querySelector("#tttModeLabel");
   const hint = root.querySelector("#tttHint");
@@ -147,6 +163,10 @@ export function bootTicTacToe(root, options = {}) {
   onlineClient.subscribe(handleOnlineSnapshot);
 
   newMatchButton?.addEventListener("click", () => newMatch());
+  window.addEventListener("keydown", (event) => {
+    if (!active || event.key !== "c" || event.metaKey || event.ctrlKey || event.altKey) return;
+    showColliders = !showColliders;
+  });
   for (const button of root.querySelectorAll('[data-intent="leave-tic-tac-toe"]')) {
     button.addEventListener("click", () => onLeave());
   }
@@ -470,8 +490,17 @@ export function bootTicTacToe(root, options = {}) {
     ctx.save();
     for (let row = 0; row < 3; row++) {
       for (let column = 0; column < 3; column++) {
+        // A CLAIMED CELL GLOWS IN ITS OWNER'S COLOUR, and that is not decoration.
+        // The glyph lies flat on the concrete, and from this camera a bin
+        // standing in the row in FRONT of it covers that floor completely — at
+        // every bin height, down to 12cm; the geometry was measured, and there is
+        // no size that fixes it. The cell's own near edge is always visible in
+        // front of the bin, so tinting the panel is what keeps the board readable
+        // without moving the glyph off the floor.
         const claimed = match.board[row * 3 + column];
-        ctx.fillStyle = claimed ? "rgba(10,6,18,.42)" : "rgba(24,6,32,.26)";
+        ctx.fillStyle = claimed
+          ? (claimed === "o" ? "rgba(40,216,255,.30)" : "rgba(255,79,216,.30)")
+          : "rgba(24,6,32,.26)";
         ctx.beginPath();
         const corners = [
           at(xEdges[column], zEdges[row]),
@@ -550,18 +579,33 @@ export function bootTicTacToe(root, options = {}) {
         drawLooseBall();
         ballDrawn = true;
       }
-      drawBinBody(ctx, bin);
-      if (captured === bin.index) drawSinkingBall(bin);
       const mark = markForCell(match.board, scoredAt, bin.index, elapsed);
       if (mark) {
-        // A winning bin pulses; the rest sit at rest. `elapsed` is tick time, so
-        // the pulse is deterministic and a replay looks identical.
+        // A CLAIMED CELL HAS NO BIN. The mark replaces it, lying flat on the
+        // floor where it stood — which is the mode's own rule, and also the
+        // honest picture: `tick` steps the ball against the OPEN bins only, so a
+        // bin left standing on a claimed cell would be a solid-looking target
+        // the ball passes straight through.
+        //
+        // A winning cell pulses; the rest sit at rest. `elapsed` is tick time,
+        // so the pulse is deterministic and a replay looks identical.
         const glow = winning.has(bin.index) ? 1.35 + Math.sin(elapsed * 6) * 0.45 : 1;
-        drawBinMark(ctx, bin, art[mark], mark, { glow });
+        drawFloorMark(ctx, bin, art[mark], mark, { glow });
+        continue;
       }
-      drawBinLip(ctx, bin);
+      drawBinBody(ctx, bin, art.bin);
+      if (captured === bin.index) drawSinkingBall(bin);
+      drawBinLip(ctx, bin, art.bin);
     }
     if (loose && !ballDrawn) drawLooseBall();
+
+    // Over everything, so a collider behind a nearer bin is still readable —
+    // this is an instrument, not part of the scene.
+    if (showColliders) {
+      for (const bin of order) if (!match.board[bin.index]) drawBinColliders(ctx, bin);
+      // Below the HUD's own stat block, which owns the top-left corner.
+      drawColliderLegend(ctx, 28, 230);
+    }
 
     if (pull) {
       const preview = createTicTacToeShot(pull, ball, { weight: ballFlight(BALL_ID).weight });

@@ -1,44 +1,51 @@
-// An open bin, drawn from the collider's own numbers.
+// The open bin, drawn from `assets/modes/floor-tic-tac-toe/open-bin.png`.
 //
-// THIS FILE EXISTS BECAUSE THE SPRITE COULD NOT BE FIXED. `open-bin.png` is a
-// fine picture of a bin and it was rendered from a camera this cabinet does not
-// have: its painted mouth is an ellipse 0.13 as tall as it is wide, and this
-// room's camera looks down at the floor steeply enough to want about 0.59 at the
-// front row. Drawn to the collider's height, the sprite put a 71px-wide bin
-// around a 94px-wide physical mouth, and — far worse, because depth here is
-// chosen with POWER, the hard axis — a painted 9px slot in place of a 55px
-// front-to-back opening. The player could not see the target at all, which is
-// the whole of what "the rim is in the wrong place" was.
+// THE ART IS THE BIN AND THE ART IS NOT TOUCHED. One uniform scale, the sprite's
+// own aspect ratio, no warping of any kind. Two earlier passes got this wrong in
+// opposite directions — one replaced the sprite with a procedural drum, the next
+// kept the sprite but stretched its mouth band to open the ellipse — and both
+// were the same mistake: bending the picture to fit the collider. The collider
+// is ours to choose and the picture is not.
 //
-// So every number here comes from `sim/bin-physics.js` and is put through
-// `sim/projection.js`. There is no art to drift out of step with the physics,
-// because the mouth being drawn IS the mouth being tested, at every row's depth.
+// So the placement is derived FROM the art, and it turns out the art was right
+// all along. Scale comes from one number — the painted rim's half-width (468px)
+// set equal to the projected radius of `mouthRadius + rimTubeRadius` — and at
+// that scale the sprite's painted base lands on the bin's own near base edge to
+// within 7px of an 83-126px body, at all three rows, with no second constant.
+// Solving it the other way round (what world height does the art's aspect ask
+// for?) gives 0.362 at the front row and 0.396 at the back, against the shipped
+// `BIN_MOUTH_Y` of 0.36. The bin in the picture and the bin in the sim are the
+// same object.
 //
-// TWO PASSES, LIKE THE RIM. `drawBinBody` is everything behind the ball and
-// `drawBinLip` the near arc in front of it, so a ball dropping in goes visibly
-// behind the front of the bin rather than skating across it. `render/hoop.js`
-// splits the same way for the same reason; the near/far rule itself lives in
-// `render/ring.js`, because the rim is ABOVE eye level and these are below it,
-// and the split inverts between them.
+// THE ONE PLACE THEY CANNOT AGREE is the mouth's depth front-to-back, and it is
+// worth stating plainly rather than papering over. The art was rendered from a
+// nearly horizontal camera: its painted mouth is an ellipse 0.248 as tall as it
+// is wide. A horizontal circle through THIS camera is 0.42 at the back row and
+// 0.59 at the front. So the painted opening reads 13px deep where the collider's
+// is 32px. That gap is not fixable by moving or scaling the sprite, and it is
+// not fixable by squashing the collider either: a mouth whose world depth
+// matched the paint would be 0.13 deep, and the ball is 0.156 across — it would
+// not fit through the hole it is drawn inside. `drawBinColliders` exists so this
+// is visible rather than argued about; press C on the court.
 //
-// LIGHT COMES FROM THE LEFT, matching the painted rooms and `render/hoop.js`.
+// TWO PASSES, LIKE THE RIM. `drawBinBody` is the whole sprite, before the ball;
+// `drawBinLip` re-draws everything below the mouth's centre line, after it — so
+// a ball dropping in goes behind the near lip and the front wall rather than
+// skating across them.
 
 import { binClearance } from "../sim/bin-physics.js";
-import { projectPoint, ringEllipseAt } from "../sim/projection.js";
+import { projectPoint, ringEllipseAt, worldToScreenLength } from "../sim/projection.js";
 import { depthGradeFilter } from "./scene.js";
-import { halfSpan } from "./ring.js";
 
 const TAU = Math.PI * 2;
 
 /**
- * Every ring this bin is drawn from, projected at the depth it actually sits at.
+ * Every ring of this bin, projected at the depth it actually sits at.
  *
- * `clear` is the one that is not decoration: it is `binClearance` — how far
- * off-axis the ball's centre may be at the mouth plane and still drop through —
- * read straight off the sim. It is shaded rather than outlined, so what the
- * player sees is a hole with a shadow in it that happens to be exactly the
- * window they have to find. Drawing a target ring would print the answer; this
- * shows the geometry and lets the answer follow from it.
+ * `clear` is `binClearance` read straight off the sim — how far off-axis the
+ * ball's centre may be at the mouth plane and still drop through. Nothing draws
+ * it as a printed target in normal play; the collider overlay does, because that
+ * is what an overlay is for.
  */
 export function binRings(bin) {
   const mouth = projectPoint({ x: bin.x, y: bin.topY, z: bin.z });
@@ -50,6 +57,7 @@ export function binRings(bin) {
     inner: ring(mouth, bin.mouthRadius - bin.rimTubeRadius),
     clear: ring(mouth, binClearance(bin)),
     base: ring(foot, bin.bottomRadius),
+    foot,
   };
 }
 
@@ -58,193 +66,200 @@ export function binMouthEllipse(bin) {
   return binRings(bin).inner;
 }
 
-function traceArc(ctx, ellipse, [start, end]) {
-  ctx.ellipse(ellipse.cx, ellipse.cy, ellipse.radiusX, ellipse.radiusY, 0, start, end);
-}
+/**
+ * Where the bin is in ITS OWN ART, in source-image pixels.
+ *
+ * Measured off `open-bin.png` (1187x1326) by walking its alpha, not eyeballed:
+ * the outer rim ellipse tops out on row 44 and is widest on row 160, so its
+ * centre is row 160 and its painted half-height is 116; the bin bottoms out on
+ * row 1272. Only `mouthCenterX`, `mouthCenterY` and `mouthRadiusX` place the
+ * sprite — the rest is here so the collider overlay can draw the painted mouth
+ * beside the tested one. Re-cut art needs this block re-measured, nothing else.
+ */
+const SPRITE = Object.freeze({
+  width: 1187,
+  height: 1326,
+  mouthCenterX: 590,
+  mouthCenterY: 160,
+  mouthRadiusX: 468,
+  mouthRadiusY: 116,
+  baseY: 1272,
+});
 
 /**
- * Everything of the bin that is BEHIND the ball: the body, the inside, and the
- * far half of the lip.
+ * Where the sprite goes: ONE uniform scale, from the painted rim's half-width.
  *
- * The silhouette of a truncated cone seen from above is its mouth's far arc,
- * down both sides, and its base's near arc — traced as one path so the body is
- * a single fill and never shows a seam where two shapes were butted together.
+ * There is deliberately no second scale and no per-band adjustment. The art's
+ * own proportions are the bin's proportions.
  */
-export function drawBinBody(ctx, bin) {
-  const { outer, inner, clear, base } = binRings(bin);
+export function binSpriteLayout(bin) {
+  const { outer } = binRings(bin);
+  const scale = outer.radiusX / SPRITE.mouthRadiusX;
+  return {
+    x: outer.cx - SPRITE.mouthCenterX * scale,
+    y: outer.cy - SPRITE.mouthCenterY * scale,
+    width: SPRITE.width * scale,
+    height: SPRITE.height * scale,
+    scale,
+    // The near/far split: the mouth's own centre line. Looking DOWN at a ring,
+    // everything below its centre is the near half — see `render/ring.js`.
+    splitY: outer.cy,
+  };
+}
 
+/** The mouth exactly as the sprite paints it, for the overlay to draw. */
+export function paintedMouthEllipse(bin) {
+  const layout = binSpriteLayout(bin);
+  return {
+    cx: layout.x + SPRITE.mouthCenterX * layout.scale,
+    cy: layout.y + SPRITE.mouthCenterY * layout.scale,
+    radiusX: SPRITE.mouthRadiusX * layout.scale,
+    radiusY: SPRITE.mouthRadiusY * layout.scale,
+  };
+}
+
+/** Everything of the bin. Drawn before the ball. */
+export function drawBinBody(ctx, bin, image) {
+  const layout = binSpriteLayout(bin);
   ctx.save();
   ctx.filter = depthGradeFilter(bin.z);
-
-  // --- the body ------------------------------------------------------------
-  ctx.beginPath();
-  traceArc(ctx, outer, halfSpan(outer, false));
-  ctx.lineTo(base.cx + base.radiusX, base.cy);
-  traceArc(ctx, base, halfSpan(base, true));
-  ctx.closePath();
-
-  const body = ctx.createLinearGradient(outer.cx - outer.radiusX, 0, outer.cx + outer.radiusX, 0);
-  body.addColorStop(0, "#4a5560");
-  body.addColorStop(0.34, "#333c46");
-  body.addColorStop(0.72, "#232a32");
-  body.addColorStop(1, "#2d353e");
-  ctx.fillStyle = body;
-  ctx.fill();
-
-  // A contact shadow where the bin meets the floor. Without it a bin drawn on a
-  // painted floor reads as a decal on the picture, the same way the backboard
-  // does without its wall shadow.
-  ctx.save();
-  ctx.globalAlpha = 0.38;
-  ctx.filter = `blur(${Math.max(2, base.radiusX * 0.16).toFixed(1)}px)`;
-  ctx.fillStyle = "#0d1116";
-  ctx.beginPath();
-  ctx.ellipse(base.cx + base.radiusX * 0.16, base.cy + base.radiusY * 0.5, base.radiusX * 1.12, base.radiusY * 0.9, 0, 0, TAU);
-  ctx.fill();
-  ctx.restore();
-
-  // Two ribs around the body, following the taper. Pure read: they are what
-  // makes the sides curve rather than sit as a flat trapezoid of gradient.
-  ctx.strokeStyle = "rgba(12,16,20,.34)";
-  ctx.lineWidth = Math.max(1, outer.radiusX * 0.035);
-  for (const t of [0.34, 0.66]) {
-    const rib = ribEllipse(bin, t);
-    ctx.beginPath();
-    traceArc(ctx, rib, halfSpan(rib, true));
-    ctx.stroke();
-  }
-
-  // --- the inside ----------------------------------------------------------
-  // Dark, and darkest under the near lip, which is the edge casting into it.
-  const cavity = ctx.createLinearGradient(0, inner.cy - inner.radiusY, 0, inner.cy + inner.radiusY);
-  cavity.addColorStop(0, "#2a323b");
-  cavity.addColorStop(0.45, "#141a20");
-  cavity.addColorStop(1, "#080b0e");
-  ctx.fillStyle = cavity;
-  ctx.beginPath();
-  ctx.ellipse(inner.cx, inner.cy, inner.radiusX, inner.radiusY, 0, 0, TAU);
-  ctx.fill();
-
-  // The make window, as a pool of shadow rather than a printed ring.
-  ctx.save();
-  ctx.globalAlpha = 0.55;
-  ctx.filter = `blur(${Math.max(1.5, clear.radiusX * 0.22).toFixed(1)}px)`;
-  ctx.fillStyle = "#04060a";
-  ctx.beginPath();
-  ctx.ellipse(clear.cx, clear.cy + clear.radiusY * 0.18, clear.radiusX, clear.radiusY, 0, 0, TAU);
-  ctx.fill();
-  ctx.restore();
-
-  // --- the far half of the lip --------------------------------------------
-  strokeLip(ctx, bin, false);
-
+  paint(ctx, image, layout);
   ctx.restore();
 }
 
 /**
- * The near half of the lip: the only part of the bin that is in FRONT of a ball
- * dropping through it. Drawn after the ball, and that is the whole illusion.
+ * The half of the bin in FRONT of a ball dropping into it: the near lip and the
+ * front wall, which is everything below the mouth's centre line. Drawn after the
+ * ball, and that is the whole illusion.
  */
-export function drawBinLip(ctx, bin) {
+export function drawBinLip(ctx, bin, image) {
+  const layout = binSpriteLayout(bin);
   ctx.save();
+  ctx.beginPath();
+  ctx.rect(layout.x, layout.splitY, layout.width, layout.y + layout.height - layout.splitY);
+  ctx.clip();
   ctx.filter = depthGradeFilter(bin.z);
-  strokeLip(ctx, bin, true);
+  paint(ctx, image, layout);
   ctx.restore();
 }
 
-function strokeLip(ctx, bin, nearHalf) {
-  const { lip } = binRings(bin);
-  const span = halfSpan(lip, nearHalf);
-  const width = Math.max(2, (lip.radiusX / bin.mouthRadius) * bin.rimTubeRadius * 2);
-
-  ctx.lineCap = "round";
-
-  // Underside, then the body on a left-lit grade, then a specular — the same
-  // three-pass stack `render/hoop.js` builds the rim from, for the same reason:
-  // one flat stroke reads as a drawn circle, the stack reads as a moulded edge.
-  ctx.strokeStyle = nearHalf ? "rgba(6,9,12,.7)" : "rgba(6,9,12,.4)";
-  ctx.lineWidth = width;
-  ctx.beginPath();
-  traceArc(ctx, lip, span);
-  ctx.stroke();
-
-  const shade = ctx.createLinearGradient(lip.cx - lip.radiusX, 0, lip.cx + lip.radiusX, 0);
-  if (nearHalf) {
-    shade.addColorStop(0, "#7b8794");
-    shade.addColorStop(0.45, "#5a6672");
-    shade.addColorStop(1, "#414b56");
-  } else {
-    shade.addColorStop(0, "#57626d");
-    shade.addColorStop(0.5, "#454f59");
-    shade.addColorStop(1, "#3a434d");
-  }
-  ctx.strokeStyle = shade;
-  ctx.lineWidth = width * 0.78;
-  ctx.beginPath();
-  traceArc(ctx, lip, span);
-  ctx.stroke();
-
-  ctx.strokeStyle = nearHalf ? "rgba(226,238,250,.5)" : "rgba(200,214,228,.22)";
-  ctx.lineWidth = Math.max(1, width * 0.22);
-  ctx.beginPath();
-  ctx.ellipse(lip.cx, lip.cy - width * 0.24, lip.radiusX * 0.99, lip.radiusY * 0.99, 0, span[0], span[1]);
-  ctx.stroke();
-}
-
-/** A ring around the body at height fraction `t`, on the same taper the collider uses. */
-function ribEllipse(bin, t) {
-  const radius = bin.bottomRadius + (bin.mouthRadius - bin.bottomRadius) * t;
-  const centre = projectPoint({ x: bin.x, y: bin.topY * t, z: bin.z });
-  return ringEllipseAt(centre.x, centre.y, radius, bin.z);
-}
-
-/**
- * A claimed cell: the neon mark lying ON the bin's mouth, and the lip lit to
- * match.
- *
- * The bin STAYS. It used to be deleted and replaced by a mark painted flat on
- * the floor, so claiming a cell made a solid object vanish out of a board the
- * player is aiming at — the grid changed shape every turn. Capping it instead
- * keeps the board still and reads immediately as closed.
- *
- * The mark is drawn squashed to the mouth's own ellipse, because that is what a
- * flat thing lying on the mouth plane looks like from here.
- */
-export function drawBinMark(ctx, bin, image, mark, { glow = 1 } = {}) {
-  const { inner, lip } = binRings(bin);
-  const tint = mark === "o" ? "#28d8ff" : "#ff4fd8";
-
-  ctx.save();
-
-  // The cap, sitting in the mouth rather than floating over it.
-  ctx.globalAlpha = 0.9;
-  ctx.fillStyle = "rgba(9,13,18,.92)";
-  ctx.beginPath();
-  ctx.ellipse(inner.cx, inner.cy, inner.radiusX, inner.radiusY, 0, 0, TAU);
-  ctx.fill();
-
-  ctx.strokeStyle = tint;
-  ctx.globalAlpha = 0.5 * glow;
-  ctx.shadowColor = tint;
-  ctx.shadowBlur = 16 * glow;
-  ctx.lineWidth = Math.max(2, lip.radiusX * 0.07);
-  ctx.beginPath();
-  ctx.ellipse(lip.cx, lip.cy, lip.radiusX, lip.radiusY, 0, 0, TAU);
-  ctx.stroke();
-
+function paint(ctx, image, layout) {
   if (image?.complete && image.naturalWidth) {
-    const width = inner.radiusX * 1.62;
-    // Two separate squashes, and they multiply. The art's own aspect ratio is
-    // the first; the mouth's ellipse is the second, because the mark lies FLAT
-    // on the mouth plane and is foreshortened by exactly as much as the opening
-    // it is lying on. Applying only the art's ratio is what draws a mark
-    // standing upright inside a bin.
-    const artRatio = (image.naturalHeight || 1) / (image.naturalWidth || 1);
-    const height = width * artRatio * (inner.radiusY / inner.radiusX);
-    ctx.globalAlpha = 0.96;
-    ctx.shadowBlur = 22 * glow;
-    ctx.drawImage(image, inner.cx - width / 2, inner.cy - height / 2, width, height);
+    ctx.drawImage(image, layout.x, layout.y, layout.width, layout.height);
+    return;
   }
+  // The loader is non-blocking, so the first frames can arrive without art. A
+  // flat drum keeps the board readable rather than leaving nine holes in it.
+  ctx.fillStyle = "#161c23";
+  ctx.beginPath();
+  ctx.ellipse(layout.x + layout.width / 2, layout.splitY, layout.width / 2, layout.width / 8, 0, 0, TAU);
+  ctx.fill();
+  ctx.fillRect(layout.x + layout.width * 0.1, layout.splitY, layout.width * 0.8, layout.y + layout.height - layout.splitY);
+}
 
+/**
+ * THE COLLIDERS, DRAWN OVER THE ART. A debug overlay, off by default, toggled
+ * with C on the tic-tac-toe court.
+ *
+ * This exists because "the rim is not aligned to the art" is a claim about two
+ * things that cannot both be seen at once, and the only way to settle it is to
+ * draw them on top of each other. Everything solid is a real collider read from
+ * `sim/bin-physics.js`; the dashed white ellipse is the mouth as PAINTED, taken
+ * from the `SPRITE` block. Where those two disagree is exactly where a contact
+ * happens off-picture, and the gap between them is the whole of the mismatch —
+ * measured, not argued.
+ */
+export function drawBinColliders(ctx, bin) {
+  const { outer, lip, clear, base } = binRings(bin);
+  const ring = (e, stroke, dash = null, width = 1.5) => {
+    ctx.save();
+    ctx.setLineDash(dash || []);
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.ellipse(e.cx, e.cy, Math.max(0.5, e.radiusX), Math.max(0.5, e.radiusY), 0, 0, TAU);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  ring(paintedMouthEllipse(bin), "rgba(255,255,255,.95)", [5, 4], 2);
+  ring(outer, "rgba(255,86,86,.95)");            // outermost the lip can touch
+  ring(lip, "rgba(0,255,128,.95)", null, 2);     // the lip's centre line
+  ring(clear, "rgba(255,214,0,.95)", null, 2);   // the make window
+  ring(base, "rgba(120,170,255,.8)", [4, 3]);    // the base on the floor
+
+  // The side wall, at three of the heights it is sampled through. It tapers, and
+  // it stops dead at the mouth plane — above that the lip torus is the only
+  // collider in the room.
+  for (const t of [0.25, 0.5, 0.75]) {
+    const radius = bin.bottomRadius + (bin.mouthRadius - bin.bottomRadius) * t;
+    const centre = projectPoint({ x: bin.x, y: bin.topY * t, z: bin.z });
+    ring(ringEllipseAt(centre.x, centre.y, radius, bin.z), "rgba(120,170,255,.45)", [3, 4], 1);
+  }
+}
+
+/** The legend for `drawBinColliders`, drawn once rather than per bin. */
+export function drawColliderLegend(ctx, x, y) {
+  const rows = [
+    ["rgba(255,255,255,.95)", "mouth AS PAINTED (the art)"],
+    ["rgba(255,86,86,.95)", "lip outer — furthest the rim can touch"],
+    ["rgba(0,255,128,.95)", "lip centre line (BIN_MOUTH_RADIUS)"],
+    ["rgba(255,214,0,.95)", "make window (binClearance)"],
+    ["rgba(120,170,255,.8)", "body taper + base on the floor"],
+  ];
+  ctx.save();
+  ctx.fillStyle = "rgba(8,10,14,.85)";
+  ctx.fillRect(x - 12, y - 24, 342, rows.length * 20 + 34);
+  ctx.font = "600 13px system-ui, sans-serif";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "#fff";
+  ctx.fillText("COLLIDERS  ·  press C to hide", x, y - 9);
+  rows.forEach(([colour, label], i) => {
+    const ry = y + 15 + i * 20;
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(x, ry);
+    ctx.lineTo(x + 22, ry);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,.85)";
+    ctx.fillText(label, x + 30, ry);
+  });
+  ctx.restore();
+}
+
+/**
+ * A claimed cell: the neon mark lying flat on the floor, WHERE THE BIN WAS.
+ *
+ * The bin is not drawn at all for a claimed cell — the mark replaces it, which
+ * is the mode's own rule and the thing that makes a filled board read at a
+ * glance. It is also what keeps the board honest: a claimed cell has no collider
+ * (`tic-tac-toe-game.js` steps the ball against the OPEN bins only), so leaving a
+ * solid-looking bin standing there would be drawing a target that cannot be hit.
+ *
+ * Composited with `lighter`, because the art is a photographed neon tube on
+ * black. Drawn straight it lays a black card on the concrete; added, only the
+ * light lands and the floor shows through it.
+ */
+export function drawFloorMark(ctx, bin, image, mark, { glow = 1 } = {}) {
+  const centre = projectPoint({ x: bin.x, y: 0.012, z: bin.z });
+  const width = worldToScreenLength(0.42, bin.z);
+  const ratio = image?.naturalWidth ? image.naturalHeight / image.naturalWidth : 0.667;
+  const height = width * ratio;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = Math.min(1, 0.82 * glow);
+  if (image?.complete && image.naturalWidth) {
+    ctx.drawImage(image, centre.x - width / 2, centre.y - height / 2, width, height);
+  } else {
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = mark === "o" ? "#28d8ff" : "#ff4fd8";
+    ctx.font = `bold ${Math.round(width * 0.6)}px system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(mark.toUpperCase(), centre.x, centre.y);
+  }
   ctx.restore();
 }

@@ -95,10 +95,11 @@ export function createSetupView(root, { onSelect = () => {} } = {}) {
   return {
     /** Reflect the current selection across every picker and the preview. */
     render(selection) {
-      // The game type is only ever offered on the hotseat setup, and the choice
-      // is remembered — so the mode is read from BOTH, or a player who picked
-      // tic-tac-toe once would find a solo setup screen with no pickers on it.
-      const ticTacToe = selection.playMode === "hotseat" && selection.gameType === "tic-tac-toe";
+      // The game type is offered on the solo and hotseat setups and never on
+      // the online one, which has a Game select of its own — and the choice is
+      // remembered, so the play mode is read alongside it or a player who once
+      // picked tic-tac-toe would find an online setup with no pickers on it.
+      const ticTacToe = selection.playMode !== "online" && selection.gameType === "tic-tac-toe";
       const shown = ticTacToe ? TIC_TAC_TOE_FIXED_SETUP : selection;
 
       markActive(groups.game, selection.gameType || "classic");
@@ -117,10 +118,10 @@ export function createSetupView(root, { onSelect = () => {} } = {}) {
       // button would promise a room, a ball and a clock the stage never reads.
       if (summary) {
         summary.textContent = ticTacToe
-          ? `Two players · ${locationById(shown.locationId).label} · ${ballById(shown.ballId).label}`
+          ? `${selection.playMode === "hotseat" ? "Two players" : "You vs CPU"} · ${locationById(shown.locationId).label} · ${ballById(shown.ballId).label}`
           : describeSetup(selection);
       }
-      if (gameTypePanel) gameTypePanel.hidden = selection.playMode !== "hotseat";
+      if (gameTypePanel) gameTypePanel.hidden = selection.playMode === "online";
       for (const panel of classicPanels) if (panel) panel.hidden = ticTacToe;
     },
   };

@@ -189,12 +189,19 @@ export function boot(root) {
   // lobby, which is shown alongside. `onShowLobby` is how it asks for the swap
   // without being handed the router.
   const ticTacToeLobby = root.querySelector("#ticTacToeOnlineScreen");
+  const ticTacToeCourt = root.querySelector("#ticTacToeScreen");
   const ticTacToe = bootTicTacToe(root, {
     audio,
     accountAccess,
     onShowLobby: (showLobby) => {
+      // THE ROUTER OWNS WHICH SCREEN IS UP; this only swaps between the court
+      // and its lobby once tic-tac-toe is already the screen. Without the
+      // guard, the boot-time render called this with `false` and switched the
+      // court ON — so the tic-tac-toe game view sat over the title screen from
+      // the moment the cabinet loaded, before anybody had chosen anything.
+      if (screens.current() !== SCREEN_TIC_TAC_TOE) return;
       if (ticTacToeLobby) ticTacToeLobby.classList.toggle("is-active", showLobby);
-      root.querySelector("#ticTacToeScreen")?.classList.toggle("is-active", !showLobby);
+      ticTacToeCourt?.classList.toggle("is-active", !showLobby);
     },
     onLeave: () => {
       ticTacToe.exit();
@@ -251,9 +258,16 @@ export function boot(root) {
     const intro = root.querySelector("#setupIntro");
     const start = root.querySelector("#setupStartButton");
     if (title) title.textContent = playMode === "hotseat" ? "Set Up Hotseat" : "Set Up the Run";
-    const ticTacToe = playMode === "hotseat" && setupGameType === "tic-tac-toe";
+    // Tic-tac-toe is a game TYPE picked on this screen, in both solo and
+    // hotseat. It used to be a sixth command on the title marquee, which put a
+    // whole second game on the front door beside the four ways into the first
+    // one — and left solo tic-tac-toe as the only mode in the cabinet you could
+    // not reach from a setup screen.
+    const ticTacToe = playMode !== "online" && setupGameType === "tic-tac-toe";
     if (intro) intro.textContent = ticTacToe
-      ? "Two players alternate shots at the nine bins. Three in a row wins — there is no clock."
+      ? playMode === "hotseat"
+        ? "Two players alternate shots at the nine bins. Three in a row wins — there is no clock."
+        : "You and the CPU alternate shots at the nine bins. Three in a row wins — there is no clock."
       : playMode === "hotseat"
         ? "Player 1 takes a full timed turn, then passes the court to Player 2."
         : "The clock starts on your first real pull, not before.";
@@ -510,7 +524,6 @@ export function boot(root) {
       screens.show(SCREEN_SETUP);
     }
     else if (command === "online") openOnline();
-    else if (command === "tic-tac-toe") openTicTacToe({ mode: "cpu" });
     else if (command === "boards") screens.show(SCREEN_BOARDS);
     else if (command === "howto") screens.show(SCREEN_HOWTO);
   }
@@ -621,8 +634,8 @@ export function boot(root) {
         screens.back();
         break;
       case "start":
-        if (playMode === "hotseat" && setupGameType === "tic-tac-toe") {
-          openTicTacToe({ mode: "local" });
+        if (playMode !== "online" && setupGameType === "tic-tac-toe") {
+          openTicTacToe({ mode: playMode === "hotseat" ? "local" : "cpu" });
           break;
         }
         if (playMode === "hotseat") hotseat = createHotseatDuel(preferences.snapshot());

@@ -382,8 +382,14 @@ a:focus-visible {
   box-shadow: 0 16px 48px rgba(28, 15, 10, 0.32);
 }
 
-#court,
-#practiceCourt {
+/* EVERY COURT CANVAS, by role rather than by id.
+   This was `#court, #practiceCourt` — a list of ids, so the third court to be
+   built simply did not get sized. The tic-tac-toe canvas rendered at its raw
+   960x760 attribute size inside a court box narrower than that: the art was
+   cropped rather than scaled, the court grew taller than the screen, and the
+   HUD was pushed off the top of the viewport entirely. A class cannot be
+   forgotten the way a fourth id in a list can. */
+.court-canvas {
   display: block;
   width: 100%;
   height: auto;
@@ -1062,7 +1068,7 @@ body.is-playing .cabinet {
     border-radius: 12px;
   }
 
-  .game-screen #court {
+  .game-screen .court-canvas {
     position: absolute;
     top: 0;
     left: 50%;
@@ -1091,7 +1097,7 @@ body.is-playing .cabinet {
     height: min(56dvh, 320px);
   }
 
-  .court--demo #practiceCourt {
+  .court--demo .court-canvas {
     position: absolute;
     top: 0;
     left: 50%;
@@ -1135,7 +1141,7 @@ body.is-playing .cabinet {
     justify-self: center;
   }
 
-  .game-screen #court {
+  .game-screen .court-canvas {
     width: 100%;
     height: 100%;
     aspect-ratio: auto;
@@ -1226,6 +1232,11 @@ body.is-playing .cabinet {
   text-transform: uppercase;
 }
 
+/* The HUD is `pointer-events: none` so a drag anywhere over the court reaches
+   the canvas. Every button inside it therefore has to opt back IN — `.hud-menu`
+   did and this did not, so `New match` was drawn, enabled and completely
+   unclickable: the only way to start a second match was to quit to the menu. */
+.hud-action { pointer-events: auto; }
 .hud-action[hidden] { display: none; }
 .hud-action:hover { border-color: rgba(255, 255, 255, .45); }
 

@@ -240,8 +240,11 @@ test("every screen the router knows about has a section in the markup", () => {
 });
 
 test("floor tic-tac-toe is offered through proper solo, hotseat, and online entry points", () => {
-  assert(html.includes('data-command="tic-tac-toe"'), "the main menu needs a CPU tic-tac-toe entry");
-  assert(html.includes('id="setupGameTypes"'), "local hotseat setup needs a game-type picker");
+  // It is a game TYPE, chosen on the setup screen in both solo and hotseat, and
+  // never a command on the title marquee — a sixth front door to a second game,
+  // standing beside four ways into the first one.
+  assert(!html.includes('data-command="tic-tac-toe"'), "tic-tac-toe must not be a main-menu command");
+  assert(html.includes('id="setupGameTypes"'), "the solo and hotseat setup needs a game-type picker");
   assert(html.includes('id="onlineGameType"'), "the online lobby needs a game-type picker");
   assert(!html.includes('id="opponent"'), "the game court must not use a mode dropdown");
   for (const id of ["tttOnlinePanel", "tttOnlineQuick", "tttOnlineCreate", "tttOnlineJoin", "tttOnlineStart", "tttOnlineLeave"]) {
@@ -285,7 +288,7 @@ test("every button intent in the markup is handled by the composition root", () 
 test("every menu command in the markup is handled", () => {
   const source = fs.readFileSync(path.join(gameRoot, "scripts", "init-game.js"), "utf8");
   const commands = new Set([...html.matchAll(/data-command="([a-z-]+)"/g)].map((match) => match[1]));
-  assertEqual(commands.size, 6, "the menu exposes solo, hotseat, online, boards, how-to-play and tic-tac-toe");
+  assertEqual(commands.size, 5, "the menu exposes solo, hotseat, online, boards and how-to-play");
   for (const command of commands) {
     assert(source.includes(`"${command}"`), `menu command "${command}" is not handled`);
   }

@@ -1,16 +1,19 @@
 import { suite, test, assert, assertEqual, assertClose, finish } from "./harness.js";
 
 import { BALL_RADIUS_WORLD, REFERENCE_POWER, TICK_SECONDS } from "../scripts/sim/constants.js";
-import { createBall, launchBall } from "../scripts/sim/physics.js";
+import { createBall, launchBall, resetBall } from "../scripts/sim/physics.js";
 import { launchSpin, solveLaunch } from "../scripts/sim/launch.js";
 import { projectPoint } from "../scripts/sim/projection.js";
 import {
   BIN_MOUTH_Y,
+  BIN_WALL_THICKNESS,
   createBinTargets,
   detectBinScore,
   resolveBinRimContact,
+  resolveBinWallContact,
   stepBallAgainstBins,
 } from "../scripts/sim/bin-physics.js";
+import { createTicTacToeShot } from "../scripts/sim/tic-tac-toe-shot.js";
 
 suite("bin physics — reusable depth targets with real rim behaviour");
 
@@ -101,6 +104,54 @@ test("a captured ball loses lateral energy and stays inside its bin", () => {
   stepBallAgainstBins(ball, bins, TICK_SECONDS, { ballId: "basketball", capturedBin: 4 });
   assert(Math.abs(ball.vx) < 2 && Math.abs(ball.vz) < 1, "the bin interior should arrest sideways travel");
   assertClose(Math.hypot(ball.x - bin.x, ball.z - bin.z) < bin.mouthRadius ? 1 : 0, 1, 0);
+});
+
+test("the side wall stops at the mouth plane, so a lob can clear a row", () => {
+  // The bug this pins: the wall used to run to `topY + BALL_RADIUS_WORLD`, which
+  // put a full-height cylinder of horizontal normal in the 7.8cm of air ABOVE
+  // the mouth — where only the rim torus exists. A back-row lob leaves the floor
+  // climbing steeply and passes through that phantom band a hand's width to the
+  // near side of the front bin, so a full-power shot came straight back at the
+  // player off a surface that was neither drawn nor there.
+  const bin = bins[7];
+  const above = createBall();
+  Object.assign(above, {
+    x: bin.x,
+    y: bin.topY + 0.05,
+    z: bin.z - (bin.mouthRadius + BIN_WALL_THICKNESS + 0.077),
+    vx: 0, vy: 3, vz: 1,
+  });
+  const previous = { x: above.x, y: above.y - 0.05, z: above.z - 0.02 };
+  assertEqual(resolveBinWallContact(above, previous, bin), null, "nothing above the mouth is wall");
+
+  // Still a wall where the wall is.
+  const beside = createBall();
+  Object.assign(beside, { x: bin.x, y: bin.topY * 0.5, z: bin.z - 0.22, vx: 0, vy: 0, vz: 2 });
+  const before = { x: beside.x, y: beside.y, z: beside.z - 0.05 };
+  assertEqual(resolveBinWallContact(beside, before, bin), "bin-wall", "the body is still solid below the mouth");
+  assert(beside.vz < 0, "and it still turns the ball away");
+});
+
+test("a full-power lob reaches the back row instead of bouncing back", () => {
+  const target = bins[1];
+  const screen = projectPoint({ x: target.x, y: target.topY, z: target.z });
+  const ball = createBall();
+  resetBall(ball);
+  const shot = createTicTacToeShot(
+    { power: 1, aimX: screen.x, aimY: screen.y, loft: 0.5, distance: 100 },
+    ball,
+    { weight: 1 },
+  );
+  launchBall(ball, shot.launch);
+  let captured = null;
+  let scored = null;
+  for (let tick = 0; tick < 300 && scored === null; tick++) {
+    const result = stepBallAgainstBins(ball, bins, TICK_SECONDS, { ballId: "basketball", capturedBin: captured });
+    if (result.capturedBin !== null) captured = result.capturedBin;
+    if (result.scoredBin !== null) scored = result.scoredBin;
+    assert(ball.z > -0.2, "the ball must never be turned back toward the player on the way out");
+  }
+  assertEqual(scored, target.index, "a maximum pull must reach the back row");
 });
 
 finish();

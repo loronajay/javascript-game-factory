@@ -2,14 +2,12 @@
 // it is a tapered body plus a torus lip, with a descending mouth-plane crossing
 // registering the make. The same target objects can be reused by later modes.
 //
-// THE BIN IS THE ONLY DEFINITION OF ITSELF. `render/bin.js` draws every one of
-// these numbers rather than sizing a sprite next to them — the mouth the player
-// aims at is the mouth `detectBinScore` tests, at every row's depth, because the
-// two are the same record read twice. That is the bug this file was rewritten
-// against: an open-bin PNG whose painted mouth was a 9px slot standing in for a
-// 55px physical opening, drawn from a near-horizontal camera in a room this
-// camera looks steeply DOWN on. Nothing about that was fixable by nudging the
-// sprite; the mouth had to be projected, not painted.
+// THE BIN IS THE ONLY DEFINITION OF WHERE IT IS. `render/bin.js` draws the
+// `open-bin.png` sprite ANCHORED to these numbers — its painted mouth is placed
+// on the mouth `detectBinScore` tests, at every row's depth — rather than sized
+// beside them off a hand-tuned ratio. That was the bug: the drawn bin and the
+// tested mouth were two independent answers, and at the front row they differed
+// by 23px of width.
 //
 // THE ROOM IS THE CLASSIC ROOM. Floor, ceiling and back wall resolve through
 // `sim/collision.js` — the same resolvers the classic cabinet runs — rather than
@@ -45,11 +43,9 @@ import { resolveCeilingContact, resolveFloorContact } from "./collision.js";
 // honest.
 //
 // So the difficulty is fixed by the room, and the thing that was actually wrong
-// was never this number: it was that the number appeared nowhere the player
-// could see. The sprite this shipped with drew a 71px-wide bin around a 94px
-// physical mouth at the front row, from a near-horizontal camera, in a room this
-// camera looks steeply down on — a painted 9px slot standing in for a 55px
-// opening. `render/bin.js` now draws these constants instead.
+// was never this number: it was that the drawn bin did not stand where this one
+// says it does. The old placement put a 71px-wide sprite around a 94px physical
+// mouth at the front row; `render/bin.js` now anchors the art to these numbers.
 export const BIN_MOUTH_Y = 0.36;
 export const BIN_MOUTH_RADIUS = 0.16;
 export const BIN_BOTTOM_RADIUS = 0.133;
@@ -127,10 +123,9 @@ export function nearestBinTo(ball, bins) {
  * The clear opening: how far off-axis the ball's CENTRE may be at the mouth
  * plane and still drop in.
  *
- * Exported because `render/bin.js` shades exactly this circle. The player is
- * entitled to see the hole they have to find rather than the lip around it, and
- * a renderer that computed its own version of it would be the sprite mismatch
- * back in a new form.
+ * Exported because the screen tests check the drawn lip and this circle share
+ * one scale at every row. A renderer that computed its own version of it would
+ * be the placement mismatch back in a new form.
  */
 export function binClearance(bin) {
   return bin.mouthRadius - BALL_RADIUS_WORLD - bin.rimTubeRadius * 0.55;
@@ -180,8 +175,22 @@ export function resolveBinRimContact(ball, bin, flight = { bounce: 1, grip: 1 })
   return "bin-rim";
 }
 
+/**
+ * The bin's side wall.
+ *
+ * THE WALL STOPS AT THE MOUTH PLANE, and that bound is load-bearing. It used to
+ * run to `topY + BALL_RADIUS_WORLD`, which put a full-height cylinder of
+ * horizontal normal in the 7.8cm of air ABOVE the mouth — where the only thing
+ * that actually exists is the rim torus, and `resolveBinRimContact` already owns
+ * it. The cost was not subtle: a ball lobbed at the back row leaves the floor
+ * climbing steeply, and on its way up it passes through that phantom band about
+ * 8cm to the near side of the front bin. The wall resolver reversed its `vz`,
+ * so a full-power shot at the back row bounced straight back at the player from
+ * a surface that was neither drawn nor there. Above the mouth plane the rim is
+ * the only collider, which is also what makes lobbing over a row possible.
+ */
 export function resolveBinWallContact(ball, previous, bin, flight = { bounce: 1 }) {
-  if (ball.y <= BALL_RADIUS_WORLD || ball.y >= bin.topY + BALL_RADIUS_WORLD) return null;
+  if (ball.y <= BALL_RADIUS_WORLD || ball.y >= bin.topY) return null;
   const height = Math.max(0, Math.min(1, ball.y / bin.topY));
   const bodyRadius = bin.bottomRadius + (bin.mouthRadius - bin.bottomRadius) * height;
   const dx = ball.x - bin.x;
