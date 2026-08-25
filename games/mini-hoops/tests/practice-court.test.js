@@ -49,7 +49,7 @@ function harness() {
   let tally = { made: 0, taken: 0 };
 
   const court = createPracticeCourt(canvas, {
-    assets: { backdrop: () => null, ballFrames: () => [] },
+    assets: { backdrop: () => null, ballFrames: () => [], ballSplats: () => null },
     onPower: (value) => {
       power = value;
     },

@@ -48,6 +48,7 @@ const MODULES = [
   "scripts/assets/ball-catalog.js",
   "scripts/assets/location-catalog.js",
   "scripts/assets/loader.js",
+  "scripts/effects/splat-field.js",
   "scripts/audio/sound-catalog.js",
   "scripts/audio/music-catalog.js",
   "scripts/audio/playlist.js",
@@ -63,6 +64,7 @@ const MODULES = [
   "scripts/render/ball.js",
   "scripts/render/aim.js",
   "scripts/render/frame.js",
+  "scripts/render/splats.js",
   "scripts/ui/screens.js",
   "scripts/ui/pointer.js",
   "scripts/ui/hud.js",
@@ -96,6 +98,21 @@ test("the sim layer never imports the DOM, the stores, or the renderers", () => 
     const code = stripComments(fs.readFileSync(path.join(simDir, name), "utf8"));
     for (const forbidden of ["../store/", "../ui/", "../render/", "document.", "window."]) {
       assert(!code.includes(forbidden), `scripts/sim/${name} reaches for ${forbidden}`);
+    }
+  }
+});
+
+test("the effects layer holds state but stays as pure as the sim", () => {
+  // `effects/` is the one layer that is neither: it holds positions and
+  // lifetimes that have to be advanced on the tick clock, which `render/` may
+  // not do, but nothing in it can change a score, which is why it is not in
+  // `sim/`. It earns that place by being as testable as the sim is — so it may
+  // not reach for a store, a view, a canvas or the DOM either.
+  const effectsDir = path.join(gameRoot, "scripts", "effects");
+  for (const name of fs.readdirSync(effectsDir)) {
+    const code = stripComments(fs.readFileSync(path.join(effectsDir, name), "utf8"));
+    for (const forbidden of ["../store/", "../ui/", "../render/", "document.", "window.", "getContext"]) {
+      assert(!code.includes(forbidden), `scripts/effects/${name} reaches for ${forbidden}`);
     }
   }
 });

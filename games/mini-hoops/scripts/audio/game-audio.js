@@ -188,6 +188,19 @@ export function createGameAudio({
     },
 
     /**
+     * A ball that did not survive its landing.
+     *
+     * It takes the PLACE of the contact sound it arrived with rather than
+     * playing over it: a wall's dull plaster thud belongs to a ball that came
+     * back off the wall, and this one did not. What is left is the ball's own
+     * body — the same sample its floor impact uses, at the weight it hit with,
+     * and then nothing, because there is no roll to follow.
+     */
+    splat(surface, { ballId, speed = 0 } = {}) {
+      engine.play(ballAudio(ballId).floor, { gain: impactGain(speed), ignoreThrottle: true });
+    },
+
+    /**
      * It went in.
      *
      * The celebration fires on the shot that STARTS the streak, not on every

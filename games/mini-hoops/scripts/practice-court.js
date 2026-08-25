@@ -12,6 +12,8 @@
 // It holds no DOM beyond its canvas. Everything it wants to say leaves through
 // the callbacks and is written by `ui/practice-view.js`.
 
+import { ballSplat } from "./assets/ball-catalog.js";
+import { addSplat, clearSplatField, createSplatField, tickSplatField } from "./effects/splat-field.js";
 import { CANVAS_HEIGHT, CANVAS_WIDTH, PULL_MIN, TICK_SECONDS } from "./sim/constants.js";
 import { hoopAt } from "./sim/hoop.js";
 import { isShootablePull, neutralPull, resolvePull } from "./sim/pull.js";
@@ -42,6 +44,7 @@ const PRACTICE_MODE = "still";
 const SILENT_AUDIO = {
   released() {},
   contact() {},
+  splat() {},
   scored() {},
   missed() {},
 };
@@ -75,6 +78,9 @@ export function createPracticeCourt(
   let active = false;
 
   const kicks = { net: 0, rim: 0 };
+  // The demo court marks up too. It is the same sim and the same ball, and a
+  // player who picked the snowball should find out here what it does.
+  const splats = createSplatField();
 
   // -----------------------------------------------------------------------
   // Input — the same gesture as the game, read through the same two helpers.
@@ -181,7 +187,12 @@ export function createPracticeCourt(
       if (stepped.contacts.includes("rim")) {
         kicks.rim = ball.x < world.hoopWorld.rimX ? -1 : 1;
       }
+      if (stepped.splat) {
+        addSplat(splats, { ...stepped.splat, ...ballSplat(style.ballId) });
+        audio.splat(stepped.splat.surface, { ballId: style.ballId, speed: stepped.splat.speed });
+      }
       for (const contact of new Set(stepped.contacts)) {
+        if (stepped.splat?.surface === contact) continue;
         audio.contact(contact, { ballId: style.ballId, speed: ball.vy });
       }
 
@@ -210,6 +221,8 @@ export function createPracticeCourt(
         onPower(0);
       }
     }
+
+    tickSplatField(splats, TICK_SECONDS);
 
     kicks.net *= Math.pow(0.055, TICK_SECONDS);
     kicks.rim *= Math.pow(0.018, TICK_SECONDS);
@@ -242,6 +255,8 @@ export function createPracticeCourt(
       trajectory,
       kicks,
       scored: shot.scored,
+      splats,
+      splatImages: assets.ballSplats(style.ballId),
     });
   }
 
@@ -271,6 +286,7 @@ export function createPracticeCourt(
       streak = 0;
       kicks.net = 0;
       kicks.rim = 0;
+      clearSplatField(splats);
       onTally({ made, taken });
       onSay("");
     },

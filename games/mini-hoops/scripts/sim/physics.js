@@ -10,12 +10,17 @@
 //   3. Rim, then back wall — only if it did not go in.
 //   4. Floor, always.
 //
+// A SPLATTING BALL IS STOPPED HERE AND NOWHERE ELSE. The colliders stay pure
+// geometry — a rim does not care what hit it — so the one thing that knows the
+// snowball does not come back off a wall is this file, which is already the
+// file that knows which ball is in the air.
+//
 // A tick is integrated in substeps (PHYSICS_SUBSTEP_SECONDS). At full speed the
 // ball crosses the whole rim in well under a 60Hz tick, so a single-step
 // integration would let it teleport past the ring and turn a made basket into a
 // coin flip on frame phase.
 
-import { rollPhasePerRadian } from "../assets/ball-catalog.js";
+import { ballSplatsOn, rollPhasePerRadian } from "../assets/ball-catalog.js";
 import {
   BALL_RADIUS_WORLD,
   GRAVITY,
@@ -42,6 +47,9 @@ export function createBall() {
     vz: 0,
     // Angular velocity about the screen-horizontal axis, radians/second.
     omegaX: 0,
+    // Where this ball burst, once it has: `{ surface, x, y, z, speed }`, or
+    // null. A ball with one set never moves again — see `stickBall`.
+    splat: null,
     // Continuous frame position, accumulated from omegaX. Fractional, and
     // negative when the ball rolls backward.
     rollPhase: 0,
@@ -84,15 +92,24 @@ export function worldFor(hoop) {
  * @returns `{ contacts, scored }` — `contacts` in the order they occurred.
  */
 export function stepBall(ball, world, tickSeconds, { ballId, alreadyScored = false } = {}) {
+  // A ball that has already burst is stuck to whatever it hit. Nothing moves it
+  // again and nothing else can happen to it; the shot above still runs out its
+  // normal beat before handing a fresh ball back.
+  if (ball.splat) return { contacts: [], scored: false, splat: null };
+
   const substeps = Math.max(1, Math.ceil(tickSeconds / PHYSICS_SUBSTEP_SECONDS));
   const dt = tickSeconds / substeps;
   const phasePerRadian = rollPhasePerRadian(ballId);
 
   const contacts = [];
   let scored = false;
+  let splat = null;
 
-  for (let step = 0; step < substeps; step++) {
+  for (let step = 0; step < substeps && !splat; step++) {
     const previous = { x: ball.x, y: ball.y, z: ball.z };
+    // This substep's own contacts, kept separately so the splat check below can
+    // ask what just happened rather than what has happened all tick.
+    const hits = [];
 
     ball.vy -= GRAVITY * dt;
     ball.x += ball.vx * dt;
@@ -108,27 +125,60 @@ export function stepBall(ball, world, tickSeconds, { ballId, alreadyScored = fal
       if (detectMadeBasket(ball, previous, world.hoopWorld)) {
         scored = true;
         applyNetDrag(ball, world.hoopWorld);
-        contacts.push("score");
+        hits.push("score");
       } else {
         // Rim and back wall are checked independently, not as alternatives: a
         // ball can clip the ring and still cross the board plane inside the same
         // substep, and collapsing that into one contact loses the second bounce.
         const rim = resolveRimContact(ball, world.hoopWorld);
-        if (rim) contacts.push(rim);
+        if (rim) hits.push(rim);
         const wall = resolveBackWallContact(ball, previous.z, world.hoopWorld, world.boardBounds);
-        if (wall) contacts.push(wall);
+        if (wall) hits.push(wall);
       }
     }
 
     const floor = resolveFloorContact(ball, dt);
-    if (floor) contacts.push(floor);
+    if (floor) hits.push(floor);
+
+    for (const hit of hits) contacts.push(hit);
+
+    // The collider has already corrected the ball onto the surface and bounced
+    // it off. For a ball that does not come back off, the bounce is undone: the
+    // corrected POSITION is exactly where the splat belongs, and the velocity
+    // it was given is exactly what it must not keep.
+    const burst = hits.find((hit) => ballSplatsOn(ballId, hit));
+    if (burst) splat = stickBall(ball, burst);
   }
 
-  return { contacts, scored };
+  return { contacts, scored, splat };
+}
+
+/**
+ * Stop a ball dead where it stands, and report the splat.
+ *
+ * `speed` is read BEFORE the velocity is thrown away, because how hard it hit
+ * is the only thing left to scale the burst and the sound by once it has.
+ */
+function stickBall(ball, surface) {
+  const speed = Math.hypot(ball.vx, ball.vy, ball.vz);
+  ball.vx = 0;
+  ball.vy = 0;
+  ball.vz = 0;
+  ball.omegaX = 0;
+  ball.splat = { surface, x: ball.x, y: ball.y, z: ball.z, speed };
+  return ball.splat;
 }
 
 /** Whether the ball has come to rest on the floor and is done being interesting. */
 export function isBallSettled(ball) {
+  // A splatted ball is as at-rest as a ball gets, and is still deliberately not
+  // reported as settled. `settled` is the flag that hands the ball back EARLY,
+  // and a ball whose dead shots ended sooner than every other ball's would fit
+  // more attempts into a 30-second round — which a board keyed on
+  // `mode:duration` alone cannot survive. The splat is what the player sees;
+  // the shot still runs the same beat it would have. See `assets/ball-catalog.js`.
+  if (ball.splat) return false;
+
   return (
     ball.z < 0.92 &&
     ball.y <= BALL_RADIUS_WORLD + 0.015 &&

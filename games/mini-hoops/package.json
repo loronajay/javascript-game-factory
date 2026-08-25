@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/projection.test.js && node tests/hoop.test.js && node tests/pull.test.js && node tests/launch.test.js && node tests/physics.test.js && node tests/shot.test.js && node tests/run.test.js && node tests/ball-catalog.test.js && node tests/location-catalog.test.js && node tests/store.test.js && node tests/sound-catalog.test.js && node tests/music.test.js && node tests/practice-court.test.js && node tests/modules.test.js"
+    "test": "node tests/projection.test.js && node tests/hoop.test.js && node tests/pull.test.js && node tests/launch.test.js && node tests/physics.test.js && node tests/shot.test.js && node tests/run.test.js && node tests/ball-catalog.test.js && node tests/splat.test.js && node tests/location-catalog.test.js && node tests/store.test.js && node tests/sound-catalog.test.js && node tests/music.test.js && node tests/practice-court.test.js && node tests/modules.test.js"
   }
 }

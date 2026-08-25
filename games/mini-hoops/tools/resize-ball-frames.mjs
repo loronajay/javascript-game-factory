@@ -1,5 +1,5 @@
-// One-off asset tool: resample a ball's roll frames down to the cabinet's
-// standard frame size.
+// One-off asset tool: resample a ball's art down to the cabinet's standard
+// frame size — its roll frames, and the splat decals for a ball that has them.
 //
 // Source art arrives at whatever size it was authored at — the paper ball came
 // in at 1254px, which is ~1.1MB per frame and more download than the whole rest
@@ -43,13 +43,16 @@ if (!fs.existsSync(frameDir)) {
   process.exit(1);
 }
 
+// Splats go through the same pass as the roll frames: same folder, same
+// standard size, same reason — they arrive at whatever the art was authored at
+// and are drawn a few dozen pixels across.
 const frames = fs
   .readdirSync(frameDir)
-  .filter((name) => /^roll-\d+\.png$/.test(name))
+  .filter((name) => /^(roll-\d+|splat-[a-z]+)\.png$/.test(name))
   .sort();
 
 if (frames.length === 0) {
-  console.error(`no roll-NN.png frames in ${frameDir}`);
+  console.error(`no roll-NN.png or splat-*.png art in ${frameDir}`);
   process.exit(1);
 }
 

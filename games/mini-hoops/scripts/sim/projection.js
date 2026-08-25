@@ -67,6 +67,19 @@ export function screenToWorldAtZ(screenX, screenY, z) {
   };
 }
 
+/**
+ * How long a world-space length is on screen at depth `z`.
+ *
+ * The honest perspective term, with no floor under it — unlike
+ * `ballScreenRadius`, which clamps so a ball that overshoots the room stays
+ * visible. Anything painted ONTO the room wants this instead: a mark on the
+ * back wall is genuinely half the size of the same mark at the player's feet,
+ * and a clamp would flatten exactly the depth it is there to show.
+ */
+export function worldToScreenLength(length, z) {
+  return length * PROJECTION_X_SCALE * depthScaleAt(z);
+}
+
 /** Draw radius of the ball sprite at depth `z`. */
 export function ballScreenRadius(z) {
   return Math.max(BALL_MIN_SCREEN_RADIUS, BALL_SCREEN_RADIUS * depthScaleAt(z));

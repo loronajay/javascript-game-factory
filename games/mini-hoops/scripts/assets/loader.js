@@ -12,7 +12,7 @@
 // `onLoad` exists because the menu and the paused game are static — they draw
 // once and stop, so they need to be told to redraw when a late image lands.
 
-import { ballFramePaths } from "./ball-catalog.js";
+import { ballFramePaths, ballSplatPaths } from "./ball-catalog.js";
 import { locationBackdropPath } from "./location-catalog.js";
 
 export function createAssetLibrary({ onLoad = () => {} } = {}) {
@@ -47,6 +47,19 @@ export function createAssetLibrary({ onLoad = () => {} } = {}) {
     /** Every roll frame for a ball, in order. */
     ballFrames(ballId) {
       return ballFramePaths(ballId).map(image);
+    },
+
+    /**
+     * The two decals a splatting ball leaves, or null for a ball that survives.
+     *
+     * Null rather than a pair of broken images: two of the three balls never
+     * splat, and asking the browser for art that does not exist would put a 404
+     * in the console on every run with a basketball.
+     */
+    ballSplats(ballId) {
+      const paths = ballSplatPaths(ballId);
+      if (!paths) return null;
+      return { wall: image(paths.wall), ground: image(paths.ground) };
     },
 
     /**

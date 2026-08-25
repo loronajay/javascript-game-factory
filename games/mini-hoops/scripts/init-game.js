@@ -11,8 +11,10 @@
 // thing this file is genuinely allowed to own is ORDER: what happens per tick,
 // and in what sequence.
 
+import { ballSplat } from "./assets/ball-catalog.js";
 import { createAssetLibrary } from "./assets/loader.js";
 import { createGameAudio } from "./audio/game-audio.js";
+import { addSplat, clearSplatField, createSplatField, tickSplatField } from "./effects/splat-field.js";
 import { createPracticeCourt } from "./practice-court.js";
 import { CANVAS_HEIGHT, CANVAS_WIDTH, PULL_MIN, TICK_MS, TICK_SECONDS } from "./sim/constants.js";
 import { hoopAt, hoopModeById } from "./sim/hoop.js";
@@ -94,6 +96,10 @@ export function boot(root) {
   let resultsShown = false;
   // Transient wobble on the net and rim. Presentation only — nothing reads these.
   const kicks = { net: 0, rim: 0 };
+  // What the burst balls have left on the room. Presentation only, and wiped at
+  // the top of every run — a board is a round, so the wall it was scored on is
+  // clean when the clock starts.
+  const splats = createSplatField();
 
   // Which board the leaderboard screen is looking at. Deliberately separate from
   // the play selection: browsing boards must not change what you are about to play.
@@ -191,6 +197,7 @@ export function boot(root) {
     resultsShown = false;
     kicks.net = 0;
     kicks.rim = 0;
+    clearSplatField(splats);
 
     overlays.hideAll();
     audio.runStarted();
@@ -360,6 +367,9 @@ export function boot(root) {
     const current = preferences.snapshot();
     assets.backdrop(current.locationId);
     assets.ballFrames(current.ballId);
+    // A splat decal is only wanted the first time a shot dies, but it is wanted
+    // instantly then — a splat that popped in a beat late would read as a bug.
+    assets.ballSplats(current.ballId);
   }
 
   function handleIntent(intent) {
@@ -506,10 +516,19 @@ export function boot(root) {
       if (stepped.contacts.includes("rim")) {
         kicks.rim = ball.x < world.hoopWorld.rimX ? -1 : 1;
       }
+      if (stepped.splat) {
+        // The catalog owns how it looks, the physics owns where and how hard.
+        addSplat(splats, { ...stepped.splat, ...ballSplat(run.ballId) });
+        audio.splat(stepped.splat.surface, { ballId: run.ballId, speed: stepped.splat.speed });
+      }
       // `ball.vy` is read after the whole tick has resolved, which is exactly
       // what the floor needs: a bounce leaves the floor with speed, a roll
       // leaves it with none, and only the first one should be heard.
       for (const contact of new Set(stepped.contacts)) {
+        // The contact the ball burst on has already been spoken for — see
+        // `audio.splat`. Playing both is the wall thudding at a ball that is
+        // still stuck to it.
+        if (stepped.splat?.surface === contact) continue;
         audio.contact(contact, { ballId: run.ballId, speed: ball.vy });
       }
 
@@ -541,6 +560,10 @@ export function boot(root) {
     } else {
       hud.setClock(formatClock(run));
     }
+
+    // Powder is advanced on the tick clock, not the frame clock, so it blows
+    // away at the same rate on a 144Hz monitor as on a 60Hz one.
+    tickSplatField(splats, TICK_SECONDS);
 
     // Wobble decays toward rest. Frame-rate independent by construction, since
     // this only ever runs inside a fixed tick.
@@ -577,6 +600,8 @@ export function boot(root) {
       trajectory,
       kicks,
       scored: shot.scored,
+      splats,
+      splatImages: assets.ballSplats(run.ballId),
     });
   }
 
@@ -623,7 +648,7 @@ export function boot(root) {
 
   // Exposed so a run can be driven and inspected from the console.
   return {
-    state: () => ({ run, shot, ball, screen: screens.current(), paused }),
+    state: () => ({ run, shot, ball, splats, screen: screens.current(), paused }),
     show: (name) => screens.show(name),
   };
 }

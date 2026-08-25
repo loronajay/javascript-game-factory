@@ -8,10 +8,14 @@ import {
   BALLS,
   BALL_FRAME_SIZE,
   DEFAULT_BALL,
+  SPLAT_SURFACES,
   ballById,
   ballFrameIndex,
   ballFramePaths,
   ballIds,
+  ballSplat,
+  ballSplatPaths,
+  ballSplatsOn,
   rollPhasePerRadian,
 } from "../scripts/assets/ball-catalog.js";
 
@@ -103,6 +107,78 @@ test("every frame is the standard size, so no ball is secretly a megabyte", () =
       assertEqual(buffer.readUInt32BE(16), BALL_FRAME_SIZE, `${relative} width`);
       assertEqual(buffer.readUInt32BE(20), BALL_FRAME_SIZE, `${relative} height`);
     }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Splats — a ball that does not survive its landing
+// ---------------------------------------------------------------------------
+
+test("a ball splats on the wall and the floor, and on nothing else, ever", () => {
+  // THE test on this feature. Bare wall and floor are the two contacts
+  // `sim/shot.js` already calls a miss on the instant they happen, so bursting
+  // there cannot change an outcome. The rim and the backboard can BOTH still
+  // produce a basket — a rattle-in and a bank-in — so a ball that burst on
+  // either would score differently from the other two, and the board key is
+  // `mode:duration` with no room in it for which ball was thrown.
+  assertEqual([...SPLAT_SURFACES].sort().join(","), "floor,wall");
+  for (const ball of BALLS) {
+    assert(!ballSplatsOn(ball.id, "rim"), `${ball.id} must not burst on the rim`);
+    assert(!ballSplatsOn(ball.id, "backboard"), `${ball.id} must not burst on the board`);
+    assert(!ballSplatsOn(ball.id, "score"), `${ball.id} must not burst on a made basket`);
+  }
+});
+
+test("splatting is opt-in per ball, and at least one ball takes it", () => {
+  const fragile = BALLS.filter((ball) => ball.splat);
+  assert(fragile.length > 0, "if no ball splatted the whole path would be dead code");
+  assert(fragile.length < BALLS.length, "if every ball splatted it would not need declaring");
+
+  for (const ball of BALLS) {
+    if (!ball.splat) {
+      assertEqual(ballSplat(ball.id), null, `${ball.id} should report no splat`);
+      assertEqual(ballSplatPaths(ball.id), null, `${ball.id} should ask for no decal art`);
+      assert(!ballSplatsOn(ball.id, "floor"), `${ball.id} should survive the floor`);
+      continue;
+    }
+    assert(ballSplatsOn(ball.id, "wall") && ballSplatsOn(ball.id, "floor"), `${ball.id} surfaces`);
+    assert(ball.splat.color, `${ball.id} has no powder colour`);
+    assert(ball.splat.scale > 0, `${ball.id} has no decal scale`);
+  }
+});
+
+test("an unknown ball id asks for no decals rather than throwing", () => {
+  assertEqual(ballSplatPaths("beach-ball"), ballSplatPaths(DEFAULT_BALL));
+  assertEqual(ballSplatsOn(undefined, "floor"), ballSplatsOn(DEFAULT_BALL, "floor"));
+});
+
+test("declared decal art exists on disk, at the standard size", () => {
+  for (const ball of BALLS) {
+    const paths = ballSplatPaths(ball.id);
+    if (!paths) continue;
+    for (const relative of Object.values(paths)) {
+      const full = path.join(gameRoot, relative);
+      assert(fs.existsSync(full), `missing ${relative}`);
+      const buffer = fs.readFileSync(full);
+      assertEqual(buffer.readUInt32BE(16), BALL_FRAME_SIZE, `${relative} width`);
+      assertEqual(buffer.readUInt32BE(20), BALL_FRAME_SIZE, `${relative} height`);
+    }
+  }
+});
+
+test("no splat art sits in a ball folder without the catalog row that uses it", () => {
+  // The same silent failure the roll-frame check exists for: decals can land in
+  // the tree long before the `splat` block does, and until it does they simply
+  // never draw.
+  for (const ball of BALLS) {
+    const dir = path.join(gameRoot, "assets", "balls", ball.id);
+    const onDisk = fs.readdirSync(dir).filter((name) => /^splat-/.test(name));
+    const declared = ballSplatPaths(ball.id);
+    assertEqual(
+      onDisk.length,
+      declared ? Object.keys(declared).length : 0,
+      `${ball.id} has ${onDisk.length} splat images on disk`,
+    );
   }
 });
 
