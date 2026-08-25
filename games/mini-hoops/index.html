@@ -193,9 +193,11 @@
             <span>SHOT POWER</span>
             <span id="meterReadout">0%</span>
           </div>
+          <!-- No marked band on the meter. The power that drops the ball is the
+               thing the player is here to find; printing it on the rail makes
+               every shot a matter of matching a number. -->
           <div class="meter" aria-label="Shot power">
             <div id="meterFill" class="meter-fill"></div>
-            <div class="meter-sweet" aria-hidden="true"></div>
           </div>
           <p class="meter-legend">
             <span>Pull <b>length</b> = power</span>
@@ -259,27 +261,42 @@
           <button type="button" class="ghost-btn" data-intent="back">Back</button>
           <div>
             <h2>How to Play</h2>
-            <p>Three things. There is no fourth thing.</p>
+            <p>Nothing here is timed or scored. Shoot until it feels right.</p>
           </div>
         </header>
 
-        <ol class="how-grid">
-          <li class="how-card">
-            <span class="how-num">1</span>
-            <h3>Grab the ball</h3>
-            <p>Start the drag on the ball itself. Your aim always begins dead centre — a moving hoop never drags your reticle along with it.</p>
-          </li>
-          <li class="how-card">
-            <span class="how-num">2</span>
-            <h3>Pull back</h3>
-            <p>How far you pull is power, and nothing else. 80% is the shot that swishes; the meter is telling you the truth, not a difficulty curve.</p>
-          </li>
-          <li class="how-card">
-            <span class="how-num">3</span>
-            <h3>Angle, then release</h3>
-            <p>Pull off to one side and the ball goes the other way — and flattens out as it does. Straight back is the steepest, kindest arc. Against a moving rim, aim where it is going to be.</p>
-          </li>
-        </ol>
+        <!-- A real court running the real sim, not an illustration of one. See
+             scripts/practice-court.js. The notes beside it say what the shot is
+             made of and stop there — which pull actually drops the ball is the
+             thing the demo exists for the player to find. -->
+        <div class="how-layout">
+          <div class="how-demo">
+            <div class="court court--demo">
+              <canvas id="practiceCourt" width="960" height="760" aria-label="Practice court"></canvas>
+              <p id="practiceShout" class="hud-shout" aria-live="polite"></p>
+              <p id="practiceHint" class="hud-hint">Grab the ball · pull back · release</p>
+            </div>
+
+            <div class="shot-panel shot-panel--demo">
+              <div class="meter-head">
+                <span>SHOT POWER</span>
+                <span id="practiceReadout">0%</span>
+              </div>
+              <div class="meter" aria-label="Shot power">
+                <div id="practiceMeterFill" class="meter-fill"></div>
+              </div>
+            </div>
+          </div>
+
+          <aside class="how-notes">
+            <ul class="how-list">
+              <li><b>Length is power.</b> How far you pull, and nothing else. The meter reports the real ratio — it is not hiding a forgiving window, and it is not marking the answer.</li>
+              <li><b>Angle is aim and arc.</b> Pull off to one side and the ball goes the other way, flattening as it goes. Straight back is the steepest, kindest arc.</li>
+              <li><b>The reticle never chases the rim.</b> Aim is always measured against where the hoop rests, so against a moving rim you lead it yourself.</li>
+            </ul>
+            <p id="practiceTally" class="how-tally">No shots yet</p>
+          </aside>
+        </div>
       </section>
     </div>
 

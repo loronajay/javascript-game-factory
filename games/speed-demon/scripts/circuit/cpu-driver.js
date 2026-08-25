@@ -1,8 +1,8 @@
 import { clamp, dot, normalize } from "./math.js";
 import { forwardVector, getSpeed, rightVector } from "./vehicle.js";
 
-export function createCpuDriver(racingLine, targetIndex = 1) {
-  return { racingLine, targetIndex: targetIndex % racingLine.length };
+export function createCpuDriver(racingLine, targetIndex = 1, difficultyId = "normal") {
+  return { racingLine, targetIndex: targetIndex % racingLine.length, difficultyId };
 }
 
 export function updateCpuDriver(driver, vehicle, options = {}) {
@@ -18,9 +18,12 @@ export function updateCpuDriver(driver, vehicle, options = {}) {
   const alignment = dot(forwardVector(vehicle.angle), direction);
   const steer = clamp(dot(rightVector(vehicle.angle), direction) / 0.48, -1, 1);
   const speed = getSpeed(vehicle);
+  const cornerSpeed = options.cornerSpeed ?? 225;
+  const cruiseSpeed = options.cruiseSpeed ?? 270;
+  const sharpSteerThreshold = options.sharpSteerThreshold ?? 0.72;
   let throttle = 1;
   if (alignment < 0.2) throttle = -0.55;
-  else if (Math.abs(steer) > 0.72 && speed > 225) throttle = -0.25;
-  else if (speed > 270) throttle = 0;
+  else if (Math.abs(steer) > sharpSteerThreshold && speed > cornerSpeed) throttle = -0.25;
+  else if (speed > cruiseSpeed) throttle = 0;
   return { driver: { ...driver, targetIndex }, input: { throttle, steer } };
 }

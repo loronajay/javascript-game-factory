@@ -336,10 +336,17 @@ const MENUS = {
     title: "RESULTS",
     subtitle: null,
     items: [
-      { id: "again", label: "RUN IT AGAIN", enabled: true },
       ...(isCampaignRun(shell)
-        ? [{ id: "campaign", label: "BACK TO CAMPAIGN", enabled: true }]
-        : [{ id: "setup", label: "CHANGE CAR / TRACK", enabled: true }]),
+        ? [
+          // The normal next step after a mission is the map, so it is both
+          // visible and selected on arrival instead of hiding behind a retry.
+          { id: "campaign", label: "RETURN TO CAMPAIGN", enabled: true },
+          { id: "again", label: "RUN IT AGAIN", enabled: true },
+        ]
+        : [
+          { id: "again", label: "RUN IT AGAIN", enabled: true },
+          { id: "setup", label: "CHANGE CAR / TRACK", enabled: true },
+        ]),
       { id: "menu", label: "QUIT TO MENU", enabled: true },
     ],
   }),

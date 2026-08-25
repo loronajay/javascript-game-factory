@@ -6,7 +6,7 @@
 // would make the canonical `{ modelId, livery }` loadout lie.
 
 export const CIRCUIT_FRAME_SIZE = 64;
-export const CIRCUIT_ATLAS_VERSION = "circuit-headings-20260824-2";
+export const CIRCUIT_ATLAS_VERSION = "circuit-headings-20260824-3";
 
 export const CIRCUIT_DIRECTIONS = Object.freeze([
   "north",
@@ -35,8 +35,6 @@ export function circuitFrameAngle(frameIndex) {
 const REPRESENTATIVE_MODELS = [
   ["kaido-gts", "Kaido GTS", "gt", 1.0124582021614492],
   ["tsunami-rz", "Tsunami RZ", "coupe", 0.9754665882886004],
-  ["meridian-rs", "Meridian RS", "euro", 1.0043802378440208],
-  ["skyward-r", "Skyward R", "gt", 1.0736220274208208],
   ["toro-sv", "Toro SV", "exotic", 0.905228093365718],
   ["scalpel-r", "Scalpel R", "hatch", 0.9557750924830416],
   ["chrono-12", "Chrono 12", "wedge", 1.080411272370425],

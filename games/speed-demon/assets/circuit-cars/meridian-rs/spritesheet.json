@@ -1,6 +1,13 @@
 {
   "schemaVersion": 1,
   "modelId": "meridian-rs",
+  "circuitStatus": "quarantined",
+  "quarantineReason": "The generated master repeats rear-facing views where south-east, south, and south-west artwork is required.",
+  "invalidHeadings": [
+    "south-east",
+    "south",
+    "south-west"
+  ],
   "image": "spritesheet-clockwise-from-north.png",
   "frameWidth": 64,
   "frameHeight": 64,
@@ -23,40 +30,7 @@
     "headingConvention": "camera-side-opposite-physical-nose"
   },
   "repairFrameConvention": "physical-nose-clockwise-from-north",
-  "repairs": [
-    {
-      "targetFrame": 1,
-      "targetHeading": "north-east",
-      "mirroredFromFrame": 5,
-      "mirroredFromHeading": "south-west",
-      "transform": "rotate-180",
-      "reason": "generated opposite headings repeated the same physical view"
-    },
-    {
-      "targetFrame": 2,
-      "targetHeading": "east",
-      "mirroredFromFrame": 6,
-      "mirroredFromHeading": "west",
-      "transform": "mirror-x",
-      "reason": "generated opposite headings repeated the same physical view"
-    },
-    {
-      "targetFrame": 3,
-      "targetHeading": "south-east",
-      "mirroredFromFrame": 7,
-      "mirroredFromHeading": "north-west",
-      "transform": "rotate-180",
-      "reason": "generated opposite headings repeated the same physical view"
-    },
-    {
-      "targetFrame": 4,
-      "targetHeading": "south",
-      "mirroredFromFrame": 0,
-      "mirroredFromHeading": "north",
-      "transform": "mirror-y",
-      "reason": "generated opposite headings repeated the same physical view"
-    }
-  ],
+  "repairs": [],
   "frames": [
     {
       "direction": "north",

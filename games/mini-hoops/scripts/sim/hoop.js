@@ -98,7 +98,125 @@ export const HOOP_MODES = Object.freeze([
       };
     },
   },
+  {
+    id: "pendulum",
+    label: "Pendulum",
+    hudLabel: "PENDULUM",
+    blurb: "The rim swings on an arc, rising at both ends.",
+    path: (seconds) => {
+      const period = 3.4;
+      const amplitudeX = 104;
+      // How far the rim rides UP at the ends of the swing. Screen y grows
+      // downward, so the lift is negative.
+      const lift = 44;
+      const omega = TAU / period;
+      const angle = seconds * omega;
+      // sin^2 is zero at the centre and one at both extremes, which is exactly a
+      // swing: fastest and lowest through the middle, highest where it stalls.
+      return {
+        dx: Math.sin(angle) * amplitudeX,
+        dy: -lift * Math.sin(angle) * Math.sin(angle),
+        vx: Math.cos(angle) * amplitudeX * omega,
+        vy: -lift * omega * Math.sin(2 * angle),
+      };
+    },
+  },
+  {
+    id: "figure8",
+    label: "Figure 8",
+    hudLabel: "FIGURE 8",
+    blurb: "A lemniscate. The rim crosses its own path at the centre.",
+    path: (seconds) => {
+      const period = 5;
+      const amplitudeX = 100;
+      const amplitudeY = 40;
+      const omega = TAU / period;
+      const angle = seconds * omega;
+      // The 1:2 frequency ratio is what makes a figure 8 rather than an ellipse
+      // — one horizontal sweep per two vertical ones.
+      return {
+        dx: Math.sin(angle) * amplitudeX,
+        dy: Math.sin(2 * angle) * amplitudeY,
+        vx: Math.cos(angle) * amplitudeX * omega,
+        vy: 2 * Math.cos(2 * angle) * amplitudeY * omega,
+      };
+    },
+  },
+  {
+    id: "cross",
+    label: "Cross",
+    hudLabel: "CROSS",
+    blurb: "A sweep that rotates from side-to-side into up-and-down.",
+    path: (seconds) => {
+      const period = 3;
+      const amplitudeX = 100;
+      const amplitudeY = 46;
+      const omega = TAU / period;
+      const angle = seconds * omega;
+      // One sweep, on an axis that itself turns. `raw` runs 1 -> 0 -> 1 at half
+      // the sweep rate, handing the travel from the x axis to the y axis and
+      // back, so the rim traces a plus over four sweeps. Doing this as a
+      // piecewise "now horizontal, now vertical" would put a velocity
+      // discontinuity at every corner, and the collision solver resolves the ball
+      // against the rim's *reported* velocity — a jump there is a rim that
+      // punches the ball for free.
+      //
+      // The smoothstep matters to how the shape reads: on the raw cosine the
+      // handoff is spread over the whole sweep and the rim traces four petals.
+      // Squaring the transition up holds each axis while it sweeps and turns only
+      // near the middle, so the strokes come out as strokes.
+      const raw = (1 + Math.cos(angle / 2)) / 2;
+      const blend = raw * raw * (3 - 2 * raw);
+      const blendRate = 6 * raw * (1 - raw) * (-(omega / 4) * Math.sin(angle / 2));
+      return {
+        dx: Math.sin(angle) * amplitudeX * blend,
+        dy: Math.sin(angle) * amplitudeY * (1 - blend),
+        vx: amplitudeX * (omega * Math.cos(angle) * blend + Math.sin(angle) * blendRate),
+        vy: amplitudeY * (omega * Math.cos(angle) * (1 - blend) - Math.sin(angle) * blendRate),
+      };
+    },
+  },
+  {
+    id: "wander",
+    label: "Wander",
+    hudLabel: "WANDER",
+    blurb: "Two rhythms at once. It never repeats the same lead twice.",
+    path: (seconds) => {
+      const period = 5.6;
+      const amplitudeX = 100;
+      const amplitudeY = 44;
+      const omega = TAU / period;
+      const t = seconds * omega;
+      // Deliberately incommensurate frequencies: the pattern is fully
+      // deterministic (a replay lands identically) but its period is long enough
+      // that a player cannot memorise a lead the way they can on a sine. The
+      // weights inside each axis sum to 1, which is what keeps the travel inside
+      // the amplitude the mobile crop was checked against.
+      return {
+        dx: amplitudeX * (0.62 * Math.sin(t) + 0.38 * Math.sin(2.3 * t)),
+        dy: amplitudeY * (0.58 * Math.sin(1.7 * t) + 0.42 * Math.sin(0.7 * t)),
+        vx: amplitudeX * omega * (0.62 * Math.cos(t) + 0.38 * 2.3 * Math.cos(2.3 * t)),
+        vy: amplitudeY * omega * (0.58 * 1.7 * Math.cos(1.7 * t) + 0.42 * 0.7 * Math.cos(0.7 * t)),
+      };
+    },
+  },
 ]);
+
+/**
+ * The screen-space box every mode's rim centre must stay inside.
+ *
+ * This is not a physics limit — it is the mobile portrait crop. The canvas is
+ * drawn at a fixed 960x760 and cropped to width on a phone, so a rim that
+ * travels further than this simply leaves the screen on the device most people
+ * will play on. `tests/hoop.test.js` holds every mode to it, because the failure
+ * is invisible on a desktop browser.
+ */
+export const HOOP_TRAVEL_BOUNDS = Object.freeze({
+  minX: 292,
+  maxX: 588,
+  minY: 172,
+  maxY: 272,
+});
 
 export const DEFAULT_HOOP_MODE = "still";
 

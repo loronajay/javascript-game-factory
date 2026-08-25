@@ -37,24 +37,6 @@
       "footprint": { "halfLength": 16, "halfWidth": 9 }
     },
     {
-      "modelId": "meridian-rs",
-      "label": "Meridian RS",
-      "archetype": "euro",
-      "renderScale": 1.0043802378440208,
-      "spritesheet": "meridian-rs/spritesheet-clockwise-from-north.png",
-      "manifest": "meridian-rs/spritesheet.json",
-      "footprint": { "halfLength": 16, "halfWidth": 9 }
-    },
-    {
-      "modelId": "skyward-r",
-      "label": "Skyward R",
-      "archetype": "gt",
-      "renderScale": 1.0736220274208208,
-      "spritesheet": "skyward-r/spritesheet-clockwise-from-north.png",
-      "manifest": "skyward-r/spritesheet.json",
-      "footprint": { "halfLength": 16, "halfWidth": 9 }
-    },
-    {
       "modelId": "toro-sv",
       "label": "Toro SV",
       "archetype": "exotic",

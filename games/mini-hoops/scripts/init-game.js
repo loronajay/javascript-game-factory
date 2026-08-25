@@ -12,6 +12,7 @@
 // and in what sequence.
 
 import { createAssetLibrary } from "./assets/loader.js";
+import { createPracticeCourt } from "./practice-court.js";
 import { CANVAS_HEIGHT, CANVAS_WIDTH, PULL_MIN, TICK_MS, TICK_SECONDS } from "./sim/constants.js";
 import { hoopAt, hoopModeById } from "./sim/hoop.js";
 import { isShootablePull, neutralPull, resolvePull } from "./sim/pull.js";
@@ -42,6 +43,7 @@ import { createPreferencesStore } from "./store/preferences.js";
 import { ballScreenPosition, renderFrame } from "./render/frame.js";
 import { prepareContext } from "./render/scene.js";
 import { createHud } from "./ui/hud.js";
+import { createPracticeView } from "./ui/practice-view.js";
 import { createMenuView } from "./ui/menu-view.js";
 import { createOverlays } from "./ui/overlays.js";
 import { createBoardsView } from "./ui/boards-view.js";
@@ -123,6 +125,20 @@ export function boot(root) {
     },
   });
   const overlays = createOverlays(root, { onIntent: handleIntent });
+
+  // The How to Play demo. It runs the same sim on its own canvas, so the only
+  // thing this file owes it is a place in the tick order and the cosmetic
+  // choices the player has already made.
+  const practiceView = createPracticeView(root);
+  const practice = createPracticeCourt(root.querySelector("#practiceCourt"), {
+    assets,
+    onPower: (power) => practiceView.setPower(power),
+    onSay: (text) => practiceView.say(text),
+    onTally: (tally) => {
+      practiceView.setTally(tally);
+      practiceView.setHintVisible(tally.taken === 0);
+    },
+  });
 
   // ---------------------------------------------------------------------
   // Selection helpers
@@ -375,7 +391,17 @@ export function boot(root) {
       renderSetup();
     } else if (next === SCREEN_BOARDS) {
       renderBoards();
+    } else if (next === SCREEN_HOWTO) {
+      // Opening the demo always starts it clean, and dressed in whatever room
+      // and ball the player has selected — both cosmetic by contract, so this
+      // cannot change how the practice shot behaves.
+      const current = preferences.snapshot();
+      practice.setStyle({ ballId: current.ballId, locationId: current.locationId });
+      practice.reset();
+      practiceView.setPower(0);
+      practiceView.setHintVisible(true);
     }
+    practice.setActive(next === SCREEN_HOWTO);
     requestRedraw();
   }
 
@@ -396,6 +422,10 @@ export function boot(root) {
   }
 
   function tick() {
+    if (screens.current() === SCREEN_HOWTO) {
+      practice.tick();
+      return;
+    }
     if (screens.current() !== SCREEN_GAME || paused || resultsShown) return;
 
     tickClock(run, TICK_SECONDS);
@@ -497,9 +527,12 @@ export function boot(root) {
       tick();
     }
 
-    // The court is only drawn while it is on screen, or once when something
+    // A court is only drawn while it is on screen, or once when something
     // off-screen changed (a late-loading image, a screen change).
-    if (screens.current() === SCREEN_GAME || redrawRequested) {
+    if (screens.current() === SCREEN_HOWTO) {
+      redrawRequested = false;
+      practice.draw();
+    } else if (screens.current() === SCREEN_GAME || redrawRequested) {
       redrawRequested = false;
       draw();
     }

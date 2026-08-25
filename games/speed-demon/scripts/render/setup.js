@@ -48,6 +48,9 @@ export const SETUP_LAYOUT = {
   // than cards too thin to tell a verge apart.
   tracks: { x: 740, y: 406, width: 71, height: 56, gap: 9 },
   objective: { x: 740, y: 500, width: 113, height: 38, gap: 8 },
+  // Circuit Race uses the space occupied by the rival grid in drag Rival Race;
+  // those panes are mutually exclusive, so the overall layout stays fixed.
+  difficulty: { x: 740, y: 572, width: 113, height: 38, gap: 8 },
   /**
    * Who you are racing. Drawn only in a mode that has the pane, but the rect
    * exists in every mode — a layout that moved when you changed mode would make
@@ -140,6 +143,12 @@ export function objectiveCardRect(index) {
   return { x: x + index * (width + gap), y, width, height };
 }
 
+/** Screen rect of one CPU difficulty card. */
+export function difficultyCardRect(index) {
+  const { x, y, width, height, gap } = SETUP_LAYOUT.difficulty;
+  return { x: x + index * (width + gap), y, width, height };
+}
+
 /** Screen rect of one rival card, by index. Wraps across `columns`. */
 export function rivalCardRect(index) {
   const { x, y, width, height, gap, columns } = SETUP_LAYOUT.rivals;
@@ -197,6 +206,11 @@ export function hitSetup(view, x, y) {
   for (const option of view.objective.options) {
     if (within(objectiveCardRect(option.index), x, y)) {
       return { pane: "objective", index: option.index };
+    }
+  }
+  for (const option of view.difficulty?.options ?? []) {
+    if (within(difficultyCardRect(option.index), x, y)) {
+      return { pane: "difficulty", index: option.index };
     }
   }
   // Null in every mode but Rival Race. Hit-testing a strip that is not drawn
@@ -410,7 +424,7 @@ function drawTrackStrip(ctx, view, trackImages) {
 
     ctx.fillStyle = "rgba(10,11,15,0.9)";
     ctx.fillRect(rect.x + 1, rect.y + rect.height - 23, rect.width - 2, 22);
-    label(ctx, track.label, rect.x + 9, rect.y + rect.height - 8, {
+    label(ctx, track.setupLabel ?? track.label, rect.x + 9, rect.y + rect.height - 8, {
       size: 12,
       colour: track.selected ? INK : track.locked ? LOCKED : track.chosen ? "#c6ccd8" : DIM,
     });
@@ -442,6 +456,31 @@ function drawObjectiveStrip(ctx, view) {
     label(ctx, option.label, rect.x + rect.width / 2, rect.y + rect.height / 2 + 6, {
       size: 15,
       colour: option.selected ? INK : option.chosen ? "#c6ccd8" : MUTED,
+      align: "center",
+    });
+  }
+}
+
+/** CPU pace, drawn only for Circuit Race. */
+function drawDifficultyStrip(ctx, view) {
+  if (!view.difficulty) return;
+  paneLabel(ctx, view.difficulty.label, SETUP_LAYOUT.difficulty, {
+    live: view.pane === "difficulty",
+    locked: view.difficulty.locked,
+    prompt: view.prompt,
+  });
+
+  for (const option of view.difficulty.options) {
+    const rect = difficultyCardRect(option.index);
+    panel(ctx, rect.x, rect.y, rect.width, rect.height, {
+      live: option.selected,
+      chosen: option.chosen,
+      locked: option.locked,
+      hovered: option.hovered,
+    });
+    label(ctx, option.label, rect.x + rect.width / 2, rect.y + rect.height / 2 + 6, {
+      size: 15,
+      colour: option.selected ? INK : option.locked ? LOCKED : option.chosen ? "#c6ccd8" : MUTED,
       align: "center",
     });
   }
@@ -610,7 +649,18 @@ function drawSummary(ctx, view, mobile = false) {
 
   label(ctx, view.chosenTrack.label.toUpperCase(), box.x + 16, box.y + 108, { size: 16, colour: INK });
   label(ctx, view.objective.label, box.x + 16, box.y + 132, { size: 11, colour: MUTED });
-  label(ctx, view.chosenObjective.label, box.x + 16, box.y + 158, { size: 24, colour: INK, weight: "700" });
+  label(ctx, view.chosenObjective.label, box.x + 16, box.y + (view.chosenDifficulty ? 151 : 158), {
+    size: view.chosenDifficulty ? 20 : 24,
+    colour: INK,
+    weight: "700",
+  });
+  if (view.chosenDifficulty) {
+    label(ctx, `CPU  ·  ${view.chosenDifficulty.label}`, box.x + 16, box.y + 174, {
+      size: 12,
+      colour: ACCENT,
+      weight: "700",
+    });
+  }
 
   // The prompt is the live pane's, not a fixed "START" — ENTER means lock while
   // there is anything left to lock, and the screen has to say which it is.
@@ -664,6 +714,7 @@ export function drawSetup(ctx, view, {
   drawPresetList(ctx, view);
   drawTrackStrip(ctx, view, trackImages);
   drawObjectiveStrip(ctx, view);
+  drawDifficultyStrip(ctx, view);
   drawRivalStrip(ctx, view, rivalImages);
   drawPreview(ctx, view, sheetImages, liveryCache);
   drawSummary(ctx, view, mobile);

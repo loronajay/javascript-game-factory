@@ -1,6 +1,6 @@
-import { CPU_VEHICLE_TUNING } from "./config.js";
 import { resolveTrackCollision } from "./collision.js";
 import { createCpuDriver, updateCpuDriver } from "./cpu-driver.js";
+import { circuitDifficultyById, cpuVehicleTuningFor } from "./difficulty.js";
 import { clamp } from "./math.js";
 import { createVehicle, stepVehicle } from "./vehicle.js";
 import { resolveVehicleCollision } from "./vehicle-collision.js";
@@ -11,7 +11,7 @@ export const STATUS_FINISHED = "finished";
 
 const validControl = (control) => ["local", "cpu", "remote"].includes(control);
 
-function normalizeParticipant(entry, index, track) {
+function normalizeParticipant(entry, index, track, cpuDifficultyId) {
   const modelId = String(entry?.modelId ?? "");
   if (!modelId) throw new Error("Circuit participant requires modelId");
   const spawn = track.spawns[index % track.spawns.length];
@@ -24,7 +24,7 @@ function normalizeParticipant(entry, index, track) {
     livery: entry?.livery ?? null,
     vehicle: createVehicle(spawn),
     input: { throttle: 0, brake: 0, steer: 0, shift: 0 },
-    driver: control === "cpu" ? createCpuDriver(track.racingLine) : null,
+    driver: control === "cpu" ? createCpuDriver(track.racingLine, 1, cpuDifficultyId) : null,
     nextCheckpoint: track.checkpoints.length > 1 ? 1 : 0,
     checkpointsPassed: 0,
     lap: 0,
@@ -46,11 +46,12 @@ export function createCircuitRace(definition, track) {
   const laps = Math.max(1, Math.min(99, Math.trunc(definition.rules?.laps ?? 3)));
   const countdownSeconds = Math.max(0, Math.min(10, Number(definition.rules?.countdownSeconds ?? 3)));
   const timeoutSeconds = Math.max(10, Math.min(1800, Number(definition.rules?.timeoutSeconds ?? 300)));
+  const cpuDifficultyId = circuitDifficultyById(definition.rules?.cpuDifficultyId).id;
   return {
     runtime: "circuit",
     modeId: definition.modeId ?? "circuit",
     trackId: track.id,
-    rules: { laps, countdownSeconds, timeoutSeconds },
+    rules: { laps, countdownSeconds, timeoutSeconds, cpuDifficultyId },
     source: {
       kind: definition.source?.kind ?? "freeplay",
       id: definition.source?.id ?? null,
@@ -59,7 +60,9 @@ export function createCircuitRace(definition, track) {
     countdown: countdownSeconds,
     elapsed: 0,
     tick: 0,
-    participants: definition.participants.map((entry, index) => normalizeParticipant(entry, index, track)),
+    participants: definition.participants.map((entry, index) => (
+      normalizeParticipant(entry, index, track, cpuDifficultyId)
+    )),
     finishOrder: [],
     lastEvents: [],
   };
@@ -150,11 +153,12 @@ function stepParticipants(state, dt, track, containsVehicle) {
     let input = participant.input;
     let driver = participant.driver;
     if (participant.control === "cpu") {
-      const decision = updateCpuDriver(driver, participant.vehicle);
+      const difficulty = circuitDifficultyById(driver.difficultyId);
+      const decision = updateCpuDriver(driver, participant.vehicle, difficulty.driver);
       input = decision.input;
       driver = decision.driver;
     }
-    const tuning = participant.control === "cpu" ? CPU_VEHICLE_TUNING : undefined;
+    const tuning = participant.control === "cpu" ? cpuVehicleTuningFor(driver.difficultyId) : undefined;
     const driveInput = { ...input, throttle: input.brake > 0 ? -input.brake : input.throttle };
     const candidate = stepVehicle(participant.vehicle, driveInput, dt, tuning);
     const collision = resolveTrackCollision(participant.vehicle, candidate, containsVehicle);

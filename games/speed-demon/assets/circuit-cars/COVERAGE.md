@@ -5,20 +5,21 @@ compiled transparent `512x64` runtime sheet, a manifest, and a saved generation
 prompt. The authoritative model inventory is `canonical-roster.json`; the
 runtime-ready subset is `catalog.json`.
 
-**Current coverage: 8 / 24 cars (33%). All seven canonical archetypes now have
-at least one runtime-ready representative.**
+**Current verified coverage: 6 / 24 cars (25%). Six canonical archetypes have
+at least one runtime-ready representative. Incomplete or mislabeled turntables
+remain unavailable until replacement art passes the eight-heading audit.**
 
 ## Models A
 
 - [x] `kaido-gts` — Kaido GTS — GT — row 1, column 1
 - [x] `tsunami-rz` — Tsunami RZ — coupe — row 1, column 2
 - [ ] `shutter-z` — Shutter Z — coupe — row 1, column 3
-- [x] `meridian-rs` — Meridian RS — Euro — row 1, column 4
+- [ ] `meridian-rs` — Meridian RS — Euro — row 1, column 4 — quarantined: missing SE/S/SW views
 - [ ] `monolith-8` — Monolith 8 — wedge — row 2, column 1
 - [ ] `zephyr-z` — Zephyr Z — coupe — row 2, column 2
 - [ ] `stallion-gt` — Stallion GT — muscle — row 2, column 3
 - [ ] `aero-rs` — Aero RS — Euro — row 2, column 4
-- [x] `skyward-r` — Skyward R — GT — row 3, column 1
+- [ ] `skyward-r` — Skyward R — GT — row 3, column 1 — quarantined: six frames use opposite headings
 - [ ] `gravel-stx` — Gravel STx — GT — row 3, column 2
 - [x] `toro-sv` — Toro SV — exotic — row 3, column 3
 - [x] `scalpel-r` — Scalpel R — hatch — row 3, column 4
@@ -42,11 +43,10 @@ at least one runtime-ready representative.**
 
 | Archetype | Ready | Canonical total |
 | --- | ---: | ---: |
-| GT | 2 | 5 |
+| GT | 1 | 5 |
 | Coupe | 1 | 6 |
-| Euro | 1 | 4 |
+| Euro | 0 | 4 |
 | Wedge | 1 | 2 |
 | Muscle | 1 | 2 |
 | Exotic | 1 | 3 |
 | Hatch | 1 | 2 |
-

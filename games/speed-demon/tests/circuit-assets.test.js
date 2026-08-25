@@ -27,20 +27,32 @@ const GAME_DIR = path.resolve(TEST_DIR, "..");
 const CARS_DIR = path.join(GAME_DIR, "assets", "circuit-cars");
 const canonicalIds = new Set(allModels().map((model) => model.id));
 
-test("catalog exposes exactly the representative eight canonical models", () => {
+test("catalog exposes only canonical models with a verified eight-heading atlas", () => {
   const expected = [
     "kaido-gts",
     "tsunami-rz",
-    "meridian-rs",
-    "skyward-r",
     "toro-sv",
     "scalpel-r",
     "chrono-12",
     "colt-gt",
   ];
   assertDeepEqual(CIRCUIT_MODELS.map((model) => model.modelId), expected);
-  assertEqual(new Set(expected).size, 8);
+  assertEqual(new Set(expected).size, 6);
   for (const id of expected) assert(canonicalIds.has(id), `${id} is not a canonical model id`);
+});
+
+test("incomplete turntables are quarantined instead of repaired with sprite rotations", () => {
+  const expected = new Map([
+    ["meridian-rs", ["south-east", "south", "south-west"]],
+    ["skyward-r", ["north", "north-east", "south-east", "south", "south-west", "north-west"]],
+  ]);
+  for (const [modelId, invalidHeadings] of expected) {
+    const manifest = JSON.parse(fs.readFileSync(path.join(CARS_DIR, modelId, "spritesheet.json"), "utf8"));
+    assertEqual(manifest.circuitStatus, "quarantined");
+    assertDeepEqual(manifest.invalidHeadings, invalidHeadings);
+    assertEqual(manifest.repairs?.length ?? 0, 0, `${modelId} still claims a transform can invent missing art`);
+    assert(!hasCircuitAtlas(modelId), `${modelId} leaked back into circuit selection`);
+  }
 });
 
 test("availability never substitutes another model", () => {
@@ -63,7 +75,7 @@ test("the JSON catalog and runtime share one heading and scale contract", () => 
 test("runtime atlas URLs carry the heading revision so repaired PNGs cannot stay cached", () => {
   for (const model of CIRCUIT_MODELS) {
     assert(
-      model.src.endsWith("?v=circuit-headings-20260824-2"),
+      model.src.endsWith("?v=circuit-headings-20260824-3"),
       `${model.modelId} can reuse a stale pre-repair atlas from browser cache`,
     );
   }
@@ -161,8 +173,6 @@ test("every canonical manifest pins the source column selected for its east slot
   const eastSourceX = new Map([
     ["kaido-gts", 1629],
     ["tsunami-rz", 1482],
-    ["meridian-rs", 1617],
-    ["skyward-r", 1656],
     ["toro-sv", 1629],
     ["scalpel-r", 1651],
     ["chrono-12", 1627],
@@ -176,63 +186,6 @@ test("every canonical manifest pins the source column selected for its east slot
       eastSourceX.get(model.modelId),
       `${model.modelId} east was replaced by its west-facing source view`,
     );
-  }
-});
-
-test("Meridian and Skyward replace every duplicated opposite view from a valid heading", () => {
-  const expectedRepairs = [
-    { targetFrame: 1, mirroredFromFrame: 5, transform: "rotate-180" },
-    { targetFrame: 2, mirroredFromFrame: 6, transform: "mirror-x" },
-    { targetFrame: 3, mirroredFromFrame: 7, transform: "rotate-180" },
-    { targetFrame: 4, mirroredFromFrame: 0, transform: "mirror-y" },
-  ];
-  for (const modelId of ["meridian-rs", "skyward-r"]) {
-    const manifest = JSON.parse(fs.readFileSync(path.join(CARS_DIR, modelId, "spritesheet.json"), "utf8"));
-    const sheet = readPng(fs.readFileSync(path.join(
-      CARS_DIR,
-      modelId,
-      "spritesheet-clockwise-from-north.png",
-    )));
-    assertEqual(
-      manifest.repairFrameConvention,
-      "physical-nose-clockwise-from-north",
-      `${modelId} repair indices can be remapped during a future source normalization`,
-    );
-    assertDeepEqual(
-      (manifest.repairs ?? []).map(({ targetFrame, mirroredFromFrame, transform }) => (
-        { targetFrame, mirroredFromFrame, transform }
-      )),
-      expectedRepairs,
-      `${modelId} does not declare all four duplicated source views`,
-    );
-    for (const repair of expectedRepairs) {
-      for (let y = 0; y < 64; y += 1) {
-        for (let x = 0; x < 64; x += 1) {
-          const sourceX = repair.transform === "mirror-x" || repair.transform === "rotate-180"
-            ? 63 - x
-            : x;
-          const sourceY = repair.transform === "mirror-y" || repair.transform === "rotate-180"
-            ? 63 - y
-            : y;
-          const targetPixel = (y * sheet.width + repair.targetFrame * 64 + x) * 4;
-          const sourcePixel = (sourceY * sheet.width + repair.mirroredFromFrame * 64 + sourceX) * 4;
-          assertEqual(
-            sheet.pixels[targetPixel + 3],
-            sheet.pixels[sourcePixel + 3],
-            `${modelId} frame ${repair.targetFrame} alpha repair drifted at ${x},${y}`,
-          );
-          if (sheet.pixels[sourcePixel + 3] <= 8) continue;
-          for (let channel = 0; channel < 3; channel += 1) {
-            assertClose(
-              sheet.pixels[targetPixel + channel],
-              sheet.pixels[sourcePixel + channel],
-              2,
-              `${modelId} frame ${repair.targetFrame} repair drifted at ${x},${y},${channel}`,
-            );
-          }
-        }
-      }
-    }
   }
 });
 

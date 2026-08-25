@@ -41,11 +41,18 @@ import { DEFAULT_RIVAL_ID, lineupEntry, lineupFor } from "../rival/lineup.js";
 import { TRACKS, DEFAULT_TRACK_ID, trackById } from "./track-layout.js";
 import { CIRCUIT_TRACKS, DEFAULT_CIRCUIT_TRACK_ID, circuitTrackById } from "../circuit/tracks.js";
 import { hasCircuitAtlas } from "../circuit/assets.js";
+import {
+  CIRCUIT_DIFFICULTIES,
+  DEFAULT_CIRCUIT_DIFFICULTY_ID,
+  circuitDifficultyById,
+} from "../circuit/difficulty.js";
 
 export const PANE_MODEL = "model";
 export const PANE_PRESET = "preset";
 export const PANE_TRACK = "track";
 export const PANE_OBJECTIVE = "objective";
+/** CPU pace. Present only when the selected runtime fields a circuit CPU. */
+export const PANE_DIFFICULTY = "difficulty";
 /**
  * Who you are racing. Present in Rival Race and nowhere else — see `panesFor`.
  *
@@ -57,7 +64,7 @@ export const PANE_OBJECTIVE = "objective";
 export const PANE_RIVAL = "rival";
 
 /** Every pane, in the order they are locked in. Not every mode uses all of them. */
-export const PANES = [PANE_MODEL, PANE_PRESET, PANE_TRACK, PANE_OBJECTIVE, PANE_RIVAL];
+export const PANES = [PANE_MODEL, PANE_PRESET, PANE_TRACK, PANE_OBJECTIVE, PANE_DIFFICULTY, PANE_RIVAL];
 
 /**
  * The panes this mode actually has.
@@ -68,7 +75,11 @@ export const PANES = [PANE_MODEL, PANE_PRESET, PANE_TRACK, PANE_OBJECTIVE, PANE_
  * that is present rather than merely different.
  */
 export function panesFor(setup) {
-  return setupMode(setup).rival ? PANES : PANES.filter((pane) => pane !== PANE_RIVAL);
+  const mode = setupMode(setup);
+  return PANES.filter((pane) => (
+    (pane !== PANE_RIVAL || mode.rival)
+    && (pane !== PANE_DIFFICULTY || mode.runtime === "circuit")
+  ));
 }
 
 /**
@@ -82,6 +93,7 @@ const PANE_LOCK_LABELS = {
   [PANE_PRESET]: "LOCK PAINT",
   [PANE_TRACK]: "LOCK TRACK",
   [PANE_OBJECTIVE]: "LOCK DISTANCE",
+  [PANE_DIFFICULTY]: "LOCK DIFFICULTY",
   [PANE_RIVAL]: "LOCK RIVAL",
 };
 
@@ -145,6 +157,7 @@ export function createSetup({
   presetId = null,
   trackId = DEFAULT_TRACK_ID,
   objectiveId = null,
+  difficultyId = DEFAULT_CIRCUIT_DIFFICULTY_ID,
   rivalId = DEFAULT_RIVAL_ID,
 } = {}, garage = emptyGarage()) {
   const mode = modeById(modeId) ?? modeById(DEFAULT_MODE_ID);
@@ -160,6 +173,10 @@ export function createSetup({
     0,
     mode.objective.options.indexOf(objectiveOption(mode, objectiveId)),
   );
+  const difficultyIndex = Math.max(
+    0,
+    CIRCUIT_DIFFICULTIES.indexOf(circuitDifficultyById(difficultyId)),
+  );
 
   const options = presetOptionsFor(model.id, garage);
   const chosenPresetIndex = Math.max(0, options.findIndex((option) => option.id === presetId));
@@ -174,6 +191,7 @@ export function createSetup({
     chosenPresetIndex,
     trackIndex,
     objectiveIndex,
+    difficultyIndex,
     // The rival is held as an id rather than an index, because the list it
     // indexes into changes length under it: a ghost exists for one distance and
     // not the next, so an index would silently mean a different driver after a
@@ -297,6 +315,12 @@ export function setupObjective(setup) {
   return mode.objective.options[setup.objectiveIndex] ?? objectiveOption(mode, null);
 }
 
+/** The CPU profile selected for a circuit match. */
+export function setupDifficulty(setup) {
+  return CIRCUIT_DIFFICULTIES[clamp(setup.difficultyIndex ?? 0, CIRCUIT_DIFFICULTIES.length - 1)]
+    ?? circuitDifficultyById(null);
+}
+
 /**
  * Moves the cursor **within the live pane only**. Left/right and up/down both
  * stay inside it, and the edges clamp — walking the car grid can no longer carry
@@ -349,6 +373,17 @@ export function moveSetup(setup, direction, garage = emptyGarage(), { ghost = nu
         return { ...setup, trackIndex: clamp(setup.trackIndex - 1, setupTracks(setup).length - 1) };
       case "right":
         return { ...setup, trackIndex: clamp(setup.trackIndex + 1, setupTracks(setup).length - 1) };
+      default:
+        return setup;
+    }
+  }
+
+  if (setup.pane === PANE_DIFFICULTY) {
+    switch (direction) {
+      case "left":
+        return { ...setup, difficultyIndex: clamp(setup.difficultyIndex - 1, CIRCUIT_DIFFICULTIES.length - 1) };
+      case "right":
+        return { ...setup, difficultyIndex: clamp(setup.difficultyIndex + 1, CIRCUIT_DIFFICULTIES.length - 1) };
       default:
         return setup;
     }
@@ -477,6 +512,13 @@ export function focusSetup(setup, target, garage = emptyGarage(), { ghost = null
   if (target.pane === PANE_TRACK) {
     return { ...setup, pane: PANE_TRACK, trackIndex: clamp(target.index, setupTracks(setup).length - 1) };
   }
+  if (target.pane === PANE_DIFFICULTY) {
+    return {
+      ...setup,
+      pane: PANE_DIFFICULTY,
+      difficultyIndex: clamp(target.index, CIRCUIT_DIFFICULTIES.length - 1),
+    };
+  }
   const options = setupMode(setup).objective.options.length;
   return { ...setup, pane: PANE_OBJECTIVE, objectiveIndex: clamp(target.index, options - 1) };
 }
@@ -491,6 +533,7 @@ export function setupSelection(setup, garage = emptyGarage()) {
     livery: preset.livery,
     trackId: setupTrack(setup).id,
     objectiveId: setupObjective(setup).id,
+    difficultyId: setupMode(setup).runtime === "circuit" ? setupDifficulty(setup).id : null,
     // Carried as the raw id rather than resolved through the lineup, because
     // resolving needs the ghost and a selection is meant to be cheap enough to
     // rebuild a setup from. `setupRival` is what resolves it, at the point the
@@ -620,6 +663,21 @@ export function setupView(setup, garage = emptyGarage(), { canCustomise = true, 
       })),
     },
     chosenObjective: setupObjective(setup),
+    difficulty: mode.runtime === "circuit"
+      ? {
+          label: "CPU DIFFICULTY",
+          locked: locked[PANE_DIFFICULTY],
+          options: CIRCUIT_DIFFICULTIES.map((option, index) => ({
+            ...option,
+            index,
+            selected: setup.pane === PANE_DIFFICULTY && setup.difficultyIndex === index,
+            hovered: isHovered(hover, PANE_DIFFICULTY, (h) => h.index === index),
+            chosen: setup.difficultyIndex === index,
+            locked: locked[PANE_DIFFICULTY] && setup.difficultyIndex === index,
+          })),
+        }
+      : null,
+    chosenDifficulty: mode.runtime === "circuit" ? setupDifficulty(setup) : null,
     // One row per archetype. `selected` is where the cursor is; `chosen` is what
     // you are taking to the line. They differ the moment the cursor moves to
     // another pane, and the renderer needs both — otherwise leaving a pane loses

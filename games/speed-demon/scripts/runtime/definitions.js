@@ -1,6 +1,7 @@
 import { createLivery } from "../garage/livery.js";
 import { modeById, objectiveOption, raceOptionsFor } from "../sim/modes.js";
 import { DEFAULT_CIRCUIT_TRACK_ID } from "../circuit/tracks.js";
+import { circuitDifficultyById } from "../circuit/difficulty.js";
 
 export function canonicalLoadout(value) {
   return {
@@ -13,6 +14,7 @@ export function buildRuntimeDefinition({
   modeId,
   objectiveId,
   trackId = null,
+  difficultyId = null,
   participants,
   source = { kind: "freeplay", id: null },
 } = {}) {
@@ -36,6 +38,7 @@ export function buildRuntimeDefinition({
         laps: objective.laps,
         countdownSeconds: 3,
         timeoutSeconds: 300,
+        cpuDifficultyId: circuitDifficultyById(difficultyId).id,
       },
       participants: normalizedParticipants,
       source: { kind: source.kind, id: source.id ?? null },

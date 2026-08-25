@@ -29,6 +29,7 @@ import {
   COMMAND_CAMPAIGN,
   COMMAND_PROFILE,
   createShell,
+  setCampaignRun,
   enterScreen,
   isMenuScreen,
   showsTheRace,
@@ -444,6 +445,17 @@ test("the results menu can run it again, change the setup, or quit to the mode l
   assert(outcomes.includes(`again:${SCREEN_RACE}:${COMMAND_RESTART}`), outcomes.join(" "));
   assert(outcomes.includes(`setup:${SCREEN_SETUP}:${COMMAND_NONE}`), outcomes.join(" "));
   assert(outcomes.includes(`menu:${SCREEN_MODES}:${COMMAND_NONE}`), outcomes.join(" "));
+});
+
+test("campaign results return to the map as the primary action", () => {
+  const campaignRace = setCampaignRun(createShell(), "ch1-toll-booth");
+  const results = enterScreen(campaignRace, SCREEN_RESULTS);
+  const menu = menuFor(results);
+  assertEqual(menu.items[0].id, "campaign");
+  assertEqual(menu.items[0].label, "RETURN TO CAMPAIGN");
+  const outcome = confirmShell(results);
+  assertEqual(outcome.shell.screen, SCREEN_CAMPAIGN);
+  assertEqual(outcome.command, COMMAND_CAMPAIGN);
 });
 
 test("only a deliberate restart rebuilds the race", () => {

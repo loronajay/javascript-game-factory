@@ -27,6 +27,7 @@ import {
   PANE_PRESET,
   PANE_TRACK,
   PANE_OBJECTIVE,
+  PANE_DIFFICULTY,
   PANE_RIVAL,
   PANES,
   panesFor,
@@ -41,6 +42,7 @@ import {
   setupMode,
   setupTrack,
   setupObjective,
+  setupDifficulty,
   setupPreset,
   setupPresetOptions,
   setupPresetRows,
@@ -810,6 +812,21 @@ test("Circuit Race defaults to Old Town, offers Docklands, and blocks models wit
   const result = confirmSetup({ ...unavailable, pane: PANE_OBJECTIVE }, EMPTY);
   assertEqual(result.done, false);
   assertEqual(result.unavailable, true);
+});
+
+test("Circuit Race setup lets the player choose CPU difficulty", () => {
+  let setup = createSetup({ modeId: MODE_CIRCUIT, difficultyId: "easy" });
+  assert(panesFor(setup).includes(PANE_DIFFICULTY));
+  assertEqual(setupDifficulty(setup).id, "easy");
+  assertEqual(setupSelection(setup).difficultyId, "easy");
+
+  setup = toPane(setup, PANE_DIFFICULTY);
+  setup = moveSetup(setup, "right", EMPTY);
+  assertEqual(setupDifficulty(setup).id, "normal");
+  assertEqual(setupView(setup, EMPTY).prompt, "START");
+
+  assert(!panesFor(createSetup({ modeId: MODE_DISTANCE })).includes(PANE_DIFFICULTY));
+  assertEqual(setupSelection(createSetup({ modeId: MODE_DISTANCE })).difficultyId, null);
 });
 
 test("changing car clamps a paint pick that the new car does not have", () => {

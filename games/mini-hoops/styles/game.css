@@ -310,7 +310,8 @@ a:focus-visible {
   box-shadow: 0 16px 48px rgba(28, 15, 10, 0.32);
 }
 
-#court {
+#court,
+#practiceCourt {
   display: block;
   width: 100%;
   height: auto;
@@ -503,17 +504,10 @@ a:focus-visible {
   transition: width 0.03s linear;
 }
 
-/* The calibrated reference pull — the shot that actually swishes. */
-.meter-sweet {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 74%;
-  width: 12%;
-  border-left: 2px solid rgba(255, 255, 255, 0.9);
-  border-right: 2px solid rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.1);
-}
+/* There is deliberately no marked band on this meter. The rail used to carry the
+   calibrated reference pull as a bracket, which turned every shot into matching
+   a printed number rather than learning a hand. The readout stays — it is an
+   honest ratio, and reading it back after a shot is how the number is earned. */
 
 .meter-legend {
   display: flex;
@@ -787,38 +781,121 @@ a:focus-visible {
 
 /* --- How to play -------------------------------------------------------- */
 
-.how-grid {
+/* This screen is a demo court plus notes, not an instruction manual. The court
+   is the real sim (scripts/practice-court.js); the notes say what the shot is
+   made of and stop short of saying which pull drops it. */
+
+.how-layout {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
 }
 
-.how-card {
-  padding: 17px;
+.how-demo {
+  min-width: 0;
+}
+
+/* Sized the same way the game court is: it takes the column it is given, but
+   never more height than the screen has left once the header and its meter are
+   paid for. A demo you have to scroll to would be teaching the wrong lesson. */
+.court--demo {
+  --chrome: 210px;
+  width: min(100%, calc((100dvh - var(--chrome)) * 960 / 760));
+  border-radius: 16px;
+}
+
+/* The demo court is half the size of the game one, and the ball rests exactly
+   where the hint pill sits there. There is no clock up top here, so the hint
+   moves to the empty wall instead of parking on the thing you have to grab. */
+.court--demo .hud-hint {
+  top: 12px;
+  bottom: auto;
+  font-size: 11px;
+}
+
+.court--demo .hud-shout {
+  top: auto;
+  bottom: 16%;
+}
+
+.shot-panel--demo {
+  margin-top: 8px;
+  padding: 10px 12px;
+}
+
+.how-notes {
+  padding: 16px 18px;
   border: 1px solid var(--panel-line);
   border-radius: 15px;
   background: var(--panel);
 }
 
-.how-num {
-  font-size: 28px;
-  font-weight: 950;
+.how-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 11px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+.how-list b {
+  color: var(--ink);
+}
+
+.how-tally {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--panel-line);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
   color: var(--brass);
 }
 
-.how-card h3 {
-  margin: 4px 0 7px;
-  font-size: 15px;
+/* --- The run fits the viewport ------------------------------------------ */
+
+/* The court, the ball, the clock and the power meter are one instrument. Having
+   to scroll to see your power while a shot is in the air is not a game, so the
+   game screen is sized to the VIEWPORT rather than to the canvas: the shot panel
+   takes what it needs, the court takes the rest, and its aspect ratio turns that
+   leftover height back into a width. Nothing on this screen ever overflows.
+   The phone rules further down replace this wholesale. */
+
+body.is-playing {
+  overflow: hidden;
 }
 
-.how-card p {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--ink-dim);
+body.is-playing .cabinet {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+.game-screen.is-active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
+}
+
+/* --chrome is everything on the screen that is not the court: the shot panel,
+   the gap above it, and the cabinet's own padding. Keep it in step with the
+   panel — if the meter grows a row, this grows with it. */
+.game-screen .court {
+  --chrome: 140px;
+  flex: 0 0 auto;
+  width: min(100%, calc((100dvh - var(--chrome)) * 960 / 760));
+}
+
+.game-screen .shot-panel {
+  flex: 0 0 auto;
+  width: min(100%, 620px);
 }
 
 /* --- Responsive --------------------------------------------------------- */
@@ -833,8 +910,17 @@ a:focus-visible {
     position: static;
   }
 
-  .how-grid {
+  .how-layout {
     grid-template-columns: 1fr;
+  }
+
+  .how-notes {
+    padding: 14px 16px;
+  }
+
+  .how-list {
+    gap: 9px;
+    font-size: 12px;
   }
 
   .board-row {
@@ -906,6 +992,32 @@ a:focus-visible {
   }
 }
 
+/* A phone held sideways is shorter than the demo court plus its meter plus the
+   notes. The court is capped and cropped to width — the same trade the game
+   screen makes in portrait — so the shot and its power are always on screen
+   together, and the notes are the part you scroll to. */
+@media (orientation: landscape) and (max-height: 620px) {
+  .court--demo {
+    height: min(56dvh, 320px);
+  }
+
+  .court--demo #practiceCourt {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: auto;
+    max-width: none;
+    height: 100%;
+    aspect-ratio: auto;
+    transform: translateX(-50%);
+  }
+
+  .how-notes {
+    max-height: calc(100dvh - 118px);
+    overflow-y: auto;
+  }
+}
+
 @media (orientation: landscape) and (max-height: 620px) {
   body.is-playing {
     overflow: hidden;
@@ -947,7 +1059,10 @@ a:focus-visible {
     justify-content: center;
   }
 
-  .hud-hint {
+  /* Scoped to the game: a sideways phone has no room for the pill over a live
+     court, but the demo is the one place the player still needs telling what
+     the gesture is. */
+  .game-screen .hud-hint {
     display: none;
   }
 

@@ -10,7 +10,9 @@ import { RIVALS } from "../scripts/rival/rivals.js";
 import { avatarById } from "../scripts/profile/avatars.js";
 import { modelById } from "../scripts/assets/car-atlas.js";
 import { trackById } from "../scripts/ui/track-layout.js";
-import { circuitTrackById } from "../scripts/circuit/tracks.js";
+import { CIRCUIT_TRACKS, circuitTrackById } from "../scripts/circuit/tracks.js";
+import { circuitDifficultyById } from "../scripts/circuit/difficulty.js";
+import { hasCircuitAtlas } from "../scripts/circuit/assets.js";
 import { boardIdFor } from "../scripts/records/records.js";
 import { buildRuntimeDefinition } from "../scripts/runtime/definitions.js";
 import { EVENTS, FIRST_EVENT_ID, eventById, splashSrc } from "../scripts/campaign/events.js";
@@ -144,6 +146,9 @@ test("every event names a track, a mode and an objective the game actually has",
     // quietly racing a different distance from the one it advertises.
     assertEqual(objectiveOption(mode, event.objectiveId).id, event.objectiveId, `${event.id}'s objective`);
     assert(mode.rival || mode.runtime === "circuit", `${event.id} has no opponent runtime`);
+    if (mode.runtime === "circuit") {
+      assertEqual(circuitDifficultyById(event.difficultyId).id, event.difficultyId, `${event.id}'s difficulty`);
+    }
   }
 });
 
@@ -158,6 +163,15 @@ test("an event's run files to a board a solo run can also reach", () => {
   }
 });
 
+test("every circuit opponent uses a verified complete directional atlas", () => {
+  for (const event of EVENTS.filter((candidate) => candidate.modeId === MODE_CIRCUIT)) {
+    assert(
+      hasCircuitAtlas(event.opponent.modelId),
+      `${event.id} uses quarantined or missing circuit art for ${event.opponent.modelId}`,
+    );
+  }
+});
+
 test("the authored circuit mission builds the same serializable circuit definition", () => {
   const event = EVENTS.find((entry) => entry.modeId === MODE_CIRCUIT);
   assert(event, "the campaign has no circuit mission");
@@ -165,6 +179,7 @@ test("the authored circuit mission builds the same serializable circuit definiti
     modeId: event.modeId,
     objectiveId: event.objectiveId,
     trackId: event.trackId,
+    difficultyId: event.difficultyId,
     participants: [
       { playerId: "local", control: "local", modelId: "kaido-gts", livery: {} },
       { playerId: event.opponent.id, control: "cpu", modelId: event.opponent.modelId, livery: event.opponent.livery },
@@ -174,8 +189,29 @@ test("the authored circuit mission builds the same serializable circuit definiti
   assertEqual(definition.runtime, "circuit");
   assertEqual(definition.trackId, "old-town-shrine-loop");
   assertEqual(definition.rules.laps, 3);
+  assertEqual(definition.rules.cpuDifficultyId, event.difficultyId);
   assertEqual(definition.source.kind, "campaign");
   assertEqual(Object.keys(definition.participants[0]).sort().join(), "control,displayName,livery,modelId,playerId");
+});
+
+test("later campaign circuit rows can select every registered geographic track", () => {
+  const event = EVENTS.find((entry) => entry.modeId === MODE_CIRCUIT);
+  for (const track of CIRCUIT_TRACKS) {
+    const definition = buildRuntimeDefinition({
+      modeId: event.modeId,
+      objectiveId: event.objectiveId,
+      trackId: track.id,
+      difficultyId: "hard",
+      participants: [
+        { playerId: "local", control: "local", modelId: "kaido-gts", livery: {} },
+        { playerId: "cpu", control: "cpu", modelId: event.opponent.modelId, livery: {} },
+      ],
+      source: { kind: "campaign", id: `future-${track.id}` },
+    });
+    assertEqual(definition.trackId, track.id);
+    assertEqual(definition.rules.cpuDifficultyId, "hard");
+    assertEqual(definition.source.kind, "campaign");
+  }
 });
 
 test("the circuit mission is presented as a grid race throughout the canon briefing", () => {

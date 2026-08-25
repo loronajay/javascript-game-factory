@@ -10,12 +10,26 @@ import {
 import {
   DEFAULT_HOOP_MODE,
   HOOP_MODES,
+  HOOP_TRAVEL_BOUNDS,
   boardWorldBounds,
   hoopAt,
   hoopModeById,
   hoopModeIds,
   hoopWorldState,
 } from "../scripts/sim/hoop.js";
+
+/** Walk a mode over a long stretch and report the box its rim centre stayed in. */
+function travelOf(id, seconds = 240, step = 0.01) {
+  const box = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+  for (let t = 0; t < seconds; t += step) {
+    const hoop = hoopAt(id, t);
+    box.minX = Math.min(box.minX, hoop.cx);
+    box.maxX = Math.max(box.maxX, hoop.cx);
+    box.minY = Math.min(box.minY, hoop.rimY);
+    box.maxY = Math.max(box.maxY, hoop.rimY);
+  }
+  return box;
+}
 
 suite("hoop — geometry and the motion modes the player picks between");
 
@@ -85,6 +99,59 @@ test("each moving mode oscillates on the axes it advertises", () => {
 
   assert(sampled("circle", "x") > 100, "circle must travel horizontally");
   assert(sampled("circle", "y") > 40, "circle must travel vertically");
+});
+
+test("each named pattern actually traces the shape its label promises", () => {
+  // Pendulum: highest at both ends of the swing, lowest through the middle.
+  const swingEnd = hoopAt("pendulum", 3.4 / 4);
+  assert(Math.abs(swingEnd.cx - HOOP_BASE_X) > 90, "the swing reaches its extreme");
+  assert(swingEnd.rimY < HOOP_BASE_RIM_Y - 40, "and rides up there");
+  assertClose(hoopAt("pendulum", 3.4 / 2).rimY, HOOP_BASE_RIM_Y, 1e-9, "back down through centre");
+
+  // Figure 8: y cycles twice per x cycle, so the path returns to the base point
+  // halfway through the period — travelling the other way. That self-crossing is
+  // the waist of the 8, and an ellipse cannot produce it.
+  const halfPeriod = 5 / 2;
+  for (const t of [0.4, 1.3, 2.2]) {
+    assertClose(hoopAt("figure8", t).rimY, hoopAt("figure8", t + halfPeriod).rimY, 1e-9, "y repeats each half");
+    assert(Math.abs(hoopAt("figure8", t).cx - hoopAt("figure8", t + halfPeriod).cx) > 50, "x does not");
+  }
+  const waist = hoopAt("figure8", halfPeriod);
+  assertClose(waist.cx, HOOP_BASE_X, 1e-9, "the path crosses itself at the base point");
+  assertClose(waist.rimY, HOOP_BASE_RIM_Y, 1e-9);
+  assert(waist.vxScreen * hoopAt("figure8", 0).vxScreen < 0, "and crosses going the other way");
+
+  // Cross: there is a moment it is travelling almost purely vertically, and a
+  // moment it is travelling almost purely horizontally. That swap is the shape.
+  let mostVertical = 0;
+  let mostHorizontal = 0;
+  for (let t = 0; t < 12; t += 0.01) {
+    const hoop = hoopAt("cross", t);
+    const speed = Math.hypot(hoop.vxScreen, hoop.vyScreen);
+    if (speed < 1) continue;
+    mostVertical = Math.max(mostVertical, Math.abs(hoop.vyScreen) / speed);
+    mostHorizontal = Math.max(mostHorizontal, Math.abs(hoop.vxScreen) / speed);
+  }
+  assert(mostVertical > 0.95, "the cross must have a vertical stroke");
+  assert(mostHorizontal > 0.95, "and a horizontal one");
+
+  // Wander: two incommensurate rhythms, so it must not repeat on any short loop.
+  for (const loop of [3, 5, 5.6, 7, 11]) {
+    const drift = Math.abs(hoopAt("wander", 2.1).cx - hoopAt("wander", 2.1 + loop).cx);
+    assert(drift > 1, `wander repeated itself after ${loop}s, which defeats the point`);
+  }
+});
+
+test("no mode travels outside the box the mobile portrait crop can show", () => {
+  // A rim that leaves this box is invisible on a phone and perfectly fine on the
+  // desktop browser it would be authored in — which is exactly why it is a test.
+  for (const id of hoopModeIds()) {
+    const box = travelOf(id);
+    assert(box.minX >= HOOP_TRAVEL_BOUNDS.minX, `${id} travels off the left (${box.minX})`);
+    assert(box.maxX <= HOOP_TRAVEL_BOUNDS.maxX, `${id} travels off the right (${box.maxX})`);
+    assert(box.minY >= HOOP_TRAVEL_BOUNDS.minY, `${id} travels above the crop (${box.minY})`);
+    assert(box.maxY <= HOOP_TRAVEL_BOUNDS.maxY, `${id} travels below the crop (${box.maxY})`);
+  }
 });
 
 test("reported velocity matches the actual motion of the rim", () => {

@@ -20,6 +20,11 @@ import {
 import { createCircuitAdapter } from "../scripts/runtime/circuit-adapter.js";
 import { createRuntimeRegistry } from "../scripts/runtime/registry.js";
 import { circuitDepthOrder, createCircuitView } from "../scripts/circuit/renderer.js";
+import {
+  CIRCUIT_DIFFICULTIES,
+  DEFAULT_CIRCUIT_DIFFICULTY_ID,
+  circuitDifficultyById,
+} from "../scripts/circuit/difficulty.js";
 
 suite("circuit race — shared deterministic runtime");
 
@@ -78,6 +83,46 @@ test("source is routing metadata and cannot change the simulation", () => {
   const stripSource = ({ source, ...state }) => state;
   assertDeepEqual(stripSource(freeplay), stripSource(campaign));
   assertDeepEqual(stripSource(freeplay), stripSource(online));
+});
+
+test("circuit difficulty is a normalized serializable race rule", () => {
+  const hard = createCircuitRace({
+    ...definition(),
+    rules: { ...definition().rules, cpuDifficultyId: "hard" },
+  }, track);
+  const fallback = createCircuitRace({
+    ...definition(),
+    rules: { ...definition().rules, cpuDifficultyId: "impossible" },
+  }, track);
+
+  assertEqual(hard.rules.cpuDifficultyId, "hard");
+  assertEqual(hard.participants.find((entry) => entry.control === "cpu").driver.difficultyId, "hard");
+  assertEqual(fallback.rules.cpuDifficultyId, DEFAULT_CIRCUIT_DIFFICULTY_ID);
+  assertEqual(CIRCUIT_DIFFICULTIES.map((entry) => entry.id).join(), "easy,normal,hard");
+  assertEqual(circuitDifficultyById("missing").id, DEFAULT_CIRCUIT_DIFFICULTY_ID);
+});
+
+test("higher circuit difficulty produces a meaningfully faster CPU", () => {
+  const cpuOnly = (difficultyId) => createCircuitRace({
+    ...definition("freeplay", [
+      { playerId: "cpu", control: "cpu", modelId: "colt-gt", livery: {} },
+    ]),
+    rules: { ...definition().rules, cpuDifficultyId: difficultyId },
+  }, track);
+  const run = (difficultyId) => {
+    let race = cpuOnly(difficultyId);
+    for (let tick = 0; tick < 120; tick += 1) {
+      race = stepCircuitRace(race, 1 / 120, { track, containsVehicle: driveable });
+    }
+    return race.participants[0];
+  };
+
+  const easy = run("easy");
+  const hard = run("hard");
+  assert(
+    hard.vehicle.x > easy.vehicle.x + 8,
+    `hard CPU (${hard.vehicle.x.toFixed(1)}) did not pull clear of easy (${easy.vehicle.x.toFixed(1)})`,
+  );
 });
 
 test("countdown, input and fixed-step vehicle movement share one reducer", () => {

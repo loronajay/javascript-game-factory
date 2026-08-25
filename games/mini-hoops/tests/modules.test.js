@@ -64,6 +64,8 @@ const MODULES = [
   "scripts/ui/setup-view.js",
   "scripts/ui/boards-view.js",
   "scripts/ui/menu-view.js",
+  "scripts/ui/practice-view.js",
+  "scripts/practice-court.js",
   "scripts/init-game.js",
 ];
 

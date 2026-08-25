@@ -279,6 +279,9 @@ function setupRects(modeId) {
   for (const option of view.objective.options) {
     rects.push({ what: `objective ${option.id}`, ...setup.objectiveCardRect(option.index) });
   }
+  for (const option of view.difficulty?.options ?? []) {
+    rects.push({ what: `difficulty ${option.id}`, ...setup.difficultyCardRect(option.index) });
+  }
   for (const entry of view.rivals ?? []) {
     rects.push({ what: `rival ${entry.id}`, ...setup.rivalCardRect(entry.index) });
   }
@@ -317,10 +320,10 @@ test("each setup pane has room for its heading above it", () => {
   // Headings are drawn 13px above their pane; a pane starting too high would
   // print its label off the top of the canvas or into the panel above.
   const setup = loaded["scripts/render/setup.js"];
-  const { grid, presets, tracks, objective, rivals, title, mode } = setup.SETUP_LAYOUT;
+  const { grid, presets, tracks, objective, difficulty, rivals, title, mode } = setup.SETUP_LAYOUT;
   assert(grid.y - 13 > mode.y, "the CAR heading collides with the mode badge");
   assert(mode.y > title.y, "the mode badge collides with the wordmark");
-  for (const [name, pane] of [["presets", presets], ["tracks", tracks], ["objective", objective], ["rivals", rivals]]) {
+  for (const [name, pane] of [["presets", presets], ["tracks", tracks], ["objective", objective], ["difficulty", difficulty], ["rivals", rivals]]) {
     assert(pane.y - 13 > 0, `the ${name} heading is off the top of the screen`);
   }
 });

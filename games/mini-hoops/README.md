@@ -18,7 +18,8 @@ any static server works:
 npx serve ..\..
 ```
 
-Pick a hoop mode (still, left-right, up-down or circle), a round length (30s or
+Pick a hoop mode (still, left-right, up-down, circle, pendulum, figure 8, cross or
+wander), a round length (30s or
 60s), a room and a ball, then drag the ball back and release. Boards are keyed by
 `mode:duration` and are stored locally.
 

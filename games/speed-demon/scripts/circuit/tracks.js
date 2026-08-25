@@ -42,6 +42,7 @@ export const CIRCUIT_TRACKS = Object.freeze([
   Object.freeze({
     id: "old-town-shrine-loop",
     label: "Old Town Shrine Loop",
+    setupLabel: "Old Town",
     blurb: "A wet shrine road above Old Town, folding back through a technical infield.",
     circuit: true,
     src: "assets/circuit-tracks/old-town-shrine-loop.png",
@@ -61,6 +62,7 @@ export const CIRCUIT_TRACKS = Object.freeze([
   Object.freeze({
     id: "docklands-freight-loop",
     label: "Docklands Freight Loop",
+    setupLabel: "Docklands",
     blurb: "A fast harbor sweep joined to a tight freight-yard infield.",
     circuit: true,
     src: "assets/circuit-tracks/docklands-freight-loop.png",
@@ -78,6 +80,7 @@ export const CIRCUIT_TRACKS = Object.freeze([
   Object.freeze({
     id: "downtown-canal-ring",
     label: "Downtown Canal Ring",
+    setupLabel: "Downtown",
     blurb: "A rain-black canal circuit threading Downtown towers and elevated rail lines.",
     circuit: true,
     src: "assets/circuit-tracks/downtown-canal-ring.png",

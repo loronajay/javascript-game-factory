@@ -350,6 +350,9 @@ export const EVENTS = [
     where: "Old Town — shrine road",
     splash: "circuit-race.png",
     trackId: "old-town-shrine-loop",
+    // The first circuit stop is deliberately welcoming. Later circuit events
+    // author both a newer trackId and a higher difficultyId on their own row.
+    difficultyId: "easy",
     modeId: MODE_CIRCUIT,
     objectiveId: "three-laps",
     seed: 6194,
@@ -362,7 +365,9 @@ export const EVENTS = [
       blurb: "Charges everyone an eighth mile to use his road. Has not lost it in a while.",
       accent: "#a97bff",
       avatarId: "female-19",
-      modelId: "meridian-rs",
+      // Meridian's generated turntable is quarantined: three physical views
+      // are missing. Keep this circuit event on a verified upright atlas.
+      modelId: "scalpel-r",
       livery: {
         paint: { hue: 268, saturation: 0.6, brightness: 0.8, finish: "metallic" },
         layers: [

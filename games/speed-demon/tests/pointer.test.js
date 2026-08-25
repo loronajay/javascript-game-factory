@@ -11,6 +11,7 @@ import {
   presetRowRect,
   trackCardRect,
   objectiveCardRect,
+  difficultyCardRect,
   startButtonRect,
 } from "../scripts/render/setup.js";
 import {
@@ -22,7 +23,7 @@ import {
   focusSetup,
   TARGET_START,
 } from "../scripts/ui/setup-menu.js";
-import { MODE_DISTANCE, MODE_RIVAL } from "../scripts/sim/modes.js";
+import { MODE_CIRCUIT, MODE_DISTANCE, MODE_RIVAL } from "../scripts/sim/modes.js";
 import { emptyGarage } from "../scripts/garage/garage.js";
 import { TRACKS } from "../scripts/ui/track-layout.js";
 
@@ -182,6 +183,20 @@ test("every rival card is clickable, and only in a mode that has them", () => {
   // The same pixels in a mode with no rival pane hit nothing at all.
   const plain = setupView(createSetup({ modeId: MODE_DISTANCE }), EMPTY_GARAGE);
   const box = rivalCardRect(0);
+  assertEqual(hitSetup(plain, box.x + box.width / 2, box.y + box.height / 2), null);
+});
+
+test("circuit difficulty cards are clickable only when the pane is drawn", () => {
+  const circuit = setupView(createSetup({ modeId: MODE_CIRCUIT }), EMPTY_GARAGE);
+  for (const option of circuit.difficulty.options) {
+    const box = difficultyCardRect(option.index);
+    const hit = hitSetup(circuit, box.x + box.width / 2, box.y + box.height / 2);
+    assertEqual(hit?.pane, "difficulty");
+    assertEqual(hit.index, option.index);
+  }
+
+  const plain = setupView(createSetup({ modeId: MODE_DISTANCE }), EMPTY_GARAGE);
+  const box = difficultyCardRect(0);
   assertEqual(hitSetup(plain, box.x + box.width / 2, box.y + box.height / 2), null);
 });
 

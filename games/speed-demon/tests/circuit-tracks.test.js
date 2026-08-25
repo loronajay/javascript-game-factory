@@ -127,6 +127,14 @@ test("the catalog contains three location-named circuits rather than one named t
   assert(!/japan|noir/i.test(modeById(MODE_CIRCUIT).blurb));
 });
 
+test("each circuit has a compact setup-card label as well as its full name", () => {
+  for (const track of CIRCUIT_TRACKS) {
+    assert(track.setupLabel, `${track.id} has no setup label`);
+    assert(track.setupLabel.length <= 10, `${track.id}'s setup label will overflow its card`);
+    assert(track.label.length >= track.setupLabel.length, `${track.id}'s setup label is not compact`);
+  }
+});
+
 test("each track owns its camera zoom and apparent car scale", () => {
   for (const track of CIRCUIT_TRACKS) {
     assert(Number.isFinite(track.presentation?.carScale) && track.presentation.carScale > 0,

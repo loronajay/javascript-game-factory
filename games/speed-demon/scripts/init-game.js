@@ -1568,6 +1568,7 @@ export function boot(canvas, options = {}) {
           modeId: event.modeId,
           objectiveId: event.objectiveId,
           trackId: event.trackId,
+          difficultyId: event.difficultyId,
         },
         garage,
       );
@@ -1592,6 +1593,7 @@ export function boot(canvas, options = {}) {
       modeId: runSelection.modeId,
       objectiveId: runSelection.objectiveId,
       trackId: chosen.track.id,
+      difficultyId: runSelection.difficultyId,
       participants: mode.runtime === "circuit"
         ? [
           localParticipant,
@@ -3707,14 +3709,17 @@ export function boot(canvas, options = {}) {
       render();
       return this.state();
     },
-    /** Jumps straight to a car, track and objective. */
-    choose(modelId, trackId, objectiveId, presetId = null) {
+    /** Jumps straight to a car, track, objective and optional circuit difficulty. */
+    choose(modelId, trackId, objectiveId, presetId = null, difficultyId = null) {
+      const current = setupSelection(setup, garage);
       const next = createSetup({
+        ...current,
         modeId: shell.modeId,
         modelId,
         presetId,
         trackId,
-        objectiveId: objectiveId ?? setupSelection(setup, garage).objectiveId,
+        objectiveId: objectiveId ?? current.objectiveId,
+        difficultyId: difficultyId ?? current.difficultyId,
       }, garage);
       if (!resolveSelection(setupSelection(next, garage))) {
         throw new Error(`No such car or track: ${modelId} on ${trackId}`);

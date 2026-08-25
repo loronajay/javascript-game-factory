@@ -6,7 +6,7 @@ Speed Demon is a top-down racer built around manual-shift execution. Stage again
 
 Live on the arcade grid (order 13).
 
-- **Five ways to race.** Distance Race (four distances), Time Attack (three clocks), Rival Race against a ten-driver CPU roster or your own ghost, Circuit Race across Old Town Shrine Loop and Docklands Freight Loop, and casual **Online Versus** — best of three, server-authoritative, on the separate `factory-network-server`.
+- **Five ways to race.** Distance Race (four distances), Time Attack (three clocks), Rival Race against a ten-driver CPU roster or your own ghost, Circuit Race across Old Town Shrine Loop, Docklands Freight Loop, and Downtown Canal Ring with Easy/Normal/Hard CPU pace, and casual **Online Versus** — best of three, server-authoritative, on the separate `factory-network-server`.
 - **A campaign.** Chapter one is the whole painted Street Circuit: nine events, START to the boss plate. The other three districts are painted and read `soon`.
 - **24-model roster, cosmetic-only.** No stat differences and no alternate gate layouts yet. Bodies are neutral and a livery — base paint, optional gradient, up to four player-placed bands and stripes, window tint, tail-light hue, underglow — is tinted on at runtime, so a new colour costs no art.
 - **Customization is server-backed and requires sign-in.** Signed out, the garage reports itself unavailable and the cabinet races on Factory paint — a normal state, not an error.
