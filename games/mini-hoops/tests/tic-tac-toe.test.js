@@ -10,7 +10,7 @@ import {
   resolveAttempt,
   winningLine,
 } from "../scripts/sim/tic-tac-toe.js";
-import { capturedBinForDraw } from "../scripts/tic-tac-toe-game.js";
+import { capturedBinForDraw, isTicTacToeBallVisible } from "../scripts/tic-tac-toe-game.js";
 
 suite("tic-tac-toe — turns, assignment, wins, and adjustable CPU play");
 
@@ -40,6 +40,18 @@ test("local multiplayer gives X to player 1 and keeps both turns human-controlle
 test("CPU matches only let the assigned human control their own turn", () => {
   const match = createTicTacToeMatch({ mode: "cpu", humanMark: "o" });
   assertEqual(playerLabel(match), "CPU");
+  assertEqual(isHumanControlledTurn(match), false);
+  resolveAttempt(match, 0, false);
+  assertEqual(playerLabel(match), "You");
+  assertEqual(isHumanControlledTurn(match), true);
+});
+
+test("online matches only let the local player's assigned mark shoot", () => {
+  const match = createTicTacToeMatch({ mode: "online", humanMark: "o" });
+  assertEqual(match.mode, "online");
+  assertEqual(match.humanMark, "o");
+  assertEqual(match.cpuMark, null);
+  assertEqual(playerLabel(match), "Opponent");
   assertEqual(isHumanControlledTurn(match), false);
   resolveAttempt(match, 0, false);
   assertEqual(playerLabel(match), "You");
@@ -103,6 +115,12 @@ test("the bin occlusion pass is safely absent between shots", () => {
   assertEqual(capturedBinForDraw(null), null);
   assertEqual(capturedBinForDraw({ capturedBin: null }), null);
   assertEqual(capturedBinForDraw({ capturedBin: 6 }), 6);
+});
+
+test("the visible ball ends when it crosses into a bin", () => {
+  assertEqual(isTicTacToeBallVisible(null), true);
+  assertEqual(isTicTacToeBallVisible({ capturedBin: null }), true);
+  assertEqual(isTicTacToeBallVisible({ capturedBin: 6 }), false);
 });
 
 finish();

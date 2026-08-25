@@ -2,12 +2,20 @@
 
 import { createAssetLibrary } from "./assets/loader.js";
 import { ballFlight } from "./assets/ball-catalog.js";
-import { CANVAS_HEIGHT, CANVAS_WIDTH, PROJECTION_Y_SCALE, REFERENCE_POWER, TICK_SECONDS } from "./sim/constants.js";
+import { createMiniHoopsAccountAccess } from "./multiplayer/account-access.js";
+import { normalizeRoomCode } from "./multiplayer/online-client.js";
+import { createTicTacToeOnlineClient } from "./multiplayer/tic-tac-toe-online-client.js";
+import { CANVAS_HEIGHT, CANVAS_WIDTH, PROJECTION_Y_SCALE, TICK_SECONDS } from "./sim/constants.js";
 import { createBinTargets, stepBallAgainstBins } from "./sim/bin-physics.js";
 import { createBall, isBallSettled, launchBall, resetBall } from "./sim/physics.js";
-import { launchSpin, solveLaunch } from "./sim/launch.js";
+import { launchSpin, trajectoryPoints } from "./sim/launch.js";
 import { isShootablePull, neutralPull, resolvePull } from "./sim/pull.js";
 import { ballScreenRadius, depthScaleAt, projectPoint, worldToScreenLength } from "./sim/projection.js";
+import {
+  createTicTacToeShot,
+  nearestOpenCellForShot,
+  ticTacToePowerForDepth,
+} from "./sim/tic-tac-toe-shot.js";
 import {
   DIFFICULTIES,
   chooseCpuCell,
@@ -17,24 +25,40 @@ import {
   markForCell,
   playerLabel,
   resolveAttempt,
+  TIC_TAC_TOE_FIXED_SETUP,
 } from "./sim/tic-tac-toe.js";
 import { drawBall } from "./render/ball.js";
+import { drawAim } from "./render/aim.js";
 import { clearScene, depthGradeFilter, drawBallShadow, drawRoom, prepareContext } from "./render/scene.js";
 import { canvasPoint, isGrab } from "./ui/pointer.js";
 
 const BIN_PATH = "assets/modes/floor-tic-tac-toe/open-bin.png";
 const X_PATH = "assets/modes/floor-tic-tac-toe/neon-x.png";
 const O_PATH = "assets/modes/floor-tic-tac-toe/neon-o.png";
-const BALL_ID = "basketball";
+// The room and the ball are fixed for this mode — the setup screen reads the
+// same record to know which of its pickers to put away.
+const { locationId: ROOM_ID, ballId: BALL_ID } = TIC_TAC_TOE_FIXED_SETUP;
 const BIN_VISIBLE_HEIGHT_RATIO = 1244 / 1326;
 const BIN_FOOT_Y_RATIO = 1288 / 1326;
-const BIN_ENTRY_VELOCITY = -4;
 
 export function capturedBinForDraw(flight) {
   return Number.isInteger(flight?.capturedBin) ? flight.capturedBin : null;
 }
 
-export function bootTicTacToe(root, { random = Math.random } = {}) {
+export function isTicTacToeBallVisible(flight) {
+  return capturedBinForDraw(flight) === null;
+}
+
+export function ticTacToeMode(value) {
+  return value === "local" || value === "online" ? value : "cpu";
+}
+
+export function bootTicTacToe(root, options = {}) {
+  const random = options.random || Math.random;
+  const accountAccess = options.accountAccess || createMiniHoopsAccountAccess();
+  const onlineClient = options.onlineClient || createTicTacToeOnlineClient({
+    resolveIdentity: () => accountAccess.identity(),
+  });
   const canvas = root.querySelector("#stageCourt");
   const ctx = canvas.getContext("2d");
   canvas.width = CANVAS_WIDTH;
@@ -43,7 +67,7 @@ export function bootTicTacToe(root, { random = Math.random } = {}) {
 
   const assets = createAssetLibrary({ onLoad: () => draw() });
   const art = {
-    room: assets.backdrop("warehouse"),
+    room: assets.backdrop(ROOM_ID),
     bin: assets.image(BIN_PATH),
     x: assets.image(X_PATH),
     o: assets.image(O_PATH),
@@ -53,10 +77,12 @@ export function bootTicTacToe(root, { random = Math.random } = {}) {
   const ball = createBall();
   const scoredAt = new Map();
 
-  let mode = "cpu";
-  let difficulty = "medium";
+  const params = new URLSearchParams(options.search ?? globalThis.location?.search ?? "");
+  const mode = ticTacToeMode(options.mode || params.get("mode"));
+  const difficulty = DIFFICULTIES.some(({ id }) => id === (options.difficulty || params.get("difficulty")))
+    ? (options.difficulty || params.get("difficulty"))
+    : "medium";
   let match;
-  let selected = null;
   let pull = null;
   let pointerId = null;
   let grabOffset = { x: 0, y: 0 };
@@ -65,43 +91,47 @@ export function bootTicTacToe(root, { random = Math.random } = {}) {
   let elapsed = 0;
   let accumulator = 0;
   let previousFrame = performance.now();
+  let onlineSnapshot = onlineClient.getSnapshot();
+  let onlineAttemptPending = false;
 
   const status = root.querySelector("#tttStatus");
   const assignment = root.querySelector("#tttAssignment");
   const meter = root.querySelector("#tttMeterFill");
   const readout = root.querySelector("#tttMeterReadout");
-  const difficultyControls = root.querySelector("#difficultyControls");
-  const difficultySelect = root.querySelector("#difficulty");
+  const newMatchButton = root.querySelector("#newMatch");
+  const onlinePanel = root.querySelector("#tttOnlinePanel");
+  const gameArea = root.querySelector("#tttGameArea");
+  const modeLabel = root.querySelector("#tttModeLabel");
+  const hint = root.querySelector("#tttHint");
 
-  root.querySelector("#opponent")?.addEventListener("change", (event) => {
-    mode = event.target.value === "local" ? "local" : "cpu";
-    newMatch();
-  });
+  onlineClient.subscribe(handleOnlineSnapshot);
 
-  difficultySelect?.addEventListener("change", (event) => {
-    difficulty = event.target.value;
-    newMatch();
+  newMatchButton?.addEventListener("click", newMatch);
+  root.querySelector("#tttOnlineQuick")?.addEventListener("click", () => onlineClient.findQuickMatch());
+  root.querySelector("#tttOnlineCreate")?.addEventListener("click", () => onlineClient.createPrivateRoom());
+  root.querySelector("#tttOnlineJoin")?.addEventListener("click", () => {
+    onlineClient.joinPrivateRoom(root.querySelector("#tttOnlineRoomInput")?.value);
   });
-  root.querySelector("#newMatch")?.addEventListener("click", newMatch);
+  root.querySelector("#tttOnlineStart")?.addEventListener("click", () => onlineClient.startMatch());
+  root.querySelector("#tttOnlineLeave")?.addEventListener("click", () => onlineClient.leave());
+  root.querySelector("#tttOnlineRoomInput")?.addEventListener("input", (event) => {
+    event.target.value = normalizeRoomCode(event.target.value);
+  });
 
   canvas.addEventListener("pointerdown", (event) => {
     if (!canHumanAct()) return;
     const point = canvasPoint(canvas, event);
     const screenBall = screenBallPosition();
-    if (selected !== null && isGrab(point, screenBall)) {
-      pointerId = event.pointerId;
-      grabOffset = { x: point.x - screenBall.x, y: point.y - screenBall.y };
-      pull = neutralPull(screenBall);
-      canvas.setPointerCapture?.(pointerId);
-      event.preventDefault();
-      return;
-    }
-    const target = closestOpenBin(point);
-    if (target !== null) {
-      selected = target;
-      setStatus(`Cell ${target + 1} selected · pull the ball to shoot`);
-      draw();
-    }
+    if (!isGrab(point, screenBall)) return;
+    pointerId = event.pointerId;
+    grabOffset = { x: point.x - screenBall.x, y: point.y - screenBall.y };
+    pull = neutralPull(screenBall);
+    // The pill parks over the ball's rest position, which is the one thing the
+    // player has to grab. It has done its job the moment they grab it.
+    hint?.classList.add("is-hidden");
+    canvas.setPointerCapture?.(pointerId);
+    setStatus("Aim with the line · release to shoot");
+    event.preventDefault();
   });
   canvas.addEventListener("pointermove", (event) => {
     if (!pull || event.pointerId !== pointerId) return;
@@ -117,7 +147,7 @@ export function bootTicTacToe(root, { random = Math.random } = {}) {
     const released = pull;
     pull = null;
     pointerId = null;
-    if (isShootablePull(released)) launchAt(selected, released.power, released.aimX);
+    if (isShootablePull(released)) launchFromPull(released);
     else setPower(0);
     event.preventDefault();
   });
@@ -130,45 +160,47 @@ export function bootTicTacToe(root, { random = Math.random } = {}) {
       humanMark: mode === "cpu" ? (random() < 0.5 ? "x" : "o") : "x",
       difficulty,
     });
+    if (mode === "online") match.status = "waiting";
     scoredAt.clear();
-    selected = null;
     pull = null;
     flight = null;
+    onlineAttemptPending = false;
     cpuDelay = mode === "cpu" ? 0.75 : 0;
     resetBall(ball);
     setPower(0);
-    if (difficultyControls) difficultyControls.hidden = mode !== "cpu";
-    if (difficultySelect) difficultySelect.disabled = mode !== "cpu";
-    assignment.textContent = mode === "local"
-      ? "PLAYER 1: X · PLAYER 2: O"
-      : `YOU: ${match.humanMark.toUpperCase()} · CPU: ${match.cpuMark.toUpperCase()}`;
+    if (onlinePanel) onlinePanel.hidden = mode !== "online";
+    if (gameArea) gameArea.hidden = mode === "online";
+    if (newMatchButton) newMatchButton.hidden = mode === "online";
+    if (modeLabel) modeLabel.textContent = mode === "local" ? "Local Hotseat" : mode === "online" ? "Online Match" : `Vs CPU · ${difficulty}`;
+    syncAssignment();
+    renderOnlineLobby();
     syncTurnStatus();
     draw();
   }
 
   function canHumanAct() {
-    return isHumanControlledTurn(match) && !flight;
+    return isHumanControlledTurn(match) && !flight && !onlineAttemptPending;
   }
 
-  function launchAt(cell, power, aimX = 480) {
-    if (cell === null || match.board[cell] || flight) return;
-    const bin = bins[cell];
-    // Pull angle supplies fine left/right placement inside the selected mouth.
-    const offset = Math.max(-0.052, Math.min(0.052, ((aimX - 480) / 160) * 0.052));
-    const target = projectPoint({ x: bin.x + offset, y: bin.topY, z: bin.z });
-    const launch = solveLaunch({
-      origin: { x: ball.x, y: ball.y, z: ball.z },
-      aim: target,
-      targetZ: bin.z,
-      power,
-      loft: 1,
-      entryVelocity: BIN_ENTRY_VELOCITY,
-      weight: ballFlight(BALL_ID).weight,
-    });
-    launchBall(ball, launch, launchSpin(launch));
-    flight = { selected: cell, age: 0, resolved: false, resetIn: null, capturedBin: null };
-    selected = null;
-    setPower(power);
+  function launchFromPull(released, attemptedCell = null) {
+    if (flight) return;
+    const shot = createTicTacToeShot(released, ball, { weight: ballFlight(BALL_ID).weight });
+    const nearest = attemptedCell ?? nearestOpenCellForShot(
+      { aimX: shot.aim.x, targetZ: shot.targetZ },
+      bins,
+      match.board,
+    );
+    if (nearest === null) return;
+    launchBall(ball, shot.launch, launchSpin(shot.launch));
+    flight = {
+      attemptedCell: nearest,
+      targetZ: shot.targetZ,
+      age: 0,
+      resolved: false,
+      resetIn: null,
+      capturedBin: null,
+    };
+    setPower(released.power);
     setStatus(`${playerLabel(match)} (${match.turn.toUpperCase()}) shoots…`);
   }
 
@@ -176,11 +208,15 @@ export function bootTicTacToe(root, { random = Math.random } = {}) {
     const cell = chooseCpuCell(match.board, match.cpuMark, match.difficulty, random);
     if (cell === null) return;
     const made = cpuMakesShot(match.difficulty, random);
-    // CPU misses are still physical shots: under-pulled on easy/medium, or a
-    // narrow lip graze on hard. No outcome is injected into the match rules.
-    const power = made ? REFERENCE_POWER : (match.difficulty === "hard" ? 0.86 : 0.65);
-    const aimX = made ? 480 : 615;
-    launchAt(cell, power, aimX);
+    const bin = bins[cell];
+    const target = projectPoint({ x: bin.x, y: bin.topY, z: bin.z });
+    // CPU misses remain real throws. They are offset from the intended mouth;
+    // if the mistake happens to fall through another open bin, that cell counts.
+    launchFromPull({
+      power: ticTacToePowerForDepth(bin.z) + (made ? 0 : -0.055),
+      aimX: target.x + (made ? 0 : (bin.column === 2 ? -92 : 92)),
+      loft: 1,
+    }, cell);
   }
 
   function tick() {
@@ -202,20 +238,25 @@ export function bootTicTacToe(root, { random = Math.random } = {}) {
       });
       if (result.capturedBin !== null) flight.capturedBin = result.capturedBin;
       if (result.scoredBin !== null && !match.board[result.scoredBin]) {
-        resolveAttempt(match, result.scoredBin, true);
-        scoredAt.set(result.scoredBin, elapsed);
+        const scoringMark = match.turn;
+        if (match.mode === "online") submitOnlineAttempt(result.scoredBin, true);
+        else {
+          resolveAttempt(match, result.scoredBin, true);
+          scoredAt.set(result.scoredBin, elapsed);
+        }
         flight.resolved = true;
         flight.resetIn = 1.05;
-        setStatus(`${match.board[result.scoredBin].toUpperCase()} scores!`);
+        setStatus(`${scoringMark.toUpperCase()} scores!`);
       } else if (flight.age > 3.15 || (flight.age > 0.45 && isBallSettled(ball))) {
-        resolveAttempt(match, flight.selected, false);
+        if (match.mode === "online") submitOnlineAttempt(flight.attemptedCell, false);
+        else resolveAttempt(match, flight.attemptedCell, false);
         flight.resolved = true;
         flight.resetIn = 0.45;
         setStatus("Miss · turn changes");
       }
     } else {
-      // Keep the scored ball visibly falling inside the can during its one-second
-      // replacement beat; misses simply rest where physics left them.
+      // Physics continues briefly so turn timing stays deterministic. Rendering
+      // ends at the mouth plane: once captured, the bin has swallowed the ball.
       if (flight.capturedBin !== null) {
         stepBallAgainstBins(ball, bins, TICK_SECONDS, { ballId: BALL_ID, capturedBin: flight.capturedBin });
       }
@@ -230,26 +271,105 @@ export function bootTicTacToe(root, { random = Math.random } = {}) {
     }
   }
 
+  function submitOnlineAttempt(cell, made) {
+    onlineAttemptPending = onlineClient.submitAttempt({
+      cell,
+      made,
+      expectedAttempt: match.attempts,
+    });
+  }
+
+  function handleOnlineSnapshot(snapshot) {
+    onlineSnapshot = snapshot;
+    renderOnlineLobby();
+    if (mode !== "online" || !snapshot.matchState) return;
+
+    const previousBoard = match?.mode === "online" ? [...match.board] : Array(9).fill(null);
+    const previousAttempts = match?.mode === "online" ? match.attempts : -1;
+    match = snapshot.matchState;
+    if (match.attempts > previousAttempts) onlineAttemptPending = false;
+    for (let cell = 0; cell < match.board.length; cell++) {
+      if (!previousBoard[cell] && match.board[cell]) scoredAt.set(cell, elapsed);
+    }
+    if (gameArea) gameArea.hidden = snapshot.matchState.status === "waiting";
+    if (onlinePanel) onlinePanel.hidden = snapshot.matchState.status !== "waiting";
+    syncAssignment();
+    syncTurnStatus();
+    draw();
+  }
+
+  function syncAssignment() {
+    if (!assignment) return;
+    if (mode === "local") {
+      assignment.textContent = "PLAYER 1: X · PLAYER 2: O";
+      return;
+    }
+    if (mode === "online") {
+      const opponentMark = match?.humanMark === "x" ? "o" : "x";
+      const opponentName = match?.players?.[opponentMark]?.name || "OPPONENT";
+      assignment.textContent = match?.status === "waiting"
+        ? "ONLINE · WAITING FOR MATCH"
+        : `YOU: ${match.humanMark.toUpperCase()} · ${opponentName.toUpperCase()}: ${opponentMark.toUpperCase()}`;
+      return;
+    }
+    assignment.textContent = `YOU: ${match.humanMark.toUpperCase()} · CPU: ${match.cpuMark.toUpperCase()}`;
+  }
+
+  function renderOnlineLobby() {
+    if (!onlinePanel) return;
+    const lobby = onlineSnapshot?.lobby;
+    const identity = accountAccess.identity();
+    const account = root.querySelector("#tttOnlineAccount");
+    if (account) account.textContent = identity?.displayName || "Factory Player";
+    const code = root.querySelector("#tttOnlineRoomCode");
+    if (code) code.textContent = lobby?.roomCode || "-----";
+    const lobbyPanel = root.querySelector("#tttOnlineLobby");
+    const pairing = root.querySelector("#tttOnlinePairing");
+    if (lobbyPanel) lobbyPanel.hidden = !lobby;
+    if (pairing) pairing.hidden = Boolean(lobby);
+
+    const players = root.querySelector("#tttOnlinePlayers");
+    if (players) {
+      const rows = lobby?.players?.length ? lobby.players : [{ name: identity?.displayName || "You" }];
+      players.replaceChildren(...[0, 1].map((index) => {
+        const row = document.createElement("span");
+        row.textContent = rows[index]?.name || "Open slot";
+        return row;
+      }));
+    }
+
+    const start = root.querySelector("#tttOnlineStart");
+    const isOwner = Boolean(lobby && lobby.ownerId === onlineSnapshot.clientId);
+    if (start) start.hidden = !isOwner || lobby?.playerCount < 2 || lobby?.status !== "open";
+    const onlineStatus = root.querySelector("#tttOnlineStatus");
+    if (onlineStatus) onlineStatus.textContent = onlineSnapshot?.error?.message
+      || (onlineSnapshot?.status === "searching" ? "Quick Search: finding an opponent…"
+        : onlineSnapshot?.status === "creating" ? "Opening private room…"
+          : onlineSnapshot?.status === "joining" ? "Joining private room…"
+            : onlineSnapshot?.status === "started" ? "Match started. X shoots first."
+              : onlineSnapshot?.status === "complete" ? "Match complete. Leave to start another online match."
+              : lobby ? (lobby.playerCount >= 2 ? "Both players ready. The host can start." : "Waiting for Player 2…")
+                : "Choose Quick Search or open a private room.");
+  }
+
   function syncTurnStatus() {
     if (match.status === "won" && match.mode === "local") setStatus(`${playerLabel(match, match.winner).toUpperCase()} WINS!`);
+    else if (match.status === "won" && match.mode === "online") setStatus(match.winner === match.humanMark ? "YOU WIN!" : `${onlineOpponentName().toUpperCase()} WINS`);
     else if (match.status === "won") setStatus(match.winner === match.humanMark ? "YOU WIN!" : "CPU WINS");
     else if (match.status === "draw") setStatus("DRAW GAME");
-    else if (match.mode === "local") setStatus(`${playerLabel(match)} (${match.turn.toUpperCase()}) turn · tap an open bin`);
-    else if (match.turn === match.humanMark) setStatus("Your turn · tap an open bin");
+    else if (match.status === "abandoned") setStatus("OPPONENT LEFT · LEAVE THE LOBBY TO PLAY AGAIN");
+    else if (match.status === "waiting") setStatus("Set up an online match below");
+    else if (match.mode === "online" && onlineAttemptPending) setStatus("Sending shot result…");
+    else if (match.mode === "online" && match.turn === match.humanMark) setStatus("Your turn · pull the ball to shoot");
+    else if (match.mode === "online") setStatus(`${onlineOpponentName()} is shooting…`);
+    else if (match.mode === "local") setStatus(`${playerLabel(match)} (${match.turn.toUpperCase()}) turn · pull the ball to shoot`);
+    else if (match.turn === match.humanMark) setStatus("Your turn · pull the ball to shoot");
     else setStatus("CPU is choosing a shot…");
   }
 
-  function closestOpenBin(point) {
-    let best = null;
-    let distance = Infinity;
-    for (const bin of bins) {
-      if (match.board[bin.index]) continue;
-      const screen = projectPoint({ x: bin.x, y: bin.topY, z: bin.z });
-      const d = Math.hypot(point.x - screen.x, point.y - screen.y);
-      const radius = worldToScreenLength(0.24, bin.z);
-      if (d < radius && d < distance) { best = bin.index; distance = d; }
-    }
-    return best;
+  function onlineOpponentName() {
+    const mark = match?.humanMark === "x" ? "o" : "x";
+    return match?.players?.[mark]?.name || "Opponent";
   }
 
   function setPower(power) {
@@ -266,7 +386,7 @@ export function bootTicTacToe(root, { random = Math.random } = {}) {
   function draw() {
     if (!match) return;
     clearScene(ctx);
-    drawRoom(ctx, art.room, "warehouse");
+    drawRoom(ctx, art.room, ROOM_ID);
     drawGrid(ctx);
 
     const occupants = [];
@@ -275,10 +395,10 @@ export function bootTicTacToe(root, { random = Math.random } = {}) {
       if (mark) occupants.push({ type: "mark", z: bin.z, bin, mark });
       else occupants.push({ type: "bin", z: bin.z, bin });
     }
-    if (!ball.splat) occupants.push({ type: "ball", z: ball.z });
+    if (!ball.splat && isTicTacToeBallVisible(flight)) occupants.push({ type: "ball", z: ball.z });
     occupants.sort((a, b) => b.z - a.z);
 
-    drawBallShadow(ctx, ball);
+    if (isTicTacToeBallVisible(flight)) drawBallShadow(ctx, ball);
     for (const occupant of occupants) {
       if (occupant.type === "bin") drawBin(ctx, occupant.bin, art.bin);
       else if (occupant.type === "mark") drawMark(ctx, occupant.bin, art[occupant.mark]);
@@ -290,9 +410,15 @@ export function bootTicTacToe(root, { random = Math.random } = {}) {
         filter: depthGradeFilter(ball.z),
       });
     }
-    if (selected !== null) drawSelection(ctx, bins[selected]);
-    const capturedBin = capturedBinForDraw(flight);
-    if (capturedBin !== null) drawBinFront(ctx, bins[capturedBin], art.bin);
+    if (pull) {
+      const preview = createTicTacToeShot(pull, ball, { weight: ballFlight(BALL_ID).weight });
+      const trajectory = pull.power > 0.03 ? trajectoryPoints(ball, preview.launch) : null;
+      drawAim(ctx, {
+        pull: { ...pull, aimX: preview.aim.x, aimY: preview.aim.y },
+        trajectory,
+        showReticle: false,
+      });
+    }
   }
 
   function frame(now) {
@@ -304,6 +430,13 @@ export function bootTicTacToe(root, { random = Math.random } = {}) {
   }
 
   newMatch();
+  if (mode === "online" && accountAccess.requireAccount()) {
+    const action = params.get("action");
+    if (action === "quick") onlineClient.findQuickMatch();
+    else if (action === "create") onlineClient.createPrivateRoom();
+    else if (action === "join" && params.get("room")) onlineClient.joinPrivateRoom(params.get("room"));
+    else onlineClient.connect();
+  }
   requestAnimationFrame(frame);
   return { get match() { return match; }, bins, ball, newMatch, draw };
 }
@@ -339,27 +472,10 @@ function drawBin(ctx, bin, image) {
   ctx.restore();
 }
 
-function drawBinFront(ctx, bin, image) {
-  if (!image.complete || !image.naturalWidth) return;
-  const rect = binRect(bin, image);
-  const sourceY = image.naturalHeight * 0.145;
-  const destY = rect.y + rect.height * 0.145;
-  ctx.save(); ctx.filter = depthGradeFilter(bin.z);
-  ctx.drawImage(image, 0, sourceY, image.naturalWidth, image.naturalHeight - sourceY, rect.x, destY, rect.width, rect.height * 0.855);
-  ctx.restore();
-}
-
 function drawMark(ctx, bin, image) {
   const centre = projectPoint({ x: bin.x, y: 0.012, z: bin.z });
   const width = worldToScreenLength(0.38, bin.z);
   const height = width * ((image.naturalHeight || 1) / (image.naturalWidth || 1));
   ctx.save(); ctx.globalAlpha = 0.95; ctx.shadowColor = "#fff"; ctx.shadowBlur = 12;
   ctx.drawImage(image, centre.x - width / 2, centre.y - height / 2, width, height); ctx.restore();
-}
-
-function drawSelection(ctx, bin) {
-  const centre = projectPoint({ x: bin.x, y: bin.topY + 0.008, z: bin.z });
-  const rx = worldToScreenLength(bin.mouthRadius + 0.035, bin.z);
-  ctx.save(); ctx.strokeStyle = "#53f6ff"; ctx.lineWidth = 5; ctx.shadowColor = "#53f6ff"; ctx.shadowBlur = 16;
-  ctx.beginPath(); ctx.ellipse(centre.x, centre.y, rx, rx * 0.28, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
 }

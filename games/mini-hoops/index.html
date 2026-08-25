@@ -52,7 +52,7 @@
               <button type="button" class="marquee-option" data-command="hotseat">
                 <span class="marquee-option-index">02</span>
                 <span class="marquee-option-label">Local Hotseat</span>
-                <span class="marquee-option-note">Two players, one court, one timed turn each.</span>
+                <span class="marquee-option-note">Choose Classic Hoops or local Floor Tic-Tac-Toe.</span>
               </button>
               <button id="onlineMenuButton" type="button" class="marquee-option" data-command="online" data-factory-account-feature>
                 <span class="marquee-option-index">03</span>
@@ -69,10 +69,10 @@
                 <span class="marquee-option-label">How to Play</span>
                 <span class="marquee-option-note">Three things to know. That's all of them.</span>
               </button>
-              <a class="marquee-option" href="tic-tac-toe-stage.html">
+              <a class="marquee-option" href="tic-tac-toe-stage.html?mode=cpu">
                 <span class="marquee-option-index">06</span>
-                <span class="marquee-option-label">Tic-Tac-Toe</span>
-                <span class="marquee-option-note">Shoot physical bins against the CPU or a local player.</span>
+                <span class="marquee-option-label">Tic-Tac-Toe vs CPU</span>
+                <span class="marquee-option-note">Pull and shoot directly into nine physical bins.</span>
               </a>
             </nav>
 
@@ -104,23 +104,28 @@
           </figure>
 
           <div class="setup-panels">
-            <fieldset class="panel">
+            <fieldset id="setupGameTypePanel" class="panel">
+              <legend>Game type</legend>
+              <div id="setupGameTypes" class="chip-grid chip-grid--tight"></div>
+            </fieldset>
+
+            <fieldset id="setupModePanel" class="panel">
               <legend>Hoop movement</legend>
               <div id="setupModes" class="chip-grid"></div>
             </fieldset>
 
-            <fieldset class="panel">
+            <fieldset id="setupDurationPanel" class="panel">
               <legend>Round length</legend>
               <div id="setupDurations" class="chip-grid chip-grid--tight"></div>
             </fieldset>
 
-            <fieldset class="panel">
+            <fieldset id="setupBallPanel" class="panel">
               <legend>Ball</legend>
               <p class="panel-note">Every ball flies differently. One board ranks them all, and names the ball you used.</p>
               <div id="setupBalls" class="chip-grid"></div>
             </fieldset>
 
-            <fieldset class="panel">
+            <fieldset id="setupLocationPanel" class="panel">
               <legend>Court</legend>
               <p class="panel-note">Cosmetic. The room never changes the shot.</p>
               <div id="setupLocations" class="chip-grid"></div>
@@ -156,11 +161,15 @@
 
           <fieldset class="panel online-config">
             <legend>Host match config</legend>
+            <label>Game<select id="onlineGameType">
+              <option value="classic">Classic Hoops</option>
+              <option value="tic-tac-toe">Floor Tic-Tac-Toe</option>
+            </select></label>
             <label>Hoop<select id="onlineMode"></select></label>
             <label>Clock<select id="onlineDuration"></select></label>
             <label>Ball<select id="onlineBall"></select></label>
             <label>Court<select id="onlineLocation"></select></label>
-            <p>The host owns these settings. Guests receive the room config from the server.</p>
+            <p id="onlineConfigNote">The host owns these settings. Guests receive the room config from the server.</p>
           </fieldset>
 
           <div id="onlinePairing" class="panel online-pairing">

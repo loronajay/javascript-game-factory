@@ -47,6 +47,7 @@ const MODULES = [
   "scripts/sim/physics.js",
   "scripts/sim/bin-physics.js",
   "scripts/sim/tic-tac-toe.js",
+  "scripts/sim/tic-tac-toe-shot.js",
   "scripts/sim/shot.js",
   "scripts/sim/run.js",
   "scripts/assets/ball-catalog.js",
@@ -64,6 +65,8 @@ const MODULES = [
   "scripts/store/boards-store.js",
   "scripts/store/local-storage.js",
   "scripts/store/preferences.js",
+  "scripts/multiplayer/online-client.js",
+  "scripts/multiplayer/tic-tac-toe-online-client.js",
   "scripts/render/scene.js",
   "scripts/render/hoop.js",
   "scripts/render/ball.js",
@@ -235,10 +238,14 @@ test("every screen the router knows about has a section in the markup", () => {
   }
 });
 
-test("floor tic-tac-toe offers CPU and local multiplayer matches", () => {
-  assert(ticTacToeHtml.includes('id="opponent"'), "tic-tac-toe needs an opponent mode control");
-  assert(ticTacToeHtml.includes('value="cpu"'), "tic-tac-toe needs a CPU option");
-  assert(ticTacToeHtml.includes('value="local"'), "tic-tac-toe needs a local multiplayer option");
+test("floor tic-tac-toe is offered through proper solo, hotseat, and online entry points", () => {
+  assert(html.includes('href="tic-tac-toe-stage.html?mode=cpu"'), "the main menu needs a CPU tic-tac-toe entry");
+  assert(html.includes('id="setupGameTypes"'), "local hotseat setup needs a game-type picker");
+  assert(html.includes('id="onlineGameType"'), "the online lobby needs a game-type picker");
+  assert(!ticTacToeHtml.includes('id="opponent"'), "the game court must not use a mode dropdown");
+  for (const id of ["tttOnlinePanel", "tttOnlineQuick", "tttOnlineCreate", "tttOnlineJoin", "tttOnlineStart", "tttOnlineLeave"]) {
+    assert(ticTacToeHtml.includes(`id="${id}"`), `tic-tac-toe online lobby needs #${id}`);
+  }
 });
 
 test("every button intent in the markup is handled by the composition root", () => {

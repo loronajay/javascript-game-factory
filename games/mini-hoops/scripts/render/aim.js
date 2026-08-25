@@ -14,7 +14,7 @@
 
 import { projectPoint } from "../sim/projection.js";
 
-export function drawAim(ctx, { pull, trajectory }) {
+export function drawAim(ctx, { pull, trajectory, showReticle = true }) {
   ctx.save();
   ctx.lineCap = "round";
 
@@ -49,7 +49,7 @@ export function drawAim(ctx, { pull, trajectory }) {
   ctx.arc(pull.x, pull.y, 4, 0, Math.PI * 2);
   ctx.fill();
 
-  drawReticle(ctx, pull.aimX, pull.aimY);
+  if (showReticle) drawReticle(ctx, pull.aimX, pull.aimY);
 
   if (trajectory) {
     ctx.fillStyle = "rgba(255,255,255,.52)";

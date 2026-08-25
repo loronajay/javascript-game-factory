@@ -1,3 +1,113 @@
+.ttt-cabinet {
+  /* Everything on this page that is not the court: the page head, the match
+     bar, the shot panel, the cabinet padding and the gaps between them. Keep it
+     in step with those, the way `--chrome` is kept in step in `game.css`. */
+  --stage-chrome: 250px;
+
+  /* One width for the whole stack. The head, the match bar, the court and the
+     shot panel are drawn as ONE joined card here — the bar and the panel carry
+     the card's rounded top and bottom — so they cannot be allowed to resolve
+     three different widths. The court is the piece with an aspect ratio, so the
+     height budget is spent on it and the others follow. */
+  /* The floor matters as much as the caps: a short landscape phone would
+     otherwise resolve a court a couple of hundred pixels across. Below the
+     floor the page simply scrolls, which costs a swipe and keeps the court
+     playable. */
+  --stage-width: min(960px, calc(100% - 20px), max(420px, calc((100dvh - var(--stage-chrome)) * 960 / 760)));
+
+  min-height: 100dvh;
+  padding-bottom: 12px;
+}
+
+.stage-back { color: inherit; text-decoration: none; }
+
+/* `.game-screen.is-active` centres its children vertically against a full-height
+   box, which clips the top of anything taller than the viewport — and the page
+   head is the top. This page is a document that may scroll, not a fitted court. */
+.ttt-cabinet .game-screen.is-active {
+  height: auto;
+  justify-content: flex-start;
+}
+
+/* Not `space-between`: `New match` is hidden in online mode, and with two items
+   left that would fling the title to the far edge away from `Back`. The button
+   claims the slack itself instead, so its absence changes nothing else. */
+.ttt-page-head {
+  justify-content: flex-start;
+  width: var(--stage-width);
+  margin-inline: auto;
+}
+
+.ttt-page-head #newMatch { margin-inline-start: auto; }
+
+/* The court is the only thing on the page with a height budget to respect. With
+   it hidden — the online lobby before a match starts — the column goes back to
+   its natural width, and the head follows it rather than staying court-shaped. */
+.ttt-cabinet:has(.ttt-game-area[hidden]) {
+  --stage-width: min(960px, calc(100% - 20px));
+}
+.ttt-page-head > div { min-width: 0; }
+.ttt-page-head h2, .ttt-page-head p { margin: 0; }
+
+.ttt-game-area { width: var(--stage-width); margin-inline: auto; }
+
+.ttt-online-panel {
+  width: min(960px, calc(100% - 20px));
+  margin-inline: auto;
+}
+
+/* Both beat `.game-screen .court` / `.game-screen .shot-panel`, which size
+   themselves independently and would otherwise break the joined card apart. */
+.ttt-game-area .stage-court,
+.ttt-game-area .stage-panel { width: 100%; }
+
+.ttt-game-area[hidden],
+.ttt-online-panel[hidden],
+.ttt-online-lobby[hidden],
+.ttt-online-pairing[hidden],
+.ttt-online-actions[hidden] { display: none; }
+
+.ttt-match-bar {
+  display: grid;
+  /* minmax(0, …) rather than px minimums: the three cells must be allowed to
+     shrink with the stage, or a short landscape viewport blows the bar — and the
+     whole page — sideways. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) minmax(0, .7fr);
+  align-items: center;
+  gap: 14px;
+  min-height: 62px;
+  padding: 9px 16px;
+  border: 1px solid rgba(255,255,255,.13);
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+  background: rgba(20, 11, 9, .96);
+  color: #fff8ef;
+  box-sizing: border-box;
+}
+
+.ttt-match-bar > span { display: grid; gap: 3px; }
+
+.ttt-match-bar small {
+  color: #baaca5;
+  font: 800 .67rem/1.2 system-ui, sans-serif;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.ttt-match-bar > strong {
+  text-align: center;
+  font: 900 clamp(.92rem, 2.4vw, 1.25rem)/1.15 system-ui, sans-serif;
+}
+
+.ttt-match-bar > small:last-child { text-align: right; }
+
+.stage-court {
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+  border-radius: 0;
+}
+
 .stage-court canvas {
   display: block;
   width: 100%;
@@ -6,66 +116,190 @@
   background: #39434b;
 }
 
-.stage-badge {
-  display: block;
-  pointer-events: none;
-}
-
-.ttt-cabinet { min-height: 100dvh; }
-
-.stage-back { color: inherit; text-decoration: none; }
-
-.stage-court { touch-action: none; }
-
-.stage-court .hud-stat--left { min-width: 220px; }
-
-.stage-court .hud-stat--left strong {
-  font-size: clamp(.9rem, 2vw, 1.35rem);
-  white-space: nowrap;
-}
+.stage-court .hud-hint { bottom: 10px; }
 
 .stage-panel {
+  padding: 10px 16px 11px;
+  border-radius: 0 0 14px 14px;
   text-align: center;
 }
 
-.ttt-controls {
+.stage-panel .meter-head { margin-bottom: 0; }
+.stage-panel .meter-legend { margin: 5px 0 0; }
+
+.ttt-online-panel {
+  display: grid;
+  grid-template-columns: minmax(190px, .75fr) minmax(360px, 1.5fr);
+  gap: 14px;
+  padding-top: 18px;
+  color: #d9efff;
+}
+
+.ttt-online-account {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  text-align: left;
+}
+
+.ttt-online-account span,
+.ttt-online-account small {
+  color: #9bb8cc;
+  font: 700 .72rem/1.3 system-ui, sans-serif;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.ttt-online-account strong { font-size: 1.25rem; }
+
+.ttt-online-pairing,
+.ttt-online-actions,
+.ttt-online-code-entry,
+.ttt-online-players {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  margin-bottom: 10px;
-  color: #d9efff;
-  font: 700 .78rem/1 system-ui, sans-serif;
-  letter-spacing: .08em;
-  text-transform: uppercase;
+  flex-wrap: wrap;
 }
 
-.ttt-control-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ttt-control-group[hidden] { display: none; }
-
-.ttt-controls select {
+.ttt-online-code-entry input {
+  width: 118px;
   border: 1px solid rgba(83, 246, 255, .55);
   border-radius: 6px;
   background: #101824;
   color: #fff;
-  padding: 7px 10px;
+  padding: 10px;
+  text-align: center;
+  text-transform: uppercase;
 }
 
-.stage-panel .meter-head {
-  margin-bottom: 0;
+.ttt-online-lobby { grid-column: 2; }
+
+.ttt-online-room-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
 }
 
-.stage-panel .meter-legend {
-  margin-top: 6px;
+.ttt-online-room-heading strong {
+  color: #53f6ff;
+  font-size: 1.4rem;
+  letter-spacing: .14em;
 }
 
-@media (max-width: 600px) {
-  .stage-court .hud-stat--left { min-width: 0; }
-  .ttt-controls { flex-wrap: wrap; }
-  .ttt-control-group { flex-wrap: wrap; justify-content: center; }
+.ttt-online-players { margin-bottom: 12px; }
+
+.ttt-online-players span {
+  min-width: 128px;
+  padding: 10px 12px;
+  border-radius: 7px;
+  background: rgba(83, 246, 255, .1);
+  font-weight: 800;
+  text-align: center;
+}
+
+.ttt-online-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #9bb8cc;
+  text-align: center;
+  font: 700 .82rem/1.4 system-ui, sans-serif;
+}
+
+@media (max-width: 700px) {
+  .ttt-page-head { gap: 8px; padding-inline: 10px; }
+  .ttt-page-head h2 { font-size: 1.05rem; }
+  .ttt-match-bar { grid-template-columns: 1fr auto; gap: 6px 10px; padding: 8px 10px; }
+  .ttt-match-bar > strong { grid-column: 1 / -1; grid-row: 2; }
+  .ttt-match-bar > small:last-child { text-align: right; }
+  .ttt-online-panel { grid-template-columns: 1fr; }
+  .ttt-online-lobby { grid-column: 1; }
+}
+
+/* Sideways there is much less height to spend, so the chrome around the court
+   is squeezed and the court takes what is left.
+
+   What is deliberately NOT done here is capping the canvas by height and
+   letterboxing it with `object-fit`. `ui/pointer.js` maps a pointer back through
+   the element's own box on the assumption that the box IS the 960x760 surface,
+   uniformly scaled — any `object-fit` other than the default silently offsets
+   every aim, which is the exact bug that file was written to prevent. */
+@media (max-height: 760px) and (orientation: landscape) {
+  .ttt-cabinet { --stage-chrome: 200px; }
+  .ttt-page-head { min-height: 54px; padding-block: 7px; }
+  .ttt-page-head h2 { font-size: 1.05rem; }
+  .ttt-match-bar { min-height: 50px; }
+  .stage-panel { padding-block: 8px 9px; }
+  .stage-panel .meter-legend { font-size: .68rem; }
+}
+
+/* --- Opting out of the classic game screen's phone layouts ---------------- */
+
+/* This page borrows `.game-screen`/`.court`/`.shot-panel` for their looks, but
+   it is not the classic game screen: it carries a page head and a match bar the
+   classic screen has never had, and it is a document that may scroll rather than
+   a court fitted to the viewport. `game.css` reshapes those three classes
+   wholesale on a phone — into a two-column grid sideways, and into a
+   height-capped, width-cropped court in portrait — for a DOM that is not this
+   one. Both are undone here rather than fought piecemeal.
+
+   The body deliberately does NOT carry `is-playing`, which is the other half of
+   this: that class locks the viewport and the cabinet to 100dvh, and the head
+   would be the part that goes off the top. */
+
+@media (orientation: landscape) and (max-height: 620px) {
+  .ttt-cabinet .game-screen.is-active {
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: none;
+    height: auto;
+  }
+
+  .ttt-cabinet .stage-court {
+    width: 100%;
+    height: auto;
+    aspect-ratio: auto;
+  }
+
+  .ttt-game-area .stage-panel {
+    display: block;
+    align-self: auto;
+    margin: 0;
+  }
+
+  /* The pill is the only thing telling a first-time player what the gesture is,
+     and unlike the classic court this one has no clock competing for the space. */
+  .ttt-cabinet .hud-hint { display: block; }
+}
+
+@media (orientation: portrait) and (max-width: 700px) {
+  .ttt-cabinet .game-screen.is-active { height: auto; }
+
+  /* A phone is far narrower than it is tall, so a court sized by width leaves
+     half the screen empty. It is given height instead and CROPPED to width —
+     the same trade the classic game screen makes, and made the same way: the
+     canvas is oversized and clipped by the court's `overflow`, never scaled
+     non-uniformly. Its own box stays a true 960x760 rectangle, so `canvasPoint`
+     keeps mapping the pull correctly. The crop is kept modest because the pull
+     itself swings wide of the grid. */
+  .ttt-cabinet .stage-court {
+    width: 100%;
+    height: min(52dvh, 430px);
+    min-height: 0;
+  }
+
+  .ttt-cabinet .stage-court canvas {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: auto;
+    max-width: none;
+    height: 100%;
+    aspect-ratio: auto;
+    transform: translateX(-50%);
+  }
+
+  .ttt-game-area .stage-panel .meter-legend { display: block; }
 }

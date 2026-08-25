@@ -5,51 +5,63 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Mini Hoops — Floor Tic-Tac-Toe</title>
     <link rel="stylesheet" href="styles/game.css" />
+    <link rel="stylesheet" href="styles/online.css" />
     <link rel="stylesheet" href="styles/tic-tac-toe-stage.css" />
   </head>
-  <body class="is-playing">
+  <body>
     <main id="ticTacToe" class="cabinet ttt-cabinet">
       <section class="screen game-screen is-active" aria-label="Floor Tic-Tac-Toe">
-        <div class="court stage-court">
-          <canvas id="stageCourt" width="960" height="760" aria-label="Nine physical bins on a floor Tic-Tac-Toe grid"></canvas>
+        <header class="screen-head ttt-page-head">
+          <a href="index.html" class="ghost-btn stage-back">Back</a>
+          <div>
+            <h2>Floor Tic-Tac-Toe</h2>
+            <p id="tttModeLabel">Vs CPU · medium</p>
+          </div>
+          <button id="newMatch" type="button" class="ghost-btn">New match</button>
+        </header>
 
-          <div class="hud">
-            <a href="index.html" class="hud-menu stage-back">MENU</a>
-            <div class="hud-clock">
-              <span class="hud-clock-mode">FLOOR TIC-TAC-TOE</span>
-              <span id="tttStatus" class="hud-clock-time">Your turn</span>
-            </div>
-            <div class="hud-stat hud-stat--left">
-              <small>ASSIGNMENT</small>
-              <strong id="tttAssignment">YOU: X · CPU: O</strong>
-              <span>three in a row wins</span>
+        <section id="tttOnlinePanel" class="ttt-online-panel" aria-label="Online Tic-Tac-Toe lobby" hidden>
+          <div class="ttt-online-account panel">
+            <span>Signed in as</span>
+            <strong id="tttOnlineAccount">Factory Player</strong>
+            <small>Floor Tic-Tac-Toe matchmaking</small>
+          </div>
+          <div id="tttOnlinePairing" class="ttt-online-pairing panel">
+            <button id="tttOnlineQuick" type="button" class="primary-btn">Quick Search</button>
+            <button id="tttOnlineCreate" type="button" class="ghost-btn">Create Private Room</button>
+            <div class="ttt-online-code-entry">
+              <input id="tttOnlineRoomInput" maxlength="8" autocomplete="off" placeholder="ROOM CODE" aria-label="Tic-Tac-Toe room code" />
+              <button id="tttOnlineJoin" type="button" class="ghost-btn">Join Room</button>
             </div>
           </div>
-          <p class="hud-hint">Tap an open bin · pull the ball · release to shoot</p>
-        </div>
-
-        <div class="shot-panel stage-panel">
-          <div class="ttt-controls">
-            <span class="ttt-control-group">
-              <label for="opponent">Mode</label>
-              <select id="opponent">
-                <option value="cpu">Vs CPU</option>
-                <option value="local">Local 2 Player</option>
-              </select>
-            </span>
-            <span id="difficultyControls" class="ttt-control-group">
-              <label for="difficulty">CPU difficulty</label>
-              <select id="difficulty">
-                <option value="easy">Easy</option>
-                <option value="medium" selected>Medium</option>
-                <option value="hard">Hard</option>
-              </select>
-            </span>
-            <button id="newMatch" type="button" class="ghost-btn ghost-btn--small">New match</button>
+          <div id="tttOnlineLobby" class="ttt-online-lobby panel" hidden>
+            <div class="ttt-online-room-heading"><span>Room</span><strong id="tttOnlineRoomCode">-----</strong></div>
+            <div id="tttOnlinePlayers" class="ttt-online-players"></div>
+            <div class="ttt-online-actions">
+              <button id="tttOnlineStart" type="button" class="primary-btn" hidden>Start Match</button>
+              <button id="tttOnlineLeave" type="button" class="ghost-btn">Leave Lobby</button>
+            </div>
           </div>
-          <div class="meter-head"><span>SHOT POWER</span><span id="tttMeterReadout">0%</span></div>
-          <div class="meter" aria-label="Shot power"><div id="tttMeterFill" class="meter-fill"></div></div>
-          <p class="meter-legend">A clean entry falls behind the front wall · scored bins become marks after one second</p>
+          <p id="tttOnlineStatus" class="ttt-online-status" aria-live="polite">Choose Quick Search or open a private room.</p>
+        </section>
+
+        <div id="tttGameArea" class="ttt-game-area">
+          <div id="tttMatchBar" class="ttt-match-bar">
+            <span><small>Assignment</small><strong id="tttAssignment">YOU: X · CPU: O</strong></span>
+            <strong id="tttStatus" aria-live="polite">Your turn · pull the ball to shoot</strong>
+            <small>Three in a row wins</small>
+          </div>
+
+          <div class="court stage-court">
+            <canvas id="stageCourt" width="960" height="760" aria-label="Nine open physical bins on a floor Tic-Tac-Toe grid"></canvas>
+            <p id="tttHint" class="hud-hint">Pull the ball · use the dotted line · release to shoot</p>
+          </div>
+
+          <div class="shot-panel stage-panel">
+            <div class="meter-head"><span>SHOT POWER</span><span id="tttMeterReadout">0%</span></div>
+            <div class="meter" aria-label="Shot power"><div id="tttMeterFill" class="meter-fill"></div></div>
+            <p class="meter-legend">≈ 50% front row · 70% middle · 90% back</p>
+          </div>
         </div>
       </section>
     </main>

@@ -15,6 +15,8 @@ function options(select, values, valueOf, labelOf) {
 }
 
 export function createOnlineView(root, callbacks = {}) {
+  const gameTypeInput = root.querySelector("#onlineGameType");
+  const configNote = root.querySelector("#onlineConfigNote");
   const configInputs = {
     modeId: root.querySelector("#onlineMode"),
     duration: root.querySelector("#onlineDuration"),
@@ -33,15 +35,34 @@ export function createOnlineView(root, callbacks = {}) {
     locationId: configInputs.locationId?.value,
   });
   Object.values(configInputs).forEach((input) => input?.addEventListener("change", () => callbacks.onConfig?.(readConfig())));
-  root.querySelector("#onlineQuick")?.addEventListener("click", () => callbacks.onQuick?.(readConfig()));
-  root.querySelector("#onlineCreate")?.addEventListener("click", () => callbacks.onCreate?.(readConfig()));
-  root.querySelector("#onlineJoin")?.addEventListener("click", () => callbacks.onJoin?.(normalizeRoomCode(root.querySelector("#onlineRoomInput")?.value)));
+  const isTicTacToe = () => gameTypeInput?.value === "tic-tac-toe";
+  const routeTicTacToe = (action) => callbacks.onTicTacToe?.({
+    action,
+    roomCode: normalizeRoomCode(root.querySelector("#onlineRoomInput")?.value),
+  });
+  root.querySelector("#onlineQuick")?.addEventListener("click", () => isTicTacToe() ? routeTicTacToe("quick") : callbacks.onQuick?.(readConfig()));
+  root.querySelector("#onlineCreate")?.addEventListener("click", () => isTicTacToe() ? routeTicTacToe("create") : callbacks.onCreate?.(readConfig()));
+  root.querySelector("#onlineJoin")?.addEventListener("click", () => isTicTacToe() ? routeTicTacToe("join") : callbacks.onJoin?.(normalizeRoomCode(root.querySelector("#onlineRoomInput")?.value)));
   root.querySelector("#onlineStart")?.addEventListener("click", () => callbacks.onStart?.());
   root.querySelector("#onlineLeave")?.addEventListener("click", () => callbacks.onLeave?.());
   root.querySelector("#onlineRoomInput")?.addEventListener("input", (event) => { event.target.value = normalizeRoomCode(event.target.value); });
+  gameTypeInput?.addEventListener("change", renderGameType);
+
+  // Floor Tic-Tac-Toe has no hoop, no clock, and a fixed room and ball, so the
+  // rows that describe a classic run are put away rather than left offering
+  // settings the tic-tac-toe stage never reads.
+  function renderGameType() {
+    const ticTacToe = isTicTacToe();
+    for (const input of Object.values(configInputs)) {
+      input?.closest("label")?.toggleAttribute("hidden", ticTacToe);
+    }
+    configNote?.toggleAttribute("hidden", ticTacToe);
+  }
+  renderGameType();
 
   return {
     render({ snapshot, config, identity, rating }) {
+      renderGameType();
       const lobby = snapshot?.lobby;
       const effective = normalizeMatchConfig(lobby?.settings || config);
       for (const [key, input] of Object.entries(configInputs)) if (input) input.value = String(effective[key]);

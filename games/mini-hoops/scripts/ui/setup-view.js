@@ -19,7 +19,13 @@ import { BALLS, ballFlightStats } from "../assets/ball-catalog.js";
 import { LOCATIONS, locationBackdropPath, locationById } from "../assets/location-catalog.js";
 import { ROUND_DURATIONS } from "../sim/constants.js";
 import { HOOP_MODES, hoopModeById } from "../sim/hoop.js";
+import { TIC_TAC_TOE_FIXED_SETUP } from "../sim/tic-tac-toe.js";
 import { ballById } from "../assets/ball-catalog.js";
+
+const GAME_TYPES = Object.freeze([
+  Object.freeze({ id: "classic", label: "Classic Hoops", blurb: "Timed turns on the regular rim." }),
+  Object.freeze({ id: "tic-tac-toe", label: "Floor Tic-Tac-Toe", blurb: "Shoot the real bin rims; three in a row wins." }),
+]);
 
 /** How a round length is written for a human. */
 export function durationLabel(seconds) {
@@ -38,6 +44,11 @@ export function describeSetup({ modeId, duration, locationId, ballId }) {
 
 export function createSetupView(root, { onSelect = () => {} } = {}) {
   const groups = {
+    game: buildGroup(root.querySelector("#setupGameTypes"), GAME_TYPES, (game) => ({
+      value: game.id,
+      label: game.label,
+      note: game.blurb,
+    })),
     mode: buildGroup(root.querySelector("#setupModes"), HOOP_MODES, (mode) => ({
       value: mode.id,
       label: mode.label,
@@ -72,21 +83,45 @@ export function createSetupView(root, { onSelect = () => {} } = {}) {
   const preview = root.querySelector("#setupPreview");
   const previewName = root.querySelector("#setupPreviewName");
   const summary = root.querySelector("#setupSummary");
+  const gameTypePanel = root.querySelector("#setupGameTypePanel");
+  // The four pickers that only describe a classic run.
+  const classicPanels = [
+    "#setupModePanel",
+    "#setupDurationPanel",
+    "#setupBallPanel",
+    "#setupLocationPanel",
+  ].map((selector) => root.querySelector(selector));
 
   return {
     /** Reflect the current selection across every picker and the preview. */
     render(selection) {
+      // The game type is only ever offered on the hotseat setup, and the choice
+      // is remembered — so the mode is read from BOTH, or a player who picked
+      // tic-tac-toe once would find a solo setup screen with no pickers on it.
+      const ticTacToe = selection.playMode === "hotseat" && selection.gameType === "tic-tac-toe";
+      const shown = ticTacToe ? TIC_TAC_TOE_FIXED_SETUP : selection;
+
+      markActive(groups.game, selection.gameType || "classic");
       markActive(groups.mode, selection.modeId);
       markActive(groups.duration, String(selection.duration));
       markActive(groups.location, selection.locationId);
       markActive(groups.ball, selection.ballId);
 
       if (preview) {
-        preview.src = locationBackdropPath(selection.locationId);
-        preview.alt = `${locationById(selection.locationId).label} court`;
+        preview.src = locationBackdropPath(shown.locationId);
+        preview.alt = `${locationById(shown.locationId).label} court`;
       }
-      if (previewName) previewName.textContent = locationById(selection.locationId).label;
-      if (summary) summary.textContent = describeSetup(selection);
+      if (previewName) previewName.textContent = locationById(shown.locationId).label;
+      // Not `describeSetup`: three of its four fields do not exist in this mode,
+      // and printing the remembered classic ones under a tic-tac-toe start
+      // button would promise a room, a ball and a clock the stage never reads.
+      if (summary) {
+        summary.textContent = ticTacToe
+          ? `Two players · ${locationById(shown.locationId).label} · ${ballById(shown.ballId).label}`
+          : describeSetup(selection);
+      }
+      if (gameTypePanel) gameTypePanel.hidden = selection.playMode !== "hotseat";
+      for (const panel of classicPanels) if (panel) panel.hidden = ticTacToe;
     },
   };
 }

@@ -15,6 +15,13 @@ import {
 import { floorScreenY } from "../scripts/sim/projection.js";
 
 const gameRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const gameSource = fs.readFileSync(path.join(gameRoot, "scripts", "tic-tac-toe-game.js"), "utf8");
+const gameHtml = fs.readFileSync(path.join(gameRoot, "tic-tac-toe-stage.html"), "utf8");
+const stageCss = fs.readFileSync(path.join(gameRoot, "styles", "tic-tac-toe-stage.css"), "utf8");
+const onlineCss = fs.readFileSync(path.join(gameRoot, "styles", "online.css"), "utf8");
+const indexHtml = fs.readFileSync(path.join(gameRoot, "index.html"), "utf8");
+const setupViewSource = fs.readFileSync(path.join(gameRoot, "scripts", "ui", "setup-view.js"), "utf8");
+const onlineViewSource = fs.readFileSync(path.join(gameRoot, "scripts", "ui", "online-view.js"), "utf8");
 
 suite("tic-tac-toe stage — canonical room perspective proof");
 
@@ -85,6 +92,87 @@ test("a scored cell replaces its bin with one neon mark", () => {
   assertEqual(scored.length, 5);
   assertEqual(openTargets.length, 4);
   assertEqual(new Set(scored.map(({ row, column }) => `${row}:${column}`)).size, 5);
+});
+
+test("gameplay starts from the ball and shows the normal trajectory guide", () => {
+  assert(!gameSource.includes("closestOpenBin"), "shooting must not start by clicking a bin");
+  assert(!gameSource.includes("drawSelection"), "the fake selection ring must not be rendered");
+  assert(gameSource.includes("drawAim"), "tic-tac-toe must reuse the normal aiming overlay");
+  assert(gameSource.includes("trajectoryPoints"), "tic-tac-toe must preview the physical shot arc");
+});
+
+test("the court has no opponent dropdown or below-court mode switch", () => {
+  assert(!gameHtml.includes('id="opponent"'), "match type belongs in the proper setup flow");
+  assert(!gameHtml.includes("Tap an open bin"), "every open bin is already playable");
+  assert(gameHtml.includes('id="tttMatchBar"'), "turn and assignment UI should live outside the canvas");
+});
+
+// ---------------------------------------------------------------------------
+// Screen layout. These are the few facts about it that a unit test CAN hold:
+// the page's relationship to `game.css`, which reshapes the classes this page
+// borrows for a DOM that is not this one. The look itself is still checked by
+// driving real viewports — see `## The screen fits` in CLAUDE.md.
+// ---------------------------------------------------------------------------
+
+test("the court is never scaled non-uniformly", () => {
+  // `ui/pointer.js` maps a pointer back through the canvas element's own box on
+  // the assumption that the box IS the 960x760 surface. `object-fit` breaks that
+  // and offsets every aim — silently, and only on the viewports that trigger it.
+  assert(!/object-fit\s*:/.test(stageCss), "the stage canvas must not be letterboxed or cropped by object-fit");
+});
+
+test("the stage does not borrow the classic game screen's viewport lock", () => {
+  // `is-playing` pins the cabinet to 100dvh, and the page head — which the
+  // classic game screen does not have — is what goes off the top.
+  assert(!gameHtml.includes("is-playing"), "the stage body must not carry is-playing");
+  assert(stageCss.includes(".ttt-cabinet .game-screen.is-active"), "the centred, full-height game screen must be undone");
+  for (const query of ["(orientation: landscape) and (max-height: 620px)", "(orientation: portrait) and (max-width: 700px)"]) {
+    assert(stageCss.includes(query), `game.css reshapes this page at ${query}; the stage must answer it`);
+  }
+});
+
+test("the head, the match bar, the court and the meter resolve one width", () => {
+  // They are drawn as one joined card — the bar carries its rounded top and the
+  // meter its rounded bottom — so three independent widths read as a broken box.
+  assert(stageCss.includes("--stage-width"), "the stage needs one declared width");
+  assert(/\.ttt-page-head\s*{[^}]*width: var\(--stage-width\)/.test(stageCss), "the page head must take the stage width");
+  assert(/\.ttt-game-area\s*{[^}]*width: var\(--stage-width\)/.test(stageCss), "the game area must take the stage width");
+  for (const selector of [".ttt-game-area .stage-court", ".ttt-game-area .stage-panel"]) {
+    assert(stageCss.includes(selector), `${selector} must be pinned to the stage width, not left to size itself`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Entry points. Tic-tac-toe reaches the stage from three places, and each one
+// has to stop offering the settings the stage does not read.
+// ---------------------------------------------------------------------------
+
+test("the room and the ball this mode fixes have exactly one owner", () => {
+  assert(gameSource.includes("TIC_TAC_TOE_FIXED_SETUP"), "the stage must read the fixed setup rather than restating it");
+  assert(!/"warehouse"/.test(gameSource), "the room id must not be a literal in the composition root");
+  assert(!/BALL_ID = "/.test(gameSource), "the ball id must not be a literal in the composition root");
+  assert(setupViewSource.includes("TIC_TAC_TOE_FIXED_SETUP"), "the setup screen must describe the mode from the same record");
+});
+
+test("a tic-tac-toe hotseat puts the classic pickers away", () => {
+  for (const id of ["setupModePanel", "setupDurationPanel", "setupBallPanel", "setupLocationPanel"]) {
+    assert(indexHtml.includes(`id="${id}"`), `the setup screen needs #${id} to be addressable`);
+    assert(setupViewSource.includes(`#${id}`), `the setup view must be able to hide #${id}`);
+  }
+  // Read from BOTH, or a player who once picked tic-tac-toe finds a solo setup
+  // screen with no pickers left on it.
+  assert(
+    setupViewSource.includes('selection.playMode === "hotseat" && selection.gameType === "tic-tac-toe"'),
+    "the tic-tac-toe setup must be gated on the play mode as well as the game type",
+  );
+});
+
+test("an online config row that is hidden actually hides", () => {
+  // `.online-config label` sets `display: grid`, which beats the UA stylesheet's
+  // `[hidden]` — so `toggleAttribute("hidden")` alone changes nothing on screen.
+  assert(onlineViewSource.includes('toggleAttribute("hidden"'), "the online view must be able to hide a config row");
+  assert(/\.online-config label\[hidden\][^{]*{\s*display: none/.test(onlineCss), "a hidden config row needs its display reset");
+  assert(indexHtml.includes('id="onlineConfigNote"'), "the note describing those rows must be addressable too");
 });
 
 finish();

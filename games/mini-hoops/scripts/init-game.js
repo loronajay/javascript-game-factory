@@ -91,6 +91,7 @@ export function boot(root) {
   let run = createRun(preferences.snapshot());
   let playMode = "solo";
   let hotseat = null;
+  let setupGameType = "classic";
   let onlineSnapshot = null;
   let onlineRating = null;
   let onlineMatchKey = "";
@@ -160,6 +161,11 @@ export function boot(root) {
     onQuick: (config) => onlineClient.findQuickMatch(config),
     onCreate: (config) => onlineClient.createPrivateRoom(config),
     onJoin: (code) => code && onlineClient.joinPrivateRoom(code),
+    onTicTacToe: ({ action, roomCode }) => {
+      const query = new URLSearchParams({ mode: "online", action });
+      if (roomCode) query.set("room", roomCode);
+      globalThis.location.href = `tic-tac-toe-stage.html?${query}`;
+    },
     onConfig: (config) => {
       if (onlineSnapshot?.lobby?.ownerId === onlineSnapshot.clientId) onlineClient.updateConfig(config);
     },
@@ -209,15 +215,20 @@ export function boot(root) {
   }
 
   function renderSetup() {
-    setup.render(preferences.snapshot());
+    setup.render({ ...preferences.snapshot(), gameType: setupGameType, playMode });
     const title = root.querySelector("#setupTitle");
     const intro = root.querySelector("#setupIntro");
     const start = root.querySelector("#setupStartButton");
     if (title) title.textContent = playMode === "hotseat" ? "Set Up Hotseat" : "Set Up the Run";
-    if (intro) intro.textContent = playMode === "hotseat"
-      ? "Player 1 takes a full timed turn, then passes the court to Player 2."
-      : "The clock starts on your first real pull, not before.";
-    if (start) start.textContent = playMode === "hotseat" ? "Start Player 1" : "Start Run";
+    const ticTacToe = playMode === "hotseat" && setupGameType === "tic-tac-toe";
+    if (intro) intro.textContent = ticTacToe
+      ? "Two players alternate shots at the nine bins. Three in a row wins — there is no clock."
+      : playMode === "hotseat"
+        ? "Player 1 takes a full timed turn, then passes the court to Player 2."
+        : "The clock starts on your first real pull, not before.";
+    if (start) start.textContent = ticTacToe
+      ? "Start Tic-Tac-Toe"
+      : playMode === "hotseat" ? "Start Player 1" : "Start Run";
   }
 
   function renderBoards() {
@@ -557,7 +568,8 @@ export function boot(root) {
   }
 
   function handleSetupSelect(kind, value) {
-    if (kind === "mode") preferences.setMode(value);
+    if (kind === "game") setupGameType = value === "tic-tac-toe" ? value : "classic";
+    else if (kind === "mode") preferences.setMode(value);
     else if (kind === "duration") preferences.setDuration(Number(value));
     else if (kind === "location") preferences.setLocation(value);
     else if (kind === "ball") preferences.setBall(value);
@@ -577,6 +589,10 @@ export function boot(root) {
         screens.back();
         break;
       case "start":
+        if (playMode === "hotseat" && setupGameType === "tic-tac-toe") {
+          globalThis.location.href = "tic-tac-toe-stage.html?mode=local";
+          break;
+        }
         if (playMode === "hotseat") hotseat = createHotseatDuel(preferences.snapshot());
         startRun(hotseat?.config || preferences.snapshot());
         break;

@@ -19,8 +19,17 @@ export function difficultyById(id) {
   return DIFFICULTIES.find((difficulty) => difficulty.id === id) || DIFFICULTIES[1];
 }
 
+// Floor Tic-Tac-Toe is not a configurable run. It is always this room and this
+// ball, so none of the classic pickers — hoop movement, round length, ball,
+// court — mean anything to it. Stated here, once, rather than as literals in the
+// composition root that the setup screen would then have to guess at.
+export const TIC_TAC_TOE_FIXED_SETUP = Object.freeze({
+  locationId: "warehouse",
+  ballId: "basketball",
+});
+
 export function createTicTacToeMatch({ mode = "cpu", humanMark = "x", difficulty = "medium" } = {}) {
-  const matchMode = mode === "local" ? "local" : "cpu";
+  const matchMode = mode === "local" || mode === "online" ? mode : "cpu";
   const human = matchMode === "local" ? "x" : (humanMark === "o" ? "o" : "x");
   return {
     board: Array(9).fill(null),
@@ -42,6 +51,7 @@ export function isHumanControlledTurn(match) {
 
 export function playerLabel(match, mark = match?.turn) {
   if (match?.mode === "local") return mark === "o" ? "Player 2" : "Player 1";
+  if (match?.mode === "online") return mark === match?.humanMark ? "You" : "Opponent";
   return mark === match?.humanMark ? "You" : "CPU";
 }
 

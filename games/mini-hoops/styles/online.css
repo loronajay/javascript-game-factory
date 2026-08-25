@@ -16,6 +16,9 @@
   background: #17110f; color: var(--ink); font: inherit;
 }
 .online-config p { grid-column: 1 / -1; margin: 0; color: var(--ink-dim); font-size: 12px; }
+/* `display: grid` on the label beats the UA stylesheet's `[hidden]`, so hiding a
+   config row from script does nothing without this. Same reason as the strip below. */
+.online-config label[hidden], .online-config p[hidden] { display: none; }
 .online-pairing, .online-lobby { grid-column: 1 / -1; display: grid; gap: 10px; }
 .online-code-entry { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .online-room-heading { display: flex; justify-content: space-between; align-items: baseline; }

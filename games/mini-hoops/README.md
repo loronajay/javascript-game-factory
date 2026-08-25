@@ -27,6 +27,10 @@ Online matches run through the sibling `full-games/factory-network-server` repo.
 The browser submits normalized pull intent only; that server replays the mirrored
 Mini Hoops physics, owns scores and the deadline, and publishes the final winner.
 
+Floor Tic-Tac-Toe supports CPU, local two-player, and signed-in Factory Network
+online play. Its Quick Search and private rooms use a dedicated game ID, so those
+players never enter the regular timed-score matchmaking pool.
+
 ## Test
 
 ```powershell
