@@ -9,7 +9,13 @@
 //   - the ball at a ladder of depths, with its shadow, through the real
 //     projection — so a ball at z=1 landing anywhere but against the painted
 //     skirting is immediately obvious;
-//   - the wall base and horizon as lines, and the occluder polygons as outlines.
+//   - the wall base, ceiling and horizon as lines, and the occluder polygons as
+//     outlines.
+//
+// The ceiling line is the one to look at hardest. It is a single world height
+// for all five rooms — the rooms are not painted with the same ceiling height,
+// so it cannot sit on every cornice — and this is how you check the compromise
+// still reads as a ceiling in each of them rather than as thin air.
 //
 // `--grid` swaps all of that for a labelled 60px coordinate grid over the bare
 // art, which is how the occluder polygons get traced in the first place: read
@@ -176,6 +182,7 @@ for (const room of rooms) {
       ctx.textAlign = "left";
       ctx.fillText(label, 8, y - 6);
     };
+    line(projection.ceilingScreenY(1), "#ff9f5a", `ceiling at the wall ${projection.ceilingScreenY(1).toFixed(0)}`);
     line(constants.HORIZON_SCREEN_Y, "#5ad1ff", `horizon ${constants.HORIZON_SCREEN_Y}`);
     line(constants.WALL_BASE_SCREEN_Y, "#7bff8a", `wall base ${constants.WALL_BASE_SCREEN_Y}`);
     line(constants.FLOOR_SCREEN_Y, "#ffd166", `floor at z=0 ${constants.FLOOR_SCREEN_Y}`);

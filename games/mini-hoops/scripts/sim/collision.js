@@ -15,6 +15,8 @@ import {
   BALL_RADIUS_WORLD,
   BOARD_RESTITUTION,
   BOARD_Z,
+  CEILING_RESTITUTION,
+  CEILING_Y,
   FLOOR_RESTITUTION,
   RIM_FRICTION,
   RIM_RADIUS_WORLD,
@@ -54,6 +56,7 @@ function restitution(base, flight) {
 export const CONTACT_RIM = "rim";
 export const CONTACT_BACKBOARD = "backboard";
 export const CONTACT_WALL = "wall";
+export const CONTACT_CEILING = "ceiling";
 export const CONTACT_FLOOR = "floor";
 
 // How hard the ball has to be moving into the floor to bounce rather than settle.
@@ -76,6 +79,11 @@ const BOARD_SPIN_FROM_SLIDE = 0.045;
 // Bare wall is dead by comparison — no bounce worth chasing.
 const WALL_TANGENT_KEEP_X = 0.84;
 const WALL_TANGENT_KEEP_Y = 0.8;
+// The ceiling scrubs sideways and forward speed the way the wall does, but it
+// keeps most of the ball's depth: a heave that clips the ceiling should still
+// arrive at the wall, just lower and slower.
+const CEILING_TANGENT_KEEP_X = 0.86;
+const CEILING_TANGENT_KEEP_Z = 0.88;
 // Nudge applied when un-penetrating, so the ball is not left exactly touching
 // and immediately re-colliding on the next substep.
 const SEPARATION_EPSILON = 0.0015;
@@ -196,6 +204,25 @@ export function resolveBackWallContact(ball, previousZ, hoopWorld, boardBounds, 
   ball.vx *= WALL_TANGENT_KEEP_X;
   ball.vy *= WALL_TANGENT_KEEP_Y;
   return CONTACT_WALL;
+}
+
+/**
+ * The ceiling.
+ *
+ * The floor's mirror image, and much simpler than it: there is no settling case,
+ * because nothing rests against a ceiling. It is checked on every substep rather
+ * than only while the shot is live — a ball is inside the room whether or not it
+ * has already scored.
+ */
+export function resolveCeilingContact(ball, flight = NEUTRAL_FLIGHT) {
+  const contactY = CEILING_Y - BALL_RADIUS_WORLD;
+  if (ball.y <= contactY) return null;
+
+  ball.y = contactY - SEPARATION_EPSILON;
+  ball.vy = -Math.abs(ball.vy) * restitution(CEILING_RESTITUTION, flight);
+  ball.vx *= CEILING_TANGENT_KEEP_X;
+  ball.vz *= CEILING_TANGENT_KEEP_Z;
+  return CONTACT_CEILING;
 }
 
 /**

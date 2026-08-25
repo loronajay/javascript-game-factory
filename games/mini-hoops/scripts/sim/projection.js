@@ -24,6 +24,7 @@
 import {
   BALL_MIN_SCREEN_RADIUS,
   BALL_SCREEN_RADIUS,
+  CEILING_Y,
   DEPTH_FALLOFF,
   FLOOR_SCREEN_Y,
   FLOOR_Y,
@@ -67,6 +68,19 @@ export function projectPoint({ x, y, z }) {
     y: floorScreenY(z) - (y - FLOOR_Y) * PROJECTION_Y_SCALE * scale,
     scale,
   };
+}
+
+/**
+ * The scanline the ceiling crosses at depth `z`.
+ *
+ * The floor line's mirror: it converges on the same horizon from above, because
+ * both planes are horizontal and a camera has one vanishing line for all of
+ * them. Nothing in the game is drawn from this — the ceiling is painted — but it
+ * is what `tools/room-contact-sheet.mjs` draws to check that the height the
+ * physics stops the ball at is the height the art puts the ceiling at.
+ */
+export function ceilingScreenY(z) {
+  return projectPoint({ x: 0, y: CEILING_Y, z }).y;
 }
 
 /**

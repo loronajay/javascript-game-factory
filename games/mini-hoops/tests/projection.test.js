@@ -4,6 +4,7 @@ import {
   BALL_MIN_SCREEN_RADIUS,
   BALL_SCREEN_RADIUS,
   BOARD_Z,
+  WALL_TOP_SCREEN_Y,
   FLOOR_SCREEN_Y,
   HORIZON_SCREEN_Y,
   PROJECTION_ORIGIN_X,
@@ -12,6 +13,7 @@ import {
 } from "../scripts/sim/constants.js";
 import {
   ballScreenRadius,
+  ceilingScreenY,
   depthScaleAt,
   floorScreenY,
   projectPoint,
@@ -61,6 +63,30 @@ test("the floor line stays below the horizon at every depth, clamp included", ()
     assert(floorScreenY(z) > HORIZON_SCREEN_Y, `the floor line crossed the horizon at z=${z}`);
   }
   assert(floorScreenY(1e6) <= floorScreenY(1), "past the wall the floor line must not come back down");
+});
+
+test("the ceiling closes the room, converging on the same horizon from above", () => {
+  // Two horizontal planes, one camera, one vanishing line. If the ceiling ever
+  // stopped mirroring the floor about the horizon it would mean the room had
+  // acquired a second camera, which is the failure the whole file exists to
+  // make impossible.
+  for (const z of [0, 0.5, 1, 1.22]) {
+    assert(ceilingScreenY(z) < HORIZON_SCREEN_Y, `the ceiling dropped below the horizon at z=${z}`);
+    assert(ceilingScreenY(z) < floorScreenY(z), `the ceiling is under the floor at z=${z}`);
+    assertClose(
+      (HORIZON_SCREEN_Y - ceilingScreenY(z)) / (HORIZON_SCREEN_Y - ceilingScreenY(0)),
+      depthScaleAt(z),
+      1e-9,
+      `the ceiling line disagrees with the depth scale at z=${z}`,
+    );
+  }
+});
+
+test("the ceiling meets the back wall on the scanline it was measured from", () => {
+  // `CEILING_Y` is derived from `WALL_TOP_SCREEN_Y` through the camera, so this
+  // is the round trip: the world height the physics stops the ball at draws back
+  // onto the row of paint it came from.
+  assertClose(ceilingScreenY(BOARD_Z), WALL_TOP_SCREEN_Y, 1e-9);
 });
 
 test("the back wall meets the floor on the scanline the rooms are aligned to", () => {

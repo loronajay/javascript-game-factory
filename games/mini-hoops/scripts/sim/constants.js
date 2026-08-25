@@ -66,12 +66,27 @@ export const DEPTH_FALLOFF = 1.0;
 // and every room follows it; nothing re-measures the art.
 export const WALL_BASE_SCREEN_Y = HORIZON_SCREEN_Y + (FLOOR_SCREEN_Y - HORIZON_SCREEN_Y) / (1 + DEPTH_FALLOFF);
 
+// Where the ceiling meets that same back wall. Measured off the art like the
+// rest of the camera, and the one number in this block that is a COMPROMISE
+// rather than a reading: the five rooms genuinely have five different ceiling
+// heights (the warehouse's visible wall stops at y=129 under its steel, the
+// detention room's runs to y=47), and a room may not change the physics. This
+// is close to the middle of them, which puts the bounce within about half a
+// ball of the paint in every room instead of matching one and insulting four.
+export const WALL_TOP_SCREEN_Y = 78;
+
 // Draw radius of the ball sprite at z = 0, and the floor it never shrinks past.
 export const BALL_SCREEN_RADIUS = 29;
 export const BALL_MIN_SCREEN_RADIUS = 12.5;
 
 // --- World geometry ---------------------------------------------------------
 export const FLOOR_Y = 0;
+// The height of the room, derived from the two screen lines above rather than
+// dialled in: it is the world distance between the floor and the ceiling where
+// they both meet the back wall, which is the one depth the camera measures them
+// at exactly. THE ROOM IS CLOSED — before this the ball simply left through the
+// ceiling on a full-power heave and came back down through the paint.
+export const CEILING_Y = ((WALL_BASE_SCREEN_Y - WALL_TOP_SCREEN_Y) * (1 + DEPTH_FALLOFF)) / PROJECTION_Y_SCALE;
 export const GRAVITY = 9.0;
 export const BALL_RADIUS_WORLD = 0.078;
 export const BOARD_Z = 1.0;
@@ -83,6 +98,10 @@ export const RIM_TUBE_RADIUS = 0.026;
 export const RIM_RESTITUTION = 0.62;
 export const BOARD_RESTITUTION = 0.68;
 export const WALL_RESTITUTION = 0.3;
+// Plaster overhead. Deader than the wall, because a ball that came off the
+// ceiling with any life in it would turn a wild heave into a second free route
+// through the hoop, and the cabinet already has exactly one lucky shot.
+export const CEILING_RESTITUTION = 0.26;
 export const FLOOR_RESTITUTION = 0.43;
 // How much tangential speed the rim scrubs off on contact. Low, but non-zero is
 // what makes a rattle settle instead of pinballing forever.

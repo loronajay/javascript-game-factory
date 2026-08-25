@@ -186,6 +186,11 @@ export function createGameAudio({
       } else if (name === "wall") {
         // Bare plaster, not the board: same impact, duller and quieter.
         engine.play("backboard", { gain: ball.apparatusGain * 0.5, rate: ball.apparatusRate * 0.82 });
+      } else if (name === "ceiling") {
+        // Also plaster, and further away than the wall ever is — duller again
+        // and pitched down. A ceiling does not need a recording of its own; it
+        // needs to sound like something the ball hit above your head.
+        engine.play("backboard", { gain: ball.apparatusGain * 0.38, rate: ball.apparatusRate * 0.7 });
       } else if (name === "floor" && speed > BOUNCE_MIN_SPEED) {
         engine.play(ball.floor, { gain: impactGain(speed) });
       }

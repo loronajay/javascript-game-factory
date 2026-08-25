@@ -41,6 +41,7 @@ import {
   applyNetDrag,
   detectMadeBasket,
   resolveBackWallContact,
+  resolveCeilingContact,
   resolveFloorContact,
   resolveRimContact,
 } from "./collision.js";
@@ -163,6 +164,10 @@ export function stepBall(ball, world, tickSeconds, { ballId, alreadyScored = fal
       }
     }
 
+    // Both horizontal planes are checked outside the scoring branch above: the
+    // room contains the ball whether or not the shot has already resolved.
+    const ceiling = resolveCeilingContact(ball, flight);
+    if (ceiling) hits.push(ceiling);
     const floor = resolveFloorContact(ball, dt, flight);
     if (floor) hits.push(floor);
 

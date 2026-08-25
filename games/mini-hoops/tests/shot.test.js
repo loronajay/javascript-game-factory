@@ -63,11 +63,30 @@ test("beginning a shot clears everything the last one left behind", () => {
 // Announcements
 // ---------------------------------------------------------------------------
 
-test("rim and backboard are called by name", () => {
+test("rim, backboard and ceiling are called by name", () => {
+  for (const [contact, label] of [["rim", "RIM"], ["backboard", "BACKBOARD"], ["ceiling", "CEILING"]]) {
+    assertDeepEqual(step(liveShot(), { contacts: [contact] }).announcements, [label], contact);
+  }
+});
+
+test("clipping the ceiling does not end the shot", () => {
+  // The ceiling is a LIVE surface, like the rim and the board and unlike the
+  // bare wall: an over-powered shot that clips it and comes down onto the rim
+  // is a real make, and around a fifth of all makes now touch it on the way in.
+  // Resolving here would call those dead a beat before they dropped.
   const shot = liveShot();
-  assertDeepEqual(step(shot, { contacts: ["rim"] }).announcements, ["RIM"]);
-  const other = liveShot();
-  assertDeepEqual(step(other, { contacts: ["backboard"] }).announcements, ["BACKBOARD"]);
+  const result = step(shot, { contacts: ["ceiling"] });
+  assertDeepEqual(result.announcements, ["CEILING"]);
+  assert(!result.finished, "a shot off the ceiling is still in the air");
+  assertEqual(shot.resolvedAt, -1, "and its outcome is not decided yet");
+});
+
+test("a ball that clipped the ceiling and came back down is called a ceiling miss", () => {
+  const shot = liveShot();
+  step(shot, { contacts: ["ceiling"] });
+  const returning = { x: 0, y: hoopWorld.rimY - 0.5, z: hoopWorld.rimZ - 0.6, vx: 0, vy: -1, vz: -0.5, rollPhase: 0 };
+  assertDeepEqual(step(shot, { ball: returning }).announcements, ["CEILING"]);
+  assert(shot.resolvedAt >= 0, "and the outcome is settled");
 });
 
 test("one collision reported twice in quick succession is only said once", () => {

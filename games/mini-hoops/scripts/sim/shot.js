@@ -25,6 +25,29 @@ import {
 } from "./constants.js";
 import { projectPoint } from "./projection.js";
 
+/**
+ * The contacts a shot can SURVIVE, and what each is called on screen.
+ *
+ * These are the surfaces there is still a route through the hoop from, so
+ * touching one announces itself and then gets out of the way — the shot is
+ * called later, by the ball dropping back into the room below the rim. The bare
+ * wall and the floor are deliberately absent: from either of those the shot is
+ * over the instant it happens, which is what lets a dead miss be called
+ * immediately instead of playing out.
+ *
+ * THE CEILING IS ON THIS LIST, and that was measured rather than assumed. A
+ * sweep of six thousand shots put the make rate at 9.30% with the ceiling and
+ * 9.16% without it: the ceiling almost entirely re-routes shots that used to be
+ * saved by the back wall, and around a fifth of all makes now touch it on the
+ * way. A route that real cannot be called dead. `tools/make-rate.mjs` re-runs
+ * that measurement, and it is the check to run before changing anything here.
+ */
+const LIVE_CONTACT_LABELS = Object.freeze({
+  rim: "RIM",
+  backboard: "BACKBOARD",
+  ceiling: "CEILING",
+});
+
 export const SHOT_IDLE = "idle";
 export const SHOT_FLIGHT = "flight";
 export const SHOT_FINISHED = "finished";
@@ -68,13 +91,13 @@ export function advanceShot(shot, { ball, hoop, hoopWorld, contacts, scored, set
       resolve(shot, null);
       continue;
     }
-    if (contact === "rim" || contact === "backboard") {
+    if (LIVE_CONTACT_LABELS[contact]) {
       // Two touches inside the debounce window are one collision, and must not
       // stutter the same word twice on screen.
       if (shot.elapsed - shot.lastContactAt <= CONTACT_DEBOUNCE_SECONDS) continue;
       shot.lastContactAt = shot.elapsed;
       shot.lastContact = contact;
-      announcements.push(contact === "rim" ? "RIM" : "BACKBOARD");
+      announcements.push(LIVE_CONTACT_LABELS[contact]);
       continue;
     }
     if (contact === "wall") {
@@ -101,7 +124,7 @@ export function advanceShot(shot, { ball, hoop, hoopWorld, contacts, scored, set
     ball.z < hoopWorld.rimZ - ABORT_DEPTH_MARGIN &&
     ball.y < hoopWorld.rimY - ABORT_HEIGHT_MARGIN
   ) {
-    const label = shot.lastContact === "rim" ? "RIM" : shot.lastContact === "backboard" ? "BACKBOARD" : "MISS";
+    const label = LIVE_CONTACT_LABELS[shot.lastContact] ?? "MISS";
     if (resolve(shot, label)) announcements.push(label);
   }
 
