@@ -18,14 +18,21 @@
 //
 // PER-BALL IMPACTS. A snowball must never make the basketball's bounce. Each
 // ball owns the sound of its own body hitting things — and, where it has one, a
-// release sound. The rim and the backboard are the *apparatus*, so all three
-// balls ring the same metal; what changes is how hard and how bright, which is
+// release sound. The rim and the backboard are the *apparatus*, so balls ring
+// the same metal by default; what changes is how hard and how bright, which is
 // what `apparatusGain`/`apparatusRate` carry. A paper wad off the backboard is a
 // quiet, higher tap; a snowball is a duller thud.
 //
-// BALLS ARE STILL COSMETIC. Nothing in this file can reach the sim, so a ball
-// that sounds different still plays identically — the board-key constraint in
-// `assets/ball-catalog.js` is not weakened by anything here.
+// THE APPARATUS CAN BE OVERRIDDEN, for one ball and one reason. A bowling ball
+// hitting a rim is not the house rim sample played louder — it is a different
+// event, and it has its own recording. So a ball may name its own `rim` sample
+// and the shared one steps aside. This is an escape hatch, not the pattern:
+// prefer `apparatusGain`/`apparatusRate` unless there is genuinely a file.
+//
+// THIS FILE STILL CANNOT REACH THE SIM. How a ball SOUNDS lives here; how it
+// FLIES lives in `assets/ball-catalog.js`. They are deliberately separate files
+// even though a ball has both, because one needs a browser and the other does
+// not — and the sim must stay silent and testable under node.
 
 import { DEFAULT_BALL } from "../assets/ball-catalog.js";
 
@@ -57,6 +64,10 @@ export const SOUNDS = Object.freeze([
   Object.freeze({ id: "bounce-basketball", file: "basketball-bounce.wav", gain: 0.55, offset: 0.05, minInterval: 0.08 }),
   Object.freeze({ id: "bounce-paper", file: "paper-ball-fall.wav", gain: 0.7, offset: 0.04, minInterval: 0.08 }),
   Object.freeze({ id: "bounce-snowball", file: "snowball-hit.wav", gain: 0.7, offset: 0.03, minInterval: 0.08 }),
+  Object.freeze({ id: "bounce-bowling-ball", file: "bowling-ball-drop.wav", gain: 0.8, offset: 0.03, minInterval: 0.1 }),
+  // The bowling ball's own rim hit, standing in for the shared `rim` sample
+  // rather than colouring it. See the apparatus note at the top of the file.
+  Object.freeze({ id: "rim-bowling-ball", file: "bowling-ball-hitting-rim.wav", gain: 0.8, offset: 0.02, minInterval: 0.09 }),
   Object.freeze({ id: "throw-paper", file: "paper-ball-throw.wav", gain: 0.55, offset: 0.02, minInterval: 0.05 }),
 
   // --- the round ----------------------------------------------------------
@@ -87,12 +98,22 @@ export const COUNTDOWN_LEAD_SECONDS = 3;
  *
  * `floor` is its body hitting the ground, `release` the sound of it leaving the
  * hand (null for balls that do not have one). The apparatus modifiers colour the
- * shared rim/backboard samples.
+ * shared rim/backboard samples; `rim`, where present, replaces the shared rim
+ * sample outright for that ball.
  */
 const BALL_AUDIO = Object.freeze({
   basketball: Object.freeze({ floor: "bounce-basketball", release: null, apparatusGain: 1, apparatusRate: 1 }),
   paper: Object.freeze({ floor: "bounce-paper", release: "throw-paper", apparatusGain: 0.45, apparatusRate: 1.18 }),
   snowball: Object.freeze({ floor: "bounce-snowball", release: null, apparatusGain: 0.7, apparatusRate: 0.88 }),
+  // Loud, dark and slow. It also brings its own rim recording — the only ball
+  // that does — and rings the backboard hard and low through the shared sample.
+  "bowling-ball": Object.freeze({
+    floor: "bounce-bowling-ball",
+    release: null,
+    apparatusGain: 1,
+    apparatusRate: 0.72,
+    rim: "rim-bowling-ball",
+  }),
 });
 
 export function soundIds() {

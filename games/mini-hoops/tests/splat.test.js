@@ -1,10 +1,11 @@
 import { suite, test, assert, assertEqual, assertClose, finish } from "./harness.js";
 
-import { BALL_RADIUS_WORLD, BOARD_Z, TICK_SECONDS } from "../scripts/sim/constants.js";
+import { BALL_RADIUS_WORLD, BOARD_Z, SHOT_SETTLE_SECONDS, TICK_SECONDS } from "../scripts/sim/constants.js";
 import { worldToScreenLength } from "../scripts/sim/projection.js";
 import { hoopAt } from "../scripts/sim/hoop.js";
 import { solveLaunch, launchSpin } from "../scripts/sim/launch.js";
 import { createBall, isBallSettled, launchBall, resetBall, stepBall, worldFor } from "../scripts/sim/physics.js";
+import { ballFlight } from "../scripts/assets/ball-catalog.js";
 import { SHOT_FLIGHT, advanceShot, beginShot, createShot } from "../scripts/sim/shot.js";
 import {
   MAX_DECALS,
@@ -17,21 +18,32 @@ import {
 
 suite("splats — a ball that does not survive its landing");
 
+/**
+ * The fewest ticks a dead shot may take to hand the ball back.
+ *
+ * `SHOT_SETTLE_SECONDS` is the beat a resolved shot waits out before the next
+ * ball appears, so anything at or above it is proof the burst did not short-
+ * circuit that wait. Derived rather than typed, so retuning the constant moves
+ * the floor with it.
+ */
+const SHOT_MIN_DEAD_TICKS = Math.floor(SHOT_SETTLE_SECONDS / TICK_SECONDS);
+
 const SNOWBALL = "snowball";
 const BASKETBALL = "basketball";
 
 /**
  * Fire one shot and play it out, returning what happened to it.
  *
- * The whole point of this helper is that it takes the ball id and CHANGES
- * NOTHING ELSE, so the same aim and power can be put through two balls and the
- * two results compared directly. That comparison is the board-key guarantee.
+ * Takes the ball id and changes nothing else, so the same aim and power can be
+ * put through two balls. Note it solves with the ball's OWN weight, exactly as
+ * the game does — the solver compensates weight and not drag, so a shot fired
+ * here is the shot the player would have got.
  */
 function takeShot({ ballId, aim, power, loft, maxTicks = 400 }) {
   const ball = createBall();
   const shot = createShot();
   const origin = { x: ball.x, y: ball.y, z: ball.z };
-  const launch = solveLaunch({ origin, aim, power, loft });
+  const launch = solveLaunch({ origin, aim, power, loft, weight: ballFlight(ballId).weight });
   launchBall(ball, launch, launchSpin(launch));
   beginShot(shot);
 
@@ -40,12 +52,21 @@ function takeShot({ ballId, aim, power, loft, maxTicks = 400 }) {
   const contacts = [];
   let splats = 0;
   let ticks = 0;
+  // WHEN each happened, not just whether: a made shot legitimately bursts on the
+  // floor after dropping through the net, so the only way to tell a harmless
+  // burst from an outcome-deciding one is the order they occurred in.
+  let splatTick = 0;
+  let scoredTick = 0;
 
   while (shot.state === SHOT_FLIGHT && ticks < maxTicks) {
     ticks += 1;
     const stepped = stepBall(ball, world, TICK_SECONDS, { ballId, alreadyScored: shot.scored });
     for (const contact of stepped.contacts) contacts.push(contact);
-    if (stepped.splat) splats += 1;
+    if (stepped.splat) {
+      splats += 1;
+      if (!splatTick) splatTick = ticks;
+    }
+    if (stepped.scored && !scoredTick) scoredTick = ticks;
 
     advanceShot(
       shot,
@@ -61,7 +82,17 @@ function takeShot({ ballId, aim, power, loft, maxTicks = 400 }) {
     );
   }
 
-  return { ball, shot, contacts, splats, ticks, scored: shot.scored, label: shot.resolvedLabel };
+  return {
+    ball,
+    shot,
+    contacts,
+    splats,
+    ticks,
+    splatTick,
+    scoredTick,
+    scored: shot.scored,
+    label: shot.resolvedLabel,
+  };
 }
 
 /** A spread of shots that between them hit the wall, the board, the rim and the floor. */
@@ -78,31 +109,95 @@ const SHOTS = [
 ];
 
 // ---------------------------------------------------------------------------
-// The board-key guarantee
+// What a burst may and may not cost
 // ---------------------------------------------------------------------------
+//
+// THIS USED TO BE A CROSS-BALL PARITY TEST — snowball and basketball asserted to
+// score identically, shot for shot, because the boards are keyed `mode:duration`
+// and the ball was not in the key. Balls now fly differently on purpose, so that
+// assertion is gone: it would be asserting the feature does not exist. Boards
+// still rank every ball together, and every entry names its ball instead.
+//
+// What survives is narrower and still load-bearing: BURSTING is not allowed to
+// be worth anything. A ball's advantages must come from its published flight
+// numbers, which a player can read on the setup screen — never from the side
+// effect of it falling apart. So the two things pinned here are that a burst
+// never happens on a live shot, and that it never hands the ball back early.
 
-test("a snowball scores exactly what a basketball scores, shot for shot", () => {
-  // The cabinet's boards are keyed on `mode:duration` — the ball is not in the
-  // key, so it may not change an outcome. If this ever fails, the fix is not to
-  // relax the test: it is either to stop the snowball bursting where it now
-  // does, or to migrate the board key. See `assets/ball-catalog.js`.
+test("a burst only ever happens to a shot that was already dead", () => {
+  // SPLAT_SURFACES is bare wall and floor, and `sim/shot.js` calls the miss the
+  // instant either is touched. If a burst could land on a live shot it would be
+  // deciding outcomes, which is exactly what a cosmetic-adjacent mechanic may
+  // not do. Widening SPLAT_SURFACES to the rim or the board fails this.
+  let burst = 0;
   for (const spec of SHOTS) {
     const snow = takeShot({ ...spec, ballId: SNOWBALL });
-    const basket = takeShot({ ...spec, ballId: BASKETBALL });
-    assertEqual(snow.scored, basket.scored, `${spec.name}: made/missed`);
-    assertEqual(snow.label, basket.label, `${spec.name}: what the game says about it`);
+    if (!snow.ball.splat) continue;
+    burst += 1;
+    assert(
+      snow.ball.splat.surface === "wall" || snow.ball.splat.surface === "floor",
+      `${spec.name}: burst on ${snow.ball.splat.surface}, which is not a dead surface`,
+    );
+    // A made shot bursting on the floor a beat after it dropped through is
+    // normal and costs nothing. Bursting BEFORE it scored would have stolen the
+    // basket, and is the failure this is looking for.
+    if (snow.scored) {
+      assert(
+        snow.splatTick >= snow.scoredTick,
+        `${spec.name}: burst on tick ${snow.splatTick}, before scoring on ${snow.scoredTick}`,
+      );
+    }
+  }
+  assert(burst > 0, "not one fixture shot ever burst, so this proves nothing");
+});
+
+test("a burst ball still runs out the full shot rather than ending it early", () => {
+  // The easier half to break: a ball whose dead shots finished sooner would fit
+  // more attempts into a 30-second round, which is a higher score for the same
+  // hand and is not a flight property anyone can read. Compared against the
+  // snowball's OWN non-bursting behaviour — `isBallSettled` refusing to report a
+  // burst ball — rather than against another ball, which now flies differently.
+  for (const spec of SHOTS) {
+    const snow = takeShot({ ...spec, ballId: SNOWBALL });
+    if (!snow.ball.splat) continue;
+    assert(
+      snow.ticks >= SHOT_MIN_DEAD_TICKS,
+      `${spec.name}: handed back after only ${snow.ticks} ticks`,
+    );
   }
 });
 
-test("a snowball takes exactly as long to hand back as a basketball does", () => {
-  // The second half of the same guarantee, and the easier one to break: a ball
-  // that ended its dead shots sooner would fit more attempts into a 30-second
-  // round, which is a higher score for the same hand.
-  for (const spec of SHOTS) {
-    const snow = takeShot({ ...spec, ballId: SNOWBALL });
-    const basket = takeShot({ ...spec, ballId: BASKETBALL });
-    assertEqual(snow.ticks, basket.ticks, `${spec.name}: ticks until the ball comes back`);
-  }
+test("balls fly the way their catalog rows say they do", () => {
+  // The flight numbers are a promise made to the player on the setup screen, so
+  // they are asserted in the DIRECTION the copy claims rather than pinned to
+  // exact values — retuning a ball should not need this test edited, but
+  // inverting one should fail it.
+  const aim = { x: 480, y: 220 };
+  const reach = (ballId) => {
+    const origin = { x: 0, y: 0.1, z: 0 };
+    const launch = solveLaunch({ origin, aim, power: 0.8, loft: 1, weight: ballFlight(ballId).weight });
+    const ball = createBall();
+    launchBall(ball, launch, launchSpin(launch));
+    const world = worldFor(hoopAt("still", 0));
+    // Flown free of the colliders: how far it gets under gravity and drag alone.
+    let far = 0;
+    for (let tick = 0; tick < 60; tick++) {
+      stepBall(ball, world, TICK_SECONDS, { ballId, alreadyScored: true });
+      far = Math.max(far, ball.z);
+    }
+    return { far, flightTime: launch.flightTime };
+  };
+
+  const house = reach(BASKETBALL);
+  const paper = reach("paper");
+  const bowling = reach("bowling-ball");
+
+  assert(paper.far < house.far, "the paper wad's drag should land it short of the house ball");
+  assert(bowling.far >= house.far * 0.98, "the bowling ball has almost no drag and should not fall short");
+  assert(
+    bowling.flightTime < house.flightTime && house.flightTime < paper.flightTime,
+    "a heavier ball should get there sooner and a lighter one should hang",
+  );
 });
 
 test("the spread really does cover the contacts this rests on", () => {

@@ -12,7 +12,7 @@
 // It holds no DOM beyond its canvas. Everything it wants to say leaves through
 // the callbacks and is written by `ui/practice-view.js`.
 
-import { ballSplat } from "./assets/ball-catalog.js";
+import { ballFlight, ballSplat } from "./assets/ball-catalog.js";
 import { addSplat, clearSplatField, createSplatField, tickSplatField } from "./effects/splat-field.js";
 import { CANVAS_HEIGHT, CANVAS_WIDTH, PULL_MIN, TICK_SECONDS } from "./sim/constants.js";
 import { hoopAt } from "./sim/hoop.js";
@@ -148,6 +148,10 @@ export function createPracticeCourt(
       aim: { x: released.aimX, y: released.aimY },
       power: released.power,
       loft: released.loft,
+      // The solver compensates for the ball's weight so the reference pull still
+      // swishes whatever is in hand; its drag is deliberately not passed, and is
+      // felt as the ball landing short. See `sim/launch.js`.
+      weight: ballFlight(style.ballId).weight,
     });
     launchBall(ball, launch, launchSpin(launch));
     beginShot(shot);
@@ -241,6 +245,7 @@ export function createPracticeCourt(
               aim: { x: pull.aimX, y: pull.aimY },
               power: pull.power,
               loft: pull.loft,
+              weight: ballFlight(style.ballId).weight,
             }),
           )
         : null;

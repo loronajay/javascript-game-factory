@@ -24,6 +24,33 @@ import {
 } from "./constants.js";
 
 /** Contact kinds, as reported back to the shot lifecycle. */
+/**
+ * The reference flight, for a caller that has no ball in hand.
+ *
+ * The colliders stay PURE GEOMETRY — a rim does not care what hit it — so the
+ * ball's character arrives as a plain block of multipliers rather than as a ball
+ * id. Nothing here may import the ball catalog; `sim/physics.js` is the file
+ * that knows which ball is in the air, and it is the one that passes this in.
+ */
+const NEUTRAL_FLIGHT = Object.freeze({ bounce: 1, grip: 1 });
+
+/** Read one multiplier off a flight block, tolerating a missing or broken one. */
+function factor(flight, key) {
+  const value = flight && flight[key];
+  return Number.isFinite(value) && value >= 0 ? value : 1;
+}
+
+/**
+ * Restitution, scaled by the ball's own liveliness and capped at 1.
+ *
+ * The cap is not cosmetic: a coefficient above 1 is a surface that ADDS energy,
+ * and a ball that left the floor faster than it arrived would bounce forever.
+ * A ball authored too lively is clamped to perfectly elastic instead.
+ */
+function restitution(base, flight) {
+  return Math.min(1, base * factor(flight, "bounce"));
+}
+
 export const CONTACT_RIM = "rim";
 export const CONTACT_BACKBOARD = "backboard";
 export const CONTACT_WALL = "wall";
@@ -62,7 +89,7 @@ const SEPARATION_EPSILON = 0.0015;
  * drop in, or clip the far edge and kick back out, and both fall out of the same
  * geometry instead of being special-cased.
  */
-export function resolveRimContact(ball, hoopWorld) {
+export function resolveRimContact(ball, hoopWorld, flight = NEUTRAL_FLIGHT) {
   // Nearest point on the ring's centre-line to the ball, found in the horizontal
   // plane the ring lies in.
   const dx = ball.x - hoopWorld.rimX;
@@ -101,16 +128,21 @@ export function resolveRimContact(ball, hoopWorld) {
   // Only resolve if the ball is actually moving *into* the rim. A ball already
   // separating has been handled and must not be bounced twice.
   if (normalSpeed < 0) {
-    rvx -= (1 + RIM_RESTITUTION) * normalSpeed * nx;
-    rvy -= (1 + RIM_RESTITUTION) * normalSpeed * ny;
-    rvz -= (1 + RIM_RESTITUTION) * normalSpeed * nz;
+    const bounce = restitution(RIM_RESTITUTION, flight);
+    rvx -= (1 + bounce) * normalSpeed * nx;
+    rvy -= (1 + bounce) * normalSpeed * ny;
+    rvz -= (1 + bounce) * normalSpeed * nz;
 
     // Scrub a little tangential speed — the difference between a rattle that
     // settles and one that pinballs forever.
+    // A grippier ball has more of its tangential speed scrubbed away, which is
+    // what turns a rattle that would have kicked out into one that dies in the
+    // ring. Clamped below 1 so grip can never reverse the tangent.
+    const scrub = Math.min(0.95, RIM_FRICTION * factor(flight, "grip"));
     const postNormal = rvx * nx + rvy * ny + rvz * nz;
-    const tx = (rvx - postNormal * nx) * (1 - RIM_FRICTION);
-    const ty = (rvy - postNormal * ny) * (1 - RIM_FRICTION);
-    const tz = (rvz - postNormal * nz) * (1 - RIM_FRICTION);
+    const tx = (rvx - postNormal * nx) * (1 - scrub);
+    const ty = (rvy - postNormal * ny) * (1 - scrub);
+    const tz = (rvz - postNormal * nz) * (1 - scrub);
 
     ball.vx = postNormal * nx + tx + hoopWorld.rimVx;
     ball.vy = postNormal * ny + ty + hoopWorld.rimVy;
@@ -132,7 +164,7 @@ export function resolveRimContact(ball, hoopWorld) {
  * ball having CROSSED the plane, not by it being near it, so a fast shot cannot
  * tunnel through the board between substeps.
  */
-export function resolveBackWallContact(ball, previousZ, hoopWorld, boardBounds) {
+export function resolveBackWallContact(ball, previousZ, hoopWorld, boardBounds, flight = NEUTRAL_FLIGHT) {
   // Only a ball travelling toward the wall can hit it.
   if (ball.vz <= 0) return null;
 
@@ -151,7 +183,7 @@ export function resolveBackWallContact(ball, previousZ, hoopWorld, boardBounds) 
   ball.z = contactZ - 0.001;
 
   if (onBoard) {
-    ball.vz = -Math.abs(ball.vz) * BOARD_RESTITUTION;
+    ball.vz = -Math.abs(ball.vz) * restitution(BOARD_RESTITUTION, flight);
     // Lateral motion is kept relative to the moving board, so a bank off a
     // travelling backboard carries the board's drift.
     ball.vx = hoopWorld.boardVx + (ball.vx - hoopWorld.boardVx) * BOARD_TANGENT_KEEP;
@@ -160,7 +192,7 @@ export function resolveBackWallContact(ball, previousZ, hoopWorld, boardBounds) 
     return CONTACT_BACKBOARD;
   }
 
-  ball.vz = -Math.abs(ball.vz) * WALL_RESTITUTION;
+  ball.vz = -Math.abs(ball.vz) * restitution(WALL_RESTITUTION, flight);
   ball.vx *= WALL_TANGENT_KEEP_X;
   ball.vy *= WALL_TANGENT_KEEP_Y;
   return CONTACT_WALL;
@@ -173,12 +205,12 @@ export function resolveBackWallContact(ball, previousZ, hoopWorld, boardBounds) 
  * rolling, with its spin converging on true rolling motion so it does not slide
  * along visibly spinning the wrong way.
  */
-export function resolveFloorContact(ball, dt) {
+export function resolveFloorContact(ball, dt, flight = NEUTRAL_FLIGHT) {
   if (ball.y >= BALL_RADIUS_WORLD) return null;
   ball.y = BALL_RADIUS_WORLD;
 
   if (Math.abs(ball.vy) > FLOOR_BOUNCE_THRESHOLD) {
-    ball.vy = Math.abs(ball.vy) * FLOOR_RESTITUTION;
+    ball.vy = Math.abs(ball.vy) * restitution(FLOOR_RESTITUTION, flight);
     ball.vx *= FLOOR_TANGENT_KEEP_X;
     ball.vz *= FLOOR_TANGENT_KEEP_Z;
     ball.omegaX += (ball.vz / BALL_RADIUS_WORLD - ball.omegaX) * FLOOR_SPIN_BOUNCE_BLEND;

@@ -176,7 +176,11 @@ export function createGameAudio({
     contact(name, { ballId, speed = 0 } = {}) {
       const ball = ballAudio(ballId);
       if (name === "rim") {
-        engine.play("rim", { gain: ball.apparatusGain, rate: ball.apparatusRate });
+        // A ball carrying its own rim recording plays it straight: the sample IS
+        // that ball on that metal, so colouring it with the apparatus modifiers
+        // meant for the shared one would be correcting a thing already correct.
+        if (ball.rim) engine.play(ball.rim);
+        else engine.play("rim", { gain: ball.apparatusGain, rate: ball.apparatusRate });
       } else if (name === "backboard") {
         engine.play("backboard", { gain: ball.apparatusGain, rate: ball.apparatusRate });
       } else if (name === "wall") {

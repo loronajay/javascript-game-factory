@@ -11,7 +11,7 @@
 // thing this file is genuinely allowed to own is ORDER: what happens per tick,
 // and in what sequence.
 
-import { ballSplat } from "./assets/ball-catalog.js";
+import { ballFlight, ballSplat } from "./assets/ball-catalog.js";
 import { createAssetLibrary } from "./assets/loader.js";
 import { createGameAudio } from "./audio/game-audio.js";
 import { addSplat, clearSplatField, createSplatField, tickSplatField } from "./effects/splat-field.js";
@@ -332,6 +332,10 @@ export function boot(root) {
       aim: { x: released.aimX, y: released.aimY },
       power: released.power,
       loft: released.loft,
+      // The solver compensates for the ball's weight so the reference pull still
+      // swishes whatever is in hand; its drag is deliberately not passed, and is
+      // felt as the ball landing short. See `sim/launch.js`.
+      weight: ballFlight(run.ballId).weight,
     });
     launchBall(ball, launch, launchSpin(launch));
     beginShot(shot);
@@ -586,6 +590,7 @@ export function boot(root) {
               aim: { x: pull.aimX, y: pull.aimY },
               power: pull.power,
               loft: pull.loft,
+              weight: ballFlight(run.ballId).weight,
             }),
           )
         : null;

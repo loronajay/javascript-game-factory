@@ -52,7 +52,7 @@ export function createAssetLibrary({ onLoad = () => {} } = {}) {
     /**
      * The two decals a splatting ball leaves, or null for a ball that survives.
      *
-     * Null rather than a pair of broken images: two of the three balls never
+     * Null rather than a pair of broken images: most balls never
      * splat, and asking the browser for art that does not exist would put a 404
      * in the console on every run with a basketball.
      */

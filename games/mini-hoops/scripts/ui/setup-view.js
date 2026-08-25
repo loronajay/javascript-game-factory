@@ -6,9 +6,16 @@
 // and nothing else, and there is no second list of balls in the markup to forget
 // to update.
 //
+// THE BALL PICKER SHOWS ITS FLIGHT NUMBERS, and that is not decoration. Balls
+// genuinely fly differently, and the boards deliberately rank all of them
+// together — so the only thing that makes a mixed board fair to read is that the
+// difference was published before the run, in the same place the choice is made.
+// The bars come from `ballFlightStats`, which does the arithmetic; this file does
+// none of it.
+//
 // Reports selections back through callbacks; owns no preference state itself.
 
-import { BALLS } from "../assets/ball-catalog.js";
+import { BALLS, ballFlightStats } from "../assets/ball-catalog.js";
 import { LOCATIONS, locationBackdropPath, locationById } from "../assets/location-catalog.js";
 import { ROUND_DURATIONS } from "../sim/constants.js";
 import { HOOP_MODES, hoopModeById } from "../sim/hoop.js";
@@ -50,6 +57,7 @@ export function createSetupView(root, { onSelect = () => {} } = {}) {
       value: ball.id,
       label: ball.label,
       note: ball.blurb,
+      stats: ballFlightStats(ball.id),
     })),
   };
 
@@ -88,7 +96,7 @@ function buildGroup(container, items, toOption) {
   if (container) {
     container.replaceChildren(
       ...items.map((item) => {
-        const { value, label, note } = toOption(item);
+        const { value, label, note, stats } = toOption(item);
         const button = document.createElement("button");
         button.type = "button";
         button.className = "chip";
@@ -101,11 +109,45 @@ function buildGroup(container, items, toOption) {
           span.textContent = note;
           button.appendChild(span);
         }
+        if (stats && stats.length) button.appendChild(buildStats(stats));
         return button;
       }),
     );
   }
   return { container, };
+}
+
+/**
+ * The little bar chart of flight stats under a ball's name.
+ *
+ * Reads `fill` straight from the catalog and does no maths of its own — see the
+ * note at the top of the file. The numeric value is carried in the row's
+ * `title`, so the exact multiplier is available on hover without cluttering a
+ * picker that has to stay readable on a phone.
+ */
+function buildStats(stats) {
+  const wrap = document.createElement("span");
+  wrap.className = "chip-stats";
+  for (const stat of stats) {
+    const row = document.createElement("span");
+    row.className = "chip-stat";
+    row.title = `${stat.label} ${stat.value} — ${stat.hint}`;
+
+    const name = document.createElement("span");
+    name.className = "chip-stat-label";
+    name.textContent = stat.label;
+
+    const track = document.createElement("span");
+    track.className = "chip-stat-track";
+    const fill = document.createElement("span");
+    fill.className = "chip-stat-fill";
+    fill.style.width = `${Math.round(stat.fill * 100)}%`;
+    track.appendChild(fill);
+
+    row.append(name, track);
+    wrap.appendChild(row);
+  }
+  return wrap;
 }
 
 function markActive(group, value) {

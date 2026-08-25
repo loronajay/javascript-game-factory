@@ -15,12 +15,22 @@
 // snowball does not come back off a wall is this file, which is already the
 // file that knows which ball is in the air.
 //
+// THE BALL'S FLIGHT IS APPLIED HERE, for the same reason. This file resolves the
+// ball id into a flight block once per tick and spends it two ways: gravity and
+// air drag are integrated here, and `bounce`/`grip` are handed down to the
+// colliders as plain multipliers. The colliders never learn what a ball is.
+//
+// Weight is deliberately NOT a surprise: `sim/launch.js` solved the shot against
+// this same multiplier, so a heavy ball still swishes at the reference pull and
+// only its arc changes. Drag is the one the solver was not told about, so it is
+// the one the player feels as the ball landing short.
+//
 // A tick is integrated in substeps (PHYSICS_SUBSTEP_SECONDS). At full speed the
 // ball crosses the whole rim in well under a 60Hz tick, so a single-step
 // integration would let it teleport past the ring and turn a made basket into a
 // coin flip on frame phase.
 
-import { ballSplatsOn, rollPhasePerRadian } from "../assets/ball-catalog.js";
+import { ballFlight, ballSplatsOn, rollPhasePerRadian } from "../assets/ball-catalog.js";
 import {
   BALL_RADIUS_WORLD,
   GRAVITY,
@@ -100,6 +110,14 @@ export function stepBall(ball, world, tickSeconds, { ballId, alreadyScored = fal
   const substeps = Math.max(1, Math.ceil(tickSeconds / PHYSICS_SUBSTEP_SECONDS));
   const dt = tickSeconds / substeps;
   const phasePerRadian = rollPhasePerRadian(ballId);
+  // Resolved once per tick, not per substep: it is pure data and cannot change
+  // mid-flight, and the lookup is a linear scan of the catalog.
+  const flight = ballFlight(ballId);
+  const gravity = GRAVITY * flight.weight;
+  // Frame-rate-independent air drag, the same trick the floor's rolling drag
+  // uses: raising a per-second keep-factor to the power of dt makes a substepped
+  // tick decay by exactly as much as a whole one would have.
+  const dragKeep = flight.drag > 0 ? Math.exp(-flight.drag * dt) : 1;
 
   const contacts = [];
   let scored = false;
@@ -111,7 +129,15 @@ export function stepBall(ball, world, tickSeconds, { ballId, alreadyScored = fal
     // ask what just happened rather than what has happened all tick.
     const hits = [];
 
-    ball.vy -= GRAVITY * dt;
+    ball.vy -= gravity * dt;
+    // Drag acts on the whole velocity, so it shortens the throw AND caps the
+    // fall. Applied before the position update, so the step the ball takes is
+    // the speed it actually has.
+    if (dragKeep !== 1) {
+      ball.vx *= dragKeep;
+      ball.vy *= dragKeep;
+      ball.vz *= dragKeep;
+    }
     ball.x += ball.vx * dt;
     ball.y += ball.vy * dt;
     ball.z += ball.vz * dt;
@@ -130,14 +156,14 @@ export function stepBall(ball, world, tickSeconds, { ballId, alreadyScored = fal
         // Rim and back wall are checked independently, not as alternatives: a
         // ball can clip the ring and still cross the board plane inside the same
         // substep, and collapsing that into one contact loses the second bounce.
-        const rim = resolveRimContact(ball, world.hoopWorld);
+        const rim = resolveRimContact(ball, world.hoopWorld, flight);
         if (rim) hits.push(rim);
-        const wall = resolveBackWallContact(ball, previous.z, world.hoopWorld, world.boardBounds);
+        const wall = resolveBackWallContact(ball, previous.z, world.hoopWorld, world.boardBounds, flight);
         if (wall) hits.push(wall);
       }
     }
 
-    const floor = resolveFloorContact(ball, dt);
+    const floor = resolveFloorContact(ball, dt, flight);
     if (floor) hits.push(floor);
 
     for (const hit of hits) contacts.push(hit);

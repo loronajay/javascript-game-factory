@@ -48,14 +48,27 @@ export function entryVelocityForLoft(loft) {
 /**
  * Solve the launch.
  *
+ * THE SOLVER KNOWS THE BALL'S WEIGHT AND NOT ITS DRAG, and that split is the
+ * whole of how balls differ. Weight is compensated — solve against the ball's
+ * own gravity and the reference pull still swishes, so a heavy ball changes the
+ * SHAPE of the arc rather than punishing the hand that has already learned the
+ * meter. Drag is not compensated, and is applied later by `sim/physics.js`: a
+ * draggy ball genuinely lands short of the reticle, which is a real number the
+ * player has to find for that ball. Compensating both would make every ball fly
+ * identically; compensating neither would make the meter dishonest per ball.
+ *
  * @param origin world-space position of the ball, `{x, y, z}`
  * @param aim    SCREEN-space reticle position, `{x, y}` — resolved onto the rim plane here
  * @param power  0..1, straight from the pull length
  * @param loft   0..1, straight from the pull angle
+ * @param weight the ball's gravity multiplier, from `ballFlight`. 1 is the house ball.
  */
-export function solveLaunch({ origin, aim, power, loft }) {
+export function solveLaunch({ origin, aim, power, loft, weight = 1 }) {
   const clampedPower = clamp(power, 0, 1);
   const clampedLoft = clamp(loft, 0, 1);
+  // Guarded rather than trusted: a zero or negative weight would divide the
+  // flight time by zero and fire the ball at infinity.
+  const gravity = GRAVITY * Math.max(0.05, Number.isFinite(weight) ? weight : 1);
 
   // Honest power: velocity scales linearly against the calibrated reference pull.
   const powerScale = clampedPower / REFERENCE_POWER;
@@ -69,11 +82,11 @@ export function solveLaunch({ origin, aim, power, loft }) {
 
   // Flight time for a ball that rises `rise` and arrives with vertical speed
   // `entryVy`: the positive root of  0.5*g*t^2 + entryVy*t - rise = 0.
-  const flightTime = (-entryVy + Math.sqrt(entryVy * entryVy + 2 * GRAVITY * rise)) / GRAVITY;
+  const flightTime = (-entryVy + Math.sqrt(entryVy * entryVy + 2 * gravity * rise)) / gravity;
 
   // The exact velocity that lands on the reticle...
   const perfectVx = (target.x - origin.x) / flightTime;
-  const perfectVy = entryVy + GRAVITY * flightTime;
+  const perfectVy = entryVy + gravity * flightTime;
   const perfectVz = (RIM_CENTER_Z - origin.z) / flightTime;
 
   // ...scaled by how far off the reference the player actually pulled.
@@ -90,6 +103,9 @@ export function solveLaunch({ origin, aim, power, loft }) {
     loft: clampedLoft,
     entryVy,
     flightTime,
+    // Carried out so the trajectory preview bends by the same gravity the ball
+    // will actually fall under, rather than re-deriving it from the ball id.
+    gravity,
     // Roughly when the ball reaches the rim plane. Used to decide how far to draw
     // the trajectory preview, not by the physics — the physics finds the plane by
     // actually integrating to it.
@@ -117,11 +133,13 @@ export function launchSpin(launch) {
  */
 export function trajectoryPoints(origin, launch, { step = 0.06, maxSeconds = 1.45 } = {}) {
   const limit = Math.min(maxSeconds, Math.max(step, launch.planeTime * 1.04));
+  // A launch solved before `gravity` existed on it still previews correctly.
+  const gravity = Number.isFinite(launch.gravity) ? launch.gravity : GRAVITY;
   const points = [];
   for (let t = step; t < limit; t += step) {
     points.push({
       x: origin.x + launch.vx * t,
-      y: origin.y + launch.vy * t - 0.5 * GRAVITY * t * t,
+      y: origin.y + launch.vy * t - 0.5 * gravity * t * t,
       z: origin.z + launch.vz * t,
     });
   }

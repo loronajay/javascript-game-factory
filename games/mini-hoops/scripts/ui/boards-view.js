@@ -4,6 +4,13 @@
 // reason. The board being viewed is the view's own state — browsing the circle
 // board must not change what you are about to play, which is why this does not
 // write back to preferences.
+//
+// A BOARD RANKS EVERY BALL TOGETHER, and names the ball on every row. Balls fly
+// differently, so the ball is the context that makes a score readable — a paper
+// wad 24 and a bowling ball 24 are different feats. It is deliberately NOT a
+// filter and NOT part of the key: splitting the boards by ball would turn one
+// contested board into four lonely ones. Showing it is the whole mechanism, so
+// it gets its own cell rather than being trailed after the room as flavour.
 
 import { ROUND_DURATIONS } from "../sim/constants.js";
 import { HOOP_MODES, hoopModeById } from "../sim/hoop.js";
@@ -60,9 +67,11 @@ function renderRow(entry, index) {
     cell("board-score", `${entry.score}`),
     cell("board-detail", `${entry.shots || 0} shots`),
     cell("board-detail", `${entry.bestStreak || 0} streak`),
-    // The room and ball are not part of the board key, but a player likes seeing
-    // where a personal best actually happened.
-    cell("board-flavour", `${locationById(entry.locationId).label} · ${ballById(entry.ballId).label}`),
+    // The ball is the one piece of context that changes what the score MEANT,
+    // so it reads as a label rather than as trailing flavour.
+    cell("board-ball", ballById(entry.ballId).label),
+    // The room genuinely is flavour: locations are still cosmetic.
+    cell("board-flavour", locationById(entry.locationId).label),
   );
   return row;
 }
