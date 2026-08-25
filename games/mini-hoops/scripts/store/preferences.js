@@ -34,6 +34,9 @@ export function createPreferencesStore({ storage } = {}) {
     locationId: locationById(saved.locationId).id,
     ballId: ballById(saved.ballId).id,
     durationByMode: normalizeDurationMap(saved.durationByMode),
+    // Sound is off only if it was explicitly turned off. A preferences blob
+    // written before sound existed has no key here, and must not read as muted.
+    muted: saved.muted === true,
   };
 
   function persist() {
@@ -54,6 +57,10 @@ export function createPreferencesStore({ storage } = {}) {
     get duration() {
       return state.durationByMode[state.modeId];
     },
+    /** Whether the player has silenced the cabinet. Not part of `snapshot()` — a run's sound is not part of its result. */
+    get muted() {
+      return state.muted;
+    },
 
     setMode(modeId) {
       state.modeId = hoopModeById(modeId).id;
@@ -69,6 +76,11 @@ export function createPreferencesStore({ storage } = {}) {
       state.ballId = ballById(ballId).id;
       persist();
       return state.ballId;
+    },
+    setMuted(muted) {
+      state.muted = Boolean(muted);
+      persist();
+      return state.muted;
     },
     /** Set the round length for the mode currently selected. */
     setDuration(duration) {

@@ -12,6 +12,7 @@
 // and in what sequence.
 
 import { createAssetLibrary } from "./assets/loader.js";
+import { createGameAudio } from "./audio/game-audio.js";
 import { createPracticeCourt } from "./practice-court.js";
 import { CANVAS_HEIGHT, CANVAS_WIDTH, PULL_MIN, TICK_MS, TICK_SECONDS } from "./sim/constants.js";
 import { hoopAt, hoopModeById } from "./sim/hoop.js";
@@ -27,6 +28,7 @@ import {
 } from "./sim/shot.js";
 import {
   RUN_EXPIRED,
+  RUN_RUNNING,
   createRun,
   formatClock,
   isRunComplete,
@@ -48,6 +50,7 @@ import { createMenuView } from "./ui/menu-view.js";
 import { createOverlays } from "./ui/overlays.js";
 import { createBoardsView } from "./ui/boards-view.js";
 import { createSetupView, describeSetup } from "./ui/setup-view.js";
+import { createSoundToggle } from "./ui/sound-toggle.js";
 import { canvasPoint, isGrab } from "./ui/pointer.js";
 import {
   SCREEN_BOARDS,
@@ -72,6 +75,7 @@ export function boot(root) {
   const preferences = createPreferencesStore();
   const boards = createBoardsStore();
   const assets = createAssetLibrary({ onLoad: () => requestRedraw() });
+  const audio = createGameAudio({ muted: preferences.muted });
 
   const ball = createBall();
   let shot = createShot();
@@ -125,6 +129,7 @@ export function boot(root) {
     },
   });
   const overlays = createOverlays(root, { onIntent: handleIntent });
+  const soundToggle = createSoundToggle(root);
 
   // The How to Play demo. It runs the same sim on its own canvas, so the only
   // thing this file owes it is a place in the tick order and the cosmetic
@@ -132,6 +137,7 @@ export function boot(root) {
   const practiceView = createPracticeView(root);
   const practice = createPracticeCourt(root.querySelector("#practiceCourt"), {
     assets,
+    audio,
     onPower: (power) => practiceView.setPower(power),
     onSay: (text) => practiceView.say(text),
     onTally: (tally) => {
@@ -187,6 +193,7 @@ export function boot(root) {
     kicks.rim = 0;
 
     overlays.hideAll();
+    audio.runStarted();
     hud.setMode(hoopModeById(run.modeId).hudLabel);
     hud.setPower(0);
     hud.setHintVisible(true);
@@ -202,7 +209,11 @@ export function boot(root) {
 
     const summary = runSummary(run);
     const placement = boards.submitRun(summary);
-    hud.shout(summary.score > placement.previousBest && summary.score > 0 ? "NEW BEST!" : "TIME!");
+    const isNewBest = summary.score > placement.previousBest && summary.score > 0;
+    hud.shout(isNewBest ? "NEW BEST!" : "TIME!");
+    // The one thing worth cheering in a solo cabinet is beating yourself. The
+    // buzzer has already gone by here, which is the right order — horn, then room.
+    if (isNewBest) audio.celebrate();
     overlays.showResults(summary, placement);
 
     boardFilter = { modeId: run.modeId, duration: run.duration };
@@ -231,6 +242,26 @@ export function boot(root) {
       run.status !== RUN_EXPIRED
     );
   }
+
+  // Sound is unlocked and every button is clicked from ONE place, in the capture
+  // phase, so it happens before whatever the button actually does. Wiring a
+  // click sound into each view would mean four files to touch and one to forget,
+  // and browsers only allow an AudioContext to start from inside a gesture — so
+  // the first press of the first button is both the click and the unlock.
+  //
+  // The two events are not interchangeable. `pointerdown` is the earliest a
+  // gesture can start the context, so the unlock hangs off that; `click` is what
+  // a keyboard press on a focused menu option produces, so the sound hangs off
+  // that or the arrow-key navigation would be silent.
+  root.addEventListener("pointerdown", () => audio.unlock(), true);
+  root.addEventListener(
+    "click",
+    (event) => {
+      audio.unlock();
+      if (event.target.closest?.("button")) audio.click();
+    },
+    true,
+  );
 
   canvas.addEventListener("pointerdown", (event) => {
     if (!canPull()) return;
@@ -297,6 +328,7 @@ export function boot(root) {
     });
     launchBall(ball, launch, launchSpin(launch));
     beginShot(shot);
+    audio.released(run.ballId);
     recordShot(run);
     syncHud();
   }
@@ -359,6 +391,9 @@ export function boot(root) {
         overlays.hideAll();
         screens.show(SCREEN_BOARDS);
         break;
+      case "toggle-sound":
+        setMuted(!audio.isMuted());
+        break;
       default:
         break;
     }
@@ -369,14 +404,29 @@ export function boot(root) {
     paused = next;
     if (next) {
       cancelPull();
+      // A frozen clock, hoop and ball with the countdown still beeping over the
+      // top would be a lie. Resuming re-arms it at the right beat by itself.
+      audio.silence();
       overlays.showPause();
     } else {
       overlays.hidePause();
     }
   }
 
+  /** Mute, and remember it — the setting outlives the session, like every other preference. */
+  function setMuted(next) {
+    audio.setMuted(next);
+    preferences.setMuted(next);
+    soundToggle.render(next);
+  }
+
   root.addEventListener("keydown", (event) => {
     if (["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName)) return;
+    if (event.key === "m" || event.key === "M") {
+      event.preventDefault();
+      setMuted(!audio.isMuted());
+      return;
+    }
     if (event.key !== "Escape") return;
     event.preventDefault();
     if (screens.current() === SCREEN_GAME && !resultsShown) setPaused(!paused);
@@ -384,6 +434,9 @@ export function boot(root) {
   });
 
   function onScreenChange(next) {
+    // Leaving the court cuts whatever it was still saying — a countdown that
+    // followed the player back to the menu would be a bug you could hear.
+    if (next !== SCREEN_GAME) audio.silence();
     if (next === SCREEN_MENU) {
       renderMenu();
       menu.focus();
@@ -428,7 +481,12 @@ export function boot(root) {
     }
     if (screens.current() !== SCREEN_GAME || paused || resultsShown) return;
 
-    tickClock(run, TICK_SECONDS);
+    const { expired } = tickClock(run, TICK_SECONDS);
+    // Armed at three seconds and seeked to the beat, so the sample's beeps fall
+    // on 3, 2 and 1 and the buzzer takes the place of its fourth. See
+    // `audio/game-audio.js`.
+    audio.clock(run.remaining, run.status === RUN_RUNNING);
+    if (expired) audio.buzzer();
 
     const hoop = hoopAt(run.modeId, motionSeconds(run));
 
@@ -441,10 +499,18 @@ export function boot(root) {
 
       if (stepped.scored) {
         kicks.net = 1;
-        hud.shout(madeAnnouncement(recordMade(run) ));
+        const streak = recordMade(run);
+        hud.shout(madeAnnouncement(streak));
+        audio.scored(streak);
       }
       if (stepped.contacts.includes("rim")) {
         kicks.rim = ball.x < world.hoopWorld.rimX ? -1 : 1;
+      }
+      // `ball.vy` is read after the whole tick has resolved, which is exactly
+      // what the floor needs: a bounce leaves the floor with speed, a roll
+      // leaves it with none, and only the first one should be heard.
+      for (const contact of new Set(stepped.contacts)) {
+        audio.contact(contact, { ballId: run.ballId, speed: ball.vy });
       }
 
       const progress = advanceShot(
@@ -463,7 +529,10 @@ export function boot(root) {
       for (const announcement of progress.announcements) hud.shout(announcement);
 
       if (progress.finished) {
-        if (!shot.scored) recordMiss(run);
+        if (!shot.scored) {
+          recordMiss(run);
+          audio.missed();
+        }
         shot = createShot();
         resetBall(ball);
         hud.setPower(0);
@@ -547,6 +616,7 @@ export function boot(root) {
   renderMenu();
   renderSetup();
   renderBoards();
+  soundToggle.render(audio.isMuted());
   hud.setMode(hoopModeById(run.modeId).hudLabel);
   syncHud();
   requestAnimationFrame(loop);

@@ -31,7 +31,25 @@ import { canvasPoint, isGrab } from "./ui/pointer.js";
  */
 const PRACTICE_MODE = "still";
 
-export function createPracticeCourt(canvas, { assets, onPower = () => {}, onSay = () => {}, onTally = () => {} } = {}) {
+/**
+ * A demo that makes no noise at all, for a caller that does not hand one in.
+ *
+ * The court is a second composition root, and a root that hard-required an
+ * audio object would make `tests/practice-court.test.js` a browser test. The
+ * silent stand-in keeps the demo runnable under node, the same way `assets`
+ * being an injected library keeps it runnable without images.
+ */
+const SILENT_AUDIO = {
+  released() {},
+  contact() {},
+  scored() {},
+  missed() {},
+};
+
+export function createPracticeCourt(
+  canvas,
+  { assets, audio = SILENT_AUDIO, onPower = () => {}, onSay = () => {}, onTally = () => {} } = {},
+) {
   const ctx = canvas.getContext("2d");
   canvas.width = CANVAS_WIDTH;
   canvas.height = CANVAS_HEIGHT;
@@ -127,6 +145,7 @@ export function createPracticeCourt(canvas, { assets, onPower = () => {}, onSay 
     });
     launchBall(ball, launch, launchSpin(launch));
     beginShot(shot);
+    audio.released(style.ballId);
     taken += 1;
     onTally({ made, taken });
   }
@@ -155,9 +174,15 @@ export function createPracticeCourt(canvas, { assets, onPower = () => {}, onSay 
         streak += 1;
         onTally({ made, taken });
         onSay(madeAnnouncement(streak));
+        // The demo's own streak, so the celebration matches the ON FIRE! it is
+        // already putting on screen. It still has no clock and no board.
+        audio.scored(streak);
       }
       if (stepped.contacts.includes("rim")) {
         kicks.rim = ball.x < world.hoopWorld.rimX ? -1 : 1;
+      }
+      for (const contact of new Set(stepped.contacts)) {
+        audio.contact(contact, { ballId: style.ballId, speed: ball.vy });
       }
 
       const progress = advanceShot(
@@ -176,7 +201,10 @@ export function createPracticeCourt(canvas, { assets, onPower = () => {}, onSay 
       for (const announcement of progress.announcements) onSay(announcement);
 
       if (progress.finished) {
-        if (!shot.scored) streak = 0;
+        if (!shot.scored) {
+          streak = 0;
+          audio.missed();
+        }
         shot = createShot();
         resetBall(ball);
         onPower(0);

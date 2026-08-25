@@ -1,0 +1,124 @@
+// The registry of every sound the cabinet can make.
+//
+// Pure data plus resolvers. No AudioContext, no DOM, no fetch — which is what
+// lets the whole mapping be tested under node while the engine that plays it
+// cannot be.
+//
+// Three things live here that are easy to mistake for engine concerns:
+//
+// TRIM. Every source file carries a little silence before its transient. On a
+// click or a bounce that lead is latency the player feels as sponginess, so each
+// row declares the offset into the file where the sound actually starts and the
+// engine plays from there. The numbers were measured off each file's amplitude
+// envelope, not guessed; re-measure if a file is replaced.
+//
+// THROTTLE. `minInterval` is the shortest gap between two plays of the same id.
+// The floor collider fires once per substep while a ball is rolling, so without
+// this a settling ball machine-guns its own bounce sample.
+//
+// PER-BALL IMPACTS. A snowball must never make the basketball's bounce. Each
+// ball owns the sound of its own body hitting things — and, where it has one, a
+// release sound. The rim and the backboard are the *apparatus*, so all three
+// balls ring the same metal; what changes is how hard and how bright, which is
+// what `apparatusGain`/`apparatusRate` carry. A paper wad off the backboard is a
+// quiet, higher tap; a snowball is a duller thud.
+//
+// BALLS ARE STILL COSMETIC. Nothing in this file can reach the sim, so a ball
+// that sounds different still plays identically — the board-key constraint in
+// `assets/ball-catalog.js` is not weakened by anything here.
+
+import { DEFAULT_BALL } from "../assets/ball-catalog.js";
+
+/** Where the audio lives, relative to the cabinet root. */
+const SOUND_ASSET_ROOT = "assets/sounds";
+
+/**
+ * @typedef {object} SoundRow
+ * @property {string} id
+ * @property {string} file          filename under `assets/sounds/`
+ * @property {number} gain          baseline level, 0..1
+ * @property {number} offset        seconds of leading silence to skip
+ * @property {number} minInterval   seconds before this id may sound again
+ * @property {boolean} [ui]         an interface sound rather than a court sound
+ *
+ * `ui` marks the sounds that silencing the court must NOT cut. Pausing and
+ * quitting both stop everything that is ringing — and both are reached by
+ * pressing a button, so without this the click of that very button is the first
+ * casualty of its own effect.
+ */
+export const SOUNDS = Object.freeze([
+  // --- the shot -----------------------------------------------------------
+  Object.freeze({ id: "swish", file: "swish.wav", gain: 0.85, offset: 0, minInterval: 0.1 }),
+  Object.freeze({ id: "miss", file: "miss-chime.wav", gain: 0.45, offset: 0, minInterval: 0.15 }),
+  Object.freeze({ id: "rim", file: "rim-shake.wav", gain: 0.7, offset: 0, minInterval: 0.09 }),
+  Object.freeze({ id: "backboard", file: "backboard-hit.wav", gain: 0.6, offset: 0.03, minInterval: 0.09 }),
+
+  // --- per-ball bodies ----------------------------------------------------
+  Object.freeze({ id: "bounce-basketball", file: "basketball-bounce.wav", gain: 0.55, offset: 0.05, minInterval: 0.08 }),
+  Object.freeze({ id: "bounce-paper", file: "paper-ball-fall.wav", gain: 0.7, offset: 0.04, minInterval: 0.08 }),
+  Object.freeze({ id: "bounce-snowball", file: "snowball-hit.wav", gain: 0.7, offset: 0.03, minInterval: 0.08 }),
+  Object.freeze({ id: "throw-paper", file: "paper-ball-throw.wav", gain: 0.55, offset: 0.02, minInterval: 0.05 }),
+
+  // --- the round ----------------------------------------------------------
+  Object.freeze({ id: "start", file: "start-match.wav", gain: 0.7, offset: 0.06, minInterval: 0.5 }),
+  Object.freeze({ id: "countdown", file: "countdown.wav", gain: 0.6, offset: 0, minInterval: 0 }),
+  Object.freeze({ id: "buzzer", file: "buzzer.wav", gain: 0.65, offset: 0.04, minInterval: 1 }),
+
+  // --- celebration --------------------------------------------------------
+  Object.freeze({ id: "crowd-cheer", file: "crowd-cheer.wav", gain: 0.6, offset: 0.45, minInterval: 3 }),
+  Object.freeze({ id: "player-cheer", file: "player-cheer.wav", gain: 0.7, offset: 0.1, minInterval: 3 }),
+
+  // --- interface ----------------------------------------------------------
+  Object.freeze({ id: "click", file: "button-click.wav", gain: 0.4, offset: 0.09, minInterval: 0.04, ui: true }),
+]);
+
+/**
+ * The countdown sample's first beep marks this many seconds remaining, and its
+ * beeps sit exactly one second apart, so the final ding lands on zero.
+ *
+ * This is a measured property of `countdown.wav` (beeps at 0.00 / 1.00 / 2.00 /
+ * 3.00), which is why it lives beside the row rather than in `sim/constants.js`:
+ * it describes the file, not the game. Replace the file and re-measure.
+ */
+export const COUNTDOWN_LEAD_SECONDS = 3;
+
+/**
+ * How each ball sounds.
+ *
+ * `floor` is its body hitting the ground, `release` the sound of it leaving the
+ * hand (null for balls that do not have one). The apparatus modifiers colour the
+ * shared rim/backboard samples.
+ */
+const BALL_AUDIO = Object.freeze({
+  basketball: Object.freeze({ floor: "bounce-basketball", release: null, apparatusGain: 1, apparatusRate: 1 }),
+  paper: Object.freeze({ floor: "bounce-paper", release: "throw-paper", apparatusGain: 0.45, apparatusRate: 1.18 }),
+  snowball: Object.freeze({ floor: "bounce-snowball", release: null, apparatusGain: 0.7, apparatusRate: 0.88 }),
+});
+
+export function soundIds() {
+  return SOUNDS.map((sound) => sound.id);
+}
+
+/** Resolve a sound id. Returns null rather than throwing — a missing sound is silence, never a crash. */
+export function soundById(id) {
+  return SOUNDS.find((sound) => sound.id === id) || null;
+}
+
+/** The path a sound is fetched from. */
+export function soundPath(id) {
+  const sound = soundById(id);
+  return sound ? `${SOUND_ASSET_ROOT}/${sound.file}` : null;
+}
+
+/** Every path, for warming the cache. */
+export function soundPaths() {
+  return SOUNDS.map((sound) => `${SOUND_ASSET_ROOT}/${sound.file}`);
+}
+
+/**
+ * The audio profile for a ball, falling back to the default ball rather than
+ * throwing — the same degrade-don't-break rule the ball catalog itself uses.
+ */
+export function ballAudio(ballId) {
+  return BALL_AUDIO[ballId] || BALL_AUDIO[DEFAULT_BALL];
+}

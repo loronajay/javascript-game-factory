@@ -48,6 +48,12 @@ const MODULES = [
   "scripts/assets/ball-catalog.js",
   "scripts/assets/location-catalog.js",
   "scripts/assets/loader.js",
+  "scripts/audio/sound-catalog.js",
+  "scripts/audio/music-catalog.js",
+  "scripts/audio/playlist.js",
+  "scripts/audio/audio-engine.js",
+  "scripts/audio/music-player.js",
+  "scripts/audio/game-audio.js",
   "scripts/store/boards.js",
   "scripts/store/boards-store.js",
   "scripts/store/local-storage.js",
@@ -65,6 +71,7 @@ const MODULES = [
   "scripts/ui/boards-view.js",
   "scripts/ui/menu-view.js",
   "scripts/ui/practice-view.js",
+  "scripts/ui/sound-toggle.js",
   "scripts/practice-court.js",
   "scripts/init-game.js",
 ];
@@ -100,6 +107,56 @@ test("the render layer draws and nothing else — it never writes game state", (
     for (const forbidden of ["../store/", "localStorage"]) {
       assert(!code.includes(forbidden), `scripts/render/${name} reaches for ${forbidden}`);
     }
+  }
+});
+
+test("only the audio engine touches the Web Audio API", () => {
+  // Same rule as localStorage below, for the same reason. Autoplay policy,
+  // decoding and gain nodes are a browser concern, and one adapter is what keeps
+  // `sound-catalog.js` testable under node and `game-audio.js` about meaning.
+  const offenders = [];
+  walk(path.join(gameRoot, "scripts"), (file) => {
+    if (file.endsWith(path.join("audio", "audio-engine.js"))) return;
+    const code = stripComments(fs.readFileSync(file, "utf8"));
+    if (/AudioContext|decodeAudioData|createBufferSource/.test(code)) {
+      offenders.push(path.relative(gameRoot, file));
+    }
+  });
+  assertEqual(offenders.join(", "), "", "Web Audio access must stay behind one adapter");
+});
+
+test("only the music player streams through an <audio> element", () => {
+  // The soundtrack is the one thing in the cabinet that is streamed rather than
+  // decoded, and that difference is the whole reason it has its own adapter. If
+  // an element gets constructed anywhere else, the split has already leaked.
+  const offenders = [];
+  walk(path.join(gameRoot, "scripts"), (file) => {
+    if (file.endsWith(path.join("audio", "music-player.js"))) return;
+    const code = stripComments(fs.readFileSync(file, "utf8"));
+    if (/new Audio\(|globalThis\.Audio(?![A-Za-z])|HTMLAudioElement/.test(code)) {
+      offenders.push(path.relative(gameRoot, file));
+    }
+  });
+  assertEqual(offenders.join(", "), "", "music playback must stay behind one adapter");
+});
+
+test("the music catalog and the playlist stay pure — no element, no DOM", () => {
+  // Same rule the sound catalog lives by: the ordering rules are only cheap to
+  // test while nothing in them needs a browser to run.
+  for (const name of ["music-catalog.js", "playlist.js"]) {
+    const code = stripComments(fs.readFileSync(path.join(gameRoot, "scripts", "audio", name), "utf8"));
+    for (const forbidden of ["music-player", "Audio(", "fetch(", "document.", "window."]) {
+      assert(!code.includes(forbidden), `${name} reaches for ${forbidden}`);
+    }
+  }
+});
+
+test("the sound catalog stays pure data — no engine, no DOM", () => {
+  // It is the half of the audio layer that can be tested, and it only stays
+  // that way while it refuses to touch anything that needs a browser.
+  const code = stripComments(fs.readFileSync(path.join(gameRoot, "scripts", "audio", "sound-catalog.js"), "utf8"));
+  for (const forbidden of ["audio-engine", "AudioContext", "fetch(", "document.", "window."]) {
+    assert(!code.includes(forbidden), `sound-catalog.js reaches for ${forbidden}`);
   }
 });
 

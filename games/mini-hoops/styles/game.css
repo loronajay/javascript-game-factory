@@ -161,6 +161,24 @@ a:focus-visible {
   font-size: 11px;
 }
 
+/* The sound switch. There is one on the setup screen and one in the pause card
+   because those are the two moments a player reaches for it; both are the same
+   setting, and scripts/ui/sound-toggle.js keeps their labels together.
+
+   `aria-pressed` tracks MUTED, so the pressed state is the OFF state — which is
+   why this dims rather than lights up when it is set. */
+.sound-btn[aria-pressed="true"] {
+  color: var(--ink-dim);
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* Row two of the setup card's two-column grid, under Start Run rather than
+   beside the summary. */
+.setup-start .sound-btn {
+  grid-column: 2;
+}
+
 /* --- Panels and chips --------------------------------------------------- */
 
 .panel {

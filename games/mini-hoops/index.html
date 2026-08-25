@@ -113,6 +113,9 @@
             <div class="setup-start">
               <p id="setupSummary" class="setup-summary">Still · 30 sec · Bedroom · Basketball</p>
               <button type="button" class="primary-btn" data-intent="start">Start Run</button>
+              <!-- Every copy of this switch is the same setting; scripts/ui/sound-toggle.js
+                   keeps their labels together. The M key does the same thing anywhere. -->
+              <button type="button" class="ghost-btn ghost-btn--small sound-btn" data-intent="toggle-sound" aria-pressed="false">Sound: On</button>
             </div>
           </div>
         </div>
@@ -157,6 +160,7 @@
                   <button type="button" class="ghost-btn" data-intent="restart">Restart</button>
                   <button type="button" class="ghost-btn" data-intent="quit">Quit to Menu</button>
                 </div>
+                <button type="button" class="ghost-btn sound-btn" data-intent="toggle-sound" aria-pressed="false">Sound: On</button>
               </div>
             </div>
           </div>
