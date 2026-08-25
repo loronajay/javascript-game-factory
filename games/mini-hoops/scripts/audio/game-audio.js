@@ -181,6 +181,17 @@ export function createGameAudio({
         // meant for the shared one would be correcting a thing already correct.
         if (ball.rim) engine.play(ball.rim);
         else engine.play("rim", { gain: ball.apparatusGain, rate: ball.apparatusRate });
+      } else if (name === "bin-rim") {
+        // A bin lip is plastic where the classic rim is steel, and the whole of
+        // that difference is carried here rather than in a new recording: the
+        // same apparatus sample, quieter and pitched well down, is a knock
+        // instead of a ring. A ball that brings its OWN rim sound — the bowling
+        // ball does — is not given it here, because that recording is sixteen
+        // pounds of resin on a steel hoop and this is a wastebasket.
+        engine.play("rim", { gain: ball.apparatusGain * 0.42, rate: ball.apparatusRate * 0.64 });
+      } else if (name === "bin-wall") {
+        // The side of the bin, which is a bigger, hollower panel than the lip.
+        engine.play("backboard", { gain: ball.apparatusGain * 0.4, rate: ball.apparatusRate * 0.7 });
       } else if (name === "backboard") {
         engine.play("backboard", { gain: ball.apparatusGain, rate: ball.apparatusRate });
       } else if (name === "wall") {
@@ -219,6 +230,20 @@ export function createGameAudio({
     scored(streak) {
       engine.play("swish");
       if (streak === ON_FIRE_STREAK) this.celebrate();
+    },
+
+    /**
+     * A bin swallowed the ball.
+     *
+     * Not `scored()`. A swish is a ball passing through a net and there is no
+     * net here — what the room hears is the ball landing in a plastic drum, so
+     * this is the ball's own body sample at full weight with the reward chime
+     * over it. It is also a TURN ending rather than a point scored, which is why
+     * it does not touch the streak or bring the crowd up.
+     */
+    binScored(ballId) {
+      engine.play(ballAudio(ballId).floor, { gain: 1, ignoreThrottle: true });
+      engine.play("swish", { gain: 0.55 });
     },
 
     /** It did not. */

@@ -31,6 +31,7 @@
 
 import { RIM_RADIUS_WORLD } from "../sim/constants.js";
 import { ringEllipseAt } from "../sim/projection.js";
+import { halfSpan, isNear, ringPoint } from "./ring.js";
 
 const TAU = Math.PI * 2;
 
@@ -178,32 +179,6 @@ export function drawBackboard(ctx, hoop) {
 /** The rim's own projected ellipse, for a hoop snapshot. */
 function rimEllipse(hoop) {
   return ringEllipseAt(hoop.cx, hoop.rimY, RIM_RADIUS_WORLD);
-}
-
-/** A point on a projected ring at angle `a`. Screen-space; `a = 0` is stage right. */
-function ringPoint(ellipse, a) {
-  return {
-    x: ellipse.cx + Math.cos(a) * ellipse.radiusX,
-    y: ellipse.cy + Math.sin(a) * ellipse.radiusY,
-  };
-}
-
-/**
- * Is the point at angle `a` on the NEAR side of this ring?
- *
- * Increasing screen y is downward, so a positive sine puts a point below the
- * ring's centre — which is the near side ONLY when the ring is seen from above.
- * Looking up at it, the whole thing inverts. Every near/far decision in this
- * file goes through here so there is exactly one place that can be wrong.
- */
-function isNear(ellipse, a) {
-  return (Math.sin(a) >= 0) !== ellipse.fromBelow;
-}
-
-/** The angular span of one half of a ring: `[start, end]`, near or far. */
-function halfSpan(ellipse, wantNear) {
-  const lowerIsNear = !ellipse.fromBelow;
-  return wantNear === lowerIsNear ? [0, Math.PI] : [Math.PI, TAU];
 }
 
 /**

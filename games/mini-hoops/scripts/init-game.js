@@ -16,6 +16,7 @@ import { createAssetLibrary } from "./assets/loader.js";
 import { createGameAudio } from "./audio/game-audio.js";
 import { addSplat, clearSplatField, createSplatField, tickSplatField } from "./effects/splat-field.js";
 import { createPracticeCourt } from "./practice-court.js";
+import { bootTicTacToe } from "./tic-tac-toe-game.js";
 import { CANVAS_HEIGHT, CANVAS_WIDTH, PULL_MIN, TICK_MS, TICK_SECONDS } from "./sim/constants.js";
 import { hoopAt, hoopModeById } from "./sim/hoop.js";
 import { isShootablePull, neutralPull, resolvePull } from "./sim/pull.js";
@@ -65,7 +66,9 @@ import {
   SCREEN_GAME,
   SCREEN_HOWTO,
   SCREEN_MENU,
+  COURT_SCREENS,
   SCREEN_ONLINE,
+  SCREEN_TIC_TAC_TOE,
   SCREEN_SETUP,
   createScreenRouter,
 } from "./ui/screens.js";
@@ -132,6 +135,7 @@ export function boot(root) {
       [SCREEN_SETUP]: root.querySelector("#setupScreen"),
       [SCREEN_ONLINE]: root.querySelector("#onlineScreen"),
       [SCREEN_GAME]: root.querySelector("#gameScreen"),
+      [SCREEN_TIC_TAC_TOE]: root.querySelector("#ticTacToeScreen"),
       [SCREEN_BOARDS]: root.querySelector("#boardsScreen"),
       [SCREEN_HOWTO]: root.querySelector("#howToScreen"),
     },
@@ -162,9 +166,7 @@ export function boot(root) {
     onCreate: (config) => onlineClient.createPrivateRoom(config),
     onJoin: (code) => code && onlineClient.joinPrivateRoom(code),
     onTicTacToe: ({ action, roomCode }) => {
-      const query = new URLSearchParams({ mode: "online", action });
-      if (roomCode) query.set("room", roomCode);
-      globalThis.location.href = `tic-tac-toe-stage.html?${query}`;
+      openTicTacToe({ mode: "online", action, room: roomCode });
     },
     onConfig: (config) => {
       if (onlineSnapshot?.lobby?.ownerId === onlineSnapshot.clientId) onlineClient.updateConfig(config);
@@ -178,6 +180,35 @@ export function boot(root) {
   });
   onlineClient.subscribe(handleOnlineSnapshot);
   if (accountAccess.isEligible()) onlineClient.resumeSavedSession();
+
+  // Floor Tic-Tac-Toe. Its own root and its own loop — like the practice court —
+  // but the cabinet's audio, so the soundtrack does not stop and the ball is
+  // audible. It used to be a separate HTML page, which is what silenced both.
+  //
+  // It owns two sections: the court, which the router knows about, and its
+  // lobby, which is shown alongside. `onShowLobby` is how it asks for the swap
+  // without being handed the router.
+  const ticTacToeLobby = root.querySelector("#ticTacToeOnlineScreen");
+  const ticTacToe = bootTicTacToe(root, {
+    audio,
+    accountAccess,
+    onShowLobby: (showLobby) => {
+      if (ticTacToeLobby) ticTacToeLobby.classList.toggle("is-active", showLobby);
+      root.querySelector("#ticTacToeScreen")?.classList.toggle("is-active", !showLobby);
+    },
+    onLeave: () => {
+      ticTacToe.exit();
+      if (ticTacToeLobby) ticTacToeLobby.classList.remove("is-active");
+      screens.show(SCREEN_MENU);
+    },
+  });
+
+  /** Enter floor tic-tac-toe in a given mode. The one door into that screen. */
+  function openTicTacToe(options) {
+    overlays.hideAll();
+    screens.show(SCREEN_TIC_TAC_TOE);
+    ticTacToe.enter(options);
+  }
 
   // The How to Play demo. It runs the same sim on its own canvas, so the only
   // thing this file owes it is a place in the tick order and the cosmetic
@@ -479,6 +510,7 @@ export function boot(root) {
       screens.show(SCREEN_SETUP);
     }
     else if (command === "online") openOnline();
+    else if (command === "tic-tac-toe") openTicTacToe({ mode: "cpu" });
     else if (command === "boards") screens.show(SCREEN_BOARDS);
     else if (command === "howto") screens.show(SCREEN_HOWTO);
   }
@@ -590,7 +622,7 @@ export function boot(root) {
         break;
       case "start":
         if (playMode === "hotseat" && setupGameType === "tic-tac-toe") {
-          globalThis.location.href = "tic-tac-toe-stage.html?mode=local";
+          openTicTacToe({ mode: "local" });
           break;
         }
         if (playMode === "hotseat") hotseat = createHotseatDuel(preferences.snapshot());
@@ -625,6 +657,10 @@ export function boot(root) {
         break;
       case "toggle-sound":
         setMuted(!audio.isMuted());
+        break;
+      case "leave-tic-tac-toe":
+        // Handled by the tic-tac-toe root's own listener; named here so the
+        // markup-coherence test can see every intent has an owner.
         break;
       default:
         break;
@@ -666,9 +702,16 @@ export function boot(root) {
   });
 
   function onScreenChange(next) {
-    // Leaving the court cuts whatever it was still saying — a countdown that
+    // Leaving a court cuts whatever it was still saying — a countdown that
     // followed the player back to the menu would be a bug you could hear.
-    if (next !== SCREEN_GAME) audio.silence();
+    // BOTH courts count: `silence()` here on the way into tic-tac-toe would kill
+    // the bounce of the shot the player is watching. It never touches the
+    // soundtrack either way; music is the room, not the game.
+    if (!COURT_SCREENS.includes(next)) audio.silence();
+    // The loop is stopped on the way out rather than left spinning behind the
+    // menu, where the CPU would go on taking turns unobserved.
+    if (next !== SCREEN_TIC_TAC_TOE && ticTacToe.isActive()) ticTacToe.exit();
+    if (next !== SCREEN_TIC_TAC_TOE && ticTacToeLobby) ticTacToeLobby.classList.remove("is-active");
     if (next === SCREEN_MENU) {
       accountAccess.syncButton(root.querySelector("#onlineMenuButton"));
       renderMenu();

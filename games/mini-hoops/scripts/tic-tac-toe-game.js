@@ -1,16 +1,32 @@
-// Standalone composition root for the first playable floor Tic-Tac-Toe mode.
+// Floor Tic-Tac-Toe: a second composition root, on the cabinet's own page.
+//
+// IT IS A SCREEN, NOT A PAGE. It used to be `tic-tac-toe-stage.html`, and every
+// cost of that landed somewhere visible: navigating to a new document destroys
+// the <audio> element the soundtrack streams through, and a stream cannot be
+// picked back up across a navigation — so entering a match cut the music dead,
+// every time. Its sound effects never existed at all, because `createGameAudio`
+// lives in the cabinet this page had left. And a second stylesheet spent most of
+// its length undoing `game.css` for a DOM those rules were not written for.
+//
+// So it takes the cabinet's `audio` rather than making its own, and `screens.js`
+// routes to it. There is exactly one <audio> element in the cabinet and it never
+// stops.
+//
+// It is still its OWN ROOT — like the practice court — because it owns a
+// different loop, a different board and a different set of colliders. Sharing a
+// page is not sharing a controller.
 
 import { createAssetLibrary } from "./assets/loader.js";
 import { ballFlight } from "./assets/ball-catalog.js";
 import { createMiniHoopsAccountAccess } from "./multiplayer/account-access.js";
 import { normalizeRoomCode } from "./multiplayer/online-client.js";
 import { createTicTacToeOnlineClient } from "./multiplayer/tic-tac-toe-online-client.js";
-import { CANVAS_HEIGHT, CANVAS_WIDTH, PROJECTION_Y_SCALE, TICK_SECONDS } from "./sim/constants.js";
+import { CANVAS_HEIGHT, CANVAS_WIDTH, CONTACT_DEBOUNCE_SECONDS, TICK_SECONDS } from "./sim/constants.js";
 import { createBinTargets, stepBallAgainstBins } from "./sim/bin-physics.js";
 import { createBall, isBallSettled, launchBall, resetBall } from "./sim/physics.js";
 import { launchSpin, trajectoryPoints } from "./sim/launch.js";
 import { isShootablePull, neutralPull, resolvePull } from "./sim/pull.js";
-import { ballScreenRadius, depthScaleAt, projectPoint, worldToScreenLength } from "./sim/projection.js";
+import { ballScreenRadius, projectPoint } from "./sim/projection.js";
 import {
   createTicTacToeShot,
   nearestOpenCellForShot,
@@ -29,23 +45,37 @@ import {
 } from "./sim/tic-tac-toe.js";
 import { drawBall } from "./render/ball.js";
 import { drawAim } from "./render/aim.js";
+import { binMouthEllipse, drawBinBody, drawBinLip, drawBinMark } from "./render/bin.js";
 import { clearScene, depthGradeFilter, drawBallShadow, drawRoom, prepareContext } from "./render/scene.js";
 import { canvasPoint, isGrab } from "./ui/pointer.js";
 
-const BIN_PATH = "assets/modes/floor-tic-tac-toe/open-bin.png";
 const X_PATH = "assets/modes/floor-tic-tac-toe/neon-x.png";
 const O_PATH = "assets/modes/floor-tic-tac-toe/neon-o.png";
 // The room and the ball are fixed for this mode — the setup screen reads the
 // same record to know which of its pickers to put away.
 const { locationId: ROOM_ID, ballId: BALL_ID } = TIC_TAC_TOE_FIXED_SETUP;
-const BIN_VISIBLE_HEIGHT_RATIO = 1244 / 1326;
-const BIN_FOOT_Y_RATIO = 1288 / 1326;
+
+/**
+ * A silent stand-in, so the root can be constructed in a test without a browser.
+ * Same pattern and same reason as `practice-court.js`.
+ */
+const SILENT_AUDIO = Object.freeze({
+  released() {}, contact() {}, binScored() {}, missed() {}, celebrate() {}, click() {},
+});
 
 export function capturedBinForDraw(flight) {
   return Number.isInteger(flight?.capturedBin) ? flight.capturedBin : null;
 }
 
-export function isTicTacToeBallVisible(flight) {
+/**
+ * Is the ball loose in the room, rather than dropping into a bin?
+ *
+ * A captured ball is still DRAWN — clipped into its bin's mouth, so it visibly
+ * sinks out of sight instead of blinking out of existence at the mouth plane,
+ * which is what it used to do. This is the flag for which of the two ways it is
+ * drawn, not for whether it is drawn at all.
+ */
+export function isBallLooseInRoom(flight) {
   return capturedBinForDraw(flight) === null;
 }
 
@@ -55,20 +85,27 @@ export function ticTacToeMode(value) {
 
 export function bootTicTacToe(root, options = {}) {
   const random = options.random || Math.random;
+  // The cabinet's audio, not a second one. See the note at the top of the file.
+  const audio = options.audio || SILENT_AUDIO;
+  // How this root asks the cabinet to change screens. It owns a court and a
+  // lobby; it does not own the router.
+  const onShowLobby = options.onShowLobby || (() => {});
+  const onLeave = options.onLeave || (() => {});
   const accountAccess = options.accountAccess || createMiniHoopsAccountAccess();
   const onlineClient = options.onlineClient || createTicTacToeOnlineClient({
     resolveIdentity: () => accountAccess.identity(),
   });
-  const canvas = root.querySelector("#stageCourt");
+  const canvas = root.querySelector("#ticTacToeCourt");
   const ctx = canvas.getContext("2d");
   canvas.width = CANVAS_WIDTH;
   canvas.height = CANVAS_HEIGHT;
   prepareContext(ctx);
 
   const assets = createAssetLibrary({ onLoad: () => draw() });
+  // No bin image. The bins are drawn from the collider's own numbers — see
+  // `render/bin.js` for why the sprite could not stay.
   const art = {
     room: assets.backdrop(ROOM_ID),
-    bin: assets.image(BIN_PATH),
     x: assets.image(X_PATH),
     o: assets.image(O_PATH),
     ballFrames: assets.ballFrames(BALL_ID),
@@ -76,12 +113,16 @@ export function bootTicTacToe(root, options = {}) {
   const bins = createBinTargets();
   const ball = createBall();
   const scoredAt = new Map();
+  // When each kind of contact last sounded, for the debounce in `announce`.
+  const lastContactAt = new Map();
 
-  const params = new URLSearchParams(options.search ?? globalThis.location?.search ?? "");
-  const mode = ticTacToeMode(options.mode || params.get("mode"));
-  const difficulty = DIFFICULTIES.some(({ id }) => id === (options.difficulty || params.get("difficulty")))
-    ? (options.difficulty || params.get("difficulty"))
-    : "medium";
+  // Mode and difficulty are settable rather than read once, because the screen
+  // is entered repeatedly now — from the menu as CPU, from hotseat setup as
+  // local, from the online lobby as online — and a root that latched them at
+  // construction would serve whichever one was asked for first, forever.
+  let mode = ticTacToeMode(options.mode);
+  let difficulty = normalizeDifficulty(options.difficulty);
+  let active = false;
   let match;
   let pull = null;
   let pointerId = null;
@@ -100,13 +141,15 @@ export function bootTicTacToe(root, options = {}) {
   const readout = root.querySelector("#tttMeterReadout");
   const newMatchButton = root.querySelector("#newMatch");
   const onlinePanel = root.querySelector("#tttOnlinePanel");
-  const gameArea = root.querySelector("#tttGameArea");
   const modeLabel = root.querySelector("#tttModeLabel");
   const hint = root.querySelector("#tttHint");
 
   onlineClient.subscribe(handleOnlineSnapshot);
 
-  newMatchButton?.addEventListener("click", newMatch);
+  newMatchButton?.addEventListener("click", () => newMatch());
+  for (const button of root.querySelectorAll('[data-intent="leave-tic-tac-toe"]')) {
+    button.addEventListener("click", () => onLeave());
+  }
   root.querySelector("#tttOnlineQuick")?.addEventListener("click", () => onlineClient.findQuickMatch());
   root.querySelector("#tttOnlineCreate")?.addEventListener("click", () => onlineClient.createPrivateRoom());
   root.querySelector("#tttOnlineJoin")?.addEventListener("click", () => {
@@ -162,20 +205,42 @@ export function bootTicTacToe(root, options = {}) {
     });
     if (mode === "online") match.status = "waiting";
     scoredAt.clear();
+    lastContactAt.clear();
     pull = null;
     flight = null;
     onlineAttemptPending = false;
     cpuDelay = mode === "cpu" ? 0.75 : 0;
     resetBall(ball);
     setPower(0);
-    if (onlinePanel) onlinePanel.hidden = mode !== "online";
-    if (gameArea) gameArea.hidden = mode === "online";
+    onShowLobby(mode === "online");
     if (newMatchButton) newMatchButton.hidden = mode === "online";
     if (modeLabel) modeLabel.textContent = mode === "local" ? "Local Hotseat" : mode === "online" ? "Online Match" : `Vs CPU · ${difficulty}`;
     syncAssignment();
     renderOnlineLobby();
     syncTurnStatus();
     draw();
+  }
+
+  /**
+   * Turn this tick's contacts into sound.
+   *
+   * Debounced on the SAME rule the classic court uses: the colliders report once
+   * per substep, so a ball scraping a bin wall reports a contact every 8ms, and
+   * played straight that is a machine-gun rather than a knock. Two contacts of
+   * the same kind closer together than CONTACT_DEBOUNCE_SECONDS are one
+   * collision. The floor is exempt because `audio.contact` already judges a
+   * floor hit by its speed, which is what separates a bounce from a roll.
+   */
+  function announce(contacts) {
+    for (const contact of contacts) {
+      if (contact === "bin-score") continue;
+      if (contact !== "floor") {
+        const last = lastContactAt.get(contact) ?? -Infinity;
+        if (elapsed - last < CONTACT_DEBOUNCE_SECONDS) continue;
+        lastContactAt.set(contact, elapsed);
+      }
+      audio.contact(contact, { ballId: BALL_ID, speed: ball.vy });
+    }
   }
 
   function canHumanAct() {
@@ -192,6 +257,7 @@ export function bootTicTacToe(root, options = {}) {
     );
     if (nearest === null) return;
     launchBall(ball, shot.launch, launchSpin(shot.launch));
+    audio.released(BALL_ID);
     flight = {
       attemptedCell: nearest,
       targetZ: shot.targetZ,
@@ -236,6 +302,7 @@ export function bootTicTacToe(root, options = {}) {
         ballId: BALL_ID,
         capturedBin: flight.capturedBin,
       });
+      announce(result.contacts);
       if (result.capturedBin !== null) flight.capturedBin = result.capturedBin;
       if (result.scoredBin !== null && !match.board[result.scoredBin]) {
         const scoringMark = match.turn;
@@ -246,12 +313,14 @@ export function bootTicTacToe(root, options = {}) {
         }
         flight.resolved = true;
         flight.resetIn = 1.05;
+        audio.binScored(BALL_ID);
         setStatus(`${scoringMark.toUpperCase()} scores!`);
       } else if (flight.age > 3.15 || (flight.age > 0.45 && isBallSettled(ball))) {
         if (match.mode === "online") submitOnlineAttempt(flight.attemptedCell, false);
         else resolveAttempt(match, flight.attemptedCell, false);
         flight.resolved = true;
         flight.resetIn = 0.45;
+        audio.missed();
         setStatus("Miss · turn changes");
       }
     } else {
@@ -291,8 +360,10 @@ export function bootTicTacToe(root, options = {}) {
     for (let cell = 0; cell < match.board.length; cell++) {
       if (!previousBoard[cell] && match.board[cell]) scoredAt.set(cell, elapsed);
     }
-    if (gameArea) gameArea.hidden = snapshot.matchState.status === "waiting";
-    if (onlinePanel) onlinePanel.hidden = snapshot.matchState.status !== "waiting";
+    // The lobby and the court are two screens now: a match that is still
+    // waiting belongs in the lobby, and one that has started belongs on the
+    // court. Nothing is hidden in place.
+    onShowLobby(snapshot.matchState.status === "waiting");
     syncAssignment();
     syncTurnStatus();
     draw();
@@ -383,33 +454,115 @@ export function bootTicTacToe(root, options = {}) {
     return { x: screen.x, y: screen.y, radius: ballScreenRadius(ball.z) };
   }
 
+  /**
+   * The floor grid, drawn on the same camera as everything standing on it.
+   *
+   * Filled as well as stroked now. Nine bare magenta outlines on a photographed
+   * concrete floor read as a decal laid over the picture; a faint dark wash
+   * inside each cell is what makes them read as marked-out ground, and it gives
+   * the neon something to sit against.
+   */
+  function drawGrid() {
+    const xEdges = [-0.75, -0.25, 0.25, 0.75];
+    const zEdges = [0.195, 0.465, 0.735, 1.005];
+    const at = (x, z) => projectPoint({ x, y: 0.004, z });
+
+    ctx.save();
+    for (let row = 0; row < 3; row++) {
+      for (let column = 0; column < 3; column++) {
+        const claimed = match.board[row * 3 + column];
+        ctx.fillStyle = claimed ? "rgba(10,6,18,.42)" : "rgba(24,6,32,.26)";
+        ctx.beginPath();
+        const corners = [
+          at(xEdges[column], zEdges[row]),
+          at(xEdges[column + 1], zEdges[row]),
+          at(xEdges[column + 1], zEdges[row + 1]),
+          at(xEdges[column], zEdges[row + 1]),
+        ];
+        ctx.moveTo(corners[0].x, corners[0].y);
+        for (const corner of corners.slice(1)) ctx.lineTo(corner.x, corner.y);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    ctx.strokeStyle = "rgba(255, 45, 225, .88)";
+    ctx.shadowColor = "#ff2ddd";
+    ctx.shadowBlur = 14;
+    ctx.lineWidth = 5;
+    for (const x of xEdges) line(at(x, zEdges[0]), at(x, zEdges[3]));
+    for (const z of zEdges) line(at(xEdges[0], z), at(xEdges[3], z));
+    ctx.restore();
+  }
+
+  function line(a, b) {
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  /**
+   * The ball, drawn into the bin that has it.
+   *
+   * Clipped to the mouth opening, so as it falls it slides out from under the
+   * near lip and is gone — which is what dropping into a bin looks like. It used
+   * to be cut dead at the mouth plane instead, so the ball reached the rim and
+   * simply stopped existing, one frame, mid-shot.
+   */
+  function drawSinkingBall(bin) {
+    const mouth = binMouthEllipse(bin);
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(mouth.cx, mouth.cy, mouth.radiusX, mouth.radiusY, 0, 0, Math.PI * 2);
+    ctx.clip();
+    drawBall(ctx, {
+      frames: art.ballFrames,
+      ballId: BALL_ID,
+      ...screenBallPosition(),
+      rollPhase: ball.rollPhase,
+      // Dimmer than the room, because it is inside a dark drum by now.
+      filter: `${depthGradeFilter(bin.z)} brightness(0.62)`,
+    });
+    ctx.restore();
+  }
+
   function draw() {
     if (!match) return;
     clearScene(ctx);
     drawRoom(ctx, art.room, ROOM_ID);
-    drawGrid(ctx);
+    drawGrid();
 
-    const occupants = [];
-    for (const bin of bins) {
+    const captured = capturedBinForDraw(flight);
+    const loose = isBallLooseInRoom(flight) && !ball.splat;
+    const winning = new Set(match.winningCells || []);
+
+    // Back to front, the painter's pass. Each bin draws its body, then anything
+    // sitting inside it, then its near lip — so the lip is in front of the ball
+    // and the ball is in front of the bin behind it.
+    const order = [...bins].sort((a, b) => b.z - a.z);
+    if (loose) drawBallShadow(ctx, ball);
+
+    let ballDrawn = false;
+    for (const bin of order) {
+      // A loose ball nearer the camera than this bin belongs in front of it.
+      if (loose && !ballDrawn && ball.z > bin.z) {
+        drawLooseBall();
+        ballDrawn = true;
+      }
+      drawBinBody(ctx, bin);
+      if (captured === bin.index) drawSinkingBall(bin);
       const mark = markForCell(match.board, scoredAt, bin.index, elapsed);
-      if (mark) occupants.push({ type: "mark", z: bin.z, bin, mark });
-      else occupants.push({ type: "bin", z: bin.z, bin });
+      if (mark) {
+        // A winning bin pulses; the rest sit at rest. `elapsed` is tick time, so
+        // the pulse is deterministic and a replay looks identical.
+        const glow = winning.has(bin.index) ? 1.35 + Math.sin(elapsed * 6) * 0.45 : 1;
+        drawBinMark(ctx, bin, art[mark], mark, { glow });
+      }
+      drawBinLip(ctx, bin);
     }
-    if (!ball.splat && isTicTacToeBallVisible(flight)) occupants.push({ type: "ball", z: ball.z });
-    occupants.sort((a, b) => b.z - a.z);
+    if (loose && !ballDrawn) drawLooseBall();
 
-    if (isTicTacToeBallVisible(flight)) drawBallShadow(ctx, ball);
-    for (const occupant of occupants) {
-      if (occupant.type === "bin") drawBin(ctx, occupant.bin, art.bin);
-      else if (occupant.type === "mark") drawMark(ctx, occupant.bin, art[occupant.mark]);
-      else drawBall(ctx, {
-        frames: art.ballFrames,
-        ballId: BALL_ID,
-        ...screenBallPosition(),
-        rollPhase: ball.rollPhase,
-        filter: depthGradeFilter(ball.z),
-      });
-    }
     if (pull) {
       const preview = createTicTacToeShot(pull, ball, { weight: ballFlight(BALL_ID).weight });
       const trajectory = pull.power > 0.03 ? trajectoryPoints(ball, preview.launch) : null;
@@ -421,61 +574,62 @@ export function bootTicTacToe(root, options = {}) {
     }
   }
 
+  function drawLooseBall() {
+    drawBall(ctx, {
+      frames: art.ballFrames,
+      ballId: BALL_ID,
+      ...screenBallPosition(),
+      rollPhase: ball.rollPhase,
+      filter: depthGradeFilter(ball.z),
+    });
+  }
+
   function frame(now) {
     accumulator += Math.min(100, now - previousFrame) / 1000;
     previousFrame = now;
     while (accumulator >= TICK_SECONDS) { tick(); accumulator -= TICK_SECONDS; }
     draw();
-    requestAnimationFrame(frame);
+    if (active) requestAnimationFrame(frame);
+  }
+
+  /**
+   * Show this screen, in the mode it is being entered for.
+   *
+   * The loop only runs while the screen is up. That is not a saving — it is what
+   * stops the CPU from taking its turn against a board nobody is looking at while
+   * the player reads the leaderboard.
+   */
+  function enter({ mode: nextMode, difficulty: nextDifficulty, action, room } = {}) {
+    if (nextMode !== undefined) mode = ticTacToeMode(nextMode);
+    if (nextDifficulty !== undefined) difficulty = normalizeDifficulty(nextDifficulty);
+    newMatch();
+    if (mode === "online" && accountAccess.requireAccount()) {
+      if (action === "quick") onlineClient.findQuickMatch();
+      else if (action === "create") onlineClient.createPrivateRoom();
+      else if (action === "join" && room) onlineClient.joinPrivateRoom(room);
+      else onlineClient.connect();
+    }
+    if (!active) {
+      active = true;
+      previousFrame = performance.now();
+      accumulator = 0;
+      requestAnimationFrame(frame);
+    }
+  }
+
+  /** Leave the screen: stop the loop, drop the pull, and let go of any lobby. */
+  function exit() {
+    active = false;
+    pull = null;
+    pointerId = null;
+    if (mode === "online") onlineClient.leave();
   }
 
   newMatch();
-  if (mode === "online" && accountAccess.requireAccount()) {
-    const action = params.get("action");
-    if (action === "quick") onlineClient.findQuickMatch();
-    else if (action === "create") onlineClient.createPrivateRoom();
-    else if (action === "join" && params.get("room")) onlineClient.joinPrivateRoom(params.get("room"));
-    else onlineClient.connect();
-  }
-  requestAnimationFrame(frame);
-  return { get match() { return match; }, bins, ball, newMatch, draw };
+  return { get match() { return match; }, bins, ball, newMatch, draw, enter, exit, isActive: () => active };
 }
 
-function drawGrid(ctx) {
-  const xEdges = [-0.75, -0.25, 0.25, 0.75];
-  const zEdges = [0.195, 0.465, 0.735, 1.005];
-  ctx.save();
-  ctx.strokeStyle = "rgba(255, 45, 225, .88)";
-  ctx.shadowColor = "#ff2ddd";
-  ctx.shadowBlur = 14;
-  ctx.lineWidth = 5;
-  for (const x of xEdges) line(ctx, projectPoint({ x, y: 0.004, z: zEdges[0] }), projectPoint({ x, y: 0.004, z: zEdges[3] }));
-  for (const z of zEdges) line(ctx, projectPoint({ x: xEdges[0], y: 0.004, z }), projectPoint({ x: xEdges[3], y: 0.004, z }));
-  ctx.restore();
-}
-
-function line(ctx, a, b) { ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
-
-function binRect(bin, image) {
-  const visibleHeight = bin.topY * PROJECTION_Y_SCALE * depthScaleAt(bin.z);
-  const height = visibleHeight / BIN_VISIBLE_HEIGHT_RATIO;
-  const width = height * ((image.naturalWidth || 1060) / (image.naturalHeight || 1326));
-  const foot = projectPoint({ x: bin.x, y: 0, z: bin.z });
-  return { x: foot.x - width / 2, y: foot.y - height * BIN_FOOT_Y_RATIO, width, height };
-}
-
-function drawBin(ctx, bin, image) {
-  const rect = binRect(bin, image);
-  ctx.save(); ctx.filter = depthGradeFilter(bin.z);
-  if (image.complete && image.naturalWidth) ctx.drawImage(image, rect.x, rect.y, rect.width, rect.height);
-  else { ctx.fillStyle = "#111820"; ctx.fillRect(rect.x, rect.y, rect.width, rect.height); }
-  ctx.restore();
-}
-
-function drawMark(ctx, bin, image) {
-  const centre = projectPoint({ x: bin.x, y: 0.012, z: bin.z });
-  const width = worldToScreenLength(0.38, bin.z);
-  const height = width * ((image.naturalHeight || 1) / (image.naturalWidth || 1));
-  ctx.save(); ctx.globalAlpha = 0.95; ctx.shadowColor = "#fff"; ctx.shadowBlur = 12;
-  ctx.drawImage(image, centre.x - width / 2, centre.y - height / 2, width, height); ctx.restore();
+/** Resolve a difficulty id, defaulting rather than throwing. */
+function normalizeDifficulty(id) {
+  return DIFFICULTIES.some((difficulty) => difficulty.id === id) ? id : "medium";
 }

@@ -24,9 +24,11 @@ import {
 suite("modules — wiring and markup coherence");
 
 const gameRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// ONE PAGE. Floor tic-tac-toe used to live in `tic-tac-toe-stage.html`, and a
+// second document is what stopped the soundtrack dead on every entry — a page
+// navigation destroys the <audio> element streaming it. It is a screen now.
 const html = fs.readFileSync(path.join(gameRoot, "index.html"), "utf8");
-const ticTacToeHtml = fs.readFileSync(path.join(gameRoot, "tic-tac-toe-stage.html"), "utf8");
-const allMarkup = `${html}\n${ticTacToeHtml}`;
+const allMarkup = html;
 
 // ---------------------------------------------------------------------------
 // Every module imports cleanly
@@ -73,7 +75,6 @@ const MODULES = [
   "scripts/render/aim.js",
   "scripts/render/frame.js",
   "scripts/render/splats.js",
-  "scripts/staging/tic-tac-toe-stage.js",
   "scripts/ui/screens.js",
   "scripts/ui/pointer.js",
   "scripts/ui/hud.js",
@@ -233,19 +234,42 @@ test("every element id the scripts query actually exists in the markup", () => {
 
 test("every screen the router knows about has a section in the markup", () => {
   for (const screen of SCREENS) {
-    const id = { menu: "menuScreen", setup: "setupScreen", online: "onlineScreen", game: "gameScreen", boards: "boardsScreen", howto: "howToScreen" }[screen];
+    const id = { menu: "menuScreen", setup: "setupScreen", online: "onlineScreen", game: "gameScreen", tictactoe: "ticTacToeScreen", boards: "boardsScreen", howto: "howToScreen" }[screen];
     assert(html.includes(`id="${id}"`), `no section for the ${screen} screen`);
   }
 });
 
 test("floor tic-tac-toe is offered through proper solo, hotseat, and online entry points", () => {
-  assert(html.includes('href="tic-tac-toe-stage.html?mode=cpu"'), "the main menu needs a CPU tic-tac-toe entry");
+  assert(html.includes('data-command="tic-tac-toe"'), "the main menu needs a CPU tic-tac-toe entry");
   assert(html.includes('id="setupGameTypes"'), "local hotseat setup needs a game-type picker");
   assert(html.includes('id="onlineGameType"'), "the online lobby needs a game-type picker");
-  assert(!ticTacToeHtml.includes('id="opponent"'), "the game court must not use a mode dropdown");
+  assert(!html.includes('id="opponent"'), "the game court must not use a mode dropdown");
   for (const id of ["tttOnlinePanel", "tttOnlineQuick", "tttOnlineCreate", "tttOnlineJoin", "tttOnlineStart", "tttOnlineLeave"]) {
-    assert(ticTacToeHtml.includes(`id="${id}"`), `tic-tac-toe online lobby needs #${id}`);
+    assert(html.includes(`id="${id}"`), `tic-tac-toe online lobby needs #${id}`);
   }
+});
+
+test("the cabinet is one page, so nothing can navigate away from its audio", () => {
+  // The soundtrack streams through a single <audio> element and a navigation
+  // destroys it — which is exactly what entering tic-tac-toe used to do. Every
+  // screen must be reached through the router instead.
+  assert(!fs.existsSync(path.join(gameRoot, "tic-tac-toe-stage.html")), "the tic-tac-toe stage page must stay deleted");
+  for (const relative of ["scripts/init-game.js", "scripts/tic-tac-toe-game.js"]) {
+    const code = stripComments(fs.readFileSync(path.join(gameRoot, relative), "utf8"));
+    assert(!/location\.href\s*=/.test(code), `${relative} navigates away from the cabinet`);
+  }
+});
+
+test("floor tic-tac-toe uses the cabinet's audio rather than making its own", () => {
+  // Its sound effects never existed, because `createGameAudio` lived in the
+  // cabinet this mode had left. It takes the one that already exists.
+  const root = stripComments(fs.readFileSync(path.join(gameRoot, "scripts", "tic-tac-toe-game.js"), "utf8"));
+  assert(!root.includes("createGameAudio"), "tic-tac-toe must not build a second audio stack");
+  for (const call of ["audio.released(", "audio.contact(", "audio.binScored(", "audio.missed("]) {
+    assert(root.includes(call), `tic-tac-toe never calls ${call}`);
+  }
+  const shell = stripComments(fs.readFileSync(path.join(gameRoot, "scripts", "init-game.js"), "utf8"));
+  assert(/bootTicTacToe\(root,\s*\{\s*audio,/.test(shell), "the cabinet must hand tic-tac-toe its audio");
 });
 
 test("every button intent in the markup is handled by the composition root", () => {
@@ -261,7 +285,7 @@ test("every button intent in the markup is handled by the composition root", () 
 test("every menu command in the markup is handled", () => {
   const source = fs.readFileSync(path.join(gameRoot, "scripts", "init-game.js"), "utf8");
   const commands = new Set([...html.matchAll(/data-command="([a-z-]+)"/g)].map((match) => match[1]));
-  assertEqual(commands.size, 5, "the menu exposes solo, hotseat, online, boards and how-to-play commands");
+  assertEqual(commands.size, 6, "the menu exposes solo, hotseat, online, boards, how-to-play and tic-tac-toe");
   for (const command of commands) {
     assert(source.includes(`"${command}"`), `menu command "${command}" is not handled`);
   }

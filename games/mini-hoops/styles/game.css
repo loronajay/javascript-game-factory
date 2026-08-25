@@ -1195,3 +1195,42 @@ body.is-playing .cabinet {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   FLOOR TIC-TAC-TOE HUD
+
+   The tic-tac-toe court is the classic court: same `.game-screen`, `.court`,
+   `.hud` and `.shot-panel`, same viewport lock, same phone rules. These are the
+   two places its HUD says something the classic one does not — a turn line
+   instead of a clock, and a New match button where the streak sits.
+   --------------------------------------------------------------------------- */
+
+.hud-clock--wide { min-width: 200px; }
+
+.hud-turn {
+  display: block;
+  font: 800 .92rem/1.25 system-ui, sans-serif;
+  letter-spacing: .01em;
+  color: #fff;
+}
+
+.hud-action {
+  border: 1px solid rgba(255, 255, 255, .22);
+  border-radius: 7px;
+  background: rgba(18, 12, 10, .72);
+  color: #fff;
+  cursor: pointer;
+  font: 800 .74rem/1 system-ui, sans-serif;
+  letter-spacing: .06em;
+  padding: 8px 10px;
+  text-transform: uppercase;
+}
+
+.hud-action[hidden] { display: none; }
+.hud-action:hover { border-color: rgba(255, 255, 255, .45); }
+
+/* The tic-tac-toe HUD says shorter things than the classic one — a mark
+   assignment rather than a running score — so its stat block is sized for a
+   line of text instead of a two-digit number. */
+#ticTacToeScreen .hud-stat strong { font-size: 1.05rem; letter-spacing: .02em; }
+#ticTacToeScreen .hud-stat--right { align-items: flex-end; }

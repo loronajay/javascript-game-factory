@@ -10,8 +10,34 @@ export const SCREEN_GAME = "game";
 export const SCREEN_BOARDS = "boards";
 export const SCREEN_HOWTO = "howto";
 export const SCREEN_ONLINE = "online";
+export const SCREEN_TIC_TAC_TOE = "tictactoe";
 
-export const SCREENS = Object.freeze([SCREEN_MENU, SCREEN_SETUP, SCREEN_ONLINE, SCREEN_GAME, SCREEN_BOARDS, SCREEN_HOWTO]);
+export const SCREENS = Object.freeze([
+  SCREEN_MENU,
+  SCREEN_SETUP,
+  SCREEN_ONLINE,
+  SCREEN_GAME,
+  SCREEN_TIC_TAC_TOE,
+  SCREEN_BOARDS,
+  SCREEN_HOWTO,
+]);
+
+/**
+ * The screens that ARE a court: sized to the viewport, and never scrolled.
+ *
+ * Floor tic-tac-toe used to be a separate HTML page, and the whole of that
+ * decision was paid for in this class. `is-playing` pins the cabinet to 100dvh,
+ * the page needed a heading the classic court has never had, and undoing the
+ * lock meant `styles/tic-tac-toe-stage.css` also had to undo `game.css`'s phone
+ * rules wholesale — for a DOM that was not the one they were written for. As a
+ * screen it is simply a court, and all of that is gone: one stylesheet, one
+ * viewport lock, one set of phone rules.
+ *
+ * It is also what keeps the soundtrack running. A page navigation destroys the
+ * <audio> element streaming it, and nothing brings a stream back — so entering
+ * tic-tac-toe cut the music off mid-bar, every time.
+ */
+export const COURT_SCREENS = Object.freeze([SCREEN_GAME, SCREEN_TIC_TAC_TOE]);
 
 /**
  * Where "back" goes from each screen.
@@ -25,6 +51,7 @@ const BACK_TARGETS = Object.freeze({
   [SCREEN_SETUP]: SCREEN_MENU,
   [SCREEN_ONLINE]: SCREEN_MENU,
   [SCREEN_GAME]: SCREEN_MENU,
+  [SCREEN_TIC_TAC_TOE]: SCREEN_MENU,
   [SCREEN_BOARDS]: SCREEN_MENU,
   [SCREEN_HOWTO]: SCREEN_MENU,
 });
@@ -55,9 +82,10 @@ export function createScreenRouter(sections, { onChange = () => {} } = {}) {
     for (const name of SCREENS) {
       sections[name]?.classList.toggle("is-active", name === current);
     }
-    // The game screen takes over the viewport on phones; the body class is what
-    // the landscape/portrait rules in the stylesheet key off.
-    document.body.classList.toggle("is-playing", current === SCREEN_GAME);
+    // A court takes over the viewport on phones; the body class is what the
+    // landscape/portrait rules in the stylesheet key off. Both courts, not just
+    // the classic one — see COURT_SCREENS.
+    document.body.classList.toggle("is-playing", COURT_SCREENS.includes(current));
   }
 
   apply();

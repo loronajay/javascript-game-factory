@@ -10,7 +10,7 @@ import {
   resolveAttempt,
   winningLine,
 } from "../scripts/sim/tic-tac-toe.js";
-import { capturedBinForDraw, isTicTacToeBallVisible } from "../scripts/tic-tac-toe-game.js";
+import { capturedBinForDraw, isBallLooseInRoom } from "../scripts/tic-tac-toe-game.js";
 
 suite("tic-tac-toe — turns, assignment, wins, and adjustable CPU play");
 
@@ -117,10 +117,14 @@ test("the bin occlusion pass is safely absent between shots", () => {
   assertEqual(capturedBinForDraw({ capturedBin: 6 }), 6);
 });
 
-test("the visible ball ends when it crosses into a bin", () => {
-  assertEqual(isTicTacToeBallVisible(null), true);
-  assertEqual(isTicTacToeBallVisible({ capturedBin: null }), true);
-  assertEqual(isTicTacToeBallVisible({ capturedBin: 6 }), false);
+test("a captured ball stops being loose in the room, and is drawn into its bin instead", () => {
+  // It used to stop being drawn at all, the instant it crossed the mouth plane
+  // — so the ball reached the rim and vanished, mid-shot, in one frame. It is
+  // now clipped into the bin's mouth and visibly sinks out of sight, so this
+  // flag chooses WHICH of the two ways it is drawn, not whether it is drawn.
+  assertEqual(isBallLooseInRoom(null), true);
+  assertEqual(isBallLooseInRoom({ capturedBin: null }), true);
+  assertEqual(isBallLooseInRoom({ capturedBin: 6 }), false);
 });
 
 finish();

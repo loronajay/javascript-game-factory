@@ -32,3 +32,98 @@
 .match-score-strip[hidden] { display: none; }
 .match-score-strip strong { color: var(--brass); font-size: 18px; }
 @media (max-width: 700px) { .online-shell { grid-template-columns: 1fr; } .online-config { grid-template-columns: 1fr 1fr; } }
+
+/* ---------------------------------------------------------------------------
+   FLOOR TIC-TAC-TOE LOBBY
+
+   Moved here from `styles/tic-tac-toe-stage.css` when tic-tac-toe stopped being
+   a separate page. That stylesheet's other job was undoing this cabinet's own
+   rules for a DOM they were not written for — a screen needs none of that, so
+   the only part worth keeping was the lobby itself.
+   --------------------------------------------------------------------------- */
+
+.ttt-online-panel {
+  display: grid;
+  grid-template-columns: minmax(190px, .75fr) minmax(360px, 1.5fr);
+  gap: 14px;
+  padding-top: 18px;
+  color: #d9efff;
+}
+
+.ttt-online-account {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  text-align: left;
+}
+
+.ttt-online-account span,
+.ttt-online-account small {
+  color: #9bb8cc;
+  font: 700 .72rem/1.3 system-ui, sans-serif;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.ttt-online-account strong { font-size: 1.25rem; }
+
+.ttt-online-pairing,
+.ttt-online-actions,
+.ttt-online-code-entry,
+.ttt-online-players {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ttt-online-code-entry input {
+  width: 118px;
+  border: 1px solid rgba(83, 246, 255, .55);
+  border-radius: 6px;
+  background: #101824;
+  color: #fff;
+  padding: 10px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.ttt-online-lobby { grid-column: 2; }
+
+.ttt-online-room-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.ttt-online-room-heading strong {
+  color: #53f6ff;
+  font-size: 1.4rem;
+  letter-spacing: .14em;
+}
+
+.ttt-online-players { margin-bottom: 12px; }
+
+.ttt-online-players span {
+  min-width: 128px;
+  padding: 10px 12px;
+  border-radius: 7px;
+  background: rgba(83, 246, 255, .1);
+  font-weight: 800;
+  text-align: center;
+}
+
+.ttt-online-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #9bb8cc;
+  text-align: center;
+  font: 700 .82rem/1.4 system-ui, sans-serif;
+}
+
+@media (max-width: 700px) {
+  .ttt-online-panel { grid-template-columns: 1fr; }
+  .ttt-online-lobby { grid-column: 1; }
+}
