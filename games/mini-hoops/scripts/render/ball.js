@@ -12,10 +12,14 @@ import { ballFrameIndex } from "../assets/ball-catalog.js";
  *
  * @param frames decoded images for this ball, in roll order
  * @param ballId which ball, for frame-count lookup
+ * @param filter a canvas filter string for aerial perspective, from
+ *   `render/scene.js`. Applied to the placeholder as well, so a ball deep in the
+ *   room does not brighten up for the frames it is still decoding.
  */
-export function drawBall(ctx, { frames, ballId, x, y, radius, rollPhase, alpha = 1 }) {
+export function drawBall(ctx, { frames, ballId, x, y, radius, rollPhase, alpha = 1, filter = null }) {
   ctx.save();
   ctx.globalAlpha = alpha;
+  if (filter) ctx.filter = filter;
   ctx.translate(x, y);
 
   const frame = frames?.[ballFrameIndex(ballId, rollPhase)];

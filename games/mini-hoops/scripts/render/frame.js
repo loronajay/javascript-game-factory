@@ -16,12 +16,27 @@
 // the decal at that spot IS the ball, added to the field on the same tick the
 // physics reported it, so the swap is seamless. Drawing the sprite as well
 // would leave a snowball hanging on the wall in front of its own splat.
+//
+// THE ROOM IS DRAWN TWICE. Once behind everything, and again — through the
+// polygons in `assets/room-geometry.js` — in front of whatever is deeper than
+// the furniture those polygons were traced around. That second pass is the only
+// occlusion this cabinet has and it is why a ball can pass behind the desk
+// instead of over the top of it. It runs twice per frame for two different
+// depths: once over the marks painted onto the room, and once over the ball,
+// whose depth changes every tick.
 
-import { PROJECTION_ORIGIN_X } from "../sim/constants.js";
+import { BOARD_Z, PROJECTION_ORIGIN_X } from "../sim/constants.js";
 import { ballScreenRadius, projectPoint } from "../sim/projection.js";
 import { drawBall } from "./ball.js";
 import { drawBackboard, drawNet, drawRim } from "./hoop.js";
-import { clearScene, drawBallShadow, drawRoom } from "./scene.js";
+import {
+  clearScene,
+  depthGradeFilter,
+  drawBallShadow,
+  drawRoom,
+  drawRoomOccluders,
+  drawWallShadow,
+} from "./scene.js";
 import { drawSplatDecals, drawSplatParticles } from "./splats.js";
 import { drawAim } from "./aim.js";
 
@@ -32,13 +47,26 @@ import { drawAim } from "./aim.js";
  *   computes no game state and reads no store.
  */
 export function renderFrame(ctx, view) {
-  const { ball, hoop, backdrop, ballFrames, ballId, pull, trajectory, kicks, scored, splats, splatImages } = view;
+  const {
+    ball,
+    hoop,
+    backdrop,
+    locationId,
+    ballFrames,
+    ballId,
+    pull,
+    trajectory,
+    kicks,
+    scored,
+    splats,
+    splatImages,
+  } = view;
   // The one question the splat asks of the composition below: is there still a
   // ball to draw at all?
   const hasBall = !ball.splat;
 
   clearScene(ctx);
-  drawRoom(ctx, backdrop);
+  drawRoom(ctx, backdrop, locationId);
   // Decals go on the room itself, under everything — a splat on the back wall
   // belongs behind the backboard that is bolted over it. The powder goes on
   // top of them and behind the hoop, which is where it was thrown from.
@@ -46,7 +74,14 @@ export function renderFrame(ctx, view) {
     drawSplatDecals(ctx, splats, { images: splatImages });
     drawSplatParticles(ctx, splats);
   }
-  if (hasBall) drawBallShadow(ctx, ball);
+  if (hasBall) {
+    // Both shadows go under the furniture pass below, so a ball's shadow cannot
+    // fall across the front of a desk that is standing in front of it.
+    drawWallShadow(ctx, ball);
+    drawBallShadow(ctx, ball);
+  }
+  // Everything painted onto the room is behind the room's own furniture.
+  drawRoomOccluders(ctx, backdrop, locationId, BOARD_Z);
 
   drawBackboard(ctx, hoop);
   drawNet(ctx, hoop, true, kicks.net);
@@ -56,6 +91,10 @@ export function renderFrame(ctx, view) {
 
   const screen = projectPoint(ball);
   const radius = ballScreenRadius(ball.z);
+  // Aerial perspective: the far end of every painted room is dimmer than the
+  // near end, so the sprite is graded to match rather than staying lit like a
+  // decal on the glass.
+  const filter = depthGradeFilter(ball.z);
 
   if (pull) {
     // Pulling: the ball is in the player's hand at the pull position, not at its
@@ -70,23 +109,33 @@ export function renderFrame(ctx, view) {
         y: pull.visualY,
         radius: radius * (1 + pull.power * 0.075),
         rollPhase: ball.rollPhase,
+        filter,
       });
     }
+    // Nothing in these rooms stands in front of a ball in the player's hands,
+    // but the pass is run anyway rather than special-cased: the depth decides.
+    drawRoomOccluders(ctx, backdrop, locationId, ball.z);
     return;
   }
 
   const droppingThroughNet = scored && ball.z > 0.55 && screen.y < hoop.rimY + 92;
 
   if (droppingThroughNet) {
-    if (hasBall) drawBall(ctx, { frames: ballFrames, ballId, x: screen.x, y: screen.y, radius, rollPhase: ball.rollPhase });
+    if (hasBall) {
+      drawBall(ctx, { frames: ballFrames, ballId, x: screen.x, y: screen.y, radius, rollPhase: ball.rollPhase, filter });
+    }
     drawNet(ctx, hoop, false, kicks.net);
     drawRim(ctx, hoop, false, kicks.rim);
+    drawRoomOccluders(ctx, backdrop, locationId, ball.z);
     return;
   }
 
   drawNet(ctx, hoop, false, kicks.net);
   drawRim(ctx, hoop, false, kicks.rim);
-  if (hasBall) drawBall(ctx, { frames: ballFrames, ballId, x: screen.x, y: screen.y, radius, rollPhase: ball.rollPhase });
+  if (hasBall) {
+    drawBall(ctx, { frames: ballFrames, ballId, x: screen.x, y: screen.y, radius, rollPhase: ball.rollPhase, filter });
+  }
+  drawRoomOccluders(ctx, backdrop, locationId, ball.z);
 }
 
 /** Where the ball is on screen, for hit-testing the start of a pull. */

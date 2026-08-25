@@ -106,6 +106,11 @@ const SHOTS = [
   { name: "flat left", aim: { x: 375, y: 235 }, power: 0.78, loft: 0.2 },
   { name: "rim graze", aim: { x: 480, y: 220 }, power: 0.86, loft: 0.9 },
   { name: "heave", aim: { x: 520, y: 200 }, power: 1, loft: 0.35 },
+  // A deliberate bank off the glass. The board used to be covered by the rim
+  // graze happening to clip it on its way past, which is a fixture that stops
+  // covering what it claims to the moment anything about the arc moves — and it
+  // did, when the camera was rebuilt. This one is aimed at the board.
+  { name: "off the glass", aim: { x: 470, y: 185 }, power: 0.88, loft: 0.4 },
 ];
 
 // ---------------------------------------------------------------------------

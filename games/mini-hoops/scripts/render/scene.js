@@ -8,8 +8,22 @@
 //
 // Draw calls only. Nothing in `render/` mutates game state or decides anything.
 
-import { CANVAS_HEIGHT, CANVAS_WIDTH, FLOOR_Y, PROJECTION_ORIGIN_X } from "../sim/constants.js";
-import { ballScreenRadius, depthScaleAt, floorScreenY } from "../sim/projection.js";
+import {
+  BOARD_Z,
+  CANVAS_HEIGHT,
+  CANVAS_WIDTH,
+  FLOOR_SCREEN_Y,
+  FLOOR_Y,
+  PROJECTION_ORIGIN_X,
+  PROJECTION_X_SCALE,
+} from "../sim/constants.js";
+import {
+  EDGE_FILL_SOURCE_BAND,
+  occludersInFrontOf,
+  roomBackdropOffsetY,
+  roomEdgeGap,
+} from "../assets/room-geometry.js";
+import { ballScreenRadius, depthScaleAt, floorScreenY, projectPoint } from "../sim/projection.js";
 
 /** Configure a context for this cabinet's art. Call once, and again after any resize. */
 export function prepareContext(ctx) {
@@ -24,15 +38,38 @@ export function clearScene(ctx) {
 /**
  * The room behind everything.
  *
+ * The backdrop is slid so its own painted skirting lands on the camera's wall
+ * base — see `assets/room-geometry.js` for why five independently painted rooms
+ * need that, and for the contract that keeps it presentation-only. The strip the
+ * slide exposes is filled by stretching the art's own edge band, which lands on
+ * plain ceiling or plain floor in every shipped room.
+ *
  * Falls back to a flat wall colour when the backdrop has not decoded yet, so the
  * first frame is never a transparent hole — the repo's placeholder rule.
  */
-export function drawRoom(ctx, backdrop) {
-  if (backdrop && backdrop.complete && backdrop.naturalWidth) {
-    ctx.drawImage(backdrop, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-  } else {
+export function drawRoom(ctx, backdrop, locationId) {
+  if (!backdrop || !backdrop.complete || !backdrop.naturalWidth) {
     ctx.fillStyle = "#7d584b";
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  } else {
+    const offset = roomBackdropOffsetY(locationId);
+    ctx.drawImage(backdrop, 0, offset, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    const gap = roomEdgeGap(locationId);
+    if (gap) {
+      const sourceY = gap.edge === "top" ? 0 : backdrop.naturalHeight - EDGE_FILL_SOURCE_BAND;
+      ctx.drawImage(
+        backdrop,
+        0,
+        sourceY,
+        backdrop.naturalWidth,
+        EDGE_FILL_SOURCE_BAND,
+        0,
+        gap.y,
+        CANVAS_WIDTH,
+        gap.height,
+      );
+    }
   }
 
   // A soft vertical grade unifies five differently-lit rooms under one light,
@@ -47,8 +84,87 @@ export function drawRoom(ctx, backdrop) {
   // A broad pool of contact shade where the player is standing.
   ctx.fillStyle = "rgba(20,10,8,.18)";
   ctx.beginPath();
-  ctx.ellipse(PROJECTION_ORIGIN_X, 716, 245, 48, 0, 0, Math.PI * 2);
+  ctx.ellipse(PROJECTION_ORIGIN_X, FLOOR_SCREEN_Y + 6, 245, 48, 0, 0, Math.PI * 2);
   ctx.fill();
+}
+
+/**
+ * The furniture that stands in front of the ball.
+ *
+ * The room is painted flat, so without this every shot skates across the face of
+ * the picture: a ball at the back wall draws over the desk in the foreground and
+ * the whole illusion collapses in one frame. Re-drawing the backdrop through a
+ * polygon cut around the desk puts it back in front, where it is.
+ *
+ * There is no new art here and there is no mask image — the clip is the mask,
+ * and the pixels are the room's own. `depth` is what is being covered up: pass
+ * the ball's depth after drawing the ball, or the back wall after drawing the
+ * decals stuck to it.
+ */
+export function drawRoomOccluders(ctx, backdrop, locationId, depth) {
+  if (!backdrop || !backdrop.complete || !backdrop.naturalWidth) return;
+  const occluders = occludersInFrontOf(locationId, depth);
+  if (!occluders.length) return;
+
+  const offset = roomBackdropOffsetY(locationId);
+  ctx.save();
+  ctx.translate(0, offset);
+  ctx.beginPath();
+  for (const occluder of occluders) {
+    const [first, ...rest] = occluder.polygon;
+    ctx.moveTo(first[0], first[1]);
+    for (const [x, y] of rest) ctx.lineTo(x, y);
+    ctx.closePath();
+  }
+  ctx.clip();
+  ctx.drawImage(backdrop, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  ctx.restore();
+}
+
+/**
+ * How much the room's own air dims an object at depth `z`.
+ *
+ * Aerial perspective, and the cheapest strong depth cue there is: the back of
+ * every one of these rooms is painted darker and flatter than the front, so a
+ * ball that stays fully lit all the way to the wall reads as a sticker sliding
+ * over the picture. Returned as a filter string rather than applied here, so the
+ * one caller that draws the sprite stays the only one touching the context.
+ */
+export function depthGradeFilter(z) {
+  const depth = Math.max(0, Math.min(1, z));
+  const brightness = (1 - 0.2 * depth).toFixed(3);
+  const saturation = (1 - 0.16 * depth).toFixed(3);
+  return `brightness(${brightness}) saturate(${saturation})`;
+}
+
+/**
+ * The ball's shadow on the back wall.
+ *
+ * Only exists in the last stretch of the room, and it is what tells a player the
+ * wall is a surface rather than a painted horizon: a ball closing on it grows a
+ * shadow that tightens and slides in until the two meet. The offset direction
+ * follows the same light-from-the-left the rooms and `render/hoop.js` are all
+ * keyed to.
+ */
+export function drawWallShadow(ctx, ball) {
+  const gap = BOARD_Z - ball.z;
+  if (gap > 0.42 || gap < -0.1) return;
+
+  const closeness = Math.max(0, Math.min(1, 1 - gap / 0.42));
+  const wall = projectPoint({ x: ball.x, y: ball.y, z: BOARD_Z });
+  const radius = ballScreenRadius(BOARD_Z);
+  // Wide and faint when the ball is still out in the room, tight and dark as it
+  // arrives — the same two-part read as the floor shadow, on a vertical plane.
+  const spread = radius * (1.5 - 0.45 * closeness);
+
+  ctx.save();
+  ctx.globalAlpha = 0.34 * closeness;
+  ctx.filter = `blur(${(9 - 5 * closeness).toFixed(1)}px)`;
+  ctx.fillStyle = "#100a08";
+  ctx.beginPath();
+  ctx.ellipse(wall.x + spread * 0.34, wall.y + spread * 0.16, spread, spread * 0.92, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 /**
@@ -62,7 +178,7 @@ export function drawRoom(ctx, backdrop) {
 export function drawBallShadow(ctx, ball) {
   const depth = Math.max(0, Math.min(1, ball.z));
   const scale = depthScaleAt(depth);
-  const screenX = PROJECTION_ORIGIN_X + ball.x * 390 * scale;
+  const screenX = PROJECTION_ORIGIN_X + ball.x * PROJECTION_X_SCALE * scale;
   const radius = ballScreenRadius(ball.z);
 
   // The projection places a ground-level ball CENTRE on the floor line, so the

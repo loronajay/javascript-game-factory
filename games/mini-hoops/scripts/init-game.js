@@ -599,6 +599,7 @@ export function boot(root) {
       ball,
       hoop,
       backdrop: assets.backdrop(run.locationId),
+      locationId: run.locationId,
       ballFrames: assets.ballFrames(run.ballId),
       ballId: run.ballId,
       pull,

@@ -1,11 +1,23 @@
 // World <-> screen mapping for the cabinet's pseudo-3D room.
 //
 // The room is a flat painted backdrop; the sense of depth comes entirely from
-// this file. A point's `z` does two things: it scales the point toward the
-// vanishing point (DEPTH_FALLOFF) and it raises the floor line the point is
-// measured from (FLOOR_SCREEN_Y_PER_Z). Everything else — the ball, the rim,
-// the trajectory preview, the shadow — is drawn by projecting world points
-// through here, so the whole scene stays on one consistent perspective.
+// this file. Everything else — the ball, the rim, the trajectory preview, the
+// shadow, the splats — is drawn by projecting world points through here, so the
+// whole scene stays on one consistent perspective.
+//
+// ONE CAMERA, NOT TWO NUMBERS. A point's depth does two things: it shrinks the
+// point, and it raises the floor line the point is measured from. Those two are
+// the SAME fact about a pinhole camera and this file derives the second from the
+// first — the floor at depth z is exactly the horizon plus the front floor's
+// distance below the horizon, shrunk by the depth scale. A ground point at
+// infinite depth lands on the horizon, which is what a horizon is.
+//
+// They used to be independent: the scale shrank hyperbolically while the floor
+// line rose linearly, at a rate that happened to be about half what the painted
+// rooms wanted. Nothing in the scene was internally wrong, but nothing agreed
+// with the picture behind it — the back wall drew where the middle of the floor
+// was painted, and the room read flat. Keeping these two derived from one
+// another is what makes that class of bug impossible rather than merely fixed.
 //
 // Every function is pure. No canvas, no state, no DOM.
 
@@ -14,8 +26,8 @@ import {
   BALL_SCREEN_RADIUS,
   DEPTH_FALLOFF,
   FLOOR_SCREEN_Y,
-  FLOOR_SCREEN_Y_PER_Z,
   FLOOR_Y,
+  HORIZON_SCREEN_Y,
   PROJECTION_ORIGIN_X,
   PROJECTION_X_SCALE,
   PROJECTION_Y_SCALE,
@@ -36,9 +48,15 @@ export function depthScaleAt(z) {
   return 1 / (1 + DEPTH_FALLOFF * clampDepth(z));
 }
 
-/** The scanline a ground-level point at depth `z` is measured from. */
+/**
+ * The scanline a ground-level point at depth `z` is measured from.
+ *
+ * Derived from `depthScaleAt`, not tuned beside it: the floor recedes toward the
+ * horizon at exactly the rate the world shrinks, because in a real camera those
+ * are one fact. Do not give this its own constant.
+ */
 export function floorScreenY(z) {
-  return FLOOR_SCREEN_Y - FLOOR_SCREEN_Y_PER_Z * clampDepth(z);
+  return HORIZON_SCREEN_Y + (FLOOR_SCREEN_Y - HORIZON_SCREEN_Y) * depthScaleAt(z);
 }
 
 /** Project a world point to canvas pixels. */

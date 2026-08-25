@@ -254,6 +254,7 @@ export function createPracticeCourt(
       ball,
       hoop,
       backdrop: assets.backdrop(style.locationId),
+      locationId: style.locationId,
       ballFrames: assets.ballFrames(style.ballId),
       ballId: style.ballId,
       pull,

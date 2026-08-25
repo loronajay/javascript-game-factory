@@ -47,6 +47,7 @@ const MODULES = [
   "scripts/sim/run.js",
   "scripts/assets/ball-catalog.js",
   "scripts/assets/location-catalog.js",
+  "scripts/assets/room-geometry.js",
   "scripts/assets/loader.js",
   "scripts/effects/splat-field.js",
   "scripts/audio/sound-catalog.js",
@@ -99,6 +100,10 @@ test("the sim layer never imports the DOM, the stores, or the renderers", () => 
     for (const forbidden of ["../store/", "../ui/", "../render/", "document.", "window."]) {
       assert(!code.includes(forbidden), `scripts/sim/${name} reaches for ${forbidden}`);
     }
+    // The room's own measurements are presentation. A sim that read them would
+    // make the shot depend on which backdrop is loaded, and one leaderboard
+    // would stop meaning one thing — see `assets/room-geometry.js`.
+    assert(!code.includes("room-geometry"), `scripts/sim/${name} reads a room's geometry`);
   }
 });
 

@@ -38,11 +38,33 @@ export const PHYSICS_SUBSTEP_SECONDS = 0.008;
 export const PROJECTION_ORIGIN_X = 480;
 export const PROJECTION_X_SCALE = 390;
 export const PROJECTION_Y_SCALE = 350;
-// A ground-level point at z=0 sits on this scanline, rising toward the horizon
-// as z grows. Together with DEPTH_FALLOFF this is the whole "3D" of the game.
-export const FLOOR_SCREEN_Y = 710;
-export const FLOOR_SCREEN_Y_PER_Z = 126;
-export const DEPTH_FALLOFF = 1.05;
+
+// THE CAMERA. These three numbers are one pinhole, and they are measured off the
+// painted rooms rather than dialled in by eye.
+//
+// `HORIZON_SCREEN_Y` is eye level: the scanline every floor line and every
+// receding edge in the art converges on, and the line a world point at infinite
+// depth would land on. `FLOOR_SCREEN_Y` is the floor directly under the player,
+// at z = 0. `DEPTH_FALLOFF` says how fast the world shrinks: at z = 1 a world
+// unit draws 1/(1 + DEPTH_FALLOFF) as large as it does at the camera plane.
+//
+// The floor line and the size falloff are NOT independent — see
+// `sim/projection.js`, which derives one from the other. They used to be two
+// unrelated numbers (the floor line rose linearly with depth while sizes shrank
+// hyperbolically), which is a camera that cannot exist: the room's depth read
+// as roughly half of what the art was painted for, and a ball against the back
+// wall drew nearly a hundred pixels below the painted skirting, out in the
+// middle of the floor. That is the bug this block replaced.
+export const HORIZON_SCREEN_Y = 298;
+export const FLOOR_SCREEN_Y = 726;
+export const DEPTH_FALLOFF = 1.0;
+
+// Where the back wall meets the floor, derived rather than declared — it is just
+// the floor line at z = 1, and BOARD_Z is 1. Every painted room is aligned to
+// this scanline by `assets/room-geometry.js`, so the wall the physics stops the
+// ball at is the wall in the picture. Changing the camera above moves the line
+// and every room follows it; nothing re-measures the art.
+export const WALL_BASE_SCREEN_Y = HORIZON_SCREEN_Y + (FLOOR_SCREEN_Y - HORIZON_SCREEN_Y) / (1 + DEPTH_FALLOFF);
 
 // Draw radius of the ball sprite at z = 0, and the floor it never shrinks past.
 export const BALL_SCREEN_RADIUS = 29;
