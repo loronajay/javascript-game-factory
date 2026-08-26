@@ -47,12 +47,12 @@
               <button type="button" class="marquee-option" data-command="solo">
                 <span class="marquee-option-index">01</span>
                 <span class="marquee-option-label">Solo Run</span>
-                <span class="marquee-option-note">Classic Hoops or Floor Tic-Tac-Toe vs the CPU.</span>
+                <span class="marquee-option-note">Classic Hoops, Floor Tic-Tac-Toe or HORSE vs the CPU.</span>
               </button>
               <button type="button" class="marquee-option" data-command="hotseat">
                 <span class="marquee-option-index">02</span>
                 <span class="marquee-option-label">Local Hotseat</span>
-                <span class="marquee-option-note">Choose Classic Hoops or local Floor Tic-Tac-Toe.</span>
+                <span class="marquee-option-note">Classic Hoops, Floor Tic-Tac-Toe or HORSE, two players.</span>
               </button>
               <button id="onlineMenuButton" type="button" class="marquee-option" data-command="online" data-factory-account-feature>
                 <span class="marquee-option-index">03</span>
@@ -102,6 +102,15 @@
             <fieldset id="setupGameTypePanel" class="panel">
               <legend>Game type</legend>
               <div id="setupGameTypes" class="chip-grid chip-grid--tight"></div>
+            </fieldset>
+
+            <!-- HORSE only. The word is the match length, so it is the one
+                 thing that has to be agreed before anyone shoots — everything
+                 else about a HORSE shot is invented on the court. -->
+            <fieldset id="setupWordPanel" class="panel" hidden>
+              <legend>Word to spell</legend>
+              <p class="panel-note">Miss a shot the other player made and you take the next letter. Spell the whole word and you lose.</p>
+              <input id="setupWord" class="word-input" maxlength="10" autocomplete="off" spellcheck="false" placeholder="HORSE" aria-label="Word to spell" />
             </fieldset>
 
             <fieldset id="setupModePanel" class="panel">
@@ -320,6 +329,65 @@
           <div class="meter-head"><span>SHOT POWER</span><span id="tttMeterReadout">0%</span></div>
           <div class="meter" aria-label="Shot power"><div id="tttMeterFill" class="meter-fill"></div></div>
           <p class="meter-legend">&asymp; 50% front row &middot; 70% middle &middot; 90% back</p>
+        </div>
+      </section>
+
+      <!-- ============================ HORSE ============================ -->
+      <!-- A court like any other court. The placement panel lives inside the
+           HUD, which is `pointer-events: none` so a drag reaches the canvas —
+           so every control in here has to opt back in, the way `.hud-menu`
+           does and `.hud-action` once forgot to. -->
+      <section id="horseScreen" class="screen game-screen" aria-label="HORSE">
+        <div class="court">
+          <canvas id="horseCourt" class="court-canvas" width="960" height="760" aria-label="A bin placed in the room, to be shot at"></canvas>
+
+          <div class="hud" aria-live="polite">
+            <button type="button" class="hud-menu" data-intent="leave-horse">MENU</button>
+
+            <div class="hud-clock hud-clock--wide">
+              <span id="horseModeLabel" class="hud-clock-mode">VS CPU</span>
+              <span id="horseStatus" class="hud-turn">Set up a shot</span>
+            </div>
+
+            <div id="horseLetters" class="horse-letters"></div>
+
+            <div class="hud-stat hud-stat--right">
+              <button type="button" id="horseNewMatch" class="hud-action" hidden>New match</button>
+            </div>
+          </div>
+
+          <p id="horseHint" class="hud-hint">Drag the bin where you want it &middot; then make the shot</p>
+        </div>
+
+        <div class="shot-panel">
+          <div id="horsePlacePanel" class="horse-place" hidden>
+            <div class="horse-place-head">
+              <span>PLACE THE BIN</span>
+              <span id="horsePlaceReadout" class="horse-place-readout">DEPTH 50% &middot; HEIGHT 0% &middot; LANE 50%</span>
+            </div>
+            <!-- Grouped by axis, because that is how the bin moves and how the
+                 keys are laid out: depth, then lane, then height. -->
+            <div id="horseNudges" class="horse-nudges">
+              <span class="horse-nudge-pair">
+                <button type="button" data-nudge="nearer" class="ghost-btn ghost-btn--small">&darr; Near</button>
+                <button type="button" data-nudge="deeper" class="ghost-btn ghost-btn--small">&uarr; Deep</button>
+              </span>
+              <span class="horse-nudge-pair">
+                <button type="button" data-nudge="left" class="ghost-btn ghost-btn--small">&larr; Left</button>
+                <button type="button" data-nudge="right" class="ghost-btn ghost-btn--small">Right &rarr;</button>
+              </span>
+              <span class="horse-nudge-pair">
+                <button type="button" data-nudge="lower" class="ghost-btn ghost-btn--small">Lower</button>
+                <button type="button" data-nudge="higher" class="ghost-btn ghost-btn--small">Higher</button>
+              </span>
+            </div>
+            <div id="horseMotions" class="chip-grid chip-grid--tight horse-motions"></div>
+            <button type="button" id="horseConfirm" class="primary-btn">Set this shot</button>
+          </div>
+
+          <div class="meter-head"><span>SHOT POWER</span><span id="horseMeterReadout">0%</span></div>
+          <div class="meter" aria-label="Shot power"><div id="horseMeterFill" class="meter-fill"></div></div>
+          <p id="horseMeterLegend" class="meter-legend">Pull strength picks how far down the room the ball lands</p>
         </div>
       </section>
 

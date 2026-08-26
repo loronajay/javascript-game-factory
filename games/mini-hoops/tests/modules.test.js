@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { suite, test, asyncTest, assert, assertEqual, finish } from "./harness.js";
 
 import {
+  COURT_SCREENS,
   SCREENS,
   SCREEN_BOARDS,
   SCREEN_GAME,
@@ -50,6 +51,9 @@ const MODULES = [
   "scripts/sim/bin-physics.js",
   "scripts/sim/tic-tac-toe.js",
   "scripts/sim/tic-tac-toe-shot.js",
+  "scripts/sim/bin-placement.js",
+  "scripts/sim/horse.js",
+  "scripts/sim/horse-shot.js",
   "scripts/sim/shot.js",
   "scripts/sim/run.js",
   "scripts/assets/ball-catalog.js",
@@ -71,6 +75,8 @@ const MODULES = [
   "scripts/multiplayer/tic-tac-toe-online-client.js",
   "scripts/render/scene.js",
   "scripts/render/hoop.js",
+  "scripts/render/bin.js",
+  "scripts/render/ring.js",
   "scripts/render/ball.js",
   "scripts/render/aim.js",
   "scripts/render/frame.js",
@@ -234,7 +240,7 @@ test("every element id the scripts query actually exists in the markup", () => {
 
 test("every screen the router knows about has a section in the markup", () => {
   for (const screen of SCREENS) {
-    const id = { menu: "menuScreen", setup: "setupScreen", online: "onlineScreen", game: "gameScreen", tictactoe: "ticTacToeScreen", boards: "boardsScreen", howto: "howToScreen" }[screen];
+    const id = { menu: "menuScreen", setup: "setupScreen", online: "onlineScreen", game: "gameScreen", tictactoe: "ticTacToeScreen", horse: "horseScreen", boards: "boardsScreen", howto: "howToScreen" }[screen];
     assert(html.includes(`id="${id}"`), `no section for the ${screen} screen`);
   }
 });
@@ -315,6 +321,19 @@ test("every class the scripts toggle is defined in a stylesheet", () => {
 // ---------------------------------------------------------------------------
 // Screen routing
 // ---------------------------------------------------------------------------
+
+test("every court screen is a screen the router actually knows about", () => {
+  // A screen missing from `SCREENS` is invisible to every other check here:
+  // `normalizeScreen` quietly sends it to the menu, `apply()` never toggles it,
+  // and the "every screen has a section" test passes vacuously because it
+  // iterates the same short list. HORSE shipped that way for an afternoon — the
+  // section existed, the markup was right, the root booted and ran, and pressing
+  // Start put the player back on the title screen. Only a browser found it.
+  for (const name of COURT_SCREENS) {
+    assert(SCREENS.includes(name), `${name} is a court but is not in SCREENS — the router cannot reach it`);
+    assertEqual(normalizeScreen(name), name, `${name} normalizes away to something else`);
+  }
+});
 
 test("the router recognises exactly the screens it declares", () => {
   for (const screen of [SCREEN_MENU, SCREEN_SETUP, SCREEN_GAME, SCREEN_BOARDS, SCREEN_HOWTO]) {

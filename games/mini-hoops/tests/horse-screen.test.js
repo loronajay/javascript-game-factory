@@ -1,0 +1,229 @@
+import { suite, test, assert, assertEqual, finish } from "./harness.js";
+
+import { bootHorse } from "../scripts/horse-game.js";
+import { PHASE_MATCH, PHASE_SET } from "../scripts/sim/horse.js";
+import { restingBallPosition } from "../scripts/render/frame.js";
+
+// A HORSE turn is a two-phase state machine — arrange a bin, shoot at it, hand
+// over — and the browser is the one place that cannot be checked. The failure
+// mode is a loop that quietly stops advancing: nothing throws, the court goes on
+// rendering, and the ball simply hangs in the air. A hidden tab does exactly
+// that on its own (rAF is throttled to nothing), so a manual pass through the
+// screen can neither confirm nor deny it. It is pinned here instead, on the same
+// seam and for the same reason as `practice-court.test.js`.
+//
+// The DOM is stubbed to the shallowest thing the root actually uses.
+
+suite("horse screen — a turn resolves, changes hands, and comes back");
+
+function stubElement() {
+  const classes = new Set();
+  return {
+    hidden: false,
+    textContent: "",
+    title: "",
+    dataset: {},
+    style: {},
+    className: "",
+    type: "",
+    classList: {
+      add: (c) => classes.add(c),
+      remove: (c) => classes.delete(c),
+      toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)),
+      contains: (c) => classes.has(c),
+    },
+    addEventListener() {},
+    setAttribute() {},
+    append() {},
+    appendChild() {},
+    replaceChildren() {},
+    querySelectorAll: () => [],
+    querySelector: () => null,
+  };
+}
+
+/**
+ * A 2D context that swallows everything and returns itself.
+ *
+ * Returning ITSELF is the load-bearing part: `createLinearGradient(...)` is
+ * followed by `.addColorStop(...)` on whatever came back, so a stub that hands
+ * out a bare object dies one call later.
+ *
+ * Worth having rather than skipping the draw: the root renders from several
+ * places outside its loop, so these tests run the REAL render path, and a crash
+ * in a renderer surfaces here instead of in a browser.
+ */
+function noopContext() {
+  const context = new Proxy({}, {
+    get: (target, key) => {
+      if (!(key in target)) target[key] = () => context;
+      return target[key];
+    },
+    set: (target, key, value) => { target[key] = value; return true; },
+  });
+  return context;
+}
+
+function stubCanvas() {
+  const listeners = new Map();
+  const element = stubElement();
+  return Object.assign(element, {
+    width: 0,
+    height: 0,
+    // A no-op 2D context rather than a bare object. The root draws from several
+    // places outside the loop, so an empty `{}` throws on the first `clearRect`
+    // — and a context that swallows everything means these tests run the REAL
+    // render path too, which is how a crash in a renderer gets caught here
+    // rather than in a browser.
+    getContext: () => noopContext(),
+    addEventListener: (type, handler) => listeners.set(type, handler),
+    setPointerCapture: () => {},
+    // Read through `ui/pointer.js`, so a 1:1 rect makes pointer coordinates
+    // canvas coordinates.
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 760 }),
+    fire(type, point) {
+      listeners.get(type)?.({
+        pointerId: 1,
+        clientX: point.x,
+        clientY: point.y,
+        preventDefault: () => {},
+        target: { closest: () => null },
+      });
+    },
+  });
+}
+
+function harness(options = {}) {
+  const canvas = stubCanvas();
+  // `document.createElement` is used to build the motion chips and the letter
+  // board. Neither is read back here, so a bare stub is enough.
+  globalThis.document = { createElement: () => stubElement() };
+  const root = {
+    querySelector: (selector) => (selector === "#horseCourt" ? canvas : stubElement()),
+    querySelectorAll: () => [],
+  };
+  const horse = bootHorse(root, {
+    random: () => 0.5,
+    // The loader builds `Image` objects, which node has none of. Nothing here
+    // renders, so the art is stubbed out entirely.
+    assets: { backdrop: () => null, image: () => null, ballFrames: () => [], ballSplats: () => null },
+    ...options,
+  });
+  return { canvas, horse };
+}
+
+/** Drag straight back from the resting ball by `distance` canvas pixels. */
+function shoot({ canvas }, distance, sideways = 0) {
+  const rest = restingBallPosition();
+  canvas.fire("pointerdown", rest);
+  canvas.fire("pointermove", { x: rest.x + sideways, y: rest.y + distance });
+  canvas.fire("pointerup", { x: rest.x + sideways, y: rest.y + distance });
+}
+
+/** Run forward until the shot in the air has resolved and the ball is back. */
+function settle(horse, maxTicks = 900) {
+  for (let i = 0; i < maxTicks; i++) {
+    horse.tick();
+    if (!horse.isBusy()) return i;
+  }
+  return -1;
+}
+
+test("a set shot resolves and hands the ball back rather than latching", () => {
+  const { horse, canvas } = harness({ mode: "local" });
+  horse.enter({ mode: "local", word: "PIG" });
+  horse.setShot();
+  shoot({ canvas }, 84);
+  assert(horse.isBusy(), "the shot did not start");
+  assert(settle(horse) >= 0, "the shot never resolved — the turn would hang forever");
+  assertEqual(horse.match.shots, 1);
+});
+
+test("a made setup passes the turn and the matcher inherits the bin", () => {
+  const { horse, canvas } = harness({ mode: "local" });
+  horse.enter({ mode: "local", word: "PIG" });
+  // Straight down the middle of the room, on the floor: reliably makeable.
+  horse.placeBin({ x: 0, y: 0.36, z: 0.6, motionId: "still" });
+  const placed = { ...horse.setup };
+  horse.setShot();
+
+  // Walk the pull until one drops, so the test does not depend on a magic number.
+  let made = false;
+  for (let pull = 40; pull <= 105 && !made; pull += 2) {
+    shoot({ canvas }, pull);
+    settle(horse);
+    made = horse.match.phase === PHASE_MATCH;
+    if (!made && horse.match.phase === PHASE_SET) horse.setShot();
+  }
+  assert(made, "no pull in the whole range could make a floor bin in the middle of the room");
+  assertEqual(horse.match.turn, 1, "the other player did not inherit the turn");
+  assertEqual(horse.match.standingShot.z, placed.z, "the standing shot is not the bin that was set");
+  assertEqual(horse.match.standingShot.motionId, placed.motionId);
+});
+
+test("the matcher may not re-place the bin", () => {
+  const { horse } = harness({ mode: "local" });
+  horse.enter({ mode: "local", word: "PIG" });
+  horse.placeBin({ x: 0, y: 0.36, z: 0.6, motionId: "still" });
+  horse.setShot();
+  // Force the standing shot without shooting, then start the matcher's turn.
+  horse.match.phase = PHASE_MATCH;
+  horse.match.standingShot = { ...horse.setup };
+  horse.match.turn = 1;
+  horse.newMatch();
+  assertEqual(horse.phase, "placing", "a fresh match always opens on a placement");
+});
+
+test("the motion clock restarts every turn, so both players face the same bin", () => {
+  // The whole claim of "the same shot" for a MOVING bin rests on this. If the
+  // clock ran on across the handover, the matcher would arrive mid-sweep and be
+  // shown a bin somewhere the setter never saw it.
+  const { horse, canvas } = harness({ mode: "local" });
+  horse.enter({ mode: "local", word: "PIG" });
+  horse.placeBin({ x: 0, y: 0.36, z: 0.6, motionId: "sideways" });
+  horse.setShot();
+  const atRest = horse.binNow().x;
+
+  // Run the sweep well away from its start, then take the shot.
+  for (let i = 0; i < 54; i++) horse.tick();
+  assert(Math.abs(horse.binNow().x - atRest) > 0.1, "the bin never actually moved — the test proves nothing");
+  shoot({ canvas }, 84);
+  settle(horse);
+
+  // Whatever the outcome, the next turn opens with the bin back at the start of
+  // its sweep. Read through the bin the court is DRAWING, not through a stored
+  // setup, because the drawn bin is what the player has to lead.
+  assert(Math.abs(horse.binNow().x - atRest) < 1e-9,
+    `the sweep carried on across the handover: ${horse.binNow().x} vs ${atRest}`);
+});
+
+test("a CPU opponent takes its own turn without a human touching anything", () => {
+  const { horse } = harness({ mode: "cpu", difficulty: "hard" });
+  horse.enter({ mode: "cpu", difficulty: "hard", word: "PIG" });
+  // Player 1 (human) misses, handing the turn to the CPU.
+  horse.setShot();
+  horse.match.turn = 1;
+  horse.match.phase = PHASE_SET;
+
+  // From here nothing but time should be required.
+  let placed = false;
+  for (let i = 0; i < 1200; i++) {
+    horse.tick();
+    if (horse.match.shots > 0) { placed = true; break; }
+  }
+  assert(placed, "the CPU never placed a bin and shot at it — its turn would hang");
+});
+
+test("a hotseat turn waits for its player and never shoots on its own", () => {
+  // The CPU test above proves an unattended turn advances. This is its opposite
+  // and it matters just as much: in hotseat, BOTH turns are human, so a root
+  // that let the clock take a shot would fire the moment a player looked away.
+  const { horse } = harness({ mode: "local" });
+  horse.enter({ mode: "local", word: "PIG" });
+  horse.setShot();
+  for (let i = 0; i < 1200; i++) horse.tick();
+  assertEqual(horse.match.shots, 0, "twenty seconds of idling took a shot by itself");
+  assertEqual(horse.match.turn, 0, "and the turn wandered off to the other player");
+});
+
+finish();

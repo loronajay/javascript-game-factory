@@ -231,35 +231,84 @@ const SEPARATION = 0.0015;
  */
 const BIN_REACH = BIN_MOUTH_RADIUS + BIN_WALL_THICKNESS + BIN_RIM_TUBE_RADIUS + BALL_RADIUS_WORLD;
 
+/** A bin that is not going anywhere. Shared, because the common case is most of them. */
+const AT_REST = Object.freeze({ x: 0, y: 0, z: 0 });
+
+/**
+ * One bin, anywhere, moving or not.
+ *
+ * THE ONE FACTORY. Tic-Tac-Toe's nine grid bins and HORSE's single placed bin
+ * are the same object built two ways, which is what lets both modes run the same
+ * two resolvers and the same renderer.
+ *
+ * `baseY` is the height the drum's FOOT stands at, and it is a real field rather
+ * than an assumed zero because a HORSE bin can hang in the air. A raised bin is
+ * the same bin lifted whole — `topY - baseY` is constant — never a stretched
+ * one: the sprite draws at one uniform scale, so a stretched collider would put
+ * it straight back out of agreement with its own picture.
+ *
+ * `velocity` is the world-space velocity of the whole assembly. Zero for a
+ * grid bin, so nothing about Tic-Tac-Toe changes; for a moving bin it is what
+ * the two resolvers subtract before they bounce the ball, so a lip travelling
+ * into the ball hits it rather than politely waiting for it.
+ */
+export function createBin({
+  index = 0,
+  row = 0,
+  column = 0,
+  x = 0,
+  z = 0.6,
+  topY = BIN_MOUTH_Y,
+  baseY = FLOOR_Y,
+  velocity = null,
+} = {}) {
+  const bin = {
+    index,
+    row,
+    column,
+    x,
+    z,
+    topY,
+    baseY,
+    mouthRadius: BIN_MOUTH_RADIUS,
+    bottomRadius: BIN_BOTTOM_RADIUS,
+    rimTubeRadius: BIN_RIM_TUBE_RADIUS,
+    wallThickness: BIN_WALL_THICKNESS,
+    velocity: velocity
+      ? Object.freeze({
+        x: Number(velocity.x) || 0,
+        y: Number(velocity.y) || 0,
+        z: Number(velocity.z) || 0,
+      })
+      : AT_REST,
+    mouthTilt: { angle: 0, sin: 0, cos: 1, tan: 0, rise: 0 },
+  };
+  // Solved once, when the bin is built, and frozen in: it is a property of the
+  // bin's depth and the art. A moving bin is rebuilt every tick, so its lean
+  // tracks its depth for free.
+  const angle = solveBinMouthTilt(bin);
+  bin.mouthTilt = Object.freeze({
+    angle,
+    sin: Math.sin(angle),
+    cos: Math.cos(angle),
+    tan: Math.tan(angle),
+    // How far the near lip stands above `topY` — the reach the mouth gains
+    // upward once it leans, which the cheap reject below has to allow for.
+    rise: (BIN_MOUTH_RADIUS + BIN_RIM_TUBE_RADIUS) * Math.sin(angle),
+  });
+  return Object.freeze(bin);
+}
+
 export function createBinTargets() {
-  return ROW_Z.flatMap((z, row) => COLUMN_X.map((x, column) => {
-    const bin = {
-      index: row * 3 + column,
-      row,
-      column,
-      x,
-      z,
-      topY: BIN_MOUTH_Y,
-      mouthRadius: BIN_MOUTH_RADIUS,
-      bottomRadius: BIN_BOTTOM_RADIUS,
-      rimTubeRadius: BIN_RIM_TUBE_RADIUS,
-      wallThickness: BIN_WALL_THICKNESS,
-      mouthTilt: { angle: 0, sin: 0, cos: 1, tan: 0, rise: 0 },
-    };
-    // Solved once, when the board is built, and frozen in: it is a property of
-    // the row's depth and the art, and neither changes during a match.
-    const angle = solveBinMouthTilt(bin);
-    bin.mouthTilt = Object.freeze({
-      angle,
-      sin: Math.sin(angle),
-      cos: Math.cos(angle),
-      tan: Math.tan(angle),
-      // How far the near lip stands above `topY` — the reach the mouth gains
-      // upward once it leans, which the cheap reject below has to allow for.
-      rise: (BIN_MOUTH_RADIUS + BIN_RIM_TUBE_RADIUS) * Math.sin(angle),
-    });
-    return Object.freeze(bin);
-  }));
+  return ROW_Z.flatMap((z, row) => COLUMN_X.map((x, column) => createBin({
+    index: row * 3 + column,
+    row,
+    column,
+    x,
+    z,
+    topY: BIN_MOUTH_Y,
+    baseY: FLOOR_Y,
+  })));
 }
 
 /** Is the ball anywhere near enough to this bin for a contact to be possible? */
@@ -267,6 +316,10 @@ export function withinBinReach(ball, bin) {
   // `mouthTilt.rise` is what the near lip gains once the mouth leans. Without it
   // the reject would cut the ball off above a lip that is genuinely there.
   if (ball.y > bin.topY + bin.mouthTilt.rise + BALL_RADIUS_WORLD + bin.rimTubeRadius) return false;
+  // And below the foot there is nothing at all. Always true for a grid bin,
+  // which stands on the floor; load-bearing for a raised HORSE bin, where a ball
+  // rolling underneath must not be claimed by a drum hanging above it.
+  if (ball.y < bin.baseY - BALL_RADIUS_WORLD) return false;
   return Math.hypot(ball.x - bin.x, ball.z - bin.z) <= BIN_REACH;
 }
 
@@ -327,7 +380,11 @@ export function binClearance(bin) {
  * replaced.
  */
 export function detectBinScore(ball, previous, bin) {
-  if (ball.vy >= 0) return false;
+  // RELATIVE to the mouth, not to the room. A bin riding upward faster than a
+  // ball is falling has not been scored in — it has come up to meet the ball,
+  // and what happens next is a lip strike. Zero for a still bin, so the grid
+  // board's test is untouched.
+  if (ball.vy - bin.velocity.y >= 0) return false;
   const before = binMouthFrame(bin, previous).normal;
   const after = binMouthFrame(bin, ball);
   if (before <= 0 || after.normal > 0) return false;
@@ -372,7 +429,14 @@ export function resolveBinRimContact(ball, bin, flight = { bounce: 1, grip: 1 })
   ball.x += nx * penetration;
   ball.y += ny * penetration;
   ball.z += nz * penetration;
-  const normalSpeed = ball.vx * nx + ball.vy * ny + ball.vz * nz;
+  // The closing speed along the normal, measured against the LIP rather than
+  // against the room. Reflecting the relative velocity is what lets a moving bin
+  // hand the ball an impulse instead of behaving like a wall that happens to be
+  // sliding. `velocity` is zero for every grid bin, so this is exactly the old
+  // arithmetic there.
+  const normalSpeed = (ball.vx - bin.velocity.x) * nx
+    + (ball.vy - bin.velocity.y) * ny
+    + (ball.vz - bin.velocity.z) * nz;
   if (normalSpeed < 0) {
     // Plastic, not the classic cabinet's steel: deader than RIM_RESTITUTION, so
     // a lip strike drops toward the floor instead of pinballing across the board
@@ -408,8 +472,16 @@ export function resolveBinWallContact(ball, previous, bin, flight = { bounce: 1 
   // normal back up into the air on the near side — which is the phantom band
   // this bound was introduced to delete. The drum is upright, which is also what
   // the sprite paints; only its mouth leans.
-  if (ball.y <= BALL_RADIUS_WORLD || ball.y >= bin.topY) return null;
-  const height = Math.max(0, Math.min(1, ball.y / bin.topY));
+  //
+  // THE DRUM ALSO HAS A FOOT, and a HORSE bin's foot need not be the floor. The
+  // band below it is open air the ball passes straight under — which is what
+  // makes a raised bin a genuinely different target rather than a floor bin
+  // drawn higher up. For a grid bin `baseY` is 0 and this is the old guard
+  // exactly.
+  if (ball.y <= bin.baseY + BALL_RADIUS_WORLD || ball.y >= bin.topY) return null;
+  const span = bin.topY - bin.baseY;
+  if (span <= 1e-6) return null;
+  const height = Math.max(0, Math.min(1, (ball.y - bin.baseY) / span));
   const bodyRadius = bin.bottomRadius + (bin.mouthRadius - bin.bottomRadius) * height;
   const dx = ball.x - bin.x;
   const dz = ball.z - bin.z;
@@ -429,7 +501,8 @@ export function resolveBinWallContact(ball, previous, bin, flight = { bounce: 1 
   const target = fromInside ? insideLimit - SEPARATION : outsideLimit + SEPARATION;
   ball.x = bin.x + ux * target;
   ball.z = bin.z + uz * target;
-  const normalSpeed = ball.vx * nx + ball.vz * nz;
+  // Relative to the moving drum — see `resolveBinRimContact`. Zero for a grid bin.
+  const normalSpeed = (ball.vx - bin.velocity.x) * nx + (ball.vz - bin.velocity.z) * nz;
   if (normalSpeed < 0) {
     const bounce = Math.min(0.72, 0.3 * (flight.bounce ?? 1));
     ball.vx -= (1 + bounce) * normalSpeed * nx;

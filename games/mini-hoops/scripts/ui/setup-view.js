@@ -20,12 +20,24 @@ import { LOCATIONS, locationBackdropPath, locationById } from "../assets/locatio
 import { ROUND_DURATIONS } from "../sim/constants.js";
 import { HOOP_MODES, hoopModeById } from "../sim/hoop.js";
 import { TIC_TAC_TOE_FIXED_SETUP } from "../sim/tic-tac-toe.js";
+import { DEFAULT_WORD, normalizeWord } from "../sim/horse.js";
 import { ballById } from "../assets/ball-catalog.js";
 
 const GAME_TYPES = Object.freeze([
   Object.freeze({ id: "classic", label: "Classic Hoops", blurb: "Timed turns on the regular rim." }),
   Object.freeze({ id: "tic-tac-toe", label: "Floor Tic-Tac-Toe", blurb: "Shoot the real bin rims; three in a row wins." }),
+  Object.freeze({ id: "horse", label: "HORSE", blurb: "Place a bin anywhere, make the shot, and make them match it." }),
 ]);
+
+/**
+ * The game types that are not the classic timed run.
+ *
+ * Both shoot at bins, both fix their own room and ball, and so neither reads a
+ * single one of the classic pickers. Exported because the composition root has
+ * to make the same distinction when it decides which screen a Start press opens,
+ * and two hand-maintained lists of the same fact is how they drift apart.
+ */
+export const BIN_GAME_TYPES = new Set(["tic-tac-toe", "horse"]);
 
 /** How a round length is written for a human. */
 export function durationLabel(seconds) {
@@ -84,6 +96,16 @@ export function createSetupView(root, { onSelect = () => {} } = {}) {
   const previewName = root.querySelector("#setupPreviewName");
   const summary = root.querySelector("#setupSummary");
   const gameTypePanel = root.querySelector("#setupGameTypePanel");
+  const wordPanel = root.querySelector("#setupWordPanel");
+  const wordInput = root.querySelector("#setupWord");
+  // Sanitised as it is typed rather than on submit: the field is the only place
+  // the player sees the word before it becomes a scoreboard, so it should never
+  // show them something the match will silently refuse.
+  wordInput?.addEventListener("input", (event) => {
+    const raw = event.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 10);
+    if (event.target.value !== raw) event.target.value = raw;
+    onSelect("word", raw);
+  });
   // The four pickers that only describe a classic run.
   const classicPanels = [
     "#setupModePanel",
@@ -100,7 +122,11 @@ export function createSetupView(root, { onSelect = () => {} } = {}) {
       // remembered, so the play mode is read alongside it or a player who once
       // picked tic-tac-toe would find an online setup with no pickers on it.
       const ticTacToe = selection.playMode !== "online" && selection.gameType === "tic-tac-toe";
-      const shown = ticTacToe ? TIC_TAC_TOE_FIXED_SETUP : selection;
+      const horse = selection.playMode !== "online" && selection.gameType === "horse";
+      // Both bin modes fix their own room and ball, so neither reads the
+      // remembered classic pickers — see the note on the summary below.
+      const binMode = selection.playMode !== "online" && BIN_GAME_TYPES.has(selection.gameType);
+      const shown = binMode ? TIC_TAC_TOE_FIXED_SETUP : selection;
 
       markActive(groups.game, selection.gameType || "classic");
       markActive(groups.mode, selection.modeId);
@@ -117,12 +143,19 @@ export function createSetupView(root, { onSelect = () => {} } = {}) {
       // and printing the remembered classic ones under a tic-tac-toe start
       // button would promise a room, a ball and a clock the stage never reads.
       if (summary) {
-        summary.textContent = ticTacToe
-          ? `${selection.playMode === "hotseat" ? "Two players" : "You vs CPU"} · ${locationById(shown.locationId).label} · ${ballById(shown.ballId).label}`
-          : describeSetup(selection);
+        const players = selection.playMode === "hotseat" ? "Two players" : "You vs CPU";
+        summary.textContent = horse
+          ? `${players} · spell ${normalizeWord(selection.word || DEFAULT_WORD)}`
+          : ticTacToe
+            ? `${players} · ${locationById(shown.locationId).label} · ${ballById(shown.ballId).label}`
+            : describeSetup(selection);
       }
       if (gameTypePanel) gameTypePanel.hidden = selection.playMode === "online";
-      for (const panel of classicPanels) if (panel) panel.hidden = ticTacToe;
+      if (wordPanel) wordPanel.hidden = !horse;
+      if (wordInput && document.activeElement !== wordInput) {
+        wordInput.value = selection.word || "";
+      }
+      for (const panel of classicPanels) if (panel) panel.hidden = binMode;
     },
   };
 }

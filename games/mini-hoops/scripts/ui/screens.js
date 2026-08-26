@@ -11,6 +11,7 @@ export const SCREEN_BOARDS = "boards";
 export const SCREEN_HOWTO = "howto";
 export const SCREEN_ONLINE = "online";
 export const SCREEN_TIC_TAC_TOE = "tictactoe";
+export const SCREEN_HORSE = "horse";
 
 export const SCREENS = Object.freeze([
   SCREEN_MENU,
@@ -18,6 +19,7 @@ export const SCREENS = Object.freeze([
   SCREEN_ONLINE,
   SCREEN_GAME,
   SCREEN_TIC_TAC_TOE,
+  SCREEN_HORSE,
   SCREEN_BOARDS,
   SCREEN_HOWTO,
 ]);
@@ -37,7 +39,7 @@ export const SCREENS = Object.freeze([
  * <audio> element streaming it, and nothing brings a stream back — so entering
  * tic-tac-toe cut the music off mid-bar, every time.
  */
-export const COURT_SCREENS = Object.freeze([SCREEN_GAME, SCREEN_TIC_TAC_TOE]);
+export const COURT_SCREENS = Object.freeze([SCREEN_GAME, SCREEN_TIC_TAC_TOE, SCREEN_HORSE]);
 
 /**
  * Where "back" goes from each screen.
@@ -52,6 +54,7 @@ const BACK_TARGETS = Object.freeze({
   [SCREEN_ONLINE]: SCREEN_MENU,
   [SCREEN_GAME]: SCREEN_MENU,
   [SCREEN_TIC_TAC_TOE]: SCREEN_MENU,
+  [SCREEN_HORSE]: SCREEN_MENU,
   [SCREEN_BOARDS]: SCREEN_MENU,
   [SCREEN_HOWTO]: SCREEN_MENU,
 });

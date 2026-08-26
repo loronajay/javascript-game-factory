@@ -17,6 +17,8 @@ import { createGameAudio } from "./audio/game-audio.js";
 import { addSplat, clearSplatField, createSplatField, tickSplatField } from "./effects/splat-field.js";
 import { createPracticeCourt } from "./practice-court.js";
 import { bootTicTacToe } from "./tic-tac-toe-game.js";
+import { bootHorse } from "./horse-game.js";
+import { DEFAULT_WORD } from "./sim/horse.js";
 import { CANVAS_HEIGHT, CANVAS_WIDTH, PULL_MIN, TICK_MS, TICK_SECONDS } from "./sim/constants.js";
 import { hoopAt, hoopModeById } from "./sim/hoop.js";
 import { isShootablePull, neutralPull, resolvePull } from "./sim/pull.js";
@@ -52,7 +54,7 @@ import { createPracticeView } from "./ui/practice-view.js";
 import { createMenuView } from "./ui/menu-view.js";
 import { createOverlays } from "./ui/overlays.js";
 import { createBoardsView } from "./ui/boards-view.js";
-import { createSetupView, describeSetup } from "./ui/setup-view.js";
+import { BIN_GAME_TYPES, createSetupView, describeSetup } from "./ui/setup-view.js";
 import { createSoundToggle } from "./ui/sound-toggle.js";
 import { createOnlineView } from "./ui/online-view.js";
 import { canvasPoint, isGrab } from "./ui/pointer.js";
@@ -69,6 +71,7 @@ import {
   COURT_SCREENS,
   SCREEN_ONLINE,
   SCREEN_TIC_TAC_TOE,
+  SCREEN_HORSE,
   SCREEN_SETUP,
   createScreenRouter,
 } from "./ui/screens.js";
@@ -95,6 +98,11 @@ export function boot(root) {
   let playMode = "solo";
   let hotseat = null;
   let setupGameType = "classic";
+  // The HORSE word. Held here rather than in the preferences store, which
+  // validates every value it keeps against a catalog — a free-text word has no
+  // catalog to be resolved through, so it would be the one field in that file
+  // that could come back as anything. `sim/horse.js` sanitises it on the way in.
+  let setupWord = DEFAULT_WORD;
   let onlineSnapshot = null;
   let onlineRating = null;
   let onlineMatchKey = "";
@@ -136,6 +144,7 @@ export function boot(root) {
       [SCREEN_ONLINE]: root.querySelector("#onlineScreen"),
       [SCREEN_GAME]: root.querySelector("#gameScreen"),
       [SCREEN_TIC_TAC_TOE]: root.querySelector("#ticTacToeScreen"),
+      [SCREEN_HORSE]: root.querySelector("#horseScreen"),
       [SCREEN_BOARDS]: root.querySelector("#boardsScreen"),
       [SCREEN_HOWTO]: root.querySelector("#howToScreen"),
     },
@@ -210,6 +219,20 @@ export function boot(root) {
     },
   });
 
+  const horse = bootHorse(root, {
+    audio,
+    onLeave: () => {
+      horse.exit();
+      screens.show(SCREEN_MENU);
+    },
+  });
+
+  /** Enter HORSE in a given mode. The one door into that screen. */
+  function openHorse(options) {
+    horse.enter({ word: setupWord, ...options });
+    screens.show(SCREEN_HORSE);
+  }
+
   /** Enter floor tic-tac-toe in a given mode. The one door into that screen. */
   function openTicTacToe(options) {
     overlays.hideAll();
@@ -253,7 +276,7 @@ export function boot(root) {
   }
 
   function renderSetup() {
-    setup.render({ ...preferences.snapshot(), gameType: setupGameType, playMode });
+    setup.render({ ...preferences.snapshot(), gameType: setupGameType, playMode, word: setupWord });
     const title = root.querySelector("#setupTitle");
     const intro = root.querySelector("#setupIntro");
     const start = root.querySelector("#setupStartButton");
@@ -264,16 +287,22 @@ export function boot(root) {
     // one — and left solo tic-tac-toe as the only mode in the cabinet you could
     // not reach from a setup screen.
     const ticTacToe = playMode !== "online" && setupGameType === "tic-tac-toe";
-    if (intro) intro.textContent = ticTacToe
-      ? playMode === "hotseat"
-        ? "Two players alternate shots at the nine bins. Three in a row wins — there is no clock."
-        : "You and the CPU alternate shots at the nine bins. Three in a row wins — there is no clock."
-      : playMode === "hotseat"
-        ? "Player 1 takes a full timed turn, then passes the court to Player 2."
-        : "The clock starts on your first real pull, not before.";
-    if (start) start.textContent = ticTacToe
-      ? "Start Tic-Tac-Toe"
-      : playMode === "hotseat" ? "Start Player 1" : "Start Run";
+    const horseMode = playMode !== "online" && setupGameType === "horse";
+    const opponent = playMode === "hotseat" ? "Two players" : "You and the CPU";
+    if (intro) {
+      intro.textContent = horseMode
+        ? `${opponent} take turns. Place a bin anywhere in the room, make the shot, and the other player has to match it — miss and you take a letter.`
+        : ticTacToe
+          ? `${opponent} alternate shots at the nine bins. Three in a row wins — there is no clock.`
+          : playMode === "hotseat"
+            ? "Player 1 takes a full timed turn, then passes the court to Player 2."
+            : "The clock starts on your first real pull, not before.";
+    }
+    if (start) {
+      start.textContent = horseMode
+        ? "Start HORSE"
+        : ticTacToe ? "Start Tic-Tac-Toe" : playMode === "hotseat" ? "Start Player 1" : "Start Run";
+    }
   }
 
   function renderBoards() {
@@ -613,7 +642,8 @@ export function boot(root) {
   }
 
   function handleSetupSelect(kind, value) {
-    if (kind === "game") setupGameType = value === "tic-tac-toe" ? value : "classic";
+    if (kind === "game") setupGameType = BIN_GAME_TYPES.has(value) ? value : "classic";
+    else if (kind === "word") setupWord = value;
     else if (kind === "mode") preferences.setMode(value);
     else if (kind === "duration") preferences.setDuration(Number(value));
     else if (kind === "location") preferences.setLocation(value);
@@ -636,6 +666,10 @@ export function boot(root) {
       case "start":
         if (playMode !== "online" && setupGameType === "tic-tac-toe") {
           openTicTacToe({ mode: playMode === "hotseat" ? "local" : "cpu" });
+          break;
+        }
+        if (playMode !== "online" && setupGameType === "horse") {
+          openHorse({ mode: playMode === "hotseat" ? "local" : "cpu", word: setupWord });
           break;
         }
         if (playMode === "hotseat") hotseat = createHotseatDuel(preferences.snapshot());
@@ -671,6 +705,10 @@ export function boot(root) {
       case "toggle-sound":
         setMuted(!audio.isMuted());
         break;
+      case "leave-horse":
+        // Handled by the HORSE root's own listener; named here so the
+        // markup-coherence test can see every intent is accounted for.
+        break;
       case "leave-tic-tac-toe":
         // Handled by the tic-tac-toe root's own listener; named here so the
         // markup-coherence test can see every intent has an owner.
@@ -703,6 +741,13 @@ export function boot(root) {
 
   root.addEventListener("keydown", (event) => {
     if (["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName)) return;
+    // HORSE is the one screen that reads arrow keys, and it only does so while
+    // a bin is being placed. It gets first refusal and reports whether it used
+    // the key, so nothing else in the cabinet has to know it exists.
+    if (screens.current() === SCREEN_HORSE && horse.handleKey(event)) {
+      event.preventDefault();
+      return;
+    }
     if (event.key === "m" || event.key === "M") {
       event.preventDefault();
       setMuted(!audio.isMuted());
@@ -724,6 +769,7 @@ export function boot(root) {
     // The loop is stopped on the way out rather than left spinning behind the
     // menu, where the CPU would go on taking turns unobserved.
     if (next !== SCREEN_TIC_TAC_TOE && ticTacToe.isActive()) ticTacToe.exit();
+    if (next !== SCREEN_HORSE && horse.isActive()) horse.exit();
     if (next !== SCREEN_TIC_TAC_TOE && ticTacToeLobby) ticTacToeLobby.classList.remove("is-active");
     if (next === SCREEN_MENU) {
       accountAccess.syncButton(root.querySelector("#onlineMenuButton"));

@@ -58,7 +58,10 @@ const TAU = Math.PI * 2;
  */
 export function binRings(bin) {
   const mouth = projectPoint({ x: bin.x, y: bin.topY, z: bin.z });
-  const foot = projectPoint({ x: bin.x, y: 0, z: bin.z });
+  // The drum's own FOOT, which is not always the floor: a HORSE bin can be
+  // placed in the air, and it is lifted whole rather than stretched. `baseY`
+  // is 0 for every Tic-Tac-Toe grid bin, so nothing about that board moves.
+  const foot = projectPoint({ x: bin.x, y: bin.baseY ?? 0, z: bin.z });
   // The mouth's rings lean with the mouth; the base sits flat on the floor,
   // because the drum is upright and only its opening leans. See
   // `sim/bin-physics.js`.
@@ -153,6 +156,36 @@ function paint(ctx, image, layout) {
   ctx.ellipse(layout.x + layout.width / 2, layout.splitY, layout.width / 2, layout.width / 8, 0, 0, TAU);
   ctx.fill();
   ctx.fillRect(layout.x + layout.width * 0.1, layout.splitY, layout.width * 0.8, layout.y + layout.height - layout.splitY);
+}
+
+/**
+ * The shadow a bin casts on the floor under it.
+ *
+ * THIS IS THE ONLY THING THAT SAYS HOW HIGH A RAISED BIN IS. A bin lifted into
+ * the air is drawn smaller as it goes back and higher up the canvas as it
+ * rises, and those two look identical on a still frame — a high near bin and a
+ * low far one land in the same place. The shadow separates them, because it
+ * stays on the floor at the bin's own depth and only the GAP between the bin and
+ * its shadow grows with height. Same trick, same reason, as `drawBallShadow`.
+ *
+ * It is skipped entirely for a bin standing on the floor: there the foot IS the
+ * contact and a cast blob under it would just muddy the concrete.
+ */
+export function drawBinShadow(ctx, bin) {
+  const height = Math.max(0, (bin.baseY ?? 0));
+  if (height < 0.02) return;
+  const floor = projectPoint({ x: bin.x, y: 0, z: bin.z });
+  const width = worldToScreenLength(bin.bottomRadius * (1.15 + Math.min(0.7, height * 0.3)), bin.z);
+  const depth = Math.max(4, width * 0.3);
+
+  ctx.save();
+  ctx.globalAlpha = Math.max(0.06, 0.3 - height * 0.07);
+  ctx.filter = `blur(${Math.min(16, 4 + height * 4)}px)`;
+  ctx.fillStyle = "#160d09";
+  ctx.beginPath();
+  ctx.ellipse(floor.x + Math.min(16, height * 5), floor.y + Math.min(14, height * 4), width, depth, 0, 0, TAU);
+  ctx.fill();
+  ctx.restore();
 }
 
 /**
