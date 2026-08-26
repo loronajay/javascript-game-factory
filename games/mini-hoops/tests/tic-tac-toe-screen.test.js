@@ -81,7 +81,7 @@ test("both courts hold the viewport lock, so neither needs its own phone rules",
   assert(screens.includes("COURT_SCREENS"), "the router must name which screens are courts");
   assert(/COURT_SCREENS\.includes\(current\)/.test(screens), "is-playing must follow COURT_SCREENS");
   assert(gameCss.includes(".hud-turn"), "the tic-tac-toe HUD additions belong in game.css");
-  assert(onlineCss.includes(".ttt-online-panel"), "the lobby styles belong in online.css");
+  assert(onlineCss.includes(".mode-lobby-panel"), "the lobby styles belong in online.css");
 });
 
 test("leaving for the menu silences the court but never the soundtrack", () => {

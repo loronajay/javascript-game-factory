@@ -73,6 +73,7 @@ const MODULES = [
   "scripts/store/preferences.js",
   "scripts/multiplayer/online-client.js",
   "scripts/multiplayer/tic-tac-toe-online-client.js",
+  "scripts/multiplayer/horse-online-client.js",
   "scripts/render/scene.js",
   "scripts/render/hoop.js",
   "scripts/render/bin.js",
@@ -92,6 +93,7 @@ const MODULES = [
   "scripts/ui/sound-toggle.js",
   "scripts/practice-court.js",
   "scripts/tic-tac-toe-game.js",
+  "scripts/horse-game.js",
   "scripts/init-game.js",
 ];
 

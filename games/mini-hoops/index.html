@@ -168,6 +168,7 @@
             <label>Game<select id="onlineGameType">
               <option value="classic">Classic Hoops</option>
               <option value="tic-tac-toe">Floor Tic-Tac-Toe</option>
+              <option value="horse">HORSE</option>
             </select></label>
             <label>Hoop<select id="onlineMode"></select></label>
             <label>Clock<select id="onlineDuration"></select></label>
@@ -403,29 +404,68 @@
           </div>
         </header>
 
-        <div id="tttOnlinePanel" class="ttt-online-panel">
-          <div class="ttt-online-account panel">
+        <div id="tttOnlinePanel" class="mode-lobby-panel">
+          <div class="mode-lobby-account panel">
             <span>Signed in as</span>
             <strong id="tttOnlineAccount">Factory Player</strong>
             <small>Floor Tic-Tac-Toe matchmaking</small>
           </div>
-          <div id="tttOnlinePairing" class="ttt-online-pairing panel">
+          <div id="tttOnlinePairing" class="mode-lobby-pairing panel">
             <button id="tttOnlineQuick" type="button" class="primary-btn">Quick Search</button>
             <button id="tttOnlineCreate" type="button" class="ghost-btn">Create Private Room</button>
-            <div class="ttt-online-code-entry">
+            <div class="mode-lobby-code-entry">
               <input id="tttOnlineRoomInput" maxlength="8" autocomplete="off" placeholder="ROOM CODE" aria-label="Tic-Tac-Toe room code" />
               <button id="tttOnlineJoin" type="button" class="ghost-btn">Join Room</button>
             </div>
           </div>
-          <div id="tttOnlineLobby" class="ttt-online-lobby panel" hidden>
-            <div class="ttt-online-room-heading"><span>Room</span><strong id="tttOnlineRoomCode">-----</strong></div>
-            <div id="tttOnlinePlayers" class="ttt-online-players"></div>
-            <div class="ttt-online-actions">
+          <div id="tttOnlineLobby" class="mode-lobby-lobby panel" hidden>
+            <div class="mode-lobby-room-heading"><span>Room</span><strong id="tttOnlineRoomCode">-----</strong></div>
+            <div id="tttOnlinePlayers" class="mode-lobby-players"></div>
+            <div class="mode-lobby-actions">
               <button id="tttOnlineStart" type="button" class="primary-btn" hidden>Start Match</button>
               <button id="tttOnlineLeave" type="button" class="ghost-btn">Leave Lobby</button>
             </div>
           </div>
-          <p id="tttOnlineStatus" class="ttt-online-status" aria-live="polite">Choose Quick Search or open a private room.</p>
+          <p id="tttOnlineStatus" class="mode-lobby-status" aria-live="polite">Choose Quick Search or open a private room.</p>
+        </div>
+      </section>
+
+      <!-- ====================== HORSE ONLINE LOBBY ==================== -->
+      <!-- Same shape as the tic-tac-toe lobby, and deliberately the same
+           classes: both modes hang a lobby off the Factory Network screen and
+           both ask the same four questions. -->
+      <section id="horseOnlineScreen" class="screen" aria-label="Online HORSE lobby">
+        <header class="screen-head">
+          <button type="button" class="ghost-btn" data-intent="leave-horse">Back</button>
+          <div>
+            <h2>Online HORSE</h2>
+            <p>Place a bin, make the shot, and your opponent owes you the same one.</p>
+          </div>
+        </header>
+
+        <div id="horseOnlinePanel" class="mode-lobby-panel">
+          <div class="mode-lobby-account panel">
+            <span>Signed in as</span>
+            <strong id="horseOnlineAccount">Factory Player</strong>
+            <small>Spelling <b id="horseOnlineWord">HORSE</b></small>
+          </div>
+          <div id="horseOnlinePairing" class="mode-lobby-pairing panel">
+            <button id="horseOnlineQuick" type="button" class="primary-btn">Quick Search</button>
+            <button id="horseOnlineCreate" type="button" class="ghost-btn">Create Private Room</button>
+            <div class="mode-lobby-code-entry">
+              <input id="horseOnlineRoomInput" maxlength="8" autocomplete="off" placeholder="ROOM CODE" aria-label="HORSE room code" />
+              <button id="horseOnlineJoin" type="button" class="ghost-btn">Join Room</button>
+            </div>
+          </div>
+          <div id="horseOnlineLobby" class="mode-lobby-lobby panel" hidden>
+            <div class="mode-lobby-room-heading"><span>Room</span><strong id="horseOnlineRoomCode">-----</strong></div>
+            <div id="horseOnlinePlayers" class="mode-lobby-players"></div>
+            <div class="mode-lobby-actions">
+              <button id="horseOnlineStart" type="button" class="primary-btn" hidden>Start Match</button>
+              <button id="horseOnlineLeave" type="button" class="ghost-btn">Leave Lobby</button>
+            </div>
+          </div>
+          <p id="horseOnlineStatus" class="mode-lobby-status" aria-live="polite">Choose Quick Search or open a private room.</p>
         </div>
       </section>
 

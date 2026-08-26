@@ -2,6 +2,20 @@
 
 Dated history extracted from the root `CLAUDE.md` (2026-07-23) so that file can stay a lean orientation guide instead of an ever-growing log. This file is a curated narrative, not a replacement for `git log` — read it for *why*/*what shipped when*, not for line-level diffs.
 
+## Mini Hoops: HORSE Keeps the Setter Honest, and Goes Online (2026-08-26)
+
+**The turn rule changed, and it changed the shape of the mode.** Matching a standing shot used to pass control to whoever matched it. It no longer does: **the setter keeps setting until they miss a shot of their own.** Answering a shot is staying alive, not taking the initiative — the previous rule made a made match the *reward*, which reads backwards. The turn now changes hands in exactly one place, a setter missing their own setup, and that player still takes no letter for it, which is what keeps them from farming letters with impossible shots.
+
+**Online HORSE shipped, server-authoritative rather than relayed.** Its own game id, `mini-hoops-horse`, so a player looking to spell a word never lands in the timed-score pool; reached from the Factory Network screen's Game select, which now routes two modes rather than one. `factory-network-server/games/mini-hoops/` grew a second definition off the same mirrored sim — `horse-adjudicator.mjs`, `horse-match-engine.mjs`, `horse-lobby-game.mjs` — and the mirror now carries `bin-physics`, `bin-placement`, `horse-shot` and `horse.js` as well.
+
+**A placement is authoritative mid-match state, and that is the new shape.** Every other server-owned game in this repo settles its config in the lobby and then rules on inputs; HORSE has a player *building the target* on their turn. The setter submits the bin, the server re-clamps it through the cabinet's own `normalizeBinSetup`, and the opponent draws the server's copy — otherwise an invented bin hands the other player a shot the rules never allow, and the two courts disagree about where it even is.
+
+**`aimY` does not travel, and the release moment does.** The classic cabinet's reticle rides one fixed line and the server pins it; HORSE's vertical aim IS the placed bin's rest height, which the server already holds — so the pin the old handoff note called for turned out not to be needed at all. What the client does choose is the phase of the bin's motion clock at release, and that is not a hole: a player may watch a moving bin for as long as they like, so every phase is legitimately reachable and picking one is the skill the motions exist to ask for.
+
+**The opponent's shot is replayed on your court rather than reported to it.** Their pull, their bin and their release moment played back through the same sim that ruled on it, so a letter arrives with a ball attached.
+
+The lobby markup's classes were renamed `ttt-online-*` → `mode-lobby-*`: two modes now hang the same four-question lobby off the same screen, and the shape should not be named after whichever needed one first. Not built: HORSE reconnection — the server pauses and forfeits on a grace period, but the client has no `resumeSavedSession`. Not yet played by two real browsers on the live server.
+
 ## Yam Bowling: Binding the Mastery Ladder (2026-08-16)
 
 The audit below found the bowler mastery ladder was **20 of 31 rewards label-only** — a name and nothing wearable — while the scope doc marked Milestone 5 complete. Five of those are now bound, which is every node that needed no new art.

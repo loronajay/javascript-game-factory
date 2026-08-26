@@ -88,14 +88,33 @@ test("a made setup becomes a standing shot the other player owes", () => {
   assertEqual(shotSetupFor(match, { x: 9, y: 9, z: 9 }), setup);
 });
 
-test("matching a standing shot passes control to whoever matched it", () => {
+test("matching a standing shot buys safety, not the initiative", () => {
+  // Answering a shot costs the matcher nothing and gains them nothing. The
+  // setter keeps dictating until they miss a shot of their own.
   const match = createHorseMatch({ mode: "local", word: "PIG" });
   resolveHorseShot(match, true, { motionId: "still" });
   resolveHorseShot(match, true, null);
   assertEqual(match.players[1].letters, 0);
-  assertEqual(match.turn, 1, "the matcher sets next");
+  assertEqual(match.turn, 0, "the setter sets again");
+  assertEqual(match.setter, 0);
   assertEqual(match.phase, PHASE_SET);
   assertEqual(match.standingShot, null);
+});
+
+test("the turn only changes hands when a setter misses their own shot", () => {
+  const match = createHorseMatch({ mode: "local", word: "PIG" });
+  // Set, matched, set, missed by the matcher: player 0 still has the ball.
+  resolveHorseShot(match, true, { motionId: "still" });
+  resolveHorseShot(match, true, null);
+  assertEqual(match.turn, 0);
+  resolveHorseShot(match, true, { motionId: "still" });
+  resolveHorseShot(match, false, null);
+  assertEqual(match.turn, 0, "a matcher who misses hands it straight back");
+  assertEqual(match.players[1].letters, 1);
+  // Only now, on the setter's own miss.
+  resolveHorseShot(match, false, { motionId: "still" });
+  assertEqual(match.turn, 1);
+  assertEqual(match.phase, PHASE_SET);
 });
 
 test("missing a standing shot takes a letter and leaves the setter in control", () => {

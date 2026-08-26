@@ -177,6 +177,9 @@ export function boot(root) {
     onTicTacToe: ({ action, roomCode }) => {
       openTicTacToe({ mode: "online", action, room: roomCode });
     },
+    onHorse: ({ action, roomCode }) => {
+      openHorse({ mode: "online", action, room: roomCode });
+    },
     onConfig: (config) => {
       if (onlineSnapshot?.lobby?.ownerId === onlineSnapshot.clientId) onlineClient.updateConfig(config);
     },
@@ -219,18 +222,33 @@ export function boot(root) {
     },
   });
 
+  // HORSE owns two sections the same way tic-tac-toe does: the court, which the
+  // router knows about, and its online lobby, which is swapped in alongside.
+  const horseLobby = root.querySelector("#horseOnlineScreen");
+  const horseCourt = root.querySelector("#horseScreen");
   const horse = bootHorse(root, {
     audio,
+    accountAccess,
+    onShowLobby: (showLobby) => {
+      // Same guard, same reason as tic-tac-toe's: the router owns which screen
+      // is up, and the boot-time render of this callback must not switch a court
+      // on over the title screen.
+      if (screens.current() !== SCREEN_HORSE) return;
+      if (horseLobby) horseLobby.classList.toggle("is-active", showLobby);
+      horseCourt?.classList.toggle("is-active", !showLobby);
+    },
     onLeave: () => {
       horse.exit();
+      if (horseLobby) horseLobby.classList.remove("is-active");
       screens.show(SCREEN_MENU);
     },
   });
 
   /** Enter HORSE in a given mode. The one door into that screen. */
   function openHorse(options) {
-    horse.enter({ word: setupWord, ...options });
+    overlays.hideAll();
     screens.show(SCREEN_HORSE);
+    horse.enter({ word: setupWord, ...options });
   }
 
   /** Enter floor tic-tac-toe in a given mode. The one door into that screen. */

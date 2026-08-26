@@ -34,6 +34,7 @@ import {
 } from "./sim/bin-placement.js";
 import { createHorseShot, horsePowerForDepth } from "./sim/horse-shot.js";
 import {
+  HORSE_FIXED_SETUP,
   PHASE_MATCH,
   canPlaceBin,
   chooseCpuBinSetup,
@@ -48,6 +49,9 @@ import {
   shotSetupFor,
 } from "./sim/horse.js";
 import { createBall, isBallSettled, launchBall, resetBall } from "./sim/physics.js";
+import { createMiniHoopsAccountAccess } from "./multiplayer/account-access.js";
+import { normalizeRoomCode } from "./multiplayer/online-client.js";
+import { createHorseOnlineClient } from "./multiplayer/horse-online-client.js";
 import { launchSpin, trajectoryPoints } from "./sim/launch.js";
 import { isShootablePull, neutralPull, resolvePull } from "./sim/pull.js";
 import { ballScreenRadius, projectPoint, screenToWorldAtZ } from "./sim/projection.js";
@@ -63,8 +67,11 @@ const BIN_PATH = "assets/modes/floor-tic-tac-toe/open-bin.png";
 // reason: the mode is not a configurable run, and the thing the players are
 // negotiating over is the BIN. A court picker would only add a second thing to
 // agree about before anyone shoots.
-const ROOM_ID = "warehouse";
-const BALL_ID = "basketball";
+// Stated once, in `sim/horse.js`, because the server adjudicating online HORSE
+// runs a mirrored copy of that file — a ball named here and re-typed over there
+// is exactly the pair that drifts silently.
+const ROOM_ID = HORSE_FIXED_SETUP.locationId;
+const BALL_ID = HORSE_FIXED_SETUP.ballId;
 
 // How far one nudge of a key or an on-screen stepper moves the bin.
 const NUDGE_DEPTH = 0.035;
@@ -85,6 +92,13 @@ export function bootHorse(root, options = {}) {
   const random = options.random || Math.random;
   const audio = options.audio || SILENT_AUDIO;
   const onLeave = options.onLeave || (() => {});
+  // How this root asks the cabinet to swap between its court and its online
+  // lobby. It owns both; it does not own the router.
+  const onShowLobby = options.onShowLobby || (() => {});
+  const accountAccess = options.accountAccess || createMiniHoopsAccountAccess();
+  const onlineClient = options.onlineClient || createHorseOnlineClient({
+    resolveIdentity: () => accountAccess.identity(),
+  });
 
   const canvas = root.querySelector("#horseCourt");
   const ctx = canvas.getContext("2d");
@@ -132,6 +146,26 @@ export function bootHorse(root, options = {}) {
   let accumulator = 0;
   let previousFrame = 0;
 
+  // ------------------------------------------------------------- online
+  // Which of the two rows in `match.players` is this device. Seat 0 is the
+  // lobby host; it never moves off zero in any other mode.
+  let seat = 0;
+  let onlineSnapshot = onlineClient.getSnapshot();
+  // The server's newest word on the match, held until the local court is ready
+  // to take it — a shot in the air is played out before its ruling lands, or the
+  // ball would vanish mid-flight and reappear as a letter.
+  let pendingState = null;
+  // The last `sequence` this court has actually applied, and the last one it has
+  // seen. A shot is replayed exactly once, and only if this device did not take
+  // it — the shooter has already watched their own ball.
+  let appliedSequence = -1;
+  let seenSequence = -1;
+  // Set while a shot has been sent and the ruling has not come back. Nothing on
+  // this court is interactive while it is true.
+  let awaitingServer = false;
+  // The bin the OTHER player has arranged this turn, as the server reports it.
+  let pendingOnlineSetup = null;
+
   const el = {
     status: root.querySelector("#horseStatus"),
     modeLabel: root.querySelector("#horseModeLabel"),
@@ -146,7 +180,20 @@ export function bootHorse(root, options = {}) {
     readouts: root.querySelector("#horsePlaceReadout"),
     newMatch: root.querySelector("#horseNewMatch"),
     court: root.querySelector("#horseScreen .court"),
+    onlinePanel: root.querySelector("#horseOnlinePanel"),
   };
+
+  onlineClient.subscribe(handleOnlineSnapshot);
+  root.querySelector("#horseOnlineQuick")?.addEventListener("click", () => onlineClient.findQuickMatch(word));
+  root.querySelector("#horseOnlineCreate")?.addEventListener("click", () => onlineClient.createPrivateRoom(word));
+  root.querySelector("#horseOnlineJoin")?.addEventListener("click", () => {
+    onlineClient.joinPrivateRoom(root.querySelector("#horseOnlineRoomInput")?.value);
+  });
+  root.querySelector("#horseOnlineStart")?.addEventListener("click", () => onlineClient.startMatch());
+  root.querySelector("#horseOnlineLeave")?.addEventListener("click", () => onlineClient.leave());
+  root.querySelector("#horseOnlineRoomInput")?.addEventListener("input", (event) => {
+    event.target.value = normalizeRoomCode(event.target.value);
+  });
 
   buildMotionChips();
 
@@ -264,11 +311,16 @@ export function bootHorse(root, options = {}) {
   }
 
   function isPlacing() {
-    return phase === PHASE_PLACING && match?.status === "playing" && isHumanControlledTurn(match) && !flight;
+    return phase === PHASE_PLACING && isMyTurn() && !flight && !awaitingServer;
   }
 
   function canHumanShoot() {
-    return phase === PHASE_AIMING && match?.status === "playing" && isHumanControlledTurn(match) && !flight;
+    return phase === PHASE_AIMING && isMyTurn() && !flight && !awaitingServer && Boolean(activeSetup);
+  }
+
+  /** Is the shot on offer this device's to take? Online, that is a seat. */
+  function isMyTurn() {
+    return match?.status === "playing" && isHumanControlledTurn(match, seat);
   }
 
   /** Move the working bin to a canvas point: across for the lane, up for the height. */
@@ -317,6 +369,9 @@ export function bootHorse(root, options = {}) {
   function confirmPlacement() {
     if (!isPlacing()) return;
     activeSetup = normalizeBinSetup(workingSetup);
+    // The server clamps it again through this very function before anybody
+    // shoots at it, so the two copies of the bin cannot disagree.
+    if (mode === "online") onlineClient.submitPlacement(activeSetup);
     phase = PHASE_AIMING;
     turnClock = 0;
     syncPanels();
@@ -328,8 +383,17 @@ export function bootHorse(root, options = {}) {
     match = createHorseMatch({
       mode,
       word,
-      startingPlayer: mode === "cpu" ? 0 : 0,
+      startingPlayer: 0,
     });
+    // ONLINE, NOTHING IS PLAYING UNTIL THE SERVER SAYS SO. The local object is a
+    // placeholder for the letter board to draw; every field on it is replaced
+    // wholesale by the first authoritative snapshot.
+    if (mode === "online") match.status = "waiting";
+    seat = 0;
+    pendingState = null;
+    appliedSequence = -1;
+    seenSequence = -1;
+    awaitingServer = false;
     lastContactAt.clear();
     workingSetup = { ...defaultPlacement(), motionId: "still" };
     activeSetup = null;
@@ -338,6 +402,8 @@ export function bootHorse(root, options = {}) {
     resetBall(ball);
     setPower(0);
     beginTurn();
+    onShowLobby(mode === "online");
+    renderOnlineLobby();
     if (el.modeLabel) {
       el.modeLabel.textContent = mode === "local"
         ? "Local Hotseat"
@@ -358,6 +424,10 @@ export function bootHorse(root, options = {}) {
     turnClock = 0;
     resetBall(ball);
     setPower(0);
+    if (mode === "online") {
+      beginOnlineTurn();
+      return;
+    }
     if (canPlaceBin(match)) {
       phase = PHASE_PLACING;
       activeSetup = null;
@@ -374,8 +444,48 @@ export function bootHorse(root, options = {}) {
     syncStatus();
   }
 
+  /**
+   * The same job online, where the other hand is on another machine.
+   *
+   * PLACING IS THE ONE PHASE THAT IS LOCAL. Only the player whose turn it is
+   * arranges a bin, so the opponent has nothing to draw until their placement
+   * arrives — `activeSetup` stays null and the court is honestly empty rather
+   * than showing a bin nobody has chosen yet.
+   */
+  function beginOnlineTurn() {
+    const mine = isMyTurn();
+    if (canPlaceBin(match) && mine) {
+      phase = PHASE_PLACING;
+      activeSetup = null;
+    } else {
+      phase = PHASE_AIMING;
+      activeSetup = match?.phase === PHASE_MATCH
+        ? match.standingShot
+        : (mine ? activeSetup : pendingOnlineSetup);
+    }
+    cpuDelay = 0;
+    el.hint?.classList.toggle("is-hidden", !mine);
+    syncPanels();
+    syncStatus();
+  }
+
   function launchFromPull(released) {
     if (flight || !activeSetup) return;
+    // ONLINE, THE PULL GOES UP THE WIRE AND THE OUTCOME COMES BACK. This court
+    // still plays the shot out — it is running the same sim the server replays
+    // it through, so the two agree — but it does not rule on it.
+    if (mode === "online") {
+      awaitingServer = true;
+      onlineClient.submitShot({
+        power: released.power,
+        aimX: released.aimX,
+        loft: released.loft,
+        // The phase of the bin's motion at release. Choosing it is the skill;
+        // the server rules on the moment the player actually picked.
+        motionSeconds: turnClock,
+        expectedShots: match.shots,
+      });
+    }
     const shot = createHorseShot(released, ball, activeSetup, { weight: ballFlight(BALL_ID).weight });
     launchBall(ball, shot.launch, launchSpin(shot.launch));
     audio.released(BALL_ID);
@@ -439,7 +549,8 @@ export function bootHorse(root, options = {}) {
       tickFlight();
       return;
     }
-    if (match.status !== "playing" || isHumanControlledTurn(match)) return;
+    // The opponent is a person on another machine; there is no CPU to run.
+    if (mode === "online" || match.status !== "playing" || isHumanControlledTurn(match)) return;
 
     cpuDelay -= TICK_SECONDS;
     if (cpuDelay > 0) return;
@@ -473,34 +584,50 @@ export function bootHorse(root, options = {}) {
     flight.resetIn -= TICK_SECONDS;
     if (flight.resetIn <= 0) {
       flight = null;
-      if (match.status === "playing") beginTurn();
+      if (mode === "online") applyServerState();
+      else if (match.status === "playing") beginTurn();
       else syncPanels();
     }
   }
 
   function finishShot(made) {
-    const outcome = resolveHorseShot(match, made, activeSetup);
     flight.resolved = true;
     flight.made = made;
     flight.resetIn = made ? 1.15 : 0.55;
     if (made) audio.binScored(BALL_ID);
     else audio.missed();
+
+    // ONLINE THE RULES ARE THE SERVER'S. This court plays the ball out and says
+    // what it saw; what it MEANT — the letter, the turn, the word — is read off
+    // the authoritative snapshot when it lands.
+    if (mode === "online") {
+      const ruling = pendingState?.lastShot;
+      if (ruling && pendingState) {
+        if (pendingState.match?.status === "won") audio.celebrate();
+        setStatus(narrate({ ...ruling, shooter: ruling.seat, accepted: true }, pendingState.match));
+      } else {
+        setStatus("Waiting for the ruling…");
+      }
+      return;
+    }
+
+    const outcome = resolveHorseShot(match, made, activeSetup);
     if (match.status === "won") audio.celebrate();
     setStatus(narrate(outcome));
     syncLetters();
   }
 
   /** What just happened, in one line. */
-  function narrate(outcome) {
-    if (!outcome?.accepted) return "";
-    const who = playerLabel(match, outcome.shooter).toUpperCase();
-    if (match.status === "won") {
-      return `${who} SPELLS ${match.word} · ${playerLabel(match, match.winner).toUpperCase()} WINS`;
+  function narrate(outcome, view = match) {
+    if (!outcome?.accepted || !view) return "";
+    const who = playerLabel(view, outcome.shooter).toUpperCase();
+    if (view.status === "won") {
+      return `${who} SPELLS ${view.word} · ${playerLabel(view, view.winner).toUpperCase()} WINS`;
     }
     if (outcome.kind === "set") return `${who} SETS THE SHOT · MATCH IT`;
     if (outcome.kind === "set-missed") return `${who} MISSED THEIR OWN SHOT · NO LETTER`;
-    if (outcome.kind === "matched") return `${who} MATCHED IT · THEY SET NEXT`;
-    return `${who} MISSES · LETTER ${match.word[match.players[outcome.shooter].letters - 1]}`;
+    if (outcome.kind === "matched") return `${who} MATCHED IT · ${playerLabel(view, view.setter).toUpperCase()} SETS AGAIN`;
+    return `${who} MISSES · LETTER ${view.word[view.players[outcome.shooter].letters - 1]}`;
   }
 
   /** Turn this tick's contacts into sound. Debounced on the cabinet's own rule. */
@@ -514,6 +641,145 @@ export function bootHorse(root, options = {}) {
       }
       audio.contact(contact, { ballId: BALL_ID, speed: ball.vy });
     }
+  }
+
+  // ------------------------------------------------------------- the wire
+
+  /**
+   * A new word from the server.
+   *
+   * TWO THINGS ARRIVE HERE AND THEY ARE HANDLED DIFFERENTLY. A new `sequence` is
+   * a shot that has been RULED ON: if this device did not take it, the shot is
+   * replayed on this court from the setup and the release phase the server
+   * recorded, so the player watches the ball that decided the letter rather than
+   * being told about it. Anything else — a placement, a lobby change, a
+   * reconnect — is applied straight away.
+   *
+   * Either way the state is HELD until the court is idle. A ruling applied
+   * mid-flight would delete the ball out of the air.
+   */
+  function handleOnlineSnapshot(snapshot) {
+    onlineSnapshot = snapshot;
+    renderOnlineLobby();
+    if (mode !== "online") return;
+    const state = snapshot?.matchState;
+    // No match is the lobby; a match is the court. Nothing is ever hidden in
+    // place — same rule tic-tac-toe's two sections learned.
+    onShowLobby(!state);
+    if (!state) return;
+
+    const index = (state.seats || []).findIndex(({ id }) => id === snapshot.clientId);
+    if (index >= 0) seat = index;
+    pendingState = state;
+    pendingOnlineSetup = state.pendingSetup || null;
+
+    const ruling = state.lastShot;
+    const unseen = Boolean(ruling) && ruling.sequence > seenSequence;
+    if (unseen && !flight && ruling.shooterId !== snapshot.clientId) {
+      seenSequence = ruling.sequence;
+      replayOpponentShot(ruling);
+      return;
+    }
+    // Either this device took the shot and has already watched it, or the court
+    // is busy and there is no room to replay it. Both take the state as read.
+    if (unseen) seenSequence = ruling.sequence;
+    if (!flight) applyServerState();
+  }
+
+  /** Take the held snapshot as the truth, and start whatever turn it describes. */
+  function applyServerState() {
+    const state = pendingState;
+    // NOTHING TO APPLY MEANS STILL WAITING, not free to shoot again. Clearing
+    // `awaitingServer` here would hand the court back between a shot leaving and
+    // its ruling arriving, and the second shot would be refused by the server's
+    // own duplicate guard while this court had already animated it.
+    if (!state) {
+      syncPanels();
+      syncStatus();
+      return;
+    }
+    pendingState = null;
+    awaitingServer = false;
+    // A shot was ruled on, or the turn itself moved: either way this is a new
+    // turn and it starts from the top, with the motion clock back at zero.
+    const advanced = state.sequence !== appliedSequence
+      || match?.turn !== state.match.turn
+      || match?.phase !== state.match.phase
+      || match?.status !== state.match.status;
+    appliedSequence = state.sequence;
+    match = state.match;
+    pendingOnlineSetup = state.pendingSetup || null;
+    if (advanced) beginTurn();
+    else {
+      // A placement from the other side mid-turn: the bin appears, and its
+      // motion starts running so it can be watched before anyone shoots.
+      if (!isMyTurn() && pendingOnlineSetup) activeSetup = pendingOnlineSetup;
+      syncPanels();
+      syncStatus();
+    }
+    draw();
+  }
+
+  /**
+   * Play the opponent's shot out on this court.
+   *
+   * It is the SERVER's record of the shot — their bin, their pull, and the phase
+   * of the motion clock they released on — replayed through the same sim. So
+   * both players watch the same ball do the same thing, and neither is watching
+   * an animation invented to match a result.
+   */
+  function replayOpponentShot(ruling) {
+    if (!ruling?.setup || !ruling.intent) return;
+    activeSetup = ruling.setup;
+    phase = PHASE_AIMING;
+    turnClock = Math.max(0, Number(ruling.intent.motionSeconds) || 0);
+    resetBall(ball);
+    const shot = createHorseShot(ruling.intent, ball, activeSetup, { weight: ballFlight(BALL_ID).weight });
+    launchBall(ball, shot.launch, launchSpin(shot.launch));
+    audio.released(BALL_ID);
+    flight = { age: 0, resolved: false, resetIn: null, capturedBin: null, made: false };
+    setPower(Number(ruling.intent.power) || 0);
+    syncPanels();
+    syncStatus();
+  }
+
+  function renderOnlineLobby() {
+    if (!el.onlinePanel) return;
+    const lobby = onlineSnapshot?.lobby;
+    const identity = accountAccess.identity();
+    const account = root.querySelector("#horseOnlineAccount");
+    if (account) account.textContent = identity?.displayName || "Factory Player";
+    const code = root.querySelector("#horseOnlineRoomCode");
+    if (code) code.textContent = lobby?.roomCode || "-----";
+    const wordOut = root.querySelector("#horseOnlineWord");
+    if (wordOut) wordOut.textContent = lobby?.word || word || "HORSE";
+    const lobbyPanel = root.querySelector("#horseOnlineLobby");
+    const pairing = root.querySelector("#horseOnlinePairing");
+    if (lobbyPanel) lobbyPanel.hidden = !lobby;
+    if (pairing) pairing.hidden = Boolean(lobby);
+
+    const players = root.querySelector("#horseOnlinePlayers");
+    if (players) {
+      const rows = lobby?.players?.length ? lobby.players : [{ name: identity?.displayName || "You" }];
+      players.replaceChildren(...[0, 1].map((index) => {
+        const row = document.createElement("span");
+        row.textContent = rows[index]?.name || "Open slot";
+        return row;
+      }));
+    }
+
+    const start = root.querySelector("#horseOnlineStart");
+    const isOwner = Boolean(lobby && lobby.ownerId === onlineSnapshot.clientId);
+    if (start) start.hidden = !isOwner || lobby?.playerCount < 2 || lobby?.status !== "open";
+    const status = root.querySelector("#horseOnlineStatus");
+    if (status) status.textContent = onlineSnapshot?.error?.message
+      || (onlineSnapshot?.status === "searching" ? "Quick Search: finding an opponent…"
+        : onlineSnapshot?.status === "creating" ? "Opening private room…"
+          : onlineSnapshot?.status === "joining" ? "Joining private room…"
+            : onlineSnapshot?.status === "started" ? "Match started. The host sets first."
+              : onlineSnapshot?.status === "complete" ? "Match complete. Leave to play another."
+                : lobby ? (lobby.playerCount >= 2 ? "Both players ready. The host can start." : "Waiting for Player 2…")
+                  : "Choose Quick Search or open a private room.");
   }
 
   // ---------------------------------------------------------------- the HUD
@@ -553,7 +819,8 @@ export function bootHorse(root, options = {}) {
     // showing belongs to `ui/screens.js` alone, and this is only about what is
     // inside one.
     el.court?.classList.toggle("is-placing", placing);
-    if (el.newMatch) el.newMatch.hidden = match?.status === "playing";
+    // Online, a rematch is a lobby decision rather than a button on the court.
+    if (el.newMatch) el.newMatch.hidden = mode === "online" || match?.status === "playing";
     if (el.legend) {
       el.legend.textContent = placing
         ? "Drag the bin · arrows or WASD for depth · Q / E for height"
@@ -623,20 +890,29 @@ export function bootHorse(root, options = {}) {
 
   function syncStatus() {
     syncLetters();
+    if (match.status === "waiting") {
+      setStatus("Set up an online match below");
+      return;
+    }
     if (match.status === "won") {
       setStatus(`${playerLabel(match, match.winner).toUpperCase()} WINS`);
       return;
     }
+    if (awaitingServer) {
+      setStatus("Waiting for the ruling…");
+      return;
+    }
     const who = playerLabel(match);
-    if (phase === PHASE_PLACING) {
-      setStatus(isHumanControlledTurn(match) ? `${who}: set up a shot` : `${who} is setting up…`);
+    const mine = isMyTurn();
+    if (phase === PHASE_PLACING || (mode === "online" && match.phase !== PHASE_MATCH && !activeSetup && !mine)) {
+      setStatus(mine ? `${who}: set up a shot` : `${who} is setting up…`);
       return;
     }
     if (match.phase === PHASE_MATCH) {
-      setStatus(isHumanControlledTurn(match) ? `${who}: MATCH IT` : `${who} must match it…`);
+      setStatus(mine ? `${who}: MATCH IT` : `${who} must match it…`);
       return;
     }
-    setStatus(isHumanControlledTurn(match) ? `${who}: make it to set the shot` : `${who} is shooting…`);
+    setStatus(mine ? `${who}: make it to set the shot` : `${who} is shooting…`);
   }
 
   function setStatus(text) { if (el.status) el.status.textContent = text; }
@@ -764,11 +1040,19 @@ export function bootHorse(root, options = {}) {
    * Show this screen. The loop runs only while it is up — otherwise the CPU
    * plays out a whole match against a board nobody is looking at.
    */
-  function enter({ mode: nextMode, difficulty: nextDifficulty, word: nextWord } = {}) {
+  function enter({ mode: nextMode, difficulty: nextDifficulty, word: nextWord, action, room } = {}) {
     if (nextMode !== undefined) mode = horseModeId(nextMode);
     if (nextDifficulty !== undefined) difficulty = horseDifficultyById(nextDifficulty).id;
     if (nextWord !== undefined) word = nextWord;
     newMatch();
+    // Signed-in only, like every other online surface in the cabinet. The gate
+    // redirects rather than explaining, and the court sits behind the lobby.
+    if (mode === "online" && accountAccess.requireAccount()) {
+      if (action === "quick") onlineClient.findQuickMatch(word);
+      else if (action === "create") onlineClient.createPrivateRoom(word);
+      else if (action === "join" && room) onlineClient.joinPrivateRoom(room);
+      else onlineClient.connect();
+    }
     if (!active) {
       active = true;
       previousFrame = typeof performance === "undefined" ? 0 : performance.now();
@@ -782,6 +1066,7 @@ export function bootHorse(root, options = {}) {
     pull = null;
     pointerId = null;
     placingPointerId = null;
+    if (mode === "online") onlineClient.leave();
   }
 
   newMatch();

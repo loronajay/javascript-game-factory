@@ -9,12 +9,28 @@
 // by the rules rather than by a validator, which is why `bin-placement.js`
 // deliberately does not test a placement for reachability.
 //
-// CONTROL PASSES ON A MAKE, NOT ON A MISS. If the matcher matches, they set
-// next; if they miss, they take a letter and the setter sets again. So a player
-// on a hot hand keeps dictating, and the way out from under it is to make the
-// shot rather than to wait for the other player to tire.
+// THE SETTER KEEPS CONTROL UNTIL THEY MISS. Matching a standing shot buys you
+// nothing but safety: the setter sets again, whether the matcher made it or
+// took a letter for it. Control changes hands in exactly one place — a setter
+// who misses their OWN setup. So a player on a hot hand keeps dictating, and
+// the only way out from under it is to wait for them to miss a shot of their
+// own making, which is also the one thing they cannot farm.
 
 export const DEFAULT_WORD = "HORSE";
+
+/**
+ * The room and the ball, fixed the way Floor Tic-Tac-Toe fixes them.
+ *
+ * Stated here rather than in the root that draws it, because online HORSE is
+ * adjudicated by a mirrored copy of this sim on `factory-network-server` — and a
+ * ball named in one root and re-typed in a server module is exactly the kind of
+ * pair that drifts silently. There is nothing to choose anyway: what the two
+ * players are negotiating over is the BIN.
+ */
+export const HORSE_FIXED_SETUP = Object.freeze({
+  locationId: "warehouse",
+  ballId: "basketball",
+});
 export const MAX_WORD_LENGTH = 10;
 
 // Setting a new shot, versus owing one that already stands.
@@ -80,10 +96,18 @@ export function letterState(match, playerIndex) {
   return [...match.word].map((letter, index) => ({ letter, earned: index < earned }));
 }
 
-export function isHumanControlledTurn(match) {
+/**
+ * Is the shot on offer this player's to take?
+ *
+ * `seat` is which of the two rows in `players` belongs to the hand holding the
+ * device, and it only ever moves off zero online — the host is seat 0 and the
+ * guest seat 1, decided by the lobby's member order. Hotseat hands the court to
+ * whoever is up, so both seats are human there.
+ */
+export function isHumanControlledTurn(match, seat = 0) {
   if (match?.status !== "playing") return false;
   if (match.mode === "local") return true;
-  return match.turn === 0;
+  return match.turn === (seat === 1 ? 1 : 0);
 }
 
 export function playerLabel(match, index = match?.turn) {
@@ -146,11 +170,13 @@ export function resolveHorseShot(match, made, setup = null) {
 
   // Matching a standing shot.
   if (made) {
-    // Matched: control passes to the player who just made it.
+    // Matched: no letter, and NOTHING ELSE CHANGES HANDS. Answering a shot is
+    // staying alive, not taking the initiative — the setter sets again, exactly
+    // as they would have if the matcher had missed. The turn only leaves them
+    // when they miss a shot of their own.
     match.standingShot = null;
     match.phase = PHASE_SET;
-    match.setter = shooter;
-    match.turn = shooter;
+    match.turn = match.setter;
     match.lastOutcome = { shooter, made: true, letter: false, kind: "matched" };
     return { accepted: true, ...match.lastOutcome, status: match.status };
   }

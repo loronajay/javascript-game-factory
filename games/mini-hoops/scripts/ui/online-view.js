@@ -35,28 +35,35 @@ export function createOnlineView(root, callbacks = {}) {
     locationId: configInputs.locationId?.value,
   });
   Object.values(configInputs).forEach((input) => input?.addEventListener("change", () => callbacks.onConfig?.(readConfig())));
-  const isTicTacToe = () => gameTypeInput?.value === "tic-tac-toe";
-  const routeTicTacToe = (action) => callbacks.onTicTacToe?.({
-    action,
-    roomCode: normalizeRoomCode(root.querySelector("#onlineRoomInput")?.value),
-  });
-  root.querySelector("#onlineQuick")?.addEventListener("click", () => isTicTacToe() ? routeTicTacToe("quick") : callbacks.onQuick?.(readConfig()));
-  root.querySelector("#onlineCreate")?.addEventListener("click", () => isTicTacToe() ? routeTicTacToe("create") : callbacks.onCreate?.(readConfig()));
-  root.querySelector("#onlineJoin")?.addEventListener("click", () => isTicTacToe() ? routeTicTacToe("join") : callbacks.onJoin?.(normalizeRoomCode(root.querySelector("#onlineRoomInput")?.value)));
+  // The two extra modes are routed rather than configured: each has its own
+  // lobby, its own game id, and nothing on this fieldset to read.
+  const gameType = () => gameTypeInput?.value || "classic";
+  const isRouted = () => gameType() === "tic-tac-toe" || gameType() === "horse";
+  const route = (action) => {
+    const payload = {
+      action,
+      roomCode: normalizeRoomCode(root.querySelector("#onlineRoomInput")?.value),
+    };
+    if (gameType() === "horse") callbacks.onHorse?.(payload);
+    else callbacks.onTicTacToe?.(payload);
+  };
+  root.querySelector("#onlineQuick")?.addEventListener("click", () => isRouted() ? route("quick") : callbacks.onQuick?.(readConfig()));
+  root.querySelector("#onlineCreate")?.addEventListener("click", () => isRouted() ? route("create") : callbacks.onCreate?.(readConfig()));
+  root.querySelector("#onlineJoin")?.addEventListener("click", () => isRouted() ? route("join") : callbacks.onJoin?.(normalizeRoomCode(root.querySelector("#onlineRoomInput")?.value)));
   root.querySelector("#onlineStart")?.addEventListener("click", () => callbacks.onStart?.());
   root.querySelector("#onlineLeave")?.addEventListener("click", () => callbacks.onLeave?.());
   root.querySelector("#onlineRoomInput")?.addEventListener("input", (event) => { event.target.value = normalizeRoomCode(event.target.value); });
   gameTypeInput?.addEventListener("change", renderGameType);
 
-  // Floor Tic-Tac-Toe has no hoop, no clock, and a fixed room and ball, so the
-  // rows that describe a classic run are put away rather than left offering
-  // settings the tic-tac-toe stage never reads.
+  // Floor Tic-Tac-Toe and HORSE both have no hoop, no clock, and a fixed room
+  // and ball, so the rows that describe a classic run are put away rather than
+  // left offering settings neither mode ever reads.
   function renderGameType() {
-    const ticTacToe = isTicTacToe();
+    const routed = isRouted();
     for (const input of Object.values(configInputs)) {
-      input?.closest("label")?.toggleAttribute("hidden", ticTacToe);
+      input?.closest("label")?.toggleAttribute("hidden", routed);
     }
-    configNote?.toggleAttribute("hidden", ticTacToe);
+    configNote?.toggleAttribute("hidden", routed);
   }
   renderGameType();
 
