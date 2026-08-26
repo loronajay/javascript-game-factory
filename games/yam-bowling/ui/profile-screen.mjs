@@ -102,7 +102,7 @@ export function createProfileScreen({
           : `<i class="profile-slot-swatch" style="${paletteStyle(option.palette)}"></i>`;
         const status = option.owned
           ? (selected ? (slot.inheritGlobal && !option.id ? "Inheriting" : "Equipped") : "Equip")
-          : "Locked";
+          : option.availability === "planned" ? "Coming soon" : "Locked";
         const keyAttribute = bowler ? "data-bowler-slot-key" : "data-slot-key";
         const itemAttribute = bowler ? "data-bowler-slot-item" : "data-slot-item";
         return `<button class="profile-slot-option${selected ? " is-selected" : ""}${option.owned ? "" : " is-locked"}"

@@ -4,7 +4,7 @@ import { SKIN_CATALOG } from "../services/payments.mjs";
 import { TACTICAL_ARENA_TUTORIAL_IDS, } from "../services/tactical-arena-reward-catalog.mjs";
 import { isPremiumGameClaimKind, isPublicGameClaimKind, isRegisteredGameClaimKind, validatePublicGameClaim, } from "../services/game-progress-claim-catalog.mjs";
 import { getValorOffer, priceValorOffer } from "../services/valor-catalog.mjs";
-import { awardCampaignXp, getGameXpProgress } from "./game-xp.mjs";
+import { awardCampaignXp, getGameXpProgress, recordYamBowlingCareerMatch } from "./game-xp.mjs";
 import { isYamBowlingStarterBowler, validateYamBowlingSkinVoucherTarget, validateYamBowlingEmoteVoucherTarget, } from "../services/yam-bowling-reward-catalog.mjs";
 import { getYamBowlingTournamentEvent, selectYamBowlingTournamentPrize, YAM_BOWLING_TOURNAMENT_KIND, YAM_BOWLING_TOURNAMENT_TITLE, } from "../services/yam-bowling-tournament-catalog.mjs";
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
@@ -328,11 +328,12 @@ export async function recordGameProgressClaim(pool, params = {}) {
             await client.query("rollback");
             return { ok: false, statusCode: 409, error: "claim_prerequisite_missing" };
         }
-        if (publicClaim?.campaignXp && !isYamBowlingStarterBowler(publicClaim.campaignXp.trackId)) {
+        const claimedTrackId = publicClaim?.campaignXp?.trackId || publicClaim?.careerStats?.trackId;
+        if (claimedTrackId && !isYamBowlingStarterBowler(claimedTrackId)) {
             const ownedBowler = await playerHasGameEntitlement(client, {
                 playerId,
                 gameSlug,
-                entitlementId: `bowler:${publicClaim.campaignXp.trackId}`,
+                entitlementId: `bowler:${claimedTrackId}`,
             });
             if (!ownedBowler) {
                 await client.query("rollback");
@@ -343,6 +344,7 @@ export async function recordGameProgressClaim(pool, params = {}) {
        values ($1, $2, $3, $4, $5, $6::jsonb)
        on conflict (player_id, game_slug, claim_id) do nothing`, [playerId, gameSlug, claimId, kind, sourceId, JSON.stringify(payload)]);
         const alreadyProcessed = claim.rowCount === 0;
+        let careerEntitlementIds = [];
         if (!alreadyProcessed && Array.isArray(publicClaim?.entitlementGrants)) {
             for (const entitlement of publicClaim.entitlementGrants) {
                 await grantEntitlement(client, playerId, gameSlug, entitlement, kind === "match-achievement" ? "achievement" : "campaign", sourceId || claimId);
@@ -369,6 +371,15 @@ export async function recordGameProgressClaim(pool, params = {}) {
             if (!xpAward.awarded && xpAward.reason !== "already-granted") {
                 throw new Error(`campaign XP refused: ${xpAward.reason}`);
             }
+        }
+        if (!alreadyProcessed && publicClaim?.careerStats) {
+            const career = await recordYamBowlingCareerMatch(client, {
+                playerId,
+                gameSlug,
+                sourceId,
+                ...publicClaim.careerStats,
+            });
+            careerEntitlementIds = career.entitlementIds || [];
         }
         if (!alreadyProcessed && kind === "campaign-valor") {
             const amount = await campaignValorAmountWithServerBoosts(client, playerId, gameSlug, publicClaim.valorBase);
@@ -460,7 +471,10 @@ export async function recordGameProgressClaim(pool, params = {}) {
             progress: await getGameProgress(pool, playerId, gameSlug),
             entitlementIds: alreadyProcessed
                 ? []
-                : (publicClaim?.entitlementGrants || []).map((entry) => entry.entitlementId),
+                : [
+                    ...(publicClaim?.entitlementGrants || []).map((entry) => entry.entitlementId),
+                    ...careerEntitlementIds,
+                ],
             ...(progression ? { progression } : {}),
         };
     }

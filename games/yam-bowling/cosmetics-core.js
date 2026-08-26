@@ -77,6 +77,7 @@
     tier = "standard",
     unlock,
     entitlementId = null,
+    availability = "live",
   }) {
     return Object.freeze({
       id: buildItemId(type, ...idParts),
@@ -86,6 +87,7 @@
       characterSlug,
       assets: Object.freeze({ ...assets }),
       tier,
+      availability,
       unlock: Object.freeze({ ...unlock }),
       entitlementId,
     });
@@ -507,7 +509,7 @@
         name: "Laser Focus",
         assets: art("laser-focus"),
         tier: "rare",
-        unlock: achievement("Bowl a game with no shot outside the pocket."),
+        unlock: achievement("Put every opening ball of a completed game on a pocket line."),
       }),
       defineItem({
         type: "badge",
@@ -531,6 +533,7 @@
         name: "Ice in the Tenth",
         assets: art("ice-in-the-tenth"),
         tier: "rare",
+        availability: "planned",
         unlock: achievement("Strike in the tenth when only a strike can preserve the win."),
       }),
       defineItem({
@@ -539,6 +542,7 @@
         name: "Spare Architect",
         assets: art("spare-architect"),
         tier: "rare",
+        availability: "planned",
         unlock: achievement("Convert 100 spares in sanctioned career play."),
       }),
       defineItem({
@@ -547,6 +551,7 @@
         name: "Bracket Breaker",
         assets: art("bracket-breaker"),
         tier: "rare",
+        availability: "planned",
         unlock: tournament("Win a first sanctioned tournament."),
       }),
       defineItem({
@@ -555,6 +560,7 @@
         name: "Undisputed",
         assets: art("undisputed"),
         tier: "legendary",
+        availability: "planned",
         unlock: tournament("Win every major tournament in one season."),
       }),
       defineItem({
@@ -603,7 +609,7 @@
         name: "Deep Bench",
         assets: art("deep-bench"),
         tier: "legendary",
-        unlock: achievement("Record a sanctioned win with every unlocked bowler."),
+        unlock: achievement("Record a sanctioned win with every canon bowler."),
       }),
     ];
   }

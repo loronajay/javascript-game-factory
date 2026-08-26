@@ -1,6 +1,6 @@
 import { validateTacticalArenaPublicClaim } from "./tactical-arena-reward-catalog.mjs";
 import { CALENDAR_PREORDER_CLAIM_KIND } from "./calendar-catalog.mjs";
-import { YAM_BOWLING_CIRCUIT_CLAIM_KIND, YAM_BOWLING_MATCH_ACHIEVEMENT_CLAIM_KIND, validateYamBowlingPublicClaim, } from "./yam-bowling-reward-catalog.mjs";
+import { YAM_BOWLING_CIRCUIT_CLAIM_KIND, YAM_BOWLING_CAREER_MATCH_CLAIM_KIND, YAM_BOWLING_MATCH_ACHIEVEMENT_CLAIM_KIND, validateYamBowlingPublicClaim, } from "./yam-bowling-reward-catalog.mjs";
 // Claim vocabulary is a per-game server contract. Keeping kind registration beside the
 // validator prevents one cabinet from borrowing another cabinet's mutation branches, while
 // the public/premium split keeps paid Tactical Arena fulfillment server-only.
@@ -24,7 +24,7 @@ const CLAIM_POLICIES = Object.freeze({
         validatePublicClaim: validateTacticalArenaPublicClaim,
     }),
     "yam-bowling": Object.freeze({
-        publicKinds: new Set([YAM_BOWLING_CIRCUIT_CLAIM_KIND, YAM_BOWLING_MATCH_ACHIEVEMENT_CLAIM_KIND]),
+        publicKinds: new Set([YAM_BOWLING_CIRCUIT_CLAIM_KIND, YAM_BOWLING_MATCH_ACHIEVEMENT_CLAIM_KIND, YAM_BOWLING_CAREER_MATCH_CLAIM_KIND]),
         // The calendar preorder bonus. Premium, so only the trusted Stripe fulfillment path may
         // submit it -- a browser can never claim its own vouchers.
         premiumKinds: new Set([CALENDAR_PREORDER_CLAIM_KIND]),

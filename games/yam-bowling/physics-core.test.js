@@ -12,6 +12,7 @@ const {
   gutterAwareTrajectoryX,
   gutterSideForX,
   hookBreakpointForPower,
+  isPocketLine,
   resolveContact,
   stepSimulation,
   spinAtTime,
@@ -124,6 +125,16 @@ describe("lane physics primitives", () => {
 
     assert.ok(trajectoryX(0.3, shot) > 0.24, "the ball should hold the outside line through the oil");
     assert.ok(trajectoryX(0.86, shot) < 0.02, "the hook should bring it back to the head-pin pocket");
+  });
+
+  test("recognizes an outside-in pocket line without treating a straight head-pin ball as pocket play", () => {
+    const rightPocket = { position: 0.3, aim: -0.12, hook: -1, hookScale: 1, power: 0.78 };
+    const leftPocket = { position: -0.3, aim: 0.12, hook: 1, hookScale: 1, power: 0.78 };
+
+    assert.equal(isPocketLine(rightPocket), true);
+    assert.equal(isPocketLine(leftPocket), true);
+    assert.equal(isPocketLine({ position: 0, aim: 0, hook: 0, power: 0.78 }), false);
+    assert.equal(isPocketLine({ position: 0.8, aim: 0.35, hook: 0, power: 0.78 }), false);
   });
 
   test("opens the pocket entry angle without moving an established target", () => {

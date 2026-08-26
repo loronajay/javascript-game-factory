@@ -6,6 +6,7 @@ import {
   inventoryRewardsBetween,
   levelFromXp,
 } from "../services/progression-catalog.mjs";
+import { earnedYamBowlingCareerBadges } from "../services/yam-bowling-career.mjs";
 
 // Earned advancement: XP totals, per-track mastery counters, and the grant
 // ledger that makes an award happen exactly once.
@@ -45,7 +46,46 @@ function mergeTrackStats(
     const next = clampCount((incoming || {})[key]);
     merged[key] = rule === "max" ? Math.max(previous, next) : previous + next;
   }
-  return merged;
+  return typeof definition.mergeTrackExtras === "function"
+    ? definition.mergeTrackExtras(stored || {}, incoming || {}, merged)
+    : merged;
+}
+
+export async function recordYamBowlingCareerMatch(client: any, params: any = {}): Promise<any> {
+  if (!client || !params.playerId || params.gameSlug !== "yam-bowling" || !params.trackId) {
+    return { entitlementIds: [] };
+  }
+  const definition = getProgression(params.gameSlug);
+  if (!definition) return { entitlementIds: [] };
+  const existing = await client.query(
+    `select stats from game_xp_tracks
+     where player_id = $1 and game_slug = $2 and track_id = $3 for update`,
+    [params.playerId, params.gameSlug, params.trackId],
+  );
+  const stats = mergeTrackStats(definition, existing.rows[0]?.stats || {}, params);
+  await client.query(
+    `insert into game_xp_tracks (player_id, game_slug, track_id, stats)
+     values ($1, $2, $3, $4::jsonb)
+     on conflict (player_id, game_slug, track_id) do update
+       set stats = excluded.stats, updated_at = now()`,
+    [params.playerId, params.gameSlug, params.trackId, JSON.stringify(stats)],
+  );
+  const allTracks = await client.query(
+    `select track_id, stats from game_xp_tracks where player_id = $1 and game_slug = $2`,
+    [params.playerId, params.gameSlug],
+  );
+  const tracks = Object.fromEntries((allTracks.rows || []).map((row: any) => [String(row.track_id), row.stats || {}]));
+  const entitlementIds: string[] = [];
+  for (const entitlementId of earnedYamBowlingCareerBadges(tracks)) {
+    const granted = await client.query(
+      `insert into game_entitlements (player_id, game_slug, entitlement_id, kind, source, source_id)
+       values ($1, $2, $3, 'badge', 'career-achievement', $4)
+       on conflict (player_id, game_slug, entitlement_id) do nothing`,
+      [params.playerId, params.gameSlug, entitlementId, params.sourceId || "career"],
+    );
+    if (granted.rowCount > 0) entitlementIds.push(entitlementId);
+  }
+  return { entitlementIds, stats };
 }
 
 // Two reporters of one match should name the same mode. When they do not, one of

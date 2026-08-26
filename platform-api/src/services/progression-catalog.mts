@@ -19,6 +19,8 @@
 // what it earned. See the trust note in db/migrations/038-game-xp-progression.sql
 // for exactly which of those reported fields are checkable and which are not.
 
+import { mergeYamBowlingCareerStats } from "./yam-bowling-career.mjs";
+
 export interface ProgressionCurve {
   // Cost to advance out of level L is `base + (L - 1) * step`.
   base: number;
@@ -49,6 +51,11 @@ export interface ProgressionDefinition {
   // How the per-track extras merge when a grant lands. Universal counters
   // (matches, wins, xp) are always summed; these are the per-game ones.
   trackStats: Record<string, "sum" | "max">;
+  mergeTrackExtras?: (
+    stored: Record<string, unknown>,
+    incoming: Record<string, unknown>,
+    standard: Record<string, number>,
+  ) => Record<string, number>;
   playerInventoryRewards?: ReadonlyArray<Readonly<{
     level: number;
     itemId: string;
@@ -111,6 +118,7 @@ const YAM_BOWLING: ProgressionDefinition = {
     classicSpareOpportunities: "sum",
     classicSpares: "sum",
   },
+  mergeTrackExtras: mergeYamBowlingCareerStats,
   // Two spendable currencies, listed in level order because that is the order a
   // player meets them and the order the reward reader returns them in.
   //

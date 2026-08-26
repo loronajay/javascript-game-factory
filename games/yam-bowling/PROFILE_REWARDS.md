@@ -28,7 +28,7 @@ or won. They never change scoring, physics, timing, or matchmaking.
 | Pocket Hunter | Title | Player Level | Reach Player Level 13 | A ball curving into the pocket inside a hunter's reticle |
 | Lane Reader | Title | Player Level | Reach Player Level 22 | An oil pattern rendered as a topographic lane map |
 | Shotmaker | Title | Player Level | Reach Player Level 28 | A perfect strike inside a laurel of pins |
-| Laser Focus | Badge | Achievement | Bowl a game with no shot outside the pocket | A pin held in a cool-blue precision sight |
+| Laser Focus | Badge | Achievement | Put every opening ball of a completed game on a pocket line | A pin held in a cool-blue precision sight |
 | Precision Bowler | Badge | Achievement | Convert twenty spares without missing one | A measured pocket line inside mechanical calipers |
 | Lane Legend | Badge | Achievement | Win a sanctioned match on every lane | A luminous lane passing through a monumental pin arch |
 | Perfect Game | Badge | Achievement | Bowl a 300 | A black-diamond and gold perfect-rack medallion |
@@ -47,12 +47,26 @@ or won. They never change scoring, physics, timing, or matchmaking.
 | Clean Card | Badge | Achievement | Finish regulation play without an open frame | An emerald ten-cell scorecard sealed with a perfect check |
 | Turkey Club | Badge | Achievement | Roll three consecutive strikes | Three linked copper impact chevrons; deliberately no cartoon turkey |
 | Road Tested | Badge | Career achievement | Complete a sanctioned match at every venue | A travel-case shield, destination panels, pins, and a winding lane route |
-| Deep Bench | Badge | Career achievement | Win with every unlocked bowler | Five distinct balls on a legendary locker-room champion bench |
+| Deep Bench | Badge | Career achievement | Record a sanctioned win with every canon bowler | Five distinct balls on a legendary locker-room champion bench |
 
-The optimized transparent WebP crests live in `assets/profile-rewards/`. Clean
-Card and Turkey Club are detected from completed sanctioned matches, including
-tenth-frame bonus balls. The career and tournament rewards have stable catalog
-identities ready for their authoritative trackers.
+The optimized transparent WebP crests live in `assets/profile-rewards/`. Match
+and career badges are detected from completed sanctioned matches. Career facts
+are merged into account progression under a locked bowler row, then evaluated
+across all bowler tracks so retries and second devices cannot duplicate awards.
+
+### Implementation status
+
+Live match rewards are **Perfect Game**, **Split Decision**, **Comeback Kid**,
+**Clean Card**, **Turkey Club**, and **Laser Focus**. Their client detection, fixed platform
+claims, server entitlements, loadout validation, result celebrations, and crest
+art are all wired.
+
+The account-backed career badges are also live: **Precision Bowler** bridges
+converted-spare runs across matches, **Lane Legend** and **Road Tested** use
+nine-bit venue histories, and **Deep Bench** requires a sanctioned win on all
+thirty canon bowler tracks. **Ice in the Tenth**, **Spare Architect**, **Bracket
+Breaker**, and **Undisputed** remain catalogued as **Coming soon** while awaiting
+their trackers.
 
 Deployment note: the platform API mirrors the current Player Level and sparse
 Bowler Mastery ladders. Migration `045` reconciles existing accounts that already

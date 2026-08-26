@@ -124,6 +124,10 @@ for (const [id, type, founding] of [
     ["title:pin-chaser", "title", false],
     ["title:comeback-kid", "title", false],
     ["title:yam-champion", "title", false],
+    ["title:ice-in-the-tenth", "title", false],
+    ["title:spare-architect", "title", false],
+    ["title:bracket-breaker", "title", false],
+    ["title:undisputed", "title", false],
     ["title:lane-regular", "title", false],
     ["title:house-favourite", "title", false],
     ["title:lane-veteran", "title", false],
@@ -132,7 +136,11 @@ for (const [id, type, founding] of [
     ["entrance:champion", "entrance", false],
     ["badge:founding-bowler", "badge", true],
     ["badge:perfect-game", "badge", false],
+    ["badge:clean-card", "badge", false],
+    ["badge:turkey-club", "badge", false],
     ["badge:split-decision", "badge", false],
+    ["badge:road-tested", "badge", false],
+    ["badge:deep-bench", "badge", false],
     // Historical mastery grants now owned by achievements. They stay registered
     // so an older entitlement is not stripped when its owner saves a loadout.
     ["badge:laser-focus", "badge", false],

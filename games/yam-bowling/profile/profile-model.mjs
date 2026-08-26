@@ -108,6 +108,7 @@ function buildPresentation({ slots, cosmetics, loadout, bowlerSlug, ownedBowlerS
         id: item.id,
         name: item.name,
         tier: item.tier,
+        availability: item.availability || "live",
         art: item.assets?.thumbnail || item.assets?.art || null,
         palette: item.assets?.palette || null,
         // A global slot filled with a bowler's own art is gated by that bowler,

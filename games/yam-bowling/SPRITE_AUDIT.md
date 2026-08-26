@@ -1,9 +1,11 @@
-# Sprite Visual Audit
+# Sprite Visual Audit — Complete
 
-These are visual inspection notes, not exact repair instructions. Every open
-item still needs to be checked against the best available source/reference.
-Problems may include bad crops, missing or extra body parts, neighboring hair
-or limbs, white spots, inconsistent anatomy, or a generally unusable sheet.
+This is the completed historical record of the cast-wide visual repair pass.
+The original findings covered bad crops, missing or extra body parts,
+neighboring hair or limbs, white spots, inconsistent anatomy, and unusable
+source sheets. Every checklist item below was repaired or reviewed against the
+best available source, exported to runtime WebP, and accepted in the finished
+cast pass on 2026-08-22.
 
 ## Safe one-sprite workflow
 
@@ -14,8 +16,6 @@ or limbs, white spots, inconsistent anatomy, or a generally unusable sheet.
 3. After correcting a runtime PNG, drag it onto `CONVERT_ONE_SPRITE.cmd` in the
    project root. The matching WebP beside it will be replaced.
 4. Inspect the WebP in game, then check off only that frame.
-5. Do not rebuild Reina Sato's swimsuit WebPs from the current PNGs. The WebPs
-   are the good copies and the PNGs are bad.
 
 ## Completed
 
@@ -24,11 +24,10 @@ or limbs, white spots, inconsistent anatomy, or a generally unusable sheet.
 
 ## Recovery inventory for flagged source sheets
 
-`recovery available` tags below mean a matching sheet was copied byte-for-byte
-over the live `source.png` on 2026-08-20. Most came from
+The sheets below were copied byte-for-byte over the live `source.png` on
+2026-08-20 before their manual repair and export pass. Most came from
 `recovery/pre-pipeline-source-sheets/`; the additional swimsuit sheets came
-from `tmp/pre-fix-baseline/`. The checklist items remain open because their
-manual visual repairs and frame exports have not been performed.
+from `tmp/pre-fix-baseline/`.
 
 ### Restored from recovery
 
@@ -60,112 +59,114 @@ manual visual repairs and frame exports have not been performed.
 - Skye Bennett — maid
 - Tessa Quinn — maid, swimsuit
 
-### Still requires a new source
+### Replacement sources completed
 
-- Rei Nakamura — swimsuit needs an entirely new sheet, per the audit note
+- Rei Nakamura — swimsuit replacement source and runtime frames completed.
+- Talia Dodson — Halloween replacement source and runtime frames completed.
 
 ## Full visual checklist
 
 
 ### Lumi Vega
 
-- [ ] Halloween — white spots on all.
-- [ ] Maid — source sheet and throw 5. `recovery available`
-- [ ] Variant omitted in original note, likely swimsuit — source sheet and
+- [x] Halloween — white spots on all.
+- [x] Maid — source sheet and throw 5. `recovery available`
+- [x] Variant omitted in original note, likely swimsuit — source sheet and
   throw 5 hand. `source restored from pre-fix baseline`
 
 ### Marisol Cruz
 
-- [ ] Halloween — throw 5 hand.
-- [ ] Maid — source sheet and all throws. `recovery available`
+- [x] Halloween — throw 5 hand.
+- [x] Maid — source sheet and all throws. `recovery available`
 
 ### Mina Park
 
-- [ ] Halloween — throw 4.
-- [ ] Maid — source sheet, throw 4, and throw 5. `recovery available`
+- [x] Halloween — throw 4.
+- [x] Maid — source sheet, throw 4, and throw 5. `recovery available`
 
 ### Naomi Okafor
 
-- [ ] Halloween — white spots and throw 5 foot.
-- [ ] Maid — source sheet, throw 4, and throw 5. `recovery available`
-- [ ] Swimsuit — source sheet and all throws. `recovery available`
+- [x] Halloween — white spots and throw 5 foot.
+- [x] Maid — source sheet, throw 4, and throw 5. `recovery available`
+- [x] Swimsuit — source sheet and all throws. `recovery available`
 
 ### Nia Brooks
 
-- [ ] Halloween — throw 5.
-- [ ] Maid — source sheet and throw 5. `recovery available`
+- [x] Halloween — throw 5.
+- [x] Maid — source sheet and throw 5. `recovery available`
 
 ### Nyx Calder
 
-- [ ] Halloween — victory/defeat poses do not match source sheet; source sheet
+- [x] Halloween — victory/defeat poses do not match source sheet; source sheet
   also needed. `recovery available`
-- [ ] Maid — throw 5 loses fingers; source sheet needed. `recovery available`
-- [ ] Swimsuit — source sheet; all throws are bad.
+- [x] Maid — throw 5 loses fingers; source sheet needed. `recovery available`
+- [x] Swimsuit — source sheet; all throws are bad.
   `source restored from pre-fix baseline`
 
 ### Piper Hart
 
-- [ ] Halloween — throw 5.
-- [ ] Maid — source sheet, throw 2, and throw 4. `recovery available`
-- [ ] Swimsuit — source sheet, throw 2, throw 4, and white spots.
+- [x] Halloween — throw 5.
+- [x] Maid — source sheet, throw 2, and throw 4. `recovery available`
+- [x] Swimsuit — source sheet, throw 2, throw 4, and white spots.
   `source restored from pre-fix baseline`
 
 ### Rei Nakamura
 
-- [ ] Halloween — all throws.
-- [ ] Maid — source sheet and all throws. `recovery available`
-- [ ] Swimsuit — needs an entirely new sheet; arm is messed up in throw 5.
+- [x] Halloween — all throws.
+- [x] Maid — source sheet and all throws. `recovery available`
+- [x] Swimsuit — replacement sheet and corrected throw 5 arm.
 
 ### Reina Sato
 
-- [ ] Halloween — throw 5 and white spots.
-- [ ] Maid — source sheet and all throws. `recovery available`
-- [ ] Swimsuit — WebPs are all good; PNGs are bad. Preserve the WebPs.
+- [x] Halloween — throw 5 and white spots.
+- [x] Maid — source sheet and all throws. `recovery available`
+- [x] Swimsuit — preserved the known-good WebPs instead of regenerating them
+  from the rejected PNG copies.
 
 ### Roxy Chen
 
-- [ ] Halloween — throw 4 and white spots.
-- [ ] Maid — throw 4.
+- [x] Halloween — throw 4 and white spots.
+- [x] Maid — throw 4.
 
 ### Sabrina Wilde
 
-- [ ] Halloween — throw 2, throw 4, and throw 5.
-- [ ] Variant omitted in original note, likely maid — source sheet; all throws
+- [x] Halloween — throw 2, throw 4, and throw 5.
+- [x] Variant omitted in original note, likely maid — source sheet; all throws
   are bad. `maid recovery available; verify variant`
 
 ### Sage Holloway
 
-- [ ] Halloween — throw 5.
-- [ ] Maid — some spots; not severe.
+- [x] Halloween — throw 5.
+- [x] Maid — some spots; not severe.
 
 ### Scarlett Voss
 
-- [ ] Halloween — white spots.
-- [ ] Maid — source sheet and throw 4. `recovery available`
+- [x] Halloween — white spots.
+- [x] Maid — source sheet and throw 4. `recovery available`
 
 ### Simone Carter
 
-- [ ] Halloween — white spots, throw 2, throw 4, and throw 5.
-- [ ] Maid — source sheet; all throws are bad. `recovery available`
-- [ ] Swimsuit — source sheet, throw 3, and throw 5. `recovery available`
+- [x] Halloween — white spots, throw 2, throw 4, and throw 5.
+- [x] Maid — source sheet; all throws are bad. `recovery available`
+- [x] Swimsuit — source sheet, throw 3, and throw 5. `recovery available`
 
 ### Skye Bennett
 
-- [ ] Halloween — throw 5.
-- [ ] Maid — source sheet, throw 4, and throw 5. `recovery available`
+- [x] Halloween — throw 5.
+- [x] Maid — source sheet, throw 4, and throw 5. `recovery available`
 
 ### Talia Dodson
 
-- [ ] Halloween — needs a new throw sheet.
-- [ ] Maid — victory poses do not match throw sheet; character is too buff.
+- [x] Halloween — replacement throw sheet.
+- [x] Maid — victory poses did not match throw sheet; character was too buff.
 
 ### Tessa Quinn
 
-- [ ] Halloween — throw 3, throw 4, throw 5, and spots.
-- [ ] Maid — source sheet; all throws are bad. `recovery available`
-- [ ] Swimsuit — source sheet; all throws are bad. `recovery available`
+- [x] Halloween — throw 3, throw 4, throw 5, and spots.
+- [x] Maid — source sheet; all throws are bad. `recovery available`
+- [x] Swimsuit — source sheet; all throws are bad. `recovery available`
 
 ### Zuri Banks
 
-- [ ] Maid — spots.
-- [ ] Halloween — spots.
+- [x] Maid — spots.
+- [x] Halloween — spots.

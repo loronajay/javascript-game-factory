@@ -68,6 +68,7 @@ test("catalog items declare the full contract and use unique ids", () => {
     );
     assert.ok(item.assets && typeof item.assets === "object", `${item.id} needs an assets record`);
     assert.ok(PRESENTATION_TIERS.includes(item.tier), `${item.id} has an unknown tier`);
+    assert.ok(["live", "planned"].includes(item.availability), `${item.id} has an unknown availability`);
     assert.ok(UNLOCK_SOURCES.includes(item.unlock.source), `${item.id} has an unknown unlock source`);
     assert.ok(Object.isFrozen(item), `${item.id} should be frozen`);
   }
@@ -281,6 +282,23 @@ test("badges certify earned distinctions rather than passive level milestones", 
       `${badge.id} should represent an earned distinction`,
     );
   }
+});
+
+test("catalog-only rewards are explicitly marked as planned", () => {
+  assert.deepEqual(
+    CATALOG.filter((item) => item.availability === "planned").map((item) => item.id),
+    [
+      "title:ice-in-the-tenth",
+      "title:spare-architect",
+      "title:bracket-breaker",
+      "title:undisputed",
+    ],
+  );
+  for (const id of ["badge:laser-focus", "badge:precision-bowler", "badge:lane-legend", "badge:road-tested", "badge:deep-bench"]) {
+    assert.equal(getItem(id).availability, "live", `${id} has a complete earning route`);
+  }
+  assert.equal(getItem("badge:clean-card").availability, "live");
+  assert.equal(getItem("badge:turkey-club").availability, "live");
 });
 
 test("rotating tournaments have an exclusive common effect pool", () => {

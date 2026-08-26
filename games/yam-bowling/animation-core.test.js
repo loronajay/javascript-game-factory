@@ -56,6 +56,11 @@ describe("canon bowler manifest", () => {
     assert.deepEqual(CANON_BOWLERS.map(({ name, slug }) => [name, slug]), EXPECTED_ROSTER);
   });
 
+  test("keeps the README roster count aligned with the live manifest", () => {
+    const documentedRoster = new RegExp(`${CANON_BOWLERS.length} canon bowlers`, "i");
+    assert.match(fs.readFileSync(path.join(__dirname, "README.md"), "utf8"), documentedRoster);
+  });
+
   test("uses unique firstname-lastname PNG slugs while retaining provenance", () => {
     assert.equal(new Set(CANON_BOWLERS.map(({ slug }) => slug)).size, 30);
     assert.equal(CANON_BOWLERS.every(({ file, slug }) => file === `${slug}.png`), true);

@@ -58,4 +58,12 @@ test("every player-facing image is WebP and the complete runtime set stays under
     0,
   );
   assert.ok(bytes <= imageBudgetBytes, `runtime images use ${(bytes / 1024 / 1024).toFixed(2)} MB`);
+
+  const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
+  const documentedCount = images.length.toLocaleString("en-US");
+  const documentedBudgetMb = imageBudgetBytes / 1024 / 1024;
+  assert.match(
+    readme,
+    new RegExp(`${documentedCount} player-facing runtime images below ${documentedBudgetMb} MB`),
+  );
 });

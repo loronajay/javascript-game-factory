@@ -3,12 +3,21 @@
 // and the match that must precede it. Rooms and other cosmetics intentionally do not appear:
 // their reward cadence has not been designed yet, and the client cannot invent it.
 
+import {
+  YAM_BOWLING_BOWLER_SLUGS,
+  yamBowlingVenueMask,
+} from "./yam-bowling-career.mjs";
+
 export const YAM_BOWLING_GAME_SLUG = "yam-bowling";
 export const YAM_BOWLING_CIRCUIT_CLAIM_KIND = "circuit-clear";
 export const YAM_BOWLING_MATCH_ACHIEVEMENT_CLAIM_KIND = "match-achievement";
+export const YAM_BOWLING_CAREER_MATCH_CLAIM_KIND = "career-match";
 
 const MATCH_ACHIEVEMENTS = Object.freeze({
   "perfect-game": Object.freeze({ entitlementId: "badge:perfect-game", kind: "badge" }),
+  "clean-card": Object.freeze({ entitlementId: "badge:clean-card", kind: "badge" }),
+  "turkey-club": Object.freeze({ entitlementId: "badge:turkey-club", kind: "badge" }),
+  "laser-focus": Object.freeze({ entitlementId: "badge:laser-focus", kind: "badge" }),
   "split-decision": Object.freeze({ entitlementId: "badge:split-decision", kind: "badge" }),
   "comeback-kid": Object.freeze({ entitlementId: "title:comeback-kid", kind: "title" }),
 });
@@ -56,10 +65,7 @@ const STARTER_BOWLER_SLUGS = new Set([
   "zuri-banks",
   "amara-reed",
 ]);
-const ALL_BOWLER_SLUGS = new Set([
-  ...STARTER_BOWLER_SLUGS,
-  ...CIRCUIT_UNLOCKS.map(([, bowlerSlug]) => bowlerSlug),
-]);
+const ALL_BOWLER_SLUGS = new Set(YAM_BOWLING_BOWLER_SLUGS);
 
 type CircuitUnlock = Readonly<{
   matchId: string;
@@ -86,6 +92,55 @@ function rejected(): any {
   return { ok: false, statusCode: 400, error: "invalid_claim" };
 }
 
+function boundedInt(value: unknown, max: number): number | null {
+  const number = Number(value);
+  return Number.isInteger(number) && number >= 0 && number <= max ? number : null;
+}
+
+function careerMatchClaim(params: any): any {
+  const sourceId = cleanText(params.sourceId, 160);
+  const input = params.payload && typeof params.payload === "object" && !Array.isArray(params.payload)
+    ? params.payload
+    : {};
+  const trackId = cleanText(input.trackId, 80);
+  const outcome = cleanText(input.outcome, 12);
+  const venueMask = yamBowlingVenueMask(input.laneSlug);
+  const spareAttempts = boundedInt(input.spareAttempts, 12);
+  const spares = boundedInt(input.spares, 12);
+  const sparePrefix = boundedInt(input.sparePrefix, 12);
+  const spareSuffix = boundedInt(input.spareSuffix, 12);
+  const spareBest = boundedInt(input.spareBest, 12);
+  const counters = [spareAttempts, spares, sparePrefix, spareSuffix, spareBest];
+  const validRuns = counters.every((value) => value !== null)
+    && spares! <= spareAttempts!
+    && sparePrefix! <= spares!
+    && spareSuffix! <= spares!
+    && spareBest! >= Math.max(sparePrefix!, spareSuffix!)
+    && spareBest! <= spares!
+    && (spares !== spareAttempts
+      || (sparePrefix === spares && spareSuffix === spares && spareBest === spares));
+  if (!sourceId || !/^[a-zA-Z0-9._:-]+$/.test(sourceId)
+    || cleanText(params.claimId) !== `${YAM_BOWLING_CAREER_MATCH_CLAIM_KIND}:${sourceId}`
+    || !ALL_BOWLER_SLUGS.has(trackId) || !["win", "loss", "draw"].includes(outcome)
+    || !venueMask || !validRuns) return rejected();
+  return {
+    ok: true,
+    sourceId,
+    payload: { trackId, outcome, laneSlug: cleanText(input.laneSlug, 80), spareAttempts, spares, sparePrefix, spareSuffix, spareBest },
+    careerStats: {
+      trackId,
+      venueMask,
+      venueWinMask: outcome === "win" ? venueMask : 0,
+      spareAttempts,
+      spares,
+      sparePrefix,
+      spareSuffix,
+      spareBest,
+      careerWins: outcome === "win" ? 1 : 0,
+    },
+  };
+}
+
 export function validateYamBowlingPublicClaim(params: any = {}): any {
   if (cleanText(params.gameSlug, 60) !== YAM_BOWLING_GAME_SLUG) return rejected();
   const kind = cleanText(params.kind, 80);
@@ -100,6 +155,7 @@ export function validateYamBowlingPublicClaim(params: any = {}): any {
       entitlementGrants: [{ ...reward }],
     };
   }
+  if (kind === YAM_BOWLING_CAREER_MATCH_CLAIM_KIND) return careerMatchClaim(params);
   if (kind !== YAM_BOWLING_CIRCUIT_CLAIM_KIND) return rejected();
   const input = params.payload && typeof params.payload === "object" && !Array.isArray(params.payload)
     ? params.payload

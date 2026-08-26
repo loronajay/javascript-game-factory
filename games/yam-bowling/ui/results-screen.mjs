@@ -37,6 +37,7 @@ export function createResultsScreen({
   audio,
   audioCore,
   cosmetics,
+  achievementCore,
   localClientId = () => "",
   onOpenProfile = () => {},
   onShown,
@@ -146,7 +147,7 @@ export function createResultsScreen({
 
   function showAchievements(achievementIds = []) {
     const rewards = achievementIds.map((achievementId) => {
-      const itemId = achievementId === "comeback-kid" ? "title:comeback-kid" : `badge:${achievementId}`;
+      const itemId = achievementCore?.rewardItemIdForAchievement?.(achievementId);
       return cosmetics?.getItem?.(itemId);
     }).filter(Boolean);
     if (!rewards.length) return;

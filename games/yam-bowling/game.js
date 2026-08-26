@@ -280,6 +280,7 @@ initMobileLandscapeGate();
     audio,
     audioCore: AudioCore,
     cosmetics: Cosmetics,
+    achievementCore: AchievementCore,
     localClientId: () => onlineClient.getSnapshot().clientId,
     onOpenProfile: (playerId, profileName, focusTarget) => publicProfileScreen.open(playerId, profileName, focusTarget),
     onShown: () => {
@@ -291,6 +292,8 @@ initMobileLandscapeGate();
         match: session.onlineMatch ? { ...session.match, playType: "online" } : session.match,
         localPlayerId,
         rolls: session.matchFacts.rolls,
+        laneSlug: session.matchLaneSlug,
+        progressId: session.onlineSnapshot?.sessionId || session.matchFacts.progressId,
       }).catch(() => {});
     },
   });

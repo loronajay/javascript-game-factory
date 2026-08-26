@@ -164,6 +164,8 @@ export function createMatchRuntime({
     session.lastAppliedOnlineRoll = 0;
     session.reportedRatingSessionId = "";
     session.matchFacts.rolls = [];
+    session.matchFacts.progressId = globalThis.crypto?.randomUUID?.()
+      || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     session.match = core.createMatch({
       modeId: session.setup.modeId,
       playType: session.tournamentMatch ? "tournament" : session.campaignMatch ? "campaign" : session.setup.playType,
@@ -289,6 +291,7 @@ export function createMatchRuntime({
       playerId: shooter?.id || "",
       frameIndex,
       rollIndex,
+      pocketLine: physics.isPocketLine(scene.shot),
       standingPinIdsAfter: scene.pins.filter((pin) => pin.standing).map((pin) => Number(pin.id)).sort((a, b) => a - b),
     });
     if (!authority) localRollSequence += 1;

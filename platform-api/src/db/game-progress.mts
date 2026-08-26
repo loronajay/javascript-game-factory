@@ -11,7 +11,7 @@ import {
   validatePublicGameClaim,
 } from "../services/game-progress-claim-catalog.mjs";
 import { getValorOffer, priceValorOffer } from "../services/valor-catalog.mjs";
-import { awardCampaignXp, getGameXpProgress } from "./game-xp.mjs";
+import { awardCampaignXp, getGameXpProgress, recordYamBowlingCareerMatch } from "./game-xp.mjs";
 import {
   isYamBowlingStarterBowler,
   validateYamBowlingSkinVoucherTarget,
@@ -413,11 +413,12 @@ export async function recordGameProgressClaim(pool: any, params: any = {}): Prom
       await client.query("rollback");
       return { ok: false, statusCode: 409, error: "claim_prerequisite_missing" };
     }
-    if (publicClaim?.campaignXp && !isYamBowlingStarterBowler(publicClaim.campaignXp.trackId)) {
+    const claimedTrackId = publicClaim?.campaignXp?.trackId || publicClaim?.careerStats?.trackId;
+    if (claimedTrackId && !isYamBowlingStarterBowler(claimedTrackId)) {
       const ownedBowler = await playerHasGameEntitlement(client, {
         playerId,
         gameSlug,
-        entitlementId: `bowler:${publicClaim.campaignXp.trackId}`,
+        entitlementId: `bowler:${claimedTrackId}`,
       });
       if (!ownedBowler) {
         await client.query("rollback");
@@ -432,6 +433,7 @@ export async function recordGameProgressClaim(pool: any, params: any = {}): Prom
     );
 
     const alreadyProcessed = claim.rowCount === 0;
+    let careerEntitlementIds: string[] = [];
     if (!alreadyProcessed && Array.isArray(publicClaim?.entitlementGrants)) {
       for (const entitlement of publicClaim.entitlementGrants) {
         await grantEntitlement(
@@ -471,6 +473,15 @@ export async function recordGameProgressClaim(pool: any, params: any = {}): Prom
       if (!xpAward.awarded && xpAward.reason !== "already-granted") {
         throw new Error(`campaign XP refused: ${xpAward.reason}`);
       }
+    }
+    if (!alreadyProcessed && publicClaim?.careerStats) {
+      const career = await recordYamBowlingCareerMatch(client, {
+        playerId,
+        gameSlug,
+        sourceId,
+        ...publicClaim.careerStats,
+      });
+      careerEntitlementIds = career.entitlementIds || [];
     }
     if (!alreadyProcessed && kind === "campaign-valor") {
       const amount = await campaignValorAmountWithServerBoosts(client, playerId, gameSlug, publicClaim.valorBase);
@@ -556,7 +567,10 @@ export async function recordGameProgressClaim(pool: any, params: any = {}): Prom
       progress: await getGameProgress(pool, playerId, gameSlug),
       entitlementIds: alreadyProcessed
         ? []
-        : (publicClaim?.entitlementGrants || []).map((entry: any) => entry.entitlementId),
+        : [
+          ...(publicClaim?.entitlementGrants || []).map((entry: any) => entry.entitlementId),
+          ...careerEntitlementIds,
+        ],
       ...(progression ? { progression } : {}),
     };
   } catch (err) {

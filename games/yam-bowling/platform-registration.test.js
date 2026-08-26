@@ -94,3 +94,41 @@ test("the platform catalog prices canonical circuit XP without trusting the clai
   assert.equal(progression.computeCampaignGrant("yam-bowling", { ...claim.campaignXp, firstClear: true }).xp, 600);
   assert.equal(progression.computeCampaignGrant("yam-bowling", { kind: "boss", firstClear: false }).xp, 0);
 });
+
+test("every shipped match achievement is accepted and equippable by the platform", async () => {
+  const rewards = await import(pathToFileURL(path.join(
+    repoRoot, "platform-api", "src", "services", "yam-bowling-reward-catalog.mjs",
+  )));
+  const loadouts = await import(pathToFileURL(path.join(
+    repoRoot, "platform-api", "src", "services", "yam-bowling-loadout-catalog.mjs",
+  )));
+  const expected = {
+    "perfect-game": "badge:perfect-game",
+    "clean-card": "badge:clean-card",
+    "turkey-club": "badge:turkey-club",
+    "comeback-kid": "title:comeback-kid",
+    "split-decision": "badge:split-decision",
+  };
+
+  for (const [achievementId, itemId] of Object.entries(expected)) {
+    const verdict = rewards.validateYamBowlingPublicClaim({
+      gameSlug: "yam-bowling",
+      kind: "match-achievement",
+      claimId: `match-achievement:${achievementId}`,
+      sourceId: achievementId,
+      payload: { achievementId },
+    });
+    assert.equal(verdict.ok, true, `${achievementId} must be accepted by the claim catalog`);
+    assert.deepEqual(verdict.entitlementGrants, [{
+      entitlementId: itemId,
+      kind: itemId.split(":")[0],
+    }]);
+
+    const slot = itemId.startsWith("title:") ? "title" : "badge";
+    const garage = loadouts.normalizeYamBowlingGarage(
+      { version: 1, global: { [slot]: itemId } },
+      { ownedEntitlementIds: new Set([itemId]) },
+    );
+    assert.equal(garage.global[slot], itemId, `${itemId} must survive a profile save`);
+  }
+});

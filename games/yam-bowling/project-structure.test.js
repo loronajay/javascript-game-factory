@@ -96,6 +96,10 @@ test("every canon bowler has every reusable processed skin package", () => {
   }
 });
 
+test("the completed sprite audit has no stale open checklist items", () => {
+  assert.doesNotMatch(read("SPRITE_AUDIT.md"), /^\s*- \[ \]/m);
+});
+
 test("the setup screen exposes skin equipment controls", () => {
   const html = read("index.html");
   const game = read("game.js");

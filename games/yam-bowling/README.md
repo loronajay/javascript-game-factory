@@ -51,7 +51,7 @@ overlay that can be placed at `games/yam-bowling/` in a Factory deployment:
 ```
 
 The packager refuses to overwrite an existing directory. The Node asset-budget
-test keeps the 482 player-facing runtime images below 48 MB.
+test keeps the 1,071 player-facing runtime images below 72 MB.
 
 ## Project map
 

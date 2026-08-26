@@ -139,6 +139,19 @@
     return hookStrength(shot) * hookCurve(z, shot).curvature;
   }
 
+  // A pocket delivery starts outside, crosses toward the head pin, and still
+  // carries a meaningful entry angle at the rack. Outcome is deliberately not
+  // part of this fact: Laser Focus rewards repeating the line, not getting ten
+  // lucky pin reactions from it.
+  function isPocketLine(shot = {}) {
+    const targetX = trajectoryX(RACK_FRONT_Z, shot);
+    const entrySlope = trajectoryDerivative(RACK_FRONT_Z, shot);
+    const outsideX = trajectoryX(0.3, shot);
+    return Math.abs(targetX) <= 0.05
+      && Math.abs(entrySlope) >= 0.18
+      && outsideX * entrySlope < 0;
+  }
+
   function resolveContact(a, b, radiusA, radiusB, restitution) {
     let dx = b.x - a.x;
     let dy = b.y - a.y;
@@ -356,6 +369,7 @@
     trajectoryX,
     trajectoryDerivative,
     trajectorySecondDerivative,
+    isPocketLine,
     gutterSideForX,
     gutterAwareTrajectoryX,
     resolveContact,

@@ -71,6 +71,7 @@ function createGameProgressPool() {
         return { rows: [] };
       }
       if (text.includes("insert into game_entitlements")) {
+        const fresh = !state.entitlements.has(params[2]);
         state.entitlements.set(params[2], {
           entitlement_id: params[2],
           kind: params[3],
@@ -80,7 +81,7 @@ function createGameProgressPool() {
           created_at: "2026-07-18T00:00:00.000Z",
           updated_at: "2026-07-18T00:00:00.000Z",
         });
-        return { rows: [] };
+        return { rows: [], rowCount: fresh ? 1 : 0 };
       }
       if (text.includes("insert into game_campaign_progress")) {
         state.campaignProgress.set(params[2], {
@@ -114,9 +115,20 @@ function createGameProgressPool() {
         const row = state.xpTracks.get(`${params[0]}:${params[1]}:${params[2]}`);
         return { rows: row ? [{ stats: row.stats }] : [] };
       }
+      if (text.includes("select track_id, stats from game_xp_tracks")) {
+        return {
+          rows: [...state.xpTracks.entries()]
+            .filter(([key]) => key.startsWith(`${params[0]}:${params[1]}:`))
+            .map(([key, row]) => ({ track_id: key.split(":").slice(2).join(":"), stats: row.stats })),
+        };
+      }
       if (text.includes("insert into game_xp_tracks")) {
         const key = `${params[0]}:${params[1]}:${params[2]}`;
         const previous = state.xpTracks.get(key) || { xp: 0, matches: 0, wins: 0 };
+        if (text.includes("track_id, stats")) {
+          state.xpTracks.set(key, { ...previous, stats: JSON.parse(params[3]) });
+          return { rows: [], rowCount: 1 };
+        }
         state.xpTracks.set(key, {
           xp: previous.xp + Number(params[3]),
           matches: previous.matches + 1,
@@ -361,6 +373,37 @@ test("Yam Bowling match achievements grant fixed cosmetics once", async () => {
   assert.equal(first.ok, true);
   assert.equal(replay.alreadyProcessed, true);
   assert.deepEqual([...pool.state.entitlements.keys()], ["title:comeback-kid"]);
+});
+
+test("Yam Bowling career claims persist one replay-safe cross-match summary", async () => {
+  const pool = createGameProgressPool();
+  const claim = {
+    playerId: "player-1",
+    gameSlug: "yam-bowling",
+    claimId: "career-match:session-123",
+    kind: "career-match",
+    sourceId: "session-123",
+    payload: {
+      trackId: "daisy-monroe",
+      outcome: "win",
+      laneSlug: "royal-gold",
+      spareAttempts: 3,
+      spares: 3,
+      sparePrefix: 3,
+      spareSuffix: 3,
+      spareBest: 3,
+    },
+  };
+
+  const first = await recordGameProgressClaim(pool, claim);
+  const replay = await recordGameProgressClaim(pool, claim);
+  const stats = pool.state.xpTracks.get("player-1:yam-bowling:daisy-monroe").stats;
+
+  assert.equal(first.ok, true);
+  assert.equal(replay.alreadyProcessed, true);
+  assert.equal(stats.careerWins, 1);
+  assert.equal(stats.careerVenueMask, 8);
+  assert.equal(stats.careerSpareRun, 3);
 });
 
 test("Yam Bowling circuit XP can use an earned bowler but never a forged active bowler", async () => {

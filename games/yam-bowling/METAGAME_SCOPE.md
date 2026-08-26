@@ -1,6 +1,9 @@
 # Yam Bowling — Metagame Scope
 
-This document is the checkable backlog for character identity, cosmetics, progression, and Yam-specific player profiles. `GDD.md` remains the source of truth for the playable bowling game; this file owns the metagame roadmap.
+This document is the implementation ledger and remaining roadmap for character
+identity, cosmetics, progression, and Yam-specific player profiles. Runtime code
+and its tests are the source of truth for shipped behavior; `GDD.md` records the
+current playable design scope.
 
 ## How to use this document
 
@@ -339,10 +342,14 @@ record.
 
 ### Still to come
 
-- [ ] Abuse telemetry, before any streak, sportsmanship, or uncapped bonus.
+Abuse telemetry remains the prerequisite for any streak, sportsmanship, or
+uncapped performance bonus; the tracked checklist item is in the anti-farming
+section above.
 
-Not yet browser-verified end to end: that needs `factory-network-server`, the API,
-and two signed-in clients running together.
+The online path has been browser-verified end to end with
+`factory-network-server`, the platform API, and signed-in clients playing live
+matches. The cabinet and relay suites retain automated coverage for the protocol,
+authority, reconnect, rematch, stakes, and progression contracts.
 
 ## Milestone 5 — Bowler unlock tree and progression UI
 
@@ -523,7 +530,7 @@ from the fictional league dossier and biography.
 - [x] Define named CPU rivals and first-clear IDs before authoring rewards.
 - [x] Award Player XP + active Bowler XP on first clear only, with a small or zero replay reward.
 - [x] Keep ordinary Vs CPU as zero-XP practice.
-- [ ] Add campaign-only cosmetics/titles without creating gameplay advantages.
+- [x] Add campaign-only cosmetics without creating gameplay advantages.
 
 `campaign-core.js` ships the five divisions, their sanctioned matches, the rival each
 unlocks and the per-match achievement. A successful server claim now joins that
@@ -552,6 +559,8 @@ the generic game-progress claim path, and `yam-bowling-reward-catalog.mts` fixes
 the entitlement each one grants, so a client cannot name its own prize.
 
 - [x] `Perfect Game` — bowl a sanctioned regulation 300.
+- [x] `Clean Card` — finish sanctioned regulation play without an open frame.
+- [x] `Turkey Club` — roll three consecutive strikes in sanctioned play.
 - [x] `Comeback Kid` — win after trailing by 30 or more entering the tenth.
 - [x] `Split Decision` — convert a 7-10 split.
 - [x] Achievements award badges/titles only, through the same entitlement path
@@ -564,6 +573,14 @@ verify against `game_xp_tracks` rather than against a reported match:
 - [ ] `Dedicated` — reach level 20 with one bowler.
 - [ ] Character mastery achievements such as `Reina Master`.
 - [ ] `Yam Connoisseur` — reach maximum mastery with five bowlers.
+
+The profile cabinet's five evidence-heavy badges are now live. `Laser Focus`
+records the pocket-line fact on every opening delivery; `Precision Bowler`
+merges consecutive-spare runs; `Lane Legend` and `Road Tested` maintain exact
+nine-venue bitmasks; and `Deep Bench` evaluates sanctioned wins across all
+thirty canon bowler tracks. Their account records merge under a locked
+progression row and entitlement grants are idempotent. See `PROFILE_REWARDS.md`
+for the player-facing definitions.
 
 ## Milestone 8 — Player level reward tree and Skin Vouchers
 
@@ -623,10 +640,16 @@ bowler unlock raise the value of a voucher already in hand.
 - [x] Server balance in `game_inventory_items` and the spend transaction (decrement + entitlement grant, one transaction).
 - [x] Redemption UI: pick a skin from an owned bowler.
 - [x] Rare tournament voucher source; circuit voucher milestones remain deferred.
-- [ ] Real-money vouchers, after the earned path is established.
+- [x] Add a server-authoritative real-money voucher source after establishing the earned path.
 
 Nothing may advertise a voucher price or offer redemption until that authoritative
 spend exists. The tree may say a voucher is coming; it may not say what it buys.
+
+The 2027 calendar preorder is the premium source: a paid, fulfilled preorder
+grants ten of the existing Skin Voucher item once per account through the
+platform's inventory transaction. The browser cannot submit the premium claim,
+and checkout fulfillment is idempotent. Operational launch steps remain in
+`CALENDAR.md`.
 
 ## Milestone 9 — Rotating CPU tournaments
 

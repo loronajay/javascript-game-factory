@@ -13,6 +13,12 @@ import {
   validateYamBowlingSkinVoucherTarget,
 } from "../src/services/yam-bowling-reward-catalog.mjs";
 import { normalizeYamBowlingGarage } from "../src/services/yam-bowling-loadout-catalog.mjs";
+import {
+  YAM_BOWLING_ALL_VENUES_MASK,
+  YAM_BOWLING_BOWLER_SLUGS,
+  earnedYamBowlingCareerBadges,
+  mergeYamBowlingCareerStats,
+} from "../src/services/yam-bowling-career.mjs";
 
 test("Yam Bowling awards its two currencies on their own rungs", () => {
   const definition = getProgression("yam-bowling");
@@ -208,17 +214,26 @@ test("a level cosmetic is still stripped for a player who has not earned it", ()
 });
 
 test("fixed match-achievement claims grant only the catalogued cosmetic", () => {
-  const verdict = validateYamBowlingPublicClaim({
-    playerId: "player-1",
-    gameSlug: "yam-bowling",
-    kind: "match-achievement",
-    claimId: "match-achievement:perfect-game",
-    sourceId: "perfect-game",
-    payload: { achievementId: "perfect-game", entitlementId: "title:forged" },
-  });
+  for (const [achievementId, entitlementId, kind] of [
+    ["perfect-game", "badge:perfect-game", "badge"],
+    ["clean-card", "badge:clean-card", "badge"],
+    ["turkey-club", "badge:turkey-club", "badge"],
+    ["laser-focus", "badge:laser-focus", "badge"],
+    ["split-decision", "badge:split-decision", "badge"],
+    ["comeback-kid", "title:comeback-kid", "title"],
+  ]) {
+    const verdict = validateYamBowlingPublicClaim({
+      playerId: "player-1",
+      gameSlug: "yam-bowling",
+      kind: "match-achievement",
+      claimId: `match-achievement:${achievementId}`,
+      sourceId: achievementId,
+      payload: { achievementId, entitlementId: "title:forged" },
+    });
 
-  assert.equal(verdict.ok, true);
-  assert.deepEqual(verdict.entitlementGrants, [{ entitlementId: "badge:perfect-game", kind: "badge" }]);
+    assert.equal(verdict.ok, true);
+    assert.deepEqual(verdict.entitlementGrants, [{ entitlementId, kind }]);
+  }
   assert.equal(validateYamBowlingPublicClaim({
     gameSlug: "yam-bowling",
     kind: "match-achievement",
@@ -302,6 +317,66 @@ test("the level-entitlement migrations backfill every node on both ladders", asy
   // spot-check two against the curves they were derived from today.
   assert.ok(sql.includes(`${xpForLevel(definition.curves.player, 2)}`), "player level 2");
   assert.ok(sql.includes(`${xpForLevel(definition.curves.track, 30)}`), "bowler level 30");
+});
+
+test("career claims accept only bounded canonical match summaries", () => {
+  const base = {
+    gameSlug: "yam-bowling",
+    kind: "career-match",
+    claimId: "career-match:session-123",
+    sourceId: "session-123",
+    payload: { trackId: "daisy-monroe", outcome: "win", laneSlug: "royal-gold", spareAttempts: 3, spares: 3, sparePrefix: 3, spareSuffix: 3, spareBest: 3 },
+  };
+  assert.deepEqual(validateYamBowlingPublicClaim(base).careerStats, {
+    trackId: "daisy-monroe",
+    venueMask: 8,
+    venueWinMask: 8,
+    spareAttempts: 3,
+    spares: 3,
+    sparePrefix: 3,
+    spareSuffix: 3,
+    spareBest: 3,
+    careerWins: 1,
+  });
+  for (const change of [
+    { claimId: "career-match:another" },
+    { payload: { ...base.payload, trackId: "invented" } },
+    { payload: { ...base.payload, laneSlug: "invented" } },
+    { payload: { ...base.payload, spareAttempts: 2, spares: 3 } },
+  ]) assert.equal(validateYamBowlingPublicClaim({ ...base, ...change }).ok, false);
+});
+
+test("career spare streaks bridge clean matches and reset after a miss", () => {
+  const bridged = mergeYamBowlingCareerStats(
+    { careerSpareRun: 17, careerSpareBest: 17 },
+    { spareAttempts: 3, spares: 3, sparePrefix: 3, spareSuffix: 3, spareBest: 3 },
+    {},
+  );
+  assert.equal(bridged.careerSpareRun, 20);
+  assert.equal(bridged.careerSpareBest, 20);
+
+  const missed = mergeYamBowlingCareerStats(
+    { careerSpareRun: 18, careerSpareBest: 18 },
+    { spareAttempts: 5, spares: 4, sparePrefix: 2, spareSuffix: 2, spareBest: 2 },
+    {},
+  );
+  assert.equal(missed.careerSpareRun, 2);
+  assert.equal(missed.careerSpareBest, 20);
+});
+
+test("career badges evaluate all nine venues and all thirty canon bowlers", () => {
+  const tracks = Object.fromEntries(YAM_BOWLING_BOWLER_SLUGS.map((slug) => [slug, { careerWins: 1 }]));
+  Object.assign(tracks[YAM_BOWLING_BOWLER_SLUGS[0]], {
+    careerVenueMask: YAM_BOWLING_ALL_VENUES_MASK,
+    careerVenueWinMask: YAM_BOWLING_ALL_VENUES_MASK,
+    careerSpareBest: 20,
+  });
+  assert.deepEqual(earnedYamBowlingCareerBadges(tracks), [
+    "badge:precision-bowler", "badge:lane-legend", "badge:road-tested", "badge:deep-bench",
+  ]);
+  delete tracks[YAM_BOWLING_BOWLER_SLUGS.at(-1)];
+  assert.equal(earnedYamBowlingCareerBadges(tracks).includes("badge:deep-bench"), false);
+  assert.equal(YAM_BOWLING_BOWLER_SLUGS.length, 30);
 });
 
 test("the progression reconciliation adds an explicit draw counter", async () => {

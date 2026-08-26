@@ -18,6 +18,7 @@
 // THE SERVER DERIVES EVERY XP AMOUNT. A client reports what it played, never
 // what it earned. See the trust note in db/migrations/038-game-xp-progression.sql
 // for exactly which of those reported fields are checkable and which are not.
+import { mergeYamBowlingCareerStats } from "./yam-bowling-career.mjs";
 // An entitlement id is `<kind>:<slug>`, so the kind is read off the id rather
 // than repeated beside it — two spellings of the same fact could disagree.
 function levelReward(level, entitlementId) {
@@ -57,6 +58,7 @@ const YAM_BOWLING = {
         classicSpareOpportunities: "sum",
         classicSpares: "sum",
     },
+    mergeTrackExtras: mergeYamBowlingCareerStats,
     // Two spendable currencies, listed in level order because that is the order a
     // player meets them and the order the reward reader returns them in.
     //

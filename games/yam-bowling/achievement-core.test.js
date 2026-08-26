@@ -3,6 +3,27 @@ const assert = require("node:assert/strict");
 
 const achievements = require("./achievement-core.js");
 
+test("every shipped match achievement has one stable cosmetic reward", () => {
+  assert.deepEqual(
+    Object.fromEntries(Object.entries(achievements.MATCH_ACHIEVEMENTS)),
+    {
+      "perfect-game": "badge:perfect-game",
+      "clean-card": "badge:clean-card",
+      "turkey-club": "badge:turkey-club",
+      "laser-focus": "badge:laser-focus",
+      "comeback-kid": "title:comeback-kid",
+      "split-decision": "badge:split-decision",
+    },
+  );
+  for (const [achievementId, itemId] of Object.entries(achievements.MATCH_ACHIEVEMENTS)) {
+    assert.equal(achievements.rewardItemIdForAchievement(achievementId), itemId);
+  }
+  assert.equal(achievements.rewardItemIdForAchievement("invented"), null);
+  for (const id of ["precision-bowler", "lane-legend", "road-tested", "deep-bench"]) {
+    assert.equal(achievements.rewardItemIdForAchievement(id), `badge:${id}`);
+  }
+});
+
 function player(id, total, cumulative = []) {
   return {
     id,
@@ -105,6 +126,51 @@ test("split-decision requires an exact 7-10 leave followed by a conversion", () 
   assert.deepEqual(achievements.detectMatchAchievements({ match, localPlayerId: "p1", rolls }), [
     "split-decision",
   ]);
+});
+
+test("laser-focus requires every opening ball in the completed game to use a pocket line", () => {
+  const match = finishedMatch();
+  const pocketRolls = Array.from({ length: 10 }, (_, frameIndex) => ({
+    playerId: "p1", frameIndex, rollIndex: 0, pocketLine: true, standingPinIdsAfter: [],
+  }));
+
+  assert.ok(achievements.detectMatchAchievements({
+    match,
+    localPlayerId: "p1",
+    rolls: pocketRolls,
+  }).includes("laser-focus"));
+
+  pocketRolls[6].pocketLine = false;
+  assert.equal(achievements.detectMatchAchievements({
+    match,
+    localPlayerId: "p1",
+    rolls: pocketRolls,
+  }).includes("laser-focus"), false);
+});
+
+test("career match evidence summarizes spare runs, lane, bowler, and outcome", () => {
+  const me = player("p1", 180, []);
+  me.characterSlug = "daisy-monroe";
+  me.frames = [
+    [7, 3], [8, 2], [6, 2], [9, 1], [10],
+    [5, 5], [4, 3], [8, 2], [10], [7, 3, 9],
+  ];
+  const match = finishedMatch({ players: [me, player("cpu", 150)] });
+
+  assert.deepEqual(achievements.summarizeCareerMatch({
+    match,
+    localPlayerId: "p1",
+    laneSlug: "royal-gold",
+  }), {
+    trackId: "daisy-monroe",
+    outcome: "win",
+    laneSlug: "royal-gold",
+    spareAttempts: 8,
+    spares: 6,
+    sparePrefix: 2,
+    spareSuffix: 2,
+    spareBest: 2,
+  });
 });
 
 test("near misses, local quick play, and unfinished matches grant nothing", () => {
