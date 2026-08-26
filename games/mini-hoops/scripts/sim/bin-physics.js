@@ -21,12 +21,18 @@ import { ballFlight, rollPhasePerRadian } from "../assets/ball-catalog.js";
 import {
   BALL_RADIUS_WORLD,
   BOARD_Z,
+  DEPTH_FALLOFF,
+  FLOOR_SCREEN_Y,
+  FLOOR_Y,
   GRAVITY,
+  HORIZON_SCREEN_Y,
   PHYSICS_SUBSTEP_SECONDS,
+  PROJECTION_Y_SCALE,
   SPIN_DECAY_PER_TICK,
   WALL_RESTITUTION,
 } from "./constants.js";
 import { resolveCeilingContact, resolveFloorContact } from "./collision.js";
+import { depthScaleAt, projectPoint, tiltedRingEllipseAt } from "./projection.js";
 
 // The mouth a ball has to find. The ball is 0.078 across the radius, so the
 // clear opening `binClearance` leaves is a little under one ball-radius of slack
@@ -47,10 +53,165 @@ import { resolveCeilingContact, resolveFloorContact } from "./collision.js";
 // says it does. The old placement put a 71px-wide sprite around a 94px physical
 // mouth at the front row; `render/bin.js` now anchors the art to these numbers.
 export const BIN_MOUTH_Y = 0.36;
-export const BIN_MOUTH_RADIUS = 0.16;
-export const BIN_BOTTOM_RADIUS = 0.133;
-export const BIN_RIM_TUBE_RADIUS = 0.022;
+
+/**
+ * THE BIN, AS MEASURED OFF `assets/modes/floor-tic-tac-toe/open-bin.png`.
+ *
+ * The art is the object and the collider is the description of it, so the
+ * description is taken FROM the picture rather than typed beside it. Every
+ * number here is in source-image pixels and every one was walked off the file by
+ * `tools/measure-bin.mjs`, not eyeballed:
+ *
+ *   mouthCenter / mouthRadius  a least-squares fit of the rim's OUTER silhouette
+ *                              across 910 columns, residual 0.57px. It is the
+ *                              painted opening, and it is what the world mouth
+ *                              is scaled and leaned to land on.
+ *   beadThickness              the rim bead's RADIAL thickness, read at the
+ *                              ellipse's own centre row — the one place the bead
+ *                              is seen edge-on with no foreshortening, and clean
+ *                              on both sides (39px left, 36px right; the
+ *                              interior falls off a cliff at both).
+ *   baseY                      the last row with paint in it.
+ *
+ * The numbers this replaced were wrong in the two ways that mattered. The mouth
+ * ellipse was recorded as centre 160 / semi-axis 116, which shares a far edge
+ * with the truth and hangs 15px past its near edge — so the collider sat low and
+ * proud of the hole. And the bead was implied to be 113px thick by a
+ * `BIN_RIM_TUBE_RADIUS` of 0.022 against a 37px paint, THREE TIMES too fat: the
+ * ball was being turned away by a lip two-thirds of which was not drawn.
+ */
+export const BIN_ART = Object.freeze({
+  width: 1187,
+  height: 1326,
+  mouthCenterX: 588.5,
+  mouthCenterY: 152.3,
+  mouthRadiusX: 469.5,
+  mouthRadiusY: 108.5,
+  beadThickness: 37.5,
+  baseY: 1275,
+  // The body's own half-width where it meets the floor, from the same walk.
+  baseRadiusX: 370,
+});
+
+// How far out the rim reaches, in world units. THE one number here that is a
+// choice rather than a reading — it fixes the bin's size in the room, and
+// everything else about the mouth is the art's proportions applied to it. It is
+// unchanged from the shipped value (0.16 + 0.022), so the sprite draws at
+// exactly the size it always did and nothing about the board's layout moved.
+const BIN_MOUTH_OUTER_RADIUS = 0.182;
+
+const perArtPixel = BIN_MOUTH_OUTER_RADIUS / BIN_ART.mouthRadiusX;
+
+// THE LIP IS AS THICK AS THE LIP IN THE PICTURE. This was 0.022 — a bead 113
+// source pixels thick against a painted 37 — and that single number was most of
+// what made the mode feel like it was lying: the collider's opening came out at
+// 0.138 where the hole you can see is 0.168, so a ball that visibly cleared the
+// rim clanged off a lip drawn 18% further in than it really was.
+export const BIN_RIM_TUBE_RADIUS = (BIN_ART.beadThickness / 2) * perArtPixel;
+
+// The ring through the middle of that bead. Derived, so it cannot drift away
+// from the outer reach and the bead thickness that define it.
+export const BIN_MOUTH_RADIUS = BIN_MOUTH_OUTER_RADIUS - BIN_RIM_TUBE_RADIUS;
+
+export const BIN_BOTTOM_RADIUS = BIN_ART.baseRadiusX * perArtPixel;
 export const BIN_WALL_THICKNESS = 0.016;
+
+// THE MOUTH IS THE PAINTED MOUTH. The bin's opening in `open-bin.png` is an
+// ellipse 116/468 = 0.248 as tall as it is wide, because the bin was
+// photographed from very near eye level. A HORIZONTAL circle through this
+// cabinet's camera is 0.42 at the back row and 0.59 at the front — nearly two
+// and a half times rounder — so a horizontal mouth collider sits visibly proud
+// of the hole it is supposed to be, and every lip strike near the front or back
+// of a mouth happens off-picture. That is what made the mode feel disconnected
+// from its own art.
+//
+// The art is not the thing that is wrong, and it is not what moves. A horizontal
+// disc is only ONE of the planes that projects to a given ellipse: leaning the
+// mouth's plane away from the camera closes the ellipse without touching its
+// width, so there is a lean at which the collider projects EXACTLY onto the
+// painted opening. `solveBinMouthTilt` finds it, per row, against the real
+// projection. The bin reads as standing very slightly back on its heel, which is
+// precisely what the photograph shows.
+//
+// It was previously recorded here as unclosable, on the grounds that a mouth
+// whose world DEPTH matched the paint would be 0.13 across against a 0.156 ball.
+// That is true and it is the wrong measurement: it assumes the mouth stays
+// horizontal and gets squashed. A leaning mouth keeps its full 0.16 radius IN
+// ITS OWN PLANE — the ball drops through the same hole it always did. All the
+// lean costs is `cos(tilt)` off the opening's front-to-back footprint, about 6%
+// at the front row and 2% at the back.
+export const BIN_PAINTED_MOUTH_ASPECT = BIN_ART.mouthRadiusY / BIN_ART.mouthRadiusX;
+
+/**
+ * The lean, in radians, at which this bin's mouth projects onto the painted one.
+ *
+ * Solved rather than derived in closed form: the exact projection is not linear
+ * in depth, and this is computed nine times when the board is built. Bisection
+ * runs over [0, `flattestTilt`] because the drawn height falls monotonically to
+ * zero across that range — past it the ring opens out again the other way, which
+ * is a second solution describing a mouth tipped past edge-on.
+ */
+export function solveBinMouthTilt(bin) {
+  const aspectAt = (tilt) => {
+    const centre = projectPoint({ x: bin.x, y: bin.topY, z: bin.z });
+    const ring = tiltedRingEllipseAt(centre.x, centre.y, bin.mouthRadius + bin.rimTubeRadius, bin.z, tilt);
+    return ring.radiusY / ring.radiusX;
+  };
+  if (aspectAt(0) <= BIN_PAINTED_MOUTH_ASPECT) return 0;
+
+  let lo = 0;
+  let hi = flattestTilt(bin);
+  for (let i = 0; i < 48; i++) {
+    const mid = (lo + hi) / 2;
+    if (aspectAt(mid) > BIN_PAINTED_MOUTH_ASPECT) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+/**
+ * The lean at which the mouth draws edge-on — a flat line — and the far end of
+ * the bracket the solve runs in.
+ *
+ * A ring point's screen height moves with BOTH the depth it gains and the world
+ * height it loses, and those two pull opposite ways. This is the angle at which
+ * they cancel exactly, from the camera's own two derivatives at the mouth.
+ */
+function flattestTilt(bin) {
+  const scale = depthScaleAt(bin.z);
+  const perDepth = DEPTH_FALLOFF * scale * scale
+    * ((FLOOR_SCREEN_Y - HORIZON_SCREEN_Y) - (bin.topY - FLOOR_Y) * PROJECTION_Y_SCALE);
+  const perHeight = PROJECTION_Y_SCALE * scale;
+  return Math.atan2(Math.abs(perDepth), Math.abs(perHeight));
+}
+
+/**
+ * The height of a bin's mouth plane at depth `z`.
+ *
+ * The plane leans back, so it rises toward the player and drops toward the wall.
+ * This is the whole of the tilt as the rest of the file sees it.
+ */
+export function binMouthPlaneY(bin, z) {
+  return bin.topY - bin.mouthTilt.tan * (z - bin.z);
+}
+
+/**
+ * A point's offset from the mouth's centre, in the mouth's OWN plane.
+ *
+ * `u` runs sideways and `v` runs up-the-slope toward the wall; `normal` is how
+ * far the point stands off the plane, positive on the side the ball arrives
+ * from. Every mouth test in this file is one of these three numbers, which is
+ * what keeps the lean from leaking into the rest of the geometry.
+ */
+export function binMouthFrame(bin, point) {
+  const { sin, cos } = bin.mouthTilt;
+  const dy = point.y - bin.topY;
+  const dz = point.z - bin.z;
+  return {
+    u: point.x - bin.x,
+    v: dz * cos - dy * sin,
+    normal: dy * cos + dz * sin,
+  };
+}
 
 // The front row deliberately starts at z=.33. A target body has real depth and
 // the held ball has real radius; moving it closer would make the ball begin its
@@ -71,23 +232,41 @@ const SEPARATION = 0.0015;
 const BIN_REACH = BIN_MOUTH_RADIUS + BIN_WALL_THICKNESS + BIN_RIM_TUBE_RADIUS + BALL_RADIUS_WORLD;
 
 export function createBinTargets() {
-  return ROW_Z.flatMap((z, row) => COLUMN_X.map((x, column) => Object.freeze({
-    index: row * 3 + column,
-    row,
-    column,
-    x,
-    z,
-    topY: BIN_MOUTH_Y,
-    mouthRadius: BIN_MOUTH_RADIUS,
-    bottomRadius: BIN_BOTTOM_RADIUS,
-    rimTubeRadius: BIN_RIM_TUBE_RADIUS,
-    wallThickness: BIN_WALL_THICKNESS,
-  })));
+  return ROW_Z.flatMap((z, row) => COLUMN_X.map((x, column) => {
+    const bin = {
+      index: row * 3 + column,
+      row,
+      column,
+      x,
+      z,
+      topY: BIN_MOUTH_Y,
+      mouthRadius: BIN_MOUTH_RADIUS,
+      bottomRadius: BIN_BOTTOM_RADIUS,
+      rimTubeRadius: BIN_RIM_TUBE_RADIUS,
+      wallThickness: BIN_WALL_THICKNESS,
+      mouthTilt: { angle: 0, sin: 0, cos: 1, tan: 0, rise: 0 },
+    };
+    // Solved once, when the board is built, and frozen in: it is a property of
+    // the row's depth and the art, and neither changes during a match.
+    const angle = solveBinMouthTilt(bin);
+    bin.mouthTilt = Object.freeze({
+      angle,
+      sin: Math.sin(angle),
+      cos: Math.cos(angle),
+      tan: Math.tan(angle),
+      // How far the near lip stands above `topY` — the reach the mouth gains
+      // upward once it leans, which the cheap reject below has to allow for.
+      rise: (BIN_MOUTH_RADIUS + BIN_RIM_TUBE_RADIUS) * Math.sin(angle),
+    });
+    return Object.freeze(bin);
+  }));
 }
 
 /** Is the ball anywhere near enough to this bin for a contact to be possible? */
 export function withinBinReach(ball, bin) {
-  if (ball.y > bin.topY + BALL_RADIUS_WORLD + bin.rimTubeRadius) return false;
+  // `mouthTilt.rise` is what the near lip gains once the mouth leans. Without it
+  // the reject would cut the ball off above a lip that is genuinely there.
+  if (ball.y > bin.topY + bin.mouthTilt.rise + BALL_RADIUS_WORLD + bin.rimTubeRadius) return false;
   return Math.hypot(ball.x - bin.x, ball.z - bin.z) <= BIN_REACH;
 }
 
@@ -128,28 +307,62 @@ export function nearestBinTo(ball, bins) {
  * be the placement mismatch back in a new form.
  */
 export function binClearance(bin) {
-  return bin.mouthRadius - BALL_RADIUS_WORLD - bin.rimTubeRadius * 0.55;
+  // THE MAKE WINDOW IS THE PAINTED HOLE, LESS THE BALL. `mouthRadius -
+  // rimTubeRadius` is the bead's inner edge, which is the dark opening in the
+  // picture; take the ball's radius off it and what is left is how far off-axis
+  // its centre may be and still fit. Nothing is fudged in either direction.
+  //
+  // It used to shave only 0.55 of the tube, which was a nudge back toward
+  // playability against a lip three times too thick. With the bead measured off
+  // the art the fudge has nothing left to correct.
+  return bin.mouthRadius - bin.rimTubeRadius - BALL_RADIUS_WORLD;
 }
 
+/**
+ * Did the ball just drop through this mouth?
+ *
+ * A crossing of the LEANING mouth plane, measured along that plane's normal, and
+ * then a distance inside the plane. It used to be a crossing of `y = topY` and a
+ * distance in the horizontal — the same test, for the horizontal mouth this one
+ * replaced.
+ */
 export function detectBinScore(ball, previous, bin) {
-  if (ball.vy >= 0 || previous.y <= bin.topY || ball.y > bin.topY) return false;
-  const drop = previous.y - ball.y;
+  if (ball.vy >= 0) return false;
+  const before = binMouthFrame(bin, previous).normal;
+  const after = binMouthFrame(bin, ball);
+  if (before <= 0 || after.normal > 0) return false;
+  const drop = before - after.normal;
   if (drop <= 1e-7) return false;
-  const t = (previous.y - bin.topY) / drop;
-  const x = previous.x + (ball.x - previous.x) * t;
-  const z = previous.z + (ball.z - previous.z) * t;
-  return Math.hypot(x - bin.x, z - bin.z) < binClearance(bin);
+  const t = before / drop;
+  const crossing = {
+    x: previous.x + (ball.x - previous.x) * t,
+    y: previous.y + (ball.y - previous.y) * t,
+    z: previous.z + (ball.z - previous.z) * t,
+  };
+  const { u, v } = binMouthFrame(bin, crossing);
+  return Math.hypot(u, v) < binClearance(bin);
 }
 
+/**
+ * The lip: a torus around the mouth's ring, IN THE MOUTH'S OWN PLANE.
+ *
+ * Identical to the horizontal version it replaces except that the nearest point
+ * on the ring is found in the plane's `(u, v)` basis rather than in the world
+ * horizontal — so the lip the ball strikes is the lip in the picture.
+ */
 export function resolveBinRimContact(ball, bin, flight = { bounce: 1, grip: 1 }) {
-  const dx = ball.x - bin.x;
-  const dz = ball.z - bin.z;
-  const radial = Math.hypot(dx, dz);
+  const { sin, cos } = bin.mouthTilt;
+  const { u, v } = binMouthFrame(bin, ball);
+  const radial = Math.hypot(u, v);
   if (radial < 1e-7) return null;
-  const cx = bin.x + (bin.mouthRadius * dx) / radial;
-  const cz = bin.z + (bin.mouthRadius * dz) / radial;
+  const ringU = (bin.mouthRadius * u) / radial;
+  const ringV = (bin.mouthRadius * v) / radial;
+  // Back out of the plane basis: e1 = (1, 0, 0), e2 = (0, -sin, cos).
+  const cx = bin.x + ringU;
+  const cy = bin.topY - ringV * sin;
+  const cz = bin.z + ringV * cos;
   let nx = ball.x - cx;
-  let ny = ball.y - bin.topY;
+  let ny = ball.y - cy;
   let nz = ball.z - cz;
   const distance = Math.hypot(nx, ny, nz);
   const contact = BALL_RADIUS_WORLD + bin.rimTubeRadius;
@@ -190,6 +403,11 @@ export function resolveBinRimContact(ball, bin, flight = { bounce: 1, grip: 1 })
  * the only collider, which is also what makes lobbing over a row possible.
  */
 export function resolveBinWallContact(ball, previous, bin, flight = { bounce: 1 }) {
+  // NOTE the bound is still `topY` and NOT the leaning mouth plane. The plane
+  // rises toward the player, and following it here would push a horizontal
+  // normal back up into the air on the near side — which is the phantom band
+  // this bound was introduced to delete. The drum is upright, which is also what
+  // the sprite paints; only its mouth leans.
   if (ball.y <= BALL_RADIUS_WORLD || ball.y >= bin.topY) return null;
   const height = Math.max(0, Math.min(1, ball.y / bin.topY));
   const bodyRadius = bin.bottomRadius + (bin.mouthRadius - bin.bottomRadius) * height;

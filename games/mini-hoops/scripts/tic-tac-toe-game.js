@@ -45,19 +45,12 @@ import {
 } from "./sim/tic-tac-toe.js";
 import { drawBall } from "./render/ball.js";
 import { drawAim } from "./render/aim.js";
-import {
-  binMouthEllipse,
-  drawBinBody,
-  drawBinColliders,
-  drawBinLip,
-  drawColliderLegend,
-  drawFloorMark,
-} from "./render/bin.js";
+import { binMouthEllipse, drawBinBody, drawBinLip, drawFloorMark } from "./render/bin.js";
 import { clearScene, depthGradeFilter, drawBallShadow, drawRoom, prepareContext } from "./render/scene.js";
 import { canvasPoint, isGrab } from "./ui/pointer.js";
 
 // One definition of what each side looks like. The floor glyph, the claimed
-// cell's tint and the debug fallback all read it, so a colour cannot drift
+// cell's tint and the no-art fallback all read it, so a colour cannot drift
 // between the three places a player sees it.
 export const MARK_COLOURS = Object.freeze({ x: "#ff4fd8", o: "#28d8ff" });
 
@@ -152,10 +145,6 @@ export function bootTicTacToe(root, options = {}) {
   const meter = root.querySelector("#tttMeterFill");
   const readout = root.querySelector("#tttMeterReadout");
   const newMatchButton = root.querySelector("#newMatch");
-  // The collider overlay. Off by default, toggled with C while the court is
-  // up — a way to SEE where the physics is against where the art is, rather
-  // than argue about it from a screenshot. See `render/bin.js`.
-  let showColliders = false;
   const onlinePanel = root.querySelector("#tttOnlinePanel");
   const modeLabel = root.querySelector("#tttModeLabel");
   const hint = root.querySelector("#tttHint");
@@ -163,10 +152,6 @@ export function bootTicTacToe(root, options = {}) {
   onlineClient.subscribe(handleOnlineSnapshot);
 
   newMatchButton?.addEventListener("click", () => newMatch());
-  window.addEventListener("keydown", (event) => {
-    if (!active || event.key !== "c" || event.metaKey || event.ctrlKey || event.altKey) return;
-    showColliders = !showColliders;
-  });
   for (const button of root.querySelectorAll('[data-intent="leave-tic-tac-toe"]')) {
     button.addEventListener("click", () => onLeave());
   }
@@ -598,14 +583,6 @@ export function bootTicTacToe(root, options = {}) {
       drawBinLip(ctx, bin, art.bin);
     }
     if (loose && !ballDrawn) drawLooseBall();
-
-    // Over everything, so a collider behind a nearer bin is still readable —
-    // this is an instrument, not part of the scene.
-    if (showColliders) {
-      for (const bin of order) if (!match.board[bin.index]) drawBinColliders(ctx, bin);
-      // Below the HUD's own stat block, which owns the top-left corner.
-      drawColliderLegend(ctx, 28, 230);
-    }
 
     if (pull) {
       const preview = createTicTacToeShot(pull, ball, { weight: ballFlight(BALL_ID).weight });

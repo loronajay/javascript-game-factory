@@ -17,24 +17,33 @@
 // `BIN_MOUTH_Y` of 0.36. The bin in the picture and the bin in the sim are the
 // same object.
 //
-// THE ONE PLACE THEY CANNOT AGREE is the mouth's depth front-to-back, and it is
-// worth stating plainly rather than papering over. The art was rendered from a
-// nearly horizontal camera: its painted mouth is an ellipse 0.248 as tall as it
-// is wide. A horizontal circle through THIS camera is 0.42 at the back row and
-// 0.59 at the front. So the painted opening reads 13px deep where the collider's
-// is 32px. That gap is not fixable by moving or scaling the sprite, and it is
-// not fixable by squashing the collider either: a mouth whose world depth
-// matched the paint would be 0.13 deep, and the ball is 0.156 across — it would
-// not fit through the hole it is drawn inside. `drawBinColliders` exists so this
-// is visible rather than argued about; press C on the court.
+// THE MOUTH'S DEPTH FRONT-TO-BACK USED TO BE THE ONE PLACE THEY DISAGREED, and
+// it no longer is. The art was photographed from very near eye level: its
+// painted mouth is an ellipse 0.248 as tall as it is wide, where a HORIZONTAL
+// circle through this camera is 0.42 at the back row and 0.59 at the front. So
+// the painted opening read 13px deep against a collider 32px deep, and a lip
+// strike near the front or back of a mouth happened off-picture.
+//
+// The fix is in `sim/bin-physics.js` and it moved the collider, not the picture:
+// a horizontal disc is only ONE of the planes that projects to a given ellipse,
+// so the mouth is allowed to LEAN AWAY from the camera until it projects onto
+// the paint exactly. `binRings` reads that lean off the bin, and all four mouth
+// rings land on the art in both axes at every row.
+//
+// NOTHING DRAWS THAT AGREEMENT IN THE GAME. There was an in-court overlay on a
+// C key for a while, and it is gone: it shipped to players, who have no use for
+// it and every reason to be confused by it. `tools/bin-contact-sheet.mjs` draws
+// the same thing offline at 12x, against the raw art, with the painted mouth
+// placed independently of the collider — a better instrument that cannot reach
+// the live site.
 //
 // TWO PASSES, LIKE THE RIM. `drawBinBody` is the whole sprite, before the ball;
 // `drawBinLip` re-draws everything below the mouth's centre line, after it — so
 // a ball dropping in goes behind the near lip and the front wall rather than
 // skating across them.
 
-import { binClearance } from "../sim/bin-physics.js";
-import { projectPoint, ringEllipseAt, worldToScreenLength } from "../sim/projection.js";
+import { BIN_ART, binClearance } from "../sim/bin-physics.js";
+import { projectPoint, ringEllipseAt, tiltedRingEllipseAt, worldToScreenLength } from "../sim/projection.js";
 import { depthGradeFilter } from "./scene.js";
 
 const TAU = Math.PI * 2;
@@ -43,20 +52,23 @@ const TAU = Math.PI * 2;
  * Every ring of this bin, projected at the depth it actually sits at.
  *
  * `clear` is `binClearance` read straight off the sim — how far off-axis the
- * ball's centre may be at the mouth plane and still drop through. Nothing draws
- * it as a printed target in normal play; the collider overlay does, because that
- * is what an overlay is for.
+ * ball's centre may be at the mouth plane and still drop through. Nothing in the
+ * game draws it; it is here for `tools/bin-contact-sheet.mjs`, and for the tests
+ * that pin the drawn lip and the clearance circle to one scale.
  */
 export function binRings(bin) {
   const mouth = projectPoint({ x: bin.x, y: bin.topY, z: bin.z });
   const foot = projectPoint({ x: bin.x, y: 0, z: bin.z });
-  const ring = (centre, radius) => ringEllipseAt(centre.x, centre.y, radius, bin.z);
+  // The mouth's rings lean with the mouth; the base sits flat on the floor,
+  // because the drum is upright and only its opening leans. See
+  // `sim/bin-physics.js`.
+  const ring = (radius) => tiltedRingEllipseAt(mouth.x, mouth.y, radius, bin.z, bin.mouthTilt.angle);
   return {
-    outer: ring(mouth, bin.mouthRadius + bin.rimTubeRadius),
-    lip: ring(mouth, bin.mouthRadius),
-    inner: ring(mouth, bin.mouthRadius - bin.rimTubeRadius),
-    clear: ring(mouth, binClearance(bin)),
-    base: ring(foot, bin.bottomRadius),
+    outer: ring(bin.mouthRadius + bin.rimTubeRadius),
+    lip: ring(bin.mouthRadius),
+    inner: ring(bin.mouthRadius - bin.rimTubeRadius),
+    clear: ring(binClearance(bin)),
+    base: ringEllipseAt(foot.x, foot.y, bin.bottomRadius, bin.z),
     foot,
   };
 }
@@ -67,31 +79,17 @@ export function binMouthEllipse(bin) {
 }
 
 /**
- * Where the bin is in ITS OWN ART, in source-image pixels.
+ * Where the bin is in its own art — the SAME measurements the collider is built
+ * from, imported rather than restated.
  *
- * Measured off `open-bin.png` (1187x1326) by walking its alpha, not eyeballed:
- * the outer rim ellipse tops out on row 44 and is widest on row 160, so its
- * centre is row 160 and its painted half-height is 116; the bin bottoms out on
- * row 1272. Only `mouthCenterX`, `mouthCenterY` and `mouthRadiusX` place the
- * sprite — the rest is here so the collider overlay can draw the painted mouth
- * beside the tested one. Re-cut art needs this block re-measured, nothing else.
+ * This block used to be a second, hand-typed copy of the numbers, and it drifted
+ * from the picture in both of the ways that matter (see `BIN_ART`). It is now
+ * one record: `sim/bin-physics.js` reads it to size the mouth and solve its
+ * lean, and this file reads it to place the sprite. The two cannot disagree,
+ * which is the whole point.
  */
-const SPRITE = Object.freeze({
-  width: 1187,
-  height: 1326,
-  mouthCenterX: 590,
-  mouthCenterY: 160,
-  mouthRadiusX: 468,
-  mouthRadiusY: 116,
-  baseY: 1272,
-});
+const SPRITE = BIN_ART;
 
-/**
- * Where the sprite goes: ONE uniform scale, from the painted rim's half-width.
- *
- * There is deliberately no second scale and no per-band adjustment. The art's
- * own proportions are the bin's proportions.
- */
 export function binSpriteLayout(bin) {
   const { outer } = binRings(bin);
   const scale = outer.radiusX / SPRITE.mouthRadiusX;
@@ -155,78 +153,6 @@ function paint(ctx, image, layout) {
   ctx.ellipse(layout.x + layout.width / 2, layout.splitY, layout.width / 2, layout.width / 8, 0, 0, TAU);
   ctx.fill();
   ctx.fillRect(layout.x + layout.width * 0.1, layout.splitY, layout.width * 0.8, layout.y + layout.height - layout.splitY);
-}
-
-/**
- * THE COLLIDERS, DRAWN OVER THE ART. A debug overlay, off by default, toggled
- * with C on the tic-tac-toe court.
- *
- * This exists because "the rim is not aligned to the art" is a claim about two
- * things that cannot both be seen at once, and the only way to settle it is to
- * draw them on top of each other. Everything solid is a real collider read from
- * `sim/bin-physics.js`; the dashed white ellipse is the mouth as PAINTED, taken
- * from the `SPRITE` block. Where those two disagree is exactly where a contact
- * happens off-picture, and the gap between them is the whole of the mismatch —
- * measured, not argued.
- */
-export function drawBinColliders(ctx, bin) {
-  const { outer, lip, clear, base } = binRings(bin);
-  const ring = (e, stroke, dash = null, width = 1.5) => {
-    ctx.save();
-    ctx.setLineDash(dash || []);
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = width;
-    ctx.beginPath();
-    ctx.ellipse(e.cx, e.cy, Math.max(0.5, e.radiusX), Math.max(0.5, e.radiusY), 0, 0, TAU);
-    ctx.stroke();
-    ctx.restore();
-  };
-
-  ring(paintedMouthEllipse(bin), "rgba(255,255,255,.95)", [5, 4], 2);
-  ring(outer, "rgba(255,86,86,.95)");            // outermost the lip can touch
-  ring(lip, "rgba(0,255,128,.95)", null, 2);     // the lip's centre line
-  ring(clear, "rgba(255,214,0,.95)", null, 2);   // the make window
-  ring(base, "rgba(120,170,255,.8)", [4, 3]);    // the base on the floor
-
-  // The side wall, at three of the heights it is sampled through. It tapers, and
-  // it stops dead at the mouth plane — above that the lip torus is the only
-  // collider in the room.
-  for (const t of [0.25, 0.5, 0.75]) {
-    const radius = bin.bottomRadius + (bin.mouthRadius - bin.bottomRadius) * t;
-    const centre = projectPoint({ x: bin.x, y: bin.topY * t, z: bin.z });
-    ring(ringEllipseAt(centre.x, centre.y, radius, bin.z), "rgba(120,170,255,.45)", [3, 4], 1);
-  }
-}
-
-/** The legend for `drawBinColliders`, drawn once rather than per bin. */
-export function drawColliderLegend(ctx, x, y) {
-  const rows = [
-    ["rgba(255,255,255,.95)", "mouth AS PAINTED (the art)"],
-    ["rgba(255,86,86,.95)", "lip outer — furthest the rim can touch"],
-    ["rgba(0,255,128,.95)", "lip centre line (BIN_MOUTH_RADIUS)"],
-    ["rgba(255,214,0,.95)", "make window (binClearance)"],
-    ["rgba(120,170,255,.8)", "body taper + base on the floor"],
-  ];
-  ctx.save();
-  ctx.fillStyle = "rgba(8,10,14,.85)";
-  ctx.fillRect(x - 12, y - 24, 342, rows.length * 20 + 34);
-  ctx.font = "600 13px system-ui, sans-serif";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = "#fff";
-  ctx.fillText("COLLIDERS  ·  press C to hide", x, y - 9);
-  rows.forEach(([colour, label], i) => {
-    const ry = y + 15 + i * 20;
-    ctx.strokeStyle = colour;
-    ctx.lineWidth = 2.5;
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.moveTo(x, ry);
-    ctx.lineTo(x + 22, ry);
-    ctx.stroke();
-    ctx.fillStyle = "rgba(255,255,255,.85)";
-    ctx.fillText(label, x + 30, ry);
-  });
-  ctx.restore();
 }
 
 /**

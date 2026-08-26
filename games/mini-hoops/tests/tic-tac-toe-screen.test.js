@@ -4,13 +4,21 @@ import { fileURLToPath } from "node:url";
 
 import { suite, test, assert, finish } from "./harness.js";
 
-import { createBinTargets, binClearance, BIN_MOUTH_RADIUS } from "../scripts/sim/bin-physics.js";
+import {
+  BIN_ART,
+  BIN_MOUTH_RADIUS,
+  BIN_RIM_TUBE_RADIUS,
+  binClearance,
+  createBinTargets,
+} from "../scripts/sim/bin-physics.js";
+import { BALL_RADIUS_WORLD } from "../scripts/sim/constants.js";
 import { binRings, binSpriteLayout, paintedMouthEllipse } from "../scripts/render/bin.js";
 
 import { floorScreenY } from "../scripts/sim/projection.js";
 
 const gameRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const gameSource = fs.readFileSync(path.join(gameRoot, "scripts", "tic-tac-toe-game.js"), "utf8");
+const binRenderSource = fs.readFileSync(path.join(gameRoot, "scripts", "render", "bin.js"), "utf8");
 const shellSource = fs.readFileSync(path.join(gameRoot, "scripts", "init-game.js"), "utf8");
 const gameCss = fs.readFileSync(path.join(gameRoot, "styles", "game.css"), "utf8");
 const onlineCss = fs.readFileSync(path.join(gameRoot, "styles", "online.css"), "utf8");
@@ -18,17 +26,23 @@ const indexHtml = fs.readFileSync(path.join(gameRoot, "index.html"), "utf8");
 const setupViewSource = fs.readFileSync(path.join(gameRoot, "scripts", "ui", "setup-view.js"), "utf8");
 const onlineViewSource = fs.readFileSync(path.join(gameRoot, "scripts", "ui", "online-view.js"), "utf8");
 
-// Measured off `open-bin.png` and mirrored from `render/bin.js`'s own SPRITE
-// block. Deliberately a second copy: these tests exist to catch the placement
-// drifting, and reading the numbers out of the file under test would let it
-// drift with them.
+// Measured off `open-bin.png` by `tools/bin-contact-sheet.mjs --measure` and
+// mirrored from `BIN_ART`. Deliberately a second copy: these tests exist to
+// catch the geometry drifting off the picture, and reading the numbers out of
+// the module under test would let it drift with them.
+//
+// The values this replaced were wrong in the two ways that mattered — a mouth
+// ellipse recorded as centre 160 / semi-axis 116 (sharing a far edge with the
+// truth and hanging 15px past its near edge), and a bead implied to be 113px
+// thick against a painted 37.
 const SPRITE_WIDTH = 1187;
 const SPRITE_HEIGHT = 1326;
-const SPRITE_MOUTH_CENTER_X = 590;
-const SPRITE_MOUTH_CENTER_Y = 160;
-const SPRITE_MOUTH_RADIUS_X = 468;
-const SPRITE_MOUTH_RADIUS_Y = 116;
-const SPRITE_BASE_Y = 1272;
+const SPRITE_MOUTH_CENTER_X = 588.5;
+const SPRITE_MOUTH_CENTER_Y = 152.3;
+const SPRITE_MOUTH_RADIUS_X = 469.5;
+const SPRITE_MOUTH_RADIUS_Y = 108.5;
+const SPRITE_BEAD_THICKNESS = 37.5;
+const SPRITE_BASE_Y = 1275;
 
 suite("floor tic-tac-toe — a screen of the cabinet, drawn on the cabinet's camera");
 
@@ -129,7 +143,7 @@ test("the sprite's painted mouth lands on the projected mouth", () => {
     const right = layout.x + (SPRITE_MOUTH_CENTER_X + SPRITE_MOUTH_RADIUS_X) * scaleX;
 
     assert(
-      Math.abs((right - left) / 2 - outer.radiusX) < 0.5,
+      Math.abs((right - left) / 2 - outer.radiusX) < 0.05,
       `bin ${bin.index}: the painted mouth must be as wide as the projected one`,
     );
     assert(
@@ -173,38 +187,104 @@ test("the art's own proportions already stand the bin on the floor", () => {
   }
 });
 
-test("the mouth is only ever mismatched front-to-back, and the gap is recorded", () => {
-  // THE ONE PLACE THE ART AND THE COLLIDER CANNOT AGREE. The sprite was rendered
-  // from a nearly horizontal camera — a painted mouth 0.248 as tall as it is
-  // wide — and a horizontal circle through this camera is 0.42 to 0.59. Sideways
-  // they match exactly, which is where most lip strikes happen; front-to-back
-  // the collider is up to 2.4x deeper than the paint, and that is not closeable:
-  // a mouth whose world depth matched the paint would be 0.13 across and the
-  // ball is 0.156. The overlay draws both so it can be seen rather than argued.
+test("the collider mouth IS the painted mouth, at every row", () => {
+  // THE FIX THIS FILE EXISTS TO PROTECT. The sprite was photographed from very
+  // near eye level — a painted opening 0.248 as tall as it is wide — while a
+  // HORIZONTAL circle through this camera is 0.42 to 0.59. The collider was
+  // therefore up to 2.4x deeper than the hole it was meant to be, so a lip
+  // strike near the front or back of a mouth happened off-picture and the mode
+  // read as disconnected from its own art.
+  //
+  // The art is not what moves. A horizontal disc is only one of the planes that
+  // projects to a given ellipse, so the mouth is allowed to LEAN AWAY from the
+  // camera until it projects onto the paint exactly — width, depth, and centre.
+  // Anything that drifts here (the camera, the row depths, the art) breaks the
+  // agreement, which is the whole point of pinning it this tightly — this and
+  // `tools/bin-contact-sheet.mjs` are now the only two things watching it.
   for (const bin of createBinTargets()) {
     const painted = paintedMouthEllipse(bin);
     const { outer } = binRings(bin);
     assert(
-      Math.abs(painted.radiusX - outer.radiusX) < 0.5,
-      `bin ${bin.index}: sideways, the paint and the collider must agree exactly`,
+      Math.abs(painted.radiusX - outer.radiusX) < 0.1,
+      `bin ${bin.index}: sideways, the paint and the collider must agree`,
     );
     assert(
-      Math.abs(painted.cx - outer.cx) < 0.5 && Math.abs(painted.cy - outer.cy) < 0.5,
-      `bin ${bin.index}: the two mouths must at least be concentric`,
+      Math.abs(painted.radiusY - outer.radiusY) < 0.1,
+      `bin ${bin.index}: front-to-back too — the collider is ${(outer.radiusY / painted.radiusY).toFixed(2)}x the paint`,
     );
-    const ratio = outer.radiusY / painted.radiusY;
-    assert(ratio > 1, `bin ${bin.index}: the collider is the deeper of the two`);
-    assert(ratio < 2.5, `bin ${bin.index}: the depth gap grew to ${ratio.toFixed(2)}x — re-check the camera`);
+    assert(
+      Math.abs(painted.cx - outer.cx) < 0.1 && Math.abs(painted.cy - outer.cy) < 0.1,
+      `bin ${bin.index}: and the two mouths must be concentric`,
+    );
+    assert(bin.mouthTilt.angle > 0, `bin ${bin.index}: this camera always needs some lean`);
   }
 });
 
-test("the colliders can be drawn over the art", () => {
-  // Not a nicety. "The rim is not aligned to the art" is a claim about two things
-  // that cannot both be seen at once, and the overlay is the only way to settle
-  // it. It must stay reachable and stay OFF by default.
-  assert(gameSource.includes("drawBinColliders"), "the court must be able to draw its colliders");
-  assert(gameSource.includes("let showColliders = false"), "the overlay must default to off");
-  assert(/event\.key !== "c"/.test(gameSource), "C is the toggle");
+test("the lip is as thick as the lip in the picture, and the make window is the hole", () => {
+  // THE OTHER HALF OF THE MISMATCH, and the half that was actually costing
+  // shots. `BIN_RIM_TUBE_RADIUS` was 0.022 — a bead 113 source pixels thick
+  // against a painted 37, three times too fat — so the collider's opening came
+  // out at 0.138 where the hole you can SEE is 0.168. A ball that visibly
+  // cleared the rim clanged off a lip two-thirds of which was never drawn.
+  //
+  // Both numbers are now read off the art, so the make window plus one ball
+  // radius is exactly the painted hole: no invisible lip, and no fudge factor
+  // standing in for one.
+  for (const key of ["mouthCenterX", "mouthCenterY", "mouthRadiusX", "mouthRadiusY", "beadThickness"]) {
+    assert(Number.isFinite(BIN_ART[key]), `BIN_ART must record ${key}`);
+  }
+  assert(Math.abs(BIN_ART.beadThickness - SPRITE_BEAD_THICKNESS) < 0.01, "the bead measurement drifted");
+  assert(Math.abs(BIN_ART.mouthRadiusY - SPRITE_MOUTH_RADIUS_Y) < 0.01, "the mouth fit drifted");
+
+  const perPixel = (BIN_MOUTH_RADIUS + BIN_RIM_TUBE_RADIUS) / SPRITE_MOUTH_RADIUS_X;
+  assert(
+    Math.abs(BIN_RIM_TUBE_RADIUS - (SPRITE_BEAD_THICKNESS / 2) * perPixel) < 1e-9,
+    "the collider's lip must be exactly as thick as the painted bead",
+  );
+  for (const bin of createBinTargets()) {
+    const paintedHole = (SPRITE_MOUTH_RADIUS_X - SPRITE_BEAD_THICKNESS) * perPixel;
+    assert(
+      Math.abs(binClearance(bin) + BALL_RADIUS_WORLD - paintedHole) < 1e-9,
+      `bin ${bin.index}: the make window plus a ball must be the painted hole`,
+    );
+  }
+});
+
+test("the lean keeps the ball's own hole — it is a plane, not a squash", () => {
+  // The reason this was previously recorded as unclosable: a mouth whose world
+  // DEPTH matched the paint would be 0.13 across and the ball is 0.156, so it
+  // would not fit through the hole it is drawn inside. That measurement assumes
+  // the mouth stays horizontal. A LEANING mouth keeps its full radius in its own
+  // plane — all the lean costs is `cos(tilt)` off the front-to-back footprint.
+  for (const bin of createBinTargets()) {
+    assert(
+      binClearance(bin) > BALL_RADIUS_WORLD * 0.5,
+      `bin ${bin.index}: the in-plane make window must stay a real hole`,
+    );
+    const footprint = binClearance(bin) * bin.mouthTilt.cos;
+    assert(
+      footprint > binClearance(bin) * 0.9,
+      `bin ${bin.index}: the lean cost ${((1 - bin.mouthTilt.cos) * 100).toFixed(1)}% of the footprint — too much`,
+    );
+  }
+});
+
+test("the collider overlay does not ship", () => {
+  // It was a real instrument and it was in the wrong place. Nothing about the
+  // colliders is a player's business, and a stray C on the court drew a legend
+  // and five rings over a live match on the public site.
+  //
+  // `tools/bin-contact-sheet.mjs` replaced it and is strictly better at the job:
+  // offline, against the raw art at 12x rather than a 55px bin, and with the
+  // painted mouth placed straight from the measurements INDEPENDENTLY of the
+  // collider — which is the check the in-court version could never make, because
+  // it drew both from the same numbers.
+  for (const gone of ["showColliders", "drawBinColliders", "drawColliderLegend"]) {
+    assert(!gameSource.includes(gone), `${gone} must not be in the shipping court`);
+    assert(!binRenderSource.includes(gone), `${gone} must not be in the renderer`);
+  }
+  assert(!/event\.key !== "c"/.test(gameSource), "the C toggle must be gone");
+  assert(fs.existsSync(path.join(gameRoot, "tools", "bin-contact-sheet.mjs")), "the offline sheet is the replacement");
 });
 
 test("a claimed cell is tinted, because its glyph can be hidden by a nearer bin", () => {
