@@ -1,3 +1,7 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { suite, test, assert, assertEqual, finish } from "./harness.js";
 
 import { bootHorse } from "../scripts/horse-game.js";
@@ -13,6 +17,8 @@ import { restingBallPosition } from "../scripts/render/frame.js";
 // seam and for the same reason as `practice-court.test.js`.
 //
 // The DOM is stubbed to the shallowest thing the root actually uses.
+
+const gameRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 suite("horse screen — a turn resolves, changes hands, and comes back");
 
@@ -224,6 +230,28 @@ test("a hotseat turn waits for its player and never shoots on its own", () => {
   for (let i = 0; i < 1200; i++) horse.tick();
   assertEqual(horse.match.shots, 0, "twenty seconds of idling took a shot by itself");
   assertEqual(horse.match.turn, 0, "and the turn wandered off to the other player");
+});
+
+test("a spelled word ends in a card, and the card is the only rematch", () => {
+  // It used to end in a status line: the HUD said who had won, and the court
+  // then sat there with nothing to do and no way on but the MENU button. The
+  // `New match` button that WAS in the HUD only ever appeared once the match was
+  // over — which is now exactly when the card's scrim is over the top of it.
+  const html = fs.readFileSync(path.join(gameRoot, "index.html"), "utf8");
+  const source = fs.readFileSync(path.join(gameRoot, "scripts", "horse-game.js"), "utf8");
+  assert(html.includes('id="horseResultsOverlay"'), "the court needs a results overlay");
+  for (const intent of ["horse-rematch", "horse-lobby", "leave-horse"]) {
+    assert(html.includes(`data-intent="${intent}"`), `the card must offer ${intent}`);
+  }
+  assert(!html.includes("horseNewMatch"), "the HUD's dead rematch button must stay gone");
+  assert(!source.includes("horseNewMatch"), "and nothing may still reach for it");
+
+  // GATED ON THE BALL. `syncPanels` runs the instant a shot resolves, and the
+  // shot that spells the last letter is the one shot of the match worth
+  // watching — a card thrown up over it would hide it.
+  const card = source.slice(source.indexOf("function syncResults()"));
+  assert(/match\?\.status !== "won" \|\| flight/.test(card), "the card must wait for the ball to be handed back");
+  assert(source.includes("hideResults();"), "a new match must put the card away");
 });
 
 finish();

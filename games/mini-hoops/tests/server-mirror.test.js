@@ -2,6 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertEqual, finish, suite, test } from "./harness.js";
+import { matchConfigSettings } from "../scripts/multiplayer/match-config.js";
+import { sanitizeLobbySettings } from "../../../../factory-network-server/src/util.mjs";
+import { createMiniHoopsMatchState } from "../../../../factory-network-server/games/mini-hoops/server/mini-hoops-match-engine.mjs";
 
 const gameRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const serverMirror = path.resolve(gameRoot, "../../../factory-network-server/games/mini-hoops/shared/scripts");
@@ -22,6 +25,26 @@ test("every authoritative physics source exactly matches the cabinet", () => {
     return browser !== server;
   });
   assertEqual(drifted.join(", "), "", "run npm run mirror:server after changing pure shot physics");
+});
+
+test("Factory lobby sanitizing preserves the Mini Hoops match config", () => {
+  const lobby = {
+    roomCode: "HOOPS",
+    members: new Set(["socket-a", "socket-b"]),
+    memberProfiles: new Map(),
+    settings: sanitizeLobbySettings(matchConfigSettings({
+      modeId: "circle",
+      duration: 60,
+      locationId: "warehouse",
+      ballId: "paper",
+    })),
+  };
+
+  const match = createMiniHoopsMatchState(lobby, 2_000);
+  assertEqual(match.config.modeId, "circle");
+  assertEqual(match.config.duration, 60);
+  assertEqual(match.config.locationId, "warehouse");
+  assertEqual(match.config.ballId, "paper");
 });
 
 finish();

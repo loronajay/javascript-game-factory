@@ -178,9 +178,17 @@ export function bootHorse(root, options = {}) {
     motions: root.querySelector("#horseMotions"),
     confirm: root.querySelector("#horseConfirm"),
     readouts: root.querySelector("#horsePlaceReadout"),
-    newMatch: root.querySelector("#horseNewMatch"),
     court: root.querySelector("#horseScreen .court"),
     onlinePanel: root.querySelector("#horseOnlinePanel"),
+  };
+  const results = {
+    overlay: root.querySelector("#horseResultsOverlay"),
+    word: root.querySelector("#horseResultWord"),
+    title: root.querySelector("#horseResultTitle"),
+    meta: root.querySelector("#horseResultMeta"),
+    letters: root.querySelector("#horseResultLetters"),
+    rematch: root.querySelector("#horseResultRematch"),
+    lobby: root.querySelector("#horseResultLobby"),
   };
 
   onlineClient.subscribe(handleOnlineSnapshot);
@@ -197,7 +205,15 @@ export function bootHorse(root, options = {}) {
 
   buildMotionChips();
 
-  el.newMatch?.addEventListener("click", () => { audio.click(); newMatch(); });
+  results.rematch?.addEventListener("click", () => { audio.click(); newMatch(); });
+  // Online, a rematch is the LOBBY's to arrange — the other player has to agree,
+  // and the room they agreed to last time has finished. Dealing a second match
+  // here would be one this device alone believed in.
+  results.lobby?.addEventListener("click", () => {
+    audio.click();
+    onlineClient.leave();
+    newMatch();
+  });
   el.confirm?.addEventListener("click", () => { audio.click(); confirmPlacement(); });
   for (const button of root.querySelectorAll('[data-intent="leave-horse"]')) {
     button.addEventListener("click", () => onLeave());
@@ -401,6 +417,7 @@ export function bootHorse(root, options = {}) {
     pull = null;
     resetBall(ball);
     setPower(0);
+    hideResults();
     beginTurn();
     onShowLobby(mode === "online");
     renderOnlineLobby();
@@ -586,7 +603,13 @@ export function bootHorse(root, options = {}) {
       flight = null;
       if (mode === "online") applyServerState();
       else if (match.status === "playing") beginTurn();
-      else syncPanels();
+      else {
+        // The match is over. `beginTurn` is what normally empties the meter, and
+        // there is no next turn — so a finished match kept the winning pull's
+        // reading on the rail underneath its own results card.
+        setPower(0);
+        syncPanels();
+      }
     }
   }
 
@@ -809,6 +832,7 @@ export function bootHorse(root, options = {}) {
   }
 
   function syncPanels() {
+    syncResults();
     const placing = isPlacing();
     if (el.place) el.place.hidden = !placing;
     // `--chrome` is the height the court hands to the panel below it, and this
@@ -819,8 +843,9 @@ export function bootHorse(root, options = {}) {
     // showing belongs to `ui/screens.js` alone, and this is only about what is
     // inside one.
     el.court?.classList.toggle("is-placing", placing);
-    // Online, a rematch is a lobby decision rather than a button on the court.
-    if (el.newMatch) el.newMatch.hidden = mode === "online" || match?.status === "playing";
+    // THE RESULTS CARD IS THE ONLY PLACE A REMATCH IS OFFERED. There used to be
+    // a `New match` button in the HUD as well, shown exactly when the match was
+    // over — which is now exactly when the card's scrim is over the top of it.
     if (el.legend) {
       el.legend.textContent = placing
         ? "Drag the bin · arrows or WASD for depth · Q / E for height"
@@ -913,6 +938,66 @@ export function bootHorse(root, options = {}) {
       return;
     }
     setStatus(mine ? `${who}: make it to set the shot` : `${who} is shooting…`);
+  }
+
+  /**
+   * The match-over card.
+   *
+   * GATED ON THE BALL, like tic-tac-toe's. `syncPanels` runs the instant a shot
+   * resolves, and the shot that spells the last letter is the one shot of the
+   * match worth watching — a card thrown up over it would hide it. `tickFlight`
+   * calls back through here when the ball is handed back.
+   *
+   * It replaces a status line. The word was spelled, the HUD said who had won,
+   * and the court then sat there with nothing to do and no way on but MENU.
+   */
+  function syncResults() {
+    if (!results.overlay) return;
+    if (match?.status !== "won" || flight) {
+      hideResults();
+      return;
+    }
+    const online = mode === "online";
+    const loser = match.winner === 0 ? 1 : 0;
+    const winner = playerLabel(match, match.winner);
+    setResult(results.word, match.word);
+    // "You Wins" is what taking the label straight gives you, and a seat's label
+    // is genuinely "You" in every mode but hotseat — so the verb agrees with the
+    // name rather than being bolted onto it.
+    setResult(results.title, winner === "You" || (online && match.winner === seat) ? "You Win" : `${winner} Wins`);
+    setResult(results.meta, `${playerLabel(match, loser).toUpperCase()} SPELLED ${match.word}`);
+
+    if (results.letters) {
+      results.letters.replaceChildren(...match.players.map((player, index) => {
+        const row = document.createElement("div");
+        row.className = index === match.winner ? "horse-result-row" : "horse-result-row is-loser";
+        const name = document.createElement("span");
+        name.className = "horse-result-name";
+        name.textContent = player.name;
+        const word = document.createElement("span");
+        word.className = "horse-result-word";
+        for (const { letter, earned } of letterState(match, index)) {
+          const span = document.createElement("span");
+          span.className = earned ? "is-earned" : "";
+          span.textContent = letter;
+          word.appendChild(span);
+        }
+        row.append(name, word);
+        return row;
+      }));
+    }
+
+    if (results.rematch) results.rematch.hidden = online;
+    if (results.lobby) results.lobby.hidden = !online;
+    results.overlay.classList.add("is-shown");
+  }
+
+  function hideResults() {
+    results.overlay?.classList.remove("is-shown");
+  }
+
+  function setResult(node, value) {
+    if (node) node.textContent = String(value);
   }
 
   function setStatus(text) { if (el.status) el.status.textContent = text; }

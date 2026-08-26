@@ -24,14 +24,44 @@ function attach(socket, type, listener) {
   else socket[`on${type}`] = listener;
 }
 
+/**
+ * The pull that took the shot, as it travels.
+ *
+ * THE OPPONENT'S BALL IS WATCHED, NOT REPORTED. Three numbers is the whole of
+ * what the other court needs to draw it: both machines run the same sim, so the
+ * same gesture there does what it did here. Without it a cell simply changed
+ * colour and the player was told about it afterwards — which is what HORSE has
+ * never done, and this mode did.
+ *
+ * It is presentation only. The relay's ruling is `cell`/`made`, and a missing or
+ * malformed intent costs the animation and nothing else, which is why this
+ * returns null rather than rejecting the attempt around it.
+ */
+export function sanitizeShotIntent(value) {
+  if (!value || typeof value !== "object") return null;
+  const power = Number(value.power);
+  const aimX = Number(value.aimX);
+  const loft = Number(value.loft);
+  if (!Number.isFinite(power) || !Number.isFinite(aimX) || !Number.isFinite(loft)) return null;
+  return {
+    power: Math.max(0, Math.min(1, power)),
+    // A canvas coordinate. Bounded to the canvas rather than to the aim band,
+    // because a CPU-style throw aims off the mouth on purpose.
+    aimX: Math.max(-960, Math.min(1920, aimX)),
+    loft: Math.max(0, Math.min(1, loft)),
+  };
+}
+
 export function sanitizeOnlineAttempt(value = {}) {
   const cell = Number(value.cell);
   if (!Number.isInteger(cell) || cell < 0 || cell > 8) return null;
   const sequence = Number(value.expectedAttempt);
+  const intent = sanitizeShotIntent(value.intent);
   return {
     cell,
     made: value.made === true || value.made === 1,
     expectedAttempt: Number.isFinite(sequence) ? Math.max(0, Math.min(100, Math.floor(sequence))) : 0,
+    ...(intent ? { intent } : {}),
   };
 }
 
@@ -44,7 +74,7 @@ export function createTicTacToeOnlineClient(options = {}) {
   let socket = null;
   let pending = [];
   let manualClose = false;
-  let snapshot = { status: "idle", clientId: "", lobby: null, matchState: null, error: null };
+  let snapshot = { status: "idle", clientId: "", lobby: null, matchState: null, lastAttempt: null, error: null };
 
   function getSnapshot() {
     return structuredClone(snapshot);
@@ -128,7 +158,24 @@ export function createTicTacToeOnlineClient(options = {}) {
     const senderMark = senderIndex === 0 ? "x" : senderIndex === 1 ? "o" : null;
     if (!senderMark || senderMark !== match.turn) return;
     const outcome = resolveAttempt(match, attempt.cell, attempt.made);
-    if (outcome.accepted) emit({ status: match.status === "playing" ? "started" : "complete", matchState: match, error: null });
+    if (!outcome.accepted) return;
+    emit({
+      status: match.status === "playing" ? "started" : "complete",
+      matchState: match,
+      // The shot that produced this board, so a court can replay it. `sequence`
+      // is the match-wide attempt counter, which only ever climbs — it is what
+      // lets a court tell a shot it has not seen from a snapshot it is being
+      // re-sent, and `shooterId` is what stops it replaying its own ball.
+      lastAttempt: {
+        sequence: match.attempts,
+        cell: attempt.cell,
+        made: attempt.made,
+        mark: senderMark,
+        shooterId: String(data.senderId || ""),
+        intent: attempt.intent || null,
+      },
+      error: null,
+    });
   }
 
   function handle(data) {
@@ -148,6 +195,7 @@ export function createTicTacToeOnlineClient(options = {}) {
       const matchState = createStartedMatch(data);
       if (matchState) emit({
         status: "started",
+        lastAttempt: null,
         lobby: snapshot.lobby ? { ...snapshot.lobby, status: "started", startAt: matchState.startAt } : snapshot.lobby,
         matchState,
         error: null,
@@ -170,7 +218,7 @@ export function createTicTacToeOnlineClient(options = {}) {
     }
     if (data.event === "lobby_left" || data.event === "lobby_closed") {
       try { storage?.removeItem?.(SESSION_KEY); } catch {}
-      emit({ status: "idle", lobby: null, matchState: null, error: null });
+      emit({ status: "idle", lobby: null, matchState: null, lastAttempt: null, error: null });
       return;
     }
     if (data.event === "error") {
@@ -219,7 +267,7 @@ export function createTicTacToeOnlineClient(options = {}) {
       socket?.close();
       socket = null;
       pending = [];
-      emit({ status: "idle", lobby: null, matchState: null, error: null });
+      emit({ status: "idle", lobby: null, matchState: null, lastAttempt: null, error: null });
     },
     subscribe(listener) { subscribers.add(listener); return () => subscribers.delete(listener); },
     getSnapshot,

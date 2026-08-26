@@ -14,6 +14,7 @@ import {
   SCREEN_SETUP,
   backTarget,
   isScreen,
+  matchSetupScreen,
   normalizeScreen,
 } from "../scripts/ui/screens.js";
 
@@ -353,6 +354,12 @@ test("back always leads to the menu, including out of a run", () => {
   for (const screen of SCREENS) {
     assertEqual(backTarget(screen), SCREEN_MENU, `${screen} back target`);
   }
+});
+
+test("changing setup after an online result returns to online matchmaking", () => {
+  assertEqual(matchSetupScreen("online"), "online");
+  assertEqual(matchSetupScreen("solo"), SCREEN_SETUP);
+  assertEqual(matchSetupScreen("hotseat"), SCREEN_SETUP);
 });
 
 function walk(dir, visit) {

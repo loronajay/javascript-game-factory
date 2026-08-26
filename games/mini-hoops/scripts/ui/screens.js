@@ -72,6 +72,11 @@ export function backTarget(name) {
   return BACK_TARGETS[normalizeScreen(name)];
 }
 
+/** The setup surface belonging to the match type that just finished. */
+export function matchSetupScreen(playMode) {
+  return playMode === "online" ? SCREEN_ONLINE : SCREEN_SETUP;
+}
+
 /**
  * Bind the router to the DOM.
  *

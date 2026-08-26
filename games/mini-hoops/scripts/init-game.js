@@ -74,6 +74,7 @@ import {
   SCREEN_HORSE,
   SCREEN_SETUP,
   createScreenRouter,
+  matchSetupScreen,
 } from "./ui/screens.js";
 
 export function boot(root) {
@@ -185,8 +186,7 @@ export function boot(root) {
     },
     onStart: () => onlineClient.startMatch(),
     onLeave: () => {
-      onlineClient.leave();
-      onlineSnapshot = null;
+      leaveOnlineSession();
       screens.show(SCREEN_MENU);
     },
   });
@@ -613,6 +613,16 @@ export function boot(root) {
     if (state.phase === "complete") finishOnlineMatch(state);
   }
 
+  /** Clear every piece of per-lobby client state before another match is opened. */
+  function leaveOnlineSession() {
+    onlineClient.leave();
+    onlineSnapshot = null;
+    onlineMatchKey = "";
+    onlineStartsLocal = 0;
+    onlineEndsLocal = 0;
+    onlineResultShown = false;
+  }
+
   function syncAuthoritativeOnlineState(state) {
     const me = state.players?.find(({ id }) => id === onlineSnapshot.clientId);
     if (me) {
@@ -709,12 +719,13 @@ export function boot(root) {
         break;
       case "quit":
         overlays.hideAll();
-        if (playMode === "online") onlineClient.leave();
+        if (playMode === "online") leaveOnlineSession();
         screens.show(SCREEN_MENU);
         break;
       case "change-setup":
         overlays.hideAll();
-        screens.show(SCREEN_SETUP);
+        if (playMode === "online") leaveOnlineSession();
+        screens.show(matchSetupScreen(playMode));
         break;
       case "view-boards":
         overlays.hideAll();
@@ -724,12 +735,17 @@ export function boot(root) {
         setMuted(!audio.isMuted());
         break;
       case "leave-horse":
-        // Handled by the HORSE root's own listener; named here so the
-        // markup-coherence test can see every intent is accounted for.
+      case "horse-rematch":
+      case "horse-lobby":
+        // Handled by the HORSE root's own listeners; named here so the
+        // markup-coherence test can see every intent is accounted for. The
+        // match, its word and its lobby all belong to that root — routing a
+        // rematch through the cabinet would give two owners to one match.
         break;
       case "leave-tic-tac-toe":
-        // Handled by the tic-tac-toe root's own listener; named here so the
-        // markup-coherence test can see every intent has an owner.
+      case "tic-tac-toe-rematch":
+      case "tic-tac-toe-lobby":
+        // Handled by the tic-tac-toe root's own listeners, for the same reason.
         break;
       default:
         break;

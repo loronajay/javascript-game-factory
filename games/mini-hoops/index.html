@@ -324,7 +324,45 @@
           </div>
 
           <p id="tttHint" class="hud-hint">Pull the ball &middot; use the dotted line &middot; release to shoot</p>
+
+          <!-- A finished match is an EVENT, not a line of status text. It used
+               to be neither: the board simply stopped taking shots and the turn
+               pill said who had won, so the court sat there with nothing to do
+               and no way on but the MENU button. -->
+          <div id="tttResultsOverlay" class="overlay" aria-label="Match results">
+            <div class="overlay-card">
+              <p class="result-label">FLOOR TIC-TAC-TOE</p>
+              <p id="tttResultGlyph" class="result-score">&mdash;</p>
+              <h3 id="tttResultTitle">Match Complete</h3>
+              <p id="tttResultMeta" class="result-meta">Vs CPU</p>
+
+              <div class="result-grid">
+                <div><strong id="tttResultCells">0</strong><span id="tttResultCellsLabel">Cells</span></div>
+                <div><strong id="tttResultShots">0</strong><span>Shots</span></div>
+                <div><strong id="tttResultAccuracy">0%</strong><span>Accuracy</span></div>
+              </div>
+
+              <div class="overlay-actions">
+                <button id="tttResultRematch" type="button" class="primary-btn" data-intent="tic-tac-toe-rematch">Rematch</button>
+                <button id="tttResultLobby" type="button" class="primary-btn" data-intent="tic-tac-toe-lobby" hidden>Back to Lobby</button>
+                <button type="button" class="ghost-btn" data-intent="leave-tic-tac-toe">Main Menu</button>
+              </div>
+            </div>
+          </div>
         </div>
+
+        <!-- THE BOARD, OFF THE COURT. From this camera a bin standing in the row
+             in front of a claimed cell covers that cell's floor completely, so
+             the glyph on the concrete can be hidden by the very object the mode
+             is played with. The court keeps the honest picture; this is the
+             board as a board, parked in the gutter the court leaves beside it.
+             It collapses to nothing when that gutter is not there — see
+             `#tttMiniBoard` in game.css. -->
+        <aside id="tttMiniBoard" class="mini-board" aria-label="Board">
+          <p class="mini-board-head">BOARD</p>
+          <div id="tttMiniGrid" class="mini-board-grid"></div>
+          <p id="tttMiniTurn" class="mini-board-turn">&nbsp;</p>
+        </aside>
 
         <div class="shot-panel">
           <div class="meter-head"><span>SHOT POWER</span><span id="tttMeterReadout">0%</span></div>
@@ -351,13 +389,30 @@
             </div>
 
             <div id="horseLetters" class="horse-letters"></div>
-
-            <div class="hud-stat hud-stat--right">
-              <button type="button" id="horseNewMatch" class="hud-action" hidden>New match</button>
-            </div>
           </div>
 
           <p id="horseHint" class="hud-hint">Drag the bin where you want it &middot; then make the shot</p>
+
+          <!-- Spelling the word is the end of the match and it used to be told
+               to the player as a status line over a court that then did nothing.
+               The card is the thing that says the match is over, and it is also
+               the only place a rematch is offered. -->
+          <div id="horseResultsOverlay" class="overlay" aria-label="Match results">
+            <div class="overlay-card">
+              <p class="result-label">HORSE</p>
+              <p id="horseResultWord" class="result-score result-score--word">HORSE</p>
+              <h3 id="horseResultTitle">Match Complete</h3>
+              <p id="horseResultMeta" class="result-meta">Vs CPU</p>
+
+              <div id="horseResultLetters" class="horse-result-letters"></div>
+
+              <div class="overlay-actions">
+                <button id="horseResultRematch" type="button" class="primary-btn" data-intent="horse-rematch">Rematch</button>
+                <button id="horseResultLobby" type="button" class="primary-btn" data-intent="horse-lobby" hidden>Back to Lobby</button>
+                <button type="button" class="ghost-btn" data-intent="leave-horse">Main Menu</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="shot-panel">

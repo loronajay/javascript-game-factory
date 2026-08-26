@@ -217,7 +217,14 @@ export function createMiniHoopsOnlineClient(options = {}) {
     updateConfig(config) { send({ type: "update_lobby_settings", settings: matchConfigSettings(normalizeMatchConfig(config)) }); },
     startMatch() { send({ type: "start_lobby" }); },
     submitShot(intent) { sendLobbyMessage("mini_hoops_shot", sanitizeShotIntent(intent)); },
-    leave() { send({ type: "leave_lobby" }); try { storage?.removeItem?.(SESSION_KEY); } catch {} },
+    leave() {
+      send({ type: "leave_lobby" });
+      try { storage?.removeItem?.(SESSION_KEY); } catch {}
+      // Do not leave an ended match mounted while the server's acknowledgement
+      // makes a round trip. The player may immediately open matchmaking again,
+      // and a stale started lobby would lock every config control until then.
+      emit({ status: "idle", lobby: null, matchState: null, error: null });
+    },
     disconnect() { manualClose = true; try { storage?.removeItem?.(SESSION_KEY); } catch {} socket?.close(); socket = null; pending = []; emit({ status: "idle", lobby: null, matchState: null }); },
     subscribe(listener) { subscribers.add(listener); return () => subscribers.delete(listener); },
     getSnapshot,

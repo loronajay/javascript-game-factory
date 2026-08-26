@@ -10,6 +10,7 @@ import {
   PULL_MIN,
   PULL_VISUAL_GAIN,
 } from "../scripts/sim/constants.js";
+import { HOOP_TRAVEL_BOUNDS } from "../scripts/sim/hoop.js";
 import { isShootablePull, neutralPull, resolvePull } from "../scripts/sim/pull.js";
 
 suite("pull — turning one drag gesture into power, aim and arc");
@@ -80,6 +81,20 @@ test("aim never leaves the playable band however hard the pull is angled", () =>
       assert(aimX >= AIM_MIN_X - 1e-9 && aimX <= AIM_MAX_X + 1e-9, `aim ${aimX} out of band`);
     }
   }
+});
+
+test("the reticle reaches every position the rim can occupy", () => {
+  // Not decoration: the moving modes exist to make the player LEAD the rim, and
+  // a reticle that stops short of the end of the sweep can only ever meet it
+  // coming back toward the middle. The band used to fall 63px short on the left.
+  // Driven through the real gesture rather than read off the constants, so a
+  // clamp or a ratio limit that quietly narrows the reach also fails here.
+  const hardLeft = pullTo(400, 300).aimX;
+  const hardRight = pullTo(-400, 300).aimX;
+  assert(hardLeft <= HOOP_TRAVEL_BOUNDS.minX + 1e-9,
+    `a fully angled pull reaches only ${hardLeft}, short of the rim's ${HOOP_TRAVEL_BOUNDS.minX}`);
+  assert(hardRight >= HOOP_TRAVEL_BOUNDS.maxX - 1e-9,
+    `a fully angled pull reaches only ${hardRight}, short of the rim's ${HOOP_TRAVEL_BOUNDS.maxX}`);
 });
 
 test("aim is anchored to the hoop's rest position, not to the moving rim", () => {

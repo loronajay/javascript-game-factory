@@ -2,19 +2,21 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { suite, test, assert, finish } from "./harness.js";
+import { suite, test, assert, assertEqual, finish } from "./harness.js";
 
 import {
   BIN_ART,
   BIN_MOUTH_RADIUS,
   BIN_RIM_TUBE_RADIUS,
   binClearance,
+  binGridCell,
+  binGridCells,
   createBinTargets,
 } from "../scripts/sim/bin-physics.js";
 import { BALL_RADIUS_WORLD } from "../scripts/sim/constants.js";
 import { binRings, binSpriteLayout, paintedMouthEllipse } from "../scripts/render/bin.js";
 
-import { floorScreenY } from "../scripts/sim/projection.js";
+import { floorScreenY, projectPoint } from "../scripts/sim/projection.js";
 
 const gameRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const gameSource = fs.readFileSync(path.join(gameRoot, "scripts", "tic-tac-toe-game.js"), "utf8");
@@ -285,6 +287,111 @@ test("the collider overlay does not ship", () => {
   }
   assert(!/event\.key !== "c"/.test(gameSource), "the C toggle must be gone");
   assert(fs.existsSync(path.join(gameRoot, "tools", "bin-contact-sheet.mjs")), "the offline sheet is the replacement");
+});
+
+test("the floor grid is indexed EXACTLY as the bins are", () => {
+  // THE BUG THIS PINS: the grid was a second, hand-typed set of numbers whose
+  // rows ran the other way. `binGridCell(0, c)` was painted at the FRONT of the
+  // room while bin 0 stands at the back — so every claimed cell lit up mirrored
+  // north/south, three rows from the mark it belonged to. One statement now, and
+  // the grid is derived from the row depths the bins are built from.
+  for (const bin of createBinTargets()) {
+    const cell = binGridCell(bin.row, bin.column);
+    assertEqual(cell.index, bin.index, `cell ${bin.row},${bin.column} must be bin ${bin.index}`);
+    assert(cell.minX < bin.x && bin.x < cell.maxX, `bin ${bin.index}: its cell must contain its lane`);
+  }
+  const cells = binGridCells();
+  assert(cells[0].minZ > cells[6].maxZ, "row 0 is the FAR row — the one against the wall");
+});
+
+test("a drum stands INSIDE its cell rather than spilling out of the front of it", () => {
+  // A drum standing at `z` covers floor from `z - bottomRadius` to
+  // `z + bottomRadius`, so a cell centred on `z` is geometrically exact and
+  // reads wrong: the far half of that footprint is hidden BEHIND the drum, so
+  // all the eye is given is the near base edge — and the near base edge landed
+  // precisely on the cell's front line. Every bin looked pushed forward out of
+  // its own square.
+  //
+  // Measured on the painted base, not the sprite box: `open-bin.png` carries 51
+  // transparent rows under the drum, which is a fifth of the overhang.
+  for (const bin of createBinTargets()) {
+    const cell = binGridCell(bin.row, bin.column);
+    const layout = binSpriteLayout(bin);
+    const paintedBase = layout.y + SPRITE_BASE_Y * (layout.height / SPRITE_HEIGHT);
+    // Screen y grows towards the camera, so the cell's front line is its LARGEST.
+    const front = projectPoint({ x: bin.x, y: 0.004, z: cell.minZ }).y;
+    const back = projectPoint({ x: bin.x, y: 0.004, z: cell.maxZ }).y;
+    assert(
+      paintedBase < front,
+      `bin ${bin.index}: the drum's painted base hangs ${(paintedBase - front).toFixed(1)}px past its cell's front line`,
+    );
+    assert(paintedBase > back, `bin ${bin.index}: the drum must still stand in its own cell, not behind it`);
+  }
+});
+
+test("nothing about the collider moved to make the grid agree with it", () => {
+  // The honest direction, and the only one available: at z=0.87 the back row is
+  // already close enough to the wall at BOARD_Z that it cannot be pushed back,
+  // and the row spacing is one of the mode's two real difficulty levers. So the
+  // PAINT caught up with where the bins visibly stand.
+  const bins = createBinTargets();
+  assertEqual(bins.find((bin) => bin.row === 0 && bin.column === 1).z, 0.87);
+  assertEqual(bins.find((bin) => bin.row === 1 && bin.column === 1).z, 0.6);
+  assertEqual(bins.find((bin) => bin.row === 2 && bin.column === 1).z, 0.33);
+});
+
+test("a finished match is an event, with a rematch and a way out", () => {
+  // It used to be neither: the board simply stopped taking shots and the turn
+  // pill said who had won, so the court sat there with nothing to do and no way
+  // on but the MENU button.
+  assert(indexHtml.includes('id="tttResultsOverlay"'), "the court needs a results overlay");
+  for (const intent of ["tic-tac-toe-rematch", "tic-tac-toe-lobby", "leave-tic-tac-toe"]) {
+    assert(indexHtml.includes(`data-intent="${intent}"`), `the card must offer ${intent}`);
+  }
+  assert(gameSource.includes("function syncResults()"), "the root must own its own card");
+  // GATED ON THE BALL. The shot that wins the match is the one shot worth
+  // watching, and a card thrown up the instant it resolves would hide it.
+  const card = gameSource.slice(gameSource.indexOf("function syncResults()"));
+  assert(/if \(!over \|\| flight\)/.test(card), "the card must wait for the ball to be handed back");
+  assert(gameSource.includes("hideResults();"), "a new match must put the card away");
+});
+
+test("the opponent's shot is watched rather than reported", () => {
+  // HORSE has done this since it shipped and tic-tac-toe did not: a letter
+  // arrives there with a ball attached, while here a cell simply changed colour
+  // and the player was told about it afterwards.
+  assert(gameSource.includes("function replayOpponentShot("), "an opponent's pull must be replayable");
+  assert(/shooterId !== snapshot\.clientId/.test(gameSource), "a court must never replay its own ball");
+  // AND THE BOARD IS HELD UNTIL THE BALL LANDS. Applied on arrival, the mark
+  // would appear before the ball had left the floor — and the bin it was about
+  // to drop into would already be gone, because the court steps the ball against
+  // the OPEN bins only.
+  assert(gameSource.includes("pendingMatch"), "the ruling must be held while a ball is in the air");
+  assert(
+    /if \(pendingMatch\) applyOnlineMatch\(pendingMatch\);/.test(gameSource),
+    "the held ruling must be applied when the ball is handed back",
+  );
+  assert(/if \(!flight\.replay\)/.test(gameSource), "a replayed shot must rule on nothing");
+});
+
+test("the board is also drawn off the court, because a bin can hide a claimed cell", () => {
+  // Measured: from this camera a bin standing in the row in front covers a
+  // claimed cell's floor completely, at every bin height down to 12cm. The court
+  // keeps the honest picture and tints the panel; this carries the abstract one.
+  assert(indexHtml.includes('id="tttMiniBoard"'), "the cabinet needs a board off the court");
+  assert(gameSource.includes("function syncMiniBoard()"), "the root must keep it in step with the match");
+  assert(/\.mini-board\s*\{/.test(gameCss), "the mini board needs its styles in game.css");
+  // IT COLLAPSES WHEN THERE IS NO GUTTER. `max-width` floors at zero, so a court
+  // that has taken the whole screen leaves nothing to sit on top of the room.
+  assert(/--gutter:\s*calc\(\(100vw - var\(--court-width\)\) \/ 2\)/.test(gameCss), "the board is sized by the gutter");
+  assert(/max-width: calc\(var\(--gutter\)/.test(gameCss), "and clamped by it");
+  // The court is HEIGHT-driven, so how much room is left beside it is a function
+  // of the aspect ratio and not of the width. Gated on min-width alone, a tall
+  // narrow desktop put a 26px stub of padding and border against the court.
+  assert(
+    /min-width: 1020px\) and \(min-aspect-ratio: 3 \/ 2\)/.test(gameCss),
+    "the board must be gated on the shape of the window, not just its width",
+  );
 });
 
 test("a claimed cell is tinted, because its glyph can be hidden by a nearer bin", () => {

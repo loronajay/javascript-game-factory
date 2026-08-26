@@ -1432,3 +1432,166 @@ body.is-playing .cabinet {
 }
 
 .word-input:focus { border-color: rgba(255, 45, 225, .75); outline: none; }
+
+/* ---------------------------------------------------------------------------
+   THE MINI BOARD
+
+   Tic-tac-toe's board, drawn as a board, in the gutter the court leaves beside
+   it. It exists because of a measured fact about the court: from this camera a
+   bin standing in the row IN FRONT of a claimed cell covers that cell's floor
+   completely, at every bin height down to 12cm, so the neon glyph lying on the
+   concrete can be hidden by the very object the mode is played with. The court
+   keeps the honest picture — a tinted panel is what carries the colour there —
+   and this carries the abstract one.
+
+   IT IS SIZED BY THE GUTTER AND IT COLLAPSES WHEN THERE IS NONE. `--court-width`
+   is the same expression `.game-screen .court` uses, so the two cannot drift; if
+   the court has taken the whole screen the gutter is zero, `max-width` floors at
+   zero and the board disappears rather than sitting on top of the room. The
+   media query is only there to stop it appearing as a sliver — the clamp is what
+   makes it safe.
+   --------------------------------------------------------------------------- */
+
+#ticTacToeScreen.is-active { position: relative; }
+
+.mini-board {
+  /* Measured against the VIEWPORT, not the cabinet. The cabinet keeps a
+     max-width on a desktop, so its own gutter is about 110px while the real
+     empty space beside the court is nearly four times that — and the board is
+     parked in the empty space a player can see, not in the padding box. */
+  --court-width: min(100vw, calc((100dvh - 140px) * 960 / 760));
+  --gutter: calc((100vw - var(--court-width)) / 2);
+  position: fixed;
+  right: 18px;
+  top: 50%;
+  translate: 0 -50%;
+  display: none;
+  width: 180px;
+  max-width: calc(var(--gutter) - 36px);
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 16px;
+  background: rgba(24, 15, 13, .78);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, .35);
+  overflow: hidden;
+}
+
+/* SHOWN ONLY WHERE THERE IS A REAL GUTTER TO SHOW IT IN, and the aspect ratio
+   is what actually decides that. The court is height-driven — 960/760 of
+   (100dvh - chrome) — so the space beside it is a function of how wide the
+   window is RELATIVE to how tall it is, and a min-width alone would put a 26px
+   stub against the court on a tall narrow desktop. Past 3/2 the gutter is never
+   less than about 133px however the two are traded off, which is why the
+   `max-width` clamp above never actually has to fire; it is there so that a
+   later change to `--chrome` cannot put the board on top of the room. */
+@media (min-width: 1020px) and (min-aspect-ratio: 3 / 2) {
+  .mini-board { display: block; }
+}
+
+.mini-board-head {
+  margin: 0 0 8px;
+  font: 900 .58rem/1 system-ui, sans-serif;
+  letter-spacing: .16em;
+  color: rgba(255, 255, 255, .55);
+  text-align: center;
+}
+
+/* Square, and square whatever width the gutter allows — the cells are the
+   board's proportions, not a pixel size, so a squeezed gutter shrinks the whole
+   thing rather than cropping it. */
+.mini-board-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  aspect-ratio: 1;
+}
+
+.mini-board-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .05);
+  container-type: inline-size;
+  color: rgba(255, 255, 255, .16);
+}
+
+/* The glyph is sized off ITS OWN CELL, which is why it is a child element:
+   `container-type` makes a box a container for its DESCENDANTS, so `cqw` set on
+   the cell itself resolves against the viewport instead — a 62cqw that came out
+   at 970px and stretched the board three thousand pixels tall. */
+.mini-board-cell span {
+  font: 950 62cqw/1 system-ui, sans-serif;
+}
+
+/* The board reads back to front on the court — row 0 is the far row, against
+   the wall — so the mini board says so rather than leaving the player to work
+   out which end of the room the top row is. */
+.mini-board-cell[data-mark="x"] { color: #ff4fd8; background: rgba(255, 79, 216, .14); }
+.mini-board-cell[data-mark="o"] { color: #28d8ff; background: rgba(40, 216, 255, .14); }
+.mini-board-cell.is-winning { box-shadow: inset 0 0 0 2px currentColor; }
+
+.mini-board-turn {
+  margin: 8px 0 0;
+  min-height: 1.1em;
+  font: 800 .6rem/1.2 system-ui, sans-serif;
+  letter-spacing: .05em;
+  color: rgba(255, 255, 255, .62);
+  text-align: center;
+}
+
+/* Both phone layouts take the whole screen for the court, so there is no gutter
+   to park it in and the clamp would collapse it anyway. Stated rather than left
+   to the clamp, because a zero-width bordered box still paints a hairline. */
+@media (max-width: 820px), (orientation: landscape) and (max-height: 620px) {
+  .mini-board { display: none; }
+}
+
+/* ---------------------------------------------------------------------------
+   THE TWO MATCH-RESULT CARDS
+
+   Both reuse `.overlay` / `.overlay-card` — same scrim, same phone shrink-then-
+   scroll rule, same buttons. Only the middle of the card differs, because a
+   tic-tac-toe result is three numbers and a HORSE result is two spelled words.
+   --------------------------------------------------------------------------- */
+
+.overlay-card .result-score.result-score--word {
+  font-size: 34px;
+  letter-spacing: .12em;
+}
+
+.horse-result-letters {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0;
+}
+
+.horse-result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, .055);
+}
+
+.horse-result-row.is-loser { background: rgba(255, 79, 216, .14); }
+
+.horse-result-name {
+  font: 800 .72rem/1 system-ui, sans-serif;
+  letter-spacing: .04em;
+  color: rgba(255, 255, 255, .72);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.horse-result-word { display: flex; gap: 3px; }
+
+.horse-result-word span {
+  font: 900 .82rem/1 system-ui, sans-serif;
+  color: rgba(255, 255, 255, .22);
+}
+
+.horse-result-word span.is-earned { color: #ff4fd8; }

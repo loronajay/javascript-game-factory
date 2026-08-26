@@ -104,4 +104,37 @@ test("a saved Factory Network session resumes inside the server grace window", (
   assertDeepEqual(socket.sent[0], { type: "resume_lobby", clientId: "socket-old", sessionToken: "resume-token" });
 });
 
+test("leaving an online match immediately clears stale lobby and match state", () => {
+  let socket;
+  const client = createMiniHoopsOnlineClient({
+    WebSocketCtor: class extends FakeSocket { constructor() { super(); socket = this; } },
+    resolveIdentity: () => ({ playerId: "factory-9", displayName: "Ana" }),
+    storage: null,
+  });
+  client.connect();
+  socket.emit("open", {});
+  socket.emit("message", { data: JSON.stringify({ event: "connected", clientId: "socket-a", sessionToken: "token" }) });
+  socket.emit("message", { data: JSON.stringify({
+    event: "lobby_started",
+    matchState: {
+      roomCode: "HOOPS",
+      startAt: 2_000,
+      endsAt: 32_000,
+      config: { modeId: "circle", duration: 30, locationId: "bedroom", ballId: "basketball" },
+      players: [],
+    },
+  }) });
+
+  client.leave();
+
+  assertDeepEqual(client.getSnapshot(), {
+    status: "idle",
+    clientId: "socket-a",
+    lobby: null,
+    matchState: null,
+    error: null,
+  });
+  assertDeepEqual(socket.sent.at(-1), { type: "leave_lobby" });
+});
+
 finish();

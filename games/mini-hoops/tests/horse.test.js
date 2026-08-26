@@ -168,7 +168,10 @@ test("the height limit is the ART, not the ceiling — and it falls with depth",
 });
 
 test("a bin at the height limit still has a solvable mouth lean", () => {
-  // The limit IS the height at which no lean is needed; a hair below it, one is.
+  // The limit is the height at which the honest mouth has fallen to
+  // MOUTH_ASPECT_TOLERANCE of the painted one, so at the very top the solve
+  // returns a flat mouth rather than a lean — what has to hold either way is
+  // that it SOLVES and still leaves a ball-sized hole.
   for (const z of [PLACEMENT_BOUNDS.minZ, 0.6, PLACEMENT_BOUNDS.maxZ]) {
     const bin = placedBinAt({ x: 0, y: maxMouthHeightAt(z) - 0.02, z, motionId: "still" }, 0);
     assert(Number.isFinite(bin.mouthTilt.angle) && bin.mouthTilt.angle >= 0,

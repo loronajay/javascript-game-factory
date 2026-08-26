@@ -80,7 +80,7 @@ export const SOUNDS = Object.freeze([
   Object.freeze({ id: "player-cheer", file: "player-cheer.wav", gain: 0.7, offset: 0.1, minInterval: 3 }),
 
   // --- interface ----------------------------------------------------------
-  Object.freeze({ id: "click", file: "button-click.wav", gain: 0.4, offset: 0.09, minInterval: 0.04, ui: true }),
+  Object.freeze({ id: "click", file: "button-click.wav", gain: 0.22, offset: 0.09, minInterval: 0.04, ui: true }),
 ]);
 
 /**
