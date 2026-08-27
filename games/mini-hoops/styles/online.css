@@ -11,7 +11,7 @@
 .online-account-card strong { font-size: 24px; color: var(--brass); }
 .online-config { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .online-config label { display: grid; gap: 5px; font-size: 11px; font-weight: 900; color: var(--ink-dim); text-transform: uppercase; }
-.online-config select, .online-code-entry input {
+.online-config select, .online-config input, .online-code-entry input {
   min-width: 0; padding: 10px 11px; border: 1px solid var(--panel-line); border-radius: 8px;
   background: #17110f; color: var(--ink); font: inherit;
 }
@@ -42,10 +42,10 @@
    the only part worth keeping was the lobby itself.
 
    ONE SHAPE, TWO MODES. Floor Tic-Tac-Toe and HORSE both hang their own lobby
-   off the Factory Network screen's Game select, and both lobbies ask exactly the
-   same four questions — who am I, quick or private, who is here, and may we
-   start. So the class names say `mode-lobby`, not the name of whichever mode
-   happened to need one first.
+   off the Factory Network screen's Game select, and both ask the same room
+   questions — who am I, quick or private, who is here, and may we start. HORSE
+   adds its word. The class names still say `mode-lobby`, not the name of
+   whichever mode happened to need one first.
    --------------------------------------------------------------------------- */
 
 .mode-lobby-panel {
@@ -82,6 +82,23 @@
   justify-content: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.mode-lobby-word-setting {
+  display: grid;
+  flex: 1 0 100%;
+  gap: 5px;
+  color: #9bb8cc;
+  font: 800 .72rem/1.2 system-ui, sans-serif;
+  letter-spacing: .05em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.mode-lobby-word-setting .word-input {
+  width: min(260px, 100%);
+  margin: 0 auto;
+  padding: 9px 12px;
 }
 
 .mode-lobby-code-entry input {

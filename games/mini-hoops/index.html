@@ -170,6 +170,7 @@
               <option value="tic-tac-toe">Floor Tic-Tac-Toe</option>
               <option value="horse">HORSE</option>
             </select></label>
+            <label>Word to spell<input id="onlineHorseWordInput" maxlength="10" autocomplete="off" spellcheck="false" placeholder="HORSE" aria-label="Online HORSE word to spell" /></label>
             <label>Hoop<select id="onlineMode"></select></label>
             <label>Clock<select id="onlineDuration"></select></label>
             <label>Ball<select id="onlineBall"></select></label>
@@ -450,7 +451,7 @@
           </div>
 
           <div class="turn-ball-picker">
-            <span class="turn-ball-label">BALL FOR THIS TURN</span>
+            <span id="horseBallLabel" class="turn-ball-label">BALL FOR SET SHOT</span>
             <div id="horseBallChoices" class="turn-ball-choices" role="group" aria-label="Choose a HORSE ball"></div>
           </div>
 
@@ -500,8 +501,8 @@
 
       <!-- ====================== HORSE ONLINE LOBBY ==================== -->
       <!-- Same shape as the tic-tac-toe lobby, and deliberately the same
-           classes: both modes hang a lobby off the Factory Network screen and
-           both ask the same four questions. -->
+           classes: both modes hang a lobby off the Factory Network screen.
+           HORSE adds the word its host chooses before matchmaking. -->
       <section id="horseOnlineScreen" class="screen" aria-label="Online HORSE lobby">
         <header class="screen-head">
           <button type="button" class="ghost-btn" data-intent="leave-horse">Back</button>
@@ -518,6 +519,10 @@
             <small>Spelling <b id="horseOnlineWord">HORSE</b></small>
           </div>
           <div id="horseOnlinePairing" class="mode-lobby-pairing panel">
+            <label class="mode-lobby-word-setting" for="horseOnlineWordInput">
+              <span>Word to spell</span>
+              <input id="horseOnlineWordInput" class="word-input" maxlength="10" autocomplete="off" spellcheck="false" placeholder="HORSE" aria-label="Online HORSE word to spell" />
+            </label>
             <button id="horseOnlineQuick" type="button" class="primary-btn">Quick Search</button>
             <button id="horseOnlineCreate" type="button" class="ghost-btn">Create Private Room</button>
             <div class="mode-lobby-code-entry">

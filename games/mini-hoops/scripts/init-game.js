@@ -178,8 +178,9 @@ export function boot(root) {
     onTicTacToe: ({ action, roomCode }) => {
       openTicTacToe({ mode: "online", action, room: roomCode });
     },
-    onHorse: ({ action, roomCode }) => {
-      openHorse({ mode: "online", action, room: roomCode });
+    onHorse: ({ action, roomCode, word }) => {
+      setupWord = word || setupWord;
+      openHorse({ mode: "online", action, room: roomCode, word: setupWord });
     },
     onConfig: (config) => {
       if (onlineSnapshot?.lobby?.ownerId === onlineSnapshot.clientId) onlineClient.updateConfig(config);

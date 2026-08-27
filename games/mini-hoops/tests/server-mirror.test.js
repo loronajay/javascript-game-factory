@@ -5,7 +5,12 @@ import { assertEqual, finish, suite, test } from "./harness.js";
 import { matchConfigSettings } from "../scripts/multiplayer/match-config.js";
 import { sanitizeLobbySettings } from "../../../../factory-network-server/src/util.mjs";
 import { createMiniHoopsMatchState } from "../../../../factory-network-server/games/mini-hoops/server/mini-hoops-match-engine.mjs";
-import { sanitizeHorseShot } from "../../../../factory-network-server/games/mini-hoops/server/horse-match-engine.mjs";
+import {
+  applyHorsePlacement,
+  applyHorseShot,
+  createHorseMatchState,
+  sanitizeHorseShot,
+} from "../../../../factory-network-server/games/mini-hoops/server/horse-match-engine.mjs";
 
 const gameRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const serverMirror = path.resolve(gameRoot, "../../../factory-network-server/games/mini-hoops/shared/scripts");
@@ -51,6 +56,37 @@ test("Factory lobby sanitizing preserves the Mini Hoops match config", () => {
 test("authoritative HORSE preserves a catalog ball on each shot", () => {
   assertEqual(sanitizeHorseShot({ ballId: "snowball" }).ballId, "snowball");
   assertEqual(sanitizeHorseShot({ ballId: "../../bad" }).ballId, "basketball");
+});
+
+test("authoritative HORSE locks a matcher to the setter's ball", () => {
+  const lobby = {
+    roomCode: "HORSE",
+    members: new Set(["socket-a", "socket-b"]),
+    memberProfiles: new Map(),
+    settings: { word: "PIG" },
+  };
+  const setup = { x: 0, y: 0.36, z: 0.6, motionId: "still" };
+  let state = createHorseMatchState(lobby, 2_000);
+  state = applyHorsePlacement(state, "socket-a", setup);
+  state = applyHorseShot(
+    state,
+    "socket-a",
+    { power: 0.5, aimX: 480, loft: 1, motionSeconds: 0, expectedShots: 0, ballId: "bowling-ball" },
+    3_000,
+    () => ({ made: true }),
+  );
+  assertEqual(state.match.standingShot.ballId, "bowling-ball");
+
+  let adjudicatedBall = "";
+  state = applyHorseShot(
+    state,
+    "socket-b",
+    { power: 0.5, aimX: 480, loft: 1, motionSeconds: 0, expectedShots: 1, ballId: "paper" },
+    3_100,
+    ({ intent }) => { adjudicatedBall = intent.ballId; return { made: false }; },
+  );
+  assertEqual(adjudicatedBall, "bowling-ball");
+  assertEqual(state.lastShot.intent.ballId, "bowling-ball");
 });
 
 finish();

@@ -37,6 +37,7 @@ import { createHorseShot, horsePowerForDepth } from "./sim/horse-shot.js";
 import {
   HORSE_FIXED_SETUP,
   PHASE_MATCH,
+  PHASE_SET,
   canPlaceBin,
   chooseCpuBinSetup,
   cpuMakesHorseShot,
@@ -45,6 +46,7 @@ import {
   horseModeId,
   isHumanControlledTurn,
   letterState,
+  normalizeWord,
   playerLabel,
   resolveHorseShot,
   shotSetupFor,
@@ -81,6 +83,18 @@ const NUDGE_HEIGHT = 0.03;
 // player owes nobody a shot.
 const PHASE_PLACING = "placing";
 const PHASE_AIMING = "aiming";
+
+/**
+ * The ball owed by the current shooter.
+ *
+ * A setter may use their own per-seat choice. Once that shot stands, the ball
+ * becomes part of the standing setup just like the bin and its motion, so the
+ * matcher never gets to replace it with their own last choice.
+ */
+export function horseTurnBallId(match, turnBalls = []) {
+  const standingBall = match?.phase === PHASE_MATCH ? match.standingShot?.ballId : null;
+  return normalizeTurnBallId(standingBall || turnBalls[match?.turn] || DEFAULT_BALL);
+}
 
 /** Silent stand-in so the root can be constructed in a test without a browser. */
 const SILENT_AUDIO = Object.freeze({
@@ -144,9 +158,8 @@ export function bootHorse(root, options = {}) {
   let cpuDelay = 0;
   let accumulator = 0;
   let previousFrame = 0;
-  // A hotseat handoff gets the next player's own last choice, not the ball the
-  // previous player happened to use. Online fills the other seat from the
-  // authoritative shot it replays.
+  // Each seat remembers its last SET-shot choice. A matcher does not read this
+  // array at all: the standing shot's recorded ball overrides it.
   let turnBalls = [DEFAULT_BALL, DEFAULT_BALL];
   let loserPopupRemaining = 0;
   let loserPopupPlayed = false;
@@ -185,6 +198,7 @@ export function bootHorse(root, options = {}) {
     readouts: root.querySelector("#horsePlaceReadout"),
     court: root.querySelector("#horseScreen .court"),
     onlinePanel: root.querySelector("#horseOnlinePanel"),
+    ballLabel: root.querySelector("#horseBallLabel"),
     loserPopup: root.querySelector("#horseLoserPopup"),
     loserPopupText: root.querySelector("#horseLoserPopupText"),
   };
@@ -200,6 +214,7 @@ export function bootHorse(root, options = {}) {
   const ballPicker = createTurnBallPicker(root.querySelector("#horseBallChoices"), {
     onSelect: selectTurnBall,
   });
+  const onlineWordInput = root.querySelector("#horseOnlineWordInput");
 
   onlineClient.subscribe(handleOnlineSnapshot);
   root.querySelector("#horseOnlineQuick")?.addEventListener("click", () => onlineClient.findQuickMatch(word));
@@ -211,6 +226,12 @@ export function bootHorse(root, options = {}) {
   root.querySelector("#horseOnlineLeave")?.addEventListener("click", () => onlineClient.leave());
   root.querySelector("#horseOnlineRoomInput")?.addEventListener("input", (event) => {
     event.target.value = normalizeRoomCode(event.target.value);
+  });
+  onlineWordInput?.addEventListener("input", (event) => {
+    const clean = String(event.target.value || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 10);
+    event.target.value = clean;
+    word = clean;
+    renderOnlineLobby();
   });
 
   buildMotionChips();
@@ -480,11 +501,11 @@ export function bootHorse(root, options = {}) {
   }
 
   function currentTurnBallId() {
-    return normalizeTurnBallId(turnBalls[match?.turn] || DEFAULT_BALL);
+    return horseTurnBallId(match, turnBalls);
   }
 
   function canChooseBall() {
-    return isMyTurn() && !flight && !awaitingServer && !pull;
+    return match?.phase === PHASE_SET && isMyTurn() && !flight && !awaitingServer && !pull;
   }
 
   function selectTurnBall(ballId) {
@@ -498,6 +519,9 @@ export function bootHorse(root, options = {}) {
   }
 
   function syncBallPicker() {
+    if (el.ballLabel) {
+      el.ballLabel.textContent = match?.phase === PHASE_MATCH ? "MATCHING WITH SET BALL" : "BALL FOR SET SHOT";
+    }
     ballPicker.render({ ballId: currentTurnBallId(), enabled: canChooseBall() });
   }
 
@@ -682,7 +706,10 @@ export function bootHorse(root, options = {}) {
       return;
     }
 
-    const outcome = resolveHorseShot(match, made, activeSetup);
+    // The ball is part of a made setup. `resolveHorseShot` stores this object as
+    // the standing shot, so the matcher inherits the bin, motion and ball in one
+    // authoritative description.
+    const outcome = resolveHorseShot(match, made, { ...activeSetup, ballId: flight.ballId });
     if (match.status === "won") audio.celebrate();
     setStatus(narrate(outcome));
     syncLetters();
@@ -826,7 +853,11 @@ export function bootHorse(root, options = {}) {
     const code = root.querySelector("#horseOnlineRoomCode");
     if (code) code.textContent = lobby?.roomCode || "-----";
     const wordOut = root.querySelector("#horseOnlineWord");
-    if (wordOut) wordOut.textContent = lobby?.word || word || "HORSE";
+    if (wordOut) wordOut.textContent = normalizeWord(lobby?.word || word);
+    if (onlineWordInput) {
+      if (document.activeElement !== onlineWordInput) onlineWordInput.value = lobby?.word || word || "";
+      onlineWordInput.disabled = Boolean(lobby);
+    }
     const lobbyPanel = root.querySelector("#horseOnlineLobby");
     const pairing = root.querySelector("#horseOnlinePairing");
     if (lobbyPanel) lobbyPanel.hidden = !lobby;

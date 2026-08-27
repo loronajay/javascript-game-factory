@@ -8,6 +8,9 @@ import {
 } from "../scripts/multiplayer/horse-online-client.js";
 import { restingBallPosition } from "../scripts/render/frame.js";
 import { PHASE_MATCH, PHASE_SET } from "../scripts/sim/horse.js";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 // Online HORSE is server-authoritative, and that only means something if the
 // browser genuinely cannot rule on a shot. These are the two halves of that
@@ -16,6 +19,8 @@ import { PHASE_MATCH, PHASE_SET } from "../scripts/sim/horse.js";
 // the letters as read rather than counting them itself).
 
 suite("Factory Network HORSE — a bin and a pull go up, a ruling comes back");
+
+const gameRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 // ---------------------------------------------------------------------------
 // The wire
@@ -118,6 +123,7 @@ test("the server's word and match state are taken as read, never recomputed", ()
 
 function stubElement() {
   const classes = new Set();
+  const listeners = new Map();
   return {
     hidden: false,
     textContent: "",
@@ -132,7 +138,8 @@ function stubElement() {
       toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)),
       contains: (c) => classes.has(c),
     },
-    addEventListener() {},
+    addEventListener(type, listener) { listeners.set(type, listener); },
+    fire(type, event = {}) { listeners.get(type)?.({ target: this, ...event }); },
     setAttribute() {},
     append() {},
     appendChild() {},
@@ -181,9 +188,10 @@ function fakeOnlineClient(clientId = "socket-a") {
   return {
     placements: [],
     shots: [],
+    quickWords: [],
     left: 0,
     connect() {},
-    findQuickMatch() {},
+    findQuickMatch(word) { this.quickWords.push(word); },
     createPrivateRoom() {},
     joinPrivateRoom() {},
     startMatch() {},
@@ -246,8 +254,13 @@ function courtHarness(clientId = "socket-a") {
   const canvas = stubCanvas();
   globalThis.document = { createElement: () => stubElement() };
   const onlineClient = fakeOnlineClient(clientId);
+  const elements = new Map();
   const root = {
-    querySelector: (selector) => (selector === "#horseCourt" ? canvas : stubElement()),
+    querySelector: (selector) => {
+      if (selector === "#horseCourt") return canvas;
+      if (!elements.has(selector)) elements.set(selector, stubElement());
+      return elements.get(selector);
+    },
     querySelectorAll: () => [],
   };
   const horse = bootHorse(root, {
@@ -262,7 +275,7 @@ function courtHarness(clientId = "socket-a") {
     },
   });
   horse.enter({ mode: "online", word: "PIG" });
-  return { canvas, horse, onlineClient };
+  return { canvas, horse, onlineClient, elements };
 }
 
 function shoot({ canvas }, distance) {
@@ -287,6 +300,19 @@ test("nothing on the court is live until the server says a match has started", (
   shoot({ canvas }, 84);
   assertEqual(onlineClient.shots.length, 0, "a shot left the court before there was a match");
   assertEqual(horse.match.shots, 0);
+});
+
+test("the dedicated online lobby lets the player choose the word before searching", () => {
+  const html = fs.readFileSync(path.join(gameRoot, "index.html"), "utf8");
+  assert(html.includes('id="horseOnlineWordInput"'), "the online HORSE lobby has no word input");
+  assert(html.includes('id="onlineHorseWordInput"'), "the Factory Network entry screen starts searching without offering the word");
+
+  const { elements, onlineClient } = courtHarness();
+  const input = elements.get("#horseOnlineWordInput");
+  input.value = "pony?!";
+  input.fire("input");
+  elements.get("#horseOnlineQuick").fire("click");
+  assertEqual(onlineClient.quickWords.at(-1), "PONY");
 });
 
 test("the seat comes from the snapshot, so the guest is not handed the host's turn", () => {
@@ -358,6 +384,22 @@ test("the ruling is what moves the letters and the turn", () => {
   assertEqual(horse.match.turn, 1, "the server's turn did not take");
   // The matcher owes this exact bin, and this court is now watching for it.
   assertEqual(horse.binNow().z, FLOOR_BIN.z);
+});
+
+test("an online matcher is forced to throw the setter's ball", () => {
+  const view = courtHarness("socket-b");
+  view.onlineClient.push({
+    status: "started",
+    matchState: serverState({
+      turn: 1,
+      phase: PHASE_MATCH,
+      standingShot: { ...FLOOR_BIN, ballId: "bowling-ball" },
+      sequence: 1,
+    }),
+  });
+  shoot(view, 84);
+  assertEqual(view.onlineClient.shots.length, 1);
+  assertEqual(view.onlineClient.shots[0].ballId, "bowling-ball");
 });
 
 test("the opponent's shot is replayed on this court, not merely reported", () => {

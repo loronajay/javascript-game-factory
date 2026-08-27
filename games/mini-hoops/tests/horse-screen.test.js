@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { suite, test, assert, assertEqual, finish } from "./harness.js";
 
-import { bootHorse } from "../scripts/horse-game.js";
+import { bootHorse, horseTurnBallId } from "../scripts/horse-game.js";
 import { PHASE_MATCH, PHASE_SET } from "../scripts/sim/horse.js";
 import { restingBallPosition } from "../scripts/render/frame.js";
 
@@ -274,6 +274,19 @@ test("each HORSE turn has a ball picker, and the losing player gets the word pop
   assert(/@keyframes horse-loser-pop/.test(css), "the popup needs its fade/grow/fade animation");
   assert(/opacity:\s*0[\s\S]*opacity:\s*1[\s\S]*opacity:\s*0/.test(css.slice(css.indexOf("@keyframes horse-loser-pop"))),
     "the popup must fade in and back out");
+});
+
+test("a matcher inherits the exact ball used to set the standing shot", () => {
+  const match = {
+    phase: PHASE_MATCH,
+    turn: 1,
+    standingShot: { x: 0, y: 0.36, z: 0.6, motionId: "carousel", ballId: "bowling-ball" },
+  };
+  assertEqual(
+    horseTurnBallId(match, ["paper", "snowball"]),
+    "bowling-ball",
+    "the responding player's own last choice replaced the setter's ball",
+  );
 });
 
 test("the loser popup plays before the results card, then yields to it", () => {

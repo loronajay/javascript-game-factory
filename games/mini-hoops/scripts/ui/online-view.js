@@ -2,6 +2,7 @@ import { BALLS } from "../assets/ball-catalog.js";
 import { LOCATIONS } from "../assets/location-catalog.js";
 import { ROUND_DURATIONS } from "../sim/constants.js";
 import { HOOP_MODES } from "../sim/hoop.js";
+import { normalizeWord } from "../sim/horse.js";
 import { normalizeRoomCode } from "../multiplayer/online-client.js";
 import { normalizeMatchConfig } from "../multiplayer/match-config.js";
 
@@ -16,6 +17,7 @@ function options(select, values, valueOf, labelOf) {
 
 export function createOnlineView(root, callbacks = {}) {
   const gameTypeInput = root.querySelector("#onlineGameType");
+  const horseWordInput = root.querySelector("#onlineHorseWordInput");
   const configNote = root.querySelector("#onlineConfigNote");
   const configInputs = {
     modeId: root.querySelector("#onlineMode"),
@@ -35,14 +37,16 @@ export function createOnlineView(root, callbacks = {}) {
     locationId: configInputs.locationId?.value,
   });
   Object.values(configInputs).forEach((input) => input?.addEventListener("change", () => callbacks.onConfig?.(readConfig())));
-  // The two extra modes are routed rather than configured: each has its own
-  // lobby, its own game id, and nothing on this fieldset to read.
+  // The two extra modes are routed rather than configured like a timed run:
+  // each has its own lobby and game id. HORSE reads only its word here so that
+  // the first Quick/Create click can carry it into matchmaking.
   const gameType = () => gameTypeInput?.value || "classic";
   const isRouted = () => gameType() === "tic-tac-toe" || gameType() === "horse";
   const route = (action) => {
     const payload = {
       action,
       roomCode: normalizeRoomCode(root.querySelector("#onlineRoomInput")?.value),
+      word: normalizeWord(horseWordInput?.value),
     };
     if (gameType() === "horse") callbacks.onHorse?.(payload);
     else callbacks.onTicTacToe?.(payload);
@@ -53,6 +57,9 @@ export function createOnlineView(root, callbacks = {}) {
   root.querySelector("#onlineStart")?.addEventListener("click", () => callbacks.onStart?.());
   root.querySelector("#onlineLeave")?.addEventListener("click", () => callbacks.onLeave?.());
   root.querySelector("#onlineRoomInput")?.addEventListener("input", (event) => { event.target.value = normalizeRoomCode(event.target.value); });
+  horseWordInput?.addEventListener("input", (event) => {
+    event.target.value = String(event.target.value || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 10);
+  });
   gameTypeInput?.addEventListener("change", renderGameType);
 
   // Floor Tic-Tac-Toe and HORSE both have no hoop, no clock, and a fixed room
@@ -63,6 +70,7 @@ export function createOnlineView(root, callbacks = {}) {
     for (const input of Object.values(configInputs)) {
       input?.closest("label")?.toggleAttribute("hidden", routed);
     }
+    horseWordInput?.closest("label")?.toggleAttribute("hidden", gameType() !== "horse");
     configNote?.toggleAttribute("hidden", routed);
   }
   renderGameType();
