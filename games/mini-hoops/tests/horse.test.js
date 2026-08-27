@@ -19,6 +19,7 @@ import {
   placedBinAt,
   placementFromFractions,
 } from "../scripts/sim/bin-placement.js";
+import { BALLS, ballById } from "../scripts/assets/ball-catalog.js";
 import { createHorseShot, horseAimDepth, horsePowerForDepth } from "../scripts/sim/horse-shot.js";
 import {
   DEFAULT_WORD,
@@ -27,6 +28,7 @@ import {
   PHASE_SET,
   canPlaceBin,
   chooseCpuBinSetup,
+  chooseCpuTurnBall,
   createHorseMatch,
   letterState,
   normalizeWord,
@@ -267,6 +269,23 @@ test("the CPU's boldness decides how adventurous a bin it sets", () => {
   assert(hard.height > easy.height, "a hard CPU raises the bin further");
   assert(Math.abs(hard.lateral) > Math.abs(easy.lateral), "and pushes it further off centre");
   assertEqual(easy.motionId, "still", "a timid CPU never moves the bin");
+});
+
+test("the CPU picks a ball for a shot it sets, and boldness widens the choice", () => {
+  const ballIds = BALLS.map(({ id }) => id);
+  const reach = (difficulty) => new Set(
+    // Sample the whole unit interval: the choice is one uniform draw over the
+    // ids this difficulty may reach for.
+    Array.from({ length: 200 }, (_, index) => chooseCpuTurnBall(difficulty, () => index / 200, ballIds)),
+  );
+  const easy = reach("easy");
+  const hard = reach("hard");
+  assertEqual(easy.size, 1, "a timid CPU stays on one ball");
+  assertEqual([...easy][0], ballIds[0], "and that ball is the reference one");
+  assert(hard.size > reach("medium").size, "a bolder CPU reaches further down the catalog");
+  assertEqual(hard.size, ballIds.length, "the boldest reaches every shipped ball");
+  for (const ballId of hard) assertEqual(ballById(ballId).id, ballId, `${ballId} is not a catalog ball`);
+  assertEqual(chooseCpuTurnBall("hard", () => 0, []), null, "no catalog, no choice");
 });
 
 // ---------------------------------------------------------------------------

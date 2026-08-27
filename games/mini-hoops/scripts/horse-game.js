@@ -16,7 +16,7 @@
 // target was invented by one of the two players.
 
 import { createAssetLibrary } from "./assets/loader.js";
-import { DEFAULT_BALL, ballFlight, ballSplat } from "./assets/ball-catalog.js";
+import { BALLS, DEFAULT_BALL, ballFlight, ballSplat } from "./assets/ball-catalog.js";
 import { addSplat, clearSplatField, createSplatField, tickSplatField } from "./effects/splat-field.js";
 import { CANVAS_HEIGHT, CANVAS_WIDTH, CONTACT_DEBOUNCE_SECONDS, TICK_SECONDS } from "./sim/constants.js";
 import { stepBallAgainstBins } from "./sim/bin-physics.js";
@@ -40,6 +40,7 @@ import {
   PHASE_SET,
   canPlaceBin,
   chooseCpuBinSetup,
+  chooseCpuTurnBall,
   cpuMakesHorseShot,
   createHorseMatch,
   horseDifficultyById,
@@ -609,6 +610,12 @@ export function bootHorse(root, options = {}) {
   /** The CPU arranging a bin of its own. */
   function startCpuPlacement() {
     const choice = chooseCpuBinSetup(difficulty, random, BIN_MOTIONS.map(({ id }) => id));
+    // The ball is the third thing a setter chooses, beside the placement and the
+    // motion, and it travels with the shot — so the CPU has to make that choice
+    // too or every shot it ever sets is a basketball. Picked here rather than at
+    // release, because it is part of the setup and the picker has to be able to
+    // report it while the CPU lines up.
+    selectCpuTurnBall();
     workingSetup = {
       ...placementFromFractions(choice, choice.motionId),
       motionId: binMotionById(choice.motionId).id,
@@ -619,6 +626,15 @@ export function bootHorse(root, options = {}) {
     cpuDelay = 0.85;
     syncPanels();
     syncStatus();
+  }
+
+  /** The CPU's own ball choice, through the same per-seat slot a person uses. */
+  function selectCpuTurnBall() {
+    const ballId = normalizeTurnBallId(chooseCpuTurnBall(difficulty, random, BALLS.map(({ id }) => id)));
+    turnBalls[match.turn] = ballId;
+    // Warm the art before the shot rather than on the frame it launches.
+    assets.ballFrames(ballId);
+    assets.ballSplats(ballId);
   }
 
   function tick() {
