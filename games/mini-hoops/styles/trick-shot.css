@@ -1,0 +1,206 @@
+/* Trick Shot Lab — one viewport editor, with a canvas and a compact tool rail. */
+
+.trick-shot-screen {
+  --trick-cyan: #3ef4ff;
+  --trick-pink: #ff4ddb;
+  --trick-lime: #d8ff4d;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  place-items: stretch;
+  gap: 10px;
+  padding: 12px max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  overflow: hidden;
+}
+
+.trick-shot-screen.is-active { display: grid; }
+
+.trick-topbar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 50px;
+}
+
+.trick-heading h2 { margin: 0; font-size: clamp(1.15rem, 2.6vw, 1.75rem); line-height: 1; }
+.trick-kicker { color: var(--trick-cyan); font: 800 .68rem/1.1 system-ui; letter-spacing: .18em; }
+.trick-top-actions { display: flex; gap: 8px; margin-right: 78px; }
+
+.trick-workspace {
+  align-self: stretch;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(272px, 324px);
+  gap: 12px;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.cabinet:has(.trick-shot-screen.is-active) > .back-link { display: none; }
+
+.trick-court {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: var(--court-mat);
+}
+
+.trick-court .court-canvas {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 960 / 760;
+  touch-action: none;
+}
+
+.trick-status {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  margin: 0;
+  padding: 7px 10px;
+  color: #081018;
+  background: var(--trick-lime);
+  box-shadow: 0 0 18px rgb(216 255 77 / .45);
+  border-radius: 4px;
+  font: 900 .68rem/1 system-ui;
+  letter-spacing: .13em;
+  pointer-events: none;
+}
+
+.trick-court .hud-hint { bottom: 12px; }
+
+.trick-empty {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  translate: -50% 0;
+  width: min(350px, 74%);
+  padding: 13px 16px;
+  border: 1px solid rgb(62 244 255 / .38);
+  background: rgb(5 8 16 / .76);
+  box-shadow: 0 0 25px rgb(62 244 255 / .11);
+  text-align: center;
+  pointer-events: none;
+}
+
+.trick-empty[hidden],
+.trick-inspector[hidden],
+.trick-control[hidden] { display: none; }
+.trick-empty strong { display: block; color: var(--trick-cyan); font-size: .75rem; letter-spacing: .13em; }
+.trick-empty span { color: var(--ink-dim); font-size: .75rem; }
+
+.trick-editor {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  padding-right: 3px;
+  scrollbar-width: thin;
+}
+
+.trick-panel {
+  padding: 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  background: var(--panel-strong);
+  box-shadow: 0 14px 34px rgb(0 0 0 / .18);
+}
+
+.trick-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  font: 800 .7rem/1 system-ui;
+  letter-spacing: .1em;
+}
+.trick-panel-head small { color: var(--ink-faint); font-size: .64rem; letter-spacing: 0; }
+
+.trick-piece-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.trick-piece-button {
+  min-width: 0;
+  min-height: 90px;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--fill);
+  text-align: left;
+}
+.trick-piece-button:hover { background: var(--fill-hover); transform: translateY(-1px); }
+.trick-piece-button b { font-size: .72rem; }
+.trick-piece-button small { color: var(--ink-faint); font-size: .59rem; line-height: 1.2; }
+.trick-piece-icon { width: 38px; height: 9px; margin: 4px 0 7px; border-radius: 99px; background: var(--trick-cyan); box-shadow: 0 0 13px var(--trick-cyan); transform: rotate(-9deg); }
+.trick-piece-button--cannon .trick-piece-icon { width: 20px; height: 20px; border: 5px solid var(--trick-pink); background: transparent; box-shadow: 0 0 13px var(--trick-pink), inset 0 0 8px var(--trick-pink); transform: none; }
+
+.trick-control { display: grid; gap: 5px; margin-top: 9px; color: var(--ink-dim); font-size: .69rem; }
+.trick-control input[type="range"] { width: 100%; accent-color: var(--trick-cyan); }
+.trick-control[id*="Pitch"] input,
+.trick-control[id*="Power"] input,
+.trick-control[id*="Delay"] input { accent-color: var(--trick-pink); }
+
+.trick-text-button,
+.trick-bank-delete {
+  padding: 3px;
+  border: 0;
+  color: var(--ink-faint);
+  background: transparent;
+  font: inherit;
+}
+.trick-text-button:hover, .trick-bank-delete:hover { color: #ff8c9a; }
+
+.trick-save-row { display: grid; grid-template-columns: 1fr auto; gap: 7px; }
+.trick-save-row input {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  background: var(--well);
+}
+
+.trick-bank-list { display: grid; gap: 5px; margin-top: 8px; }
+.trick-bank-row { display: grid; grid-template-columns: minmax(0, 1fr) 32px; border: 1px solid var(--panel-line); border-radius: 6px; overflow: hidden; }
+.trick-bank-row.is-current { border-color: rgb(216 255 77 / .5); box-shadow: inset 3px 0 var(--trick-lime); }
+.trick-bank-load { display: grid; justify-items: start; gap: 2px; min-width: 0; padding: 8px 10px; border: 0; color: var(--ink); background: var(--fill-faint); text-align: left; }
+.trick-bank-load:hover { background: var(--fill-hover); }
+.trick-bank-load strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .7rem; }
+.trick-bank-load small, .trick-bank-empty { color: var(--ink-faint); font-size: .62rem; }
+.trick-bank-delete { font-size: 1.25rem; background: var(--fill-faint); }
+
+@media (max-width: 760px), (max-height: 600px) and (orientation: landscape) {
+  .trick-shot-screen { padding: 6px; gap: 6px; }
+  .trick-topbar { min-height: 42px; }
+  .trick-heading .trick-kicker { display: none; }
+  .trick-workspace { grid-template-columns: minmax(0, 1fr) minmax(224px, 270px); gap: 6px; }
+  .trick-panel { padding: 9px; }
+  .trick-piece-button { min-height: 75px; padding: 8px; }
+}
+
+@media (max-width: 560px) and (orientation: portrait) {
+  .trick-shot-screen { grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+  .trick-heading h2 { font-size: 1rem; }
+  .trick-top-actions { margin-right: 0; }
+  .trick-top-actions #trickNew { display: none; }
+  .trick-workspace { height: 100%; grid-template-columns: 1fr; grid-template-rows: minmax(0, 34%) minmax(0, 66%); }
+  .trick-shot-screen .trick-court { min-height: 0; height: auto; align-self: stretch; }
+  .trick-editor { min-height: 0; height: 100%; }
+  .trick-court .court-canvas { width: auto; height: 100%; max-width: 100%; }
+  .trick-editor { grid-template-columns: 1fr; overflow-y: auto; }
+  .trick-piece-button { min-height: 68px; }
+}

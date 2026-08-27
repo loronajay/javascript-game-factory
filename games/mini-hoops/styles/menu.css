@@ -510,14 +510,10 @@
     font-size: 16px;
   }
 
-  /* The bottom RULE belongs under the bottom ROW, which is the last two cells
-     once the board wraps — `:last-child` alone underlines one of them. */
+  /* Seven options leave one cell in the final row, so only that last cell loses
+     its bottom rule; the sixth still closes the full row above it. */
   .marquee-option:last-child {
     border-bottom: 0;
-  }
-
-  .marquee-option:nth-last-child(-n + 2) {
-    border-bottom: 1px solid var(--panel-line);
   }
 
   /* The notes go with the second column. "Solo Run" and "Leaderboards" are not

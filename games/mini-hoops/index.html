@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="styles/menu.css" />
     <link rel="stylesheet" href="styles/online.css" />
     <link rel="stylesheet" href="styles/customize.css" />
+    <link rel="stylesheet" href="styles/trick-shot.css" />
   </head>
   <body>
     <div id="mini-hoops" class="cabinet">
@@ -60,18 +61,23 @@
                 <span class="marquee-option-label">Online Multiplayer</span>
                 <span class="marquee-option-note">Sign in to use Quick Search and private rooms.</span>
               </button>
-              <button type="button" class="marquee-option" data-command="boards">
+              <button type="button" class="marquee-option" data-command="trickshot">
                 <span class="marquee-option-index">04</span>
+                <span class="marquee-option-label">Trick Shot Lab</span>
+                <span class="marquee-option-note">Build neon ricochets, tune ball cannons, and save your creations.</span>
+              </button>
+              <button type="button" class="marquee-option" data-command="boards">
+                <span class="marquee-option-index">05</span>
                 <span class="marquee-option-label">Leaderboards</span>
                 <span class="marquee-option-note">A top five for every rim and every clock.</span>
               </button>
               <button type="button" class="marquee-option" data-command="howto">
-                <span class="marquee-option-index">05</span>
+                <span class="marquee-option-index">06</span>
                 <span class="marquee-option-label">How to Play</span>
                 <span class="marquee-option-note">Three things to know. That's all of them.</span>
               </button>
               <button type="button" class="marquee-option" data-command="customize">
-                <span class="marquee-option-index">06</span>
+                <span class="marquee-option-index">07</span>
                 <span class="marquee-option-label">Customize</span>
                 <span class="marquee-option-note">Eight cabinets, one game. Pick the room you play in.</span>
               </button>
@@ -82,6 +88,97 @@
               <span id="menuBest" class="marquee-card-best">No local best yet</span>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- ====================== TRICK SHOT LAB ====================== -->
+      <section id="trickShotScreen" class="screen game-screen trick-shot-screen" aria-label="Trick Shot Lab">
+        <header class="trick-topbar">
+          <button id="trickExit" type="button" class="ghost-btn">Menu</button>
+          <div class="trick-heading">
+            <span class="trick-kicker">NEON SANDBOX</span>
+            <h2>Trick Shot Lab</h2>
+          </div>
+          <div class="trick-top-actions">
+            <button id="trickResetBall" type="button" class="ghost-btn">Reset Ball</button>
+            <button id="trickNew" type="button" class="ghost-btn">New</button>
+          </div>
+        </header>
+
+        <div class="trick-workspace">
+          <div class="court trick-court">
+            <canvas id="trickShotCourt" class="court-canvas" width="960" height="760" aria-label="Editable trick shot court"></canvas>
+            <p id="trickStatus" class="trick-status" aria-live="polite">BUILD MODE</p>
+            <p id="trickHint" class="hud-hint">Drag pieces to place · drag the ball to shoot</p>
+            <div id="trickEmptyState" class="trick-empty">
+              <strong>BUILD YOUR FIRST LINE</strong>
+              <span>Add a board or a cannon, then drag it into the room.</span>
+            </div>
+          </div>
+
+          <aside class="trick-editor" aria-label="Sandbox tools">
+            <section class="trick-panel trick-palette">
+              <div class="trick-panel-head">
+                <span>PIECE TRAY</span>
+                <small>24 max</small>
+              </div>
+              <div class="trick-piece-buttons">
+                <button id="trickAddBoard" type="button" class="trick-piece-button trick-piece-button--board">
+                  <span class="trick-piece-icon" aria-hidden="true"></span>
+                  <b>Bounce Board</b>
+                  <small>Rotate · place · tune bounce</small>
+                </button>
+                <button id="trickAddCannon" type="button" class="trick-piece-button trick-piece-button--cannon">
+                  <span class="trick-piece-icon" aria-hidden="true"></span>
+                  <b>Ball Cannon</b>
+                  <small>Aim · power · timed trigger</small>
+                </button>
+              </div>
+            </section>
+
+            <section id="trickInspector" class="trick-panel trick-inspector" hidden>
+              <div class="trick-panel-head">
+                <strong id="trickInspectorTitle">Bounce Board</strong>
+                <button id="trickDeletePiece" type="button" class="trick-text-button">Delete piece</button>
+              </div>
+              <label class="trick-control">
+                <span>Depth in room</span>
+                <input id="trickDepth" type="range" min="8" max="94" value="50" />
+              </label>
+              <label class="trick-control">
+                <span id="trickAngleLabel">Rotation</span>
+                <input id="trickAngle" type="range" min="-82" max="82" value="0" />
+              </label>
+              <label id="trickPitchRow" class="trick-control" hidden>
+                <span>Trajectory height</span>
+                <input id="trickPitch" type="range" min="5" max="79" value="45" />
+              </label>
+              <label id="trickPowerRow" class="trick-control" hidden>
+                <span>Launch power</span>
+                <input id="trickPower" type="range" min="2.5" max="7.5" step="0.1" value="5.4" />
+              </label>
+              <label id="trickDelayRow" class="trick-control" hidden>
+                <span>Trigger delay</span>
+                <input id="trickDelay" type="range" min="0.25" max="2" step="0.05" value="0.5" />
+              </label>
+              <label id="trickBounceRow" class="trick-control">
+                <span>Bounce energy</span>
+                <input id="trickBounce" type="range" min="0.45" max="1.12" step="0.01" value="0.88" />
+              </label>
+            </section>
+
+            <section class="trick-panel trick-bank">
+              <div class="trick-panel-head">
+                <span>MY TRICK SHOTS</span>
+                <small>Saved on this device</small>
+              </div>
+              <div class="trick-save-row">
+                <input id="trickShotName" type="text" maxlength="40" autocomplete="off" value="Untitled Trick Shot" aria-label="Trick shot name" />
+                <button id="trickSave" type="button" class="primary-btn">Save</button>
+              </div>
+              <div id="trickBankList" class="trick-bank-list"></div>
+            </section>
+          </aside>
         </div>
       </section>
 

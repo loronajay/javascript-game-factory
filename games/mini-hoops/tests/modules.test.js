@@ -55,6 +55,8 @@ const MODULES = [
   "scripts/sim/bin-placement.js",
   "scripts/sim/horse.js",
   "scripts/sim/horse-shot.js",
+  "scripts/sim/trick-shot.js",
+  "scripts/sim/trick-shot-physics.js",
   "scripts/sim/shot.js",
   "scripts/sim/run.js",
   "scripts/assets/ball-catalog.js",
@@ -74,6 +76,7 @@ const MODULES = [
   "scripts/store/boards-store.js",
   "scripts/store/local-storage.js",
   "scripts/store/preferences.js",
+  "scripts/store/trick-shots-store.js",
   "scripts/multiplayer/online-client.js",
   "scripts/multiplayer/tic-tac-toe-online-client.js",
   "scripts/multiplayer/horse-online-client.js",
@@ -86,6 +89,7 @@ const MODULES = [
   "scripts/render/frame.js",
   "scripts/render/splats.js",
   "scripts/render/flames.js",
+  "scripts/render/trick-shot.js",
   "scripts/ui/screens.js",
   "scripts/ui/pointer.js",
   "scripts/ui/hud.js",
@@ -97,9 +101,11 @@ const MODULES = [
   "scripts/ui/practice-view.js",
   "scripts/ui/sound-toggle.js",
   "scripts/ui/theme.js",
+  "scripts/ui/trick-shot-view.js",
   "scripts/practice-court.js",
   "scripts/tic-tac-toe-game.js",
   "scripts/horse-game.js",
+  "scripts/trick-shot-game.js",
   "scripts/init-game.js",
 ];
 
@@ -248,7 +254,7 @@ test("every element id the scripts query actually exists in the markup", () => {
 
 test("every screen the router knows about has a section in the markup", () => {
   for (const screen of SCREENS) {
-    const id = { menu: "menuScreen", setup: "setupScreen", online: "onlineScreen", game: "gameScreen", tictactoe: "ticTacToeScreen", horse: "horseScreen", boards: "boardsScreen", howto: "howToScreen", customize: "customizeScreen" }[screen];
+    const id = { menu: "menuScreen", setup: "setupScreen", online: "onlineScreen", game: "gameScreen", tictactoe: "ticTacToeScreen", horse: "horseScreen", trickshot: "trickShotScreen", boards: "boardsScreen", howto: "howToScreen", customize: "customizeScreen" }[screen];
     assert(html.includes(`id="${id}"`), `no section for the ${screen} screen`);
   }
 });
@@ -302,7 +308,7 @@ test("every button intent in the markup is handled by the composition root", () 
 test("every menu command in the markup is handled", () => {
   const source = fs.readFileSync(path.join(gameRoot, "scripts", "init-game.js"), "utf8");
   const commands = new Set([...html.matchAll(/data-command="([a-z-]+)"/g)].map((match) => match[1]));
-  assertEqual(commands.size, 6, "the menu exposes solo, hotseat, online, boards, how-to-play and customize");
+  assertEqual(commands.size, 7, "the menu exposes play, Trick Shot Lab, boards, how-to-play and customize");
   for (const command of commands) {
     assert(source.includes(`"${command}"`), `menu command "${command}" is not handled`);
   }

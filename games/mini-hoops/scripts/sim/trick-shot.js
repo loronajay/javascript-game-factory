@@ -1,0 +1,105 @@
+// Reusable sandbox-piece records.
+//
+// This module deliberately knows nothing about Trick Shot Lab's DOM, storage,
+// or HORSE. HORSE can later expose this same piece catalog during its own setup
+// phase without inheriting the lab's saved-shot bank or editor state.
+
+import { DEFAULT_BALL, ballById } from "../assets/ball-catalog.js";
+import { DEFAULT_LOCATION, locationById } from "../assets/location-catalog.js";
+
+export const BOARD_PIECE = "board";
+export const CANNON_PIECE = "cannon";
+export const SANDBOX_PIECE_TYPES = Object.freeze([BOARD_PIECE, CANNON_PIECE]);
+export const MAX_SANDBOX_PIECES = 24;
+export const TRICK_SHOT_VERSION = 1;
+
+export const PIECE_BOUNDS = Object.freeze({
+  x: Object.freeze([-0.9, 0.9]),
+  y: Object.freeze([0.12, 1.58]),
+  z: Object.freeze([0.08, 0.94]),
+});
+
+const clamp = (value, min, max, fallback) => {
+  const numeric = Number(value);
+  return Math.max(min, Math.min(max, Number.isFinite(numeric) ? numeric : fallback));
+};
+
+const finite = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
+
+export function normalizePieceId(value, fallback = "piece") {
+  const safe = String(value || fallback).trim().replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 48);
+  return safe || fallback;
+}
+
+export function normalizeShotName(value) {
+  const safe = String(value || "").replace(/\s+/g, " ").trim().slice(0, 40);
+  return safe || "Untitled Trick Shot";
+}
+
+export function normalizeAngle(value, fallback = 0) {
+  const angle = finite(value, fallback);
+  return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+
+/** Create one validated piece record from player-authored or stored data. */
+export function createSandboxPiece(type, input = {}, fallbackId = `${type || "piece"}-1`) {
+  if (!SANDBOX_PIECE_TYPES.includes(type)) return null;
+  const common = {
+    id: normalizePieceId(input.id, fallbackId),
+    type,
+    x: clamp(input.x, ...PIECE_BOUNDS.x, 0),
+    y: clamp(input.y, ...PIECE_BOUNDS.y, type === CANNON_PIECE ? 0.34 : 0.72),
+    z: clamp(input.z, ...PIECE_BOUNDS.z, type === CANNON_PIECE ? 0.32 : 0.55),
+  };
+
+  if (type === BOARD_PIECE) {
+    return {
+      ...common,
+      angle: normalizeAngle(input.angle, 0),
+      length: clamp(input.length, 0.2, 0.76, 0.48),
+      restitution: clamp(input.restitution, 0.45, 1.12, 0.88),
+    };
+  }
+
+  return {
+    ...common,
+    yaw: clamp(input.yaw, -Math.PI * 0.46, Math.PI * 0.46, 0),
+    pitch: clamp(input.pitch, Math.PI / 36, Math.PI * 0.44, Math.PI / 4),
+    speed: clamp(input.speed, 2.5, 7.5, 5.4),
+    delay: clamp(input.delay, 0.25, 2, 0.5),
+  };
+}
+
+/** A storage-safe Trick Shot Lab layout. It intentionally has no HORSE fields. */
+export function normalizeTrickShot(input = {}) {
+  const pieces = [];
+  const ids = new Set();
+  for (const [index, source] of (Array.isArray(input.pieces) ? input.pieces : []).entries()) {
+    if (pieces.length >= MAX_SANDBOX_PIECES) break;
+    if (!SANDBOX_PIECE_TYPES.includes(source?.type)) continue;
+    const piece = createSandboxPiece(source.type, source, `${source.type}-${index + 1}`);
+    if (!piece || ids.has(piece.id)) continue;
+    ids.add(piece.id);
+    pieces.push(piece);
+  }
+
+  return {
+    version: TRICK_SHOT_VERSION,
+    id: normalizePieceId(input.id, ""),
+    name: normalizeShotName(input.name),
+    locationId: locationById(input.locationId || DEFAULT_LOCATION).id,
+    ballId: ballById(input.ballId || DEFAULT_BALL).id,
+    pieces,
+    createdAt: Math.max(0, finite(input.createdAt, 0)),
+    updatedAt: Math.max(0, finite(input.updatedAt, 0)),
+  };
+}
+
+export function cannonDirection(cannon) {
+  const horizontal = Math.cos(cannon.pitch);
+  return {
+    x: Math.sin(cannon.yaw) * horizontal,
+    y: Math.sin(cannon.pitch),
+    z: Math.cos(cannon.yaw) * horizontal,
+  };
+}

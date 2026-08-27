@@ -19,6 +19,7 @@ import { addFire, clearFlameTrail, createFlameTrail, emitFlameTrail, tickFlameTr
 import { createPracticeCourt } from "./practice-court.js";
 import { bootTicTacToe } from "./tic-tac-toe-game.js";
 import { bootHorse } from "./horse-game.js";
+import { bootTrickShot } from "./trick-shot-game.js";
 import { DEFAULT_WORD } from "./sim/horse.js";
 import { CANVAS_HEIGHT, CANVAS_WIDTH, PULL_MIN, TICK_MS, TICK_SECONDS } from "./sim/constants.js";
 import { hoopAt, hoopModeById } from "./sim/hoop.js";
@@ -77,6 +78,7 @@ import {
   SCREEN_ONLINE,
   SCREEN_TIC_TAC_TOE,
   SCREEN_HORSE,
+  SCREEN_TRICK_SHOT,
   SCREEN_SETUP,
   createScreenRouter,
   matchSetupScreen,
@@ -155,6 +157,7 @@ export function boot(root) {
       [SCREEN_GAME]: root.querySelector("#gameScreen"),
       [SCREEN_TIC_TAC_TOE]: root.querySelector("#ticTacToeScreen"),
       [SCREEN_HORSE]: root.querySelector("#horseScreen"),
+      [SCREEN_TRICK_SHOT]: root.querySelector("#trickShotScreen"),
       [SCREEN_BOARDS]: root.querySelector("#boardsScreen"),
       [SCREEN_HOWTO]: root.querySelector("#howToScreen"),
       [SCREEN_CUSTOMIZE]: root.querySelector("#customizeScreen"),
@@ -259,6 +262,22 @@ export function boot(root) {
       screens.show(SCREEN_MENU);
     },
   });
+
+  // Trick Shot Lab is a fourth court root. Its named bank belongs only to the
+  // lab; the sandbox piece catalog beneath it is the seam HORSE can reuse later.
+  const trickShot = bootTrickShot(root, {
+    audio,
+    onLeave: () => {
+      trickShot.exit();
+      screens.show(SCREEN_MENU);
+    },
+  });
+
+  function openTrickShot() {
+    overlays.hideAll();
+    screens.show(SCREEN_TRICK_SHOT);
+    trickShot.enter(preferences.snapshot());
+  }
 
   /** Enter HORSE in a given mode. The one door into that screen. */
   function openHorse(options) {
@@ -607,6 +626,7 @@ export function boot(root) {
       screens.show(SCREEN_SETUP);
     }
     else if (command === "online") openOnline();
+    else if (command === "trickshot") openTrickShot();
     else if (command === "boards") screens.show(SCREEN_BOARDS);
     else if (command === "howto") screens.show(SCREEN_HOWTO);
     else if (command === "customize") screens.show(SCREEN_CUSTOMIZE);
@@ -885,6 +905,7 @@ export function boot(root) {
     // menu, where the CPU would go on taking turns unobserved.
     if (next !== SCREEN_TIC_TAC_TOE && ticTacToe.isActive()) ticTacToe.exit();
     if (next !== SCREEN_HORSE && horse.isActive()) horse.exit();
+    if (next !== SCREEN_TRICK_SHOT && trickShot.isActive()) trickShot.exit();
     if (next !== SCREEN_TIC_TAC_TOE && ticTacToeLobby) ticTacToeLobby.classList.remove("is-active");
     if (next === SCREEN_MENU) {
       accountAccess.syncButton(root.querySelector("#onlineMenuButton"));
