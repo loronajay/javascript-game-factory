@@ -4,7 +4,7 @@
 
 import { REFERENCE_POWER } from "./constants.js";
 import { BIN_MOUTH_Y } from "./bin-physics.js";
-import { solveLaunch } from "./launch.js";
+import { binEntryVelocity, solveLaunch } from "./launch.js";
 import { projectPoint } from "./projection.js";
 
 const FRONT_ROW_POWER = 0.5;
@@ -12,7 +12,6 @@ const DEPTH_PER_POWER = 1.35;
 const FRONT_ROW_Z = 0.33;
 const MIN_AIM_Z = 0.18;
 const MAX_AIM_Z = 0.95;
-const BIN_ENTRY_VELOCITY = -4;
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
@@ -39,7 +38,7 @@ export function createTicTacToeShot(pull, origin, { weight = 1 } = {}) {
     // row demand the normal hoop's 80% pull.
     power: REFERENCE_POWER,
     loft: pull.loft,
-    entryVelocity: BIN_ENTRY_VELOCITY,
+    entryVelocity: binEntryVelocity(weight),
     weight,
   });
   launch.inputPower = clamp(pull.power, 0, 1);

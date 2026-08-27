@@ -17,7 +17,7 @@
 // points to the one projection everything else uses is what makes it read that
 // way for free.
 
-import { GRAVITY } from "../sim/constants.js";
+import { BOARD_Z, GRAVITY } from "../sim/constants.js";
 
 /**
  * How many decals a surface holds before the oldest is painted over.
@@ -81,7 +81,13 @@ export function addSplat(field, { surface, x, y, z, speed = 0, ballId = null, sc
     // A floor decal lies ON the floor, whatever height the ball's centre was
     // corrected to. A wall decal keeps the height it struck at.
     y: onFloor ? 0 : y,
-    z,
+    // ...and the mirror of that: a WALL decal lies ON the wall. The physics
+    // stops the ball's CENTRE one radius short of the plane, so taking its `z`
+    // raw painted the mark hanging a ball-radius out in the room — drawn a
+    // little too large and a little too low for the plaster behind it, which is
+    // the "splat that never quite reaches the back wall" this fixes. The floor
+    // case has always snapped its own axis for exactly this reason.
+    z: surface === "wall" ? BOARD_Z : z,
     // SIZE CARRIES DEPTH AND NOTHING ELSE RANDOM. The projection shrinks a
     // decal by about a third across the useful depth of the room, so a random
     // size jitter of even ten percent is the same order as the perspective and

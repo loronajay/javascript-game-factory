@@ -31,9 +31,16 @@ import { createHorseShot } from "../scripts/sim/horse-shot.js";
 import { stepBallAgainstBins } from "../scripts/sim/bin-physics.js";
 import { createBall, isBallSettled, launchBall } from "../scripts/sim/physics.js";
 import { launchSpin } from "../scripts/sim/launch.js";
+import { ballFlight, ballIds, DEFAULT_BALL } from "../scripts/assets/ball-catalog.js";
 
 const args = process.argv.slice(2);
 const fine = args[args.indexOf("--samples") + 1] === "fine";
+// WHICH BALL, because the balls genuinely fly differently and a volume of legal
+// placements has to be convertible with EVERY one of them, not just the
+// reference. `--ball all` walks the roster; the answer that matters is still
+// `makeable`, and anything but n/n is a bug for the ball it is reported under.
+const ballArg = args.includes("--ball") ? args[args.indexOf("--ball") + 1] : DEFAULT_BALL;
+const ballsUnderTest = ballArg === "all" ? ballIds() : [ballArg];
 
 const POWER_STEP = fine ? 0.025 : 0.05;
 const AIM_STEP = fine ? 10 : 20;
@@ -42,16 +49,16 @@ const HEIGHTS = fine ? [0, 0.5, 1] : [0, 1];
 const LANES = [-1, 0, 1];
 
 /** One shot, played out through the real sim against the real moving bin. */
-function playShot(setup, power, aimX) {
+function playShot(setup, power, aimX, ballId) {
   const ball = createBall();
-  const shot = createHorseShot({ power, aimX, loft: 1 }, ball, setup);
+  const shot = createHorseShot({ power, aimX, loft: 1 }, ball, setup, { weight: ballFlight(ballId).weight });
   launchBall(ball, shot.launch, launchSpin(shot.launch));
   let clock = 0;
   let age = 0;
   let captured = null;
   while (age < 3) {
     const result = stepBallAgainstBins(ball, [placedBinAt(setup, clock)], TICK_SECONDS, {
-      ballId: "basketball",
+      ballId,
       capturedBin: captured,
     });
     if (result.capturedBin !== null) captured = result.capturedBin;
@@ -64,6 +71,7 @@ function playShot(setup, power, aimX) {
 }
 
 const rows = [];
+for (const ballId of ballsUnderTest) {
 for (const motion of BIN_MOTIONS) {
   let placements = 0;
   let makeable = 0;
@@ -83,7 +91,7 @@ for (const motion of BIN_MOTIONS) {
         for (let power = POWER_STEP; power <= 1; power += POWER_STEP) {
           for (let aimX = AIM_MIN_X; aimX <= AIM_MAX_X; aimX += AIM_STEP) {
             total++;
-            if (playShot(setup, power, aimX)) hits++;
+            if (playShot(setup, power, aimX, ballId)) hits++;
           }
         }
         if (hits) makeable++; else dead.push(`d${depth} h${height} l${lateral}`);
@@ -93,11 +101,13 @@ for (const motion of BIN_MOTIONS) {
   }
 
   rows.push({
+    ball: ballId,
     motion: motion.id,
     makeable: `${makeable}/${placements}`,
     avgWindow: `${((windowSum / placements) * 100).toFixed(2)}%`,
     unmakeable: dead.join(", ") || "-",
   });
+}
 }
 
 console.table(rows);
