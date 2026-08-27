@@ -12,8 +12,9 @@
 // It holds no DOM beyond its canvas. Everything it wants to say leaves through
 // the callbacks and is written by `ui/practice-view.js`.
 
-import { ballFlight, ballSplat } from "./assets/ball-catalog.js";
+import { ballFlight, ballSplat, ballTrail } from "./assets/ball-catalog.js";
 import { addSplat, clearSplatField, createSplatField, tickSplatField } from "./effects/splat-field.js";
+import { addFire, clearFlameTrail, createFlameTrail, emitFlameTrail, tickFlameTrail } from "./effects/flame-trail.js";
 import { CANVAS_HEIGHT, CANVAS_WIDTH, PULL_MIN, TICK_SECONDS } from "./sim/constants.js";
 import { hoopAt } from "./sim/hoop.js";
 import { isShootablePull, neutralPull, resolvePull } from "./sim/pull.js";
@@ -45,13 +46,21 @@ const SILENT_AUDIO = {
   released() {},
   contact() {},
   splat() {},
+  sizzle() {},
   scored() {},
   missed() {},
 };
 
 export function createPracticeCourt(
   canvas,
-  { assets, audio = SILENT_AUDIO, onPower = () => {}, onSay = () => {}, onTally = () => {} } = {},
+  {
+    assets,
+    audio = SILENT_AUDIO,
+    onPower = () => {},
+    onSay = () => {},
+    onTally = () => {},
+    onBusy = () => {},
+  } = {},
 ) {
   const ctx = canvas.getContext("2d");
   canvas.width = CANVAS_WIDTH;
@@ -81,6 +90,10 @@ export function createPracticeCourt(
   // The demo court marks up too. It is the same sim and the same ball, and a
   // player who picked the snowball should find out here what it does.
   const splats = createSplatField();
+  // The magma ball burns, and what it leaves in the air and on the floor is a
+  // second transient field beside the splats. Same layer, same tick clock, and
+  // the same guarantee: it cannot touch a score. See `effects/flame-trail.js`.
+  const trail = createFlameTrail();
 
   // -----------------------------------------------------------------------
   // Input — the same gesture as the game, read through the same two helpers.
@@ -158,6 +171,10 @@ export function createPracticeCourt(
     audio.released(style.ballId);
     taken += 1;
     onTally({ made, taken });
+    // The ball is locked for the flight. The launch was just solved against
+    // this ball's weight, so a swap mid-air would leave a ball in the room
+    // flying an arc that was solved for a different one.
+    onBusy(true);
   }
 
   function cancelPull() {
@@ -177,6 +194,7 @@ export function createPracticeCourt(
     if (shot.state === SHOT_FLIGHT) {
       const world = worldFor(hoop);
       const stepped = stepBall(ball, world, TICK_SECONDS, { ballId: style.ballId, alreadyScored: shot.scored });
+      emitFlameTrail(trail, { ...ball, dt: TICK_SECONDS, style: ballTrail(style.ballId) });
 
       if (stepped.scored) {
         kicks.net = 1;
@@ -192,10 +210,16 @@ export function createPracticeCourt(
         kicks.rim = ball.x < world.hoopWorld.rimX ? -1 : 1;
       }
       if (stepped.splat) {
-        addSplat(splats, { ...stepped.splat, ...ballSplat(style.ballId) });
+        addSplat(splats, { ...stepped.splat, ballId: style.ballId, ...ballSplat(style.ballId) });
         audio.splat(stepped.splat.surface, { ballId: style.ballId, speed: stepped.splat.speed });
       }
       for (const contact of new Set(stepped.contacts)) {
+        // A burning ball lights what it lands on. `addFire` is what knows
+        // whether this contact started a fire or fell inside one already
+        // burning, so the sizzle follows ITS answer rather than the collider's
+        // report — which arrives once per 8ms substep for as long as the ball
+        // rolls. A ball with no trail block hands in null and nothing happens.
+        if (addFire(trail, { ...ball, surface: contact, style: ballTrail(style.ballId) })) audio.sizzle(style.ballId);
         if (stepped.splat?.surface === contact) continue;
         audio.contact(contact, { ballId: style.ballId, speed: ball.vy });
       }
@@ -223,10 +247,12 @@ export function createPracticeCourt(
         shot = createShot();
         resetBall(ball);
         onPower(0);
+        onBusy(false);
       }
     }
 
     tickSplatField(splats, TICK_SECONDS);
+    tickFlameTrail(trail, TICK_SECONDS);
 
     kicks.net *= Math.pow(0.055, TICK_SECONDS);
     kicks.rim *= Math.pow(0.018, TICK_SECONDS);
@@ -262,17 +288,22 @@ export function createPracticeCourt(
       kicks,
       scored: shot.scored,
       splats,
-      splatImages: assets.ballSplats(style.ballId),
+      splatImagesFor: assets.ballSplats,
+      trail,
     });
   }
 
   return {
     /**
-     * Show the room and ball the player has actually chosen, so the demo looks
-     * like the run they are about to take. Both are cosmetic by contract, so
-     * this can never change how the practice shot behaves.
+     * Show the room and ball the player has actually chosen, so the demo plays
+     * like the run they are about to take. The room is cosmetic by contract and
+     * cannot reach the shot. The ball is not, and that is the point: a player
+     * about to shoot a snowball should be practising with one.
      */
     setStyle(next) {
+      // Refused while a shot is in the air, for the reason the picker is locked
+      // there: the arc under way was solved against the ball that took it.
+      if (next.ballId && shot.state === SHOT_FLIGHT) return;
       style = { ballId: next.ballId ?? style.ballId, locationId: next.locationId ?? style.locationId };
     },
 
@@ -293,6 +324,7 @@ export function createPracticeCourt(
       kicks.net = 0;
       kicks.rim = 0;
       clearSplatField(splats);
+    clearFlameTrail(trail);
       onTally({ made, taken });
       onSay("");
     },

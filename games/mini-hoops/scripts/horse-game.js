@@ -16,8 +16,9 @@
 // target was invented by one of the two players.
 
 import { createAssetLibrary } from "./assets/loader.js";
-import { BALLS, DEFAULT_BALL, ballFlight, ballSplat } from "./assets/ball-catalog.js";
+import { BALLS, DEFAULT_BALL, ballFlight, ballSplat, ballTrail } from "./assets/ball-catalog.js";
 import { addSplat, clearSplatField, createSplatField, tickSplatField } from "./effects/splat-field.js";
+import { addFire, clearFlameTrail, createFlameTrail, emitFlameTrail, tickFlameTrail } from "./effects/flame-trail.js";
 import { CANVAS_HEIGHT, CANVAS_WIDTH, CONTACT_DEBOUNCE_SECONDS, TICK_SECONDS } from "./sim/constants.js";
 import { stepBallAgainstBins } from "./sim/bin-physics.js";
 import {
@@ -66,6 +67,7 @@ import { clearScene, depthGradeFilter, drawBallShadow, drawRoom, prepareContext 
 import { canvasPoint, isGrab } from "./ui/pointer.js";
 import { createTurnBallPicker, normalizeTurnBallId } from "./ui/turn-ball-picker.js";
 import { drawSplatDecals, drawSplatParticles } from "./render/splats.js";
+import { drawFlameEmbers, drawFlameFires } from "./render/flames.js";
 
 const BIN_PATH = "assets/modes/floor-tic-tac-toe/open-bin.png";
 
@@ -131,6 +133,10 @@ export function bootHorse(root, options = {}) {
 
   const ball = createBall();
   const splats = createSplatField();
+  // The magma ball burns, and what it leaves in the air and on the floor is a
+  // second transient field beside the splats. Same layer, same tick clock, and
+  // the same guarantee: it cannot touch a score. See `effects/flame-trail.js`.
+  const trail = createFlameTrail();
   const lastContactAt = new Map();
 
   let mode = horseModeId(options.mode);
@@ -200,6 +206,7 @@ export function bootHorse(root, options = {}) {
     court: root.querySelector("#horseScreen .court"),
     onlinePanel: root.querySelector("#horseOnlinePanel"),
     ballLabel: root.querySelector("#horseBallLabel"),
+    ballPanel: root.querySelector("#horseBallPanel"),
     loserPopup: root.querySelector("#horseLoserPopup"),
     loserPopupText: root.querySelector("#horseLoserPopupText"),
   };
@@ -451,6 +458,7 @@ export function bootHorse(root, options = {}) {
     hideLoserPopup();
     lastContactAt.clear();
     clearSplatField(splats);
+    clearFlameTrail(trail);
     workingSetup = { ...defaultPlacement(), motionId: "still" };
     activeSetup = null;
     flight = null;
@@ -520,6 +528,10 @@ export function bootHorse(root, options = {}) {
   }
 
   function syncBallPicker() {
+    // THE BALL IS A PHASE-TWO DECISION. While the bin is still being arranged
+    // the player is choosing a target, not a shot, and the picker is put away —
+    // which is also what lets `--chrome` for `is-placing` be as small as it is.
+    if (el.ballPanel) el.ballPanel.hidden = isPlacing();
     if (el.ballLabel) {
       el.ballLabel.textContent = match?.phase === PHASE_MATCH ? "MATCHING WITH SET BALL" : "BALL FOR SET SHOT";
     }
@@ -641,6 +653,7 @@ export function bootHorse(root, options = {}) {
     elapsed += TICK_SECONDS;
     tickLoserPopup();
     tickSplatField(splats, TICK_SECONDS);
+    tickFlameTrail(trail, TICK_SECONDS, { random });
     // The bin's own clock runs whenever a shot is set, INCLUDING while the
     // player is still lining up their pull — so a moving bin can be watched
     // before anyone commits, exactly like the classic cabinet's moving rim.
@@ -668,8 +681,10 @@ export function bootHorse(root, options = {}) {
         ballId: flight.ballId,
         capturedBin: flight.capturedBin,
       });
+      emitFlameTrail(trail, { ...ball, dt: TICK_SECONDS, style: ballTrail(flight.ballId), random });
+      ignite(result.contacts, flight.ballId);
       if (result.splat) {
-        addSplat(splats, { ...result.splat, ...ballSplat(flight.ballId), random });
+        addSplat(splats, { ...result.splat, ballId: flight.ballId, ...ballSplat(flight.ballId), random });
         audio.splat(result.splat.surface, { ballId: flight.ballId, speed: result.splat.speed });
       }
       announce(result.contacts, result.splat);
@@ -745,6 +760,24 @@ export function bootHorse(root, options = {}) {
   }
 
   /** Turn this tick's contacts into sound. Debounced on the cabinet's own rule. */
+  /**
+   * Set alight whatever a burning ball just landed on.
+   *
+   * Beside `announce` rather than inside it, because the two answer different
+   * questions on purpose: `announce` debounces, since a collider reports the
+   * same contact every substep and the ear cannot take that. A fire is not
+   * debounced on a clock at all — `addFire` refuses one that is already
+   * burning where this one would go, which is a fact about the room rather than
+   * about elapsed time, and is what lets a rolling ball leave a line of them.
+   */
+  function ignite(contacts, ballId) {
+    const style = ballTrail(ballId);
+    if (!style) return;
+    for (const contact of new Set(contacts)) {
+      if (addFire(trail, { ...ball, surface: contact, style, random })) audio.sizzle(ballId);
+    }
+  }
+
   function announce(contacts, splat = null) {
     for (const contact of contacts) {
       if (contact === "bin-score") continue;
@@ -1149,8 +1182,10 @@ export function bootHorse(root, options = {}) {
     if (!match) return;
     clearScene(ctx);
     drawRoom(ctx, art.room, ROOM_ID);
-    drawSplatDecals(ctx, splats, { images: assets.ballSplats(flight?.ballId || currentTurnBallId()) });
+    drawSplatDecals(ctx, splats, { imagesFor: assets.ballSplats });
     drawSplatParticles(ctx, splats);
+    drawFlameFires(ctx, trail);
+    drawFlameEmbers(ctx, trail);
 
     const setup = phase === PHASE_PLACING ? workingSetup : activeSetup;
     const bin = setup ? placedBinAt(setup, turnClock) : null;

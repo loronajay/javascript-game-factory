@@ -7,10 +7,13 @@
 // a separate file rather than a second mode of the HUD because the two share no
 // element ids and the demo has no clock, no score and no streak.
 
+import { createTurnBallPicker } from "./turn-ball-picker.js";
+
 const TRANSIENT_MS = 900;
 
-export function createPracticeView(root) {
+export function createPracticeView(root, { onBallSelect = () => {} } = {}) {
   const nodes = {
+    ballChoices: root.querySelector("#practiceBallChoices"),
     meterFill: root.querySelector("#practiceMeterFill"),
     readout: root.querySelector("#practiceReadout"),
     shout: root.querySelector("#practiceShout"),
@@ -18,9 +21,28 @@ export function createPracticeView(root) {
     tally: root.querySelector("#practiceTally"),
   };
 
+  // The same catalog-driven picker the two per-turn modes use. The demo is the
+  // one screen where a ball is worth trying rather than reading about: the balls
+  // genuinely fly differently, and the pull that drops a bowling ball is not the
+  // pull that drops a paper wad. It is deliberately NOT written back to
+  // preferences — How to Play is a sandbox, not a second setup screen, and the
+  // demo is re-dressed from the player's real selection every time it opens.
+  const balls = createTurnBallPicker(nodes.ballChoices, { onSelect: onBallSelect });
+
   let shoutTimer = 0;
 
   return {
+    /**
+     * Which ball the demo is shooting, and whether the choice is live.
+     *
+     * It is locked for the flight, because the court solves the launch against
+     * the ball's own weight at release: swapping mid-air would leave a ball in
+     * the room flying an arc solved for a different one.
+     */
+    setBallChoice(choice) {
+      balls.render(choice);
+    },
+
     /** Power meter, 0..1. The number is the honest ratio, same as in a run. */
     setPower(power) {
       const percent = Math.round(Math.max(0, Math.min(1, power)) * 100);

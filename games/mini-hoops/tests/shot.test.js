@@ -15,7 +15,9 @@ import {
   advanceShot,
   beginShot,
   createShot,
+  FIRE_LEVELS,
   madeAnnouncement,
+  onFireLevel,
 } from "../scripts/sim/shot.js";
 
 suite("shot — what a contact means, and when the ball comes back");
@@ -108,6 +110,15 @@ test("a made basket announces itself, and shouts louder on a streak", () => {
   assertEqual(madeAnnouncement(1), "BUCKET!");
   assertEqual(madeAnnouncement(ON_FIRE_STREAK), "ON FIRE!");
   assertEqual(madeAnnouncement(ON_FIRE_STREAK + 4), "ON FIRE!");
+
+  // The HUD burns off the SAME answer the shout is written from, which is what
+  // stops a card that is alight sitting over a shout that says BUCKET!.
+  assertEqual(onFireLevel(0), 0);
+  assertEqual(onFireLevel(ON_FIRE_STREAK - 1), 0, "a streak one short of catching must be cold");
+  assertEqual(onFireLevel(ON_FIRE_STREAK), 1, "the streak that earns ON FIRE! must light the card");
+  assertEqual(onFireLevel(ON_FIRE_STREAK + 1), 2, "the heat has to keep climbing with the streak");
+  assertEqual(onFireLevel(ON_FIRE_STREAK + 40), FIRE_LEVELS, "the heat must cap rather than run off the card");
+  assertEqual(onFireLevel(undefined), 0, "a missing streak must read cold, not NaN");
 });
 
 test("a miss into bare wall is called by the direction it went", () => {

@@ -11,10 +11,11 @@
 // thing this file is genuinely allowed to own is ORDER: what happens per tick,
 // and in what sequence.
 
-import { ballFlight, ballSplat } from "./assets/ball-catalog.js";
+import { DEFAULT_BALL, ballFlight, ballSplat, ballTrail } from "./assets/ball-catalog.js";
 import { createAssetLibrary } from "./assets/loader.js";
 import { createGameAudio } from "./audio/game-audio.js";
 import { addSplat, clearSplatField, createSplatField, tickSplatField } from "./effects/splat-field.js";
+import { addFire, clearFlameTrail, createFlameTrail, emitFlameTrail, tickFlameTrail } from "./effects/flame-trail.js";
 import { createPracticeCourt } from "./practice-court.js";
 import { bootTicTacToe } from "./tic-tac-toe-game.js";
 import { bootHorse } from "./horse-game.js";
@@ -30,6 +31,7 @@ import {
   beginShot,
   createShot,
   madeAnnouncement,
+  onFireLevel,
 } from "./sim/shot.js";
 import {
   RUN_EXPIRED,
@@ -56,6 +58,7 @@ import { createOverlays } from "./ui/overlays.js";
 import { createBoardsView } from "./ui/boards-view.js";
 import { BIN_GAME_TYPES, createSetupView, describeSetup } from "./ui/setup-view.js";
 import { createSoundToggle } from "./ui/sound-toggle.js";
+import { createHandToggle } from "./ui/hand-toggle.js";
 import { createOnlineView } from "./ui/online-view.js";
 import { canvasPoint, isGrab } from "./ui/pointer.js";
 import { createMiniHoopsAccountAccess } from "./multiplayer/account-access.js";
@@ -129,6 +132,10 @@ export function boot(root) {
   // the top of every run — a board is a round, so the wall it was scored on is
   // clean when the clock starts.
   const splats = createSplatField();
+  // The magma ball burns, and what it leaves in the air and on the floor is a
+  // second transient field beside the splats. Same layer, same tick clock, and
+  // the same guarantee: it cannot touch a score. See `effects/flame-trail.js`.
+  const trail = createFlameTrail();
 
   // Which board the leaderboard screen is looking at. Deliberately separate from
   // the play selection: browsing boards must not change what you are about to play.
@@ -168,6 +175,7 @@ export function boot(root) {
   });
   const overlays = createOverlays(root, { onIntent: handleIntent });
   const soundToggle = createSoundToggle(root);
+  const handToggle = createHandToggle(root);
   const accountAccess = createMiniHoopsAccountAccess();
   const platformApi = createPlatformApiClient();
   const onlineClient = createMiniHoopsOnlineClient({ resolveIdentity: () => accountAccess.identity() });
@@ -262,7 +270,21 @@ export function boot(root) {
   // The How to Play demo. It runs the same sim on its own canvas, so the only
   // thing this file owes it is a place in the tick order and the cosmetic
   // choices the player has already made.
-  const practiceView = createPracticeView(root);
+  // The demo's own ball. It starts as whatever the player has selected for a
+  // run and can be swapped freely here without touching that selection: this
+  // screen is a sandbox, and a ball picked while learning the pull is not a
+  // decision about the next run.
+  let practiceBallId = DEFAULT_BALL;
+
+  const practiceView = createPracticeView(root, {
+    onBallSelect: (ballId) => {
+      if (practice.isBusy()) return;
+      practiceBallId = ballId;
+      practice.setStyle({ ballId });
+      practiceView.setBallChoice({ ballId, enabled: true });
+      requestRedraw();
+    },
+  });
   const practice = createPracticeCourt(root.querySelector("#practiceCourt"), {
     assets,
     audio,
@@ -272,6 +294,7 @@ export function boot(root) {
       practiceView.setTally(tally);
       practiceView.setHintVisible(tally.taken === 0);
     },
+    onBusy: (busy) => practiceView.setBallChoice({ ballId: practiceBallId, enabled: !busy }),
   });
 
   // ---------------------------------------------------------------------
@@ -346,6 +369,7 @@ export function boot(root) {
     kicks.net = 0;
     kicks.rim = 0;
     clearSplatField(splats);
+    clearFlameTrail(trail);
 
     if (playMode === "online") {
       run.status = RUN_RUNNING;
@@ -403,6 +427,10 @@ export function boot(root) {
     hud.setScore(run.score);
     hud.setShots(run.shots);
     hud.setStreak(run.streak);
+    // The shout that says ON FIRE! lasts 650ms; this is the part that stays lit
+    // for as long as the streak does, so a player glancing at the card mid-run
+    // can see they are still on it. Same question, one answer — `onFireLevel`.
+    hud.setOnFire(onFireLevel(run.streak));
     hud.setBest(boards.bestScore(run.modeId, run.duration));
     syncMatchStrip();
   }
@@ -735,6 +763,9 @@ export function boot(root) {
       case "toggle-sound":
         setMuted(!audio.isMuted());
         break;
+      case "toggle-hand":
+        setHand(preferences.hand === "left" ? "right" : "left");
+        break;
       case "leave-horse":
       case "horse-rematch":
       case "horse-lobby":
@@ -772,6 +803,17 @@ export function boot(root) {
     audio.setMuted(next);
     preferences.setMuted(next);
     soundToggle.render(next);
+  }
+
+  /**
+   * Which side of a sideways screen the court sits on.
+   *
+   * Nothing but the stylesheet is told: the canvas is drawn identically either
+   * way, so there is no run to restart and no sim to inform. That is what makes
+   * this safe to flip mid-match from the pause card.
+   */
+  function setHand(next) {
+    handToggle.render(preferences.setHand(next));
   }
 
   root.addEventListener("keydown", (event) => {
@@ -818,11 +860,14 @@ export function boot(root) {
       renderBoards();
     } else if (next === SCREEN_HOWTO) {
       // Opening the demo always starts it clean, and dressed in whatever room
-      // and ball the player has selected — both cosmetic by contract, so this
-      // cannot change how the practice shot behaves.
+      // and ball the player has selected. The room cannot change how the
+      // practice shot behaves; the BALL can, and should — the demo exists to
+      // teach the pull, and the pull is different in a bowling ball's hands.
       const current = preferences.snapshot();
+      practiceBallId = current.ballId;
       practice.setStyle({ ballId: current.ballId, locationId: current.locationId });
       practice.reset();
+      practiceView.setBallChoice({ ballId: practiceBallId, enabled: true });
       practiceView.setPower(0);
       practiceView.setHintVisible(true);
     }
@@ -868,6 +913,10 @@ export function boot(root) {
         ballId: run.ballId,
         alreadyScored: shot.scored,
       });
+      // Shed from where the ball ACTUALLY ended the tick, after every collider
+      // has had its say — so a ball that just came off the rim trails from the
+      // rim rather than from where it would have been had nothing stopped it.
+      emitFlameTrail(trail, { ...ball, dt: TICK_SECONDS, style: ballTrail(run.ballId) });
 
       if (stepped.scored) {
         kicks.net = 1;
@@ -880,13 +929,19 @@ export function boot(root) {
       }
       if (stepped.splat) {
         // The catalog owns how it looks, the physics owns where and how hard.
-        addSplat(splats, { ...stepped.splat, ...ballSplat(run.ballId) });
+        addSplat(splats, { ...stepped.splat, ballId: run.ballId, ...ballSplat(run.ballId) });
         audio.splat(stepped.splat.surface, { ballId: run.ballId, speed: stepped.splat.speed });
       }
       // `ball.vy` is read after the whole tick has resolved, which is exactly
       // what the floor needs: a bounce leaves the floor with speed, a roll
       // leaves it with none, and only the first one should be heard.
       for (const contact of new Set(stepped.contacts)) {
+        // A burning ball lights what it lands on. `addFire` is what knows
+        // whether this contact started a fire or fell inside one already
+        // burning, so the sizzle follows ITS answer rather than the collider's
+        // report — which arrives once per 8ms substep for as long as the ball
+        // rolls. A ball with no trail block hands in null and nothing happens.
+        if (addFire(trail, { ...ball, surface: contact, style: ballTrail(run.ballId) })) audio.sizzle(run.ballId);
         // The contact the ball burst on has already been spoken for — see
         // `audio.splat`. Playing both is the wall thudding at a ball that is
         // still stuck to it.
@@ -926,6 +981,7 @@ export function boot(root) {
     // Powder is advanced on the tick clock, not the frame clock, so it blows
     // away at the same rate on a 144Hz monitor as on a 60Hz one.
     tickSplatField(splats, TICK_SECONDS);
+    tickFlameTrail(trail, TICK_SECONDS);
 
     // Wobble decays toward rest. Frame-rate independent by construction, since
     // this only ever runs inside a fixed tick.
@@ -975,7 +1031,8 @@ export function boot(root) {
       kicks,
       scored: shot.scored,
       splats,
-      splatImages: assets.ballSplats(run.ballId),
+      splatImagesFor: assets.ballSplats,
+      trail,
     });
   }
 
@@ -1016,6 +1073,7 @@ export function boot(root) {
   renderSetup();
   renderBoards();
   soundToggle.render(audio.isMuted());
+  handToggle.render(preferences.hand);
   accountAccess.syncButton(root.querySelector("#onlineMenuButton"));
   hud.setMode(hoopModeById(run.modeId).hudLabel);
   syncHud();

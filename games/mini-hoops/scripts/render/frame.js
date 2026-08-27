@@ -38,6 +38,7 @@ import {
   drawWallShadow,
 } from "./scene.js";
 import { drawSplatDecals, drawSplatParticles } from "./splats.js";
+import { drawFlameEmbers, drawFlameFires } from "./flames.js";
 import { drawAim } from "./aim.js";
 
 /**
@@ -59,7 +60,8 @@ export function renderFrame(ctx, view) {
     kicks,
     scored,
     splats,
-    splatImages,
+    splatImagesFor,
+    trail,
   } = view;
   // The one question the splat asks of the composition below: is there still a
   // ball to draw at all?
@@ -71,8 +73,15 @@ export function renderFrame(ctx, view) {
   // belongs behind the backboard that is bolted over it. The powder goes on
   // top of them and behind the hoop, which is where it was thrown from.
   if (splats) {
-    drawSplatDecals(ctx, splats, { images: splatImages });
+    drawSplatDecals(ctx, splats, { imagesFor: splatImagesFor });
     drawSplatParticles(ctx, splats);
+  }
+  // A fire is a mark on a surface, so it goes where a decal goes — on the room,
+  // under the backboard bolted over it. Its grains go in the air with the
+  // powder, which is the other thing in this cabinet that hangs there.
+  if (trail) {
+    drawFlameFires(ctx, trail);
+    drawFlameEmbers(ctx, trail);
   }
   if (hasBall) {
     // Both shadows go under the furniture pass below, so a ball's shadow cannot

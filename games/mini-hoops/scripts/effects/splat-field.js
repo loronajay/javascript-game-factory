@@ -56,16 +56,28 @@ export function clearSplatField(field) {
  *
  * @param surface "wall" or "floor", straight from the physics report
  * @param speed   how fast the ball was going when it burst
+ * @param ballId  which ball burst — see the note on the decal below
  * @param scale   decal width in ball diameters, from the ball catalog
  * @param color   powder tint, from the ball catalog
  */
-export function addSplat(field, { surface, x, y, z, speed = 0, scale = 3, color = "#ffffff", random = Math.random }) {
+export function addSplat(field, { surface, x, y, z, speed = 0, ballId = null, scale = 3, color = "#ffffff", random = Math.random }) {
   const onFloor = surface === "floor";
   const force = Math.max(0.25, Math.min(1, speed / FULL_BURST_SPEED));
 
   field.decals.push({
     surface,
     x,
+    // A DECAL REMEMBERS THE BALL THAT MADE IT, and this is the only thing about
+    // it that is not geometry. The field outlives the ball selection: a player
+    // who splatters a wall with snowballs and then switches to the meatball
+    // still has those snowball marks on the wall, and had this not been
+    // recorded the renderer would have had one ball id to work from and would
+    // have re-dressed every existing mark in the new ball's art — or, for a
+    // ball that does not splat at all, in no art, which is how a wall full of
+    // snow quietly emptied itself the instant someone picked the basketball.
+    // Storing an ID rather than the images is what keeps this layer as free of
+    // the browser as the sim is.
+    ballId,
     // A floor decal lies ON the floor, whatever height the ball's centre was
     // corrected to. A wall decal keeps the height it struck at.
     y: onFloor ? 0 : y,

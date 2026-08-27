@@ -17,10 +17,31 @@ import { readJSON, resolveStorage, writeJSON } from "./local-storage.js";
 
 const STORAGE_KEY = "miniHoops.preferences.v1";
 
+/**
+ * Which thumb shoots.
+ *
+ * Sideways, the court and the shot panel sit beside each other, so the court
+ * cannot be centred and the ball lands about 104px to one side of the screen —
+ * which is a whole thumb's worth of reach on a phone. Right-handed is the
+ * default because most hands are, and the setting exists because the layout has
+ * to pick a side and the wrong side is genuinely uncomfortable to play.
+ *
+ * It is PRESENTATION ONLY. Nothing under `sim/` reads it, the canvas is drawn
+ * identically either way, and a run set left-handed is the same run — which is
+ * what keeps one board meaning one thing.
+ */
+export const SHOOTING_HANDS = ["right", "left"];
+export const DEFAULT_SHOOTING_HAND = "right";
+
 /** Coerce a duration to one the game actually offers. */
 export function normalizeDuration(value) {
   const number = Number(value);
   return ROUND_DURATIONS.includes(number) ? number : DEFAULT_DURATION;
+}
+
+/** Coerce a stored hand to one of the two the layout knows how to draw. */
+export function normalizeHand(value) {
+  return SHOOTING_HANDS.includes(value) ? value : DEFAULT_SHOOTING_HAND;
 }
 
 export function createPreferencesStore({ storage } = {}) {
@@ -37,6 +58,7 @@ export function createPreferencesStore({ storage } = {}) {
     // Sound is off only if it was explicitly turned off. A preferences blob
     // written before sound existed has no key here, and must not read as muted.
     muted: saved.muted === true,
+    hand: normalizeHand(saved.hand),
   };
 
   function persist() {
@@ -61,6 +83,10 @@ export function createPreferencesStore({ storage } = {}) {
     get muted() {
       return state.muted;
     },
+    /** Which thumb shoots. Layout only — deliberately absent from `snapshot()`. */
+    get hand() {
+      return state.hand;
+    },
 
     setMode(modeId) {
       state.modeId = hoopModeById(modeId).id;
@@ -81,6 +107,11 @@ export function createPreferencesStore({ storage } = {}) {
       state.muted = Boolean(muted);
       persist();
       return state.muted;
+    },
+    setHand(hand) {
+      state.hand = normalizeHand(hand);
+      persist();
+      return state.hand;
     },
     /** Set the round length for the mode currently selected. */
     setDuration(duration) {

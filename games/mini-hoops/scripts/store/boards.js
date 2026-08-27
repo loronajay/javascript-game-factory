@@ -1,13 +1,23 @@
 // Leaderboard shaping. Pure — no storage, no DOM.
 //
 // A BOARD KEY IS `mode:duration`, and that is a deliberate, load-bearing choice.
-// Those are the two things that change what a score means. Location and ball are
-// NOT in the key, which is exactly why both catalogs are constrained to be
-// cosmetic: if a room or a ball could change the shot, two entries on one board
-// would no longer be comparable and the board would quietly become a lie.
+// Those are the two things that change what a score means STRUCTURALLY. Neither
+// the room nor the ball is in the key, but for two different reasons.
 //
-// If a ball or a room should ever play differently, it has to join the key here
-// first — and that is a migration, because existing keys would no longer parse.
+// The room is genuinely cosmetic and cannot change the shot — `location-catalog.js`
+// is constrained to carry nothing but a name and a blurb, and a test says so.
+//
+// The BALL is not. Balls fly differently (see the `flight` block in
+// `ball-catalog.js`), and choosing one is a real decision. That could have made
+// the ball a fourth key; it deliberately did not, because splitting boards by
+// ball would turn one contested board into four lonely ones, which is the worse
+// failure for a local-only leaderboard. What keeps a mixed board honest instead
+// is publication: the difference is stated on the setup screen BEFORE the run,
+// as flight bars on the same picker the ball is chosen from, and every row on
+// the board names the ball its run was set with.
+//
+// So a change of ball is a label here, never a key. A change to what MODE or
+// DURATION mean would be a migration, because existing keys would no longer parse.
 
 import { LEADERBOARD_SIZE } from "../sim/constants.js";
 

@@ -4,6 +4,7 @@
 // presses back as intents; it decides nothing about what those intents do.
 
 import { hoopModeById } from "../sim/hoop.js";
+import { onFireLevel } from "../sim/shot.js";
 import { locationById } from "../assets/location-catalog.js";
 import { ballById } from "../assets/ball-catalog.js";
 
@@ -20,6 +21,7 @@ export function createOverlays(root, { onIntent = () => {} } = {}) {
     rank: root.querySelector("#resultRank"),
     rankLabel: root.querySelector("#resultRankLabel"),
     streak: root.querySelector("#resultStreak"),
+    streakLine: root.querySelector("#resultStreakLine"),
   };
   const nextHotseat = root.querySelector("#nextHotseatButton");
   const replay = results?.querySelector('[data-intent="restart"]');
@@ -75,6 +77,11 @@ export function createOverlays(root, { onIntent = () => {} } = {}) {
       setText(resultNodes.rank, placement.rank > 0 ? `#${placement.rank}` : "—");
       setText(resultNodes.rankLabel, "Local Rank");
       setText(resultNodes.streak, summary.bestStreak);
+      // The payoff for the HUD burning during the run: a best streak that ever
+      // caught keeps its flames on the card that reports it.
+      const heat = onFireLevel(summary.bestStreak);
+      resultNodes.streakLine?.classList.toggle("is-on-fire", heat > 0);
+      resultNodes.streakLine?.style?.setProperty("--heat", String(heat));
       results?.classList.add("is-shown");
     },
     showHotseatPass(summary, playerName = "Player 1") {

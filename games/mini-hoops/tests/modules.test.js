@@ -62,6 +62,7 @@ const MODULES = [
   "scripts/assets/room-geometry.js",
   "scripts/assets/loader.js",
   "scripts/effects/splat-field.js",
+  "scripts/effects/flame-trail.js",
   "scripts/audio/sound-catalog.js",
   "scripts/audio/music-catalog.js",
   "scripts/audio/playlist.js",
@@ -83,6 +84,7 @@ const MODULES = [
   "scripts/render/aim.js",
   "scripts/render/frame.js",
   "scripts/render/splats.js",
+  "scripts/render/flames.js",
   "scripts/ui/screens.js",
   "scripts/ui/pointer.js",
   "scripts/ui/hud.js",
@@ -317,8 +319,45 @@ test("every class the scripts toggle is defined in a stylesheet", () => {
     .join("\n");
 
   // The state classes are the ones that silently do nothing if they are missing.
-  for (const className of ["is-active", "is-shown", "is-hidden", "is-playing", "is-leader"]) {
+  for (const className of ["is-active", "is-shown", "is-hidden", "is-playing", "is-leader", "is-on-fire", "is-placing"]) {
     assert(css.includes(`.${className}`), `.${className} is toggled by script but never styled`);
+  }
+});
+
+test("every ball picker shows the ball, and none of them ships second portrait art", () => {
+  // Eight balls that genuinely fly differently, told apart by name alone, asks
+  // the player to recognise "Rubber Band Ball" as a colour they have never
+  // seen. Every picker draws one, and every one of them draws a ROLL FRAME —
+  // `ballPortraitPath` is the single source, so adding a ball is still one
+  // folder and one catalog row.
+  for (const relative of [
+    "scripts/ui/setup-view.js",
+    "scripts/ui/turn-ball-picker.js",
+    "scripts/ui/boards-view.js",
+  ]) {
+    const code = stripComments(fs.readFileSync(path.join(gameRoot, relative), "utf8"));
+    assert(code.includes("ballPortraitPath"), `${relative} names a ball without showing it`);
+  }
+});
+
+test("the streak burns for as long as it lasts, off the same answer the shout uses", () => {
+  // The ON FIRE! shout is gone in 650ms. The card is the part that stays lit,
+  // and both read `onFireLevel` — two independent answers is how a card that is
+  // alight ends up sitting over a shout that says BUCKET!.
+  const shell = stripComments(fs.readFileSync(path.join(gameRoot, "scripts", "init-game.js"), "utf8"));
+  assert(shell.includes("onFireLevel(run.streak)"), "the HUD is never told the run caught fire");
+  assert(html.includes('id="hudFire"'), "the streak card has nowhere to put its flames");
+
+  const css = fs.readFileSync(path.join(gameRoot, "styles", "game.css"), "utf8");
+  // The magma ball's own trail colours, so "on fire" is one visual language
+  // across the cabinet rather than two things that happen to both be orange.
+  for (const token of ["--fire-core", "--fire-flame", "--fire-smoke"]) {
+    assert(css.includes(token), `${token} is missing, so the HUD flame is not the canvas flame`);
+  }
+  const trail = stripComments(fs.readFileSync(path.join(gameRoot, "scripts", "assets", "ball-catalog.js"), "utf8"));
+  for (const [token, hex] of [["--fire-core", "#fff0bd"], ["--fire-flame", "#ff6a12"], ["--fire-smoke", "#6b4534"]]) {
+    assert(trail.includes(hex), `${hex} is no longer a magma trail stop — retune ${token} with it`);
+    assert(css.includes(`${token}: ${hex}`), `${token} has drifted off the magma trail`);
   }
 });
 

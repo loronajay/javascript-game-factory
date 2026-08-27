@@ -316,6 +316,20 @@ test("a splat leaves one decal and a burst of powder", () => {
   assertEqual(field.decals[0].color, "#fff");
 });
 
+test("a decal remembers the ball that made it, so the wall survives a ball change", () => {
+  // THE reason a decal carries an id at all. The field outlives the selection:
+  // splatter a wall with snowballs, pick up the meatball, and those marks are
+  // still snow. The renderer asks per decal — hand it one ball id for the whole
+  // field and it re-dresses every mark in whatever is in hand now, which for a
+  // ball that does not splat at all is NO art, and a wall full of snow empties
+  // itself the instant someone picks the basketball.
+  const field = createSplatField();
+  addSplat(field, { surface: "wall", x: 0, y: 1.1, z: 0.9, speed: 3, ballId: "snowball", random: sequence([0.5]) });
+  addSplat(field, { surface: "floor", x: 0.3, y: 0, z: 0.4, speed: 3, ballId: "meatball", random: sequence([0.5]) });
+
+  assertEqual(field.decals.map((decal) => decal.ballId).join(","), "snowball,meatball");
+});
+
 test("a floor decal lies on the floor whatever height the ball burst at", () => {
   const field = createSplatField();
   addSplat(field, { surface: "floor", x: 0, y: BALL_RADIUS_WORLD, z: 0.4, speed: 2, random: sequence([0.5]) });

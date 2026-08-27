@@ -221,6 +221,21 @@ export function createGameAudio({
     },
 
     /**
+     * A ball has set something alight where it landed.
+     *
+     * NOT a contact, and deliberately not routed through `contact()`. The
+     * collider reports a bump the instant it happens and once per 8ms substep
+     * after that; a fire is what the room is left with, it starts at most once
+     * per landing, and whether one started at all is a question only
+     * `effects/flame-trail.js` can answer — so that module decides and this
+     * plays. A ball with no fire has no `land` sample and this is silence.
+     */
+    sizzle(ballId) {
+      const land = ballAudio(ballId).land;
+      if (land) engine.play(land);
+    },
+
+    /**
      * It went in.
      *
      * The celebration fires on the shot that STARTS the streak, not on every

@@ -13,6 +13,7 @@ import {
   ballFrameIndex,
   ballFramePaths,
   ballIds,
+  ballPortraitPath,
   ballSplat,
   ballSplatPaths,
   ballSplatsOn,
@@ -43,7 +44,7 @@ test("the default ball exists in the catalog", () => {
 });
 
 test("an unknown ball id falls back to the default instead of throwing", () => {
-  assertEqual(ballById("beach-ball").id, DEFAULT_BALL);
+  assertEqual(ballById("no-such-ball").id, DEFAULT_BALL);
   assertEqual(ballById(undefined).id, DEFAULT_BALL);
   assertEqual(ballById(null).id, DEFAULT_BALL);
 });
@@ -63,6 +64,17 @@ test("frame paths are zero-padded, in order, and one per declared frame", () => 
     assertEqual(paths.length, ball.frameCount, `${ball.id} path count`);
     assertEqual(paths[0], `assets/balls/${ball.id}/roll-00.png`);
     assertEqual(paths[ball.frameCount - 1], `assets/balls/${ball.id}/roll-${String(ball.frameCount - 1).padStart(2, "0")}.png`);
+  }
+});
+
+test("every ball has a portrait, and it is a real frame rather than separate art", () => {
+  // The pickers show the ball as well as naming it. There is deliberately no
+  // portrait art: a second file per ball is a second thing to forget, and the
+  // roll frames already are the ball photographed square on transparency.
+  for (const ball of BALLS) {
+    const portrait = ballPortraitPath(ball.id);
+    assertEqual(portrait, ballFramePaths(ball.id)[0], `${ball.id} portrait is not a roll frame`);
+    assert(fs.existsSync(path.join(gameRoot, portrait)), `missing ${portrait}`);
   }
 });
 
@@ -148,7 +160,7 @@ test("splatting is opt-in per ball, and at least one ball takes it", () => {
 });
 
 test("an unknown ball id asks for no decals rather than throwing", () => {
-  assertEqual(ballSplatPaths("beach-ball"), ballSplatPaths(DEFAULT_BALL));
+  assertEqual(ballSplatPaths("no-such-ball"), ballSplatPaths(DEFAULT_BALL));
   assertEqual(ballSplatsOn(undefined, "floor"), ballSplatsOn(DEFAULT_BALL, "floor"));
 });
 

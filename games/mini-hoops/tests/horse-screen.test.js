@@ -276,6 +276,30 @@ test("each HORSE turn has a ball picker, and the losing player gets the word pop
     "the popup must fade in and back out");
 });
 
+test("the ball is a phase-two control and is put away while the bin is being placed", () => {
+  // A HORSE turn is arrange-a-target then take-a-shot. The picker used to sit
+  // under the placement panel through both, which put two unrelated decisions
+  // in one panel and made the court pay 112px of chrome for a control the
+  // player could not usefully act on yet.
+  const html = fs.readFileSync(path.join(gameRoot, "index.html"), "utf8");
+  const source = fs.readFileSync(path.join(gameRoot, "scripts", "horse-game.js"), "utf8");
+  const css = fs.readFileSync(path.join(gameRoot, "styles", "game.css"), "utf8");
+
+  assert(html.includes('id="horseBallPanel"'), "the picker needs a panel the court can hide");
+  assert(/el\.ballPanel\.hidden = isPlacing\(\)/.test(source), "the picker must be hidden for the placing phase");
+  // `.turn-ball-picker` is `display: grid`, which beats the UA stylesheet's
+  // `[hidden] { display: none }` — without this rule the hide above is a
+  // property nobody reads and the picker stays on screen.
+  assert(/\.turn-ball-picker\[hidden\]\s*\{\s*display:\s*none/.test(css),
+    "hidden must actually hide a display:grid picker");
+
+  // The reservation has to come down with it, or the court pays for a panel
+  // that is not on screen — which is the whole reason `is-placing` exists.
+  const aiming = Number(/#horseScreen \.court \{ --chrome: (\d+)px; \}/.exec(css)[1]);
+  const placing = Number(/#horseScreen \.court\.is-placing \{ --chrome: (\d+)px; \}/.exec(css)[1]);
+  assert(placing < aiming + 112, `placing chrome (${placing}px) still reserves the hidden ball picker`);
+});
+
 test("a matcher inherits the exact ball used to set the standing shot", () => {
   const match = {
     phase: PHASE_MATCH,

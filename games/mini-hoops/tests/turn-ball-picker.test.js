@@ -1,6 +1,6 @@
 import { assert, assertEqual, finish, suite, test } from "./harness.js";
 
-import { BALLS } from "../scripts/assets/ball-catalog.js";
+import { BALLS, ballPortraitPath } from "../scripts/assets/ball-catalog.js";
 import { createTurnBallPicker } from "../scripts/ui/turn-ball-picker.js";
 
 suite("turn ball picker — every human turn may choose its own ball");
@@ -63,6 +63,26 @@ test("the picker is catalog-driven and reports a chosen ball", () => {
     assert(paper.classList.contains("is-active"), "the current ball is not marked");
     view.container.click(paper);
     assertEqual(view.selected.at(-1), "paper");
+  } finally {
+    view.restore();
+  }
+});
+
+test("every choice shows the ball as well as naming it", () => {
+  // Eight balls that fly differently, told apart by their names alone, asks a
+  // player to recognise "Rubber Band Ball" as a colour they have never seen.
+  const view = harness();
+  try {
+    for (const ball of BALLS) {
+      const button = view.container.children.find((child) => child.dataset.ballId === ball.id);
+      const art = button.children.find((child) => child.tagName === "IMG");
+      assert(art, `${ball.id} has no picture on its button`);
+      assertEqual(art.src, ballPortraitPath(ball.id));
+      // The name is right beside it, so a second announcement is noise.
+      assertEqual(art.alt, "");
+      // The picture comes FIRST: the eye should land on the ball, not the word.
+      assertEqual(button.children.indexOf(art), 0, `${ball.id} draws its name before its picture`);
+    }
   } finally {
     view.restore();
   }

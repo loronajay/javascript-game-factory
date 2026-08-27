@@ -140,7 +140,12 @@
               <button id="setupStartButton" type="button" class="primary-btn" data-intent="start">Start Run</button>
               <!-- Every copy of this switch is the same setting; scripts/ui/sound-toggle.js
                    keeps their labels together. The M key does the same thing anywhere. -->
-              <button type="button" class="ghost-btn ghost-btn--small sound-btn" data-intent="toggle-sound" aria-pressed="false">Sound: On</button>
+              <div class="setup-switches">
+                <button type="button" class="ghost-btn ghost-btn--small sound-btn" data-intent="toggle-sound" aria-pressed="false">Sound: On</button>
+                <!-- Which side of a sideways screen the court sits on. Layout only;
+                     scripts/ui/hand-toggle.js. -->
+                <button type="button" class="ghost-btn ghost-btn--small" data-intent="toggle-hand" aria-pressed="false">Shoot: Right</button>
+              </div>
             </div>
           </div>
         </div>
@@ -218,8 +223,13 @@
               <span><b id="hudShots">0</b> shots</span>
             </div>
 
-          <div class="hud-stat hud-stat--right">
-              <small>STREAK</small>
+          <!-- The streak card is where the run catches fire. `hud-fire` is the
+                 painted flame (magma palette, same three stops as the canvas
+                 trail) and `hud-fire-emoji` is the count that says how hot; both
+                 are inert until `is-on-fire` lands on the card. -->
+            <div id="hudStreakStat" class="hud-stat hud-stat--right">
+              <span class="hud-fire" aria-hidden="true"></span>
+              <small>STREAK <b id="hudFire" class="hud-fire-emoji"></b></small>
               <strong id="hudStreak">0</strong>
               <span>best <b id="hudBest">0</b></span>
             </div>
@@ -243,7 +253,10 @@
                   <button type="button" class="ghost-btn" data-intent="restart">Restart</button>
                   <button type="button" class="ghost-btn" data-intent="quit">Quit to Menu</button>
                 </div>
-                <button type="button" class="ghost-btn sound-btn" data-intent="toggle-sound" aria-pressed="false">Sound: On</button>
+                <div class="overlay-actions overlay-actions--split">
+                  <button type="button" class="ghost-btn sound-btn" data-intent="toggle-sound" aria-pressed="false">Sound: On</button>
+                  <button type="button" class="ghost-btn" data-intent="toggle-hand" aria-pressed="false">Shoot: Right</button>
+                </div>
               </div>
             </div>
           </div>
@@ -261,7 +274,7 @@
                 <div><strong id="resultRank">—</strong><span id="resultRankLabel">Local Rank</span></div>
               </div>
 
-              <p class="result-streak">Best streak: <strong id="resultStreak">0</strong></p>
+              <p id="resultStreakLine" class="result-streak">Best streak: <strong id="resultStreak">0</strong></p>
 
               <div class="overlay-actions">
                 <button id="nextHotseatButton" type="button" class="primary-btn" data-intent="next-hotseat" hidden>Pass to Player 2</button>
@@ -450,7 +463,12 @@
             <button type="button" id="horseConfirm" class="primary-btn">Set this shot</button>
           </div>
 
-          <div class="turn-ball-picker">
+          <!-- A HORSE turn is two phases and the ball belongs to the second of
+               them. Placing a bin is arranging the TARGET; the ball is part of
+               the shot taken at it, and offering both at once put two unrelated
+               decisions in one panel — and cost the court 112px of height while
+               the player was still dragging a bin around it. -->
+          <div id="horseBallPanel" class="turn-ball-picker">
             <span id="horseBallLabel" class="turn-ball-label">BALL FOR SET SHOT</span>
             <div id="horseBallChoices" class="turn-ball-choices" role="group" aria-label="Choose a HORSE ball"></div>
           </div>
@@ -614,6 +632,14 @@
             </div>
 
             <div class="shot-panel shot-panel--demo">
+              <!-- The balls genuinely fly differently, so the demo is where a
+                   player finds out what that costs their hand. Local to this
+                   screen: it is never written back to the setup choice. -->
+              <div class="turn-ball-picker">
+                <span class="turn-ball-label">PRACTICE BALL</span>
+                <div id="practiceBallChoices" class="turn-ball-choices" role="group" aria-label="Choose a practice ball"></div>
+              </div>
+
               <div class="meter-head">
                 <span>SHOT POWER</span>
                 <span id="practiceReadout">0%</span>

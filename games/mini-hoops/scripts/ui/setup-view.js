@@ -15,7 +15,7 @@
 //
 // Reports selections back through callbacks; owns no preference state itself.
 
-import { BALLS, ballFlightStats } from "../assets/ball-catalog.js";
+import { BALLS, ballFlightStats, ballPortraitPath } from "../assets/ball-catalog.js";
 import { LOCATIONS, locationBackdropPath, locationById } from "../assets/location-catalog.js";
 import { ROUND_DURATIONS } from "../sim/constants.js";
 import { HOOP_MODES, hoopModeById } from "../sim/hoop.js";
@@ -81,6 +81,10 @@ export function createSetupView(root, { onSelect = () => {} } = {}) {
       label: ball.label,
       note: ball.blurb,
       stats: ballFlightStats(ball.id),
+      // The ball itself, beside its numbers. A picker that publishes four flight
+      // bars and then leaves the player to recognise "Rubber Band Ball" from the
+      // words is asking them to imagine the object it is describing.
+      art: { src: ballPortraitPath(ball.id), alt: "" },
     })),
   };
 
@@ -165,16 +169,20 @@ function buildGroup(container, items, toOption) {
   if (container) {
     container.replaceChildren(
       ...items.map((item) => {
-        const { value, label, note, stats } = toOption(item);
+        const { value, label, note, stats, art } = toOption(item);
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "chip";
+        button.className = art ? "chip chip--art" : "chip";
         button.dataset.value = value;
+        // Before the name, so the picture is what the eye lands on first; the
+        // grid areas in `game.css` put it down the left of the chip.
+        if (art) button.appendChild(buildArt(art));
         const strong = document.createElement("strong");
         strong.textContent = label;
         button.appendChild(strong);
         if (note) {
           const span = document.createElement("span");
+          span.className = "chip-note";
           span.textContent = note;
           button.appendChild(span);
         }
@@ -184,6 +192,24 @@ function buildGroup(container, items, toOption) {
     );
   }
   return { container, };
+}
+
+/**
+ * The picture of the thing being chosen.
+ *
+ * Lazy and async: eight 512px PNGs are already in the preloader's queue for the
+ * court, and the setup screen must not block on them a second time. `alt` is
+ * empty on purpose — the chip's own name is the accessible label, and a screen
+ * reader announcing "Basketball, Basketball" is worse than silence.
+ */
+function buildArt({ src, alt = "" }) {
+  const image = document.createElement("img");
+  image.className = "chip-art";
+  image.src = src;
+  image.alt = alt;
+  image.loading = "lazy";
+  image.decoding = "async";
+  return image;
 }
 
 /**

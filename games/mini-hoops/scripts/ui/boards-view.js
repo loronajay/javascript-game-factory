@@ -14,9 +14,10 @@
 
 import { ROUND_DURATIONS } from "../sim/constants.js";
 import { HOOP_MODES, hoopModeById } from "../sim/hoop.js";
-import { ballById } from "../assets/ball-catalog.js";
+import { ballById, ballPortraitPath } from "../assets/ball-catalog.js";
 import { locationById } from "../assets/location-catalog.js";
 import { durationLabel } from "./setup-view.js";
+import { onFireLevel } from "../sim/shot.js";
 
 export function createBoardsView(root, { onFilter = () => {}, onClear = () => {} } = {}) {
   const modes = root.querySelector("#boardModes");
@@ -66,14 +67,38 @@ function renderRow(entry, index) {
     cell("board-rank", `#${index + 1}`),
     cell("board-score", `${entry.score}`),
     cell("board-detail", `${entry.shots || 0} shots`),
-    cell("board-detail", `${entry.bestStreak || 0} streak`),
+    cell("board-detail", streakLabel(entry.bestStreak || 0)),
     // The ball is the one piece of context that changes what the score MEANT,
-    // so it reads as a label rather than as trailing flavour.
-    cell("board-ball", ballById(entry.ballId).label),
+    // so it reads as a label rather than as trailing flavour — and the pill
+    // carries the ball itself, because a row that names eight different balls
+    // is asking the reader to hold eight names in their head.
+    ballCell(entry.ballId),
     // The room genuinely is flavour: locations are still cosmetic.
     cell("board-flavour", locationById(entry.locationId).label),
   );
   return row;
+}
+
+/** A best streak, with the flames it earned. Same answer the HUD burned on. */
+function streakLabel(bestStreak) {
+  const heat = onFireLevel(bestStreak);
+  return `${bestStreak} streak${heat > 0 ? ` ${"\u{1F525}".repeat(heat)}` : ""}`;
+}
+
+/** The ball pill: the ball, then its name. */
+function ballCell(ballId) {
+  const ball = ballById(ballId);
+  const node = cell("board-ball", "");
+  const art = document.createElement("img");
+  art.className = "board-ball-art";
+  art.src = ballPortraitPath(ball.id);
+  art.alt = "";
+  art.loading = "lazy";
+  art.decoding = "async";
+  const label = document.createElement("span");
+  label.textContent = ball.label;
+  node.append(art, label);
+  return node;
 }
 
 function cell(className, text) {

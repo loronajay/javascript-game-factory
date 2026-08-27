@@ -13,12 +13,17 @@ import { floorScreenY, projectPoint, worldToScreenLength } from "../sim/projecti
 /**
  * The marks stuck to the room, oldest first.
  *
- * `images` is `{ wall, ground }` from the loader, or null for a ball that does
- * not splat. Missing or still-decoding art falls back to a painted blob rather
- * than a hole, per the repo's placeholder rule — the ball has already vanished
- * by the time this draws, so drawing nothing would look like the shot did.
+ * `imagesFor` is asked PER DECAL, with that decal's own ball id, and returns
+ * `{ wall, ground }` from the loader or null for a ball that does not splat.
+ * It is a lookup rather than one resolved pair because the field outlives the
+ * ball selection — the wall keeps its snowball marks after the player has
+ * picked up the meatball, and a single pair would re-dress every mark in the
+ * room in whatever is in hand now. Missing or still-decoding art falls back to
+ * a painted blob rather than a hole, per the repo's placeholder rule: the ball
+ * has already vanished by the time this draws, so drawing nothing would look
+ * like the shot did.
  */
-export function drawSplatDecals(ctx, field, { images } = {}) {
+export function drawSplatDecals(ctx, field, { imagesFor = () => null } = {}) {
   for (const decal of field.decals) {
     const screen = projectPoint({ x: decal.x, y: decal.y, z: decal.z });
     // Sized in WORLD units and projected, not scaled off the ball sprite. The
@@ -29,6 +34,7 @@ export function drawSplatDecals(ctx, field, { images } = {}) {
     // size of the same splat at the player's feet because it IS half the size.
     const ballRadius = worldToScreenLength(BALL_RADIUS_WORLD, decal.z);
     const size = ballRadius * 2 * decal.scale;
+    const images = imagesFor(decal.ballId);
     const image = decal.surface === "floor" ? images?.ground : images?.wall;
 
     // The projection puts a ground-level CENTRE on the floor line, so a pile

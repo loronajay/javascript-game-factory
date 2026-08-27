@@ -45,6 +45,7 @@ function stubCanvas() {
 function harness() {
   const canvas = stubCanvas();
   const said = [];
+  const busy = [];
   let power = 0;
   let tally = { made: 0, taken: 0 };
 
@@ -57,9 +58,10 @@ function harness() {
     onTally: (next) => {
       tally = next;
     },
+    onBusy: (next) => busy.push(next),
   });
 
-  return { canvas, court, said, tally: () => tally, power: () => power };
+  return { canvas, court, said, busy, tally: () => tally, power: () => power };
 }
 
 /** Drag straight back from the resting ball by `distance` canvas pixels. */
@@ -99,6 +101,15 @@ test("a released shot resolves and the ball is handed back", () => {
   const ticks = settle(h.court);
   assert(ticks >= 0, "the shot never resolved — the demo would accept one shot and go dead");
   assertEqual(h.power(), 0, "the meter is cleared when the ball comes back");
+});
+
+test("ball choices lock for the flight and unlock when the ball returns", () => {
+  const h = harness();
+  h.court.setActive(true);
+  shoot(h, PULL_MAX * 0.8);
+  assertEqual(h.busy.at(-1), true, "a released shot must lock the practice ball picker");
+  settle(h.court);
+  assertEqual(h.busy.at(-1), false, "the picker must unlock for the next shot");
 });
 
 test("the reference pull drops it, the same as it does in a run", () => {

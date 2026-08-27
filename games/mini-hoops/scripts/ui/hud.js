@@ -14,6 +14,8 @@ export function createHud(root) {
     score: root.querySelector("#hudScore"),
     shots: root.querySelector("#hudShots"),
     streak: root.querySelector("#hudStreak"),
+    streakStat: root.querySelector("#hudStreakStat"),
+    fire: root.querySelector("#hudFire"),
     best: root.querySelector("#hudBest"),
     shout: root.querySelector("#hudShout"),
     hint: root.querySelector("#hudHint"),
@@ -33,6 +35,22 @@ export function createHud(root) {
     setScore: (value) => setText(nodes.score, value),
     setShots: (value) => setText(nodes.shots, value),
     setStreak: (value) => setText(nodes.streak, value),
+
+    /**
+     * How hard the streak card is burning: 0 is cold, then 1..n gets hotter.
+     *
+     * A LEVEL RATHER THAN A BOOLEAN, and the level is worked out by
+     * `sim/shot.js`'s `onFireLevel` rather than here — the HUD makes no
+     * decisions about the run, and "am I on fire" is the same question the
+     * shout already asks. One flame per level, so the readout keeps telling a
+     * player their streak is still climbing after it has already caught.
+     */
+    setOnFire(level) {
+      const heat = Math.max(0, Math.floor(Number(level) || 0));
+      nodes.streakStat?.classList.toggle("is-on-fire", heat > 0);
+      nodes.streakStat?.style?.setProperty("--heat", String(heat));
+      setText(nodes.fire, "\u{1F525}".repeat(heat));
+    },
     setBest: (value) => setText(nodes.best, value),
 
     /** The big transient word over the court — BUCKET!, RIM, SHORT. */

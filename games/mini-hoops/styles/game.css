@@ -14,6 +14,13 @@
   --ember: #c84c2f;
   --ember-hot: #e0683c;
   --brass: #f0b074;
+  /* The magma ball's own trail colours, lifted verbatim from its `trail` block
+     in `assets/ball-catalog.js`. The HUD burns in the same three stops the
+     canvas does, so "on fire" is one visual language across the cabinet rather
+     than two things that happen to both be orange. */
+  --fire-core: #fff0bd;
+  --fire-flame: #ff6a12;
+  --fire-smoke: #6b4534;
   --radius: 16px;
   --radius-lg: 24px;
   --font: ui-rounded, "Trebuchet MS", system-ui, sans-serif;
@@ -53,7 +60,12 @@ a:focus-visible {
   width: 100%;
   max-width: 1000px;
   margin: 0 auto;
-  padding: 14px;
+  /* Named, because a splash screen has to size itself to what is LEFT of the
+     viewport after this padding, and the phone rules change it. Two places
+     stating the same number is how the landscape backdrop ended up 36px taller
+     than the screen it was lining. */
+  --cabinet-pad-y: 14px;
+  padding: var(--cabinet-pad-y) 14px;
 }
 
 /* Sits over the menu art, so it carries its own backing rather than relying on
@@ -156,7 +168,7 @@ a:focus-visible {
 }
 
 .ghost-btn--small {
-  min-height: 36px;
+  min-height: 40px;
   padding: 7px 11px;
   font-size: 11px;
 }
@@ -174,9 +186,14 @@ a:focus-visible {
 }
 
 /* Row two of the setup card's two-column grid, under Start Run rather than
-   beside the summary. */
-.setup-start .sound-btn {
+   beside the summary. Both switches share the row: they are the cabinet's two
+   settings, they are the same size, and neither is part of the run. */
+.setup-switches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   grid-column: 2;
+  justify-content: flex-end;
 }
 
 /* --- Panels and chips --------------------------------------------------- */
@@ -231,6 +248,36 @@ a:focus-visible {
 .chip strong {
   font-size: 13px;
   font-weight: 850;
+}
+
+/* --- A chip that shows the thing it names -------------------------------- */
+/* The ball picker publishes four flight bars, which is a lot of words about an
+   object the player has never seen. The art runs down the left as its own grid
+   column so the bars still get the chip's full width underneath. */
+
+.chip--art {
+  grid-template-columns: 46px minmax(0, 1fr);
+  grid-template-areas:
+    "art name"
+    "art note"
+    "stats stats";
+  align-items: start;
+  column-gap: 9px;
+}
+
+.chip--art > .chip-art { grid-area: art; }
+.chip--art > strong { grid-area: name; align-self: end; }
+.chip--art > .chip-note { grid-area: note; }
+.chip--art > .chip-stats { grid-area: stats; }
+
+.chip-art {
+  display: block;
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+  /* The frames are lit from the left like the rooms, so the drop shadow goes
+     the same way. Without it a transparent PNG reads as a sticker. */
+  filter: drop-shadow(2px 3px 3px rgba(0, 0, 0, 0.45));
 }
 
 .chip span {
@@ -420,8 +467,10 @@ a:focus-visible {
   top: 10px;
   left: 10px;
   z-index: 12;
-  min-height: 38px;
-  padding: 6px 11px;
+  /* 44px is the Material/HIG floor for a touch target, and this one sits in a
+     corner over a live canvas where a missed press starts a drag instead. */
+  min-height: 44px;
+  padding: 6px 13px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 10px;
   background: rgba(21, 14, 13, 0.78);
@@ -504,6 +553,125 @@ a:focus-visible {
   color: rgba(255, 255, 255, 0.58);
 }
 
+/* --- ON FIRE ------------------------------------------------------------- */
+/* A streak of ON_FIRE_STREAK or more sets the card alight and it stays alight
+   for as long as the streak does — the shout over the court lasts 650ms and
+   says the same thing, but it is gone by the time the next ball is in hand.
+   `--heat` is 1..3 and comes from `onFireLevel` in `sim/shot.js`.
+   
+   THE FLAME IS BUILT THE WAY THE CANVAS BUILDS ONE: a hot core fading out
+   through the magma ball's own three stops, composited so overlapping layers
+   pile toward white rather than toward a flat orange. The flicker is two
+   animations at deliberately different, non-harmonic periods, which is what
+   stops it reading as a pulsing lamp. */
+
+/* NOT `z-index: -1`. The card carries `backdrop-filter`, which makes it a
+   stacking context, so a negative child would be sealed behind the card's own
+   background and never seen. It is painted OVER the card instead and blended
+   with `screen`, which is the CSS equivalent of the `lighter` composite
+   `render/flames.js` uses — light adds, so the card glows instead of being
+   covered. The readouts below then take `position: relative` to climb back on
+   top of it. */
+.hud-fire {
+  position: absolute;
+  /* Reaches well past the top of the card: a flame is taller than the thing it
+     is burning, and one confined to the card's own box reads as a glow. */
+  inset: -30px -14px -8px;
+  z-index: 0;
+  border-radius: 22px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+
+/* The literal fire, and the part that reads at any size. `letter-spacing` is
+   negative so three of them stay inside the card's width. */
+.hud-fire-emoji {
+  font-size: 12px;
+  letter-spacing: -1.5px;
+  filter: drop-shadow(0 0 5px var(--fire-flame));
+}
+
+.hud-stat--right.is-on-fire {
+  /* The frosted-glass backing goes when the card catches. `backdrop-filter`
+     makes the card a backdrop root, and a backdrop root confines everything
+     inside it — so with the blur on, the flame could only ever glow inside the
+     card's own box and the licks reaching past its top edge were clipped away.
+     A card that is on fire does not need to look like frosted glass anyway. */
+  backdrop-filter: none;
+  border-color: rgba(255, 106, 18, 0.72);
+  background: rgba(48, 17, 9, 0.78);
+  box-shadow: 0 0 18px rgba(255, 106, 18, calc(0.14 + 0.08 * var(--heat, 1)));
+}
+
+.hud-stat--right.is-on-fire .hud-fire {
+  /* Two licks of flame with their own offsets, plus a bed of smoke underneath —
+     the same order `render/flames.js` draws in, smoke first and cooler. */
+  /* THE CARD IS THE LOG, NOT THE FLAME, and at 110x60 the flame is HEAT rather
+     than tongues. Drawn tongues were tried at four sizes and every one of them
+     came out as a row of little round lamps: a radial gradient's top is round,
+     and 20px of it cannot be a flame tip. So this is a hot bed burning along
+     the card's top edge and the haze coming off it — the magma trail's own
+     three stops — and the literal fire is left to the emoji beside STREAK,
+     which is unmistakable at any size. Filling the card was also tried and it
+     buries the very number the card exists to report. */
+  background:
+    radial-gradient(50% 15% at 50% 28%, var(--fire-core) 0%, rgba(255, 106, 18, 0.78) 40%, rgba(255, 106, 18, 0) 92%),
+    radial-gradient(38% 26% at 44% 20%, rgba(255, 106, 18, 0.5) 0%, rgba(255, 106, 18, 0) 88%),
+    radial-gradient(34% 30% at 62% 17%, rgba(255, 106, 18, 0.45) 0%, rgba(255, 106, 18, 0) 88%),
+    radial-gradient(60% 26% at 50% 6%, rgba(107, 69, 52, 0.55) 0%, rgba(107, 69, 52, 0) 86%),
+    radial-gradient(78% 62% at 50% 62%, rgba(255, 106, 18, 0.3) 0%, rgba(255, 106, 18, 0) 78%);
+  opacity: calc(0.6 + 0.13 * var(--heat, 1));
+  /* A flame grows off what it is burning, and what it is burning is the card's
+     top edge — a hair over a quarter of the way down the box. */
+  transform-origin: 50% 30%;
+  animation: hud-fire-lick 0.62s ease-in-out infinite alternate;
+}
+
+/* The readouts climb on top of the flame. `:not(.hud-fire)` is load-bearing:
+   the flame is a span too, and `.hud-stat--right.is-on-fire span` outranks
+   `.hud-fire`, so without it the fire itself was handed `position: relative`
+   and collapsed to a zero-height block that drew nothing at all. */
+.hud-stat--right.is-on-fire small,
+.hud-stat--right.is-on-fire > span:not(.hud-fire) {
+  position: relative;
+  color: rgba(255, 240, 189, 0.85);
+}
+
+.hud-stat--right.is-on-fire strong {
+  position: relative;
+  color: var(--fire-core);
+  text-shadow: 0 0 10px var(--fire-flame), 0 0 22px rgba(255, 106, 18, 0.55);
+  animation: hud-fire-throb 0.83s ease-in-out infinite alternate;
+}
+
+/* Scale from the base, because a flame grows upward off what it is burning. */
+@keyframes hud-fire-lick {
+  from { transform: scaleY(0.88) scaleX(1.03); opacity: 0.82; }
+  to { transform: scaleY(1.14) scaleX(0.94); opacity: 1; }
+}
+
+@keyframes hud-fire-throb {
+  from { text-shadow: 0 0 8px var(--fire-flame), 0 0 18px rgba(255, 106, 18, 0.42); }
+  to { text-shadow: 0 0 14px var(--fire-core), 0 0 28px rgba(255, 106, 18, 0.65); }
+}
+
+/* The same treatment on the card that reports the run, so a streak that caught
+   during play is still visibly a streak that caught when the run is over. */
+.result-streak.is-on-fire {
+  color: rgba(255, 240, 189, 0.9);
+}
+
+.result-streak.is-on-fire strong {
+  color: var(--fire-core);
+  text-shadow: 0 0 10px var(--fire-flame), 0 0 22px rgba(255, 106, 18, 0.5);
+}
+
+.result-streak.is-on-fire::after {
+  content: " F525";
+  filter: drop-shadow(0 0 5px var(--fire-flame));
+}
+
 .hud-shout {
   position: absolute;
   top: 118px;
@@ -566,6 +734,13 @@ a:focus-visible {
   margin-bottom: 10px;
 }
 
+/* `display: grid` beats the UA stylesheet's `[hidden] { display: none }`, so
+   HORSE putting the picker away for the placing phase would otherwise change
+   nothing on screen — the same trap `.online-config label[hidden]` fell into. */
+.turn-ball-picker[hidden] {
+  display: none;
+}
+
 .turn-ball-label {
   color: rgba(255, 255, 255, .72);
   font: 850 10px/1 system-ui, sans-serif;
@@ -579,17 +754,33 @@ a:focus-visible {
 }
 
 .turn-ball-choice {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   min-width: 0;
-  min-height: 32px;
+  min-height: 40px;
   padding: 6px 5px;
   border: 1px solid rgba(255, 255, 255, .15);
   border-radius: 9px;
   background: rgba(255, 255, 255, .055);
   color: rgba(255, 255, 255, .62);
+  text-align: left;
+}
+
+/* 22px keeps the button on the 40px row every court already reserves for it —
+   see the note in `ui/turn-ball-picker.js`. `flex-shrink: 0` because the name
+   beside it is the part allowed to ellipsis. */
+.turn-ball-art {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  filter: drop-shadow(1px 2px 2px rgba(0, 0, 0, .45));
 }
 
 .turn-ball-choice strong {
   display: block;
+  min-width: 0;
   overflow: hidden;
   font: 800 10px/1.1 system-ui, sans-serif;
   text-overflow: ellipsis;
@@ -771,7 +962,7 @@ a:focus-visible {
 
 .screen--splash.is-active {
   padding: 20px;
-  min-height: calc(100dvh - 28px);
+  min-height: calc(100dvh - 2 * var(--cabinet-pad-y, 14px));
 }
 
 .splash-backdrop-layer {
@@ -896,8 +1087,11 @@ a:focus-visible {
    together, so this is context rather than decoration — it is given the brass
    the rest of the row's detail cells do not get. */
 .board-ball {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   justify-self: start;
-  padding: 2px 7px;
+  padding: 2px 7px 2px 3px;
   border: 1px solid rgba(240, 176, 116, 0.3);
   border-radius: 999px;
   font-size: 11px;
@@ -907,6 +1101,18 @@ a:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+
+.board-ball-art {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.board-ball > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .board-flavour {
@@ -943,7 +1149,10 @@ a:focus-visible {
    never more height than the screen has left once the header and its meter are
    paid for. A demo you have to scroll to would be teaching the wrong lesson. */
 .court--demo {
-  --chrome: 210px;
+  /* The panel under this court is the practice ball picker AND the meter. Per
+     the rule at the top of the viewport section: when the panel grows a row the
+     reservation grows with it, and the picker is 66px of row. */
+  --chrome: 276px;
   width: min(100%, calc((100dvh - var(--chrome)) * 960 / 760));
   border-radius: 16px;
 }
@@ -966,6 +1175,21 @@ a:focus-visible {
   margin-top: 8px;
   padding: 10px 12px;
 }
+
+/* The demo's ball picker sits with its label INLINE rather than stacked over the
+   buttons, which is the two per-turn courts' shape. The row it saves is the
+   whole reason it fits: the demo court and its meter are one instrument and may
+   never be scrolled apart, so anything added under the court is paid for out of
+   the court itself. One row of four is also the honest presentation here — the
+   four balls are a single choice, not a grid. */
+.shot-panel--demo .turn-ball-picker {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.shot-panel--demo .turn-ball-choice { min-height: 44px; }
 
 .how-notes {
   padding: 16px 18px;
@@ -1057,8 +1281,10 @@ body.is-playing .cabinet {
     grid-template-columns: 1fr;
   }
 
+  .shot-panel--demo { margin-top: 6px; padding: 8px 10px; }
+
   .how-notes {
-    padding: 14px 16px;
+    padding: 11px 16px;
   }
 
   .how-list {
@@ -1140,10 +1366,104 @@ body.is-playing .cabinet {
    notes. The court is capped and cropped to width — the same trade the game
    screen makes in portrait — so the shot and its power are always on screen
    together, and the notes are the part you scroll to. */
+/* PORTRAIT ONLY, and the orientation clause is load-bearing: `max-width: 820px`
+   on its own also matches a 740-wide phone lying on its side, where the notes
+   are a column beside the court rather than a stack under it and the court is
+   sized by height instead.
+
+   This is where the ball picker's row is paid for in portrait. */
+@media (max-width: 820px) and (orientation: portrait) {
+  /* Portrait stacks the notes under the court, so this court is width-limited by
+     its own column rather than by `--chrome` — the reservation does not bind and
+     so cannot pay for the picker. This cap does.
+
+     It is a cap on WIDTH, written as the width that height would need. A
+     `max-height` looks equivalent and is not: `.court` is `overflow: hidden` and
+     the canvas is `height: auto`, so a height cap CROPS the bottom of the room
+     off — which is exactly where the ball rests. */
+  /* Centred, because it is now narrower than the column it sits in and a court
+     hanging off the left edge puts the ball off-centre under the thumb. */
+  .court--demo { width: min(100%, calc(27dvh * 960 / 760)); margin-inline: auto; }
+
+  /* The label stays over the buttons here rather than inline beside them:
+     inline, four ball names share 255px of a 360-wide phone and come out 41px
+     each — narrower than a fingertip, and too narrow to read "Bowling Ball". */
+  .shot-panel--demo .turn-ball-picker { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+
+  /* Three across rather than four. Four puts eight balls on 65px buttons, and a
+     22px picture plus "Basketball" does not go in 65px — every name came out as
+     two letters and an ellipsis. The extra row is affordable here and nowhere
+     else: the notes below now flex, so a row taken by the picker comes out of
+     the scrolling half of the screen rather than out of the court. */
+  .shot-panel--demo .turn-ball-choices { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 @media (orientation: landscape) and (max-height: 620px) {
-  .court--demo {
-    height: min(56dvh, 320px);
+  /* The `max-width: 820px` rule above stacks the demo over the notes, which is
+     right for a narrow portrait screen and wrong for a wide short one: stacked,
+     the court plus its meter plus the notes measured 250px taller than a 740x360
+     phone, so the PAGE scrolled and the demo court's ball sat 17% across the
+     screen. Sideways there is width to spend, so the two go back side by side —
+     and on the same shooting side as the game court, since this is the screen
+     where the gesture is learned. */
+  .how-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 300px) minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
   }
+
+  /* `grid-row: 1` for the same reason the court pins it — see the game screen's
+     landscape rule. */
+  /* `align-self: start`, not the grid's `center`: an item taller than its row is
+     centred by overflowing BOTH ways, which is how the demo court came to sit on
+     top of the header. Start means any remaining overshoot is visible at the
+     bottom, where it is obvious, rather than hidden behind the title. */
+  .how-demo { grid-column: 2; grid-row: 1; align-self: start; }
+  .how-notes { grid-column: 1; grid-row: 1; }
+
+  [data-hand="left"] .how-demo { grid-column: 1; }
+  [data-hand="left"] .how-notes { grid-column: 2; }
+
+  /* `--chrome` is the portrait reservation — the notes stacked underneath. Side
+     by side there is nothing under the court to pay for, and leaving it set
+     capped the demo at 189px of the 402 its column had. */
+  /* Sideways the court is HEIGHT-driven and its width follows from that, which
+     is the one thing the old rule got wrong: it set a height and left the base
+     rule's width alone, so a 402px-wide box held a 196px canvas and the room sat
+     between two bars of bare court. The canvas is `height: 100%` here, so the
+     box has to BE the canvas.
+
+     `--chrome` is everything else in this column plus the head and the padding
+     around it — measured, and the same contract as every other court in the
+     cabinet: if the panel grows a row, this grows with it. It replaces a flat
+     43dvh that did not fit a 360-tall phone at all and pushed the court up
+     through the header. */
+  .court--demo {
+    --chrome: 246px;
+    height: min(calc(100dvh - var(--chrome)), 300px);
+    width: min(100%, calc(min(calc(100dvh - var(--chrome)), 300px) * 960 / 760));
+    margin-inline: auto;
+  }
+
+  /* Bought back out of the panel and spent on the court: four pixels a row over
+     two rows of picker, plus the padding. 40px is the floor the landscape rail
+     already works to elsewhere in the cabinet. */
+  .shot-panel--demo { padding: 6px 9px; }
+  /* The label goes back OVER the buttons here. Inline it eats 110px of a 380px
+     rail and every ball came out as two letters and an ellipsis; stacked, the
+     row it costs is cheaper than the eight names it buys back. */
+  .shot-panel--demo .turn-ball-picker {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+  .shot-panel--demo .turn-ball-choice { min-height: 40px; }
+
+  /* The hint pill is wider than this court and is clipped by it — and the three
+     notes sitting immediately beside it say the same thing at length. Same call
+     the game screen makes about `.meter-legend` on a phone. */
+  .court--demo .hud-hint { display: none; }
 
   .court--demo .court-canvas {
     position: absolute;
@@ -1156,9 +1476,79 @@ body.is-playing .cabinet {
     transform: translateX(-50%);
   }
 
+  /* The notes are the part that scrolls, inside their own box — the demo and its
+     meter always stay together on screen. The bound is the grid area they were
+     given rather than a hand-measured offset from the viewport: the fitted
+     column below makes that area definite, and `100dvh - 144px` was three
+     guesses about the header, the padding and the cabinet stacked on top of
+     each other, all of which drifted. */
   .how-notes {
-    max-height: calc(100dvh - 118px);
+    max-height: 100%;
     overflow-y: auto;
+  }
+
+  .how-list { gap: 8px; font-size: 11.5px; }
+  .screen-head { margin: 2px 0 8px; }
+
+  /* How to Play is the one non-court screen that has to FIT rather than scroll:
+     the demo and its power meter are a single instrument, exactly as they are in
+     a run. It is not a `body.is-playing` screen, so it does not get that rule's
+     viewport lock and pays the cabinet's full 14px padding — which was the last
+     10px standing between it and the fold. */
+  .cabinet { --cabinet-pad-y: 6px; padding: var(--cabinet-pad-y) 10px; }
+}
+
+/* ---------------------------------------------------------------------------
+   HOW TO PLAY FITS
+
+   The demo court and its power meter are one instrument, exactly as they are in
+   a run, and a page scroll separates them — so this screen may never scroll,
+   even though it is not a `body.is-playing` screen and gets none of that rule's
+   viewport lock.
+
+   It used to be held to that by arithmetic: a court capped in `dvh`, a notes box
+   capped at `100dvh - 144px`, and a cabinet padding trimmed to buy the last
+   10px. Every one of those is a separate guess about the same layout, and the
+   roster growing from four balls to eight put a second row under the picker and
+   broke all three at once — 47px over in portrait, 39px sideways.
+
+   This is the mechanism instead, and it holds at any content height: the screen
+   is exactly the viewport less the cabinet's padding, the head and the demo take
+   what they need, and THE NOTES ARE THE PART THAT SCROLLS. Scoped to the screen
+   rather than to `.screen--splash`, because Leaderboards is a list and is
+   supposed to scroll.
+   --------------------------------------------------------------------------- */
+
+@media (max-width: 820px), (orientation: landscape) and (max-height: 620px) {
+  #howToScreen.is-active {
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - 2 * var(--cabinet-pad-y, 14px));
+    overflow: hidden;
+  }
+
+  #howToScreen .screen-head { flex: 0 0 auto; }
+
+  /* `min-height: 0` on both, or a flex/grid child refuses to shrink below its
+     content and hands the overflow straight back to the page. */
+  #howToScreen .how-layout {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  #howToScreen .how-demo { min-height: 0; }
+
+  #howToScreen .how-notes {
+    min-height: 0;
+    max-height: 100%;
+    overflow-y: auto;
+  }
+}
+
+/* Stacked, the notes are the second ROW, and they are the one that flexes. */
+@media (max-width: 820px) and (orientation: portrait) {
+  #howToScreen .how-layout {
+    grid-template-rows: auto minmax(0, 1fr);
   }
 }
 
@@ -1173,12 +1563,31 @@ body.is-playing .cabinet {
     padding: 5px;
   }
 
+  /* THE COURT GOES ON THE SHOOTING SIDE.
+     Sideways there is no way to centre the court — the shot panel is a rail
+     beside it, so the ball's resting position lands about 104px off centre
+     whichever way round they go. Measured on a 393-tall phone that is the
+     difference between a thumb that reaches the ball and one that stretches
+     across the screen for it, so the side is a setting rather than a guess:
+     `data-hand` comes off the preferences store via scripts/ui/hand-toggle.js
+     and is the ONLY thing it changes. Right-handed puts the rail in column 1
+     and the court in column 2; left-handed is the mirror.
+
+     The rail is the fixed column in both directions, because the court's width
+     is derived from the height it is given and the panel's is not.
+
+     BOTH children pin `grid-row: 1`. Auto-placement only ever moves forward, so
+     sending the second child in DOM order back to column 1 makes the grid open a
+     second row for it instead — which put the whole shot panel below the fold
+     and quietly re-introduced the page scroll `body.is-playing` exists to
+     prevent. It measures as 101px of scroll and looks like nothing at all. */
   .game-screen.is-active {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 200px;
+    grid-template-columns: var(--rail) minmax(0, 1fr);
     gap: 8px;
     align-items: center;
     height: 100%;
+    --rail: 200px;
   }
 
   .game-screen .court {
@@ -1187,6 +1596,25 @@ body.is-playing .cabinet {
     max-width: 100%;
     aspect-ratio: 960 / 760;
     justify-self: center;
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .game-screen .shot-panel {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  [data-hand="left"] .game-screen.is-active {
+    grid-template-columns: minmax(0, 1fr) var(--rail);
+  }
+
+  [data-hand="left"] .game-screen .court {
+    grid-column: 1;
+  }
+
+  [data-hand="left"] .game-screen .shot-panel {
+    grid-column: 2;
   }
 
   .game-screen .court-canvas {
@@ -1254,16 +1682,166 @@ body.is-playing .cabinet {
     overflow-y: auto;
   }
 
-  .horse-nudges { grid-template-columns: 1fr; gap: 5px; }
-  .horse-motions { grid-template-columns: 1fr 1fr; }
-  .horse-place { gap: 6px; margin-bottom: 8px; padding-bottom: 8px; }
-  .horse-place-head { flex-direction: column; gap: 2px; }
+  /* A wider rail for HORSE, and the same one in both phases of the turn.
+     At 200px the placement panel measured taller than the screen at every
+     landscape size, which put `Set this shot` and half the motions under a
+     scroll nobody would go looking for — a turn a player cannot finish, the
+     same failure the results card had. The extra 50px buys the motions three
+     columns instead of two and the steppers a real tap target.
+
+     It does NOT widen only while placing, even though `is-placing` is right
+     there: the court would then change size in the middle of a turn, and the
+     bin a player just placed would move under them between arranging it and
+     shooting at it. A constant court is worth more than 50px of it. */
+  #horseScreen.is-active { --rail: 280px; }
+
+  /* The rail scrolls when the placement panel is taller than a short screen, and
+     a centred column that overflows puts its FIRST rows above the top of the
+     scroll box where nothing can reach them — the depth steppers, which are the
+     control a turn starts with. Anchored to the top, everything is reachable by
+     scrolling the direction people scroll. */
+  #horseScreen .shot-panel { justify-content: flex-start; }
+
+  /* Nothing in a scrolling panel may be SHRUNK to make room. Flex items shrink
+     by default, and the placement panel overflowing its rail squeezed the power
+     meter from 21px to 2px — a control that still worked and could no longer be
+     read. The panel scrolls; its contents keep their size. */
+  .game-screen .shot-panel > * { flex-shrink: 0; }
+
+  /* The legend under the meter names what the ends of the bar mean. It is the
+     one thing here a player reads once and never again, so it is what gives way
+     on a short screen — the same call the portrait rules already make. */
+  .game-screen .meter-legend { display: none; }
+
+  /* Scoped to `#horseScreen` on purpose. The unscoped `.horse-nudges` and
+     `.horse-motions` rules live further down this file, so at equal specificity
+     they WIN over anything written here on source order alone — which is why the
+     steppers were still coming out three-across and 43px wide on a phone despite
+     a landscape rule that said otherwise. */
+  /* Two columns rather than three stacked rows: the rail is wide enough for two
+     stepper pairs abreast, and the row it saves is what brings the ball picker
+     back above the fold on a 393-tall phone. */
+  #horseScreen .horse-nudges { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+  #horseScreen .horse-place .primary-btn { min-height: 46px; }
+  #horseScreen .horse-motions { grid-template-columns: repeat(3, 1fr); }
+  #horseScreen .horse-place { gap: 6px; margin-bottom: 8px; padding-bottom: 8px; }
+  #horseScreen .horse-place-head { flex-direction: column; gap: 2px; }
+
+  /* Four ball buttons across a 200px rail is 38px each — under half a fingertip.
+     Two rows of two is the same information at a size that can be pressed. */
+  .turn-ball-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  /* HORSE keeps them on one row, because its rail is 250px wide (55px a button,
+     still a real target) and it is the mode that cannot afford the extra row:
+     the ball is chosen while placing, and a second row pushed the picker off the
+     bottom of the panel. */
+  #horseScreen .turn-ball-choices { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+  /* The How-to-Play picker is NOT in a 200px rail — its panel is the full width
+     of the demo column, several hundred pixels of it. Left on the two-column
+     rule above it stacked into a second row of 40px buttons, and the demo went
+     from fitting to scrolling 106px with two balls under the fold. Sideways it
+     is one flat row with the label inline: the meter has to stay glued to the
+     court, so the picker is the part that gives way. */
+  #howToScreen .turn-ball-picker { gap: 8px; margin-bottom: 6px; }
+  #howToScreen .turn-ball-choices { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+  #howToScreen .turn-ball-choice { min-height: 34px; padding: 4px 3px; }
+  .shot-panel--demo { margin-top: 5px; padding: 7px 10px; }
 
   /* The letter board sits over a court that is now the full height of a short
      screen, so it moves up under the menu button and loses its name column. */
   .horse-letters { top: 46px; }
   .horse-letter-row { padding: 3px 6px; gap: 6px; }
   .horse-letter-name { font-size: .6rem; }
+}
+
+/* HORSE ON A WIDE SCREEN: THE PANEL GOES IN A RAIL, THE SAME AS ON A PHONE.
+
+   HORSE reserves the most chrome in the cabinet — 385px while placing, because
+   the placement panel is three stepper pairs, six motion chips, a confirm button
+   and a ball picker. Stacked, that reservation comes straight off the court's
+   height, and the court's width is derived from its height: on a 1600x725
+   window it left a 430px court in a 1600px window with the whole middle of the
+   screen empty. The waste is horizontal and the shortage is vertical, which is
+   exactly the trade the landscape rail already makes on a phone.
+
+   So the same layout is used above the phone breakpoint, scoped to `#horseScreen`
+   because the other two courts reserve 140-245px and are not starved by it.
+   `--chrome` does not apply here at all — the court is given an explicit height —
+   which also means `is-placing` stops resizing the court between arranging a bin
+   and shooting at it, the property the phone rail already has.
+
+   `body.is-playing .cabinet` has to give up its 1000px cap for this: a rail plus
+   a full-height court is wider than that, and capping it would hand back the
+   width the rail exists to spend. */
+@media (orientation: landscape) and (min-height: 621px) and (min-width: 1100px) {
+  body.is-playing:has(#horseScreen.is-active) .cabinet {
+    max-width: none;
+  }
+
+  #horseScreen.is-active {
+    --rail: 340px;
+    display: grid;
+    grid-template-columns: var(--rail) minmax(0, 1fr);
+    gap: 14px;
+    align-items: center;
+    height: 100%;
+  }
+
+  /* Both children pin `grid-row: 1` for the reason the phone rule does: auto
+     placement only moves forward, so sending the court back to column 1 in the
+     left-handed mirror would open a SECOND ROW for it and push the panel off the
+     bottom of a locked page. */
+  #horseScreen .court {
+    height: calc(100dvh - 28px);
+    width: auto;
+    max-width: 100%;
+    aspect-ratio: 960 / 760;
+    justify-self: center;
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  #horseScreen .court-canvas {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+  }
+
+  #horseScreen .shot-panel {
+    width: auto;
+    margin: 0;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    /* `safe` centre: centred while the panel fits, which it does at every size
+       this rule covers, and pinned to the top the moment it does not. A plain
+       `center` that overflows puts its first rows ABOVE the top of the scroll
+       box where nothing can reach them — and the first rows here are the depth
+       steppers a turn starts with. */
+    justify-content: safe center;
+    overflow-y: auto;
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  /* Nothing in a scrolling panel may be shrunk to make room — the meter is the
+     first thing flex takes it out of, and a 2px meter still works and can no
+     longer be read. */
+  #horseScreen .shot-panel > * { flex-shrink: 0; }
+
+  [data-hand="left"] #horseScreen.is-active {
+    grid-template-columns: minmax(0, 1fr) var(--rail);
+  }
+
+  [data-hand="left"] #horseScreen .court { grid-column: 1; }
+  [data-hand="left"] #horseScreen .shot-panel { grid-column: 2; }
+
+  /* 340px of rail: two stepper pairs abreast and the motions three across, which
+     is the widest the panel gets and still leaves every control a real target. */
+  #horseScreen .horse-nudges { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #horseScreen .horse-motions { grid-template-columns: repeat(3, 1fr); }
+  #horseScreen .turn-ball-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1300,7 +1878,8 @@ body.is-playing .cabinet {
   cursor: pointer;
   font: 800 .74rem/1 system-ui, sans-serif;
   letter-spacing: .06em;
-  padding: 8px 10px;
+  min-height: 40px;
+  padding: 8px 12px;
   text-transform: uppercase;
 }
 
@@ -1335,11 +1914,16 @@ body.is-playing .cabinet {
    --------------------------------------------------------------------------- */
 
 /* Two reservations, because the panel below is two different heights: aiming is
-   the meter alone, placing adds the readout, the steppers and the motion row.
-   One number big enough for both would shrink the court for the whole of every
-   shot to pay for a panel that is not even on screen. */
+   the meter and the ball picker, placing is the readout, the steppers and the
+   motion row. One number big enough for both would shrink the court for the
+   whole of every shot to pay for a panel that is not even on screen.
+   
+   The two overlap less than they look: the ball picker is a phase-two control
+   and is hidden while placing, which is 112px (a 10px label, a 6px gap, two
+   40px rows with a 6px gap between them, and a 10px margin) that the placing
+   reservation does not have to carry. */
 #horseScreen .court { --chrome: 245px; }
-#horseScreen .court.is-placing { --chrome: 385px; }
+#horseScreen .court.is-placing { --chrome: 273px; }
 
 /* Below the MENU button on the left, on the same line `.hud-stat` sits on — the
    HUD is absolutely positioned, not a grid, so a letter board laid out in flow
@@ -1437,7 +2021,7 @@ body.is-playing .cabinet {
 }
 
 .horse-nudge-pair { display: grid; gap: 4px; grid-template-columns: 1fr 1fr; }
-.horse-nudge-pair .ghost-btn { padding: 7px 4px; white-space: nowrap; }
+.horse-nudge-pair .ghost-btn { min-height: 40px; padding: 7px 4px; white-space: nowrap; }
 
 /* Labels only. The court is locked to the viewport, so six chips carrying a
    line of description each cost about 95px of the height the court is trying to
@@ -1459,7 +2043,7 @@ body.is-playing .cabinet {
 
 @media (max-width: 820px) {
   #horseScreen .court { --chrome: 265px; }
-  #horseScreen .court.is-placing { --chrome: 415px; }
+  #horseScreen .court.is-placing { --chrome: 303px; }
   .horse-motions { grid-template-columns: repeat(3, 1fr); }
   .horse-nudges { grid-template-columns: 1fr; }
   .horse-letter-name { min-width: 0; }

@@ -17,8 +17,9 @@
 // page is not sharing a controller.
 
 import { createAssetLibrary } from "./assets/loader.js";
-import { DEFAULT_BALL, ballFlight, ballSplat } from "./assets/ball-catalog.js";
+import { DEFAULT_BALL, ballFlight, ballSplat, ballTrail } from "./assets/ball-catalog.js";
 import { addSplat, clearSplatField, createSplatField, tickSplatField } from "./effects/splat-field.js";
+import { addFire, clearFlameTrail, createFlameTrail, emitFlameTrail, tickFlameTrail } from "./effects/flame-trail.js";
 import { createMiniHoopsAccountAccess } from "./multiplayer/account-access.js";
 import { normalizeRoomCode } from "./multiplayer/online-client.js";
 import { createTicTacToeOnlineClient } from "./multiplayer/tic-tac-toe-online-client.js";
@@ -51,6 +52,7 @@ import { clearScene, depthGradeFilter, drawBallShadow, drawRoom, prepareContext 
 import { canvasPoint, isGrab } from "./ui/pointer.js";
 import { createTurnBallPicker, normalizeTurnBallId } from "./ui/turn-ball-picker.js";
 import { drawSplatDecals, drawSplatParticles } from "./render/splats.js";
+import { drawFlameEmbers, drawFlameFires } from "./render/flames.js";
 
 // One definition of what each side looks like. The floor glyph, the claimed
 // cell's tint and the no-art fallback all read it, so a colour cannot drift
@@ -121,6 +123,10 @@ export function bootTicTacToe(root, options = {}) {
   const cells = binGridCells();
   const ball = createBall();
   const splats = createSplatField();
+  // The magma ball burns, and what it leaves in the air and on the floor is a
+  // second transient field beside the splats. Same layer, same tick clock, and
+  // the same guarantee: it cannot touch a score. See `effects/flame-trail.js`.
+  const trail = createFlameTrail();
   const scoredAt = new Map();
   // When each kind of contact last sounded, for the debounce in `announce`.
   const lastContactAt = new Map();
@@ -261,6 +267,7 @@ export function bootTicTacToe(root, options = {}) {
     scoredAt.clear();
     lastContactAt.clear();
     clearSplatField(splats);
+    clearFlameTrail(trail);
     pull = null;
     flight = null;
     onlineAttemptPending = false;
@@ -292,6 +299,24 @@ export function bootTicTacToe(root, options = {}) {
    * collision. The floor is exempt because `audio.contact` already judges a
    * floor hit by its speed, which is what separates a bounce from a roll.
    */
+  /**
+   * Set alight whatever a burning ball just landed on.
+   *
+   * Beside `announce` rather than inside it, because the two answer different
+   * questions on purpose: `announce` debounces, since a collider reports the
+   * same contact every substep and the ear cannot take that. A fire is not
+   * debounced on a clock at all — `addFire` refuses one that is already
+   * burning where this one would go, which is a fact about the room rather than
+   * about elapsed time, and is what lets a rolling ball leave a line of them.
+   */
+  function ignite(contacts, ballId) {
+    const style = ballTrail(ballId);
+    if (!style) return;
+    for (const contact of new Set(contacts)) {
+      if (addFire(trail, { ...ball, surface: contact, style, random })) audio.sizzle(ballId);
+    }
+  }
+
   function announce(contacts, ballId, splat = null) {
     for (const contact of contacts) {
       if (contact === "bin-score") continue;
@@ -417,6 +442,7 @@ export function bootTicTacToe(root, options = {}) {
       if (cpuDelay <= 0) startCpuShot();
     }
     tickSplatField(splats, TICK_SECONDS);
+    tickFlameTrail(trail, TICK_SECONDS, { random });
   }
 
   function tickFlight() {
@@ -427,8 +453,10 @@ export function bootTicTacToe(root, options = {}) {
         ballId: flight.ballId,
         capturedBin: flight.capturedBin,
       });
+      emitFlameTrail(trail, { ...ball, dt: TICK_SECONDS, style: ballTrail(flight.ballId), random });
+      ignite(result.contacts, flight.ballId);
       if (result.splat) {
-        addSplat(splats, { ...result.splat, ...ballSplat(flight.ballId), random });
+        addSplat(splats, { ...result.splat, ballId: flight.ballId, ...ballSplat(flight.ballId), random });
         audio.splat(result.splat.surface, { ballId: flight.ballId, speed: result.splat.speed });
       }
       announce(result.contacts, flight.ballId, result.splat);
@@ -825,8 +853,10 @@ export function bootTicTacToe(root, options = {}) {
     if (!match) return;
     clearScene(ctx);
     drawRoom(ctx, art.room, ROOM_ID);
-    drawSplatDecals(ctx, splats, { images: assets.ballSplats(flight?.ballId || currentTurnBallId()) });
+    drawSplatDecals(ctx, splats, { imagesFor: assets.ballSplats });
     drawSplatParticles(ctx, splats);
+    drawFlameFires(ctx, trail);
+    drawFlameEmbers(ctx, trail);
     drawGrid();
 
     const captured = capturedBinForDraw(flight);

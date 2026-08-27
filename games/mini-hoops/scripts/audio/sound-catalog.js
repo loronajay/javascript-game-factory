@@ -23,11 +23,13 @@
 // what `apparatusGain`/`apparatusRate` carry. A paper wad off the backboard is a
 // quiet, higher tap; a snowball is a duller thud.
 //
-// THE APPARATUS CAN BE OVERRIDDEN, for one ball and one reason. A bowling ball
-// hitting a rim is not the house rim sample played louder — it is a different
-// event, and it has its own recording. So a ball may name its own `rim` sample
-// and the shared one steps aside. This is an escape hatch, not the pattern:
-// prefer `apparatusGain`/`apparatusRate` unless there is genuinely a file.
+// THE APPARATUS CAN BE OVERRIDDEN, for one reason. A bowling ball hitting a rim
+// is not the house rim sample played louder — it is a different event, and it
+// has its own recording; so do the meatball and the rubber band ball. So a ball may name its own `rim`
+// sample and the shared one steps aside. This is an escape hatch, not the
+// pattern: prefer `apparatusGain`/`apparatusRate` unless there is genuinely a
+// file. The board, the wall and the ceiling are never overridden — those are the
+// ROOM rather than the ball, and every ball rings the same plaster.
 //
 // THIS FILE STILL CANNOT REACH THE SIM. How a ball SOUNDS lives here; how it
 // FLIES lives in `assets/ball-catalog.js`. They are deliberately separate files
@@ -68,6 +70,34 @@ export const SOUNDS = Object.freeze([
   // The bowling ball's own rim hit, standing in for the shared `rim` sample
   // rather than colouring it. See the apparatus note at the top of the file.
   Object.freeze({ id: "rim-bowling-ball", file: "bowling-ball-hitting-rim.wav", gain: 0.8, offset: 0.02, minInterval: 0.09 }),
+  // The meatball's body. ONE recording serves both its floor impact and its
+  // burst, which is what its filename says and is honest rather than lazy: a
+  // ball that comes apart on the floor and a ball that comes apart on the wall
+  // make the same wet noise, and `splat()` plays the ball's floor sample anyway.
+  Object.freeze({ id: "bounce-meatball", file: "meatball-floor-wall-splat.wav", gain: 0.75, offset: 0.08, minInterval: 0.08 }),
+  // The meatball's own rim hit — the second ball to bring one. The trim is long
+  // because the file opens with two hundred milliseconds of near-silent approach
+  // before the contact; the impact is at 0.28s and this puts it 20ms in.
+  Object.freeze({ id: "rim-meatball", file: "meatball-hit-rim.wav", gain: 0.85, offset: 0.26, minInterval: 0.09 }),
+  // The rubber band ball, which is all contact and nothing else. Both files are
+  // its own: a wound ball of elastic hitting anything is a slap and a squeak,
+  // and there is no gain or rate that gets there from a leather bounce.
+  Object.freeze({ id: "bounce-rubber-band-ball", file: "rubber-ball-bounce.wav", gain: 0.7, offset: 0.06, minInterval: 0.07 }),
+  Object.freeze({ id: "rim-rubber-band-ball", file: "rubber-ball-hit-rim.wav", gain: 0.8, offset: 0.08, minInterval: 0.08 }),
+  // The magma ball. `magma-ball-collisions.wav` is its BODY — the sound of it
+  // arriving anywhere — and it goes through the shared apparatus samples on the
+  // rim and the board like every ball that has no recording of its own.
+  Object.freeze({ id: "bounce-magma-ball", file: "magma-ball-collisions.wav", gain: 0.75, offset: 0.06, minInterval: 0.09 }),
+  Object.freeze({ id: "throw-magma-ball", file: "magma-ball-flight.wav", gain: 0.6, offset: 0.08, minInterval: 0.05 }),
+  // The beach ball. Two hundred milliseconds of hollow vinyl, and no rim
+  // recording of its own — it rings the shared apparatus quiet and bright,
+  // which is what an inflated skin does to a steel hoop.
+  Object.freeze({ id: "bounce-beach-ball", file: "beach-ball-collisions.wav", gain: 0.65, offset: 0.06, minInterval: 0.07 }),
+  // The sizzle is not an impact. It is what the room hears AFTER one — the fire
+  // the magma ball leaves burning where it landed — so it is throttled long,
+  // fired by the effect rather than by the collider, and deliberately not the
+  // ball's `floor` sound. See `effects/flame-trail.js` and `game-audio.sizzle`.
+  Object.freeze({ id: "sizzle-magma-ball", file: "magma-ball-sizzle.wav", gain: 0.5, offset: 0.04, minInterval: 0.7 }),
   Object.freeze({ id: "throw-paper", file: "paper-ball-throw.wav", gain: 0.55, offset: 0.02, minInterval: 0.05 }),
 
   // --- the round ----------------------------------------------------------
@@ -100,6 +130,11 @@ export const COUNTDOWN_LEAD_SECONDS = 3;
  * hand (null for balls that do not have one). The apparatus modifiers colour the
  * shared rim/backboard samples; `rim`, where present, replaces the shared rim
  * sample outright for that ball.
+ *
+ * `land` is the odd one out and is deliberately NOT a contact: it is what the
+ * ball leaves behind on a surface it landed on — the magma ball's fire — so it
+ * is played by the effect that starts that fire rather than by the collider
+ * that reported the bump. A ball with no fire has no `land`.
  */
 const BALL_AUDIO = Object.freeze({
   basketball: Object.freeze({ floor: "bounce-basketball", release: null, apparatusGain: 1, apparatusRate: 1 }),
@@ -113,6 +148,50 @@ const BALL_AUDIO = Object.freeze({
     apparatusGain: 1,
     apparatusRate: 0.72,
     rim: "rim-bowling-ball",
+  }),
+  // Soft, wet and heavy. It brings its own rim recording for the same reason the
+  // bowling ball does — a meatball hitting a hoop is not the steel sample played
+  // quieter, it is a different event with a file of its own. On the board, the
+  // wall and the ceiling it goes through the shared plaster sample, dulled and
+  // pitched down, because those are the ROOM and the room does not change.
+  meatball: Object.freeze({
+    floor: "bounce-meatball",
+    release: null,
+    apparatusGain: 0.6,
+    apparatusRate: 0.82,
+    rim: "rim-meatball",
+  }),
+  // Elastic. The third and last ball with its own rim recording, and for the
+  // same reason as the other two: a wound ball of rubber bands off a steel hoop
+  // is a slap and a squeak, which is not the house ring at any gain or rate.
+  // The board and the plaster it still shares, pitched up a little because it
+  // is the lightest-sounding thing in the roster.
+  "rubber-band-ball": Object.freeze({
+    floor: "bounce-rubber-band-ball",
+    release: null,
+    apparatusGain: 0.65,
+    apparatusRate: 1.12,
+    rim: "rim-rubber-band-ball",
+  }),
+  // Molten. It has a release sound — the whoosh of something that light and
+  // that hot leaving the hand — and it rings the apparatus through the shared
+  // samples, because a rim is a rim. What is its own is `land`: the fire it
+  // leaves behind, which is a sound the room keeps making after the ball has
+  // stopped, and is the one field here that is not a contact.
+  "magma-ball": Object.freeze({
+    floor: "bounce-magma-ball",
+    release: "throw-magma-ball",
+    apparatusGain: 0.7,
+    apparatusRate: 1.05,
+    land: "sizzle-magma-ball",
+  }),
+  // Hollow and light. The quietest, brightest apparatus in the roster, which is
+  // the whole of what an inflated skin does to a rim: it barely rings it.
+  "beach-ball": Object.freeze({
+    floor: "bounce-beach-ball",
+    release: null,
+    apparatusGain: 0.4,
+    apparatusRate: 1.26,
   }),
 });
 

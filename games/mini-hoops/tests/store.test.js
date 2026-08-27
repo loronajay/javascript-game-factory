@@ -7,7 +7,12 @@ import { DEFAULT_HOOP_MODE } from "../scripts/sim/hoop.js";
 import { addEntry, bestScore, boardKey, compareEntries, rankOf } from "../scripts/store/boards.js";
 import { createBoardsStore } from "../scripts/store/boards-store.js";
 import { createMemoryStorage } from "../scripts/store/local-storage.js";
-import { createPreferencesStore, normalizeDuration } from "../scripts/store/preferences.js";
+import {
+  DEFAULT_SHOOTING_HAND,
+  createPreferencesStore,
+  normalizeDuration,
+  normalizeHand,
+} from "../scripts/store/preferences.js";
 
 suite("store — boards, preferences, and surviving hostile storage");
 
@@ -34,9 +39,11 @@ test("a board key is mode and duration — the two things that change what a sco
   assert(boardKey("still", 30) !== boardKey("circle", 30), "mode splits boards");
 });
 
-test("cosmetic choices do NOT split boards", () => {
-  // The counterpart to the cosmetic-only rule in the ball and location catalogs.
-  // If this ever needs to change, the catalogs' constraints can relax with it.
+test("the room and the ball do NOT split boards", () => {
+  // One board ranks every room and every ball together. The room is cosmetic and
+  // could never have split them; the ball genuinely flies differently and is
+  // still not a key, because the difference is published on the setup screen and
+  // named on every row instead. See the header of scripts/store/boards.js.
   const store = createBoardsStore({ storage: createMemoryStorage(), now: makeClock() });
   store.submitRun(summary(10, { locationId: "bedroom", ballId: "basketball" }));
   store.submitRun(summary(20, { locationId: "cubicle", ballId: "paper" }));
@@ -224,6 +231,33 @@ test("a stored value naming something that no longer exists falls back", () => {
   assertEqual(prefs.locationId, DEFAULT_LOCATION);
   assertEqual(prefs.ballId, DEFAULT_BALL);
   assertEqual(prefs.duration, DEFAULT_DURATION, "45 seconds is not a length this game offers");
+});
+
+test("the shooting hand is remembered, and is not part of a run", () => {
+  const storage = createMemoryStorage();
+  const first = createPreferencesStore({ storage });
+  assertEqual(first.hand, DEFAULT_SHOOTING_HAND, "right-handed until someone says otherwise");
+  first.setHand("left");
+
+  const second = createPreferencesStore({ storage });
+  assertEqual(second.hand, "left");
+  // The hand moves the court to the other side of a sideways screen and does
+  // nothing else. A run set left-handed is the same run, which is what keeps one
+  // board meaning one thing — so it must never reach a result.
+  assertEqual(second.snapshot().hand, undefined, "the hand is layout, not a run setting");
+});
+
+test("a hand nobody has is rejected", () => {
+  assertEqual(normalizeHand("left"), "left");
+  assertEqual(normalizeHand("sideways"), DEFAULT_SHOOTING_HAND);
+  assertEqual(normalizeHand(undefined), DEFAULT_SHOOTING_HAND, "an older blob has no key at all");
+
+  const prefs = createPreferencesStore({
+    storage: createMemoryStorage({
+      "miniHoops.preferences.v1": JSON.stringify({ hand: "both" }),
+    }),
+  });
+  assertEqual(prefs.hand, DEFAULT_SHOOTING_HAND);
 });
 
 test("a duration the game does not offer is rejected", () => {
