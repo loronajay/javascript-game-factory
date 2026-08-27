@@ -1,0 +1,287 @@
+/* Mini Hoops — the customization layer.
+ *
+ * Two surfaces and one widget:
+ *
+ *   the Customize screen   the gallery, the sampler, and the comfort switches
+ *   the setup strip        the same eight themes as swatches, filling the empty
+ *                          column beside the room preview
+ *   .chip--swatch          the theme button itself, in both of its shapes
+ *
+ * It is its own file for the reason every other stylesheet here is: `game.css`
+ * owns the shell, the courts and the boards, and it is already 2400 lines. This
+ * is a page, and a page's rules belong beside each other.
+ *
+ * NOTHING IN HERE NAMES A COLOUR. Every rule below is written in the tokens
+ * `game.css` defines and `ui/theme.js` writes over — which is the point: the
+ * screen that picks the theme has to be the strongest proof that the theme
+ * actually reaches everything.
+ */
+
+/* --- The screen ---------------------------------------------------------- */
+
+.customize-layout {
+  display: grid;
+  /* The sampler leads, because it is the thing being changed. It is also the
+     narrower column: a mock court is a picture and a picker is a list, and a
+     list needs the room. */
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.customize-panels {
+  display: grid;
+  gap: 10px;
+}
+
+.customize-switches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.customize-note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink-faint);
+}
+
+/* --- The sampler --------------------------------------------------------- */
+
+/* Sticky for the same reason the room preview is: the picker beside it is long
+   enough to scroll, and a sampler you have scrolled past is not sampling
+   anything. */
+.customize-sample {
+  position: sticky;
+  top: 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.customize-sample-head {
+  margin: 0;
+  padding: 3px 9px;
+  justify-self: start;
+  border: 1px solid var(--panel-line);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+/* A stand-in for a room, not a picture of one. The three cards are what matter
+   here — they are frosted glass standing on a lit floor, and how they read
+   against it is exactly the thing a theme decides and a menu cannot show. The
+   ground is the court mat lit from above, which is the shape every painted room
+   in the cabinet actually has. */
+.sample-court {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 8px;
+  min-height: 132px;
+  padding: 10px;
+  border: 1px solid var(--panel-line);
+  border-radius: 16px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 50% -20%, rgb(var(--ink-rgb) / 0.1), rgba(0, 0, 0, 0) 62%),
+    linear-gradient(180deg, var(--room-deep) 0%, var(--court-mat) 100%);
+}
+
+.sample-stat {
+  min-width: 78px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--glass);
+  backdrop-filter: blur(4px);
+}
+
+.sample-stat--clock {
+  justify-self: center;
+  min-width: 96px;
+  text-align: center;
+}
+
+.sample-stat--right {
+  text-align: right;
+}
+
+.sample-stat small {
+  display: block;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  color: var(--ink-dim);
+}
+
+.sample-stat strong {
+  display: block;
+  font-size: 22px;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.sample-stat span {
+  display: block;
+  margin-top: 2px;
+  font-size: 9px;
+  color: var(--ink-dim);
+}
+
+/* The real `.shot-panel`, with the run's own top margin taken back off — it is
+   sitting in a grid with its own gap here rather than under a court. */
+.shot-panel--sample {
+  margin-top: 0;
+}
+
+/* Two rows off the real leaderboard, written small. It is a stand-in rather
+   than the live `.board-row`, which is a six-column grid built by
+   `ui/boards-view.js` out of a run that may not exist yet — and a sampler that
+   needed a played run to show anything would be blank for every new player. */
+.sample-board {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sample-row {
+  display: grid;
+  grid-template-columns: 18px 34px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 38px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--fill-faint);
+  font-size: 12px;
+}
+
+.sample-row.is-leader {
+  background: var(--brass-wash);
+  box-shadow: inset 2px 0 0 var(--brass);
+}
+
+.sample-row b {
+  font-weight: 950;
+  color: var(--ink-faint);
+}
+
+.sample-row strong {
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.sample-row span {
+  color: var(--ink-dim);
+}
+
+/* The ball pill, which is the one cell on a real board row that is given the
+   highlight — balls fly differently and the boards rank them together, so which
+   ball a score was set with is context rather than decoration. */
+.sample-row em {
+  padding: 2px 8px;
+  border: 1px solid var(--brass-line);
+  border-radius: 999px;
+  color: var(--brass);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+/* --- The theme button ---------------------------------------------------- */
+
+/* A `.chip` with the palette down its left, so it lands in the same visual
+   family as the ball and room pickers rather than inventing a third shape for
+   a fourth kind of choice. */
+.chip--swatch {
+  grid-template-columns: 30px minmax(0, 1fr);
+  grid-template-areas:
+    "swatch name"
+    "swatch note";
+  align-items: center;
+  column-gap: 10px;
+}
+
+.chip--swatch > .theme-swatch { grid-area: swatch; }
+.chip--swatch > strong { grid-area: name; align-self: end; }
+.chip--swatch > .chip-note { grid-area: note; }
+
+/* Four bands of the theme's own colour: the page, a panel, the action, the
+   highlight. Built by `ui/theme.js` straight from the theme's tokens, so a
+   swatch cannot advertise a colour the cabinet will not wear. */
+.theme-swatch {
+  display: grid;
+  grid-template-rows: repeat(4, 1fr);
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+
+.theme-swatch > span {
+  display: block;
+}
+
+/* --- The setup strip ----------------------------------------------------- */
+
+/* The compact shape: swatch only, on a grid that keeps all eight visible
+   without scrolling the column they were put there to fill. */
+.setup-cabinet {
+  margin-top: 10px;
+}
+
+/* FOUR ACROSS, not auto-fit. Eight themes on an auto-fit grid come out seven
+   and one on a wide column, and a single orphan swatch under a full row reads
+   as a rendering fault rather than as a set. Four is the one factor of eight
+   that stays comfortable from a 360px phone up. */
+.theme-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.chip--swatch-compact {
+  display: grid;
+  place-items: center;
+  /* 44px is the tap-target floor and the swatch is 30px, so the padding is what
+     buys the rest of it back rather than the button being sized by hand. */
+  min-height: 44px;
+  padding: 7px;
+}
+
+.chip--swatch-compact > .theme-swatch {
+  width: 100%;
+  height: 30px;
+  grid-template-rows: none;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* --- Responsive ---------------------------------------------------------- */
+
+/* Same breakpoint the setup and how-to layouts collapse at, and the same
+   reason: two columns of this width stop being two columns well before a phone.
+   The sampler gives up sticky when it is stacked, because a sticky element in a
+   single column parks itself on top of the list it is describing. */
+@media (max-width: 820px) {
+  .customize-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .customize-sample {
+    position: static;
+  }
+
+  .customize-switches .ghost-btn {
+    flex: 1 0 auto;
+  }
+}

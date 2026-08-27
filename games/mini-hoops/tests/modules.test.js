@@ -59,6 +59,7 @@ const MODULES = [
   "scripts/sim/run.js",
   "scripts/assets/ball-catalog.js",
   "scripts/assets/location-catalog.js",
+  "scripts/assets/theme-catalog.js",
   "scripts/assets/room-geometry.js",
   "scripts/assets/loader.js",
   "scripts/effects/splat-field.js",
@@ -95,6 +96,7 @@ const MODULES = [
   "scripts/ui/menu-view.js",
   "scripts/ui/practice-view.js",
   "scripts/ui/sound-toggle.js",
+  "scripts/ui/theme.js",
   "scripts/practice-court.js",
   "scripts/tic-tac-toe-game.js",
   "scripts/horse-game.js",
@@ -246,7 +248,7 @@ test("every element id the scripts query actually exists in the markup", () => {
 
 test("every screen the router knows about has a section in the markup", () => {
   for (const screen of SCREENS) {
-    const id = { menu: "menuScreen", setup: "setupScreen", online: "onlineScreen", game: "gameScreen", tictactoe: "ticTacToeScreen", horse: "horseScreen", boards: "boardsScreen", howto: "howToScreen" }[screen];
+    const id = { menu: "menuScreen", setup: "setupScreen", online: "onlineScreen", game: "gameScreen", tictactoe: "ticTacToeScreen", horse: "horseScreen", boards: "boardsScreen", howto: "howToScreen", customize: "customizeScreen" }[screen];
     assert(html.includes(`id="${id}"`), `no section for the ${screen} screen`);
   }
 });
@@ -300,7 +302,7 @@ test("every button intent in the markup is handled by the composition root", () 
 test("every menu command in the markup is handled", () => {
   const source = fs.readFileSync(path.join(gameRoot, "scripts", "init-game.js"), "utf8");
   const commands = new Set([...html.matchAll(/data-command="([a-z-]+)"/g)].map((match) => match[1]));
-  assertEqual(commands.size, 5, "the menu exposes solo, hotseat, online, boards and how-to-play");
+  assertEqual(commands.size, 6, "the menu exposes solo, hotseat, online, boards, how-to-play and customize");
   for (const command of commands) {
     assert(source.includes(`"${command}"`), `menu command "${command}" is not handled`);
   }

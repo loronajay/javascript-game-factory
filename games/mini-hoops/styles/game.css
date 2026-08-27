@@ -4,23 +4,100 @@
  * else. Shared tokens live here because the menu builds on them.
  */
 
+/* --- The token map -------------------------------------------------------
+ *
+ * ONE THEME PAINTS THE WHOLE CABINET, and it does it by naming fourteen
+ * primitives. Everything else below is DERIVED from three of them, which is
+ * what makes a new theme a row in `scripts/assets/theme-catalog.js` rather
+ * than a stylesheet of its own.
+ *
+ * The values in the first block are the DEFAULTS — the Midnight theme, spelled
+ * out so a cabinet whose scripts have not run yet is still coherent rather than
+ * unstyled. `ui/theme.js` writes the selected theme over them as inline styles
+ * ON THIS SAME ELEMENT, which is the whole reason the derived tokens work:
+ * substitution happens where the derived property is declared, against whichever
+ * declaration of the primitive wins there. Set `--ink-rgb` further down the tree
+ * and every hairline below would still resolve against the value here — half the
+ * cabinet in the new theme and half of it in the old one.
+ *
+ * WHAT IS NOT THEMED, and why none of it is an oversight:
+ *   --fire-*        the ON FIRE card burns in the magma ball own trail stops.
+ *                   That card is the canvas talking, and it has to be the same
+ *                   fire as the one burning in the room.
+ *   the neon marks  tic-tac-toe X and O, and HORSE earned letters. `render/`
+ *                   paints those on the floor; chrome that drifted off them
+ *                   would name a different colour from the board underneath.
+ *   the index card  the taped note on the title screen (menu.css) is PAPER — a
+ *                   physical object in the painted room, not part of the shell.
+ */
+
 :root {
-  --ink: #f6efe6;
-  --ink-dim: rgba(246, 239, 230, 0.62);
-  --ink-faint: rgba(246, 239, 230, 0.42);
-  --room: #1a1210;
-  --panel: rgba(43, 31, 28, 0.9);
-  --panel-line: rgba(255, 255, 255, 0.11);
-  --ember: #c84c2f;
-  --ember-hot: #e0683c;
-  --brass: #f0b074;
-  /* The magma ball's own trail colours, lifted verbatim from its `trail` block
-     in `assets/ball-catalog.js`. The HUD burns in the same three stops the
-     canvas does, so "on fire" is one visual language across the cabinet rather
-     than two things that happen to both be orange. */
+  /* --- The fourteen a theme owns ---------------------------------------- */
+  /* The two colours every neutral is built from, plus the dark everything is
+     shaded with — all three as space-separated triples, so a hairline can be
+     `rgb(var(--ink-rgb) / 0.16)` of the very ink the body text is set in. */
+  --ink-rgb: 234 240 252;
+  --brass-rgb: 137 196 255;
+  --shade-rgb: 5 8 16;
+  /* Surfaces, from the page ground inward. */
+  --room: #0c1120;
+  --room-deep: #070b16;
+  --well: #141c30;
+  --panel: rgba(22, 31, 52, 0.9);
+  --panel-soft: rgba(30, 42, 68, 0.72);
+  --panel-strong: rgba(19, 27, 46, 0.96);
+  /* The mat the canvas sits on: the court rounded corners, and the frame seen
+     for the instant before a room backdrop has decoded. */
+  --court-mat: #2b3a5c;
+  /* The primary action, its hover, and the shade its pressed lip is cut in. */
+  --ember: #3f6fd8;
+  --ember-hot: #5384ec;
+  --ember-shade: rgba(8, 24, 60, 0.35);
+  /* The wash behind the whole cabinet. This is the token that does the most
+     work on a wide screen, where the court is height-driven and leaves several
+     hundred pixels of bare page down either side of it. */
+  --backdrop:
+    radial-gradient(1200px 660px at 50% -14%, rgba(63, 111, 216, 0.26), rgba(0, 0, 0, 0) 68%),
+    radial-gradient(900px 520px at 6% 106%, rgba(137, 196, 255, 0.1), rgba(0, 0, 0, 0) 64%);
+
+  /* --- Derived: the ink scale ------------------------------------------- */
+  --ink: rgb(var(--ink-rgb));
+  --ink-dim: rgb(var(--ink-rgb) / 0.62);
+  --ink-faint: rgb(var(--ink-rgb) / 0.42);
+
+  /* --- Derived: hairlines and soft fills --------------------------------- */
+  /* Four fills and three lines cover the whole cabinet. They replaced eleven
+     hand-typed alphas between 0.03 and 0.28 that were describing five distinct
+     intentions — exactly the kind of drift a theme cannot survive. */
+  --panel-line: rgb(var(--ink-rgb) / 0.11);
+  --line: rgb(var(--ink-rgb) / 0.16);
+  --line-strong: rgb(var(--ink-rgb) / 0.28);
+  --fill-faint: rgb(var(--ink-rgb) / 0.045);
+  --fill: rgb(var(--ink-rgb) / 0.055);
+  --fill-hover: rgb(var(--ink-rgb) / 0.1);
+  --fill-strong: rgb(var(--ink-rgb) / 0.16);
+
+  /* --- Derived: the highlight -------------------------------------------- */
+  --brass: rgb(var(--brass-rgb));
+  --brass-line: rgb(var(--brass-rgb) / 0.3);
+  --brass-wash: rgb(var(--brass-rgb) / 0.13);
+  /* The light the marquee sign throws onto the wall behind it. */
+  --glow: rgb(var(--brass-rgb) / 0.16);
+
+  /* --- Derived: shading over the painted art ----------------------------- */
+  /* Frosted cards standing on a room, and the dark an overlay dims it with. */
+  --glass: rgb(var(--shade-rgb) / 0.78);
+  --scrim: rgb(var(--shade-rgb) / 0.68);
+
+  /* --- Not themed: the magma ball own trail colours ----------------------- */
+  /* Lifted verbatim from its `trail` block in `assets/ball-catalog.js`. The HUD
+     burns in the same three stops the canvas does, so "on fire" is one visual
+     language across the cabinet rather than two things that happen to both be
+     orange. `tests/modules.test.js` fails if either copy drifts. */
   --fire-core: #fff0bd;
   --fire-flame: #ff6a12;
   --fire-smoke: #6b4534;
+
   --radius: 16px;
   --radius-lg: 24px;
   --font: ui-rounded, "Trebuchet MS", system-ui, sans-serif;
@@ -34,9 +111,23 @@ html,
 body {
   margin: 0;
   min-height: 100%;
-  background: var(--room);
   color: var(--ink);
   font-family: var(--font);
+}
+
+/* THE DEAD SPACE IS PART OF THE THEME. On a wide screen the court is sized off
+   the viewport HEIGHT, so several hundred pixels either side of it are page and
+   nothing else — flat, that is the largest single area of the cabinet, and it
+   was reading as an unfinished background. `--backdrop` is the theme own wash
+   across it, `fixed` so it stays put behind a setup screen that scrolls and
+   behind a court that never does: one lit room rather than a strip of colour
+   that slides. */
+body {
+  background-color: var(--room);
+  background-image: var(--backdrop);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 body {
@@ -76,9 +167,9 @@ a:focus-visible {
   right: 26px;
   z-index: 30;
   padding: 6px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(16, 10, 9, 0.62);
+  background: var(--glass);
   backdrop-filter: blur(6px);
   color: var(--ink-dim);
   text-decoration: none;
@@ -88,7 +179,7 @@ a:focus-visible {
 }
 
 .back-link:hover {
-  background: rgba(16, 10, 9, 0.82);
+  background: var(--panel-strong);
   color: var(--ink);
 }
 
@@ -100,6 +191,16 @@ a:focus-visible {
     right: 16px;
     padding: 5px 10px;
     font-size: 10px;
+  }
+
+  /* AND THE HEADINGS HAVE TO KEEP OUT FROM UNDER IT. The link is positioned
+     against the cabinet, so it floats over whatever is at the top of the active
+     screen — and a screen head is exactly there. It went unnoticed while every
+     title was short enough to stop before the corner; "Customize the Cabinet"
+     is the first one that does not, and it lost its last letter under the pill.
+     Reserving the width fixes it for every title rather than for that one. */
+  .screen-head {
+    padding-right: 86px;
   }
 }
 
@@ -137,7 +238,7 @@ a:focus-visible {
 .primary-btn {
   min-height: 52px;
   padding: 12px 20px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 1px solid var(--line-strong);
   border-bottom-width: 4px;
   border-radius: 13px;
   background: var(--ember);
@@ -157,14 +258,14 @@ a:focus-visible {
 .ghost-btn {
   min-height: 44px;
   padding: 9px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--line);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--fill);
   font-weight: 800;
 }
 
 .ghost-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--fill-hover);
 }
 
 .ghost-btn--small {
@@ -182,7 +283,7 @@ a:focus-visible {
 .sound-btn[aria-pressed="true"] {
   color: var(--ink-dim);
   border-style: dashed;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--fill-faint);
 }
 
 /* Row two of the setup card's two-column grid, under Start Run rather than
@@ -239,9 +340,9 @@ a:focus-visible {
   gap: 3px;
   min-height: 44px;
   padding: 9px 11px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--line);
   border-radius: 11px;
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--fill);
   text-align: left;
 }
 
@@ -287,13 +388,13 @@ a:focus-visible {
 }
 
 .chip:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--fill-hover);
 }
 
 .chip.is-active {
   background: var(--ember);
   border-color: rgba(255, 255, 255, 0.36);
-  box-shadow: inset 0 -3px 0 rgba(73, 27, 17, 0.32);
+  box-shadow: inset 0 -3px 0 var(--ember-shade);
 }
 
 .chip.is-active span {
@@ -329,7 +430,7 @@ a:focus-visible {
 .chip-stat-track {
   height: 4px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.13);
+  background: var(--fill-strong);
   overflow: hidden;
 }
 
@@ -347,7 +448,7 @@ a:focus-visible {
 }
 
 .chip.is-active .chip-stat-track {
-  background: rgba(73, 27, 17, 0.35);
+  background: var(--ember-shade);
 }
 
 .chip.is-active .chip-stat-fill {
@@ -370,14 +471,20 @@ a:focus-visible {
   align-items: start;
 }
 
-.setup-preview {
+/* THE WHOLE LEFT COLUMN IS STICKY, not just the picture in it. The column is
+   the room preview plus the cabinet strip now, and sticking only the figure
+   would scroll the swatches away from under it. */
+.setup-side {
   position: sticky;
   top: 14px;
+}
+
+.setup-preview {
   margin: 0;
   border: 1px solid var(--panel-line);
   border-radius: 19px;
   overflow: hidden;
-  background: #171110;
+  background: var(--room-deep);
 }
 
 .setup-preview img {
@@ -425,8 +532,8 @@ a:focus-visible {
   border-radius: 20px;
   overflow: hidden;
   isolation: isolate;
-  background: #bd8667;
-  box-shadow: 0 16px 48px rgba(28, 15, 10, 0.32);
+  background: var(--court-mat);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.32);
 }
 
 /* EVERY COURT CANVAS, by role rather than by id.
@@ -443,7 +550,7 @@ a:focus-visible {
   aspect-ratio: 960 / 760;
   touch-action: none;
   cursor: crosshair;
-  background: #bd8667;
+  background: var(--court-mat);
 }
 
 .game-screen,
@@ -471,9 +578,9 @@ a:focus-visible {
      corner over a live canvas where a missed press starts a drag instead. */
   min-height: 44px;
   padding: 6px 13px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--line);
   border-radius: 10px;
-  background: rgba(21, 14, 13, 0.78);
+  background: var(--glass);
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -487,9 +594,9 @@ a:focus-visible {
   transform: translateX(-50%);
   min-width: 116px;
   padding: 7px 13px 6px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--line);
   border-radius: 13px;
-  background: rgba(21, 14, 13, 0.8);
+  background: var(--glass);
   backdrop-filter: blur(5px);
   text-align: center;
 }
@@ -517,9 +624,9 @@ a:focus-visible {
   top: 62px;
   min-width: 90px;
   padding: 7px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--line);
   border-radius: 12px;
-  background: rgba(21, 14, 13, 0.72);
+  background: var(--glass);
   backdrop-filter: blur(4px);
 }
 
@@ -537,7 +644,7 @@ a:focus-visible {
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.1em;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--ink-dim);
 }
 
 .hud-stat strong {
@@ -550,7 +657,7 @@ a:focus-visible {
   display: block;
   margin-top: 2px;
   font-size: 9px;
-  color: rgba(255, 255, 255, 0.58);
+  color: var(--ink-dim);
 }
 
 /* --- ON FIRE ------------------------------------------------------------- */
@@ -682,7 +789,7 @@ a:focus-visible {
   font-size: clamp(22px, 5vw, 44px);
   font-weight: 950;
   letter-spacing: 0.04em;
-  text-shadow: 0 4px 0 rgba(57, 30, 20, 0.4), 0 7px 18px rgba(0, 0, 0, 0.22);
+  text-shadow: 0 4px 0 rgba(0, 0, 0, 0.4), 0 7px 18px rgba(0, 0, 0, 0.22);
   opacity: 0;
   transition: opacity 0.16s, transform 0.16s;
   pointer-events: none;
@@ -701,9 +808,9 @@ a:focus-visible {
   margin: 0;
   padding: 8px 14px;
   transform: translateX(-50%);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(30, 21, 19, 0.78);
+  background: var(--glass);
   font-size: 12px;
   font-weight: 750;
   white-space: nowrap;
@@ -722,7 +829,7 @@ a:focus-visible {
   padding: 12px 14px;
   border: 1px solid var(--panel-line);
   border-radius: 15px;
-  background: rgba(34, 24, 22, 0.9);
+  background: var(--panel);
 }
 
 /* A ball is a turn decision in both bin modes. Four compact catalog buttons fit
@@ -742,7 +849,7 @@ a:focus-visible {
 }
 
 .turn-ball-label {
-  color: rgba(255, 255, 255, .72);
+  color: var(--ink-dim);
   font: 850 10px/1 system-ui, sans-serif;
   letter-spacing: .09em;
 }
@@ -760,10 +867,10 @@ a:focus-visible {
   min-width: 0;
   min-height: 40px;
   padding: 6px 5px;
-  border: 1px solid rgba(255, 255, 255, .15);
+  border: 1px solid var(--line);
   border-radius: 9px;
-  background: rgba(255, 255, 255, .055);
-  color: rgba(255, 255, 255, .62);
+  background: var(--fill);
+  color: var(--ink-dim);
   text-align: left;
 }
 
@@ -787,7 +894,7 @@ a:focus-visible {
   white-space: nowrap;
 }
 
-.turn-ball-choice:hover:not(:disabled) { background: rgba(255, 255, 255, .1); }
+.turn-ball-choice:hover:not(:disabled) { background: var(--fill-hover); }
 .turn-ball-choice.is-active {
   border-color: rgba(255, 79, 216, .75);
   background: rgba(255, 79, 216, .18);
@@ -802,22 +909,25 @@ a:focus-visible {
   margin-bottom: 6px;
   font-size: 11px;
   font-weight: 850;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--ink);
 }
 
 .meter {
   position: relative;
   height: 21px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: #211816;
+  background: var(--well);
   overflow: hidden;
 }
 
 .meter-fill {
   width: 0%;
   height: 100%;
-  background: linear-gradient(90deg, #c64f2e 0%, #e69b3b 58%, #e8d36e 78%, #d75a3f 100%);
+  /* THE METER IS THE THEME OWN HEAT rather than one fixed warm ramp: it is
+     the biggest block of colour on a court, and a fixed one made every theme
+     read as a brown cabinet wearing a hat. */
+  background: linear-gradient(90deg, var(--ember) 0%, var(--ember-hot) 52%, var(--brass) 78%, var(--ember) 100%);
   transition: width 0.03s linear;
 }
 
@@ -849,7 +959,7 @@ a:focus-visible {
   align-items: center;
   justify-content: center;
   padding: 18px;
-  background: rgba(15, 10, 9, 0.68);
+  background: var(--scrim);
   backdrop-filter: blur(4px);
 }
 
@@ -860,9 +970,9 @@ a:focus-visible {
 .overlay-card {
   width: min(430px, 94%);
   padding: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--line);
   border-radius: 19px;
-  background: rgba(35, 25, 23, 0.96);
+  background: var(--panel-strong);
   box-shadow: 0 16px 46px rgba(0, 0, 0, 0.35);
   text-align: center;
 }
@@ -897,7 +1007,7 @@ a:focus-visible {
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 0.14em;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--ink-dim);
 }
 
 .overlay-card .result-score {
@@ -919,7 +1029,7 @@ a:focus-visible {
 .result-grid div {
   padding: 9px 6px;
   border-radius: 11px;
-  background: rgba(255, 255, 255, 0.055);
+  background: var(--fill);
 }
 
 .result-grid strong {
@@ -933,7 +1043,7 @@ a:focus-visible {
   font-size: 9px;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--ink-dim);
 }
 
 /* --- Splash backdrops ----------------------------------------------------
@@ -993,10 +1103,10 @@ a:focus-visible {
   inset: 0;
   background: linear-gradient(
     180deg,
-    rgba(13, 9, 8, 0.76) 0%,
-    rgba(13, 9, 8, 0.5) 30%,
-    rgba(13, 9, 8, 0.56) 62%,
-    rgba(13, 9, 8, 0.8) 100%
+    rgb(var(--shade-rgb) / 0.76) 0%,
+    rgb(var(--shade-rgb) / 0.5) 30%,
+    rgb(var(--shade-rgb) / 0.56) 62%,
+    rgb(var(--shade-rgb) / 0.8) 100%
   );
 }
 
@@ -1019,7 +1129,7 @@ a:focus-visible {
   padding: 14px;
   border: 1px solid var(--panel-line);
   border-radius: 17px;
-  background: rgba(34, 24, 22, 0.88);
+  background: var(--panel);
 }
 
 .board-head {
@@ -1060,12 +1170,12 @@ a:focus-visible {
   min-height: 40px;
   padding: 7px 10px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--fill-faint);
   font-size: 12px;
 }
 
 .board-row.is-leader {
-  background: rgba(240, 176, 116, 0.13);
+  background: var(--brass-wash);
   box-shadow: inset 2px 0 0 var(--brass);
 }
 
@@ -1092,7 +1202,7 @@ a:focus-visible {
   gap: 6px;
   justify-self: start;
   padding: 2px 7px 2px 3px;
-  border: 1px solid rgba(240, 176, 116, 0.3);
+  border: 1px solid var(--brass-line);
   border-radius: 999px;
   font-size: 11px;
   font-weight: 700;
@@ -1125,7 +1235,7 @@ a:focus-visible {
   margin: 0;
   padding: 18px 10px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.52);
+  color: var(--ink-dim);
 }
 
 /* --- How to play -------------------------------------------------------- */
@@ -1278,7 +1388,7 @@ body.is-playing .cabinet {
     grid-template-columns: 1fr;
   }
 
-  .setup-preview {
+  .setup-side {
     position: static;
   }
 
@@ -1964,14 +2074,14 @@ body.is-playing .cabinet {
   display: block;
   font: 800 .92rem/1.25 system-ui, sans-serif;
   letter-spacing: .01em;
-  color: #fff;
+  color: var(--ink);
 }
 
 .hud-action {
-  border: 1px solid rgba(255, 255, 255, .22);
+  border: 1px solid var(--line-strong);
   border-radius: 7px;
-  background: rgba(18, 12, 10, .72);
-  color: #fff;
+  background: var(--glass);
+  color: var(--ink);
   cursor: pointer;
   font: 800 .74rem/1 system-ui, sans-serif;
   letter-spacing: .06em;
@@ -1986,7 +2096,7 @@ body.is-playing .cabinet {
    unclickable: the only way to start a second match was to quit to the menu. */
 .hud-action { pointer-events: auto; }
 .hud-action[hidden] { display: none; }
-.hud-action:hover { border-color: rgba(255, 255, 255, .45); }
+.hud-action:hover { border-color: rgb(var(--ink-rgb) / .45); }
 
 /* THE COURT PAYS FOR THE BALL PICKER, like HORSE's does.
 
@@ -2055,8 +2165,8 @@ body.is-playing .cabinet {
 
 .horse-letter-row {
   align-items: center;
-  background: rgba(18, 12, 10, .58);
-  border: 1px solid rgba(255, 255, 255, .12);
+  background: var(--glass);
+  border: 1px solid var(--panel-line);
   border-radius: 7px;
   display: flex;
   gap: 10px;
@@ -2071,7 +2181,7 @@ body.is-playing .cabinet {
 }
 
 .horse-letter-name {
-  color: rgba(255, 255, 255, .72);
+  color: var(--ink-dim);
   font: 800 .68rem/1 system-ui, sans-serif;
   letter-spacing: .07em;
   min-width: 66px;
@@ -2083,7 +2193,7 @@ body.is-playing .cabinet {
 /* An unearned letter is drawn, not hidden: the word is the match length, and a
    player has to be able to see how much of it is left to lose. */
 .horse-letter {
-  color: rgba(255, 255, 255, .26);
+  color: rgb(var(--ink-rgb) / .26);
   font: 800 .86rem/1 system-ui, sans-serif;
   letter-spacing: .04em;
 }
@@ -2094,7 +2204,7 @@ body.is-playing .cabinet {
 }
 
 .horse-place {
-  border-bottom: 1px solid rgba(255, 255, 255, .1);
+  border-bottom: 1px solid var(--panel-line);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2112,7 +2222,7 @@ body.is-playing .cabinet {
 }
 
 .horse-place-head > span:first-child {
-  color: rgba(255, 255, 255, .72);
+  color: var(--ink-dim);
   font: 800 .7rem/1 system-ui, sans-serif;
   letter-spacing: .09em;
 }
@@ -2120,7 +2230,7 @@ body.is-playing .cabinet {
 /* Percentages of the legal volume rather than world units — a world unit is not
    something a player has any feel for, and the bounds move with the room. */
 .horse-place-readout {
-  color: rgba(255, 255, 255, .5);
+  color: var(--ink-dim);
   font: 700 .66rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: .04em;
 }
@@ -2167,10 +2277,10 @@ body.is-playing .cabinet {
 /* The word field on the setup screen. Uppercase because the HUD prints it
    uppercase, and a player typing lowercase should see what they will get. */
 .word-input {
-  background: rgba(12, 8, 7, .68);
-  border: 1px solid rgba(255, 255, 255, .2);
+  background: var(--well);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  color: #fff;
+  color: var(--ink);
   font: 800 1.05rem/1 system-ui, sans-serif;
   letter-spacing: .18em;
   padding: 10px 12px;
@@ -2218,9 +2328,9 @@ body.is-playing .cabinet {
   width: 180px;
   max-width: calc(var(--gutter) - 36px);
   padding: 12px;
-  border: 1px solid rgba(255, 255, 255, .14);
+  border: 1px solid var(--line);
   border-radius: 16px;
-  background: rgba(24, 15, 13, .78);
+  background: var(--glass);
   box-shadow: 0 14px 38px rgba(0, 0, 0, .35);
   overflow: hidden;
 }
@@ -2241,7 +2351,7 @@ body.is-playing .cabinet {
   margin: 0 0 8px;
   font: 900 .58rem/1 system-ui, sans-serif;
   letter-spacing: .16em;
-  color: rgba(255, 255, 255, .55);
+  color: var(--ink-dim);
   text-align: center;
 }
 
@@ -2260,9 +2370,9 @@ body.is-playing .cabinet {
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  background: rgba(255, 255, 255, .05);
+  background: var(--fill);
   container-type: inline-size;
-  color: rgba(255, 255, 255, .16);
+  color: rgb(var(--ink-rgb) / .16);
 }
 
 /* The glyph is sized off ITS OWN CELL, which is why it is a child element:
@@ -2285,7 +2395,7 @@ body.is-playing .cabinet {
   min-height: 1.1em;
   font: 800 .6rem/1.2 system-ui, sans-serif;
   letter-spacing: .05em;
-  color: rgba(255, 255, 255, .62);
+  color: var(--ink-dim);
   text-align: center;
 }
 
@@ -2322,7 +2432,7 @@ body.is-playing .cabinet {
   gap: 8px;
   padding: 8px 10px;
   border-radius: 11px;
-  background: rgba(255, 255, 255, .055);
+  background: var(--fill);
 }
 
 .horse-result-row.is-loser { background: rgba(255, 79, 216, .14); }
@@ -2330,7 +2440,7 @@ body.is-playing .cabinet {
 .horse-result-name {
   font: 800 .72rem/1 system-ui, sans-serif;
   letter-spacing: .04em;
-  color: rgba(255, 255, 255, .72);
+  color: var(--ink-dim);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2340,7 +2450,7 @@ body.is-playing .cabinet {
 
 .horse-result-word span {
   font: 900 .82rem/1 system-ui, sans-serif;
-  color: rgba(255, 255, 255, .22);
+  color: rgb(var(--ink-rgb) / .22);
 }
 
 .horse-result-word span.is-earned { color: #ff4fd8; }

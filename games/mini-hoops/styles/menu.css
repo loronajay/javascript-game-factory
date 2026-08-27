@@ -30,11 +30,11 @@
   position: relative;
   /* Fills the viewport rather than sitting in a band with dead space beneath —
      a menu that stops two thirds of the way down reads as an unfinished page. */
-  min-height: clamp(520px, calc(100dvh - 42px), 820px);
+  min-height: clamp(520px, calc(100dvh - 2 * var(--cabinet-pad-y, 14px)), 820px);
   border-radius: var(--radius-lg);
   overflow: hidden;
   isolation: isolate;
-  background: #120b09;
+  background: var(--room-deep);
   box-shadow: 0 22px 70px rgba(0, 0, 0, 0.45);
 
   /* Fed by menu-view.js on pointer move. */
@@ -89,12 +89,12 @@
   background:
     linear-gradient(
       100deg,
-      rgba(14, 8, 7, 0.9) 0%,
-      rgba(14, 8, 7, 0.74) 30%,
-      rgba(14, 8, 7, 0.26) 50%,
-      rgba(14, 8, 7, 0) 66%
+      rgb(var(--shade-rgb) / 0.9) 0%,
+      rgb(var(--shade-rgb) / 0.74) 30%,
+      rgb(var(--shade-rgb) / 0.26) 50%,
+      rgb(var(--shade-rgb) / 0) 66%
     ),
-    linear-gradient(to top, rgba(11, 7, 6, 0.6) 0%, rgba(11, 7, 6, 0) 38%);
+    linear-gradient(to top, rgb(var(--shade-rgb) / 0.6) 0%, rgb(var(--shade-rgb) / 0) 38%);
 }
 
 .marquee {
@@ -113,15 +113,15 @@
 .marquee-sign {
   position: relative;
   padding: 20px 26px 22px;
-  border: 1px solid rgba(240, 176, 116, 0.34);
+  border: 1px solid rgb(var(--brass-rgb) / 0.34);
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(46, 27, 21, 0.72), rgba(24, 14, 12, 0.66));
+  background: linear-gradient(180deg, var(--panel-soft), var(--panel-strong));
   /* The outer glow is the light this sign is throwing onto the wall behind it —
      it is what makes the marquee sit *in* the room instead of on top of it. */
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.4),
     0 18px 40px rgba(0, 0, 0, 0.5),
-    0 0 90px 10px rgba(240, 176, 116, 0.16);
+    0 0 90px 10px var(--glow);
 }
 
 /* The bulb strip along the top edge. Repeating-gradient dots rather than 14
@@ -132,10 +132,10 @@
   left: 20px;
   right: 20px;
   height: 10px;
-  background-image: radial-gradient(circle, rgba(255, 226, 178, 0.95) 0 2.4px, rgba(255, 226, 178, 0) 2.6px);
+  background-image: radial-gradient(circle, rgb(var(--brass-rgb) / 0.95) 0 2.4px, rgb(var(--brass-rgb) / 0) 2.6px);
   background-size: 26px 10px;
   background-repeat: repeat-x;
-  filter: drop-shadow(0 0 5px rgba(255, 198, 122, 0.75));
+  filter: drop-shadow(0 0 5px rgb(var(--brass-rgb) / 0.75));
   animation: bulb-flicker 4.5s steps(1, end) infinite;
 }
 
@@ -157,7 +157,7 @@
   font-weight: 900;
   letter-spacing: 0.24em;
   text-transform: uppercase;
-  color: rgba(240, 176, 116, 0.82);
+  color: rgb(var(--brass-rgb) / 0.82);
 }
 
 .marquee-title {
@@ -167,10 +167,10 @@
   line-height: 0.86;
   letter-spacing: -0.055em;
   text-transform: uppercase;
-  color: #fff6e9;
+  color: var(--ink);
   text-shadow:
-    0 2px 0 rgba(120, 62, 36, 0.55),
-    0 0 34px rgba(255, 189, 118, 0.42);
+    0 2px 0 rgba(0, 0, 0, 0.55),
+    0 0 34px rgb(var(--brass-rgb) / 0.42);
 }
 
 .marquee-sub {
@@ -178,7 +178,7 @@
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: rgba(246, 239, 230, 0.72);
+  color: var(--ink-dim);
 }
 
 /* --- The options board -------------------------------------------------- */
@@ -190,7 +190,7 @@
      brightest part of most rooms, and the note lines lose against it without
      this — but a full panel would put the menu back on top of the art instead
      of in it. */
-  background: linear-gradient(90deg, rgba(12, 7, 6, 0.5) 0%, rgba(12, 7, 6, 0.34) 62%, rgba(12, 7, 6, 0) 100%);
+  background: linear-gradient(90deg, rgb(var(--shade-rgb) / 0.5) 0%, rgb(var(--shade-rgb) / 0.34) 62%, rgb(var(--shade-rgb) / 0) 100%);
   border-radius: 10px;
 }
 
@@ -206,7 +206,7 @@
   border: 0;
   /* Deliberately not a card. A hairline rule between rows reads as a listed
      board, which is the thing a card grid was failing to be. */
-  border-top: 1px solid rgba(246, 239, 230, 0.12);
+  border-top: 1px solid var(--panel-line);
   border-radius: 8px;
   background: transparent;
   text-align: left;
@@ -215,7 +215,7 @@
 }
 
 .marquee-option:last-child {
-  border-bottom: 1px solid rgba(246, 239, 230, 0.12);
+  border-bottom: 1px solid var(--panel-line);
 }
 
 .marquee-option-index {
@@ -224,7 +224,7 @@
   font-weight: 900;
   letter-spacing: 0.1em;
   font-variant-numeric: tabular-nums;
-  color: rgba(240, 176, 116, 0.5);
+  color: rgb(var(--brass-rgb) / 0.5);
   transition: color 160ms ease;
 }
 
@@ -234,7 +234,7 @@
   font-weight: 900;
   letter-spacing: -0.01em;
   color: var(--ink);
-  text-shadow: 0 1px 4px rgba(10, 6, 5, 0.6);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 
 .marquee-option-note {
@@ -242,14 +242,14 @@
   margin-top: 2px;
   font-size: 11.5px;
   line-height: 1.35;
-  color: rgba(246, 239, 230, 0.64);
-  text-shadow: 0 1px 3px rgba(10, 6, 5, 0.7);
+  color: var(--ink-dim);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
 }
 
 .marquee-option:hover,
 .marquee-option:focus-visible {
   padding-left: 22px;
-  background: linear-gradient(90deg, rgba(240, 176, 116, 0.16), rgba(240, 176, 116, 0));
+  background: linear-gradient(90deg, var(--glow), rgb(var(--brass-rgb) / 0));
 }
 
 .marquee-option:hover .marquee-option-index,
@@ -266,7 +266,7 @@
   height: 2px;
   margin-top: 7px;
   border-radius: 2px;
-  background: linear-gradient(90deg, var(--brass), rgba(240, 176, 116, 0));
+  background: linear-gradient(90deg, var(--brass), rgb(var(--brass-rgb) / 0));
   transition: width 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -285,6 +285,10 @@
   border-radius: 3px;
   /* Slightly off-square, like something actually stuck to the wall. */
   transform: rotate(-1.1deg);
+  /* DELIBERATELY NOT THEMED. This is a piece of paper taped to a wall, not part
+     of the cabinet chrome — an index card that changed colour with the palette
+     would stop being an object in the room and go back to being a UI panel,
+     which is the whole thing this menu was built to avoid. */
   background: linear-gradient(180deg, #f4ead6, #e6d8bd);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.42);
   color: #3a2a20;
@@ -334,9 +338,78 @@
    The portrait splash is also composed for its own frame — `cover` on a
    matching aspect is close to a straight fit — so there is no crop bias here.
    The marquee drops to the foot of it, out of the backboard. */
+/* --- The menu fits, at any height ---------------------------------------
+ *
+ * SIX OPTIONS DO NOT GO WHERE FIVE DID. The marquee was laid out at sizes that
+ * suited a tall desktop window, and Customize is the row that pushed the taped
+ * index card — and on a 640-tall laptop the whole bottom option — under the
+ * fold. `tools/mobile-audit.mjs` measured it at 236px over on a 1280x640
+ * window and 145px on a 1598x731 one, which is the same 848px column against
+ * two different viewports.
+ *
+ * The fix is to stop authoring the marquee in fixed pixels and let its vertical
+ * rhythm ride on the height it actually has. Everything below is a `clamp` on a
+ * `vh` term, so the scene shrinks continuously rather than stepping at one
+ * breakpoint, and a tall screen still gets exactly the sizes it always had —
+ * every clamp maxes out at the original value.
+ *
+ * Only VERTICAL measurements are in here. The horizontal ones are already
+ * keyed off `vw`, and the shape of the marquee is a column of text: what
+ * changes when there is less room is the leading, never the measure.
+ *
+ * `max-height: 900px` is where the original sizes stop fitting — it is the
+ * content column plus the cabinet's own padding, rounded up — so above it not
+ * one declaration here applies.
+ */
+@media (max-height: 900px) {
+  .marquee {
+    gap: clamp(9px, 1.7vh, 22px);
+    padding: clamp(14px, 2.9vh, 56px) clamp(22px, 4vw, 46px);
+  }
+
+  .marquee-sign {
+    padding: clamp(10px, 1.7vh, 20px) 26px clamp(11px, 1.9vh, 22px);
+  }
+
+  .marquee-kicker {
+    margin-bottom: clamp(4px, 0.9vh, 8px);
+  }
+
+  /* vh, not vw: on a short screen it is height that has run out, and a headline
+     sized in vw grows in the one direction there is no room to grow. The
+     landscape-phone rule below makes the same trade for the same reason. */
+  .marquee-title {
+    font-size: clamp(34px, 6.9vh, 82px);
+  }
+
+  .marquee-sub {
+    margin-top: clamp(5px, 1.1vh, 12px);
+    font-size: clamp(11px, 1.9vh, 13px);
+  }
+
+  /* The options board is two thirds of the column, so it is where the height
+     actually comes from — six rows pay six times over for every pixel. */
+  .marquee-option {
+    padding: clamp(4px, 0.95vh, 11px) 14px clamp(5px, 1.05vh, 12px);
+  }
+
+  .marquee-option-label {
+    font-size: clamp(15px, 2.7vh, 21px);
+  }
+
+  .marquee-option-note {
+    font-size: clamp(10px, 1.75vh, 11.5px);
+    line-height: 1.3;
+  }
+
+  .marquee-card {
+    padding: clamp(7px, 1.3vh, 11px) 18px clamp(8px, 1.4vh, 12px);
+  }
+}
+
 @media (orientation: portrait) {
   .marquee-vignette {
-    background: linear-gradient(to top, rgba(11, 7, 6, 0.94) 0%, rgba(11, 7, 6, 0.66) 46%, rgba(11, 7, 6, 0.12) 100%);
+    background: linear-gradient(to top, rgb(var(--shade-rgb) / 0.94) 0%, rgb(var(--shade-rgb) / 0.66) 46%, rgb(var(--shade-rgb) / 0.12) 100%);
   }
 
   .marquee {
@@ -366,6 +439,12 @@
    scene stops being a stage with a minimum height and simply becomes the
    viewport, and the type steps down to fit inside it.
 
+   These rules sit BELOW the `max-height: 900px` block and win on source order
+   at equal specificity, which is deliberate — that block scales a laptop down
+   and this one is a different, tighter answer for a shape a laptop never has.
+   It also means this block has to be re-checked whenever the option list
+   changes: it did not scale, so the sixth option simply fell off the bottom.
+
    The title is sized in vh rather than vw on purpose: in this shape the screen
    is wide and short, so vw would make the headline grow in the direction there
    is no room to grow. */
@@ -375,13 +454,13 @@
   }
 
   .marquee {
-    gap: 10px;
+    gap: 8px;
     max-width: 470px;
-    padding: 14px clamp(16px, 3vw, 34px);
+    padding: 10px clamp(16px, 3vw, 34px);
   }
 
   .marquee-sign {
-    padding: 10px 16px 12px;
+    padding: 9px 16px 10px;
   }
 
   .marquee-kicker {
@@ -389,31 +468,87 @@
   }
 
   .marquee-title {
-    font-size: clamp(30px, 5.4vh, 46px);
+    font-size: clamp(28px, 5.4vh, 46px);
   }
 
   .marquee-sub {
-    margin-top: 6px;
-    font-size: 11px;
+    margin-top: 5px;
+    font-size: 10.5px;
+  }
+
+  /* THE BOARD GOES TO TWO COLUMNS, AND THE SIXTH OPTION IS WHY.
+     A sideways phone is about 360px tall, and the options board is two thirds
+     of the column — so every pixel of row height is paid for six times over.
+     One column of six put Customize and the taped index card 129px under the
+     fold on a 740x360 handset, which is the exact failure this whole block
+     exists to prevent.
+
+     Two columns is the answer rather than smaller rows, because the shortage
+     here is vertical and the surplus is horizontal — the same trade the courts
+     make with their landscape rail. Halving the row count buys enough height to
+     put every option back over the 44px tap-target floor, which a six-row
+     column could not do at any padding: six rows at 44px is 264px on its own,
+     against 332px of usable screen once the sign and the card are paid for.
+
+     The board still fits inside the marquee's 470px cap, so it stays under the
+     vignette's left wash and no contrast changes with it. */
+  .marquee-options {
+    grid-template-columns: 1fr 1fr;
+    /* Flat, not the left-to-right fade. That gradient is gone by 100% of the
+       board's own width, which with one column is behind nothing — and with two
+       leaves the right-hand column sitting on bare art. */
+    background: rgb(var(--shade-rgb) / 0.46);
   }
 
   .marquee-option {
-    padding: 6px 12px 7px;
+    /* 12/13 rather than 5/6: with the note hidden the row is the label alone,
+       and this is the padding that carries it back over 44px. */
+    padding: 12px 12px 13px;
   }
 
   .marquee-option-label {
     font-size: 16px;
   }
 
-  .marquee-option-note {
-    font-size: 10.5px;
+  /* The bottom RULE belongs under the bottom ROW, which is the last two cells
+     once the board wraps — `:last-child` alone underlines one of them. */
+  .marquee-option:last-child {
+    border-bottom: 0;
+  }
+
+  .marquee-option:nth-last-child(-n + 2) {
+    border-bottom: 1px solid var(--panel-line);
+  }
+
+  /* The notes go with the second column. "Solo Run" and "Leaderboards" are not
+     ambiguous, a 10.5px note is barely legible on a screen this small, and a
+     half-width one would wrap to three lines. The `::after` underline goes with
+     them — it lives in the note's grid row, so leaving it behind would keep
+     that row 9px tall on every option, and it is a hover affordance on a device
+     with no hover. */
+  .marquee-option-note,
+  .marquee-option::after {
+    display: none;
   }
 
   .marquee-card {
-    padding: 7px 14px 8px;
+    padding: 6px 14px 7px;
   }
 }
 
+/* STILLNESS HAS TWO DOORS, and they open on the same room.
+ *
+ * `prefers-reduced-motion` is the machine-wide answer and it wins outright — a
+ * player who has told their OS to stop moving things has already answered this
+ * question, and the cabinet does not get to ask again. `[data-motion="calm"]`
+ * is for the player who has NOT set that flag and still does not want a title
+ * screen that breathes; it is written by `ui/theme.js` off the Customize
+ * screen.
+ *
+ * The rule blocks are duplicated rather than shared. A selector list cannot span
+ * a media query and an attribute selector, and the alternative — a `--drift`
+ * custom property gating every animation — buys nothing here for two keyframes
+ * and a transform. */
 @media (prefers-reduced-motion: reduce) {
   .marquee-drift {
     animation: none;
@@ -427,4 +562,17 @@
   .marquee-bulbs {
     animation: none;
   }
+}
+
+:root[data-motion="calm"] .marquee-drift {
+  animation: none;
+}
+
+:root[data-motion="calm"] .marquee-backdrop {
+  transform: scale(1.02);
+  transition: none;
+}
+
+:root[data-motion="calm"] .marquee-bulbs {
+  animation: none;
 }

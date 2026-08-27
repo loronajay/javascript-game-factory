@@ -59,6 +59,7 @@ import { createBoardsView } from "./ui/boards-view.js";
 import { BIN_GAME_TYPES, createSetupView, describeSetup } from "./ui/setup-view.js";
 import { createSoundToggle } from "./ui/sound-toggle.js";
 import { createHandToggle } from "./ui/hand-toggle.js";
+import { createThemeView } from "./ui/theme.js";
 import { createOnlineView } from "./ui/online-view.js";
 import { canvasPoint, isGrab } from "./ui/pointer.js";
 import { createMiniHoopsAccountAccess } from "./multiplayer/account-access.js";
@@ -68,6 +69,7 @@ import { normalizeMatchConfig } from "./multiplayer/match-config.js";
 import { createPlatformApiClient } from "../../../js/platform/api/platform-api.mjs";
 import {
   SCREEN_BOARDS,
+  SCREEN_CUSTOMIZE,
   SCREEN_GAME,
   SCREEN_HOWTO,
   SCREEN_MENU,
@@ -155,6 +157,7 @@ export function boot(root) {
       [SCREEN_HORSE]: root.querySelector("#horseScreen"),
       [SCREEN_BOARDS]: root.querySelector("#boardsScreen"),
       [SCREEN_HOWTO]: root.querySelector("#howToScreen"),
+      [SCREEN_CUSTOMIZE]: root.querySelector("#customizeScreen"),
     },
     { onChange: (next) => onScreenChange(next) },
   );
@@ -176,6 +179,10 @@ export function boot(root) {
   const overlays = createOverlays(root, { onIntent: handleIntent });
   const soundToggle = createSoundToggle(root);
   const handToggle = createHandToggle(root);
+  // How the cabinet is dressed. It paints the page from the theme catalog and
+  // keeps every copy of the picker in step — the gallery on the Customize
+  // screen and the compact strip filling the setup screen's empty column.
+  const themeView = createThemeView(root, { onSelect: (themeId) => setTheme(themeId) });
   const accountAccess = createMiniHoopsAccountAccess();
   const platformApi = createPlatformApiClient();
   const onlineClient = createMiniHoopsOnlineClient({ resolveIdentity: () => accountAccess.identity() });
@@ -602,6 +609,7 @@ export function boot(root) {
     else if (command === "online") openOnline();
     else if (command === "boards") screens.show(SCREEN_BOARDS);
     else if (command === "howto") screens.show(SCREEN_HOWTO);
+    else if (command === "customize") screens.show(SCREEN_CUSTOMIZE);
   }
 
   async function openOnline() {
@@ -766,6 +774,9 @@ export function boot(root) {
       case "toggle-hand":
         setHand(preferences.hand === "left" ? "right" : "left");
         break;
+      case "toggle-motion":
+        setMotion(preferences.motion === "calm" ? "full" : "calm");
+        break;
       case "leave-horse":
       case "horse-rematch":
       case "horse-lobby":
@@ -814,6 +825,33 @@ export function boot(root) {
    */
   function setHand(next) {
     handToggle.render(preferences.setHand(next));
+  }
+
+  /**
+   * How the cabinet is dressed, and how much it moves on its own.
+   *
+   * Both are CHROME. Nothing under `sim/` is told, the canvas is drawn
+   * identically under every theme, and neither appears in
+   * `preferences.snapshot()` — a run set in Arcade is the same run as one set
+   * in Hardwood, which is what keeps one board meaning one thing. That is also
+   * why this is safe to change from a pause card mid-run.
+   *
+   * Rendered together because they are one view: `ui/theme.js` writes both onto
+   * the root element in the same pass, and splitting them would mean two calls
+   * that have to stay in the right order.
+   */
+  function renderCabinet() {
+    themeView.render({ themeId: preferences.themeId, motion: preferences.motion });
+  }
+
+  function setTheme(next) {
+    preferences.setTheme(next);
+    renderCabinet();
+  }
+
+  function setMotion(next) {
+    preferences.setMotion(next);
+    renderCabinet();
   }
 
   root.addEventListener("keydown", (event) => {
@@ -1074,6 +1112,11 @@ export function boot(root) {
   renderBoards();
   soundToggle.render(audio.isMuted());
   handToggle.render(preferences.hand);
+  // Before the first frame: the theme is fourteen custom properties on the root
+  // element, and the stylesheet's own defaults are the Midnight ones — so a
+  // cabinet opened in any other theme would otherwise paint one frame in the
+  // wrong colours on every boot.
+  renderCabinet();
   accountAccess.syncButton(root.querySelector("#onlineMenuButton"));
   hud.setMode(hoopModeById(run.modeId).hudLabel);
   syncHud();

@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="styles/game.css" />
     <link rel="stylesheet" href="styles/menu.css" />
     <link rel="stylesheet" href="styles/online.css" />
+    <link rel="stylesheet" href="styles/customize.css" />
   </head>
   <body>
     <div id="mini-hoops" class="cabinet">
@@ -69,6 +70,11 @@
                 <span class="marquee-option-label">How to Play</span>
                 <span class="marquee-option-note">Three things to know. That's all of them.</span>
               </button>
+              <button type="button" class="marquee-option" data-command="customize">
+                <span class="marquee-option-index">06</span>
+                <span class="marquee-option-label">Customize</span>
+                <span class="marquee-option-note">Eight cabinets, one game. Pick the room you play in.</span>
+              </button>
             </nav>
 
             <div class="marquee-card">
@@ -89,14 +95,30 @@
           </div>
         </header>
 
+        <!-- The left column used to be the room preview and then several hundred
+             pixels of nothing, because the pickers on the right are much taller
+             than a 960x760 thumbnail. The cabinet strip fills it, and it belongs
+             here rather than anywhere else on the screen: this is where the room
+             is being chosen, and the two are the same decision about what the
+             next run LOOKS like. Swatches only — the names and the blurbs are the
+             Customize screen's job, and repeating them here would make the column
+             a second copy of that screen instead of a shortcut into it. -->
         <div class="setup-layout">
-          <figure class="setup-preview">
-            <img id="setupPreview" alt="" />
-            <figcaption>
-              <span>Court</span>
-              <strong id="setupPreviewName">Bedroom</strong>
-            </figcaption>
-          </figure>
+          <div class="setup-side">
+            <figure class="setup-preview">
+              <img id="setupPreview" alt="" />
+              <figcaption>
+                <span>Court</span>
+                <strong id="setupPreviewName">Bedroom</strong>
+              </figcaption>
+            </figure>
+
+            <fieldset class="panel setup-cabinet">
+              <legend>Cabinet</legend>
+              <p class="panel-note">Chrome only, like the court. The full set is under Customize on the menu.</p>
+              <div class="theme-strip" data-theme-picker="compact"></div>
+            </fieldset>
+          </div>
 
           <div class="setup-panels">
             <fieldset id="setupGameTypePanel" class="panel">
@@ -557,6 +579,78 @@
             </div>
           </div>
           <p id="horseOnlineStatus" class="mode-lobby-status" aria-live="polite">Choose Quick Search or open a private room.</p>
+        </div>
+      </section>
+
+      <!-- ========================== CUSTOMIZE =========================== -->
+      <!-- The customization layer's home. Everything on this screen is CHROME:
+           it dresses the cabinet and it never reaches the court, which is why
+           none of it appears in `preferences.snapshot()` and why a run set in
+           Arcade is the same run as one set in Hardwood. Same contract the rooms
+           have always been under, and the same reason — one board has to keep
+           meaning one thing.
+
+           The theme picker is built from `assets/theme-catalog.js` at runtime,
+           so adding a ninth cabinet is a row in that file and nothing here. -->
+      <section id="customizeScreen" class="screen" aria-label="Customize the cabinet">
+        <header class="screen-head">
+          <button type="button" class="ghost-btn" data-intent="back">Back</button>
+          <div>
+            <h2>Customize the Cabinet</h2>
+            <p>Chrome only. Nothing on this screen changes a shot, a score, or a board.</p>
+          </div>
+        </header>
+
+        <div class="customize-layout">
+          <!-- THE SAMPLER SHOWS WHAT A MENU CANNOT. Picking a theme repaints
+               this whole screen live, so a preview of panels and buttons would
+               be showing you the thing you are already looking at. What it
+               cannot show you is the court — the frosted cards standing on a
+               room, and the power meter, which between them are most of what a
+               player actually spends a run looking at. -->
+          <div class="customize-sample">
+            <p class="customize-sample-head">Over the room</p>
+            <div class="sample-court">
+              <div class="sample-stat sample-stat--left"><small>SCORE</small><strong>12</strong><span>9 shots</span></div>
+              <div class="sample-stat sample-stat--clock"><small>STILL</small><strong>0:18</strong></div>
+              <div class="sample-stat sample-stat--right"><small>STREAK</small><strong>3</strong><span>best 5</span></div>
+            </div>
+            <div class="shot-panel shot-panel--sample">
+              <div class="meter-head"><span>SHOT POWER</span><span>78%</span></div>
+              <div class="meter"><div class="meter-fill" style="width: 78%"></div></div>
+            </div>
+
+            <!-- The other half of what a theme dresses and a menu does not
+                 show: the leaderboard, where the highlight colour stops being
+                 decoration and becomes the thing that says which row won. -->
+            <p class="customize-sample-head">On a board</p>
+            <ol class="sample-board">
+              <li class="sample-row is-leader"><b>1</b><strong>34</strong><span>Still · 30 sec</span><em>Basketball</em></li>
+              <li class="sample-row"><b>2</b><strong>28</strong><span>Still · 30 sec</span><em>Snowball</em></li>
+            </ol>
+          </div>
+
+          <div class="customize-panels">
+            <fieldset class="panel">
+              <legend>Theme</legend>
+              <p class="panel-note">Eight cabinets. The rooms, the balls and the physics are the same in all of them.</p>
+              <div class="chip-grid" data-theme-picker="full"></div>
+            </fieldset>
+
+            <fieldset class="panel">
+              <legend>Comfort</legend>
+              <p class="panel-note">The same switches that live on the setup screen and in the pause card, gathered in one place.</p>
+              <div class="customize-switches">
+                <button type="button" class="ghost-btn sound-btn" data-intent="toggle-sound" aria-pressed="false">Sound: On</button>
+                <button type="button" class="ghost-btn" data-intent="toggle-hand" aria-pressed="false">Shoot: Right</button>
+                <!-- The second door to the same room `prefers-reduced-motion`
+                     opens. The OS setting still wins outright; this is for the
+                     player who has not set it. See the note in menu.css. -->
+                <button type="button" class="ghost-btn" data-intent="toggle-motion" aria-pressed="false">Motion: On</button>
+              </div>
+              <p class="customize-note">Shooting hand decides which side of a sideways screen the court sits on. It is layout only — a run played left-handed is the same run.</p>
+            </fieldset>
+          </div>
         </div>
       </section>
 

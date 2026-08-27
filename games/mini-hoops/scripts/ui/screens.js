@@ -9,6 +9,7 @@ export const SCREEN_SETUP = "setup";
 export const SCREEN_GAME = "game";
 export const SCREEN_BOARDS = "boards";
 export const SCREEN_HOWTO = "howto";
+export const SCREEN_CUSTOMIZE = "customize";
 export const SCREEN_ONLINE = "online";
 export const SCREEN_TIC_TAC_TOE = "tictactoe";
 export const SCREEN_HORSE = "horse";
@@ -22,6 +23,7 @@ export const SCREENS = Object.freeze([
   SCREEN_HORSE,
   SCREEN_BOARDS,
   SCREEN_HOWTO,
+  SCREEN_CUSTOMIZE,
 ]);
 
 /**
@@ -57,6 +59,7 @@ const BACK_TARGETS = Object.freeze({
   [SCREEN_HORSE]: SCREEN_MENU,
   [SCREEN_BOARDS]: SCREEN_MENU,
   [SCREEN_HOWTO]: SCREEN_MENU,
+  [SCREEN_CUSTOMIZE]: SCREEN_MENU,
 });
 
 export function isScreen(name) {

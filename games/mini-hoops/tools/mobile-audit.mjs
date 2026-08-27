@@ -17,7 +17,7 @@
 //   offscreen  -- interactive controls outside the viewport or under the fold
 //   small      -- tap targets under the 44px Material/HIG minimum
 //
-//   node tools/mobile-audit.mjs [--viewport <name>] [--shots <dir>]
+//   node tools/mobile-audit.mjs [--viewport <name>] [--shots <dir>] [--theme <id>]
 //
 // Hand-run, no new dependencies, Chrome via CHROME_PATH -- the same shape as the
 // contact sheets. Screenshots are written only when --shots is passed.
@@ -43,6 +43,12 @@ const flag = (name) => {
 };
 const shotDir = flag("--shots");
 const only = flag("--viewport");
+// A theme changes no measurement -- it is fourteen colours and not one box --
+// but every screen here is also the only place a palette can be REVIEWED, and
+// eight cabinets are eight times as many screens to look at. This seeds the
+// preference before the cabinet boots, so `--theme carbon --shots <dir>` is a
+// contact sheet of the whole game in one theme.
+const theme = flag("--theme");
 
 // Real handsets, not round numbers: the two portrait widths either side of the
 // common case and the two landscape shapes a phone actually produces.
@@ -194,6 +200,26 @@ const pickGameType = (pattern) => {
 /** Steps that put the cabinet on a screen worth measuring. */
 const ROUTES = [
   {
+    // The boot screen, and now also the front door to the customization layer.
+    // It MUST fit: the whole point of the diegetic marquee is that the options
+    // are an object in the room rather than a list you scroll, and a sixth entry
+    // is exactly the kind of change that pushes the index card under the fold on
+    // a sideways phone.
+    name: "menu",
+    mustFit: true,
+    async go() {},
+  },
+  {
+    // A list, so it scrolls by design -- but its two columns and its sticky
+    // sampler are measured the same way the setup screen is.
+    name: "customize",
+    mustFit: false,
+    async go(page) {
+      await page.click('[data-command="customize"]');
+      await page.waitForSelector("#customizeScreen.is-active");
+    },
+  },
+  {
     name: "setup",
     mustFit: false,
     async go(page) {
@@ -266,6 +292,17 @@ const ROUTES = [
     },
   },
   {
+    // A splash screen with a list on it. It scrolls by design, but it is also
+    // where the scrim over the painted art is judged, and it had never been in
+    // this sheet at all.
+    name: "boards",
+    mustFit: false,
+    async go(page) {
+      await page.click('[data-command="boards"]');
+      await page.waitForSelector("#boardsScreen.is-active");
+    },
+  },
+  {
     name: "how to play",
     mustFit: true,
     async go(page) {
@@ -295,13 +332,17 @@ for (const viewport of VIEWPORTS) {
     // localStorage and the whole run shares one browser profile, so without this
     // the left-handed route below leaks its setting into the next viewport's
     // default and both read as working while neither is being measured.
-    await page.evaluateOnNewDocument(() => {
+    await page.evaluateOnNewDocument((themeId) => {
       try {
         localStorage.clear();
+        // Written as the store writes it, so it goes through the same catalog
+        // validation a real preference does -- a typo here must degrade to the
+        // default rather than quietly shooting the sheet in a ninth theme.
+        if (themeId) localStorage.setItem("miniHoops.preferences.v1", JSON.stringify({ themeId }));
       } catch {
         /* private mode: nothing to clear */
       }
-    });
+    }, theme);
     await page.goto(`${origin}${gameUrlPath}`, { waitUntil: "networkidle0" });
     try {
       await route.go(page);
