@@ -17,7 +17,8 @@
 // page is not sharing a controller.
 
 import { createAssetLibrary } from "./assets/loader.js";
-import { ballFlight } from "./assets/ball-catalog.js";
+import { DEFAULT_BALL, ballFlight, ballSplat } from "./assets/ball-catalog.js";
+import { addSplat, clearSplatField, createSplatField, tickSplatField } from "./effects/splat-field.js";
 import { createMiniHoopsAccountAccess } from "./multiplayer/account-access.js";
 import { normalizeRoomCode } from "./multiplayer/online-client.js";
 import { createTicTacToeOnlineClient } from "./multiplayer/tic-tac-toe-online-client.js";
@@ -48,6 +49,8 @@ import { drawAim } from "./render/aim.js";
 import { binMouthEllipse, drawBinBody, drawBinLip, drawFloorMark } from "./render/bin.js";
 import { clearScene, depthGradeFilter, drawBallShadow, drawRoom, prepareContext } from "./render/scene.js";
 import { canvasPoint, isGrab } from "./ui/pointer.js";
+import { createTurnBallPicker, normalizeTurnBallId } from "./ui/turn-ball-picker.js";
+import { drawSplatDecals, drawSplatParticles } from "./render/splats.js";
 
 // One definition of what each side looks like. The floor glyph, the claimed
 // cell's tint and the no-art fallback all read it, so a colour cannot drift
@@ -57,16 +60,16 @@ export const MARK_COLOURS = Object.freeze({ x: "#ff4fd8", o: "#28d8ff" });
 const BIN_PATH = "assets/modes/floor-tic-tac-toe/open-bin.png";
 const X_PATH = "assets/modes/floor-tic-tac-toe/neon-x.png";
 const O_PATH = "assets/modes/floor-tic-tac-toe/neon-o.png";
-// The room and the ball are fixed for this mode — the setup screen reads the
-// same record to know which of its pickers to put away.
-const { locationId: ROOM_ID, ballId: BALL_ID } = TIC_TAC_TOE_FIXED_SETUP;
+// The room is fixed and the ball id is the per-turn default — the setup screen
+// reads the same record to know which of its pre-match pickers to put away.
+const { locationId: ROOM_ID } = TIC_TAC_TOE_FIXED_SETUP;
 
 /**
  * A silent stand-in, so the root can be constructed in a test without a browser.
  * Same pattern and same reason as `practice-court.js`.
  */
 const SILENT_AUDIO = Object.freeze({
-  released() {}, contact() {}, binScored() {}, missed() {}, celebrate() {}, click() {},
+  released() {}, contact() {}, binScored() {}, missed() {}, celebrate() {}, click() {}, splat() {},
 });
 
 export function capturedBinForDraw(flight) {
@@ -113,10 +116,11 @@ export function bootTicTacToe(root, options = {}) {
     bin: assets.image(BIN_PATH),
     x: assets.image(X_PATH),
     o: assets.image(O_PATH),
-    ballFrames: assets.ballFrames(BALL_ID),
   };
   const bins = createBinTargets();
+  const cells = binGridCells();
   const ball = createBall();
+  const splats = createSplatField();
   const scoredAt = new Map();
   // When each kind of contact last sounded, for the debounce in `announce`.
   const lastContactAt = new Map();
@@ -149,6 +153,10 @@ export function bootTicTacToe(root, options = {}) {
   // and the bin it was about to drop into would already be gone.
   let pendingMatch = null;
   let seenAttempt = -1;
+  // Each side remembers its own last choice. In hotseat that keeps Player 2
+  // from inheriting Player 1's ball; online, the opponent's choice is filled in
+  // by the shot intent that is replayed on this court.
+  let turnBalls = { x: DEFAULT_BALL, o: DEFAULT_BALL };
 
   const status = root.querySelector("#tttStatus");
   const assignment = root.querySelector("#tttAssignment");
@@ -174,6 +182,9 @@ export function bootTicTacToe(root, options = {}) {
     grid: root.querySelector("#tttMiniGrid"),
     turn: root.querySelector("#tttMiniTurn"),
   };
+  const ballPicker = createTurnBallPicker(root.querySelector("#tttBallChoices"), {
+    onSelect: selectTurnBall,
+  });
 
   onlineClient.subscribe(handleOnlineSnapshot);
 
@@ -213,6 +224,7 @@ export function bootTicTacToe(root, options = {}) {
     // The pill parks over the ball's rest position, which is the one thing the
     // player has to grab. It has done its job the moment they grab it.
     hint?.classList.add("is-hidden");
+    syncBallPicker();
     canvas.setPointerCapture?.(pointerId);
     setStatus("Aim with the line · release to shoot");
     event.preventDefault();
@@ -233,9 +245,10 @@ export function bootTicTacToe(root, options = {}) {
     pointerId = null;
     if (isShootablePull(released)) launchFromPull(released);
     else setPower(0);
+    syncBallPicker();
     event.preventDefault();
   });
-  canvas.addEventListener("pointercancel", () => { pull = null; pointerId = null; setPower(0); });
+  canvas.addEventListener("pointercancel", () => { pull = null; pointerId = null; setPower(0); syncBallPicker(); });
   canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
   function newMatch() {
@@ -247,12 +260,14 @@ export function bootTicTacToe(root, options = {}) {
     if (mode === "online") match.status = "waiting";
     scoredAt.clear();
     lastContactAt.clear();
+    clearSplatField(splats);
     pull = null;
     flight = null;
     onlineAttemptPending = false;
     tally = { x: { shots: 0, made: 0 }, o: { shots: 0, made: 0 } };
     pendingMatch = null;
     seenAttempt = -1;
+    turnBalls = { x: DEFAULT_BALL, o: DEFAULT_BALL };
     hideResults();
     cpuDelay = mode === "cpu" ? 0.75 : 0;
     resetBall(ball);
@@ -277,15 +292,16 @@ export function bootTicTacToe(root, options = {}) {
    * collision. The floor is exempt because `audio.contact` already judges a
    * floor hit by its speed, which is what separates a bounce from a roll.
    */
-  function announce(contacts) {
+  function announce(contacts, ballId, splat = null) {
     for (const contact of contacts) {
       if (contact === "bin-score") continue;
+      if (splat?.surface === contact) continue;
       if (contact !== "floor") {
         const last = lastContactAt.get(contact) ?? -Infinity;
         if (elapsed - last < CONTACT_DEBOUNCE_SECONDS) continue;
         lastContactAt.set(contact, elapsed);
       }
-      audio.contact(contact, { ballId: BALL_ID, speed: ball.vy });
+      audio.contact(contact, { ballId, speed: ball.vy });
     }
   }
 
@@ -293,9 +309,29 @@ export function bootTicTacToe(root, options = {}) {
     return isHumanControlledTurn(match) && !flight && !onlineAttemptPending;
   }
 
+  function currentTurnBallId() {
+    return normalizeTurnBallId(turnBalls[match?.turn]);
+  }
+
+  function selectTurnBall(ballId) {
+    if (!canHumanAct() || pull) return;
+    turnBalls[match.turn] = normalizeTurnBallId(ballId);
+    // Start loading the chosen art while the player lines up the pull.
+    assets.ballFrames(turnBalls[match.turn]);
+    assets.ballSplats(turnBalls[match.turn]);
+    audio.click();
+    syncBallPicker();
+    draw();
+  }
+
+  function syncBallPicker() {
+    ballPicker.render({ ballId: currentTurnBallId(), enabled: canHumanAct() && !pull });
+  }
+
   function launchFromPull(released, attemptedCell = null) {
     if (flight) return;
-    const shot = createTicTacToeShot(released, ball, { weight: ballFlight(BALL_ID).weight });
+    const selectedBallId = currentTurnBallId();
+    const shot = createTicTacToeShot(released, ball, { weight: ballFlight(selectedBallId).weight });
     const nearest = attemptedCell ?? nearestOpenCellForShot(
       { aimX: shot.aim.x, targetZ: shot.targetZ },
       bins,
@@ -303,8 +339,9 @@ export function bootTicTacToe(root, options = {}) {
     );
     if (nearest === null) return;
     launchBall(ball, shot.launch, launchSpin(shot.launch));
-    audio.released(BALL_ID);
+    audio.released(selectedBallId);
     flight = {
+      ballId: selectedBallId,
       attemptedCell: nearest,
       targetZ: shot.targetZ,
       age: 0,
@@ -315,9 +352,10 @@ export function bootTicTacToe(root, options = {}) {
       // The gesture itself, kept so it can go up the wire. It is the whole of
       // what the other client needs to draw this ball: their court runs the same
       // sim, so a pull replayed there does what it did here.
-      intent: { power: released.power, aimX: released.aimX, loft: released.loft },
+      intent: { power: released.power, aimX: released.aimX, loft: released.loft, ballId: selectedBallId },
       replay: false,
     };
+    syncBallPicker();
     setPower(released.power);
     setStatus(`${playerLabel(match)} (${match.turn.toUpperCase()}) shoots…`);
   }
@@ -333,11 +371,14 @@ export function bootTicTacToe(root, options = {}) {
    */
   function replayOpponentShot(attempt) {
     if (!attempt?.intent) return false;
+    const selectedBallId = normalizeTurnBallId(attempt.intent.ballId);
+    if (attempt.mark) turnBalls[attempt.mark] = selectedBallId;
     resetBall(ball);
-    const shot = createTicTacToeShot(attempt.intent, ball, { weight: ballFlight(BALL_ID).weight });
+    const shot = createTicTacToeShot(attempt.intent, ball, { weight: ballFlight(selectedBallId).weight });
     launchBall(ball, shot.launch, launchSpin(shot.launch));
-    audio.released(BALL_ID);
+    audio.released(selectedBallId);
     flight = {
+      ballId: selectedBallId,
       attemptedCell: attempt.cell,
       targetZ: shot.targetZ,
       age: 0,
@@ -375,6 +416,7 @@ export function bootTicTacToe(root, options = {}) {
       cpuDelay -= TICK_SECONDS;
       if (cpuDelay <= 0) startCpuShot();
     }
+    tickSplatField(splats, TICK_SECONDS);
   }
 
   function tickFlight() {
@@ -382,10 +424,14 @@ export function bootTicTacToe(root, options = {}) {
     if (!flight.resolved) {
       const activeBins = bins.filter((bin) => !match.board[bin.index]);
       const result = stepBallAgainstBins(ball, activeBins, TICK_SECONDS, {
-        ballId: BALL_ID,
+        ballId: flight.ballId,
         capturedBin: flight.capturedBin,
       });
-      announce(result.contacts);
+      if (result.splat) {
+        addSplat(splats, { ...result.splat, ...ballSplat(flight.ballId), random });
+        audio.splat(result.splat.surface, { ballId: flight.ballId, speed: result.splat.speed });
+      }
+      announce(result.contacts, flight.ballId, result.splat);
       if (result.capturedBin !== null) flight.capturedBin = result.capturedBin;
       if (result.scoredBin !== null && !match.board[result.scoredBin]) {
         resolveFlight(true, result.scoredBin);
@@ -396,7 +442,7 @@ export function bootTicTacToe(root, options = {}) {
       // Physics continues briefly so turn timing stays deterministic. Rendering
       // ends at the mouth plane: once captured, the bin has swallowed the ball.
       if (flight.capturedBin !== null) {
-        stepBallAgainstBins(ball, bins, TICK_SECONDS, { ballId: BALL_ID, capturedBin: flight.capturedBin });
+        stepBallAgainstBins(ball, bins, TICK_SECONDS, { ballId: flight.ballId, capturedBin: flight.capturedBin });
       }
       flight.resetIn -= TICK_SECONDS;
       if (flight.resetIn <= 0) {
@@ -435,7 +481,7 @@ export function bootTicTacToe(root, options = {}) {
     flight.resolved = true;
     flight.resetIn = made ? 1.05 : 0.45;
     if (made) {
-      audio.binScored(BALL_ID);
+      audio.binScored(flight.ballId);
       setStatus(`${flight.mark.toUpperCase()} scores!`);
     } else {
       audio.missed();
@@ -557,6 +603,7 @@ export function bootTicTacToe(root, options = {}) {
   function syncTurnStatus() {
     syncMiniBoard();
     syncResults();
+    syncBallPicker();
     if (match.status === "won" && match.mode === "local") setStatus(`${playerLabel(match, match.winner).toUpperCase()} WINS!`);
     else if (match.status === "won" && match.mode === "online") setStatus(match.winner === match.humanMark ? "YOU WIN!" : `${onlineOpponentName().toUpperCase()} WINS`);
     else if (match.status === "won") setStatus(match.winner === match.humanMark ? "YOU WIN!" : "CPU WINS");
@@ -699,7 +746,6 @@ export function bootTicTacToe(root, options = {}) {
     // its cell's front line and read as the bins spilling out towards the
     // camera. `binGridCell` answers both, and it is indexed exactly as
     // `bin.index` is.
-    const cells = binGridCells();
     const at = (x, z) => projectPoint({ x, y: 0.004, z });
 
     ctx.save();
@@ -765,8 +811,8 @@ export function bootTicTacToe(root, options = {}) {
     ctx.ellipse(mouth.cx, mouth.cy, mouth.radiusX, mouth.radiusY, 0, 0, Math.PI * 2);
     ctx.clip();
     drawBall(ctx, {
-      frames: art.ballFrames,
-      ballId: BALL_ID,
+      frames: assets.ballFrames(flight.ballId),
+      ballId: flight.ballId,
       ...screenBallPosition(),
       rollPhase: ball.rollPhase,
       // Dimmer than the room, because it is inside a dark drum by now.
@@ -779,6 +825,8 @@ export function bootTicTacToe(root, options = {}) {
     if (!match) return;
     clearScene(ctx);
     drawRoom(ctx, art.room, ROOM_ID);
+    drawSplatDecals(ctx, splats, { images: assets.ballSplats(flight?.ballId || currentTurnBallId()) });
+    drawSplatParticles(ctx, splats);
     drawGrid();
 
     const captured = capturedBinForDraw(flight);
@@ -809,7 +857,7 @@ export function bootTicTacToe(root, options = {}) {
         // A winning cell pulses; the rest sit at rest. `elapsed` is tick time,
         // so the pulse is deterministic and a replay looks identical.
         const glow = winning.has(bin.index) ? 1.35 + Math.sin(elapsed * 6) * 0.45 : 1;
-        drawFloorMark(ctx, bin, art[mark], mark, { glow });
+        drawFloorMark(ctx, bin, art[mark], mark, { glow, cell: cells[bin.index] });
         continue;
       }
       drawBinBody(ctx, bin, art.bin);
@@ -819,7 +867,7 @@ export function bootTicTacToe(root, options = {}) {
     if (loose && !ballDrawn) drawLooseBall();
 
     if (pull) {
-      const preview = createTicTacToeShot(pull, ball, { weight: ballFlight(BALL_ID).weight });
+      const preview = createTicTacToeShot(pull, ball, { weight: ballFlight(currentTurnBallId()).weight });
       const trajectory = pull.power > 0.03 ? trajectoryPoints(ball, preview.launch) : null;
       drawAim(ctx, {
         pull: { ...pull, aimX: preview.aim.x, aimY: preview.aim.y },
@@ -830,9 +878,10 @@ export function bootTicTacToe(root, options = {}) {
   }
 
   function drawLooseBall() {
+    const ballId = flight?.ballId || currentTurnBallId();
     drawBall(ctx, {
-      frames: art.ballFrames,
-      ballId: BALL_ID,
+      frames: assets.ballFrames(ballId),
+      ballId,
       ...screenBallPosition(),
       rollPhase: ball.rollPhase,
       filter: depthGradeFilter(ball.z),

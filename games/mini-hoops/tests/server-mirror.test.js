@@ -5,6 +5,7 @@ import { assertEqual, finish, suite, test } from "./harness.js";
 import { matchConfigSettings } from "../scripts/multiplayer/match-config.js";
 import { sanitizeLobbySettings } from "../../../../factory-network-server/src/util.mjs";
 import { createMiniHoopsMatchState } from "../../../../factory-network-server/games/mini-hoops/server/mini-hoops-match-engine.mjs";
+import { sanitizeHorseShot } from "../../../../factory-network-server/games/mini-hoops/server/horse-match-engine.mjs";
 
 const gameRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const serverMirror = path.resolve(gameRoot, "../../../factory-network-server/games/mini-hoops/shared/scripts");
@@ -45,6 +46,11 @@ test("Factory lobby sanitizing preserves the Mini Hoops match config", () => {
   assertEqual(match.config.duration, 60);
   assertEqual(match.config.locationId, "warehouse");
   assertEqual(match.config.ballId, "paper");
+});
+
+test("authoritative HORSE preserves a catalog ball on each shot", () => {
+  assertEqual(sanitizeHorseShot({ ballId: "snowball" }).ballId, "snowball");
+  assertEqual(sanitizeHorseShot({ ballId: "../../bad" }).ballId, "basketball");
 });
 
 finish();

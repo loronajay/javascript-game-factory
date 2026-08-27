@@ -4,6 +4,7 @@ import {
   sanitizeIdentity,
 } from "./online-client.js";
 import { createTicTacToeMatch, resolveAttempt } from "../sim/tic-tac-toe.js";
+import { ballById } from "../assets/ball-catalog.js";
 
 export const TIC_TAC_TOE_GAME_ID = "mini-hoops-tic-tac-toe";
 const SESSION_KEY = "mini-hoops.tic-tac-toe-online-session.v1";
@@ -28,8 +29,8 @@ function attach(socket, type, listener) {
  * The pull that took the shot, as it travels.
  *
  * THE OPPONENT'S BALL IS WATCHED, NOT REPORTED. Three numbers is the whole of
- * what the other court needs to draw it: both machines run the same sim, so the
- * same gesture there does what it did here. Without it a cell simply changed
+ * what the other court needs to draw it, plus the catalog ball id: both machines
+ * run the same sim, so the same gesture and ball there do what they did here. Without it a cell simply changed
  * colour and the player was told about it afterwards — which is what HORSE has
  * never done, and this mode did.
  *
@@ -49,6 +50,9 @@ export function sanitizeShotIntent(value) {
     // because a CPU-style throw aims off the mouth on purpose.
     aimX: Math.max(-960, Math.min(1920, aimX)),
     loft: Math.max(0, Math.min(1, loft)),
+    // A catalog id, not a path. The receiver loads art and applies flight
+    // physics from this value, so arbitrary input must fall back before either.
+    ballId: ballById(value.ballId).id,
   };
 }
 

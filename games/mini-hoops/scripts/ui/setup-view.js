@@ -32,8 +32,8 @@ const GAME_TYPES = Object.freeze([
 /**
  * The game types that are not the classic timed run.
  *
- * Both shoot at bins, both fix their own room and ball, and so neither reads a
- * single one of the classic pickers. Exported because the composition root has
+ * Both shoot at bins, both fix their room and choose balls on the court, and so
+ * neither reads a single one of the classic pickers. Exported because the composition root has
  * to make the same distinction when it decides which screen a Start press opens,
  * and two hand-maintained lists of the same fact is how they drift apart.
  */
@@ -123,8 +123,8 @@ export function createSetupView(root, { onSelect = () => {} } = {}) {
       // picked tic-tac-toe would find an online setup with no pickers on it.
       const ticTacToe = selection.playMode !== "online" && selection.gameType === "tic-tac-toe";
       const horse = selection.playMode !== "online" && selection.gameType === "horse";
-      // Both bin modes fix their own room and ball, so neither reads the
-      // remembered classic pickers — see the note on the summary below.
+      // Both bin modes fix their room and choose a ball each turn, so neither
+      // reads the remembered classic pickers — see the summary below.
       const binMode = selection.playMode !== "online" && BIN_GAME_TYPES.has(selection.gameType);
       const shown = binMode ? TIC_TAC_TOE_FIXED_SETUP : selection;
 
@@ -147,7 +147,7 @@ export function createSetupView(root, { onSelect = () => {} } = {}) {
         summary.textContent = horse
           ? `${players} · spell ${normalizeWord(selection.word || DEFAULT_WORD)}`
           : ticTacToe
-            ? `${players} · ${locationById(shown.locationId).label} · ${ballById(shown.ballId).label}`
+            ? `${players} · ${locationById(shown.locationId).label} · choose a ball each turn`
             : describeSetup(selection);
       }
       if (gameTypePanel) gameTypePanel.hidden = selection.playMode === "online";

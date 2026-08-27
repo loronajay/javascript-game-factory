@@ -16,7 +16,8 @@
 // target was invented by one of the two players.
 
 import { createAssetLibrary } from "./assets/loader.js";
-import { ballFlight } from "./assets/ball-catalog.js";
+import { DEFAULT_BALL, ballFlight, ballSplat } from "./assets/ball-catalog.js";
+import { addSplat, clearSplatField, createSplatField, tickSplatField } from "./effects/splat-field.js";
 import { CANVAS_HEIGHT, CANVAS_WIDTH, CONTACT_DEBOUNCE_SECONDS, TICK_SECONDS } from "./sim/constants.js";
 import { stepBallAgainstBins } from "./sim/bin-physics.js";
 import {
@@ -60,18 +61,16 @@ import { drawBall } from "./render/ball.js";
 import { binMouthEllipse, drawBinBody, drawBinLip, drawBinShadow } from "./render/bin.js";
 import { clearScene, depthGradeFilter, drawBallShadow, drawRoom, prepareContext } from "./render/scene.js";
 import { canvasPoint, isGrab } from "./ui/pointer.js";
+import { createTurnBallPicker, normalizeTurnBallId } from "./ui/turn-ball-picker.js";
+import { drawSplatDecals, drawSplatParticles } from "./render/splats.js";
 
 const BIN_PATH = "assets/modes/floor-tic-tac-toe/open-bin.png";
 
-// The room and the ball, fixed the way tic-tac-toe fixes them and for the same
-// reason: the mode is not a configurable run, and the thing the players are
-// negotiating over is the BIN. A court picker would only add a second thing to
-// agree about before anyone shoots.
-// Stated once, in `sim/horse.js`, because the server adjudicating online HORSE
-// runs a mirrored copy of that file — a ball named here and re-typed over there
-// is exactly the pair that drifts silently.
+// The room is fixed; the ball is a decision made on every turn. The catalog
+// default still lives in `sim/horse.js` because the server needs the same safe
+// fallback for old or malformed online intents.
 const ROOM_ID = HORSE_FIXED_SETUP.locationId;
-const BALL_ID = HORSE_FIXED_SETUP.ballId;
+const LOSER_POPUP_SECONDS = 2.4;
 
 // How far one nudge of a key or an on-screen stepper moves the bin.
 const NUDGE_DEPTH = 0.035;
@@ -85,7 +84,7 @@ const PHASE_AIMING = "aiming";
 
 /** Silent stand-in so the root can be constructed in a test without a browser. */
 const SILENT_AUDIO = Object.freeze({
-  released() {}, contact() {}, binScored() {}, missed() {}, celebrate() {}, click() {},
+  released() {}, contact() {}, binScored() {}, missed() {}, celebrate() {}, click() {}, splat() {},
 });
 
 export function bootHorse(root, options = {}) {
@@ -113,10 +112,10 @@ export function bootHorse(root, options = {}) {
   const art = {
     room: assets.backdrop(ROOM_ID),
     bin: assets.image(BIN_PATH),
-    ballFrames: assets.ballFrames(BALL_ID),
   };
 
   const ball = createBall();
+  const splats = createSplatField();
   const lastContactAt = new Map();
 
   let mode = horseModeId(options.mode);
@@ -145,6 +144,12 @@ export function bootHorse(root, options = {}) {
   let cpuDelay = 0;
   let accumulator = 0;
   let previousFrame = 0;
+  // A hotseat handoff gets the next player's own last choice, not the ball the
+  // previous player happened to use. Online fills the other seat from the
+  // authoritative shot it replays.
+  let turnBalls = [DEFAULT_BALL, DEFAULT_BALL];
+  let loserPopupRemaining = 0;
+  let loserPopupPlayed = false;
 
   // ------------------------------------------------------------- online
   // Which of the two rows in `match.players` is this device. Seat 0 is the
@@ -180,6 +185,8 @@ export function bootHorse(root, options = {}) {
     readouts: root.querySelector("#horsePlaceReadout"),
     court: root.querySelector("#horseScreen .court"),
     onlinePanel: root.querySelector("#horseOnlinePanel"),
+    loserPopup: root.querySelector("#horseLoserPopup"),
+    loserPopupText: root.querySelector("#horseLoserPopupText"),
   };
   const results = {
     overlay: root.querySelector("#horseResultsOverlay"),
@@ -190,6 +197,9 @@ export function bootHorse(root, options = {}) {
     rematch: root.querySelector("#horseResultRematch"),
     lobby: root.querySelector("#horseResultLobby"),
   };
+  const ballPicker = createTurnBallPicker(root.querySelector("#horseBallChoices"), {
+    onSelect: selectTurnBall,
+  });
 
   onlineClient.subscribe(handleOnlineSnapshot);
   root.querySelector("#horseOnlineQuick")?.addEventListener("click", () => onlineClient.findQuickMatch(word));
@@ -255,6 +265,7 @@ export function bootHorse(root, options = {}) {
     grabOffset = { x: point.x - screenBall.x, y: point.y - screenBall.y };
     pull = neutralPull(screenBall);
     el.hint?.classList.add("is-hidden");
+    syncBallPicker();
     canvas.setPointerCapture?.(pointerId);
     event.preventDefault();
   });
@@ -286,6 +297,7 @@ export function bootHorse(root, options = {}) {
     pointerId = null;
     if (isShootablePull(released)) launchFromPull(released);
     else setPower(0);
+    syncBallPicker();
     event.preventDefault();
   });
 
@@ -294,6 +306,7 @@ export function bootHorse(root, options = {}) {
     pointerId = null;
     placingPointerId = null;
     setPower(0);
+    syncBallPicker();
   });
   canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
@@ -410,7 +423,12 @@ export function bootHorse(root, options = {}) {
     appliedSequence = -1;
     seenSequence = -1;
     awaitingServer = false;
+    turnBalls = [DEFAULT_BALL, DEFAULT_BALL];
+    loserPopupRemaining = 0;
+    loserPopupPlayed = false;
+    hideLoserPopup();
     lastContactAt.clear();
+    clearSplatField(splats);
     workingSetup = { ...defaultPlacement(), motionId: "still" };
     activeSetup = null;
     flight = null;
@@ -461,6 +479,28 @@ export function bootHorse(root, options = {}) {
     syncStatus();
   }
 
+  function currentTurnBallId() {
+    return normalizeTurnBallId(turnBalls[match?.turn] || DEFAULT_BALL);
+  }
+
+  function canChooseBall() {
+    return isMyTurn() && !flight && !awaitingServer && !pull;
+  }
+
+  function selectTurnBall(ballId) {
+    if (!canChooseBall()) return;
+    turnBalls[match.turn] = normalizeTurnBallId(ballId);
+    assets.ballFrames(turnBalls[match.turn]);
+    assets.ballSplats(turnBalls[match.turn]);
+    audio.click();
+    syncBallPicker();
+    draw();
+  }
+
+  function syncBallPicker() {
+    ballPicker.render({ ballId: currentTurnBallId(), enabled: canChooseBall() });
+  }
+
   /**
    * The same job online, where the other hand is on another machine.
    *
@@ -488,6 +528,7 @@ export function bootHorse(root, options = {}) {
 
   function launchFromPull(released) {
     if (flight || !activeSetup) return;
+    const selectedBallId = currentTurnBallId();
     // ONLINE, THE PULL GOES UP THE WIRE AND THE OUTCOME COMES BACK. This court
     // still plays the shot out — it is running the same sim the server replays
     // it through, so the two agree — but it does not rule on it.
@@ -501,12 +542,13 @@ export function bootHorse(root, options = {}) {
         // the server rules on the moment the player actually picked.
         motionSeconds: turnClock,
         expectedShots: match.shots,
+        ballId: selectedBallId,
       });
     }
-    const shot = createHorseShot(released, ball, activeSetup, { weight: ballFlight(BALL_ID).weight });
+    const shot = createHorseShot(released, ball, activeSetup, { weight: ballFlight(selectedBallId).weight });
     launchBall(ball, shot.launch, launchSpin(shot.launch));
-    audio.released(BALL_ID);
-    flight = { age: 0, resolved: false, resetIn: null, capturedBin: null, made: false };
+    audio.released(selectedBallId);
+    flight = { ballId: selectedBallId, age: 0, resolved: false, resetIn: null, capturedBin: null, made: false };
     setPower(released.power);
     syncStatus();
     syncPanels();
@@ -529,7 +571,7 @@ export function bootHorse(root, options = {}) {
       { power: horsePowerForDepth(rest.z), aimX: projectPoint(rest).x, loft: 1 },
       ball,
       setup,
-      { weight: ballFlight(BALL_ID).weight },
+      { weight: ballFlight(currentTurnBallId()).weight },
     );
     const lead = placedBinAt(setup, turnClock + Math.max(0, provisional.launch.flightTime));
     const target = projectPoint({ x: lead.x, y: lead.topY, z: lead.z });
@@ -557,6 +599,8 @@ export function bootHorse(root, options = {}) {
 
   function tick() {
     elapsed += TICK_SECONDS;
+    tickLoserPopup();
+    tickSplatField(splats, TICK_SECONDS);
     // The bin's own clock runs whenever a shot is set, INCLUDING while the
     // player is still lining up their pull — so a moving bin can be watched
     // before anyone commits, exactly like the classic cabinet's moving rim.
@@ -581,10 +625,14 @@ export function bootHorse(root, options = {}) {
 
     if (!flight.resolved) {
       const result = stepBallAgainstBins(ball, [bin], TICK_SECONDS, {
-        ballId: BALL_ID,
+        ballId: flight.ballId,
         capturedBin: flight.capturedBin,
       });
-      announce(result.contacts);
+      if (result.splat) {
+        addSplat(splats, { ...result.splat, ...ballSplat(flight.ballId), random });
+        audio.splat(result.splat.surface, { ballId: flight.ballId, speed: result.splat.speed });
+      }
+      announce(result.contacts, result.splat);
       if (result.capturedBin !== null) flight.capturedBin = result.capturedBin;
 
       if (result.scoredBin !== null) {
@@ -596,7 +644,7 @@ export function bootHorse(root, options = {}) {
     }
 
     if (flight.capturedBin !== null) {
-      stepBallAgainstBins(ball, [bin], TICK_SECONDS, { ballId: BALL_ID, capturedBin: flight.capturedBin });
+      stepBallAgainstBins(ball, [bin], TICK_SECONDS, { ballId: flight.ballId, capturedBin: flight.capturedBin });
     }
     flight.resetIn -= TICK_SECONDS;
     if (flight.resetIn <= 0) {
@@ -617,7 +665,7 @@ export function bootHorse(root, options = {}) {
     flight.resolved = true;
     flight.made = made;
     flight.resetIn = made ? 1.15 : 0.55;
-    if (made) audio.binScored(BALL_ID);
+    if (made) audio.binScored(flight.ballId);
     else audio.missed();
 
     // ONLINE THE RULES ARE THE SERVER'S. This court plays the ball out and says
@@ -654,15 +702,16 @@ export function bootHorse(root, options = {}) {
   }
 
   /** Turn this tick's contacts into sound. Debounced on the cabinet's own rule. */
-  function announce(contacts) {
+  function announce(contacts, splat = null) {
     for (const contact of contacts) {
       if (contact === "bin-score") continue;
+      if (splat?.surface === contact) continue;
       if (contact !== "floor") {
         const last = lastContactAt.get(contact) ?? -Infinity;
         if (elapsed - last < CONTACT_DEBOUNCE_SECONDS) continue;
         lastContactAt.set(contact, elapsed);
       }
-      audio.contact(contact, { ballId: BALL_ID, speed: ball.vy });
+      audio.contact(contact, { ballId: flight?.ballId || currentTurnBallId(), speed: ball.vy });
     }
   }
 
@@ -753,14 +802,16 @@ export function bootHorse(root, options = {}) {
    */
   function replayOpponentShot(ruling) {
     if (!ruling?.setup || !ruling.intent) return;
+    const selectedBallId = normalizeTurnBallId(ruling.intent.ballId);
+    if (ruling.seat === 0 || ruling.seat === 1) turnBalls[ruling.seat] = selectedBallId;
     activeSetup = ruling.setup;
     phase = PHASE_AIMING;
     turnClock = Math.max(0, Number(ruling.intent.motionSeconds) || 0);
     resetBall(ball);
-    const shot = createHorseShot(ruling.intent, ball, activeSetup, { weight: ballFlight(BALL_ID).weight });
+    const shot = createHorseShot(ruling.intent, ball, activeSetup, { weight: ballFlight(selectedBallId).weight });
     launchBall(ball, shot.launch, launchSpin(shot.launch));
-    audio.released(BALL_ID);
-    flight = { age: 0, resolved: false, resetIn: null, capturedBin: null, made: false };
+    audio.released(selectedBallId);
+    flight = { ballId: selectedBallId, age: 0, resolved: false, resetIn: null, capturedBin: null, made: false };
     setPower(Number(ruling.intent.power) || 0);
     syncPanels();
     syncStatus();
@@ -833,6 +884,7 @@ export function bootHorse(root, options = {}) {
 
   function syncPanels() {
     syncResults();
+    syncBallPicker();
     const placing = isPlacing();
     if (el.place) el.place.hidden = !placing;
     // `--chrome` is the height the court hands to the panel below it, and this
@@ -959,6 +1011,11 @@ export function bootHorse(root, options = {}) {
     }
     const online = mode === "online";
     const loser = match.winner === 0 ? 1 : 0;
+    if (!loserPopupPlayed && shouldShowLoserPopup(loser)) showLoserPopup();
+    if (loserPopupRemaining > 0) {
+      hideResults();
+      return;
+    }
     const winner = playerLabel(match, match.winner);
     setResult(results.word, match.word);
     // "You Wins" is what taking the label straight gives you, and a seat's label
@@ -996,6 +1053,32 @@ export function bootHorse(root, options = {}) {
     results.overlay?.classList.remove("is-shown");
   }
 
+  function shouldShowLoserPopup(loser) {
+    if (mode === "local") return true;
+    return loser === (mode === "online" ? seat : 0);
+  }
+
+  function showLoserPopup() {
+    loserPopupPlayed = true;
+    loserPopupRemaining = LOSER_POPUP_SECONDS;
+    if (el.loserPopupText) el.loserPopupText.textContent = `YOU ARE A ${match.word}!`;
+    el.loserPopup?.setAttribute("aria-hidden", "false");
+    el.loserPopup?.classList.add("is-shown");
+  }
+
+  function hideLoserPopup() {
+    el.loserPopup?.setAttribute("aria-hidden", "true");
+    el.loserPopup?.classList.remove("is-shown");
+  }
+
+  function tickLoserPopup() {
+    if (loserPopupRemaining <= 0) return;
+    loserPopupRemaining = Math.max(0, loserPopupRemaining - TICK_SECONDS);
+    if (loserPopupRemaining > 0) return;
+    hideLoserPopup();
+    syncPanels();
+  }
+
   function setResult(node, value) {
     if (node) node.textContent = String(value);
   }
@@ -1019,6 +1102,8 @@ export function bootHorse(root, options = {}) {
     if (!match) return;
     clearScene(ctx);
     drawRoom(ctx, art.room, ROOM_ID);
+    drawSplatDecals(ctx, splats, { images: assets.ballSplats(flight?.ballId || currentTurnBallId()) });
+    drawSplatParticles(ctx, splats);
 
     const setup = phase === PHASE_PLACING ? workingSetup : activeSetup;
     const bin = setup ? placedBinAt(setup, turnClock) : null;
@@ -1041,7 +1126,7 @@ export function bootHorse(root, options = {}) {
     if (loose && !ballDrawn) drawLooseBall();
 
     if (pull && activeSetup) {
-      const preview = createHorseShot(pull, ball, activeSetup, { weight: ballFlight(BALL_ID).weight });
+      const preview = createHorseShot(pull, ball, activeSetup, { weight: ballFlight(currentTurnBallId()).weight });
       drawAim(ctx, {
         pull: { ...pull, aimX: preview.aim.x, aimY: preview.aim.y },
         trajectory: pull.power > 0.03 ? trajectoryPoints(ball, preview.launch) : null,
@@ -1088,9 +1173,10 @@ export function bootHorse(root, options = {}) {
 
   function drawLooseBall() {
     if (ball.splat) return;
+    const ballId = flight?.ballId || currentTurnBallId();
     drawBall(ctx, {
-      frames: art.ballFrames,
-      ballId: BALL_ID,
+      frames: assets.ballFrames(ballId),
+      ballId,
       ...screenBallPosition(),
       rollPhase: ball.rollPhase,
       filter: depthGradeFilter(ball.z),
@@ -1104,8 +1190,8 @@ export function bootHorse(root, options = {}) {
     ctx.ellipse(mouth.cx, mouth.cy, mouth.radiusX, mouth.radiusY, 0, 0, Math.PI * 2);
     ctx.clip();
     drawBall(ctx, {
-      frames: art.ballFrames,
-      ballId: BALL_ID,
+      frames: assets.ballFrames(flight.ballId),
+      ballId: flight.ballId,
       ...screenBallPosition(),
       rollPhase: ball.rollPhase,
       filter: `${depthGradeFilter(bin.z)} brightness(0.62)`,

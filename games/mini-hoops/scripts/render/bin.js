@@ -201,8 +201,21 @@ export function drawBinShadow(ctx, bin) {
  * black. Drawn straight it lays a black card on the concrete; added, only the
  * light lands and the floor shows through it.
  */
-export function drawFloorMark(ctx, bin, image, mark, { glow = 1 } = {}) {
-  const centre = projectPoint({ x: bin.x, y: 0.012, z: bin.z });
+export function floorMarkWorldCentre(bin, cell = null) {
+  return {
+    x: cell ? (cell.minX + cell.maxX) / 2 : bin.x,
+    y: 0.012,
+    z: cell ? (cell.minZ + cell.maxZ) / 2 : bin.z,
+  };
+}
+
+export function drawFloorMark(ctx, bin, image, mark, { glow = 1, cell = null } = {}) {
+  // The panel was shifted half a base-radius toward the camera so it sits under
+  // the part of the drum's footprint a player can SEE. The glyph belongs at
+  // that same visual centre. Leaving it on `bin.z` was the old two-layout bug
+  // in miniature: the bin and panel agreed while the X/O floated behind both.
+  const worldCentre = floorMarkWorldCentre(bin, cell);
+  const centre = projectPoint(worldCentre);
   const width = worldToScreenLength(0.42, bin.z);
   const ratio = image?.naturalWidth ? image.naturalHeight / image.naturalWidth : 0.667;
   const height = width * ratio;

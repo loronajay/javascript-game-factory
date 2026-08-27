@@ -14,7 +14,7 @@ import {
   createBinTargets,
 } from "../scripts/sim/bin-physics.js";
 import { BALL_RADIUS_WORLD } from "../scripts/sim/constants.js";
-import { binRings, binSpriteLayout, paintedMouthEllipse } from "../scripts/render/bin.js";
+import { binRings, binSpriteLayout, floorMarkWorldCentre, paintedMouthEllipse } from "../scripts/render/bin.js";
 
 import { floorScreenY, projectPoint } from "../scripts/sim/projection.js";
 
@@ -338,6 +338,23 @@ test("nothing about the collider moved to make the grid agree with it", () => {
   assertEqual(bins.find((bin) => bin.row === 0 && bin.column === 1).z, 0.87);
   assertEqual(bins.find((bin) => bin.row === 1 && bin.column === 1).z, 0.6);
   assertEqual(bins.find((bin) => bin.row === 2 && bin.column === 1).z, 0.33);
+});
+
+test("a floor glyph follows the shifted visible cell, not the bin's hidden axis", () => {
+  for (const bin of createBinTargets()) {
+    const cell = binGridCell(bin.row, bin.column);
+    const centre = floorMarkWorldCentre(bin, cell);
+    assertEqual(centre.x, bin.x, `cell ${bin.index} moved sideways`);
+    assertEqual(centre.z, (cell.minZ + cell.maxZ) / 2, `cell ${bin.index} did not use the panel centre`);
+    assert(centre.z < bin.z, `cell ${bin.index} glyph was not shifted toward the visible foot`);
+  }
+});
+
+test("tic-tac-toe offers the catalog on the court and binds the shot to its chosen ball", () => {
+  assert(indexHtml.includes('id="tttBallChoices"'), "the turn needs a ball picker");
+  assert(gameSource.includes("createTurnBallPicker"), "the court must build the shared picker");
+  assert(/ballId:\s*selectedBallId/.test(gameSource), "the selected ball must be frozen onto the flight");
+  assert(/intent:\s*\{[^}]*ballId:/s.test(gameSource), "an online opponent must receive the ball they are replaying");
 });
 
 test("a finished match is an event, with a rematch and a way out", () => {

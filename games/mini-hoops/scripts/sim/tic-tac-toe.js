@@ -19,10 +19,10 @@ export function difficultyById(id) {
   return DIFFICULTIES.find((difficulty) => difficulty.id === id) || DIFFICULTIES[1];
 }
 
-// Floor Tic-Tac-Toe is not a configurable run. It is always this room and this
-// ball, so none of the classic pickers — hoop movement, round length, ball,
-// court — mean anything to it. Stated here, once, rather than as literals in the
-// composition root that the setup screen would then have to guess at.
+// Floor Tic-Tac-Toe is not a configurable run. It always uses this room and
+// starts each player on this ball, so none of the CLASSIC pre-match pickers —
+// hoop movement, round length, ball, court — configure it. The ball is chosen
+// again on every turn, on the court where that choice matters.
 export const TIC_TAC_TOE_FIXED_SETUP = Object.freeze({
   locationId: "warehouse",
   ballId: "basketball",

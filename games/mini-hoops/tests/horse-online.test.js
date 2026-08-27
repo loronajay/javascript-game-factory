@@ -74,13 +74,15 @@ test("a shot carries a pull and a release moment — no outcome, and no aimY", (
     loft: 0.4,
     motionSeconds: 2.5,
     expectedShots: 3.9,
+    ballId: "paper",
     made: true,
     letters: 4,
   });
-  assertDeepEqual(intent, { power: 0.62, aimX: 505, loft: 0.4, motionSeconds: 2.5, expectedShots: 3 });
+  assertDeepEqual(intent, { power: 0.62, aimX: 505, loft: 0.4, motionSeconds: 2.5, expectedShots: 3, ballId: "paper" });
   for (const forbidden of ["aimY", "made", "letters"]) {
     assert(!Object.hasOwn(intent, forbidden), `a shot must not carry ${forbidden}`);
   }
+  assertEqual(sanitizeHorseShotIntent({ ballId: "../../bad" }).ballId, "basketball");
 });
 
 test("the server's word and match state are taken as read, never recomputed", () => {

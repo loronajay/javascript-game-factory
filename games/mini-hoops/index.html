@@ -365,6 +365,10 @@
         </aside>
 
         <div class="shot-panel">
+          <div class="turn-ball-picker">
+            <span class="turn-ball-label">BALL FOR THIS TURN</span>
+            <div id="tttBallChoices" class="turn-ball-choices" role="group" aria-label="Choose a Tic-Tac-Toe ball"></div>
+          </div>
           <div class="meter-head"><span>SHOT POWER</span><span id="tttMeterReadout">0%</span></div>
           <div class="meter" aria-label="Shot power"><div id="tttMeterFill" class="meter-fill"></div></div>
           <p class="meter-legend">&asymp; 50% front row &middot; 70% middle &middot; 90% back</p>
@@ -392,6 +396,10 @@
           </div>
 
           <p id="horseHint" class="hud-hint">Drag the bin where you want it &middot; then make the shot</p>
+
+          <div id="horseLoserPopup" class="horse-loser-popup" role="status" aria-live="assertive" aria-hidden="true">
+            <strong id="horseLoserPopupText">YOU ARE A HORSE!</strong>
+          </div>
 
           <!-- Spelling the word is the end of the match and it used to be told
                to the player as a status line over a court that then did nothing.
@@ -439,6 +447,11 @@
             </div>
             <div id="horseMotions" class="chip-grid chip-grid--tight horse-motions"></div>
             <button type="button" id="horseConfirm" class="primary-btn">Set this shot</button>
+          </div>
+
+          <div class="turn-ball-picker">
+            <span class="turn-ball-label">BALL FOR THIS TURN</span>
+            <div id="horseBallChoices" class="turn-ball-choices" role="group" aria-label="Choose a HORSE ball"></div>
           </div>
 
           <div class="meter-head"><span>SHOT POWER</span><span id="horseMeterReadout">0%</span></div>

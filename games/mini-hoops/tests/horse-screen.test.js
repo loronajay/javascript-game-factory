@@ -104,8 +104,13 @@ function harness(options = {}) {
   // `document.createElement` is used to build the motion chips and the letter
   // board. Neither is read back here, so a bare stub is enough.
   globalThis.document = { createElement: () => stubElement() };
+  const elements = new Map();
   const root = {
-    querySelector: (selector) => (selector === "#horseCourt" ? canvas : stubElement()),
+    querySelector: (selector) => {
+      if (selector === "#horseCourt") return canvas;
+      if (!elements.has(selector)) elements.set(selector, stubElement());
+      return elements.get(selector);
+    },
     querySelectorAll: () => [],
   };
   const horse = bootHorse(root, {
@@ -115,7 +120,7 @@ function harness(options = {}) {
     assets: { backdrop: () => null, image: () => null, ballFrames: () => [], ballSplats: () => null },
     ...options,
   });
-  return { canvas, horse };
+  return { canvas, horse, elements };
 }
 
 /** Drag straight back from the resting ball by `distance` canvas pixels. */
@@ -252,6 +257,50 @@ test("a spelled word ends in a card, and the card is the only rematch", () => {
   const card = source.slice(source.indexOf("function syncResults()"));
   assert(/match\?\.status !== "won" \|\| flight/.test(card), "the card must wait for the ball to be handed back");
   assert(source.includes("hideResults();"), "a new match must put the card away");
+});
+
+test("each HORSE turn has a ball picker, and the losing player gets the word popup first", () => {
+  const html = fs.readFileSync(path.join(gameRoot, "index.html"), "utf8");
+  const source = fs.readFileSync(path.join(gameRoot, "scripts", "horse-game.js"), "utf8");
+  const css = fs.readFileSync(path.join(gameRoot, "styles", "game.css"), "utf8");
+
+  assert(html.includes('id="horseBallChoices"'), "the turn needs a ball picker");
+  assert(source.includes("createTurnBallPicker"), "HORSE must build the shared picker");
+  assert(/ballId:\s*selectedBallId/.test(source), "the selected ball must be frozen onto the flight");
+
+  assert(html.includes('id="horseLoserPopup"'), "the court needs the loser's popup");
+  assert(html.includes('id="horseLoserPopupText"'), "the popup text must carry the chosen word");
+  assert(source.includes('`YOU ARE A ${match.word}!`'), "the popup must use the actual game word");
+  assert(/@keyframes horse-loser-pop/.test(css), "the popup needs its fade/grow/fade animation");
+  assert(/opacity:\s*0[\s\S]*opacity:\s*1[\s\S]*opacity:\s*0/.test(css.slice(css.indexOf("@keyframes horse-loser-pop"))),
+    "the popup must fade in and back out");
+});
+
+test("the loser popup plays before the results card, then yields to it", () => {
+  const view = harness({ mode: "local" });
+  view.horse.enter({ mode: "local", word: "P" });
+  view.horse.placeBin({ x: 0, y: 0.36, z: 0.87, motionId: "still" });
+  view.horse.setShot();
+
+  // Make this the last owed shot. A weak pull at the far bin misses, giving the
+  // shooter the one-letter word and making Player 2 the winner.
+  view.horse.match.phase = PHASE_MATCH;
+  view.horse.match.setter = 1;
+  view.horse.match.standingShot = { ...view.horse.setup };
+  shoot(view, 40);
+  assert(settle(view.horse) >= 0, "the losing shot never resolved");
+  assertEqual(view.horse.match.status, "won");
+
+  const popup = view.elements.get("#horseLoserPopup");
+  const popupText = view.elements.get("#horseLoserPopupText");
+  const results = view.elements.get("#horseResultsOverlay");
+  assertEqual(popupText.textContent, "YOU ARE A P!");
+  assert(popup.classList.contains("is-shown"), "the loser popup did not start");
+  assert(!results.classList.contains("is-shown"), "the result card covered the popup");
+
+  for (let tick = 0; tick < 310; tick += 1) view.horse.tick();
+  assert(!popup.classList.contains("is-shown"), "the loser popup did not fade away");
+  assert(results.classList.contains("is-shown"), "the result card did not follow the popup");
 });
 
 finish();

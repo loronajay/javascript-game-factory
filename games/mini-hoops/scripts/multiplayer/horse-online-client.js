@@ -22,6 +22,7 @@ import {
   sanitizeIdentity,
 } from "./online-client.js";
 import { DEFAULT_WORD, normalizeWord } from "../sim/horse.js";
+import { ballById } from "../assets/ball-catalog.js";
 
 export const HORSE_GAME_ID = "mini-hoops-horse";
 export const HORSE_PROTOCOL_VERSION = 1;
@@ -76,6 +77,7 @@ export function sanitizeHorseShotIntent(value = {}) {
     loft: number(value.loft, 0, 1, 1),
     motionSeconds: number(value.motionSeconds, 0, 3600, 0),
     expectedShots: Math.max(0, Math.floor(number(value.expectedShots, 0, 10_000, 0))),
+    ballId: ballById(value.ballId).id,
   };
 }
 

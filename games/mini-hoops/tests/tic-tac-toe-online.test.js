@@ -121,8 +121,8 @@ test("the pull travels, bounded, and a broken one costs the animation and nothin
   // THE OPPONENT'S BALL IS WATCHED, NOT REPORTED. Three numbers is the whole of
   // what the other court needs to throw it: both machines run the same sim.
   assertDeepEqual(
-    sanitizeShotIntent({ power: 2, aimX: 480, loft: -3, spin: 9 }),
-    { power: 1, aimX: 480, loft: 0 },
+    sanitizeShotIntent({ power: 2, aimX: 480, loft: -3, ballId: "paper", spin: 9 }),
+    { power: 1, aimX: 480, loft: 0, ballId: "paper" },
   );
   assertEqual(sanitizeShotIntent({ power: "x", aimX: 1, loft: 1 }), null);
   assertEqual(sanitizeShotIntent(null), null);
@@ -133,9 +133,10 @@ test("the pull travels, bounded, and a broken one costs the animation and nothin
   assert(!Object.hasOwn(attempt, "intent"), "a malformed pull must be dropped, not carried");
 
   assertDeepEqual(
-    sanitizeOnlineAttempt({ cell: 3, made: true, expectedAttempt: 1, intent: { power: 0.62, aimX: 511, loft: 0.8 } }).intent,
-    { power: 0.62, aimX: 511, loft: 0.8 },
+    sanitizeOnlineAttempt({ cell: 3, made: true, expectedAttempt: 1, intent: { power: 0.62, aimX: 511, loft: 0.8, ballId: "bowling-ball" } }).intent,
+    { power: 0.62, aimX: 511, loft: 0.8, ballId: "bowling-ball" },
   );
+  assertEqual(sanitizeShotIntent({ power: 0.5, aimX: 480, loft: 1, ballId: "../../bad" }).ballId, "basketball");
 });
 
 test("a ruled attempt is published with the pull that produced it", () => {
@@ -161,14 +162,14 @@ test("a ruled attempt is published with the pull that produced it", () => {
     scope: "lobby",
     messageType: "tic_tac_toe_attempt",
     senderId: "socket-a",
-    value: JSON.stringify({ cell: 4, made: true, expectedAttempt: 0, intent: { power: 0.7, aimX: 480, loft: 1 } }),
+    value: JSON.stringify({ cell: 4, made: true, expectedAttempt: 0, intent: { power: 0.7, aimX: 480, loft: 1, ballId: "snowball" } }),
   });
   const { lastAttempt } = harness.client.getSnapshot();
   assertEqual(lastAttempt.sequence, 1);
   assertEqual(lastAttempt.cell, 4);
   assertEqual(lastAttempt.mark, "x");
   assertEqual(lastAttempt.shooterId, "socket-a");
-  assertDeepEqual(lastAttempt.intent, { power: 0.7, aimX: 480, loft: 1 });
+  assertDeepEqual(lastAttempt.intent, { power: 0.7, aimX: 480, loft: 1, ballId: "snowball" });
 });
 
 finish();

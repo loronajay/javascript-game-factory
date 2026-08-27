@@ -106,6 +106,17 @@ test("a captured ball loses lateral energy and stays inside its bin", () => {
   assertClose(Math.hypot(ball.x - bin.x, ball.z - bin.z) < bin.mouthRadius ? 1 : 0, 1, 0);
 });
 
+test("a fragile turn ball still splats on the bare room around the bins", () => {
+  const ball = createBall();
+  Object.assign(ball, { y: 0.22, vy: -2.4, z: 0.12 });
+  let splat = null;
+  for (let tick = 0; tick < 30 && !splat; tick += 1) {
+    splat = stepBallAgainstBins(ball, [], TICK_SECONDS, { ballId: "snowball" }).splat;
+  }
+  assertEqual(splat?.surface, "floor", "the snowball bounced like a permanent ball");
+  assertEqual(ball.splat?.surface, "floor", "the burst was reported but not frozen onto the ball");
+});
+
 test("the side wall stops at the mouth plane, so a lob can clear a row", () => {
   // The bug this pins: the wall used to run to `topY + BALL_RADIUS_WORLD`, which
   // put a full-height cylinder of horizontal normal in the 7.8cm of air ABOVE

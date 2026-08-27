@@ -88,6 +88,7 @@ const MODULES = [
   "scripts/ui/hud.js",
   "scripts/ui/overlays.js",
   "scripts/ui/setup-view.js",
+  "scripts/ui/turn-ball-picker.js",
   "scripts/ui/boards-view.js",
   "scripts/ui/menu-view.js",
   "scripts/ui/practice-view.js",
