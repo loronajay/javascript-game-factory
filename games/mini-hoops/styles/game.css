@@ -668,7 +668,7 @@ a:focus-visible {
 }
 
 .result-streak.is-on-fire::after {
-  content: " F525";
+  content: " \01F525";
   filter: drop-shadow(0 0 5px var(--fire-flame));
 }
 

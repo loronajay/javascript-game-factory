@@ -16,18 +16,27 @@ function memoryStorage() {
 test("redemption choices include only unowned alternate skins for owned bowlers", () => {
   const choices = buildVoucherChoices({
     ownedBowlers: [{ slug: "daisy-monroe", name: "Daisy Monroe" }, { slug: "nia-brooks", name: "Nia Brooks" }],
-    availableSkins: [{ id: "canon", name: "Classic" }, { id: "swimsuit", name: "Swimsuit" }, { id: "maid", name: "Maid Café" }],
+    availableSkins: [
+      { id: "canon", name: "Classic" },
+      { id: "swimsuit", name: "Swimsuit" },
+      { id: "maid", name: "Maid Café" },
+      { id: "halloween", name: "Halloween" },
+    ],
     owns: (itemId) => itemId === "skin:daisy-monroe:maid",
   });
 
   assert.deepEqual(choices.map(({ entitlementId }) => entitlementId), [
     "skin:daisy-monroe:swimsuit",
+    "skin:daisy-monroe:halloween",
     "skin:nia-brooks:swimsuit",
     "skin:nia-brooks:maid",
+    "skin:nia-brooks:halloween",
   ]);
   assert.deepEqual(choices.map(({ voucherItemId }) => voucherItemId), [
     "swimsuit-voucher",
+    "skin-voucher",
     "swimsuit-voucher",
+    "skin-voucher",
     "skin-voucher",
   ]);
 });
@@ -114,6 +123,31 @@ test("regular Skin Vouchers cannot unlock swimsuits and Swimsuit Vouchers cannot
   assert.deepEqual(calls, ["skin:daisy-monroe:maid", "skin:nia-brooks:swimsuit"]);
 });
 
+test("a regular Skin Voucher unlocks a Halloween skin", async () => {
+  const calls = [];
+  const client = createVoucherClient({
+    platformApi: {
+      redeemGameSkinVoucher: async (_gameSlug, body) => {
+        calls.push(body.entitlementId);
+        return {
+          ok: true,
+          gameProgress: {
+            inventoryItems: [{ itemId: "skin-voucher", quantity: 0 }],
+            entitlements: [{ entitlementId: body.entitlementId }],
+          },
+        };
+      },
+    },
+    loadout: {},
+  });
+
+  client.applyProgress({ inventoryItems: [{ itemId: "skin-voucher", quantity: 1 }] });
+
+  assert.equal(await client.redeem("skin:daisy-monroe:halloween"), true);
+  assert.deepEqual(calls, ["skin:daisy-monroe:halloween"]);
+  assert.equal(client.getState().balance, 0);
+});
+
 test("both skin voucher balances come from separate authoritative inventory rows", () => {
   const client = createVoucherClient({});
   client.applyProgress({ inventoryItems: [
@@ -138,6 +172,10 @@ test("the voucher shop publishes three distinct server-addressable products", ()
   assert.equal(formatVoucherPrice(99), "$0.99");
   assert.equal(formatVoucherPrice(199), "$1.99");
   for (const offer of VOUCHER_STORE_OFFERS) assert.match(offer.asset, /^assets\/vouchers\/.+\.webp$/);
+  assert.equal(
+    VOUCHER_STORE_OFFERS.find((offer) => offer.id === "skin-voucher").description,
+    "Unlock one normal skin.",
+  );
   assert.doesNotMatch(
     VOUCHER_STORE_OFFERS.find((offer) => offer.id === "skin-voucher").description,
     /swimsuit/i,

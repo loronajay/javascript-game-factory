@@ -111,6 +111,15 @@ test("the setup screen exposes skin equipment controls", () => {
   assert.match(read("renderer.js"), /getFrameAssetPath/);
 });
 
+test("the skin voucher dialog uses an encoding-safe close glyph", () => {
+  const html = read("index.html");
+  const closeButton = html.match(/<button[^>]*id=["']voucher-close["'][^>]*>([^<]*)<\/button>/);
+
+  assert.ok(closeButton, "the skin voucher dialog should expose its close button");
+  assert.equal(closeButton[1], "&#215;");
+  assert.doesNotMatch(html, /Ã—/);
+});
+
 test("local and online character selection expose the read-only bowler inspector", () => {
   const html = read("index.html");
   const game = read("game.js");

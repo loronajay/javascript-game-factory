@@ -12,7 +12,7 @@ export const VOUCHER_STORE_OFFERS = Object.freeze([
     cents: 99,
     currency: "USD",
     name: "Skin Voucher",
-    description: "Unlock one Maid Café outfit for a bowler you own.",
+    description: "Unlock one normal skin.",
     asset: "assets/vouchers/skin-voucher.webp",
   }),
   Object.freeze({

@@ -115,6 +115,21 @@ test("retrying a redemption id replays its result without spending again", async
   assert.equal(pool.state.inventory.get("skin-voucher"), 0);
 });
 
+test("Halloween skins consume a regular Skin Voucher", async () => {
+  const pool = makePool();
+  const halloweenRequest = {
+    ...request,
+    entitlementId: "skin:daisy-monroe:halloween",
+    redemptionId: "redeem-halloween",
+  };
+
+  const result = await redeemYamBowlingSkinVoucher(pool, halloweenRequest);
+
+  assert.equal(result.ok, true);
+  assert.equal(pool.state.inventory.get("skin-voucher"), 0);
+  assert.equal(pool.state.entitlements.has(halloweenRequest.entitlementId), true);
+});
+
 test("swimsuits consume only Swimsuit Vouchers and regular skins consume only Skin Vouchers", async () => {
   const swimsuitRequest = {
     ...request,

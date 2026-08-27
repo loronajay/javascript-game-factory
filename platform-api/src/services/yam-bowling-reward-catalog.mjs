@@ -173,7 +173,7 @@ export function validateYamBowlingPublicClaim(params = {}) {
 export function validateYamBowlingSkinVoucherTarget(gameSlug, entitlementId) {
     if (gameSlug !== YAM_BOWLING_GAME_SLUG || typeof entitlementId !== "string")
         return null;
-    const match = /^skin:([a-z0-9-]+):(swimsuit|maid)$/.exec(entitlementId);
+    const match = /^skin:([a-z0-9-]+):(swimsuit|maid|halloween)$/.exec(entitlementId);
     if (!match || !ALL_BOWLER_SLUGS.has(match[1]))
         return null;
     return { entitlementId, bowlerSlug: match[1], skinId: match[2] };

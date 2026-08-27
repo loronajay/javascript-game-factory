@@ -274,6 +274,11 @@ test("voucher targets are restricted to alternate skins on canonical bowlers", (
     bowlerSlug: "daisy-monroe",
     skinId: "maid",
   });
+  assert.deepEqual(validateYamBowlingSkinVoucherTarget("yam-bowling", "skin:daisy-monroe:halloween"), {
+    entitlementId: "skin:daisy-monroe:halloween",
+    bowlerSlug: "daisy-monroe",
+    skinId: "halloween",
+  });
   assert.equal(validateYamBowlingSkinVoucherTarget("yam-bowling", "skin:daisy-monroe:canon"), null);
   assert.equal(validateYamBowlingSkinVoucherTarget("yam-bowling", "skin:not-a-bowler:maid"), null);
   assert.equal(validateYamBowlingSkinVoucherTarget("another-game", "skin:daisy-monroe:maid"), null);

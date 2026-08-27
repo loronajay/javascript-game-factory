@@ -1,11 +1,12 @@
 const GAME_SLUG = "yam-bowling";
 const VOUCHER_ITEM_ID = "skin-voucher";
 const SWIMSUIT_VOUCHER_ITEM_ID = "swimsuit-voucher";
-const SKIN_ENTITLEMENT = /^skin:[a-z0-9-]+:(?:swimsuit|maid)$/;
+const SKIN_ENTITLEMENT = /^skin:[a-z0-9-]+:(?:swimsuit|maid|halloween)$/;
 
 export const SKIN_VOUCHER_ITEMS = Object.freeze({
   swimsuit: SWIMSUIT_VOUCHER_ITEM_ID,
   maid: VOUCHER_ITEM_ID,
+  halloween: VOUCHER_ITEM_ID,
 });
 
 function voucherItemForEntitlement(entitlementId) {
@@ -25,7 +26,7 @@ function defaultRedemptionId() {
 }
 
 export function buildVoucherChoices({ ownedBowlers = [], availableSkins = [], owns = () => false } = {}) {
-  const alternates = availableSkins.filter((skin) => skin?.id === "swimsuit" || skin?.id === "maid");
+  const alternates = availableSkins.filter((skin) => Object.hasOwn(SKIN_VOUCHER_ITEMS, skin?.id));
   return ownedBowlers.flatMap((bowler) => alternates.map((skin) => ({
     bowlerSlug: bowler.slug,
     bowlerName: bowler.name,

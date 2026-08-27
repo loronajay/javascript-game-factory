@@ -14,7 +14,7 @@ const BOWLER_SLUGS = Object.freeze([
 ]);
 const STARTER_BOWLERS = new Set(BOWLER_SLUGS.slice(0, 5));
 const BOWLERS = new Set(BOWLER_SLUGS);
-const SKIN_IDS = Object.freeze(["canon", "swimsuit", "maid"]);
+const SKIN_IDS = Object.freeze(["canon", "swimsuit", "maid", "halloween"]);
 const ROOM_SLUGS = Object.freeze([
   "default", "teal-lounge", "hot-pink-hideout", "retro-arcade", "beach-house",
   "industrial-workshop", "botanical-glasshouse", "frosted-suite", "lavender-cosmic",

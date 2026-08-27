@@ -67,6 +67,16 @@ test("one exact skin entitlement unlocks that skin and both matching outcome pos
   assert.deepEqual(wrongBowler.featured, { bowlerSlug: "nia-brooks", skinId: "canon" });
 });
 
+test("a Halloween entitlement survives server garage normalization", () => {
+  const halloweenGarage = legacyGarage("halloween");
+  const garage = normalizeYamBowlingGarage(halloweenGarage, {
+    ownedEntitlementIds: new Set(["skin:daisy-monroe:halloween"]),
+  });
+
+  assert.deepEqual(garage.bowlers["daisy-monroe"], halloweenGarage.bowlers["daisy-monroe"]);
+  assert.deepEqual(garage.featured, { bowlerSlug: "daisy-monroe", skinId: "halloween" });
+});
+
 test("each Yam trail entitlement preserves only its exact equipped color", () => {
   const cyanGarage = {
     ...legacyGarage("canon"),
