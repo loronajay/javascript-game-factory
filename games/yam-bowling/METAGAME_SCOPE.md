@@ -628,11 +628,13 @@ is a server entitlement. The profile screen reads
 a cached level 1 as earned progress. `project-structure.test.js` asserts the
 player ladder can never persist, cache, or name a balance.
 
-### Skin Vouchers
+### Cosmetic Vouchers
 
-A voucher is the scarce reward of this track: **one voucher buys one skin**, chosen
-by the player from the bowlers they already own, which is what makes a circuit
-bowler unlock raise the value of a voucher already in hand.
+A voucher is a scarce, typed reward: **one Skin Voucher buys one Maid Café skin,
+one Swimsuit Voucher buys one Swimsuit skin, and one Emote Voucher buys one
+emote**. A regular Skin Voucher can never buy a Swimsuit skin. Skin choices are
+limited to bowlers the player already owns, which makes a circuit bowler unlock
+raise the value of a voucher already in hand.
 
 - [x] Exactly two vouchers in the player tree, at levels 10 and 25.
 - [x] The first lands early enough to teach the mechanic while there is tree left.
@@ -641,6 +643,7 @@ bowler unlock raise the value of a voucher already in hand.
 - [x] Redemption UI: pick a skin from an owned bowler.
 - [x] Rare tournament voucher source; circuit voucher milestones remain deferred.
 - [x] Add a server-authoritative real-money voucher source after establishing the earned path.
+- [x] Add an illustrated three-offer shop at $0.99 / $1.99 / $0.99 with trusted server pricing and idempotent fulfillment.
 
 Nothing may advertise a voucher price or offer redemption until that authoritative
 spend exists. The tree may say a voucher is coming; it may not say what it buys.
@@ -677,9 +680,9 @@ prize, or apply ownership before the returned game-progress snapshot arrives.
 
 ## Explicitly deferred
 
-- Paid cosmetics, storefront, and pricing. Skin Vouchers are an *earned* currency
-  as of Milestone 8; buying them with real money stays deferred until the earned
-  path and the server spend transaction are both shipped.
+- Native Google Play Billing integration and Play Console product setup. The
+  browser storefront and server-authoritative Stripe fulfillment are shipped;
+  packaged Android purchases must use the same three stable SKUs through Play.
 - Buying Player XP, Bowler XP, levels, or mastery rewards.
 - Gameplay-stat upgrades tied to characters or cosmetics.
 - A level cap above 30.

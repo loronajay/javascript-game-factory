@@ -216,16 +216,21 @@ export function createProfileScreen({
   }
 
   function renderVoucherPicker(model) {
-    const state = voucherClient?.getState?.() || { balance: 0, status: "idle" };
-    $("profile-reward-vouchers").textContent = `${state.balance} Skin Voucher${state.balance === 1 ? "" : "s"}`;
+    const state = voucherClient?.getState?.() || { balance: 0, swimsuitBalance: 0, status: "idle" };
+    $("profile-reward-vouchers").textContent = `${state.balance} Skin · ${state.swimsuitBalance || 0} Swimsuit`;
+    const hasVoucherFor = (choice) => choice.voucherItemId === "swimsuit-voucher"
+      ? (state.swimsuitBalance || 0) > 0
+      : state.balance > 0;
+    const choices = voucherChoices(model);
     const button = $("profile-voucher-button");
-    button.disabled = syncing || state.balance < 1 || state.status === "redeeming" || voucherChoices(model).length === 0;
-    $("voucher-choice-grid").innerHTML = voucherChoices(model).map((choice) => {
+    button.disabled = syncing || state.status === "redeeming" || !choices.some(hasVoucherFor);
+    $("voucher-choice-grid").innerHTML = choices.map((choice) => {
       const bowler = animation.CANON_BOWLERS.find((entry) => entry.slug === choice.bowlerSlug);
       const art = animation.getPortraitAssetPath(bowler, choice.skinId);
-      return `<button class="voucher-choice" type="button" role="listitem" data-voucher-entitlement="${escapeHtml(choice.entitlementId)}"${syncing ? " disabled" : ""}>
+      const voucherName = choice.voucherItemId === "swimsuit-voucher" ? "Swimsuit Voucher" : "Skin Voucher";
+      return `<button class="voucher-choice" type="button" role="listitem" data-voucher-entitlement="${escapeHtml(choice.entitlementId)}"${syncing || !hasVoucherFor(choice) ? " disabled" : ""}>
         <img src="${escapeHtml(art)}" alt="" loading="lazy" />
-        <span><strong>${escapeHtml(choice.bowlerName)}</strong><small>${escapeHtml(choice.skinName)}</small></span>
+        <span><strong>${escapeHtml(choice.bowlerName)}</strong><small>${escapeHtml(choice.skinName)} · ${voucherName}</small></span>
       </button>`;
     }).join("") || `<p class="voucher-choice-empty">Every voucher skin for your owned bowlers is already unlocked.</p>`;
   }
@@ -435,7 +440,11 @@ export function createProfileScreen({
   function openVoucherPicker() {
     if (syncing) return;
     const model = render();
-    if ((voucherClient?.getState?.().balance || 0) < 1 || voucherChoices(model).length === 0) return;
+    const state = voucherClient?.getState?.() || {};
+    const canRedeem = voucherChoices(model).some((choice) => choice.voucherItemId === "swimsuit-voucher"
+      ? (state.swimsuitBalance || 0) > 0
+      : (state.balance || 0) > 0);
+    if (!canRedeem) return;
     $("voucher-status").textContent = "";
     armedVoucherChoice = null;
     $("voucher-dialog").showModal();
@@ -454,8 +463,9 @@ export function createProfileScreen({
     if (armedVoucherChoice !== entitlementId) {
       armedVoucherChoice = entitlementId;
       const choice = voucherChoices(render()).find((entry) => entry.entitlementId === entitlementId);
+      const voucherName = choice?.voucherItemId === "swimsuit-voucher" ? "Swimsuit Voucher" : "Skin Voucher";
       $("voucher-status").textContent = choice
-        ? `Spend your voucher on ${choice.bowlerName}'s ${choice.skinName}? Choose it again to confirm.`
+        ? `Spend your ${voucherName} on ${choice.bowlerName}'s ${choice.skinName}? Choose it again to confirm.`
         : "Choose it again to confirm.";
       return false;
     }
@@ -467,7 +477,8 @@ export function createProfileScreen({
     $("voucher-status").textContent = redeemed ? "Outfit unlocked." : "Could not redeem that voucher.";
     if (redeemed) {
       audio?.play?.("confirm");
-      if ((voucherClient.getState().balance || 0) < 1) $("voucher-dialog").close();
+      const state = voucherClient.getState();
+      if ((state.balance || 0) < 1 && (state.swimsuitBalance || 0) < 1) $("voucher-dialog").close();
     }
     return Boolean(redeemed);
   }

@@ -28,7 +28,7 @@ const POLICIES: Record<string, InventoryPolicy> = Object.freeze({
     // The calendar preorder bonus pays the skin voucher that already exists -- the same item
     // the circuit and the reward ladders pay, redeemed through the same voucher path. A
     // promotion never mints a currency of its own.
-    resolveItemId: (itemId: string) => (itemId === "skin-voucher" || itemId === "emote-voucher" ? itemId : ""),
+    resolveItemId: (itemId: string) => (["skin-voucher", "swimsuit-voucher", "emote-voucher"].includes(itemId) ? itemId : ""),
     maxQuantity: MAX_INVENTORY_GRANT_QUANTITY,
   }),
 });

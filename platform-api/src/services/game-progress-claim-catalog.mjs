@@ -27,7 +27,7 @@ const CLAIM_POLICIES = Object.freeze({
         publicKinds: new Set([YAM_BOWLING_CIRCUIT_CLAIM_KIND, YAM_BOWLING_MATCH_ACHIEVEMENT_CLAIM_KIND, YAM_BOWLING_CAREER_MATCH_CLAIM_KIND]),
         // The calendar preorder bonus. Premium, so only the trusted Stripe fulfillment path may
         // submit it -- a browser can never claim its own vouchers.
-        premiumKinds: new Set([CALENDAR_PREORDER_CLAIM_KIND]),
+        premiumKinds: new Set([CALENDAR_PREORDER_CLAIM_KIND, "premium-inventory-purchase"]),
         validatePublicClaim: validateYamBowlingPublicClaim,
     }),
 });

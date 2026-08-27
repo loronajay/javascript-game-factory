@@ -10,6 +10,19 @@ import optimize_runtime_assets as optimizer
 
 
 class OptimizeRuntimeAssetsTests(unittest.TestCase):
+    def test_swimsuit_voucher_ships_as_a_real_transparent_cutout(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        for relative_path in (
+            "assets/vouchers/swimsuit-voucher.png",
+            "assets/vouchers/swimsuit-voucher.webp",
+        ):
+            with self.subTest(relative_path=relative_path):
+                with Image.open(root / relative_path) as voucher:
+                    alpha = voucher.getchannel("A")
+                    self.assertEqual(alpha.getextrema(), (0, 255))
+                    transparent_pixels = sum(value == 0 for value in alpha.get_flattened_data())
+                    self.assertGreater(transparent_pixels, voucher.width * voucher.height * 0.3)
+
     def test_writes_lossy_webp_with_exact_alpha_and_bounded_dimensions(self) -> None:
         with TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -43,6 +56,9 @@ class OptimizeRuntimeAssetsTests(unittest.TestCase):
                 "assets/lanes/crimson-crown.png",
                 "assets/lanes/cosmic-bowl.png",
                 "assets/pins/1.png",
+                "assets/vouchers/skin-voucher.png",
+                "assets/vouchers/emote-voucher.png",
+                "assets/vouchers/swimsuit-voucher.png",
             ]
             for relative_path in paths:
                 destination = root / relative_path
@@ -68,6 +84,9 @@ class OptimizeRuntimeAssetsTests(unittest.TestCase):
             self.assertIn("assets/lanes/cosmic-bowl.webp", destinations)
             self.assertIn("assets/lanes/thumbs/cosmic-bowl.webp", destinations)
             self.assertIn("assets/pins/1.webp", destinations)
+            self.assertIn("assets/vouchers/skin-voucher.webp", destinations)
+            self.assertIn("assets/vouchers/emote-voucher.webp", destinations)
+            self.assertIn("assets/vouchers/swimsuit-voucher.webp", destinations)
             self.assertNotIn("assets/characters/skins/daisy-monroe/swimsuit/source.webp", destinations)
 
     def test_can_discover_only_emotes_for_a_targeted_rebuild(self) -> None:

@@ -731,7 +731,7 @@ export function createApp(options: any = {}) {
       windowMs: 15 * MINUTE_MS,
     },
     {
-      match: (p: string) => p === "/payments/tactical-arena/checkout-sessions",
+      match: (p: string) => /^\/payments\/(tactical-arena|yam-bowling)\/checkout-sessions$/.test(p),
       bucket: "checkout",
       limit: 30,
       windowMs: 60 * MINUTE_MS,

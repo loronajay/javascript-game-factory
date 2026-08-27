@@ -2,12 +2,14 @@ import { loadFactoryProfile } from "../../js/platform/identity/factory-profile.m
 import { createAuthApiClient } from "../../js/platform/api/auth-api.mjs";
 import { createYamOnlineIdentity } from "./online-identity.mjs";
 import { createPlatformApiClient } from "../../js/platform/api/platform-api.mjs";
+import { getStoredAuthToken } from "../../js/platform/api/auth-token.mjs";
 import { createYamAccountAccess } from "./account-access.mjs";
 import { createCampaignProgressClient } from "./campaign-progress-client.mjs";
 import { createTournamentClient } from "./tournament-client.mjs";
 import { createProfileSyncClient } from "./profile/profile-sync-client.mjs";
 import { createVoucherClient } from "./profile/voucher-client.mjs";
 import { createEmoteVoucherClient } from "./profile/emote-voucher-client.mjs";
+import { createVoucherStoreClient } from "./profile/voucher-store-client.mjs";
 import { createAchievementClient } from "./profile/achievement-client.mjs";
 import { createPublicProfileClient } from "./profile/public-profile-client.mjs";
 import { createPublicProfileRepository } from "./profile/public-profile-repository.mjs";
@@ -23,6 +25,7 @@ import { createOnlineScreen } from "./ui/online-screen.mjs";
 import { createCircuitScreen } from "./ui/circuit-screen.mjs";
 import { createTournamentScreen } from "./ui/tournament-screen.mjs";
 import { createProfileScreen } from "./ui/profile-screen.mjs";
+import { createVoucherStore } from "./ui/voucher-store.mjs";
 import { createPublicProfileScreen } from "./ui/public-profile-screen.mjs";
 import { createShotHud } from "./ui/shot-hud.mjs";
 import { createScoreboard } from "./ui/scoreboard.mjs";
@@ -102,6 +105,9 @@ initMobileLandscapeGate();
   let profileScreen = null;
   const voucherClient = createVoucherClient({ platformApi, loadout });
   const emoteVoucherClient = createEmoteVoucherClient({ platformApi, loadout });
+  const voucherStoreClient = createVoucherStoreClient({
+    account: () => ({ playerId: factoryProfile.playerId, token: getStoredAuthToken() }),
+  });
   const assets = createCharacterAssets({ animation: Animation, roster: Roster, loadout, cosmetics: Cosmetics });
   const progressionReporter = createProgressionReporter({
     progressionCore: ProgressionCore,
@@ -227,6 +233,17 @@ initMobileLandscapeGate();
     voucherClient,
     emoteCore: EmoteCore,
     emoteVoucherClient,
+    audio,
+  });
+  const voucherStore = createVoucherStore({
+    storeClient: voucherStoreClient,
+    voucherClient,
+    emoteVoucherClient,
+    accountAccess,
+    onProgress: (snapshot) => {
+      loadout.applyServerEntitlements(snapshot.entitlements || []);
+      profileScreen.refresh();
+    },
     audio,
   });
   const publicProfiles = createPublicProfileRepository({
@@ -476,6 +493,7 @@ initMobileLandscapeGate();
     circuitScreen.bind();
     tournamentScreen.bind();
     profileScreen.bind();
+    voucherStore.bind();
     matchReactions.bind();
     tutorial.bind();
     publicProfileScreen.bind();

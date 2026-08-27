@@ -122,6 +122,31 @@ test("POST /payments/tactical-arena/checkout-sessions delegates trusted checkout
   assert.equal(seen[0].body.offer.sku, "ta.skin.swordsman.medieval");
 });
 
+test("POST /payments/yam-bowling/checkout-sessions pins checkout to the Yam cabinet", async () => {
+  const token = signToken({ playerId: "player-1", email: "player@test.com" }, TEST_SECRET);
+  const seen = [];
+  const app = createApp({
+    jwtSecret: TEST_SECRET,
+    createPremiumCheckoutSession: async (params) => {
+      seen.push(params);
+      return { ok: true, url: "https://checkout.stripe.com/c/yam", sessionId: "cs_yam" };
+    },
+    now: () => "2026-07-21T00:00:00.000Z",
+  });
+
+  const response = await invoke(app, "POST", "/payments/yam-bowling/checkout-sessions", {
+    token,
+    body: {
+      gameSlug: "yam-bowling",
+      offer: { id: "skin-voucher", kind: "inventory", sku: "yb.voucher.skin.1" },
+    },
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json.url, "https://checkout.stripe.com/c/yam");
+  assert.equal(seen[0].body.gameSlug, "yam-bowling");
+});
+
 test("POST /payments/tactical-arena/checkout-sessions/fulfill verifies a returned Checkout Session", async () => {
   const token = signToken({ playerId: "player-1", email: "player@test.com" }, TEST_SECRET);
   const seen = [];

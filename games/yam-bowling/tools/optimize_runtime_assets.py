@@ -25,6 +25,7 @@ PIN_SIZE = (256, 384)
 # arrive around 1024px and roughly 2 MB each; at this size thirty of them cost
 # less than one lane backdrop.
 EMOTE_SIZE = (320, 320)
+VOUCHER_SIZE = (768, 512)
 
 
 @dataclass(frozen=True)
@@ -90,6 +91,13 @@ def discover_emote_jobs(project_root: Path) -> list[ConversionJob]:
     ]
 
 
+def discover_voucher_jobs(project_root: Path) -> list[ConversionJob]:
+    return [
+        _webp_job(source, max_size=VOUCHER_SIZE, quality=90)
+        for source in sorted((project_root / "assets" / "vouchers").glob("*.png"))
+    ]
+
+
 def discover_jobs(project_root: Path) -> list[ConversionJob]:
     assets = project_root / "assets"
     jobs: list[ConversionJob] = []
@@ -143,6 +151,8 @@ def discover_jobs(project_root: Path) -> list[ConversionJob]:
     if pin.exists():
         jobs.append(_webp_job(pin, max_size=PIN_SIZE, quality=90))
 
+    jobs.extend(discover_voucher_jobs(project_root))
+
     return jobs
 
 
@@ -163,7 +173,13 @@ def optimize(
     clean_derived: bool = False,
     collection: str = "all",
 ) -> tuple[int, int, int]:
-    jobs = discover_emote_jobs(project_root) if collection == "emotes" else discover_jobs(project_root)
+    jobs = (
+        discover_emote_jobs(project_root)
+        if collection == "emotes"
+        else discover_voucher_jobs(project_root)
+        if collection == "vouchers"
+        else discover_jobs(project_root)
+    )
     source_bytes = 0
     output_bytes = 0
     for job in jobs:
@@ -194,7 +210,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--collection",
-        choices=("all", "emotes"),
+        choices=("all", "emotes", "vouchers"),
         default="all",
         help="Limit conversion to one runtime asset collection.",
     )

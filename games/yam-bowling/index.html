@@ -40,6 +40,7 @@
             <button class="button button--primary button--xl" id="circuit-button" type="button" data-factory-account-feature>Enter circuit</button>
             <button class="button button--ghost button--xl" id="tournament-button" type="button" data-factory-account-feature>Tournaments</button>
             <button class="button button--ghost button--xl" id="profile-button" type="button" data-factory-account-feature>My room</button>
+            <button class="button button--ghost button--xl" id="shop-button" type="button" data-factory-account-feature>Voucher shop</button>
             <button class="button button--ghost button--xl" id="play-button" type="button">Exhibition</button>
             <button class="button button--ghost button--xl" id="online-button" type="button" data-factory-account-feature>Play online</button>
             <button class="button button--ghost" id="how-button" type="button">How to play</button>
@@ -103,7 +104,7 @@
             <section class="profile-card profile-reward-card" aria-labelledby="profile-reward-title">
               <div class="profile-card__heading">
                 <div><p class="eyebrow">Player reward path</p><h3 id="profile-reward-title">What levelling pays out</h3></div>
-                <span id="profile-reward-vouchers">0 Skin Vouchers</span>
+                <span id="profile-reward-vouchers">0 Skin · 0 Swimsuit</span>
               </div>
               <p class="profile-reward-status" id="profile-reward-status">Not synced - sign in to see your earned rewards</p>
               <p class="profile-reward-next">Next: <b id="profile-reward-next">Level 2 - Lime Shock Ball Trail</b></p>
@@ -115,6 +116,7 @@
                 <span id="profile-emote-reward-vouchers">0 Emote Vouchers</span>
                 <button class="button button--ghost" id="profile-emote-voucher-button" type="button" disabled>Redeem an emote</button>
               </div>
+              <button class="button button--primary button--wide profile-shop-button" id="profile-shop-button" type="button">Get vouchers</button>
               <ol class="player-reward-tree" id="profile-reward-tree" aria-label="Complete player level reward path"></ol>
             </section>
 
@@ -723,6 +725,18 @@
       <p class="menu-splash-intro" id="voucher-dialog-copy">Choose one unowned outfit for a bowler you own. This cannot be undone.</p>
       <div class="voucher-choice-grid" id="voucher-choice-grid" role="list" aria-label="Available voucher skins"></div>
       <p class="profile-sync-status" id="voucher-status" aria-live="polite"></p>
+    </dialog>
+
+    <dialog class="voucher-store-dialog" id="voucher-store-dialog" aria-labelledby="voucher-store-title">
+      <button class="dialog-close" id="voucher-store-close" type="button" aria-label="Close voucher shop">&#215;</button>
+      <header class="voucher-store-header">
+        <div><p class="eyebrow">Yam Bowling cashier</p><h2 id="voucher-store-title">Voucher Shop</h2></div>
+        <p id="voucher-store-balances">0 Skin Vouchers · 0 Swimsuit Vouchers · 0 Emote Vouchers</p>
+      </header>
+      <p class="voucher-store-intro">Choose a collectible voucher now, or earn vouchers by playing. Purchases are delivered to your signed-in Factory account.</p>
+      <div class="voucher-store-grid" id="voucher-store-grid" aria-label="Voucher offers"></div>
+      <p class="voucher-store-rule"><strong>Different tickets, different cabinets:</strong> regular Skin Vouchers unlock standard alternate outfits; only Swimsuit Vouchers unlock swimsuit outfits.</p>
+      <p class="voucher-status" id="voucher-store-status" aria-live="polite"></p>
     </dialog>
 
     <dialog class="menu-splash-dialog voucher-dialog" id="emote-voucher-dialog" aria-labelledby="emote-voucher-dialog-title">

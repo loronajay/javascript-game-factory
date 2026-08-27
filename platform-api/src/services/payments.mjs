@@ -6,7 +6,43 @@ export const STRIPE_CHECKOUT_SESSIONS_URL = "https://api.stripe.com/v1/checkout/
 // integration identifier with an eight-random-letter suffix for Checkout Session creation.
 const STRIPE_CHECKOUT_INTEGRATION_IDENTIFIER = "tactical_arena_checkout_qmxvptla";
 const TACTICAL_ARENA_GAME_SLUG = "tactical-arena";
+const YAM_BOWLING_GAME_SLUG = "yam-bowling";
 const TACTICAL_ARENA_PRODUCT_TAX_CODE = "txcd_10201000";
+export const YAM_BOWLING_VOUCHER_OFFERS = Object.freeze([
+    Object.freeze({
+        id: "skin-voucher", kind: "inventory", sku: "yb.voucher.skin.1",
+        name: "Yam Bowling Skin Voucher", amountCents: 99, currency: "usd",
+        inventoryItems: Object.freeze([{ itemId: "skin-voucher", quantity: 1 }]),
+    }),
+    Object.freeze({
+        id: "swimsuit-voucher", kind: "inventory", sku: "yb.voucher.swimsuit.1",
+        name: "Yam Bowling Swimsuit Voucher", amountCents: 199, currency: "usd",
+        inventoryItems: Object.freeze([{ itemId: "swimsuit-voucher", quantity: 1 }]),
+    }),
+    Object.freeze({
+        id: "emote-voucher", kind: "inventory", sku: "yb.voucher.emote.1",
+        name: "Yam Bowling Emote Voucher", amountCents: 99, currency: "usd",
+        inventoryItems: Object.freeze([{ itemId: "emote-voucher", quantity: 1 }]),
+    }),
+]);
+export function resolveYamBowlingVoucherOffer(input = {}) {
+    const id = cleanText(input?.id, 120);
+    const offer = YAM_BOWLING_VOUCHER_OFFERS.find((entry) => entry.id === id);
+    if (!offer || cleanText(input?.kind, 40) !== "inventory")
+        return stripeError(400, "offer_not_found");
+    const requestedSku = cleanText(input?.sku, 200);
+    if (requestedSku && requestedSku !== offer.sku)
+        return stripeError(400, "offer_mismatch");
+    return {
+        ok: true,
+        offer: {
+            ...offer,
+            inventoryItems: offer.inventoryItems.map((item) => ({ ...item })),
+            entitlementIds: [],
+            metadata: { offerKind: "inventory", offerId: offer.id, itemId: offer.inventoryItems[0].itemId },
+        },
+    };
+}
 const SKIN_PACK_PRICES = Object.freeze({
     "summer-vibes": 1499,
     halloween: 2499,
@@ -380,7 +416,9 @@ function cleanUrl(value) {
         return "";
     try {
         const url = new URL(text);
-        return url.protocol === "http:" || url.protocol === "https:" ? url.href : "";
+        return url.protocol === "http:" || url.protocol === "https:"
+            ? url.href.replace("%7BCHECKOUT_SESSION_ID%7D", "{CHECKOUT_SESSION_ID}")
+            : "";
     }
     catch {
         return "";
@@ -613,17 +651,20 @@ export async function createTacticalArenaCheckoutSession(params = {}) {
     if (!stripeApiKey)
         return stripeError(503, "checkout_not_configured");
     const stripePublishableKey = cleanText(params.stripePublishableKey, 500);
-    if (!stripePublishableKey)
-        return stripeError(503, "stripe_publishable_key_not_configured");
     const playerId = cleanText(params.playerId, 120);
     const body = params.body && typeof params.body === "object" ? params.body : {};
     const gameSlug = cleanText(body.gameSlug || TACTICAL_ARENA_GAME_SLUG, 80);
-    if (!playerId || gameSlug !== TACTICAL_ARENA_GAME_SLUG) {
+    if (!playerId || ![TACTICAL_ARENA_GAME_SLUG, YAM_BOWLING_GAME_SLUG].includes(gameSlug)) {
         return stripeError(400, "invalid_checkout_request");
+    }
+    if (gameSlug === TACTICAL_ARENA_GAME_SLUG && !stripePublishableKey) {
+        return stripeError(503, "stripe_publishable_key_not_configured");
     }
     const getGameProgress = typeof params.getGameProgress === "function" ? params.getGameProgress : async () => null;
     const progress = await getGameProgress(playerId, gameSlug);
-    const resolved = await resolveTacticalArenaPremiumOffer(body.offer, progress || {});
+    const resolved = gameSlug === YAM_BOWLING_GAME_SLUG
+        ? resolveYamBowlingVoucherOffer(body.offer)
+        : await resolveTacticalArenaPremiumOffer(body.offer, progress || {});
     if (!resolved.ok)
         return resolved;
     const fetchImpl = typeof params.fetchImpl === "function" ? params.fetchImpl : globalThis.fetch;
@@ -632,9 +673,19 @@ export async function createTacticalArenaCheckoutSession(params = {}) {
     const premiumOffer = resolved.offer;
     const form = new URLSearchParams();
     form.set("mode", "payment");
-    form.set("ui_mode", "embedded_page");
-    form.set("redirect_on_completion", "never");
-    form.set("integration_identifier", STRIPE_CHECKOUT_INTEGRATION_IDENTIFIER);
+    if (gameSlug === YAM_BOWLING_GAME_SLUG) {
+        const successUrl = cleanUrl(body.successUrl);
+        const cancelUrl = cleanUrl(body.cancelUrl);
+        if (!successUrl || !cancelUrl)
+            return stripeError(400, "invalid_return_url");
+        form.set("success_url", successUrl);
+        form.set("cancel_url", cancelUrl);
+    }
+    else {
+        form.set("ui_mode", "embedded_page");
+        form.set("redirect_on_completion", "never");
+        form.set("integration_identifier", STRIPE_CHECKOUT_INTEGRATION_IDENTIFIER);
+    }
     form.set("client_reference_id", playerId);
     form.set("line_items[0][quantity]", "1");
     form.set("line_items[0][price_data][currency]", premiumOffer.currency);
@@ -665,7 +716,7 @@ export async function createTacticalArenaCheckoutSession(params = {}) {
     const url = cleanUrl(json?.url);
     const clientSecret = cleanText(json?.client_secret, 500);
     const sessionId = cleanText(json?.id, 200);
-    return clientSecret && sessionId
+    return sessionId && (gameSlug === YAM_BOWLING_GAME_SLUG ? url : clientSecret)
         ? { ok: true, url, clientSecret, sessionId, publishableKey: stripePublishableKey }
         : stripeError(502, "stripe_checkout_failed");
 }
@@ -735,7 +786,7 @@ export async function fulfillTacticalArenaCheckoutSession(params = {}) {
     const gameSlug = cleanText(metadata.gameSlug, 80);
     const playerId = cleanText(metadata.playerId || session.client_reference_id, 120);
     const sessionId = cleanText(session.id, 200);
-    if (gameSlug !== TACTICAL_ARENA_GAME_SLUG || !playerId || !sessionId) {
+    if (![TACTICAL_ARENA_GAME_SLUG, YAM_BOWLING_GAME_SLUG].includes(gameSlug) || !playerId || !sessionId) {
         return stripeError(400, "invalid_checkout_session");
     }
     const getGameProgress = typeof params.getGameProgress === "function" ? params.getGameProgress : async () => null;
@@ -749,9 +800,13 @@ export async function fulfillTacticalArenaCheckoutSession(params = {}) {
             ? { kind: "unit", sku: metadata.sku, type: metadata.type }
             : offerKind === "consumable"
                 ? { kind: "consumable", sku: metadata.sku, id: metadata.itemId }
-                : { kind: "skin", sku: metadata.sku, type: metadata.type, slug: metadata.slug };
+                : offerKind === "inventory"
+                    ? { kind: "inventory", sku: metadata.sku, id: metadata.offerId }
+                    : { kind: "skin", sku: metadata.sku, type: metadata.type, slug: metadata.slug };
     const progress = await getGameProgress(playerId, gameSlug);
-    const resolved = await resolveTacticalArenaPremiumOffer(offerInput, progress || {});
+    const resolved = gameSlug === YAM_BOWLING_GAME_SLUG
+        ? resolveYamBowlingVoucherOffer(offerInput)
+        : await resolveTacticalArenaPremiumOffer(offerInput, progress || {});
     if (!resolved.ok && resolved.error !== "offer_already_owned")
         return resolved;
     const entitlementIds = resolved.ok ? resolved.offer.entitlementIds : [];
@@ -784,6 +839,8 @@ function premiumClaimKind(offerKind) {
         return "premium-unit-purchase";
     if (offerKind === "consumable")
         return "premium-consumable-purchase";
+    if (offerKind === "inventory")
+        return "premium-inventory-purchase";
     return "premium-skin-purchase";
 }
 export async function fulfillPremiumCheckoutSessionFromReturn(params = {}) {

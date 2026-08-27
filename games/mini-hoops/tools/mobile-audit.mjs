@@ -1,4 +1,4 @@
-// Drive the real cabinet at real phone viewports and MEASURE the layout.
+// Drive the real cabinet at real phone and laptop viewports and MEASURE the layout.
 //
 // Screen layout is the one part of this game the unit tests cannot reach, and
 // the `## Mobile` section of CLAUDE.md is a record of measurements rather than
@@ -46,13 +46,22 @@ const only = flag("--viewport");
 
 // Real handsets, not round numbers: the two portrait widths either side of the
 // common case and the two landscape shapes a phone actually produces.
+//
+// AND TWO LAPTOPS, because a court can fail to fit on one of those as well and
+// for the same reason -- the shortage is vertical on a laptop too, since a
+// browser's chrome takes 200-odd pixels off a 900-tall screen and the court's
+// reservation is measured against what is left. Tic-tac-toe overflowed by 78px
+// on every desktop under about 1080 tall for months while this tool, which asks
+// exactly that question, was only ever pointed at phones.
 const VIEWPORTS = [
-  { name: "portrait-360", width: 360, height: 800 },
-  { name: "portrait-393", width: 393, height: 852 },
-  { name: "portrait-430", width: 430, height: 932 },
-  { name: "landscape-740", width: 740, height: 360 },
-  { name: "landscape-852", width: 852, height: 393 },
-  { name: "landscape-915", width: 915, height: 412 },
+  { name: "portrait-360", width: 360, height: 800, mobile: true },
+  { name: "portrait-393", width: 393, height: 852, mobile: true },
+  { name: "portrait-430", width: 430, height: 932, mobile: true },
+  { name: "landscape-740", width: 740, height: 360, mobile: true },
+  { name: "landscape-852", width: 852, height: 393, mobile: true },
+  { name: "landscape-915", width: 915, height: 412, mobile: true },
+  { name: "laptop-1280", width: 1280, height: 640, mobile: false },
+  { name: "laptop-1598", width: 1598, height: 731, mobile: false },
 ];
 
 const MIME = {
@@ -278,9 +287,9 @@ for (const viewport of VIEWPORTS) {
     await page.setViewport({
       width: viewport.width,
       height: viewport.height,
-      isMobile: true,
-      hasTouch: true,
-      deviceScaleFactor: 2,
+      isMobile: viewport.mobile,
+      hasTouch: viewport.mobile,
+      deviceScaleFactor: viewport.mobile ? 2 : 1,
     });
     // Every route starts from a clean cabinet. Preferences persist in
     // localStorage and the whole run shares one browser profile, so without this
@@ -325,14 +334,17 @@ for (const viewport of VIEWPORTS) {
     if (stranded.length) {
       notes.push(`${stranded.length} off screen: ${stranded.map((node) => node.text || node.label).join(", ")}`);
     }
-    if (found.small.length) notes.push(`${found.small.length} tap target(s) under 44px`);
+    // 44px is a THUMB minimum. A laptop is driven with a pointer, so reporting it
+    // there would bury the two things that matter on that shape -- overflow and a
+    // stranded control -- under thirty rows of buttons that are fine.
+    if (viewport.mobile && found.small.length) notes.push(`${found.small.length} tap target(s) under 44px`);
     if (scrolls || found.overflowX > 2 || stranded.length || (found.ball && !found.ball.onScreen)) {
       problems += 1;
     }
 
     console.log(`  ${route.name.padEnd(14)} ${found.screen.padEnd(16)} ${notes.join(" · ") || "clean"}`);
     for (const note of found.culprits ?? []) console.log(`      over: ${note}`);
-    for (const node of found.small.slice(0, 6)) {
+    for (const node of (viewport.mobile ? found.small : []).slice(0, 6)) {
       console.log(`      small: ${(node.text || node.label).padEnd(26)} ${node.w}x${node.h}`);
     }
     await page.close();

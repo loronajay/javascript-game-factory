@@ -21,11 +21,13 @@ const PREMIUM_GRANT_CLAIM_KINDS = [
     "premium-skin-purchase",
     "premium-unit-purchase",
     "premium-consumable-purchase",
+    "premium-inventory-purchase",
 ];
 // The kinds whose payload carries inventory quantity rather than entitlements. Listed once
 // so a new paid item grant is a row here, not a fourth branch that forgets to be revocable.
 const INVENTORY_GRANT_CLAIM_KINDS = [
     "premium-consumable-purchase",
+    "premium-inventory-purchase",
     "premium-calendar-preorder",
 ];
 // A single purchase may never add more than this much of one consumable, whatever a
@@ -782,7 +784,7 @@ export async function recordYamBowlingTournamentRound(pool, params = {}) {
 // redemption id makes a lost response safe to retry without spending twice.
 const VOUCHER_KINDS = {
     skin: {
-        itemId: "skin-voucher",
+        resolveItemId: (target) => target.skinId === "swimsuit" ? "swimsuit-voucher" : "skin-voucher",
         claimKind: "skin-voucher-redemption",
         grantKind: "skin",
         invalidTargetError: "invalid_skin_target",
@@ -799,7 +801,7 @@ const VOUCHER_KINDS = {
         },
     },
     emote: {
-        itemId: "emote-voucher",
+        resolveItemId: () => "emote-voucher",
         claimKind: "emote-voucher-redemption",
         grantKind: "emote",
         invalidTargetError: "invalid_emote_target",
@@ -830,6 +832,7 @@ export async function redeemYamBowlingVoucher(pool, params = {}) {
     }
     if (!target)
         return { ok: false, statusCode: 400, error: kind.invalidTargetError };
+    const voucherItemId = kind.resolveItemId(target);
     const claimId = `${kind.claimKind}:${redemptionId}`;
     const client = await pool.connect();
     try {
@@ -868,12 +871,12 @@ export async function redeemYamBowlingVoucher(pool, params = {}) {
         const spent = await client.query(`update game_inventory_items
        set quantity = quantity - 1, updated_at = now()
        where player_id = $1 and game_slug = $2 and item_id = $3 and quantity > 0
-       returning quantity`, [playerId, gameSlug, kind.itemId]);
+       returning quantity`, [playerId, gameSlug, voucherItemId]);
         if (!spent.rows.length) {
             await client.query("rollback");
             return { ok: false, statusCode: 409, error: "voucher_not_owned" };
         }
-        await grantEntitlement(client, playerId, gameSlug, { entitlementId: target.entitlementId, kind: kind.grantKind }, kind.itemId, redemptionId);
+        await grantEntitlement(client, playerId, gameSlug, { entitlementId: target.entitlementId, kind: kind.grantKind }, voucherItemId, redemptionId);
         await client.query(`update game_progress_claims set payload = $4::jsonb
        where player_id = $1 and game_slug = $2 and claim_id = $3`, [playerId, gameSlug, claimId, JSON.stringify({ entitlementId: target.entitlementId })]);
         await client.query("commit");

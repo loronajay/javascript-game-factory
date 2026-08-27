@@ -68,8 +68,9 @@ on a page most visitors scroll past.
 
 ### What was reused, unchanged
 
-- `game_inventory_items` and the `skin-voucher` item — no new currency, no calendar-specific
-  voucher type, and `profile/voucher-client.mjs` redemption is untouched
+- `game_inventory_items` and the regular `skin-voucher` item — no calendar-specific
+  voucher type. These vouchers redeem Maid Café skins only; the calendar bonus
+  does not grant `swimsuit-voucher` inventory and cannot unlock Swimsuit skins.
 - `game_progress_claims` for idempotency, `revokeGameEntitlements` for clawback,
   `findStripeGrant` for tracing, and the existing Stripe signature verification
 

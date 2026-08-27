@@ -2,10 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { redeemYamBowlingSkinVoucher } from "../src/db/game-progress.mjs";
+import { isPremiumGameClaimKind, isPublicGameClaimKind } from "../src/services/game-progress-claim-catalog.mjs";
 
-function makePool({ vouchers = 1 } = {}) {
+function makePool({ vouchers = 1, swimsuitVouchers = 0 } = {}) {
   const state = {
-    vouchers,
+    inventory: new Map([
+      ["skin-voucher", vouchers],
+      ["swimsuit-voucher", swimsuitVouchers],
+    ]),
     entitlements: new Map(),
     claims: new Map(),
     transactions: [],
@@ -32,9 +36,11 @@ function makePool({ vouchers = 1 } = {}) {
         return { rows: owned ? [{ "?column?": 1 }] : [], rowCount: owned ? 1 : 0 };
       }
       if (text.startsWith("update game_inventory_items")) {
-        if (state.vouchers < 1) return { rows: [], rowCount: 0 };
-        state.vouchers -= 1;
-        return { rows: [{ quantity: state.vouchers }], rowCount: 1 };
+        const itemId = params[2];
+        const quantity = state.inventory.get(itemId) || 0;
+        if (quantity < 1) return { rows: [], rowCount: 0 };
+        state.inventory.set(itemId, quantity - 1);
+        return { rows: [{ quantity: quantity - 1 }], rowCount: 1 };
       }
       if (text.startsWith("insert into game_entitlements")) {
         state.entitlements.set(params[2], { entitlement_id: params[2], kind: params[3] });
@@ -62,7 +68,9 @@ function makePool({ vouchers = 1 } = {}) {
         })) };
       }
       if (text.includes("from game_inventory_items")) {
-        return { rows: state.vouchers > 0 ? [{ item_id: "skin-voucher", quantity: state.vouchers }] : [] };
+        return { rows: [...state.inventory]
+          .filter(([, quantity]) => quantity > 0)
+          .map(([item_id, quantity]) => ({ item_id, quantity })) };
       }
       return { rows: [] };
     },
@@ -78,6 +86,11 @@ const request = {
   redemptionId: "redeem-1",
 };
 
+test("paid voucher inventory grants are trusted-only Yam Bowling claims", () => {
+  assert.equal(isPremiumGameClaimKind("yam-bowling", "premium-inventory-purchase"), true);
+  assert.equal(isPublicGameClaimKind("yam-bowling", "premium-inventory-purchase"), false);
+});
+
 test("skin voucher redemption decrements and grants in one transaction", async () => {
   const pool = makePool();
 
@@ -85,7 +98,7 @@ test("skin voucher redemption decrements and grants in one transaction", async (
 
   assert.equal(result.ok, true);
   assert.equal(result.alreadyProcessed, false);
-  assert.equal(pool.state.vouchers, 0);
+  assert.equal(pool.state.inventory.get("skin-voucher"), 0);
   assert.equal(pool.state.entitlements.has(request.entitlementId), true);
   assert.deepEqual(pool.state.transactions, ["begin", "commit"]);
   assert.deepEqual(result.progress.entitlements.map((entry) => entry.entitlementId), [request.entitlementId]);
@@ -99,7 +112,27 @@ test("retrying a redemption id replays its result without spending again", async
 
   assert.equal(replay.ok, true);
   assert.equal(replay.alreadyProcessed, true);
-  assert.equal(pool.state.vouchers, 0);
+  assert.equal(pool.state.inventory.get("skin-voucher"), 0);
+});
+
+test("swimsuits consume only Swimsuit Vouchers and regular skins consume only Skin Vouchers", async () => {
+  const swimsuitRequest = {
+    ...request,
+    entitlementId: "skin:daisy-monroe:swimsuit",
+    redemptionId: "redeem-swimsuit",
+  };
+
+  const wrongForSwimsuit = makePool({ vouchers: 1, swimsuitVouchers: 0 });
+  assert.equal((await redeemYamBowlingSkinVoucher(wrongForSwimsuit, swimsuitRequest)).error, "voucher_not_owned");
+  assert.equal(wrongForSwimsuit.state.inventory.get("skin-voucher"), 1, "regular voucher was not spent");
+
+  const swimsuit = makePool({ vouchers: 0, swimsuitVouchers: 1 });
+  assert.equal((await redeemYamBowlingSkinVoucher(swimsuit, swimsuitRequest)).ok, true);
+  assert.equal(swimsuit.state.inventory.get("swimsuit-voucher"), 0);
+
+  const wrongForMaid = makePool({ vouchers: 0, swimsuitVouchers: 1 });
+  assert.equal((await redeemYamBowlingSkinVoucher(wrongForMaid, request)).error, "voucher_not_owned");
+  assert.equal(wrongForMaid.state.inventory.get("swimsuit-voucher"), 1, "swimsuit voucher was not spent");
 });
 
 test("redemption refuses an empty balance, an owned skin, and forged targets", async () => {

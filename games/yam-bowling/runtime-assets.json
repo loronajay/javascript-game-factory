@@ -44,6 +44,7 @@
     "assets/lanes/thumbs/*.webp",
     "assets/pins/*.webp",
     "assets/profile-rewards/*.webp",
+    "assets/vouchers/*.webp",
     "assets/emotes/*.webp",
     "assets/menu-splashes/**/*.webp",
     "assets/characters/processed/canon/**/*.webp",

@@ -1149,10 +1149,15 @@ a:focus-visible {
    never more height than the screen has left once the header and its meter are
    paid for. A demo you have to scroll to would be teaching the wrong lesson. */
 .court--demo {
-  /* The panel under this court is the practice ball picker AND the meter. Per
-     the rule at the top of the viewport section: when the panel grows a row the
-     reservation grows with it, and the picker is 66px of row. */
-  --chrome: 276px;
+  /* Unlike a court, this one sits UNDER A PAGE HEADING, and the reservation has
+     to carry it: 96px of head + the 163px panel (the practice ball picker and
+     the meter) + the cabinet's 28px of padding. 276 paid for the last two and
+     not the first, so the column ran 11px past the bottom of a 640-tall laptop
+     — and `#howToScreen` is `overflow: hidden`, so what that cost was not a page
+     scroll but the meter being silently clipped off. The shortfall is the head's
+     height and does not depend on the viewport, which is why one number fixes it
+     at every size. */
+  --chrome: 287px;
   width: min(100%, calc((100dvh - var(--chrome)) * 960 / 760));
   border-radius: 16px;
 }
@@ -1517,32 +1522,37 @@ body.is-playing .cabinet {
    what they need, and THE NOTES ARE THE PART THAT SCROLLS. Scoped to the screen
    rather than to `.screen--splash`, because Leaderboards is a list and is
    supposed to scroll.
+
+   IT IS NOT BEHIND A MEDIA QUERY, and it used to be — a phone one, which is how
+   the screen came to overflow a LAPTOP by 18-31px while measuring clean on every
+   handset. The rule this states is not "a phone is short", it is "the demo and
+   its meter are one instrument"; that is true at every size, and a mechanism that
+   holds at any content height has nothing to gain from being switched off on a
+   big screen. `tools/mobile-audit.mjs` measures the laptop shapes now.
    --------------------------------------------------------------------------- */
 
-@media (max-width: 820px), (orientation: landscape) and (max-height: 620px) {
-  #howToScreen.is-active {
-    display: flex;
-    flex-direction: column;
-    height: calc(100dvh - 2 * var(--cabinet-pad-y, 14px));
-    overflow: hidden;
-  }
+#howToScreen.is-active {
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 2 * var(--cabinet-pad-y, 14px));
+  overflow: hidden;
+}
 
-  #howToScreen .screen-head { flex: 0 0 auto; }
+#howToScreen .screen-head { flex: 0 0 auto; }
 
-  /* `min-height: 0` on both, or a flex/grid child refuses to shrink below its
-     content and hands the overflow straight back to the page. */
-  #howToScreen .how-layout {
-    flex: 1 1 auto;
-    min-height: 0;
-  }
+/* `min-height: 0` on both, or a flex/grid child refuses to shrink below its
+   content and hands the overflow straight back to the page. */
+#howToScreen .how-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+}
 
-  #howToScreen .how-demo { min-height: 0; }
+#howToScreen .how-demo { min-height: 0; }
 
-  #howToScreen .how-notes {
-    min-height: 0;
-    max-height: 100%;
-    overflow-y: auto;
-  }
+#howToScreen .how-notes {
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
 }
 
 /* Stacked, the notes are the second ROW, and they are the one that flexes. */
@@ -1844,6 +1854,93 @@ body.is-playing .cabinet {
   #horseScreen .turn-ball-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+/* TIC-TAC-TOE ON A WIDE SCREEN: THE SAME RAIL, FOR THE SAME REASON.
+
+   This court reserves 252px stacked, which is more than HORSE's aiming phase
+   does — the per-turn ball picker is two 40px rows and the mode has a legend
+   line under its meter. That reservation comes off the court's HEIGHT and the
+   width is derived from it, so on a 1598x731 window it left a 605px court in
+   the middle of an empty 1598px screen. The waste is horizontal and the
+   shortage is vertical, which is the trade the rail makes: the same window puts
+   up an 888x703 court instead.
+
+   The mini board comes INTO the rail here. Stacked, it is parked in the gutter
+   the court leaves beside it; there is no gutter once the court has spent the
+   width, and a fixed-position board would sit on top of the room. In the rail it
+   is a row above the panel and it is shown unconditionally — the gutter question
+   the `min-aspect-ratio` rule answers does not arise. */
+@media (orientation: landscape) and (min-height: 621px) and (min-width: 1100px) {
+  body.is-playing:has(#ticTacToeScreen.is-active) .cabinet {
+    max-width: none;
+  }
+
+  /* Two rows in the rail: the board above the panel, both taking what they need
+     and the pair centred as a block. The court spans both. */
+  #ticTacToeScreen.is-active {
+    --rail: 340px;
+    display: grid;
+    grid-template-columns: var(--rail) minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-content: center;
+    gap: 14px;
+    height: 100%;
+  }
+
+  /* Explicit placement for all three, for the reason the phone rail pins
+     `grid-row`: auto placement only moves forward, so the left-handed mirror
+     sending the court back to column 1 would open fresh rows for it and push
+     the panel off the bottom of a locked page. */
+  #ticTacToeScreen .court {
+    height: calc(100dvh - 28px);
+    width: auto;
+    max-width: 100%;
+    aspect-ratio: 960 / 760;
+    justify-self: center;
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  #ticTacToeScreen .court-canvas {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+  }
+
+  /* Capped and centred rather than filling the rail. The grid inside it is
+     `aspect-ratio: 1`, so a board as wide as the rail is 377px TALL — which on a
+     640-tall window does not go beside a 290px panel, and the pair being centred
+     as a block pushed the board's own heading off the top of the screen. */
+  #ticTacToeScreen .mini-board {
+    display: block;
+    position: static;
+    translate: none;
+    width: min(100%, 210px);
+    max-width: none;
+    margin-inline: auto;
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  #ticTacToeScreen .shot-panel {
+    width: auto;
+    margin: 0;
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  /* 340px of rail: eight balls two across rather than four, the same trade
+     HORSE's picker makes at this width. */
+  #ticTacToeScreen .turn-ball-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  [data-hand="left"] #ticTacToeScreen.is-active {
+    grid-template-columns: minmax(0, 1fr) var(--rail);
+  }
+
+  [data-hand="left"] #ticTacToeScreen .court { grid-column: 1; }
+  [data-hand="left"] #ticTacToeScreen .mini-board { grid-column: 2; }
+  [data-hand="left"] #ticTacToeScreen .shot-panel { grid-column: 2; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.001ms !important;
@@ -1890,6 +1987,24 @@ body.is-playing .cabinet {
 .hud-action { pointer-events: auto; }
 .hud-action[hidden] { display: none; }
 .hud-action:hover { border-color: rgba(255, 255, 255, .45); }
+
+/* THE COURT PAYS FOR THE BALL PICKER, like HORSE's does.
+
+   `.game-screen .court` reserves 140px, which is the classic run's panel: a
+   meter and nothing else. This court's panel carries the per-turn ball picker
+   above that meter — 112px of it, a 10px label, a 6px gap and two 40px rows —
+   and a legend line under it, and none of that was reserved. So the court was
+   sized as though the panel were 86px tall when it measures 198, and the whole
+   screen overflowed by 78px: centred, that is 39px off the TOP (the turn line
+   and the MENU button clipped) and 39px off the bottom (the meter under the
+   fold), on every desktop shorter than about 1080.
+
+   252px = the 20px gap above the panel + the panel's 198px + the cabinet's 34px
+   of padding, the same three parts HORSE's 245 is made of. If the panel grows a
+   row, this grows with it. It does not apply in the landscape rail, where the
+   panel is a column beside the court rather than under it. */
+#ticTacToeScreen.is-active { --court-chrome: 252px; }
+#ticTacToeScreen .court { --chrome: var(--court-chrome); }
 
 /* The tic-tac-toe HUD says shorter things than the classic one — a mark
    assignment rather than a running score — so its stat block is sized for a
@@ -2077,7 +2192,9 @@ body.is-playing .cabinet {
    and this carries the abstract one.
 
    IT IS SIZED BY THE GUTTER AND IT COLLAPSES WHEN THERE IS NONE. `--court-width`
-   is the same expression `.game-screen .court` uses, so the two cannot drift; if
+   is the same expression `.game-screen .court` uses — off the same
+   `--court-chrome` the court's own reservation is set from, so a change to one
+   moves the other and the two cannot drift; if
    the court has taken the whole screen the gutter is zero, `max-width` floors at
    zero and the board disappears rather than sitting on top of the room. The
    media query is only there to stop it appearing as a sliver — the clamp is what
@@ -2091,7 +2208,7 @@ body.is-playing .cabinet {
      max-width on a desktop, so its own gutter is about 110px while the real
      empty space beside the court is nearly four times that — and the board is
      parked in the empty space a player can see, not in the padding box. */
-  --court-width: min(100vw, calc((100dvh - 140px) * 960 / 760));
+  --court-width: min(100vw, calc((100dvh - var(--court-chrome, 140px)) * 960 / 760));
   --gutter: calc((100vw - var(--court-width)) / 2);
   position: fixed;
   right: 18px;
