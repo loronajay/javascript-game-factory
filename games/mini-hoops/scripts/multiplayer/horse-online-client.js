@@ -21,11 +21,14 @@ import {
   resolveWebSocketUrl,
   sanitizeIdentity,
 } from "./online-client.js";
-import { DEFAULT_WORD, normalizeWord } from "../sim/horse.js";
+import { DEFAULT_WORD, HORSE_FIXED_SETUP, normalizeWord } from "../sim/horse.js";
 import { ballById } from "../assets/ball-catalog.js";
+import { locationById } from "../assets/location-catalog.js";
+import { normalizeSandboxPieces } from "../sim/trick-shot.js";
+import { BIN_TARGET, HOOP_TARGET } from "../sim/trick-shot-target.js";
 
 export const HORSE_GAME_ID = "mini-hoops-horse";
-export const HORSE_PROTOCOL_VERSION = 1;
+export const HORSE_PROTOCOL_VERSION = 2;
 const SESSION_KEY = "mini-hoops.horse-online-session.v1";
 
 function text(value, max = 100, fallback = "") {
@@ -52,13 +55,38 @@ export function horseLobbySettings(word) {
   return { word: normalizeWord(word || DEFAULT_WORD), protocolVersion: HORSE_PROTOCOL_VERSION };
 }
 
-/** Where the bin stands. Clamped again server-side — this is only shaping. */
+/**
+ * Where the target stands. Clamped again server-side — this is only shaping.
+ *
+ * TWO PLACEMENT SHAPES, and the kind is what says which. A bin's is a world
+ * point on the floor and a hoop's is a screen point on the back wall, so this
+ * sends the one that belongs to the kind rather than a union of both: a field
+ * from the wrong shape is a field the server's clamp does not read, and shipping
+ * it would only invite someone to believe it meant something.
+ *
+ * ANYTHING THAT IS NOT EXPLICITLY A HOOP IS A BIN, the same default the sim's
+ * `horseTargetKind` and the server's `sanitizeHorsePlacement` both keep — and
+ * deliberately not the target catalog's own, which opens on the hoop because the
+ * Trick Shot Lab does.
+ */
 export function sanitizeHorsePlacementIntent(value = {}) {
+  const hoop = value.kind === HOOP_TARGET;
+  const placement = value.placement || value;
   return {
-    x: number(value.x, -8, 8, 0),
-    y: number(value.y, 0, 8, 0),
-    z: number(value.z, 0, 8, 0),
+    kind: hoop ? HOOP_TARGET : BIN_TARGET,
     motionId: text(value.motionId, 24, "still"),
+    placement: hoop
+      ? {
+        cx: number(placement.cx, -4_000, 4_000, 0),
+        rimY: number(placement.rimY, -4_000, 4_000, 0),
+      }
+      : {
+        x: number(placement.x, -8, 8, 0),
+        y: number(placement.y, 0, 8, 0),
+        z: number(placement.z, 0, 8, 0),
+      },
+    locationId: locationById(value.locationId || HORSE_FIXED_SETUP.locationId).id,
+    pieces: normalizeSandboxPieces(value.pieces),
   };
 }
 
@@ -67,8 +95,10 @@ export function sanitizeHorsePlacementIntent(value = {}) {
  *
  * `aimY` is deliberately not here, and that is the difference from the classic
  * cabinet's intent. There the reticle rides one fixed line and the server pins
- * it against a crafted client; here the vertical aim IS the placed bin's own
- * rest height, which the server already holds and has already clamped.
+ * it against a crafted client; here the vertical aim IS the placed target's own
+ * rest height — a bin's mouth or a hung hoop's rim — which the server already
+ * holds and has already clamped. Making the hoop placeable did not open that
+ * back up, because the height a shot is solved to still comes off the setup.
  */
 export function sanitizeHorseShotIntent(value = {}) {
   return {

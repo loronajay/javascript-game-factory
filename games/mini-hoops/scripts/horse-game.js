@@ -7,8 +7,18 @@
 //
 // It is its own root because it owns a different loop and a different shape of
 // turn. Tic-tac-toe's turn is one gesture; a HORSE turn is TWO phases —
-// arranging a bin, then shooting at it — and the second half of that is only
+// arranging a TARGET, then shooting at it — and the second half of that is only
 // ever reached from the first.
+//
+// A TARGET IS A FLOOR BIN OR THE WALL HOOP, and which one is the first thing a
+// setter chooses. The seam is `sim/trick-shot-target.js`, the same one the Trick
+// Shot Lab uses, so the two modes describe a target identically and a layout
+// authored in the Lab can be set here whichever way it ends. Everything that
+// follows from that choice is a dispatch on one field: which motion catalog the
+// picker is built from, which clamp a drag goes through, which integrator the
+// flight runs on, and which of two gestures the pull means. See
+// `sim/horse-shot.js` for why the gesture is allowed to change with the target
+// here when the Lab deliberately refused to let it.
 //
 // WHAT IT DELIBERATELY DOES NOT IMPORT: `sim/run.js`, and any store. HORSE has
 // no clock and files to no leaderboard, for the reason a board key is
@@ -19,28 +29,47 @@ import { createAssetLibrary } from "./assets/loader.js";
 import { BALLS, DEFAULT_BALL, ballFlight, ballSplat, ballTrail } from "./assets/ball-catalog.js";
 import { addSplat, clearSplatField, createSplatField, tickSplatField } from "./effects/splat-field.js";
 import { addFire, clearFlameTrail, createFlameTrail, emitFlameTrail, tickFlameTrail } from "./effects/flame-trail.js";
-import { CANVAS_HEIGHT, CANVAS_WIDTH, CONTACT_DEBOUNCE_SECONDS, TICK_SECONDS } from "./sim/constants.js";
+import {
+  addTrickShotImpact,
+  clearTrickShotImpacts,
+  createTrickShotImpactField,
+  tickTrickShotImpacts,
+} from "./effects/trick-shot-impact.js";
+import {
+  CANVAS_HEIGHT,
+  CANVAS_WIDTH,
+  REFERENCE_POWER,
+  CONTACT_DEBOUNCE_SECONDS,
+  PHYSICS_SUBSTEP_SECONDS,
+  TICK_SECONDS,
+} from "./sim/constants.js";
 import { stepBallAgainstBins } from "./sim/bin-physics.js";
+import { HOOP_MODES, hoopModeById } from "./sim/hoop.js";
+import {
+  defaultHoopPlacement,
+  hoopPlacementBoundsFor,
+  hoopPlacementFromFractions,
+  placedHoopAt,
+} from "./sim/hoop-placement.js";
 import {
   BIN_MOTIONS,
   binMotionById,
-  clampPlacement,
   motionEnvelope,
   defaultPlacement,
   heightBoundsAt,
   horizontalBoundsAt,
-  normalizeBinSetup,
   placedBinAt,
   placementFromFractions,
   PLACEMENT_BOUNDS,
 } from "./sim/bin-placement.js";
-import { createHorseShot, horsePowerForDepth } from "./sim/horse-shot.js";
+import { createHorseShot, horsePowerForDepth, horseTargetAt } from "./sim/horse-shot.js";
 import {
   HORSE_FIXED_SETUP,
   PHASE_MATCH,
   PHASE_SET,
   canPlaceBin,
   chooseCpuBinSetup,
+  chooseCpuTargetKind,
   chooseCpuTurnBall,
   cpuMakesHorseShot,
   createHorseMatch,
@@ -53,21 +82,50 @@ import {
   resolveHorseShot,
   shotSetupFor,
 } from "./sim/horse.js";
-import { createBall, isBallSettled, launchBall, resetBall } from "./sim/physics.js";
+import { createBall, isBallSettled, launchBall, resetBall, stepBall, worldFor } from "./sim/physics.js";
+import {
+  BOARD_PIECE,
+  CANNON_PIECE,
+  MAX_SANDBOX_PIECES,
+  SPRING_PIECE,
+  createSandboxPiece,
+  isPadPiece,
+  normalizeSandboxPieces,
+} from "./sim/trick-shot.js";
+import {
+  createTrickShotPhysics,
+  resetTrickShotPhysics,
+  stepTrickShotPieces,
+} from "./sim/trick-shot-physics.js";
+import {
+  BIN_TARGET,
+  HOOP_TARGET,
+  TRICK_SHOT_TARGETS,
+  defaultTrickShotMotion,
+  defaultTrickShotPlacement,
+  normalizeTrickShotTarget,
+  trickShotTargetAt,
+  trickShotTargetKind,
+} from "./sim/trick-shot-target.js";
 import { createMiniHoopsAccountAccess } from "./multiplayer/account-access.js";
 import { normalizeRoomCode } from "./multiplayer/online-client.js";
 import { createHorseOnlineClient } from "./multiplayer/horse-online-client.js";
 import { launchSpin, trajectoryPoints } from "./sim/launch.js";
 import { isShootablePull, neutralPull, resolvePull } from "./sim/pull.js";
-import { ballScreenRadius, projectPoint, screenToWorldAtZ } from "./sim/projection.js";
-import { drawAim } from "./render/aim.js";
-import { drawBall } from "./render/ball.js";
-import { binMouthEllipse, drawBinBody, drawBinLip, drawBinShadow } from "./render/bin.js";
-import { clearScene, depthGradeFilter, drawBallShadow, drawRoom, prepareContext } from "./render/scene.js";
+import { ballScreenRadius, projectPoint, screenToWorldAtZ, screenToWorldOnFloor } from "./sim/projection.js";
+import { prepareContext } from "./render/scene.js";
 import { canvasPoint, isGrab } from "./ui/pointer.js";
 import { createTurnBallPicker, normalizeTurnBallId } from "./ui/turn-ball-picker.js";
-import { drawSplatDecals, drawSplatParticles } from "./render/splats.js";
 import { drawFlameEmbers, drawFlameFires } from "./render/flames.js";
+import {
+  TRICK_SHOT_ASSET_PATHS,
+  binDepthHandleAt,
+  renderTrickShotFrame,
+  sandboxPieceAtPoint,
+  sandboxPieceControlAtPoint,
+  trickShotTargetAtPoint,
+} from "./render/trick-shot.js";
+import { createTrickShotStore } from "./store/trick-shots-store.js";
 
 const BIN_PATH = "assets/modes/floor-tic-tac-toe/open-bin.png";
 
@@ -76,11 +134,17 @@ const BIN_PATH = "assets/modes/floor-tic-tac-toe/open-bin.png";
 // fallback for old or malformed online intents.
 const ROOM_ID = HORSE_FIXED_SETUP.locationId;
 const LOSER_POPUP_SECONDS = 2.4;
+const MAX_HORSE_SHOT_SECONDS = 7;
 
-// How far one nudge of a key or an on-screen stepper moves the bin.
+// How far one nudge of a key or an on-screen stepper moves the target. Two sets,
+// because the two targets are placed in two different spaces — a bin in world
+// units on the floor, a hoop in screen pixels on the wall. Sized so a nudge is
+// about the same visible step either way rather than the same number.
 const NUDGE_DEPTH = 0.035;
 const NUDGE_LATERAL = 0.045;
 const NUDGE_HEIGHT = 0.03;
+const NUDGE_HOOP_X = 14;
+const NUDGE_HOOP_Y = 8;
 
 // A turn's two phases. `placing` is only ever reached when the rules say this
 // player owes nobody a shot.
@@ -101,7 +165,8 @@ export function horseTurnBallId(match, turnBalls = []) {
 
 /** Silent stand-in so the root can be constructed in a test without a browser. */
 const SILENT_AUDIO = Object.freeze({
-  released() {}, contact() {}, binScored() {}, missed() {}, celebrate() {}, click() {}, splat() {},
+  released() {}, contact() {}, scored() {}, binScored() {}, missed() {},
+  celebrate() {}, click() {}, splat() {}, sizzle() {},
 });
 
 export function bootHorse(root, options = {}) {
@@ -112,6 +177,7 @@ export function bootHorse(root, options = {}) {
   // lobby. It owns both; it does not own the router.
   const onShowLobby = options.onShowLobby || (() => {});
   const accountAccess = options.accountAccess || createMiniHoopsAccountAccess();
+  const store = options.store || createTrickShotStore();
   const onlineClient = options.onlineClient || createHorseOnlineClient({
     resolveIdentity: () => accountAccess.identity(),
   });
@@ -127,12 +193,15 @@ export function bootHorse(root, options = {}) {
   // machine is exactly the thing that has to be testable without a browser.
   const assets = options.assets || createAssetLibrary({ onLoad: () => draw() });
   const art = {
-    room: assets.backdrop(ROOM_ID),
     bin: assets.image(BIN_PATH),
+    cannonBase: assets.image(TRICK_SHOT_ASSET_PATHS.cannonBase),
+    cannonBarrel: assets.image(TRICK_SHOT_ASSET_PATHS.cannonBarrel),
   };
 
   const ball = createBall();
   const splats = createSplatField();
+  const impacts = createTrickShotImpactField();
+  const piecePhysics = createTrickShotPhysics();
   // The magma ball burns, and what it leaves in the air and on the floor is a
   // second transient field beside the splats. Same layer, same tick clock, and
   // the same guarantee: it cannot touch a score. See `effects/flame-trail.js`.
@@ -145,12 +214,31 @@ export function bootHorse(root, options = {}) {
   let active = false;
   let match;
   let phase = PHASE_PLACING;
-  // The bin the current shooter is arranging. Carried between turns on purpose:
-  // a player who liked where they stood the bin last time starts from there
-  // rather than from the middle of the room again.
-  let workingSetup = { ...defaultPlacement(), motionId: "still" };
-  // The bin the shot in progress is actually against — frozen at the moment the
-  // shot was set, so the setter cannot keep fiddling once the ball is in the air.
+  // The target the current shooter is arranging. Carried between turns on
+  // purpose: a player who liked where they stood the bin last time starts from
+  // there rather than from the middle of the room again.
+  let workingTarget = defaultWorkingTarget();
+  // What each KIND was last set to, so flipping between the bin and the hoop to
+  // compare them does not quietly reset either. The Lab keeps exactly this pair
+  // for exactly this reason — and it has to be per kind, because the two motion
+  // catalogs do not share ids and the two placements do not share a shape.
+  const rememberedMotion = {
+    [HOOP_TARGET]: defaultTrickShotMotion(HOOP_TARGET),
+    [BIN_TARGET]: "still",
+  };
+  const rememberedPlacement = {
+    [HOOP_TARGET]: defaultHoopPlacement(),
+    [BIN_TARGET]: defaultPlacement(),
+  };
+  let workingPieces = [];
+  let activePieces = [];
+  let selectedPieceId = null;
+  let currentLocationId = ROOM_ID;
+  let currentSavedShotId = "";
+  let pieceSerial = 0;
+  // The target the shot in progress is actually against — frozen at the moment
+  // the shot was set, so the setter cannot keep fiddling once the ball is in the
+  // air.
   let activeSetup = null;
   // The motion clock. Reset to zero at the start of EVERY turn, which is what
   // makes the matcher face the shot the setter faced: same bin, same phase, same
@@ -161,6 +249,8 @@ export function bootHorse(root, options = {}) {
   let pointerId = null;
   let grabOffset = { x: 0, y: 0 };
   let placingPointerId = null;
+  let placingPointerMode = null;
+  let pieceDragOffset = { x: 0, y: 0 };
   let flight = null;
   let cpuDelay = 0;
   let accumulator = 0;
@@ -200,6 +290,9 @@ export function bootHorse(root, options = {}) {
     hint: root.querySelector("#horseHint"),
     letters: root.querySelector("#horseLetters"),
     place: root.querySelector("#horsePlacePanel"),
+    placeHead: root.querySelector("#horsePlaceHead"),
+    targets: root.querySelector("#horseTargets"),
+    depthNudges: root.querySelector("#horseDepthNudges"),
     motions: root.querySelector("#horseMotions"),
     confirm: root.querySelector("#horseConfirm"),
     readouts: root.querySelector("#horsePlaceReadout"),
@@ -209,6 +302,18 @@ export function bootHorse(root, options = {}) {
     ballPanel: root.querySelector("#horseBallPanel"),
     loserPopup: root.querySelector("#horseLoserPopup"),
     loserPopupText: root.querySelector("#horseLoserPopupText"),
+    savedShots: root.querySelector("#horseSavedShots"),
+    useSavedShot: root.querySelector("#horseUseSavedShot"),
+    toolInspector: root.querySelector("#horseToolInspector"),
+    toolTitle: root.querySelector("#horseToolTitle"),
+    toolDepth: root.querySelector("#horseToolDepth"),
+    toolDirection: root.querySelector("#horseToolDirection"),
+    toolAngle: root.querySelector("#horseToolAngle"),
+    toolAngleLabel: root.querySelector("#horseToolAngleLabel"),
+    toolPower: root.querySelector("#horseToolPower"),
+    toolPowerLabel: root.querySelector("#horseToolPowerLabel"),
+    toolDelay: root.querySelector("#horseToolDelay"),
+    toolDelayRow: root.querySelector("#horseToolDelayRow"),
   };
   const results = {
     overlay: root.querySelector("#horseResultsOverlay"),
@@ -242,6 +347,7 @@ export function bootHorse(root, options = {}) {
     renderOnlineLobby();
   });
 
+  buildTargetChips();
   buildMotionChips();
 
   results.rematch?.addEventListener("click", () => { audio.click(); newMatch(); });
@@ -263,6 +369,15 @@ export function bootHorse(root, options = {}) {
     audio.click();
     setWorking({ motionId: button.dataset.value });
   });
+  // THE TARGET IS THE FIRST DECISION OF A TURN, not a variant of the motion —
+  // it decides which motion catalog the chips below are even built from, so it
+  // is its own row above them rather than a ninth chip among them.
+  el.targets?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-value]");
+    if (!button || !isPlacing()) return;
+    audio.click();
+    setWorking({ kind: button.dataset.value });
+  });
   // The on-screen nudges. THESE ARE THE PRIMARY PLACEMENT CONTROL, not a
   // fallback: the keys below are a desktop accelerant, and a cabinet that can
   // only be placed with WASD is a cabinet that cannot be played on a phone —
@@ -273,17 +388,77 @@ export function bootHorse(root, options = {}) {
     audio.click();
     nudge(button.dataset.nudge);
   });
+  // One listener on the placement panel keeps the expandable tray's controls
+  // live as a single unit. It also makes the DOM contract explicit through
+  // data attributes, instead of duplicating a selector/listener per tool.
+  el.place?.addEventListener("click", (event) => {
+    if (!isPlacing()) return;
+    const pieceButton = event.target.closest("[data-horse-piece]");
+    if (pieceButton) {
+      audio.click();
+      addPiece(pieceButton.dataset.horsePiece);
+      return;
+    }
+    const action = event.target.closest("[data-horse-tool-action]")?.dataset.horseToolAction;
+    if (action === "use-saved") {
+      audio.click();
+      useSavedShot(el.savedShots?.value);
+    } else if (action === "remove") {
+      audio.click();
+      removeSelectedPiece();
+    }
+  });
+  for (const [node, field] of [
+    [el.toolDepth, "depth"],
+    [el.toolDirection, "direction"],
+    [el.toolAngle, "angle"],
+    [el.toolPower, "power"],
+    [el.toolDelay, "delay"],
+  ]) {
+    node?.addEventListener("input", (event) => updateSelectedPiece(field, Number(event.target.value)));
+  }
 
   canvas.addEventListener("pointerdown", (event) => {
     const point = canvasPoint(canvas, event);
     if (isPlacing()) {
-      // Drag the bin itself: across for the lane, up and down for the height.
-      // Depth is the one axis a single drag cannot carry honestly, because up
-      // the screen is BOTH higher and further away — so depth gets its own
-      // control rather than being guessed at from the same gesture.
       placingPointerId = event.pointerId;
       canvas.setPointerCapture?.(placingPointerId);
-      dragBinTo(point);
+      const control = sandboxPieceControlAtPoint(workingPieces, point, selectedPieceId);
+      const piece = sandboxPieceAtPoint(workingPieces, point);
+      const target = placementTargetNow();
+      if (control?.action === "delete") {
+        selectedPieceId = control.piece.id;
+        removeSelectedPiece();
+        placingPointerId = null;
+      } else if (control?.action === "depth") {
+        selectedPieceId = control.piece.id;
+        placingPointerMode = "piece-depth";
+        const floor = projectPoint({ x: control.piece.x, y: 0, z: control.piece.z });
+        pieceDragOffset = { x: point.x - floor.x, y: point.y - floor.y };
+      } else if (piece) {
+        selectedPieceId = piece.id;
+        placingPointerMode = "piece";
+        const centre = projectPoint({ x: piece.x, y: piece.y, z: piece.z });
+        pieceDragOffset = { x: point.x - centre.x, y: point.y - centre.y };
+        syncToolInspector();
+      } else if (binDepthHandleAt(target, point)) {
+        turnClock = 0;
+        placingPointerMode = "bin-depth";
+        const floor = projectPoint({ x: workingTarget.placement.x, y: 0, z: workingTarget.placement.z });
+        pieceDragOffset = { x: point.x - floor.x, y: point.y - floor.y };
+        selectedPieceId = null;
+        syncToolInspector();
+      } else if (trickShotTargetAtPoint(target, point)) {
+        turnClock = 0;
+        placingPointerMode = "target";
+        selectedPieceId = null;
+        syncToolInspector();
+        dragTargetTo(point);
+      } else {
+        placingPointerMode = null;
+        selectedPieceId = null;
+        syncToolInspector();
+      }
       event.preventDefault();
       return;
     }
@@ -301,7 +476,7 @@ export function bootHorse(root, options = {}) {
 
   canvas.addEventListener("pointermove", (event) => {
     if (placingPointerId !== null && event.pointerId === placingPointerId) {
-      dragBinTo(canvasPoint(canvas, event));
+      movePlacementPointer(canvasPoint(canvas, event));
       event.preventDefault();
       return;
     }
@@ -315,6 +490,7 @@ export function bootHorse(root, options = {}) {
   canvas.addEventListener("pointerup", (event) => {
     if (placingPointerId !== null && event.pointerId === placingPointerId) {
       placingPointerId = null;
+      placingPointerMode = null;
       event.preventDefault();
       return;
     }
@@ -334,6 +510,7 @@ export function bootHorse(root, options = {}) {
     pull = null;
     pointerId = null;
     placingPointerId = null;
+    placingPointerMode = null;
     setPower(0);
     syncBallPicker();
   });
@@ -381,14 +558,178 @@ export function bootHorse(root, options = {}) {
     return match?.status === "playing" && isHumanControlledTurn(match, seat);
   }
 
-  /** Move the working bin to a canvas point: across for the lane, up for the height. */
-  function dragBinTo(point) {
-    const { z } = workingSetup;
-    const world = screenToWorldAtZ(point.x, point.y, z);
+  /**
+   * Move the working target to a canvas point.
+   *
+   * A BIN IS DRAGGED IN THE ROOM AND A HOOP IS DRAGGED ON THE GLASS, and that is
+   * the difference in placement spaces showing through at the one place a player
+   * can feel it. The bin's screen point has to be converted back to a world point
+   * at the depth it is standing at, because moving it up the canvas at a fixed
+   * depth means raising it. The hoop's placement IS a screen point — it hangs on
+   * the wall at the one depth there is — so the pointer position is the answer
+   * with no conversion at all, and none of the projection's rounding either.
+   */
+  function dragTargetTo(point) {
+    if (workingTarget.kind === HOOP_TARGET) {
+      setWorking({ cx: point.x, rimY: point.y });
+      return;
+    }
+    const world = screenToWorldAtZ(point.x, point.y, workingTarget.placement.z);
     setWorking({ x: world.x, y: world.y });
   }
 
+  /** The working target as the renderer and the hit tests see it, right now. */
+  function placementTargetNow() {
+    return horseTargetAt(workingTarget, turnClock);
+  }
+
+  function movePlacementPointer(point) {
+    if (placingPointerMode === "target") {
+      dragTargetTo(point);
+      return;
+    }
+    // Bin only. `binDepthHandleAt` answers false for a hoop, which has no depth
+    // to choose and therefore no second drag to separate from the first.
+    if (placingPointerMode === "bin-depth") {
+      const world = screenToWorldOnFloor(point.x - pieceDragOffset.x, point.y - pieceDragOffset.y);
+      setWorking({ x: world.x, z: world.z });
+      return;
+    }
+    const piece = workingPieces.find((candidate) => candidate.id === selectedPieceId);
+    if (!piece) return;
+    if (placingPointerMode === "piece-depth") {
+      const world = screenToWorldOnFloor(point.x - pieceDragOffset.x, point.y - pieceDragOffset.y);
+      replaceSelectedPiece({ x: world.x, z: world.z });
+    } else if (placingPointerMode === "piece") {
+      const world = screenToWorldAtZ(point.x - pieceDragOffset.x, point.y - pieceDragOffset.y, piece.z);
+      replaceSelectedPiece({ x: world.x, y: world.y });
+    }
+    syncToolInspector();
+    draw();
+  }
+
+  function uniquePieceId(type) {
+    let id;
+    do { id = `horse-${type}-${++pieceSerial}`; }
+    while (workingPieces.some((piece) => piece.id === id));
+    return id;
+  }
+
+  function addPiece(type) {
+    if (!isPlacing() || workingPieces.length >= MAX_SANDBOX_PIECES) return false;
+    const count = workingPieces.length;
+    const piece = createSandboxPiece(type, {
+      id: uniquePieceId(type),
+      x: ((count % 5) - 2) * 0.26,
+      y: type === CANNON_PIECE ? 0.3 : 0.6 + (count % 3) * 0.24,
+      z: 0.28 + (count % 4) * 0.18,
+      angle: type !== CANNON_PIECE ? -0.18 + (count % 3) * 0.18 : undefined,
+    });
+    if (!piece) return false;
+    workingPieces = [...workingPieces, piece];
+    selectedPieceId = piece.id;
+    currentSavedShotId = "";
+    syncPlacementPanel();
+    draw();
+    return true;
+  }
+
+  function replaceSelectedPiece(changes) {
+    workingPieces = workingPieces.map((piece) => piece.id === selectedPieceId
+      ? createSandboxPiece(piece.type, { ...piece, ...changes }, piece.id)
+      : piece);
+    currentSavedShotId = "";
+  }
+
+  function updateSelectedPiece(field, value) {
+    if (!isPlacing() || !selectedPieceId) return;
+    const piece = workingPieces.find((candidate) => candidate.id === selectedPieceId);
+    if (!piece) return;
+    if (field === "depth") replaceSelectedPiece({ z: value / 100 });
+    else if (field === "direction") replaceSelectedPiece({ yaw: value * Math.PI / 180 });
+    else if (field === "angle") replaceSelectedPiece(isPadPiece(piece)
+      ? { angle: value * Math.PI / 180 }
+      : { pitch: value * Math.PI / 180 });
+    else if (field === "power") replaceSelectedPiece(isPadPiece(piece)
+      ? (piece.type === BOARD_PIECE ? { restitution: value } : { speed: value })
+      : { speed: value });
+    else if (field === "delay") replaceSelectedPiece({ delay: value });
+    syncToolInspector();
+    draw();
+  }
+
+  function removeSelectedPiece() {
+    if (!selectedPieceId) return false;
+    const next = workingPieces.filter((piece) => piece.id !== selectedPieceId);
+    if (next.length === workingPieces.length) return false;
+    workingPieces = next;
+    selectedPieceId = null;
+    currentSavedShotId = "";
+    syncToolInspector();
+    draw();
+    return true;
+  }
+
+  /**
+   * The Lab layouts a HORSE setter may set.
+   *
+   * EVERY ONE OF THEM, NOW. This used to filter the bank down to bin layouts,
+   * because a HORSE bin was the only target the mode had — a saved hoop layout
+   * was silently missing from a list the player had authored it into, which is
+   * the worst shape a filter can take. HORSE places both kinds, so it offers
+   * both, and the bank is a bank rather than half of one.
+   */
+  function savedShots() {
+    return store.list();
+  }
+
+  function useSavedShot(id) {
+    if (!isPlacing()) return false;
+    const saved = store.get(id);
+    if (!saved) return false;
+    adoptTarget(saved.target);
+    workingPieces = normalizeSandboxPieces(saved.pieces);
+    currentLocationId = saved.locationId;
+    currentSavedShotId = saved.id;
+    selectedPieceId = workingPieces[0]?.id || null;
+    turnBalls[match.turn] = normalizeTurnBallId(saved.ballId);
+    assets.backdrop(currentLocationId);
+    assets.ballFrames(turnBalls[match.turn]);
+    assets.ballSplats(turnBalls[match.turn]);
+    turnClock = 0;
+    syncPlacementPanel();
+    syncBallPicker();
+    draw();
+    return true;
+  }
+
+  /**
+   * One step of a key or an on-screen stepper.
+   *
+   * The six directions mean the same thing to a player whichever target is up,
+   * and they land on different axes underneath: a bin moves through the room, a
+   * hoop slides on the wall. DEPTH IS THE ONE THAT DOES NOT SURVIVE THE HOOP —
+   * there is no depth to choose there, so it is refused here as well as put away
+   * in the panel, since the keys are a second route to the same control and a
+   * key that silently did nothing would read as a broken key.
+   */
   function nudge(direction) {
+    if (workingTarget.kind === HOOP_TARGET) {
+      // Screen y grows downward, so `higher` is a NEGATIVE step. This is the one
+      // place in the cabinet a player-facing direction and its axis disagree.
+      const step = {
+        left: { cx: -NUDGE_HOOP_X },
+        right: { cx: NUDGE_HOOP_X },
+        higher: { rimY: -NUDGE_HOOP_Y },
+        lower: { rimY: NUDGE_HOOP_Y },
+      }[direction];
+      if (!step) return;
+      setWorking({
+        cx: workingTarget.placement.cx + (step.cx || 0),
+        rimY: workingTarget.placement.rimY + (step.rimY || 0),
+      });
+      return;
+    }
     const step = {
       deeper: { z: NUDGE_DEPTH },
       nearer: { z: -NUDGE_DEPTH },
@@ -398,35 +739,95 @@ export function bootHorse(root, options = {}) {
       lower: { y: -NUDGE_HEIGHT },
     }[direction];
     if (!step) return;
-    setWorking({
-      x: workingSetup.x + (step.x || 0),
-      y: workingSetup.y + (step.y || 0),
-      z: workingSetup.z + (step.z || 0),
-    });
+    const { x, y, z } = workingTarget.placement;
+    setWorking({ x: x + (step.x || 0), y: y + (step.y || 0), z: z + (step.z || 0) });
   }
 
   /**
-   * Apply a change to the working bin, re-clamped.
+   * Apply a change to the working target, re-clamped.
    *
    * EVERY route into the placement goes through here, so there is one place the
    * legal volume is enforced and no caller has to remember to clamp. Changing
    * the motion re-clamps the position too, because a motion's sweep is
-   * subtracted from the volume — pick Left / Right while parked against the wall
-   * and the bin steps in far enough for its whole run to fit.
+   * subtracted from the volume — pick Left / Right while parked against the end
+   * of the wall and the target steps in far enough for its whole run to fit.
+   *
+   * A `kind` in the change is a target SWAP and goes through `adoptTarget`, which
+   * is the only thing that knows the two kinds remember separate answers. A
+   * placement patch is otherwise merged onto the current kind's own placement, so
+   * a caller passing `{ x }` while a hoop is up is passing a field the hoop's
+   * clamp does not read — it keeps its position rather than being handed a
+   * translation of somebody else's.
    */
-  function setWorking(change) {
-    const next = { ...workingSetup, ...change };
-    workingSetup = { ...clampPlacement(next, next.motionId), motionId: binMotionById(next.motionId).id };
+  function setWorking(change = {}) {
+    if (change.kind !== undefined && trickShotTargetKind(change.kind) !== workingTarget.kind) {
+      adoptTarget({ ...change, kind: change.kind });
+      return;
+    }
+    const { kind, motionId, placement, ...patch } = change;
+    adoptTarget({
+      kind: workingTarget.kind,
+      motionId: motionId !== undefined ? motionId : workingTarget.motionId,
+      placement: { ...workingTarget.placement, ...placement, ...patch },
+    });
+  }
+
+  /**
+   * Take a whole target record — a kind, a motion and a placement — and make it
+   * the working one, remembering it per kind on the way through.
+   *
+   * A SWAP FALLS BACK TO WHAT THAT KIND WAS LAST SET TO, never to a translation
+   * of the target being left behind: the two motion catalogs do not share ids and
+   * the two placements do not share a shape, so there is nothing to carry across
+   * and a guess would be worse than a memory.
+   *
+   * THE MOTION CLOCK RESTARTS HERE. A motion is an offset from where the target
+   * was placed, so the preview has to run from the top or a player is deciding
+   * whether they like a sweep by watching its middle. Same rule the Lab keeps
+   * when it adopts a target, and the same one `beginTurn` keeps for a turn.
+   */
+  function adoptTarget(input) {
+    const kind = trickShotTargetKind(input?.kind);
+    workingTarget = normalizeTrickShotTarget({
+      kind,
+      motionId: input?.motionId ?? rememberedMotion[kind],
+      placement: input?.placement || rememberedPlacement[kind],
+    });
+    rememberedMotion[kind] = workingTarget.motionId;
+    rememberedPlacement[kind] = workingTarget.placement;
+    currentSavedShotId = "";
     // Watching a motion you have just chosen is most of how you decide whether
     // you want it, so the preview runs on the same clock the shot will.
     turnClock = 0;
-    syncPlacementPanel();
+    // THE WHOLE PANEL, not just the placement half. Swapping the target changes
+    // the court hint and the meter legend as well, because a hoop takes a
+    // different gesture and is arranged with a different set of steppers — and
+    // those two live in `syncPanels`. Syncing only the placement rows left the
+    // court telling a player to drag a bin at a hoop they had just hung.
+    syncPanels();
     draw();
+  }
+
+  /** Where a turn's arranging starts: the bin, on the floor, still. */
+  function defaultWorkingTarget() {
+    return normalizeTrickShotTarget({
+      kind: BIN_TARGET,
+      motionId: "still",
+      placement: defaultTrickShotPlacement(BIN_TARGET),
+    });
   }
 
   function confirmPlacement() {
     if (!isPlacing()) return;
-    activeSetup = normalizeBinSetup(workingSetup);
+    activePieces = normalizeSandboxPieces(workingPieces);
+    activeSetup = {
+      ...normalizeTrickShotTarget(workingTarget),
+      pieces: activePieces,
+      locationId: currentLocationId,
+      savedShotId: currentSavedShotId,
+    };
+    resetTrickShotPhysics(piecePhysics);
+    clearTrickShotImpacts(impacts);
     // The server clamps it again through this very function before anybody
     // shoots at it, so the two copies of the bin cannot disagree.
     if (mode === "online") onlineClient.submitPlacement(activeSetup);
@@ -459,7 +860,18 @@ export function bootHorse(root, options = {}) {
     lastContactAt.clear();
     clearSplatField(splats);
     clearFlameTrail(trail);
-    workingSetup = { ...defaultPlacement(), motionId: "still" };
+    clearTrickShotImpacts(impacts);
+    resetTrickShotPhysics(piecePhysics);
+    workingTarget = defaultWorkingTarget();
+    rememberedMotion[HOOP_TARGET] = defaultTrickShotMotion(HOOP_TARGET);
+    rememberedMotion[BIN_TARGET] = "still";
+    rememberedPlacement[HOOP_TARGET] = defaultHoopPlacement();
+    rememberedPlacement[BIN_TARGET] = defaultPlacement();
+    workingPieces = [];
+    activePieces = [];
+    selectedPieceId = null;
+    currentLocationId = ROOM_ID;
+    currentSavedShotId = "";
     activeSetup = null;
     flight = null;
     pull = null;
@@ -496,13 +908,18 @@ export function bootHorse(root, options = {}) {
     if (canPlaceBin(match)) {
       phase = PHASE_PLACING;
       activeSetup = null;
+      activePieces = [];
     } else {
       // Through the rules' own seam, not by reading `standingShot` directly:
       // "what am I shooting at" is a rule, and the answer for a matcher is the
       // setter's bin whatever this player had arranged.
       phase = PHASE_AIMING;
-      activeSetup = shotSetupFor(match, workingSetup);
+      activeSetup = shotSetupFor(match, workingTarget);
+      activePieces = normalizeSandboxPieces(activeSetup?.pieces);
+      currentLocationId = activeSetup?.locationId || currentLocationId;
     }
+    resetTrickShotPhysics(piecePhysics);
+    clearTrickShotImpacts(impacts);
     cpuDelay = isHumanControlledTurn(match) ? 0 : 0.9;
     el.hint?.classList.toggle("is-hidden", !isHumanControlledTurn(match));
     syncPanels();
@@ -557,6 +974,9 @@ export function bootHorse(root, options = {}) {
         ? match.standingShot
         : (mine ? activeSetup : pendingOnlineSetup);
     }
+    activePieces = normalizeSandboxPieces(activeSetup?.pieces);
+    if (activeSetup?.locationId) currentLocationId = activeSetup.locationId;
+    resetTrickShotPhysics(piecePhysics);
     cpuDelay = 0;
     el.hint?.classList.toggle("is-hidden", !mine);
     syncPanels();
@@ -603,6 +1023,11 @@ export function bootHorse(root, options = {}) {
     const setup = activeSetup;
     if (!setup) return;
     const makes = cpuMakesHorseShot(difficulty, random);
+    const stray = () => (random() < 0.5 ? -1 : 1);
+    if (setup.kind === HOOP_TARGET) {
+      startCpuHoopShot(setup, makes, stray);
+      return;
+    }
     const rest = placedBinAt(setup, turnClock);
     const provisional = createHorseShot(
       { power: horsePowerForDepth(rest.z), aimX: projectPoint(rest).x, loft: 1 },
@@ -613,26 +1038,80 @@ export function bootHorse(root, options = {}) {
     const lead = placedBinAt(setup, turnClock + Math.max(0, provisional.launch.flightTime));
     const target = projectPoint({ x: lead.x, y: lead.topY, z: lead.z });
     launchFromPull({
-      power: horsePowerForDepth(lead.z) + (makes ? 0 : (random() < 0.5 ? -0.06 : 0.06)),
-      aimX: target.x + (makes ? 0 : (random() < 0.5 ? -95 : 95)),
+      power: horsePowerForDepth(lead.z) + (makes ? 0 : stray() * 0.06),
+      aimX: target.x + (makes ? 0 : stray() * 95),
       loft: 1,
     });
   }
 
-  /** The CPU arranging a bin of its own. */
+  /**
+   * The CPU shooting at a placed hoop.
+   *
+   * Its own function because the two targets take two different gestures, so a
+   * CPU aiming at one is not the CPU aiming at the other with a field swapped:
+   * strength here is POWER and the reference pull is the one that lands on the
+   * reticle, where at a bin strength is depth and the launch is solved at the
+   * reference regardless. What both share is the LEAD — it solves once to learn
+   * the flight time, asks the motion where the rim will be when the ball gets
+   * there, and aims at that. Without it the CPU is comically bad at exactly the
+   * setups it has just chosen for itself.
+   */
+  function startCpuHoopShot(setup, makes, stray) {
+    const weight = ballFlight(currentTurnBallId()).weight;
+    const provisional = createHorseShot(
+      { power: REFERENCE_POWER, aimX: placedHoopAt(setup, turnClock).cx, loft: 1 },
+      ball,
+      setup,
+      { weight },
+    );
+    const lead = placedHoopAt(setup, turnClock + Math.max(0, provisional.launch.flightTime));
+    launchFromPull({
+      power: REFERENCE_POWER + (makes ? 0 : stray() * 0.09),
+      aimX: lead.cx + (makes ? 0 : stray() * 70),
+      loft: 1,
+    });
+  }
+
+  /**
+   * The CPU arranging a target of its own.
+   *
+   * FOUR DECISIONS, IN THE ORDER A PERSON MAKES THEM: which target, which
+   * motion, where it stands, and which ball. The kind comes first because it
+   * decides which catalog the motion is drawn from, and it is unlocked by
+   * boldness exactly as the motions and the balls are — a timid CPU stays on the
+   * bin a new player has been learning, and a braver one will hang the hoop.
+   */
   function startCpuPlacement() {
-    const choice = chooseCpuBinSetup(difficulty, random, BIN_MOTIONS.map(({ id }) => id));
-    // The ball is the third thing a setter chooses, beside the placement and the
-    // motion, and it travels with the shot — so the CPU has to make that choice
-    // too or every shot it ever sets is a basketball. Picked here rather than at
-    // release, because it is part of the setup and the picker has to be able to
-    // report it while the CPU lines up.
+    const kind = chooseCpuTargetKind(difficulty, random, [BIN_TARGET, HOOP_TARGET]);
+    // The ball is the fourth thing a setter chooses, and it travels with the
+    // shot — so the CPU has to make that choice too or every shot it ever sets is
+    // a basketball. Picked here rather than at release, because it is part of the
+    // setup and the picker has to be able to report it while the CPU lines up.
     selectCpuTurnBall();
-    workingSetup = {
-      ...placementFromFractions(choice, choice.motionId),
-      motionId: binMotionById(choice.motionId).id,
-    };
-    activeSetup = normalizeBinSetup(workingSetup);
+    if (kind === HOOP_TARGET) {
+      const choice = chooseCpuBinSetup(difficulty, random, HOOP_MODES.map(({ id }) => id));
+      const motionId = hoopModeById(choice.motionId).id;
+      workingTarget = normalizeTrickShotTarget({
+        kind: HOOP_TARGET,
+        motionId,
+        placement: hoopPlacementFromFractions(
+          { lateral: choice.lateral, height: choice.depth },
+          motionId,
+        ),
+      });
+    } else {
+      const choice = chooseCpuBinSetup(difficulty, random, BIN_MOTIONS.map(({ id }) => id));
+      const motionId = binMotionById(choice.motionId).id;
+      workingTarget = normalizeTrickShotTarget({
+        kind: BIN_TARGET,
+        motionId,
+        placement: placementFromFractions(choice, motionId),
+      });
+    }
+    rememberedMotion[workingTarget.kind] = workingTarget.motionId;
+    rememberedPlacement[workingTarget.kind] = workingTarget.placement;
+    activeSetup = { ...workingTarget, pieces: [], locationId: currentLocationId };
+    activePieces = [];
     phase = PHASE_AIMING;
     turnClock = 0;
     cpuDelay = 0.85;
@@ -654,6 +1133,7 @@ export function bootHorse(root, options = {}) {
     tickLoserPopup();
     tickSplatField(splats, TICK_SECONDS);
     tickFlameTrail(trail, TICK_SECONDS, { random });
+    tickTrickShotImpacts(impacts, TICK_SECONDS);
     // The bin's own clock runs whenever a shot is set, INCLUDING while the
     // player is still lining up their pull — so a moving bin can be watched
     // before anyone commits, exactly like the classic cabinet's moving rim.
@@ -674,31 +1154,70 @@ export function bootHorse(root, options = {}) {
 
   function tickFlight() {
     flight.age += TICK_SECONDS;
-    const bin = placedBinAt(activeSetup, turnClock);
+    // Resolved ONCE per tick, like `worldFor` in the classic cabinet: within a
+    // single tick the target is treated as moving at a constant velocity, which
+    // is what keeps the substeps consistent with each other.
+    const target = horseTargetAt(activeSetup, turnClock);
+    const bin = target.bin;
+    // EXACTLY ONE INTEGRATOR RUNS PER SUBSTEP. `stepBall` and
+    // `stepBallAgainstBins` are both COMPLETE — each owns gravity, drag, the room
+    // and its own target — so which one runs is the whole of what choosing a
+    // target means down here. Running both would apply gravity twice.
+    const world = target.hoop ? worldFor(target.hoop) : null;
 
     if (!flight.resolved) {
-      const result = stepBallAgainstBins(ball, [bin], TICK_SECONDS, {
-        ballId: flight.ballId,
-        capturedBin: flight.capturedBin,
-      });
-      emitFlameTrail(trail, { ...ball, dt: TICK_SECONDS, style: ballTrail(flight.ballId), random });
-      ignite(result.contacts, flight.ballId);
-      if (result.splat) {
-        addSplat(splats, { ...result.splat, ballId: flight.ballId, ...ballSplat(flight.ballId), random });
-        audio.splat(result.splat.surface, { ballId: flight.ballId, speed: result.splat.speed });
-      }
-      announce(result.contacts, result.splat);
-      if (result.capturedBin !== null) flight.capturedBin = result.capturedBin;
+      const contacts = new Set();
+      let splat = null;
+      let scored = false;
+      const substeps = Math.max(1, Math.ceil(TICK_SECONDS / PHYSICS_SUBSTEP_SECONDS));
+      const dt = TICK_SECONDS / substeps;
+      for (let index = 0; index < substeps; index++) {
+        const previous = { x: ball.x, y: ball.y, z: ball.z };
+        if (!piecePhysics.capture) {
+          const result = world
+            ? stepBall(ball, world, dt, { ballId: flight.ballId, alreadyScored: false })
+            : stepBallAgainstBins(ball, [bin], dt, {
+              ballId: flight.ballId,
+              capturedBin: flight.capturedBin,
+            });
+          if (!world && result.capturedBin !== null) flight.capturedBin = result.capturedBin;
+          if (world ? result.scored : result.scoredBin !== null) scored = true;
+          if (result.splat) splat = result.splat;
+          for (const contact of result.contacts) contacts.add(contact);
+        }
 
-      if (result.scoredBin !== null) {
+        const pieceStep = ball.splat || flight.capturedBin !== null
+          ? { contacts: [], impacts: [] }
+          : stepTrickShotPieces(ball, previous, activePieces, piecePhysics, dt);
+        for (const contact of pieceStep.contacts) contacts.add(contact);
+        for (const impact of pieceStep.impacts || []) addTrickShotImpact(impacts, impact);
+      }
+      emitFlameTrail(trail, { ...ball, dt: TICK_SECONDS, style: ballTrail(flight.ballId), random });
+      ignite([...contacts], flight.ballId);
+      if (splat) {
+        addSplat(splats, { ...splat, ballId: flight.ballId, ...ballSplat(flight.ballId), random });
+        audio.splat(splat.surface, { ballId: flight.ballId, speed: splat.speed });
+      }
+      announce([...contacts], splat);
+
+      if (scored) {
         finishShot(true);
-      } else if (flight.age > 3.4 || (flight.age > 0.45 && isBallSettled(ball))) {
+      } else if (flight.age > MAX_HORSE_SHOT_SECONDS
+        || (!piecePhysics.capture && flight.age > 0.45 && isBallSettled(ball))) {
         finishShot(false);
       }
       return;
     }
 
-    if (flight.capturedBin !== null) {
+    // THE BALL KEEPS FALLING AFTER THE RULING, and both kinds need saying. A bin
+    // that has swallowed the ball goes on pushing it down its own axis so it
+    // visibly sinks away; a hoop needs the room to carry on existing or a made
+    // shot would hang in the net, frozen, for the whole of the hold. The hoop's
+    // colliders are suppressed with `alreadyScored` — a ball dropping through is
+    // past them, and letting the rim have another say would kick it back out.
+    if (world) {
+      stepBall(ball, world, TICK_SECONDS, { ballId: flight.ballId, alreadyScored: flight.made });
+    } else if (flight.capturedBin !== null) {
       stepBallAgainstBins(ball, [bin], TICK_SECONDS, { ballId: flight.ballId, capturedBin: flight.capturedBin });
     }
     flight.resetIn -= TICK_SECONDS;
@@ -720,8 +1239,13 @@ export function bootHorse(root, options = {}) {
     flight.resolved = true;
     flight.made = made;
     flight.resetIn = made ? 1.15 : 0.55;
-    if (made) audio.binScored(flight.ballId);
-    else audio.missed();
+    // A swish is a ball passing through a NET, and there is only one of those.
+    // A bin has no net, so a made bin is the ball's own body at full weight with
+    // the reward chime over it — `game-audio.js` owns which is which.
+    if (made) {
+      if (activeSetup?.kind === HOOP_TARGET) audio.scored(1);
+      else audio.binScored(flight.ballId);
+    } else audio.missed();
 
     // ONLINE THE RULES ARE THE SERVER'S. This court plays the ball out and says
     // what it saw; what it MEANT — the letter, the turn, the word — is read off
@@ -780,14 +1304,22 @@ export function bootHorse(root, options = {}) {
 
   function announce(contacts, splat = null) {
     for (const contact of contacts) {
-      if (contact === "bin-score") continue;
+      // The two made-basket announcements. Neither is a bump the room made, and
+      // `finishShot` has already played the one that belongs to this target.
+      if (contact === "bin-score" || contact === "score") continue;
       if (splat?.surface === contact) continue;
       if (contact !== "floor") {
         const last = lastContactAt.get(contact) ?? -Infinity;
         if (elapsed - last < CONTACT_DEBOUNCE_SECONDS) continue;
         lastContactAt.set(contact, elapsed);
       }
-      audio.contact(contact, { ballId: flight?.ballId || currentTurnBallId(), speed: ball.vy });
+      if (contact === "sandbox-board" || contact === "sandbox-spring") {
+        audio.contact("backboard", { ballId: flight?.ballId || currentTurnBallId(), speed: ball.vy });
+      } else if (contact === "sandbox-cannon-catch") {
+        audio.contact("rim", { ballId: flight?.ballId || currentTurnBallId(), speed: ball.vy });
+      } else if (contact !== "sandbox-cannon-fire") {
+        audio.contact(contact, { ballId: flight?.ballId || currentTurnBallId(), speed: ball.vy });
+      }
     }
   }
 
@@ -862,6 +1394,8 @@ export function bootHorse(root, options = {}) {
       // A placement from the other side mid-turn: the bin appears, and its
       // motion starts running so it can be watched before anyone shoots.
       if (!isMyTurn() && pendingOnlineSetup) activeSetup = pendingOnlineSetup;
+      activePieces = normalizeSandboxPieces(activeSetup?.pieces);
+      if (activeSetup?.locationId) currentLocationId = activeSetup.locationId;
       syncPanels();
       syncStatus();
     }
@@ -881,6 +1415,9 @@ export function bootHorse(root, options = {}) {
     const selectedBallId = normalizeTurnBallId(ruling.intent.ballId);
     if (ruling.seat === 0 || ruling.seat === 1) turnBalls[ruling.seat] = selectedBallId;
     activeSetup = ruling.setup;
+    activePieces = normalizeSandboxPieces(activeSetup.pieces);
+    currentLocationId = activeSetup.locationId || currentLocationId;
+    resetTrickShotPhysics(piecePhysics);
     phase = PHASE_AIMING;
     turnClock = Math.max(0, Number(ruling.intent.motionSeconds) || 0);
     resetBall(ball);
@@ -948,18 +1485,35 @@ export function bootHorse(root, options = {}) {
    * `title`, the same place the ball picker keeps its exact flight multipliers.
    */
   function buildMotionChips() {
-    if (!el.motions) return;
-    el.motions.replaceChildren(...BIN_MOTIONS.map((motion) => {
+    // Built from the catalog the CURRENT KIND reads, and rebuilt when that
+    // changes — the two catalogs do not share ids, so one merged row of chips
+    // would be offering a hoop mode to a bin. Same rule the Lab keeps.
+    renderChips(el.motions, motionCatalog().map(({ id, label, blurb }) => ({ id, label, blurb })));
+  }
+
+  function buildTargetChips() {
+    renderChips(el.targets, TRICK_SHOT_TARGETS.map(({ kind, label, blurb }) => ({
+      id: kind, label, blurb,
+    })));
+  }
+
+  function renderChips(container, entries) {
+    if (!container) return;
+    container.replaceChildren(...entries.map((entry) => {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "chip chip--bare";
-      button.dataset.value = motion.id;
-      button.title = motion.blurb;
+      button.dataset.value = entry.id;
+      button.title = entry.blurb;
       const strong = document.createElement("strong");
-      strong.textContent = motion.label;
+      strong.textContent = entry.label;
       button.append(strong);
       return button;
     }));
+  }
+
+  function motionCatalog() {
+    return workingTarget.kind === HOOP_TARGET ? HOOP_MODES : BIN_MOTIONS;
   }
 
   function syncPanels() {
@@ -978,17 +1532,29 @@ export function bootHorse(root, options = {}) {
     // THE RESULTS CARD IS THE ONLY PLACE A REMATCH IS OFFERED. There used to be
     // a `New match` button in the HUD as well, shown exactly when the match was
     // over — which is now exactly when the card's scrim is over the top of it.
+    // The legend is about the gesture, and the gesture is the target's — a hoop
+    // takes the cabinet's classic pull where a bin spends strength on depth, so
+    // saying one thing under both would be wrong half the time. Read off the
+    // ACTIVE setup rather than the working one, since that is what is about to be
+    // shot at; the working one is only the player's business while placing.
     if (el.legend) {
+      const hoop = (placing ? workingTarget : activeSetup)?.kind === HOOP_TARGET;
       el.legend.textContent = placing
-        ? "Drag the bin · arrows or WASD for depth · Q / E for height"
-        : "Pull strength picks how far down the room the ball lands";
+        ? (hoop
+          ? "Drag the hoop along the wall · arrows or WASD for the lane · Q / E for height"
+          : "Drag the bin · arrows or WASD for depth · Q / E for height")
+        : (hoop
+          ? "Pull angle aims and sets the arc · strength is power"
+          : "Pull strength picks how far down the room the ball lands");
     }
     // The hint over the court is phase-specific too. It used to be set once in
     // the markup, so it went on telling a player to drag the bin while they were
     // standing over the ball with the bin already set.
     if (el.hint) {
       el.hint.textContent = placing
-        ? "Drag the bin where you want it · then set the shot"
+        ? (workingTarget.kind === HOOP_TARGET
+          ? "Hang the hoop where you want it · then set the shot"
+          : "Drag the bin where you want it · then set the shot")
         : match?.phase === PHASE_MATCH
           ? "Match it · pull the ball and release"
           : "Pull the ball · release to shoot";
@@ -997,25 +1563,103 @@ export function bootHorse(root, options = {}) {
   }
 
   function syncPlacementPanel() {
-    if (el.motions) {
-      for (const button of el.motions.querySelectorAll("[data-value]")) {
-        const on = button.dataset.value === workingSetup.motionId;
-        button.classList.toggle("is-active", on);
-        button.setAttribute("aria-pressed", on ? "true" : "false");
-      }
-    }
+    const hoop = workingTarget.kind === HOOP_TARGET;
+    // The motion chips are a different LIST for each kind, not the same list with
+    // a different one lit, so they are rebuilt before they are marked.
+    buildMotionChips();
+    markActiveChip(el.motions, workingTarget.motionId);
+    markActiveChip(el.targets, workingTarget.kind);
+    if (el.placeHead) el.placeHead.textContent = hoop ? "HANG THE HOOP" : "PLACE THE BIN";
+    // A HOOP HAS NO DEPTH, so the pair of steppers that choose one is put away
+    // rather than left there doing nothing. `[hidden]` alone would not do it —
+    // the row is `display: flex` and the UA stylesheet loses to that — so the
+    // stylesheet carries the matching rule, the same trap the online config rows
+    // and the ball picker both fell into.
+    if (el.depthNudges) el.depthNudges.hidden = hoop;
+    syncSavedShotBank();
+    syncToolInspector();
     if (!el.readouts) return;
-    // Percentages of the legal volume rather than world units, because a world
-    // unit is not a thing a player has any feel for and the bounds move with the
-    // room anyway.
-    const envelope = motionEnvelope(workingSetup.motionId);
-    const band = heightBoundsAt(workingSetup.z, envelope);
-    const lateral = horizontalBoundsAt(workingSetup.z);
-    el.readouts.textContent = [
-      `DEPTH ${percent(workingSetup.z, PLACEMENT_BOUNDS.minZ - envelope.minDz, PLACEMENT_BOUNDS.maxZ - envelope.maxDz)}`,
-      `HEIGHT ${percent(workingSetup.y, band.minY, band.maxY)}`,
-      `LANE ${percent(workingSetup.x, lateral.minX, lateral.maxX)}`,
-    ].join(" · ");
+    // Percentages of the legal volume rather than raw units, because neither a
+    // world unit nor a canvas pixel is a thing a player has any feel for, and the
+    // bounds move with the room and the motion anyway.
+    el.readouts.textContent = (hoop ? hoopReadouts() : binReadouts()).join(" · ");
+  }
+
+  function hoopReadouts() {
+    const { cx, rimY } = workingTarget.placement;
+    const bounds = hoopPlacementBoundsFor(workingTarget.motionId);
+    return [
+      "ON THE WALL",
+      // Screen y grows downward, so the percentage is read the other way up: a
+      // player asking how HIGH the rim is wants 100% at the top of the band.
+      `HEIGHT ${percent(bounds.maxRimY - (rimY - bounds.minRimY), bounds.minRimY, bounds.maxRimY)}`,
+      `LANE ${percent(cx, bounds.minCx, bounds.maxCx)}`,
+    ];
+  }
+
+  function binReadouts() {
+    const { x, y, z } = workingTarget.placement;
+    const envelope = motionEnvelope(workingTarget.motionId);
+    const band = heightBoundsAt(z, envelope);
+    const lateral = horizontalBoundsAt(z);
+    return [
+      `DEPTH ${percent(z, PLACEMENT_BOUNDS.minZ - envelope.minDz, PLACEMENT_BOUNDS.maxZ - envelope.maxDz)}`,
+      `HEIGHT ${percent(y, band.minY, band.maxY)}`,
+      `LANE ${percent(x, lateral.minX, lateral.maxX)}`,
+    ];
+  }
+
+  function markActiveChip(container, value) {
+    if (!container) return;
+    for (const button of container.querySelectorAll("[data-value]")) {
+      const on = button.dataset.value === value;
+      button.classList.toggle("is-active", on);
+      button.setAttribute("aria-pressed", on ? "true" : "false");
+    }
+  }
+
+  function syncSavedShotBank() {
+    if (!el.savedShots) return;
+    const shots = savedShots();
+    const selected = shots.some(({ id }) => id === currentSavedShotId)
+      ? currentSavedShotId
+      : shots[0]?.id || "";
+    el.savedShots.replaceChildren(...(shots.length ? shots : [{ id: "", name: "No saved trick shots" }]).map((shot) => {
+      const option = document.createElement("option");
+      option.value = shot.id;
+      option.textContent = shot.name;
+      return option;
+    }));
+    el.savedShots.value = selected;
+    el.savedShots.disabled = !shots.length || !isPlacing();
+    if (el.useSavedShot) el.useSavedShot.disabled = !shots.length || !isPlacing();
+  }
+
+  function syncToolInspector() {
+    const piece = workingPieces.find((candidate) => candidate.id === selectedPieceId);
+    if (el.toolInspector) el.toolInspector.hidden = !piece;
+    if (!piece) return;
+    if (el.toolTitle) {
+      el.toolTitle.textContent = piece.type === BOARD_PIECE
+        ? "Rebound Pad"
+        : piece.type === SPRING_PIECE ? "Springboard" : "Ball Cannon";
+    }
+    if (el.toolDepth) el.toolDepth.value = String(Math.round(piece.z * 100));
+    if (el.toolDirection) el.toolDirection.value = String(Math.round(piece.yaw * 180 / Math.PI));
+    if (el.toolAngle) el.toolAngle.value = String(Math.round((isPadPiece(piece) ? piece.angle : piece.pitch) * 180 / Math.PI));
+    if (el.toolAngleLabel) el.toolAngleLabel.textContent = isPadPiece(piece) ? "Face tilt" : "Launch angle";
+    if (el.toolPower) {
+      const rebound = piece.type === BOARD_PIECE;
+      el.toolPower.min = rebound ? "0.45" : "2.5";
+      el.toolPower.max = rebound ? "1.12" : "7.5";
+      el.toolPower.step = rebound ? "0.01" : "0.1";
+      el.toolPower.value = String(rebound ? piece.restitution : piece.speed);
+    }
+    if (el.toolPowerLabel) {
+      el.toolPowerLabel.textContent = piece.type === BOARD_PIECE ? "Bounce energy" : "Launch power";
+    }
+    if (el.toolDelayRow) el.toolDelayRow.hidden = piece.type !== CANNON_PIECE;
+    if (el.toolDelay) el.toolDelay.value = String(piece.delay || 0.5);
   }
 
   function percent(value, min, max) {
@@ -1180,105 +1824,44 @@ export function bootHorse(root, options = {}) {
 
   function draw() {
     if (!match) return;
-    clearScene(ctx);
-    drawRoom(ctx, art.room, ROOM_ID);
-    drawSplatDecals(ctx, splats, { imagesFor: assets.ballSplats });
-    drawSplatParticles(ctx, splats);
-    drawFlameFires(ctx, trail);
-    drawFlameEmbers(ctx, trail);
-
-    const setup = phase === PHASE_PLACING ? workingSetup : activeSetup;
-    const bin = setup ? placedBinAt(setup, turnClock) : null;
-    const captured = flight?.capturedBin !== null && flight?.capturedBin !== undefined;
-    const loose = !captured;
-
-    if (bin) drawPlacementFloorMark(bin);
-    if (loose) drawBallShadow(ctx, ball);
-    if (bin) drawBinShadow(ctx, bin);
-
-    // The painter's pass: a ball nearer the camera than the bin goes in front
-    // of it, and the bin's near lip goes in front of a ball dropping into it.
-    let ballDrawn = false;
-    if (bin && loose && ball.z > bin.z) { drawLooseBall(); ballDrawn = true; }
-    if (bin) {
-      drawBinBody(ctx, bin, art.bin);
-      if (captured) drawSinkingBall(bin);
-      drawBinLip(ctx, bin, art.bin);
-    }
-    if (loose && !ballDrawn) drawLooseBall();
-
+    const setup = phase === PHASE_PLACING ? workingTarget : activeSetup;
+    const target = setup
+      ? horseTargetAt(setup, turnClock)
+      : { kind: null, motionId: null, hoop: null, bin: null };
+    const pieces = phase === PHASE_PLACING ? workingPieces : activePieces;
+    const ballId = flight?.ballId || currentTurnBallId();
+    let trajectory = null;
+    let renderPull = pull;
     if (pull && activeSetup) {
       const preview = createHorseShot(pull, ball, activeSetup, { weight: ballFlight(currentTurnBallId()).weight });
-      drawAim(ctx, {
-        pull: { ...pull, aimX: preview.aim.x, aimY: preview.aim.y },
-        trajectory: pull.power > 0.03 ? trajectoryPoints(ball, preview.launch) : null,
-        showReticle: false,
-      });
+      trajectory = pull.power > 0.03 ? trajectoryPoints(ball, preview.launch) : null;
+      renderPull = { ...pull, aimX: preview.aim.x, aimY: preview.aim.y };
     }
-  }
-
-  /**
-   * A ring on the floor under the bin, while it is being placed.
-   *
-   * It is the only thing on screen that separates "the bin is further away" from
-   * "the bin is higher up", which look identical on a still frame — the ring
-   * stays on the floor at the bin's own depth while the bin climbs away from it.
-   * The shadow says the same thing softly; this says it in a straight line, and
-   * only while someone is actually choosing.
-   */
-  function drawPlacementFloorMark(bin) {
-    if (phase !== PHASE_PLACING) return;
-    const foot = projectPoint({ x: bin.x, y: 0.004, z: bin.z });
-    const mouth = projectPoint({ x: bin.x, y: bin.topY, z: bin.z });
-    const rings = binMouthEllipse(bin);
-
-    ctx.save();
-    ctx.strokeStyle = "rgba(255, 45, 225, .8)";
-    ctx.shadowColor = "#ff2ddd";
-    ctx.shadowBlur = 12;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.ellipse(foot.x, foot.y, rings.radiusX * 0.92, Math.max(4, rings.radiusX * 0.3), 0, 0, Math.PI * 2);
-    ctx.stroke();
-    // The tether. Without it a raised bin and a distant one read the same.
-    if (bin.baseY > 0.02) {
-      ctx.setLineDash([7, 7]);
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(foot.x, foot.y);
-      ctx.lineTo(mouth.x, mouth.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-    ctx.restore();
-  }
-
-  function drawLooseBall() {
-    if (ball.splat) return;
-    const ballId = flight?.ballId || currentTurnBallId();
-    drawBall(ctx, {
-      frames: assets.ballFrames(ballId),
+    renderTrickShotFrame(ctx, {
+      ball,
+      target,
+      binImage: art.bin,
+      building: phase === PHASE_PLACING,
+      capturedBin: flight?.capturedBin,
+      backdrop: assets.backdrop(currentLocationId),
+      locationId: currentLocationId,
+      ballFrames: assets.ballFrames(ballId),
       ballId,
-      ...screenBallPosition(),
-      rollPhase: ball.rollPhase,
-      filter: depthGradeFilter(ball.z),
+      pieceAssets: { cannonBase: art.cannonBase, cannonBarrel: art.cannonBarrel },
+      pieces,
+      selectedId: phase === PHASE_PLACING ? selectedPieceId : null,
+      capture: piecePhysics.capture,
+      pull: renderPull,
+      trajectory,
+      scored: Boolean(flight?.made),
+      splats,
+      splatImagesFor: assets.ballSplats,
+      impacts,
     });
-  }
-
-  function drawSinkingBall(bin) {
-    const mouth = binMouthEllipse(bin);
-    ctx.save();
-    ctx.beginPath();
-    ctx.ellipse(mouth.cx, mouth.cy, mouth.radiusX, mouth.radiusY, 0, 0, Math.PI * 2);
-    ctx.clip();
-    drawBall(ctx, {
-      frames: assets.ballFrames(flight.ballId),
-      ballId: flight.ballId,
-      ...screenBallPosition(),
-      rollPhase: ball.rollPhase,
-      filter: `${depthGradeFilter(bin.z)} brightness(0.62)`,
-    });
-    ctx.restore();
+    // Fire is a HORSE-only ball effect. It deliberately sits above the shared
+    // scene so bringing the Lab renderer in does not make a magma shot vanish.
+    drawFlameFires(ctx, trail);
+    drawFlameEmbers(ctx, trail);
   }
 
   function frame(now) {
@@ -1327,7 +1910,9 @@ export function bootHorse(root, options = {}) {
   return {
     get match() { return match; },
     get phase() { return phase; },
-    get setup() { return workingSetup; },
+    get setup() { return workingTarget; },
+    get pieces() { return normalizeSandboxPieces(workingPieces); },
+    get locationId() { return currentLocationId; },
     ball,
     newMatch,
     draw,
@@ -1341,12 +1926,18 @@ export function bootHorse(root, options = {}) {
     // rendering keeps working. Same seam, same reason, as the practice court's.
     tick,
     isBusy: () => Boolean(flight),
-    // The bin as the court is drawing it RIGHT NOW — placed position plus
-    // however far its motion has carried it. The only way to observe the motion
-    // clock from outside, and the motion clock is what makes "the same shot"
-    // true for a moving bin.
-    binNow: () => placedBinAt(phase === PHASE_PLACING ? workingSetup : activeSetup, turnClock),
-    placeBin: setWorking,
+    // The target as the court is drawing it RIGHT NOW — placed position plus
+    // however far its motion has carried it, in the resolved `{ kind, hoop, bin }`
+    // shape the renderer and the colliders both take. The only way to observe the
+    // motion clock from outside, and the motion clock is what makes "the same
+    // shot" a true statement about a moving target.
+    targetNow: () => horseTargetAt(phase === PHASE_PLACING ? workingTarget : activeSetup, turnClock),
+    placeTarget: setWorking,
     setShot: confirmPlacement,
+    addPiece,
+    removeSelectedPiece,
+    savedShots,
+    useSavedShot,
+    currentBallId: currentTurnBallId,
   };
 }

@@ -1,5 +1,11 @@
-// Local named Trick Shot Lab layouts. This bank is intentionally independent
-// of HORSE: HORSE may reuse the piece tools later, but not these saved records.
+// Local named Trick Shot Lab layouts. HORSE reads this same bank and offers ALL
+// of it, so a player can author a library once in the Lab and set those shots
+// without rebuilding the room every match.
+//
+// It used to be filtered to bin layouts there, because a bin was the only target
+// HORSE had. HORSE places both kinds now, so a saved hoop layout is no longer
+// silently missing from a list the player authored it into — which is the worst
+// shape a filter can take.
 
 import { normalizeTrickShot } from "../sim/trick-shot.js";
 import { readJSON, resolveStorage, writeJSON } from "./local-storage.js";
@@ -57,4 +63,3 @@ export function createTrickShotStore({ storage, now = () => Date.now(), makeId =
     },
   };
 }
-

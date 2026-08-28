@@ -611,13 +611,38 @@
         <div class="shot-panel">
           <div id="horsePlacePanel" class="horse-place" hidden>
             <div class="horse-place-head">
-              <span>PLACE THE BIN</span>
+              <span id="horsePlaceHead">PLACE THE BIN</span>
               <span id="horsePlaceReadout" class="horse-place-readout">DEPTH 50% &middot; HEIGHT 0% &middot; LANE 50%</span>
             </div>
-            <!-- Grouped by axis, because that is how the bin moves and how the
-                 keys are laid out: depth, then lane, then height. -->
+            <details class="horse-trick-tools">
+              <summary>TRICK SHOT TOOLS <small>Saved Lab shots + pieces</small></summary>
+              <div class="horse-saved-shot-row">
+                <select id="horseSavedShots" aria-label="Saved trick shots"><option>No saved trick shots</option></select>
+                <button id="horseUseSavedShot" type="button" class="ghost-btn ghost-btn--small" data-horse-tool-action="use-saved">Use shot</button>
+              </div>
+              <div class="horse-tool-tray" role="group" aria-label="Add a Trick Shot Lab tool">
+                <button id="horseAddBoard" type="button" class="ghost-btn ghost-btn--small" data-horse-piece="board">+ Rebound Pad</button>
+                <button id="horseAddSpring" type="button" class="ghost-btn ghost-btn--small" data-horse-piece="spring">+ Springboard</button>
+                <button id="horseAddCannon" type="button" class="ghost-btn ghost-btn--small" data-horse-piece="cannon">+ Ball Cannon</button>
+              </div>
+              <div id="horseToolInspector" class="horse-tool-inspector" hidden>
+                <div class="horse-tool-inspector-head">
+                  <strong id="horseToolTitle">Rebound Pad</strong>
+                  <button id="horseRemoveTool" type="button" class="trick-delete-button" data-horse-tool-action="remove">Remove</button>
+                </div>
+                <label><span>Depth</span><input id="horseToolDepth" type="range" min="8" max="94" value="50" /></label>
+                <label><span>Direction</span><input id="horseToolDirection" type="range" min="-180" max="180" step="15" value="0" /></label>
+                <label><span id="horseToolAngleLabel">Face tilt</span><input id="horseToolAngle" type="range" min="-79" max="79" step="5" value="0" /></label>
+                <label><span id="horseToolPowerLabel">Bounce energy</span><input id="horseToolPower" type="range" min="0.45" max="1.12" step="0.01" value="0.88" /></label>
+                <label id="horseToolDelayRow"><span>Trigger delay</span><input id="horseToolDelay" type="range" min="0.25" max="2" step="0.05" value="0.5" /></label>
+              </div>
+            </details>
+            <!-- Grouped by axis, because that is how the target moves and how the
+                 keys are laid out: depth, then lane, then height. The depth pair
+                 is its own element so it can be put away for the wall hoop, which
+                 hangs at the one depth there is and has no depth to choose. -->
             <div id="horseNudges" class="horse-nudges">
-              <span class="horse-nudge-pair">
+              <span id="horseDepthNudges" class="horse-nudge-pair">
                 <button type="button" data-nudge="nearer" class="ghost-btn ghost-btn--small">&darr; Near</button>
                 <button type="button" data-nudge="deeper" class="ghost-btn ghost-btn--small">&uarr; Deep</button>
               </span>
@@ -630,6 +655,13 @@
                 <button type="button" data-nudge="higher" class="ghost-btn ghost-btn--small">Higher</button>
               </span>
             </div>
+            <!-- THE TARGET IS THE FIRST DECISION OF A TURN, and it decides which
+                 motion catalog the row under it is even built from — a floor bin
+                 and the wall hoop do not share a motion id. So it is its own row
+                 above them rather than a ninth chip among them, and both rows are
+                 built from their catalogs by `horse-game.js` rather than typed
+                 here: there is no second list in the markup to forget. -->
+            <div id="horseTargets" class="chip-grid chip-grid--tight horse-targets"></div>
             <div id="horseMotions" class="chip-grid chip-grid--tight horse-motions"></div>
             <button type="button" id="horseConfirm" class="primary-btn">Set this shot</button>
           </div>

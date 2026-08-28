@@ -19,8 +19,20 @@ import {
   placedBinAt,
   placementFromFractions,
 } from "../scripts/sim/bin-placement.js";
+import { HOOP_MODES, HOOP_TRAVEL_BOUNDS } from "../scripts/sim/hoop.js";
+import {
+  HOOP_PLACEMENT_BOUNDS,
+  clampHoopPlacement,
+  defaultHoopPlacement,
+  hoopMotionEnvelope,
+  hoopPlacementBoundsFor,
+  hoopPlacementFromFractions,
+  placedHoopAt,
+  placementIsWithinAimReach,
+} from "../scripts/sim/hoop-placement.js";
+import { HOOP_TARGET } from "../scripts/sim/trick-shot-target.js";
 import { BALLS, ballById } from "../scripts/assets/ball-catalog.js";
-import { createHorseShot, horseAimDepth, horsePowerForDepth } from "../scripts/sim/horse-shot.js";
+import { createHorseShot, horseAimDepth, horsePowerForDepth, horseTargetKind } from "../scripts/sim/horse-shot.js";
 import {
   DEFAULT_WORD,
   MAX_WORD_LENGTH,
@@ -28,6 +40,7 @@ import {
   PHASE_SET,
   canPlaceBin,
   chooseCpuBinSetup,
+  chooseCpuTargetKind,
   chooseCpuTurnBall,
   createHorseMatch,
   letterState,
@@ -36,7 +49,7 @@ import {
   shotSetupFor,
 } from "../scripts/sim/horse.js";
 import { binClearance, stepBallAgainstBins } from "../scripts/sim/bin-physics.js";
-import { createBall, isBallSettled, launchBall } from "../scripts/sim/physics.js";
+import { createBall, isBallSettled, launchBall, stepBall, worldFor } from "../scripts/sim/physics.js";
 import { launchSpin } from "../scripts/sim/launch.js";
 import { projectPoint } from "../scripts/sim/projection.js";
 
@@ -331,6 +344,189 @@ test("every corner of every motion's volume can actually be made", () => {
     }
   }
 });
+
+// ------------------------------------------------------------- the wall hoop
+
+test("the hoop's placement volume is the cabinet's own travel, not a new number", () => {
+  // Adopting `HOOP_TRAVEL_BOUNDS` whole rather than inventing a wider box is
+  // what makes a HORSE hoop shot one the classic cabinet has already proved
+  // makeable, at a height it is already calibrated for. It is imported, not
+  // copied, so a change to the portrait crop moves this with it.
+  assertEqual(HOOP_PLACEMENT_BOUNDS, HOOP_TRAVEL_BOUNDS);
+
+  // And the cabinet's own peg is legal on every motion, so a turn that opens on
+  // the hoop opens on the one rim position everything else is calibrated to.
+  for (const mode of HOOP_MODES) {
+    const clamped = clampHoopPlacement(defaultHoopPlacement(), mode.id);
+    assertClose(clamped.cx, defaultHoopPlacement().cx, 1e-9, `${mode.id} moved the base lane`);
+    assertClose(clamped.rimY, defaultHoopPlacement().rimY, 1e-9, `${mode.id} moved the base height`);
+  }
+});
+
+test("a motion's reach is measured off its own path, not declared beside it", () => {
+  // `circle` is authored as `(cos - 1)`, so it starts where the hoop was hung and
+  // travels TWICE its amplitude, entirely to one side. A hand-written +/-94 would
+  // be wrong in both directions at once — and the asymmetry is what lets a circle
+  // hung on the right be limited only on its left.
+  const circle = hoopMotionEnvelope("circle");
+  assertClose(circle.maxDx, 0, 1e-6, "the circle does not start at the placement");
+  assert(circle.minDx < -180, `the circle's reach was under-measured: ${circle.minDx}`);
+
+  const bounds = hoopPlacementBoundsFor("circle");
+  assertClose(bounds.minCx, HOOP_TRAVEL_BOUNDS.minX - circle.minDx, 1e-9);
+  assertClose(bounds.maxCx, HOOP_TRAVEL_BOUNDS.maxX, 1e-9, "a one-sided sweep must not cost the other side");
+});
+
+test("every point a hung hoop VISITS stays inside the crop", () => {
+  // The clamp subtracts the sweep, so this is the whole claim: not that the
+  // placement is legal, but that the sweep from it is. The failure is invisible
+  // on the desktop browser a mode is authored in and obvious on a phone.
+  for (const mode of HOOP_MODES) {
+    for (const wild of [
+      { cx: -9e3, rimY: -9e3 }, { cx: 9e3, rimY: -9e3 },
+      { cx: -9e3, rimY: 9e3 }, { cx: 9e3, rimY: 9e3 },
+    ]) {
+      const setup = { motionId: mode.id, ...clampHoopPlacement(wild, mode.id) };
+      for (let step = 0; step <= 600; step++) {
+        const hoop = placedHoopAt(setup, step * 0.1);
+        assert(hoop.cx >= HOOP_TRAVEL_BOUNDS.minX - 1e-9 && hoop.cx <= HOOP_TRAVEL_BOUNDS.maxX + 1e-9,
+          `${mode.id} leaves the crop at x=${hoop.cx.toFixed(1)}`);
+        assert(hoop.rimY >= HOOP_TRAVEL_BOUNDS.minY - 1e-9 && hoop.rimY <= HOOP_TRAVEL_BOUNDS.maxY + 1e-9,
+          `${mode.id} leaves the crop at y=${hoop.rimY.toFixed(1)}`);
+      }
+    }
+  }
+});
+
+test("you may only hang a hoop you could shoot at", () => {
+  // The bin's third constraint, and here it is free rather than enforced: the
+  // reticle swings across 292..668 and the crop stops at 588, so every placement
+  // is already inside the band a pull can reach. It is free by ARITHMETIC, not by
+  // guarantee — the day the crop or the aim gain moves is the day it stops being
+  // true, which is why the module asks the question and this pins the answer.
+  assert(placementIsWithinAimReach(), "the hoop's placement volume outran the reticle");
+  assert(HOOP_PLACEMENT_BOUNDS.minX >= AIM_MIN_X && HOOP_PLACEMENT_BOUNDS.maxX <= AIM_MAX_X);
+});
+
+test("fractional placement spans the hoop's band without ever leaving it", () => {
+  for (const mode of HOOP_MODES) {
+    const bounds = hoopPlacementBoundsFor(mode.id);
+    for (const lateral of [-1, -0.5, 0, 0.5, 1]) {
+      for (const height of [0, 0.5, 1]) {
+        const { cx, rimY } = hoopPlacementFromFractions({ lateral, height }, mode.id);
+        assert(cx >= bounds.minCx - 1e-9 && cx <= bounds.maxCx + 1e-9, `${mode.id} lane ${lateral}`);
+        assert(rimY >= bounds.minRimY - 1e-9 && rimY <= bounds.maxRimY + 1e-9, `${mode.id} height ${height}`);
+      }
+    }
+  }
+  // The extremes really are the extremes, or the CPU's boldness would be capped
+  // well short of the volume it is supposed to be reaching into.
+  const still = hoopPlacementBoundsFor("still");
+  assertClose(hoopPlacementFromFractions({ lateral: -1 }, "still").cx, still.minCx, 1e-9);
+  assertClose(hoopPlacementFromFractions({ lateral: 1 }, "still").cx, still.maxCx, 1e-9);
+});
+
+test("a hoop shot is aimed at the rim's own REST height, never the reticle's line", () => {
+  // `sim/pull.js` pins `aimY` to `HOOP_BASE_RIM_Y`, because until the hoop was
+  // placeable there was only one peg. A hoop the setter has raised makes that
+  // line wrong, and a player left to correct for it by hand would be inverting a
+  // ballistic arc in their head — arithmetic, not a skill. So the line follows
+  // the hoop and `pull.aimY` is deliberately not read.
+  const ball = createBall();
+  const pull = { power: 0.8, aimX: 480, aimY: 224, loft: 1 };
+  const high = createHorseShot(pull, ball, { kind: HOOP_TARGET, motionId: "still", placement: { cx: 480, rimY: 180 } });
+  const low = createHorseShot(pull, ball, { kind: HOOP_TARGET, motionId: "still", placement: { cx: 480, rimY: 260 } });
+  assert(high.aim.y < low.aim.y, "a higher hoop is aimed at higher up the screen");
+
+  // And it is the REST height: a moving hoop is not tracked, exactly as the
+  // classic cabinet's reticle never tracks the moving rim.
+  const moving = { kind: HOOP_TARGET, motionId: "vertical", placement: { cx: 480, rimY: 222 } };
+  assertClose(createHorseShot(pull, ball, moving).aim.y, createHorseShot(pull, ball, moving).aim.y, 1e-9);
+});
+
+test("a HORSE setup with no kind is a bin, not the target catalog's own default", () => {
+  // `trickShotTargetKind` opens on the hoop because the Trick Shot Lab does. A
+  // HORSE setup written before HORSE had targets carries no kind and was a bin
+  // every time, so an online match in flight must not change target underneath
+  // its players. Both halves of a ruling read this — the solve and the colliders
+  // — which is exactly why it is said in one place.
+  assertEqual(horseTargetKind({ x: 0, y: 0.36, z: 0.6, motionId: "still" }), "bin");
+  assertEqual(horseTargetKind({}), "bin");
+  assertEqual(horseTargetKind(null), "bin");
+  assertEqual(horseTargetKind({ kind: HOOP_TARGET }), HOOP_TARGET);
+});
+
+test("the CPU reaches for the hoop only as it gets bold", () => {
+  const kinds = ["bin", "hoop"];
+  const always = (value) => () => value;
+  // Easy never leaves the bin the mode has been teaching all match.
+  assertEqual(chooseCpuTargetKind("easy", always(0.99), kinds), "bin");
+  // Hard reaches the whole list.
+  assertEqual(chooseCpuTargetKind("hard", always(0.99), kinds), "hoop");
+  assertEqual(chooseCpuTargetKind("hard", always(0), kinds), "bin");
+  // And it owns no catalog: an empty list is no choice rather than a guess.
+  assertEqual(chooseCpuTargetKind("hard", always(0), []), null);
+});
+
+test("every corner of every hoop motion's band can actually be made", () => {
+  // THE GUARANTEE THAT MATTERS, and it is the bin's own. A placement no pull can
+  // convert is not a hard shot, it is a broken one — and it is invisible to every
+  // other test here, because the geometry is all perfectly legal.
+  //
+  // Coarse on purpose: this asks whether a window exists, not how wide it is.
+  // `tools/horse-make-rate.mjs --target hoop` is where the width is measured, and
+  // where the rest of the ball roster is walked.
+  for (const mode of HOOP_MODES) {
+    const bounds = hoopPlacementBoundsFor(mode.id);
+    for (const cx of [bounds.minCx, (bounds.minCx + bounds.maxCx) / 2, bounds.maxCx]) {
+      for (const rimY of [bounds.minRimY, (bounds.minRimY + bounds.maxRimY) / 2, bounds.maxRimY]) {
+        const setup = { kind: HOOP_TARGET, motionId: mode.id, placement: { cx, rimY } };
+        assert(anyHoopMakeExists(setup),
+          `${mode.id} at ${Math.round(cx)},${Math.round(rimY)} cannot be made by any pull`);
+      }
+    }
+  }
+});
+
+/**
+ * Fire a coarse grid of pulls at a hung hoop and report whether any of them drop.
+ *
+ * TWO RELEASE PHASES, which the bin's sweep does not need. A hoop's motions reach
+ * much further across the screen than a bin's do through the room, so a shot at a
+ * moving rim genuinely has to be led — and a sweep pinned to one release moment
+ * would be asking whether the placement is makeable WITHOUT the skill the motions
+ * exist to ask for. A player may watch the rim for as long as they like.
+ */
+function anyHoopMakeExists(setup) {
+  for (const motionSeconds of [0, 0.9]) {
+    for (let power = 0.4; power <= 1; power += 0.075) {
+      for (let aimX = AIM_MIN_X; aimX <= AIM_MAX_X; aimX += 24) {
+        for (const loft of [0.4, 1]) {
+          if (playHoopShot(setup, { power, aimX, loft }, motionSeconds)) return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+/** One shot, played out through the real sim against the real moving rim. */
+function playHoopShot(setup, pull, motionSeconds) {
+  const ball = createBall();
+  const shot = createHorseShot(pull, ball, setup);
+  launchBall(ball, shot.launch, launchSpin(shot.launch));
+  let clock = motionSeconds;
+  let age = 0;
+  while (age < 3) {
+    clock += TICK_SECONDS;
+    age += TICK_SECONDS;
+    if (stepBall(ball, worldFor(placedHoopAt(setup, clock)), TICK_SECONDS, { ballId: "basketball" }).scored) {
+      return true;
+    }
+    if (age > 0.45 && isBallSettled(ball)) return false;
+  }
+  return false;
+}
 
 /** Fire a coarse grid of pulls at a setup and report whether any of them drop. */
 function anyMakeExists(setup) {

@@ -1,8 +1,9 @@
 // Trick Shot Lab: composition root for a reusable sandbox editor.
 //
 // The lab owns a local named-layout bank. It does not own or serialize HORSE
-// state. What HORSE can reuse later is below this file: sim/trick-shot.js,
-// sim/trick-shot-target.js, sim/trick-shot-physics.js, and render/trick-shot.js.
+// state. HORSE reuses the modules below this file — sim/trick-shot.js,
+// sim/trick-shot-target.js, sim/trick-shot-physics.js, render/trick-shot.js —
+// plus bin-target records from the shared saved-shot bank.
 //
 // THE TARGET IS PART OF THE SHOT, AND IT DECIDES WHICH INTEGRATOR RUNS.
 // `sim/physics.js` steps the ball against the wall hoop and knows nothing about
@@ -39,7 +40,6 @@ import {
 import { launchSpin, solveLaunch, trajectoryPoints } from "./sim/launch.js";
 import { createBall, isBallSettled, launchBall, resetBall, stepBall, worldFor } from "./sim/physics.js";
 import { stepBallAgainstBins } from "./sim/bin-physics.js";
-import { clampPlacement } from "./sim/bin-placement.js";
 import { isShootablePull, neutralPull, resolvePull } from "./sim/pull.js";
 import {
   BOARD_PIECE,
@@ -53,6 +53,7 @@ import {
   BIN_TARGET,
   HOOP_TARGET,
   defaultTrickShotMotion,
+  defaultTrickShotPlacement,
   defaultTrickShotTarget,
   normalizeTrickShotTarget,
   trickShotTargetAt,
@@ -113,8 +114,15 @@ export function bootTrickShot(root, options = {}) {
   // ids — see the note at the top of `sim/trick-shot-target.js` — so there is
   // nothing to map across and a remembered pair is the whole answer.
   const rememberedMotion = { [HOOP_TARGET]: target.motionId, [BIN_TARGET]: defaultTrickShotMotion(BIN_TARGET) };
-  // And where the bin was last stood, for the same reason.
-  let rememberedPlacement = defaultTrickShotTarget(BIN_TARGET).placement;
+  // And where each kind was last stood, for the same reason and with the same
+  // shape of answer. PER KIND, because the two placements are as incompatible as
+  // the two motion ids: a bin's is a world point on the floor and a hoop's is a
+  // screen point on the back wall, so there is nothing to carry across and a
+  // guess would be worse than a memory.
+  const rememberedPlacement = {
+    [HOOP_TARGET]: defaultTrickShotPlacement(HOOP_TARGET),
+    [BIN_TARGET]: defaultTrickShotPlacement(BIN_TARGET),
+  };
   // The target's own clock. Runs whenever the screen is up, never reset by a
   // shot: the cabinet's two-clock rule, so a moving target can be watched.
   let motionSeconds = 0;
@@ -202,7 +210,7 @@ export function bootTrickShot(root, options = {}) {
     if (shotActive || pull) return;
     target = normalizeTrickShotTarget(next);
     rememberedMotion[target.kind] = target.motionId;
-    if (target.placement) rememberedPlacement = target.placement;
+    rememberedPlacement[target.kind] = target.placement;
     motionSeconds = 0;
     resetShot(status_);
   }
@@ -212,10 +220,10 @@ export function bootTrickShot(root, options = {}) {
     if (safe === target.kind) return;
     audio.click();
     setTarget(
-      // The placement is remembered across a trip through the hoop, so a player
-      // comparing the two targets does not have to re-place the bin each time.
-      { kind: safe, motionId: rememberedMotion[safe], placement: rememberedPlacement },
-      safe === BIN_TARGET ? "FLOOR BIN · DRAG TO PLACE" : "WALL HOOP",
+      // Each kind's placement is remembered across a trip through the other, so a
+      // player comparing the two does not have to re-place either one each time.
+      { kind: safe, motionId: rememberedMotion[safe], placement: rememberedPlacement[safe] },
+      safe === BIN_TARGET ? "FLOOR BIN · DRAG TO PLACE" : "WALL HOOP · DRAG TO HANG",
     );
   }
 
@@ -351,7 +359,7 @@ export function bootTrickShot(root, options = {}) {
     ballId = saved.ballId;
     target = saved.target;
     rememberedMotion[target.kind] = target.motionId;
-    if (target.placement) rememberedPlacement = target.placement;
+    rememberedPlacement[target.kind] = target.placement;
     motionSeconds = 0;
     history = [];
     pieces = saved.pieces;
@@ -431,39 +439,50 @@ export function bootTrickShot(root, options = {}) {
   const isPlacingTarget = () => pointerMode === "target" || pointerMode === "target-depth";
 
   /**
-   * Start dragging the floor bin.
+   * Start dragging the target.
    *
-   * THE MOTION CLOCK IS RESET TO ZERO, not merely paused. A bin's motion is an
-   * offset from where it was placed, so with the clock anywhere else the drawn
-   * bin and its placement differ by a constant a drag would have to carry. At
-   * zero they are the same point, the bin sits still under the finger, and the
-   * sweep restarts from where it was put down — which is HORSE's own rule and
-   * the reason the bin the player lined up is the bin that is there when the
-   * shot begins.
+   * THE MOTION CLOCK IS RESET TO ZERO, not merely paused. A motion is an offset
+   * from where the target was placed, so with the clock anywhere else the drawn
+   * target and its placement differ by a constant a drag would have to carry. At
+   * zero they are the same point, the target sits still under the finger, and
+   * the sweep restarts from where it was put down — which is HORSE's own rule
+   * and the reason the target a player lined up is the one that is there when
+   * the shot begins.
+   *
+   * `target-depth` is bin-only and stays that way: a hoop hangs at the one depth
+   * there is, so there is no second axis to separate from the first.
    */
   function startTargetDrag(event, point, mode) {
-    if (target.kind !== BIN_TARGET) return false;
+    const hoop = target.kind === HOOP_TARGET;
+    if (hoop && mode === "target-depth") return false;
     motionSeconds = 0;
-    const anchor = mode === "target-depth"
-      ? projectPoint({ x: target.placement.x, y: 0, z: target.placement.z })
-      : projectPoint({ x: target.placement.x, y: target.placement.y, z: target.placement.z });
+    // A hoop's placement IS a screen point, so the anchor is that point and the
+    // offset is honest with no round trip through the projection.
+    const anchor = hoop
+      ? { x: target.placement.cx, y: target.placement.rimY }
+      : mode === "target-depth"
+        ? projectPoint({ x: target.placement.x, y: 0, z: target.placement.z })
+        : projectPoint({ x: target.placement.x, y: target.placement.y, z: target.placement.z });
     pointerId = event.pointerId;
     pointerMode = mode;
     selectedId = null;
     dragOffset = { x: point.x - anchor.x, y: point.y - anchor.y };
     canvas.setPointerCapture?.(event.pointerId);
-    status = mode === "target-depth" ? "BIN DEPTH" : "PLACE BIN";
+    status = hoop ? "HANG HOOP" : mode === "target-depth" ? "BIN DEPTH" : "PLACE BIN";
     renderView();
     return true;
   }
 
-  /** Re-place the bin, always back through HORSE's own legal-volume clamp. */
+  /**
+   * Re-place the target, always back through its own legal-volume clamp.
+   *
+   * `normalizeTrickShotTarget` picks the clamp off the kind, so this hands it the
+   * raw placement and does not choose one itself — which is what keeps the two
+   * volumes stated in one place each rather than in two.
+   */
   function moveTarget(placement) {
-    target = normalizeTrickShotTarget({
-      ...target,
-      placement: clampPlacement(placement, target.motionId),
-    });
-    rememberedPlacement = target.placement;
+    target = normalizeTrickShotTarget({ ...target, placement });
+    rememberedPlacement[target.kind] = target.placement;
   }
 
   canvas.addEventListener("pointerdown", (event) => {
@@ -517,9 +536,16 @@ export function bootTrickShot(root, options = {}) {
       replaceSelected({ x: worldPoint.x, z: worldPoint.z });
       renderView();
     } else if (pointerMode === "target") {
-      // Across for the lane, up for the height — HORSE's own drag. Depth is a
-      // separate handle, because up the screen is both higher and further away
-      // and one drag cannot carry both honestly.
+      // Across for the lane, up for the height — HORSE's own drag. For a BIN,
+      // depth is a separate handle, because up the screen is both higher and
+      // further away and one drag cannot carry both honestly. A HOOP has no
+      // depth to confuse it with, and its placement is already a screen point,
+      // so the pointer position is the whole answer.
+      if (target.kind === HOOP_TARGET) {
+        moveTarget({ cx: point.x - dragOffset.x, rimY: point.y - dragOffset.y });
+        renderView();
+        return;
+      }
       const worldPoint = screenToWorldAtZ(point.x - dragOffset.x, point.y - dragOffset.y, target.placement.z);
       moveTarget({ x: worldPoint.x, y: worldPoint.y, z: target.placement.z });
       renderView();

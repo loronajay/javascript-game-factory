@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { suite, test, assert, assertClose, assertEqual, finish } from "./harness.js";
+import { suite, test, assert, assertClose, assertDeepEqual, assertEqual, finish } from "./harness.js";
 
 import {
   BIN_TARGET,
@@ -14,7 +14,8 @@ import {
   trickShotTargetMotions,
 } from "../scripts/sim/trick-shot-target.js";
 import { HOOP_MODES, HOOP_TRAVEL_BOUNDS } from "../scripts/sim/hoop.js";
-import { BIN_MOTIONS, clampPlacement, motionEnvelope } from "../scripts/sim/bin-placement.js";
+import { BIN_MOTIONS, clampPlacement, defaultPlacement, motionEnvelope } from "../scripts/sim/bin-placement.js";
+import { clampHoopPlacement, defaultHoopPlacement } from "../scripts/sim/hoop-placement.js";
 import { normalizeTrickShot } from "../scripts/sim/trick-shot.js";
 import { createTrickShotStore } from "../scripts/store/trick-shots-store.js";
 
@@ -47,15 +48,56 @@ test("the two motion catalogs do not cross, and a wrong-catalog id falls back", 
   assertEqual(normalizeTrickShotTarget({ kind: "nonsense" }).kind, HOOP_TARGET);
 });
 
-test("a hoop target carries no placement and a bin target always carries a legal one", () => {
-  const hoop = normalizeTrickShotTarget({ kind: HOOP_TARGET, motionId: "circle", placement: { x: 9, y: 9, z: 9 } });
-  assertEqual(hoop.placement, null, "a hoop cannot be stood in the middle of the floor");
-
+test("both kinds carry a placement, and each goes through its own clamp", () => {
   const wild = normalizeTrickShotTarget({ kind: BIN_TARGET, motionId: "carousel", placement: { x: 99, y: 99, z: 99 } });
   const legal = clampPlacement({ x: 99, y: 99, z: 99 }, "carousel");
   assertClose(wild.placement.x, legal.x, 1e-9);
   assertClose(wild.placement.y, legal.y, 1e-9);
   assertClose(wild.placement.z, legal.z, 1e-9);
+
+  const hoop = normalizeTrickShotTarget({ kind: HOOP_TARGET, motionId: "circle", placement: { cx: 9_000, rimY: -9_000 } });
+  const hoopLegal = clampHoopPlacement({ cx: 9_000, rimY: -9_000 }, "circle");
+  assertClose(hoop.placement.cx, hoopLegal.cx, 1e-9);
+  assertClose(hoop.placement.rimY, hoopLegal.rimY, 1e-9);
+});
+
+test("a placement of the wrong shape falls back rather than being translated", () => {
+  // The same rule the motion ids keep, one level down. A bin's placement is a
+  // world point on the floor and a hoop's is a screen point on the back wall;
+  // there is no meaningful conversion between them, only a guess, so each clamp
+  // ignores the other's fields and yields its own kind's default.
+  const hoop = normalizeTrickShotTarget({ kind: HOOP_TARGET, motionId: "still", placement: { x: 0.4, y: 0.5, z: 0.7 } });
+  assertDeepEqual(hoop.placement, defaultHoopPlacement(), "a floor point hung a hoop somewhere");
+
+  const bin = normalizeTrickShotTarget({ kind: BIN_TARGET, motionId: "still", placement: { cx: 300, rimY: 200 } });
+  assertDeepEqual(bin.placement, clampPlacement(defaultPlacement(), "still"), "a wall point stood a bin somewhere");
+});
+
+test("a placed hoop never leaves the crop, whichever motion it is given", () => {
+  // The reason the placement volume is the cabinet's own travel MINUS the sweep,
+  // rather than the travel itself: it is every point the hoop will VISIT that
+  // has to stay on screen, not merely the point it was hung at.
+  for (const mode of HOOP_MODES) {
+    for (const corner of [
+      { cx: -9_000, rimY: -9_000 },
+      { cx: 9_000, rimY: -9_000 },
+      { cx: -9_000, rimY: 9_000 },
+      { cx: 9_000, rimY: 9_000 },
+    ]) {
+      const target = normalizeTrickShotTarget({ kind: HOOP_TARGET, motionId: mode.id, placement: corner });
+      for (let step = 0; step <= 400; step++) {
+        const { hoop } = trickShotTargetAt(target, step * 0.14);
+        assert(
+          hoop.cx >= HOOP_TRAVEL_BOUNDS.minX - 1e-9 && hoop.cx <= HOOP_TRAVEL_BOUNDS.maxX + 1e-9,
+          `${mode.id} hung at the edge leaves the crop at x=${hoop.cx.toFixed(1)}`,
+        );
+        assert(
+          hoop.rimY >= HOOP_TRAVEL_BOUNDS.minY - 1e-9 && hoop.rimY <= HOOP_TRAVEL_BOUNDS.maxY + 1e-9,
+          `${mode.id} hung at the edge leaves the crop at y=${hoop.rimY.toFixed(1)}`,
+        );
+      }
+    }
+  }
 });
 
 test("every hoop motion stays inside the mobile crop, and every bin sweep inside the legal volume", () => {
@@ -124,7 +166,10 @@ test("a saved layout remembers its target, and one saved before targets existed 
   const legacy = normalizeTrickShot({ id: "old", name: "v1 layout", pieces: [] });
   assertEqual(legacy.target.kind, HOOP_TARGET, "a record from before targets takes the hoop it was authored against");
   assertEqual(legacy.target.motionId, "still");
-  assertEqual(legacy.target.placement, null);
+  // A hoop's placement used to be null, because the rim was bolted to one peg.
+  // Such a record normalizes to the cabinet's own base position, which is
+  // precisely where its hoop stood — the layout is unchanged, not merely legal.
+  assertDeepEqual(legacy.target.placement, defaultHoopPlacement());
 });
 
 test("the bank round-trips a target through storage", () => {
@@ -176,9 +221,15 @@ test("the target picker is built from the catalog and the bin is placed on the c
   assert(view.includes("TRICK_SHOT_TARGETS") && view.includes("trickShotTargetMotions"),
     "the picker must read the catalogs rather than a second list in the markup");
   assert(!/<option value="still"/.test(html), "motions must not be hand-listed in the markup");
-  assert(game.includes("clampPlacement("), "a dragged bin has to go back through HORSE's legal-volume clamp");
+  // A dragged target goes back through its own kind's legal-volume clamp, and it
+  // reaches that clamp through the normalizer rather than by picking one itself —
+  // which is what keeps the two volumes stated in one place each.
+  assert(game.includes("normalizeTrickShotTarget({ ...target, placement })"),
+    "a dragged target has to go back through the target normalizer");
+  assert(!game.includes("clampPlacement("),
+    "the Lab must not pick a clamp itself — the kind decides, in the normalizer");
   assert(game.includes("trickShotTargetAtPoint(") && game.includes("binDepthHandleAt("),
-    "the bin needs both a body grab and its own depth handle");
+    "the target needs a body grab, and the bin its own depth handle");
 });
 
 finish();

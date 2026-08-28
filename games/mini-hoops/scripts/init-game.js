@@ -263,8 +263,9 @@ export function boot(root) {
     },
   });
 
-  // Trick Shot Lab is a fourth court root. Its named bank belongs only to the
-  // lab; the sandbox piece catalog beneath it is the seam HORSE can reuse later.
+  // Trick Shot Lab is a fourth court root. It authors the named bank; HORSE
+  // reads every entry in it — both target kinds — and the two share the sandbox
+  // piece catalog and the target seam beneath it.
   const trickShot = bootTrickShot(root, {
     audio,
     onLeave: () => {

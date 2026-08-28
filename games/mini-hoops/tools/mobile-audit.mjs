@@ -334,6 +334,25 @@ const ROUTES = [
     },
   },
   {
+    // HORSE'S SECOND TARGET, WHICH IS A DIFFERENT PANEL AND A DIFFERENT COURT.
+    // Placing is the tallest panel in the cabinet and the hoop puts its depth
+    // steppers away, so the two phases of a hoop turn measure differently from
+    // the two phases of a bin turn — and it is the only route here that shows
+    // the hoop hung anywhere but its own peg.
+    name: "horse place (hoop)",
+    mustFit: true,
+    async go(page) {
+      await page.click('[data-command="solo"]');
+      await page.waitForSelector("#setupScreen.is-active");
+      await page.evaluate(pickGameType, "horse");
+      await page.click("#setupStartButton");
+      await page.waitForSelector("#horseScreen.is-active");
+      await page.click('#horseTargets [data-value="hoop"]');
+      for (let step = 0; step < 4; step++) await page.click('#horseNudges [data-nudge="left"]');
+      for (let step = 0; step < 3; step++) await page.click('#horseNudges [data-nudge="higher"]');
+    },
+  },
+  {
     // A splash screen with a list on it. It scrolls by design, but it is also
     // where the scrim over the painted art is judged, and it had never been in
     // this sheet at all.

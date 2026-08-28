@@ -2,11 +2,17 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { suite, test, assert, assertEqual, finish } from "./harness.js";
+import { suite, test, assert, assertDeepEqual, assertEqual, finish } from "./harness.js";
 
 import { bootHorse, horseTurnBallId } from "../scripts/horse-game.js";
+import { BOARD_PIECE } from "../scripts/sim/trick-shot.js";
+import { BIN_TARGET, HOOP_TARGET } from "../scripts/sim/trick-shot-target.js";
 import { PHASE_MATCH, PHASE_SET } from "../scripts/sim/horse.js";
+import { HOOP_TRAVEL_BOUNDS } from "../scripts/sim/hoop.js";
+import { defaultHoopPlacement } from "../scripts/sim/hoop-placement.js";
 import { restingBallPosition } from "../scripts/render/frame.js";
+import { createMemoryStorage } from "../scripts/store/local-storage.js";
+import { createTrickShotStore } from "../scripts/store/trick-shots-store.js";
 
 // A HORSE turn is a two-phase state machine — arrange a bin, shoot at it, hand
 // over — and the browser is the one place that cannot be checked. The failure
@@ -154,8 +160,9 @@ test("a made setup passes the turn and the matcher inherits the bin", () => {
   const { horse, canvas } = harness({ mode: "local" });
   horse.enter({ mode: "local", word: "PIG" });
   // Straight down the middle of the room, on the floor: reliably makeable.
-  horse.placeBin({ x: 0, y: 0.36, z: 0.6, motionId: "still" });
+  horse.placeTarget({ x: 0, y: 0.36, z: 0.6, motionId: "still" });
   const placed = { ...horse.setup };
+  assertEqual(placed.kind, BIN_TARGET, "a turn opens on the bin");
   horse.setShot();
 
   // Walk the pull until one drops, so the test does not depend on a magic number.
@@ -168,14 +175,162 @@ test("a made setup passes the turn and the matcher inherits the bin", () => {
   }
   assert(made, "no pull in the whole range could make a floor bin in the middle of the room");
   assertEqual(horse.match.turn, 1, "the other player did not inherit the turn");
-  assertEqual(horse.match.standingShot.z, placed.z, "the standing shot is not the bin that was set");
+  assertEqual(horse.match.standingShot.placement.z, placed.placement.z,
+    "the standing shot is not the bin that was set");
   assertEqual(horse.match.standingShot.motionId, placed.motionId);
+});
+
+test("HORSE offers every saved shot and loads its target, tools, room, and ball", () => {
+  const store = createTrickShotStore({ storage: createMemoryStorage(), makeId: (() => {
+    let id = 0;
+    return () => `saved-${++id}`;
+  })() });
+  const binShot = store.save({
+    name: "Bank off the pad",
+    locationId: "warehouse",
+    ballId: "paper",
+    target: {
+      kind: BIN_TARGET,
+      motionId: "sideways",
+      placement: { x: 0.2, y: 0.4, z: 0.62 },
+    },
+    pieces: [{ type: BOARD_PIECE, id: "bank-pad", x: 0.72, y: 1.2, z: 0.5, yaw: 0.4 }],
+  });
+  const hoopShot = store.save({
+    name: "Hoop only",
+    target: { kind: HOOP_TARGET, motionId: "horizontal", placement: { cx: 452, rimY: 214 } },
+    pieces: [],
+  });
+
+  const { horse } = harness({ mode: "local", store });
+  horse.enter({ mode: "local", word: "PIG" });
+
+  // The bank used to be filtered down to bin layouts, because a bin was the only
+  // target HORSE had. It places both now, so it offers both — a saved layout
+  // missing from a list the player authored it into is the worst shape a filter
+  // can take.
+  assertDeepEqual(
+    horse.savedShots().map(({ id }) => id).sort(),
+    [binShot.id, hoopShot.id].sort(),
+    "the HORSE bank is not the whole bank",
+  );
+
+  assert(horse.useSavedShot(binShot.id), "the bin layout was refused");
+  assertEqual(horse.setup.kind, BIN_TARGET);
+  assertEqual(horse.setup.motionId, "sideways");
+  assertEqual(horse.setup.placement.x, binShot.target.placement.x);
+  assertEqual(horse.locationId, "warehouse");
+  assertEqual(horse.pieces.length, 1);
+  assertEqual(horse.pieces[0].id, "bank-pad");
+  assertEqual(horse.currentBallId(), "paper");
+
+  // And the hoop layout brings its whole target across, motion and all — the
+  // point of allowing it at all.
+  assert(horse.useSavedShot(hoopShot.id), "a hoop layout was refused");
+  assertEqual(horse.setup.kind, HOOP_TARGET);
+  assertEqual(horse.setup.motionId, "horizontal");
+  assertEqual(horse.setup.placement.cx, hoopShot.target.placement.cx);
+  assertEqual(horse.setup.placement.rimY, hoopShot.target.placement.rimY);
+});
+
+test("the wall hoop is a HORSE target, and its shot is the cabinet's classic pull", () => {
+  const { horse, canvas } = harness({ mode: "local" });
+  horse.enter({ mode: "local", word: "PIG" });
+  horse.placeTarget({ kind: HOOP_TARGET });
+  assertEqual(horse.setup.kind, HOOP_TARGET);
+  // Hung at the cabinet's own peg to start with, which is the one rim position
+  // the classic run is calibrated against.
+  assertDeepEqual(horse.setup.placement, defaultHoopPlacement());
+
+  horse.setShot();
+  let made = false;
+  for (let pull = 40; pull <= 115 && !made; pull += 2) {
+    shoot({ canvas }, pull);
+    settle(horse);
+    made = horse.match.phase === PHASE_MATCH;
+    if (!made && horse.match.phase === PHASE_SET) horse.setShot();
+  }
+  assert(made, "no pull in the whole range could make the hoop at its own base position");
+  assertEqual(horse.match.standingShot.kind, HOOP_TARGET, "the standing shot is not the hoop that was set");
+});
+
+test("a hung hoop stays on the wall, and its lane and height are the only choices", () => {
+  const { horse } = harness({ mode: "local" });
+  horse.enter({ mode: "local", word: "PIG" });
+  horse.placeTarget({ kind: HOOP_TARGET });
+
+  // Shoved past every edge of the room in turn, it stays inside the crop the
+  // classic cabinet's own modes are held to — that box IS the placement volume.
+  for (const wild of [{ cx: -9e3 }, { cx: 9e3 }, { rimY: -9e3 }, { rimY: 9e3 }]) {
+    horse.placeTarget(wild);
+    const { cx, rimY } = horse.setup.placement;
+    assert(cx >= HOOP_TRAVEL_BOUNDS.minX - 1e-9 && cx <= HOOP_TRAVEL_BOUNDS.maxX + 1e-9, `lane escaped: ${cx}`);
+    assert(rimY >= HOOP_TRAVEL_BOUNDS.minY - 1e-9 && rimY <= HOOP_TRAVEL_BOUNDS.maxY + 1e-9, `height escaped: ${rimY}`);
+  }
+
+  // A depth is not a thing a hoop has. Handing it one changes nothing — there is
+  // no field for it to land in and no translation of it that would mean anything.
+  horse.placeTarget({ cx: 430, rimY: 210 });
+  const before = { ...horse.setup.placement };
+  horse.placeTarget({ z: 0.2 });
+  assertDeepEqual(horse.setup.placement, before, "a depth moved a hoop");
+});
+
+test("the two targets remember their own placement across a swap", () => {
+  const { horse } = harness({ mode: "local" });
+  horse.enter({ mode: "local", word: "PIG" });
+  horse.placeTarget({ x: 0.3, y: 0.4, z: 0.55, motionId: "still" });
+  const bin = { ...horse.setup.placement };
+
+  horse.placeTarget({ kind: HOOP_TARGET });
+  horse.placeTarget({ cx: 420, rimY: 200 });
+  const hoop = { ...horse.setup.placement };
+
+  // Nothing is carried across a swap: the two placements do not share a shape
+  // and the two motion catalogs do not share an id, so each kind picks up where
+  // it was left rather than being handed a guess at the other one.
+  horse.placeTarget({ kind: BIN_TARGET });
+  assertDeepEqual(horse.setup.placement, bin, "the bin forgot where it was standing");
+  horse.placeTarget({ kind: HOOP_TARGET });
+  assertDeepEqual(horse.setup.placement, hoop, "the hoop forgot where it was hanging");
+});
+
+test("a saved tool layout becomes part of the standing shot the matcher inherits", () => {
+  const store = createTrickShotStore({ storage: createMemoryStorage(), makeId: () => "bin-bank" });
+  store.save({
+    name: "Safe side pad",
+    target: {
+      kind: BIN_TARGET,
+      motionId: "still",
+      placement: { x: 0, y: 0.36, z: 0.6 },
+    },
+    pieces: [{ type: BOARD_PIECE, id: "side-pad", x: 0.9, y: 1.5, z: 0.1 }],
+  });
+  const view = harness({ mode: "local", store });
+  view.horse.enter({ mode: "local", word: "PIG" });
+  view.horse.useSavedShot("bin-bank");
+  view.horse.setShot();
+
+  let made = false;
+  for (let pull = 40; pull <= 105 && !made; pull += 2) {
+    shoot(view, pull);
+    settle(view.horse);
+    made = view.horse.match.phase === PHASE_MATCH;
+    if (!made && view.horse.match.phase === PHASE_SET) {
+      view.horse.useSavedShot("bin-bank");
+      view.horse.setShot();
+    }
+  }
+
+  assert(made, "the saved bin shot could not be set");
+  assertDeepEqual(view.horse.match.standingShot.pieces, view.horse.pieces,
+    "the matching player did not inherit the setter's tools");
 });
 
 test("the matcher may not re-place the bin", () => {
   const { horse } = harness({ mode: "local" });
   horse.enter({ mode: "local", word: "PIG" });
-  horse.placeBin({ x: 0, y: 0.36, z: 0.6, motionId: "still" });
+  horse.placeTarget({ x: 0, y: 0.36, z: 0.6, motionId: "still" });
   horse.setShot();
   // Force the standing shot without shooting, then start the matcher's turn.
   horse.match.phase = PHASE_MATCH;
@@ -191,21 +346,21 @@ test("the motion clock restarts every turn, so both players face the same bin", 
   // shown a bin somewhere the setter never saw it.
   const { horse, canvas } = harness({ mode: "local" });
   horse.enter({ mode: "local", word: "PIG" });
-  horse.placeBin({ x: 0, y: 0.36, z: 0.6, motionId: "sideways" });
+  horse.placeTarget({ x: 0, y: 0.36, z: 0.6, motionId: "sideways" });
   horse.setShot();
-  const atRest = horse.binNow().x;
+  const atRest = horse.targetNow().bin.x;
 
   // Run the sweep well away from its start, then take the shot.
   for (let i = 0; i < 54; i++) horse.tick();
-  assert(Math.abs(horse.binNow().x - atRest) > 0.1, "the bin never actually moved — the test proves nothing");
+  assert(Math.abs(horse.targetNow().bin.x - atRest) > 0.1, "the bin never actually moved — the test proves nothing");
   shoot({ canvas }, 84);
   settle(horse);
 
   // Whatever the outcome, the next turn opens with the bin back at the start of
   // its sweep. Read through the bin the court is DRAWING, not through a stored
   // setup, because the drawn bin is what the player has to lead.
-  assert(Math.abs(horse.binNow().x - atRest) < 1e-9,
-    `the sweep carried on across the handover: ${horse.binNow().x} vs ${atRest}`);
+  assert(Math.abs(horse.targetNow().bin.x - atRest) < 1e-9,
+    `the sweep carried on across the handover: ${horse.targetNow().bin.x} vs ${atRest}`);
 });
 
 test("a CPU opponent takes its own turn without a human touching anything", () => {
@@ -300,6 +455,16 @@ test("the ball is a phase-two control and is put away while the bin is being pla
   assert(placing < aiming + 112, `placing chrome (${placing}px) still reserves the hidden ball picker`);
 });
 
+test("the HORSE placement panel exposes the lab tool tray and saved-shot bank", () => {
+  const html = fs.readFileSync(path.join(gameRoot, "index.html"), "utf8");
+  for (const id of [
+    "horseSavedShots", "horseUseSavedShot", "horseAddBoard", "horseAddSpring",
+    "horseAddCannon", "horseToolInspector", "horseToolDepth", "horseToolDirection",
+  ]) {
+    assert(html.includes(`id="${id}"`), `HORSE is missing ${id}`);
+  }
+});
+
 test("a matcher inherits the exact ball used to set the standing shot", () => {
   const match = {
     phase: PHASE_MATCH,
@@ -316,7 +481,7 @@ test("a matcher inherits the exact ball used to set the standing shot", () => {
 test("the loser popup plays before the results card, then yields to it", () => {
   const view = harness({ mode: "local" });
   view.horse.enter({ mode: "local", word: "P" });
-  view.horse.placeBin({ x: 0, y: 0.36, z: 0.87, motionId: "still" });
+  view.horse.placeTarget({ x: 0, y: 0.36, z: 0.87, motionId: "still" });
   view.horse.setShot();
 
   // Make this the last owed shot. A weak pull at the far bin misses, giving the

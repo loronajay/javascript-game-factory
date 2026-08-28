@@ -4,10 +4,12 @@ import { bootHorse } from "../scripts/horse-game.js";
 import {
   HORSE_GAME_ID,
   createHorseOnlineClient,
+  sanitizeHorsePlacementIntent,
   sanitizeHorseShotIntent,
 } from "../scripts/multiplayer/horse-online-client.js";
 import { restingBallPosition } from "../scripts/render/frame.js";
 import { PHASE_MATCH, PHASE_SET } from "../scripts/sim/horse.js";
+import { HOOP_TRAVEL_BOUNDS } from "../scripts/sim/hoop.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -62,7 +64,7 @@ test("quick search uses its own game id, so HORSE never pairs with score duels",
     gameId: HORSE_GAME_ID,
     minPlayers: 2,
     maxPlayers: 2,
-    settings: { word: "PIG", protocolVersion: 1 },
+    settings: { word: "PIG", protocolVersion: 2 },
     identity: { playerId: "factory-42", displayName: "Jay" },
   });
 });
@@ -88,6 +90,40 @@ test("a shot carries a pull and a release moment — no outcome, and no aimY", (
     assert(!Object.hasOwn(intent, forbidden), `a shot must not carry ${forbidden}`);
   }
   assertEqual(sanitizeHorseShotIntent({ ballId: "../../bad" }).ballId, "basketball");
+});
+
+test("an online placement carries a bounded Lab tool layout and room", () => {
+  const setup = sanitizeHorsePlacementIntent({
+    x: 0, y: 0.36, z: 0.6, motionId: "still",
+    locationId: "warehouse",
+    pieces: [{ type: "board", id: "bank-pad", x: 0.4, y: 0.8, z: 0.5, restitution: 0.9 }],
+  });
+  assertEqual(setup.locationId, "warehouse");
+  assertEqual(setup.pieces.length, 1);
+  assertEqual(setup.pieces[0].id, "bank-pad");
+});
+
+test("a placement names its target, and sends only that kind's placement shape", () => {
+  // A bin's placement is a world point on the floor and a hoop's is a screen
+  // point on the back wall. The wire carries the one that belongs to the kind:
+  // a field from the other shape is one the server's clamp does not read, and
+  // shipping it would only invite someone to believe it meant something.
+  const bin = sanitizeHorsePlacementIntent({ x: 0, y: 0.36, z: 0.6, motionId: "still", cx: 9_000, rimY: 9_000 });
+  assertEqual(bin.kind, "bin");
+  assertDeepEqual(Object.keys(bin.placement).sort(), ["x", "y", "z"]);
+
+  const hoop = sanitizeHorsePlacementIntent({
+    kind: "hoop", motionId: "still", placement: { cx: 452, rimY: 214 }, x: 9, y: 9, z: 9,
+  });
+  assertEqual(hoop.kind, "hoop");
+  assertDeepEqual(Object.keys(hoop.placement).sort(), ["cx", "rimY"]);
+  assertEqual(hoop.placement.cx, 452);
+  assertEqual(hoop.placement.rimY, 214);
+
+  // And a placement from before the hoop existed carries no kind at all. It was
+  // a bin every time, so it stays one — deliberately not the target catalog's
+  // own default, which opens on the hoop because the Trick Shot Lab does.
+  assertEqual(sanitizeHorsePlacementIntent({}).kind, "bin");
 });
 
 test("the server's word and match state are taken as read, never recomputed", () => {
@@ -249,6 +285,10 @@ function serverState({
 }
 
 const FLOOR_BIN = { x: 0, y: 0.36, z: 0.6, motionId: "still" };
+// The standing-shot shape the server actually broadcasts, which is the target
+// record rather than a placement flattened onto it.
+const FLOOR_BIN_SETUP = { kind: "bin", motionId: "still", placement: { x: 0, y: 0.36, z: 0.6 } };
+const WALL_HOOP_SETUP = { kind: "hoop", motionId: "still", placement: { cx: 452, rimY: 214 } };
 
 function courtHarness(clientId = "socket-a") {
   const canvas = stubCanvas();
@@ -324,7 +364,7 @@ test("the seat comes from the snapshot, so the guest is not handed the host's tu
   assertEqual(onlineClient.shots.length, 0, "the guest shot on the host's turn");
 
   onlineClient.push({ status: "started", matchState: serverState({ turn: 1, sequence: 1 }) });
-  horse.placeBin(FLOOR_BIN);
+  horse.placeTarget(FLOOR_BIN);
   horse.setShot();
   shoot({ canvas }, 84);
   assertEqual(onlineClient.shots.length, 1, "the guest could not shoot on their own turn");
@@ -333,16 +373,47 @@ test("the seat comes from the snapshot, so the guest is not handed the host's tu
 test("a placement goes up the wire the moment the shot is set", () => {
   const { horse, onlineClient } = courtHarness();
   onlineClient.push({ status: "started", matchState: serverState({ turn: 0 }) });
-  horse.placeBin({ ...FLOOR_BIN, motionId: "sideways" });
+  horse.placeTarget({ ...FLOOR_BIN, motionId: "sideways" });
+  horse.addPiece("board");
   horse.setShot();
   assertEqual(onlineClient.placements.length, 1);
+  assertEqual(onlineClient.placements[0].kind, "bin");
   assertEqual(onlineClient.placements[0].motionId, "sideways");
+  assertEqual(onlineClient.placements[0].pieces.length, 1);
+});
+
+test("a hung hoop goes up the wire as a hoop, and the server owns where it hangs", () => {
+  const { horse, onlineClient } = courtHarness();
+  onlineClient.push({ status: "started", matchState: serverState({ turn: 0 }) });
+  horse.placeTarget({ kind: "hoop" });
+  horse.placeTarget({ cx: 9_000, rimY: 9_000 });
+  horse.setShot();
+  assertEqual(onlineClient.placements.length, 1);
+  const sent = onlineClient.placements[0];
+  assertEqual(sent.kind, "hoop");
+  // The court clamped it before sending, and the server clamps it again through
+  // the same module — so a crafted client cannot hang a hoop off the wall.
+  assert(sent.placement.cx <= HOOP_TRAVEL_BOUNDS.maxX + 1e-9, `lane escaped: ${sent.placement.cx}`);
+  assert(sent.placement.rimY <= HOOP_TRAVEL_BOUNDS.maxY + 1e-9, `height escaped: ${sent.placement.rimY}`);
+});
+
+test("the visible HORSE tray adds a Lab tool through the placement panel", () => {
+  const { horse, onlineClient, elements } = courtHarness();
+  onlineClient.push({ status: "started", matchState: serverState({ turn: 0 }) });
+  elements.get("#horsePlacePanel").fire("click", {
+    target: {
+      closest(selector) {
+        return selector === "[data-horse-piece]" ? { dataset: { horsePiece: "board" } } : null;
+      },
+    },
+  });
+  assertEqual(horse.pieces.length, 1, "clicking the on-screen tray did not add its tool");
 });
 
 test("this court sends a pull and rules on nothing", () => {
   const { horse, canvas, onlineClient } = courtHarness();
   onlineClient.push({ status: "started", matchState: serverState({ turn: 0 }) });
-  horse.placeBin(FLOOR_BIN);
+  horse.placeTarget(FLOOR_BIN);
   horse.setShot();
   for (let i = 0; i < 20; i++) horse.tick();
   shoot({ canvas }, 84);
@@ -365,7 +436,7 @@ test("this court sends a pull and rules on nothing", () => {
 test("the ruling is what moves the letters and the turn", () => {
   const { horse, canvas, onlineClient } = courtHarness();
   onlineClient.push({ status: "started", matchState: serverState({ turn: 0 }) });
-  horse.placeBin(FLOOR_BIN);
+  horse.placeTarget(FLOOR_BIN);
   horse.setShot();
   shoot({ canvas }, 84);
   settle(horse);
@@ -375,15 +446,36 @@ test("the ruling is what moves the letters and the turn", () => {
     matchState: serverState({
       turn: 1,
       phase: PHASE_MATCH,
-      standingShot: FLOOR_BIN,
+      standingShot: FLOOR_BIN_SETUP,
       sequence: 1,
-      lastShot: { sequence: 1, shooterId: "socket-a", seat: 0, made: true, kind: "set", intent: {}, setup: FLOOR_BIN },
+      lastShot: {
+        sequence: 1, shooterId: "socket-a", seat: 0, made: true, kind: "set",
+        intent: {}, setup: FLOOR_BIN_SETUP,
+      },
     }),
   });
   assertEqual(horse.match.phase, PHASE_MATCH);
   assertEqual(horse.match.turn, 1, "the server's turn did not take");
   // The matcher owes this exact bin, and this court is now watching for it.
-  assertEqual(horse.binNow().z, FLOOR_BIN.z);
+  assertEqual(horse.targetNow().bin.z, FLOOR_BIN_SETUP.placement.z);
+});
+
+test("a standing hoop is drawn from the server's copy, not re-derived", () => {
+  const { horse, onlineClient } = courtHarness("socket-b");
+  onlineClient.push({
+    status: "started",
+    matchState: serverState({
+      turn: 1,
+      phase: PHASE_MATCH,
+      standingShot: WALL_HOOP_SETUP,
+      sequence: 1,
+    }),
+  });
+  const target = horse.targetNow();
+  assertEqual(target.kind, "hoop");
+  assertEqual(target.bin, null, "a hoop turn must not also stand a bin on the floor");
+  assertEqual(target.hoop.cx, WALL_HOOP_SETUP.placement.cx, "the matcher is not facing the hoop that was hung");
+  assertEqual(target.hoop.rimY, WALL_HOOP_SETUP.placement.rimY);
 });
 
 test("an online matcher is forced to throw the setter's ball", () => {

@@ -252,6 +252,27 @@ export function chooseCpuBinSetup(difficulty = "medium", random = Math.random, m
 }
 
 /**
+ * The target the CPU sets a shot at.
+ *
+ * The FIRST of a setter's four decisions, because it decides which motion
+ * catalog the second one is drawn from. Unlocked by boldness the way the motions
+ * and the balls are, and for the same reason: the timid end stays on the floor
+ * bin, whose gesture a new player has already been taught by the mode itself,
+ * and a braver CPU will hang the hoop and ask for the cabinet's classic pull
+ * instead. Below a third of boldness it never reaches past the first kind.
+ *
+ * The list comes from the caller, so this module still owns no catalog. It
+ * relies on that list being ordered from the plainest question to the boldest —
+ * the same contract `chooseCpuTurnBall` relies on for the ball roster.
+ */
+export function chooseCpuTargetKind(difficulty = "medium", random = Math.random, kinds = []) {
+  if (!kinds.length) return null;
+  const { boldness } = horseDifficultyById(difficulty);
+  const reach = boldness < 0.34 ? 1 : Math.max(1, Math.round(kinds.length * boldness));
+  return kinds[Math.floor(random() * Math.min(reach, kinds.length))];
+}
+
+/**
  * The ball the CPU sets a shot with.
  *
  * The ball is part of the standing shot, so this is a real decision and not a

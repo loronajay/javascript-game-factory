@@ -25,7 +25,12 @@
 // Pure. No DOM, no storage, no rendering — the same contract `sim/hoop.js` and
 // `sim/bin-placement.js` are held to.
 
-import { DEFAULT_HOOP_MODE, HOOP_MODES, hoopAt, hoopModeById } from "./hoop.js";
+import { DEFAULT_HOOP_MODE, HOOP_MODES, hoopModeById } from "./hoop.js";
+import {
+  clampHoopPlacement,
+  defaultHoopPlacement,
+  placedHoopAt,
+} from "./hoop-placement.js";
 import {
   BIN_MOTIONS,
   DEFAULT_BIN_MOTION,
@@ -78,14 +83,22 @@ export function defaultTrickShotMotion(kind) {
 /**
  * A storage-safe, physically legal target record.
  *
- * The bin's placement goes through `clampPlacement` with its own motion, so
- * every point the bin will VISIT is inside the legal volume — not merely the
- * point it was placed at. That is HORSE's rule and it is inherited whole: the
- * Lab does not get to invent a bin outside the volume HORSE proved was
- * reachable, because the reticle's reach is what defines that volume.
+ * BOTH KINDS CARRY A PLACEMENT, and each goes through its own clamp with its own
+ * motion — so every point the target will VISIT is inside the legal volume, not
+ * merely the point it was placed at. That is HORSE's rule and it is inherited
+ * whole for both: the Lab does not get to invent a target outside the volume
+ * HORSE proved was reachable.
  *
- * `placement` is null for a hoop target rather than carried and ignored, so a
- * saved record cannot describe a hoop standing in the middle of the floor.
+ * A HOOP'S PLACEMENT IS TWO NUMBERS AND A BIN'S IS THREE, and the shapes do not
+ * cross any more than the motion ids do. `{ cx, rimY }` is a screen-space point
+ * on the back wall; `{ x, y, z }` is a world-space point on the floor. Handing
+ * one to the other's clamp yields that kind's default rather than a translation,
+ * which is the same fallback an id from the wrong catalog gets and for the same
+ * reason: there is no meaningful conversion, only a guess.
+ *
+ * The hoop's placement used to be `null` — the rim was bolted to one peg, so
+ * there was nothing to carry. A record saved back then normalizes to the
+ * cabinet's own base position, which is exactly where its hoop stood.
  */
 export function normalizeTrickShotTarget(input = {}) {
   const kind = trickShotTargetKind(input?.kind);
@@ -93,7 +106,8 @@ export function normalizeTrickShotTarget(input = {}) {
     const motionId = binMotionById(input.motionId).id;
     return { kind, motionId, placement: clampPlacement(input.placement || input, motionId) };
   }
-  return { kind, motionId: hoopModeById(input.motionId).id, placement: null };
+  const motionId = hoopModeById(input.motionId).id;
+  return { kind, motionId, placement: clampHoopPlacement(input.placement || input, motionId) };
 }
 
 export function defaultTrickShotTarget(kind = DEFAULT_TRICK_SHOT_TARGET_KIND) {
@@ -101,8 +115,13 @@ export function defaultTrickShotTarget(kind = DEFAULT_TRICK_SHOT_TARGET_KIND) {
   return normalizeTrickShotTarget({
     kind: safe,
     motionId: defaultTrickShotMotion(safe),
-    placement: safe === BIN_TARGET ? defaultPlacement() : null,
+    placement: safe === BIN_TARGET ? defaultPlacement() : defaultHoopPlacement(),
   });
+}
+
+/** Where a target of this kind starts before anyone has moved it. */
+export function defaultTrickShotPlacement(kind = DEFAULT_TRICK_SHOT_TARGET_KIND) {
+  return trickShotTargetKind(kind) === BIN_TARGET ? defaultPlacement() : defaultHoopPlacement();
 }
 
 /**
@@ -127,7 +146,7 @@ export function trickShotTargetAt(target, elapsedSeconds = 0) {
   return {
     kind: HOOP_TARGET,
     motionId: safe.motionId,
-    hoop: hoopAt(safe.motionId, seconds),
+    hoop: placedHoopAt({ ...safe.placement, motionId: safe.motionId }, seconds),
     bin: null,
   };
 }

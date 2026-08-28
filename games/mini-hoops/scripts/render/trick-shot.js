@@ -33,7 +33,7 @@
 //    box over every tool on the court at once, which is most of what made a
 //    five-piece layout unreadable.
 
-import { BALL_RADIUS_WORLD, BOARD_Z, GRAVITY, RIM_CENTER_Z } from "../sim/constants.js";
+import { BALL_RADIUS_WORLD, BOARD_Z, GRAVITY, RIM_CENTER_Z, RIM_SCREEN_HALF_WIDTH } from "../sim/constants.js";
 import { trickShotImpactProgress } from "../effects/trick-shot-impact.js";
 import {
   BOARD_PAD_THICKNESS,
@@ -44,7 +44,8 @@ import {
   cannonDirection,
   isPadPiece,
 } from "../sim/trick-shot.js";
-import { BIN_TARGET } from "../sim/trick-shot-target.js";
+import { BIN_TARGET, HOOP_TARGET } from "../sim/trick-shot-target.js";
+import { hoopPlacementBoundsFor } from "../sim/hoop-placement.js";
 import { ballScreenRadius, depthScaleAt, projectPoint, worldToScreenLength } from "../sim/projection.js";
 import { drawAim } from "./aim.js";
 import { drawBall } from "./ball.js";
@@ -930,13 +931,6 @@ export function sandboxPieceAtPoint(pieces, point) {
 }
 
 /**
- * Is this canvas point on the target's own body?
- *
- * Only a bin can answer yes. The wall hoop is bolted to the wall at a fixed
- * height and has nothing to drag — its motion is the only thing about it the
- * player chooses, and that is a picker, not a gesture.
- */
-/**
  * The bin's own depth handle: the diamond on the floor beneath it.
  *
  * The SAME control the pieces carry, at the same offset below the same floor
@@ -954,6 +948,18 @@ export function binDepthHandleAt(target, point) {
   const handle = binDepthHandle(target);
   if (!handle) return false;
   return Math.hypot(point.x - handle.x, point.y - handle.y) <= DEPTH_HANDLE_RADIUS + 6;
+}
+
+/**
+ * The build-mode marks for whichever target is up.
+ *
+ * The frame asks once and this dispatches, rather than the frame branching on
+ * the kind — the two kinds need different marks for different reasons, and which
+ * ones is a fact about the target, not about the composition order.
+ */
+function drawTargetPlacementMarks(ctx, target) {
+  if (target?.kind === HOOP_TARGET) drawHoopPlacementMarks(ctx, target);
+  else drawBinPlacementMarks(ctx, target);
 }
 
 /** The build-mode floor ring, tether and depth handle for a placed bin. */
@@ -997,12 +1003,74 @@ function drawBinPlacementMarks(ctx, target) {
   ctx.restore();
 }
 
+/**
+ * Is this canvas point on the target's own body?
+ *
+ * Both kinds answer now. The hoop used to be bolted to one peg and had nothing
+ * to drag, so this returned false for it outright; a HORSE setter hangs it along
+ * the back wall, so it is grabbed by the same gesture the bin is.
+ *
+ * A HOOP IS GRABBED BY THE WHOLE ASSEMBLY, board and ring together, because that
+ * is what moves — they are one rigid object bolted to one wall, and offering the
+ * ring alone would put most of the visible target outside its own hit box.
+ */
 export function trickShotTargetAtPoint(target, point) {
+  if (target?.kind === HOOP_TARGET && target.hoop) return hoopAssemblyAtPoint(target.hoop, point);
   if (target?.kind !== BIN_TARGET || !target.bin) return false;
   const mouth = binMouthEllipse(target.bin);
   const foot = projectPoint({ x: target.bin.x, y: target.bin.baseY ?? 0, z: target.bin.z });
   if (Math.abs(point.x - mouth.cx) > Math.max(18, mouth.radiusX)) return false;
   return point.y >= mouth.cy - mouth.radiusY - 8 && point.y <= foot.y + 10;
+}
+
+function hoopAssemblyAtPoint(hoop, point) {
+  const onBoard = point.x >= hoop.boardX && point.x <= hoop.boardX + hoop.boardW
+    && point.y >= hoop.boardY && point.y <= hoop.boardY + hoop.boardH;
+  const onRim = Math.abs(point.x - hoop.cx) <= RIM_SCREEN_HALF_WIDTH + 10
+    && Math.abs(point.y - hoop.rimY) <= 26;
+  return onBoard || onRim;
+}
+
+/**
+ * The build-mode marks for a placed hoop: the band it may hang in, and a cross
+ * on the rim centre that is the point actually being dragged.
+ *
+ * DELIBERATELY NOT THE BIN'S FLOOR RING AND TETHER. Those exist to separate "the
+ * bin is further away" from "the bin is higher up", which look identical on a
+ * still frame — an ambiguity a hoop simply does not have, because there is one
+ * depth it can be at and the player knows it. The question a hoop actually
+ * raises is the other one: HOW FAR MAY I MOVE THIS? On a still hoop that is most
+ * of the room, and on Up / Down it is four pixels, so drawing the band is the
+ * difference between a control that feels stuck and one that is visibly at its
+ * limit. It is read from `sim/hoop-placement.js` rather than restated, so a
+ * mode's real reach is what is drawn.
+ */
+function drawHoopPlacementMarks(ctx, target) {
+  const hoop = target?.hoop;
+  if (!hoop) return;
+  const bounds = hoopPlacementBoundsFor(target.motionId);
+  const width = Math.max(2, bounds.maxCx - bounds.minCx);
+  const height = Math.max(2, bounds.maxRimY - bounds.minRimY);
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,45,225,.55)";
+  ctx.shadowColor = "#ff2ddd";
+  ctx.shadowBlur = 8;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([9, 8]);
+  ctx.strokeRect(bounds.minCx, bounds.minRimY, width, height);
+  ctx.setLineDash([]);
+
+  // The rim centre is the point the drag actually carries, so it gets the mark.
+  ctx.strokeStyle = "rgba(255,77,219,.95)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(hoop.cx - 11, hoop.rimY);
+  ctx.lineTo(hoop.cx + 11, hoop.rimY);
+  ctx.moveTo(hoop.cx, hoop.rimY - 11);
+  ctx.lineTo(hoop.cx, hoop.rimY + 11);
+  ctx.stroke();
+  ctx.restore();
 }
 
 // --- entities ---------------------------------------------------------------
@@ -1183,7 +1251,7 @@ export function renderTrickShotFrame(ctx, view) {
   drawTrickShotImpacts(ctx, impacts);
 
   if (building) {
-    if (bin && !pull) drawBinPlacementMarks(ctx, target);
+    if (!pull) drawTargetPlacementMarks(ctx, target);
     const selected = pieces.find((piece) => piece.id === selectedId);
     if (selected && !pull) drawPieceControls(ctx, selected);
   }

@@ -1,8 +1,8 @@
 // Reusable sandbox-piece records.
 //
-// This module deliberately knows nothing about Trick Shot Lab's DOM, storage,
-// or HORSE. HORSE can later expose this same piece catalog during its own setup
-// phase without inheriting the lab's saved-shot bank or editor state.
+// This module deliberately knows nothing about either editor's DOM or storage.
+// The Lab and HORSE both consume these records, so a saved layout and a standing
+// HORSE shot describe the same physical tools with the same validation.
 
 import { DEFAULT_BALL, ballById } from "../assets/ball-catalog.js";
 import { DEFAULT_LOCATION, locationById } from "../assets/location-catalog.js";
@@ -107,11 +107,11 @@ export function createSandboxPiece(type, input = {}, fallbackId = `${type || "pi
   };
 }
 
-/** A storage-safe Trick Shot Lab layout. It intentionally has no HORSE fields. */
-export function normalizeTrickShot(input = {}) {
+/** Validate a bounded, uniquely identified list of player-authored tools. */
+export function normalizeSandboxPieces(input = []) {
   const pieces = [];
   const ids = new Set();
-  for (const [index, source] of (Array.isArray(input.pieces) ? input.pieces : []).entries()) {
+  for (const [index, source] of (Array.isArray(input) ? input : []).entries()) {
     if (pieces.length >= MAX_SANDBOX_PIECES) break;
     if (!SANDBOX_PIECE_TYPES.includes(source?.type)) continue;
     const piece = createSandboxPiece(source.type, source, `${source.type}-${index + 1}`);
@@ -119,7 +119,11 @@ export function normalizeTrickShot(input = {}) {
     ids.add(piece.id);
     pieces.push(piece);
   }
+  return pieces;
+}
 
+/** A storage-safe Trick Shot Lab layout. It intentionally has no HORSE fields. */
+export function normalizeTrickShot(input = {}) {
   return {
     version: TRICK_SHOT_VERSION,
     id: normalizePieceId(input.id, ""),
@@ -130,7 +134,7 @@ export function normalizeTrickShot(input = {}) {
     // before targets existed has none, and takes the still wall hoop it was
     // authored against — see `TRICK_SHOT_VERSION`.
     target: input.target ? normalizeTrickShotTarget(input.target) : defaultTrickShotTarget(),
-    pieces,
+    pieces: normalizeSandboxPieces(input.pieces),
     createdAt: Math.max(0, finite(input.createdAt, 0)),
     updatedAt: Math.max(0, finite(input.updatedAt, 0)),
   };
