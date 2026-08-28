@@ -201,8 +201,22 @@
     linear-gradient(135deg, rgb(62 244 255 / .17), rgb(5 31 45 / .96));
   box-shadow: 0 0 13px rgb(62 244 255 / .58), inset 0 0 0 8px rgb(62 244 255 / .1);
 }
+.trick-spring-preview::before {
+  background: #3e1117;
+}
+.trick-spring-preview i {
+  border-color: #ffe34f;
+  background:
+    repeating-linear-gradient(12deg, transparent 0 8px, rgb(255 243 106 / .92) 9px 13px, transparent 14px 21px),
+    linear-gradient(135deg, #ef3f32, #78191d);
+  box-shadow: 0 0 14px rgb(255 90 69 / .7), inset 0 0 0 7px rgb(255 227 79 / .12);
+}
 .trick-piece-art--cannon img:first-child { left: 4px; bottom: 0; width: 45px; height: 54px; }
 .trick-piece-art--cannon img:last-child { right: -3px; top: 7px; width: 68px; height: 35px; transform: rotate(-16deg); transform-origin: left center; }
+
+.trick-ball-panel .turn-ball-picker { margin: 0; }
+.trick-ball-panel .turn-ball-choices { gap: 5px; }
+.trick-ball-panel .turn-ball-choice { min-height: 38px; padding: 5px 4px; }
 
 .trick-control { display: grid; gap: 5px; margin-top: 9px; color: var(--ink-dim); font-size: .69rem; }
 .trick-control input[type="range"] { width: 100%; accent-color: var(--trick-cyan); }

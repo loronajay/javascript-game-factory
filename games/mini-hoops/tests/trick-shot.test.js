@@ -3,6 +3,7 @@ import { suite, test, assert, assertClose, assertEqual, finish } from "./harness
 import {
   BOARD_PIECE,
   CANNON_PIECE,
+  SPRING_PIECE,
   boardFrame,
   cannonDirection,
   createSandboxPiece,
@@ -31,6 +32,13 @@ test("piece records are normalized into a bounded, reusable catalog", () => {
   assert(cannon.yaw >= -Math.PI / 2 && cannon.pitch < Math.PI / 2);
   assert(cannon.speed <= 7.5);
   assert(cannon.delay >= 0.25);
+
+  const spring = createSandboxPiece(SPRING_PIECE, {
+    id: "spring-1", x: -99, angle: -99, length: 9, speed: 100,
+  });
+  assertEqual(spring.type, SPRING_PIECE);
+  assert(spring.x >= -0.9 && spring.length <= 0.68, "springboards share pad placement bounds");
+  assert(spring.speed <= 7.5, "spring power is bounded");
 });
 
 test("launchers and pads can be oriented around the room, not only toward the hoop", () => {
@@ -100,6 +108,21 @@ test("a tilted pad reflects only the velocity normal to its face", () => {
   assert(ball.vx < -1.7, "the approaching normal velocity bounces away with restitution");
   assertClose(ball.vy, 0.4, 0.03, "vertical velocity along the face is preserved");
   assertClose(ball.vz, 1, 0.03, "depth velocity along the face is preserved");
+});
+
+test("a springboard pushes the ball away at its authored speed", () => {
+  const spring = createSandboxPiece(SPRING_PIECE, {
+    id: "spring", x: 0, y: 0.7, z: 0.45,
+    yaw: Math.PI / 2, angle: 0, length: 0.5, speed: 5.8,
+  });
+  const ball = { x: -0.095, y: 0.775, z: 0.45, vx: 0.4, vy: 0.7, vz: 1.1, omegaX: 0 };
+  const previous = { x: -0.12, y: 0.77, z: 0.438 };
+  const result = stepTrickShotPieces(ball, previous, [spring], createTrickShotPhysics(), 0.008);
+
+  assert(result.contacts.includes("sandbox-spring"));
+  assertClose(ball.vx, -5.8, 1e-9, "the contacted face launches directly outward");
+  assertClose(ball.vy, 0.7, 0.03, "motion along the spring face is preserved");
+  assertClose(ball.vz, 1.1, 0.03, "sideways motion along the spring face is preserved");
 });
 
 test("a cannon catches a descending ball, waits its delay, then fires on its set trajectory", () => {

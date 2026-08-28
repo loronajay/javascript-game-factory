@@ -9,8 +9,10 @@ import {
   BOARD_PAD_THICKNESS,
   BOARD_PIECE,
   CANNON_PIECE,
+  SPRING_PIECE,
   boardFrame,
   cannonDirection,
+  isPadPiece,
 } from "./trick-shot.js";
 
 const CANNON_MOUTH_RADIUS = 0.135;
@@ -86,7 +88,7 @@ function catchWithCannon(ball, previous, cannon, runtime) {
   return true;
 }
 
-function resolveBoard(ball, previous, board) {
+function resolvePad(ball, previous, board) {
   const halfFace = board.length / 2;
   const halfDepth = BOARD_PAD_THICKNESS / 2;
   const { normal, right, up } = boardFrame(board);
@@ -132,11 +134,19 @@ function resolveBoard(ball, previous, board) {
   const nz = right.z * localNormal.x + up.z * localNormal.y + normal.z * localNormal.z;
 
   const normalSpeed = ball.vx * nx + ball.vy * ny + ball.vz * nz;
-  if (normalSpeed >= 0) return false;
-  const impulse = (1 + board.restitution) * normalSpeed;
-  ball.vx -= impulse * nx;
-  ball.vy -= impulse * ny;
-  ball.vz -= impulse * nz;
+  if (board.type === SPRING_PIECE) {
+    if (normalSpeed >= board.speed) return false;
+    const boost = board.speed - normalSpeed;
+    ball.vx += boost * nx;
+    ball.vy += boost * ny;
+    ball.vz += boost * nz;
+  } else {
+    if (normalSpeed >= 0) return false;
+    const impulse = (1 + board.restitution) * normalSpeed;
+    ball.vx -= impulse * nx;
+    ball.vy -= impulse * ny;
+    ball.vz -= impulse * nz;
+  }
   const closest = {
     x: board.x + right.x * closestLocal.x + up.x * closestLocal.y + normal.x * closestLocal.z,
     y: board.y + right.y * closestLocal.x + up.y * closestLocal.y + normal.y * closestLocal.z,
@@ -162,7 +172,8 @@ export function stepTrickShotPieces(ball, previous, pieces, runtime, dt) {
 
   const contacts = [];
   for (const board of pieces) {
-    if (board.type === BOARD_PIECE && resolveBoard(ball, previous, board)) contacts.push("sandbox-board");
+    if (!isPadPiece(board) || !resolvePad(ball, previous, board)) continue;
+    contacts.push(board.type === BOARD_PIECE ? "sandbox-board" : "sandbox-spring");
   }
   return { contacts, captured: false, launched: false };
 }

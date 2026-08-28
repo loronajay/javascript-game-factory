@@ -8,8 +8,10 @@ import {
   BOARD_PAD_THICKNESS,
   BOARD_PIECE,
   CANNON_PIECE,
+  SPRING_PIECE,
   boardFrame,
   cannonDirection,
+  isPadPiece,
 } from "../sim/trick-shot.js";
 import { ballScreenRadius, depthScaleAt, projectPoint } from "../sim/projection.js";
 import { drawAim } from "./aim.js";
@@ -137,7 +139,20 @@ function strokeGlow(ctx, color, width, drawPath, selected = false) {
   ctx.restore();
 }
 
-function drawBoard(ctx, piece, selected) {
+function quadPoint(points, u, v) {
+  const top = {
+    x: points[0].x + (points[1].x - points[0].x) * u,
+    y: points[0].y + (points[1].y - points[0].y) * u,
+  };
+  const bottom = {
+    x: points[3].x + (points[2].x - points[3].x) * u,
+    y: points[3].y + (points[2].y - points[3].y) * u,
+  };
+  return { x: top.x + (bottom.x - top.x) * v, y: top.y + (bottom.y - top.y) * v };
+}
+
+function drawSquarePad(ctx, piece, selected) {
+  const springboard = piece.type === SPRING_PIECE;
   const geometry = boardProjectedGeometry(piece);
   const orderedFaces = [...geometry.faces].sort((a, b) => {
     const depthA = a.world.reduce((sum, point) => sum + point.z, 0) / a.world.length;
@@ -146,31 +161,49 @@ function drawBoard(ctx, piece, selected) {
   });
   ctx.save();
   ctx.lineJoin = "round";
-  ctx.shadowColor = selected ? "#d8ff4d" : "#3ef4ff";
+  ctx.shadowColor = selected ? "#d8ff4d" : springboard ? "#ff5a45" : "#3ef4ff";
   ctx.shadowBlur = selected ? 18 : 9;
   for (const face of orderedFaces) {
     polygonPath(ctx, face.points);
     ctx.fillStyle = face.kind === "impact"
-      ? selected ? "rgba(52,71,55,.97)" : "rgba(11,58,72,.96)"
-      : selected ? "rgba(132,159,54,.98)" : "rgba(10,28,42,.98)";
+      ? selected ? "rgba(52,71,55,.97)" : springboard ? "rgba(120,24,26,.97)" : "rgba(11,58,72,.96)"
+      : selected ? "rgba(132,159,54,.98)" : springboard ? "rgba(58,14,20,.98)" : "rgba(10,28,42,.98)";
     ctx.fill();
-    ctx.strokeStyle = face.kind === "impact" ? selected ? "#d8ff4d" : "#53f5ff" : "#0b111c";
+    ctx.strokeStyle = face.kind === "impact"
+      ? selected ? "#d8ff4d" : springboard ? "#ffe34f" : "#53f5ff"
+      : "#0b111c";
     ctx.lineWidth = face.kind === "impact" ? 3 : 2;
     ctx.stroke();
 
     if (face.kind === "impact" && polygonArea(face.points) > 240) {
       const inner = insetPolygon(face.points, 0.2);
       polygonPath(ctx, inner);
-      ctx.fillStyle = "rgba(62,244,255,.10)";
+      ctx.fillStyle = springboard ? "rgba(255,70,50,.72)" : "rgba(62,244,255,.10)";
       ctx.fill();
-      ctx.strokeStyle = selected ? "rgba(216,255,77,.95)" : "rgba(186,252,255,.86)";
+      ctx.strokeStyle = selected
+        ? "rgba(216,255,77,.95)"
+        : springboard ? "rgba(255,231,84,.96)" : "rgba(186,252,255,.86)";
       ctx.lineWidth = 2;
       ctx.stroke();
       const centre = inner.reduce((sum, point) => ({ x: sum.x + point.x / 4, y: sum.y + point.y / 4 }), { x: 0, y: 0 });
-      ctx.fillStyle = selected ? "#d8ff4d" : "#f2ffff";
-      ctx.beginPath();
-      ctx.arc(centre.x, centre.y, Math.max(3, 5 * depthScaleAt(piece.z)), 0, Math.PI * 2);
-      ctx.fill();
+      if (springboard) {
+        ctx.beginPath();
+        for (const [index, [u, v]] of [[0.18, 0.28], [0.82, 0.28], [0.18, 0.5], [0.82, 0.5], [0.18, 0.72], [0.82, 0.72]].entries()) {
+          const point = quadPoint(inner, u, v);
+          if (index === 0) ctx.moveTo(point.x, point.y);
+          else ctx.lineTo(point.x, point.y);
+        }
+        ctx.strokeStyle = selected ? "#d8ff4d" : "#fff36a";
+        ctx.lineWidth = Math.max(3, 5 * depthScaleAt(piece.z));
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = selected ? "#d8ff4d" : "#f2ffff";
+        ctx.beginPath();
+        ctx.arc(centre.x, centre.y, Math.max(3, 5 * depthScaleAt(piece.z)), 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
   if (selected) {
@@ -181,6 +214,14 @@ function drawBoard(ctx, piece, selected) {
     ctx.stroke();
   }
   ctx.restore();
+}
+
+function drawBoard(ctx, piece, selected) {
+  drawSquarePad(ctx, piece, selected);
+}
+
+function drawSpringboard(ctx, piece, selected) {
+  drawSquarePad(ctx, piece, selected);
 }
 
 function ringPoints(piece, count = 30) {
@@ -296,6 +337,7 @@ function drawCannon(ctx, piece, selected, capture, assets = {}) {
 
 export function drawSandboxPiece(ctx, piece, { selected = false, capture = null, pieceAssets = {} } = {}) {
   if (piece.type === BOARD_PIECE) drawBoard(ctx, piece, selected);
+  else if (piece.type === SPRING_PIECE) drawSpringboard(ctx, piece, selected);
   else if (piece.type === CANNON_PIECE) drawCannon(ctx, piece, selected, capture?.pieceId === piece.id ? capture : null, pieceAssets);
 }
 
@@ -305,7 +347,7 @@ export function pieceControlLayout(piece) {
   const floor = projectPoint({ x: piece.x, y: 0, z: piece.z });
   let right = centre.x + 34;
   let top = centre.y - 34;
-  if (piece.type === BOARD_PIECE) {
+  if (isPadPiece(piece)) {
     const hull = boardProjectedGeometry(piece).hull;
     right = Math.max(...hull.map((point) => point.x)) + 22;
     top = Math.min(...hull.map((point) => point.y)) - 24;
@@ -420,7 +462,7 @@ function pointInPolygon(point, polygon) {
 /** Nearest visible piece at a canvas point; used by the editor, not the sim. */
 export function sandboxPieceAtPoint(pieces, point) {
   for (const piece of [...pieces].sort((a, b) => a.z - b.z)) {
-    if (piece.type === BOARD_PIECE) {
+    if (isPadPiece(piece)) {
       if (pointInPolygon(point, boardProjectedGeometry(piece).hull)) return piece;
     } else {
       const centre = projectPoint({ x: piece.x, y: piece.y + 0.08, z: piece.z });
@@ -438,7 +480,7 @@ export function sandboxPieceAtPoint(pieces, point) {
 function drawPieceLocator(ctx, piece, selected = false) {
   const centre = projectPoint({ x: piece.x, y: piece.y + (piece.type === CANNON_PIECE ? 0.08 : 0), z: piece.z });
   const floor = projectPoint({ x: piece.x, y: 0, z: piece.z });
-  const color = selected ? "#d8ff4d" : piece.type === BOARD_PIECE ? "#53f5ff" : "#ff5ddd";
+  const color = selected ? "#d8ff4d" : piece.type === BOARD_PIECE ? "#53f5ff" : piece.type === SPRING_PIECE ? "#ffe34f" : "#ff5ddd";
   ctx.save();
   ctx.setLineDash(selected ? [] : [4, 6]);
   ctx.strokeStyle = "rgba(5,8,16,.9)";
@@ -462,8 +504,8 @@ function drawPieceLocator(ctx, piece, selected = false) {
   ctx.restore();
 
   ctx.save();
-  const label = piece.type === BOARD_PIECE ? "PAD" : "LAUNCHER";
-  const labelY = centre.y - (piece.type === BOARD_PIECE ? 18 : 42 * depthScaleAt(piece.z));
+  const label = piece.type === BOARD_PIECE ? "PAD" : piece.type === SPRING_PIECE ? "SPRING" : "LAUNCHER";
+  const labelY = centre.y - (isPadPiece(piece) ? 18 : 42 * depthScaleAt(piece.z));
   ctx.font = "900 10px system-ui";
   const width = ctx.measureText(label).width + 14;
   ctx.fillStyle = "rgba(5,8,16,.9)";
@@ -494,7 +536,18 @@ function drawBallEntity(ctx, view) {
   });
 }
 
-/** Draw one editor/play frame with sandbox pieces sorted in the same world depth as the ball. */
+/**
+ * Tools are interactive editor objects, so keep their complete silhouettes above
+ * the photographed furniture. Their own far-to-near order still communicates
+ * depth when two tools overlap.
+ */
+function drawForegroundSandboxPieces(ctx, pieces, { selectedId, capture, pieceAssets }) {
+  for (const piece of [...pieces].sort((a, b) => b.z - a.z)) {
+    drawSandboxPiece(ctx, piece, { selected: piece.id === selectedId, capture, pieceAssets });
+  }
+}
+
+/** Draw one editor/play frame with room objects depth-sorted behind the sandbox tools. */
 export function renderTrickShotFrame(ctx, view) {
   const { ball, hoop, backdrop, locationId, pieces, selectedId, capture, pull, trajectory, scored, pieceAssets = {} } = view;
   clearScene(ctx);
@@ -509,20 +562,21 @@ export function renderTrickShotFrame(ctx, view) {
   drawRim(ctx, hoop, true, 0);
   drawRoomOccluders(ctx, backdrop, locationId, BOARD_Z);
 
-  const entities = pieces.map((piece) => ({
-    z: piece.z,
-    draw: () => drawSandboxPiece(ctx, piece, { selected: piece.id === selectedId, capture, pieceAssets }),
-  }));
-  entities.push({ z: pull ? 0 : ball.z, draw: () => drawBallEntity(ctx, view) });
-  entities.push({ z: RIM_CENTER_Z, draw: () => { drawNet(ctx, hoop, false, scored ? 0.18 : 0); drawRim(ctx, hoop, false, 0); } });
+  const entities = [
+    { z: pull ? 0 : ball.z, draw: () => drawBallEntity(ctx, view) },
+    { z: RIM_CENTER_Z, draw: () => { drawNet(ctx, hoop, false, scored ? 0.18 : 0); drawRim(ctx, hoop, false, 0); } },
+  ];
   entities.sort((a, b) => b.z - a.z);
   for (const entity of entities) {
     entity.draw();
     drawRoomOccluders(ctx, backdrop, locationId, entity.z);
   }
 
-  // Locators are editor chrome, not room objects. They remain visible above a
-  // desk or bed even when the piece body is correctly behind that furniture.
+  // Pads and launchers must be readable and draggable wherever they are placed;
+  // painting them here prevents a bed or desk mask from erasing their bodies.
+  drawForegroundSandboxPieces(ctx, pieces, { selectedId, capture, pieceAssets });
+
+  // Locators are editor chrome and share the tools' foreground layer.
   for (const piece of pieces) drawPieceLocator(ctx, piece, piece.id === selectedId);
 
   const selected = pieces.find((piece) => piece.id === selectedId);

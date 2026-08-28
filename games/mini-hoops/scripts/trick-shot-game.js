@@ -4,7 +4,7 @@
 // state. What HORSE can reuse later is below this file: sim/trick-shot.js,
 // sim/trick-shot-physics.js, and render/trick-shot.js.
 
-import { DEFAULT_BALL, ballFlight } from "./assets/ball-catalog.js";
+import { DEFAULT_BALL, ballById, ballFlight } from "./assets/ball-catalog.js";
 import { DEFAULT_LOCATION } from "./assets/location-catalog.js";
 import { createAssetLibrary } from "./assets/loader.js";
 import {
@@ -23,7 +23,9 @@ import {
   BOARD_PIECE,
   CANNON_PIECE,
   MAX_SANDBOX_PIECES,
+  SPRING_PIECE,
   createSandboxPiece,
+  isPadPiece,
 } from "./sim/trick-shot.js";
 import {
   createTrickShotPhysics,
@@ -91,6 +93,7 @@ export function bootTrickShot(root, options = {}) {
   const view = createTrickShotView(root, {
     onExit: () => onLeave(),
     onAddBoard: () => addPiece(BOARD_PIECE),
+    onAddSpring: () => addPiece(SPRING_PIECE),
     onAddCannon: () => addPiece(CANNON_PIECE),
     onUndo: undoEdit,
     onResetBall: () => resetShot("BUILD MODE"),
@@ -100,6 +103,7 @@ export function bootTrickShot(root, options = {}) {
     onNew: newLayout,
     onLoad: loadLayout,
     onDeleteShot: deleteSaved,
+    onBallSelect: selectBall,
   });
 
   function bank() {
@@ -118,7 +122,16 @@ export function bootTrickShot(root, options = {}) {
       power: pull?.power || 0,
       pulling: pointerMode === "pull",
       canUndo: history.length > 0,
+      ballId,
     });
+  }
+
+  function selectBall(nextBallId) {
+    if (shotActive || pull) return;
+    ballId = ballById(nextBallId).id;
+    assets.ballFrames(ballId);
+    audio.click();
+    resetShot("BALL SELECTED");
   }
 
   function rememberEdit() {
@@ -149,11 +162,13 @@ export function bootTrickShot(root, options = {}) {
       x: ((count % 5) - 2) * 0.12,
       y: type === CANNON_PIECE ? 0.3 : 0.65 + (count % 3) * 0.13,
       z: 0.32 + (count % 4) * 0.12,
-      angle: type === BOARD_PIECE ? -0.18 + (count % 3) * 0.18 : undefined,
+      angle: type !== CANNON_PIECE ? -0.18 + (count % 3) * 0.18 : undefined,
     });
     pieces = [...pieces, piece];
     selectedId = piece.id;
-    status = type === BOARD_PIECE ? "REBOUND PAD ADDED" : "CANNON ADDED";
+    status = type === BOARD_PIECE
+      ? "REBOUND PAD ADDED"
+      : type === SPRING_PIECE ? "SPRINGBOARD ADDED" : "CANNON ADDED";
     renderView();
   }
 
@@ -170,7 +185,7 @@ export function bootTrickShot(root, options = {}) {
     rememberEdit();
     if (field === "depth") replaceSelected({ z: value / 100 });
     else if (field === "angle") replaceSelected({ yaw: value * Math.PI / 180 });
-    else if (field === "pitch") replaceSelected(piece.type === BOARD_PIECE
+    else if (field === "pitch") replaceSelected(isPadPiece(piece)
       ? { angle: value * Math.PI / 180 }
       : { pitch: value * Math.PI / 180 });
     else if (field === "power") replaceSelected({ speed: value });
@@ -426,7 +441,10 @@ export function bootTrickShot(root, options = {}) {
     }
 
     for (const contact of heard) {
-      if (contact === "sandbox-board") audio.contact("backboard", { ballId, speed: ball.vy });
+      if (contact === "sandbox-board" || contact === "sandbox-spring") {
+        audio.contact("backboard", { ballId, speed: ball.vy });
+        if (contact === "sandbox-spring") status = "SPRING!";
+      }
       else if (contact === "sandbox-cannon-catch") audio.contact("rim", { ballId, speed: ball.vy });
       else if (!["score", "sandbox-cannon-fire"].includes(contact)) audio.contact(contact, { ballId, speed: ball.vy });
     }
@@ -505,6 +523,6 @@ export function bootTrickShot(root, options = {}) {
       resetShot("BUILD MODE");
     },
     isActive: () => active,
-    state: () => ({ pieces, selectedId, currentId, shotActive, ball, capture: piecePhysics.capture }),
+    state: () => ({ pieces, selectedId, currentId, shotActive, ballId, ball, capture: piecePhysics.capture }),
   };
 }

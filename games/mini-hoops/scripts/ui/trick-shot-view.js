@@ -1,6 +1,7 @@
 // DOM binding for the Trick Shot Lab. It owns no layout, physics, or saved data.
 
-import { BOARD_PIECE, CANNON_PIECE } from "../sim/trick-shot.js";
+import { BOARD_PIECE, CANNON_PIECE, SPRING_PIECE, isPadPiece } from "../sim/trick-shot.js";
+import { createTurnBallPicker } from "./turn-ball-picker.js";
 
 const byId = (root, id) => root.querySelector(`#${id}`);
 
@@ -22,6 +23,7 @@ export function createTrickShotView(root, handlers = {}) {
     angle: byId(root, "trickAngle"),
     pitch: byId(root, "trickPitch"),
     power: byId(root, "trickPower"),
+    powerLabel: byId(root, "trickPowerLabel"),
     delay: byId(root, "trickDelay"),
     bounce: byId(root, "trickBounce"),
     angleLabel: byId(root, "trickAngleLabel"),
@@ -30,10 +32,13 @@ export function createTrickShotView(root, handlers = {}) {
     powerRow: byId(root, "trickPowerRow"),
     delayRow: byId(root, "trickDelayRow"),
     bounceRow: byId(root, "trickBounceRow"),
+    ballChoices: byId(root, "trickBallChoices"),
   };
 
+  const balls = createTurnBallPicker(nodes.ballChoices, { onSelect: handlers.onBallSelect });
+
   const actionMap = [
-    ["trickExit", "onExit"], ["trickAddBoard", "onAddBoard"], ["trickAddCannon", "onAddCannon"],
+    ["trickExit", "onExit"], ["trickAddBoard", "onAddBoard"], ["trickAddSpring", "onAddSpring"], ["trickAddCannon", "onAddCannon"],
     ["trickUndo", "onUndo"], ["trickResetBall", "onResetBall"], ["trickDeletePiece", "onDeletePiece"],
     ["trickSave", "onSave"], ["trickNew", "onNew"],
   ];
@@ -86,7 +91,7 @@ export function createTrickShotView(root, handlers = {}) {
   return {
     name: () => nodes.name?.value || "",
 
-    render({ pieces, selectedId, bank, currentId, name, status, busy, power = 0, pulling = false, canUndo = false }) {
+    render({ pieces, selectedId, bank, currentId, name, status, busy, ballId, power = 0, pulling = false, canUndo = false }) {
       const selected = pieces.find((piece) => piece.id === selectedId) || null;
       if (nodes.status) nodes.status.textContent = status;
       if (nodes.hint) nodes.hint.textContent = busy
@@ -104,18 +109,22 @@ export function createTrickShotView(root, handlers = {}) {
       if (nodes.name && document.activeElement !== nodes.name) nodes.name.value = name;
       if (nodes.empty) nodes.empty.hidden = pieces.length > 0;
       if (nodes.inspector) nodes.inspector.hidden = !selected;
-      if (nodes.inspectorTitle) nodes.inspectorTitle.textContent = selected?.type === BOARD_PIECE ? "Rebound Pad" : "Ball Cannon";
+      if (nodes.inspectorTitle) nodes.inspectorTitle.textContent = selected?.type === BOARD_PIECE
+        ? "Rebound Pad"
+        : selected?.type === SPRING_PIECE ? "Springboard" : "Ball Cannon";
 
       if (selected) {
         nodes.depth.value = Math.round(selected.z * 100);
         nodes.angle.value = Math.round(selected.yaw * 180 / Math.PI);
         if (nodes.angleLabel) nodes.angleLabel.textContent = "Direction around room";
         const cannon = selected.type === CANNON_PIECE;
+        const spring = selected.type === SPRING_PIECE;
         nodes.pitchRow.hidden = false;
-        nodes.powerRow.hidden = !cannon;
+        nodes.powerRow.hidden = !cannon && !spring;
+        if (nodes.powerLabel) nodes.powerLabel.textContent = spring ? "Spring power" : "Launch power";
         nodes.delayRow.hidden = !cannon;
-        nodes.bounceRow.hidden = cannon;
-        if (nodes.pitchLabel) nodes.pitchLabel.textContent = selected.type === BOARD_PIECE ? "Face tilt" : "Launch angle";
+        nodes.bounceRow.hidden = selected.type !== BOARD_PIECE;
+        if (nodes.pitchLabel) nodes.pitchLabel.textContent = isPadPiece(selected) ? "Face tilt" : "Launch angle";
         nodes.pitch.min = cannon ? "5" : "-80";
         nodes.pitch.max = cannon ? "85" : "80";
         nodes.pitch.step = cannon ? "5" : "10";
@@ -125,7 +134,8 @@ export function createTrickShotView(root, handlers = {}) {
           nodes.delay.value = selected.delay;
         } else {
           nodes.pitch.value = Math.round(selected.angle * 180 / Math.PI);
-          nodes.bounce.value = selected.restitution;
+          if (spring) nodes.power.value = selected.speed;
+          else nodes.bounce.value = selected.restitution;
         }
         const direction = Math.round(selected.yaw * 180 / Math.PI);
         for (const button of directionButtons) {
@@ -136,12 +146,13 @@ export function createTrickShotView(root, handlers = {}) {
 
       for (const [input] of fields) if (input) input.disabled = busy;
       for (const button of directionButtons) button.disabled = busy;
-      for (const id of ["trickAddBoard", "trickAddCannon", "trickDeletePiece"]) {
+      for (const id of ["trickAddBoard", "trickAddSpring", "trickAddCannon", "trickDeletePiece"]) {
         const button = byId(root, id);
         if (button) button.disabled = busy;
       }
       const undo = byId(root, "trickUndo");
       if (undo) undo.disabled = busy || !canUndo;
+      balls.render({ ballId, enabled: !busy && !pulling });
       renderBank(bank, currentId);
     },
   };

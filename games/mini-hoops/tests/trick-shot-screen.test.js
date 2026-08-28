@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { suite, test, assert, assertEqual, finish } from "./harness.js";
 import { COURT_SCREENS, SCREENS, SCREEN_TRICK_SHOT } from "../scripts/ui/screens.js";
-import { createSandboxPiece, BOARD_PIECE } from "../scripts/sim/trick-shot.js";
+import { createSandboxPiece, BOARD_PIECE, SPRING_PIECE } from "../scripts/sim/trick-shot.js";
 import {
   boardProjectedGeometry,
   pieceControlLayout,
@@ -33,7 +33,7 @@ test("the lab is a routed court reached from the marquee", () => {
 
 test("the editor exposes creation, tuning, testing, and a named shot bank", () => {
   for (const id of [
-    "trickShotCourt", "trickAddBoard", "trickAddCannon", "trickResetBall",
+    "trickShotCourt", "trickAddBoard", "trickAddSpring", "trickAddCannon", "trickResetBall",
     "trickUndo", "trickDeletePiece", "trickPowerGauge", "trickPowerFill", "trickPowerReadout",
     "trickDepth", "trickAngle", "trickPitch", "trickPower", "trickDelay",
     "trickShotName", "trickSave", "trickNew", "trickBankList",
@@ -74,6 +74,14 @@ test("a rebound pad has a projected square face with thickness and body hit test
   assert(turnedWidth > 30 && turnedArea > 1000, "the pad's box silhouette survives an edge-on room angle");
 });
 
+test("a springboard reuses the square pad geometry but has distinct spring art", () => {
+  const spring = createSandboxPiece(SPRING_PIECE, { id: "spring", x: -0.12, y: 0.68, z: 0.55, angle: -0.2 });
+  const geometry = boardProjectedGeometry(spring);
+  assertEqual(sandboxPieceAtPoint([spring], geometry.centre)?.id, spring.id);
+  assert(html.includes("trick-spring-preview"), "the tray needs a recognizable springboard preview");
+  assert(renderer.includes("drawSpringboard"), "springboards need distinct court art");
+});
+
 test("a selected piece exposes direct remove and depth handles in the same projection as its collider", () => {
   const board = createSandboxPiece(BOARD_PIECE, { id: "board", x: 0.15, y: 0.7, z: 0.5, angle: 0.2 });
   const controls = pieceControlLayout(board);
@@ -99,7 +107,7 @@ test("tool orientation offers useful snapped directions through the full room", 
   assert(html.includes('id="trickAngle" type="range" min="-180" max="180" step="15"'));
   assert(html.includes('id="trickPitch" type="range" min="5" max="85" step="5"'));
   assert([...html.matchAll(/data-trick-direction=/g)].length >= 8, "common 3D directions need one-tap presets");
-  assert(view.includes('selected.type === BOARD_PIECE ? "Face tilt" : "Launch angle"'));
+  assert(view.includes('isPadPiece(selected) ? "Face tilt" : "Launch angle"'));
 });
 
 test("piece art and hit testing use the cabinet's one projection", () => {

@@ -1,6 +1,6 @@
 import { suite, test, assert, assertEqual, assertDeepEqual, finish } from "./harness.js";
 
-import { BOARD_PIECE } from "../scripts/sim/trick-shot.js";
+import { BOARD_PIECE, SPRING_PIECE } from "../scripts/sim/trick-shot.js";
 import { createMemoryStorage } from "../scripts/store/local-storage.js";
 import { createTrickShotStore } from "../scripts/store/trick-shots-store.js";
 
@@ -40,6 +40,15 @@ test("the named bank persists and returns defensive copies", () => {
   const loaded = reloaded.get("persisted");
   loaded.pieces[0].x = 999;
   assertEqual(reloaded.get("persisted").pieces[0].x, 0, "callers cannot mutate the bank in memory");
+});
+
+test("saved layouts retain springboards and their launch power", () => {
+  const store = createTrickShotStore({ storage: createMemoryStorage(), makeId: () => "spring-shot" });
+  const saved = store.save(layout("Spring route", {
+    pieces: [{ type: SPRING_PIECE, id: "spring-1", x: 0.1, y: 0.8, z: 0.6, speed: 6.2 }],
+  }));
+  assertEqual(saved.pieces[0].type, SPRING_PIECE);
+  assertEqual(saved.pieces[0].speed, 6.2);
 });
 
 test("shots can be deleted without touching neighboring saves", () => {

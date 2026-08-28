@@ -8,11 +8,14 @@ import { DEFAULT_BALL, ballById } from "../assets/ball-catalog.js";
 import { DEFAULT_LOCATION, locationById } from "../assets/location-catalog.js";
 
 export const BOARD_PIECE = "board";
+export const SPRING_PIECE = "spring";
 export const CANNON_PIECE = "cannon";
-export const SANDBOX_PIECE_TYPES = Object.freeze([BOARD_PIECE, CANNON_PIECE]);
+export const SANDBOX_PIECE_TYPES = Object.freeze([BOARD_PIECE, SPRING_PIECE, CANNON_PIECE]);
 export const MAX_SANDBOX_PIECES = 24;
 export const TRICK_SHOT_VERSION = 1;
 export const BOARD_PAD_THICKNESS = 0.055;
+
+export const isPadPiece = (piece) => piece?.type === BOARD_PIECE || piece?.type === SPRING_PIECE;
 
 export const PIECE_BOUNDS = Object.freeze({
   x: Object.freeze([-0.9, 0.9]),
@@ -53,8 +56,8 @@ export function createSandboxPiece(type, input = {}, fallbackId = `${type || "pi
     z: clamp(input.z, ...PIECE_BOUNDS.z, type === CANNON_PIECE ? 0.32 : 0.55),
   };
 
-  if (type === BOARD_PIECE) {
-    return {
+  if (isPadPiece(common)) {
+    const pad = {
       ...common,
       yaw: normalizeAngle(input.yaw, 0),
       angle: clamp(input.angle, -Math.PI * 0.44, Math.PI * 0.44, 0),
@@ -62,8 +65,10 @@ export function createSandboxPiece(type, input = {}, fallbackId = `${type || "pi
       // a square rebound pad. Old layouts therefore load as useful pads rather
       // than needing a storage migration.
       length: clamp(input.length, 0.28, 0.68, 0.48),
-      restitution: clamp(input.restitution, 0.45, 1.12, 0.88),
     };
+    return type === SPRING_PIECE
+      ? { ...pad, speed: clamp(input.speed, 2.5, 7.5, 5.8) }
+      : { ...pad, restitution: clamp(input.restitution, 0.45, 1.12, 0.88) };
   }
 
   return {

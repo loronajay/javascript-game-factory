@@ -138,6 +138,11 @@
                   <b>Rebound Pad</b>
                   <small>Square hit face · aim · tilt · bounce</small>
                 </button>
+                <button id="trickAddSpring" type="button" class="trick-piece-button trick-piece-button--spring">
+                  <span class="trick-piece-art trick-pad-preview trick-spring-preview" aria-hidden="true"><i></i></span>
+                  <b>Springboard</b>
+                  <small>Square hit face · launches on contact</small>
+                </button>
                 <button id="trickAddCannon" type="button" class="trick-piece-button trick-piece-button--cannon">
                   <span class="trick-piece-art trick-piece-art--cannon" aria-hidden="true">
                     <img src="assets/trick-shot/cannon-base.png" alt="" />
@@ -178,7 +183,7 @@
                 <input id="trickPitch" type="range" min="5" max="85" step="5" value="45" />
               </label>
               <label id="trickPowerRow" class="trick-control" hidden>
-                <span>Launch power</span>
+                <span id="trickPowerLabel">Launch power</span>
                 <input id="trickPower" type="range" min="2.5" max="7.5" step="0.1" value="5.4" />
               </label>
               <label id="trickDelayRow" class="trick-control" hidden>
@@ -189,6 +194,16 @@
                 <span>Bounce energy</span>
                 <input id="trickBounce" type="range" min="0.45" max="1.12" step="0.01" value="0.88" />
               </label>
+            </section>
+
+            <section class="trick-panel trick-ball-panel">
+              <div class="trick-panel-head">
+                <span>SHOT BALL</span>
+                <small>Choose before launch</small>
+              </div>
+              <div class="turn-ball-picker">
+                <div id="trickBallChoices" class="turn-ball-choices" role="group" aria-label="Choose a trick shot ball"></div>
+              </div>
             </section>
 
             <section class="trick-panel trick-bank">
