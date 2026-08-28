@@ -140,6 +140,26 @@ button {
   cursor: pointer;
 }
 
+/* A NATIVE SELECT'S POPUP IS DRAWN BY THE PLATFORM, NOT BY THIS STYLESHEET.
+   The control itself takes `--ink` on a dark fill and reads fine; the dropped
+   list inherits that same near-white ink and paints it on the platform's own
+   default WHITE, which is how the trick-shot motion picker came out as eight
+   invisible rows with only the hovered one legible. Every theme in the catalog
+   is dark, so `color-scheme: dark` is the honest fix rather than a per-engine
+   patch: it moves the whole popup — background, scrollbar and the highlight —
+   onto the platform's dark palette, and it follows the cabinet automatically
+   because the tokens under it are the theme's own. The `option` pair is the
+   belt for engines that paint the list with page colours instead of the
+   scheme's; both are tokens, so a ninth theme still costs a catalog row. */
+select {
+  color-scheme: dark;
+}
+
+select option {
+  color: var(--ink);
+  background: var(--well);
+}
+
 button:focus-visible,
 a:focus-visible {
   outline: 3px solid var(--brass);
