@@ -204,10 +204,13 @@
 .trick-spring-preview::before {
   background: #3e1117;
 }
+/* The same compression zig-zag `drawSpringFaceMotif` paints on the court, at
+   the same seven points: the tray has to show the tool you are about to place,
+   not a differently-striped cousin of it. */
 .trick-spring-preview i {
   border-color: #ffe34f;
   background:
-    repeating-linear-gradient(12deg, transparent 0 8px, rgb(255 243 106 / .92) 9px 13px, transparent 14px 21px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpolyline points='5.6,10.4 10.4,28.8 15.2,10.4 20,28.8 24.8,10.4 29.6,28.8 34.4,10.4' fill='none' stroke='%23ffd64f' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 100% 100% no-repeat,
     linear-gradient(135deg, #ef3f32, #78191d);
   box-shadow: 0 0 14px rgb(255 90 69 / .7), inset 0 0 0 7px rgb(255 227 79 / .12);
 }
@@ -223,6 +226,43 @@
 .trick-control[id*="Pitch"] input,
 .trick-control[id*="Power"] input,
 .trick-control[id*="Delay"] input { accent-color: var(--trick-pink); }
+
+/* The target picker. Two kinds side by side, then that kind's own motions.
+   The blurb sits between them because choosing the target and choosing how it
+   moves are one decision about what the shot has to finish in. */
+.trick-target-kinds { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.trick-target-kind {
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink-dim);
+  background: var(--fill);
+  font: 800 .72rem/1.15 system-ui;
+  letter-spacing: .04em;
+}
+.trick-target-kind:hover { color: white; background: var(--fill-hover); }
+.trick-target-kind[aria-pressed="true"] {
+  color: #081018;
+  border-color: var(--trick-cyan);
+  background: var(--trick-cyan);
+  box-shadow: 0 0 14px rgb(62 244 255 / .35);
+}
+.trick-target-kind:disabled { opacity: .4; }
+.trick-target-panel .trick-panel-copy { margin: 9px 0 0; min-height: 1.7em; }
+
+.trick-control select {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  background: var(--fill);
+  font: 700 .74rem/1 system-ui;
+}
+.trick-control select:disabled { opacity: .45; }
 
 .trick-direction-presets { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 7px; }
 .trick-direction-presets button {
@@ -319,7 +359,26 @@
     max-width: none;
     aspect-ratio: auto;
   }
-  .trick-shot-screen .trick-court .court-canvas { width: auto; height: auto; max-width: 100%; max-height: 100%; }
+  /* THE CANVAS IS CAPPED IN dvh, NOT IN PER CENT.
+     `max-height: 100%` needs a definite height on every ancestor to resolve
+     against, and sideways that chain runs through a `.cabinet` that has none —
+     so the cap silently did nothing and the canvas grew to its own aspect ratio
+     off the court's WIDTH. Measured on an 852x393 phone that was a 554x439
+     canvas in a 393-tall viewport with `.trick-court` set to `overflow: hidden`:
+     109px clipped off the bottom, which is exactly where the ball rests. The
+     Lab's own instrument was below the fold and untouchable.
+
+     `--trick-rail-chrome` is what the screen spends above and below the court —
+     the cabinet's padding, the topbar and the gap under it — the same
+     reservation every other court in this cabinet states as `--chrome`. If the
+     topbar grows a row, this grows with it. */
+  .trick-shot-screen { --trick-rail-chrome: 76px; }
+  .trick-shot-screen .trick-court .court-canvas {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: calc(100dvh - var(--trick-rail-chrome));
+  }
   .trick-shot-screen .trick-editor { grid-column: 2; grid-row: 1; }
 }
 

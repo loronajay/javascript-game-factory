@@ -120,12 +120,25 @@
               <small id="trickPowerCue">GRAB BALL + PULL BACK</small>
             </div>
             <div id="trickEmptyState" class="trick-empty">
-              <strong>1 · ADD A TOOL</strong>
-              <span>2 · Drag it into the lane &nbsp; 3 · Pull the ball back to test</span>
+              <strong>1 · PICK A TARGET</strong>
+              <span>2 · Add a tool and drag it into the room &nbsp; 3 · Pull the ball back to test</span>
             </div>
           </div>
 
           <aside class="trick-editor" aria-label="Sandbox tools">
+            <section class="trick-panel trick-target-panel">
+              <div class="trick-panel-head">
+                <span>TARGET</span>
+                <small id="trickTargetHint">Where the shot has to finish</small>
+              </div>
+              <div id="trickTargetKinds" class="trick-target-kinds" role="group" aria-label="Choose a target"></div>
+              <p id="trickTargetBlurb" class="trick-panel-copy"></p>
+              <label class="trick-control">
+                <span>Target motion <small>Lead it</small></span>
+                <select id="trickTargetMotion"></select>
+              </label>
+            </section>
+
             <section class="trick-panel trick-palette">
               <div class="trick-panel-head">
                 <span>PIECE TRAY</span>

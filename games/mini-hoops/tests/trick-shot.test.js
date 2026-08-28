@@ -13,6 +13,12 @@ import {
   createTrickShotPhysics,
   stepTrickShotPieces,
 } from "../scripts/sim/trick-shot-physics.js";
+import {
+  addTrickShotImpact,
+  createTrickShotImpactField,
+  tickTrickShotImpacts,
+} from "../scripts/effects/trick-shot-impact.js";
+import { trajectoryPadContact } from "../scripts/render/trick-shot.js";
 
 suite("trick-shot sandbox — reusable pieces and deterministic contacts");
 
@@ -72,6 +78,10 @@ test("a square pad rebounds from its face and does not act like a long thin bar"
   const ball = { x: 0.08, y: 0.72, z: 0.405, vx: 0, vy: 0, vz: 2, omegaX: 0 };
   const result = stepTrickShotPieces(ball, { x: 0.08, y: 0.72, z: 0.385 }, [board], createTrickShotPhysics(), 0.008);
   assert(result.contacts.includes("sandbox-board"));
+  assertEqual(result.impacts.length, 1, "a pad contact needs one renderable impact event");
+  assertEqual(result.impacts[0].pieceId, board.id);
+  assertEqual(result.impacts[0].kind, BOARD_PIECE);
+  assert(result.impacts[0].speed > 1.9, "the effect strength remembers arrival speed, not rebound speed");
   assert(ball.vz < -1.7, "the ball bounces from the pad's visible face normal");
 
   const outside = { x: 0.42, y: 0.65, z: 0.405, vx: 0, vy: 0, vz: 2, omegaX: 0 };
@@ -120,9 +130,42 @@ test("a springboard pushes the ball away at its authored speed", () => {
   const result = stepTrickShotPieces(ball, previous, [spring], createTrickShotPhysics(), 0.008);
 
   assert(result.contacts.includes("sandbox-spring"));
+  assertEqual(result.impacts[0].kind, SPRING_PIECE);
+  assertClose(Math.hypot(result.impacts[0].normal.x, result.impacts[0].normal.y, result.impacts[0].normal.z), 1, 1e-9);
   assertClose(ball.vx, -5.8, 1e-9, "the contacted face launches directly outward");
   assertClose(ball.vy, 0.7, 0.03, "motion along the spring face is preserved");
   assertClose(ball.vz, 1.1, 0.03, "sideways motion along the spring face is preserved");
+});
+
+test("the aiming arc tells the renderer when it will cross a pad's real collision face", () => {
+  const pad = createSandboxPiece(SPRING_PIECE, {
+    id: "preview", x: 0, y: 0.7, z: 0.5, yaw: 0, angle: 0, length: 0.48,
+  });
+  const hit = trajectoryPadContact([
+    { x: 0.05, y: 0.72, z: 0.2 },
+    { x: 0.05, y: 0.72, z: 0.8 },
+  ], pad);
+  assert(hit, "a segment through the visible square should be highlighted");
+  assertClose(hit.z, pad.z - 0.03, 0.04, "the marker belongs on the near impact face");
+
+  const miss = trajectoryPadContact([
+    { x: 0.5, y: 0.72, z: 0.2 },
+    { x: 0.5, y: 0.72, z: 0.8 },
+  ], pad);
+  assertEqual(miss, null, "a line beside the square must not claim a hit");
+});
+
+test("pad impact flashes are transient and spring hits linger slightly longer", () => {
+  const field = createTrickShotImpactField();
+  addTrickShotImpact(field, {
+    pieceId: "spring", kind: SPRING_PIECE, x: 0, y: 0.7, z: 0.5,
+    speed: 4, normal: { x: 0, y: 0, z: -1 },
+    right: { x: 1, y: 0, z: 0 }, up: { x: 0, y: 1, z: 0 },
+  });
+  assertEqual(field.bursts.length, 1);
+  assert(field.bursts[0].life >= 0.4, "a spring compression should be readable for more than one frame");
+  tickTrickShotImpacts(field, 1);
+  assertEqual(field.bursts.length, 0, "impact flashes must not accumulate around the court");
 });
 
 test("a cannon catches a descending ball, waits its delay, then fires on its set trajectory", () => {

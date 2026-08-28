@@ -79,7 +79,10 @@ test("a springboard reuses the square pad geometry but has distinct spring art",
   const geometry = boardProjectedGeometry(spring);
   assertEqual(sandboxPieceAtPoint([spring], geometry.centre)?.id, spring.id);
   assert(html.includes("trick-spring-preview"), "the tray needs a recognizable springboard preview");
-  assert(renderer.includes("drawSpringboard"), "springboards need distinct court art");
+  // One solid, two skins: a springboard is the same lit block as a rebound pad,
+  // told apart by its palette and the compression motif on its impact face.
+  assert(renderer.includes("drawSpringFaceMotif"), "springboards need their own face motif");
+  assert(renderer.includes("PALETTES"), "each piece kind needs its own palette rather than inline literals");
 });
 
 test("a selected piece exposes direct remove and depth handles in the same projection as its collider", () => {
@@ -116,10 +119,62 @@ test("piece art and hit testing use the cabinet's one projection", () => {
   assert(!renderer.includes("PROJECTION_ORIGIN_X"), "the piece renderer must not restate the camera");
 });
 
-test("furniture occlusion is resolved per entity and tool locators stay visible", () => {
+test("furniture occlusion is resolved per entity, and depth is answered on the floor", () => {
   assert(renderer.includes("drawRoomOccluders(ctx, backdrop, locationId, entity.z)"));
-  assert(renderer.includes("drawPieceLocator("));
   assert(!renderer.includes("const nearestDepth"), "one nearest-depth redraw makes launchers pop behind furniture during flight");
+  // A tool drawn smaller and higher up is equally consistent with being further
+  // away and with being raised. The floor is where that is answered — a cast
+  // shadow always, a footprint ring and tether while building.
+  assert(renderer.includes("drawPieceShadow("), "every tool needs a cast shadow at its own depth");
+  assert(renderer.includes("drawPieceFloorMark("), "building needs a footprint ring at the tool's own depth");
+  assert(renderer.includes("drawBuildFloorGrid("), "the floor needs ruled depths to measure a footprint against");
+});
+
+test("editor chrome belongs to build mode, and detail to the selection", () => {
+  const frame = renderer.slice(renderer.indexOf("export function renderTrickShotFrame"));
+  for (const chrome of ["drawBuildFloorGrid(ctx)", "drawPieceFloorMark(ctx", "drawPieceControls(ctx"]) {
+    const at = frame.indexOf(chrome);
+    assert(at >= 0, `missing ${chrome}`);
+    assert(/building/.test(frame.slice(Math.max(0, at - 220), at)), `${chrome} must be gated on build mode`);
+  }
+  assert(frame.includes("showPreview: building"), "contact and launch previews have no business over a live shot");
+  assert(!renderer.includes('"LAUNCHER"'), "per-piece caption boxes put a label over every tool at once");
+});
+
+test("a pad is a lit solid: back faces culled, one light, real thickness", () => {
+  const pad = createSandboxPiece(BOARD_PIECE, { id: "lit", x: 0, y: 0.7, z: 0.5, yaw: 0, angle: 0, length: 0.48 });
+  const facing = boardProjectedGeometry(pad).faces.filter((face) => face.facing);
+  // Below eye level and dead centre: the camera sees the face turned toward it
+  // and the top, and nothing else. Both side faces are exactly edge-on there,
+  // so a cull that let them through would be inverted.
+  assertEqual(facing.length, 2, "a box at screen centre shows exactly two faces");
+  assert(facing.some((face) => face.axis === "normal" && face.sign === -1), "the face toward the camera is visible");
+  assert(facing.some((face) => face.axis === "up" && face.sign === 1), "a pad below eye level shows its top");
+
+  const high = createSandboxPiece(BOARD_PIECE, { ...pad, id: "high", y: 1.5 });
+  const highFacing = boardProjectedGeometry(high).faces.filter((face) => face.facing);
+  assert(
+    highFacing.some((face) => face.axis === "up" && face.sign === -1),
+    "a pad above eye level shows its underside instead",
+  );
+
+  // THE TURN MUST NOT BE AN EVAPORATION. A flat plate really does foreshorten to
+  // nothing, which is why the collider is a block: edge-on it still has to be a
+  // grabbable, visible object rather than a bright hairline.
+  const edgeOn = createSandboxPiece(BOARD_PIECE, { ...pad, id: "edge", yaw: Math.PI / 2 });
+  const hull = boardProjectedGeometry(edgeOn).hull;
+  const width = Math.max(...hull.map((point) => point.x)) - Math.min(...hull.map((point) => point.x));
+  assert(width > 30, `an edge-on pad still has a body (was ${width.toFixed(1)}px)`);
+  assertEqual(sandboxPieceAtPoint([edgeOn], boardProjectedGeometry(edgeOn).centre)?.id, edgeOn.id);
+});
+
+test("the lab owns, advances, and renders fragile-ball splats", () => {
+  for (const seam of ["createSplatField", "addSplat", "tickSplatField", "ballSplat", "assets.ballSplats"]) {
+    assert(game.includes(seam), `missing splat seam: ${seam}`);
+  }
+  assert(renderer.includes("drawSplatDecals"), "the lab never paints the marks left on the room");
+  assert(renderer.includes("drawSplatParticles"), "the lab never paints the impact burst");
+  assert(!/\|\|\s*ball\.splat\)\s*\{\s*resetShot/.test(game), "a splat must remain visible instead of resetting in its birth tick");
 });
 
 test("the lab resolves sandbox contacts on physics substeps, not just rendered frames", () => {

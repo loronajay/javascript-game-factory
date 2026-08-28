@@ -2,11 +2,32 @@
 //
 // The lab owns a local named-layout bank. It does not own or serialize HORSE
 // state. What HORSE can reuse later is below this file: sim/trick-shot.js,
-// sim/trick-shot-physics.js, and render/trick-shot.js.
+// sim/trick-shot-target.js, sim/trick-shot-physics.js, and render/trick-shot.js.
+//
+// THE TARGET IS PART OF THE SHOT, AND IT DECIDES WHICH INTEGRATOR RUNS.
+// `sim/physics.js` steps the ball against the wall hoop and knows nothing about
+// bins; `sim/bin-physics.js` steps it against bins and has no backboard. They
+// are two complete integrators rather than two colliders, so exactly one runs
+// per substep — which is the honest shape of a mode where you choose ONE target.
+// `sim/trick-shot-target.js` is the seam that says which, and the piece step
+// runs after whichever it was, on the same substep, so a thin pad can never be
+// skipped at 60 Hz.
+//
+// TWO CLOCKS, THE CABINET'S OWN RULE. The target's motion clock runs the whole
+// time the screen is up, so a moving hoop or bin can be watched and led before
+// anyone commits to a pull. The shot's own clock only runs while a ball is in
+// the air.
 
-import { DEFAULT_BALL, ballById, ballFlight } from "./assets/ball-catalog.js";
+import { DEFAULT_BALL, ballById, ballFlight, ballSplat } from "./assets/ball-catalog.js";
 import { DEFAULT_LOCATION } from "./assets/location-catalog.js";
 import { createAssetLibrary } from "./assets/loader.js";
+import { addSplat, clearSplatField, createSplatField, tickSplatField } from "./effects/splat-field.js";
+import {
+  addTrickShotImpact,
+  clearTrickShotImpacts,
+  createTrickShotImpactField,
+  tickTrickShotImpacts,
+} from "./effects/trick-shot-impact.js";
 import {
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
@@ -15,9 +36,10 @@ import {
   TICK_MS,
   TICK_SECONDS,
 } from "./sim/constants.js";
-import { hoopAt } from "./sim/hoop.js";
 import { launchSpin, solveLaunch, trajectoryPoints } from "./sim/launch.js";
 import { createBall, isBallSettled, launchBall, resetBall, stepBall, worldFor } from "./sim/physics.js";
+import { stepBallAgainstBins } from "./sim/bin-physics.js";
+import { clampPlacement } from "./sim/bin-placement.js";
 import { isShootablePull, neutralPull, resolvePull } from "./sim/pull.js";
 import {
   BOARD_PIECE,
@@ -28,14 +50,25 @@ import {
   isPadPiece,
 } from "./sim/trick-shot.js";
 import {
+  BIN_TARGET,
+  HOOP_TARGET,
+  defaultTrickShotMotion,
+  defaultTrickShotTarget,
+  normalizeTrickShotTarget,
+  trickShotTargetAt,
+  trickShotTargetKind,
+} from "./sim/trick-shot-target.js";
+import {
   createTrickShotPhysics,
   resetTrickShotPhysics,
   stepTrickShotPieces,
 } from "./sim/trick-shot-physics.js";
 import {
+  binDepthHandleAt,
   renderTrickShotFrame,
   sandboxPieceAtPoint,
   sandboxPieceControlAtPoint,
+  trickShotTargetAtPoint,
   TRICK_SHOT_ASSET_PATHS,
 } from "./render/trick-shot.js";
 import { ballScreenPosition } from "./render/frame.js";
@@ -45,10 +78,14 @@ import { createTrickShotStore } from "./store/trick-shots-store.js";
 import { canvasPoint, isGrab } from "./ui/pointer.js";
 import { createTrickShotView } from "./ui/trick-shot-view.js";
 
-const SILENT_AUDIO = Object.freeze({ released() {}, contact() {}, scored() {}, click() {} });
+const SILENT_AUDIO = Object.freeze({
+  released() {}, contact() {}, splat() {}, scored() {}, binScored() {}, click() {},
+});
+const BIN_PATH = "assets/modes/floor-tic-tac-toe/open-bin.png";
 const MAX_SHOT_SECONDS = 14;
 const SETTLED_SECONDS = 0.8;
 const MADE_HOLD_SECONDS = 1.05;
+const SPLAT_HOLD_SECONDS = 0.72;
 const MAX_EDIT_HISTORY = 40;
 
 export function bootTrickShot(root, options = {}) {
@@ -64,12 +101,24 @@ export function bootTrickShot(root, options = {}) {
   const store = options.store || createTrickShotStore();
   const ball = createBall();
   const piecePhysics = createTrickShotPhysics();
-  const hoop = hoopAt("still", 0);
-  const world = worldFor(hoop);
+  const splats = createSplatField();
+  const impacts = createTrickShotImpactField();
 
   let active = false;
   let locationId = DEFAULT_LOCATION;
   let ballId = DEFAULT_BALL;
+  let target = defaultTrickShotTarget();
+  // The motion each target kind was last set to, so flipping between the hoop
+  // and the bin does not quietly reset either one. The two catalogs share no
+  // ids — see the note at the top of `sim/trick-shot-target.js` — so there is
+  // nothing to map across and a remembered pair is the whole answer.
+  const rememberedMotion = { [HOOP_TARGET]: target.motionId, [BIN_TARGET]: defaultTrickShotMotion(BIN_TARGET) };
+  // And where the bin was last stood, for the same reason.
+  let rememberedPlacement = defaultTrickShotTarget(BIN_TARGET).placement;
+  // The target's own clock. Runs whenever the screen is up, never reset by a
+  // shot: the cabinet's two-clock rule, so a moving target can be watched.
+  let motionSeconds = 0;
+  let capturedBin = null;
   let pieces = [];
   let selectedId = null;
   let currentId = "";
@@ -81,6 +130,7 @@ export function bootTrickShot(root, options = {}) {
   let flightSeconds = 0;
   let settledSeconds = 0;
   let madeSeconds = 0;
+  let splatSeconds = 0;
   let pull = null;
   let pointerId = null;
   let pointerMode = null;
@@ -104,6 +154,8 @@ export function bootTrickShot(root, options = {}) {
     onLoad: loadLayout,
     onDeleteShot: deleteSaved,
     onBallSelect: selectBall,
+    onTargetKind: selectTargetKind,
+    onTargetMotion: selectTargetMotion,
   });
 
   function bank() {
@@ -121,15 +173,62 @@ export function bootTrickShot(root, options = {}) {
       busy: shotActive,
       power: pull?.power || 0,
       pulling: pointerMode === "pull",
+      // Any live gesture at all, which is a different question from `pulling`:
+      // the onboarding card is centred over the floor, which is exactly where a
+      // bin is placed, and it has no business sitting on the controls of the
+      // thing the player is dragging.
+      interacting: pointerMode !== null,
       canUndo: history.length > 0,
       ballId,
+      target,
     });
+  }
+
+  /** The target as the sim and the renderer see it right now. */
+  function targetNow() {
+    return trickShotTargetAt(target, motionSeconds);
+  }
+
+  /**
+   * Adopt a target, and RESTART ITS SWEEP.
+   *
+   * A motion is an offset from where the target was placed, so a new one has to
+   * begin there — HORSE's own rule, and without it changing the motion teleports
+   * the bin to wherever the old sweep happened to be. It is the only thing that
+   * zeroes this clock apart from picking the bin up; a shot ending does not,
+   * because the sweep is the second clock and it does not belong to the shot.
+   */
+  function setTarget(next, status_ = "TARGET SET") {
+    if (shotActive || pull) return;
+    target = normalizeTrickShotTarget(next);
+    rememberedMotion[target.kind] = target.motionId;
+    if (target.placement) rememberedPlacement = target.placement;
+    motionSeconds = 0;
+    resetShot(status_);
+  }
+
+  function selectTargetKind(kind) {
+    const safe = trickShotTargetKind(kind);
+    if (safe === target.kind) return;
+    audio.click();
+    setTarget(
+      // The placement is remembered across a trip through the hoop, so a player
+      // comparing the two targets does not have to re-place the bin each time.
+      { kind: safe, motionId: rememberedMotion[safe], placement: rememberedPlacement },
+      safe === BIN_TARGET ? "FLOOR BIN · DRAG TO PLACE" : "WALL HOOP",
+    );
+  }
+
+  function selectTargetMotion(motionId) {
+    audio.click();
+    setTarget({ ...target, motionId }, "TARGET MOTION SET");
   }
 
   function selectBall(nextBallId) {
     if (shotActive || pull) return;
     ballId = ballById(nextBallId).id;
     assets.ballFrames(ballId);
+    assets.ballSplats(ballId);
     audio.click();
     resetShot("BALL SELECTED");
   }
@@ -157,11 +256,19 @@ export function bootTrickShot(root, options = {}) {
     if (shotActive || pieces.length >= MAX_SANDBOX_PIECES) return;
     rememberEdit();
     const count = pieces.length;
+    // A NEW TOOL HAS TO LAND SOMEWHERE THE LAST ONE IS NOT. These strides used
+    // to be 0.12 across and 0.12 deep, which at mid-room is about 33 screen
+    // pixels between two 125px-wide pads: three tools in a row buried each
+    // other, and adding one read as nothing happening. The x stride is bounded
+    // by the portrait crop rather than by `PIECE_BOUNDS` — a pad at 0.52 with
+    // its own half-width still lands inside the columns a phone shows — and the
+    // three moduli are coprime-ish on purpose, so consecutive pieces differ on
+    // every axis at once instead of sliding along one.
     const piece = createSandboxPiece(type, {
       id: uniquePieceId(type),
-      x: ((count % 5) - 2) * 0.12,
-      y: type === CANNON_PIECE ? 0.3 : 0.65 + (count % 3) * 0.13,
-      z: 0.32 + (count % 4) * 0.12,
+      x: ((count % 5) - 2) * 0.26,
+      y: type === CANNON_PIECE ? 0.3 : 0.6 + (count % 3) * 0.24,
+      z: 0.28 + (count % 4) * 0.18,
       angle: type !== CANNON_PIECE ? -0.18 + (count % 3) * 0.18 : undefined,
     });
     pieces = [...pieces, piece];
@@ -210,6 +317,7 @@ export function bootTrickShot(root, options = {}) {
       name: view.name(),
       locationId,
       ballId,
+      target,
       pieces,
     });
     currentId = saved.id;
@@ -220,6 +328,8 @@ export function bootTrickShot(root, options = {}) {
 
   function newLayout() {
     resetShot();
+    clearSplatField(splats);
+    clearTrickShotImpacts(impacts);
     if (pieces.length) rememberEdit();
     pieces = [];
     selectedId = null;
@@ -233,10 +343,16 @@ export function bootTrickShot(root, options = {}) {
     const saved = store.get(id);
     if (!saved) return;
     resetShot();
+    clearSplatField(splats);
+    clearTrickShotImpacts(impacts);
     currentId = saved.id;
     currentName = saved.name;
     locationId = saved.locationId;
     ballId = saved.ballId;
+    target = saved.target;
+    rememberedMotion[target.kind] = target.motionId;
+    if (target.placement) rememberedPlacement = target.placement;
+    motionSeconds = 0;
     history = [];
     pieces = saved.pieces;
     selectedId = pieces[0]?.id || null;
@@ -254,11 +370,13 @@ export function bootTrickShot(root, options = {}) {
   function resetShot(nextStatus = "BALL RESET") {
     resetBall(ball);
     resetTrickShotPhysics(piecePhysics);
+    capturedBin = null;
     shotActive = false;
     scored = false;
     flightSeconds = 0;
     settledSeconds = 0;
     madeSeconds = 0;
+    splatSeconds = 0;
     pull = null;
     pointerId = null;
     pointerMode = null;
@@ -310,18 +428,61 @@ export function bootTrickShot(root, options = {}) {
     return projectPoint({ x: piece.x, y: piece.y, z: piece.z });
   }
 
+  const isPlacingTarget = () => pointerMode === "target" || pointerMode === "target-depth";
+
+  /**
+   * Start dragging the floor bin.
+   *
+   * THE MOTION CLOCK IS RESET TO ZERO, not merely paused. A bin's motion is an
+   * offset from where it was placed, so with the clock anywhere else the drawn
+   * bin and its placement differ by a constant a drag would have to carry. At
+   * zero they are the same point, the bin sits still under the finger, and the
+   * sweep restarts from where it was put down — which is HORSE's own rule and
+   * the reason the bin the player lined up is the bin that is there when the
+   * shot begins.
+   */
+  function startTargetDrag(event, point, mode) {
+    if (target.kind !== BIN_TARGET) return false;
+    motionSeconds = 0;
+    const anchor = mode === "target-depth"
+      ? projectPoint({ x: target.placement.x, y: 0, z: target.placement.z })
+      : projectPoint({ x: target.placement.x, y: target.placement.y, z: target.placement.z });
+    pointerId = event.pointerId;
+    pointerMode = mode;
+    selectedId = null;
+    dragOffset = { x: point.x - anchor.x, y: point.y - anchor.y };
+    canvas.setPointerCapture?.(event.pointerId);
+    status = mode === "target-depth" ? "BIN DEPTH" : "PLACE BIN";
+    renderView();
+    return true;
+  }
+
+  /** Re-place the bin, always back through HORSE's own legal-volume clamp. */
+  function moveTarget(placement) {
+    target = normalizeTrickShotTarget({
+      ...target,
+      placement: clampPlacement(placement, target.motionId),
+    });
+    rememberedPlacement = target.placement;
+  }
+
   canvas.addEventListener("pointerdown", (event) => {
     if (!active || shotActive) return;
     const point = canvasPoint(canvas, event);
     const control = sandboxPieceControlAtPoint(pieces, point, selectedId);
     const piece = sandboxPieceAtPoint(pieces, point);
+    const resolved = targetNow();
     event.preventDefault();
     if (control?.action === "delete") {
       selectedId = control.piece.id;
       deleteSelected();
     }
     else if (control?.action === "depth") startDepthDrag(event, point, control.piece);
+    // A piece is picked up before the target is: the tools are what the player
+    // is arranging, and a pad drawn over the bin has to be the thing they get.
     else if (piece) startPieceDrag(event, point, piece);
+    else if (binDepthHandleAt(resolved, point) && startTargetDrag(event, point, "target-depth")) { /* placed */ }
+    else if (trickShotTargetAtPoint(resolved, point) && startTargetDrag(event, point, "target")) { /* placed */ }
     else if (!startPull(event, point)) {
       selectedId = null;
       status = "BUILD MODE";
@@ -354,6 +515,17 @@ export function bootTrickShot(root, options = {}) {
     } else if (pointerMode === "depth") {
       const worldPoint = screenToWorldOnFloor(point.x - dragOffset.x, point.y - dragOffset.y);
       replaceSelected({ x: worldPoint.x, z: worldPoint.z });
+      renderView();
+    } else if (pointerMode === "target") {
+      // Across for the lane, up for the height — HORSE's own drag. Depth is a
+      // separate handle, because up the screen is both higher and further away
+      // and one drag cannot carry both honestly.
+      const worldPoint = screenToWorldAtZ(point.x - dragOffset.x, point.y - dragOffset.y, target.placement.z);
+      moveTarget({ x: worldPoint.x, y: worldPoint.y, z: target.placement.z });
+      renderView();
+    } else if (pointerMode === "target-depth") {
+      const worldPoint = screenToWorldOnFloor(point.x - dragOffset.x, point.y - dragOffset.y);
+      moveTarget({ x: worldPoint.x, y: target.placement.y, z: worldPoint.z });
       renderView();
     }
   });
@@ -409,30 +581,60 @@ export function bootTrickShot(root, options = {}) {
   }
 
   function tick() {
+    tickSplatField(splats, TICK_SECONDS);
+    tickTrickShotImpacts(impacts, TICK_SECONDS);
+    // The target's own clock, and it is not the shot's. It runs whether or not a
+    // ball is in the air, so a moving hoop or bin can be watched and led before
+    // anyone commits — the classic court's two-clock rule. It is held only while
+    // the bin is being dragged, because then the player is placing it, not
+    // reading it.
+    if (!isPlacingTarget()) motionSeconds += TICK_SECONDS;
     if (!shotActive) return;
     const statusBeforeTick = status;
     flightSeconds += TICK_SECONDS;
+
+    // Resolved ONCE per tick, like `worldFor` in the classic cabinet: within a
+    // single tick the target is treated as moving at a constant velocity, which
+    // is what keeps the substeps consistent with each other.
+    const resolved = targetNow();
+    const world = resolved.hoop ? worldFor(resolved.hoop) : null;
+    const bins = resolved.bin ? [resolved.bin] : null;
+
     const substeps = Math.max(1, Math.ceil(TICK_SECONDS / PHYSICS_SUBSTEP_SECONDS));
     const dt = TICK_SECONDS / substeps;
     const heard = new Set();
 
     for (let index = 0; index < substeps; index++) {
       const previous = { x: ball.x, y: ball.y, z: ball.z };
-      let base = { contacts: [], scored: false };
+      // EXACTLY ONE INTEGRATOR RUNS. `stepBall` and `stepBallAgainstBins` are
+      // both complete integrators — each owns gravity, drag, the room and its
+      // own target — so which one runs is the whole of what choosing a target
+      // means down here. A cannon holding the ball suspends both.
       if (!piecePhysics.capture) {
-        base = stepBall(ball, world, dt, { ballId, alreadyScored: scored });
-        if (base.scored) {
+        const step = world
+          ? stepBall(ball, world, dt, { ballId, alreadyScored: scored })
+          : stepBallAgainstBins(ball, bins, dt, { ballId, capturedBin });
+        if (!world) capturedBin = step.capturedBin;
+        const justScored = world ? step.scored : step.scoredBin !== null && step.scoredBin !== undefined;
+        if (justScored && !scored) {
           scored = true;
-          status = "SWISH!";
-          audio.scored(1);
+          status = world ? "SWISH!" : "IN THE BIN!";
+          if (world) audio.scored(1);
+          else audio.binScored(ballId);
         }
-        for (const contact of base.contacts) heard.add(contact);
+        for (const contact of step.contacts) heard.add(contact);
+        if (step.splat) {
+          addSplat(splats, { ...step.splat, ballId, ...ballSplat(ballId) });
+          audio.splat(step.splat.surface, { ballId, speed: step.splat.speed });
+          status = "SPLAT!";
+        }
       }
 
-      const pieceStep = ball.splat
-        ? { contacts: [], captured: false, launched: false }
+      const pieceStep = ball.splat || capturedBin !== null
+        ? { contacts: [], impacts: [], captured: false, launched: false }
         : stepTrickShotPieces(ball, previous, pieces, piecePhysics, dt);
       for (const contact of pieceStep.contacts) heard.add(contact);
+      for (const impact of pieceStep.impacts || []) addTrickShotImpact(impacts, impact);
       if (pieceStep.captured) status = "CANNON CHARGING";
       if (pieceStep.launched) {
         status = "CANNON FIRED";
@@ -441,18 +643,27 @@ export function bootTrickShot(root, options = {}) {
     }
 
     for (const contact of heard) {
+      if (ball.splat?.surface === contact) continue;
       if (contact === "sandbox-board" || contact === "sandbox-spring") {
         audio.contact("backboard", { ballId, speed: ball.vy });
         if (contact === "sandbox-spring") status = "SPRING!";
       }
       else if (contact === "sandbox-cannon-catch") audio.contact("rim", { ballId, speed: ball.vy });
-      else if (!["score", "sandbox-cannon-fire"].includes(contact)) audio.contact(contact, { ballId, speed: ball.vy });
+      else if (!["score", "bin-score", "sandbox-cannon-fire"].includes(contact)) {
+        audio.contact(contact, { ballId, speed: ball.vy });
+      }
     }
 
     if (scored) madeSeconds += TICK_SECONDS;
-    const settled = !piecePhysics.capture && isBallSettled(ball);
+    splatSeconds = ball.splat ? splatSeconds + TICK_SECONDS : 0;
+    // A ball a bin has swallowed never settles — it is held on the drum's axis
+    // and pushed down forever — so the made-shot hold is what ends that shot.
+    const settled = !piecePhysics.capture && capturedBin === null && isBallSettled(ball);
     settledSeconds = settled ? settledSeconds + TICK_SECONDS : 0;
-    if ((scored && madeSeconds >= MADE_HOLD_SECONDS) || settledSeconds >= SETTLED_SECONDS || flightSeconds >= MAX_SHOT_SECONDS || ball.splat) {
+    if ((scored && madeSeconds >= MADE_HOLD_SECONDS)
+      || settledSeconds >= SETTLED_SECONDS
+      || flightSeconds >= MAX_SHOT_SECONDS
+      || (ball.splat && splatSeconds >= SPLAT_HOLD_SECONDS)) {
       resetShot(scored ? "BUCKET · TRY IT AGAIN" : "READY · TRY IT AGAIN");
     } else if (status !== statusBeforeTick) {
       renderView();
@@ -475,7 +686,10 @@ export function bootTrickShot(root, options = {}) {
     if (!ctx) return;
     renderTrickShotFrame(ctx, {
       ball,
-      hoop,
+      target: targetNow(),
+      binImage: assets.image(BIN_PATH),
+      building: !shotActive,
+      capturedBin,
       backdrop: assets.backdrop(locationId),
       locationId,
       ballFrames: assets.ballFrames(ballId),
@@ -490,6 +704,9 @@ export function bootTrickShot(root, options = {}) {
       pull,
       trajectory: currentTrajectory(),
       scored,
+      splats,
+      splatImagesFor: assets.ballSplats,
+      impacts,
     });
   }
 
@@ -510,6 +727,10 @@ export function bootTrickShot(root, options = {}) {
     enter(style = {}) {
       locationId = style.locationId || locationId;
       ballId = style.ballId || ballId;
+      assets.ballSplats(ballId);
+      assets.image(BIN_PATH);
+      clearSplatField(splats);
+      clearTrickShotImpacts(impacts);
       active = true;
       lastTime = null;
       accumulator = 0;
@@ -523,6 +744,9 @@ export function bootTrickShot(root, options = {}) {
       resetShot("BUILD MODE");
     },
     isActive: () => active,
-    state: () => ({ pieces, selectedId, currentId, shotActive, ballId, ball, capture: piecePhysics.capture }),
+    state: () => ({
+      pieces, selectedId, currentId, shotActive, ballId, ball, splats, impacts,
+      target, motionSeconds, capturedBin, capture: piecePhysics.capture,
+    }),
   };
 }

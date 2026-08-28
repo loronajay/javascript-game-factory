@@ -1,6 +1,13 @@
 // DOM binding for the Trick Shot Lab. It owns no layout, physics, or saved data.
+//
+// THE TARGET PICKER IS BUILT FROM THE CATALOG, both halves of it. The two kinds
+// come from `TRICK_SHOT_TARGETS` and the motions from `trickShotTargetMotions`,
+// so adding a hoop mode or a bin motion costs a row in the sim's own catalog and
+// no second list here or in the markup — the rule every other picker in this
+// cabinet keeps.
 
 import { BOARD_PIECE, CANNON_PIECE, SPRING_PIECE, isPadPiece } from "../sim/trick-shot.js";
+import { TRICK_SHOT_TARGETS, trickShotTargetMotions } from "../sim/trick-shot-target.js";
 import { createTurnBallPicker } from "./turn-ball-picker.js";
 
 const byId = (root, id) => root.querySelector(`#${id}`);
@@ -33,9 +40,47 @@ export function createTrickShotView(root, handlers = {}) {
     delayRow: byId(root, "trickDelayRow"),
     bounceRow: byId(root, "trickBounceRow"),
     ballChoices: byId(root, "trickBallChoices"),
+    targetKinds: byId(root, "trickTargetKinds"),
+    targetBlurb: byId(root, "trickTargetBlurb"),
+    targetMotion: byId(root, "trickTargetMotion"),
+    targetHint: byId(root, "trickTargetHint"),
   };
 
   const balls = createTurnBallPicker(nodes.ballChoices, { onSelect: handlers.onBallSelect });
+
+  // Built once. The kinds never change, only which one is pressed.
+  const targetButtons = new Map();
+  for (const { kind, label } of TRICK_SHOT_TARGETS) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "trick-target-kind";
+    button.dataset.targetKind = kind;
+    button.textContent = label;
+    button.addEventListener("click", () => handlers.onTargetKind?.(kind));
+    nodes.targetKinds?.append(button);
+    targetButtons.set(kind, button);
+  }
+  nodes.targetMotion?.addEventListener("change", () => handlers.onTargetMotion?.(nodes.targetMotion.value));
+
+  // The motion list is rebuilt only when the KIND changes: the two catalogs
+  // share no ids, so a stale list would be offering the other target's motions.
+  let shownSelectionId = null;
+  let motionKind = "";
+  function renderTargetMotions(target) {
+    if (!nodes.targetMotion) return;
+    if (motionKind !== target.kind) {
+      motionKind = target.kind;
+      nodes.targetMotion.replaceChildren();
+      for (const motion of trickShotTargetMotions(target.kind)) {
+        const option = document.createElement("option");
+        option.value = motion.id;
+        option.textContent = motion.label;
+        option.title = motion.blurb;
+        nodes.targetMotion.append(option);
+      }
+    }
+    if (nodes.targetMotion.value !== target.motionId) nodes.targetMotion.value = target.motionId;
+  }
 
   const actionMap = [
     ["trickExit", "onExit"], ["trickAddBoard", "onAddBoard"], ["trickAddSpring", "onAddSpring"], ["trickAddCannon", "onAddCannon"],
@@ -91,7 +136,10 @@ export function createTrickShotView(root, handlers = {}) {
   return {
     name: () => nodes.name?.value || "",
 
-    render({ pieces, selectedId, bank, currentId, name, status, busy, ballId, power = 0, pulling = false, canUndo = false }) {
+    render({
+      pieces, selectedId, bank, currentId, name, status, busy, ballId, target,
+      power = 0, pulling = false, interacting = false, canUndo = false,
+    }) {
       const selected = pieces.find((piece) => piece.id === selectedId) || null;
       if (nodes.status) nodes.status.textContent = status;
       if (nodes.hint) nodes.hint.textContent = busy
@@ -107,8 +155,22 @@ export function createTrickShotView(root, handlers = {}) {
         : busy ? "SHOT IN MOTION" : "GRAB BALL + PULL BACK";
       nodes.powerGauge?.classList.toggle("is-aiming", pulling);
       if (nodes.name && document.activeElement !== nodes.name) nodes.name.value = name;
-      if (nodes.empty) nodes.empty.hidden = pieces.length > 0;
+      // The onboarding card is the biggest thing on the court, and it used to
+      // stay up through a live shot on an empty layout — a bin target with no
+      // tools yet had a caption sitting over the ball it was describing. It is
+      // for a still court with nothing on it and nothing else.
+      if (nodes.empty) nodes.empty.hidden = pieces.length > 0 || busy || interacting;
       if (nodes.inspector) nodes.inspector.hidden = !selected;
+      // SELECTING A PIECE HAS TO REVEAL ITS CONTROLS. The tool rail is a
+      // deliberate scroll container, and with the inspector open on a laptop its
+      // sliders measured below the rail's own fold — so picking a tool up
+      // silently hid the panel that appeared because you picked it up. Only on a
+      // CHANGE of selection: re-scrolling every frame would fight the player's
+      // own scrolling while they tune.
+      if (selected && selected.id !== shownSelectionId) {
+        nodes.inspector?.scrollIntoView?.({ block: "nearest" });
+      }
+      shownSelectionId = selected?.id || null;
       if (nodes.inspectorTitle) nodes.inspectorTitle.textContent = selected?.type === BOARD_PIECE
         ? "Rebound Pad"
         : selected?.type === SPRING_PIECE ? "Springboard" : "Ball Cannon";
@@ -142,6 +204,22 @@ export function createTrickShotView(root, handlers = {}) {
           const pressed = Math.abs(Number(button.dataset.trickDirection) - direction) < 1;
           button.setAttribute("aria-pressed", String(pressed));
         }
+      }
+
+      if (target) {
+        for (const [kind, button] of targetButtons) {
+          button.setAttribute("aria-pressed", String(kind === target.kind));
+          button.disabled = busy || pulling;
+        }
+        const chosen = TRICK_SHOT_TARGETS.find((entry) => entry.kind === target.kind);
+        if (nodes.targetBlurb) nodes.targetBlurb.textContent = chosen?.blurb || "";
+        if (nodes.targetHint) {
+          nodes.targetHint.textContent = target.kind === "bin"
+            ? "Drag the bin · Z diamond for depth"
+            : "Where the shot has to finish";
+        }
+        renderTargetMotions(target);
+        if (nodes.targetMotion) nodes.targetMotion.disabled = busy || pulling;
       }
 
       for (const [input] of fields) if (input) input.disabled = busy;

@@ -6,14 +6,41 @@
 
 import { DEFAULT_BALL, ballById } from "../assets/ball-catalog.js";
 import { DEFAULT_LOCATION, locationById } from "../assets/location-catalog.js";
+import { defaultTrickShotTarget, normalizeTrickShotTarget } from "./trick-shot-target.js";
 
 export const BOARD_PIECE = "board";
 export const SPRING_PIECE = "spring";
 export const CANNON_PIECE = "cannon";
 export const SANDBOX_PIECE_TYPES = Object.freeze([BOARD_PIECE, SPRING_PIECE, CANNON_PIECE]);
 export const MAX_SANDBOX_PIECES = 24;
-export const TRICK_SHOT_VERSION = 1;
-export const BOARD_PAD_THICKNESS = 0.055;
+// Bumped when `target` joined the record. Nothing branches on it — a v1 layout
+// simply normalizes with the default target, which is the still wall hoop it was
+// authored against, so there is no migration to write.
+export const TRICK_SHOT_VERSION = 2;
+
+/**
+ * How thick a rebound pad is, front to back, in world units.
+ *
+ * A PAD IS A BLOCK, NOT A PLATE, AND THAT IS A VISIBILITY DECISION AS MUCH AS A
+ * PHYSICAL ONE. This was 0.055 — about 14 screen pixels at mid-room — and a
+ * plate that thin has one fatal property in a perspective room: turn it toward
+ * edge-on and it disappears. Measured, a 0.48 pad at z = 0.5 went from a 127px
+ * silhouette at yaw 0 to SEVENTEEN PIXELS at yaw 90, while its drawn height grew
+ * by a third on the way. Nothing about that is a projection bug — a flat square
+ * really does foreshorten like that — but a tool the player is arranging by hand
+ * must not evaporate as they arrange it, and "it changed size when I rotated it"
+ * is exactly what a shape doing that reads as.
+ *
+ * At 0.13 the same turn leaves a solid slab standing edge-on, its side faces lit
+ * from the left like everything else in the room, so the turn reads as a TURN.
+ * The collider thickens with it — this is the half-depth `sim/trick-shot-physics.js`
+ * builds its box from and the depth `render/trick-shot.js` builds its faces from,
+ * one number for both, so the block that is drawn is the block that is hit.
+ *
+ * It stays under the ball's own radius (0.078) on purpose: a slab thicker than
+ * the ball starts to read as a wall rather than a bumper.
+ */
+export const BOARD_PAD_THICKNESS = 0.13;
 
 export const isPadPiece = (piece) => piece?.type === BOARD_PIECE || piece?.type === SPRING_PIECE;
 
@@ -99,6 +126,10 @@ export function normalizeTrickShot(input = {}) {
     name: normalizeShotName(input.name),
     locationId: locationById(input.locationId || DEFAULT_LOCATION).id,
     ballId: ballById(input.ballId || DEFAULT_BALL).id,
+    // What the shot is aimed at, and how that target moves. A record saved
+    // before targets existed has none, and takes the still wall hoop it was
+    // authored against — see `TRICK_SHOT_VERSION`.
+    target: input.target ? normalizeTrickShotTarget(input.target) : defaultTrickShotTarget(),
     pieces,
     createdAt: Math.max(0, finite(input.createdAt, 0)),
     updatedAt: Math.max(0, finite(input.updatedAt, 0)),

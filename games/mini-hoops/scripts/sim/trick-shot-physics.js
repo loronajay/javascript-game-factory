@@ -42,7 +42,7 @@ function holdOrLaunch(ball, pieces, runtime, dt) {
   const cannon = pieces.find((piece) => piece.type === CANNON_PIECE && piece.id === runtime.capture.pieceId);
   if (!cannon) {
     runtime.capture = null;
-    return { contacts: [], captured: false, launched: false };
+    return { contacts: [], impacts: [], captured: false, launched: false };
   }
 
   ball.x = cannon.x;
@@ -54,7 +54,7 @@ function holdOrLaunch(ball, pieces, runtime, dt) {
   ball.omegaX = 0;
   runtime.capture.remaining -= dt;
   if (runtime.capture.remaining > 1e-9) {
-    return { contacts: [], captured: true, launched: false };
+    return { contacts: [], impacts: [], captured: true, launched: false };
   }
 
   const direction = cannonDirection(cannon);
@@ -67,7 +67,7 @@ function holdOrLaunch(ball, pieces, runtime, dt) {
   ball.omegaX = cannon.speed / BALL_RADIUS_WORLD;
   runtime.cooldowns[cannon.id] = CANNON_COOLDOWN;
   runtime.capture = null;
-  return { contacts: ["sandbox-cannon-fire"], captured: false, launched: true };
+  return { contacts: ["sandbox-cannon-fire"], impacts: [], captured: false, launched: true };
 }
 
 function catchWithCannon(ball, previous, cannon, runtime) {
@@ -107,7 +107,7 @@ function resolvePad(ball, previous, board) {
   let dy = local.y - closestLocal.y;
   let dz = local.z - closestLocal.z;
   let distance = Math.hypot(dx, dy, dz);
-  if (distance >= BALL_RADIUS_WORLD) return false;
+  if (distance >= BALL_RADIUS_WORLD) return null;
 
   if (distance < 1e-8) {
     // The centre is inside the thin box. Choose the nearest broad face, using
@@ -135,13 +135,13 @@ function resolvePad(ball, previous, board) {
 
   const normalSpeed = ball.vx * nx + ball.vy * ny + ball.vz * nz;
   if (board.type === SPRING_PIECE) {
-    if (normalSpeed >= board.speed) return false;
+    if (normalSpeed >= board.speed) return null;
     const boost = board.speed - normalSpeed;
     ball.vx += boost * nx;
     ball.vy += boost * ny;
     ball.vz += boost * nz;
   } else {
-    if (normalSpeed >= 0) return false;
+    if (normalSpeed >= 0) return null;
     const impulse = (1 + board.restitution) * normalSpeed;
     ball.vx -= impulse * nx;
     ball.vy -= impulse * ny;
@@ -155,7 +155,17 @@ function resolvePad(ball, previous, board) {
   ball.x = closest.x + nx * BALL_RADIUS_WORLD;
   ball.y = closest.y + ny * BALL_RADIUS_WORLD;
   ball.z = closest.z + nz * BALL_RADIUS_WORLD;
-  return true;
+  return {
+    pieceId: board.id,
+    kind: board.type,
+    x: closest.x,
+    y: closest.y,
+    z: closest.z,
+    speed: Math.abs(normalSpeed),
+    normal: { x: nx, y: ny, z: nz },
+    right: { ...right },
+    up: { ...up },
+  };
 }
 
 /** Advance capture timing and resolve any piece contacts for one substep. */
@@ -166,14 +176,18 @@ export function stepTrickShotPieces(ball, previous, pieces, runtime, dt) {
 
   for (const cannon of pieces) {
     if (cannon.type === CANNON_PIECE && catchWithCannon(ball, previous, cannon, runtime)) {
-      return { contacts: ["sandbox-cannon-catch"], captured: true, launched: false };
+      return { contacts: ["sandbox-cannon-catch"], impacts: [], captured: true, launched: false };
     }
   }
 
   const contacts = [];
+  const impacts = [];
   for (const board of pieces) {
-    if (!isPadPiece(board) || !resolvePad(ball, previous, board)) continue;
+    if (!isPadPiece(board)) continue;
+    const impact = resolvePad(ball, previous, board);
+    if (!impact) continue;
     contacts.push(board.type === BOARD_PIECE ? "sandbox-board" : "sandbox-spring");
+    impacts.push(impact);
   }
-  return { contacts, captured: false, launched: false };
+  return { contacts, impacts, captured: false, launched: false };
 }

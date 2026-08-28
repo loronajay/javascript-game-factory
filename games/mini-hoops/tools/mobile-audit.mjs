@@ -145,8 +145,23 @@ const MEASURE = () => {
       fromLeft: +(x / vw).toFixed(3),
       offCentre: Math.round(x - vw / 2),
       onScreen: x >= 0 && x <= vw && y >= 0 && y <= vh,
+      canvasBox: rect(canvas),
     };
   }
+
+  // A control below the fold of a panel that SCROLLS ON PURPOSE is reachable,
+  // and reporting it as stranded buries the real strandings in noise. The Lab's
+  // tool rail and How to Play's notes box are both deliberate scroll containers
+  // — the design rule in both cases is "the instrument fits and the LIST is what
+  // scrolls" — so the question is whether some ancestor can actually bring the
+  // control into view, not whether it happens to be inside the viewport now.
+  const inScrollContainer = (node) => {
+    for (let parent = node.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+      const overflow = getComputedStyle(parent).overflowY;
+      if ((overflow === "auto" || overflow === "scroll") && parent.scrollHeight - parent.clientHeight > 2) return true;
+    }
+    return false;
+  };
 
   const controls = [...scope.querySelectorAll("button, input, select, [role=button]")].filter(visible);
   const offscreen = [];
@@ -155,7 +170,7 @@ const MEASURE = () => {
     const box = node.getBoundingClientRect();
     const label = (node.id || node.className || node.tagName).toString().split(" ")[0];
     const text = (node.textContent || "").trim().slice(0, 22);
-    if (box.bottom > vh + 1 || box.top < -1 || box.right > vw + 1 || box.left < -1) {
+    if ((box.bottom > vh + 1 || box.top < -1 || box.right > vw + 1 || box.left < -1) && !inScrollContainer(node)) {
       offscreen.push({ label, text, box: rect(node) });
     }
     if (box.width < 44 || box.height < 44) {
@@ -292,6 +307,33 @@ const ROUTES = [
     },
   },
   {
+    // The Trick Shot Lab. A court beside a scrolling tool rail: the RAIL is the
+    // part that scrolls, so the screen itself must fit -- the court and its power
+    // meter are one instrument here exactly as they are in a run.
+    name: "trick shot lab",
+    mustFit: true,
+    async go(page) {
+      await page.click('[data-command="trickshot"]');
+      await page.waitForSelector("#trickShotScreen.is-active");
+      await page.click("#trickAddBoard");
+      await page.click("#trickAddSpring");
+      await page.click("#trickAddCannon");
+    },
+  },
+  {
+    // The same screen with a floor bin as the target. Worth its own row: the
+    // target panel gains a motion select and the court gains a placed bin with
+    // its own depth handle, and both are new things that can fall under a fold.
+    name: "trick shot lab (bin)",
+    mustFit: true,
+    async go(page) {
+      await page.click('[data-command="trickshot"]');
+      await page.waitForSelector("#trickShotScreen.is-active");
+      await page.click('#trickTargetKinds [data-target-kind="bin"]');
+      await page.click("#trickAddSpring");
+    },
+  },
+  {
     // A splash screen with a list on it. It scrolls by design, but it is also
     // where the scrim over the painted art is judged, and it had never been in
     // this sheet at all.
@@ -368,7 +410,17 @@ for (const viewport of VIEWPORTS) {
     if (found.ball) {
       const sign = found.ball.offCentre >= 0 ? "+" : "";
       notes.push(`ball ${sign}${found.ball.offCentre}px off centre (${Math.round(found.ball.fromLeft * 100)}% across)`);
-      if (!found.ball.onScreen) notes.push("BALL OFF SCREEN");
+      if (!found.ball.onScreen) {
+        // Say WHERE, because the answer is almost always a canvas that outgrew
+        // its own court: a cap that cannot resolve leaves the canvas sized off
+        // the court's width, and `overflow: hidden` then clips the bottom of the
+        // room off — which is exactly where the ball rests.
+        const box = found.ball.canvasBox;
+        notes.push(
+          `BALL OFF SCREEN (ball ${found.ball.x},${found.ball.y}`
+          + ` canvas ${box?.x},${box?.y} ${box?.w}x${box?.h} vp ${found.vw}x${found.vh})`,
+        );
+      }
     }
     // Off-screen controls on a scrolling list screen are just below the fold.
     const stranded = route.mustFit ? found.offscreen : [];
