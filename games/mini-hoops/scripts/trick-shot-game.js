@@ -30,10 +30,15 @@ import {
   resetTrickShotPhysics,
   stepTrickShotPieces,
 } from "./sim/trick-shot-physics.js";
-import { renderTrickShotFrame, sandboxPieceAtPoint } from "./render/trick-shot.js";
+import {
+  renderTrickShotFrame,
+  sandboxPieceAtPoint,
+  sandboxPieceControlAtPoint,
+  TRICK_SHOT_ASSET_PATHS,
+} from "./render/trick-shot.js";
 import { ballScreenPosition } from "./render/frame.js";
 import { prepareContext } from "./render/scene.js";
-import { projectPoint, screenToWorldAtZ } from "./sim/projection.js";
+import { projectPoint, screenToWorldAtZ, screenToWorldOnFloor } from "./sim/projection.js";
 import { createTrickShotStore } from "./store/trick-shots-store.js";
 import { canvasPoint, isGrab } from "./ui/pointer.js";
 import { createTrickShotView } from "./ui/trick-shot-view.js";
@@ -42,6 +47,7 @@ const SILENT_AUDIO = Object.freeze({ released() {}, contact() {}, scored() {}, c
 const MAX_SHOT_SECONDS = 14;
 const SETTLED_SECONDS = 0.8;
 const MADE_HOLD_SECONDS = 1.05;
+const MAX_EDIT_HISTORY = 40;
 
 export function bootTrickShot(root, options = {}) {
   const canvas = root.querySelector("#trickShotCourt");
@@ -78,6 +84,7 @@ export function bootTrickShot(root, options = {}) {
   let pointerMode = null;
   let grabOffset = { x: 0, y: 0 };
   let dragOffset = { x: 0, y: 0 };
+  let history = [];
   let lastTime = null;
   let accumulator = 0;
 
@@ -85,6 +92,7 @@ export function bootTrickShot(root, options = {}) {
     onExit: () => onLeave(),
     onAddBoard: () => addPiece(BOARD_PIECE),
     onAddCannon: () => addPiece(CANNON_PIECE),
+    onUndo: undoEdit,
     onResetBall: () => resetShot("BUILD MODE"),
     onDeletePiece: deleteSelected,
     onPieceChange: updateSelected,
@@ -107,7 +115,24 @@ export function bootTrickShot(root, options = {}) {
       name: currentName,
       status,
       busy: shotActive,
+      power: pull?.power || 0,
+      pulling: pointerMode === "pull",
+      canUndo: history.length > 0,
     });
+  }
+
+  function rememberEdit() {
+    history.push({ pieces: pieces.map((piece) => ({ ...piece })), selectedId });
+    if (history.length > MAX_EDIT_HISTORY) history.shift();
+  }
+
+  function undoEdit() {
+    if (shotActive || !history.length) return;
+    const previous = history.pop();
+    pieces = previous.pieces;
+    selectedId = previous.selectedId;
+    status = "UNDO";
+    renderView();
   }
 
   function uniquePieceId(type) {
@@ -117,6 +142,7 @@ export function bootTrickShot(root, options = {}) {
 
   function addPiece(type) {
     if (shotActive || pieces.length >= MAX_SANDBOX_PIECES) return;
+    rememberEdit();
     const count = pieces.length;
     const piece = createSandboxPiece(type, {
       id: uniquePieceId(type),
@@ -127,7 +153,7 @@ export function bootTrickShot(root, options = {}) {
     });
     pieces = [...pieces, piece];
     selectedId = piece.id;
-    status = type === BOARD_PIECE ? "BOARD ADDED" : "CANNON ADDED";
+    status = type === BOARD_PIECE ? "REBOUND PAD ADDED" : "CANNON ADDED";
     renderView();
   }
 
@@ -141,11 +167,12 @@ export function bootTrickShot(root, options = {}) {
     if (shotActive || !selectedId) return;
     const piece = pieces.find((candidate) => candidate.id === selectedId);
     if (!piece) return;
+    rememberEdit();
     if (field === "depth") replaceSelected({ z: value / 100 });
-    else if (field === "angle") replaceSelected(piece.type === BOARD_PIECE
+    else if (field === "angle") replaceSelected({ yaw: value * Math.PI / 180 });
+    else if (field === "pitch") replaceSelected(piece.type === BOARD_PIECE
       ? { angle: value * Math.PI / 180 }
-      : { yaw: value * Math.PI / 180 });
-    else if (field === "pitch") replaceSelected({ pitch: value * Math.PI / 180 });
+      : { pitch: value * Math.PI / 180 });
     else if (field === "power") replaceSelected({ speed: value });
     else if (field === "delay") replaceSelected({ delay: value });
     else if (field === "bounce") replaceSelected({ restitution: value });
@@ -155,6 +182,7 @@ export function bootTrickShot(root, options = {}) {
 
   function deleteSelected() {
     if (shotActive || !selectedId) return;
+    rememberEdit();
     pieces = pieces.filter((piece) => piece.id !== selectedId);
     selectedId = null;
     status = "PIECE REMOVED";
@@ -177,6 +205,7 @@ export function bootTrickShot(root, options = {}) {
 
   function newLayout() {
     resetShot();
+    if (pieces.length) rememberEdit();
     pieces = [];
     selectedId = null;
     currentId = "";
@@ -193,6 +222,7 @@ export function bootTrickShot(root, options = {}) {
     currentName = saved.name;
     locationId = saved.locationId;
     ballId = saved.ballId;
+    history = [];
     pieces = saved.pieces;
     selectedId = pieces[0]?.id || null;
     status = `LOADED · ${saved.name.toUpperCase()}`;
@@ -236,13 +266,28 @@ export function bootTrickShot(root, options = {}) {
   }
 
   function startPieceDrag(event, point, piece) {
-    const centre = projectPointForPiece(piece);
+    rememberEdit();
+    const centre = piece.type === CANNON_PIECE
+      ? projectPoint({ x: piece.x, y: 0, z: piece.z })
+      : projectPointForPiece(piece);
     pointerId = event.pointerId;
     pointerMode = "piece";
     selectedId = piece.id;
     dragOffset = { x: point.x - centre.x, y: point.y - centre.y };
     canvas.setPointerCapture?.(event.pointerId);
     status = "PLACE PIECE";
+    renderView();
+  }
+
+  function startDepthDrag(event, point, piece) {
+    rememberEdit();
+    const floor = projectPoint({ x: piece.x, y: 0, z: piece.z });
+    pointerId = event.pointerId;
+    pointerMode = "depth";
+    selectedId = piece.id;
+    dragOffset = { x: point.x - floor.x, y: point.y - floor.y };
+    canvas.setPointerCapture?.(event.pointerId);
+    status = "MOVE IN DEPTH";
     renderView();
   }
 
@@ -253,9 +298,15 @@ export function bootTrickShot(root, options = {}) {
   canvas.addEventListener("pointerdown", (event) => {
     if (!active || shotActive) return;
     const point = canvasPoint(canvas, event);
+    const control = sandboxPieceControlAtPoint(pieces, point, selectedId);
     const piece = sandboxPieceAtPoint(pieces, point);
     event.preventDefault();
-    if (piece) startPieceDrag(event, point, piece);
+    if (control?.action === "delete") {
+      selectedId = control.piece.id;
+      deleteSelected();
+    }
+    else if (control?.action === "depth") startDepthDrag(event, point, control.piece);
+    else if (piece) startPieceDrag(event, point, piece);
     else if (!startPull(event, point)) {
       selectedId = null;
       status = "BUILD MODE";
@@ -277,8 +328,17 @@ export function bootTrickShot(root, options = {}) {
     } else if (pointerMode === "piece") {
       const piece = pieces.find((candidate) => candidate.id === selectedId);
       if (!piece) return;
-      const worldPoint = screenToWorldAtZ(point.x - dragOffset.x, point.y - dragOffset.y, piece.z);
-      replaceSelected({ x: worldPoint.x, y: worldPoint.y });
+      if (piece.type === CANNON_PIECE) {
+        const worldPoint = screenToWorldOnFloor(point.x - dragOffset.x, point.y - dragOffset.y);
+        replaceSelected({ x: worldPoint.x, z: worldPoint.z });
+      } else {
+        const worldPoint = screenToWorldAtZ(point.x - dragOffset.x, point.y - dragOffset.y, piece.z);
+        replaceSelected({ x: worldPoint.x, y: worldPoint.y });
+      }
+      renderView();
+    } else if (pointerMode === "depth") {
+      const worldPoint = screenToWorldOnFloor(point.x - dragOffset.x, point.y - dragOffset.y);
+      replaceSelected({ x: worldPoint.x, z: worldPoint.z });
       renderView();
     }
   });
@@ -298,6 +358,16 @@ export function bootTrickShot(root, options = {}) {
     renderView();
   });
   canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+
+  root.addEventListener("keydown", (event) => {
+    if (!active || shotActive || !selectedId) return;
+    const editable = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
+    if (editable) return;
+    if (event.key === "Delete" || event.key === "Backspace") {
+      event.preventDefault();
+      deleteSelected();
+    }
+  });
 
   function releasePull() {
     const released = pull;
@@ -392,6 +462,10 @@ export function bootTrickShot(root, options = {}) {
       locationId,
       ballFrames: assets.ballFrames(ballId),
       ballId,
+      pieceAssets: {
+        cannonBase: assets.image(TRICK_SHOT_ASSET_PATHS.cannonBase),
+        cannonBarrel: assets.image(TRICK_SHOT_ASSET_PATHS.cannonBarrel),
+      },
       pieces,
       selectedId,
       capture: piecePhysics.capture,
@@ -422,6 +496,7 @@ export function bootTrickShot(root, options = {}) {
       lastTime = null;
       accumulator = 0;
       status = "BUILD MODE";
+      history = [];
       renderView();
       requestAnimationFrame(frame);
     },

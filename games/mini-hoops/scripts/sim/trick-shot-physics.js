@@ -5,9 +5,14 @@
 // thin neon boards cannot be skipped at 60 Hz and cannon timing is deterministic.
 
 import { BALL_RADIUS_WORLD } from "./constants.js";
-import { BOARD_PIECE, CANNON_PIECE, cannonDirection } from "./trick-shot.js";
+import {
+  BOARD_PAD_THICKNESS,
+  BOARD_PIECE,
+  CANNON_PIECE,
+  boardFrame,
+  cannonDirection,
+} from "./trick-shot.js";
 
-const BOARD_HALF_THICKNESS = 0.024;
 const CANNON_MOUTH_RADIUS = 0.135;
 const CANNON_MOUTH_HEIGHT = 0.08;
 const CANNON_MUZZLE_CLEARANCE = 0.17;
@@ -81,42 +86,50 @@ function catchWithCannon(ball, previous, cannon, runtime) {
   return true;
 }
 
-function resolveBoard(ball, board) {
-  const half = board.length / 2;
-  const dx = Math.cos(board.angle);
-  const dy = Math.sin(board.angle);
-  const ax = board.x - dx * half;
-  const ay = board.y - dy * half;
-  const az = board.z;
-  const segmentLength2 = board.length * board.length;
-  const along = Math.max(0, Math.min(1, ((ball.x - ax) * (dx * board.length) + (ball.y - ay) * (dy * board.length)) / segmentLength2));
-  const closest = {
-    x: ax + dx * board.length * along,
-    y: ay + dy * board.length * along,
-    z: az,
+function resolveBoard(ball, previous, board) {
+  const halfFace = board.length / 2;
+  const halfDepth = BOARD_PAD_THICKNESS / 2;
+  const { normal, right, up } = boardFrame(board);
+  const relative = { x: ball.x - board.x, y: ball.y - board.y, z: ball.z - board.z };
+  const local = {
+    x: relative.x * right.x + relative.y * right.y + relative.z * right.z,
+    y: relative.x * up.x + relative.y * up.y + relative.z * up.z,
+    z: relative.x * normal.x + relative.y * normal.y + relative.z * normal.z,
   };
-  let nx = ball.x - closest.x;
-  let ny = ball.y - closest.y;
-  let nz = ball.z - closest.z;
-  const distance = Math.hypot(nx, ny, nz);
-  const clearance = BALL_RADIUS_WORLD + BOARD_HALF_THICKNESS;
-  if (distance >= clearance) return false;
+  const closestLocal = {
+    x: Math.max(-halfFace, Math.min(halfFace, local.x)),
+    y: Math.max(-halfFace, Math.min(halfFace, local.y)),
+    z: Math.max(-halfDepth, Math.min(halfDepth, local.z)),
+  };
+  let dx = local.x - closestLocal.x;
+  let dy = local.y - closestLocal.y;
+  let dz = local.z - closestLocal.z;
+  let distance = Math.hypot(dx, dy, dz);
+  if (distance >= BALL_RADIUS_WORLD) return false;
 
   if (distance < 1e-8) {
-    // Pick the board-normal direction opposing the incoming velocity. This is
-    // rare but keeps an exact centre hit finite and deterministic.
-    nx = -dy;
-    ny = dx;
-    nz = 0;
-    if (ball.vx * nx + ball.vy * ny > 0) {
-      nx *= -1;
-      ny *= -1;
-    }
-  } else {
-    nx /= distance;
-    ny /= distance;
-    nz /= distance;
+    // The centre is inside the thin box. Choose the nearest broad face, using
+    // the incoming side as the tie-breaker, so a fast centred hit remains
+    // finite and never rebounds from an arbitrary edge.
+    const previousRelative = {
+      x: previous?.x - board.x,
+      y: previous?.y - board.y,
+      z: previous?.z - board.z,
+    };
+    const previousNormal = Number.isFinite(previousRelative.x)
+      ? previousRelative.x * normal.x + previousRelative.y * normal.y + previousRelative.z * normal.z
+      : local.z;
+    dz = previousNormal < 0 ? -1 : 1;
+    dx = 0;
+    dy = 0;
+    distance = 1;
+    closestLocal.z = dz < 0 ? -halfDepth : halfDepth;
   }
+
+  const localNormal = { x: dx / distance, y: dy / distance, z: dz / distance };
+  const nx = right.x * localNormal.x + up.x * localNormal.y + normal.x * localNormal.z;
+  const ny = right.y * localNormal.x + up.y * localNormal.y + normal.y * localNormal.z;
+  const nz = right.z * localNormal.x + up.z * localNormal.y + normal.z * localNormal.z;
 
   const normalSpeed = ball.vx * nx + ball.vy * ny + ball.vz * nz;
   if (normalSpeed >= 0) return false;
@@ -124,9 +137,14 @@ function resolveBoard(ball, board) {
   ball.vx -= impulse * nx;
   ball.vy -= impulse * ny;
   ball.vz -= impulse * nz;
-  ball.x = closest.x + nx * clearance;
-  ball.y = closest.y + ny * clearance;
-  ball.z = closest.z + nz * clearance;
+  const closest = {
+    x: board.x + right.x * closestLocal.x + up.x * closestLocal.y + normal.x * closestLocal.z,
+    y: board.y + right.y * closestLocal.x + up.y * closestLocal.y + normal.y * closestLocal.z,
+    z: board.z + right.z * closestLocal.x + up.z * closestLocal.y + normal.z * closestLocal.z,
+  };
+  ball.x = closest.x + nx * BALL_RADIUS_WORLD;
+  ball.y = closest.y + ny * BALL_RADIUS_WORLD;
+  ball.z = closest.z + nz * BALL_RADIUS_WORLD;
   return true;
 }
 
@@ -144,8 +162,7 @@ export function stepTrickShotPieces(ball, previous, pieces, runtime, dt) {
 
   const contacts = [];
   for (const board of pieces) {
-    if (board.type === BOARD_PIECE && resolveBoard(ball, board)) contacts.push("sandbox-board");
+    if (board.type === BOARD_PIECE && resolveBoard(ball, previous, board)) contacts.push("sandbox-board");
   }
   return { contacts, captured: false, launched: false };
 }
-

@@ -3,6 +3,8 @@ import { suite, test, assert, assertClose, assertEqual, finish } from "./harness
 import {
   BOARD_PIECE,
   CANNON_PIECE,
+  boardFrame,
+  cannonDirection,
   createSandboxPiece,
   normalizeTrickShot,
 } from "../scripts/sim/trick-shot.js";
@@ -31,6 +33,44 @@ test("piece records are normalized into a bounded, reusable catalog", () => {
   assert(cannon.delay >= 0.25);
 });
 
+test("launchers and pads can be oriented around the room, not only toward the hoop", () => {
+  const backwardCannon = createSandboxPiece(CANNON_PIECE, {
+    id: "backward", yaw: Math.PI, pitch: Math.PI / 6,
+  });
+  const launch = cannonDirection(backwardCannon);
+  assert(launch.z < -0.8, "a launcher can fire back toward the camera for a combo");
+
+  const depthPad = createSandboxPiece(BOARD_PIECE, {
+    id: "depth-pad", yaw: 0, angle: 0,
+  });
+  const frame = boardFrame(depthPad);
+  assertClose(frame.normal.x, 0, 1e-9);
+  assert(frame.normal.z > 0.99, "a pad face can point toward the hoop");
+  assertClose(frame.right.x, 1, 1e-9);
+  assertClose(frame.up.y, 1, 1e-9);
+  assertClose(
+    frame.normal.x * frame.right.x + frame.normal.y * frame.right.y + frame.normal.z * frame.right.z,
+    0,
+    1e-9,
+    "the square face axes stay perpendicular",
+  );
+});
+
+test("a square pad rebounds from its face and does not act like a long thin bar", () => {
+  const board = createSandboxPiece(BOARD_PIECE, {
+    id: "depth-board", x: 0, y: 0.65, z: 0.5,
+    yaw: 0, angle: 0, length: 0.48, restitution: 0.9,
+  });
+  const ball = { x: 0.08, y: 0.72, z: 0.405, vx: 0, vy: 0, vz: 2, omegaX: 0 };
+  const result = stepTrickShotPieces(ball, { x: 0.08, y: 0.72, z: 0.385 }, [board], createTrickShotPhysics(), 0.008);
+  assert(result.contacts.includes("sandbox-board"));
+  assert(ball.vz < -1.7, "the ball bounces from the pad's visible face normal");
+
+  const outside = { x: 0.42, y: 0.65, z: 0.405, vx: 0, vy: 0, vz: 2, omegaX: 0 };
+  const missed = stepTrickShotPieces(outside, { ...outside, z: 0.385 }, [board], createTrickShotPhysics(), 0.008);
+  assert(!missed.contacts.includes("sandbox-board"), "empty space beside the square face is not a hidden capsule");
+});
+
 test("saved trick shots keep sandbox layouts separate from HORSE state", () => {
   const shot = normalizeTrickShot({
     id: "shot-1",
@@ -48,18 +88,18 @@ test("saved trick shots keep sandbox layouts separate from HORSE state", () => {
   assertEqual(shot.horse, undefined, "the bank schema has no HORSE match/config field");
 });
 
-test("a rotated board reflects only the velocity normal to its face", () => {
+test("a tilted pad reflects only the velocity normal to its face", () => {
   const board = createSandboxPiece(BOARD_PIECE, {
-    id: "board", x: 0, y: 0.7, z: 0.45, angle: 0, length: 0.6, restitution: 0.9,
+    id: "board", x: 0, y: 0.7, z: 0.45, yaw: Math.PI / 2, angle: 0, length: 0.5, restitution: 0.9,
   });
-  const ball = { x: 0.08, y: 0.775, z: 0.45, vx: 0.4, vy: -2, vz: 1, omegaX: 0 };
-  const previous = { x: 0.077, y: 0.79, z: 0.443 };
+  const ball = { x: -0.095, y: 0.775, z: 0.45, vx: 2, vy: 0.4, vz: 1, omegaX: 0 };
+  const previous = { x: -0.12, y: 0.77, z: 0.438 };
   const result = stepTrickShotPieces(ball, previous, [board], createTrickShotPhysics(), 0.008);
 
   assert(result.contacts.includes("sandbox-board"));
-  assert(ball.vy > 1.7, "the approaching normal velocity bounces away with restitution");
-  assertClose(ball.vx, 0.4, 0.03, "velocity along the plank is preserved");
-  assertClose(ball.vz, 1, 0.03, "a screen-plane plank does not invent depth speed");
+  assert(ball.vx < -1.7, "the approaching normal velocity bounces away with restitution");
+  assertClose(ball.vy, 0.4, 0.03, "vertical velocity along the face is preserved");
+  assertClose(ball.vz, 1, 0.03, "depth velocity along the face is preserved");
 });
 
 test("a cannon catches a descending ball, waits its delay, then fires on its set trajectory", () => {

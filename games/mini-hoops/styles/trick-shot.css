@@ -38,6 +38,10 @@
   overflow: hidden;
 }
 
+.cabinet:has(.trick-shot-screen.is-active) {
+  max-width: 1300px;
+}
+
 .cabinet:has(.trick-shot-screen.is-active) > .back-link { display: none; }
 
 .trick-court {
@@ -54,7 +58,7 @@
 
 .trick-court .court-canvas {
   width: auto;
-  height: 100%;
+  height: auto;
   max-width: 100%;
   max-height: 100%;
   aspect-ratio: 960 / 760;
@@ -78,10 +82,30 @@
 
 .trick-court .hud-hint { bottom: 12px; }
 
+.trick-power-gauge {
+  position: absolute;
+  right: 14px;
+  bottom: 52px;
+  width: clamp(180px, 28%, 260px);
+  padding: 10px 12px;
+  border: 1px solid rgb(62 244 255 / .48);
+  border-radius: 8px;
+  color: #eaffff;
+  background: rgb(5 8 16 / .88);
+  box-shadow: 0 10px 28px rgb(0 0 0 / .35), inset 0 0 22px rgb(62 244 255 / .05);
+  pointer-events: none;
+}
+.trick-power-gauge.is-aiming { border-color: var(--trick-lime); box-shadow: 0 0 24px rgb(216 255 77 / .24); }
+.trick-power-head { display: flex; align-items: center; justify-content: space-between; font: 900 .67rem/1 system-ui; letter-spacing: .12em; }
+.trick-power-head strong { color: var(--trick-lime); font-size: 1rem; letter-spacing: 0; }
+.trick-power-track { height: 14px; margin: 7px 0 6px; overflow: hidden; border: 1px solid rgb(255 255 255 / .22); border-radius: 99px; background: rgb(255 255 255 / .08); }
+.trick-power-track i { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--trick-cyan), var(--trick-lime) 72%, #ff6a4d); box-shadow: 0 0 14px var(--trick-cyan); transition: width 40ms linear; }
+.trick-power-gauge small { display: block; color: var(--ink-faint); font: 800 .56rem/1 system-ui; letter-spacing: .1em; }
+
 .trick-empty {
   position: absolute;
   left: 50%;
-  bottom: 84px;
+  bottom: 126px;
   translate: -50% 0;
   width: min(350px, 74%);
   padding: 13px 16px;
@@ -126,11 +150,13 @@
   letter-spacing: .1em;
 }
 .trick-panel-head small { color: var(--ink-faint); font-size: .64rem; letter-spacing: 0; }
+.trick-panel-copy,
+.trick-selection-help { margin: -2px 0 10px; color: var(--ink-faint); font-size: .62rem; line-height: 1.35; }
 
 .trick-piece-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .trick-piece-button {
   min-width: 0;
-  min-height: 90px;
+  min-height: 116px;
   display: grid;
   align-content: center;
   justify-items: start;
@@ -145,14 +171,59 @@
 .trick-piece-button:hover { background: var(--fill-hover); transform: translateY(-1px); }
 .trick-piece-button b { font-size: .72rem; }
 .trick-piece-button small { color: var(--ink-faint); font-size: .59rem; line-height: 1.2; }
-.trick-piece-icon { width: 38px; height: 9px; margin: 4px 0 7px; border-radius: 99px; background: var(--trick-cyan); box-shadow: 0 0 13px var(--trick-cyan); transform: rotate(-9deg); }
-.trick-piece-button--cannon .trick-piece-icon { width: 20px; height: 20px; border: 5px solid var(--trick-pink); background: transparent; box-shadow: 0 0 13px var(--trick-pink), inset 0 0 8px var(--trick-pink); transform: none; }
+.trick-piece-art { position: relative; width: 100%; height: 54px; display: block; overflow: hidden; }
+.trick-piece-art img { position: absolute; display: block; object-fit: contain; filter: drop-shadow(0 7px 8px rgb(0 0 0 / .58)); }
+.trick-pad-preview {
+  display: grid;
+  place-items: center;
+  overflow: visible;
+  perspective: 160px;
+}
+.trick-pad-preview::before,
+.trick-pad-preview i {
+  content: "";
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  border-radius: 7px;
+  transform: rotateX(7deg) rotateY(-22deg) rotateZ(-5deg);
+}
+.trick-pad-preview::before {
+  translate: 5px 5px;
+  border: 2px solid #071019;
+  background: #102232;
+  box-shadow: 0 10px 13px rgb(0 0 0 / .55);
+}
+.trick-pad-preview i {
+  border: 3px solid var(--trick-cyan);
+  background:
+    radial-gradient(circle, #efffff 0 4px, transparent 5px),
+    linear-gradient(135deg, rgb(62 244 255 / .17), rgb(5 31 45 / .96));
+  box-shadow: 0 0 13px rgb(62 244 255 / .58), inset 0 0 0 8px rgb(62 244 255 / .1);
+}
+.trick-piece-art--cannon img:first-child { left: 4px; bottom: 0; width: 45px; height: 54px; }
+.trick-piece-art--cannon img:last-child { right: -3px; top: 7px; width: 68px; height: 35px; transform: rotate(-16deg); transform-origin: left center; }
 
 .trick-control { display: grid; gap: 5px; margin-top: 9px; color: var(--ink-dim); font-size: .69rem; }
 .trick-control input[type="range"] { width: 100%; accent-color: var(--trick-cyan); }
 .trick-control[id*="Pitch"] input,
 .trick-control[id*="Power"] input,
 .trick-control[id*="Delay"] input { accent-color: var(--trick-pink); }
+
+.trick-direction-presets { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 7px; }
+.trick-direction-presets button {
+  min-width: 0;
+  min-height: 32px;
+  padding: 4px 0;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--ink-dim);
+  background: var(--fill);
+  font: 900 1rem/1 system-ui;
+}
+.trick-direction-presets button:hover { color: white; background: var(--fill-hover); }
+.trick-direction-presets button[aria-pressed="true"] { color: #081018; border-color: var(--trick-lime); background: var(--trick-lime); box-shadow: 0 0 12px rgb(216 255 77 / .35); }
+.trick-direction-presets button:disabled { opacity: .4; }
 
 .trick-text-button,
 .trick-bank-delete {
@@ -163,6 +234,18 @@
   font: inherit;
 }
 .trick-text-button:hover, .trick-bank-delete:hover { color: #ff8c9a; }
+.trick-delete-button {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid rgb(255 80 104 / .62);
+  border-radius: 6px;
+  color: #ff9dad;
+  background: rgb(255 80 104 / .1);
+  font: 900 .63rem/1 system-ui;
+  letter-spacing: .06em;
+}
+.trick-delete-button:hover { color: white; background: rgb(255 80 104 / .28); }
+.trick-delete-button:disabled { opacity: .4; }
 
 .trick-save-row { display: grid; grid-template-columns: 1fr auto; gap: 7px; }
 .trick-save-row input {
@@ -190,6 +273,40 @@
   .trick-workspace { grid-template-columns: minmax(0, 1fr) minmax(224px, 270px); gap: 6px; }
   .trick-panel { padding: 9px; }
   .trick-piece-button { min-height: 75px; padding: 8px; }
+  .trick-piece-art { height: 42px; }
+  .trick-power-gauge { width: 190px; bottom: 44px; padding: 8px 10px; }
+}
+
+@media (max-height: 600px) and (orientation: landscape) {
+  .trick-shot-screen.is-active {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    align-items: stretch;
+    justify-content: stretch;
+    height: 100%;
+  }
+  .trick-shot-screen .trick-topbar { grid-column: 1; grid-row: 1; min-height: 38px; }
+  .trick-shot-screen .trick-top-actions { margin-right: 0; }
+  .trick-shot-screen .trick-heading h2 { font-size: 1rem; }
+  .trick-shot-screen .trick-kicker { display: none; }
+  .trick-shot-screen .trick-workspace {
+    grid-column: 1;
+    grid-row: 2;
+    grid-template-columns: minmax(0, 1fr) minmax(224px, 270px);
+    grid-template-rows: minmax(0, 1fr);
+    height: 100%;
+  }
+  .trick-shot-screen .trick-court {
+    grid-column: 1;
+    grid-row: 1;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    aspect-ratio: auto;
+  }
+  .trick-shot-screen .trick-court .court-canvas { width: auto; height: auto; max-width: 100%; max-height: 100%; }
+  .trick-shot-screen .trick-editor { grid-column: 2; grid-row: 1; }
 }
 
 @media (max-width: 560px) and (orientation: portrait) {
@@ -200,7 +317,9 @@
   .trick-workspace { height: 100%; grid-template-columns: 1fr; grid-template-rows: minmax(0, 34%) minmax(0, 66%); }
   .trick-shot-screen .trick-court { min-height: 0; height: auto; align-self: stretch; }
   .trick-editor { min-height: 0; height: 100%; }
-  .trick-court .court-canvas { width: auto; height: 100%; max-width: 100%; }
+  .trick-court .court-canvas { width: auto; height: auto; max-width: 100%; max-height: 100%; }
   .trick-editor { grid-template-columns: 1fr; overflow-y: auto; }
   .trick-piece-button { min-height: 68px; }
+  .trick-power-gauge { right: 8px; bottom: 42px; width: 170px; }
+  .trick-empty { display: none; }
 }

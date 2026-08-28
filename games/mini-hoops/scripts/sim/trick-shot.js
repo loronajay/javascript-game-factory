@@ -12,6 +12,7 @@ export const CANNON_PIECE = "cannon";
 export const SANDBOX_PIECE_TYPES = Object.freeze([BOARD_PIECE, CANNON_PIECE]);
 export const MAX_SANDBOX_PIECES = 24;
 export const TRICK_SHOT_VERSION = 1;
+export const BOARD_PAD_THICKNESS = 0.055;
 
 export const PIECE_BOUNDS = Object.freeze({
   x: Object.freeze([-0.9, 0.9]),
@@ -55,15 +56,19 @@ export function createSandboxPiece(type, input = {}, fallbackId = `${type || "pi
   if (type === BOARD_PIECE) {
     return {
       ...common,
-      angle: normalizeAngle(input.angle, 0),
-      length: clamp(input.length, 0.2, 0.76, 0.48),
+      yaw: normalizeAngle(input.yaw, 0),
+      angle: clamp(input.angle, -Math.PI * 0.44, Math.PI * 0.44, 0),
+      // `length` is retained in the saved schema, but now means both sides of
+      // a square rebound pad. Old layouts therefore load as useful pads rather
+      // than needing a storage migration.
+      length: clamp(input.length, 0.28, 0.68, 0.48),
       restitution: clamp(input.restitution, 0.45, 1.12, 0.88),
     };
   }
 
   return {
     ...common,
-    yaw: clamp(input.yaw, -Math.PI * 0.46, Math.PI * 0.46, 0),
+    yaw: normalizeAngle(input.yaw, 0),
     pitch: clamp(input.pitch, Math.PI / 36, Math.PI * 0.44, Math.PI / 4),
     speed: clamp(input.speed, 2.5, 7.5, 5.4),
     delay: clamp(input.delay, 0.25, 2, 0.5),
@@ -92,6 +97,37 @@ export function normalizeTrickShot(input = {}) {
     pieces,
     createdAt: Math.max(0, finite(input.createdAt, 0)),
     updatedAt: Math.max(0, finite(input.updatedAt, 0)),
+  };
+}
+
+/**
+ * Orthonormal frame for the rebound pad's square face.
+ *
+ * Yaw and tilt describe the direction the face points, matching the launcher's
+ * direction controls. `right` and `up` lie on the impact face; `normal` is the
+ * direction a centred hit reflects along. Rendering and collision share this
+ * exact frame so the painted surface is always the physical surface.
+ */
+export function boardFrame(board) {
+  const yaw = board.yaw;
+  const tilt = board.angle;
+  const horizontal = Math.cos(tilt);
+  return {
+    normal: {
+      x: Math.sin(yaw) * horizontal,
+      y: Math.sin(tilt),
+      z: Math.cos(yaw) * horizontal,
+    },
+    right: {
+      x: Math.cos(yaw),
+      y: 0,
+      z: -Math.sin(yaw),
+    },
+    up: {
+      x: -Math.sin(yaw) * Math.sin(tilt),
+      y: Math.cos(tilt),
+      z: -Math.cos(yaw) * Math.sin(tilt),
+    },
   };
 }
 

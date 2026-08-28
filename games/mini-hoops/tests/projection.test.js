@@ -20,6 +20,7 @@ import {
   projectPoint,
   ringEllipseAt,
   screenToWorldAtZ,
+  screenToWorldOnFloor,
   worldToScreenLength,
 } from "../scripts/sim/projection.js";
 
@@ -118,6 +119,20 @@ test("screenToWorldAtZ inverts projectPoint on the plane it is given", () => {
       assertClose(back.x, point.x, 1e-9, `x round trip at z=${z}`);
       assertClose(back.y, point.y, 1e-9, `y round trip at z=${z}`);
     }
+  }
+});
+
+test("screenToWorldOnFloor makes a projected floor handle directly draggable in depth", () => {
+  for (const point of [
+    { x: -0.7, z: 0.08 },
+    { x: 0.25, z: 0.48 },
+    { x: 0.75, z: 0.94 },
+  ]) {
+    const screen = projectPoint({ ...point, y: 0 });
+    const back = screenToWorldOnFloor(screen.x, screen.y);
+    assertClose(back.x, point.x, 1e-9, `floor x round trip at z=${point.z}`);
+    assertClose(back.z, point.z, 1e-9, `floor depth round trip at z=${point.z}`);
+    assertClose(back.y, 0, 1e-9);
   }
 });
 
