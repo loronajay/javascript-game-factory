@@ -6,6 +6,7 @@ const {
   createStairLayout,
   createStairwellShellLayout,
   getRoomFillLight,
+  getHallLighting,
   resolveWalkSurfaceHeight,
 } = require('../layout.js');
 
@@ -95,4 +96,41 @@ test('room doorway fill uses a shader-stable emissive glow', () => {
     assert.equal(light.strategy, 'emissive');
     assert.ok(light.emissiveIntensity >= 0.45);
   }
+});
+
+test('hall lighting uses sparse red pools instead of white light at every fixture', () => {
+  const lighting = getHallLighting();
+
+  assert.equal(lighting.color, 0xb00000);
+  assert.equal(lighting.intensity, 0.62);
+  assert.ok(lighting.pointSpacing >= 16);
+  assert.equal(lighting.castShadow, false);
+});
+
+test('a floor lights only itself', () => {
+  const layout = require('../layout.js');
+
+  assert.deepEqual(layout.selectVisibleLightFloors({ activeFloor: 3, feetY: 9.2 }), [3]);
+});
+
+test('the stairwell lights only the floors it runs between, never the whole hotel', () => {
+  const layout = require('../layout.js');
+  const floorHeight = 4.6;
+
+  // Standing on the floor-1 stair landing.
+  assert.deepEqual(layout.selectVisibleLightFloors({ activeFloor: 0, feetY: 0, floorHeight }), [1]);
+  // Halfway up the first switchback: floors 1 and 2 only.
+  assert.deepEqual(layout.selectVisibleLightFloors({ activeFloor: 0, feetY: floorHeight / 2, floorHeight }), [1, 2]);
+  // Halfway between 3 and 4 — floors 1 and 2 must be dark.
+  assert.deepEqual(layout.selectVisibleLightFloors({ activeFloor: 0, feetY: floorHeight * 2.5, floorHeight }), [3, 4]);
+  for (let y = -1; y <= floorHeight * 3 + 1; y += 0.25) {
+    assert.ok(layout.selectVisibleLightFloors({ activeFloor: 0, feetY: y, floorHeight }).length <= 2);
+  }
+});
+
+test('a player somehow outside every floor band still gets one lit floor', () => {
+  const layout = require('../layout.js');
+
+  assert.deepEqual(layout.selectVisibleLightFloors({ activeFloor: 0, feetY: 400 }), [4]);
+  assert.deepEqual(layout.selectVisibleLightFloors({ activeFloor: 0, feetY: -400 }), [1]);
 });

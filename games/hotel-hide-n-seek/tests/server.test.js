@@ -23,6 +23,24 @@ test('local server serves the game and rejects path traversal', async (t) => {
   assert.equal(creatureAsset.status, 200);
   assert.equal(creatureAsset.headers.get('content-type'), 'model/gltf-binary');
 
+  for (const playerAsset of ['base-character.glb', 'locomotion.glb']) {
+    const response = await fetch(`${baseUrl}/assets/quaternius-player/${playerAsset}`, { method: 'HEAD' });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'model/gltf-binary');
+  }
+
+  const chillTheme = await fetch(`${baseUrl}/assets/sounds/bg-themes/empty-halls.mp3`, { method: 'HEAD' });
+  assert.equal(chillTheme.status, 200);
+  assert.equal(chillTheme.headers.get('content-type'), 'audio/mpeg');
+
+  const chaseTheme = await fetch(`${baseUrl}/assets/sounds/bg-themes/the-chase.mp3`, { method: 'HEAD' });
+  assert.equal(chaseTheme.status, 200);
+  assert.equal(chaseTheme.headers.get('content-type'), 'audio/mpeg');
+
+  const caughtEffect = await fetch(`${baseUrl}/assets/sounds/sfx/caught.wav`, { method: 'HEAD' });
+  assert.equal(caughtEffect.status, 200);
+  assert.equal(caughtEffect.headers.get('content-type'), 'audio/wav');
+
   const traversal = await fetch(`${baseUrl}/..%2Fpackage.json`);
   assert.equal(traversal.status, 403);
 });

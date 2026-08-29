@@ -4,6 +4,7 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
     car: new THREE.Group(), currentFloor: 1, targetFloor: 1, state: 'open', doorAmount: 1,
     passengerTrip: false, pendingCall: null, indicatorCanvas: null, indicatorTexture: null,
     cabinLeftDoor: null, cabinRightDoor: null,
+    roundHeld: false,
   };
   const indicatorChanged = performance.createChangeTracker();
   elevator.car.position.set(CONFIG.elevatorCenterX, floorY(1), CONFIG.elevatorCenterZ);
@@ -41,11 +42,13 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
     for (const id of collections.hallElevatorDoors.keys()) setHallDoorAmount(id, id === elevator.currentFloor ? amount : 0);
   }
   function call(floorId) {
+    if (elevator.roundHeld) { world.notify('The elevator is locked until hiding time is over.'); return; }
     if (elevator.state === 'moving' || elevator.state === 'closing') { elevator.pendingCall = floorId; world.notify('Elevator is currently moving. Call registered.'); return; }
     if (elevator.currentFloor === floorId) { elevator.targetFloor = floorId; elevator.state = 'opening'; return; }
     elevator.targetFloor = floorId; elevator.passengerTrip = false; elevator.state = 'closing'; world.notify('Elevator called.'); world.emit('elevator-called', { floor: floorId });
   }
   function requestFloor(floorId) {
+    if (elevator.roundHeld) return;
     if (!isPlayerInside()) { world.notify('Step inside the elevator first.'); return; }
     if (elevator.state === 'moving' || elevator.state === 'closing') return;
     if (floorId === elevator.currentFloor) { elevator.state = 'opening'; return; }
@@ -55,18 +58,18 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
     const group = elevator.car; const cabinWidth = 2.5; const cabinDepth = 3.2; const cabinHeight = 2.65;
     const floor = new THREE.Mesh(new THREE.BoxGeometry(cabinWidth, 0.18, cabinDepth), new THREE.MeshStandardMaterial({ color: 0x4e4b45, metalness: 0.12, roughness: 0.75 })); floor.position.y = -0.09; floor.receiveShadow = true; group.add(floor);
     const ceiling = new THREE.Mesh(new THREE.BoxGeometry(cabinWidth, 0.12, cabinDepth), MAT.elevatorInterior); ceiling.position.y = cabinHeight; group.add(ceiling);
-    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.12, cabinHeight, cabinDepth), MAT.elevatorInterior); leftWall.position.set(-cabinWidth / 2, cabinHeight / 2, 0); group.add(leftWall); world.registerCollider(leftWall, () => world.aabbFromObject(leftWall));
-    const rightWall = leftWall.clone(); rightWall.position.x = cabinWidth / 2; group.add(rightWall); world.registerCollider(rightWall, () => world.aabbFromObject(rightWall));
-    const backWall = new THREE.Mesh(new THREE.BoxGeometry(cabinWidth, cabinHeight, 0.12), MAT.elevatorInterior); backWall.position.set(0, cabinHeight / 2, cabinDepth / 2); group.add(backWall); world.registerCollider(backWall, () => world.aabbFromObject(backWall));
+    const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.12, cabinHeight, cabinDepth), MAT.elevatorInterior); leftWall.position.set(-cabinWidth / 2, cabinHeight / 2, 0); group.add(leftWall); world.registerBoxCollider(leftWall, { width: 0.12, height: cabinHeight, depth: cabinDepth }, () => true, true);
+    const rightWall = leftWall.clone(); rightWall.position.x = cabinWidth / 2; group.add(rightWall); world.registerBoxCollider(rightWall, { width: 0.12, height: cabinHeight, depth: cabinDepth }, () => true, true);
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(cabinWidth, cabinHeight, 0.12), MAT.elevatorInterior); backWall.position.set(0, cabinHeight / 2, cabinDepth / 2); group.add(backWall); world.registerBoxCollider(backWall, { width: cabinWidth, height: cabinHeight, depth: 0.12 }, () => true, true);
     const trimL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.5, 0.14), MAT.brass); trimL.position.set(-1.08, 1.25, -1.57); group.add(trimL); const trimR = trimL.clone(); trimR.position.x = 1.08; group.add(trimR);
     const leftDoor = new THREE.Mesh(new THREE.BoxGeometry(0.92, 2.35, 0.08), MAT.metal); leftDoor.position.set(-0.46, 1.175, -1.58); group.add(leftDoor);
     const rightDoor = leftDoor.clone(); rightDoor.position.x = 0.46; group.add(rightDoor); elevator.cabinLeftDoor = leftDoor; elevator.cabinRightDoor = rightDoor;
-    world.registerCollider(leftDoor, () => world.aabbFromObject(leftDoor), () => elevator.doorAmount < 0.62); world.registerCollider(rightDoor, () => world.aabbFromObject(rightDoor), () => elevator.doorAmount < 0.62);
+    world.registerBoxCollider(leftDoor, { width: 0.92, height: 2.35, depth: 0.08 }, () => elevator.doorAmount < 0.62, true); world.registerBoxCollider(rightDoor, { width: 0.92, height: 2.35, depth: 0.08 }, () => elevator.doorAmount < 0.62, true);
     const panel = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.65, 0.62), MAT.dark); panel.position.set(1.16, 1.28, 0.25); group.add(panel);
     for (let floorId = 1; floorId <= 4; floorId += 1) {
       const buttonGroup = new THREE.Group(); buttonGroup.position.set(1.105, 0.72 + (floorId - 1) * 0.35, 0.25); group.add(buttonGroup);
       buttonGroup.add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.23, 0.23), MAT.brass)); world.addNumberPlate(buttonGroup, String(floorId), -0.038, 0, 0, -Math.PI / 2, 0.17);
-      collections.interactables.push({ object: buttonGroup, enabled: () => isPlayerInside() && elevator.state !== 'moving' && elevator.state !== 'closing', prompt: () => `Elevator button — Floor ${floorId}`, action: () => requestFloor(floorId) });
+      collections.interactables.push({ object: buttonGroup, enabled: () => !elevator.roundHeld && isPlayerInside() && elevator.state !== 'moving' && elevator.state !== 'closing', prompt: () => `Elevator button — Floor ${floorId}`, action: () => requestFloor(floorId) });
     }
     const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 128; elevator.indicatorCanvas = canvas; elevator.indicatorTexture = new THREE.CanvasTexture(canvas);
     const indicator = new THREE.Mesh(new THREE.PlaneGeometry(0.78, 0.32), new THREE.MeshBasicMaterial({ map: elevator.indicatorTexture })); indicator.position.set(0, 2.27, -1.53); group.add(indicator);
@@ -74,6 +77,24 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
     const fixture = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.06, 0.48), new THREE.MeshStandardMaterial({ color: 0xf2ead1, emissive: 0x77682f, emissiveIntensity: 0.28 })); fixture.position.set(0, 2.55, 0); group.add(fixture);
     world.registerGroundWorld(CONFIG.elevatorCenterX - 1.16, CONFIG.elevatorCenterX + 1.16, CONFIG.elevatorFrontZ - 0.12, CONFIG.elevatorCenterZ + 1.47, () => elevator.car.position.y);
     syncDoors(1); updateIndicator(true);
+  }
+  function holdSeeker() {
+    elevator.roundHeld = true;
+    elevator.currentFloor = 1;
+    elevator.targetFloor = 1;
+    elevator.state = 'round-hold';
+    elevator.passengerTrip = false;
+    elevator.pendingCall = null;
+    elevator.car.position.y = floorY(1);
+    syncDoors(0);
+    camera.position.set(CONFIG.elevatorCenterX, floorY(1) + playerEyeHeight(), CONFIG.elevatorCenterZ + 0.25);
+    camera.rotation.x = 0; camera.rotation.y = 0;
+    world.state.yaw = 0; world.state.pitch = 0; world.state.playerFloor = 0;
+  }
+  function releaseSeeker() {
+    if (!elevator.roundHeld) return;
+    elevator.roundHeld = false;
+    elevator.state = 'opening';
   }
   function update(delta, elapsed) {
     const epsilon = 0.005;
@@ -92,5 +113,5 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
     if (elevator.state === 'moving') { world.elevatorBadge.classList.remove('hidden'); world.elevatorBadge.textContent = `Elevator ${elevator.targetFloor > elevator.currentFloor ? '↑' : '↓'} Floor ${elevator.targetFloor}`; } else world.elevatorBadge.classList.add('hidden');
   }
 
-  return { elevator, build, call, requestFloor, update, isPlayerInside, isPlayerInsideXZ };
+  return { elevator, build, call, requestFloor, update, holdSeeker, releaseSeeker, isPlayerInside, isPlayerInsideXZ };
 }

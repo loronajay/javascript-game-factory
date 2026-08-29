@@ -1,4 +1,4 @@
-# Hotel Hide-N-Seek V6: The Guest
+# Hotel Hide-N-Seek V6.8: The Bellhop
 
 ## Play
 
@@ -6,7 +6,23 @@ On Windows, double-click `PLAY HOTEL HIDE-N-SEEK.cmd`. It starts the local serve
 
 From a terminal, the equivalent command is `npm start`.
 
-V6 turns the exploration prototype into a stealth survival game. A demonic being called The Guest spawns at a safe random hotel position, roams every floor, uses the physical stairwell, investigates its last sighting, and catches the player on contact.
+V6 turns the exploration prototype into a stealth survival game. A demonic being called The Bellhop spawns at a safe random hotel position, roams every floor, uses the physical stairwell, investigates its last sighting, and catches players on contact.
+
+**Do not settle anywhere.** Every player carries a sanity clock that climbs while they stay put. Fill it in a room and you stop being hidden: The Bellhop turns and walks straight into that room. Changing rooms clears the meter, and so does walking a stretch of hallway. Hiding is a delay, not a strategy.
+
+The **secret passages are the one real refuge**. Inside a tunnel the meter runs backwards — it bleeds off instead of climbing, and can never read full — so a passage is somewhere to retreat to and wait out rather than somewhere to sprint through. Diving in at 100% does not save you instantly; you have to sit there while it drains.
+
+**Sprinting is metered.** The `STAMINA` bar under `SANITY` drains while you run and refills whenever you are not: fastest crouched in cover, then standing still, and slowest of all while you walk. Empty it and you are *winded* — sprinting is locked out entirely until you have won a real share of the bar back, so the panic run out of a room has to end somewhere. Running is the one thing that outpaces The Bellhop, so it is a resource you spend rather than a speed you hold.
+
+V6.8 makes the hiding phase physical. **You are the seeker.** Three guests get at least 45 seconds to scatter across the four floors while you are locked inside the closed lobby elevator. When hiding time expires, the doors open and the untimed hunt starts. Walking into a guest tags them; find all three to win. The `ROUND` readout shows the hiding countdown, then `NO LIMIT` beside the tally. It never tells you where anybody is.
+
+The catch is that **The Bellhop is nobody's ally.** It sees, hunts, and sanity-tracks the hiders as well as you, and it does not care which of you it reaches first. A guest it takes still counts toward your total, so the demon can hand you the round. A *you* it takes ends the round on the spot and the hiders win, however many you had already found. That is the whole tension: every tool that makes seeking faster — sprinting especially — is a tool that gets you found.
+
+The guests are not statues. They pick a room, walk to it and crouch down, and they bolt if you or the demon gets close — from you at a longer range than from the demon, because a seeker with a plan is worth moving for while a roaming demon is worth staying still for. A door standing open is a guest who went through it.
+
+V6.6 also puts the demo behind a proper menu: a title screen with `PLAY` / `HOW TO PLAY` / `EXTRAS` (the model viewers), and `Esc` opens a pause menu mid-round with `RESUME` / `HOW TO PLAY` / `QUIT TO TITLE`. Nothing simulates behind a menu — the fixed-timestep accumulator is not advanced at all while paused, so meters no longer tick while you are reading the controls, and the paused seconds are never replayed on resume.
+
+V6.1 makes The Bellhop a near-black silhouette with bright red eyes, corrects its model-forward direction, and keeps chase replanning from restarting an active stair route. The hotel now uses sparse red light pools and emissive sconces, disables unused shadow rendering, caps high-DPI resolution, and automatically lowers render resolution after sustained slow frames. Use `?inspect=monster` (or the title-screen link) for the interactive creature workbench with orbit, zoom, idle/walk, and auto-turn controls.
 
 V5.1 is a stabilization pass for building gameplay on top of that environment:
 
@@ -18,12 +34,17 @@ V5.1 is a stabilization pass for building gameplay on top of that environment:
 
 V5.2 closes the remaining stairwell voids, makes the bottom slab walkable, guards exposed landing edges, and splits the runtime into focused ES modules. It also removes three recurring frame costs: unchanged elevator-indicator uploads, full-speed interaction raycasts, and repeated static AABB construction.
 
+V6.4 is the first step toward the multiplayer game:
+
+- **Gameplay runs on a fixed 60hz timestep.** The loop used to feed the display's frame delta straight into movement and the demon, so the game ran differently on a 144hz monitor than on a 60hz one. Simulation now advances in whole ticks and only rendering happens per frame — the prerequisite for a server ever being authoritative.
+- **Players are real human figures.** Every player, the local one included, uses a textured Quaternius Base Character driven by the matching Universal Animation Library's native idle, jog, sprint, and crouch clips. Your own body is drawn under you with its head collapsed so it does not fill the camera. `?inspect=avatar` (or the title-screen link) opens a workbench for the figure with idle/walk/run/crouch.
+- **The stairwell framerate collapse is fixed.** Standing in the stairwell reported "floor 0", and floor 0 switched on every light in the hotel — roughly 32 point lights in a single forward-rendered pass. Lighting now follows vertical proximity, so at most two floors are lit. The stairwell's 108 treads, landings, and rail segments are also baked into two meshes at build time, since none of them move.
+
 V6 adds:
 
 - A distorted, animated demon built from the local Universal Animation Library model plus procedural horns, eyes, claws, and a fallback shadow-form.
 - A patrol/chase/search state machine with field-of-view, range, vertical-level, and collider-aware line-of-sight checks.
 - Crouching with a lower eye line and reduced detection range, allowing couches, dressers, desks, beds, walls, and corners to function as cover.
-- A no-floor minimap that plots the player and monster in X/Z without revealing which of the four floors the monster occupies.
 - Chase/search danger feedback, a catch condition, and a restart screen.
 - Local vendored Three.js and GLTF loader files so the launcher no longer needs a CDN connection.
 
@@ -38,10 +59,12 @@ V6 adds:
 - `hotel.js` — rooms, corridors, secret passages, and stair construction
 - `elevator.js` — car, doors, calls, and travel state
 - `player.js` — input, movement, location tracking, and interaction targeting
-- `monster.js` — creature rendering, navigation, LOS, chase/search behavior, minimap updates, and defeat
-- `performance.js` — reusable change and interval gates for expensive work
+- `monster.js` — creature rendering, navigation, LOS, chase/search behavior, threat HUD state, and defeat
+- `performance.js` — reusable change and interval gates, the adaptive quality controller, and the fixed-timestep accumulator
+- `avatars.js` — player figures: one shared textured body and locomotion bank, cloned per player, with a placeholder body until they load
+- `sanity.js` — the anti-camping meter: samples which room you are standing in, drives the HUD bar, and hands The Bellhop its hunt target
 
-Pure monster rules live in `enemy-logic.js` so spawn safety, visibility, search timing, and floor-agnostic minimap projection can be tested without WebGL.
+Pure monster rules live in `enemy-logic.js`, pure avatar rules (motion state, clip choice, crouch posture, facing, seat tints) live in `avatar-logic.js`, collision boxes live in `collision-logic.js`, and sanity rules live in `sanity-logic.js`, so those decisions can be tested without WebGL — and run headlessly on a server later. The tracker minimap was removed in V6.3 — the player is meant to locate The Bellhop by sound and sight, not by a HUD readout.
 
 ## Major changes
 
@@ -62,15 +85,19 @@ Pure monster rules live in `enemy-logic.js` so spawn safety, visibility, search 
 3. Enter the stairwell on the east side and physically walk the west flight up, cross the north landing, then take the east flight to the next floor. Repeat through Floor 4; there should be no use prompt or teleport.
 4. Return to Floor 1, enter the elevator, select a floor from inside, ride, and exit.
 5. Room 105 still demonstrates the drawer/key loop.
+6. Stand still inside any room and watch `SANITY` climb; at 100% The Bellhop routes to that room. Step into the corridor and walk a short way — the meter drops to 0% and the demon breaks off and resumes roaming.
+7. Hold Shift and run a corridor end to end. `STAMINA` drains, reads `WINDED` at zero, and Shift stops doing anything; stand still or crouch and watch it climb back — crouching refills noticeably faster than walking does.
+8. Press `Esc` mid-round. The pause menu appears and both meters freeze; `RESUME` puts you back where you were with the same readings.
+9. Fill the meter in room 105, then open the loose wall panel and step into the secret passage. The bar turns green, reads `CALMING`, and counts down to `UNSEEN` — it carries your meter in rather than wiping it, so the drain is visible. Step out into 107 and it starts climbing again.
 
 ## Controls
 
-WASD/arrows move, mouse look, Shift sprints, C or Ctrl crouches, E interacts, and Esc releases the mouse. On mobile, hold HIDE to crouch. Browsers without Pointer Lock automatically use click-and-drag mouse look.
+WASD/arrows move, mouse look, Shift sprints (while stamina lasts), C or Ctrl crouches, E interacts, and Esc pauses. On mobile, hold HIDE to crouch. Browsers without Pointer Lock automatically use click-and-drag mouse look.
 
 ## Engineering note
 
-The controller remains lightweight rather than physics-engine based. The Guest uses a purpose-built hotel route graph for inter-floor travel and direct collider-aware steering during a chase. It intentionally uses the stairs rather than the elevator.
+The controller remains lightweight rather than physics-engine based. The Bellhop uses a purpose-built hotel route graph for inter-floor travel and direct collider-aware steering during a chase. It intentionally uses the stairs rather than the elevator.
 
-The creature body and animation library are by Quaternius and are included under CC0 1.0; see `assets/UAL2-LICENSE.txt`. The local Three.js runtime retains its MIT license in `vendor/THREE-LICENSE.txt`.
+The creature body, player Base Character, and animation libraries are by Quaternius and are included under CC0 1.0; see `assets/UAL2-LICENSE.txt` and `assets/quaternius-player/`. The local Three.js runtime retains its MIT license in `vendor/THREE-LICENSE.txt`.
 
-Run `npm test` for the AI, architecture, layout, controls, server, and performance regressions. For visual development, `?inspect=stair`, `?inspect=stairEntrance`, and `?inspect=doorway` start at representative QA views without requiring a full traversal.
+Run `npm test` for the AI, avatar, architecture, layout, controls, server, music, and performance regressions (70 tests). For visual development, `?inspect=stair`, `?inspect=stairEntrance`, `?inspect=doorway`, `?inspect=monster`, and `?inspect=avatar` start at representative QA views without requiring a full traversal.

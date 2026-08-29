@@ -1,9 +1,9 @@
-export function createWorld({ THREE, scene, materials: MAT, config: CONFIG, layout, document, window }) {
-  const state = { isLocked: false, yaw: 0, pitch: 0, playerFloor: 1, playerEyeHeight: CONFIG.eyeHeight, inventory: new Set(), activeInteractable: null, notificationTimer: null };
+export function createWorld({ THREE, scene, materials: MAT, config: CONFIG, layout, logic, document, window }) {
+  const state = { isLocked: false, yaw: 0, pitch: 0, playerFloor: 1, playerFeetY: 0, playerEyeHeight: CONFIG.eyeHeight, playerCrouching: false, inventory: new Set(), activeInteractable: null, notificationTimer: null };
   const collections = {
     colliders: [], interactables: [], dynamicDoors: [], dynamicDrawers: [], walkSurfaces: [],
     floorGroups: new Map(), floorLights: new Map(), roomDoors: new Map(), secretPanels: new Map(),
-    hallElevatorDoors: new Map(), roomCenters: new Map(),
+    hallElevatorDoors: new Map(), roomCenters: new Map(), secretTunnels: [],
   };
   const stairwellGroup = new THREE.Group();
   stairwellGroup.name = 'Continuous Stairwell';
@@ -39,17 +39,33 @@ export function createWorld({ THREE, scene, materials: MAT, config: CONFIG, layo
     while (current) { if (current.userData && Number.isInteger(current.userData.floorId)) return current.userData.floorId; current = current.parent; }
     return null;
   }
-  function registerCollider(obj, boxProvider, enabledProvider = () => true) { collections.colliders.push({ obj, boxProvider, enabledProvider }); }
-  function aabbFromObject(obj) {
-    obj.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(obj);
-    return { minX: box.min.x, maxX: box.max.x, minY: box.min.y, maxY: box.max.y, minZ: box.min.z, maxZ: box.max.z };
+  const colliderPoint = new THREE.Vector3();
+  function boxDataFromObject(obj, { width, height, depth }) {
+    obj.updateMatrixWorld(true);
+    let minX = Infinity; let minY = Infinity; let minZ = Infinity;
+    let maxX = -Infinity; let maxY = -Infinity; let maxZ = -Infinity;
+    for (const x of [-width / 2, width / 2]) for (const y of [-height / 2, height / 2]) for (const z of [-depth / 2, depth / 2]) {
+      colliderPoint.set(x, y, z).applyMatrix4(obj.matrixWorld);
+      minX = Math.min(minX, colliderPoint.x); maxX = Math.max(maxX, colliderPoint.x);
+      minY = Math.min(minY, colliderPoint.y); maxY = Math.max(maxY, colliderPoint.y);
+      minZ = Math.min(minZ, colliderPoint.z); maxZ = Math.max(maxZ, colliderPoint.z);
+    }
+    return { minX, maxX, minY, maxY, minZ, maxZ };
+  }
+  function registerBoxCollider(obj, size, enabledProvider = () => true, dynamic = false) {
+    const collider = { obj, enabledProvider, dirty: true, data: null, invalidate() { this.dirty = true; } };
+    collider.dataProvider = () => {
+      if (dynamic || collider.dirty || !collider.data) { collider.data = boxDataFromObject(obj, size); collider.dirty = false; }
+      return collider.data;
+    };
+    collections.colliders.push(collider);
+    return collider;
   }
   function addBox(parent, x, y, z, w, h, d, material, collider = false) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
     mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh);
     if (collider) {
-      let cachedBox = null;
-      registerCollider(mesh, () => { if (!cachedBox) cachedBox = aabbFromObject(mesh); return cachedBox; });
+      registerBoxCollider(mesh, { width: w, height: h, depth: d });
     }
     return mesh;
   }
@@ -78,15 +94,15 @@ export function createWorld({ THREE, scene, materials: MAT, config: CONFIG, layo
     while (current) { if (current.visible === false) return false; current = current.parent; }
     return true;
   }
-  function collidesAt(x, z, feetY, bodyHeight = CONFIG.bodyHeight, radius = CONFIG.playerRadius) {
-    const playerMinY = feetY + 0.06; const playerMaxY = feetY + bodyHeight;
+  function colliderData() {
     for (const collider of collections.colliders) {
-      if (!colliderAllowed(collider)) continue;
-      const box = collider.boxProvider();
-      if (playerMaxY <= box.minY + 0.015 || playerMinY >= box.maxY - 0.015) continue;
-      if (x > box.minX - radius && x < box.maxX + radius && z > box.minZ - radius && z < box.maxZ + radius) return true;
+      Object.assign(collider, collider.dataProvider());
+      collider.enabled = colliderAllowed(collider);
     }
-    return false;
+    return collections.colliders;
+  }
+  function collidesAt(x, z, feetY, bodyHeight = CONFIG.bodyHeight, radius = CONFIG.playerRadius) {
+    return logic.collidesAt(colliderData(), { x, z, feetY, bodyHeight, radius });
   }
   function addSign(parent, text, x, y, z, rotationY = 0, width = 1.3, height = 0.65) {
     const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 256; const ctx = canvas.getContext('2d');
@@ -105,7 +121,7 @@ export function createWorld({ THREE, scene, materials: MAT, config: CONFIG, layo
 
   return {
     state, collections, stairwellGroup, promptEl, floorBadge, elevatorBadge, emit, notify, updateInventoryHud, addInventoryKey, getFloorId,
-    registerCollider, aabbFromObject, addBox, addFloor, addCeiling, addWall, addDoorFrame, registerGroundRect, registerGroundWorld,
+    registerBoxCollider, colliderData, addBox, addFloor, addCeiling, addWall, addDoorFrame, registerGroundRect, registerGroundWorld,
     resolveGroundHeight, collidesAt, addSign, addNumberPlate,
   };
 }

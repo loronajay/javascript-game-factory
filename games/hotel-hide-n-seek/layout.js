@@ -126,6 +126,39 @@
     };
   }
 
+  function getHallLighting() {
+    return {
+      color: 0xb00000,
+      intensity: 0.62,
+      distance: 9,
+      decay: 2,
+      pointSpacing: 16,
+      fixtureSpacing: 8,
+      castShadow: false,
+    };
+  }
+
+  // Which floors keep their lights in the realtime pass. On a floor this is just that floor, but the
+  // stairwell and the moving elevator report floor 0, and lighting *every* floor there put ~32 point
+  // lights in one pass — the stairwell framerate collapse. Vertical proximity is the honest rule:
+  // from a stair flight you can only ever see into the floors it runs between.
+  function selectVisibleLightFloors({ activeFloor = 1, feetY = 0, floorHeight = 4.6, floorCount = 4, radius = 0.9 } = {}) {
+    if (activeFloor >= 1) return [activeFloor];
+    const reach = floorHeight * radius;
+    const near = [];
+    for (let floor = 1; floor <= floorCount; floor += 1) {
+      if (Math.abs(feetY - (floor - 1) * floorHeight) <= reach) near.push(floor);
+    }
+    if (near.length) return near;
+    let closest = 1;
+    let bestDiff = Infinity;
+    for (let floor = 1; floor <= floorCount; floor += 1) {
+      const diff = Math.abs(feetY - (floor - 1) * floorHeight);
+      if (diff < bestDiff) { bestDiff = diff; closest = floor; }
+    }
+    return [closest];
+  }
+
   function resolveWalkSurfaceHeight(surfaces, x, z, currentFeetY, groundSnap) {
     let best = null;
     let bestPriority = -Infinity;
@@ -144,5 +177,5 @@
     return best;
   }
 
-  return { createDoorFrameLayout, createStairLayout, createStairwellShellLayout, getRoomFillLight, resolveWalkSurfaceHeight };
+  return { createDoorFrameLayout, createStairLayout, createStairwellShellLayout, getHallLighting, getRoomFillLight, resolveWalkSurfaceHeight, selectVisibleLightFloors };
 });

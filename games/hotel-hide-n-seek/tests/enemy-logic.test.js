@@ -4,11 +4,30 @@ const assert = require('node:assert/strict');
 const {
   ENEMY_STATES,
   canDetectPlayer,
+  chooseRoamTarget,
+  createStairPursuitRoute,
+  createStairRoute,
   chooseSpawn,
   createAwareness,
-  projectToMinimap,
+  prepareHuntDoor,
+  prepareRoamDoor,
+  selectDetectedTarget,
   updateAwareness,
 } = require('../enemy-logic.js');
+const { createStairLayout } = require('../layout.js');
+
+test('detection considers every player and chooses the nearest visible target', () => {
+  const enemy = { x: 0, y: 0, z: 0, facingX: 0, facingZ: 1 };
+  const candidates = [
+    { id: 'local', x: 0, y: 0, z: 12, crouching: false },
+    { id: 'hider-1', x: 0, y: 0, z: 6, crouching: false },
+    { id: 'hider-2', x: 0, y: 0, z: 4, crouching: false },
+  ];
+
+  const target = selectDetectedTarget(candidates, enemy, { isOccluded: (candidate) => candidate.id === 'hider-2' });
+
+  assert.equal(target.id, 'hider-1');
+});
 
 test('spawn selection keeps the demon away from the player when possible', () => {
   const spawns = [
@@ -54,12 +73,90 @@ test('a lock-on becomes a finite search after LOS breaks, then returns to roamin
   assert.equal(awareness.lastSeen, null);
 });
 
-test('the minimap projection deliberately ignores vertical floor position', () => {
-  const bounds = { minX: -10, maxX: 10, minZ: -60, maxZ: 60 };
-  const floorOne = projectToMinimap({ x: 3, y: 0, z: -12 }, bounds);
-  const floorFour = projectToMinimap({ x: 3, y: 13.8, z: -12 }, bounds);
+test('inter-floor routes follow the real switchback stairs without leaving between floors', () => {
+  const stairLayout = createStairLayout({ floorCount: 4, floorHeight: 4.6 });
+  const route = createStairRoute({ fromFloor: 1, toFloor: 3, floorHeight: 4.6, stairLayout });
 
-  assert.deepEqual(floorOne, floorFour);
-  assert.ok(floorOne.left > 0 && floorOne.left < 100);
-  assert.ok(floorOne.top > 0 && floorOne.top < 100);
+  assert.deepEqual(route[0], { x: 0, y: 0, z: 42.8, floor: 1, guided: false });
+  assert.deepEqual(route.at(-1), { x: 0, y: 9.2, z: 42.8, floor: 3, guided: false });
+  assert.ok(route.filter((point) => point.stair).every((point) => point.guided));
+  assert.ok(route.every((point, index) => index === 0 || point.y >= route[index - 1].y));
+  assert.equal(route.filter((point) => point.x === 0).length, 2, 'route should not exit and re-enter at intermediate floors');
+  assert.ok(route.some((point) => point.x === 5.65 && point.z === 51.8 && point.y === 2.3));
+  assert.ok(route.some((point) => point.x === 7.85 && point.z === 44.7 && point.y === 9.2));
 });
+
+test('descending routes traverse the stair flights in reverse order', () => {
+  const stairLayout = createStairLayout({ floorCount: 4, floorHeight: 4.6 });
+  const route = createStairRoute({ fromFloor: 4, toFloor: 2, floorHeight: 4.6, stairLayout });
+
+  assert.ok(route.every((point, index) => index === 0 || point.y <= route[index - 1].y));
+  assert.deepEqual(route.at(-1), { x: 0, y: 4.6, z: 42.8, floor: 2, guided: false });
+});
+
+test('a same-floor pursuit enters the stairwell before following a player onto a flight', () => {
+  const stairLayout = createStairLayout({ floorCount: 4, floorHeight: 4.6 });
+  const route = createStairPursuitRoute({
+    enemy: { x: 0, y: 0, z: 20, floor: 1, inStairwell: false },
+    target: { x: 5.65, y: 1.15, z: 48.25, inStairwell: true },
+    floorHeight: 4.6,
+    stairLayout,
+  });
+
+  assert.deepEqual(route[0], { x: 0, y: 0, z: 44.15, floor: 1, guided: false });
+  assert.deepEqual(route[1], { x: 5.35, y: 0, z: 44.15, floor: 1, guided: true, stair: true });
+  assert.ok(route.some((point) => point.x === 5.65 && point.y === 0 && point.z === 44.7));
+  assert.deepEqual(route.at(-1), { x: 5.65, y: 1.15, z: 48.25, floor: 1, guided: true, stair: true });
+});
+
+test('a demon already on the stairs follows the switchback instead of exiting through a wall', () => {
+  const stairLayout = createStairLayout({ floorCount: 4, floorHeight: 4.6 });
+  const route = createStairPursuitRoute({
+    enemy: { x: 7.85, y: 3.45, z: 48.25, inStairwell: true },
+    target: { x: 5.65, y: 1.15, z: 48.25, inStairwell: true },
+    floorHeight: 4.6,
+    stairLayout,
+  });
+
+  assert.ok(route.length > 2);
+  assert.ok(route.every((point) => point.guided && point.stair));
+  assert.ok(route.some((point) => point.x === 5.65 && point.z === 51.8), 'route should use the north switchback');
+  assert.equal(route.some((point) => point.x === 0), false, 'an active stair pursuit must not leave the shaft');
+  assert.deepEqual(route.at(-1), { x: 5.65, y: 1.15, z: 48.25, floor: 1, guided: true, stair: true });
+});
+
+test('roaming occasionally chooses an available room and otherwise stays in the halls', () => {
+  const halls = [{ x: 0, z: -20, floor: 1 }, { x: 0, z: 20, floor: 2 }];
+  const rooms = [{ id: '105', x: -8, z: 30, floor: 1 }];
+  const roomVisit = chooseRoamTarget({ hallTargets: halls, roomTargets: rooms, roomChance: 0.25 }, sequenceRandom([0.1, 0.9]));
+  const hallVisit = chooseRoamTarget({ hallTargets: halls, roomTargets: rooms, roomChance: 0.25 }, sequenceRandom([0.8, 0.75]));
+
+  assert.deepEqual(roomVisit, { id: '105', x: -8, z: 30, floor: 1, room: true });
+  assert.deepEqual(hallVisit, { x: 0, z: 20, floor: 2, room: false });
+});
+
+test('a sanity hunt opens even a locked room door in the correct direction', () => {
+  const leftDoor = { side: 'left', locked: true, open: false, target: 0 };
+  const rightDoor = { side: 'right', locked: true, open: false, target: 0 };
+
+  assert.equal(prepareHuntDoor(leftDoor, Math.PI / 2), true);
+  assert.equal(prepareHuntDoor(rightDoor, Math.PI / 2), true);
+  assert.deepEqual(leftDoor, { side: 'left', locked: false, open: true, target: -Math.PI / 2 });
+  assert.deepEqual(rightDoor, { side: 'right', locked: false, open: true, target: Math.PI / 2 });
+  assert.equal(prepareHuntDoor(null, Math.PI / 2), false);
+});
+
+test('an ordinary room trudge opens unlocked doors but respects locked ones', () => {
+  const unlocked = { side: 'right', locked: false, open: false, target: 0 };
+  const locked = { side: 'left', locked: true, open: false, target: 0 };
+
+  assert.equal(prepareRoamDoor(unlocked, Math.PI / 2), true);
+  assert.deepEqual(unlocked, { side: 'right', locked: false, open: true, target: Math.PI / 2 });
+  assert.equal(prepareRoamDoor(locked, Math.PI / 2), false);
+  assert.deepEqual(locked, { side: 'left', locked: true, open: false, target: 0 });
+});
+
+function sequenceRandom(values) {
+  let index = 0;
+  return () => values[index++];
+}

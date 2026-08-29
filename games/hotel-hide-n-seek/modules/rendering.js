@@ -53,31 +53,31 @@ function createMaterials(THREE, renderer, document) {
     metal: new THREE.MeshStandardMaterial({ color: 0x8b8f95, metalness: 0.62, roughness: 0.28 }), elevatorInterior: new THREE.MeshStandardMaterial({ color: 0x5f615f, metalness: 0.18, roughness: 0.7 }),
     accent: new THREE.MeshStandardMaterial({ color: 0x496173, roughness: 0.78 }), linen: new THREE.MeshStandardMaterial({ color: 0xe5e1d8, roughness: 0.97 }),
     bed: new THREE.MeshStandardMaterial({ color: 0x5d6d82, roughness: 0.93 }), green: new THREE.MeshStandardMaterial({ color: 0x3b6840, roughness: 0.9 }),
-    shade: new THREE.MeshStandardMaterial({ color: 0xf0ead5, emissive: 0x4b401d, emissiveIntensity: 0.16, roughness: 0.8 }), black: new THREE.MeshStandardMaterial({ color: 0x07080a, roughness: 1 }),
-    redLight: new THREE.MeshStandardMaterial({ color: 0x561717, emissive: 0x6d1111, emissiveIntensity: 0.7, roughness: 0.5 }),
+    shade: new THREE.MeshStandardMaterial({ color: 0x260304, emissive: 0xb00000, emissiveIntensity: 1.1, roughness: 0.8 }), black: new THREE.MeshStandardMaterial({ color: 0x07080a, roughness: 1 }),
+    redLight: new THREE.MeshStandardMaterial({ color: 0x3b0305, emissive: 0xb00000, emissiveIntensity: 1.15, roughness: 0.5 }),
   };
 }
 
 export function createRendering({ THREE, document, window, config }) {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0b0b10);
-  scene.fog = new THREE.Fog(0x0b0b10, 28, 105);
+  scene.background = new THREE.Color(0x020205);
+  scene.fog = new THREE.Fog(0x020205, 17, 72);
   const camera = new THREE.PerspectiveCamera(74, window.innerWidth / window.innerHeight, 0.1, 300);
   camera.position.set(0, config.eyeHeight, 32);
   camera.rotation.order = 'YXZ';
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const nativePixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
+  renderer.setPixelRatio(nativePixelRatio);
+  renderer.shadowMap.enabled = false;
   document.body.appendChild(renderer.domElement);
   const materials = createMaterials(THREE, renderer, document);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.27));
-  scene.add(new THREE.HemisphereLight(0xb9c8da, 0x242018, 0.24));
+  scene.add(new THREE.AmbientLight(0x350509, 0.16));
+  scene.add(new THREE.HemisphereLight(0x3b0609, 0x010102, 0.1));
   window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
-  return { scene, camera, renderer, materials };
+  return { scene, camera, renderer, materials, setRenderScale: (scale) => renderer.setPixelRatio(nativePixelRatio * scale) };
 }
