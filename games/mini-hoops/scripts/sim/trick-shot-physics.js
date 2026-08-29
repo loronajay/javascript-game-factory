@@ -15,10 +15,15 @@ import {
   isPadPiece,
 } from "./trick-shot.js";
 
-const CANNON_MOUTH_RADIUS = 0.135;
-const CANNON_MOUTH_HEIGHT = 0.08;
-const CANNON_MUZZLE_CLEARANCE = 0.17;
-const CANNON_COOLDOWN = 0.22;
+// The cannon's own measurements. Exported because they are not private to the
+// collider: `sim/horse-plan.js` has to know where a mouth sits before it can
+// drop one under a ball, and where a muzzle points before it can solve the
+// flight out of one. A second copy of these numbers would be a planner that
+// aimed a cannon it was not actually holding.
+export const CANNON_MOUTH_RADIUS = 0.135;
+export const CANNON_MOUTH_HEIGHT = 0.08;
+export const CANNON_MUZZLE_CLEARANCE = 0.17;
+export const CANNON_COOLDOWN = 0.22;
 
 export function createTrickShotPhysics() {
   return { capture: null, cooldowns: Object.create(null) };

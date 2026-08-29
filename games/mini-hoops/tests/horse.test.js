@@ -30,7 +30,7 @@ import {
   placedHoopAt,
   placementIsWithinAimReach,
 } from "../scripts/sim/hoop-placement.js";
-import { HOOP_TARGET } from "../scripts/sim/trick-shot-target.js";
+import { HOOP_TARGET, normalizeTrickShotTarget } from "../scripts/sim/trick-shot-target.js";
 import { BALLS, ballById } from "../scripts/assets/ball-catalog.js";
 import { createHorseShot, horseAimDepth, horsePowerForDepth, horseTargetKind } from "../scripts/sim/horse-shot.js";
 import {
@@ -42,6 +42,7 @@ import {
   chooseCpuBinSetup,
   chooseCpuTargetKind,
   chooseCpuTurnBall,
+  cpuSetsTrickShot,
   createHorseMatch,
   judgeHorseShot,
   letterState,
@@ -51,7 +52,13 @@ import {
   shotSetupFor,
   unmetPieceIds,
 } from "../scripts/sim/horse.js";
-import { needsProvenPull, provenPullPhase, provenPullShot } from "../scripts/sim/horse-cpu.js";
+import { leadPull, needsProvenPull, provenPullPhase, provenPullShot, recipeShot } from "../scripts/sim/horse-cpu.js";
+import {
+  PLAN_RELEASE_SECONDS,
+  aimCannon,
+  interceptSites,
+  planCpuTrickShot,
+} from "../scripts/sim/horse-plan.js";
 import { replayHorseShot } from "../scripts/sim/horse-replay.js";
 import { createSandboxPiece } from "../scripts/sim/trick-shot.js";
 import { binClearance, stepBallAgainstBins } from "../scripts/sim/bin-physics.js";
@@ -693,6 +700,113 @@ test("a ball that goes straight in without the apparatus is ruled a skip, throug
   const judged = judgeHorseShot(match, { scored: replay.made, touched: replay.touched });
   assertEqual(judged.made, false, "the ball went in and the shot was not matched");
   assertEqual(judged.unmet.join(","), "a");
+});
+
+/*
+ * The CPU SETTING a trick shot.
+ *
+ * The rule these all serve is the mode's own: the setter shoots first, so a shot
+ * the CPU has not made is not a shot anybody owes. The planner may therefore
+ * decline — every one of these asserts what a plan MEANS, never that one exists
+ * for some particular target.
+ */
+
+/** A target the planner is known to solve, so the assertions below have a subject. */
+function plannedTrickShot(overrides = {}, ballId = "basketball") {
+  const setup = normalizeTrickShotTarget({ kind: "hoop", motionId: "figure8", ...overrides });
+  return { setup, plan: planCpuTrickShot({ setup, ballId }), ballId };
+}
+
+test("a planned trick shot is one the CPU has actually made, in the real sim", () => {
+  const { setup, plan, ballId } = plannedTrickShot();
+  assert(plan, "the planner has to solve at least one shipped target, or nothing below is tested");
+  assertEqual(plan.pieces.length, 1);
+  assertEqual(plan.pieces[0].type, "cannon");
+  assertEqual(plan.requiredPieces.join(","), plan.pieces[0].id);
+
+  const shot = replayHorseShot({
+    setup: { ...setup, pieces: plan.pieces },
+    intent: { ...plan.pull, ballId },
+    motionSeconds: plan.pull.motionSeconds,
+  });
+  assertEqual(shot.made, true, "the recipe converts");
+  assert(shot.touched.includes(plan.pieces[0].id), "and it converts THROUGH the cannon");
+});
+
+test("a planned trick shot is a trick shot — the pull does not work without the tool", () => {
+  const { setup, plan, ballId } = plannedTrickShot();
+  const bare = replayHorseShot({
+    setup: { ...setup, pieces: [] },
+    intent: { ...plan.pull, ballId },
+    motionSeconds: plan.pull.motionSeconds,
+  });
+  assertEqual(bare.made, false,
+    "the seed is deliberately pulled short; take the cannon away and it lands nowhere");
+});
+
+test("a planned trick shot survives the tick of slop between proving it and releasing it", () => {
+  const { setup, plan, ballId } = plannedTrickShot();
+  // The court releases on the first tick whose clock has REACHED the recipe's
+  // moment, which is never exactly on it. A plan that only worked on the frame
+  // it was found on would be one the CPU sets and then misses.
+  const later = replayHorseShot({
+    setup: { ...setup, pieces: plan.pieces },
+    intent: { ...plan.pull, ballId },
+    motionSeconds: plan.pull.motionSeconds + TICK_SECONDS,
+  });
+  assertEqual(later.made, true);
+  assert(later.touched.includes(plan.pieces[0].id));
+});
+
+test("a plan is the same recipe shape a human setter's make leaves behind", () => {
+  const { setup, plan } = plannedTrickShot();
+  const standing = { ...setup, pieces: plan.pieces, requiredPieces: plan.requiredPieces, provenPull: plan.pull };
+  assert(needsProvenPull(standing), "the opponent's CPU repeats it exactly as it would a person's");
+  assertClose(provenPullShot(standing, { makes: true }).pull.power, plan.pull.power, 1e-9);
+  assertClose(recipeShot(plan.pull, { periodSeconds: 60 }).atSeconds, PLAN_RELEASE_SECONDS, 1e-9);
+});
+
+test("a cannon is only ever dropped where a ball is falling, and where it fits", () => {
+  const rising = { x: 0, y: 0.8, z: 0.4, vy: 2, t: 0.2 };
+  const falling = { x: 0, y: 0.8, z: 0.4, vy: -2, t: 0.2 };
+  const outOfRoom = { x: 4, y: 0.8, z: 0.4, vy: -2, t: 0.2 };
+  const tooHigh = { x: 0, y: 4, z: 0.4, vy: -2, t: 0.2 };
+  const tail = { x: 0, y: 0.8, z: 0.4, vy: -2, t: 1.2 };
+  assertEqual(interceptSites([rising, outOfRoom, tooHigh, falling, tail]).length, 1,
+    "descending, inside the piece bounds, and clear of the target");
+  assertEqual(interceptSites([]).length, 0);
+});
+
+test("a cannon that cannot be pointed at the target is refused rather than clamped", () => {
+  const setup = normalizeTrickShotTarget({ kind: "hoop", motionId: "still" });
+  // Standing well above the rim and asked to reach it quickly: the only velocity
+  // that does it points DOWN, and a cannon fires up. Refused rather than clamped,
+  // because a clamped answer is a cannon aimed somewhere nobody asked for — and
+  // `createSandboxPiece` would take it without complaint.
+  const site = { x: 0, y: 2.4, z: 0.5, vy: -2, t: 0.4 };
+  assertEqual(aimCannon({ setup, site, cannon: { id: "c", delay: 0.5 }, seconds: 0.25 }), null);
+});
+
+test("the easy CPU never sets an apparatus", () => {
+  // Nothing in a trick shot teaches the meter, which is the first thing a new
+  // player has to learn — so this is a floor, not a low point on a curve.
+  for (let roll = 0; roll < 1; roll += 0.05) {
+    assertEqual(cpuSetsTrickShot("easy", () => roll), false);
+  }
+  assertEqual(cpuSetsTrickShot("hard", () => 0), true);
+  assertEqual(cpuSetsTrickShot("hard", () => 0.99), false);
+});
+
+test("the CPU's lead is one statement, shared by the court and the planner", () => {
+  for (const setup of [
+    normalizeTrickShotTarget({ kind: "hoop", motionId: "still" }),
+    normalizeTrickShotTarget({ kind: "bin", motionId: "still" }),
+  ]) {
+    const lead = leadPull(setup, "basketball", 0);
+    assert(Number.isFinite(lead.power) && Number.isFinite(lead.aimX));
+    assertEqual(replayHorseShot({ setup, intent: { ...lead, ballId: "basketball" } }).made, true,
+      "a lead that does not convert a still target is not a lead");
+  }
 });
 
 /** The first pull in a coarse sweep that drops through a still bin. */

@@ -17,7 +17,11 @@ test('local server serves the game and rejects path traversal', async (t) => {
   const home = await fetch(`${baseUrl}/`);
   assert.equal(home.status, 200);
   assert.match(home.headers.get('content-type'), /^text\/html/);
-  assert.match(await home.text(), /Hotel Horror Prototype/);
+  assert.match(await home.text(), /Hotel Hide-N-Seek/);
+
+  const creatureAsset = await fetch(`${baseUrl}/assets/UAL2_Standard.glb`, { method: 'HEAD' });
+  assert.equal(creatureAsset.status, 200);
+  assert.equal(creatureAsset.headers.get('content-type'), 'model/gltf-binary');
 
   const traversal = await fetch(`${baseUrl}/..%2Fpackage.json`);
   assert.equal(traversal.status, 403);

@@ -1,4 +1,4 @@
-# Hotel Horror Exploration Prototype V5.2
+# Hotel Hide-N-Seek V6: The Guest
 
 ## Play
 
@@ -6,7 +6,7 @@ On Windows, double-click `PLAY HOTEL HIDE-N-SEEK.cmd`. It starts the local serve
 
 From a terminal, the equivalent command is `npm start`.
 
-V5 converts the hotel into one continuous vertical environment.
+V6 turns the exploration prototype into a stealth survival game. A demonic being called The Guest spawns at a safe random hotel position, roams every floor, uses the physical stairwell, investigates its last sighting, and catches the player on contact.
 
 V5.1 is a stabilization pass for building gameplay on top of that environment:
 
@@ -17,6 +17,15 @@ V5.1 is a stabilization pass for building gameplay on top of that environment:
 - Pure layout helpers and regression tests cover stair continuity, doorway frames, and room-light defaults.
 
 V5.2 closes the remaining stairwell voids, makes the bottom slab walkable, guards exposed landing edges, and splits the runtime into focused ES modules. It also removes three recurring frame costs: unchanged elevator-indicator uploads, full-speed interaction raycasts, and repeated static AABB construction.
+
+V6 adds:
+
+- A distorted, animated demon built from the local Universal Animation Library model plus procedural horns, eyes, claws, and a fallback shadow-form.
+- A patrol/chase/search state machine with field-of-view, range, vertical-level, and collider-aware line-of-sight checks.
+- Crouching with a lower eye line and reduced detection range, allowing couches, dressers, desks, beds, walls, and corners to function as cover.
+- A no-floor minimap that plots the player and monster in X/Z without revealing which of the four floors the monster occupies.
+- Chase/search danger feedback, a catch condition, and a restart screen.
+- Local vendored Three.js and GLTF loader files so the launcher no longer needs a CDN connection.
 
 ## Architecture
 
@@ -29,7 +38,10 @@ V5.2 closes the remaining stairwell voids, makes the bottom slab walkable, guard
 - `hotel.js` — rooms, corridors, secret passages, and stair construction
 - `elevator.js` — car, doors, calls, and travel state
 - `player.js` — input, movement, location tracking, and interaction targeting
+- `monster.js` — creature rendering, navigation, LOS, chase/search behavior, minimap updates, and defeat
 - `performance.js` — reusable change and interval gates for expensive work
+
+Pure monster rules live in `enemy-logic.js` so spawn safety, visibility, search timing, and floor-agnostic minimap projection can be tested without WebGL.
 
 ## Major changes
 
@@ -53,10 +65,12 @@ V5.2 closes the remaining stairwell voids, makes the bottom slab walkable, guard
 
 ## Controls
 
-WASD/arrows move, mouse look, Shift sprint, E interact, Esc releases mouse. Browsers without Pointer Lock automatically use click-and-drag mouse look. Mobile controls remain included.
+WASD/arrows move, mouse look, Shift sprints, C or Ctrl crouches, E interacts, and Esc releases the mouse. On mobile, hold HIDE to crouch. Browsers without Pointer Lock automatically use click-and-drag mouse look.
 
 ## Engineering note
 
-The controller is still lightweight rather than physics-engine based. It now uses height-aware AABB collision plus explicit walk surfaces. Before production chase AI, add a navigation graph/navmesh and formalize stair/elevator traversal nodes.
+The controller remains lightweight rather than physics-engine based. The Guest uses a purpose-built hotel route graph for inter-floor travel and direct collider-aware steering during a chase. It intentionally uses the stairs rather than the elevator.
 
-Run `npm test` for the architecture, layout, controls, and performance regressions. For visual development, `?inspect=stair`, `?inspect=stairEntrance`, and `?inspect=doorway` start at representative QA views without requiring a full traversal.
+The creature body and animation library are by Quaternius and are included under CC0 1.0; see `assets/UAL2-LICENSE.txt`. The local Three.js runtime retains its MIT license in `vendor/THREE-LICENSE.txt`.
+
+Run `npm test` for the AI, architecture, layout, controls, server, and performance regressions. For visual development, `?inspect=stair`, `?inspect=stairEntrance`, and `?inspect=doorway` start at representative QA views without requiring a full traversal.

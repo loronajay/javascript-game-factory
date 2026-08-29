@@ -12,6 +12,7 @@ const contentTypes = {
   '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.mjs': 'text/javascript; charset=utf-8',
+  '.glb': 'model/gltf-binary',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
   '.webp': 'image/webp',
@@ -57,7 +58,7 @@ export function startServer({ port = 4173, host = '127.0.0.1', root = defaultRoo
         'Content-Type': contentTypes[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
         'Cache-Control': 'no-cache',
       });
-      if (request.method === 'HEAD') response.end();
+      if (request.method === 'HEAD') { stream.destroy(); response.end(); }
       else stream.pipe(response);
     });
     stream.once('error', () => {

@@ -57,6 +57,7 @@ const MODULES = [
   "scripts/sim/horse-shot.js",
   "scripts/sim/horse-replay.js",
   "scripts/sim/horse-cpu.js",
+  "scripts/sim/horse-plan.js",
   "scripts/sim/trick-shot.js",
   "scripts/sim/trick-shot-physics.js",
   "scripts/sim/shot.js",

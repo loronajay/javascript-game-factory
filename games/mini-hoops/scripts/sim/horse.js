@@ -301,16 +301,24 @@ export function resolveHorseShot(match, made, setup = null, { unmet = [], touche
 /**
  * What the CPU does with a turn.
  *
- * Two decisions, and they are deliberately separate. `makeChance` is whether it
- * sinks the shot; `boldness` is how adventurous a bin it places when it is
+ * Three decisions, and they are deliberately separate. `makeChance` is whether
+ * it sinks the shot; `boldness` is how adventurous a target it places when it is
  * setting. A weak CPU that placed brutal shots would be no easier to beat — it
  * would just miss its own setups all day and never put a letter on anyone. So
  * boldness rises with skill, and the easy CPU sets shots it can mostly hit.
+ *
+ * `trickChance` is the third, and it is stated separately from boldness rather
+ * than derived off it because it is not a harder question of the same kind — it
+ * is a DIFFERENT kind of question. A trick shot has an apparatus in it, so the
+ * answer is not a pull anyone can find by aiming; the opponent has to be shown
+ * the recipe and repeat it. The easy CPU never asks one, and that is a floor
+ * rather than a curve: the first thing a new player has to learn is the meter,
+ * and there is nothing in this that teaches it.
  */
 export const HORSE_DIFFICULTIES = Object.freeze([
-  Object.freeze({ id: "easy", label: "Easy", makeChance: 0.5, boldness: 0.25 }),
-  Object.freeze({ id: "medium", label: "Medium", makeChance: 0.68, boldness: 0.6 }),
-  Object.freeze({ id: "hard", label: "Hard", makeChance: 0.85, boldness: 1 }),
+  Object.freeze({ id: "easy", label: "Easy", makeChance: 0.5, boldness: 0.25, trickChance: 0 }),
+  Object.freeze({ id: "medium", label: "Medium", makeChance: 0.68, boldness: 0.6, trickChance: 0.35 }),
+  Object.freeze({ id: "hard", label: "Hard", makeChance: 0.85, boldness: 1, trickChance: 0.5 }),
 ]);
 
 export function horseDifficultyById(id) {
@@ -319,6 +327,20 @@ export function horseDifficultyById(id) {
 
 export function cpuMakesHorseShot(difficulty = "medium", random = Math.random) {
   return random() < horseDifficultyById(difficulty).makeChance;
+}
+
+/**
+ * Does the CPU reach for an apparatus this turn?
+ *
+ * Asked BEFORE the target is placed and separately from whether one could be
+ * built, because the two are different failures and only one of them is a
+ * decision. A CPU that declined is setting a plain shot on purpose; a CPU whose
+ * plan did not converge is setting one because `sim/horse-plan.js` could not
+ * prove anything, and the mode's own rule is that a shot nobody has made is not
+ * a shot anybody owes.
+ */
+export function cpuSetsTrickShot(difficulty = "medium", random = Math.random) {
+  return random() < (horseDifficultyById(difficulty).trickChance || 0);
 }
 
 /**

@@ -1,5 +1,5 @@
 export function createWorld({ THREE, scene, materials: MAT, config: CONFIG, layout, document, window }) {
-  const state = { isLocked: false, yaw: 0, pitch: 0, playerFloor: 1, inventory: new Set(), activeInteractable: null, notificationTimer: null };
+  const state = { isLocked: false, yaw: 0, pitch: 0, playerFloor: 1, playerEyeHeight: CONFIG.eyeHeight, inventory: new Set(), activeInteractable: null, notificationTimer: null };
   const collections = {
     colliders: [], interactables: [], dynamicDoors: [], dynamicDrawers: [], walkSurfaces: [],
     floorGroups: new Map(), floorLights: new Map(), roomDoors: new Map(), secretPanels: new Map(),
@@ -78,13 +78,13 @@ export function createWorld({ THREE, scene, materials: MAT, config: CONFIG, layo
     while (current) { if (current.visible === false) return false; current = current.parent; }
     return true;
   }
-  function collidesAt(x, z, feetY) {
-    const playerMinY = feetY + 0.06; const playerMaxY = feetY + CONFIG.bodyHeight;
+  function collidesAt(x, z, feetY, bodyHeight = CONFIG.bodyHeight, radius = CONFIG.playerRadius) {
+    const playerMinY = feetY + 0.06; const playerMaxY = feetY + bodyHeight;
     for (const collider of collections.colliders) {
       if (!colliderAllowed(collider)) continue;
       const box = collider.boxProvider();
       if (playerMaxY <= box.minY + 0.015 || playerMinY >= box.maxY - 0.015) continue;
-      if (x > box.minX - CONFIG.playerRadius && x < box.maxX + CONFIG.playerRadius && z > box.minZ - CONFIG.playerRadius && z < box.maxZ + CONFIG.playerRadius) return true;
+      if (x > box.minX - radius && x < box.maxX + radius && z > box.minZ - radius && z < box.maxZ + radius) return true;
     }
     return false;
   }

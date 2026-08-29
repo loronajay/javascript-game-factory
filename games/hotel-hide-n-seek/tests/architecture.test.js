@@ -18,6 +18,7 @@ test('main is a small composition root and gameplay responsibilities live in mod
     'hotel.js',
     'elevator.js',
     'player.js',
+    'monster.js',
   ]) {
     assert.ok(fs.existsSync(path.join(projectRoot, 'modules', moduleName)), `${moduleName} is missing`);
     assert.match(main, new RegExp(moduleName.replace('.', '\\.')));

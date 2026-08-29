@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Hotel Horror Exploration Prototype V5</title>
+  <title>Hotel Hide-N-Seek: The Guest</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div id="overlay">
     <div class="panel">
-      <h1>Hotel Horror Prototype V5</h1>
+      <h1>Hotel Hide-N-Seek</h1>
       <p>Click or tap to enter.</p>
       <p><strong>Move:</strong> WASD / arrows &nbsp; <strong>Look:</strong> mouse / drag</p>
-      <p><strong>Interact:</strong> E / USE &nbsp; <strong>Sprint:</strong> Shift</p>
-      <p>Search drawers, find keys, open locked rooms, discover hidden passages, and ride the elevator physically between floors.</p>
+      <p><strong>Interact:</strong> E / USE &nbsp; <strong>Sprint:</strong> Shift &nbsp; <strong>Crouch:</strong> C / Ctrl</p>
+      <p>Something is roaming the hotel. Break its line of sight, crouch behind cover, and stay hidden until it gives up the search.</p>
     </div>
   </div>
 
@@ -29,10 +29,29 @@
   <div id="floorBadge">Floor 1</div>
   <div id="elevatorBadge" class="hidden"></div>
 
+  <div id="miniMap" aria-label="Minimap showing player and creature positions without floor information">
+    <div class="mapTitle">NO-FLOOR TRACKER</div>
+    <div class="mapShape mapLobby north"></div><div class="mapShape mapHall"></div><div class="mapShape mapLobby south"></div>
+    <div id="playerDot" class="mapDot playerDot" title="You"></div>
+    <div id="enemyDot" class="mapDot enemyDot" title="The Guest"></div>
+  </div>
+  <div id="monsterStatus" data-state="roam">THE GUEST IS ROAMING</div>
+  <div id="threatVignette" aria-hidden="true"></div>
+
+  <div id="caughtOverlay">
+    <div class="caughtPanel">
+      <div class="caughtEyebrow">ROOM SERVICE</div>
+      <h1>IT FOUND YOU</h1>
+      <p>You were seen. Use corners, furniture, and crouching to break its line of sight next time.</p>
+      <button id="restartBtn" type="button">TRY AGAIN</button>
+    </div>
+  </div>
+
   <div id="hud">
     WASD / Arrows = Move<br>
     E = Interact<br>
     Shift = Sprint<br>
+    C / Ctrl = Crouch<br>
     Esc = Release mouse
   </div>
 
@@ -44,12 +63,14 @@
       <button id="moveRight" class="moveBtn" type="button">→</button>
     </div>
     <button id="interactBtn" type="button">USE</button>
+    <button id="crouchBtn" type="button">HIDE</button>
     <div id="lookHint">Drag right side to look</div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-  <script src="layout.js?v=5.2"></script>
-  <script src="controls.js?v=5.2"></script>
-  <script type="module" src="main.js?v=5.2"></script>
+  <script src="layout.js?v=6.0"></script>
+  <script src="controls.js?v=6.0"></script>
+  <script src="enemy-logic.js?v=6.0"></script>
+  <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+  <script type="module" src="main.js?v=6.0"></script>
 </body>
 </html>

@@ -14,7 +14,8 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
       && camera.position.z > CONFIG.elevatorFrontZ - 0.12
       && camera.position.z < CONFIG.elevatorCenterZ + 1.46;
   }
-  function isPlayerInside() { return isPlayerInsideXZ() && Math.abs(camera.position.y - (elevator.car.position.y + CONFIG.eyeHeight)) < 0.7; }
+  function playerEyeHeight() { return world.state.playerEyeHeight || CONFIG.eyeHeight; }
+  function isPlayerInside() { return isPlayerInsideXZ() && Math.abs(camera.position.y - (elevator.car.position.y + playerEyeHeight())) < 0.7; }
 
   function updateIndicator(force = false) {
     let text = String(elevator.currentFloor);
@@ -81,8 +82,8 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
       if (next <= epsilon) { syncDoors(0); elevator.state = 'moving'; if (elevator.passengerTrip) { elevator.passengerTrip = isPlayerInsideXZ(); if (elevator.passengerTrip) world.state.playerFloor = 0; } world.emit('elevator-start', { from: elevator.currentFloor, to: elevator.targetFloor, passenger: elevator.passengerTrip }); updateIndicator(); }
     } else if (elevator.state === 'moving') {
       const targetY = floorY(elevator.targetFloor); const diff = targetY - elevator.car.position.y; elevator.car.position.y += Math.sign(diff) * Math.min(Math.abs(diff), CONFIG.elevatorSpeed * delta);
-      if (elevator.passengerTrip && isPlayerInsideXZ()) camera.position.y = elevator.car.position.y + CONFIG.eyeHeight + Math.sin(elapsed * 28) * 0.006;
-      if (Math.abs(diff) < 0.008) { elevator.car.position.y = targetY; elevator.currentFloor = elevator.targetFloor; if (elevator.passengerTrip) { world.state.playerFloor = elevator.currentFloor; camera.position.y = targetY + CONFIG.eyeHeight; world.emit('floor-change', { floor: world.state.playerFloor, method: 'elevator' }); } elevator.state = 'opening'; world.emit('elevator-arrive', { floor: elevator.currentFloor, passenger: elevator.passengerTrip }); elevator.passengerTrip = false; updateIndicator(); }
+      if (elevator.passengerTrip && isPlayerInsideXZ()) camera.position.y = elevator.car.position.y + playerEyeHeight() + Math.sin(elapsed * 28) * 0.006;
+      if (Math.abs(diff) < 0.008) { elevator.car.position.y = targetY; elevator.currentFloor = elevator.targetFloor; if (elevator.passengerTrip) { world.state.playerFloor = elevator.currentFloor; camera.position.y = targetY + playerEyeHeight(); world.emit('floor-change', { floor: world.state.playerFloor, method: 'elevator' }); } elevator.state = 'opening'; world.emit('elevator-arrive', { floor: elevator.currentFloor, passenger: elevator.passengerTrip }); elevator.passengerTrip = false; updateIndicator(); }
     } else if (elevator.state === 'opening') {
       const next = Math.min(1, elevator.doorAmount + CONFIG.elevatorDoorSpeed * delta); syncDoors(next);
       if (next >= 1 - epsilon) { syncDoors(1); elevator.state = 'open'; if (elevator.pendingCall !== null && elevator.pendingCall !== elevator.currentFloor) { const pending = elevator.pendingCall; elevator.pendingCall = null; window.setTimeout(() => { if (elevator.state === 'open') { elevator.targetFloor = pending; elevator.passengerTrip = false; elevator.state = 'closing'; } }, 500); } }

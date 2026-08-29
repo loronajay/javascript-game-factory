@@ -1,5 +1,7 @@
 export const CONFIG = Object.freeze({
   eyeHeight: 1.7,
+  crouchEyeHeight: 1.02,
+  crouchSpeed: 2.45,
   walkSpeed: 4.2,
   sprintSpeed: 6.8,
   playerRadius: 0.34,
@@ -17,6 +19,9 @@ export const CONFIG = Object.freeze({
   elevatorFrontZ: 55.88,
   elevatorHalfWidth: 1.25,
   elevatorHalfDepth: 1.6,
+  enemyWalkSpeed: 2.25,
+  enemyChaseSpeed: 4.85,
+  enemyCatchDistance: 1.05,
 });
 
 export const floorY = (id) => (id - 1) * CONFIG.floorHeight;
@@ -34,4 +39,5 @@ export const inspectionViews = Object.freeze({
   stair: { x: 6.75, y: 1.78, z: 43.8, yaw: Math.PI, pitch: 0.08 },
   stairEntrance: { x: 2.35, y: floorY(2) + 1.78, z: 44.15, yaw: -Math.PI / 2, pitch: 0 },
   doorway: { x: 0, y: floorY(4) + CONFIG.eyeHeight, z: 10, yaw: Math.PI / 2, pitch: 0 },
+  monster: { x: 0, y: CONFIG.eyeHeight, z: 31.5, yaw: 0, pitch: 0 },
 });

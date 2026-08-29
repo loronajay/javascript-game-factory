@@ -38,7 +38,6 @@ import {
 import {
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
-  REFERENCE_POWER,
   CONTACT_DEBOUNCE_SECONDS,
   PHYSICS_SUBSTEP_SECONDS,
   TICK_SECONDS,
@@ -49,7 +48,6 @@ import {
   defaultHoopPlacement,
   hoopPlacementBoundsFor,
   hoopPlacementFromFractions,
-  placedHoopAt,
 } from "./sim/hoop-placement.js";
 import {
   BIN_MOTIONS,
@@ -58,12 +56,12 @@ import {
   defaultPlacement,
   heightBoundsAt,
   horizontalBoundsAt,
-  placedBinAt,
   placementFromFractions,
   PLACEMENT_BOUNDS,
 } from "./sim/bin-placement.js";
-import { needsProvenPull, provenPullPhase, provenPullShot } from "./sim/horse-cpu.js";
-import { createHorseShot, horsePowerForDepth, horseTargetAt } from "./sim/horse-shot.js";
+import { leadPull, needsProvenPull, provenPullPhase, provenPullShot } from "./sim/horse-cpu.js";
+import { planCpuTrickShot } from "./sim/horse-plan.js";
+import { createHorseShot, horseTargetAt } from "./sim/horse-shot.js";
 import {
   HORSE_FIXED_SETUP,
   PHASE_MATCH,
@@ -73,6 +71,7 @@ import {
   chooseCpuTargetKind,
   chooseCpuTurnBall,
   cpuMakesHorseShot,
+  cpuSetsTrickShot,
   createHorseMatch,
   horseDifficultyById,
   horseModeId,
@@ -1029,19 +1028,21 @@ export function bootHorse(root, options = {}) {
   /**
    * The CPU's turn.
    *
-   * Its shot LEADS a moving bin rather than aiming at where the bin is now: it
-   * solves once to learn the flight time, asks the motion where the bin will be
-   * when the ball gets there, and aims at that. Without it the CPU would be
-   * comically bad at exactly the setups it had just chosen for itself.
+   * Two answers, and which one it reaches for is decided by whether the shot has
+   * an apparatus on it. A plain target is SOLVED — `leadPull` aims at where the
+   * target will be when the ball gets there. A shot with a duty is REPEATED, off
+   * a recipe: the pull a human setter proved, or the one `sim/horse-plan.js`
+   * proved for the CPU when it set the shot itself. Both live in
+   * `sim/horse-cpu.js`; the stray that makes it miss at its own difficulty is
+   * this court's, because missing on purpose is what the setting means.
    */
   function startCpuShot() {
     const setup = activeSetup;
     if (!setup) return;
-    // A SHOT WITH A DUTY IS REPEATED, NOT SOLVED. No lead finds a route off a
-    // springboard and through a cannon, so the CPU takes the pull the setter
-    // proved — at the same phase of the same sweep, which means waiting for it.
-    // Asked before the difficulty roll, or the roll would be re-taken every tick
-    // of that wait and the easy CPU would eventually roll a make.
+    // No lead finds a route off a springboard and through a cannon, so a shot
+    // with a duty waits for the recipe's own phase of the sweep. Asked BEFORE the
+    // difficulty roll, or the roll would be re-taken every tick of that wait and
+    // the easy CPU would eventually roll a make.
     if (needsProvenPull(setup) && turnClock < provenPullPhase(setup)) return;
     const makes = cpuMakesHorseShot(difficulty, random);
     const stray = () => (random() < 0.5 ? -1 : 1);
@@ -1054,47 +1055,27 @@ export function bootHorse(root, options = {}) {
       startCpuHoopShot(setup, makes, stray);
       return;
     }
-    const rest = placedBinAt(setup, turnClock);
-    const provisional = createHorseShot(
-      { power: horsePowerForDepth(rest.z), aimX: projectPoint(rest).x, loft: 1 },
-      ball,
-      setup,
-      { weight: ballFlight(currentTurnBallId()).weight },
-    );
-    const lead = placedBinAt(setup, turnClock + Math.max(0, provisional.launch.flightTime));
-    const target = projectPoint({ x: lead.x, y: lead.topY, z: lead.z });
+    const lead = leadPull(setup, currentTurnBallId(), turnClock);
     launchFromPull({
-      power: horsePowerForDepth(lead.z) + (makes ? 0 : stray() * 0.06),
-      aimX: target.x + (makes ? 0 : stray() * 95),
-      loft: 1,
+      power: lead.power + (makes ? 0 : stray() * 0.06),
+      aimX: lead.aimX + (makes ? 0 : stray() * 95),
+      loft: lead.loft,
     });
   }
 
   /**
    * The CPU shooting at a placed hoop.
    *
-   * Its own function because the two targets take two different gestures, so a
-   * CPU aiming at one is not the CPU aiming at the other with a field swapped:
-   * strength here is POWER and the reference pull is the one that lands on the
-   * reticle, where at a bin strength is depth and the launch is solved at the
-   * reference regardless. What both share is the LEAD — it solves once to learn
-   * the flight time, asks the motion where the rim will be when the ball gets
-   * there, and aims at that. Without it the CPU is comically bad at exactly the
-   * setups it has just chosen for itself.
+   * Still its own function after the lead moved into `sim/horse-cpu.js`, because
+   * the STRAY is not shared: a hoop's strength is power and a bin's is depth, so
+   * the two miss by different amounts in different units.
    */
   function startCpuHoopShot(setup, makes, stray) {
-    const weight = ballFlight(currentTurnBallId()).weight;
-    const provisional = createHorseShot(
-      { power: REFERENCE_POWER, aimX: placedHoopAt(setup, turnClock).cx, loft: 1 },
-      ball,
-      setup,
-      { weight },
-    );
-    const lead = placedHoopAt(setup, turnClock + Math.max(0, provisional.launch.flightTime));
+    const lead = leadPull(setup, currentTurnBallId(), turnClock);
     launchFromPull({
-      power: REFERENCE_POWER + (makes ? 0 : stray() * 0.09),
-      aimX: lead.cx + (makes ? 0 : stray() * 70),
-      loft: 1,
+      power: lead.power + (makes ? 0 : stray() * 0.09),
+      aimX: lead.aimX + (makes ? 0 : stray() * 70),
+      loft: lead.loft,
     });
   }
 
@@ -1138,6 +1119,28 @@ export function bootHorse(root, options = {}) {
     rememberedPlacement[workingTarget.kind] = workingTarget.placement;
     activeSetup = { ...workingTarget, pieces: [], locationId: currentLocationId };
     activePieces = [];
+    // AND THE APPARATUS, WHEN IT REACHES FOR ONE. `planCpuTrickShot` builds a
+    // tool onto a flight it has already replayed and hands back the pull that
+    // routes through it — which is the same `provenPull` shape a human setter's
+    // make leaves behind, so nothing downstream learns a second way to repeat a
+    // shot. Stamping `requiredPieces` here is not a claim about a shot that has
+    // not been taken yet: the setter is never held to a duty, and `recordShotDuty`
+    // overwrites both fields with what this ball really touches. A turn with no
+    // plan is the bare target the CPU has always set.
+    if (cpuSetsTrickShot(difficulty, random)) {
+      const plan = planCpuTrickShot({ setup: activeSetup, ballId: currentTurnBallId() });
+      if (plan) {
+        activePieces = normalizeSandboxPieces(plan.pieces);
+        activeSetup = {
+          ...activeSetup,
+          pieces: activePieces,
+          requiredPieces: plan.requiredPieces,
+          provenPull: plan.pull,
+        };
+      }
+    }
+    resetTrickShotPhysics(piecePhysics);
+    clearTrickShotImpacts(impacts);
     phase = PHASE_AIMING;
     turnClock = 0;
     cpuDelay = 0.85;
