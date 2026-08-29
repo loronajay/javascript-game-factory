@@ -146,3 +146,51 @@ Sound *propagation* (noise the demon and other players can hear) was never built
 - **"Arrived" means standing in the room, not out of waypoints.** The mover gives a waypoint up when the way is solid, so an empty route proves nothing. A hider that runs out of route without reaching its spot strikes that room off its own list and picks another; without that it crouches in the corridor for the rest of the round, which is both a terrible hiding place and a free find.
 
 Hiders route through the one stairwell the demon uses, via `enemy-logic.createStairRoute`. Do not grow a second navigation system for them.
+
+## Movement and line of sight (V7.0)
+
+There is **one mover**. `movement-logic.js` is pure and owns both integrators: `stepAxes` (the local
+player's, two axes tried separately) and `stepToward` (a routed body's, direct step then the two
+perpendicular ones). `player.js`, `monster.js` and `hiders.js` all call it against a `space` the
+world provides.
+
+- **A runtime module may not call `world.resolveGroundHeight` or `world.collidesAt` directly.**
+  Sliding along a wall, snapping to the ground and giving up when boxed in are rules; a module that
+  re-derives them is a second physics implementation the server would have to match.
+  `tests/architecture.test.js` fails on it.
+- **`groundAt` returning null is not the same answer as `blocked` returning true.** One is a ledge
+  and one is a wall, and only a wall is worth sliding along. Keep them distinct.
+- **A `guided` waypoint is followed literally, vertical component included.** Stair flights and the
+  elevator carry a body along a path the walk surfaces cannot describe.
+- **Line of sight is `collision-logic.segmentBlocked`, an AABB slab ray.** It replaced a
+  `THREE.Raycaster` in the demon that skipped every collider whose `enabled` flag was *absent* — and
+  the plan's records do not carry one, so nothing had been occluding the demon at all. Do not
+  reintroduce a raycast: a server cannot run one.
+
+## The authoritative round (V7.0)
+
+`sim-logic.js` is `tick(state, delta, inputs) -> state`, and it is the same file in the browser and
+on the server.
+
+- **A client sends what it is trying to do, never what happened.** `readInput` narrows a message to
+  a direction, a facing and three held keys. Whether you moved, whether your battery is empty and
+  whether you were tagged are answers the tick gives.
+- **The tick does not mutate what it is handed**, and the same inputs produce the same state — a
+  mirrored server has to agree with the client that ran them.
+- **`createPlanSpace` caches its colliders and rebuilds only when a door actually moves.** Resolving
+  700-odd boxes per query per body per tick is not a tick budget.
+- **The demon is not in the tick yet.** `resolveDemonCatch` / `endRoundByDemon` are wired to the one
+  place a round may end, so adding the hunt changes nothing downstream.
+
+## Online (V7.0)
+
+- **`factory-network-server/games/hide-and-seek/shared/` is a byte-for-byte mirror.** Change a pure
+  file here, run `node tools/mirror-sim.mjs`, commit both repos. Both sides check the manifest, and
+  the failure mode of an unchecked mirror is silent: the server keeps deciding catches in a hotel
+  that no longer exists while every suite stays green.
+- **There is one authority per hotel.** Online, `main.js` stands the local round and both demons
+  down. Do not "fix" an empty online hotel by starting the local demons.
+- **The client never resolves a catch.** `modules/online.js` may not import or re-implement
+  `canTag`, `resolveTag` or `resolveDemonCatch`; the architecture test asserts it.
+- **Not replicated yet:** doors/drawers/keys, flashlight pickups, and the demons. All three are
+  contested state and all three belong on the server, not in a client message.

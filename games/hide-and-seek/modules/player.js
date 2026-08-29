@@ -1,4 +1,5 @@
-export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, floorY, world, elevator, controls, flashlight: flashlightLogic, flashlightConfig, performance, menu, stamina, document, window }) {
+export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, floorY, world, elevator, controls, movement, flashlight: flashlightLogic, flashlightConfig, performance, menu, stamina, document, window }) {
+  const BODY = { height: CONFIG.bodyHeight, radius: CONFIG.playerRadius };
   const keys = {};
   const isTouchDevice = window.matchMedia('(pointer:coarse)').matches || ('ontouchstart' in window);
   const forceDragLook = controls.shouldAutoStartDragLook(window.location.search);
@@ -68,11 +69,13 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
     else { world.promptEl.textContent = ''; world.promptEl.classList.remove('visible'); }
   }
   function interact() { if (world.state.activeInteractable) world.state.activeInteractable.action(); }
+  // The local player is not a special kind of body: it walks through the same pure mover the demons
+  // and the hiders use, so a server ticking a remote player can never disagree with this client.
   function tryMove(dx, dz) {
-    let feetY = camera.position.y - currentEyeHeight; const nextX = camera.position.x + dx; let ground = world.resolveGroundHeight(nextX, camera.position.z, feetY);
-    if (ground !== null && !world.collidesAt(nextX, camera.position.z, ground)) { camera.position.x = nextX; feetY = ground; camera.position.y = ground + currentEyeHeight; }
-    const nextZ = camera.position.z + dz; ground = world.resolveGroundHeight(camera.position.x, nextZ, feetY);
-    if (ground !== null && !world.collidesAt(camera.position.x, nextZ, ground)) { camera.position.z = nextZ; camera.position.y = ground + currentEyeHeight; }
+    const feetY = camera.position.y - currentEyeHeight;
+    const step = movement.stepAxes(world.space, BODY, { x: camera.position.x, y: feetY, z: camera.position.z }, dx, dz);
+    if (!step.moved) return;
+    camera.position.set(step.x, step.y + currentEyeHeight, step.z);
   }
   function nearestFloorFromFeet(feetY) {
     let floor = 1; let diff = Infinity; for (let id = 1; id <= 4; id += 1) { const candidate = Math.abs(feetY - floorY(id)); if (candidate < diff) { floor = id; diff = candidate; } }
@@ -131,6 +134,16 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
   return {
     update, beginPlay, refreshLocation, interact, setFlashlight, toggleFlashlight, addFlashlightCharge,
     isCrouching: () => !!(keys.KeyC || keys.ControlLeft || keys.ControlRight),
+    // What the player is trying to do, which is the only thing an online round sends. The answer to
+    // whether any of it happened comes back from the server.
+    getInput: () => ({
+      forward: (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0),
+      strafe: (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0),
+      yaw: world.state.yaw,
+      crouch: !!(keys.KeyC || keys.ControlLeft || keys.ControlRight),
+      sprint: !!(keys.ShiftLeft || keys.ShiftRight),
+      light: flashlightState.on,
+    }),
     getEyeHeight: () => currentEyeHeight,
     getState: () => ({ crouching: !!world.state.playerCrouching, eyeHeight: currentEyeHeight, flashlightOn: flashlightState.on, flashlightCharge: flashlightState.charge }),
   };

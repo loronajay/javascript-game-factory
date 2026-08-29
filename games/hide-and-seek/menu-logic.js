@@ -12,6 +12,7 @@
     TITLE: 'title',
     HOW_TO: 'howTo',
     EXTRAS: 'extras',
+    ONLINE: 'online',
     PAUSE: 'pause',
     PLAYING: 'playing',
     CAUGHT: 'caught',
@@ -21,6 +22,7 @@
     PLAY: 'play',
     HOW_TO: 'howTo',
     EXTRAS: 'extras',
+    ONLINE: 'online',
     BACK: 'back',
     PAUSE: 'pause',
     RESUME: 'resume',
@@ -29,8 +31,9 @@
   });
 
   // How-to and extras are reached from both the title and the pause menu, so BACK has to remember
-  // where it came from instead of always landing on the title.
-  const READABLE = Object.freeze([SCREENS.HOW_TO, SCREENS.EXTRAS]);
+  // where it came from instead of always landing on the title. The online lobby behaves the same
+  // way, except that leaving PLAYING is not its own decision: the server starts the match.
+  const READABLE = Object.freeze([SCREENS.HOW_TO, SCREENS.EXTRAS, SCREENS.ONLINE]);
 
   function createMenuState() {
     return { screen: SCREENS.TITLE, back: null, effect: null };
@@ -57,7 +60,11 @@
     // Quitting cannot be modelled as a transition: the hotel, the demon and the key ring are all
     // still standing, so the host has to rebuild the session. The machine only reports the intent.
     if (action === ACTIONS.QUIT) return current.screen === SCREENS.PAUSE || current.screen === SCREENS.CAUGHT ? { ...stay, effect: 'quit' } : stay;
+    // The online lobby is a waiting room, and the wait ends when the server says it does — PLAY is
+    // dispatched by the net layer on `lobby_started`, never by a button on this screen.
+    if (current.screen === SCREENS.ONLINE && action === ACTIONS.PLAY) return goto(SCREENS.PLAYING);
     if (READABLE.includes(current.screen)) return action === ACTIONS.BACK ? goto(current.back || SCREENS.TITLE) : stay;
+    if (action === ACTIONS.ONLINE) return goto(SCREENS.ONLINE, current.screen);
     if (action === ACTIONS.HOW_TO) return goto(SCREENS.HOW_TO, current.screen);
     if (action === ACTIONS.EXTRAS) return goto(SCREENS.EXTRAS, current.screen);
     if (current.screen === SCREENS.TITLE) return action === ACTIONS.PLAY ? goto(SCREENS.PLAYING) : stay;

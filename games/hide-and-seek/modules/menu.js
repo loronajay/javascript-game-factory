@@ -4,12 +4,13 @@
 //
 // `PLAYING` is the game's single "the simulation is running" answer: the loop pauses whenever the
 // player is not locked in, which is what stops meters like sanity from ticking behind a menu.
-export function createMenu({ logic, document, window, onPlay }) {
+export function createMenu({ logic, document, window, onPlay, onScreen }) {
   const overlay = document.getElementById('overlay');
   const screenEls = new Map([
     [logic.SCREENS.TITLE, document.getElementById('menuTitle')],
     [logic.SCREENS.HOW_TO, document.getElementById('menuHowTo')],
     [logic.SCREENS.EXTRAS, document.getElementById('menuExtras')],
+    [logic.SCREENS.ONLINE, document.getElementById('menuOnline')],
     [logic.SCREENS.PAUSE, document.getElementById('menuPause')],
   ]);
   let state = logic.createMenuState();
@@ -27,6 +28,7 @@ export function createMenu({ logic, document, window, onPlay }) {
     const wasPlaying = logic.isPlaying(state.screen);
     state = next;
     render();
+    if (onScreen) onScreen(state.screen);
     if (!wasPlaying && logic.isPlaying(state.screen)) onPlay();
   }
 

@@ -1,4 +1,4 @@
-# Hide and Seek V6.9: The Bellhop and The Housekeeper
+# Hide and Seek V7.0: The Bellhop and The Housekeeper
 
 ## Play
 
@@ -23,6 +23,24 @@ V6.9 adds a light and a second hunter, and both cut both ways.
 **The flashlight (`F`) runs on a battery.** A full charge is about two minutes of continuous light and it drains only while lit, so it is something you spend rather than something you hold. At zero it switches itself off and will not come back on — there is no last flick of vision. A caught player drops their flashlight where they fell, and anyone, seeker or hider, can pick it up and add the leftover charge to their own up to 100%. A body on the floor is a resupply.
 
 **There are now two demons.** The Bellhop is joined by The Housekeeper, and they start on different floors. Only The Bellhop tracks the sanity clock and walks into the room of whoever has been sitting still too long; The Housekeeper roams, sees and chases like any hunter. Neither is your ally and neither cares which of you it reaches first. The threat readout still tells you a state and never a place — with two of them loose, that restraint is the point.
+
+## Playing online (new in V7.0, untested with real players)
+
+`PLAY ONLINE` on the title screen connects to the shared arcade network server and drops you into a
+lobby for two to eight guests. The host presses `START ROUND`; the server picks who is it and does
+not announce it until the doors close.
+
+**The server owns the round.** Where you are, what you can see, how much battery you have left and
+who was caught are all decided there, from the positions it is tracking — your client only sends
+which keys you are holding and which way you are facing. That is deliberate: a client that gets to
+say "I wasn't caught" is the obvious way to cheat at hide and seek.
+
+Two things are missing from online rounds and are known, not forgotten. **The demons are not in the
+hotel yet** — an online round is currently seeker versus hiders only. And **doors are still local**:
+a door someone else opens is not open for you. Both are the next pieces of work.
+
+Playing on `localhost` talks to a network server on `localhost:3000`; anywhere else uses the live
+one.
 
 The guests are not statues. They pick a room, walk to it and crouch down, and they bolt if you or the demon gets close — from you at a longer range than from the demon, because a seeker with a plan is worth moving for while a roaming demon is worth staying still for. A door standing open is a guest who went through it.
 

@@ -79,3 +79,22 @@ test('every screen is addressable and the action list is frozen', () => {
   assert.ok(Object.isFrozen(ACTIONS));
   for (const screen of Object.values(SCREENS)) assert.equal(typeof screen, 'string');
 });
+
+test('the online lobby is a waiting room the server ends, not a button', () => {
+  const title = menu.createMenuState();
+  const lobby = menu.nextMenuState(title, menu.ACTIONS.ONLINE);
+
+  assert.equal(lobby.screen, menu.SCREENS.ONLINE);
+  assert.equal(menu.isOverlayVisible(lobby.screen), true);
+  // Waiting in the lobby is not playing: nothing simulates behind it.
+  assert.equal(menu.isPlaying(lobby.screen), false);
+  assert.equal(menu.nextMenuState(lobby, menu.ACTIONS.BACK).screen, menu.SCREENS.TITLE);
+  assert.equal(menu.nextMenuState(lobby, menu.ACTIONS.PLAY).screen, menu.SCREENS.PLAYING);
+});
+
+test('the online lobby remembers where it was opened from', () => {
+  const paused = { screen: menu.SCREENS.PAUSE, back: null, effect: null };
+  const lobby = menu.nextMenuState(paused, menu.ACTIONS.ONLINE);
+
+  assert.equal(menu.nextMenuState(lobby, menu.ACTIONS.BACK).screen, menu.SCREENS.PAUSE);
+});

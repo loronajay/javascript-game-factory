@@ -4,15 +4,16 @@
 // so a server can run it headlessly. This module owns only the parts that need the built hotel:
 // walking a waypoint route against the real collision, and driving the avatar rig. It deliberately
 // borrows the demon's navigation shape (a route of waypoints from `enemy-logic`, then a slide-along
-// -walls mover) rather than inventing a second one, because there is only one stairwell to route.
+// -walls mover from `movement-logic.js`) rather than inventing a second one, because there is only
+// one stairwell to route and one way to walk it.
 //
 // The seam that matters: `list()` returns positions in exactly the shape the round's catch
 // resolution and the demon's threat checks want. When real players arrive, the same list is fed
 // from the network and this file simply stops being asked for entries.
-export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floorY, layout, world, avatars, logic, enemyLogic, sanityLogic, avatarLogic, count = 3, seekerSpawn = null }) {
+export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floorY, layout, world, avatars, logic, enemyLogic, movement, sanityLogic, avatarLogic, count = 3, seekerSpawn = null }) {
+  const BODY = { height: CONFIG.bodyHeight, radius: CONFIG.playerRadius };
   const stairLayout = layout.createStairLayout({ floorCount: 4, floorHeight: CONFIG.floorHeight });
   const hiders = new Map();
-  const scratch = new THREE.Vector3();
   let zones = [];
 
   function sanityZones() {
@@ -99,42 +100,15 @@ export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floo
       && Math.hypot(hider.position.x - spot.x, hider.position.z - spot.z) < 2.2;
   }
 
-  // A body-sized version of the demon's mover: try the direct step, then slide along the wall rather
-  // than stalling in a doorway.
+  // The same pure mover the player and the demons use, at hider size.
   function tryMove(hider, waypoint, speed, delta) {
-    const dx = waypoint.x - hider.position.x;
-    const dy = waypoint.y - hider.position.y;
-    const dz = waypoint.z - hider.position.z;
-    const distance = Math.hypot(dx, dy, dz);
-    if (distance < 0.22) { hider.position.set(waypoint.x, waypoint.y, waypoint.z); hider.route.shift(); return; }
-    const amount = Math.min(distance, speed * delta);
-    const direction = scratch.set(dx, dy, dz).normalize().clone();
-    if (waypoint.guided) { hider.position.addScaledVector(direction, amount); hider.moving = true; }
-    else {
-      const nextX = hider.position.x + direction.x * amount;
-      const nextZ = hider.position.z + direction.z * amount;
-      const ground = world.resolveGroundHeight(nextX, nextZ, hider.position.y);
-      if (ground !== null && !world.collidesAt(nextX, nextZ, ground, CONFIG.bodyHeight, CONFIG.playerRadius)) {
-        hider.position.set(nextX, ground, nextZ);
-        hider.moving = true;
-      } else {
-        let slid = false;
-        for (const side of [-1, 1]) {
-          const sideX = hider.position.x + direction.z * side * amount;
-          const sideZ = hider.position.z - direction.x * side * amount;
-          const sideGround = world.resolveGroundHeight(sideX, sideZ, hider.position.y);
-          if (sideGround !== null && !world.collidesAt(sideX, sideZ, sideGround, CONFIG.bodyHeight, CONFIG.playerRadius)) {
-            hider.position.set(sideX, sideGround, sideZ);
-            slid = true;
-            break;
-          }
-        }
-        // Boxed in: drop the waypoint so the next tick re-plans instead of grinding into the wall.
-        if (!slid) hider.route.shift();
-        hider.moving = slid;
-      }
-    }
-    if (Math.hypot(direction.x, direction.z) > 0.01) hider.yaw = Math.atan2(direction.x, direction.z);
+    const step = movement.stepToward(world.space, BODY, hider.position, waypoint, { speed, delta, arriveRadius: 0.22, guided: !!waypoint.guided });
+    if (step.arrived) { hider.position.set(step.x, step.y, step.z); hider.route.shift(); return; }
+    if (step.moved) hider.position.set(step.x, step.y, step.z);
+    // Boxed in: drop the waypoint so the next tick re-plans instead of grinding into the wall.
+    if (step.blocked) hider.route.shift();
+    hider.moving = step.moved;
+    if (Math.hypot(step.dirX, step.dirZ) > 0.01) hider.yaw = Math.atan2(step.dirX, step.dirZ);
   }
 
   function update(delta, threats = []) {

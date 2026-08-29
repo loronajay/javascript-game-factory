@@ -41,3 +41,7 @@ button{font:inherit}
 #staminaMeter,.monster-chase #staminaMeter,.monster-search #staminaMeter,.monster-hunt #staminaMeter{top:224px}
 #flashlightStatus{bottom:146px}
 @media(pointer:coarse){#sanityMeter{top:174px}#staminaMeter,.monster-chase #staminaMeter,.monster-search #staminaMeter,.monster-hunt #staminaMeter{top:222px}}
+.onlineStatus{margin-top:14px;color:#e8ddd2;font-size:12px;font-weight:800;letter-spacing:.22em}
+.onlineRoom{color:#c6a869;font-size:20px;font-weight:800;letter-spacing:.32em;min-height:24px}
+.onlinePlayers{color:#a99b94;font-size:11px;font-weight:700;letter-spacing:.12em}
+.menuBtn[disabled]{opacity:.45;cursor:default}

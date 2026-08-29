@@ -14,10 +14,25 @@
       <p>You are it. Three guests are hiding across four floors. Take as long as you need to find them all &mdash; but something else is hunting the hotel, and it does not care that you are the one seeking.</p>
       <div class="menuButtons">
         <button class="menuBtn primary" type="button" data-menu="play">PLAY</button>
+        <button class="menuBtn" type="button" data-menu="online">PLAY ONLINE</button>
         <button class="menuBtn" type="button" data-menu="howTo">HOW TO PLAY</button>
         <button class="menuBtn" type="button" data-menu="extras">EXTRAS</button>
       </div>
       <div class="menuFoot">V6.7 &middot; SINGLE-PLAYER DEMO</div>
+    </div>
+
+    <div id="menuOnline" class="panel menuScreen hidden">
+      <div class="menuEyebrow">THE HOTEL, TOGETHER</div>
+      <h1>Play Online</h1>
+      <p>Two to eight guests. One of you is it &mdash; the server picks, and it does not tell you until the doors close. Everything that decides a round happens there: where you are, what you can see, and who was caught.</p>
+      <p id="onlineStatus" class="onlineStatus">NOT CONNECTED</p>
+      <p id="onlineRoom" class="onlineRoom"></p>
+      <p id="onlinePlayers" class="onlinePlayers">No one else here yet.</p>
+      <div class="menuButtons">
+        <button class="menuBtn primary" id="onlineStart" type="button" disabled>WAITING FOR HOST</button>
+        <button class="menuBtn" type="button" data-menu="back">BACK</button>
+      </div>
+      <div class="menuFoot">SERVER AUTHORITATIVE &middot; THE DEMONS ARE NOT ONLINE YET</div>
     </div>
 
     <div id="menuHowTo" class="panel menuScreen hidden">
@@ -52,6 +67,7 @@
       <p>The Bellhop is holding still too. Nothing moves until you go back in.</p>
       <div class="menuButtons">
         <button class="menuBtn primary" type="button" data-menu="resume">RESUME</button>
+        <button class="menuBtn" type="button" data-menu="online">PLAY ONLINE</button>
         <button class="menuBtn" type="button" data-menu="howTo">HOW TO PLAY</button>
         <button class="menuBtn" type="button" data-menu="quit">QUIT TO TITLE</button>
       </div>
@@ -128,6 +144,9 @@
 
   <script src="layout.js?v=6.9"></script>
   <script src="collision-logic.js?v=6.9"></script>
+  <script src="movement-logic.js?v=6.9"></script>
+  <script src="sim-logic.js?v=6.9"></script>
+  <script src="online-logic.js?v=6.9"></script>
   <script src="hotel-plan.js?v=6.9"></script>
   <script src="flashlight-logic.js?v=6.9"></script>
   <script src="controls.js?v=6.9"></script>

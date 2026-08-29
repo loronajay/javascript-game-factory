@@ -15,11 +15,12 @@ import { createDemons } from './modules/demons.js';
 import { createSanity } from './modules/sanity.js';
 import { createStamina } from './modules/stamina.js';
 import { createMenu } from './modules/menu.js';
+import { createOnline } from './modules/online.js';
 import { createAvatars } from './modules/avatars.js';
 import { createHiders } from './modules/hiders.js';
 import { createRound } from './modules/round.js';
 import { createModelViewer } from './modules/model-viewer.js';
-if (!window.HotelLayout || !window.HotelCollision || !window.HotelPlan) throw new Error('Hotel layout helpers failed to load');
+if (!window.HotelLayout || !window.HotelCollision || !window.HotelPlan || !window.HotelMovement) throw new Error('Hotel layout helpers failed to load');
 if (!window.HotelControls) throw new Error('Hotel control helpers failed to load');
 if (!window.HotelFlashlight) throw new Error('Flashlight helpers failed to load');
 if (!window.HotelEnemyLogic) throw new Error('Hotel enemy logic failed to load');
@@ -27,8 +28,7 @@ if (!window.HotelAvatarLogic) throw new Error('Hotel avatar logic failed to load
 if (!window.HotelSanity) throw new Error('Hotel sanity logic failed to load');
 if (!window.HotelStamina) throw new Error('Hotel stamina logic failed to load');
 if (!window.HotelMenu) throw new Error('Hotel menu logic failed to load');
-if (!window.HotelRound || !window.HotelHiders) throw new Error('Hotel round logic failed to load');
-if (!window.HotelMusic) throw new Error('Hotel music failed to load');
+if (!window.HotelRound || !window.HotelHiders || !window.HotelOnline || !window.HotelMusic) throw new Error('Hotel round logic failed to load');
 const rendering = createRendering({ THREE, document, window, config: CONFIG });
 const world = createWorld({ THREE, scene: rendering.scene, materials: rendering.materials, config: CONFIG, layout: window.HotelLayout, logic: window.HotelCollision, plan: window.HotelPlan, document, window });
 const elevator = createElevator({
@@ -56,11 +56,11 @@ if (inspectionView) {
 }
 // The menu is built before the player so it can drive it: picking Play or Resume is what asks for
 // the pointer lock, which has to ride on the click gesture that chose it.
-const menu = inspectionView ? null : createMenu({ logic: window.HotelMenu, document, window, onPlay: () => player.beginPlay() });
+const menu = inspectionView ? null : createMenu({ logic: window.HotelMenu, document, window, onPlay: () => player.beginPlay(), onScreen: (screen) => { if (screen === window.HotelMenu.SCREENS.ONLINE) online.connect(); } });
 const stamina = inspectionView ? null : createStamina({ logic: window.HotelStamina, config: STAMINA_CONFIG, world, document });
 const player = createPlayer({
   THREE, camera: rendering.camera, renderer: rendering.renderer, scene: rendering.scene,
-  config: CONFIG, floorY, world, elevator, controls: window.HotelControls, flashlight: window.HotelFlashlight, flashlightConfig: FLASHLIGHT_CONFIG,
+  config: CONFIG, floorY, world, elevator, controls: window.HotelControls, movement: window.HotelMovement, flashlight: window.HotelFlashlight, flashlightConfig: FLASHLIGHT_CONFIG,
   performance: window.HotelPerformance, menu, stamina, document, window,
 });
 const flashlightDrops = createFlashlightPickups({ THREE, scene: rendering.scene, world, player });
@@ -69,7 +69,7 @@ const soundEffects = inspectionView ? null : window.HotelMusic.createSoundEffect
 const sanity = inspectionView ? null : createSanity({ camera: rendering.camera, world, logic: window.HotelSanity, config: SANITY_CONFIG, document });
 const demons = createDemons({ createMonster, includeHousekeeper: !inspectionView, common: {
   THREE, GLTFLoader, scene: rendering.scene, camera: rendering.camera, config: CONFIG, floorY,
-  layout: window.HotelLayout, world, player, logic: window.HotelEnemyLogic, sanity, document, window,
+  layout: window.HotelLayout, world, player, logic: window.HotelEnemyLogic, movement: window.HotelMovement, sanity, document, window,
 } });
 const monster = demons.primary;
 const avatars = createAvatars({ THREE, GLTFLoader, scene: rendering.scene, config: CONFIG, logic: window.HotelAvatarLogic });
@@ -86,9 +86,10 @@ const modelViewer = viewerSubject
 // you ends it for your side.
 const hiders = modelViewer ? null : createHiders({
   THREE, config: CONFIG, tuning: HIDER_CONFIG, sanityConfig: SANITY_CONFIG, floorY, layout: window.HotelLayout, world, avatars, count: ROUND_CONFIG.hiderCount,
-  logic: window.HotelHiders, enemyLogic: window.HotelEnemyLogic, sanityLogic: window.HotelSanity, avatarLogic: window.HotelAvatarLogic, seekerSpawn: { ...rendering.camera.position, floor: world.state.playerFloor },
+  logic: window.HotelHiders, enemyLogic: window.HotelEnemyLogic, movement: window.HotelMovement, sanityLogic: window.HotelSanity, avatarLogic: window.HotelAvatarLogic, seekerSpawn: { ...rendering.camera.position, floor: world.state.playerFloor },
 });
 if (hiders) demons.setPlayers(() => hiders.list());
+const online = createOnline({ logic: window.HotelOnline, avatars, avatarLogic: window.HotelAvatarLogic, camera: rendering.camera, world, player, menu, config: CONFIG, document, window });
 const round = hiders ? createRound({ camera: rendering.camera, world, player, elevator, hiders, monsters: demons.list, flashlightDrops, logic: window.HotelRound, config: ROUND_CONFIG, document, window }) : null;
 document.getElementById('restartBtn').addEventListener('click', () => window.location.reload());
 // Every player is a figure in the world, the local one included: the same avatar the network will
@@ -119,18 +120,17 @@ const adaptiveQuality = window.HotelPerformance.createAdaptiveQualityController(
 // simulate the same hotel a 60hz one does, and a server cannot be authoritative over anything else.
 const timestep = window.HotelPerformance.createFixedTimestep({ tickRate: 60, maxTicksPerFrame: 5 });
 
+// Online, the server owns the round and the roster, so the local round and the demons stand down —
+// there is one authority per hotel, and a second one running here would disagree about who was caught.
 function simulate(delta, elapsed) {
   if (!modelViewer) {
-    hotel.update(delta);
-    furnishings.update(delta, CONFIG);
-    elevator.update(delta, elapsed);
-    player.update(delta, elapsed);
+    hotel.update(delta); furnishings.update(delta, CONFIG); elevator.update(delta, elapsed); player.update(delta, elapsed);
     if (sanity) sanity.update(delta);
-    if (round) round.update(delta);
+    if (online.isActive()) online.update(delta); else if (round) round.update(delta);
     syncLocalAvatar();
     avatars.update(delta);
   }
-  demons.update(delta, elapsed);
+  if (!online.isActive()) demons.update(delta, elapsed);
 }
 
 function animate() {
@@ -150,10 +150,10 @@ animate();
 
 window.HotelPrototype = {
   version: '6.9', floorDefs: FLOOR_DEFS,
-  getState: () => ({ locked: !!world.state.isLocked, playerFloor: world.state.playerFloor, keys: [...world.state.inventory], gameOver: !!world.state.gameOver, player: player.getState(), flashlightDrops: flashlightDrops.getState(), monster: monster.getState(), demons: demons.getStates(), sanity: sanity ? sanity.getState() : null, stamina: stamina ? stamina.getState() : null, menu: menu ? menu.getScreen() : null, round: round ? round.getState() : null, hiders: hiders ? hiders.list() : [], avatars: avatars.list().map((id) => avatars.describe(id)), tick: { rate: 1 / timestep.step, ticks: timestep.getTicks(), simulatedSeconds: Number(timestep.getElapsed().toFixed(2)) }, elevator: { currentFloor: elevator.elevator.currentFloor, targetFloor: elevator.elevator.targetFloor, state: elevator.elevator.state } }),
+  getState: () => ({ locked: !!world.state.isLocked, playerFloor: world.state.playerFloor, keys: [...world.state.inventory], gameOver: !!world.state.gameOver, player: player.getState(), flashlightDrops: flashlightDrops.getState(), monster: monster.getState(), demons: demons.getStates(), sanity: sanity ? sanity.getState() : null, stamina: stamina ? stamina.getState() : null, menu: menu ? menu.getScreen() : null, online: online.getState(), round: round ? round.getState() : null, hiders: hiders ? hiders.list() : [], avatars: avatars.list().map((id) => avatars.describe(id)), tick: { rate: 1 / timestep.step, ticks: timestep.getTicks(), simulatedSeconds: Number(timestep.getElapsed().toFixed(2)) }, elevator: { currentFloor: elevator.elevator.currentFloor, targetFloor: elevator.elevator.targetFloor, state: elevator.elevator.state } }),
   getRoomDoor: (roomNumber) => world.collections.roomDoors.get(String(roomNumber)) || null,
   getSecretPanel: (id) => world.collections.secretPanels.get(id) || null,
   inspectionViews: Object.keys(inspectionViews), notify: world.notify,
-  soundtrack, soundEffects, avatars, demons, flashlightDrops, sanity, stamina, menu, round, hiders, world, rendering,
+  soundtrack, soundEffects, avatars, demons, flashlightDrops, sanity, stamina, menu, round, hiders, online, world, rendering,
   events: ['hotel:key-found', 'hotel:door-unlocked', 'hotel:secret-discovered', 'hotel:secret-opened', 'hotel:elevator-called', 'hotel:elevator-start', 'hotel:elevator-arrive', 'hotel:floor-change', 'hotel:drawer-searched', 'hotel:flashlight-change', 'hotel:flashlight-charge', 'hotel:flashlight-drop', 'hotel:flashlight-pickup', 'hotel:demon-state', 'hotel:monster-state', 'hotel:demon-catch', 'hotel:sanity-full', 'hotel:sanity-hunt', 'hotel:round-over', 'hotel:caught'],
 };

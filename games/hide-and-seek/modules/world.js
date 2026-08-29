@@ -142,6 +142,15 @@ export function createWorld({ THREE, scene, materials: MAT, config: CONFIG, layo
   function collidesAt(x, z, feetY, bodyHeight = CONFIG.bodyHeight, radius = CONFIG.playerRadius) {
     return logic.collidesAt(colliderData(), { x, z, feetY, bodyHeight, radius });
   }
+  // The two questions a moving body has, and the one a watching one has. The rules that consume
+  // them live in movement-logic.js and collision-logic.js; this is only the built hotel answering.
+  // `groundAt` returning null ("nothing to stand on") is a different answer from `blocked` — one is
+  // a ledge and only the other is worth sliding along.
+  const space = {
+    groundAt: (x, z, fromY) => resolveGroundHeight(x, z, fromY),
+    blocked: (x, z, feetY, bodyHeight = CONFIG.bodyHeight, radius = CONFIG.playerRadius) => collidesAt(x, z, feetY, bodyHeight, radius),
+  };
+  function sightBlocked(from, to, options) { return logic.segmentBlocked(colliderData(), from, to, options); }
   function addSign(parent, text, x, y, z, rotationY = 0, width = 1.3, height = 0.65) {
     const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 256; const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#4c3523'; ctx.fillRect(0, 0, 512, 256); ctx.strokeStyle = '#c6a869'; ctx.lineWidth = 12; ctx.strokeRect(12, 12, 488, 232);
@@ -161,6 +170,6 @@ export function createWorld({ THREE, scene, materials: MAT, config: CONFIG, layo
     state, collections, stairwellGroup, promptEl, floorBadge, elevatorBadge, emit, notify, updateInventoryHud, addInventoryKey, getFloorId,
     setPlan, setOpening, setDynamicHeight, getPlan: () => plan,
     registerBoxCollider, colliderData, addBox, addFloor, addCeiling, addWall, addDoorFrame,
-    resolveGroundHeight, collidesAt, addSign, addNumberPlate,
+    resolveGroundHeight, collidesAt, space, sightBlocked, addSign, addNumberPlate,
   };
 }

@@ -1,5 +1,5 @@
 export function createMonster({
-  THREE, GLTFLoader, scene, camera, config: CONFIG, floorY, layout, world, player, logic, sanity, document, window,
+  THREE, GLTFLoader, scene, camera, config: CONFIG, floorY, layout, world, player, logic, movement, sanity, document, window,
   name = 'The Bellhop', statusElementId = 'monsterStatus', excludedSpawnFloors = [], accentColor = 0x5c141a, eyeColor = 0xff1008,
 }) {
   const { ENEMY_STATES } = logic;
@@ -7,8 +7,8 @@ export function createMonster({
   root.name = name;
   scene.add(root);
   const facing = new THREE.Vector3(0, 0, 1);
-  const raycaster = new THREE.Raycaster();
-  const blockerBox = new THREE.Box3(); const blockerHit = new THREE.Vector3();
+  // A demon is 2.25m of body on a 0.32m footprint. Both numbers belong to the body, not to the mover.
+  const BODY = { height: 2.25, radius: 0.32 };
   const monsterStatus = document.getElementById(statusElementId);
   const caughtOverlay = document.getElementById('caughtOverlay');
   const patrolZ = [-52, -34, -18, 0, 18, 34, 49];
@@ -483,42 +483,24 @@ export function createMonster({
     }
   }
 
+  // Walking is a rule, so it lives in movement-logic.js and this only paints the result: the demon
+  // uses the same mover the player and the hiders do.
   function tryMove(target, speed, delta) {
-    const dx = target.x - root.position.x; const dy = target.y - root.position.y; const dz = target.z - root.position.z;
-    const distance = Math.hypot(dx, dy, dz);
-    if (distance < 0.18) { root.position.set(target.x, target.y, target.z); route.shift(); moving = false; return; }
-    const amount = Math.min(distance, speed * delta); const direction = new THREE.Vector3(dx, dy, dz).normalize();
-    const next = root.position.clone().addScaledVector(direction, amount);
-    let moved = false;
-    if (target.guided) { root.position.copy(next); moved = true; }
-    else {
-      const ground = world.resolveGroundHeight(next.x, next.z, root.position.y);
-      if (ground !== null && !world.collidesAt(next.x, next.z, ground, 2.25, 0.32)) { root.position.set(next.x, ground, next.z); moved = true; }
-      else {
-        for (const side of [-1, 1]) {
-          const sideX = root.position.x + direction.z * side * amount; const sideZ = root.position.z - direction.x * side * amount;
-          const sideGround = world.resolveGroundHeight(sideX, sideZ, root.position.y);
-          if (sideGround !== null && !world.collidesAt(sideX, sideZ, sideGround, 2.25, 0.32)) { root.position.set(sideX, sideGround, sideZ); moved = true; break; }
-        }
-      }
-    }
-    if (moved && Math.hypot(direction.x, direction.z) > 0.01) {
-      const turn = Math.min(1, delta * 7); facing.x += (direction.x - facing.x) * turn; facing.z += (direction.z - facing.z) * turn; facing.normalize(); root.rotation.y = Math.atan2(facing.x, facing.z); moving = true;
+    const step = movement.stepToward(world.space, BODY, root.position, target, { speed, delta, arriveRadius: 0.18, guided: !!target.guided });
+    if (step.arrived) { root.position.set(step.x, step.y, step.z); route.shift(); moving = false; return; }
+    if (step.moved) root.position.set(step.x, step.y, step.z);
+    if (step.moved && Math.hypot(step.dirX, step.dirZ) > 0.01) {
+      const turn = Math.min(1, delta * 7); facing.x += (step.dirX - facing.x) * turn; facing.z += (step.dirZ - facing.z) * turn; facing.normalize(); root.rotation.y = Math.atan2(facing.x, facing.z); moving = true;
     } else moving = false;
   }
 
+  // Line of sight against the same plain boxes that stop a body. This used to be a THREE.Raycaster
+  // over `world.colliderData()`, which skipped every record whose `enabled` flag was merely absent —
+  // and the plan's records do not carry one, so nothing ever occluded the demon.
   function rayIsBlocked(target) {
-    const origin = root.position.clone(); origin.y += 2.05;
-    const targetEye = new THREE.Vector3(target.x, target.y + (target.crouching ? 0.9 : 1.55), target.z);
-    const direction = targetEye.sub(origin); const distance = direction.length(); direction.normalize();
-    raycaster.set(origin, direction); raycaster.far = distance;
-    for (const box of world.colliderData()) {
-      if (!box.enabled) continue;
-      blockerBox.min.set(box.minX, box.minY, box.minZ); blockerBox.max.set(box.maxX, box.maxY, box.maxZ);
-      const hit = raycaster.ray.intersectBox(blockerBox, blockerHit);
-      if (hit && origin.distanceTo(hit) < distance - 0.18) return true;
-    }
-    return false;
+    const eyes = { x: root.position.x, y: root.position.y + 2.05, z: root.position.z };
+    const targetEyes = { x: target.x, y: target.y + (target.crouching ? 0.9 : 1.55), z: target.z };
+    return world.sightBlocked(eyes, targetEyes, { tolerance: 0.18 });
   }
 
   function playerCandidates() {

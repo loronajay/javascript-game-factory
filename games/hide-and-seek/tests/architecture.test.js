@@ -348,3 +348,97 @@ test('flashlight state is part of the player snapshot before networking is added
   assert.match(main, /createFlashlightPickups/);
   assert.match(player, /flashlightCharge/);
 });
+
+test('every body walks through the one pure mover and no module reimplements it', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  const world = fs.readFileSync(path.join(projectRoot, 'modules', 'world.js'), 'utf8');
+  const movers = ['player.js', 'monster.js', 'hiders.js']
+    .map((file) => [file, fs.readFileSync(path.join(projectRoot, 'modules', file), 'utf8')]);
+
+  assert.ok(fs.existsSync(path.join(projectRoot, 'movement-logic.js')), 'movement-logic.js is missing');
+  assert.match(html, /movement-logic\.js/);
+  // The world answers the two questions a mover asks; it does not move anything itself.
+  assert.match(world, /const space = \{/);
+  assert.match(world, /groundAt:/);
+
+  for (const [file, source] of movers) {
+    assert.match(source, /movement\.step(Axes|Toward)\(/, `${file} should walk through movement-logic.js`);
+    // Sliding along a wall, snapping to the ground and giving up when boxed in are rules. A module
+    // that re-derives them is a second physics implementation the server would have to match.
+    assert.doesNotMatch(source, /world\.resolveGroundHeight\(/, `${file} should not resolve ground itself`);
+    assert.doesNotMatch(source, /world\.collidesAt\(/, `${file} should not test collision itself`);
+  }
+});
+
+test('line of sight is an AABB ray in the pure layer rather than a renderer raycast', () => {
+  const monster = fs.readFileSync(path.join(projectRoot, 'modules', 'monster.js'), 'utf8');
+  const collisionLogic = fs.readFileSync(path.join(projectRoot, 'collision-logic.js'), 'utf8');
+
+  assert.match(collisionLogic, /function segmentBlocked/);
+  // The demon decided what it could see with a THREE.Raycaster, which a server cannot run — and it
+  // skipped every collider whose `enabled` flag was absent, which is all of the plan's records.
+  assert.doesNotMatch(monster, /new THREE\.Raycaster\(\)/);
+  assert.match(monster, /world\.sightBlocked\(/);
+});
+
+test('a whole round can be ticked with no renderer in the process', () => {
+  const headless = fs.readFileSync(path.join(projectRoot, 'tests', 'headless-round.test.js'), 'utf8');
+  const fixture = fs.readFileSync(path.join(projectRoot, 'tests', 'helpers', 'hotel-fixture.js'), 'utf8');
+
+  // This is the gate for networking: if either file ever needs Three.js, the simulation seam has
+  // leaked back into the runtime modules and the server cannot own the tick.
+  for (const [name, source] of [['headless-round.test.js', headless], ['hotel-fixture.js', fixture]]) {
+    assert.doesNotMatch(source, /THREE|three\.module/, `${name} must stay renderer-free`);
+  }
+  assert.match(headless, /movement-logic/);
+  assert.match(headless, /round-logic/);
+});
+
+test('the authoritative simulation is mirrored to the network server without drift', () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(projectRoot, 'tools', 'sim-mirror-manifest.json'), 'utf8'));
+  const crypto = require('node:crypto');
+  const hash = (text) => crypto.createHash('sha256').update(text.replace(/\r\n/g, '\n')).digest('hex');
+
+  // The server adjudicates catches by running these exact files. If one is edited here and not
+  // re-mirrored, it decides rounds in a hotel that no longer exists while every suite stays green.
+  for (const [name, recorded] of Object.entries(manifest.files)) {
+    assert.equal(hash(fs.readFileSync(path.join(projectRoot, name), 'utf8')), recorded,
+      `${name} changed without re-mirroring — run: node tools/mirror-sim.mjs`);
+  }
+});
+
+test('the authoritative round is one pure tick the client and the server share', () => {
+  // Comments stripped: prose may name the renderer it is deliberately avoiding, code may not.
+  const sim = fs.readFileSync(path.join(projectRoot, 'sim-logic.js'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+
+  assert.ok(fs.existsSync(path.join(projectRoot, 'sim-logic.js')), 'sim-logic.js is missing');
+  // A client sends what it is trying to do; what happened is the tick's answer. Nothing in here may
+  // read a position, a charge or a catch off an input.
+  assert.match(sim, /function readInput/);
+  assert.doesNotMatch(sim, /raw\.(x|y|z|charge|alive|caught)(?![A-Za-z])/);
+  assert.doesNotMatch(sim, /THREE|document\.|window\./);
+});
+
+test('online play is server authoritative and the client only sends intent', () => {
+  const main = fs.readFileSync(path.join(projectRoot, 'main.js'), 'utf8');
+  const onlineModule = fs.readFileSync(path.join(projectRoot, 'modules', 'online.js'), 'utf8');
+  const html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+
+  assert.ok(fs.existsSync(path.join(projectRoot, 'online-logic.js')), 'online-logic.js is missing');
+  assert.match(html, /online-logic\.js/);
+  assert.match(html, /id="menuOnline"/);
+  assert.match(main, /createOnline/);
+
+  // The runtime module may not own a rule: connection state, what is worth sending and how far a
+  // client may disagree with the server all live in the pure layer a test can run.
+  for (const rule of ['logic.applyNetEvent', 'logic.describeInput', 'logic.shouldSendInput', 'logic.reconcilePosition', 'logic.interpolatePose']) {
+    assert.match(onlineModule, new RegExp(rule.replace('.', '\.')));
+  }
+  // A client that decides its own catch is the obvious cheat. Nothing here may resolve one.
+  assert.doesNotMatch(onlineModule, /resolveTag|resolveDemonCatch|canTag/);
+  // There is one authority per hotel: the local round and the demons stand down online.
+  assert.match(main, /if \(online\.isActive\(\)\) online\.update\(delta\); else if \(round\)/);
+  assert.match(main, /if \(!online\.isActive\(\)\) demons\.update/);
+});
