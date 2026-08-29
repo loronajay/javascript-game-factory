@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Hotel Horror Exploration Prototype V5</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="overlay">
+    <div class="panel">
+      <h1>Hotel Horror Prototype V5</h1>
+      <p>Click or tap to enter.</p>
+      <p><strong>Move:</strong> WASD / arrows &nbsp; <strong>Look:</strong> mouse / drag</p>
+      <p><strong>Interact:</strong> E / USE &nbsp; <strong>Sprint:</strong> Shift</p>
+      <p>Search drawers, find keys, open locked rooms, discover hidden passages, and ride the elevator physically between floors.</p>
+    </div>
+  </div>
+
+  <div id="crosshair" aria-hidden="true"></div>
+  <div id="interactionPrompt" aria-live="polite"></div>
+  <div id="notification" aria-live="polite"></div>
+
+  <div id="inventoryHud">
+    <div class="hudTitle">KEY RING</div>
+    <div id="keyList">No keys</div>
+  </div>
+
+  <div id="floorBadge">Floor 1</div>
+  <div id="elevatorBadge" class="hidden"></div>
+
+  <div id="hud">
+    WASD / Arrows = Move<br>
+    E = Interact<br>
+    Shift = Sprint<br>
+    Esc = Release mouse
+  </div>
+
+  <div id="mobileControls" aria-hidden="true">
+    <div id="movePad">
+      <button id="moveUp" class="moveBtn" type="button">↑</button>
+      <button id="moveLeft" class="moveBtn" type="button">←</button>
+      <button id="moveDown" class="moveBtn" type="button">↓</button>
+      <button id="moveRight" class="moveBtn" type="button">→</button>
+    </div>
+    <button id="interactBtn" type="button">USE</button>
+    <div id="lookHint">Drag right side to look</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="layout.js?v=5.2"></script>
+  <script src="controls.js?v=5.2"></script>
+  <script type="module" src="main.js?v=5.2"></script>
+</body>
+</html>

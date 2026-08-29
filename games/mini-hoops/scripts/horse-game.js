@@ -62,6 +62,7 @@ import {
   placementFromFractions,
   PLACEMENT_BOUNDS,
 } from "./sim/bin-placement.js";
+import { needsProvenPull, provenPullPhase, provenPullShot } from "./sim/horse-cpu.js";
 import { createHorseShot, horsePowerForDepth, horseTargetAt } from "./sim/horse-shot.js";
 import {
   HORSE_FIXED_SETUP,
@@ -76,9 +77,11 @@ import {
   horseDifficultyById,
   horseModeId,
   isHumanControlledTurn,
+  judgeHorseShot,
   letterState,
   normalizeWord,
   playerLabel,
+  requiredPieceIds,
   resolveHorseShot,
   shotSetupFor,
 } from "./sim/horse.js";
@@ -1005,7 +1008,19 @@ export function bootHorse(root, options = {}) {
     const shot = createHorseShot(released, ball, activeSetup, { weight: ballFlight(selectedBallId).weight });
     launchBall(ball, shot.launch, launchSpin(shot.launch));
     audio.released(selectedBallId);
-    flight = { ballId: selectedBallId, age: 0, resolved: false, resetIn: null, capturedBin: null, made: false };
+    // The pull, kept with the flight it started. A setter's make records it on
+    // the standing shot, so a shot through an apparatus can be repeated by
+    // whoever owes it — see `sim/horse-cpu.js`.
+    flight = {
+      ballId: selectedBallId,
+      age: 0,
+      resolved: false,
+      resetIn: null,
+      capturedBin: null,
+      made: false,
+      touched: [],
+      pull: { power: released.power, aimX: released.aimX, loft: released.loft, motionSeconds: turnClock },
+    };
     setPower(released.power);
     syncStatus();
     syncPanels();
@@ -1022,8 +1037,19 @@ export function bootHorse(root, options = {}) {
   function startCpuShot() {
     const setup = activeSetup;
     if (!setup) return;
+    // A SHOT WITH A DUTY IS REPEATED, NOT SOLVED. No lead finds a route off a
+    // springboard and through a cannon, so the CPU takes the pull the setter
+    // proved — at the same phase of the same sweep, which means waiting for it.
+    // Asked before the difficulty roll, or the roll would be re-taken every tick
+    // of that wait and the easy CPU would eventually roll a make.
+    if (needsProvenPull(setup) && turnClock < provenPullPhase(setup)) return;
     const makes = cpuMakesHorseShot(difficulty, random);
     const stray = () => (random() < 0.5 ? -1 : 1);
+    const proven = provenPullShot(setup, { makes, stray });
+    if (proven) {
+      launchFromPull(proven.pull);
+      return;
+    }
     if (setup.kind === HOOP_TARGET) {
       startCpuHoopShot(setup, makes, stray);
       return;
@@ -1191,6 +1217,12 @@ export function bootHorse(root, options = {}) {
           : stepTrickShotPieces(ball, previous, activePieces, piecePhysics, dt);
         for (const contact of pieceStep.contacts) contacts.add(contact);
         for (const impact of pieceStep.impacts || []) addTrickShotImpact(impacts, impact);
+        // WHICH tools this shot used, and only up to the moment it scored. A
+        // ball that has already dropped through can still clip a pad on the way
+        // down, and crediting that would hand a matcher a tool they touched
+        // after the shot was over. `sim/horse-replay.js` is gated the same way,
+        // which is what keeps this court and the server's ruling on one answer.
+        if (!scored) for (const id of pieceStep.touched || []) flight.touched.push(id);
       }
       emitFlameTrail(trail, { ...ball, dt: TICK_SECONDS, style: ballTrail(flight.ballId), random });
       ignite([...contacts], flight.ballId);
@@ -1235,13 +1267,29 @@ export function bootHorse(root, options = {}) {
     }
   }
 
-  function finishShot(made) {
+  /**
+   * The ball has finished. Two different questions follow and they are kept
+   * apart deliberately.
+   *
+   * `scored` is what the BALL did — it went through, or it did not — and the
+   * animation belongs to it: a ball that dropped in needs the sink time and
+   * needs `alreadyScored`, or the rim it is falling through gets another say
+   * and kicks it back out. `judged` is what the RULES make of that, and a make
+   * that skipped one of the setter's tools is not one.
+   */
+  function finishShot(scored) {
+    const touched = [...new Set(flight.touched)];
+    const judged = judgeHorseShot(match, { scored, touched });
+    const made = judged.made;
     flight.resolved = true;
-    flight.made = made;
-    flight.resetIn = made ? 1.15 : 0.55;
+    flight.made = scored;
+    flight.resetIn = scored ? 1.15 : 0.55;
     // A swish is a ball passing through a NET, and there is only one of those.
     // A bin has no net, so a made bin is the ball's own body at full weight with
     // the reward chime over it — `game-audio.js` owns which is which.
+    // The REWARD chime answers the ruling, not the ball. A shot that went in
+    // having skipped a tool has not scored, and a cheer over it would be the
+    // court telling the player the opposite of what the status line says.
     if (made) {
       if (activeSetup?.kind === HOOP_TARGET) audio.scored(1);
       else audio.binScored(flight.ballId);
@@ -1264,7 +1312,11 @@ export function bootHorse(root, options = {}) {
     // The ball is part of a made setup. `resolveHorseShot` stores this object as
     // the standing shot, so the matcher inherits the bin, motion and ball in one
     // authoritative description.
-    const outcome = resolveHorseShot(match, made, { ...activeSetup, ballId: flight.ballId });
+    const outcome = resolveHorseShot(match, made, { ...activeSetup, ballId: flight.ballId }, {
+      unmet: judged.unmet,
+      touched,
+      pull: flight.pull,
+    });
     if (match.status === "won") audio.celebrate();
     setStatus(narrate(outcome));
     syncLetters();
@@ -1280,7 +1332,11 @@ export function bootHorse(root, options = {}) {
     if (outcome.kind === "set") return `${who} SETS THE SHOT · MATCH IT`;
     if (outcome.kind === "set-missed") return `${who} MISSED THEIR OWN SHOT · NO LETTER`;
     if (outcome.kind === "matched") return `${who} MATCHED IT · ${playerLabel(view, view.setter).toUpperCase()} SETS AGAIN`;
-    return `${who} MISSES · LETTER ${view.word[view.players[outcome.shooter].letters - 1]}`;
+    const letter = view.word[view.players[outcome.shooter].letters - 1];
+    // A ball that went cleanly in and still cost a letter reads as a bug unless
+    // the line says which of the two misses it was.
+    if (outcome.skipped) return `${who} SKIPPED THE TOOLS · LETTER ${letter}`;
+    return `${who} MISSES · LETTER ${letter}`;
   }
 
   /** Turn this tick's contacts into sound. Debounced on the cabinet's own rule. */
@@ -1424,7 +1480,7 @@ export function bootHorse(root, options = {}) {
     const shot = createHorseShot(ruling.intent, ball, activeSetup, { weight: ballFlight(selectedBallId).weight });
     launchBall(ball, shot.launch, launchSpin(shot.launch));
     audio.released(selectedBallId);
-    flight = { ballId: selectedBallId, age: 0, resolved: false, resetIn: null, capturedBin: null, made: false };
+    flight = { ballId: selectedBallId, age: 0, resolved: false, resetIn: null, capturedBin: null, made: false, touched: [] };
     setPower(Number(ruling.intent.power) || 0);
     syncPanels();
     syncStatus();
@@ -1710,7 +1766,12 @@ export function bootHorse(root, options = {}) {
       return;
     }
     if (match.phase === PHASE_MATCH) {
-      setStatus(mine ? `${who}: MATCH IT` : `${who} must match it…`);
+      // The tools are part of the shot being owed, so the line that names the
+      // duty is the line that has to say how many. Without it the only way to
+      // learn the rule is to lose a letter to it.
+      const owed = requiredPieceIds(match.standingShot).length;
+      const tools = owed > 0 ? ` · ${owed} TOOL${owed === 1 ? "" : "S"}` : "";
+      setStatus(mine ? `${who}: MATCH IT${tools}` : `${who} must match it…${tools}`);
       return;
     }
     setStatus(mine ? `${who}: make it to set the shot` : `${who} is shooting…`);

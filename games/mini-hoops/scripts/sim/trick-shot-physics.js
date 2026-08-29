@@ -42,7 +42,7 @@ function holdOrLaunch(ball, pieces, runtime, dt) {
   const cannon = pieces.find((piece) => piece.type === CANNON_PIECE && piece.id === runtime.capture.pieceId);
   if (!cannon) {
     runtime.capture = null;
-    return { contacts: [], impacts: [], captured: false, launched: false };
+    return { contacts: [], impacts: [], touched: [], captured: false, launched: false };
   }
 
   ball.x = cannon.x;
@@ -54,7 +54,7 @@ function holdOrLaunch(ball, pieces, runtime, dt) {
   ball.omegaX = 0;
   runtime.capture.remaining -= dt;
   if (runtime.capture.remaining > 1e-9) {
-    return { contacts: [], impacts: [], captured: true, launched: false };
+    return { contacts: [], impacts: [], touched: [], captured: true, launched: false };
   }
 
   const direction = cannonDirection(cannon);
@@ -67,7 +67,10 @@ function holdOrLaunch(ball, pieces, runtime, dt) {
   ball.omegaX = cannon.speed / BALL_RADIUS_WORLD;
   runtime.cooldowns[cannon.id] = CANNON_COOLDOWN;
   runtime.capture = null;
-  return { contacts: ["sandbox-cannon-fire"], impacts: [], captured: false, launched: true };
+  // The CATCH is what reported this cannon as touched; firing is the same
+  // contact finishing. Reporting it twice would let one tool satisfy a duty it
+  // was only asked for once.
+  return { contacts: ["sandbox-cannon-fire"], impacts: [], touched: [], captured: false, launched: true };
 }
 
 function catchWithCannon(ball, previous, cannon, runtime) {
@@ -176,18 +179,23 @@ export function stepTrickShotPieces(ball, previous, pieces, runtime, dt) {
 
   for (const cannon of pieces) {
     if (cannon.type === CANNON_PIECE && catchWithCannon(ball, previous, cannon, runtime)) {
-      return { contacts: ["sandbox-cannon-catch"], impacts: [], captured: true, launched: false };
+      return { contacts: ["sandbox-cannon-catch"], impacts: [], touched: [cannon.id], captured: true, launched: false };
     }
   }
 
   const contacts = [];
   const impacts = [];
+  // WHICH tool was touched, not merely that one was. HORSE reads this to hold a
+  // matcher to the tools the setter actually used, so a generic kind string is
+  // not enough — two pads in a layout are two separate duties.
+  const touched = [];
   for (const board of pieces) {
     if (!isPadPiece(board)) continue;
     const impact = resolvePad(ball, previous, board);
     if (!impact) continue;
     contacts.push(board.type === BOARD_PIECE ? "sandbox-board" : "sandbox-spring");
     impacts.push(impact);
+    touched.push(board.id);
   }
-  return { contacts, impacts, captured: false, launched: false };
+  return { contacts, impacts, touched, captured: false, launched: false };
 }

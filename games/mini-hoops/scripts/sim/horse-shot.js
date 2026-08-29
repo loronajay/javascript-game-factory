@@ -46,7 +46,8 @@
 // always solved against where the target was PLACED.
 
 import { AIM_RIM_Y_OFFSET, REFERENCE_POWER, RIM_CENTER_Z } from "./constants.js";
-import { PLACEMENT_BOUNDS, normalizeBinSetup } from "./bin-placement.js";
+import { PLACEMENT_BOUNDS, binMotionById, normalizeBinSetup } from "./bin-placement.js";
+import { hoopModeById } from "./hoop.js";
 import { normalizeHoopSetup, placedHoopAt } from "./hoop-placement.js";
 import { binEntryVelocity, solveLaunch } from "./launch.js";
 import { projectPoint } from "./projection.js";
@@ -97,6 +98,24 @@ export function horsePowerForDepth(z) {
  */
 export function horseTargetKind(setup) {
   return setup?.kind === HOOP_TARGET ? HOOP_TARGET : BIN_TARGET;
+}
+
+/**
+ * How long this target's path takes to come back to itself.
+ *
+ * The two catalogs are kept apart on purpose — one is authored in screen space
+ * and one in world space — so this dispatches rather than merging them, exactly
+ * as `horseTargetAt` does. It is here so that "the same moment of the same
+ * sweep" is a thing a caller can ASK FOR: a phase and that phase plus a whole
+ * period put the target in the identical place, which is what lets a shot be
+ * repeated without waiting out however long the setter stood there watching.
+ */
+export function horseMotionPeriod(setup) {
+  const motion = horseTargetKind(setup) === HOOP_TARGET
+    ? hoopModeById(setup?.motionId)
+    : binMotionById(setup?.motionId);
+  const period = Number(motion?.period);
+  return Number.isFinite(period) && period > 0 ? period : 1;
 }
 
 /** The HORSE target at a moment on the turn's motion clock. */

@@ -1,0 +1,8 @@
+{
+  "name": "hotel-hide-n-seek",
+  "private": true,
+  "scripts": {
+    "start": "node server.mjs --open",
+    "test": "node --test"
+  }
+}

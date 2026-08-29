@@ -43,11 +43,17 @@ import {
   chooseCpuTargetKind,
   chooseCpuTurnBall,
   createHorseMatch,
+  judgeHorseShot,
   letterState,
   normalizeWord,
+  requiredPieceIds,
   resolveHorseShot,
   shotSetupFor,
+  unmetPieceIds,
 } from "../scripts/sim/horse.js";
+import { needsProvenPull, provenPullPhase, provenPullShot } from "../scripts/sim/horse-cpu.js";
+import { replayHorseShot } from "../scripts/sim/horse-replay.js";
+import { createSandboxPiece } from "../scripts/sim/trick-shot.js";
 import { binClearance, stepBallAgainstBins } from "../scripts/sim/bin-physics.js";
 import { createBall, isBallSettled, launchBall, stepBall, worldFor } from "../scripts/sim/physics.js";
 import { launchSpin } from "../scripts/sim/launch.js";
@@ -558,6 +564,146 @@ function playShot(setup, power, aimX) {
     age += TICK_SECONDS;
   }
   return false;
+}
+
+
+// ---------------------------------------------------------------------------
+// The tools a matcher owes
+// ---------------------------------------------------------------------------
+
+const pad = (id, at) => createSandboxPiece("board", { id, ...at }, id);
+
+/** A setter's turn with an apparatus on the floor, ready to be made or missed. */
+function matchWithApparatus(pieces) {
+  const match = createHorseMatch({ word: "HORSE", names: ["One", "Two"] });
+  return { match, setup: { kind: "bin", motionId: "still", pieces } };
+}
+
+test("the duty is the tools the setter TOUCHED, not the tools they put down", () => {
+  const pieces = [pad("a", { x: -0.3 }), pad("b", { x: 0 }), pad("c", { x: 0.3 })];
+  const { match, setup } = matchWithApparatus(pieces);
+  resolveHorseShot(match, true, setup, { touched: ["a", "c"], pull: { power: 0.5, aimX: 480 } });
+  assertEqual(requiredPieceIds(match.standingShot).join(","), "a,c",
+    "a pad the setter flew past is not part of the shot they proved");
+});
+
+test("a duty naming a tool the setup does not carry is discarded", () => {
+  // Nothing could ever discharge it, so it cannot be allowed to stand as a duty
+  // — this is what stops a stale or crafted standing shot being unanswerable.
+  assertEqual(requiredPieceIds({ pieces: [pad("a", {})], requiredPieces: ["a", "ghost"] }).join(","), "a");
+});
+
+test("a matcher who goes in having skipped a tool takes the letter, and the HUD is told why", () => {
+  const pieces = [pad("a", { x: -0.3 }), pad("b", { x: 0.3 })];
+  const { match, setup } = matchWithApparatus(pieces);
+  resolveHorseShot(match, true, setup, { touched: ["a", "b"], pull: { power: 0.5, aimX: 480 } });
+  assertEqual(match.phase, PHASE_MATCH, "the shot is now owed");
+
+  const judged = judgeHorseShot(match, { scored: true, touched: ["a"] });
+  assertEqual(judged.made, false, "going in is necessary and not sufficient while matching");
+  assertEqual(judged.unmet.join(","), "b");
+  const outcome = resolveHorseShot(match, judged.made, match.standingShot, { unmet: judged.unmet });
+  assertEqual(outcome.letter, true);
+  assertEqual(outcome.skipped, true, "a clean make that cost a letter reads as a bug unless it is named");
+  assertEqual(match.players[1].letters, 1);
+  assertEqual(match.turn, match.setter, "the setter sets again");
+});
+
+test("a matcher who uses every required tool matches it", () => {
+  const pieces = [pad("a", { x: -0.3 }), pad("b", { x: 0.3 })];
+  const { match, setup } = matchWithApparatus(pieces);
+  resolveHorseShot(match, true, setup, { touched: ["a", "b"], pull: { power: 0.5, aimX: 480 } });
+  // Order is deliberately not part of the duty: touch them all and it stands.
+  const judged = judgeHorseShot(match, { scored: true, touched: ["b", "a", "b"] });
+  assertEqual(judged.made, true);
+  const outcome = resolveHorseShot(match, judged.made, match.standingShot, { unmet: judged.unmet });
+  assertEqual(outcome.kind, "matched");
+  assertEqual(match.players[1].letters, 0);
+});
+
+test("a setter is never held to a duty", () => {
+  const { match, setup } = matchWithApparatus([pad("a", {})]);
+  // They are inventing the shot — whatever their ball touches BECOMES the duty,
+  // so there is nothing yet to check them against.
+  const judged = judgeHorseShot(match, { scored: true, touched: [] });
+  assertEqual(judged.made, true);
+  assertEqual(judged.unmet.length, 0);
+  resolveHorseShot(match, judged.made, setup, { touched: [] });
+  assertEqual(requiredPieceIds(match.standingShot).length, 0, "an untouched apparatus owes nobody anything");
+});
+
+test("unmet tools are only the missing ones", () => {
+  const setup = { pieces: [pad("a", {}), pad("b", {})], requiredPieces: ["a", "b"] };
+  assertEqual(unmetPieceIds(setup, ["a"]).join(","), "b");
+  assertEqual(unmetPieceIds(setup, ["a", "b"]).length, 0);
+});
+
+test("the pull that proved a trick shot travels with it, and only with it", () => {
+  const withTools = matchWithApparatus([pad("a", {})]);
+  resolveHorseShot(withTools.match, true, withTools.setup, {
+    touched: ["a"],
+    pull: { power: 0.62, aimX: 470, loft: 1, motionSeconds: 9.4 },
+  });
+  assertClose(withTools.match.standingShot.provenPull.power, 0.62, 1e-9,
+    "the CPU has no hands, so the one pull known to route the apparatus is kept");
+
+  const plain = matchWithApparatus([]);
+  resolveHorseShot(plain.match, true, plain.setup, { touched: [], pull: { power: 0.62, aimX: 470 } });
+  assertEqual(plain.match.standingShot.provenPull, undefined,
+    "a shot the CPU's own lead already answers carries no recipe");
+});
+
+test("the CPU repeats a proven trick shot at the same phase of the same sweep", () => {
+  const setup = {
+    kind: "bin",
+    motionId: "sideways",
+    pieces: [pad("a", {})],
+    requiredPieces: ["a"],
+    provenPull: { power: 0.62, aimX: 470, loft: 1, motionSeconds: 9.4 },
+  };
+  assert(needsProvenPull(setup), "a duty with a recipe is repeated rather than solved");
+  const shot = provenPullShot(setup, { makes: true });
+  assertEqual(shot.pull.power, 0.62);
+  assertEqual(shot.pull.aimX, 470);
+  // Modulo the period: one period later the target is in the identical place,
+  // so a CPU that sat out the setter's whole wait would only look hung.
+  assertClose(shot.atSeconds, provenPullPhase(setup), 1e-9);
+  assert(shot.atSeconds < 9.4, "the wait is a phase, not a stopwatch");
+
+  const missed = provenPullShot(setup, { makes: false, stray: () => 1 });
+  assert(missed.pull.aimX !== 470, "a CPU handed the recipe still misses at its own difficulty");
+  assertEqual(provenPullShot({ pieces: [], requiredPieces: [] }), null, "nothing to repeat without a duty");
+});
+
+test("a ball that goes straight in without the apparatus is ruled a skip, through the real sim", () => {
+  // End to end rather than by hand: the pad stands well out of the lane, the
+  // pull is one found by a real sweep, and the replay reports what the ball
+  // really touched on the way — which is nothing.
+  const bare = { kind: "bin", motionId: "still", placement: placementFromFractions({ lateral: 0, depth: 0.5 }) };
+  const direct = findDirectMake(bare);
+  assert(direct, "a still bin at mid depth has to be makeable, or this test proves nothing");
+
+  const setup = { ...bare, pieces: [pad("a", { x: 0.62, y: 0.9, z: 0.2 })] };
+  const replay = replayHorseShot({ setup, intent: { ...direct, ballId: "basketball" } });
+  assertEqual(replay.made, true, "the pad is out of the lane; the shot still drops");
+  assertEqual(replay.touched.length, 0);
+
+  const match = createHorseMatch({ word: "HORSE", names: ["One", "Two"] });
+  resolveHorseShot(match, true, { ...setup, requiredPieces: ["a"] }, { touched: ["a"], pull: direct });
+  const judged = judgeHorseShot(match, { scored: replay.made, touched: replay.touched });
+  assertEqual(judged.made, false, "the ball went in and the shot was not matched");
+  assertEqual(judged.unmet.join(","), "a");
+});
+
+/** The first pull in a coarse sweep that drops through a still bin. */
+function findDirectMake(setup) {
+  for (let power = 0.1; power <= 1; power += 0.05) {
+    for (let aimX = AIM_MIN_X; aimX <= AIM_MAX_X; aimX += 16) {
+      const intent = { power, aimX, loft: 1, ballId: "basketball" };
+      if (replayHorseShot({ setup, intent, maxSeconds: 4 }).made) return { power, aimX, loft: 1 };
+    }
+  }
+  return null;
 }
 
 finish();

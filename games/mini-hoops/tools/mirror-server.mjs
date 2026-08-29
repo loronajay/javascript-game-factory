@@ -16,6 +16,10 @@ const files = [
   // `hoopAt`'s placed base, which every mode of play shares one copy of.
   "sim/bin-physics.js", "sim/bin-placement.js", "sim/horse-shot.js", "sim/horse.js",
   "sim/trick-shot.js", "sim/trick-shot-target.js", "sim/trick-shot-physics.js",
+  // The flight loop itself. The adjudicator used to carry its own copy of it,
+  // which is a second statement of the one thing that must not differ between
+  // the two machines.
+  "sim/horse-replay.js",
 ];
 
 for (const file of files) {

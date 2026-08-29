@@ -505,4 +505,39 @@ test("the loser popup plays before the results card, then yields to it", () => {
   assert(results.classList.contains("is-shown"), "the result card did not follow the popup");
 });
 
+
+test("the court records the tools the ball touched, and holds the matcher to them", () => {
+  const { horse, canvas } = harness({ mode: "local" });
+  horse.enter({ mode: "local", word: "PIG" });
+  horse.placeTarget({ x: 0, y: 0.36, z: 0.6, motionId: "still" });
+  horse.setShot();
+
+  let made = false;
+  for (let pull = 40; pull <= 105 && !made; pull += 2) {
+    shoot({ canvas }, pull);
+    settle(horse);
+    made = horse.match.phase === PHASE_MATCH;
+    if (!made && horse.match.phase === PHASE_SET) horse.setShot();
+  }
+  assert(made, "no pull in the whole range could make a floor bin in the middle of the room");
+  // A setter with nothing on the floor proves nothing, so the matcher owes
+  // nothing: the duty is what the BALL found, never what was put down.
+  assertEqual((horse.match.standingShot.requiredPieces || []).length, 0);
+
+  // Now stand a pad on the shot the matcher owes. The ball they are about to
+  // throw goes straight in without ever reaching it.
+  horse.match.standingShot.pieces = [{ type: BOARD_PIECE, id: "owed-pad", x: 0.62, y: 0.9, z: 0.2 }];
+  horse.match.standingShot.requiredPieces = ["owed-pad"];
+
+  const before = horse.match.players[1].letters;
+  for (let pull = 40; pull <= 105 && horse.match.phase === PHASE_MATCH; pull += 2) {
+    shoot({ canvas }, pull);
+    settle(horse);
+  }
+  assertEqual(horse.match.players[1].letters, before + 1,
+    "a clean make that skipped the setter's tool has to cost a letter");
+  assertEqual(horse.match.lastOutcome.skipped, true,
+    "and it has to be told apart from an ordinary miss, or it reads as a bug");
+});
+
 finish();
