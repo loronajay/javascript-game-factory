@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Hide and Seek: The Bellhop</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="overlay">
+    <div id="menuTitle" class="panel menuScreen">
+      <div class="menuEyebrow">FOUR FLOORS &middot; TWO DEMONS</div>
+      <h1>Hide and Seek</h1>
+      <p>You are it. Three guests are hiding across four floors. Take as long as you need to find them all &mdash; but something else is hunting the hotel, and it does not care that you are the one seeking.</p>
+      <div class="menuButtons">
+        <button class="menuBtn primary" type="button" data-menu="play">PLAY</button>
+        <button class="menuBtn" type="button" data-menu="howTo">HOW TO PLAY</button>
+        <button class="menuBtn" type="button" data-menu="extras">EXTRAS</button>
+      </div>
+      <div class="menuFoot">V6.7 &middot; SINGLE-PLAYER DEMO</div>
+    </div>
+
+    <div id="menuHowTo" class="panel menuScreen hidden">
+      <div class="menuEyebrow">HOUSE RULES</div>
+      <h1>How To Play</h1>
+      <p><strong>Move:</strong> WASD / arrows &nbsp; <strong>Look:</strong> mouse / drag &nbsp; <strong>Interact:</strong> E / USE</p>
+      <p><strong>Sprint:</strong> Shift &nbsp; <strong>Crouch:</strong> C / Ctrl &nbsp; <strong>Flashlight:</strong> F &nbsp; <strong>Pause:</strong> Esc</p>
+      <p><strong>You are the seeker.</strong> The guests get at least 45 seconds to hide while you are locked inside the lobby elevator. Its doors open when the hunt begins. Then walk into each guest to tag them. There is no hunt timer: find all three and you win.</p>
+      <p><strong>The Bellhop and The Housekeeper are nobody's allies.</strong> They hunt hiders even during the hiding phase, and they hunt you. They remember a fleeing player's trail for a few seconds, including through the stairwell, so keep changing direction after breaking sight.</p>
+      <p><strong>Flashlight charge is finite.</strong> A full light lasts about two minutes of continuous use. A caught player drops their flashlight; seekers and hiders can recover it, adding its remaining charge to their own up to 100%.</p>
+      <p><strong>Sprinting is metered.</strong> Your STAMINA bar drains while you run and empties into a winded state you cannot sprint out of. It refills while you walk, faster standing still, and fastest crouched in cover.</p>
+      <p><strong>Do not settle.</strong> Stay in one place and your SANITY meter climbs. Fill it and The Bellhop walks straight into the room you are hiding in. Changing rooms clears it &mdash; so does walking the halls, and the secret passages drain it.</p>
+      <div class="menuButtons">
+        <button class="menuBtn" type="button" data-menu="back">BACK</button>
+      </div>
+    </div>
+
+    <div id="menuExtras" class="panel menuScreen hidden">
+      <div class="menuEyebrow">WORKBENCH</div>
+      <h1>Extras</h1>
+      <p>Inspection views for the figures in the hotel. These open outside a round.</p>
+      <a class="modelViewerLink" href="?inspect=monster">Open The Bellhop model viewer</a>
+      <a class="modelViewerLink" href="?inspect=avatar">Open the player figure viewer</a>
+      <div class="menuButtons">
+        <button class="menuBtn" type="button" data-menu="back">BACK</button>
+      </div>
+    </div>
+
+    <div id="menuPause" class="panel menuScreen hidden">
+      <div class="menuEyebrow">THE HOTEL IS WAITING</div>
+      <h1>Paused</h1>
+      <p>The Bellhop is holding still too. Nothing moves until you go back in.</p>
+      <div class="menuButtons">
+        <button class="menuBtn primary" type="button" data-menu="resume">RESUME</button>
+        <button class="menuBtn" type="button" data-menu="howTo">HOW TO PLAY</button>
+        <button class="menuBtn" type="button" data-menu="quit">QUIT TO TITLE</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="crosshair" aria-hidden="true"></div>
+  <div id="interactionPrompt" aria-live="polite"></div>
+  <div id="notification" aria-live="polite"></div>
+
+  <div id="inventoryHud">
+    <div class="hudTitle">KEY RING</div>
+    <div id="keyList">No keys</div>
+  </div>
+
+  <div id="floorBadge">Floor 1</div>
+  <div id="elevatorBadge" class="hidden"></div>
+
+  <div id="roundHud" data-phase="hiding">
+    <div class="hudTitle">ROUND</div>
+    <div id="roundClock">0:45</div>
+    <div class="roundLine">GUESTS LEFT <span id="roundCount">3 / 3</span></div>
+    <div id="roundBanner">THEY ARE HIDING — WAIT HERE</div>
+  </div>
+
+  <div id="demonStatuses">
+    <div id="monsterStatus" class="demonStatus" data-state="roam">THE BELLHOP IS ROAMING</div>
+    <div id="housekeeperStatus" class="demonStatus" data-state="roam">THE HOUSEKEEPER IS ROAMING</div>
+  </div>
+
+  <div id="sanityMeter" data-state="calm">
+    <div class="hudTitle">SANITY</div>
+    <div id="sanityTrack"><div id="sanityFill"></div></div>
+    <div id="sanityReadout">0%</div>
+  </div>
+  <div id="staminaMeter" data-state="ready">
+    <div class="hudTitle">STAMINA</div>
+    <div id="staminaTrack"><div id="staminaFill"></div></div>
+    <div id="staminaReadout">100%</div>
+  </div>
+  <div id="flashlightStatus" data-on="false" data-charge="100">FLASHLIGHT OFF · 100% · F</div>
+  <div id="threatVignette" aria-hidden="true"></div>
+
+  <div id="caughtOverlay">
+    <div class="caughtPanel">
+      <div class="caughtEyebrow">ROOM SERVICE</div>
+      <h1>IT FOUND YOU</h1>
+      <p>You were seen. Use corners, furniture, and crouching to break its line of sight next time.</p>
+      <button id="restartBtn" type="button">TRY AGAIN</button>
+    </div>
+  </div>
+
+  <div id="hud">
+    WASD / Arrows = Move<br>
+    E = Interact<br>
+    Shift = Sprint<br>
+    C / Ctrl = Crouch<br>
+    F = Flashlight<br>
+    Esc = Pause
+  </div>
+
+  <div id="mobileControls" aria-hidden="true">
+    <div id="movePad">
+      <button id="moveUp" class="moveBtn" type="button">↑</button>
+      <button id="moveLeft" class="moveBtn" type="button">←</button>
+      <button id="moveDown" class="moveBtn" type="button">↓</button>
+      <button id="moveRight" class="moveBtn" type="button">→</button>
+    </div>
+    <button id="interactBtn" type="button">USE</button>
+    <button id="crouchBtn" type="button">HIDE</button>
+    <button id="flashlightBtn" type="button">LIGHT</button>
+    <div id="lookHint">Drag right side to look</div>
+  </div>
+
+  <script src="layout.js?v=6.9"></script>
+  <script src="collision-logic.js?v=6.9"></script>
+  <script src="hotel-plan.js?v=6.9"></script>
+  <script src="flashlight-logic.js?v=6.9"></script>
+  <script src="controls.js?v=6.9"></script>
+  <script src="enemy-logic.js?v=6.9"></script>
+  <script src="avatar-logic.js?v=6.9"></script>
+  <script src="sanity-logic.js?v=6.9"></script>
+  <script src="stamina-logic.js?v=6.9"></script>
+  <script src="menu-logic.js?v=6.9"></script>
+  <script src="round-logic.js?v=6.9"></script>
+  <script src="hider-logic.js?v=6.9"></script>
+  <script src="modules/music.js?v=6.9"></script>
+  <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
+  <script type="module" src="main.js?v=6.9"></script>
+</body>
+</html>
