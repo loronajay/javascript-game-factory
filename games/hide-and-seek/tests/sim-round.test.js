@@ -222,3 +222,30 @@ test('a demon reaches through an open door and not through a shut one', () => {
   assert.equal(roundLogic.participant(open.round, 'hider-0').alive, false, 'an open doorway is not cover');
   assert.equal(roundLogic.participant(open.round, 'hider-0').caughtBy, roundLogic.CAUGHT_BY.DEMON);
 });
+
+test('a chasing demon opens the room door in front of it instead of running into it', () => {
+  const built = startRound();
+  const door = built.engine.catalog.find((item) => item.kind === 'door' && !item.openInitially && item.floor === 1);
+  const sign = Math.sign(door.x);
+  const inside = { x: door.x + sign * 2, y: fixture.floorY(1), z: door.z };
+  const corridor = { x: door.x - sign * 1.1, y: fixture.floorY(1), z: door.z };
+  let next = run(built.engine, built.state, 60 * 46);
+  next = {
+    ...next,
+    bodies: next.bodies.map((body) => (body.id === 'hider-0' ? { ...body, ...inside } : body)),
+    demons: next.demons.map((demon, index) => (index === 0 ? {
+      ...demon,
+      ...corridor,
+      floor: 1,
+      awareness: { ...demon.awareness, state: 'chase', targetId: 'hider-0', lastSeen: { ...inside, floor: 1 } },
+      detectionCooldown: 1,
+      routePurpose: 'chase',
+      route: [{ ...inside, floor: 1, guided: false }],
+    } : demon)),
+  };
+
+  next = built.engine.tick(next, TICK, {});
+
+  assert.equal(next.fixtures.doors[door.id].open, true);
+  assert.equal(next.fixtures.doors[door.id].locked, false, 'a chase cannot be stopped by relocking the door');
+});

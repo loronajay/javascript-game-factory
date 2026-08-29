@@ -17,14 +17,14 @@ import { createStamina } from './modules/stamina.js';
 import { createMenu } from './modules/menu.js';
 import { createOnline } from './modules/online.js';
 import { createAvatars } from './modules/avatars.js';
-import { createHiders } from './modules/hiders.js';
-import { createRound } from './modules/round.js';
+import { createSpectator } from './modules/spectator.js';
+import { createSoloMatch } from './modules/solo-match.js';
 import { createModelViewer } from './modules/model-viewer.js';
 import { createPrototypeApi } from './modules/prototype-api.js';
 import { createAccountAccess } from './modules/account-access.js';
 // The pure layer loads as classic scripts before this module graph, so a missing one has to fail
 // loudly here rather than as an undefined call three frames into a round.
-for (const name of ['HotelAvatarLogic', 'HotelCollision', 'HotelControls', 'HotelDemon', 'HotelEnemyLogic', 'HotelFixtures', 'HotelFlashlight', 'HotelHiders', 'HotelLayout', 'HotelMenu', 'HotelMovement', 'HotelMusic', 'HotelOnline', 'HotelPlan', 'HotelRound', 'HotelSanity', 'HotelStamina']) {
+for (const name of ['HotelAvatarLogic', 'HotelCollision', 'HotelControls', 'HotelDemon', 'HotelEnemyLogic', 'HotelFixtures', 'HotelFlashlight', 'HotelHiders', 'HotelLayout', 'HotelMenu', 'HotelMovement', 'HotelMusic', 'HotelOnline', 'HotelPlan', 'HotelRound', 'HotelSanity', 'HotelSeeker', 'HotelSpectator', 'HotelStamina']) {
   if (!window[name]) throw new Error(`Hotel pure module ${name} failed to load`);
 }
 const rendering = createRendering({ THREE, document, window, config: CONFIG });
@@ -53,14 +53,13 @@ if (inspectionView) {
   document.getElementById('overlay').style.display = 'none';
 }
 const account = inspectionView ? null : createAccountAccess({ document });
-let hiders = null;
-let round = null;
-let online = null;
+let hiders = null; let round = null; let seeker = null; let online = null;
 let lastMenuScreen = window.HotelMenu.SCREENS.TITLE;
 const menu = inspectionView ? null : createMenu({
   logic: window.HotelMenu, document, window,
   onPlay: () => player.beginPlay(),
   onStartSingle: (options) => startSingleMatch(options),
+  canPause: () => !online?.isActive(),
   onScreen: (screen) => {
     if (screen === window.HotelMenu.SCREENS.ONLINE) {
       account.syncMenu();
@@ -85,6 +84,7 @@ const demons = createDemons({ createMonster, includeHousekeeper: !inspectionView
 } });
 const monster = demons.primary;
 const avatars = createAvatars({ THREE, GLTFLoader, scene: rendering.scene, config: CONFIG, logic: window.HotelAvatarLogic });
+const spectator = createSpectator({ logic: window.HotelSpectator, camera: rendering.camera, world, avatars, config: CONFIG, document, window });
 const viewerSubject = inspectTarget === 'monster'
   ? { root: monster.root, setInspectionAnimation: monster.setInspectionAnimation, title: 'The Bellhop' }
   : inspectTarget === 'avatar'
@@ -95,17 +95,16 @@ const modelViewer = viewerSubject
   : null;
 function startSingleMatch(options) {
   if (modelViewer || hiders) return;
-  const matchConfig = { ...ROUND_CONFIG, ...window.HotelMenu.normalizeMatchConfig(options) };
-  hiders = createHiders({
-    THREE, config: CONFIG, tuning: HIDER_CONFIG, sanityConfig: SANITY_CONFIG, floorY, layout: window.HotelLayout, world, avatars, count: matchConfig.hiderCount,
-    logic: window.HotelHiders, enemyLogic: window.HotelEnemyLogic, movement: window.HotelMovement, sanityLogic: window.HotelSanity, avatarLogic: window.HotelAvatarLogic, seekerSpawn: { ...rendering.camera.position, floor: world.state.playerFloor },
-  });
-  demons.setPlayers(() => hiders.list());
-  round = createRound({ camera: rendering.camera, world, player, elevator, hiders, monsters: demons.list, flashlightDrops, logic: window.HotelRound, config: matchConfig, document, window });
+  ({ hiders, seeker, round } = createSoloMatch({
+    THREE, camera: rendering.camera, config: CONFIG, roundConfig: ROUND_CONFIG, hiderConfig: HIDER_CONFIG, seekerConfig: window.HotelSeeker.SEEKER_DEFAULTS, floorY,
+    layout: window.HotelLayout, world, player, elevator, avatars, avatarLogic: window.HotelAvatarLogic, hiderLogic: window.HotelHiders, seekerLogic: window.HotelSeeker,
+    enemyLogic: window.HotelEnemyLogic, movement: window.HotelMovement, sanityLogic: window.HotelSanity, sanityConfig: SANITY_CONFIG,
+    demons, flashlightDrops, spectator, document, window, options: window.HotelMenu.normalizeMatchConfig(options),
+  }));
 }
 online = createOnline({
   logic: window.HotelOnline, avatars, avatarLogic: window.HotelAvatarLogic, camera: rendering.camera,
-  world, player, menu, config: CONFIG, hotel, furnishings, elevator, demons, flashlightDrops, hiders, document, window,
+  world, player, menu, config: CONFIG, hotel, furnishings, elevator, demons, flashlightDrops, hiders, spectator, document, window,
   identity: account ? account.identity() : null,
 });
 if (account) account.syncMenu();
@@ -129,6 +128,7 @@ function simulate(delta, elapsed) {
     hotel.update(delta); furnishings.update(delta, CONFIG); elevator.update(delta, elapsed); player.update(delta, elapsed);
     if (sanity) sanity.update(delta);
     if (online.isActive()) online.update(delta); else if (round) round.update(delta);
+    if (!online.isActive()) spectator.update();
     avatars.followCamera(LOCAL_AVATAR, { camera: rendering.camera, world, player });
     avatars.update(delta);
   }
@@ -141,7 +141,7 @@ function animate() {
   const frameDelta = clock.getDelta();
   // Behind a menu nothing simulates. The accumulator is not advanced at all, so the paused seconds
   // are never owed back and meters like sanity cannot tick while the player is reading the controls.
-  const running = !!modelViewer || world.state.isLocked || world.state.gameOver;
+  const running = !!modelViewer || online.isActive() || world.state.isLocked || world.state.gameOver;
   const ticks = running ? timestep.advance(frameDelta) : 0;
   for (let tick = 0; tick < ticks; tick += 1) simulate(timestep.step, timestep.getElapsed());
   if (modelViewer) modelViewer.update(frameDelta);
@@ -153,6 +153,6 @@ rendering.warmUp();
 animate();
 createPrototypeApi({
   window, world, rendering, hotel, player, monster, demons, flashlightDrops, sanity, stamina, menu,
-  online, round, hiders, avatars, elevator, timestep, soundtrack, soundEffects,
+  online, round, hiders, seeker, spectator, avatars, elevator, timestep, soundtrack, soundEffects,
   floorDefs: FLOOR_DEFS, inspectionViews, version: '7.1',
 });

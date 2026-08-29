@@ -266,6 +266,7 @@ test('the demo runs behind a menu state machine and pauses the simulation with i
   const main = fs.readFileSync(path.join(projectRoot, 'main.js'), 'utf8');
   const player = fs.readFileSync(path.join(projectRoot, 'modules', 'player.js'), 'utf8');
   const menuModule = fs.readFileSync(path.join(projectRoot, 'modules', 'menu.js'), 'utf8');
+  const soloMatch = fs.readFileSync(path.join(projectRoot, 'modules', 'solo-match.js'), 'utf8');
   const html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
 
   assert.ok(fs.existsSync(path.join(projectRoot, 'menu-logic.js')), 'menu-logic.js is missing');
@@ -274,7 +275,7 @@ test('the demo runs behind a menu state machine and pauses the simulation with i
   assert.match(html, /id="soloHiderCount"/);
   assert.match(html, /id="soloHideSeconds"/);
   assert.match(main, /normalizeMatchConfig/);
-  assert.match(main, /count:\s*matchConfig\.hiderCount/);
+  assert.match(soloMatch, /count:\s*Math\.max\(0, match\.hiderCount/);
   assert.match(main, /createMenu/);
   assert.match(menuModule, /logic\.nextMenuState/);
   // Which screen follows which action is a rule; the runtime module only paints it.
@@ -287,18 +288,25 @@ test('the demo runs behind a menu state machine and pauses the simulation with i
   // tick through the pause and the paused seconds are never replayed on resume.
   assert.match(main, /const running = /);
   assert.match(main, /running \? timestep\.advance\(frameDelta\) : 0/);
+  // Esc can release the browser's pointer lock, but it cannot pause a live authority. The menu
+  // rejects the transition and the client keeps applying snapshots while the server match runs.
+  assert.match(main, /canPause:\s*\(\)\s*=>\s*!online\?\.isActive\(\)/);
+  assert.match(main, /online\.isActive\(\).*world\.state\.isLocked/);
+  assert.match(menuModule, /allowPause/);
+  assert.match(player, /paused === false.*enterDragLookMode/);
 });
 
 test('the round keeps its rules pure and resolves catches on the authority side', () => {
   const main = fs.readFileSync(path.join(projectRoot, 'main.js'), 'utf8');
   const roundModule = fs.readFileSync(path.join(projectRoot, 'modules', 'round.js'), 'utf8');
   const player = fs.readFileSync(path.join(projectRoot, 'modules', 'player.js'), 'utf8');
+  const soloMatch = fs.readFileSync(path.join(projectRoot, 'modules', 'solo-match.js'), 'utf8');
   const html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
 
   assert.ok(fs.existsSync(path.join(projectRoot, 'round-logic.js')), 'round-logic.js is missing');
   assert.match(html, /round-logic\.js/);
   assert.match(html, /id="roundHud"/);
-  assert.match(main, /createRound/);
+  assert.match(soloMatch, /createRound/);
   assert.match(main, /HotelRound/);
   // Roles, the two win conditions and the clock are rules a server has to run headlessly, so the
   // runtime module may only call into the pure layer.

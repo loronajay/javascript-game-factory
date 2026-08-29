@@ -15,13 +15,13 @@
         <div class="hotelMark" aria-hidden="true"><span>H</span></div>
         <div class="menuEyebrow">THE BLACKWOOD HOTEL PRESENTS</div>
         <h1><span>Hide</span><span class="titleAnd">&amp;</span><span>Seek</span></h1>
-        <p class="titleTagline">You came to find the guests.<br />Something else found you.</p>
+        <p class="titleTagline">Come to find the guests—or become one.<br />Something else found all of you.</p>
         <div class="titleRule"><span></span><b>EST. 1926</b><span></span></div>
       </section>
       <section class="titleActions" aria-label="Main menu">
         <div class="modeLabel">CHOOSE HOW TO ENTER</div>
         <button class="menuBtn modeBtn primary" type="button" data-menu="singlePlayer">
-          <span class="modeNumber">01</span><span class="modeCopy"><strong>Single Player</strong><small>Hunt AI guests at your own pace</small></span><span class="modeArrow">&#8594;</span>
+          <span class="modeNumber">01</span><span class="modeCopy"><strong>Single Player</strong><small>Play seeker or hider against AI</small></span><span class="modeArrow">&#8594;</span>
         </button>
         <button class="menuBtn modeBtn" type="button" data-menu="online">
           <span class="modeNumber">02</span><span class="modeCopy"><strong>Online Multiplayer</strong><small>Enter a 2&ndash;8 player lobby</small></span><span class="modeArrow">&#8594;</span>
@@ -40,18 +40,27 @@
         <div><div class="menuEyebrow">PRIVATE RESERVATION</div><h1>Set Up Your Hunt</h1></div>
         <div class="headerIndex">01 / SOLO</div>
       </header>
-      <p class="screenLead">Choose how crowded the hotel feels and how long the guests get to disappear. You will always play as the seeker.</p>
+      <p id="soloLead" class="screenLead">Choose how crowded the hotel feels and how long the guests get to disappear.</p>
       <div class="setupGrid">
+        <label class="settingCard" for="soloRole">
+          <span class="settingIcon" aria-hidden="true">&#9823;</span>
+          <span class="settingCopy"><strong>Your Role</strong><small>Hunt the guests, or hide from an AI seeker.</small></span>
+          <span id="soloRoleReadout" class="settingValue">SEEKER</span>
+          <select id="soloRole">
+            <option value="seeker">Seeker</option>
+            <option value="hider">Hider</option>
+          </select>
+        </label>
         <label class="settingCard" for="soloHiderCount">
           <span class="settingIcon" aria-hidden="true">&#9673;</span>
-          <span class="settingCopy"><strong>Guests to Find</strong><small>More guests make every floor more active.</small></span>
+          <span class="settingCopy"><strong id="soloHiderLabel">Guests to Find</strong><small id="soloHiderHelp">More guests make every floor more active.</small></span>
           <span id="soloHiderReadout" class="settingValue">3 guests</span>
           <input id="soloHiderCount" type="range" min="1" max="8" step="1" value="3" />
           <span class="rangeEnds"><span>1</span><span>8</span></span>
         </label>
         <label class="settingCard" for="soloHideSeconds">
           <span class="settingIcon" aria-hidden="true">&#9684;</span>
-          <span class="settingCopy"><strong>Hiding Time</strong><small>You remain locked in the elevator.</small></span>
+          <span class="settingCopy"><strong>Hiding Time</strong><small id="soloHideHelp">You remain locked in the elevator.</small></span>
           <span id="soloHideReadout" class="settingValue">45 seconds</span>
           <select id="soloHideSeconds">
             <option value="45">45 seconds</option>
@@ -61,9 +70,9 @@
           </select>
         </label>
       </div>
-      <div class="matchSummary"><span>YOUR ROLE</span><strong>SEEKER</strong><i></i><span>HUNT TIMER</span><strong>NO LIMIT</strong><i></i><span>THREATS</span><strong>2 DEMONS</strong></div>
+      <div class="matchSummary"><span>YOUR ROLE</span><strong id="soloRoleSummary">SEEKER</strong><i></i><span>HUNT TIMER</span><strong>NO LIMIT</strong><i></i><span>THREATS</span><strong>2 DEMONS</strong></div>
       <div class="menuButtons setupActions">
-        <button class="menuBtn primary" type="button" data-menu="play">BEGIN THE HUNT <span>&#8594;</span></button>
+        <button id="soloStart" class="menuBtn primary" type="button" data-menu="play">BEGIN THE HUNT <span>&#8594;</span></button>
       </div>
     </div>
 
@@ -98,7 +107,8 @@
       <h1>How To Play</h1>
       <p><strong>Move:</strong> WASD / arrows &nbsp; <strong>Look:</strong> mouse / drag &nbsp; <strong>Interact:</strong> E / USE</p>
       <p><strong>Sprint:</strong> Shift &nbsp; <strong>Crouch:</strong> C / Ctrl &nbsp; <strong>Flashlight:</strong> F &nbsp; <strong>Pause:</strong> Esc</p>
-      <p><strong>You are the seeker.</strong> Choose how many guests enter and how long they get to hide while you are locked inside the lobby elevator. Its doors open when the hunt begins. Then walk into each guest to tag them. There is no hunt timer: find them all and you win.</p>
+      <p><strong>Choose your role in single player.</strong> As seeker, wait in the lobby elevator and then tag every hider. As hider, use the head start to disappear before the AI seeker is released. There is no hunt timer.</p>
+      <p><strong>Caught hiders can spectate.</strong> Use Q / E, [ / ], the arrow keys, or the on-screen buttons to switch between living players until the round ends.</p>
       <p><strong>The Bellhop and The Housekeeper are nobody's allies.</strong> They hunt hiders even during the hiding phase, and they hunt you. They remember a fleeing player's trail for a few seconds, including through the stairwell, so keep changing direction after breaking sight.</p>
       <p><strong>Flashlight charge is finite.</strong> A full light lasts about two minutes of continuous use. A caught player drops their flashlight; seekers and hiders can recover it, adding its remaining charge to their own up to 100%.</p>
       <p><strong>Sprinting is metered.</strong> Your STAMINA bar drains while you run and empties into a winded state you cannot sprint out of. It refills while you walk, faster standing still, and fastest crouched in cover.</p>
@@ -168,6 +178,14 @@
   <div id="flashlightStatus" data-on="false" data-charge="100">FLASHLIGHT OFF · 100% · F</div>
   <div id="threatVignette" aria-hidden="true"></div>
 
+  <div id="spectatorHud" aria-live="polite">
+    <div class="hudTitle">SPECTATING</div>
+    <button id="spectatorPrevious" type="button" aria-label="Previous player">&#8592;</button>
+    <strong id="spectatorTarget">PLAYER</strong>
+    <button id="spectatorNext" type="button" aria-label="Next player">&#8594;</button>
+    <small>Q / E TO SWITCH</small>
+  </div>
+
   <div id="caughtOverlay">
     <div class="caughtPanel">
       <div class="caughtEyebrow">ROOM SERVICE</div>
@@ -215,6 +233,8 @@
   <script src="menu-logic.js?v=7.1"></script>
   <script src="round-logic.js?v=7.1"></script>
   <script src="hider-logic.js?v=7.1"></script>
+  <script src="seeker-logic.js?v=7.2"></script>
+  <script src="spectator-logic.js?v=7.2"></script>
   <script src="sim-logic.js?v=7.1"></script>
   <script src="modules/music.js?v=7.1"></script>
   <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>

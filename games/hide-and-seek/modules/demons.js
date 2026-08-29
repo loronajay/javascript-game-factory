@@ -24,10 +24,9 @@ export function createDemons({ createMonster, common, includeHousekeeper = true 
       ? !!override.localChase
       : states.some((state) => state.state === common.logic.ENEMY_STATES.CHASE
         && state.detectedTargetId === 'local');
-    const chasing = threatState === common.logic.ENEMY_STATES.CHASE;
     const searching = threatState === common.logic.ENEMY_STATES.SEARCH;
     const hunting = threatState === 'hunt';
-    common.document.body.classList.toggle('monster-chase', chasing);
+    common.document.body.classList.toggle('monster-chase', localChase);
     common.document.body.classList.toggle('monster-search', searching);
     common.document.body.classList.toggle('monster-hunt', hunting);
     if (threatState !== publishedState || localChase !== publishedLocalChase) {

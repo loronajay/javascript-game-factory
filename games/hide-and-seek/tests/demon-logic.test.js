@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const demonLogic = require('../demon-logic.js');
+const collision = require('../collision-logic.js');
 const enemy = require('../enemy-logic.js');
 const movement = require('../movement-logic.js');
 const sanity = require('../sanity-logic.js');
@@ -64,6 +65,29 @@ test('a demon walks its patrol route through the real hotel without leaving the 
   assert.ok(Number.isFinite(demon.y));
 });
 
+test('a demon follows a wall to its end instead of running in place against it', () => {
+  const wall = collision.createBoxCollider({ x: 1, y: 1.6, z: 0, width: 0.3, height: 3.2, depth: 3 });
+  const space = {
+    groundAt: () => 0,
+    blocked: (x, z, feetY, height, radius) => collision.collidesAt([wall], { x, z, feetY, bodyHeight: height, radius }),
+    sightBlocked: () => false,
+  };
+  const harness = context({ space, ctx: { rooms: [] } });
+  let demon = demonLogic.createDemon({ id: 'bellhop', spawn: { x: 0, y: 0, z: 0, floor: 1 } });
+  demon = {
+    ...demon,
+    awareness: enemy.createAwareness(),
+    route: [{ x: 3, y: 0, z: 0, floor: 1, guided: false }],
+  };
+
+  for (let tick = 0; tick < 60 * 5 && demon.route.length; tick += 1) {
+    demon = demonLogic.tickDemon(demon, TICK, harness.ctx);
+  }
+
+  assert.equal(demon.route.length, 0, 'the demon should walk around the end of the wall and reach its waypoint');
+  assert.ok(demon.x > 2.8);
+});
+
 test('a demon that can see a player chases, and loses the trail behind a wall', () => {
   const harness = context();
   const spot = { x: 0, y: fixture.floorY(1), z: -20 };
@@ -87,6 +111,43 @@ test('a demon that can see a player chases, and loses the trail behind a wall', 
   for (let tick = 0; tick < 60 * 20; tick += 1) demon = demonLogic.tickDemon(demon, TICK, harness.ctx);
   assert.equal(demon.awareness.state, enemy.ENEMY_STATES.ROAM);
   assert.equal(demon.awareness.targetId, null);
+});
+
+test('a chasing demon asks to force open a door blocking its next step', () => {
+  const openedAhead = [];
+  const harness = context({
+    ctx: {
+      rooms: [],
+      openDoorAhead: (demon, target, options) => openedAhead.push({ demon, target, options }),
+    },
+  });
+  let demon = demonLogic.createDemon({ id: 'bellhop', spawn: { x: 0, y: 0, z: 0, floor: 1 } });
+  demon = {
+    ...demon,
+    awareness: { ...enemy.createAwareness(), state: enemy.ENEMY_STATES.CHASE },
+    detectionCooldown: 1,
+    routePurpose: 'chase',
+    route: [{ x: 4, y: 0, z: 0, floor: 1, guided: false }],
+  };
+
+  demonLogic.tickDemon(demon, TICK, harness.ctx);
+
+  assert.equal(openedAhead.length, 1);
+  assert.equal(openedAhead[0].target.x, 4);
+  assert.deepEqual(openedAhead[0].options, { unlock: true });
+});
+
+test('the next closed door on a demon route is selected, not a nearby door behind it', () => {
+  const demon = { x: 0, y: 0, z: 0, floor: 1 };
+  const target = { x: 5, y: 0, z: 0, floor: 1 };
+  const doors = [
+    { id: 'behind', x: -0.5, y: 0, z: 0, floor: 1 },
+    { id: 'beside', x: 0.7, y: 0, z: 2, floor: 1 },
+    { id: 'ahead', x: 1.2, y: 0, z: 0.15, floor: 1 },
+    { id: 'upstairs', x: 0.8, y: fixture.CONFIG.floorHeight, z: 0, floor: 2 },
+  ];
+
+  assert.equal(demonLogic.selectBlockingDoor(demon, target, doors).id, 'ahead');
 });
 
 test('line of sight is the hotel geometry, not a clear line between two points', () => {

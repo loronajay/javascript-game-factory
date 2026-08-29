@@ -14,7 +14,7 @@ The **secret passages are the one real refuge**. Inside a tunnel the meter runs 
 
 **Sprinting is metered.** The `STAMINA` bar under `SANITY` drains while you run and refills whenever you are not: fastest crouched in cover, then standing still, and slowest of all while you walk. Empty it and you are *winded* — sprinting is locked out entirely until you have won a real share of the bar back, so the panic run out of a room has to end somewhere. Running is the one thing that outpaces The Bellhop, so it is a resource you spend rather than a speed you hold.
 
-V6.8 makes the hiding phase physical. **You are the seeker.** Three guests get at least 45 seconds to scatter across the four floors while you are locked inside the closed lobby elevator. When hiding time expires, the doors open and the untimed hunt starts. Walking into a guest tags them; find all three to win. The `ROUND` readout shows the hiding countdown, then `NO LIMIT` beside the tally. It never tells you where anybody is.
+V6.8 makes the hiding phase physical, and the solo setup now lets you choose either role. As the **seeker**, the guests get at least 45 seconds to scatter across the four floors while you are locked inside the closed lobby elevator. As a **hider**, you use that head start to find cover alongside any AI hider teammates, then an AI seeker is released to hunt you. The `ROUND` readout shows the hiding countdown, then `NO LIMIT` beside the tally. It never tells the seeker where anybody is.
 
 The catch is that **The Bellhop is nobody's ally.** It sees, hunts, and sanity-tracks the hiders as well as you, and it does not care which of you it reaches first. A guest it takes still counts toward your total, so the demon can hand you the round. A *you* it takes ends the round on the spot and the hiders win, however many you had already found. That is the whole tension: every tool that makes seeking faster — sprinting especially — is a tool that gets you found.
 
@@ -30,6 +30,8 @@ V6.9 adds a light and a second hunter, and both cut both ways.
 lobby for two to eight guests. It needs a signed-in Javascript Game Factory account — the panel says
 so, and the name over your body in the corridor comes from your factory profile. The host presses
 `START ROUND`; the server picks who is it and does not announce it until the doors close.
+That assignment is random and authoritative, so any player can enter a round as either the seeker or a
+hider; it is not fixed by the client.
 
 **The server owns the round.** Where you are, what you can see, how much battery you have left, which
 drawer still had the key in it and who was caught are all decided there, from the positions it is
@@ -40,6 +42,10 @@ deliberate: a client that gets to say "I wasn't caught" is the obvious way to ch
 holds one key and the second person to search it finds it empty. The elevator carries whoever is
 standing in it. Both demons are in the building and hunting everyone, and a battery dropped by
 someone who was caught goes to whoever walks over it first.
+
+When a hider is caught before the round ends, they stay in the match as a spectator. They can cycle
+between the remaining living players with `Q` / `E`, the bracket or arrow keys, or the on-screen
+previous/next buttons.
 
 If your connection drops mid-round your body stays standing in the hotel — a free find, which is the
 honest consequence — and you have half a minute to walk back into it before the seat is given up.
@@ -129,7 +135,7 @@ Pure monster rules live in `enemy-logic.js`, pure avatar rules (motion state, cl
 
 ## Controls
 
-WASD/arrows move, mouse look, Shift sprints (while stamina lasts), C or Ctrl crouches, E interacts, and Esc pauses. On mobile, hold HIDE to crouch. Browsers without Pointer Lock automatically use click-and-drag mouse look.
+WASD/arrows move, mouse look, Shift sprints (while stamina lasts), C or Ctrl crouches, E interacts, and Esc pauses. While spectating, Q/E, brackets, arrows, or the on-screen buttons switch players. On mobile, hold HIDE to crouch. Browsers without Pointer Lock automatically use click-and-drag mouse look.
 
 ## Engineering note
 

@@ -81,7 +81,7 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
     world.setDynamicHeight('elevator-car', elevator.car.position.y);
     syncDoors(1); updateIndicator(true);
   }
-  function holdSeeker() {
+  function holdSeeker({ moveCamera = true } = {}) {
     elevator.roundHeld = true;
     elevator.currentFloor = 1;
     elevator.targetFloor = 1;
@@ -91,9 +91,11 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
     elevator.car.position.y = floorY(1);
     world.setDynamicHeight('elevator-car', elevator.car.position.y);
     syncDoors(0);
-    camera.position.set(CONFIG.elevatorCenterX, floorY(1) + playerEyeHeight(), CONFIG.elevatorCenterZ + 0.25);
-    camera.rotation.x = 0; camera.rotation.y = 0;
-    world.state.yaw = 0; world.state.pitch = 0; world.state.playerFloor = 0;
+    if (moveCamera) {
+      camera.position.set(CONFIG.elevatorCenterX, floorY(1) + playerEyeHeight(), CONFIG.elevatorCenterZ + 0.25);
+      camera.rotation.x = 0; camera.rotation.y = 0;
+      world.state.yaw = 0; world.state.pitch = 0; world.state.playerFloor = 0;
+    }
   }
   function releaseSeeker() {
     if (!elevator.roundHeld) return;

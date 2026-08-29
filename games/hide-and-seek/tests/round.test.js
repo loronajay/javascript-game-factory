@@ -25,7 +25,7 @@ function element() {
 // The round module reaches for the built world, the demon and the HUD. None of those need WebGL to
 // answer the questions catch resolution asks, so they are stood up as plain objects here — which is
 // the same thing a headless server will be doing.
-function harness({ hiders = [], demon = { x: 90, y: 0, z: 90, floor: 1 }, demons = null, seeker = { x: 0, y: 0, z: 0 } } = {}) {
+function harness({ hiders = [], demon = { x: 90, y: 0, z: 90, floor: 1 }, demons = null, seeker = { x: 0, y: 0, z: 0 }, aiSeeker = null, localRole = logic.ROLES.SEEKER } = {}) {
   const elements = new Map();
   const listeners = new Map();
   const events = [];
@@ -38,14 +38,15 @@ function harness({ hiders = [], demon = { x: 90, y: 0, z: 90, floor: 1 }, demons
   };
   const state = { playerFloor: 1, gameOver: false, isLocked: true, seekerHeld: false };
   const elevatorCalls = [];
+  const spectatorStarts = [];
   return {
-    elements, events, alive, state, elevatorCalls, drops,
+    elements, events, alive, state, elevatorCalls, spectatorStarts, drops,
     fire(name, detail) { for (const handler of listeners.get(name) || []) handler({ detail }); },
     deps: {
       camera: { position: { ...seeker, y: seeker.y + 1.7 } },
-      player: { getEyeHeight: () => 1.7, getState: () => ({ flashlightOn: false, flashlightCharge: 0.65 }) },
+      player: { getEyeHeight: () => 1.7, getState: () => ({ flashlightOn: false, flashlightCharge: 0.65 }), setFlashlight: () => {} },
       elevator: {
-        holdSeeker: () => elevatorCalls.push('hold'),
+        holdSeeker: (options) => elevatorCalls.push(['hold', options]),
         releaseSeeker: () => elevatorCalls.push('release'),
       },
       world: {
@@ -60,6 +61,16 @@ function harness({ hiders = [], demon = { x: 90, y: 0, z: 90, floor: 1 }, demons
         eliminate: (id) => alive.delete(id),
         update: () => {},
       },
+      seeker: aiSeeker ? {
+        id: 'solo-seeker',
+        update: () => {},
+        setHeld: () => {},
+        eliminate: () => {},
+        getState: () => ({ id: 'solo-seeker', name: 'The Seeker', role: 'seeker', alive: true, x: aiSeeker.x, y: aiSeeker.y, z: aiSeeker.z, floor: aiSeeker.floor || 1, yaw: 0, crouching: false }),
+      } : null,
+      spectator: { start: (provider) => spectatorStarts.push(provider), stop: () => {} },
+      avatars: { setVisible: () => {} },
+      localRole,
       flashlightDrops: { drop: (entry) => drops.push(entry) },
       monster: { getState: () => ({ name: 'The Bellhop', position: { x: demon.x, y: demon.y, z: demon.z }, floor: demon.floor }) },
       monsters: demons ? demons.map((entry) => ({ getState: () => ({ name: entry.name, position: { x: entry.x, y: entry.y, z: entry.z }, floor: entry.floor }) })) : null,
@@ -82,16 +93,40 @@ test('the seeker is shut in the elevator for at least forty-five seconds and rel
   const setup = harness({ hiders: [FAR] });
   const round = await createRound(setup);
 
-  assert.deepEqual(setup.elevatorCalls, ['hold']);
+  assert.deepEqual(setup.elevatorCalls, [['hold', undefined]]);
   round.update(44);
   assert.equal(setup.state.seekerHeld, true);
   assert.equal(round.getState().phase, logic.PHASES.HIDING);
-  assert.deepEqual(setup.elevatorCalls, ['hold']);
+  assert.deepEqual(setup.elevatorCalls, [['hold', undefined]]);
 
   round.update(1);
   assert.equal(setup.state.seekerHeld, false);
   assert.equal(round.getState().phase, logic.PHASES.SEEKING);
-  assert.deepEqual(setup.elevatorCalls, ['hold', 'release']);
+  assert.deepEqual(setup.elevatorCalls, [['hold', undefined], 'release']);
+});
+
+test('a solo hider gets the head start while the AI seeker is held', async () => {
+  const setup = harness({ hiders: [FAR], aiSeeker: { x: 40, y: 0, z: 40 }, localRole: logic.ROLES.HIDER });
+  const round = await createRound(setup);
+
+  assert.deepEqual(setup.elevatorCalls, [['hold', { moveCamera: false }]], 'the cabin closes without moving the hider camera');
+  assert.equal(round.getState().hidersTotal, 2, 'the local player is part of the hider tally');
+  round.update(45);
+  assert.deepEqual(setup.elevatorCalls, [['hold', { moveCamera: false }], 'release']);
+});
+
+test('a caught solo hider spectates while other hiders keep the round alive', async () => {
+  const setup = harness({ hiders: [FAR], aiSeeker: { x: 1, y: 0, z: 0 }, localRole: logic.ROLES.HIDER });
+  const round = await createRound(setup);
+
+  round.update(45);
+
+  assert.equal(round.getState().hidersRemaining, 1);
+  assert.equal(round.getState().over, false);
+  assert.equal(setup.state.playerEliminated, true);
+  assert.equal(setup.state.gameOver, false);
+  assert.equal(setup.spectatorStarts.length, 1);
+  assert.ok(setup.spectatorStarts[0]().some((entry) => entry.id === 'hider-2'));
 });
 
 test('a hider inside reach is tagged, but not before the head start ends', async () => {

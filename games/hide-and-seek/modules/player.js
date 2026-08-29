@@ -65,9 +65,12 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
   // The menu owns what is on screen; the player only reports whether it has the mouse. A lock lost
   // mid-round is a pause, and the state machine decides that — pressing Esc on the caught screen must
   // not stack a pause menu over it.
-  function notifyMenu(action) { if (menu) menu.dispatch(action); }
+  function notifyMenu(action) { return menu ? menu.dispatch(action) : true; }
   function enterDragLookMode() { dragLookMode = true; world.state.isLocked = true; }
-  function leaveDragLookMode() { dragLookMode = false; mouseLookPointerId = null; world.state.isLocked = false; notifyMenu('pause'); }
+  function leaveDragLookMode() {
+    if (notifyMenu('pause') === false) return;
+    dragLookMode = false; mouseLookPointerId = null; world.state.isLocked = false;
+  }
   // Called by the menu when the player picks Play or Resume, so the pointer-lock request always rides
   // on a real click gesture.
   function beginPlay() {
@@ -114,7 +117,17 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
   }
   function setupInput() {
     document.addEventListener('pointerlockerror', () => { if (!isTouchDevice) enterDragLookMode(); });
-    document.addEventListener('pointerlockchange', () => { if (isTouchDevice) return; if (document.pointerLockElement === document.body) { dragLookMode = false; world.state.isLocked = true; } else if (!dragLookMode) { world.state.isLocked = false; notifyMenu('pause'); } });
+    document.addEventListener('pointerlockchange', () => {
+      if (isTouchDevice) return;
+      if (document.pointerLockElement === document.body) { dragLookMode = false; world.state.isLocked = true; }
+      else if (!dragLookMode) {
+        world.state.isLocked = false;
+        const paused = notifyMenu('pause');
+        // Browsers always release pointer lock on Esc. During an online round that must only change
+        // the look mode; the authority and its snapshots keep running and no pause overlay appears.
+        if (paused === false && !world.state.gameOver) enterDragLookMode();
+      }
+    });
     document.addEventListener('mousemove', (event) => { if (world.state.isLocked && !isTouchDevice && !dragLookMode) applyLookDelta(event.movementX, event.movementY, 0.0022); });
     window.addEventListener('keydown', (event) => { keys[event.code] = true; if (event.code === 'Escape' && dragLookMode) leaveDragLookMode(); if (event.code === 'KeyE' && !event.repeat) interact(); if (event.code === 'KeyF' && !event.repeat && world.state.isLocked && !world.state.gameOver) toggleFlashlight(); }); window.addEventListener('keyup', (event) => { keys[event.code] = false; });
     for (const [id, code] of Object.entries({ moveUp: 'KeyW', moveDown: 'KeyS', moveLeft: 'KeyA', moveRight: 'KeyD' })) { const button = document.getElementById(id); const press = (event) => { event.preventDefault(); keys[code] = true; }; const release = (event) => { event.preventDefault(); keys[code] = false; }; button.addEventListener('pointerdown', press); button.addEventListener('pointerup', release); button.addEventListener('pointercancel', release); button.addEventListener('pointerleave', release); }
@@ -132,7 +145,7 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
     const clearLook = (event) => { if (event.pointerId === lookTouchId) lookTouchId = null; if (event.pointerId === mouseLookPointerId) mouseLookPointerId = null; }; renderer.domElement.addEventListener('pointerup', clearLook); renderer.domElement.addEventListener('pointercancel', clearLook);
   }
   function update(delta, elapsed) {
-    if (!world.state.isLocked || world.state.gameOver) { world.promptEl.classList.remove('visible'); return; }
+    if (!world.state.isLocked || world.state.gameOver || world.state.playerSpectating) { world.promptEl.classList.remove('visible'); return; }
     const previousFlashlight = flashlightState;
     flashlightState = flashlightLogic.tickFlashlight(flashlightState, delta, flashlightConfig);
     if (Math.ceil(previousFlashlight.charge * 100) !== Math.ceil(flashlightState.charge * 100) || previousFlashlight.on !== flashlightState.on) paintFlashlight();

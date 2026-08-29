@@ -29,9 +29,9 @@ test('single player opens match setup before a round can begin', () => {
 
 test('single-player match options are clamped to supported values', () => {
   assert.deepEqual(menu.normalizeMatchConfig(), menu.MATCH_DEFAULTS);
-  assert.deepEqual(menu.normalizeMatchConfig({ hiderCount: 0, hideSeconds: 8 }), { hiderCount: 1, hideSeconds: 45 });
-  assert.deepEqual(menu.normalizeMatchConfig({ hiderCount: 99, hideSeconds: 999 }), { hiderCount: 8, hideSeconds: 120 });
-  assert.deepEqual(menu.normalizeMatchConfig({ hiderCount: '6', hideSeconds: '60' }), { hiderCount: 6, hideSeconds: 60 });
+  assert.deepEqual(menu.normalizeMatchConfig({ hiderCount: 0, hideSeconds: 8, role: 'hider' }), { hiderCount: 1, hideSeconds: 45, role: 'hider' });
+  assert.deepEqual(menu.normalizeMatchConfig({ hiderCount: 99, hideSeconds: 999, role: 'ghost' }), { hiderCount: 8, hideSeconds: 120, role: 'seeker' });
+  assert.deepEqual(menu.normalizeMatchConfig({ hiderCount: '6', hideSeconds: '60', role: 'seeker' }), { hiderCount: 6, hideSeconds: 60, role: 'seeker' });
   assert.ok(Object.isFrozen(menu.MATCH_DEFAULTS));
   assert.ok(Object.isFrozen(menu.MATCH_LIMITS));
 });
@@ -56,6 +56,15 @@ test('pause suspends play and resume returns to it', () => {
   assert.equal(menu.isPlaying(paused.screen), false);
   assert.equal(menu.isOverlayVisible(paused.screen), true);
   assert.equal(menu.nextMenuState(paused, ACTIONS.RESUME).screen, SCREENS.PLAYING);
+});
+
+test('an online match rejects pause without leaving play', () => {
+  const playing = walk(menu.createMenuState(), [ACTIONS.ONLINE, ACTIONS.PLAY]);
+  const stillPlaying = menu.nextMenuState(playing, ACTIONS.PAUSE, { allowPause: false });
+
+  assert.equal(stillPlaying.screen, SCREENS.PLAYING);
+  assert.equal(menu.isPlaying(stillPlaying.screen), true);
+  assert.equal(menu.isOverlayVisible(stillPlaying.screen), false);
 });
 
 test('being caught takes over from play and cannot be paused away', () => {

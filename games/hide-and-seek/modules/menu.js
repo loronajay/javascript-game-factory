@@ -4,7 +4,7 @@
 //
 // `PLAYING` is the game's single "the simulation is running" answer: the loop pauses whenever the
 // player is not locked in, which is what stops meters like sanity from ticking behind a menu.
-export function createMenu({ logic, document, window, onPlay, onStartSingle, onScreen }) {
+export function createMenu({ logic, document, window, onPlay, onStartSingle, onScreen, canPause = () => true }) {
   const overlay = document.getElementById('overlay');
   const screenEls = new Map([
     [logic.SCREENS.TITLE, document.getElementById('menuTitle')],
@@ -17,17 +17,34 @@ export function createMenu({ logic, document, window, onPlay, onStartSingle, onS
   let state = logic.createMenuState();
   const hiderInput = document.getElementById('soloHiderCount');
   const hideInput = document.getElementById('soloHideSeconds');
+  const roleInput = document.getElementById('soloRole');
   const hiderReadout = document.getElementById('soloHiderReadout');
   const hideReadout = document.getElementById('soloHideReadout');
+  const roleReadout = document.getElementById('soloRoleReadout');
+  const roleSummary = document.getElementById('soloRoleSummary');
+  const soloLead = document.getElementById('soloLead');
+  const soloStart = document.getElementById('soloStart');
+  const hiderLabel = document.getElementById('soloHiderLabel');
+  const hiderHelp = document.getElementById('soloHiderHelp');
+  const hideHelp = document.getElementById('soloHideHelp');
 
   function matchConfig() {
-    return logic.normalizeMatchConfig({ hiderCount: hiderInput?.value, hideSeconds: hideInput?.value });
+    return logic.normalizeMatchConfig({ hiderCount: hiderInput?.value, hideSeconds: hideInput?.value, role: roleInput?.value });
   }
 
   function renderMatchConfig() {
     const config = matchConfig();
     if (hiderReadout) hiderReadout.textContent = `${config.hiderCount} guest${config.hiderCount === 1 ? '' : 's'}`;
     if (hideReadout) hideReadout.textContent = `${config.hideSeconds} seconds`;
+    if (roleReadout) roleReadout.textContent = config.role.toUpperCase();
+    if (roleSummary) roleSummary.textContent = config.role.toUpperCase();
+    if (soloLead) soloLead.textContent = config.role === 'hider'
+      ? 'Hide anywhere in the hotel, outlast the AI seeker, and stay clear of both demons.'
+      : 'Choose how crowded the hotel feels and how long the guests get to disappear.';
+    if (soloStart) soloStart.firstChild.textContent = config.role === 'hider' ? 'BEGIN HIDING ' : 'BEGIN THE HUNT ';
+    if (hiderLabel) hiderLabel.textContent = config.role === 'hider' ? 'Hiders in Match' : 'Guests to Find';
+    if (hiderHelp) hiderHelp.textContent = config.role === 'hider' ? 'Includes you and any AI hider teammates.' : 'More guests make every floor more active.';
+    if (hideHelp) hideHelp.textContent = config.role === 'hider' ? 'Use every second before the AI seeker is released.' : 'You remain locked in the elevator.';
   }
 
   function emit(name, detail) {
@@ -44,7 +61,7 @@ export function createMenu({ logic, document, window, onPlay, onStartSingle, onS
 
   function dispatch(action) {
     const previousScreen = state.screen;
-    const next = logic.nextMenuState(state, action);
+    const next = logic.nextMenuState(state, action, { allowPause: canPause() });
     // Quitting rebuilds the session rather than pretending the hotel reset: the demon, the open doors
     // and the key ring are all still standing, and a reload is the honest way back to a clean round.
     if (next.effect === 'quit') { window.location.reload(); return; }
@@ -58,6 +75,7 @@ export function createMenu({ logic, document, window, onPlay, onStartSingle, onS
       if (previousScreen === logic.SCREENS.SOLO_SETUP && onStartSingle) onStartSingle(matchConfig());
       onPlay();
     }
+    return state.screen !== previousScreen;
   }
 
   overlay.addEventListener('click', (event) => {
@@ -66,7 +84,7 @@ export function createMenu({ logic, document, window, onPlay, onStartSingle, onS
     event.preventDefault();
     dispatch(button.dataset.menu);
   });
-  for (const input of [hiderInput, hideInput]) input?.addEventListener('input', renderMatchConfig);
+  for (const input of [hiderInput, hideInput, roleInput]) input?.addEventListener('input', renderMatchConfig);
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && [logic.SCREENS.SOLO_SETUP, logic.SCREENS.ONLINE, logic.SCREENS.HOW_TO, logic.SCREENS.EXTRAS].includes(state.screen)) dispatch(logic.ACTIONS.BACK);
   });

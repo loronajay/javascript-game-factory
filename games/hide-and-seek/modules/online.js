@@ -19,7 +19,7 @@ export function defaultSocketUrl(location) {
 
 export function createOnline({
   logic, avatars, avatarLogic, camera, world, player, menu, config: CONFIG, document, window,
-  hotel = null, furnishings = null, elevator = null, demons = null, flashlightDrops = null, hiders = null,
+  hotel = null, furnishings = null, elevator = null, demons = null, flashlightDrops = null, hiders = null, spectator = null,
   socketUrl = defaultSocketUrl(window.location), gameId = 'hide-and-seek', identity = null,
 }) {
   const statusEl = document.getElementById('onlineStatus');
@@ -32,6 +32,7 @@ export function createOnline({
   const countEl = document.getElementById('roundCount');
   const bannerEl = document.getElementById('roundBanner');
   const hudEl = document.getElementById('roundHud');
+  const caughtOverlay = document.getElementById('caughtOverlay');
 
   let socket = null;
   let net = logic.createNetState();
@@ -41,6 +42,8 @@ export function createOnline({
   let poses = new Map();
   let spawned = new Set();
   let announcedOver = false;
+  let spectating = false;
+  let localAvatarRole = null;
   let narratedTick = -1;
   let publishedKeys = '';
   // The seat to reclaim if the socket drops mid-round. Session storage rather than local: a seat is
@@ -153,6 +156,43 @@ export function createOnline({
     }
   }
 
+  function syncLocalRole() {
+    const self = logic.selfOf(net);
+    if (!self || self.role === localAvatarRole) return;
+    localAvatarRole = self.role;
+    avatars.spawn('local', { role: self.role === 'seeker' ? avatarLogic.ROLES.SEEKER : avatarLogic.ROLES.HIDER, seat: 0, hideHead: true, name: self.name || 'You' });
+  }
+
+  function spectatorPlayers() { return net.snapshot?.players || []; }
+
+  function beginSpectating() {
+    if (spectating) return;
+    spectating = true;
+    avatars.setVisible('local', false);
+    player.setFlashlight(false);
+    spectator?.start(spectatorPlayers, net.clientId);
+    world.notify('YOU WERE CAUGHT. SPECTATING THE REST OF THE MATCH.', 2600);
+  }
+
+  function finishRound() {
+    if (announcedOver || !net.snapshot?.round?.over) return;
+    announcedOver = true;
+    spectating = false;
+    spectator?.stop();
+    world.state.gameOver = true; world.state.isLocked = false;
+    const view = net.snapshot.round;
+    const won = (logic.isSeeker(net) && view.outcome === 'seeker') || (!logic.isSeeker(net) && view.outcome === 'hiders');
+    const panel = caughtOverlay?.querySelector('.caughtPanel');
+    if (panel) {
+      panel.querySelector('.caughtEyebrow').textContent = won ? 'MATCH COMPLETE' : 'NO VACANCY';
+      panel.querySelector('h1').textContent = won ? 'YOUR SIDE WON' : 'YOUR SIDE LOST';
+      panel.querySelector('p').textContent = won ? 'The hotel kept running after every catch, and your side survived the round.' : 'The round is over. Switch viewpoints after a catch to learn the hotel before trying again.';
+    }
+    caughtOverlay?.classList.add('visible'); document.body.classList.add('caught');
+    if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
+    world.emit('caught', { outcome: view.outcome, online: true });
+  }
+
   // The hotel's moving parts, drawn from the snapshot. None of this is decided here: a door is open
   // because the server says so, the cabin is at that height because the server put it there, and a
   // drawer is empty because someone else got there first.
@@ -210,7 +250,7 @@ export function createOnline({
     const self = logic.selfOf(net);
     if (!self) return;
     if (!self.alive) {
-      if (!announcedOver) { announcedOver = true; world.emit('caught', { by: self.caughtBy || 'seeker', online: true }); }
+      if (!net.snapshot?.round?.over) beginSpectating();
       return;
     }
     const eyeHeight = player.getEyeHeight();
@@ -253,6 +293,8 @@ export function createOnline({
     if (net.status === logic.NET_STATES.STARTING && previousStatus !== logic.NET_STATES.STARTING) {
       active = true;
       announcedOver = false;
+      spectating = false;
+      world.state.gameOver = false;
       // There is one authority per hotel. Every door, drawer, lift and demon in this browser stops
       // deciding anything the moment the match starts, and the offline stand-in hiders leave the
       // building — the guests are real now.
@@ -264,6 +306,7 @@ export function createOnline({
       // A finished round is not a seat worth reclaiming.
       clearSession();
       world.emit('round-over', { ...net.snapshot.round, online: true });
+      finishRound();
     }
     renderLobby();
   }
@@ -312,16 +355,23 @@ export function createOnline({
   function update(delta) {
     if (!active) return;
     if (net.status !== logic.NET_STATES.PLAYING && net.status !== logic.NET_STATES.ENDED) return;
-    pushInput(delta);
-    reconcileSelf(delta);
+    syncLocalRole();
+    const self = logic.selfOf(net);
+    if (self?.alive) { pushInput(delta); reconcileSelf(delta); }
+    else reconcileSelf(delta);
     syncBodies(delta);
     applyFixtures(net.snapshot?.fixtures);
     if (demons) demons.applySnapshot(net.snapshot?.demons || [], net.snapshot?.threat, net.clientId);
     if (flashlightDrops) flashlightDrops.applySnapshot(net.snapshot?.pickups || []);
-    const self = logic.selfOf(net);
-    if (self) { player.applyRemoteFlashlight(self.flashlight); applyKeys(self.keys); }
+    if (self) {
+      if (self.alive) player.applyRemoteFlashlight(self.flashlight);
+      else player.setFlashlight(false);
+      applyKeys(self.keys);
+    }
     narrate(net.snapshot);
     paintRoundHud();
+    spectator?.update();
+    finishRound();
   }
 
   function menuClick() {

@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
 const url = require('node:url');
 
@@ -51,4 +52,38 @@ test('the shared threat event separately reports whether a demon sees the local 
     name: 'monster-state',
     detail: { state: logic.ENEMY_STATES.CHASE, localChase: true },
   });
+});
+
+test('the viewport vignette is transparent unless the local player is actively chased', async () => {
+  const createDemons = await loadCreateDemons();
+  const bodyClassList = createClassList();
+  const states = [
+    { state: logic.ENEMY_STATES.CHASE, detectedTargetId: 'hider-1' },
+    { state: logic.ENEMY_STATES.ROAM, detectedTargetId: null },
+  ];
+  let created = 0;
+  const demons = createDemons({
+    createMonster() {
+      const index = created++;
+      return { update() {}, setPlayers() {}, getState: () => states[index] };
+    },
+    common: {
+      logic,
+      document: { body: { classList: bodyClassList } },
+      world: { emit() {} },
+    },
+  });
+
+  demons.update(0.1, 0.1);
+  assert.equal(bodyClassList.active.has('monster-chase'), false, 'another player being chased must not obscure this viewport');
+
+  states[1] = { state: logic.ENEMY_STATES.CHASE, detectedTargetId: 'local' };
+  demons.update(0.1, 0.2);
+  assert.equal(bodyClassList.active.has('monster-chase'), true);
+
+  const css = fs.readFileSync(path.resolve(__dirname, '..', 'styles.css'), 'utf8');
+  const neutralRule = '#threatVignette{box-shadow:inset 0 0 120px 25px transparent;animation:none}';
+  const chaseRule = '.monster-chase #threatVignette{box-shadow:inset 0 0 150px 38px rgba(105,0,0,.48);animation:threatBeat .68s infinite}';
+  assert.ok(css.lastIndexOf(neutralRule) > css.lastIndexOf('rgba(90,0,0,.3)'), 'the final base vignette rule must clear old threat glows');
+  assert.ok(css.lastIndexOf(chaseRule) > css.lastIndexOf(neutralRule), 'only the chase override should restore the red glow');
 });

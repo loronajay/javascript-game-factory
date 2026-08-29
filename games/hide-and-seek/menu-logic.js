@@ -36,7 +36,7 @@
   // where it came from instead of always landing on the title. The online lobby behaves the same
   // way, except that leaving PLAYING is not its own decision: the server starts the match.
   const READABLE = Object.freeze([SCREENS.HOW_TO, SCREENS.EXTRAS, SCREENS.ONLINE]);
-  const MATCH_DEFAULTS = Object.freeze({ hiderCount: 3, hideSeconds: 45 });
+  const MATCH_DEFAULTS = Object.freeze({ hiderCount: 3, hideSeconds: 45, role: 'seeker' });
   const MATCH_LIMITS = Object.freeze({ minHiders: 1, maxHiders: 8, minHideSeconds: 45, maxHideSeconds: 120 });
 
   function clampInteger(value, fallback, minimum, maximum) {
@@ -48,6 +48,7 @@
     return {
       hiderCount: clampInteger(options.hiderCount, MATCH_DEFAULTS.hiderCount, MATCH_LIMITS.minHiders, MATCH_LIMITS.maxHiders),
       hideSeconds: clampInteger(options.hideSeconds, MATCH_DEFAULTS.hideSeconds, MATCH_LIMITS.minHideSeconds, MATCH_LIMITS.maxHideSeconds),
+      role: options.role === 'hider' ? 'hider' : 'seeker',
     };
   }
 
@@ -69,7 +70,7 @@
     return { screen, back, effect: null };
   }
 
-  function nextMenuState(state, action) {
+  function nextMenuState(state, action, { allowPause = true } = {}) {
     const current = state || createMenuState();
     const stay = { ...current, effect: null };
     if (action === ACTIONS.CAUGHT) return isPlaying(current.screen) ? goto(SCREENS.CAUGHT) : stay;
@@ -89,7 +90,7 @@
     if (action === ACTIONS.HOW_TO) return goto(SCREENS.HOW_TO, current.screen);
     if (action === ACTIONS.EXTRAS) return goto(SCREENS.EXTRAS, current.screen);
     if (current.screen === SCREENS.TITLE) return action === ACTIONS.SINGLE_PLAYER ? goto(SCREENS.SOLO_SETUP, SCREENS.TITLE) : stay;
-    if (current.screen === SCREENS.PLAYING) return action === ACTIONS.PAUSE ? goto(SCREENS.PAUSE) : stay;
+    if (current.screen === SCREENS.PLAYING) return action === ACTIONS.PAUSE && allowPause ? goto(SCREENS.PAUSE) : stay;
     if (current.screen === SCREENS.PAUSE) return action === ACTIONS.RESUME ? goto(SCREENS.PLAYING) : stay;
     return stay;
   }

@@ -12,9 +12,20 @@ export function createMonster({
   const monsterStatus = document.getElementById(statusElementId);
   const caughtOverlay = document.getElementById('caughtOverlay');
   const patrolZ = [-52, -34, -18, 0, 18, 34, 49];
+  const doorRecords = [...world.collections.roomDoors.entries()].map(([roomNumber, item]) => {
+    const room = world.collections.roomCenters.get(roomNumber);
+    return {
+      id: item.planId, item,
+      x: item.hinge.position.x,
+      y: floorY(room.floor),
+      z: item.hinge.position.z + item.door.position.z,
+      floor: room.floor,
+    };
+  });
   let awareness = logic.createAwareness();
   let route = [];
   let routePurpose = 'roam';
+  let avoidance = null;
   let mixer = null;
   let activeAction = null;
   let idleAction = null;
@@ -494,9 +505,27 @@ export function createMonster({
 
   // Walking is a rule, so it lives in movement-logic.js and this only paints the result: the demon
   // uses the same mover the player and the hiders do.
+  function openDoorAhead(target) {
+    const closed = doorRecords.filter((entry) => !entry.item.open || entry.item.locked);
+    const selected = window.HotelDemon.selectBlockingDoor(
+      { x: root.position.x, y: root.position.y, z: root.position.z, floor: nearestFloor() },
+      target,
+      closed,
+      CONFIG,
+    );
+    if (!selected) return;
+    const force = routePurpose === 'hunt' || awareness.state === ENEMY_STATES.CHASE || awareness.state === ENEMY_STATES.SEARCH;
+    if (force) logic.prepareHuntDoor(selected.item, CONFIG.doorOpenAngle);
+    else logic.prepareRoamDoor(selected.item, CONFIG.doorOpenAngle);
+  }
+
   function tryMove(target, speed, delta) {
-    const step = movement.stepToward(world.space, BODY, root.position, target, { speed, delta, arriveRadius: 0.18, guided: !!target.guided });
-    if (step.arrived) { root.position.set(step.x, step.y, step.z); route.shift(); moving = false; return; }
+    openDoorAhead(target);
+    const step = movement.stepToward(world.space, BODY, root.position, target, {
+      speed, delta, arriveRadius: 0.18, guided: !!target.guided, avoidance,
+    });
+    avoidance = step.avoidance || null;
+    if (step.arrived) { root.position.set(step.x, step.y, step.z); route.shift(); moving = false; avoidance = null; return; }
     if (step.moved) root.position.set(step.x, step.y, step.z);
     if (step.moved && Math.hypot(step.dirX, step.dirZ) > 0.01) {
       const turn = Math.min(1, delta * 7); facing.x += (step.dirX - facing.x) * turn; facing.z += (step.dirZ - facing.z) * turn; facing.normalize(); root.rotation.y = Math.atan2(facing.x, facing.z); moving = true;
@@ -515,7 +544,7 @@ export function createMonster({
   function playerCandidates() {
     const playerFeetY = camera.position.y - player.getEyeHeight();
     return [
-      { id: 'local', x: camera.position.x, y: playerFeetY, z: camera.position.z, floor: world.state.playerFloor || nearestFloor(playerFeetY), crouching: player.isCrouching() },
+      ...(world.state.playerEliminated ? [] : [{ id: 'local', x: camera.position.x, y: playerFeetY, z: camera.position.z, floor: world.state.playerFloor || nearestFloor(playerFeetY), crouching: player.isCrouching() }]),
       ...playerProvider(),
     ];
   }
@@ -603,7 +632,11 @@ export function createMonster({
   }
 
   function caught() {
-    if (world.state.gameOver) return;
+    if (world.state.gameOver || world.state.playerEliminated) return;
+    if (world.state.localRole === 'hider') {
+      world.emit('caught', { demon: name, floor: nearestFloor(), x: root.position.x, z: root.position.z });
+      return;
+    }
     world.state.gameOver = true; world.state.isLocked = false; caughtOverlay.classList.add('visible'); document.body.classList.add('caught');
     if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
     world.emit('caught', { demon: name, floor: nearestFloor(), x: root.position.x, z: root.position.z });
@@ -652,7 +685,7 @@ export function createMonster({
     if (mixer) { setAnimation(moving ? walkAction : idleAction, awareness.state === ENEMY_STATES.CHASE ? 1.85 : 1); advance(delta); }
     if (fallback) { const t = window.performance.now() * 0.001; fallback.position.y = Math.sin(t * 3.2) * 0.035; fallback.rotation.z = Math.sin(t * 1.7) * 0.018; }
     const playerFeetY = camera.position.y - player.getEyeHeight();
-    if (Math.abs(playerFeetY - root.position.y) < 1.15 && Math.hypot(camera.position.x - root.position.x, camera.position.z - root.position.z) < CONFIG.enemyCatchDistance) caught();
+    if (!world.state.playerEliminated && Math.abs(playerFeetY - root.position.y) < 1.15 && Math.hypot(camera.position.x - root.position.x, camera.position.z - root.position.z) < CONFIG.enemyCatchDistance) caught();
     updateHud();
   }
 

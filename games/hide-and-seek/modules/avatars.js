@@ -139,6 +139,17 @@ export function createAvatars({ THREE, GLTFLoader, scene, config: CONFIG, logic 
     if (avatar) { avatar.visible = visible; avatar.root.visible = visible; }
   }
 
+  function setHeadHidden(id, hidden) {
+    const avatar = avatars.get(id);
+    if (!avatar) return;
+    avatar.hideHead = !!hidden;
+    avatar.headBone = avatar.hideHead && avatar.model ? avatar.model.getObjectByName('Head') : null;
+    if (!hidden && avatar.model) {
+      const head = avatar.model.getObjectByName('Head');
+      if (head) head.scale.setScalar(1);
+    }
+  }
+
   function remove(id) {
     const avatar = avatars.get(id);
     if (!avatar) return;
@@ -205,5 +216,5 @@ export function createAvatars({ THREE, GLTFLoader, scene, config: CONFIG, logic 
     });
   }
 
-  return { spawn, setPose, setVisible, remove, update, get, list, describe, createShowcase, followCamera };
+  return { spawn, setPose, setVisible, setHeadHidden, remove, update, get, list, describe, createShowcase, followCamera };
 }

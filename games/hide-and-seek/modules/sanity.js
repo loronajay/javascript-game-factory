@@ -39,11 +39,11 @@ export function createSanity({ camera, world, logic, config, document }) {
   }
 
   function localCandidate() {
-    return { id: 'local', full: state.full, zone: state.zone, kind: state.kind, x: camera.position.x, z: camera.position.z, floor: world.state.playerFloor || 1 };
+    return { id: 'local', full: world.state.playerEliminated ? false : state.full, zone: state.zone, kind: state.kind, x: camera.position.x, z: camera.position.z, floor: world.state.playerFloor || 1 };
   }
 
   function update(delta) {
-    if (world.state.gameOver) return;
+    if (world.state.gameOver || world.state.playerEliminated) return;
     const { x, z } = camera.position;
     const movedDistance = Math.hypot(x - lastX, z - lastZ);
     lastX = x; lastZ = z;
