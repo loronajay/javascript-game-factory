@@ -180,5 +180,13 @@ export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floo
   }
 
   spawn();
-  return { update, eliminate, list, ids: () => [...hiders.keys()] };
+  // Online there are real guests, so the stand-ins leave. They are not paused — their bodies are
+  // taken out of the hotel entirely, because a hider nobody can catch standing in a corridor is a
+  // decoy the seeker will waste the whole round on.
+  function standDown() {
+    for (const id of [...hiders.keys()]) avatars.remove(id);
+    hiders.clear();
+  }
+
+  return { update, eliminate, list, standDown, ids: () => [...hiders.keys()] };
 }

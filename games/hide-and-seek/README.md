@@ -1,4 +1,4 @@
-# Hide and Seek V7.0: The Bellhop and The Housekeeper
+# Hide and Seek V7.1: The Bellhop and The Housekeeper
 
 ## Play
 
@@ -24,23 +24,36 @@ V6.9 adds a light and a second hunter, and both cut both ways.
 
 **There are now two demons.** The Bellhop is joined by The Housekeeper, and they start on different floors. Only The Bellhop tracks the sanity clock and walks into the room of whoever has been sitting still too long; The Housekeeper roams, sees and chases like any hunter. Neither is your ally and neither cares which of you it reaches first. The threat readout still tells you a state and never a place — with two of them loose, that restraint is the point.
 
-## Playing online (new in V7.0, untested with real players)
+## Playing online (new in V7.1, not yet played by real people)
 
 `PLAY ONLINE` on the title screen connects to the shared arcade network server and drops you into a
-lobby for two to eight guests. The host presses `START ROUND`; the server picks who is it and does
-not announce it until the doors close.
+lobby for two to eight guests. It needs a signed-in Javascript Game Factory account — the panel says
+so, and the name over your body in the corridor comes from your factory profile. The host presses
+`START ROUND`; the server picks who is it and does not announce it until the doors close.
 
-**The server owns the round.** Where you are, what you can see, how much battery you have left and
-who was caught are all decided there, from the positions it is tracking — your client only sends
-which keys you are holding and which way you are facing. That is deliberate: a client that gets to
-say "I wasn't caught" is the obvious way to cheat at hide and seek.
+**The server owns the round.** Where you are, what you can see, how much battery you have left, which
+drawer still had the key in it and who was caught are all decided there, from the positions it is
+tracking — your client only sends which keys you are holding and which way you are facing. That is
+deliberate: a client that gets to say "I wasn't caught" is the obvious way to cheat at hide and seek.
 
-Two things are missing from online rounds and are known, not forgotten. **The demons are not in the
-hotel yet** — an online round is currently seeker versus hiders only. And **doors are still local**:
-a door someone else opens is not open for you. Both are the next pieces of work.
+**The hotel is shared, not copied.** A door you open is open for the seeker chasing you. A drawer
+holds one key and the second person to search it finds it empty. The elevator carries whoever is
+standing in it. Both demons are in the building and hunting everyone, and a battery dropped by
+someone who was caught goes to whoever walks over it first.
+
+If your connection drops mid-round your body stays standing in the hotel — a free find, which is the
+honest consequence — and you have half a minute to walk back into it before the seat is given up.
 
 Playing on `localhost` talks to a network server on `localhost:3000`; anywhere else uses the live
 one.
+
+### Known gaps
+
+- **Nobody has played an online round with real people yet.** Connection, lobby, roles, the head
+  start, the shared hotel and the demons have all been driven in a browser; how movement *feels*
+  between two machines has not been tested by a human.
+- A two-player round is fragile: there is exactly one hider, so a demon reaching them ends it. Three
+  or more guests is where the game is meant to live.
 
 The guests are not statues. They pick a room, walk to it and crouch down, and they bolt if you or the demon gets close — from you at a longer range than from the demon, because a seeker with a plan is worth moving for while a roaming demon is worth staying still for. A door standing open is a guest who went through it.
 
@@ -124,4 +137,4 @@ The controller remains lightweight rather than physics-engine based. The Bellhop
 
 The creature body, player Base Character, and animation libraries are by Quaternius and are included under CC0 1.0; see `assets/UAL2-LICENSE.txt` and `assets/quaternius-player/`. The local Three.js runtime retains its MIT license in `vendor/THREE-LICENSE.txt`.
 
-Run `npm test` for the AI, avatar, architecture, layout, controls, server, music, and performance regressions (70 tests). For visual development, `?inspect=stair`, `?inspect=stairEntrance`, `?inspect=doorway`, `?inspect=monster`, and `?inspect=avatar` start at representative QA views without requiring a full traversal.
+Run `npm test` for the AI, avatar, fixture, demon, round, architecture, layout, controls, server, music, and performance regressions. For visual development, `?inspect=stair`, `?inspect=stairEntrance`, `?inspect=doorway`, `?inspect=monster`, and `?inspect=avatar` start at representative QA views without requiring a full traversal.

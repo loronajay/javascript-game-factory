@@ -1,0 +1,11 @@
+{
+  "title": "Hide and Seek",
+  "tagline": "One of you is it. Two of them are worse.",
+  "description": "Online multiplayer hide and seek in a four-floor hotel with two demons loose in it. One player is the seeker, held in the lobby elevator while everyone else scatters across rooms, locked suites and secret passages. The demons hunt everyone, the seeker included, so being it is not safe either. Crouch to stay hidden, spend your flashlight battery carefully, and keep moving: standing still too long is what brings The Bellhop to your door. Two to eight guests on a server-authoritative round, or a solo run against the hotel.",
+  "players": "1-8",
+  "status": "Playable - solo and online 2-8 players, server authoritative",
+  "order": 16,
+  "featured": false,
+  "theme": "hotel",
+  "accentColor": "#8f2f2a"
+}

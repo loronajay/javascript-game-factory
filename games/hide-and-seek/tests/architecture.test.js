@@ -52,8 +52,39 @@ test('rendering avoids expensive unused shadows and caps high-DPI resolution', (
 test('only lights near the active floor stay in the realtime lighting pass', () => {
   const hotel = fs.readFileSync(path.join(projectRoot, 'modules', 'hotel.js'), 'utf8');
 
-  assert.match(hotel, /floorLightingChanged/);
-  assert.match(hotel, /light\.visible\s*=/);
+  assert.match(hotel, /selectVisibleLightFloors/);
+  // This used to assert `light.visible =`, which was the bug rather than the invariant: hiding a
+  // light removes it from three's light state, `numPointLights` is part of the shader program's
+  // cache key, and so every material in the hotel recompiled on the frame the player entered the
+  // stairwell. The lamps near the player are now assigned into a fixed pool instead, so the count
+  // never moves. Toggling visibility here again would bring the stall back.
+  assert.doesNotMatch(hotel, /light\.visible\s*=/);
+  assert.match(hotel, /LIGHT_POOL_SIZE/);
+});
+
+test('the flashlight dims rather than hides, so clicking it cannot recompile the scene', () => {
+  const player = fs.readFileSync(path.join(projectRoot, 'modules', 'player.js'), 'utf8');
+
+  // Same rule as the lamp pool, one light down: `numSpotLights` is in the program cache key too.
+  assert.doesNotMatch(player, /flashlightBeam\.visible\s*=/);
+  assert.match(player, /flashlightBeam\.intensity\s*=/);
+});
+
+test('the demon brings every light it will ever have to the scene up front', () => {
+  const monster = fs.readFileSync(path.join(projectRoot, 'modules', 'monster.js'), 'utf8');
+
+  // The face is a GLB that lands a beat after the round starts. A light arriving with it moves the
+  // scene's point-light count, and that count is part of every material's shader program key.
+  assert.ok(monster.indexOf('new THREE.PointLight(0xb50006') < monster.indexOf('function createModelDetails'));
+  assert.match(monster, /details\.add\(headHalo\)/);
+});
+
+test('shaders are compiled up front rather than on the frame a material is first seen', () => {
+  const rendering = fs.readFileSync(path.join(projectRoot, 'modules', 'rendering.js'), 'utf8');
+  const main = fs.readFileSync(path.join(projectRoot, 'main.js'), 'utf8');
+
+  assert.match(rendering, /renderer\.compile\(/);
+  assert.match(main, /warmUp\(\)/);
 });
 
 test('the demon face follows the animated head and shares the body forward direction', () => {
@@ -163,6 +194,24 @@ test('the stairwell lights only nearby floors and draws its static geometry in o
   assert.match(hotel, /Stair Treads/);
 });
 
+test('static hotel geometry is merged per floor and nothing that moves is merged away', () => {
+  const hotel = fs.readFileSync(path.join(projectRoot, 'modules', 'hotel.js'), 'utf8');
+  const furnishings = fs.readFileSync(path.join(projectRoot, 'modules', 'furnishings.js'), 'utf8');
+
+  assert.ok(fs.existsSync(path.join(projectRoot, 'modules', 'static-batcher.js')), 'static-batcher.js is missing');
+  assert.match(hotel, /createStaticBatcher/);
+  assert.match(hotel, /batcher\.flatten\(group/);
+  // A merged mesh has no identity and no local transform. Everything that swings, slides, is
+  // animated, or has to be recognised by the interaction ray is named as a skip root — if one of
+  // these stops being excluded the failure is a door that will not open, not a slow frame.
+  for (const kept of [/skip\.add\(item\.hinge\)/, /skip\.add\(item\.drawer\)/, /skip\.add\(entry\.group\)/, /skip\.add\(item\.object\)/, /skip\.add\(door\.fillFixture\)/]) {
+    assert.match(hotel, kept);
+  }
+  // Two meshes can only share a draw call if they share a material instance, so anything the hotel
+  // places dozens of may not mint one per placement.
+  assert.doesNotMatch(furnishings, /CylinderGeometry\([^)]*\), new THREE\.MeshStandardMaterial/);
+});
+
 test('the local head collapse is re-applied after the mixer writes each frame', () => {
   const avatars = fs.readFileSync(path.join(projectRoot, 'modules', 'avatars.js'), 'utf8');
 
@@ -221,7 +270,11 @@ test('the demo runs behind a menu state machine and pauses the simulation with i
 
   assert.ok(fs.existsSync(path.join(projectRoot, 'menu-logic.js')), 'menu-logic.js is missing');
   assert.match(html, /menu-logic\.js/);
-  for (const screen of ['menuTitle', 'menuHowTo', 'menuExtras', 'menuPause']) assert.match(html, new RegExp(`id="${screen}"`));
+  for (const screen of ['menuTitle', 'menuSoloSetup', 'menuOnline', 'menuHowTo', 'menuExtras', 'menuPause']) assert.match(html, new RegExp(`id="${screen}"`));
+  assert.match(html, /id="soloHiderCount"/);
+  assert.match(html, /id="soloHideSeconds"/);
+  assert.match(main, /normalizeMatchConfig/);
+  assert.match(main, /count:\s*matchConfig\.hiderCount/);
   assert.match(main, /createMenu/);
   assert.match(menuModule, /logic\.nextMenuState/);
   // Which screen follows which action is a rule; the runtime module only paints it.
@@ -343,7 +396,8 @@ test('flashlight state is part of the player snapshot before networking is added
   assert.match(html, /flashlight-logic\.js/);
   assert.match(player, /flashlightOn/);
   assert.match(player, /hotel:flashlight-change|flashlight-change/);
-  assert.match(main, /player:\s*player\.getState\(\)/);
+  const prototypeApi = fs.readFileSync(path.join(projectRoot, 'modules', 'prototype-api.js'), 'utf8');
+  assert.match(prototypeApi, /player:\s*player\.getState\(\)/);
   assert.ok(fs.existsSync(path.join(projectRoot, 'modules', 'flashlight-pickups.js')));
   assert.match(main, /createFlashlightPickups/);
   assert.match(player, /flashlightCharge/);
@@ -436,9 +490,54 @@ test('online play is server authoritative and the client only sends intent', () 
   for (const rule of ['logic.applyNetEvent', 'logic.describeInput', 'logic.shouldSendInput', 'logic.reconcilePosition', 'logic.interpolatePose']) {
     assert.match(onlineModule, new RegExp(rule.replace('.', '\.')));
   }
-  // A client that decides its own catch is the obvious cheat. Nothing here may resolve one.
+  // A client that decides its own catch is the obvious cheat. Nothing here may resolve one, and
+  // nothing here may decide a door, a drawer or a key either — those are contested state too.
   assert.doesNotMatch(onlineModule, /resolveTag|resolveDemonCatch|canTag/);
-  // There is one authority per hotel: the local round and the demons stand down online.
+  assert.doesNotMatch(onlineModule, /applyInteraction|forceDoorOpen|createFixtureState|tickFixtures|tickDemon/);
+
+  // There is one authority per hotel: the local round stands down online.
   assert.match(main, /if \(online\.isActive\(\)\) online\.update\(delta\); else if \(round\)/);
-  assert.match(main, /if \(!online\.isActive\(\)\) demons\.update/);
+
+  // The demons still render online, but as puppets. Their *brain* is what stands down — the client
+  // poses them from the snapshot and never detects, routes or catches on its own.
+  const monster = fs.readFileSync(path.join(projectRoot, 'modules', 'monster.js'), 'utf8');
+  assert.match(monster, /setRemotePose/);
+  assert.match(monster, /if \(remotePose\) \{ updateRemote\(delta\); return; \}/);
+  assert.match(onlineModule, /demons\.applySnapshot/);
+
+  // The offline stand-ins leave when real guests arrive. A hider nobody can catch, standing still in
+  // a corridor, is a decoy the seeker wastes the whole round on.
+  assert.match(onlineModule, /hiders\.standDown\(\)/);
+
+  // Everything the server owns has to actually reach the renderer, or online is a hotel where a door
+  // someone else opened is still a wall for you.
+  for (const applied of ['hotel.applyOpening', 'furnishings.applyDrawer', 'elevator.applyRemote', 'flashlightDrops.applySnapshot']) {
+    assert.match(onlineModule, new RegExp(applied.replace('.', '\.')), `online.js must draw ${applied} from the snapshot`);
+  }
+});
+
+test('the authoritative tick owns the fixtures and the demons, and the pure layer is mirrored whole', () => {
+  const sim = fs.readFileSync(path.join(projectRoot, 'sim-logic.js'), 'utf8');
+  // Comments stripped: prose may name the renderer it is deliberately avoiding, code may not.
+  const strip = (name) => fs.readFileSync(path.join(projectRoot, name), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+  const fixtures = strip('fixtures-logic.js');
+  const demon = strip('demon-logic.js');
+  const manifest = JSON.parse(fs.readFileSync(path.join(projectRoot, 'tools', 'sim-mirror-manifest.json'), 'utf8'));
+
+  // Neither may reach for a renderer: they run on a server that has no DOM and no WebGL.
+  for (const source of [fixtures, demon]) assert.doesNotMatch(source, /THREE|document\.|window\.|requestAnimationFrame/);
+
+  // The tick composes them rather than re-deriving them; a second door animation or a second hunt
+  // is a second authority.
+  assert.match(sim, /fixtures\.tickFixtures/);
+  assert.match(sim, /demonLogic\.tickDemon/);
+  assert.match(sim, /demonLogic\.caughtBy/);
+  assert.match(sim, /fixtures\.releaseElevator/);
+
+  // A mirrored file the server never loads is drift waiting to happen.
+  for (const name of ['fixtures-logic.js', 'demon-logic.js']) {
+    assert.ok(name in manifest.files, `${name} must be mirrored to the network server`);
+  }
 });

@@ -10,19 +10,33 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
   let dragLookMode = false; let mouseLookPointerId = null; let mouseLookLastX = 0; let mouseLookLastY = 0;
   let lookTouchId = null; let lookLastX = 0; let lookLastY = 0;
   const flashlightStatus = document.getElementById('flashlightStatus');
-  const flashlightBeam = new THREE.SpotLight(0xffedc2, 5.4, 31, Math.PI / 7, 0.58, 1.35);
-  flashlightBeam.name = 'Local Player Flashlight'; flashlightBeam.visible = false; flashlightBeam.position.set(0.12, -0.12, -0.08);
+  // The beam is switched with `intensity`, never with `visible`. Hiding it takes it out of three's
+  // light state, `numSpotLights` is part of every material's shader program cache key, and so the F
+  // key would otherwise recompile the entire hotel — on the most-pressed key in the game.
+  const BEAM_INTENSITY = 5.4;
+  const flashlightBeam = new THREE.SpotLight(0xffedc2, 0, 31, Math.PI / 7, 0.58, 1.35);
+  flashlightBeam.name = 'Local Player Flashlight'; flashlightBeam.position.set(0.12, -0.12, -0.08);
   flashlightBeam.target.position.set(0, -0.08, -5);
   camera.add(flashlightBeam, flashlightBeam.target);
   if (!camera.parent) scene.add(camera);
 
   function paintFlashlight() {
-    flashlightBeam.visible = flashlightState.on;
+    flashlightBeam.intensity = flashlightState.on ? BEAM_INTENSITY : 0;
     const percent = Math.ceil(flashlightState.charge * 100);
     if (flashlightStatus) { flashlightStatus.dataset.on = String(flashlightState.on); flashlightStatus.dataset.charge = String(percent); flashlightStatus.textContent = `FLASHLIGHT ${flashlightState.on ? 'ON' : flashlightState.charge > 0 ? 'OFF' : 'EMPTY'} · ${percent}% · F`; }
     const button = document.getElementById('flashlightBtn');
     if (button) { button.dataset.on = String(flashlightState.on); button.textContent = flashlightState.on ? 'LIGHT ON' : 'LIGHT'; }
   }
+  // The battery is server-authoritative online — a client that reports its own charge is the same
+  // class of cheat as one that reports it wasn't caught — so the snapshot's value is applied over
+  // whatever the local prediction drained.
+  function applyRemoteFlashlight(view) {
+    if (!view) return;
+    const changed = flashlightState.on !== view.on || Math.ceil(flashlightState.charge * 100) !== Math.ceil(view.charge * 100);
+    flashlightState = flashlightLogic.createFlashlightState(view.on, view.charge);
+    if (changed) paintFlashlight();
+  }
+
   function setFlashlight(on) {
     const previousOn = flashlightState.on;
     flashlightState = flashlightLogic.setFlashlight(flashlightState, on);
@@ -68,7 +82,13 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
     if (world.state.activeInteractable) { world.promptEl.textContent = `[E] ${world.state.activeInteractable.prompt()}`; world.promptEl.classList.add('visible'); }
     else { world.promptEl.textContent = ''; world.promptEl.classList.remove('visible'); }
   }
-  function interact() { if (world.state.activeInteractable) world.state.activeInteractable.action(); }
+  // Online a press is a *request*: it goes out on the input and the server decides what it opened,
+  // whether the drawer still had the key in it, and whether the door was locked. Running the local
+  // action too would give this client a hotel that briefly disagrees with everyone else's.
+  function interact() {
+    if (world.state.remoteFixtures) return;
+    if (world.state.activeInteractable) world.state.activeInteractable.action();
+  }
   // The local player is not a special kind of body: it walks through the same pure mover the demons
   // and the hiders use, so a server ticking a remote player can never disagree with this client.
   function tryMove(dx, dz) {
@@ -98,7 +118,11 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
     document.addEventListener('mousemove', (event) => { if (world.state.isLocked && !isTouchDevice && !dragLookMode) applyLookDelta(event.movementX, event.movementY, 0.0022); });
     window.addEventListener('keydown', (event) => { keys[event.code] = true; if (event.code === 'Escape' && dragLookMode) leaveDragLookMode(); if (event.code === 'KeyE' && !event.repeat) interact(); if (event.code === 'KeyF' && !event.repeat && world.state.isLocked && !world.state.gameOver) toggleFlashlight(); }); window.addEventListener('keyup', (event) => { keys[event.code] = false; });
     for (const [id, code] of Object.entries({ moveUp: 'KeyW', moveDown: 'KeyS', moveLeft: 'KeyA', moveRight: 'KeyD' })) { const button = document.getElementById(id); const press = (event) => { event.preventDefault(); keys[code] = true; }; const release = (event) => { event.preventDefault(); keys[code] = false; }; button.addEventListener('pointerdown', press); button.addEventListener('pointerup', release); button.addEventListener('pointercancel', release); button.addEventListener('pointerleave', release); }
-    document.getElementById('interactBtn').addEventListener('pointerdown', (event) => { event.preventDefault(); interact(); }); renderer.domElement.style.touchAction = 'none';
+    const interactButton = document.getElementById('interactBtn');
+    // The button holds the key down for a beat rather than firing once: online the authority reads a
+    // rising edge off the input stream, and a flag that is never true in a sent frame is never seen.
+    interactButton.addEventListener('pointerdown', (event) => { event.preventDefault(); keys.KeyE = true; interact(); });
+    for (const release of ['pointerup', 'pointercancel', 'pointerleave']) interactButton.addEventListener(release, () => { keys.KeyE = false; }); renderer.domElement.style.touchAction = 'none';
     const crouchButton = document.getElementById('crouchBtn');
     if (crouchButton) { const crouchOn = (event) => { event.preventDefault(); keys.KeyC = true; }; const crouchOff = (event) => { event.preventDefault(); keys.KeyC = false; }; crouchButton.addEventListener('pointerdown', crouchOn); crouchButton.addEventListener('pointerup', crouchOff); crouchButton.addEventListener('pointercancel', crouchOff); crouchButton.addEventListener('pointerleave', crouchOff); }
     const flashlightButton = document.getElementById('flashlightBtn');
@@ -132,7 +156,7 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
   }
   setupInput(); refreshLocation(); paintFlashlight();
   return {
-    update, beginPlay, refreshLocation, interact, setFlashlight, toggleFlashlight, addFlashlightCharge,
+    update, beginPlay, refreshLocation, interact, setFlashlight, toggleFlashlight, addFlashlightCharge, applyRemoteFlashlight,
     isCrouching: () => !!(keys.KeyC || keys.ControlLeft || keys.ControlRight),
     // What the player is trying to do, which is the only thing an online round sends. The answer to
     // whether any of it happened comes back from the server.
@@ -143,6 +167,7 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
       crouch: !!(keys.KeyC || keys.ControlLeft || keys.ControlRight),
       sprint: !!(keys.ShiftLeft || keys.ShiftRight),
       light: flashlightState.on,
+      interact: !!keys.KeyE,
     }),
     getEyeHeight: () => currentEyeHeight,
     getState: () => ({ crouching: !!world.state.playerCrouching, eyeHeight: currentEyeHeight, flashlightOn: flashlightState.on, flashlightCharge: flashlightState.charge }),

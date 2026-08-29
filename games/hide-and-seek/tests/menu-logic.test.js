@@ -15,11 +15,25 @@ test('a session opens on the title screen with the overlay up and the sim paused
   assert.equal(menu.isPlaying(state.screen), false);
 });
 
-test('play leaves the menu and hides the overlay', () => {
-  const state = menu.nextMenuState(menu.createMenuState(), ACTIONS.PLAY);
+test('single player opens match setup before a round can begin', () => {
+  const setup = menu.nextMenuState(menu.createMenuState(), ACTIONS.SINGLE_PLAYER);
+  assert.equal(setup.screen, SCREENS.SOLO_SETUP);
+  assert.equal(menu.isPlaying(setup.screen), false);
+  assert.equal(menu.nextMenuState(setup, ACTIONS.BACK).screen, SCREENS.TITLE);
+
+  const state = menu.nextMenuState(setup, ACTIONS.PLAY);
   assert.equal(state.screen, SCREENS.PLAYING);
   assert.equal(menu.isPlaying(state.screen), true);
   assert.equal(menu.isOverlayVisible(state.screen), false);
+});
+
+test('single-player match options are clamped to supported values', () => {
+  assert.deepEqual(menu.normalizeMatchConfig(), menu.MATCH_DEFAULTS);
+  assert.deepEqual(menu.normalizeMatchConfig({ hiderCount: 0, hideSeconds: 8 }), { hiderCount: 1, hideSeconds: 45 });
+  assert.deepEqual(menu.normalizeMatchConfig({ hiderCount: 99, hideSeconds: 999 }), { hiderCount: 8, hideSeconds: 120 });
+  assert.deepEqual(menu.normalizeMatchConfig({ hiderCount: '6', hideSeconds: '60' }), { hiderCount: 6, hideSeconds: 60 });
+  assert.ok(Object.isFrozen(menu.MATCH_DEFAULTS));
+  assert.ok(Object.isFrozen(menu.MATCH_LIMITS));
 });
 
 test('how-to and extras return to whichever screen opened them', () => {
@@ -27,7 +41,7 @@ test('how-to and extras return to whichever screen opened them', () => {
   assert.equal(fromTitle.screen, SCREENS.HOW_TO);
   assert.equal(menu.nextMenuState(fromTitle, ACTIONS.BACK).screen, SCREENS.TITLE);
 
-  const fromPause = walk(menu.createMenuState(), [ACTIONS.PLAY, ACTIONS.PAUSE, ACTIONS.HOW_TO]);
+  const fromPause = walk(menu.createMenuState(), [ACTIONS.SINGLE_PLAYER, ACTIONS.PLAY, ACTIONS.PAUSE, ACTIONS.HOW_TO]);
   assert.equal(fromPause.screen, SCREENS.HOW_TO);
   assert.equal(menu.nextMenuState(fromPause, ACTIONS.BACK).screen, SCREENS.PAUSE);
 
@@ -37,7 +51,7 @@ test('how-to and extras return to whichever screen opened them', () => {
 });
 
 test('pause suspends play and resume returns to it', () => {
-  const paused = walk(menu.createMenuState(), [ACTIONS.PLAY, ACTIONS.PAUSE]);
+  const paused = walk(menu.createMenuState(), [ACTIONS.SINGLE_PLAYER, ACTIONS.PLAY, ACTIONS.PAUSE]);
   assert.equal(paused.screen, SCREENS.PAUSE);
   assert.equal(menu.isPlaying(paused.screen), false);
   assert.equal(menu.isOverlayVisible(paused.screen), true);
@@ -45,7 +59,7 @@ test('pause suspends play and resume returns to it', () => {
 });
 
 test('being caught takes over from play and cannot be paused away', () => {
-  const caught = walk(menu.createMenuState(), [ACTIONS.PLAY, ACTIONS.CAUGHT]);
+  const caught = walk(menu.createMenuState(), [ACTIONS.SINGLE_PLAYER, ACTIONS.PLAY, ACTIONS.CAUGHT]);
   assert.equal(caught.screen, SCREENS.CAUGHT);
   assert.equal(menu.isPlaying(caught.screen), false);
   // The caught screen owns the whole viewport; the menu overlay must not stack on top of it.
@@ -55,14 +69,14 @@ test('being caught takes over from play and cannot be paused away', () => {
 });
 
 test('quitting asks the host to restart rather than pretending the world reset', () => {
-  const paused = walk(menu.createMenuState(), [ACTIONS.PLAY, ACTIONS.PAUSE]);
+  const paused = walk(menu.createMenuState(), [ACTIONS.SINGLE_PLAYER, ACTIONS.PLAY, ACTIONS.PAUSE]);
   const quit = menu.nextMenuState(paused, ACTIONS.QUIT);
   assert.equal(quit.effect, 'quit');
 
-  const caught = walk(menu.createMenuState(), [ACTIONS.PLAY, ACTIONS.CAUGHT]);
+  const caught = walk(menu.createMenuState(), [ACTIONS.SINGLE_PLAYER, ACTIONS.PLAY, ACTIONS.CAUGHT]);
   assert.equal(menu.nextMenuState(caught, ACTIONS.QUIT).effect, 'quit');
   // Nothing else produces an effect.
-  assert.equal(menu.nextMenuState(menu.createMenuState(), ACTIONS.PLAY).effect, null);
+  assert.equal(menu.nextMenuState(menu.createMenuState(), ACTIONS.SINGLE_PLAYER).effect, null);
 });
 
 test('unknown and out-of-context actions leave the state untouched', () => {
@@ -70,7 +84,7 @@ test('unknown and out-of-context actions leave the state untouched', () => {
   assert.equal(menu.nextMenuState(title, ACTIONS.RESUME).screen, SCREENS.TITLE);
   assert.equal(menu.nextMenuState(title, ACTIONS.PAUSE).screen, SCREENS.TITLE);
   assert.equal(menu.nextMenuState(title, 'nonsense').screen, SCREENS.TITLE);
-  const playing = menu.nextMenuState(title, ACTIONS.PLAY);
+  const playing = walk(title, [ACTIONS.SINGLE_PLAYER, ACTIONS.PLAY]);
   assert.equal(menu.nextMenuState(playing, ACTIONS.PLAY).screen, SCREENS.PLAYING);
 });
 

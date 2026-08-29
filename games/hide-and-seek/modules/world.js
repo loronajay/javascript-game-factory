@@ -2,7 +2,7 @@ export function createWorld({ THREE, scene, materials: MAT, config: CONFIG, layo
   const state = { isLocked: false, yaw: 0, pitch: 0, playerFloor: 1, playerFeetY: 0, playerEyeHeight: CONFIG.eyeHeight, playerCrouching: false, inventory: new Set(), activeInteractable: null, notificationTimer: null };
   const collections = {
     colliders: [], interactables: [], dynamicDoors: [], dynamicDrawers: [],
-    floorGroups: new Map(), floorLights: new Map(), roomDoors: new Map(), secretPanels: new Map(),
+    floorGroups: new Map(), floorLights: new Map(), roomDoors: new Map(), secretPanels: new Map(), doorsByPlanId: new Map(), drawersByPlanId: new Map(),
     hallElevatorDoors: new Map(), roomCenters: new Map(), secretTunnels: [],
   };
   const stairwellGroup = new THREE.Group();

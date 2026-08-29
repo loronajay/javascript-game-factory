@@ -5,9 +5,19 @@ export function createFurnishings({ THREE, materials: MAT, world, keyLabelForFlo
   // registers collision — a bed that is solid on screen and thin air on the server is exactly the
   // drift this seam exists to prevent.
 
+  // A material instance is what decides whether two meshes can share a draw call, so anything the
+  // hotel places dozens of gets one material rather than one per placement. The pot used to be a
+  // fresh MeshStandardMaterial per plant, which made 58 pots 58 batches that could never merge.
+  const potMaterial = new THREE.MeshStandardMaterial({ color: 0x6a4a34, roughness: 0.9 });
+  const vendingMaterials = new Map();
+  function vendingMaterial(color) {
+    if (!vendingMaterials.has(color)) vendingMaterials.set(color, new THREE.MeshStandardMaterial({ color, roughness: 0.66 }));
+    return vendingMaterials.get(color);
+  }
+
   function addPlant(parent, x, z, scale = 1) {
     const group = new THREE.Group();
-    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.24 * scale, 0.18 * scale, 0.42 * scale, 16), new THREE.MeshStandardMaterial({ color: 0x6a4a34, roughness: 0.9 }));
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.24 * scale, 0.18 * scale, 0.42 * scale, 16), potMaterial);
     pot.position.y = 0.2 * scale; group.add(pot);
     for (let i = 0; i < 7; i += 1) { const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.16 * scale, 8, 8), MAT.green); leaf.position.set((Math.random() - 0.5) * 0.35 * scale, 0.55 * scale + Math.random() * 0.45 * scale, (Math.random() - 0.5) * 0.35 * scale); group.add(leaf); }
     group.position.set(x, 0, z); parent.add(group); return group;
@@ -21,7 +31,16 @@ export function createFurnishings({ THREE, materials: MAT, world, keyLabelForFlo
     const group = new THREE.Group(); const base = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.08, 18), MAT.brass); base.position.y = 0.04;
     const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.42, 10), MAT.brass); stem.position.y = 0.29;
     const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.29, 0.24, 20), MAT.shade); shade.position.y = 0.6;
-    const light = new THREE.PointLight(0x750000, 0.2, 4.2, 2); light.position.y = 0.55; light.castShadow = false; group.add(base, stem, shade, light); group.position.set(x, y, z); parent.add(group); const floor = world.getFloorId(group); collections.floorLights.get(floor)?.push(light); return group;
+    group.add(base, stem, shade); group.position.set(x, y, z); parent.add(group);
+    // A lamp contributes a *record* to the hotel's light pool rather than a PointLight of its own.
+    // One more light in the scene is one more entry in every material's shader program key, and the
+    // pool exists precisely so that number never moves. The shade's emissive is what makes it read
+    // as lit whether or not the pool is currently spending a slot on it.
+    const floor = world.getFloorId(group);
+    group.updateMatrixWorld(true);
+    const spot = group.getWorldPosition(new THREE.Vector3());
+    collections.floorLights.get(floor)?.push({ floor, x: spot.x, y: spot.y + 0.55, z: spot.z, color: 0x750000, intensity: 0.2, distance: 4.2, decay: 2 });
+    return group;
   }
   function addBed(parent, x, z, rotationY = 0) {
     const group = new THREE.Group(); const base = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.45, 3.2), MAT.dark); base.position.y = 0.3;
@@ -42,7 +61,7 @@ export function createFurnishings({ THREE, materials: MAT, world, keyLabelForFlo
     const tooth1 = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.08, 0.035), MAT.brass); tooth1.position.set(0.14, -0.035, 0); const tooth2 = tooth1.clone(); tooth2.position.x = 0.19;
     group.add(ring, shaft, tooth1, tooth2); group.scale.setScalar(0.9); return group;
   }
-  function addDresser(parent, x, z, rotationY = 0, { keyId = null, keyLabel = null, label = 'drawer' } = {}) {
+  function addDresser(parent, x, z, rotationY = 0, { keyId = null, keyLabel = null, label = 'drawer', planId = null } = {}) {
     const root = new THREE.Group(); root.position.set(x, 0, z); root.rotation.y = rotationY; parent.add(root);
     const body = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.9, 0.58), MAT.wood); body.position.y = 0.45; body.castShadow = true; body.receiveShadow = true; root.add(body);
     const top = new THREE.Mesh(new THREE.BoxGeometry(1.44, 0.08, 0.66), MAT.wood); top.position.y = 0.94; root.add(top);
@@ -50,8 +69,9 @@ export function createFurnishings({ THREE, materials: MAT, world, keyLabelForFlo
     const handle = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.045, 0.05), MAT.brass); handle.position.set(0, 0, -0.065); face.add(handle);
     const tray = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.18, 0.48), MAT.dark); tray.position.set(0, -0.03, 0.22); drawer.add(tray);
     const keyMesh = makeKeyMesh(); keyMesh.position.set(0, 0.09, 0.12); keyMesh.rotation.z = 0.1; drawer.add(keyMesh); keyMesh.visible = !!keyId;
-    const item = { root, drawer, face, open: false, searched: false, keyId, keyLabel: keyLabel || keyId, label, targetZ: -0.31, closedZ: -0.31, openZ: -0.83, keyMesh };
+    const item = { planId, root, drawer, face, open: false, searched: false, keyId, keyLabel: keyLabel || keyId, label, targetZ: -0.31, closedZ: -0.31, openZ: -0.83, keyMesh };
     collections.dynamicDrawers.push(item);
+    if (planId) collections.drawersByPlanId.set(planId, item);
     collections.interactables.push({ object: face, enabled: () => true, prompt: () => !item.open ? `Open ${item.label}` : !item.searched ? `Search ${item.label}` : `Close ${item.label}`, action: () => {
       if (!item.open) { item.open = true; item.targetZ = item.openZ; return; }
       if (!item.searched) { item.searched = true; if (item.keyId) { world.addInventoryKey(item.keyId, item.keyLabel); item.keyMesh.visible = false; } else world.notify('Nothing useful in this drawer.'); world.emit('drawer-searched', { keyId: item.keyId || null, floor: world.getFloorId(root) }); return; }
@@ -61,11 +81,22 @@ export function createFurnishings({ THREE, materials: MAT, world, keyLabelForFlo
   }
   function addVending(parent, x, z, color, rotationY = 0) {
     const group = new THREE.Group(); group.position.set(x, 0, z); group.rotation.y = rotationY; parent.add(group);
-    world.addBox(group, 0, 1.1, 0, 1.1, 2.2, 0.9, new THREE.MeshStandardMaterial({ color, roughness: 0.66 }));
+    world.addBox(group, 0, 1.1, 0, 1.1, 2.2, 0.9, vendingMaterial(color));
     world.addBox(group, 0, 1.3, -0.455, 0.74, 1.05, 0.05, MAT.dark); world.addBox(group, 0.28, 0.56, -0.46, 0.16, 0.18, 0.05, MAT.brass); return group;
   }
   function update(delta, config) {
     for (const item of collections.dynamicDrawers) { const diff = item.targetZ - item.drawer.position.z; if (Math.abs(diff) > 0.001) item.drawer.position.z += Math.sign(diff) * Math.min(Math.abs(diff), config.drawerSpeed * delta); }
+  }
+
+  // Online the server owns which drawers are open and whether the key is still in one, so a snapshot
+  // drives the slide and hides the key rather than a click doing it locally.
+  function applyDrawer(planId, { amount, searched }) {
+    const item = collections.drawersByPlanId.get(planId);
+    if (!item) return false;
+    item.targetZ = item.closedZ + (item.openZ - item.closedZ) * Math.max(0, Math.min(1, amount));
+    item.open = amount > 0.05;
+    if (searched && item.keyMesh) item.keyMesh.visible = false;
+    return true;
   }
 
   // One placement record from the plan becomes one piece of furniture.
@@ -75,7 +106,7 @@ export function createFurnishings({ THREE, materials: MAT, world, keyLabelForFlo
     if (type === 'couch') return addCouch(parent, x, z, rotationY);
     if (type === 'plant') return addPlant(parent, x, z, placement.scale || 1);
     if (type === 'vending') return addVending(parent, x, z, placement.color, rotationY);
-    if (type === 'dresser') return addDresser(parent, x, z, rotationY, { keyId: placement.keyId || null, keyLabel: placement.keyLabel || null, label: placement.label || 'drawer' });
+    if (type === 'dresser') return addDresser(parent, x, z, rotationY, { keyId: placement.keyId || null, keyLabel: placement.keyLabel || null, label: placement.label || 'drawer', planId: placement.id || null });
     if (type === 'desk') {
       const desk = addDesk(parent, x, z, rotationY);
       if (placement.lamp) addTableLamp(desk, 0, 0.13);
@@ -84,5 +115,5 @@ export function createFurnishings({ THREE, materials: MAT, world, keyLabelForFlo
     return null;
   }
 
-  return { addPlant, addDesk, addTableLamp, addBed, addCouch, addDresser, addVending, place, update, keyLabelForFloor, state };
+  return { addPlant, addDesk, addTableLamp, addBed, addCouch, addDresser, addVending, place, update, keyLabelForFloor, state, applyDrawer };
 }

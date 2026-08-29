@@ -100,7 +100,28 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
     elevator.roundHeld = false;
     elevator.state = 'opening';
   }
+  // Online the cabin is the server's. It publishes a height, a floor and how far apart the leaves
+  // are; this only draws that, because two clients running their own lift would disagree about where
+  // the floor under a passenger is.
+  function applyRemote(view) {
+    if (!view) return;
+    elevator.remote = true;
+    elevator.currentFloor = view.floor;
+    elevator.targetFloor = view.targetFloor;
+    elevator.state = view.state;
+    elevator.car.position.y = view.y;
+    world.setDynamicHeight('elevator-car', view.y);
+    syncDoors(view.doorAmount);
+    updateIndicator();
+    if (elevator.state === 'moving' && isPlayerInsideXZ()) world.state.playerFloor = 0;
+    if (elevator.state === 'moving') { world.elevatorBadge.classList.remove('hidden'); world.elevatorBadge.textContent = `Elevator ${elevator.targetFloor > elevator.currentFloor ? '↑' : '↓'} Floor ${elevator.targetFloor}`; }
+    else world.elevatorBadge.classList.add('hidden');
+  }
+
   function update(delta, elapsed) {
+    // There is one authority per hotel. Online the local state machine stands down entirely rather
+    // than running alongside the server's and fighting it over the car's height.
+    if (elevator.remote) return;
     const epsilon = 0.005;
     if (elevator.state === 'closing') {
       const next = Math.max(0, elevator.doorAmount - CONFIG.elevatorDoorSpeed * delta); syncDoors(next);
@@ -117,5 +138,5 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
     if (elevator.state === 'moving') { world.elevatorBadge.classList.remove('hidden'); world.elevatorBadge.textContent = `Elevator ${elevator.targetFloor > elevator.currentFloor ? '↑' : '↓'} Floor ${elevator.targetFloor}`; } else world.elevatorBadge.classList.add('hidden');
   }
 
-  return { elevator, build, call, requestFloor, update, holdSeeker, releaseSeeker, isPlayerInside, isPlayerInsideXZ };
+  return { elevator, build, call, requestFloor, update, applyRemote, holdSeeker, releaseSeeker, isPlayerInside, isPlayerInsideXZ };
 }

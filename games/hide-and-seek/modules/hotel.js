@@ -1,17 +1,40 @@
+import { createStaticBatcher } from './static-batcher.js';
+
 // The hotel's renderer.
 //
 // It does not decide where anything is. `hotel-plan.js` answers that with plain data, and this walks
 // the plan turning it into meshes. That split is what lets a server build the same building with no
 // WebGL in the process — and it means a wall can never exist for the eye but not for collision, or
 // the other way round, because both come from the one list.
-export function createHotel({ THREE, scene, materials: MAT, config: CONFIG, floorY, keyIdForFloor, keyLabelForFloor, floorDefs, layout, plan: planApi, world, furnishings, elevator, performance, mergeGeometries }) {
+// How many point lights the hotel ever has switched on. This is a hard number rather than a budget:
+// three.js bakes the light count into every material's shader program cache key, so a hotel that
+// lights 8 lamps on one floor and 16 in the stairwell is a hotel that recompiles ~220 materials on
+// the frame the player opens the stairwell door. The lamps themselves are plain records, and the
+// nearest `LIGHT_POOL_SIZE` of them are assigned into these fixed slots as the player moves.
+export const LIGHT_POOL_SIZE = 8;
+
+// The nearest lit lamps to a point, from the floors that are lit. Pure, and deliberately here
+// rather than in the mirrored pure layer: a server has no lights to choose between.
+export function selectPoolLights(candidates, { floors = null, origin = { x: 0, y: 0, z: 0 }, poolSize = LIGHT_POOL_SIZE } = {}) {
+  const lit = [];
+  for (const entry of candidates || []) {
+    if (floors && !floors.includes(entry.floor)) continue;
+    const dx = entry.x - origin.x; const dy = entry.y - origin.y; const dz = entry.z - origin.z;
+    lit.push({ entry, distance: dx * dx + dy * dy + dz * dz });
+  }
+  lit.sort((a, b) => a.distance - b.distance);
+  return lit.slice(0, poolSize).map((item) => item.entry);
+}
+
+export function createHotel({ THREE, scene, camera, materials: MAT, config: CONFIG, floorY, keyIdForFloor, keyLabelForFloor, floorDefs, layout, plan: planApi, world, furnishings, elevator, performance, mergeGeometries }) {
   const { collections, stairwellGroup } = world;
+  const batcher = createStaticBatcher({ THREE, mergeGeometries });
+  let batchStats = null;
   // The stairwell is 108 treads plus every rail segment. Left as individual meshes that is several
   // hundred draw calls in the one place the player is guaranteed to stand, so the static parts are
   // baked into one mesh per material at build time. Nothing in the stairwell moves.
   const stairBatch = { treads: [], rails: [] };
   const railMat = new THREE.MeshStandardMaterial({ color: 0x202329, metalness: 0.42, roughness: 0.62 });
-  const floorLightingChanged = performance.createChangeTracker();
   let plan = null;
 
   function bakeStatic(geometry, matrix, bucket) {
@@ -20,7 +43,19 @@ export function createHotel({ THREE, scene, materials: MAT, config: CONFIG, floo
     bucket.push(baked);
     return baked;
   }
-  function registerFloorLight(floor, light) { collections.floorLights.get(floor)?.push(light); }
+  // The pool. Every slot is created once, added to the scene once, and never hidden — only moved,
+  // recoloured and dimmed. A parked slot sits at zero intensity, which costs a few shader
+  // instructions and saves a compile.
+  const lightPool = [];
+  const poolSelectionChanged = performance.createChangeTracker();
+  function buildLightPool() {
+    for (let slot = 0; slot < LIGHT_POOL_SIZE; slot += 1) {
+      const light = new THREE.PointLight(0xb00000, 0, 9, 2);
+      light.name = `Hall Lamp Slot ${slot}`; light.castShadow = false;
+      scene.add(light); lightPool.push(light);
+    }
+  }
+  function registerFloorLight(floor, record) { collections.floorLights.get(floor)?.push(record); }
   function materialFor(name) { return MAT[name] || MAT.wall; }
   function groupFor(floor) { return collections.floorGroups.get(floor); }
 
@@ -32,7 +67,7 @@ export function createHotel({ THREE, scene, materials: MAT, config: CONFIG, floo
     const item = { planId: spec.id, hinge, door, open: spec.openInitially, target: 0, side: spec.side, locked: spec.locked, roomNumber, requiredKey: spec.requiredKey };
     if (spec.openInitially) { item.target = spec.openAngle; hinge.rotation.y = item.target; }
     world.setOpening(spec.id, hinge.rotation.y);
-    collections.dynamicDoors.push(item); collections.roomDoors.set(roomNumber, item);
+    collections.dynamicDoors.push(item); collections.roomDoors.set(roomNumber, item); collections.doorsByPlanId.set(spec.id, item);
     collections.interactables.push({ object: door, enabled: () => true, prompt: () => {
       if (item.locked) return item.requiredKey && world.state.inventory.has(item.requiredKey) ? `Unlock ${roomNumber} with key` : `${roomNumber} — Locked`;
       return `${item.open ? 'Close' : 'Open'} ${roomNumber}`;
@@ -48,7 +83,7 @@ export function createHotel({ THREE, scene, materials: MAT, config: CONFIG, floo
     const trim = new THREE.Mesh(new THREE.BoxGeometry(0.125, 1.72, 0.035), new THREE.MeshStandardMaterial({ color: 0xcac7bd, roughness: 0.9 })); trim.position.set(spec.side === 'left' ? 0.065 : -0.065, 0, spec.width * 0.31); panel.add(trim);
     const item = { planId: spec.id, id: spec.id, hinge, panel, side: spec.side, open: false, target: 0, discovered: false };
     world.setOpening(spec.id, 0);
-    collections.dynamicDoors.push(item); collections.secretPanels.set(spec.id, item);
+    collections.dynamicDoors.push(item); collections.secretPanels.set(spec.id, item); collections.doorsByPlanId.set(spec.id, item);
     collections.interactables.push({ object: panel, enabled: () => true, prompt: () => !item.discovered ? 'Inspect loose wall panel' : `${item.open ? 'Close' : 'Open'} secret passage`, action: () => {
       if (!item.discovered) { item.discovered = true; world.notify('A hidden passage is behind the wall.'); world.emit('secret-discovered', { id: spec.id, floor: spec.floor }); }
       item.open = !item.open; item.target = item.open ? spec.openAngle : 0; if (item.open) world.emit('secret-opened', { id: spec.id, floor: spec.floor });
@@ -110,6 +145,35 @@ export function createHotel({ THREE, scene, materials: MAT, config: CONFIG, floo
     }
   }
 
+  // Everything the plan describes is built one record at a time — that is what keeps the renderer a
+  // walk over the plan rather than a second author of the building. The cost is a draw call per
+  // wall, slab, ceiling tile, door frame jamb and bed leg, which came to roughly 2,880 per frame.
+  // So the hotel is built exactly as before and then flattened: static leaves merge per floor per
+  // material, and everything that moves or has to be identified by a raycast is named here.
+  function flattenStatics() {
+    const skip = new Set();
+    // A leaf that swings, slides or is animated. `skip` holds subtree roots, so naming the hinge
+    // covers the leaf and its knobs, and naming the drawer covers the face, the tray and the key.
+    for (const item of collections.dynamicDoors) skip.add(item.hinge);
+    for (const item of collections.dynamicDrawers) skip.add(item.drawer);
+    for (const entry of collections.hallElevatorDoors.values()) skip.add(entry.group);
+    // A merged mesh has no identity, and `player.js` finds what you are looking at by matching the
+    // object a ray hit against this list.
+    for (const item of collections.interactables) if (item.object) skip.add(item.object);
+    // The room fills are lit by their door's swing, so their material is written to at runtime.
+    for (const door of collections.roomDoors.values()) if (door.fillFixture) skip.add(door.fillFixture);
+
+    const totals = { merged: 0, batches: 0, skipped: 0, pruned: 0 };
+    for (const def of floorDefs) {
+      const group = groupFor(def.id);
+      if (!group) continue;
+      const stats = batcher.flatten(group, { skip, name: `Floor ${def.id}` });
+      for (const key of Object.keys(totals)) totals[key] += stats[key];
+    }
+    batchStats = totals;
+    return totals;
+  }
+
   function build() {
     plan = planApi.createHotelPlan({ config: CONFIG, floorDefs, layout, floorY, keyIdForFloor, keyLabelForFloor });
     world.setPlan(plan);
@@ -142,11 +206,9 @@ export function createHotel({ THREE, scene, materials: MAT, config: CONFIG, floo
     for (const entry of plan.signs) world.addSign(groupFor(entry.floor), entry.text, entry.x, entry.localY, entry.z, entry.rotationY, entry.w, entry.h);
     for (const entry of plan.doorFrames) world.addDoorFrame(groupFor(entry.floor), { x: entry.x, z: entry.z, width: entry.width, height: entry.height, material: materialFor(entry.material) });
     for (const entry of plan.wallLamps) addWallLamp(groupFor(entry.floor), entry.x, entry.localY, entry.z, entry.rotationY);
-    for (const entry of plan.lights) {
-      const light = new THREE.PointLight(entry.color, entry.intensity, entry.distance, entry.decay);
-      light.position.set(entry.x, entry.localY, entry.z); light.castShadow = false;
-      groupFor(entry.floor).add(light); registerFloorLight(entry.floor, light);
-    }
+    // A lamp is a record in world space, not a light. Which of them are switched on is decided every
+    // frame by the pool, and the pool lives on the scene rather than under a floor group.
+    for (const entry of plan.lights) registerFloorLight(entry.floor, { floor: entry.floor, x: entry.x, y: entry.y, z: entry.z, color: entry.color, intensity: entry.intensity, distance: entry.distance, decay: entry.decay });
 
     for (const spec of plan.roomDoors) createRoomDoor(groupFor(spec.floor), spec);
     for (const spec of plan.secretPanels) createSecretPanel(groupFor(spec.floor), spec);
@@ -169,8 +231,32 @@ export function createHotel({ THREE, scene, materials: MAT, config: CONFIG, floo
 
     buildStairwell();
     flushStairBatch();
+    flattenStatics();
+    buildLightPool();
+    updateLightPool(layout.selectVisibleLightFloors({ activeFloor: world.state.playerFloor, feetY: world.state.playerFeetY, floorHeight: CONFIG.floorHeight, floorCount: floorDefs.length }));
     scene.updateMatrixWorld(true);
     world.colliderData();
+  }
+
+  // Reassigning the slots is cheap (a few dozen distance comparisons), but doing it every tick would
+  // let a lamp swap slots on a knife edge and flicker, so it only runs when the lit floors change or
+  // the player has actually walked somewhere.
+  function updateLightPool(litFloors) {
+    const origin = camera ? camera.position : { x: 0, y: world.state.playerFeetY, z: 0 };
+    const key = `${litFloors.join(',')}|${Math.round(origin.x / 2)}|${Math.round(origin.z / 2)}|${Math.round(origin.y / 2)}`;
+    if (!poolSelectionChanged(key)) return;
+    const candidates = [];
+    for (const [, records] of collections.floorLights) for (const record of records) candidates.push(record);
+    const chosen = selectPoolLights(candidates, { floors: litFloors, origin, poolSize: LIGHT_POOL_SIZE });
+    for (let slot = 0; slot < lightPool.length; slot += 1) {
+      const light = lightPool[slot];
+      const record = chosen[slot];
+      // A slot with nothing to light is parked, not hidden: hiding it is what changes the count.
+      if (!record) { light.intensity = 0; continue; }
+      light.position.set(record.x, record.y, record.z);
+      light.color.setHex(record.color); light.intensity = record.intensity;
+      light.distance = record.distance; light.decay = record.decay;
+    }
   }
 
   function update(delta) {
@@ -178,9 +264,7 @@ export function createHotel({ THREE, scene, materials: MAT, config: CONFIG, floo
     const litFloors = layout.selectVisibleLightFloors({
       activeFloor, feetY: world.state.playerFeetY, floorHeight: CONFIG.floorHeight, floorCount: floorDefs.length,
     });
-    if (floorLightingChanged(litFloors.join(','))) {
-      for (const [floor, lights] of collections.floorLights) for (const light of lights) light.visible = litFloors.includes(floor);
-    }
+    updateLightPool(litFloors);
     for (const item of collections.dynamicDoors) {
       const diff = item.target - item.hinge.rotation.y;
       if (Math.abs(diff) > 0.001) {
@@ -191,5 +275,17 @@ export function createHotel({ THREE, scene, materials: MAT, config: CONFIG, floo
       if (item.fillFixture) item.fillFixture.material.emissiveIntensity = Math.abs(item.hinge.rotation.y) > 0.12 ? item.fillSpec.emissiveIntensity : 0.12;
     }
   }
-  return { build, update, getPlan: () => plan };
+  // Online the server owns every door in the hotel, so a snapshot drives the leaf instead of a
+  // click. The angle is set as the *target* rather than applied outright: snapshots arrive 15 times
+  // a second and the swing is drawn 60, so the existing animation is what smooths between them.
+  function applyOpening(planId, angle) {
+    const item = collections.doorsByPlanId.get(planId);
+    if (!item) return false;
+    item.target = angle;
+    item.open = Math.abs(angle) > 0.05;
+    if (item.discovered === false && item.open) item.discovered = true;
+    return true;
+  }
+
+  return { build, update, applyOpening, getPlan: () => plan, getBatchStats: () => batchStats };
 }

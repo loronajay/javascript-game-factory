@@ -79,5 +79,12 @@ export function createRendering({ THREE, document, window, config }) {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
-  return { scene, camera, renderer, materials, setRenderScale: (scale) => renderer.setPixelRatio(nativePixelRatio * scale) };
+  // Compile every material in the built scene up front. Without this the first frame a material is
+  // ever visible pays for its GLSL compile and link, which is a stall in the middle of a round
+  // rather than on the loading screen. It is only honest once the light count is fixed — the pool in
+  // hotel.js — because a program is compiled against the light counts in force when it is built.
+  function warmUp() {
+    try { renderer.compile(scene, camera); } catch (error) { console.warn('Shader warm-up skipped', error); }
+  }
+  return { scene, camera, renderer, materials, warmUp, setRenderScale: (scale) => renderer.setPixelRatio(nativePixelRatio * scale) };
 }

@@ -31,6 +31,9 @@ export function createMonster({
   let detectedTargetId = null;
   let playerProvider = () => [];
   let previousState = awareness.state;
+  // Online this demon is a puppet: the server ticked the real one, and this only draws where it
+  // ended up. Nothing below may decide a catch in that mode — there is one authority per hotel.
+  let remotePose = null;
   let inspectionMotion = 'idle';
   const inspectionMode = new URLSearchParams(window.location.search).get('inspect') === 'monster';
   const stairLayout = layout.createStairLayout({ floorCount: 4, floorHeight: CONFIG.floorHeight });
@@ -45,7 +48,13 @@ export function createMonster({
   const eyeParts = [];
   const skeleton = {};
   let jawGroup = null;
-  let headHalo = null;
+  // Created here rather than with the face it belongs to, and never removed. The face arrives with
+  // the GLB a second or two after the round starts, and a light appearing then changes the scene's
+  // point-light count — which is part of every material's shader program key, so it would recompile
+  // the whole hotel mid-play. It is re-parented onto the head below; that costs nothing.
+  const headHalo = new THREE.PointLight(0xb50006, 0.3, 3.4, 2);
+  headHalo.name = 'Eye Bleed'; headHalo.castShadow = false; headHalo.position.set(0, 2.1, 0.3);
+  root.add(headHalo);
   let mistDisc = null;
   let body = null;
   const bodyRest = new THREE.Vector3();
@@ -270,7 +279,7 @@ export function createMonster({
       const lowerFang = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.075, 6), fangMaterial); lowerFang.name = 'Lower Fang'; lowerFang.position.set(side * 0.025, -0.125, 0.064); jawGroup.add(lowerFang);
       const gash = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.09, 0.012), mouthGlow); gash.name = 'Cheek Gash'; gash.position.set(side * 0.115, -0.03, 0.145); gash.rotation.z = side * 0.4; details.add(gash);
     }
-    headHalo = new THREE.PointLight(0xb50006, 0.3, 3.4, 2); headHalo.name = 'Eye Bleed'; headHalo.position.set(0, 0.02, 0.3); details.add(headHalo);
+    headHalo.position.set(0, 0.02, 0.3); details.add(headHalo);
     details.traverse((object) => { if (object.isMesh) object.castShadow = true; });
     return details;
   }
@@ -600,8 +609,35 @@ export function createMonster({
     world.emit('caught', { demon: name, floor: nearestFloor(), x: root.position.x, z: root.position.z });
   }
 
+  // A snapshot pose, applied the way a network avatar's is: walked toward rather than teleported
+  // onto, so a body that arrives 15 times a second is still drawn smoothly at 60.
+  function setRemotePose(pose) {
+    remotePose = pose;
+    if (!pose) return;
+    awareness = { ...awareness, state: pose.state || ENEMY_STATES.ROAM };
+    routePurpose = pose.routePurpose || 'roam';
+  }
+
+  function updateRemote(delta) {
+    const blend = Math.min(1, delta * 12);
+    root.position.x += (remotePose.x - root.position.x) * blend;
+    root.position.y += (remotePose.y - root.position.y) * blend;
+    root.position.z += (remotePose.z - root.position.z) * blend;
+    let turn = remotePose.yaw - root.rotation.y;
+    while (turn > Math.PI) turn -= Math.PI * 2;
+    while (turn < -Math.PI) turn += Math.PI * 2;
+    root.rotation.y += turn * blend;
+    facing.set(Math.sin(root.rotation.y), 0, Math.cos(root.rotation.y));
+    moving = !!remotePose.moving;
+    if (mixer) { setAnimation(moving ? walkAction : idleAction, awareness.state === ENEMY_STATES.CHASE ? 1.85 : 1); advance(delta); }
+    updateHud();
+  }
+
   function update(delta) {
     updateMenace(delta);
+    // Online the local brain stands down completely: no detection, no routing, and above all no
+    // catch. The server already decided all three.
+    if (remotePose) { updateRemote(delta); return; }
     if (world.state.gameOver) { if (mixer) advance(delta * 0.25); return; }
     if (inspectionMode) { if (mixer) { setAnimation(inspectionMotion === 'walk' ? walkAction : idleAction, 1); advance(delta); } updateHud(); return; }
     updateAwareness(delta);
@@ -628,6 +664,7 @@ export function createMonster({
   root.position.set(spawn.x, spawn.y, spawn.z); if (inspectionMode) root.position.set(0, 0, 0); else choosePatrol(); loadAnimatedBody(); updateHud();
   return {
     update,
+    setRemotePose,
     root,
     setPlayers: (provider) => { playerProvider = typeof provider === 'function' ? provider : () => []; },
     setInspectionAnimation: (motion) => { inspectionMotion = motion === 'walk' ? 'walk' : 'idle'; },

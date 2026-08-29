@@ -1,4 +1,4 @@
-# Agent Handoff — V6.9
+# Agent Handoff — V7.1
 
 Design direction, roadmap, and working agreements live in `CLAUDE.md`. This file is only the list of hard-won invariants: things that were expensive to get right and are easy to break by accident.
 
@@ -36,6 +36,18 @@ The east service-zone shaft is continuous from Floor 1 through Floor 4: south en
 
 Room openings are framed on every floor. Each room owns a shadow-free `fillFixture` that is visible only while its door is open — the architecture test asserts opening a door does not change the renderer's light count, and that only lights near the active floor stay in the realtime pass. Shadows are off and DPR is capped at 1.5 on purpose; adaptive quality lowers render scale after sustained slow frames.
 
+### The light count never changes (V7.2)
+
+**This is the hard one.** three.js bakes the number of lights of each type into every material's shader program cache key, so the frame on which a light appears, disappears, or is hidden is a frame that recompiles and relinks every shader program in the scene. Measured on the built hotel, a normal frame is ~6ms and the frame that adds one point light is **4,580ms** (software renderer — the ratio is what matters). That was the stairwell chug: entering it lit a second floor, doubling the point lights.
+
+So the rule for anything that emits light in this cabinet:
+
+- **Hall and table lamps are records, not lights.** `plan.lights` and `furnishings.addTableLamp` push plain `{ floor, x, y, z, color, intensity, distance, decay }` into `world.collections.floorLights`. `modules/hotel.js` owns a fixed pool of `LIGHT_POOL_SIZE` (8) `PointLight`s, created once at build and **never hidden**; `selectPoolLights` assigns the nearest lit lamps into them as the player moves and parks any spare slot at `intensity = 0`. `layout.selectVisibleLightFloors` still decides which floors are candidates — it just feeds the pool instead of a visibility flag.
+- **Switch a light with `intensity`, never with `visible`.** The flashlight (`modules/player.js`) does this; so does a parked pool slot. `flashlightBeam.visible = ...` used to recompile the hotel on the most-pressed key in the game.
+- **A light that arrives late is a light that stalls.** The demon's `headHalo` is constructed in `createMonster` and merely re-parented onto the face when the GLB lands, because creating it with the face moved the count a second into the round.
+- `rendering.warmUp()` (`renderer.compile`) is called before the first frame so materials compile on the loading screen. It is only honest while the count is fixed, since a program is compiled against the light counts in force when it is built.
+- Share materials for anything spawned during play — a new material is a new program compile. Dropped batteries reuse one casing and one lens material for this reason.
+
 ## The Bellhop (V6)
 
 Spawns at a safe random position, roams all four floors, and travels between them on a purpose-built route graph using the **stairs, never the elevator**. Chase replanning must not restart an active stair route — a route with `stair` points is committed. Detection is FOV + range + vertical level + collider-aware LOS; crouching lowers the eye line and shrinks detection range, which is what makes furniture and corners real cover.
@@ -59,9 +71,32 @@ Every player is a figure, the local one included: the local avatar is driven fro
 
 ## Stairwell performance (V6.4)
 
-The stairwell and the moving elevator report `playerFloor === 0`, and floor 0 used to make **every** light in the hotel visible — roughly 32 point lights in one forward-rendered pass, which is what made the stairwell unplayable. `layout.selectVisibleLightFloors()` now picks floors by vertical proximity to `world.state.playerFeetY`, so at most two are lit. Keep `playerFeetY` published from `player.refreshLocation()`; the lighting rule depends on it.
+The stairwell and the moving elevator report `playerFloor === 0`, and floor 0 used to make **every** light in the hotel visible — roughly 32 point lights in one forward-rendered pass, which is what made the stairwell unplayable. `layout.selectVisibleLightFloors()` now picks floors by vertical proximity to `world.state.playerFeetY`, so at most two are lit. Keep `playerFeetY` published from `player.refreshLocation()`; the lighting rule depends on it. Since V7.2 those floors only choose the *candidates* for a fixed-size light pool — see "The light count never changes" above, which is what actually removed the stairwell hitch.
 
 The stairwell's treads, landings, and rail segments are static, so they are baked into one merged mesh per material at build time (168 meshes → 2 draw calls). Anything new in there that does not move should join the batch rather than being added as its own mesh.
+
+## Static batching (V7.2)
+
+The stairwell's bake is now the whole hotel's. `modules/static-batcher.js` runs once at the end of
+`hotel.build()`: each floor group is traversed, its static leaf meshes are merged per material, and
+emptied containers are pruned. The floor groups go from ~2,780 meshes to ~620.
+
+- **Nothing changes about how the hotel is built.** The renderer still walks the plan one record at
+  a time; the flatten pass happens afterwards. Do not make a builder batch-aware — that drags the
+  merge decision back into the code whose only job is to walk the plan.
+- **What may never be merged is named in `hotel.flattenStatics()`**: door hinges, drawer groups, the
+  hall elevator doors, every `collections.interactables` object, and the room-fill fixtures. A merged
+  mesh has no local transform *and no identity* — `player.js` finds what you are looking at by
+  matching the object its ray hit, so a batched interactable is a door that can no longer be opened.
+  Anything new that animates or has to be pointed at goes in that skip set.
+- **Merged meshes stay raycastable.** The interaction ray reads the nearest hit and then walks up to
+  an interactable, so a wall that stops being a ray target is a door you can open through it.
+- **Frustum culling is the trade.** A merged floor is one bounding box and is always drawn. That is
+  intended: ~620 always-drawn batches beat ~2,780 individually culled boxes.
+- **Share materials for anything placed dozens of times.** A material instance is the batch key, so a
+  fresh `MeshStandardMaterial` per plant pot is 58 draw calls that can never merge. See
+  `potMaterial` / `vendingMaterial` in `modules/furnishings.js`.
+- `HotelPrototype.getState().render` reports live `drawCalls`/`triangles` and what the pass collapsed.
 
 ## Sanity / the anti-camping hunt (V6.5)
 
@@ -112,6 +147,73 @@ A flashlight is the strongest seeker-favouring tool in the game, so it obeys the
 - **They start apart.** `excludedSpawnFloors` seeds the Housekeeper away from the Bellhop's floor, so a round cannot open with both in one stairwell.
 - **The threat readout stays aggregated and position-free.** `enemy-logic.aggregateEnemyState` reduces every demon to one worst-case state for the vignette and the `hotel:monster-state` event. Do not add a per-demon indicator — that is the tracker minimap coming back through the side door, and online it leaks two positions instead of one.
 - **The round does not care which demon caught you.** `resolveDemonCatch` takes a player id, not a killer. Keep it that way; a third demon should cost nothing in `round-logic.js`.
+
+## The shared hotel (V7.1)
+
+`fixtures-logic.js` owns every door, secret panel, drawer, key ring and the elevator. Before it, the
+renderer owned all of them, which is why an online round was a hotel where a door you opened was
+still a wall for the seeker chasing you.
+
+- **A client sends "I pressed E", never "I opened door-201".** The authority picks the fixture by
+  distance, then height, then a facing dot — the same ordering `canTag` uses, and for the same
+  reason. It does not raycast: a server has no meshes to raycast against.
+- **Interaction is edge-triggered on the authority.** A client that holds `E`, or one that spams the
+  message, must not strobe a door open and shut sixty times a second. The rising edge is read off
+  the input stream, which is also why `shouldSendInput` has to send the *release* — an `interact`
+  that latches true means the next press is not an edge at all.
+- **A drawer is contested.** It holds one key, `emptied` is permanent, and `searched` resets on close
+  so the next player gets to look and finds it empty. Two players pressing on the same tick is
+  exactly what this seam exists to resolve.
+- **Only the floor the cabin is standing at has its hall doors open.** Every other floor's opening
+  onto the shaft stays shut whatever the cabin is doing, or the shaft becomes a four-storey hole.
+- **The elevator cabin is still the one collider that is state rather than layout.** It rides the
+  shaft, so `space.setDynamicBoxes` keeps it in a short separate list — folding it into the cached
+  collider set would rebuild all 700-odd boxes every tick it moves.
+- **`describeFixtures` publishes only what a client has to draw.** An undiscovered secret panel is
+  not on the wire, and neither is anyone's key ring but your own: the full map would be a wallhack
+  for every locked room nobody has opened yet.
+
+## The demons, server-side (V7.1)
+
+`demon-logic.js` is the brain; `modules/monster.js` is the body. Everything that decides — where a
+demon walks, what it can see, when it replans, who it catches — moved out of the rendering module.
+
+- **`modules/monster.js` has a puppet mode.** `setRemotePose` switches the whole brain off:
+  `update` returns after `updateRemote`, so online it detects nothing, routes nothing and catches
+  nobody. There is one authority per hotel, and a second demon thinking in a browser would disagree
+  about who died.
+- **A demon's catch requires line of sight**, exactly like a seeker's tag. It used to be distance
+  only, which made a shut door real cover against a player and no cover at all against a demon. The
+  sight ray only runs for a candidate already within arm's reach, so it costs a ray on the rare tick
+  where somebody is about to die rather than one per body per tick.
+- **Only The Bellhop hunts campers** — still. `hunts: false` on The Housekeeper is deliberate and
+  keeps `selectHuntTarget` single-hunter.
+- **Roaming opens an unlocked door; only the hunt forces a lock.** A locked room is a hiding place,
+  not a fortress, but a roaming demon should not be a master key.
+- **A snapshot carries a demon's position and nothing about its intent.** Its route, its target and
+  its awareness stay on the server; the HUD still gets one aggregated threat state. That is the
+  tracker minimap rule (V6.3), enforced at the network boundary this time.
+
+## Online, the parts that bite (V7.1)
+
+- **`find_lobby` must carry `HotelOnline.LOBBY_LIMITS`.** The server matches an open lobby on its
+  seat limits, and a search that omits them is sanitized to the server-wide default of 2-6 — which
+  never equals the 2-8 lobby this game creates. The symptom is silent and baffling: every guest gets
+  their own room and nobody can see anybody.
+- **The cabinet is served from the repo root.** `modules/account-access.js` imports
+  `/js/platform/**` for the sign-in gate, so `server.mjs` roots at the repo and opens
+  `/games/hide-and-seek/`. Rooting it at the cabinet again 404s those modules and the whole module
+  graph fails to boot.
+- **The offline hiders stand down when a match starts.** `hiders.standDown()` removes their bodies
+  rather than pausing them — a hider nobody can catch, standing still in a corridor, is a decoy the
+  seeker wastes the whole round on.
+- **The factory profile is read, never written.** `account-access.js` derives a match alias. This is
+  the repo's Factory-Identity-First rule and it is not negotiable in a cabinet.
+- **A dropped guest keeps their body.** It stays standing and catchable for the 30-second grace
+  window, and `resumeRequestFor` refuses to ask for a seat that window has already closed on.
+- **Automation cannot playtest this.** Chrome freezes `requestAnimationFrame` in unfocused tabs, so
+  two scripted clients cannot both simulate a round. Connection, lobby, roles and replication can be
+  verified from a script; how movement feels cannot.
 
 ## Deliberate removals — do not "restore" these
 
@@ -192,5 +294,6 @@ on the server.
   down. Do not "fix" an empty online hotel by starting the local demons.
 - **The client never resolves a catch.** `modules/online.js` may not import or re-implement
   `canTag`, `resolveTag` or `resolveDemonCatch`; the architecture test asserts it.
-- **Not replicated yet:** doors/drawers/keys, flashlight pickups, and the demons. All three are
-  contested state and all three belong on the server, not in a client message.
+- **All of it is replicated now:** doors, drawers, keys, the elevator, dropped batteries and both
+  demons. See "The shared hotel" and "The demons, server-side" above for the rules each of them
+  brought with it.

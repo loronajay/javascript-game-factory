@@ -189,5 +189,21 @@ export function createAvatars({ THREE, GLTFLoader, scene, config: CONFIG, logic 
     };
   }
 
-  return { spawn, setPose, setVisible, remove, update, get, list, describe, createShowcase };
+  // The local player is a figure like everyone else, driven from the camera through the same
+  // `setPose` a network snapshot uses — so a remote body and the local one can never become two
+  // implementations. The rig's forward is +Z and the camera looks down -Z, hence the half turn.
+  function followCamera(id, { camera, world, player }) {
+    const view = player.getState();
+    setPose(id, {
+      x: camera.position.x,
+      y: world.state.playerFeetY,
+      z: camera.position.z,
+      yaw: world.state.yaw + Math.PI,
+      crouching: world.state.playerCrouching,
+      flashlightOn: view.flashlightOn,
+      flashlightCharge: view.flashlightCharge,
+    });
+  }
+
+  return { spawn, setPose, setVisible, remove, update, get, list, describe, createShowcase, followCamera };
 }

@@ -19,12 +19,15 @@ export function defaultSocketUrl(location) {
 
 export function createOnline({
   logic, avatars, avatarLogic, camera, world, player, menu, config: CONFIG, document, window,
+  hotel = null, furnishings = null, elevator = null, demons = null, flashlightDrops = null, hiders = null,
   socketUrl = defaultSocketUrl(window.location), gameId = 'hide-and-seek', identity = null,
 }) {
   const statusEl = document.getElementById('onlineStatus');
   const roomEl = document.getElementById('onlineRoom');
   const rosterEl = document.getElementById('onlinePlayers');
+  const playerCountEl = document.getElementById('onlinePlayerCount');
   const startBtn = document.getElementById('onlineStart');
+  const copyBtn = document.getElementById('onlineCopy');
   const clockEl = document.getElementById('roundClock');
   const countEl = document.getElementById('roundCount');
   const bannerEl = document.getElementById('roundBanner');
@@ -38,6 +41,32 @@ export function createOnline({
   let poses = new Map();
   let spawned = new Set();
   let announcedOver = false;
+  let narratedTick = -1;
+  let publishedKeys = '';
+  // The seat to reclaim if the socket drops mid-round. Session storage rather than local: a seat is
+  // this tab's, and a second tab opening the hotel must not steal it.
+  const sessionStore = (() => { try { return window.sessionStorage; } catch { return null; } })();
+  const SESSION_KEY = 'hide-and-seek.session';
+  let reconnectTimer = null;
+
+  function saveSession() {
+    if (!sessionStore) return;
+    const saved = logic.rememberSession(net, Date.now());
+    try {
+      if (saved) sessionStore.setItem(SESSION_KEY, JSON.stringify(saved));
+      else sessionStore.removeItem(SESSION_KEY);
+    } catch { /* a browser refusing storage is not a reason to refuse the round */ }
+  }
+
+  function readSession() {
+    if (!sessionStore) return null;
+    try { return JSON.parse(sessionStore.getItem(SESSION_KEY) || 'null'); } catch { return null; }
+  }
+
+  function clearSession() {
+    if (!sessionStore) return;
+    try { sessionStore.removeItem(SESSION_KEY); } catch { /* see above */ }
+  }
 
   function label() {
     if (net.error) return `ERROR: ${net.error.code}`;
@@ -46,16 +75,38 @@ export function createOnline({
     if (net.status === logic.NET_STATES.LOBBY) return `WAITING FOR GUESTS (${net.members.length})`;
     if (net.status === logic.NET_STATES.STARTING) return 'THE HOTEL IS OPENING…';
     if (net.status === logic.NET_STATES.ENDED) return 'ROUND OVER';
+    if (net.absent.length) return `IN THE HOTEL · ${net.absent.length} GUEST${net.absent.length === 1 ? '' : 'S'} DROPPED`;
     return 'IN THE HOTEL';
   }
 
   function renderLobby() {
-    if (statusEl) statusEl.textContent = label();
-    if (roomEl) roomEl.textContent = net.roomCode ? `ROOM ${net.roomCode}` : '';
+    if (statusEl) { statusEl.textContent = label(); statusEl.dataset.state = net.status; }
+    if (roomEl) roomEl.textContent = net.roomCode || '— — — — —';
+    if (playerCountEl) playerCountEl.textContent = `${net.members.length} / ${logic.LOBBY_LIMITS.maxPlayers}`;
+    if (copyBtn) copyBtn.disabled = !net.roomCode;
     if (rosterEl) {
-      rosterEl.textContent = net.members.length
-        ? net.members.map((id, index) => (id === net.clientId ? `You` : `Guest ${index + 1}`)).join(' · ')
-        : 'No one else here yet.';
+      rosterEl.replaceChildren();
+      if (!net.members.length) {
+        const empty = document.createElement('div');
+        empty.className = 'emptyRoster';
+        empty.textContent = 'Waiting for the first guest…';
+        rosterEl.appendChild(empty);
+      }
+      net.members.forEach((id, index) => {
+        const guest = document.createElement('div');
+        guest.className = 'rosterGuest';
+        const seat = document.createElement('span');
+        seat.className = 'guestSeat';
+        seat.textContent = String(index + 1).padStart(2, '0');
+        const name = document.createElement('span');
+        name.className = 'guestName';
+        name.textContent = id === net.clientId ? 'YOU' : `GUEST ${index + 1}`;
+        const badge = document.createElement('span');
+        badge.className = 'guestBadge';
+        badge.textContent = id === net.ownerId ? 'HOST' : 'READY';
+        guest.append(seat, name, badge);
+        rosterEl.appendChild(guest);
+      });
     }
     if (startBtn) {
       const owner = !!net.clientId && net.clientId === net.ownerId;
@@ -99,6 +150,43 @@ export function createOnline({
       avatars.remove(id);
       spawned.delete(id);
       poses.delete(id);
+    }
+  }
+
+  // The hotel's moving parts, drawn from the snapshot. None of this is decided here: a door is open
+  // because the server says so, the cabin is at that height because the server put it there, and a
+  // drawer is empty because someone else got there first.
+  function applyFixtures(view) {
+    if (!view) return;
+    if (hotel) for (const id of Object.keys(view.doors)) hotel.applyOpening(id, view.doors[id]);
+    if (furnishings) for (const id of Object.keys(view.drawers)) furnishings.applyDrawer(id, view.drawers[id]);
+    if (elevator) elevator.applyRemote(view.elevator);
+  }
+
+  // The key ring is the one piece of fixture state that is *yours*, so it arrives on your own player
+  // record rather than in the shared fixture view — another player's keys are not your business.
+  function applyKeys(keys) {
+    const joined = (keys || []).join('|');
+    if (joined === publishedKeys) return;
+    publishedKeys = joined;
+    world.state.inventory = new Set(keys || []);
+    world.updateInventoryHud();
+  }
+
+  // Server events, narrated once. Snapshots arrive 15 times a second and this runs 60, so the tick
+  // that produced them is what gates the callout — otherwise every message is read out four times.
+  function narrate(snapshot) {
+    if (!snapshot || !Array.isArray(snapshot.events) || snapshot.tick === narratedTick) return;
+    narratedTick = snapshot.tick;
+    for (const event of snapshot.events) {
+      if (event.playerId && event.playerId !== net.clientId) continue;
+      if (event.type === 'door-locked') world.notify(`${event.roomNumber} is locked. Search drawers or find another route.`, 2200);
+      else if (event.type === 'door-unlocked') world.notify(`${event.roomNumber} unlocked.`, 1800);
+      else if (event.type === 'key-found') world.notify(`Found: ${event.keyLabel || event.keyId}`, 2000);
+      else if (event.type === 'drawer-empty') world.notify('Nothing useful in this drawer.', 1600);
+      else if (event.type === 'secret-discovered') world.notify('A hidden passage is behind the wall.', 2200);
+      else if (event.type === 'flashlight-pickup') world.notify(`FLASHLIGHT CHARGE: ${Math.ceil(event.charge * 100)}%`, 1800);
+      else if (event.type === 'elevator-held') world.notify('The elevator is locked until hiding time is over.', 1800);
     }
   }
 
@@ -146,14 +234,35 @@ export function createOnline({
     const previousStatus = net.status;
     net = logic.applyNetEvent(net, event);
     if (event.event === 'connected') {
-      send({ type: 'find_lobby', gameId, identity: identity || undefined });
+      // A seat still inside its grace window is reclaimed rather than replaced: the body is standing
+      // in the hotel and is still catchable, so rejoining as a new player would leave a corpse.
+      const resume = logic.resumeRequestFor(readSession(), Date.now(), logic.RECONNECT_GRACE_MS);
+      if (resume) send(resume);
+      else send({ type: 'find_lobby', gameId, ...logic.LOBBY_LIMITS, identity: identity || undefined });
     }
+    if (event.event === 'error' && event.code === 'RESUME_REJECTED') {
+      clearSession();
+      send({ type: 'find_lobby', gameId, ...logic.LOBBY_LIMITS, identity: identity || undefined });
+    }
+    if (event.event === 'session_resumed') {
+      active = true;
+      world.state.remoteFixtures = true;
+      menu.dispatch(menu.actions.PLAY);
+    }
+    if (event.event === 'lobby_joined' || event.event === 'connected' || event.event === 'session_resumed') saveSession();
     if (net.status === logic.NET_STATES.STARTING && previousStatus !== logic.NET_STATES.STARTING) {
       active = true;
       announcedOver = false;
+      // There is one authority per hotel. Every door, drawer, lift and demon in this browser stops
+      // deciding anything the moment the match starts, and the offline stand-in hiders leave the
+      // building — the guests are real now.
+      world.state.remoteFixtures = true;
+      if (hiders) hiders.standDown();
       menu.dispatch(menu.actions.PLAY);
     }
     if (net.status === logic.NET_STATES.ENDED && previousStatus !== logic.NET_STATES.ENDED) {
+      // A finished round is not a seat worth reclaiming.
+      clearSession();
       world.emit('round-over', { ...net.snapshot.round, online: true });
     }
     renderLobby();
@@ -170,7 +279,18 @@ export function createOnline({
       if (payload) handleEvent(payload);
     });
     socket.addEventListener('close', () => {
+      // Mid-round, a closed socket is a dropped connection rather than a finished game: the seat is
+      // held for a grace window, so try to walk back into it before tearing the lobby down.
+      const resumable = logic.resumeRequestFor(readSession(), Date.now(), logic.RECONNECT_GRACE_MS);
       active = false;
+      world.state.remoteFixtures = false;
+      if (resumable) {
+        if (statusEl) statusEl.textContent = 'RECONNECTING…';
+        window.clearTimeout(reconnectTimer);
+        reconnectTimer = window.setTimeout(() => { socket = null; connect(); }, 1200);
+        return;
+      }
+      clearSession();
       net = logic.applyNetEvent(net, { event: 'lobby_closed' });
       renderLobby();
     });
@@ -182,26 +302,52 @@ export function createOnline({
 
   function disconnect() {
     active = false;
+    world.state.remoteFixtures = false;
+    window.clearTimeout(reconnectTimer);
+    clearSession();
     if (socket) socket.close();
     socket = null;
   }
 
   function update(delta) {
     if (!active) return;
-    if (net.status === logic.NET_STATES.PLAYING || net.status === logic.NET_STATES.ENDED) {
-      pushInput(delta);
-      reconcileSelf(delta);
-      syncBodies(delta);
-      paintRoundHud();
-    }
+    if (net.status !== logic.NET_STATES.PLAYING && net.status !== logic.NET_STATES.ENDED) return;
+    pushInput(delta);
+    reconcileSelf(delta);
+    syncBodies(delta);
+    applyFixtures(net.snapshot?.fixtures);
+    if (demons) demons.applySnapshot(net.snapshot?.demons || [], net.snapshot?.threat, net.clientId);
+    if (flashlightDrops) flashlightDrops.applySnapshot(net.snapshot?.pickups || []);
+    const self = logic.selfOf(net);
+    if (self) { player.applyRemoteFlashlight(self.flashlight); applyKeys(self.keys); }
+    narrate(net.snapshot);
+    paintRoundHud();
   }
 
-  if (startBtn) startBtn.addEventListener('click', () => send({ type: 'start_lobby' }));
+  function menuClick() {
+    window.dispatchEvent(new window.CustomEvent('hotel:menu-action', { detail: { action: 'onlineAction' } }));
+  }
+
+  if (startBtn) startBtn.addEventListener('click', () => { menuClick(); send({ type: 'start_lobby' }); });
+  if (copyBtn) copyBtn.addEventListener('click', () => {
+    if (!net.roomCode) return;
+    menuClick();
+    window.navigator?.clipboard?.writeText(net.roomCode).catch(() => {});
+    copyBtn.textContent = 'COPIED';
+    window.setTimeout(() => { copyBtn.textContent = 'COPY CODE'; }, 1200);
+  });
   renderLobby();
 
   return {
     connect, disconnect, update,
     isActive: () => active,
-    getState: () => ({ status: net.status, roomCode: net.roomCode, clientId: net.clientId, members: net.members.length, seeker: net.seekerId, tick: net.snapshot?.tick ?? null }),
+    getState: () => ({
+      status: net.status, roomCode: net.roomCode, clientId: net.clientId,
+      members: net.members.length, absent: net.absent.length, seeker: net.seekerId,
+      tick: net.snapshot?.tick ?? null,
+      demons: net.snapshot?.demons?.length ?? 0,
+      threat: net.snapshot?.threat ?? null,
+      resumable: !!logic.resumeRequestFor(readSession(), Date.now(), logic.RECONNECT_GRACE_MS),
+    }),
   };
 }

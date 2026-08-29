@@ -10,6 +10,7 @@
   // is pure so `PLAYING` can be the one place the rest of the game asks "is the simulation running?".
   const SCREENS = Object.freeze({
     TITLE: 'title',
+    SOLO_SETUP: 'soloSetup',
     HOW_TO: 'howTo',
     EXTRAS: 'extras',
     ONLINE: 'online',
@@ -19,6 +20,7 @@
   });
 
   const ACTIONS = Object.freeze({
+    SINGLE_PLAYER: 'singlePlayer',
     PLAY: 'play',
     HOW_TO: 'howTo',
     EXTRAS: 'extras',
@@ -34,6 +36,20 @@
   // where it came from instead of always landing on the title. The online lobby behaves the same
   // way, except that leaving PLAYING is not its own decision: the server starts the match.
   const READABLE = Object.freeze([SCREENS.HOW_TO, SCREENS.EXTRAS, SCREENS.ONLINE]);
+  const MATCH_DEFAULTS = Object.freeze({ hiderCount: 3, hideSeconds: 45 });
+  const MATCH_LIMITS = Object.freeze({ minHiders: 1, maxHiders: 8, minHideSeconds: 45, maxHideSeconds: 120 });
+
+  function clampInteger(value, fallback, minimum, maximum) {
+    const parsed = Number.parseInt(value, 10);
+    return Math.min(maximum, Math.max(minimum, Number.isFinite(parsed) ? parsed : fallback));
+  }
+
+  function normalizeMatchConfig(options = {}) {
+    return {
+      hiderCount: clampInteger(options.hiderCount, MATCH_DEFAULTS.hiderCount, MATCH_LIMITS.minHiders, MATCH_LIMITS.maxHiders),
+      hideSeconds: clampInteger(options.hideSeconds, MATCH_DEFAULTS.hideSeconds, MATCH_LIMITS.minHideSeconds, MATCH_LIMITS.maxHideSeconds),
+    };
+  }
 
   function createMenuState() {
     return { screen: SCREENS.TITLE, back: null, effect: null };
@@ -64,14 +80,19 @@
     // dispatched by the net layer on `lobby_started`, never by a button on this screen.
     if (current.screen === SCREENS.ONLINE && action === ACTIONS.PLAY) return goto(SCREENS.PLAYING);
     if (READABLE.includes(current.screen)) return action === ACTIONS.BACK ? goto(current.back || SCREENS.TITLE) : stay;
+    if (current.screen === SCREENS.SOLO_SETUP) {
+      if (action === ACTIONS.BACK) return goto(SCREENS.TITLE);
+      if (action === ACTIONS.PLAY) return goto(SCREENS.PLAYING);
+      return stay;
+    }
     if (action === ACTIONS.ONLINE) return goto(SCREENS.ONLINE, current.screen);
     if (action === ACTIONS.HOW_TO) return goto(SCREENS.HOW_TO, current.screen);
     if (action === ACTIONS.EXTRAS) return goto(SCREENS.EXTRAS, current.screen);
-    if (current.screen === SCREENS.TITLE) return action === ACTIONS.PLAY ? goto(SCREENS.PLAYING) : stay;
+    if (current.screen === SCREENS.TITLE) return action === ACTIONS.SINGLE_PLAYER ? goto(SCREENS.SOLO_SETUP, SCREENS.TITLE) : stay;
     if (current.screen === SCREENS.PLAYING) return action === ACTIONS.PAUSE ? goto(SCREENS.PAUSE) : stay;
     if (current.screen === SCREENS.PAUSE) return action === ACTIONS.RESUME ? goto(SCREENS.PLAYING) : stay;
     return stay;
   }
 
-  return { ACTIONS, SCREENS, createMenuState, isOverlayVisible, isPlaying, nextMenuState };
+  return { ACTIONS, SCREENS, MATCH_DEFAULTS, MATCH_LIMITS, createMenuState, isOverlayVisible, isPlaying, nextMenuState, normalizeMatchConfig };
 });

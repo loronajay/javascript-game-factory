@@ -38,17 +38,48 @@
 
   const INPUT_HEARTBEAT_SECONDS = 0.5;
 
+  // The server holds a dropped player's seat for 30 seconds and leaves their body standing where it
+  // was — a free find, which is the honest consequence. The client is given slightly less than that
+  // to come back, so a resume that is already too late is never even attempted.
+  const RECONNECT_GRACE_MS = 30_000;
+
+  // The lobby size, and it has to be **sent** rather than left to the server's default. `find_lobby`
+  // matches an open lobby by its seat limits, and a search that omits them is sanitized to the
+  // server-wide default of 2-6 — which never equals the 2-8 lobby this game actually creates, so
+  // every guest would silently open a room of their own instead of joining each other.
+  const LOBBY_LIMITS = Object.freeze({ minPlayers: 2, maxPlayers: 8 });
+  const RESUME_MARGIN_MS = 1_500;
+
   function createNetState() {
     return {
       status: NET_STATES.OFFLINE,
       clientId: null,
+      sessionToken: null,
       roomCode: null,
       ownerId: null,
       members: [],
       seekerId: null,
       snapshot: null,
       error: null,
+      // Who has dropped and is still inside their grace window. Their body is standing in the hotel
+      // and is still catchable, so this is a caption rather than a roster change.
+      absent: [],
     };
+  }
+
+  // What has to survive a socket closing so the same seat can be reclaimed. Nothing about the round
+  // is kept — the server still owns all of that, and a resumed client is told it fresh.
+  function rememberSession(state, now = Date.now()) {
+    if (!state || !state.clientId || !state.sessionToken || !state.roomCode) return null;
+    return { clientId: state.clientId, sessionToken: state.sessionToken, roomCode: state.roomCode, at: now };
+  }
+
+  // Whether a saved seat is still worth asking for. Past the grace window the server has already
+  // given it away, and asking would only produce a RESUME_REJECTED to handle.
+  function resumeRequestFor(saved, now = Date.now(), graceMs = RECONNECT_GRACE_MS) {
+    if (!saved || !saved.clientId || !saved.sessionToken) return null;
+    if (!(now - (saved.at || 0) < graceMs - RESUME_MARGIN_MS)) return null;
+    return { type: 'resume_lobby', clientId: saved.clientId, sessionToken: saved.sessionToken };
   }
 
   function memberIdsFrom(payload) {
@@ -68,7 +99,28 @@
     if (!event || !event.event) return current;
     switch (event.event) {
       case 'connected':
-        return { ...current, status: NET_STATES.CONNECTING, clientId: event.clientId || null, error: null };
+        return {
+          ...current,
+          status: NET_STATES.CONNECTING,
+          clientId: event.clientId || null,
+          sessionToken: event.sessionToken || null,
+          error: null,
+        };
+      // The seat was still there. The round is still running and the server will say where everyone
+      // is on the next snapshot, so this only restores who this client *is*.
+      case 'session_resumed':
+        return {
+          ...current,
+          status: NET_STATES.PLAYING,
+          clientId: event.clientId || current.clientId,
+          sessionToken: event.sessionToken || current.sessionToken,
+          roomCode: event.roomCode || current.roomCode,
+          error: null,
+        };
+      case 'lobby_player_disconnected':
+        return { ...current, absent: [...new Set([...current.absent, event.clientId].filter(Boolean))] };
+      case 'lobby_player_reconnected':
+        return { ...current, absent: current.absent.filter((id) => id !== event.clientId) };
       case 'lobby_joined':
         return {
           ...current,
@@ -109,6 +161,9 @@
         };
       }
       case 'error':
+        // A refused resume is not a failure state: the seat is simply gone, and the client falls
+        // back to joining a lobby the ordinary way.
+        if (event.code === 'RESUME_REJECTED') return { ...current, status: NET_STATES.CONNECTING, error: null };
         return { ...current, status: NET_STATES.ERROR, error: { code: event.code || 'ERROR', message: event.message || '' } };
       default:
         return current;
@@ -131,7 +186,7 @@
 
   // What the client is trying to do. Deliberately the whole payload: there is no field here for
   // where the player thinks they are, because the server does not read one.
-  function describeInput({ forward = 0, strafe = 0, yaw = 0, crouch = false, sprint = false, light = false } = {}) {
+  function describeInput({ forward = 0, strafe = 0, yaw = 0, crouch = false, sprint = false, light = false, interact = false } = {}) {
     return {
       forward: Math.max(-1, Math.min(1, Number(forward) || 0)),
       strafe: Math.max(-1, Math.min(1, Number(strafe) || 0)),
@@ -139,6 +194,7 @@
       crouch: !!crouch,
       sprint: !!sprint,
       light: !!light,
+      interact: !!interact,
     };
   }
 
@@ -150,6 +206,9 @@
     if (secondsSinceSent >= INPUT_HEARTBEAT_SECONDS) return true;
     if (previous.forward !== next.forward || previous.strafe !== next.strafe) return true;
     if (previous.crouch !== next.crouch || previous.sprint !== next.sprint || previous.light !== next.light) return true;
+    // The authority reads a rising edge off `interact`, so both halves of a press have to reach it.
+    // A release that is never sent leaves the door strobing on the next press.
+    if (previous.interact !== next.interact) return true;
     return Math.abs(previous.yaw - next.yaw) > 0.01;
   }
 
@@ -195,8 +254,8 @@
   }
 
   return {
-    INPUT_HEARTBEAT_SECONDS, NET_STATES, RECONCILE_DEFAULTS,
+    INPUT_HEARTBEAT_SECONDS, LOBBY_LIMITS, NET_STATES, RECONCILE_DEFAULTS, RECONNECT_GRACE_MS,
     applyNetEvent, createNetState, describeInput, interpolatePose, isSeeker,
-    othersOf, reconcilePosition, selfOf, shouldSendInput,
+    othersOf, reconcilePosition, rememberSession, resumeRequestFor, selfOf, shouldSendInput,
   };
 });

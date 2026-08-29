@@ -4,7 +4,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 
-const defaultRoot = path.dirname(fileURLToPath(import.meta.url));
+const cabinetDir = path.dirname(fileURLToPath(import.meta.url));
+// Served from the repo root, the way GitHub Pages serves it, because the cabinet now imports the
+// shared platform modules under `/js/platform/` for the online sign-in gate. Serving the cabinet
+// folder alone would 404 those and take the whole module graph down with them.
+const repoRoot = path.resolve(cabinetDir, '..', '..');
+const cabinetPath = `/${path.relative(repoRoot, cabinetDir).split(path.sep).join('/')}/`;
+const defaultRoot = repoRoot;
 
 const contentTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -99,7 +105,7 @@ async function run() {
   }
 
   const address = server.address();
-  const url = `http://127.0.0.1:${address.port}`;
+  const url = `http://127.0.0.1:${address.port}${cabinetPath}`;
   console.log(`Hide and Seek is ready at ${url}`);
   console.log('Keep this window open while you play. Press Ctrl+C to stop.');
   if (shouldOpen) openBrowser(url);

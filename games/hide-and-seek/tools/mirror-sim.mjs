@@ -32,6 +32,8 @@ export const MIRRORED_FILES = Object.freeze([
   'sanity-logic.js',
   'flashlight-logic.js',
   'enemy-logic.js',
+  'fixtures-logic.js',
+  'demon-logic.js',
   'sim-logic.js',
 ]);
 

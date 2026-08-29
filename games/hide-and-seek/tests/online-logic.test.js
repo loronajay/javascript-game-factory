@@ -83,9 +83,9 @@ test('an error is surfaced rather than swallowed', () => {
 });
 
 test('an input carries intent only', () => {
-  const input = online.describeInput({ forward: 4, strafe: -9, yaw: 1.2, crouch: 1, sprint: 0, light: true, x: 12, charge: 1 });
+  const input = online.describeInput({ forward: 4, strafe: -9, yaw: 1.2, crouch: 1, sprint: 0, light: true, interact: true, x: 12, charge: 1, roomNumber: '105' });
 
-  assert.deepEqual(input, { forward: 1, strafe: -1, yaw: 1.2, crouch: true, sprint: false, light: true });
+  assert.deepEqual(input, { forward: 1, strafe: -1, yaw: 1.2, crouch: true, sprint: false, light: true, interact: true });
 });
 
 test('an unchanged input is not resent, but silence is still heartbeaten', () => {
@@ -125,4 +125,71 @@ test('a remote body is walked toward its last pose and turns the short way', () 
   // Turning from 3.0 to -3.0 is a short hop across pi, not a long sweep back through zero.
   assert.ok(step.yaw > 3.0, `expected the short way round, got ${step.yaw}`);
   assert.deepEqual(online.interpolatePose(null, target, 1 / 60), { ...target });
+});
+
+test('both halves of an interact press reach the authority', () => {
+  const resting = online.describeInput({ yaw: 0.4 });
+  const pressed = online.describeInput({ yaw: 0.4, interact: true });
+
+  // The server opens a door on the rising edge. A release that is never sent leaves `interact`
+  // latched true, and the next press is not an edge at all.
+  assert.equal(online.shouldSendInput(resting, pressed, 0), true);
+  assert.equal(online.shouldSendInput(pressed, resting, 0), true);
+  assert.equal(online.shouldSendInput(pressed, pressed, 0), false);
+});
+
+test('a dropped player can reclaim the seat their body is still standing in', () => {
+  let state = online.applyNetEvent(online.createNetState(), { event: 'connected', clientId: 'me', sessionToken: 'tok' });
+  state = online.applyNetEvent(state, { event: 'lobby_joined', clientId: 'me', roomCode: 'HOTEL', ownerId: 'me', members: ['me', 'you'] });
+
+  const saved = online.rememberSession(state, 1_000);
+  assert.deepEqual(saved, { clientId: 'me', sessionToken: 'tok', roomCode: 'HOTEL', at: 1_000 });
+
+  // Inside the grace window the seat is worth asking for; past it the server has already given it
+  // away and the ask would only produce a rejection to handle.
+  assert.deepEqual(online.resumeRequestFor(saved, 5_000), { type: 'resume_lobby', clientId: 'me', sessionToken: 'tok' });
+  assert.equal(online.resumeRequestFor(saved, 1_000 + online.RECONNECT_GRACE_MS), null);
+  assert.equal(online.resumeRequestFor(null, 5_000), null);
+  assert.equal(online.resumeRequestFor({ clientId: 'me', at: 1_000 }, 2_000), null, 'a seat without its token is not resumable');
+});
+
+test('a resumed session restores who this client is and nothing about the round', () => {
+  const state = online.applyNetEvent(online.createNetState(), {
+    event: 'session_resumed', clientId: 'me', sessionToken: 'tok2', roomCode: 'HOTEL',
+  });
+
+  assert.equal(state.status, online.NET_STATES.PLAYING);
+  assert.equal(state.clientId, 'me');
+  assert.equal(state.roomCode, 'HOTEL');
+  // The server still owns the round and says so on the next snapshot.
+  assert.equal(state.snapshot, null);
+});
+
+test('a refused resume falls back to joining rather than becoming an error screen', () => {
+  const connected = online.applyNetEvent(online.createNetState(), { event: 'connected', clientId: 'me', sessionToken: 'tok' });
+  const refused = online.applyNetEvent(connected, { event: 'error', code: 'RESUME_REJECTED', message: 'gone' });
+  const genuine = online.applyNetEvent(connected, { event: 'error', code: 'LOBBY_FULL', message: 'full' });
+
+  assert.equal(refused.status, online.NET_STATES.CONNECTING);
+  assert.equal(refused.error, null);
+  assert.equal(genuine.status, online.NET_STATES.ERROR);
+  assert.equal(genuine.error.code, 'LOBBY_FULL');
+});
+
+test('a dropped guest is a caption, not a roster change: their body is still in the hotel', () => {
+  let state = online.applyNetEvent(online.createNetState(), { event: 'lobby_joined', clientId: 'me', members: ['me', 'you'] });
+  state = online.applyNetEvent(state, { event: 'lobby_player_disconnected', clientId: 'you' });
+
+  assert.deepEqual(state.absent, ['you']);
+  assert.deepEqual(state.members, ['me', 'you'], 'a dropped hider is left standing — a free find, not a vanishing');
+
+  state = online.applyNetEvent(state, { event: 'lobby_player_reconnected', clientId: 'you' });
+  assert.deepEqual(state.absent, []);
+});
+
+test('the lobby search carries this game\'s seat limits', () => {
+  // `find_lobby` matches an open lobby on its limits. Omitting them sanitizes to the server-wide
+  // default of 2-6, which never equals the 2-8 lobby this game creates — so every guest would
+  // quietly open a room of their own instead of joining each other.
+  assert.deepEqual(online.LOBBY_LIMITS, { minPlayers: 2, maxPlayers: 8 });
 });

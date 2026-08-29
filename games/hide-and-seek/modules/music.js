@@ -6,10 +6,13 @@
   'use strict';
 
   const DEFAULT_TRACKS = Object.freeze({
+    menu: 'assets/sounds/bg-themes/menu.mp3',
     chill: 'assets/sounds/bg-themes/empty-halls.mp3',
     chase: 'assets/sounds/bg-themes/the-chase.mp3',
   });
   const DEFAULT_EFFECTS = Object.freeze({
+    menuClick: 'assets/sounds/sfx/button-click.wav',
+    menuCancel: 'assets/sounds/sfx/cancel.wav',
     caught: 'assets/sounds/sfx/caught.wav',
     caughtScream: 'assets/sounds/sfx/caught-scream.wav',
     elevatorRide: 'assets/sounds/sfx/elevator-ride.wav',
@@ -24,10 +27,13 @@
     volume = 0.42,
   } = {}) {
     const tracks = {
+      menu: createAudio(sources.menu),
       chill: createAudio(sources.chill),
       chase: createAudio(sources.chase),
     };
-    let desiredName = 'chill';
+    let desiredName = 'menu';
+    let gameplayName = 'chill';
+    let inMenu = true;
     let activeName = null;
     let started = false;
 
@@ -64,8 +70,11 @@
     }
 
     function setMonsterState(state) {
-      desiredName = state === 'chase' ? 'chase' : 'chill';
-      playDesired();
+      gameplayName = state === 'chase' ? 'chase' : 'chill';
+      if (!inMenu) {
+        desiredName = gameplayName;
+        playDesired();
+      }
     }
 
     function stop() {
@@ -77,6 +86,11 @@
     eventTarget.addEventListener('hotel:monster-state', (event) => {
       const { state, localChase } = event.detail;
       setMonsterState(typeof localChase === 'boolean' ? (localChase ? 'chase' : 'roam') : state);
+    });
+    eventTarget.addEventListener('hotel:menu-screen', (event) => {
+      inMenu = event.detail.screen !== 'playing';
+      desiredName = inMenu ? 'menu' : gameplayName;
+      playDesired();
     });
     eventTarget.addEventListener('pointerdown', start);
     eventTarget.addEventListener('keydown', start);
@@ -130,6 +144,9 @@
     eventTarget.addEventListener('hotel:elevator-arrive', () => {
       stopElevatorMovement();
       play(effects.elevatorDing);
+    });
+    eventTarget.addEventListener('hotel:menu-action', (event) => {
+      play(['back', 'quit'].includes(event.detail.action) ? effects.menuCancel : effects.menuClick);
     });
 
     return { stop: stopElevatorMovement };

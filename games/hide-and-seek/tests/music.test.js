@@ -42,6 +42,7 @@ test('soundtrack starts the looping chill theme after player interaction', () =>
   const harness = createAudioHarness();
   createSoundtrack({ eventTarget: target, createAudio: harness.createAudio });
 
+  const menu = harness.tracks.get('assets/sounds/bg-themes/menu.mp3');
   const chill = harness.tracks.get('assets/sounds/bg-themes/empty-halls.mp3');
   const chase = harness.tracks.get('assets/sounds/bg-themes/the-chase.mp3');
   assert.equal(chill.loop, true);
@@ -50,9 +51,25 @@ test('soundtrack starts the looping chill theme after player interaction', () =>
 
   target.dispatch('pointerdown');
 
-  assert.equal(chill.currentTime, 0);
-  assert.equal(chill.playCalls, 1);
+  assert.equal(menu.currentTime, 0);
+  assert.equal(menu.playCalls, 1);
+  assert.equal(chill.playCalls, 0);
   assert.equal(chase.playCalls, 0);
+});
+
+test('leaving the menu swaps the menu theme for hotel ambience', () => {
+  const target = new FakeEventTarget();
+  const harness = createAudioHarness();
+  createSoundtrack({ eventTarget: target, createAudio: harness.createAudio });
+  const menu = harness.tracks.get('assets/sounds/bg-themes/menu.mp3');
+  const chill = harness.tracks.get('assets/sounds/bg-themes/empty-halls.mp3');
+
+  target.dispatch('pointerdown');
+  target.dispatch('hotel:menu-screen', { screen: 'playing' });
+
+  assert.equal(menu.pauseCalls, 1);
+  assert.equal(menu.currentTime, 0);
+  assert.equal(chill.playCalls, 1);
 });
 
 test('chase changes cut off and reset the outgoing theme before restarting the other theme', () => {
@@ -62,6 +79,7 @@ test('chase changes cut off and reset the outgoing theme before restarting the o
   const chill = harness.tracks.get('assets/sounds/bg-themes/empty-halls.mp3');
   const chase = harness.tracks.get('assets/sounds/bg-themes/the-chase.mp3');
 
+  target.dispatch('hotel:menu-screen', { screen: 'playing' });
   soundtrack.start();
   chill.currentTime = 31;
   target.dispatch('hotel:monster-state', { state: 'chase' });
@@ -87,6 +105,7 @@ test('another player being chased does not change the local soundtrack', () => {
   const chill = harness.tracks.get('assets/sounds/bg-themes/empty-halls.mp3');
   const chase = harness.tracks.get('assets/sounds/bg-themes/the-chase.mp3');
 
+  target.dispatch('hotel:menu-screen', { screen: 'playing' });
   target.dispatch('pointerdown');
   target.dispatch('hotel:monster-state', { state: 'chase', localChase: false });
 
@@ -101,6 +120,7 @@ test('a demon seeing the local player starts the local chase soundtrack', () => 
   createSoundtrack({ eventTarget: target, createAudio: harness.createAudio });
   const chase = harness.tracks.get('assets/sounds/bg-themes/the-chase.mp3');
 
+  target.dispatch('hotel:menu-screen', { screen: 'playing' });
   target.dispatch('pointerdown');
   target.dispatch('hotel:monster-state', { state: 'chase', localChase: true });
 
@@ -114,6 +134,7 @@ test('the latest monster state chooses the first theme when audio unlocks', () =
   const chill = harness.tracks.get('assets/sounds/bg-themes/empty-halls.mp3');
   const chase = harness.tracks.get('assets/sounds/bg-themes/the-chase.mp3');
 
+  target.dispatch('hotel:menu-screen', { screen: 'playing' });
   target.dispatch('hotel:monster-state', { state: 'chase' });
   target.dispatch('keydown');
 
@@ -138,6 +159,7 @@ test('a late rejection from the old theme does not clear the new active theme', 
   };
   const soundtrack = createSoundtrack({ eventTarget: target, createAudio });
 
+  target.dispatch('hotel:menu-screen', { screen: 'playing' });
   soundtrack.start();
   target.dispatch('hotel:monster-state', { state: 'chase' });
   rejectChill(new Error('play interrupted by pause'));
@@ -214,4 +236,18 @@ test('sound effects ignore rejected browser playback promises', async () => {
   await Promise.resolve();
 
   assert.equal(harness.tracks.get('assets/sounds/sfx/elevator-ding.wav').playCalls, 1);
+});
+
+test('menu actions use the supplied click and cancel sounds', () => {
+  const target = new FakeEventTarget();
+  const harness = createAudioHarness();
+  createSoundEffects({ eventTarget: target, createAudio: harness.createAudio });
+  const click = harness.tracks.get('assets/sounds/sfx/button-click.wav');
+  const cancel = harness.tracks.get('assets/sounds/sfx/cancel.wav');
+
+  target.dispatch('hotel:menu-action', { action: 'singlePlayer' });
+  target.dispatch('hotel:menu-action', { action: 'back' });
+
+  assert.equal(click.playCalls, 1);
+  assert.equal(cancel.playCalls, 1);
 });

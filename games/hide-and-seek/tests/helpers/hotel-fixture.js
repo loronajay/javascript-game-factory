@@ -7,6 +7,14 @@ const plan = require('../../hotel-plan.js');
 const collision = require('../../collision-logic.js');
 const layout = require('../../layout.js');
 const sim = require('../../sim-logic.js');
+const movement = require('../../movement-logic.js');
+const roundLogic = require('../../round-logic.js');
+const stamina = require('../../stamina-logic.js');
+const flashlight = require('../../flashlight-logic.js');
+const sanity = require('../../sanity-logic.js');
+const fixtures = require('../../fixtures-logic.js');
+const demon = require('../../demon-logic.js');
+const enemy = require('../../enemy-logic.js');
 
 // The tuning the browser passes in, restated because game-config.js is an ES module and the pure
 // layer stays loadable with no build step.
@@ -40,4 +48,46 @@ function createSpace(hotel, openings = {}) {
   return sim.createPlanSpace({ plan, collision, hotel, config: CONFIG, openings });
 }
 
-module.exports = { CONFIG, FLOOR_DEFS, floorY, keyIdForFloor, keyLabelForFloor, buildHotel, createSpace };
+// A deterministic stand-in for Math.random, so a round that spawns demons and picks patrol targets
+// replays identically. The authority has to be reproducible before it can be trusted.
+function seededRandom(seed = 1) {
+  let value = seed >>> 0 || 1;
+  return () => {
+    value ^= value << 13; value >>>= 0;
+    value ^= value >> 17;
+    value ^= value << 5; value >>>= 0;
+    return value / 4294967296;
+  };
+}
+
+const SIM_CONFIG = {
+  player: { ...CONFIG, walkSpeed: 3.1, sprintSpeed: 5.4, crouchSpeed: 1.9, eyeHeight: 1.62, crouchEyeHeight: 1.02 },
+  round: { durationSeconds: null, hideSeconds: 45, tagDistance: 1.8, tagHeightTolerance: 1.4 },
+  stamina: undefined,
+  sanity: undefined,
+  flashlight: { drainSeconds: 120 },
+};
+
+function sanityZones(hotel) {
+  return [
+    ...hotel.roomCenters.map((room) => ({ id: room.roomNumber, kind: sanity.ZONE_KINDS.ROOM, floor: room.floor, x: room.x, z: room.z })),
+    ...hotel.secretTunnels,
+  ];
+}
+
+// The whole authority, assembled exactly the way `factory-network-server` assembles it. A test that
+// uses this is testing the shipped composition, not a convenient approximation of it.
+function createFullSim({ hotel = buildHotel(), seed = 7, config } = {}) {
+  const space = createSpace(hotel);
+  const engine = sim.createSimulation({
+    movement, round: roundLogic, stamina, flashlight, sanity, fixtures, demon, enemy, layout,
+    space, plan: hotel, zones: sanityZones(hotel), random: seededRandom(seed),
+    config: { ...SIM_CONFIG, ...(config || {}) },
+  });
+  return { hotel, space, engine };
+}
+
+module.exports = {
+  CONFIG, FLOOR_DEFS, SIM_CONFIG, floorY, keyIdForFloor, keyLabelForFloor,
+  buildHotel, createSpace, createFullSim, sanityZones, seededRandom,
+};
