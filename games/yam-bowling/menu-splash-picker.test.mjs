@@ -80,3 +80,49 @@ test("opening menu art refreshes cards from live character ownership", async () 
     ["daisy-monroe", "hazel-ward"],
   );
 });
+
+test("equipping a splash persists the pick to the garage", async () => {
+  const elements = new Map([
+    "menu-splash-art",
+    "menu-splash-button",
+    "menu-splash-grid",
+    "menu-splash-dialog",
+    "menu-splash-close",
+  ].map((id) => [id, new StubElement()]));
+  globalThis.document = {
+    getElementById: (id) => elements.get(id),
+    createElement: () => new StubElement(),
+  };
+
+  const splashes = ["daisy-monroe", "hazel-ward"].map((slug) => ({
+    slug,
+    name: slug,
+    src: `${slug}.webp`,
+    thumbnailSrc: `${slug}-thumb.webp`,
+    alt: slug,
+  }));
+  const menuSplash = {
+    MENU_SPLASHES: splashes,
+    getMenuSplash: (slug) => splashes.find((splash) => splash.slug === slug) || splashes[0],
+  };
+  let equipped = "daisy-monroe";
+  const loadout = {
+    getMenuSplashSlug: () => equipped,
+    setMenuSplashSlug: (slug) => { equipped = slug; return slug; },
+    listOwned: () => ["daisy-monroe", "hazel-ward"].map((slug) => ({ id: `menu-splash:${slug}` })),
+  };
+  const equipCalls = [];
+  const { createMenuSplashPicker } = await import("./ui/menu-splash-picker.mjs");
+  const picker = createMenuSplashPicker({
+    menuSplash,
+    loadout,
+    audio: { play() {} },
+    onEquip: (slug) => equipCalls.push(slug),
+  });
+
+  picker.build();
+  elements.get("menu-splash-grid").children[1].click();
+
+  assert.equal(equipped, "hazel-ward");
+  assert.deepEqual(equipCalls, ["hazel-ward"]);
+});

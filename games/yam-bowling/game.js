@@ -154,7 +154,15 @@ initMobileLandscapeGate();
     reducedMotion: Boolean(prefersReducedMotion?.matches),
   });
 
-  const menuSplashPicker = createMenuSplashPicker({ menuSplash: MenuSplash, loadout, audio });
+  const menuSplashPicker = createMenuSplashPicker({
+    menuSplash: MenuSplash,
+    loadout,
+    audio,
+    // The splash lives in the loadout's garage, so a signed-in pick has to be
+    // pushed to the server or the next profile sync overwrites it with the
+    // stored copy. Signed out, save() is a no-op and localStorage already holds it.
+    onEquip: () => { profileSync?.save?.(); },
+  });
 
   // A level-earned reward is proved by the level itself, so the owned set is
   // recomputed from each authoritative snapshot rather than granted once and

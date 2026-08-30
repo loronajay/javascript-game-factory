@@ -6,7 +6,7 @@ import { $, escapeHtml } from "./dom.mjs";
 //
 // The chosen splash is the loadout's global `menuSplash` slot, so the title
 // screen and the presentation loadout can never disagree about it.
-export function createMenuSplashPicker({ menuSplash, loadout, audio }) {
+export function createMenuSplashPicker({ menuSplash, loadout, audio, onEquip = () => {} }) {
   let selectedSlug = loadout.getMenuSplashSlug();
 
   function apply(slug, persist = false) {
@@ -43,6 +43,10 @@ export function createMenuSplashPicker({ menuSplash, loadout, audio }) {
       card.addEventListener("click", () => {
         apply(splash.slug, true);
         $("menu-splash-dialog").close();
+        // The pick is a loadout global slot. Persist it to the Factory garage
+        // now, because the next profile-screen sync replaces the whole local
+        // record with the server copy and would otherwise discard it.
+        onEquip(selectedSlug);
       });
       grid.appendChild(card);
     }
