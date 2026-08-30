@@ -1,5 +1,7 @@
 html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#080708;font-family:"Segoe UI",Arial,Helvetica,sans-serif;color:#f4eee7}
 canvas{display:block}
+#arcadeReturn{position:absolute;top:18px;left:18px;z-index:3;padding:8px 14px;border:1px solid rgba(196,170,144,.32);border-radius:8px;background:rgba(8,8,10,.72);color:#e8ddcf;text-decoration:none;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+#arcadeReturn:hover{background:rgba(181,35,29,.28);color:#fff;border-color:rgba(181,35,29,.6)}
 button{font:inherit}
 #overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:auto;background:radial-gradient(circle at 32% 44%,rgba(81,16,14,.32),transparent 46%),linear-gradient(90deg,#050506,#0a0809);z-index:20;padding:clamp(18px,4vw,56px);box-sizing:border-box}
 #overlay:before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px);background-size:72px 72px;mask-image:linear-gradient(to right,black,transparent 72%)}
