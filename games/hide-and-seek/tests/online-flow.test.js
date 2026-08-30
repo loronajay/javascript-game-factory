@@ -20,7 +20,8 @@ async function client(id = 'me', mapId = 'grand-hotel') {
     close() { this.readyState = 3; this.fire('close'); }
     receive(event) { this.fire('message', { data: JSON.stringify(event) }); }
   };
-  const world = { state: { yaw: 0, gameOver: false }, notify() {}, updateInventoryHud() {}, emit(name, detail) { env.window.fire(`hotel:${name}`, { detail }); } };
+  const notices = [];
+  const world = { state: { yaw: 0, gameOver: false }, notify(message) { notices.push(message); }, updateInventoryHud() {}, emit(name, detail) { env.window.fire(`hotel:${name}`, { detail }); } };
   const camera = { position: { x: 0, y: 1.7, z: 0, set(x, y, z) { Object.assign(this, { x, y, z }); } }, rotation: {} };
   const visibility = new Map();
   const avatars = { spawn() {}, setVisible: (id, value) => visibility.set(id, value), setPose() {}, remove() {}, setHeadHidden() {} };
@@ -43,12 +44,16 @@ async function client(id = 'me', mapId = 'grand-hotel') {
   online.connect();
   const socket = sockets.at(-1);
   socket.receive({ event: 'connected', clientId: id, sessionToken: 'test-token' });
-  socket.receive({ event: 'lobby_joined', clientId: id, roomCode: 'TEST', ownerId: 'seeker', members: ['seeker', 'me', 'other'] });
-  return { ...env, online, menu, socket, sockets, world, camera, spectator, visibility, mapSession };
+  socket.receive({ event: 'lobby_joined', clientId: id, roomCode: 'TEST', ownerId: 'seeker', members: ['seeker', 'me', 'other'],
+    players: ['seeker', 'me', 'other'].map((seat) => ({ id: seat, name: NAMES[seat] })) });
+  return { ...env, online, menu, socket, sockets, world, notices, camera, spectator, visibility, mapSession };
 }
+// The seats these clients share, and the factory profile name the authority publishes for each —
+// the lobby payload and every snapshot carry the same name, because both are read off one profile.
+const NAMES = { seeker: 'Bo', me: 'loronajay', other: 'Ana' };
 function snapshot({ dead = [], over = false, tick = 1, mapId = 'grand-hotel' } = {}) {
   return { mapId, tick, seekerId: 'seeker',
-    players: ['seeker', 'me', 'other'].map((id, index) => ({ id, name: id, role: id === 'seeker' ? 'seeker' : 'hider', alive: !dead.includes(id), x: index * 10, y: 0, z: 0, yaw: 0, floor: 1, flashlight: { on: false, charge: 1 } })),
+    players: ['seeker', 'me', 'other'].map((id, index) => ({ id, name: NAMES[id], role: id === 'seeker' ? 'seeker' : 'hider', alive: !dead.includes(id), x: index * 10, y: 0, z: 0, yaw: 0, floor: 1, flashlight: { on: false, charge: 1 } })),
     round: { phase: over ? 'over' : 'hiding', over, outcome: over ? 'hiders' : null, hidersRemaining: 2 - dead.filter(id => id !== 'seeker').length, hidersTotal: 2, clock: '0:45' },
   };
 }
@@ -134,4 +139,23 @@ for (const cause of ['tag', 'demon']) test(`three clients follow authoritative $
   state = engine.resolveDemonCatch(state, 'seeker');
   clients.forEach(env => deliver(env, view()));
   assert.ok(clients.every(env => env.world.state.gameOver && !env.spectator.isActive()));
+});
+
+test("the lobby roster is the players' own names, not seat numbers", async () => {
+  const env = await client();
+  const rows = env.document.getElementById('onlinePlayers').children;
+  assert.deepEqual(rows.map((row) => row.children[1].textContent), ['BO', 'LORONAJAY (YOU)', 'ANA']);
+});
+
+test('a catch is called out by name to every client except the one it happened to', async () => {
+  const env = await client();
+  start(env);
+  deliver(env, { ...snapshot(), tick: 2, events: [{ type: 'hider-tagged', playerId: 'other', seekerId: 'seeker' }] });
+  assert.ok(env.notices.includes('ANA HAS BEEN FOUND.'));
+
+  const before = env.notices.length;
+  deliver(env, { ...snapshot({ dead: ['me'] }), tick: 3, events: [{ type: 'hider-tagged', playerId: 'me', seekerId: 'seeker' }] });
+  // Your own catch is announced by the spectator handoff, which knows what happens next.
+  assert.ok(!env.notices.slice(before).some((line) => line.includes('HAS BEEN FOUND')));
+  assert.ok(env.notices.at(-1).includes('SPECTATING'));
 });

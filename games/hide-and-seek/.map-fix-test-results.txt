@@ -1,0 +1,2603 @@
+TAP version 13
+# {
+#   "result": "PASS",
+#   "rooms": 12,
+#   "screens": 6,
+#   "seatVisualParts": 856,
+#   "boxes": 2423,
+#   "colliders": 264,
+#   "surfaces": 58,
+#   "stairTreads": 56,
+#   "stairConnectors": 2,
+#   "floor1BaseSlabs": 1,
+#   "floor2BaseSlabs": 1,
+#   "hallDoors": 0,
+#   "callButtons": 0
+# }
+# Subtest: crowne-point-cinema-reference\\test-cinema-v3.js
+ok 1 - crowne-point-cinema-reference\\test-cinema-v3.js
+  ---
+  duration_ms: 302.9649
+  ...
+# {
+#   "result": "PASS",
+#   "rendererDefaultRejected": true,
+#   "correctedSpawn": {
+#     "x": 0,
+#     "z": -27,
+#     "y": 0
+#   },
+#   "cardinalMovementProbes": 4
+# }
+# Subtest: mercy-hospital-reference\\test-runtime-spawn-regression.js
+ok 2 - mercy-hospital-reference\\test-runtime-spawn-regression.js
+  ---
+  duration_ms: 250.5253
+  ...
+# Subtest: main is a small composition root and gameplay responsibilities live in modules
+not ok 3 - main is a small composition root and gameplay responsibilities live in modules
+  ---
+  duration_ms: 7.8996
+  location: 'C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\tests\\architecture.test.js:8:1'
+  failureType: 'testCodeFailure'
+  error: 'main.js should stay below 160 lines; found 161'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (C:\Users\leoja\Desktop\Dad Games\full-games\javascript-games\games\hide-and-seek\tests\architecture.test.js:12:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:934:25)
+    Test.start (node:internal/test_runner/test:833:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: opening a room door does not change the renderer light count
+ok 4 - opening a room door does not change the renderer light count
+  ---
+  duration_ms: 1.3813
+  ...
+# Subtest: the demon inspection view is a dedicated interactive model viewer
+ok 5 - the demon inspection view is a dedicated interactive model viewer
+  ---
+  duration_ms: 2.2347
+  ...
+# Subtest: rendering avoids expensive unused shadows and caps high-DPI resolution
+ok 6 - rendering avoids expensive unused shadows and caps high-DPI resolution
+  ---
+  duration_ms: 0.8098
+  ...
+# Subtest: only lights near the active floor stay in the realtime lighting pass
+ok 7 - only lights near the active floor stay in the realtime lighting pass
+  ---
+  duration_ms: 2.5871
+  ...
+# Subtest: the flashlight dims rather than hides, so clicking it cannot recompile the scene
+ok 8 - the flashlight dims rather than hides, so clicking it cannot recompile the scene
+  ---
+  duration_ms: 0.8438
+  ...
+# Subtest: the demon brings every light it will ever have to the scene up front
+ok 9 - the demon brings every light it will ever have to the scene up front
+  ---
+  duration_ms: 0.9435
+  ...
+# Subtest: shaders are compiled up front rather than on the frame a material is first seen
+ok 10 - shaders are compiled up front rather than on the frame a material is first seen
+  ---
+  duration_ms: 0.8265
+  ...
+# Subtest: the demon face follows the animated head and shares the body forward direction
+ok 11 - the demon face follows the animated head and shares the body forward direction
+  ---
+  duration_ms: 1.3854
+  ...
+# Subtest: the demon face has an aggressive brow, horns, jaw, and fangs
+ok 12 - the demon face has an aggressive brow, horns, jaw, and fangs
+  ---
+  duration_ms: 1.4693
+  ...
+# Subtest: the demon reads as a silhouette in the dark through a fresnel rim on its skin
+ok 13 - the demon reads as a silhouette in the dark through a fresnel rim on its skin
+  ---
+  duration_ms: 0.9034
+  ...
+# Subtest: the demon wears a swaying shroud and hand talons rigged to the animated skeleton
+ok 14 - the demon wears a swaying shroud and hand talons rigged to the animated skeleton
+  ---
+  duration_ms: 0.8826
+  ...
+# Subtest: the demon posture is forced onto the skeleton after the mixer writes each frame
+ok 15 - the demon posture is forced onto the skeleton after the mixer writes each frame
+  ---
+  duration_ms: 0.8553
+  ...
+# Subtest: the demon menace reacts to its awareness state instead of holding one pose
+ok 16 - the demon menace reacts to its awareness state instead of holding one pose
+  ---
+  duration_ms: 2.4771
+  ...
+# Subtest: the demon body is pulled off the human rig into a creature silhouette
+ok 17 - the demon body is pulled off the human rig into a creature silhouette
+  ---
+  duration_ms: 1.036
+  ...
+# Subtest: gameplay advances on a fixed timestep rather than on the display refresh rate
+ok 18 - gameplay advances on a fixed timestep rather than on the display refresh rate
+  ---
+  duration_ms: 1.132
+  ...
+# Subtest: players are rigged human figures driven by pure avatar rules
+ok 19 - players are rigged human figures driven by pure avatar rules
+  ---
+  duration_ms: 1.3123
+  ...
+# Subtest: a cloned avatar gets its own skeleton instead of sharing the source rig
+ok 20 - a cloned avatar gets its own skeleton instead of sharing the source rig
+  ---
+  duration_ms: 0.4979
+  ...
+# Subtest: the stairwell lights only nearby floors and draws its static geometry in one batch
+ok 21 - the stairwell lights only nearby floors and draws its static geometry in one batch
+  ---
+  duration_ms: 0.6582
+  ...
+# Subtest: static hotel geometry is merged per floor and nothing that moves is merged away
+ok 22 - static hotel geometry is merged per floor and nothing that moves is merged away
+  ---
+  duration_ms: 1.4255
+  ...
+# Subtest: the local head collapse is re-applied after the mixer writes each frame
+ok 23 - the local head collapse is re-applied after the mixer writes each frame
+  ---
+  duration_ms: 0.5829
+  ...
+# Subtest: the heat meter keeps its rules pure and lets the demon read them
+ok 24 - the heat meter keeps its rules pure and lets the demon read them
+  ---
+  duration_ms: 6.0745
+  ...
+# Subtest: sprinting is metered by pure stamina rules the movement code only reads
+ok 25 - sprinting is metered by pure stamina rules the movement code only reads
+  ---
+  duration_ms: 1.7044
+  ...
+# Subtest: the demo runs behind a menu state machine and pauses the simulation with it
+ok 26 - the demo runs behind a menu state machine and pauses the simulation with it
+  ---
+  duration_ms: 3.272
+  ...
+# Subtest: the round keeps its rules pure and resolves catches on the authority side
+ok 27 - the round keeps its rules pure and resolves catches on the authority side
+  ---
+  duration_ms: 2.304
+  ...
+# Subtest: the hiders are stand-ins for players, not a second kind of body
+ok 28 - the hiders are stand-ins for players, not a second kind of body
+  ---
+  duration_ms: 1.251
+  ...
+# Subtest: collision is plain headless data rather than geometry discovered from meshes
+ok 29 - collision is plain headless data rather than geometry discovered from meshes
+  ---
+  duration_ms: 1.2333
+  ...
+# Subtest: the building is pure data and the renderer only draws what the plan describes
+ok 30 - the building is pure data and the renderer only draws what the plan describes
+  ---
+  duration_ms: 15.949
+  ...
+# Subtest: player-facing creature copy consistently names The Bellhop
+ok 31 - player-facing creature copy consistently names The Bellhop
+  ---
+  duration_ms: 2.1672
+  ...
+# Subtest: a map owns its demon roster and every demon in it starts clear of the others
+ok 32 - a map owns its demon roster and every demon in it starts clear of the others
+  ---
+  duration_ms: 5.4149
+  ...
+# Subtest: the maps are a registry both sides of the wire read
+ok 33 - the maps are a registry both sides of the wire read
+  ---
+  duration_ms: 2.9695
+  ...
+# Subtest: how tall a building is comes from the map, not from the hotel’s four
+ok 34 - how tall a building is comes from the map, not from the hotel’s four
+  ---
+  duration_ms: 4.1358
+  ...
+# Subtest: a map is picked before a round and never swapped underneath one
+ok 35 - a map is picked before a round and never swapped underneath one
+  ---
+  duration_ms: 1.866
+  ...
+# Subtest: flashlight state is part of the player snapshot before networking is added
+ok 36 - flashlight state is part of the player snapshot before networking is added
+  ---
+  duration_ms: 2.4112
+  ...
+# Subtest: every body walks through the one pure mover and no module reimplements it
+ok 37 - every body walks through the one pure mover and no module reimplements it
+  ---
+  duration_ms: 2.6096
+  ...
+# Subtest: line of sight is an AABB ray in the pure layer rather than a renderer raycast
+ok 38 - line of sight is an AABB ray in the pure layer rather than a renderer raycast
+  ---
+  duration_ms: 15.1034
+  ...
+# Subtest: a whole round can be ticked with no renderer in the process
+ok 39 - a whole round can be ticked with no renderer in the process
+  ---
+  duration_ms: 1.3372
+  ...
+# Subtest: the authoritative simulation is mirrored to the network server without drift
+ok 40 - the authoritative simulation is mirrored to the network server without drift
+  ---
+  duration_ms: 37.8574
+  ...
+# Subtest: the authoritative round is one pure tick the client and the server share
+ok 41 - the authoritative round is one pure tick the client and the server share
+  ---
+  duration_ms: 1.452
+  ...
+# Subtest: online play is server authoritative and the client only sends intent
+ok 42 - online play is server authoritative and the client only sends intent
+  ---
+  duration_ms: 2.9462
+  ...
+# Subtest: the authoritative tick owns the fixtures and the demons, and the pure layer is mirrored whole
+ok 43 - the authoritative tick owns the fixtures and the demons, and the pure layer is mirrored whole
+  ---
+  duration_ms: 3.797
+  ...
+# Subtest: player body is a textured Base Character on the shared 65-joint rig
+ok 44 - player body is a textured Base Character on the shared 65-joint rig
+  ---
+  duration_ms: 9.3674
+  ...
+# Subtest: player animation bank contains dedicated locomotion and crouch clips
+ok 45 - player animation bank contains dedicated locomotion and crouch clips
+  ---
+  duration_ms: 59.2101
+  ...
+# Subtest: motion state comes from speed and crouch, not from an animation name
+ok 46 - motion state comes from speed and crouch, not from an animation name
+  ---
+  duration_ms: 2.5438
+  ...
+# Subtest: clip choice uses the asset bank locomotion and crouch clips
+ok 47 - clip choice uses the asset bank locomotion and crouch clips
+  ---
+  duration_ms: 0.4563
+  ...
+# Subtest: native locomotion clips stay near their authored playback rate
+ok 48 - native locomotion clips stay near their authored playback rate
+  ---
+  duration_ms: 0.3409
+  ...
+# Subtest: facing turns the short way around and never overshoots
+ok 49 - facing turns the short way around and never overshoots
+  ---
+  duration_ms: 0.8334
+  ...
+# Subtest: crouching is covered by native clips instead of manual bone folding
+ok 50 - crouching is covered by native clips instead of manual bone folding
+  ---
+  duration_ms: 1.9425
+  ...
+# Subtest: the seeker is the one warm figure so a glimpse identifies it without a tracker
+ok 51 - the seeker is the one warm figure so a glimpse identifies it without a tracker
+  ---
+  duration_ms: 0.4241
+  ...
+# Subtest: avatar motion is derived from successive poses, which is what a network snapshot gives us
+ok 52 - avatar motion is derived from successive poses, which is what a network snapshot gives us
+  ---
+  duration_ms: 2.8003
+  ...
+# Subtest: a pose without a yaw faces the direction it is travelling
+ok 53 - a pose without a yaw faces the direction it is travelling
+  ---
+  duration_ms: 0.7432
+  ...
+# Subtest: avatar motion retains flashlight state supplied by a network pose
+ok 54 - avatar motion retains flashlight state supplied by a network pose
+  ---
+  duration_ms: 1.0536
+  ...
+# Subtest: Crowne Point preserves six screens and booths, with two demons and two floor previews
+ok 55 - Crowne Point preserves six screens and booths, with two demons and two floor previews
+  ---
+  duration_ms: 20.5672
+  ...
+# Subtest: every seat, room and demon start has clear footing and safe opening separation
+ok 56 - every seat, room and demon start has clear footing and safe opening separation
+  ---
+  duration_ms: 10.2495
+  ...
+# Subtest: navigation links are connected, collision-clear and remain on their own floor
+ok 57 - navigation links are connected, collision-clear and remain on their own floor
+  ---
+  duration_ms: 109.821
+  ...
+# Subtest: all room pairs and all eight hider seats are physically routable
+ok 58 - all room pairs and all eight hider seats are physically routable
+  ---
+  duration_ms: 3234.6827
+  ...
+# Subtest: both stairs have continuous ground and head clearance in both directions
+ok 59 - both stairs have continuous ground and head clearance in both directions
+  ---
+  duration_ms: 11.4361
+  ...
+# Subtest: cinema is loaded by the browser and included in the pure server mirror
+ok 60 - cinema is loaded by the browser and included in the pure server mirror
+  ---
+  duration_ms: 82.7723
+  ...
+# Subtest: inspection cameras stand at eye height on real walk surfaces
+ok 61 - inspection cameras stand at eye height on real walk surfaces
+  ---
+  duration_ms: 0.552
+  ...
+# Subtest: the lift has a real upper shaft void and clear exits on both floors
+ok 62 - the lift has a real upper shaft void and clear exits on both floors
+  ---
+  duration_ms: 10.2042
+  ...
+# Subtest: both cinema elevator entrances identify the elevator
+ok 63 - both cinema elevator entrances identify the elevator
+  ---
+  duration_ms: 1.1548
+  ...
+# (node:12152) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/vendor/three.module.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the CPU seeker sweeps every unlocked cinema room on both floors
+ok 64 - the CPU seeker sweeps every unlocked cinema room on both floors
+  ---
+  duration_ms: 739.6373
+  ...
+# Subtest: a cinema authority seats eight players, keeps two demons and releases its held seeker
+ok 65 - a cinema authority seats eight players, keeps two demons and releases its held seeker
+  ---
+  duration_ms: 622.7445
+  ...
+# Subtest: mall furniture collision includes seats, stool footprints and scaled crates
+ok 66 - mall furniture collision includes seats, stool footprints and scaled crates
+  ---
+  duration_ms: 3.1652
+  ...
+# Subtest: box collider data is plain and accounts for a rotated footprint
+ok 67 - box collider data is plain and accounts for a rotated footprint
+  ---
+  duration_ms: 1.9369
+  ...
+# Subtest: headless collision checks horizontal radius and vertical overlap
+ok 68 - headless collision checks horizontal radius and vertical overlap
+  ---
+  duration_ms: 0.5166
+  ...
+# Subtest: disabled collider records do not block movement
+ok 69 - disabled collider records do not block movement
+  ---
+  duration_ms: 0.4614
+  ...
+# Subtest: a sight line is blocked by a box standing between the two points
+ok 70 - a sight line is blocked by a box standing between the two points
+  ---
+  duration_ms: 0.7167
+  ...
+# Subtest: a sight line ignores disabled records and a box the target is standing inside
+ok 71 - a sight line ignores disabled records and a box the target is standing inside
+  ---
+  duration_ms: 1.8244
+  ...
+# Subtest: a sight line between two identical points is never blocked
+ok 72 - a sight line between two identical points is never blocked
+  ---
+  duration_ms: 0.4736
+  ...
+# Subtest: uses pointer lock when the browser accepts the request
+ok 73 - uses pointer lock when the browser accepts the request
+  ---
+  duration_ms: 2.279
+  ...
+# Subtest: falls back to drag look when pointer lock rejects
+ok 74 - falls back to drag look when pointer lock rejects
+  ---
+  duration_ms: 0.4563
+  ...
+# Subtest: falls back to drag look when pointer lock is unavailable
+ok 75 - falls back to drag look when pointer lock is unavailable
+  ---
+  duration_ms: 0.2738
+  ...
+# Subtest: forced drag-look links start without requiring a browser click
+ok 76 - forced drag-look links start without requiring a browser click
+  ---
+  duration_ms: 0.4974
+  ...
+# Subtest: grand-hotel: demons start clear of every hider and seeker seat
+ok 77 - grand-hotel: demons start clear of every hider and seeker seat
+  ---
+  duration_ms: 63.4601
+  ...
+# Subtest: grand-hotel: a demon pursues through every room door from both sides
+ok 78 - grand-hotel: a demon pursues through every room door from both sides
+  ---
+  duration_ms: 9521.4961
+  ...
+# Subtest: grand-hotel: an open elevator protects occupants but not the hallway
+ok 79 - grand-hotel: an open elevator protects occupants but not the hallway
+  ---
+  duration_ms: 13.8148
+  ...
+# Subtest: grand-hotel: eight-player authority starts without an immediate elimination
+ok 80 - grand-hotel: eight-player authority starts without an immediate elimination
+  ---
+  duration_ms: 84.9324
+  ...
+# Subtest: cinder-mall: demons start clear of every hider and seeker seat
+ok 81 - cinder-mall: demons start clear of every hider and seeker seat
+  ---
+  duration_ms: 231.4427
+  ...
+# Subtest: cinder-mall: a demon pursues through every room door from both sides
+ok 82 - cinder-mall: a demon pursues through every room door from both sides
+  ---
+  duration_ms: 508.8563
+  ...
+# Subtest: cinder-mall: an open elevator protects occupants but not the hallway
+ok 83 - cinder-mall: an open elevator protects occupants but not the hallway
+  ---
+  duration_ms: 197.5106
+  ...
+# Subtest: cinder-mall: eight-player authority starts without an immediate elimination
+ok 84 - cinder-mall: eight-player authority starts without an immediate elimination
+  ---
+  duration_ms: 226.8792
+  ...
+# Subtest: mercy-hospital: demons start clear of every hider and seeker seat
+ok 85 - mercy-hospital: demons start clear of every hider and seeker seat
+  ---
+  duration_ms: 16.8996
+  ...
+# Subtest: mercy-hospital: a demon pursues through every room door from both sides
+ok 86 - mercy-hospital: a demon pursues through every room door from both sides
+  ---
+  duration_ms: 383.9445
+  ...
+# Subtest: mercy-hospital: an open elevator protects occupants but not the hallway
+ok 87 - mercy-hospital: an open elevator protects occupants but not the hallway
+  ---
+  duration_ms: 5.0724
+  ...
+# Subtest: mercy-hospital: eight-player authority starts without an immediate elimination
+ok 88 - mercy-hospital: eight-player authority starts without an immediate elimination
+  ---
+  duration_ms: 30.3065
+  ...
+# Subtest: crowne-point-cinema: demons start clear of every hider and seeker seat
+ok 89 - crowne-point-cinema: demons start clear of every hider and seeker seat
+  ---
+  duration_ms: 25.2782
+  ...
+# Subtest: crowne-point-cinema: a demon pursues through every room door from both sides
+ok 90 - crowne-point-cinema: a demon pursues through every room door from both sides
+  ---
+  duration_ms: 482.8707
+  ...
+# Subtest: crowne-point-cinema: an open elevator protects occupants but not the hallway
+ok 91 - crowne-point-cinema: an open elevator protects occupants but not the hallway
+  ---
+  duration_ms: 12.6829
+  ...
+# Subtest: crowne-point-cinema: eight-player authority starts without an immediate elimination
+ok 92 - crowne-point-cinema: eight-player authority starts without an immediate elimination
+  ---
+  duration_ms: 37.1884
+  ...
+# Subtest: spawn fallback never relaxes player safety to separate demons
+ok 93 - spawn fallback never relaxes player safety to separate demons
+  ---
+  duration_ms: 0.7655
+  ...
+# Subtest: hotel secret passages can be entered and exited by a pursuing demon
+ok 94 - hotel secret passages can be entered and exited by a pursuing demon
+  ---
+  duration_ms: 122.0031
+  ...
+# Subtest: a blocked demon discards the route suffix, not just the doorway before a guided flight
+ok 95 - a blocked demon discards the route suffix, not just the doorway before a guided flight
+  ---
+  duration_ms: 43.8267
+  ...
+# Subtest: a demon walks its patrol route through the real hotel without leaving the floor
+ok 96 - a demon walks its patrol route through the real hotel without leaving the floor
+  ---
+  duration_ms: 75.1399
+  ...
+# Subtest: a demon follows a wall to its end instead of running in place against it
+ok 97 - a demon follows a wall to its end instead of running in place against it
+  ---
+  duration_ms: 15.2587
+  ...
+# Subtest: a demon that can see a player chases, and loses the trail behind a wall
+ok 98 - a demon that can see a player chases, and loses the trail behind a wall
+  ---
+  duration_ms: 76.3808
+  ...
+# Subtest: a chasing demon keeps spatial awareness of a nearby target outside its forward cone
+ok 99 - a chasing demon keeps spatial awareness of a nearby target outside its forward cone
+  ---
+  duration_ms: 17.1748
+  ...
+# Subtest: a chasing demon asks to force open a door blocking its next step
+ok 100 - a chasing demon asks to force open a door blocking its next step
+  ---
+  duration_ms: 7.8204
+  ...
+# Subtest: the next closed door on a demon route is selected, not a nearby door behind it
+ok 101 - the next closed door on a demon route is selected, not a nearby door behind it
+  ---
+  duration_ms: 0.8751
+  ...
+# Subtest: line of sight is the hotel geometry, not a clear line between two points
+ok 102 - line of sight is the hotel geometry, not a clear line between two points
+  ---
+  duration_ms: 13.0855
+  ...
+# Subtest: only a hunting demon forces a lock, and only The Bellhop hunts at all
+ok 103 - only a hunting demon forces a lock, and only The Bellhop hunts at all
+  ---
+  duration_ms: 17.5206
+  ...
+# Subtest: a catch is resolved from positions and does not care which demon it was
+ok 104 - a catch is resolved from positions and does not care which demon it was
+  ---
+  duration_ms: 1.2628
+  ...
+# Subtest: what a client is told about a demon is a body, not an intention it can track
+ok 105 - what a client is told about a demon is a body, not an intention it can track
+  ---
+  duration_ms: 8.5683
+  ...
+# Subtest: demons spawn apart and away from the player
+ok 106 - demons spawn apart and away from the player
+  ---
+  duration_ms: 1.1107
+  ...
+# Subtest: replacing a map stops every outgoing demon body
+ok 107 - replacing a map stops every outgoing demon body
+  ---
+  duration_ms: 35.5613
+  ...
+# (node:16448) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/modules/demons.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the shared threat event separately reports whether a demon sees the local player
+ok 108 - the shared threat event separately reports whether a demon sees the local player
+  ---
+  duration_ms: 1.7894
+  ...
+# Subtest: the viewport vignette is transparent unless the local player is actively chased
+ok 109 - the viewport vignette is transparent unless the local player is actively chased
+  ---
+  duration_ms: 2.9102
+  ...
+# Subtest: a roster longer than the hotel’s two composes that many bodies and builds their HUD rows
+ok 110 - a roster longer than the hotel’s two composes that many bodies and builds their HUD rows
+  ---
+  duration_ms: 1.8791
+  ...
+# Subtest: a snapshot owns the threat readout; the puppet bodies stop publishing one
+ok 111 - a snapshot owns the threat readout; the puppet bodies stop publishing one
+  ---
+  duration_ms: 2.2928
+  ...
+# (node:29556) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/vendor/three.module.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: hotel door leaves and secret panels occupy the plan's world height on every floor
+ok 112 - hotel door leaves and secret panels occupy the plan's world height on every floor
+  ---
+  duration_ms: 427.9644
+  ...
+# Subtest: mall door leaves and secret panels occupy the plan's world height on every floor
+ok 113 - mall door leaves and secret panels occupy the plan's world height on every floor
+  ---
+  duration_ms: 641.0131
+  ...
+# Subtest: a complete sparse door snapshot closes previously open doors, including initially open rooms
+ok 114 - a complete sparse door snapshot closes previously open doors, including initially open rooms
+  ---
+  duration_ms: 100.9468
+  ...
+# (node:5740) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/vendor/three.module.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: visible and authoritative lift face -1 with the plan
+ok 115 - visible and authoritative lift face -1 with the plan
+  ---
+  duration_ms: 233.3197
+  ...
+# Subtest: visible and authoritative lift face 1 with the plan
+ok 116 - visible and authoritative lift face 1 with the plan
+  ---
+  duration_ms: 4.1133
+  ...
+# Subtest: the replicated lift still announces departures and arrivals
+ok 117 - the replicated lift still announces departures and arrivals
+  ---
+  duration_ms: 7.7401
+  ...
+# Subtest: detection considers every player and chooses the nearest visible target
+ok 118 - detection considers every player and chooses the nearest visible target
+  ---
+  duration_ms: 14.7893
+  ...
+# Subtest: multiple demons publish the most urgent shared threat state
+ok 119 - multiple demons publish the most urgent shared threat state
+  ---
+  duration_ms: 0.5577
+  ...
+# Subtest: spawn selection keeps the demon away from the player when possible
+ok 120 - spawn selection keeps the demon away from the player when possible
+  ---
+  duration_ms: 1.5138
+  ...
+# Subtest: a second demon excludes floors already occupied by another demon
+ok 121 - a second demon excludes floors already occupied by another demon
+  ---
+  duration_ms: 0.383
+  ...
+# Subtest: detection requires range, field of view, same level, and a clear ray
+ok 122 - detection requires range, field of view, same level, and a clear ray
+  ---
+  duration_ms: 3.653
+  ...
+# Subtest: crouching substantially shortens long-range detection
+ok 123 - crouching substantially shortens long-range detection
+  ---
+  duration_ms: 0.3661
+  ...
+# Subtest: a lock-on becomes a finite search after LOS breaks, then returns to roaming
+ok 124 - a lock-on becomes a finite search after LOS breaks, then returns to roaming
+  ---
+  duration_ms: 1.4471
+  ...
+# Subtest: a demon follows fresh pursuit clues briefly after sight is broken
+ok 125 - a demon follows fresh pursuit clues briefly after sight is broken
+  ---
+  duration_ms: 0.5916
+  ...
+# Subtest: inter-floor routes follow the real switchback stairs without leaving between floors
+ok 126 - inter-floor routes follow the real switchback stairs without leaving between floors
+  ---
+  duration_ms: 2.8724
+  ...
+# Subtest: descending routes traverse the stair flights in reverse order
+ok 127 - descending routes traverse the stair flights in reverse order
+  ---
+  duration_ms: 1.8439
+  ...
+# Subtest: a same-floor pursuit enters the stairwell before following a player onto a flight
+ok 128 - a same-floor pursuit enters the stairwell before following a player onto a flight
+  ---
+  duration_ms: 3.6567
+  ...
+# Subtest: a demon already on the stairs follows the switchback instead of exiting through a wall
+ok 129 - a demon already on the stairs follows the switchback instead of exiting through a wall
+  ---
+  duration_ms: 0.9717
+  ...
+# Subtest: roaming occasionally chooses an available room and otherwise stays in the halls
+ok 130 - roaming occasionally chooses an available room and otherwise stays in the halls
+  ---
+  duration_ms: 0.6194
+  ...
+# Subtest: a heat hunt opens even a locked room door in the correct direction
+ok 131 - a heat hunt opens even a locked room door in the correct direction
+  ---
+  duration_ms: 0.3892
+  ...
+# Subtest: AI door opening preserves an authored swing angle on either doorway axis
+ok 132 - AI door opening preserves an authored swing angle on either doorway axis
+  ---
+  duration_ms: 1.6517
+  ...
+# Subtest: an ordinary room trudge opens unlocked doors but respects locked ones
+ok 133 - an ordinary room trudge opens unlocked doors but respects locked ones
+  ---
+  duration_ms: 0.3162
+  ...
+# Subtest: the catalog covers every operable thing in the hotel and nothing else
+ok 134 - the catalog covers every operable thing in the hotel and nothing else
+  ---
+  duration_ms: 46.7618
+  ...
+# Subtest: a fixture is reached by distance, height and facing rather than by a raycast
+ok 135 - a fixture is reached by distance, height and facing rather than by a raycast
+  ---
+  duration_ms: 32.6918
+  ...
+# Subtest: a locked door needs its key, and the key comes out of a drawer exactly once
+ok 136 - a locked door needs its key, and the key comes out of a drawer exactly once
+  ---
+  duration_ms: 15.9089
+  ...
+# Subtest: a secret panel is discovered before it is a door
+ok 137 - a secret panel is discovered before it is a door
+  ---
+  duration_ms: 20.6906
+  ...
+# Subtest: a swinging door reaches the space, and only when its angle actually changed
+ok 138 - a swinging door reaches the space, and only when its angle actually changed
+  ---
+  duration_ms: 18.8298
+  ...
+# Subtest: the cabin is held shut for the head start and only a release opens it
+ok 139 - the cabin is held shut for the head start and only a release opens it
+  ---
+  duration_ms: 33.4518
+  ...
+# Subtest: the cabin carries its own colliders up the shaft and opens the hall doors it is standing at
+ok 140 - the cabin carries its own colliders up the shaft and opens the hall doors it is standing at
+  ---
+  duration_ms: 29.9706
+  ...
+# Subtest: what goes on the wire is only what a client has to draw
+ok 141 - what goes on the wire is only what a client has to draw
+  ---
+  duration_ms: 62.4677
+  ...
+# Subtest: flashlights start off and toggle immutably
+ok 142 - flashlights start off and toggle immutably
+  ---
+  duration_ms: 6.5339
+  ...
+# Subtest: the flashlight has a compact snapshot suitable for a player network pose
+ok 143 - the flashlight has a compact snapshot suitable for a player network pose
+  ---
+  duration_ms: 0.4967
+  ...
+# Subtest: charge drains slowly only while the flashlight is on and shuts it off at zero
+ok 144 - charge drains slowly only while the flashlight is on and shuts it off at zero
+  ---
+  duration_ms: 0.7748
+  ...
+# Subtest: leftover charge adds directly and caps at a full battery
+ok 145 - leftover charge adds directly and caps at a full battery
+  ---
+  duration_ms: 0.8101
+  ...
+# Subtest: a pending toggle survives the snapshots that have not seen it yet
+ok 146 - a pending toggle survives the snapshots that have not seen it yet
+  ---
+  duration_ms: 0.6344
+  ...
+# Subtest: the authority still wins: a refusal, and a stuck intent that times out
+ok 147 - the authority still wins: a refusal, and a stuck intent that times out
+  ---
+  duration_ms: 0.3877
+  ...
+# Subtest: with no intent outstanding the snapshot is applied as-is
+ok 148 - with no intent outstanding the snapshot is applied as-is
+  ---
+  duration_ms: 0.5306
+  ...
+# (node:23004) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/vendor/three.module.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: grand-hotel: server placements and one contested claim converge under snapshot latency
+ok 149 - grand-hotel: server placements and one contested claim converge under snapshot latency
+  ---
+  duration_ms: 650.8652
+  ...
+# Subtest: cinder-mall: server placements and one contested claim converge under snapshot latency
+ok 150 - cinder-mall: server placements and one contested claim converge under snapshot latency
+  ---
+  duration_ms: 509.475
+  ...
+# Subtest: mercy-hospital: server placements and one contested claim converge under snapshot latency
+ok 151 - mercy-hospital: server placements and one contested claim converge under snapshot latency
+  ---
+  duration_ms: 53.2915
+  ...
+# Subtest: crowne-point-cinema: server placements and one contested claim converge under snapshot latency
+ok 152 - crowne-point-cinema: server placements and one contested claim converge under snapshot latency
+  ---
+  duration_ms: 88.5225
+  ...
+# (node:25220) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/vendor/three.module.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: solo floor pickups use the shared selection, retain full-battery pickups, and clean up when collected
+ok 153 - solo floor pickups use the shared selection, retain full-battery pickups, and clean up when collected
+  ---
+  duration_ms: 398.8869
+  ...
+# Subtest: online snapshots exclusively own pickups, including late joins and consumption
+ok 154 - online snapshots exclusively own pickups, including late joins and consumption
+  ---
+  duration_ms: 40.1643
+  ...
+# Subtest: solo eliminated players cannot collect floor loot
+ok 155 - solo eliminated players cannot collect floor loot
+  ---
+  duration_ms: 36.4494
+  ...
+# Subtest: grand-hotel: flashlight spots are authored, grounded, and clear of furniture and door swings
+ok 156 - grand-hotel: flashlight spots are authored, grounded, and clear of furniture and door swings
+  ---
+  duration_ms: 316.5883
+  ...
+# Subtest: cinder-mall: flashlight spots are authored, grounded, and clear of furniture and door swings
+ok 157 - cinder-mall: flashlight spots are authored, grounded, and clear of furniture and door swings
+  ---
+  duration_ms: 676.1669
+  ...
+# Subtest: mercy-hospital: flashlight spots are authored, grounded, and clear of furniture and door swings
+ok 158 - mercy-hospital: flashlight spots are authored, grounded, and clear of furniture and door swings
+  ---
+  duration_ms: 61.7832
+  ...
+# Subtest: crowne-point-cinema: flashlight spots are authored, grounded, and clear of furniture and door swings
+ok 159 - crowne-point-cinema: flashlight spots are authored, grounded, and clear of furniture and door swings
+  ---
+  duration_ms: 169.3112
+  ...
+# Subtest: floor pickups are seeded, sampled without replacement, and never mutate the plan
+ok 160 - floor pickups are seeded, sampled without replacement, and never mutate the plan
+  ---
+  duration_ms: 3.3854
+  ...
+# Subtest: authority creates floor pickups once; snapshots carry placement and inputs cannot forge it
+ok 161 - authority creates floor pickups once; snapshots carry placement and inputs cannot forge it
+  ---
+  duration_ms: 56.3964
+  ...
+# Subtest: one server tick grants a contested floor pickup only once and reports the resulting charge
+ok 162 - one server tick grants a contested floor pickup only once and reports the resulting charge
+  ---
+  duration_ms: 11.9829
+  ...
+# Subtest: floor pickups refuse full, eliminated, distant, wrong-height and wall-separated players
+ok 163 - floor pickups refuse full, eliminated, distant, wrong-height and wall-separated players
+  ---
+  duration_ms: 59.6784
+  ...
+# Subtest: an awake demon that can plainly see a hider stops roaming
+ok 164 - an awake demon that can plainly see a hider stops roaming
+  ---
+  duration_ms: 9.4684
+  ...
+# Subtest: a dormant demon looks at the same hider and stays roaming
+ok 165 - a dormant demon looks at the same hider and stays roaming
+  ---
+  duration_ms: 4.8389
+  ...
+# Subtest: a dormant demon does not hunt a full heat meter
+ok 166 - a dormant demon does not hunt a full heat meter
+  ---
+  duration_ms: 2.7746
+  ...
+# Subtest: a dormant demon still walks, so the building is not frozen while the hiders hide
+ok 167 - a dormant demon still walks, so the building is not frozen while the hiders hide
+  ---
+  duration_ms: 78.1756
+  ...
+# Subtest: a demon standing on a hider takes nobody during the head start, and takes them the moment it ends
+ok 168 - a demon standing on a hider takes nobody during the head start, and takes them the moment it ends
+  ---
+  duration_ms: 418.413
+  ...
+# Subtest: the snapshot reports a calm building during the head start
+ok 169 - the snapshot reports a calm building during the head start
+  ---
+  duration_ms: 94.5484
+  ...
+# Subtest: the solo round publishes the head start and the solo brain reads it
+ok 170 - the solo round publishes the head start and the solo brain reads it
+  ---
+  duration_ms: 1.6364
+  ...
+# Subtest: a body walks the real corridor at 60hz without leaving the floor or crossing a wall
+ok 171 - a body walks the real corridor at 60hz without leaving the floor or crossing a wall
+  ---
+  duration_ms: 89.4127
+  ...
+# Subtest: a shut room door stops a body that a walked route would otherwise pass through
+ok 172 - a shut room door stops a body that a walked route would otherwise pass through
+  ---
+  duration_ms: 49.0461
+  ...
+# Subtest: a whole round ticks headlessly from the head start to a seeker win
+ok 173 - a whole round ticks headlessly from the head start to a seeker win
+  ---
+  duration_ms: 21.7071
+  ...
+# Subtest: a demon taking the seeker ends the same headless round for the hiders
+ok 174 - a demon taking the seeker ends the same headless round for the hiders
+  ---
+  duration_ms: 0.889
+  ...
+# Subtest: a position inside a room reports that room, and the hallway reports the hallway
+ok 175 - a position inside a room reports that room, and the hallway reports the hallway
+  ---
+  duration_ms: 6.0965
+  ...
+# Subtest: a room only claims the floor it is on
+ok 176 - a room only claims the floor it is on
+  ---
+  duration_ms: 0.4878
+  ...
+# Subtest: the stairwell and elevator (floor 0) are never a room
+ok 177 - the stairwell and elevator (floor 0) are never a room
+  ---
+  duration_ms: 0.2901
+  ...
+# Subtest: a secret tunnel is its own kind of zone, on its own floor
+ok 178 - a secret tunnel is its own kind of zone, on its own floor
+  ---
+  duration_ms: 0.3998
+  ...
+# Subtest: the tunnel wins the sliver of wall it shares with the room box next door
+ok 179 - the tunnel wins the sliver of wall it shares with the room box next door
+  ---
+  duration_ms: 0.2961
+  ...
+# Subtest: heat fills while the player stays in one room and reports full at the fill time
+ok 180 - heat fills while the player stays in one room and reports full at the fill time
+  ---
+  duration_ms: 0.8987
+  ...
+# Subtest: heat does not overfill past 1
+ok 181 - heat does not overfill past 1
+  ---
+  duration_ms: 0.5707
+  ...
+# Subtest: leaving the room resets the meter
+ok 182 - leaving the room resets the meter
+  ---
+  duration_ms: 0.393
+  ...
+# Subtest: moving between two rooms resets the meter as surely as stepping into the hall
+ok 183 - moving between two rooms resets the meter as surely as stepping into the hall
+  ---
+  duration_ms: 0.9683
+  ...
+# Subtest: steps taken in the hallway reset the meter once they add up
+ok 184 - steps taken in the hallway reset the meter once they add up
+  ---
+  duration_ms: 1.0261
+  ...
+# Subtest: standing still in the hallway still fills — camping anywhere is the thing being punished
+ok 185 - standing still in the hallway still fills — camping anywhere is the thing being punished
+  ---
+  duration_ms: 0.4204
+  ...
+# Subtest: walking around inside a room does not reset it — hiding in place is the sin, not moving
+ok 186 - walking around inside a room does not reset it — hiding in place is the sin, not moving
+  ---
+  duration_ms: 0.2794
+  ...
+# Subtest: no hunt target while nobody is full
+ok 187 - no hunt target while nobody is full
+  ---
+  duration_ms: 0.3758
+  ...
+# Subtest: a full hider standing in the hallway is not a hunt target — the demon enters rooms
+ok 188 - a full hider standing in the hallway is not a hunt target — the demon enters rooms
+  ---
+  duration_ms: 0.2191
+  ...
+# Subtest: among full hiders the demon commits to the one it is closest to
+ok 189 - among full hiders the demon commits to the one it is closest to
+  ---
+  duration_ms: 0.289
+  ...
+# Subtest: each hider carries an independent heat tracker that becomes a hunt candidate
+ok 190 - each hider carries an independent heat tracker that becomes a hunt candidate
+  ---
+  duration_ms: 0.6271
+  ...
+# Subtest: a floor apart counts as distance, so a hider one floor up is further than one down the hall
+ok 191 - a floor apart counts as distance, so a hider one floor up is further than one down the hall
+  ---
+  duration_ms: 0.2735
+  ...
+# Subtest: a secret tunnel drains the meter instead of filling it
+ok 192 - a secret tunnel drains the meter instead of filling it
+  ---
+  duration_ms: 0.2993
+  ...
+# Subtest: the tunnel drain bottoms out at zero and stays there
+ok 193 - the tunnel drain bottoms out at zero and stays there
+  ---
+  duration_ms: 0.3272
+  ...
+# Subtest: a meter can never read full inside a tunnel, however long you sit there
+ok 194 - a meter can never read full inside a tunnel, however long you sit there
+  ---
+  duration_ms: 0.3457
+  ...
+# Subtest: leaving a tunnel resets like any other zone change and the meter starts climbing again
+ok 195 - leaving a tunnel resets like any other zone change and the meter starts climbing again
+  ---
+  duration_ms: 0.2534
+  ...
+# Subtest: a tunnel is never a hunt target — the demon walks into rooms and cannot open a secret panel
+ok 196 - a tunnel is never a hunt target — the demon walks into rooms and cannot open a secret panel
+  ---
+  duration_ms: 0.2232
+  ...
+# Subtest: a fresh hider is on its way to a spot, standing, with nowhere claimed yet
+ok 197 - a fresh hider is on its way to a spot, standing, with nowhere claimed yet
+  ---
+  duration_ms: 5.5132
+  ...
+# Subtest: a hiding spot is chosen away from every known threat
+ok 198 - a hiding spot is chosen away from every known threat
+  ---
+  duration_ms: 0.9465
+  ...
+# Subtest: hiders spread out instead of piling into one room
+ok 199 - hiders spread out instead of piling into one room
+  ---
+  duration_ms: 0.8616
+  ...
+# Subtest: every spot being taken still yields a spot rather than a stranded hider
+ok 200 - every spot being taken still yields a spot rather than a stranded hider
+  ---
+  duration_ms: 0.5542
+  ...
+# Subtest: a floor between a hider and a threat counts as real distance
+ok 201 - a floor between a hider and a threat counts as real distance
+  ---
+  duration_ms: 0.3904
+  ...
+# Subtest: arriving at the spot settles the hider into a crouch
+ok 202 - arriving at the spot settles the hider into a crouch
+  ---
+  duration_ms: 2.0257
+  ...
+# Subtest: a seeker closing in makes a hidden hider bolt and drop its spot
+ok 203 - a seeker closing in makes a hidden hider bolt and drop its spot
+  ---
+  duration_ms: 0.5008
+  ...
+# Subtest: the demon has a shorter fuse than the seeker but is still fled from
+ok 204 - the demon has a shorter fuse than the seeker but is still fled from
+  ---
+  duration_ms: 0.5173
+  ...
+# Subtest: a fled hider stays spooked for a while before looking for a new spot
+ok 205 - a fled hider stays spooked for a while before looking for a new spot
+  ---
+  duration_ms: 0.9252
+  ...
+# Subtest: a threat still in the room keeps resetting the calm timer
+ok 206 - a threat still in the room keeps resetting the calm timer
+  ---
+  duration_ms: 0.9389
+  ...
+# Subtest: the speed a hider moves at follows what it is doing
+ok 207 - the speed a hider moves at follows what it is doing
+  ---
+  duration_ms: 0.5078
+  ...
+# (node:8504) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/vendor/three.module.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: eight CPU hiders start at the map spawns and physically settle inside departments
+ok 208 - eight CPU hiders start at the map spawns and physically settle inside departments
+  ---
+  duration_ms: 1072.7627
+  ...
+# Subtest: CPU hider teammates reserve the local hider spawn seat
+ok 209 - CPU hider teammates reserve the local hider spawn seat
+  ---
+  duration_ms: 27.8329
+  ...
+# Subtest: the existing hotel seeker still exits bedrooms and reaches its next room
+ok 210 - the existing hotel seeker still exits bedrooms and reaches its next room
+  ---
+  duration_ms: 631.3321
+  ...
+# Subtest: the CPU seeker sweeps every department through the real map graph
+ok 211 - the CPU seeker sweeps every department through the real map graph
+  ---
+  duration_ms: 214.6243
+  ...
+# Subtest: a full-height demon physically visits every hospital department across both floors
+ok 212 - a full-height demon physically visits every hospital department across both floors
+  ---
+  duration_ms: 440.3475
+  ...
+# Subtest: Mercy is a pure two-floor building with the reference departments and its own staff
+ok 213 - Mercy is a pure two-floor building with the reference departments and its own staff
+  ---
+  duration_ms: 11.6792
+  ...
+# Subtest: every player/demon spawn and department target has clear footing
+ok 214 - every player/demon spawn and department target has clear footing
+  ---
+  duration_ms: 4.8321
+  ...
+# Subtest: hospital demons never open on a player spawn, including the solo hider seat
+ok 215 - hospital demons never open on a player spawn, including the solo hider seat
+  ---
+  duration_ms: 0.7712
+  ...
+# (node:25624) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/modules/map-session.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: map boot places the actual camera and feet at an authored spawn, not the hotel wall coordinate
+ok 216 - map boot places the actual camera and feet at an authored spawn, not the hotel wall coordinate
+  ---
+  duration_ms: 86.8415
+  ...
+# Subtest: the entire navigation graph is connected per floor and every edge is physically clear
+ok 217 - the entire navigation graph is connected per floor and every edge is physically clear
+  ---
+  duration_ms: 52.7479
+  ...
+# Subtest: CPUs can walk into and out of all departments and between floors
+ok 218 - CPUs can walk into and out of all departments and between floors
+  ---
+  duration_ms: 1823.6329
+  ...
+# Subtest: stairs are continuous walk surfaces in both directions, with clear thresholds
+ok 219 - stairs are continuous walk surfaces in both directions, with clear thresholds
+  ---
+  duration_ms: 36.6055
+  ...
+# Subtest: department bounds fill heat inside the actual room, not the corridors
+ok 220 - department bounds fill heat inside the actual room, not the corridors
+  ---
+  duration_ms: 1.6686
+  ...
+# Subtest: lift calls, hall doors, upper shaft void and inspection spawns are usable
+ok 221 - lift calls, hall doors, upper shaft void and inspection spawns are usable
+  ---
+  duration_ms: 1.9489
+  ...
+# Subtest: the hospital boots in the browser and is included in the authority mirror
+ok 222 - the hospital boots in the browser and is included in the authority mirror
+  ---
+  duration_ms: 23.6049
+  ...
+# (node:27528) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/modules/hotel.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: the lamp pool keeps a constant light count no matter how many floors are lit
+ok 223 - the lamp pool keeps a constant light count no matter how many floors are lit
+  ---
+  duration_ms: 73.0445
+  ...
+# Subtest: the pool takes the nearest lamps and only from the lit floors
+ok 224 - the pool takes the nearest lamps and only from the lit floors
+  ---
+  duration_ms: 2.3057
+  ...
+# Subtest: a lit floor with fewer lamps than the pool still returns a short list
+ok 225 - a lit floor with fewer lamps than the pool still returns a short list
+  ---
+  duration_ms: 0.6441
+  ...
+# Subtest: the hotel plan is pure data built without a renderer
+ok 226 - the hotel plan is pure data built without a renderer
+  ---
+  duration_ms: 53.0295
+  ...
+# Subtest: every number the plan publishes is finite
+ok 227 - every number the plan publishes is finite
+  ---
+  duration_ms: 47.5606
+  ...
+# Subtest: all four floors are physically present at their real height
+ok 228 - all four floors are physically present at their real height
+  ---
+  duration_ms: 13.6256
+  ...
+# Subtest: corridor walls block sideways movement without sealing the corridor
+ok 229 - corridor walls block sideways movement without sealing the corridor
+  ---
+  duration_ms: 14.0992
+  ...
+# Subtest: every authored room has a centre, a door, and the right lock
+ok 230 - every authored room has a centre, a door, and the right lock
+  ---
+  duration_ms: 12.5216
+  ...
+# Subtest: a closed door seals its doorway and an open one does not
+ok 231 - a closed door seals its doorway and an open one does not
+  ---
+  duration_ms: 10.275
+  ...
+# Subtest: room interiors are standable and their beds are not
+ok 232 - room interiors are standable and their beds are not
+  ---
+  duration_ms: 9.5821
+  ...
+# Subtest: secret rooms carry panels and their links carry a drainable tunnel
+ok 233 - secret rooms carry panels and their links carry a drainable tunnel
+  ---
+  duration_ms: 7.3042
+  ...
+# Subtest: the stairwell is one continuous climb from floor one to floor four
+ok 234 - the stairwell is one continuous climb from floor one to floor four
+  ---
+  duration_ms: 20.4146
+  ...
+# Subtest: the stair landing on each floor meets that floor
+ok 235 - the stair landing on each floor meets that floor
+  ---
+  duration_ms: 9.0797
+  ...
+# Subtest: the elevator hall doors are dynamic and only block while nearly shut
+ok 236 - the elevator hall doors are dynamic and only block while nearly shut
+  ---
+  duration_ms: 7.6576
+  ...
+# Subtest: the plan places the seeker cabin and reachable hider spawns
+ok 237 - the plan places the seeker cabin and reachable hider spawns
+  ---
+  duration_ms: 25.5939
+  ...
+# Subtest: with no aim the authority still picks the nearest thing in the cone
+ok 238 - with no aim the authority still picks the nearest thing in the cone
+  ---
+  duration_ms: 2.4592
+  ...
+# Subtest: an aim inside reach wins over the nearer fixture
+ok 239 - an aim inside reach wins over the nearer fixture
+  ---
+  duration_ms: 0.3464
+  ...
+# Subtest: an aim at something out of reach falls back to the authority pick
+ok 240 - an aim at something out of reach falls back to the authority pick
+  ---
+  duration_ms: 0.3425
+  ...
+# Subtest: an aim behind the player is refused
+ok 241 - an aim behind the player is refused
+  ---
+  duration_ms: 0.531
+  ...
+# Subtest: an aim at a fixture that is not in the catalog at all is ignored
+ok 242 - an aim at a fixture that is not in the catalog at all is ignored
+  ---
+  duration_ms: 1.8497
+  ...
+# Subtest: an aim one floor up cannot be reached through the ceiling
+ok 243 - an aim one floor up cannot be reached through the ceiling
+  ---
+  duration_ms: 0.404
+  ...
+# Subtest: readInput carries an aim and refuses anything that is not an id
+ok 244 - readInput carries an aim and refuses anything that is not an id
+  ---
+  duration_ms: 0.7066
+  ...
+# Subtest: the authority opens the fixture the player aimed at, not the one that happened to be closer
+ok 245 - the authority opens the fixture the player aimed at, not the one that happened to be closer
+  ---
+  duration_ms: 130.4781
+  ...
+# Subtest: the stairwell uses one clear switchback per floor transition
+ok 246 - the stairwell uses one clear switchback per floor transition
+  ---
+  duration_ms: 5.475
+  ...
+# Subtest: room openings have two jambs and a header outside the walkable opening
+ok 247 - room openings have two jambs and a header outside the walkable opening
+  ---
+  duration_ms: 0.7435
+  ...
+# Subtest: rooms on every floor retain a visible low-cost fill light
+ok 248 - rooms on every floor retain a visible low-cost fill light
+  ---
+  duration_ms: 0.3701
+  ...
+# Subtest: the stair entrance is enclosed and its threshold fully bridges the shaft
+ok 249 - the stair entrance is enclosed and its threshold fully bridges the shaft
+  ---
+  duration_ms: 1.9009
+  ...
+# Subtest: stair landings include guards on every exposed abyss-facing edge
+ok 250 - stair landings include guards on every exposed abyss-facing edge
+  ---
+  duration_ms: 0.7288
+  ...
+# Subtest: the bottom of the stairwell is a complete walkable slab, not a decorative pit
+ok 251 - the bottom of the stairwell is a complete walkable slab, not a decorative pit
+  ---
+  duration_ms: 0.3644
+  ...
+# Subtest: stair ramps win over an overlapping flat bottom slab
+ok 252 - stair ramps win over an overlapping flat bottom slab
+  ---
+  duration_ms: 0.7178
+  ...
+# Subtest: room doorway fill uses a shader-stable emissive glow
+ok 253 - room doorway fill uses a shader-stable emissive glow
+  ---
+  duration_ms: 0.2847
+  ...
+# Subtest: hall lighting uses sparse red pools instead of white light at every fixture
+ok 254 - hall lighting uses sparse red pools instead of white light at every fixture
+  ---
+  duration_ms: 0.8129
+  ...
+# Subtest: a floor lights only itself
+ok 255 - a floor lights only itself
+  ---
+  duration_ms: 1.3864
+  ...
+# Subtest: the stairwell lights only the floors it runs between, never the whole hotel
+ok 256 - the stairwell lights only the floors it runs between, never the whole hotel
+  ---
+  duration_ms: 0.8913
+  ...
+# Subtest: a player somehow outside every floor band still gets one lit floor
+ok 257 - a player somehow outside every floor band still gets one lit floor
+  ---
+  duration_ms: 0.3277
+  ...
+# Subtest: the mall is data, with no renderer anywhere in it
+ok 258 - the mall is data, with no renderer anywhere in it
+  ---
+  duration_ms: 4.7663
+  ...
+# Subtest: every number the plan publishes is finite
+ok 259 - every number the plan publishes is finite
+  ---
+  duration_ms: 12.2673
+  ...
+# Subtest: every spawn is somewhere a body can actually stand
+ok 260 - every spawn is somewhere a body can actually stand
+  ---
+  duration_ms: 2.878
+  ...
+# Subtest: the hiders are spread over both levels
+ok 261 - the hiders are spread over both levels
+  ---
+  duration_ms: 1.6623
+  ...
+# Subtest: the atrium is a real void: the upper gallery is a ring, not a slab
+ok 262 - the atrium is a real void: the upper gallery is a ring, not a slab
+  ---
+  duration_ms: 0.7866
+  ...
+# Subtest: both levels are reachable from each other on foot
+ok 263 - both levels are reachable from each other on foot
+  ---
+  duration_ms: 0.7885
+  ...
+# Subtest: the demons can route to every store, on either level
+ok 264 - the demons can route to every store, on either level
+  ---
+  duration_ms: 48.622
+  ...
+# Subtest: a routed body can physically reach every shop from the concourse
+ok 265 - a routed body can physically reach every shop from the concourse
+  ---
+  duration_ms: 102.8588
+  ...
+# Subtest: the navigation graph is one connected loop per level, not islands
+ok 266 - the navigation graph is one connected loop per level, not islands
+  ---
+  duration_ms: 11.4535
+  ...
+# Subtest: three demons open apart in a two-level building
+ok 267 - three demons open apart in a two-level building
+  ---
+  duration_ms: 452.6744
+  ...
+# Subtest: a whole round ticks in the mall with no renderer in the process
+ok 268 - a whole round ticks in the mall with no renderer in the process
+  ---
+  duration_ms: 1612.4436
+  ...
+# Subtest: the mall carries its own lift, and it opens toward the concourse
+ok 269 - the mall carries its own lift, and it opens toward the concourse
+  ---
+  duration_ms: 0.3292
+  ...
+# Subtest: reference shopfronts are glazed, with all twenty public openings intact
+ok 270 - reference shopfronts are glazed, with all twenty public openings intact
+  ---
+  duration_ms: 9.7643
+  ...
+# Subtest: each vertical route exits on its own landing without doubling back or visiting hotel coordinates
+ok 271 - each vertical route exits on its own landing without doubling back or visiting hotel coordinates
+  ---
+  duration_ms: 1.087
+  ...
+# Subtest: a demon can pursue a player halfway up either escalator without a missing second flight
+ok 272 - a demon can pursue a player halfway up either escalator without a missing second flight
+  ---
+  duration_ms: 1.84
+  ...
+# Subtest: inspection views are authored by the map and stand in clear playable spaces
+ok 273 - inspection views are authored by the map and stand in clear playable spaces
+  ---
+  duration_ms: 1.2301
+  ...
+# Subtest: a shop uses its actual bounds for heat without filling the concourse outside its glass
+ok 274 - a shop uses its actual bounds for heat without filling the concourse outside its glass
+  ---
+  duration_ms: 0.9407
+  ...
+# Subtest: the atrium has no low ceiling, and the fountain and shop-specific interiors match the reference
+ok 275 - the atrium has no low ceiling, and the fountain and shop-specific interiors match the reference
+  ---
+  duration_ms: 0.8526
+  ...
+# Subtest: furniture is solid and every authored navigation edge is walkable
+ok 276 - furniture is solid and every authored navigation edge is walkable
+  ---
+  duration_ms: 843.6562
+  ...
+# Subtest: the cinema projection refuge is inside the shell and reachable from both auditoriums
+ok 277 - the cinema projection refuge is inside the shell and reachable from both auditoriums
+  ---
+  duration_ms: 1.1667
+  ...
+# Subtest: lift call buttons, upper shaft opening and sill are part of the plan
+ok 278 - lift call buttons, upper shaft opening and sill are part of the plan
+  ---
+  duration_ms: 1.0051
+  ...
+# Subtest: the service corridors drain heat, and the stores fill it
+ok 279 - the service corridors drain heat, and the stores fill it
+  ---
+  duration_ms: 0.3672
+  ...
+# Subtest: each level hides its own master key behind a locked door
+ok 280 - each level hides its own master key behind a locked door
+  ---
+  duration_ms: 0.3972
+  ...
+# Subtest: a patrolling demon walks the mall, not the hotel it is not in
+ok 281 - a patrolling demon walks the mall, not the hotel it is not in
+  ---
+  duration_ms: 1.3513
+  ...
+# Subtest: the registry lists all four playable locations
+ok 282 - the registry lists all four playable locations
+  ---
+  duration_ms: 4.9588
+  ...
+# Subtest: `soon` stays a real state even with nothing sitting in it
+ok 283 - `soon` stays a real state even with nothing sitting in it
+  ---
+  duration_ms: 0.5151
+  ...
+# Subtest: an untrusted map id becomes a map, and an unknown one never becomes a round
+ok 284 - an untrusted map id becomes a map, and an unknown one never becomes a round
+  ---
+  duration_ms: 0.523
+  ...
+# Subtest: the demon roster is per map and is not capped at two
+ok 285 - the demon roster is per map and is not capped at two
+  ---
+  duration_ms: 0.4472
+  ...
+# Subtest: exactly one demon per map reads the heat meter
+ok 286 - exactly one demon per map reads the heat meter
+  ---
+  duration_ms: 0.6671
+  ...
+# Subtest: every roster entry is a distinct, nameable demon
+ok 287 - every roster entry is a distinct, nameable demon
+  ---
+  duration_ms: 3.3021
+  ...
+# Subtest: a map describes how tall it is so nothing has to assume four floors
+ok 288 - a map describes how tall it is so nothing has to assume four floors
+  ---
+  duration_ms: 0.5357
+  ...
+# Subtest: a demon roster may be longer than the building is tall
+ok 289 - a demon roster may be longer than the building is tall
+  ---
+  duration_ms: 0.9157
+  ...
+# Subtest: a plan is resolved through the named global rather than imported
+ok 290 - a plan is resolved through the named global rather than imported
+  ---
+  duration_ms: 1.6741
+  ...
+# Subtest: a map whose plan module is not loaded fails loudly instead of building an empty building
+ok 291 - a map whose plan module is not loaded fails loudly instead of building an empty building
+  ---
+  duration_ms: 1.7169
+  ...
+# (node:16700) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/vendor/three.module.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: every playable map publishes navigation of its own, standing in its own building
+ok 292 - every playable map publishes navigation of its own, standing in its own building
+  ---
+  duration_ms: 1034.8969
+  ...
+# Subtest: a patrolling demon is only ever sent to waypoints and rooms of the map it is in
+ok 293 - a patrolling demon is only ever sent to waypoints and rooms of the map it is in
+  ---
+  duration_ms: 1739.7106
+  ...
+# Subtest: a demon physically reaches every room of every map
+ok 294 - a demon physically reaches every room of every map
+  ---
+  duration_ms: 2023.338
+  ...
+# Subtest: CPU hiders start on their map's own seats and settle inside its rooms
+ok 295 - CPU hiders start on their map's own seats and settle inside its rooms
+  ---
+  duration_ms: 1853.8565
+  ...
+# Subtest: the CPU seeker sweeps rooms on every map through that map's own graph
+ok 296 - the CPU seeker sweeps rooms on every map through that map's own graph
+  ---
+  duration_ms: 317.6347
+  ...
+# Subtest: every playable map has locked rooms
+ok 297 - every playable map has locked rooms
+  ---
+  duration_ms: 634.4706
+  ...
+# Subtest: every locked door names a key that a drawer actually holds, on its own floor
+ok 298 - every locked door names a key that a drawer actually holds, on its own floor
+  ---
+  duration_ms: 479.5617
+  ...
+# Subtest: a key is never locked behind a door
+ok 299 - a key is never locked behind a door
+  ---
+  duration_ms: 428.7709
+  ...
+# Subtest: every floor of every playable map has a locked room and its key
+ok 300 - every floor of every playable map has a locked room and its key
+  ---
+  duration_ms: 520.0065
+  ...
+# Subtest: a key drawer stands clear of its own room doorway
+ok 301 - a key drawer stands clear of its own room doorway
+  ---
+  duration_ms: 560.0169
+  ...
+# Subtest: a preview has one panel per level a player can stand on
+ok 302 - a preview has one panel per level a player can stand on
+  ---
+  duration_ms: 9.1061
+  ...
+# Subtest: every drawn wall lands inside the panel it belongs to
+ok 303 - every drawn wall lands inside the panel it belongs to
+  ---
+  duration_ms: 7.9445
+  ...
+# Subtest: the two buildings do not draw the same picture
+ok 304 - the two buildings do not draw the same picture
+  ---
+  duration_ms: 1.7478
+  ...
+# Subtest: the projection keeps a building its own shape
+ok 305 - the projection keeps a building its own shape
+  ---
+  duration_ms: 1.0371
+  ...
+# Subtest: the rooms a map names are placed on the level they are on
+ok 306 - the rooms a map names are placed on the level they are on
+  ---
+  duration_ms: 2.0251
+  ...
+# Subtest: a plan with nothing in it draws an empty panel rather than throwing
+ok 307 - a plan with nothing in it draws an empty panel rather than throwing
+  ---
+  duration_ms: 0.3492
+  ...
+# (node:28264) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/vendor/three.module.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: map preparation replaces only the world and keeps the renderer and consumer handles
+ok 308 - map preparation replaces only the world and keeps the renderer and consumer handles
+  ---
+  duration_ms: 358.4416
+  ...
+# Subtest: repeated preparation is a no-op and a running round cannot change maps
+ok 309 - repeated preparation is a no-op and a running round cannot change maps
+  ---
+  duration_ms: 2.0188
+  ...
+# Subtest: failed preparation discards partial geometry and leaves the old world usable
+ok 310 - failed preparation discards partial geometry and leaves the old world usable
+  ---
+  duration_ms: 4.0598
+  ...
+# Subtest: a session opens on the title screen with the overlay up and the sim paused
+ok 311 - a session opens on the title screen with the overlay up and the sim paused
+  ---
+  duration_ms: 2.6556
+  ...
+# Subtest: single player opens match setup before a round can begin
+ok 312 - single player opens match setup before a round can begin
+  ---
+  duration_ms: 0.8
+  ...
+# Subtest: single-player match options are clamped to supported values
+ok 313 - single-player match options are clamped to supported values
+  ---
+  duration_ms: 2.3696
+  ...
+# Subtest: the match carries which building it is in, and an unknown one is not a location
+ok 314 - the match carries which building it is in, and an unknown one is not a location
+  ---
+  duration_ms: 4.2932
+  ...
+# Subtest: how-to and extras return to whichever screen opened them
+ok 315 - how-to and extras return to whichever screen opened them
+  ---
+  duration_ms: 0.7483
+  ...
+# Subtest: pause suspends play and resume returns to it
+ok 316 - pause suspends play and resume returns to it
+  ---
+  duration_ms: 0.345
+  ...
+# Subtest: an online match rejects pause without leaving play
+ok 317 - an online match rejects pause without leaving play
+  ---
+  duration_ms: 0.505
+  ...
+# Subtest: being caught takes over from play and cannot be paused away
+ok 318 - being caught takes over from play and cannot be paused away
+  ---
+  duration_ms: 0.3064
+  ...
+# Subtest: quitting asks the host to restart rather than pretending the world reset
+ok 319 - quitting asks the host to restart rather than pretending the world reset
+  ---
+  duration_ms: 0.8533
+  ...
+# Subtest: unknown and out-of-context actions leave the state untouched
+ok 320 - unknown and out-of-context actions leave the state untouched
+  ---
+  duration_ms: 0.9835
+  ...
+# Subtest: every screen is addressable and the action list is frozen
+ok 321 - every screen is addressable and the action list is frozen
+  ---
+  duration_ms: 0.5003
+  ...
+# Subtest: the online lobby is a waiting room the server ends, not a button
+ok 322 - the online lobby is a waiting room the server ends, not a button
+  ---
+  duration_ms: 0.2939
+  ...
+# Subtest: online setup can be left without starting a round
+ok 323 - online setup can be left without starting a round
+  ---
+  duration_ms: 0.2357
+  ...
+# (node:25072) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/modules/menu.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Esc on the end-of-round overlay quits to the title
+ok 324 - Esc on the end-of-round overlay quits to the title
+  ---
+  duration_ms: 76.1846
+  ...
+# Subtest: the explicit QUIT TO TITLE button on the caught overlay leaves the round
+ok 325 - the explicit QUIT TO TITLE button on the caught overlay leaves the round
+  ---
+  duration_ms: 1.5249
+  ...
+# Subtest: Esc does nothing destructive while the caught overlay is hidden
+ok 326 - Esc does nothing destructive while the caught overlay is hidden
+  ---
+  duration_ms: 2.9379
+  ...
+# Subtest: a hider eliminated mid-round keeps a working pause menu
+ok 327 - a hider eliminated mid-round keeps a working pause menu
+  ---
+  duration_ms: 1.8478
+  ...
+# Subtest: a screen focuses its panel, never the back arrow on it
+ok 328 - a screen focuses its panel, never the back arrow on it
+  ---
+  duration_ms: 1.7862
+  ...
+# Subtest: an unobstructed axis step moves on both axes and lands on the ground height
+ok 329 - an unobstructed axis step moves on both axes and lands on the ground height
+  ---
+  duration_ms: 4.8404
+  ...
+# Subtest: axis steps are independent, so a wall on one axis still lets you slide along it
+ok 330 - axis steps are independent, so a wall on one axis still lets you slide along it
+  ---
+  duration_ms: 0.6579
+  ...
+# Subtest: a step onto nothing is refused rather than walked off
+ok 331 - a step onto nothing is refused rather than walked off
+  ---
+  duration_ms: 1.8686
+  ...
+# Subtest: stepping toward a waypoint covers speed * delta and reports the facing direction
+ok 332 - stepping toward a waypoint covers speed * delta and reports the facing direction
+  ---
+  duration_ms: 0.8641
+  ...
+# Subtest: arrival on a walking waypoint uses the ground, never the waypoint altitude
+ok 333 - arrival on a walking waypoint uses the ground, never the waypoint altitude
+  ---
+  duration_ms: 0.484
+  ...
+# Subtest: a body walking into a wall slides along it instead of stalling
+ok 334 - a body walking into a wall slides along it instead of stalling
+  ---
+  duration_ms: 0.6298
+  ...
+# Subtest: a boxed-in body reports blocked and does not move
+ok 335 - a boxed-in body reports blocked and does not move
+  ---
+  duration_ms: 0.7598
+  ...
+# Subtest: a guided waypoint follows the stair altitude when there is body clearance
+ok 336 - a guided waypoint follows the stair altitude when there is body clearance
+  ---
+  duration_ms: 0.3994
+  ...
+# Subtest: guided stair movement cannot carry a body through a wall or ceiling
+ok 337 - guided stair movement cannot carry a body through a wall or ceiling
+  ---
+  duration_ms: 1.0581
+  ...
+# Subtest: arrival tolerance does not snap a body into a solid wall
+ok 338 - arrival tolerance does not snap a body into a solid wall
+  ---
+  duration_ms: 1.1625
+  ...
+# Subtest: a step never overshoots the waypoint it is walking to
+ok 339 - a step never overshoots the waypoint it is walking to
+  ---
+  duration_ms: 0.4756
+  ...
+# Subtest: soundtrack starts the looping chill theme after player interaction
+ok 340 - soundtrack starts the looping chill theme after player interaction
+  ---
+  duration_ms: 4.7346
+  ...
+# Subtest: leaving the menu swaps the menu theme for hotel ambience
+ok 341 - leaving the menu swaps the menu theme for hotel ambience
+  ---
+  duration_ms: 0.7775
+  ...
+# Subtest: chase changes cut off and reset the outgoing theme before restarting the other theme
+ok 342 - chase changes cut off and reset the outgoing theme before restarting the other theme
+  ---
+  duration_ms: 0.6406
+  ...
+# Subtest: another player being chased does not change the local soundtrack
+ok 343 - another player being chased does not change the local soundtrack
+  ---
+  duration_ms: 0.4147
+  ...
+# Subtest: a demon seeing the local player starts the local chase soundtrack
+ok 344 - a demon seeing the local player starts the local chase soundtrack
+  ---
+  duration_ms: 3.492
+  ...
+# Subtest: the latest monster state chooses the first theme when audio unlocks
+ok 345 - the latest monster state chooses the first theme when audio unlocks
+  ---
+  duration_ms: 0.6442
+  ...
+# Subtest: a late rejection from the old theme does not clear the new active theme
+ok 346 - a late rejection from the old theme does not clear the new active theme
+  ---
+  duration_ms: 0.7729
+  ...
+# Subtest: being caught plays the impact and scream together
+ok 347 - being caught plays the impact and scream together
+  ---
+  duration_ms: 0.7671
+  ...
+# Subtest: elevator travel uses the ride sound for passengers and arriving sound for calls
+ok 348 - elevator travel uses the ride sound for passengers and arriving sound for calls
+  ---
+  duration_ms: 4.5337
+  ...
+# Subtest: elevator arrival stops movement audio and plays the ding
+ok 349 - elevator arrival stops movement audio and plays the ding
+  ---
+  duration_ms: 1.1637
+  ...
+# Subtest: sound effects ignore rejected browser playback promises
+ok 350 - sound effects ignore rejected browser playback promises
+  ---
+  duration_ms: 0.981
+  ...
+# Subtest: menu actions use the supplied click and cancel sounds
+ok 351 - menu actions use the supplied click and cancel sounds
+  ---
+  duration_ms: 0.4889
+  ...
+# Subtest: routes use the actual walk height of tiered seating, including the final target
+ok 352 - routes use the actual walk height of tiered seating, including the final target
+  ---
+  duration_ms: 4.8769
+  ...
+# Subtest: the plan carries its own navigation graph
+ok 353 - the plan carries its own navigation graph
+  ---
+  duration_ms: 0.4446
+  ...
+# Subtest: every edge names nodes that exist, and never joins two floors
+ok 354 - every edge names nodes that exist, and never joins two floors
+  ---
+  duration_ms: 1.2916
+  ...
+# Subtest: a same-floor route walks the graph instead of cutting through walls
+ok 355 - a same-floor route walks the graph instead of cutting through walls
+  ---
+  duration_ms: 3.2183
+  ...
+# Subtest: a target off the spine is reached through its own doorway, not diagonally through a wall
+ok 356 - a target off the spine is reached through its own doorway, not diagonally through a wall
+  ---
+  duration_ms: 1.2226
+  ...
+# Subtest: a connector is chosen for the floors it actually serves
+ok 357 - a connector is chosen for the floors it actually serves
+  ---
+  duration_ms: 0.6824
+  ...
+# Subtest: the graph answers for a building with no waypoints at all
+ok 358 - the graph answers for a building with no waypoints at all
+  ---
+  duration_ms: 1.7541
+  ...
+# Subtest: replanning halfway up stairs exits along the flight, even when the target is on the rounded floor
+ok 359 - replanning halfway up stairs exits along the flight, even when the target is on the rounded floor
+  ---
+  duration_ms: 129.3465
+  ...
+# Subtest: a floor route cannot invent a crossing when no connector serves the destination
+ok 360 - a floor route cannot invent a crossing when no connector serves the destination
+  ---
+  duration_ms: 0.8881
+  ...
+# (node:28968) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/vendor/three.module.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: every map can reroute a demon from mid-flight to either landing without crossing solids
+ok 361 - every map can reroute a demon from mid-flight to either landing without crossing solids
+  ---
+  duration_ms: 1287.1482
+  ...
+# (node:28836) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/modules/spectator.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: a server-caught online hider follows living players without a solo loss screen
+ok 362 - a server-caught online hider follows living players without a solo loss screen
+  ---
+  duration_ms: 113.1059
+  ...
+# Subtest: a local catch notification cannot take over the online menu
+ok 363 - a local catch notification cannot take over the online menu
+  ---
+  duration_ms: 4.7099
+  ...
+# Subtest: only the authority ends the match and online results offer another online match
+ok 364 - only the authority ends the match and online results offer another online match
+  ---
+  duration_ms: 5.7219
+  ...
+# Subtest: each stage is sent to matchmaking as its own lobby setting
+ok 365 - each stage is sent to matchmaking as its own lobby setting
+  ---
+  duration_ms: 14.2466
+  ...
+# Subtest: three clients follow authoritative tag captures with staggered snapshot delivery
+ok 366 - three clients follow authoritative tag captures with staggered snapshot delivery
+  ---
+  duration_ms: 190.3764
+  ...
+# Subtest: three clients follow authoritative demon captures with staggered snapshot delivery
+ok 367 - three clients follow authoritative demon captures with staggered snapshot delivery
+  ---
+  duration_ms: 79.4251
+  ...
+# Subtest: the connection reduces server events into one view
+ok 368 - the connection reduces server events into one view
+  ---
+  duration_ms: 4.5354
+  ...
+# Subtest: a snapshot is the truth about who is where, who is it and who is out
+ok 369 - a snapshot is the truth about who is where, who is it and who is out
+  ---
+  duration_ms: 0.841
+  ...
+# Subtest: the end of a round arrives as a status, not as something the client decides
+ok 370 - the end of a round arrives as a status, not as something the client decides
+  ---
+  duration_ms: 38.1697
+  ...
+# Subtest: an unrelated lobby message and a malformed snapshot leave the view alone
+ok 371 - an unrelated lobby message and a malformed snapshot leave the view alone
+  ---
+  duration_ms: 0.5592
+  ...
+# Subtest: an error is surfaced rather than swallowed
+ok 372 - an error is surfaced rather than swallowed
+  ---
+  duration_ms: 1.4251
+  ...
+# Subtest: an input carries intent only
+ok 373 - an input carries intent only
+  ---
+  duration_ms: 2.6588
+  ...
+# Subtest: an unchanged input is not resent, but silence is still heartbeaten
+ok 374 - an unchanged input is not resent, but silence is still heartbeaten
+  ---
+  duration_ms: 0.8572
+  ...
+# Subtest: a small disagreement with the server is walked off and a large one is applied at once
+ok 375 - a small disagreement with the server is walked off and a large one is applied at once
+  ---
+  duration_ms: 0.7543
+  ...
+# Subtest: a remote body is walked toward its last pose and turns the short way
+ok 376 - a remote body is walked toward its last pose and turns the short way
+  ---
+  duration_ms: 1.3324
+  ...
+# Subtest: both halves of an interact press reach the authority
+ok 377 - both halves of an interact press reach the authority
+  ---
+  duration_ms: 1.0211
+  ...
+# Subtest: a dropped player can reclaim the seat their body is still standing in
+ok 378 - a dropped player can reclaim the seat their body is still standing in
+  ---
+  duration_ms: 0.7477
+  ...
+# Subtest: a resumed session restores who this client is and nothing about the round
+ok 379 - a resumed session restores who this client is and nothing about the round
+  ---
+  duration_ms: 0.2863
+  ...
+# Subtest: a refused resume falls back to joining rather than becoming an error screen
+ok 380 - a refused resume falls back to joining rather than becoming an error screen
+  ---
+  duration_ms: 0.2695
+  ...
+# Subtest: a dropped guest is a caption, not a roster change: their body is still in the hotel
+ok 381 - a dropped guest is a caption, not a roster change: their body is still in the hotel
+  ---
+  duration_ms: 0.6397
+  ...
+# Subtest: the lobby search carries this game's seat limits
+ok 382 - the lobby search carries this game's seat limits
+  ---
+  duration_ms: 0.2675
+  ...
+# (node:2040) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/modules/map-session.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: browsing online maps stays in setup without navigation (storage blocked: false)
+ok 383 - browsing online maps stays in setup without navigation (storage blocked: false)
+  ---
+  duration_ms: 107.8387
+  ...
+# Subtest: solo map browsing keeps role, guests, timing and screen (storage blocked: false)
+ok 384 - solo map browsing keeps role, guests, timing and screen (storage blocked: false)
+  ---
+  duration_ms: 4.9879
+  ...
+# Subtest: browsing online maps stays in setup without navigation (storage blocked: true)
+ok 385 - browsing online maps stays in setup without navigation (storage blocked: true)
+  ---
+  duration_ms: 3.2904
+  ...
+# Subtest: solo map browsing keeps role, guests, timing and screen (storage blocked: true)
+ok 386 - solo map browsing keeps role, guests, timing and screen (storage blocked: true)
+  ---
+  duration_ms: 9.2561
+  ...
+# Subtest: each setup commits its own selection before entering matchmaking or play
+ok 387 - each setup commits its own selection before entering matchmaking or play
+  ---
+  duration_ms: 3.6693
+  ...
+# Subtest: a failed map preparation leaves the setup usable and the active map unchanged
+ok 388 - a failed map preparation leaves the setup usable and the active map unchanged
+  ---
+  duration_ms: 2.0049
+  ...
+# (node:28952) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/modules/menu.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: a dropped connection keeps online ownership and can reclaim a seat after a long match
+ok 389 - a dropped connection keeps online ownership and can reclaim a seat after a long match
+  ---
+  duration_ms: 254.5563
+  ...
+# Subtest: backing out of a lobby closes it without scheduling a reconnect
+ok 390 - backing out of a lobby closes it without scheduling a reconnect
+  ---
+  duration_ms: 2.3814
+  ...
+# Subtest: an incompatible or incomplete start packet never opens a playable local world
+ok 391 - an incompatible or incomplete start packet never opens a playable local world
+  ---
+  duration_ms: 69.3993
+  ...
+# Subtest: grand-hotel: two clients receive their roles, countdown and fixtures before play, even if the next packet is delayed
+ok 392 - grand-hotel: two clients receive their roles, countdown and fixtures before play, even if the next packet is delayed
+  ---
+  duration_ms: 251.025
+  ...
+# Subtest: cinder-mall: two clients receive their roles, countdown and fixtures before play, even if the next packet is delayed
+ok 393 - cinder-mall: two clients receive their roles, countdown and fixtures before play, even if the next packet is delayed
+  ---
+  duration_ms: 765.1645
+  ...
+# Subtest: mercy-hospital: two clients receive their roles, countdown and fixtures before play, even if the next packet is delayed
+ok 394 - mercy-hospital: two clients receive their roles, countdown and fixtures before play, even if the next packet is delayed
+  ---
+  duration_ms: 67.9246
+  ...
+# Subtest: crowne-point-cinema: two clients receive their roles, countdown and fixtures before play, even if the next packet is delayed
+ok 395 - crowne-point-cinema: two clients receive their roles, countdown and fixtures before play, even if the next packet is delayed
+  ---
+  duration_ms: 220.1739
+  ...
+# Subtest: change tracking skips repeated expensive render work
+ok 396 - change tracking skips repeated expensive render work
+  ---
+  duration_ms: 5.1283
+  ...
+# Subtest: interaction work is capped to a fixed interval
+ok 397 - interaction work is capped to a fixed interval
+  ---
+  duration_ms: 0.3944
+  ...
+# Subtest: dynamic collider bounds are reused until the door moves
+ok 398 - dynamic collider bounds are reused until the door moves
+  ---
+  duration_ms: 1.7296
+  ...
+# Subtest: adaptive quality lowers render scale after sustained slow frames and recovers gradually
+ok 399 - adaptive quality lowers render scale after sustained slow frames and recovers gradually
+  ---
+  duration_ms: 0.6823
+  ...
+# Subtest: simulation advances in whole 60hz ticks regardless of the display refresh rate
+ok 400 - simulation advances in whole 60hz ticks regardless of the display refresh rate
+  ---
+  duration_ms: 0.8553
+  ...
+# Subtest: a 30hz display still simulates 60 ticks a second, two per frame
+ok 401 - a 30hz display still simulates 60 ticks a second, two per frame
+  ---
+  duration_ms: 1.7448
+  ...
+# Subtest: a long stall is capped and its remainder dropped instead of spiralling
+ok 402 - a long stall is capped and its remainder dropped instead of spiralling
+  ---
+  duration_ms: 0.6498
+  ...
+# Subtest: leftover time is carried into the next frame rather than lost
+ok 403 - leftover time is carried into the next frame rather than lost
+  ---
+  duration_ms: 0.4077
+  ...
+# Subtest: a negative or broken frame delta cannot rewind the simulation
+ok 404 - a negative or broken frame delta cannot rewind the simulation
+  ---
+  duration_ms: 0.9218
+  ...
+# Subtest: the demo has three guests while an untimed round still scales to a sixteen-player lobby
+ok 405 - the demo has three guests while an untimed round still scales to a sixteen-player lobby
+  ---
+  duration_ms: 5.0407
+  ...
+# Subtest: a created round seats every player, names one seeker, and starts in the hiding phase
+ok 406 - a created round seats every player, names one seeker, and starts in the hiding phase
+  ---
+  duration_ms: 2.2902
+  ...
+# Subtest: the round clock does not start until the hiding head start expires
+ok 407 - the round clock does not start until the hiding head start expires
+  ---
+  duration_ms: 1.5429
+  ...
+# Subtest: the hiding phase cannot be configured below forty-five seconds
+ok 408 - the hiding phase cannot be configured below forty-five seconds
+  ---
+  duration_ms: 0.3785
+  ...
+# Subtest: a tick that spans the release only spends its remainder on the round clock
+ok 409 - a tick that spans the release only spends its remainder on the round clock
+  ---
+  duration_ms: 0.5058
+  ...
+# Subtest: a seeker tags a hider only within reach, at a matching height, and with line of sight
+ok 410 - a seeker tags a hider only within reach, at a matching height, and with line of sight
+  ---
+  duration_ms: 0.4568
+  ...
+# Subtest: tagging a hider takes it out of play and records who took it
+ok 411 - tagging a hider takes it out of play and records who took it
+  ---
+  duration_ms: 0.8003
+  ...
+# Subtest: the seeker wins once the last hider is out, however each one went out
+ok 412 - the seeker wins once the last hider is out, however each one went out
+  ---
+  duration_ms: 0.7111
+  ...
+# Subtest: the demon taking the seeker ends the round for the hiders even with hiders left
+ok 413 - the demon taking the seeker ends the round for the hiders even with hiders left
+  ---
+  duration_ms: 0.8963
+  ...
+# Subtest: running out of time is a hider win
+ok 414 - running out of time is a hider win
+  ---
+  duration_ms: 1.0652
+  ...
+# Subtest: the seeker cannot tag during the head start
+ok 415 - the seeker cannot tag during the head start
+  ---
+  duration_ms: 0.4335
+  ...
+# Subtest: bogus catch resolution is ignored rather than trusted
+ok 416 - bogus catch resolution is ignored rather than trusted
+  ---
+  duration_ms: 0.5894
+  ...
+# Subtest: a round with no hiders never starts
+ok 417 - a round with no hiders never starts
+  ---
+  duration_ms: 0.3924
+  ...
+# Subtest: the seeker is picked from the roster when nobody is named
+ok 418 - the seeker is picked from the roster when nobody is named
+  ---
+  duration_ms: 0.3272
+  ...
+# Subtest: the round describes itself for a HUD without exposing hider positions
+ok 419 - the round describes itself for a HUD without exposing hider positions
+  ---
+  duration_ms: 0.3924
+  ...
+# (node:27436) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/modules/round.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: solo demon catches respect an open elevator and walls for both CPU roles
+ok 420 - solo demon catches respect an open elevator and walls for both CPU roles
+  ---
+  duration_ms: 117.426
+  ...
+# Subtest: hospital round copy names the hospital staff without losing their catch bodies
+ok 421 - hospital round copy names the hospital staff without losing their catch bodies
+  ---
+  duration_ms: 26.2834
+  ...
+# Subtest: the seeker is shut in the elevator for at least forty-five seconds and released when seeking starts
+ok 422 - the seeker is shut in the elevator for at least forty-five seconds and released when seeking starts
+  ---
+  duration_ms: 3.9512
+  ...
+# Subtest: a solo hider gets the head start while the AI seeker is held
+ok 423 - a solo hider gets the head start while the AI seeker is held
+  ---
+  duration_ms: 1.6092
+  ...
+# Subtest: a caught solo hider spectates while other hiders keep the round alive
+ok 424 - a caught solo hider spectates while other hiders keep the round alive
+  ---
+  duration_ms: 1.5445
+  ...
+# Subtest: a hider inside reach is tagged, but not before the head start ends
+ok 425 - a hider inside reach is tagged, but not before the head start ends
+  ---
+  duration_ms: 1.7319
+  ...
+# Subtest: a wall between them is not a tag
+ok 426 - a wall between them is not a tag
+  ---
+  duration_ms: 2.5897
+  ...
+# Subtest: the demon takes a hider it walks into, and that still counts for the seeker
+ok 427 - the demon takes a hider it walks into, and that still counts for the seeker
+  ---
+  duration_ms: 1.7509
+  ...
+# Subtest: a demon standing on a hider takes nobody during the head start, and takes them the moment it ends
+ok 428 - a demon standing on a hider takes nobody during the head start, and takes them the moment it ends
+  ---
+  duration_ms: 1.8602
+  ...
+# Subtest: either named demon can take a hider
+ok 429 - either named demon can take a hider
+  ---
+  duration_ms: 1.8951
+  ...
+# Subtest: a caught player leaves their remaining flashlight charge at the catch position
+ok 430 - a caught player leaves their remaining flashlight charge at the catch position
+  ---
+  duration_ms: 0.9767
+  ...
+# Subtest: clearing the hotel ends the round on the win screen
+ok 431 - clearing the hotel ends the round on the win screen
+  ---
+  duration_ms: 0.9024
+  ...
+# Subtest: the demon taking the seeker hands the round to the hiders
+ok 432 - the demon taking the seeker hands the round to the hiders
+  ---
+  duration_ms: 0.9367
+  ...
+# Subtest: the round's own ending does not recurse through the caught event
+ok 433 - the round's own ending does not recurse through the caught event
+  ---
+  duration_ms: 0.8597
+  ...
+# Subtest: running the clock out with guests left is a hider win
+ok 434 - running the clock out with guests left is a hider win
+  ---
+  duration_ms: 2.0398
+  ...
+# Subtest: the HUD shows the clock and the tally without leaking where anyone is
+ok 435 - the HUD shows the clock and the tally without leaking where anyone is
+  ---
+  duration_ms: 0.7534
+  ...
+# Subtest: the ending marks itself a win for the side that won
+ok 436 - the ending marks itself a win for the side that won
+  ---
+  duration_ms: 0.8756
+  ...
+# Subtest: the ending marks itself a loss for the side that lost
+ok 437 - the ending marks itself a loss for the side that lost
+  ---
+  duration_ms: 0.845
+  ...
+# Subtest: a seeker who clears the building gets the win treatment too
+ok 438 - a seeker who clears the building gets the win treatment too
+  ---
+  duration_ms: 1.1182
+  ...
+# Subtest: the solo seeker only acquires living hiders it can see
+ok 439 - the solo seeker only acquires living hiders it can see
+  ---
+  duration_ms: 3.2993
+  ...
+# Subtest: the seeker remembers a sighting briefly, then resumes searching
+ok 440 - the seeker remembers a sighting briefly, then resumes searching
+  ---
+  duration_ms: 1.714
+  ...
+# Subtest: a room-to-room sweep exits the current room before crossing the hall
+ok 441 - a room-to-room sweep exits the current room before crossing the hall
+  ---
+  duration_ms: 6.0669
+  ...
+# (node:21548) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/vendor/three.module.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: a seeker chasing a visible hider in the same bedroom does not repeatedly exit the room
+ok 442 - a seeker chasing a visible hider in the same bedroom does not repeatedly exit the room
+  ---
+  duration_ms: 499.9549
+  ...
+# Subtest: seeker route recovery keeps its retry budget and never skips a blocked stair approach
+ok 443 - seeker route recovery keeps its retry budget and never skips a blocked stair approach
+  ---
+  duration_ms: 27.1753
+  ...
+# Subtest: CPU bodies retain their obstacle-avoidance direction between movement ticks
+ok 444 - CPU bodies retain their obstacle-avoidance direction between movement ticks
+  ---
+  duration_ms: 140.5448
+  ...
+# Subtest: a hider does not promote a guided stair waypoint after its entrance is blocked
+ok 445 - a hider does not promote a guided stair waypoint after its entrance is blocked
+  ---
+  duration_ms: 30.0109
+  ...
+# Subtest: local server serves the game and rejects path traversal
+ok 446 - local server serves the game and rejects path traversal
+  ---
+  duration_ms: 721.4213
+  ...
+# Subtest: one-click launcher and npm start use the local server
+ok 447 - one-click launcher and npm start use the local server
+  ---
+  duration_ms: 1.2202
+  ...
+# (node:22300) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/modules/sign-layout.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: every authored map sign preserves all its words inside its own proportions
+ok 448 - every authored map sign preserves all its words inside its own proportions
+  ---
+  duration_ms: 852.8479
+  ...
+# Subtest: cinema marquees fit on one line while poster titles wrap without stretching letters
+ok 449 - cinema marquees fit on one line while poster titles wrap without stretching letters
+  ---
+  duration_ms: 4.6101
+  ...
+# Subtest: long unbroken labels and room numbers shrink uniformly to stay inside their borders
+ok 450 - long unbroken labels and room numbers shrink uniformly to stay inside their borders
+  ---
+  duration_ms: 19.774
+  ...
+# Subtest: short signs retain a readable font and empty labels have a finite layout
+ok 451 - short signs retain a readable font and empty labels have a finite layout
+  ---
+  duration_ms: 0.7774
+  ...
+# Subtest: a simulation given no roster still runs the hotel it always ran
+ok 452 - a simulation given no roster still runs the hotel it always ran
+  ---
+  duration_ms: 54.4232
+  ...
+# Subtest: the roster is the demon count — three names put three demons in the building
+ok 453 - the roster is the demon count — three names put three demons in the building
+  ---
+  duration_ms: 19.5279
+  ...
+# Subtest: demons open apart from each other, whether or not the map has a floor each
+ok 454 - demons open apart from each other, whether or not the map has a floor each
+  ---
+  duration_ms: 44.1352
+  ...
+# Subtest: a third demon is a third catcher, not decoration
+ok 455 - a third demon is a third catcher, not decoration
+  ---
+  duration_ms: 809.1274
+  ...
+# Subtest: a roster off the wire is bounded rather than trusted
+ok 456 - a roster off the wire is bounded rather than trusted
+  ---
+  duration_ms: 0.7738
+  ...
+# Subtest: the simulation seats every player, names one seeker and starts them held
+ok 457 - the simulation seats every player, names one seeker and starts them held
+  ---
+  duration_ms: 62.3106
+  ...
+# Subtest: a held seeker cannot walk during the head start but the hiders can
+ok 458 - a held seeker cannot walk during the head start but the hiders can
+  ---
+  duration_ms: 70.5339
+  ...
+# Subtest: the simulation resolves a tag from positions rather than from a claim
+ok 459 - the simulation resolves a tag from positions rather than from a claim
+  ---
+  duration_ms: 135.013
+  ...
+# Subtest: sprinting drains the meter and an emptied one drops the runner back to a walk
+ok 460 - sprinting drains the meter and an emptied one drops the runner back to a walk
+  ---
+  duration_ms: 54.3464
+  ...
+# Subtest: the flashlight is spent by the simulation, so a client cannot assert its own charge
+ok 461 - the flashlight is spent by the simulation, so a client cannot assert its own charge
+  ---
+  duration_ms: 45.6978
+  ...
+# Subtest: a demon catch and the clock both end the round through the same settle
+ok 462 - a demon catch and the clock both end the round through the same settle
+  ---
+  duration_ms: 18.2022
+  ...
+# Subtest: the same inputs produce the same state, because a mirrored server has to agree
+ok 463 - the same inputs produce the same state, because a mirrored server has to agree
+  ---
+  duration_ms: 135.9136
+  ...
+# Subtest: a tick never mutates the state it was handed
+ok 464 - a tick never mutates the state it was handed
+  ---
+  duration_ms: 13.5178
+  ...
+# Subtest: the plan space answers ground, collision and sight without a renderer
+ok 465 - the plan space answers ground, collision and sight without a renderer
+  ---
+  duration_ms: 21.3289
+  ...
+# Subtest: the plan space rebuilds its colliders only when a door actually moves
+ok 466 - the plan space rebuilds its colliders only when a door actually moves
+  ---
+  duration_ms: 11.8146
+  ...
+# Subtest: the head start is physical: the seeker is held in a shut cabin until the phase flips
+ok 467 - the head start is physical: the seeker is held in a shut cabin until the phase flips
+  ---
+  duration_ms: 773.149
+  ...
+# Subtest: a tag is resolved from positions, and never during the head start
+ok 468 - a tag is resolved from positions, and never during the head start
+  ---
+  duration_ms: 219.5205
+  ...
+# Subtest: interaction is edge-triggered, and the door it opens is open for everyone
+ok 469 - interaction is edge-triggered, and the door it opens is open for everyone
+  ---
+  duration_ms: 64.3363
+  ...
+# Subtest: a key is claimed once, by whoever searched the drawer first
+ok 470 - a key is claimed once, by whoever searched the drawer first
+  ---
+  duration_ms: 35.2486
+  ...
+# Subtest: a demon that catches the seeker ends the round for the hiders, with survivors left alive
+ok 471 - a demon that catches the seeker ends the round for the hiders, with survivors left alive
+  ---
+  duration_ms: 220.9724
+  ...
+# Subtest: a caught player drops their battery, and the first body to reach it takes the charge
+ok 472 - a caught player drops their battery, and the first body to reach it takes the charge
+  ---
+  duration_ms: 173.3576
+  ...
+# Subtest: the tick is deterministic and does not mutate what it is handed
+ok 473 - the tick is deterministic and does not mutate what it is handed
+  ---
+  duration_ms: 932.9695
+  ...
+# Subtest: a snapshot carries what a client draws and nothing that would make it a wallhack
+ok 474 - a snapshot carries what a client draws and nothing that would make it a wallhack
+  ---
+  duration_ms: 322.3468
+  ...
+# Subtest: a demon reaches through an open door and not through a shut one
+ok 475 - a demon reaches through an open door and not through a shut one
+  ---
+  duration_ms: 164.5353
+  ...
+# Subtest: a chasing demon opens the room door in front of it instead of running into it
+ok 476 - a chasing demon opens the room door in front of it instead of running into it
+  ---
+  duration_ms: 222.3934
+  ...
+# Subtest: a caught player may watch every other living player
+ok 477 - a caught player may watch every other living player
+  ---
+  duration_ms: 4.5022
+  ...
+# Subtest: spectator cycling wraps and survives a target being eliminated
+ok 478 - spectator cycling wraps and survives a target being eliminated
+  ---
+  duration_ms: 0.6559
+  ...
+# Subtest: a spectator camera uses the watched player eye height and facing
+ok 479 - a spectator camera uses the watched player eye height and facing
+  ---
+  duration_ms: 0.4896
+  ...
+# (node:10680) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/vendor/three.module.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: CPU spectator poses look along their avatar forward, not backwards or at a fixed heading
+ok 480 - CPU spectator poses look along their avatar forward, not backwards or at a fixed heading
+  ---
+  duration_ms: 410.4687
+  ...
+# Subtest: a fresh meter is full, rested, and cleared to sprint
+ok 481 - a fresh meter is full, rested, and cleared to sprint
+  ---
+  duration_ms: 2.5417
+  ...
+# Subtest: sprinting drains the meter and only while actually moving
+ok 482 - sprinting drains the meter and only while actually moving
+  ---
+  duration_ms: 1.313
+  ...
+# Subtest: crouching cannot sprint even with the key held
+ok 483 - crouching cannot sprint even with the key held
+  ---
+  duration_ms: 0.3781
+  ...
+# Subtest: an emptied meter locks sprinting out until it recovers past the threshold
+ok 484 - an emptied meter locks sprinting out until it recovers past the threshold
+  ---
+  duration_ms: 2.5613
+  ...
+# Subtest: recovery is fastest crouched, then resting, and slowest while walking
+ok 485 - recovery is fastest crouched, then resting, and slowest while walking
+  ---
+  duration_ms: 0.7817
+  ...
+# Subtest: the meter never leaves the 0..1 range
+ok 486 - the meter never leaves the 0..1 range
+  ---
+  duration_ms: 0.5283
+  ...
+# Subtest: sprint seconds and recovery seconds are the published tuning contract
+ok 487 - sprint seconds and recovery seconds are the published tuning contract
+  ---
+  duration_ms: 0.6585
+  ...
+# (node:25804) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///C:/Users/leoja/Desktop/Dad%20Games/full-games/javascript-games/games/hide-and-seek/modules/static-batcher.js is not specified and it doesn't parse as CommonJS.
+# Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+# To eliminate this warning, add "type": "module" to C:\\Users\\leoja\\Desktop\\Dad Games\\full-games\\javascript-games\\games\\hide-and-seek\\package.json.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: leaves are grouped by material so one floor becomes one draw call per material
+ok 488 - leaves are grouped by material so one floor becomes one draw call per material
+  ---
+  duration_ms: 41.8305
+  ...
+# Subtest: geometry that cannot be merged with its neighbours is grouped apart rather than merged wrongly
+ok 489 - geometry that cannot be merged with its neighbours is grouped apart rather than merged wrongly
+  ---
+  duration_ms: 1.8563
+  ...
+# Subtest: a skipped subtree is left whole, meshes and children alike
+ok 490 - a skipped subtree is left whole, meshes and children alike
+  ---
+  duration_ms: 0.9001
+  ...
+# Subtest: a mesh a raycast has to identify keeps its own identity
+ok 491 - a mesh a raycast has to identify keeps its own identity
+  ---
+  duration_ms: 2.6973
+  ...
+# Subtest: flattening replaces the merged meshes with one batch and reports the saving
+ok 492 - flattening replaces the merged meshes with one batch and reports the saving
+  ---
+  duration_ms: 1.2099
+  ...
+# Subtest: an emptied container is pruned, but a floor group and anything skipped stays
+ok 493 - an emptied container is pruned, but a floor group and anything skipped stays
+  ---
+  duration_ms: 2.0251
+  ...
+# Subtest: nothing is merged when the renderer cannot merge geometry
+ok 494 - nothing is merged when the renderer cannot merge geometry
+  ---
+  duration_ms: 2.4767
+  ...
+1..494
+# tests 494
+# suites 0
+# pass 493
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 12472.9146

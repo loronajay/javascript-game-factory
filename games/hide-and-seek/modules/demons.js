@@ -128,6 +128,7 @@ export function createDemons({ createMonster, common, roster = DEFAULT_ROSTER })
     rosterText: () => (names.length <= 1 ? names[0] || 'the demon'
       : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`),
     list,
+    dispose() { for (const demon of list) demon.dispose?.(); },
     applySnapshot,
     setPlayers(provider) { for (const demon of list) demon.setPlayers(provider); },
     // Online this only advances each mixer over the pose the server sent; the threat readout belongs

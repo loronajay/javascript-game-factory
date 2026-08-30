@@ -365,7 +365,9 @@ test("the hoop's placement volume is the cabinet's own travel, not a new number"
   // what makes a HORSE hoop shot one the classic cabinet has already proved
   // makeable, at a height it is already calibrated for. It is imported, not
   // copied, so a change to the portrait crop moves this with it.
-  assertEqual(HOOP_PLACEMENT_BOUNDS, HOOP_TRAVEL_BOUNDS);
+  assertEqual(HOOP_PLACEMENT_BOUNDS.minX, AIM_MIN_X);
+  assertEqual(HOOP_PLACEMENT_BOUNDS.maxX, AIM_MAX_X);
+  assert(HOOP_PLACEMENT_BOUNDS.maxY > 400, "a low wall hoop should be placeable");
 
   // And the cabinet's own peg is legal on every motion, so a turn that opens on
   // the hoop opens on the one rim position everything else is calibrated to.
@@ -386,8 +388,8 @@ test("a motion's reach is measured off its own path, not declared beside it", ()
   assert(circle.minDx < -180, `the circle's reach was under-measured: ${circle.minDx}`);
 
   const bounds = hoopPlacementBoundsFor("circle");
-  assertClose(bounds.minCx, HOOP_TRAVEL_BOUNDS.minX - circle.minDx, 1e-9);
-  assertClose(bounds.maxCx, HOOP_TRAVEL_BOUNDS.maxX, 1e-9, "a one-sided sweep must not cost the other side");
+  assertClose(bounds.minCx, HOOP_PLACEMENT_BOUNDS.minX - circle.minDx, 1e-9);
+  assertClose(bounds.maxCx, HOOP_PLACEMENT_BOUNDS.maxX, 1e-9, "a one-sided sweep must not cost the other side");
 });
 
 test("every point a hung hoop VISITS stays inside the crop", () => {
@@ -402,9 +404,9 @@ test("every point a hung hoop VISITS stays inside the crop", () => {
       const setup = { motionId: mode.id, ...clampHoopPlacement(wild, mode.id) };
       for (let step = 0; step <= 600; step++) {
         const hoop = placedHoopAt(setup, step * 0.1);
-        assert(hoop.cx >= HOOP_TRAVEL_BOUNDS.minX - 1e-9 && hoop.cx <= HOOP_TRAVEL_BOUNDS.maxX + 1e-9,
+        assert(hoop.cx >= HOOP_PLACEMENT_BOUNDS.minX - 1e-9 && hoop.cx <= HOOP_PLACEMENT_BOUNDS.maxX + 1e-9,
           `${mode.id} leaves the crop at x=${hoop.cx.toFixed(1)}`);
-        assert(hoop.rimY >= HOOP_TRAVEL_BOUNDS.minY - 1e-9 && hoop.rimY <= HOOP_TRAVEL_BOUNDS.maxY + 1e-9,
+        assert(hoop.rimY >= HOOP_PLACEMENT_BOUNDS.minY - 1e-9 && hoop.rimY <= HOOP_PLACEMENT_BOUNDS.maxY + 1e-9,
           `${mode.id} leaves the crop at y=${hoop.rimY.toFixed(1)}`);
       }
     }
@@ -586,215 +588,39 @@ function matchWithApparatus(pieces) {
   return { match, setup: { kind: "bin", motionId: "still", pieces } };
 }
 
-test("the duty is the tools the setter TOUCHED, not the tools they put down", () => {
-  const pieces = [pad("a", { x: -0.3 }), pad("b", { x: 0 }), pad("c", { x: 0.3 })];
-  const { match, setup } = matchWithApparatus(pieces);
-  resolveHorseShot(match, true, setup, { touched: ["a", "c"], pull: { power: 0.5, aimX: 480 } });
-  assertEqual(requiredPieceIds(match.standingShot).join(","), "a,c",
-    "a pad the setter flew past is not part of the shot they proved");
+test("old apparatus setups cannot create duties or CPU recipes", () => {
+  const setup = { kind: "bin", pieces: [pad("a", {})], requiredPieces: ["a"], provenPull: { power: 0.5, aimX: 480 } };
+  assertEqual(requiredPieceIds(setup).length, 0);
+  assertEqual(unmetPieceIds(setup).length, 0);
+  assertEqual(needsProvenPull(setup), false);
+  assertEqual(provenPullShot(setup), null);
+  const match = createHorseMatch({ mode: "local" });
+  resolveHorseShot(match, true, setup, { touched: ["a"], pull: setup.provenPull });
+  assertEqual(match.standingShot.pieces.length, 0);
+  assertEqual(match.standingShot.provenPull, undefined);
+  match.standingShot = setup; // A pre-change snapshot may still carry a duty.
+  assertEqual(judgeHorseShot(match, { scored: true }).made, true);
+  assertEqual(shotSetupFor(match, null).pieces.length, 0);
+  const imported = createHorseMatch({ mode: "local" });
+  resolveHorseShot(imported, true, setup);
+  assertEqual(imported.standingShot.pieces.length, 0, "an older caller without contact data still strips tools");
 });
 
-test("a duty naming a tool the setup does not carry is discarded", () => {
-  // Nothing could ever discharge it, so it cannot be allowed to stand as a duty
-  // — this is what stops a stale or crafted standing shot being unanswerable.
-  assertEqual(requiredPieceIds({ pieces: [pad("a", {})], requiredPieces: ["a", "ghost"] }).join(","), "a");
-});
-
-test("a matcher who goes in having skipped a tool takes the letter, and the HUD is told why", () => {
-  const pieces = [pad("a", { x: -0.3 }), pad("b", { x: 0.3 })];
-  const { match, setup } = matchWithApparatus(pieces);
-  resolveHorseShot(match, true, setup, { touched: ["a", "b"], pull: { power: 0.5, aimX: 480 } });
-  assertEqual(match.phase, PHASE_MATCH, "the shot is now owed");
-
-  const judged = judgeHorseShot(match, { scored: true, touched: ["a"] });
-  assertEqual(judged.made, false, "going in is necessary and not sufficient while matching");
-  assertEqual(judged.unmet.join(","), "b");
-  const outcome = resolveHorseShot(match, judged.made, match.standingShot, { unmet: judged.unmet });
-  assertEqual(outcome.letter, true);
-  assertEqual(outcome.skipped, true, "a clean make that cost a letter reads as a bug unless it is named");
-  assertEqual(match.players[1].letters, 1);
-  assertEqual(match.turn, match.setter, "the setter sets again");
-});
-
-test("a matcher who uses every required tool matches it", () => {
-  const pieces = [pad("a", { x: -0.3 }), pad("b", { x: 0.3 })];
-  const { match, setup } = matchWithApparatus(pieces);
-  resolveHorseShot(match, true, setup, { touched: ["a", "b"], pull: { power: 0.5, aimX: 480 } });
-  // Order is deliberately not part of the duty: touch them all and it stands.
-  const judged = judgeHorseShot(match, { scored: true, touched: ["b", "a", "b"] });
-  assertEqual(judged.made, true);
-  const outcome = resolveHorseShot(match, judged.made, match.standingShot, { unmet: judged.unmet });
-  assertEqual(outcome.kind, "matched");
-  assertEqual(match.players[1].letters, 0);
-});
-
-test("a setter is never held to a duty", () => {
-  const { match, setup } = matchWithApparatus([pad("a", {})]);
-  // They are inventing the shot — whatever their ball touches BECOMES the duty,
-  // so there is nothing yet to check them against.
-  const judged = judgeHorseShot(match, { scored: true, touched: [] });
-  assertEqual(judged.made, true);
-  assertEqual(judged.unmet.length, 0);
-  resolveHorseShot(match, judged.made, setup, { touched: [] });
-  assertEqual(requiredPieceIds(match.standingShot).length, 0, "an untouched apparatus owes nobody anything");
-});
-
-test("unmet tools are only the missing ones", () => {
-  const setup = { pieces: [pad("a", {}), pad("b", {})], requiredPieces: ["a", "b"] };
-  assertEqual(unmetPieceIds(setup, ["a"]).join(","), "b");
-  assertEqual(unmetPieceIds(setup, ["a", "b"]).length, 0);
-});
-
-test("the pull that proved a trick shot travels with it, and only with it", () => {
-  const withTools = matchWithApparatus([pad("a", {})]);
-  resolveHorseShot(withTools.match, true, withTools.setup, {
-    touched: ["a"],
-    pull: { power: 0.62, aimX: 470, loft: 1, motionSeconds: 9.4 },
-  });
-  assertClose(withTools.match.standingShot.provenPull.power, 0.62, 1e-9,
-    "the CPU has no hands, so the one pull known to route the apparatus is kept");
-
-  const plain = matchWithApparatus([]);
-  resolveHorseShot(plain.match, true, plain.setup, { touched: [], pull: { power: 0.62, aimX: 470 } });
-  assertEqual(plain.match.standingShot.provenPull, undefined,
-    "a shot the CPU's own lead already answers carries no recipe");
-});
-
-test("the CPU repeats a proven trick shot at the same phase of the same sweep", () => {
-  const setup = {
-    kind: "bin",
-    motionId: "sideways",
-    pieces: [pad("a", {})],
-    requiredPieces: ["a"],
-    provenPull: { power: 0.62, aimX: 470, loft: 1, motionSeconds: 9.4 },
-  };
-  assert(needsProvenPull(setup), "a duty with a recipe is repeated rather than solved");
-  const shot = provenPullShot(setup, { makes: true });
-  assertEqual(shot.pull.power, 0.62);
-  assertEqual(shot.pull.aimX, 470);
-  // Modulo the period: one period later the target is in the identical place,
-  // so a CPU that sat out the setter's whole wait would only look hung.
-  assertClose(shot.atSeconds, provenPullPhase(setup), 1e-9);
-  assert(shot.atSeconds < 9.4, "the wait is a phase, not a stopwatch");
-
-  const missed = provenPullShot(setup, { makes: false, stray: () => 1 });
-  assert(missed.pull.aimX !== 470, "a CPU handed the recipe still misses at its own difficulty");
-  assertEqual(provenPullShot({ pieces: [], requiredPieces: [] }), null, "nothing to repeat without a duty");
-});
-
-test("a ball that goes straight in without the apparatus is ruled a skip, through the real sim", () => {
-  // End to end rather than by hand: the pad stands well out of the lane, the
-  // pull is one found by a real sweep, and the replay reports what the ball
-  // really touched on the way — which is nothing.
-  const bare = { kind: "bin", motionId: "still", placement: placementFromFractions({ lateral: 0, depth: 0.5 }) };
-  const direct = findDirectMake(bare);
-  assert(direct, "a still bin at mid depth has to be makeable, or this test proves nothing");
-
-  const setup = { ...bare, pieces: [pad("a", { x: 0.62, y: 0.9, z: 0.2 })] };
-  const replay = replayHorseShot({ setup, intent: { ...direct, ballId: "basketball" } });
-  assertEqual(replay.made, true, "the pad is out of the lane; the shot still drops");
-  assertEqual(replay.touched.length, 0);
-
-  const match = createHorseMatch({ word: "HORSE", names: ["One", "Two"] });
-  resolveHorseShot(match, true, { ...setup, requiredPieces: ["a"] }, { touched: ["a"], pull: direct });
-  const judged = judgeHorseShot(match, { scored: replay.made, touched: replay.touched });
-  assertEqual(judged.made, false, "the ball went in and the shot was not matched");
-  assertEqual(judged.unmet.join(","), "a");
-});
-
-/*
- * The CPU SETTING a trick shot.
- *
- * The rule these all serve is the mode's own: the setter shoots first, so a shot
- * the CPU has not made is not a shot anybody owes. The planner may therefore
- * decline — every one of these asserts what a plan MEANS, never that one exists
- * for some particular target.
- */
-
-/** A target the planner is known to solve, so the assertions below have a subject. */
-function plannedTrickShot(overrides = {}, ballId = "basketball") {
-  const setup = normalizeTrickShotTarget({ kind: "hoop", motionId: "figure8", ...overrides });
-  return { setup, plan: planCpuTrickShot({ setup, ballId }), ballId };
-}
-
-test("a planned trick shot is one the CPU has actually made, in the real sim", () => {
-  const { setup, plan, ballId } = plannedTrickShot();
-  assert(plan, "the planner has to solve at least one shipped target, or nothing below is tested");
-  assertEqual(plan.pieces.length, 1);
-  assertEqual(plan.pieces[0].type, "cannon");
-  assertEqual(plan.requiredPieces.join(","), plan.pieces[0].id);
-
-  const shot = replayHorseShot({
-    setup: { ...setup, pieces: plan.pieces },
-    intent: { ...plan.pull, ballId },
-    motionSeconds: plan.pull.motionSeconds,
-  });
-  assertEqual(shot.made, true, "the recipe converts");
-  assert(shot.touched.includes(plan.pieces[0].id), "and it converts THROUGH the cannon");
-});
-
-test("a planned trick shot is a trick shot — the pull does not work without the tool", () => {
-  const { setup, plan, ballId } = plannedTrickShot();
-  const bare = replayHorseShot({
-    setup: { ...setup, pieces: [] },
-    intent: { ...plan.pull, ballId },
-    motionSeconds: plan.pull.motionSeconds,
-  });
-  assertEqual(bare.made, false,
-    "the seed is deliberately pulled short; take the cannon away and it lands nowhere");
-});
-
-test("a planned trick shot survives the tick of slop between proving it and releasing it", () => {
-  const { setup, plan, ballId } = plannedTrickShot();
-  // The court releases on the first tick whose clock has REACHED the recipe's
-  // moment, which is never exactly on it. A plan that only worked on the frame
-  // it was found on would be one the CPU sets and then misses.
-  const later = replayHorseShot({
-    setup: { ...setup, pieces: plan.pieces },
-    intent: { ...plan.pull, ballId },
-    motionSeconds: plan.pull.motionSeconds + TICK_SECONDS,
-  });
-  assertEqual(later.made, true);
-  assert(later.touched.includes(plan.pieces[0].id));
-});
-
-test("a plan is the same recipe shape a human setter's make leaves behind", () => {
-  const { setup, plan } = plannedTrickShot();
-  const standing = { ...setup, pieces: plan.pieces, requiredPieces: plan.requiredPieces, provenPull: plan.pull };
-  assert(needsProvenPull(standing), "the opponent's CPU repeats it exactly as it would a person's");
-  assertClose(provenPullShot(standing, { makes: true }).pull.power, plan.pull.power, 1e-9);
-  assertClose(recipeShot(plan.pull, { periodSeconds: 60 }).atSeconds, PLAN_RELEASE_SECONDS, 1e-9);
-});
-
-test("a cannon is only ever dropped where a ball is falling, and where it fits", () => {
-  const rising = { x: 0, y: 0.8, z: 0.4, vy: 2, t: 0.2 };
-  const falling = { x: 0, y: 0.8, z: 0.4, vy: -2, t: 0.2 };
-  const outOfRoom = { x: 4, y: 0.8, z: 0.4, vy: -2, t: 0.2 };
-  const tooHigh = { x: 0, y: 4, z: 0.4, vy: -2, t: 0.2 };
-  const tail = { x: 0, y: 0.8, z: 0.4, vy: -2, t: 1.2 };
-  assertEqual(interceptSites([rising, outOfRoom, tooHigh, falling, tail]).length, 1,
-    "descending, inside the piece bounds, and clear of the target");
-  assertEqual(interceptSites([]).length, 0);
-});
-
-test("a cannon that cannot be pointed at the target is refused rather than clamped", () => {
+test("Horse replay ignores even a cannon placed directly on the ball path", () => {
   const setup = normalizeTrickShotTarget({ kind: "hoop", motionId: "still" });
-  // Standing well above the rim and asked to reach it quickly: the only velocity
-  // that does it points DOWN, and a cannon fires up. Refused rather than clamped,
-  // because a clamped answer is a cannon aimed somewhere nobody asked for — and
-  // `createSandboxPiece` would take it without complaint.
-  const site = { x: 0, y: 2.4, z: 0.5, vy: -2, t: 0.4 };
-  assertEqual(aimCannon({ setup, site, cannon: { id: "c", delay: 0.5 }, seconds: 0.25 }), null);
+  const intent = { ...leadPull(setup, "basketball"), ballId: "basketball" };
+  const bare = replayHorseShot({ setup, intent, trace: true });
+  const point = bare.path.find(p => p.vy < 0);
+  const cannon = createSandboxPiece("cannon", { id: "catch", x: point.x, y: point.y - 0.2, z: point.z });
+  const dirty = replayHorseShot({ setup: { ...setup, pieces: [cannon] }, intent, trace: true });
+  assertEqual(JSON.stringify(dirty), JSON.stringify(bare));
 });
 
-test("the easy CPU never sets an apparatus", () => {
-  // Nothing in a trick shot teaches the meter, which is the first thing a new
-  // player has to learn — so this is a floor, not a low point on a curve.
-  for (let roll = 0; roll < 1; roll += 0.05) {
-    assertEqual(cpuSetsTrickShot("easy", () => roll), false);
+test("all CPU difficulties decline Lab tools and planning", () => {
+  for (const difficulty of ["easy", "medium", "hard"]) {
+    for (const roll of [0, 0.3, 0.99]) assertEqual(cpuSetsTrickShot(difficulty, () => roll), false);
   }
-  assertEqual(cpuSetsTrickShot("hard", () => 0), true);
-  assertEqual(cpuSetsTrickShot("hard", () => 0.99), false);
+  assertEqual(planCpuTrickShot({ setup: normalizeTrickShotTarget({ kind: "hoop" }), ballId: "basketball" }), null);
 });
 
 test("the CPU's lead is one statement, shared by the court and the planner", () => {

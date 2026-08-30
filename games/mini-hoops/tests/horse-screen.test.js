@@ -8,8 +8,9 @@ import { bootHorse, horseTurnBallId } from "../scripts/horse-game.js";
 import { BOARD_PIECE } from "../scripts/sim/trick-shot.js";
 import { BIN_TARGET, HOOP_TARGET } from "../scripts/sim/trick-shot-target.js";
 import { PHASE_MATCH, PHASE_SET } from "../scripts/sim/horse.js";
-import { HOOP_TRAVEL_BOUNDS } from "../scripts/sim/hoop.js";
-import { defaultHoopPlacement } from "../scripts/sim/hoop-placement.js";
+import { HOOP_MODES } from "../scripts/sim/hoop.js";
+import { BIN_MOTIONS } from "../scripts/sim/bin-placement.js";
+import { HOOP_PLACEMENT_BOUNDS, defaultHoopPlacement } from "../scripts/sim/hoop-placement.js";
 import { restingBallPosition } from "../scripts/render/frame.js";
 import { createMemoryStorage } from "../scripts/store/local-storage.js";
 import { createTrickShotStore } from "../scripts/store/trick-shots-store.js";
@@ -180,57 +181,18 @@ test("a made setup passes the turn and the matcher inherits the bin", () => {
   assertEqual(horse.match.standingShot.motionId, placed.motionId);
 });
 
-test("HORSE offers every saved shot and loads its target, tools, room, and ball", () => {
-  const store = createTrickShotStore({ storage: createMemoryStorage(), makeId: (() => {
-    let id = 0;
-    return () => `saved-${++id}`;
-  })() });
-  const binShot = store.save({
-    name: "Bank off the pad",
-    locationId: "warehouse",
-    ballId: "paper",
-    target: {
-      kind: BIN_TARGET,
-      motionId: "sideways",
-      placement: { x: 0.2, y: 0.4, z: 0.62 },
-    },
-    pieces: [{ type: BOARD_PIECE, id: "bank-pad", x: 0.72, y: 1.2, z: 0.5, yaw: 0.4 }],
-  });
-  const hoopShot = store.save({
-    name: "Hoop only",
-    target: { kind: HOOP_TARGET, motionId: "horizontal", placement: { cx: 452, rimY: 214 } },
-    pieces: [],
-  });
-
+test("HORSE refuses Lab imports without changing or deleting saved shots", () => {
+  const store = createTrickShotStore({ storage: createMemoryStorage(), makeId: () => "lab-shot" });
+  const saved = store.save({ name: "Keep me", target: { kind: "bin" }, pieces: [{ type: "board", id: "pad" }] });
   const { horse } = harness({ mode: "local", store });
-  horse.enter({ mode: "local", word: "PIG" });
-
-  // The bank used to be filtered down to bin layouts, because a bin was the only
-  // target HORSE had. It places both now, so it offers both — a saved layout
-  // missing from a list the player authored it into is the worst shape a filter
-  // can take.
-  assertDeepEqual(
-    horse.savedShots().map(({ id }) => id).sort(),
-    [binShot.id, hoopShot.id].sort(),
-    "the HORSE bank is not the whole bank",
-  );
-
-  assert(horse.useSavedShot(binShot.id), "the bin layout was refused");
-  assertEqual(horse.setup.kind, BIN_TARGET);
-  assertEqual(horse.setup.motionId, "sideways");
-  assertEqual(horse.setup.placement.x, binShot.target.placement.x);
-  assertEqual(horse.locationId, "warehouse");
-  assertEqual(horse.pieces.length, 1);
-  assertEqual(horse.pieces[0].id, "bank-pad");
-  assertEqual(horse.currentBallId(), "paper");
-
-  // And the hoop layout brings its whole target across, motion and all — the
-  // point of allowing it at all.
-  assert(horse.useSavedShot(hoopShot.id), "a hoop layout was refused");
-  assertEqual(horse.setup.kind, HOOP_TARGET);
-  assertEqual(horse.setup.motionId, "horizontal");
-  assertEqual(horse.setup.placement.cx, hoopShot.target.placement.cx);
-  assertEqual(horse.setup.placement.rimY, hoopShot.target.placement.rimY);
+  horse.enter({ mode: "local" });
+  const before = structuredClone(horse.setup);
+  assertDeepEqual(horse.savedShots(), []);
+  assertEqual(horse.useSavedShot(saved.id), false);
+  for (const type of ["board", "spring", "cannon"]) assertEqual(horse.addPiece(type), false);
+  assertDeepEqual(horse.pieces, []);
+  assertDeepEqual(horse.setup, before);
+  assertDeepEqual(store.get(saved.id), saved, "Lab data must remain intact");
 });
 
 test("the wall hoop is a HORSE target, and its shot is the cabinet's classic pull", () => {
@@ -264,8 +226,8 @@ test("a hung hoop stays on the wall, and its lane and height are the only choice
   for (const wild of [{ cx: -9e3 }, { cx: 9e3 }, { rimY: -9e3 }, { rimY: 9e3 }]) {
     horse.placeTarget(wild);
     const { cx, rimY } = horse.setup.placement;
-    assert(cx >= HOOP_TRAVEL_BOUNDS.minX - 1e-9 && cx <= HOOP_TRAVEL_BOUNDS.maxX + 1e-9, `lane escaped: ${cx}`);
-    assert(rimY >= HOOP_TRAVEL_BOUNDS.minY - 1e-9 && rimY <= HOOP_TRAVEL_BOUNDS.maxY + 1e-9, `height escaped: ${rimY}`);
+    assert(cx >= HOOP_PLACEMENT_BOUNDS.minX - 1e-9 && cx <= HOOP_PLACEMENT_BOUNDS.maxX + 1e-9, `lane escaped: ${cx}`);
+    assert(rimY >= HOOP_PLACEMENT_BOUNDS.minY - 1e-9 && rimY <= HOOP_PLACEMENT_BOUNDS.maxY + 1e-9, `height escaped: ${rimY}`);
   }
 
   // A depth is not a thing a hoop has. Handing it one changes nothing — there is
@@ -295,36 +257,25 @@ test("the two targets remember their own placement across a swap", () => {
   assertDeepEqual(horse.setup.placement, hoop, "the hoop forgot where it was hanging");
 });
 
-test("a saved tool layout becomes part of the standing shot the matcher inherits", () => {
-  const store = createTrickShotStore({ storage: createMemoryStorage(), makeId: () => "bin-bank" });
-  store.save({
-    name: "Safe side pad",
-    target: {
-      kind: BIN_TARGET,
-      motionId: "still",
-      placement: { x: 0, y: 0.36, z: 0.6 },
-    },
-    pieces: [{ type: BOARD_PIECE, id: "side-pad", x: 0.9, y: 1.5, z: 0.1 }],
-  });
-  const view = harness({ mode: "local", store });
-  view.horse.enter({ mode: "local", word: "PIG" });
-  view.horse.useSavedShot("bin-bank");
-  view.horse.setShot();
-
-  let made = false;
-  for (let pull = 40; pull <= 105 && !made; pull += 2) {
-    shoot(view, pull);
-    settle(view.horse);
-    made = view.horse.match.phase === PHASE_MATCH;
-    if (!made && view.horse.match.phase === PHASE_SET) {
-      view.horse.useSavedShot("bin-bank");
-      view.horse.setShot();
+test("both Horse targets retain every motion option", () => {
+  const { horse } = harness({ mode: "local" });
+  horse.enter({ mode: "local" });
+  for (const [kind, motions] of [["hoop", HOOP_MODES], ["bin", BIN_MOTIONS]]) {
+    for (const motion of motions) {
+      horse.placeTarget({ kind, motionId: motion.id });
+      assertEqual(horse.setup.motionId, motion.id);
+      const start = horse.targetNow();
+      for (let i = 0; i < 23; i++) horse.tick();
+      if (motion.id !== "still") assert(JSON.stringify(start) !== JSON.stringify(horse.targetNow()), motion.id + " stopped moving");
     }
   }
+});
 
-  assert(made, "the saved bin shot could not be set");
-  assertDeepEqual(view.horse.match.standingShot.pieces, view.horse.pieces,
-    "the matching player did not inherit the setter's tools");
+test("a hoop can be hung low and across the full aiming range", () => {
+  const { horse } = harness({ mode: "local" });
+  horse.enter({ mode: "local" });
+  horse.placeTarget({ kind: "hoop", motionId: "still", placement: { cx: 630, rimY: 420, z: 0.1 } });
+  assertDeepEqual(horse.setup.placement, { cx: 630, rimY: 420 });
 });
 
 test("the matcher may not re-place the bin", () => {
@@ -455,14 +406,10 @@ test("the ball is a phase-two control and is put away while the bin is being pla
   assert(placing < aiming + 112, `placing chrome (${placing}px) still reserves the hidden ball picker`);
 });
 
-test("the HORSE placement panel exposes the lab tool tray and saved-shot bank", () => {
+test("the retained Horse tool tray is hidden while the Lab remains available", () => {
   const html = fs.readFileSync(path.join(gameRoot, "index.html"), "utf8");
-  for (const id of [
-    "horseSavedShots", "horseUseSavedShot", "horseAddBoard", "horseAddSpring",
-    "horseAddCannon", "horseToolInspector", "horseToolDepth", "horseToolDirection",
-  ]) {
-    assert(html.includes(`id="${id}"`), `HORSE is missing ${id}`);
-  }
+  assert(/<details[^>]*class="horse-trick-tools"[^>]*hidden/.test(html));
+  assert(html.includes('id="trickShotScreen"'));
 });
 
 test("a matcher inherits the exact ball used to set the standing shot", () => {
@@ -506,38 +453,15 @@ test("the loser popup plays before the results card, then yields to it", () => {
 });
 
 
-test("the court records the tools the ball touched, and holds the matcher to them", () => {
-  const { horse, canvas } = harness({ mode: "local" });
-  horse.enter({ mode: "local", word: "PIG" });
-  horse.placeTarget({ x: 0, y: 0.36, z: 0.6, motionId: "still" });
-  horse.setShot();
-
-  let made = false;
-  for (let pull = 40; pull <= 105 && !made; pull += 2) {
-    shoot({ canvas }, pull);
-    settle(horse);
-    made = horse.match.phase === PHASE_MATCH;
-    if (!made && horse.match.phase === PHASE_SET) horse.setShot();
+test("the CPU never places tools on any difficulty", () => {
+  for (const difficulty of ["easy", "medium", "hard"]) {
+    const { horse } = harness({ mode: "cpu", difficulty, random: () => 0 });
+    horse.enter({ mode: "cpu", difficulty });
+    horse.match.turn = 1;
+    for (let i = 0; i < 65; i++) horse.tick();
+    assertDeepEqual(horse.pieces, []);
+    assertEqual(horse.phase, "aiming");
   }
-  assert(made, "no pull in the whole range could make a floor bin in the middle of the room");
-  // A setter with nothing on the floor proves nothing, so the matcher owes
-  // nothing: the duty is what the BALL found, never what was put down.
-  assertEqual((horse.match.standingShot.requiredPieces || []).length, 0);
-
-  // Now stand a pad on the shot the matcher owes. The ball they are about to
-  // throw goes straight in without ever reaching it.
-  horse.match.standingShot.pieces = [{ type: BOARD_PIECE, id: "owed-pad", x: 0.62, y: 0.9, z: 0.2 }];
-  horse.match.standingShot.requiredPieces = ["owed-pad"];
-
-  const before = horse.match.players[1].letters;
-  for (let pull = 40; pull <= 105 && horse.match.phase === PHASE_MATCH; pull += 2) {
-    shoot({ canvas }, pull);
-    settle(horse);
-  }
-  assertEqual(horse.match.players[1].letters, before + 1,
-    "a clean make that skipped the setter's tool has to cost a letter");
-  assertEqual(horse.match.lastOutcome.skipped, true,
-    "and it has to be told apart from an ordinary miss, or it reads as a bug");
 });
 
 finish();

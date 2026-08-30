@@ -21,10 +21,9 @@ import {
   resolveWebSocketUrl,
   sanitizeIdentity,
 } from "./online-client.js";
-import { DEFAULT_WORD, HORSE_FIXED_SETUP, normalizeWord } from "../sim/horse.js";
+import { DEFAULT_WORD, HORSE_FIXED_SETUP, normalizeHorsePieces, normalizeWord } from "../sim/horse.js";
 import { ballById } from "../assets/ball-catalog.js";
 import { locationById } from "../assets/location-catalog.js";
-import { normalizeSandboxPieces } from "../sim/trick-shot.js";
 import { BIN_TARGET, HOOP_TARGET } from "../sim/trick-shot-target.js";
 
 export const HORSE_GAME_ID = "mini-hoops-horse";
@@ -86,7 +85,7 @@ export function sanitizeHorsePlacementIntent(value = {}) {
         z: number(placement.z, 0, 8, 0),
       },
     locationId: locationById(value.locationId || HORSE_FIXED_SETUP.locationId).id,
-    pieces: normalizeSandboxPieces(value.pieces),
+    pieces: normalizeHorsePieces(value.pieces),
   };
 }
 

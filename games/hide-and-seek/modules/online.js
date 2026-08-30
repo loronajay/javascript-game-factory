@@ -23,11 +23,11 @@ export function createOnline({
   logic, avatars, avatarLogic, camera, world, player, menu, config: CONFIG, document, window,
   hotel = null, furnishings = null, elevator = null, demons = null, flashlightDrops = null, hiders = null, spectator = null,
   socketUrl = defaultSocketUrl(window.location), gameId = 'hide-and-seek', identity = null,
-  maps = null, mapId = null,
+  maps = null, mapId = null, getMapId = () => mapId,
 }) {
   // The building this page is standing. It is fixed at boot, so it is both what this client queues
   // for and what it checks the authority's snapshot against.
-  const localMapId = maps ? maps.playableMapId(mapId) : mapId;
+  let localMapId = maps ? maps.playableMapId(mapId) : mapId;
   const lobbySettings = () => logic.lobbySettingsFor(localMapId);
   let mapMismatch = null;
   const statusEl = document.getElementById('onlineStatus');
@@ -111,7 +111,10 @@ export function createOnline({
         seat.textContent = String(index + 1).padStart(2, '0');
         const name = document.createElement('span');
         name.className = 'guestName';
-        name.textContent = id === net.clientId ? 'YOU' : `GUEST ${index + 1}`;
+        // The lobby says who is actually here. A seat only reads as a number while its name is
+        // still in flight — `nameOf` owns that fallback, not this render.
+        const who = logic.nameOf(net, id).toUpperCase();
+        name.textContent = id === net.clientId ? `${who} (YOU)` : who;
         const badge = document.createElement('span');
         badge.className = 'guestBadge';
         badge.textContent = id === net.ownerId ? 'HOST' : 'READY';
@@ -145,7 +148,7 @@ export function createOnline({
         avatars.spawn(entry.id, {
           role: entry.role === 'seeker' ? avatarLogic.ROLES.SEEKER : avatarLogic.ROLES.HIDER,
           seat: spawned.size + 1,
-          name: entry.name || 'Guest',
+          name: entry.name || logic.nameOf(net, entry.id),
         });
         spawned.add(entry.id);
       }
@@ -236,6 +239,10 @@ export function createOnline({
     if (!snapshot || !Array.isArray(snapshot.events) || snapshot.tick === narratedTick) return;
     narratedTick = snapshot.tick;
     for (const event of snapshot.events) {
+      // Catches are announced to the whole building, by name. Everything else on this list happened
+      // to one player and is only their business.
+      const caught = logic.describeCatchEvent(net, event);
+      if (caught) { world.notify(caught, 2600); continue; }
       if (event.playerId && event.playerId !== net.clientId) continue;
       if (event.type === 'door-locked') world.notify(`${event.roomNumber} is locked. Search drawers or find another route.`, 2200);
       else if (event.type === 'door-unlocked') world.notify(`${event.roomNumber} unlocked.`, 1800);
@@ -339,6 +346,7 @@ export function createOnline({
 
   function connect() {
     if (socket && (socket.readyState === 0 || socket.readyState === 1)) return;
+    if (!active) localMapId = maps ? maps.playableMapId(getMapId()) : getMapId();
     net = logic.applyNetEvent(logic.createNetState(), { event: 'connected', clientId: null });
     renderLobby();
     const connection = new window.WebSocket(socketUrl);

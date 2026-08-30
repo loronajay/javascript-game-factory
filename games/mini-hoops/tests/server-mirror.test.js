@@ -10,12 +10,13 @@ import {
   applyHorseShot,
   createHorseMatchState,
   sanitizeHorseShot,
+  sanitizeHorsePlacement,
 } from "../../../../factory-network-server/games/mini-hoops/server/horse-match-engine.mjs";
 
 const gameRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const serverMirror = path.resolve(gameRoot, "../../../factory-network-server/games/mini-hoops/shared/scripts");
 const files = [
-  "sim/constants.js", "sim/projection.js", "sim/hoop.js", "sim/launch.js",
+  "sim/constants.js", "sim/projection.js", "sim/hoop.js", "sim/hoop-placement.js", "sim/launch.js",
   "sim/collision.js", "sim/physics.js", "sim/shot.js", "assets/ball-catalog.js",
   // HORSE. The bin, where it may stand, how the shot is solved, and the rules
   // of the word — all adjudicated server-side, so all mirrored.
@@ -92,80 +93,12 @@ test("authoritative HORSE locks a matcher to the setter's ball", () => {
 });
 
 
-test("authoritative HORSE holds a matcher to the tools the setter proved", () => {
-  const lobby = {
-    roomCode: "HORSE",
-    members: new Set(["socket-a", "socket-b"]),
-    memberProfiles: new Map(),
-    settings: { word: "PIG" },
-  };
-  const setup = {
-    x: 0,
-    y: 0.36,
-    z: 0.6,
-    motionId: "still",
-    pieces: [
-      { type: "board", id: "used", x: -0.3, y: 0.7, z: 0.4 },
-      { type: "board", id: "ignored", x: 0.4, y: 0.7, z: 0.4 },
-    ],
-  };
-  let state = createHorseMatchState(lobby, 2_000);
-  state = applyHorsePlacement(state, "socket-a", setup);
-
-  // The setter makes it, off ONE of the two pads. The duty is what their ball
-  // found, not what they put down — and the pull that found it is kept, because
-  // a shot through an apparatus is not one a matcher can aim at.
-  state = applyHorseShot(
-    state,
-    "socket-a",
-    { power: 0.5, aimX: 480, loft: 1, motionSeconds: 4.5, expectedShots: 0, ballId: "basketball" },
-    3_000,
-    () => ({ made: true, contacts: [], touched: ["used"] }),
-  );
-  assertEqual(state.match.standingShot.requiredPieces.join(","), "used");
-  assertEqual(state.match.standingShot.provenPull.power, 0.5);
-
-  // The matcher's ball goes cleanly in having skipped it. THE SERVER RULES THAT
-  // A MISS, and says which of the two misses it was.
-  state = applyHorseShot(
-    state,
-    "socket-b",
-    { power: 0.5, aimX: 480, loft: 1, motionSeconds: 0, expectedShots: 1, ballId: "basketball" },
-    3_100,
-    () => ({ made: true, contacts: [], touched: [] }),
-  );
-  assertEqual(state.lastShot.made, false);
-  assertEqual(state.lastShot.skipped, true);
-  assertEqual(state.match.players[1].letters, 1);
-});
-
-test("authoritative HORSE lets a matcher through when the tools are used", () => {
-  const lobby = {
-    roomCode: "HORSE",
-    members: new Set(["socket-a", "socket-b"]),
-    memberProfiles: new Map(),
-    settings: { word: "PIG" },
-  };
-  const setup = { x: 0, y: 0.36, z: 0.6, motionId: "still", pieces: [{ type: "board", id: "used", x: -0.3 }] };
-  let state = createHorseMatchState(lobby, 2_000);
-  state = applyHorsePlacement(state, "socket-a", setup);
-  state = applyHorseShot(
-    state,
-    "socket-a",
-    { power: 0.5, aimX: 480, loft: 1, motionSeconds: 0, expectedShots: 0, ballId: "basketball" },
-    3_000,
-    () => ({ made: true, contacts: [], touched: ["used"] }),
-  );
-  state = applyHorseShot(
-    state,
-    "socket-b",
-    { power: 0.5, aimX: 480, loft: 1, motionSeconds: 0, expectedShots: 1, ballId: "basketball" },
-    3_100,
-    () => ({ made: true, contacts: [], touched: ["used"] }),
-  );
-  assertEqual(state.lastShot.made, true);
-  assertEqual(state.lastShot.kind, "matched");
-  assertEqual(state.match.players[1].letters, 0);
+test("authoritative Horse rejects Lab tools from stale or crafted clients", () => {
+  const setup = sanitizeHorsePlacement({ kind: "hoop", motionId: "horizontal", placement: { cx: 480, rimY: 400, z: 0.1 }, pieces: [{ type: "cannon", id: "bad" }], requiredPieces: ["bad"] });
+  assertEqual(setup.pieces.length, 0);
+  assertEqual(setup.motionId, "horizontal");
+  assertEqual(setup.placement.rimY, 400);
+  assertEqual(setup.placement.z, undefined);
 });
 
 finish();

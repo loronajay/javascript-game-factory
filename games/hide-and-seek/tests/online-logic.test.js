@@ -198,3 +198,59 @@ test('the lobby search carries this game\'s seat limits', () => {
   // quietly open a room of their own instead of joining each other.
   assert.deepEqual(online.LOBBY_LIMITS, { minPlayers: 2, maxPlayers: 8 });
 });
+
+test('a seat is named by the profile the server published for it', () => {
+  let state = online.applyNetEvent(online.createNetState(), {
+    event: 'lobby_joined',
+    clientId: 'me',
+    members: ['me', 'you', 'late'],
+    players: [{ id: 'me', name: 'loronajay' }, { id: 'you', name: 'Ana' }],
+  });
+
+  assert.equal(online.nameOf(state, 'me'), 'loronajay');
+  assert.equal(online.nameOf(state, 'you'), 'Ana');
+  assert.equal(online.nameOf(state, 'late'), 'Guest 3', 'a seat whose name has not arrived is still a seat');
+
+  // A name that only ever appeared on a snapshot is learned there too, and survives the catch that
+  // takes its body out of the next one.
+  state = online.applyNetEvent(state, {
+    event: 'message',
+    messageType: 'hide_and_seek_snapshot',
+    value: JSON.stringify({ seekerId: 'me', round: {}, players: [{ id: 'late', name: 'Cy', role: 'hider' }] }),
+  });
+  assert.equal(online.nameOf(state, 'late'), 'Cy');
+  state = online.applyNetEvent(state, {
+    event: 'message',
+    messageType: 'hide_and_seek_snapshot',
+    value: JSON.stringify({ seekerId: 'me', round: {}, players: [] }),
+  });
+  assert.equal(online.nameOf(state, 'late'), 'Cy', 'a caught player still has to be nameable');
+});
+
+test('a catch is narrated by name, to everyone except the player it happened to', () => {
+  let state = online.applyNetEvent(online.createNetState(), {
+    event: 'lobby_joined',
+    clientId: 'me',
+    members: ['me', 'you', 'seeker'],
+    players: [{ id: 'me', name: 'loronajay' }, { id: 'you', name: 'Ana' }, { id: 'seeker', name: 'Bo' }],
+  });
+  state = online.applyNetEvent(state, {
+    event: 'message',
+    messageType: 'hide_and_seek_snapshot',
+    value: JSON.stringify({ seekerId: 'seeker', round: {}, players: [
+      { id: 'me', name: 'loronajay', role: 'hider' },
+      { id: 'you', name: 'Ana', role: 'hider' },
+      { id: 'seeker', name: 'Bo', role: 'seeker' },
+    ] }),
+  });
+
+  assert.equal(online.describeCatchEvent(state, { type: 'hider-tagged', playerId: 'you', seekerId: 'seeker' }), 'ANA HAS BEEN FOUND.');
+  assert.equal(online.describeCatchEvent(state, { type: 'demon-catch', playerId: 'you', demon: 'The Bellhop' }), 'THE BELLHOP TOOK ANA.');
+  assert.equal(
+    online.describeCatchEvent(state, { type: 'demon-catch', playerId: 'seeker', demon: 'The Bellhop' }),
+    'THE BELLHOP TOOK BO. THE SEEKER IS GONE.',
+    'a seeker taken by a demon ends the round, and the callout has to say so',
+  );
+  assert.equal(online.describeCatchEvent(state, { type: 'hider-tagged', playerId: 'me' }), null, 'your own catch is the spectator handoff\'s to announce');
+  assert.equal(online.describeCatchEvent(state, { type: 'drawer-empty', playerId: 'you' }), null);
+});

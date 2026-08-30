@@ -72,6 +72,21 @@ test('a tag is resolved from positions, and never during the head start', () => 
   assert.equal(roundLogic.participant(next.round, 'hider-0').caughtBy, roundLogic.CAUGHT_BY.SEEKER);
 });
 
+test('a tag is announced as an event naming the seat that was found', () => {
+  const { engine, state, hotel } = startRound({ config: PARKED_DEMON });
+  const spot = hotel.spawns.hiders[0];
+  let next = { ...state, bodies: state.bodies.map((body) => (body.id === 'seeker' ? { ...body, x: spot.x + 0.4, y: spot.y, z: spot.z } : body)) };
+  // Run until the tag lands, keeping the tick that carried it: events live for one tick only.
+  let tagged = null;
+  for (let tick = 0; tick < 60 * 60 && !tagged; tick += 1) {
+    next = engine.tick(next, TICK, {});
+    tagged = next.events.find((event) => event.type === 'hider-tagged') || null;
+  }
+  assert.ok(tagged, 'the authority publishes the catch rather than leaving clients to diff the roster');
+  assert.equal(tagged.playerId, 'hider-0');
+  assert.equal(tagged.seekerId, 'seeker');
+});
+
 test('interaction is edge-triggered, and the door it opens is open for everyone', () => {
   const { engine, state, space } = startRound();
   const door = engine.catalog.find((item) => item.kind === 'door' && !item.locked && !item.openInitially && item.floor === 1);

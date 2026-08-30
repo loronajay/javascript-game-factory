@@ -48,7 +48,7 @@ export function createMapSession({ maps, window: win = globalThis, storage = nul
   // The map a round will actually happen in. A registered-but-unbuilt map falls back to the default
   // rather than booting into a location with no geometry.
   const requested = queryMapId() || read(STORAGE_KEY);
-  const activeId = maps ? maps.playableMapId(requested) : 'grand-hotel';
+  let activeId = maps ? maps.playableMapId(requested) : 'grand-hotel';
 
   function remember(mapId) {
     try { if (store) store.setItem(STORAGE_KEY, mapId); } catch { /* preference only */ }
@@ -62,15 +62,20 @@ export function createMapSession({ maps, window: win = globalThis, storage = nul
     try { return raw ? JSON.parse(raw) : null; } catch { return null; }
   }
 
-  // Returns true when the caller must stop what it was doing: the page is on its way out.
-  function select(mapId, setup = null) {
+  // Browsing never navigates, rebuilds the world, or depends on storage succeeding.
+  function select(mapId) {
     const next = maps ? maps.playableMapId(mapId) : activeId;
     remember(next);
-    if (next === activeId) return false;
-    try { if (store && setup) store.setItem(SETUP_KEY, JSON.stringify(setup)); } catch { /* preference only */ }
-    const base = String(location.href || '').split('?')[0].split('#')[0];
-    win.location.href = `${base}?map=${encodeURIComponent(next)}`;
-    return true;
+    return next;
+  }
+
+  function activate(mapId) {
+    activeId = select(mapId);
+    try {
+      const url = new URL(location.href);
+      url.searchParams.set('map', activeId);
+      win.history?.replaceState(null, '', url.href);
+    } catch { /* restricted history does not prevent play */ }
   }
 
   function reopenOnlineSetup() {
@@ -84,6 +89,6 @@ export function createMapSession({ maps, window: win = globalThis, storage = nul
     requestedMapId: () => (maps ? maps.normalizeMapId(requested) : activeId),
     map: () => (maps ? maps.getMap(activeId) : null),
     demonRoster: () => (maps ? maps.demonRosterFor(activeId) : []),
-    remember, select, takePendingSetup, reopenOnlineSetup, SETUP_KEY, STORAGE_KEY,
+    remember, select, activate, takePendingSetup, reopenOnlineSetup, SETUP_KEY, STORAGE_KEY,
   };
 }

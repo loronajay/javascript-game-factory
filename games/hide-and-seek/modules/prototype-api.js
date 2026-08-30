@@ -15,7 +15,7 @@ export function createPrototypeApi(parts) {
     version, floorDefs,
     // Which building this page booted into. QA has to be able to ask, because from inside a round
     // the answer is only visible as scenery.
-    map: mapSession ? { id: mapSession.activeMapId(), demons: mapSession.demonRoster().map((entry) => entry.name) } : null,
+    get map() { return mapSession ? { id: mapSession.activeMapId(), demons: mapSession.demonRoster().map((entry) => entry.name) } : null; },
     getState: () => ({
       locked: !!world.state.isLocked,
       playerFloor: world.state.playerFloor,
@@ -25,7 +25,7 @@ export function createPrototypeApi(parts) {
       mapId: hotel.getMapId ? hotel.getMapId() : null,
       player: player.getState(),
       flashlightDrops: flashlightDrops.getState(),
-      monster: monster.getState(),
+      monster: demons.primary.getState(),
       demons: demons.getStates(),
       heat: heat ? heat.getState() : null,
       stamina: stamina ? stamina.getState() : null,

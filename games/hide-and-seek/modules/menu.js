@@ -6,7 +6,7 @@
 // player is not locked in, which is what stops meters like heat from ticking behind a menu.
 import { createMapPicker } from './map-picker.js';
 
-export function createMenu({ logic, document, window, onPlay, onStartSingle, onScreen, onQuit, maps = null, mapSession = null, canPause = () => true }) {
+export function createMenu({ logic, document, window, onPlay, onStartSingle, onScreen, onQuit, onPrepareMap, maps = null, mapSession = null, canPause = () => true }) {
   const overlay = document.getElementById('overlay');
   const screenEls = new Map([
     [logic.SCREENS.TITLE, document.getElementById('menuTitle')],
@@ -36,8 +36,9 @@ export function createMenu({ logic, document, window, onPlay, onStartSingle, onS
   const lobbyMapName = document.getElementById('lobbyMapName');
   const lobbyDemonCount = document.getElementById('lobbyDemonCount');
   const soloPicker = createMapPicker({ prefix: 'solo', maps, mapSession, document, window, onChange: applyMapChange });
-  createMapPicker({ prefix: 'online', maps, mapSession, document, window, onChange: (mapId) => {
-    mapSession?.select(mapId, { mode: 'online', mapId });
+  const onlinePicker = createMapPicker({ prefix: 'online', maps, mapSession, document, window, onChange: (mapId) => {
+    mapSession?.select(mapId);
+    renderMapCopy(mapId);
   } });
 
   function renderMapCopy(mapId) {
@@ -50,13 +51,11 @@ export function createMenu({ logic, document, window, onPlay, onStartSingle, onS
     if (lobbyDemonCount) lobbyDemonCount.textContent = String(demonCount);
   }
 
-  // Changing location is an entry, not a transition â€” the page re-enters into the new building and
-  // the setup the player had filled in travels with it. See `modules/map-session.js`.
+  // Setup stays in memory. The selected world is prepared only on Start / Join.
   function applyMapChange(mapId) {
     if (!mapSession || !maps || !maps.isPlayable(mapId)) return;
-    const config = matchConfig();
-    renderMapCopy(config.mapId);
-    mapSession.select(config.mapId, config);
+    renderMatchConfig();
+    mapSession.select(mapId);
   }
 
   function matchConfig() {
@@ -98,7 +97,7 @@ export function createMenu({ logic, document, window, onPlay, onStartSingle, onS
     // back arrow in the header - so Space or Enter, pressed anywhere while reading the options, was
     // a click on "back to main menu". That is the random kick to the title players hit while setting
     // a match up. (The first *control* is no safer: on the solo screen it is a location radio, and an
-    // arrow key on a radio group changes map, which re-enters the page.) Focusing the panel keeps
+    // arrow key on a radio group changes map.) Focusing the panel keeps
     // the screen reachable by Tab without arming anything.
     const active = screenEls.get(state.screen);
     if (active && typeof active.focus === 'function') {
@@ -110,11 +109,19 @@ export function createMenu({ logic, document, window, onPlay, onStartSingle, onS
   function dispatch(action) {
     const previousScreen = state.screen;
     const next = logic.nextMenuState(state, action, { allowPause: canPause() });
+    const startingSolo = previousScreen === logic.SCREENS.SOLO_SETUP && next.screen === logic.SCREENS.PLAYING;
+    const joiningOnline = previousScreen === logic.SCREENS.ONLINE_SETUP && next.screen === logic.SCREENS.ONLINE;
+    if (startingSolo || joiningOnline) {
+      const mapId = startingSolo ? soloPicker.selected() : onlinePicker.selected();
+      if (onPrepareMap?.(mapId) === false) return false;
+      mapSession?.activate(mapId);
+    }
     // Quitting rebuilds the session rather than pretending the hotel reset: the demon, the open doors
     // and the key ring are all still standing, and a reload is the honest way back to a clean round.
     if (next.effect === 'quit') { onQuit?.(); window.location.reload(); return; }
     const wasPlaying = logic.isPlaying(state.screen);
     state = next;
+    if (state.screen === logic.SCREENS.ONLINE_SETUP) renderMapCopy(onlinePicker.selected());
     if (!wasPlaying && logic.isPlaying(state.screen)) onlineMatch = previousScreen === logic.SCREENS.ONLINE || onlineMatch;
     render();
     emit('hotel:menu-action', { action });
@@ -154,7 +161,7 @@ export function createMenu({ logic, document, window, onPlay, onStartSingle, onS
     // An elimination is not an ending. A hider taken while other guests are still hiding keeps
     // playing as a spectator, and the menu has to stay on PLAYING for that: CAUGHT hides the overlay
     // (the end-of-round screen is drawn over it) and swallows PAUSE, so a player eliminated mid-round
-    // was left with a live game and no way to open a menu at all — Esc did nothing.
+    // was left with a live game and no way to open a menu at all ï¿½ Esc did nothing.
     if (event.detail?.roundOver === false) return;
     // Only the server-owned round may end online play. Local catch notifications are not results.
     if (onlineMatch && !event.detail?.online) return;

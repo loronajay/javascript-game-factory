@@ -24,27 +24,33 @@ import { createModelViewer } from './modules/model-viewer.js';
 import { createPrototypeApi } from './modules/prototype-api.js';
 import { createAccountAccess } from './modules/account-access.js';
 import { createMapSession, placeAtMapSpawn } from './modules/map-session.js';
-// The pure layer loads as classic scripts first, so a missing one fails loudly here rather than as
-// an undefined call three frames into a round. Which building it stands: `modules/map-session.js`.
+import { createMapRuntime } from './modules/map-runtime.js';
 for (const name of ['HotelAvatarLogic', 'HotelCollision', 'HotelControls', 'HotelDemon', 'HotelEnemyLogic', 'HotelFixtures', 'HotelFlashlight', 'HotelHiders', 'HotelLayout', 'HotelMaps', 'HotelMenu', 'HotelMovement', 'HotelMusic', 'HotelOnline', 'HotelPlan', 'HotelRound', 'HotelHeat', 'HotelSeeker', 'HotelSpectator', 'HotelStamina']) {
   if (!window[name]) throw new Error(`Hotel pure module ${name} failed to load`);
 }
 const mapSession = createMapSession({ maps: window.HotelMaps, window });
 const rendering = createRendering({ THREE, document, window, config: CONFIG });
-const world = createWorld({ THREE, scene: rendering.scene, materials: rendering.materials, config: CONFIG, layout: window.HotelLayout, logic: window.HotelCollision, plan: window.HotelPlan, document, window });
-const elevator = createElevator({
-  THREE, scene: rendering.scene, camera: rendering.camera, materials: rendering.materials,
-  config: CONFIG, floorY, world, performance: window.HotelPerformance, document, window,
-});
-const furnishings = createFurnishings({ THREE, materials: rendering.materials, world, keyLabelForFloor });
-const hotel = createHotel({
-  THREE, scene: rendering.scene, camera: rendering.camera, materials: rendering.materials, config: CONFIG,
-  floorY, keyIdForFloor, keyLabelForFloor, floorDefs: FLOOR_DEFS, layout: window.HotelLayout, plan: window.HotelPlan, maps: window.HotelMaps, mapId: mapSession.activeMapId(),
-  world, furnishings, elevator, performance: window.HotelPerformance, mergeGeometries,
-});
-hotel.build();
-elevator.build();
-placeAtMapSpawn({ camera: rendering.camera, world, spawn: hotel.getPlan().spawns.seeker, eyeHeight: CONFIG.eyeHeight });
+const mapRuntime = createMapRuntime({ THREE, scene: rendering.scene, materials: rendering.materials,
+  canChange: () => !hiders && !online?.isActive() && !world.state.isLocked,
+  onReady: ({ world, hotel }) => placeAtMapSpawn({ camera: rendering.camera, world, spawn: hotel.getPlan().spawns.seeker, eyeHeight: CONFIG.eyeHeight }),
+  createMap(mapId, scene) {
+    const world = createWorld({ THREE, scene, materials: rendering.materials, config: CONFIG, layout: window.HotelLayout, logic: window.HotelCollision, plan: window.HotelPlan, document, window });
+    const elevator = createElevator({
+      THREE, scene, camera: rendering.camera, materials: rendering.materials,
+      config: CONFIG, floorY, world, performance: window.HotelPerformance, document, window,
+    });
+    const furnishings = createFurnishings({ THREE, materials: rendering.materials, world, keyLabelForFloor });
+    const hotel = createHotel({
+      THREE, scene, camera: rendering.camera, materials: rendering.materials, config: CONFIG,
+      floorY, keyIdForFloor, keyLabelForFloor, floorDefs: FLOOR_DEFS, layout: window.HotelLayout, plan: window.HotelPlan, maps: window.HotelMaps, mapId,
+      world, furnishings, elevator, performance: window.HotelPerformance, mergeGeometries,
+    });
+    hotel.build();
+    elevator.build();
+    return { world, elevator, furnishings, hotel };
+    } });
+mapRuntime.prepare(mapSession.activeMapId());
+const { world, elevator, furnishings, hotel } = mapRuntime.parts;
 const inspectTarget = new URLSearchParams(location.search).get('inspect');
 const inspectionView = hotel.getPlan().inspectionViews?.[inspectTarget] || inspectionViews[inspectTarget];
 if (inspectionView) {
@@ -62,6 +68,10 @@ const menu = inspectionView ? null : createMenu({
   logic: window.HotelMenu, document, window,
   onPlay: () => player.beginPlay(),
   onStartSingle: (options) => startSingleMatch(options), maps: window.HotelMaps, mapSession,
+  onPrepareMap: mapId => {
+    try { return mapRuntime.prepare(mapId); }
+    catch (error) { console.error('Map preparation failed', error); world.notify('Could not load this map. Please try again.'); return false; }
+  },
   canPause: () => !online?.isActive(),
   onQuit: () => online?.disconnect(),
   onScreen: createSessionMenuHandler({ logic: window.HotelMenu, account, getOnline: () => online }),
@@ -77,10 +87,10 @@ const soundtrack = inspectionView ? null : window.HotelMusic.createSoundtrack({ 
 const soundEffects = inspectionView ? null : window.HotelMusic.createSoundEffects({ eventTarget: window });
 const heat = inspectionView ? null : createHeat({ camera: rendering.camera, world, logic: window.HotelHeat, config: HEAT_CONFIG, document });
 // The map's roster, however long it is. The workbench shows one body, so it takes the first.
-const demons = createDemons({ createMonster, roster: inspectionView ? mapSession.demonRoster().slice(0, 1) : mapSession.demonRoster(), common: {
-  THREE, GLTFLoader, scene: rendering.scene, camera: rendering.camera, config: CONFIG, floorY,
+const demons = mapRuntime.setDemonsFactory((world, scene, mapId) => createDemons({ createMonster, roster: inspectionView ? mapSession.demonRoster().slice(0, 1) : window.HotelMaps.demonRosterFor(mapId), common: {
+  THREE, GLTFLoader, scene, camera: rendering.camera, config: CONFIG, floorY,
   layout: window.HotelLayout, world, player, logic: window.HotelEnemyLogic, movement: window.HotelMovement, heat, document, window,
-} });
+} }));
 const monster = demons.primary;
 const avatars = createAvatars({ THREE, GLTFLoader, scene: rendering.scene, config: CONFIG, logic: window.HotelAvatarLogic });
 const spectator = createSpectator({ logic: window.HotelSpectator, camera: rendering.camera, world, avatars, config: CONFIG, document, window });
@@ -102,7 +112,7 @@ function startSingleMatch(options) {
 online = createOnline({
   logic: window.HotelOnline, avatars, avatarLogic: window.HotelAvatarLogic, camera: rendering.camera,
   world, player, menu, config: CONFIG, hotel, furnishings, elevator, demons, flashlightDrops, hiders, spectator, document, window, maps: window.HotelMaps, mapId: mapSession.activeMapId(),
-  identity: account ? account.identity() : null,
+  identity: account ? account.identity() : null, getMapId: mapSession.activeMapId,
 });
 if (account) account.syncMenu();
 const LOCAL_AVATAR = 'local';
@@ -114,11 +124,7 @@ if (menu && window.HotelControls.shouldAutoStartDragLook(location.search)) {
 world.updateInventoryHud();
 const clock = new THREE.Clock();
 const adaptiveQuality = window.HotelPerformance.createAdaptiveQualityController();
-// Gameplay runs on a fixed 60hz accumulator, not on the display's refresh rate: a 144hz monitor must
-// simulate the same hotel a 60hz one does, and a server cannot be authoritative over anything else.
 const timestep = window.HotelPerformance.createFixedTimestep({ tickRate: 60, maxTicksPerFrame: 5 });
-// Online, the server owns the round and the roster, so the local round and the demons stand down —
-// there is one authority per hotel, and a second one running here would disagree about who was caught.
 function simulate(delta, elapsed) {
   if (!modelViewer) {
     hotel.update(delta); furnishings.update(delta, CONFIG); elevator.update(delta, elapsed); player.update(delta, elapsed);

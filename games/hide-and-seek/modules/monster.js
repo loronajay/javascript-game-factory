@@ -1,3 +1,5 @@
+import { disposeMapObjects } from './map-runtime.js';
+
 export function createMonster({
   THREE, GLTFLoader, scene, camera, config: CONFIG, floorY, layout, world, player, logic, movement, heat, document, window,
   name = 'The Bellhop', statusElementId = 'monsterStatus', takenSpawns = [], accentColor = 0x5c141a, eyeColor = 0xff1008,
@@ -21,6 +23,7 @@ export function createMonster({
   let routePurpose = 'roam';
   let avoidance = null;
   let mixer = null;
+  let disposed = false;
   let activeAction = null;
   let idleAction = null;
   let walkAction = null;
@@ -317,6 +320,7 @@ export function createMonster({
     if (!GLTFLoader) return;
     const loader = new GLTFLoader();
     loader.load('assets/UAL2_Standard.glb', (gltf) => {
+      if (disposed) { disposeMapObjects(gltf.scene); return; }
       const model = gltf.scene;
       model.traverse((object) => {
         if (!object.isMesh) return;
@@ -721,6 +725,7 @@ export function createMonster({
   fallback = createFallbackDemon();
   root.position.set(spawn.x, spawn.y, spawn.z); if (inspectionMode) root.position.set(0, 0, 0); else choosePatrol(); loadAnimatedBody(); updateHud();
   return {
+    dispose() { disposed = true; mixer?.stopAllAction(); if (mixer && body) mixer.uncacheRoot(body); },
     update,
     setRemotePose,
     root,

@@ -55,6 +55,7 @@ import { HOOP_TARGET } from "./trick-shot-target.js";
 import { hoopWorldState } from "./hoop.js";
 import { horseTargetAt, horseTargetKind } from "./horse-shot.js";
 import { leadPull } from "./horse-cpu.js";
+import { HORSE_LAB_TOOLS_ENABLED } from "./horse.js";
 import { replayHorseShot } from "./horse-replay.js";
 
 /**
@@ -153,6 +154,7 @@ export function horseTargetPoint(setup, seconds = 0) {
  *          `sim/horse-cpu.js` takes a human setter's proven pull in.
  */
 export function planCpuTrickShot({ setup, ballId, budget = PLAN_FLIGHT_BUDGET } = {}) {
+  if (!HORSE_LAB_TOOLS_ENABLED) return null;
   if (!setup) return null;
   const bare = { ...setup, pieces: [], requiredPieces: [] };
   const weight = ballFlight(ballId).weight;

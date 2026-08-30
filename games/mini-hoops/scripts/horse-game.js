@@ -64,6 +64,8 @@ import { planCpuTrickShot } from "./sim/horse-plan.js";
 import { createHorseShot, horseTargetAt } from "./sim/horse-shot.js";
 import {
   HORSE_FIXED_SETUP,
+  HORSE_LAB_TOOLS_ENABLED,
+  normalizeHorsePieces,
   PHASE_MATCH,
   PHASE_SET,
   canPlaceBin,
@@ -92,7 +94,6 @@ import {
   SPRING_PIECE,
   createSandboxPiece,
   isPadPiece,
-  normalizeSandboxPieces,
 } from "./sim/trick-shot.js";
 import {
   createTrickShotPhysics,
@@ -618,6 +619,7 @@ export function bootHorse(root, options = {}) {
   }
 
   function addPiece(type) {
+    if (!HORSE_LAB_TOOLS_ENABLED) return false;
     if (!isPlacing() || workingPieces.length >= MAX_SANDBOX_PIECES) return false;
     const count = workingPieces.length;
     const piece = createSandboxPiece(type, {
@@ -682,15 +684,16 @@ export function bootHorse(root, options = {}) {
    * both, and the bank is a bank rather than half of one.
    */
   function savedShots() {
-    return store.list();
+    return HORSE_LAB_TOOLS_ENABLED ? store.list() : [];
   }
 
   function useSavedShot(id) {
+    if (!HORSE_LAB_TOOLS_ENABLED) return false;
     if (!isPlacing()) return false;
     const saved = store.get(id);
     if (!saved) return false;
     adoptTarget(saved.target);
-    workingPieces = normalizeSandboxPieces(saved.pieces);
+    workingPieces = normalizeHorsePieces(saved.pieces);
     currentLocationId = saved.locationId;
     currentSavedShotId = saved.id;
     selectedPieceId = workingPieces[0]?.id || null;
@@ -821,7 +824,7 @@ export function bootHorse(root, options = {}) {
 
   function confirmPlacement() {
     if (!isPlacing()) return;
-    activePieces = normalizeSandboxPieces(workingPieces);
+    activePieces = normalizeHorsePieces(workingPieces);
     activeSetup = {
       ...normalizeTrickShotTarget(workingTarget),
       pieces: activePieces,
@@ -917,7 +920,7 @@ export function bootHorse(root, options = {}) {
       // setter's bin whatever this player had arranged.
       phase = PHASE_AIMING;
       activeSetup = shotSetupFor(match, workingTarget);
-      activePieces = normalizeSandboxPieces(activeSetup?.pieces);
+      activePieces = normalizeHorsePieces(activeSetup?.pieces);
       currentLocationId = activeSetup?.locationId || currentLocationId;
     }
     resetTrickShotPhysics(piecePhysics);
@@ -976,7 +979,7 @@ export function bootHorse(root, options = {}) {
         ? match.standingShot
         : (mine ? activeSetup : pendingOnlineSetup);
     }
-    activePieces = normalizeSandboxPieces(activeSetup?.pieces);
+    activePieces = normalizeHorsePieces(activeSetup?.pieces);
     if (activeSetup?.locationId) currentLocationId = activeSetup.locationId;
     resetTrickShotPhysics(piecePhysics);
     cpuDelay = 0;
@@ -1130,7 +1133,7 @@ export function bootHorse(root, options = {}) {
     if (cpuSetsTrickShot(difficulty, random)) {
       const plan = planCpuTrickShot({ setup: activeSetup, ballId: currentTurnBallId() });
       if (plan) {
-        activePieces = normalizeSandboxPieces(plan.pieces);
+        activePieces = normalizeHorsePieces(plan.pieces);
         activeSetup = {
           ...activeSetup,
           pieces: activePieces,
@@ -1453,7 +1456,7 @@ export function bootHorse(root, options = {}) {
       // A placement from the other side mid-turn: the bin appears, and its
       // motion starts running so it can be watched before anyone shoots.
       if (!isMyTurn() && pendingOnlineSetup) activeSetup = pendingOnlineSetup;
-      activePieces = normalizeSandboxPieces(activeSetup?.pieces);
+      activePieces = normalizeHorsePieces(activeSetup?.pieces);
       if (activeSetup?.locationId) currentLocationId = activeSetup.locationId;
       syncPanels();
       syncStatus();
@@ -1474,7 +1477,7 @@ export function bootHorse(root, options = {}) {
     const selectedBallId = normalizeTurnBallId(ruling.intent.ballId);
     if (ruling.seat === 0 || ruling.seat === 1) turnBalls[ruling.seat] = selectedBallId;
     activeSetup = ruling.setup;
-    activePieces = normalizeSandboxPieces(activeSetup.pieces);
+    activePieces = normalizeHorsePieces(activeSetup.pieces);
     currentLocationId = activeSetup.locationId || currentLocationId;
     resetTrickShotPhysics(piecePhysics);
     phase = PHASE_AIMING;
@@ -1975,7 +1978,7 @@ export function bootHorse(root, options = {}) {
     get match() { return match; },
     get phase() { return phase; },
     get setup() { return workingTarget; },
-    get pieces() { return normalizeSandboxPieces(workingPieces); },
+    get pieces() { return normalizeHorsePieces(workingPieces); },
     get locationId() { return currentLocationId; },
     ball,
     newMatch,

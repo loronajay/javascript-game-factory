@@ -88,6 +88,10 @@
       roomCode: null,
       ownerId: null,
       members: [],
+      // Seat id -> the factory profile name the server published for it. A lobby payload names its
+      // members and every snapshot player carries a name, so the client never has to invent one;
+      // `Guest N` survives only as the fallback for a seat that arrived before its name did.
+      names: {},
       seekerId: null,
       snapshot: null,
       error: null,
@@ -115,6 +119,66 @@
   function memberIdsFrom(payload) {
     if (Array.isArray(payload?.members)) return payload.members.map((entry) => (typeof entry === 'string' ? entry : entry?.clientId)).filter(Boolean);
     return [];
+  }
+
+  // Names are additive. A roster payload names whoever is in the lobby now, but a player who has
+  // been caught still has to be *nameable* — so what arrives is merged over what is known rather
+  // than replacing it.
+  function mergeNames(current, entries) {
+    if (!Array.isArray(entries) || !entries.length) return current || {};
+    let names = current || {};
+    let changed = false;
+    for (const entry of entries) {
+      if (!entry || typeof entry !== 'object') continue;
+      const id = typeof entry.id === 'string' ? entry.id : entry.clientId;
+      const name = typeof entry.name === 'string' ? entry.name.trim() : '';
+      if (!id || !name || names[id] === name) continue;
+      if (!changed) { names = { ...names }; changed = true; }
+      names[id] = name;
+    }
+    return names;
+  }
+
+  function namesFrom(state, payload) {
+    const current = state?.names || {};
+    const fromPlayers = mergeNames(current, payload?.players);
+    return mergeNames(fromPlayers, payload?.members);
+  }
+
+  // The one place a seat becomes a word. Everything on screen that says who somebody is — the
+  // lobby roster, the name over a body, the callout when they are found — goes through here, so
+  // there is exactly one fallback rather than one per surface.
+  function nameOf(state, id) {
+    if (!id) return 'Guest';
+    const known = state?.names?.[id];
+    if (typeof known === 'string' && known.trim()) return known.trim();
+    const fromSnapshot = state?.snapshot?.players?.find((entry) => entry.id === id);
+    if (fromSnapshot && typeof fromSnapshot.name === 'string' && fromSnapshot.name.trim()) return fromSnapshot.name.trim();
+    const seat = (state?.members || []).indexOf(id);
+    return seat >= 0 ? `Guest ${seat + 1}` : 'Guest';
+  }
+
+  function roleOf(state, id) {
+    return state?.snapshot?.players?.find((entry) => entry.id === id)?.role || null;
+  }
+
+  // Being found is round news rather than private news, so every client narrates every catch. The
+  // authority sends the seat; the name is looked up here, because the wire never carries a name it
+  // has already sent once.
+  function describeCatchEvent(state, event) {
+    if (!event || !event.playerId) return null;
+    if (event.type !== 'demon-catch' && event.type !== 'hider-tagged') return null;
+    // Your own catch is not narrated here. The spectator handoff already announces it and knows
+    // what happens next, and two lines about the same death would only overwrite each other.
+    if (!!state?.clientId && event.playerId === state.clientId) return null;
+    const who = nameOf(state, event.playerId).toUpperCase();
+    if (event.type === 'demon-catch') {
+      const demon = String(event.demon || 'something').toUpperCase();
+      return roleOf(state, event.playerId) === 'seeker'
+        ? `${demon} TOOK ${who}. THE SEEKER IS GONE.`
+        : `${demon} TOOK ${who}.`;
+    }
+    return `${who} HAS BEEN FOUND.`;
   }
 
   function parseValue(value) {
@@ -159,18 +223,20 @@
           roomCode: event.roomCode || null,
           ownerId: event.ownerId || null,
           members: memberIdsFrom(event),
+          names: namesFrom(current, event),
           error: null,
         };
       case 'lobby_updated':
       case 'lobby_player_joined':
       case 'lobby_player_left':
-        return { ...current, members: memberIdsFrom(event) || current.members, ownerId: event.ownerId || current.ownerId };
+        return { ...current, members: memberIdsFrom(event) || current.members, names: namesFrom(current, event), ownerId: event.ownerId || current.ownerId };
       case 'lobby_started': {
         const started = parseValue(event.matchState);
         return {
           ...current,
           status: NET_STATES.STARTING,
           members: memberIdsFrom(event) || current.members,
+          names: namesFrom(namesFrom(current, event), started),
           seekerId: started?.seekerId || current.seekerId,
           snapshot: started || current.snapshot,
         };
@@ -186,6 +252,7 @@
         return {
           ...current,
           status: ended ? NET_STATES.ENDED : NET_STATES.PLAYING,
+          names: namesFrom(current, snapshot),
           seekerId: snapshot.seekerId || current.seekerId,
           snapshot,
         };
@@ -290,7 +357,7 @@
   return {
     INPUT_HEARTBEAT_SECONDS, LOBBY_LIMITS, NET_STATES, RECONCILE_DEFAULTS, RECONNECT_GRACE_MS,
     lobbySettingsFor, snapshotMapMismatch, hasPlayableSnapshot,
-    applyNetEvent, createNetState, describeInput, interpolatePose, isSeeker,
-    othersOf, reconcilePosition, rememberSession, resumeRequestFor, selfOf, shouldSendInput,
+    applyNetEvent, createNetState, describeCatchEvent, describeInput, interpolatePose, isSeeker,
+    nameOf, othersOf, reconcilePosition, rememberSession, resumeRequestFor, roleOf, selfOf, shouldSendInput,
   };
 });

@@ -13,9 +13,9 @@ import {
   trickShotTargetAt,
   trickShotTargetMotions,
 } from "../scripts/sim/trick-shot-target.js";
-import { HOOP_MODES, HOOP_TRAVEL_BOUNDS } from "../scripts/sim/hoop.js";
+import { HOOP_MODES } from "../scripts/sim/hoop.js";
 import { BIN_MOTIONS, clampPlacement, defaultPlacement, motionEnvelope } from "../scripts/sim/bin-placement.js";
-import { clampHoopPlacement, defaultHoopPlacement } from "../scripts/sim/hoop-placement.js";
+import { HOOP_PLACEMENT_BOUNDS, clampHoopPlacement, defaultHoopPlacement } from "../scripts/sim/hoop-placement.js";
 import { normalizeTrickShot } from "../scripts/sim/trick-shot.js";
 import { createTrickShotStore } from "../scripts/store/trick-shots-store.js";
 
@@ -88,11 +88,11 @@ test("a placed hoop never leaves the crop, whichever motion it is given", () => 
       for (let step = 0; step <= 400; step++) {
         const { hoop } = trickShotTargetAt(target, step * 0.14);
         assert(
-          hoop.cx >= HOOP_TRAVEL_BOUNDS.minX - 1e-9 && hoop.cx <= HOOP_TRAVEL_BOUNDS.maxX + 1e-9,
+          hoop.cx >= HOOP_PLACEMENT_BOUNDS.minX - 1e-9 && hoop.cx <= HOOP_PLACEMENT_BOUNDS.maxX + 1e-9,
           `${mode.id} hung at the edge leaves the crop at x=${hoop.cx.toFixed(1)}`,
         );
         assert(
-          hoop.rimY >= HOOP_TRAVEL_BOUNDS.minY - 1e-9 && hoop.rimY <= HOOP_TRAVEL_BOUNDS.maxY + 1e-9,
+          hoop.rimY >= HOOP_PLACEMENT_BOUNDS.minY - 1e-9 && hoop.rimY <= HOOP_PLACEMENT_BOUNDS.maxY + 1e-9,
           `${mode.id} hung at the edge leaves the crop at y=${hoop.rimY.toFixed(1)}`,
         );
       }
@@ -108,10 +108,10 @@ test("every hoop motion stays inside the mobile crop, and every bin sweep inside
     for (let step = 0; step <= 200; step++) {
       const { hoop } = trickShotTargetAt(target, step * 0.05);
       assert(
-        hoop.cx >= HOOP_TRAVEL_BOUNDS.minX && hoop.cx <= HOOP_TRAVEL_BOUNDS.maxX,
+        hoop.cx >= HOOP_PLACEMENT_BOUNDS.minX && hoop.cx <= HOOP_PLACEMENT_BOUNDS.maxX,
         `${mode.id} leaves the portrait crop at x=${hoop.cx.toFixed(1)}`,
       );
-      assert(hoop.rimY >= HOOP_TRAVEL_BOUNDS.minY && hoop.rimY <= HOOP_TRAVEL_BOUNDS.maxY);
+      assert(hoop.rimY >= HOOP_PLACEMENT_BOUNDS.minY && hoop.rimY <= HOOP_PLACEMENT_BOUNDS.maxY);
     }
   }
 

@@ -19,6 +19,17 @@ async function loadCreateDemons() {
   return (await import(moduleUrl)).createDemons;
 }
 
+test('replacing a map stops every outgoing demon body', async () => {
+  const createDemons = await loadCreateDemons();
+  const disposed = [];
+  const demons = createDemons({
+    createMonster: ({ name }) => ({ getState: () => ({}), dispose: () => disposed.push(name) }),
+    common: { document: null },
+  });
+  demons.dispose();
+  assert.deepEqual(disposed, ['The Bellhop', 'The Housekeeper']);
+});
+
 test('the shared threat event separately reports whether a demon sees the local player', async () => {
   const createDemons = await loadCreateDemons();
   const events = [];

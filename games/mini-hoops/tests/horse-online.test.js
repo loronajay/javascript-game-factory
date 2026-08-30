@@ -9,7 +9,7 @@ import {
 } from "../scripts/multiplayer/horse-online-client.js";
 import { restingBallPosition } from "../scripts/render/frame.js";
 import { PHASE_MATCH, PHASE_SET } from "../scripts/sim/horse.js";
-import { HOOP_TRAVEL_BOUNDS } from "../scripts/sim/hoop.js";
+import { HOOP_PLACEMENT_BOUNDS } from "../scripts/sim/hoop-placement.js";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -92,15 +92,14 @@ test("a shot carries a pull and a release moment — no outcome, and no aimY", (
   assertEqual(sanitizeHorseShotIntent({ ballId: "../../bad" }).ballId, "basketball");
 });
 
-test("an online placement carries a bounded Lab tool layout and room", () => {
+test("an online placement strips Lab tools while keeping the target and room", () => {
   const setup = sanitizeHorsePlacementIntent({
     x: 0, y: 0.36, z: 0.6, motionId: "still",
     locationId: "warehouse",
     pieces: [{ type: "board", id: "bank-pad", x: 0.4, y: 0.8, z: 0.5, restitution: 0.9 }],
   });
   assertEqual(setup.locationId, "warehouse");
-  assertEqual(setup.pieces.length, 1);
-  assertEqual(setup.pieces[0].id, "bank-pad");
+  assertEqual(setup.pieces.length, 0);
 });
 
 test("a placement names its target, and sends only that kind's placement shape", () => {
@@ -379,7 +378,7 @@ test("a placement goes up the wire the moment the shot is set", () => {
   assertEqual(onlineClient.placements.length, 1);
   assertEqual(onlineClient.placements[0].kind, "bin");
   assertEqual(onlineClient.placements[0].motionId, "sideways");
-  assertEqual(onlineClient.placements[0].pieces.length, 1);
+  assertEqual(onlineClient.placements[0].pieces.length, 0);
 });
 
 test("a hung hoop goes up the wire as a hoop, and the server owns where it hangs", () => {
@@ -393,11 +392,11 @@ test("a hung hoop goes up the wire as a hoop, and the server owns where it hangs
   assertEqual(sent.kind, "hoop");
   // The court clamped it before sending, and the server clamps it again through
   // the same module — so a crafted client cannot hang a hoop off the wall.
-  assert(sent.placement.cx <= HOOP_TRAVEL_BOUNDS.maxX + 1e-9, `lane escaped: ${sent.placement.cx}`);
-  assert(sent.placement.rimY <= HOOP_TRAVEL_BOUNDS.maxY + 1e-9, `height escaped: ${sent.placement.rimY}`);
+  assert(sent.placement.cx <= HOOP_PLACEMENT_BOUNDS.maxX + 1e-9, `lane escaped: ${sent.placement.cx}`);
+  assert(sent.placement.rimY <= HOOP_PLACEMENT_BOUNDS.maxY + 1e-9, `height escaped: ${sent.placement.rimY}`);
 });
 
-test("the visible HORSE tray adds a Lab tool through the placement panel", () => {
+test("stale Horse tool controls cannot add a Lab tool", () => {
   const { horse, onlineClient, elements } = courtHarness();
   onlineClient.push({ status: "started", matchState: serverState({ turn: 0 }) });
   elements.get("#horsePlacePanel").fire("click", {
@@ -407,7 +406,7 @@ test("the visible HORSE tray adds a Lab tool through the placement panel", () =>
       },
     },
   });
-  assertEqual(horse.pieces.length, 1, "clicking the on-screen tray did not add its tool");
+  assertEqual(horse.pieces.length, 0, "a stale control added a tool");
 });
 
 test("this court sends a pull and rules on nothing", () => {
