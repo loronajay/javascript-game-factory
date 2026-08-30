@@ -153,7 +153,7 @@ test('a caught player drops their battery, and the first body to reach it takes 
 
   assert.equal(roundLogic.participant(next.round, 'hider-0').caughtBy, roundLogic.CAUGHT_BY.DEMON);
   assert.ok(next.events.some((event) => event.type === 'flashlight-drop' && event.playerId === 'hider-0'));
-  assert.equal(next.pickups.length, 1);
+  assert.equal(next.pickups.filter(pickup => pickup.id.startsWith('drop-')).length, 1);
 
   // Someone finds it later, once the demon has moved on. Walk the finder onto it with a light that
   // has room to take the charge.
@@ -168,7 +168,7 @@ test('a caught player drops their battery, and the first body to reach it takes 
 
   assert.ok(next.events.some((event) => event.type === 'flashlight-pickup' && event.playerId === 'hider-1'));
   assert.ok(built.engine.bodyOf(next, 'hider-1').flashlight.charge > 0.9, 'a body on the floor is a resupply');
-  assert.equal(next.pickups.length, 0, 'a claimed battery is gone');
+  assert.equal(next.pickups.filter(pickup => pickup.id.startsWith('drop-')).length, 0, 'a claimed battery is gone');
 });
 
 test('the tick is deterministic and does not mutate what it is handed', () => {

@@ -105,9 +105,10 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
     if (world.state.activeInteractable) { world.promptEl.textContent = world.state.activeInteractable.prompt(); world.promptEl.classList.add('visible'); }
     else { world.promptEl.textContent = ''; world.promptEl.classList.remove('visible'); }
   }
-  // Online a press is a *request*: it goes out on the input and the server decides what it opened,
-  // whether the drawer still had the key in it, and whether the door was locked. Running the local
-  // action too would give this client a hotel that briefly disagrees with everyone else's.
+  // Online a press is a *request*: it goes out on the input — carrying the id the crosshair was on,
+  // see `getInput` — and the server decides what it opened, whether the drawer still had the key in
+  // it, and whether the door was locked. Running the local action too would give this client a hotel
+  // that briefly disagrees with everyone else's.
   function interact() {
     if (world.state.remoteFixtures) return;
     if (world.state.activeInteractable) world.state.activeInteractable.action();
@@ -201,6 +202,12 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
       sprint: !!(keys.ShiftLeft || keys.ShiftRight),
       light: flashlightState.on,
       interact: !!keys.KeyE,
+      // What the crosshair is on. The authority still decides what opened — it re-tests reach on
+      // this exact fixture and falls back to its own cone pick — but without it, two fixtures in one
+      // cone are resolved by distance on the server and by the raycast here, and the player watches
+      // the wrong drawer slide open. Anything the raycast found that the plan does not name (a
+      // dropped battery) sends null and the authority picks as it always did.
+      interactId: world.state.activeInteractable ? world.state.activeInteractable.fixtureId || null : null,
     }),
     getEyeHeight: () => currentEyeHeight,
     getState: () => ({ crouching: !!world.state.playerCrouching, eyeHeight: currentEyeHeight, flashlightOn: flashlightState.on, flashlightCharge: flashlightState.charge }),

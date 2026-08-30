@@ -85,7 +85,12 @@ test('an error is surfaced rather than swallowed', () => {
 test('an input carries intent only', () => {
   const input = online.describeInput({ forward: 4, strafe: -9, yaw: 1.2, crouch: 1, sprint: 0, light: true, interact: true, x: 12, charge: 1, roomNumber: '105' });
 
-  assert.deepEqual(input, { forward: 1, strafe: -1, yaw: 1.2, crouch: true, sprint: false, light: true, interact: true });
+  assert.deepEqual(input, { forward: 1, strafe: -1, yaw: 1.2, crouch: true, sprint: false, light: true, interact: true, interactId: null });
+
+  // The one field that names something in the world. It is still intent, not outcome: the authority
+  // re-tests reach on it before honouring it, and refuses anything that is not an id.
+  assert.equal(online.describeInput({ interact: true, interactId: 'door-105' }).interactId, 'door-105');
+  assert.equal(online.describeInput({ interact: true, interactId: 7 }).interactId, null);
 });
 
 test('an unchanged input is not resent, but silence is still heartbeaten', () => {

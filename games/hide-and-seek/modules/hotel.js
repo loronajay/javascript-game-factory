@@ -85,7 +85,7 @@ export function createHotel({ THREE, scene, camera, materials: MAT, config: CONF
     if (spec.openInitially) { item.target = spec.openAngle; hinge.rotation.y = item.target; }
     world.setOpening(spec.id, hinge.rotation.y);
     collections.dynamicDoors.push(item); collections.roomDoors.set(roomNumber, item); collections.doorsByPlanId.set(spec.id, item);
-    collections.interactables.push({ object: door, enabled: () => true, prompt: () => {
+    collections.interactables.push({ object: door, fixtureId: spec.id, enabled: () => true, prompt: () => {
       if (item.locked) return item.requiredKey && world.state.inventory.has(item.requiredKey) ? `Unlock ${roomNumber} with key` : `${roomNumber} — Locked`;
       return `${item.open ? 'Close' : 'Open'} ${roomNumber}`;
     }, action: () => {
@@ -101,7 +101,7 @@ export function createHotel({ THREE, scene, camera, materials: MAT, config: CONF
     const item = { planId: spec.id, id: spec.id, hinge, panel, openAngle: spec.openAngle, side: spec.side, open: false, target: 0, discovered: false };
     world.setOpening(spec.id, 0);
     collections.dynamicDoors.push(item); collections.secretPanels.set(spec.id, item); collections.doorsByPlanId.set(spec.id, item);
-    collections.interactables.push({ object: panel, enabled: () => true, prompt: () => !item.discovered ? 'Inspect loose wall panel' : `${item.open ? 'Close' : 'Open'} secret passage`, action: () => {
+    collections.interactables.push({ object: panel, fixtureId: spec.id, enabled: () => true, prompt: () => !item.discovered ? 'Inspect loose wall panel' : `${item.open ? 'Close' : 'Open'} secret passage`, action: () => {
       if (!item.discovered) { item.discovered = true; world.notify('A hidden passage is behind the wall.'); world.emit('secret-discovered', { id: spec.id, floor: spec.floor }); }
       item.open = !item.open; item.target = item.open ? spec.openAngle : 0; if (item.open) world.emit('secret-opened', { id: spec.id, floor: spec.floor });
     } });
@@ -228,7 +228,7 @@ export function createHotel({ THREE, scene, camera, materials: MAT, config: CONF
       if (entry.kind === 'call-button') {
         const callFloor = entry.callFloor;
         collections.interactables.push({
-          object: mesh, enabled: () => true,
+          object: mesh, fixtureId: `elevator-call-${callFloor}`, enabled: () => true,
           prompt: () => (elevator.elevator.currentFloor === callFloor && elevator.elevator.state === 'open' ? 'Elevator is here' : 'Call elevator'),
           action: () => elevator.call(callFloor),
         });

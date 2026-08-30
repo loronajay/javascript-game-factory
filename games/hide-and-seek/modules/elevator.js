@@ -80,7 +80,7 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
     for (let floorId = 1; floorId <= world.state.floorCount; floorId += 1) {
       const buttonGroup = new THREE.Group(); buttonGroup.position.set(1.105, 0.72 + (floorId - 1) * 0.35, -facing * 0.25); group.add(buttonGroup);
       buttonGroup.add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.23, 0.23), MAT.brass)); world.addNumberPlate(buttonGroup, String(floorId), -0.038, 0, 0, -Math.PI / 2, 0.17);
-      collections.interactables.push({ object: buttonGroup, enabled: () => !elevator.roundHeld && isPlayerInside() && elevator.state !== 'moving' && elevator.state !== 'closing', prompt: () => `Elevator button — Floor ${floorId}`, action: () => requestFloor(floorId) });
+      collections.interactables.push({ object: buttonGroup, fixtureId: `elevator-button-${floorId}`, enabled: () => !elevator.roundHeld && isPlayerInside() && elevator.state !== 'moving' && elevator.state !== 'closing', prompt: () => `Elevator button — Floor ${floorId}`, action: () => requestFloor(floorId) });
     }
     const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 128; elevator.indicatorCanvas = canvas; elevator.indicatorTexture = new THREE.CanvasTexture(canvas);
     const indicator = new THREE.Mesh(new THREE.PlaneGeometry(0.78, 0.32), new THREE.MeshBasicMaterial({ map: elevator.indicatorTexture })); indicator.position.set(0, 2.27, facing * 1.53); indicator.rotation.y = facing > 0 ? Math.PI : 0; group.add(indicator);

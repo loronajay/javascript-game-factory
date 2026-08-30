@@ -679,8 +679,19 @@ export function createMonster({
     if (world.state.remoteFixtures) return;
     if (world.state.gameOver) { if (mixer) advance(delta * 0.25); return; }
     if (inspectionMode) { if (mixer) { setAnimation(inspectionMotion === 'walk' ? walkAction : idleAction, 1); advance(delta); } updateHud(); return; }
-    updateAwareness(delta);
-    updateHunt();
+    // The head start belongs to the hiders. A dormant demon still patrols and is still worth
+    // avoiding, but it does not look, does not read the heat meter and cannot catch — the same rule
+    // `goDormant` applies on the authority, restated here because the solo round runs this brain
+    // rather than `sim-logic.js`. `modules/round.js` publishes the flag and gates its own catches.
+    const dormant = !!world.state.headStart;
+    if (dormant) {
+      if (awareness.state !== ENEMY_STATES.ROAM) { awareness = logic.createAwareness(); route = []; routePurpose = 'roam'; }
+      if (huntZone || huntTargetId) { huntZone = null; huntTargetId = null; heat?.setHunted(null); }
+      detectedTargetId = null;
+    } else {
+      updateAwareness(delta);
+      updateHunt();
+    }
     if (awareness.state === ENEMY_STATES.ROAM && !route.length) choosePatrol();
     if (awareness.state === ENEMY_STATES.SEARCH && !route.length && awareness.lastSeen) {
       const angle = Math.random() * Math.PI * 2; const radius = 2 + Math.random() * 3;
@@ -691,7 +702,7 @@ export function createMonster({
     if (mixer) { setAnimation(moving ? walkAction : idleAction, awareness.state === ENEMY_STATES.CHASE ? 1.85 : 1); advance(delta); }
     if (fallback) { const t = window.performance.now() * 0.001; fallback.position.y = Math.sin(t * 3.2) * 0.035; fallback.rotation.z = Math.sin(t * 1.7) * 0.018; }
     const playerFeetY = camera.position.y - player.getEyeHeight();
-    if (!world.state.playerEliminated && window.HotelDemon.caughtBy(
+    if (!dormant && !world.state.playerEliminated && window.HotelDemon.caughtBy(
       root.position, [{ id: 'local', x: camera.position.x, y: playerFeetY, z: camera.position.z }],
       { catchDistance: CONFIG.enemyCatchDistance, elevator: world.getPlan().elevator }, world.space,
     ).length) caught();

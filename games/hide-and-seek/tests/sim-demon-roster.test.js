@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const sim = require('../sim-logic.js');
 const maps = require('../map-catalog.js');
+const roundLogic = require('../round-logic.js');
 const fixture = require('./helpers/hotel-fixture.js');
 
 const PLAYERS = [
@@ -48,6 +49,9 @@ test('a third demon is a third catcher, not decoration', () => {
   const roster = maps.demonRosterFor('cinder-mall');
   const { engine } = fixture.createFullSim({ config: { demons: roster } });
   let state = engine.createState({ players: PLAYERS, seekerId: 'a' });
+  // Past the head start, during which no demon in any roster is allowed to catch — see
+  // `tests/head-start-grace.test.js`. This test is about the third demon, not about the phase.
+  state = { ...state, round: { ...state.round, hideRemaining: 0, phase: roundLogic.PHASES.SEEKING } };
   // Put the last demon in the roster on top of a hider. The round has to end for that player
   // through the same path the first demon uses; there is no "the first two are the real ones".
   const victim = state.bodies.find((entry) => entry.id === 'b');

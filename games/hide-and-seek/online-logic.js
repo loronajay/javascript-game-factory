@@ -216,7 +216,7 @@
 
   // What the client is trying to do. Deliberately the whole payload: there is no field here for
   // where the player thinks they are, because the server does not read one.
-  function describeInput({ forward = 0, strafe = 0, yaw = 0, crouch = false, sprint = false, light = false, interact = false } = {}) {
+  function describeInput({ forward = 0, strafe = 0, yaw = 0, crouch = false, sprint = false, light = false, interact = false, interactId = null } = {}) {
     return {
       forward: Math.max(-1, Math.min(1, Number(forward) || 0)),
       strafe: Math.max(-1, Math.min(1, Number(strafe) || 0)),
@@ -225,6 +225,10 @@
       sprint: !!sprint,
       light: !!light,
       interact: !!interact,
+      // Which fixture the crosshair was on. Only read on the rising edge of `interact`, and only as
+      // a preference — `sim-logic.readInput` bounds it and the authority re-tests reach on it — so it
+      // never needs a send of its own.
+      interactId: typeof interactId === 'string' && interactId ? interactId : null,
     };
   }
 

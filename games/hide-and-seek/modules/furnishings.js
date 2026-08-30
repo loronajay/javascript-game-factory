@@ -72,7 +72,7 @@ export function createFurnishings({ THREE, materials: MAT, world, keyLabelForFlo
     const item = { planId, root, drawer, face, open: false, searched: false, keyId, keyLabel: keyLabel || keyId, label, targetZ: -0.31, closedZ: -0.31, openZ: -0.83, keyMesh };
     collections.dynamicDrawers.push(item);
     if (planId) collections.drawersByPlanId.set(planId, item);
-    collections.interactables.push({ object: face, enabled: () => true, prompt: () => !item.open ? `Open ${item.label}` : !item.searched ? `Search ${item.label}` : `Close ${item.label}`, action: () => {
+    collections.interactables.push({ object: face, fixtureId: planId || null, enabled: () => true, prompt: () => !item.open ? `Open ${item.label}` : !item.searched ? `Search ${item.label}` : `Close ${item.label}`, action: () => {
       if (!item.open) { item.open = true; item.targetZ = item.openZ; return; }
       if (!item.searched) { item.searched = true; if (item.keyId) { world.addInventoryKey(item.keyId, item.keyLabel); item.keyMesh.visible = false; } else world.notify('Nothing useful in this drawer.'); world.emit('drawer-searched', { keyId: item.keyId || null, floor: world.getFloorId(root) }); return; }
       item.open = false; item.targetZ = item.closedZ;

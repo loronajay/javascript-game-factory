@@ -11,15 +11,22 @@ authoritative tick spawns whatever demons the row lists, the picker fills itself
 and matchmaking separates maps into pools. Register the classic script and server mirror imports
 as described below. No map-specific branch belongs in the renderer or CPU controllers.
 
-Four maps exist: **The Grand Hotel** (`hotel-plan.js`, four floors, two demons), **Cinder Mall**
-(`mall-plan.js`, two levels, three demons), and **Mercy Hospital** (`hospital-plan.js`, two floors,
-three demons), and **Crowne Point Cinema** (`cinema-plan.js` plus `cinema-navigation.js`, two floors,
-two demons). `status: 'soon'` is still a real state for the next map
-that is registered before it is built — a `soon` map shows in the picker as a locked card and can
-never be resolved into a round — there is just nothing sitting in it right now.
+Four maps exist:
+
+| Map | Plan | Shape | Demons |
+| --- | --- | --- | --- |
+| The Grand Hotel | `hotel-plan.js` | four floors | 2 |
+| Cinder Mall | `mall-plan.js` | two levels around an atrium | 3 |
+| Mercy Hospital | `hospital-plan.js` | two floors, fourteen departments | 3 |
+| Crowne Point Cinema | `cinema-plan.js` + `cinema-navigation.js` | two floors, six auditoriums | 2 |
+
+`status: 'soon'` is a real state for a map registered before it is built — it shows in the picker as
+a locked card and can never be resolved into a round. Nothing is sitting in it right now.
 
 Read `mall-plan.js` before writing another one. It preserves the Cinder Mall reference geometry
-while adding game-owned primary doors, master keys and a collision-checked aisle graph.
+while adding game-owned primary doors, master keys and a collision-checked aisle graph. The mall,
+hospital and cinema each adapt an untouched reference build in their `*-reference/` folder; leave
+those folders as they are.
 
 ---
 
@@ -31,7 +38,7 @@ while adding game-owned primary doors, master keys and a collision-checked aisle
 Object.freeze({
   id: 'cinder-mall',                 // lower-kebab; this is what a URL, a saved preference and a lobby setting carry
   name: 'Cinder Mall',
-  eyebrow: 'THREE LEVELS',
+  eyebrow: 'TWO LEVELS',
   blurb: 'A burnt-out shopping centre. Three of the staff are still on shift.',
   status: MAP_STATUS.READY,          // READY only once the plan below exists; SOON until then
   floorCount: 2,                     // how tall it is; nothing may assume the hotel's four
@@ -55,8 +62,6 @@ export on that module holding the floor definitions; pass `null` only for the ho
   `eyeColor` (the demon's fresnel rim and its eyes);
 - `statusElementId` is optional. The hotel's two have authored rows in `index.html`; anything without
   one gets a `#demonStatuses` row built for it at runtime.
-
-Cinder Mall's staff: **The Greeter** (the hunter), **The Custodian**, and **The Nightwatch**.
 
 Demons open **clear of each other by distance**, not one per floor. A floor each was arithmetic that
 only worked while the one map was four storeys deep with two demons in it; a map wider than it is
@@ -100,12 +105,13 @@ genuinely does not have (a mall with no secret passages returns `secretPanels: [
 | `secretPanels` | Same shape, `kind: 'secret'`, plus `hideWhenOpen`. |
 | `secretTunnels` | `{ id, kind: 'tunnel', floor, minX, maxX, minZ, maxZ }` — a zone that **drains** the heat meter. |
 | `roomCenters` | `{ roomNumber, floor, x, z, side }`. These become the heat meter's `room` zones and the demon's hunt targets. |
-| `furnishings` | Placements, not meshes: `{ id, type, floor, x, z, rotationY, y }`. `type` must be one the renderer knows (`bed`, `desk`, `couch`, `dresser`, `vending`, `plant`) or you must teach `modules/furnishings.js` to draw a new one. Ids must be stable — a drawer is contested state online. |
+| `furnishings` | Placements, not meshes: `{ id, type, floor, x, z, rotationY, y }`. `type` must be one `modules/furnishings.js` knows — read the dispatch at the bottom of that file for the current list, and teach it a new one rather than approximating with an existing shape. Ids must be stable: a drawer is contested state online. |
 | `hallDoors` | The lift's hall doors. |
 | `signs`, `doorFrames`, `wallLamps`, `lights`, `fixtures` | Presentation the renderer draws. `lights` are the point-light pool; `fixtures` include the per-room fill. |
 | `stairs` | `{ treads, rails }` for the continuous stairwell. |
 | `spawns` | `{ seeker: { floor, x, y, z }, hiders: [ …the same ] }`. Hider spawns must be places a body can actually stand, and there should be one per lobby seat (8). |
-| `elevator` | `{ centerX, centerZ, frontZ, halfWidth, halfDepth, floors }`. **The cabin's near face must be the low-Z one** (`frontZ < centerZ`) — the whole engine assumes it, and one building disagreeing is a lift whose doors open inside its own shaft. |
+| `spawns.flashlights` | Candidate floor pickups: `{ id, label, floor, x, y, z }`. Use stable unique IDs and meaningful location labels. Author clear, reachable floor beside furnishings, never inside props or door swings. The round owner selects half the candidates per floor and assigns 35–65% charge; online only the server samples them. Include at least four candidates per floor. |
+| `elevator` | `{ centerX, centerZ, frontZ, halfWidth, halfDepth, floors }`. **The sign of `frontZ - centerZ` owns which way the cabin opens** — the hotel and the hospital face -Z, the mall faces +Z. Everything downstream derives facing from it, so state it correctly rather than assuming either sign. |
 | `navigation` | How a demon gets around. See below — this is the one that decides whether the AI can play your map at all. |
 
 The quickest way to get the shape exactly right is to print one:
@@ -156,9 +162,10 @@ Rules the tests enforce:
 An empty graph is legal and means "walk straight at it", which is the right answer for a single open
 room and the wrong one for anything with walls.
 
-The original hotel spine predates room-entry graph nodes and explicitly declares `corridorSweep`
-for its legacy seeker doglegs. New maps should supply complete graphs and omit this compatibility
-field. Camera/physics initialization and solo CPU seats now come from the plan's `spawns`.
+The hotel's spine predates room-entry graph nodes and still declares `corridorSweep` for its legacy
+seeker doglegs. **A new map supplies a complete graph and omits that field.** Camera and physics
+initialization and the solo CPU seats all come from the plan's `spawns`, so a map that authors them
+badly puts a body inside a wall on the first frame.
 
 Low tiered surfaces (as in Crowne Point's seating) must be within the ground-snap range of their
 floor datum. `planFloorRoute` samples `space.groundAt` for every unguided waypoint, including the

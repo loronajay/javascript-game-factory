@@ -72,7 +72,7 @@ const player = createPlayer({
   config: CONFIG, floorY, world, elevator, controls: window.HotelControls, movement: window.HotelMovement, flashlight: window.HotelFlashlight, flashlightConfig: FLASHLIGHT_CONFIG,
   performance: window.HotelPerformance, menu, stamina, document, window,
 });
-const flashlightDrops = createFlashlightPickups({ THREE, scene: rendering.scene, world, player });
+const flashlightDrops = createFlashlightPickups({ THREE, scene: rendering.scene, world, player, logic: window.HotelFlashlight });
 const soundtrack = inspectionView ? null : window.HotelMusic.createSoundtrack({ eventTarget: window });
 const soundEffects = inspectionView ? null : window.HotelMusic.createSoundEffects({ eventTarget: window });
 const heat = inspectionView ? null : createHeat({ camera: rendering.camera, world, logic: window.HotelHeat, config: HEAT_CONFIG, document });

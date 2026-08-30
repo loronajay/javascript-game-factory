@@ -92,13 +92,18 @@ const FAR = { id: 'hider-2', x: 40, y: 0, z: 40, floor: 1 };
 test('solo demon catches respect an open elevator and walls for both CPU roles', async () => {
   for (const localRole of ['seeker', 'hider']) {
     const target = { id: 'hider-1', x: 0, y: 0, z: 0, floor: 1 };
-    const setup = harness({ localRole, hiders: [target, FAR], aiSeeker: localRole === 'hider' ? target : null,
+    // The AI seeker stands well clear: this is about what stops a *demon*, and now that the tag and
+    // the catch are both live from the same tick, a seeker parked on the target would decide it.
+    const setup = harness({ localRole, hiders: [target, FAR], aiSeeker: localRole === 'hider' ? { x: -80, y: 0, z: -80, floor: 1 } : null,
       demon: { ...target, z: -0.6 }, seeker: { x: 100, y: 0, z: 100 } });
     setup.deps.world.getPlan = () => ({ elevator: { centerX: 0, centerZ: 1, frontZ: -.2 } });
     const round = await createRound(setup);
-    round.update(1 / 60);
+    // Past the head start, during which no demon catches anybody at all — otherwise this asserts
+    // against the grace rather than against the cabin and the wall.
+    round.update(45);
+    assert.equal(round.getState().phase, logic.PHASES.SEEKING);
     assert.equal(round.getState().over, false);
-    assert.equal(setup.alive.has('hider-1'), true);
+    assert.equal(setup.alive.has('hider-1'), true, 'the cabin is cover against a demon');
     setup.deps.world.getPlan = () => ({ elevator: null });
     setup.deps.world.sightBlocked = () => true;
     round.update(1 / 60);
@@ -195,13 +200,25 @@ test('the demon takes a hider it walks into, and that still counts for the seeke
   assert.deepEqual(view.caught, [{ id: 'hider-1', by: logic.CAUGHT_BY.DEMON }]);
 });
 
-test('the Bellhop can take a hider during the hiding phase', async () => {
+// This used to assert the opposite, and it was the single worst thing about a small round: a guest
+// still looking for somewhere to hide could be taken before the seeker's cabin ever opened, and with
+// one hider that ended the match while the seeker was still shut in a box. The demons walk during
+// the head start; they do not hunt. See `tests/head-start-grace.test.js` for the authority's half.
+test('a demon standing on a hider takes nobody during the head start, and takes them the moment it ends', async () => {
   const setup = harness({ hiders: [{ id: 'hider-1', x: 20, y: 0, z: 20, floor: 1 }, FAR], demon: { x: 20.5, y: 0, z: 20, floor: 1 } });
   const round = await createRound(setup);
 
   round.update(1);
 
   assert.equal(round.getState().phase, logic.PHASES.HIDING);
+  assert.equal(setup.state.headStart, true);
+  assert.equal(round.getState().hidersRemaining, 2, 'the head start is not a death sentence');
+  assert.ok(setup.alive.has('hider-1'));
+
+  round.update(45);
+
+  assert.equal(round.getState().phase, logic.PHASES.SEEKING);
+  assert.equal(setup.state.headStart, false);
   assert.equal(round.getState().hidersRemaining, 1);
   assert.ok(!setup.alive.has('hider-1'));
   assert.deepEqual(round.getState().caught, [{ id: 'hider-1', by: logic.CAUGHT_BY.DEMON }]);
@@ -217,7 +234,7 @@ test('either named demon can take a hider', async () => {
   });
   const round = await createRound(setup);
 
-  round.update(1);
+  round.update(45);
 
   assert.equal(round.getState().hidersRemaining, 1);
   assert.ok(setup.events.some((entry) => entry.name === 'demon-catch' && entry.detail.demon === 'The Housekeeper'));
@@ -228,7 +245,7 @@ test('a caught player leaves their remaining flashlight charge at the catch posi
   const setup = harness({ hiders: [hider, FAR], demon: { x: 20.4, y: 4.6, z: 20, floor: 2 } });
   const round = await createRound(setup);
 
-  round.update(1);
+  round.update(45);
 
   assert.deepEqual(setup.drops, [{ playerId: 'hider-1', x: 20, y: 4.6, z: 20, floor: 2, charge: 0.4 }]);
 });

@@ -26,6 +26,9 @@ export function createRound({ camera, world, player, elevator, hiders, seeker = 
   world.state.localRole = localRole;
   world.state.playerEliminated = false;
   world.state.seekerHeld = localIsSeeker && state.phase === logic.PHASES.HIDING;
+  // Read by `modules/monster.js`, which runs the solo round's demon brains rather than the
+  // authoritative tick. One flag, so the two paths cannot disagree about when the hunt begins.
+  world.state.headStart = state.phase === logic.PHASES.HIDING;
   if (state.phase === logic.PHASES.HIDING) {
     elevator.holdSeeker(localIsSeeker ? undefined : { moveCamera: false });
     seeker?.setHeld(true);
@@ -206,9 +209,12 @@ export function createRound({ camera, world, player, elevator, hiders, seeker = 
         ...hiders.list().map((entry) => ({ ...entry, role: logic.ROLES.HIDER, alive: true })),
       ]);
     }
-    // Demons hunt throughout the whole active round. Only the seeker's own tag remains gated behind
-    // the head start, so guests can be taken while they are still trying to reach a hiding place.
-    resolveDemonCatches();
+    // Neither threat is live during the head start. A guest looking for a hiding place in the first
+    // forty-five seconds has nothing to go on — no seeker to hear, no idea which corridor is walked —
+    // so being taken then was not a mistake they could have avoided, and in a small round it ended
+    // the match before the seeker's cabin ever opened. The demons still walk; they simply do not hunt.
+    world.state.headStart = state.phase === logic.PHASES.HIDING;
+    if (!world.state.headStart) resolveDemonCatches();
     if (state.phase === logic.PHASES.SEEKING && state.status === logic.ROUND_STATES.ACTIVE) resolveSeekerTags();
     // The head start is a rule, not a caption: the seeker looks around but does not walk.
     world.state.seekerHeld = localIsSeeker && state.phase === logic.PHASES.HIDING;

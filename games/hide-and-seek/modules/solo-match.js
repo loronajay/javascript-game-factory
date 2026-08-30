@@ -8,6 +8,7 @@ export function createSoloMatch({ THREE, camera, config, roundConfig, hiderConfi
   const match = { ...roundConfig, ...options };
   const localIsHider = match.role === 'hider';
   const plan = world.getPlan();
+  flashlightDrops?.spawnFloorPickups(plan);
   if (localIsHider) {
     const spawn = plan.spawns.hiders[0];
     placeAtMapSpawn({ camera, world, spawn, eyeHeight: config.eyeHeight });
