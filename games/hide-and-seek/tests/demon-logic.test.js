@@ -113,6 +113,40 @@ test('a demon that can see a player chases, and loses the trail behind a wall', 
   assert.equal(demon.awareness.targetId, null);
 });
 
+test('a chasing demon keeps spatial awareness of a nearby target outside its forward cone', () => {
+  const harness = context({
+    space: {
+      groundAt: () => 0,
+      blocked: () => false,
+      sightBlocked: () => false,
+    },
+    ctx: { rooms: [] },
+  });
+  let demon = demonLogic.createDemon({ id: 'bellhop', spawn: { x: 0, y: 0, z: 0, floor: 1 } });
+  demon = {
+    ...demon,
+    facingX: 0,
+    facingZ: 1,
+    awareness: {
+      ...enemy.createAwareness(),
+      state: enemy.ENEMY_STATES.CHASE,
+      targetId: 'ana',
+      lastSeen: { x: 0, y: 0, z: -6, floor: 1, crouching: false, inStairwell: false },
+      searchRemaining: 9,
+      pursuitRemaining: 5.5,
+    },
+    route: [{ x: 0, y: 0, z: 3, floor: 1, guided: false }],
+    routePurpose: 'chase',
+    detectionCooldown: 0,
+  };
+  harness.ctx.candidates = [{ id: 'ana', x: 0, y: 0, z: -6, floor: 1, crouching: false }];
+
+  demon = demonLogic.tickDemon(demon, TICK, harness.ctx);
+
+  assert.equal(demon.awareness.state, enemy.ENEMY_STATES.CHASE, 'turning to navigate must not erase an active nearby chase');
+  assert.equal(demon.detectedTargetId, 'ana');
+});
+
 test('a chasing demon asks to force open a door blocking its next step', () => {
   const openedAhead = [];
   const harness = context({

@@ -85,8 +85,16 @@ export function createMenu({ logic, document, window, onPlay, onStartSingle, onS
     dispatch(button.dataset.menu);
   });
   for (const input of [hiderInput, hideInput, roleInput]) input?.addEventListener('input', renderMatchConfig);
+  // The end-of-round overlay sits above the menu at its own z-index, so a pause menu behind it is
+  // unreachable. Single player must always have a way out: Esc (and an explicit button) on that
+  // screen quits to the title rather than doing nothing.
+  const caughtOverlay = document.getElementById('caughtOverlay');
+  const caughtQuit = document.getElementById('caughtQuitBtn');
+  caughtQuit?.addEventListener('click', () => dispatch(logic.ACTIONS.QUIT));
   window.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && [logic.SCREENS.SOLO_SETUP, logic.SCREENS.ONLINE, logic.SCREENS.HOW_TO, logic.SCREENS.EXTRAS].includes(state.screen)) dispatch(logic.ACTIONS.BACK);
+    if (event.key !== 'Escape') return;
+    if (caughtOverlay && caughtOverlay.classList.contains('visible')) { dispatch(logic.ACTIONS.QUIT); return; }
+    if ([logic.SCREENS.SOLO_SETUP, logic.SCREENS.ONLINE, logic.SCREENS.HOW_TO, logic.SCREENS.EXTRAS].includes(state.screen)) dispatch(logic.ACTIONS.BACK);
   });
   window.addEventListener('hotel:caught', () => dispatch(logic.ACTIONS.CAUGHT));
 

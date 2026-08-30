@@ -33,3 +33,18 @@ test('the seeker remembers a sighting briefly, then resumes searching', () => {
   assert.equal(state.mode, seeker.SEEKER_STATES.PATROLLING);
   assert.equal(state.targetId, null);
 });
+
+test('a room-to-room sweep exits the current room before crossing the hall', () => {
+  const route = seeker.createSweepRoute({
+    hunter: { x: -8, y: 0, z: 10, floor: 1 },
+    target: { x: 8, y: 0, z: 30, floor: 1 },
+  });
+
+  assert.deepEqual(route, [
+    { x: -3.75, y: 0, z: 10, floor: 1, guided: false },
+    { x: 0, y: 0, z: 10, floor: 1, guided: false },
+    { x: 0, y: 0, z: 30, floor: 1, guided: false },
+    { x: 3.75, y: 0, z: 30, floor: 1, guided: false },
+    { x: 8, y: 0, z: 30, floor: 1, guided: false },
+  ]);
+});

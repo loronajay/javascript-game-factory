@@ -43,5 +43,35 @@
     return createSeekerState();
   }
 
-  return { SEEKER_DEFAULTS, SEEKER_STATES, canSee, createSeekerState, selectVisibleHider, updateSeeker };
+  // A sweep route has to leave the room the seeker is currently standing in before it can aim at
+  // the next corridor/stair waypoint. Without this egress dogleg, every new room target points
+  // through the bedroom wall; the mover discards the blocked legs and the seeker looks like it has
+  // chosen that room as a hiding place of its own.
+  function createSweepRoute({ hunter, target, interFloorRoute = [], roomThreshold = 4.25, doorwayX = 3.75 } = {}) {
+    if (!hunter || !target) return [];
+    const fromFloor = hunter.floor || 1;
+    const toFloor = target.floor || fromFloor;
+    const fromY = Number.isFinite(hunter.y) ? hunter.y : 0;
+    const toY = Number.isFinite(target.y) ? target.y : fromY;
+    const route = [];
+    const push = (point) => {
+      const previous = route.at(-1);
+      if (!previous || Math.hypot(previous.x - point.x, previous.y - point.y, previous.z - point.z) > 0.025) route.push(point);
+    };
+    const point = (x, y, z, floor) => ({ x, y, z, floor, guided: false });
+
+    if (Math.abs(hunter.x) > roomThreshold) {
+      push(point(Math.sign(hunter.x) * doorwayX, fromY, hunter.z, fromFloor));
+      push(point(0, fromY, hunter.z, fromFloor));
+    }
+    for (const waypoint of interFloorRoute) push({ ...waypoint });
+    if (Math.abs(target.x) > roomThreshold) {
+      push(point(0, toY, target.z, toFloor));
+      push(point(Math.sign(target.x) * doorwayX, toY, target.z, toFloor));
+    }
+    push(point(target.x, toY, target.z, toFloor));
+    return route;
+  }
+
+  return { SEEKER_DEFAULTS, SEEKER_STATES, canSee, createSeekerState, createSweepRoute, selectVisibleHider, updateSeeker };
 });

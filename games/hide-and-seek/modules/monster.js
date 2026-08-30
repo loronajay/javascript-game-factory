@@ -560,7 +560,20 @@ export function createMonster({
     if (detectionCooldown > 0) return;
     detectionCooldown = 0.085;
     const candidates = playerCandidates();
-    const visible = visiblePlayer(candidates);
+    let visible = visiblePlayer(candidates);
+    // Acquiring a target still requires the forward vision cone. During an active chase, however,
+    // a nearby target with clear line of sight remains spatially tracked while the demon turns its
+    // body through a doorway or around a route waypoint.
+    if (!visible && awareness.state === ENEMY_STATES.CHASE && awareness.targetId) {
+      const tracked = candidates.find((candidate) => candidate.id === awareness.targetId);
+      if (tracked && logic.canDetectPlayer({
+        enemy: { x: root.position.x, y: root.position.y, z: root.position.z, facingX: facing.x, facingZ: facing.z },
+        player: tracked,
+        occluded: rayIsBlocked(tracked),
+        maxDistance: CONFIG.chaseAwarenessDistance,
+        fieldOfView: Math.PI * 2,
+      })) visible = tracked;
+    }
     detectedTargetId = visible ? visible.id : null;
     const playerPosition = visible ? { ...visible, inStairwell: isInStairwell(visible) } : null;
     const remembered = !visible && awareness.targetId ? candidates.find((candidate) => candidate.id === awareness.targetId) : null;

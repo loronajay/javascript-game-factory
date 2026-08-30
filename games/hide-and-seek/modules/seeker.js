@@ -19,12 +19,12 @@ export function createSeeker({ THREE, config: CONFIG, tuning, floorY, layout, wo
   function describe() { return { id, name: 'The Seeker', role: 'seeker', alive, x: position.x, y: position.y, z: position.z, floor: floor(), yaw, crouching: false, flashlightOn: true, flashlightCharge: 1, state: state.mode }; }
   function planRoute(target) {
     const fromFloor = floor(); const toFloor = target.floor || fromFloor;
-    route = fromFloor === toFloor ? [] : enemyLogic.createStairRoute({ fromFloor, toFloor, floorHeight: CONFIG.floorHeight, stairLayout });
-    if (Math.abs(target.x) > 4.25) {
-      route.push({ x: 0, y: floorY(toFloor), z: target.z, floor: toFloor, guided: false });
-      route.push({ x: Math.sign(target.x) * 3.75, y: floorY(toFloor), z: target.z, floor: toFloor, guided: false });
-    }
-    route.push({ x: target.x, y: target.y ?? floorY(toFloor), z: target.z, floor: toFloor, guided: false });
+    const interFloorRoute = fromFloor === toFloor ? [] : enemyLogic.createStairRoute({ fromFloor, toFloor, floorHeight: CONFIG.floorHeight, stairLayout });
+    route = logic.createSweepRoute({
+      hunter: describe(),
+      target: { ...target, y: target.y ?? floorY(toFloor), floor: toFloor },
+      interFloorRoute,
+    });
   }
   function patrol() {
     const rooms = [...world.collections.roomCenters.entries()].filter(([number]) => !world.collections.roomDoors.get(number)?.locked);
