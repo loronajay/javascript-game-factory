@@ -97,6 +97,28 @@ test('the demons can route to every store, on either level', () => {
   }
 });
 
+test('a routed body can physically reach every shop from the concourse', () => {
+  const movement = require('../movement-logic.js');
+  const space = fixture.createSpace(mall, Object.fromEntries(mall.swingDoors.map(d => [d.id, d.openAngle])));
+  const navigator = enemy.createNavigator(mall.navigation);
+  for (const room of mall.roomCenters) {
+    let body = { x: 0, z: -18, y: 0 };
+    const route = navigator.planFloorRoute({ from: body, target: room, fromFloor: 1, toFloor: room.floor, floorHeight: fixture.CONFIG.floorHeight });
+    for (const target of route) {
+      let arrived = false;
+      for (let i = 0; i < 1600; i++) {
+        const next = movement.stepToward(space, { radius: 0.34, height: 1.78 }, body, target,
+          { speed: 4, delta: 1 / 30, arriveRadius: 0.03, guided: target.guided });
+        body = next;
+        if (next.arrived) { arrived = true; break; }
+        if (next.blocked) break;
+      }
+      assert.ok(arrived, `${room.roomNumber}: stuck en route to ${target.x}, ${target.z} from ${body.x}, ${body.z}`);
+    }
+    assert.ok(Math.hypot(body.x - room.x, body.z - room.z) < 0.05);
+  }
+});
+
 test('the navigation graph is one connected loop per level, not islands', () => {
   const byFloor = new Map();
   for (const node of mall.navigation.nodes) {
@@ -164,10 +186,130 @@ test('a whole round ticks in the mall with no renderer in the process', () => {
 
 test('the mall carries its own lift, and it opens toward the concourse', () => {
   assert.deepEqual(mall.elevator.floors, [1, 2]);
-  // Every building in this engine has its cabin's near face on the low-Z side. One map disagreeing
-  // is a lift whose doors open inside its own shaft.
-  assert.ok(mall.elevator.frontZ < mall.elevator.centerZ, 'the mall lift must open toward -Z');
+  assert.equal(mall.elevator.centerX, 34);
+  assert.equal(mall.elevator.centerZ, -29);
+  assert.equal(mall.elevator.frontZ, -26.9, 'the reference lift opens north into the south concourse');
   assert.equal(mall.hallDoors.length, 4, 'two leaves per level');
+});
+
+test('reference shopfronts are glazed, with all twenty public openings intact', () => {
+  assert.equal(mall.storeEntries.length, 20);
+  assert.ok(mall.boxes.filter(box => box.material === 'glass' && box.collider).length >= 20);
+  const openings = Object.fromEntries(mall.swingDoors.map(door => [door.id, door.openAngle]));
+  const space = fixture.createSpace(mall, openings);
+  for (const entry of mall.storeEntries) {
+    for (const lateral of [-0.42, 0, 0.42]) {
+      for (let distance = -1.8; distance <= 0.9; distance += 0.2) {
+        const x = entry.axis === 'x' ? entry.center + lateral : entry.fixed + entry.outward * distance;
+        const z = entry.axis === 'x' ? entry.fixed + entry.outward * distance : entry.center + lateral;
+        const y = fixture.floorY(entry.floor);
+        assert.equal(space.groundAt(x, z, y), y, `${entry.name}: missing threshold`);
+        assert.equal(space.blocked(x, z, y), false, `${entry.name}: blocked entrance ${entry.center} at ${x}, ${z}`);
+      }
+    }
+  }
+});
+
+test('each vertical route exits on its own landing without doubling back or visiting hotel coordinates', () => {
+  for (const connector of mall.navigation.connectors) for (const [fromFloor, toFloor] of [[1, 2], [2, 1]]) {
+    const route = enemy.createStairRoute({ fromFloor, toFloor, floorHeight: fixture.CONFIG.floorHeight,
+      stairLayout: connector.layout, approach: connector.approach, approaches: connector.approaches });
+    assert.ok(route.every(p => Math.abs(p.z) <= 36), `${connector.id} routed out of the mall`);
+    const sign = toFloor > fromFloor ? 1 : -1;
+    for (let i = 1; i < route.length; i++) assert.ok((route[i].y - route[i - 1].y) * sign >= 0, 'a straight escalator doubles back');
+    const end = connector.approaches?.[toFloor] || connector.approach;
+    assert.deepEqual({ x: route.at(-1).x, z: route.at(-1).z }, end);
+  }
+});
+
+test('a demon can pursue a player halfway up either escalator without a missing second flight', () => {
+  const connector = mall.navigation.connectors.find(c => c.id === 'escalators');
+  const route = enemy.createStairPursuitRoute({
+    enemy: { x: 2, z: 8.5, y: 0, floor: 1 }, target: { x: 2, z: -2, y: fixture.floorY(2) / 2 },
+    floorHeight: fixture.CONFIG.floorHeight, stairLayout: connector.layout, approach: connector.approach,
+  });
+  assert.ok(route.length > 1);
+  assert.equal(route[0].x, 2);
+  assert.ok(route.every(p => Number.isFinite(p.y) && p.y <= fixture.floorY(2) / 2));
+});
+
+test('inspection views are authored by the map and stand in clear playable spaces', () => {
+  const space = fixture.createSpace(mall, Object.fromEntries(mall.swingDoors.map(d => [d.id, d.openAngle])));
+  for (const view of Object.values(mall.inspectionViews)) {
+    const feet = view.y - 1.62;
+    assert.equal(space.groundAt(view.x, view.z, feet), feet);
+    assert.equal(space.blocked(view.x, view.z, feet), false);
+  }
+});
+
+test('a shop uses its actual bounds for sanity without filling the concourse outside its glass', () => {
+  const sanity = require('../sanity-logic.js');
+  const zones = mall.roomCenters.map(room => ({ ...room, id: room.roomNumber, kind: 'room' }));
+  assert.deepEqual(sanity.locateZone(zones, { floor: 1, x: -36, z: -15 }), { id: '101', kind: 'room' });
+  assert.equal(sanity.locateZone(zones, { floor: 1, x: -23, z: 8 }).kind, 'hallway');
+});
+
+test('the atrium has no low ceiling, and the fountain and shop-specific interiors match the reference', () => {
+  assert.equal(mall.boxes.some(b => b.kind === 'ceiling' && b.floor === 1
+    && Math.abs(b.x) < b.w / 2 && Math.abs(b.z) < b.d / 2), false);
+  const count = type => mall.furnishings.filter(p => p.type === type).length;
+  assert.equal(count('fountain'), 1);
+  assert.equal(count('rack'), 12);
+  assert.equal(count('table'), 6);
+  assert.equal(count('arcade'), 15);
+  assert.equal(count('display-bed'), 4);
+  assert.equal(count('toy-display'), 4);
+  assert.equal(count('bookcase'), 4);
+  assert.equal(count('cinema-seat'), 30);
+  assert.equal(count('cinema-screen'), 2);
+  assert.equal(count('bed'), 0, 'hotel beds do not belong in the shops');
+  assert.equal(mall.stairs.treads.filter(t => t.rotationX && t.material === 'metal').length, 2, 'escalators need solid inclined decks');
+  assert.ok(mall.boxes.filter(b => b.kind === 'slab' && b.floor === 1 && b.material === 'carpetRed').every(b => b.localY + b.h / 2 > 0), 'shop floor finishes must not z-fight the concourse slab');
+});
+
+test('furniture is solid and every authored navigation edge is walkable', () => {
+  const openings = Object.fromEntries(mall.swingDoors.map(door => [door.id, door.openAngle]));
+  const space = fixture.createSpace(mall, openings);
+  for (const type of ['rack', 'arcade', 'bookcase', 'cinema-seat', 'table', 'fountain']) {
+    const p = mall.furnishings.find(p => p.type === type);
+    assert.ok(p, `missing ${type}`);
+    assert.equal(space.blocked(p.x, p.z, p.y), true, `${type} is only scenery`);
+  }
+  const nodes = new Map(mall.navigation.nodes.map(n => [n.id, n]));
+  for (const [a, b] of mall.navigation.edges) {
+    const from = nodes.get(a), to = nodes.get(b);
+    const steps = Math.ceil(Math.hypot(to.x - from.x, to.z - from.z) / 0.2);
+    for (let i = 0; i <= steps; i++) {
+      const t = steps ? i / steps : 0;
+      const x = from.x + (to.x - from.x) * t, z = from.z + (to.z - from.z) * t;
+      const y = fixture.floorY(from.floor);
+      assert.equal(space.blocked(x, z, y), false, `${a} -> ${b} crosses a solid at ${x}, ${z}`);
+      assert.equal(space.groundAt(x, z, y), y, `${a} -> ${b} crosses a void or ramp`);
+    }
+  }
+  for (const p of [...mall.roomCenters, ...mall.navigation.spawnNodes]) {
+    assert.equal(space.blocked(p.x, p.z, fixture.floorY(p.floor)), false, `target/spawn obstructed at ${p.x}, ${p.z}`);
+  }
+});
+
+test('the cinema projection refuge is inside the shell and reachable from both auditoriums', () => {
+  const tunnel = mall.secretTunnels.find(t => t.floor === 2);
+  assert.deepEqual([tunnel.minX, tunnel.maxX, tunnel.minZ, tunnel.maxZ], [20.2, 37.8, 31.7, 35]);
+  const space = fixture.createSpace(mall);
+  for (const x of [23, 32, 36.7]) for (let z = 31.2; z <= 34.2; z += 0.2) {
+    assert.equal(space.groundAt(x, z, fixture.floorY(2)), fixture.floorY(2));
+    assert.equal(space.blocked(x, z, fixture.floorY(2)), false, `projection entrance ${x} blocked at ${z}`);
+  }
+});
+
+test('lift call buttons, upper shaft opening and sill are part of the plan', () => {
+  assert.equal(mall.boxes.filter(b => b.kind === 'call-button').length, 2);
+  const space = fixture.createSpace(mall, Object.fromEntries(mall.hallDoors.map(d => [d.id, 1])));
+  assert.equal(space.groundAt(34, -29, fixture.floorY(2)), null, 'upper shaft must not be filled by a slab');
+  for (const floor of [1, 2]) for (let z = -26.4; z >= -27.45; z -= 0.1) {
+    assert.equal(space.groundAt(34, z, fixture.floorY(floor)), fixture.floorY(floor), `lift sill missing on ${floor} at ${z}`);
+    assert.equal(space.blocked(34, z, fixture.floorY(floor)), false);
+  }
 });
 
 test('the service corridors drain sanity, and the stores fill it', () => {

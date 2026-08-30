@@ -479,6 +479,7 @@ export function createMonster({
         target,
         floorHeight: CONFIG.floorHeight,
         stairLayout: connector.layout,
+        approach: connector.approach, approaches: connector.approaches,
       }) : [];
     } else {
       route = navigator.planFloorRoute({

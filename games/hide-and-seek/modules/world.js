@@ -37,7 +37,7 @@ export function createWorld({ THREE, scene, materials: MAT, config: CONFIG, layo
     doorCount = staticCount;
     openingsDirty = true;
     for (const tunnel of plan.secretTunnels) collections.secretTunnels.push(tunnel);
-    for (const centre of plan.roomCenters) collections.roomCenters.set(centre.roomNumber, { floor: centre.floor, x: centre.x, z: centre.z, side: centre.side });
+    for (const centre of plan.roomCenters) collections.roomCenters.set(centre.roomNumber, { ...centre });
   }
   function setOpening(id, value) {
     if (openings[id] === value) return;

@@ -17,8 +17,8 @@ Two maps exist: **The Grand Hotel** (`hotel-plan.js`, four floors, two demons) a
 that is registered before it is built — a `soon` map shows in the picker as a locked card and can
 never be resolved into a round — there is just nothing sitting in it right now.
 
-Read `mall-plan.js` before writing a third one. It is the worked example, and its header records the
-three places it deliberately departs from the prototype it was grown out of.
+Read `mall-plan.js` before writing a third one. It preserves the Cinder Mall reference geometry
+while adding game-owned primary doors, master keys and a collision-checked aisle graph.
 
 ---
 
@@ -125,6 +125,7 @@ navigation: {
   connectors: [{                  // the ways up. A map may have several; the nearest serving both floors wins.
     id, kind: 'stair', floors: [1, 2],
     approach: { x, z },           // the hall point outside its door
+    approaches: { 1: { x, z }, 2: { x, z } }, // optional per-floor endpoints, e.g. an escalator
     layout: { entrances, landings, flights },   // the shape `enemy-logic.createStairRoute` walks
     shell: { bounds: { xWest, xEast, zMin, zMax } },  // "is a body on the stairs"
   }],
@@ -159,6 +160,15 @@ room and the wrong one for anything with walls.
 - **Materials are named, and the names come from `modules/rendering.js`.** `floor1`..`floor4`, `wall`,
   `ceiling`, `wood`, `brass`, `dark`, `darker`, `metal`, `accent`, `linen`, `bed`, `green`, `shade`,
   `black`, `redLight`, `elevatorInterior`. A name that is not in there silently falls back to `wall`.
+  The mall also uses `tile`, `carpetRed`, `service`, `glass`, `upholstery`, `red` and `screen`.
+- **A lift can face either way along Z.** The sign of `frontZ - centerZ` owns its facing. Do not
+  assume that a cabin's front always has the smaller Z coordinate.
+- **A shop's hunt target is not its boundary.** Rooms may carry `minX`, `maxX`, `minZ`, `maxZ`
+  alongside a clear `x,z` aisle target; sanity uses the bounds while navigation uses the target.
+- **Stair visuals can specify `material` and `rotationX`.** Inclined escalator decks and metal
+  treads still batch by material. A missing material retains the hotel's wooden stair default.
+- **Optional `inspectionViews` belong to the plan.** Named `{ x, y, z, yaw, pitch }` views can be
+  opened with `?map=<id>&inspect=<name>` for repeatable browser QA without changing a live round.
 - **A room with no door is treated as locked**, so no demon ever patrols into it. Every `roomCenters`
   entry needs a `roomDoors` entry, even one that starts open.
 

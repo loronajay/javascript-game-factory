@@ -1,6 +1,20 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+test('mall furniture collision includes seats, stool footprints and scaled crates', () => {
+  const geometry = require('../collision-logic.js');
+  const table = geometry.furnishingColliders({ type: 'table' });
+  assert.ok(table.some(b => b.x === 1.05 && b.w === 0.68));
+  assert.ok(geometry.furnishingColliders({ type: 'cinema-seat' }).some(b => b.y + b.h / 2 >= 1.34));
+  assert.equal(geometry.furnishingColliders({ type: 'crate', scale: 0.8 })[0].w, 0.8);
+  for (const facing of [-1, 1]) {
+    const shaft = { centerX: 34, centerZ: -29, frontZ: -29 + facing * 2.1 };
+    assert.equal(geometry.elevatorFacing(shaft), facing);
+    assert.equal(geometry.inCabinFootprint({ x: 34, z: -29 + facing }, shaft), true);
+    assert.equal(geometry.inCabinFootprint({ x: 34, z: -29 - facing * 2 }, shaft), false);
+  }
+});
+
 const collision = require('../collision-logic.js');
 
 test('box collider data is plain and accounts for a rotated footprint', () => {

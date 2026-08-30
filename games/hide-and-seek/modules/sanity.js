@@ -21,7 +21,7 @@ export function createSanity({ camera, world, logic, config, document }) {
     const { roomCenters, secretTunnels } = world.collections;
     if (zones.length !== roomCenters.size + secretTunnels.length) {
       zones = [
-        ...[...roomCenters.entries()].map(([id, room]) => ({ id, kind: logic.ZONE_KINDS.ROOM, floor: room.floor, x: room.x, z: room.z })),
+        ...[...roomCenters.entries()].map(([id, room]) => ({ ...room, id, kind: logic.ZONE_KINDS.ROOM })),
         ...secretTunnels,
       ];
     }

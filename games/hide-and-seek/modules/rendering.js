@@ -44,6 +44,30 @@ function createMaterials(THREE, renderer, document) {
     for (let i = 0; i < 18; i += 1) { const y = i * 14 + Math.random() * 6; ctx.strokeStyle = `rgba(48,23,13,${0.12 + Math.random() * 0.14})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, y); ctx.bezierCurveTo(w * 0.3, y + 8, w * 0.7, y - 8, w, y + 3); ctx.stroke(); }
   });
 
+  // --- the mall's own surfaces ------------------------------------------------------------------
+  //
+  // A hotel's palette is four carpets and a papered wall, which is why Cinder Mall's first pass read
+  // as a hotel with the walls moved: a tiled concourse, a service-corridor screed and a glazed
+  // shopfront had nowhere to come from. These are the prototype's own textures, kept as textures
+  // rather than as flat colours so a 96m concourse has something for the flashlight to catch.
+  const mallTile = makeCanvasTexture(THREE, renderer, document, (ctx, w, h) => {
+    ctx.fillStyle = '#6c675e'; ctx.fillRect(0, 0, w, h); ctx.strokeStyle = 'rgba(25,20,18,.3)'; ctx.lineWidth = 3;
+    for (let q = 0; q <= w; q += 32) {
+      ctx.beginPath(); ctx.moveTo(q, 0); ctx.lineTo(q, h); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, q); ctx.lineTo(w, q); ctx.stroke();
+    }
+    for (let i = 0; i < 100; i += 1) { ctx.fillStyle = 'rgba(30,15,12,.04)'; ctx.beginPath(); ctx.arc(Math.random() * w, Math.random() * h, 3 + Math.random() * 9, 0, 7); ctx.fill(); }
+  }, 9, 9);
+  const mallCarpet = makeCanvasTexture(THREE, renderer, document, (ctx, w, h) => {
+    ctx.fillStyle = '#4a2022'; ctx.fillRect(0, 0, w, h); ctx.strokeStyle = 'rgba(224,180,112,.17)'; ctx.lineWidth = 4;
+    for (let y = 12; y < h; y += 32) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y + 16); ctx.stroke(); }
+    for (let i = 0; i < 800; i += 1) { ctx.fillStyle = 'rgba(255,255,255,.025)'; ctx.fillRect(Math.random() * w, Math.random() * h, 2, 2); }
+  }, 4, 18);
+  const mallConcrete = makeCanvasTexture(THREE, renderer, document, (ctx, w, h) => {
+    ctx.fillStyle = '#303236'; ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 700; i += 1) { const v = 70 + Math.random() * 50; ctx.fillStyle = `rgba(${v},${v},${v},.035)`; ctx.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 3, 1 + Math.random() * 3); }
+  }, 5, 12);
+
   return {
     floor1: new THREE.MeshStandardMaterial({ map: carpet1, roughness: 0.96 }), floor2: new THREE.MeshStandardMaterial({ map: carpet2, roughness: 0.96 }),
     floor3: new THREE.MeshStandardMaterial({ map: carpet3, roughness: 0.96 }), floor4: new THREE.MeshStandardMaterial({ map: carpet4, roughness: 0.98 }),
@@ -55,6 +79,16 @@ function createMaterials(THREE, renderer, document) {
     bed: new THREE.MeshStandardMaterial({ color: 0x5d6d82, roughness: 0.93 }), green: new THREE.MeshStandardMaterial({ color: 0x3b6840, roughness: 0.9 }),
     shade: new THREE.MeshStandardMaterial({ color: 0x260304, emissive: 0xb00000, emissiveIntensity: 1.1, roughness: 0.8 }), black: new THREE.MeshStandardMaterial({ color: 0x07080a, roughness: 1 }),
     redLight: new THREE.MeshStandardMaterial({ color: 0x3b0305, emissive: 0xb00000, emissiveIntensity: 1.15, roughness: 0.5 }),
+    // Mall surfaces. `tile` is the concourse, `carpetRed` a tenancy, `service` back-of-house screed.
+    tile: new THREE.MeshStandardMaterial({ map: mallTile, roughness: 0.91 }),
+    carpetRed: new THREE.MeshStandardMaterial({ map: mallCarpet, roughness: 0.98 }),
+    service: new THREE.MeshStandardMaterial({ map: mallConcrete, roughness: 1 }),
+    // A shopfront. Transparent, double-sided and still a collider — you can see the hider inside and
+    // you still have to walk round to the opening, which is the whole appeal of a glazed frontage.
+    glass: new THREE.MeshStandardMaterial({ color: 0x7b8790, transparent: true, opacity: 0.22, roughness: 0.17, side: THREE.DoubleSide }),
+    upholstery: new THREE.MeshStandardMaterial({ color: 0x506174, roughness: 0.94 }),
+    red: new THREE.MeshStandardMaterial({ color: 0x4b0a0d, roughness: 0.8 }),
+    screen: new THREE.MeshStandardMaterial({ color: 0x120205, emissive: 0xa8000d, emissiveIntensity: 1.4, roughness: 0.35 }),
   };
 }
 

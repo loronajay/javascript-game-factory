@@ -167,9 +167,27 @@ A flashlight is the strongest seeker-favouring tool in the game, so it obeys the
 - **A connector may be a switchback or a straight run.** The hotel's stairwell is two lanes with a landing; the mall's escalators are one flight. `createStairRoute` handles both — it assumed the switchback and crashed on a single flight.
 - **`layout.js`'s stairwell is the hotel's**, and the mall builds its own. Nothing may call `layout.createStairLayout()` to find out where *a* map's stairs are.
 
-## The building owns its lift, and its near face is the low-Z one
+## The building owns its lift, including which way it opens
 
-The lift's five coordinates were global config read by the fixtures, the tick, the renderer and `modules/elevator.js`. They are `plan.elevator` now. **`frontZ < centerZ` is a standing convention** — every in-cabin test in the engine assumes the cabin's near face is the low-Z one, and a building that disagrees has a lift whose doors open inside its own shaft. `modules/elevator.js` reads the shaft in `build()`, not at construction, because it is composed before the hotel is built.
+The lift's five coordinates are `plan.elevator`. Facing is the sign of `frontZ - centerZ`: the hotel
+opens toward -Z and the reference mall toward +Z. Never restore raw low-Z occupancy assumptions.
+Cabin walls, doors, buttons, passenger checks and the held seeker's view must all use the same
+facing. `modules/elevator.js` reads the shaft in `build()`, not at construction. Hall doors carry
+world-space Y and their own Z; render them at those coordinates. Both orientations are exercised
+in `tests/elevator-facing.test.js`.
+
+## Cinder Mall reference fidelity
+
+`mall-plan.js` preserves the reference's twenty public entries and furnished shops. Primary doors
+and the master keys remain gameplay additions. Furniture has plan-owned collision; its meshes
+never register it. Shop targets are clear aisle points, with separate bounds for sanity zones.
+Ground ceilings cover shops only, never the atrium or escalators. Shop finishes sit above the
+structural slab to avoid z-fighting. The projection corridor is inside the cinema's rear wall.
+
+The aisle graph is checked against full player-width collision and walk surfaces at build time.
+Straight escalators are one flight, not a switchback with a duplicated return flight. A connector
+can carry floor-specific `approaches` when its two landings differ. Keep the entrance/edge/route
+clearance tests in `tests/mall-plan.test.js` passing when moving any furniture or wall.
 
 ## A door hangs in a wall that runs one way or the other
 

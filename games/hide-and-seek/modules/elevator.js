@@ -12,13 +12,14 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
   // `build()` is where the car is first placed.
   const shaftOf = () => world.getPlan().elevator;
   let shaft = null;
+  let facing = -1;
   scene.add(elevator.car);
 
   function isPlayerInsideXZ() {
     if (!shaft) return false;
+    const offset = (camera.position.z - shaft.centerZ) * facing;
     return Math.abs(camera.position.x - shaft.centerX) < 1.12
-      && camera.position.z > shaft.frontZ - 0.12
-      && camera.position.z < shaft.centerZ + 1.46;
+      && offset > -1.46 && offset < Math.abs(shaft.frontZ - shaft.centerZ) + 0.12;
   }
   function playerEyeHeight() { return world.state.playerEyeHeight || CONFIG.eyeHeight; }
   function isPlayerInside() { return isPlayerInsideXZ() && Math.abs(camera.position.y - (elevator.car.position.y + playerEyeHeight())) < 0.7; }
@@ -63,25 +64,26 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
   }
   function build() {
     shaft = shaftOf();
+    facing = shaft.frontZ > shaft.centerZ ? 1 : -1;
     elevator.car.position.set(shaft.centerX, floorY(1), shaft.centerZ);
     const group = elevator.car; const cabinWidth = 2.5; const cabinDepth = 3.2; const cabinHeight = 2.65;
     const floor = new THREE.Mesh(new THREE.BoxGeometry(cabinWidth, 0.18, cabinDepth), new THREE.MeshStandardMaterial({ color: 0x4e4b45, metalness: 0.12, roughness: 0.75 })); floor.position.y = -0.09; floor.receiveShadow = true; group.add(floor);
     const ceiling = new THREE.Mesh(new THREE.BoxGeometry(cabinWidth, 0.12, cabinDepth), MAT.elevatorInterior); ceiling.position.y = cabinHeight; group.add(ceiling);
     const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.12, cabinHeight, cabinDepth), MAT.elevatorInterior); leftWall.position.set(-cabinWidth / 2, cabinHeight / 2, 0); group.add(leftWall); world.registerBoxCollider(leftWall, { width: 0.12, height: cabinHeight, depth: cabinDepth }, () => true, true);
     const rightWall = leftWall.clone(); rightWall.position.x = cabinWidth / 2; group.add(rightWall); world.registerBoxCollider(rightWall, { width: 0.12, height: cabinHeight, depth: cabinDepth }, () => true, true);
-    const backWall = new THREE.Mesh(new THREE.BoxGeometry(cabinWidth, cabinHeight, 0.12), MAT.elevatorInterior); backWall.position.set(0, cabinHeight / 2, cabinDepth / 2); group.add(backWall); world.registerBoxCollider(backWall, { width: cabinWidth, height: cabinHeight, depth: 0.12 }, () => true, true);
-    const trimL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.5, 0.14), MAT.brass); trimL.position.set(-1.08, 1.25, -1.57); group.add(trimL); const trimR = trimL.clone(); trimR.position.x = 1.08; group.add(trimR);
-    const leftDoor = new THREE.Mesh(new THREE.BoxGeometry(0.92, 2.35, 0.08), MAT.metal); leftDoor.position.set(-0.46, 1.175, -1.58); group.add(leftDoor);
+    const backWall = new THREE.Mesh(new THREE.BoxGeometry(cabinWidth, cabinHeight, 0.12), MAT.elevatorInterior); backWall.position.set(0, cabinHeight / 2, -facing * cabinDepth / 2); group.add(backWall); world.registerBoxCollider(backWall, { width: cabinWidth, height: cabinHeight, depth: 0.12 }, () => true, true);
+    const trimL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 2.5, 0.14), MAT.brass); trimL.position.set(-1.08, 1.25, facing * 1.57); group.add(trimL); const trimR = trimL.clone(); trimR.position.x = 1.08; group.add(trimR);
+    const leftDoor = new THREE.Mesh(new THREE.BoxGeometry(0.92, 2.35, 0.08), MAT.metal); leftDoor.position.set(-0.46, 1.175, facing * 1.58); group.add(leftDoor);
     const rightDoor = leftDoor.clone(); rightDoor.position.x = 0.46; group.add(rightDoor); elevator.cabinLeftDoor = leftDoor; elevator.cabinRightDoor = rightDoor;
     world.registerBoxCollider(leftDoor, { width: 0.92, height: 2.35, depth: 0.08 }, () => elevator.doorAmount < 0.62, true); world.registerBoxCollider(rightDoor, { width: 0.92, height: 2.35, depth: 0.08 }, () => elevator.doorAmount < 0.62, true);
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.65, 0.62), MAT.dark); panel.position.set(1.16, 1.28, 0.25); group.add(panel);
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.65, 0.62), MAT.dark); panel.position.set(1.16, 1.28, -facing * 0.25); group.add(panel);
     for (let floorId = 1; floorId <= world.state.floorCount; floorId += 1) {
-      const buttonGroup = new THREE.Group(); buttonGroup.position.set(1.105, 0.72 + (floorId - 1) * 0.35, 0.25); group.add(buttonGroup);
+      const buttonGroup = new THREE.Group(); buttonGroup.position.set(1.105, 0.72 + (floorId - 1) * 0.35, -facing * 0.25); group.add(buttonGroup);
       buttonGroup.add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.23, 0.23), MAT.brass)); world.addNumberPlate(buttonGroup, String(floorId), -0.038, 0, 0, -Math.PI / 2, 0.17);
       collections.interactables.push({ object: buttonGroup, enabled: () => !elevator.roundHeld && isPlayerInside() && elevator.state !== 'moving' && elevator.state !== 'closing', prompt: () => `Elevator button — Floor ${floorId}`, action: () => requestFloor(floorId) });
     }
     const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 128; elevator.indicatorCanvas = canvas; elevator.indicatorTexture = new THREE.CanvasTexture(canvas);
-    const indicator = new THREE.Mesh(new THREE.PlaneGeometry(0.78, 0.32), new THREE.MeshBasicMaterial({ map: elevator.indicatorTexture })); indicator.position.set(0, 2.27, -1.53); group.add(indicator);
+    const indicator = new THREE.Mesh(new THREE.PlaneGeometry(0.78, 0.32), new THREE.MeshBasicMaterial({ map: elevator.indicatorTexture })); indicator.position.set(0, 2.27, facing * 1.53); indicator.rotation.y = facing > 0 ? Math.PI : 0; group.add(indicator);
     const light = new THREE.PointLight(0xfff2d4, 0.82, 5, 2); light.position.set(0, 2.35, 0); group.add(light);
     const fixture = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.06, 0.48), new THREE.MeshStandardMaterial({ color: 0xf2ead1, emissive: 0x77682f, emissiveIntensity: 0.28 })); fixture.position.set(0, 2.55, 0); group.add(fixture);
     // The cabin floor is the one walk surface whose height is state rather than layout.
@@ -99,9 +101,9 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
     world.setDynamicHeight('elevator-car', elevator.car.position.y);
     syncDoors(0);
     if (moveCamera) {
-      camera.position.set(shaft.centerX, floorY(1) + playerEyeHeight(), shaft.centerZ + 0.25);
-      camera.rotation.x = 0; camera.rotation.y = 0;
-      world.state.yaw = 0; world.state.pitch = 0; world.state.playerFloor = 0;
+      camera.position.set(shaft.centerX, floorY(1) + playerEyeHeight(), shaft.centerZ - facing * 0.25);
+      camera.rotation.x = 0; camera.rotation.y = facing > 0 ? Math.PI : 0;
+      world.state.yaw = camera.rotation.y; world.state.pitch = 0; world.state.playerFloor = 0;
     }
   }
   function releaseSeeker() {

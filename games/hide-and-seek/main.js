@@ -45,7 +45,7 @@ const hotel = createHotel({
 hotel.build();
 elevator.build();
 const inspectTarget = new URLSearchParams(location.search).get('inspect');
-const inspectionView = inspectionViews[inspectTarget];
+const inspectionView = hotel.getPlan().inspectionViews?.[inspectTarget] || inspectionViews[inspectTarget];
 if (inspectionView) {
   rendering.camera.position.set(inspectionView.x, inspectionView.y, inspectionView.z);
   rendering.camera.rotation.y = inspectionView.yaw;

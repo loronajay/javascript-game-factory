@@ -39,6 +39,7 @@ export function createHotel({ THREE, scene, camera, materials: MAT, config: CONF
   // hundred draw calls in the one place the player is guaranteed to stand, so the static parts are
   // baked into one mesh per material at build time. Nothing in the stairwell moves.
   const stairBatch = { treads: [], rails: [] };
+  const treadBatches = new Map([['wood', stairBatch.treads]]);
   const railMat = new THREE.MeshStandardMaterial({ color: 0x202329, metalness: 0.42, roughness: 0.62 });
   let plan = null;
 
@@ -112,7 +113,7 @@ export function createHotel({ THREE, scene, camera, materials: MAT, config: CONF
     const parent = groupFor(def.id);
     // The shaft is the building's, not the config's — a mall's lift is not in a hotel's lobby.
     const shaft = plan.elevator || { centerX: CONFIG.elevatorCenterX, frontZ: CONFIG.elevatorFrontZ };
-    const group = new THREE.Group(); group.position.set(shaft.centerX, 0, shaft.frontZ - 0.08); parent.add(group);
+    const group = new THREE.Group(); group.position.set(shaft.centerX, 0, specs[0].z); parent.add(group);
     const meshes = {};
     for (const spec of specs) {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(spec.w, spec.h, spec.d), MAT.metal);
@@ -140,18 +141,20 @@ export function createHotel({ THREE, scene, camera, materials: MAT, config: CONF
     for (const tread of plan.stairs.treads) {
       const geometry = new THREE.BoxGeometry(tread.w, tread.h, tread.d);
       const position = new THREE.Vector3(tread.x, tread.y, tread.z);
+      const finish = tread.material || 'wood';
+      if (!treadBatches.has(finish)) treadBatches.set(finish, []);
       if (mergeGeometries) {
-        bakeStatic(geometry, new THREE.Matrix4().compose(position, new THREE.Quaternion().setFromEuler(new THREE.Euler(0, tread.rotationY || 0, 0)), new THREE.Vector3(1, 1, 1)), stairBatch.treads);
+        bakeStatic(geometry, new THREE.Matrix4().compose(position, new THREE.Quaternion().setFromEuler(new THREE.Euler(tread.rotationX || 0, tread.rotationY || 0, 0)), new THREE.Vector3(1, 1, 1)), treadBatches.get(finish));
         geometry.dispose();
         continue;
       }
-      const mesh = new THREE.Mesh(geometry, MAT.wood); mesh.position.copy(position); mesh.rotation.y = tread.rotationY || 0; stairwellGroup.add(mesh);
+      const mesh = new THREE.Mesh(geometry, materialFor(finish)); mesh.position.copy(position); mesh.rotation.set(tread.rotationX || 0, tread.rotationY || 0, 0); stairwellGroup.add(mesh);
     }
     for (const segment of plan.stairs.rails) addRailSegment(segment.start, segment.end);
   }
   function flushStairBatch() {
     if (!mergeGeometries) return;
-    for (const [bucket, material, name] of [[stairBatch.treads, MAT.wood, 'Stair Treads'], [stairBatch.rails, railMat, 'Stair Rails']]) {
+    for (const [bucket, material, name] of [...[...treadBatches].map(([finish, batch]) => [batch, materialFor(finish), 'Stair Treads']), [stairBatch.rails, railMat, 'Stair Rails']]) {
       if (!bucket.length) continue;
       const merged = mergeGeometries(bucket, false);
       for (const geometry of bucket) geometry.dispose();

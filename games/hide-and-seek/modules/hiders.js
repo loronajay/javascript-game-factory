@@ -20,7 +20,7 @@ export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floo
   function sanityZones() {
     const { roomCenters, secretTunnels } = world.collections;
     if (zones.length !== roomCenters.size + secretTunnels.length) zones = [
-      ...[...roomCenters.entries()].map(([id, room]) => ({ id, kind: sanityLogic.ZONE_KINDS.ROOM, floor: room.floor, x: room.x, z: room.z })),
+      ...[...roomCenters.entries()].map(([id, room]) => ({ ...room, id, kind: sanityLogic.ZONE_KINDS.ROOM })),
       ...secretTunnels,
     ];
     return zones;
