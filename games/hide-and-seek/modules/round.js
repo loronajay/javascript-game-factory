@@ -4,7 +4,7 @@
 // positions the rules need, paints the HUD, and routes the two endings onto the screen the menu
 // already owns. Catch resolution runs here rather than being announced by whoever thinks they were
 // tagged, because that is the shape a server has to keep when this goes online.
-export function createRound({ camera, world, player, elevator, hiders, seeker = null, spectator = null, avatars = null, localRole = 'seeker', monster, monsters, flashlightDrops, logic, config, document, window }) {
+export function createRound({ camera, world, player, elevator, hiders, seeker = null, spectator = null, avatars = null, localRole = 'seeker', monster, monsters, staff = monsters, flashlightDrops, logic, config, document, window }) {
   const LOCAL_ID = 'local';
   const localIsSeeker = localRole === logic.ROLES.SEEKER;
   const SEEKER_ID = localIsSeeker ? LOCAL_ID : seeker?.id;
@@ -17,8 +17,8 @@ export function createRound({ camera, world, player, elevator, hiders, seeker = 
   let state = logic.createRound({ players, seekerId: SEEKER_ID, config });
   // The copy names this map's staff. It used to say "The Bellhop" outright, which is a demon that
   // does not work at Cinder Mall.
-  const hunterText = () => (monsters && monsters.hunterName ? monsters.hunterName() : 'The Bellhop');
-  const staffText = () => (monsters && monsters.rosterText ? monsters.rosterText() : 'The Bellhop and The Housekeeper');
+  const hunterText = () => (staff && staff.hunterName ? staff.hunterName() : 'The Bellhop');
+  const staffText = () => (staff && staff.rosterText ? staff.rosterText() : 'The Bellhop and The Housekeeper');
   const demonList = Array.isArray(monsters) && monsters.length ? monsters : [monster];
   let announcedPhase = null;
   world.state.localRole = localRole;

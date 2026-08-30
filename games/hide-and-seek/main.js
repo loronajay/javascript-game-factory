@@ -23,7 +23,7 @@ import { createSoloMatch } from './modules/solo-match.js';
 import { createModelViewer } from './modules/model-viewer.js';
 import { createPrototypeApi } from './modules/prototype-api.js';
 import { createAccountAccess } from './modules/account-access.js';
-import { createMapSession } from './modules/map-session.js';
+import { createMapSession, placeAtMapSpawn } from './modules/map-session.js';
 // The pure layer loads as classic scripts first, so a missing one fails loudly here rather than as
 // an undefined call three frames into a round. Which building it stands: `modules/map-session.js`.
 for (const name of ['HotelAvatarLogic', 'HotelCollision', 'HotelControls', 'HotelDemon', 'HotelEnemyLogic', 'HotelFixtures', 'HotelFlashlight', 'HotelHiders', 'HotelLayout', 'HotelMaps', 'HotelMenu', 'HotelMovement', 'HotelMusic', 'HotelOnline', 'HotelPlan', 'HotelRound', 'HotelSanity', 'HotelSeeker', 'HotelSpectator', 'HotelStamina']) {
@@ -44,6 +44,7 @@ const hotel = createHotel({
 });
 hotel.build();
 elevator.build();
+placeAtMapSpawn({ camera: rendering.camera, world, spawn: hotel.getPlan().spawns.seeker, eyeHeight: CONFIG.eyeHeight });
 const inspectTarget = new URLSearchParams(location.search).get('inspect');
 const inspectionView = hotel.getPlan().inspectionViews?.[inspectTarget] || inspectionViews[inspectTarget];
 if (inspectionView) {

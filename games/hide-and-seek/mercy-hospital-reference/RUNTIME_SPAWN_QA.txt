@@ -1,0 +1,17 @@
+/mnt/data/saint_mercy_real_engine_v5_1/hospital-plan.js:513
+  </script>
+  ^
+
+SyntaxError: Unexpected token '<'
+[90m    at wrapSafe (node:internal/modules/cjs/loader:1662:18)[39m
+[90m    at Module._compile (node:internal/modules/cjs/loader:1704:20)[39m
+[90m    at Object..js (node:internal/modules/cjs/loader:1895:10)[39m
+[90m    at Module.load (node:internal/modules/cjs/loader:1465:32)[39m
+[90m    at Function._load (node:internal/modules/cjs/loader:1282:12)[39m
+[90m    at TracingChannel.traceSync (node:diagnostics_channel:322:14)[39m
+[90m    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)[39m
+[90m    at Module.require (node:internal/modules/cjs/loader:1487:12)[39m
+[90m    at require (node:internal/modules/helpers:135:16)[39m
+    at Object.<anonymous> [90m(/mnt/data/saint_mercy_real_engine_v5_1/[39mtest-runtime-spawn-regression.js:38:9[90m)[39m
+
+Node.js v22.16.0

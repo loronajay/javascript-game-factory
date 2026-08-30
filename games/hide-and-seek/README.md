@@ -1,4 +1,18 @@
-# Hide and Seek V7.2: Two Locations, One Rulebook
+# Hide and Seek: Three Locations, One Rulebook
+
+Mercy Hospital is now available in solo and online setup (`?map=mercy-hospital`). It uses the
+Saint Mercy V5.1 reference: two floors, fourteen departments, continuous service stairs and a
+working elevator. The Surgeon hunts campers; The Matron and The Orderly roam and chase.
+CPU hiders use the hospital's spawn seats and clear room aisles; the CPU seeker and demons use
+the department/corridor graph. The hospital's doors start unlocked; no new key puzzle is added.
+
+Inspection links: `?map=mercy-hospital&inspect=lobby` (also `emergency`, `ward`, `stairs`).
+Press F for the flashlight. The original reference folder is unchanged.
+
+Online deployment must include both this cabinet and the updated `factory-network-server`.
+Local verification covers map-separated matchmaking, eight-player authoritative rounds, elevator
+hold/release, deterministic replay and two clients receiving snapshots at different delays.
+This does not replace a real two-device movement/latency playtest.
 
 ## Play
 
@@ -26,7 +40,7 @@ V6.9 adds a light and a second hunter, and both cut both ways.
 
 ## Playing online (new in V7.1, not yet played by real people)
 
-`Online Multiplayer` opens its own stage selector. Choose The Grand Hotel or Cinder Mall, then
+`Online Multiplayer` opens its own stage selector. Choose The Grand Hotel, Cinder Mall or Mercy Hospital, then
 press `FIND A LOBBY` to connect to the shared arcade network server. Friends must choose the same
 stage; matchmaking separates locations. `LEAVE / CHANGE STAGE` returns to the stage selector.
 The lobby holds two to eight guests. It needs a signed-in Javascript Game Factory account — the panel says

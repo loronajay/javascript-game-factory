@@ -6,7 +6,7 @@ const { element, environment } = require('./helpers/menu-environment.js');
 const logic = require('../online-logic.js');
 const menuLogic = require('../menu-logic.js');
 const maps = require('../map-catalog.js');
-const fixtures = [require('./helpers/hotel-fixture.js'), require('./helpers/mall-fixture.js')];
+const fixtures = [require('./helpers/hotel-fixture.js'), require('./helpers/mall-fixture.js'), require('./helpers/hospital-fixture.js')];
 const load = name => import(pathToFileURL(path.resolve(__dirname, '../modules', name)));
 
 async function client(id, mapId) {
@@ -92,7 +92,7 @@ test('an incompatible or incomplete start packet never opens a playable local wo
   }
 });
 
-for (const [index, mapId] of ['grand-hotel', 'cinder-mall'].entries()) {
+for (const [index, mapId] of ['grand-hotel', 'cinder-mall', 'mercy-hospital'].entries()) {
   test(`${mapId}: two clients receive their roles, countdown and fixtures before play, even if the next packet is delayed`, async () => {
     const { engine } = fixtures[index].createFullSim({ config: { demons: [] } });
     let state = engine.createState({ seekerId: 'dad', players: [

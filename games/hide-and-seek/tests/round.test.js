@@ -89,6 +89,21 @@ async function createRound(setup) {
 
 const FAR = { id: 'hider-2', x: 40, y: 0, z: 40, floor: 1 };
 
+test('hospital round copy names the hospital staff without losing their catch bodies', async () => {
+  const setup = harness({ hiders: [FAR] });
+  const notices = [];
+  const ending = element();
+  setup.deps.world.notify = text => notices.push(text);
+  setup.elements.set('caughtOverlay', { ...element(), querySelector: () => ({ querySelector: () => ending }) });
+  setup.deps.staff = { hunterName: () => 'The Surgeon', rosterText: () => 'The Surgeon, The Matron and The Orderly' };
+  const round = await createRound(setup);
+  round.update(45);
+  assert.ok(notices.some(text => text.includes('THE SURGEON')));
+  setup.alive.set(FAR.id, { ...FAR, x: 0, z: 0 });
+  round.update(0.1);
+  assert.match(ending.textContent, /The Surgeon, The Matron and The Orderly/);
+});
+
 test('the seeker is shut in the elevator for at least forty-five seconds and released when seeking starts', async () => {
   const setup = harness({ hiders: [FAR] });
   const round = await createRound(setup);

@@ -14,6 +14,13 @@ const STORAGE_KEY = 'hideAndSeek.mapId';
 // on the title screen would make the picker feel like a punishment for looking at another map.
 const SETUP_KEY = 'hideAndSeek.pendingSetup';
 
+// Apply one authored spawn to both the view and the physics state, before any CPU chooses a spawn.
+export function placeAtMapSpawn({ camera, world, spawn, eyeHeight }) {
+  camera.position.set(spawn.x, spawn.y + eyeHeight, spawn.z);
+  camera.rotation.x = 0; camera.rotation.y = 0;
+  Object.assign(world.state, { yaw: 0, pitch: 0, playerFloor: spawn.floor, playerFeetY: spawn.y });
+}
+
 export function createMapSession({ maps, window: win = globalThis, storage = null }) {
   const location = win.location || { search: '', href: '' };
   const store = storage !== null ? storage : safeStorage(win);

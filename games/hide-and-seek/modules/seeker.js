@@ -20,13 +20,16 @@ export function createSeeker({ THREE, config: CONFIG, tuning, floorY, layout, wo
   function describe() { return { id, name: 'The Seeker', role: 'seeker', alive, x: position.x, y: position.y, z: position.z, floor: floor(), yaw, crouching: false, flashlightOn: true, flashlightCharge: 1, state: state.mode }; }
   function planRoute(target) {
     const fromFloor = floor(); const toFloor = target.floor || fromFloor;
-    const interFloorRoute = fromFloor === toFloor ? [] : navigator.planFloorRoute({
-      from: position, target: { x: position.x, z: position.z }, fromFloor, toFloor, floorHeight: CONFIG.floorHeight,
-    });
-    route = logic.createSweepRoute({
-      hunter: describe(),
-      target: { ...target, y: target.y ?? floorY(toFloor), floor: toFloor },
-      interFloorRoute,
+    const corridorSweep = world.getPlan().navigation?.corridorSweep;
+    if (corridorSweep) {
+      const interFloorRoute = fromFloor === toFloor ? [] : navigator.planFloorRoute({
+        from: position, target: { x: position.x, z: position.z }, fromFloor, toFloor, floorHeight: CONFIG.floorHeight,
+      });
+      route = logic.createSweepRoute({ hunter: describe(), target: { ...target, y: target.y ?? floorY(toFloor), floor: toFloor }, interFloorRoute, ...corridorSweep });
+      return;
+    }
+    route = navigator.planFloorRoute({
+      from: position, target, fromFloor, toFloor, floorHeight: CONFIG.floorHeight,
     });
   }
   function patrol() {
@@ -58,7 +61,8 @@ export function createSeeker({ THREE, config: CONFIG, tuning, floorY, layout, wo
     const visible = logic.selectVisibleHider(candidates, hunter, { config: tuning, isOccluded: occluded });
     state = logic.updateSeeker(state, { delta, visible, config: tuning });
     replanIn -= delta;
-    if (state.lastSeen && replanIn <= 0) { planRoute(state.lastSeen); replanIn = state.mode === logic.SEEKER_STATES.CHASING ? 0.35 : 0.9; }
+    // Finish a stair traversal before replanning a sighting; otherwise each replan restarts the flight.
+    if (state.lastSeen && replanIn <= 0 && !route.some(point => point.stair)) { planRoute(state.lastSeen); replanIn = state.mode === logic.SEEKER_STATES.CHASING ? 0.35 : 0.9; }
     if (!route.length && state.mode === logic.SEEKER_STATES.PATROLLING) patrol();
     step(delta, state.mode === logic.SEEKER_STATES.CHASING ? tuning.chaseSpeed : tuning.patrolSpeed);
     avatars.setPose(id, describe());

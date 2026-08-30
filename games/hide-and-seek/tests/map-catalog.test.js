@@ -3,13 +3,14 @@ const assert = require('node:assert/strict');
 
 const maps = require('../map-catalog.js');
 
-test('the registry lists both locations and both can be entered', () => {
+test('the registry lists all three playable locations', () => {
   const ids = maps.listMaps().map((entry) => entry.id);
-  assert.deepEqual(ids, ['grand-hotel', 'cinder-mall']);
+  assert.deepEqual(ids, ['grand-hotel', 'cinder-mall', 'mercy-hospital']);
   assert.equal(maps.DEFAULT_MAP_ID, 'grand-hotel');
   assert.equal(maps.isPlayable('grand-hotel'), true);
   assert.equal(maps.isPlayable('cinder-mall'), true);
-  assert.deepEqual(maps.playableMaps().map((entry) => entry.id), ['grand-hotel', 'cinder-mall']);
+  assert.equal(maps.isPlayable('mercy-hospital'), true);
+  assert.deepEqual(maps.playableMaps().map((entry) => entry.id), ids);
 });
 
 test('`soon` stays a real state even with nothing sitting in it', () => {

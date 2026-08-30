@@ -1,0 +1,23 @@
+{
+  "root_cause": "Renderer defaults to (0,32); solo Seeker does not apply plan.spawns.seeker; Saint Mercy north wall is z=32.",
+  "old_runtime_spawn": {
+    "x": 0,
+    "z": 32
+  },
+  "new_runtime_spawn": {
+    "x": 0,
+    "y": 0,
+    "z": -27,
+    "floor": 1
+  },
+  "qa": {
+    "result": "PASS",
+    "rendererDefaultRejected": true,
+    "correctedSpawn": {
+      "x": 0,
+      "z": -27,
+      "y": 0
+    },
+    "cardinalMovementProbes": 4
+  }
+}

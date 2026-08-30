@@ -10,7 +10,7 @@
 // The seam that matters: `list()` returns positions in exactly the shape the round's catch
 // resolution and the demon's threat checks want. When real players arrive, the same list is fed
 // from the network and this file simply stops being asked for entries.
-export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floorY, layout, world, avatars, logic, enemyLogic, movement, sanityLogic, avatarLogic, count = 3, seekerSpawn = null }) {
+export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floorY, layout, world, avatars, logic, enemyLogic, movement, sanityLogic, avatarLogic, count = 3, spawnOffset = 0, seekerSpawn = null }) {
   const BODY = { height: CONFIG.bodyHeight, radius: CONFIG.playerRadius };
   // Borrowed from the demon deliberately: there is one building to cross and one way to cross it.
   const navigator = enemyLogic.createNavigator(world.getPlan().navigation);
@@ -152,9 +152,10 @@ export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floo
       const id = `hider-${index + 1}`;
       const spot = logic.chooseHideSpot(spots, { threats, taken, config: tuning }) || spots[index % spots.length];
       taken.push(spot);
-      // Hiders start out in the corridor by their room rather than inside it, so the head start is
-      // spent visibly walking away — the seeker sees the hotel come alive, not figures blink in.
-      const start = { x: Math.sign(spot.x || 1) * 3.4, y: floorY(spot.floor), z: spot.z, floor: spot.floor };
+      // Spawn seats belong to the building. A hotel corridor coordinate may be a hospital wall.
+      // Reserve seat zero when the local player is also a hider.
+      const spawns = world.getPlan().spawns.hiders;
+      const start = spawns[(index + spawnOffset) % spawns.length];
       const hider = {
         id,
         position: new THREE.Vector3(start.x, start.y, start.z),

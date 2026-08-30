@@ -6,14 +6,14 @@ A location in this game is **three things and nothing else**:
 2. a pure plan module that emits the building as plain records,
 3. the demons named in the catalog row.
 
-Nothing else in the cabinet has to change. The renderer walks whatever plan comes back, the
+The renderer walks whatever plan comes back, the
 authoritative tick spawns whatever demons the row lists, the picker fills itself from the registry,
-and matchmaking keeps two maps in two pools on its own. If adding a map is making you edit
-`modules/hotel.js`, `modules/demons.js`, `main.js` or `index.html`, something has drifted — say so
-rather than working around it.
+and matchmaking separates maps into pools. Register the classic script and server mirror imports
+as described below. No map-specific branch belongs in the renderer or CPU controllers.
 
-Two maps exist: **The Grand Hotel** (`hotel-plan.js`, four floors, two demons) and **Cinder Mall**
-(`mall-plan.js`, two levels, three demons). `status: 'soon'` is still a real state for the next map
+Three maps exist: **The Grand Hotel** (`hotel-plan.js`, four floors, two demons), **Cinder Mall**
+(`mall-plan.js`, two levels, three demons), and **Mercy Hospital** (`hospital-plan.js`, two floors,
+three demons). `status: 'soon'` is still a real state for the next map
 that is registered before it is built — a `soon` map shows in the picker as a locked card and can
 never be resolved into a round — there is just nothing sitting in it right now.
 
@@ -139,6 +139,10 @@ Rules the tests enforce:
 - **an edge never joins two floors.** A demon that could stroll between levels along the graph walks
   up through a ceiling;
 - **each level's graph is connected.** An island is a set of waypoints nothing can ever walk to;
+- **room targets are clear aisles, not furniture centers.** Include doorway/inside nodes so room
+  egress uses the door too; test actual room-to-room movement with player and demon dimensions;
+- **player and demon spawn nodes must be separated.** Sharing a coordinate can eliminate a solo
+  hider on the first tick, before role-specific spawning can affect the demon's choice;
 - **a spur reaches every room.** `roomCenters` are the demon's hunt targets, so a room the graph
   cannot reach is a room nobody is ever hunted in;
 - a connector's `flights` may be a switchback (two lanes, `west`/`east`, with a landing between) or a
@@ -146,6 +150,10 @@ Rules the tests enforce:
 
 An empty graph is legal and means "walk straight at it", which is the right answer for a single open
 room and the wrong one for anything with walls.
+
+The original hotel spine predates room-entry graph nodes and explicitly declares `corridorSweep`
+for its legacy seeker doglegs. New maps should supply complete graphs and omit this compatibility
+field. Camera/physics initialization and solo CPU seats now come from the plan's `spawns`.
 
 ### Things that will bite
 
