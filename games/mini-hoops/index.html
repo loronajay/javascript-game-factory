@@ -610,9 +610,17 @@
 
         <div class="shot-panel">
           <div id="horsePlacePanel" class="horse-place" hidden>
+            <!-- THE PANEL ANSWERS THREE QUESTIONS AND SAYS SO. They used to be
+                 fifteen identically-shaped pills in one stack, in the order
+                 position -> target -> motion, with a single label over the lot —
+                 so the target picker read as a fourth pair of position steppers
+                 and nothing named the three groups apart. They are in dependency
+                 order now (the target decides which motion catalog exists below
+                 it and whether there is a depth to choose at all) behind boxed
+                 section labels, which is the repo's own panel-header rule. -->
             <div class="horse-place-head">
-              <span id="horsePlaceHead">PLACE THE BIN</span>
-              <span id="horsePlaceReadout" class="horse-place-readout">DEPTH 50% &middot; HEIGHT 0% &middot; LANE 50%</span>
+              <span id="horsePlaceHead">SET UP YOUR SHOT</span>
+              <span class="horse-place-step">STEP 1 OF 2</span>
             </div>
             <details class="horse-trick-tools" hidden>
               <summary>TRICK SHOT TOOLS <small>Saved Lab shots + pieces</small></summary>
@@ -637,33 +645,57 @@
                 <label id="horseToolDelayRow"><span>Trigger delay</span><input id="horseToolDelay" type="range" min="0.25" max="2" step="0.05" value="0.5" /></label>
               </div>
             </details>
+
+            <!-- FIRST, because it decides what the other two sections even are:
+                 the two motion catalogs do not share an id, and a hoop hangs at
+                 the one depth there is so it has no depth stepper. Drawn as one
+                 segmented control rather than two loose pills, which is what
+                 stops it reading as another nudge pair. -->
+            <div class="horse-section">
+              <span class="horse-section-label">Target</span>
+              <div id="horseTargets" class="chip-grid chip-grid--tight horse-targets"></div>
+            </div>
+
             <!-- Grouped by axis, because that is how the target moves and how the
                  keys are laid out: depth, then lane, then height. The depth pair
                  is its own element so it can be put away for the wall hoop, which
-                 hangs at the one depth there is and has no depth to choose. -->
-            <div id="horseNudges" class="horse-nudges">
-              <span id="horseDepthNudges" class="horse-nudge-pair">
-                <button type="button" data-nudge="nearer" class="ghost-btn ghost-btn--small">&darr; Near</button>
-                <button type="button" data-nudge="deeper" class="ghost-btn ghost-btn--small">&uarr; Deep</button>
-              </span>
-              <span class="horse-nudge-pair">
-                <button type="button" data-nudge="left" class="ghost-btn ghost-btn--small">&larr; Left</button>
-                <button type="button" data-nudge="right" class="ghost-btn ghost-btn--small">Right &rarr;</button>
-              </span>
-              <span class="horse-nudge-pair">
-                <button type="button" data-nudge="lower" class="ghost-btn ghost-btn--small">Lower</button>
-                <button type="button" data-nudge="higher" class="ghost-btn ghost-btn--small">Higher</button>
-              </span>
+                 hangs at the one depth there is and has no depth to choose.
+                 THE READOUT RIDES THIS SECTION'S OWN HEADER, not the panel head
+                 where it used to sit: it reports these three steppers and nothing
+                 else, and up there it described controls three rows away and
+                 wrapped onto a second line beside a wrapped `HANG THE HOOP`. On
+                 the header rather than under the steppers because a row of its
+                 own is ~19px the court would have to give up. -->
+            <div class="horse-section">
+              <div class="horse-section-head">
+                <span class="horse-section-label" id="horsePositionLabel">Where the bin stands</span>
+                <span id="horsePlaceReadout" class="horse-place-readout">DEPTH 50% &middot; HEIGHT 0% &middot; LANE 50%</span>
+              </div>
+              <div id="horseNudges" class="horse-nudges">
+                <span id="horseDepthNudges" class="horse-nudge-pair">
+                  <button type="button" data-nudge="nearer" class="ghost-btn ghost-btn--small">&darr; Near</button>
+                  <button type="button" data-nudge="deeper" class="ghost-btn ghost-btn--small">&uarr; Deep</button>
+                </span>
+                <span class="horse-nudge-pair">
+                  <button type="button" data-nudge="left" class="ghost-btn ghost-btn--small">&larr; Left</button>
+                  <button type="button" data-nudge="right" class="ghost-btn ghost-btn--small">Right &rarr;</button>
+                </span>
+                <span class="horse-nudge-pair">
+                  <button type="button" data-nudge="lower" class="ghost-btn ghost-btn--small">&darr; Lower</button>
+                  <button type="button" data-nudge="higher" class="ghost-btn ghost-btn--small">&uarr; Higher</button>
+                </span>
+              </div>
             </div>
-            <!-- THE TARGET IS THE FIRST DECISION OF A TURN, and it decides which
-                 motion catalog the row under it is even built from — a floor bin
-                 and the wall hoop do not share a motion id. So it is its own row
-                 above them rather than a ninth chip among them, and both rows are
-                 built from their catalogs by `horse-game.js` rather than typed
-                 here: there is no second list in the markup to forget. -->
-            <div id="horseTargets" class="chip-grid chip-grid--tight horse-targets"></div>
-            <div id="horseMotions" class="chip-grid chip-grid--tight horse-motions"></div>
-            <button type="button" id="horseConfirm" class="primary-btn">Set this shot</button>
+
+            <!-- Built from the catalog the chosen target reads, by `horse-game.js`
+                 rather than typed here: there is no second list in the markup to
+                 forget, and a bin motion is not a hoop mode. -->
+            <div class="horse-section">
+              <span class="horse-section-label">How it moves</span>
+              <div id="horseMotions" class="chip-grid chip-grid--tight horse-motions"></div>
+            </div>
+
+            <button type="button" id="horseConfirm" class="primary-btn">Set this shot &rarr;</button>
           </div>
 
           <!-- A HORSE turn is two phases and the ball belongs to the second of

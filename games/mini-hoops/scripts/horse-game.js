@@ -293,7 +293,7 @@ export function bootHorse(root, options = {}) {
     hint: root.querySelector("#horseHint"),
     letters: root.querySelector("#horseLetters"),
     place: root.querySelector("#horsePlacePanel"),
-    placeHead: root.querySelector("#horsePlaceHead"),
+    positionLabel: root.querySelector("#horsePositionLabel"),
     targets: root.querySelector("#horseTargets"),
     depthNudges: root.querySelector("#horseDepthNudges"),
     motions: root.querySelector("#horseMotions"),
@@ -1631,7 +1631,13 @@ export function bootHorse(root, options = {}) {
     buildMotionChips();
     markActiveChip(el.motions, workingTarget.motionId);
     markActiveChip(el.targets, workingTarget.kind);
-    if (el.placeHead) el.placeHead.textContent = hoop ? "HANG THE HOOP" : "PLACE THE BIN";
+    // The PANEL is called the same thing whatever the target is — it is the
+    // first half of a turn either way — so the per-kind wording belongs to the
+    // position section, which is the only part that actually differs: a hoop is
+    // hung on a wall and a bin is stood on a floor.
+    if (el.positionLabel) {
+      el.positionLabel.textContent = hoop ? "Where the hoop hangs" : "Where the bin stands";
+    }
     // A HOOP HAS NO DEPTH, so the pair of steppers that choose one is put away
     // rather than left there doing nothing. `[hidden]` alone would not do it —
     // the row is `display: flex` and the UA stylesheet loses to that — so the

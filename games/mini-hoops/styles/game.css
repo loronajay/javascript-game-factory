@@ -1861,11 +1861,15 @@ body.is-playing .cabinet {
   /* Two columns rather than three stacked rows: the rail is wide enough for two
      stepper pairs abreast, and the row it saves is what brings the ball picker
      back above the fold on a 393-tall phone. */
-  #horseScreen .horse-nudges { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+  #horseScreen .horse-nudges { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 12px; }
   #horseScreen .horse-place .primary-btn { min-height: 46px; }
   #horseScreen .horse-motions { grid-template-columns: repeat(3, 1fr); }
-  #horseScreen .horse-place { gap: 6px; margin-bottom: 8px; padding-bottom: 8px; }
-  #horseScreen .horse-place-head { flex-direction: column; gap: 2px; }
+  #horseScreen .horse-place { gap: 7px; margin-bottom: 8px; padding-bottom: 8px; }
+  /* The head is a title and a step pill now rather than a title and a readout,
+     so it fits a 280px rail on one line — the readout that used to force it to
+     stack has moved down under the steppers it reports. */
+  #horseScreen .horse-section { gap: 4px; }
+  #horseScreen .horse-section-label { font-size: .56rem; }
 
   /* Four ball buttons across a 200px rail is 38px each — under half a fingertip.
      Two rows of two is the same information at a size that can be pressed. */
@@ -2246,17 +2250,67 @@ body.is-playing .cabinet {
 }
 
 .horse-place-head > span:first-child {
-  color: var(--ink-dim);
+  color: var(--ink);
   font: 800 .7rem/1 system-ui, sans-serif;
   letter-spacing: .09em;
 }
 
-/* Percentages of the legal volume rather than world units — a world unit is not
-   something a player has any feel for, and the bounds move with the room. */
-.horse-place-readout {
+/* A HORSE TURN IS TWO PHASES AND NOTHING USED TO SAY SO. `Set this shot` is not
+   the shot — it hands you the ball — and a new player has no way to learn that
+   except by pressing it. The pill is the cheapest possible statement of it, and
+   it is why the confirm button carries an arrow. */
+.horse-place-step {
+  background: var(--fill-faint);
+  border: 1px solid var(--panel-line);
+  border-radius: 999px;
+  color: var(--ink-faint);
+  font: 800 .56rem/1 system-ui, sans-serif;
+  letter-spacing: .11em;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+/* THREE QUESTIONS, NAMED. The panel is fifteen controls of nearly one shape, and
+   without labels the target picker reads as a fourth pair of position steppers —
+   which is exactly how it was reported. The rule is the repo's own: a section
+   label is a container header and has to look like one rather than blending into
+   the controls under it. */
+.horse-section { display: grid; gap: 5px; }
+
+/* A section label and, where the section has one, its live readout — on one
+   line, because a row of its own is height the court would have to pay for and
+   this panel is already the tallest in the cabinet. It wraps rather than
+   shrinking on a rail too narrow to hold both. */
+.horse-section-head {
+  align-items: baseline;
+  column-gap: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  row-gap: 2px;
+}
+
+.horse-section-label {
+  align-items: center;
+  border-left: 2px solid var(--brass);
   color: var(--ink-dim);
-  font: 700 .66rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  display: flex;
+  font: 800 .6rem/1 system-ui, sans-serif;
+  letter-spacing: .1em;
+  padding-left: 7px;
+  text-transform: uppercase;
+}
+
+/* Percentages of the legal volume rather than world units — a world unit is not
+   something a player has any feel for, and the bounds move with the room. It
+   rides the header of the section it reports rather than the panel head, where
+   it described controls three rows away and wrapped onto a second line beside a
+   wrapped `HANG THE HOOP`. */
+.horse-place-readout {
+  color: var(--ink-faint);
+  font: 700 .62rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: .04em;
+  margin: 0;
 }
 
 .horse-trick-tools {
@@ -2310,11 +2364,17 @@ body.is-playing .cabinet {
    phone, which the rest of this game very deliberately can be. */
 .horse-nudges {
   display: grid;
-  gap: 8px;
+  /* THE GAP BETWEEN PAIRS HAS TO BEAT THE GAP INSIDE ONE, or the pairing is not
+     a pairing. At 8px against 4px the two were near enough identical that the
+     row read as four loose buttons — `Near Deep Left Right` — and the axis
+     grouping the layout exists to express was invisible. Proximity is the whole
+     mechanism here and it costs no height, which matters because this panel is
+     already the tallest in the cabinet. */
+  gap: 10px 14px;
   grid-template-columns: repeat(3, 1fr);
 }
 
-.horse-nudge-pair { display: grid; gap: 4px; grid-template-columns: 1fr 1fr; }
+.horse-nudge-pair { display: grid; gap: 3px; grid-template-columns: 1fr 1fr; }
 .horse-nudge-pair .ghost-btn { min-height: 40px; padding: 7px 4px; white-space: nowrap; }
 
 /* The wall hoop hangs at the one depth there is, so its depth pair is put away
@@ -2324,11 +2384,32 @@ body.is-playing .cabinet {
    label[hidden]` and `.turn-ball-picker[hidden]` both fell into. */
 .horse-nudge-pair[hidden] { display: none; }
 
-/* THE TARGET IS THE FIRST DECISION OF A TURN, so it gets its own row above the
-   motions rather than sitting among them — it decides which catalog those are
-   even built from. Two entries, so two columns at every width; the motions wrap
-   underneath and this does not. */
-.horse-targets { display: grid; gap: 6px; grid-template-columns: repeat(2, 1fr); margin: 0; }
+/* THE TARGET IS THE FIRST DECISION OF A TURN, so it is the first section rather
+   than a row buried between the steppers and the motions — it decides which
+   motion catalog those are even built from and whether there is a depth to
+   choose at all.
+
+   ONE SEGMENTED CONTROL, NOT TWO PILLS. Drawn as a loose pair it was the same
+   shape, size and spacing as `Lower / Higher` directly above it, so it read as a
+   fourth pair of position steppers; a player had no way to see that this row and
+   that one asked different questions. Sharing one border makes it a single
+   either/or, which is what it is. Two entries, so two columns at every width;
+   the motions wrap underneath and this does not. */
+.horse-targets {
+  border: 1px solid var(--panel-line);
+  border-radius: 9px;
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(2, 1fr);
+  margin: 0;
+  overflow: hidden;
+  padding: 2px;
+}
+
+/* THE SHELL'S PADDING COMES OFF THE BUTTONS, so the chips need the floor stated
+   back: inside a 2px shell `chip--bare`'s own padding left them 32px, where as
+   loose pills they cleared 44. A target picker is pressed on every single turn. */
+.horse-targets .chip { border-radius: 7px; min-height: 44px; }
 
 /* Labels only. The court is locked to the viewport, so six chips carrying a
    line of description each cost about 95px of the height the court is trying to
@@ -2365,6 +2446,17 @@ body.is-playing .cabinet {
   .horse-motions { grid-template-columns: repeat(3, 1fr); }
   .horse-nudges { grid-template-columns: 1fr; }
   .horse-letter-name { min-width: 0; }
+
+  /* THE SECTIONS PAY FOR THEMSELVES HERE RATHER THAN BILLING THE COURT. Naming
+     the three questions costs three label rows, and on a 360x800 phone that was
+     4px past the viewport on a screen that may never scroll. It comes out of the
+     panel's own spacing instead: one column already separates the axis pairs, so
+     the wide between-pair gap earns nothing and goes back to 8px, and the panel
+     and section gaps tighten by a pixel or two each. The court keeps the floor it
+     had. Re-measured at all eight viewports with `tools/mobile-audit.mjs`. */
+  #horseScreen .horse-place { gap: 6px; }
+  #horseScreen .horse-section { gap: 4px; }
+  #horseScreen .horse-nudges { row-gap: 8px; }
 }
 
 /* The word field on the setup screen. Uppercase because the HUD prints it
