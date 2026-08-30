@@ -8,7 +8,8 @@ export function createMonster({
   scene.add(root);
   const facing = new THREE.Vector3(0, 0, 1);
   // A demon is 2.25m of body on a 0.32m footprint. Both numbers belong to the body, not to the mover.
-  const BODY = { height: 2.25, radius: 0.32 };
+  // Clearance, not stature: see `bodyHeight` in `demon-logic.js`. A door is 2.12m tall.
+  const BODY = { height: 2.05, radius: 0.32 };
   const monsterStatus = document.getElementById(statusElementId);
   const caughtOverlay = document.getElementById('caughtOverlay');
   const doorRecords = [...world.collections.roomDoors.entries()].map(([roomNumber, item]) => {
@@ -46,7 +47,7 @@ export function createMonster({
   let remotePose = null;
   let inspectionMotion = 'idle';
   const inspectionMode = new URLSearchParams(window.location.search).get('inspect') === 'monster';
-  const navigator = logic.createNavigator(world.getPlan().navigation);
+  const navigator = logic.createNavigator(world.getPlan().navigation, { space: world.space });
   const headWorldPosition = new THREE.Vector3();
   const headOffset = new THREE.Vector3();
   const rootWorldQuaternion = new THREE.Quaternion();
@@ -646,12 +647,15 @@ export function createMonster({
   function caught() {
     if (world.state.gameOver || world.state.playerEliminated) return;
     if (world.state.localRole === 'hider') {
-      world.emit('caught', { demon: name, floor: nearestFloor(), x: root.position.x, z: root.position.z });
+      // A hider taken by a demon is out, not necessarily over: the round goes on for whoever is left
+      // and this player watches it. `roundOver: false` says so, because everything downstream of this
+      // event — the menu above all — has to know the difference between an elimination and an ending.
+      world.emit('caught', { demon: name, floor: nearestFloor(), x: root.position.x, z: root.position.z, roundOver: false });
       return;
     }
     world.state.gameOver = true; world.state.isLocked = false; caughtOverlay.classList.add('visible'); document.body.classList.add('caught');
     if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
-    world.emit('caught', { demon: name, floor: nearestFloor(), x: root.position.x, z: root.position.z });
+    world.emit('caught', { demon: name, floor: nearestFloor(), x: root.position.x, z: root.position.z, roundOver: true });
   }
 
   // A snapshot pose, applied the way a network avatar's is: walked toward rather than teleported

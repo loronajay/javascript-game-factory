@@ -68,15 +68,18 @@ test('the CPU seeker sweeps every department through the real map graph', async 
   const { createSeeker } = await import('../modules/seeker.js');
   const seeker = createSeeker({ ...context, logic: seekerLogic, tuning: seekerLogic.SEEKER_DEFAULTS });
   seeker.setHeld(false);
+  // A locked department is not on the sweep: the seeker has no key until it finds one, and walking a
+  // patrol into a door it cannot open is the bug this filter exists to avoid.
+  const open = context.plan.roomCenters.filter(r => !context.world.collections.roomDoors.get(r.roomNumber).locked);
   const visited = new Set();
-  for (let tick = 0; tick < 800 * 60 && visited.size < 14; tick++) {
+  for (let tick = 0; tick < 800 * 60 && visited.size < open.length; tick++) {
     seeker.update(1 / 60, []);
     const body = seeker.getState();
-    for (const room of context.plan.roomCenters) {
+    for (const room of open) {
       if (body.floor === room.floor && Math.hypot(body.x - room.x, body.z - room.z) < .5) visited.add(room.roomNumber);
     }
   }
-  assert.deepEqual([...visited].sort(), context.plan.roomCenters.map(r => r.roomNumber).sort());
+  assert.deepEqual([...visited].sort(), open.map(r => r.roomNumber).sort());
 });
 
 test('a full-height demon physically visits every hospital department across both floors', async () => {

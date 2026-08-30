@@ -43,14 +43,21 @@ test('a same-floor route walks the graph instead of cutting through walls', () =
   for (let i = 1; i < zs.length; i += 1) assert.ok(zs[i] >= zs[i - 1] - 1e-6, 'route doubles back');
 });
 
-test('a target off the spine is reached via the nearest waypoint, not diagonally through a wall', () => {
+test('a target off the spine is reached through its own doorway, not diagonally through a wall', () => {
   const navigator = enemy.createNavigator(nav);
-  const route = navigator.walkRoute({ x: 0, z: -52, floor: 2 }, { x: 8.4, z: -18, floor: 2 });
+  const room = hotel.roomCenters.find((entry) => entry.floor === 2 && entry.side === 'right');
+  const door = hotel.roomDoors.find((entry) => entry.roomNumber === room.roomNumber);
+  const route = navigator.walkRoute({ x: 0, z: -52, floor: 2 }, room);
   const last = route.at(-1);
   assert.ok(last, 'a route to a room must exist');
-  // The final waypoint before the room is the hall stop at the room's own Z.
-  assert.ok(Math.abs(last.x) < 0.001, 'the demon must reach the corridor spine before stepping into the room');
-  assert.ok(Math.abs(last.z - -18) < 1e-6);
+  assert.ok(Math.abs(last.z - door.z) < 1e-6, 'the last waypoint sits at the door, not at the room');
+  // The final waypoint before the room is the mouth of that room's own door, on the room's side of
+  // the corridor. It used to be the hall stop at the room's Z, which left the last leg to cross the
+  // corridor wall wherever the door did not line up with a hall stop.
+  assert.ok(Math.abs(last.x - 3.4) < 1e-6, 'the last waypoint before a room is its doorway');
+  // And the spine is still walked to get there: crossing the building is never one straight line.
+  assert.ok(route.length >= 3, 'the route must cross the building along the corridor');
+  assert.ok(route.slice(0, -1).every((point) => Math.abs(point.x) < 0.001), 'the approach runs down the spine');
 });
 
 test('a connector is chosen for the floors it actually serves', () => {

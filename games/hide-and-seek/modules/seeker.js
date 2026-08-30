@@ -4,7 +4,7 @@ export function createSeeker({ THREE, config: CONFIG, tuning, floorY, layout, wo
   const id = 'solo-seeker';
   const BODY = { height: CONFIG.bodyHeight, radius: CONFIG.playerRadius };
   // How to get around comes off the building, not out of one hotel's stairwell.
-  const navigator = enemyLogic.createNavigator(world.getPlan().navigation);
+  const navigator = enemyLogic.createNavigator(world.getPlan().navigation, { space: world.space });
   const spawn = world.getPlan().spawns.seeker;
   const position = new THREE.Vector3(spawn.x, spawn.y, spawn.z);
   let state = logic.createSeekerState();
@@ -15,10 +15,18 @@ export function createSeeker({ THREE, config: CONFIG, tuning, floorY, layout, wo
   let alive = true;
   let replanIn = 0;
   let patrolIndex = 0;
+  // What this route was for, and how many times the way there has already turned out to be solid.
+  // A leg the mover gives up on used to be dropped silently, which on a long graph edge — a mall
+  // aisle node twenty-five metres from the shop it opens onto — emptied the route and sent the
+  // seeker on to the next room. Deterministically, every cycle, so a store could never be searched.
+  let routeTarget = null;
+  let routeAttempts = 0;
+  const MAX_ROUTE_ATTEMPTS = 3;
 
   function floor() { return Math.max(1, Math.min(world.state.floorCount, Math.round(position.y / CONFIG.floorHeight) + 1)); }
   function describe() { return { id, name: 'The Seeker', role: 'seeker', alive, x: position.x, y: position.y, z: position.z, floor: floor(), yaw, crouching: false, flashlightOn: true, flashlightCharge: 1, state: state.mode }; }
   function planRoute(target) {
+    if (target !== routeTarget) { routeTarget = target; routeAttempts = 0; }
     const fromFloor = floor(); const toFloor = target.floor || fromFloor;
     const corridorSweep = world.getPlan().navigation?.corridorSweep;
     if (corridorSweep) {
@@ -51,7 +59,13 @@ export function createSeeker({ THREE, config: CONFIG, tuning, floorY, layout, wo
     if (!target) return;
     const result = movement.stepToward(world.space, BODY, position, target, { speed, delta, arriveRadius: 0.22, guided: !!target.guided });
     if (result.moved || result.arrived) position.set(result.x, result.y, result.z);
-    if (result.arrived || result.blocked) route.shift();
+    if (result.arrived) route.shift();
+    else if (result.blocked) {
+      // Re-enter the graph from where the body actually is, rather than abandoning the target: the
+      // nearest waypoint to a wedged seeker is the one that walks it back out into the aisle.
+      route.shift();
+      if (routeTarget && routeAttempts < MAX_ROUTE_ATTEMPTS) { routeAttempts += 1; const target = routeTarget; routeTarget = null; planRoute(target); routeTarget = target; }
+    }
     moving = result.moved;
     if (Math.hypot(result.dirX, result.dirZ) > 0.01) yaw = Math.atan2(result.dirX, result.dirZ);
   }

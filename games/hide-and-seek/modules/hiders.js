@@ -13,7 +13,7 @@
 export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floorY, layout, world, avatars, logic, enemyLogic, movement, sanityLogic, avatarLogic, count = 3, spawnOffset = 0, seekerSpawn = null }) {
   const BODY = { height: CONFIG.bodyHeight, radius: CONFIG.playerRadius };
   // Borrowed from the demon deliberately: there is one building to cross and one way to cross it.
-  const navigator = enemyLogic.createNavigator(world.getPlan().navigation);
+  const navigator = enemyLogic.createNavigator(world.getPlan().navigation, { space: world.space });
   const hiders = new Map();
   let zones = [];
 

@@ -141,6 +141,11 @@ export function createMenu({ logic, document, window, onPlay, onStartSingle, onS
     if ([logic.SCREENS.SOLO_SETUP, logic.SCREENS.ONLINE_SETUP, logic.SCREENS.ONLINE, logic.SCREENS.HOW_TO, logic.SCREENS.EXTRAS].includes(state.screen)) dispatch(logic.ACTIONS.BACK);
   });
   window.addEventListener('hotel:caught', (event) => {
+    // An elimination is not an ending. A hider taken while other guests are still hiding keeps
+    // playing as a spectator, and the menu has to stay on PLAYING for that: CAUGHT hides the overlay
+    // (the end-of-round screen is drawn over it) and swallows PAUSE, so a player eliminated mid-round
+    // was left with a live game and no way to open a menu at all — Esc did nothing.
+    if (event.detail?.roundOver === false) return;
     // Only the server-owned round may end online play. Local catch notifications are not results.
     if (onlineMatch && !event.detail?.online) return;
     onlineResult = !!event.detail?.online;

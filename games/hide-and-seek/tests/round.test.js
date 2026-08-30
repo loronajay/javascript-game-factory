@@ -280,3 +280,37 @@ test('the HUD shows the clock and the tally without leaking where anyone is', as
   assert.match(printed, /1:00/);
   assert.ok(!printed.includes('40'), 'positions never reach the HUD');
 });
+
+// A win and a loss share one overlay, which is what stopped a second ending screen from growing.
+// That is a layout decision, not a tone decision: the panel has to say which of the two happened,
+// or a hider whose seeker was dragged off reads their own victory as the blood-red screen that has
+// meant "you died" all game.
+test('the ending marks itself a win for the side that won', async () => {
+  // The demon standing on the CPU seeker is the hiders' win condition.
+  const setup = harness({ hiders: [FAR], aiSeeker: { x: 40, y: 0, z: 40 }, demon: { x: 40, y: 0, z: 40, floor: 1 }, localRole: logic.ROLES.HIDER });
+  const round = await createRound(setup);
+  round.update(45);
+
+  const overlay = setup.elements.get('caughtOverlay');
+  assert.equal(round.getState().outcome, logic.OUTCOMES.HIDERS);
+  assert.equal(overlay.dataset.result, 'win');
+  assert.equal(setup.elements.get('restartBtn').textContent, 'PLAY AGAIN');
+});
+
+test('the ending marks itself a loss for the side that lost', async () => {
+  const setup = harness({ hiders: [{ id: 'hider-1', x: 1, y: 0, z: 0, floor: 1 }], aiSeeker: { x: 1, y: 0, z: 0 }, localRole: logic.ROLES.HIDER });
+  const round = await createRound(setup);
+  round.update(45);
+
+  assert.equal(round.getState().outcome, logic.OUTCOMES.SEEKER);
+  assert.equal(setup.elements.get('caughtOverlay').dataset.result, 'loss');
+  assert.equal(setup.elements.get('restartBtn').textContent, 'TRY AGAIN');
+});
+
+test('a seeker who clears the building gets the win treatment too', async () => {
+  const setup = harness({ hiders: [{ id: 'hider-1', x: 1, y: 0, z: 0, floor: 1 }] });
+  const round = await createRound(setup);
+  round.update(45);
+
+  assert.equal(setup.elements.get('caughtOverlay').dataset.result, 'win');
+});

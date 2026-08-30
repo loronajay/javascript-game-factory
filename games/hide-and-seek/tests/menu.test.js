@@ -90,3 +90,21 @@ test('Esc does nothing destructive while the caught overlay is hidden', async ()
   assert.equal(env.reloads, 0);
   assert.equal(menu.getScreen(), logic.SCREENS.PLAYING);
 });
+
+test('a hider eliminated mid-round keeps a working pause menu', async () => {
+  const env = harness();
+  const menu = await createMenu(env);
+  menu.dispatch(logic.ACTIONS.SINGLE_PLAYER);
+  menu.dispatch(logic.ACTIONS.PLAY);
+
+  // The demon takes the local hider while other guests are still hiding: `modules/monster.js` reports
+  // the catch, `modules/round.js` puts the player into spectator mode, and the round carries on. The
+  // caught overlay is never shown, so the menu must not move to its CAUGHT screen either.
+  env.window.fire('hotel:caught', { detail: { demon: 'The Bellhop', roundOver: false } });
+  assert.equal(menu.getScreen(), logic.SCREENS.PLAYING);
+
+  // Releasing the pointer is a pause, exactly as it is for a living player.
+  menu.dispatch(logic.ACTIONS.PAUSE);
+  assert.equal(menu.getScreen(), logic.SCREENS.PAUSE);
+  assert.equal(env.elements.get('overlay').classList.contains('hidden'), false);
+});

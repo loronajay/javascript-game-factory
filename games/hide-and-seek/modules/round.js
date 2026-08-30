@@ -68,12 +68,23 @@ export function createRound({ camera, world, player, elevator, hiders, seeker = 
     return false;
   }
 
+  // Your side won if the outcome names the role you were playing. It is the only thing that decides
+  // the ending's tone: a hider who was caught an hour before the demon took the seeker still won, and
+  // painting that with the blood-red screen that has meant "you died" all game reads as a loss.
+  function localWon(view) {
+    return view.outcome === (localIsSeeker ? logic.OUTCOMES.SEEKER : logic.OUTCOMES.HIDERS);
+  }
+
   function endedText(view) {
     if (view.outcome === logic.OUTCOMES.SEEKER) {
-      if (!localIsSeeker) return ['NO VACANCY', 'THE SEEKER WON', 'Every hiding place was cleared. Watch the other guests after a catch, then try a different floor next round.'];
+      if (!localIsSeeker) return ['THE HUNT IS OVER', 'THE SEEKER WON', 'Every hiding place was cleared. Watch the other guests after a catch, then try a different floor next round.'];
       return ['CHECKOUT COMPLETE', 'EVERY GUEST FOUND', `You cleared the building before it cleared you. ${staffText()} went hungry.`];
     }
-    if (!localIsSeeker) return ['STILL OCCUPIED', 'HIDERS WIN', world.state.playerEliminated ? 'The remaining guests outlasted the hunt. You stayed to watch the building finish what it started.' : 'The seeker was taken before every guest was found. You made it out of the hunt alive.'];
+    if (!localIsSeeker) {
+      return ['YOU SURVIVED THE NIGHT', 'HIDERS WIN', world.state.playerEliminated
+        ? `${hunterText()} took the seeker before the rest of the guests were found. Your side outlasted the hunt.`
+        : `${hunterText()} took the seeker before you were ever found. You walked out of the building — your side wins.`];
+    }
     if (view.cause === logic.CAUSES.TIMEOUT) {
       const left = view.hidersRemaining;
       return ['LAST CALL', 'TIME RAN OUT', `${left} guest${left === 1 ? '' : 's'} stayed hidden. Sweep the floors faster — sprinting costs, but so does dawdling.`];
@@ -83,12 +94,17 @@ export function createRound({ camera, world, player, elevator, hiders, seeker = 
 
   function paintEnding(view) {
     const [eyebrow, title, body] = endedText(view);
+    const won = localWon(view);
     const panel = caughtOverlay.querySelector('.caughtPanel');
     if (panel) {
       panel.querySelector('.caughtEyebrow').textContent = eyebrow;
       panel.querySelector('h1').textContent = title;
       panel.querySelector('p').textContent = body;
     }
+    // The panel's palette is CSS's job; all this says is which of the two endings it is.
+    caughtOverlay.dataset.result = won ? 'win' : 'loss';
+    const restart = document.getElementById('restartBtn');
+    if (restart) restart.textContent = won ? 'PLAY AGAIN' : 'TRY AGAIN';
     caughtOverlay.classList.add('visible');
     document.body.classList.add('caught');
     if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
@@ -103,7 +119,7 @@ export function createRound({ camera, world, player, elevator, hiders, seeker = 
     world.emit('round-over', { outcome: view.outcome, cause: view.cause, hidersRemaining: view.hidersRemaining });
     // The menu's caught screen is the one full-viewport ending surface, so a win and a loss both
     // land on it rather than growing a second overlay that can stack on the first.
-    world.emit('caught', { outcome: view.outcome });
+    world.emit('caught', { outcome: view.outcome, roundOver: true });
   }
 
   function updateHud(view) {

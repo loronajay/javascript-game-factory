@@ -189,8 +189,13 @@ export function createOnline({
     spectating = false;
     const view = net.snapshot.round;
     const won = (logic.isSeeker(net) && view.outcome === 'seeker') || (!logic.isSeeker(net) && view.outcome === 'hiders');
-    results.show({ eyebrow: 'MATCH COMPLETE', title: won ? 'YOUR SIDE WON' : 'YOUR SIDE LOST',
-      message: 'The online round is over. Find another match to choose a stage and join a new lobby.', outcome: view.outcome });
+    results.show({
+      eyebrow: won ? 'MATCH COMPLETE — YOUR SIDE WON' : 'MATCH COMPLETE',
+      title: won ? 'VICTORY' : 'YOUR SIDE LOST',
+      message: won
+        ? `${logic.isSeeker(net) ? 'Every guest was found' : 'The seeker never cleared the building'}. Find another match to choose a stage and join a new lobby.`
+        : 'The online round is over. Find another match to choose a stage and join a new lobby.',
+      outcome: view.outcome, won });
   }
 
   function failOnline(message) {
