@@ -39,7 +39,7 @@ function run(engine, state, ticks, inputs = () => ({})) {
 }
 
 test('the head start is physical: the seeker is held in a shut cabin until the phase flips', () => {
-  const { engine, state } = startRound();
+  const { engine, state } = startRound({ config: PARKED_DEMON });
   const walking = { forward: 1, strafe: 0, yaw: 0, crouch: false, sprint: false, light: false };
   const inputs = () => ({ seeker: walking, 'hider-0': walking });
 
@@ -128,6 +128,8 @@ test('a demon that catches the seeker ends the round for the hiders, with surviv
   let next = run(built.engine, built.state, 60 * 46);
   assert.equal(next.round.phase, roundLogic.PHASES.SEEKING);
 
+  // Stage the catch in the hallway; the elevator cabin remains protected after the release.
+  next = { ...next, bodies: next.bodies.map(body => body.id === 'seeker' ? { ...body, x: 0, z: 49 } : body) };
   // Put a demon on top of the seeker. The round does not care which one it was.
   const seeker = built.engine.bodyOf(next, 'seeker');
   next = { ...next, demons: next.demons.map((demon, index) => (index === 0 ? { ...demon, x: seeker.x, y: seeker.y, z: seeker.z } : demon)) };

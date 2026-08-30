@@ -1,3 +1,5 @@
+import { createSignCanvas } from './signs.js';
+
 export function createWorld({ THREE, scene, materials: MAT, config: CONFIG, layout, logic, plan: planApi, document, window }) {
   // `floorCount` is the building's height. It was the literal 4 in six different modules before maps
   // were a registry, which is six places a three-level location would have been wrong in.
@@ -149,21 +151,18 @@ export function createWorld({ THREE, scene, materials: MAT, config: CONFIG, layo
   // `groundAt` returning null ("nothing to stand on") is a different answer from `blocked` — one is
   // a ledge and only the other is worth sliding along.
   const space = {
+    sightBlocked: (from, to, options) => sightBlocked(from, to, options),
     groundAt: (x, z, fromY) => resolveGroundHeight(x, z, fromY),
     blocked: (x, z, feetY, bodyHeight = CONFIG.bodyHeight, radius = CONFIG.playerRadius) => collidesAt(x, z, feetY, bodyHeight, radius),
   };
   function sightBlocked(from, to, options) { return logic.segmentBlocked(colliderData(), from, to, options); }
   function addSign(parent, text, x, y, z, rotationY = 0, width = 1.3, height = 0.65) {
-    const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 256; const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#4c3523'; ctx.fillRect(0, 0, 512, 256); ctx.strokeStyle = '#c6a869'; ctx.lineWidth = 12; ctx.strokeRect(12, 12, 488, 232);
-    ctx.fillStyle = '#f2e5c5'; ctx.font = 'bold 100px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, 256, 134);
+    const canvas = createSignCanvas(document, text, width, height);
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(canvas), roughness: 0.85 }));
     mesh.position.set(x, y, z); mesh.rotation.y = rotationY; parent.add(mesh); return mesh;
   }
   function addNumberPlate(parent, text, x, y, z, rotationY = 0, size = 0.22) {
-    const canvas = document.createElement('canvas'); canvas.width = 128; canvas.height = 128; const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#1d1d1d'; ctx.fillRect(0, 0, 128, 128); ctx.strokeStyle = '#b99b54'; ctx.lineWidth = 8; ctx.strokeRect(5, 5, 118, 118);
-    ctx.fillStyle = '#f0e2b5'; ctx.font = 'bold 72px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, 64, 68);
+    const canvas = createSignCanvas(document, text, size, size, { numberPlate: true });
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(canvas), roughness: 0.65 }));
     mesh.position.set(x, y, z); mesh.rotation.y = rotationY; parent.add(mesh); return mesh;
   }

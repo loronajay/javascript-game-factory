@@ -1,0 +1,15 @@
+{
+  "result": "PASS",
+  "rooms": 12,
+  "screens": 6,
+  "seatVisualParts": 856,
+  "boxes": 2423,
+  "colliders": 264,
+  "surfaces": 58,
+  "stairTreads": 56,
+  "stairConnectors": 2,
+  "floor1BaseSlabs": 1,
+  "floor2BaseSlabs": 1,
+  "hallDoors": 0,
+  "callButtons": 0
+}

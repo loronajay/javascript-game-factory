@@ -12,16 +12,10 @@ export function createMonster({
   const BODY = { height: 2.05, radius: 0.32 };
   const monsterStatus = document.getElementById(statusElementId);
   const caughtOverlay = document.getElementById('caughtOverlay');
-  const doorRecords = [...world.collections.roomDoors.entries()].map(([roomNumber, item]) => {
-    const room = world.collections.roomCenters.get(roomNumber);
-    return {
-      id: item.planId, item,
-      x: item.hinge.position.x,
-      y: floorY(room.floor),
-      z: item.hinge.position.z + item.door.position.z,
-      floor: room.floor,
-    };
-  });
+  const doorRecords = world.getPlan().swingDoors.map((spec) => ({
+    id: spec.id, item: world.collections.doorsByPlanId.get(spec.id),
+    x: spec.x, y: floorY(spec.floor), z: spec.z, floor: spec.floor,
+  })).filter((entry) => entry.item);
   let awareness = logic.createAwareness();
   let route = [];
   let routePurpose = 'roam';
@@ -471,6 +465,7 @@ export function createMonster({
   }
 
   function planRoute(target, purpose = 'roam') {
+    if (window.HotelDemon.isSafeHaven(target, world.getPlan().elevator)) { route = []; return; }
     const fromFloor = nearestFloor();
     const toFloor = target.floor || Math.max(1, Math.min(world.state.floorCount, Math.round(target.y / CONFIG.floorHeight) + 1));
     if (target.inStairwell) {
@@ -506,7 +501,7 @@ export function createMonster({
   // Walking is a rule, so it lives in movement-logic.js and this only paints the result: the demon
   // uses the same mover the player and the hiders do.
   function openDoorAhead(target) {
-    const closed = doorRecords.filter((entry) => !entry.item.open || entry.item.locked);
+    const closed = doorRecords.filter(({ item }) => !item.open || item.locked || Math.abs(item.hinge.rotation.y - item.target) > 0.01);
     const selected = window.HotelDemon.selectBlockingDoor(
       { x: root.position.x, y: root.position.y, z: root.position.z, floor: nearestFloor() },
       target,
@@ -517,13 +512,16 @@ export function createMonster({
     const force = routePurpose === 'hunt' || awareness.state === ENEMY_STATES.CHASE || awareness.state === ENEMY_STATES.SEARCH;
     if (force) logic.prepareHuntDoor(selected.item, CONFIG.doorOpenAngle);
     else logic.prepareRoamDoor(selected.item, CONFIG.doorOpenAngle);
+    if (selected.item.open) selected.item.discovered = true;
+    return selected.item.open && Math.abs(selected.item.hinge.rotation.y - selected.item.target) > 0.01;
   }
 
   function tryMove(target, speed, delta) {
-    openDoorAhead(target);
+    if (openDoorAhead(target)) { moving = false; avoidance = null; return; }
     const step = movement.stepToward(world.space, BODY, root.position, target, {
       speed, delta, arriveRadius: 0.18, guided: !!target.guided, avoidance,
     });
+    if (window.HotelDemon.isSafeHaven(step, world.getPlan().elevator)) { route = []; moving = false; avoidance = null; return; }
     avoidance = step.avoidance || null;
     if (step.arrived) { root.position.set(step.x, step.y, step.z); route.shift(); moving = false; avoidance = null; return; }
     if (step.moved) root.position.set(step.x, step.y, step.z);
@@ -546,7 +544,7 @@ export function createMonster({
     return [
       ...(world.state.playerEliminated ? [] : [{ id: 'local', x: camera.position.x, y: playerFeetY, z: camera.position.z, floor: world.state.playerFloor || nearestFloor(playerFeetY), crouching: player.isCrouching() }]),
       ...playerProvider(),
-    ];
+    ].filter((candidate) => !window.HotelDemon.isSafeHaven(candidate, world.getPlan().elevator));
   }
 
   function visiblePlayer(candidates) {
@@ -703,21 +701,21 @@ export function createMonster({
     if (mixer) { setAnimation(moving ? walkAction : idleAction, awareness.state === ENEMY_STATES.CHASE ? 1.85 : 1); advance(delta); }
     if (fallback) { const t = window.performance.now() * 0.001; fallback.position.y = Math.sin(t * 3.2) * 0.035; fallback.rotation.z = Math.sin(t * 1.7) * 0.018; }
     const playerFeetY = camera.position.y - player.getEyeHeight();
-    if (!world.state.playerEliminated && Math.abs(playerFeetY - root.position.y) < 1.15 && Math.hypot(camera.position.x - root.position.x, camera.position.z - root.position.z) < CONFIG.enemyCatchDistance) caught();
+    if (!world.state.playerEliminated && window.HotelDemon.caughtBy(
+      root.position, [{ id: 'local', x: camera.position.x, y: playerFeetY, z: camera.position.z }],
+      { catchDistance: CONFIG.enemyCatchDistance, elevator: world.getPlan().elevator }, world.space,
+    ).length) caught();
     updateHud();
   }
 
   const navigation = world.getPlan().navigation;
-  const spawns = (navigation?.spawnNodes || []).map((node) => floorPoint(node.floor, node.x, node.z));
-  // Away from the demons already standing, measured as a distance rather than as a floor each: the
-  // mall carries three demons on two levels, and "one per floor" has no answer there. This mirrors
-  // `demon-logic.chooseDemonSpawn`, which is what the authoritative side uses.
-  const separation = navigation?.minSpawnSeparation || 24;
-  const clear = spawns.filter((candidate) => takenSpawns.every((other) => (
-    candidate.floor !== other.floor || Math.hypot(candidate.x - other.x, candidate.z - other.z) >= separation
-  )));
-  const pool = clear.length ? clear : spawns;
-  const spawn = logic.chooseSpawn(pool, { x: camera.position.x, z: camera.position.z, floor: world.state.playerFloor }, Math.random, separation, []);
+  // Reserve every player seat before the solo role is selected, using the authority's rule.
+  const playerSpawns = world.getPlan().spawns;
+  const spawn = window.HotelDemon.chooseDemonSpawn({
+    enemy: logic, navigation, taken: takenSpawns,
+    players: [playerSpawns.seeker, ...playerSpawns.hiders],
+    config: { floorHeight: CONFIG.floorHeight, floorCount: world.state.floorCount },
+  });
   mistDisc = createFloorBloom(); if (mistDisc) root.add(mistDisc);
   fallback = createFallbackDemon();
   root.position.set(spawn.x, spawn.y, spawn.z); if (inspectionMode) root.position.set(0, 0, 0); else choosePatrol(); loadAnimatedBody(); updateHud();

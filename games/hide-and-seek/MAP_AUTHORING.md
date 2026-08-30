@@ -11,13 +11,14 @@ authoritative tick spawns whatever demons the row lists, the picker fills itself
 and matchmaking separates maps into pools. Register the classic script and server mirror imports
 as described below. No map-specific branch belongs in the renderer or CPU controllers.
 
-Three maps exist: **The Grand Hotel** (`hotel-plan.js`, four floors, two demons), **Cinder Mall**
+Four maps exist: **The Grand Hotel** (`hotel-plan.js`, four floors, two demons), **Cinder Mall**
 (`mall-plan.js`, two levels, three demons), and **Mercy Hospital** (`hospital-plan.js`, two floors,
-three demons). `status: 'soon'` is still a real state for the next map
+three demons), and **Crowne Point Cinema** (`cinema-plan.js` plus `cinema-navigation.js`, two floors,
+two demons). `status: 'soon'` is still a real state for the next map
 that is registered before it is built — a `soon` map shows in the picker as a locked card and can
 never be resolved into a round — there is just nothing sitting in it right now.
 
-Read `mall-plan.js` before writing a third one. It preserves the Cinder Mall reference geometry
+Read `mall-plan.js` before writing another one. It preserves the Cinder Mall reference geometry
 while adding game-owned primary doors, master keys and a collision-checked aisle graph.
 
 ---
@@ -141,8 +142,12 @@ Rules the tests enforce:
 - **each level's graph is connected.** An island is a set of waypoints nothing can ever walk to;
 - **room targets are clear aisles, not furniture centers.** Include doorway/inside nodes so room
   egress uses the door too; test actual room-to-room movement with player and demon dimensions;
-- **player and demon spawn nodes must be separated.** Sharing a coordinate can eliminate a solo
-  hider on the first tick, before role-specific spawning can affect the demon's choice;
+- **player and demon spawn nodes must be separated** by `navigation.minSpawnSeparation` from
+  every seeker/hider seat on the same floor. Solo reserves all seats before role selection; the
+  authority checks every participating body. Unsafe starts are rejected, never used as a fallback;
+- **only the elevator cabin is protected from demons.** Publish routes through secret passages
+  and leave room for their panels to open. Check door crossings from both sides and at angles,
+  using moving/closed fixtures as well as fully open doors;
 - **a spur reaches every room.** `roomCenters` are the demon's hunt targets, so a room the graph
   cannot reach is a room nobody is ever hunted in;
 - a connector's `flights` may be a switchback (two lanes, `west`/`east`, with a landing between) or a
@@ -154,6 +159,10 @@ room and the wrong one for anything with walls.
 The original hotel spine predates room-entry graph nodes and explicitly declares `corridorSweep`
 for its legacy seeker doglegs. New maps should supply complete graphs and omit this compatibility
 field. Camera/physics initialization and solo CPU seats now come from the plan's `spawns`.
+
+Low tiered surfaces (as in Crowne Point's seating) must be within the ground-snap range of their
+floor datum. `planFloorRoute` samples `space.groundAt` for every unguided waypoint, including the
+final room target; aiming at `floorY` alone strands a CPU above its requested destination.
 
 ### Things that will bite
 

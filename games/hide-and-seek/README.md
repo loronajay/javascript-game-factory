@@ -1,4 +1,19 @@
-# Hide and Seek: Three Locations, One Rulebook
+# Hide and Seek: Four Locations, One Rulebook
+
+Crowne Point Cinema is selectable in solo and online setup (`?map=crowne-point-cinema`).
+The six-screen reference now has red tiered seating, sound-lock entrances, service escape loops,
+six projection booths, searchable restrooms and a locked film store. A working lobby elevator
+joins a new upper landing; both original stairs remain. The Usher hunts sanity; The Projectionist
+roams and chases. Both can catch any role.
+
+CPU demons, seekers and hiders share `cinema-navigation.js`. Tests walk every graph edge, every
+room pair, both stairs in both directions, every hider seat and the seeker's complete unlocked-room
+sweep. Keys live in the box-office drawer and Projection 1; they open the film store and Projections
+2/5 respectively. The supplied reference folder is unchanged.
+
+Inspect with `?map=crowne-point-cinema&inspect=lobby` (also `theater1`, `projection`, `lift`,
+`landing`); `F` enables the flashlight. Multiplayer requires deploying the updated cabinet and
+companion server together; local mirror and delayed two-client startup tests cover the cinema.
 
 Mercy Hospital is now available in solo and online setup (`?map=mercy-hospital`). It uses the
 Saint Mercy V5.1 reference: two floors, fourteen departments, continuous service stairs and a
@@ -24,7 +39,12 @@ V6 turns the exploration prototype into a stealth survival game. A demonic being
 
 **Do not settle anywhere.** Every player carries a sanity clock that climbs while they stay put. Fill it in a room and you stop being hidden: The Bellhop turns and walks straight into that room. Changing rooms clears the meter, and so does walking a stretch of hallway. Hiding is a delay, not a strategy.
 
-The **secret passages are the one real refuge**. Inside a tunnel the meter runs backwards — it bleeds off instead of climbing, and can never read full — so a passage is somewhere to retreat to and wait out rather than somewhere to sprint through. Diving in at 100% does not save you instantly; you have to sit there while it drains.
+The **elevator cabin is the only demon-safe haven**, including when its doors are open. Secret passages still drain the sanity meter, but demons can open their panels and follow you through them. Locked rooms can also be forced during a chase or hunt.
+
+Demons start at separate, reserved locations on every map, at least the map's minimum spacing
+(24 metres, or 26 in the mall) from every player start on the same floor. Solo and online use the
+same placement rule. Door pursuit checks cover openable leaves, angled approaches, secret panels,
+and both stair directions; demons wait for a door to swing clear instead of losing its crossing waypoint.
 
 **Sprinting is metered.** The `STAMINA` bar under `SANITY` drains while you run and refills whenever you are not: fastest crouched in cover, then standing still, and slowest of all while you walk. Empty it and you are *winded* — sprinting is locked out entirely until you have won a real share of the bar back, so the panic run out of a room has to end somewhere. Running is the one thing that outpaces The Bellhop, so it is a resource you spend rather than a speed you hold.
 
@@ -40,7 +60,7 @@ V6.9 adds a light and a second hunter, and both cut both ways.
 
 ## Playing online (new in V7.1, not yet played by real people)
 
-`Online Multiplayer` opens its own stage selector. Choose The Grand Hotel, Cinder Mall or Mercy Hospital, then
+`Online Multiplayer` opens its own stage selector. Choose The Grand Hotel, Cinder Mall, Mercy Hospital or Crowne Point Cinema, then
 press `FIND A LOBBY` to connect to the shared arcade network server. Friends must choose the same
 stage; matchmaking separates locations. `LEAVE / CHANGE STAGE` returns to the stage selector.
 The lobby holds two to eight guests. It needs a signed-in Javascript Game Factory account — the panel says

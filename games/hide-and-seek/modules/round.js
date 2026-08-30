@@ -1,3 +1,5 @@
+import '../demon-logic.js';
+
 // The round: who is it, who is left, how long there is, and who won.
 //
 // All of the rules are in `round-logic.js` — this module only samples the built world for the
@@ -136,9 +138,11 @@ export function createRound({ camera, world, player, elevator, hiders, seeker = 
 
   function resolveDemonCatches() {
     const demonStates = demonList.map((demon) => demon.getState());
+    const canCatch = (demon, target) => globalThis.HotelDemon.caughtBy(demon.position, [target], {
+      catchDistance: config.demonCatchDistance, elevator: world.getPlan?.()?.elevator,
+    }, { sightBlocked: (from, to) => world.sightBlocked ? world.sightBlocked(from, to) : blockedBetween(from, to) }).length > 0;
     for (const hider of hiders.list()) {
-      const catcher = demonStates.find((demon) => Math.abs(hider.y - demon.position.y) < 1.15
-        && Math.hypot(hider.x - demon.position.x, hider.z - demon.position.z) < config.demonCatchDistance);
+      const catcher = demonStates.find((demon) => canCatch(demon, hider));
       if (!catcher) continue;
       flashlightDrops?.drop({ playerId: hider.id, x: hider.x, y: hider.y, z: hider.z, floor: hider.floor, charge: hider.flashlightCharge });
       state = logic.resolveDemonCatch(state, hider.id);
@@ -148,8 +152,7 @@ export function createRound({ camera, world, player, elevator, hiders, seeker = 
     }
     if (seeker) {
       const target = seeker.getState();
-      const catcher = target.alive && demonStates.find((demon) => Math.abs(target.y - demon.position.y) < 1.15
-        && Math.hypot(target.x - demon.position.x, target.z - demon.position.z) < config.demonCatchDistance);
+      const catcher = target.alive && demonStates.find((demon) => canCatch(demon, target));
       if (catcher) {
         state = logic.resolveDemonCatch(state, seeker.id);
         seeker.eliminate();

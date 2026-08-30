@@ -81,7 +81,7 @@ export function createHotel({ THREE, scene, camera, materials: MAT, config: CONF
       door.add(knob);
     }
     const roomNumber = spec.roomNumber;
-    const item = { planId: spec.id, hinge, door, open: spec.openInitially, target: 0, side: spec.side, locked: spec.locked, roomNumber, requiredKey: spec.requiredKey };
+    const item = { planId: spec.id, hinge, door, openAngle: spec.openAngle, open: spec.openInitially, target: 0, side: spec.side, locked: spec.locked, roomNumber, requiredKey: spec.requiredKey };
     if (spec.openInitially) { item.target = spec.openAngle; hinge.rotation.y = item.target; }
     world.setOpening(spec.id, hinge.rotation.y);
     collections.dynamicDoors.push(item); collections.roomDoors.set(roomNumber, item); collections.doorsByPlanId.set(spec.id, item);
@@ -98,7 +98,7 @@ export function createHotel({ THREE, scene, camera, materials: MAT, config: CONF
     const hinge = new THREE.Group(); hinge.position.set(spec.hingeX, 0, spec.hingeZ); parent.add(hinge);
     const panel = new THREE.Mesh(new THREE.BoxGeometry(spec.w, spec.h, spec.d), MAT.wall); panel.position.set(spec.localX, spec.y - floorY(spec.floor), spec.localZ); panel.castShadow = true; panel.receiveShadow = true; hinge.add(panel);
     const trim = new THREE.Mesh(new THREE.BoxGeometry(0.125, 1.72, 0.035), new THREE.MeshStandardMaterial({ color: 0xcac7bd, roughness: 0.9 })); trim.position.set(spec.side === 'left' ? 0.065 : -0.065, 0, spec.width * 0.31); panel.add(trim);
-    const item = { planId: spec.id, id: spec.id, hinge, panel, side: spec.side, open: false, target: 0, discovered: false };
+    const item = { planId: spec.id, id: spec.id, hinge, panel, openAngle: spec.openAngle, side: spec.side, open: false, target: 0, discovered: false };
     world.setOpening(spec.id, 0);
     collections.dynamicDoors.push(item); collections.secretPanels.set(spec.id, item); collections.doorsByPlanId.set(spec.id, item);
     collections.interactables.push({ object: panel, enabled: () => true, prompt: () => !item.discovered ? 'Inspect loose wall panel' : `${item.open ? 'Close' : 'Open'} secret passage`, action: () => {

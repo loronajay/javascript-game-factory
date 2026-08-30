@@ -89,6 +89,23 @@ async function createRound(setup) {
 
 const FAR = { id: 'hider-2', x: 40, y: 0, z: 40, floor: 1 };
 
+test('solo demon catches respect an open elevator and walls for both CPU roles', async () => {
+  for (const localRole of ['seeker', 'hider']) {
+    const target = { id: 'hider-1', x: 0, y: 0, z: 0, floor: 1 };
+    const setup = harness({ localRole, hiders: [target, FAR], aiSeeker: localRole === 'hider' ? target : null,
+      demon: { ...target, z: -0.6 }, seeker: { x: 100, y: 0, z: 100 } });
+    setup.deps.world.getPlan = () => ({ elevator: { centerX: 0, centerZ: 1, frontZ: -.2 } });
+    const round = await createRound(setup);
+    round.update(1 / 60);
+    assert.equal(round.getState().over, false);
+    assert.equal(setup.alive.has('hider-1'), true);
+    setup.deps.world.getPlan = () => ({ elevator: null });
+    setup.deps.world.sightBlocked = () => true;
+    round.update(1 / 60);
+    assert.equal(setup.alive.has('hider-1'), true, 'a wall blocks a demon catch');
+  }
+});
+
 test('hospital round copy names the hospital staff without losing their catch bodies', async () => {
   const setup = harness({ hiders: [FAR] });
   const notices = [];

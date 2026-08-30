@@ -14,6 +14,13 @@ const fixture = require('./helpers/hotel-fixture.js');
 const hotel = fixture.buildHotel();
 const nav = hotel.navigation;
 
+test('routes use the actual walk height of tiered seating, including the final target', () => {
+  const navigation = { nodes: [{ id: 'tier', floor: 1, x: 2, z: 0 }], edges: [], connectors: [] };
+  const navigator = enemy.createNavigator(navigation, { space: { groundAt: () => 0.55 } });
+  const route = navigator.planFloorRoute({ from: { x: 0, z: 0 }, target: { x: 3, z: 0 }, fromFloor: 1, toFloor: 1 });
+  assert.ok(route.every(p => p.y === 0.55), 'floor datum is not the top of a raised seating tier');
+});
+
 test('the plan carries its own navigation graph', () => {
   assert.ok(nav, 'a plan must describe how to get around itself');
   assert.ok(nav.nodes.length > 0);
@@ -48,16 +55,15 @@ test('a target off the spine is reached through its own doorway, not diagonally 
   const room = hotel.roomCenters.find((entry) => entry.floor === 2 && entry.side === 'right');
   const door = hotel.roomDoors.find((entry) => entry.roomNumber === room.roomNumber);
   const route = navigator.walkRoute({ x: 0, z: -52, floor: 2 }, room);
-  const last = route.at(-1);
-  assert.ok(last, 'a route to a room must exist');
-  assert.ok(Math.abs(last.z - door.z) < 1e-6, 'the last waypoint sits at the door, not at the room');
+  const doorwayIndex = route.findIndex(point => Math.abs(point.x - 3.4) < 1e-6 && Math.abs(point.z - door.z) < 1e-6);
+  assert.ok(doorwayIndex >= 0, 'the room is entered through its own doorway');
   // The final waypoint before the room is the mouth of that room's own door, on the room's side of
   // the corridor. It used to be the hall stop at the room's Z, which left the last leg to cross the
   // corridor wall wherever the door did not line up with a hall stop.
-  assert.ok(Math.abs(last.x - 3.4) < 1e-6, 'the last waypoint before a room is its doorway');
+  assert.ok(route.slice(doorwayIndex).every(point => Math.abs(point.z - door.z) < 1e-6), 'the room entry stays square to the doorway');
   // And the spine is still walked to get there: crossing the building is never one straight line.
   assert.ok(route.length >= 3, 'the route must cross the building along the corridor');
-  assert.ok(route.slice(0, -1).every((point) => Math.abs(point.x) < 0.001), 'the approach runs down the spine');
+  assert.ok(route.slice(0, doorwayIndex).every((point) => Math.abs(point.x) < 0.001), 'the approach runs down the spine');
 });
 
 test('a connector is chosen for the floors it actually serves', () => {

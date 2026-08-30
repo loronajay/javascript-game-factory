@@ -194,6 +194,15 @@ test('a sanity hunt opens even a locked room door in the correct direction', () 
   assert.equal(prepareHuntDoor(null, Math.PI / 2), false);
 });
 
+test('AI door opening preserves an authored swing angle on either doorway axis', () => {
+  const door = { side: 'left', openAngle: Math.PI / 2, locked: true };
+  prepareHuntDoor(door);
+  assert.equal(door.target, door.openAngle);
+  door.openAngle = -Math.PI / 2;
+  prepareRoamDoor(door);
+  assert.equal(door.target, door.openAngle);
+});
+
 test('an ordinary room trudge opens unlocked doors but respects locked ones', () => {
   const unlocked = { side: 'right', locked: false, open: false, target: 0 };
   const locked = { side: 'left', locked: true, open: false, target: 0 };

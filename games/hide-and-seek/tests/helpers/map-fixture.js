@@ -15,6 +15,7 @@ const maps = require('../../map-catalog.js');
 require('../../hotel-plan.js');
 require('../../mall-plan.js');
 require('../../hospital-plan.js');
+require('../../cinema-plan.js');
 const base = require('./hotel-fixture.js');
 
 function buildPlan(mapId) {

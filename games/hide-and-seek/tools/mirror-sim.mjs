@@ -28,6 +28,8 @@ export const MIRRORED_FILES = Object.freeze([
   'hotel-plan.js',
   'mall-plan.js',
   'hospital-plan.js',
+  'cinema-plan.js',
+  'cinema-navigation.js',
   'collision-logic.js',
   'movement-logic.js',
   'round-logic.js',
