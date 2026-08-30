@@ -30,7 +30,7 @@
     settleSeconds: 1.5,
     // How far apart hiders try to keep their spots, so a sweep of one room is not a jackpot.
     spotSpreadDistance: 12,
-    // A floor apart is worth this many metres, the same figure the sanity meter uses: the stairwell
+    // A floor apart is worth this many metres, the same figure the heat meter uses: the stairwell
     // is the only way up, so a floor really is a long way.
     floorPenalty: 26,
     settleSpeed: 2.4,

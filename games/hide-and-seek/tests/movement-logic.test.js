@@ -57,11 +57,11 @@ test('stepping toward a waypoint covers speed * delta and reports the facing dir
   assert.equal(Number(result.dirZ.toFixed(6)), 0);
 });
 
-test('a waypoint inside the arrive radius is snapped to and reported as arrived', () => {
+test('arrival on a walking waypoint uses the ground, never the waypoint altitude', () => {
   const space = createSpace();
   const result = movement.stepToward(space, BODY, { x: 0, y: 0, z: 0 }, { x: 0.1, y: 0.2, z: 0 }, { speed: 2, delta: 0.5, arriveRadius: 0.3 });
 
-  assert.deepEqual({ x: result.x, y: result.y, z: result.z }, { x: 0.1, y: 0.2, z: 0 });
+  assert.deepEqual({ x: result.x, y: result.y, z: result.z }, { x: 0.1, y: 0, z: 0 });
   assert.equal(result.arrived, true);
   assert.equal(result.moved, false);
 });
@@ -87,13 +87,31 @@ test('a boxed-in body reports blocked and does not move', () => {
   assert.equal(result.blocked, true);
 });
 
-test('a guided waypoint ignores the world, because the stairs and the elevator carry the body', () => {
+test('a guided waypoint follows the stair altitude when there is body clearance', () => {
   const wall = collision.createBoxCollider({ x: 1, y: 1.6, z: 0, width: 0.3, height: 3.2, depth: 8 });
   const space = createSpace([wall]);
   const result = movement.stepToward(space, BODY, { x: 0, y: 0, z: 0 }, { x: 0, y: 4, z: 0 }, { speed: 2, delta: 0.5, guided: true });
 
   assert.equal(Number(result.y.toFixed(6)), 1);
   assert.equal(result.moved, true);
+});
+
+test('guided stair movement cannot carry a body through a wall or ceiling', () => {
+  const space = { groundAt: () => 0, blocked: (x, z, y) => x > .01 || y > .01 };
+  for (const target of [{ x: 1, y: 0, z: 0 }, { x: 0, y: 1, z: 0 }]) {
+    const result = movement.stepToward(space, BODY, { x: 0, y: 0, z: 0 }, target, { speed: 2, delta: .1, guided: true });
+    assert.equal(result.blocked, true);
+    assert.deepEqual([result.x, result.y, result.z], [0, 0, 0]);
+  }
+});
+
+test('arrival tolerance does not snap a body into a solid wall', () => {
+  const space = { groundAt: () => 0, blocked: (x) => x > .05 };
+  for (const guided of [false, true]) {
+    const result = movement.stepToward(space, BODY, { x: 0, y: 0, z: 0 }, { x: .1, y: 0, z: 0 }, { speed: 2, delta: .1, guided });
+    assert.equal(result.arrived, false);
+    assert.ok(result.x <= .05);
+  }
 });
 
 test('a step never overshoots the waypoint it is walking to', () => {

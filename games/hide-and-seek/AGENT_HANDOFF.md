@@ -4,6 +4,15 @@ Design direction, roadmap, and working agreements live in `CLAUDE.md`. This file
 
 ## Traversal (V5, still binding)
 
+Spectator/traversal regression (2026-08-30): CPU poses retain rig-facing `yaw` (+Z) and publish
+`cameraYaw` for the spectator camera (-Z); human/network poses already use camera yaw. Hiders must
+publish facing too. The seeker uses the map graph for chases as well as patrols, never a room-centre
+sweep that forces a same-room chase back into the corridor. Guided stairs still check body collision,
+and arrival snapping checks clearance and actual walk height. A blocked waypoint invalidates the
+whole remaining route, not just its first leg. Replanning from a flight preserves the body's actual Y
+and exits along the stair spine before rejoining a floor graph. CPU wall avoidance persists between
+ticks, and retrying a seeker route must not reset its retry count.
+
 Do not reintroduce floor visibility swapping or stair teleports. Continuous vertical traversal is the architectural goal — all four floors are physically present at their real Y positions.
 
 `plan.surfaces` contains flat hotel floors, room floors, secret tunnels, the moving elevator floor, stair landings, and stair ramps. `resolveGroundHeight()` deliberately selects only a *nearby* surface, so overlapping stair flights do not snap the player several meters vertically.
@@ -98,18 +107,24 @@ emptied containers are pruned. The floor groups go from ~2,780 meshes to ~620.
   `potMaterial` / `vendingMaterial` in `modules/furnishings.js`.
 - `HotelPrototype.getState().render` reports live `drawCalls`/`triangles` and what the pass collapsed.
 
-## Sanity / the anti-camping hunt (V6.5)
+## Heat signature / the anti-camping hunt (V6.5, renamed V7.4)
 
-The meter exists to stop hiding in one room from being a winning strategy, and every rule for it is in `sanity-logic.js` so a server can run it headlessly — `modules/sanity.js` may sample the camera and paint the HUD, but must not re-implement the timing (the architecture test asserts it never mentions `fillSeconds`).
+The meter was called `sanity` through V7.3. It counts *up* while you sit still and a full bar brings
+a demon to your door, which is the opposite of what a sanity bar does everywhere else — it is a heat
+signature, and it is named one everywhere: `heat-logic.js`, `modules/heat.js`, the `hotel:heat-*`
+events, the plans’ room `heat` bounds, and the roster’s `heat: null` for a demon that does not hunt.
+The mirrored copy in `factory-network-server` was renamed with it; deploy both repositories together.
+
+The meter exists to stop hiding in one room from being a winning strategy, and every rule for it is in `heat-logic.js` so a server can run it headlessly — `modules/heat.js` may sample the camera and paint the HUD, but must not re-implement the timing (the architecture test asserts it never mentions `fillSeconds`).
 
 - There are three **zone kinds** and the meter treats each differently: `room` (an 8×8 box from `world.collections.roomCenters`) fills it and can be hunted; `hallway` — corridors, the stairwell, a moving elevator (`playerFloor === 0`) — fills it but is never entered by the demon; `tunnel` (explicit bounds from `world.collections.secretTunnels`, published by `addSecretTunnel`) **drains** it.
 - Tunnels are matched *before* rooms in `locateZone`. Their floor rect overlaps the neighbouring room box by ~2.5cm of solid wall, and the tunnel is the more specific space.
 - The elevator cabin is the only protected refuge, even with open doors. Demons can open secret panels and traverse tunnels. A tunnel still cannot read full however long you sit in it, and entering one does **not** reset the meter: it carries the value in and bleeds it off over `tunnelDrainSeconds`. Leaving a tunnel resets like any other zone change.
 - Changing zone resets it, and that tick's time is dropped (the tunnel exception above aside). Distance walked **in the hallway** resets it too, once it passes `hallwayStepDistance`. Moving around *inside* a room does not: camping in place is what is being punished, not motion.
 - A full meter only makes you a target while you are **in a room** — the demon walks into rooms, so a full meter in a corridor does nothing. With several full hiders it takes the nearest, with a floor priced at `floorPenalty` metres of corridor.
-- Every living hider owns a `createPlayerSanity` tracker. `hiders.list()` publishes its candidate fields, and both The Bellhop's visual detection and sanity hunt consume that entire list alongside the local player.
+- Every living hider owns a `createPlayerHeat` tracker. `hiders.list()` publishes its candidate fields, and both The Bellhop's visual detection and heat hunt consume that entire list alongside the local player.
 - The hunt fires only from `ROAM`. `CHASE` always wins (it has a live sighting) and `SEARCH` is a fresher lead than a stale camper; letting either stack with the hunt would double-plan the route. On arrival the demon prowls the room rather than standing in the doorway.
-- `sanity.setHunted()` is called by `monster.js`, not by the meter — the demon owns whether it is actually walking your way, so the HUD and the AI cannot disagree.
+- `heat.setHunted()` is called by `monster.js`, not by the meter — the demon owns whether it is actually walking your way, so the HUD and the AI cannot disagree.
 
 ## Sprint stamina (V6.6)
 
@@ -118,17 +133,41 @@ Sprinting is the only thing that outruns The Bellhop, so it is a metered resourc
 - The shift key is a *request*. `player.js` asks the meter and uses the answer, so a spent player drops back to a walk mid-stride. Do not reintroduce `keys.ShiftLeft ? CONFIG.sprintSpeed : ...`.
 - The bar drains only while actually moving and not crouching — holding shift while standing still recovers instead of draining.
 - **Exhaustion, not emptiness, is the sprint gate.** A bar at 10% still sprints; a bar recovering from zero does not, until it passes `recoverThreshold`. Without that lockout, emptying the bar would give a stutter-sprint one frame later instead of a real cost.
-- Recovery is fastest crouched, then standing, and slowest while walking. That ordering is the point: the safe way to get sprint back is to stop and hide, which is exactly where the sanity meter starts filling. The two meters are meant to pull against each other.
+- Recovery is fastest crouched, then standing, and slowest while walking. That ordering is the point: the safe way to get sprint back is to stop and hide, which is exactly where the heat meter starts filling. The two meters are meant to pull against each other.
 
 ## Menus and pause (V6.6)
 
 `menu-logic.js` is the screen state machine (title / how-to / extras / pause / playing / caught); `modules/menu.js` only paints it and dispatches button clicks.
 
-- `PLAYING` is the game's single "the simulation is running" answer. `main.js` gates the accumulator on it: **it does not advance `timestep` at all while paused**, so no meter ticks behind a menu and no paused time is owed back on resume. Do not "fix" a pause by clamping the delta instead — that reintroduces the tick the sanity meter used to steal.
+- `PLAYING` is the game's single "the simulation is running" answer. `main.js` gates the accumulator on it: **it does not advance `timestep` at all while paused**, so no meter ticks behind a menu and no paused time is owed back on resume. Do not "fix" a pause by clamping the delta instead — that reintroduces the tick the heat meter used to steal.
 - `player.js` no longer touches the overlay. It reports lock changes to the menu and the machine decides what that means — which is what keeps a pause menu from stacking on top of the caught screen when the pointer lock is released by the catch.
 - Pointer lock must be requested from inside the click that chose Play or Resume, so the menu calls `player.beginPlay()` rather than the player watching the overlay. `?controls=drag` goes through the same dispatch instead of around it: there is one path into a round.
 - `how-to` and `extras` remember which screen opened them, so `BACK` from the pause menu returns to the pause menu.
 - Quitting reloads. The hotel, the demon, the open doors and the key ring are all still standing, so the machine reports the intent (`effect: 'quit'`) and the host rebuilds the session; there is no in-place reset and it should not be faked.
+
+## The in-game HUD (V7.4)
+
+The round now uses the menus' own design language — hairline warm border, near-black ground, a red
+accent tick, 8px letterspaced micro-labels, one serif numeral — instead of the prototype's six
+translucent black rounded rectangles. The rules that hold it together:
+
+- **Four corners and one rail.** Key ring top left, location top right, the round plate top centre,
+  the controls legend bottom left, and everything a player spends in `#hudRail` down the right.
+  `.hudPlate` fixes one width for both side columns so the plates line up as columns, not as four
+  boxes near the corners.
+- **Nothing is positioned relative to another element's height.** Every panel in the rail used to be
+  `position:fixed` at its own hard-coded `top`, which is only correct for one roster size, and the
+  stylesheet carried a duplicate copy of the stamina block per `.monster-*` state to re-pin it. The
+  rail is a grid; a third demon pushes the meters down. Do not reintroduce a `top` on a rail child.
+- **A meter is a label, a readout and a track**, sharing `.hudMeter` / `.meterHead` /
+  `.meterTrack` / `.meterFill`. Heat, stamina and the flashlight are the same shape because they are
+  the same kind of thing: something you spend. State is a `data-state` (or `data-on`) attribute the
+  module sets and CSS colours — a module must never write a colour.
+- **The interaction prompt's keycap is CSS**, drawn from `data-key`. `player.js` sets the sentence
+  the interactable wrote; it must not paste `[E] ` onto the front of it again.
+- **`#threatVignette` is transparent on its own** and lit only by a `.monster-*` body class, each
+  declared exactly once. `tests/demons.test.js` asserts that: a second copy of any of those
+  selectors is how a chase glow used to outlive the chase.
 
 ## The flashlight (V6.9)
 
@@ -180,7 +219,7 @@ in `tests/elevator-facing.test.js`.
 
 `mall-plan.js` preserves the reference's twenty public entries and furnished shops. Primary doors
 and the master keys remain gameplay additions. Furniture has plan-owned collision; its meshes
-never register it. Shop targets are clear aisle points, with separate bounds for sanity zones.
+never register it. Shop targets are clear aisle points, with separate bounds for heat zones.
 Ground ceilings cover shops only, never the atrium or escalators. Shop finishes sit above the
 structural slab to avoid z-fighting. The projection corridor is inside the cinema's rear wall.
 
@@ -199,7 +238,7 @@ The renderer re-derived every door leaf as thin-in-X and wide-in-Z, and `createD
 
 `boxBounds`, `hingedBounds`, `slidingBounds`, `resolveColliders`, `walkHeightAt` and `rotateY` were in `hotel-plan.js`; a mall cannot sensibly ask a hotel where its own floor is. Both plan modules re-export them, so `plan.resolveColliders(...)` still works everywhere. **`collision-logic.js` must load before any plan module** — in `index.html` and in the server's `shared/index.mjs`.
 
-- **Exactly one demon per map hunts campers.** Every other demon is constructed with `sanity: null` deliberately. Two sanity hunters would converge on the same full meter and make the anti-camping rule read as a swarm; it also keeps `selectHuntTarget` single-hunter. `tests/map-catalog.test.js` asserts it for every registered map.
+- **Exactly one demon per map hunts campers.** Every other demon is constructed with `heat: null` deliberately. Two heat hunters would converge on the same full meter and make the anti-camping rule read as a swarm; it also keeps `selectHuntTarget` single-hunter. `tests/map-catalog.test.js` asserts it for every registered map.
 - **They start apart.** Each demon's `excludedSpawnFloors` is every floor already taken, so a roster of three opens on three levels rather than two in one stairwell.
 - **A demon without authored markup gets a HUD row built for it.** The hotel's two are in `index.html`; a new map's are created into `#demonStatuses`. Adding a demon must never be an HTML edit.
 - **The threat readout stays aggregated and position-free.** `enemy-logic.aggregateEnemyState` reduces every demon to one worst-case state for the vignette and the `hotel:monster-state` event. Do not add a per-demon indicator — that is the tracker minimap coming back through the side door, and with three demons it leaks three positions.

@@ -221,23 +221,23 @@ test('the local head collapse is re-applied after the mixer writes each frame', 
   assert.doesNotMatch(avatars, /crouchPosture/);
 });
 
-test('the sanity meter keeps its rules pure and lets the demon read them', () => {
+test('the heat meter keeps its rules pure and lets the demon read them', () => {
   const main = fs.readFileSync(path.join(projectRoot, 'main.js'), 'utf8');
   const monster = fs.readFileSync(path.join(projectRoot, 'modules', 'monster.js'), 'utf8');
-  const sanityModule = fs.readFileSync(path.join(projectRoot, 'modules', 'sanity.js'), 'utf8');
+  const heatModule = fs.readFileSync(path.join(projectRoot, 'modules', 'heat.js'), 'utf8');
   const html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
 
-  assert.ok(fs.existsSync(path.join(projectRoot, 'sanity-logic.js')), 'sanity-logic.js is missing');
-  assert.match(html, /sanity-logic\.js/);
-  assert.match(html, /id="sanityMeter"/);
-  assert.match(main, /createSanity/);
-  assert.match(main, /HotelSanity/);
+  assert.ok(fs.existsSync(path.join(projectRoot, 'heat-logic.js')), 'heat-logic.js is missing');
+  assert.match(html, /heat-logic\.js/);
+  assert.match(html, /id="heatMeter"/);
+  assert.match(main, /createHeat/);
+  assert.match(main, /HotelHeat/);
   // Timing, zone tests and target selection are rules a server must be able to run headlessly, so
   // the runtime module may only call into the pure layer, never re-implement it.
-  for (const rule of ['logic.locateZone', 'logic.updateSanity', 'logic.selectHuntTarget']) assert.match(sanityModule, new RegExp(rule.replace('.', '\.')));
-  for (const tuning of ['fillSeconds', 'tunnelDrainSeconds', 'hallwayStepDistance']) assert.doesNotMatch(sanityModule, new RegExp(tuning));
+  for (const rule of ['logic.locateZone', 'logic.updateHeat', 'logic.selectHuntTarget']) assert.match(heatModule, new RegExp(rule.replace('.', '\.')));
+  for (const tuning of ['fillSeconds', 'tunnelDrainSeconds', 'hallwayStepDistance']) assert.doesNotMatch(heatModule, new RegExp(tuning));
   // Which spaces exist is a rule too — the runtime module may not decide what a tunnel is.
-  assert.match(sanityModule, /logic\.ZONE_KINDS\.TUNNEL/);
+  assert.match(heatModule, /logic\.ZONE_KINDS\.TUNNEL/);
   // The demon acts on the meter; a full meter that nothing hunts is just a HUD decoration.
   assert.match(monster, /getHuntTarget/);
   assert.match(monster, /routePurpose === 'hunt'/);
@@ -338,7 +338,7 @@ test('the hiders are stand-ins for players, not a second kind of body', () => {
   assert.match(hidersModule, /avatars\.setPose/);
   assert.match(hidersModule, /createNavigator/);
   assert.match(hidersModule, /planFloorRoute/);
-  assert.match(hidersModule, /sanityLogic\.updatePlayerSanity/);
+  assert.match(hidersModule, /heatLogic\.updatePlayerHeat/);
 });
 
 test('collision is plain headless data rather than geometry discovered from meshes', () => {

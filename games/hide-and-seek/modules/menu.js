@@ -3,7 +3,7 @@
 // the buttons that dispatch actions into the machine.
 //
 // `PLAYING` is the game's single "the simulation is running" answer: the loop pauses whenever the
-// player is not locked in, which is what stops meters like sanity from ticking behind a menu.
+// player is not locked in, which is what stops meters like heat from ticking behind a menu.
 import { createMapPicker } from './map-picker.js';
 
 export function createMenu({ logic, document, window, onPlay, onStartSingle, onScreen, onQuit, maps = null, mapSession = null, canPause = () => true }) {
@@ -92,9 +92,19 @@ export function createMenu({ logic, document, window, onPlay, onStartSingle, onS
   function render() {
     overlay.classList.toggle('hidden', !logic.isOverlayVisible(state.screen));
     for (const [screen, element] of screenEls) if (element) element.classList.toggle('hidden', screen !== state.screen);
+    // Focus the panel, never a control on it.
+    //
+    // This used to focus the screen's first button, which on every setup and lobby screen is the
+    // back arrow in the header - so Space or Enter, pressed anywhere while reading the options, was
+    // a click on "back to main menu". That is the random kick to the title players hit while setting
+    // a match up. (The first *control* is no safer: on the solo screen it is a location radio, and an
+    // arrow key on a radio group changes map, which re-enters the page.) Focusing the panel keeps
+    // the screen reachable by Tab without arming anything.
     const active = screenEls.get(state.screen);
-    const first = active?.querySelector?.('button:not([disabled]), input, select');
-    if (first && typeof first.focus === 'function') first.focus({ preventScroll: true });
+    if (active && typeof active.focus === 'function') {
+      active.tabIndex = -1;
+      active.focus({ preventScroll: true });
+    }
   }
 
   function dispatch(action) {

@@ -24,7 +24,8 @@
       x: target.x,
       y: target.y + (target.crouching ? crouchEyeHeight : eyeHeight),
       z: target.z,
-      yaw: Number(target.yaw) || 0,
+      // CPU rigs face +Z; human/network yaw already describes a camera looking down -Z.
+      yaw: Number.isFinite(target.cameraYaw) ? target.cameraYaw : Number(target.yaw) || 0,
       pitch: Number(target.pitch) || 0,
     };
   }

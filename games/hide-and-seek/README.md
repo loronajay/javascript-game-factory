@@ -3,7 +3,7 @@
 Crowne Point Cinema is selectable in solo and online setup (`?map=crowne-point-cinema`).
 The six-screen reference now has red tiered seating, sound-lock entrances, service escape loops,
 six projection booths, searchable restrooms and a locked film store. A working lobby elevator
-joins a new upper landing; both original stairs remain. The Usher hunts sanity; The Projectionist
+joins a new upper landing; both original stairs remain. The Usher hunts heat; The Projectionist
 roams and chases. Both can catch any role.
 
 CPU demons, seekers and hiders share `cinema-navigation.js`. Tests walk every graph edge, every
@@ -37,26 +37,26 @@ From a terminal, the equivalent command is `npm start`.
 
 V6 turns the exploration prototype into a stealth survival game. A demonic being called The Bellhop spawns at a safe random hotel position, roams every floor, uses the physical stairwell, investigates its last sighting, and catches players on contact.
 
-**Do not settle anywhere.** Every player carries a sanity clock that climbs while they stay put. Fill it in a room and you stop being hidden: The Bellhop turns and walks straight into that room. Changing rooms clears the meter, and so does walking a stretch of hallway. Hiding is a delay, not a strategy.
+**Do not settle anywhere.** Every player carries a heat clock that climbs while they stay put. Fill it in a room and you stop being hidden: The Bellhop turns and walks straight into that room. Changing rooms clears the meter, and so does walking a stretch of hallway. Hiding is a delay, not a strategy.
 
-The **elevator cabin is the only demon-safe haven**, including when its doors are open. Secret passages still drain the sanity meter, but demons can open their panels and follow you through them. Locked rooms can also be forced during a chase or hunt.
+The **elevator cabin is the only demon-safe haven**, including when its doors are open. Secret passages still drain the heat meter, but demons can open their panels and follow you through them. Locked rooms can also be forced during a chase or hunt.
 
 Demons start at separate, reserved locations on every map, at least the map's minimum spacing
 (24 metres, or 26 in the mall) from every player start on the same floor. Solo and online use the
 same placement rule. Door pursuit checks cover openable leaves, angled approaches, secret panels,
 and both stair directions; demons wait for a door to swing clear instead of losing its crossing waypoint.
 
-**Sprinting is metered.** The `STAMINA` bar under `SANITY` drains while you run and refills whenever you are not: fastest crouched in cover, then standing still, and slowest of all while you walk. Empty it and you are *winded* — sprinting is locked out entirely until you have won a real share of the bar back, so the panic run out of a room has to end somewhere. Running is the one thing that outpaces The Bellhop, so it is a resource you spend rather than a speed you hold.
+**Sprinting is metered.** The `STAMINA` bar under `HEAT SIGNATURE` drains while you run and refills whenever you are not: fastest crouched in cover, then standing still, and slowest of all while you walk. Empty it and you are *winded* — sprinting is locked out entirely until you have won a real share of the bar back, so the panic run out of a room has to end somewhere. Running is the one thing that outpaces The Bellhop, so it is a resource you spend rather than a speed you hold.
 
 V6.8 makes the hiding phase physical, and the solo setup now lets you choose either role. As the **seeker**, the guests get at least 45 seconds to scatter across the four floors while you are locked inside the closed lobby elevator. As a **hider**, you use that head start to find cover alongside any AI hider teammates, then an AI seeker is released to hunt you. The `ROUND` readout shows the hiding countdown, then `NO LIMIT` beside the tally. It never tells the seeker where anybody is.
 
-The catch is that **The Bellhop is nobody's ally.** It sees, hunts, and sanity-tracks the hiders as well as you, and it does not care which of you it reaches first. A guest it takes still counts toward your total, so the demon can hand you the round. A *you* it takes ends the round on the spot and the hiders win, however many you had already found. That is the whole tension: every tool that makes seeking faster — sprinting especially — is a tool that gets you found.
+The catch is that **The Bellhop is nobody's ally.** It sees, hunts, and heat-tracks the hiders as well as you, and it does not care which of you it reaches first. A guest it takes still counts toward your total, so the demon can hand you the round. A *you* it takes ends the round on the spot and the hiders win, however many you had already found. That is the whole tension: every tool that makes seeking faster — sprinting especially — is a tool that gets you found.
 
 V6.9 adds a light and a second hunter, and both cut both ways.
 
 **The flashlight (`F`) runs on a battery.** A full charge is about two minutes of continuous light and it drains only while lit, so it is something you spend rather than something you hold. At zero it switches itself off and will not come back on — there is no last flick of vision. A caught player drops their flashlight where they fell, and anyone, seeker or hider, can pick it up and add the leftover charge to their own up to 100%. A body on the floor is a resupply.
 
-**There are now two demons.** The Bellhop is joined by The Housekeeper, and they start on different floors. Only The Bellhop tracks the sanity clock and walks into the room of whoever has been sitting still too long; The Housekeeper roams, sees and chases like any hunter. Neither is your ally and neither cares which of you it reaches first. The threat readout still tells you a state and never a place — with two of them loose, that restraint is the point.
+**There are now two demons.** The Bellhop is joined by The Housekeeper, and they start on different floors. Only The Bellhop tracks the heat clock and walks into the room of whoever has been sitting still too long; The Housekeeper roams, sees and chases like any hunter. Neither is your ally and neither cares which of you it reaches first. The threat readout still tells you a state and never a place — with two of them loose, that restraint is the point.
 
 ## Playing online (new in V7.1, not yet played by real people)
 
@@ -143,10 +143,10 @@ V6 adds:
 - `monster.js` — creature rendering, navigation, LOS, chase/search behavior, threat HUD state, and defeat
 - `performance.js` — reusable change and interval gates, the adaptive quality controller, and the fixed-timestep accumulator
 - `avatars.js` — player figures: one shared textured body and locomotion bank, cloned per player, with a placeholder body until they load
-- `sanity.js` — the anti-camping meter: samples which room you are standing in, drives the HUD bar, and hands the map's hunter its target
+- `heat.js` — the anti-camping meter: samples which room you are standing in, drives the HUD bar, and hands the map's hunter its target
 - `map-session.js` — which location this page booted into, and the re-entry that changes it
 
-Pure monster rules live in `enemy-logic.js`, pure avatar rules (motion state, clip choice, crouch posture, facing, seat tints) live in `avatar-logic.js`, collision boxes live in `collision-logic.js`, and sanity rules live in `sanity-logic.js`, so those decisions can be tested without WebGL — and run headlessly on a server later. The tracker minimap was removed in V6.3 — the player is meant to locate a demon by sound and sight, not by a HUD readout.
+Pure monster rules live in `enemy-logic.js`, pure avatar rules (motion state, clip choice, crouch posture, facing, seat tints) live in `avatar-logic.js`, collision boxes live in `collision-logic.js`, and heat rules live in `heat-logic.js`, so those decisions can be tested without WebGL — and run headlessly on a server later. The tracker minimap was removed in V6.3 — the player is meant to locate a demon by sound and sight, not by a HUD readout.
 
 ## Locations
 
@@ -157,7 +157,7 @@ before a round rather than during one:
   The Bellhop (who walks to whoever has stopped moving) and The Housekeeper.
 - **Cinder Mall** — a burnt-out shopping centre: two levels wrapped around an atrium void, thirteen
   storefronts, an escalator pair, an enclosed service stair, a two-floor lift and two back-of-house
-  service corridors that drain the sanity meter. Three demons: The Greeter (the hunter), The
+  service corridors that drain the heat meter. Three demons: The Greeter (the hunter), The
   Custodian and The Nightwatch.
 
 A location is a row in `map-catalog.js`, a pure plan module and a demon roster; nothing else in the
@@ -172,6 +172,21 @@ preview with it.
 
 `?map=<id>` boots straight into a location. Online, the map is a lobby setting, so two locations are
 two matchmaking pools and the server names the map in every snapshot.
+
+## The HUD
+
+The in-game UI is one system in the menus' own language: hairline warm borders on a near-black
+ground, a red accent tick, small letterspaced labels, and one serif numeral. Four corner plates —
+`KEY RING` top left, `LOCATION` top right, the round plate top centre, `CONTROLS` bottom left — and
+a right-hand rail holding the demon roster and the three things you spend: `HEAT SIGNATURE`,
+`STAMINA` and `FLASHLIGHT`, all the same meter shape. The rail stacks, so a location with three
+demons pushes the meters down rather than sitting on top of them.
+
+**`SANITY` is now `HEAT SIGNATURE`.** Nothing about how it behaves changed: it builds while you stay
+put, a full bar sends the map's hunting demon to the room you are in, and the secret passages cool it
+back down. It counts up and a full bar is bad, which is a heat signature rather than a sanity meter,
+so the name says what the number does. The readout says `COOLING` in a passage and `YOU ARE LIT UP`
+when it is full.
 
 ## Major changes
 
@@ -192,7 +207,7 @@ two matchmaking pools and the server names the map in every snapshot.
 3. Enter the stairwell on the east side and physically walk the west flight up, cross the north landing, then take the east flight to the next floor. Repeat through Floor 4; there should be no use prompt or teleport.
 4. Return to Floor 1, enter the elevator, select a floor from inside, ride, and exit.
 5. Room 105 still demonstrates the drawer/key loop.
-6. Stand still inside any room and watch `SANITY` climb; at 100% The Bellhop routes to that room. Step into the corridor and walk a short way — the meter drops to 0% and the demon breaks off and resumes roaming.
+6. Stand still inside any room and watch `HEAT SIGNATURE` climb; at 100% The Bellhop routes to that room. Step into the corridor and walk a short way — the meter drops to 0% and the demon breaks off and resumes roaming.
 7. Hold Shift and run a corridor end to end. `STAMINA` drains, reads `WINDED` at zero, and Shift stops doing anything; stand still or crouch and watch it climb back — crouching refills noticeably faster than walking does.
 8. Press `Esc` mid-round. The pause menu appears and both meters freeze; `RESUME` puts you back where you were with the same readings.
 9. Fill the meter in room 105, then open the loose wall panel and step into the secret passage. The bar turns green, reads `CALMING`, and counts down to `UNSEEN` — it carries your meter in rather than wiping it, so the drain is visible. Step out into 107 and it starts climbing again.

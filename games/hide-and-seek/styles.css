@@ -10,7 +10,7 @@ button{font:inherit}
 .panel{position:relative;z-index:1;margin:auto;width:min(920px,100%);padding:clamp(24px,4vw,54px);border:1px solid rgba(196,170,144,.2);background:linear-gradient(135deg,rgba(21,18,19,.97),rgba(8,8,10,.96));box-shadow:0 32px 90px rgba(0,0,0,.7),inset 0 1px rgba(255,255,255,.025);box-sizing:border-box}
 .panel:before,.panel:after{content:"";position:absolute;width:34px;height:34px;pointer-events:none}.panel:before{left:10px;top:10px;border-left:1px solid rgba(181,35,29,.6);border-top:1px solid rgba(181,35,29,.6)}.panel:after{right:10px;bottom:10px;border-right:1px solid rgba(181,35,29,.45);border-bottom:1px solid rgba(181,35,29,.45)}
 .panel h1{margin:0;font-family:Georgia,"Times New Roman",serif;font-size:clamp(32px,5vw,52px);font-weight:400;letter-spacing:-.035em}.panel p{margin:10px 0;line-height:1.55;color:#aaa1a0}
-.menuScreen{box-sizing:border-box}.menuEyebrow{margin-bottom:10px;color:#ad2d28;font-size:10px;font-weight:800;letter-spacing:.32em}.menuFoot{display:flex;justify-content:space-between;margin-top:22px;color:#615b5a;font-size:9px;font-weight:800;letter-spacing:.18em}
+.menuScreen{box-sizing:border-box}.menuScreen:focus{outline:none}.menuEyebrow{margin-bottom:10px;color:#ad2d28;font-size:10px;font-weight:800;letter-spacing:.32em}.menuFoot{display:flex;justify-content:space-between;margin-top:22px;color:#615b5a;font-size:9px;font-weight:800;letter-spacing:.18em}
 .titleScreen{display:grid;grid-template-columns:minmax(280px,1fr) minmax(320px,.88fr);gap:clamp(35px,7vw,86px);align-items:center;min-height:min(610px,80vh)}
 .titleBrand{text-align:center}.hotelMark{display:grid;place-items:center;width:58px;height:58px;margin:0 auto 24px;border:1px solid rgba(181,35,29,.62);transform:rotate(45deg);box-shadow:0 0 40px rgba(140,14,10,.18)}.hotelMark span{font:30px Georgia,serif;color:#d5c5b7;transform:rotate(-45deg)}
 .titleBrand h1{display:flex;justify-content:center;align-items:center;gap:.16em;font-size:clamp(54px,7vw,90px);line-height:.8;text-transform:uppercase}.titleBrand h1>span:first-child,.titleBrand h1>span:last-child{display:block}.titleAnd{color:#9c211d;font-size:.42em;font-style:italic}.titleTagline{margin:28px auto 0!important;color:#8f8583!important;font-family:Georgia,serif;font-size:14px;font-style:italic;letter-spacing:.08em}.titleRule{display:flex;align-items:center;gap:12px;width:min(280px,80%);margin:30px auto 0;color:#514b49;font-size:8px;letter-spacing:.25em}.titleRule span{height:1px;flex:1;background:#332f2e}
@@ -22,23 +22,6 @@ button{font:inherit}
 .connectionPill{display:flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid rgba(255,255,255,.09);color:#706866;font-size:8px;font-weight:800;letter-spacing:.12em}.connectionPill:before{content:"";width:6px;height:6px;border-radius:50%;background:#6b2a27;box-shadow:0 0 9px #6b2a27}.connectionPill[data-state="lobby"]:before,.connectionPill[data-state="playing"]:before{background:#6f9a77;box-shadow:0 0 9px #6f9a77}.accountStrip{margin-bottom:14px;padding:10px 12px;border-left:2px solid #a37735;color:#c49c5e;background:rgba(163,119,53,.08);font-size:9px;font-weight:800;letter-spacing:.12em}.accountStrip[data-signed-in="true"]{border-color:#56755d;color:#829989;background:rgba(74,112,83,.08)}.lobbyGrid{display:grid;grid-template-columns:.85fr 1.15fr;gap:14px}.roomCard,.rosterCard{min-height:190px;padding:20px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.018);box-sizing:border-box}.roomCard{text-align:center}.roomCardLabel,.rosterHeading{color:#68605e;font-size:9px;font-weight:800;letter-spacing:.2em}.onlineRoom{margin:20px 0 14px;color:#d4c2b2;font-family:Georgia,serif;font-size:clamp(18px,3vw,27px);font-weight:400;letter-spacing:.2em;min-height:32px}.copyBtn{padding:8px 12px;border:1px solid rgba(255,255,255,.12);font-size:8px;font-weight:800;letter-spacing:.14em}.copyBtn:not([disabled]):hover{border-color:#a82d28;color:#eee}.roomCard p{margin:15px auto 0;max-width:260px;color:#66605e;font-size:10px}.rosterHeading{display:flex;justify-content:space-between;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.07)}.rosterHeading b{color:#9b8d87}.onlinePlayers{display:grid;gap:7px;margin-top:10px}.rosterGuest{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:10px;padding:8px;background:rgba(255,255,255,.025)}.guestSeat{display:grid;place-items:center;width:27px;height:27px;border:1px solid rgba(162,44,38,.35);color:#a33c37;font:12px Georgia,serif}.guestName{color:#c9bfba;font-size:10px;font-weight:800;letter-spacing:.1em}.guestBadge{color:#6f9a77;font-size:7px;font-weight:800;letter-spacing:.12em}.emptyRoster{padding:50px 10px;text-align:center;color:#625b59;font-family:Georgia,serif;font-size:12px;font-style:italic}.lobbyRules{display:grid;grid-template-columns:repeat(5,1fr);margin-top:14px;border:1px solid rgba(255,255,255,.07)}.lobbyRules span{padding:11px;text-align:center;color:#665f5d;font-size:8px;letter-spacing:.12em}.lobbyRules span+span{border-left:1px solid rgba(255,255,255,.07)}.lobbyRules b{color:#a69b95}.lobbyActions{justify-content:flex-end}.lobbyActions .menuBtn{flex:0 1 240px}.menuBtn.quiet{flex-basis:160px}.infoScreen,.pauseScreen{width:min(680px,100%)}
 .modelViewerLink{display:inline-block;margin-top:10px;padding:9px 12px;border:1px solid rgba(222,31,25,.62);border-radius:6px;color:#ff6b63;background:rgba(75,0,0,.24);font-size:13px;font-weight:800;text-decoration:none;letter-spacing:.03em}.modelViewerLink:hover{background:rgba(112,0,0,.38)}
 @media(max-width:760px){#overlay{align-items:flex-start;padding:12px}.panel{margin:auto;padding:24px 20px}.titleScreen{grid-template-columns:1fr;gap:30px;min-height:auto}.titleActions{padding:25px 0 0;border-left:0;border-top:1px solid rgba(255,255,255,.08)}.titleBrand h1{font-size:58px}.hotelMark{width:44px;height:44px;margin-bottom:18px}.setupGrid,.lobbyGrid{grid-template-columns:1fr}.matchSummary{flex-wrap:wrap}.lobbyRules{grid-template-columns:1fr 1fr}.lobbyRules span:nth-child(3){border-left:0;border-top:1px solid rgba(255,255,255,.07)}.lobbyRules span:nth-child(4){border-top:1px solid rgba(255,255,255,.07)}.screenHeader{grid-template-columns:auto 1fr}.headerIndex,.connectionPill{grid-column:2}.connectionPill{justify-self:start}.setupActions .menuBtn,.lobbyActions .menuBtn{flex:1 1 100%}}
-#crosshair{position:fixed;left:50%;top:50%;width:11px;height:11px;margin:-5.5px 0 0 -5.5px;z-index:8;pointer-events:none;opacity:.8}
-#crosshair:before,#crosshair:after{content:"";position:absolute;background:rgba(255,255,255,.9)}#crosshair:before{left:5px;top:0;width:1px;height:11px}#crosshair:after{left:0;top:5px;width:11px;height:1px}
-#interactionPrompt{position:fixed;left:50%;bottom:66px;transform:translateX(-50%);z-index:9;min-width:180px;max-width:min(640px,80vw);padding:9px 14px;border-radius:9px;background:rgba(12,8,6,.82);border:1px solid rgba(255,255,255,.1);text-align:center;font-weight:700;font-size:14px;opacity:0;transition:opacity .12s;pointer-events:none}
-#interactionPrompt.visible{opacity:1}
-#notification{position:fixed;left:50%;top:72px;transform:translateX(-50%) translateY(-8px);z-index:11;max-width:min(620px,86vw);padding:10px 15px;border-radius:9px;background:rgba(20,17,13,.9);border:1px solid rgba(219,186,110,.38);font-size:14px;font-weight:700;opacity:0;transition:opacity .18s,transform .18s;pointer-events:none}.notificationVisible{opacity:1!important;transform:translateX(-50%) translateY(0)!important}
-#hud{position:fixed;left:14px;bottom:14px;z-index:8;padding:10px 12px;border-radius:9px;background:rgba(0,0,0,.52);font-size:13px;line-height:1.42;pointer-events:none}
-#floorBadge,#elevatorBadge{position:fixed;right:14px;top:14px;z-index:8;padding:9px 12px;border-radius:9px;background:rgba(0,0,0,.55);font-weight:700;font-size:15px;pointer-events:none}#elevatorBadge{top:57px;font-size:13px;color:#e8d9aa}.hidden{display:none!important}
-#inventoryHud{position:fixed;left:14px;top:14px;z-index:8;min-width:132px;padding:9px 11px;border-radius:9px;background:rgba(0,0,0,.52);pointer-events:none}.hudTitle{font-size:10px;letter-spacing:.13em;color:#bdb8ac;margin-bottom:5px}#keyList{font-size:13px;line-height:1.35}
-#demonStatuses{position:fixed;right:14px;top:98px;z-index:8;width:132px;display:grid;gap:7px;pointer-events:none}.demonStatus{color:#9b938c;font-size:8px;font-weight:800;letter-spacing:.12em;text-align:center;text-shadow:0 1px 4px #000}.demonStatus[data-state="chase"]{color:#ff3328;animation:statusFlicker .32s infinite}.demonStatus[data-state="search"]{color:#d6aa78}.demonStatus[data-state="hunt"]{color:#ff6a4a;animation:statusFlicker .8s infinite}#housekeeperStatus[data-state="chase"]{color:#7dffe0}
-#sanityMeter{position:fixed;right:14px;top:150px;z-index:8;width:112px;text-align:center;pointer-events:none;text-shadow:0 1px 4px #000}#sanityMeter .hudTitle{margin-bottom:4px;color:#8d8681;font-size:8px;font-weight:800;letter-spacing:.14em}#sanityTrack{height:6px;border:1px solid rgba(255,255,255,.16);border-radius:3px;background:rgba(0,0,0,.55);overflow:hidden}#sanityFill{width:0;height:100%;background:#5f7f8c;transition:width .2s linear,background .35s}#sanityReadout{margin-top:4px;color:#8d8681;font-size:8px;font-weight:800;letter-spacing:.1em}#sanityMeter[data-state="draining"] #sanityFill{background:#4f9d7a;transition:width .3s linear,background .35s}#sanityMeter[data-state="draining"] #sanityReadout{color:#67c39a}#sanityMeter[data-state="rising"] #sanityFill{background:#b98b3e}#sanityMeter[data-state="rising"] #sanityReadout{color:#d6aa78}#sanityMeter[data-state="full"] #sanityFill{background:#c9401f}#sanityMeter[data-state="full"] #sanityReadout{color:#ff6a4a}#sanityMeter[data-state="hunted"] #sanityFill{background:#ff2418}#sanityMeter[data-state="hunted"] #sanityReadout{color:#ff3328;animation:statusFlicker .32s infinite}
-#staminaMeter{position:fixed;right:14px;top:198px;z-index:8;width:112px;text-align:center;pointer-events:none;text-shadow:0 1px 4px #000}#staminaMeter .hudTitle{margin-bottom:4px;color:#8d8681;font-size:8px;font-weight:800;letter-spacing:.14em}#staminaTrack{height:6px;border:1px solid rgba(255,255,255,.16);border-radius:3px;background:rgba(0,0,0,.55);overflow:hidden}#staminaFill{width:100%;height:100%;background:#6f8fa8;transition:width .12s linear,background .3s}#staminaReadout{margin-top:4px;color:#8d8681;font-size:8px;font-weight:800;letter-spacing:.1em}#staminaMeter[data-state="sprinting"] #staminaFill{background:#8fc0e0}#staminaMeter[data-state="low"] #staminaFill{background:#b98b3e}#staminaMeter[data-state="low"] #staminaReadout{color:#d6aa78}#staminaMeter[data-state="spent"] #staminaFill{background:#7a2f22}#staminaMeter[data-state="spent"] #staminaReadout{color:#e07f66}
-#flashlightStatus{position:fixed;left:14px;bottom:119px;z-index:8;padding:6px 9px;border:1px solid rgba(255,255,255,.12);border-radius:6px;background:rgba(0,0,0,.52);color:#7d7872;font-size:9px;font-weight:800;letter-spacing:.1em;pointer-events:none}#flashlightStatus[data-on="true"]{border-color:rgba(255,233,178,.35);color:#ffedbd;box-shadow:0 0 18px rgba(255,228,155,.12)}
-#threatVignette{position:fixed;z-index:7;inset:0;box-shadow:inset 0 0 120px 25px transparent;pointer-events:none;transition:box-shadow .45s}.monster-chase #staminaMeter{position:fixed;right:14px;top:172px;z-index:8;width:112px;text-align:center;pointer-events:none;text-shadow:0 1px 4px #000}#staminaMeter .hudTitle{margin-bottom:4px;color:#8d8681;font-size:8px;font-weight:800;letter-spacing:.14em}#staminaTrack{height:6px;border:1px solid rgba(255,255,255,.16);border-radius:3px;background:rgba(0,0,0,.55);overflow:hidden}#staminaFill{width:100%;height:100%;background:#6f8fa8;transition:width .12s linear,background .3s}#staminaReadout{margin-top:4px;color:#8d8681;font-size:8px;font-weight:800;letter-spacing:.1em}#staminaMeter[data-state="sprinting"] #staminaFill{background:#8fc0e0}#staminaMeter[data-state="low"] #staminaFill{background:#b98b3e}#staminaMeter[data-state="low"] #staminaReadout{color:#d6aa78}#staminaMeter[data-state="spent"] #staminaFill{background:#7a2f22}#staminaMeter[data-state="spent"] #staminaReadout{color:#e07f66}
-#threatVignette{box-shadow:inset 0 0 150px 38px rgba(105,0,0,.48);animation:threatBeat .68s infinite}.monster-search #staminaMeter{position:fixed;right:14px;top:172px;z-index:8;width:112px;text-align:center;pointer-events:none;text-shadow:0 1px 4px #000}#staminaMeter .hudTitle{margin-bottom:4px;color:#8d8681;font-size:8px;font-weight:800;letter-spacing:.14em}#staminaTrack{height:6px;border:1px solid rgba(255,255,255,.16);border-radius:3px;background:rgba(0,0,0,.55);overflow:hidden}#staminaFill{width:100%;height:100%;background:#6f8fa8;transition:width .12s linear,background .3s}#staminaReadout{margin-top:4px;color:#8d8681;font-size:8px;font-weight:800;letter-spacing:.1em}#staminaMeter[data-state="sprinting"] #staminaFill{background:#8fc0e0}#staminaMeter[data-state="low"] #staminaFill{background:#b98b3e}#staminaMeter[data-state="low"] #staminaReadout{color:#d6aa78}#staminaMeter[data-state="spent"] #staminaFill{background:#7a2f22}#staminaMeter[data-state="spent"] #staminaReadout{color:#e07f66}
-#threatVignette{box-shadow:inset 0 0 105px 12px rgba(72,22,0,.2)}.monster-hunt #staminaMeter{position:fixed;right:14px;top:172px;z-index:8;width:112px;text-align:center;pointer-events:none;text-shadow:0 1px 4px #000}#staminaMeter .hudTitle{margin-bottom:4px;color:#8d8681;font-size:8px;font-weight:800;letter-spacing:.14em}#staminaTrack{height:6px;border:1px solid rgba(255,255,255,.16);border-radius:3px;background:rgba(0,0,0,.55);overflow:hidden}#staminaFill{width:100%;height:100%;background:#6f8fa8;transition:width .12s linear,background .3s}#staminaReadout{margin-top:4px;color:#8d8681;font-size:8px;font-weight:800;letter-spacing:.1em}#staminaMeter[data-state="sprinting"] #staminaFill{background:#8fc0e0}#staminaMeter[data-state="low"] #staminaFill{background:#b98b3e}#staminaMeter[data-state="low"] #staminaReadout{color:#d6aa78}#staminaMeter[data-state="spent"] #staminaFill{background:#7a2f22}#staminaMeter[data-state="spent"] #staminaReadout{color:#e07f66}
-#threatVignette{box-shadow:inset 0 0 120px 20px rgba(90,0,0,.3);animation:threatBeat 1.6s infinite}
-#roundHud{position:fixed;left:50%;top:12px;z-index:9;transform:translateX(-50%);width:190px;text-align:center;pointer-events:none;text-shadow:0 1px 4px #000}#roundHud .hudTitle{margin-bottom:2px;color:#8d8681;font-size:8px;font-weight:800;letter-spacing:.14em}#roundClock{color:#e6ddd6;font-size:26px;font-weight:800;letter-spacing:.03em;line-height:1}#roundHud .roundLine{margin-top:3px;color:#8d8681;font-size:8px;font-weight:800;letter-spacing:.1em}#roundHud .roundLine span{color:#d8cec6}#roundBanner{margin-top:6px;min-height:11px;color:#c9a25a;font-size:10px;font-weight:800;letter-spacing:.18em}#roundHud[data-phase="hiding"] #roundClock{color:#7fa4bd}#roundHud[data-phase="hiding"] #roundBanner{color:#7fa4bd;animation:statusFlicker 1.1s infinite}#roundHud[data-phase="ended"]{opacity:.35}
 #caughtOverlay{position:fixed;z-index:40;inset:0;display:none;place-items:center;padding:22px;background:radial-gradient(circle,rgba(30,0,0,.84),rgba(0,0,0,.98));box-sizing:border-box}#caughtOverlay.visible{display:grid}.caughtPanel{max-width:520px;text-align:center}.caughtEyebrow{margin-bottom:9px;color:#a99b94;font-size:11px;font-weight:800;letter-spacing:.32em}.caughtPanel h1{margin:0;color:#d1120a;font-size:clamp(42px,9vw,86px);line-height:.9;letter-spacing:-.045em;text-shadow:0 0 32px rgba(255,0,0,.45)}.caughtPanel p{max-width:450px;margin:20px auto;color:#c6bebb;line-height:1.5}.caughtPanel button{padding:12px 25px;border:1px solid #8d201c;border-radius:4px;color:#fff;background:#42100e;font-weight:800;letter-spacing:.12em;cursor:pointer}.caughtPanel button:hover{background:#641713}.caughtActions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}#caughtQuitBtn{border-color:#4a4340;background:#1a1815;color:#d8cfc2}#caughtQuitBtn:hover{background:#2a2723}
 /* One overlay carries both endings, so the palette is what tells a player which one they got. The
    default above is the loss — the red screen that has meant "it found you" all game. A win repaints
@@ -55,21 +38,10 @@ button{font:inherit}
 #caughtOverlay[data-result="neutral"] .caughtPanel h1{color:#c8d2de;text-shadow:0 0 26px rgba(140,170,200,.28)}
 #caughtOverlay[data-result="neutral"] .caughtPanel button{border-color:#3a4552;background:#141a22}
 #caughtOverlay[data-result="neutral"] .caughtPanel button:hover{background:#1e2733}
-#spectatorHud{position:fixed;z-index:22;top:22px;left:50%;display:none;grid-template-columns:34px minmax(130px,auto) 34px;align-items:center;gap:8px;padding:10px 12px;border:1px solid rgba(191,156,93,.5);border-radius:4px;background:rgba(5,7,10,.88);color:#eee4cf;text-align:center;transform:translateX(-50%);backdrop-filter:blur(8px)}#spectatorHud.visible{display:grid}#spectatorHud .hudTitle,#spectatorHud small{grid-column:1/-1}#spectatorHud small{color:#988d7d;font-size:9px;letter-spacing:.16em}#spectatorHud button{width:34px;height:30px;border:1px solid #66583e;background:#17150f;color:#e8d5aa;cursor:pointer}body.spectating #crosshair,body.spectating #interactionPrompt,body.spectating #flashlightStatus{display:none}
 @keyframes statusFlicker{50%{opacity:.5}}@keyframes threatBeat{50%{box-shadow:inset 0 0 165px 46px rgba(125,0,0,.58)}}
-#threatVignette{box-shadow:inset 0 0 120px 25px transparent;animation:none}.monster-chase #threatVignette{box-shadow:inset 0 0 150px 38px rgba(105,0,0,.48);animation:threatBeat .68s infinite}
-#mobileControls{display:none;position:fixed;inset:0;z-index:10;pointer-events:none}#movePad{position:absolute;left:18px;bottom:20px;width:154px;height:154px;pointer-events:none}.moveBtn{position:absolute;width:52px;height:52px;border:1px solid rgba(255,255,255,.34);border-radius:50%;background:rgba(0,0,0,.48);color:#fff;font-size:23px;font-weight:700;pointer-events:auto;touch-action:none;user-select:none}#moveUp{left:51px;top:0}#moveLeft{left:0;top:51px}#moveDown{left:51px;top:102px}#moveRight{left:102px;top:51px}#interactBtn,#crouchBtn,#flashlightBtn{position:absolute;right:24px;width:72px;height:72px;border-radius:50%;border:1px solid rgba(255,255,255,.42);color:#fff;font-weight:800;font-size:14px;pointer-events:auto;touch-action:none}#interactBtn{bottom:34px;background:rgba(51,34,24,.72)}#crouchBtn{right:106px;bottom:24px;background:rgba(20,24,28,.72);font-size:12px}#flashlightBtn{right:188px;bottom:34px;background:rgba(45,42,31,.72);font-size:11px}#flashlightBtn[data-on="true"]{color:#fff1bd;background:rgba(89,76,36,.82);box-shadow:0 0 18px rgba(255,230,150,.25)}#lookHint{position:absolute;right:20px;bottom:118px;padding:7px 9px;border-radius:7px;background:rgba(0,0,0,.35);font-size:11px;color:rgba(255,255,255,.75)}
-@media(pointer:coarse){#mobileControls{display:block}#roundHud{top:8px;width:150px}#roundClock{font-size:20px}#hud{display:none}#interactionPrompt{bottom:120px}#inventoryHud{top:10px;left:10px}#floorBadge{top:10px;right:10px}#elevatorBadge{top:52px;right:10px}#demonStatuses{right:10px;top:94px}#sanityMeter{right:10px;top:148px}#staminaMeter{right:10px;top:196px}#flashlightStatus{display:none}}
-.model-viewer-mode #overlay,.model-viewer-mode #crosshair,.model-viewer-mode #interactionPrompt,.model-viewer-mode #notification,.model-viewer-mode #inventoryHud,.model-viewer-mode #floorBadge,.model-viewer-mode #elevatorBadge,.model-viewer-mode #roundHud,.model-viewer-mode #demonStatuses,.model-viewer-mode #sanityMeter,.model-viewer-mode #staminaMeter,.model-viewer-mode #flashlightStatus,.model-viewer-mode #threatVignette,.model-viewer-mode #hud,.model-viewer-mode #mobileControls{display:none!important}
+.model-viewer-mode #overlay,.model-viewer-mode #crosshair,.model-viewer-mode #interactionPrompt,.model-viewer-mode #notification,.model-viewer-mode #inventoryHud,.model-viewer-mode #locationPlate,.model-viewer-mode #roundHud,.model-viewer-mode #hudRail,.model-viewer-mode #threatVignette,.model-viewer-mode #hud,.model-viewer-mode #mobileControls{display:none!important}
 #modelViewerPanel{position:fixed;z-index:30;left:clamp(16px,4vw,52px);top:50%;width:min(290px,calc(100vw - 32px));transform:translateY(-50%);box-sizing:border-box;padding:22px;border:1px solid rgba(255,32,24,.3);border-radius:10px;background:linear-gradient(145deg,rgba(14,9,12,.94),rgba(3,3,5,.86));box-shadow:0 18px 65px rgba(0,0,0,.65);pointer-events:auto}#modelViewerPanel .viewerEyebrow{margin-bottom:7px;color:#d2231d;font-size:10px;font-weight:900;letter-spacing:.2em}#modelViewerPanel h1{margin:0 0 6px;font-size:30px;letter-spacing:-.03em}#modelViewerPanel p{margin:0 0 14px;color:#9b979c;font-size:12px}.viewerLight{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px;margin-bottom:15px;color:#b3afb4;font-size:11px;font-weight:700}.viewerLight input{width:100%;accent-color:#c5140e}#modelViewerPanel .viewerActions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:16px}#modelViewerPanel button{padding:9px;border:1px solid rgba(255,255,255,.15);border-radius:5px;color:#ddd;background:#151519;cursor:pointer;font-size:12px;font-weight:700}#modelViewerPanel button:hover,#modelViewerPanel button.active{border-color:#9e1512;color:#ff625b;background:#260708}#modelViewerPanel button:last-child{grid-column:1/-1}#modelViewerPanel a{color:#bdb8bc;font-size:12px;text-decoration:none}#modelViewerPanel a:hover{color:#fff}@media(max-width:700px){#modelViewerPanel{left:12px;right:12px;top:auto;bottom:12px;width:auto;transform:none;padding:14px}#modelViewerPanel h1{font-size:22px}#modelViewerPanel p{margin-bottom:8px}.viewerLight{margin-bottom:9px}#modelViewerPanel .viewerActions{grid-template-columns:repeat(3,1fr);margin-bottom:10px}#modelViewerPanel button:last-child{grid-column:auto}}
 
-/* Two independently wrapping demon labels need a stable lane above the meters. These final
-   overrides also beat the chase/search theme selectors without changing their colours. */
-#demonStatuses{width:146px;gap:6px}
-#sanityMeter{top:176px}
-#staminaMeter,.monster-chase #staminaMeter,.monster-search #staminaMeter,.monster-hunt #staminaMeter{top:224px}
-#flashlightStatus{bottom:146px}
-@media(pointer:coarse){#sanityMeter{top:174px}#staminaMeter,.monster-chase #staminaMeter,.monster-search #staminaMeter,.monster-hunt #staminaMeter{top:222px}}
 .menuBtn[disabled]{opacity:.45;cursor:default}
 /* The location picker: one card per registered map, each showing floorplans derived from that map's
    own plan (see `map-preview.js`). A `soon` map is shown as a locked card rather than hidden — the
@@ -97,13 +69,190 @@ button{font:inherit}
 .mapCard--soon{cursor:not-allowed;opacity:.5}
 .mapCard--soon:hover{border-color:rgba(255,255,255,.1);background:rgba(255,255,255,.02)}
 
-/* The right-hand HUD rail. Every panel in it used to be `position:fixed` at its own hard-coded `top`
-   — 98px for the demon list, 150px for sanity, 198px for stamina — which is only correct while the
-   demon list is exactly two lines tall. Cinder Mall's three demons overlapped the sanity meter. The
-   rail stacks them instead, so a roster of any length pushes the meters down rather than through
-   them. The overrides below beat the older per-element rules, including the `.monster-*` ones. */
-#hudRail{position:fixed;right:14px;top:98px;z-index:8;display:grid;gap:12px;justify-items:center;width:132px;pointer-events:none}
-#hudRail #demonStatuses,#hudRail #sanityMeter,#hudRail #staminaMeter,
-.monster-chase #hudRail #staminaMeter,.monster-search #hudRail #staminaMeter,.monster-hunt #hudRail #staminaMeter{position:static;right:auto;top:auto;width:100%}
-#hudRail #demonStatuses{display:grid;gap:7px}
-#hudRail #sanityMeter,#hudRail #staminaMeter{width:112px;justify-self:center}
+
+/* -- In-game HUD ------------------------------------------------------------------------------
+   The round used to look like a different product from the screen that started it: six translucent
+   black rounded rectangles, each pinned to its own hard-coded `top`, each inventing its own type.
+   This is one system instead - the same hairline warm border, near-black ground and red tick the
+   menus use - arranged as four corners and a single right-hand rail of meters. Nothing here is
+   positioned relative to anything else's height, so a map with three demons pushes the rail down
+   rather than through it. */
+:root{
+  --hudLine:rgba(198,172,146,.22);
+  --hudGround:linear-gradient(160deg,rgba(21,18,19,.8),rgba(8,8,10,.74));
+  --hudText:#e5dad0;
+  --hudDim:#8d8681;
+  --hudAccent:#b5231d;
+  --hudWarn:#c9a25a;
+}
+.hudPlate{position:fixed;z-index:8;padding:10px 12px 11px;border:1px solid var(--hudLine);background:var(--hudGround);box-shadow:0 12px 34px rgba(0,0,0,.45);pointer-events:none}
+/* The accent is a tick on the plate's outer edge - the side the screen edge is on - so the four
+   corners read as one set rather than four unrelated boxes. */
+.hudPlate:before{content:"";position:absolute;top:9px;bottom:9px;width:2px;background:var(--hudAccent);opacity:.7}
+.hudTitle{display:block;color:var(--hudDim);font-size:8px;font-weight:800;letter-spacing:.22em;text-transform:uppercase}
+.keyCap{display:inline-grid;place-items:center;white-space:nowrap;min-width:16px;height:15px;padding:0 4px;border:1px solid rgba(198,172,146,.3);background:rgba(255,255,255,.05);color:var(--hudText);font-size:8px;font-weight:800;font-style:normal;letter-spacing:.04em}
+.hidden{display:none!important}
+
+/* Top left: what you are carrying. Keys are chips rather than a bullet-separated string, because a
+   key ring with three keys on it should look like three things. */
+/* Both columns are one width, so the four plates line up as two rails rather than four boxes that
+   happen to be near the corners. */
+.hudPlate{box-sizing:border-box;width:198px}
+#inventoryHud{left:16px;top:16px}
+#inventoryHud:before{left:-1px}
+#inventoryHud .hudTitle{margin-bottom:8px}
+#keyList{display:flex;flex-wrap:wrap;gap:5px;color:var(--hudText);font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+.keyChip{padding:3px 7px;border:1px solid rgba(201,162,90,.45);background:rgba(201,162,90,.1);color:#ecd6a8}
+.keyChip--empty{border-color:rgba(255,255,255,.08);background:none;color:#5f5a58}
+
+/* Top right: where you are. The elevator's travel line is a second row of the same plate rather
+   than a badge of its own floating underneath it. */
+#locationPlate{right:16px;top:16px;text-align:right}
+#locationPlate:before{right:-1px}
+#locationPlate .hudTitle{margin-bottom:6px}
+#floorBadge{color:var(--hudText);font-family:Georgia,"Times New Roman",serif;font-size:19px;line-height:1.05}
+#elevatorBadge{margin-top:6px;padding-top:6px;border-top:1px solid rgba(255,255,255,.09);color:var(--hudWarn);font-size:8px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+
+/* Top centre: the round itself. The clock is the one serif numeral in the HUD - it is the number
+   the whole round is about, so nothing else competes with it. */
+#roundHud{position:fixed;left:50%;top:14px;z-index:9;display:grid;justify-items:center;gap:5px;min-width:214px;padding:9px 22px 11px;border:1px solid var(--hudLine);background:linear-gradient(180deg,rgba(21,18,19,.82),rgba(8,8,10,.74));text-align:center;transform:translateX(-50%);pointer-events:none}
+#roundHud:before,#roundHud:after{content:"";position:absolute;top:9px;bottom:9px;width:1px;background:linear-gradient(transparent,var(--hudAccent),transparent);opacity:.75}
+#roundHud:before{left:9px}
+#roundHud:after{right:9px}
+#roundBanner{min-height:10px;color:var(--hudWarn);font-size:9px;font-weight:800;letter-spacing:.24em;text-transform:uppercase}
+#roundClock{color:#f2e9e0;font-family:Georgia,"Times New Roman",serif;font-size:31px;line-height:1;text-shadow:0 2px 20px rgba(0,0,0,.85)}
+#roundHud .roundLine{display:flex;align-items:center;gap:9px;color:var(--hudDim);font-size:8px;font-weight:800;letter-spacing:.18em;text-transform:uppercase}
+#roundCount{color:var(--hudText);font-size:9px;letter-spacing:.1em}
+#roundHud[data-phase="hiding"] #roundClock{color:#a8c6da}
+#roundHud[data-phase="hiding"] #roundBanner{color:#8fb4cc;animation:statusFlicker 1.1s infinite}
+#roundHud[data-phase="ended"]{opacity:.4}
+
+/* The right-hand rail: who is hunting, and the three things you can spend. It stacks, so a roster
+   of any length pushes the meters down rather than sitting on top of them. */
+#hudRail{position:fixed;right:16px;top:98px;z-index:8;display:grid;gap:10px;width:198px;pointer-events:none}
+#demonStatuses,.hudMeter{display:grid;gap:6px;padding:9px 11px;border:1px solid var(--hudLine);background:var(--hudGround)}
+.demonStatus{display:flex;align-items:center;gap:8px;color:#9b938c;font-size:8px;font-weight:800;letter-spacing:.14em;line-height:1.3;text-align:left;text-transform:uppercase}
+/* A diamond that fills in as the thing behind it wakes up: the roster reads at a glance without
+   ever saying where anyone is. */
+.demonStatus:before{content:"";flex:none;width:5px;height:5px;border:1px solid currentColor;transform:rotate(45deg)}
+.demonStatus[data-state="search"]{color:var(--hudWarn)}
+.demonStatus[data-state="hunt"]{color:#ff6a4a;animation:statusFlicker .8s infinite}
+.demonStatus[data-state="chase"]{color:#ff3328;animation:statusFlicker .32s infinite}
+.demonStatus[data-state="hunt"]:before,.demonStatus[data-state="chase"]:before{background:currentColor}
+
+.meterHead{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.meterHead .hudTitle{letter-spacing:.16em}
+.meterReadout{color:var(--hudDim);font-size:8px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+.meterTrack{position:relative;height:5px;border:1px solid rgba(255,255,255,.14);background:rgba(0,0,0,.55);overflow:hidden}
+/* Tick marks behind the fill, so a bar at 30% is readable as a fraction and not just a stub. */
+.meterTrack:after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 9px,rgba(255,255,255,.1) 9px 10px)}
+.meterFill{height:100%;background:#5f7f8c}
+
+#heatFill{width:0;transition:width .2s linear,background .35s}
+#heatMeter[data-state="draining"] #heatFill{background:#4f9d7a;transition:width .3s linear,background .35s}
+#heatMeter[data-state="draining"] #heatReadout{color:#67c39a}
+#heatMeter[data-state="rising"] #heatFill{background:#b98b3e}
+#heatMeter[data-state="rising"] #heatReadout{color:var(--hudWarn)}
+#heatMeter[data-state="full"] #heatFill{background:#c9401f}
+#heatMeter[data-state="full"] #heatReadout{color:#ff6a4a}
+#heatMeter[data-state="hunted"]{border-color:rgba(255,36,24,.5)}
+#heatMeter[data-state="hunted"] #heatFill{background:#ff2418}
+#heatMeter[data-state="hunted"] #heatReadout{color:#ff3328;animation:statusFlicker .32s infinite}
+
+#staminaFill{width:100%;background:#6f8fa8;transition:width .12s linear,background .3s}
+#staminaMeter[data-state="sprinting"] #staminaFill{background:#8fc0e0}
+#staminaMeter[data-state="low"] #staminaFill{background:#b98b3e}
+#staminaMeter[data-state="low"] #staminaReadout{color:var(--hudWarn)}
+#staminaMeter[data-state="spent"] #staminaFill{background:#7a2f22}
+#staminaMeter[data-state="spent"] #staminaReadout{color:#e07f66}
+
+/* The flashlight was a line of text reading "FLASHLIGHT OFF - 100% - F". It is a battery, so it is
+   a bar beside the other two things you spend. */
+#flashlightFill{width:100%;background:#8a7c52;transition:width .3s linear,background .3s}
+#flashlightStatus[data-on="true"]{border-color:rgba(255,233,178,.32);box-shadow:0 0 24px rgba(255,228,155,.1)}
+#flashlightStatus[data-on="true"] #flashlightFill{background:#ffe49b}
+#flashlightStatus[data-on="true"] #flashlightReadout{color:#ffedbd}
+#flashlightStatus[data-charge="0"] #flashlightReadout{color:#e07f66}
+
+/* Bottom left: the controls, as keycaps rather than a wall of "WASD / Arrows = Move". */
+#hud{left:16px;bottom:16px}
+#hud:before{left:-1px}
+#hud .hudTitle{margin-bottom:9px}
+.keyLegend{display:grid;grid-template-columns:auto auto;gap:6px 16px;margin:0;padding:0;list-style:none}
+.keyLegend li{display:flex;align-items:center;gap:7px;color:var(--hudDim);font-size:8px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+
+#interactionPrompt{position:fixed;left:50%;bottom:104px;z-index:9;display:flex;align-items:center;gap:11px;max-width:min(560px,80vw);padding:9px 15px 9px 10px;border:1px solid rgba(198,172,146,.3);background:rgba(10,9,10,.88);color:var(--hudText);font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:0;transform:translateX(-50%) translateY(5px);transition:opacity .12s,transform .12s;pointer-events:none}
+/* The key is drawn from `data-key` rather than pasted into the sentence, so the prompt copy stays
+   a sentence and the keycap stays a keycap. */
+#interactionPrompt:before{content:attr(data-key);flex:none;display:grid;place-items:center;width:21px;height:21px;border:1px solid var(--hudAccent);background:rgba(181,35,29,.2);color:#f2d9d5;font-size:9px}
+#interactionPrompt.visible{opacity:1;transform:translateX(-50%) translateY(0)}
+
+#notification{position:fixed;left:50%;top:120px;z-index:11;max-width:min(560px,86vw);padding:10px 16px;border:1px solid rgba(201,162,90,.3);border-left:2px solid var(--hudWarn);background:rgba(16,13,11,.9);color:#f1e5d4;font-size:11px;font-weight:800;letter-spacing:.13em;text-align:center;text-transform:uppercase;opacity:0;transform:translateX(-50%) translateY(-8px);transition:opacity .18s,transform .18s;pointer-events:none}
+.notificationVisible{opacity:1!important;transform:translateX(-50%) translateY(0)!important}
+
+#crosshair{position:fixed;left:50%;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;z-index:8;opacity:.5;pointer-events:none}
+#crosshair:before{content:"";position:absolute;left:50%;top:50%;width:3px;height:3px;margin:-1.5px 0 0 -1.5px;border-radius:50%;background:#fff;box-shadow:0 0 5px rgba(0,0,0,.9)}
+#crosshair:after{content:"";position:absolute;inset:0;border:1px solid rgba(255,255,255,.32);border-radius:50%}
+
+#threatVignette{position:fixed;inset:0;z-index:7;box-shadow:inset 0 0 120px 25px transparent;pointer-events:none;transition:box-shadow .45s}
+.monster-search #threatVignette{box-shadow:inset 0 0 105px 12px rgba(72,22,0,.2)}
+.monster-hunt #threatVignette{box-shadow:inset 0 0 120px 20px rgba(90,0,0,.3);animation:threatBeat 1.6s infinite}
+.monster-chase #threatVignette{box-shadow:inset 0 0 150px 38px rgba(105,0,0,.48);animation:threatBeat .68s infinite}
+
+/* Spectating moved to the bottom of the screen: it used to sit at top centre, on top of the round
+   clock it exists to keep watching. */
+#spectatorHud{position:fixed;left:50%;bottom:22px;z-index:22;display:none;grid-template-columns:32px minmax(140px,auto) 32px;align-items:center;gap:9px;padding:11px 13px;border:1px solid rgba(198,172,146,.32);background:rgba(8,8,10,.9);color:#efe5d1;text-align:center;transform:translateX(-50%)}
+#spectatorHud.visible{display:grid}
+#spectatorHud .hudTitle,#spectatorHud small{grid-column:1/-1}
+#spectatorHud strong{font-family:Georgia,"Times New Roman",serif;font-size:16px;font-weight:400;letter-spacing:.03em}
+#spectatorHud small{color:#988d7d;font-size:8px;font-weight:800;letter-spacing:.18em;text-transform:uppercase}
+#spectatorHud button{width:32px;height:28px;border:1px solid rgba(198,172,146,.28);background:rgba(255,255,255,.04);color:#e8d5aa;cursor:pointer}
+#spectatorHud button:hover{border-color:var(--hudAccent);color:#fff}
+body.spectating #crosshair,body.spectating #interactionPrompt,body.spectating #hud,body.spectating #flashlightStatus{display:none}
+
+/* The ending panel picks up the menu's corner brackets, so the screen that closes a round belongs
+   to the same set as the one that opened it. */
+.caughtPanel{position:relative;padding:36px 32px;border:1px solid rgba(198,172,146,.16);background:rgba(6,5,6,.45)}
+.caughtPanel:before,.caughtPanel:after{content:"";position:absolute;width:30px;height:30px;pointer-events:none}
+.caughtPanel:before{left:9px;top:9px;border-left:1px solid rgba(181,35,29,.55);border-top:1px solid rgba(181,35,29,.55)}
+.caughtPanel:after{right:9px;bottom:9px;border-right:1px solid rgba(181,35,29,.42);border-bottom:1px solid rgba(181,35,29,.42)}
+#caughtOverlay[data-result="win"] .caughtPanel:before{border-color:rgba(143,191,146,.5)}
+#caughtOverlay[data-result="win"] .caughtPanel:after{border-color:rgba(143,191,146,.38)}
+
+#mobileControls{display:none;position:fixed;inset:0;z-index:10;pointer-events:none}
+#movePad{position:absolute;left:18px;bottom:20px;width:154px;height:154px;pointer-events:none}
+.moveBtn{position:absolute;width:52px;height:52px;border:1px solid rgba(198,172,146,.32);border-radius:50%;background:rgba(10,9,10,.55);color:#e8ddd2;font-size:22px;font-weight:700;pointer-events:auto;touch-action:none;user-select:none}
+#moveUp{left:51px;top:0}
+#moveLeft{left:0;top:51px}
+#moveDown{left:51px;top:102px}
+#moveRight{left:102px;top:51px}
+#interactBtn,#crouchBtn,#flashlightBtn{position:absolute;right:24px;width:72px;height:72px;border-radius:50%;border:1px solid rgba(198,172,146,.36);color:#f0e6da;font-size:12px;font-weight:800;letter-spacing:.1em;pointer-events:auto;touch-action:none}
+#interactBtn{bottom:34px;background:rgba(181,35,29,.34)}
+#crouchBtn{right:106px;bottom:24px;background:rgba(18,22,26,.72)}
+#flashlightBtn{right:188px;bottom:34px;background:rgba(45,42,31,.72);font-size:11px}
+#flashlightBtn[data-on="true"]{color:#fff1bd;background:rgba(89,76,36,.82);box-shadow:0 0 18px rgba(255,230,150,.25)}
+#lookHint{position:absolute;right:20px;bottom:118px;padding:7px 9px;border:1px solid var(--hudLine);background:rgba(10,9,10,.5);color:rgba(240,230,218,.7);font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+
+@media(pointer:coarse){
+  #mobileControls{display:block}
+  #hud{display:none}
+  #flashlightStatus{display:none}
+  #roundHud{top:8px;min-width:168px;padding:7px 14px 9px}
+  #roundClock{font-size:23px}
+  .hudPlate{width:166px}
+  #inventoryHud{left:10px;top:10px}
+  #locationPlate{right:10px;top:10px}
+  #hudRail{right:10px;top:88px;width:166px}
+  #interactionPrompt{bottom:150px}
+  #notification{top:104px}
+  #spectatorHud{bottom:auto;top:76px}
+}
+/* A short viewport is the case that actually crowds the rail - four plates down the right-hand side
+   of a laptop screen. Tighten rather than let the last meter fall off the bottom. */
+@media(max-height:660px){
+  #hudRail{top:88px;gap:7px;width:186px}
+  .hudPlate{width:186px}
+  #demonStatuses,.hudMeter{padding:7px 10px;gap:5px}
+  #roundClock{font-size:25px}
+  #hud{display:none}
+}

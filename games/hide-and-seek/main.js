@@ -1,7 +1,7 @@
 import * as THREE from './vendor/three.module.js';
 import { GLTFLoader } from './vendor/loaders/GLTFLoader.js';
 import { mergeGeometries } from './vendor/utils/BufferGeometryUtils.js';
-import { CONFIG, FLASHLIGHT_CONFIG, FLOOR_DEFS, HIDER_CONFIG, ROUND_CONFIG, SANITY_CONFIG, STAMINA_CONFIG, floorY, inspectionViews, keyIdForFloor, keyLabelForFloor } from './modules/game-config.js';
+import { CONFIG, FLASHLIGHT_CONFIG, FLOOR_DEFS, HIDER_CONFIG, ROUND_CONFIG, HEAT_CONFIG, STAMINA_CONFIG, floorY, inspectionViews, keyIdForFloor, keyLabelForFloor } from './modules/game-config.js';
 import { createRendering } from './modules/rendering.js';
 import { createWorld } from './modules/world.js';
 import './modules/performance.js';
@@ -12,7 +12,7 @@ import { createPlayer } from './modules/player.js';
 import { createFlashlightPickups } from './modules/flashlight-pickups.js';
 import { createMonster } from './modules/monster.js';
 import { createDemons } from './modules/demons.js';
-import { createSanity } from './modules/sanity.js';
+import { createHeat } from './modules/heat.js';
 import { createStamina } from './modules/stamina.js';
 import { createMenu } from './modules/menu.js';
 import { createSessionMenuHandler } from './modules/online-session-menu.js';
@@ -26,7 +26,7 @@ import { createAccountAccess } from './modules/account-access.js';
 import { createMapSession, placeAtMapSpawn } from './modules/map-session.js';
 // The pure layer loads as classic scripts first, so a missing one fails loudly here rather than as
 // an undefined call three frames into a round. Which building it stands: `modules/map-session.js`.
-for (const name of ['HotelAvatarLogic', 'HotelCollision', 'HotelControls', 'HotelDemon', 'HotelEnemyLogic', 'HotelFixtures', 'HotelFlashlight', 'HotelHiders', 'HotelLayout', 'HotelMaps', 'HotelMenu', 'HotelMovement', 'HotelMusic', 'HotelOnline', 'HotelPlan', 'HotelRound', 'HotelSanity', 'HotelSeeker', 'HotelSpectator', 'HotelStamina']) {
+for (const name of ['HotelAvatarLogic', 'HotelCollision', 'HotelControls', 'HotelDemon', 'HotelEnemyLogic', 'HotelFixtures', 'HotelFlashlight', 'HotelHiders', 'HotelLayout', 'HotelMaps', 'HotelMenu', 'HotelMovement', 'HotelMusic', 'HotelOnline', 'HotelPlan', 'HotelRound', 'HotelHeat', 'HotelSeeker', 'HotelSpectator', 'HotelStamina']) {
   if (!window[name]) throw new Error(`Hotel pure module ${name} failed to load`);
 }
 const mapSession = createMapSession({ maps: window.HotelMaps, window });
@@ -75,11 +75,11 @@ const player = createPlayer({
 const flashlightDrops = createFlashlightPickups({ THREE, scene: rendering.scene, world, player });
 const soundtrack = inspectionView ? null : window.HotelMusic.createSoundtrack({ eventTarget: window });
 const soundEffects = inspectionView ? null : window.HotelMusic.createSoundEffects({ eventTarget: window });
-const sanity = inspectionView ? null : createSanity({ camera: rendering.camera, world, logic: window.HotelSanity, config: SANITY_CONFIG, document });
+const heat = inspectionView ? null : createHeat({ camera: rendering.camera, world, logic: window.HotelHeat, config: HEAT_CONFIG, document });
 // The map's roster, however long it is. The workbench shows one body, so it takes the first.
 const demons = createDemons({ createMonster, roster: inspectionView ? mapSession.demonRoster().slice(0, 1) : mapSession.demonRoster(), common: {
   THREE, GLTFLoader, scene: rendering.scene, camera: rendering.camera, config: CONFIG, floorY,
-  layout: window.HotelLayout, world, player, logic: window.HotelEnemyLogic, movement: window.HotelMovement, sanity, document, window,
+  layout: window.HotelLayout, world, player, logic: window.HotelEnemyLogic, movement: window.HotelMovement, heat, document, window,
 } });
 const monster = demons.primary;
 const avatars = createAvatars({ THREE, GLTFLoader, scene: rendering.scene, config: CONFIG, logic: window.HotelAvatarLogic });
@@ -95,7 +95,7 @@ function startSingleMatch(options) {
   ({ hiders, seeker, round } = createSoloMatch({
     THREE, camera: rendering.camera, config: CONFIG, roundConfig: ROUND_CONFIG, hiderConfig: HIDER_CONFIG, seekerConfig: window.HotelSeeker.SEEKER_DEFAULTS, floorY,
     layout: window.HotelLayout, world, player, elevator, avatars, avatarLogic: window.HotelAvatarLogic, hiderLogic: window.HotelHiders, seekerLogic: window.HotelSeeker,
-    enemyLogic: window.HotelEnemyLogic, movement: window.HotelMovement, sanityLogic: window.HotelSanity, sanityConfig: SANITY_CONFIG,
+    enemyLogic: window.HotelEnemyLogic, movement: window.HotelMovement, heatLogic: window.HotelHeat, heatConfig: HEAT_CONFIG,
     demons, flashlightDrops, spectator, document, window, options: window.HotelMenu.normalizeMatchConfig(options),
   }));
 }
@@ -122,7 +122,7 @@ const timestep = window.HotelPerformance.createFixedTimestep({ tickRate: 60, max
 function simulate(delta, elapsed) {
   if (!modelViewer) {
     hotel.update(delta); furnishings.update(delta, CONFIG); elevator.update(delta, elapsed); player.update(delta, elapsed);
-    if (sanity) sanity.update(delta);
+    if (heat) heat.update(delta);
     if (online.isActive()) online.update(delta); else if (round) round.update(delta);
     if (!online.isActive()) spectator.update();
     avatars.followCamera(LOCAL_AVATAR, { camera: rendering.camera, world, player });
@@ -136,7 +136,7 @@ function animate() {
   requestAnimationFrame(animate);
   const frameDelta = clock.getDelta();
   // Behind a menu nothing simulates. The accumulator is not advanced at all, so the paused seconds
-  // are never owed back and meters like sanity cannot tick while the player is reading the controls.
+  // are never owed back and meters like heat cannot tick while the player is reading the controls.
   const running = !!modelViewer || online.isActive() || world.state.isLocked || world.state.gameOver;
   const ticks = running ? timestep.advance(frameDelta) : 0;
   for (let tick = 0; tick < ticks; tick += 1) simulate(timestep.step, timestep.getElapsed());
@@ -148,7 +148,7 @@ function animate() {
 rendering.warmUp();
 animate();
 createPrototypeApi({
-  window, world, rendering, hotel, player, monster, demons, flashlightDrops, sanity, stamina, menu,
+  window, world, rendering, hotel, player, monster, demons, flashlightDrops, heat, stamina, menu,
   online, round, hiders, seeker, spectator, avatars, elevator, timestep, soundtrack, soundEffects,
   floorDefs: FLOOR_DEFS, inspectionViews, mapSession, version: '7.2',
 });

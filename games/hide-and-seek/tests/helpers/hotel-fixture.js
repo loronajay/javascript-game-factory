@@ -11,7 +11,7 @@ const movement = require('../../movement-logic.js');
 const roundLogic = require('../../round-logic.js');
 const stamina = require('../../stamina-logic.js');
 const flashlight = require('../../flashlight-logic.js');
-const sanity = require('../../sanity-logic.js');
+const heat = require('../../heat-logic.js');
 const fixtures = require('../../fixtures-logic.js');
 const demon = require('../../demon-logic.js');
 const enemy = require('../../enemy-logic.js');
@@ -64,13 +64,13 @@ const SIM_CONFIG = {
   player: { ...CONFIG, walkSpeed: 3.1, sprintSpeed: 5.4, crouchSpeed: 1.9, eyeHeight: 1.62, crouchEyeHeight: 1.02 },
   round: { durationSeconds: null, hideSeconds: 45, tagDistance: 1.8, tagHeightTolerance: 1.4 },
   stamina: undefined,
-  sanity: undefined,
+  heat: undefined,
   flashlight: { drainSeconds: 120 },
 };
 
-function sanityZones(hotel) {
+function heatZones(hotel) {
   return [
-    ...hotel.roomCenters.map((room) => ({ id: room.roomNumber, kind: sanity.ZONE_KINDS.ROOM, floor: room.floor, x: room.x, z: room.z })),
+    ...hotel.roomCenters.map((room) => ({ id: room.roomNumber, kind: heat.ZONE_KINDS.ROOM, floor: room.floor, x: room.x, z: room.z })),
     ...hotel.secretTunnels,
   ];
 }
@@ -80,8 +80,8 @@ function sanityZones(hotel) {
 function createFullSim({ hotel = buildHotel(), seed = 7, config } = {}) {
   const space = createSpace(hotel);
   const engine = sim.createSimulation({
-    movement, round: roundLogic, stamina, flashlight, sanity, fixtures, demon, enemy, layout,
-    space, plan: hotel, zones: sanityZones(hotel), random: seededRandom(seed),
+    movement, round: roundLogic, stamina, flashlight, heat, fixtures, demon, enemy, layout,
+    space, plan: hotel, zones: heatZones(hotel), random: seededRandom(seed),
     config: { ...SIM_CONFIG, ...(config || {}) },
   });
   return { hotel, space, engine };
@@ -89,5 +89,5 @@ function createFullSim({ hotel = buildHotel(), seed = 7, config } = {}) {
 
 module.exports = {
   CONFIG, FLOOR_DEFS, SIM_CONFIG, floorY, keyIdForFloor, keyLabelForFloor,
-  buildHotel, createSpace, createFullSim, sanityZones, seededRandom,
+  buildHotel, createSpace, createFullSim, heatZones, seededRandom,
 };

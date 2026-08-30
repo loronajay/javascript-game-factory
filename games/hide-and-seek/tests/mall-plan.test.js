@@ -242,11 +242,11 @@ test('inspection views are authored by the map and stand in clear playable space
   }
 });
 
-test('a shop uses its actual bounds for sanity without filling the concourse outside its glass', () => {
-  const sanity = require('../sanity-logic.js');
+test('a shop uses its actual bounds for heat without filling the concourse outside its glass', () => {
+  const heat = require('../heat-logic.js');
   const zones = mall.roomCenters.map(room => ({ ...room, id: room.roomNumber, kind: 'room' }));
-  assert.deepEqual(sanity.locateZone(zones, { floor: 1, x: -36, z: -15 }), { id: '101', kind: 'room' });
-  assert.equal(sanity.locateZone(zones, { floor: 1, x: -23, z: 8 }).kind, 'hallway');
+  assert.deepEqual(heat.locateZone(zones, { floor: 1, x: -36, z: -15 }), { id: '101', kind: 'room' });
+  assert.equal(heat.locateZone(zones, { floor: 1, x: -23, z: 8 }).kind, 'hallway');
 });
 
 test('the atrium has no low ceiling, and the fountain and shop-specific interiors match the reference', () => {
@@ -312,7 +312,7 @@ test('lift call buttons, upper shaft opening and sill are part of the plan', () 
   }
 });
 
-test('the service corridors drain sanity, and the stores fill it', () => {
+test('the service corridors drain heat, and the stores fill it', () => {
   assert.equal(mall.secretTunnels.length, 2);
   for (const tunnel of mall.secretTunnels) assert.equal(tunnel.kind, 'tunnel');
   // Every store is a room the meter can fill in and the hunter can walk to.

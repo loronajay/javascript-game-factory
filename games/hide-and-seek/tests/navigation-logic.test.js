@@ -81,3 +81,63 @@ test('the graph answers for a building with no waypoints at all', () => {
   assert.deepEqual(navigator.walkRoute({ x: 0, z: 0, floor: 1 }, { x: 5, z: 5, floor: 1 }), []);
   assert.equal(navigator.connectorBetween(1, 2, { x: 0, z: 0 }), null);
 });
+
+test('replanning halfway up stairs exits along the flight, even when the target is on the rounded floor', () => {
+  const space = fixture.createSpace(hotel, Object.fromEntries(hotel.swingDoors.map(d => [d.id, d.openAngle])));
+  const navigator = enemy.createNavigator(nav, { space });
+  const flight = nav.connectors[0].layout.flights[0];
+  const from = { x: flight.startX, z: (flight.startZ + flight.endZ) / 2, y: (flight.startY + flight.endY) / 2 };
+  const route = navigator.planFloorRoute({ from, target: { x: 0, z: 30 }, fromFloor: 1, toFloor: 1, floorHeight: 4.6 });
+  assert.ok(route.some(p => p.stair), 'a floor label cannot erase the remaining stair traversal');
+  let body = from;
+  for (const target of route) {
+    let arrived = false;
+    for (let tick = 0; tick < 4000; tick++) {
+      const next = require('../movement-logic.js').stepToward(space, { height: 2.05, radius: .46 }, body, target, { speed: 3, delta: 1 / 60, guided: target.guided });
+      assert.equal(space.blocked(next.x, next.z, next.y, 2.05, .46), false, 'the body intersects the stair shell');
+      assert.equal(next.blocked, false, 'the route stalls in the stairwell');
+      body = next;
+      if (next.arrived) { arrived = true; break; }
+    }
+    assert.ok(arrived, 'a mid-flight replan must reach every waypoint');
+  }
+  assert.ok(Math.hypot(body.x, body.y, body.z - 30) < .25);
+});
+
+test('a floor route cannot invent a crossing when no connector serves the destination', () => {
+  const navigator = enemy.createNavigator({ nodes: [], edges: [], connectors: [] });
+  assert.deepEqual(navigator.planFloorRoute({ from: { x: 0, y: 0, z: 0 }, target: { x: 0, y: 4.6, z: 0 }, fromFloor: 1, toFloor: 2 }), []);
+});
+
+test('every map can reroute a demon from mid-flight to either landing without crossing solids', async () => {
+  const { mapRuntime } = require('./helpers/map-fixture.js');
+  const movement = require('../movement-logic.js');
+  for (const map of require('../map-catalog.js').playableMaps()) {
+    const context = await mapRuntime(map.id);
+    const navigator = enemy.createNavigator(context.plan.navigation, { space: context.space });
+    for (const connector of context.plan.navigation.connectors) {
+      for (const flight of connector.layout.flights) {
+        const from = { x: (flight.startX + flight.endX) / 2, y: (flight.startY + flight.endY) / 2, z: (flight.startZ + flight.endZ) / 2 };
+        for (const toFloor of [flight.transition, flight.transition + 1]) {
+          const target = connector.approaches?.[toFloor] || connector.approach;
+          const fromFloor = Math.round(from.y / 4.6) + 1;
+          const route = navigator.planFloorRoute({ from, target, fromFloor, toFloor, floorHeight: 4.6 });
+          const label = `${map.id}/${connector.id}/${flight.lane} to ${toFloor}`;
+          let body = from;
+          for (const waypoint of route) {
+            let arrived = false;
+            for (let tick = 0; tick < 3000; tick++) {
+              body = movement.stepToward(context.space, { height: 2.05, radius: .46 }, body, waypoint,
+                { speed: 3, delta: 1 / 60, guided: waypoint.guided });
+              assert.equal(context.space.blocked(body.x, body.z, body.y, 2.05, .46), false, `${label}: inside geometry`);
+              assert.equal(body.blocked, false, `${label}: stalled on flight`);
+              if (body.arrived) { arrived = true; break; }
+            }
+            assert.ok(arrived, `${label}: waypoint never reached`);
+          }
+          assert.ok(Math.hypot(body.x - target.x, body.y - (toFloor - 1) * 4.6, body.z - target.z) < .25, label);
+        }
+      }
+    }
+  }
+});

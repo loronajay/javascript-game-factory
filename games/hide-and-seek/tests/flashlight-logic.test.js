@@ -37,3 +37,38 @@ test('leftover charge adds directly and caps at a full battery', () => {
   assert.deepEqual(flashlight.addFlashlightCharge(almostEmpty, 2), { on: false, charge: 1 });
   assert.deepEqual(flashlight.createFlashlightDrop({ on: true, charge: 0.4 }), { charge: 0.4 });
 });
+
+// Online the snapshot answering a press is a round trip old. Mirroring it straight back over the
+// local light stomps the toggle before the input carrying it has even been sent, which is why F
+// only worked occasionally in a real match.
+test('a pending toggle survives the snapshots that have not seen it yet', () => {
+  const intent = flashlight.createFlashlightIntent(true, 1000);
+  const first = flashlight.reconcileFlashlight({ on: false, charge: 0.8 }, intent, 1010);
+  assert.equal(first.state.on, true, 'the press must not be undone by a snapshot taken before it');
+  assert.equal(first.state.charge, 0.8, 'the charge is always the authority\'s');
+  assert.equal(first.intent, intent);
+
+  const settled = flashlight.reconcileFlashlight({ on: true, charge: 0.79 }, first.intent, 1120);
+  assert.equal(settled.state.on, true);
+  assert.equal(settled.intent, null, 'the intent is released once the server agrees');
+});
+
+test('the authority still wins: a refusal, and a stuck intent that times out', () => {
+  const dead = flashlight.createFlashlightIntent(true, 0);
+  const refused = flashlight.reconcileFlashlight({ on: false, charge: 0 }, dead, 10);
+  assert.equal(refused.state.on, false, 'an empty battery cannot be switched on');
+  assert.equal(refused.intent, null);
+
+  const stuck = flashlight.createFlashlightIntent(true, 0);
+  const held = flashlight.reconcileFlashlight({ on: false, charge: 0.5 }, stuck, 100);
+  assert.equal(held.state.on, true);
+  const expired = flashlight.reconcileFlashlight({ on: false, charge: 0.5 }, stuck, flashlight.INTENT_GRACE_MS);
+  assert.equal(expired.state.on, false, 'a client may not ignore the server forever');
+  assert.equal(expired.intent, null);
+});
+
+test('with no intent outstanding the snapshot is applied as-is', () => {
+  const applied = flashlight.reconcileFlashlight({ on: true, charge: 0.42 }, null, 0);
+  assert.deepEqual(applied.state, { on: true, charge: 0.42 });
+  assert.equal(applied.intent, null);
+});

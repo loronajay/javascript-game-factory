@@ -183,7 +183,7 @@ test('roaming occasionally chooses an available room and otherwise stays in the 
   assert.deepEqual(hallVisit, { x: 0, z: 20, floor: 2, room: false });
 });
 
-test('a sanity hunt opens even a locked room door in the correct direction', () => {
+test('a heat hunt opens even a locked room door in the correct direction', () => {
   const leftDoor = { side: 'left', locked: true, open: false, target: 0 };
   const rightDoor = { side: 'right', locked: true, open: false, target: 0 };
 

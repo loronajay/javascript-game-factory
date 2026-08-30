@@ -46,6 +46,12 @@ function pruneStatusRows(document, keepIds) {
 export function createDemons({ createMonster, common, roster = DEFAULT_ROSTER }) {
   let publishedState = null;
   let publishedLocalChase = null;
+  // Whether the roster's states come off the wire. Online the bodies are puppets whose brains stood
+  // down, so their local awareness is a permanent `roam` — and `update` runs every tick alongside
+  // `applySnapshot`, which meant the authority's threat state was overwritten by that `roam` sixty
+  // times a second. The HUD flickered and the soundtrack, which restarts a track whenever the state
+  // changes, was torn down and restarted twice per tick: the chase theme never audibly played.
+  let remote = false;
   const entries = (Array.isArray(roster) && roster.length ? roster : DEFAULT_ROSTER);
   // The order the server builds them in, so a snapshot's demon is posed onto the right body.
   const ids = entries.map((entry) => entry.id);
@@ -54,9 +60,9 @@ export function createDemons({ createMonster, common, roster = DEFAULT_ROSTER })
   for (const entry of entries) {
     list.push(createMonster({
       ...common,
-      // Only the roster's hunter reads the sanity meter; the rest are handed no meter at all, which
+      // Only the roster's hunter reads the heat meter; the rest are handed no meter at all, which
       // is what keeps the anti-camping rule legible as one stalker rather than a pack.
-      sanity: entry.hunts ? common.sanity : null,
+      heat: entry.hunts ? common.heat : null,
       name: entry.name,
       statusElementId: statusIds[statusIds.push(statusElementIdFor(entry, common.document)) - 1],
       // Each demon opens clear of the ones already standing. See `createMonster`.
@@ -99,6 +105,7 @@ export function createDemons({ createMonster, common, roster = DEFAULT_ROSTER })
   // stays aggregated and position-free exactly as it is offline: one state for the whole roster, so
   // two hunters never become two trackers.
   function applySnapshot(demons = [], threat = null, localId = null) {
+    remote = true;
     for (let index = 0; index < list.length; index += 1) {
       const view = demons.find((entry) => entry.id === ids[index]) || demons[index] || null;
       list[index].setRemotePose(view);
@@ -123,7 +130,9 @@ export function createDemons({ createMonster, common, roster = DEFAULT_ROSTER })
     list,
     applySnapshot,
     setPlayers(provider) { for (const demon of list) demon.setPlayers(provider); },
-    update(delta, elapsed) { for (const demon of list) demon.update(delta, elapsed); paintThreat(); },
+    // Online this only advances each mixer over the pose the server sent; the threat readout belongs
+    // to the snapshot, so repainting it from the stood-down local states here would fight it.
+    update(delta, elapsed) { for (const demon of list) demon.update(delta, elapsed); if (!remote) paintThreat(); },
     getStates: () => list.map((demon) => demon.getState()),
   };
 }

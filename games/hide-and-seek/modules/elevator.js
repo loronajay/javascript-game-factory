@@ -116,6 +116,11 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
   // the floor under a passenger is.
   function applyRemote(view) {
     if (!view) return;
+    // The local state machine stands down online, and it was the only thing emitting the lift's
+    // events — so the ride, the arrival and the ding were all silent in a real match. The edges are
+    // read off the authority's own state instead: `closing`/`opening` → `moving` is a departure, and
+    // anything → `idle`/`opening` after a trip is an arrival.
+    const wasState = elevator.remote ? elevator.state : view.state;
     elevator.remote = true;
     elevator.currentFloor = view.floor;
     elevator.targetFloor = view.targetFloor;
@@ -127,6 +132,10 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
     if (elevator.state === 'moving' && isPlayerInsideXZ()) world.state.playerFloor = 0;
     if (elevator.state === 'moving') { world.elevatorBadge.classList.remove('hidden'); world.elevatorBadge.textContent = `Elevator ${elevator.targetFloor > elevator.currentFloor ? '↑' : '↓'} Floor ${elevator.targetFloor}`; }
     else world.elevatorBadge.classList.add('hidden');
+    if (wasState !== elevator.state) {
+      if (elevator.state === 'moving') world.emit('elevator-start', { from: elevator.currentFloor, to: elevator.targetFloor, passenger: isPlayerInsideXZ() });
+      else if (wasState === 'moving') world.emit('elevator-arrive', { floor: elevator.currentFloor, passenger: isPlayerInsideXZ() });
+    }
   }
 
   function update(delta, elapsed) {

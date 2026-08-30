@@ -81,11 +81,18 @@ test('the viewport vignette is transparent unless the local player is actively c
   demons.update(0.1, 0.2);
   assert.equal(bodyClassList.active.has('monster-chase'), true);
 
+  // The vignette must be transparent on its own and only ever lit by a `.monster-*` class, so a
+  // threat that ends takes its glow with it. Each selector is declared exactly once: a second copy
+  // of any of them is how the glow used to survive the chase that caused it.
   const css = fs.readFileSync(path.resolve(__dirname, '..', 'styles.css'), 'utf8');
-  const neutralRule = '#threatVignette{box-shadow:inset 0 0 120px 25px transparent;animation:none}';
-  const chaseRule = '.monster-chase #threatVignette{box-shadow:inset 0 0 150px 38px rgba(105,0,0,.48);animation:threatBeat .68s infinite}';
-  assert.ok(css.lastIndexOf(neutralRule) > css.lastIndexOf('rgba(90,0,0,.3)'), 'the final base vignette rule must clear old threat glows');
-  assert.ok(css.lastIndexOf(chaseRule) > css.lastIndexOf(neutralRule), 'only the chase override should restore the red glow');
+  const base = '#threatVignette{position:fixed;inset:0;z-index:7;box-shadow:inset 0 0 120px 25px transparent';
+  assert.equal(css.split(base).length - 1, 1, 'the base vignette rule must be declared exactly once');
+  for (const state of ['search', 'hunt', 'chase']) {
+    const rule = `.monster-${state} #threatVignette{`;
+    assert.equal(css.split(rule).length - 1, 1, `.monster-${state} must light the vignette exactly once`);
+    assert.ok(css.indexOf(rule) > css.indexOf(base), `.monster-${state} must override the transparent base`);
+  }
+  assert.ok(!css.includes('.monster-chase #staminaMeter'), 'a threat state must not reposition the meter rail');
 });
 
 test('a roster longer than the hotel\u2019s two composes that many bodies and builds their HUD rows', async () => {
@@ -110,7 +117,7 @@ test('a roster longer than the hotel\u2019s two composes that many bodies and bu
       { id: 'custodian', name: 'The Custodian', hunts: false },
       { id: 'nightwatch', name: 'The Nightwatch', hunts: false },
     ],
-    common: { logic, sanity: { meter: true }, document, world: { emit() {} } },
+    common: { logic, heat: { meter: true }, document, world: { emit() {} } },
   });
 
   assert.equal(demons.list.length, 3);
@@ -118,8 +125,8 @@ test('a roster longer than the hotel\u2019s two composes that many bodies and bu
   assert.deepEqual(created.map((options) => options.statusElementId),
     ['demonStatus-greeter', 'demonStatus-custodian', 'demonStatus-nightwatch']);
   assert.equal(host.children.length, 3, 'every demon without authored markup gets a status row');
-  // Only the roster's hunter reads the sanity meter, however many demons a map has.
-  assert.deepEqual(created.map((options) => !!options.sanity), [true, false, false]);
+  // Only the roster's hunter reads the heat meter, however many demons a map has.
+  assert.deepEqual(created.map((options) => !!options.heat), [true, false, false]);
   // Each one is placed clear of the demons already standing. It used to be handed the floors that
   // were taken, which cannot spread three demons over Cinder Mall's two levels — so it is handed
   // where they actually are, and separation is a distance.
@@ -127,4 +134,49 @@ test('a roster longer than the hotel\u2019s two composes that many bodies and bu
   // Flattened to loose coordinates: `getState()` reports a vector, and a separation measured against
   // an undefined x would silently always pass and stack three demons in one spot.
   assert.deepEqual(created[2].takenSpawns[0], { x: 10, z: 4, floor: 1 });
+});
+
+// Online the demons are puppets: their brains stood down, so their local awareness is a permanent
+// `roam`. `demons.update` still runs every tick to advance the mixers, and it used to repaint the
+// threat readout from those stood-down states — overwriting the authority's twice per tick. The
+// soundtrack restarts a track whenever the state changes, so the chase theme was torn down and
+// restarted 120 times a second and never audibly played.
+test('a snapshot owns the threat readout; the puppet bodies stop publishing one', async () => {
+  const createDemons = await loadCreateDemons();
+  const events = [];
+  const bodyClassList = createClassList();
+  const poses = [];
+  const demons = createDemons({
+    createMonster() {
+      return {
+        update() {},
+        setPlayers() {},
+        setRemotePose(view) { poses.push(view); },
+        getState: () => ({ state: logic.ENEMY_STATES.ROAM, detectedTargetId: null }),
+      };
+    },
+    common: {
+      logic,
+      document: { body: { classList: bodyClassList } },
+      world: { emit: (name, detail) => events.push({ name, detail }) },
+    },
+    roster: [
+      { id: 'bellhop', name: 'The Bellhop', hunts: true },
+      { id: 'housekeeper', name: 'The Housekeeper', hunts: false },
+    ],
+  });
+
+  demons.applySnapshot(
+    [{ id: 'bellhop', state: logic.ENEMY_STATES.CHASE }, { id: 'housekeeper', state: logic.ENEMY_STATES.ROAM }],
+    logic.ENEMY_STATES.CHASE,
+    'client-1',
+  );
+  assert.equal(events.length, 1);
+  assert.equal(events.at(-1).detail.state, logic.ENEMY_STATES.CHASE);
+  assert.equal(bodyClassList.active.has('monster-chase'), true);
+
+  for (let tick = 0; tick < 10; tick += 1) demons.update(1 / 60, tick / 60);
+  assert.equal(events.length, 1, 'a stood-down demon must not publish a threat state of its own');
+  assert.equal(bodyClassList.active.has('monster-chase'), true, 'the chase vignette must survive the puppet ticks');
+  assert.equal(poses.length, 2);
 });

@@ -10,17 +10,17 @@
 // The seam that matters: `list()` returns positions in exactly the shape the round's catch
 // resolution and the demon's threat checks want. When real players arrive, the same list is fed
 // from the network and this file simply stops being asked for entries.
-export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floorY, layout, world, avatars, logic, enemyLogic, movement, sanityLogic, avatarLogic, count = 3, spawnOffset = 0, seekerSpawn = null }) {
+export function createHiders({ THREE, config: CONFIG, tuning, heatConfig, floorY, layout, world, avatars, logic, enemyLogic, movement, heatLogic, avatarLogic, count = 3, spawnOffset = 0, seekerSpawn = null }) {
   const BODY = { height: CONFIG.bodyHeight, radius: CONFIG.playerRadius };
   // Borrowed from the demon deliberately: there is one building to cross and one way to cross it.
   const navigator = enemyLogic.createNavigator(world.getPlan().navigation, { space: world.space });
   const hiders = new Map();
   let zones = [];
 
-  function sanityZones() {
+  function heatZones() {
     const { roomCenters, secretTunnels } = world.collections;
     if (zones.length !== roomCenters.size + secretTunnels.length) zones = [
-      ...[...roomCenters.entries()].map(([id, room]) => ({ ...room, id, kind: sanityLogic.ZONE_KINDS.ROOM })),
+      ...[...roomCenters.entries()].map(([id, room]) => ({ ...room, id, kind: heatLogic.ZONE_KINDS.ROOM })),
       ...secretTunnels,
     ];
     return zones;
@@ -37,13 +37,15 @@ export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floo
   }
 
   function describe(hider) {
-    const candidate = hider.sanity.candidate || {};
+    const candidate = hider.heat.candidate || {};
     return {
       id: hider.id,
       x: hider.position.x,
       y: hider.position.y,
       z: hider.position.z,
       floor: nearestFloor(hider.position.y),
+      yaw: hider.yaw,
+      cameraYaw: hider.yaw + Math.PI,
       crouching: !!hider.ai.crouching,
       flashlightOn: false,
       flashlightCharge: hider.flashlightCharge,
@@ -53,13 +55,14 @@ export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floo
       spot: hider.ai.spot ? hider.ai.spot.id : null,
       full: !!candidate.full,
       zone: candidate.zone || null,
-      kind: candidate.kind || sanityLogic.ZONE_KINDS.HALLWAY,
+      kind: candidate.kind || heatLogic.ZONE_KINDS.HALLWAY,
     };
   }
 
   // The same waypoint plan the demon uses: route through the stairwell when floors differ, then out
   // of the corridor centre line and into the room.
   function planRoute(hider, target) {
+    hider.avoidance = null;
     const fromFloor = nearestFloor(hider.position.y);
     const toFloor = target.floor || fromFloor;
     hider.route = navigator.planFloorRoute({
@@ -97,13 +100,14 @@ export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floo
 
   // The same pure mover the player and the demons use, at hider size.
   function tryMove(hider, waypoint, speed, delta) {
-    const step = movement.stepToward(world.space, BODY, hider.position, waypoint, { speed, delta, arriveRadius: 0.22, guided: !!waypoint.guided });
-    if (step.arrived) { hider.position.set(step.x, step.y, step.z); hider.route.shift(); return; }
+    const step = movement.stepToward(world.space, BODY, hider.position, waypoint, { speed, delta, arriveRadius: 0.22, guided: !!waypoint.guided, avoidance: hider.avoidance });
+    hider.avoidance = step.avoidance || null;
+    if (step.arrived) { hider.position.set(step.x, step.y, step.z); hider.route.shift(); hider.avoidance = null; return; }
     if (step.moved) hider.position.set(step.x, step.y, step.z);
-    // Boxed in: drop the waypoint so the next tick re-plans instead of grinding into the wall.
-    if (step.blocked) hider.route.shift();
+    // Later legs depend on reaching this doorway; none may be promoted after a blocked step.
+    if (step.blocked) { hider.route = []; hider.avoidance = null; }
     hider.moving = step.moved;
-    if (Math.hypot(step.dirX, step.dirZ) > 0.01) hider.yaw = Math.atan2(step.dirX, step.dirZ);
+    if (step.moved && Math.hypot(step.dirX, step.dirZ) > 0.01) hider.yaw = Math.atan2(step.dirX, step.dirZ);
   }
 
   function update(delta, threats = []) {
@@ -124,7 +128,7 @@ export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floo
       const speed = logic.movementSpeed(hider.ai, tuning);
       if (waypoint && speed > 0) tryMove(hider, waypoint, speed, delta);
       const pose = describe(hider);
-      hider.sanity = sanityLogic.updatePlayerSanity(hider.sanity, pose, sanityZones(), delta, sanityConfig);
+      hider.heat = heatLogic.updatePlayerHeat(hider.heat, pose, heatZones(), delta, heatConfig);
       avatars.setPose(hider.id, {
         x: hider.position.x, y: hider.position.y, z: hider.position.z,
         yaw: hider.yaw, crouching: !!hider.ai.crouching, flashlightOn: false, flashlightCharge: hider.flashlightCharge,
@@ -167,7 +171,7 @@ export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floo
         flashlightCharge: 1,
         unreachable: new Set(),
         ai: logic.createHiderState(),
-        sanity: sanityLogic.createPlayerSanity(start),
+        heat: heatLogic.createPlayerHeat(start),
       };
       hiders.set(id, hider);
       avatars.spawn(id, { role: avatarLogic.ROLES.HIDER, seat: index + 1, name: `Guest ${index + 1}`, pose: start });

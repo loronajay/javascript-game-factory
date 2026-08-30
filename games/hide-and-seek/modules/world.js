@@ -55,12 +55,24 @@ export function createWorld({ THREE, scene, materials: MAT, config: CONFIG, layo
     if (state.notificationTimer) window.clearTimeout(state.notificationTimer);
     state.notificationTimer = window.setTimeout(() => notificationEl.classList.remove('notificationVisible'), duration);
   }
+  // One chip per key rather than one bullet-separated string: a ring with three keys on it should
+  // look like three things.
   function updateInventoryHud() {
-    if (!state.inventory.size) { keyListEl.textContent = 'No keys'; return; }
-    keyListEl.textContent = [...state.inventory].map((id) => {
+    keyListEl.replaceChildren();
+    if (!state.inventory.size) {
+      const empty = document.createElement('span');
+      empty.className = 'keyChip keyChip--empty';
+      empty.textContent = 'No keys';
+      keyListEl.append(empty);
+      return;
+    }
+    for (const id of state.inventory) {
       const match = id.match(/^floor-(\d+)-master$/);
-      return match ? `F${match[1]} master` : id;
-    }).join(' • ');
+      const chip = document.createElement('span');
+      chip.className = 'keyChip';
+      chip.textContent = match ? `F${match[1]} Master` : id;
+      keyListEl.append(chip);
+    }
   }
   function addInventoryKey(keyId, label) {
     if (state.inventory.has(keyId)) return;

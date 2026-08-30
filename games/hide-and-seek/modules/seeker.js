@@ -9,6 +9,7 @@ export function createSeeker({ THREE, config: CONFIG, tuning, floorY, layout, wo
   const position = new THREE.Vector3(spawn.x, spawn.y, spawn.z);
   let state = logic.createSeekerState();
   let route = [];
+  let avoidance = null;
   let yaw = 0;
   let moving = false;
   let held = true;
@@ -16,26 +17,21 @@ export function createSeeker({ THREE, config: CONFIG, tuning, floorY, layout, wo
   let replanIn = 0;
   let patrolIndex = 0;
   // What this route was for, and how many times the way there has already turned out to be solid.
-  // A leg the mover gives up on used to be dropped silently, which on a long graph edge — a mall
-  // aisle node twenty-five metres from the shop it opens onto — emptied the route and sent the
+  // A leg the mover gives up on used to be dropped silently, which on a long graph edge â€” a mall
+  // aisle node twenty-five metres from the shop it opens onto â€” emptied the route and sent the
   // seeker on to the next room. Deterministically, every cycle, so a store could never be searched.
   let routeTarget = null;
   let routeAttempts = 0;
   const MAX_ROUTE_ATTEMPTS = 3;
 
   function floor() { return Math.max(1, Math.min(world.state.floorCount, Math.round(position.y / CONFIG.floorHeight) + 1)); }
-  function describe() { return { id, name: 'The Seeker', role: 'seeker', alive, x: position.x, y: position.y, z: position.z, floor: floor(), yaw, crouching: false, flashlightOn: true, flashlightCharge: 1, state: state.mode }; }
+  function describe() { return { id, name: 'The Seeker', role: 'seeker', alive, x: position.x, y: position.y, z: position.z, floor: floor(), yaw, cameraYaw: yaw + Math.PI, crouching: false, flashlightOn: true, flashlightCharge: 1, state: state.mode }; }
   function planRoute(target) {
     if (target !== routeTarget) { routeTarget = target; routeAttempts = 0; }
+    avoidance = null;
     const fromFloor = floor(); const toFloor = target.floor || fromFloor;
-    const corridorSweep = world.getPlan().navigation?.corridorSweep;
-    if (corridorSweep) {
-      const interFloorRoute = fromFloor === toFloor ? [] : navigator.planFloorRoute({
-        from: position, target: { x: position.x, z: position.z }, fromFloor, toFloor, floorHeight: CONFIG.floorHeight,
-      });
-      route = logic.createSweepRoute({ hunter: describe(), target: { ...target, y: target.y ?? floorY(toFloor), floor: toFloor }, interFloorRoute, ...corridorSweep });
-      return;
-    }
+    // The map graph owns doorways for patrols and chases alike. A room-centre dogleg cannot
+    // describe a moving target: it sends a seeker back outside on every sighting refresh.
     route = navigator.planFloorRoute({
       from: position, target, fromFloor, toFloor, floorHeight: CONFIG.floorHeight,
     });
@@ -57,17 +53,19 @@ export function createSeeker({ THREE, config: CONFIG, tuning, floorY, layout, wo
   function step(delta, speed) {
     const target = route[0]; moving = false;
     if (!target) return;
-    const result = movement.stepToward(world.space, BODY, position, target, { speed, delta, arriveRadius: 0.22, guided: !!target.guided });
+    const result = movement.stepToward(world.space, BODY, position, target, { speed, delta, arriveRadius: 0.22, guided: !!target.guided, avoidance });
+    avoidance = result.avoidance || null;
     if (result.moved || result.arrived) position.set(result.x, result.y, result.z);
-    if (result.arrived) route.shift();
+    if (result.arrived) { route.shift(); avoidance = null; }
     else if (result.blocked) {
       // Re-enter the graph from where the body actually is, rather than abandoning the target: the
       // nearest waypoint to a wedged seeker is the one that walks it back out into the aisle.
-      route.shift();
-      if (routeTarget && routeAttempts < MAX_ROUTE_ATTEMPTS) { routeAttempts += 1; const target = routeTarget; routeTarget = null; planRoute(target); routeTarget = target; }
+      // Later legs are only valid after reaching this one, especially at the stair entrance.
+      route = []; avoidance = null;
+      if (routeTarget && routeAttempts < MAX_ROUTE_ATTEMPTS) { routeAttempts += 1; planRoute(routeTarget); }
     }
     moving = result.moved;
-    if (Math.hypot(result.dirX, result.dirZ) > 0.01) yaw = Math.atan2(result.dirX, result.dirZ);
+    if (result.moved && Math.hypot(result.dirX, result.dirZ) > 0.01) yaw = Math.atan2(result.dirX, result.dirZ);
   }
   function update(delta, candidates = []) {
     if (!alive || held) { moving = false; avatars.setPose(id, describe()); return; }

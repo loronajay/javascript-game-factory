@@ -1,5 +1,5 @@
 export function createMonster({
-  THREE, GLTFLoader, scene, camera, config: CONFIG, floorY, layout, world, player, logic, movement, sanity, document, window,
+  THREE, GLTFLoader, scene, camera, config: CONFIG, floorY, layout, world, player, logic, movement, heat, document, window,
   name = 'The Bellhop', statusElementId = 'monsterStatus', takenSpawns = [], accentColor = 0x5c141a, eyeColor = 0xff1008,
 }) {
   const { ENEMY_STATES } = logic;
@@ -468,20 +468,9 @@ export function createMonster({
     if (window.HotelDemon.isSafeHaven(target, world.getPlan().elevator)) { route = []; return; }
     const fromFloor = nearestFloor();
     const toFloor = target.floor || Math.max(1, Math.min(world.state.floorCount, Math.round(target.y / CONFIG.floorHeight) + 1));
-    if (target.inStairwell) {
-      const connector = navigator.connectorContaining(target) || navigator.connectorBetween(fromFloor, toFloor, root.position);
-      route = connector ? logic.createStairPursuitRoute({
-        enemy: { x: root.position.x, y: root.position.y, z: root.position.z, floor: fromFloor, inStairwell: isInStairwell(root.position) },
-        target,
-        floorHeight: CONFIG.floorHeight,
-        stairLayout: connector.layout,
-        approach: connector.approach, approaches: connector.approaches,
-      }) : [];
-    } else {
-      route = navigator.planFloorRoute({
-        from: root.position, target, fromFloor, toFloor, floorHeight: CONFIG.floorHeight,
-      });
-    }
+    route = navigator.planFloorRoute({
+      from: root.position, target, fromFloor, toFloor, floorHeight: CONFIG.floorHeight,
+    });
     routePurpose = purpose;
   }
 
@@ -523,6 +512,7 @@ export function createMonster({
     });
     if (window.HotelDemon.isSafeHaven(step, world.getPlan().elevator)) { route = []; moving = false; avoidance = null; return; }
     avoidance = step.avoidance || null;
+    if (step.blocked) { route = []; moving = false; avoidance = null; return; }
     if (step.arrived) { root.position.set(step.x, step.y, step.z); route.shift(); moving = false; avoidance = null; return; }
     if (step.moved) root.position.set(step.x, step.y, step.z);
     if (step.moved && Math.hypot(step.dirX, step.dirZ) > 0.01) {
@@ -601,18 +591,18 @@ export function createMonster({
     }
   }
 
-  // The sanity hunt. A player who has been still long enough stops being hidden: the demon walks to
+  // The heat hunt. A player who has been still long enough stops being hidden: the demon walks to
   // the room they are camping in and prowls it until they move (which resets their meter and calls
   // it off) or it sees them (which is a chase, and chase always wins). It only fires from ROAM â€”
   // an active search is a better lead than a stale one, and stacking the two would double-plan.
   function updateHunt() {
-    if (!sanity || awareness.state !== ENEMY_STATES.ROAM) {
-      if (huntZone && awareness.state !== ENEMY_STATES.ROAM) { huntZone = null; huntTargetId = null; sanity?.setHunted(null); }
+    if (!heat || awareness.state !== ENEMY_STATES.ROAM) {
+      if (huntZone && awareness.state !== ENEMY_STATES.ROAM) { huntZone = null; huntTargetId = null; heat?.setHunted(null); }
       return;
     }
-    const target = sanity.getHuntTarget({ x: root.position.x, z: root.position.z, floor: nearestFloor() }, playerProvider());
+    const target = heat.getHuntTarget({ x: root.position.x, z: root.position.z, floor: nearestFloor() }, playerProvider());
     if (!target) {
-      if (huntZone) { huntZone = null; huntTargetId = null; route = []; routePurpose = 'roam'; sanity.setHunted(null); }
+      if (huntZone) { huntZone = null; huntTargetId = null; route = []; routePurpose = 'roam'; heat.setHunted(null); }
       return;
     }
     const arrived = huntZone === target.zone && !route.length;
@@ -622,9 +612,9 @@ export function createMonster({
       planRoute({ x: target.x, y: floorY(target.floor), z: target.z, floor: target.floor }, 'hunt');
       huntZone = target.zone;
       huntTargetId = target.id;
-      sanity.setHunted(target);
+      heat.setHunted(target);
       if (target.id === 'local') world.notify(`${name.toUpperCase()} HAS TURNED TOWARD YOU.`, 2400);
-      world.emit('sanity-hunt', { demon: name, id: target.id, zone: target.zone, floor: target.floor });
+      world.emit('heat-hunt', { demon: name, id: target.id, zone: target.zone, floor: target.floor });
     } else if (arrived) {
       // Reached the room and still cannot see them: prowl it rather than stand in the doorway.
       const angle = Math.random() * Math.PI * 2; const radius = 1.2 + Math.random() * 2.2;
@@ -647,7 +637,7 @@ export function createMonster({
     if (world.state.localRole === 'hider') {
       // A hider taken by a demon is out, not necessarily over: the round goes on for whoever is left
       // and this player watches it. `roundOver: false` says so, because everything downstream of this
-      // event — the menu above all — has to know the difference between an elimination and an ending.
+      // event â€” the menu above all â€” has to know the difference between an elimination and an ending.
       world.emit('caught', { demon: name, floor: nearestFloor(), x: root.position.x, z: root.position.z, roundOver: false });
       return;
     }

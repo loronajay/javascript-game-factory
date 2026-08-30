@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fixture = require('./helpers/hospital-fixture.js');
 const enemyLogic = require('../enemy-logic.js');
 const movement = require('../movement-logic.js');
-const sanityLogic = require('../sanity-logic.js');
+const heatLogic = require('../heat-logic.js');
 const hiderLogic = require('../hider-logic.js');
 const seekerLogic = require('../seeker-logic.js');
 const demonLogic = require('../demon-logic.js');
@@ -17,7 +17,7 @@ async function runtime(plan = fixture.buildHospital()) {
       roomDoors: new Map(plan.roomDoors.map(d => [d.roomNumber, { ...d, open: true }])), secretTunnels: [] },
   };
   const avatars = { spawn() {}, setPose() {}, remove() {}, setVisible() {} };
-  return { THREE, plan, world, space, avatars, config: fixture.CONFIG, floorY: fixture.floorY, enemyLogic, movement, sanityLogic,
+  return { THREE, plan, world, space, avatars, config: fixture.CONFIG, floorY: fixture.floorY, enemyLogic, movement, heatLogic,
     avatarLogic: { ROLES: { HIDER: 'hider', SEEKER: 'seeker' } } };
 }
 
@@ -84,7 +84,7 @@ test('the CPU seeker sweeps every department through the real map graph', async 
 
 test('a full-height demon physically visits every hospital department across both floors', async () => {
   const context = await runtime();
-  const ctx = { ...context, enemy: enemyLogic, sanity: sanityLogic, candidates: [], huntCandidates: [],
+  const ctx = { ...context, enemy: enemyLogic, heat: heatLogic, candidates: [], huntCandidates: [],
     navigation: context.plan.navigation, rooms: context.plan.roomCenters, isRoomLocked: () => false,
     config: { ...demonLogic.DEFAULTS, floorCount: 2 } };
   let demon = demonLogic.createDemon({ id: 'surgeon', spawn: { ...context.plan.navigation.spawnNodes.at(-1), y: fixture.floorY(2) } });

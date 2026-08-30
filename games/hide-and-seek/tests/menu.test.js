@@ -9,7 +9,9 @@ const logic = require('../menu-logic.js');
 // a pause menu behind it is unreachable. These tests pin down the way out: Esc and an explicit
 // button on that screen both quit to the title.
 
-function element() {
+const focusLog = [];
+
+function element(id = null) {
   const listeners = new Map();
   const el = {
     textContent: '',
@@ -25,15 +27,16 @@ function element() {
     listeners,
     addEventListener(name, handler) { listeners.set(name, [...(listeners.get(name) || []), handler]); },
     fire(name, event = {}) { for (const handler of listeners.get(name) || []) handler(event); },
+    id,
     querySelector() { return element(); },
-    focus() {},
+    focus() { focusLog.push(el.id); },
   };
   return el;
 }
 
 function harness() {
   const elements = new Map();
-  const getElementById = (id) => { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); };
+  const getElementById = (id) => { if (!elements.has(id)) elements.set(id, element(id)); return elements.get(id); };
   const winListeners = new Map();
   let reloads = 0;
   const window = {
@@ -107,4 +110,26 @@ test('a hider eliminated mid-round keeps a working pause menu', async () => {
   menu.dispatch(logic.ACTIONS.PAUSE);
   assert.equal(menu.getScreen(), logic.SCREENS.PAUSE);
   assert.equal(env.elements.get('overlay').classList.contains('hidden'), false);
+});
+
+// Every setup and lobby screen opens with the back arrow as its first button. Focusing it meant a
+// Space or an Enter pressed anywhere while reading the options was a click on "back to main menu" —
+// the random kick to the title players hit while setting a match up.
+test('a screen focuses its panel, never the back arrow on it', async () => {
+  const env = harness();
+  focusLog.length = 0;
+  const menu = await createMenu(env);
+
+  menu.dispatch(logic.ACTIONS.SINGLE_PLAYER);
+  assert.equal(menu.getScreen(), logic.SCREENS.SOLO_SETUP);
+  assert.equal(focusLog.at(-1), 'menuSoloSetup');
+  assert.equal(env.elements.get('menuSoloSetup').tabIndex, -1, 'the panel has to be focusable to hold focus');
+
+  // Space with nothing armed is not a menu action, so the screen stays put.
+  env.elements.get('overlay').fire('click', { target: {}, preventDefault() {} });
+  assert.equal(menu.getScreen(), logic.SCREENS.SOLO_SETUP);
+
+  menu.dispatch(logic.ACTIONS.BACK);
+  menu.dispatch(logic.ACTIONS.ONLINE);
+  assert.equal(focusLog.at(-1), 'menuOnlineSetup');
 });

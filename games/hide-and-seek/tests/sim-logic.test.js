@@ -6,7 +6,7 @@ const movement = require('../movement-logic.js');
 const round = require('../round-logic.js');
 const stamina = require('../stamina-logic.js');
 const flashlight = require('../flashlight-logic.js');
-const sanity = require('../sanity-logic.js');
+const heat = require('../heat-logic.js');
 const fixture = require('./helpers/hotel-fixture.js');
 
 const TICK = 1 / 60;
@@ -18,7 +18,7 @@ const ROUND_CONFIG = { durationSeconds: 300, hideSeconds: 45, tagDistance: 1.35,
 
 function createSim(hotel, space) {
   return sim.createSimulation({
-    movement, round, stamina, flashlight, sanity,
+    movement, round, stamina, flashlight, heat,
     space,
     zones: [],
     config: { player: PLAYER, round: ROUND_CONFIG, flashlight: { drainSeconds: 120 } },

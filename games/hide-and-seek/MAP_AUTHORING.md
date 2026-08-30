@@ -48,7 +48,7 @@ export on that module holding the floor definitions; pass `null` only for the ho
 
 - a roster may be any length up to `MAX_DEMONS` (6) — two was the hotel's number, never a rule, and
   it may be **longer than the building is tall**: Cinder Mall runs three demons on two levels;
-- **exactly one demon per map has `hunts: true`.** That is the one that reads the sanity meter and
+- **exactly one demon per map has `hunts: true`.** That is the one that reads the heat meter and
   walks to a camper. Two camper-hunters converge on the same full bar and read as a swarm rather
   than a stalker you can learn;
 - ids are unique within a map, names read as `The Something`, and each carries an `accentColor` and
@@ -98,8 +98,8 @@ genuinely does not have (a mall with no secret passages returns `secretPanels: [
 | `swingDoors` / `slidingDoors` | Doors as hinged / sliding bodies, for the moving colliders. |
 | `roomDoors` | `{ id, kind: 'room', roomNumber, floor, side, direction, x, z, width, locked, requiredKey, openInitially, hingeX, hingeZ, y, localX, localZ, w, h, d, openAngle }`. |
 | `secretPanels` | Same shape, `kind: 'secret'`, plus `hideWhenOpen`. |
-| `secretTunnels` | `{ id, kind: 'tunnel', floor, minX, maxX, minZ, maxZ }` — a zone that **drains** the sanity meter. |
-| `roomCenters` | `{ roomNumber, floor, x, z, side }`. These become the sanity meter's `room` zones and the demon's hunt targets. |
+| `secretTunnels` | `{ id, kind: 'tunnel', floor, minX, maxX, minZ, maxZ }` — a zone that **drains** the heat meter. |
+| `roomCenters` | `{ roomNumber, floor, x, z, side }`. These become the heat meter's `room` zones and the demon's hunt targets. |
 | `furnishings` | Placements, not meshes: `{ id, type, floor, x, z, rotationY, y }`. `type` must be one the renderer knows (`bed`, `desk`, `couch`, `dresser`, `vending`, `plant`) or you must teach `modules/furnishings.js` to draw a new one. Ids must be stable — a drawer is contested state online. |
 | `hallDoors` | The lift's hall doors. |
 | `signs`, `doorFrames`, `wallLamps`, `lights`, `fixtures` | Presentation the renderer draws. `lights` are the point-light pool; `fixtures` include the per-room fill. |
@@ -181,7 +181,7 @@ final room target; aiming at `floorY` alone strands a CPU above its requested de
 - **A lift can face either way along Z.** The sign of `frontZ - centerZ` owns its facing. Do not
   assume that a cabin's front always has the smaller Z coordinate.
 - **A shop's hunt target is not its boundary.** Rooms may carry `minX`, `maxX`, `minZ`, `maxZ`
-  alongside a clear `x,z` aisle target; sanity uses the bounds while navigation uses the target.
+  alongside a clear `x,z` aisle target; heat uses the bounds while navigation uses the target.
 - **Stair visuals can specify `material` and `rotationX`.** Inclined escalator decks and metal
   treads still batch by material. A missing material retains the hotel's wooden stair default.
 - **Optional `inspectionViews` belong to the plan.** Named `{ x, y, z, yaw, pitch }` views can be

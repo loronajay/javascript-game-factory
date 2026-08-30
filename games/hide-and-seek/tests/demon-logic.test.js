@@ -5,7 +5,7 @@ const demonLogic = require('../demon-logic.js');
 const collision = require('../collision-logic.js');
 const enemy = require('../enemy-logic.js');
 const movement = require('../movement-logic.js');
-const sanity = require('../sanity-logic.js');
+const heat = require('../heat-logic.js');
 const fixtures = require('../fixtures-logic.js');
 const layout = require('../layout.js');
 const fixture = require('./helpers/hotel-fixture.js');
@@ -16,6 +16,15 @@ const fixture = require('./helpers/hotel-fixture.js');
 
 const TICK = 1 / 60;
 const CONFIG = { floorHeight: fixture.CONFIG.floorHeight };
+
+test('a blocked demon discards the route suffix, not just the doorway before a guided flight', () => {
+  const { ctx } = context({ space: { groundAt: () => 0, blocked: () => true, sightBlocked: () => true } });
+  const demon = { ...demonLogic.createDemon({ spawn: { x: 0, y: 0, z: 0, floor: 1 } }),
+    awareness: enemy.createAwareness(), route: [{ x: 1, y: 0, z: 0 }, { x: 5, y: 2, z: 4, guided: true, stair: true }] };
+  const next = demonLogic.tickDemon(demon, TICK, ctx);
+  assert.deepEqual(next.route, [], 'every subsequent leg depends on reaching this doorway');
+  assert.deepEqual([next.x, next.y, next.z], [0, 0, 0]);
+});
 
 function context(overrides = {}) {
   const hotel = overrides.hotel || fixture.buildHotel();
@@ -29,7 +38,7 @@ function context(overrides = {}) {
   return {
     hotel, space, catalog, opened, emitted, hunted, state,
     ctx: {
-      space, movement, enemy, sanity, layout,
+      space, movement, enemy, heat, layout,
       candidates: [], huntCandidates: [],
       rooms: hotel.roomCenters.map((room) => ({ roomNumber: room.roomNumber, floor: room.floor, x: room.x, z: room.z })),
       stairLayout: layout.createStairLayout({ floorCount: 4, floorHeight: fixture.CONFIG.floorHeight }),
@@ -202,7 +211,7 @@ test('only a hunting demon forces a lock, and only The Bellhop hunts at all', ()
   const room = harness.hotel.roomCenters.find((entry) => entry.floor === 1);
   const camper = { id: 'ana', x: room.x, z: room.z, floor: 1, zone: room.roomNumber, kind: 'room', full: true };
   harness.ctx.huntCandidates = [camper];
-  harness.ctx.sanityConfig = undefined;
+  harness.ctx.heatConfig = undefined;
 
   let housekeeper = demonLogic.createDemon({ id: 'housekeeper', name: 'The Housekeeper', spawn: { x: 0, y: fixture.floorY(1), z: 0, floor: 1 }, hunts: false });
   for (let tick = 0; tick < 30; tick += 1) housekeeper = demonLogic.tickDemon(housekeeper, TICK, harness.ctx);
@@ -215,7 +224,7 @@ test('only a hunting demon forces a lock, and only The Bellhop hunts at all', ()
   assert.equal(bellhop.routePurpose, 'hunt');
   assert.deepEqual(harness.hunted.at(-1), 'ana');
   assert.ok(harness.opened.some(([roomNumber, unlock]) => roomNumber === room.roomNumber && unlock === true), 'the hunt unlocks the door it is walking through');
-  assert.ok(harness.emitted.some((event) => event.type === 'sanity-hunt' && event.id === 'ana'));
+  assert.ok(harness.emitted.some((event) => event.type === 'heat-hunt' && event.id === 'ana'));
 });
 
 test('a catch is resolved from positions and does not care which demon it was', () => {

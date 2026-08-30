@@ -38,7 +38,7 @@ test('the demon roster is per map and is not capped at two', () => {
     ['The Greeter', 'The Custodian', 'The Nightwatch']);
 });
 
-test('exactly one demon per map reads the sanity meter', () => {
+test('exactly one demon per map reads the heat meter', () => {
   for (const map of maps.listMaps()) {
     const hunters = maps.demonRosterFor(map.id).filter((entry) => entry.hunts);
     assert.equal(hunters.length, 1, `${map.id} must have one camper-hunter, not ${hunters.length}`);

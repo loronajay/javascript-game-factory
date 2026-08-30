@@ -40,3 +40,47 @@ for (const facing of [-1, 1]) test(`visible and authoritative lift face ${facing
   const rear = boxes.find(b => b.id === 'elevator-cabin-back');
   assert.ok(Math.abs((rear.minZ + rear.maxZ) / 2 - (-29 - facing * 1.6)) < 1e-9);
 });
+
+// Online the local state machine stands down, and it was the only thing emitting the lift's events —
+// so the ride, the arrival and the ding never played in a real match. `applyRemote` reads the edges
+// off the authority's own state instead.
+test('the replicated lift still announces departures and arrivals', async () => {
+  const THREE = await load('vendor/three.module.js');
+  const { createElevator } = await load('modules/elevator.js');
+  const shaft = { centerX: 34, centerZ: -29, frontZ: -31.1 };
+  const emitted = [];
+  const world = {
+    collections: { hallElevatorDoors: new Map(), interactables: [] },
+    state: { floorCount: 2, playerEyeHeight: 1.65 },
+    elevatorBadge: { textContent: '', classList: { add() {}, remove() {} } },
+    getPlan: () => ({ elevator: shaft }), setOpening() {}, setDynamicHeight() {}, addNumberPlate() {},
+    registerBoxCollider() {}, emit: (name, detail) => emitted.push({ name, detail }),
+  };
+  const context = { fillRect() {}, strokeRect() {}, fillText() {} };
+  const material = new THREE.MeshStandardMaterial();
+  const elevator = createElevator({ THREE, scene: new THREE.Scene(), camera: new THREE.PerspectiveCamera(),
+    materials: { elevatorInterior: material, brass: material, metal: material, dark: material },
+    config: { eyeHeight: 1.65 }, floorY: f => (f - 1) * 4.6, world,
+    performance: { createChangeTracker: () => () => true }, document: { createElement: () => ({ getContext: () => context }) }, window: {},
+  });
+  elevator.build();
+  emitted.length = 0;
+
+  const snapshot = (state, floor, targetFloor, y) => ({ state, floor, targetFloor, y, doorAmount: 0 });
+  // The first snapshot is the world as it stands, not an event: joining mid-ride must not play a ding.
+  elevator.applyRemote(snapshot('moving', 1, 2, 2.3));
+  assert.deepEqual(emitted, []);
+
+  elevator.applyRemote(snapshot('opening', 2, 2, 4.6));
+  assert.equal(emitted.at(-1).name, 'elevator-arrive');
+  assert.equal(emitted.at(-1).detail.floor, 2);
+
+  elevator.applyRemote(snapshot('closing', 2, 1, 4.6));
+  elevator.applyRemote(snapshot('moving', 2, 1, 4.4));
+  assert.equal(emitted.at(-1).name, 'elevator-start');
+  assert.deepEqual([emitted.at(-1).detail.from, emitted.at(-1).detail.to], [2, 1]);
+
+  const before = emitted.length;
+  elevator.applyRemote(snapshot('moving', 2, 1, 3.9));
+  assert.equal(emitted.length, before, 'an unchanged state is not an event');
+});

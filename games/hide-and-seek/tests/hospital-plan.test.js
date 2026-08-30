@@ -121,11 +121,11 @@ test('stairs are continuous walk surfaces in both directions, with clear thresho
   }
 });
 
-test('department bounds fill sanity inside the actual room, not the corridors', () => {
-  const sanity = require('../sanity-logic.js');
+test('department bounds fill heat inside the actual room, not the corridors', () => {
+  const heat = require('../heat-logic.js');
   const zones = hospital.roomCenters.map(r => ({ ...r, id: r.roomNumber, kind: 'room' }));
-  assert.equal(sanity.locateZone(zones, { floor: 1, x: -40, z: -29 }).id, '101');
-  assert.equal(sanity.locateZone(zones, { floor: 1, x: -25, z: -18 }).kind, 'hallway');
+  assert.equal(heat.locateZone(zones, { floor: 1, x: -40, z: -29 }).id, '101');
+  assert.equal(heat.locateZone(zones, { floor: 1, x: -25, z: -18 }).kind, 'hallway');
 });
 
 test('lift calls, hall doors, upper shaft void and inspection spawns are usable', () => {

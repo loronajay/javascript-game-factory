@@ -73,7 +73,7 @@ async function mapRuntime(mapId) {
     layout,
     enemyLogic: require('../../enemy-logic.js'),
     movement: require('../../movement-logic.js'),
-    sanityLogic: require('../../sanity-logic.js'),
+    heatLogic: require('../../heat-logic.js'),
   };
 }
 

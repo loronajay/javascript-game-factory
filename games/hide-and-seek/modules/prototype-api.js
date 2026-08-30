@@ -6,7 +6,7 @@
 // into a god object.
 export function createPrototypeApi(parts) {
   const {
-    window, world, rendering, hotel, player, monster, demons, flashlightDrops, sanity, stamina, menu,
+    window, world, rendering, hotel, player, monster, demons, flashlightDrops, heat, stamina, menu,
     online, round, hiders, avatars, elevator, timestep, soundtrack, soundEffects,
     floorDefs, inspectionViews, mapSession, version,
   } = parts;
@@ -27,7 +27,7 @@ export function createPrototypeApi(parts) {
       flashlightDrops: flashlightDrops.getState(),
       monster: monster.getState(),
       demons: demons.getStates(),
-      sanity: sanity ? sanity.getState() : null,
+      heat: heat ? heat.getState() : null,
       stamina: stamina ? stamina.getState() : null,
       menu: menu ? menu.getScreen() : null,
       online: online.getState(),
@@ -54,13 +54,13 @@ export function createPrototypeApi(parts) {
     getSecretPanel: (id) => world.collections.secretPanels.get(id) || null,
     inspectionViews: Object.keys(inspectionViews),
     notify: world.notify,
-    soundtrack, soundEffects, avatars, demons, flashlightDrops, sanity, stamina, menu, round, hiders, online, world, rendering,
+    soundtrack, soundEffects, avatars, demons, flashlightDrops, heat, stamina, menu, round, hiders, online, world, rendering,
     events: [
       'hotel:key-found', 'hotel:door-unlocked', 'hotel:secret-discovered', 'hotel:secret-opened',
       'hotel:elevator-called', 'hotel:elevator-start', 'hotel:elevator-arrive', 'hotel:floor-change',
       'hotel:drawer-searched', 'hotel:flashlight-change', 'hotel:flashlight-charge',
       'hotel:flashlight-drop', 'hotel:flashlight-pickup', 'hotel:demon-state', 'hotel:monster-state',
-      'hotel:demon-catch', 'hotel:sanity-full', 'hotel:sanity-hunt', 'hotel:round-over', 'hotel:caught',
+      'hotel:demon-catch', 'hotel:heat-full', 'hotel:heat-hunt', 'hotel:round-over', 'hotel:caught',
     ],
   };
   window.HotelPrototype = api;

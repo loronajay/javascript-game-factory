@@ -142,7 +142,7 @@
       <p><strong>The demons are nobody's allies.</strong> Every location has its own staff &mdash; The Bellhop and The Housekeeper keep the Grand Hotel; The Greeter, The Custodian and The Nightwatch still work Cinder Mall. They hunt hiders even during the hiding phase, and they hunt you. They remember a fleeing player's trail for a few seconds, including through the stairwell, so keep changing direction after breaking sight.</p>
       <p><strong>Flashlight charge is finite.</strong> A full light lasts about two minutes of continuous use. A caught player drops their flashlight; seekers and hiders can recover it, adding its remaining charge to their own up to 100%.</p>
       <p><strong>Sprinting is metered.</strong> Your STAMINA bar drains while you run and empties into a winded state you cannot sprint out of. It refills while you walk, faster standing still, and fastest crouched in cover.</p>
-      <p><strong>Do not settle.</strong> Stay in one place and your SANITY meter climbs. Fill it and The Bellhop walks straight into the room you are hiding in. Changing rooms clears it &mdash; so does walking the halls, and the secret passages drain it.</p>
+      <p><strong>Do not settle.</strong> Stay in one place and your HEAT SIGNATURE builds. Fill it and you are the warmest thing in the building &mdash; the hunting demon walks straight into the room you are sitting in. Changing rooms clears it, walking the halls clears it, and the secret passages cool it back down.</p>
       <div class="menuButtons">
         <button class="menuBtn" type="button" data-menu="back">BACK</button>
       </div>
@@ -172,54 +172,62 @@
   </div>
 
   <div id="crosshair" aria-hidden="true"></div>
-  <div id="interactionPrompt" aria-live="polite"></div>
+  <!-- The keycap is drawn by CSS from `data-key`, so the prompt's text stays the sentence the
+       interactable wrote rather than "[E] " glued onto the front of it. -->
+  <div id="interactionPrompt" aria-live="polite" data-key="E"></div>
   <div id="notification" aria-live="polite"></div>
 
-  <div id="inventoryHud">
-    <div class="hudTitle">KEY RING</div>
-    <div id="keyList">No keys</div>
+  <div id="inventoryHud" class="hudPlate">
+    <div class="hudTitle">Key Ring</div>
+    <div id="keyList"><span class="keyChip keyChip--empty">No keys</span></div>
   </div>
 
-  <div id="floorBadge">Floor 1</div>
-  <div id="elevatorBadge" class="hidden"></div>
+  <!-- Floor and elevator travel are two rows of one plate. They were two badges stacked at
+       hard-coded offsets, which read as two unrelated things saying where you are. -->
+  <div id="locationPlate" class="hudPlate">
+    <div class="hudTitle">Location</div>
+    <div id="floorBadge">Floor 1</div>
+    <div id="elevatorBadge" class="hidden"></div>
+  </div>
 
   <div id="roundHud" data-phase="hiding">
-    <div class="hudTitle">ROUND</div>
+    <div id="roundBanner">THEY ARE HIDING &mdash; WAIT HERE</div>
     <div id="roundClock">0:45</div>
-    <div class="roundLine">GUESTS LEFT <span id="roundCount">3 / 3</span></div>
-    <div id="roundBanner">THEY ARE HIDING — WAIT HERE</div>
+    <div class="roundLine">Guests Left <span id="roundCount">3 / 3</span></div>
   </div>
 
   <!-- The right-hand rail stacks rather than pinning each panel to a hard-coded offset. The demon
        list is as long as the map's roster, so a fixed `top` for the meters below it is only ever
-       right for one roster size — Cinder Mall's three demons put the status lines under the sanity
-       bar. Stacking is the fix that holds for a roster of any length. -->
+       right for one roster size. Stacking is the fix that holds for a roster of any length. -->
   <div id="hudRail">
     <div id="demonStatuses">
       <div id="monsterStatus" class="demonStatus" data-state="roam">THE BELLHOP IS ROAMING</div>
       <div id="housekeeperStatus" class="demonStatus" data-state="roam">THE HOUSEKEEPER IS ROAMING</div>
     </div>
 
-    <div id="sanityMeter" data-state="calm">
-      <div class="hudTitle">SANITY</div>
-      <div id="sanityTrack"><div id="sanityFill"></div></div>
-      <div id="sanityReadout">0%</div>
+    <div id="heatMeter" class="hudMeter" data-state="calm">
+      <div class="meterHead"><span class="hudTitle">Heat Signature</span><span id="heatReadout" class="meterReadout">0%</span></div>
+      <div id="heatTrack" class="meterTrack"><div id="heatFill" class="meterFill"></div></div>
     </div>
-    <div id="staminaMeter" data-state="ready">
-      <div class="hudTitle">STAMINA</div>
-      <div id="staminaTrack"><div id="staminaFill"></div></div>
-      <div id="staminaReadout">100%</div>
+    <div id="staminaMeter" class="hudMeter" data-state="ready">
+      <div class="meterHead"><span class="hudTitle">Stamina</span><span id="staminaReadout" class="meterReadout">100%</span></div>
+      <div id="staminaTrack" class="meterTrack"><div id="staminaFill" class="meterFill"></div></div>
+    </div>
+    <!-- The flashlight is a battery, so it lives with the other two things a player spends rather
+         than as a line of text in the opposite corner. -->
+    <div id="flashlightStatus" class="hudMeter" data-on="false" data-charge="100">
+      <div class="meterHead"><span class="hudTitle">Flashlight <b class="keyCap">F</b></span><span id="flashlightReadout" class="meterReadout">100%</span></div>
+      <div class="meterTrack"><div id="flashlightFill" class="meterFill"></div></div>
     </div>
   </div>
-  <div id="flashlightStatus" data-on="false" data-charge="100">FLASHLIGHT OFF · 100% · F</div>
   <div id="threatVignette" aria-hidden="true"></div>
 
   <div id="spectatorHud" aria-live="polite">
-    <div class="hudTitle">SPECTATING</div>
+    <div class="hudTitle">Spectating</div>
     <button id="spectatorPrevious" type="button" aria-label="Previous player">&#8592;</button>
     <strong id="spectatorTarget">PLAYER</strong>
     <button id="spectatorNext" type="button" aria-label="Next player">&#8594;</button>
-    <small>Q / E TO SWITCH</small>
+    <small>Q / E to switch</small>
   </div>
 
   <div id="caughtOverlay" data-result="loss">
@@ -234,13 +242,16 @@
     </div>
   </div>
 
-  <div id="hud">
-    WASD / Arrows = Move<br>
-    E = Interact<br>
-    Shift = Sprint<br>
-    C / Ctrl = Crouch<br>
-    F = Flashlight<br>
-    Esc = Pause
+  <div id="hud" class="hudPlate">
+    <div class="hudTitle">Controls</div>
+    <ul class="keyLegend">
+      <li><b class="keyCap">WASD</b>Move</li>
+      <li><b class="keyCap">Shift</b>Sprint</li>
+      <li><b class="keyCap">C</b>Crouch</li>
+      <li><b class="keyCap">E</b>Interact</li>
+      <li><b class="keyCap">F</b>Light</li>
+      <li><b class="keyCap">Esc</b>Pause</li>
+    </ul>
   </div>
 
   <div id="mobileControls" aria-hidden="true">
@@ -272,7 +283,7 @@
   <script src="fixtures-logic.js?v=7.1"></script>
   <script src="demon-logic.js?v=7.1"></script>
   <script src="avatar-logic.js?v=7.1"></script>
-  <script src="sanity-logic.js?v=7.1"></script>
+  <script src="heat-logic.js?v=7.1"></script>
   <script src="stamina-logic.js?v=7.1"></script>
   <script src="map-catalog.js?v=7.2"></script>
   <script src="menu-logic.js?v=7.2"></script>

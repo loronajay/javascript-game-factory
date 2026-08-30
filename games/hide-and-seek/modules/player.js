@@ -7,6 +7,10 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
   const shouldScanInteractions = performance.createIntervalGate(0.08);
   let currentEyeHeight = CONFIG.eyeHeight;
   let flashlightState = flashlightLogic.createFlashlightState();
+  // The toggle this client is still waiting for the authority to acknowledge. Offline it is set and
+  // cleared by nothing, because nothing ever disagrees.
+  let lightIntent = null;
+  const now = () => (window.performance && typeof window.performance.now === 'function' ? window.performance.now() : Date.now());
   let dragLookMode = false; let mouseLookPointerId = null; let mouseLookLastX = 0; let mouseLookLastY = 0;
   let lookTouchId = null; let lookLastX = 0; let lookLastY = 0;
   const flashlightStatus = document.getElementById('flashlightStatus');
@@ -23,17 +27,30 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
   function paintFlashlight() {
     flashlightBeam.intensity = flashlightState.on ? BEAM_INTENSITY : 0;
     const percent = Math.ceil(flashlightState.charge * 100);
-    if (flashlightStatus) { flashlightStatus.dataset.on = String(flashlightState.on); flashlightStatus.dataset.charge = String(percent); flashlightStatus.textContent = `FLASHLIGHT ${flashlightState.on ? 'ON' : flashlightState.charge > 0 ? 'OFF' : 'EMPTY'} · ${percent}% · F`; }
+    if (flashlightStatus) {
+      flashlightStatus.dataset.on = String(flashlightState.on);
+      flashlightStatus.dataset.charge = String(percent);
+      const fill = document.getElementById('flashlightFill');
+      const readout = document.getElementById('flashlightReadout');
+      if (fill) fill.style.width = `${percent}%`;
+      if (readout) readout.textContent = flashlightState.charge > 0 ? `${flashlightState.on ? 'ON' : 'OFF'} · ${percent}%` : 'DEAD';
+    }
     const button = document.getElementById('flashlightBtn');
     if (button) { button.dataset.on = String(flashlightState.on); button.textContent = flashlightState.on ? 'LIGHT ON' : 'LIGHT'; }
   }
   // The battery is server-authoritative online — a client that reports its own charge is the same
   // class of cheat as one that reports it wasn't caught — so the snapshot's value is applied over
-  // whatever the local prediction drained.
+  // whatever the local prediction drained. The *switch* is not the same thing: a snapshot answering a
+  // press is a round trip old, and mirroring its `on` back over the local light undid the press
+  // before the input carrying it had been sent. `reconcileFlashlight` holds the press until the
+  // authority has seen it. See `flashlight-logic.js`.
   function applyRemoteFlashlight(view) {
     if (!view) return;
-    const changed = flashlightState.on !== view.on || Math.ceil(flashlightState.charge * 100) !== Math.ceil(view.charge * 100);
-    flashlightState = flashlightLogic.createFlashlightState(view.on, view.charge);
+    const settled = flashlightLogic.reconcileFlashlight(view, lightIntent, now());
+    lightIntent = settled.intent;
+    const changed = flashlightState.on !== settled.state.on
+      || Math.ceil(flashlightState.charge * 100) !== Math.ceil(settled.state.charge * 100);
+    flashlightState = settled.state;
     if (changed) paintFlashlight();
   }
 
@@ -41,6 +58,9 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
     const previousOn = flashlightState.on;
     flashlightState = flashlightLogic.setFlashlight(flashlightState, on);
     const changed = previousOn !== flashlightState.on;
+    // Only a press the player can see is worth defending against a stale snapshot. A refused toggle
+    // (an empty battery) changed nothing and must not hold the authority off.
+    if (changed) lightIntent = flashlightLogic.createFlashlightIntent(flashlightState.on, now());
     paintFlashlight();
     if (changed) world.emit('flashlight-change', { playerId: 'local', flashlightOn: flashlightState.on, flashlightCharge: flashlightState.charge });
     return flashlightState.on;
@@ -82,7 +102,7 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
   function updateInteractionTarget() {
     world.state.activeInteractable = null; raycaster.setFromCamera(new THREE.Vector2(0, 0), camera); const hits = raycaster.intersectObjects(scene.children, true);
     if (hits.length) { let object = hits[0].object; while (object) { const found = world.collections.interactables.find((item) => item.object === object && interactableAllowed(item)); if (found) { world.state.activeInteractable = found; break; } object = object.parent; } }
-    if (world.state.activeInteractable) { world.promptEl.textContent = `[E] ${world.state.activeInteractable.prompt()}`; world.promptEl.classList.add('visible'); }
+    if (world.state.activeInteractable) { world.promptEl.textContent = world.state.activeInteractable.prompt(); world.promptEl.classList.add('visible'); }
     else { world.promptEl.textContent = ''; world.promptEl.classList.remove('visible'); }
   }
   // Online a press is a *request*: it goes out on the input and the server decides what it opened,

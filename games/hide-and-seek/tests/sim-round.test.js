@@ -201,7 +201,7 @@ test('a snapshot carries what a client draws and nothing that would make it a wa
   assert.equal(snapshot.demons.length, 2);
   assert.equal(typeof snapshot.threat, 'string', 'threat is one aggregated state for the whole roster');
   for (const player of snapshot.players) {
-    assert.equal('sanity' in player, true);
+    assert.equal('heat' in player, true);
     assert.equal('route' in player, false);
   }
   // The round HUD stays position-free; that rule is older than the network layer.
