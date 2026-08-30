@@ -1,4 +1,4 @@
-# Agent Handoff — V7.1
+# Agent Handoff — V7.2
 
 Design direction, roadmap, and working agreements live in `CLAUDE.md`. This file is only the list of hard-won invariants: things that were expensive to get right and are easy to break by accident.
 
@@ -139,14 +139,52 @@ A flashlight is the strongest seeker-favouring tool in the game, so it obeys the
 - **`describeFlashlight` is a network pose field, not a HUD model.** It returns exactly `{ on, charge }`. Online, `on` must replicate because a lit player is visible to everyone, and `charge` is server-authoritative — a client that reports its own battery is the same class of cheat as one that reports it wasn't caught.
 - **Open item:** `enemy-logic.canDetectPlayer` still weighs only crouching and distance. A lit player is not currently easier for a demon to see. If that changes, it must change in `enemy-logic.js` so a server runs the same rule.
 
-## Two demons (V6.9)
+## Maps (V7.2)
 
-`modules/demons.js` composes the roster from the single `createMonster` factory; there is no second monster implementation and there must not be one.
+`map-catalog.js` is the registry of locations. A map is a catalog row, a pure plan module named by the global it attaches to, and a demon roster — see `MAP_AUTHORING.md` for the plan contract.
 
-- **Only The Bellhop hunts campers.** The Housekeeper is constructed with `sanity: null` deliberately. Two sanity hunters would converge on the same full meter and make the anti-camping rule read as a swarm; it also keeps `selectHuntTarget` single-hunter.
-- **They start apart.** `excludedSpawnFloors` seeds the Housekeeper away from the Bellhop's floor, so a round cannot open with both in one stairwell.
-- **The threat readout stays aggregated and position-free.** `enemy-logic.aggregateEnemyState` reduces every demon to one worst-case state for the vignette and the `hotel:monster-state` event. Do not add a per-demon indicator — that is the tracker minimap coming back through the side door, and online it leaks two positions instead of one.
-- **The round does not care which demon caught you.** `resolveDemonCatch` takes a player id, not a killer. Keep it that way; a third demon should cost nothing in `round-logic.js`.
+- **Adding a map must not require editing the renderer, the menu, `main.js` or `index.html`.** `modules/hotel.js` resolves a plan through `maps.resolveMapPlan` rather than naming a factory; the picker is filled from `maps.listMaps()`. `tests/architecture.test.js` fails if that starts to drift.
+- **`status: 'soon'` is a real state.** A registered map with no plan is shown as a locked row and `playableMapId` refuses to resolve it into a round, on the client and on the server. `normalizeMapId` is descriptive (the picker needs to name an unbuilt place); `playableMapId` is what anything standing a round up must use.
+- **A map is entered, never swapped.** The building is constructed at boot and the demons spawn into it, so changing location re-enters the page (`modules/map-session.js`) carrying the solo setup across. Do not try to rebuild the world under a live round.
+- **Online, the map is a lobby setting.** Matchmaking already compares settings, so two maps are two pools for free, and the snapshot names the map. A client whose building disagrees refuses the round rather than adjudicating against geometry it does not have.
+- **How tall a building is comes from the map.** `world.state.floorCount` in the browser, `player.floorCount` in the tick. Five modules used to walk 1..4 by hand; a test keeps the literal out.
+
+## Demons, per map (V6.9, rewritten V7.2)
+
+`modules/demons.js` composes a map's roster from the single `createMonster` factory; there is no second monster implementation and there must not be one. **Two was The Grand Hotel's number, not a rule** — the roster is data, up to `MAX_DEMONS` (6), and Cinder Mall has three.
+
+- **A roster may be longer than the building is tall, so demons are spread by distance, not one per floor.** Cinder Mall is three demons on two levels; "a floor each" is arithmetic with no answer there, and the floor was never the point — two demons in one corridor is what must not happen, two at opposite ends of a 96m concourse is fine. `navigation.minSpawnSeparation` is the rule, and both `demon-logic.chooseDemonSpawn` and `modules/monster.js` apply it.
+- **A status row belongs to the roster or it does not exist.** The hotel's two are authored in `index.html`; anything else is built at runtime, and `pruneStatusRows` removes any row naming a demon that is not in this building. Cinder Mall showed five before that existed.
+- **Copy names the map's own staff.** `monsters.hunterName()` / `monsters.rosterText()` — a round in the mall telling the seeker to beat The Bellhop is naming a demon who does not work there.
+
+## Where a demon may walk belongs to the plan
+
+`demon-logic.js` used to navigate by arithmetic against one floorplan: a corridor spine at x=0, a list of patrol Z values, and a dogleg to |x|=3.75 for anything off it. A plan emits a `navigation` block instead — a per-floor waypoint graph plus the vertical connectors between floors — and `enemy-logic.createNavigator` is the only thing that reads it.
+
+- **`planFloorRoute` is the one router.** The demon, the offline seeker and the offline hiders all use it. There were four copies of the dogleg before; do not write a fifth.
+- **An edge never joins two floors.** A floor change is a connector, and a walk edge between levels is a demon walking up through a ceiling.
+- **A connector may be a switchback or a straight run.** The hotel's stairwell is two lanes with a landing; the mall's escalators are one flight. `createStairRoute` handles both — it assumed the switchback and crashed on a single flight.
+- **`layout.js`'s stairwell is the hotel's**, and the mall builds its own. Nothing may call `layout.createStairLayout()` to find out where *a* map's stairs are.
+
+## The building owns its lift, and its near face is the low-Z one
+
+The lift's five coordinates were global config read by the fixtures, the tick, the renderer and `modules/elevator.js`. They are `plan.elevator` now. **`frontZ < centerZ` is a standing convention** — every in-cabin test in the engine assumes the cabin's near face is the low-Z one, and a building that disagrees has a lift whose doors open inside its own shaft. `modules/elevator.js` reads the shaft in `build()`, not at construction, because it is composed before the hotel is built.
+
+## A door hangs in a wall that runs one way or the other
+
+The renderer re-derived every door leaf as thin-in-X and wide-in-Z, and `createDoorFrameLayout` always placed its jambs either side along Z. Both are a hotel corridor written into the renderer. A door record carries `w`/`d`, `hingeX`/`hingeZ`, `localX`/`localZ`; a `doorFrames` entry carries `axis`. **Honour them** — the failure mode is a leaf lying flat through a shopfront and a jamb standing in the middle of the opening.
+
+- **A room with no door is treated as locked**, so no demon patrols into it. Every `roomCenters` entry needs a `roomDoors` entry, even one that starts open.
+
+## Plan geometry is shared, and lives in `collision-logic.js`
+
+`boxBounds`, `hingedBounds`, `slidingBounds`, `resolveColliders`, `walkHeightAt` and `rotateY` were in `hotel-plan.js`; a mall cannot sensibly ask a hotel where its own floor is. Both plan modules re-export them, so `plan.resolveColliders(...)` still works everywhere. **`collision-logic.js` must load before any plan module** — in `index.html` and in the server's `shared/index.mjs`.
+
+- **Exactly one demon per map hunts campers.** Every other demon is constructed with `sanity: null` deliberately. Two sanity hunters would converge on the same full meter and make the anti-camping rule read as a swarm; it also keeps `selectHuntTarget` single-hunter. `tests/map-catalog.test.js` asserts it for every registered map.
+- **They start apart.** Each demon's `excludedSpawnFloors` is every floor already taken, so a roster of three opens on three levels rather than two in one stairwell.
+- **A demon without authored markup gets a HUD row built for it.** The hotel's two are in `index.html`; a new map's are created into `#demonStatuses`. Adding a demon must never be an HTML edit.
+- **The threat readout stays aggregated and position-free.** `enemy-logic.aggregateEnemyState` reduces every demon to one worst-case state for the vignette and the `hotel:monster-state` event. Do not add a per-demon indicator — that is the tracker minimap coming back through the side door, and with three demons it leaks three positions.
+- **The round does not care which demon caught you.** `resolveDemonCatch` takes a player id, not a killer. Keep it that way; a third demon costs nothing in `round-logic.js`, and that is now load-bearing rather than aspirational.
 
 ## The shared hotel (V7.1)
 

@@ -572,7 +572,9 @@ export function bootTrickShot(root, options = {}) {
   });
   canvas.addEventListener("contextmenu", (event) => event.preventDefault());
 
-  root.addEventListener("keydown", (event) => {
+  // On `window`, not `root`: a keydown reaches the cabinet div only when focus is
+  // already on a control inside it, which it is not until the player clicks one.
+  window.addEventListener("keydown", (event) => {
     if (!active || shotActive || !selectedId) return;
     const editable = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
     if (editable) return;

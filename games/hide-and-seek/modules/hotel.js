@@ -26,8 +26,13 @@ export function selectPoolLights(candidates, { floors = null, origin = { x: 0, y
   return lit.slice(0, poolSize).map((item) => item.entry);
 }
 
-export function createHotel({ THREE, scene, camera, materials: MAT, config: CONFIG, floorY, keyIdForFloor, keyLabelForFloor, floorDefs, layout, plan: planApi, world, furnishings, elevator, performance, mergeGeometries }) {
+export function createHotel({ THREE, scene, camera, materials: MAT, config: CONFIG, floorY, keyIdForFloor, keyLabelForFloor, floorDefs: authoredFloorDefs, layout, plan: planApi, maps, mapId, world, furnishings, elevator, performance, mergeGeometries }) {
   const { collections, stairwellGroup } = world;
+  // The map this renderer is standing. It is resolved once, at build, and a different one means a
+  // rebuilt world — which is why changing map from the menu re-enters the game rather than swapping
+  // geometry under a round that is already running.
+  let activeMapId = maps ? maps.playableMapId(mapId) : mapId;
+  let floorDefs = authoredFloorDefs;
   const batcher = createStaticBatcher({ THREE, mergeGeometries });
   let batchStats = null;
   // The stairwell is 108 treads plus every rail segment. Left as individual meshes that is several
@@ -60,9 +65,19 @@ export function createHotel({ THREE, scene, camera, materials: MAT, config: CONF
   function groupFor(floor) { return collections.floorGroups.get(floor); }
 
   function createRoomDoor(parent, spec) {
-    const hinge = new THREE.Group(); hinge.position.set(spec.x, 0, spec.z - spec.width / 2); parent.add(hinge);
-    const door = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.12, spec.width), MAT.wood); door.position.set(0, 1.06, spec.width / 2); door.castShadow = true; door.receiveShadow = true; hinge.add(door);
-    for (const xSide of [-0.078, 0.078]) { const knob = new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 12), MAT.brass); knob.position.set(xSide, 0, spec.width * 0.34); door.add(knob); }
+    // The leaf is the plan's leaf. This used to re-derive it — a 0.1 x 2.12 x width box hinged at
+    // `z - width/2` — which silently assumed every door in the game hangs in a wall running along Z,
+    // because that is how a hotel corridor is shaped. A mall's storefronts face all four ways, and a
+    // door drawn across the wrong axis is a leaf lying flat through the shopfront.
+    const hinge = new THREE.Group(); hinge.position.set(spec.hingeX, 0, spec.hingeZ); parent.add(hinge);
+    const door = new THREE.Mesh(new THREE.BoxGeometry(spec.w, spec.h, spec.d), MAT.wood); door.position.set(spec.localX, spec.y, spec.localZ); door.castShadow = true; door.receiveShadow = true; hinge.add(door);
+    // Knobs sit near the leaf's free edge, which is along whichever of its two footprint axes is long.
+    const alongZ = spec.d >= spec.w;
+    for (const offset of [-0.078, 0.078]) {
+      const knob = new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 12), MAT.brass);
+      knob.position.set(alongZ ? offset : spec.w * 0.34, 0, alongZ ? spec.d * 0.34 : offset);
+      door.add(knob);
+    }
     const roomNumber = spec.roomNumber;
     const item = { planId: spec.id, hinge, door, open: spec.openInitially, target: 0, side: spec.side, locked: spec.locked, roomNumber, requiredKey: spec.requiredKey };
     if (spec.openInitially) { item.target = spec.openAngle; hinge.rotation.y = item.target; }
@@ -78,8 +93,8 @@ export function createHotel({ THREE, scene, camera, materials: MAT, config: CONF
     return item;
   }
   function createSecretPanel(parent, spec) {
-    const hinge = new THREE.Group(); hinge.position.set(spec.x, 0, spec.z - spec.width / 2); parent.add(hinge);
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(0.11, 2.05, spec.width), MAT.wall); panel.position.set(0, 1.025, spec.width / 2); panel.castShadow = true; panel.receiveShadow = true; hinge.add(panel);
+    const hinge = new THREE.Group(); hinge.position.set(spec.hingeX, 0, spec.hingeZ); parent.add(hinge);
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(spec.w, spec.h, spec.d), MAT.wall); panel.position.set(spec.localX, spec.y, spec.localZ); panel.castShadow = true; panel.receiveShadow = true; hinge.add(panel);
     const trim = new THREE.Mesh(new THREE.BoxGeometry(0.125, 1.72, 0.035), new THREE.MeshStandardMaterial({ color: 0xcac7bd, roughness: 0.9 })); trim.position.set(spec.side === 'left' ? 0.065 : -0.065, 0, spec.width * 0.31); panel.add(trim);
     const item = { planId: spec.id, id: spec.id, hinge, panel, side: spec.side, open: false, target: 0, discovered: false };
     world.setOpening(spec.id, 0);
@@ -94,7 +109,9 @@ export function createHotel({ THREE, scene, camera, materials: MAT, config: CONF
     const specs = plan.hallDoors.filter((entry) => entry.floor === def.id);
     if (!specs.length) return;
     const parent = groupFor(def.id);
-    const group = new THREE.Group(); group.position.set(CONFIG.elevatorCenterX, 0, CONFIG.elevatorFrontZ - 0.08); parent.add(group);
+    // The shaft is the building's, not the config's — a mall's lift is not in a hotel's lobby.
+    const shaft = plan.elevator || { centerX: CONFIG.elevatorCenterX, frontZ: CONFIG.elevatorFrontZ };
+    const group = new THREE.Group(); group.position.set(shaft.centerX, 0, shaft.frontZ - 0.08); parent.add(group);
     const meshes = {};
     for (const spec of specs) {
       const mesh = new THREE.Mesh(new THREE.BoxGeometry(spec.w, spec.h, spec.d), MAT.metal);
@@ -174,9 +191,19 @@ export function createHotel({ THREE, scene, camera, materials: MAT, config: CONF
     return totals;
   }
 
-  function build() {
-    plan = planApi.createHotelPlan({ config: CONFIG, floorDefs, layout, floorY, keyIdForFloor, keyLabelForFloor });
+  // Which building this is. The plan factory is chosen by the map registry rather than named here,
+  // so a second location is a new pure plan file and a catalog row — this renderer is a walk over
+  // whatever plan comes back, and does not know a hotel from a mall.
+  function build(mapId = activeMapId) {
+    activeMapId = maps ? maps.playableMapId(mapId) : mapId;
+    floorDefs = maps ? maps.resolveMapFloorDefs(activeMapId, { floorDefs: authoredFloorDefs }) : authoredFloorDefs;
+    plan = maps
+      ? maps.resolveMapPlan(activeMapId, { config: CONFIG, floorDefs: authoredFloorDefs, layout, floorY, keyIdForFloor, keyLabelForFloor })
+      : planApi.createHotelPlan({ config: CONFIG, floorDefs, layout, floorY, keyIdForFloor, keyLabelForFloor });
     world.setPlan(plan);
+    // Everything that walks the stairwell, rides the lift or works out which floor a body is on
+    // reads this rather than assuming the hotel's four.
+    world.state.floorCount = floorDefs.length;
 
     for (const def of floorDefs) {
       const group = new THREE.Group();
@@ -204,7 +231,7 @@ export function createHotel({ THREE, scene, camera, materials: MAT, config: CONF
       }
     }
     for (const entry of plan.signs) world.addSign(groupFor(entry.floor), entry.text, entry.x, entry.localY, entry.z, entry.rotationY, entry.w, entry.h);
-    for (const entry of plan.doorFrames) world.addDoorFrame(groupFor(entry.floor), { x: entry.x, z: entry.z, width: entry.width, height: entry.height, material: materialFor(entry.material) });
+    for (const entry of plan.doorFrames) world.addDoorFrame(groupFor(entry.floor), { x: entry.x, z: entry.z, width: entry.width, height: entry.height, axis: entry.axis || 'z', material: materialFor(entry.material) });
     for (const entry of plan.wallLamps) addWallLamp(groupFor(entry.floor), entry.x, entry.localY, entry.z, entry.rotationY);
     // A lamp is a record in world space, not a light. Which of them are switched on is decided every
     // frame by the pool, and the pool lives on the scene rather than under a floor group.
@@ -287,5 +314,5 @@ export function createHotel({ THREE, scene, camera, materials: MAT, config: CONF
     return true;
   }
 
-  return { build, update, applyOpening, getPlan: () => plan, getBatchStats: () => batchStats };
+  return { build, update, applyOpening, getMapId: () => activeMapId, getPlan: () => plan, getBatchStats: () => batchStats };
 }

@@ -22,11 +22,13 @@ import { createSoloMatch } from './modules/solo-match.js';
 import { createModelViewer } from './modules/model-viewer.js';
 import { createPrototypeApi } from './modules/prototype-api.js';
 import { createAccountAccess } from './modules/account-access.js';
-// The pure layer loads as classic scripts before this module graph, so a missing one has to fail
-// loudly here rather than as an undefined call three frames into a round.
-for (const name of ['HotelAvatarLogic', 'HotelCollision', 'HotelControls', 'HotelDemon', 'HotelEnemyLogic', 'HotelFixtures', 'HotelFlashlight', 'HotelHiders', 'HotelLayout', 'HotelMenu', 'HotelMovement', 'HotelMusic', 'HotelOnline', 'HotelPlan', 'HotelRound', 'HotelSanity', 'HotelSeeker', 'HotelSpectator', 'HotelStamina']) {
+import { createMapSession } from './modules/map-session.js';
+// The pure layer loads as classic scripts first, so a missing one fails loudly here rather than as
+// an undefined call three frames into a round. Which building it stands: `modules/map-session.js`.
+for (const name of ['HotelAvatarLogic', 'HotelCollision', 'HotelControls', 'HotelDemon', 'HotelEnemyLogic', 'HotelFixtures', 'HotelFlashlight', 'HotelHiders', 'HotelLayout', 'HotelMaps', 'HotelMenu', 'HotelMovement', 'HotelMusic', 'HotelOnline', 'HotelPlan', 'HotelRound', 'HotelSanity', 'HotelSeeker', 'HotelSpectator', 'HotelStamina']) {
   if (!window[name]) throw new Error(`Hotel pure module ${name} failed to load`);
 }
+const mapSession = createMapSession({ maps: window.HotelMaps, window });
 const rendering = createRendering({ THREE, document, window, config: CONFIG });
 const world = createWorld({ THREE, scene: rendering.scene, materials: rendering.materials, config: CONFIG, layout: window.HotelLayout, logic: window.HotelCollision, plan: window.HotelPlan, document, window });
 const elevator = createElevator({
@@ -36,7 +38,7 @@ const elevator = createElevator({
 const furnishings = createFurnishings({ THREE, materials: rendering.materials, world, keyLabelForFloor });
 const hotel = createHotel({
   THREE, scene: rendering.scene, camera: rendering.camera, materials: rendering.materials, config: CONFIG,
-  floorY, keyIdForFloor, keyLabelForFloor, floorDefs: FLOOR_DEFS, layout: window.HotelLayout, plan: window.HotelPlan,
+  floorY, keyIdForFloor, keyLabelForFloor, floorDefs: FLOOR_DEFS, layout: window.HotelLayout, plan: window.HotelPlan, maps: window.HotelMaps, mapId: mapSession.activeMapId(),
   world, furnishings, elevator, performance: window.HotelPerformance, mergeGeometries,
 });
 hotel.build();
@@ -58,7 +60,7 @@ let lastMenuScreen = window.HotelMenu.SCREENS.TITLE;
 const menu = inspectionView ? null : createMenu({
   logic: window.HotelMenu, document, window,
   onPlay: () => player.beginPlay(),
-  onStartSingle: (options) => startSingleMatch(options),
+  onStartSingle: (options) => startSingleMatch(options), maps: window.HotelMaps, mapSession,
   canPause: () => !online?.isActive(),
   onScreen: (screen) => {
     if (screen === window.HotelMenu.SCREENS.ONLINE) {
@@ -78,7 +80,8 @@ const flashlightDrops = createFlashlightPickups({ THREE, scene: rendering.scene,
 const soundtrack = inspectionView ? null : window.HotelMusic.createSoundtrack({ eventTarget: window });
 const soundEffects = inspectionView ? null : window.HotelMusic.createSoundEffects({ eventTarget: window });
 const sanity = inspectionView ? null : createSanity({ camera: rendering.camera, world, logic: window.HotelSanity, config: SANITY_CONFIG, document });
-const demons = createDemons({ createMonster, includeHousekeeper: !inspectionView, common: {
+// The map's roster, however long it is. The workbench shows one body, so it takes the first.
+const demons = createDemons({ createMonster, roster: inspectionView ? mapSession.demonRoster().slice(0, 1) : mapSession.demonRoster(), common: {
   THREE, GLTFLoader, scene: rendering.scene, camera: rendering.camera, config: CONFIG, floorY,
   layout: window.HotelLayout, world, player, logic: window.HotelEnemyLogic, movement: window.HotelMovement, sanity, document, window,
 } });
@@ -86,13 +89,11 @@ const monster = demons.primary;
 const avatars = createAvatars({ THREE, GLTFLoader, scene: rendering.scene, config: CONFIG, logic: window.HotelAvatarLogic });
 const spectator = createSpectator({ logic: window.HotelSpectator, camera: rendering.camera, world, avatars, config: CONFIG, document, window });
 const viewerSubject = inspectTarget === 'monster'
-  ? { root: monster.root, setInspectionAnimation: monster.setInspectionAnimation, title: 'The Bellhop' }
+  ? { root: monster.root, setInspectionAnimation: monster.setInspectionAnimation, title: mapSession.demonRoster()[0].name }
   : inspectTarget === 'avatar'
     ? { ...avatars.createShowcase(), title: 'Hotel Guest', eyebrow: 'PLAYER FIGURE', motions: ['idle', 'walk', 'run', 'crouch'], rimColor: 0x4f7cc4 }
     : null;
-const modelViewer = viewerSubject
-  ? createModelViewer({ THREE, scene: rendering.scene, camera: rendering.camera, renderer: rendering.renderer, subject: viewerSubject, world, document, window })
-  : null;
+const modelViewer = viewerSubject ? createModelViewer({ THREE, scene: rendering.scene, camera: rendering.camera, renderer: rendering.renderer, subject: viewerSubject, world, document, window }) : null;
 function startSingleMatch(options) {
   if (modelViewer || hiders) return;
   ({ hiders, seeker, round } = createSoloMatch({
@@ -104,7 +105,7 @@ function startSingleMatch(options) {
 }
 online = createOnline({
   logic: window.HotelOnline, avatars, avatarLogic: window.HotelAvatarLogic, camera: rendering.camera,
-  world, player, menu, config: CONFIG, hotel, furnishings, elevator, demons, flashlightDrops, hiders, spectator, document, window,
+  world, player, menu, config: CONFIG, hotel, furnishings, elevator, demons, flashlightDrops, hiders, spectator, document, window, maps: window.HotelMaps, mapId: mapSession.activeMapId(),
   identity: account ? account.identity() : null,
 });
 if (account) account.syncMenu();
@@ -154,5 +155,5 @@ animate();
 createPrototypeApi({
   window, world, rendering, hotel, player, monster, demons, flashlightDrops, sanity, stamina, menu,
   online, round, hiders, seeker, spectator, avatars, elevator, timestep, soundtrack, soundEffects,
-  floorDefs: FLOOR_DEFS, inspectionViews, version: '7.1',
+  floorDefs: FLOOR_DEFS, inspectionViews, mapSession, version: '7.2',
 });

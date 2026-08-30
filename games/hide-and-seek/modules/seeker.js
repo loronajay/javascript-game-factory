@@ -3,7 +3,8 @@
 export function createSeeker({ THREE, config: CONFIG, tuning, floorY, layout, world, avatars, logic, enemyLogic, movement, avatarLogic }) {
   const id = 'solo-seeker';
   const BODY = { height: CONFIG.bodyHeight, radius: CONFIG.playerRadius };
-  const stairLayout = layout.createStairLayout({ floorCount: 4, floorHeight: CONFIG.floorHeight });
+  // How to get around comes off the building, not out of one hotel's stairwell.
+  const navigator = enemyLogic.createNavigator(world.getPlan().navigation);
   const spawn = world.getPlan().spawns.seeker;
   const position = new THREE.Vector3(spawn.x, spawn.y, spawn.z);
   let state = logic.createSeekerState();
@@ -15,11 +16,13 @@ export function createSeeker({ THREE, config: CONFIG, tuning, floorY, layout, wo
   let replanIn = 0;
   let patrolIndex = 0;
 
-  function floor() { return Math.max(1, Math.min(4, Math.round(position.y / CONFIG.floorHeight) + 1)); }
+  function floor() { return Math.max(1, Math.min(world.state.floorCount, Math.round(position.y / CONFIG.floorHeight) + 1)); }
   function describe() { return { id, name: 'The Seeker', role: 'seeker', alive, x: position.x, y: position.y, z: position.z, floor: floor(), yaw, crouching: false, flashlightOn: true, flashlightCharge: 1, state: state.mode }; }
   function planRoute(target) {
     const fromFloor = floor(); const toFloor = target.floor || fromFloor;
-    const interFloorRoute = fromFloor === toFloor ? [] : enemyLogic.createStairRoute({ fromFloor, toFloor, floorHeight: CONFIG.floorHeight, stairLayout });
+    const interFloorRoute = fromFloor === toFloor ? [] : navigator.planFloorRoute({
+      from: position, target: { x: position.x, z: position.z }, fromFloor, toFloor, floorHeight: CONFIG.floorHeight,
+    });
     route = logic.createSweepRoute({
       hunter: describe(),
       target: { ...target, y: target.y ?? floorY(toFloor), floor: toFloor },

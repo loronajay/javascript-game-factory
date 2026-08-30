@@ -7,13 +7,18 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
     roundHeld: false,
   };
   const indicatorChanged = performance.createChangeTracker();
-  elevator.car.position.set(CONFIG.elevatorCenterX, floorY(1), CONFIG.elevatorCenterZ);
+  // Where the shaft is belongs to the building, and the building is not built yet: this module is
+  // composed before `hotel.build()` because the hotel needs it. So the plan is read on demand, and
+  // `build()` is where the car is first placed.
+  const shaftOf = () => world.getPlan().elevator;
+  let shaft = null;
   scene.add(elevator.car);
 
   function isPlayerInsideXZ() {
-    return Math.abs(camera.position.x - CONFIG.elevatorCenterX) < 1.12
-      && camera.position.z > CONFIG.elevatorFrontZ - 0.12
-      && camera.position.z < CONFIG.elevatorCenterZ + 1.46;
+    if (!shaft) return false;
+    return Math.abs(camera.position.x - shaft.centerX) < 1.12
+      && camera.position.z > shaft.frontZ - 0.12
+      && camera.position.z < shaft.centerZ + 1.46;
   }
   function playerEyeHeight() { return world.state.playerEyeHeight || CONFIG.eyeHeight; }
   function isPlayerInside() { return isPlayerInsideXZ() && Math.abs(camera.position.y - (elevator.car.position.y + playerEyeHeight())) < 0.7; }
@@ -57,6 +62,8 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
     elevator.targetFloor = floorId; elevator.passengerTrip = true; elevator.state = 'closing'; world.notify(`Floor ${floorId} selected.`);
   }
   function build() {
+    shaft = shaftOf();
+    elevator.car.position.set(shaft.centerX, floorY(1), shaft.centerZ);
     const group = elevator.car; const cabinWidth = 2.5; const cabinDepth = 3.2; const cabinHeight = 2.65;
     const floor = new THREE.Mesh(new THREE.BoxGeometry(cabinWidth, 0.18, cabinDepth), new THREE.MeshStandardMaterial({ color: 0x4e4b45, metalness: 0.12, roughness: 0.75 })); floor.position.y = -0.09; floor.receiveShadow = true; group.add(floor);
     const ceiling = new THREE.Mesh(new THREE.BoxGeometry(cabinWidth, 0.12, cabinDepth), MAT.elevatorInterior); ceiling.position.y = cabinHeight; group.add(ceiling);
@@ -68,7 +75,7 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
     const rightDoor = leftDoor.clone(); rightDoor.position.x = 0.46; group.add(rightDoor); elevator.cabinLeftDoor = leftDoor; elevator.cabinRightDoor = rightDoor;
     world.registerBoxCollider(leftDoor, { width: 0.92, height: 2.35, depth: 0.08 }, () => elevator.doorAmount < 0.62, true); world.registerBoxCollider(rightDoor, { width: 0.92, height: 2.35, depth: 0.08 }, () => elevator.doorAmount < 0.62, true);
     const panel = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.65, 0.62), MAT.dark); panel.position.set(1.16, 1.28, 0.25); group.add(panel);
-    for (let floorId = 1; floorId <= 4; floorId += 1) {
+    for (let floorId = 1; floorId <= world.state.floorCount; floorId += 1) {
       const buttonGroup = new THREE.Group(); buttonGroup.position.set(1.105, 0.72 + (floorId - 1) * 0.35, 0.25); group.add(buttonGroup);
       buttonGroup.add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.23, 0.23), MAT.brass)); world.addNumberPlate(buttonGroup, String(floorId), -0.038, 0, 0, -Math.PI / 2, 0.17);
       collections.interactables.push({ object: buttonGroup, enabled: () => !elevator.roundHeld && isPlayerInside() && elevator.state !== 'moving' && elevator.state !== 'closing', prompt: () => `Elevator button — Floor ${floorId}`, action: () => requestFloor(floorId) });
@@ -92,7 +99,7 @@ export function createElevator({ THREE, scene, camera, materials: MAT, config: C
     world.setDynamicHeight('elevator-car', elevator.car.position.y);
     syncDoors(0);
     if (moveCamera) {
-      camera.position.set(CONFIG.elevatorCenterX, floorY(1) + playerEyeHeight(), CONFIG.elevatorCenterZ + 0.25);
+      camera.position.set(shaft.centerX, floorY(1) + playerEyeHeight(), shaft.centerZ + 0.25);
       camera.rotation.x = 0; camera.rotation.y = 0;
       world.state.yaw = 0; world.state.pitch = 0; world.state.playerFloor = 0;
     }

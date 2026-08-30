@@ -1,8 +1,8 @@
 (function attachHotelMenu(root, factory) {
-  const api = factory();
+  const api = factory(root);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.HotelMenu = api;
-})(typeof window !== 'undefined' ? window : globalThis, function createHotelMenuApi() {
+})(typeof window !== 'undefined' ? window : globalThis, function createHotelMenuApi(root) {
   'use strict';
 
   // The demo's front end is a state machine rather than a single click-to-enter curtain, because the
@@ -36,7 +36,7 @@
   // where it came from instead of always landing on the title. The online lobby behaves the same
   // way, except that leaving PLAYING is not its own decision: the server starts the match.
   const READABLE = Object.freeze([SCREENS.HOW_TO, SCREENS.EXTRAS, SCREENS.ONLINE]);
-  const MATCH_DEFAULTS = Object.freeze({ hiderCount: 3, hideSeconds: 45, role: 'seeker' });
+  const MATCH_DEFAULTS = Object.freeze({ hiderCount: 3, hideSeconds: 45, role: 'seeker', mapId: 'grand-hotel' });
   const MATCH_LIMITS = Object.freeze({ minHiders: 1, maxHiders: 8, minHideSeconds: 45, maxHideSeconds: 120 });
 
   function clampInteger(value, fallback, minimum, maximum) {
@@ -44,8 +44,19 @@
     return Math.min(maximum, Math.max(minimum, Number.isFinite(parsed) ? parsed : fallback));
   }
 
+  // Which building. The catalog is read through the global rather than imported, because the pure
+  // layer is classic scripts in the browser: `map-catalog.js` is loaded ahead of this one and is a
+  // global by the time a player can touch a menu. Without it the menu still works and every round
+  // is in the default map, which is exactly the pre-registry behaviour.
+  function normalizeMapId(id) {
+    const maps = root && root.HotelMaps;
+    if (maps) return maps.normalizeMapId(id);
+    return typeof id === 'string' && id.trim() ? id.trim().toLowerCase() : MATCH_DEFAULTS.mapId;
+  }
+
   function normalizeMatchConfig(options = {}) {
     return {
+      mapId: normalizeMapId(options.mapId),
       hiderCount: clampInteger(options.hiderCount, MATCH_DEFAULTS.hiderCount, MATCH_LIMITS.minHiders, MATCH_LIMITS.maxHiders),
       hideSeconds: clampInteger(options.hideSeconds, MATCH_DEFAULTS.hideSeconds, MATCH_LIMITS.minHideSeconds, MATCH_LIMITS.maxHideSeconds),
       role: options.role === 'hider' ? 'hider' : 'seeker',

@@ -50,6 +50,26 @@
   const LOBBY_LIMITS = Object.freeze({ minPlayers: 2, maxPlayers: 8 });
   const RESUME_MARGIN_MS = 1_500;
 
+  // Which building an online round is played in, carried as a lobby setting.
+  //
+  // A client builds its map at boot, so it cannot join a round happening somewhere else — it has no
+  // geometry for it, and every collision, every ground height and every catch would be adjudicated
+  // against a building it is not standing in. Matchmaking already compares lobby settings, so
+  // sending the map is what keeps two locations from being matched into one round. Two maps are two
+  // pools, deliberately.
+  function lobbySettingsFor(mapId) {
+    return { mapId: typeof mapId === 'string' && mapId ? mapId : 'grand-hotel' };
+  }
+
+  // The authority names the map in its snapshot. If it ever disagrees with the building this page
+  // actually built, the round is unplayable here and saying so is far better than walking a body
+  // through a hotel the server thinks is a mall.
+  function snapshotMapMismatch(snapshot, localMapId) {
+    const announced = snapshot && typeof snapshot.mapId === 'string' ? snapshot.mapId : null;
+    if (!announced || !localMapId) return null;
+    return announced === localMapId ? null : { expected: localMapId, actual: announced };
+  }
+
   function createNetState() {
     return {
       status: NET_STATES.OFFLINE,
@@ -255,6 +275,7 @@
 
   return {
     INPUT_HEARTBEAT_SECONDS, LOBBY_LIMITS, NET_STATES, RECONCILE_DEFAULTS, RECONNECT_GRACE_MS,
+    lobbySettingsFor, snapshotMapMismatch,
     applyNetEvent, createNetState, describeInput, interpolatePose, isSeeker,
     othersOf, reconcilePosition, rememberSession, resumeRequestFor, selfOf, shouldSendInput,
   };

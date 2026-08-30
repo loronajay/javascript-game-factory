@@ -332,10 +332,12 @@ test('the hiders are stand-ins for players, not a second kind of body', () => {
     assert.match(hidersModule, new RegExp(rule.replace('.', '\.')));
   }
   for (const tuning of ['panicDistance', 'calmSeconds', 'settleSeconds']) assert.doesNotMatch(hidersModule, new RegExp(tuning));
-  // They wear the same rig every player wears and route through the one stairwell the demon uses.
+  // They wear the same rig every player wears and cross the building the way the demon crosses it:
+  // through the map's own navigation graph, not a second idea of where the corridors are.
   assert.match(hidersModule, /avatars\.spawn/);
   assert.match(hidersModule, /avatars\.setPose/);
-  assert.match(hidersModule, /enemyLogic\.createStairRoute/);
+  assert.match(hidersModule, /createNavigator/);
+  assert.match(hidersModule, /planFloorRoute/);
   assert.match(hidersModule, /sanityLogic\.updatePlayerSanity/);
 });
 
@@ -383,16 +385,85 @@ test('player-facing creature copy consistently names The Bellhop', () => {
   assert.doesNotMatch(copy, /The Guest|THE GUEST/);
 });
 
-test('two named demons are composed with distinct starting floors', () => {
+test('a map owns its demon roster and every demon in it starts clear of the others', () => {
   const main = fs.readFileSync(path.join(projectRoot, 'main.js'), 'utf8');
   const demons = fs.readFileSync(path.join(projectRoot, 'modules', 'demons.js'), 'utf8');
   const html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  const maps = require(path.join(projectRoot, 'map-catalog.js'));
 
   assert.match(main, /createDemons/);
-  assert.match(demons, /name:\s*['"]The Bellhop['"]/);
-  assert.match(demons, /name:\s*['"]The Housekeeper['"]/);
-  assert.match(demons, /excludedSpawnFloors/);
+  assert.match(main, /roster:/, 'the roster comes from the map, not from a hard-coded pair');
+  // Clear of the demons already standing, measured as a distance. It was a floor each, which
+  // Cinder Mall cannot satisfy: three demons, two levels.
+  assert.match(demons, /takenSpawns/);
+  assert.doesNotMatch(demons, /excludedSpawnFloors/);
   assert.match(html, /The Housekeeper/);
+  // Two was the hotel's number, never a rule. The renderer must not name a demon or count them.
+  assert.doesNotMatch(demons, /includeHousekeeper/);
+  assert.deepEqual(maps.demonRosterFor('grand-hotel').map((entry) => entry.name), ['The Bellhop', 'The Housekeeper']);
+  assert.ok(maps.demonCountFor('cinder-mall') > 2, 'a map must be able to hold more than two demons');
+});
+
+test('the maps are a registry both sides of the wire read', () => {
+  const main = fs.readFileSync(path.join(projectRoot, 'main.js'), 'utf8');
+  const html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  const hotel = fs.readFileSync(path.join(projectRoot, 'modules', 'hotel.js'), 'utf8');
+  const mirrorTool = fs.readFileSync(path.join(projectRoot, 'tools', 'mirror-sim.mjs'), 'utf8');
+
+  assert.ok(fs.existsSync(path.join(projectRoot, 'map-catalog.js')), 'map-catalog.js is missing');
+  assert.ok(fs.existsSync(path.join(projectRoot, 'modules', 'map-session.js')), 'map-session.js is missing');
+  assert.match(html, /map-catalog\.js/);
+  assert.match(main, /createMapSession/);
+  assert.match(main, /'HotelMaps'/);
+  // The renderer walks whatever plan the registry resolves; it must not name a building's factory.
+  assert.match(hotel, /resolveMapPlan/);
+  // The authority has to agree with the client about which building a round is in, so the registry
+  // is mirrored like every other rule the tick depends on.
+  assert.match(mirrorTool, /'map-catalog\.js'/, 'map-catalog.js must be mirrored to the server');
+});
+
+test('how tall a building is comes from the map, not from the hotel’s four', () => {
+  const hotel = fs.readFileSync(path.join(projectRoot, 'modules', 'hotel.js'), 'utf8');
+  assert.match(hotel, /world\.state\.floorCount = floorDefs\.length/);
+
+  // These are every module that used to walk floors 1..4 by hand. A three-level map would have been
+  // silently wrong in each of them, so the literal must not come back.
+  for (const name of ['elevator.js', 'hiders.js', 'monster.js', 'player.js', 'seeker.js']) {
+    const source = fs.readFileSync(path.join(projectRoot, 'modules', name), 'utf8');
+    assert.doesNotMatch(source, /<=\s*4;\s*(floor|id)/, `${name} still assumes four floors`);
+    assert.doesNotMatch(source, /floorCount:\s*4/, `${name} still assumes four floors`);
+    assert.match(source, /world\.state\.floorCount/, `${name} should read the map's floor count`);
+  }
+
+  // The authority reads it too, so a map's height is one number on both sides of the wire.
+  const sim = fs.readFileSync(path.join(projectRoot, 'sim-logic.js'), 'utf8');
+  assert.match(sim, /floorCount: player\.floorCount/);
+  assert.match(sim, /id <= player\.floorCount/);
+});
+
+test('a map is picked before a round and never swapped underneath one', () => {
+  const html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  const menu = fs.readFileSync(path.join(projectRoot, 'modules', 'menu.js'), 'utf8');
+  const online = fs.readFileSync(path.join(projectRoot, 'modules', 'online.js'), 'utf8');
+  const onlineLogic = fs.readFileSync(path.join(projectRoot, 'online-logic.js'), 'utf8');
+
+  assert.match(html, /id="soloMapCards"/);
+  // The picker is filled from the catalog, so adding a location never means editing the menu, and
+  // its floorplans are derived from each map's own plan rather than shipped as art that goes stale.
+  assert.match(menu, /maps\.listMaps\(\)/);
+  assert.match(menu, /HotelMapPreview/);
+  // The map picker is an empty container in the markup. Other settings may author their options —
+  // a role is a role — but a location is a catalog row, so naming one here would be a second list.
+  const picker = /<div id="soloMapCards"[^>]*>([\s\S]*?)<\/div>/.exec(html);
+  assert.ok(picker, 'the map picker container is missing');
+  assert.equal(picker[1].trim(), '', 'locations must not be authored in the markup');
+  assert.match(menu, /mapSession\.select/);
+  // Online, the map is a lobby setting so matchmaking keeps two buildings in two pools, and the
+  // snapshot names it so a client can refuse a round it has no geometry for.
+  assert.match(onlineLogic, /lobbySettingsFor/);
+  assert.match(onlineLogic, /snapshotMapMismatch/);
+  assert.match(online, /settings: lobbySettings\(\)/);
+  assert.match(online, /snapshotMapMismatch/);
 });
 
 test('flashlight state is part of the player snapshot before networking is added', () => {

@@ -15,6 +15,10 @@ export function createRound({ camera, world, player, elevator, hiders, seeker = 
   const caughtOverlay = document.getElementById('caughtOverlay');
   const players = localIsSeeker ? [LOCAL_ID, ...hiders.ids()] : [SEEKER_ID, LOCAL_ID, ...hiders.ids()].filter(Boolean);
   let state = logic.createRound({ players, seekerId: SEEKER_ID, config });
+  // The copy names this map's staff. It used to say "The Bellhop" outright, which is a demon that
+  // does not work at Cinder Mall.
+  const hunterText = () => (monsters && monsters.hunterName ? monsters.hunterName() : 'The Bellhop');
+  const staffText = () => (monsters && monsters.rosterText ? monsters.rosterText() : 'The Bellhop and The Housekeeper');
   const demonList = Array.isArray(monsters) && monsters.length ? monsters : [monster];
   let announcedPhase = null;
   world.state.localRole = localRole;
@@ -67,9 +71,9 @@ export function createRound({ camera, world, player, elevator, hiders, seeker = 
   function endedText(view) {
     if (view.outcome === logic.OUTCOMES.SEEKER) {
       if (!localIsSeeker) return ['NO VACANCY', 'THE SEEKER WON', 'Every hiding place was cleared. Watch the other guests after a catch, then try a different floor next round.'];
-      return ['CHECKOUT COMPLETE', 'EVERY GUEST FOUND', 'You cleared the hotel before it cleared you. The Bellhop and The Housekeeper went hungry.'];
+      return ['CHECKOUT COMPLETE', 'EVERY GUEST FOUND', `You cleared the building before it cleared you. ${staffText()} went hungry.`];
     }
-    if (!localIsSeeker) return ['STILL OCCUPIED', 'HIDERS WIN', world.state.playerEliminated ? 'The remaining guests outlasted the hunt. You stayed to watch the hotel finish what it started.' : 'The seeker was taken before every guest was found. You made it out of the hunt alive.'];
+    if (!localIsSeeker) return ['STILL OCCUPIED', 'HIDERS WIN', world.state.playerEliminated ? 'The remaining guests outlasted the hunt. You stayed to watch the building finish what it started.' : 'The seeker was taken before every guest was found. You made it out of the hunt alive.'];
     if (view.cause === logic.CAUSES.TIMEOUT) {
       const left = view.hidersRemaining;
       return ['LAST CALL', 'TIME RAN OUT', `${left} guest${left === 1 ? '' : 's'} stayed hidden. Sweep the floors faster — sprinting costs, but so does dawdling.`];
@@ -109,7 +113,7 @@ export function createRound({ camera, world, player, elevator, hiders, seeker = 
     if (view.phase === logic.PHASES.HIDING) bannerEl.textContent = localIsSeeker ? 'THEY ARE HIDING — WAIT HERE' : 'HIDE. THE SEEKER IS HELD.';
     else if (announcedPhase === logic.PHASES.HIDING) {
       bannerEl.textContent = 'GO';
-      world.notify(localIsSeeker ? 'GO. FIND THEM ALL BEFORE THE BELLHOP FINDS YOU.' : 'THE SEEKER IS OUT. KEEP MOVING.', 3200);
+      world.notify(localIsSeeker ? `GO. FIND THEM ALL BEFORE ${hunterText().toUpperCase()} FINDS YOU.` : 'THE SEEKER IS OUT. KEEP MOVING.', 3200);
     } else bannerEl.textContent = '';
     announcedPhase = view.phase;
   }

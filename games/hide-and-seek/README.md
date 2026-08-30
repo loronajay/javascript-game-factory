@@ -1,4 +1,4 @@
-# Hide and Seek V7.1: The Bellhop and The Housekeeper
+# Hide and Seek V7.2: Two Locations, One Rulebook
 
 ## Play
 
@@ -105,13 +105,39 @@ V6 adds:
 - `monster.js` — creature rendering, navigation, LOS, chase/search behavior, threat HUD state, and defeat
 - `performance.js` — reusable change and interval gates, the adaptive quality controller, and the fixed-timestep accumulator
 - `avatars.js` — player figures: one shared textured body and locomotion bank, cloned per player, with a placeholder body until they load
-- `sanity.js` — the anti-camping meter: samples which room you are standing in, drives the HUD bar, and hands The Bellhop its hunt target
+- `sanity.js` — the anti-camping meter: samples which room you are standing in, drives the HUD bar, and hands the map's hunter its target
+- `map-session.js` — which location this page booted into, and the re-entry that changes it
 
-Pure monster rules live in `enemy-logic.js`, pure avatar rules (motion state, clip choice, crouch posture, facing, seat tints) live in `avatar-logic.js`, collision boxes live in `collision-logic.js`, and sanity rules live in `sanity-logic.js`, so those decisions can be tested without WebGL — and run headlessly on a server later. The tracker minimap was removed in V6.3 — the player is meant to locate The Bellhop by sound and sight, not by a HUD readout.
+Pure monster rules live in `enemy-logic.js`, pure avatar rules (motion state, clip choice, crouch posture, facing, seat tints) live in `avatar-logic.js`, collision boxes live in `collision-logic.js`, and sanity rules live in `sanity-logic.js`, so those decisions can be tested without WebGL — and run headlessly on a server later. The tracker minimap was removed in V6.3 — the player is meant to locate a demon by sound and sight, not by a HUD readout.
+
+## Locations
+
+The game ships two registered locations, and which one you are in is chosen on the setup screen
+before a round rather than during one:
+
+- **The Grand Hotel** — four floors, a continuous stairwell and one working elevator. Two demons:
+  The Bellhop (who walks to whoever has stopped moving) and The Housekeeper.
+- **Cinder Mall** — a burnt-out shopping centre: two levels wrapped around an atrium void, thirteen
+  storefronts, an escalator pair, an enclosed service stair, a two-floor lift and two back-of-house
+  service corridors that drain the sanity meter. Three demons: The Greeter (the hunter), The
+  Custodian and The Nightwatch.
+
+A location is a row in `map-catalog.js`, a pure plan module and a demon roster; nothing else in the
+cabinet changes to add one. `MAP_AUTHORING.md` is the contract. Demon count is per map — two was the
+hotel's number, never a rule — with exactly one camper-hunter in every roster, and a roster may be
+longer than the building is tall: the mall runs three demons on two levels, spread by distance rather
+than one per floor.
+
+The setup screen's location cards show a **floorplan per level**, drawn from each map's own plan
+data (`map-preview.js`) rather than from shipped art, so a building that moves a wall moves its
+preview with it.
+
+`?map=<id>` boots straight into a location. Online, the map is a lobby setting, so two locations are
+two matchmaking pools and the server names the map in every snapshot.
 
 ## Major changes
 
-- All four floors remain physically present at their real Y positions.
+- All four floors of the hotel remain physically present at their real Y positions.
 - Collision now checks vertical overlap as well as X/Z. This fixes the elevator header behaving like an invisible full-height wall.
 - The elevator cabin has a dynamic walk surface. You can physically cross the threshold, ride the moving car, and walk out at another floor.
 - Stair teleportation is removed.

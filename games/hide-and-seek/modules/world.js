@@ -1,5 +1,7 @@
 export function createWorld({ THREE, scene, materials: MAT, config: CONFIG, layout, logic, plan: planApi, document, window }) {
-  const state = { isLocked: false, yaw: 0, pitch: 0, playerFloor: 1, playerFeetY: 0, playerEyeHeight: CONFIG.eyeHeight, playerCrouching: false, inventory: new Set(), activeInteractable: null, notificationTimer: null };
+  // `floorCount` is the building's height. It was the literal 4 in six different modules before maps
+  // were a registry, which is six places a three-level location would have been wrong in.
+  const state = { floorCount: 4, isLocked: false, yaw: 0, pitch: 0, playerFloor: 1, playerFeetY: 0, playerEyeHeight: CONFIG.eyeHeight, playerCrouching: false, inventory: new Set(), activeInteractable: null, notificationTimer: null };
   const collections = {
     colliders: [], interactables: [], dynamicDoors: [], dynamicDrawers: [],
     floorGroups: new Map(), floorLights: new Map(), roomDoors: new Map(), secretPanels: new Map(), doorsByPlanId: new Map(), drawersByPlanId: new Map(),
@@ -103,8 +105,8 @@ export function createWorld({ THREE, scene, materials: MAT, config: CONFIG, layo
     mesh.position.set(x, height, z); mesh.receiveShadow = true; parent.add(mesh); return mesh;
   }
   function addWall(parent, x, z, w, d, h = 3.2, material = MAT.wall) { return addBox(parent, x, h / 2, z, w, h, d, material); }
-  function addDoorFrame(parent, { x, z, width = 1.45, height = 2.12, material = MAT.wood }) {
-    for (const part of layout.createDoorFrameLayout({ x, z, width, height })) addBox(parent, part.x, part.y, part.z, part.w, part.h, part.d, material);
+  function addDoorFrame(parent, { x, z, width = 1.45, height = 2.12, axis = 'z', material = MAT.wood }) {
+    for (const part of layout.createDoorFrameLayout({ x, z, width, height, axis })) addBox(parent, part.x, part.y, part.z, part.w, part.h, part.d, material);
   }
   function resolveGroundHeight(x, z, currentFeetY) {
     return planApi.walkHeightAt(plan.surfaces, x, z, currentFeetY, CONFIG.groundSnap, dynamicHeights);

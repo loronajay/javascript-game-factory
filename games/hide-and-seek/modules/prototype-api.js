@@ -8,17 +8,21 @@ export function createPrototypeApi(parts) {
   const {
     window, world, rendering, hotel, player, monster, demons, flashlightDrops, sanity, stamina, menu,
     online, round, hiders, avatars, elevator, timestep, soundtrack, soundEffects,
-    floorDefs, inspectionViews, version,
+    floorDefs, inspectionViews, mapSession, version,
   } = parts;
 
   const api = {
     version, floorDefs,
+    // Which building this page booted into. QA has to be able to ask, because from inside a round
+    // the answer is only visible as scenery.
+    map: mapSession ? { id: mapSession.activeMapId(), demons: mapSession.demonRoster().map((entry) => entry.name) } : null,
     getState: () => ({
       locked: !!world.state.isLocked,
       playerFloor: world.state.playerFloor,
       keys: [...world.state.inventory],
       gameOver: !!world.state.gameOver,
       remoteFixtures: !!world.state.remoteFixtures,
+      mapId: hotel.getMapId ? hotel.getMapId() : null,
       player: player.getState(),
       flashlightDrops: flashlightDrops.getState(),
       monster: monster.getState(),

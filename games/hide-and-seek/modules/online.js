@@ -21,7 +21,13 @@ export function createOnline({
   logic, avatars, avatarLogic, camera, world, player, menu, config: CONFIG, document, window,
   hotel = null, furnishings = null, elevator = null, demons = null, flashlightDrops = null, hiders = null, spectator = null,
   socketUrl = defaultSocketUrl(window.location), gameId = 'hide-and-seek', identity = null,
+  maps = null, mapId = null,
 }) {
+  // The building this page is standing. It is fixed at boot, so it is both what this client queues
+  // for and what it checks the authority's snapshot against.
+  const localMapId = maps ? maps.playableMapId(mapId) : mapId;
+  const lobbySettings = () => logic.lobbySettingsFor(localMapId);
+  let mapMismatch = null;
   const statusEl = document.getElementById('onlineStatus');
   const roomEl = document.getElementById('onlineRoom');
   const rosterEl = document.getElementById('onlinePlayers');
@@ -278,11 +284,11 @@ export function createOnline({
       // in the hotel and is still catchable, so rejoining as a new player would leave a corpse.
       const resume = logic.resumeRequestFor(readSession(), Date.now(), logic.RECONNECT_GRACE_MS);
       if (resume) send(resume);
-      else send({ type: 'find_lobby', gameId, ...logic.LOBBY_LIMITS, identity: identity || undefined });
+      else send({ type: 'find_lobby', gameId, ...logic.LOBBY_LIMITS, settings: lobbySettings(), identity: identity || undefined });
     }
     if (event.event === 'error' && event.code === 'RESUME_REJECTED') {
       clearSession();
-      send({ type: 'find_lobby', gameId, ...logic.LOBBY_LIMITS, identity: identity || undefined });
+      send({ type: 'find_lobby', gameId, ...logic.LOBBY_LIMITS, settings: lobbySettings(), identity: identity || undefined });
     }
     if (event.event === 'session_resumed') {
       active = true;
@@ -355,6 +361,17 @@ export function createOnline({
   function update(delta) {
     if (!active) return;
     if (net.status !== logic.NET_STATES.PLAYING && net.status !== logic.NET_STATES.ENDED) return;
+    // Two authorities disagreeing about who was caught is the failure this whole layer exists to
+    // prevent; two of them disagreeing about which *building* the round is in is the same failure
+    // one level down, and it can only end with a body walking through a wall that is not there.
+    // Refuse the round out loud instead.
+    const mismatch = logic.snapshotMapMismatch(net.snapshot, localMapId);
+    if (mismatch && !mapMismatch) {
+      mapMismatch = mismatch;
+      world.notify(`This round is in a different location (${mismatch.actual}). Reload to join it.`);
+      world.emit('online-map-mismatch', mismatch);
+    }
+    if (mapMismatch) return;
     syncLocalRole();
     const self = logic.selfOf(net);
     if (self?.alive) { pushInput(delta); reconcileSelf(delta); }
@@ -394,6 +411,8 @@ export function createOnline({
     getState: () => ({
       status: net.status, roomCode: net.roomCode, clientId: net.clientId,
       members: net.members.length, absent: net.absent.length, seeker: net.seekerId,
+      mapId: localMapId,
+      mapMismatch,
       tick: net.snapshot?.tick ?? null,
       demons: net.snapshot?.demons?.length ?? 0,
       threat: net.snapshot?.threat ?? null,

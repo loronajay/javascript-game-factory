@@ -23,8 +23,10 @@ const server = resolve(cabinet, '..', '..', '..', 'factory-network-server', 'gam
 // copies land flat in the server's `shared/` under their basename.
 export const MIRRORED_FILES = Object.freeze([
   'modules/game-config.js',
+  'map-catalog.js',
   'layout.js',
   'hotel-plan.js',
+  'mall-plan.js',
   'collision-logic.js',
   'movement-logic.js',
   'round-logic.js',

@@ -11,6 +11,18 @@ const fixture = require('./helpers/hotel-fixture.js');
 
 const TICK = 1 / 60;
 
+// A scenario test that is not *about* the demons has to say so. These rounds run for forty-six
+// seconds of simulated time before the rule under test is staged, and a demon roaming the hotel in
+// the meantime can end the round before the assertion is ever reached — which is a test that passes
+// on the luck of a seed rather than on the behaviour it names. `NO_DEMONS` empties the building;
+// `ONE_DEMON` leaves exactly the one the test positions itself.
+// A parked demon: one body, standing where it spawned. An empty roster is not the way to say this —
+// `normalizeRoster` deliberately falls back to the hotel's two, so that a simulation handed no
+// roster still runs the game it always ran. Zeroing the speeds is the honest way to hold a demon
+// still, and it leaves the catch rule itself untouched for the tests that stage a demon by hand.
+const STILL = { walkSpeed: 0, chaseSpeed: 0, huntSpeed: 0 };
+const PARKED_DEMON = { demons: [{ id: 'bellhop', name: 'The Bellhop', hunts: true }], demon: STILL };
+
 function startRound({ seed = 7, hiders = 3, config } = {}) {
   const built = fixture.createFullSim({ seed, config });
   const players = [
@@ -46,7 +58,7 @@ test('the head start is physical: the seeker is held in a shut cabin until the p
 });
 
 test('a tag is resolved from positions, and never during the head start', () => {
-  const { engine, state, hotel } = startRound();
+  const { engine, state, hotel } = startRound({ config: PARKED_DEMON });
   const spot = hotel.spawns.hiders[0];
   // Stand the seeker on top of a hider. Nothing may happen until the head start is over.
   let next = { ...state, bodies: state.bodies.map((body) => (body.id === 'seeker' ? { ...body, x: spot.x + 0.4, y: spot.y, z: spot.z } : body)) };
@@ -111,8 +123,8 @@ test('a key is claimed once, by whoever searched the drawer first', () => {
 });
 
 test('a demon that catches the seeker ends the round for the hiders, with survivors left alive', () => {
-  const { engine } = startRound();
-  const built = startRound();
+  const { engine } = startRound({ config: PARKED_DEMON });
+  const built = startRound({ config: PARKED_DEMON });
   let next = run(built.engine, built.state, 60 * 46);
   assert.equal(next.round.phase, roundLogic.PHASES.SEEKING);
 
@@ -129,7 +141,7 @@ test('a demon that catches the seeker ends the round for the hiders, with surviv
 });
 
 test('a caught player drops their battery, and the first body to reach it takes the charge', () => {
-  const built = startRound();
+  const built = startRound({ config: PARKED_DEMON });
   let next = run(built.engine, built.state, 60 * 46);
   const victim = built.engine.bodyOf(next, 'hider-0');
 
@@ -196,7 +208,7 @@ test('a snapshot carries what a client draws and nothing that would make it a wa
 });
 
 test('a demon reaches through an open door and not through a shut one', () => {
-  const built = startRound();
+  const built = startRound({ config: PARKED_DEMON });
   const door = built.engine.catalog.find((item) => item.kind === 'door' && !item.locked && !item.openInitially && item.floor === 1);
   let next = run(built.engine, built.state, 60 * 46);
 

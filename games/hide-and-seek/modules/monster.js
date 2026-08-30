@@ -1,6 +1,6 @@
 export function createMonster({
   THREE, GLTFLoader, scene, camera, config: CONFIG, floorY, layout, world, player, logic, movement, sanity, document, window,
-  name = 'The Bellhop', statusElementId = 'monsterStatus', excludedSpawnFloors = [], accentColor = 0x5c141a, eyeColor = 0xff1008,
+  name = 'The Bellhop', statusElementId = 'monsterStatus', takenSpawns = [], accentColor = 0x5c141a, eyeColor = 0xff1008,
 }) {
   const { ENEMY_STATES } = logic;
   const root = new THREE.Group();
@@ -11,7 +11,6 @@ export function createMonster({
   const BODY = { height: 2.25, radius: 0.32 };
   const monsterStatus = document.getElementById(statusElementId);
   const caughtOverlay = document.getElementById('caughtOverlay');
-  const patrolZ = [-52, -34, -18, 0, 18, 34, 49];
   const doorRecords = [...world.collections.roomDoors.entries()].map(([roomNumber, item]) => {
     const room = world.collections.roomCenters.get(roomNumber);
     return {
@@ -47,8 +46,7 @@ export function createMonster({
   let remotePose = null;
   let inspectionMotion = 'idle';
   const inspectionMode = new URLSearchParams(window.location.search).get('inspect') === 'monster';
-  const stairLayout = layout.createStairLayout({ floorCount: 4, floorHeight: CONFIG.floorHeight });
-  const stairShell = layout.createStairwellShellLayout();
+  const navigator = logic.createNavigator(world.getPlan().navigation);
   const headWorldPosition = new THREE.Vector3();
   const headOffset = new THREE.Vector3();
   const rootWorldQuaternion = new THREE.Quaternion();
@@ -460,7 +458,7 @@ export function createMonster({
   }
 
   function nearestFloor(y = root.position.y) {
-    return Math.max(1, Math.min(4, Math.round(y / CONFIG.floorHeight) + 1));
+    return Math.max(1, Math.min(world.state.floorCount, Math.round(y / CONFIG.floorHeight) + 1));
   }
 
   function floorPoint(floor, x, z, guided = false) {
@@ -468,31 +466,31 @@ export function createMonster({
   }
 
   function isInStairwell(point) {
-    const { xWest, xEast, zMin, zMax } = stairShell.bounds;
-    return point.x >= xWest - 0.2 && point.x <= xEast + 0.2 && point.z >= zMin - 0.2 && point.z <= zMax + 0.2;
+    return !!navigator.connectorContaining(point);
   }
 
   function planRoute(target, purpose = 'roam') {
     const fromFloor = nearestFloor();
-    const toFloor = target.floor || Math.max(1, Math.min(4, Math.round(target.y / CONFIG.floorHeight) + 1));
-    route = target.inStairwell
-      ? logic.createStairPursuitRoute({
+    const toFloor = target.floor || Math.max(1, Math.min(world.state.floorCount, Math.round(target.y / CONFIG.floorHeight) + 1));
+    if (target.inStairwell) {
+      const connector = navigator.connectorContaining(target) || navigator.connectorBetween(fromFloor, toFloor, root.position);
+      route = connector ? logic.createStairPursuitRoute({
         enemy: { x: root.position.x, y: root.position.y, z: root.position.z, floor: fromFloor, inStairwell: isInStairwell(root.position) },
         target,
         floorHeight: CONFIG.floorHeight,
-        stairLayout,
-      })
-      : fromFloor === toFloor ? [] : logic.createStairRoute({ fromFloor, toFloor, floorHeight: CONFIG.floorHeight, stairLayout });
-    if (!target.inStairwell) {
-      if (Math.abs(target.x) > 4.25) route.push(floorPoint(toFloor, 0, target.z), floorPoint(toFloor, Math.sign(target.x) * 3.75, target.z));
-      route.push({ x: target.x, y: floorY(toFloor), z: target.z, floor: toFloor, guided: false });
+        stairLayout: connector.layout,
+      }) : [];
+    } else {
+      route = navigator.planFloorRoute({
+        from: root.position, target, fromFloor, toFloor, floorHeight: CONFIG.floorHeight,
+      });
     }
     routePurpose = purpose;
   }
 
   function choosePatrol() {
-    const hallTargets = [];
-    for (let floor = 1; floor <= 4; floor += 1) for (const z of patrolZ) hallTargets.push(floorPoint(floor, z < -42 || z > 42 ? (Math.random() - 0.5) * 8 : 0, z));
+    // Where there is to walk is the building's answer, not a list of this hotel's corridor Z values.
+    const hallTargets = (world.getPlan().navigation?.nodes || []).map((node) => floorPoint(node.floor, node.x, node.z));
     const roomTargets = [...world.collections.roomCenters.entries()]
       .filter(([roomNumber]) => !world.collections.roomDoors.get(roomNumber)?.locked)
       .map(([id, room]) => ({ id, ...room }));
@@ -702,9 +700,17 @@ export function createMonster({
     updateHud();
   }
 
-  const spawns = [];
-  for (let floor = 1; floor <= 4; floor += 1) for (const z of [-52, -28, 0, 28, 49]) spawns.push(floorPoint(floor, z < -42 || z > 42 ? 0 : (Math.random() - 0.5) * 3, z));
-  const spawn = logic.chooseSpawn(spawns, { x: camera.position.x, z: camera.position.z, floor: world.state.playerFloor }, Math.random, 24, excludedSpawnFloors);
+  const navigation = world.getPlan().navigation;
+  const spawns = (navigation?.spawnNodes || []).map((node) => floorPoint(node.floor, node.x, node.z));
+  // Away from the demons already standing, measured as a distance rather than as a floor each: the
+  // mall carries three demons on two levels, and "one per floor" has no answer there. This mirrors
+  // `demon-logic.chooseDemonSpawn`, which is what the authoritative side uses.
+  const separation = navigation?.minSpawnSeparation || 24;
+  const clear = spawns.filter((candidate) => takenSpawns.every((other) => (
+    candidate.floor !== other.floor || Math.hypot(candidate.x - other.x, candidate.z - other.z) >= separation
+  )));
+  const pool = clear.length ? clear : spawns;
+  const spawn = logic.chooseSpawn(pool, { x: camera.position.x, z: camera.position.z, floor: world.state.playerFloor }, Math.random, separation, []);
   mistDisc = createFloorBloom(); if (mistDisc) root.add(mistDisc);
   fallback = createFallbackDemon();
   root.position.set(spawn.x, spawn.y, spawn.z); if (inspectionMode) root.position.set(0, 0, 0); else choosePatrol(); loadAnimatedBody(); updateHud();

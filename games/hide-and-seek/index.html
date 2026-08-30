@@ -43,6 +43,16 @@
       </header>
       <p id="soloLead" class="screenLead">Choose how crowded the hotel feels and how long the guests get to disappear.</p>
       <div class="setupGrid">
+        <!-- Options are filled from `map-catalog.js` rather than authored here, so a new location is
+             a plan file and a catalog row and never a menu edit. -->
+        <div class="settingCard settingCard--maps spanWide">
+          <span class="settingIcon" aria-hidden="true">&#9962;</span>
+          <span class="settingCopy"><strong>Location</strong><small id="soloMapHelp">Guest rooms, a continuous stairwell and one working elevator.</small></span>
+          <span id="soloMapReadout" class="settingValue">THE GRAND HOTEL</span>
+          <!-- Cards, floorplans and all, are built from `map-catalog.js` and each map's own plan.
+               Nothing about a location is authored here: adding one is a plan file and a catalog row. -->
+          <div id="soloMapCards" class="mapCards" role="radiogroup" aria-label="Location"></div>
+        </div>
         <label class="settingCard" for="soloRole">
           <span class="settingIcon" aria-hidden="true">&#9823;</span>
           <span class="settingCopy"><strong>Your Role</strong><small>Hunt the guests, or hide from an AI seeker.</small></span>
@@ -71,7 +81,7 @@
           </select>
         </label>
       </div>
-      <div class="matchSummary"><span>YOUR ROLE</span><strong id="soloRoleSummary">SEEKER</strong><i></i><span>HUNT TIMER</span><strong>NO LIMIT</strong><i></i><span>THREATS</span><strong>2 DEMONS</strong></div>
+      <div class="matchSummary"><span>YOUR ROLE</span><strong id="soloRoleSummary">SEEKER</strong><i></i><span>HUNT TIMER</span><strong>NO LIMIT</strong><i></i><span>THREATS</span><strong id="soloThreatSummary">2 DEMONS</strong></div>
       <div class="menuButtons setupActions">
         <button id="soloStart" class="menuBtn primary" type="button" data-menu="play">BEGIN THE HUNT <span>&#8594;</span></button>
       </div>
@@ -96,7 +106,7 @@
           <div id="onlinePlayers" class="onlinePlayers" aria-live="polite"><div class="emptyRoster">Waiting for the first guest&hellip;</div></div>
         </section>
       </div>
-      <div class="lobbyRules"><span><b>2&ndash;8</b> PLAYERS</span><span><b>RANDOM</b> SEEKER</span><span><b>45 SEC</b> TO HIDE</span><span><b>2</b> DEMONS</span></div>
+      <div class="lobbyRules"><span><b id="lobbyMapName">THE GRAND HOTEL</b></span><span><b>2&ndash;8</b> PLAYERS</span><span><b>RANDOM</b> SEEKER</span><span><b>45 SEC</b> TO HIDE</span><span><b id="lobbyDemonCount">2</b> DEMONS</span></div>
       <div class="menuButtons lobbyActions">
         <button class="menuBtn primary" id="onlineStart" type="button" disabled>WAITING FOR HOST</button>
         <button class="menuBtn quiet" type="button" data-menu="back">LEAVE LOBBY</button>
@@ -110,7 +120,7 @@
       <p><strong>Sprint:</strong> Shift &nbsp; <strong>Crouch:</strong> C / Ctrl &nbsp; <strong>Flashlight:</strong> F &nbsp; <strong>Pause:</strong> Esc</p>
       <p><strong>Choose your role in single player.</strong> As seeker, wait in the lobby elevator and then tag every hider. As hider, use the head start to disappear before the AI seeker is released. There is no hunt timer.</p>
       <p><strong>Caught hiders can spectate.</strong> Use Q / E, [ / ], the arrow keys, or the on-screen buttons to switch between living players until the round ends.</p>
-      <p><strong>The Bellhop and The Housekeeper are nobody's allies.</strong> They hunt hiders even during the hiding phase, and they hunt you. They remember a fleeing player's trail for a few seconds, including through the stairwell, so keep changing direction after breaking sight.</p>
+      <p><strong>The demons are nobody's allies.</strong> Every location has its own staff &mdash; The Bellhop and The Housekeeper keep the Grand Hotel; The Greeter, The Custodian and The Nightwatch still work Cinder Mall. They hunt hiders even during the hiding phase, and they hunt you. They remember a fleeing player's trail for a few seconds, including through the stairwell, so keep changing direction after breaking sight.</p>
       <p><strong>Flashlight charge is finite.</strong> A full light lasts about two minutes of continuous use. A caught player drops their flashlight; seekers and hiders can recover it, adding its remaining charge to their own up to 100%.</p>
       <p><strong>Sprinting is metered.</strong> Your STAMINA bar drains while you run and empties into a winded state you cannot sprint out of. It refills while you walk, faster standing still, and fastest crouched in cover.</p>
       <p><strong>Do not settle.</strong> Stay in one place and your SANITY meter climbs. Fill it and The Bellhop walks straight into the room you are hiding in. Changing rooms clears it &mdash; so does walking the halls, and the secret passages drain it.</p>
@@ -161,20 +171,26 @@
     <div id="roundBanner">THEY ARE HIDING — WAIT HERE</div>
   </div>
 
-  <div id="demonStatuses">
-    <div id="monsterStatus" class="demonStatus" data-state="roam">THE BELLHOP IS ROAMING</div>
-    <div id="housekeeperStatus" class="demonStatus" data-state="roam">THE HOUSEKEEPER IS ROAMING</div>
-  </div>
+  <!-- The right-hand rail stacks rather than pinning each panel to a hard-coded offset. The demon
+       list is as long as the map's roster, so a fixed `top` for the meters below it is only ever
+       right for one roster size — Cinder Mall's three demons put the status lines under the sanity
+       bar. Stacking is the fix that holds for a roster of any length. -->
+  <div id="hudRail">
+    <div id="demonStatuses">
+      <div id="monsterStatus" class="demonStatus" data-state="roam">THE BELLHOP IS ROAMING</div>
+      <div id="housekeeperStatus" class="demonStatus" data-state="roam">THE HOUSEKEEPER IS ROAMING</div>
+    </div>
 
-  <div id="sanityMeter" data-state="calm">
-    <div class="hudTitle">SANITY</div>
-    <div id="sanityTrack"><div id="sanityFill"></div></div>
-    <div id="sanityReadout">0%</div>
-  </div>
-  <div id="staminaMeter" data-state="ready">
-    <div class="hudTitle">STAMINA</div>
-    <div id="staminaTrack"><div id="staminaFill"></div></div>
-    <div id="staminaReadout">100%</div>
+    <div id="sanityMeter" data-state="calm">
+      <div class="hudTitle">SANITY</div>
+      <div id="sanityTrack"><div id="sanityFill"></div></div>
+      <div id="sanityReadout">0%</div>
+    </div>
+    <div id="staminaMeter" data-state="ready">
+      <div class="hudTitle">STAMINA</div>
+      <div id="staminaTrack"><div id="staminaFill"></div></div>
+      <div id="staminaReadout">100%</div>
+    </div>
   </div>
   <div id="flashlightStatus" data-on="false" data-charge="100">FLASHLIGHT OFF · 100% · F</div>
   <div id="threatVignette" aria-hidden="true"></div>
@@ -224,8 +240,10 @@
   <script src="layout.js?v=7.1"></script>
   <script src="collision-logic.js?v=7.1"></script>
   <script src="movement-logic.js?v=7.1"></script>
-  <script src="online-logic.js?v=7.1"></script>
+  <script src="online-logic.js?v=7.2"></script>
   <script src="hotel-plan.js?v=7.1"></script>
+  <script src="mall-plan.js?v=7.3"></script>
+  <script src="map-preview.js?v=7.3"></script>
   <script src="flashlight-logic.js?v=7.1"></script>
   <script src="controls.js?v=7.1"></script>
   <script src="enemy-logic.js?v=7.1"></script>
@@ -234,14 +252,15 @@
   <script src="avatar-logic.js?v=7.1"></script>
   <script src="sanity-logic.js?v=7.1"></script>
   <script src="stamina-logic.js?v=7.1"></script>
-  <script src="menu-logic.js?v=7.1"></script>
+  <script src="map-catalog.js?v=7.2"></script>
+  <script src="menu-logic.js?v=7.2"></script>
   <script src="round-logic.js?v=7.1"></script>
   <script src="hider-logic.js?v=7.1"></script>
   <script src="seeker-logic.js?v=7.2"></script>
   <script src="spectator-logic.js?v=7.2"></script>
-  <script src="sim-logic.js?v=7.1"></script>
+  <script src="sim-logic.js?v=7.2"></script>
   <script src="modules/music.js?v=7.1"></script>
   <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
-  <script type="module" src="main.js?v=7.1"></script>
+  <script type="module" src="main.js?v=7.2"></script>
 </body>
 </html>

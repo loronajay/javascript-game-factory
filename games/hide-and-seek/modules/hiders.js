@@ -12,7 +12,8 @@
 // from the network and this file simply stops being asked for entries.
 export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floorY, layout, world, avatars, logic, enemyLogic, movement, sanityLogic, avatarLogic, count = 3, seekerSpawn = null }) {
   const BODY = { height: CONFIG.bodyHeight, radius: CONFIG.playerRadius };
-  const stairLayout = layout.createStairLayout({ floorCount: 4, floorHeight: CONFIG.floorHeight });
+  // Borrowed from the demon deliberately: there is one building to cross and one way to cross it.
+  const navigator = enemyLogic.createNavigator(world.getPlan().navigation);
   const hiders = new Map();
   let zones = [];
 
@@ -32,7 +33,7 @@ export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floo
   }
 
   function nearestFloor(y) {
-    return Math.max(1, Math.min(4, Math.round(y / CONFIG.floorHeight) + 1));
+    return Math.max(1, Math.min(world.state.floorCount, Math.round(y / CONFIG.floorHeight) + 1));
   }
 
   function describe(hider) {
@@ -61,15 +62,9 @@ export function createHiders({ THREE, config: CONFIG, tuning, sanityConfig, floo
   function planRoute(hider, target) {
     const fromFloor = nearestFloor(hider.position.y);
     const toFloor = target.floor || fromFloor;
-    const route = fromFloor === toFloor
-      ? []
-      : enemyLogic.createStairRoute({ fromFloor, toFloor, floorHeight: CONFIG.floorHeight, stairLayout });
-    if (Math.abs(target.x) > 4.25) {
-      route.push({ x: 0, y: floorY(toFloor), z: target.z, floor: toFloor, guided: false });
-      route.push({ x: Math.sign(target.x) * 3.75, y: floorY(toFloor), z: target.z, floor: toFloor, guided: false });
-    }
-    route.push({ x: target.x, y: floorY(toFloor), z: target.z, floor: toFloor, guided: false });
-    hider.route = route;
+    hider.route = navigator.planFloorRoute({
+      from: hider.position, target, fromFloor, toFloor, floorHeight: CONFIG.floorHeight,
+    });
     hider.target = target;
   }
 

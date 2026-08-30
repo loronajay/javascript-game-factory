@@ -101,7 +101,7 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
     camera.position.set(step.x, step.y + currentEyeHeight, step.z);
   }
   function nearestFloorFromFeet(feetY) {
-    let floor = 1; let diff = Infinity; for (let id = 1; id <= 4; id += 1) { const candidate = Math.abs(feetY - floorY(id)); if (candidate < diff) { floor = id; diff = candidate; } }
+    let floor = 1; let diff = Infinity; for (let id = 1; id <= world.state.floorCount; id += 1) { const candidate = Math.abs(feetY - floorY(id)); if (candidate < diff) { floor = id; diff = candidate; } }
     return { floor, diff };
   }
   function isInStairwellXZ() { return camera.position.x > 4.65 && camera.position.x < 8.95 && camera.position.z > 42.8 && camera.position.z < 55.6; }

@@ -28,12 +28,22 @@ test('single player opens match setup before a round can begin', () => {
 });
 
 test('single-player match options are clamped to supported values', () => {
+  const HOTEL = { mapId: 'grand-hotel' };
   assert.deepEqual(menu.normalizeMatchConfig(), menu.MATCH_DEFAULTS);
-  assert.deepEqual(menu.normalizeMatchConfig({ hiderCount: 0, hideSeconds: 8, role: 'hider' }), { hiderCount: 1, hideSeconds: 45, role: 'hider' });
-  assert.deepEqual(menu.normalizeMatchConfig({ hiderCount: 99, hideSeconds: 999, role: 'ghost' }), { hiderCount: 8, hideSeconds: 120, role: 'seeker' });
-  assert.deepEqual(menu.normalizeMatchConfig({ hiderCount: '6', hideSeconds: '60', role: 'seeker' }), { hiderCount: 6, hideSeconds: 60, role: 'seeker' });
+  assert.deepEqual(menu.normalizeMatchConfig({ hiderCount: 0, hideSeconds: 8, role: 'hider' }), { ...HOTEL, hiderCount: 1, hideSeconds: 45, role: 'hider' });
+  assert.deepEqual(menu.normalizeMatchConfig({ hiderCount: 99, hideSeconds: 999, role: 'ghost' }), { ...HOTEL, hiderCount: 8, hideSeconds: 120, role: 'seeker' });
+  assert.deepEqual(menu.normalizeMatchConfig({ hiderCount: '6', hideSeconds: '60', role: 'seeker' }), { ...HOTEL, hiderCount: 6, hideSeconds: 60, role: 'seeker' });
   assert.ok(Object.isFrozen(menu.MATCH_DEFAULTS));
   assert.ok(Object.isFrozen(menu.MATCH_LIMITS));
+});
+
+test('the match carries which building it is in, and an unknown one is not a location', () => {
+  // Loaded for its side effect: the pure layer is classic scripts, so the catalog is a global by
+  // the time a menu can be touched. Without it the menu still answers with the default map.
+  require('../map-catalog.js');
+  assert.equal(menu.normalizeMatchConfig({ mapId: 'cinder-mall' }).mapId, 'cinder-mall');
+  assert.equal(menu.normalizeMatchConfig({ mapId: 'atlantis' }).mapId, 'grand-hotel');
+  assert.equal(menu.normalizeMatchConfig({}).mapId, 'grand-hotel');
 });
 
 test('how-to and extras return to whichever screen opened them', () => {

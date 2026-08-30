@@ -875,8 +875,14 @@ export function boot(root) {
     renderCabinet();
   }
 
-  root.addEventListener("keydown", (event) => {
-    if (["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName)) return;
+  // Bound on `window`, not on `root`: a keydown only reaches the cabinet div if
+  // focus happens to sit on a control inside it, and on every court the focus is
+  // on the body until the player clicks a button — so HORSE's placement keys, the
+  // mute key and Escape all silently did nothing. The screen guards below already
+  // scope every key to where it applies.
+  window.addEventListener("keydown", (event) => {
+    const tag = event.target && event.target.tagName;
+    if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
     // HORSE is the one screen that reads arrow keys, and it only does so while
     // a bin is being placed. It gets first refusal and reports whether it used
     // the key, so nothing else in the cabinet has to know it exists.
