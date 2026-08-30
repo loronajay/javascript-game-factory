@@ -70,6 +70,16 @@
     return announced === localMapId ? null : { expected: localMapId, actual: announced };
   }
 
+  // A lobby opening is not permission to invent a round. Both seats must receive the same complete
+  // authority assignment before either client enables input.
+  function hasPlayableSnapshot(state) {
+    const view = state?.snapshot;
+    if (!view?.round || !Array.isArray(view.players) || !selfOf(state)) return false;
+    const seekers = view.players.filter(player => player.role === 'seeker');
+    return seekers.length === 1 && seekers[0].id === state.seekerId
+      && view.players.every(player => ['seeker', 'hider'].includes(player.role));
+  }
+
   function createNetState() {
     return {
       status: NET_STATES.OFFLINE,
@@ -275,7 +285,7 @@
 
   return {
     INPUT_HEARTBEAT_SECONDS, LOBBY_LIMITS, NET_STATES, RECONCILE_DEFAULTS, RECONNECT_GRACE_MS,
-    lobbySettingsFor, snapshotMapMismatch,
+    lobbySettingsFor, snapshotMapMismatch, hasPlayableSnapshot,
     applyNetEvent, createNetState, describeInput, interpolatePose, isSeeker,
     othersOf, reconcilePosition, rememberSession, resumeRequestFor, selfOf, shouldSendInput,
   };

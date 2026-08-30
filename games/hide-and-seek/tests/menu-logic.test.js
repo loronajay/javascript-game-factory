@@ -69,7 +69,7 @@ test('pause suspends play and resume returns to it', () => {
 });
 
 test('an online match rejects pause without leaving play', () => {
-  const playing = walk(menu.createMenuState(), [ACTIONS.ONLINE, ACTIONS.PLAY]);
+  const playing = walk(menu.createMenuState(), [ACTIONS.ONLINE, ACTIONS.JOIN_ONLINE, ACTIONS.PLAY]);
   const stillPlaying = menu.nextMenuState(playing, ACTIONS.PAUSE, { allowPause: false });
 
   assert.equal(stillPlaying.screen, SCREENS.PLAYING);
@@ -115,19 +115,20 @@ test('every screen is addressable and the action list is frozen', () => {
 
 test('the online lobby is a waiting room the server ends, not a button', () => {
   const title = menu.createMenuState();
-  const lobby = menu.nextMenuState(title, menu.ACTIONS.ONLINE);
+  const setup = menu.nextMenuState(title, menu.ACTIONS.ONLINE);
+  assert.equal(setup.screen, menu.SCREENS.ONLINE_SETUP);
+  assert.equal(menu.nextMenuState(setup, menu.ACTIONS.PLAY).screen, menu.SCREENS.ONLINE_SETUP);
+  const lobby = menu.nextMenuState(setup, menu.ACTIONS.JOIN_ONLINE);
 
   assert.equal(lobby.screen, menu.SCREENS.ONLINE);
   assert.equal(menu.isOverlayVisible(lobby.screen), true);
   // Waiting in the lobby is not playing: nothing simulates behind it.
   assert.equal(menu.isPlaying(lobby.screen), false);
-  assert.equal(menu.nextMenuState(lobby, menu.ACTIONS.BACK).screen, menu.SCREENS.TITLE);
+  assert.equal(menu.nextMenuState(lobby, menu.ACTIONS.BACK).screen, menu.SCREENS.ONLINE_SETUP);
   assert.equal(menu.nextMenuState(lobby, menu.ACTIONS.PLAY).screen, menu.SCREENS.PLAYING);
 });
 
-test('the online lobby remembers where it was opened from', () => {
-  const paused = { screen: menu.SCREENS.PAUSE, back: null, effect: null };
-  const lobby = menu.nextMenuState(paused, menu.ACTIONS.ONLINE);
-
-  assert.equal(menu.nextMenuState(lobby, menu.ACTIONS.BACK).screen, menu.SCREENS.PAUSE);
+test('online setup can be left without starting a round', () => {
+  const setup = menu.nextMenuState(menu.createMenuState(), menu.ACTIONS.ONLINE);
+  assert.equal(menu.nextMenuState(setup, menu.ACTIONS.BACK).screen, menu.SCREENS.TITLE);
 });

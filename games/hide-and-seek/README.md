@@ -26,8 +26,10 @@ V6.9 adds a light and a second hunter, and both cut both ways.
 
 ## Playing online (new in V7.1, not yet played by real people)
 
-`PLAY ONLINE` on the title screen connects to the shared arcade network server and drops you into a
-lobby for two to eight guests. It needs a signed-in Javascript Game Factory account — the panel says
+`Online Multiplayer` opens its own stage selector. Choose The Grand Hotel or Cinder Mall, then
+press `FIND A LOBBY` to connect to the shared arcade network server. Friends must choose the same
+stage; matchmaking separates locations. `LEAVE / CHANGE STAGE` returns to the stage selector.
+The lobby holds two to eight guests. It needs a signed-in Javascript Game Factory account — the panel says
 so, and the name over your body in the corridor comes from your factory profile. The host presses
 `START ROUND`; the server picks who is it and does not announce it until the doors close.
 That assignment is random and authoritative, so any player can enter a round as either the seeker or a
@@ -46,6 +48,8 @@ someone who was caught goes to whoever walks over it first.
 When a hider is caught before the round ends, they stay in the match as a spectator. They can cycle
 between the remaining living players with `Q` / `E`, the bracket or arrow keys, or the on-screen
 previous/next buttons.
+Local catch notifications cannot end an online match. When the server ends the round, the results
+screen offers `FIND ANOTHER MATCH`, which returns to online stage selection, and `QUIT TO TITLE`.
 
 If your connection drops mid-round your body stays standing in the hotel — a free find, which is the
 honest consequence — and you have half a minute to walk back into it before the seat is given up.

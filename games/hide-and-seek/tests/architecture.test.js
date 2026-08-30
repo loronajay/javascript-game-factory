@@ -450,8 +450,11 @@ test('a map is picked before a round and never swapped underneath one', () => {
   assert.match(html, /id="soloMapCards"/);
   // The picker is filled from the catalog, so adding a location never means editing the menu, and
   // its floorplans are derived from each map's own plan rather than shipped as art that goes stale.
-  assert.match(menu, /maps\.listMaps\(\)/);
-  assert.match(menu, /HotelMapPreview/);
+  const mapPicker = fs.readFileSync(path.join(projectRoot, 'modules', 'map-picker.js'), 'utf8');
+  assert.match(menu, /createMapPicker/);
+  assert.match(mapPicker, /maps\.listMaps\(\)/);
+  assert.match(mapPicker, /HotelMapPreview/);
+  assert.match(html, /id="onlineMapCards"/);
   // The map picker is an empty container in the markup. Other settings may author their options —
   // a role is a role — but a location is a catalog row, so naming one here would be a second list.
   const picker = /<div id="soloMapCards"[^>]*>([\s\S]*?)<\/div>/.exec(html);
@@ -582,6 +585,7 @@ test('online play is server authoritative and the client only sends intent', () 
   const monster = fs.readFileSync(path.join(projectRoot, 'modules', 'monster.js'), 'utf8');
   assert.match(monster, /setRemotePose/);
   assert.match(monster, /if \(remotePose\) \{ updateRemote\(delta\); return; \}/);
+  assert.match(monster, /if \(world\.state\.remoteFixtures\) return;/, 'waiting for an online pose must never run the local demon brain');
   assert.match(onlineModule, /demons\.applySnapshot/);
 
   // The offline stand-ins leave when real guests arrive. A hider nobody can catch, standing still in

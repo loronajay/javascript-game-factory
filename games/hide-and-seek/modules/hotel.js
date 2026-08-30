@@ -70,7 +70,8 @@ export function createHotel({ THREE, scene, camera, materials: MAT, config: CONF
     // because that is how a hotel corridor is shaped. A mall's storefronts face all four ways, and a
     // door drawn across the wrong axis is a leaf lying flat through the shopfront.
     const hinge = new THREE.Group(); hinge.position.set(spec.hingeX, 0, spec.hingeZ); parent.add(hinge);
-    const door = new THREE.Mesh(new THREE.BoxGeometry(spec.w, spec.h, spec.d), MAT.wood); door.position.set(spec.localX, spec.y, spec.localZ); door.castShadow = true; door.receiveShadow = true; hinge.add(door);
+    // Plan heights are world coordinates; the parent floor already supplies its elevation.
+    const door = new THREE.Mesh(new THREE.BoxGeometry(spec.w, spec.h, spec.d), MAT.wood); door.position.set(spec.localX, spec.y - floorY(spec.floor), spec.localZ); door.castShadow = true; door.receiveShadow = true; hinge.add(door);
     // Knobs sit near the leaf's free edge, which is along whichever of its two footprint axes is long.
     const alongZ = spec.d >= spec.w;
     for (const offset of [-0.078, 0.078]) {
@@ -94,7 +95,7 @@ export function createHotel({ THREE, scene, camera, materials: MAT, config: CONF
   }
   function createSecretPanel(parent, spec) {
     const hinge = new THREE.Group(); hinge.position.set(spec.hingeX, 0, spec.hingeZ); parent.add(hinge);
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(spec.w, spec.h, spec.d), MAT.wall); panel.position.set(spec.localX, spec.y, spec.localZ); panel.castShadow = true; panel.receiveShadow = true; hinge.add(panel);
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(spec.w, spec.h, spec.d), MAT.wall); panel.position.set(spec.localX, spec.y - floorY(spec.floor), spec.localZ); panel.castShadow = true; panel.receiveShadow = true; hinge.add(panel);
     const trim = new THREE.Mesh(new THREE.BoxGeometry(0.125, 1.72, 0.035), new THREE.MeshStandardMaterial({ color: 0xcac7bd, roughness: 0.9 })); trim.position.set(spec.side === 'left' ? 0.065 : -0.065, 0, spec.width * 0.31); panel.add(trim);
     const item = { planId: spec.id, id: spec.id, hinge, panel, side: spec.side, open: false, target: 0, discovered: false };
     world.setOpening(spec.id, 0);
@@ -314,5 +315,10 @@ export function createHotel({ THREE, scene, camera, materials: MAT, config: CONF
     return true;
   }
 
-  return { build, update, applyOpening, getMapId: () => activeMapId, getPlan: () => plan, getBatchStats: () => batchStats };
+  // Snapshots are complete but sparse: an omitted leaf is fully closed, not unchanged.
+  function applyOpenings(openings) {
+    for (const id of collections.doorsByPlanId.keys()) applyOpening(id, openings[id] ?? 0);
+  }
+
+  return { build, update, applyOpening, applyOpenings, getMapId: () => activeMapId, getPlan: () => plan, getBatchStats: () => batchStats };
 }

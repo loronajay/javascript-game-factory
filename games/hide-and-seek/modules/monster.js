@@ -682,6 +682,8 @@ export function createMonster({
     // Online the local brain stands down completely: no detection, no routing, and above all no
     // catch. The server already decided all three.
     if (remotePose) { updateRemote(delta); return; }
+    // Authority starts at match entry, even before the first demon pose arrives.
+    if (world.state.remoteFixtures) return;
     if (world.state.gameOver) { if (mixer) advance(delta * 0.25); return; }
     if (inspectionMode) { if (mixer) { setAnimation(inspectionMotion === 'walk' ? walkAction : idleAction, 1); advance(delta); } updateHud(); return; }
     updateAwareness(delta);

@@ -11,6 +11,7 @@
   const SCREENS = Object.freeze({
     TITLE: 'title',
     SOLO_SETUP: 'soloSetup',
+    ONLINE_SETUP: 'onlineSetup',
     HOW_TO: 'howTo',
     EXTRAS: 'extras',
     ONLINE: 'online',
@@ -26,6 +27,7 @@
     EXTRAS: 'extras',
     ONLINE: 'online',
     BACK: 'back',
+    JOIN_ONLINE: 'joinOnline',
     PAUSE: 'pause',
     RESUME: 'resume',
     QUIT: 'quit',
@@ -84,20 +86,25 @@
   function nextMenuState(state, action, { allowPause = true } = {}) {
     const current = state || createMenuState();
     const stay = { ...current, effect: null };
-    if (action === ACTIONS.CAUGHT) return isPlaying(current.screen) ? goto(SCREENS.CAUGHT) : stay;
+    if (action === ACTIONS.CAUGHT) return isPlaying(current.screen) || current.screen === SCREENS.ONLINE ? goto(SCREENS.CAUGHT) : stay;
     // Quitting cannot be modelled as a transition: the hotel, the demon and the key ring are all
     // still standing, so the host has to rebuild the session. The machine only reports the intent.
     if (action === ACTIONS.QUIT) return current.screen === SCREENS.PAUSE || current.screen === SCREENS.CAUGHT ? { ...stay, effect: 'quit' } : stay;
     // The online lobby is a waiting room, and the wait ends when the server says it does — PLAY is
     // dispatched by the net layer on `lobby_started`, never by a button on this screen.
     if (current.screen === SCREENS.ONLINE && action === ACTIONS.PLAY) return goto(SCREENS.PLAYING);
+    if (current.screen === SCREENS.ONLINE_SETUP) {
+      if (action === ACTIONS.BACK) return goto(SCREENS.TITLE);
+      if (action === ACTIONS.JOIN_ONLINE) return goto(SCREENS.ONLINE, SCREENS.ONLINE_SETUP);
+      return stay;
+    }
     if (READABLE.includes(current.screen)) return action === ACTIONS.BACK ? goto(current.back || SCREENS.TITLE) : stay;
     if (current.screen === SCREENS.SOLO_SETUP) {
       if (action === ACTIONS.BACK) return goto(SCREENS.TITLE);
       if (action === ACTIONS.PLAY) return goto(SCREENS.PLAYING);
       return stay;
     }
-    if (action === ACTIONS.ONLINE) return goto(SCREENS.ONLINE, current.screen);
+    if (action === ACTIONS.ONLINE) return goto(SCREENS.ONLINE_SETUP, current.screen);
     if (action === ACTIONS.HOW_TO) return goto(SCREENS.HOW_TO, current.screen);
     if (action === ACTIONS.EXTRAS) return goto(SCREENS.EXTRAS, current.screen);
     if (current.screen === SCREENS.TITLE) return action === ACTIONS.SINGLE_PLAYER ? goto(SCREENS.SOLO_SETUP, SCREENS.TITLE) : stay;

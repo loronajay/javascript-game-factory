@@ -147,6 +147,7 @@ A flashlight is the strongest seeker-favouring tool in the game, so it obeys the
 - **`status: 'soon'` is a real state.** A registered map with no plan is shown as a locked row and `playableMapId` refuses to resolve it into a round, on the client and on the server. `normalizeMapId` is descriptive (the picker needs to name an unbuilt place); `playableMapId` is what anything standing a round up must use.
 - **A map is entered, never swapped.** The building is constructed at boot and the demons spawn into it, so changing location re-enters the page (`modules/map-session.js`) carrying the solo setup across. Do not try to rebuild the world under a live round.
 - **Online, the map is a lobby setting.** Matchmaking already compares settings, so two maps are two pools for free, and the snapshot names the map. A client whose building disagrees refuses the round rather than adjudicating against geometry it does not have.
+- **Online has its own stage setup before the lobby.** Both pickers use `modules/map-picker.js`; a map change carries `mode: 'online'` through `map-session.js` so it never falls into solo setup. Online round results return here, too. The online menu accepts only server-owned catch results; local demon brains must stay idle while awaiting a remote pose.
 - **How tall a building is comes from the map.** `world.state.floorCount` in the browser, `player.floorCount` in the tick. Five modules used to walk 1..4 by hand; a test keeps the literal out.
 
 ## Demons, per map (V6.9, rewritten V7.2)

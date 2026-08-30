@@ -15,6 +15,7 @@ import { createDemons } from './modules/demons.js';
 import { createSanity } from './modules/sanity.js';
 import { createStamina } from './modules/stamina.js';
 import { createMenu } from './modules/menu.js';
+import { createSessionMenuHandler } from './modules/online-session-menu.js';
 import { createOnline } from './modules/online.js';
 import { createAvatars } from './modules/avatars.js';
 import { createSpectator } from './modules/spectator.js';
@@ -56,19 +57,13 @@ if (inspectionView) {
 }
 const account = inspectionView ? null : createAccountAccess({ document });
 let hiders = null; let round = null; let seeker = null; let online = null;
-let lastMenuScreen = window.HotelMenu.SCREENS.TITLE;
 const menu = inspectionView ? null : createMenu({
   logic: window.HotelMenu, document, window,
   onPlay: () => player.beginPlay(),
   onStartSingle: (options) => startSingleMatch(options), maps: window.HotelMaps, mapSession,
   canPause: () => !online?.isActive(),
-  onScreen: (screen) => {
-    if (screen === window.HotelMenu.SCREENS.ONLINE) {
-      account.syncMenu();
-      if (account.requireAccount()) online?.connect();
-    } else if (lastMenuScreen === window.HotelMenu.SCREENS.ONLINE) online?.disconnect();
-    lastMenuScreen = screen;
-  },
+  onQuit: () => online?.disconnect(),
+  onScreen: createSessionMenuHandler({ logic: window.HotelMenu, account, getOnline: () => online }),
 });
 const stamina = inspectionView ? null : createStamina({ logic: window.HotelStamina, config: STAMINA_CONFIG, world, document });
 const player = createPlayer({
@@ -109,7 +104,6 @@ online = createOnline({
   identity: account ? account.identity() : null,
 });
 if (account) account.syncMenu();
-document.getElementById('restartBtn').addEventListener('click', () => window.location.reload());
 const LOCAL_AVATAR = 'local';
 if (!modelViewer) avatars.spawn(LOCAL_AVATAR, { role: window.HotelAvatarLogic.ROLES.SEEKER, seat: 0, hideHead: true, name: 'You' });
 if (menu && window.HotelControls.shouldAutoStartDragLook(location.search)) {

@@ -87,10 +87,29 @@
       </div>
     </div>
 
+    <div id="menuOnlineSetup" class="panel menuScreen setupScreen hidden">
+      <header class="screenHeader">
+        <button class="backBtn" type="button" data-menu="back" aria-label="Back to main menu">&#8592;</button>
+        <div><div class="menuEyebrow">ONLINE MULTIPLAYER</div><h1>Choose Your Stage</h1></div>
+        <div class="headerIndex">02 / ONLINE</div>
+      </header>
+      <p class="screenLead">Pick a location, then find a lobby. Friends should choose the same stage to play together.</p>
+      <div class="settingCard settingCard--maps">
+        <span class="settingIcon" aria-hidden="true">&#9962;</span>
+        <span class="settingCopy"><strong>Stage</strong><small id="onlineMapHelp"></small></span>
+        <span id="onlineMapReadout" class="settingValue"></span>
+        <div id="onlineMapCards" class="mapCards" role="radiogroup" aria-label="Online stage"></div>
+      </div>
+      <div class="lobbyRules"><span><b>2&ndash;8</b> PLAYERS</span><span><b>RANDOM</b> SEEKER</span><span><b>45 SEC</b> TO HIDE</span><span>CAUGHT? <b>SPECTATE THE MATCH</b></span></div>
+      <div class="menuButtons setupActions">
+        <button class="menuBtn primary" type="button" data-menu="joinOnline">FIND A LOBBY <span>&#8594;</span></button>
+      </div>
+    </div>
+
     <div id="menuOnline" class="panel menuScreen lobbyScreen hidden">
       <header class="screenHeader">
         <button class="backBtn" type="button" data-menu="back" aria-label="Leave lobby">&#8592;</button>
-        <div><div class="menuEyebrow">ONLINE MULTIPLAYER</div><h1>Hotel Lobby</h1></div>
+        <div><div class="menuEyebrow">ONLINE MULTIPLAYER</div><h1>Match Lobby</h1></div>
         <div id="onlineStatus" class="connectionPill" data-state="offline"><span></span>NOT CONNECTED</div>
       </header>
       <div id="onlineAccount" class="accountStrip" data-signed-in="false">SIGN IN TO YOUR FACTORY ACCOUNT TO PLAY ONLINE</div>
@@ -109,7 +128,7 @@
       <div class="lobbyRules"><span><b id="lobbyMapName">THE GRAND HOTEL</b></span><span><b>2&ndash;8</b> PLAYERS</span><span><b>RANDOM</b> SEEKER</span><span><b>45 SEC</b> TO HIDE</span><span><b id="lobbyDemonCount">2</b> DEMONS</span></div>
       <div class="menuButtons lobbyActions">
         <button class="menuBtn primary" id="onlineStart" type="button" disabled>WAITING FOR HOST</button>
-        <button class="menuBtn quiet" type="button" data-menu="back">LEAVE LOBBY</button>
+        <button class="menuBtn quiet" type="button" data-menu="back">LEAVE / CHANGE STAGE</button>
       </div>
     </div>
 

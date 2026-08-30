@@ -9,6 +9,8 @@
 // whether the difference is small enough to walk off or big enough to apply outright.
 // The sibling real-time service every online cabinet in this repo uses. A page served from
 // localhost talks to a local copy of it instead, so the hotel can be tested without a deploy.
+import { createOnlineResults } from './online-results.js';
+
 const PRODUCTION_WS_URL = 'wss://factory-network-server-production.up.railway.app';
 const LOCAL_WS_URL = 'ws://localhost:3000';
 
@@ -38,7 +40,7 @@ export function createOnline({
   const countEl = document.getElementById('roundCount');
   const bannerEl = document.getElementById('roundBanner');
   const hudEl = document.getElementById('roundHud');
-  const caughtOverlay = document.getElementById('caughtOverlay');
+  const results = createOnlineResults({ world, spectator, document });
 
   let socket = null;
   let net = logic.createNetState();
@@ -174,6 +176,7 @@ export function createOnline({
   function beginSpectating() {
     if (spectating) return;
     spectating = true;
+    world.state.playerEliminated = true;
     avatars.setVisible('local', false);
     player.setFlashlight(false);
     spectator?.start(spectatorPlayers, net.clientId);
@@ -184,19 +187,22 @@ export function createOnline({
     if (announcedOver || !net.snapshot?.round?.over) return;
     announcedOver = true;
     spectating = false;
-    spectator?.stop();
-    world.state.gameOver = true; world.state.isLocked = false;
     const view = net.snapshot.round;
     const won = (logic.isSeeker(net) && view.outcome === 'seeker') || (!logic.isSeeker(net) && view.outcome === 'hiders');
-    const panel = caughtOverlay?.querySelector('.caughtPanel');
-    if (panel) {
-      panel.querySelector('.caughtEyebrow').textContent = won ? 'MATCH COMPLETE' : 'NO VACANCY';
-      panel.querySelector('h1').textContent = won ? 'YOUR SIDE WON' : 'YOUR SIDE LOST';
-      panel.querySelector('p').textContent = won ? 'The hotel kept running after every catch, and your side survived the round.' : 'The round is over. Switch viewpoints after a catch to learn the hotel before trying again.';
-    }
-    caughtOverlay?.classList.add('visible'); document.body.classList.add('caught');
-    if (document.pointerLockElement && document.exitPointerLock) document.exitPointerLock();
-    world.emit('caught', { outcome: view.outcome, online: true });
+    results.show({ eyebrow: 'MATCH COMPLETE', title: won ? 'YOUR SIDE WON' : 'YOUR SIDE LOST',
+      message: 'The online round is over. Find another match to choose a stage and join a new lobby.', outcome: view.outcome });
+  }
+
+  function failOnline(message) {
+    clearSession();
+    window.clearTimeout(reconnectTimer);
+    const connection = socket;
+    socket = null;
+    connection?.close();
+    net = logic.applyNetEvent(net, { event: 'error', code: 'ONLINE_SESSION', message });
+    // Keep the authority claim until the user explicitly leaves. A transport error cannot enable
+    // the solo simulation, even while the online recovery screen is visible.
+    results.show({ eyebrow: 'ONLINE MATCH INTERRUPTED', title: 'MATCH UNAVAILABLE', message });
   }
 
   // The hotel's moving parts, drawn from the snapshot. None of this is decided here: a door is open
@@ -204,7 +210,7 @@ export function createOnline({
   // drawer is empty because someone else got there first.
   function applyFixtures(view) {
     if (!view) return;
-    if (hotel) for (const id of Object.keys(view.doors)) hotel.applyOpening(id, view.doors[id]);
+    if (hotel) hotel.applyOpenings(view.doors || {});
     if (furnishings) for (const id of Object.keys(view.drawers)) furnishings.applyDrawer(id, view.drawers[id]);
     if (elevator) elevator.applyRemote(view.elevator);
   }
@@ -252,7 +258,7 @@ export function createOnline({
   // The camera is corrected toward the authoritative body, never driven by it: hard-setting a
   // position 15 times a second is a stutter, and the local player has already walked with the same
   // rules the server used.
-  function reconcileSelf(delta) {
+  function reconcileSelf(delta, initial = false) {
     const self = logic.selfOf(net);
     if (!self) return;
     if (!self.alive) {
@@ -261,7 +267,7 @@ export function createOnline({
     }
     const eyeHeight = player.getEyeHeight();
     const local = { x: camera.position.x, y: camera.position.y - eyeHeight, z: camera.position.z };
-    const fixed = logic.reconcilePosition(local, self, delta);
+    const fixed = initial ? { ...self, corrected: true } : logic.reconcilePosition(local, self, delta);
     if (fixed.corrected) camera.position.set(fixed.x, fixed.y + eyeHeight, fixed.z);
     world.state.playerFeetY = fixed.y;
     world.state.seekerHeld = net.snapshot.round.phase === 'hiding' && logic.isSeeker(net);
@@ -288,6 +294,7 @@ export function createOnline({
     }
     if (event.event === 'error' && event.code === 'RESUME_REJECTED') {
       clearSession();
+      if (active) { failOnline('Your seat could not be rejoined. Find another online match.'); return; }
       send({ type: 'find_lobby', gameId, ...logic.LOBBY_LIMITS, settings: lobbySettings(), identity: identity || undefined });
     }
     if (event.event === 'session_resumed') {
@@ -295,18 +302,26 @@ export function createOnline({
       world.state.remoteFixtures = true;
       menu.dispatch(menu.actions.PLAY);
     }
-    if (event.event === 'lobby_joined' || event.event === 'connected' || event.event === 'session_resumed') saveSession();
+    if (event.event === 'lobby_joined' || event.event === 'session_resumed') saveSession();
     if (net.status === logic.NET_STATES.STARTING && previousStatus !== logic.NET_STATES.STARTING) {
       active = true;
       announcedOver = false;
       spectating = false;
       world.state.gameOver = false;
+      world.state.playerEliminated = false;
       // There is one authority per hotel. Every door, drawer, lift and demon in this browser stops
       // deciding anything the moment the match starts, and the offline stand-in hiders leave the
       // building — the guests are real now.
       world.state.remoteFixtures = true;
       if (hiders) hiders.standDown();
-      menu.dispatch(menu.actions.PLAY);
+      if (!logic.hasPlayableSnapshot(net)) {
+        failOnline('The server did not provide a complete round with one seeker. Reload before joining again.');
+        return;
+      }
+      // The start packet already contains the authority's world. Apply it before input is enabled,
+      // including an exact spawn, instead of waiting for the first periodic snapshot.
+      update(0, true);
+      if (!world.state.gameOver) menu.dispatch(menu.actions.PLAY);
     }
     if (net.status === logic.NET_STATES.ENDED && previousStatus !== logic.NET_STATES.ENDED) {
       // A finished round is not a seat worth reclaiming.
@@ -321,29 +336,36 @@ export function createOnline({
     if (socket && (socket.readyState === 0 || socket.readyState === 1)) return;
     net = logic.applyNetEvent(logic.createNetState(), { event: 'connected', clientId: null });
     renderLobby();
-    socket = new window.WebSocket(socketUrl);
-    socket.addEventListener('message', (message) => {
+    const connection = new window.WebSocket(socketUrl);
+    socket = connection;
+    connection.addEventListener('message', (message) => {
+      if (socket !== connection) return;
       let payload = null;
       try { payload = JSON.parse(message.data); } catch { payload = null; }
       if (payload) handleEvent(payload);
     });
-    socket.addEventListener('close', () => {
+    connection.addEventListener('close', () => {
+      if (socket !== connection) return;
+      socket = null;
       // Mid-round, a closed socket is a dropped connection rather than a finished game: the seat is
       // held for a grace window, so try to walk back into it before tearing the lobby down.
+      if (active && [logic.NET_STATES.STARTING, logic.NET_STATES.PLAYING].includes(net.status)) saveSession();
       const resumable = logic.resumeRequestFor(readSession(), Date.now(), logic.RECONNECT_GRACE_MS);
-      active = false;
-      world.state.remoteFixtures = false;
       if (resumable) {
         if (statusEl) statusEl.textContent = 'RECONNECTING…';
         window.clearTimeout(reconnectTimer);
-        reconnectTimer = window.setTimeout(() => { socket = null; connect(); }, 1200);
+        reconnectTimer = window.setTimeout(() => connect(), 1200);
         return;
       }
+      if (active && !world.state.gameOver) { failOnline('The connection was lost. Find another online match.'); return; }
       clearSession();
       net = logic.applyNetEvent(net, { event: 'lobby_closed' });
       renderLobby();
     });
-    socket.addEventListener('error', () => {
+    connection.addEventListener('error', () => {
+      if (socket !== connection) return;
+      // The close event owns reconnection; keep the seat's current state until it runs.
+      if (active) return;
       net = logic.applyNetEvent(net, { event: 'error', code: 'SOCKET', message: 'Connection failed' });
       renderLobby();
     });
@@ -354,13 +376,17 @@ export function createOnline({
     world.state.remoteFixtures = false;
     window.clearTimeout(reconnectTimer);
     clearSession();
-    if (socket) socket.close();
+    const connection = socket;
     socket = null;
+    if (connection) connection.close();
+    net = logic.createNetState();
+    renderLobby();
   }
 
-  function update(delta) {
+  function update(delta, initial = false) {
     if (!active) return;
-    if (net.status !== logic.NET_STATES.PLAYING && net.status !== logic.NET_STATES.ENDED) return;
+    if (![logic.NET_STATES.STARTING, logic.NET_STATES.PLAYING, logic.NET_STATES.ENDED].includes(net.status)) return;
+    if (!net.snapshot?.round || !Array.isArray(net.snapshot.players)) return;
     // Two authorities disagreeing about who was caught is the failure this whole layer exists to
     // prevent; two of them disagreeing about which *building* the round is in is the same failure
     // one level down, and it can only end with a body walking through a wall that is not there.
@@ -370,12 +396,13 @@ export function createOnline({
       mapMismatch = mismatch;
       world.notify(`This round is in a different location (${mismatch.actual}). Reload to join it.`);
       world.emit('online-map-mismatch', mismatch);
+      failOnline('The server selected a different map. Find another match after choosing the same stage.');
     }
     if (mapMismatch) return;
     syncLocalRole();
     const self = logic.selfOf(net);
-    if (self?.alive) { pushInput(delta); reconcileSelf(delta); }
-    else reconcileSelf(delta);
+    if (self?.alive && !initial) pushInput(delta);
+    reconcileSelf(delta, initial);
     syncBodies(delta);
     applyFixtures(net.snapshot?.fixtures);
     if (demons) demons.applySnapshot(net.snapshot?.demons || [], net.snapshot?.threat, net.clientId);

@@ -66,12 +66,17 @@ export function createMapSession({ maps, window: win = globalThis, storage = nul
     return true;
   }
 
+  function reopenOnlineSetup() {
+    try { if (store) store.setItem(SETUP_KEY, JSON.stringify({ mode: 'online', mapId: activeId })); } catch { /* preference only */ }
+    win.location.reload();
+  }
+
   return {
     activeMapId: () => activeId,
     // What the picker last showed, which may be a `soon` map the player is only looking at.
     requestedMapId: () => (maps ? maps.normalizeMapId(requested) : activeId),
     map: () => (maps ? maps.getMap(activeId) : null),
     demonRoster: () => (maps ? maps.demonRosterFor(activeId) : []),
-    remember, select, takePendingSetup, SETUP_KEY, STORAGE_KEY,
+    remember, select, takePendingSetup, reopenOnlineSetup, SETUP_KEY, STORAGE_KEY,
   };
 }
