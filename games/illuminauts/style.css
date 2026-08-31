@@ -6,6 +6,7 @@ html, body {
   min-height: 100dvh;
   background: #02040a;
   overflow: hidden;
+  font-family: "Arial Narrow", "Roboto Condensed", system-ui, sans-serif;
 }
 
 #gameCanvas {
@@ -21,19 +22,23 @@ html, body {
 [hidden] { display: none !important; }
 .traversal-tools, .look-hint { display: none; }
 body[data-phase="playing"] .traversal-tools {
-  position: fixed; z-index: 5; top: max(52px, 8vh); left: 16px; right: 16px;
-  display: flex; align-items: center; gap: 8px; color: #b8d9e2;
-  font: 11px/1.4 ui-monospace, Consolas, monospace;
+  position: fixed; z-index: 5; top: max(48px, 7vh); left: 18px; right: 18px;
+  display: flex; align-items: center; gap: 8px; color: #779b9f;
+  font: 700 10px/1.4 ui-monospace, Consolas, monospace;
 }
-.traversal-label { margin-right: auto; letter-spacing: 0.1em; }
+.traversal-label { margin-right: auto; letter-spacing: 0.16em; text-transform: uppercase; }
+.traversal-label::before { content: "●"; margin-right: 8px; color: #67f5f2; text-shadow: 0 0 8px #67f5f2; }
 .traversal-tools button {
-  border: 1px solid #496974; border-radius: 4px; background: #102029dc; color: #d9faff;
-  padding: 9px 12px; cursor: pointer; font: inherit; touch-action: manipulation;
+  border: 1px solid rgba(255, 89, 109, 0.42); border-radius: 0; background: rgba(12, 21, 25, 0.88); color: #ff8997;
+  padding: 8px 12px; cursor: pointer; font: inherit; letter-spacing: 0.08em; touch-action: manipulation;
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
 }
+.traversal-tools button:hover { border-color: #ff596d; background: rgba(67, 18, 28, 0.9); color: #fff; }
 body[data-phase="playing"] .look-hint {
   display: block; position: fixed; z-index: 2; left: 50%; bottom: 9vh; transform: translateX(-50%);
-  padding: 7px 12px; border-radius: 5px; color: #a7c9d5; background: #06131bbd;
-  text-align: center; font: 11px/1.6 ui-monospace, Consolas, monospace; pointer-events: none;
+  padding: 8px 15px; border: 1px solid rgba(103, 245, 242, 0.2); border-radius: 0; color: #91b6b8; background: rgba(2, 11, 15, 0.82);
+  text-align: center; font: 700 10px/1.6 ui-monospace, Consolas, monospace; letter-spacing: 0.04em; pointer-events: none;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
 }
 body[data-pointer-locked="true"] .look-hint { display: none; }
 body:not([data-phase="playing"]) .mobile-controller[data-mobile-controller-root="illuminauts-touch"] { display: none !important; }
@@ -51,17 +56,20 @@ body:not([data-phase="playing"]) .mobile-controller[data-mobile-controller-root=
   top: 18px;
   left: 20px;
   z-index: 10;
-  color: rgba(229, 245, 255, 0.82);
-  font: 700 11px/1.2 Arial, sans-serif;
-  letter-spacing: 0.16em;
+  color: rgba(154, 196, 198, 0.84);
+  font: 800 10px/1.2 ui-monospace, Consolas, monospace;
+  letter-spacing: 0.12em;
   text-decoration: none;
   text-transform: uppercase;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+  padding: 8px 11px;
+  border-left: 2px solid rgba(103, 245, 242, 0.6);
+  background: linear-gradient(90deg, rgba(3, 16, 21, 0.88), rgba(3, 16, 21, 0));
 }
 
 .back-link:hover,
 .back-link:focus-visible {
-  color: #ffffff;
+  color: #67f5f2;
 }
 
 .mobile-landscape-gate {
@@ -96,20 +104,21 @@ body:not([data-phase="playing"]) .mobile-controller[data-mobile-controller-root=
 .mobile-landscape-gate-card {
   width: min(420px, 100%);
   border: 1px solid rgba(118, 244, 255, 0.45);
-  border-radius: 8px;
+  border-radius: 0;
   padding: 22px;
   background: rgba(7, 16, 27, 0.94);
-  box-shadow: 0 0 36px rgba(124, 77, 255, 0.28);
+  box-shadow: 0 0 36px rgba(103, 245, 242, 0.14);
+  clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
   color: #dffaff;
   text-align: center;
   font-family: system-ui, sans-serif;
 }
 
 .mobile-landscape-gate-kicker {
-  color: #6ee7d8;
+  color: #67f5f2;
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
@@ -117,6 +126,7 @@ body:not([data-phase="playing"]) .mobile-controller[data-mobile-controller-root=
   margin-top: 8px;
   color: #ffffff;
   font-size: clamp(25px, 7vw, 38px);
+  font-family: "Arial Narrow", system-ui, sans-serif;
   font-weight: 900;
   line-height: 1;
 }
@@ -133,14 +143,15 @@ body:not([data-phase="playing"]) .mobile-controller[data-mobile-controller-root=
   min-height: 46px;
   min-width: 170px;
   border: 1px solid rgba(110, 231, 216, 0.82);
-  border-radius: 6px;
-  background: rgba(110, 231, 216, 0.16);
+  border-radius: 0;
+  background: rgba(103, 245, 242, 0.12);
   color: #ffffff;
   font: 900 13px/1 system-ui, sans-serif;
-  letter-spacing: 0;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: pointer;
   touch-action: manipulation;
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
 }
 
 .mobile-controller[data-mobile-controller-root="illuminauts-touch"] {

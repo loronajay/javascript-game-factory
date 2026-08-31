@@ -59,17 +59,28 @@ function testHudUsesBiggerHeartText() {
   assert.ok(heartCall[2].startsWith('bold 31px'), `expected larger heart font, got ${heartCall[2]}`);
 }
 
+function testHudPresentsSuitTelemetry() {
+  const ctx = createFakeContext();
+  drawHud(ctx, createState({ hearts: 2 }), 1000, 900, 600);
+
+  const labels = ctx.calls.filter((call) => call[0] === 'fillText').map((call) => call[3]);
+  assert.ok(labels.includes('SUIT INTEGRITY'));
+  assert.ok(labels.includes('ACCESS'));
+  assert.ok(labels.includes('CELL'));
+}
+
 function testMessageShowsQuitHint() {
   const ctx = createFakeContext();
   drawMessage(ctx, { message: 'Find the Beacon Core.' }, 900, 600);
 
   assert.ok(ctx.calls.some((call) => call[0] === 'fillText' && call[3] === 'Find the Beacon Core.'));
-  assert.ok(ctx.calls.some((call) => call[0] === 'fillText' && call[3] === 'ESC - quit match'));
+  assert.ok(ctx.calls.some((call) => call[0] === 'fillText' && call[3] === 'ESC  ABORT RUN'));
 }
 
 function run() {
   testHudDrawsChipAndPowerSprites();
   testHudUsesBiggerHeartText();
+  testHudPresentsSuitTelemetry();
   testMessageShowsQuitHint();
   console.log('Illuminauts HUD tests passed.');
 }
