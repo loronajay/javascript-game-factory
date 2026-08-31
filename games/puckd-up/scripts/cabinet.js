@@ -6,8 +6,9 @@ import { createView } from './render/view.js';
 import { createControls } from './input/controls.js';
 import { createUI } from './ui/controller.js';
 import { createAudio } from './audio/audio.js';
+import { createOnlineController } from './online/controller.js';
 // Composition/lifecycle boundary for a future platform adapter. No singleton state.
-export function createCabinet({ THREE, CANNON, doc = document }) {
+export function createCabinet({ THREE, CANNON, account, doc = document }) {
     const win = doc.defaultView, disposers = [], handlers = [];
     let frameId = 0, lastTime = null, disposed = false;
     const abort = new AbortController();
@@ -43,13 +44,14 @@ export function createCabinet({ THREE, CANNON, doc = document }) {
         const audio = own(createAudio({ muted: config.muted }));
         const controls = own(createControls({ THREE, canvas: doc.getElementById('game'), camera: view.camera, match, unlock: audio.unlock }));
         const ui = own(createUI({ doc, match, metrics: simulation.metrics, audio, controls, view, storage }));
+        const online = own(createOnlineController({ doc, match, account }));
         const clock = createFixedStep(dt => {
             const input = controls.sample();
             match.tick(dt);
             simulation.tick(dt, input);
             view.tick(dt, simulation, match);
         });
-        handlers.push(simulation.handle, controls.handle, view.handle, audio.handle, ui.handle, event => {
+        handlers.push(simulation.handle, controls.handle, view.handle, audio.handle, ui.handle, online.handle, event => {
             if (event.type === 'screen') {
                 clock.reset();
                 lastTime = null;

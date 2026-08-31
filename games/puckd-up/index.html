@@ -30,12 +30,27 @@
         <p class="menuLead">Fast 3D table hockey built around the approved high-speed physics model. Choose a mode to continue.</p>
         <div class="modeGrid">
           <button class="modeBtn primary" type="button" id="cpuModeBtn"><b>VS CPU</b><small>Playable now · configurable difficulty</small></button>
-          <button class="modeBtn" type="button" disabled><b>ONLINE MULTIPLAYER</b><small>Planned · network match flow reserved</small></button>
+          <button class="modeBtn" type="button" id="onlineModeBtn" disabled><b>ONLINE LOBBY PREVIEW</b><small id="onlineAccountNote">Sign in to Player Factory to use online lobbies</small></button>
           <button class="modeBtn" type="button" disabled><b>LOCAL VERSUS</b><small>Planned · second-player input slot reserved</small></button>
           <button class="modeBtn" type="button" disabled><b>TRAINING</b><small>Planned · free-play / shot practice</small></button>
         </div>
         <div class="futureNote">The live simulation is kept separate from menu configuration so future online matches can supply a network-controlled opponent without changing the puck, rail, goal, or collision systems.</div>
-        <div class="menuActions"><button type="button" id="menuFullscreen">Fullscreen</button></div>
+        <div class="menuActions"><button type="button" id="menuFullscreen">Fullscreen</button><button type="button" id="onlineSignIn">Sign in to Player Factory</button><a href="../../grid.html">Back to Arcade</a></div>
+      </div>
+    </section>
+
+    <section class="screen" id="onlineScreen" aria-label="Online lobby preview" hidden>
+      <div class="menuPanel onlinePanel">
+        <div class="menuEyebrow">Player Factory · Factory Network</div>
+        <h2>Online Lobby</h2>
+        <p class="menuLead">Signed in as <strong id="onlineIdentity">Account checked when joining</strong></p>
+        <p class="futureNote">Lobby preview: meet another player now. Online matches and recorded results will unlock after multiplayer synchronization is implemented.</p>
+        <div class="menuActions"><button type="button" id="onlineQuick">Quick Search</button><button type="button" id="onlineCreate">Create Private Lobby</button></div>
+        <div class="onlineJoinRow"><label for="onlineCode">Private room code</label><input id="onlineCode" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCDE"><button type="button" id="onlineJoin">Join Private Lobby</button></div>
+        <p id="onlineStatus" role="status" aria-live="polite">Choose Quick Search or create/join a private lobby.</p>
+        <div class="onlineRoomLine"><span id="onlineKind">Quick Search</span><strong id="onlineRoom">—</strong></div>
+        <ol id="onlineRoster" aria-label="Lobby players"></ol>
+        <div class="menuActions"><button type="button" id="onlineStart" disabled>Match play coming next</button><button type="button" id="onlineLeave" disabled>Cancel search</button><button type="button" id="onlineBack">Back</button></div>
       </div>
     </section>
 
@@ -103,6 +118,6 @@
   </footer>
 </div>
 
-<script type="module" src="./game.js"></script>
+<script type="module" src="./game.js?v=platform-lobby-1"></script>
 </body>
 </html>

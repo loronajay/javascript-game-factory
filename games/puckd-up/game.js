@@ -1,11 +1,15 @@
 import { createCabinet } from './scripts/cabinet.js';
 // Keep external library loading at the boundary; the cabinet modules are ordinary ESM.
 try {
-    const [THREE, CANNON] = await Promise.all([
+    const [THREE, CANNON, account] = await Promise.all([
         import('https://cdn.jsdelivr.net/npm/three@0.166.1/+esm'),
         import('https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/+esm'),
+        // Standalone CPU play must survive missing shared-platform modules.
+        import('./scripts/platform/account-access.js')
+            .then(module => module.createAccountAccess())
+            .catch(error => { console.warn('Online platform integration unavailable:', error); return undefined; }),
     ]);
-    createCabinet({ THREE, CANNON });
+    createCabinet({ THREE, CANNON, account });
 }
 catch (error) {
     console.error('PUCK\'D UP failed to start:', error);

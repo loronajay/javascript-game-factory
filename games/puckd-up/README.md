@@ -14,6 +14,9 @@ python -m http.server 8080
 
 Open `http://localhost:8080/` when serving this directory, or
 `http://localhost:8080/games/puckd-up/` when serving the repository root.
+Serve from the platform root for account integration and online lobbies; a
+standalone folder server still supports CPU play. Online uses local port 3000
+on localhost, or the existing Railway Factory Network service on deployed hosts.
 Do not open `index.html` through `file://`: browsers restrict module loading there.
 
 ```sh
@@ -113,16 +116,35 @@ mute/lifecycle behavior. Simulation orchestration tests use a motion-only world;
 they do not claim to test Cannon's internal solver. Browser smoke tests and a
 separate run against the repository's existing Cannon build supplement them.
 
-## Next platform pass
+## Platform and online lobby preview
 
-This architecture pass does **not** list the cabinet publicly or implement online
-play. Before official catalog inclusion, add the cabinet's `game.json`, an entry
-in the platform's `js/arcade-catalog.mts`, and `grid-previews/puckd-up.png` together.
-The platform owns canonical player identity and durable records. Integrate those
-through adapters rather than adding profile ownership to cabinet settings.
+The cabinet is registered at grid order 17 with game.json, source/emitted catalog
+entries, and the existing grid-previews/puckd-up.png. Metadata advertises only
+the currently playable CPU mode, not online match play.
 
-Other follow-up work: use the supplied logo/menu art in a presentation pass,
-review sound levels in play, decide offline dependency packaging, and separately
-design/test online synchronization. Local versus, online and training remain
-disabled placeholders. The existing `README.txt` records the pre-refactor v9
-visual baseline; it is historical rather than current architecture guidance.
+Online lobbies reuse the shared Player Factory account gate and auth API. Each
+join/search validates the current account and reads its playerId/profileName;
+no cabinet-owned identity cache or manual username is introduced. Auth tokens
+are never sent in lobby messages. Guests can still play CPU matches.
+
+Quick Search pairs two players. Private lobbies expose a five-character code,
+and support joining, roster updates, host transfer, cancel/leave and disconnect
+cleanup. Match start is disabled in both cabinet and server until synchronized
+air hockey exists. No score, rating, activity or durable-record writes occur.
+
+`scripts/online/` owns transport and lobby UI; `scripts/platform/account-access.js`
+is the shared-account boundary. Factory Network's corresponding definition is
+`games/puckd-up/server/puckd-up.game.mjs` in the sibling repository. The existing
+platform ratings API can serve this slug without a schema/registry change;
+secure completed-match reporting is a separate milestone, not lobby metadata.
+
+Run `npm test` for cabinet tests. With the sibling server repo present, run
+`npm run test:network` for real sockets with 0/80/200 ms added round-trip latency.
+For browser QA, start the local server, serve the platform root, and open
+`tests/lobby-preview.html` and `tests/lobby-preview.html?seat=bob`. This localhost-only
+fixture injects synthetic accounts and never calls production auth or records.
+
+See MULTIPLAYER.md for the next implementation pass and deployment order.
+Other follow-ups remain presentation using supplied artwork, sound-level review,
+offline packaging, local versus and training. README.txt is a historical visual
+baseline rather than current architecture guidance.

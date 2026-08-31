@@ -15,6 +15,10 @@ export function createMatch({ config = {}, emit = () => {
     }
     return {
         state, config: settings,
+        online() {
+            if (state.screen === 'menu')
+                screen('online');
+        },
         setup() {
             if (state.screen === 'menu')
                 screen('setup');
