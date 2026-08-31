@@ -29,6 +29,7 @@ import { createVoucherStore } from "./ui/voucher-store.mjs";
 import { createPublicProfileScreen } from "./ui/public-profile-screen.mjs";
 import { createShotHud } from "./ui/shot-hud.mjs";
 import { createScoreboard } from "./ui/scoreboard.mjs";
+import { createPinDeck } from "./ui/pin-deck.mjs";
 import { createResultsScreen } from "./ui/results-screen.mjs";
 import { createMatchReactions } from "./ui/match-reactions.mjs";
 import { createTutorialCoach } from "./ui/tutorial.mjs";
@@ -42,6 +43,7 @@ import { createMasteryCelebrationQueue } from "./state/mastery-celebrations.mjs"
 import { createPlayerLevelCelebrationQueue } from "./state/player-level-celebrations.mjs";
 import { createProgressionCelebrationPresenter } from "./ui/progression-celebration.mjs";
 import { bindEvents, createHeldKeys } from "./input/bindings.mjs";
+import { createBowlingMode } from "./bowl3d/controller.mjs";
 
 initMobileLandscapeGate();
 
@@ -76,7 +78,7 @@ initMobileLandscapeGate();
   const TICK_MS = 1000 / 60;
   const PHYSICS_DT = 1 / 180;
 
-  const renderer = new window.YamBowlingRenderer($("game-canvas"));
+  const classicRenderer = new window.YamBowlingRenderer($("game-canvas"));
   const audio = AudioCore.createAudioDirector();
   const factoryProfile = loadFactoryProfile();
   const platformApi = createPlatformApiClient();
@@ -127,6 +129,8 @@ initMobileLandscapeGate();
     storedSkinId: assets.storedSkinId,
     localClientId: () => onlineClient.getSnapshot().clientId,
   });
+  const bowling = createBowlingMode({ session, classicRenderer, physics: Physics, cpu: Cpu, laneCore: LaneCore, effects: Effects, balls: BALLS });
+  const renderer = bowling.renderer;
 
   // One seam decides the house a match is bowled in: local play uses the saved
   // pick, online play uses the lane the server dealt both bowlers.
@@ -338,6 +342,7 @@ initMobileLandscapeGate();
     core: Core,
     laneCore: LaneCore,
     shotHud,
+    pinDeck: createPinDeck({ session }),
     onCalloutHidden: () => resultsScreen.hideCalloutPose(),
   });
   onlineScreen = createOnlineScreen({
@@ -360,8 +365,8 @@ initMobileLandscapeGate();
   matchRuntime = createMatchRuntime({
     session,
     core: Core,
-    physics: Physics,
-    cpu: Cpu,
+    physics: bowling.physics,
+    cpu: bowling.cpu,
     balls: BALLS,
     audio,
     audioCore: AudioCore,
@@ -418,6 +423,7 @@ initMobileLandscapeGate();
 
   onlineSession = createOnlineSession({
     session,
+    prepareBowlingMode: bowling.prepare,
     onlineClient,
     platformApi,
     progressionReporter,
@@ -460,7 +466,9 @@ initMobileLandscapeGate();
     accumulator += Math.min(100, timestamp - lastTimestamp);
     lastTimestamp = timestamp;
     while (accumulator >= TICK_MS) {
+      onlineSession.tick();
       matchRuntime.tick(TICK_MS / 1000, keys);
+      bowling.tick(TICK_MS / 1000);
       accumulator -= TICK_MS;
     }
     tutorial.observe();
@@ -497,6 +505,7 @@ initMobileLandscapeGate();
 
     characterInspector.bind();
     setupScreen.bind();
+    bowling.bind();
     onlineScreen.bind();
     circuitScreen.bind();
     tournamentScreen.bind();
@@ -509,6 +518,7 @@ initMobileLandscapeGate();
       session, keys, audio, renderer, matchRuntime, onlineSession,
       circuitScreen, tournamentScreen, profileScreen, setupScreen, onlineScreen, shotHud, syncAudioToggle, accountAccess,
       matchReactions, tutorial,
+      startLocalMatch: () => bowling.start(() => matchRuntime.startMatch()),
     });
 
     // Account reads can be slow or remain pending while the Factory is

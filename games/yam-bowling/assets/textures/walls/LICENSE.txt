@@ -1,0 +1,23 @@
+Painted Plaster Wall
+Author: Amal Kumar / Poly Haven
+Source: https://polyhaven.com/a/painted_plaster_wall
+License: CC0 1.0 Universal (public domain dedication)
+https://polyhaven.com/license
+https://creativecommons.org/publicdomain/zero/1.0/
+
+The three 1K JPEG maps were converted to WebP for the game runtime.
+Color and roughness: quality 88. OpenGL normal map: lossless WebP.
+No external requests are made by the game for these assets.
+
+Original sources and MD5 checksums:
+painted-plaster-color.webp
+https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_plaster_wall/painted_plaster_wall_diff_1k.jpg
+15ba8c1f63a5ab412b1eabe31728540a
+
+painted-plaster-normal.webp
+https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_plaster_wall/painted_plaster_wall_nor_gl_1k.jpg
+43fff290583dbdfc9bfa088a2750e840
+
+painted-plaster-roughness.webp
+https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/painted_plaster_wall/painted_plaster_wall_rough_1k.jpg
+e076a6360329a2bc18c7397dc50c074a

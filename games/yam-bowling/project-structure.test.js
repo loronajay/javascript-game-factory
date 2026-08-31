@@ -1026,3 +1026,24 @@ test("the catalog stays underneath the ladders that read it", () => {
   assert.doesNotMatch(cosmetics, /YamPlayerRewards|YamMasteryRewards|player-rewards-core|mastery-rewards-core/);
   assert.ok(html.indexOf("cosmetics-core.js") < html.indexOf("player-rewards-core.js"));
 });
+
+// The down-lane rack readout exists because the 3D deck is too far away to
+// read. It is a render-only surface over the standing flags the simulation
+// already wrote: if it ever gained a route to physics or persistence it would
+// stop being a readout and start being a second opinion about the rack.
+test("the rack readout paints standing flags and owns nothing else", () => {
+  const deck = read("ui/pin-deck.mjs");
+  const html = read("index.html");
+
+  assert.match(html, /id=["']pin-deck-pins["']/);
+  assert.ok(html.indexOf('id="scoreboard"') < html.indexOf('id="pin-deck"'), "the rack sits under the scorecard rail");
+  assert.match(deck, /session\.scene\?\.pins/);
+  const code = deck.replace(/^\s*\/\/.*$/gm, "");
+  assert.doesNotMatch(code, /physics|localStorage|createRack|createSimulation/);
+  // Only the 3D style shows it; Arcade already draws pins the player can read.
+  assert.match(read("styles/bowl3d.css"), /\[data-bowling-style="3d"\]\s+\.pin-deck/);
+  // The scoreboard is the one caller, so the readout repaints on the same
+  // beats the pin counter already does — including every deck substep.
+  assert.match(read("ui/scoreboard.mjs"), /pinDeck\.update\(\)/);
+  assert.match(read("match/match-runtime.mjs"), /scoreboard\.updateStandingPinCount\(\)/);
+});

@@ -13,8 +13,10 @@ const runtimeManifest = require("./runtime-assets.json");
 const root = __dirname;
 const imageBudgetBytes = runtimeManifest.budgets.runtimeImageBytes;
 
-function runtimeImagePaths() {
+async function runtimeImagePaths() {
   const images = ["assets/pins/1.webp"];
+  const { WALL_MAPS } = await import('./bowl3d/wall-material.mjs');
+  images.push(...Object.values(WALL_MAPS).map(imagePath => path.posix.normalize(`bowl3d/${imagePath}`)));
   for (const lane of LaneCore.LANES) {
     images.push(lane.src, lane.thumbnailSrc);
   }
@@ -47,9 +49,9 @@ function runtimeImagePaths() {
   return [...new Set(images)];
 }
 
-test("every player-facing image is WebP and the complete runtime set stays under budget", () => {
-  const images = runtimeImagePaths();
-  assert.equal(images.length, 1071);
+test("every player-facing image is WebP and the complete runtime set stays under budget", async () => {
+  const images = await runtimeImagePaths();
+  assert.equal(images.length, 1074);
   assert.equal(images.every((imagePath) => imagePath.endsWith(".webp")), true);
   assert.deepEqual(images.filter((imagePath) => !fs.existsSync(path.join(root, imagePath))), []);
 

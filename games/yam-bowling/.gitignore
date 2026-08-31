@@ -4,3 +4,5 @@ tmp/
 .tmp/
 __pycache__/
 *.log
+!bowl3d/*.test.mjs
+!match/match-runtime.test.mjs

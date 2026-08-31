@@ -10,6 +10,13 @@ export function createSetupScreen({ session, roster, animation, assets, loadout,
   function render() {
     setup.skinIds = setup.characterSlugs.map((slug) => assets.storedSkinId(slug));
     setSelected($("mode-options"), "data-mode", setup.modeId);
+    setSelected($("bowling-style-options"), "data-bowling-style", setup.bowlingStyle);
+    for (const button of $("bowling-style-options").querySelectorAll("[data-bowling-style]")) {
+      button.setAttribute("aria-pressed", String(button.dataset.bowlingStyle === setup.bowlingStyle));
+    }
+    $("bowling-style-status").textContent = setup.bowlingStyle === "3d"
+      ? "A physical 3D alley. Your bowlers, outfits and match rules. Local exhibition only."
+      : "The original Yam lane. Pick a match length and make it yours.";
     setSelected($("play-type-options"), "data-play-type", setup.playType);
     setSelected($("cpu-options"), "data-cpu-level", setup.cpuLevelId);
     $("cpu-options").hidden = setup.playType !== "cpu";
@@ -79,6 +86,12 @@ export function createSetupScreen({ session, roster, animation, assets, loadout,
   }
 
   function bind() {
+    $("bowling-style-options").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-bowling-style]");
+      if (!button) return;
+      setup.bowlingStyle = button.dataset.bowlingStyle === "3d" ? "3d" : "arcade";
+      render();
+    });
     $("mode-options").addEventListener("click", (event) => {
       const button = event.target.closest("[data-mode]");
       if (!button) return;

@@ -1,5 +1,6 @@
 import { $, showScreen } from "../ui/dom.mjs";
 import { defaultShot } from "../state/session-state.mjs";
+import { localBowlingStyle } from "../bowl3d/mode.mjs";
 
 // Everything that advances a match: starting one, taking a shot through its
 // spin/charge/approach/deck stages, scoring the roll, and racking the next one.
@@ -172,6 +173,7 @@ export function createMatchRuntime({
       cpuLevelId: session.setup.cpuLevelId,
       players: createPlayers(),
     });
+    session.match.bowlingStyle = localBowlingStyle(session);
     session.resetScene(physics.createRack());
     session.cpuDelay = 0.8;
     shotHud.resetChargeFeedback();
@@ -255,6 +257,10 @@ export function createMatchRuntime({
     scene.throwElapsed = 0;
     scene.liveShot.power = power;
     scene.simulation = null;
+    if (physics.fullLaneSimulation) {
+      scene.simulation = physics.createSimulation(scene.pins, scene.shot);
+      scene.phase = "deck";
+    }
     session.contactedPinCount = 0;
     audio.play("throw", { intensity: power });
     shotHud.updateShotControls();
@@ -326,6 +332,7 @@ export function createMatchRuntime({
 
   function prepareNextRoll() {
     if (session.match.status === "complete") {
+      scene.phase = "finished";
       resultsScreen.showResults();
       return;
     }
@@ -335,7 +342,7 @@ export function createMatchRuntime({
       : expectedPins === 10 ? physics.createRack() : physics.clearFallen(scene.pins);
     Object.assign(scene, {
       simulation: null,
-      phase: "ready",
+      phase: session.onlineMatch && session.onlineSnapshot?.phase === "paused" ? "network-paused" : "ready",
       ballZ: 0,
       gutterSide: 0,
       throwElapsed: 0,
@@ -407,7 +414,12 @@ export function createMatchRuntime({
       }
     } else if (scene.phase === "deck") {
       scene.throwElapsed += dt;
-      for (let i = 0; i < 3; i += 1) physics.stepSimulation(scene.simulation, physicsStep);
+      const duration = session.onlineMatch ? session.pendingAuthoritativeRoll?.roll?.duration : null;
+      const timedReplay = Number.isFinite(duration) && duration > 0;
+      for (let i = 0; i < 3; i += 1) {
+        if (timedReplay && scene.simulation.complete) scene.simulation.elapsed += physicsStep;
+        else physics.stepSimulation(scene.simulation, physicsStep);
+      }
       scene.pins = scene.simulation.pins;
       const nextContactedPinCount = scene.pins.filter((pin) => pin.contacted).length;
       if (nextContactedPinCount > session.contactedPinCount) {
@@ -416,7 +428,7 @@ export function createMatchRuntime({
         session.contactedPinCount = nextContactedPinCount;
       }
       scoreboard.updateStandingPinCount();
-      if (scene.simulation.complete) finalizeRoll();
+      if (timedReplay ? scene.simulation.elapsed + 1e-8 >= duration : scene.simulation.complete) finalizeRoll();
     } else if (scene.phase === "transition") {
       session.transitionTime -= dt;
       if (session.transitionTime <= 0) prepareNextRoll();

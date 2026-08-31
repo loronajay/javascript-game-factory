@@ -1,4 +1,5 @@
 import { $, showScreen } from "../ui/dom.mjs";
+import { createModeReadiness } from "./mode-readiness.mjs";
 
 export function sanitizeOnlineSetupSkin(onlineSetup, getOwnedSkinId) {
   const skinId = getOwnedSkinId?.(onlineSetup?.characterSlug);
@@ -28,8 +29,19 @@ export function createOnlineSession({
   getMatchPresentation = () => ({}),
   normalizePresentation = (value) => value || {},
   onMatchStarted = () => {},
+  prepareBowlingMode = async () => {},
 }) {
   const { scene } = session;
+  const readiness = createModeReadiness(prepareBowlingMode);
+  const replayQueue = new Map();
+  const retiredSessions = new Set();
+
+  function loadingFailed(error) {
+    // Never silently substitute Arcade for a server-authoritative 3D match.
+    $("online-status").textContent = "3D Bowl could not load. Leave the room and retry with a WebGL 2 capable browser.";
+    $("online-status").classList.add("is-error");
+    $("online-status").title = String(error.message || error);
+  }
 
   function normalizeMatchState(matchState) {
     if (!matchState?.match?.players) return matchState;
@@ -57,6 +69,7 @@ export function createOnlineSession({
     session.reportedRatingSessionId = "";
     session.matchFacts.rolls = [];
     session.resetScene(matchRuntime.clonePins(snapshot.nextPins));
+    scene.phase = snapshot.phase === "paused" ? "network-paused" : "ready";
     shotHud.resetChargeFeedback();
     shotHud.resetSpinFeedback();
     $("pause-overlay").hidden = true;
@@ -69,6 +82,7 @@ export function createOnlineSession({
     matchRuntime.prepareActivePlayer();
     scoreboard.updateMatchUI();
     showScreen("game-screen");
+    if (session.match.status === "complete") { resultsScreen.showResults(); return; }
     onMatchStarted(session.match.players);
   }
 
@@ -76,14 +90,29 @@ export function createOnlineSession({
   // animating anything.
   function applyOnlineSnapshotDirect(snapshot) {
     if (!snapshot?.match) return;
+    if (Number(snapshot.rollNumber) < session.lastAppliedOnlineRoll) return;
+    const rollAdvanced = (Number(snapshot.rollNumber) || 0) > session.lastAppliedOnlineRoll;
     session.match = structuredClone(snapshot.match);
     session.onlineSnapshot = snapshot;
     session.lastAppliedOnlineRoll = Math.max(
       session.lastAppliedOnlineRoll,
       Number(snapshot.rollNumber) || 0,
     );
-    scene.pins = matchRuntime.clonePins(snapshot.nextPins);
     session.pendingAuthoritativeRoll = null;
+    // A reaction or presence ping carries the match document but advances nothing:
+    // same roll, no pause change, not complete. Adopt it for the scoreboard only —
+    // touching the scene here would reset the active bowler's aim, spin and
+    // approach mid-shot, which read as an opponent's emote hijacking your controls.
+    const pauseChanged = (snapshot.phase === "paused") !== (scene.phase === "network-paused");
+    if (session.onlineMatch && !rollAdvanced && !pauseChanged
+      && session.match.status !== "complete") {
+      scoreboard.updateMatchUI();
+      return;
+    }
+    // Presence/reaction updates must not skip a result hold or reset live input.
+    if (scene.phase === "transition" || (["spin", "charging", "submitting"].includes(scene.phase)
+      && snapshot.phase !== "paused" && session.match.status !== "complete")) return;
+    scene.pins = matchRuntime.clonePins(snapshot.nextPins);
     if (session.match.status === "complete") {
       resultsScreen.showResults();
       return;
@@ -92,7 +121,9 @@ export function createOnlineSession({
     // Presence and reaction messages carry the latest match document too. They
     // need a visual refresh, but they are not a new turn and must not replay the
     // "who's up" banner or its announcement sound.
+    const liveShot = { ...scene.liveShot };
     matchRuntime.prepareActivePlayer({ announce: false });
+    Object.assign(scene.liveShot || {}, liveShot);
     scoreboard.updateMatchUI();
   }
 
@@ -100,11 +131,28 @@ export function createOnlineSession({
   // are the server's, applied in finalizeRoll, not whatever the local sim found.
   function playAuthoritativeRoll(snapshot) {
     const roll = snapshot?.lastRoll;
+    if (session.pendingAuthoritativeRoll) {
+      const pending = session.pendingAuthoritativeRoll;
+      if (Number(roll?.rollNumber) > Number(pending.roll.rollNumber)) {
+        replayQueue.set(Number(roll.rollNumber), snapshot);
+      } else if (Number(roll?.rollNumber) === Number(pending.roll.rollNumber)) {
+        pending.snapshot = snapshot;
+      }
+      return;
+    }
+    if (scene.phase === "transition" && Number(roll?.rollNumber) > session.lastAppliedOnlineRoll) {
+      replayQueue.set(Number(roll.rollNumber), snapshot);
+      return;
+    }
     if (!roll || Number(roll.rollNumber) <= session.lastAppliedOnlineRoll) {
       if (snapshot?.match && !session.pendingAuthoritativeRoll) applyOnlineSnapshotDirect(snapshot);
       return;
     }
     if (Number(session.pendingAuthoritativeRoll?.roll?.rollNumber) === Number(roll.rollNumber)) return;
+    if (Number(roll.rollNumber) > session.lastAppliedOnlineRoll + 1) {
+      applyOnlineSnapshotDirect(snapshot);
+      return;
+    }
 
     if (!session.match || $("game-screen").hidden) {
       resetSceneForOnline({ ...snapshot, rollNumber: Number(roll.rollNumber) - 1 });
@@ -131,6 +179,14 @@ export function createOnlineSession({
   function handleSnapshot(snapshot) {
     if (snapshot?.matchState) snapshot = { ...snapshot, matchState: normalizeMatchState(snapshot.matchState) };
     onlineScreen.renderLobby(snapshot);
+    const style = snapshot.matchState?.match?.bowlingStyle || snapshot.lobby?.settings?.bowlingStyle;
+    return readiness.run(style, () => acceptSnapshot(snapshot), loadingFailed);
+  }
+
+  function acceptSnapshot(snapshot) {
+    if (scene.phase === "submitting" && ["SHOT_FAILED", "INVALID_SHOT", "NOT_YOUR_TURN", "NOT_READY_FOR_SHOT"].includes(snapshot.error?.code)) {
+      scene.phase = "ready";
+    }
     if (
       snapshot.status === "lobby"
       && snapshot.lobby?.status === "open"
@@ -140,46 +196,66 @@ export function createOnlineSession({
       onlineClient.startLobby();
     }
     if (!snapshot.matchState) return;
+    if (retiredSessions.has(snapshot.matchState.sessionId)) return;
     const isNewSession = !session.onlineMatch
       || (session.onlineSnapshot?.sessionId
         && snapshot.matchState.sessionId !== session.onlineSnapshot.sessionId);
     if (isNewSession) {
+      if (session.onlineSnapshot?.sessionId) retiredSessions.add(session.onlineSnapshot.sessionId);
+      replayQueue.clear();
       resetSceneForOnline(snapshot.matchState);
       return;
     }
     playAuthoritativeRoll(snapshot.matchState);
   }
 
+  function tick() {
+    if (!session.onlineMatch || session.pendingAuthoritativeRoll || scene.phase !== "ready") return;
+    const next = [...replayQueue.keys()].sort((a, b) => a - b)[0];
+    if (next === undefined) return;
+    const snapshot = replayQueue.get(next);
+    replayQueue.delete(next);
+    playAuthoritativeRoll(snapshot);
+  }
+
   function begin(intent) {
     if (!accountAccess.requireFactoryAccount()) return false;
     sanitizeOnlineSetupSkin(session.onlineSetup, getOwnedSkinId);
     session.onlineSetup.intent = intent;
-    onlineClient.connect();
     showScreen("online-lobby-screen");
     onlineScreen.renderLobby(onlineClient.getSnapshot());
     const options = {
       modeId: session.onlineSetup.modeId,
+      bowlingStyle: session.onlineSetup.bowlingStyle === "3d" ? "3d" : "arcade",
       ranked: session.onlineSetup.ranked === true,
       characterSlug: session.onlineSetup.characterSlug,
       skinId: session.onlineSetup.skinId,
       presentation: getMatchPresentation(session.onlineSetup.characterSlug),
     };
-    if (intent === "quick") onlineClient.findQuickMatch(options);
-    if (intent === "private-create") onlineClient.createPrivateRoom(options);
+    let code = "";
     if (intent === "private-join") {
-      const code = normalizeRoomCode($("join-room-code").value);
+      code = normalizeRoomCode($("join-room-code").value);
       if (!code) {
         showScreen("online-screen");
         $("online-menu-status").textContent = "Enter the private room code first.";
         $("online-menu-status").classList.add("is-error");
         return;
       }
-      onlineClient.joinPrivateRoom(code, options);
     }
-    return true;
+    if (options.bowlingStyle === "3d") $("online-status").textContent = "Preparing the 3D lane…";
+    // Code joins learn the host's style from the server. Creation/search can
+    // preflight graphics before opening a room for another player.
+    return readiness.run(intent === "private-join" ? "arcade" : options.bowlingStyle, () => {
+      onlineClient.connect();
+      if (intent === "quick") onlineClient.findQuickMatch(options);
+      if (intent === "private-create") onlineClient.createPrivateRoom(options);
+      if (intent === "private-join") onlineClient.joinPrivateRoom(code, options);
+      return true;
+    }, loadingFailed);
   }
 
   function leave() {
+    readiness.cancel(); replayQueue.clear();
     onlineClient.leaveLobby();
     session.onlineMatch = false;
     session.onlineSnapshot = null;
@@ -190,6 +266,7 @@ export function createOnlineSession({
   // Leaving from the results screen goes home rather than back to the lobby, so
   // it drops the room without re-rendering the online setup on the way past.
   function leaveToTitle() {
+    readiness.cancel(); replayQueue.clear();
     onlineClient.leaveLobby();
     session.onlineMatch = false;
     showScreen("title-screen");
@@ -282,5 +359,5 @@ export function createOnlineSession({
     status.textContent = progressionLine ? `${ratingLine} · ${progressionLine}` : ratingLine;
   }
 
-  return { handleSnapshot, begin, flushPendingReports, leave, leaveToTitle, requestRematch, reportResult };
+  return { handleSnapshot, tick, begin, flushPendingReports, leave, leaveToTitle, requestRematch, reportResult };
 }

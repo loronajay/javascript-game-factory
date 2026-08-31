@@ -137,6 +137,20 @@ test("the stakes are declared with the queue and never assumed", () => {
   assert.equal(join.settings, undefined);
 });
 
+test("3D queues declare separate physics and private joins adopt the host style", () => {
+  const client = createClient();
+  client.connect();
+  const socket = MockWebSocket.instances[0];
+  socket.open();
+  client.findQuickMatch({ bowlingStyle: "3d", ranked: true });
+  client.createPrivateRoom({ bowlingStyle: "3d", modeId: "classic" });
+  client.joinPrivateRoom("YAM42", { bowlingStyle: "arcade" });
+  assert.equal(socket.sent[0].settings.bowlingStyle, "3d");
+  assert.equal(socket.sent[0].settings.protocolVersion, 3);
+  assert.equal(socket.sent[1].settings.bowlingStyle, "3d");
+  assert.equal(socket.sent[2].settings, undefined);
+});
+
 test("lobby join publishes the selected bowler and owner can start a full lobby", () => {
   const client = createClient();
   client.connect();

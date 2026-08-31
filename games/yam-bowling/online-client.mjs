@@ -1,5 +1,5 @@
 export const YAM_BOWLING_GAME_ID = "yam-bowling";
-export const YAM_BOWLING_PROTOCOL_VERSION = 2;
+export const YAM_BOWLING_PROTOCOL_VERSION = 3;
 
 const PROD_WS_URL = "wss://factory-network-server-production.up.railway.app";
 const LOCAL_WS_PORT = "3000";
@@ -348,7 +348,7 @@ export function createOnlineClient(options = {}) {
     return true;
   }
 
-  function lobbyRequest(type, { modeId = "quick", ranked = false, characterSlug = "daisy-monroe", skinId = "canon", presentation = {}, roomCode = "", privateRoom = false } = {}) {
+  function lobbyRequest(type, { modeId = "quick", bowlingStyle = "arcade", ranked = false, characterSlug = "daisy-monroe", skinId = "canon", presentation = {}, roomCode = "", privateRoom = false } = {}) {
     selectedCharacterSlug = boundedText(characterSlug, 64, "daisy-monroe");
     selectedSkinId = boundedText(skinId, 40, "canon");
     selectedPresentation = sanitizePresentation(presentation);
@@ -364,7 +364,8 @@ export function createOnlineClient(options = {}) {
         // handed a casual room. A join names only the room code, so a joiner
         // takes the stakes the room was opened with rather than declaring their
         // own — the same rule as the mode.
-        settings: { matchType: normalizeModeId(modeId), ranked: ranked === true, protocolVersion: YAM_BOWLING_PROTOCOL_VERSION },
+        settings: { matchType: normalizeModeId(modeId), ranked: ranked === true, protocolVersion: YAM_BOWLING_PROTOCOL_VERSION,
+          ...(bowlingStyle === "3d" ? { bowlingStyle: "3d" } : {}) },
       }),
       identity: currentIdentity(),
     };

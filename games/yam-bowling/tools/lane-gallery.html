@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Yam Bowling · 3D house gallery</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;background:#0d111b;color:#f9ead8;font:14px system-ui}
+  header{display:flex;align-items:center;gap:20px;padding:14px 22px;flex-wrap:wrap;border-bottom:1px solid #354056}
+  h1{font-size:17px;margin:0}select,button{font:inherit;color:inherit;background:#202838;border:1px solid #506078;border-radius:5px;padding:7px}
+  main{height:calc(100vh - 125px);min-height:360px;display:grid;grid-template-columns:1fr 260px;gap:16px;padding:16px}
+  canvas{width:100%;height:100%;min-width:0;min-height:0;border-radius:10px}figure{margin:0;display:flex;flex-direction:column;min-height:0}
+  img{width:100%;height:calc(100% - 28px);object-fit:contain}figcaption{padding:7px;color:#afbdd2;font-size:12px;text-align:center}
+  output{display:block;padding:0 22px;font-size:12px;color:#b5c6df}
+  @media(max-width:700px){main{grid-template-columns:1fr;height:70vh}figure{display:none}}
+</style>
+<header><h1>3D house gallery</h1><label>House <select id="house"></select></label>
+<label>Camera <select id="camera"><option value="approach">Approach</option><option value="midway">Mid-lane follow</option><option value="deck">Pin deck follow</option></select></label>
+<button id="cycle">Cycle all houses</button></header>
+<main><canvas aria-label="3D house preview"></canvas><figure><img alt="2D lane reference"><figcaption>Original 2D art</figcaption></figure></main>
+<output id="status" aria-live="polite">Building house…</output>
+<script src="../physics-core.js"></script><script src="../lane-core.js"></script><script src="../ball-core.js"></script><script src="../effects-core.js"></script>
+<script type="module" src="./lane-gallery.mjs"></script>
+</html>

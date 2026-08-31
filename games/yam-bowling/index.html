@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="styles/setup.css" />
     <link rel="stylesheet" href="styles/online.css" />
     <link rel="stylesheet" href="styles/match.css" />
+    <link rel="stylesheet" href="styles/bowl3d.css" />
     <link rel="stylesheet" href="styles/tutorial.css" />
     <link rel="stylesheet" href="styles/results.css" />
     <link rel="stylesheet" href="styles/dialogs.css" />
@@ -299,6 +300,18 @@
                 </button>
               </div>
             </section>
+            <section class="option-section">
+              <p class="option-label">Bowling style</p>
+              <div class="segmented segmented--stack" id="online-style-options">
+                <button class="choice-card is-selected" type="button" data-online-style="arcade">
+                  <span><strong>Arcade</strong><small>The original Yam lane</small></span><b>2D</b>
+                </button>
+                <button class="choice-card" type="button" data-online-style="3d">
+                  <span><strong>3D Bowl</strong><small>Full alley · physical pinfall</small></span><b>3D</b>
+                </button>
+              </div>
+              <p class="bowling-style-status" id="online-style-note" role="status">Private-room guests use the host's bowling style.</p>
+            </section>
             <section class="option-section online-stakes-section">
               <p class="option-label">Stakes</p>
               <div class="segmented segmented--stack" id="online-stakes-options">
@@ -376,6 +389,14 @@
         <div class="setup-layout">
           <aside class="setup-options panel">
             <section class="option-section">
+              <p class="option-label">Bowling style</p>
+              <div class="segmented" id="bowling-style-options" aria-label="Bowling style">
+                <button class="is-selected" type="button" data-bowling-style="arcade" aria-pressed="true">Arcade</button>
+                <button type="button" data-bowling-style="3d" aria-pressed="false">3D Bowl <small>Side mode</small></button>
+              </div>
+              <p class="bowling-style-status" id="bowling-style-status" role="status">The original Yam lane. Pick a match length and make it yours.</p>
+            </section>
+            <section class="option-section">
               <p class="option-label">Match length</p>
               <div class="segmented segmented--stack" id="mode-options">
                 <button class="choice-card is-selected" type="button" data-mode="quick">
@@ -450,6 +471,11 @@
               <div class="scoreboard" id="scoreboard"></div>
             </section>
 
+            <section class="pin-deck" id="pin-deck" aria-labelledby="pin-deck-title">
+              <div class="section-heading section-heading--small"><h3 id="pin-deck-title">Rack</h3><span id="pin-deck-count">10 up</span></div>
+              <div class="pin-deck__pins" id="pin-deck-pins" role="img" aria-label="Pins still standing"></div>
+            </section>
+
             <section class="mobile-line-controls" aria-label="Shot line controls">
               <label class="range-control"><span>Strafe</span><input id="mobile-position-control" data-shot-control="position" type="range" min="-46" max="46" value="0" /><output data-shot-output="position">C</output></label>
               <label class="range-control"><span>Aim</span><input id="mobile-aim-control" data-shot-control="aim" type="range" min="-45" max="45" value="10" /><output data-shot-output="aim">R 10</output></label>
@@ -458,6 +484,13 @@
 
           <section class="lane-shell" aria-label="Bowling lane">
             <canvas id="game-canvas" width="1024" height="1536"></canvas>
+            <canvas id="game-canvas-3d" aria-label="3D bowling alley" hidden></canvas>
+            <button class="three-d-camera" id="three-d-camera" type="button" aria-pressed="false" hidden>Camera · Follow</button>
+            <div class="three-d-error" id="three-d-error" role="alert" hidden>
+              <strong>3D graphics interrupted</strong>
+              <p>The match is paused. Return to setup to retry, or choose Arcade.</p>
+              <button class="button button--primary" id="three-d-back" type="button">Return to setup</button>
+            </div>
             <div class="lane-hud">
               <span>Frame <b id="hud-frame">1</b></span>
               <span><b id="hud-pins">10</b> pins up</span>

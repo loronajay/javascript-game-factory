@@ -1,9 +1,11 @@
 import { $, escapeHtml } from "./dom.mjs";
+import { matchUses3d } from "../bowl3d/mode.mjs";
+import { displayedStandingPins } from "./pin-deck.mjs";
 
 // The left-hand match rail: the frame-by-frame scoreboard plus the HUD chips
 // that describe whose turn it is. Read-only over the session — it paints the
 // match, it never advances it.
-export function createScoreboard({ session, core, laneCore, shotHud, onCalloutHidden }) {
+export function createScoreboard({ session, core, laneCore, shotHud, pinDeck, onCalloutHidden }) {
   function updateScoreboard() {
     const { match } = session;
     const board = $("scoreboard");
@@ -42,11 +44,13 @@ export function createScoreboard({ session, core, laneCore, shotHud, onCalloutHi
     if (!match) return;
     const player = session.activePlayer();
     const mode = core.MODES[match.modeId];
+    $("game-screen").dataset.bowlingStyle = matchUses3d(session) ? "3d" : "arcade";
     const opponent = session.onlineMatch ? "Online" : match.playType === "campaign" ? "Circuit" : match.playType === "cpu" ? "Vs CPU" : "Hotseat";
-    $("match-chip").textContent = `${mode.name} · ${opponent} · ${laneCore.getLane(session.matchLaneSlug).name}`;
+    $("match-chip").textContent = `${matchUses3d(session) ? "3D Bowl · " : ""}${mode.name} · ${opponent} · ${laneCore.getLane(session.matchLaneSlug).name}`;
     $("score-mode").textContent = `${mode.frames} frames`;
     $("hud-frame").textContent = Math.min(mode.frames, match.frameIndex + 1);
-    $("hud-pins").textContent = scene.pins.filter((pin) => pin.standing).length;
+    $("hud-pins").textContent = displayedStandingPins(session).length;
+    pinDeck.update();
     $("turn-name").textContent = player.name;
     $("turn-detail").textContent = `Frame ${match.frameIndex + 1} · Roll ${session.frameRollNumber()}`;
     $("turn-banner").querySelector("strong").textContent = player.name;
@@ -64,7 +68,8 @@ export function createScoreboard({ session, core, laneCore, shotHud, onCalloutHi
   }
 
   function updateStandingPinCount() {
-    $("hud-pins").textContent = session.scene.pins.filter((pin) => pin.standing).length;
+    $("hud-pins").textContent = displayedStandingPins(session).length;
+    pinDeck.update();
   }
 
   return { updateScoreboard, updateMatchUI, updateOverlayVisibility, updateStandingPinCount };

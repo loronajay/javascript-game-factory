@@ -1,0 +1,81 @@
+/* Only the local 3D exhibition changes lane proportions. All shot controls,
+   scorecards and menus retain their shared Yam styling. */
+#bowling-style-options button { flex: 1; }
+#bowling-style-options small { margin-left: .3rem; color: var(--gold); font-size: .5rem; letter-spacing: .06em; text-transform: uppercase; }
+.bowling-style-status { margin: .5rem 0 0; min-height: 2.5em; color: var(--muted); font-size: .65rem; line-height: 1.5; }
+.game-screen[data-bowling-style="3d"] .match-layout {
+  width: min(1680px, 100%);
+  grid-template-columns: minmax(190px, 250px) minmax(0, 1fr) minmax(220px, 280px);
+}
+.game-screen[data-bowling-style="3d"] .score-row { grid-template-columns: 60px minmax(0,1fr) 36px; }
+.game-screen[data-bowling-style="3d"] .shot-section { min-width: 0; }
+.game-screen[data-bowling-style="3d"] .meter-heading { min-width: 0; gap: .25rem; }
+.game-screen[data-bowling-style="3d"] .meter-heading output { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.game-screen[data-bowling-style="3d"] .lane-shell { width: 100%; aspect-ratio: auto; }
+#game-canvas-3d { display: block; width: 100%; height: 100%; }
+#game-canvas-3d[hidden], #game-canvas[hidden] { display: none; }
+.three-d-camera { position: absolute; z-index: 6; right: .7rem; bottom: .7rem; min-height: 36px; padding: .45rem .65rem; border: 1px solid var(--line); border-radius: 999px; background: rgba(8,9,13,.85); color: var(--gold); font-family: inherit; font-size: .6rem; font-weight: 800; cursor: pointer; }
+.three-d-camera:hover { border-color: var(--gold); }
+.three-d-error { position: absolute; z-index: 20; inset: 0; display: grid; padding: 2rem; place-content: center; text-align: center; background: rgba(8,9,13,.95); }
+.three-d-error p { color: var(--muted); }
+.three-d-error[hidden], .three-d-camera[hidden] { display: none; }
+
+@media (min-width: 961px) {
+  .game-screen[data-bowling-style="3d"] { height: 100dvh; min-height: 0; overflow: hidden; }
+  .game-screen[data-bowling-style="3d"] .match-layout { height: calc(100% - 58px); }
+}
+
+@media (min-height: 521px) and (max-height: 700px) and (orientation: landscape) {
+  .game-screen[data-bowling-style="3d"] { height: 100dvh; min-height: 0; overflow: hidden; }
+  .game-screen[data-bowling-style="3d"] .match-layout { height: calc(100% - 58px); grid-template-areas: none; }
+  .game-screen[data-bowling-style="3d"] .game-panel { padding: .65rem; }
+  .game-screen[data-bowling-style="3d"] .game-panel--shot,
+  .game-screen[data-bowling-style="3d"] .game-panel--score,
+  .game-screen[data-bowling-style="3d"] .lane-shell { grid-area: auto; }
+  .game-screen[data-bowling-style="3d"] .shot-section { gap: .4rem; }
+  .game-screen[data-bowling-style="3d"] .ball-profile p,
+  .game-screen[data-bowling-style="3d"] .ball-profile dl,
+  .game-screen[data-bowling-style="3d"] .control-help { display: none; }
+  .game-screen[data-bowling-style="3d"] .ball-button i { width: 27px; }
+  .game-screen[data-bowling-style="3d"] .button--throw { min-height: 42px; }
+}
+
+@media (max-width: 960px) and (min-height: 701px) {
+  .game-screen[data-bowling-style="3d"] .match-layout { grid-template-columns: repeat(2,minmax(0,1fr)); grid-template-areas: "lane lane" "score shot"; }
+  .game-screen[data-bowling-style="3d"] .lane-shell { height: 58svh; }
+}
+@media (max-width: 560px) and (min-height: 701px) {
+  .game-screen[data-bowling-style="3d"] .match-layout { grid-template-columns: 1fr; grid-template-areas: "lane" "score" "shot"; }
+}
+@media (max-height: 520px) and (orientation: landscape), (pointer: coarse) and (orientation: landscape) {
+  .game-screen[data-bowling-style="3d"] .match-layout { grid-template-columns: minmax(128px, .7fr) minmax(210px, 2fr) minmax(174px, 1fr); }
+  .game-screen[data-bowling-style="3d"] .lane-shell { height: 100%; }
+  .three-d-camera { right: .35rem; bottom: .35rem; min-height: 28px; padding: .3rem .4rem; font-size: .5rem; }
+  .bowling-style-status { font-size: .5rem; }
+}
+
+/* Down-lane rack readout. Arcade draws the pins big enough to read, so this
+   only earns its space in 3D, where the deck is forty units away. */
+.pin-deck { display: none; }
+.game-screen[data-bowling-style="3d"] .pin-deck { display: block; min-width: 0; }
+.pin-deck #pin-deck-count { color: var(--gold); font-size: .58rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.pin-deck__pins { display: grid; margin-top: .5rem; padding: .5rem .55rem; gap: .28rem; border: 1px solid var(--line); border-radius: 12px; background: rgba(0,0,0,.28); }
+.pin-deck__row { display: grid; grid-template-columns: repeat(7, 1fr); justify-items: center; }
+.pin-deck__pin {
+  width: 11px; height: 15px;
+  border-radius: 46% 46% 38% 38% / 62% 62% 38% 38%;
+  background: linear-gradient(160deg, #fff, #cfd3dc);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.45), 0 0 7px rgba(255,255,255,.28);
+  transition: background .18s ease, box-shadow .18s ease, opacity .18s ease, transform .18s ease;
+}
+.pin-deck__pin::after { content: ""; display: block; width: 100%; height: 3px; margin-top: 5px; background: linear-gradient(90deg, transparent, rgba(243,46,63,.85) 22%, rgba(243,46,63,.85) 78%, transparent); }
+.pin-deck__pin.is-down { background: rgba(255,255,255,.09); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); opacity: .5; transform: scale(.72); }
+.pin-deck__pin.is-down::after { background: none; }
+
+@media (min-height: 521px) and (max-height: 700px) and (orientation: landscape) {
+  .pin-deck__pins { padding: .35rem .4rem; gap: .18rem; }
+  .pin-deck__pin { width: 9px; height: 12px; }
+}
+@media (max-height: 520px) and (orientation: landscape), (pointer: coarse) and (orientation: landscape) {
+  .game-screen[data-bowling-style="3d"] .pin-deck { display: none; }
+}

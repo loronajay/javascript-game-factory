@@ -27,6 +27,7 @@ export function bindEvents({
   shotHud,
   syncAudioToggle,
   matchReactions,
+  startLocalMatch = () => matchRuntime.startMatch(),
 }) {
   const { scene } = session;
 
@@ -95,7 +96,7 @@ export function bindEvents({
   // "How to play" bowls the lesson rather than opening a card of text: the shot
   // is three timed inputs, and a paragraph about them teaches nobody.
   $("how-button").addEventListener("click", () => tutorial.start());
-  $("start-match").addEventListener("click", () => matchRuntime.startMatch());
+  $("start-match").addEventListener("click", () => startLocalMatch());
 
   // --- Shot controls ---
   document.querySelectorAll('[data-shot-control="position"]').forEach((control) => {

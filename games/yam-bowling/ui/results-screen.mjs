@@ -1,4 +1,5 @@
 import { $, escapeHtml, showScreen } from "./dom.mjs";
+import { matchUses3d } from "../bowl3d/mode.mjs";
 
 export function buildFinalScoreboardMarkup(match, core) {
   const mode = core.MODES[match.modeId];
@@ -102,7 +103,7 @@ export function createResultsScreen({
     const tie = match.winnerIds.length > 1;
     const winner = match.players.find((player) => match.winnerIds.includes(player.id));
     $("results-title").textContent = tie ? "Dead heat!" : `${winner.name} wins!`;
-    $("results-subtitle").textContent = `${core.MODES[match.modeId].name}. ${tie ? "Nothing between them." : "The rack has spoken."}`;
+    $("results-subtitle").textContent = `${matchUses3d(session) ? "3D Bowl · " : ""}${core.MODES[match.modeId].name}. ${tie ? "Nothing between them." : "The rack has spoken."}`;
     $("results-scoreboard-mode").textContent = `${core.MODES[match.modeId].name} · ${core.MODES[match.modeId].frames} frames`;
     $("results-scoreboard").innerHTML = buildFinalScoreboardMarkup(match, core);
     const host = $("results-players");

@@ -45,6 +45,10 @@ export function createOnlineScreen({
     const owned = ownedSlugs();
     onlineSetup.characterSlug = resolveOwnedSlug(onlineSetup.characterSlug, owned);
     onlineSetup.skinId = assets.storedSkinId(onlineSetup.characterSlug);
+    setSelected($("online-style-options"), "data-online-style", onlineSetup.bowlingStyle || "arcade");
+    $("online-style-note").textContent = onlineSetup.bowlingStyle === "3d"
+      ? "Full 3D pin physics, scored by the server. Both bowlers share the same rack. Requires WebGL 2."
+      : "The original 2D lane. Private-room guests use the host's bowling style.";
     setSelected($("online-mode-options"), "data-online-mode", onlineSetup.modeId);
     setSelected($("online-stakes-options"), "data-online-stakes", onlineSetup.ranked ? "ranked" : "casual");
     $("online-stakes-note").textContent = onlineSetup.ranked
@@ -124,7 +128,9 @@ export function createOnlineScreen({
       : lobby?.settings
         ? lobby.settings.ranked === true
         : onlineSetup.ranked === true;
-    $("online-lobby-kind").textContent = `${privateRoom ? "Private room" : "Quick match"} · ${ranked ? "Ranked" : "Casual"}`;
+    const style = snapshot.matchState ? snapshot.matchState.match?.bowlingStyle
+      : lobby?.settings ? lobby.settings.bowlingStyle : onlineSetup.bowlingStyle;
+    $("online-lobby-kind").textContent = `${style === "3d" ? "3D Bowl · " : ""}${privateRoom ? "Private room" : "Quick match"} · ${ranked ? "Ranked" : "Casual"}`;
     $("online-lobby-title").textContent = lobby?.playerCount >= 2
       ? "Match found"
       : roomCode
@@ -206,6 +212,12 @@ export function createOnlineScreen({
   }
 
   function bind() {
+    $("online-style-options").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-online-style]");
+      if (!button) return;
+      onlineSetup.bowlingStyle = button.dataset.onlineStyle === "3d" ? "3d" : "arcade";
+      renderSetup();
+    });
     $("online-mode-options").addEventListener("click", (event) => {
       const button = event.target.closest("[data-online-mode]");
       if (!button) return;

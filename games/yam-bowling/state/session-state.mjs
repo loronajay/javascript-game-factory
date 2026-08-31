@@ -29,6 +29,7 @@ export function createSessionState({ physics, animation, effects, storedSkinId, 
   const session = {
     // --- Match configuration, owned by the setup screens ---
     setup: {
+      bowlingStyle: "arcade",
       modeId: "quick",
       playType: "cpu",
       cpuLevelId: "casual",
@@ -37,6 +38,7 @@ export function createSessionState({ physics, animation, effects, storedSkinId, 
       skinIds: [storedSkinId("daisy-monroe"), storedSkinId("nia-brooks")],
     },
     onlineSetup: {
+      bowlingStyle: "arcade",
       modeId: "quick",
       // The stakes of the next online match. Casual by default on purpose: a
       // rating should be staked deliberately, and the cost of the wrong default
