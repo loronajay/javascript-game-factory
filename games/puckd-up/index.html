@@ -119,6 +119,9 @@
   </footer>
 </div>
 
-<script type="module" src="./game.js?v=online-2"></script>
+<!-- Sets __JGF_PLATFORM_API_URL__ so /auth/me resolves in production; without it
+     the online gate always fails with "Could not verify your Player Factory account". -->
+<script type="module" src="../../js/platform-config.mjs"></script>
+<script type="module" src="./game.js?v=online-3"></script>
 </body>
 </html>

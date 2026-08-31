@@ -20,7 +20,25 @@
   reset the flow. Leave/Back/navigation release the seat. No reconnect token is
   persisted for a lobby-only preview.
 
-## Next: synchronized air hockey (not implemented)
+## Completed: synchronized air hockey (server-authoritative)
+
+Implemented as server-owned physics (`server/authority.js`) with client paddle
+input only and interpolated remote/puck state (`scripts/online/sync.js`). The
+pure sim boundary is mirrored into factory-network-server through
+`server/mirror-manifest.mjs`; `npm run test:network` runs `sync-server.mjs
+--check` then the real-socket contract test, and
+`tests/online-authority.test.js` / `tests/online-sync.test.js` cover the sim and
+reconciliation. `canStart` gates on two seats + matching `protocolVersion` +
+both seats ready; gameplay messages before start are rejected. Rematch,
+reconnect grace, and authoritative forfeit on disconnect are wired. Server and
+client match gates were removed together once `cabinet npm test`, `npm run
+test:network`, and `factory-network-server npm test` all passed.
+
+Still deferred: Player Factory records. Online matches remain casual and write
+nothing to platform-api — see the section below before adding any record,
+ladder, or ranked stakes.
+
+### Original design notes (retained for reference)
 
 Recommended authority model: server-owned physics with client paddle prediction
 and interpolated remote state. Do not assume Cannon produces deterministic
