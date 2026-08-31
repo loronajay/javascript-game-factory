@@ -1,8 +1,10 @@
 import { createGameState, selectMatchMapIndex } from './scripts/state.js';
 import { MAPS } from './scripts/maps.js';
 import { bindInput, clearFrameInput, consumeAnyKey } from './scripts/input.js';
-import { updateAliens } from './scripts/hazards.js';
 import { updatePlayer } from './scripts/player.js';
+import { updateAliens } from './scripts/hazards.js';
+import { bindFirstPersonControls } from './scripts/input-3d.js';
+import { createPositionPacket, applyRemotePosition } from './scripts/online-pose.js';
 import {
   renderMenu,
   renderSideSelect,
@@ -11,6 +13,8 @@ import {
   renderCountdown,
   renderDisconnected,
   renderGameView,
+  initializeGameView,
+  setGameViewActive,
   renderWinScreen,
 } from './scripts/renderer.js';
 import { createAudioController, enqueueSoundEvent, isTileVisibleToPlayer } from './scripts/audio.js';
@@ -89,6 +93,9 @@ canvas.addEventListener('click', (e) => {
 // Phases: 'menu' | 'side_select' | 'map_select' | 'lobby' | 'countdown' | 'playing' | 'win' | 'disconnected'
 
 let phase = 'menu';
+const firstPersonControls = bindFirstPersonControls(canvas, input, () => phase === 'playing');
+document.getElementById('quitRun').addEventListener('click', () => { _freshClient(); goToMenu(); });
+canvas.addEventListener('click', () => { if (phase === 'win') { _freshClient(); goToMenu(); } });
 let state = createGameState(0);
 state.input = input;
 
@@ -119,8 +126,8 @@ let remotePlayerId   = '';
 let remoteDisplayName = '';
 let winnerIsLocal    = true;
 let winnerName       = '';
-let lastSentTx       = -1;
-let lastSentTy       = -1;
+let lastPositionSentAt = -Infinity;
+let positionSequence = 0;
 
 // ─── Online client callbacks ──────────────────────────────────────────────────
 
@@ -157,14 +164,7 @@ function wireOnlineCallbacks() {
         state.remote.playerId    = remotePlayerId;
       }
     } else if (messageType === 'position' && phase === 'playing') {
-      const moved = value.x !== state.remote.tx || value.y !== state.remote.ty;
-      state.remote.tx = value.x;
-      state.remote.ty = value.y;
-      state.remote.px = value.x + 0.5;
-      state.remote.py = value.y + 0.5;
-      state.remote.dir = value.dir;
-      state.remote.active = true;
-      if (moved) state.remote.walkFrame = ((state.remote.walkFrame ?? 0) + 1) % 3;
+      applyRemotePosition(state, value);
     } else if (messageType === 'event' && phase === 'playing') {
       handleRemoteEvent(value);
     }
@@ -424,7 +424,7 @@ function startOnlineGame() {
     if (p.type === 'dataCore') p.active = false;
   }
   state.input = input;
-  state.gameStartAt = performance.now();
+  state.gameStartAt = performance.now() - Math.max(0, Date.now() + onlineClockOffset - onlineStartAt);
   state.online.enabled = true;
   state.online.localPlayerId = localIdentity?.playerId || '';
   state.remote.displayName  = remoteDisplayName;
@@ -432,8 +432,8 @@ function startOnlineGame() {
   input.held.clear();
   input.justPressed.clear();
   accumulator  = 0;
-  lastSentTx   = -1;
-  lastSentTy   = -1;
+  lastPositionSentAt = -Infinity;
+  positionSequence = 0;
   state.lastTime = performance.now();
   phase = 'playing';
 }
@@ -441,6 +441,7 @@ function startOnlineGame() {
 // ─── State transitions ────────────────────────────────────────────────────────
 
 function goToMenu() {
+  firstPersonControls.release();
   state = createGameState();
   state.input = input;
   input.held.clear();
@@ -455,8 +456,7 @@ function goToMenu() {
 function gameTick(now) {
   if (phase !== 'playing') return;
 
-  const elapsed = now - (state.gameStartAt || 0);
-  updateAliens(state.hazards, elapsed);
+  updateAliens(state.hazards, now - (state.gameStartAt || 0));
   updatePlayer(state, now, TICK_MS);
 
   if (state.online?.enabled && onlineClient) {
@@ -465,20 +465,21 @@ function gameTick(now) {
     }
     state.online.outbox.length = 0;
 
-    const p = state.player;
-    if (p.tx !== lastSentTx || p.ty !== lastSentTy) {
-      onlineClient.sendPosition(p.tx, p.ty, p.dir);
-      lastSentTx = p.tx;
-      lastSentTy = p.ty;
+    if (now - lastPositionSentAt >= 50) {
+      const packet = createPositionPacket(state.player, positionSequence++);
+      onlineClient.sendPosition(packet.x, packet.y, packet.dir, packet);
+      lastPositionSentAt = now;
     }
   }
+  state.online.outbox.length = 0;
+  clearFrameInput(input);
 
   if (state.player.won) {
     winnerIsLocal = true;
     winnerName    = localIdentity?.displayName || 'You';
     if (state.solo?.enabled) {
       soloTimeMs = performance.now() - (state.gameStartAt || 0);
-      const pbKey  = `illuminauts_pb_${state.solo.mode}_${state.mapId}`;
+      const pbKey  = `illuminauts_pb_3d_v1_${state.solo.mode}_${state.mapId}`;
       const stored = parseInt(localStorage.getItem(pbKey) || '0', 10) || 0;
       soloIsNewPb = !stored || soloTimeMs < stored;
       if (soloIsNewPb) localStorage.setItem(pbKey, String(Math.round(soloTimeMs)));
@@ -495,7 +496,7 @@ function loop(now) {
   state.lastTime = now;
 
   while (accumulator >= TICK_MS) {
-    gameTick(now);
+    gameTick(now - accumulator + TICK_MS);
     accumulator -= TICK_MS;
   }
 
@@ -507,6 +508,10 @@ function loop(now) {
   void audioController.sync(state, phase, now);
 
   if (backLinkEl) backLinkEl.style.display = phase === 'playing' ? 'none' : '';
+  document.body.dataset.phase = phase;
+  document.body.dataset.pointerLocked = String(document.pointerLockElement === canvas);
+  setGameViewActive(phase === 'playing');
+  if (phase !== 'playing' && document.pointerLockElement === canvas) firstPersonControls.release();
 
   clearButtons();
 
@@ -523,13 +528,13 @@ function loop(now) {
       const mapConfigs = MAPS.map((m) => ({
         id:          m.id,
         name:        m.soloConfig?.name ?? m.id,
-        sprintParMs: m.soloConfig?.sprint?.parMs ?? 0,
-        sweepParMs:  m.soloConfig?.sweep?.parMs  ?? 0,
+        sprintParMs: 0, // 2D par times are not comparable to the 3D traversal release.
+        sweepParMs:  0,
       }));
       const personalBests = {};
       for (const m of MAPS) {
-        const sp = parseInt(localStorage.getItem(`illuminauts_pb_sprint_${m.id}`) || '0', 10) || 0;
-        const sw = parseInt(localStorage.getItem(`illuminauts_pb_sweep_${m.id}`)  || '0', 10) || 0;
+        const sp = parseInt(localStorage.getItem(`illuminauts_pb_3d_v1_sprint_${m.id}`) || '0', 10) || 0;
+        const sw = parseInt(localStorage.getItem(`illuminauts_pb_3d_v1_sweep_${m.id}`)  || '0', 10) || 0;
         personalBests[`sprint_${m.id}`] = sp || null;
         personalBests[`sweep_${m.id}`]  = sw || null;
       }
@@ -579,13 +584,14 @@ function loop(now) {
       break;
   }
 
-  clearFrameInput(state.input);
+  if (phase !== 'playing') clearFrameInput(state.input);
   requestAnimationFrame(loop);
 }
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 async function boot() {
+  initializeGameView(document.getElementById('worldCanvas'));
   void loadAssets().catch(() => {
     console.warn('[Illuminauts] Sprite sheet load failed — falling back to debug glyphs.');
   });
@@ -595,13 +601,22 @@ async function boot() {
     sessionStorage.removeItem('illuminauts_test_map');
     sessionStorage.removeItem('illuminauts_test_side');
     try { startTestGame(JSON.parse(testMapJSON), testSide); } catch (_) { /* malformed — fall through to menu */ }
+  } else if (new URLSearchParams(location.search).has('map')) {
+    const params = new URLSearchParams(location.search);
+    const index = MAPS.findIndex(map => map.id === params.get('map'));
+    soloSide = params.get('side') === 'beta' ? 'beta' : 'alpha';
+    soloMode = params.get('mode') === 'sweep' ? 'sweep' : 'sprint';
+    if (index >= 0) startSoloGame(index);
+    else state.lastTime = performance.now();
   } else {
     state.lastTime = performance.now();
   }
   requestAnimationFrame(loop);
 }
 
-boot().catch(() => {
-  state.lastTime = performance.now();
-  requestAnimationFrame(loop);
+boot().catch((error) => {
+  console.error('[Illuminauts 3D boot]', error);
+  const message = document.getElementById('bootError');
+  message.hidden = false;
+  message.textContent = 'Illuminauts 3D could not start. WebGL 2 and hardware acceleration are required. Try enabling hardware acceleration and reloading. Details: ' + error.message;
 });

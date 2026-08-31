@@ -9,10 +9,41 @@ html, body {
 }
 
 #gameCanvas {
+  position: relative;
+  z-index: 1;
   display: block;
   width: 100%;
   height: 100%;
   image-rendering: pixelated;
+}
+
+#worldCanvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+[hidden] { display: none !important; }
+.traversal-tools, .look-hint { display: none; }
+body[data-phase="playing"] .traversal-tools {
+  position: fixed; z-index: 5; top: max(52px, 8vh); left: 16px; right: 16px;
+  display: flex; align-items: center; gap: 8px; color: #b8d9e2;
+  font: 11px/1.4 ui-monospace, Consolas, monospace;
+}
+.traversal-label { margin-right: auto; letter-spacing: 0.1em; }
+.traversal-tools button {
+  border: 1px solid #496974; border-radius: 4px; background: #102029dc; color: #d9faff;
+  padding: 9px 12px; cursor: pointer; font: inherit; touch-action: manipulation;
+}
+body[data-phase="playing"] .look-hint {
+  display: block; position: fixed; z-index: 2; left: 50%; bottom: 9vh; transform: translateX(-50%);
+  padding: 7px 12px; border-radius: 5px; color: #a7c9d5; background: #06131bbd;
+  text-align: center; font: 11px/1.6 ui-monospace, Consolas, monospace; pointer-events: none;
+}
+body[data-pointer-locked="true"] .look-hint { display: none; }
+body:not([data-phase="playing"]) .mobile-controller[data-mobile-controller-root="illuminauts-touch"] { display: none !important; }
+#bootError {
+  position: fixed; z-index: 100; inset: 20%; padding: 32px; background: #102029; color: #e1faff;
+  border: 1px solid #76f4ff; font: 18px/1.6 system-ui, sans-serif;
+}
+@media (max-height: 540px) {
+  .traversal-label { font-size: 9px; letter-spacing: 0; }
+  body[data-phase="playing"] .look-hint { bottom: 12vh; font-size: 9px; width: 48%; }
 }
 
 .back-link {

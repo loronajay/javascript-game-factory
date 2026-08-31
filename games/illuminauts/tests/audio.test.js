@@ -106,9 +106,9 @@ function testDoorUnlockQueuesSound() {
   state.player.px = 2.5;
   state.player.py = 1.5;
   state.player.chips = 1;
-  state.input.held.add('ArrowRight');
+  state.input.held.add('KeyW'); // Spawn faces east; ArrowRight now turns the camera.
 
-  updatePlayer(state, 1000, 1000 / 60);
+  for (let i = 0; i < 30; i++) updatePlayer(state, 1000 + i * 1000 / 60, 1000 / 60);
 
   assert.equal(state.map.doors[0].open, true);
   assert.equal(state.player.chips, 0);

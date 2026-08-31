@@ -1,7 +1,10 @@
 {
   "type": "module",
   "scripts": {
-    "test": "node tests/shell.test.js && node tests/mobile-ui.test.js && node tests/state.test.js && node tests/session-controls.test.js && node tests/online-identity.test.js && node tests/renderer-world.test.js && node tests/renderer-hud.test.js && node tests/audio.test.js && node tests/assets.test.js",
+    "dev": "node scripts/serve.mjs",
+    "validate:maps": "node scripts/check-maps.mjs",
+    "test": "node --test tests/*.test.js",
+    "test:3d": "node --test tests/map-3d.test.js tests/player-3d.test.js tests/scene-3d.test.js tests/online-pose.test.js tests/hazards-3d.test.js tests/hazard-scene.test.js tests/3d-integration.test.js",
     "test:shell": "node tests/shell.test.js",
     "test:mobile-ui": "node tests/mobile-ui.test.js",
     "test:state": "node tests/state.test.js",

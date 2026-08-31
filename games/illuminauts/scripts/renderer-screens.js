@@ -1,7 +1,7 @@
 import { COLORS } from './config.js';
 import { drawScreenSpriteContain, getScreenSpriteContainRect } from './assets.js';
 import { resizeCanvasToDisplaySize } from './renderer-primitives.js';
-import { drawDarkBg, drawButton, drawRoleCard } from './renderer-ui.js';
+import { drawDarkBg, drawButton, drawRoleCard, getMapCardRowLayout } from './renderer-ui.js';
 
 export function renderMenu(canvas, hoveredButtonId, registerButton) {
   resizeCanvasToDisplaySize(canvas);
@@ -55,7 +55,7 @@ export function renderMenu(canvas, hoveredButtonId, registerButton) {
   ctx.font = `${Math.max(9, Math.floor(Math.min(width, height) * 0.018))}px ui-monospace, Consolas, monospace`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('WASD / Arrows - move  |  Shift - sprint', cx, controlsY);
+  ctx.fillText('3D FIRST PERSON  |  WASD move  |  Mouse / arrows look  |  Shift sprint', cx, controlsY);
 }
 
 export function renderSideSelect(canvas, hoveredButtonId, registerButton) {
@@ -210,11 +210,8 @@ export function renderMapSelect(canvas, { mode, side, hoveredButtonId, personalB
 
   // Map cards
   const cardCount = mapConfigs.length;
-  const cardW = Math.min(200, Math.floor((width - 80) / Math.max(cardCount, 1)));
+  const { cardW, cardGap, cardStartX } = getMapCardRowLayout(width, cardCount);
   const cardH = Math.max(130, Math.floor(Math.min(width, height) * 0.22));
-  const cardGap = Math.max(12, Math.floor(width * 0.018));
-  const totalW  = cardCount * cardW + (cardCount - 1) * cardGap;
-  const cardStartX = cx - totalW / 2;
   const cardY = height * 0.44;
 
   for (let i = 0; i < cardCount; i++) {

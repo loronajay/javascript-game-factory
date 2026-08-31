@@ -138,8 +138,8 @@ export function createOnlineClient() {
       _send({ type: 'leave_room' });
     },
 
-    sendPosition(x, y, dir) {
-      _roomMsg('position', { x, y, dir });
+    sendPosition(x, y, dir, pose = {}) {
+      _roomMsg('position', { ...pose, x, y, dir });
     },
 
     sendEvent(type, data = {}) {

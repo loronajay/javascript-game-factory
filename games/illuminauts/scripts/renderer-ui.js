@@ -75,3 +75,9 @@ export function drawRoleCard(ctx, x, y, w, h, title, subtitle, detail, accentCol
   ctx.fillText('[ SELECT ]', x + w / 2, y + h * 0.91);
   ctx.restore();
 }
+export function getMapCardRowLayout(width, count) {
+  const cardGap = Math.max(8, Math.floor(width * 0.012));
+  const cardW = Math.min(200, Math.floor((width - 32 - Math.max(0, count - 1) * cardGap) / Math.max(count, 1)));
+  const total = count * cardW + Math.max(0, count - 1) * cardGap;
+  return { cardW, cardGap, cardStartX: (width - total) / 2 };
+}

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+  <title>Illuminauts — 3D Map-01 Proof</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #020507; }
+    body { touch-action: none; user-select: none; -webkit-user-select: none; }
+    canvas.webgl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+
+    #hud { position: fixed; inset: 0; pointer-events: none; color: #dffcff; text-shadow: 0 1px 4px #000; }
+    .panel {
+      background: rgba(2, 10, 14, .76);
+      border: 1px solid rgba(71, 226, 255, .28);
+      box-shadow: inset 0 0 18px rgba(0, 208, 255, .05), 0 8px 26px rgba(0,0,0,.28);
+      backdrop-filter: blur(5px);
+    }
+    #status {
+      position: absolute; top: max(12px, env(safe-area-inset-top)); left: max(12px, env(safe-area-inset-left));
+      min-width: 220px; padding: 10px 12px; border-radius: 8px; font-size: 12px; letter-spacing: .04em;
+    }
+    #status strong { color: #fff; font-size: 13px; }
+    #message {
+      position: absolute; left: 50%; top: max(18px, env(safe-area-inset-top)); transform: translateX(-50%);
+      padding: 9px 14px; border-radius: 999px; font-size: 12px; opacity: 0; transition: opacity .15s;
+      white-space: nowrap;
+    }
+    #message.show { opacity: 1; }
+    #crosshair { position: absolute; left: 50%; top: 50%; width: 18px; height: 18px; transform: translate(-50%,-50%); opacity: .65; }
+    #crosshair::before, #crosshair::after { content:""; position:absolute; background:#c9fbff; box-shadow:0 0 7px rgba(71,226,255,.8); }
+    #crosshair::before { width: 12px; height: 1px; left: 3px; top: 8px; }
+    #crosshair::after { width: 1px; height: 12px; left: 8px; top: 3px; }
+    #help {
+      position: absolute; right: max(12px, env(safe-area-inset-right)); top: max(12px, env(safe-area-inset-top));
+      width: min(330px, calc(100vw - 24px)); padding: 10px 12px; border-radius: 8px; font-size: 11px; line-height: 1.45; color: #a9cbd0;
+    }
+    #help b { color:#eafcff; }
+    #minimapWrap {
+      position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom));
+      padding: 7px; border-radius: 8px; transition: opacity .15s;
+    }
+    #minimap { display:block; width: 210px; height: auto; image-rendering: pixelated; }
+    #proofBadge {
+      position:absolute; left:max(12px, env(safe-area-inset-left)); bottom:max(12px, env(safe-area-inset-bottom));
+      padding:8px 10px; border-radius:8px; font-size:10px; color:#8eb9bf; letter-spacing:.04em;
+    }
+    #lockScreen {
+      position: fixed; inset: 0; z-index: 5; display:grid; place-items:center; background:rgba(0,3,5,.42); cursor:pointer;
+    }
+    #lockCard { width:min(430px, calc(100vw - 34px)); padding:22px; border-radius:12px; text-align:center; }
+    #lockCard h1 { margin:0 0 8px; font-size:22px; letter-spacing:.08em; text-transform:uppercase; }
+    #lockCard p { margin:7px 0; color:#a7c6ca; font-size:13px; line-height:1.45; }
+    #lockCard .cta { margin-top:15px; color:#fff; font-weight:700; font-size:13px; }
+
+    .touch-only { display:none; }
+    #movePad {
+      position:fixed; left:max(18px, env(safe-area-inset-left)); bottom:max(18px, env(safe-area-inset-bottom)); z-index:4;
+      width:132px; height:132px; border-radius:50%; background:rgba(7,21,26,.34); border:1px solid rgba(151,239,255,.18);
+      pointer-events:auto;
+    }
+    #moveKnob { position:absolute; left:44px; top:44px; width:44px; height:44px; border-radius:50%; background:rgba(150,238,255,.28); border:1px solid rgba(208,250,255,.45); }
+    #sprintBtn {
+      position:fixed; right:max(20px, env(safe-area-inset-right)); bottom:max(28px, env(safe-area-inset-bottom)); z-index:4;
+      width:76px; height:76px; border-radius:50%; pointer-events:auto; display:grid; place-items:center; font-size:11px; font-weight:800;
+      color:#dffcff; background:rgba(7,21,26,.48); border:1px solid rgba(151,239,255,.28);
+    }
+    #lookZone { position:fixed; z-index:3; right:0; top:0; width:58%; height:100%; pointer-events:auto; }
+
+    @media (pointer: coarse) {
+      .touch-only { display:block; }
+      #lockScreen { display:none; }
+      #help { display:none; }
+      #minimap { width:150px; }
+      #minimapWrap { bottom:max(112px, calc(env(safe-area-inset-bottom) + 95px)); }
+      #proofBadge { display:none; }
+      #status { min-width:180px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <div id="hud">
+    <div id="status" class="panel"><strong>MAP-01 // 3D PROOF</strong><br><span id="statusText">Loading authored map…</span></div>
+    <div id="message" class="panel"></div>
+    <div id="crosshair"></div>
+    <div id="help" class="panel"><b>Desktop:</b> click to capture mouse · WASD move · mouse look · Shift sprint · M minimap · R reset.<br><b>Goal:</b> reach the 5×5 Beacon Core. Access Chips automatically disable Laser Doors, matching the 2D rules.</div>
+    <div id="minimapWrap" class="panel"><canvas id="minimap" width="350" height="270"></canvas></div>
+    <div id="proofBadge" class="panel">CANONICAL SOURCE: ../maps/map-01.txt · 1 CELL = 1 FIXED 3D TILE</div>
+  </div>
+
+  <div id="lockScreen">
+    <div id="lockCard" class="panel">
+      <h1>Illuminauts 3D</h1>
+      <p>This proof loads the existing authored <b>map-01</b> diagram and extrudes it directly into first-person geometry.</p>
+      <p>No random maze generation. Reloading the same map file produces the same world.</p>
+      <div class="cta">CLICK TO ENTER FACILITY</div>
+    </div>
+  </div>
+
+  <div id="movePad" class="touch-only"><div id="moveKnob"></div></div>
+  <div id="lookZone" class="touch-only"></div>
+  <div id="sprintBtn" class="touch-only">SPRINT</div>
+
+  <script type="module" src="./prototype.js"></script>
+</body>
+</html>

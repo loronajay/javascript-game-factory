@@ -38,8 +38,12 @@ from [Poly Haven](https://polyhaven.com/a/painted_plaster_wall) (CC0). The maps
 tile at a consistent world scale across every house. Cross-lane overhead bars
 are removed; their lighting and lane reflections remain without blocking the view.
 The camera follows the ball, with a Fixed toggle on the lane; reduced motion
-disables following. The original Arcade mode, Circuit, tournaments, lessons,
-and online play keep their existing engine. 3D exhibition awards no progression.
+disables following. The original Arcade mode, Circuit, tournaments, and lessons keep their existing
+engine. Online play offers 3D Bowl as a per-room choice (the host picks it on
+the online setup screen; private-room guests inherit it): the server runs the
+authoritative Cannon pinfall and clients replay it to the served roll duration.
+Local 3D exhibition awards no progression; online 3D pays XP and mastery exactly
+as online Arcade does.
 
 The 3D lane now has an 84-unit release-to-head-pin run, almost three times the
 original length, with the pin deck kept at its original scale. Aiming uses

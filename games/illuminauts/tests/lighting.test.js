@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { getSuitLighting } from '../scripts/lighting.js';
+const weak = getSuitLighting({ powerUntil: 0 }, 1000);
+const charged = getSuitLighting({ powerUntil: 2000 }, 1000);
+assert.ok(weak.beamIntensity > 0 && weak.suitIntensity > 0, 'a depleted suit still permits navigation');
+assert.ok(charged.beamIntensity > weak.beamIntensity * 2);
+assert.ok(charged.beamDistance > weak.beamDistance * 1.5);
+assert.ok(charged.suitDistance > weak.suitDistance);
+assert.ok(weak.fogDensity > charged.fogDensity);
+assert.deepEqual(getSuitLighting({ powerUntil: 2000 }, 2000), weak, 'battery light ends at expiry');
+console.log('Illuminauts low-charge and battery lighting tests passed.');

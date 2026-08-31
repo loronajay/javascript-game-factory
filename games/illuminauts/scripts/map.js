@@ -1,4 +1,9 @@
 export function createWorldMap(raw) {
+  if (!Array.isArray(raw) || !raw.length || typeof raw[0] !== 'string' || !raw[0].length) throw new Error('[Illuminauts map] Empty grid.');
+  if (!raw.every(row => typeof row === 'string' && row.length === raw[0].length)) throw new Error('[Illuminauts map] Grid must be rectangular.');
+  if (raw.some(row => /[^#.STAPDBK]/.test(row))) throw new Error('[Illuminauts map] Unknown grid symbol.');
+  if ([raw[0], raw.at(-1)].some(row => /[^#]/.test(row)) || raw.some(row => row[0] !== '#' || row.at(-1) !== '#')) throw new Error('[Illuminauts map] Border must be enclosed by walls.');
+  if (raw.join('').split('S').length !== 2 || raw.join('').split('T').length !== 2) throw new Error('[Illuminauts map] Exactly one S and one T spawn required.');
   const tiles = raw.map((row) => row.split(''));
   const pickups = [];
   const doors = [];

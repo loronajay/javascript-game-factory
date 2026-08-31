@@ -8,7 +8,14 @@
 </head>
 <body>
   <a href="../../grid.html" class="back-link">&lt; Back to Arcade</a>
+  <canvas id="worldCanvas" aria-label="First-person facility" hidden></canvas>
   <canvas id="gameCanvas"></canvas>
+  <div class="traversal-tools" aria-label="Exploration controls">
+    <span class="traversal-label">ILLUMINAUTS · FIRST PERSON</span>
+    <button id="quitRun" type="button">Quit [Esc]</button>
+  </div>
+  <div class="look-hint">WASD move · Click for mouse look · Arrow keys turn · Shift run<br>Touch: D-pad move · Drag the scene to look</div>
+  <div id="bootError" role="alert" hidden></div>
   <script type="module">
     import { CONTROL_KEY_SPECS as KEY, mountMobileController } from '../../js/mobile-controller.mjs';
     import { initMobileLandscapeGate } from './scripts/mobile-ui.js';

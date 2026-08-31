@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import { createGameState } from '../scripts/state.js';
+import { createHazardScene } from '../scripts/scene-hazards.js';
+const state = createGameState(0);
+const scene = createHazardScene(state.map, state.hazards);
+const gate = state.hazards.laserGates[0];
+const gateObject = scene.root.getObjectByName('gate:' + gate.id);
+const at = local => (local - gate.offsetMs + gate.cycleMs * 2) % gate.cycleMs;
+scene.sync(at(0)); assert.equal(gateObject.userData.phase, 'warning');
+scene.sync(at(gate.warningMs)); assert.equal(gateObject.userData.phase, 'active');
+scene.sync(at(gate.warningMs + gate.activeMs)); assert.equal(gateObject.userData.phase, 'cooldown');
+assert.ok(scene.root.children.some(o => o.name.startsWith('turret:')));
+assert.ok(scene.root.children.some(o => o.name.startsWith('patrol:')));
+console.log('Illuminauts hazard presentation states passed.');

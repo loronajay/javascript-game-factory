@@ -1,5 +1,9 @@
 # Illuminauts - Game Design Document
 
+## 3D migration decision — 2026-08-31
+
+The production experience is now first-person 3D across all six authored maps. Hazards are included: patrols, laser gates, turrets, damage, and respawn. There is no minimap or player-facing layout reveal. Suits begin with barely charged reserve illumination, sufficient to read nearby walls and floor; Power Cells are batteries that restore stronger light for 15 seconds. This decision supersedes legacy top-down camera/light and tile-step references below. New 3D par times and live online/device balance testing remain follow-up tuning work; old 2D personal bests are preserved separately. See `MAP_AUTHORING.md` for the current implementation contract.
+
 ## 1. High Concept
 
 **Illuminauts** is a 2-player online shared-maze race game where players navigate a dark alien facility using limited suit-generated light. Players start on opposite sides of the maze and race to reach the illuminated **Beacon Core** at the center.
@@ -56,21 +60,21 @@ Players may indirectly affect each other through shared world state. For example
 
 ## 6. Movement
 
-Movement uses classic RPG-style navigation.
+Movement uses continuous first-person navigation over a deterministic tile-based maze, without jumping, gravity, or physics-heavy motion.
 
 The player moves through a tile-based maze using directional input. Movement should feel deliberate and readable rather than physics-heavy.
 
 Recommended controls:
 
-- Keyboard: WASD or arrow keys.
-- Gamepad: D-pad or left stick.
-- Mobile, if supported later: virtual D-pad or virtual stick.
+- Keyboard: WASD move/strafe, mouse look, arrow up/down move, arrow left/right turn, Shift sprint, Escape quit.
+- Mobile: virtual D-pad and run button, with drag-look on the scene.
+- Gamepad support is not part of the 3D migration.
 
-Movement should support smooth tile stepping or grid-aligned movement, but it should not become a freeform action game. The maze and hazards depend on readable tile positioning.
+World collision uses a small circular body against authored wall/door cells. Pickup and laser rules use the occupied tile; patrol contact follows the same continuous position as the visible creature. The game remains a navigation challenge, not a freeform action game.
 
 ## 7. Camera and View
 
-Each player has a zoomed-in local view centered around their character.
+Each player looks out through a first-person camera at suit-eye height.
 
 The game does not show the full maze. The player only sees the nearby section of the facility, and even that area is constrained by suit light.
 
@@ -83,7 +87,7 @@ The visibility stack is:
 
 ## 8. Fog of War and Light
 
-Players begin with a small circular light radius around their character. Everything outside that radius is blacked out.
+Players begin with a weak near-field suit glow and forward light. Low ambient fill preserves nearby wall/floor contrast; distance fog and darkness conceal distant corridors. Batteries increase suit brightness and useful light reach. There is no minimap or full-map view in gameplay.
 
 The suit light reveals nearby floors, walls, Laser Doors, Power Cells, Access Chips, Alien Patrols, laser hazards, and other players.
 

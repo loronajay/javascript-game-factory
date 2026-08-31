@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Illuminauts — 3D visual test bench</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+  #bench { position:fixed; z-index:10; top:48px; left:12px; display:flex; gap:8px; padding:8px; background:#061019; color:white; font:12px system-ui; }
+  #bench button,#bench select { padding:8px; background:#18303e; color:white; border:1px solid #577482; }
+</style>
+<canvas id="worldCanvas"></canvas><canvas id="gameCanvas"></canvas>
+<div id="bench">
+  <label>Map <select id="map"></select></label>
+  <button id="reserve">Reserve suit</button><button id="battery">Insert battery</button>
+  <button id="patrol">Inspect patrol</button><button id="gate">Inspect gate</button><button id="turret">Inspect turret</button>
+</div>
+<script type="module">
+  import { createGameState } from '../scripts/state.js';
+  import { MAPS } from '../scripts/maps.js';
+  import { initializeGameView, renderGameView } from '../scripts/renderer-3d.js';
+  import { isWall } from '../scripts/map.js';
+  import { getAlienPose } from '../scripts/hazards.js';
+  const world = document.querySelector('#worldCanvas'), canvas = document.querySelector('#gameCanvas');
+  const select = document.querySelector('#map');
+  MAPS.forEach((map, i) => { const option = document.createElement('option'); option.value = i; option.textContent = map.id; select.append(option); });
+  let state = createGameState();
+  state.message = 'Visual test bench — not a playable run';
+  initializeGameView(world);
+  select.addEventListener('change', () => { state = createGameState(Number(select.value)); state.message = 'Visual test bench'; });
+  document.querySelector('#reserve').onclick = () => { state.player.powerUntil = 0; };
+  document.querySelector('#battery').onclick = () => { state.player.powerUntil = performance.now() + 15000; };
+  function inspect(x, y) {
+    for (const distance of [2, 1]) for (const [dx, dy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+      const tx = x + dx * distance, ty = y + dy * distance;
+      if (isWall(state.map, tx, ty)) continue;
+      if (distance === 2 && isWall(state.map, x + dx, y + dy)) continue;
+      Object.assign(state.player, { px:tx+0.5, py:ty+0.5, tx, ty, yaw:Math.atan2(dx,dy), pitch:-0.12 }); return;
+    }
+  }
+  document.querySelector('#patrol').onclick = () => { const alien = state.hazards.aliens[0]; if (alien) { const p = getAlienPose(alien, performance.now()); inspect(Math.floor(p.px),Math.floor(p.py)); } };
+  document.querySelector('#gate').onclick = () => { const p = state.hazards.laserGates[0]?.tiles[0]; if (p) inspect(p.x,p.y); };
+  document.querySelector('#turret').onclick = () => { const p = state.hazards.turrets[0]; if(p) { Object.assign(state.player,{px:p.x+p.dx*2+0.5,py:p.y+p.dy*2+0.5,yaw:Math.atan2(p.dx,p.dy),pitch:-0.1}); } };
+  function frame(now) { renderGameView(canvas,state,now); requestAnimationFrame(frame); }
+  requestAnimationFrame(frame);
+</script>
+</html>

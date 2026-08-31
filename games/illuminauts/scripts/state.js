@@ -2,19 +2,16 @@ import { HEARTS_MAX, STAMINA_MAX } from './config.js';
 import { createAudioState } from './audio.js';
 import { createWorldMap } from './map.js';
 import { MAPS } from './maps.js';
+import { getSpawnYaw } from './map-3d.js';
+import { createHazards } from './hazard-layout.js';
 
 // role: 'A' spawns at the S tile, 'B' spawns at the T tile.
 // mapEntry overrides MAPS lookup when provided (used by playtest mode).
 export function createGameState(mapIndex = 0, role = 'A', mapEntry = null) {
   const mapDef = mapEntry ?? MAPS[mapIndex % MAPS.length];
   const map = createWorldMap(mapDef.raw);
-  const hazards = JSON.parse(JSON.stringify(mapDef.hazards));
+  const { hazards, diagnostics } = createHazards(map, mapDef.hazards);
   const dataCoreTotal = map.pickups.filter((p) => p.type === 'dataCore').length;
-  // Turrets don't move — precompute beam tiles once so getTurretBeamTiles() never allocates.
-  for (const t of hazards.turrets) {
-    t.beamTiles = [];
-    for (let i = 1; i <= t.range; i++) t.beamTiles.push({ x: t.x + t.dx * i, y: t.y + t.dy * i });
-  }
 
   const localStart  = role === 'B' ? map.start2 : map.start;
   const remoteStart = role === 'B' ? map.start  : map.start2;
@@ -24,6 +21,9 @@ export function createGameState(mapIndex = 0, role = 'A', mapEntry = null) {
     map,
     mapIndex: mapIndex % MAPS.length,
     mapId: mapDef.id,
+    world3d: mapDef.world3d ?? {},
+    rules: { hazardsEnabled: true },
+    mapDiagnostics: diagnostics,
     gameStartAt: 0, // set to performance.now() when the match begins
 
     player: {
@@ -41,6 +41,8 @@ export function createGameState(mapIndex = 0, role = 'A', mapEntry = null) {
       stepMs: 0,
       isSprinting: false,
       dir: 'down',
+      yaw: getSpawnYaw(map, localStart),
+      pitch: 0,
       walkFrame: 0,
       hearts: HEARTS_MAX,
       chips: 0,

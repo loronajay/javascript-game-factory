@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
+const game = read('../game.js');
+assert.match(read('../index.html'), /id="worldCanvas"/);
+assert.doesNotMatch(read('../index.html'), /mapToggle|minimap/i, 'no in-game map reveal');
+assert.doesNotMatch(read('../scripts/renderer-3d.js'), /minimap/i);
+assert.match(game, /initializeGameView/);
+assert.match(game, /bindFirstPersonControls/);
+assert.match(game, /applyRemotePosition/);
+assert.match(game, /updateAliens\(/, 'authored patrols update on the fixed simulation tick');
+assert.match(read('../scripts/scene-3d.js'), /createHazardScene/);
+assert.match(game, /illuminauts_pb_3d_v1_/, '3D times must not overwrite 2D records');
+assert.match(read('../scripts/renderer.js'), /from '.\/renderer-3d.js'/);
+assert.doesNotMatch(read('../scripts/scene-3d.js'), /https:\/\//);
+assert.doesNotMatch(read('../scripts/map-3d.js'), /FALLBACK_RAW|Function\(/);
+console.log('Illuminauts 3D integration contracts passed.');
