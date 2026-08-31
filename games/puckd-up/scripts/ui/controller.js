@@ -117,6 +117,7 @@ export function createUI({ doc, match, metrics, audio, controls, view, storage, 
     });
     function render() {
         const { screen, phase, playerScore, cpuScore, servingPlayer } = match.state;
+        el.app.dataset.screen = screen;
         const isOnline = match.state.mode === 'online';
         const opponent = isOnline ? match.state.opponentName || 'Opponent' : 'CPU';
         const inMatch = ['playing', 'paused', 'result'].includes(screen), won = isOnline ? match.state.winner === 0 : playerScore > cpuScore;

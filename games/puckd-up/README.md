@@ -146,5 +146,6 @@ fixture injects synthetic accounts and never calls production auth or records.
 
 See MULTIPLAYER.md for the next implementation pass and deployment order.
 Other follow-ups remain presentation using supplied artwork, sound-level review,
-offline packaging, local versus and training. README.txt is a historical visual
+offline packaging and training. Local multiplayer is intentionally unsupported.
+README.txt is a historical visual
 baseline rather than current architecture guidance.

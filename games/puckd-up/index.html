@@ -3,125 +3,155 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#040814" />
 <title>PUCK'D UP</title>
 <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-<div id="app">
-  <header class="topbar">
-    <div><div class="brand">PUCK'D UP</div><div class="sub">First to 7 · contained high-speed physics</div></div>
-    <div class="score" id="scoreboard" aria-live="polite"><span class="playerName">PLAYER</span><strong id="pScore">0</strong><span class="sub">—</span><strong id="cScore">0</strong><span id="opponentName">CPU</span></div>
+<div id="app" data-screen="menu">
+  <header class="topbar matchChrome">
+    <div class="matchBrand" aria-label="Puck'd Up"><span class="matchBrandMark">P//U</span><span>FIRST TO 7</span></div>
+    <div class="score" id="scoreboard" aria-live="polite" hidden>
+      <span class="scoreSide scoreSidePlayer"><small>PLAYER</small><strong id="pScore">0</strong></span>
+      <span class="scoreDivider">:</span>
+      <span class="scoreSide"><strong id="cScore">0</strong><small id="opponentName">CPU</small></span>
+    </div>
     <div class="state" id="gameState">LOADING</div>
-    <button type="button" id="soundToggle" aria-pressed="false" aria-label="Mute audio">Sound: On</button>
+    <button class="iconButton" type="button" id="soundToggle" aria-pressed="false" aria-label="Mute audio">Sound: On</button>
   </header>
 
   <main class="gamewrap" id="gamewrap">
     <canvas id="game" tabindex="0" aria-label="Playable 3D table hockey game"></canvas>
     <div class="hud" id="matchHud" hidden>
-      <div class="hudbox">PUCK <b id="speed">0.0</b> m/s<br>LAST SHOT <b id="shot">0.0</b> m/s</div>
-      <div class="hudbox" style="text-align:right"><span id="difficultyLabel">CPU: ARCADE</span><br><span id="serveLabel">YOUR SERVE</span></div>
+      <div class="hudbox telemetry"><span>PUCK <b id="speed">0.0</b> m/s</span><span>LAST SHOT <b id="shot">0.0</b> m/s</span></div>
+      <div class="hudbox matchReadout"><span id="difficultyLabel">CPU: ARCADE</span><strong id="serveLabel">YOUR SERVE</strong></div>
     </div>
     <div class="centerMsg"><span id="message">GOAL</span></div>
 
-    <section class="screen" id="menuScreen" aria-label="Main menu">
-      <div class="menuPanel">
-        <div class="menuEyebrow">Platform Cabinet</div>
-        <h1 class="menuTitle">PUCK'D<br>UP</h1>
-        <p class="menuLead">Fast 3D table hockey built around the approved high-speed physics model. Choose a mode to continue.</p>
-        <div class="modeGrid">
-          <button class="modeBtn primary" type="button" id="cpuModeBtn"><b>VS CPU</b><small>Playable now · configurable difficulty</small></button>
-          <button class="modeBtn" type="button" id="onlineModeBtn" disabled><b>ONLINE MULTIPLAYER</b><small id="onlineAccountNote">Sign in to Player Factory to play online</small></button>
-          <button class="modeBtn" type="button" disabled><b>LOCAL VERSUS</b><small>Planned · second-player input slot reserved</small></button>
-          <button class="modeBtn" type="button" disabled><b>TRAINING</b><small>Planned · free-play / shot practice</small></button>
+    <section class="screen splashScreen" id="menuScreen" data-splash="main-menu" aria-label="Main menu">
+      <div class="menuStage mainStage">
+        <div class="brandLockup">
+          <img src="./assets/logos/canon.png" alt="Puck'd Up" />
+          <p>Own the table.</p>
+          <div class="editionTag">Arcade Series // 01</div>
         </div>
-        <div class="futureNote">Play solo against the CPU or challenge another player online. Online games are casual, first to seven, with server-controlled puck physics and scoring.</div>
-        <div class="menuActions"><button type="button" id="menuFullscreen">Fullscreen</button><button type="button" id="onlineSignIn">Sign in to Player Factory</button><a href="../../grid.html">Back to Arcade</a></div>
+        <div class="commandRail mainCommandRail">
+          <div class="screenKicker"><span>Main menu</span><span>First to 7</span></div>
+          <h1>Choose your match</h1>
+          <p class="menuLead">High-speed table hockey with no room for hesitation.</p>
+          <div class="modeGrid">
+            <button class="modeBtn primary" type="button" id="cpuModeBtn">
+              <span class="commandIndex">01</span><span class="commandCopy"><b>Solo Clash</b><small>Take on the CPU</small></span><span class="commandArrow" aria-hidden="true">›</span>
+            </button>
+            <button class="modeBtn" type="button" id="onlineModeBtn" disabled>
+              <span class="commandIndex">02</span><span class="commandCopy"><b>Online 1v1</b><small id="onlineAccountNote">Sign in to Player Factory to play online</small></span><span class="commandArrow" aria-hidden="true">›</span>
+            </button>
+            <button class="modeBtn" type="button" disabled>
+              <span class="commandIndex">03</span><span class="commandCopy"><b>Training Lab</b><small>Free play · coming soon</small></span><span class="statusTag">Locked</span>
+            </button>
+          </div>
+          <div class="menuUtility">
+            <button type="button" id="menuFullscreen">Fullscreen</button>
+            <button type="button" id="onlineSignIn">Sign in</button>
+            <a href="../../grid.html">Exit to arcade</a>
+          </div>
+        </div>
       </div>
     </section>
 
-    <section class="screen" id="onlineScreen" aria-label="Online multiplayer lobby" hidden>
-      <div class="menuPanel onlinePanel">
-        <div class="menuEyebrow">Player Factory · Factory Network</div>
-        <h2>Online Lobby</h2>
-        <p class="menuLead">Signed in as <strong id="onlineIdentity">Account checked when joining</strong></p>
-        <p class="futureNote">Casual 1v1 · first to seven. Both players ready up to begin. No ratings or account records are changed. Online play keeps running when a tab is hidden; a lost connection gets 10 seconds to reconnect.</p>
-        <div class="menuActions"><button type="button" id="onlineQuick">Quick Search</button><button type="button" id="onlineCreate">Create Private Lobby</button></div>
-        <div class="onlineJoinRow"><label for="onlineCode">Private room code</label><input id="onlineCode" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCDE"><button type="button" id="onlineJoin">Join Private Lobby</button></div>
-        <p id="onlineStatus" role="status" aria-live="polite">Choose Quick Search or create/join a private lobby.</p>
-        <div class="onlineRoomLine"><span id="onlineKind">Quick Search</span><strong id="onlineRoom">—</strong></div>
-        <ol id="onlineRoster" aria-label="Lobby players"></ol>
-        <div class="menuActions"><button type="button" id="onlineStart" disabled>Ready to play</button><button type="button" id="onlineLeave" disabled>Cancel search</button><button type="button" id="onlineBack">Back</button></div>
+    <section class="screen splashScreen" id="onlineScreen" data-splash="online-lobby" aria-label="Online multiplayer lobby" hidden>
+      <div class="menuStage leftStage">
+        <div class="commandRail onlinePanel">
+          <div class="screenKicker"><span>Factory Network</span><span class="liveFlag">Live</span></div>
+          <h2>Online Lobby</h2>
+          <p class="identityLine">Playing as <strong id="onlineIdentity">Account checked when joining</strong></p>
+          <p class="menuLead">Casual 1v1. Both players ready up. No ratings, just first to seven.</p>
+          <div class="lobbyActions">
+            <button class="primary" type="button" id="onlineQuick"><span>Quick Search</span><small>Find any challenger</small></button>
+            <button type="button" id="onlineCreate"><span>Private Room</span><small>Create a code</small></button>
+          </div>
+          <div class="onlineJoinRow">
+            <label for="onlineCode">Join with room code</label>
+            <div><input id="onlineCode" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCDE"><button type="button" id="onlineJoin">Join</button></div>
+          </div>
+          <div class="lobbyStatusCard">
+            <p id="onlineStatus" role="status" aria-live="polite">Choose Quick Search or create/join a private lobby.</p>
+            <div class="onlineRoomLine"><span id="onlineKind">Quick Search</span><strong id="onlineRoom">—</strong></div>
+            <ol id="onlineRoster" aria-label="Lobby players"></ol>
+          </div>
+          <div class="menuActions"><button class="primary" type="button" id="onlineStart" disabled>Ready to play</button><button type="button" id="onlineLeave" disabled>Cancel search</button><button class="ghost" type="button" id="onlineBack">Back</button></div>
+        </div>
       </div>
     </section>
 
-    <section class="screen" id="setupScreen" aria-label="CPU match setup" hidden>
-      <div class="menuPanel">
-        <div class="menuEyebrow">CPU Match Setup</div>
-        <h2 style="margin:0 0 16px;font-size:26px">Configure Match</h2>
-        <div class="setupGrid">
-          <div class="colorBox">
-            <div class="sectionLabel">Your side color</div>
-            <div class="swatches" id="swatches">
-              <button class="swatch" type="button" data-color="#a14848" style="--swatch:#a14848" aria-label="Crimson"></button>
-              <button class="swatch" type="button" data-color="#d05a32" style="--swatch:#d05a32" aria-label="Orange"></button>
-              <button class="swatch" type="button" data-color="#d0a52e" style="--swatch:#d0a52e" aria-label="Gold"></button>
-              <button class="swatch" type="button" data-color="#3e9b61" style="--swatch:#3e9b61" aria-label="Green"></button>
-              <button class="swatch" type="button" data-color="#3d82b2" style="--swatch:#3d82b2" aria-label="Blue"></button>
-              <button class="swatch" type="button" data-color="#7652b8" style="--swatch:#7652b8" aria-label="Purple"></button>
-              <button class="swatch" type="button" data-color="#c24b86" style="--swatch:#c24b86" aria-label="Pink"></button>
-              <button class="swatch" type="button" data-color="#d8dde2" style="--swatch:#d8dde2" aria-label="Silver"></button>
+    <section class="screen splashScreen" id="setupScreen" data-splash="settings" aria-label="CPU match setup" hidden>
+      <div class="menuStage leftStage settingsStage">
+        <div class="commandRail settingsPanel">
+          <div class="screenKicker"><span>Solo Clash</span><span>Match setup</span></div>
+          <div class="panelHeading"><div><h2>Dial it in</h2><p>Set your side, opponent, and venue.</p></div><span class="matchBadge">1P // CPU</span></div>
+          <div class="setupGrid">
+            <div class="colorBox">
+              <div class="sectionLabel">01 // Your color</div>
+              <div class="swatches" id="swatches">
+                <button class="swatch" type="button" data-color="#a14848" style="--swatch:#a14848" aria-label="Crimson"></button>
+                <button class="swatch" type="button" data-color="#d05a32" style="--swatch:#d05a32" aria-label="Orange"></button>
+                <button class="swatch" type="button" data-color="#d0a52e" style="--swatch:#d0a52e" aria-label="Gold"></button>
+                <button class="swatch" type="button" data-color="#3e9b61" style="--swatch:#3e9b61" aria-label="Green"></button>
+                <button class="swatch" type="button" data-color="#3d82b2" style="--swatch:#3d82b2" aria-label="Blue"></button>
+                <button class="swatch" type="button" data-color="#7652b8" style="--swatch:#7652b8" aria-label="Purple"></button>
+                <button class="swatch" type="button" data-color="#c24b86" style="--swatch:#c24b86" aria-label="Pink"></button>
+                <button class="swatch" type="button" data-color="#d8dde2" style="--swatch:#d8dde2" aria-label="Silver"></button>
+              </div>
+              <div class="pickerRow"><div class="previewChip" id="colorPreview" aria-hidden="true"></div><label class="customColor">Custom<input type="color" id="playerColor" value="#a14848" aria-label="Custom player color"></label></div>
             </div>
-            <div class="pickerRow"><div class="previewChip" id="colorPreview" aria-hidden="true"></div><input type="color" id="playerColor" value="#a14848" aria-label="Custom player color"></div>
-            <p class="sub" style="margin:10px 0 0">This colors your mallet, defended goal, side light, and player HUD accent before the match loads.</p>
+            <div class="settingStack">
+              <label class="settingCard" for="setupDifficulty"><span class="sectionLabel">02 // CPU level</span><select id="setupDifficulty"><option value="0">Casual</option><option value="1" selected>Arcade</option><option value="2">Expert</option></select></label>
+              <div class="settingCard matchRule"><span><span class="sectionLabel">Win condition</span><b>First to 7</b></span><span><span class="sectionLabel">Format</span><b>1P vs CPU</b></span></div>
+            </div>
           </div>
-          <div class="settingStack">
-            <div class="settingCard"><label for="setupDifficulty">CPU Difficulty</label><select id="setupDifficulty"><option value="0">Casual</option><option value="1" selected>Arcade</option><option value="2">Expert</option></select></div>
-            <div class="settingCard"><span class="sectionLabel" style="margin:0">Win condition</span><div class="locked">First to 7</div></div>
-            <div class="settingCard"><span class="sectionLabel" style="margin:0">Mode</span><div class="locked">1P vs CPU</div></div>
+          <div class="arenaSection">
+            <div class="sectionLabel">03 // Choose venue</div>
+            <div class="arenaGrid" id="arenaGrid">
+              <button class="arenaCard" type="button" data-arena="hyper_arcade"><span class="arenaNumber">A1</span><b>Hyper Arcade</b><small>Neon light tunnel</small></button>
+              <button class="arenaCard" type="button" data-arena="competition_circuit"><span class="arenaNumber">A2</span><b>Competition Circuit</b><small>Open stadium bowl</small></button>
+              <button class="arenaCard" type="button" data-arena="park_jam"><span class="arenaNumber">A3</span><b>Park Jam</b><small>Urban rec park</small></button>
+              <button class="arenaCard" type="button" data-arena="skyline_rooftop"><span class="arenaNumber">A4</span><b>Skyline Rooftop</b><small>City after dark</small></button>
+            </div>
           </div>
+          <div class="menuActions setupActions"><button class="ghost" type="button" id="setupBack">Back</button><button class="primary startButton" type="button" id="startMatch">Start Match <span aria-hidden="true">›</span></button></div>
         </div>
-        <div class="arenaSection">
-          <div class="sectionLabel">Venue</div>
-          <div class="arenaGrid" id="arenaGrid">
-            <button class="arenaCard" type="button" data-arena="hyper_arcade"><b>HYPER ARCADE</b><small>Neon light tunnel, cabinets, prize towers, reactive glow</small></button>
-            <button class="arenaCard" type="button" data-arena="competition_circuit"><b>COMPETITION CIRCUIT</b><small>Open stadium bowl, crowd lights, broadcast wall</small></button>
-            <button class="arenaCard" type="button" data-arena="park_jam"><b>PARK JAM</b><small>Urban rec park, murals, skate forms, golden daylight</small></button>
-            <button class="arenaCard" type="button" data-arena="skyline_rooftop"><b>SKYLINE ROOFTOP</b><small>Deep-blue sky, layered skyline, city lights, rooftop glow</small></button>
-          </div>
-        </div>
-        <div class="menuActions"><button type="button" id="setupBack">Back</button><button class="primary" type="button" id="startMatch">Start Match</button></div>
       </div>
     </section>
 
-    <section class="screen" id="pauseScreen" aria-label="Pause menu" hidden>
-      <div class="menuPanel" style="max-width:390px">
-        <div class="menuEyebrow">Match Paused</div><h2 style="margin:0 0 14px;font-size:28px">PAUSED</h2>
-        <div class="menuActions"><button class="primary" type="button" id="resumeMatch">Resume</button><button type="button" id="pauseRestart">Restart Match</button><button type="button" id="pauseMenu">Main Menu</button></div>
+    <section class="screen matchOverlay" id="pauseScreen" aria-label="Pause menu" hidden>
+      <div class="menuPanel modalPanel">
+        <div class="screenKicker"><span>Match interrupted</span><span>Time out</span></div>
+        <h2>Paused</h2><p>The table is frozen. Pick up exactly where you left off.</p>
+        <div class="menuActions verticalActions"><button class="primary" type="button" id="resumeMatch">Resume Match <span aria-hidden="true">›</span></button><button type="button" id="pauseRestart">Restart Match</button><button class="ghost" type="button" id="pauseMenu">Exit to Main Menu</button></div>
       </div>
     </section>
 
-    <section class="screen" id="resultScreen" aria-label="Match result" hidden>
-      <div class="menuPanel" style="max-width:420px;text-align:center">
-        <div class="menuEyebrow">Final</div><h2 id="resultTitle" style="margin:0;font-size:30px">MATCH WON</h2>
-        <div class="resultScore"><span class="p" id="resultP">7</span> — <span id="resultC">0</span></div>
-        <p class="futureNote" id="resultNote"></p>
-        <div class="menuActions"><button class="primary" type="button" id="rematch">Rematch</button><button type="button" id="resultMenu">Main Menu</button></div>
+    <section class="screen matchOverlay" id="resultScreen" aria-label="Match result" hidden>
+      <div class="menuPanel modalPanel resultPanel">
+        <div class="screenKicker"><span>Final score</span><span>First to 7</span></div>
+        <h2 id="resultTitle">MATCH WON</h2>
+        <div class="resultScore"><span class="p" id="resultP">7</span><i>:</i><span id="resultC">0</span></div>
+        <p class="resultNote" id="resultNote"></p>
+        <div class="menuActions"><button class="primary" type="button" id="rematch">Rematch</button><button class="ghost" type="button" id="resultMenu">Main Menu</button></div>
       </div>
     </section>
   </main>
 
-  <footer class="bottom" id="matchControls" hidden>
-    <button class="primary" type="button" id="restart">Restart</button>
-    <button type="button" id="fullscreen">Fullscreen</button>
-    <button type="button" id="pause">Pause</button>
-    <div class="power">SHOT POWER <div class="powerbar"><i id="powerFill"></i></div></div>
-    <div class="help">Pointer/touch controls your mallet. WASD or arrows also work. Fullscreen locks the mouse; Esc releases it (and pauses CPU games only). Online matches cannot be paused. Use Leave match to exit.</div>
+  <footer class="bottom matchChrome" id="matchControls" hidden>
+    <div class="controlCluster"><button class="primary" type="button" id="restart">Restart</button><button type="button" id="fullscreen">Fullscreen</button><button type="button" id="pause">Pause</button></div>
+    <div class="power"><span>Shot power</span><div class="powerbar"><i id="powerFill"></i></div></div>
+    <div class="help"><b>MOVE</b> Pointer / WASD / Arrows <span></span> <b>AIM</b> Mouse <span></span> <b>ESC</b> Release / Pause</div>
   </footer>
 </div>
 
 <!-- Sets __JGF_PLATFORM_API_URL__ so /auth/me resolves in production; without it
      the online gate always fails with "Could not verify your Player Factory account". -->
 <script type="module" src="../../js/platform-config.mjs"></script>
-<script type="module" src="./game.js?v=online-3"></script>
+<script type="module" src="./game.js?v=ui-1"></script>
 </body>
 </html>
