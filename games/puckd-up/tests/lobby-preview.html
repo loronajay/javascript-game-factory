@@ -1,22 +1,19 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Puck'd Up local lobby test</title><link rel="stylesheet" href="../style.css"></head><body>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Puck'd Up local multiplayer test</title><link rel="stylesheet" href="../style.css"></head><body>
 <script type="module">
-// Local-only UI fixture. Uses production lobby/controller modules and synthetic
+// Local-only full-cabinet fixture. Uses production modules and synthetic
 // account responses, not real auth tokens. Never connects to production.
 if (!['localhost', '127.0.0.1'].includes(location.hostname)) throw new Error('Local test fixture only');
-const { createMatch } = await import('../scripts/core/match.js');
+const { createCabinet } = await import('../scripts/cabinet.js');
 const { createOnlineClient } = await import('../scripts/online/client.js');
-const { createOnlineController } = await import('../scripts/online/controller.js');
+const [THREE, CANNON] = await Promise.all([
+    import('https://cdn.jsdelivr.net/npm/three@0.166.1/+esm'),
+    import('https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/+esm'),
+]);
 const source = new DOMParser().parseFromString(await (await fetch('../index.html')).text(), 'text/html');
 document.body.append(source.getElementById('app'));
-document.getElementById('menuScreen').hidden = true;
-document.getElementById('matchHud').hidden = true;
-document.getElementById('scoreboard').hidden = true;
-document.getElementById('gameState').textContent = 'LOCAL TEST';
 const name = new URLSearchParams(location.search).get('seat') === 'bob' ? 'TestBob' : 'TestAlice';
 const account = { isEligible: () => true, resolve: async () => ({ playerId: `test-${name}`, displayName: name }) };
-let controller;
-const match = createMatch({ emit: event => controller?.handle(event) });
-controller = createOnlineController({ doc: document, match, account, client: createOnlineClient({ resolveIdentity: account.resolve, wsUrl: 'ws://127.0.0.1:3000' }) });
-match.online();
+createCabinet({ THREE, CANNON, account, doc: document,
+    onlineClient: createOnlineClient({ resolveIdentity: account.resolve, wsUrl: 'ws://127.0.0.1:3000' }) });
 </script></body></html>

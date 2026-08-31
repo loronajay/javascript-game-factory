@@ -10,7 +10,7 @@
 <div id="app">
   <header class="topbar">
     <div><div class="brand">PUCK'D UP</div><div class="sub">First to 7 · contained high-speed physics</div></div>
-    <div class="score" id="scoreboard" aria-live="polite"><span class="playerName">PLAYER</span><strong id="pScore">0</strong><span class="sub">—</span><strong id="cScore">0</strong><span>CPU</span></div>
+    <div class="score" id="scoreboard" aria-live="polite"><span class="playerName">PLAYER</span><strong id="pScore">0</strong><span class="sub">—</span><strong id="cScore">0</strong><span id="opponentName">CPU</span></div>
     <div class="state" id="gameState">LOADING</div>
     <button type="button" id="soundToggle" aria-pressed="false" aria-label="Mute audio">Sound: On</button>
   </header>
@@ -30,27 +30,27 @@
         <p class="menuLead">Fast 3D table hockey built around the approved high-speed physics model. Choose a mode to continue.</p>
         <div class="modeGrid">
           <button class="modeBtn primary" type="button" id="cpuModeBtn"><b>VS CPU</b><small>Playable now · configurable difficulty</small></button>
-          <button class="modeBtn" type="button" id="onlineModeBtn" disabled><b>ONLINE LOBBY PREVIEW</b><small id="onlineAccountNote">Sign in to Player Factory to use online lobbies</small></button>
+          <button class="modeBtn" type="button" id="onlineModeBtn" disabled><b>ONLINE MULTIPLAYER</b><small id="onlineAccountNote">Sign in to Player Factory to play online</small></button>
           <button class="modeBtn" type="button" disabled><b>LOCAL VERSUS</b><small>Planned · second-player input slot reserved</small></button>
           <button class="modeBtn" type="button" disabled><b>TRAINING</b><small>Planned · free-play / shot practice</small></button>
         </div>
-        <div class="futureNote">The live simulation is kept separate from menu configuration so future online matches can supply a network-controlled opponent without changing the puck, rail, goal, or collision systems.</div>
+        <div class="futureNote">Play solo against the CPU or challenge another player online. Online games are casual, first to seven, with server-controlled puck physics and scoring.</div>
         <div class="menuActions"><button type="button" id="menuFullscreen">Fullscreen</button><button type="button" id="onlineSignIn">Sign in to Player Factory</button><a href="../../grid.html">Back to Arcade</a></div>
       </div>
     </section>
 
-    <section class="screen" id="onlineScreen" aria-label="Online lobby preview" hidden>
+    <section class="screen" id="onlineScreen" aria-label="Online multiplayer lobby" hidden>
       <div class="menuPanel onlinePanel">
         <div class="menuEyebrow">Player Factory · Factory Network</div>
         <h2>Online Lobby</h2>
         <p class="menuLead">Signed in as <strong id="onlineIdentity">Account checked when joining</strong></p>
-        <p class="futureNote">Lobby preview: meet another player now. Online matches and recorded results will unlock after multiplayer synchronization is implemented.</p>
+        <p class="futureNote">Casual 1v1 · first to seven. Both players ready up to begin. No ratings or account records are changed. Online play keeps running when a tab is hidden; a lost connection gets 10 seconds to reconnect.</p>
         <div class="menuActions"><button type="button" id="onlineQuick">Quick Search</button><button type="button" id="onlineCreate">Create Private Lobby</button></div>
         <div class="onlineJoinRow"><label for="onlineCode">Private room code</label><input id="onlineCode" maxlength="5" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABCDE"><button type="button" id="onlineJoin">Join Private Lobby</button></div>
         <p id="onlineStatus" role="status" aria-live="polite">Choose Quick Search or create/join a private lobby.</p>
         <div class="onlineRoomLine"><span id="onlineKind">Quick Search</span><strong id="onlineRoom">—</strong></div>
         <ol id="onlineRoster" aria-label="Lobby players"></ol>
-        <div class="menuActions"><button type="button" id="onlineStart" disabled>Match play coming next</button><button type="button" id="onlineLeave" disabled>Cancel search</button><button type="button" id="onlineBack">Back</button></div>
+        <div class="menuActions"><button type="button" id="onlineStart" disabled>Ready to play</button><button type="button" id="onlineLeave" disabled>Cancel search</button><button type="button" id="onlineBack">Back</button></div>
       </div>
     </section>
 
@@ -104,6 +104,7 @@
       <div class="menuPanel" style="max-width:420px;text-align:center">
         <div class="menuEyebrow">Final</div><h2 id="resultTitle" style="margin:0;font-size:30px">MATCH WON</h2>
         <div class="resultScore"><span class="p" id="resultP">7</span> — <span id="resultC">0</span></div>
+        <p class="futureNote" id="resultNote"></p>
         <div class="menuActions"><button class="primary" type="button" id="rematch">Rematch</button><button type="button" id="resultMenu">Main Menu</button></div>
       </div>
     </section>
@@ -114,10 +115,10 @@
     <button type="button" id="fullscreen">Fullscreen</button>
     <button type="button" id="pause">Pause</button>
     <div class="power">SHOT POWER <div class="powerbar"><i id="powerFill"></i></div></div>
-    <div class="help">Pointer/touch controls your mallet. Fullscreen matches lock the mouse for relative cabinet-style control; Esc pauses. WASD or arrows also work. High-speed puck motion activates a directional energy trail.</div>
+    <div class="help">Pointer/touch controls your mallet. WASD or arrows also work. Fullscreen locks the mouse; Esc releases it (and pauses CPU games only). Online matches cannot be paused. Use Leave match to exit.</div>
   </footer>
 </div>
 
-<script type="module" src="./game.js?v=platform-lobby-1"></script>
+<script type="module" src="./game.js?v=online-2"></script>
 </body>
 </html>

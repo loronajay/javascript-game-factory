@@ -4,7 +4,7 @@ import { normalizeSettings } from '../settings.js';
 export function createMatch({ config = {}, emit = () => {
 } } = {}) {
     const settings = normalizeSettings(config);
-    const state = { screen: 'menu', phase: 'idle', playerScore: 0, cpuScore: 0, servingPlayer: true, remaining: 0 };
+    const state = { mode: 'cpu', screen: 'menu', phase: 'idle', playerScore: 0, cpuScore: 0, servingPlayer: true, remaining: 0 };
     function screen(value) {
         state.screen = value;
         emit({ type: 'screen', screen: value });
@@ -24,17 +24,19 @@ export function createMatch({ config = {}, emit = () => {
                 screen('setup');
         },
         start() {
+            if (state.mode === 'online') return;
             Object.assign(state, { playerScore: 0, cpuScore: 0 });
             screen('playing');
             emit({ type: 'match-start' });
             faceoff(true);
         },
         menu() {
-            Object.assign(state, { phase: 'idle', playerScore: 0, cpuScore: 0, remaining: 0 });
+            Object.assign(state, { mode: 'cpu', matchId: '', opponentName: '', winner: null, reason: '', disconnected: false, phase: 'idle', playerScore: 0, cpuScore: 0, remaining: 0 });
             screen('menu');
             emit({ type: 'match-reset' });
         },
         pause() {
+            if (state.mode === 'online') return;
             if (state.screen === 'playing')
                 screen('paused');
         },
@@ -43,6 +45,7 @@ export function createMatch({ config = {}, emit = () => {
                 screen('playing');
         },
         score(playerScored) {
+            if (state.mode === 'online') return false;
             if (state.screen !== 'playing' || state.phase !== 'live')
                 return false;
             state[playerScored ? 'playerScore' : 'cpuScore']++;
@@ -57,6 +60,7 @@ export function createMatch({ config = {}, emit = () => {
             return true;
         },
         tick(dt) {
+            if (state.mode === 'online') return;
             if (state.screen !== 'playing' || !['faceoff', 'goal'].includes(state.phase))
                 return;
             state.remaining = Math.max(0, state.remaining - dt);
@@ -68,6 +72,23 @@ export function createMatch({ config = {}, emit = () => {
                 state.phase = 'live';
                 emit({ type: 'serve', servingPlayer: state.servingPlayer });
             }
+        },
+        beginOnline({ matchId, opponentName }) {
+            Object.assign(state, { mode: 'online', matchId, opponentName, playerScore: 0, cpuScore: 0, phase: 'faceoff', remaining: .65, winner: null, reason: '', disconnected: false });
+            screen('playing');
+            emit({ type: 'match-start' });
+        },
+        returnOnline() {
+            Object.assign(state, { mode: 'cpu', matchId: '', phase: 'idle', remaining: 0, playerScore: 0, cpuScore: 0 });
+            screen('online');
+            emit({ type: 'match-reset' });
+        },
+        applyOnline(snapshot) {
+            if (state.mode !== 'online' || snapshot.matchId !== state.matchId) return;
+            Object.assign(state, { phase: snapshot.phase, remaining: snapshot.remaining, playerScore: snapshot.scores[0], cpuScore: snapshot.scores[1], servingPlayer: snapshot.servingPlayer,
+                winner: snapshot.winner, reason: snapshot.reason, disconnected: snapshot.disconnected.some(Boolean) });
+            const next = snapshot.phase === 'finished' ? 'result' : 'playing';
+            if (state.screen !== next) screen(next);
         },
     };
 }

@@ -74,8 +74,10 @@ export function createControls({ THREE, canvas, camera, match, unlock = () => {
         }
     }, options);
     doc.addEventListener('pointerlockchange', () => {
-        if (doc.pointerLockElement !== canvas && live())
+        if (doc.pointerLockElement !== canvas && live()) {
+            clear();
             match.pause();
+        }
     }, options);
     canvas.addEventListener('keydown', event => {
         if (!live())

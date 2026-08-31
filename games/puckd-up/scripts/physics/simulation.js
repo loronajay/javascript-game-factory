@@ -6,14 +6,14 @@ import { updatePlayer } from '../input/player-motion.js';
 // Owns rigid-body updates. Input is sampled once per fixed tick; events are facts,
 // not presentation calls. An opponent controller can replace the CPU at this seam.
 export function createSimulation(CANNON, match, { emit = () => {
-}, random = Math.random, opponent = updateCPU, bodies = createWorld(CANNON) } = {}) {
+}, random = Math.random, opponent = updateCPU, humanOpponent = false, bodies = createWorld(CANNON) } = {}) {
     const { world, puckBody, player, cpu } = bodies;
     const metrics = { speed: 0, lastShot: 0, power: 0 };
     let elapsed = 0, lastPlayerBoost = -Infinity, lastCpuBoost = -Infinity, lastFire = -Infinity, lastSpeed = 0;
     function strike(mallet, isPlayer) {
         emit({ type: 'puck-hit', player: isPlayer });
         const previous = isPlayer ? lastPlayerBoost : lastCpuBoost;
-        if (elapsed - previous < (isPlayer ? .075 : .09))
+        if (elapsed - previous < (isPlayer || humanOpponent ? .075 : .09))
             return;
         if (isPlayer)
             lastPlayerBoost = elapsed;
@@ -22,7 +22,7 @@ export function createSimulation(CANNON, match, { emit = () => {
         const mv = mallet.body.velocity;
         if (Math.hypot(mv.x, mv.z) < 2)
             return;
-        const coefficient = isPlayer ? .42 : .25;
+        const coefficient = isPlayer || humanOpponent ? .42 : .25;
         puckBody.velocity.x += mv.x * coefficient;
         puckBody.velocity.z += mv.z * coefficient;
         capPuck(puckBody);
@@ -74,7 +74,7 @@ export function createSimulation(CANNON, match, { emit = () => {
         handle(event) {
             if (event.type === 'round-reset')
                 resetRound(event.servingPlayer);
-            if (event.type === 'serve' && !event.servingPlayer)
+            if (event.type === 'serve' && !event.servingPlayer && !humanOpponent)
                 puckBody.velocity.set((random() - .5) * 1.8, 0, 3.6);
             if (event.type === 'goal') {
                 capturePuck(puckBody, event.playerScored);

@@ -8,7 +8,7 @@ const unavailableAccount = {
 };
 
 // Cabinet-owned lobby UI, shared-platform identity, Factory Network transport.
-// No match-start or record-write adapter exists until authoritative play ships.
+// Match state is owned by the separate sync adapter; no platform record writes.
 export function createOnlineController({ doc, match, account = unavailableAccount, client = createOnlineClient({ resolveIdentity: () => account.resolve() }) }) {
     const abort = new AbortController(), options = { signal: abort.signal };
     const ids = ['onlineModeBtn', 'onlineScreen', 'onlineQuick', 'onlineCreate', 'onlineJoin', 'onlineCode', 'onlineLeave', 'onlineBack', 'onlineStatus', 'onlineRoster', 'onlineRoom', 'onlineKind', 'onlineIdentity', 'onlineSignIn', 'onlineStart', 'onlineAccountNote'];
@@ -21,8 +21,8 @@ export function createOnlineController({ doc, match, account = unavailableAccoun
         sessionKey = account.sessionKey?.();
         el.onlineScreen.hidden = match.state.screen !== 'online';
         el.onlineModeBtn.disabled = !eligible;
-        el.onlineModeBtn.title = eligible ? 'Online lobby preview' : 'Sign in to your Player Factory account to use online lobbies.';
-        el.onlineAccountNote.textContent = eligible ? 'Quick Search / private rooms · lobby preview' : 'Sign in to Player Factory to use online lobbies';
+        el.onlineModeBtn.title = eligible ? 'Online multiplayer' : 'Sign in to your Player Factory account to play online.';
+        el.onlineAccountNote.textContent = eligible ? 'Quick Search / private rooms · casual 1v1' : 'Sign in to Player Factory to play online';
         el.onlineSignIn.hidden = eligible;
         el.onlineSignIn.disabled = account.configured === false;
         if (account.configured === false) el.onlineAccountNote.textContent = 'Serve from the platform root to enable online lobbies';
@@ -34,6 +34,7 @@ export function createOnlineController({ doc, match, account = unavailableAccoun
         el.onlineLeave.disabled = !vm.busy;
         el.onlineLeave.textContent = snapshot.lobby ? 'Leave lobby' : 'Cancel search';
         el.onlineStart.disabled = !vm.canStart;
+        el.onlineStart.textContent = vm.startLabel;
         el.onlineRoster.replaceChildren(...vm.players.map(name => { const li = doc.createElement('li'); li.textContent = name; return li; }));
     }
     const on = (node, event, fn) => node.addEventListener(event, fn, options);
@@ -45,6 +46,10 @@ export function createOnlineController({ doc, match, account = unavailableAccoun
     on(el.onlineCode, 'keydown', event => { if (event.key === 'Enter') { event.preventDefault(); client.joinPrivateRoom(el.onlineCode.value); } });
     on(el.onlineLeave, 'click', () => client.leave());
     on(el.onlineBack, 'click', () => match.menu());
+    on(el.onlineStart, 'click', () => {
+        const snapshot = client.getSnapshot();
+        client.setReady(!snapshot.lobby?.players.find(player => player.id === snapshot.clientId)?.ready);
+    });
     function refreshAccount() {
         // A sign-out in another tab must release any waiting seat.
         if (!account.isEligible() || sessionKey !== account.sessionKey?.()) client.leave();
@@ -58,9 +63,10 @@ export function createOnlineController({ doc, match, account = unavailableAccoun
     return {
         handle(event) {
             if (event.type !== 'screen') return;
-            const online = match.state.screen === 'online';
-            if (wasOnline && !online) client.leave();
+            const online = match.state.screen === 'online' || match.state.mode === 'online';
+            const leaving = wasOnline && !online;
             wasOnline = online;
+            if (leaving) client.leave();
             render();
         },
         dispose() { abort.abort(); unsubscribe(); client.dispose(); },

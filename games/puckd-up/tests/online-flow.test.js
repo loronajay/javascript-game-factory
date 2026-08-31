@@ -15,21 +15,24 @@ test('online is a separate frozen screen and Back returns safely to CPU setup', 
     assert.equal(match.state.screen, 'playing');
 });
 
-test('lobby copy distinguishes search, private codes, roster, errors and match gate', () => {
+test('lobby copy distinguishes search, private codes, readiness, roster and errors', () => {
     assert.match(lobbyViewModel({ status: 'searching' }).status, /Searching/);
     const ready = lobbyViewModel({ status: 'lobby', clientId: 'a', lobby: { roomCode: 'ABCDE', isPrivate: true, ownerId: 'a', players: [{ id: 'a', name: 'Alice' }, { id: 'b', name: 'Bob' }] } });
     assert.equal(ready.code, 'ABCDE');
     assert.match(ready.status, /Both players/);
-    assert.equal(ready.canStart, false);
+    assert.equal(ready.canStart, true);
     assert.match(ready.players[0], /Host/);
     assert.equal(lobbyViewModel({ status: 'idle', error: 'No connection' }).status, 'No connection');
+    assert.equal(lobbyViewModel({ status: 'lobby', clientId: 'a', lobby: { players: [{ id: 'a', ready: true }, { id: 'b' }] } }).startLabel, 'Not ready');
 });
 
-test('online markup is explicit about staging and uses platform navigation', () => {
+test('online markup identifies casual play and uses platform navigation', () => {
     const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
     for (const id of ['onlineModeBtn', 'onlineScreen', 'onlineQuick', 'onlineCreate', 'onlineJoin', 'onlineCode', 'onlineLeave', 'onlineBack', 'onlineStatus', 'onlineRoster']) assert.ok(html.includes(`id="${id}"`), id);
     assert.match(html, /id="onlineStart"[^>]*disabled/);
     assert.match(html, /\.\.\/\.\.\/grid.html/);
+    assert.match(html, /Casual/);
+    assert.doesNotMatch(html, /ONLINE LOBBY PREVIEW|Match play coming next/);
 });
 
 test('optional platform imports cannot stop standalone CPU play from loading', () => {

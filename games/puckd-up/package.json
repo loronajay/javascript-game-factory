@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "test:network": "node --test tests/network-contract.mjs"
+    "test:network": "node server/sync-server.mjs --check && node --test tests/network-contract.mjs",
+    "sync:server": "node server/sync-server.mjs"
   }
 }

@@ -1,12 +1,12 @@
 import { normalizeSettings, saveSettings } from '../settings.js';
 // Owns DOM lookup, presentation and user actions. Reads match state; never moves bodies.
-export function createUI({ doc, match, metrics, audio, controls, view, storage }) {
+export function createUI({ doc, match, metrics, audio, controls, view, storage, onlineClient }) {
     const abort = new AbortController(), options = { signal: abort.signal };
     const ids = ['app', 'game', 'gamewrap', 'pScore', 'cScore', 'scoreboard', 'speed', 'shot', 'powerFill',
         'gameState', 'message', 'pause', 'restart', 'fullscreen', 'menuFullscreen', 'difficultyLabel',
         'serveLabel', 'menuScreen', 'setupScreen', 'pauseScreen', 'resultScreen', 'matchHud', 'matchControls',
         'cpuModeBtn', 'setupBack', 'startMatch', 'setupDifficulty', 'playerColor', 'colorPreview',
-        'resumeMatch', 'pauseRestart', 'pauseMenu', 'rematch', 'resultMenu', 'resultTitle', 'resultP', 'resultC', 'arenaGrid', 'soundToggle'];
+        'resumeMatch', 'pauseRestart', 'pauseMenu', 'rematch', 'resultMenu', 'resultTitle', 'resultP', 'resultC', 'arenaGrid', 'soundToggle', 'opponentName', 'resultNote'];
     const el = Object.fromEntries(ids.map(id => {
         const node = doc.getElementById(id);
         if (!node)
@@ -54,6 +54,7 @@ export function createUI({ doc, match, metrics, audio, controls, view, storage }
         focusMatch();
     }
     function restart() {
+        if (match.state.mode === 'online') { onlineClient?.rematch(); return; }
         match.start();
         focusMatch();
     }
@@ -85,7 +86,7 @@ export function createUI({ doc, match, metrics, audio, controls, view, storage }
     on(el.restart, 'click', restart);
     on(el.pauseRestart, 'click', restart);
     on(el.rematch, 'click', restart);
-    on(el.pause, 'click', () => match.pause());
+    on(el.pause, 'click', () => match.state.mode === 'online' ? match.menu() : match.pause());
     on(el.resumeMatch, 'click', () => {
         match.resume();
         focusMatch();
@@ -116,7 +117,9 @@ export function createUI({ doc, match, metrics, audio, controls, view, storage }
     });
     function render() {
         const { screen, phase, playerScore, cpuScore, servingPlayer } = match.state;
-        const inMatch = ['playing', 'paused', 'result'].includes(screen), won = playerScore > cpuScore;
+        const isOnline = match.state.mode === 'online';
+        const opponent = isOnline ? match.state.opponentName || 'Opponent' : 'CPU';
+        const inMatch = ['playing', 'paused', 'result'].includes(screen), won = isOnline ? match.state.winner === 0 : playerScore > cpuScore;
         for (const name of ['menu', 'setup', 'pause', 'result'])
             el[`${name}Screen`].hidden = screen !== (name === 'pause' ? 'paused' : name);
         el.matchHud.hidden = el.scoreboard.hidden = !inMatch;
@@ -126,21 +129,28 @@ export function createUI({ doc, match, metrics, audio, controls, view, storage }
         write(el.resultP, playerScore);
         write(el.resultC, cpuScore);
         write(el.resultTitle, won ? 'MATCH WON' : 'MATCH LOST');
-        const status = screen === 'result' ? (won ? 'YOU WIN' : 'CPU WINS') : screen === 'playing' ? ({ faceoff: 'FACE-OFF', goal: 'GOAL', live: 'PLAY' }[phase] || 'PLAY') : screen.toUpperCase();
+        write(el.opponentName, opponent);
+        write(el.pause, isOnline ? 'Leave match' : 'Pause');
+        el.restart.hidden = isOnline;
+        el.rematch.disabled = isOnline && (match.state.rematchPending || match.state.reason === 'forfeit');
+        write(el.rematch, isOnline && match.state.rematchPending ? 'Waiting for opponent…' : 'Rematch');
+        write(el.resultNote, isOnline ? match.state.networkError || (match.state.reason === 'forfeit' ? 'Opponent disconnected or left. Match decided by forfeit.' : 'Casual match · no ratings recorded. Both players must request a rematch.') : '');
+        const status = screen === 'result' ? (won ? 'YOU WIN' : `${opponent} WINS`) : isOnline && match.state.disconnected ? 'RECONNECTING' : screen === 'playing' ? ({ faceoff: 'FACE-OFF', goal: 'GOAL', live: 'PLAY' }[phase] || 'PLAY') : screen.toUpperCase();
         write(el.gameState, status);
-        write(el.difficultyLabel, `CPU: ${['CASUAL', 'ARCADE', 'EXPERT'][match.config.cpuDifficulty]}`);
-        write(el.serveLabel, servingPlayer ? 'YOUR SERVE' : 'CPU SERVE');
+        write(el.difficultyLabel, isOnline ? 'ONLINE · CASUAL' : `CPU: ${['CASUAL', 'ARCADE', 'EXPERT'][match.config.cpuDifficulty]}`);
+        write(el.serveLabel, isOnline && match.state.disconnected ? 'Waiting for connection · 10s grace' : servingPlayer ? 'YOUR SERVE' : `${opponent} SERVE`);
         write(el.speed, metrics.speed.toFixed(1));
         write(el.shot, metrics.lastShot.toFixed(1));
         el.powerFill.style.width = `${metrics.power.toFixed(0)}%`;
         const goal = screen === 'playing' && phase === 'goal';
         el.message.style.display = goal ? 'inline-block' : 'none';
         if (goal)
-            write(el.message, servingPlayer ? 'CPU GOAL' : 'PLAYER GOAL');
+            write(el.message, servingPlayer ? `${opponent} GOAL` : 'PLAYER GOAL');
         if (previousScreen !== screen) {
             previousScreen = screen;
             const focus = { menu: el.cpuModeBtn, setup: el.startMatch, paused: el.resumeMatch, result: el.rematch }[screen];
             focus?.focus();
+            if (screen === 'playing' && isOnline) el.game.focus();
         }
     }
     applyConfig();

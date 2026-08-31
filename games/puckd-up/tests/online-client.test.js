@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createOnlineClient, resolveWebSocketUrl } from '../scripts/online/client.js';
+import { PROTOCOL_VERSION } from '../scripts/online/protocol.js';
 
 class Socket {
     static OPEN = 1;
@@ -31,7 +32,7 @@ test('quick search waits for identity and handshake and sends exact two-seat set
     await client.findQuickMatch();
     assert.equal(socket().sent.length, 0);
     socket().open();
-    assert.deepEqual(socket().sent, [{ type: 'find_lobby', gameId: 'puckd-up', minPlayers: 2, maxPlayers: 2, settings: { protocolVersion: 1, targetScore: 7 }, identity }]);
+    assert.deepEqual(socket().sent, [{ type: 'find_lobby', gameId: 'puckd-up', minPlayers: 2, maxPlayers: 2, settings: { protocolVersion: PROTOCOL_VERSION, targetScore: 7 }, identity }]);
     socket().message(lobby());
     assert.equal(client.getSnapshot().status, 'lobby');
     client.dispose();
@@ -92,13 +93,51 @@ test('roster changes, wrong-game responses, disconnects and unexpected starts ar
     assert.equal(client.getSnapshot().lobby.players.length, 2);
     socket().message({ event: 'lobby_started', roomCode: 'ABCDE' });
     assert.equal(client.getSnapshot().lobby, null);
-    assert.match(client.getSnapshot().error, /not available/i);
+    assert.match(client.getSnapshot().error, /incompatible/i);
     await client.findQuickMatch(); socket().open(); socket().message(lobby({ gameId: 'mini-hoops' }));
     assert.equal(client.getSnapshot().lobby, null);
     assert.match(client.getSnapshot().error, /different game/i);
     await client.findQuickMatch(); socket().open(); socket().message(lobby()); socket().close();
     assert.equal(client.getSnapshot().lobby, null);
     assert.match(client.getSnapshot().error, /Connection lost/);
+    client.dispose();
+});
+
+const snapshot = (patch = {}) => ({ protocolVersion: 2, matchId: 'm1', tick: 0, seats: ['c_me', 'c_two'], scores: [0, 0], ack: [0, 0],
+    paddles: [{ x: 0, z: 5.8, vx: 0, vz: 0 }, { x: 0, z: -5.8, vx: 0, vz: 0 }], puck: { x: 0, z: 1.15, vx: 0, vz: 0 },
+    phase: 'faceoff', remaining: .65, serving: 0, winner: null, disconnected: [false, false], ...patch });
+test('ready, authoritative snapshots, input and rematch use the current match binding', async () => {
+    const { client, socket } = setup();
+    await client.findQuickMatch(); socket().open(); socket().message(lobby({ members: ['c_me', 'c_two'] }));
+    client.setReady(true);
+    assert.equal(socket().sent.at(-1).messageType, 'puck_ready');
+    socket().message({ event: 'lobby_started', gameId: 'puckd-up', roomCode: 'ABCDE', authorityMode: 'server', matchState: snapshot() });
+    assert.equal(client.getSnapshot().status, 'playing');
+    client.sendInput({ seq: 1, x: 2, z: 4, scores: [7, 0] });
+    assert.deepEqual(JSON.parse(socket().sent.at(-1).value), { matchId: 'm1', seq: 1, x: 2, z: 4 });
+    socket().message({ event: 'puck_state', roomCode: 'ABCDE', snapshot: snapshot({ tick: 10, phase: 'live' }) });
+    socket().message({ event: 'puck_state', roomCode: 'ABCDE', snapshot: snapshot({ tick: 5 }) });
+    socket().message({ event: 'puck_state', roomCode: 'ABCDE', snapshot: snapshot({ matchId: 'old', tick: 99 }) });
+    assert.equal(client.getSnapshot().match.tick, 10);
+    socket().message({ event: 'puck_state', roomCode: 'ABCDE', snapshot: snapshot({ tick: 20, phase: 'finished', scores: [7, 0], winner: 0 }) });
+    client.rematch(); assert.equal(socket().sent.at(-1).messageType, 'puck_rematch');
+    client.dispose();
+});
+test('socket-session reconnect retains match binding and explicit leave cancels retries', async () => {
+    const { client, socket } = setup();
+    await client.findQuickMatch(); socket().open();
+    socket().message({ event: 'connected', clientId: 'c_me', sessionToken: 'secret-session' });
+    socket().message(lobby({ members: ['c_me', 'c_two'] }));
+    socket().message({ event: 'lobby_started', gameId: 'puckd-up', roomCode: 'ABCDE', authorityMode: 'server', matchState: snapshot() });
+    const old = socket(); old.close();
+    assert.equal(client.getSnapshot().status, 'reconnecting');
+    socket().open();
+    assert.deepEqual(socket().sent.at(-1), { type: 'resume_lobby', clientId: 'c_me', sessionToken: 'secret-session' });
+    assert.equal(JSON.stringify(client.getSnapshot()).includes('secret-session'), false);
+    socket().message({ event: 'session_resumed', clientId: 'c_me', roomCode: 'ABCDE' });
+    assert.equal(client.getSnapshot().status, 'playing');
+    client.leave(); old.message({ event: 'puck_state', roomCode: 'ABCDE', snapshot: snapshot() });
+    assert.equal(client.getSnapshot().match, null);
     client.dispose();
 });
 
