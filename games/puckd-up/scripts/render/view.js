@@ -1,38 +1,42 @@
 import { createScene } from './scene.js';
 import { createTable } from './table.js';
 import { createVenues } from './venues/index.js';
-import { createTrail } from './trail.js';
+const CPU_COLOR = '#3f7194';
+
+export function visiblePlayerColors(config, state) {
+    return state.mode === 'online' && Array.isArray(state.playerColors) ? state.playerColors : [config.playerColor, CPU_COLOR];
+}
 // Rendering reads bodies. Animation ages advance in tick(), never in render().
 export function createView(THREE, canvas, container) {
     const stage = createScene(THREE, canvas, container);
     try {
         const table = createTable(THREE, stage.scene);
         const venues = createVenues(THREE, stage, table);
-        const trail = createTrail(THREE, stage.scene);
-        let elapsed = 0, arena = null, color = null;
+        let elapsed = 0, arena = null, config = null, colors = [];
+        function applyColors(next) {
+            if (colors[0] === next[0] && colors[1] === next[1]) return;
+            colors = [...next];
+            table.applyColors(...colors);
+            stage.warm.color.set(colors[0]);
+            stage.cool.color.set(colors[1]);
+        }
         return {
             camera: stage.camera, resize: stage.resize, dispose: stage.dispose,
-            configure(config) {
-                if (arena !== config.arenaId) {
-                    arena = config.arenaId;
+            configure(nextConfig) {
+                config = nextConfig;
+                if (arena !== nextConfig.arenaId) {
+                    arena = nextConfig.arenaId;
                     venues.applyArenaTheme(arena);
                 }
-                if (color !== config.playerColor) {
-                    color = config.playerColor;
-                    table.applyPlayerColor(color);
-                    stage.warm.color.set(color);
-                }
+                applyColors([nextConfig.playerColor, CPU_COLOR]);
             },
-            handle(event) {
-                if (['round-reset', 'goal', 'match-reset'].includes(event.type))
-                    trail.clear();
-            },
+            handle() {},
             tick(dt, simulation, match) {
                 if (match.state.screen === 'paused')
                     return;
+                applyColors(visiblePlayerColors(config, match.state));
                 elapsed += dt;
                 venues.updateArenaVisuals(elapsed);
-                trail.update(dt, simulation.metrics.speed, simulation.bodies.puckBody, match.state.screen === 'playing' && match.state.phase === 'live');
             },
             render(bodies) {
                 table.sync(bodies);

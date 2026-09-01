@@ -99,13 +99,15 @@ for (const [delay, rateA, rateB] of [[0, 30, 144], [40, 60, 120], [100, 144, 30]
         try {
             await Promise.all([a.findQuickMatch(), b.findQuickMatch()]);
             await Promise.all([a, b].map(c => until(c, s => s.lobby?.players.length === 2)));
-            b.setReady(true);
+            b.setReady(true, '#38bdf8');
             await until(a, s => s.lobby?.players.some(p => p.ready));
             assert.equal(a.getSnapshot().match, null);
-            a.setReady(true);
+            a.setReady(true, '#c24b86');
             await Promise.all([a, b].map(c => until(c, s => s.match?.phase === 'live')));
             const originalId = a.getSnapshot().match.matchId;
             assert.equal(originalId, b.getSnapshot().match.matchId);
+            assert.deepEqual(a.getSnapshot().match.colors, ['#c24b86', '#38bdf8']);
+            assert.deepEqual(b.getSnapshot().match.colors, ['#c24b86', '#38bdf8']);
             assert.equal(matches[1].state.opponentName, 'Alice');
             for (const [i, rate] of [rateA, rateB].entries()) {
                 const clock = createFixedStep(dt => syncs[i].tick(dt, { dx: 0, dz: 0, keys: new Set(), target: i ? { x: 4.1, z: 5.8 } : { x: 0, z: .8 } }));

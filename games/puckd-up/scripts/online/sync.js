@@ -34,7 +34,7 @@ export function createOnlineSync({ client, match, emit = () => {} }) {
         const transition = fresh || current.phase !== s.phase || s.disconnected.some(Boolean);
         if (fresh) {
             seq = eventId = 0; sendAge = 1 / INPUT_HZ; history = []; samples = []; metrics.lastShot = 0;
-            match.beginOnline({ matchId: s.matchId, opponentName: state.lobby?.players.find(p => p.id !== state.clientId)?.name || 'Opponent' });
+            match.beginOnline({ matchId: s.matchId, opponentName: state.lobby?.players.find(p => p.id !== state.clientId)?.name || 'Opponent', playerColors: s.colors });
         }
         current = s; sampleAge = 0;
         match.applyOnline(s);

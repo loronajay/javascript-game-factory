@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { visiblePlayerColors } from '../scripts/render/view.js';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const css = readFileSync(new URL('../style.css', import.meta.url), 'utf8');
 const controller = readFileSync(new URL('../scripts/ui/controller.js', import.meta.url), 'utf8');
+const view = readFileSync(new URL('../scripts/render/view.js', import.meta.url), 'utf8');
 
 test('menu screens use the finished splash art and canonical logo', () => {
     assert.match(html, /assets\/logos\/canon\.png/);
@@ -30,4 +32,13 @@ test('unsupported local multiplayer is not advertised', () => {
 
 test('UI controller exposes the current screen to the visual shell', () => {
     assert.match(controller, /el\.app\.dataset\.screen\s*=\s*screen/);
+});
+
+test('puck presentation has no trail renderer', () => {
+    assert.doesNotMatch(view, /createTrail|trail\.(?:clear|update)/);
+});
+
+test('online presentation uses both seat-specific custom colors', () => {
+    assert.deepEqual(visiblePlayerColors({ playerColor: '#a14848' }, { mode: 'online', playerColors: ['#c24b86', '#38bdf8'] }), ['#c24b86', '#38bdf8']);
+    assert.deepEqual(visiblePlayerColors({ playerColor: '#c24b86' }, { mode: 'cpu' }), ['#c24b86', '#3f7194']);
 });

@@ -28,11 +28,11 @@ test('ready button sends intent and entering a live online match keeps the seat'
     const doc = { defaultView: new EventTarget(), getElementById(id) { if (!nodes.has(id)) nodes.set(id, node()); return nodes.get(id); }, createElement: node };
     let leaves = 0, ready = null;
     const state = { status: 'lobby', clientId: 'a', lobby: { players: [{ id: 'a', ready: false }, { id: 'b' }] } };
-    const client = { getSnapshot: () => state, subscribe: () => () => {}, setReady(value) { ready = value; }, leave() { leaves++; }, dispose() {} };
-    const match = { state: { screen: 'online', mode: 'cpu' } };
+    const client = { getSnapshot: () => state, subscribe: () => () => {}, setReady(value, color) { ready = { value, color }; }, leave() { leaves++; }, dispose() {} };
+    const match = { state: { screen: 'online', mode: 'cpu' }, config: { playerColor: '#c24b86' } };
     const c = createOnlineController({ doc, match, account: { isEligible: () => true }, client });
     c.handle({ type: 'screen' });
-    nodes.get('onlineStart').dispatchEvent(new Event('click')); assert.equal(ready, true);
+    nodes.get('onlineStart').dispatchEvent(new Event('click')); assert.deepEqual(ready, { value: true, color: '#c24b86' });
     Object.assign(match.state, { screen: 'playing', mode: 'online' }); c.handle({ type: 'screen' }); assert.equal(leaves, 0);
     Object.assign(match.state, { screen: 'menu', mode: 'cpu' }); c.handle({ type: 'screen' }); assert.equal(leaves, 1);
     c.dispose();

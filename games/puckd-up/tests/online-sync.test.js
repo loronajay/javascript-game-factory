@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createOnlineSync } from '../scripts/online/sync.js';
 import { createMatch } from '../scripts/core/match.js';
 const body = (x, z) => ({ x, z, vx: 0, vz: 0 });
-const snapshot = patch => ({ protocolVersion: 2, matchId: 'm1', tick: 0, seats: ['a', 'b'], phase: 'live', remaining: 0,
+const snapshot = patch => ({ protocolVersion: 3, matchId: 'm1', tick: 0, seats: ['a', 'b'], colors: ['#c24b86', '#38bdf8'], phase: 'live', remaining: 0,
     scores: [0, 0], serving: 0, winner: null, reason: '', ack: [0, 0], disconnected: [false, false],
     puck: body(0, 1.15), paddles: [body(0, 5.8), body(0, -5.8)], events: [], ...patch });
 function fixture(seat = 0) {
@@ -21,6 +21,7 @@ test('both seat views predict their own paddle at fixed ticks and cap sends at 6
         const f = fixture(seat); f.deliver(snapshot());
         for (let i = 0; i < 240; i++) f.sync.tick(1 / 240, input);
         assert.equal(f.match.state.opponentName, seat ? 'Alice' : 'Bob');
+        assert.deepEqual(f.match.state.playerColors, seat ? ['#38bdf8', '#c24b86'] : ['#c24b86', '#38bdf8']);
         assert.equal(f.sent.length, 60);
         assert.ok(f.sync.bodies.player.body.position.x > 4);
         assert.equal(f.sync.bodies.cpu.body.position.z, -5.8);

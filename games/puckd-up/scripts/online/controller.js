@@ -48,7 +48,7 @@ export function createOnlineController({ doc, match, account = unavailableAccoun
     on(el.onlineBack, 'click', () => match.menu());
     on(el.onlineStart, 'click', () => {
         const snapshot = client.getSnapshot();
-        client.setReady(!snapshot.lobby?.players.find(player => player.id === snapshot.clientId)?.ready);
+        client.setReady(!snapshot.lobby?.players.find(player => player.id === snapshot.clientId)?.ready, match.config.playerColor);
     });
     function refreshAccount() {
         // A sign-out in another tab must release any waiting seat.

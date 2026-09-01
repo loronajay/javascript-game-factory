@@ -89,12 +89,15 @@ export function createTable(THREE, scene) {
         return { mesh: grp, baseMat };
     }
     const player = makeMallet(5.8, 0xa14848), cpu = makeMallet(-5.8, 0x3f7194);
-    function applyPlayerColor(hex) {
-        player.baseMat.color.set(hex);
-        playerGoalMat.color.set(hex);
-        playerGoalMat.emissive.set(hex);
-        playerSideAccentMat.color.set(hex);
-        playerSideAccentMat.emissive.set(hex);
+    function applyColors(playerHex, opponentHex) {
+        for (const material of [player.baseMat, playerGoalMat, playerSideAccentMat]) {
+            material.color.set(playerHex);
+            if (material.emissive) material.emissive.set(playerHex);
+        }
+        for (const material of [cpu.baseMat, cpuGoalMat, cpuSideAccentMat]) {
+            material.color.set(opponentHex);
+            if (material.emissive) material.emissive.set(opponentHex);
+        }
     }
     function sync(bodies) {
         puckMesh.position.copy(bodies.puckBody.position);
@@ -102,5 +105,5 @@ export function createTable(THREE, scene) {
         player.mesh.position.copy(bodies.player.body.position);
         cpu.mesh.position.copy(bodies.cpu.body.position);
     }
-    return { bed, field, railVisMat, railTopMat, lineMat, applyPlayerColor, sync };
+    return { bed, field, railVisMat, railTopMat, lineMat, applyColors, sync };
 }

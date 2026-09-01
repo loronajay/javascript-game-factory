@@ -54,7 +54,7 @@ export function createScene(THREE, canvas, gamewrap) {
     function dispose() {
         observer.disconnect();
         window.removeEventListener('resize', resize);
-        // Shared geometries/materials (including instancing and the trail pool) dispose once.
+        // Shared geometries/materials (including instancing) dispose once.
         const geometries = new Set(), materials = new Set();
         scene.traverse(object => {
             if (object.geometry)

@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION, RECONNECT_MS, validSnapshot } from './protocol.js';
+import { isPlayerColor, PROTOCOL_VERSION, RECONNECT_MS, validSnapshot } from './protocol.js';
 export const GAME_ID = 'puckd-up';
 const SETTINGS = Object.freeze({ protocolVersion: PROTOCOL_VERSION, targetScore: 7 });
 const clean = (value, max = 80) => typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -143,7 +143,10 @@ export function createOnlineClient({ WebSocketCtor = globalThis.WebSocket, resol
         findQuickMatch: () => request('find_lobby'),
         createPrivateRoom: () => request('create_lobby'),
         joinPrivateRoom: code => request('join_lobby', code),
-        setReady(ready) { if (state.status === 'lobby') return message('puck_ready', { protocolVersion: PROTOCOL_VERSION, ready: ready === true }); return false; },
+        setReady(ready, playerColor) {
+            if (state.status !== 'lobby' || !isPlayerColor(playerColor)) return false;
+            return message('puck_ready', { protocolVersion: PROTOCOL_VERSION, ready: ready === true, playerColor });
+        },
         sendInput({ seq, x, z }) { if (state.status !== 'playing') return false; return message('puck_input', { matchId: state.match.matchId, seq, x, z }); },
         rematch() { if (state.status === 'result') return message('puck_rematch', { matchId: state.match.matchId }); return false; },
         leave: () => leave(),

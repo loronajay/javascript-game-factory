@@ -103,14 +103,15 @@ test('roster changes, wrong-game responses, disconnects and unexpected starts ar
     client.dispose();
 });
 
-const snapshot = (patch = {}) => ({ protocolVersion: 2, matchId: 'm1', tick: 0, seats: ['c_me', 'c_two'], scores: [0, 0], ack: [0, 0],
+const snapshot = (patch = {}) => ({ protocolVersion: 3, matchId: 'm1', tick: 0, seats: ['c_me', 'c_two'], colors: ['#c24b86', '#38bdf8'], scores: [0, 0], ack: [0, 0],
     paddles: [{ x: 0, z: 5.8, vx: 0, vz: 0 }, { x: 0, z: -5.8, vx: 0, vz: 0 }], puck: { x: 0, z: 1.15, vx: 0, vz: 0 },
     phase: 'faceoff', remaining: .65, serving: 0, winner: null, disconnected: [false, false], ...patch });
 test('ready, authoritative snapshots, input and rematch use the current match binding', async () => {
     const { client, socket } = setup();
     await client.findQuickMatch(); socket().open(); socket().message(lobby({ members: ['c_me', 'c_two'] }));
-    client.setReady(true);
+    client.setReady(true, '#c24b86');
     assert.equal(socket().sent.at(-1).messageType, 'puck_ready');
+    assert.deepEqual(JSON.parse(socket().sent.at(-1).value), { protocolVersion: PROTOCOL_VERSION, ready: true, playerColor: '#c24b86' });
     socket().message({ event: 'lobby_started', gameId: 'puckd-up', roomCode: 'ABCDE', authorityMode: 'server', matchState: snapshot() });
     assert.equal(client.getSnapshot().status, 'playing');
     client.sendInput({ seq: 1, x: 2, z: 4, scores: [7, 0] });

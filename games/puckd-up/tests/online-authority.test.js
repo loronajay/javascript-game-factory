@@ -12,7 +12,7 @@ function bodies() {
         for (const b of [puckBody, player.body, cpu.body]) { b.position.x += b.velocity.x * dt; b.position.z += b.velocity.z * dt; }
     } } };
 }
-const make = () => createAuthority({ matchId: 'match-1', seats: ['a', 'b'], bodies: bodies() });
+const make = () => createAuthority({ matchId: 'match-1', seats: ['a', 'b'], colors: ['#c24b86', '#38bdf8'], bodies: bodies() });
 const advance = (engine, n) => { for (let i = 0; i < n; i++) engine.tick(1 / 240); };
 
 test('authority accepts only current seated, sequenced, finite, bounded intent', () => {
@@ -83,19 +83,22 @@ test('disconnect grace freezes play, reconnect resumes, expiry awards one forfei
 test('snapshots validate and mirror seat 1 scores, bodies, serve and winner together', () => {
     const engine = make(), snapshot = engine.snapshot();
     assert.equal(validSnapshot(snapshot), true);
+    assert.deepEqual(snapshot.colors, ['#c24b86', '#38bdf8']);
     assert.equal(validSnapshot({ ...snapshot, puck: { ...snapshot.puck, x: Infinity } }), false);
+    assert.equal(validSnapshot({ ...snapshot, colors: ['red', '#38bdf8'] }), false);
     const mirrored = toSeatSnapshot({ ...snapshot, scores: [2, 4], winner: 1 }, 1);
     assert.deepEqual(mirrored.scores, [4, 2]);
     assert.equal(mirrored.paddles[0].z, 5.8);
     assert.equal(mirrored.puck.z, -snapshot.puck.z);
     assert.equal(mirrored.servingPlayer, false);
     assert.equal(mirrored.winner, 0);
+    assert.deepEqual(mirrored.colors, ['#38bdf8', '#c24b86']);
     engine.dispose();
 });
 
 test('online match cannot score, restart or pause locally and returns to CPU safely', () => {
     const match = createMatch(), engine = make();
-    match.beginOnline({ matchId: 'match-1', opponentName: 'Bob' });
+    match.beginOnline({ matchId: 'match-1', opponentName: 'Bob', playerColors: ['#c24b86', '#38bdf8'] });
     match.applyOnline(toSeatSnapshot(engine.snapshot(), 0));
     const before = { ...match.state };
     match.tick(50); match.pause(); match.start(); match.score(true);
