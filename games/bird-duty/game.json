@@ -1,9 +1,9 @@
 {
   "title": "Bird Duty",
   "tagline": "Drop, dodge, and cash in before the turn flips.",
-  "description": "A native Javascript Game Factory port of Bird Duty from the TurboWarp original.",
-  "players": "1-2",
-  "status": "Porting",
+  "description": "Perch as a bird and poop on pedestrians walking below to score points before they pass. Play solo time-attack, local hotseat 2-player, or online 2-4 player (public matchmaking or private join-code rooms).",
+  "players": "1-4",
+  "status": "Solo + local hotseat + online 2-4P",
   "order": 7,
   "featured": false,
   "theme": "sky",

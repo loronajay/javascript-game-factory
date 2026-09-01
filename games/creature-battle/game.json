@@ -4,7 +4,7 @@
   "previewImage": "grid-previews/creature-battler.png",
   "description": "A 3v3 turn-based battle game. Pick your rental team from the roster, plan your commands, and outlast the opponent. Six status effects, elemental matchups, a class/skill system, and a full move library across twelve creatures. Play solo training vs AI or online 1v1 blind pick.",
   "players": "1-2",
-  "status": "Playable prototype — solo training + online 1v1",
+  "status": "Playable — solo training vs AI, or online 1v1 blind pick",
   "order": 8,
   "featured": false,
   "theme": "void",

@@ -1,9 +1,9 @@
 {
   "title": "Build Buddy",
   "tagline": "Run the route. Build the way.",
-  "description": "A real-time co-op platformer prototype where one player runs through momentum-heavy stages while the other places platforms, springs, and checkpoints to keep the route alive.",
+  "description": "A momentum platformer where you switch between running the route and placing platforms, springs, and checkpoints to build it. Solo local play (switch roles solo) and Practice/Debug Lab are playable now; true two-player co-op (one runner, one builder) works in Online mode via public matchmaking or private room codes.",
   "players": "1-2",
-  "status": "Playable prototype - local runner/builder engine and 10-stage pack structure",
+  "status": "Playable - solo local run + practice, plus online 2P co-op, across a 10-stage pack",
   "order": 10,
   "featured": false,
   "theme": "workshop",

@@ -1,7 +1,7 @@
 {
   "title": "Hide and Seek",
   "tagline": "One of you is it. Two of them are worse.",
-  "description": "Online multiplayer hide and seek in a four-floor hotel with two demons loose in it. One player is the seeker, held in the lobby elevator while everyone else scatters across rooms, locked suites and secret passages. The demons hunt everyone, the seeker included, so being it is not safe either. Crouch to stay hidden, spend your flashlight battery carefully, and keep moving: standing still too long is what brings The Bellhop to your door. Two to eight guests on a server-authoritative round, or a solo run against the hotel.",
+  "description": "Online multiplayer hide and seek across four locations — The Grand Hotel, Cinder Mall, Mercy Hospital, and Crowne Point Cinema — each stalked by its own roster of demons. One player is the seeker, held back at the start while everyone else scatters; the demons hunt everyone, seeker included, so being it is not safe either. Crouch to stay hidden, spend your flashlight battery carefully, and keep moving: standing still too long brings a demon to your room. Two to eight guests on a server-authoritative round, or a solo run against the CPU. Only the hotel and Cinder Mall have been playtested with real people so far.",
   "players": "1-8",
   "status": "Playable - solo and online 2-8 players, server authoritative",
   "order": 16,

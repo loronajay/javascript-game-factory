@@ -1,9 +1,9 @@
 {
   "title": "Yam Bowling",
   "tagline": "Pick your bowler. Find the pocket. Feed the competition.",
-  "description": "A character-driven arcade bowling cabinet with three-frame quick matches or regulation ten-frame scoring, playable locally, against CPU opponents, or online through Quick Match and private rooms.",
+  "description": "A character-driven arcade bowling cabinet with a 30-bowler canon roster, three-frame Quick Bowl or regulation ten-frame Classic Ten scoring, playable locally, against CPU opponents, or online through Quick Match and private rooms. Signed-in players can also run a five-division circuit campaign and rotating CPU tournament brackets, with cosmetic progression (skins, rooms, effects) unlocked through XP and vouchers.",
   "players": "1-2",
-  "status": "Playable - local, vs CPU, and online",
+  "status": "Playable - local, vs CPU, online multiplayer, circuit campaign, and tournaments",
   "order": 14,
   "featured": false,
   "theme": "ember",

@@ -1,6 +1,12 @@
 // Geometry helpers are visual only; venues never add physics bodies.
 export const SURFACE_RECIPES = Object.freeze({
     rubber: { roughness: .74, metalness: .03 },
+    arcadeCarpet: { roughness: .92, metalness: 0 },
+    acrylic: { roughness: .24, metalness: .16 },
+    tournamentComposite: { roughness: .30, metalness: .24 },
+    outdoorComposite: { roughness: .48, metalness: .05 },
+    rooftopResin: { roughness: .38, metalness: .12 },
+    garageLaminate: { roughness: .34, metalness: .10 },
     arenaFloor: { roughness: .52, metalness: .10 },
     grass: { roughness: .96, metalness: 0 },
     roofing: { roughness: .72, metalness: .16 },
@@ -36,6 +42,44 @@ function sampleSurface(kind, x, y, size, seed) {
         const seam = x % 32 < 2 || y % 32 < 2;
         accent = seam ? .62 : (grain > .965 ? .32 : 0);
         light = seam ? .60 : .89 + coarse * .14;
+    }
+    else if (kind === 'arcadeCarpet') {
+        const cellX = (x + seed * 3) % 32, cellY = (y + seed * 5) % 32;
+        const slash = cellX > 4 && cellX < 14 && Math.abs(cellY - (cellX * 1.45 - 3)) < 1.5;
+        const chevron = cellX > 19 && Math.abs(cellY - Math.abs(cellX - 25) * 1.35 - 8) < 1.4;
+        const confetti = grain > .982;
+        accent = confetti ? .90 : (slash || chevron ? .62 : 0);
+        light = .78 + grain * .16;
+    }
+    else if (kind === 'acrylic') {
+        const frost = grain > .965 || grain < .025;
+        accent = frost ? .24 : 0;
+        light = .97 + grain * .06;
+    }
+    else if (kind === 'tournamentComposite') {
+        const weaveA = (x + y + seed) % 10 < 2;
+        const weaveB = (x - y + size * 2 + seed) % 10 < 2;
+        const fleck = grain > .985;
+        accent = fleck ? .34 : (weaveA && weaveB ? .18 : (weaveA || weaveB ? .07 : 0));
+        light = .91 + grain * .09;
+    }
+    else if (kind === 'outdoorComposite') {
+        const fleck = grain > .965 || grain < .028;
+        const scuff = Math.sin(x * .22 + y * .13 + seed) > .94 && coarse > .72;
+        accent = fleck ? .22 : (scuff ? .10 : 0);
+        light = .88 + grain * .13;
+    }
+    else if (kind === 'rooftopResin') {
+        const aggregate = grain > .955 || grain < .025;
+        const rollerMark = Math.sin(x * .16 + y * .07 + seed) > .965;
+        accent = aggregate ? .24 : (rollerMark ? .08 : 0);
+        light = .90 + grain * .11;
+    }
+    else if (kind === 'garageLaminate') {
+        const flake = grain > .97 || grain < .02;
+        const buffMark = Math.sin(x * .11 + y * .19 + seed) > .975;
+        accent = flake ? .20 : (buffMark ? .07 : 0);
+        light = .91 + grain * .10;
     }
     else if (kind === 'arenaFloor') {
         const weave = (x + y) % 12 < 2 || (x - y + size) % 12 < 2;
