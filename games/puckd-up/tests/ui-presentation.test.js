@@ -64,6 +64,8 @@ test('main menu exposes a portrait-driven twelve-stop Arcade Circuit', () => {
     assert.match(html, /id="rivalPortrait"/);
     assert.match(css, /campaign\.png/);
     assert.match(controller, /CIRCUIT_STOPS/);
+    assert.match(controller, /--portrait-focus[^\n]+rival\.portraitFocus/);
+    assert.match(css, /object-position:var\(--portrait-focus/);
 });
 
 test('Zero-G Arena keeps station ribs and light channels out of the table view corridor', () => {

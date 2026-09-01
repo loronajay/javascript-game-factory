@@ -9,7 +9,10 @@ export function buildGarageClub(THREE) {
     const steel = makeStd(0x35393c, { roughness: .38, metalness: .78 });
     const yellow = makeStd(0xe2a332, { roughness: .42, metalness: .34, emissive: 0xb16d18, emissiveIntensity: .48 });
     addBox(g, [32, .45, 38], [0, -.72, -1], floor);
-    addBox(g, [32, .35, 38], [0, 6.4, -1], concrete);
+    // Open trusses imply a low garage ceiling without putting an opaque slab
+    // between the elevated broadcast camera and the table.
+    for (const z of [-11, -5]) addBox(g, [23, .32, .5], [0, 6.15, z], steel);
+    for (const x of [-10.5, 10.5]) addBox(g, [.5, .32, 18], [x, 6.15, -4], steel);
     const pillars = [];
     for (const x of [-10.5, 10.5]) for (const z of [-12, -4, 4, 10]) pillars.push({ x, y: 2.7, z, sx: 1.05, sy: 6.2, sz: 1.05 });
     addInstancedBoxes(g, pillars, concrete);

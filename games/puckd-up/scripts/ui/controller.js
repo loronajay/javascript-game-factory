@@ -36,6 +36,7 @@ export function createUI({ doc, match, metrics, audio, controls, view, stagePrev
         button.type = 'button';
         button.className = 'circuitStop';
         button.dataset.stop = String(index);
+        button.style.setProperty('--portrait-focus', rival.portraitFocus);
         button.innerHTML = `<img src="${rival.portrait}" alt=""><span class="circuitStopCopy"><span class="circuitStopNo">${String(stop.number).padStart(2, '0')}</span><strong>${rival.name}</strong><span class="circuitStopState"></span><small>${stop.name} · ${rival.style}</small></span>`;
         el.circuitGrid.append(button);
         return button;
@@ -64,12 +65,14 @@ export function createUI({ doc, match, metrics, audio, controls, view, stagePrev
         el.setupRival.value = rival.id;
         el.rivalPortrait.src = rival.portrait;
         el.rivalPortrait.alt = `${rival.name}, ${rival.title}`;
+        el.rivalPortrait.style.objectPosition = rival.portraitFocus;
         write(el.rivalTitle, `${rival.title} // ${rival.style}`);
         write(el.rivalName, rival.name);
         write(el.rivalIntro, rival.intro);
         write(el.rivalRecord, `Record ${record.wins}–${record.losses}`);
         el.rivalPortraitMobile.src = rival.portrait;
         el.rivalPortraitMobile.alt = `${rival.name}, ${rival.title}`;
+        el.rivalPortraitMobile.style.objectPosition = rival.portraitFocus;
         write(el.rivalTitleMobile, `${rival.title} // ${rival.style}`);
         write(el.rivalNameMobile, rival.name);
         write(el.rivalIntroMobile, rival.intro);

@@ -3,18 +3,18 @@ import { W, L } from '../config.js';
 const portrait = id => `./assets/rivals/${id}.jpg`;
 
 export const RIVALS = Object.freeze([
-    { id: 'rookie', name: 'Jin', title: 'The Prodigy', style: 'Reactive', color: '#a6d854', accent: '#e7ffad', homeArena: 'hyper_arcade', portrait: portrait('rookie'), speed: 6.2, error: .16, strikePower: .21, design: 'starter', intro: 'Seventeen, scary fast to learn, and still liable to bite on the first fake.', behavior: 'reactive' },
-    { id: 'banks', name: 'Banks', title: 'Park Hustler', style: 'Rail shots', color: '#9b5b45', accent: '#f1c27d', homeArena: 'park_jam', portrait: portrait('banks'), speed: 7.1, error: .095, strikePower: .24, design: 'classic', intro: 'He has taken lunch money off three generations at the same park table.', behavior: 'banker' },
-    { id: 'brick', name: 'Mack', title: 'The Brick', style: 'Deep defense', color: '#d36b35', accent: '#ffb270', homeArena: 'garage_club', portrait: portrait('brick'), speed: 7.0, error: .075, strikePower: .23, design: 'heavy', intro: 'An electrician by day. After work, nothing gets through his half of the table.', behavior: 'defender' },
-    { id: 'viper', name: 'Val', title: 'Viper', style: 'All-out attack', color: '#d43883', accent: '#ff8dc5', homeArena: 'hyper_arcade', portrait: portrait('viper'), speed: 9.1, error: .072, strikePower: .27, design: 'razor', intro: 'A bike courier with no neutral gear and even less patience for a loose puck.', behavior: 'aggressor' },
-    { id: 'gambler', name: 'Nico', title: 'The Gambler', style: 'Risky angles', color: '#8c55c7', accent: '#f0c45e', homeArena: 'boardwalk_bash', portrait: portrait('gambler'), speed: 8.5, error: .115, strikePower: .29, design: 'flash', intro: 'He will try the shot nobody sane would take—and somehow make half of them.', behavior: 'gambler' },
-    { id: 'cannon', name: 'Tess', title: 'Cannon', style: 'Heavy strikes', color: '#b93a38', accent: '#ff8b6b', homeArena: 'freight_yard', portrait: portrait('cannon'), speed: 8.0, error: .065, strikePower: .38, design: 'power', intro: 'A former amateur boxer who treats every clean contact like a right cross.', behavior: 'power' },
-    { id: 'mirror', name: 'Mara', title: 'Mirror', style: 'Position copy', color: '#4b78c2', accent: '#d482ad', homeArena: 'competition_circuit', portrait: portrait('mirror'), speed: 8.9, error: .045, strikePower: .28, design: 'split', intro: 'A choreographer who reads your balance before you know you have shifted it.', behavior: 'mirror' },
-    { id: 'switch', name: 'Roxy', title: 'Switch', style: 'Tempo changes', color: '#d75c91', accent: '#ffd3e6', homeArena: 'skyline_rooftop', portrait: portrait('switch'), speed: 9.4, error: .052, strikePower: .30, design: 'gloss', intro: 'Sweet smile, sharp tongue, and a nasty habit of changing pace mid-rally.', behavior: 'switch' },
-    { id: 'anchor', name: 'Dale', title: 'Anchor', style: 'Center control', color: '#397d76', accent: '#9bd6c7', homeArena: 'freight_yard', portrait: portrait('anchor'), speed: 9.0, error: .036, strikePower: .31, design: 'solid', intro: 'A dock foreman who owns the middle lane and never wastes a movement.', behavior: 'anchor' },
-    { id: 'ghost', name: 'June', title: 'Ghost', style: 'Late reactions', color: '#7d8394', accent: '#d9deea', homeArena: 'garage_club', portrait: portrait('ghost'), speed: 9.8, error: .03, strikePower: .30, design: 'quiet', intro: 'The retired librarian barely seems to move until your shot is already coming back.', behavior: 'ghost' },
-    { id: 'orbit', name: 'Dev', title: 'Orbit', style: 'Rebound reads', color: '#2d9cb8', accent: '#8eeaff', homeArena: 'zero_g_arena', portrait: portrait('orbit'), speed: 10.6, error: .022, strikePower: .33, design: 'ring', intro: 'A physics grad student who sees two rebounds ahead and explains none of them.', behavior: 'reader' },
-    { id: 'ace', name: 'Sloane', title: 'The Ace', style: 'Complete game', color: '#d5aa38', accent: '#fff0a6', homeArena: 'zero_g_arena', portrait: portrait('ace'), speed: 11.8, error: .012, strikePower: .36, design: 'champion', intro: 'The circuit champion has no obvious weakness. That is the point.', behavior: 'ace' },
+    { id: 'rookie', name: 'Jin', title: 'The Prodigy', style: 'Reactive', color: '#a6d854', accent: '#e7ffad', homeArena: 'hyper_arcade', portrait: portrait('rookie'), portraitFocus: '50% 12%', speed: 6.2, error: .16, strikePower: .21, design: 'starter', intro: 'Seventeen, scary fast to learn, and still liable to bite on the first fake.', behavior: 'reactive' },
+    { id: 'banks', name: 'Banks', title: 'Park Hustler', style: 'Rail shots', color: '#9b5b45', accent: '#f1c27d', homeArena: 'park_jam', portrait: portrait('banks'), portraitFocus: '50% 20%', speed: 7.1, error: .095, strikePower: .24, design: 'classic', intro: 'He has taken lunch money off three generations at the same park table.', behavior: 'banker' },
+    { id: 'brick', name: 'Mack', title: 'The Brick', style: 'Deep defense', color: '#d36b35', accent: '#ffb270', homeArena: 'garage_club', portrait: portrait('brick'), portraitFocus: '50% 15%', speed: 7.0, error: .075, strikePower: .23, design: 'heavy', intro: 'An electrician by day. After work, nothing gets through his half of the table.', behavior: 'defender' },
+    { id: 'viper', name: 'Val', title: 'Viper', style: 'All-out attack', color: '#d43883', accent: '#ff8dc5', homeArena: 'hyper_arcade', portrait: portrait('viper'), portraitFocus: '50% 10%', speed: 9.1, error: .072, strikePower: .27, design: 'razor', intro: 'A bike courier with no neutral gear and even less patience for a loose puck.', behavior: 'aggressor' },
+    { id: 'gambler', name: 'Nico', title: 'The Gambler', style: 'Risky angles', color: '#8c55c7', accent: '#f0c45e', homeArena: 'boardwalk_bash', portrait: portrait('gambler'), portraitFocus: '50% 13%', speed: 8.5, error: .115, strikePower: .29, design: 'flash', intro: 'He will try the shot nobody sane would take—and somehow make half of them.', behavior: 'gambler' },
+    { id: 'cannon', name: 'Tess', title: 'Cannon', style: 'Heavy strikes', color: '#b93a38', accent: '#ff8b6b', homeArena: 'freight_yard', portrait: portrait('cannon'), portraitFocus: '50% 9%', speed: 8.0, error: .065, strikePower: .38, design: 'power', intro: 'A former amateur boxer who treats every clean contact like a right cross.', behavior: 'power' },
+    { id: 'mirror', name: 'Mara', title: 'Mirror', style: 'Position copy', color: '#4b78c2', accent: '#d482ad', homeArena: 'competition_circuit', portrait: portrait('mirror'), portraitFocus: '50% 8%', speed: 8.9, error: .045, strikePower: .28, design: 'split', intro: 'A choreographer who reads your balance before you know you have shifted it.', behavior: 'mirror' },
+    { id: 'switch', name: 'Roxy', title: 'Switch', style: 'Tempo changes', color: '#d75c91', accent: '#ffd3e6', homeArena: 'skyline_rooftop', portrait: portrait('switch'), portraitFocus: '50% 10%', speed: 9.4, error: .052, strikePower: .30, design: 'gloss', intro: 'Sweet smile, sharp tongue, and a nasty habit of changing pace mid-rally.', behavior: 'switch' },
+    { id: 'anchor', name: 'Dale', title: 'Anchor', style: 'Center control', color: '#397d76', accent: '#9bd6c7', homeArena: 'freight_yard', portrait: portrait('anchor'), portraitFocus: '50% 14%', speed: 9.0, error: .036, strikePower: .31, design: 'solid', intro: 'A dock foreman who owns the middle lane and never wastes a movement.', behavior: 'anchor' },
+    { id: 'ghost', name: 'June', title: 'Ghost', style: 'Late reactions', color: '#7d8394', accent: '#d9deea', homeArena: 'garage_club', portrait: portrait('ghost'), portraitFocus: '50% 17%', speed: 9.8, error: .03, strikePower: .30, design: 'quiet', intro: 'The retired librarian barely seems to move until your shot is already coming back.', behavior: 'ghost' },
+    { id: 'orbit', name: 'Dev', title: 'Orbit', style: 'Rebound reads', color: '#2d9cb8', accent: '#8eeaff', homeArena: 'zero_g_arena', portrait: portrait('orbit'), portraitFocus: '50% 12%', speed: 10.6, error: .022, strikePower: .33, design: 'ring', intro: 'A physics grad student who sees two rebounds ahead and explains none of them.', behavior: 'reader' },
+    { id: 'ace', name: 'Sloane', title: 'The Ace', style: 'Complete game', color: '#d5aa38', accent: '#fff0a6', homeArena: 'zero_g_arena', portrait: portrait('ace'), portraitFocus: '50% 8%', speed: 11.8, error: .012, strikePower: .36, design: 'champion', intro: 'The circuit champion has no obvious weakness. That is the point.', behavior: 'ace' },
 ]);
 
 export const RIVAL_IDS = Object.freeze(RIVALS.map(rival => rival.id));
@@ -46,6 +46,30 @@ export function planRivalMove(id, { cpu, puck, player }, random = Math.random) {
     const rival = getRival(id);
     let x = 0, z = -5.65;
     const incoming = puck.vz < -.15;
+    const backLimit = -L / 2 + .82;
+    const trappedBehind = puck.vz < .75 && (puck.z < cpu.z - .18 || (puck.z < -5.9 && Math.abs(puck.vz) < .75));
+    if (trappedBehind) {
+        const behindPuck = cpu.z < puck.z - .25;
+        const safelyBeside = Math.abs(cpu.x - puck.x) > 1.1;
+        const reachedBackRail = cpu.z <= backLimit + .08;
+        if (behindPuck || (reachedBackRail && safelyBeside)) {
+            // Sweep forward through the puck after getting behind it. The back-rail
+            // fallback also clears pucks too deep for the mallet center to pass.
+            return {
+                x: clamp(puck.x + puck.vx * .035, -W / 2 + .82, W / 2 - .82),
+                z: clamp(puck.z + .95, backLimit, -.72),
+                speed: Math.max(rival.speed, 9.5),
+            };
+        }
+        // Circle around the puck first so the recovery does not drive it into the
+        // CPU's own goal. Preserve the chosen side once the mallet has committed.
+        const side = Math.abs(cpu.x - puck.x) > .15 ? Math.sign(cpu.x - puck.x) : (puck.vx >= 0 ? -1 : 1);
+        return {
+            x: clamp(puck.x + side * 1.45, -W / 2 + .82, W / 2 - .82),
+            z: backLimit,
+            speed: Math.max(rival.speed, 9.5),
+        };
+    }
     switch (rival.behavior) {
         case 'defender':
             x = incoming ? intercept(puck, -5.55) * .72 : puck.x * .34;
