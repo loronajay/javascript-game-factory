@@ -55,13 +55,15 @@ export function createScene(THREE, canvas, gamewrap) {
         observer.disconnect();
         window.removeEventListener('resize', resize);
         // Shared geometries/materials (including instancing) dispose once.
-        const geometries = new Set(), materials = new Set();
+        const geometries = new Set(), materials = new Set(), textures = new Set();
         scene.traverse(object => {
             if (object.geometry)
                 geometries.add(object.geometry);
             if (object.material)
                 for (const material of [object.material].flat())
                     materials.add(material);
+            if (object.userData?.fieldMap)
+                textures.add(object.userData.fieldMap);
             if (object.isInstancedMesh)
                 object.dispose();
             if (object.shadow)
@@ -69,8 +71,12 @@ export function createScene(THREE, canvas, gamewrap) {
         });
         for (const geometry of geometries)
             geometry.dispose();
-        for (const material of materials)
+        for (const material of materials) {
+            if (material.map) textures.add(material.map);
             material.dispose();
+        }
+        for (const texture of textures)
+            texture.dispose();
         renderer.dispose();
     }
     return { scene, renderer, camera, hemi, key, cool, warm, resize, dispose };

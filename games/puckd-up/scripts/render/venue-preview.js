@@ -5,16 +5,21 @@ import { getRival } from '../physics/rivals.js';
 
 
 function disposeStage(stage) {
-    const geometries = new Set(), materials = new Set();
+    const geometries = new Set(), materials = new Set(), textures = new Set();
     stage.scene.traverse(object => {
         if (object.geometry) geometries.add(object.geometry);
         if (object.material)
             for (const material of [object.material].flat()) materials.add(material);
+        if (object.userData?.fieldMap) textures.add(object.userData.fieldMap);
         if (object.isInstancedMesh) object.dispose();
         if (object.shadow) object.shadow.dispose();
     });
     for (const geometry of geometries) geometry.dispose();
-    for (const material of materials) material.dispose();
+    for (const material of materials) {
+        if (material.map) textures.add(material.map);
+        material.dispose();
+    }
+    for (const texture of textures) texture.dispose();
     stage.renderer.dispose();
 }
 

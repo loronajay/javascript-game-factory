@@ -1,7 +1,139 @@
 // Geometry helpers are visual only; venues never add physics bodies.
+export const SURFACE_RECIPES = Object.freeze({
+    rubber: { roughness: .74, metalness: .03 },
+    arenaFloor: { roughness: .52, metalness: .10 },
+    grass: { roughness: .96, metalness: 0 },
+    roofing: { roughness: .72, metalness: .16 },
+    concrete: { roughness: .9, metalness: .02 },
+    wood: { roughness: .84, metalness: .01 },
+    asphalt: { roughness: .94, metalness: .01 },
+    spacePanels: { roughness: .34, metalness: .62 },
+    corrugated: { roughness: .64, metalness: .38 },
+    paintedMetal: { roughness: .5, metalness: .45 },
+    water: { roughness: .26, metalness: .12 },
+});
+
+function rgb(hex) {
+    return [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255];
+}
+
+function hash(x, y, seed) {
+    let value = Math.imul(x + seed * 17, 374761393) ^ Math.imul(y + seed * 29, 668265263);
+    value = Math.imul(value ^ (value >>> 13), 1274126177);
+    return ((value ^ (value >>> 16)) >>> 0) / 4294967295;
+}
+
+function mixColor(base, accent, amount, light = 1) {
+    return base.map((channel, i) => Math.max(0, Math.min(255, Math.round((channel + (accent[i] - channel) * amount) * light))));
+}
+
+function sampleSurface(kind, x, y, size, seed) {
+    const grain = hash(x, y, seed);
+    const coarse = hash(Math.floor(x / 4), Math.floor(y / 4), seed + 41);
+    let accent = 0;
+    let light = .88 + grain * .22;
+    if (kind === 'rubber') {
+        const seam = x % 32 < 2 || y % 32 < 2;
+        accent = seam ? .62 : (grain > .965 ? .32 : 0);
+        light = seam ? .60 : .89 + coarse * .14;
+    }
+    else if (kind === 'arenaFloor') {
+        const weave = (x + y) % 12 < 2 || (x - y + size) % 12 < 2;
+        accent = weave ? .14 : (grain > .985 ? .28 : 0);
+        light = .91 + coarse * .13;
+    }
+    else if (kind === 'grass') {
+        const blade = (x * 7 + y * 13 + seed) % 19 < 3;
+        accent = blade ? .24 : 0;
+        light = .76 + grain * .34 + (Math.floor(x / 16) % 2 ? .025 : -.025);
+    }
+    else if (kind === 'roofing') {
+        const seam = x % 40 < 2 || y % 40 < 2;
+        accent = seam ? .52 : (grain > .97 ? .18 : 0);
+        light = seam ? .65 : .82 + grain * .23;
+    }
+    else if (kind === 'concrete') {
+        const aggregate = grain > .96;
+        const crack = Math.abs(y - ((x * 5 + seed * 7) % size)) < 1 && coarse > .62;
+        accent = crack ? .76 : (aggregate ? .38 : 0);
+        light = .82 + grain * .24;
+    }
+    else if (kind === 'wood') {
+        const seam = y % 24 < 2;
+        const grainLine = Math.sin(x * .38 + y * .08 + coarse * 5) > .82;
+        const nail = (x % 48 < 2 || x % 48 > 46) && (y % 24 < 4);
+        accent = nail ? .82 : (seam ? .68 : (grainLine ? .24 : 0));
+        light = seam ? .66 : .82 + grain * .24;
+    }
+    else if (kind === 'asphalt') {
+        const pebble = grain > .93 || grain < .035;
+        const crack = Math.abs(y - ((x * 3 + seed * 11) % size)) < 1 && coarse > .72;
+        accent = crack ? .74 : (pebble ? .30 : 0);
+        light = .75 + grain * .28;
+    }
+    else if (kind === 'spacePanels') {
+        const seam = x % 32 < 2 || y % 32 < 2;
+        const hatch = (x + y) % 32 < 2 && x % 32 > 18;
+        accent = seam ? .64 : (hatch ? .25 : 0);
+        light = seam ? .62 : .88 + coarse * .15;
+    }
+    else if (kind === 'corrugated') {
+        const rib = x % 12;
+        light = .72 + Math.sin(rib / 12 * Math.PI) * .32;
+        accent = grain > .985 ? .5 : 0;
+    }
+    else if (kind === 'paintedMetal') {
+        const scratch = (x * 3 + y * 11 + seed) % 97 < 2;
+        accent = scratch ? .42 : (grain > .985 ? .22 : 0);
+        light = .84 + coarse * .20;
+    }
+    else if (kind === 'water') {
+        const wave = Math.sin(y * .42 + Math.sin(x * .16) * 2.4);
+        accent = wave > .76 ? .18 : 0;
+        light = .82 + (wave + 1) * .10;
+    }
+    return { accent, light };
+}
+
+function createSurfaceTexture(THREE, kind, color, accentColor, { size = 96, repeat = [4, 4], seed = 1 } = {}) {
+    if (!THREE.DataTexture || !THREE.RGBAFormat)
+        return null;
+    const base = rgb(color), accent = rgb(accentColor);
+    const data = new Uint8Array(size * size * 4);
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const sample = sampleSurface(kind, x, y, size, seed);
+            const pixel = mixColor(base, accent, sample.accent, sample.light);
+            const offset = (y * size + x) * 4;
+            data[offset] = pixel[0];
+            data[offset + 1] = pixel[1];
+            data[offset + 2] = pixel[2];
+            data[offset + 3] = 255;
+        }
+    }
+    const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(...repeat);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    if (THREE.LinearFilter) texture.magFilter = THREE.LinearFilter;
+    if (THREE.LinearMipmapLinearFilter) texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.generateMipmaps = true;
+    texture.anisotropy = 4;
+    texture.needsUpdate = true;
+    return texture;
+}
+
 export function createVenueHelpers(THREE) {
     function makeStd(color, { roughness = .55, metalness = .05, emissive = 0x000000, emissiveIntensity = 0, transparent = false, opacity = 1 } = {}) {
         return new THREE.MeshStandardMaterial({ color, roughness, metalness, emissive, emissiveIntensity, transparent, opacity });
+    }
+    function makeSurface(kind, color, { accent = 0x151515, repeat = [4, 4], size = 96, seed = 1, ...options } = {}) {
+        const recipe = SURFACE_RECIPES[kind] || {};
+        const map = createSurfaceTexture(THREE, kind, color, accent, { repeat, size, seed });
+        const material = makeStd(map ? 0xffffff : color, { ...recipe, ...options });
+        if (map) material.map = map;
+        material.userData.surfaceKind = kind;
+        return material;
     }
     function addBox(group, size, pos, material, rotation = [0, 0, 0]) {
         const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), material);
@@ -76,5 +208,5 @@ export function createVenueHelpers(THREE) {
         const head = makeStd(color, { roughness: .15, metalness: .2, emissive: color, emissiveIntensity: 1.8 });
         addBox(group, [.55, .10, .25], [x, 3.0, z], head);
     }
-    return { makeStd, addBox, addCylinder, addInstancedBoxes, makePoints, addSkyDome, addNeonStrip, addLampPost };
+    return { makeStd, makeSurface, addBox, addCylinder, addInstancedBoxes, makePoints, addSkyDome, addNeonStrip, addLampPost };
 }

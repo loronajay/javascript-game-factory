@@ -1,10 +1,10 @@
 import { createVenueHelpers } from './helpers.js';
 export function buildSkylineRooftop(THREE) {
-    const { makeStd, addBox, addCylinder, addInstancedBoxes, makePoints, addSkyDome, addNeonStrip } = createVenueHelpers(THREE);
+    const { makeStd, makeSurface, addBox, addCylinder, addInstancedBoxes, makePoints, addSkyDome, addNeonStrip } = createVenueHelpers(THREE);
     const g = new THREE.Group();
     g.name = 'Skyline Rooftop';
     addSkyDome(g, { top: 0x031129, bottom: 0x3a3352, horizon: 0x14284b, radius: 50, y: 7, z: -7 });
-    const roof = makeStd(0x101823, { roughness: .56, metalness: .34 });
+    const roof = makeSurface('roofing', 0x182431, { accent: 0x070b10, repeat: [8, 11], seed: 211, roughness: .68, metalness: .18 });
     const metal = makeStd(0x384653, { roughness: .25, metalness: .84 });
     const glass = makeStd(0x183652, { roughness: .08, metalness: .32, transparent: true, opacity: .34 });
     const cyan = makeStd(0x38bff2, { roughness: .14, metalness: .48, emissive: 0x38bff2, emissiveIntensity: 1.5 });

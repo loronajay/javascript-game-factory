@@ -1,13 +1,13 @@
 import { createVenueHelpers } from './helpers.js';
 
 export function buildZeroGArena(THREE) {
-    const { makeStd, addBox, addCylinder, makePoints, addSkyDome, addNeonStrip } = createVenueHelpers(THREE);
+    const { makeStd, makeSurface, addBox, addCylinder, makePoints, addSkyDome, addNeonStrip } = createVenueHelpers(THREE);
     const g = new THREE.Group();
     g.name = 'Zero-G Arena';
     addSkyDome(g, { top: 0x01040c, bottom: 0x09142a, horizon: 0x050b18, radius: 54, y: 6, z: -10 });
-    const floor = makeStd(0x0c121d, { roughness: .24, metalness: .7 });
-    const white = makeStd(0xaebdca, { roughness: .22, metalness: .68 });
-    const dark = makeStd(0x151d29, { roughness: .35, metalness: .62 });
+    const floor = makeSurface('spacePanels', 0x131e2b, { accent: 0x03070c, repeat: [8, 10], seed: 601, roughness: .3, metalness: .6 });
+    const white = makeSurface('paintedMetal', 0xb7c5cf, { accent: 0x53616c, repeat: [2, 6], seed: 607, roughness: .25, metalness: .64 });
+    const dark = makeSurface('spacePanels', 0x1b2634, { accent: 0x070b10, repeat: [2, 8], seed: 613 });
     const cyan = makeStd(0x4ed9e8, { emissive: 0x4ed9e8, emissiveIntensity: 1.25, roughness: .12, metalness: .5 });
     const gold = makeStd(0xe9bd5b, { emissive: 0xc98b2e, emissiveIntensity: 1.05, roughness: .18, metalness: .58 });
     addBox(g, [32, .4, 40], [0, -.72, -1], floor);

@@ -6,6 +6,7 @@ import { buildGarageClub } from './garage-club.js';
 import { buildBoardwalkBash } from './boardwalk-bash.js';
 import { buildFreightYard } from './freight-yard.js';
 import { buildZeroGArena } from './zero-g-arena.js';
+import { createVenueHelpers } from './helpers.js';
 export function createVenues(THREE, stage, table) {
     const { scene, renderer, hemi, key, cool, warm } = stage;
     const { bed, field, railVisMat, railTopMat, lineMat } = table;
@@ -21,6 +22,21 @@ export function createVenues(THREE, stage, table) {
     arenaGroups.set('boardwalk_bash', buildBoardwalkBash(THREE));
     arenaGroups.set('freight_yard', buildFreightYard(THREE));
     arenaGroups.set('zero_g_arena', buildZeroGArena(THREE));
+    const { makeSurface } = createVenueHelpers(THREE);
+    const TABLE_FINISHES = {
+        hyper_arcade: { kind: 'rubber', accent: 0x777079, repeat: [5, 9], seed: 701, roughness: .40, metalness: .11 },
+        competition_circuit: { kind: 'arenaFloor', accent: 0x89939a, repeat: [6, 10], seed: 709, roughness: .34, metalness: .12 },
+        park_jam: { kind: 'concrete', accent: 0x777a75, repeat: [5, 9], seed: 719, roughness: .50, metalness: .04 },
+        skyline_rooftop: { kind: 'roofing', accent: 0x747d86, repeat: [5, 9], seed: 727, roughness: .38, metalness: .12 },
+        garage_club: { kind: 'concrete', accent: 0x696b69, repeat: [6, 10], seed: 733, roughness: .46, metalness: .08 },
+        boardwalk_bash: { kind: 'wood', accent: 0x7c7169, repeat: [5, 10], seed: 739, roughness: .42, metalness: .04 },
+        freight_yard: { kind: 'asphalt', accent: 0x73797a, repeat: [6, 10], seed: 743, roughness: .48, metalness: .08 },
+        zero_g_arena: { kind: 'spacePanels', accent: 0x788592, repeat: [5, 9], seed: 751, roughness: .27, metalness: .22 },
+    };
+    for (const [id, finish] of Object.entries(TABLE_FINISHES)) {
+        const material = makeSurface(finish.kind, 0xeeeeee, finish);
+        arenaGroups.get(id).userData.fieldMap = material.map || null;
+    }
     for (const group of arenaGroups.values()) {
         group.visible = false;
         venueRoot.add(group);
@@ -55,6 +71,10 @@ export function createVenues(THREE, stage, table) {
         renderer.toneMappingExposure = t.exposure;
         bed.material.color.setHex(t.bed);
         field.material.color.setHex(t.field);
+        field.material.map = activeArenaGroup.userData.fieldMap;
+        field.material.roughness = TABLE_FINISHES[id].roughness;
+        field.material.metalness = TABLE_FINISHES[id].metalness;
+        field.material.needsUpdate = true;
         railVisMat.color.setHex(t.rail);
         railTopMat.color.setHex(t.railTop);
         lineMat.color.setHex(t.line);

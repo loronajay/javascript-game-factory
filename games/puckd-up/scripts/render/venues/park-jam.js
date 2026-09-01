@@ -1,17 +1,30 @@
 import { createVenueHelpers } from './helpers.js';
 export function buildParkJam(THREE) {
-    const { makeStd, addBox, addInstancedBoxes, addSkyDome, addNeonStrip, addLampPost } = createVenueHelpers(THREE);
+    const { makeStd, makeSurface, addBox, addInstancedBoxes, addSkyDome, addNeonStrip, addLampPost } = createVenueHelpers(THREE);
     const g = new THREE.Group();
     g.name = 'Park Jam';
     addSkyDome(g, { top: 0x5e9bd0, bottom: 0xd9d2a4, horizon: 0x9bc0d0, radius: 48, y: 7, z: -7 });
-    const grass = makeStd(0x496b3d, { roughness: .94 });
-    const concrete = makeStd(0x787a76, { roughness: .88 });
-    const concreteDark = makeStd(0x4f5358, { roughness: .84 });
+    const grass = makeSurface('grass', 0x527743, { accent: 0x1f3d25, repeat: [13, 15], seed: 101 });
+    const concrete = makeSurface('concrete', 0x85847d, { accent: 0x35383a, repeat: [7, 10], seed: 113 });
+    const concreteDark = makeSurface('concrete', 0x5d6266, { accent: 0x292d30, repeat: [3, 3], seed: 127, roughness: .86 });
     const trunkMat = makeStd(0x604129, { roughness: .95 });
     const leafMat = makeStd(0x34613b, { roughness: .91 });
     const metal = makeStd(0x353b3d, { roughness: .62, metalness: .55 });
     addBox(g, [36, .45, 42], [0, -.75, -2], grass);
     addBox(g, [21, .18, 27], [0, -.49, -.5], concrete);
+    // Faded rec-court paint breaks up the slab and frames the table as a piece
+    // of equipment wheeled into a real multipurpose park court.
+    const courtMarkings = [];
+    for (const side of [-1, 1]) {
+        courtMarkings.push({ x: side * 7.15, y: -.385, z: -.5, sx: .075, sy: .018, sz: 20.5 });
+        for (let z = -8; z <= 8; z += 4)
+            courtMarkings.push({ x: side * 7.75, y: -.383, z, sx: 1.25, sy: .018, sz: .075 });
+    }
+    addInstancedBoxes(g, courtMarkings, makeStd(0xd2b957, { roughness: .82, transparent: true, opacity: .58 }));
+    const patchMarks = [];
+    for (const [x, z, sx, sz] of [[-8.8, -8.8, 1.5, .25], [8.6, -5.0, 1.1, .18], [-8.5, 3.0, 1.0, .16], [8.8, 7.4, 1.4, .22]])
+        patchMarks.push({ x, y: -.381, z, sx, sy: .016, sz, ry: x < 0 ? -.18 : .16 });
+    addInstancedBoxes(g, patchMarks, makeStd(0x4a8494, { roughness: .84, transparent: true, opacity: .46 }));
     const trunks = [], leaves = [];
     const treePositions = [[-10, -11], [-10, -5], [-9, 4], [10, -11], [10, -4], [9, 5], [-6, -15], [6, -15], [-12, 8], [12, 8]];
     for (const [x, z] of treePositions) {

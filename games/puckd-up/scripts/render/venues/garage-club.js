@@ -1,11 +1,11 @@
 import { createVenueHelpers } from './helpers.js';
 
 export function buildGarageClub(THREE) {
-    const { makeStd, addBox, addCylinder, addInstancedBoxes, addNeonStrip } = createVenueHelpers(THREE);
+    const { makeStd, makeSurface, addBox, addCylinder, addInstancedBoxes, addNeonStrip } = createVenueHelpers(THREE);
     const g = new THREE.Group();
     g.name = 'Garage Club';
-    const concrete = makeStd(0x2a2927, { roughness: .92 });
-    const floor = makeStd(0x17191a, { roughness: .62, metalness: .12 });
+    const concrete = makeSurface('concrete', 0x383633, { accent: 0x131312, repeat: [3, 7], seed: 307 });
+    const floor = makeSurface('concrete', 0x252728, { accent: 0x0b0c0c, repeat: [8, 11], seed: 311, roughness: .78, metalness: .07 });
     const steel = makeStd(0x35393c, { roughness: .38, metalness: .78 });
     const yellow = makeStd(0xe2a332, { roughness: .42, metalness: .34, emissive: 0xb16d18, emissiveIntensity: .48 });
     addBox(g, [32, .45, 38], [0, -.72, -1], floor);

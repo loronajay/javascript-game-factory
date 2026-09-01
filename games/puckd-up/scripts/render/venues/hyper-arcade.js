@@ -1,11 +1,11 @@
 import { createVenueHelpers } from './helpers.js';
 export function buildHyperArcade(THREE) {
-    const { makeStd, addBox, addInstancedBoxes, makePoints, addSkyDome, addNeonStrip } = createVenueHelpers(THREE);
+    const { makeStd, makeSurface, addBox, addInstancedBoxes, makePoints, addSkyDome, addNeonStrip } = createVenueHelpers(THREE);
     const g = new THREE.Group();
     g.name = 'Hyper Arcade';
     addSkyDome(g, { top: 0x05020d, bottom: 0x10031b, horizon: 0x1e092b, radius: 44, y: 4, z: -5 });
-    const floorMat = makeStd(0x0a0812, { roughness: .26, metalness: .34 });
-    const cabinetMat = makeStd(0x16151f, { roughness: .32, metalness: .42 });
+    const floorMat = makeSurface('rubber', 0x15101d, { accent: 0x07050b, repeat: [8, 10], seed: 17, roughness: .58, metalness: .18 });
+    const cabinetMat = makeSurface('paintedMetal', 0x201a28, { accent: 0x08070a, repeat: [2, 4], seed: 29, roughness: .32, metalness: .42 });
     const purple = makeStd(0xb92df0, { roughness: .18, metalness: .42, emissive: 0xb92df0, emissiveIntensity: 1.65 });
     const cyan = makeStd(0x19c8ff, { roughness: .16, metalness: .46, emissive: 0x19c8ff, emissiveIntensity: 1.8 });
     const pink = makeStd(0xff327f, { roughness: .16, metalness: .42, emissive: 0xff327f, emissiveIntensity: 1.8 });

@@ -1,13 +1,13 @@
 import { createVenueHelpers } from './helpers.js';
 export function buildCompetitionCircuit(THREE) {
-    const { makeStd, addBox, addInstancedBoxes, makePoints, addSkyDome, addNeonStrip } = createVenueHelpers(THREE);
+    const { makeStd, makeSurface, addBox, addInstancedBoxes, makePoints, addSkyDome, addNeonStrip } = createVenueHelpers(THREE);
     const g = new THREE.Group();
     g.name = 'Competition Circuit';
     addSkyDome(g, { top: 0x070b12, bottom: 0x10151a, horizon: 0x111b24, radius: 45, y: 5, z: -6 });
-    const floorMat = makeStd(0x0b1015, { roughness: .40, metalness: .22 });
+    const floorMat = makeSurface('arenaFloor', 0x111a22, { accent: 0x05080b, repeat: [7, 10], seed: 41, roughness: .48, metalness: .18 });
     const steel = makeStd(0x38434d, { roughness: .28, metalness: .82 });
     const dark = makeStd(0x151b21, { roughness: .52, metalness: .32 });
-    const seat = makeStd(0x202932, { roughness: .6, metalness: .15 });
+    const seat = makeSurface('rubber', 0x26323c, { accent: 0x0d1115, repeat: [2, 9], seed: 53, roughness: .67, metalness: .10 });
     const blue = makeStd(0x2b8fca, { roughness: .18, metalness: .48, emissive: 0x2b8fca, emissiveIntensity: 1.0 });
     const white = makeStd(0xc9e8ff, { roughness: .15, metalness: .42, emissive: 0x8cc8ed, emissiveIntensity: .85 });
     addBox(g, [30, .38, 38], [0, -.70, -2], floorMat);

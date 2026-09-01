@@ -1,13 +1,13 @@
 import { createVenueHelpers } from './helpers.js';
 
 export function buildBoardwalkBash(THREE) {
-    const { makeStd, addBox, addCylinder, addInstancedBoxes, addSkyDome, addNeonStrip, addLampPost } = createVenueHelpers(THREE);
+    const { makeStd, makeSurface, addBox, addCylinder, addInstancedBoxes, addSkyDome, addNeonStrip, addLampPost } = createVenueHelpers(THREE);
     const g = new THREE.Group();
     g.name = 'Boardwalk Bash';
     addSkyDome(g, { top: 0x704e87, bottom: 0xf3a665, horizon: 0xe97967, radius: 52, y: 6, z: -8 });
-    const wood = makeStd(0x72513b, { roughness: .86 });
-    const darkWood = makeStd(0x3d2d29, { roughness: .9 });
-    const ocean = makeStd(0x31758d, { roughness: .2, metalness: .18, transparent: true, opacity: .82 });
+    const wood = makeSurface('wood', 0x866044, { accent: 0x2f211c, repeat: [6, 12], seed: 401 });
+    const darkWood = makeSurface('wood', 0x4b342a, { accent: 0x17100e, repeat: [5, 2], seed: 409, roughness: .9 });
+    const ocean = makeSurface('water', 0x347d91, { accent: 0x9fd0d5, repeat: [8, 5], seed: 419, transparent: true, opacity: .82 });
     const steel = makeStd(0x4b4851, { roughness: .36, metalness: .72 });
     addBox(g, [34, .38, 40], [0, -.72, -1], wood);
     for (let z = -18; z < 18; z += 1.25) addBox(g, [34, .025, .055], [0, -.50, z], darkWood);
