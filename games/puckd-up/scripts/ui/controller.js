@@ -1,12 +1,13 @@
 import { normalizeSettings, saveSettings } from '../settings.js';
 // Owns DOM lookup, presentation and user actions. Reads match state; never moves bodies.
-export function createUI({ doc, match, metrics, audio, controls, view, storage, onlineClient }) {
+export function createUI({ doc, match, metrics, audio, controls, view, stagePreview, storage, onlineClient }) {
     const abort = new AbortController(), options = { signal: abort.signal };
     const ids = ['app', 'game', 'gamewrap', 'pScore', 'cScore', 'scoreboard', 'speed', 'shot', 'powerFill',
         'gameState', 'message', 'pause', 'restart', 'fullscreen', 'menuFullscreen', 'difficultyLabel',
         'serveLabel', 'menuScreen', 'setupScreen', 'pauseScreen', 'resultScreen', 'matchHud', 'matchControls',
         'cpuModeBtn', 'setupBack', 'startMatch', 'setupDifficulty', 'playerColor', 'colorPreview',
-        'resumeMatch', 'pauseRestart', 'pauseMenu', 'rematch', 'resultMenu', 'resultTitle', 'resultP', 'resultC', 'arenaGrid', 'soundToggle', 'opponentName', 'resultNote'];
+        'resumeMatch', 'pauseRestart', 'pauseMenu', 'rematch', 'resultMenu', 'resultTitle', 'resultP', 'resultC', 'arenaGrid', 'soundToggle', 'opponentName', 'resultNote',
+        'stagePreviewNumber', 'stagePreviewName', 'stagePreviewDescription'];
     const el = Object.fromEntries(ids.map(id => {
         const node = doc.getElementById(id);
         if (!node)
@@ -38,6 +39,12 @@ export function createUI({ doc, match, metrics, audio, controls, view, storage, 
             card.classList.toggle('selected', selected);
             card.setAttribute('aria-pressed', String(selected));
         }
+        const selectedVenue = arenas.find(card => card.dataset.arena === arenaId);
+        const venueIndex = arenas.indexOf(selectedVenue) + 1;
+        write(el.stagePreviewNumber, `A${venueIndex} // Selected venue`);
+        write(el.stagePreviewName, selectedVenue?.querySelector('b')?.textContent || 'Hyper Arcade');
+        write(el.stagePreviewDescription, selectedVenue?.querySelector('small')?.textContent || 'Neon light tunnel');
+        stagePreview.configure(match.config);
         write(el.soundToggle, muted ? 'Sound: Off' : 'Sound: On');
         el.soundToggle.setAttribute('aria-pressed', String(muted));
         el.soundToggle.setAttribute('aria-label', muted ? 'Unmute audio' : 'Mute audio');

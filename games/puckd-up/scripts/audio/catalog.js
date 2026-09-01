@@ -6,6 +6,7 @@ export const SFX = Object.freeze({
     puckB: asset('sfx/puck-hit-b.wav'),
     fire: asset('sfx/on-fire.wav'),
     go: asset('sfx/go.wav'),
+    explosion: asset('sfx/explosion.wav'),
     end: asset('sfx/game-end.wav'),
     crowd: asset('sfx/crowd-ambience.mp3'),
     tick: asset('sfx/countdown-tick.wav'),

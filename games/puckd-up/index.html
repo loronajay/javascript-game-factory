@@ -112,14 +112,26 @@
           <div class="arenaSection">
             <div class="sectionLabel">03 // Choose venue</div>
             <div class="arenaGrid" id="arenaGrid">
-              <button class="arenaCard" type="button" data-arena="hyper_arcade"><span class="arenaNumber">A1</span><b>Hyper Arcade</b><small>Neon light tunnel</small></button>
-              <button class="arenaCard" type="button" data-arena="competition_circuit"><span class="arenaNumber">A2</span><b>Competition Circuit</b><small>Open stadium bowl</small></button>
-              <button class="arenaCard" type="button" data-arena="park_jam"><span class="arenaNumber">A3</span><b>Park Jam</b><small>Urban rec park</small></button>
-              <button class="arenaCard" type="button" data-arena="skyline_rooftop"><span class="arenaNumber">A4</span><b>Skyline Rooftop</b><small>City after dark</small></button>
+              <button class="arenaCard" type="button" data-arena="hyper_arcade"><span class="arenaThumbnail" aria-hidden="true"></span><span class="arenaNumber">A1</span><b>Hyper Arcade</b><small>Neon light tunnel</small></button>
+              <button class="arenaCard" type="button" data-arena="competition_circuit"><span class="arenaThumbnail" aria-hidden="true"></span><span class="arenaNumber">A2</span><b>Competition Circuit</b><small>Open stadium bowl</small></button>
+              <button class="arenaCard" type="button" data-arena="park_jam"><span class="arenaThumbnail" aria-hidden="true"></span><span class="arenaNumber">A3</span><b>Park Jam</b><small>Urban rec park</small></button>
+              <button class="arenaCard" type="button" data-arena="skyline_rooftop"><span class="arenaThumbnail" aria-hidden="true"></span><span class="arenaNumber">A4</span><b>Skyline Rooftop</b><small>City after dark</small></button>
             </div>
           </div>
           <div class="menuActions setupActions"><button class="ghost" type="button" id="setupBack">Back</button><button class="primary startButton" type="button" id="startMatch">Start Match <span aria-hidden="true">›</span></button></div>
         </div>
+        <aside class="stagePreview" aria-labelledby="stagePreviewName">
+          <div class="stagePreviewFrame">
+            <canvas class="stagePreviewCanvas" id="setupStagePreview" aria-hidden="true"></canvas>
+            <span class="stagePreviewLive">Live 3D preview</span>
+            <div class="stagePreviewReticle" aria-hidden="true"></div>
+          </div>
+          <div class="stagePreviewCaption">
+            <span id="stagePreviewNumber">A1 // Selected venue</span>
+            <strong id="stagePreviewName">Hyper Arcade</strong>
+            <small id="stagePreviewDescription">Neon light tunnel</small>
+          </div>
+        </aside>
       </div>
     </section>
 
@@ -152,6 +164,6 @@
 <!-- Sets __JGF_PLATFORM_API_URL__ so /auth/me resolves in production; without it
      the online gate always fails with "Could not verify your Player Factory account". -->
 <script type="module" src="../../js/platform-config.mjs"></script>
-<script type="module" src="./game.js?v=ui-1"></script>
+<script type="module" src="./game.js?v=ui-2"></script>
 </body>
 </html>

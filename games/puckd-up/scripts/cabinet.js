@@ -3,6 +3,7 @@ import { createMatch } from './core/match.js';
 import { createFixedStep } from './core/fixed-step.js';
 import { createSimulation } from './physics/simulation.js';
 import { createView } from './render/view.js';
+import { createVenuePreview } from './render/venue-preview.js';
 import { createControls } from './input/controls.js';
 import { createUI } from './ui/controller.js';
 import { createAudio } from './audio/audio.js';
@@ -47,9 +48,14 @@ export function createCabinet({ THREE, CANNON, account, onlineClient, doc = docu
         const activeSimulation = () => match.state.mode === 'online' ? sync : simulation;
         const metrics = Object.fromEntries(['speed', 'power', 'lastShot'].map(key => [key, 0]));
         const view = own(createView(THREE, doc.getElementById('game'), doc.getElementById('gamewrap')));
+        const previewCanvas = doc.getElementById('setupStagePreview');
+        const stagePreview = own(createVenuePreview({
+            THREE, canvas: previewCanvas, container: previewCanvas.parentElement,
+            thumbnailTargets: [...doc.querySelectorAll('.arenaThumbnail')],
+        }));
         const audio = own(createAudio({ muted: config.muted }));
         const controls = own(createControls({ THREE, canvas: doc.getElementById('game'), camera: view.camera, match, unlock: audio.unlock }));
-        const ui = own(createUI({ doc, match, metrics, audio, controls, view, storage, onlineClient: client }));
+        const ui = own(createUI({ doc, match, metrics, audio, controls, view, stagePreview, storage, onlineClient: client }));
         const online = own(createOnlineController({ doc, match, account, client }));
         const clock = createFixedStep(dt => {
             const input = controls.sample();
@@ -95,6 +101,7 @@ export function createCabinet({ THREE, CANNON, account, onlineClient, doc = docu
             lastTime = timestamp;
             ui.render();
             view.render(activeSimulation().bodies);
+            stagePreview.render(timestamp, match.state.screen === 'setup');
             frameId = win.requestAnimationFrame(frame);
         }
         frameId = win.requestAnimationFrame(frame);

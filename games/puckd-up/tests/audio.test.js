@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-import { createAudio } from '../scripts/audio/audio.js';
+import { createAudio, MIX } from '../scripts/audio/audio.js';
 import { SOUNDTRACK, SFX } from '../scripts/audio/catalog.js';
 test('menu transitions preserve button feedback and paused menus can click', () => {
     const { audio, media, setTime } = fixture();
@@ -38,9 +38,30 @@ function fixture(fail = false) {
 }
 test('all supplied soundtrack and effect files are mapped to real assets', () => {
     assert.equal(SOUNDTRACK.length, 6);
-    assert.equal(Object.keys(SFX).length, 9);
+    assert.equal(Object.keys(SFX).length, 10);
     for (const url of [...SOUNDTRACK, ...Object.values(SFX)])
         assert.ok(existsSync(new URL(url)), url);
+});
+test('goal explosions play once and the music-to-effects mix stays balanced', () => {
+    const { audio, media, setTime } = fixture();
+    audio.unlock();
+    audio.setScreen('playing');
+    audio.handle({ type: 'goal', playerScored: true });
+    audio.handle({ type: 'goal', playerScored: true });
+    const explosion = media.find(m => m.src === SFX.explosion);
+    const music = media.find(m => m.src === SOUNDTRACK[0]);
+    assert.equal(explosion.plays, 1);
+    assert.equal(music.volume, MIX.music);
+    assert.equal(explosion.volume, MIX.explosion);
+    assert.ok(MIX.music >= .3);
+    assert.ok(MIX.puck <= .55 && MIX.wall <= .4 && MIX.explosion <= .6);
+    audio.handle({ type: 'screen', screen: 'result' });
+    assert.equal(explosion.paused, false);
+    audio.setScreen('playing');
+    setTime(1100);
+    audio.handle({ type: 'goal', playerScored: false });
+    assert.equal(explosion.plays, 2);
+    audio.dispose();
 });
 test('audio waits for a gesture, loops ambience only during play and rotates music', () => {
     const { audio, media } = fixture();

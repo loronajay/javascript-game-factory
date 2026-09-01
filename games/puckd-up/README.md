@@ -95,6 +95,7 @@ element. The top-bar Sound button persists the mute preference as
 | `button-click.wav` | Enabled button activation |
 | `countdown-tick.wav` | Start of the existing 650 ms face-off |
 | `go.wav` | Puck becomes live |
+| `explosion.wav` | One color-matched particle burst when a goal is scored |
 | `puck-hit-a.wav`, `puck-hit-b.wav` | Alternating paddle contacts |
 | `wall-hit.wav` | Every native or containment-resolved wall impact |
 | `on-fire.wav` | Puck above 23 m/s, at most once per four simulation seconds |

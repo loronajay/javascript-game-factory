@@ -1,5 +1,9 @@
 import { SFX, SOUNDTRACK } from './catalog.js';
 import { createPlaylist } from './playlist.js';
+export const MIX = Object.freeze({
+    music: .34, crowd: .12, button: .36, tick: .5, go: .5,
+    end: .58, explosion: .56, wall: .34, puck: .5, fire: .5,
+});
 // Browser media stays outside simulation. No eager downloads, unbounded voices,
 // or autoplay errors can block starting a game. dispose() releases every channel.
 export function createAudio({ createMedia = src => new Audio(src), now = () => performance.now(), muted = false, random = Math.random } = {}) {
@@ -50,7 +54,7 @@ export function createAudio({ createMedia = src => new Audio(src), now = () => p
             stopAll(true);
             return;
         }
-        const music = channel('music', playlist.current(), .22);
+        const music = channel('music', playlist.current(), MIX.music);
         if (music) {
             music.onended = () => {
                 if (disposed)
@@ -63,14 +67,14 @@ export function createAudio({ createMedia = src => new Audio(src), now = () => p
                 play(music);
         }
         if (screen === 'playing') {
-            const crowd = channel('crowd', SFX.crowd, .15, true);
+            const crowd = channel('crowd', SFX.crowd, MIX.crowd, true);
             if (crowd?.paused)
                 play(crowd);
         }
         else
             channels.get('crowd')?.pause();
     }
-    function effect(key, gap = 0, volume = .65) {
+    function effect(key, gap = 0, volume = .5) {
         if (!enabled() || (screen === 'paused' && key !== 'button'))
             return;
         const time = now();
@@ -102,31 +106,33 @@ export function createAudio({ createMedia = src => new Audio(src), now = () => p
             if (event.type === 'screen') {
                 screen = event.screen;
                 for (const [key, media] of channels)
-                    if (key !== 'button' && key !== 'music') media?.pause();
+                    if (key !== 'button' && key !== 'music' && !(screen === 'result' && key === 'explosion')) media?.pause();
                 sync();
             }
             if (event.type === 'button-click')
-                effect('button', 40, .45);
+                effect('button', 40, MIX.button);
             if (event.type === 'round-reset')
-                effect('tick', 100, .7);
+                effect('tick', 100, MIX.tick);
             if (event.type === 'serve')
-                effect('go', 100, .7);
+                effect('go', 100, MIX.go);
+            if (event.type === 'goal')
+                effect('explosion', 100, MIX.explosion);
             if (event.type === 'match-end')
-                effect('end', 100, .8);
+                effect('end', 100, MIX.end);
             // Every impact gets a voice, even a second wall in the same corner tick.
             // Cycling a small pool allows overlaps without unbounded media allocation.
             if (event.type === 'wall-hit' && enabled() && screen !== 'paused') {
-                play(channel(`wall-${wallVoice++ % 4}`, SFX.wall, .45), true);
+                play(channel(`wall-${wallVoice++ % 4}`, SFX.wall, MIX.wall), true);
             }
             if (event.type === 'puck-hit') {
                 const time = now();
                 if (time - (lastPlayed.get('puck') ?? -Infinity) < 55)
                     return;
                 lastPlayed.set('puck', time);
-                effect(variant++ % 2 ? 'puckB' : 'puckA', 0, .7);
+                effect(variant++ % 2 ? 'puckB' : 'puckA', 0, MIX.puck);
             }
             if (event.type === 'on-fire')
-                effect('fire', 4000, .7);
+                effect('fire', 4000, MIX.fire);
         },
         dispose() {
             disposed = true;
