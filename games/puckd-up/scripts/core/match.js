@@ -20,8 +20,18 @@ export function createMatch({ config = {}, emit = () => {
                 screen('online');
         },
         setup() {
-            if (state.screen === 'menu')
+            if (state.screen === 'menu') {
+                state.mode = 'cpu';
                 screen('setup');
+            }
+        },
+        circuit() {
+            if (['menu', 'result', 'circuit'].includes(state.screen)) {
+                state.mode = 'campaign';
+                Object.assign(state, { phase: 'idle', playerScore: 0, cpuScore: 0, remaining: 0 });
+                screen('circuit');
+                emit({ type: 'match-reset' });
+            }
         },
         start() {
             if (state.mode === 'online') return;
@@ -55,7 +65,7 @@ export function createMatch({ config = {}, emit = () => {
                 state.phase = 'finished';
                 state.remaining = 0;
                 screen('result');
-                emit({ type: 'match-end', winner: state.playerScore > state.cpuScore ? 'player' : 'cpu' });
+                emit({ type: 'match-end', winner: state.playerScore > state.cpuScore ? 'player' : 'cpu', mode: state.mode, rivalId: settings.rivalId });
             }
             return true;
         },

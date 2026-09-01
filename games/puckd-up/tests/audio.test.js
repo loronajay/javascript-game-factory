@@ -95,6 +95,17 @@ test('every wall impact plays, including rapid hits, using a bounded pool of voi
     audio.dispose();
     assert.ok(media.every(m => m.paused));
 });
+test('impact playback pitch follows puck velocity without changing the bounded voice pool', () => {
+    const { audio, media } = fixture();
+    audio.unlock();
+    audio.setScreen('playing');
+    audio.handle({ type: 'puck-hit', speed: 10 });
+    const slow = media.find(m => m.src === SFX.puckA);
+    assert.ok(slow.playbackRate < 1);
+    audio.handle({ type: 'wall-hit', speed: 28 });
+    const fast = media.find(m => m.src === SFX.wall);
+    assert.ok(fast.playbackRate > 1.25);
+});
 test('rejected media playback does not reject the game action', async () => {
     const { audio } = fixture(true);
     audio.unlock();

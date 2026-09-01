@@ -75,3 +75,20 @@ test('long stalls are bounded and resetting discards partial frame time', () => 
     clock.advance(.003);
     assert.equal(ticks, 12);
 });
+
+test('Circuit matches preserve campaign mode and can return to the tour after a result', () => {
+    const events = [], match = createMatch({ emit: event => events.push(event) });
+    match.circuit();
+    assert.equal(match.state.screen, 'circuit');
+    assert.equal(match.state.mode, 'campaign');
+    match.config.rivalId = 'rookie';
+    match.start();
+    for (let i = 0; i < 7; i++) {
+        match.tick(.65);
+        match.score(true);
+        if (i < 6) match.tick(1.05);
+    }
+    assert.deepEqual(events.findLast(event => event.type === 'match-end'), { type: 'match-end', winner: 'player', mode: 'campaign', rivalId: 'rookie' });
+    match.circuit();
+    assert.equal(match.state.screen, 'circuit');
+});

@@ -1,5 +1,6 @@
 import { SFX, SOUNDTRACK } from './catalog.js';
 import { createPlaylist } from './playlist.js';
+import { getPuckFeedback } from '../render/puck-feedback.js';
 export const MIX = Object.freeze({
     music: .34, crowd: .12, button: .36, tick: .5, go: .5,
     end: .58, explosion: .56, wall: .34, puck: .5, fire: .5,
@@ -37,6 +38,12 @@ export function createAudio({ createMedia = src => new Audio(src), now = () => p
         }
         catch { /* Missing files and autoplay denial are nonfatal. */
         }
+    }
+    function pitch(media, speed) {
+        if (!media) return media;
+        try { media.playbackRate = getPuckFeedback(speed).pitch; }
+        catch { /* Some embedded media adapters expose a read-only rate. */ }
+        return media;
     }
     function enabled() {
         return unlocked && !muted && !hidden && !disposed;
@@ -122,14 +129,15 @@ export function createAudio({ createMedia = src => new Audio(src), now = () => p
             // Every impact gets a voice, even a second wall in the same corner tick.
             // Cycling a small pool allows overlaps without unbounded media allocation.
             if (event.type === 'wall-hit' && enabled() && screen !== 'paused') {
-                play(channel(`wall-${wallVoice++ % 4}`, SFX.wall, MIX.wall), true);
+                play(pitch(channel(`wall-${wallVoice++ % 4}`, SFX.wall, MIX.wall), event.speed), true);
             }
             if (event.type === 'puck-hit') {
                 const time = now();
                 if (time - (lastPlayed.get('puck') ?? -Infinity) < 55)
                     return;
                 lastPlayed.set('puck', time);
-                effect(variant++ % 2 ? 'puckB' : 'puckA', 0, MIX.puck);
+                const key = variant++ % 2 ? 'puckB' : 'puckA';
+                play(pitch(channel(key, SFX[key], MIX.puck), event.speed), true);
             }
             if (event.type === 'on-fire')
                 effect('fire', 4000, MIX.fire);

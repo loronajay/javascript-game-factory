@@ -1,8 +1,8 @@
 import { ARENA_IDS } from '../config.js';
 import { createTable } from './table.js';
 import { createVenues } from './venues/index.js';
+import { getRival } from '../physics/rivals.js';
 
-const CPU_COLOR = '#3f7194';
 
 function disposeStage(stage) {
     const geometries = new Set(), materials = new Set();
@@ -50,16 +50,18 @@ function createPreviewStage(THREE, canvas, { preserveDrawingBuffer = false } = {
         player: { body: { position: new THREE.Vector3(1.15, .25, 5.6) } },
         cpu: { body: { position: new THREE.Vector3(-1.05, .25, -5.55) } },
     });
-    function configure(arenaId, playerColor) {
+    function configure(arenaId, playerColor, rivalId = 'rookie') {
+        const rival = getRival(rivalId);
         venues.applyArenaTheme(arenaId);
-        table.applyColors(playerColor, CPU_COLOR);
+        table.applyColors(playerColor, rival.color);
+        table.applyRivalDesign(rival);
         warm.color.set(playerColor);
-        cool.color.set(CPU_COLOR);
+        cool.color.set(rival.color);
     }
     return { ...stage, venues, configure, dispose: () => disposeStage(stage) };
 }
 
-function createThumbnails(THREE, doc, targets, playerColor) {
+function createThumbnails(THREE, doc, targets, playerColor, rivalId) {
     if (!targets.length) return;
     const canvas = doc.createElement('canvas');
     const stage = createPreviewStage(THREE, canvas, { preserveDrawingBuffer: true });
@@ -72,7 +74,7 @@ function createThumbnails(THREE, doc, targets, playerColor) {
         for (const arenaId of ARENA_IDS) {
             const target = targets.find(node => node.closest('.arenaCard')?.dataset.arena === arenaId);
             if (!target) continue;
-            stage.configure(arenaId, playerColor);
+            stage.configure(arenaId, playerColor, rivalId);
             stage.venues.updateArenaVisuals(1.7);
             stage.renderer.render(stage.scene, stage.camera);
             target.style.backgroundImage = `url("${canvas.toDataURL('image/jpeg', .82)}")`;
@@ -103,11 +105,11 @@ export function createVenuePreview({ THREE, canvas, container, thumbnailTargets 
         stage.camera.updateProjectionMatrix();
     }
     function configure(config) {
-        stage.configure(config.arenaId, config.playerColor);
+        stage.configure(config.arenaId, config.playerColor, config.rivalId);
         configured = true;
         if (!thumbnailsReady) {
             thumbnailsReady = true;
-            try { createThumbnails(THREE, doc, thumbnailTargets, config.playerColor); }
+            try { createThumbnails(THREE, doc, thumbnailTargets, config.playerColor, config.rivalId); }
             catch (error) { console.warn('Venue thumbnail previews unavailable:', error); }
         }
     }

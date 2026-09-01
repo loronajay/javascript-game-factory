@@ -2,10 +2,10 @@ import { createScene } from './scene.js';
 import { createTable } from './table.js';
 import { createVenues } from './venues/index.js';
 import { createGoalBurst } from './goal-burst.js';
-const CPU_COLOR = '#3f7194';
+import { getRival } from '../physics/rivals.js';
 
 export function visiblePlayerColors(config, state) {
-    return state.mode === 'online' && Array.isArray(state.playerColors) ? state.playerColors : [config.playerColor, CPU_COLOR];
+    return state.mode === 'online' && Array.isArray(state.playerColors) ? state.playerColors : [config.playerColor, getRival(config.rivalId).color];
 }
 // Rendering reads bodies. Animation ages advance in tick(), never in render().
 export function createView(THREE, canvas, container) {
@@ -34,10 +34,13 @@ export function createView(THREE, canvas, container) {
                     arena = nextConfig.arenaId;
                     venues.applyArenaTheme(arena);
                 }
-                applyColors([nextConfig.playerColor, CPU_COLOR]);
+                const rival = getRival(nextConfig.rivalId);
+                applyColors([nextConfig.playerColor, rival.color]);
+                table.applyRivalDesign(rival);
             },
             handle(event) {
                 goalBurst.handle(event, colors);
+                table.handleFeedback(event);
             },
             tick(dt, simulation, match) {
                 if (match.state.screen === 'paused')
@@ -46,6 +49,7 @@ export function createView(THREE, canvas, container) {
                 elapsed += dt;
                 venues.updateArenaVisuals(elapsed);
                 goalBurst.tick(dt);
+                table.tickFeedback(dt, simulation.bodies, match.state.phase === 'live');
             },
             render(bodies) {
                 table.sync(bodies);

@@ -97,3 +97,18 @@ test('paddle motion and CPU sampling use the same fixed ticks at every refresh r
         assert.deepEqual(outcome, outcomes[0]);
     assert.ok(outcomes[0][0] > 0 && outcomes[0][0] <= 4.23);
 });
+
+test('simulation selects the configured named rival and attaches impact speed to feedback events', () => {
+    const bodies = rig(), events = [], calls = [];
+    const match = createMatch({ config: { rivalId: 'banks' }, emit: event => simulation?.handle(event) });
+    const simulation = createSimulation(null, match, { bodies, emit: event => events.push(event), opponent: (...args) => calls.push(args) });
+    match.start();
+    match.tick(.65);
+    simulation.tick(1 / 240, { keys: new Set(), target: null, dx: 0, dz: 0 });
+    assert.equal(calls[0][2], 'banks');
+    bodies.puckBody.velocity.set(18, 0, 0);
+    bodies.puckBody.collide({ body: {}, contact: { getImpactVelocityAlongNormal: () => 18 } });
+    assert.equal(events.at(-1).type, 'wall-hit');
+    assert.equal(events.at(-1).speed, 18);
+    assert.deepEqual(events.at(-1).position, { x: bodies.puckBody.position.x, y: bodies.puckBody.position.y, z: bodies.puckBody.position.z });
+});

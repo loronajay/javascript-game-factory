@@ -1,8 +1,8 @@
 # PUCK'D UP
 
-A self-contained vanilla JavaScript 3D air-hockey cabinet. The current playable
-mode is first-to-seven against the CPU, with three difficulties, four venues,
-custom player colors, pointer/touch/keyboard input, and fullscreen pointer lock.
+A self-contained vanilla JavaScript 3D air-hockey cabinet. The current solo game
+has 12 named rivals, a 12-stop Arcade Circuit across eight venues, custom player
+colors, pointer/touch/keyboard input, and fullscreen pointer lock.
 
 ## Run and test
 
@@ -38,15 +38,17 @@ loads the two existing libraries and starts one cabinet instance.
 | `scripts/cabinet.js` | Composition, fixed-step frame loop, visibility, teardown |
 | `scripts/config.js` | Shared dimensions and approved tuning |
 | `scripts/settings.js` | Validated cabinet preferences and legacy storage keys |
+| `scripts/core/circuit.js` | Sequential Circuit stops, local progress and rival records |
 | `scripts/core/match.js` | Screens, scoring, face-offs, celebrations, pause/resume |
 | `scripts/core/fixed-step.js` | 240 Hz accumulator with bounded catch-up |
 | `scripts/physics/world.js` | Cannon bodies, materials, solver setup |
 | `scripts/physics/table-layout.js` | Rail geometry shared by physics and meshes |
 | `scripts/physics/collisions.js` | Containment, speed cap, swept contact, goal crossing |
 | `scripts/physics/simulation.js` | Fixed-tick body updates, strikes, gameplay events |
-| `scripts/physics/cpu.js` | CPU opponent controller; injectable at simulation construction |
+| `scripts/physics/rivals.js` | Rival roster, personalities, tuning and distinct shot planning |
+| `scripts/physics/cpu.js` | CPU adapter; injectable at simulation construction |
 | `scripts/input/` | Browser input collection and fixed-tick player motion |
-| `scripts/render/` | Scene, table meshes, pooled trail, visual synchronization |
+| `scripts/render/` | Scene, table meshes, speed-tiered puck feedback, visual synchronization |
 | `scripts/render/venues/` | One visual-only builder per venue and shared geometry helpers |
 | `scripts/ui/controller.js` | DOM state, menu actions, HUD, accessibility and fullscreen |
 | `scripts/audio/` | Asset catalog, shuffled playlist and browser media adapter |
@@ -75,8 +77,8 @@ releases pointer lock and audio, cancels the frame loop and frees GPU resources.
   stay still during face-off/goal delays.
 - Focus loss and hidden tabs clear held input and pause live matches. Returning
   requires Resume. Pointer-lock loss also pauses, including during a face-off.
-- Missing difficulty preferences now select Arcade; `Number(null)` previously
-  selected Casual. Existing `tableHockey.*` preferences are still read.
+- Legacy difficulty preferences map to Jin, Val or Sloane. New preferences save
+  a stable rival id while existing `tableHockey.*` values are still read.
 
 ## Soundtrack and effects
 
@@ -106,14 +108,17 @@ Wall impacts have **no time cooldown**. A four-voice pool supports close hits
 without continually creating media elements. Containment reports velocity
 reflections, not position corrections, so a native bounce is not sounded again
 by the safety envelope. Paddle effects retain a short contact debounce.
+Puck and wall effects rise in pitch with impact speed, matching the normal,
+charged, fast, hot and extreme visual trail/impact tiers.
 Autoplay denial, missing media and unavailable audio do not stop the game.
 
 ## Validation
 
 The dependency-free regression suite covers collision/goal rules, swept-hit
-energy ordering, screen transitions, pause-safe round timing, refresh-rate
-independence, preferences, repeated wall events, playlist ordering, and audio
-mute/lifecycle behavior. Simulation orchestration tests use a motion-only world;
+energy ordering, rival behavior, Circuit progression, puck-feedback tiers,
+screen transitions, pause-safe round timing, refresh-rate independence,
+preferences, repeated wall events, playlist ordering, and audio mute/lifecycle
+behavior. Simulation orchestration tests use a motion-only world;
 they do not claim to test Cannon's internal solver. Browser smoke tests and a
 separate run against the repository's existing Cannon build supplement them.
 

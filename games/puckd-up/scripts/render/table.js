@@ -1,5 +1,6 @@
 import { W, L, GOAL, RAIL } from '../config.js';
 import { tableRails } from '../physics/table-layout.js';
+import { createPuckFeedback } from './puck-feedback.js';
 export function createTable(THREE, scene) {
     const table = new THREE.Group();
     scene.add(table);
@@ -68,25 +69,32 @@ export function createTable(THREE, scene) {
     }
     const cpuGoalMat = goalFrame(-L / 2 - .25, 0x376b8d);
     const playerGoalMat = goalFrame(L / 2 + .25, 0xa14848);
-    const puckMesh = new THREE.Mesh(new THREE.CylinderGeometry(.43, .43, .22, 48), new THREE.MeshStandardMaterial({ color: 0xe5e9ed, roughness: .16, metalness: .82 }));
+    const puckMesh = new THREE.Mesh(new THREE.CylinderGeometry(.43, .43, .22, 48), new THREE.MeshStandardMaterial({ color: 0xe5e9ed, emissive: 0x000000, emissiveIntensity: 0, roughness: .16, metalness: .82 }));
     puckMesh.castShadow = true;
     scene.add(puckMesh);
     const puckRing = new THREE.Mesh(new THREE.TorusGeometry(.33, .035, 10, 48), new THREE.MeshBasicMaterial({ color: 0x20262c }));
     puckRing.rotation.x = Math.PI / 2;
     puckRing.position.y = .12;
     puckMesh.add(puckRing);
+    const feedback = createPuckFeedback(THREE, scene, puckMesh);
     function makeMallet(z, color) {
         const grp = new THREE.Group();
         const baseMat = new THREE.MeshStandardMaterial({ color, roughness: .22, metalness: .58 });
         const base = new THREE.Mesh(new THREE.CylinderGeometry(.73, .73, .26, 40), baseMat);
         base.castShadow = true;
         grp.add(base);
-        const cap = new THREE.Mesh(new THREE.CylinderGeometry(.38, .48, .30, 40), new THREE.MeshStandardMaterial({ color: 0x171c22, roughness: .20, metalness: .76 }));
+        const capMat = new THREE.MeshStandardMaterial({ color: 0x171c22, roughness: .20, metalness: .76 });
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(.38, .48, .30, 40), capMat);
         cap.position.y = .26;
         cap.castShadow = true;
         grp.add(cap);
+        const accentMat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: .34, roughness: .2, metalness: .6 });
+        const accent = new THREE.Mesh(new THREE.TorusGeometry(.49, .045, 8, 40), accentMat);
+        accent.rotation.x = Math.PI / 2;
+        accent.position.y = .18;
+        grp.add(accent);
         scene.add(grp);
-        return { mesh: grp, baseMat };
+        return { mesh: grp, baseMat, capMat, accentMat, cap, accent };
     }
     const player = makeMallet(5.8, 0xa14848), cpu = makeMallet(-5.8, 0x3f7194);
     function applyColors(playerHex, opponentHex) {
@@ -98,6 +106,17 @@ export function createTable(THREE, scene) {
             material.color.set(opponentHex);
             if (material.emissive) material.emissive.set(opponentHex);
         }
+        cpu.accentMat.color.set(opponentHex);
+        cpu.accentMat.emissive.set(opponentHex);
+        player.accentMat.color.set(playerHex);
+        player.accentMat.emissive.set(playerHex);
+    }
+    function applyRivalDesign(rival) {
+        cpu.capMat.color.set(rival?.accent || 0x171c22);
+        const designs = { starter: [.92, .9], classic: [1, .75], heavy: [1.16, .78], razor: [.88, 1.18], flash: [1.05, 1.3], power: [1.22, .9], split: [.96, 1.05], gloss: [1.02, 1.16], solid: [1.13, .82], quiet: [.9, .7], ring: [1, 1.42], champion: [1.15, 1.5] };
+        const [capScale, ringScale] = designs[rival?.design] || [1, 1];
+        cpu.cap.scale.setScalar(capScale);
+        cpu.accent.scale.setScalar(ringScale);
     }
     function sync(bodies) {
         puckMesh.position.copy(bodies.puckBody.position);
@@ -105,5 +124,5 @@ export function createTable(THREE, scene) {
         player.mesh.position.copy(bodies.player.body.position);
         cpu.mesh.position.copy(bodies.cpu.body.position);
     }
-    return { bed, field, railVisMat, railTopMat, lineMat, applyColors, sync };
+    return { bed, field, railVisMat, railTopMat, lineMat, applyColors, applyRivalDesign, handleFeedback: feedback.handle, tickFeedback: feedback.tick, sync };
 }

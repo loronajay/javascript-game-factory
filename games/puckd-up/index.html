@@ -40,14 +40,17 @@
           <h1>Choose your match</h1>
           <p class="menuLead">High-speed table hockey with no room for hesitation.</p>
           <div class="modeGrid">
-            <button class="modeBtn primary" type="button" id="cpuModeBtn">
-              <span class="commandIndex">01</span><span class="commandCopy"><b>Solo Clash</b><small>Take on the CPU</small></span><span class="commandArrow" aria-hidden="true">›</span>
+            <button class="modeBtn primary" type="button" id="circuitModeBtn">
+              <span class="commandIndex">01</span><span class="commandCopy"><b>Arcade Circuit</b><small>12 rivals · 8 venues · one title</small></span><span class="commandArrow" aria-hidden="true">›</span>
+            </button>
+            <button class="modeBtn" type="button" id="cpuModeBtn">
+              <span class="commandIndex">02</span><span class="commandCopy"><b>Solo Clash</b><small>Choose any rival and venue</small></span><span class="commandArrow" aria-hidden="true">›</span>
             </button>
             <button class="modeBtn" type="button" id="onlineModeBtn" disabled>
-              <span class="commandIndex">02</span><span class="commandCopy"><b>Online 1v1</b><small id="onlineAccountNote">Sign in to Player Factory to play online</small></span><span class="commandArrow" aria-hidden="true">›</span>
+              <span class="commandIndex">03</span><span class="commandCopy"><b>Online 1v1</b><small id="onlineAccountNote">Sign in to Player Factory to play online</small></span><span class="commandArrow" aria-hidden="true">›</span>
             </button>
             <button class="modeBtn" type="button" disabled>
-              <span class="commandIndex">03</span><span class="commandCopy"><b>Training Lab</b><small>Free play · coming soon</small></span><span class="statusTag">Locked</span>
+              <span class="commandIndex">04</span><span class="commandCopy"><b>Training Lab</b><small>Free play · coming soon</small></span><span class="statusTag">Locked</span>
             </button>
           </div>
           <div class="menuUtility">
@@ -55,6 +58,17 @@
             <button type="button" id="onlineSignIn">Sign in</button>
             <a href="../../grid.html">Exit to arcade</a>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="screen splashScreen" id="circuitScreen" data-splash="campaign" aria-label="Arcade Circuit" hidden>
+      <div class="circuitStage">
+        <div class="commandRail circuitPanel">
+          <div class="screenKicker"><span>Arcade Circuit</span><span id="circuitProgress">0 / 12 cleared</span></div>
+          <div class="circuitHeading"><div><h2 id="circuitTitle">Own the tour</h2><p>Win to unlock the next stop. Losses stay on your record; the table stays open.</p></div><span class="matchBadge">12 // 08</span></div>
+          <div class="circuitGrid" id="circuitGrid" aria-label="Circuit stops"></div>
+          <div class="menuActions circuitActions"><button class="ghost" type="button" id="circuitBack">Back</button></div>
         </div>
       </div>
     </section>
@@ -105,9 +119,13 @@
               <div class="pickerRow"><div class="previewChip" id="colorPreview" aria-hidden="true"></div><label class="customColor">Custom<input type="color" id="playerColor" value="#a14848" aria-label="Custom player color"></label></div>
             </div>
             <div class="settingStack">
-              <label class="settingCard" for="setupDifficulty"><span class="sectionLabel">02 // CPU level</span><select id="setupDifficulty"><option value="0">Casual</option><option value="1" selected>Arcade</option><option value="2">Expert</option></select></label>
+              <label class="settingCard" for="setupRival"><span class="sectionLabel">02 // Rival</span><select id="setupRival" aria-label="Choose rival"></select></label>
               <div class="settingCard matchRule"><span><span class="sectionLabel">Win condition</span><b>First to 7</b></span><span><span class="sectionLabel">Format</span><b>1P vs CPU</b></span></div>
             </div>
+          </div>
+          <div class="rivalIntroCard rivalMobileCard">
+            <img id="rivalPortraitMobile" src="./assets/rivals/rookie.jpg" alt="Selected rival portrait" />
+            <div><span id="rivalTitleMobile">The Prodigy // Reactive</span><strong id="rivalNameMobile">Jin</strong><small id="rivalIntroMobile">Seventeen, scary fast to learn, and still liable to bite on the first fake.</small><em id="rivalRecordMobile">Record 0–0</em></div>
           </div>
           <div class="arenaSection">
             <div class="sectionLabel">03 // Choose venue</div>
@@ -116,6 +134,10 @@
               <button class="arenaCard" type="button" data-arena="competition_circuit"><span class="arenaThumbnail" aria-hidden="true"></span><span class="arenaNumber">A2</span><b>Competition Circuit</b><small>Open stadium bowl</small></button>
               <button class="arenaCard" type="button" data-arena="park_jam"><span class="arenaThumbnail" aria-hidden="true"></span><span class="arenaNumber">A3</span><b>Park Jam</b><small>Urban rec park</small></button>
               <button class="arenaCard" type="button" data-arena="skyline_rooftop"><span class="arenaThumbnail" aria-hidden="true"></span><span class="arenaNumber">A4</span><b>Skyline Rooftop</b><small>City after dark</small></button>
+              <button class="arenaCard" type="button" data-arena="garage_club"><span class="arenaThumbnail" aria-hidden="true"></span><span class="arenaNumber">A5</span><b>Garage Club</b><small>Concrete after hours</small></button>
+              <button class="arenaCard" type="button" data-arena="boardwalk_bash"><span class="arenaThumbnail" aria-hidden="true"></span><span class="arenaNumber">A6</span><b>Boardwalk Bash</b><small>Sunset over the pier</small></button>
+              <button class="arenaCard" type="button" data-arena="freight_yard"><span class="arenaThumbnail" aria-hidden="true"></span><span class="arenaNumber">A7</span><b>Freight Yard</b><small>Steel and sodium light</small></button>
+              <button class="arenaCard" type="button" data-arena="zero_g_arena"><span class="arenaThumbnail" aria-hidden="true"></span><span class="arenaNumber">A8</span><b>Zero-G Arena</b><small>Championship in orbit</small></button>
             </div>
           </div>
           <div class="menuActions setupActions"><button class="ghost" type="button" id="setupBack">Back</button><button class="primary startButton" type="button" id="startMatch">Start Match <span aria-hidden="true">›</span></button></div>
@@ -130,6 +152,10 @@
             <span id="stagePreviewNumber">A1 // Selected venue</span>
             <strong id="stagePreviewName">Hyper Arcade</strong>
             <small id="stagePreviewDescription">Neon light tunnel</small>
+          </div>
+          <div class="rivalIntroCard">
+            <img id="rivalPortrait" src="./assets/rivals/rookie.jpg" alt="Selected rival portrait" />
+            <div><span id="rivalTitle">The Prodigy // Reactive</span><strong id="rivalName">Jin</strong><small id="rivalIntro">Seventeen, scary fast to learn, and still liable to bite on the first fake.</small><em id="rivalRecord">Record 0–0</em></div>
           </div>
         </aside>
       </div>
@@ -164,6 +190,6 @@
 <!-- Sets __JGF_PLATFORM_API_URL__ so /auth/me resolves in production; without it
      the online gate always fails with "Could not verify your Player Factory account". -->
 <script type="module" src="../../js/platform-config.mjs"></script>
-<script type="module" src="./game.js?v=ui-2"></script>
+<script type="module" src="./game.js?v=circuit-1"></script>
 </body>
 </html>
