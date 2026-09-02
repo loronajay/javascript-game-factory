@@ -147,6 +147,48 @@ test('a roster longer than the hotel\u2019s two composes that many bodies and bu
   assert.deepEqual(created[2].takenSpawns[0], { x: 10, z: 4, floor: 1 });
 });
 
+test('a roster visual profile reaches the body factory without becoming simulation state', async () => {
+  const createDemons = await loadCreateDemons();
+  const created = [];
+  createDemons({
+    createMonster(options) {
+      created.push(options);
+      return {
+        update() {}, setPlayers() {}, setRemotePose() {},
+        getState: () => ({ state: logic.ENEMY_STATES.ROAM, floor: 1, position: { x: 0, y: 0, z: 0 } }),
+      };
+    },
+    roster: [{
+      id: 'matron', name: 'The Matron', hunts: true,
+      visual: { asset: 'assets/horror/silent-horror-nurse-rigged.glb', height: 1.98 },
+    }],
+    common: {
+      logic, heat: {}, document: null,
+      world: { emit() {} },
+    },
+  });
+
+  assert.deepEqual(created[0].visual, {
+    asset: 'assets/horror/silent-horror-nurse-rigged.glb', height: 1.98,
+  });
+});
+
+test('an unreplaced roster slot receives the stock placeholder, never a rejected horror rig', async () => {
+  const createDemons = await loadCreateDemons();
+  let visual = null;
+  createDemons({
+    createMonster(options) {
+      visual = options.visual;
+      return { getState: () => ({ floor: 1, position: { x: 0, y: 0, z: 0 } }) };
+    },
+    roster: [{ id: 'bellhop', name: 'The Bellhop', hunts: true }],
+    common: { document: null },
+  });
+  assert.equal(visual.asset, 'assets/UAL2_Standard.glb');
+  assert.equal(visual.stock, true);
+  assert.equal(visual.height, 2.68);
+});
+
 // Online the demons are puppets: their brains stood down, so their local awareness is a permanent
 // `roam`. `demons.update` still runs every tick to advance the mixers, and it used to repaint the
 // threat readout from those stood-down states — overwriting the authority's twice per tick. The

@@ -3,6 +3,7 @@ import { disposeMapObjects } from './map-runtime.js';
 export function createMonster({
   THREE, GLTFLoader, scene, camera, config: CONFIG, floorY, layout, world, player, logic, movement, heat, document, window,
   name = 'The Bellhop', statusElementId = 'monsterStatus', takenSpawns = [], accentColor = 0x5c141a, eyeColor = 0xff1008,
+  visual = null,
 }) {
   const { ENEMY_STATES } = logic;
   const root = new THREE.Group();
@@ -26,7 +27,8 @@ export function createMonster({
   let disposed = false;
   let activeAction = null;
   let idleAction = null;
-  let walkAction = null;
+  let stalkAction = null;
+  let chaseAction = null;
   let fallback = null;
   let headBone = null;
   let headDetails = null;
@@ -97,8 +99,9 @@ export function createMonster({
   const demonSkin = withDreadRim(new THREE.MeshStandardMaterial({ color: 0x08070a, roughness: 0.99, metalness: 0.02 }), { color: accentColor, power: 2.6, strength: 0.75 });
   const demonBone = withDreadRim(new THREE.MeshStandardMaterial({ color: 0x030305, roughness: 0.94, metalness: 0.03 }), { color: 0x584c44, power: 3.1, strength: 0.5 });
   const shroudMaterial = new THREE.MeshStandardMaterial({ color: 0x040406, roughness: 1, metalness: 0, side: THREE.DoubleSide, transparent: true, opacity: 0.93, depthWrite: false });
-  const eyeCore = new THREE.MeshBasicMaterial({ color: eyeColor });
-  const eyeGlow = new THREE.MeshBasicMaterial({ color: eyeColor, transparent: true, opacity: 0.24, depthWrite: false });
+  const resolvedEyeColor = visual?.eyes === 'red' ? 0xff1008 : eyeColor;
+  const eyeCore = new THREE.MeshBasicMaterial({ color: resolvedEyeColor });
+  const eyeGlow = new THREE.MeshBasicMaterial({ color: resolvedEyeColor, transparent: true, opacity: 0.24, depthWrite: false });
   const eyeSocket = new THREE.MeshBasicMaterial({ color: 0x000000 });
   const mouthGlow = new THREE.MeshBasicMaterial({ color: 0x7d0000 });
   const gulletGlow = new THREE.MeshBasicMaterial({ color: 0x3a0000, transparent: true, opacity: 0.85, depthWrite: false });
@@ -316,33 +319,66 @@ export function createMonster({
     updateHeadDetails();
   }
 
+  function attachAuthoredEyes(model) {
+    if (visual?.eyes !== 'red') return;
+    headBone = model.getObjectByName('Head');
+    if (!headBone) return;
+    const eyes = new THREE.Group();
+    eyes.name = 'Gaunt Red Eyes';
+    for (const side of [-1, 1]) addEye(eyes, side * 0.048, 0, 0, 0.022);
+    eyes.scale.setScalar(1.35);
+    headDetails = eyes;
+    root.add(eyes);
+    // Preserve the authored head's bind orientation, then track its animated world transform. This
+    // avoids relying on an imported bone-roll axis for the forward offset while still following
+    // every Blender-authored look and lunge.
+    root.updateMatrixWorld(true);
+    root.getWorldQuaternion(rootWorldQuaternion);
+    headBone.getWorldQuaternion(headWorldQuaternion);
+    inverseBindHeadQuaternion.copy(rootWorldQuaternion).invert().multiply(headWorldQuaternion).invert();
+    headHalo.color.setHex(0xff0800);
+    headHalo.position.set(0, 0, 0.05);
+    eyes.add(headHalo);
+    updateHeadDetails();
+  }
+
   function loadAnimatedBody() {
     if (!GLTFLoader) return;
     const loader = new GLTFLoader();
-    loader.load('assets/UAL2_Standard.glb', (gltf) => {
+    loader.load(visual?.asset, (gltf) => {
       if (disposed) { disposeMapObjects(gltf.scene); return; }
       const model = gltf.scene;
       model.traverse((object) => {
         if (!object.isMesh) return;
         object.castShadow = true; object.receiveShadow = true;
-        object.material = demonSkin;
-        if (object.material.skinning !== undefined) object.material.skinning = true;
+        if (visual?.stock) {
+          object.material = demonSkin;
+          if (object.material.skinning !== undefined) object.material.skinning = true;
+        }
       });
-      const targetHeight = 2.68;
+      const targetHeight = visual?.height || 2.03;
       const initial = new THREE.Box3().setFromObject(model); const size = initial.getSize(new THREE.Vector3()); const scale = targetHeight / size.y;
-      faceScale = targetHeight / 2.52;
-      model.scale.set(scale * 0.62, scale, scale * 0.68); model.updateMatrixWorld(true);
+      if (visual?.stock) {
+        faceScale = targetHeight / 2.52;
+        model.scale.set(scale * 0.62, scale, scale * 0.68);
+      } else model.scale.setScalar(scale);
+      model.updateMatrixWorld(true);
       const bounds = new THREE.Box3().setFromObject(model); const center = bounds.getCenter(new THREE.Vector3());
       model.position.set(-center.x, -bounds.min.y, -center.z);
       bodyRest.copy(model.position); body = model;
       root.remove(fallback); fallback = null; shroudStrips.length = 0; eyeParts.length = 0;
-      root.add(model); attachRigDressing(model); bindModelDetails(model);
+      root.add(model);
+      if (visual?.stock) { attachRigDressing(model); bindModelDetails(model); }
+      else attachAuthoredEyes(model);
       mixer = new THREE.AnimationMixer(model);
-      const idleClip = gltf.animations.find((clip) => clip.name === 'Zombie_Idle_Loop');
-      const walkClip = gltf.animations.find((clip) => clip.name === 'Zombie_Walk_Fwd_Loop');
+      const idleClip = gltf.animations.find((clip) => clip.name === (visual?.stock ? 'Zombie_Idle_Loop' : 'Creature_Idle'));
+      const stalkClip = gltf.animations.find((clip) => clip.name === (visual?.stock ? 'Zombie_Walk_Fwd_Loop' : 'Creature_Stalk'));
+      const chaseClip = visual?.stock ? stalkClip : gltf.animations.find((clip) => clip.name === 'Creature_Chase');
       if (idleClip) idleAction = mixer.clipAction(idleClip);
-      if (walkClip) walkAction = mixer.clipAction(walkClip);
+      if (stalkClip) stalkAction = mixer.clipAction(stalkClip);
+      if (chaseClip) chaseAction = mixer.clipAction(chaseClip);
       setAnimation(idleAction, 1);
+      if (activeAction && visual?.phase) activeAction.time = visual.phase % activeAction.getClip().duration;
     }, undefined, (error) => console.warn(`${name} model could not load; using its shadow-form.`, error));
   }
 
@@ -353,6 +389,11 @@ export function createMonster({
     action.reset().fadeIn(0.22).play();
     if (activeAction) activeAction.fadeOut(0.22);
     activeAction = action;
+  }
+
+  function gameplayAction() {
+    if (!moving) return idleAction;
+    return awareness.state === ENEMY_STATES.CHASE ? chaseAction : stalkAction;
   }
 
   // The mixer rewrites every animated bone each frame, so these overrides are applied straight after
@@ -431,12 +472,6 @@ export function createMonster({
       strip.rotation.x = Math.sin(menaceTime * (2.1 + heat * 2.6) + strip.userData.phase) * sway;
       strip.rotation.z = Math.cos(menaceTime * 1.6 + strip.userData.phase) * sway * 0.55;
     }
-    if (body) {
-      const gait = moving ? 1 : 0.22;
-      body.rotation.z = Math.sin(menaceTime * (moving ? 8.6 : 1.8)) * 0.052 * gait;
-      body.rotation.x = Math.sin(menaceTime * (moving ? 4.3 : 0.9) + 0.7) * 0.03 * gait;
-      body.position.y = bodyRest.y + Math.abs(Math.sin(menaceTime * (moving ? 8.6 : 1.4))) * 0.05 * gait;
-    }
     if (mistDisc) {
       mistDisc.material.opacity = 0.035 + heat * 0.15 * (0.5 + beat * 0.5);
       const spread = 1 + heat * 0.35;
@@ -453,7 +488,11 @@ export function createMonster({
   }
 
   function advance(delta) {
-    mixer.update(delta); applyPosture(); updateHeadDetails(); updateShroud();
+    if (mixer) {
+      mixer.update(delta);
+      if (visual?.stock) { applyPosture(); updateHeadDetails(); updateShroud(); }
+      else updateHeadDetails();
+    }
   }
 
   function nearestFloor(y = root.position.y) {
@@ -670,7 +709,8 @@ export function createMonster({
     root.rotation.y += turn * blend;
     facing.set(Math.sin(root.rotation.y), 0, Math.cos(root.rotation.y));
     moving = !!remotePose.moving;
-    if (mixer) { setAnimation(moving ? walkAction : idleAction, awareness.state === ENEMY_STATES.CHASE ? 1.85 : 1); advance(delta); }
+    if (mixer) setAnimation(gameplayAction(), 1);
+    if (mixer) advance(delta);
     updateHud();
   }
 
@@ -682,7 +722,12 @@ export function createMonster({
     // Authority starts at match entry, even before the first demon pose arrives.
     if (world.state.remoteFixtures) return;
     if (world.state.gameOver) { if (mixer) advance(delta * 0.25); return; }
-    if (inspectionMode) { if (mixer) { setAnimation(inspectionMotion === 'walk' ? walkAction : idleAction, 1); advance(delta); } updateHud(); return; }
+    if (inspectionMode) {
+      moving = inspectionMotion === 'walk';
+      if (mixer) setAnimation(moving ? stalkAction : idleAction, 1);
+      if (mixer) advance(delta);
+      updateHud(); return;
+    }
     // The head start belongs to the hiders. A dormant demon still patrols and is still worth
     // avoiding, but it does not look, does not read the heat meter and cannot catch — the same rule
     // `goDormant` applies on the authority, restated here because the solo round runs this brain
@@ -703,7 +748,8 @@ export function createMonster({
     }
     const target = route[0]; const speed = awareness.state === ENEMY_STATES.CHASE ? CONFIG.enemyChaseSpeed : awareness.state === ENEMY_STATES.SEARCH ? CONFIG.enemyWalkSpeed * 1.22 : routePurpose === 'hunt' ? CONFIG.enemyHuntSpeed : CONFIG.enemyWalkSpeed;
     if (target) tryMove(target, speed, delta); else moving = false;
-    if (mixer) { setAnimation(moving ? walkAction : idleAction, awareness.state === ENEMY_STATES.CHASE ? 1.85 : 1); advance(delta); }
+    if (mixer) setAnimation(gameplayAction(), 1);
+    if (mixer) advance(delta);
     if (fallback) { const t = window.performance.now() * 0.001; fallback.position.y = Math.sin(t * 3.2) * 0.035; fallback.rotation.z = Math.sin(t * 1.7) * 0.018; }
     const playerFeetY = camera.position.y - player.getEyeHeight();
     if (!dormant && !world.state.playerEliminated && window.HotelDemon.caughtBy(
@@ -722,10 +768,13 @@ export function createMonster({
     config: { floorHeight: CONFIG.floorHeight, floorCount: world.state.floorCount },
   });
   mistDisc = createFloorBloom(); if (mistDisc) root.add(mistDisc);
-  fallback = createFallbackDemon();
   root.position.set(spawn.x, spawn.y, spawn.z); if (inspectionMode) root.position.set(0, 0, 0); else choosePatrol(); loadAnimatedBody(); updateHud();
   return {
-    dispose() { disposed = true; mixer?.stopAllAction(); if (mixer && body) mixer.uncacheRoot(body); },
+    dispose() {
+      disposed = true;
+      mixer?.stopAllAction();
+      if (mixer && body) mixer.uncacheRoot(body);
+    },
     update,
     setRemotePose,
     root,

@@ -1,0 +1,14 @@
+{
+  "title": "Shark Hall",
+  "tagline": "Where the tip lands, and how long you hold it.",
+  "description": "House 8-ball on a real physics table. Power is only how long you hold the stroke, and the contact point is a mark you drag across the cue ball — high is follow, low is draw, sideways is English, all of it genuine angular velocity rather than a modifier, so a full follow shot spins above natural roll and the cue ball speeds up off the object ball. Full rules: open table, group assignment on the first legal pot after the break, the 8 on the break as a rerack, ball in hand behind the head string on a scratch. Play a rack against the CPU at three strengths or hand the cue across the table in local hotseat. The aim guide is computed by the same function the CPU searches with, so it never lies, and turning it down never turns the physics down.",
+  "players": "1-2",
+  "categories": ["Sports", "Arcade", "Simulation"],
+  "dimensions": ["3d"],
+  "play_modes": ["solo", "local"],
+  "status": "Playable - full 8-ball vs CPU or local hotseat",
+  "order": 18,
+  "featured": false,
+  "theme": "hall",
+  "accentColor": "#2f6f52"
+}

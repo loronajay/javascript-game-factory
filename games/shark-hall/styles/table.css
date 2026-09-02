@@ -1,0 +1,687 @@
+/* The shell: header, canvas frame, table HUD, and the control deck.
+ *
+ * Split from `menu.css` on the repo's per-concern CSS rule. This file styles
+ * what is on screen WHILE PLAYING; that file styles everything that covers it.
+ *
+ * The palette is the splash: navy cloth, brass, dark walnut, warm low light.
+ */
+
+:root {
+  --ink: #06080a;
+  --ink2: #0d1116;
+  --panel: #131a22;
+  --panel2: #19222c;
+  --panel3: #212c38;
+  --cream: #eef1f5;
+  --muted: #8f9aa6;
+  --line: rgba(255, 255, 255, 0.1);
+  --brass: #c79a4f;
+  --brass2: #efc87c;
+  --navy: #24405f;
+  --navy2: #2f527a;
+  --red: #a4423c;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.42);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: radial-gradient(circle at 50% -20%, #1c2430 0, #0a0e12 48%, #05070a 100%);
+  color: var(--cream);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+button,
+select,
+input {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--brass2);
+  outline-offset: 2px;
+}
+button:disabled {
+  cursor: default;
+  opacity: 0.38;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+#app {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 10px 12px 18px;
+  position: relative;
+}
+
+/* --- header -------------------------------------------------------------- */
+
+.game-header {
+  height: 52px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.brand-mini {
+  font-size: 11px;
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+  color: #6f7a86;
+  font-weight: 800;
+}
+.match-title {
+  text-align: center;
+  min-width: 0;
+}
+.match-title .status {
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 900;
+}
+.match-title .sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 480px;
+}
+.header-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.icon-btn {
+  height: 40px;
+  border: 1px solid var(--line);
+  background: rgba(16, 22, 29, 0.84);
+  color: var(--cream);
+  border-radius: 10px;
+  padding: 0 13px;
+  font-weight: 750;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  backdrop-filter: blur(8px);
+}
+.icon-btn:hover {
+  border-color: rgba(199, 154, 79, 0.46);
+  background: #1c2531;
+}
+
+/* --- table --------------------------------------------------------------- */
+
+.game-wrap {
+  position: relative;
+  background: #04060a;
+  border: 1px solid rgba(199, 154, 79, 0.22);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.02), var(--shadow);
+}
+
+canvas#game {
+  display: block;
+  width: 100%;
+  height: min(69vh, 720px);
+  /* The canvas is the aim surface; the browser must not steal the drag. */
+  touch-action: none;
+  background: #04060a;
+}
+
+.score-hud {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr);
+  gap: 10px;
+  align-items: start;
+  pointer-events: none;
+}
+.player-plaque {
+  width: min(250px, 42vw);
+  background: linear-gradient(180deg, rgba(20, 27, 35, 0.92), rgba(7, 10, 13, 0.88));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 9px 11px;
+  box-shadow: 0 9px 24px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(10px);
+}
+.player-plaque.right {
+  justify-self: end;
+  text-align: right;
+}
+.player-plaque.active {
+  border-color: rgba(239, 200, 124, 0.54);
+  box-shadow: 0 9px 24px rgba(0, 0, 0, 0.24), inset 0 0 0 1px rgba(199, 154, 79, 0.14);
+}
+.plaque-kicker {
+  font-size: 9px;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  color: #6f7a86;
+  font-weight: 900;
+}
+.plaque-name {
+  font-size: 14px;
+  font-weight: 900;
+  margin-top: 2px;
+}
+.plaque-meta {
+  font-size: 11px;
+  color: #a4adb8;
+  margin-top: 1px;
+}
+
+.turn-chip {
+  justify-self: center;
+  background: rgba(6, 9, 12, 0.76);
+  border: 1px solid rgba(199, 154, 79, 0.38);
+  color: var(--brass2);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  font-weight: 900;
+  backdrop-filter: blur(8px);
+}
+
+.table-actions {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: none;
+}
+.table-actions button {
+  pointer-events: auto;
+  background: rgba(6, 9, 12, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  color: #e6ebf1;
+  border-radius: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 800;
+  backdrop-filter: blur(8px);
+}
+
+.placement-banner {
+  position: absolute;
+  left: 50%;
+  bottom: 60px;
+  transform: translateX(-50%);
+  max-width: min(540px, 90%);
+  background: rgba(8, 12, 17, 0.89);
+  border: 1px solid rgba(199, 154, 79, 0.42);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 11px;
+  text-align: center;
+  color: #dde3ea;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s;
+}
+.placement-banner.show {
+  opacity: 1;
+}
+
+/* The hover readout. Positioned from script against `.game-wrap`, which is the
+ * only positioned ancestor, and never interactive — it sits under the cursor
+ * that summoned it, so a pointer-events value of anything but `none` would have
+ * it eat the aim click. */
+.ball-tip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: rgba(6, 9, 13, 0.93);
+  border: 1px solid rgba(199, 154, 79, 0.34);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--cream);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+.ball-tip.show {
+  opacity: 1;
+}
+/* Past the right edge the readout is drawn on the other side of the cursor. */
+.ball-tip.flip {
+  transform: translateX(calc(-100% - 32px));
+}
+
+.bt-swatch {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.4);
+  flex: none;
+}
+/* A stripe is drawn as a stripe: a cream cap and heel over the ball's own
+ * colour, which arrives as an inline background-color and shows through the
+ * transparent middle of this gradient. */
+.bt-swatch.striped {
+  background-image: linear-gradient(
+    to bottom,
+    #f5f4ef 0,
+    #f5f4ef 28%,
+    transparent 28%,
+    transparent 72%,
+    #f5f4ef 72%,
+    #f5f4ef 100%
+  );
+}
+
+.bt-owner {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 5px;
+  border-radius: 4px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+}
+.bt-owner:empty {
+  display: none;
+}
+.ball-tip.mine .bt-owner {
+  color: #0f1408;
+  background: #a9c86a;
+}
+.ball-tip.theirs .bt-owner {
+  color: #f4dcda;
+  background: rgba(164, 66, 60, 0.85);
+}
+
+/* The between-turns card. Hidden by opacity rather than display so it can
+ * animate; `pointer-events: none` is what keeps it from eating a click. */
+.turn-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 12;
+  width: min(430px, 86%);
+  transform: translate(-50%, -46%) scale(0.97);
+  opacity: 0;
+  pointer-events: none;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(11, 16, 22, 0.96), rgba(5, 7, 10, 0.94));
+  border: 1px solid rgba(239, 200, 124, 0.46);
+  border-radius: 16px;
+  padding: 15px 18px 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.46), inset 0 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  transition: opacity 0.16s ease, transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.turn-card.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+.turn-card .tc-kicker {
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--brass);
+  font-weight: 950;
+}
+.turn-card .tc-name {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(27px, 5vw, 42px);
+  line-height: 1;
+  margin-top: 5px;
+  font-weight: 900;
+  letter-spacing: -0.025em;
+}
+.turn-card .tc-reason {
+  font-size: 11px;
+  color: #aeb6c0;
+  margin-top: 7px;
+}
+
+/* --- control deck -------------------------------------------------------- */
+
+.control-deck {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) 210px minmax(250px, 0.78fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+.control-card {
+  min-width: 0;
+  background: linear-gradient(180deg, #151d26, #0f151c);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.card-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #7c8894;
+  font-weight: 900;
+}
+.card-value {
+  color: #d6dde5;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.aim-tools {
+  display: grid;
+  grid-template-columns: 48px 1fr 48px;
+  gap: 8px;
+  align-items: center;
+}
+.nudge {
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #202b37;
+  color: #eef1f5;
+  font-weight: 1000;
+  font-size: 19px;
+}
+.nudge:hover {
+  border-color: rgba(199, 154, 79, 0.5);
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--brass);
+  min-height: 38px;
+}
+
+.spin-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.spin-copy {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 5px;
+  text-align: center;
+  line-height: 1.35;
+}
+.spin-title {
+  font-size: 12px;
+  font-weight: 850;
+  margin-top: 3px;
+  text-align: center;
+}
+#spin {
+  width: 116px;
+  height: 116px;
+  border-radius: 50%;
+  touch-action: none;
+  background: #ddd;
+  border: 1px solid #6f6f6a;
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.18), 0 8px 20px rgba(0, 0, 0, 0.18);
+}
+
+.shot-card {
+  display: flex;
+  flex-direction: column;
+}
+.charge-readout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+.charge-track {
+  height: 9px;
+  border-radius: 999px;
+  background: #202a35;
+  overflow: hidden;
+  border: 1px solid #2c3846;
+}
+.charge-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #8d6a30, var(--brass2));
+  /* Short enough to feel instant, long enough not to strobe at 144hz. */
+  transition: width 0.035s linear;
+}
+.shoot {
+  width: 100%;
+  min-height: 58px;
+  margin-top: 9px;
+  border: 1px solid rgba(239, 200, 124, 0.58);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #d2a353, #a4762f);
+  color: #150f08;
+  font-weight: 950;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.28), 0 8px 18px rgba(0, 0, 0, 0.22);
+  touch-action: none;
+}
+.shoot:not(:disabled):active {
+  transform: translateY(1px);
+  filter: brightness(0.94);
+}
+
+.event-strip {
+  margin-top: 8px;
+  min-height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  background: rgba(14, 19, 25, 0.72);
+  display: flex;
+  align-items: center;
+  padding: 7px 11px;
+  font-size: 11px;
+  color: #97a1ac;
+}
+.event-strip::before {
+  content: "TABLE";
+  font-size: 8px;
+  letter-spacing: 0.17em;
+  color: var(--brass);
+  font-weight: 900;
+  margin-right: 10px;
+}
+
+/* --- narrow screens ------------------------------------------------------
+ * A phone gets a different arrangement, not a shrunken one: the aim slider
+ * spans the full width because fine aim is the control that most needs travel,
+ * and the two square cards sit beside each other under it. */
+
+@media (max-width: 760px) {
+  #app {
+    padding: 6px 6px 12px;
+  }
+  .game-header {
+    height: 44px;
+    margin-bottom: 5px;
+    grid-template-columns: 1fr auto;
+  }
+  .brand-mini {
+    display: none;
+  }
+  .match-title {
+    text-align: left;
+  }
+  .match-title .sub {
+    max-width: 230px;
+  }
+  .header-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  canvas#game {
+    height: min(58vh, 560px);
+  }
+  .score-hud {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    gap: 5px;
+  }
+  .player-plaque {
+    width: auto;
+    min-width: 0;
+    padding: 7px 8px;
+  }
+  .plaque-kicker {
+    font-size: 7px;
+  }
+  .plaque-name {
+    font-size: 11px;
+  }
+  .plaque-meta {
+    font-size: 9px;
+  }
+  .turn-chip {
+    font-size: 8px;
+    padding: 6px 8px;
+  }
+  .table-actions {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+  }
+  .table-actions button {
+    min-height: 38px;
+    padding: 0 10px;
+  }
+  .control-deck {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .control-card {
+    padding: 9px;
+    border-radius: 11px;
+  }
+  .aim-card {
+    grid-column: 1 / -1;
+  }
+  .spin-card,
+  .shot-card {
+    min-height: 158px;
+  }
+  .shot-card {
+    justify-content: center;
+  }
+  .card-label {
+    font-size: 8px;
+    margin-bottom: 3px;
+  }
+  .aim-tools {
+    grid-template-columns: 46px 1fr 46px;
+  }
+  .nudge {
+    height: 44px;
+  }
+  .spin-copy {
+    font-size: 8px;
+  }
+  .spin-title {
+    font-size: 10px;
+  }
+  #spin {
+    width: 100px;
+    height: 100px;
+  }
+  .shoot {
+    min-height: 62px;
+    font-size: 11px;
+  }
+  .event-strip {
+    margin-top: 6px;
+    min-height: 32px;
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 390px) {
+  .turn-chip {
+    display: none;
+  }
+  .score-hud {
+    grid-template-columns: 1fr 1fr;
+  }
+  .player-plaque.right {
+    grid-column: 2;
+  }
+  .control-deck {
+    grid-template-columns: 1fr;
+  }
+  .aim-card {
+    grid-column: auto;
+  }
+  .spin-card,
+  .shot-card {
+    min-height: auto;
+  }
+  .spin-card {
+    flex-direction: row;
+    gap: 10px;
+    justify-content: flex-start;
+  }
+  .spin-copy {
+    text-align: left;
+  }
+  .turn-card {
+    width: 84%;
+    padding: 13px 14px;
+  }
+  .turn-card .tc-name {
+    font-size: 29px;
+  }
+}

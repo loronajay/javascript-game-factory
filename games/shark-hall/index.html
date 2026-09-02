@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>Shark Hall — 8 Ball</title>
+    <meta name="description" content="House 8-ball in a late-night hall. Vs CPU or local hotseat, with real spin, cushion English, and ball in hand." />
+    <link rel="stylesheet" href="styles/table.css" />
+    <link rel="stylesheet" href="styles/menu.css" />
+  </head>
+  <body>
+    <!--
+      ONE PAGE. Every screen is a layer over this document rather than its own
+      HTML file — the same rule Mini Hoops learned the hard way, because a page
+      navigation destroys the <audio> element streaming the soundtrack and the
+      room tone, and the music would restart from silence on every menu visit.
+    -->
+    <div id="app">
+      <div class="game-header">
+        <div class="brand-mini">JavaScript Game Factory · Shark Hall</div>
+        <div class="match-title">
+          <div id="status" class="status">Table ready</div>
+          <div id="sub" class="sub">Choose a match from the menu</div>
+        </div>
+        <div class="header-actions">
+          <button id="muteBtn" class="icon-btn" type="button" aria-pressed="true">Sound on</button>
+          <button id="pauseBtn" class="icon-btn" type="button">Pause</button>
+        </div>
+      </div>
+
+      <div class="game-wrap">
+        <canvas id="game"></canvas>
+
+        <div class="score-hud">
+          <div id="p1Plaque" class="player-plaque">
+            <div class="plaque-kicker">Player one</div>
+            <div id="p1Label" class="plaque-name">PLAYER 1 · OPEN</div>
+            <div id="p1Count" class="plaque-meta">Table open</div>
+          </div>
+          <div id="turnChip" class="turn-chip">8 Ball</div>
+          <div id="p2Plaque" class="player-plaque right">
+            <div id="p2Kicker" class="plaque-kicker">Opponent</div>
+            <div id="p2Label" class="plaque-name">CPU · OPEN</div>
+            <div id="p2Count" class="plaque-meta">Table open</div>
+          </div>
+        </div>
+
+        <div id="placementBanner" class="placement-banner">
+          Place the cue ball behind the head string, then release to confirm.
+        </div>
+
+        <div id="turnCard" class="turn-card" role="status" aria-live="assertive">
+          <div id="turnCardKicker" class="tc-kicker">Turn over</div>
+          <div id="turnCardName" class="tc-name">PLAYER 2'S TURN</div>
+          <div id="turnCardReason" class="tc-reason">No ball made</div>
+        </div>
+
+        <!--
+          The hover readout. A stripe seen edge-on from the cue view reads as a
+          solid, so the answer is printed rather than solved with camera work.
+          Positioned from script; it has no place in the flow.
+        -->
+        <div id="ballTip" class="ball-tip" role="status" aria-live="off">
+          <span id="ballTipSwatch" class="bt-swatch"></span>
+          <span id="ballTipName" class="bt-name">Cue ball</span>
+          <span id="ballTipOwner" class="bt-owner"></span>
+        </div>
+
+        <div class="table-actions">
+          <button id="camBtn" type="button">Overhead view</button>
+          <button id="resetAim" type="button">Center aim</button>
+        </div>
+      </div>
+
+      <div class="control-deck">
+        <section class="control-card aim-card">
+          <div class="card-label"><span>Fine aim</span><span id="aimText" class="card-value">0.0°</span></div>
+          <div class="aim-tools">
+            <button id="nudgeLeft" class="nudge" type="button" aria-label="Aim left">◀</button>
+            <input id="aim" type="range" min="-180" max="180" step=".1" value="0" aria-label="Fine aim angle" />
+            <button id="nudgeRight" class="nudge" type="button" aria-label="Aim right">▶</button>
+          </div>
+        </section>
+
+        <section class="control-card spin-card">
+          <div class="card-label" style="width: 100%"><span>Cue contact</span><span></span></div>
+          <canvas id="spin" width="132" height="132" aria-label="Cue-ball contact point"></canvas>
+          <div>
+            <div id="spinText" class="spin-title">Center ball</div>
+            <div class="spin-copy">Drag the contact point for draw, follow, and English.</div>
+          </div>
+        </section>
+
+        <section class="control-card shot-card">
+          <div class="charge-readout">
+            <div class="card-label" style="margin: 0"><span>Stroke</span></div>
+            <span id="powerText" class="card-value" style="font-size: 11px">Hold to charge</span>
+          </div>
+          <div class="charge-track" aria-hidden="true"><div id="chargeFill" class="charge-fill"></div></div>
+          <button id="shoot" class="shoot" type="button">Hold · Release to shoot</button>
+        </section>
+      </div>
+
+      <div id="log" class="event-strip" aria-live="polite">Rack ready.</div>
+    </div>
+
+    <!-- Front door -->
+    <div id="frontDoor" class="screen-layer show">
+      <div class="menu-frame">
+        <div class="menu-brand">
+          <div class="eyebrow">JavaScript Game Factory</div>
+          <div class="hero-lockup">
+            <div class="eight-mark">8</div>
+            <div class="hero-title">SHARK<br />HALL</div>
+          </div>
+          <div class="hero-sub">
+            House 8-ball in a late-night room. Real spin off the tip, English through the cushions, and a table that
+            settles before it scores you.
+          </div>
+          <div id="nowPlaying" class="now-playing">Starts on first click</div>
+        </div>
+
+        <section id="menuMain" class="menu-panel active">
+          <h2>Rack up.</h2>
+          <div class="lead">Choose how you want to play. Match settings are locked once the rack begins.</div>
+          <div class="menu-stack">
+            <button id="menuPlay" class="menu-btn primary-menu" type="button">
+              <div><strong>Play</strong><span>CPU or local hotseat</span></div>
+              <div class="menu-arrow">›</div>
+            </button>
+            <button id="menuHow" class="menu-btn" type="button">
+              <div><strong>How to play</strong><span>Aim, spin, power, and scratch placement</span></div>
+              <div class="menu-arrow">›</div>
+            </button>
+            <button id="menuRules" class="menu-btn" type="button">
+              <div><strong>House rules</strong><span>The full 8-ball rules this table plays</span></div>
+              <div class="menu-arrow">&rsaquo;</div>
+            </button>
+            <button id="menuSettings" class="menu-btn" type="button">
+              <div><strong>Settings</strong><span>Aim guide, camera, and sound</span></div>
+              <div class="menu-arrow">›</div>
+            </button>
+          </div>
+        </section>
+
+        <section id="menuPlayPanel" class="menu-panel">
+          <h2>Choose match.</h2>
+          <div class="lead">The same rules and physics are used in both modes.</div>
+          <div class="mode-grid">
+            <div class="mode-card selected" role="button" tabindex="0" data-mode="cpu">
+              <div class="mode-icon">CPU</div>
+              <strong>Vs CPU</strong>
+              <small>Single-player 8-ball against a positional opponent.</small>
+            </div>
+            <div class="mode-card" role="button" tabindex="0" data-mode="hotseat">
+              <div class="mode-icon">2P</div>
+              <strong>Hotseat</strong>
+              <small>Two players share the same device and table.</small>
+            </div>
+          </div>
+          <div id="difficultyWrap" class="diff-wrap">
+            <div class="diff-label">CPU strength</div>
+            <div class="segmented">
+              <button type="button" data-difficulty="casual">Casual</button>
+              <button type="button" data-difficulty="club" class="active">Club</button>
+              <button type="button" data-difficulty="sharp">Sharp</button>
+            </div>
+          </div>
+          <div class="menu-foot">
+            <button class="back-btn menu-back" type="button">Back</button>
+            <button id="startMatch" class="start-btn" type="button">Start match</button>
+          </div>
+        </section>
+
+        <section id="menuHowPanel" class="menu-panel">
+          <h2>At the table.</h2>
+          <div class="lead">The controls use the same interaction model on mouse and touch.</div>
+          <div class="how-list">
+            <div class="how-item">
+              <div class="how-num">1</div>
+              <div>
+                <strong>Aim on the cloth.</strong>
+                <p>Tap a point on the table to face it. Drag left and right for continuous aim; use the fine controls for tiny cuts.</p>
+              </div>
+            </div>
+            <div class="how-item">
+              <div class="how-num">2</div>
+              <div>
+                <strong>Choose cue contact.</strong>
+                <p>Move the red mark high for follow, low for draw, and sideways for English. It is real spin, so it comes off the cushions too.</p>
+              </div>
+            </div>
+            <div class="how-item">
+              <div class="how-num">3</div>
+              <div>
+                <strong>Hold the stroke.</strong>
+                <p>Power is only how long you hold the shot button — watch the cue draw back on the table. Release to strike.</p>
+              </div>
+            </div>
+            <div class="how-item">
+              <div class="how-num">4</div>
+              <div>
+                <strong>Placement is two steps.</strong>
+                <p>On a scratch, drag the cue ball behind the head string and release to confirm. Your next gesture goes back to aiming.</p>
+              </div>
+            </div>
+          </div>
+          <div class="menu-foot"><button class="back-btn menu-back" type="button">Back</button></div>
+        </section>
+
+        <!--
+          THE RULES, IN PRINT. Every foul name below is the exact string the turn
+          card shows, so a player who reads "Wrong ball first" mid-rack can find
+          it here word for word. If `sim/rules.js` changes, this changes with it.
+        -->
+        <section id="menuRulesPanel" class="menu-panel rules-panel">
+          <h2>House rules.</h2>
+          <div class="lead">
+            Standard 8-ball as this table plays it. The last section is the one worth reading &mdash; it is where the
+            house differs from the hall down the road.
+          </div>
+
+          <div class="rules-doc">
+            <div class="rule-block">
+              <h3>The object</h3>
+              <p>
+                Fifteen balls: <b>solids 1&ndash;7</b>, <b>stripes 9&ndash;15</b>, and the <b>8</b>, which belongs to
+                nobody. Claim a group, pot all seven of it, then pot the 8. First to do that wins the rack.
+              </p>
+            </div>
+
+            <div class="rule-block">
+              <h3>The break</h3>
+              <ul>
+                <li>The breaker keeps shooting if a ball drops, but <b>the break never assigns groups</b> &mdash; the table stays open no matter what falls.</li>
+                <li>Pot the 8 on the break and it is a <b>rerack</b>: not a win, not a loss. Same breaker, fresh triangle.</li>
+                <li>Scratch on the break and it is an ordinary scratch &mdash; the incoming player takes ball in hand behind the head string.</li>
+              </ul>
+            </div>
+
+            <div class="rule-block">
+              <h3>The open table</h3>
+              <ul>
+                <li>Until someone claims a group the table is <b>open</b>, and you may strike any ball first except the 8.</li>
+                <li>Groups are settled by the <b>first legal pot after the break</b>. Not by the break, and never off a foul.</li>
+                <li>Drop one of each on that shot and the group is taken from <b>whichever fell first</b>, not from the majority.</li>
+              </ul>
+            </div>
+
+            <div class="rule-block">
+              <h3>A legal shot</h3>
+              <p>Three things have to be true:</p>
+              <ul>
+                <li><b>Hit your own first.</b> Once you have a group, the first ball the cue ball touches must be from it. On an open table, anything but the 8. Once your group is gone, the 8 and nothing else.</li>
+                <li><b>Then a pot or a rail.</b> After that contact, either a ball goes down or some ball &mdash; any ball, the cue ball included &mdash; must reach a cushion.</li>
+                <li><b>Don't scratch.</b> The cue ball stays on the table.</li>
+              </ul>
+              <p>
+                Meet all three and pot one of yours, and you shoot again. Meet all three and pot nothing &mdash; or pot
+                only the opponent's &mdash; and the turn simply passes, with <b>no penalty</b>. That one is a safety, and
+                it is a real shot rather than a mistake.
+              </p>
+            </div>
+
+            <div class="rule-block">
+              <h3>Fouls, and what they cost</h3>
+              <p>
+                Every foul hands the incoming player <b>ball in hand anywhere on the table</b> &mdash; except a scratch.
+                These are the five, named exactly as the turn card names them:
+              </p>
+              <ul>
+                <li><b>Scratch</b> &mdash; the cue ball went down. The one exception to the penalty: ball in hand <b>behind the head string only</b>. The line itself is legal; past it is not.</li>
+                <li><b>No ball struck</b> &mdash; the cue ball reached nothing at all.</li>
+                <li><b>Wrong ball first</b> &mdash; the first contact was not from your group, or was not the 8 once your group was already clear.</li>
+                <li><b>No rail after contact</b> &mdash; you hit the right ball, then nothing dropped and nothing reached a cushion.</li>
+                <li><b>Struck the 8 on an open table</b> &mdash; the 8 is nobody's ball until a group has been cleared.</li>
+              </ul>
+              <p>
+                A foul never assigns a group, and potting your own ball on a foul does not rescue the shot &mdash; the
+                turn passes anyway. Nothing that goes down is ever returned to the table.
+              </p>
+            </div>
+
+            <div class="rule-block">
+              <h3>Ending the rack &mdash; the 8</h3>
+              <ul>
+                <li>You may shoot at the 8 only once <b>every ball of your group was already down when you struck</b>. Clearing your last ball and the 8 on the same shot is a loss.</li>
+                <li>A winning 8 is a clean one: the 8 struck first, potted, no foul.</li>
+                <li>Pot the 8 early, foul while potting it, or scratch on it, and the <b>opponent wins immediately</b>.</li>
+                <li>Potting your last group ball is an ordinary legal pot. You stay at the table, now shooting the 8.</li>
+              </ul>
+            </div>
+
+            <div class="rule-block house">
+              <h3>House calls</h3>
+              <p>Where this table is deliberately friendlier than the rule book:</p>
+              <ul>
+                <li><b>Nothing is called.</b> No naming the ball, no naming the pocket. A ball that drops, counts &mdash; slop included, and so are combinations, caroms and kicks, so long as you hit your own first.</li>
+                <li><b>The 8 on the break is a rerack</b>, where most rule sets make it a win or a loss.</li>
+                <li><b>The break has no rail requirement.</b> Any break is a legal break.</li>
+                <li><b>No three-foul rule</b>, and <b>no push-out</b> after the break.</li>
+                <li><b>Ball in hand is anywhere</b> on every foul but the scratch.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="menu-foot"><button class="back-btn menu-back" type="button">Back</button></div>
+        </section>
+
+        <section id="menuSettingsPanel" class="menu-panel">
+          <h2>Table settings.</h2>
+          <div class="lead">These affect presentation and assistance only; the physics stay unchanged.</div>
+          <div class="setting-row">
+            <label for="guideSetting">Aim guide<span>Full shows the ghost-ball contact and the object-ball path.</span></label>
+            <select id="guideSetting">
+              <option value="full">Full</option>
+              <option value="line">Line only</option>
+              <option value="off">Off</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="cameraSetting">Starting camera<span>You can still switch views during a match.</span></label>
+            <select id="cameraSetting">
+              <option value="aim">Cue view</option>
+              <option value="over">Overhead</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <label for="musicSetting">Sound<span>Soundtrack, room tone, and the table.</span></label>
+            <select id="musicSetting">
+              <option value="on">On</option>
+              <option value="off">Off</option>
+            </select>
+          </div>
+          <div class="menu-foot"><button class="back-btn menu-back" type="button">Back</button></div>
+        </section>
+      </div>
+    </div>
+
+    <div id="pauseLayer" class="modal-layer">
+      <div class="modal-card">
+        <div class="result-kicker">Match paused</div>
+        <h2>Off the table.</h2>
+        <p>The rack is frozen exactly where it is.</p>
+        <div class="modal-actions">
+          <button id="resumeBtn" class="gold" type="button">Resume match</button>
+          <button id="newRack" type="button">Restart rack</button>
+          <button id="pauseRules" type="button">House rules</button>
+          <button id="pauseSettings" type="button">Settings</button>
+          <button id="quitMenu" type="button">Main menu</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="resultLayer" class="modal-layer">
+      <div class="modal-card">
+        <div class="result-kicker">Rack complete</div>
+        <h2 id="resultTitle">Player 1 wins</h2>
+        <p id="resultSub">8-ball match complete.</p>
+        <div class="modal-actions">
+          <button id="rematchBtn" class="gold" type="button">Run it back</button>
+          <button id="resultMenu" type="button">Main menu</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { bootGame } from "./scripts/init-game.js";
+      bootGame();
+    </script>
+  </body>
+</html>

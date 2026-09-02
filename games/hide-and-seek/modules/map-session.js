@@ -45,6 +45,11 @@ export function createMapSession({ maps, window: win = globalThis, storage = nul
     return match ? decodeURIComponent(match[1]) : null;
   }
 
+  function queryDemonId() {
+    const match = /[?&]demon=([^&]+)/.exec(String(location.search || ''));
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
   // The map a round will actually happen in. A registered-but-unbuilt map falls back to the default
   // rather than booting into a location with no geometry.
   const requested = queryMapId() || read(STORAGE_KEY);
@@ -83,12 +88,19 @@ export function createMapSession({ maps, window: win = globalThis, storage = nul
     win.location.reload();
   }
 
+  function inspectionDemonRoster() {
+    const roster = maps ? maps.demonRosterFor(activeId) : [];
+    const selected = roster.find((entry) => entry.id === queryDemonId()) || roster[0];
+    return selected ? [selected] : [];
+  }
+
   return {
     activeMapId: () => activeId,
     // What the picker last showed, which may be a `soon` map the player is only looking at.
     requestedMapId: () => (maps ? maps.normalizeMapId(requested) : activeId),
     map: () => (maps ? maps.getMap(activeId) : null),
     demonRoster: () => (maps ? maps.demonRosterFor(activeId) : []),
+    inspectionDemonRoster,
     remember, select, activate, takePendingSetup, reopenOnlineSetup, SETUP_KEY, STORAGE_KEY,
   };
 }

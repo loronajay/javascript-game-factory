@@ -96,6 +96,25 @@ test('the demon face follows the animated head and shares the body forward direc
   assert.match(monster, /updateHeadDetails/);
 });
 
+test('demons play authored Blender clips instead of deforming static meshes at runtime', () => {
+  const monster = fs.readFileSync(path.join(projectRoot, 'modules', 'monster.js'), 'utf8');
+
+  assert.doesNotMatch(monster, /procedural-rig/);
+  assert.doesNotMatch(monster, /UAL2_Standard\.glb/);
+  for (const clip of ['Creature_Idle', 'Creature_Stalk', 'Creature_Chase']) {
+    assert.match(monster, new RegExp(clip));
+  }
+});
+
+test('rejected horror prototypes are isolated from every gameplay roster', () => {
+  const demons = fs.readFileSync(path.join(projectRoot, 'modules', 'demons.js'), 'utf8');
+  const maps = fs.readFileSync(path.join(projectRoot, 'map-catalog.js'), 'utf8');
+
+  assert.doesNotMatch(demons, /horror\/.*-rigged\.glb/);
+  assert.doesNotMatch(maps, /horror\/.*-rigged\.glb/);
+  assert.match(demons, /assets\/UAL2_Standard\.glb/);
+});
+
 test('the demon face has an aggressive brow, horns, jaw, and fangs', () => {
   const monster = fs.readFileSync(path.join(projectRoot, 'modules', 'monster.js'), 'utf8');
 
@@ -111,22 +130,22 @@ test('the demon reads as a silhouette in the dark through a fresnel rim on its s
   assert.match(monster, /customProgramCacheKey/);
 });
 
-test('the demon wears a swaying shroud and hand talons rigged to the animated skeleton', () => {
+test('the gaunt red eyes are parented to the authored head bone', () => {
   const monster = fs.readFileSync(path.join(projectRoot, 'modules', 'monster.js'), 'utf8');
 
-  for (const detail of ['Tattered Shroud', 'Hand Talon']) assert.match(monster, new RegExp(detail));
-  assert.match(monster, /getObjectByName\(['"]hand_l['"]\)/);
-  assert.match(monster, /getObjectByName\(['"]hand_r['"]\)/);
-  assert.match(monster, /getWorldScale/);
+  assert.match(monster, /visual\?\.eyes === ['"]red['"]/);
+  assert.match(monster, /getObjectByName\(['"]Head['"]\)/);
+  assert.match(monster, /headBone\.getWorldQuaternion/);
+  assert.match(monster, /updateHeadDetails\(\)/);
+  assert.match(monster, /0xff1008/);
 });
 
-test('the demon posture is forced onto the skeleton after the mixer writes each frame', () => {
+test('the game chooses authored stalk and chase actions from replicated gameplay state', () => {
   const monster = fs.readFileSync(path.join(projectRoot, 'modules', 'monster.js'), 'utf8');
 
-  assert.match(monster, /applyPosture/);
-  assert.match(monster, /spine_01/);
-  assert.match(monster, /lowerarm_l/);
-  assert.match(monster, /mixer\.update\([^)]*\);\s*applyPosture\(\)/);
+  assert.match(monster, /return awareness\.state === ENEMY_STATES\.CHASE \? chaseAction : stalkAction/);
+  assert.match(monster, /moving = !!remotePose\.moving/);
+  assert.match(monster, /setAnimation\(gameplayAction\(\), 1\)/);
 });
 
 test('the demon menace reacts to its awareness state instead of holding one pose', () => {
@@ -135,15 +154,6 @@ test('the demon menace reacts to its awareness state instead of holding one pose
   assert.match(monster, /updateMenace/);
   assert.match(monster, /jawGroup/);
   assert.match(monster, /ENEMY_STATES\.CHASE/);
-});
-
-test('the demon body is pulled off the human rig into a creature silhouette', () => {
-  const monster = fs.readFileSync(path.join(projectRoot, 'modules', 'monster.js'), 'utf8');
-
-  for (const bone of ['calf_l', 'clavicle_r', 'thigh_l', 'index_01_l']) assert.match(monster, new RegExp(bone));
-  assert.match(monster, /Spinal Barb/);
-  assert.match(monster, /digitigrade/i);
-  assert.match(monster, /asymmetry|asymmetric/i);
 });
 
 test('gameplay advances on a fixed timestep rather than on the display refresh rate', () => {

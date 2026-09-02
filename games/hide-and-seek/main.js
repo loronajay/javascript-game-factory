@@ -28,8 +28,7 @@ import { createMapRuntime } from './modules/map-runtime.js';
 for (const name of ['HotelAvatarLogic', 'HotelCollision', 'HotelControls', 'HotelDemon', 'HotelEnemyLogic', 'HotelFixtures', 'HotelFlashlight', 'HotelHiders', 'HotelLayout', 'HotelMaps', 'HotelMenu', 'HotelMovement', 'HotelMusic', 'HotelOnline', 'HotelPlan', 'HotelRound', 'HotelHeat', 'HotelSeeker', 'HotelSpectator', 'HotelStamina']) {
   if (!window[name]) throw new Error(`Hotel pure module ${name} failed to load`);
 }
-const mapSession = createMapSession({ maps: window.HotelMaps, window });
-const rendering = createRendering({ THREE, document, window, config: CONFIG });
+const mapSession = createMapSession({ maps: window.HotelMaps, window }); const rendering = createRendering({ THREE, document, window, config: CONFIG });
 const mapRuntime = createMapRuntime({ THREE, scene: rendering.scene, materials: rendering.materials,
   canChange: () => !hiders && !online?.isActive() && !world.state.isLocked,
   onReady: ({ world, hotel }) => placeAtMapSpawn({ camera: rendering.camera, world, spawn: hotel.getPlan().spawns.seeker, eyeHeight: CONFIG.eyeHeight }),
@@ -87,7 +86,7 @@ const soundtrack = inspectionView ? null : window.HotelMusic.createSoundtrack({ 
 const soundEffects = inspectionView ? null : window.HotelMusic.createSoundEffects({ eventTarget: window });
 const heat = inspectionView ? null : createHeat({ camera: rendering.camera, world, logic: window.HotelHeat, config: HEAT_CONFIG, document });
 // The map's roster, however long it is. The workbench shows one body, so it takes the first.
-const demons = mapRuntime.setDemonsFactory((world, scene, mapId) => createDemons({ createMonster, roster: inspectionView ? mapSession.demonRoster().slice(0, 1) : window.HotelMaps.demonRosterFor(mapId), common: {
+const demons = mapRuntime.setDemonsFactory((world, scene, mapId) => createDemons({ createMonster, roster: inspectionView ? mapSession.inspectionDemonRoster() : window.HotelMaps.demonRosterFor(mapId), common: {
   THREE, GLTFLoader, scene, camera: rendering.camera, config: CONFIG, floorY,
   layout: window.HotelLayout, world, player, logic: window.HotelEnemyLogic, movement: window.HotelMovement, heat, document, window,
 } }));
@@ -95,7 +94,7 @@ const monster = demons.primary;
 const avatars = createAvatars({ THREE, GLTFLoader, scene: rendering.scene, config: CONFIG, logic: window.HotelAvatarLogic });
 const spectator = createSpectator({ logic: window.HotelSpectator, camera: rendering.camera, world, avatars, config: CONFIG, document, window });
 const viewerSubject = inspectTarget === 'monster'
-  ? { root: monster.root, setInspectionAnimation: monster.setInspectionAnimation, title: mapSession.demonRoster()[0].name }
+  ? { root: monster.root, setInspectionAnimation: monster.setInspectionAnimation, title: mapSession.inspectionDemonRoster()[0].name }
   : inspectTarget === 'avatar'
     ? { ...avatars.createShowcase(), title: 'Hotel Guest', eyebrow: 'PLAYER FIGURE', motions: ['idle', 'walk', 'run', 'crouch'], rimColor: 0x4f7cc4 }
     : null;
@@ -151,10 +150,10 @@ function animate() {
   const renderScale = adaptiveQuality.sample(frameDelta * 1000);
   if (renderScale !== null) rendering.setRenderScale(renderScale);
 }
-rendering.warmUp();
-animate();
 createPrototypeApi({
   window, world, rendering, hotel, player, monster, demons, flashlightDrops, heat, stamina, menu,
   online, round, hiders, seeker, spectator, avatars, elevator, timestep, soundtrack, soundEffects,
   floorDefs: FLOOR_DEFS, inspectionViews, mapSession, version: '7.2',
 });
+rendering.warmUp();
+animate();

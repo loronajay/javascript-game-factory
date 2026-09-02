@@ -1,0 +1,536 @@
+/* The front door and the two modals: everything that covers the table.
+ *
+ * THE SPLASH IS THE FRONT DOOR'S BACKGROUND, not an <img>. It is a photographic
+ * plate of the hall, and the menu panel sits over its right-hand side where the
+ * picture is darkest — so the scrim below is a horizontal gradient rather than a
+ * flat wash, keeping the lit table on the left readable while the text on the
+ * right has something solid to sit on.
+ */
+
+.screen-layer,
+.modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right))
+    max(18px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  overflow-y: auto;
+}
+
+.screen-layer.show,
+.modal-layer.show {
+  display: flex;
+}
+
+#frontDoor {
+  background-color: #05070a;
+  background-image: linear-gradient(
+      90deg,
+      rgba(4, 6, 9, 0.34) 0%,
+      rgba(4, 6, 9, 0.5) 38%,
+      rgba(4, 6, 9, 0.88) 72%,
+      rgba(4, 6, 9, 0.95) 100%
+    ),
+    url("../assets/splashes/menu.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.modal-layer {
+  z-index: 40;
+  background: rgba(3, 5, 8, 0.76);
+  backdrop-filter: blur(7px);
+}
+
+.menu-frame {
+  width: min(1060px, 100%);
+  display: grid;
+  grid-template-columns: minmax(280px, 430px) 1fr;
+  gap: 34px;
+  align-items: center;
+}
+
+.menu-brand {
+  align-self: end;
+}
+.eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.27em;
+  text-transform: uppercase;
+  color: var(--brass);
+  font-weight: 900;
+}
+.hero-lockup {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin: 7px 0 3px;
+}
+.eight-mark {
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: #07090b;
+  border: 2px solid #dfe4ea;
+  display: grid;
+  place-items: center;
+  font-family: Georgia, serif;
+  font-size: 35px;
+  font-weight: 900;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.42);
+}
+.hero-title {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(38px, 6.4vw, 70px);
+  line-height: 0.86;
+  letter-spacing: -0.05em;
+  font-weight: 900;
+  text-shadow: 0 6px 28px rgba(0, 0, 0, 0.6);
+}
+.hero-sub {
+  color: #c2cad3;
+  font-size: 13px;
+  max-width: 380px;
+  line-height: 1.55;
+  margin-top: 13px;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+}
+.now-playing {
+  display: inline-flex;
+  margin-top: 16px;
+  border: 1px solid rgba(199, 154, 79, 0.35);
+  border-radius: 999px;
+  padding: 6px 11px;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #d3c3a1;
+  background: rgba(4, 6, 9, 0.55);
+}
+
+.menu-panel {
+  display: none;
+  width: min(440px, 100%);
+  justify-self: end;
+  background: linear-gradient(160deg, rgba(21, 28, 36, 0.96), rgba(10, 14, 19, 0.97));
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 17px;
+  padding: 18px;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.5);
+}
+.menu-panel.active {
+  display: block;
+}
+.menu-panel h2 {
+  margin: 0;
+  font-family: Georgia, serif;
+  font-size: 27px;
+  letter-spacing: -0.02em;
+}
+.menu-panel .lead {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 4px 0 14px;
+}
+
+.menu-stack {
+  display: grid;
+  gap: 8px;
+}
+.menu-btn {
+  width: 100%;
+  min-height: 52px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #19212b;
+  color: var(--cream);
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.menu-btn:hover {
+  border-color: rgba(199, 154, 79, 0.5);
+  background: #212b36;
+}
+.menu-btn strong {
+  display: block;
+  font-size: 13px;
+}
+.menu-btn span {
+  display: block;
+  font-size: 10px;
+  color: #7f8a96;
+  margin-top: 2px;
+}
+.menu-btn.primary-menu {
+  background: linear-gradient(180deg, #cd9f4f, #a67630);
+  border-color: #dab05c;
+  color: #150f08;
+}
+.menu-btn.primary-menu span {
+  color: #55411d;
+}
+.menu-arrow {
+  font-size: 18px;
+  opacity: 0.7;
+}
+
+.mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.mode-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 13px;
+  background: #151d26;
+  cursor: pointer;
+}
+.mode-card.selected {
+  border-color: var(--brass);
+  box-shadow: inset 0 0 0 1px rgba(199, 154, 79, 0.2);
+  background: linear-gradient(160deg, #232520, #151d26);
+}
+.mode-card .mode-icon {
+  font-family: Georgia, serif;
+  font-size: 26px;
+  color: var(--brass2);
+}
+.mode-card strong {
+  display: block;
+  font-size: 13px;
+  margin-top: 7px;
+}
+.mode-card small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+  margin-top: 3px;
+}
+
+.setting-row {
+  display: grid;
+  grid-template-columns: 1fr 160px;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+.setting-row:first-of-type {
+  border-top: 0;
+}
+.setting-row label {
+  font-size: 12px;
+  font-weight: 800;
+}
+.setting-row label span {
+  display: block;
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 10px;
+  margin-top: 2px;
+}
+.setting-row select {
+  min-height: 42px;
+  background: #1d2530;
+  border: 1px solid var(--line);
+  color: var(--cream);
+  border-radius: 9px;
+  padding: 0 9px;
+}
+
+.diff-wrap {
+  margin-top: 12px;
+}
+.diff-label {
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7c8894;
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.segmented button {
+  min-height: 40px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: #171f28;
+  color: #97a1ac;
+  font-size: 10px;
+  font-weight: 850;
+}
+.segmented button:last-child {
+  border-right: 0;
+}
+.segmented button.active {
+  background: #30281a;
+  color: var(--brass2);
+}
+
+.menu-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 13px;
+}
+.back-btn {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: #9ea9b4;
+  border-radius: 9px;
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.start-btn {
+  flex: 1;
+  min-height: 46px;
+  border: 1px solid #dab05c;
+  background: linear-gradient(180deg, #d2a353, #a4762f);
+  color: #140e08;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.how-list {
+  display: grid;
+  gap: 10px;
+}
+.how-item {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+}
+.how-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(199, 154, 79, 0.42);
+  color: var(--brass2);
+  font-size: 10px;
+  font-weight: 900;
+}
+.how-item strong {
+  font-size: 11px;
+}
+.how-item p {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 2px 0 0;
+}
+
+/* --- the rules page ------------------------------------------------------
+ *
+ * Wider than the other panels and scrolled INSIDE its own box rather than by the
+ * layer, so the brand lockup stays put and Back stays reachable without scrolling
+ * to the bottom of a rule book to find it. */
+.menu-panel.rules-panel {
+  width: min(620px, 100%);
+}
+
+.rules-doc {
+  max-height: min(52vh, 460px);
+  overflow-y: auto;
+  padding-right: 10px;
+  display: grid;
+  gap: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(199, 154, 79, 0.4) transparent;
+}
+.rules-doc::-webkit-scrollbar {
+  width: 8px;
+}
+.rules-doc::-webkit-scrollbar-thumb {
+  background: rgba(199, 154, 79, 0.36);
+  border-radius: 4px;
+}
+
+.rule-block h3 {
+  margin: 0 0 5px;
+  font-family: Georgia, serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--brass2);
+  letter-spacing: -0.01em;
+}
+.rule-block p {
+  margin: 0 0 6px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: #b9c2cc;
+}
+.rule-block ul {
+  margin: 0;
+  padding-left: 15px;
+  display: grid;
+  gap: 5px;
+}
+.rule-block li {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #b9c2cc;
+}
+.rule-block li::marker {
+  color: rgba(199, 154, 79, 0.6);
+}
+.rule-block b {
+  color: var(--cream);
+  font-weight: 800;
+}
+
+/* The house calls are the section people actually came for. */
+.rule-block.house {
+  border: 1px solid rgba(199, 154, 79, 0.3);
+  background: rgba(199, 154, 79, 0.06);
+  border-radius: 11px;
+  padding: 11px 12px;
+}
+
+/* --- modals -------------------------------------------------------------- */
+
+.modal-card {
+  width: min(390px, 100%);
+  background: linear-gradient(160deg, #18202a, #0c1116);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+.modal-card h2 {
+  font-family: Georgia, serif;
+  font-size: 30px;
+  margin: 2px 0;
+}
+.modal-card p {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 4px 0 15px;
+}
+.modal-actions {
+  display: grid;
+  gap: 8px;
+}
+.modal-actions button {
+  min-height: 48px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #1d2530;
+  color: var(--cream);
+  font-weight: 850;
+}
+.modal-actions .gold {
+  background: linear-gradient(180deg, #d0a154, #a1742e);
+  color: #150f08;
+  border-color: #d9af5c;
+}
+.result-kicker {
+  font-size: 9px;
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+  color: var(--brass);
+  font-weight: 900;
+}
+
+@media (max-width: 760px) {
+  .screen-layer,
+  .modal-layer {
+    padding: 10px;
+  }
+  /* On a phone the splash goes behind a vertical scrim instead of a horizontal
+   * one — the panel is under the brand rather than beside it, so the gradient
+   * has to run the other way for the same reason it ran that way on desktop. */
+  #frontDoor {
+    background-image: linear-gradient(180deg, rgba(4, 6, 9, 0.55) 0%, rgba(4, 6, 9, 0.9) 34%, rgba(4, 6, 9, 0.97) 100%),
+      url("../assets/splashes/menu.png");
+  }
+  .menu-frame {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    align-items: end;
+  }
+  .menu-brand {
+    padding: 8px 4px 0;
+  }
+  .hero-lockup {
+    gap: 10px;
+  }
+  .eight-mark {
+    width: 46px;
+    height: 46px;
+    font-size: 26px;
+  }
+  .hero-title {
+    font-size: 44px;
+  }
+  .hero-sub {
+    display: none;
+  }
+  .now-playing {
+    margin-top: 8px;
+  }
+  .menu-panel {
+    justify-self: stretch;
+    padding: 14px;
+    width: 100%;
+  }
+  .menu-panel h2 {
+    font-size: 23px;
+  }
+  .menu-btn {
+    min-height: 49px;
+  }
+  .mode-grid {
+    gap: 6px;
+  }
+  .mode-card {
+    padding: 10px;
+  }
+  .setting-row {
+    grid-template-columns: 1fr 140px;
+  }
+  .modal-card {
+    padding: 15px;
+  }
+}
+
+@media (max-width: 390px) {
+  .menu-brand {
+    padding-top: 0;
+  }
+  .eyebrow {
+    font-size: 8px;
+  }
+  .hero-title {
+    font-size: 38px;
+  }
+  .eight-mark {
+    width: 42px;
+    height: 42px;
+  }
+}

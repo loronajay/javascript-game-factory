@@ -1,12 +1,32 @@
+export function containsViewerSubject(root, subject) {
+  let current = subject;
+  while (current) {
+    if (current === root) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+export function isolateViewerSubject(scene, subject) {
+  for (const child of scene.children) child.visible = containsViewerSubject(child, subject);
+  // The subject may live inside the active map group. Keep each ancestor visible, but hide its
+  // siblings so the workbench does not accidentally render the whole hospital around the model.
+  let childOnPath = subject;
+  let parent = subject.parent;
+  while (parent && parent !== scene) {
+    for (const child of parent.children) child.visible = child === childOnPath;
+    childOnPath = parent;
+    parent = parent.parent;
+  }
+}
+
 export function createModelViewer({ THREE, scene, camera, renderer, subject, world, document, window }) {
   document.body.classList.add('model-viewer-mode');
   world.state.isLocked = false;
   scene.background.set(subject.background === undefined ? 0x010102 : subject.background);
   scene.fog = null;
 
-  for (const child of scene.children) {
-    if (child !== subject.root) child.visible = false;
-  }
+  isolateViewerSubject(scene, subject.root);
 
   const stage = new THREE.Group();
   const pedestal = new THREE.Mesh(

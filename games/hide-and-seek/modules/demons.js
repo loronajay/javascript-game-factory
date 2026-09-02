@@ -14,6 +14,18 @@ const DEFAULT_ROSTER = Object.freeze([
   Object.freeze({ id: 'housekeeper', name: 'The Housekeeper', hunts: false, statusElementId: 'housekeeperStatus', accentColor: 0x285f58, eyeColor: 0x7dffe0 }),
 ]);
 
+const DEFAULT_VISUAL = Object.freeze({
+  asset: 'assets/UAL2_Standard.glb', stock: true, height: 2.68,
+});
+
+function defaultVisualFor(entry) {
+  // Multiple roster slots can share the same sculpture without marching in lockstep. The stable id
+  // supplies a deterministic phase, so local and online clients still render the same personality.
+  const text = String(entry.id || entry.name || 'demon');
+  const phase = [...text].reduce((sum, character) => sum + character.charCodeAt(0), 0) % 29 / 7;
+  return { ...DEFAULT_VISUAL, phase };
+}
+
 // A roster entry may bring its own status element (the hotel's two are authored in index.html), but
 // a third demon on a new map must not need markup written for it. Anything without one gets a row
 // built into `#demonStatuses` on the spot, styled by the same class.
@@ -76,6 +88,9 @@ export function createDemons({ createMonster, common, roster = DEFAULT_ROSTER })
       }),
       accentColor: entry.accentColor,
       eyeColor: entry.eyeColor,
+      // Rejected creature prototypes stay outside gameplay. Until a replacement rig passes visual
+      // review, every roster slot deliberately uses the known-good stock demon body.
+      visual: entry.visual || defaultVisualFor(entry),
     }));
   }
 

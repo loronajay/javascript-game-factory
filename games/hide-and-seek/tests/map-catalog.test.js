@@ -45,6 +45,13 @@ test('exactly one demon per map reads the heat meter', () => {
   }
 });
 
+test('Mercy Hospital does not assign either rejected authored creature to gameplay', () => {
+  const roster = maps.demonRosterFor('mercy-hospital');
+  assert.equal(roster.find((entry) => entry.id === 'surgeon').visual, undefined);
+  assert.equal(roster.find((entry) => entry.id === 'matron').visual, undefined);
+  assert.equal(roster.find((entry) => entry.id === 'orderly').visual, undefined);
+});
+
 test('every roster entry is a distinct, nameable demon', () => {
   for (const map of maps.listMaps()) {
     const roster = maps.demonRosterFor(map.id);
