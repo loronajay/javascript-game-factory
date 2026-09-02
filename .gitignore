@@ -48,6 +48,12 @@ js/tests/*
 !js/tests/arcade-session-nav.test.mjs
 !js/tests/auth-api.test.mjs
 !js/tests/deployment-config.test.mjs
+# Catalog metadata/filtering and admin override contracts ship with the redesign.
+!js/tests/arcade-catalog-query.test.mjs
+!js/tests/arcade-catalog-metadata.test.mjs
+!js/tests/arcade-gridpage.test.mjs
+!js/tests/admin-catalog-overrides.test.mjs
+!js/tests/admin-cabinet-editor.test.mjs
 
 # Keep the database regression that prevents narrow profile updates from
 # erasing canonical fields after an origin/domain change.
@@ -63,6 +69,7 @@ platform-api/tests/*
 !platform-api/tests/yam-bowling-voucher-route.test.mjs
 !platform-api/tests/yam-bowling-tournament-catalog.test.mjs
 !platform-api/tests/yam-bowling-tournament-route.test.mjs
+!platform-api/tests/cabinet-overrides.test.mjs
 !platform-api/tests/yam-bowling-tournament-db.test.mjs
 
 # Echo Duel keeps its local regression tests out of shipped game builds.

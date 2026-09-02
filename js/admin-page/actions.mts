@@ -183,7 +183,13 @@ export async function runAdminAction(action: string, context: ActionContext): Pr
   // ---- Cabinets ----
 
   if (action === "cabinet:save") {
-    const result = await api.saveCabinet(value, readForm(form));
+    const values = readForm(form);
+    const result = await api.saveCabinet(value, {
+      ...values,
+      categories: splitList(values.categories),
+      dimensions: splitList(values.dimensions).map((entry) => entry.toLowerCase()),
+      playModes: splitList(values.playModes).map((entry) => entry.toLowerCase()),
+    });
     return setFlash(state, result, "Cabinet presentation saved.");
   }
 

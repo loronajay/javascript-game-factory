@@ -42,7 +42,7 @@
 
       <div class="grid-stage__header page-stage__header">
         <h1 class="pixel-text pixel-text--title grid-stage__title">GAME GRID</h1>
-        <p class="grid-stage__subtitle">Click any game to jump right in.</p>
+        <p class="grid-stage__subtitle">Pick a cabinet and jump right in.</p>
       </div>
 
       <aside id="playerProfilePanel" class="player-card" hidden>
@@ -88,18 +88,26 @@
         </form>
       </aside>
 
-      <div class="grid-board">
-        <div id="emptyState" class="empty-state" hidden>
-          No cabinets are registered yet.
+      <section class="grid-board" aria-label="Arcade catalog">
+        <div class="catalog-toolbar">
+          <label class="catalog-search" for="catalogSearch">
+            <span class="catalog-search__icon" aria-hidden="true"></span>
+            <input id="catalogSearch" type="search" placeholder="SEARCH CABINETS" autocomplete="off">
+          </label>
+          <button id="modeFilter" class="catalog-mode-filter" type="button" aria-pressed="false">
+            <span aria-hidden="true">&#9881;</span> Multiplayer
+          </button>
+          <div id="dimensionFilters" class="catalog-dimension-filters" aria-label="Visual format"></div>
+          <p id="catalogResults" class="catalog-results" role="status" aria-live="polite">Loading cabinets…</p>
         </div>
-        <div id="gridTrack"></div>
-      </div>
 
-      <div class="grid-stage__pager pager-row">
-        <button id="prevPage" class="pager-button" type="button" hidden>&#x276E; Prev</button>
-        <div class="page-indicator" id="pageIndicator">1 / 1</div>
-        <button id="nextPage" class="pager-button" type="button" hidden>Next &#x276F;</button>
-      </div>
+        <div id="categoryFilters" class="catalog-category-filters" aria-label="Game categories"></div>
+
+        <div id="emptyState" class="empty-state" hidden>
+          No cabinets match those filters. Try another route through the catalog.
+        </div>
+        <div id="gridTrack" class="game-grid"></div>
+      </section>
     </section>
   </main>
 

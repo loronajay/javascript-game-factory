@@ -23,6 +23,9 @@ export const ARCADE_GAME_SLUGS: ReadonlyArray<ArcadeGameSlug> = Object.freeze([
 
 export const GRID_PAGE_SIZE = 9;
 
+export type ArcadeDimension = "2d" | "3d";
+export type ArcadePlayMode = "solo" | "local" | "online";
+
 export interface ArcadeGameEntry {
   slug: string;
   title: string;
@@ -30,14 +33,50 @@ export interface ArcadeGameEntry {
   description: string;
   players: string;
   status: string;
+  categories: string[];
+  dimensions: ArcadeDimension[];
+  playModes: ArcadePlayMode[];
   order: number;
   featured: boolean;
   theme: string;
   accentColor: string;
   href: string;
   previewImage?: string;
+  previewVideo?: string;
   cardClasses: string[];
   isPlaceholder?: boolean;
+}
+
+function normalizeStringList(value: unknown, transform: (entry: string) => string): string[] {
+  if (!Array.isArray(value)) return [];
+  const normalized: string[] = [];
+  for (const item of value) {
+    const entry = transform(String(item ?? "").trim());
+    if (entry && !normalized.includes(entry)) normalized.push(entry);
+  }
+  return normalized;
+}
+
+export function normalizeCatalogCategories(value: unknown, fallback: string[] = ["Arcade"]): string[] {
+  const categories = normalizeStringList(value, (entry) => entry.slice(0, 32)).slice(0, 8);
+  return categories.length ? categories : [...fallback];
+}
+
+export function normalizeCatalogDimensions(value: unknown, fallback: ArcadeDimension[] = ["2d"]): ArcadeDimension[] {
+  const dimensions = normalizeStringList(value, (entry) => entry.toLowerCase())
+    .filter((entry): entry is ArcadeDimension => entry === "2d" || entry === "3d");
+  return dimensions.length ? dimensions : [...fallback];
+}
+
+export function normalizeCatalogPlayModes(value: unknown, fallback: ArcadePlayMode[] = ["solo"]): ArcadePlayMode[] {
+  const modes = normalizeStringList(value, (entry) => entry.toLowerCase())
+    .filter((entry): entry is ArcadePlayMode => entry === "solo" || entry === "local" || entry === "online");
+  return modes.length ? modes : [...fallback];
+}
+
+export function normalizeCatalogPreviewVideo(value: unknown): string | undefined {
+  const path = typeof value === "string" ? value.trim() : "";
+  return /^grid-previews\/[a-z0-9][a-z0-9._/-]*\.(?:webm|mp4)$/i.test(path) ? path : undefined;
 }
 
 function titleFromSlug(slug: unknown): string {
@@ -57,12 +96,16 @@ export function normalizeGameEntry(slug: string, config: any = {}, path: string 
     description: config.description || "",
     players: config.players || "1-2",
     status: config.status || "Prototype",
+    categories: normalizeCatalogCategories(config.categories),
+    dimensions: normalizeCatalogDimensions(config.dimensions),
+    playModes: normalizeCatalogPlayModes(config.play_modes),
     order: Number.isFinite(config.order) ? config.order : 9999,
     featured: config.featured === true,
     theme: config.theme || "ember",
     accentColor: config.accentColor || "#ffb84d",
     href: `games/${folderPath}/index.html`,
     previewImage: config.previewImage || `grid-previews/${slug}.png`,
+    previewVideo: normalizeCatalogPreviewVideo(config.previewVideo),
     cardClasses: Array.isArray(config.card_classes) ? [...config.card_classes] : [],
   };
 }
@@ -106,6 +149,9 @@ export function fillArcadePageSlots(games: ArcadeGameEntry[], pageSize = GRID_PA
       description: "",
       players: "Soon",
       status: "Coming Soon",
+      categories: ["Arcade"],
+      dimensions: ["2d"],
+      playModes: ["solo"],
       order: 9000 + slotNumber,
       featured: false,
       theme: "placeholder",
@@ -160,7 +206,12 @@ export function applyCabinetOverrides(
       ...game,
       title: typeof override.title === "string" && override.title ? override.title : game.title,
       tagline: typeof override.tagline === "string" && override.tagline ? override.tagline : game.tagline,
+      description: typeof override.description === "string" && override.description ? override.description : game.description,
       status: typeof override.statusLabel === "string" && override.statusLabel ? override.statusLabel : game.status,
+      categories: normalizeCatalogCategories(override.categories, game.categories),
+      dimensions: normalizeCatalogDimensions(override.dimensions, game.dimensions),
+      playModes: normalizeCatalogPlayModes(override.playModes, game.playModes),
+      previewVideo: normalizeCatalogPreviewVideo(override.previewVideo) || game.previewVideo,
       order: Number.isFinite(override.sortOrder) ? Number(override.sortOrder) : game.order,
       featured: typeof override.featured === "boolean" ? override.featured : game.featured,
     });

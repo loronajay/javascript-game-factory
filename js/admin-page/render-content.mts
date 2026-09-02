@@ -203,6 +203,20 @@ function cabinetCard(game: any, override: any): string {
         ${field("Grid order", textInput("sortOrder", override?.sortOrder ?? "", { type: "number", placeholder: String(game.order) }))}
       </div>
       ${field("Tagline", textInput("tagline", override?.tagline || "", { placeholder: game.tagline }))}
+      ${field("Description", textArea("description", override?.description || "", 4, game.description),
+        "Used by catalog search and future cabinet detail surfaces.")}
+      <div class="admin-cabinet__grid">
+        ${field("Categories / tags", textInput("categories", (override?.categories || []).join(", "), { placeholder: game.categories.join(", ") }),
+          "Comma-separated. The first category is the card label.")}
+        ${field("Visual formats", textInput("dimensions", (override?.dimensions || []).join(", "), { placeholder: game.dimensions.join(", ") }),
+          "Use 2d, 3d, or both.")}
+      </div>
+      <div class="admin-cabinet__grid">
+        ${field("Play modes", textInput("playModes", (override?.playModes || []).join(", "), { placeholder: game.playModes.join(", ") }),
+          "Use solo, local, and/or online.")}
+        ${field("Hover preview video", textInput("previewVideo", override?.previewVideo || "", { placeholder: "grid-previews/game-slug.webm" }),
+          "Optional local WEBM/MP4. Desktop hover only; screenshots remain the fallback.")}
+      </div>
       ${field("Status label", textInput("statusLabel", override?.statusLabel || "", { placeholder: game.status }))}
       <div class="admin-cabinet__toggles">
         ${checkbox("hidden", override?.hidden === true, "Hide from the grid")}
@@ -227,9 +241,10 @@ export function renderCabinets(state: AdminState): string {
   // nothing on this screen can reach into a game before they feel free to use it.
   return panel("Cabinet Presentation", `
     <p class="admin-note">
-      These settings only change how the arcade grid presents a cabinet. Blank fields inherit
-      from the game's own <code>game.json</code>, hiding a cabinet removes its grid card but
-      leaves the game itself untouched, and <strong>Reset</strong> restores everything.
+      These settings only change how the arcade grid presents a cabinet. You can hide/show
+      cabinets and refine their copy, tags, formats, play modes, or optional hover clip here.
+      Blank fields inherit from the game's own <code>game.json</code>; <strong>Reset</strong>
+      restores every shipped value. Launch URLs and screenshots cannot be changed here.
     </p>
     <div class="admin-cabinet-grid">${cards}</div>
   `);

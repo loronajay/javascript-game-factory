@@ -7,7 +7,12 @@ function mapOverrideRow(row) {
         sortOrder: Number.isFinite(row.sort_order) ? Number(row.sort_order) : null,
         title: row.title === null || row.title === undefined ? null : String(row.title),
         tagline: row.tagline === null || row.tagline === undefined ? null : String(row.tagline),
+        description: row.description === null || row.description === undefined ? null : String(row.description),
         statusLabel: row.status_label === null || row.status_label === undefined ? null : String(row.status_label),
+        categories: Array.isArray(row.categories) ? row.categories.map(String) : null,
+        dimensions: Array.isArray(row.dimensions) ? row.dimensions.map(String) : null,
+        playModes: Array.isArray(row.play_modes) ? row.play_modes.map(String) : null,
+        previewVideo: row.preview_video === null || row.preview_video === undefined ? null : String(row.preview_video),
         updatedAt: toIso(row.updated_at),
     };
 }
@@ -31,11 +36,32 @@ function optionalBoolean(value) {
         return false;
     return null;
 }
+function optionalList(value, { maxItems = 8, maxLength = 32, allowed = null, lowercase = false } = {}) {
+    if (!Array.isArray(value))
+        return null;
+    const normalized = [];
+    for (const item of value) {
+        let entry = singleLine(item, maxLength);
+        if (lowercase)
+            entry = entry.toLowerCase();
+        if (!entry || allowed?.has(entry) === false || normalized.includes(entry))
+            continue;
+        normalized.push(entry);
+        if (normalized.length >= maxItems)
+            break;
+    }
+    return normalized.length ? normalized : null;
+}
+function optionalPreviewVideo(value) {
+    const path = singleLine(value, 240);
+    return /^grid-previews\/[a-z0-9][a-z0-9._/-]*\.(?:webm|mp4)$/i.test(path) ? path : null;
+}
 export async function listCabinetOverrides(pool) {
     if (!pool)
         return [];
     try {
-        const result = await pool.query(`select slug, hidden, featured, sort_order, title, tagline, status_label, updated_at
+        const result = await pool.query(`select slug, hidden, featured, sort_order, title, tagline, description, status_label,
+              categories, dimensions, play_modes, preview_video, updated_at
          from cabinet_overrides order by slug asc`);
         return (result?.rows || []).map(mapOverrideRow);
     }
@@ -50,25 +76,43 @@ export async function saveCabinetOverride(pool, slug, input, updatedBy) {
     if (!cabinetSlug)
         return { ok: false, error: "invalid_slug" };
     try {
-        const result = await pool.query(`insert into cabinet_overrides (slug, hidden, featured, sort_order, title, tagline, status_label, updated_by, updated_at)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, now())
+        const result = await pool.query(`insert into cabinet_overrides (
+         slug, hidden, featured, sort_order, title, tagline, description, status_label,
+         categories, dimensions, play_modes, preview_video, updated_by, updated_at
+       )
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, $12, $13, now())
        on conflict (slug) do update
          set hidden = excluded.hidden,
              featured = excluded.featured,
              sort_order = excluded.sort_order,
              title = excluded.title,
              tagline = excluded.tagline,
+             description = excluded.description,
              status_label = excluded.status_label,
+             categories = excluded.categories,
+             dimensions = excluded.dimensions,
+             play_modes = excluded.play_modes,
+             preview_video = excluded.preview_video,
              updated_by = excluded.updated_by,
              updated_at = now()
-       returning slug, hidden, featured, sort_order, title, tagline, status_label, updated_at`, [
+       returning slug, hidden, featured, sort_order, title, tagline, description, status_label,
+                 categories, dimensions, play_modes, preview_video, updated_at`, [
             cabinetSlug,
             input?.hidden === true,
             optionalBoolean(input?.featured),
             optionalNumber(input?.sortOrder),
             optionalText(input?.title, 96),
             optionalText(input?.tagline, 160),
+            optionalText(input?.description, 1200),
             optionalText(input?.statusLabel, 160),
+            JSON.stringify(optionalList(input?.categories) || null),
+            JSON.stringify(optionalList(input?.dimensions, {
+                allowed: new Set(["2d", "3d"]), lowercase: true,
+            }) || null),
+            JSON.stringify(optionalList(input?.playModes, {
+                allowed: new Set(["solo", "local", "online"]), lowercase: true,
+            }) || null),
+            optionalPreviewVideo(input?.previewVideo),
             String(updatedBy || "system"),
         ]);
         return { ok: true, override: mapOverrideRow(result.rows[0]) };

@@ -1,416 +1,270 @@
 import {
-  GRID_PAGE_SIZE,
   applyCabinetOverrides,
-  fillArcadePageSlots,
   loadArcadeCatalog,
-  paginateArcadeGames,
+  type ArcadeGameEntry,
+  type ArcadeDimension,
 } from "./arcade-catalog.mjs";
+import {
+  buildCatalogFacets,
+  filterArcadeCatalog,
+  type CatalogQuery,
+} from "./arcade-catalog-query.mjs";
 import { initArcadeProfilePanel } from "./arcade-profile.mjs";
 import { initSessionNav, renderPrimaryAppNav } from "./arcade-session-nav.mjs";
 import { createContentApiClient } from "./platform/api/content-api.mjs";
 
-function hexToRgba(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
+const track = document.getElementById("gridTrack") as HTMLElement;
+const emptyState = document.getElementById("emptyState") as HTMLElement;
+const results = document.getElementById("catalogResults") as HTMLElement;
+const searchInput = document.getElementById("catalogSearch") as HTMLInputElement;
+const categoryFilters = document.getElementById("categoryFilters") as HTMLElement;
+const dimensionFilters = document.getElementById("dimensionFilters") as HTMLElement;
+const modeFilter = document.getElementById("modeFilter") as HTMLButtonElement;
+
+let catalog: ArcadeGameEntry[] = [];
+let filteredCatalog: ArcadeGameEntry[] = [];
+let selectedIndex = 0;
+let showGamepadSelection = false;
+const query: CatalogQuery = { search: "", category: "", dimension: "", mode: "", sort: "factory" };
+
+function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = ""): HTMLElementTagNameMap[K] {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  return node;
 }
 
-function generateThumb(game: any): HTMLCanvasElement {
-  const W = 192;
-  const H = 108;
-  const canvas = document.createElement("canvas");
-  canvas.width = W;
-  canvas.height = H;
-
-  const ctx = canvas.getContext("2d")!;
-  ctx.imageSmoothingEnabled = false;
-
-  ctx.fillStyle = "#050507";
-  ctx.fillRect(0, 0, W, H);
-
-  const accent = game.accentColor || "#ff6b35";
-
-  if (game.isPlaceholder) {
-    const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, "rgba(2, 18, 10, 0.96)");
-    sky.addColorStop(0.45, "rgba(4, 38, 18, 0.92)");
-    sky.addColorStop(1, "rgba(0, 0, 0, 0.98)");
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, H);
-
-    const sunGlow = ctx.createRadialGradient(W / 2, 44, 4, W / 2, 44, 32);
-    sunGlow.addColorStop(0, "rgba(144, 255, 196, 0.92)");
-    sunGlow.addColorStop(0.45, "rgba(24, 255, 140, 0.22)");
-    sunGlow.addColorStop(1, "transparent");
-    ctx.fillStyle = sunGlow;
-    ctx.fillRect(0, 0, W, H);
-
-    ctx.fillStyle = "rgba(0, 8, 3, 0.96)";
-    ctx.fillRect(0, 64, W, 10);
-
-    ctx.strokeStyle = "rgba(24, 255, 140, 0.5)";
-    ctx.lineWidth = 1;
-    const gridTop = 70;
-    for (let x = -W; x < W * 2; x += 16) {
-      ctx.beginPath();
-      ctx.moveTo(x, H);
-      ctx.lineTo(W / 2 + (x - W / 2) * 0.28, gridTop);
-      ctx.stroke();
-    }
-    for (let y = gridTop; y < H; y += 8) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(W, y);
-      ctx.stroke();
-    }
-
-    ctx.fillStyle = "rgba(120, 255, 182, 0.08)";
-    for (let y = 0; y < H; y += 3) {
-      ctx.fillRect(0, y, W, 1);
-    }
-
-    ctx.fillStyle = "#b6ffd4";
-    ctx.font = "bold 34px Consolas, monospace";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("?", W / 2, 48);
-
-    return canvas;
-  }
-
-  const sky = ctx.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0, "rgba(38, 38, 38, 0.42)");
-  sky.addColorStop(0.48, hexToRgba(accent, 0.14));
-  sky.addColorStop(1, "rgba(0, 0, 0, 0.9)");
-  ctx.fillStyle = sky;
-  ctx.fillRect(0, 0, W, H);
-
-  ctx.fillStyle = "rgba(255,255,255,0.06)";
-  for (let y = 0; y < H; y += 3) {
-    ctx.fillRect(0, y, W, 1);
-  }
-
-  const sunGlow = ctx.createRadialGradient(W / 2, 44, 8, W / 2, 44, 42);
-  sunGlow.addColorStop(0, "rgba(255, 221, 189, 0.95)");
-  sunGlow.addColorStop(0.45, hexToRgba(accent, 0.58));
-  sunGlow.addColorStop(1, "transparent");
-  ctx.fillStyle = sunGlow;
-  ctx.fillRect(0, 0, W, H);
-
-  const skylineY = 62;
-  ctx.fillStyle = "rgba(14, 14, 28, 0.96)";
-  ctx.fillRect(0, skylineY, W, 8);
-
-  const towers = [
-    [18, 50, 8, 12],
-    [32, 42, 10, 20],
-    [47, 46, 7, 16],
-    [64, 38, 11, 24],
-    [82, 49, 8, 13],
-    [106, 40, 12, 22],
-    [128, 52, 9, 10],
-    [144, 44, 8, 18],
-    [162, 36, 12, 26],
-  ];
-  towers.forEach(([x, y, w, h]) => ctx.fillRect(x, y, w, h));
-
-  const gridTop = 72;
-  ctx.strokeStyle = hexToRgba(accent, 0.84);
-  ctx.lineWidth = 1;
-
-  for (let x = -W; x < W * 2; x += 18) {
-    ctx.beginPath();
-    ctx.moveTo(x, H);
-    ctx.lineTo(W / 2 + (x - W / 2) * 0.28, gridTop);
-    ctx.stroke();
-  }
-
-  for (let y = gridTop; y < H; y += 10) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(W, y);
-    ctx.stroke();
-  }
-
-  const heart = [
-    [0, 1, 0, 1, 0],
-    [1, 1, 1, 1, 1],
-    [1, 1, 1, 1, 1],
-    [0, 1, 1, 1, 0],
-    [0, 0, 1, 0, 0],
-  ];
-
-  ctx.fillStyle = hexToRgba(accent, 0.96);
-  heart.forEach((row, r) => {
-    row.forEach((pixel, col) => {
-      if (pixel) {
-        ctx.fillRect(W / 2 - 5 + col * 2, 56 + r * 2, 2, 2);
-      }
-    });
-  });
-
-  return canvas;
+function statusBadge(status: string): string {
+  const value = status.toLocaleLowerCase();
+  if (value.includes("release candidate")) return "RELEASE CANDIDATE";
+  if (value.includes("prototype")) return "PLAYABLE PROTOTYPE";
+  if (value.includes("beta")) return "BETA";
+  return "PLAYABLE";
 }
 
-function createThumbNode(game: any): HTMLElement {
-  if (game.isPlaceholder) {
-    return generateThumb(game);
-  }
+function playerLabel(players: string): string {
+  const range = String(players || "1").replace("-", "–");
+  return `${range} ${range === "1" ? "PLAYER" : "PLAYERS"}`;
+}
 
-  if (game.previewImage) {
-    const img = document.createElement("img");
-    img.src = game.previewImage;
-    img.alt = `${game.title} preview`;
-    img.loading = "lazy";
-    img.decoding = "async";
-    img.addEventListener("error", () => {
-      if (!img.dataset.fallbackApplied) {
-        img.dataset.fallbackApplied = "true";
-        img.replaceWith(generateThumb(game));
-      }
-    }, { once: true });
-    return img;
-  }
+function canPlayHoverVideo(): boolean {
+  return window.matchMedia("(hover: hover) and (pointer: fine)").matches
+    && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
-  return generateThumb(game);
+function attachHoverVideo(card: HTMLAnchorElement, frame: HTMLElement, game: ArcadeGameEntry): void {
+  if (!game.previewVideo || !canPlayHoverVideo()) return;
+
+  const video = element("video", "game-card__video");
+  video.src = game.previewVideo;
+  video.muted = true;
+  video.loop = true;
+  video.playsInline = true;
+  video.preload = "none";
+  video.setAttribute("aria-hidden", "true");
+  frame.appendChild(video);
+
+  const play = () => {
+    video.classList.add("is-active");
+    void video.play().catch(() => video.classList.remove("is-active"));
+  };
+  const stop = () => {
+    video.pause();
+    video.currentTime = 0;
+    video.classList.remove("is-active");
+  };
+
+  card.addEventListener("mouseenter", play);
+  card.addEventListener("mouseleave", stop);
+  card.addEventListener("focus", play);
+  card.addEventListener("blur", stop);
+  video.addEventListener("error", () => video.remove(), { once: true });
 }
 
 let sfx: any = null;
 
 function getSFX(): any {
   if (sfx) return sfx;
-  if (!window.matchMedia("(prefers-reduced-motion: no-preference)").matches) return null;
-
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return null;
   try {
     const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const tone = (frequency: number, duration: number, volume: number) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "square";
+      osc.frequency.value = frequency;
+      gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    };
     sfx = {
-      hover() {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = "square";
-        osc.frequency.value = 440;
-        gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.03);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.03);
-      },
-      select() {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = "square";
-        osc.frequency.value = 880;
-        gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.05);
-      },
+      hover: () => tone(440, 0.03, 0.035),
+      select: () => tone(880, 0.05, 0.055),
     };
   } catch {
     sfx = null;
   }
-
   return sfx;
 }
 
-const track = document.getElementById("gridTrack") as HTMLElement;
-const emptyState = document.getElementById("emptyState") as HTMLElement;
-const pageIndicator = document.getElementById("pageIndicator") as HTMLElement;
-const prevPageButton = document.getElementById("prevPage") as HTMLElement;
-const nextPageButton = document.getElementById("nextPage") as HTMLElement;
-const pagerRow = document.querySelector(".grid-stage__pager") as HTMLElement | null;
+function createCard(game: ArcadeGameEntry): HTMLAnchorElement {
+  const card = element("a", ["game-card", ...game.cardClasses].join(" "));
+  card.href = game.href;
+  card.setAttribute("aria-description", game.description);
 
-let pages: any[] = [];
-let currentPage = 0;
-let selectedIndex = 0;
-let showGamepadSelection = false;
+  const frame = element("div", "game-card__frame");
+  const image = element("img", "game-card__image");
+  image.src = game.previewImage || `grid-previews/${game.slug}.png`;
+  image.alt = `${game.title} gameplay`;
+  image.loading = "lazy";
+  image.decoding = "async";
+  frame.appendChild(image);
 
-function createCard(game: any): HTMLElement {
-  const card = document.createElement(game.isPlaceholder ? "article" : "a");
-  card.className = ["game-card", ...game.cardClasses].join(" ");
+  const status = element("span", "game-card__status");
+  status.textContent = statusBadge(game.status);
+  frame.appendChild(status);
 
-  if (game.isPlaceholder) {
-    card.setAttribute("aria-disabled", "true");
-  } else {
-    (card as HTMLAnchorElement).href = game.href;
-  }
+  const dimensions = element("span", "game-card__dimensions");
+  dimensions.textContent = game.dimensions.map((value) => value.toUpperCase()).join(" + ");
+  frame.appendChild(dimensions);
+  attachHoverVideo(card, frame, game);
 
-  card.innerHTML = `
-    <div class="game-card-preview">
-      <div class="game-thumb"></div>
-      <div class="game-card-copy${game.isPlaceholder ? " game-card-copy--placeholder" : ""}">
-        <h2 class="game-title">${game.isPlaceholder ? "COMING SOON" : game.title}</h2>
-      </div>
-    </div>
-  `;
+  const body = element("div", "game-card__body");
+  const meta = element("div", "game-card__meta");
+  const title = element("h2", "game-card__title");
+  title.textContent = game.title;
+  const category = element("span", "game-card__category");
+  category.textContent = game.categories[0] || "Arcade";
+  meta.append(title, category);
 
-  card.querySelector(".game-thumb")?.appendChild(createThumbNode(game));
+  const tagline = element("p", "game-card__tagline");
+  tagline.textContent = game.tagline;
 
-  if (!game.isPlaceholder) {
-    card.addEventListener("click", (event) => {
-      event.preventDefault();
-      getSFX()?.select();
-      card.style.transition = "transform 280ms ease-in";
-      card.style.transform = "scale(1.05)";
-      setTimeout(() => {
-        window.location.href = (card as HTMLAnchorElement).href;
-      }, 220);
-    });
+  const footer = element("div", "game-card__footer");
+  const players = element("span", "game-card__players");
+  players.textContent = `♙ ${playerLabel(game.players)}`;
+  const open = element("span", "game-card__open");
+  open.textContent = "OPEN  ›";
+  footer.append(players, open);
+  body.append(meta, tagline, footer);
+  card.append(frame, body);
 
-    card.addEventListener("mouseenter", () => {
-      const index = visibleCards().indexOf(card);
-      if (index !== -1) {
-        setSelectedIndex(index);
-        getSFX()?.hover();
-      }
-    });
-  }
+  card.addEventListener("click", (event) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    getSFX()?.select();
+    card.classList.add("is-launching");
+    window.setTimeout(() => { window.location.href = card.href; }, 160);
+  });
+  card.addEventListener("mouseenter", () => {
+    const index = visibleCards().indexOf(card);
+    if (index !== -1) {
+      setSelectedIndex(index);
+      getSFX()?.hover();
+    }
+  });
 
   return card;
 }
 
-function visibleCards(): any[] {
-  return pages[currentPage] || [];
+function visibleCards(): HTMLAnchorElement[] {
+  return Array.from(track.querySelectorAll<HTMLAnchorElement>(".game-card"));
 }
 
 function setSelectedIndex(index: number): void {
   const cards = visibleCards();
   if (!cards.length) return;
-
   selectedIndex = ((index % cards.length) + cards.length) % cards.length;
-  cards.forEach((card: any, cardIndex: number) => {
+  cards.forEach((card, cardIndex) => {
     card.classList.toggle("gamepad-selected", showGamepadSelection && cardIndex === selectedIndex);
   });
+  if (showGamepadSelection) cards[selectedIndex]?.scrollIntoView({ block: "nearest" });
 }
 
-function syncPager(): void {
-  const totalPages = pages.length || 1;
-  pageIndicator.textContent = `${currentPage + 1} / ${totalPages}`;
-  prevPageButton.hidden = currentPage === 0;
-  nextPageButton.hidden = currentPage >= totalPages - 1;
-
-  if (pagerRow) {
-    pagerRow.hidden = totalPages <= 1;
-  }
-}
-
-function showPage(index: number, nextSelectedIndex = 0): void {
-  currentPage = Math.max(0, Math.min(index, pages.length - 1));
-
-  Array.from(track.children).forEach((page, pageIndex) => {
-    (page as HTMLElement).hidden = pageIndex !== currentPage;
+function createFilterChip(label: string, value: string, kind: "category" | "dimension"): HTMLButtonElement {
+  const button = element("button", "catalog-filter-chip");
+  button.type = "button";
+  button.textContent = label;
+  button.dataset.value = value;
+  button.addEventListener("click", () => {
+    if (kind === "category") query.category = value;
+    else query.dimension = value as "" | ArcadeDimension;
+    renderCatalog();
   });
-
-  syncPager();
-  setSelectedIndex(nextSelectedIndex);
+  return button;
 }
 
-function buildPages(games: any): void {
-  const chunks = paginateArcadeGames(games, GRID_PAGE_SIZE);
-  const sourcePages = chunks.length > 0 ? chunks : [[]];
-
-  pages = [];
-  track.innerHTML = "";
-
-  sourcePages.forEach((chunk: any) => {
-    const page = document.createElement("section");
-    page.className = "grid-page";
-
-    const grid = document.createElement("div");
-    grid.className = "game-grid";
-
-    fillArcadePageSlots(chunk, GRID_PAGE_SIZE).forEach((game) => {
-      grid.appendChild(createCard(game));
-    });
-
-    page.appendChild(grid);
-    track.appendChild(page);
-    pages.push(Array.from(grid.querySelectorAll(".game-card:not(.game-card--placeholder)")));
-  });
-
-  emptyState.hidden = true;
-  track.hidden = false;
+function renderFilters(): void {
+  const facets = buildCatalogFacets(catalog);
+  categoryFilters.replaceChildren(
+    createFilterChip("All", "", "category"),
+    ...facets.categories.map((facet) => createFilterChip(facet.value, facet.value, "category")),
+  );
+  dimensionFilters.replaceChildren(
+    createFilterChip("All formats", "", "dimension"),
+    ...facets.dimensions.map((facet) => createFilterChip(facet.value.toUpperCase(), facet.value, "dimension")),
+  );
 }
 
-function moveSelection(delta: number): void {
-  const cards = visibleCards();
-  if (!cards.length) return;
-
-  const nextIndex = selectedIndex + delta;
-  if (nextIndex >= 0 && nextIndex < cards.length) {
-    setSelectedIndex(nextIndex);
-    return;
+function syncFilterState(): void {
+  for (const button of Array.from(categoryFilters.querySelectorAll<HTMLButtonElement>("button"))) {
+    const active = button.dataset.value === (query.category || "");
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
   }
-
-  if (delta > 0 && currentPage < pages.length - 1) {
-    showPage(currentPage + 1, 0);
-    return;
+  for (const button of Array.from(dimensionFilters.querySelectorAll<HTMLButtonElement>("button"))) {
+    const active = button.dataset.value === (query.dimension || "");
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
   }
-
-  if (delta < 0 && currentPage > 0) {
-    const previousCards = pages[currentPage - 1];
-    showPage(currentPage - 1, previousCards.length - 1);
-  }
+  const multiplayer = query.mode === "multiplayer";
+  modeFilter.classList.toggle("is-active", multiplayer);
+  modeFilter.setAttribute("aria-pressed", String(multiplayer));
 }
 
-// The pager sits below the fold on phones, so a page turn from down there would drop the
-// viewer into the middle of the new page. Send them back to the first cabinet instead.
-function scrollGridToTop(): void {
-  const behavior: ScrollBehavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ? "auto"
-    : "smooth";
-  window.scrollTo({ top: 0, behavior });
-  // Shells that scroll the body element itself rather than the viewport.
-  document.scrollingElement?.scrollTo?.({ top: 0, behavior });
-  document.body?.scrollTo?.({ top: 0, behavior });
+function renderCatalog(): void {
+  filteredCatalog = filterArcadeCatalog(catalog, query);
+  track.replaceChildren(...filteredCatalog.map(createCard));
+  emptyState.hidden = filteredCatalog.length > 0;
+  track.hidden = filteredCatalog.length === 0;
+  results.textContent = `${filteredCatalog.length} / ${catalog.length} CABINETS`;
+  selectedIndex = 0;
+  syncFilterState();
+  setSelectedIndex(0);
 }
 
-prevPageButton.addEventListener("click", () => {
-  if (currentPage > 0) {
-    showPage(currentPage - 1, 0);
-    scrollGridToTop();
-  }
+searchInput.addEventListener("input", () => {
+  query.search = searchInput.value;
+  renderCatalog();
 });
 
-nextPageButton.addEventListener("click", () => {
-  if (currentPage < pages.length - 1) {
-    showPage(currentPage + 1, 0);
-    scrollGridToTop();
-  }
+modeFilter.addEventListener("click", () => {
+  query.mode = query.mode === "multiplayer" ? "" : "multiplayer";
+  renderCatalog();
 });
 
 window.ArcadeInput?.onAction((action) => {
   showGamepadSelection = true;
   setSelectedIndex(selectedIndex);
-
-  if (action === "left" || action === "up") {
-    moveSelection(-1);
-  }
-
-  if (action === "right" || action === "down") {
-    moveSelection(1);
-  }
-
-  if (action === "select") {
-    visibleCards()[selectedIndex]?.click();
-  }
+  if (action === "left" || action === "up") setSelectedIndex(selectedIndex - 1);
+  if (action === "right" || action === "down") setSelectedIndex(selectedIndex + 1);
+  if (action === "select") visibleCards()[selectedIndex]?.click();
 });
 
-// The catalog is built from each cabinet's own game.json first, then admin presentation
-// overrides are layered on if — and only if — the platform answers. Both calls run
-// together so a slow API never delays the grid past the game.json fetches it already
-// waits on, and a null site-config leaves the catalog exactly as the files describe it.
+// Shipped metadata always loads first. Admin rows are deliberately presentation-only:
+// they can hide a known cabinet or refine its catalog copy/tags, never create a new game
+// or redirect where a card launches.
 const [baseCatalog, siteConfig] = await Promise.all([
   loadArcadeCatalog(),
   createContentApiClient().getSiteConfig().catch(() => null),
 ]);
-const catalog = applyCabinetOverrides(baseCatalog, siteConfig?.cabinets || []);
+catalog = applyCabinetOverrides(baseCatalog, siteConfig?.cabinets || []);
+renderFilters();
+renderCatalog();
+
 const profilePanel = initArcadeProfilePanel();
-buildPages(catalog);
 renderPrimaryAppNav(document.getElementById("gridPrimaryNav"), {
   basePath: "",
   currentPage: "arcade",
@@ -418,9 +272,6 @@ renderPrimaryAppNav(document.getElementById("gridPrimaryNav"), {
   sessionNavId: "gridAuthNav",
 });
 
-// initSessionNav also purges a stale token + cached identity when the session was
-// invalidated server-side, so consume its resolved session directly rather than
-// making a second /auth/me call against a possibly-cleared token.
 const session = await initSessionNav(document.getElementById("gridAuthNav"), {
   signInPath: "sign-in/index.html",
   signUpPath: "sign-up/index.html",
@@ -428,19 +279,10 @@ const session = await initSessionNav(document.getElementById("gridAuthNav"), {
 });
 
 if (session?.ok && session?.playerId) {
-  // registered users manage their full profile at /me — hide the guest name chip
   const chip = document.getElementById("playerProfileButton");
   const panel = document.getElementById("playerProfilePanel");
   if (chip) chip.hidden = true;
   if (panel) panel.hidden = true;
 } else {
-  // signed out: re-render the chip so a just-purged stale identity reverts to the
-  // default guest name instead of lingering as the signed-out player's pilot name
   profilePanel?.render();
-}
-
-if (pages.length > 0) {
-  showPage(0, 0);
-} else {
-  syncPager();
 }
