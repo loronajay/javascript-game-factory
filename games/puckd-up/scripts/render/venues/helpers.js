@@ -7,6 +7,9 @@ export const SURFACE_RECIPES = Object.freeze({
     outdoorComposite: { roughness: .48, metalness: .05 },
     rooftopResin: { roughness: .38, metalness: .12 },
     garageLaminate: { roughness: .34, metalness: .10 },
+    boardwalkComposite: { roughness: .40, metalness: .08 },
+    yardComposite: { roughness: .46, metalness: .10 },
+    zeroGComposite: { roughness: .28, metalness: .24 },
     arenaFloor: { roughness: .52, metalness: .10 },
     grass: { roughness: .96, metalness: 0 },
     roofing: { roughness: .72, metalness: .16 },
@@ -80,6 +83,24 @@ function sampleSurface(kind, x, y, size, seed) {
         const buffMark = Math.sin(x * .11 + y * .19 + seed) > .975;
         accent = flake ? .20 : (buffMark ? .07 : 0);
         light = .91 + grain * .10;
+    }
+    else if (kind === 'boardwalkComposite') {
+        const saltFleck = grain > .965 || grain < .018;
+        const brushed = Math.sin(x * .18 + y * .05 + seed) > .97;
+        accent = saltFleck ? .22 : (brushed ? .08 : 0);
+        light = .90 + grain * .11;
+    }
+    else if (kind === 'yardComposite') {
+        const mineral = grain > .96 || grain < .02;
+        const drag = Math.sin(x * .09 + y * .21 + seed) > .975;
+        accent = mineral ? .23 : (drag ? .08 : 0);
+        light = .89 + grain * .12;
+    }
+    else if (kind === 'zeroGComposite') {
+        const microPanel = x % 48 < 1 || y % 48 < 1;
+        const sparkle = grain > .978;
+        accent = microPanel ? .18 : (sparkle ? .26 : 0);
+        light = .93 + grain * .09;
     }
     else if (kind === 'arenaFloor') {
         const weave = (x + y) % 12 < 2 || (x - y + size) % 12 < 2;

@@ -1,46 +1,110 @@
 import { createVenueHelpers } from './helpers.js';
 
+export const FREIGHT_YARD_STYLE = Object.freeze({
+    floorSurface: 'asphalt',
+    tableSurface: 'yardComposite',
+    tableColor: 0x15282c,
+    overheadSpans: false,
+    yard: Object.freeze({ width: 260, depth: 320, apronWidth: 64, apronDepth: 82 }),
+    container: Object.freeze({ length: 96, width: 20, height: 21 }),
+    crane: Object.freeze({ height: 84, sideClearance: 72 }),
+});
+
 export function buildFreightYard(THREE) {
-    const { makeStd, makeSurface, addBox, addInstancedBoxes, addSkyDome, addNeonStrip, addLampPost } = createVenueHelpers(THREE);
+    const { makeStd, makeSurface, addBox, addCylinder, addInstancedBoxes, addSkyDome, addNeonStrip } = createVenueHelpers(THREE);
     const g = new THREE.Group();
     g.name = 'Freight Yard';
-    addSkyDome(g, { top: 0x07111a, bottom: 0x28353a, horizon: 0x182830, radius: 50, y: 6, z: -8 });
-    const ground = makeSurface('asphalt', 0x303536, { accent: 0x101314, repeat: [10, 12], seed: 503 });
-    const steel = makeStd(0x363e42, { roughness: .44, metalness: .72 });
-    addBox(g, [38, .42, 44], [0, -.72, -2], ground);
-    const containers = [], colors = [0x814237, 0x335b67, 0x76602f, 0x424f55];
-    for (const side of [-1, 1]) for (let i = 0; i < 7; i++) for (let tier = 0; tier < 1 + (i % 3); tier++)
-        containers.push({ side, i, tier, x: side * (8.7 + tier * .15), y: .18 + tier * 1.55, z: -12 + i * 3.7, sx: 3.0, sy: 1.45, sz: 2.4 });
-    colors.forEach((color, index) => addInstancedBoxes(g, containers.filter((_, i) => i % colors.length === index), makeSurface('corrugated', color, { accent: 0x251813, repeat: [4, 2], seed: 521 + index * 13 })));
-    // Modeled ribs catch the side lighting on the inward container faces. The
-    // texture supplies wear; this geometry makes the material read from camera.
-    const containerRibs = [];
-    for (const container of containers) {
-        const faceX = container.x - container.side * 1.52;
-        for (let offset = -.9; offset <= .9; offset += .45)
-            containerRibs.push({ x: faceX, y: container.y, z: container.z + offset, sx: .075, sy: 1.24, sz: .055 });
-    }
-    addInstancedBoxes(g, containerRibs, makeStd(0x242829, { roughness: .58, metalness: .48 }));
-    // Two embedded service tracks explain the yard layout and give the broad
-    // asphalt apron a strong perspective rhythm.
+    const { yard, container, crane } = FREIGHT_YARD_STYLE;
+
+    addSkyDome(g, { top: 0x07111a, bottom: 0x28353a, horizon: 0x182830, radius: 330, y: 70, z: -100 });
+    const ground = makeSurface(FREIGHT_YARD_STYLE.floorSurface, 0x303536, {
+        accent: 0x101314, repeat: [22, 28], seed: 503, roughness: .93, metalness: .01,
+    });
+    const apron = makeSurface('paintedMetal', 0x293335, {
+        accent: 0x101617, repeat: [9, 12], seed: 511, roughness: .64, metalness: .16,
+    });
+    const steel = makeStd(0x414c51, { roughness: .40, metalness: .72 });
+    const darkSteel = makeStd(0x222a2d, { roughness: .52, metalness: .62 });
+    const safety = makeStd(0xe2a43d, { emissive: 0xb76a18, emissiveIntensity: .30, roughness: .45, metalness: .18 });
+    const railWood = makeSurface('wood', 0x51402f, {
+        accent: 0x171310, repeat: [1, 1], seed: 557, roughness: .94,
+    });
+
+    addBox(g, [yard.width, .55, yard.depth], [0, -.78, -28], ground);
+    addBox(g, [yard.apronWidth, .09, yard.apronDepth], [0, -.44, 0], apron);
+
+    // Flush hazard boundaries define a dedicated event apron without fencing in the table.
+    const pulse = [];
+    for (const side of [-1, 1])
+        pulse.push(addNeonStrip(g, [.16, .07, yard.apronDepth - 3], [side * (yard.apronWidth / 2 - .8), -.37, 0], side < 0 ? 0xe18b31 : 0x52a9b5, .72).mat);
+    pulse.push(addNeonStrip(g, [yard.apronWidth - 3, .07, .16], [0, -.37, -yard.apronDepth / 2 + .8], 0xe18b31, .68).mat);
+    pulse.push(addNeonStrip(g, [yard.apronWidth - 3, .07, .16], [0, -.37, yard.apronDepth / 2 - .8], 0x52a9b5, .68).mat);
+
+    // One standard-gauge service track runs beside the event apron, never beneath play.
+    for (const x of [14, 25])
+        addBox(g, [.48, .28, 250], [x, -.34, -30], steel);
     const railSleepers = [];
-    for (const side of [-1, 1]) {
-        for (const x of [side * 7.35, side * 8.05]) addBox(g, [.09, .07, 31], [x, -.43, -1.5], steel);
-        for (let z = -15; z <= 13; z += 1.25)
-            railSleepers.push({ x: side * 7.70, y: -.47, z, sx: 1.35, sy: .055, sz: .16 });
+    for (let z = -150; z <= 90; z += 5)
+        railSleepers.push({ x: 19.5, y: -.46, z, sx: 18, sy: .10, sz: .80 });
+    addInstancedBoxes(g, railSleepers, railWood);
+
+    function addContainer(x, z, color, tier = 0) {
+        const y = -.5 + container.height / 2 + tier * (container.height + 1.2);
+        const shell = makeSurface('corrugated', color, {
+            accent: 0x251813, repeat: [14, 4], seed: 521 + tier * 19 + Math.round(Math.abs(x)), roughness: .65, metalness: .38,
+        });
+        addBox(g, [container.length, container.height, container.width], [x, y, z], shell);
+        // Modeled containerRibs maintain readable corrugation at gameplay distance.
+        const containerRibs = [];
+        for (let localX = -container.length / 2 + 3; localX <= container.length / 2 - 3; localX += 4)
+            containerRibs.push({ x: x + localX, y, z: z + container.width / 2 + .12, sx: .55, sy: container.height - 2, sz: .30 });
+        addInstancedBoxes(g, containerRibs, darkSteel);
+        for (const edgeX of [x - container.length / 2 + 1, x + container.length / 2 - 1])
+            addBox(g, [1.1, container.height, .55], [edgeX, y, z + container.width / 2 + .25], steel);
+        addBox(g, [container.length - 2, 1.0, .55], [x, y + container.height / 2 - .8, z + container.width / 2 + .25], steel);
     }
-    addInstancedBoxes(g, railSleepers, makeSurface('wood', 0x51402f, { accent: 0x171310, repeat: [1, 1], seed: 557, roughness: .94 }));
-    // Gantry crane frames the rear skyline without crossing the playable sightline.
-    for (const x of [-11.5, 11.5]) addBox(g, [.38, 8.5, .38], [x, 3.55, -15], steel);
-    addBox(g, [23.4, .5, .5], [0, 7.4, -15], steel);
-    addBox(g, [.22, 4.5, .22], [4.2, 5.2, -15], steel);
-    addBox(g, [1.2, .42, 1.2], [4.2, 2.95, -15], steel);
-    const stripes = makeStd(0xe2a43d, { emissive: 0xb76a18, emissiveIntensity: .35, roughness: .45 });
-    for (let i = 0; i < 8; i++) addBox(g, [1.4, .03, .16], [-5.4 + i * 1.55, -.48, 10.3], stripes, [0, i % 2 ? .35 : -.35, 0]);
-    addLampPost(g, -7.7, -5, 0xffb35e); addLampPost(g, 7.7, -5, 0xffb35e); addLampPost(g, -7.7, 8, 0xffb35e); addLampPost(g, 7.7, 8, 0xffb35e);
-    addNeonStrip(g, [.1, .1, 16], [-7.0, -.38, 0], 0xe18b31, .65);
-    addNeonStrip(g, [.1, .1, 16], [7.0, -.38, 0], 0x52a9b5, .65);
-    const haze = new THREE.PointLight(0xe28c38, 12, 20, 2); haze.position.set(-7, 3, -8); g.add(haze);
-    g.userData.pulse = [stripes];
+
+    // Real-size containers occupy a rear loading row, never the immediate table perimeter.
+    addContainer(40, -31, 0x814237);
+    addContainer(-62, -78, 0x335b67);
+    addContainer(62, -91, 0x76602f, 1);
+    addContainer(-60, -112, 0x424f55, 1);
+
+    // A forklift provides a single familiar scale reference in the rear-left service lane.
+    const forklift = makeStd(0xd5982d, { roughness: .50, metalness: .36 });
+    addBox(g, [16, 8, 25], [-22, 3.5, -30], forklift);
+    addBox(g, [15, 12, 11], [-22, 12, -35], forklift);
+    addBox(g, [12, 8, 7], [-22, 13, -30], darkSteel);
+    for (const x of [-29.5, -14.5]) {
+        for (const z of [-39, -23]) {
+            const wheel = addCylinder(g, 3.1, 2.0, [x, 2.6, z], darkSteel, 24);
+            wheel.rotation.z = Math.PI / 2;
+        }
+    }
+    for (const x of [-28, -16])
+        addBox(g, [1.2, 27, 1.2], [x, 13, -17], steel);
+    addBox(g, [22, 1.0, 2.0], [-22, 24.5, -17], steel);
+
+    // The gantry crane runs down the remote right boundary instead of crossing the playfield.
+    for (const z of [-120, 58])
+        addBox(g, [5.0, crane.height, 5.0], [crane.sideClearance, crane.height / 2 - .5, z], steel);
+    addBox(g, [7.0, 6.0, 183], [crane.sideClearance, crane.height - 3.5, -31], steel);
+    addBox(g, [12, 8, 18], [crane.sideClearance, crane.height - 10, -36], safety);
+
+    // Large yard lamps stay outside the open apron and never span overhead.
+    const lampGlow = makeStd(0xffc06c, { emissive: 0xffa23c, emissiveIntensity: 1.45, roughness: .10 });
+    for (const [x, z] of [[-38, 28], [44, 26], [-45, -55]]) {
+        addBox(g, [1.3, 42, 1.3], [x, 20.5, z], darkSteel);
+        addBox(g, [12, 1.4, 5], [x, 41, z], lampGlow);
+    }
+    pulse.push(lampGlow);
+
+    const warmHaze = new THREE.PointLight(0xe28c38, 28, 110, 1.8);
+    warmHaze.position.set(-34, 22, -38);
+    g.add(warmHaze);
+    const coolHaze = new THREE.PointLight(0x4a9eaa, 22, 100, 1.8);
+    coolHaze.position.set(34, 18, -18);
+    g.add(coolHaze);
+    g.userData.pulse = pulse;
     return g;
 }

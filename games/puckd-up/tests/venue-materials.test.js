@@ -7,6 +7,9 @@ import { COMPETITION_CIRCUIT_STYLE } from '../scripts/render/venues/competition-
 import { PARK_JAM_STYLE } from '../scripts/render/venues/park-jam.js';
 import { SKYLINE_ROOFTOP_STYLE } from '../scripts/render/venues/skyline-rooftop.js';
 import { GARAGE_CLUB_STYLE } from '../scripts/render/venues/garage-club.js';
+import { BOARDWALK_BASH_STYLE } from '../scripts/render/venues/boardwalk-bash.js';
+import { FREIGHT_YARD_STYLE } from '../scripts/render/venues/freight-yard.js';
+import { ZERO_G_ARENA_STYLE } from '../scripts/render/venues/zero-g-arena.js';
 
 class MeshStandardMaterial {
     constructor(options) { Object.assign(this, options); this.userData = {}; }
@@ -177,4 +180,67 @@ test('Garage Club reads as a full parking level with a dedicated table finish', 
         'a car should approach the fixed ten-unit table width instead of reading as a miniature');
     assert.ok(GARAGE_CLUB_STYLE.vehicle.height >= 8,
         'vehicle height must reinforce the human scale of the surrounding architecture');
+});
+
+test('Boardwalk Bash reads as a full amusement pier with a dedicated table finish', () => {
+    assert.equal(BOARDWALK_BASH_STYLE.floorSurface, 'wood');
+    assert.equal(BOARDWALK_BASH_STYLE.tableSurface, 'boardwalkComposite');
+    assert.notEqual(BOARDWALK_BASH_STYLE.floorSurface, BOARDWALK_BASH_STYLE.tableSurface,
+        'the boardwalk table must not copy the pier planks');
+    assert.equal(BOARDWALK_BASH_STYLE.overheadSpans, false,
+        'lights and amusement structures must stay outside the playfield sightline');
+    const tableChannels = [BOARDWALK_BASH_STYLE.tableColor >> 16, BOARDWALK_BASH_STYLE.tableColor >> 8, BOARDWALK_BASH_STYLE.tableColor]
+        .map(channel => channel & 255);
+    assert.ok(Math.max(...tableChannels) <= 0x55, 'the playfield finish must remain dark');
+    assert.ok(BOARDWALK_BASH_STYLE.pier.width >= 160, 'the pier should extend far beyond the fixed table');
+    assert.ok(BOARDWALK_BASH_STYLE.pier.depth >= 220, 'the boardwalk needs substantial foreground and background depth');
+    assert.ok(BOARDWALK_BASH_STYLE.pier.plazaWidth >= 44, 'the table needs a dedicated open activity plaza');
+    assert.ok(BOARDWALK_BASH_STYLE.landmarks.wheelRadius >= 60,
+        'the Ferris wheel must tower over the table instead of reading as a tabletop prop');
+    assert.ok(BOARDWALK_BASH_STYLE.landmarks.vendorWidth >= 30,
+        'vendor buildings must provide credible human-scale architecture');
+    assert.ok(BOARDWALK_BASH_STYLE.landmarks.lampHeight >= 24,
+        'pier lamps must be scaled against people, not against the game table');
+});
+
+test('Freight Yard reads as a full intermodal yard with a dedicated table finish', () => {
+    assert.equal(FREIGHT_YARD_STYLE.floorSurface, 'asphalt');
+    assert.equal(FREIGHT_YARD_STYLE.tableSurface, 'yardComposite');
+    assert.notEqual(FREIGHT_YARD_STYLE.floorSurface, FREIGHT_YARD_STYLE.tableSurface,
+        'the freight table must not copy the asphalt apron');
+    assert.equal(FREIGHT_YARD_STYLE.overheadSpans, false,
+        'cranes and yard lighting must leave the complete playfield sightline open');
+    const tableChannels = [FREIGHT_YARD_STYLE.tableColor >> 16, FREIGHT_YARD_STYLE.tableColor >> 8, FREIGHT_YARD_STYLE.tableColor]
+        .map(channel => channel & 255);
+    assert.ok(Math.max(...tableChannels) <= 0x55, 'the playfield finish must remain dark');
+    assert.ok(FREIGHT_YARD_STYLE.yard.width >= 240, 'the intermodal yard should dwarf the fixed table');
+    assert.ok(FREIGHT_YARD_STYLE.yard.depth >= 300, 'the yard needs believable working depth');
+    assert.ok(FREIGHT_YARD_STYLE.yard.apronWidth >= 56, 'the table needs a broad, dedicated event apron');
+    assert.ok(FREIGHT_YARD_STYLE.container.length >= 80,
+        'shipping containers must be several times longer than the air-hockey table');
+    assert.ok(FREIGHT_YARD_STYLE.container.width >= 16, 'container width must provide a credible human-scale reference');
+    assert.ok(FREIGHT_YARD_STYLE.container.height >= 18, 'containers must tower above the table surface');
+    assert.ok(FREIGHT_YARD_STYLE.crane.height >= 70, 'yard cranes must read as major industrial architecture');
+});
+
+test('Zero-G Arena reads as a full orbital hangar with a dedicated table finish', () => {
+    assert.equal(ZERO_G_ARENA_STYLE.floorSurface, 'spacePanels');
+    assert.equal(ZERO_G_ARENA_STYLE.tableSurface, 'zeroGComposite');
+    assert.notEqual(ZERO_G_ARENA_STYLE.floorSurface, ZERO_G_ARENA_STYLE.tableSurface,
+        'the Zero-G table must not copy the station deck panels');
+    assert.equal(ZERO_G_ARENA_STYLE.overheadSpans, false,
+        'station ribs and light channels must leave the playfield sightline open');
+    const tableChannels = [ZERO_G_ARENA_STYLE.tableColor >> 16, ZERO_G_ARENA_STYLE.tableColor >> 8, ZERO_G_ARENA_STYLE.tableColor]
+        .map(channel => channel & 255);
+    assert.ok(Math.max(...tableChannels) <= 0x55, 'the playfield finish must remain dark');
+    assert.ok(ZERO_G_ARENA_STYLE.station.width >= 180, 'the hangar deck should dwarf the fixed table');
+    assert.ok(ZERO_G_ARENA_STYLE.station.depth >= 240, 'the station needs believable foreground and background depth');
+    assert.ok(ZERO_G_ARENA_STYLE.station.clearHeight >= 48, 'the orbital hangar needs monumental vertical scale');
+    assert.ok(ZERO_G_ARENA_STYLE.station.apronWidth >= 52, 'the table needs a dedicated open competition apron');
+    assert.ok(ZERO_G_ARENA_STYLE.landmarks.ringRadius >= 60,
+        'the observation ring must read as architecture, not a tabletop prop');
+    assert.ok(ZERO_G_ARENA_STYLE.landmarks.planetRadius >= 70,
+        'the planet must dominate the distant horizon rather than resemble a game ball');
+    assert.ok(ZERO_G_ARENA_STYLE.landmarks.airlockHeight >= 26,
+        'airlocks should provide a credible human-scale reference');
 });
