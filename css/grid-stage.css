@@ -12,7 +12,7 @@
 .grid-page-shell .arcade-shell {
   width: 100%;
   min-height: 100vh;
-  padding: 22px clamp(0px, 4vw, 72px) 0;
+  padding: 0;
 }
 
 .grid-stage {
@@ -21,16 +21,16 @@
   display: grid;
   justify-items: center;
   align-content: start;
-  width: min(1400px, 100%);
-  min-height: calc(100vh - 22px);
-  margin: 0 auto;
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
   padding: 18px 0 72px;
   overflow: hidden;
   background:
     radial-gradient(circle at 50% 20%, rgba(169, 92, 239, 0.28), transparent 30%),
     linear-gradient(180deg, #171044 0%, #2d1858 32%, #4c2572 56%, #171344 100%);
-  border: 1px solid rgba(131, 85, 211, 0.14);
-  box-shadow: 0 0 70px rgba(75, 34, 121, 0.16);
+  border: 0;
+  box-shadow: none;
 }
 
 .grid-stage::after {

@@ -66,6 +66,21 @@ test("grid page removes old utility bars and keeps the grid mount", () => {
   assert(gridHtml.includes('id="gridTrack"'), "expected interactive grid mount");
 });
 
+test("grid scene background spans the full viewport", () => {
+  assert(
+    /\.grid-page-shell \.arcade-shell\s*\{[^}]*padding:\s*0;/.test(gridStageCss),
+    "expected the shared shell not to inset the arcade scene"
+  );
+  assert(
+    /\.grid-stage\s*\{[^}]*width:\s*100%;/.test(gridStageCss),
+    "expected the synthwave scene to cover the full page width"
+  );
+  assert(
+    !gridStageCss.includes("width: min(1400px, 100%);"),
+    "expected no max-width panel around the page background"
+  );
+});
+
 test("arcade CSS defines responsive catalog cards and filter controls", () => {
   assert(arcadeCss.includes(".app-shell-nav__utility-link"), "expected shared session utility styling");
   assert(arcadeCss.includes("grid-template-columns: repeat(auto-fill, minmax("), "expected a responsive catalog grid");
