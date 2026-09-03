@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/rules.test.js && node tests/physics.test.js && node tests/world.test.js && node tests/aim.test.js && node tests/cpu.test.js && node tests/match.test.js && node tests/audio.test.js && node tests/ui.test.js && node tests/online.test.js && node tests/modules.test.js"
+    "test": "node tests/rules.test.js && node tests/physics.test.js && node tests/world.test.js && node tests/aim.test.js && node tests/cpu.test.js && node tests/match.test.js && node tests/audio.test.js && node tests/ui.test.js && node tests/table-geometry.test.js && node tests/online.test.js && node tests/modules.test.js"
   }
 }

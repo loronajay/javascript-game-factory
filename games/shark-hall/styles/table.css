@@ -685,3 +685,43 @@ input[type="range"] {
     font-size: 29px;
   }
 }
+
+/*
+  The way out. Fixed above the menu, pause and result layers (30 and 40), in the
+  corner every cabinet in the factory puts it in. The playing header is a grid
+  with three cells and no room for a fourth, and the front door covers the header
+  entirely, so this belongs to the document rather than to either screen.
+*/
+.back-link {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  left: max(12px, env(safe-area-inset-left));
+  z-index: 60;
+  padding: 8px 12px;
+  border-left: 2px solid rgba(199, 154, 79, 0.7);
+  background: linear-gradient(90deg, rgba(5, 7, 10, 0.9), rgba(5, 7, 10, 0));
+  color: rgba(214, 200, 176, 0.86);
+  font: 800 10px/1.2 ui-monospace, Consolas, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: none;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.9);
+  transition: color 140ms ease;
+}
+
+.back-link:hover,
+.back-link:focus-visible {
+  color: #f0ca78;
+}
+
+/* The header's own brand line would sit under it; give the link the corner. */
+.game-header .brand-mini {
+  padding-left: 128px;
+}
+
+@media (max-width: 760px), (max-height: 620px) {
+  .back-link {
+    padding: 6px 9px;
+    font-size: 9px;
+  }
+}

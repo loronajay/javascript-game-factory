@@ -15,11 +15,36 @@
 // so they see their own contact before it swings out to follow the table. Cut to
 // the wide shot immediately and the shot the player just took is never seen.
 
+import { HALF_LENGTH, HALF_WIDTH } from "../sim/constants.js";
+
 /** How long the camera stays on the aim shot after the strike. */
 export const STRIKE_HOLD_SECONDS = 0.24;
 
 /** Below this canvas width the phone composition is used. */
 const NARROW_WIDTH = 650;
+
+/** Clearance kept outside the nose line in the overhead shot, so the rails are in frame. */
+const OVERHEAD_MARGIN = 0.3;
+/** How far up the overhead shot may go. Past this the fog starts eating the cloth. */
+const OVERHEAD_MAX_Y = 4.6;
+const OVERHEAD_MIN_Y = 2.2;
+/** The overhead lens. Tight, because a wide one from above bends the rails and lies about angles. */
+const OVERHEAD_FOV = 41;
+
+/**
+ * How high the camera has to be to hold the whole table at this aspect ratio.
+ *
+ * DERIVED, because a typed height is only correct at one window shape. The
+ * overhead shot is the one view whose whole job is "the entire table at once",
+ * and on a wide canvas a fixed 3.0 cut both ends off.
+ */
+export function overheadHeight(aspect, fovDegrees = OVERHEAD_FOV) {
+  const half = Math.tan((fovDegrees * Math.PI) / 360);
+  const across = HALF_LENGTH + OVERHEAD_MARGIN;
+  const down = HALF_WIDTH + OVERHEAD_MARGIN;
+  const needed = Math.max(across / (half * Math.max(0.2, aspect)), down / half);
+  return Math.min(OVERHEAD_MAX_Y, Math.max(OVERHEAD_MIN_Y, needed));
+}
 
 export function createCameraRig(THREE) {
   const camera = new THREE.PerspectiveCamera(48, 1, 0.02, 20);
@@ -68,12 +93,23 @@ export function createCameraRig(THREE) {
       const chasing = moving && hold <= 0;
 
       if (mode === "over") {
-        // Straight down. The read here is the whole table at once, so the FOV is
-        // tight — a wide lens from above bends the rails and lies about angles.
-        desiredPosition.set(0, narrow ? 3.12 : 3.0, 0.02);
+        // Straight down, and TWO things have to be right or the top view is
+        // useless: which way is up, and how high.
+        //
+        // WHICH WAY IS UP. Looking straight down is the degenerate case for
+        // `lookAt`: the default up vector (0,1,0) is parallel to the view
+        // direction, so the roll of the shot fell out of a 2cm fudge in z — and
+        // it landed with the table's LONG axis running down the screen, which is
+        // the one orientation it does not fit in. Set explicitly, +x always runs
+        // across the frame.
+        //
+        // HOW HIGH. Derived from the aspect, not typed: see `overheadHeight`.
+        camera.up.set(0, 0, -1);
+        camera.fov = OVERHEAD_FOV;
+        desiredPosition.set(0, overheadHeight(camera.aspect), 0);
         desiredTarget.set(0, 0.12, 0);
-        camera.fov = narrow ? 45 : 41;
       } else if (chasing) {
+        camera.up.set(0, 1, 0);
         // Follow the centroid of everything still rolling, not the cue ball: on a
         // break the cue ball is the least interesting thing on the table.
         const live = balls.filter((ball) => !ball.pocketed && Math.hypot(ball.vx, ball.vz) > 0.035);
@@ -87,6 +123,7 @@ export function createCameraRig(THREE) {
         desiredTarget.set(cx, 0.22, cz);
         camera.fov = narrow ? 55 : 47;
       } else {
+        camera.up.set(0, 1, 0);
         // Behind the cue, slightly off the line so the stick does not fill the
         // middle of the screen.
         const back = narrow ? 0.92 : 1.03;

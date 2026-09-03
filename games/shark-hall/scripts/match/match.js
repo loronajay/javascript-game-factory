@@ -18,7 +18,14 @@
 
 import { CUE, EIGHT, cueBall, groupOf, remaining } from "../sim/balls.js";
 import { DEFAULT_DIFFICULTY, difficultyById, planShot, strokeFor } from "../sim/cpu.js";
-import { ZONE_ANYWHERE, ZONE_KITCHEN, ZONE_NONE, defaultSpotFor, findLegalCuePosition, isLegalCuePosition } from "../sim/placement.js";
+import {
+  ZONE_ANYWHERE,
+  ZONE_KITCHEN,
+  ZONE_NONE,
+  clampCuePosition,
+  defaultSpotFor,
+  findLegalCuePosition,
+} from "../sim/placement.js";
 import { resolveShot } from "../sim/rules.js";
 import { clampContact } from "../sim/shot.js";
 import { createWorld } from "../sim/world.js";
@@ -202,11 +209,18 @@ export function createMatch({
    * drag, then release to confirm — so the same pointer interaction that aims
    * cannot also accidentally spot the ball somewhere the player did not mean.
    */
+  /**
+   * Move the cue ball to where the player is pointing.
+   *
+   * The point is CLAMPED into the legal zone rather than tested against it, so a
+   * drag past a rail or into a cluster slides the ball instead of freezing it.
+   * See `clampCuePosition`. The only false here means there is no ball in hand.
+   */
   function tryPlaceCue(x, z) {
     if (state.ballInHand === ZONE_NONE) return false;
-    if (!isLegalCuePosition(world.balls, x, z, state.ballInHand)) return false;
-    world.placeCue(x, z);
-    emit("place", { x, z });
+    const spot = clampCuePosition(world.balls, x, z, state.ballInHand);
+    world.placeCue(spot.x, spot.z);
+    emit("place", spot);
     return true;
   }
 

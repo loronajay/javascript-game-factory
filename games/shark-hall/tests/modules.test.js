@@ -237,6 +237,24 @@ test("the splash the menu is built around is on disk and referenced by the CSS",
   assert(read("styles/menu.css").includes("assets/splashes/menu.png"), "the front door does not use the splash");
 });
 
+test("there is a way back to the arcade, and it points at the grid", () => {
+  // Every cabinet in the factory carries this, and it is the only navigation a
+  // player has out of a one-page game. `../../grid.html` resolves from
+  // `/games/shark-hall/` to the grid at the repo root, which is where this
+  // cabinet is served from.
+  const html = read("index.html");
+  assert(
+    /<a\s+href="\.\.\/\.\.\/grid\.html"\s+class="back-link"/.test(html),
+    "the back-to-arcade link is missing or no longer points at the grid",
+  );
+  // Above the front door (30) and the pause/result modals (40), or it is buried
+  // under the first screen the player sees.
+  const css = read("styles/table.css");
+  const rule = css.slice(css.indexOf(".back-link {"));
+  const zIndex = Number(/z-index:\s*(\d+)/.exec(rule)?.[1]);
+  assert(zIndex > 40, `the back link sits at z-index ${zIndex}, under the menu layers`);
+});
+
 test("there is exactly one page", () => {
   // Mini Hoops learned this the hard way: a second document destroys the <audio>
   // element streaming the soundtrack and the room tone, and the music restarts

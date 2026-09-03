@@ -9,9 +9,24 @@
 // is what lets a player charge a shot while looking at the balls rather than at
 // the meter in the control deck.
 
+import { BALLS_GROUP_Y } from "./balls-view.js";
+import { BALL_Y } from "./table-view.js";
+
+/**
+ * The height a level cue rides at: dead through the centre of the cue ball.
+ *
+ * DERIVED, like the pointer plane in `scene.js`, and for the same reason. It was
+ * typed as 0.15 — the height of the table GROUP, not of the bed on top of it —
+ * which put the whole stick 14cm under the cloth, inside the cabinet, where the
+ * player could not see the pull-back that is the only on-table power feedback.
+ * The cue view is added to the scene rather than to the table, so this is the
+ * world height and both terms belong in it.
+ */
+export const CUE_Y = BALLS_GROUP_Y + BALL_Y;
+
 export function createCueView(THREE, scene) {
   const group = new THREE.Group();
-  group.position.y = 0.15;
+  group.position.y = CUE_Y;
   scene.add(group);
 
   const shaft = new THREE.Mesh(
@@ -83,14 +98,14 @@ export function createCueView(THREE, scene) {
         group.visible = kick > 0.08;
         if (!group.visible) return;
         const forward = 0.06 * kick;
-        group.position.set(cue.x - Math.cos(angle) * (0.03 - forward), 0.15, cue.z - Math.sin(angle) * (0.03 - forward));
+        group.position.set(cue.x - Math.cos(angle) * (0.03 - forward), CUE_Y, cue.z - Math.sin(angle) * (0.03 - forward));
         group.rotation.y = -angle;
         return;
       }
 
       group.visible = true;
       const pull = 0.08 + Math.min(1, Math.max(0, charge)) * 0.18;
-      group.position.set(cue.x - Math.cos(angle) * pull, 0.15, cue.z - Math.sin(angle) * pull);
+      group.position.set(cue.x - Math.cos(angle) * pull, CUE_Y, cue.z - Math.sin(angle) * pull);
       group.rotation.y = -angle;
     },
   };

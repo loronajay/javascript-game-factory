@@ -4,7 +4,7 @@
 // and the turn card's hold are real product behaviour, and a test that had to
 // wait 1.24 real seconds for a turn card would be a test nobody runs.
 
-import { assert, assertEqual, finish, suite, test } from "./harness.js";
+import { assert, assertClose, assertEqual, finish, suite, test } from "./harness.js";
 import {
   MODE_CPU,
   MODE_HOTSEAT,
@@ -176,8 +176,16 @@ test("a scratch confines placement to behind the head string", () => {
   clock.flush();
 
   assertEqual(match.snapshot().ballInHand, ZONE_KITCHEN);
-  assert(!match.tryPlaceCue(0.5, 0), "past the head string is illegal on a scratch");
+
+  // The drag is never refused — it is clamped. Asking for a spot past the head
+  // string slides the ball along the string instead of freezing it there, which
+  // is what makes placement feel like moving a ball. See `clampCuePosition`.
+  assert(match.tryPlaceCue(0.5, 0), "a drag is always accepted while there is ball in hand");
+  assert(match.world.cue().x <= HEAD_STRING_X, "but it cannot end up past the head string");
+
   assert(match.tryPlaceCue(HEAD_STRING_X - 0.2, 0.1), "behind the head string is legal");
+  assertClose(match.world.cue().x, HEAD_STRING_X - 0.2, 1e-9, "and a legal spot is taken exactly");
+  assertClose(match.world.cue().z, 0.1, 1e-9);
 });
 
 // --- the CPU ---------------------------------------------------------------

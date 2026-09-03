@@ -21,7 +21,7 @@
 // No THREE, no DOM. The world it drives is the cabinet's own pure one.
 
 import { cloneBalls, remaining } from "../sim/balls.js";
-import { ZONE_NONE, isLegalCuePosition } from "../sim/placement.js";
+import { ZONE_NONE, clampCuePosition } from "../sim/placement.js";
 import { clampContact } from "../sim/shot.js";
 import { createWorld } from "../sim/world.js";
 import {
@@ -303,11 +303,12 @@ export function createOnlineMatch({
 
     setContact,
 
+    /** Clamped, not tested — the same drag behaviour the local match has. */
     tryPlaceCue(x, z) {
       if (!state || state.ballInHand === ZONE_NONE || !isMyTurn()) return false;
-      if (!isLegalCuePosition(world.balls, x, z, state.ballInHand)) return false;
-      world.placeCue(x, z);
-      emit("place", { x, z });
+      const spot = clampCuePosition(world.balls, x, z, state.ballInHand);
+      world.placeCue(spot.x, spot.z);
+      emit("place", spot);
       return true;
     },
 

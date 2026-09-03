@@ -4,12 +4,20 @@
 // line goes, where the cue ball may be put down, and how hard a held button hits.
 
 import { assert, assertClose, assertEqual, finish, suite, test } from "./harness.js";
-import { BALL_RADIUS, FULL_CHARGE_MS, HALF_LENGTH, HEAD_STRING_X, MAX_SHOT_SPEED } from "../scripts/sim/constants.js";
+import {
+  BALL_RADIUS,
+  FULL_CHARGE_MS,
+  HALF_LENGTH,
+  HALF_WIDTH,
+  HEAD_STRING_X,
+  MAX_SHOT_SPEED,
+} from "../scripts/sim/constants.js";
 import { createBall } from "../scripts/sim/balls.js";
 import { aimSolution, angleToDegrees, ballAt, firstContact, railDistance, segmentBlocked } from "../scripts/sim/aim.js";
 import {
   ZONE_ANYWHERE,
   ZONE_KITCHEN,
+  clampCuePosition,
   findLegalCuePosition,
   isLegalCuePosition,
 } from "../scripts/sim/placement.js";
@@ -99,6 +107,68 @@ test("the fallback search always returns a legal spot, even in a crowd", () => {
 
   const spot = findLegalCuePosition(balls, -0.72, 0, ZONE_ANYWHERE);
   assert(isLegalCuePosition(balls, spot.x, spot.z, ZONE_ANYWHERE), `returned an illegal spot ${spot.x},${spot.z}`);
+});
+
+// --- the drag ---------------------------------------------------------------
+//
+// `clampCuePosition` is what the player's finger is actually connected to, and
+// every case here is about the ball CONTINUING to move rather than stopping.
+
+test("a drag off the end of the cloth slides the ball along the rail", () => {
+  const balls = [createBall(0, -1, 0)];
+  const spot = clampCuePosition(balls, HALF_LENGTH + 3, 0.31, ZONE_ANYWHERE);
+  assert(spot.x < HALF_LENGTH, "it stayed on the table");
+  assertClose(spot.z, 0.31, 1e-9, "and it kept following the finger along the rail");
+  assert(isLegalCuePosition(balls, spot.x, spot.z, ZONE_ANYWHERE));
+});
+
+test("a drag past the head string slides along the string", () => {
+  const balls = [createBall(0, -1, 0)];
+  const spot = clampCuePosition(balls, 0.9, -0.22, ZONE_KITCHEN);
+  assert(spot.x <= HEAD_STRING_X, `escaped the kitchen at x=${spot.x}`);
+  assertClose(spot.z, -0.22, 1e-9, "and it still tracked the finger across the table");
+});
+
+test("a drag into another ball slides around it rather than stopping", () => {
+  const balls = [createBall(0, -1, 0), createBall(5, 0, 0)];
+  // Straight at the 5 from the left, offset slightly high: the cue ball should
+  // end up touching it on the near side, not frozen where it first met it.
+  const spot = clampCuePosition(balls, -0.004, 0.006, ZONE_ANYWHERE);
+  const gap = Math.hypot(spot.x, spot.z);
+  assert(gap >= 2.08 * BALL_RADIUS, `it ended up inside the 5 (gap ${gap})`);
+  assert(isLegalCuePosition(balls, spot.x, spot.z, ZONE_ANYWHERE), "and it ended up somewhere legal");
+});
+
+test("a drag is never refused, however hopeless the spot", () => {
+  // Jammed into a corner, against the string, inside a cluster, off the table.
+  const balls = [createBall(0, -1, 0)];
+  let n = 1;
+  for (let i = 0; i < 14; i++) {
+    const around = (i / 14) * Math.PI * 2;
+    balls.push(createBall(n++, HEAD_STRING_X + Math.cos(around) * 0.05, Math.sin(around) * 0.05));
+  }
+
+  for (const [x, z] of [
+    [HEAD_STRING_X, 0],
+    [-HALF_LENGTH - 1, -HALF_WIDTH - 1],
+    [0, 0],
+    [1e6, -1e6],
+  ]) {
+    for (const zone of [ZONE_ANYWHERE, ZONE_KITCHEN]) {
+      const spot = clampCuePosition(balls, x, z, zone);
+      assert(
+        isLegalCuePosition(balls, spot.x, spot.z, zone),
+        `${zone} drag to ${x},${z} produced the illegal spot ${spot.x},${spot.z}`,
+      );
+    }
+  }
+});
+
+test("a legal spot is taken exactly, so the ball sits under the finger", () => {
+  const balls = [createBall(0, -1, 0), createBall(5, 0.6, 0.2)];
+  const spot = clampCuePosition(balls, -0.3, 0.15, ZONE_ANYWHERE);
+  assertClose(spot.x, -0.3, 1e-12);
+  assertClose(spot.z, 0.15, 1e-12);
 });
 
 test("the kitchen search stays in the kitchen", () => {

@@ -37,7 +37,7 @@ test("a scratch is ball in hand behind the head string, not anywhere", () => {
     shot({ pocketed: [0], firstHit: 1 }),
   );
   assert(outcome.scratch, "expected a scratch");
-  assertEqual(outcome.ballInHand, ZONE_KITCHEN, "a scratch is kitchen; every other foul is anywhere");
+  assertEqual(outcome.ballInHand, ZONE_KITCHEN, "a scratch is kitchen; every other foul away from the break is anywhere");
 });
 
 test("striking the wrong group first is a foul even when a ball drops", () => {
@@ -78,6 +78,29 @@ test("striking the 8 first on an open table is a foul", () => {
     shot({ firstHit: 8 }),
   );
   assert(outcome.foul, "the 8 is not a legal first contact on an open table");
+});
+
+test("every foul on the break is behind the head string, not just a scratch", () => {
+  // Not a detail. Ball in hand ANYWHERE off a missed break lets the incoming
+  // player set up BEHIND a full rack and break it backwards, which is not a shot
+  // that exists in pool. The head string is there precisely so that nobody
+  // starts a rack from the far side of it, and an illegal break hands the table
+  // over in the kitchen exactly as a scratch does.
+  const missed = resolveShot(tableWith([1, 9]), { shooter: 0, groups: [null, null], isBreak: true }, shot());
+  assertEqual(missed.foulReason, "No ball struck");
+  assertEqual(missed.ballInHand, ZONE_KITCHEN, "a missed break must not hand over the whole table");
+
+  const scratched = resolveShot(
+    tableWith([1, 9]),
+    { shooter: 0, groups: [null, null], isBreak: true },
+    shot({ pocketed: [0], firstHit: 1 }),
+  );
+  assertEqual(scratched.ballInHand, ZONE_KITCHEN, "and a scratch on the break is the same");
+
+  // And it really is the break that does it: the same miss on the next shot is
+  // an ordinary foul with ball in hand anywhere.
+  const later = resolveShot(tableWith([1, 9]), { shooter: 0, groups: [null, null], isBreak: false }, shot());
+  assertEqual(later.ballInHand, ZONE_ANYWHERE);
 });
 
 // --- groups ----------------------------------------------------------------

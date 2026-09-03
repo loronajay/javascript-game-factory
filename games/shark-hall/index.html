@@ -15,6 +15,15 @@
       navigation destroys the <audio> element streaming the soundtrack and the
       room tone, and the music would restart from silence on every menu visit.
     -->
+    <!--
+      OUT OF THE HALL. Fixed and above every layer on purpose: the front door,
+      the pause modal and the result card are all full-screen layers at z-index
+      30-40, and a link that lives inside the playing header would be buried
+      under the first menu a player ever sees. Every other cabinet in the factory
+      carries the same `.back-link` in the same corner.
+    -->
+    <a href="../../grid.html" class="back-link">&larr; Back to Arcade</a>
+
     <div id="app">
       <div class="game-header">
         <div class="brand-mini">JavaScript Game Factory · Shark Hall</div>
@@ -245,7 +254,7 @@
               <ul>
                 <li>The breaker keeps shooting if a ball drops, but <b>the break never assigns groups</b> &mdash; the table stays open no matter what falls.</li>
                 <li>Pot the 8 on the break and it is a <b>rerack</b>: not a win, not a loss. Same breaker, fresh triangle.</li>
-                <li>Scratch on the break and it is an ordinary scratch &mdash; the incoming player takes ball in hand behind the head string.</li>
+                <li><b>Every foul on the break is behind the head string</b>, not just a scratch. Miss the rack, or scratch, and the incoming player takes ball in hand in the kitchen &mdash; nobody ever starts a rack from the far side of the string.</li>
               </ul>
             </div>
 
@@ -280,7 +289,7 @@
                 These are the five, named exactly as the turn card names them:
               </p>
               <ul>
-                <li><b>Scratch</b> &mdash; the cue ball went down. The one exception to the penalty: ball in hand <b>behind the head string only</b>. The line itself is legal; past it is not.</li>
+                <li><b>Scratch</b> &mdash; the cue ball went down. One of the two exceptions to the penalty: ball in hand <b>behind the head string only</b>. The line itself is legal; past it is not. The other exception is the break, where <b>any</b> foul is behind the string.</li>
                 <li><b>No ball struck</b> &mdash; the cue ball reached nothing at all.</li>
                 <li><b>Wrong ball first</b> &mdash; the first contact was not from your group, or was not the 8 once your group was already clear.</li>
                 <li><b>No rail after contact</b> &mdash; you hit the right ball, then nothing dropped and nothing reached a cushion.</li>
@@ -310,7 +319,7 @@
                 <li><b>The 8 on the break is a rerack</b>, where most rule sets make it a win or a loss.</li>
                 <li><b>The break has no rail requirement.</b> Any break is a legal break.</li>
                 <li><b>No three-foul rule</b>, and <b>no push-out</b> after the break.</li>
-                <li><b>Ball in hand is anywhere</b> on every foul but the scratch.</li>
+                <li><b>Ball in hand is anywhere</b> on every foul but a scratch and a foul on the break.</li>
               </ul>
             </div>
           </div>

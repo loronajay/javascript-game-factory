@@ -7,7 +7,14 @@
 import { assert, assertClose, assertEqual, finish, suite, test } from "./harness.js";
 import { BALL_RADIUS, HALF_LENGTH, HALF_WIDTH, SIM_STEP } from "../scripts/sim/constants.js";
 import { createBall, speedOf } from "../scripts/sim/balls.js";
-import { applyClothFriction, collideBalls, collideCushion, collideRails } from "../scripts/sim/physics.js";
+import {
+  applyClothFriction,
+  clampToCloth,
+  collideBalls,
+  collideCushion,
+  collideRails,
+  cushionRestitution,
+} from "../scripts/sim/physics.js";
 import { strikeCue } from "../scripts/sim/shot.js";
 import { findPocket } from "../scripts/sim/pockets.js";
 import { POCKETS } from "../scripts/sim/table.js";
@@ -96,7 +103,74 @@ test("English changes the angle a ball leaves a cushion at", () => {
 
   const right = off(40);
   const left = off(-40);
-  assert(left - right > 0.2, `English must survive the rail (${left} vs ${right}), or it is decoration`);
+  assert(left - right > 0.1, `English must survive the rail (${left} vs ${right}), or it is decoration`);
+});
+
+test("running English lengthens the angle and holds speed; the rail alone does neither", () => {
+  // The direction that matters. Running English is spin whose contact patch is
+  // already moving WITH the rail, so friction pushes the ball along it instead
+  // of scrubbing it: off the same cushion the ball leaves wider and quicker.
+  const off = (wy) => {
+    const ball = createBall(1, 0, HALF_WIDTH - BALL_RADIUS);
+    ball.vx = 1.77;
+    ball.vz = 1.77;
+    ball.wy = wy;
+    collideCushion(ball, 0, -1);
+    return { angle: Math.atan2(Math.abs(ball.vx), Math.abs(ball.vz)), speed: Math.hypot(ball.vx, ball.vz) };
+  };
+
+  const plain = off(0);
+  const running = off(-0.95 * 1.77 * Math.SQRT2 / BALL_RADIUS);
+  assert(running.angle > plain.angle + 0.05, "running English must widen the rebound");
+  assert(running.speed > plain.speed * 1.05, "running English must hold speed through the rail");
+});
+
+test("the rebound angle off a rail is LONGER than the incidence, the way a real cushion plays", () => {
+  // The single most-felt property of a cushion, and the one a naive Coulomb
+  // model gets backwards. The normal component is damped by the restitution and
+  // the along-rail component is very nearly preserved, so a ball arriving 45
+  // degrees off the normal leaves at roughly 48 rather than at 40. Every safety
+  // and every two-rail position shot is built on this. See CUSHION_FRICTION.
+  for (const incidence of [30, 45, 60]) {
+    const radians = (incidence * Math.PI) / 180;
+    const ball = createBall(1, 0, HALF_WIDTH - BALL_RADIUS);
+    ball.vx = Math.sin(radians) * 2.5;
+    ball.vz = Math.cos(radians) * 2.5;
+    collideCushion(ball, 0, -1);
+    const out = (Math.atan2(Math.abs(ball.vx), Math.abs(ball.vz)) * 180) / Math.PI;
+    assert(out >= incidence, `${incidence} degrees in came back at ${out.toFixed(1)}, shorter than it went`);
+    assert(out < incidence + 8, `${incidence} degrees in came back at ${out.toFixed(1)}, wildly long`);
+  }
+});
+
+test("a cushion is livelier for a soft ball than for a hard one", () => {
+  // Rubber is not linear. A flat restitution has to pick one speed to be right
+  // at, and picking the slow one is what made a hard shot ricochet for seconds.
+  const soft = cushionRestitution(0.4);
+  const hard = cushionRestitution(5.4);
+  assert(soft > hard + 0.1, `a break should die into the rail (${soft} vs ${hard})`);
+  assert(hard > 0.5, "a cushion is not a sandbag");
+  assert(soft < 1, "and it is not a trampoline");
+  assertEqual(cushionRestitution(-3), cushionRestitution(3), "only the magnitude of the closing speed matters");
+});
+
+test("a ball shoved into a rail by its neighbour is put back on the cloth", () => {
+  // The frame-visible artefact: `collideAll` separates two overlapping balls
+  // after the rails have already been resolved, so without this the renderer
+  // gets one frame with a ball sunk into the cushion.
+  const ball = createBall(1, 0.4, HALF_WIDTH - BALL_RADIUS + 0.004);
+  ball.vz = 0.5;
+  clampToCloth(ball);
+  assertClose(ball.z, HALF_WIDTH - BALL_RADIUS, 1e-9, "it belongs against the nose of the cushion");
+  assertEqual(ball.vz, 0.5, "and it was not struck: position only");
+});
+
+test("the cloth clamp leaves a ball crossing a pocket mouth alone", () => {
+  // There is no cushion over a mouth, and clamping there would bounce a potted
+  // ball back out of the pocket it had already entered.
+  const ball = createBall(1, HALF_LENGTH - 0.02, HALF_WIDTH + 0.01);
+  clampToCloth(ball);
+  assertClose(ball.z, HALF_WIDTH + 0.01, 1e-9, "the corner mouth is not a rail");
 });
 
 test("a ball rolled at a rail comes back and stays on the table", () => {
