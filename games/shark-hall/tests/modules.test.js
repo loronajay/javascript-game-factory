@@ -79,6 +79,33 @@ test("the sim imports nothing from outside the sim", () => {
   }
 });
 
+test("the cosmetics layer is pure, like the sim", () => {
+  // The catalog, the loadout and the editor state are the second pure layer in
+  // the cabinet, and for the same reason: content and equipment rules that can
+  // only be checked in a browser are content and equipment rules that do not get
+  // checked. `tests/cosmetics.test.js` validates 123 items under node because of
+  // this rule.
+  for (const file of FILES.filter((f) => inLayer(f, "cosmetics"))) {
+    const source = code(file);
+    assert(!/THREE/.test(source), `${file} references THREE`);
+    assert(!/document|window|getElementById/.test(source), `${file} touches the DOM`);
+    assert(!/performance\.now|Date\.now|setTimeout|setInterval/.test(source), `${file} reads a clock`);
+    assert(!/Math\.random/.test(source), `${file} uses an ambient random source`);
+    assert(!/fetch\(|localStorage/.test(source), `${file} reaches storage or the network directly`);
+  }
+});
+
+test("the cosmetics layer imports nothing from outside itself", () => {
+  // Including the sim. A cosmetic is presentation, so it has no business reading
+  // a ball radius or a cushion constant — and a catalog that imported `sim/`
+  // would be one refactor away from deriving a value from one.
+  for (const file of FILES.filter((f) => inLayer(f, "cosmetics"))) {
+    for (const specifier of importsOf(code(file))) {
+      assert(specifier.startsWith("./"), `${file} imports "${specifier}" from outside cosmetics/`);
+    }
+  }
+});
+
 test("the match layer holds no DOM and no THREE", () => {
   for (const file of FILES.filter((f) => inLayer(f, "match"))) {
     const source = code(file);
@@ -109,6 +136,15 @@ test("the render layer never reads the match or the rules", () => {
       assert(!specifier.includes("/audio/"), `${file} imports the audio layer`);
     }
   }
+
+  // And the dependency runs one way only: the render layer reads cosmetic DATA,
+  // the cosmetics layer never reaches a renderer. That is what lets the catalog
+  // be validated with no GPU and the scene be repainted with no catalog.
+  for (const file of FILES.filter((f) => inLayer(f, "cosmetics"))) {
+    for (const specifier of importsOf(code(file))) {
+      assert(!specifier.includes("render"), `${file} imports the render layer`);
+    }
+  }
 });
 
 test("the multiplayer layer draws nothing and decides nothing", () => {
@@ -126,17 +162,18 @@ test("the multiplayer layer draws nothing and decides nothing", () => {
   }
 });
 
-test("only the account gate reaches outside the cabinet", () => {
-  // Shark Hall is otherwise self-contained. The one import of the shared
-  // platform layer is the sign-in gate, and it is the reason this cabinet is
-  // served from the repo root rather than from its own folder. If a second file
-  // grows one, that fact is no longer findable in one place.
+test("only the account gate and the cosmetics store reach outside the cabinet", () => {
+  // Shark Hall is otherwise self-contained. TWO files import the shared platform
+  // layer — the online sign-in gate, and the store that keeps a player's saved
+  // tables on their Factory account — and between them they are the reason this
+  // cabinet is served from the repo root rather than from its own folder. The
+  // list is asserted by name so a third cannot appear unnoticed.
   const reaching = FILES.filter((file) =>
     importsOf(code(file)).some((specifier) => specifier.includes("/js/platform/")));
   assertEqual(
     reaching.join(","),
-    "scripts/multiplayer/account-access.js",
-    "exactly one file may import the shared platform layer",
+    "scripts/multiplayer/account-access.js,scripts/store/cosmetics-store.js",
+    "only the sign-in gate and the cosmetics store may import the shared platform layer",
   );
 });
 
@@ -227,9 +264,10 @@ test("index.html boots the cabinet through the composition root", () => {
   assert(html.includes('type="module"'), "the cabinet is ES modules; a classic script would not load it");
 });
 
-test("both stylesheets are linked", () => {
+test("every stylesheet is linked", () => {
   assert(html.includes('href="styles/table.css"'));
   assert(html.includes('href="styles/menu.css"'));
+  assert(html.includes('href="styles/editor.css"'));
 });
 
 test("the splash the menu is built around is on disk and referenced by the CSS", () => {

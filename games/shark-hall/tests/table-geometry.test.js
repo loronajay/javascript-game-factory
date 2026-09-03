@@ -18,9 +18,11 @@
 // swappable — so it can be built here against a stub and measured. Nothing in
 // this file draws anything.
 
-import { assert, assertClose, finish, suite, test } from "./harness.js";
+import { assert, assertClose, assertEqual, finish, suite, test } from "./harness.js";
 import { BALL_RADIUS, HALF_LENGTH, HALF_WIDTH } from "../scripts/sim/constants.js";
 import { BALL_Y, CLOTH_TOP, buildTable } from "../scripts/render/table-view.js";
+import { resolveLoadout, defaultLoadout, applyPreset } from "../scripts/cosmetics/loadout.js";
+import { installCanvasStub } from "./canvas-stub.js";
 
 suite("the table mesh");
 
@@ -45,12 +47,12 @@ function stubThree() {
       this.scale = vector();
       this.children = [];
     }
-    add(child) {
-      this.children.push(child);
+    add(...children) {
+      this.children.push(...children);
     }
   }
 
-  const geometry = (type, size) => ({ type, ...size });
+  const geometry = (type, size) => ({ type, ...size, scale() { return this; }, dispose() {} });
 
   return {
     Group: Node,
@@ -73,20 +75,41 @@ function stubThree() {
     OctahedronGeometry: function (radius) {
       return geometry("octahedron", { w: radius * 2, h: radius * 2, d: radius * 2 });
     },
+    PlaneGeometry: function (w, h) {
+      return geometry("plane", { w, h, d: 0 });
+    },
+    CircleGeometry: function (radius) {
+      return geometry("circle", { w: radius * 2, h: 0, d: radius * 2 });
+    },
+    CanvasTexture: function () {
+      return { repeat: { set() {} }, dispose() {} };
+    },
+    RepeatWrapping: 1000,
+    SRGBColorSpace: "srgb",
     MeshPhysicalMaterial: function (options) {
-      return { ...options };
+      return { ...options, color: { set() {} } };
     },
     MeshStandardMaterial: function (options) {
-      return { ...options };
+      return { ...options, color: { set() {} } };
     },
   };
 }
 
-function build() {
+/**
+ * Build the table.
+ *
+ * Passing no cosmetics is deliberate for the geometry checks: the mesh is what
+ * is being measured, and the whole point of the cosmetic layer is that it cannot
+ * move any of it. `cosmeticsMoveNothing` below proves that by measuring the
+ * table twice with two very different loadouts.
+ */
+function build(cosmetics) {
   const THREE = stubThree();
   const scene = { add() {} };
-  const table = buildTable(THREE, scene, { feltTexture: null, woodTexture: null });
-  const parts = table.group.children.map((mesh) => ({
+  const table = buildTable(THREE, scene, cosmetics ? { cosmetics } : undefined);
+  // Groups (the sights and the decal) have no geometry of their own; only their
+  // children do, and neither is part of the table a ball touches.
+  const parts = table.group.children.filter((mesh) => mesh.geometry).map((mesh) => ({
     material: mesh.material,
     type: mesh.geometry.type,
     x: mesh.position.x,
@@ -198,6 +221,52 @@ test("nothing at a pocket rises above the cloth far enough to cut through a ball
       `a pocket piece rises ${((top - CLOTH_TOP) * 1000).toFixed(1)}mm above the bed and cuts across balls`,
     );
     assert(top > CLOTH_TOP - 0.02, "and it must not vanish under the cloth either");
+  }
+});
+
+// --- cosmetics may not move anything ----------------------------------------
+
+test("switching cosmetics moves no part of the table a ball can touch", () => {
+  // THE LOAD-BEARING TEST OF THE WHOLE COSMETIC LAYER. Two loadouts that share
+  // nothing — different cloth, timber, cushion, hardware, liner, sights, decal
+  // and ball set — must produce byte-identical geometry. If a cosmetic could
+  // move a cushion face by a millimetre it would be a cheat with a swatch on it,
+  // and it would pass every other test in this suite.
+  const restore = installCanvasStub();
+  try {
+    const plain = resolveLoadout(defaultLoadout()).table;
+    const loud = resolveLoadout(applyPreset(defaultLoadout(), "preset.table.tournament-traditional")).table;
+
+    const before = build(plain).parts;
+    const after = build(loud).parts;
+    assertEqual(after.length, before.length, "a cosmetic added or removed a piece of the table");
+    for (let i = 0; i < before.length; i++) {
+      for (const key of ["type", "x", "y", "z", "hw", "hh", "hd"]) {
+        assertEqual(after[i][key], before[i][key], `cosmetics moved part ${i}'s ${key}`);
+      }
+    }
+  } finally {
+    restore();
+  }
+});
+
+test("no cosmetic payload carries a value the simulation reads", () => {
+  // The catalog check lives in `cosmetics.test.js`; this is the render-side half:
+  // what actually reaches `buildTable` has no physics in it either.
+  const restore = installCanvasStub();
+  try {
+    const table = resolveLoadout(applyPreset(defaultLoadout(), "preset.table.casino")).table;
+    const banned = /radius|mass|friction|restitution|gravity|damping|elastic|velocity|inertia/i;
+    const walk = (value, path) => {
+      if (!value || typeof value !== "object") return;
+      for (const [key, child] of Object.entries(value)) {
+        assert(!banned.test(key), `${path}.${key} is a simulation value in a cosmetic payload`);
+        walk(child, `${path}.${key}`);
+      }
+    };
+    for (const [slot, payload] of Object.entries(table)) walk(payload, slot);
+  } finally {
+    restore();
   }
 });
 

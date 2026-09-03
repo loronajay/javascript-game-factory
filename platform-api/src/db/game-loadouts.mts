@@ -25,6 +25,10 @@ import {
   YAM_BOWLING_GAME_SLUG,
   YAM_BOWLING_LOADOUT_CATALOG,
 } from "../services/yam-bowling-loadout-catalog.mjs";
+import {
+  SHARK_HALL_GAME_SLUG,
+  SHARK_HALL_LOADOUT_CATALOG,
+} from "../services/shark-hall-loadout-catalog.mjs";
 
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
 
@@ -42,6 +46,7 @@ type LoadoutCatalog = {
 const CATALOGS: Record<string, LoadoutCatalog> = {
   [SPEED_DEMON_GAME_SLUG]: { normalizeGarage, loadoutFromGarage },
   [YAM_BOWLING_GAME_SLUG]: YAM_BOWLING_LOADOUT_CATALOG,
+  [SHARK_HALL_GAME_SLUG]: SHARK_HALL_LOADOUT_CATALOG,
 };
 
 function cleanText(value: any, maxLength = 120): string {

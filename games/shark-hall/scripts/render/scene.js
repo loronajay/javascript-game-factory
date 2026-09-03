@@ -15,9 +15,8 @@ import { createCueView } from "./cue-view.js";
 import { createGuidesView } from "./guides-view.js";
 import { buildRoom } from "./room.js";
 import { BALL_Y, buildTable } from "./table-view.js";
-import { feltTexture, floorTexture, woodTexture } from "./textures.js";
 
-export function createTableScene(THREE, canvas) {
+export function createTableScene(THREE, canvas, { cosmetics = { table: {}, hall: {} } } = {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
   // Capped at 2: past that the cost is real and the gain is not visible on any
   // phone that would survive the frame budget anyway.
@@ -34,10 +33,14 @@ export function createTableScene(THREE, canvas) {
   // than a table floating in black. It starts just past the table's far rail.
   scene.fog = new THREE.Fog(0x08090b, 4.8, 10.5);
 
-  const room = buildRoom(THREE, scene, { floorTexture: floorTexture(THREE) });
-  const table = buildTable(THREE, scene, { feltTexture: feltTexture(THREE), woodTexture: woodTexture(THREE) });
+  // The scene is built FROM a resolved cosmetic configuration rather than
+  // built and then repainted: a first frame drawn on the house table and
+  // corrected on the second is a flash of the wrong table on every load.
+  const room = buildRoom(THREE, scene, { cosmetics: cosmetics.hall });
+  const table = buildTable(THREE, scene, { cosmetics: cosmetics.table });
   const balls = createBallsView(THREE, scene, {
     anisotropy: Math.min(8, renderer.capabilities.getMaxAnisotropy()),
+    set: cosmetics.table?.balls ?? undefined,
   });
   const cue = createCueView(THREE, scene);
   const guides = createGuidesView(THREE, scene);
@@ -82,7 +85,34 @@ export function createTableScene(THREE, canvas) {
     cue,
     guides,
     table,
+    room,
     resize,
+
+    /**
+     * Repaint the table and the hall from a resolved loadout.
+     *
+     * THE RENDER LAYER'S HALF OF THE COSMETIC CONTRACT. It takes presentation
+     * payloads and no item ids, so nothing here can look a cosmetic up, ask
+     * whether it is owned, or reach the catalog. Idempotent and cheap enough to
+     * call on every preview click: each view compares payload identity per slot
+     * and does nothing where nothing changed.
+     */
+    applyCosmetics(resolved = {}) {
+      table.apply(resolved.table ?? {});
+      room.apply(resolved.hall ?? {});
+      balls.setBallSet(resolved.table?.balls);
+    },
+
+    /** The ball set currently painted on, so the hover readout names the right colour. */
+    get ballSet() {
+      return balls.ballSet;
+    },
+
+    /** Point the editor's orbit camera. Returns the clamped orbit. */
+    setOrbit(orbit) {
+      return rig.setOrbit(orbit);
+    },
+    getOrbit: () => rig.getOrbit(),
 
     /** Kick the cue's follow-through. Called when the match reports a strike. */
     strike() {
@@ -108,6 +138,10 @@ export function createTableScene(THREE, canvas) {
       // are all you can see. Hidden geometry only: the light itself never moves,
       // which is why the cloth looks identical from both cameras.
       room.fixture.visible = view.cameraMode !== "over";
+      // In the editor the room is part of what is being edited, so the pendant
+      // stays visible however the player has orbited — hiding it there would
+      // make the light slot uneditable from above.
+      if (view.cameraMode === "editor") room.fixture.visible = true;
       cue.update(dt);
       balls.sync(view.balls, view.paused ? 0 : dt);
       cue.place(view.cue, view.angle, view.charge, view.moving);

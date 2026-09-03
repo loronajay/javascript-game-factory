@@ -16,6 +16,8 @@
 // frame rate.
 
 import { createGameAudio } from "./audio/game-audio.js";
+import { createTableEditor } from "./cosmetics/editor.js";
+import { DEVELOPMENT_INVENTORY } from "./cosmetics/inventory.js";
 import { MODE_CPU, createMatch } from "./match/match.js";
 import { createAccountAccess } from "./multiplayer/account-access.js";
 import { createOnlineClient } from "./multiplayer/online-client.js";
@@ -26,12 +28,14 @@ import { ballColor } from "./render/textures.js";
 import { aimSolution } from "./sim/aim.js";
 import { describeBall } from "./sim/rules.js";
 import { ZONE_NONE } from "./sim/placement.js";
+import { createCosmeticsStore } from "./store/cosmetics-store.js";
 import { loadSettings, saveSettings } from "./store/settings.js";
 import { createControls } from "./ui/controls.js";
 import { findElements } from "./ui/elements.js";
 import { createHud } from "./ui/hud.js";
 import { createMenu } from "./ui/menu.js";
 import { createOnlineView } from "./ui/online-view.js";
+import { createEditorView } from "./ui/table-editor.js";
 import { createSpinDial } from "./ui/spin-dial.js";
 
 /** Pinned. One import, one version, one place to change it. */
@@ -57,14 +61,52 @@ export async function bootGame() {
     return;
   }
 
+  // --- cosmetics ----------------------------------------------------------
+  // Resolved BEFORE the scene is built, and awaited. The alternative is a first
+  // frame drawn on the house table and corrected on the second, which is a
+  // visible flash of somebody else's table on every load. The inventory is the
+  // development grant — every cosmetic owned — and it is passed in here rather
+  // than reached for inside the editor, so the day it comes from the Factory
+  // this line changes and nothing else does.
+  const inventory = DEVELOPMENT_INVENTORY;
+  // The scene does not exist yet, and the first `onChange` fires during `load`
+  // below. A `const scene` referenced from that callback would be a temporal
+  // dead zone error rather than the no-op the `?.` suggests, so the reference is
+  // held explicitly and filled in the moment the scene is built.
+  let sceneRef = null;
+  const cosmeticsOptions = { isOwned: (id) => inventory.isOwned(id) };
+  const cosmeticsStore = createCosmeticsStore({ normalizeOptions: cosmeticsOptions });
+  const tableEditor = createTableEditor({
+    store: cosmeticsStore,
+    options: cosmeticsOptions,
+    onChange: (resolved) => sceneRef?.applyCosmetics(resolved),
+  });
+  await tableEditor.load();
+
   // --- the layers ---------------------------------------------------------
   let settings = loadSettings();
   const audio = createGameAudio({ muted: settings.muted });
-  const scene = createTableScene(THREE, elements.canvas);
+  const scene = createTableScene(THREE, elements.canvas, { cosmetics: tableEditor.resolved() });
+  sceneRef = scene;
   const hud = createHud(elements);
   const match = createMatch({ mode: MODE_CPU, difficulty: settings.difficulty });
 
   let cameraMode = settings.camera;
+
+  // The editor drives the camera itself while it is open, and hands it back on
+  // exit. `cameraMode` is not written by the editor — it is overridden for the
+  // frames the editor owns — so leaving restores whatever view was in play.
+  const editorView = createEditorView({
+    elements,
+    editor: tableEditor,
+    scene,
+    audio,
+    inventory,
+    onExit: () => {
+      menu.showMain();
+      refresh();
+    },
+  });
 
   const spinDial = createSpinDial(elements.spin, {
     onChange: ({ spinX, spinY }) => {
@@ -134,6 +176,7 @@ export async function bootGame() {
     // Every callback below goes through `live`, never through the `match` built
     // above: `swapMatch` replaces it on a mode change, and a menu button still
     // holding the first one would resume a match nobody is playing.
+    onOpenTable: () => void editorView.show(),
     onResume: () => live.resume(),
     onRestart: () => live.rack(),
     onQuit: () => {
@@ -270,7 +313,9 @@ export async function bootGame() {
       const described = describeBall(hit.n, snapshot.groups[snapshot.shooter]);
       hud.ballTip({
         ...described,
-        color: ballColor(hit.n),
+        // The equipped set, so the readout names the colour the ball is
+        // actually painted with rather than the house one.
+        color: ballColor(hit.n, scene.ballSet),
         owner: described.mine === null ? "" : described.mine ? "Yours" : "Theirs",
         clientX: hit.clientX,
         clientY: hit.clientY,
@@ -343,6 +388,9 @@ export async function bootGame() {
     lastFrame = now;
 
     live.tick(dt);
+    // Drives the cosmetics store's retry backoff, so a save that failed on a
+    // dropped connection keeps trying without a timer of its own.
+    tableEditor.tick(dt);
 
     if (controls.isCharging()) {
       const percent = Math.round(controls.chargeLevel() * 100);
@@ -364,7 +412,7 @@ export async function bootGame() {
       paused: snapshot.paused,
       guideMode: settings.guide,
       placing: snapshot.ballInHand === ZONE_NONE || !snapshot.humanCanAct ? null : snapshot.ballInHand,
-      cameraMode,
+      cameraMode: editorView.isOpen ? "editor" : cameraMode,
       // Recomputed each frame rather than cached: the aim, the cue ball and the
       // balls in the way all move, and a stale guide line is a lie about where
       // the shot goes.

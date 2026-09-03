@@ -63,6 +63,7 @@ export const ELEMENT_IDS = Object.freeze({
   menuSettingsPanel: "menuSettingsPanel",
   menuOnlinePanel: "menuOnlinePanel",
   menuPlay: "menuPlay",
+  menuTable: "menuTable",
   menuHow: "menuHow",
   menuRules: "menuRules",
   menuSettings: "menuSettings",
@@ -89,6 +90,23 @@ export const ELEMENT_IDS = Object.freeze({
   onlineStatus: "onlineStatus",
   onlineStart: "onlineStart",
   onlineLeave: "onlineLeave",
+
+  // table editor
+  tableEditor: "tableEditor",
+  editorBack: "editorBack",
+  editorTableName: "editorTableName",
+  editorStatus: "editorStatus",
+  editorTables: "editorTables",
+  editorSaveAs: "editorSaveAs",
+  editorReset: "editorReset",
+  editorSave: "editorSave",
+  editorStage: "editorStage",
+  editorTabs: "editorTabs",
+  editorGrid: "editorGrid",
+  editorPrompt: "editorPrompt",
+  promptSave: "promptSave",
+  promptDiscard: "promptDiscard",
+  promptCancel: "promptCancel",
 
   // modals
   pauseLayer: "pauseLayer",

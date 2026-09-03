@@ -7,6 +7,7 @@
     <meta name="description" content="House 8-ball in a late-night hall. Vs CPU or local hotseat, with real spin, cushion English, and ball in hand." />
     <link rel="stylesheet" href="styles/table.css" />
     <link rel="stylesheet" href="styles/menu.css" />
+    <link rel="stylesheet" href="styles/editor.css" />
   </head>
   <body>
     <!--
@@ -135,6 +136,15 @@
           <div class="menu-stack">
             <button id="menuPlay" class="menu-btn primary-menu" type="button">
               <div><strong>Play</strong><span>CPU, local hotseat, or online</span></div>
+              <div class="menu-arrow">›</div>
+            </button>
+            <!--
+              MY TABLE is a first-class destination on the main menu, deliberately
+              not a row inside Settings. The table a player builds is theirs, and
+              a thing you own is not a preference.
+            -->
+            <button id="menuTable" class="menu-btn" type="button">
+              <div><strong>My Table</strong><span>Cloth, timber, hardware, balls, and the room</span></div>
               <div class="menu-arrow">›</div>
             </button>
             <button id="menuHow" class="menu-btn" type="button">
@@ -409,6 +419,48 @@
           </div>
           <div class="menu-foot"><button class="back-btn menu-back" type="button">Back</button></div>
         </section>
+      </div>
+    </div>
+
+    <!--
+      THE TABLE EDITOR IS ITS OWN LAYER, not a menu panel.
+      Every other screen in this cabinet is a card over a splash; this one has to
+      let the table dominate the screen, so it is a transparent shell over the
+      live canvas with a bar on top and a tray at the bottom. The middle region
+      is a drag surface: orbit with one pointer, zoom with the wheel or a pinch.
+    -->
+    <div id="tableEditor" class="screen-layer editor-layer">
+      <header class="editor-bar">
+        <button id="editorBack" class="back-btn" type="button">Back</button>
+        <div class="editor-heading">
+          <strong id="editorTableName">House Table</strong>
+          <span id="editorStatus">Every cosmetic unlocked for testing</span>
+        </div>
+        <div class="editor-actions">
+          <select id="editorTables" aria-label="Saved tables"></select>
+          <button id="editorSaveAs" type="button">Save as new</button>
+          <button id="editorReset" type="button">Reset</button>
+          <button id="editorSave" class="gold" type="button">Save table</button>
+        </div>
+      </header>
+
+      <div id="editorStage" class="editor-stage" aria-label="Drag to orbit, scroll to zoom"></div>
+
+      <section class="editor-tray">
+        <div id="editorTabs" class="tray-tabs" role="tablist"></div>
+        <div id="editorGrid" class="tray-grid"></div>
+      </section>
+
+      <div id="editorPrompt" class="editor-prompt">
+        <div class="prompt-card">
+          <h3>Unsaved changes</h3>
+          <p>This table has previews you have not saved yet.</p>
+          <div class="prompt-actions">
+            <button id="promptSave" class="gold" type="button">Save and leave</button>
+            <button id="promptDiscard" type="button">Discard changes</button>
+            <button id="promptCancel" type="button">Keep editing</button>
+          </div>
+        </div>
       </div>
     </div>
 

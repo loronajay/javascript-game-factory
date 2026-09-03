@@ -1,0 +1,422 @@
+/* The table editor.
+ *
+ * THE TABLE IS THE PAGE. This layer is transparent over the live canvas, with a
+ * bar pinned to the top, a tray pinned to the bottom, and the whole middle left
+ * empty on purpose — that empty middle is the drag surface, and it is where the
+ * table is. Every other screen in this cabinet is a card over a splash; this one
+ * would be useless as a card, because a 440px panel cannot show you the timber.
+ *
+ * DESKTOP AND MOBILE ARE TWO LAYOUTS, NOT ONE STACKED. The wide layout docks a
+ * shallow tray under a big table with the tabs along its top. The narrow one is
+ * a bottom sheet: taller chips, a tab rail that scrolls sideways, a compressed
+ * bar, and the Save button on the sheet where a thumb is — not at the top of a
+ * bar. Same markup, because the two show the same tray and forking it would
+ * fork the behaviour.
+ */
+
+.editor-layer {
+  z-index: 36;
+  display: none;
+  flex-direction: column;
+  padding: 0;
+  align-items: stretch;
+  justify-content: flex-start;
+  /* No background: the table behind IS the screen. */
+  background: none;
+  overflow: hidden;
+}
+.editor-layer.show {
+  display: flex;
+}
+
+/* --- the bar ------------------------------------------------------------ */
+
+.editor-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: max(12px, env(safe-area-inset-top)) 16px 12px max(64px, env(safe-area-inset-left));
+  background: linear-gradient(180deg, rgba(4, 6, 9, 0.94), rgba(4, 6, 9, 0.55) 74%, transparent);
+}
+
+.editor-heading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.editor-heading strong {
+  font-family: Georgia, serif;
+  font-size: 19px;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#editorStatus {
+  font-size: 11px;
+  color: var(--muted);
+}
+#editorStatus.warn {
+  color: #e6c07a;
+}
+
+.editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.editor-actions button,
+.editor-actions select {
+  font: inherit;
+  font-size: 12px;
+  padding: 9px 14px;
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(16, 21, 27, 0.9);
+  color: inherit;
+  cursor: pointer;
+}
+.editor-actions button:hover:not(:disabled) {
+  border-color: rgba(220, 190, 130, 0.5);
+}
+.editor-actions button.gold {
+  background: linear-gradient(160deg, #d9b06a, #a97b3a);
+  border-color: rgba(255, 226, 170, 0.5);
+  color: #170f05;
+  font-weight: 700;
+}
+.editor-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.editor-actions select[hidden] {
+  display: none;
+}
+
+/* --- the drag surface --------------------------------------------------- */
+/* Deliberately empty. It sits over the canvas and takes the orbit gestures, so
+ * the editor's drag can never be confused with the aiming drag bound to the
+ * canvas itself. `touch-action: none` is what makes a one-finger orbit possible
+ * at all on a phone — without it the browser scrolls the page instead. */
+
+.editor-stage {
+  flex: 1;
+  min-height: 0;
+  cursor: grab;
+  touch-action: none;
+}
+.editor-stage:active {
+  cursor: grabbing;
+}
+
+/* --- the tray ----------------------------------------------------------- */
+
+.editor-tray {
+  background: linear-gradient(180deg, rgba(6, 9, 13, 0.6), rgba(6, 9, 13, 0.96) 22%);
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  padding: 10px 14px max(12px, env(safe-area-inset-bottom));
+}
+
+.tray-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 8px;
+}
+.tray-tabs::-webkit-scrollbar {
+  height: 5px;
+}
+.tray-tabs::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 3px;
+}
+.tray-tab {
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  padding: 8px 13px;
+  min-height: 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(18, 23, 30, 0.8);
+  color: var(--muted);
+  cursor: pointer;
+}
+.tray-tab.active {
+  color: #1a1206;
+  background: linear-gradient(160deg, #e0bd7e, #b8894a);
+  border-color: rgba(255, 228, 176, 0.6);
+  font-weight: 700;
+}
+.tab-divider {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+  padding: 0 10px 0 6px;
+  white-space: nowrap;
+}
+
+.tray-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 118px;
+  gap: 9px;
+  overflow-x: auto;
+  padding: 4px 2px 6px;
+  scrollbar-width: thin;
+}
+.tray-grid::-webkit-scrollbar {
+  height: 6px;
+}
+.tray-grid::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 3px;
+}
+
+/* One chip: swatch, name, state. The state line is what makes the editor
+ * legible — Equipped is on your account, Previewing is only on screen. */
+.tray-chip {
+  display: grid;
+  gap: 5px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(16, 21, 27, 0.88);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tray-chip:hover:not(:disabled) {
+  border-color: rgba(220, 190, 130, 0.45);
+}
+.tray-chip.equipped {
+  border-color: rgba(150, 220, 170, 0.65);
+  background: rgba(20, 34, 26, 0.92);
+}
+.tray-chip.previewing {
+  border-color: rgba(230, 192, 122, 0.8);
+  background: rgba(38, 30, 16, 0.92);
+}
+.tray-chip.locked {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.chip-swatch {
+  display: block;
+  height: 46px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -8px 14px rgba(0, 0, 0, 0.35);
+}
+/* Rarity reads as a hairline on the swatch rather than as a badge: it is a
+ * detail about the item, not the reason to pick it. */
+.chip-swatch[data-rarity="rare"] {
+  outline: 1px solid rgba(110, 175, 235, 0.75);
+}
+.chip-swatch[data-rarity="epic"] {
+  outline: 1px solid rgba(186, 130, 240, 0.8);
+}
+.chip-swatch[data-rarity="legendary"] {
+  outline: 1px solid rgba(232, 190, 110, 0.9);
+}
+
+.chip-name {
+  font-size: 12px;
+  line-height: 1.25;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chip-state {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  min-height: 12px;
+}
+.tray-chip.equipped .chip-state {
+  color: #9fdcb2;
+}
+.tray-chip.previewing .chip-state {
+  color: #e6c07a;
+}
+
+/* --- the unsaved-changes question --------------------------------------- */
+
+.editor-prompt {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(3, 5, 8, 0.72);
+  backdrop-filter: blur(6px);
+  padding: 20px;
+}
+.editor-prompt.show {
+  display: flex;
+}
+.prompt-card {
+  width: min(420px, 100%);
+  background: linear-gradient(160deg, rgba(21, 28, 36, 0.98), rgba(10, 14, 19, 0.99));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 20px;
+}
+.prompt-card h3 {
+  margin: 0;
+  font-family: Georgia, serif;
+  font-size: 22px;
+}
+.prompt-card p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 6px 0 16px;
+}
+.prompt-actions {
+  display: grid;
+  gap: 8px;
+}
+.prompt-actions button {
+  font: inherit;
+  font-size: 13px;
+  padding: 12px;
+  min-height: 46px;
+  border-radius: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(16, 21, 27, 0.9);
+  color: inherit;
+  cursor: pointer;
+}
+.prompt-actions button.gold {
+  background: linear-gradient(160deg, #d9b06a, #a97b3a);
+  border-color: rgba(255, 226, 170, 0.5);
+  color: #170f05;
+  font-weight: 700;
+}
+
+/* --- the phone ---------------------------------------------------------- */
+/* A bottom sheet, not the desktop tray made shorter. Chips get taller and wider
+ * so a thumb hits one without aiming, the tabs scroll sideways as their own
+ * rail, and Save moves into the sheet — a save affordance at the top of a bar is
+ * a save affordance out of reach. */
+
+@media (max-width: 720px) {
+  .editor-bar {
+    padding: max(10px, env(safe-area-inset-top)) 12px 8px max(56px, env(safe-area-inset-left));
+    gap: 10px;
+  }
+  .editor-heading strong {
+    font-size: 15px;
+  }
+  .editor-actions {
+    gap: 6px;
+  }
+  /* Save and Reset live in the sheet on a phone; the bar keeps only what is
+   * occasional. `order` moves them without a second copy in the markup. */
+  #editorSave,
+  #editorReset {
+    position: fixed;
+    bottom: calc(max(12px, env(safe-area-inset-bottom)) + 214px);
+    z-index: 3;
+    min-height: 46px;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.55);
+  }
+  #editorSave {
+    right: 12px;
+  }
+  #editorReset {
+    right: 132px;
+  }
+  #editorSaveAs {
+    display: none;
+  }
+
+  .editor-tray {
+    border-radius: 18px 18px 0 0;
+    padding: 12px 12px max(14px, env(safe-area-inset-bottom));
+    box-shadow: 0 -18px 44px rgba(0, 0, 0, 0.6);
+  }
+  .tray-tab {
+    font-size: 13px;
+    padding: 10px 16px;
+    min-height: 44px;
+  }
+  .tray-grid {
+    grid-auto-columns: 132px;
+    gap: 10px;
+  }
+  .chip-swatch {
+    height: 58px;
+  }
+  .chip-name {
+    font-size: 13px;
+  }
+  .tray-chip {
+    padding: 10px;
+  }
+}
+
+/* Landscape phones have almost no vertical room, so the sheet gets shallower
+ * and the floating buttons come back into the bar rather than covering it. */
+@media (max-height: 460px) {
+  .chip-swatch {
+    height: 38px;
+  }
+  #editorSave,
+  #editorReset {
+    position: static;
+    box-shadow: none;
+  }
+}
+
+/* --- the cabinet gets out of the way ------------------------------------
+ * The editor is a layer over the SAME document the match is played in, so the
+ * playing chrome — the header, the two player plaques, the control deck, the
+ * spin dial — is still sitting there behind it. None of it means anything in
+ * the editor, and the arcade link lands exactly where the editor's own Back is.
+ * One class on <body> puts the whole cabinet away for the duration.
+ */
+
+body.editing .game-header,
+body.editing .score-hud,
+body.editing .control-deck,
+body.editing .table-actions,
+body.editing .back-link,
+body.editing #ballTip,
+body.editing #turnCard,
+body.editing .event-strip,
+body.editing #placementBanner {
+  display: none !important;
+}
+
+/* The canvas is laid out for PLAYING — a bordered stage inside a 1240px column,
+ * 69vh tall, with a HUD around it. In the editor the table is the screen, so the
+ * stage is promoted to fill the viewport for as long as the editor is open. The
+ * scene measures the canvas every frame, so it re-frames itself with no help. */
+
+body.editing #app {
+  max-width: none;
+  padding: 0;
+}
+body.editing .game-wrap {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+body.editing canvas#game {
+  height: 100vh;
+  height: 100dvh;
+}

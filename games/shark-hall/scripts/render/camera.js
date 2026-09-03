@@ -53,10 +53,36 @@ export function createCameraRig(THREE) {
   const desiredTarget = new THREE.Vector3();
 
   let hold = 0;
+  /**
+   * The editor's orbit.
+   *
+   * A THIRD SHOT, not a mode of the aiming one. The table editor is the only
+   * place the player drives the camera themselves, so the rig holds the yaw,
+   * pitch and distance it is given and composes from those instead of from the
+   * cue ball. It goes through the same lerp as every other shot, which is what
+   * makes entering and leaving the editor a move rather than a cut.
+   */
+  const orbit = { yaw: 0.72, pitch: 0.62, distance: 3.4 };
 
   return {
     camera,
     target,
+
+    /** Point the editor's orbit. Clamped here so no caller can put the camera under the floor. */
+    setOrbit({ yaw, pitch, distance } = {}) {
+      if (Number.isFinite(yaw)) orbit.yaw = yaw;
+      // The top of the range stops short of straight down on purpose: the
+      // pendant hangs between the camera and the cloth, and past about 66
+      // degrees the shades fill the frame. The overhead SHOT solves that by
+      // hiding the fixture; the editor cannot, because the fixture is one of
+      // the things being edited.
+      if (Number.isFinite(pitch)) orbit.pitch = Math.max(0.1, Math.min(1.15, pitch));
+      if (Number.isFinite(distance)) orbit.distance = Math.max(1.5, Math.min(6.5, distance));
+      return { ...orbit };
+    },
+
+    /** The orbit as it stands, so the editor can nudge it rather than track it twice. */
+    getOrbit: () => ({ ...orbit }),
 
     /** Begin the post-strike hold. */
     holdOnStrike() {
@@ -84,15 +110,26 @@ export function createCameraRig(THREE) {
      * @param width  canvas width, which chooses the composition
      */
     update(dt, { mode, cue, balls, angle, moving, width }) {
-      if (!cue) return;
+      // The editor shot is the one that does not need a cue ball: it frames the
+      // table itself, and the editor can be open over an empty table.
+      if (!cue && mode !== "editor") return;
       hold = Math.max(0, hold - dt);
 
       const narrow = width < NARROW_WIDTH;
-      const dx = Math.cos(angle);
-      const dz = Math.sin(angle);
+      const dx = Math.cos(angle || 0);
+      const dz = Math.sin(angle || 0);
       const chasing = moving && hold <= 0;
 
-      if (mode === "over") {
+      if (mode === "editor") {
+        // The table, from wherever the player has dragged to. The look-at is the
+        // table centre rather than the cue ball: in the editor the table is the
+        // subject, and there may not be a rack on it at all.
+        camera.up.set(0, 1, 0);
+        camera.fov = narrow ? 52 : 44;
+        const flat = Math.cos(orbit.pitch) * orbit.distance;
+        desiredPosition.set(Math.cos(orbit.yaw) * flat, 0.35 + Math.sin(orbit.pitch) * orbit.distance, Math.sin(orbit.yaw) * flat);
+        desiredTarget.set(0, 0.18, 0);
+      } else if (mode === "over") {
         // Straight down, and TWO things have to be right or the top view is
         // useless: which way is up, and how high.
         //

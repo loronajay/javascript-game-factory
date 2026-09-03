@@ -9,6 +9,7 @@
 // a new menu button cannot forget to make a sound.
 
 import {
+  LAYER_EDITOR,
   LAYER_MENU,
   LAYER_PAUSE,
   LAYER_RESULT,
@@ -28,7 +29,7 @@ import { DIFFICULTIES } from "../sim/cpu.js";
 import { MODE_CPU } from "../match/match.js";
 import { MODE_ONLINE } from "../multiplayer/online-match.js";
 
-export function createMenu({ elements, audio, settings, onStart, onResume, onRestart, onQuit, onSettingsChange }) {
+export function createMenu({ elements, audio, settings, onStart, onResume, onRestart, onQuit, onSettingsChange, onOpenTable }) {
   let layer = LAYER_MENU;
   let panel = PANEL_MAIN;
   /** Which layer the front door was opened from. Drives contextual back. */
@@ -71,6 +72,12 @@ export function createMenu({ elements, audio, settings, onStart, onResume, onRes
 
   // --- front door ---------------------------------------------------------
   click(elements.menuPlay, () => go(LAYER_MENU, PANEL_PLAY));
+  // MY TABLE leaves the front door entirely rather than opening a panel on it:
+  // the editor's subject is the 3D table, and the splash is in front of it.
+  click(elements.menuTable, () => {
+    go(LAYER_EDITOR, PANEL_MAIN);
+    onOpenTable?.();
+  });
   click(elements.menuHow, () => go(LAYER_MENU, PANEL_HOW));
   click(elements.menuRules, () => go(LAYER_MENU, PANEL_RULES));
   click(elements.menuSettings, () => go(LAYER_MENU, PANEL_SETTINGS));

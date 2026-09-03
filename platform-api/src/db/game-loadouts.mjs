@@ -17,10 +17,12 @@
 // server-backed cosmetics registers its own catalog and reuses this table.
 import { SPEED_DEMON_GAME_SLUG, loadoutFromGarage, normalizeGarage, } from "../services/speed-demon-catalog.mjs";
 import { YAM_BOWLING_GAME_SLUG, YAM_BOWLING_LOADOUT_CATALOG, } from "../services/yam-bowling-loadout-catalog.mjs";
+import { SHARK_HALL_GAME_SLUG, SHARK_HALL_LOADOUT_CATALOG, } from "../services/shark-hall-loadout-catalog.mjs";
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
 const CATALOGS = {
     [SPEED_DEMON_GAME_SLUG]: { normalizeGarage, loadoutFromGarage },
     [YAM_BOWLING_GAME_SLUG]: YAM_BOWLING_LOADOUT_CATALOG,
+    [SHARK_HALL_GAME_SLUG]: SHARK_HALL_LOADOUT_CATALOG,
 };
 function cleanText(value, maxLength = 120) {
     return typeof value === "string" ? value.trim().slice(0, maxLength) : "";

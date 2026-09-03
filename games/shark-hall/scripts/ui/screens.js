@@ -17,8 +17,17 @@ export const LAYER_PAUSE = "pause";
 export const LAYER_RESULT = "result";
 /** Nothing up: the table is live. */
 export const LAYER_TABLE = "table";
+/**
+ * The table editor.
+ *
+ * A LAYER RATHER THAN A MENU PANEL, because it is the one screen whose subject
+ * is the 3D table itself: a 440px card over a splash cannot show you the timber
+ * you just picked. It owns its own Back, because leaving it with unsaved
+ * previews is a question rather than a navigation.
+ */
+export const LAYER_EDITOR = "editor";
 
-export const LAYERS = Object.freeze([LAYER_MENU, LAYER_PAUSE, LAYER_RESULT, LAYER_TABLE]);
+export const LAYERS = Object.freeze([LAYER_MENU, LAYER_PAUSE, LAYER_RESULT, LAYER_TABLE, LAYER_EDITOR]);
 
 export const PANEL_MAIN = "main";
 export const PANEL_PLAY = "play";
@@ -70,6 +79,10 @@ export function backTarget(cameFrom = LAYER_MENU) {
 export function escapeTarget(layer, { started, paused }) {
   const current = normalizeLayer(layer);
   if (current === LAYER_RESULT) return null;
+  // The editor answers Escape itself: with unsaved previews the press has to
+  // raise the save/discard question, and only the editor knows whether there
+  // are any. Routing it through here would leave by the back door.
+  if (current === LAYER_EDITOR) return null;
   if (current === LAYER_MENU) return started && paused ? LAYER_PAUSE : null;
   if (current === LAYER_PAUSE) return LAYER_TABLE;
   return started ? LAYER_PAUSE : null;

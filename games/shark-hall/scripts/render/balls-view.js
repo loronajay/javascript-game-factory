@@ -12,6 +12,7 @@
 // also why the sim carries wx/wy/wz at all rather than just speed.
 
 import { BALL_RADIUS } from "../sim/constants.js";
+import { CLASSIC } from "../cosmetics/ball-sets.js";
 import { ballTexture } from "./textures.js";
 import { BALL_Y } from "./table-view.js";
 
@@ -24,7 +25,7 @@ import { BALL_Y } from "./table-view.js";
  */
 export const BALLS_GROUP_Y = 0.15;
 
-export function createBallsView(THREE, scene, { anisotropy = 1 } = {}) {
+export function createBallsView(THREE, scene, { anisotropy = 1, set = CLASSIC } = {}) {
   const group = new THREE.Group();
   group.position.y = BALLS_GROUP_Y;
   scene.add(group);
@@ -36,13 +37,24 @@ export function createBallsView(THREE, scene, { anisotropy = 1 } = {}) {
   const meshes = new Map();
   const axis = new THREE.Vector3();
 
+  /**
+   * The equipped ball set.
+   *
+   * A BALL SET IS A SKIN AND NOTHING ELSE. It changes the map on sixteen
+   * materials; it does not touch the geometry (one shared sphere at
+   * `BALL_RADIUS`), the sim's ball objects, or anything a shot is computed
+   * from. That is why `setBallSet` can be called mid-preview with a rack on the
+   * table and nothing about the rack changes but its paint.
+   */
+  let ballSet = set;
+
   function meshFor(n) {
     let mesh = meshes.get(n);
     if (mesh) return mesh;
     mesh = new THREE.Mesh(
       geometry,
       new THREE.MeshPhysicalMaterial({
-        map: ballTexture(THREE, n, anisotropy),
+        map: ballTexture(THREE, n, ballSet, anisotropy),
         roughness: 0.12,
         metalness: 0,
         clearcoat: 1,
@@ -58,6 +70,28 @@ export function createBallsView(THREE, scene, { anisotropy = 1 } = {}) {
 
   return {
     group,
+
+    /**
+     * Repaint the sixteen balls.
+     *
+     * The meshes, the geometry and every position stay exactly as they are —
+     * only the sixteen maps are replaced, and the old ones disposed. Called on
+     * every ball-set preview, including with balls in motion.
+     */
+    setBallSet(next) {
+      if (!next || next === ballSet) return;
+      ballSet = next;
+      for (const [n, mesh] of meshes) {
+        mesh.material.map?.dispose();
+        mesh.material.map = ballTexture(THREE, n, ballSet, anisotropy);
+        mesh.material.needsUpdate = true;
+      }
+    },
+
+    /** The set currently painted on, so the hover readout can name the right colour. */
+    get ballSet() {
+      return ballSet;
+    },
 
     /**
      * Build the meshes for a rack.
