@@ -17,6 +17,7 @@ import { aimSolution, angleToDegrees, ballAt, firstContact, railDistance, segmen
 import {
   ZONE_ANYWHERE,
   ZONE_KITCHEN,
+  BALL_GAP,
   clampCuePosition,
   findLegalCuePosition,
   isLegalCuePosition,
@@ -135,7 +136,7 @@ test("a drag into another ball slides around it rather than stopping", () => {
   // end up touching it on the near side, not frozen where it first met it.
   const spot = clampCuePosition(balls, -0.004, 0.006, ZONE_ANYWHERE);
   const gap = Math.hypot(spot.x, spot.z);
-  assert(gap >= 2.08 * BALL_RADIUS, `it ended up inside the 5 (gap ${gap})`);
+  assert(gap >= BALL_GAP - 1e-9, `it ended up inside the 5 (gap ${gap})`);
   assert(isLegalCuePosition(balls, spot.x, spot.z, ZONE_ANYWHERE), "and it ended up somewhere legal");
 });
 
