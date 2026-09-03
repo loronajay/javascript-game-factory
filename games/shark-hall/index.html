@@ -125,7 +125,7 @@
           <div class="lead">Choose how you want to play. Match settings are locked once the rack begins.</div>
           <div class="menu-stack">
             <button id="menuPlay" class="menu-btn primary-menu" type="button">
-              <div><strong>Play</strong><span>CPU or local hotseat</span></div>
+              <div><strong>Play</strong><span>CPU, local hotseat, or online</span></div>
               <div class="menu-arrow">›</div>
             </button>
             <button id="menuHow" class="menu-btn" type="button">
@@ -145,7 +145,7 @@
 
         <section id="menuPlayPanel" class="menu-panel">
           <h2>Choose match.</h2>
-          <div class="lead">The same rules and physics are used in both modes.</div>
+          <div class="lead">The same rules and physics in every mode. Online is scored on the Factory Network server.</div>
           <div class="mode-grid">
             <div class="mode-card selected" role="button" tabindex="0" data-mode="cpu">
               <div class="mode-icon">CPU</div>
@@ -156,6 +156,17 @@
               <div class="mode-icon">2P</div>
               <strong>Hotseat</strong>
               <small>Two players share the same device and table.</small>
+            </div>
+            <!--
+              Online is a mode card like the other two, but it does not open a
+              table: it opens the lobby panel below. Every shot in it is played
+              on the Factory Network server, so it needs a signed-in account and
+              an opponent before there is anything to rack.
+            -->
+            <div class="mode-card" role="button" tabindex="0" data-mode="online">
+              <div class="mode-icon">NET</div>
+              <strong>Online</strong>
+              <small>Play a stranger or a friend. Server-scored, ranked-ready.</small>
             </div>
           </div>
           <div id="difficultyWrap" class="diff-wrap">
@@ -305,6 +316,61 @@
           </div>
 
           <div class="menu-foot"><button class="back-btn menu-back" type="button">Back</button></div>
+        </section>
+
+        <!--
+          THE LOBBY. Matchmaking, a private room code, and the two seats. The
+          race length is the only setting here on purpose: the generic lobby
+          pairs players by comparing settings field for field, so every value
+          added to this panel halves the pool of opponents.
+        -->
+        <section id="menuOnlinePanel" class="menu-panel online-panel">
+          <h2>Find a table.</h2>
+          <div class="lead">
+            Every shot is played on the Factory Network server, so the table both of you watch is the same table.
+          </div>
+
+          <div class="online-account">
+            <span class="online-account-label">Signed in as</span>
+            <strong id="onlineAccountName">Factory player</strong>
+          </div>
+
+          <div id="onlinePairing" class="online-pairing">
+            <div class="setting-row">
+              <label for="onlineRace">Match length<span id="onlineRaceNote">First to three racks. The break alternates.</span></label>
+              <select id="onlineRace">
+                <option value="1">Single rack</option>
+                <option value="3" selected>Race to 3</option>
+                <option value="5">Race to 5</option>
+              </select>
+            </div>
+            <div class="online-actions">
+              <button id="onlineQuick" class="start-btn" type="button">Quick search</button>
+              <button id="onlineCreate" type="button">Open a private room</button>
+            </div>
+            <div class="online-join">
+              <input id="onlineRoomInput" type="text" maxlength="8" placeholder="ROOM CODE" aria-label="Private room code" />
+              <button id="onlineJoin" type="button">Join</button>
+            </div>
+          </div>
+
+          <div id="onlineLobbyPanel" class="online-lobby" hidden>
+            <div class="online-code">
+              <span>Room code</span>
+              <strong id="onlineRoomCode">-----</strong>
+            </div>
+            <div id="onlinePlayers" class="online-players"></div>
+            <div class="online-lobby-actions">
+              <button id="onlineStart" class="start-btn" type="button">Break it</button>
+              <button id="onlineLeave" type="button">Leave table</button>
+            </div>
+          </div>
+
+          <div id="onlineStatus" class="online-status" role="status" aria-live="polite">
+            Choose Quick search, or open a private room and share the code.
+          </div>
+
+          <div class="menu-foot"><button id="onlineBack" class="back-btn" type="button">Back</button></div>
         </section>
 
         <section id="menuSettingsPanel" class="menu-panel">

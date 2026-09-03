@@ -16,7 +16,7 @@
 // accumulator, so the break resolves identically at 60hz and at 144hz.
 
 import { SETTLE_MS, SIM_STEP, REST_SPEED } from "./constants.js";
-import { CUE, cueBall, rackBalls, speedOf, stillBall } from "./balls.js";
+import { CUE, cloneBalls, cueBall, rackBalls, speedOf, stillBall } from "./balls.js";
 import { applyClothFriction, collideAll, collideRails } from "./physics.js";
 import { captureHangingBalls, findPocket, pocketBall } from "./pockets.js";
 import { strikeCue } from "./shot.js";
@@ -93,6 +93,26 @@ export function createWorld() {
     /** A fresh rack. Everything about the shot in progress is discarded. */
     rack() {
       balls = rackBalls();
+      moving = false;
+      accumulator = 0;
+      stillFor = 0;
+      report = emptyReport();
+      events = [];
+      return balls;
+    },
+
+    /**
+     * Adopt a table from outside.
+     *
+     * The counterpart of `rack`, and the reason this world can be driven by
+     * something other than itself: an authoritative table arrives as fifteen
+     * plain objects and is taken up whole, with the shot in progress discarded.
+     * The copy is deliberate — the caller keeps its own array and neither side
+     * can write through the other. Every online shot on this cabinet starts
+     * here, on both the server that scores it and the client that draws it.
+     */
+    load(next) {
+      balls = cloneBalls(next);
       moving = false;
       accumulator = 0;
       stillFor = 0;

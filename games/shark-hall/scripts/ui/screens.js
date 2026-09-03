@@ -26,9 +26,13 @@ export const PANEL_HOW = "how";
 /** The rules in print. Reachable from the front door AND from a paused rack,
  *  because the moment you need it is mid-argument, not before the break. */
 export const PANEL_RULES = "rules";
+/** Matchmaking and the lobby, opened from the Play panel when Online is chosen.
+ *  It is a menu panel rather than a screen of its own because the soundtrack
+ *  lives in this document and a second page would kill it. */
+export const PANEL_ONLINE = "online";
 export const PANEL_SETTINGS = "settings";
 
-export const PANELS = Object.freeze([PANEL_MAIN, PANEL_PLAY, PANEL_HOW, PANEL_RULES, PANEL_SETTINGS]);
+export const PANELS = Object.freeze([PANEL_MAIN, PANEL_PLAY, PANEL_HOW, PANEL_RULES, PANEL_ONLINE, PANEL_SETTINGS]);
 
 export const isLayer = (value) => LAYERS.includes(value);
 export const isPanel = (value) => PANELS.includes(value);

@@ -15,6 +15,7 @@ import {
   LAYER_TABLE,
   PANEL_HOW,
   PANEL_MAIN,
+  PANEL_ONLINE,
   PANEL_PLAY,
   PANEL_RULES,
   PANEL_SETTINGS,
@@ -25,6 +26,7 @@ import {
 import { SELECTORS } from "./elements.js";
 import { DIFFICULTIES } from "../sim/cpu.js";
 import { MODE_CPU } from "../match/match.js";
+import { MODE_ONLINE } from "../multiplayer/online-match.js";
 
 export function createMenu({ elements, audio, settings, onStart, onResume, onRestart, onQuit, onSettingsChange }) {
   let layer = LAYER_MENU;
@@ -43,6 +45,7 @@ export function createMenu({ elements, audio, settings, onStart, onResume, onRes
     [PANEL_HOW]: elements.menuHowPanel,
     [PANEL_RULES]: elements.menuRulesPanel,
     [PANEL_SETTINGS]: elements.menuSettingsPanel,
+    [PANEL_ONLINE]: elements.menuOnlinePanel,
   };
 
   function paint() {
@@ -120,8 +123,12 @@ export function createMenu({ elements, audio, settings, onStart, onResume, onRes
   });
 
   // --- actions ------------------------------------------------------------
+  // Online does not open a table: there is nothing to rack until somebody else
+  // is sitting at it, so the same button opens the lobby panel instead. Every
+  // other mode starts a rack the moment it is pressed, as before.
   click(elements.startMatch, () => {
-    go(LAYER_TABLE, PANEL_MAIN);
+    if (selectedMode === MODE_ONLINE) go(LAYER_MENU, PANEL_ONLINE);
+    else go(LAYER_TABLE, PANEL_MAIN);
     onStart?.(selectedMode);
   });
   click(elements.resumeBtn, () => {
@@ -186,6 +193,10 @@ export function createMenu({ elements, audio, settings, onStart, onResume, onRes
     syncMatch(snapshot) {
       started = snapshot.started;
       paused = snapshot.paused;
+      // There is no restarting a rack somebody else is standing at. The button
+      // is put away online rather than disabled, because it is not a thing that
+      // is temporarily unavailable — it is a thing that does not exist there.
+      elements.newRack?.toggleAttribute("hidden", snapshot.mode === MODE_ONLINE);
     },
 
     /** Called by the match when someone wins. */
@@ -202,6 +213,20 @@ export function createMenu({ elements, audio, settings, onStart, onResume, onRes
     showTable() {
       go(LAYER_TABLE, PANEL_MAIN);
     },
+
+    /** The front door's first panel. */
+    showMain() {
+      cameFrom = LAYER_MENU;
+      go(LAYER_MENU, PANEL_MAIN);
+    },
+
+    /** Back to the lobby panel — after leaving a match, or when a search fails. */
+    showOnline() {
+      go(LAYER_MENU, PANEL_ONLINE);
+    },
+
+    /** Whether the lobby panel is the one on screen, so it is only redrawn then. */
+    isOnlinePanel: () => layer === LAYER_MENU && panel === PANEL_ONLINE,
 
     /** Wire the pause button's own path through the same layer logic. */
     onPause(handler) {

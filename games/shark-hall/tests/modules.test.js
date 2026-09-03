@@ -111,6 +111,53 @@ test("the render layer never reads the match or the rules", () => {
   }
 });
 
+test("the multiplayer layer draws nothing and decides nothing", () => {
+  // Online is a source of state, not a second renderer and not a second rule
+  // book. The rules live on the server for an online match; a copy of them
+  // reachable from here would be a second opinion, which is the one thing a
+  // server-authoritative mode cannot have.
+  for (const file of FILES.filter((f) => inLayer(f, "multiplayer"))) {
+    const source = code(file);
+    assert(!/THREE/.test(source), `${file} references THREE`);
+    for (const specifier of importsOf(source)) {
+      assert(!specifier.includes("/render/"), `${file} imports the render layer`);
+      assert(!specifier.includes("rules.js"), `${file} imports the rules — the server owns them online`);
+    }
+  }
+});
+
+test("only the account gate reaches outside the cabinet", () => {
+  // Shark Hall is otherwise self-contained. The one import of the shared
+  // platform layer is the sign-in gate, and it is the reason this cabinet is
+  // served from the repo root rather than from its own folder. If a second file
+  // grows one, that fact is no longer findable in one place.
+  const reaching = FILES.filter((file) =>
+    importsOf(code(file)).some((specifier) => specifier.includes("/js/platform/")));
+  assertEqual(
+    reaching.join(","),
+    "scripts/multiplayer/account-access.js",
+    "exactly one file may import the shared platform layer",
+  );
+});
+
+test("the mirrored simulation on the network server is current", async () => {
+  // The failure mode of a mirror is silent drift: the physics are retuned here,
+  // the server keeps scoring on the old ones, and every suite stays green while
+  // it adjudicates racks on a table that no longer exists. The manifest is
+  // written by `tools/mirror-sim.mjs` and committed in both repos.
+  const { buildManifest } = await import("../tools/mirror-sim.mjs");
+  const recorded = JSON.parse(read("tools/sim-mirror-manifest.json"));
+  const current = buildManifest();
+  const names = new Set([...Object.keys(recorded.files), ...Object.keys(current.files)]);
+  for (const name of names) {
+    assertEqual(
+      current.files[name],
+      recorded.files[name],
+      `sim/${name} changed without re-mirroring — run \`node tools/mirror-sim.mjs\``,
+    );
+  }
+});
+
 test("only the audio adapters touch Web Audio or an <audio> element", () => {
   const adapters = new Set([
     "scripts/audio/audio-engine.js",

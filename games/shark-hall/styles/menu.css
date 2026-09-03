@@ -410,6 +410,155 @@
   padding: 11px 12px;
 }
 
+/* --- the lobby -----------------------------------------------------------
+ *
+ * Two seats, drawn as two cards side by side whether or not anyone is in them,
+ * so the shape of the panel does not change the moment an opponent arrives —
+ * the empty one simply fills in. The status line under them is the single place
+ * anything is ever said about the connection, which is why every state the view
+ * can be in resolves to one sentence there rather than to a scattering of
+ * badges. */
+
+.online-account {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 9px 11px;
+  margin-bottom: 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.online-account-label {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.online-account strong {
+  font-size: 12px;
+  color: var(--brass2);
+}
+
+.online-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 11px;
+}
+.online-actions button:not(.start-btn),
+.online-lobby-actions button:not(.start-btn),
+.online-join button {
+  min-height: 46px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--cream);
+  border-radius: 10px;
+  padding: 0 14px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.online-join {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.online-join input {
+  flex: 1;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--cream);
+  border-radius: 10px;
+  padding: 0 12px;
+  /* A room code is read aloud and typed back in, so it is set wide and monospaced
+   * rather than in the body face where 0 and O are the same shape. */
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+.online-join input::placeholder {
+  color: #55606b;
+  letter-spacing: 0.16em;
+}
+
+.online-code {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid rgba(199, 154, 79, 0.32);
+  border-radius: 10px;
+  background: rgba(199, 154, 79, 0.06);
+}
+.online-code span {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.online-code strong {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 0.24em;
+  color: var(--brass);
+}
+
+.online-players {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 9px;
+}
+.online-player {
+  display: grid;
+  gap: 3px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.online-player strong {
+  font-size: 12px;
+  color: var(--cream);
+}
+.online-player span {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.online-player.you {
+  border-color: rgba(199, 154, 79, 0.5);
+}
+.online-player.empty {
+  border-style: dashed;
+}
+.online-player.empty strong {
+  color: var(--muted);
+}
+
+.online-lobby-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.online-lobby-actions .start-btn[disabled] {
+  opacity: 0.45;
+}
+
+.online-status {
+  margin-top: 11px;
+  padding: 9px 11px;
+  border-left: 2px solid rgba(199, 154, 79, 0.5);
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
 /* --- modals -------------------------------------------------------------- */
 
 .modal-card {

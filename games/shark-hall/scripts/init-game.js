@@ -17,6 +17,10 @@
 
 import { createGameAudio } from "./audio/game-audio.js";
 import { MODE_CPU, createMatch } from "./match/match.js";
+import { createAccountAccess } from "./multiplayer/account-access.js";
+import { createOnlineClient } from "./multiplayer/online-client.js";
+import { MODE_ONLINE, createOnlineMatch } from "./multiplayer/online-match.js";
+import { PROTOCOL_VERSION } from "./multiplayer/match-config.js";
 import { createTableScene } from "./render/scene.js";
 import { ballColor } from "./render/textures.js";
 import { aimSolution } from "./sim/aim.js";
@@ -27,6 +31,7 @@ import { createControls } from "./ui/controls.js";
 import { findElements } from "./ui/elements.js";
 import { createHud } from "./ui/hud.js";
 import { createMenu } from "./ui/menu.js";
+import { createOnlineView } from "./ui/online-view.js";
 import { createSpinDial } from "./ui/spin-dial.js";
 
 /** Pinned. One import, one version, one place to change it. */
@@ -68,11 +73,58 @@ export async function bootGame() {
     },
   });
 
+  // --- online -------------------------------------------------------------
+  // The lobby is built before the menu because the menu's Start button routes
+  // into it. Nothing here connects a socket: `createOnlineClient` is inert
+  // until the player asks for a match, so the offline cabinet never opens one.
+  const account = createAccountAccess();
+  const onlineClient = createOnlineClient({
+    resolveIdentity: () => account.identity(),
+    protocolVersion: PROTOCOL_VERSION,
+  });
+
+  const onlineView = createOnlineView(elements, {
+    onConfig: (config) => onlineClient.updateConfig(config),
+    onQuick: (config) => account.requireAccount() && onlineClient.findQuickMatch(config),
+    onCreate: (config) => account.requireAccount() && onlineClient.createPrivateRoom(config),
+    onJoin: (code) => account.requireAccount() && code && onlineClient.joinPrivateRoom(code),
+    onStart: () => onlineClient.startMatch(),
+    onLeave: () => {
+      onlineClient.leave();
+      paintOnline();
+    },
+    onBack: () => {
+      // Backing out of the lobby is leaving it. A seat held by somebody who has
+      // walked back to the front door is a seat nobody can use.
+      onlineClient.leave();
+      menu.showMain();
+      paintOnline();
+    },
+  });
+
+  function paintOnline() {
+    onlineView.render({
+      snapshot: onlineClient.getSnapshot(),
+      identity: account.identity(),
+      signedIn: account.isEligible(),
+    });
+  }
+
   const menu = createMenu({
     elements,
     audio,
     settings,
     onStart(mode) {
+      if (mode === MODE_ONLINE) {
+        // Opening the lobby, not a rack. The sign-in gate is deliberately NOT
+        // applied here: sending a signed-out player straight off the page for
+        // pressing "Online" is a redirect they did not ask for. The panel opens,
+        // says what it needs, and the three buttons that actually need an
+        // account ask for one.
+        if (account.isEligible()) onlineClient.connect();
+        paintOnline();
+        return;
+      }
       // The match is rebuilt rather than reconfigured, because mode is not a
       // setting a live match can absorb — a hotseat rack halfway through cannot
       // grow a CPU. One line here beats a mode-change path through every module.
@@ -121,7 +173,9 @@ export async function bootGame() {
         audio.silence();
         menu.showResult({
           title: `${name} wins`,
-          sub: `${live.mode === MODE_CPU ? "Vs CPU" : "Hotseat"} · 8-ball rack complete.`,
+          sub: live.mode === MODE_ONLINE
+            ? `${live.snapshot().raceTo > 1 ? `Race to ${live.snapshot().raceTo}` : "Single rack"} · online match complete.`
+            : `${live.mode === MODE_CPU ? "Vs CPU" : "Hotseat"} · 8-ball rack complete.`,
         });
       }),
       target.on("change", () => refresh()),
@@ -137,6 +191,33 @@ export async function bootGame() {
     menu.showTable();
     refresh();
   }
+
+  /**
+   * Hand the table over to an online match.
+   *
+   * The same swap `swapMatch` does, with one difference that matters: the match
+   * being replaced is only told to quit if it is a LOCAL one. An online match's
+   * quit leaves the lobby, and the lobby is the thing that just started.
+   */
+  function swapToOnline() {
+    if (live.mode !== MODE_ONLINE) live.quit();
+    live = createOnlineMatch({ client: onlineClient });
+    subscribe(live);
+    scene.reset(live.world.balls);
+    live.start();
+    menu.showTable();
+    audio.unlock();
+    refresh();
+  }
+
+  onlineClient.subscribe((snapshot) => {
+    if (menu.isOnlinePanel()) paintOnline();
+    // The server has seated both players and racked. Everything below this line
+    // is the ordinary cabinet: one live match, drawn by the same renderer.
+    if (snapshot.status === "started" && snapshot.matchState && !(live.mode === MODE_ONLINE && live.started)) {
+      swapToOnline();
+    }
+  });
 
   subscribe(live);
   scene.reset(live.world.balls);
@@ -226,6 +307,12 @@ export async function bootGame() {
   // --- painting -----------------------------------------------------------
   function refresh() {
     const snapshot = live.snapshot();
+    // An accepted online rematch arrives as an ordinary fresh rack, with no
+    // event of its own. The result modal is over a table that is now live, so
+    // it is the modal's job to notice and get out of the way.
+    if (snapshot.mode === MODE_ONLINE && snapshot.started && snapshot.winner === null && menu.layer === "result") {
+      menu.showTable();
+    }
     hud.render(snapshot);
     hud.shootLabel(shootLabel(snapshot));
     spinDial.draw(snapshot.spinX, snapshot.spinY);

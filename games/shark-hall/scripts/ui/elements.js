@@ -61,6 +61,7 @@ export const ELEMENT_IDS = Object.freeze({
   menuHowPanel: "menuHowPanel",
   menuRulesPanel: "menuRulesPanel",
   menuSettingsPanel: "menuSettingsPanel",
+  menuOnlinePanel: "menuOnlinePanel",
   menuPlay: "menuPlay",
   menuHow: "menuHow",
   menuRules: "menuRules",
@@ -71,6 +72,23 @@ export const ELEMENT_IDS = Object.freeze({
   cameraSetting: "cameraSetting",
   musicSetting: "musicSetting",
   nowPlaying: "nowPlaying",
+
+  // online lobby
+  onlineAccountName: "onlineAccountName",
+  onlineRace: "onlineRace",
+  onlineRaceNote: "onlineRaceNote",
+  onlinePairing: "onlinePairing",
+  onlineQuick: "onlineQuick",
+  onlineCreate: "onlineCreate",
+  onlineRoomInput: "onlineRoomInput",
+  onlineJoin: "onlineJoin",
+  onlineBack: "onlineBack",
+  onlineLobbyPanel: "onlineLobbyPanel",
+  onlineRoomCode: "onlineRoomCode",
+  onlinePlayers: "onlinePlayers",
+  onlineStatus: "onlineStatus",
+  onlineStart: "onlineStart",
+  onlineLeave: "onlineLeave",
 
   // modals
   pauseLayer: "pauseLayer",

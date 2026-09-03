@@ -30,9 +30,12 @@ export function createHud(elements) {
       const placing = snapshot.ballInHand !== ZONE_NONE && snapshot.humanCanAct;
 
       // --- plaques -------------------------------------------------------
-      setText(elements.p1Label, `PLAYER 1 · ${groupLabel(p1.group)}`);
+      // Both plaques read their seat's own name. Offline that is "Player 1" and
+      // "CPU" exactly as before; online it is who is actually at the table, which
+      // is the entire reason the seat carries a name at all.
+      setText(elements.p1Label, `${p1.name.toUpperCase()} · ${groupLabel(p1.group)}`);
       setText(elements.p2Label, `${p2.name.toUpperCase()} · ${groupLabel(p2.group)}`);
-      setText(elements.p2Kicker, p2.isCpu ? "CPU opponent" : "Player two");
+      setText(elements.p2Kicker, p2.isCpu ? "CPU opponent" : p2.you === false && p1.you ? "Opponent" : "Player two");
       setText(elements.p1Count, seatCount(p1));
       setText(elements.p2Count, seatCount(p2));
       elements.p1Plaque?.classList.toggle("active", snapshot.started && !snapshot.winner && p1.active);
@@ -161,6 +164,9 @@ export function createHud(elements) {
 }
 
 function seatCount(seat) {
+  // A seat whose player has dropped says so first. Everything else about the
+  // rack is still true, but it is not the thing the other player needs to read.
+  if (seat.connected === false) return "Reconnecting…";
   if (!seat.group) return "Table open";
   if (seat.onTheEight) return "On the 8";
   return `${seat.remaining} remaining`;
@@ -173,6 +179,13 @@ function subline(snapshot, placing) {
     return snapshot.ballInHand === ZONE_KITCHEN
       ? "Place behind the head string · release to confirm"
       : "Ball in hand · release to confirm placement";
+  }
+  // A race is the one piece of state the plaques have no room for, and it is
+  // the one a player checks between racks. Absent offline, where every match is
+  // a single rack and `raceTo` is never set.
+  if (snapshot.raceTo > 1 && !snapshot.winnerName) {
+    const [p1, p2] = snapshot.seats;
+    return `Rack ${snapshot.rackNumber} · race to ${snapshot.raceTo} · ${p1.wins}-${p2.wins}`;
   }
   if (snapshot.isBreak && !snapshot.moving) return "Break shot";
   return "Tap or drag on the cloth to aim";

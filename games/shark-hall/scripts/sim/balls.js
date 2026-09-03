@@ -95,6 +95,18 @@ export function rackBalls() {
   return balls;
 }
 
+/**
+ * A detached copy of a table.
+ *
+ * Nine numbers and a flag is the whole of a ball, so a table copies with a
+ * spread and nothing is shared afterwards. This is what lets an authoritative
+ * table be handed across a wire and adopted without the sender and the receiver
+ * ending up holding the same array.
+ */
+export function cloneBalls(balls) {
+  return balls.map((ball) => ({ ...ball }));
+}
+
 /** Speed of a ball along the cloth. Vertical spin is not motion. */
 export function speedOf(ball) {
   return Math.hypot(ball.vx, ball.vz);
