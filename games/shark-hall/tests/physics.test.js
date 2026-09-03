@@ -5,7 +5,7 @@
 // one of them has broken the game rather than the numbers.
 
 import { assert, assertClose, assertEqual, finish, suite, test } from "./harness.js";
-import { BALL_RADIUS, HALF_LENGTH, HALF_WIDTH, SIM_STEP } from "../scripts/sim/constants.js";
+import { BALL_RADIUS, CORNER_GAP, HALF_LENGTH, HALF_WIDTH, JAW_RADIUS, SIDE_GAP, SIM_STEP } from "../scripts/sim/constants.js";
 import { createBall, speedOf } from "../scripts/sim/balls.js";
 import {
   applyClothFriction,
@@ -17,7 +17,7 @@ import {
 } from "../scripts/sim/physics.js";
 import { strikeCue } from "../scripts/sim/shot.js";
 import { findPocket } from "../scripts/sim/pockets.js";
-import { POCKETS } from "../scripts/sim/table.js";
+import { JAWS, POCKETS } from "../scripts/sim/table.js";
 
 suite("physics — the table");
 
@@ -229,6 +229,63 @@ test("a ball always stops eventually", () => {
   ball.vx = 5;
   settle(ball, 20000);
   assert(speedOf(ball) < 0.01, `still moving at ${speedOf(ball)}`);
+});
+
+// --- the jaws ---------------------------------------------------------------
+// A jaw is the rounded END of a cushion, not an obstacle standing on the cloth.
+// These two cases are the difference, and they are here because the game
+// shipped with the jaw circles centred ON the nose line: each one bulged a full
+// jaw radius over the playing surface, and every shot rolled along a wall was
+// bumped away from the rail before it reached the pocket.
+
+test("no jaw reaches out over the cloth", () => {
+  for (const jaw of JAWS) {
+    // A jaw belongs to one rail, so it is clear of the cloth as soon as it is
+    // outside EITHER nose line — the other axis is the run it caps.
+    const intoCloth = Math.min(HALF_LENGTH - Math.abs(jaw.x), HALF_WIDTH - Math.abs(jaw.z));
+    assert(
+      intoCloth <= JAW_RADIUS + 1e-9,
+      `a jaw at (${jaw.x}, ${jaw.z}) sits ${intoCloth - JAW_RADIUS}m proud of the nose line`,
+    );
+  }
+});
+
+test("a ball rolled frozen to a rail passes every jaw and reaches the corner", () => {
+  for (const side of [-1, 1]) {
+    const ball = createBall(1, -HALF_LENGTH + 0.3, side * (HALF_WIDTH - BALL_RADIUS));
+    ball.vx = 1.6;
+    for (let i = 0; i < 900 && ball.x < HALF_LENGTH - CORNER_GAP; i++) {
+      ball.x += ball.vx * SIM_STEP;
+      ball.z += ball.vz * SIM_STEP;
+      collideRails(ball, null);
+    }
+    assertClose(
+      ball.z,
+      side * (HALF_WIDTH - BALL_RADIUS),
+      1e-6,
+      "a rail-frozen ball was pushed off the rail on its way to the corner",
+    );
+    assert(ball.x >= HALF_LENGTH - CORNER_GAP, "the ball never reached the corner mouth");
+  }
+});
+
+test("a ball driven at a pocket facing still rattles the jaw", () => {
+  const jaw = { x: SIDE_GAP, z: HALF_WIDTH + JAW_RADIUS };
+  const ball = createBall(1, 0, HALF_WIDTH - BALL_RADIUS - 0.03);
+  const dx = jaw.x - ball.x;
+  const dz = jaw.z - ball.z;
+  const length = Math.hypot(dx, dz);
+  ball.vx = (dx / length) * 1.5;
+  ball.vz = (dz / length) * 1.5;
+  let hit = 0;
+  for (let i = 0; i < 120; i++) {
+    ball.x += ball.vx * SIM_STEP;
+    ball.z += ball.vz * SIM_STEP;
+    const events = [];
+    collideRails(ball, events);
+    hit += events.filter((event) => event.kind === "jaw").length;
+  }
+  assert(hit > 0, "a ball driven into the side pocket facing must strike the jaw");
 });
 
 // --- pockets ---------------------------------------------------------------
