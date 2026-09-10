@@ -96,15 +96,17 @@ export async function listReports(pool: any, options: any = {}): Promise<Content
               coalesce(reporter.profile_name, '') as reporter_name,
               coalesce(owner.profile_name, '')    as target_owner_name
          from content_reports r
-         left join players reporter on reporter.player_id = r.reporter_player_id
-         left join players owner    on owner.player_id    = r.target_owner_player_id
+         left join player_profiles reporter on reporter.player_id = r.reporter_player_id
+         left join player_profiles owner    on owner.player_id    = r.target_owner_player_id
         where ($1 = 'all' or r.status = $1)
         order by r.created_at desc, r.id desc
         limit $2`,
       [status, limit],
     );
     return (result?.rows || []).map(mapReportRow);
-  } catch {
+  } catch (err) {
+    process.stderr.write(`[moderation] listReports error: ${(err as any)?.message || err}
+`);
     return [];
   }
 }
@@ -211,7 +213,7 @@ export async function listSuspendedAccounts(pool: any): Promise<any[]> {
       `select a.player_id, a.email, a.suspended_until, a.suspended_reason,
               coalesce(p.profile_name, '') as profile_name
          from accounts a
-         left join players p on p.player_id = a.player_id
+         left join player_profiles p on p.player_id = a.player_id
         where a.suspended_until is not null and a.suspended_until > now()
         order by a.suspended_until asc`,
     );
@@ -222,7 +224,9 @@ export async function listSuspendedAccounts(pool: any): Promise<any[]> {
       suspendedUntil: toIso(row.suspended_until),
       suspendedReason: String(row.suspended_reason || ""),
     }));
-  } catch {
+  } catch (err) {
+    process.stderr.write(`[moderation] listSuspendedAccounts error: ${(err as any)?.message || err}
+`);
     return [];
   }
 }

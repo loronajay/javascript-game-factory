@@ -95,7 +95,7 @@ export async function listAdmins(pool: any): Promise<AdminAccount[]> {
     const result = await pool.query(
       `select a.player_id, a.email, a.created_at, coalesce(p.profile_name, '') as profile_name
          from accounts a
-         left join players p on p.player_id = a.player_id
+         left join player_profiles p on p.player_id = a.player_id
         where a.is_admin
         order by a.created_at asc`,
     );
@@ -105,7 +105,9 @@ export async function listAdmins(pool: any): Promise<AdminAccount[]> {
       profileName: String(row.profile_name || ""),
       createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at || null,
     }));
-  } catch {
+  } catch (err) {
+    process.stderr.write(`[admin] listAdmins error: ${(err as any)?.message || err}
+`);
     return [];
   }
 }
@@ -180,7 +182,7 @@ export async function listAuditLog(pool: any, options: any = {}): Promise<AuditE
       `select l.id, l.admin_player_id, l.action, l.target_type, l.target_id, l.details, l.created_at,
               coalesce(p.profile_name, '') as admin_name
          from admin_audit_log l
-         left join players p on p.player_id = l.admin_player_id
+         left join player_profiles p on p.player_id = l.admin_player_id
         order by l.created_at desc, l.id desc
         limit $1`,
       [limit],
@@ -195,7 +197,9 @@ export async function listAuditLog(pool: any, options: any = {}): Promise<AuditE
       details: row.details && typeof row.details === "object" ? row.details : {},
       createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at || null,
     }));
-  } catch {
+  } catch (err) {
+    process.stderr.write(`[admin] listAuditLog error: ${(err as any)?.message || err}
+`);
     return [];
   }
 }
