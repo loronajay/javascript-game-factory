@@ -3,6 +3,7 @@
 // Everything decided here is presentation; pose selection stays in avatar-logic.js.
 export function createAvatars({ THREE, GLTFLoader, scene, config: CONFIG, logic }) {
   const avatars = new Map();
+  const markerPoint = new THREE.Vector3();
   let sourceRequest = null;
 
   function loadGltf(path) {
@@ -55,6 +56,63 @@ export function createAvatars({ THREE, GLTFLoader, scene, config: CONFIG, logic 
     return group;
   }
 
+  // The role marker: the uniform that tells a seeker from a guest at a glance. It is built from the
+  // pure spec in `avatar-logic.avatarMarker` and added *beside* the rig, never over it — the base
+  // character's authored textures stay exactly as they were shipped.
+  //
+  // It hangs off `avatar.body` rather than off the head bone, so it inherits the figure's facing
+  // without inheriting a bone roll nobody authored for a hat. Only the head's height and lean are
+  // sampled each frame (`trackMarker`), which is what carries the cap through a crouch.
+  function createMarker(spec) {
+    const group = new THREE.Group();
+    group.name = `Role Marker (${spec.kind})`;
+    const cloth = new THREE.MeshStandardMaterial({ color: spec.cloth, roughness: 0.72, metalness: 0.05 });
+    const metal = new THREE.MeshStandardMaterial({ color: spec.metal, roughness: 0.34, metalness: 0.65, emissive: spec.lamp, emissiveIntensity: spec.glow * 0.35 });
+    const lamp = new THREE.MeshStandardMaterial({ color: spec.lamp, roughness: 1, emissive: spec.lamp, emissiveIntensity: spec.glow });
+    // Offsets are measured from the `Head` bone's origin, which sits at the base of the skull on the
+    // Base Character: the crown is about 0.27 above it and the shoulders about 0.12 below.
+    if (spec.cap) {
+      const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.108, 0.075, 14), cloth);
+      crown.position.y = 0.238;
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.111, 0.111, 0.024, 14), metal);
+      band.position.y = 0.191;
+      const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.129, 0.129, 0.012, 16), cloth);
+      brim.position.y = 0.171;
+      group.add(crown, band, brim);
+    }
+    if (spec.epaulettes) {
+      for (const side of [-1, 1]) {
+        const pad = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.026, 0.11), metal);
+        pad.position.set(side * 0.142, -0.078, -0.028);
+        group.add(pad);
+      }
+      // The one warm light on the figure. It is emissive material, not a light: `numPointLights` is
+      // part of every material's shader program key, so a lamp per player would recompile the hotel
+      // each time somebody joined.
+      const collar = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 8), lamp);
+      collar.position.set(0, -0.086, 0.072);
+      group.add(collar);
+    }
+    if (spec.scarf) {
+      const scarf = new THREE.Mesh(new THREE.TorusGeometry(0.076, 0.023, 8, 16), cloth);
+      scarf.rotation.x = Math.PI / 2;
+      scarf.position.y = -0.08;
+      group.add(scarf);
+    }
+    for (const node of group.children) { node.castShadow = false; node.receiveShadow = false; node.frustumCulled = false; }
+    return group;
+  }
+
+  // The marker sits where the head is. Sampling the bone in body space keeps it on the shoulders
+  // through a crouch, a walk cycle and an idle sway without the marker itself being animated.
+  function trackMarker(avatar) {
+    if (!avatar.marker) return;
+    if (!avatar.markerAnchor) { avatar.marker.position.set(0, CONFIG.eyeHeight, 0); return; }
+    avatar.markerAnchor.getWorldPosition(markerPoint);
+    avatar.body.worldToLocal(markerPoint);
+    avatar.marker.position.copy(markerPoint);
+  }
+
   function prepareModel(model) {
     model.traverse((node) => {
       if (!node.isMesh && !node.isSkinnedMesh) return;
@@ -80,6 +138,10 @@ export function createAvatars({ THREE, GLTFLoader, scene, config: CONFIG, logic 
     // camera, so it is collapsed rather than the whole figure being hidden from its owner. The clips
     // carry scale tracks, so this has to be re-applied after the mixer runs, not once at load.
     avatar.headBone = avatar.hideHead ? model.getObjectByName('Head') : null;
+    // Kept separately from `headBone`, which is only set when the head is being collapsed. The
+    // marker has to follow the head whether or not its owner is looking through it.
+    avatar.markerAnchor = model.getObjectByName('Head') || null;
+    trackMarker(avatar);
     avatar.mixer = new THREE.AnimationMixer(model);
     avatar.clips = new Map(sources.animation.animations.map((clip) => [clip.name, clip]));
     avatar.clipNames = [...avatar.clips.keys()];
@@ -104,6 +166,12 @@ export function createAvatars({ THREE, GLTFLoader, scene, config: CONFIG, logic 
     if (avatar.headBone) avatar.headBone.scale.setScalar(0.0001);
   }
 
+  // Whoever is looking out of this body sees the marker from the inside — a cap brim across the top
+  // of the screen. It goes wherever the head goes.
+  function setMarkerHidden(avatar, hidden) {
+    if (avatar.marker) avatar.marker.visible = !hidden;
+  }
+
   function spawn(id, { role = logic.ROLES.HIDER, seat = 0, pose = { x: 0, y: 0, z: 0 }, hideHead = false, name = '' } = {}) {
     remove(id);
     const tint = logic.avatarTint(role, seat);
@@ -113,13 +181,17 @@ export function createAvatars({ THREE, GLTFLoader, scene, config: CONFIG, logic 
     root.add(body);
     const placeholder = createPlaceholder(tint);
     body.add(placeholder);
+    const marker = createMarker(logic.avatarMarker(role, seat));
+    marker.position.set(0, CONFIG.eyeHeight, 0);
+    body.add(marker);
     root.position.set(pose.x || 0, pose.y || 0, pose.z || 0);
     scene.add(root);
     const avatar = {
-      id, role, seat, tint, root, body, placeholder, hideHead, name,
+      id, role, seat, tint, root, body, placeholder, marker, markerAnchor: null, hideHead, name,
       model: null, mixer: null, clips: new Map(), clipNames: [], actions: new Map(), activeAction: null,
       headBone: null, motion: logic.createAvatarMotion(pose), pendingPose: null, visible: true,
     };
+    setMarkerHidden(avatar, hideHead);
     avatars.set(id, avatar);
     loadSources().then((sources) => { if (avatars.get(id) === avatar) attachRig(avatar, sources); })
       .catch((error) => console.warn('Avatar rig could not load; using the block figure.', error));
@@ -143,6 +215,7 @@ export function createAvatars({ THREE, GLTFLoader, scene, config: CONFIG, logic 
     const avatar = avatars.get(id);
     if (!avatar) return;
     avatar.hideHead = !!hidden;
+    setMarkerHidden(avatar, !!hidden);
     avatar.headBone = avatar.hideHead && avatar.model ? avatar.model.getObjectByName('Head') : null;
     if (!hidden && avatar.model) {
       const head = avatar.model.getObjectByName('Head');
@@ -167,6 +240,7 @@ export function createAvatars({ THREE, GLTFLoader, scene, config: CONFIG, logic 
       avatar.body.rotation.y = avatar.motion.facing;
       playMotion(avatar, avatar.motion.motionState);
       if (avatar.mixer) { avatar.mixer.update(delta); applyLocalOverrides(avatar); }
+      trackMarker(avatar);
     }
   }
 
@@ -175,7 +249,7 @@ export function createAvatars({ THREE, GLTFLoader, scene, config: CONFIG, logic 
   function describe(id) {
     const avatar = avatars.get(id);
     if (!avatar) return null;
-    return { id, role: avatar.role, rig: avatar.model ? 'base-character' : 'placeholder', motion: avatar.motion.motionState, speed: Number(avatar.motion.speed.toFixed(2)), flashlightOn: avatar.motion.flashlightOn, flashlightCharge: avatar.motion.flashlightCharge, position: { ...avatar.motion.position } };
+    return { id, role: avatar.role, rig: avatar.model ? 'base-character' : 'placeholder', marker: avatar.marker ? avatar.marker.name : null, motion: avatar.motion.motionState, speed: Number(avatar.motion.speed.toFixed(2)), flashlightOn: avatar.motion.flashlightOn, flashlightCharge: avatar.motion.flashlightCharge, position: { ...avatar.motion.position } };
   }
 
   // A single figure on the spot for `?inspect=avatar`, shaped like the demon's viewer subject so the

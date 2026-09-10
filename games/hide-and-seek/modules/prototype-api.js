@@ -7,9 +7,13 @@
 export function createPrototypeApi(parts) {
   const {
     window, world, rendering, hotel, player, monster, demons, flashlightDrops, heat, stamina, menu,
-    online, round, hiders, avatars, elevator, timestep, soundtrack, soundEffects,
+    online, spectator, avatars, elevator, timestep, soundtrack, soundEffects, audioSettings,
     floorDefs, inspectionViews, mapSession, version,
   } = parts;
+  // The round, its CPU bodies and the seeker do not exist until a match is started, and they are
+  // rebound in main.js when one is. Capturing them here by value meant `round` and `hiders` read
+  // `null` for the whole session, however long the match ran — so they are asked for, not held.
+  const match = typeof parts.getMatch === 'function' ? parts.getMatch : () => ({ round: null, hiders: null, seeker: null });
 
   const api = {
     version, floorDefs,
@@ -31,8 +35,10 @@ export function createPrototypeApi(parts) {
       stamina: stamina ? stamina.getState() : null,
       menu: menu ? menu.getScreen() : null,
       online: online.getState(),
-      round: round ? round.getState() : null,
-      hiders: hiders ? hiders.list() : [],
+      round: match().round ? match().round.getState() : null,
+      hiders: match().hiders ? match().hiders.list() : [],
+      spectating: !!world.state.playerSpectating,
+      spectatorTarget: spectator ? spectator.getTarget() : null,
       avatars: avatars.list().map((id) => avatars.describe(id)),
       tick: { rate: 1 / timestep.step, ticks: timestep.getTicks(), simulatedSeconds: Number(timestep.getElapsed().toFixed(2)) },
       // The one number that says whether the hotel is cheap to draw. Static geometry is merged per
@@ -54,7 +60,8 @@ export function createPrototypeApi(parts) {
     getSecretPanel: (id) => world.collections.secretPanels.get(id) || null,
     inspectionViews: Object.keys(inspectionViews),
     notify: world.notify,
-    soundtrack, soundEffects, avatars, demons, flashlightDrops, heat, stamina, menu, round, hiders, online, world, rendering,
+    soundtrack, soundEffects, audioSettings, avatars, demons, flashlightDrops, heat, stamina, menu, spectator, online, world, rendering,
+    get round() { return match().round; }, get hiders() { return match().hiders; }, get seeker() { return match().seeker; },
     events: [
       'hotel:key-found', 'hotel:door-unlocked', 'hotel:secret-discovered', 'hotel:secret-opened',
       'hotel:elevator-called', 'hotel:elevator-start', 'hotel:elevator-arrive', 'hotel:floor-change',

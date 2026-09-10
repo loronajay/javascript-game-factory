@@ -26,6 +26,10 @@ From a terminal the equivalent is `npm start`.
 
 Browsers without Pointer Lock fall back to click-and-drag mouse look automatically.
 
+**Audio** has its own screen, reachable from the title menu and from the pause menu. Music and sound
+effects have separate levels and there is a mute switch that keeps them; the mix is remembered on
+this device.
+
 ## The rules
 
 **The seeker** must find every hider before the round ends. **The hiders** must survive. Everyone
@@ -125,7 +129,11 @@ standing in it. The demons are in the building hunting everyone, and a dropped b
 whoever walks over it first.
 
 A hider caught before the round ends stays in the match as a **spectator** and can cycle between the
-living players. When the server ends the round, the results screen offers `FIND ANOTHER MATCH` and
+living players. The camera sees by the watched player's flashlight, and the flashlight plate on the
+right reads *their* battery; when their light is out the view falls back to a dim spectator light so
+a dark corridor is still watchable. The mouse is released on a catch so the switcher arrows can be
+clicked, and the keys that ran your own round — E to interact, F for the light — do nothing once you
+are out. When the server ends the round, the results screen offers `FIND ANOTHER MATCH` and
 `QUIT TO TITLE`. If your connection drops mid-round your body stays standing — a free find, which is
 the honest consequence — and you have half a minute to walk back into it.
 

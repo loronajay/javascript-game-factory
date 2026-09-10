@@ -306,6 +306,11 @@ and the HUD.
   zero it switches itself off, and `setFlashlight(empty, true)` refuses. Do not "fix" that refusal.
 - **A caught player drops their remaining charge.** `createFlashlightDrop` makes the record and
   `modules/round.js` drops it for hiders and the seeker alike.
+- **A CPU guest carries one too**, and spends it through the same pure functions: on while it is
+  still looking for a spot, out once it is tucked in (`hider-logic.flashlightOn`). It is a real tell —
+  a beam bobbing down a corridor is how a seeker finds someone still settling — and it is what a
+  spectator following that guest sees by. The seam is injected (`flashlightLogic`/`flashlightConfig`
+  into `createHiders`); without it a guest keeps the permanently dark full battery it had before.
 - **`describeFlashlight` is a network pose field, not a HUD model.** It returns exactly
   `{ on, charge }`. `on` must replicate because a lit player is visible to everyone; `charge` is
   server-authoritative, since a client reporting its own battery is the same class of cheat as one
@@ -375,7 +380,27 @@ the shape catch resolution and the demons' threat checks want.
 
 A caught hider stays in the match as a camera, never as a body. Target eligibility and cycling are
 pure (`spectator-logic.js`); `modules/spectator.js` only moves the camera and paints the switcher.
-The spectated player's head is hidden while they are the target and restored when they are not.
+The spectated player's head is hidden while they are the target and restored when they are not, and
+so is their role marker — you would be looking at the underside of your own cap brim.
+
+- **A camera sees by the light of whoever it is following.** The beam is the local player's one
+  SpotLight, and it used to be painted from the local battery — which a catch spends and switches
+  off, so spectating was a black screen. `spectator-logic.spectatorLight(target)` decides, and
+  `player.setSpectatedLight` paints it *without touching `flashlightState`*: a spectator can neither
+  spend nor recover a charge. `null` gives the beam back. A target with its light out still gets
+  `GHOST_BEAM` of it, because a watcher staring at an unlit corridor cannot tell a hidden player from
+  a broken game. **Do not add a second light for this** — `numSpotLights` is in every material's
+  shader program cache key (see *The light count never changes*).
+- **The flashlight plate stays up while spectating** and reads the *target's* battery, which is the
+  only honest answer to "why has it gone dark".
+- **A caught player still holds the keyboard and the mouse, and neither may reach the round.**
+  Pointer lock is released on a catch so the switcher arrows are clickable, and `modules/player.js`
+  knows that a lock released while spectating is not a pause (`isLocked` means "the simulation is
+  running", and the round being watched is). E and F are swallowed: the interaction scan stops with
+  `player.update`, so `activeInteractable` would otherwise keep whatever the crosshair was on at the
+  moment of the catch and E kept opening that same door from the grave. A look drag is swallowed too
+  — the spectator overwrites the camera on the next *tick*, and frames render in between.
+- **The local body is not dragged along behind the camera** (`main.js` gates `followCamera`).
 
 ## Menus and pause
 
@@ -493,6 +518,19 @@ the same `setPose` a network snapshot uses, so there is only one body implementa
   leaves a capsule torso with the real character's limbs sticking through it.
 - The local head collapse and the demon's forced posture are re-applied **after** the mixer writes
   each frame, or the clip overwrites them.
+- **Role is told by a uniform, not by a recolour.** Everyone wears the same textured rig, so a seeker
+  and a guest used to be the same figure at a glance — `avatarTint` only ever reached the block
+  placeholder and vanished when the real body arrived. `avatar-logic.avatarMarker` is the spec and
+  `modules/avatars.createMarker` builds it: the seeker gets the hotel's cap, brass epaulettes and a
+  warm collar lamp, a guest gets a scarf in a dimmed seat colour. Replacing rig materials is the
+  mannequin bug in a different disguise and the architecture test forbids `node.material =`.
+- The marker hangs off `avatar.body`, so it inherits the figure's facing without inheriting a bone
+  roll nobody authored for a hat; only the `Head` bone's position is sampled each frame
+  (`trackMarker`), which is what carries it through a crouch. **Its offsets are measured from that
+  bone's origin**, which sits at the base of the skull: the crown is about +0.27, the shoulders about
+  -0.08. Move the anchor and every one of them is wrong.
+- The collar lamp is **emissive material, not a light**, for the same reason the spectator beam is
+  not a second SpotLight.
 
 ### Rooms and lighting
 

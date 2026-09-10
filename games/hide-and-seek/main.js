@@ -25,9 +25,7 @@ import { createPrototypeApi } from './modules/prototype-api.js';
 import { createAccountAccess } from './modules/account-access.js';
 import { createMapSession, placeAtMapSpawn } from './modules/map-session.js';
 import { createMapRuntime } from './modules/map-runtime.js';
-for (const name of ['HotelAvatarLogic', 'HotelCollision', 'HotelControls', 'HotelDemon', 'HotelEnemyLogic', 'HotelFixtures', 'HotelFlashlight', 'HotelHiders', 'HotelLayout', 'HotelMaps', 'HotelMenu', 'HotelMovement', 'HotelMusic', 'HotelOnline', 'HotelPlan', 'HotelRound', 'HotelHeat', 'HotelSeeker', 'HotelSpectator', 'HotelStamina']) {
-  if (!window[name]) throw new Error(`Hotel pure module ${name} failed to load`);
-}
+for (const name of ['HotelAvatarLogic', 'HotelCollision', 'HotelControls', 'HotelDemon', 'HotelEnemyLogic', 'HotelFixtures', 'HotelFlashlight', 'HotelHiders', 'HotelLayout', 'HotelMaps', 'HotelMenu', 'HotelMovement', 'HotelMusic', 'HotelOnline', 'HotelPlan', 'HotelRound', 'HotelHeat', 'HotelSeeker', 'HotelSpectator', 'HotelStamina']) if (!window[name]) throw new Error(`Hotel pure module ${name} failed to load`);
 const mapSession = createMapSession({ maps: window.HotelMaps, window }); const rendering = createRendering({ THREE, document, window, config: CONFIG });
 const mapRuntime = createMapRuntime({ THREE, scene: rendering.scene, materials: rendering.materials,
   canChange: () => !hiders && !online?.isActive() && !world.state.isLocked,
@@ -84,6 +82,7 @@ const player = createPlayer({
 const flashlightDrops = createFlashlightPickups({ THREE, scene: rendering.scene, world, player, logic: window.HotelFlashlight });
 const soundtrack = inspectionView ? null : window.HotelMusic.createSoundtrack({ eventTarget: window });
 const soundEffects = inspectionView ? null : window.HotelMusic.createSoundEffects({ eventTarget: window });
+const audioSettings = inspectionView ? null : window.HotelMusic.createAudioSettings({ soundtrack, effects: soundEffects, document });
 const heat = inspectionView ? null : createHeat({ camera: rendering.camera, world, logic: window.HotelHeat, config: HEAT_CONFIG, document });
 // The map's roster, however long it is. The workbench shows one body, so it takes the first.
 const demons = mapRuntime.setDemonsFactory((world, scene, mapId) => createDemons({ createMonster, roster: inspectionView ? mapSession.inspectionDemonRoster() : window.HotelMaps.demonRosterFor(mapId), common: {
@@ -92,7 +91,7 @@ const demons = mapRuntime.setDemonsFactory((world, scene, mapId) => createDemons
 } }));
 const monster = demons.primary;
 const avatars = createAvatars({ THREE, GLTFLoader, scene: rendering.scene, config: CONFIG, logic: window.HotelAvatarLogic });
-const spectator = createSpectator({ logic: window.HotelSpectator, camera: rendering.camera, world, avatars, config: CONFIG, document, window });
+const spectator = createSpectator({ logic: window.HotelSpectator, camera: rendering.camera, world, avatars, player, config: CONFIG, document, window });
 const viewerSubject = inspectTarget === 'monster'
   ? { root: monster.root, setInspectionAnimation: monster.setInspectionAnimation, title: mapSession.inspectionDemonRoster()[0].name }
   : inspectTarget === 'avatar'
@@ -104,7 +103,7 @@ function startSingleMatch(options) {
   ({ hiders, seeker, round } = createSoloMatch({
     THREE, camera: rendering.camera, config: CONFIG, roundConfig: ROUND_CONFIG, hiderConfig: HIDER_CONFIG, seekerConfig: window.HotelSeeker.SEEKER_DEFAULTS, floorY,
     layout: window.HotelLayout, world, player, elevator, avatars, avatarLogic: window.HotelAvatarLogic, hiderLogic: window.HotelHiders, seekerLogic: window.HotelSeeker,
-    enemyLogic: window.HotelEnemyLogic, movement: window.HotelMovement, heatLogic: window.HotelHeat, heatConfig: HEAT_CONFIG,
+    enemyLogic: window.HotelEnemyLogic, movement: window.HotelMovement, heatLogic: window.HotelHeat, heatConfig: HEAT_CONFIG, flashlightLogic: window.HotelFlashlight, flashlightConfig: FLASHLIGHT_CONFIG,
     demons, flashlightDrops, spectator, document, window, options: window.HotelMenu.normalizeMatchConfig(options),
   }));
 }
@@ -130,7 +129,7 @@ function simulate(delta, elapsed) {
     if (heat) heat.update(delta);
     if (online.isActive()) online.update(delta); else if (round) round.update(delta);
     if (!online.isActive()) spectator.update();
-    avatars.followCamera(LOCAL_AVATAR, { camera: rendering.camera, world, player });
+    if (!world.state.playerSpectating) avatars.followCamera(LOCAL_AVATAR, { camera: rendering.camera, world, player });
     avatars.update(delta);
   }
   // The demons still `update` online — but as puppets. Their brains stood down when the match
@@ -152,7 +151,7 @@ function animate() {
 }
 createPrototypeApi({
   window, world, rendering, hotel, player, monster, demons, flashlightDrops, heat, stamina, menu,
-  online, round, hiders, seeker, spectator, avatars, elevator, timestep, soundtrack, soundEffects,
+  online, spectator, avatars, elevator, timestep, soundtrack, soundEffects, audioSettings, getMatch: () => ({ round, hiders, seeker }),
   floorDefs: FLOOR_DEFS, inspectionViews, mapSession, version: '7.2',
 });
 rendering.warmUp();

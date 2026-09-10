@@ -14,6 +14,7 @@ export function createMenu({ logic, document, window, onPlay, onStartSingle, onS
     [logic.SCREENS.ONLINE_SETUP, document.getElementById('menuOnlineSetup')],
     [logic.SCREENS.HOW_TO, document.getElementById('menuHowTo')],
     [logic.SCREENS.EXTRAS, document.getElementById('menuExtras')],
+    [logic.SCREENS.SETTINGS, document.getElementById('menuSettings')],
     [logic.SCREENS.ONLINE, document.getElementById('menuOnline')],
     [logic.SCREENS.PAUSE, document.getElementById('menuPause')],
   ]);
@@ -155,7 +156,7 @@ export function createMenu({ logic, document, window, onPlay, onStartSingle, onS
   window.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
     if (caughtOverlay && caughtOverlay.classList.contains('visible')) { dispatch(logic.ACTIONS.QUIT); return; }
-    if ([logic.SCREENS.SOLO_SETUP, logic.SCREENS.ONLINE_SETUP, logic.SCREENS.ONLINE, logic.SCREENS.HOW_TO, logic.SCREENS.EXTRAS].includes(state.screen)) dispatch(logic.ACTIONS.BACK);
+    if ([logic.SCREENS.SOLO_SETUP, logic.SCREENS.ONLINE_SETUP, logic.SCREENS.ONLINE, logic.SCREENS.HOW_TO, logic.SCREENS.EXTRAS, logic.SCREENS.SETTINGS].includes(state.screen)) dispatch(logic.ACTIONS.BACK);
   });
   window.addEventListener('hotel:caught', (event) => {
     // An elimination is not an ending. A hider taken while other guests are still hiding keeps

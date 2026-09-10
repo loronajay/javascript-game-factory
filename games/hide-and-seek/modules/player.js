@@ -24,19 +24,33 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
   camera.add(flashlightBeam, flashlightBeam.target);
   if (!camera.parent) scene.add(camera);
 
+  // While spectating, the beam belongs to the player being watched — see `setSpectatedLight`. The
+  // local battery is spent and switched off the instant its owner is caught, so painting from it is
+  // what made spectating a black screen.
+  let spectatedLight = null;
+
   function paintFlashlight() {
-    flashlightBeam.intensity = flashlightState.on ? BEAM_INTENSITY : 0;
-    const percent = Math.ceil(flashlightState.charge * 100);
+    const view = spectatedLight || { beam: flashlightState.on ? 1 : 0, on: flashlightState.on, charge: flashlightState.charge };
+    flashlightBeam.intensity = BEAM_INTENSITY * view.beam;
+    const percent = Math.ceil(view.charge * 100);
     if (flashlightStatus) {
-      flashlightStatus.dataset.on = String(flashlightState.on);
+      flashlightStatus.dataset.on = String(view.on);
       flashlightStatus.dataset.charge = String(percent);
       const fill = document.getElementById('flashlightFill');
       const readout = document.getElementById('flashlightReadout');
       if (fill) fill.style.width = `${percent}%`;
-      if (readout) readout.textContent = flashlightState.charge > 0 ? `${flashlightState.on ? 'ON' : 'OFF'} · ${percent}%` : 'DEAD';
+      if (readout) readout.textContent = view.charge > 0 ? `${view.on ? 'ON' : 'OFF'} · ${percent}%` : 'DEAD';
     }
     const button = document.getElementById('flashlightBtn');
-    if (button) { button.dataset.on = String(flashlightState.on); button.textContent = flashlightState.on ? 'LIGHT ON' : 'LIGHT'; }
+    if (button) { button.dataset.on = String(view.on); button.textContent = view.on ? 'LIGHT ON' : 'LIGHT'; }
+  }
+
+  // A caught player is a camera, and a camera sees by the light of whoever it is following. `view`
+  // is `HotelSpectator.spectatorLight(target)`; `null` hands the beam back to the local battery.
+  // Nothing here touches `flashlightState`, so a spectator can never spend or recover a charge.
+  function setSpectatedLight(view) {
+    spectatedLight = view || null;
+    paintFlashlight();
   }
   // The battery is server-authoritative online — a client that reports its own charge is the same
   // class of cheat as one that reports it wasn't caught — so the snapshot's value is applied over
@@ -79,6 +93,10 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
   }
 
   function applyLookDelta(dx, dy, sensitivity) {
+    // Spectating, the camera belongs to `modules/spectator.js`. Pointer lock is released on a catch
+    // so the switcher buttons are clickable, but a stray drag must not steer the watched player's
+    // head either: the spectator overwrites it on the next *tick*, and frames render in between.
+    if (world.state.playerSpectating) return;
     world.state.yaw -= dx * sensitivity; world.state.pitch -= dy * sensitivity; const max = Math.PI / 2 - 0.05;
     world.state.pitch = Math.max(-max, Math.min(max, world.state.pitch)); camera.rotation.y = world.state.yaw; camera.rotation.x = world.state.pitch;
   }
@@ -110,7 +128,7 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
   // it, and whether the door was locked. Running the local action too would give this client a hotel
   // that briefly disagrees with everyone else's.
   function interact() {
-    if (world.state.remoteFixtures) return;
+    if (world.state.remoteFixtures || world.state.playerSpectating) return;
     if (world.state.activeInteractable) world.state.activeInteractable.action();
   }
   // The local player is not a special kind of body: it walks through the same pure mover the demons
@@ -141,6 +159,9 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
     document.addEventListener('pointerlockchange', () => {
       if (isTouchDevice) return;
       if (document.pointerLockElement === document.body) { dragLookMode = false; world.state.isLocked = true; }
+      // Being caught releases the pointer on purpose. `isLocked` is "the simulation is running", and
+      // the round the player is now watching very much is, so it stays true and no menu opens.
+      else if (world.state.playerSpectating) { dragLookMode = false; world.state.isLocked = true; }
       else if (!dragLookMode) {
         world.state.isLocked = false;
         const paused = notifyMenu('pause');
@@ -150,7 +171,10 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
       }
     });
     document.addEventListener('mousemove', (event) => { if (world.state.isLocked && !isTouchDevice && !dragLookMode) applyLookDelta(event.movementX, event.movementY, 0.0022); });
-    window.addEventListener('keydown', (event) => { keys[event.code] = true; if (event.code === 'Escape' && dragLookMode) leaveDragLookMode(); if (event.code === 'KeyE' && !event.repeat) interact(); if (event.code === 'KeyF' && !event.repeat && world.state.isLocked && !world.state.gameOver) toggleFlashlight(); }); window.addEventListener('keyup', (event) => { keys[event.code] = false; });
+    // E and F belong to the spectator's switcher and to nothing else once the player is out. The
+    // interaction scan stops with `update`, so `activeInteractable` keeps whatever the crosshair was
+    // on at the moment of the catch — and E used to keep opening that same door from the grave.
+    window.addEventListener('keydown', (event) => { keys[event.code] = true; if (world.state.playerSpectating) return; if (event.code === 'Escape' && dragLookMode) leaveDragLookMode(); if (event.code === 'KeyE' && !event.repeat) interact(); if (event.code === 'KeyF' && !event.repeat && world.state.isLocked && !world.state.gameOver) toggleFlashlight(); }); window.addEventListener('keyup', (event) => { keys[event.code] = false; });
     for (const [id, code] of Object.entries({ moveUp: 'KeyW', moveDown: 'KeyS', moveLeft: 'KeyA', moveRight: 'KeyD' })) { const button = document.getElementById(id); const press = (event) => { event.preventDefault(); keys[code] = true; }; const release = (event) => { event.preventDefault(); keys[code] = false; }; button.addEventListener('pointerdown', press); button.addEventListener('pointerup', release); button.addEventListener('pointercancel', release); button.addEventListener('pointerleave', release); }
     const interactButton = document.getElementById('interactBtn');
     // The button holds the key down for a beat rather than firing once: online the authority reads a
@@ -160,13 +184,13 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
     const crouchButton = document.getElementById('crouchBtn');
     if (crouchButton) { const crouchOn = (event) => { event.preventDefault(); keys.KeyC = true; }; const crouchOff = (event) => { event.preventDefault(); keys.KeyC = false; }; crouchButton.addEventListener('pointerdown', crouchOn); crouchButton.addEventListener('pointerup', crouchOff); crouchButton.addEventListener('pointercancel', crouchOff); crouchButton.addEventListener('pointerleave', crouchOff); }
     const flashlightButton = document.getElementById('flashlightBtn');
-    if (flashlightButton) flashlightButton.addEventListener('pointerdown', (event) => { event.preventDefault(); if (world.state.isLocked && !world.state.gameOver) toggleFlashlight(); });
+    if (flashlightButton) flashlightButton.addEventListener('pointerdown', (event) => { event.preventDefault(); if (world.state.isLocked && !world.state.gameOver && !world.state.playerSpectating) toggleFlashlight(); });
     renderer.domElement.addEventListener('pointerdown', (event) => { if (!world.state.isLocked) return; if (isTouchDevice) { if (event.clientX < window.innerWidth * 0.45) return; lookTouchId = event.pointerId; lookLastX = event.clientX; lookLastY = event.clientY; } else if (dragLookMode) { mouseLookPointerId = event.pointerId; mouseLookLastX = event.clientX; mouseLookLastY = event.clientY; } else return; if (renderer.domElement.setPointerCapture) renderer.domElement.setPointerCapture(event.pointerId); });
     renderer.domElement.addEventListener('pointermove', (event) => { if (isTouchDevice && event.pointerId === lookTouchId) { const dx = event.clientX - lookLastX; const dy = event.clientY - lookLastY; lookLastX = event.clientX; lookLastY = event.clientY; applyLookDelta(dx, dy, 0.004); } else if (!isTouchDevice && dragLookMode && event.pointerId === mouseLookPointerId) { const dx = event.clientX - mouseLookLastX; const dy = event.clientY - mouseLookLastY; mouseLookLastX = event.clientX; mouseLookLastY = event.clientY; applyLookDelta(dx, dy, 0.0032); } });
     const clearLook = (event) => { if (event.pointerId === lookTouchId) lookTouchId = null; if (event.pointerId === mouseLookPointerId) mouseLookPointerId = null; }; renderer.domElement.addEventListener('pointerup', clearLook); renderer.domElement.addEventListener('pointercancel', clearLook);
   }
   function update(delta, elapsed) {
-    if (!world.state.isLocked || world.state.gameOver || world.state.playerSpectating) { world.promptEl.classList.remove('visible'); return; }
+    if (!world.state.isLocked || world.state.gameOver || world.state.playerSpectating) { world.state.activeInteractable = null; world.promptEl.classList.remove('visible'); return; }
     const previousFlashlight = flashlightState;
     flashlightState = flashlightLogic.tickFlashlight(flashlightState, delta, flashlightConfig);
     if (Math.ceil(previousFlashlight.charge * 100) !== Math.ceil(flashlightState.charge * 100) || previousFlashlight.on !== flashlightState.on) paintFlashlight();
@@ -190,7 +214,7 @@ export function createPlayer({ THREE, camera, renderer, scene, config: CONFIG, f
   }
   setupInput(); refreshLocation(); paintFlashlight();
   return {
-    update, beginPlay, refreshLocation, interact, setFlashlight, toggleFlashlight, addFlashlightCharge, applyRemoteFlashlight,
+    update, beginPlay, refreshLocation, interact, setFlashlight, toggleFlashlight, addFlashlightCharge, applyRemoteFlashlight, setSpectatedLight,
     isCrouching: () => !!(keys.KeyC || keys.ControlLeft || keys.ControlRight),
     // What the player is trying to do, which is the only thing an online round sends. The answer to
     // whether any of it happened comes back from the server.

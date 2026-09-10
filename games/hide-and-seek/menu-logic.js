@@ -14,6 +14,7 @@
     ONLINE_SETUP: 'onlineSetup',
     HOW_TO: 'howTo',
     EXTRAS: 'extras',
+    SETTINGS: 'settings',
     ONLINE: 'online',
     PAUSE: 'pause',
     PLAYING: 'playing',
@@ -25,6 +26,7 @@
     PLAY: 'play',
     HOW_TO: 'howTo',
     EXTRAS: 'extras',
+    SETTINGS: 'settings',
     ONLINE: 'online',
     BACK: 'back',
     JOIN_ONLINE: 'joinOnline',
@@ -37,7 +39,7 @@
   // How-to and extras are reached from both the title and the pause menu, so BACK has to remember
   // where it came from instead of always landing on the title. The online lobby behaves the same
   // way, except that leaving PLAYING is not its own decision: the server starts the match.
-  const READABLE = Object.freeze([SCREENS.HOW_TO, SCREENS.EXTRAS, SCREENS.ONLINE]);
+  const READABLE = Object.freeze([SCREENS.HOW_TO, SCREENS.EXTRAS, SCREENS.SETTINGS, SCREENS.ONLINE]);
   const MATCH_DEFAULTS = Object.freeze({ hiderCount: 3, hideSeconds: 45, role: 'seeker', mapId: 'grand-hotel' });
   const MATCH_LIMITS = Object.freeze({ minHiders: 1, maxHiders: 8, minHideSeconds: 45, maxHideSeconds: 120 });
 
@@ -107,6 +109,9 @@
     if (action === ACTIONS.ONLINE) return goto(SCREENS.ONLINE_SETUP, current.screen);
     if (action === ACTIONS.HOW_TO) return goto(SCREENS.HOW_TO, current.screen);
     if (action === ACTIONS.EXTRAS) return goto(SCREENS.EXTRAS, current.screen);
+    // Reachable from the title and from the pause menu alike: a player only notices the music is too
+    // loud once they are inside the hotel, and BACK has to land them where they opened it from.
+    if (action === ACTIONS.SETTINGS) return goto(SCREENS.SETTINGS, current.screen);
     if (current.screen === SCREENS.TITLE) return action === ACTIONS.SINGLE_PLAYER ? goto(SCREENS.SOLO_SETUP, SCREENS.TITLE) : stay;
     if (current.screen === SCREENS.PLAYING) return action === ACTIONS.PAUSE && allowPause ? goto(SCREENS.PAUSE) : stay;
     if (current.screen === SCREENS.PAUSE) return action === ACTIONS.RESUME ? goto(SCREENS.PLAYING) : stay;

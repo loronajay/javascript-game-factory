@@ -144,5 +144,32 @@
       }
     }
   ],
-  "headingConvention": "physical-nose-clockwise-from-north"
+  "headingConvention": "physical-nose-clockwise-from-north",
+  "repairs": [
+    {
+      "targetFrame": 2,
+      "targetHeading": "east",
+      "mirroredFromFrame": 6,
+      "mirroredFromHeading": "west",
+      "transform": "mirror-x",
+      "reason": "generated opposite-side view did not preserve the canonical vehicle body"
+    },
+    {
+      "targetFrame": 1,
+      "targetHeading": "north-east",
+      "mirroredFromFrame": 7,
+      "mirroredFromHeading": "north-west",
+      "transform": "mirror-x",
+      "reason": "generated opposite-side view did not preserve the canonical vehicle body"
+    },
+    {
+      "targetFrame": 3,
+      "targetHeading": "south-east",
+      "mirroredFromFrame": 5,
+      "mirroredFromHeading": "south-west",
+      "transform": "mirror-x",
+      "reason": "generated opposite-side view did not preserve the canonical vehicle body"
+    }
+  ],
+  "repairFrameConvention": "physical-nose-clockwise-from-north"
 }

@@ -6,7 +6,7 @@
 // would make the canonical `{ modelId, livery }` loadout lie.
 
 export const CIRCUIT_FRAME_SIZE = 64;
-export const CIRCUIT_ATLAS_VERSION = "circuit-headings-20260824-3";
+export const CIRCUIT_ATLAS_VERSION = "circuit-continuity-20260909-1";
 
 export const CIRCUIT_DIRECTIONS = Object.freeze([
   "north",

@@ -90,6 +90,14 @@
     return state.state === HIDER_STATES.FLEEING ? cfg.fleeSpeed : cfg.settleSpeed;
   }
 
+  // A guest crossing a dark hotel carries a light like everyone else, and puts it out once it is
+  // tucked into a room — the whole point of being hidden. It is a real tell rather than flavour: a
+  // beam bobbing down a corridor is how a seeker finds someone still looking for a spot, and it is
+  // what a spectator watching that guest actually sees by.
+  function flashlightOn(state) {
+    return !!state && state.state !== HIDER_STATES.HIDDEN;
+  }
+
   function updateHider(previous, { delta = 0, self, threats = [], arrived = false, config } = {}) {
     const cfg = settings(config);
     const state = previous || createHiderState();
@@ -117,5 +125,5 @@
     return { ...state, state: HIDER_STATES.HIDDEN, crouching: true, settledFor };
   }
 
-  return { HIDER_DEFAULTS, HIDER_STATES, THREATS, chooseHideSpot, createHiderState, movementSpeed, threatDistance, updateHider };
+  return { HIDER_DEFAULTS, HIDER_STATES, THREATS, chooseHideSpot, createHiderState, flashlightOn, movementSpeed, threatDistance, updateHider };
 });

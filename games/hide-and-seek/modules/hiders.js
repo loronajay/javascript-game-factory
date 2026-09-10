@@ -10,7 +10,7 @@
 // The seam that matters: `list()` returns positions in exactly the shape the round's catch
 // resolution and the demon's threat checks want. When real players arrive, the same list is fed
 // from the network and this file simply stops being asked for entries.
-export function createHiders({ THREE, config: CONFIG, tuning, heatConfig, floorY, layout, world, avatars, logic, enemyLogic, movement, heatLogic, avatarLogic, count = 3, spawnOffset = 0, seekerSpawn = null }) {
+export function createHiders({ THREE, config: CONFIG, tuning, heatConfig, floorY, layout, world, avatars, logic, enemyLogic, movement, heatLogic, avatarLogic, flashlightLogic = null, flashlightConfig = null, count = 3, spawnOffset = 0, seekerSpawn = null }) {
   const BODY = { height: CONFIG.bodyHeight, radius: CONFIG.playerRadius };
   // Borrowed from the demon deliberately: there is one building to cross and one way to cross it.
   const navigator = enemyLogic.createNavigator(world.getPlan().navigation, { space: world.space });
@@ -40,6 +40,9 @@ export function createHiders({ THREE, config: CONFIG, tuning, heatConfig, floorY
     const candidate = hider.heat.candidate || {};
     return {
       id: hider.id,
+      // The spectator switcher shows this. Without it a watched guest was labelled `HIDER-2`, which
+      // is an internal id rather than one of the hotel's guests.
+      name: hider.name,
       x: hider.position.x,
       y: hider.position.y,
       z: hider.position.z,
@@ -47,8 +50,8 @@ export function createHiders({ THREE, config: CONFIG, tuning, heatConfig, floorY
       yaw: hider.yaw,
       cameraYaw: hider.yaw + Math.PI,
       crouching: !!hider.ai.crouching,
-      flashlightOn: false,
-      flashlightCharge: hider.flashlightCharge,
+      flashlightOn: !!hider.flashlight.on,
+      flashlightCharge: hider.flashlight.charge,
       state: hider.ai.state,
       // The room it is heading for. Debug/automation only — the round HUD never sees a hider's
       // intent, let alone its position.
@@ -127,13 +130,24 @@ export function createHiders({ THREE, config: CONFIG, tuning, heatConfig, floorY
       const waypoint = hider.route[0];
       const speed = logic.movementSpeed(hider.ai, tuning);
       if (waypoint && speed > 0) tryMove(hider, waypoint, speed, delta);
+      updateFlashlight(hider, delta);
       const pose = describe(hider);
       hider.heat = heatLogic.updatePlayerHeat(hider.heat, pose, heatZones(), delta, heatConfig);
       avatars.setPose(hider.id, {
         x: hider.position.x, y: hider.position.y, z: hider.position.z,
-        yaw: hider.yaw, crouching: !!hider.ai.crouching, flashlightOn: false, flashlightCharge: hider.flashlightCharge,
+        yaw: hider.yaw, crouching: !!hider.ai.crouching, flashlightOn: pose.flashlightOn, flashlightCharge: pose.flashlightCharge,
       });
     }
+  }
+
+  // A guest carries the same battery the player does, and spends it the same way: on while it is
+  // still looking for somewhere to be, out once it is tucked in. `hider-logic.flashlightOn` owns the
+  // rule; this only runs the clock. Without the injected flashlight seam a hider keeps a full,
+  // permanently dark battery, which is what it had before — the drop it leaves behind still works.
+  function updateFlashlight(hider, delta) {
+    const wanted = logic.flashlightOn ? logic.flashlightOn(hider.ai) : false;
+    if (!flashlightLogic) { hider.flashlight = { on: false, charge: hider.flashlight.charge }; return; }
+    hider.flashlight = flashlightLogic.tickFlashlight(flashlightLogic.setFlashlight(hider.flashlight, wanted), delta, flashlightConfig || {});
   }
 
   function eliminate(id) {
@@ -162,19 +176,20 @@ export function createHiders({ THREE, config: CONFIG, tuning, heatConfig, floorY
       const start = spawns[(index + spawnOffset) % spawns.length];
       const hider = {
         id,
+        name: `Guest ${index + 1}`,
         position: new THREE.Vector3(start.x, start.y, start.z),
         yaw: 0,
         route: [],
         target: null,
         alive: true,
         moving: false,
-        flashlightCharge: 1,
+        flashlight: flashlightLogic ? flashlightLogic.createFlashlightState(true, 1) : { on: false, charge: 1 },
         unreachable: new Set(),
         ai: logic.createHiderState(),
         heat: heatLogic.createPlayerHeat(start),
       };
       hiders.set(id, hider);
-      avatars.spawn(id, { role: avatarLogic.ROLES.HIDER, seat: index + 1, name: `Guest ${index + 1}`, pose: start });
+      avatars.spawn(id, { role: avatarLogic.ROLES.HIDER, seat: index + 1, name: hider.name, pose: start });
       assignSpot(hider, spot);
     }
   }

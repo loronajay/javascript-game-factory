@@ -167,6 +167,67 @@ test('gameplay advances on a fixed timestep rather than on the display refresh r
   assert.doesNotMatch(main, /Math\.min\(frameDelta, 0\.05\)/);
 });
 
+test('a spectator drives nothing in the world it is watching', () => {
+  const player = fs.readFileSync(path.join(projectRoot, 'modules', 'player.js'), 'utf8');
+  const spectatorModule = fs.readFileSync(path.join(projectRoot, 'modules', 'spectator.js'), 'utf8');
+  const main = fs.readFileSync(path.join(projectRoot, 'main.js'), 'utf8');
+
+  // A caught player still holds the keyboard, the mouse and — until now — pointer lock. Every one of
+  // those used to reach into a round it is no longer in: E re-fired the interactable the crosshair
+  // was on at the moment of the catch, a mouse drag fought the spectator camera between ticks, and
+  // the released lock opened a pause menu over a live round.
+  assert.match(player, /if \(world\.state\.playerSpectating\) return;[\s\S]{0,40}world\.state\.yaw -=/);
+  assert.match(player, /keydown[\s\S]{0,120}world\.state\.playerSpectating\) return;/);
+  assert.match(player, /remoteFixtures \|\| world\.state\.playerSpectating/);
+  assert.match(spectatorModule, /exitPointerLock/);
+  // The local body must not be dragged along behind the camera it no longer owns.
+  assert.match(main, /if \(!world\.state\.playerSpectating\) avatars\.followCamera/);
+});
+
+test('a spectator sees by the watched player light rather than by its own spent battery', () => {
+  const player = fs.readFileSync(path.join(projectRoot, 'modules', 'player.js'), 'utf8');
+  const spectatorModule = fs.readFileSync(path.join(projectRoot, 'modules', 'spectator.js'), 'utf8');
+
+  assert.match(player, /setSpectatedLight/);
+  assert.match(spectatorModule, /logic\.spectatorLight/);
+  // Same rule as the F key: the beam is switched with intensity, never with `visible`, because
+  // `numSpotLights` is in every material's shader program cache key. A spectator light must not be a
+  // second SpotLight either.
+  assert.doesNotMatch(spectatorModule, /SpotLight/);
+  assert.doesNotMatch(player, /flashlightBeam\.visible\s*=/);
+  // And it must not spend or refill the dead player's charge on the way past.
+  assert.doesNotMatch(player, /function setSpectatedLight[\s\S]{0,320}flashlightState\s*=/);
+});
+
+test('the seeker is told from a guest by its uniform, not by repainting the shipped rig', () => {
+  const avatars = fs.readFileSync(path.join(projectRoot, 'modules', 'avatars.js'), 'utf8');
+  const avatarLogic = fs.readFileSync(path.join(projectRoot, 'avatar-logic.js'), 'utf8');
+
+  assert.match(avatarLogic, /function avatarMarker/);
+  assert.match(avatars, /logic\.avatarMarker/);
+  // Same rule the mannequin bug bought: the Base Characters textures are not ours to overwrite, so
+  // the distinction is geometry added beside the rig.
+  assert.doesNotMatch(avatars, /node\.material\s*=/);
+  assert.match(avatars, /body\.add\(marker\)/);
+});
+
+test('audio has one seam and every channel on it can be turned down', () => {
+  const music = fs.readFileSync(path.join(projectRoot, 'modules', 'music.js'), 'utf8');
+  const html = fs.readFileSync(path.join(projectRoot, 'index.html'), 'utf8');
+  const main = fs.readFileSync(path.join(projectRoot, 'main.js'), 'utf8');
+
+  assert.match(music, /function createAudioSettings/);
+  assert.match(music, /function setVolume/);
+  assert.match(main, /createAudioSettings/);
+  for (const control of ['musicVolume', 'effectsVolume', 'audioMuted']) assert.match(html, new RegExp(`id="${control}"`));
+  // Every sound in the game is created through this module, so a slider here reaches all of it. A
+  // second `new Audio` anywhere else is a channel with no volume control.
+  for (const moduleName of fs.readdirSync(path.join(projectRoot, 'modules'))) {
+    if (moduleName === 'music.js') continue;
+    assert.doesNotMatch(fs.readFileSync(path.join(projectRoot, 'modules', moduleName), 'utf8'), /new (window\.|root\.)?Audio\(/, `${moduleName} creates audio outside the audio seam`);
+  }
+});
+
 test('players are rigged human figures driven by pure avatar rules', () => {
   const main = fs.readFileSync(path.join(projectRoot, 'main.js'), 'utf8');
   const avatars = fs.readFileSync(path.join(projectRoot, 'modules', 'avatars.js'), 'utf8');

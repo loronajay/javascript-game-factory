@@ -75,7 +75,7 @@ test("the JSON catalog and runtime share one heading and scale contract", () => 
 test("runtime atlas URLs carry the heading revision so repaired PNGs cannot stay cached", () => {
   for (const model of CIRCUIT_MODELS) {
     assert(
-      model.src.endsWith("?v=circuit-headings-20260824-3"),
+      model.src.endsWith("?v=circuit-continuity-20260909-1"),
       `${model.modelId} can reuse a stale pre-repair atlas from browser cache`,
     );
   }
@@ -169,22 +169,22 @@ test("each atlas records whether its generated source labels describe the camera
   }
 });
 
-test("every canonical manifest pins the source column selected for its east slot", () => {
-  const eastSourceX = new Map([
-    ["kaido-gts", 1629],
-    ["tsunami-rz", 1482],
-    ["toro-sv", 1629],
-    ["scalpel-r", 1651],
-    ["chrono-12", 1627],
-    ["colt-gt", 1559],
+test("every canonical manifest pins the authoritative source column for its lateral repair", () => {
+  const westSourceX = new Map([
+    ["kaido-gts", 537],
+    ["tsunami-rz", 525],
+    ["toro-sv", 546],
+    ["scalpel-r", 531],
+    ["chrono-12", 513],
+    ["colt-gt", 524],
   ]);
   for (const model of CIRCUIT_MODELS) {
     const manifest = JSON.parse(fs.readFileSync(path.join(CARS_DIR, model.manifest), "utf8"));
-    assertEqual(manifest.frames[2].direction, "east");
+    assertEqual(manifest.frames[6].direction, "west");
     assertEqual(
-      manifest.frames[2].sourceBounds.x,
-      eastSourceX.get(model.modelId),
-      `${model.modelId} east was replaced by its west-facing source view`,
+      manifest.frames[6].sourceBounds.x,
+      westSourceX.get(model.modelId),
+      `${model.modelId} lost the source view used to repair its lateral continuity`,
     );
   }
 });
@@ -203,6 +203,48 @@ test("asset repair metadata uses the canonical physical heading of each frame", 
         manifest.frames[repair.mirroredFromFrame]?.direction,
         `${model.modelId} repair source frame is mislabeled`,
       );
+    }
+  }
+});
+
+test("every lateral heading is the mirrored opposite view of the same car", () => {
+  const lateralPairs = [
+    { targetFrame: 1, targetHeading: "north-east", sourceFrame: 7, sourceHeading: "north-west" },
+    { targetFrame: 2, targetHeading: "east", sourceFrame: 6, sourceHeading: "west" },
+    { targetFrame: 3, targetHeading: "south-east", sourceFrame: 5, sourceHeading: "south-west" },
+  ];
+
+  for (const model of CIRCUIT_MODELS) {
+    const manifest = JSON.parse(fs.readFileSync(path.join(CARS_DIR, model.manifest), "utf8"));
+    const sheet = readPng(fs.readFileSync(path.join(CARS_DIR, model.spritesheet)));
+
+    for (const pair of lateralPairs) {
+      const repair = (manifest.repairs ?? []).find((entry) => entry.targetFrame === pair.targetFrame);
+      assert(repair, `${model.modelId} ${pair.targetHeading} has no continuity repair record`);
+      assertEqual(repair.targetHeading, pair.targetHeading);
+      assertEqual(repair.mirroredFromFrame, pair.sourceFrame);
+      assertEqual(repair.mirroredFromHeading, pair.sourceHeading);
+      assertEqual(repair.transform, "mirror-x");
+
+      for (let y = 0; y < CIRCUIT_FRAME_SIZE; y += 1) {
+        for (let x = 0; x < CIRCUIT_FRAME_SIZE; x += 1) {
+          for (let channel = 0; channel < 4; channel += 1) {
+            const targetPixel = (
+              y * sheet.width + pair.targetFrame * CIRCUIT_FRAME_SIZE + x
+            ) * 4 + channel;
+            const sourcePixel = (
+              y * sheet.width
+              + pair.sourceFrame * CIRCUIT_FRAME_SIZE
+              + (CIRCUIT_FRAME_SIZE - 1 - x)
+            ) * 4 + channel;
+            assertEqual(
+              sheet.pixels[targetPixel],
+              sheet.pixels[sourcePixel],
+              `${model.modelId} ${pair.targetHeading} changes body at ${x},${y},${channel}`,
+            );
+          }
+        }
+      }
     }
   }
 });

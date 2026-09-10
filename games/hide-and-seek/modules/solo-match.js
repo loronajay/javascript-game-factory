@@ -4,7 +4,7 @@ import { createSeeker } from './seeker.js';
 import { placeAtMapSpawn } from './map-session.js';
 
 // Compose either solo role without making main.js or the menu understand round internals.
-export function createSoloMatch({ THREE, camera, config, roundConfig, hiderConfig, seekerConfig, floorY, layout, world, player, elevator, avatars, avatarLogic, hiderLogic, seekerLogic, enemyLogic, movement, heatLogic, heatConfig, demons, flashlightDrops, spectator, document, window, options }) {
+export function createSoloMatch({ THREE, camera, config, roundConfig, hiderConfig, seekerConfig, floorY, layout, world, player, elevator, avatars, avatarLogic, hiderLogic, seekerLogic, enemyLogic, movement, heatLogic, heatConfig, flashlightLogic, flashlightConfig, demons, flashlightDrops, spectator, document, window, options }) {
   const match = { ...roundConfig, ...options };
   const localIsHider = match.role === 'hider';
   const plan = world.getPlan();
@@ -24,7 +24,7 @@ export function createSoloMatch({ THREE, camera, config, roundConfig, hiderConfi
     THREE, config, tuning: hiderConfig, heatConfig, floorY, layout, world, avatars,
     count: Math.max(0, match.hiderCount - (localIsHider ? 1 : 0)), seekerSpawn,
     spawnOffset: localIsHider ? 1 : 0,
-    logic: hiderLogic, enemyLogic, movement, heatLogic, avatarLogic,
+    logic: hiderLogic, enemyLogic, movement, heatLogic, avatarLogic, flashlightLogic, flashlightConfig,
   });
   demons.setPlayers(() => [...hiders.list(), ...(seeker?.getState().alive ? [seeker.getState()] : [])]);
   const round = createRound({

@@ -1,13 +1,15 @@
 # Canonical circuit-car coverage
 
-Coverage means the model has an accepted eight-direction source master, a
-compiled transparent `512x64` runtime sheet, a manifest, and a saved generation
-prompt. The authoritative model inventory is `canonical-roster.json`; the
-runtime-ready subset is `catalog.json`.
+Coverage means the model has accepted north/south art plus one coherent lateral
+half-turn, a compiled transparent `512x64` runtime sheet, and a manifest. The
+opposite NE/E/SE views are mirrored from NW/W/SW so generated art cannot switch
+vehicle bodies between headings. The authoritative model inventory is
+`canonical-roster.json`; the runtime-ready subset is `catalog.json`.
 
 **Current verified coverage: 6 / 24 cars (25%). Six canonical archetypes have
 at least one runtime-ready representative. Incomplete or mislabeled turntables
-remain unavailable until replacement art passes the eight-heading audit.**
+remain unavailable until replacement art passes the heading and body-continuity
+audit.**
 
 ## Models A
 

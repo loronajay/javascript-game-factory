@@ -78,6 +78,42 @@
     return { skin, accent: 0x1a1c22 };
   }
 
+  // Every player wears the same textured rig, so until now a seeker and a guest were the same figure
+  // at a glance — the tint above only ever reached the block placeholder, and vanished the moment
+  // the real body arrived. The distinction is a *silhouette* rather than a recolour: the seeker
+  // wears the hotel's uniform (a bellhop cap, epaulettes, a warm lamp at the collar) and a guest
+  // wears a scarf in its own seat colour. That keeps the rig's authored textures intact, and it
+  // reads down a dark corridor, which a body colour does not.
+  //
+  // This is a spec, not geometry: `modules/avatars.js` builds meshes from it, and nothing here knows
+  // what a mesh is.
+  function dim(color, factor) {
+    const r = Math.round(((color >> 16) & 0xff) * factor);
+    const g = Math.round(((color >> 8) & 0xff) * factor);
+    const b = Math.round((color & 0xff) * factor);
+    return (r << 16) | (g << 8) | b;
+  }
+
+  function avatarMarker(role, seatIndex = 0) {
+    const tint = avatarTint(role, seatIndex);
+    if (role === ROLES.SEEKER) {
+      return {
+        kind: 'seeker',
+        cloth: 0x7d1f22,
+        metal: 0xd8a24a,
+        lamp: 0xffb257,
+        glow: 0.85,
+        cap: true,
+        epaulettes: true,
+        scarf: false,
+      };
+    }
+    // A guest's scarf is identification for a spectator and a faint tell for the seeker, never a
+    // beacon: the seat colour is darkened and carries no glow at all, so the one warm figure in the
+    // corridor is still the seeker.
+    return { kind: 'hider', cloth: dim(tint.skin, 0.55), metal: dim(tint.skin, 0.55), lamp: dim(tint.skin, 0.55), glow: 0, cap: false, epaulettes: false, scarf: true };
+  }
+
   function measureSpeed(previous, next, delta) {
     if (!previous || !next || delta <= 0) return 0;
     return Math.hypot(next.x - previous.x, next.z - previous.z) / delta;
@@ -118,7 +154,7 @@
 
   return {
     MOTION, ROLES, CLIP_CANDIDATES,
-    avatarTint, clipTimeScale, createAvatarMotion, measureSpeed,
+    avatarMarker, avatarTint, clipTimeScale, createAvatarMotion, measureSpeed,
     pickClipName, resolveMotionState, shortestAngle, stepFacing, updateAvatarMotion,
   };
 });
