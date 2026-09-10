@@ -110,7 +110,7 @@ export function createOnlineClient(gameId = "bird-duty") {
       return;
     }
     if (data.event === "message" && data.scope === "lobby") {
-      if (data.senderId === clientId && data.messageType !== "state_sync") return;
+      if (data.senderId === clientId) return;
       cb.onLobbyMessage?.({
         messageType: data.messageType,
         value: data.value,
@@ -192,16 +192,15 @@ export function createOnlineClient(gameId = "bird-duty") {
     lobbyMessage("profile", identity);
   }
 
-  function sendInput(input, meta = {}) {
-    lobbyMessage("input", {
-      input,
-      tick: Number(meta.tick || 0),
-      clientTime: Date.now(),
+  // The entire client-to-server vocabulary for a match: three booleans saying which keys are down.
+  // There is deliberately no counterpart that sends state — the server owns the match, and a
+  // `state_sync` from a client is refused on the other end with SERVER_AUTHORITY.
+  function sendInput(input) {
+    lobbyMessage("bird_duty_input", {
+      left: input?.left === true,
+      right: input?.right === true,
+      drop: input?.drop === true,
     });
-  }
-
-  function sendState(stateSnapshot) {
-    lobbyMessage("state_sync", stateSnapshot);
   }
 
   function disconnect() {
@@ -220,7 +219,6 @@ export function createOnlineClient(gameId = "bird-duty") {
     leaveLobby,
     sendProfile,
     sendInput,
-    sendState,
     disconnect,
     get clientId() {
       return clientId;

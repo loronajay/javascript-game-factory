@@ -288,6 +288,13 @@ export function updateNpcState(state) {
   return next;
 }
 
+// Guest clients in an online match receive host snapshots at a lower rate than
+// the 60hz tick. They advance the entities they already have so motion stays
+// smooth between snapshots, without running the spawner or resolving any hits.
+export function advanceNpcEntities(entities = []) {
+  return entities.map(updateNpcEntity);
+}
+
 export function getNpcHitbox(entity) {
   const def = NPC_DEFINITIONS[entity.type];
   return {

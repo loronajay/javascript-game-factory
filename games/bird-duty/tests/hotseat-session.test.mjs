@@ -9,7 +9,7 @@ import {
   finishHotseatTurn,
   resolveHotseatWinner,
   startHotseatTurn,
-} from "../scripts/hotseat-session.js";
+} from "../scripts/sim/hotseat-session.js";
 
 let passed = 0;
 let failed = 0;

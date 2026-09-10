@@ -7,7 +7,7 @@ import {
   createPlayerState,
   getPlayerFrameIndex,
   updatePlayer,
-} from "../scripts/player.js";
+} from "../scripts/sim/player.js";
 
 let passed = 0;
 let failed = 0;

@@ -5,7 +5,7 @@ import {
   scratchToCanvasPoint,
   canvasToScratchPoint,
   costumeDrawRect,
-} from "../scripts/coordinates.js";
+} from "../scripts/sim/coordinates.js";
 
 let passed = 0;
 let failed = 0;

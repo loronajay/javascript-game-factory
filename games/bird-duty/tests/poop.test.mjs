@@ -1,4 +1,4 @@
-import { createPlayerState } from "../scripts/player.js";
+import { createPlayerState } from "../scripts/sim/player.js";
 import {
   POOP_BACKSIDE_OFFSET_X,
   POOP_BACKSIDE_OFFSET_Y,
@@ -9,7 +9,7 @@ import {
   isPoopHitboxActive,
   spawnPoopFromPlayer,
   updatePoop,
-} from "../scripts/poop.js";
+} from "../scripts/sim/poop.js";
 
 let passed = 0;
 let failed = 0;

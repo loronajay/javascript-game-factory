@@ -4,7 +4,7 @@ import {
   createInputState,
   shouldPreventGameKey,
   updateInputForKey,
-} from "./scripts/input.js";
+} from "./scripts/sim/input.js";
 import { advanceMenuBirdState } from "./scripts/menu-birds.js";
 import {
   createMenuInteractionState,
@@ -23,8 +23,8 @@ import { applyMenuAction, createInitialState, SCREEN } from "./scripts/state.js"
 import {
   resolveTwoPlayerActionAtCanvasPoint,
 } from "./scripts/two-player-menu.js";
-import { createPlayerState, updatePlayer } from "./scripts/player.js";
-import { createPoopState, spawnPoopFromPlayer, updatePoop } from "./scripts/poop.js";
+import { createPlayerState, updatePlayer } from "./scripts/sim/player.js";
+import { createPoopState, spawnPoopFromPlayer, updatePoop } from "./scripts/sim/poop.js";
 import { clearPersonalBest, getPersonalBest, updatePersonalBest } from "./scripts/personal-best.js";
 import { loadArcadeIdentity } from "./scripts/identity.js";
 import { createOnlineClient } from "./scripts/online-client.js";
@@ -45,8 +45,15 @@ import {
   fireShot,
   shouldReturnToMenu,
   updatePlaySession,
-} from "./scripts/play-session.js";
-import { createNpcState, processNpcHits, updateNpcState } from "./scripts/npcs.js";
+} from "./scripts/sim/play-session.js";
+import { createNpcState, processNpcHits, updateNpcState } from "./scripts/sim/npcs.js";
+import { getNpcSoundKey } from "./scripts/sim/online-sync.js";
+import { MATCH_OVER_LINGER_TICKS } from "./scripts/sim/match-sim.js";
+import {
+  ONLINE_MATCH_ENDED_MESSAGE,
+  ONLINE_SNAPSHOT_MESSAGE,
+  createOnlineSession,
+} from "./scripts/online-session.js";
 import {
   HOTSEAT_PHASE,
   addHotseatScore,
@@ -55,16 +62,10 @@ import {
   createHotseatTurnSession,
   finishHotseatTurn,
   startHotseatTurn,
-} from "./scripts/hotseat-session.js";
-import {
-  ONLINE_MATCH_PHASE,
-  addOnlineMatchScore,
-  createOnlineMatchSession,
-  createOnlineTurnSession,
-  finishOnlineMatchTurn,
-  getOnlineActivePlayer,
-  startOnlineMatchTurn,
-} from "./scripts/online-match.js";
+} from "./scripts/sim/hotseat-session.js";
+// Only the phase names, for the renderer. The match state machine they belong to runs on the
+// server now; nothing in this file advances it.
+import { ONLINE_MATCH_PHASE } from "./scripts/sim/online-match.js";
 
 const TICK_MS = 1000 / 60;
 
@@ -100,23 +101,16 @@ export async function initGame() {
       members: [],
     };
     let onlineJoinCode = "";
-    let onlineMatchSession = null;
-    let onlineRemoteInputs = {};
-    let onlineBroadcastTick = 0;
-    let onlineSyncSeq = 0;
     let onlineMatchOverTicks = 0;
-    let lastOnlinePoopPhase = "inactive";
-    let lastOnlineScoreTotal = 0;
+    // The client half of a server-authoritative match. It holds the last snapshot and this player's
+    // intent, and nothing else; there is no local copy of the match to keep in step.
+    const onlineSession = createOnlineSession({ sounds });
     let lastTime = null;
     let accumulator = 0;
     let joinCodeInput = null;
 
     function createHotseatNpcState(session = hotseatSession) {
       return createNpcState({ round: session.round });
-    }
-
-    function createOnlineNpcState(session = onlineMatchSession) {
-      return createNpcState({ round: session?.round || 1 });
     }
 
     function canvasPointFromEvent(event) {
@@ -168,94 +162,50 @@ export async function initGame() {
       return member?.clientId || member?.id || "";
     }
 
-    function buildOnlinePlayersFromLobby(payload = onlineLobby) {
-      const members = normalizeLobbyMembers(payload.members || onlineLobby.members);
-      const profiles = onlineLobby.profiles || {};
-      return members.map((member, index) => {
-        const clientId = lobbyMemberId(member);
-        const profile = profiles[clientId] || {};
-        return {
-          clientId,
-          name: profile.displayName
-            || (clientId === onlineClient?.clientId ? onlineIdentity?.displayName : "")
-            || `Player ${index + 1}`,
-        };
-      }).filter((player) => player.clientId);
-    }
-
-    function serializeOnlineSnapshot() {
-      return {
-        syncSeq: ++onlineSyncSeq,
-        player: playerState,
-        poop: poopState,
-        playSession,
-        npcs: npcState,
-        match: {
-          ...onlineMatchSession,
-          syncSeq: onlineSyncSeq,
-        },
-      };
-    }
-
-    function applyOnlineSnapshot(snapshot) {
-      if (!snapshot || typeof snapshot !== "object") return;
-      const syncSeq = Number(snapshot.syncSeq || snapshot.match?.syncSeq || 0);
-      if (syncSeq && onlineMatchSession?.syncSeq && syncSeq <= onlineMatchSession.syncSeq) return;
-      playerState = snapshot.player || playerState;
-      poopState = snapshot.poop || poopState;
-      playSession = snapshot.playSession || playSession;
-      npcState = snapshot.npcs || npcState;
-      onlineMatchSession = snapshot.match || onlineMatchSession;
-      playOnlineSnapshotSounds(snapshot);
-      gameState = { ...gameState, screen: SCREEN.ONLINE_PLAY, mode: "online" };
-    }
-
-    function onlineScoreTotal(match = onlineMatchSession) {
-      return Object.values(match?.scores || {}).reduce((total, score) => total + (Number(score) || 0), 0);
-    }
-
-    function playOnlineSnapshotSounds(snapshot) {
-      const nextPoopPhase = snapshot?.poop?.phase || "inactive";
-      const nextScoreTotal = onlineScoreTotal(snapshot?.match);
-      if (lastOnlinePoopPhase === "inactive" && nextPoopPhase === "airborne") {
-        sounds.playPoopRelease();
-      }
-      if (lastOnlinePoopPhase === "airborne" && nextPoopPhase === "splat") {
-        sounds.playSplat();
-      }
-      if (nextScoreTotal > lastOnlineScoreTotal) {
-        sounds.playNpcHit("alan");
-      }
-      lastOnlinePoopPhase = nextPoopPhase;
-      lastOnlineScoreTotal = nextScoreTotal;
-    }
-
-    function broadcastOnlineSnapshot(force = false) {
-      if (!onlineClient || onlineLobby.ownerId !== onlineClient.clientId || !onlineMatchSession) return;
-      onlineBroadcastTick += 1;
-      if (!force && onlineBroadcastTick % 3 !== 0) return;
-      onlineClient.sendState(serializeOnlineSnapshot());
-    }
-
-    function resetOnlineTurnState(session = onlineMatchSession) {
-      playerState = createPlayerState();
-      poopState = createPoopState();
-      playSession = createOnlineTurnSession();
-      npcState = createOnlineNpcState(session);
-    }
-
-    function startOnlineMatchAsHost(payload = onlineLobby) {
-      const players = buildOnlinePlayersFromLobby(payload);
-      onlineMatchSession = createOnlineMatchSession(players);
-      onlineRemoteInputs = {};
-      onlineSyncSeq = 0;
-      onlineMatchOverTicks = 0;
-      lastOnlinePoopPhase = "inactive";
-      lastOnlineScoreTotal = 0;
-      resetOnlineTurnState(onlineMatchSession);
+    // The whole client side of an online match.
+    //
+    // There is no host. Every client here — including whoever created the lobby — sends three
+    // booleans and draws what the server sends back. Nothing below decides a score, a hit, a turn
+    // or a winner, and `tests/modules.test.mjs` asserts that it stays that way.
+    function startOnlineMatch(payload = {}) {
+      onlineSession.reset();
+      if (payload.matchState) onlineSession.applySnapshot(payload.matchState);
       gameState = { ...gameState, screen: SCREEN.ONLINE_PLAY, mode: "online" };
       sounds.startGameMusic();
-      broadcastOnlineSnapshot(true);
+    }
+
+    function endOnlineMatch() {
+      sounds.stopGameMusic();
+      leaveOnlineLobby();
+      gameState = createInitialState();
+    }
+
+    /**
+     * The world to draw this frame.
+     *
+     * Offline that is the cabinet's own state. Online it is whatever the server last described,
+     * moved on by whatever this client can safely predict — with the local state as a fallback so
+     * the first frame after `lobby_started` has something to draw while the first snapshot is still
+     * in flight.
+     */
+    function renderWorld() {
+      if (gameState.screen !== SCREEN.ONLINE_PLAY) {
+        return {
+          player: playerState,
+          poop: poopState,
+          playSession,
+          npcs: npcState.entities,
+          onlineMatch: null,
+        };
+      }
+      const world = onlineSession.world;
+      return {
+        player: world?.player || playerState,
+        poop: world?.poop || poopState,
+        playSession: world?.playSession || playSession,
+        npcs: world?.npcs?.entities || [],
+        onlineMatch: onlineSession.match,
+      };
     }
 
     function syncOnlineLobby(payload = {}, message = "") {
@@ -319,13 +269,10 @@ export async function initGame() {
         syncOnlineLobby(payload, "Match starting...");
       };
       onlineClient.cb.onLobbyStarted = (payload) => {
-        syncOnlineLobby(payload, "Match sync coming next.");
-        gameState = { ...gameState, screen: SCREEN.ONLINE_PLAY, mode: "online" };
-        if (payload.ownerId === onlineClient?.clientId) {
-          startOnlineMatchAsHost(payload);
-        } else {
-          sounds.startGameMusic();
-        }
+        syncOnlineLobby(payload, "Match starting.");
+        // Every seat takes the same path, the lobby owner included. The owner of a lobby is who can
+        // press start; it is not who runs the match.
+        startOnlineMatch(payload);
       };
       onlineClient.cb.onPlayerJoined = () => {
         broadcastProfileSoon();
@@ -339,28 +286,12 @@ export async function initGame() {
         };
       };
       onlineClient.cb.onLobbyMessage = ({ messageType, value, senderId }) => {
-        if (messageType === "input") {
-          if (onlineLobby.ownerId !== onlineClient?.clientId) return;
+        if (messageType === ONLINE_SNAPSHOT_MESSAGE || messageType === ONLINE_MATCH_ENDED_MESSAGE) {
           try {
-            const message = JSON.parse(value);
-            const input = message?.input || {};
-            const key = String(input.key || "");
-            if (!key) return;
-            const previous = onlineRemoteInputs[senderId] || createInputState();
-            onlineRemoteInputs = {
-              ...onlineRemoteInputs,
-              [senderId]: updateInputForKey(previous, key, input.pressed === true),
-            };
-          } catch {
-            // Ignore malformed input packets.
-          }
-          return;
-        }
-
-        if (messageType === "state_sync") {
-          if (onlineLobby.ownerId === onlineClient?.clientId) return;
-          try {
-            applyOnlineSnapshot(JSON.parse(value));
+            onlineSession.applySnapshot(JSON.parse(value), {
+              ended: messageType === ONLINE_MATCH_ENDED_MESSAGE,
+            });
+            gameState = { ...gameState, screen: SCREEN.ONLINE_PLAY, mode: "online" };
           } catch {
             // Ignore malformed snapshots.
           }
@@ -407,6 +338,8 @@ export async function initGame() {
       onlineClient?.disconnect?.();
       onlineClient = null;
       onlinePendingAction = null;
+      onlineMatchOverTicks = 0;
+      onlineSession.reset();
       onlineLobby = {
         status: "",
         profiles: {},
@@ -559,90 +492,19 @@ export async function initGame() {
       setJoinCodeInputActive(joinCodeInput, gameState.screen === SCREEN.ONLINE_JOIN, onlineJoinCode);
       menuBirdState = advanceMenuBirdState(menuBirdState);
       if (gameState.screen === SCREEN.ONLINE_PLAY) {
-        if (onlineMatchSession?.phase === ONLINE_MATCH_PHASE.MATCH_OVER) {
+        // Everything this client does in a match, in three lines: say which keys are down, move the
+        // picture on a frame, and leave when the result board has had its time.
+        onlineSession.sendInput(onlineClient, inputState);
+        onlineSession.predict(inputState, onlineClient?.clientId || null);
+
+        if (onlineSession.ended) {
           onlineMatchOverTicks += 1;
-          if (inputState.dropRequested || onlineMatchOverTicks >= 240) {
-            sounds.stopGameMusic();
-            leaveOnlineLobby();
-            gameState = createInitialState();
-            onlineMatchSession = null;
-          }
-          inputState = consumeDropRequest(inputState);
-          return;
-        }
-
-        if (onlineLobby.ownerId !== onlineClient?.clientId || !onlineMatchSession) {
-          inputState = consumeDropRequest(inputState);
-          return;
-        }
-
-        const activePlayer = getOnlineActivePlayer(onlineMatchSession);
-        const activeInput = activePlayer?.clientId === onlineClient?.clientId
-          ? inputState
-          : onlineRemoteInputs[activePlayer?.clientId] || createInputState();
-        let handledTurnStart = false;
-
-        if (activeInput.dropRequested) {
-          if (onlineMatchSession.phase === ONLINE_MATCH_PHASE.READY || onlineMatchSession.phase === ONLINE_MATCH_PHASE.TURN_OVER) {
-            onlineMatchSession = startOnlineMatchTurn(onlineMatchSession);
-            resetOnlineTurnState(onlineMatchSession);
-            broadcastOnlineSnapshot(true);
-            handledTurnStart = true;
-          } else if (onlineMatchSession.phase === ONLINE_MATCH_PHASE.MATCH_OVER) {
-            sounds.stopGameMusic();
-            leaveOnlineLobby();
-            gameState = createInitialState();
-            onlineMatchSession = null;
-            return;
+          if (inputState.dropRequested || onlineMatchOverTicks >= MATCH_OVER_LINGER_TICKS) {
+            endOnlineMatch();
           }
         }
 
-        if (onlineMatchSession.phase === ONLINE_MATCH_PHASE.PLAYING) {
-          playerState = updatePlayer(playerState, activeInput);
-          if (!handledTurnStart && activeInput.dropRequested && poopState.phase === "inactive" && canFireShot(playSession)) {
-            poopState = spawnPoopFromPlayer(playerState);
-            playSession = fireShot(playSession);
-            sounds.playPoopRelease();
-          }
-          const previousPoopPhase = poopState.phase;
-          poopState = updatePoop(poopState);
-          if (previousPoopPhase === "airborne" && poopState.phase === "splat") {
-            sounds.playSplat();
-          }
-          npcState = updateNpcState(npcState);
-          const hitResult = processNpcHits(npcState.entities, poopState);
-          npcState = {
-            ...npcState,
-            entities: hitResult.entities,
-          };
-          if (hitResult.scoreDelta > 0) {
-            playSession = addScore(playSession, hitResult.scoreDelta);
-            onlineMatchSession = addOnlineMatchScore(onlineMatchSession, hitResult.scoreDelta);
-            for (const type of hitResult.hitTypes) {
-              sounds.playNpcHit(type);
-            }
-          }
-          const previousSessionPhase = playSession.phase;
-          playSession = updatePlaySession(playSession, poopState);
-          if (previousSessionPhase === "running" && playSession.phase === "game-over") {
-            onlineMatchSession = finishOnlineMatchTurn(onlineMatchSession);
-            if (onlineMatchSession.phase === ONLINE_MATCH_PHASE.MATCH_OVER) {
-              onlineMatchOverTicks = 0;
-            }
-            resetOnlineTurnState(onlineMatchSession);
-            broadcastOnlineSnapshot(true);
-          }
-        }
-
-        if (activePlayer?.clientId === onlineClient?.clientId) {
-          inputState = consumeDropRequest(inputState);
-        } else if (onlineRemoteInputs[activePlayer?.clientId]) {
-          onlineRemoteInputs = {
-            ...onlineRemoteInputs,
-            [activePlayer.clientId]: consumeDropRequest(onlineRemoteInputs[activePlayer.clientId]),
-          };
-        }
-        broadcastOnlineSnapshot(false);
+        inputState = consumeDropRequest(inputState);
         return;
       }
 
@@ -690,7 +552,7 @@ export async function initGame() {
             playSession = addScore(playSession, hitResult.scoreDelta);
             hotseatSession = addHotseatScore(hotseatSession, hitResult.scoreDelta);
             for (const type of hitResult.hitTypes) {
-              sounds.playNpcHit(type);
+              sounds.play(getNpcSoundKey(type));
             }
           }
           const previousSessionPhase = playSession.phase;
@@ -731,7 +593,7 @@ export async function initGame() {
           if (hitResult.scoreDelta > 0) {
             playSession = addScore(playSession, hitResult.scoreDelta);
             for (const type of hitResult.hitTypes) {
-              sounds.playNpcHit(type);
+              sounds.play(getNpcSoundKey(type));
             }
           }
         }
@@ -784,19 +646,10 @@ export async function initGame() {
       if (gameState.screen === SCREEN.ONLINE_PLAY) {
         if (!shouldPreventGameKey(event.key)) return;
         event.preventDefault();
-        const activePlayer = getOnlineActivePlayer(onlineMatchSession);
-        const isMyTurn = activePlayer?.clientId === onlineClient?.clientId;
-        if (!isMyTurn && onlineMatchSession?.phase !== ONLINE_MATCH_PHASE.MATCH_OVER) return;
-
-        if (onlineLobby.ownerId === onlineClient?.clientId) {
-          inputState = updateInputForKey(inputState, event.key, pressed);
-        } else if (onlineMatchSession?.phase === ONLINE_MATCH_PHASE.MATCH_OVER && event.key === " ") {
-          sounds.stopGameMusic();
-          leaveOnlineLobby();
-          gameState = createInitialState();
-        } else {
-          onlineClient?.sendInput({ key: event.key, pressed });
-        }
+        // Keys are tracked for every seat, on turn or off. The server ignores an off-turn seat's
+        // input, so there is nothing to gate here — and tracking it anyway means a player who takes
+        // the seat mid-press is already holding the key the server thinks they are.
+        inputState = updateInputForKey(inputState, event.key, pressed);
         return;
       }
       if (!shouldPreventGameKey(event.key)) return;
@@ -823,15 +676,11 @@ export async function initGame() {
         screen: gameState.screen,
         menuBirdTick: menuBirdState.tick,
         hoverAction: menuInteractionState.selectedAction,
-        player: playerState,
-        poop: poopState,
-        playSession,
-        npcs: npcState.entities,
+        ...renderWorld(),
         personalBest,
         hotseat: hotseatSession,
         onlineLobby,
         onlineJoinCode,
-        onlineMatch: onlineMatchSession,
         onlineClientId: onlineClient?.clientId || null,
         mobileControlsActive: Boolean(document.querySelector('[data-mobile-controller-root="bird-duty-touch"]')),
       });
@@ -865,15 +714,11 @@ export async function initGame() {
       screen: gameState.screen,
       menuBirdTick: menuBirdState.tick,
       hoverAction: menuInteractionState.selectedAction,
-      player: playerState,
-      poop: poopState,
-      playSession,
-      npcs: npcState.entities,
+      ...renderWorld(),
       personalBest,
       hotseat: hotseatSession,
       onlineLobby,
       onlineJoinCode,
-      onlineMatch: onlineMatchSession,
       onlineClientId: onlineClient?.clientId || null,
       mobileControlsActive: Boolean(document.querySelector('[data-mobile-controller-root="bird-duty-touch"]')),
     });

@@ -1,4 +1,4 @@
-import { canvasToScratchPoint } from "./coordinates.js";
+import { canvasToScratchPoint } from "./sim/coordinates.js";
 
 export const MENU_ACTIONS = Object.freeze({
   SINGLE_PLAYER: "single-player",

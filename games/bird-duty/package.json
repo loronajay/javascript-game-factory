@@ -1,0 +1,9 @@
+{
+  "name": "bird-duty",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/coordinates.test.mjs && node tests/hotseat-session.test.mjs && node tests/input.test.mjs && node tests/match-sim.test.mjs && node tests/menu-birds.test.mjs && node tests/menu-input.test.mjs && node tests/menu-scene.test.mjs && node tests/mobile-join-code-input.test.mjs && node tests/mobile-menu-controls.test.mjs && node tests/mobile-structure.test.mjs && node tests/mobile-ui.test.mjs && node tests/modules.test.mjs && node tests/npcs.test.mjs && node tests/online-client.test.mjs && node tests/online-match.test.mjs && node tests/online-menu.test.mjs && node tests/online-session.test.mjs && node tests/online-sync.test.mjs && node tests/personal-best.test.mjs && node tests/play-session.test.mjs && node tests/player.test.mjs && node tests/poop.test.mjs && node tests/renderer-geometry.test.mjs && node tests/sounds.test.mjs && node tests/state.test.mjs && node tests/two-player-menu.test.mjs && node tools/mirror-sim.mjs --check",
+    "mirror:server": "node tools/mirror-sim.mjs"
+  }
+}

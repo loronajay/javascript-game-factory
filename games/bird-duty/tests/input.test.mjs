@@ -4,7 +4,7 @@ import {
   directionForKey,
   shouldPreventGameKey,
   updateInputForKey,
-} from "../scripts/input.js";
+} from "../scripts/sim/input.js";
 
 let passed = 0;
 let failed = 0;

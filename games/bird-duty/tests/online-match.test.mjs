@@ -5,7 +5,7 @@ import {
   finishOnlineMatchTurn,
   getOnlineActivePlayer,
   startOnlineMatchTurn,
-} from "../scripts/online-match.js";
+} from "../scripts/sim/online-match.js";
 
 let passed = 0;
 let failed = 0;

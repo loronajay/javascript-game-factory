@@ -1,4 +1,4 @@
-import { PLAYER_RENDER_SCALE, createPlayerState } from "../scripts/player.js";
+import { PLAYER_RENDER_SCALE, createPlayerState } from "../scripts/sim/player.js";
 import { buildCenteredImageRect } from "../scripts/renderer.js";
 
 let passed = 0;

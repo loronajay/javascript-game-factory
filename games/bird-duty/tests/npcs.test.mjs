@@ -11,8 +11,8 @@ import {
   startNextWave,
   updateNpcState,
   getNpcFrameFile,
-} from "../scripts/npcs.js";
-import { createPoopState } from "../scripts/poop.js";
+} from "../scripts/sim/npcs.js";
+import { createPoopState } from "../scripts/sim/poop.js";
 
 let passed = 0;
 let failed = 0;

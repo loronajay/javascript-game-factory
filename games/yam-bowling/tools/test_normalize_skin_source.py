@@ -48,15 +48,15 @@ class NormalizeSkinSourceTests(unittest.TestCase):
 
         self.assertEqual(normalizer.occupied_boundaries(image), [256])
 
-    def test_all_halloween_sources_use_true_alpha_and_empty_cell_gutters(self) -> None:
+    def test_all_skin_sources_use_true_alpha_and_empty_cell_gutters(self) -> None:
         project_root = TOOLS_ROOT.parent
         sources = sorted(
             (project_root / "assets" / "characters" / "skins").glob(
-                "*/halloween/source.png"
+                "*/*/source.png"
             )
         )
 
-        self.assertEqual(len(sources), 30)
+        self.assertEqual(len(sources), 90)
         for source in sources:
             with self.subTest(source=source):
                 with Image.open(source) as image:

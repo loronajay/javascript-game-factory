@@ -6,7 +6,7 @@ import {
   fireShot,
   shouldReturnToMenu,
   updatePlaySession,
-} from "../scripts/play-session.js";
+} from "../scripts/sim/play-session.js";
 
 let passed = 0;
 let failed = 0;

@@ -4,7 +4,7 @@ import {
   costumeDrawRect,
   scratchToCanvasPoint,
   scratchToGamePoint,
-} from "./coordinates.js";
+} from "./sim/coordinates.js";
 import { findCostume, findTarget, loadCostumeImage, loadImage, loadScratchImage } from "./assets.js";
 import {
   MENU_BIRD_FRAME_FILES,
@@ -13,9 +13,9 @@ import {
 } from "./menu-birds.js";
 import { getMenuButtonByAction } from "./menu-input.js";
 import { buildMenuSprites } from "./menu-scene.js";
-import { PLAYER_FRAME_FILES, PLAYER_RENDER_SCALE, getPlayerFrameIndex } from "./player.js";
-import { POOP_RENDER_SCALE } from "./poop.js";
-import { NPC_DEFINITIONS, getNpcFrameFile } from "./npcs.js";
+import { PLAYER_FRAME_FILES, PLAYER_RENDER_SCALE, getPlayerFrameIndex } from "./sim/player.js";
+import { POOP_RENDER_SCALE } from "./sim/poop.js";
+import { NPC_DEFINITIONS, getNpcFrameFile } from "./sim/npcs.js";
 import { TWO_PLAYER_BUTTONS } from "./two-player-menu.js";
 import {
   ONLINE_JOIN_BUTTONS,
@@ -23,8 +23,8 @@ import {
   ONLINE_MENU_BUTTONS,
   shouldShowJoinCodeCursor,
 } from "./online-menu.js";
-import { HOTSEAT_PHASE, HOTSEAT_ROUNDS } from "./hotseat-session.js";
-import { ONLINE_MATCH_PHASE } from "./online-match.js";
+import { HOTSEAT_PHASE, HOTSEAT_ROUNDS } from "./sim/hotseat-session.js";
+import { ONLINE_MATCH_PHASE } from "./sim/online-match.js";
 
 const HUD_TEXT_COLOR = "#ffffff";
 const HUD_TEXT_SHADOW = "rgba(0, 0, 0, 0.35)";

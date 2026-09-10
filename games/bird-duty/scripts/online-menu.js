@@ -1,4 +1,4 @@
-import { canvasToScratchPoint } from "./coordinates.js";
+import { canvasToScratchPoint } from "./sim/coordinates.js";
 import { pointInScratchButton } from "./menu-input.js";
 
 export const ONLINE_ACTIONS = Object.freeze({
