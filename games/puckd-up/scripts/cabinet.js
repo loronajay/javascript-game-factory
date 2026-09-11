@@ -10,6 +10,8 @@ import { createAudio } from './audio/audio.js';
 import { createOnlineController } from './online/controller.js';
 import { createOnlineClient } from './online/client.js';
 import { createOnlineSync } from './online/sync.js';
+import { createGarageStore } from './garage/garage-store.js';
+import { createGarageScreen } from './garage/garage-screen.js';
 // Composition/lifecycle boundary for a future platform adapter. No singleton state.
 export function createCabinet({ THREE, CANNON, account, onlineClient, doc = document }) {
     const win = doc.defaultView, disposers = [], handlers = [];
@@ -55,7 +57,18 @@ export function createCabinet({ THREE, CANNON, account, onlineClient, doc = docu
         }));
         const audio = own(createAudio({ muted: config.muted }));
         const controls = own(createControls({ THREE, canvas: doc.getElementById('game'), camera: view.camera, match, unlock: audio.unlock }));
-        const ui = own(createUI({ doc, match, metrics, audio, controls, view, stagePreview, storage, onlineClient: client }));
+        // Equipment lives on the Factory account, so it is fetched once at boot
+        // rather than when the Garage opens: the saved mallet and half-table
+        // have to be on the table in a CPU match whether or not the player
+        // visits the editor this session. Signed out, this resolves to the
+        // factory loadout and never claims to have saved anything.
+        const garage = createGarageStore();
+        const ui = own(createUI({ doc, match, metrics, audio, controls, view, stagePreview, storage, onlineClient: client, getGarage: () => garage.equipped }));
+        const garageScreen = own(createGarageScreen({ doc, match, view, store: garage }));
+        void garage.load().then(equipped => {
+            view.equipPlayer(equipped);
+            ui.render();
+        }).catch(() => { /* The cabinet plays on the factory loadout. */ });
         const online = own(createOnlineController({ doc, match, account, client }));
         const clock = createFixedStep(dt => {
             const input = controls.sample();
@@ -64,7 +77,7 @@ export function createCabinet({ THREE, CANNON, account, onlineClient, doc = docu
             Object.assign(metrics, activeSimulation().metrics);
             view.tick(dt, activeSimulation(), match);
         });
-        handlers.push(event => { if (match.state.mode !== 'online') simulation.handle(event); }, controls.handle, view.handle, audio.handle, ui.handle, online.handle, event => {
+        handlers.push(event => { if (match.state.mode !== 'online') simulation.handle(event); }, controls.handle, view.handle, audio.handle, ui.handle, garageScreen.handle, online.handle, event => {
             if (event.type === 'screen') {
                 clock.reset();
                 lastTime = null;

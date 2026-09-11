@@ -28,37 +28,25 @@ const CARS_DIR = path.join(GAME_DIR, "assets", "circuit-cars");
 const canonicalIds = new Set(allModels().map((model) => model.id));
 
 test("catalog exposes only canonical models with a verified eight-heading atlas", () => {
-  const expected = [
-    "kaido-gts",
-    "tsunami-rz",
-    "toro-sv",
-    "scalpel-r",
-    "chrono-12",
-    "colt-gt",
-  ];
+  const expected = allModels().map((model) => model.id);
   assertDeepEqual(CIRCUIT_MODELS.map((model) => model.modelId), expected);
-  assertEqual(new Set(expected).size, 6);
+  assertEqual(new Set(expected).size, 24);
   for (const id of expected) assert(canonicalIds.has(id), `${id} is not a canonical model id`);
 });
 
-test("incomplete turntables are quarantined instead of repaired with sprite rotations", () => {
-  const expected = new Map([
-    ["meridian-rs", ["south-east", "south", "south-west"]],
-    ["skyward-r", ["north", "north-east", "south-east", "south", "south-west", "north-west"]],
-  ]);
-  for (const [modelId, invalidHeadings] of expected) {
+test("previously quarantined models have complete replacement turntables", () => {
+  for (const modelId of ["meridian-rs", "skyward-r"]) {
     const manifest = JSON.parse(fs.readFileSync(path.join(CARS_DIR, modelId, "spritesheet.json"), "utf8"));
-    assertEqual(manifest.circuitStatus, "quarantined");
-    assertDeepEqual(manifest.invalidHeadings, invalidHeadings);
-    assertEqual(manifest.repairs?.length ?? 0, 0, `${modelId} still claims a transform can invent missing art`);
-    assert(!hasCircuitAtlas(modelId), `${modelId} leaked back into circuit selection`);
+    assertEqual(manifest.circuitStatus, "ready");
+    assertEqual(manifest.invalidHeadings?.length ?? 0, 0);
+    assert(hasCircuitAtlas(modelId));
   }
 });
 
 test("availability never substitutes another model", () => {
   assert(hasCircuitAtlas("kaido-gts"));
-  assert(!hasCircuitAtlas("shutter-z"));
-  assertEqual(circuitModelById("shutter-z"), null);
+  assert(!hasCircuitAtlas("not-a-car"));
+  assertEqual(circuitModelById("not-a-car"), null);
 });
 
 test("the JSON catalog and runtime share one heading and scale contract", () => {
@@ -75,7 +63,7 @@ test("the JSON catalog and runtime share one heading and scale contract", () => 
 test("runtime atlas URLs carry the heading revision so repaired PNGs cannot stay cached", () => {
   for (const model of CIRCUIT_MODELS) {
     assert(
-      model.src.endsWith("?v=circuit-continuity-20260909-1"),
+      model.src.endsWith("?v=circuit-full-roster-20260910-1"),
       `${model.modelId} can reuse a stale pre-repair atlas from browser cache`,
     );
   }
@@ -144,9 +132,20 @@ test("every atlas is eight transparent 64px frames clockwise from north", () => 
       for (let y = 0; y < 64; y += 1) {
         for (let x = frame * 64; x < (frame + 1) * 64; x += 1) {
           if (sheet.pixels[(y * sheet.width + x) * 4 + 3] > 8) visible += 1;
+          const offset = (y * sheet.width + x) * 4;
+          const [r, g, b, a] = sheet.pixels.subarray(offset, offset + 4);
+          assert(!(a > 8 && r > 130 && b > 100 && g < Math.min(r, b) * 0.65),
+            `${model.modelId} frame ${frame} contains residual magenta key`);
         }
       }
       assert(visible > 250, `${model.modelId} frame ${frame} is empty or clipped`);
+      assert(visible < 3000, `${model.modelId} frame ${frame} has an opaque background`);
+      for (let edge = 0; edge < 64; edge += 1) {
+        for (const [x, y] of [[edge, 0], [edge, 63], [0, edge], [63, edge]]) {
+          assertEqual(sheet.pixels[(y * sheet.width + frame * 64 + x) * 4 + 3], 0,
+            `${model.modelId} frame ${frame} has background pixels or clipped bodywork on its border`);
+        }
+      }
     }
 
     assertEqual(sheet.pixels[3], 0, `${model.modelId} top-left must be transparent`);
@@ -161,9 +160,8 @@ test("every atlas is eight transparent 64px frames clockwise from north", () => 
 test("each atlas records whether its generated source labels describe the camera side or the nose", () => {
   for (const model of CIRCUIT_MODELS) {
     const manifest = JSON.parse(fs.readFileSync(path.join(CARS_DIR, model.manifest), "utf8"));
-    assertEqual(
-      manifest.source.headingConvention,
-      "camera-side-opposite-physical-nose",
+    assert(
+      ["camera-side-opposite-physical-nose", "physical-nose-clockwise-from-north"].includes(manifest.source.headingConvention),
       `${model.modelId} source convention is undocumented, so a blanket repair can reverse it`,
     );
   }
@@ -181,6 +179,7 @@ test("every canonical manifest pins the authoritative source column for its late
   for (const model of CIRCUIT_MODELS) {
     const manifest = JSON.parse(fs.readFileSync(path.join(CARS_DIR, model.manifest), "utf8"));
     assertEqual(manifest.frames[6].direction, "west");
+    if (manifest.source.provider !== "OpenAI ImageGen" || manifest.physicalNoseAudit) continue;
     assertEqual(
       manifest.frames[6].sourceBounds.x,
       westSourceX.get(model.modelId),
@@ -322,10 +321,10 @@ test("Tsunami East is the opposite side of the same car, not a generated substit
     "tsunami-rz",
     "spritesheet-clockwise-from-north.png",
   )));
-  assertEqual(manifest.repairs?.[0]?.targetFrame, 2);
-  assertEqual(manifest.repairs?.[0]?.targetHeading, "east");
-  assertEqual(manifest.repairs?.[0]?.mirroredFromFrame, 6);
-  assertEqual(manifest.repairs?.[0]?.mirroredFromHeading, "west");
+  const eastRepair = manifest.repairs?.find((repair) => repair.targetFrame === 2);
+  assertEqual(eastRepair?.targetHeading, "east");
+  assertEqual(eastRepair?.mirroredFromFrame, 6);
+  assertEqual(eastRepair?.mirroredFromHeading, "west");
   for (let y = 0; y < 64; y += 1) {
     for (let x = 0; x < 64; x += 1) {
       for (let channel = 0; channel < 4; channel += 1) {

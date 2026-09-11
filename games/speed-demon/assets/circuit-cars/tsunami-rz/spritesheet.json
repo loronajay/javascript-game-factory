@@ -15,161 +15,166 @@
     "west",
     "north-west"
   ],
+  "headingConvention": "physical-nose-clockwise-from-north",
+  "circuitStatus": "ready",
   "source": {
-    "image": "source/tsunami-rz-eight-direction-master-v1.png",
-    "provider": "OpenAI ImageGen",
-    "role": "generated rotation master",
-    "backgroundExtraction": "edge-connected-neutral",
-    "headingConvention": "camera-side-opposite-physical-nose"
+    "image": "source/accepted/tsunami-rz.png",
+    "provider": "OpenAI ImageGen + alpha compiler",
+    "headingConvention": "physical-nose-clockwise-from-north",
+    "sourceFrameOrder": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ]
   },
-  "repairs": [
+  "frames": [
     {
-      "targetFrame": 2,
-      "targetHeading": "east",
-      "mirroredFromFrame": 6,
-      "mirroredFromHeading": "west",
-      "transform": "mirror-x",
-      "reason": "generated opposite-side view did not preserve the canonical vehicle body"
+      "direction": "north",
+      "sourceBounds": {
+        "x": 0,
+        "y": 0,
+        "width": 443,
+        "height": 443
+      },
+      "targetBounds": {
+        "x": 15,
+        "y": 13,
+        "width": 34,
+        "height": 36
+      }
     },
+    {
+      "direction": "north-east",
+      "sourceBounds": {
+        "x": 443,
+        "y": 0,
+        "width": 443,
+        "height": 443
+      },
+      "targetBounds": {
+        "x": 10,
+        "y": 17,
+        "width": 46,
+        "height": 31
+      }
+    },
+    {
+      "direction": "east",
+      "sourceBounds": {
+        "x": 887,
+        "y": 0,
+        "width": 443,
+        "height": 443
+      },
+      "targetBounds": {
+        "x": 7,
+        "y": 19,
+        "width": 54,
+        "height": 23
+      }
+    },
+    {
+      "direction": "south-east",
+      "sourceBounds": {
+        "x": 1330,
+        "y": 0,
+        "width": 443,
+        "height": 443
+      },
+      "targetBounds": {
+        "x": 11,
+        "y": 12,
+        "width": 44,
+        "height": 37
+      }
+    },
+    {
+      "direction": "south",
+      "sourceBounds": {
+        "x": 0,
+        "y": 443,
+        "width": 443,
+        "height": 443
+      },
+      "targetBounds": {
+        "x": 17,
+        "y": 12,
+        "width": 31,
+        "height": 38
+      }
+    },
+    {
+      "direction": "south-west",
+      "sourceBounds": {
+        "x": 443,
+        "y": 443,
+        "width": 443,
+        "height": 443
+      },
+      "targetBounds": {
+        "x": 9,
+        "y": 12,
+        "width": 44,
+        "height": 37
+      }
+    },
+    {
+      "direction": "west",
+      "sourceBounds": {
+        "x": 887,
+        "y": 443,
+        "width": 443,
+        "height": 443
+      },
+      "targetBounds": {
+        "x": 3,
+        "y": 19,
+        "width": 54,
+        "height": 23
+      }
+    },
+    {
+      "direction": "north-west",
+      "sourceBounds": {
+        "x": 1330,
+        "y": 443,
+        "width": 443,
+        "height": 443
+      },
+      "targetBounds": {
+        "x": 8,
+        "y": 17,
+        "width": 46,
+        "height": 31
+      }
+    }
+  ],
+  "repairs": [
     {
       "targetFrame": 1,
       "targetHeading": "north-east",
       "mirroredFromFrame": 7,
       "mirroredFromHeading": "north-west",
-      "transform": "mirror-x",
-      "reason": "generated opposite-side view did not preserve the canonical vehicle body"
+      "transform": "mirror-x"
+    },
+    {
+      "targetFrame": 2,
+      "targetHeading": "east",
+      "mirroredFromFrame": 6,
+      "mirroredFromHeading": "west",
+      "transform": "mirror-x"
     },
     {
       "targetFrame": 3,
       "targetHeading": "south-east",
       "mirroredFromFrame": 5,
       "mirroredFromHeading": "south-west",
-      "transform": "mirror-x",
-      "reason": "generated opposite-side view did not preserve the canonical vehicle body"
+      "transform": "mirror-x"
     }
-  ],
-  "frames": [
-    {
-      "direction": "north",
-      "sourceBounds": {
-        "x": 1072,
-        "y": 311,
-        "width": 134,
-        "height": 168
-      },
-      "targetBounds": {
-        "x": 9,
-        "y": 4,
-        "width": 45,
-        "height": 56
-      }
-    },
-    {
-      "direction": "north-east",
-      "sourceBounds": {
-        "x": 1271,
-        "y": 335,
-        "width": 189,
-        "height": 136
-      },
-      "targetBounds": {
-        "x": 4,
-        "y": 12,
-        "width": 56,
-        "height": 40
-      }
-    },
-    {
-      "direction": "east",
-      "sourceBounds": {
-        "x": 1482,
-        "y": 337,
-        "width": 222,
-        "height": 118
-      },
-      "targetBounds": {
-        "x": 4,
-        "y": 17,
-        "width": 56,
-        "height": 30
-      }
-    },
-    {
-      "direction": "south-east",
-      "sourceBounds": {
-        "x": 1722,
-        "y": 311,
-        "width": 172,
-        "height": 171
-      },
-      "targetBounds": {
-        "x": 4,
-        "y": 4,
-        "width": 56,
-        "height": 56
-      }
-    },
-    {
-      "direction": "south",
-      "sourceBounds": {
-        "x": 111,
-        "y": 323,
-        "width": 133,
-        "height": 165
-      },
-      "targetBounds": {
-        "x": 9,
-        "y": 4,
-        "width": 45,
-        "height": 56
-      }
-    },
-    {
-      "direction": "south-west",
-      "sourceBounds": {
-        "x": 283,
-        "y": 311,
-        "width": 186,
-        "height": 173
-      },
-      "targetBounds": {
-        "x": 4,
-        "y": 6,
-        "width": 56,
-        "height": 52
-      }
-    },
-    {
-      "direction": "west",
-      "sourceBounds": {
-        "x": 525,
-        "y": 339,
-        "width": 231,
-        "height": 117
-      },
-      "targetBounds": {
-        "x": 4,
-        "y": 18,
-        "width": 56,
-        "height": 28
-      }
-    },
-    {
-      "direction": "north-west",
-      "sourceBounds": {
-        "x": 811,
-        "y": 336,
-        "width": 189,
-        "height": 135
-      },
-      "targetBounds": {
-        "x": 4,
-        "y": 12,
-        "width": 56,
-        "height": 40
-      }
-    }
-  ],
-  "headingConvention": "physical-nose-clockwise-from-north",
-  "repairFrameConvention": "physical-nose-clockwise-from-north"
+  ]
 }

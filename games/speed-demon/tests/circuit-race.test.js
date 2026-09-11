@@ -68,7 +68,7 @@ test("canonical model identity is required and never substituted", () => {
   let threw = false;
   try {
     createCircuitAdapter({ track }).create(definition("freeplay", [
-      { playerId: "local", control: "local", modelId: "shutter-z", livery: {} },
+      { playerId: "local", control: "local", modelId: "not-a-car", livery: {} },
     ]), track);
   } catch (error) {
     threw = /atlas unavailable/.test(error.message);

@@ -2,12 +2,12 @@ import { normalizeSettings, saveSettings } from '../settings.js';
 import { RIVALS, getRival } from '../physics/rivals.js';
 import { CIRCUIT_STOPS, createCircuitProgress, loadCircuitProgress, recordCircuitResult, saveCircuitProgress, stopStatus } from '../core/circuit.js';
 // Owns DOM lookup, presentation and user actions. Reads match state; never moves bodies.
-export function createUI({ doc, match, metrics, audio, controls, view, stagePreview, storage, onlineClient }) {
+export function createUI({ doc, match, metrics, audio, controls, view, stagePreview, storage, onlineClient, getGarage = () => undefined }) {
     const abort = new AbortController(), options = { signal: abort.signal };
     const ids = ['app', 'game', 'gamewrap', 'pScore', 'cScore', 'scoreboard', 'speed', 'shot', 'powerFill',
         'gameState', 'message', 'pause', 'restart', 'fullscreen', 'menuFullscreen', 'difficultyLabel',
         'serveLabel', 'menuScreen', 'setupScreen', 'pauseScreen', 'resultScreen', 'matchHud', 'matchControls',
-        'cpuModeBtn', 'circuitModeBtn', 'circuitScreen', 'circuitGrid', 'circuitBack', 'circuitProgress', 'circuitTitle',
+        'cpuModeBtn', 'circuitModeBtn', 'garageModeBtn', 'garageScreen', 'circuitScreen', 'circuitGrid', 'circuitBack', 'circuitProgress', 'circuitTitle',
         'setupBack', 'startMatch', 'setupRival', 'playerColor', 'colorPreview',
         'resumeMatch', 'pauseRestart', 'pauseMenu', 'rematch', 'resultMenu', 'resultTitle', 'resultP', 'resultC', 'arenaGrid', 'soundToggle', 'opponentName', 'resultNote',
         'stagePreviewNumber', 'stagePreviewName', 'stagePreviewDescription', 'rivalPortrait', 'rivalTitle', 'rivalName', 'rivalIntro', 'rivalRecord',
@@ -93,7 +93,7 @@ export function createUI({ doc, match, metrics, audio, controls, view, stagePrev
         write(el.stagePreviewNumber, `A${venueIndex} // Selected venue`);
         write(el.stagePreviewName, selectedVenue?.querySelector('b')?.textContent || 'Hyper Arcade');
         write(el.stagePreviewDescription, selectedVenue?.querySelector('small')?.textContent || 'Neon light tunnel');
-        stagePreview.configure(match.config);
+        stagePreview.configure(match.config, getGarage());
         write(el.soundToggle, muted ? 'Sound: Off' : 'Sound: On');
         el.soundToggle.setAttribute('aria-pressed', String(muted));
         el.soundToggle.setAttribute('aria-label', muted ? 'Unmute audio' : 'Mute audio');
@@ -137,6 +137,7 @@ export function createUI({ doc, match, metrics, audio, controls, view, stagePrev
         }
     }, { ...options, capture: true });
     on(el.cpuModeBtn, 'click', () => match.setup());
+    on(el.garageModeBtn, 'click', () => match.garage());
     on(el.circuitModeBtn, 'click', () => match.circuit());
     on(el.circuitBack, 'click', () => match.menu());
     on(el.setupBack, 'click', () => match.menu());
@@ -188,7 +189,7 @@ export function createUI({ doc, match, metrics, audio, controls, view, stagePrev
         const rival = getRival(match.config.rivalId);
         const opponent = isOnline ? match.state.opponentName || 'Opponent' : rival.name;
         const inMatch = ['playing', 'paused', 'result'].includes(screen), won = isOnline ? match.state.winner === 0 : playerScore > cpuScore;
-        for (const name of ['menu', 'setup', 'circuit', 'pause', 'result'])
+        for (const name of ['menu', 'setup', 'circuit', 'garage', 'pause', 'result'])
             el[`${name}Screen`].hidden = screen !== (name === 'pause' ? 'paused' : name);
         el.matchHud.hidden = el.scoreboard.hidden = !inMatch;
         el.matchControls.hidden = screen !== 'playing';
@@ -218,7 +219,7 @@ export function createUI({ doc, match, metrics, audio, controls, view, stagePrev
             write(el.message, servingPlayer ? `${opponent} GOAL` : 'PLAYER GOAL');
         if (previousScreen !== screen) {
             previousScreen = screen;
-            const focus = { menu: el.circuitModeBtn, circuit: circuitButtons.find(button => !button.disabled), setup: el.startMatch, paused: el.resumeMatch, result: el.rematch }[screen];
+            const focus = { menu: el.circuitModeBtn, circuit: circuitButtons.find(button => !button.disabled), setup: el.startMatch, garage: doc.getElementById('garageSave'), paused: el.resumeMatch, result: el.rematch }[screen];
             focus?.focus();
             if (screen === 'playing' && isOnline) el.game.focus();
         }

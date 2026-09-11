@@ -2,6 +2,8 @@ import { ARENA_IDS } from '../config.js';
 import { createTable } from './table.js';
 import { createVenues } from './venues/index.js';
 import { getRival } from '../physics/rivals.js';
+import { rivalGarage } from '../cosmetics/rival-appearance.js';
+import { defaultGarage } from '../cosmetics/loadout.js';
 
 
 function disposeStage(stage) {
@@ -55,15 +57,21 @@ function createPreviewStage(THREE, canvas, { preserveDrawingBuffer = false } = {
         player: { body: { position: new THREE.Vector3(1.15, .25, 5.6) } },
         cpu: { body: { position: new THREE.Vector3(-1.05, .25, -5.55) } },
     });
-    function configure(arenaId, playerColor, rivalId = 'rookie') {
-        const rival = getRival(rivalId);
+    // The preview dresses both halves through the same appearance calls the
+    // match uses, so the venue card shows the equipment that will actually be
+    // on the table rather than a stand-in.
+    function configure(arenaId, playerColor, rivalId = 'rookie', garage = defaultGarage()) {
+        const rival = getRival(rivalId), opponent = rivalGarage(rival);
         venues.applyArenaTheme(arenaId);
+        table.applyHalfAppearance('player', garage.tableHalf);
+        table.applyMalletAppearance('player', garage.mallet);
+        table.applyHalfAppearance('cpu', opponent.tableHalf);
+        table.applyMalletAppearance('cpu', opponent.mallet);
         table.applyColors(playerColor, rival.color);
-        table.applyRivalDesign(rival);
         warm.color.set(playerColor);
         cool.color.set(rival.color);
     }
-    return { ...stage, venues, configure, dispose: () => disposeStage(stage) };
+    return { ...stage, venues, configure, dispose: () => { table.dispose(); disposeStage(stage); } };
 }
 
 function createThumbnails(THREE, doc, targets, playerColor, rivalId) {
@@ -109,8 +117,8 @@ export function createVenuePreview({ THREE, canvas, container, thumbnailTargets 
         stage.camera.aspect = width / height;
         stage.camera.updateProjectionMatrix();
     }
-    function configure(config) {
-        stage.configure(config.arenaId, config.playerColor, config.rivalId);
+    function configure(config, garage) {
+        stage.configure(config.arenaId, config.playerColor, config.rivalId, garage);
         configured = true;
         if (!thumbnailsReady) {
             thumbnailsReady = true;

@@ -228,12 +228,12 @@ test("the circuit mission is presented as a grid race throughout the canon brief
   assertEqual(briefing.briefing.opponent.heading, "ON THE GRID");
 });
 
-test("a campaign circuit mission clearly blocks a selected model with no atlas", () => {
+test("a campaign circuit mission accepts Shutter Z from the completed roster", () => {
   const event = EVENTS.find((entry) => entry.modeId === MODE_CIRCUIT);
   const campaign = createCampaign({ eventId: event.id });
   const view = campaignView(campaign, cleared(), { circuitModelId: "shutter-z" });
-  assertEqual(view.detail.circuitUnavailable, true);
-  assert(view.detail.hint.includes("ATLAS UNAVAILABLE"));
+  assertEqual(view.detail.circuitUnavailable, false);
+  assert(!view.detail.hint.includes("ATLAS UNAVAILABLE"));
 });
 
 test("the painted base decides whether a roster face is spent on the race", () => {

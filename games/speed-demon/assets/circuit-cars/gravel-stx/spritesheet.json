@@ -1,0 +1,180 @@
+{
+  "schemaVersion": 1,
+  "modelId": "gravel-stx",
+  "image": "spritesheet-clockwise-from-north.png",
+  "frameWidth": 64,
+  "frameHeight": 64,
+  "frameCount": 8,
+  "order": [
+    "north",
+    "north-east",
+    "east",
+    "south-east",
+    "south",
+    "south-west",
+    "west",
+    "north-west"
+  ],
+  "headingConvention": "physical-nose-clockwise-from-north",
+  "circuitStatus": "ready",
+  "source": {
+    "image": "source/accepted/gravel-stx.png",
+    "provider": "OpenAI ImageGen + alpha compiler",
+    "headingConvention": "physical-nose-clockwise-from-north",
+    "sourceFrameOrder": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ]
+  },
+  "frames": [
+    {
+      "direction": "north",
+      "sourceBounds": {
+        "x": 0,
+        "y": 0,
+        "width": 443,
+        "height": 443
+      },
+      "targetBounds": {
+        "x": 14,
+        "y": 13,
+        "width": 35,
+        "height": 37
+      }
+    },
+    {
+      "direction": "north-east",
+      "sourceBounds": {
+        "x": 443,
+        "y": 0,
+        "width": 443,
+        "height": 443
+      },
+      "targetBounds": {
+        "x": 10,
+        "y": 15,
+        "width": 44,
+        "height": 35
+      }
+    },
+    {
+      "direction": "east",
+      "sourceBounds": {
+        "x": 887,
+        "y": 0,
+        "width": 443,
+        "height": 443
+      },
+      "targetBounds": {
+        "x": 6,
+        "y": 18,
+        "width": 52,
+        "height": 26
+      }
+    },
+    {
+      "direction": "south-east",
+      "sourceBounds": {
+        "x": 1330,
+        "y": 0,
+        "width": 443,
+        "height": 443
+      },
+      "targetBounds": {
+        "x": 11,
+        "y": 13,
+        "width": 42,
+        "height": 37
+      }
+    },
+    {
+      "direction": "south",
+      "sourceBounds": {
+        "x": 0,
+        "y": 443,
+        "width": 443,
+        "height": 443
+      },
+      "targetBounds": {
+        "x": 14,
+        "y": 12,
+        "width": 36,
+        "height": 37
+      }
+    },
+    {
+      "direction": "south-west",
+      "sourceBounds": {
+        "x": 443,
+        "y": 443,
+        "width": 443,
+        "height": 443
+      },
+      "targetBounds": {
+        "x": 11,
+        "y": 13,
+        "width": 42,
+        "height": 37
+      }
+    },
+    {
+      "direction": "west",
+      "sourceBounds": {
+        "x": 887,
+        "y": 443,
+        "width": 443,
+        "height": 443
+      },
+      "targetBounds": {
+        "x": 6,
+        "y": 18,
+        "width": 52,
+        "height": 26
+      }
+    },
+    {
+      "direction": "north-west",
+      "sourceBounds": {
+        "x": 1330,
+        "y": 443,
+        "width": 443,
+        "height": 443
+      },
+      "targetBounds": {
+        "x": 10,
+        "y": 15,
+        "width": 44,
+        "height": 35
+      }
+    }
+  ],
+  "repairs": [
+    {
+      "targetFrame": 1,
+      "targetHeading": "north-east",
+      "mirroredFromFrame": 7,
+      "mirroredFromHeading": "north-west",
+      "transform": "mirror-x"
+    },
+    {
+      "targetFrame": 2,
+      "targetHeading": "east",
+      "mirroredFromFrame": 6,
+      "mirroredFromHeading": "west",
+      "transform": "mirror-x"
+    },
+    {
+      "targetFrame": 3,
+      "targetHeading": "south-east",
+      "mirroredFromFrame": 5,
+      "mirroredFromHeading": "south-west",
+      "transform": "mirror-x"
+    }
+  ]
+}

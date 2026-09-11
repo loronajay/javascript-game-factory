@@ -13,6 +13,24 @@ audit.**
 
 ## Models A
 
+### 2026-09-10 inspection in progress
+
+The full-roster stripe viewer now shows all 24 entries and exports a PNG. Missing
+atlases are explicitly marked unavailable. Saved positive/negative stripe curves
+are regression-tested on every available model and all eight headings. Lateral
+stripe guides now mirror with the repaired artwork.
+Both enlarged previews and the exported contact sheet use the race renderer's
+per-heading and per-model size normalization. Raw 64px atlas cells must not be
+used as visual evidence of in-race size. Every new model must retain consistent
+apparent size through all eight turns; the full-roster size audit remains part
+of acceptance, alongside physical nose direction and stripe flow.
+
+Coverage remains 6/24. The Shutter Z source draft has an opaque checkerboard and
+has not been admitted to the runtime catalog. The visual audit is not complete:
+Tsunami's North/South views both appear to show rear lamps, and Chrono's cardinal
+views need another physical-nose audit. Passing structural asset tests alone is
+not a visual sign-off.
+
 - [x] `kaido-gts` — Kaido GTS — GT — row 1, column 1
 - [x] `tsunami-rz` — Tsunami RZ — coupe — row 1, column 2
 - [ ] `shutter-z` — Shutter Z — coupe — row 1, column 3

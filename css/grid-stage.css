@@ -340,6 +340,37 @@
   box-shadow: 0 16px 32px rgba(0, 0, 0, 0.34), 0 0 18px rgba(237, 68, 160, 0.14);
 }
 
+/* The admin console's "Feature this cabinet" toggle lands here. A featured cabinet has
+   to read as featured AT REST, not only under the cursor, or an operator who saves the
+   toggle sees no difference and assumes the save failed. */
+.game-card.featured {
+  border-color: rgba(255, 184, 77, 0.6);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22), 0 0 20px rgba(255, 184, 77, 0.16);
+}
+
+.grid-page-shell .game-card.featured:hover,
+.grid-page-shell .game-card.featured:focus-visible,
+.grid-page-shell .game-card.featured.gamepad-selected {
+  border-color: rgba(255, 205, 128, 0.82);
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.34), 0 0 24px rgba(255, 184, 77, 0.26);
+}
+
+/* Bottom-right of the preview, because the top corners already carry the status badge
+   and the 2D/3D tag. */
+.game-card.featured .game-card__frame::after {
+  content: "\2605 FEATURED";
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 3;
+  padding: 6px 8px;
+  color: #1b1207;
+  background: rgba(255, 184, 77, 0.92);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
 .game-card.is-launching {
   transform: scale(0.985);
 }

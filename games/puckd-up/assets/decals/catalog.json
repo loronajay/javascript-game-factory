@@ -1,0 +1,322 @@
+[
+  {
+    "id": "decal.lightning-bolt",
+    "slug": "lightning-bolt",
+    "displayName": "Lightning Bolt",
+    "asset": "./lightning-bolt.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.skull",
+    "slug": "skull",
+    "displayName": "Skull",
+    "asset": "./skull.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.champion-crown",
+    "slug": "champion-crown",
+    "displayName": "Champion Crown",
+    "asset": "./champion-crown.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.target-reticle",
+    "slug": "target-reticle",
+    "displayName": "Target Reticle",
+    "asset": "./target-reticle.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.crossed-mallets",
+    "slug": "crossed-mallets",
+    "displayName": "Crossed Mallets",
+    "asset": "./crossed-mallets.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.turbine",
+    "slug": "turbine",
+    "displayName": "Turbine",
+    "asset": "./turbine.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.reactor-core",
+    "slug": "reactor-core",
+    "displayName": "Reactor Core",
+    "asset": "./reactor-core.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.radiation",
+    "slug": "radiation",
+    "displayName": "Radiation",
+    "asset": "./radiation.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.claw-marks",
+    "slug": "claw-marks",
+    "displayName": "Claw Marks",
+    "asset": "./claw-marks.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.flaming-puck",
+    "slug": "flaming-puck",
+    "displayName": "Flaming Puck",
+    "asset": "./flaming-puck.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.circuit-puck",
+    "slug": "circuit-puck",
+    "displayName": "Circuit Puck",
+    "asset": "./circuit-puck.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.champion-shield",
+    "slug": "champion-shield",
+    "displayName": "Champion Shield",
+    "asset": "./champion-shield.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.gold-star",
+    "slug": "gold-star",
+    "displayName": "Gold Star",
+    "asset": "./gold-star.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.number-one-laurel",
+    "slug": "number-one-laurel",
+    "displayName": "Number One Laurel",
+    "asset": "./number-one-laurel.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.checkered-flag",
+    "slug": "checkered-flag",
+    "displayName": "Checkered Flag",
+    "asset": "./checkered-flag.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.yin-yang",
+    "slug": "yin-yang",
+    "displayName": "Yin Yang",
+    "asset": "./yin-yang.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.spade",
+    "slug": "spade",
+    "displayName": "Spade",
+    "asset": "./spade.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.club",
+    "slug": "club",
+    "displayName": "Club",
+    "asset": "./club.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.wolf",
+    "slug": "wolf",
+    "displayName": "Wolf",
+    "asset": "./wolf.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.smiley",
+    "slug": "smiley",
+    "displayName": "Smiley",
+    "asset": "./smiley.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.pixel-ghost",
+    "slug": "pixel-ghost",
+    "displayName": "Pixel Ghost",
+    "asset": "./pixel-ghost.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.arcade-joystick",
+    "slug": "arcade-joystick",
+    "displayName": "Arcade Joystick",
+    "asset": "./arcade-joystick.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.facet-star",
+    "slug": "facet-star",
+    "displayName": "Arcade Star",
+    "asset": "./facet-star.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.hex-cluster",
+    "slug": "hex-cluster",
+    "displayName": "Hex Cluster",
+    "asset": "./hex-cluster.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.carbon-fiber",
+    "slug": "carbon-fiber",
+    "displayName": "Carbon Fiber",
+    "asset": "./carbon-fiber.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.gear",
+    "slug": "gear",
+    "displayName": "Gear",
+    "asset": "./gear.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.glitch-x",
+    "slug": "glitch-x",
+    "displayName": "Glitch X",
+    "asset": "./glitch-x.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.crossed-bars",
+    "slug": "crossed-bars",
+    "displayName": "Crossed Bars",
+    "asset": "./crossed-bars.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.cherry-blossom",
+    "slug": "cherry-blossom",
+    "displayName": "Cherry Blossom",
+    "asset": "./cherry-blossom.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.great-wave",
+    "slug": "great-wave",
+    "displayName": "Great Wave",
+    "asset": "./great-wave.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.galaxy",
+    "slug": "galaxy",
+    "displayName": "Galaxy",
+    "asset": "./galaxy.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.mountain-moon",
+    "slug": "mountain-moon",
+    "displayName": "Mountain Moon",
+    "asset": "./mountain-moon.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.desert-sunset",
+    "slug": "desert-sunset",
+    "displayName": "Desert Sunset",
+    "asset": "./desert-sunset.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.snowflake",
+    "slug": "snowflake",
+    "displayName": "Snowflake",
+    "asset": "./snowflake.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.city-skyline",
+    "slug": "city-skyline",
+    "displayName": "City Skyline",
+    "asset": "./city-skyline.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.rising-sun",
+    "slug": "rising-sun",
+    "displayName": "Rising Sun",
+    "asset": "./rising-sun.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.monster-grin",
+    "slug": "monster-grin",
+    "displayName": "Monster Grin",
+    "asset": "./monster-grin.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.oni-mask",
+    "slug": "oni-mask",
+    "displayName": "Oni Mask",
+    "asset": "./oni-mask.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.anarchy",
+    "slug": "anarchy",
+    "displayName": "Anarchy",
+    "asset": "./anarchy.png",
+    "width": 512,
+    "height": 512
+  },
+  {
+    "id": "decal.speed-slashes",
+    "slug": "speed-slashes",
+    "displayName": "Speed Slashes",
+    "asset": "./speed-slashes.png",
+    "width": 512,
+    "height": 512
+  }
+]

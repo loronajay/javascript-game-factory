@@ -15,6 +15,7 @@
 // Validation lives in services/speed-demon-catalog, not here: this module owns
 // the rows, the catalog owns what a valid garage means. A second cabinet wanting
 // server-backed cosmetics registers its own catalog and reuses this table.
+// Four cabinets share it now: Speed Demon, Yam Bowling, Shark Hall, Puck'd Up.
 
 import {
   SPEED_DEMON_GAME_SLUG,
@@ -29,6 +30,10 @@ import {
   SHARK_HALL_GAME_SLUG,
   SHARK_HALL_LOADOUT_CATALOG,
 } from "../services/shark-hall-loadout-catalog.mjs";
+import {
+  PUCK_D_UP_GAME_SLUG,
+  PUCK_D_UP_LOADOUT_CATALOG,
+} from "../services/puckd-up-loadout-catalog.mjs";
 
 const VALID_GAME_SLUG = /^[a-z0-9-]{1,60}$/;
 
@@ -47,6 +52,7 @@ const CATALOGS: Record<string, LoadoutCatalog> = {
   [SPEED_DEMON_GAME_SLUG]: { normalizeGarage, loadoutFromGarage },
   [YAM_BOWLING_GAME_SLUG]: YAM_BOWLING_LOADOUT_CATALOG,
   [SHARK_HALL_GAME_SLUG]: SHARK_HALL_LOADOUT_CATALOG,
+  [PUCK_D_UP_GAME_SLUG]: PUCK_D_UP_LOADOUT_CATALOG,
 };
 
 function cleanText(value: any, maxLength = 120): string {

@@ -799,19 +799,17 @@ test("a car with nothing saved for it still has a paint row that does not break"
   }
 });
 
-test("Circuit Race defaults to Old Town, offers Docklands, and blocks models without directional art", () => {
+test("Circuit Race defaults to Old Town, offers Docklands, and accepts the completed roster", () => {
   const available = createSetup({ modeId: MODE_CIRCUIT, modelId: "kaido-gts" });
   assertEqual(setupTrack(available).id, "old-town-shrine-loop");
   assertEqual(setupTrack(moveSetup({ ...available, pane: PANE_TRACK }, "right", EMPTY)).id, "docklands-freight-loop");
   assertEqual(setupView(available, EMPTY).start.disabled, false);
 
-  const unavailable = createSetup({ modeId: MODE_CIRCUIT, modelId: "shutter-z" });
-  const view = setupView(unavailable, EMPTY);
-  assertEqual(view.start.disabled, true);
-  assertEqual(view.start.label, "ATLAS UNAVAILABLE");
-  const result = confirmSetup({ ...unavailable, pane: PANE_OBJECTIVE }, EMPTY);
-  assertEqual(result.done, false);
-  assertEqual(result.unavailable, true);
+  const shutter = createSetup({ modeId: MODE_CIRCUIT, modelId: "shutter-z" });
+  const view = setupView(shutter, EMPTY);
+  assertEqual(view.start.disabled, false);
+  const result = confirmSetup({ ...shutter, pane: PANE_DIFFICULTY }, EMPTY);
+  assertEqual(result.done, true);
 });
 
 test("Circuit Race setup lets the player choose CPU difficulty", () => {

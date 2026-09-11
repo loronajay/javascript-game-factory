@@ -12,7 +12,7 @@
       <div>
         <p class="eyebrow">Speed Demon · Real circuit renderer</p>
         <h1>Circuit Stripe Viewer</h1>
-        <p class="lede">All eight baked in-game frames, shown with their perspective-calibrated panel correction.</p>
+        <p class="lede">All 24 garage cars, with real in-game stripes and normalized turning size.</p>
       </div>
       <a href="../index.html">Back to game</a>
     </header>
@@ -63,6 +63,7 @@
         </label>
 
         <button id="reset" type="button">Reset high-contrast preview</button>
+        <button id="exportRoster" type="button">Save full roster PNG</button>
 
         <p class="note"><strong>What is fixed:</strong> each visible hood, roof and deck segment follows a calibrated stripe axis. Position, width and curve still come from the real player livery.</p>
         <p class="note"><strong>North and South:</strong> unchanged, because those frames were already correct.</p>
@@ -74,11 +75,20 @@
             <p class="eyebrow">Corrected output</p>
             <h2 id="viewerTitle">Every direction</h2>
           </div>
-          <span>64px source · 4× nearest-neighbour preview</span>
+          <span>Race size normalization · nearest-neighbour preview</span>
+        </div>
+        <div class="turntable-row">
+          <canvas id="turntable" width="256" height="256" aria-label="Animated circuit car turning through all eight headings"></canvas>
+          <div><h3>Turning-size check</h3><p id="turnHeading">North</p><button id="pauseTurntable" type="button">Pause turntable</button></div>
         </div>
         <div id="directionGrid" class="direction-grid"></div>
       </section>
     </main>
+    <section class="roster-viewer" aria-labelledby="rosterTitle">
+      <h2 id="rosterTitle">Full garage roster · stripe inspection</h2>
+      <p class="lede">The controls above apply to every available car below. Click a car name for the larger eight-view inspection.</p>
+      <div id="rosterGrid"></div>
+    </section>
 
     <script type="module" src="circuit-livery-viewer.js"></script>
   </body>

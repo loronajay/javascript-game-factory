@@ -249,7 +249,7 @@ test("a private room switches between drag and circuit without changing the load
   assertEqual(Object.hasOwn(request.config, "modelId"), false, "car config remains a separate loadout");
 });
 
-test("circuit rows show laps and block ready when either car lacks a circuit atlas", () => {
+test("circuit rows show laps and allow Shutter Z to ready with its own atlas", () => {
   const config = { raceTypeId: "circuit", trackId: "old-town-shrine-loop", laps: 3, bestOf: 1 };
   const unavailable = lobbySession({
     config,
@@ -261,8 +261,8 @@ test("circuit rows show laps and block ready when either car lacks a circuit atl
   const view = onlineView(createOnlineMenu(), unavailable).lobby;
   assertEqual(view.rows.find((row) => row.id === LOBBY_ROW_DISTANCE).label, "LAPS");
   assertEqual(view.rows.find((row) => row.id === LOBBY_ROW_DISTANCE).value, "3 LAPS");
-  assert(view.issue.includes("Bo"));
-  assertEqual(confirmOnline(onRow(unavailable, LOBBY_ROW_READY), unavailable), ONLINE_NOTHING);
+  assert(!view.issue);
+  assertEqual(confirmOnline(onRow(unavailable, LOBBY_ROW_READY), unavailable), ONLINE_READY);
 });
 
 test("a circuit room cycles through the location track catalog", () => {

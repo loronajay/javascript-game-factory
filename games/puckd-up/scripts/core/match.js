@@ -19,6 +19,12 @@ export function createMatch({ config = {}, emit = () => {
             if (state.screen === 'menu')
                 screen('online');
         },
+        // The Garage is a menu destination, not a match state: no bodies move
+        // and no score exists while it is open.
+        garage() {
+            if (state.screen === 'menu')
+                screen('garage');
+        },
         setup() {
             if (state.screen === 'menu') {
                 state.mode = 'cpu';

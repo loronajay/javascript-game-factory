@@ -110,7 +110,12 @@ function getSFX(): any {
 }
 
 function createCard(game: ArcadeGameEntry): HTMLAnchorElement {
-  const card = element("a", ["game-card", ...game.cardClasses].join(" "));
+  // The admin console's "Feature this cabinet" toggle only reaches a player through this
+  // class: the override is stored and merged onto the catalog entry, and this is the one
+  // place that turns it into something visible.
+  const classes = ["game-card", ...game.cardClasses];
+  if (game.featured) classes.push("featured");
+  const card = element("a", classes.join(" "));
   card.href = game.href;
   card.setAttribute("aria-description", game.description);
 

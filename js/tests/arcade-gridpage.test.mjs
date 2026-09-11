@@ -171,6 +171,24 @@ test("grid script only shows selection styling after arcade input is used", () =
   );
 });
 
+test("a featured cabinet is visibly featured on the grid", () => {
+  // The admin console's "Feature this cabinet" toggle is stored and merged onto the
+  // catalog entry, but it only reaches a player through this class. Without it the save
+  // succeeds and nothing on the grid changes, which reads as a broken button.
+  assert(
+    gridScript.includes("game.featured"),
+    "expected the card builder to read the merged featured flag"
+  );
+  assert(
+    gridStageCss.includes(".game-card.featured"),
+    "expected featured cabinets to carry a resting treatment, not only a hover one"
+  );
+  assert(
+    gridStageCss.includes(".game-card.featured .game-card__frame::after"),
+    "expected a featured badge on the card preview"
+  );
+});
+
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed`);
 
 if (failed > 0) {

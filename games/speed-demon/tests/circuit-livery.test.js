@@ -37,6 +37,7 @@ const {
   createCircuitLiveryCache,
   circuitLiveryAtlas,
   measureCircuitBodyGeometry,
+  circuitFrameGeometry,
 } = await import("../scripts/circuit/livery-atlas.js");
 const {
   KAIDO_STRIPE_PANEL_GUIDES,
@@ -216,7 +217,7 @@ test("editor turntable visits all eight headings without changing the livery", (
 });
 
 test("Kaido stripe projection has authored panels in six views and preserves North and South", () => {
-  const expectedPanelCounts = [0, 4, 4, 4, 0, 4, 3, 4];
+  const expectedPanelCounts = [0, 4, 3, 4, 0, 4, 3, 4];
   assertEqual(KAIDO_STRIPE_PANEL_GUIDES.length, 8);
   for (let frame = 0; frame < 8; frame += 1) {
     assertEqual(KAIDO_STRIPE_PANEL_GUIDES[frame].length, expectedPanelCounts[frame], `frame ${frame}`);
@@ -271,6 +272,9 @@ test("Kaido follows every authored panel angle and uses each pair only as a roug
 
   for (const [frameText, paths] of Object.entries(KAIDO_GUIDED_PATHS)) {
     const frame = Number(frameText);
+    // East-facing artwork was replaced by mirrored West views; its old
+    // hand-drawn guides no longer describe the pixels in the runtime sheet.
+    if ([1, 2, 3].includes(frame)) continue;
     for (let pair = 0; pair < paths.length; pair += 2) {
       const samples = paths.slice(pair, pair + 2);
       for (let sample = 0; sample < samples.length; sample += 1) {
@@ -301,6 +305,24 @@ test("Kaido follows every authored panel angle and uses each pair only as a roug
   }
 });
 
+test("stripe guides follow the same mirrored headings as the repaired car artwork", () => {
+  for (const model of CIRCUIT_MODELS) {
+    const guides = circuitStripePanelGuides(model.modelId);
+    for (const [east, west] of [[1, 7], [2, 6], [3, 5]]) {
+      assertEqual(guides[east].length, guides[west].length, `${model.modelId}: mismatched panels`);
+      guides[west].forEach((guide, panel) => {
+        for (const line of ["a", "b"]) {
+          guide[line].forEach(([x, y], endpoint) => {
+            assertClose(guides[east][panel][line][endpoint][0], 63 - x, 1e-9,
+              `${model.modelId} frame ${east}: stripe angle does not follow mirrored art`);
+            assertClose(guides[east][panel][line][endpoint][1], y, 1e-9);
+          });
+        }
+      });
+    }
+  }
+});
+
 test("the Kaido viewer shows all eight corrected frames through the real circuit baker", () => {
   const html = readFileSync(join(root, "tools/circuit-livery-viewer.html"), "utf8");
   const source = readFileSync(join(root, "tools/circuit-livery-viewer.js"), "utf8");
@@ -311,7 +333,58 @@ test("the Kaido viewer shows all eight corrected frames through the real circuit
   assert(source.includes("circuitLiveryAtlas"));
   assert(source.includes("CIRCUIT_FRAME_HEADINGS"));
   assert(source.includes("CIRCUIT_MODELS"));
+  assert(html.includes('id="rosterGrid"'), "full-roster inspection is missing");
+  assert(html.includes('id="exportRoster"'), "striped contact sheet cannot be saved");
+  assert(html.includes('id="turntable"'), "turning-size inspection is missing");
+  assert(source.includes("createRosterPreview"));
+  assert(source.includes("circuitFrameGeometry"));
+  assert(source.includes("circuitDrawBox"), "large previews bypass race sizing");
+  const rosterSource = readFileSync(join(root, "tools/circuit-roster-preview.js"), "utf8");
+  assert(rosterSource.includes("circuitFrameGeometry"));
+  assert(rosterSource.includes("circuitDrawBox"), "export bypasses race sizing");
   assert(!source.includes("const MODEL_ID"));
+});
+
+test("garage stripe curves survive serialization and bake distinctly on every model and heading", () => {
+  for (const model of CIRCUIT_MODELS) {
+    const png = readPng(readFileSync(join(root, "assets/circuit-cars", model.spritesheet)));
+    const sourceImage = Object.assign(png.pixels, {
+      width: png.width, height: png.height, complete: true, naturalWidth: png.width,
+    });
+    const outputs = [-0.25, 0, 0.25].map((curve) => {
+      let livery = addLayer(createLivery({ paint: { hue: 0, saturation: 0.9, brightness: 0.7 } }), "stripes");
+      livery = updateLayer(livery, livery.layers[0].id, {
+        curve, size: 0.08, paint: { hue: 0, saturation: 0, brightness: 1.3 },
+      });
+      const saved = JSON.stringify(livery);
+      const restored = createLivery(JSON.parse(saved));
+      assertEqual(restored.layers[0].curve, curve);
+      const bakeCache = createCircuitLiveryCache();
+      const atlas = circuitLiveryAtlas(bakeCache, {
+        image: sourceImage, modelId: model.modelId, livery: restored,
+      });
+      const areas = Array.from({ length: 8 }, (_, frame) => {
+        const geometry = circuitFrameGeometry(bakeCache, model.modelId, frame);
+        return geometry.alphaArea * geometry.scale ** 2;
+      });
+      for (const area of areas) assertClose(area, areas[0], areas[0] * 0.01,
+        `${model.modelId}: baked heading changes apparent size`);
+      assertEqual(JSON.stringify(livery), saved, "baking mutated the garage livery");
+      return atlas.data;
+    });
+    for (let frame = 0; frame < 8; frame += 1) {
+      for (const comparison of [0, 2]) {
+        let changed = 0;
+        for (let y = 0; y < 64; y += 1) {
+          for (let x = 0; x < 64; x += 1) {
+            const offset = (y * png.width + frame * 64 + x) * 4;
+            if (outputs[comparison][offset] !== outputs[1][offset]) changed += 1;
+          }
+        }
+        assert(changed > 5, `${model.modelId} frame ${frame} lost curve ${comparison}`);
+      }
+    }
+  }
 });
 
 finish();

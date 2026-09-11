@@ -25,52 +25,286 @@
       "renderScale": 1.0124582021614492,
       "spritesheet": "kaido-gts/spritesheet-clockwise-from-north.png",
       "manifest": "kaido-gts/spritesheet.json",
-      "footprint": { "halfLength": 16, "halfWidth": 9 }
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
     },
     {
       "modelId": "tsunami-rz",
       "label": "Tsunami RZ",
       "archetype": "coupe",
-      "renderScale": 0.9754665882886004,
+      "renderScale": 1.6452857989813294,
       "spritesheet": "tsunami-rz/spritesheet-clockwise-from-north.png",
       "manifest": "tsunami-rz/spritesheet.json",
-      "footprint": { "halfLength": 16, "halfWidth": 9 }
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "shutter-z",
+      "label": "Shutter Z",
+      "archetype": "coupe",
+      "renderScale": 1.3974124731575182,
+      "spritesheet": "shutter-z/spritesheet-clockwise-from-north.png",
+      "manifest": "shutter-z/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "meridian-rs",
+      "label": "Meridian RS",
+      "archetype": "euro",
+      "renderScale": 1.472454340455064,
+      "spritesheet": "meridian-rs/spritesheet-clockwise-from-north.png",
+      "manifest": "meridian-rs/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "monolith-8",
+      "label": "Monolith 8",
+      "archetype": "wedge",
+      "renderScale": 1.4538550010107347,
+      "spritesheet": "monolith-8/spritesheet-clockwise-from-north.png",
+      "manifest": "monolith-8/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "zephyr-z",
+      "label": "Zephyr Z",
+      "archetype": "coupe",
+      "renderScale": 1.393736377593823,
+      "spritesheet": "zephyr-z/spritesheet-clockwise-from-north.png",
+      "manifest": "zephyr-z/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "stallion-gt",
+      "label": "Stallion GT",
+      "archetype": "muscle",
+      "renderScale": 1.4791422825480283,
+      "spritesheet": "stallion-gt/spritesheet-clockwise-from-north.png",
+      "manifest": "stallion-gt/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "aero-rs",
+      "label": "Aero RS",
+      "archetype": "euro",
+      "renderScale": 1.4135253616051755,
+      "spritesheet": "aero-rs/spritesheet-clockwise-from-north.png",
+      "manifest": "aero-rs/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "skyward-r",
+      "label": "Skyward R",
+      "archetype": "gt",
+      "renderScale": 1.5391437169460167,
+      "spritesheet": "skyward-r/spritesheet-clockwise-from-north.png",
+      "manifest": "skyward-r/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "gravel-stx",
+      "label": "Gravel STx",
+      "archetype": "gt",
+      "renderScale": 1.3999294986609823,
+      "spritesheet": "gravel-stx/spritesheet-clockwise-from-north.png",
+      "manifest": "gravel-stx/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
     },
     {
       "modelId": "toro-sv",
       "label": "Toro SV",
       "archetype": "exotic",
-      "renderScale": 0.905228093365718,
+      "renderScale": 0.9052280933657142,
       "spritesheet": "toro-sv/spritesheet-clockwise-from-north.png",
       "manifest": "toro-sv/spritesheet.json",
-      "footprint": { "halfLength": 16, "halfWidth": 9 }
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
     },
     {
       "modelId": "scalpel-r",
       "label": "Scalpel R",
       "archetype": "hatch",
-      "renderScale": 0.9557750924830416,
+      "renderScale": 0.9557750924830376,
       "spritesheet": "scalpel-r/spritesheet-clockwise-from-north.png",
       "manifest": "scalpel-r/spritesheet.json",
-      "footprint": { "halfLength": 16, "halfWidth": 9 }
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
     },
     {
       "modelId": "chrono-12",
       "label": "Chrono 12",
       "archetype": "wedge",
-      "renderScale": 1.080411272370425,
+      "renderScale": 1.1081490242437988,
       "spritesheet": "chrono-12/spritesheet-clockwise-from-north.png",
       "manifest": "chrono-12/spritesheet.json",
-      "footprint": { "halfLength": 16, "halfWidth": 9 }
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "orbit-rz",
+      "label": "Orbit RZ",
+      "archetype": "coupe",
+      "renderScale": 1.4809233949215506,
+      "spritesheet": "orbit-rz/spritesheet-clockwise-from-north.png",
+      "manifest": "orbit-rz/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "vega-qv",
+      "label": "Vega QV",
+      "archetype": "exotic",
+      "renderScale": 1.4250124406584523,
+      "spritesheet": "vega-qv/spritesheet-clockwise-from-north.png",
+      "manifest": "vega-qv/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "crest-s",
+      "label": "Crest S",
+      "archetype": "euro",
+      "renderScale": 1.4236912348659303,
+      "spritesheet": "crest-s/spritesheet-clockwise-from-north.png",
+      "manifest": "crest-s/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "titan-r",
+      "label": "Titan R",
+      "archetype": "gt",
+      "renderScale": 1.4318347997456087,
+      "spritesheet": "titan-r/spritesheet-clockwise-from-north.png",
+      "manifest": "titan-r/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "cyclone-rz",
+      "label": "Cyclone RZ",
+      "archetype": "coupe",
+      "renderScale": 1.5140779431637947,
+      "spritesheet": "cyclone-rz/spritesheet-clockwise-from-north.png",
+      "manifest": "cyclone-rz/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
     },
     {
       "modelId": "colt-gt",
       "label": "Colt GT",
       "archetype": "muscle",
-      "renderScale": 1.0298041716846214,
+      "renderScale": 1.0298041716846171,
       "spritesheet": "colt-gt/spritesheet-clockwise-from-north.png",
       "manifest": "colt-gt/spritesheet.json",
-      "footprint": { "halfLength": 16, "halfWidth": 9 }
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "ember-rs",
+      "label": "Ember RS",
+      "archetype": "hatch",
+      "renderScale": 1.398210057474193,
+      "spritesheet": "ember-rs/spritesheet-clockwise-from-north.png",
+      "manifest": "ember-rs/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "halo-lt",
+      "label": "Halo LT",
+      "archetype": "exotic",
+      "renderScale": 1.565014121119803,
+      "spritesheet": "halo-lt/spritesheet-clockwise-from-north.png",
+      "manifest": "halo-lt/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "vortex-fd",
+      "label": "Vortex FD",
+      "archetype": "coupe",
+      "renderScale": 1.4116270272481413,
+      "spritesheet": "vortex-fd/spritesheet-clockwise-from-north.png",
+      "manifest": "vortex-fd/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "kaido-r",
+      "label": "Kaido R",
+      "archetype": "gt",
+      "renderScale": 1.4699667509208747,
+      "spritesheet": "kaido-r/spritesheet-clockwise-from-north.png",
+      "manifest": "kaido-r/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
+    },
+    {
+      "modelId": "crest-turbo",
+      "label": "Crest Turbo",
+      "archetype": "euro",
+      "renderScale": 1.4200891957068185,
+      "spritesheet": "crest-turbo/spritesheet-clockwise-from-north.png",
+      "manifest": "crest-turbo/spritesheet.json",
+      "footprint": {
+        "halfLength": 16,
+        "halfWidth": 9
+      }
     }
   ]
 }

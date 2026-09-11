@@ -134,6 +134,14 @@ canvas { width: min(100%, 256px); height: auto; image-rendering: pixelated; }
 .direction-name { font-size: 13px; font-weight: 850; text-transform: uppercase; letter-spacing: 0.05em; }
 .correction { color: var(--accent); font-size: 11px; font-weight: 800; }
 .correction.identity { color: var(--muted); }
+.turntable-row { display: flex; align-items: center; gap: 20px; margin-bottom: 20px; background: #0c1319; border-radius: 10px; }
+.turntable-row canvas { width: 50%; max-width: 256px; }
+.turntable-row p { margin: 12px 0; color: var(--muted); text-transform: uppercase; }
+.roster-viewer { width: min(1500px, calc(100% - 32px)); margin: 32px auto; }
+.roster-card { margin-top: 18px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); }
+.roster-card button { margin: 12px; }
+.roster-card img { display: block; width: 100%; max-width: none; image-rendering: pixelated; }
+.roster-card button:disabled { cursor: default; color: var(--muted); }
 
 @media (max-width: 1000px) {
   main { grid-template-columns: 1fr; }

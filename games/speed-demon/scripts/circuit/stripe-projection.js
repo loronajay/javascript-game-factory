@@ -8,6 +8,7 @@
 
 import { CIRCUIT_FRAME_SIZE } from "./assets.js";
 import { localCarCoordinates } from "./sprite-geometry.js";
+import { MODEL_STRIPE_GUIDES } from "./model-stripe-guides.js";
 
 const pair = (a0, a1, b0, b1) => Object.freeze({
   a: Object.freeze([Object.freeze(a0), Object.freeze(a1)]),
@@ -20,6 +21,14 @@ const pair = (a0, a1, b0, b1) => Object.freeze({
 const physicalHeadingOrder = (frames) => Object.freeze(frames.map(
   (_, frame) => frames[(frame + 4) % 8],
 ));
+
+function mirroredLateralGuides(frames) {
+  const result = [...frames];
+  for (const [east, west] of [[1, 7], [2, 6], [3, 5]]) {
+    result[east] = Object.freeze(frames[west].map(mirrorGuide));
+  }
+  return Object.freeze(result);
+}
 
 // Atlas frame order by visible nose:
 // North, Northeast, East, Southeast, South, Southwest, West, Northwest.
@@ -65,71 +74,29 @@ const KAIDO_CAMERA_VIEW_PANEL_GUIDES = Object.freeze([
   ]),
 ]);
 
-export const KAIDO_STRIPE_PANEL_GUIDES = physicalHeadingOrder(KAIDO_CAMERA_VIEW_PANEL_GUIDES);
+export const KAIDO_STRIPE_PANEL_GUIDES = mirroredLateralGuides(physicalHeadingOrder(KAIDO_CAMERA_VIEW_PANEL_GUIDES));
 
-const TSUNAMI_WEST_GUIDES = Object.freeze([
-  pair([18.87, 25.56], [6.64, 27.96], [18.64, 27.84], [6.19, 30.7]),
-  pair([30.53, 21.1], [42.3, 20.76], [30.19, 23.96], [41.96, 23.16]),
-  pair([52.47, 25.9], [53.84, 26.01], [52.13, 28.53], [53.61, 28.53]),
-]);
-
-const mirrorGuide = (guide) => pair(
+function mirrorGuide(guide) { return pair(
   [63 - guide.a[0][0], guide.a[0][1]],
   [63 - guide.a[1][0], guide.a[1][1]],
   [63 - guide.b[0][0], guide.b[0][1]],
   [63 - guide.b[1][0], guide.b[1][1]],
-);
+); }
 
-// Tsunami's generated East body was invalid and is repaired from mirrored West
-// art. Its East guide follows the same identity-preserving mirror rather than
-// retaining paths authored over the discarded car.
-const TSUNAMI_CAMERA_VIEW_PANEL_GUIDES = Object.freeze([
-  Object.freeze([]),
-  Object.freeze([
-    pair([32.81, 16.76], [25.73, 23.27], [38.53, 18.36], [31.21, 25.1]),
-    pair([18.07, 33.9], [12.7, 38.36], [22.19, 36.19], [17.16, 42.01]),
-    pair([12.01, 43.04], [10.3, 54.13], [15.44, 44.87], [14.53, 55.5]),
-  ]),
-  TSUNAMI_WEST_GUIDES,
-  Object.freeze([
-    pair([27.44, 18.36], [36.59, 25.33], [33.04, 15.39], [41.39, 22.47]),
-    pair([45.27, 32.99], [48.13, 35.04], [49.04, 30.24], [52.01, 33.56]),
-    pair([47.33, 35.96], [47.33, 47.61], [51.44, 35.04], [50.99, 44.99]),
-    pair([22.07, 16.41], [15.44, 13.33], [17.96, 18.47], [12.13, 15.27]),
-  ]),
-  Object.freeze([]),
-  Object.freeze([
-    pair([31.1, 15.61], [20.7, 22.36], [35.44, 18.01], [25.16, 24.76]),
-    pair([41.5, 16.53], [48.13, 14.59], [45.27, 18.24], [50.53, 16.07]),
-    pair([14.87, 32.07], [13.04, 34.01], [18.3, 33.21], [15.44, 36.19]),
-    pair([13.04, 36.07], [12.93, 46.59], [15.56, 38.13], [16.24, 48.53]),
-  ]),
-  Object.freeze(TSUNAMI_WEST_GUIDES.map(mirrorGuide)),
-  Object.freeze([
-    pair([21.39, 17.44], [28.36, 24.07], [25.96, 15.84], [32.36, 22.01]),
-    pair([38.3, 36.64], [44.7, 42.01], [43.21, 33.79], [48.47, 39.39]),
-    pair([47.9, 45.79], [48.7, 55.39], [50.53, 43.84], [51.67, 55.04]),
-  ]),
-]);
-
-export const TSUNAMI_STRIPE_PANEL_GUIDES = physicalHeadingOrder(TSUNAMI_CAMERA_VIEW_PANEL_GUIDES);
+const calibratedGuides = Object.freeze(Object.fromEntries(Object.entries(MODEL_STRIPE_GUIDES).map(
+  ([modelId, frames]) => [modelId, Object.freeze(frames.map((guides) => Object.freeze(guides.map(
+    (guide) => pair(guide.a[0], guide.a[1], guide.b[0], guide.b[1]),
+  ))))],
+)));
+export const TSUNAMI_STRIPE_PANEL_GUIDES = calibratedGuides["tsunami-rz"];
 
 const EMPTY_STRIPE_PANEL_GUIDES = Object.freeze(Array.from(
   { length: 8 },
   () => Object.freeze([]),
 ));
 const STRIPE_PANEL_GUIDES_BY_MODEL = Object.freeze({
+  ...calibratedGuides,
   "kaido-gts": KAIDO_STRIPE_PANEL_GUIDES,
-  "tsunami-rz": TSUNAMI_STRIPE_PANEL_GUIDES,
-  // All six remaining masters use the same camera pose and panel layout as
-  // Kaido. Sharing its calibrated perspective axes gives every race-ready body
-  // honest hood/roof/deck angles instead of falling back to one flat rectangle.
-  "meridian-rs": KAIDO_STRIPE_PANEL_GUIDES,
-  "skyward-r": KAIDO_STRIPE_PANEL_GUIDES,
-  "toro-sv": KAIDO_STRIPE_PANEL_GUIDES,
-  "scalpel-r": KAIDO_STRIPE_PANEL_GUIDES,
-  "chrono-12": KAIDO_STRIPE_PANEL_GUIDES,
-  "colt-gt": KAIDO_STRIPE_PANEL_GUIDES,
 });
 
 export function circuitStripePanelGuides(modelId) {

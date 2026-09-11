@@ -9,7 +9,10 @@ import { buildZeroGArena, ZERO_G_ARENA_STYLE } from './zero-g-arena.js';
 import { createVenueHelpers } from './helpers.js';
 export function createVenues(THREE, stage, table) {
     const { scene, renderer, hemi, key, cool, warm } = stage;
-    const { bed, field, railVisMat, railTopMat, lineMat } = table;
+    // The venue themes the whole cabinet: every field plane and every rail
+    // section, including both halves. A half with an equipped garage design is
+    // re-asserted on top afterwards by `table.refreshHalves()`.
+    const { bed, fieldMaterials, railMaterials, lineMat } = table;
     const venueRoot = new THREE.Group();
     scene.add(venueRoot);
     const arenaGroups = new Map();
@@ -70,15 +73,19 @@ export function createVenues(THREE, stage, table) {
         warm.intensity = t.warmIntensity;
         renderer.toneMappingExposure = t.exposure;
         bed.material.color.setHex(t.bed);
-        field.material.color.setHex(t.field);
-        field.material.map = activeArenaGroup.userData.fieldMap;
-        field.material.roughness = TABLE_FINISHES[id].roughness;
-        field.material.metalness = TABLE_FINISHES[id].metalness;
-        field.material.emissive.setHex(TABLE_FINISHES[id].emissive || 0x000000);
-        field.material.emissiveIntensity = TABLE_FINISHES[id].emissiveIntensity || 0;
-        field.material.needsUpdate = true;
-        railVisMat.color.setHex(t.rail);
-        railTopMat.color.setHex(t.railTop);
+        for (const material of fieldMaterials) {
+            material.color.setHex(t.field);
+            material.map = activeArenaGroup.userData.fieldMap;
+            material.roughness = TABLE_FINISHES[id].roughness;
+            material.metalness = TABLE_FINISHES[id].metalness;
+            material.emissive.setHex(TABLE_FINISHES[id].emissive || 0x000000);
+            material.emissiveIntensity = TABLE_FINISHES[id].emissiveIntensity || 0;
+            material.needsUpdate = true;
+        }
+        for (const pair of Object.values(railMaterials)) {
+            pair.body.color.setHex(t.rail);
+            pair.top.color.setHex(t.railTop);
+        }
         lineMat.color.setHex(t.line);
     }
     function updateArenaVisuals(time) {

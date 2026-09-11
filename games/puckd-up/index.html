@@ -49,8 +49,11 @@
             <button class="modeBtn" type="button" id="onlineModeBtn" disabled>
               <span class="commandIndex">03</span><span class="commandCopy"><b>Online 1v1</b><small id="onlineAccountNote">Sign in to Player Factory to play online</small></span><span class="commandArrow" aria-hidden="true">›</span>
             </button>
+            <button class="modeBtn" type="button" id="garageModeBtn">
+              <span class="commandIndex">04</span><span class="commandCopy"><b>Garage</b><small>Build your mallet and your half of the table</small></span><span class="commandArrow" aria-hidden="true">›</span>
+            </button>
             <button class="modeBtn" type="button" disabled>
-              <span class="commandIndex">04</span><span class="commandCopy"><b>Training Lab</b><small>Free play · coming soon</small></span><span class="statusTag">Locked</span>
+              <span class="commandIndex">05</span><span class="commandCopy"><b>Training Lab</b><small>Free play · coming soon</small></span><span class="statusTag">Locked</span>
             </button>
           </div>
           <div class="menuUtility">
@@ -158,6 +161,33 @@
             <div><span id="rivalTitle">The Prodigy // Reactive</span><strong id="rivalName">Jin</strong><small id="rivalIntro">Seventeen, scary fast to learn, and still liable to bite on the first fake.</small><em id="rivalRecord">Record 0–0</em></div>
           </div>
         </aside>
+      </div>
+    </section>
+
+
+    <!-- The Garage panel sits OVER the live cabinet canvas rather than over a
+         preview of its own: the table behind it is the real one, so Match View
+         is the match camera and nothing can look different once play starts.
+         Only the panel takes pointer events; the canvas stays orbitable. -->
+    <section class="screen garageScreen" id="garageScreen" data-splash="garage" aria-label="Garage" hidden>
+      <div class="garagePanel">
+        <div class="garageHeader">
+          <div class="screenKicker"><span>Garage</span><span id="garageStatus" data-tone="ok">Saved to your account</span></div>
+          <h2>Your equipment</h2>
+          <p class="garageSubhead">You own your mallet and your half of the table. The far half belongs to whoever is standing there.</p>
+          <div class="garageTabs" id="garageTabs" role="group" aria-label="Editor section"></div>
+        </div>
+        <div class="garageEditor" id="garageEditor"></div>
+        <div class="garageFooter">
+          <div class="garageCamera" id="garageCamera" role="group" aria-label="Camera"></div>
+          <button class="garageGhost" type="button" id="garageCollision" aria-pressed="false">Show collision</button>
+          <p class="garageNote" id="garageStatusNote" role="status" aria-live="polite"></p>
+          <div class="garageActions">
+            <button class="ghost" type="button" id="garageBack">Back</button>
+            <button type="button" id="garageRevert">Revert</button>
+            <button class="primary" type="button" id="garageSave">Save &amp; Equip</button>
+          </div>
+        </div>
       </div>
     </section>
 

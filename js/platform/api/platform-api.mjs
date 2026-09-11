@@ -116,6 +116,41 @@ export function createPlatformApiClient(options = {}) {
     return {
         baseUrl,
         isConfigured: !!baseUrl && typeof fetchImpl === "function",
+        // The raw verbs, authenticated and error-swallowing like every helper below.
+        // Cabinets with their own route families (per-game garages, boards, driver
+        // profiles) use these rather than growing a named method here per cabinet
+        // per endpoint, and must NOT hand-roll a fetch: the bearer header, the
+        // credentials mode and the 401-drops-the-token rule all live in one place
+        // and a cabinet that rebuilds them will drift from it.
+        get,
+        put,
+        post,
+        del,
+        /**
+         * Per-game cosmetic loadouts, on the generic `game_loadouts` routes.
+         *
+         * The garage pair is self-only — the acting player is the token's, never a
+         * body field — and the loadout pair is public but resolves to the active
+         * appearance first. Named here so the privacy split is visible at the call
+         * site instead of being a path string a cabinet assembled itself.
+         */
+        fetchGameGarage(gameSlug) {
+            const gs = encodePathSegment(gameSlug);
+            return gs ? get(`/games/${gs}/garage`) : Promise.resolve(null);
+        },
+        saveGameGarage(gameSlug, garage) {
+            const gs = encodePathSegment(gameSlug);
+            return gs ? put(`/games/${gs}/garage`, { garage }) : Promise.resolve(null);
+        },
+        fetchGamePublicLoadout(gameSlug, playerId) {
+            const gs = encodePathSegment(gameSlug);
+            const pid = encodePathSegment(playerId);
+            return gs && pid ? get(`/games/${gs}/loadout/${pid}`, "loadout") : Promise.resolve(null);
+        },
+        fetchGamePublicLoadouts(gameSlug, playerIds) {
+            const gs = encodePathSegment(gameSlug);
+            return gs ? post(`/games/${gs}/loadouts`, { playerIds }, "loadouts") : Promise.resolve(null);
+        },
         loadPlayerProfile(playerId) {
             const encoded = encodePathSegment(playerId);
             return encoded ? get(`/players/${encoded}/profile`, "player") : Promise.resolve(null);

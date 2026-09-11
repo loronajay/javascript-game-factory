@@ -26,66 +26,6 @@
     {
       "direction": "north",
       "sourceBounds": {
-        "x": 1129,
-        "y": 245,
-        "width": 158,
-        "height": 224
-      },
-      "targetBounds": {
-        "x": 12,
-        "y": 4,
-        "width": 40,
-        "height": 56
-      }
-    },
-    {
-      "direction": "north-east",
-      "sourceBounds": {
-        "x": 1332,
-        "y": 239,
-        "width": 248,
-        "height": 227
-      },
-      "targetBounds": {
-        "x": 4,
-        "y": 6,
-        "width": 56,
-        "height": 51
-      }
-    },
-    {
-      "direction": "east",
-      "sourceBounds": {
-        "x": 1627,
-        "y": 272,
-        "width": 268,
-        "height": 156
-      },
-      "targetBounds": {
-        "x": 4,
-        "y": 15,
-        "width": 56,
-        "height": 33
-      }
-    },
-    {
-      "direction": "south-east",
-      "sourceBounds": {
-        "x": 1923,
-        "y": 240,
-        "width": 221,
-        "height": 230
-      },
-      "targetBounds": {
-        "x": 5,
-        "y": 4,
-        "width": 54,
-        "height": 56
-      }
-    },
-    {
-      "direction": "south",
-      "sourceBounds": {
         "x": 51,
         "y": 244,
         "width": 159,
@@ -99,7 +39,7 @@
       }
     },
     {
-      "direction": "south-west",
+      "direction": "north-east",
       "sourceBounds": {
         "x": 257,
         "y": 239,
@@ -114,7 +54,7 @@
       }
     },
     {
-      "direction": "west",
+      "direction": "east",
       "sourceBounds": {
         "x": 513,
         "y": 272,
@@ -129,7 +69,7 @@
       }
     },
     {
-      "direction": "north-west",
+      "direction": "south-east",
       "sourceBounds": {
         "x": 831,
         "y": 240,
@@ -142,34 +82,92 @@
         "width": 56,
         "height": 51
       }
+    },
+    {
+      "direction": "south",
+      "sourceBounds": {
+        "x": 1129,
+        "y": 245,
+        "width": 158,
+        "height": 224
+      },
+      "targetBounds": {
+        "x": 12,
+        "y": 4,
+        "width": 40,
+        "height": 56
+      }
+    },
+    {
+      "direction": "south-west",
+      "sourceBounds": {
+        "x": 1332,
+        "y": 239,
+        "width": 248,
+        "height": 227
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 6,
+        "width": 56,
+        "height": 51
+      }
+    },
+    {
+      "direction": "west",
+      "sourceBounds": {
+        "x": 1627,
+        "y": 272,
+        "width": 268,
+        "height": 156
+      },
+      "targetBounds": {
+        "x": 4,
+        "y": 15,
+        "width": 56,
+        "height": 33
+      }
+    },
+    {
+      "direction": "north-west",
+      "sourceBounds": {
+        "x": 1923,
+        "y": 240,
+        "width": 221,
+        "height": 230
+      },
+      "targetBounds": {
+        "x": 5,
+        "y": 4,
+        "width": 54,
+        "height": 56
+      }
     }
   ],
   "headingConvention": "physical-nose-clockwise-from-north",
   "repairs": [
     {
-      "targetFrame": 2,
-      "targetHeading": "east",
-      "mirroredFromFrame": 6,
-      "mirroredFromHeading": "west",
-      "transform": "mirror-x",
-      "reason": "generated opposite-side view did not preserve the canonical vehicle body"
-    },
-    {
       "targetFrame": 1,
       "targetHeading": "north-east",
       "mirroredFromFrame": 7,
       "mirroredFromHeading": "north-west",
-      "transform": "mirror-x",
-      "reason": "generated opposite-side view did not preserve the canonical vehicle body"
+      "transform": "mirror-x"
+    },
+    {
+      "targetFrame": 2,
+      "targetHeading": "east",
+      "mirroredFromFrame": 6,
+      "mirroredFromHeading": "west",
+      "transform": "mirror-x"
     },
     {
       "targetFrame": 3,
       "targetHeading": "south-east",
       "mirroredFromFrame": 5,
       "mirroredFromHeading": "south-west",
-      "transform": "mirror-x",
-      "reason": "generated opposite-side view did not preserve the canonical vehicle body"
+      "transform": "mirror-x"
     }
   ],
-  "repairFrameConvention": "physical-nose-clockwise-from-north"
+  "repairFrameConvention": "physical-nose-clockwise-from-north",
+  "physicalNoseAudit": "20260910-half-turn"
 }

@@ -5,9 +5,12 @@ import {
 } from "../scripts/circuit/assets.js";
 import {
   circuitLiveryAtlas,
+  circuitFrameGeometry,
   createCircuitLiveryCache,
 } from "../scripts/circuit/livery-atlas.js";
 import { circuitStripePanelGuides } from "../scripts/circuit/stripe-projection.js";
+import { circuitDrawBox } from "../scripts/circuit/sprite-geometry.js";
+import { createRosterPreview } from "./circuit-roster-preview.js";
 import {
   addLayer,
   createLivery,
@@ -23,6 +26,7 @@ const state = {
   model: initialModel,
   image: null,
   loadingToken: 0,
+  atlas: null,
 };
 
 const elements = {
@@ -75,6 +79,10 @@ for (const model of CIRCUIT_MODELS) {
   elements.modelSelect.append(option);
 }
 elements.modelSelect.value = state.model.modelId;
+const roster = createRosterPreview(document.querySelector("#rosterGrid"), (modelId) => {
+  loadModel(modelId).then(() => window.scrollTo({ top: 0, behavior: "smooth" })).catch(console.error);
+});
+document.querySelector("#exportRoster").addEventListener("click", () => roster.download());
 
 function titleCase(value) {
   return value.replace(/(^|-)([a-z])/g, (_, separator, letter) => `${separator ? " " : ""}${letter.toUpperCase()}`);
@@ -97,7 +105,7 @@ function previewLivery() {
     mirrored: elements.layout.value === "twin",
     paint: {
       hue: Number(elements.stripeHue.value),
-      saturation: 0,
+      saturation: Number(elements.stripeHue.value) === 0 ? 0 : 0.9,
       brightness: 1.3,
       finish: "gloss",
     },
@@ -117,6 +125,7 @@ function syncLabels() {
 function draw() {
   if (!state.image) return;
   syncLabels();
+  roster.draw(previewLivery());
   const guides = circuitStripePanelGuides(state.model.modelId);
   const guidedPanels = guides.reduce((sum, frame) => sum + frame.length, 0);
   const atlas = circuitLiveryAtlas(cache, {
@@ -125,21 +134,24 @@ function draw() {
     livery: previewLivery(),
   });
   if (!atlas) return;
+  state.atlas = atlas;
 
   for (const { canvas, correction, frame } of cards) {
     const context = canvas.getContext("2d");
     context.imageSmoothingEnabled = false;
     context.clearRect(0, 0, canvas.width, canvas.height);
+    const box = circuitDrawBox(canvas.width / 2, canvas.height / 2, CIRCUIT_FRAME_SIZE,
+      circuitFrameGeometry(cache, state.model.modelId, frame), PREVIEW_SCALE * 0.75);
     context.drawImage(
       atlas,
       frame * CIRCUIT_FRAME_SIZE,
       0,
       CIRCUIT_FRAME_SIZE,
       CIRCUIT_FRAME_SIZE,
-      0,
-      0,
-      canvas.width,
-      canvas.height,
+      box.x,
+      box.y,
+      box.width,
+      box.height,
     );
     const panelCount = guides[frame].length;
     correction.className = `correction${panelCount ? "" : " identity"}`;
@@ -162,6 +174,7 @@ async function loadModel(modelId) {
   const token = ++state.loadingToken;
   state.model = model;
   state.image = null;
+  state.atlas = null;
   elements.status.textContent = `Loading ${model.label} atlas…`;
   const image = new Image();
   image.src = `../${model.src}`;
@@ -201,3 +214,33 @@ elements.reset.addEventListener("click", () => {
 });
 
 await loadModel(state.model.modelId);
+
+const turntable = document.querySelector("#turntable");
+const pauseTurntable = document.querySelector("#pauseTurntable");
+let turnFrame = 0;
+let turnTime = 0;
+let previousTime = null;
+let turning = true;
+pauseTurntable.addEventListener("click", () => {
+  turning = !turning;
+  pauseTurntable.textContent = turning ? "Pause turntable" : "Resume turntable";
+});
+function animateTurntable(time) {
+  if (previousTime !== null && turning) turnTime += Math.min(time - previousTime, 100);
+  previousTime = time;
+  if (turnTime >= 600) {
+    turnTime %= 600;
+    turnFrame = (turnFrame + 1) % 8;
+  }
+  const context = turntable.getContext("2d");
+  context.clearRect(0, 0, 256, 256);
+  context.imageSmoothingEnabled = false;
+  if (state.atlas) {
+    const box = circuitDrawBox(128, 128, CIRCUIT_FRAME_SIZE,
+      circuitFrameGeometry(cache, state.model.modelId, turnFrame), 3);
+    context.drawImage(state.atlas, turnFrame * 64, 0, 64, 64, box.x, box.y, box.width, box.height);
+    document.querySelector("#turnHeading").textContent = CIRCUIT_FRAME_HEADINGS[turnFrame];
+  }
+  requestAnimationFrame(animateTurntable);
+}
+requestAnimationFrame(animateTurntable);
