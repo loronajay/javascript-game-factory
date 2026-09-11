@@ -1,0 +1,1616 @@
+
+> test
+> node tests/gate.test.js && node tests/engine.test.js && node tests/grading.test.js && node tests/launch.test.js && node tests/match.test.js && node tests/input-log.test.js && node tests/golden-run.test.js && node tests/online-session.test.js && node tests/online-menu.test.js && node tests/online-opponent.test.js && node tests/circuit-assets.test.js && node tests/circuit-livery.test.js && node tests/circuit-mask-editor.test.js && node tests/circuit-tracks.test.js && node tests/circuit-race.test.js && node tests/circuit-online.test.js && node tests/modes.test.js && node tests/race.test.js && node tests/audio.test.js && node tests/radio-tracks.test.js && node tests/radio-playlist.test.js && node tests/radio-stereo.test.js && node tests/radio-panel.test.js && node tests/pointer.test.js && node tests/car-atlas.test.js && node tests/car-sheets.test.js && node tests/livery.test.js && node tests/paint.test.js && node tests/garage.test.js && node tests/garage-editor.test.js && node tests/garage-store.test.js && node tests/records.test.js && node tests/records-store.test.js && node tests/rival.test.js && node tests/shifter-gate.test.js && node tests/track-layout.test.js && node tests/gauges.test.js && node tests/setup-menu.test.js && node tests/collection.test.js && node tests/boards.test.js && node tests/shell.test.js && node tests/coach.test.js && node tests/campaign.test.js && node tests/profile.test.js && node tests/profile-screen.test.js && node tests/versus.test.js && node tests/gauge-assets.test.js && node tests/mobile-ui.test.js && node tests/modules.test.js
+
+
+gate — H-pattern topology and traversal
+  PASS a 6-speed gate exposes six gears across three columns
+  PASS odd gears sit on the top row, even gears on the bottom row
+  PASS gear pairs share a column with their neutral rail node
+  PASS an unknown gear has no node
+  PASS a top-row gear drops into its own neutral node
+  PASS a bottom-row gear lifts into its own neutral node
+  PASS gears are walled in every direction except back toward neutral
+  PASS the neutral rail connects sideways between adjacent columns
+  PASS the neutral rail is walled at both ends
+  PASS a neutral node reaches both of its column's gears
+  PASS 1 -> 2 is Down, Down
+  PASS 2 -> 3 is Up, Right, Up
+  PASS 3 -> 4 is Down, Down
+  PASS 4 -> 5 is Up, Right, Up
+  PASS 5 -> 6 is Down, Down
+  PASS downshifts mirror upshifts
+  PASS a long skip-shift crosses the whole rail
+  PASS a shift attempt starts parked in the origin gear with no errors
+  PASS beginShift rejects a gear the gate does not have
+  PASS a clean 1 -> 2 completes on the second input
+  PASS a clean 2 -> 3 completes on the third input
+  PASS driving the knob into a gate wall records an error and does not move it
+  PASS wall bumps accumulate but never fail the shift outright
+  PASS landing in the wrong gear is a misshift
+  PASS falling back into the origin gear resets the attempt rather than failing it
+  PASS a resolved attempt ignores further input
+  PASS applyShiftInput never mutates the attempt it is given
+  PASS an unrecognised direction is ignored rather than counted as an error
+  PASS a 4-speed gate is just a smaller definition
+
+  29 passed, 0 failed
+
+engine — drivetrain and integration
+  PASS rpm rises with road speed in a fixed gear
+  PASS rpm drops when the same road speed is carried in a taller gear
+  PASS rpm never falls below idle
+  PASS rpm matches the drivetrain maths rather than a fudge factor
+  PASS speedForRpm is the inverse of rpmForSpeed
+  PASS an unknown gear is rejected rather than silently producing NaN
+  PASS torque peaks at the car's peak-torque rpm
+  PASS holding a gear to the redline genuinely costs torque
+  PASS torque never collapses to zero inside the usable range
+  PASS the rev limiter cuts drive force entirely
+  PASS a shorter gear multiplies drive force
+  PASS drive force is capped by available traction
+  PASS drag grows with the square of speed
+  PASS a stationary car has no resistance
+  PASS a new car state sits still in first gear at idle
+  PASS full throttle accelerates the car and covers ground
+  PASS declutching kills drive force so the car bleeds speed
+  PASS a coasting car never reverses
+  PASS the force multiplier from a shift grade changes acceleration
+  PASS speed converges on a terminal velocity instead of climbing forever
+  PASS the car cannot exceed its limiter in any gear
+  PASS stepCar is pure — it neither mutates nor aliases its input
+  PASS stepping is deterministic for identical inputs
+  PASS a gear change drops the revs at unchanged road speed
+
+  24 passed, 0 failed
+
+grading — timing windows and gate penalties
+  PASS shifting exactly on the optimal rpm is perfect
+  PASS the perfect window has real width on both sides
+  PASS just outside the perfect window is good, not perfect
+  PASS the good window has real width on both sides
+  PASS shifting while bogged down low is poor
+  PASS hanging on well past the shift point is poor
+  PASS rpm alone never produces a missed grade
+  PASS a downgrade steps perfect toward good toward poor
+  PASS downgrades bottom out at poor and never reach missed
+  PASS a downgrade of zero steps changes nothing
+  PASS missed cannot be downgraded further
+  PASS a perfectly timed, cleanly executed shift grades perfect
+  PASS sloppy gate work spoils perfect timing
+  PASS a badly fumbled gate drops even perfect timing to poor
+  PASS landing in the wrong gear is missed regardless of perfect timing
+  PASS an unresolved attempt cannot be graded
+  PASS better grades pull harder out of the shift
+  PASS only a poor or missed shift actively punishes the player
+  PASS better grades get the clutch back in sooner
+  PASS resolveShift hands back the effects the race loop needs
+  PASS an unknown grade has no effects entry and is rejected
+  PASS a slow gate costs a full grade even with flawless timing
+  PASS bad rpm timing plus a slow shift is a poor shift
+  PASS good rpm timing plus a slow shift drops to poor
+  PASS a snapped gate cannot rescue bad timing
+  PASS the neutral band between snap and slow neither helps nor hurts
+  PASS a snapped gate pays a force bonus on top of the grade
+  PASS a slow gate and a wall bump stack into a double downgrade
+  PASS a misshift stays missed no matter how quickly it was fumbled
+  PASS the duration that produced the grade is reported back
+  PASS a shift below the window is reported as early
+  PASS a shift above the window is reported as late
+  PASS a shift inside the perfect window has nothing to report
+  PASS the reason describes the timing, not the grade it ended up with
+  PASS landing on the clutch either side is a clean catch
+  PASS the clean window has an edge, and past it is loose
+  PASS never getting back on the gas is a fumble, not an infinitely late catch
+  PASS early and late cost the same, and are told apart only for feedback
+  PASS a clean catch leaves the grade the gate earned exactly where it was
+  PASS a loose catch costs one grade and a fumble costs two
+  PASS the catch cannot rescue a badly timed shift
+  PASS a missed shift stays missed however the gas comes back
+  PASS a fumble forfeits the snap bonus
+  PASS a fumble never turns a punishing multiplier into a rewarding one
+  PASS the clutch dead time is the gate's, and the catch cannot rewrite it
+  PASS a shift carries no catch until it has one, and cannot be settled twice
+
+  46 passed, 0 failed
+
+launch — reaction time and the red light
+  PASS leaving the instant the bulb goes green is a holeshot
+  PASS the holeshot window has real width
+  PASS a hair past the holeshot window is merely a good launch
+  PASS the good window closes where it says it does
+  PASS sleeping on the light is a late launch, not a foul
+  PASS jumping the light is a foul however good the reaction looks
+  PASS a negative reaction time is a foul by definition
+  PASS a holeshot pulls harder off the line than a good launch
+  PASS a late launch is neutral — the lost time is the punishment
+  PASS a foul actively bogs the car
+  PASS the reward windows are ordered holeshot then good then late
+  PASS an unknown launch grade is rejected
+
+  12 passed, 0 failed
+
+match — best-of-N rounds, red lights and finishes
+  PASS a new match is live, best of three, with a clean sheet
+  PASS rounds to win is derived from the match length, never passed in
+  PASS a match needs exactly two distinct players and a legal length
+  PASS a clean tree changes nothing, so every start can be piped through
+  PASS a first red light re-runs the round rather than deciding it
+  PASS a second red light in the same round forfeits that round
+  PASS the grace fault is per player, so one driver never spends the other's
+  PASS faults reset when a new round begins
+  PASS a driver may red-light once in every round without ever being forfeited
+  PASS a re-run keeps the faults, because they belong to the round not the attempt
+  PASS a double red light on the first tree burns both graces and re-runs
+  PASS in a double red light only the driver out of grace loses the round
+  PASS when both run out of grace on the same tree, the earlier jumper loses
+  PASS two drivers fouling out at the identical instant re-runs the round
+  PASS the lower finishing time takes the round
+  PASS a driver who crossed beats one who did not
+  PASS neither crossing re-runs the round rather than inventing a winner
+  PASS an exact dead heat re-runs the round
+  PASS two rounds wins a best of three
+  PASS one round wins a best of one
+  PASS three rounds wins a best of five, and two does not
+  PASS a match can be won on red lights alone
+  PASS the history records every decided round with how many attempts it took
+  PASS a decided match ignores everything that follows
+  PASS a disconnect hands the whole match over, not just the round
+  PASS a stranger in any reducer is rejected
+  PASS no reducer mutates the match it is given
+  PASS the grace allowance is configurable, so ranked could run without one
+  PASS matchScore shapes the board for a screen without re-deriving it
+  PASS matchScore flags a driver one red light from losing the round
+  PASS the module has no imports, so the server port is a copy
+
+  31 passed, 0 failed
+
+input-log
+  PASS a driven run replays to exactly the same finishing time
+  PASS a driven run replays to exactly the same distance, speed and gear
+  PASS every shift replays with the same grade, reason and catch
+  PASS the launch replays with the same reaction time and grade
+  PASS a false start replays as a false start, at the same point on the tree
+  PASS a throttle held through a shift replays as a fumble, exactly as it was driven
+  PASS the throttle is recorded as edges, not as a level every tick
+  PASS no two consecutive throttle edges carry the same level
+  PASS throttleAt reconstructs the level between edges
+  PASS a clutch on the same tick as a lift opens the gate rather than arming it
+  PASS mergeEvents drops duplicates, so a resent packet cannot fake a gate move
+  PASS mergeEvents sorts by tick, so packet arrival order cannot change a run
+  PASS mergeEvents rejects malformed events rather than replaying them
+  PASS a merged stream replays identically to the log it was streamed from
+  PASS eventsSince returns only the tail, so a live stream stays small
+  PASS streaming a log in tick-sized windows loses nothing
+  PASS re-sending an already-streamed window is harmless
+  PASS an empty log leaves the car on the line rather than spinning
+  PASS a log is replayed under an explicit tick ceiling, not until it happens to end
+  PASS replaying the same log twice gives the same answer
+  PASS the same log over a longer distance finishes later, so options are honoured
+  PASS a holeshot log beats a late log over the same distance
+
+  22 passed, 0 failed
+
+golden run — the cabinet and the server must agree
+  PASS the fixture is the shape this test was written for
+  PASS the golden run still finishes in exactly the recorded time
+  PASS distance, top speed and final gear are unchanged
+  PASS the launch still grades the same way
+  PASS every shift still grades the same way, on all three axes
+  PASS the golden run is a properly driven one, so it actually exercises the grading
+
+  6 passed, 0 failed
+
+online session
+  PASS a new session is idle and knows nothing
+  PASS searching, then cancelling, returns to idle
+  PASS a lobby frame moves an arriving session into the room
+  PASS you and your opponent are told apart by the id the server gave you
+  PASS a lobby frame arriving mid-race does not yank the driver off the strip
+  PASS a lobby frame arriving over a result panel does not clear the result
+  PASS a solo lobby is not full, so nothing can be started from it
+  PASS the green is measured through the server's clock, never the local one
+  PASS readyToLaunch flips exactly when the shared start time arrives
+  PASS a session with no round pending is never ready to launch
+  PASS the offset is re-measured every round, so a drifting clock is corrected
+  PASS a round start puts the driver on the strip and names the live round
+  PASS a round result stops the round and shows the panel
+  PASS a decided match goes to the match panel instead
+  PASS youWon reads from the id the server gave this side, not from a lane
+  PASS roundRows puts this driver first so no renderer has to work it out
+  PASS a headline names a red light rather than reporting it as a slow time
+  PASS a headline says whether the round was won or lost
+  PASS a finished match says so, rather than leaving the biggest line blank
+  PASS a match that ends without naming a round winner still reads properly
+  PASS an opponent walking out is named as such, not reported as a win on merit
+  PASS a red-light re-run says it was a red light
+  PASS a re-run explains itself, and only when there is one
+  PASS an opponent walking out ends the match as a forfeit
+  PASS a rematch frame records who has asked, including whether you have
+  PASS a rematch starting clears the board rather than half-resetting it
+  PASS leaving keeps nothing but the measured clock offset
+  PASS an error is a state, not a thrown exception
+  PASS no reducer mutates the session it is given
+
+  29 passed, 0 failed
+
+online menu and typed room codes
+  PASS a room code takes only characters from the server's alphabet
+  PASS typing is case-insensitive, because a code is read aloud
+  PASS a full code refuses more rather than scrolling
+  PASS backspace and clear do what they say, and are safe when empty
+  PASS the alphabet has no lookalike characters in it at all
+  PASS the view says where the caret is, so the boxes cannot disagree with it
+  PASS the pane follows the session rather than being stored alongside it
+  PASS the join pane is the one thing the menu owns, because the session cannot see it
+  PASS only the join pane wants the keyboard typing letters
+  PASS the home cursor walks the three ways in and stops at both ends
+  PASS each way in asks for the right thing
+  PASS a half-typed code cannot be submitted
+  PASS a backspace action steps the code back
+  PASS opening the join pane starts from an empty field
+  PASS the lobby cursor walks your car, the race and the button
+  PASS a private room switches between drag and circuit without changing the loadout shape
+  PASS circuit rows show laps and allow Shutter Z to ready with its own atlas
+  PASS a circuit room cycles through the location track catalog
+  PASS the host steps a setting and gets a config to publish
+  PASS a guest moving the host's row publishes nothing
+  PASS your car is yours in either seat — a guest still steps it
+  PASS the car rows are live for a guest where the race rows are dimmed
+  PASS distances wrap through all four, because a private room opens every length
+  PASS match length steps through best of one, three and five
+  PASS only the button readies up, and only the paint row opens the garage
+  PASS the lobby shows the car it was handed, and says so when there is no account
+  PASS the driver cards carry a resolved model name, not an id
+  PASS the lobby shows the settings to the guest, dimmed rather than hidden
+  PASS this driver is always the first card, whichever seat they took
+  PASS a lobby with one driver in it says so instead of offering to start
+  PASS the button says what pressing it does next, not what it did last
+  PASS the view resolves track and distance names, so the renderer looks nothing up
+  PASS every way in is clickable, and the click lands on the one under the pointer
+  PASS no two targets on any pane claim the same pixel
+  PASS a stepper arrow wins over the row it sits inside
+  PASS a guest has arrows on their own car and none on the host's settings
+  PASS clicking an arrow steps the row it belongs to, not the one the caret is on
+  PASS the way into the garage is clickable, and is not a target without an account
+  PASS hover is resolved by the same function that resolves the click
+  PASS hovering nothing highlights nothing
+  PASS hover never moves the pick — it only marks what a click would take
+  PASS the join pane offers a submit button only once the code is whole
+  PASS every pane has a way back out that can be clicked
+  PASS every target sits on screen
+  PASS a finished round offers one button, a finished match offers two
+  PASS the rematch button says it is waiting once this side has asked
+  PASS the result buttons sit inside the panel and do not overlap
+  PASS no reducer mutates the menu it is given
+
+  48 passed, 0 failed
+
+online opponent reconstruction
+  PASS a fresh opponent is a car on the line, not a blank
+  PASS with the whole stream in hand, the reconstruction is exact
+  PASS the reconstruction stays exact all the way to the line
+  PASS a stream arriving in chunks converges on the same car
+  PASS a duplicated packet does not put a phantom gate move in the other car
+  PASS out-of-order packets arrive at the same car as in-order ones
+  PASS past the last input the throttle is held, and nothing else is invented
+  PASS the guess is short-lived: real inputs rebuild the run exactly
+  PASS how far the drawing is running ahead of the inputs is reported
+  PASS the gap between the cars is reported in metres, signed toward the leader
+  PASS advancing to a tick already reached does not move the car
+  PASS a silent opponent sits on the line rather than drifting off it
+  PASS reconstruction never mutates the opponent it is given
+
+  13 passed, 0 failed
+
+circuit assets — representative canonical atlas set
+  PASS catalog exposes only canonical models with a verified eight-heading atlas
+  PASS previously quarantined models have complete replacement turntables
+  PASS availability never substitutes another model
+  PASS the JSON catalog and runtime share one heading and scale contract
+  PASS runtime atlas URLs carry the heading revision so repaired PNGs cannot stay cached
+  PASS world headings select the artwork frame whose nose points forward
+  PASS atlas pixels use the same nose direction as their declared frame
+  PASS every atlas is eight transparent 64px frames clockwise from north
+  PASS each atlas records whether its generated source labels describe the camera side or the nose
+  PASS every canonical manifest pins the authoritative source column for its lateral repair
+  PASS asset repair metadata uses the canonical physical heading of each frame
+  PASS every lateral heading is the mirrored opposite view of the same car
+  PASS all eight views normalize to one apparent car size
+  PASS every model is normalized to the same apparent race size
+  PASS normalized sprites anchor their measured visual centre on the vehicle
+  PASS track presentation scale resizes around the measured vehicle centre
+  PASS Tsunami East is the opposite side of the same car, not a generated substitute
+
+  17 passed, 0 failed
+
+circuit livery — one canonical paint across eight headings
+  PASS each generated view maps the same authored UV to the same car-local point
+  PASS paint projection is calibrated to bodywork, not wheels, wings or shadows
+  PASS a complex livery paints body, glass and lamps in every generated view
+  PASS cache identity is modelId:liveryKey and excludes world-space underglow
+  PASS editor turntable visits all eight headings without changing the livery
+  PASS Kaido stripe projection has authored panels in six views and preserves North and South
+  PASS Tsunami uses its authored panels and mirrors the valid West guide over repaired East
+  PASS every race-ready model calibrates stripes in all six perspective-sensitive views
+  PASS Kaido follows every authored panel angle and uses each pair only as a rough centreline
+  PASS stripe guides follow the same mirrored headings as the repaired car artwork
+  PASS the Kaido viewer shows all eight corrected frames through the real circuit baker
+  PASS garage stripe curves survive serialization and bake distinctly on every model and heading
+
+  12 passed, 0 failed
+
+circuit mask editor — canonical customization truth for every view
+  PASS display headings name the direction the car nose actually faces
+  PASS surface routing contains only customization categories the renderer owns
+  PASS guide masks are sourced from the canonical editor rather than a second catalog
+  PASS a new project has independent overlapping masks for all eight views
+  PASS a stripe-flow guide preserves the authored direction and curve
+  PASS JSON export round-trips routing and overlapping canonical layer guides
+  PASS the transitional schema-2 atlas field names remain readable
+  PASS schema-2 projects exported with the old reversed display labels remain readable
+  PASS legacy physical-part masks migrate without destroying the saved work
+  PASS painting follows a continuous stroke but never writes locked pixels
+  PASS flood fill is frame-local and respects the sprite silhouette
+  PASS routing completion and guide pixel counts have honest, different meanings
+
+  12 passed, 0 failed
+
+circuit tracks — campaign geography and collision-authored catalog
+  PASS the catalog contains three location-named circuits rather than one named theme
+  PASS each circuit has a compact setup-card label as well as its full name
+  PASS each track owns its camera zoom and apparent car scale
+  PASS TOLL BOOTH names the Old Town circuit and its actual shrine-road setting
+  PASS every circuit ships a world-sized binary mask matching its art
+  PASS every spawn, checkpoint and racing-line pose fits fully inside its own mask
+  PASS Docklands collision reaches the visibly painted asphalt instead of a narrow centre ribbon
+  PASS Docklands collision edge hugs its painted curbs as closely as the Old Town mask
+  PASS Downtown collision follows the paired canal curbs instead of swallowing its infields
+  PASS Downtown collision stays curb-tight in each reported failure region
+  PASS Downtown upper-right contour stays directly on the finished curb paint
+  PASS the track viewer exercises the real catalog, vehicle step and collision resolver
+  PASS all location ids resolve through the shared catalog
+
+  13 passed, 0 failed
+
+circuit race — shared deterministic runtime
+  PASS canonical model identity is required and never substituted
+  PASS source is routing metadata and cannot change the simulation
+  PASS circuit difficulty is a normalized serializable race rule
+  PASS higher circuit difficulty produces a meaningfully faster CPU
+  PASS countdown, input and fixed-step vehicle movement share one reducer
+  PASS Old Town Shrine Loop starts both cars on one fair line rather than gifting the CPU a lead
+  PASS Old Town Shrine Loop checkpoint gates span the full driveable road
+  PASS road containment samples the full normalized footprint
+  PASS ordered checkpoints reject shortcuts and only the finish checkpoint counts a lap
+  PASS a three-lap race requires three complete checkpoint sequences and records each lap
+  PASS car contact changes both vehicles symmetrically
+  PASS finish order and normalized results are deterministic
+  PASS the local driver's finish ends the race without waiting for the CPU
+  PASS overlapping cars draw from upper road position to lower road position
+  PASS the circuit view starts at the selected track's low-speed zoom
+  PASS a losing result explicitly names defeat and the driver who took the flag
+  PASS the circuit HUD exposes real race instruments, timing and running order
+  PASS the runtime registry exposes one stable adapter shape
+  PASS one circuit adapter resolves the selected catalog track for create and step
+  PASS vehicle integration remains pure
+  PASS the browser reducer matches the committed cross-runtime golden replay
+
+  21 passed, 0 failed
+
+circuit online prediction and reconciliation
+  PASS every locally predicted input carries a simulation tick and the complete wire controls
+  PASS an authoritative snapshot drops acknowledged inputs and replays the unacknowledged tail
+  PASS an old snapshot never rewinds a newer acknowledgement
+
+  3 passed, 0 failed
+
+modes — the catalog the menu and the race are both built from
+  PASS every mode is uniquely identified
+  PASS every mode carries the copy the menu needs
+  PASS an unavailable mode says why, and an available one does not need to
+  PASS the default mode is one that can actually be played
+  PASS an unknown id resolves to nothing rather than to something plausible
+  PASS the playable list is exactly the available modes
+  PASS every mode offers at least one objective option
+  PASS every objective option is uniquely identified within its mode
+  PASS every mode's default option is one of the options it offers
+  PASS an unknown option falls back to the mode's default rather than to nothing
+  PASS distance modes measure in metres and time modes measure in seconds
+  PASS the distance modes offer the distances the race constants define
+  PASS time attack is measured on a clock
+  PASS Circuit Race is one shared circuit runtime with lap objectives
+  PASS all existing race types remain on the drag runtime
+  PASS a distance mode produces a distance and no clock
+  PASS time attack produces a clock and no distance
+  PASS circuit produces laps without drag distance or clock fields
+  PASS every mode and option pair produces exactly one objective
+  PASS online is playable and shapes a real race
+  PASS online is the one mode that skips the solo setup screen
+  PASS an unknown mode fails loudly rather than racing something arbitrary
+
+  22 passed, 0 failed
+
+race — state machine and shift integration
+  PASS a new race is staged and stationary
+  PASS a staged car does not move no matter how hard the throttle is held
+  PASS starting the race opens the countdown
+  PASS the car cannot creep during the countdown
+  PASS the countdown expires into a running race
+  PASS a running race accumulates time, speed, and distance
+  PASS the shift button does nothing before the green
+  PASS pressing shift opens the gate and pulls the clutch
+  PASS the rpm the shift is graded against is captured at the button press
+  PASS time in the gate costs speed because the car is coasting
+  PASS gate input outside a shift is ignored
+  PASS completing the gate engages the new gear and records a grade
+  PASS a perfectly timed shift is graded perfect
+  PASS a missed shift really does leave the car in the wrong gear
+  PASS the clutch stays out for the dead time after a shift resolves
+  PASS a shift boost expires instead of lasting forever
+  PASS the shifter cannot be opened while a shift is already in progress
+  PASS there is no gear above top gear to shift into
+  PASS the clutch cannot go in while the gas is still down
+  PASS an armed clutch goes in by itself the moment the gas comes off
+  PASS the rpm that grades the shift is sampled at the lift, not at the key
+  PASS holding the gas with the clutch down flares the engine instead of driving
+  PASS a shift is not graded until the gas comes back
+  PASS catching the gas on the clutch keeps the grade the gate earned
+  PASS a loose catch costs one grade and a fumbled one costs two
+  PASS never getting back on the gas settles the shift rather than hanging it
+  PASS a fumble forfeits the reward but never turns a penalty into one
+  PASS declutching again with the gas never picked up settles the shift as fumbled
+  PASS a shift still waiting on its catch at the line is counted, not dropped
+  PASS driving it properly beats holding the gas through the shift
+  PASS crossing the line finishes the race and stops the clock
+  PASS the finish time is interpolated, not rounded to the tick
+  PASS a finished race ignores further stepping and input
+  PASS a race must name exactly one objective
+  PASS a distance race is not a time attack, and vice versa
+  PASS a time attack runs until the clock does, however far the car gets
+  PASS a time attack does not finish just because the car went a long way
+  PASS the distance a time attack scores is interpolated, not rounded to the tick
+  PASS a finished time attack ignores further stepping
+  PASS progress reads against whichever objective the race has
+  PASS the run records the fastest the car went, not the speed it ended on
+  PASS stepRace does not mutate the race it is given
+  PASS an identical sequence of inputs produces an identical race
+  PASS a fresh race has not launched and has not fouled
+  PASS touching the throttle during the countdown latches a false start
+  PASS a false start does not shorten or skip the countdown
+  PASS a false start records how early the light was jumped
+  PASS the recorded jump time is the first one, not the last
+  PASS a clean countdown records no jump time
+  PASS lifting off does not clear a false start once committed
+  PASS a clean countdown produces no false start
+  PASS reaction time is measured from the green bulb
+  PASS going the instant the light turns green is a holeshot
+  PASS a holeshot genuinely accelerates harder off the line
+  PASS a late launch gets no boost at all
+  PASS a red light bogs the car instead of disqualifying it
+  PASS the launch is graded once and never re-graded
+  PASS a car that never gets throttle never launches
+  PASS the time spent in the gate is measured and graded
+  PASS a snapped gate beats a dawdled one at the same rpm
+  PASS a well-shifted quarter mile beats a lazy one-gear run
+
+  61 passed, 0 failed
+
+audio — cue routing and engine pitch
+  PASS every authored sound has a stable asset path
+  PASS the tree ticks low at each amber and high on green
+  PASS the circuit lights reuse the drag tree sounds for 3-2-1-GO
+  PASS only a newly completed perfect shift earns the perfect cue
+  PASS the stick cue follows physical gate movement, not a wall bump
+  PASS rev pitch rises monotonically from first through sixth
+  PASS circuit engine sound follows road speed and load instead of a fake gear
+  PASS engine control switches between idle and rev and applies real pitch shifting
+  PASS engine control applies the continuous circuit mix to the real loops
+  PASS one-shot cues rewind so repeated countdown ticks are never skipped
+
+  10 passed, 0 failed
+
+radio tracks — what counts as music and what it is called
+  PASS the formats the brief asked for are all playable
+  PASS non-audio files are left out of the playlist
+  PASS the extension check ignores case, which is how Windows writes them
+  PASS a leading dot is a hidden file, not an extension
+  PASS every listed extension is distinct
+  PASS track numbers are stripped from the display name in every common shape
+  PASS a title that is itself a number keeps its name
+  PASS a filename that is only a track number still reads as something
+  PASS an artist is taken from the filename only when it offers one
+  PASS only the first separator splits, so a suffixed title keeps its suffix
+  PASS a track's folder is everything left of the last slash
+  PASS a track's id is its path, so two files with one name do not collide
+  PASS ten sorts after two
+  PASS a folder scan keeps albums together and in order
+  PASS the same file listed twice appears once
+  PASS an empty or junk-only folder produces an empty playlist rather than throwing
+
+  16 passed, 0 failed
+
+radio playlist — the transport
+  PASS an empty folder loads nothing and stays silent
+  PASS every transport button is inert with no tracks, rather than throwing
+  PASS a folder loads on its first track, ready to go
+  PASS play/pause toggles and nothing else
+  PASS skip walks the folder
+  PASS a manual skip wraps in both directions whatever the repeat mode says
+  PASS skipping starts the track playing
+  PASS restart asks the deck to seek without changing track
+  PASS restart un-pauses, because RESTART is a play instruction
+  PASS re-selecting the track already playing restarts it
+  PASS the repeat button cycles the three modes and comes back round
+  PASS repeat-one plays the same track again from the top
+  PASS repeat-all wraps past the end of the folder
+  PASS repeat-off stops at the end of the folder but not before it
+  PASS an unplayable track never repeats itself, whatever the repeat mode
+  PASS an unplayable lone track stops rather than retrying
+  PASS volume clamps at both ends
+  PASS volume steps land on clean values however many times they are pressed
+  PASS no sequence of volume presses leaves a value storage would render ugly
+  PASS the default volume is somewhere you can hear the engine over
+  PASS moving the cursor does not change what is playing
+  PASS the cursor stops at both ends rather than wrapping
+  PASS left and right jump ten, clamped to the folder
+  PASS ENTER plays the row the cursor is on
+  PASS selecting a track pulls the cursor with it, so the list follows the deck
+  PASS a new folder resets the deck but keeps the stereo's own settings
+  PASS an empty folder leaves the deck stopped with nothing loaded
+  PASS stopping silences the deck without moving it
+  PASS every operation returns a new state rather than editing the old one
+
+  29 passed, 0 failed
+
+radio stereo — applying a state to the deck
+  PASS a source is loaded and played
+  PASS re-applying an unchanged state does nothing at all
+  PASS the element never loops itself, so the reducer always sees the track end
+  PASS a track change does not seek as well as load
+  PASS a bumped seek token on the same source rewinds it
+  PASS an element that refuses to be seeked does not take the game down with it
+  PASS pausing pauses, and resuming does not reload the track
+  PASS no source yet is a normal state, not an error
+  PASS losing the source empties the deck rather than leaving it holding a dead URL
+  PASS play is retried, but not sixty times a second
+  PASS a deliberate track change is not held up by that backoff
+  PASS a finished track is reported once, to the reducer
+  PASS an element error on a loaded track is reported as a failure
+  PASS an error with nothing loaded is not a track failure
+  PASS playback is read from the element rather than stored
+  PASS a duration the element does not know yet reads as zero, not NaN
+  PASS without an Audio class the stereo is a no-op rather than a crash
+  PASS destroying unhooks the listeners
+
+  18 passed, 0 failed
+
+radio panel — the head unit's geometry and readout
+  PASS the clock reads as a clock
+  PASS a clock the element has not worked out yet does not print NaN
+  PASS a short folder is shown whole, from the top
+  PASS a long folder scrolls with the cursor kept off both edges
+  PASS the window never runs past either end of the folder
+  PASS the list box has room for the rows it claims to show
+  PASS the five buttons fill their row exactly
+  PASS no two buttons overlap
+  PASS every button names the key that works it
+  PASS the transport is dead with no tracks, except the repeat mode
+  PASS the play button says what pressing it will do
+  PASS the display names the track, its place in the folder, and the clock
+  PASS an unknown duration shows as unknown rather than as zero
+  PASS each empty state says what to press, not just what is wrong
+  PASS a folder with no audio in it says so rather than looking broken
+  PASS the volume readout is a whole number of percent
+  PASS silence lights no segments and full volume lights them all
+  PASS the repeat lamp knows the difference between off and repeat-one
+  PASS the playing row is marked whether or not the cursor is on it
+  PASS the list reports its own scroll position only when there is something to scroll
+  PASS row numbers are the track's place in the whole folder, not in the window
+  PASS a title that fits does not scroll
+  PASS a long title scrolls all the way and comes back, dwelling at both ends
+  PASS the marquee never scrolls past what it has to show
+  PASS the marquee phase wraps cleanly on the tick clock
+  PASS every drawn button is clickable, and reports the button it looks like
+  PASS a disabled button is not clickable, so a dead folder cannot be pressed
+  PASS clicking a playlist row names the track in the whole folder, not in the window
+  PASS the volume bar reports the level at the point it was clicked
+  PASS the volume bar's own label is not part of the bar
+  PASS the folder slot is clickable
+  PASS with no folder the display itself is the way in
+  PASS the display is not a folder button once there is music in it
+  PASS empty space hits nothing, and a nonsense point does not throw
+  PASS no two targets claim the same pixel
+  PASS the hover the renderer draws is the target a click would hit
+  PASS no pointer means no hover, rather than a hover at the origin
+  PASS the now-playing strip holds, then fades, then is gone
+
+  38 passed, 0 failed
+
+pointer — mapping the mouse onto the world, and onto menu items
+  PASS a pixel on a full-size canvas is the same pixel in the world
+  PASS a shrunken canvas maps back up
+  PASS a letterboxed canvas subtracts its offset
+  PASS a canvas with no size yet maps to nothing rather than to infinity
+  PASS every menu screen offers the mouse a box to aim at
+  PASS a click in the middle of each row picks that row, on every menu screen
+  PASS the gaps between rows are dead, so a click never picks the wrong neighbour
+  PASS clicks outside the list miss
+  PASS a click past the last row misses rather than wrapping to it
+  PASS a nonsense point does not throw
+  PASS the race and setup screens are not clickable, and say so by having no box
+  PASS every clickable list stays inside the panel drawn around it
+  PASS every model cell is clickable at its centre, and reports its own position
+  PASS every config row, track card and objective card is clickable
+  PASS every rival card is clickable, and only in a mode that has them
+  PASS circuit difficulty cards are clickable only when the pane is drawn
+  PASS clicking a rival picks it and settles every pane behind it
+  PASS hovering a rival marks it without taking it
+  PASS no two setup targets claim the same pixel
+  PASS the START button is clickable and is not a pane
+  PASS hovering marks the cell under the pointer and nothing else
+  PASS hovering a car does not change which car is chosen
+  PASS every pane and the START button can be hovered
+  PASS empty space on the setup screen is not a target
+  PASS clicking a target puts the cursor on it, changing pane if it has to
+  PASS clicking a model selects it without disturbing the other panes
+  PASS focusing an unknown target leaves the setup alone
+  PASS an out-of-range click index clamps rather than selecting nothing
+
+  28 passed, 0 failed
+
+car-atlas — sprite frame measurement
+  PASS bands are the runs of non-empty counts
+  PASS a band running to the end of the buffer is still closed
+  PASS runs shorter than the minimum are discarded as noise
+  PASS an empty projection yields no bands
+  PASS column and row counts only tally pixels at or above the threshold
+  PASS tight bounds shrink to the painted pixels, not the search rect
+  PASS tight bounds of an empty region are null rather than a zero-size rect
+  PASS a gridded sheet resolves into one frame per blob, row-major
+  PASS frames are measured tightly even when a row band is taller than one blob
+  PASS an empty sheet measures no frames instead of throwing
+  PASS the roster is two sheets of twelve models
+  PASS model ids are unique across the whole roster, not just within a sheet
+  PASS every sheet id is unique
+  PASS every frame sits inside its sheet
+  PASS no two frames on a sheet overlap
+  PASS frames are close to a consistent size, as rear-view cars on one sheet should be
+  PASS every car is taller than it is wide, as a rear view of a car is
+  PASS the default model resolves to a real car
+  PASS an unknown model id resolves to null rather than undefined behaviour
+  PASS a model id resolves on its own, without naming a sheet
+  PASS every model carries the sheet it came from, so one lookup is enough to draw it
+  PASS every model lands in exactly one archetype group
+  PASS no archetype group is empty
+  PASS grouping preserves roster order within a group
+
+  24 passed, 0 failed
+
+car sheets — the shipped pixels
+  PASS each sheet is the size the manifest says it is
+  PASS no magenta survives the chroma key
+  PASS the tint pass would leave no saturated pixel behind on a body panel
+  PASS the bodies are still neutral enough for the classifier to find them
+  PASS every frame rect is tight against the art it names
+  PASS a frame is big enough for the garage preview to draw it without inventing pixels
+
+  6 passed, 0 failed
+
+livery — what a player changes about a car
+  PASS a livery built from nothing is the factory default
+  PASS garbage input normalizes rather than throwing
+  PASS non-numeric field values fall back instead of poisoning the car
+  PASS only a literal true switches the underglow on
+  PASS normalizing an already-normal livery changes nothing
+  PASS a nested livery cannot smuggle extra fields through
+  PASS out-of-range values clamp to the field's limit
+  PASS hue wraps rather than clamping, because it is a circle
+  PASS stepping hue past either end wraps around
+  PASS stepping a bounded field stops at the limit
+  PASS stepping does not accumulate float drift into storage
+  PASS brightness reaches genuine black and stops before the highlights blow out
+  PASS the black paint preset is actually black
+  PASS the default finish is a real finish
+  PASS finish ids are unique
+  PASS an unknown finish resolves to null rather than undefined behaviour
+  PASS paint preset ids are unique and every preset is in range
+  PASS applying a preset changes the paint and leaves everything else alone
+  PASS applying a preset preserves the chosen finish
+  PASS an unknown preset leaves the livery untouched
+  PASS equality is by value over the normalized form
+  PASS every visible field participates in equality
+  PASS liveries that look identical share a cache key
+  PASS underglow is absent from the cache key
+  PASS every field that changes pixels does change the cache key
+  PASS a livery with no fade normalizes to a switched-off one
+  PASS an unknown fade axis falls back rather than throwing
+  PASS every fade axis maps a frame position into 0..1
+  PASS reversing an axis is the mirror of the one it reverses
+  PASS a switched-off fade does not change how a livery compares or caches
+  PASS a switched-on fade does distinguish two liveries
+  PASS a livery with no layers normalizes to an empty list
+  PASS layers past the ceiling are dropped, not honoured
+  PASS every layer field is clamped, whatever arrives
+  PASS adding a layer seeds it from its preset and stops at the ceiling
+  PASS a fresh layer is visible against the car it lands on
+  PASS layer ids are stable, and an update finds a layer by id rather than index
+  PASS an update through a layer id re-clamps rather than trusting the caller
+  PASS layer order is part of what a livery is
+  PASS canAddLayer agrees with what addLayer will do
+  PASS a layer preset catalog with a duplicate id or a bad shape would break the picker
+  PASS a layer's curve survives a save, a compare and a cache key
+  PASS a livery saved before curves existed bakes to the same car it always did
+  PASS the neutral names span the whole brightness range without a gap
+  PASS a name says how many layers are on the car, and still fits in storage
+
+  45 passed, 0 failed
+
+paint — turning a neutral body into a coloured one
+  PASS neutral bright pixels are bodywork
+  PASS the two red bands are told apart by where they sit on the car
+  PASS the same red pixel classifies differently either side of the band edge
+  PASS glass inside the cabin band is cabin
+  PASS dark pixels outside the cabin band are left alone
+  PASS the outline stroke is never painted
+  PASS saturated pixels are never bodywork whatever their brightness
+  PASS the body thresholds match what was measured off the sheets
+  PASS confident bodywork is fully painted
+  PASS a crease shadow just under the threshold is partly painted, not dropped
+  PASS the feather reaches zero before it reaches glass, tyres or the outline
+  PASS the feather is monotonic, so a ramp never doubles back
+  PASS red trim is excluded outright rather than feathered
+  PASS the fade floors sit below the thresholds they feather away from
+  PASS a crease inside bodywork keeps its coverage
+  PASS a large dark field is glass, and keeps none
+  PASS the feather cannot cascade across a dark field
+  PASS fully transparent pixels are never painted
+  PASS saturation zero is the identity paint
+  PASS an unpainted body pixel survives a saturation-zero repaint unchanged
+  PASS painting preserves relative shading, which is what keeps panels readable
+  PASS the painted hue actually lands on the requested channel
+  PASS brightness moves the whole body without inverting the shading
+  PASS no channel ever overflows
+  PASS gloss is the identity finish
+  PASS matte compresses contrast and metallic expands it
+  PASS every finish stays in range and keeps mid-grey put
+  PASS an unknown finish behaves as gloss rather than throwing
+  PASS only bright pixels catch a highlight
+  PASS matte barely catches the light and metallic catches it hardest
+  PASS a highlight is the colour of the light, not of the paint
+  PASS saturation zero adds no highlight, so silver stays a bit-exact identity
+  PASS the clearcoat wins back shading that the pigment took away
+  PASS brighter source art always paints brighter, at every finish and hue
+  PASS the clearcoat never overflows a channel
+  PASS hueToRgb walks the wheel and wraps
+  PASS window tint darkens, and full tint hides the interior
+  PASS zero tint leaves the cabin untouched
+  PASS a lamp takes the requested hue and keeps its brightness
+  PASS a bright lens stays brighter than a dim one after recolouring
+  PASS lamp recolouring never overflows
+  PASS preparing a paint and painting with it is the same as painting in one go
+  PASS a car painted at the brightness floor is black but still has shading
+  PASS the clearcoat is what saves a dark car, not the brightness itself
+  PASS brightening a paint past 1 does not hand it free clearcoat
+  PASS shading stays monotonic all the way down to the floor
+  PASS a swatch shows the painted result, so two different paints look different
+  PASS a swatch is a colour a canvas will accept
+  PASS hue takes the short way round the wheel
+  PASS a fade from 350 to 10 goes through red, not through everything else
+  PASS a fade lands exactly on its two stops, and clamps outside them
+  PASS a fade keeps the first paint's finish rather than inventing one
+  PASS a band is measured down the car and a stripe across it
+  PASS a hard-edged zone covers exactly its size
+  PASS a feather straddles the edge, so softening one does not move it
+  PASS a feathered zone never reports a weight outside 0..1
+  PASS mirroring puts the same shape on the other side of the centreline
+  PASS a mirrored zone at the centreline is one shape, not two overlapping ones
+  PASS a straight layer is exactly what it was before curvature existed
+  PASS a curve moves the middle of a shape and leaves its ends alone
+  PASS the sign of a curve chooses which way the layer bends
+  PASS a curved stripe bows across the car rather than down it
+  PASS a mirrored pair bows symmetrically rather than drifting sideways
+  PASS a curved zone never reports a weight outside 0..1
+  PASS the bow is zero at both ends of the cross axis and one in the middle
+  PASS the renderer's split of a curve into offset-then-weight is the same maths
+
+  66 passed, 0 failed
+
+garage — saved configs and which one goes to the line
+  PASS a garage built from nothing is empty and sits on factory
+  PASS garbage input normalizes rather than throwing
+  PASS malformed presets are dropped, good ones survive
+  PASS presets for a model that no longer exists are dropped
+  PASS duplicate preset ids are dropped rather than letting the last writer win
+  PASS stored presets beyond the per-model cap are dropped on load
+  PASS preset liveries are normalized on the way in
+  PASS long preset names are truncated rather than rejected
+  PASS a blank name falls back rather than leaving an unlabelled row
+  PASS selecting a model keeps factory until a preset is chosen
+  PASS selecting a preset moves the model with it
+  PASS a selection naming a preset that does not exist falls back to factory
+  PASS a stored selection whose model and preset disagree follows the preset
+  PASS selecting an unknown preset leaves the pick alone
+  PASS selectFactory drops back to the default without changing model
+  PASS there is always a car to race
+  PASS saving a preset selects it
+  PASS saving does not mutate the garage handed in
+  PASS preset ids are unique even across identical names and models
+  PASS ids are not re-minted after a round trip through storage
+  PASS a full model refuses the save rather than dropping the oldest preset
+  PASS filling one model does not block another
+  PASS presets are listed per model
+  PASS renaming changes only the name
+  PASS updating a livery keeps the id and the name
+  PASS updating an unknown preset is a no-op
+  PASS deleting the selected preset falls back to factory, not a neighbour
+  PASS deleting an unselected preset leaves the selection alone
+  PASS deleting an unknown preset is a no-op
+  PASS deleting the last preset for a model leaves it raceable
+  PASS dirty is false against the selection's own livery
+  PASS an unsaved edit against factory reads as dirty
+  PASS the loadout is a model plus a livery, with no preset id in it
+  PASS serialization keeps only the fields that survive a round trip
+
+  34 passed, 0 failed
+
+garage-editor — building a livery
+  PASS every row names a real livery field with a real limit
+  PASS every choice row carries the catalog it steps through
+  PASS row ids are unique within every section
+  PASS every livery field a player can see is reachable from some row
+  PASS an unknown row resolves to null rather than undefined behaviour
+  PASS up and down walk rows and actions as one list
+  PASS the cursor stops at both ends instead of wrapping
+  PASS left and right on an action do nothing
+  PASS moving never mutates the editor it was given
+  PASS right and left step the row under the cursor
+  PASS hue wraps and the bounded fields clamp, exactly as the limits say
+  PASS the finish stepper walks the catalog and stops at its ends
+  PASS the underglow toggle is a switch, not a counter
+  PASS the palette applies a preset without touching glass, lamps or glow
+  PASS selecting a palette swatch by index applies it
+  PASS an out-of-range palette index clamps rather than breaking
+  PASS adjusting an unknown row is a no-op
+  PASS dragging a bar sets the value directly and stays snapped to the step
+  PASS a drag beyond either end of a bar clamps
+  PASS every adjusted value survives normalization unchanged
+  PASS a new paint offers save and done, but not update or delete
+  PASS editing an existing preset offers update and delete
+  PASS save changes is disabled until something actually changes
+  PASS save is disabled once the model's slots are full
+  PASS a preset id that is no longer in the garage falls back to the new-paint actions
+  PASS done is always offered, so the screen can always be left
+  PASS an untouched editor is pristine, and any change is not
+  PASS stepping a value and stepping it back is pristine again
+  PASS a preset is named after the paint on it
+  PASS desaturated paints are named by brightness, not by a meaningless hue
+  PASS the finish shows up in the name, and gloss does not clutter it
+  PASS hue names pick the nearest colour the short way round the wheel
+  PASS every palette swatch produces a name mentioning its own colour
+  PASS exactly one stop is selected at a time
+  PASS every row arrives with its text and a bar fill in range
+  PASS the underglow colour rows dim when the glow is off but stay in the list
+  PASS the fade colour rows dim when the fade is off but stay in the list
+  PASS the view carries the car, the livery and the derived name
+  PASS hue rows expose their hue so the renderer can tint the marker
+  PASS focusing a stop that does not exist leaves the cursor alone
+  PASS the palette arrives with a swatch marked, matching the cursor
+  PASS the editor opens on the paint section with the cursor on the tab strip
+  PASS left and right on the tab strip walk the sections
+  PASS changing section puts the cursor back on the strip
+  PASS selecting a section that does not exist leaves the editor alone
+  PASS every section has rows, and only the fixed ones are listed as a catalog
+  PASS an unknown section falls back to paint rather than showing nothing
+  PASS a car with no layers offers the add tab and no layer tabs
+  PASS the add tab disappears at the ceiling rather than going inert
+  PASS adding a layer jumps to it, because colouring it is the next thing
+  PASS stepping the layer picker highlights without adding anything
+  PASS the picker's highlight stops at both ends of the catalog
+  PASS removing a layer takes the cursor somewhere that still exists
+  PASS a layer's controls write into that layer and not another
+  PASS a layer's colour is its own, not the body's
+  PASS mirror dims on a band, because a band has no other side
+  PASS only the picker and the remove button answer to ENTER
+  PASS left and right on a button do nothing
+  PASS activating a row that does nothing leaves the editor untouched
+  PASS the view hands the renderer a marked option list, resolving nothing itself
+  PASS the view says how many layer slots are spent
+
+  61 passed, 0 failed
+
+garage-store — the server, and the cache in front of it
+  PASS signed out, the garage is unavailable rather than broken
+  PASS signed out, saving is a no-op rather than a throw
+  PASS signed out, nothing is written to storage at all
+  PASS signed in, the garage is available
+  PASS signed in with an unconfigured client, the garage is unavailable
+  PASS loading returns the server's copy
+  PASS the server's copy is normalized, so a bad row cannot reach the picker
+  PASS a failed load falls back to the cached copy
+  PASS a failed load with no cache is an empty garage, not a crash
+  PASS the cache is keyed by player, so a shared browser cannot leak paints
+  PASS blocked storage does not stop a load
+  PASS saving writes the cache synchronously, before the network is involved
+  PASS saving pushes the garage to the server
+  PASS only the fields that survive a round trip are sent
+  PASS a failed save keeps the work and reports the failure
+  PASS a failed save is retried on a backoff driven by the game loop
+  PASS ticking with nothing pending does nothing
+  PASS an edit made during a save is not swallowed by it
+  PASS saving a garage does not alter it
+
+  19 passed, 0 failed
+
+records — what a personal best is
+  PASS a board is a mode and an objective
+  PASS a stale objective falls back to the mode's default rather than inventing a board
+  PASS online keeps no board, and that is a normal answer rather than an error
+  PASS a mode's direction and unit follow its objective
+  PASS a distance race scores its finish time to the millisecond
+  PASS a time attack scores the distance covered, to the centimetre
+  PASS a run that never reached the line scores nothing
+  PASS a fouled run still scores
+  PASS lower wins on a time board and higher wins on a distance board
+  PASS anything beats nothing
+  PASS a tie is not an improvement
+  PASS a run only replaces a record it beats, and reports what it beat
+  PASS boards do not interfere with each other
+  PASS a run with no board or no value changes nothing
+  PASS a locally-set record is never verified
+  PASS malformed saved data is dropped rather than trusted
+  PASS a value formats in its board's own unit
+  PASS a delta reads negative when it is an improvement, whichever way the board runs
+  PASS a delta against nothing is null rather than a made-up zero
+
+  19 passed, 0 failed
+
+records-store — the local best, and the board behind it
+  PASS signed out, bests are kept locally and nothing is submitted
+  PASS signed out bests survive a reload
+  PASS signed-out bests are not donated to whoever signs in next
+  PASS bests are keyed by player, so a shared browser does not leak them
+  PASS blocked storage does not stop a run being recorded for this session
+  PASS only a better run replaces the record, in either direction
+  PASS a non-improvement reports the standing record so the screen can show it
+  PASS a personal best is pushed to the board with its input log
+  PASS a run with no log omits the field rather than claiming an empty one
+  PASS a run that is not a best is never submitted
+  PASS a failed submission keeps the best and retries from the game loop
+  PASS a better run mid-failure replaces the pending one rather than queuing behind it
+  PASS the server's verdict overrides the local one
+  PASS load merges the server's records over the local ones, per board
+  PASS a local best the server has never seen is submitted on load
+  PASS signed out, load is a no-op that still answers with the local set
+  PASS a failed load leaves the local records intact
+  PASS a global board is readable signed out
+  PASS a board is asked for once and then kept
+  PASS a board that could not be reached is an error, not an empty board
+  PASS with no platform configured the board says so rather than erroring
+  PASS a rank is derived from the boards already in hand
+  PASS a signed-out viewer is nobody on the board
+
+  23 passed, 0 failed
+
+rival — CPU drivers, ghosts, and the car in the other lane
+  PASS stepping a playhead to the end matches replaying the log in one go
+  PASS a playhead counts exactly one tick per step
+  PASS rebasing moves the start to tick zero and drops what came before it
+  PASS a log that already starts at zero is left exactly as it is
+  PASS a rebased ghost runs the same race it originally ran
+  PASS the same seed drives the same run, every time
+  PASS a different seed is a different run by the same driver
+  PASS a generated log replays to the run that generated it
+  PASS the roster runs strictly faster as it gets harder
+  PASS even the hardest rival is beatable by a perfect human run
+  PASS the easiest rival shifts badly rather than driving a slower car
+  PASS a rival never lands in the wrong gear
+  PASS a rival reaches top gear on a long enough run
+  PASS a rival never touches the throttle before the green
+  PASS a driver who is told to jump the light does
+  PASS a profile is the default with the given fields laid over it
+  PASS a rival races the options it is given and cannot be handed better ones
+  PASS a ghost needs a board, a value and at least one input
+  PASS a malformed ghost is no ghost rather than an exception mid-setup
+  PASS a ghost carries the car that set the time
+  PASS the event ceiling is far past any real run
+  PASS with no ghost the lineup is the roster
+  PASS a ghost for this board heads the lineup
+  PASS a ghost belonging to another board is not offered
+  PASS a stale rival id falls back to somebody real
+  PASS building a CPU rival and building a ghost produce the same kind of thing
+  PASS a built ghost replays to the time it is defending
+  PASS every rival names a car that exists and a portrait file that is really there
+  PASS a distance race is decided on the clock, in the right direction
+  PASS a time attack is decided on ground covered, which is the other direction
+  PASS nobody has won while either car is still driving
+  PASS the verdict names the rival and signs the margin toward better
+  PASS a rival run files to the distance boards it borrows
+  PASS a mode that borrows no boards still files to its own
+  PASS a rival stepped alongside a driven race stays on the same clock
+  PASS a rival does not move while the player is still staging
+
+  36 passed, 0 failed
+
+shifter-gate — plate geometry and knob motion
+  PASS every gate node gets a position
+  PASS columns run left to right in gear order
+  PASS a gear pair shares its column's x with the neutral node
+  PASS odd gears sit above the rail and even gears below it
+  PASS the plate is centred and stays inside its box
+  PASS layout honours an offset box rather than assuming the origin
+  PASS a narrower box produces a narrower plate, not an overflowing one
+  PASS the plate has one vertical slot per column plus the neutral rail
+  PASS each gate slot spans its column from the top gear to the bottom gear
+  PASS the rail runs along the neutral row across every column
+  PASS a knob starts parked exactly on its node
+  PASS a knob slides toward its target instead of teleporting
+  PASS a knob never overshoots its target
+  PASS a huge timestep snaps to the target rather than flying past it
+  PASS a knob already on target reports arrival and stops moving
+  PASS redirecting mid-travel works from wherever the knob actually is
+  PASS stepKnob is pure
+  PASS with the gate closed the knob rests in the current gear
+  PASS with the gate open the knob follows the attempt's node
+
+  19 passed, 0 failed
+
+track-layout — top-down road geometry
+  PASS the road declares four lanes
+  PASS lane centres ascend left to right
+  PASS every lane sits between the road edges
+  PASS two lanes fall either side of the centre divider
+  PASS lanes are evenly spaced
+  PASS every track has an id of its own
+  PASS the default track is one of them
+  PASS every track carries its art and its measured dash rhythm
+  PASS dash rhythms are per-track because they genuinely differ
+  PASS the visible slice scales to exactly fill the screen width
+  PASS the view window stays inside the source image
+  PASS the view window keeps both barriers and the whole road in frame
+  PASS the race camera leaves scenery visible outside both sides of the road
+  PASS the centre divider lands in the middle of the screen
+  PASS lane screen positions stay on screen and stay ordered
+  PASS the two racing lanes straddle screen centre
+  PASS an out-of-range lane is rejected rather than drawn off screen
+  PASS the world is drawn at a sane arcade zoom, not a wild one
+  PASS a whole car length of road stays visible at the top zoom
+  PASS more speed means more scroll
+  PASS every track's tile is a whole number of its own dash periods
+  PASS every track's tile starts on a dash so the rhythm carries across the loop
+  PASS every track's tile plus its blend strip stays inside the source image
+  PASS one more period would not fit any track, so no tile is needlessly short
+  PASS tile screen height scales with the world
+  PASS track A's tile is unchanged by the catalog split
+  PASS scroll wraps into the tile instead of growing without bound
+  PASS a negative scroll still wraps to a positive offset
+  PASS wrapping is stable for very large scroll values
+
+  29 passed, 0 failed
+
+gauges — needle mapping and shift light
+  PASS the needle rests at the start of the sweep for a minimum value
+  PASS the needle reaches the end of the sweep at maximum
+  PASS half scale is half sweep
+  PASS the needle never leaves the dial
+  PASS a degenerate scale parks the needle instead of producing NaN
+  PASS the sweep travels clockwise across the bottom of the dial
+  PASS major ticks land on every step from min to max inclusive
+  PASS minor ticks fill in between the majors without duplicating them
+  PASS ticks come back in ascending order with matching angles
+  PASS omitting a minor step yields majors only
+  PASS a needle moves toward its target
+  PASS a needle never overshoots, however large the step
+  PASS a needle settles on its target rather than creeping forever
+  PASS a zero timestep leaves the needle alone
+  PASS smoothing is symmetric on the way down
+  PASS the shift light is dark well below the shift point
+  PASS the shift light arms across the perfect window
+  PASS the shift light warns once the perfect window has passed
+  PASS the light arms exactly where a perfect grade begins, not a moment early
+  PASS the light stops promising a perfect shift once the window closes
+
+  20 passed, 0 failed
+
+setup-menu — pre-race car, paint, track and objective selection
+  PASS the menu opens on the default car, factory paint and the default track
+  PASS the menu opens on a previous selection when given one
+  PASS an unknown saved selection opens on something valid rather than nothing
+  PASS a saved preset id reopens on that preset
+  PASS left and right walk along an archetype's row of cars
+  PASS up and down walk between archetypes
+  PASS the cursor stops at the edges instead of wrapping
+  PASS moving into a shorter archetype row lands on a real car
+  PASS every model in the roster is reachable with the four direction keys
+  PASS no direction key can leave the model pane
+  PASS a car chosen in the first archetype survives the walk to the other panes
+  PASS factory is always offered, even with nothing saved
+  PASS saved configs follow factory in the list
+  PASS only the chosen model's configs are offered
+  PASS up and down walk the config list once the preset pane is live
+  PASS the config cursor stops at the ends of the list
+  PASS changing model resets the config cursor rather than keeping an index
+  PASS factory paint is the default livery
+  PASS selecting a saved config changes the livery taken to the line
+  PASS confirming locks the live pane in and moves to the next
+  PASS confirming the last pane reports done rather than looping round
+  PASS a pane is locked exactly when the cursor has moved past it
+  PASS cancelling unlocks the pane behind you and keeps what was picked there
+  PASS cancelling out of the first pane means leaving the screen
+  PASS every pane is reachable by locking forwards and unlocking back again
+  PASS only Rival Race has a rival pane, and it is the last one
+  PASS the last pane of the mode is the one that says START
+  PASS a distance mode offers no rival strip at all
+  PASS the rival strip lists the roster, and the cursor wraps along it
+  PASS a ghost for this board heads the strip and a ghost for another does not
+  PASS walking off a board that has a ghost falls the cursor back to the roster
+  PASS a rival run files to the distance boards, not to boards of its own
+  PASS clicking a rival takes it and locks every pane behind it
+  PASS the rival pane cannot be clicked into from a mode that has no rivals
+  PASS rewinding reopens the first pane without touching a single choice
+  PASS moving never mutates the setup it was given
+  PASS left and right walk the track strip once the track pane is live
+  PASS moving in the track pane leaves the chosen car alone
+  PASS the menu opens on the default mode and that mode's default objective
+  PASS the objective pane offers the mode's options, not one fixed list
+  PASS switching modes falls back to the new mode's default rather than an alien id
+  PASS an unknown mode opens on a real one rather than on nothing
+  PASS left and right walk the objective options once that pane is live
+  PASS the selection names every part of the race by id
+  PASS a selection carries straight through to the race the mode describes
+  PASS a selection resolves to the model, livery and track needed to race it
+  PASS every reachable selection resolves, so no cursor position can fail to start
+  PASS a stale selection fails loudly rather than half-loading
+  PASS a resolved livery is normalized, so a hostile preset cannot reach the road
+  PASS the view model lays the grid out one row per archetype
+  PASS exactly one cell is selected, and only in the live pane
+  PASS what is chosen stays marked after the cursor leaves its pane
+  PASS the view model marks the locked pick apart from the one still being browsed
+  PASS the view model says what ENTER will do on the pane you are standing on
+  PASS every cell carries the source rect and sheet the renderer needs
+  PASS the config list arrives pre-shaped, with no garage lookup left to the renderer
+  PASS signed out, the Customise row says why rather than disappearing
+  PASS the sign-in state changes nothing about the saved configs themselves
+  PASS the Customise row is last, so a config is never a keypress further away
+  PASS walking onto the Customise row does not change the paint being raced
+  PASS confirming the Customise row asks for the garage instead of locking the pane
+  PASS confirming a real config still locks the pane and moves on
+  PASS the cursor and the pick are marked separately on the action row
+  PASS changing model keeps the cursor on a real config rather than an action
+  PASS the view model carries the chosen car, config, livery and track
+  PASS the objective pane is only live when the cursor is in it
+  PASS every objective option carries the label the renderer prints
+  PASS every track offers a label and a blurb to show under the preview
+  PASS the view model says which mode is being set up
+  PASS stepping the car walks the whole roster in the order the grid reads it
+  PASS the car row wraps, because a one-row picker has no edge to lose a cursor against
+  PASS stepping the car does not disturb the track or the objective
+  PASS stepping the paint moves the pick, not just a browsing cursor
+  PASS the paint row wraps through Factory rather than stopping on it
+  PASS a car with nothing saved for it still has a paint row that does not break
+  PASS Circuit Race defaults to Old Town, offers Docklands, and accepts the completed roster
+  PASS Circuit Race setup lets the player choose CPU difficulty
+  PASS changing car clamps a paint pick that the new car does not have
+
+  78 passed, 0 failed
+
+collection — the whole roster, and every paint saved for it
+  PASS every model in the roster gets a row
+  PASS the rows are in the same order the setup screen's grid reads
+  PASS a row is Factory, then the saved paints, then the one action
+  PASS the add cell disappears at the per-model ceiling rather than going inert
+  PASS signed out there is no add cell at all
+  PASS the collection opens on the car and paint it was handed
+  PASS an unknown paint opens on Factory rather than on nothing
+  PASS moving picks, and the action cell does not
+  PASS nothing wraps, in either direction
+  PASS a column lands somewhere real in the row it arrives in
+  PASS walking off the bottom of the window scrolls it
+  PASS the window never scrolls past the last page
+  PASS scrolling pulls the cursor along rather than leaving it off screen
+  PASS the cursor is always inside the visible window
+  PASS a click reaches any visible row directly
+  PASS an unknown click target changes nothing
+  PASS the view shows one window's worth of rows and says what is beyond it
+  PASS exactly one cell is the cursor and exactly one is the pick
+  PASS hovering marks a cell without moving the cursor
+  PASS the view names the car going to the line, wherever the cursor is
+  PASS every row says how many paints it carries
+
+  21 passed, 0 failed
+
+boards — the leaderboard screen
+  PASS the board list is derived from the mode catalog, not listed again
+  PASS every recorded mode's objectives are all offered
+  PASS online keeps no board, so it is not a tab
+  PASS a board knows which way it runs and what it is measured in
+  PASS the screen opens on the board the setup would race for
+  PASS a selection that names no board falls back rather than inventing one
+  PASS switching scope never changes which board is being read
+  PASS changing mode carries the objective where it still means something
+  PASS nothing wraps on the strips
+  PASS taking a tab resets the scroll
+  PASS up and down walk the strips and then into the list
+  PASS the list takes the cursor only when there is something to scroll
+  PASS going up off the top of the list returns to the board strip
+  PASS the scroll cannot run past the end of the list
+  PASS left and right do nothing in the list — it has no strip
+  PASS moving never mutates the cursor it was given
+  PASS the global view is the board, with the viewer's own row marked
+  PASS a global row says which car and track set the time
+  PASS the personal view lists every board in the mode, driven or not
+  PASS the mode tab filters the personal view, so it is a real tab in both scopes
+  PASS the board strip still points at one personal row
+  PASS a personal rank is shown only for a board that has been fetched
+  PASS personal bests never wait on the network
+  PASS an empty global board is told apart from one that has not arrived
+  PASS signed out the screen says the times are kept but not ranked
+  PASS the window shows one page and says whether there is more
+  PASS a scroll past the end of a shorter list is clamped by the view too
+  PASS a malformed date reads as nothing rather than as Invalid Date
+  PASS every tab, row and arrow fits on screen and nothing collides
+  PASS clicking a tab hits the tab that was drawn there
+  PASS a dead scroll arrow is not a target
+  PASS a list row is not a click target
+  PASS a click takes the tab as well as moving the cursor onto it
+  PASS a click on an arrow scrolls without dragging the cursor into the list
+
+  34 passed, 0 failed
+
+shell — title, menus, and the flow between them
+  PASS the game opens on the title screen
+  PASS every screen is handled by exactly one of the input paths
+  PASS the garage is not a menu screen and does not replace the race
+  PASS backing out of the garage returns to whichever screen opened it
+  PASS re-entering the garage from itself cannot trap the player there
+  PASS the garage declines ENTER, leaving it to the editor's own actions
+  PASS the mode list opens the collection, and ESC comes back to it
+  PASS the collection is not a menu screen and does not replace the race
+  PASS the collection declines ENTER, leaving it to its own cell action
+  PASS the leaderboards open from the title menu and back out to it
+  PASS the leaderboards own their own cursor and have nothing to confirm
+  PASS the editor opened from the collection backs out to the collection
+  PASS the screens drawn over a live race say so
+  PASS only the screens with a list of choices have a menu
+  PASS every menu names itself and offers something to choose
+  PASS exactly one menu item is highlighted, and it is the one the cursor is on
+  PASS the cursor stops at the ends instead of wrapping
+  PASS left and right do nothing in a vertical menu
+  PASS moving never mutates the shell it was given
+  PASS the cursor cannot point past the end of a shorter menu
+  PASS the title screen leads to the mode list
+  PASS choosing a mode adopts it and moves on to the setup screen
+  PASS the mode list opens on the mode already chosen
+  PASS a locked mode says no and changes nothing
+  PASS each mode says what the setup screen will ask it for
+  PASS every mode is listed, and a note explains any that cannot be entered
+  PASS online is listed, enabled, and goes to the lobby rather than the setup screen
+  PASS the campaign is on the mode list, not the title menu
+  PASS backing out of online closes the session as well as the screen
+  PASS the online screen owns its own ENTER, as the setup and garage screens do
+  PASS confirming the setup screen starts the race
+  PASS confirm does nothing on the race screen — the race owns that key
+  PASS cancel unwinds the flow one screen at a time
+  PASS there is nothing above the title screen to back out to
+  PASS backing out never restarts the race behind the menu
+  PASS the pause menu can resume, restart, re-setup, or quit to the mode list
+  PASS the results menu can run it again, change the setup, or quit to the mode list
+  PASS campaign results return to the map as the primary action
+  PASS only a deliberate restart rebuilds the race
+  PASS every menu item resolves to a handled command
+  PASS the chosen mode survives every trip through the menus
+  PASS a mode chosen once is still chosen the next time round
+  PASS the title screen offers the stereo without starting a race
+  PASS the title screen still starts a race from its first item
+  PASS the tutorial goes straight to the track, past the mode list and the picker
+  PASS restarting a run is a different request from building a picked one
+  PASS the stereo is reachable from a paused race too
+  PASS backing out of the radio returns to wherever it was opened from
+  PASS re-entering the radio from itself cannot trap the player there
+  PASS the radio screen has no shell menu, because it owns its own cursor
+  PASS the radio replaces the world rather than sitting over a live race
+  PASS confirm on the radio screen is left to the radio
+  PASS the chosen mode survives a trip to the stereo
+
+  53 passed, 0 failed
+
+coach — the guided practice run
+  PASS the coach opens on something to read, with the world held
+  PASS a holding beat is cleared by the player and by nothing else
+  PASS acknowledging does nothing on a step that is a thing to do
+  PASS every step has a title and something to say
+  PASS a finished coach has no view left to draw
+  PASS the lesson follows the car through a whole shift
+  PASS a player who gets ahead of the coach is not held back
+  PASS the verdict speaks to the shift that was actually made
+  PASS the lift step nags only while the clutch is actually waiting
+
+  9 passed, 0 failed
+
+campaign — the event catalog, the career, and the map
+  PASS every event stands on a painted node, and no two share one
+  PASS the painted nodes are inside the art and none of them collide
+  PASS the detail strip clears every painted stop
+  PASS the map is fitted whole, never cropped
+  PASS every event names a track, a mode and an objective the game actually has
+  PASS an event's run files to a board a solo run can also reach
+  PASS every circuit opponent uses a verified complete directional atlas
+  PASS the authored circuit mission builds the same serializable circuit definition
+  PASS later campaign circuit rows can select every registered geographic track
+  PASS the circuit mission is presented as a grid race throughout the canon briefing
+  PASS a campaign circuit mission accepts Shutter Z from the completed roster
+  PASS the painted base decides whether a roster face is spent on the race
+  PASS every driver and every voice has a face the game can actually load
+  PASS nothing the campaign draws asks for a full-size master
+  PASS every event is reachable from the first one
+  PASS a briefing fits the box it is drawn in
+  PASS the briefing's furniture all fits inside its fixed box
+  PASS a fresh career opens the first event and nothing else
+  PASS losing counts the attempt and opens nothing
+  PASS winning clears the node and opens what it leads to, once
+  PASS the best attempt is kept by the board's own direction
+  PASS a saved career survives a round trip, and repairs itself
+  PASS a malformed count normalizes to zero rather than surviving as one
+  PASS the map opens on the first event's node and moves across the picture
+  PASS a painted node with no event written for it reads as coming soon
+  PASS a locked node refuses to open, an open one starts its briefing
+  PASS the briefing turns its pages and then asks for the race
+  PASS ESC steps out of a briefing before it steps out of the screen
+  PASS a locked node says nothing about what it is
+  PASS a click lands on the node that was drawn, and nowhere else
+  PASS every drag event's opponent is beatable, and the opening one is a gift
+  PASS an event plays the same way every time it is attempted
+
+  32 passed, 0 failed
+
+profile — the driver, and where the driver is kept
+  PASS every avatar id is unique, and every one resolves
+  PASS every avatar points at a file under its own group's folder
+  PASS the default face is a real one
+  PASS a name is trimmed, filtered and capped
+  PASS an empty name is legal, and prints as the anonymous one
+  PASS an unknown avatar falls back rather than being stored
+  PASS favourites are deduped, validated and capped
+  PASS a pin is a car as painted, and an old saved id still reads
+  PASS a re-coloured preset is written through to the pins that name it
+  PASS pinning past the ceiling is refused, not silently swapped
+  PASS pin order is part of what the card says
+  PASS an unchanged edit returns the same object
+  PASS signed out the driver still exists, and nothing is sent
+  PASS a fresh driver is named from the factory profile, never the other way round
+  PASS signed out and signed in do not share a saved driver
+  PASS signed in, an edit is pushed to the game's driver route
+  PASS the server's driver wins on load, and a blank one does not
+  PASS a failed push keeps the edit and says so
+  PASS another player's driver is a public read, and null on failure
+
+  19 passed, 0 failed
+
+profile screen — the card, the pickers, and what they draw
+  PASS the screen opens on the card, on the face already worn
+  PASS each card row opens its own stage, and ESC walks back to the card
+  PASS the keyboard is captured only while a name is being typed
+  PASS typing edits the field, and only ENTER commits it
+  PASS typing does nothing outside the name stage
+  PASS picking a face closes the picker; pinning a car does not
+  PASS the picker offers the paints in the garage, not just the bare bodies
+  PASS the same car in two paints is two pins
+  PASS painted cars are listed before the rest of the roster
+  PASS the car cursor is never outside the visible window
+  PASS a cursor never leaves a grid, whatever the row length
+  PASS the avatar cursor is never outside the visible window
+  PASS a direction is inert on the card's sideways axis and in the name field
+  PASS every board gets a row, driven or not
+  PASS a driven board prints its time, its car and its rank
+  PASS an unfetched rank is null rather than zero
+  PASS the favourites strip is always five cells wide
+  PASS the roster view says when the list is full, and where each pin sits
+  PASS hover marks a cell without moving the cursor
+  PASS every panel on the card fits on screen and nothing collides
+  PASS every grid cell fits on screen and nothing collides with the scroll arrows
+  PASS every drawn target is clickable, and reports what the cursor would take
+  PASS a picker drawn over the card swallows the clicks that would hit it
+  PASS a dead scroll arrow is not a target
+
+  24 passed, 0 failed
+
+versus — the two drivers, before the tree
+  PASS the player's side wears their own name and face
+  PASS an unnamed driver still has something on the plate
+  PASS a roster rival brings their portrait
+  PASS a ghost wears the player's own face, labelled as the ghost
+  PASS a driver who is on no roster has no portrait, and that is normal
+  PASS there is no card at all without somebody to face
+  PASS the curtain lifts by itself, and the bar says it is going to
+  PASS the entrance finishes well before the hold does
+  PASS the headline and subtitle are shouted, because the card is
+  PASS both slots land on screen, inside the frame they are measured from
+  PASS the two slots do not overlap, and the player's is the left one
+  PASS everything under the slots is stacked, not printed through
+
+  12 passed, 0 failed
+
+gauge-assets — art and code agree on the scale
+  PASS tachFace artwork is present at assets/gauges/tachometer_face.svg
+  PASS speedoFace artwork is present at assets/gauges/speedometer_face.svg
+  PASS needle artwork is present at assets/gauges/gauge_needle.svg
+  PASS gearFrame artwork is present at assets/gauges/gear_indicator_frame.svg
+  PASS shiftStrip artwork is present at assets/gauges/shift_light_strip.svg
+  PASS every gauge face is authored on the same 512 canvas the renderer assumes
+  PASS the tachometer sweep starts where the code starts it
+  PASS the tachometer sweep ends where the code ends it
+  PASS the tachometer's printed range matches the dial's full scale
+  PASS every tachometer numeral sits where the code would point the needle
+  PASS the speedometer shares the tachometer's sweep
+  PASS the speedometer's printed range matches the dial's full scale
+  PASS every speedometer numeral sits where the code would point the needle
+  PASS the needle artwork is pre-rotated to the start of the sweep
+  PASS the needle points along positive x before that rotation
+  PASS the code's LED cells line up with the authored housings
+  PASS the LED colour ramp runs green then amber then red
+
+  17 passed, 0 failed
+
+mobile UI — landscape gate, controls, and safe viewport shell
+  PASS portrait touch devices are held at the landscape gate
+  PASS landscape touch devices ask for fullscreen when the browser supports it
+  PASS landscape play proceeds after fullscreen starts or the player has requested it
+  PASS desktop and non-touch portrait windows are never gated
+  PASS touch detection includes tablet browsers that present a desktop user agent
+  PASS the control profile covers menus, drag racing, and circuit racing
+  PASS title and menu contexts remove race-only controls
+  PASS setup-style screens present selection controls and direct-tap help
+  PASS drag-race controls teach the actual lift, clutch, gate, catch sequence
+  PASS circuit controls support gas and steering at the same time without a dead shift button
+  PASS tutorial holds and versus curtains collapse to one obvious continue action
+  PASS mobile canvas instructions name touch controls while desktop copy stays intact
+  PASS tutorial copy translates physical key names into the controls on screen
+  PASS the crew-chief helper has a polite live region without stealing canvas touches
+  PASS the gate copy is specific to Speed Demon and describes the next action
+  PASS the entry page mounts the gate and shared controller before booting the game
+  PASS the phone layout fills the dynamic viewport and respects safe areas
+
+  17 passed, 0 failed
+
+modules — wiring and layout coherence
+  PASS scripts/sim/constants.js imports cleanly
+  PASS scripts/sim/gate.js imports cleanly
+  PASS scripts/sim/engine.js imports cleanly
+  PASS scripts/sim/grading.js imports cleanly
+  PASS scripts/sim/launch.js imports cleanly
+  PASS scripts/sim/match.js imports cleanly
+  PASS scripts/sim/modes.js imports cleanly
+  PASS scripts/sim/race.js imports cleanly
+  PASS scripts/sim/input-log.js imports cleanly
+  PASS scripts/audio.js imports cleanly
+  PASS scripts/online/session.js imports cleanly
+  PASS scripts/online/opponent.js imports cleanly
+  PASS scripts/online/net.js imports cleanly
+  PASS scripts/radio/tracks.js imports cleanly
+  PASS scripts/radio/playlist.js imports cleanly
+  PASS scripts/radio/library-status.js imports cleanly
+  PASS scripts/radio/library.js imports cleanly
+  PASS scripts/radio/stereo.js imports cleanly
+  PASS scripts/radio/preferences.js imports cleanly
+  PASS scripts/garage/livery.js imports cleanly
+  PASS scripts/garage/paint.js imports cleanly
+  PASS scripts/garage/garage.js imports cleanly
+  PASS scripts/records/records.js imports cleanly
+  PASS scripts/assets/car-atlas.js imports cleanly
+  PASS scripts/render/livery.js imports cleanly
+  PASS scripts/ui/shifter-gate.js imports cleanly
+  PASS scripts/ui/radio-panel.js imports cleanly
+  PASS scripts/ui/track-layout.js imports cleanly
+  PASS scripts/ui/gauges.js imports cleanly
+  PASS scripts/ui/circuit-hud.js imports cleanly
+  PASS scripts/ui/setup-menu.js imports cleanly
+  PASS scripts/ui/collection.js imports cleanly
+  PASS scripts/ui/boards.js imports cleanly
+  PASS scripts/ui/garage-editor.js imports cleanly
+  PASS scripts/ui/shell.js imports cleanly
+  PASS scripts/ui/coach.js imports cleanly
+  PASS scripts/ui/text-entry.js imports cleanly
+  PASS scripts/ui/online-menu.js imports cleanly
+  PASS scripts/render/scene.js imports cleanly
+  PASS scripts/render/car.js imports cleanly
+  PASS scripts/render/setup.js imports cleanly
+  PASS scripts/render/collection.js imports cleanly
+  PASS scripts/render/boards.js imports cleanly
+  PASS scripts/render/garage.js imports cleanly
+  PASS scripts/render/dashboard.js imports cleanly
+  PASS scripts/render/shifter.js imports cleanly
+  PASS scripts/render/overlay.js imports cleanly
+  PASS scripts/render/coach.js imports cleanly
+  PASS scripts/render/menus.js imports cleanly
+  PASS scripts/render/radio.js imports cleanly
+  PASS scripts/render/online.js imports cleanly
+  PASS scripts/input.js imports cleanly
+  PASS scripts/pointer.js imports cleanly
+  PASS scripts/mobile-ui.js imports cleanly
+  PASS scripts/rival/cpu-driver.js imports cleanly
+  PASS scripts/rival/rivals.js imports cleanly
+  PASS scripts/rival/ghost.js imports cleanly
+  PASS scripts/rival/lineup.js imports cleanly
+  PASS scripts/campaign/contacts.js imports cleanly
+  PASS scripts/campaign/events.js imports cleanly
+  PASS scripts/campaign/map.js imports cleanly
+  PASS scripts/campaign/progress.js imports cleanly
+  PASS scripts/ui/campaign.js imports cleanly
+  PASS scripts/render/campaign.js imports cleanly
+  PASS scripts/profile/avatars.js imports cleanly
+  PASS scripts/profile/profile.js imports cleanly
+  PASS scripts/ui/profile.js imports cleanly
+  PASS scripts/render/profile.js imports cleanly
+  PASS scripts/ui/versus.js imports cleanly
+  PASS scripts/render/versus.js imports cleanly
+  PASS scripts/init-game.js imports cleanly
+  PASS the composition root exports a boot function
+  PASS the sim never reaches up into the ui or the renderers
+  PASS no module reaches for the DOM at import time
+  PASS the road meets the dashboard with no gap
+  PASS the road scale is shared by everything that measures in metres
+  PASS every car in the roster sits on the road, clear of the instrument cluster
+  PASS the car's drawn proportions come from its frame, not from a fixed square
+  PASS a missing frame still yields a box, so the fallback block can be drawn
+  PASS the tail-light glow sits on the tail lights of whatever frame is drawn
+  PASS the tail-light glow follows the body when the car squats
+  PASS the car fits inside its lane
+  PASS the pulled-back race camera keeps the car visually compact
+  PASS the player's lane is on tarmac, between the painted road edges
+  PASS the visible track slice is drawn at the full width of the frame
+  PASS both road edges stay on screen after the view crop
+  PASS every dashboard element sits inside the dash panel
+  PASS every setup panel fits on screen and nothing collides, in every mode
+  PASS the setup hint line sits below everything it explains
+  PASS each setup pane has room for its heading above it
+  PASS every menu surface fits inside the frame
+  PASS the pause menu's items fit inside the panel drawn around them
+  PASS the title menu sits below the splash's cars and above its control legend
+  PASS every coaching step fits the surface it is drawn on
+  PASS the modal menus stay clear of the instrument cluster they sit over
+  PASS the transport rules never reach for a browser
+  PASS the garage's rules never reach for a browser
+  PASS the records' rules never reach for a browser
+  PASS the rivals' rules never reach for a browser
+  PASS the CPU driver is the only place in the cabinet that rolls a die
+  PASS the leaderboard screen decides nothing about fetching
+  PASS the leaderboard screen and the board registry are one list
+  PASS the debug handle can move on every screen that owns a cursor
+  PASS circuit races route every countdown transition through the shared tree audio
+  PASS the campaign's rules never reach for a browser
+  PASS nothing the game loads at runtime is a full-size master
+  PASS the whole thumb set is smaller than a single master was
+  PASS no derived face is stale against a master that is present
+  PASS the driver's rules never reach for a browser
+  PASS the driver screen's bests are the boards a run can actually reach
+  PASS the VS card is built for a rival race and never for an online round
+  PASS every path onto the race screen goes through the same door
+  PASS the online rules never reach for a browser or a socket
+  PASS the online rules do not import the socket layer
+  PASS net.js is the only module in the cabinet that opens a socket
+  PASS restart and pause are both refused during an online race
+  PASS no server frame tears the race down without moving the screen
+  PASS the debug handle stages and declutches through the logged path
+  PASS the garage's rules do not import the storage layer
+  PASS the paint rules are shared by the renderer rather than copied into it
+  PASS the radio's display layer does not import the file-system layer
+  PASS every radio surface fits on screen
+  PASS the head unit's controls all sit inside the faceplate
+  PASS nothing on the head unit collides with anything else
+  PASS the in-race now-playing strip stays on the road and clear of the tree
+  PASS the mode list and its detail panel do not collide
+  PASS a car frame fits its grid cell without being stretched
+  PASS every collection row and cell fits on screen and nothing collides
+  PASS every drawn cell on the collection is clickable, and reports its own row
+  PASS every garage panel fits on screen and nothing collides
+  PASS every strip cell fits inside its own row and its neighbours
+  PASS every garage control is clickable, and the bars report where they were hit
+  PASS a drawn stepper arrow is a pressable target that steps its own row
+  PASS the shift light strip clears the readout column below it
+  PASS the shift light strip stays inside the dash and clear of the shifter
+  PASS the gauges do not overlap each other or the shifter
+  PASS the shifter plate keeps its knob inside the console
+  PASS the entry point wires the real module and stylesheet
+  PASS referenced asset files are actually present
+
+  139 passed, 0 failed

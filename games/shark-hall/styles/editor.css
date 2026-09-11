@@ -389,9 +389,8 @@
  */
 
 body.editing .game-header,
-body.editing .score-hud,
+body.editing .scoreboard,
 body.editing .control-deck,
-body.editing .table-actions,
 body.editing .back-link,
 body.editing #ballTip,
 body.editing #turnCard,

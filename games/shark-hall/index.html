@@ -32,28 +32,51 @@
           <div id="status" class="status">Table ready</div>
           <div id="sub" class="sub">Choose a match from the menu</div>
         </div>
+        <!--
+          The camera and fullscreen toggles live up here, not on the table. They
+          used to sit in the canvas's bottom corners, where the overhead shot —
+          the one view whose whole job is the entire table at once — drew the
+          bottom rail under them. Nothing that stays put is drawn over the cloth
+          any more; see the scoreboard below for the same rule applied to the
+          plaques.
+        -->
         <div class="header-actions">
+          <button id="camBtn" class="icon-btn" type="button">Overhead view</button>
           <button id="muteBtn" class="icon-btn" type="button" aria-pressed="true">Sound on</button>
+          <button id="fullscreenBtn" class="icon-btn" type="button" aria-pressed="false">Fullscreen</button>
           <button id="pauseBtn" class="icon-btn" type="button">Pause</button>
+        </div>
+      </div>
+
+      <!--
+        THE SCOREBOARD IS A ROW, NOT AN OVERLAY. The two plaques and the turn chip
+        were absolutely positioned over the top of the canvas, and from the
+        overhead camera they covered the far rail and both top pockets — a ball
+        frozen on that rail was a ball you could not see. They sit in the flow
+        above the table now, so both cameras get the whole cloth. Only things
+        that come and go — the turn card, the placement banner, the hover
+        readout — are still drawn over the table.
+      -->
+      <div class="scoreboard">
+        <div id="p1Plaque" class="player-plaque">
+          <div class="plaque-kicker">Player one</div>
+          <div class="plaque-line">
+            <span id="p1Label" class="plaque-name">PLAYER 1 · OPEN</span>
+            <span id="p1Count" class="plaque-meta">Table open</span>
+          </div>
+        </div>
+        <div id="turnChip" class="turn-chip">8 Ball</div>
+        <div id="p2Plaque" class="player-plaque right">
+          <div id="p2Kicker" class="plaque-kicker">Opponent</div>
+          <div class="plaque-line">
+            <span id="p2Label" class="plaque-name">CPU · OPEN</span>
+            <span id="p2Count" class="plaque-meta">Table open</span>
+          </div>
         </div>
       </div>
 
       <div class="game-wrap">
         <canvas id="game"></canvas>
-
-        <div class="score-hud">
-          <div id="p1Plaque" class="player-plaque">
-            <div class="plaque-kicker">Player one</div>
-            <div id="p1Label" class="plaque-name">PLAYER 1 · OPEN</div>
-            <div id="p1Count" class="plaque-meta">Table open</div>
-          </div>
-          <div id="turnChip" class="turn-chip">8 Ball</div>
-          <div id="p2Plaque" class="player-plaque right">
-            <div id="p2Kicker" class="plaque-kicker">Opponent</div>
-            <div id="p2Label" class="plaque-name">CPU · OPEN</div>
-            <div id="p2Count" class="plaque-meta">Table open</div>
-          </div>
-        </div>
 
         <div id="placementBanner" class="placement-banner">
           Place the cue ball behind the head string, then release to confirm.
@@ -75,16 +98,17 @@
           <span id="ballTipName" class="bt-name">Cue ball</span>
           <span id="ballTipOwner" class="bt-owner"></span>
         </div>
-
-        <div class="table-actions">
-          <button id="camBtn" type="button">Overhead view</button>
-          <button id="resetAim" type="button">Center aim</button>
-        </div>
       </div>
 
       <div class="control-deck">
         <section class="control-card aim-card">
-          <div class="card-label"><span>Fine aim</span><span id="aimText" class="card-value">0.0°</span></div>
+          <div class="card-label">
+            <span>Fine aim</span>
+            <span class="card-tools">
+              <span id="aimText" class="card-value">0.0°</span>
+              <button id="resetAim" class="card-btn" type="button">Center</button>
+            </span>
+          </div>
           <div class="aim-tools">
             <button id="nudgeLeft" class="nudge" type="button" aria-label="Aim left">◀</button>
             <input id="aim" type="range" min="-180" max="180" step=".1" value="0" aria-label="Fine aim angle" />

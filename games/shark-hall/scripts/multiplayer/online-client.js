@@ -86,6 +86,30 @@ export function sanitizeShotIntent(value = {}) {
   return intent;
 }
 
+/**
+ * An aim in progress: the same four numbers a stroke will be, plus the charge
+ * and, with ball in hand, where the cue ball is being dragged.
+ *
+ * It is a picture, not a request. Nothing about it is ever applied to a match;
+ * the other seat draws it and the stroke that follows is what counts.
+ */
+export function sanitizeAimIntent(value = {}) {
+  const number = (raw, min, max, fallback) => {
+    const numeric = Number(raw);
+    return Number.isFinite(numeric) ? Math.max(min, Math.min(max, numeric)) : fallback;
+  };
+  const aim = {
+    angle: number(value.angle, -Math.PI * 2, Math.PI * 2, 0),
+    spinX: number(value.spinX, -1, 1, 0),
+    spinY: number(value.spinY, -1, 1, 0),
+    charge: number(value.charge, 0, 1, 0),
+  };
+  if (value.place) {
+    aim.place = { x: number(value.place.x, -10, 10, 0), z: number(value.place.z, -10, 10, 0) };
+  }
+  return aim;
+}
+
 export function createOnlineClient(options = {}) {
   const WebSocketCtor = options.WebSocketCtor || globalThis.WebSocket;
   const resolveIdentity = options.resolveIdentity || (() => ({}));
@@ -96,7 +120,10 @@ export function createOnlineClient(options = {}) {
 
   const subscribers = new Set();
   const shotListeners = new Set();
+  const aimListeners = new Set();
   let socket = null;
+  /** The socket the protocol was last announced on. Announced once per connection. */
+  let announcedOn = null;
   let pending = [];
   let manualClose = false;
   let resumeCredentials = null;
@@ -192,10 +219,16 @@ export function createOnlineClient(options = {}) {
 
     if (data.event === "lobby_joined" || data.event === "lobby_updated") {
       emit({ status: snapshot.matchState ? snapshot.status : "lobby", lobby: normalizeLobby(data), error: null });
-      // The protocol handshake. Announced on every lobby event rather than once,
-      // because a reconnect gets a fresh lobby view and the server will not
-      // start a match until both seats have said which protocol they speak.
-      send({ type: "lobby_message", messageType: "shark_profile", value: JSON.stringify({ protocolVersion: options.protocolVersion || 1 }) });
+      // The protocol handshake. Announced once per CONNECTION rather than once
+      // ever, because a reconnect is a fresh socket the server knows nothing
+      // about, and it will not start a match until both seats have said which
+      // protocol they speak. Not on every lobby event: the server acknowledges
+      // an announcement with a lobby update, and answering that with another
+      // announcement was an infinite ping-pong.
+      if (announcedOn !== socket) {
+        announcedOn = socket;
+        send({ type: "lobby_message", messageType: "shark_profile", value: JSON.stringify({ protocolVersion: options.protocolVersion || 1 }) });
+      }
       return;
     }
 
@@ -218,6 +251,17 @@ export function createOnlineClient(options = {}) {
       if (data.messageType === "shark_match" || data.messageType === "shark_match_ended") {
         const matchState = json(data.value);
         if (matchState) emit({ status: "started", matchState, error: null });
+        return;
+      }
+      if (data.messageType === "shark_aim") {
+        // The other seat lining up. Goes to its listeners and nowhere near the
+        // snapshot: it is not state, and a snapshot emit per aim update would
+        // repaint the whole interface twelve times a second.
+        if (data.senderId && data.senderId === snapshot.clientId) return;
+        const aim = json(data.value);
+        if (!aim) return;
+        const seat = Number.isInteger(aim.seat) ? aim.seat : -1;
+        for (const listener of aimListeners) listener({ ...sanitizeAimIntent(aim), seat });
         return;
       }
       return;
@@ -315,6 +359,11 @@ export function createOnlineClient(options = {}) {
       send({ type: "lobby_message", messageType: "shark_rematch", value: JSON.stringify({}) });
     },
 
+    /** Where this seat is pointing right now, for the other seat to watch. */
+    sendAim(aim) {
+      send({ type: "lobby_message", messageType: "shark_aim", value: JSON.stringify(sanitizeAimIntent(aim)) });
+    },
+
     leave() {
       send({ type: "leave_lobby" });
       forget();
@@ -342,6 +391,12 @@ export function createOnlineClient(options = {}) {
     onShot(listener) {
       shotListeners.add(listener);
       return () => shotListeners.delete(listener);
+    },
+
+    /** The other seat's aim, each time it changes. Carries the seat it came from. */
+    onAim(listener) {
+      aimListeners.add(listener);
+      return () => aimListeners.delete(listener);
     },
 
     getSnapshot,

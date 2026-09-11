@@ -293,6 +293,33 @@ test("there is a way back to the arcade, and it points at the grid", () => {
   assert(zIndex > 40, `the back link sits at z-index ${zIndex}, under the menu layers`);
 });
 
+test("nothing that stays put is drawn over the table", () => {
+  // The overhead camera frames the cloth edge to edge, so anything pinned over
+  // the canvas is pinned over a rail. The plaques and the camera toggle used to
+  // be; a ball frozen on the far rail was a ball you could not see. Only the
+  // readouts that come and go — the turn card, the placement banner, the hover
+  // tip — may be positioned over `.game-wrap`.
+  const stage = html.slice(html.indexOf('<div class="game-wrap">'), html.indexOf('<div class="control-deck">'));
+  const overlaid = [...stage.matchAll(/id="([A-Za-z0-9]+)"/g)].map((match) => match[1]).filter((id) => id !== "game");
+  const transient = new Set(["placementBanner", "turnCard", "turnCardKicker", "turnCardName", "turnCardReason", "ballTip", "ballTipSwatch", "ballTipName", "ballTipOwner"]);
+  for (const id of overlaid) assert(transient.has(id), `#${id} is laid over the canvas and would cover the table from above`);
+
+  assert(html.indexOf('class="scoreboard"') < html.indexOf('<canvas id="game"'), "the scoreboard sits above the table, in the flow");
+  const css = read("styles/table.css");
+  const scoreboard = css.slice(css.indexOf(".scoreboard {"), css.indexOf(".player-plaque {"));
+  assert(!/position:\s*absolute/.test(scoreboard), "the scoreboard must not float over the canvas");
+  assert(!css.includes(".table-actions"), "the on-table button row is gone; its buttons live in the header and the aim card");
+});
+
+test("the fullscreen layout is one class on the body, and the editor keeps its own", () => {
+  const css = read("styles/table.css");
+  assert(css.includes("body.fullscreen #app"), "no fullscreen layout");
+  assert(css.includes("body.fullscreen canvas#game"), "the canvas must grow to the viewport in fullscreen");
+  assert(css.includes("body.fullscreen .control-deck"), "the deck must be cut down in fullscreen");
+  const editor = read("styles/editor.css");
+  assert(editor.includes("body.editing .scoreboard"), "the editor must put the scoreboard away like it does the rest of the chrome");
+});
+
 test("there is exactly one page", () => {
   // Mini Hoops learned this the hard way: a second document destroys the <audio>
   // element streaming the soundtrack and the room tone, and the music restarts

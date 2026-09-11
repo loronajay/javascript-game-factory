@@ -18,6 +18,13 @@
 // had drifted, the `ballsBefore` it is given corrects it before the stroke,
 // which is why the correction is invisible rather than a snap.
 //
+// THE OPPONENT'S AIM IS SHOWN, NOT DECIDED. While a seat is lining up, its
+// angle, contact point, charge and (with ball in hand) the cue ball it is
+// dragging are broadcast a few times a second, and the other seat draws them
+// exactly as it draws its own — the same stick, the same guide. None of it is
+// state: nothing arriving this way moves a ball the server has not moved, and
+// the stroke that follows corrects the table from `ballsBefore` regardless.
+//
 // No THREE, no DOM. The world it drives is the cabinet's own pure one.
 
 import { cloneBalls, remaining } from "../sim/balls.js";
@@ -36,6 +43,17 @@ export const MODE_ONLINE = "online";
 
 /** How long the turn card holds the screen. The same beat the local match uses. */
 const TURN_CARD_MS = 1240;
+
+/**
+ * How often the shooter's aim goes out, in simulated seconds.
+ *
+ * Counted in `tick(dt)` rather than off a clock, for the same reason the settle
+ * window is: the match has no clock, and a throttle that can be tested under
+ * node is a throttle that gets tested. Twelve a second reads as live on the
+ * other table; a message only goes out when something changed, so an idle aim
+ * costs nothing.
+ */
+export const AIM_SEND_INTERVAL = 1 / 12;
 
 export function createOnlineMatch({
   client,
@@ -60,6 +78,14 @@ export function createOnlineMatch({
   let spinY = 0;
   let message = "Waiting for the table…";
   let connection = { status: "idle", roomCode: "", error: null };
+
+  /** How far into the stroke this seat is, as the controls report it each frame. */
+  let charge = 0;
+  /** The other seat's aim, as last received. Null whenever it is not theirs to line up. */
+  let opponentAim = null;
+  /** The last aim sent, so an unchanged one is not sent again. */
+  let lastSent = null;
+  let sinceSent = 0;
 
   // -----------------------------------------------------------------------
   // Events — the same names the local match emits
@@ -93,6 +119,8 @@ export function createOnlineMatch({
 
   const seatName = (seat) => state?.seats?.[seat]?.name || `Player ${seat + 1}`;
   const isMyTurn = () => state !== null && mySeat() === state.shooter;
+  /** Ball in hand as this seat sees it: spent locally the moment the placement is confirmed. */
+  const heldZone = () => (state && isMyTurn() && !placement ? state.ballInHand : ZONE_NONE);
 
   function humanCanAct() {
     if (!started || !state || world.moving || card || awaiting) return false;
@@ -113,13 +141,18 @@ export function createOnlineMatch({
    * whether the match is over — is applied either way.
    */
   function apply(next, { snapTable = true } = {}) {
-    if (!next) return;
+    // The same object again is not news. The client re-emits its snapshot on
+    // every lobby event, and every one of those carries the state it already
+    // had; reloading the table off it would snap a cue ball the holder is
+    // mid-drag with back to the server's default spot and forget the placement.
+    if (!next || next === state) return;
     const previous = state;
     state = next;
 
     if (snapTable) {
       world.load(next.balls);
       placement = null;
+      opponentAim = null;
       emit("rack", world.balls);
     }
 
@@ -176,6 +209,7 @@ export function createOnlineMatch({
     angle = played.stroke.angle;
     spinX = played.stroke.spinX;
     spinY = played.stroke.spinY;
+    opponentAim = null;
     say(played.seat === mySeat() ? "Your shot is away…" : `${seatName(played.seat)} shoots…`);
     emit("shot", shot);
     emit("change", { type: "shot" });
@@ -195,10 +229,67 @@ export function createOnlineMatch({
   }
 
   // -----------------------------------------------------------------------
+  // The other seat, lining up
+  // -----------------------------------------------------------------------
+
+  /**
+   * Take the shooter's aim.
+   *
+   * Accepted only from the seat that is actually shooting, and only while the
+   * table is at rest with nothing in flight — an aim that arrives after the
+   * stroke it belonged to is a stale one, and drawing it would swing the stick
+   * on a table the shot has already left.
+   */
+  function receiveAim(aim) {
+    if (!state || !aim || world.moving || pending) return;
+    if (aim.seat !== state.shooter || aim.seat === mySeat()) return;
+    opponentAim = {
+      angle: Number.isFinite(aim.angle) ? aim.angle : angle,
+      spinX: Number.isFinite(aim.spinX) ? aim.spinX : 0,
+      spinY: Number.isFinite(aim.spinY) ? aim.spinY : 0,
+      charge: Math.max(0, Math.min(1, Number(aim.charge) || 0)),
+    };
+    // Their cue ball, being dragged. Clamped through the same rule the holder's
+    // own drag goes through, so a bad message cannot draw it inside the rack;
+    // and the stroke corrects it from `ballsBefore` either way.
+    if (aim.place && state.ballInHand !== ZONE_NONE && !world.cue()?.pocketed) {
+      const spot = clampCuePosition(world.balls, aim.place.x, aim.place.z, state.ballInHand);
+      world.placeCue(spot.x, spot.z);
+    }
+  }
+
+  /** What this seat would broadcast right now, or null if it is not lining up. */
+  function aimToSend() {
+    if (!humanCanAct()) return null;
+    const cue = world.cue();
+    const mine = { angle, spinX, spinY, charge };
+    // The placement rides while it is being made AND after it is confirmed:
+    // the opponent is looking at a cue ball, not at a confirmation state.
+    if (state.ballInHand !== ZONE_NONE && cue && !cue.pocketed) mine.place = { x: cue.x, z: cue.z };
+    return mine;
+  }
+
+  function broadcastAim(dt) {
+    sinceSent += dt;
+    if (sinceSent < AIM_SEND_INTERVAL) return;
+    const next = aimToSend();
+    if (!next) {
+      lastSent = null;
+      return;
+    }
+    const key = JSON.stringify(next);
+    if (key === lastSent) return;
+    sinceSent = 0;
+    lastSent = key;
+    client.sendAim?.(next);
+  }
+
+  // -----------------------------------------------------------------------
   // The socket
   // -----------------------------------------------------------------------
 
   unsubscribe.push(client.onShot((played) => replay(played)));
+  if (typeof client.onAim === "function") unsubscribe.push(client.onAim((aim) => receiveAim(aim)));
   unsubscribe.push(
     client.subscribe((snapshot) => {
       connection = {
@@ -305,7 +396,7 @@ export function createOnlineMatch({
 
     /** Clamped, not tested — the same drag behaviour the local match has. */
     tryPlaceCue(x, z) {
-      if (!state || state.ballInHand === ZONE_NONE || !isMyTurn()) return false;
+      if (heldZone() === ZONE_NONE) return false;
       const spot = clampCuePosition(world.balls, x, z, state.ballInHand);
       world.placeCue(spot.x, spot.z);
       emit("place", spot);
@@ -320,9 +411,14 @@ export function createOnlineMatch({
      * open a window where the two halves of one turn could arrive apart.
      */
     confirmPlacement() {
-      if (!state || state.ballInHand === ZONE_NONE || !isMyTurn()) return false;
+      if (heldZone() === ZONE_NONE) return false;
       const cue = world.cue();
       if (!cue) return false;
+      // Confirming is what leaves ball-in-hand mode, exactly as it does locally.
+      // The server still holds the grant until the stroke spends it, which is
+      // why the snapshot reads `heldZone()` and not the server's field: a
+      // snapshot that kept saying "placing" kept the shot button disabled and
+      // turned every press into another drag, and the turn could never be taken.
       placement = { x: cue.x, z: cue.z };
       say("Cue ball placed · now aim the shot.");
       emit("change", { type: "placed" });
@@ -331,10 +427,16 @@ export function createOnlineMatch({
 
     shoot,
 
+    /** How far into the stroke the controls are. Broadcast, never acted on here. */
+    setCharge(level) {
+      charge = Math.max(0, Math.min(1, Number(level) || 0));
+    },
+
     tick(dt) {
       const { settled, events } = world.step(dt);
       for (const event of events) emit("physics", event);
       if (settled) settle();
+      broadcastAim(dt);
       return events;
     },
 
@@ -352,9 +454,13 @@ export function createOnlineMatch({
             ? PHASE_TURN_CARD
             : state.phase === "complete"
               ? PHASE_OVER
-              : state.ballInHand !== ZONE_NONE && isMyTurn()
+              : heldZone() !== ZONE_NONE
                 ? PHASE_PLACING
                 : PHASE_AIMING;
+      // While the other seat is lining up, the table shows THEIR aim: the stick
+      // and the guide follow the shot that is about to be played, not the angle
+      // this seat last left its own cue at.
+      const watching = opponentAim && !isMyTurn() && !world.moving ? opponentAim : null;
 
       return {
         phase,
@@ -364,10 +470,11 @@ export function createOnlineMatch({
         isBreak: Boolean(state?.isBreak),
         // Only the player holding the ball is placing one. The opponent sees a
         // table, not a banner telling them to drag something they cannot touch.
-        ballInHand: state && isMyTurn() ? state.ballInHand : ZONE_NONE,
-        angle,
-        spinX,
-        spinY,
+        ballInHand: heldZone(),
+        angle: watching ? watching.angle : angle,
+        spinX: watching ? watching.spinX : spinX,
+        spinY: watching ? watching.spinY : spinY,
+        opponentAim: watching,
         message,
         card,
         mode: MODE_ONLINE,

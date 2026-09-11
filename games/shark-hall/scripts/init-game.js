@@ -32,6 +32,7 @@ import { createCosmeticsStore } from "./store/cosmetics-store.js";
 import { loadSettings, saveSettings } from "./store/settings.js";
 import { createControls } from "./ui/controls.js";
 import { findElements } from "./ui/elements.js";
+import { createFullscreen, fullscreenLabel } from "./ui/fullscreen.js";
 import { createHud } from "./ui/hud.js";
 import { createMenu } from "./ui/menu.js";
 import { createOnlineView } from "./ui/online-view.js";
@@ -343,6 +344,16 @@ export async function bootGame() {
     refresh();
   });
 
+  // Fullscreen is a property of the document, not of the match: the scene
+  // re-measures the canvas every frame, so the layout change needs no help
+  // from anything below this line.
+  const fullscreen = createFullscreen({ onChange: () => refresh() });
+  elements.fullscreenBtn?.addEventListener("click", () => {
+    audio.unlock();
+    audio.click();
+    fullscreen.toggle();
+  });
+
   // The first gesture anywhere is what a browser will accept an AudioContext
   // from, so it is caught at the document rather than on any one control.
   for (const type of ["pointerdown", "keydown"]) {
@@ -363,6 +374,10 @@ export async function bootGame() {
     spinDial.draw(snapshot.spinX, snapshot.spinY);
     menu.syncMatch(snapshot);
     if (elements.camBtn) elements.camBtn.textContent = cameraMode === "aim" ? "Overhead view" : "Cue view";
+    if (elements.fullscreenBtn) {
+      elements.fullscreenBtn.textContent = fullscreenLabel(fullscreen.isActive());
+      elements.fullscreenBtn.setAttribute("aria-pressed", String(fullscreen.isActive()));
+    }
     if (elements.muteBtn) {
       elements.muteBtn.textContent = settings.muted ? "Sound off" : "Sound on";
       elements.muteBtn.setAttribute("aria-pressed", String(!settings.muted));
@@ -387,6 +402,9 @@ export async function bootGame() {
     const dt = Math.min(MAX_FRAME_SECONDS, (now - lastFrame) / 1000);
     lastFrame = now;
 
+    // The stroke as it stands, reported before the tick so an online match
+    // can broadcast it to the seat watching. Locally it is a no-op.
+    live.setCharge(controls.chargeLevel());
     live.tick(dt);
     // Drives the cosmetics store's retry backoff, so a save that failed on a
     // dropped connection keeps trying without a timer of its own.
@@ -407,7 +425,9 @@ export async function bootGame() {
       balls: live.world.balls,
       cue,
       angle: snapshot.angle,
-      charge: controls.chargeLevel(),
+      // While the other seat is lining up online, the stick draws back with
+      // THEIR stroke; the snapshot's angle and spin already follow them.
+      charge: snapshot.opponentAim ? snapshot.opponentAim.charge : controls.chargeLevel(),
       moving: snapshot.moving,
       paused: snapshot.paused,
       guideMode: settings.guide,

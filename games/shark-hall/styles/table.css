@@ -130,11 +130,16 @@ button:disabled {
   font-weight: 750;
   font-size: 12px;
   letter-spacing: 0.03em;
+  white-space: nowrap;
   backdrop-filter: blur(8px);
 }
 .icon-btn:hover {
   border-color: rgba(199, 154, 79, 0.46);
   background: #1c2531;
+}
+.icon-btn[aria-pressed="true"]#fullscreenBtn {
+  border-color: rgba(239, 200, 124, 0.54);
+  color: var(--brass2);
 }
 
 /* --- table --------------------------------------------------------------- */
@@ -157,25 +162,24 @@ canvas#game {
   background: #04060a;
 }
 
-.score-hud {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  right: 12px;
+/* The scoreboard. In the flow above the table, never over it: the overhead shot
+ * frames the whole cloth edge to edge, and anything pinned over the canvas is
+ * pinned over a rail. */
+.scoreboard {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr);
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 10px;
-  align-items: start;
-  pointer-events: none;
+  align-items: center;
+  margin-bottom: 8px;
 }
 .player-plaque {
-  width: min(250px, 42vw);
+  min-width: 0;
+  max-width: 340px;
   background: linear-gradient(180deg, rgba(20, 27, 35, 0.92), rgba(7, 10, 13, 0.88));
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
-  padding: 9px 11px;
+  padding: 7px 11px;
   box-shadow: 0 9px 24px rgba(0, 0, 0, 0.24);
-  backdrop-filter: blur(10px);
 }
 .player-plaque.right {
   justify-self: end;
@@ -192,15 +196,29 @@ canvas#game {
   color: #6f7a86;
   font-weight: 900;
 }
+/* Name and count on one line, so the row stays a row. */
+.plaque-line {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+  margin-top: 2px;
+}
+.player-plaque.right .plaque-line {
+  flex-direction: row-reverse;
+}
 .plaque-name {
   font-size: 14px;
   font-weight: 900;
-  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .plaque-meta {
   font-size: 11px;
   color: #a4adb8;
-  margin-top: 1px;
+  white-space: nowrap;
+  flex: none;
 }
 
 .turn-chip {
@@ -217,33 +235,10 @@ canvas#game {
   backdrop-filter: blur(8px);
 }
 
-.table-actions {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  pointer-events: none;
-}
-.table-actions button {
-  pointer-events: auto;
-  background: rgba(6, 9, 12, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.11);
-  color: #e6ebf1;
-  border-radius: 10px;
-  min-height: 40px;
-  padding: 0 12px;
-  font-size: 11px;
-  font-weight: 800;
-  backdrop-filter: blur(8px);
-}
-
 .placement-banner {
   position: absolute;
   left: 50%;
-  bottom: 60px;
+  bottom: 16px;
   transform: translateX(-50%);
   max-width: min(540px, 90%);
   background: rgba(8, 12, 17, 0.89);
@@ -417,6 +412,27 @@ canvas#game {
   letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
 }
+.card-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* A small action inside a card label — "Center", beside the aim readout. */
+.card-btn {
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #202b37;
+  color: #e6ebf1;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.card-btn:hover {
+  border-color: rgba(199, 154, 79, 0.5);
+}
 
 .aim-tools {
   display: grid;
@@ -562,26 +578,41 @@ input[type="range"] {
   .header-actions {
     grid-column: 2;
     grid-row: 1;
+    gap: 5px;
+  }
+  .icon-btn {
+    height: 34px;
+    padding: 0 8px;
+    font-size: 10px;
+    border-radius: 8px;
   }
   canvas#game {
     height: min(58vh, 560px);
   }
-  .score-hud {
-    top: 8px;
-    left: 8px;
-    right: 8px;
+  .scoreboard {
     gap: 5px;
+    margin-bottom: 5px;
   }
   .player-plaque {
-    width: auto;
-    min-width: 0;
-    padding: 7px 8px;
+    max-width: none;
+    padding: 5px 8px;
   }
   .plaque-kicker {
-    font-size: 7px;
+    display: none;
+  }
+  .plaque-line {
+    margin-top: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+  }
+  .player-plaque.right .plaque-line {
+    flex-direction: column;
+    align-items: flex-end;
   }
   .plaque-name {
     font-size: 11px;
+    max-width: 100%;
   }
   .plaque-meta {
     font-size: 9px;
@@ -589,15 +620,6 @@ input[type="range"] {
   .turn-chip {
     font-size: 8px;
     padding: 6px 8px;
-  }
-  .table-actions {
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
-  }
-  .table-actions button {
-    min-height: 38px;
-    padding: 0 10px;
   }
   .control-deck {
     grid-template-columns: 1fr 1fr;
@@ -649,12 +671,34 @@ input[type="range"] {
   }
 }
 
+/* Four header buttons beside the title. Under 480px they lose their padding
+ * rather than the title losing its line. */
+@media (max-width: 480px) {
+  .header-actions {
+    gap: 4px;
+  }
+  .icon-btn {
+    padding: 0 6px;
+    font-size: 9px;
+    letter-spacing: 0;
+  }
+  .match-title .status {
+    font-size: 11px;
+  }
+  .match-title .sub {
+    max-width: 130px;
+  }
+}
+
 @media (max-width: 390px) {
   .turn-chip {
     display: none;
   }
-  .score-hud {
+  .scoreboard {
     grid-template-columns: 1fr 1fr;
+  }
+  .match-title .sub {
+    display: none;
   }
   .player-plaque.right {
     grid-column: 2;
@@ -683,6 +727,127 @@ input[type="range"] {
   }
   .turn-card .tc-name {
     font-size: 29px;
+  }
+}
+
+/* --- fullscreen ---------------------------------------------------------
+ * One class, two ways in. `body.fullscreen` is set whether the document went
+ * fullscreen through the API or the cabinet fell back to pinning itself to the
+ * viewport, so this block is the whole of the fullscreen layout. The shell
+ * becomes a column that fills the screen: header, scoreboard, the table taking
+ * every pixel that is left, and a deck cut down to what a stroke needs. */
+
+body.fullscreen {
+  overflow: hidden;
+}
+body.fullscreen #app {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  max-width: none;
+  height: 100vh;
+  height: 100dvh;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: radial-gradient(circle at 50% -20%, #1c2430 0, #0a0e12 48%, #05070a 100%);
+}
+body.fullscreen .game-header {
+  height: 38px;
+  margin: 0;
+  flex: none;
+}
+body.fullscreen .scoreboard {
+  margin: 0;
+  flex: none;
+}
+body.fullscreen .player-plaque {
+  padding: 4px 10px;
+}
+body.fullscreen .plaque-kicker {
+  display: none;
+}
+body.fullscreen .plaque-line {
+  margin-top: 0;
+}
+body.fullscreen .game-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+body.fullscreen canvas#game {
+  height: 100%;
+}
+body.fullscreen .control-deck {
+  flex: none;
+  margin: 0;
+  grid-template-columns: minmax(0, 1.4fr) 150px minmax(220px, 0.7fr);
+  gap: 6px;
+}
+body.fullscreen .control-card {
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+body.fullscreen .card-label {
+  margin-bottom: 4px;
+}
+body.fullscreen .aim-tools {
+  grid-template-columns: 40px 1fr 40px;
+}
+body.fullscreen .nudge {
+  height: 38px;
+}
+body.fullscreen input[type="range"] {
+  min-height: 30px;
+}
+body.fullscreen .spin-card {
+  flex-direction: row;
+  gap: 8px;
+}
+body.fullscreen .spin-card .card-label {
+  display: none;
+}
+body.fullscreen #spin {
+  width: 72px;
+  height: 72px;
+  flex: none;
+}
+body.fullscreen .spin-copy {
+  display: none;
+}
+body.fullscreen .spin-title {
+  text-align: left;
+  margin: 0;
+}
+body.fullscreen .shoot {
+  min-height: 42px;
+  margin-top: 6px;
+}
+body.fullscreen .event-strip {
+  flex: none;
+  margin: 0;
+  min-height: 26px;
+  padding: 4px 10px;
+}
+/* The arcade link would sit on the header's brand line; the way out of
+ * fullscreen is the button that got you in. */
+body.fullscreen .back-link {
+  display: none;
+}
+body.fullscreen .game-header .brand-mini {
+  padding-left: 0;
+}
+
+@media (max-width: 760px) {
+  body.fullscreen .control-deck {
+    grid-template-columns: 1fr 1fr;
+  }
+  body.fullscreen .aim-card {
+    grid-column: 1 / -1;
+  }
+  body.fullscreen .spin-card,
+  body.fullscreen .shot-card {
+    min-height: 0;
   }
 }
 

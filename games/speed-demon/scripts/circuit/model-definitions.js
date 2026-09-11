@@ -10,7 +10,7 @@ export const CIRCUIT_MODEL_DEFINITIONS = [
     "tsunami-rz",
     "Tsunami RZ",
     "coupe",
-    1.6452857989813294
+    1.4895764779905902
   ],
   [
     "shutter-z",

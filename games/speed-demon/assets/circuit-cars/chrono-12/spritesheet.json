@@ -56,16 +56,16 @@
     {
       "direction": "east",
       "sourceBounds": {
-        "x": 513,
+        "x": 1627,
         "y": 272,
-        "width": 271,
+        "width": 268,
         "height": 156
       },
       "targetBounds": {
         "x": 4,
-        "y": 16,
+        "y": 15,
         "width": 56,
-        "height": 32
+        "height": 33
       }
     },
     {
@@ -116,16 +116,16 @@
     {
       "direction": "west",
       "sourceBounds": {
-        "x": 1627,
+        "x": 513,
         "y": 272,
-        "width": 268,
+        "width": 271,
         "height": 156
       },
       "targetBounds": {
         "x": 4,
-        "y": 15,
+        "y": 16,
         "width": 56,
-        "height": 33
+        "height": 32
       }
     },
     {
@@ -169,5 +169,5 @@
     }
   ],
   "repairFrameConvention": "physical-nose-clockwise-from-north",
-  "physicalNoseAudit": "20260910-half-turn"
+  "physicalNoseAudit": "20260910-verified"
 }

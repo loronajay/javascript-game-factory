@@ -19,6 +19,8 @@ export const ELEMENT_IDS = Object.freeze({
   log: "log",
   pauseBtn: "pauseBtn",
   muteBtn: "muteBtn",
+  camBtn: "camBtn",
+  fullscreenBtn: "fullscreenBtn",
 
   // table HUD
   turnChip: "turnChip",
@@ -39,11 +41,8 @@ export const ELEMENT_IDS = Object.freeze({
   turnCardName: "turnCardName",
   turnCardReason: "turnCardReason",
 
-  // table actions
-  camBtn: "camBtn",
-  resetAim: "resetAim",
-
   // control deck
+  resetAim: "resetAim",
   aim: "aim",
   aimText: "aimText",
   nudgeLeft: "nudgeLeft",

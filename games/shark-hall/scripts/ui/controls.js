@@ -240,16 +240,18 @@ export function createControls({
       return;
     }
 
-    if (!match.humanCanAct()) return;
     const key = event.key.toLowerCase();
+    // The camera is a way of watching, not of acting, so it is not gated on
+    // whose turn it is.
+    if (key === "o") return onCameraToggle?.();
+
+    if (!match.humanCanAct()) return;
     if (event.key === "ArrowLeft" || key === "a") {
       event.preventDefault();
       match.nudgeAngle(-NUDGE);
     } else if (event.key === "ArrowRight" || key === "d") {
       event.preventDefault();
       match.nudgeAngle(NUDGE);
-    } else if (key === "o") {
-      onCameraToggle?.();
     }
   }
 

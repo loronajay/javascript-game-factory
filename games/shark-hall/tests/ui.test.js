@@ -18,6 +18,7 @@ import {
   normalizeLayer,
   normalizePanel,
 } from "../scripts/ui/screens.js";
+import { createFullscreen, fullscreenLabel } from "../scripts/ui/fullscreen.js";
 import { CAMERA_MODES, DEFAULT_SETTINGS, GUIDE_MODES, normalizeSettings } from "../scripts/store/settings.js";
 import { DIFFICULTIES } from "../scripts/sim/cpu.js";
 
@@ -101,6 +102,76 @@ test("a valid setting survives normalization untouched", () => {
 test("the default settings are themselves valid", () => {
   const normalized = normalizeSettings(DEFAULT_SETTINGS);
   assertEqual(JSON.stringify(normalized), JSON.stringify(DEFAULT_SETTINGS), "the defaults must survive their own validator");
+});
+
+// --- fullscreen ------------------------------------------------------------
+
+/** A document with just enough of the Fullscreen API to be asked. */
+function fakeDocument({ supported = true, refuse = false } = {}) {
+  const classes = new Set();
+  const listeners = new Map();
+  const doc = {
+    fullscreenElement: null,
+    body: { classList: { toggle: (name, on) => (on ? classes.add(name) : classes.delete(name)) } },
+    documentElement: {},
+    addEventListener: (type, fn) => listeners.set(type, fn),
+    removeEventListener: (type) => listeners.delete(type),
+    classes,
+    /** The browser leaving fullscreen on its own — Escape, or a tab switch. */
+    browserExits() {
+      doc.fullscreenElement = null;
+      listeners.get("fullscreenchange")?.();
+    },
+  };
+  if (supported) {
+    doc.documentElement.requestFullscreen = async () => {
+      if (refuse) throw new Error("denied");
+      doc.fullscreenElement = doc.documentElement;
+    };
+    doc.exitFullscreen = async () => {
+      doc.fullscreenElement = null;
+    };
+  }
+  return doc;
+}
+
+test("the fullscreen button reads the state it will change to", () => {
+  assertEqual(fullscreenLabel(false), "Fullscreen");
+  assertEqual(fullscreenLabel(true), "Exit fullscreen");
+});
+
+test("fullscreen goes through the document and lays the cabinet out with one class", async () => {
+  const doc = fakeDocument();
+  const seen = [];
+  const fullscreen = createFullscreen({ doc, onChange: (active) => seen.push(active) });
+  await fullscreen.toggle();
+  assertEqual(doc.fullscreenElement, doc.documentElement, "the DOCUMENT goes fullscreen, so the modals outside #app stay visible");
+  assert(doc.classes.has("fullscreen"));
+  await fullscreen.toggle();
+  assertEqual(doc.fullscreenElement, null);
+  assert(!doc.classes.has("fullscreen"));
+  assertEqual(seen.join(","), "true,false");
+});
+
+test("the class follows the document when the browser leaves fullscreen on its own", async () => {
+  const doc = fakeDocument();
+  const fullscreen = createFullscreen({ doc });
+  await fullscreen.enter();
+  doc.browserExits();
+  assertEqual(fullscreen.isActive(), false, "Escape left fullscreen; the button must not say otherwise");
+  assert(!doc.classes.has("fullscreen"));
+});
+
+test("without the API, or when it says no, the same class pins the cabinet to the viewport", async () => {
+  for (const doc of [fakeDocument({ supported: false }), fakeDocument({ refuse: true })]) {
+    const fullscreen = createFullscreen({ doc });
+    await fullscreen.toggle();
+    assertEqual(fullscreen.isActive(), true, "an iPhone still gets a fullscreen table");
+    assert(doc.classes.has("fullscreen"));
+    await fullscreen.toggle();
+    assertEqual(fullscreen.isActive(), false);
+    assert(!doc.classes.has("fullscreen"));
+  }
 });
 
 finish();

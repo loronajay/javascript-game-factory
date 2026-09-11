@@ -34,7 +34,7 @@
       "modelId": "tsunami-rz",
       "label": "Tsunami RZ",
       "archetype": "coupe",
-      "renderScale": 1.6452857989813294,
+      "renderScale": 1.4895764779905902,
       "spritesheet": "tsunami-rz/spritesheet-clockwise-from-north.png",
       "manifest": "tsunami-rz/spritesheet.json",
       "footprint": {

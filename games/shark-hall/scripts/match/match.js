@@ -432,6 +432,9 @@ export function createMatch({
       moving: world.moving,
       humanCanAct: humanCanAct(),
       cuePocketed: Boolean(cue && cue.pocketed),
+      // Never set locally: the other seat is in the room, or is the CPU, whose
+      // aim is already the match's own. Present so both snapshots wear one shape.
+      opponentAim: null,
       seats: [0, 1].map((seat) => ({
         seat,
         name: seatName(seat),
@@ -475,6 +478,9 @@ export function createMatch({
 
     shoot,
     tick,
+
+    /** Nothing to report to: the stroke is drawn from the controls. Kept so the interfaces match. */
+    setCharge() {},
 
     setDifficulty(next) {
       difficulty = difficultyById(next).id;

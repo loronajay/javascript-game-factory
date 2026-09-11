@@ -21,9 +21,10 @@ import {
   createOnlineClient,
   normalizeRoomCode,
   resolveWebSocketUrl,
+  sanitizeAimIntent,
   sanitizeShotIntent,
 } from "../scripts/multiplayer/online-client.js";
-import { MODE_ONLINE, createOnlineMatch } from "../scripts/multiplayer/online-match.js";
+import { AIM_SEND_INTERVAL, MODE_ONLINE, createOnlineMatch } from "../scripts/multiplayer/online-match.js";
 import { PHASE_AIMING, PHASE_OVER, PHASE_PLACING, PHASE_SHOOTING } from "../scripts/match/match.js";
 import { rackBalls } from "../scripts/sim/balls.js";
 
@@ -124,6 +125,33 @@ test("a stroke is four numbers, clamped, and the placement rides with it", () =>
   assertEqual(sanitizeShotIntent({}).place, undefined, "no placement is sent when none was made");
 });
 
+test("an aim is the same numbers without the power, plus the charge", () => {
+  const aim = sanitizeAimIntent({ angle: 0.4, spinX: 3, spinY: -0.2, charge: 4, place: { x: -0.5, z: 0.1 } });
+  assertEqual(aim.spinX, 1);
+  assertEqual(aim.charge, 1);
+  assertClose(aim.place.z, 0.1, 1e-9);
+  assertEqual(sanitizeAimIntent({}).place, undefined);
+  assertEqual("power" in sanitizeAimIntent({ power: 1 }), false, "an aim is not a stroke");
+});
+
+test("the other seat's aim reaches its listeners and this seat's own echo does not", () => {
+  const { client, socket } = makeClient();
+  client.findQuickMatch({});
+  socket().receive({ event: "connected", clientId: "c1", sessionToken: "t" });
+  const seen = [];
+  client.onAim((aim) => seen.push(aim));
+  socket().receive({ event: "message", scope: "lobby", messageType: "shark_aim", senderId: "c2", value: JSON.stringify({ seat: 1, angle: 0.3, charge: 0.5 }) });
+  socket().receive({ event: "message", scope: "lobby", messageType: "shark_aim", senderId: "c1", value: JSON.stringify({ seat: 0, angle: 0.9 }) });
+  assertEqual(seen.length, 1, "a relay that echoes the sender must not draw a seat its own aim");
+  assertEqual(seen[0].seat, 1);
+  assertClose(seen[0].angle, 0.3, 1e-9);
+  assertEqual(seen[0].charge, 0.5);
+
+  client.sendAim({ angle: 0.2, spinX: 0, spinY: 0.3, charge: 0.1 });
+  assertEqual(socket().messages("shark_aim").length, 1);
+  assertClose(socket().messages("shark_aim")[0].spinY, 0.3, 1e-9);
+});
+
 // ---------------------------------------------------------------------------
 // Matchmaking
 // ---------------------------------------------------------------------------
@@ -151,13 +179,25 @@ test("a private room is private and a join carries the code and the game", () =>
   assertEqual(join.gameId, "shark-hall");
 });
 
-test("the protocol is announced on every lobby event, not only the first", () => {
+test("the protocol is announced once per connection, and again after a reconnect", () => {
+  // Once per SOCKET, not once per lobby event: the server acknowledges an
+  // announcement with a lobby update, so announcing on every update was an
+  // infinite ping-pong. A reconnect is a fresh socket and must announce again.
   const { client, socket } = makeClient();
   client.findQuickMatch({});
-  socket().receive({ event: "lobby_joined", roomCode: "AB3D", ownerId: "c1", members: ["c1"], players: [], settings: {} });
-  socket().receive({ event: "lobby_updated", roomCode: "AB3D", ownerId: "c1", members: ["c1", "c2"], players: [], settings: {} });
-  assertEqual(socket().messages("shark_profile").length, 2, "a reconnect gets a fresh lobby view and must re-announce");
-  assertEqual(socket().messages("shark_profile")[0].protocolVersion, 1);
+  const first = socket();
+  first.receive({ event: "lobby_joined", roomCode: "AB3D", ownerId: "c1", members: ["c1"], players: [], settings: {} });
+  first.receive({ event: "lobby_updated", roomCode: "AB3D", ownerId: "c1", members: ["c1", "c2"], players: [], settings: {} });
+  first.receive({ event: "lobby_updated", roomCode: "AB3D", ownerId: "c1", members: ["c1", "c2"], players: [], settings: {} });
+  assertEqual(first.messages("shark_profile").length, 1, "one announcement per connection");
+  assertEqual(first.messages("shark_profile")[0].protocolVersion, 1);
+
+  first.fire("close", {});
+  client.findQuickMatch({});
+  const second = socket();
+  assert(second !== first, "precondition: a new socket");
+  second.receive({ event: "lobby_joined", roomCode: "AB3D", ownerId: "c1", members: ["c1"], players: [], settings: {} });
+  assertEqual(second.messages("shark_profile").length, 1, "a reconnect gets a fresh lobby view and must re-announce");
 });
 
 test("the client snapshot names the lobby it is in", () => {
@@ -188,10 +228,21 @@ test("the client snapshot names the lobby it is in", () => {
 function stubClient(clientId = "c1") {
   const shots = new Set();
   const snapshots = new Set();
+  const aims = new Set();
   const sent = [];
   let snapshot = { status: "started", clientId, lobby: null, matchState: null, error: null };
   return {
     sent,
+    onAim(listener) {
+      aims.add(listener);
+      return () => aims.delete(listener);
+    },
+    sendAim(aim) {
+      sent.push(["aim", aim]);
+    },
+    pushAim(aim) {
+      for (const listener of aims) listener(aim);
+    },
     getSnapshot: () => snapshot,
     subscribe(listener) {
       snapshots.add(listener);
@@ -378,6 +429,155 @@ test("ball in hand is offered to the holder only, and the placement rides with t
   const theirs = createOnlineMatch({ client: stubClient("c2") });
   theirs.start();
   assertEqual(theirs.snapshot().ballInHand, "none");
+});
+
+test("confirming a placement hands the table back to aiming, as it does locally", () => {
+  // The bug this holds shut: the server keeps the grant until the stroke spends
+  // it, and a snapshot that echoed the server's field kept saying "placing"
+  // after the confirm — so the shot button stayed disabled and every press on
+  // the cloth was another drag. The turn could not be taken.
+  const client = stubClient();
+  const match = createOnlineMatch({ client });
+  client.pushState(matchState({ ballInHand: "kitchen", shooter: 0, isBreak: false }));
+  match.start();
+
+  assertEqual(match.tryPlaceCue(-0.8, 0.1), true);
+  assertEqual(match.confirmPlacement(), true);
+  const after = match.snapshot();
+  assertEqual(after.ballInHand, "none", "the holder has placed; there is nothing left to place");
+  assertEqual(after.phase, PHASE_AIMING);
+  assertEqual(after.humanCanAct, true);
+  assertEqual(match.tryPlaceCue(-0.7, 0.1), false, "a confirmed placement is not re-opened by the next press");
+  assertEqual(match.confirmPlacement(), false);
+
+  match.shoot(0.5);
+  const [, intent] = client.sent.find(([kind]) => kind === "shot");
+  assertClose(intent.place.x, -0.8, 1e-9, "and the placement still rides with the stroke");
+});
+
+test("a re-emitted snapshot does not move a ball the holder is placing", () => {
+  // Every lobby event re-emits the client snapshot with the state it already
+  // had. Reloading the table from it snapped the dragged cue ball back to the
+  // server's default spot mid-placement and forgot a confirmed one.
+  const client = stubClient();
+  const match = createOnlineMatch({ client });
+  const state = matchState({ ballInHand: "anywhere", shooter: 0, isBreak: false });
+  client.pushState(state);
+  match.start();
+
+  assertEqual(match.tryPlaceCue(0.3, -0.2), true);
+  client.pushState(state);
+  assertClose(match.world.cue().x, 0.3, 1e-9, "the same state again must not reload the table");
+  assertEqual(match.confirmPlacement(), true);
+  client.pushState(state);
+  assertEqual(match.snapshot().ballInHand, "none", "nor forget the placement");
+  assertEqual(match.snapshot().phase, PHASE_AIMING);
+
+  // A genuinely new state still lands.
+  client.pushState(matchState({ ...state, shotSeq: 4, shooter: 1, shooterId: "c2" }));
+  assertEqual(match.snapshot().shooter, 1);
+});
+
+// ---------------------------------------------------------------------------
+// Watching the other seat line up
+// ---------------------------------------------------------------------------
+
+test("the shooter's aim is broadcast on a throttle, and only when it changes", () => {
+  const client = stubClient();
+  const match = createOnlineMatch({ client });
+  client.pushState(matchState({ isBreak: false }));
+  match.start();
+  runToRest(match);
+  const aims = () => client.sent.filter(([kind]) => kind === "aim").map(([, aim]) => aim);
+
+  match.setAngle(0.5);
+  match.setContact(0, 0.4);
+  match.setCharge(0.25);
+  for (let i = 0; i < 6; i++) match.tick(AIM_SEND_INTERVAL / 4);
+  assertEqual(aims().length, 1, "one interval, one message");
+  assertClose(aims()[0].angle, 0.5, 1e-9);
+  assertClose(aims()[0].spinY, 0.4, 1e-9);
+  assertEqual(aims()[0].charge, 0.25);
+  assertEqual(aims()[0].place, undefined, "no ball in hand, nothing to place");
+
+  for (let i = 0; i < 40; i++) match.tick(AIM_SEND_INTERVAL);
+  assertEqual(aims().length, 1, "an aim that has not moved is not sent again");
+
+  match.setAngle(0.6);
+  match.tick(AIM_SEND_INTERVAL);
+  assertEqual(aims().length, 2);
+});
+
+test("the other seat does not broadcast, and a placement rides with the aim", () => {
+  const theirs = stubClient("c2");
+  const watching = createOnlineMatch({ client: theirs });
+  theirs.pushState(matchState({ isBreak: false }));
+  watching.start();
+  runToRest(watching);
+  watching.setAngle(1);
+  for (let i = 0; i < 20; i++) watching.tick(AIM_SEND_INTERVAL);
+  assertEqual(theirs.sent.filter(([kind]) => kind === "aim").length, 0, "nothing to line up on somebody else's turn");
+
+  const client = stubClient();
+  const match = createOnlineMatch({ client });
+  client.pushState(matchState({ ballInHand: "anywhere", isBreak: false }));
+  match.start();
+  runToRest(match);
+  match.tryPlaceCue(0.2, 0.1);
+  match.tick(AIM_SEND_INTERVAL);
+  const [, aim] = client.sent.find(([kind]) => kind === "aim");
+  assertClose(aim.place.x, 0.2, 1e-9, "the opponent watches the cue ball being dragged");
+});
+
+test("the watcher draws the shooter's aim, and only the shooter's", () => {
+  const client = stubClient("c2");
+  const match = createOnlineMatch({ client });
+  client.pushState(matchState({ ballInHand: "anywhere", shooter: 0, isBreak: false }));
+  match.start();
+  runToRest(match);
+  match.setAngle(2);
+
+  client.pushAim({ seat: 0, angle: 0.7, spinX: 0.1, spinY: -0.3, charge: 0.6, place: { x: 0.25, z: -0.1 } });
+  const snapshot = match.snapshot();
+  assertClose(snapshot.angle, 0.7, 1e-9, "the stick follows the shooter, not this seat's stale aim");
+  assertClose(snapshot.spinY, -0.3, 1e-9);
+  assertEqual(snapshot.opponentAim.charge, 0.6);
+  assertClose(match.world.cue().x, 0.25, 1e-9, "their cue ball is drawn where they are dragging it");
+  assertEqual(snapshot.ballInHand, "none", "watching a placement is not holding one");
+  assertEqual(snapshot.humanCanAct, false);
+
+  // An aim from the seat that is not shooting is noise and is ignored.
+  client.pushAim({ seat: 1, angle: 3, charge: 1 });
+  assertClose(match.snapshot().angle, 0.7, 1e-9);
+
+  // And a placement outside the zone is clamped, never drawn inside another ball.
+  client.pushAim({ seat: 0, angle: 0.7, place: { x: 99, z: 99 } });
+  assert(Math.abs(match.world.cue().x) < 2, "a bad placement is pulled onto the table");
+});
+
+test("the watched aim is dropped the moment the stroke arrives", () => {
+  const client = stubClient("c2");
+  const match = createOnlineMatch({ client });
+  client.pushState(matchState({ isBreak: false }));
+  match.start();
+  runToRest(match);
+  client.pushAim({ seat: 0, angle: 0.7, charge: 0.9 });
+  assertEqual(match.snapshot().opponentAim.charge, 0.9);
+
+  client.pushShot({
+    seq: 0,
+    seat: 0,
+    stroke: { angle: 0.7, power: 0.5, spinX: 0, spinY: 0 },
+    ballsBefore: rackBalls(),
+    outcome: { turnChanged: true, kicker: "Turn over", reason: "No legal ball made", foul: false },
+    match: matchState({ shotSeq: 1, shooter: 1, shooterId: "c2", isBreak: false }),
+  });
+  assertEqual(match.snapshot().opponentAim, null, "nothing to watch once the shot is away");
+  // A late aim for the shot already played is stale, and ignored while the balls roll.
+  client.pushAim({ seat: 0, angle: 1.2, charge: 0.1 });
+  assertEqual(match.snapshot().opponentAim, null);
+  runToRest(match);
+  assertEqual(match.snapshot().opponentAim, null, "and the turn is this seat's now");
 });
 
 test("a decided match reports a winner and offers a rematch rather than a restart", () => {

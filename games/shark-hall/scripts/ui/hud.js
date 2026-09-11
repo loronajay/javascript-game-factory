@@ -79,8 +79,11 @@ export function createHud(elements) {
       );
 
       // --- controls -------------------------------------------------------
+      // The camera is deliberately NOT in this list. Switching views is how
+      // you watch, and the turn you most want the overhead for is the other
+      // player's.
       const live = snapshot.humanCanAct && !placing;
-      for (const control of [elements.aim, elements.nudgeLeft, elements.nudgeRight, elements.resetAim, elements.camBtn]) {
+      for (const control of [elements.aim, elements.nudgeLeft, elements.nudgeRight, elements.resetAim]) {
         setDisabled(control, !live);
       }
       setDisabled(elements.shoot, !live);
